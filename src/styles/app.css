@@ -1,11 +1,17 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+@import './brand.css';
+
+@custom-variant dark (&:is(.dark *));
 
 @layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
   html,
   body {
-    @apply text-gray-900 bg-gray-50 dark:bg-gray-950 dark:text-gray-200;
+    @apply bg-background text-foreground antialiased;
   }
-
   .using-mouse * {
     outline: none !important;
   }

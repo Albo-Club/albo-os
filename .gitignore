@@ -1,8 +1,10 @@
 node_modules
 
-!.env
+# env files (never commit; .env.example is tracked)
 .env
-.env.local
+.env.*
+!.env.example
+
 .DS_Store
 .cache
 .vercel
@@ -17,7 +19,7 @@ node_modules
 /dist/
 /dist-ssr/
 
-# Sentry Config File
+# Sentry config file
 .env.sentry-build-plugin
 /test-results/
 /playwright-report/
