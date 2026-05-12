@@ -7,6 +7,7 @@ import {
 import * as React from 'react'
 import type { QueryClient } from '@tanstack/react-query'
 import appCss from '~/styles/app.css?url'
+import { Toaster } from '~/components/ui/sonner'
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient
@@ -67,6 +68,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        <Toaster richColors closeButton />
         <Scripts />
       </body>
     </html>

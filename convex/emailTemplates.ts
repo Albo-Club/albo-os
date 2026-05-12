@@ -1,0 +1,142 @@
+/**
+ * Email templates. Plain text + HTML are sent together (multipart/alternative)
+ * — a strong anti-spam signal and required for accessibility.
+ *
+ * HTML uses inline styles since Gmail / Outlook strip <style> tags.
+ * Layout is a single 560px column, mobile-safe.
+ */
+
+const APP_NAME = 'albo'
+const BRAND = '#0f0f10'
+const MUTED = '#6b6b73'
+const BORDER = '#e7e7ea'
+const BG = '#ffffff'
+const BUTTON_BG = '#0f0f10'
+const BUTTON_FG = '#ffffff'
+
+function layout({
+  preheader,
+  heading,
+  paragraphs,
+  cta,
+  footer,
+}: {
+  preheader: string
+  heading: string
+  paragraphs: string[]
+  cta?: { label: string; url: string }
+  footer: string
+}) {
+  const ctaHtml = cta
+    ? `<tr><td style="padding: 24px 0 8px;">
+        <a href="${cta.url}"
+          style="display:inline-block; background:${BUTTON_BG}; color:${BUTTON_FG}; text-decoration:none; padding:12px 20px; border-radius:8px; font-weight:600; font-size:14px;">
+          ${cta.label}
+        </a>
+      </td></tr>`
+    : ''
+  const bodyHtml = paragraphs
+    .map(
+      (p) =>
+        `<tr><td style="padding-bottom:14px; line-height:1.55;">${p}</td></tr>`,
+    )
+    .join('')
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${heading}</title>
+</head>
+<body style="margin:0; padding:0; background:${BG}; color:${BRAND}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Arial, sans-serif;">
+  <span style="display:none; max-height:0; overflow:hidden; opacity:0;">${preheader}</span>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${BG};">
+    <tr><td align="center" style="padding:40px 16px;">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%; max-width:560px; border:1px solid ${BORDER}; border-radius:14px; background:${BG};">
+        <tr><td style="padding:28px 32px 0;">
+          <div style="font-weight:700; font-size:18px; letter-spacing:-0.01em;">${APP_NAME}</div>
+        </td></tr>
+        <tr><td style="padding:20px 32px 8px;">
+          <h1 style="margin:0 0 8px; font-size:20px; font-weight:600; line-height:1.3;">${heading}</h1>
+        </td></tr>
+        <tr><td style="padding:0 32px 8px; font-size:15px; color:${BRAND};">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+            ${bodyHtml}
+            ${ctaHtml}
+          </table>
+        </td></tr>
+        <tr><td style="padding:24px 32px 28px; border-top:1px solid ${BORDER}; color:${MUTED}; font-size:12px; line-height:1.5;">
+          ${footer}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
+}
+
+function plainText(parts: string[]): string {
+  return parts.filter(Boolean).join('\n\n')
+}
+
+export function invitationEmail({
+  inviterName,
+  orgName,
+  acceptUrl,
+}: {
+  inviterName: string
+  orgName: string
+  acceptUrl: string
+}) {
+  const subject = `You're invited to ${orgName} on ${APP_NAME}`
+  const heading = `Join ${orgName}`
+  const intro = `<strong>${inviterName}</strong> invited you to join <strong>${orgName}</strong>.`
+  const followup = `Click the button below to accept. This link expires in 7 days.`
+  const footer = `If you didn't expect this invitation, you can safely ignore this email.`
+  const preheader = `${inviterName} invited you to join ${orgName}.`
+
+  const html = layout({
+    preheader,
+    heading,
+    paragraphs: [intro, followup],
+    cta: { label: 'Accept invitation', url: acceptUrl },
+    footer,
+  })
+
+  const text = plainText([
+    `${inviterName} invited you to join ${orgName} on ${APP_NAME}.`,
+    `Accept the invitation:`,
+    acceptUrl,
+    `This link expires in 7 days.`,
+    `If you didn't expect this invitation, you can safely ignore this email.`,
+  ])
+
+  return { subject, html, text }
+}
+
+export function magicLinkEmail({ url }: { url: string }) {
+  const subject = `Your ${APP_NAME} sign-in link`
+  const heading = `Sign in to ${APP_NAME}`
+  const intro = `Click the button below to sign in. This link expires in 5 minutes.`
+  const fallback = `If the button doesn't work, copy this URL into your browser:<br><span style="color:${MUTED}; word-break:break-all;">${url}</span>`
+  const footer = `If you didn't request this, you can safely ignore this email.`
+  const preheader = `Sign in to ${APP_NAME}.`
+
+  const html = layout({
+    preheader,
+    heading,
+    paragraphs: [intro, fallback],
+    cta: { label: 'Sign in', url },
+    footer,
+  })
+
+  const text = plainText([
+    `Sign in to ${APP_NAME}.`,
+    `Open this link to sign in (expires in 5 minutes):`,
+    url,
+    `If you didn't request this, you can safely ignore this email.`,
+  ])
+
+  return { subject, html, text }
+}

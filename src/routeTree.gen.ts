@@ -9,38 +9,172 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as RegisterRouteImport } from './routes/register'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AppRouteRouteImport } from './routes/app/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AppOnboardingRouteImport } from './routes/app/onboarding'
+import { Route as AcceptInviteTokenRouteImport } from './routes/accept-invite.$token'
+import { Route as AppOrgSlugRouteRouteImport } from './routes/app/$orgSlug/route'
+import { Route as AppOrgSlugIndexRouteImport } from './routes/app/$orgSlug/index'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRouteRoute = AppRouteRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppOnboardingRoute = AppOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AcceptInviteTokenRoute = AcceptInviteTokenRouteImport.update({
+  id: '/accept-invite/$token',
+  path: '/accept-invite/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppOrgSlugRouteRoute = AppOrgSlugRouteRouteImport.update({
+  id: '/$orgSlug',
+  path: '/$orgSlug',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppOrgSlugIndexRoute = AppOrgSlugIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppOrgSlugRouteRoute,
+} as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/app': typeof AppRouteRouteWithChildren
+  '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
+  '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
+  '/accept-invite/$token': typeof AcceptInviteTokenRoute
+  '/app/onboarding': typeof AppOnboardingRoute
+  '/app/': typeof AppIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/app/$orgSlug/': typeof AppOrgSlugIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
+  '/accept-invite/$token': typeof AcceptInviteTokenRoute
+  '/app/onboarding': typeof AppOnboardingRoute
+  '/app': typeof AppIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/app/$orgSlug': typeof AppOrgSlugIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/app': typeof AppRouteRouteWithChildren
+  '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
+  '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
+  '/accept-invite/$token': typeof AcceptInviteTokenRoute
+  '/app/onboarding': typeof AppOnboardingRoute
+  '/app/': typeof AppIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/app/$orgSlug/': typeof AppOrgSlugIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/app'
+    | '/login'
+    | '/register'
+    | '/app/$orgSlug'
+    | '/accept-invite/$token'
+    | '/app/onboarding'
+    | '/app/'
+    | '/api/auth/$'
+    | '/app/$orgSlug/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/login'
+    | '/register'
+    | '/accept-invite/$token'
+    | '/app/onboarding'
+    | '/app'
+    | '/api/auth/$'
+    | '/app/$orgSlug'
+  id:
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/login'
+    | '/register'
+    | '/app/$orgSlug'
+    | '/accept-invite/$token'
+    | '/app/onboarding'
+    | '/app/'
+    | '/api/auth/$'
+    | '/app/$orgSlug/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRouteRoute: typeof AppRouteRouteWithChildren
+  LoginRoute: typeof LoginRoute
+  RegisterRoute: typeof RegisterRoute
+  AcceptInviteTokenRoute: typeof AcceptInviteTokenRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +182,86 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/onboarding': {
+      id: '/app/onboarding'
+      path: '/onboarding'
+      fullPath: '/app/onboarding'
+      preLoaderRoute: typeof AppOnboardingRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/accept-invite/$token': {
+      id: '/accept-invite/$token'
+      path: '/accept-invite/$token'
+      fullPath: '/accept-invite/$token'
+      preLoaderRoute: typeof AcceptInviteTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app/$orgSlug': {
+      id: '/app/$orgSlug'
+      path: '/$orgSlug'
+      fullPath: '/app/$orgSlug'
+      preLoaderRoute: typeof AppOrgSlugRouteRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/$orgSlug/': {
+      id: '/app/$orgSlug/'
+      path: '/'
+      fullPath: '/app/$orgSlug/'
+      preLoaderRoute: typeof AppOrgSlugIndexRouteImport
+      parentRoute: typeof AppOrgSlugRouteRoute
+    }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface AppOrgSlugRouteRouteChildren {
+  AppOrgSlugIndexRoute: typeof AppOrgSlugIndexRoute
+}
+
+const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
+  AppOrgSlugIndexRoute: AppOrgSlugIndexRoute,
+}
+
+const AppOrgSlugRouteRouteWithChildren = AppOrgSlugRouteRoute._addFileChildren(
+  AppOrgSlugRouteRouteChildren,
+)
+
+interface AppRouteRouteChildren {
+  AppOrgSlugRouteRoute: typeof AppOrgSlugRouteRouteWithChildren
+  AppOnboardingRoute: typeof AppOnboardingRoute
+  AppIndexRoute: typeof AppIndexRoute
+}
+
+const AppRouteRouteChildren: AppRouteRouteChildren = {
+  AppOrgSlugRouteRoute: AppOrgSlugRouteRouteWithChildren,
+  AppOnboardingRoute: AppOnboardingRoute,
+  AppIndexRoute: AppIndexRoute,
+}
+
+const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
+  AppRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRouteRoute: AppRouteRouteWithChildren,
+  LoginRoute: LoginRoute,
+  RegisterRoute: RegisterRoute,
+  AcceptInviteTokenRoute: AcceptInviteTokenRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

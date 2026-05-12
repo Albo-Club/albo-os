@@ -1,0 +1,45 @@
+import { useEffect } from 'react'
+import { createFileRoute, Outlet, useNavigate } from '@tanstack/react-router'
+import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
+import { api } from '../../../../convex/_generated/api'
+
+export const Route = createFileRoute('/app/$orgSlug')({
+  component: OrgLayout,
+})
+
+function OrgLayout() {
+  const { orgSlug } = Route.useParams()
+  const navigate = useNavigate()
+  const me = useConvexQuery(api.users.me)
+  const setLastOrg = useConvexMutation(api.organizations.setLastOrg)
+
+  useEffect(() => {
+    if (me?.kind !== 'ready') return
+    const member = me.orgs.find((o) => o.slug === orgSlug)
+    if (!member) {
+      navigate({ to: '/app' })
+      return
+    }
+    if (me.user.lastOrgSlug !== orgSlug) {
+      void setLastOrg({ slug: orgSlug })
+    }
+  }, [me, orgSlug, navigate, setLastOrg])
+
+  if (!me || me.kind !== 'ready') {
+    return (
+      <main className="flex min-h-svh items-center justify-center">
+        <p className="text-muted-foreground text-sm">Loading…</p>
+      </main>
+    )
+  }
+  const member = me.orgs.find((o) => o.slug === orgSlug)
+  if (!member) {
+    return (
+      <main className="flex min-h-svh items-center justify-center">
+        <p className="text-muted-foreground text-sm">Redirecting…</p>
+      </main>
+    )
+  }
+
+  return <Outlet />
+}

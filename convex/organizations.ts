@@ -1,0 +1,99 @@
+import { ConvexError, v } from 'convex/values'
+import { mutation, query } from './_generated/server'
+import { requireAppUser, requireOrgMember, safeAppUser } from './lib/auth'
+
+export const listMembers = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+    const members = await ctx.db
+      .query('organizationMembers')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    return await Promise.all(
+      members.map(async (m) => {
+        const u = await ctx.db.get(m.userId)
+        return {
+          _id: m._id,
+          userId: m.userId,
+          email: u?.email ?? '',
+          name: u?.name ?? null,
+          role: m.role,
+          joinedAt: m.joinedAt,
+        }
+      }),
+    )
+  },
+})
+
+const SLUG_RE = /^[a-z0-9-]{3,40}$/
+
+export const create = mutation({
+  args: { name: v.string(), slug: v.string() },
+  handler: async (ctx, { name, slug }) => {
+    const user = await requireAppUser(ctx)
+    const normalizedSlug = slug.toLowerCase().trim()
+    if (!SLUG_RE.test(normalizedSlug)) throw new ConvexError('invalid_slug')
+    const trimmedName = name.trim()
+    if (!trimmedName) throw new ConvexError('invalid_name')
+
+    const conflict = await ctx.db
+      .query('organizations')
+      .withIndex('by_slug', (q) => q.eq('slug', normalizedSlug))
+      .unique()
+    if (conflict) throw new ConvexError('slug_taken')
+
+    const orgId = await ctx.db.insert('organizations', {
+      slug: normalizedSlug,
+      name: trimmedName,
+      createdBy: user._id,
+      createdAt: Date.now(),
+    })
+    await ctx.db.insert('organizationMembers', {
+      orgId,
+      userId: user._id,
+      role: 'owner',
+      joinedAt: Date.now(),
+    })
+    await ctx.db.patch(user._id, { lastOrgSlug: normalizedSlug })
+    return { orgId, slug: normalizedSlug }
+  },
+})
+
+export const bySlug = query({
+  args: { slug: v.string() },
+  handler: async (ctx, { slug }) => {
+    const user = await safeAppUser(ctx)
+    if (!user) return null
+    const org = await ctx.db
+      .query('organizations')
+      .withIndex('by_slug', (q) => q.eq('slug', slug))
+      .unique()
+    if (!org) return null
+    const member = await ctx.db
+      .query('organizationMembers')
+      .withIndex('by_org_and_user', (q) =>
+        q.eq('orgId', org._id).eq('userId', user._id),
+      )
+      .unique()
+    if (!member) return null
+    return org
+  },
+})
+
+export const setLastOrg = mutation({
+  args: { slug: v.string() },
+  handler: async (ctx, { slug }) => {
+    const user = await requireAppUser(ctx)
+    const org = await ctx.db
+      .query('organizations')
+      .withIndex('by_slug', (q) => q.eq('slug', slug))
+      .unique()
+    if (!org) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, org._id)
+    if (user.lastOrgSlug !== slug) {
+      await ctx.db.patch(user._id, { lastOrgSlug: slug })
+    }
+    return null
+  },
+})
