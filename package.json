@@ -15,7 +15,8 @@
     "sync:skills": "node scripts/sync-skills.mjs",
     "sync:skills:check": "node scripts/sync-skills.mjs --check",
     "init": "node scripts/init.mjs",
-    "upgrade-template": "node scripts/upgrade-template.mjs"
+    "upgrade-template": "node scripts/upgrade-template.mjs",
+    "test:smoke": "node scripts/e2e-smoke.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.76",
