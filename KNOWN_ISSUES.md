@@ -59,15 +59,26 @@ find . \( -path ./node_modules -o -path ./.output \) -prune -o \
 `ANTHROPIC_MODEL` Convex env var to pick a different model. Anthropic
 sometimes ships dated aliases (`claude-sonnet-4-5-20251022`) for stability.
 
-## Vite dev fails with `_gensync(...) is not a function`
+## Vite / Convex dev fails after partial install state
 
-Under Node 22 + `@babel/core@7.29.0`, the CJS-ESM interop loading of
-`gensync@1.0.0-beta.2` (transitive via `@vitejs/plugin-react`) intermittently
-yields a module shape that babel's `gensync-utils/async.js` cannot call. Pure
-dev-time failure — production builds and Convex dev are unaffected.
+If `pnpm dev` errors with one of:
+- `_gensync(...) is not a function`
+- `Cannot destructure property 'isCompatTag' of 'react'`
+- `esbuild failed: import_esbuild2.default.build is not a function`
 
-**Workaround**: `pnpm dedupe` or `pnpm install --force`. If that fails, downgrade
-to Node 20.x for local dev. Tracking upstream babel / gensync.
+…the node_modules tree is in an inconsistent state (typically after a
+mid-session `pnpm dedupe` or after pnpm skipped postinstall scripts on
+`esbuild`).
+
+**Fix**:
+```bash
+rm -rf node_modules
+pnpm install
+pnpm rebuild esbuild   # ensures esbuild's native binary is fetched
+```
+
+`pnpm rebuild esbuild` is required because pnpm 10 skips lifecycle scripts
+by default, so esbuild's `install.js` doesn't download the platform binary.
 
 ## Trade-offs vs PROJECT_BRIEF.md
 
