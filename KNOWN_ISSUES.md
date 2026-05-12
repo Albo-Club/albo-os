@@ -80,6 +80,28 @@ pnpm rebuild esbuild   # ensures esbuild's native binary is fetched
 `pnpm rebuild esbuild` is required because pnpm 10 skips lifecycle scripts
 by default, so esbuild's `install.js` doesn't download the platform binary.
 
+## Vercel framework preset traps TanStack Start
+
+Vercel's auto-detection lands on **Vite** the moment it sees `vite.config.ts`,
+and the Vite preset serves `dist/` as static files. TanStack Start + Nitro
+emit the Build Output API layout in `.vercel/output/` instead — so the
+preset and the actual output never meet, and every route returns 404.
+
+Two things must both be true:
+
+1. `vite.config.ts` loads `nitro()` from `nitro/vite` *after* `tanstackStart()`.
+   Without Nitro, `pnpm build` only produces `.output/server/index.mjs`
+   (generic Node server) which Vercel cannot serve.
+2. `vercel.json` overrides the preset:
+   ```json
+   { "framework": null, "buildCommand": "pnpm build", "installCommand": "pnpm install --frozen-lockfile=false" }
+   ```
+   Editing the preset in the dashboard works too, but the file is the
+   durable answer — survives team handoffs and project re-imports.
+
+**Symptom**: `curl -I https://<your-domain>/` returns `HTTP/2 404` with
+`server: Vercel` and a static-looking `cache-control: public, max-age=...`.
+
 ## Trade-offs vs PROJECT_BRIEF.md
 
 Choices that diverge from the brief, with rationale. See

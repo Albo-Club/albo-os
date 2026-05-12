@@ -128,6 +128,68 @@ Tool calls cap out at 5 rounds per turn (`stepCountIs(5)`).
 There's also an HTTP streaming endpoint at `<convex-site-url>/api/chat` for
 clients that prefer plain HTTP streaming (curl, custom clients).
 
+## Deploy to Vercel
+
+The frontend runs on Vercel (serverless via Nitro's Vercel preset); the
+Convex backend deploys to Convex Cloud separately.
+
+**Project setup (one-time)**
+
+1. Install the Vercel CLI on the fly: `pnpm dlx vercel@latest login`.
+2. From the repo root: `pnpm dlx vercel@latest link` — pick the team and
+   project (creates `.vercel/project.json`, gitignored).
+3. Verify the framework override is in place: `vercel.json` must contain
+   `"framework": null`. Vercel's auto-detection lands on the **Vite**
+   preset (which expects `dist/`), but Nitro outputs the Build Output API
+   layout in `.vercel/output/`. The override is what kills the 404.
+4. Make sure `vite.config.ts` loads `nitro()` from `nitro/vite` in the
+   plugin chain — without it the build emits a plain Node server that
+   Vercel can't serve.
+
+**Per-environment env vars (Production at minimum)**
+
+```bash
+# client-exposed Convex endpoints (build-time inlined into the bundle)
+pnpm dlx vercel@latest env add VITE_CONVEX_URL production
+pnpm dlx vercel@latest env add VITE_CONVEX_SITE_URL production
+# optional: same two for `preview` if you use PR preview deploys
+```
+
+For a real production setup, also provision a separate Convex prod
+deployment instead of pointing at your `dev:` one:
+
+```bash
+pnpm exec convex deploy                            # creates prod
+# grab the prod Deploy Key from the Convex dashboard, then:
+pnpm dlx vercel@latest env add CONVEX_DEPLOY_KEY production
+```
+
+Then set the Vercel build command to
+`pnpm exec convex deploy --cmd "pnpm build"` — Convex deploys the
+backend and injects `VITE_CONVEX_URL` automatically (the manual VITE_*
+env vars become unnecessary).
+
+**Convex prod env** — set the server-side secrets directly on the Convex
+prod deployment (not on Vercel):
+
+```bash
+pnpm exec convex env set --prod BETTER_AUTH_SECRET "$(openssl rand -hex 32)"
+pnpm exec convex env set --prod BETTER_AUTH_URL https://<your-vercel-domain>
+pnpm exec convex env set --prod SITE_URL https://<your-vercel-domain>
+pnpm exec convex env set --prod ANTHROPIC_API_KEY sk-ant-...
+pnpm exec convex env set --prod RESEND_API_KEY re_...
+pnpm exec convex env set --prod RESEND_FROM "hello@yourdomain.com"
+pnpm exec convex env set --prod RESEND_TEST_MODE false
+```
+
+**Verify a deploy**
+
+```bash
+pnpm dlx vercel@latest ls --prod                   # latest deployments
+pnpm dlx vercel@latest inspect <url> --wait        # block until Ready
+curl -sI https://<your-vercel-domain>/             # expect HTTP 200
+```
+
 ## CI / Ops
 
 - Renovate: weekly, groups non-majors, automerges devDeps, freezes the
