@@ -136,6 +136,36 @@ on it for `/sign-in/email`, `/sign-up/email`, `/forgot-password`,
 email-send wrappers). Do not confuse the two : BA's limiter is on the
 auth HTTP edge, ours is on Convex mutations/actions.
 
+### Password policy (Phase 1)
+
+- BA: `minPasswordLength: 12`, `maxPasswordLength: 128`.
+- Zod schemas in `/register`, `/reset-password`, `/me` mirror the
+  minimum. Both layers must agree — if you tighten the Convex side,
+  bump the Zod min in the same commit or signup passes client
+  validation and 400s on submit.
+- HIBP k-anonymity check on every new-password field (`onBlurAsync`
+  validator). `src/lib/hibp.ts` soft-fails on network errors so an
+  outage at api.pwnedpasswords.com doesn't block signups; the
+  server-side minimum still applies.
+- zxcvbn-ts strength meter is indicative, not blocking. The wordlist
+  is ~1.2 MB but lazy-loaded only when a password field mounts.
+
+### eslint must be a direct devDependency
+
+`eslint.config.mjs` does `import { defineConfig } from 'eslint/config'`,
+which requires `eslint` to be resolvable from the project root. pnpm
+10's strict isolation does not hoist transitive devDeps, so without
+`"eslint": "^10"` in `devDependencies` the lint script fails with
+`Cannot find package 'eslint'`.
+
+This was silently broken before Phase 1 (the `| tail -40` wrapper in
+the lint script swallowed the failing exit code). Adding `eslint` to
+`devDependencies` fixes the run; it also surfaces ~240 pre-existing
+lint errors (`sort-imports`, `import/order`, `@typescript-eslint/array-type`)
+across non-auth routes that pre-date Phase 0/1 and want a separate
+cleanup PR. The new Phase 1 files (`hibp.ts`, `auth-errors.ts`,
+`password-input.tsx`, `password-strength.tsx`) lint clean.
+
 ## Production deploy is wired into the Vercel build
 
 `vercel.json` runs `npx convex deploy --cmd 'pnpm build'`, so every

@@ -8,6 +8,7 @@ import { authClient } from '~/lib/auth-client'
 import { classifyAuthError, formatAuthError } from '~/lib/auth-errors'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
+import { PasswordInput } from '~/components/auth/password-input'
 import {
   Field,
   FieldError,
@@ -181,10 +182,9 @@ function LoginPage() {
                   return (
                     <Field data-invalid={invalid || undefined}>
                       <FieldLabel htmlFor={field.name}>Password</FieldLabel>
-                      <Input
+                      <PasswordInput
                         id={field.name}
                         name={field.name}
-                        type="password"
                         autoComplete="current-password"
                         value={field.state.value}
                         onBlur={field.handleBlur}

@@ -30,7 +30,7 @@ export interface AuthErrorLike {
   message?: string | null
 }
 
-const CODE_MAP: Record<string, AuthErrorCode> = {
+const CODE_MAP: Partial<Record<string, AuthErrorCode>> = {
   INVALID_EMAIL_OR_PASSWORD: 'INVALID_CREDENTIALS',
   INVALID_PASSWORD: 'INVALID_CREDENTIALS',
   INVALID_USER: 'INVALID_CREDENTIALS',
@@ -56,7 +56,10 @@ export function classifyAuthError(
 ): AuthErrorCode {
   if (!err) return 'UNKNOWN'
   if (err.status === 429) return 'RATE_LIMITED'
-  if (err.code && CODE_MAP[err.code]) return CODE_MAP[err.code]
+  if (err.code) {
+    const mapped = CODE_MAP[err.code]
+    if (mapped) return mapped
+  }
   if (err.status === 403) return 'EMAIL_NOT_VERIFIED'
   if (err.status === 401) return 'INVALID_CREDENTIALS'
   if (err.status == null && err.code == null) return 'NETWORK'

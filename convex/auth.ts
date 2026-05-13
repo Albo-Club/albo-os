@@ -81,9 +81,23 @@ export const createAuth = (ctx: GenericCtx<DataModel>) =>
         })
       },
     },
+    session: {
+      expiresIn: 60 * 60 * 24 * 7, // 7 days
+      updateAge: 60 * 60 * 24, // refresh once a day
+      cookieCache: { enabled: true, maxAge: 60 * 5 }, // 5 min
+      // `freshAge` is how recently a user must have authenticated for
+      // sensitive ops (changeEmail, deleteUser, change-password). BA enforces
+      // this when an endpoint asks for a fresh session.
+      freshAge: 60 * 60, // 1h
+    },
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: true,
+      // Server-side minimum. The Zod schemas in /register, /reset-password
+      // and /me change-password mirror this — both layers must agree or the
+      // form passes client validation and 400s on submit.
+      minPasswordLength: 12,
+      maxPasswordLength: 128,
       sendResetPassword: async (data: {
         user: { email: string }
         url: string

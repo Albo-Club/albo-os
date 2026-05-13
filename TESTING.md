@@ -51,6 +51,11 @@ Tester avec un user neuf "Alice" (`alice@test.local`).
 | A16| Sign-up 4× en 60s avec emails différents           | À partir de la 4e tentative : 429 BA                                  |
 | A17| `/app/me` → change email vers nouvelle adresse     | Email de **demande d'approbation** arrive à l'adresse **courante** (sujet "Approve email change") ; clic → vérification envoyée à la nouvelle |
 | A18| DevTools → cookies prod                            | `albo.session_token` a `Secure; HttpOnly; SameSite=Lax`              |
+| A19| `/register` avec password 11 caractères            | Erreur Zod "At least 12 characters" ; serveur 400 si court-circuit Zod |
+| A20| `/register` avec password connu type `Password1234` | Validator onBlurAsync HIBP affiche "appeared in known data breaches"  |
+| A21| `/register`, `/reset-password`, `/me`              | Strength meter zxcvbn affiche 4 barres + label (Very weak → Excellent) |
+| A22| Clic sur l'icône œil dans n'importe quel champ password | Bascule visible/masqué, focus reste sur l'input, aria-pressed mis à jour |
+| A23| Cookie `albo.session_token` après sign-in          | Max-Age ≈ 604800 (7 jours) ; `__Secure-` prefix optionnel selon hôte |
 
 ## Niveau 2 — App shell UI (10 min)
 
