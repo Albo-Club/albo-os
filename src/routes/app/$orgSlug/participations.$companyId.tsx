@@ -103,7 +103,7 @@ function ParticipationDetail() {
         </div>
       ) : (
         <div className="rounded-lg border">
-          <DealsList deals={deals} />
+          <DealsList deals={deals} orgSlug={orgSlug} />
         </div>
       )}
     </main>

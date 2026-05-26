@@ -216,16 +216,25 @@ Variables, scoped to **Production** only) :
   to push functions/schema to the prod deployment.
 
 The shell guard in `package.json` → `build:vercel` requires **both**
-`VERCEL=1` (auto-set by Vercel) and `CONVEX_DEPLOY_KEY` before running
+`VERCEL_ENV = production` and `CONVEX_DEPLOY_KEY` before running
 `convex deploy`. Falls back to plain `pnpm build` otherwise. Effects :
 
-- Preview deployments without a Convex preview key → frontend builds
-  but runs against the current prod Convex backend. Fine for read-only
-  UI changes ; **never ship preview deploys that depend on
-  un-deployed schema/function changes**. If you need preview-isolated
-  Convex, generate a Preview Deploy Key in the Convex dashboard and
-  add `CONVEX_DEPLOY_KEY` scoped to Preview in Vercel.
-- Local `pnpm build:vercel` → `$VERCEL` is empty, so the script
+- **Why `VERCEL_ENV`, not `VERCEL=1`** : `CONVEX_DEPLOY_KEY` is a
+  *production* key and, in practice, Vercel forwards it to **Preview**
+  builds too (env-var scoping in the dashboard is not always honored).
+  A `VERCEL=1` guard therefore let preview/branch builds (PRs,
+  release-please) run `convex deploy` with a prod key from a non-prod
+  env → Convex aborts with *"non-production build environment and
+  CONVEX_DEPLOY_KEY for a production deployment"* → build exits 1.
+  Gating on `VERCEL_ENV = production` is what actually keeps previews
+  off the prod deploy path.
+- Preview/branch deployments → skip `convex deploy`, just `pnpm build`.
+  The frontend builds **green** but runs against the current prod
+  Convex backend. Fine for read-only UI review ; **never ship preview
+  deploys that depend on un-deployed schema/function changes**. If you
+  need preview-isolated Convex, generate a Preview Deploy Key and add
+  `CONVEX_DEPLOY_KEY` scoped to Preview in Vercel (and relax the guard).
+- Local `pnpm build:vercel` → `$VERCEL_ENV` is empty, so the script
   always skips `convex deploy` even if a dev happens to have a deploy
   key in their shell env. Safe to run locally for build smoke-tests.
 

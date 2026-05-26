@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 
 import { Badge } from '~/components/ui/badge'
+import { Button } from '~/components/ui/button'
 import {
   Table,
   TableBody,
@@ -45,7 +46,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** Formateurs €/date localisés, partagés par les composants ci-dessous. */
-function useFormatters() {
+export function useFormatters() {
   const { i18n } = useTranslation('participations')
   const lang = i18n.language
   const fmtEur = (cents?: number | null) =>
@@ -71,40 +72,63 @@ function useFormatters() {
  * Liste détaillée de deals (un bloc par deal). Réutilisée par l'accordéon
  * de la table par-société et par la page détail d'une participation.
  */
-export function DealsList({ deals }: { deals: Array<DealRow> }) {
+export function DealsList({
+  deals,
+  orgSlug,
+}: {
+  deals: Array<DealRow>
+  orgSlug?: string
+}) {
   const { t } = useTranslation('participations')
   const { fmtEur, fmtDate } = useFormatters()
+  const cellClass =
+    'grid grid-cols-2 gap-x-6 gap-y-1 px-6 py-3 text-sm sm:grid-cols-5'
   return (
     <div className="divide-y">
-      {deals.map((dl) => (
-        <div
-          key={dl._id}
-          className="grid grid-cols-2 gap-x-6 gap-y-1 px-6 py-3 text-sm sm:grid-cols-5"
-        >
-          <Field label={t('deal.instrument')}>
-            {t(`instrument.${dl.instrumentKind}`, {
-              defaultValue: dl.instrumentKind,
-            })}
-          </Field>
-          <Field label={t('deal.investor')}>
-            {dl.investor?.name ?? '—'}
-            {dl.spv ? (
-              <span className="text-muted-foreground">
-                {' '}
-                · {t('deal.viaSpv')} {dl.spv.name}
-              </span>
-            ) : null}
-          </Field>
-          <Field label={t('deal.committed')}>{fmtEur(dl.committedAmount)}</Field>
-          <Field label={t('deal.paid')}>{fmtEur(dl.paidAmount)}</Field>
-          <Field label={t('deal.status')}>
-            <Badge variant={statusVariant(dl.status)}>
-              {t(`status.${dl.status}`, { defaultValue: dl.status })}
-            </Badge>
-          </Field>
-          <Field label={t('deal.signed')}>{fmtDate(dl.signedDate)}</Field>
-        </div>
-      ))}
+      {deals.map((dl) => {
+        const body = (
+          <>
+            <Field label={t('deal.instrument')}>
+              {t(`instrument.${dl.instrumentKind}`, {
+                defaultValue: dl.instrumentKind,
+              })}
+            </Field>
+            <Field label={t('deal.investor')}>
+              {dl.investor?.name ?? '—'}
+              {dl.spv ? (
+                <span className="text-muted-foreground">
+                  {' '}
+                  · {t('deal.viaSpv')} {dl.spv.name}
+                </span>
+              ) : null}
+            </Field>
+            <Field label={t('deal.committed')}>
+              {fmtEur(dl.committedAmount)}
+            </Field>
+            <Field label={t('deal.paid')}>{fmtEur(dl.paidAmount)}</Field>
+            <Field label={t('deal.status')}>
+              <Badge variant={statusVariant(dl.status)}>
+                {t(`status.${dl.status}`, { defaultValue: dl.status })}
+              </Badge>
+            </Field>
+            <Field label={t('deal.signed')}>{fmtDate(dl.signedDate)}</Field>
+          </>
+        )
+        return orgSlug ? (
+          <Link
+            key={dl._id}
+            to="/app/$orgSlug/deals/$dealId"
+            params={{ orgSlug, dealId: dl._id }}
+            className={`${cellClass} hover:bg-accent/60 transition-colors`}
+          >
+            {body}
+          </Link>
+        ) : (
+          <div key={dl._id} className={cellClass}>
+            {body}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -257,16 +281,16 @@ function CompanyRows({
             />
             {group.name}
             {group.slug && (
-              <Link
-                to="/app/$orgSlug/participations/$companyId"
-                params={{ orgSlug: group.slug, companyId: group.id }}
-                aria-label={t('openDetail')}
-                title={t('openDetail')}
-                onClick={(e) => e.stopPropagation()}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <ArrowUpRight className="size-4" />
-              </Link>
+              <Button asChild variant="outline" size="sm" className="ml-2">
+                <Link
+                  to="/app/$orgSlug/participations/$companyId"
+                  params={{ orgSlug: group.slug, companyId: group.id }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ArrowUpRight className="size-4" />
+                  {t('openDetail')}
+                </Link>
+              </Button>
             )}
           </span>
         </TableCell>
@@ -294,7 +318,7 @@ function CompanyRows({
       {isOpen && (
         <TableRow className="hover:bg-transparent">
           <TableCell colSpan={colSpan} className="bg-muted/30 p-0">
-            <DealsList deals={group.deals} />
+            <DealsList deals={group.deals} orgSlug={group.slug} />
           </TableCell>
         </TableRow>
       )}
