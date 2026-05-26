@@ -30,6 +30,7 @@ import type * as organizations from "../organizations.js";
 import type * as publicConfig from "../publicConfig.js";
 import type * as rateLimiters from "../rateLimiters.js";
 import type * as seed from "../seed.js";
+import type * as transactions from "../transactions.js";
 import type * as users from "../users.js";
 
 import type {
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   publicConfig: typeof publicConfig;
   rateLimiters: typeof rateLimiters;
   seed: typeof seed;
+  transactions: typeof transactions;
   users: typeof users;
 }>;
 
