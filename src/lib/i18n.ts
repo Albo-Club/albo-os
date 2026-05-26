@@ -11,6 +11,7 @@ import enErrors from '~/locales/en/errors.json'
 import enValidation from '~/locales/en/validation.json'
 import enNav from '~/locales/en/nav.json'
 import enDashboard from '~/locales/en/dashboard.json'
+import enParticipations from '~/locales/en/participations.json'
 import enAccount from '~/locales/en/account.json'
 import enOrg from '~/locales/en/org.json'
 import enSettings from '~/locales/en/settings.json'
@@ -22,6 +23,7 @@ import frErrors from '~/locales/fr/errors.json'
 import frValidation from '~/locales/fr/validation.json'
 import frNav from '~/locales/fr/nav.json'
 import frDashboard from '~/locales/fr/dashboard.json'
+import frParticipations from '~/locales/fr/participations.json'
 import frAccount from '~/locales/fr/account.json'
 import frOrg from '~/locales/fr/org.json'
 import frSettings from '~/locales/fr/settings.json'
@@ -34,6 +36,7 @@ export const NAMESPACES = [
   'validation',
   'nav',
   'dashboard',
+  'participations',
   'account',
   'org',
   'settings',
@@ -50,6 +53,7 @@ export const resources = {
     validation: enValidation,
     nav: enNav,
     dashboard: enDashboard,
+    participations: enParticipations,
     account: enAccount,
     org: enOrg,
     settings: enSettings,
@@ -62,6 +66,7 @@ export const resources = {
     validation: frValidation,
     nav: frNav,
     dashboard: frDashboard,
+    participations: frParticipations,
     account: frAccount,
     org: frOrg,
     settings: frSettings,

@@ -8,7 +8,8 @@
  * dans les `notes`.
  *
  * Lancer (dev) :
- *   pnpm exec convex run seed:seedCalteFamilyOffice
+ *   pnpm exec convex run seed:seedCalteFamilyOffice   # org + 9 entités
+ *   pnpm exec convex run seed:seedExampleDeals         # deals d'exemple
  * Ou cibler une org existante :
  *   pnpm exec convex run seed:seedGroup '{"orgId":"<id>"}'
  */
@@ -277,5 +278,229 @@ export const seedCalteFamilyOffice = internalMutation({
 
     const result = await upsertGroup(ctx, orgId)
     return { orgId, slug: ORG_SLUG, owner: owner.email, ...result }
+  },
+})
+
+// ─── Deals d'exemple (illustratifs, tirés de la Notion) ─────────────────────
+// Montants en cents EUR, taux en bps. Upsert par `attioDealId` synthétique
+// (`seed-example:<clé>`) → idempotent.
+
+type ExtraCompany = {
+  name: string
+  kind: 'portfolio' | 'group_spv'
+  holdingScope?: 'albo' | 'calte'
+  sector?: string
+  notes?: string
+}
+
+const EXAMPLE_COMPANIES: Array<ExtraCompany> = [
+  { name: 'Eben Home', kind: 'portfolio', sector: 'Mobilier/déco B2B' },
+  { name: 'Hectarea', kind: 'portfolio', sector: 'AgTech / foncier' },
+  { name: 'Parallel', kind: 'portfolio', sector: 'Dette immobilière' },
+  { name: 'Via Sana', kind: 'portfolio', sector: 'Proptech santé' },
+  {
+    name: 'SPV Eben Home',
+    kind: 'group_spv',
+    holdingScope: 'albo',
+    notes: 'SPV Albo pour syndiquer des co-investisseurs sur Eben Home.',
+  },
+  {
+    name: 'SPV Hectarea',
+    kind: 'group_spv',
+    holdingScope: 'albo',
+    notes: 'SPV Albo pour syndiquer des co-investisseurs sur Hectarea.',
+  },
+]
+
+// Part d'Albo DANS chaque SPV (régime mère-fille à traiter plus tard).
+const SPV_RELATIONS: Array<{ spv: string; ownershipPct: number }> = [
+  { spv: 'SPV Eben Home', ownershipPct: 40 },
+  { spv: 'SPV Hectarea', ownershipPct: 35 },
+]
+
+type ExampleDeal = {
+  key: string
+  investor: string
+  target: string
+  via?: string
+  instrumentKind: string
+  committedAmount?: number
+  paidAmount?: number
+  interestRate?: number
+  maturityDate?: number
+  signedDate?: number
+  notes?: string
+}
+
+const EXAMPLE_DEALS: Array<ExampleDeal> = [
+  {
+    key: 'eben-direct',
+    investor: 'Albo Club',
+    target: 'Eben Home',
+    instrumentKind: 'share',
+    committedAmount: 2_000_000, // 20 000 €
+    paidAmount: 2_000_000,
+    signedDate: d(2025, 3, 12),
+    notes: 'Ticket equity direct Albo + place au board.',
+  },
+  {
+    key: 'eben-spv',
+    investor: 'Albo Club',
+    target: 'Eben Home',
+    via: 'SPV Eben Home',
+    instrumentKind: 'spv_share',
+    committedAmount: 5_000_000, // 50 000 €
+    paidAmount: 5_000_000,
+    signedDate: d(2025, 6, 18),
+    notes: 'Investissement via SPV pour embarquer des co-investisseurs.',
+  },
+  {
+    key: 'hectarea-spv',
+    investor: 'Albo Club',
+    target: 'Hectarea',
+    via: 'SPV Hectarea',
+    instrumentKind: 'spv_share',
+    committedAmount: 3_000_000, // 30 000 €
+    paidAmount: 3_000_000,
+    signedDate: d(2025, 9, 4),
+    notes: 'Investissement via SPV + place au board.',
+  },
+  {
+    key: 'parallel-os',
+    investor: 'CALTE',
+    target: 'Parallel',
+    instrumentKind: 'os',
+    committedAmount: 20_000_000, // 200 000 €
+    paidAmount: 20_000_000,
+    interestRate: 1100, // 11 %
+    maturityDate: d(2026, 12, 31),
+    signedDate: d(2025, 1, 20),
+    notes: 'Obligation simple ~11 % sur 18/24 mois.',
+  },
+  {
+    key: 'viasana-share',
+    investor: 'CALTE',
+    target: 'Via Sana',
+    instrumentKind: 'share',
+    committedAmount: 10_000_000, // 100 000 €
+    paidAmount: 10_000_000,
+    signedDate: d(2024, 11, 8),
+    notes: 'Equity + board (synergie SCI Upload qui loue un local à Via Sana).',
+  },
+]
+
+async function companyIdByName(
+  ctx: MutationCtx,
+  orgId: Id<'organizations'>,
+  name: string,
+) {
+  const c = await ctx.db
+    .query('companies')
+    .withIndex('by_org', (q) => q.eq('orgId', orgId))
+    .filter((q) => q.eq(q.field('name'), name))
+    .first()
+  return c?._id ?? null
+}
+
+/** Seed quelques deals d'exemple dans l'org "Calte Family Office". */
+export const seedExampleDeals = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const org = await ctx.db
+      .query('organizations')
+      .withIndex('by_slug', (q) => q.eq('slug', ORG_SLUG))
+      .first()
+    if (!org) throw new ConvexError('org_not_found_run_seedCalteFamilyOffice')
+    const orgId = org._id
+
+    // 1) Portfolio + SPV companies (upsert par name).
+    const ids = new Map<string, Id<'companies'>>()
+    for (const c of EXAMPLE_COMPANIES) {
+      const existing = await companyIdByName(ctx, orgId, c.name)
+      const fields = {
+        orgId,
+        name: c.name,
+        kind: c.kind,
+        holdingScope: c.holdingScope,
+        sector: c.sector,
+        notes: c.notes,
+        countryCode: 'FR',
+      }
+      if (existing) {
+        await ctx.db.patch(existing, fields)
+        ids.set(c.name, existing)
+      } else {
+        ids.set(c.name, await ctx.db.insert('companies', fields))
+      }
+    }
+
+    // 2) Part d'Albo dans chaque SPV (companyRelations Albo → SPV).
+    const alboId = await companyIdByName(ctx, orgId, 'Albo Club')
+    if (alboId) {
+      for (const r of SPV_RELATIONS) {
+        const spvId = ids.get(r.spv)!
+        const existing = await ctx.db
+          .query('companyRelations')
+          .withIndex('by_parent', (q) =>
+            q.eq('orgId', orgId).eq('parentCompanyId', alboId),
+          )
+          .filter((q) => q.eq(q.field('childCompanyId'), spvId))
+          .first()
+        if (existing) {
+          await ctx.db.patch(existing._id, { ownershipPct: r.ownershipPct })
+        } else {
+          await ctx.db.insert('companyRelations', {
+            orgId,
+            parentCompanyId: alboId,
+            childCompanyId: spvId,
+            ownershipPct: r.ownershipPct,
+          })
+        }
+      }
+    }
+
+    // 3) Deals (upsert par attioDealId synthétique).
+    for (const dl of EXAMPLE_DEALS) {
+      const investorCompanyId = await companyIdByName(ctx, orgId, dl.investor)
+      const targetCompanyId = ids.get(dl.target) ?? null
+      if (!investorCompanyId || !targetCompanyId) continue
+      const investor = await ctx.db.get(investorCompanyId)
+      const holdingScope = investor?.holdingScope
+      if (!holdingScope) continue
+
+      const attioDealId = `seed-example:${dl.key}`
+      const fields = {
+        orgId,
+        investorCompanyId,
+        targetCompanyId,
+        viaSpvCompanyId: dl.via ? ids.get(dl.via) : undefined,
+        instrumentKind: dl.instrumentKind as never,
+        holdingScope,
+        currency: 'EUR',
+        committedAmount: dl.committedAmount,
+        paidAmount: dl.paidAmount,
+        interestRate: dl.interestRate,
+        maturityDate: dl.maturityDate,
+        signedDate: dl.signedDate,
+        status: 'active' as const,
+        attioDealId,
+        notes: dl.notes,
+      }
+      const existing = await ctx.db
+        .query('deals')
+        .withIndex('by_attio_deal_id', (q) => q.eq('attioDealId', attioDealId))
+        .first()
+      if (existing) {
+        await ctx.db.patch(existing._id, fields)
+      } else {
+        await ctx.db.insert('deals', fields)
+      }
+    }
+
+    return {
+      orgId,
+      companies: EXAMPLE_COMPANIES.length,
+      deals: EXAMPLE_DEALS.length,
+    }
   },
 })
