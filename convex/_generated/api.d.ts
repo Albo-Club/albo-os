@@ -13,6 +13,7 @@ import type * as agent from "../agent.js";
 import type * as agentTools from "../agentTools.js";
 import type * as aggregate from "../aggregate.js";
 import type * as auth from "../auth.js";
+import type * as cash from "../cash.js";
 import type * as chat from "../chat.js";
 import type * as companies from "../companies.js";
 import type * as deals from "../deals.js";
@@ -43,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   agentTools: typeof agentTools;
   aggregate: typeof aggregate;
   auth: typeof auth;
+  cash: typeof cash;
   chat: typeof chat;
   companies: typeof companies;
   deals: typeof deals;

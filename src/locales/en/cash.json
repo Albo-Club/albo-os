@@ -1,0 +1,31 @@
+{
+  "metaTitle": "Cash — Albo OS",
+  "title": "Cash",
+  "totalBalance": "Total balance",
+  "asOf": "as of {{date}}",
+  "noBalance": "No balance",
+  "accountsEmpty": "No bank accounts for this organization yet.",
+  "loading": "Loading…",
+  "col": {
+    "account": "Account",
+    "bank": "Bank",
+    "kind": "Type",
+    "balance": "Balance"
+  },
+  "tx": {
+    "title": "Deal-linked transactions",
+    "subtitle": "{{bank}} · {{label}}",
+    "col": {
+      "date": "Date",
+      "label": "Label",
+      "deal": "Deal",
+      "amount": "Amount"
+    },
+    "empty": "No deal-linked transactions on this account.",
+    "loading": "Loading transactions…"
+  },
+  "direction": {
+    "in": "Inflow",
+    "out": "Outflow"
+  }
+}
