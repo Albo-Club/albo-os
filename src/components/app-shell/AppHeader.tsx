@@ -63,7 +63,7 @@ export function AppHeader({
 }: {
   orgSlug: string
   orgName: string
-  onOpenAiChat: () => void
+  onOpenAiChat?: () => void
 }) {
   const location = useLocation()
   const { t } = useTranslation(['nav'])
@@ -96,10 +96,12 @@ export function AppHeader({
         </BreadcrumbList>
       </Breadcrumb>
       <div className="ml-auto flex items-center gap-1">
-        <Button variant="ghost" size="sm" onClick={onOpenAiChat}>
-          <Sparkles className="mr-1.5 size-4" />
-          {t('nav:appShell.ai')}
-        </Button>
+        {onOpenAiChat && (
+          <Button variant="ghost" size="sm" onClick={onOpenAiChat}>
+            <Sparkles className="mr-1.5 size-4" />
+            {t('nav:appShell.ai')}
+          </Button>
+        )}
         <ThemeToggle />
         <UserButton />
       </div>

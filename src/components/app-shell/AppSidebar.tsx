@@ -5,6 +5,7 @@ import { OrgSwitcher } from './OrgSwitcher'
 import { NavUser } from './NavUser'
 import { ThemePicker } from './ThemePicker'
 import { getNavGroups } from './nav'
+import type { NavGroup } from './nav'
 import { LanguageSwitcher } from '~/components/i18n/LanguageSwitcher'
 import {
   Sidebar,
@@ -43,20 +44,23 @@ export function AppSidebar({
   currentSlug,
   myRole,
   me,
+  navGroups,
 }: {
   orgs: Array<Org>
   currentSlug: string
   myRole: string | undefined
   me: Me
+  navGroups?: Array<NavGroup>
 }) {
   const location = useLocation()
   const { t } = useTranslation(['nav', 'common'])
-  const groups = getNavGroups()
+  const groups = navGroups ?? getNavGroups()
   const isAdmin = myRole === 'admin' || myRole === 'owner'
 
   const renderItem = (item: NavLeaf, size?: 'sm') => {
     const Icon = item.icon
-    const href = item.to.replace('$orgSlug', currentSlug)
+    const isParam = item.to.includes('$orgSlug')
+    const href = isParam ? item.to.replace('$orgSlug', currentSlug) : item.to
     const title = t(`nav:${item.titleKey}`)
     const isActive =
       item.to === '/app/$orgSlug'
@@ -71,10 +75,17 @@ export function AppSidebar({
           tooltip={title}
           size={size}
         >
-          <Link to={item.to} params={{ orgSlug: currentSlug }}>
-            {Icon ? <Icon /> : null}
-            <span>{title}</span>
-          </Link>
+          {isParam ? (
+            <Link to={item.to} params={{ orgSlug: currentSlug }}>
+              {Icon ? <Icon /> : null}
+              <span>{title}</span>
+            </Link>
+          ) : (
+            <Link to={item.to}>
+              {Icon ? <Icon /> : null}
+              <span>{title}</span>
+            </Link>
+          )}
         </SidebarMenuButton>
         {item.demo && <SidebarMenuBadge>{t('common:demo')}</SidebarMenuBadge>}
       </SidebarMenuItem>

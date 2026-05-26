@@ -14,7 +14,6 @@ import { z } from 'zod/v3'
 
 import { internal } from './_generated/api'
 import { internalMutation, internalQuery } from './_generated/server'
-import { resolveScope } from './lib/scope'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 
@@ -58,8 +57,6 @@ const instrumentValidator = v.union(
   v.literal('crypto'),
 )
 
-const scopeValidator = v.union(v.literal('albo'), v.literal('calte'))
-
 function parseScope(scope: string | undefined | null): {
   orgId: Id<'organizations'>
   userId: Id<'users'>
@@ -98,29 +95,16 @@ export const listCompaniesInternal = internalQuery({
   args: {
     orgId: v.id('organizations'),
     actorUserId: v.id('users'),
-    scope: v.optional(scopeValidator),
   },
-  handler: async (ctx, { orgId, actorUserId, scope }) => {
+  handler: async (ctx, { orgId, actorUserId }) => {
     await readMembership(ctx, orgId, actorUserId)
-    const rows = scope
-      ? await ctx.db
-          .query('companies')
-          .withIndex('by_org_scope', (q) =>
-            q.eq('orgId', orgId).eq('holdingScope', scope),
-          )
-          .collect()
-      : await ctx.db
-          .query('companies')
-          .withIndex('by_org', (q) => q.eq('orgId', orgId))
-          .collect()
+    const rows = await ctx.db
+      .query('companies')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
     return rows
       .filter((c) => !c.archivedAt)
-      .map((c) => ({
-        _id: c._id,
-        name: c.name,
-        kind: c.kind,
-        holdingScope: c.holdingScope ?? null,
-      }))
+      .map((c) => ({ _id: c._id, name: c.name, kind: c.kind }))
   },
 })
 
@@ -128,21 +112,13 @@ export const listDealsInternal = internalQuery({
   args: {
     orgId: v.id('organizations'),
     actorUserId: v.id('users'),
-    scope: v.optional(scopeValidator),
   },
-  handler: async (ctx, { orgId, actorUserId, scope }) => {
+  handler: async (ctx, { orgId, actorUserId }) => {
     await readMembership(ctx, orgId, actorUserId)
-    const rows = scope
-      ? await ctx.db
-          .query('deals')
-          .withIndex('by_org_scope', (q) =>
-            q.eq('orgId', orgId).eq('holdingScope', scope),
-          )
-          .collect()
-      : await ctx.db
-          .query('deals')
-          .withIndex('by_org', (q) => q.eq('orgId', orgId))
-          .collect()
+    const rows = await ctx.db
+      .query('deals')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
     return await Promise.all(
       rows.map(async (d) => ({
         _id: d._id,
@@ -152,7 +128,6 @@ export const listDealsInternal = internalQuery({
           ? companyName(await ctx.db.get(d.viaSpvCompanyId))
           : null,
         instrumentKind: d.instrumentKind,
-        holdingScope: d.holdingScope,
         committedAmount: d.committedAmount ?? null,
         paidAmount: d.paidAmount ?? null,
         status: d.status,
@@ -223,15 +198,21 @@ export const createDealInternal = internalMutation({
     if (args.viaSpvCompanyId) {
       await assertSameOrg(ctx, args.orgId, args.viaSpvCompanyId, 'spv_wrong_org')
     }
-    const holdingScope = await resolveScope(ctx, args.investorCompanyId)
+    // L'investisseur doit être une entité du groupe (pas une portfolio).
+    const investor = await ctx.db.get(args.investorCompanyId)
+    if (!investor || investor.orgId !== args.orgId) {
+      throw new ConvexError('investor_wrong_org')
+    }
+    if (!investor.kind.startsWith('group_')) {
+      throw new ConvexError('investor_must_be_group_entity')
+    }
     const { actorUserId, ...rest } = args
     const id = await ctx.db.insert('deals', {
       ...rest,
-      holdingScope,
       currency: 'EUR',
       status: 'active',
     })
-    return { _id: id, holdingScope }
+    return { _id: id }
   },
 })
 
@@ -265,19 +246,16 @@ export const updateDealInternal = internalMutation({
 
 const listCompanies = createTool({
   description:
-    'List companies in the current org (group entities + portfolio). ' +
-    'Optionally filter by scope ("albo" or "calte"). Use this to find the ' +
-    'investor company id (a group entity like CALTE or Albo Club) or to ' +
-    'check whether a portfolio company already exists before creating a deal.',
-  inputSchema: z.object({
-    scope: z.enum(['albo', 'calte']).optional(),
-  }),
-  execute: async (ctx, input): Promise<unknown> => {
+    'List companies in the current org (group entities + portfolio). Use ' +
+    'this to find the investor company id (a group entity like CALTE or ' +
+    'Albo Club) or to check whether a portfolio company already exists ' +
+    'before creating a deal.',
+  inputSchema: z.object({}),
+  execute: async (ctx): Promise<unknown> => {
     const { orgId, userId } = parseScope(ctx.userId)
     return await ctx.runQuery(internal.agentTools.listCompaniesInternal, {
       orgId,
       actorUserId: userId,
-      scope: input.scope,
     })
   },
 })
@@ -285,16 +263,13 @@ const listCompanies = createTool({
 const listDeals = createTool({
   description:
     'List investments (deals) in the current org, with investor/target ' +
-    'company names. Optionally filter by scope ("albo" or "calte").',
-  inputSchema: z.object({
-    scope: z.enum(['albo', 'calte']).optional(),
-  }),
-  execute: async (ctx, input): Promise<unknown> => {
+    'company names.',
+  inputSchema: z.object({}),
+  execute: async (ctx): Promise<unknown> => {
     const { orgId, userId } = parseScope(ctx.userId)
     return await ctx.runQuery(internal.agentTools.listDealsInternal, {
       orgId,
       actorUserId: userId,
-      scope: input.scope,
     })
   },
 })
@@ -323,14 +298,13 @@ const createCompany = createTool({
 
 const createDeal = createTool({
   description:
-    'Create an investment (deal). The investor MUST be a group entity ' +
-    '(holdingScope albo/calte) — find its id via listCompanies. The target ' +
-    'is the invested company — create it with createCompany first if needed. ' +
-    'Amounts are in CENTS EUR (50 000 € → 5000000). Rates in basis points ' +
-    '(11% → 1100). signedDate is an ISO date "YYYY-MM-DD". For an SPV ' +
-    'investment, pass viaSpvCompanyId (the SPV is a group entity). The deal ' +
-    "scope is derived from the investor automatically. Confirm the details " +
-    'with the user before calling this.',
+    'Create an investment (deal) in the current org. The investor MUST be a ' +
+    'group entity (CALTE, Albo Club, an SCI, a SPV…) — find its id via ' +
+    'listCompanies. The target is the invested company — create it with ' +
+    'createCompany first if needed. Amounts are in CENTS EUR (50 000 € → ' +
+    '5000000). Rates in basis points (11% → 1100). signedDate is an ISO date ' +
+    '"YYYY-MM-DD". For an SPV investment, pass viaSpvCompanyId. Confirm the ' +
+    'details with the user before calling this.',
   inputSchema: z.object({
     investorCompanyId: z.string().describe('Group entity id (CALTE, Albo…)'),
     targetCompanyId: z.string().describe('Invested company id'),

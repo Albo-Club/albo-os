@@ -1,13 +1,10 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
-import { resolveScope } from './lib/scope'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
 import type { DataModel, Doc, Id } from './_generated/dataModel'
 
 type Ctx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>
-
-const scopeValidator = v.union(v.literal('albo'), v.literal('calte'))
 
 const statusValidator = v.union(
   v.literal('active'),
@@ -67,7 +64,6 @@ function companyRef(c: Doc<'companies'> | null) {
     _id: c._id,
     name: c.name,
     kind: c.kind,
-    holdingScope: c.holdingScope ?? null,
     totalShares: c.totalShares ?? null,
   }
 }
@@ -88,18 +84,17 @@ async function enrich(ctx: Ctx, deal: Doc<'deals'>) {
 }
 
 /**
- * Liste enrichie des deals (deal + noms investor/target/spv), filtrable par
- * scope / status / target. Sert la vue Participations (regroupée par société
- * côté client). Tri par défaut : signedDate desc.
+ * Liste enrichie des deals (deal + noms investor/target/spv) d'une org,
+ * filtrable par status / target. Sert la vue Participations par-org
+ * (regroupée par société côté client). Tri par défaut : signedDate desc.
  */
 export const list = query({
   args: {
     orgId: v.id('organizations'),
-    scope: v.optional(scopeValidator),
     status: v.optional(statusValidator),
     targetCompanyId: v.optional(v.id('companies')),
   },
-  handler: async (ctx, { orgId, scope, status, targetCompanyId }) => {
+  handler: async (ctx, { orgId, status, targetCompanyId }) => {
     await requireOrgMember(ctx, orgId)
 
     let rows: Array<Doc<'deals'>>
@@ -108,13 +103,6 @@ export const list = query({
         .query('deals')
         .withIndex('by_org_target', (q) =>
           q.eq('orgId', orgId).eq('targetCompanyId', targetCompanyId),
-        )
-        .collect()
-    } else if (scope) {
-      rows = await ctx.db
-        .query('deals')
-        .withIndex('by_org_scope', (q) =>
-          q.eq('orgId', orgId).eq('holdingScope', scope),
         )
         .collect()
     } else {
@@ -151,6 +139,22 @@ async function assertSameOrg(
   if (!c || c.orgId !== orgId) throw new ConvexError(code)
 }
 
+/**
+ * L'investisseur d'un deal est toujours une entité du groupe (`group_*`),
+ * jamais une société portfolio. (Remplace l'ancienne dérivation de scope.)
+ */
+async function assertInvestorIsGroupEntity(
+  ctx: Ctx,
+  orgId: Id<'organizations'>,
+  investorCompanyId: Id<'companies'>,
+) {
+  const c = await ctx.db.get(investorCompanyId)
+  if (!c || c.orgId !== orgId) throw new ConvexError('investor_wrong_org')
+  if (!c.kind.startsWith('group_')) {
+    throw new ConvexError('investor_must_be_group_entity')
+  }
+}
+
 export const create = mutation({
   args: {
     orgId: v.id('organizations'),
@@ -171,13 +175,11 @@ export const create = mutation({
     if (args.viaSpvCompanyId) {
       await assertSameOrg(ctx, args.orgId, args.viaSpvCompanyId, 'spv_wrong_org')
     }
-    // Scope dérivé de l'investisseur (throw si pas une group_*).
-    const holdingScope = await resolveScope(ctx, args.investorCompanyId)
+    await assertInvestorIsGroupEntity(ctx, args.orgId, args.investorCompanyId)
 
     const { status, currency, ...rest } = args
     return await ctx.db.insert('deals', {
       ...rest,
-      holdingScope,
       currency: currency ?? 'EUR',
       status: status ?? 'active',
     })
@@ -200,10 +202,12 @@ export const update = mutation({
     if (!deal) throw new ConvexError('not_found')
     await requireOrgMember(ctx, deal.orgId)
 
-    const next: Record<string, unknown> = { ...patch }
-    // Recalcule le scope si l'investisseur change.
     if (patch.investorCompanyId) {
-      next.holdingScope = await resolveScope(ctx, patch.investorCompanyId)
+      await assertInvestorIsGroupEntity(
+        ctx,
+        deal.orgId,
+        patch.investorCompanyId,
+      )
     }
     if (patch.targetCompanyId) {
       await assertSameOrg(
@@ -213,7 +217,7 @@ export const update = mutation({
         'target_wrong_org',
       )
     }
-    await ctx.db.patch(id, next)
+    await ctx.db.patch(id, patch)
     return id
   },
 })

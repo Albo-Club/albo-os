@@ -6,10 +6,10 @@
  * Pas de mutation ici : l'édition se fait dans la vue par-org.
  */
 
-import type { GenericQueryCtx } from 'convex/server'
-import type { DataModel, Doc } from './_generated/dataModel'
 import { query } from './_generated/server'
 import { requireAppUser } from './lib/auth'
+import type { GenericQueryCtx } from 'convex/server'
+import type { DataModel, Doc } from './_generated/dataModel'
 
 type Ctx = GenericQueryCtx<DataModel>
 

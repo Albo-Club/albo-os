@@ -1,15 +1,11 @@
 {
   "metaTitle": "Participations — Albo OS",
+  "metaTitleAll": "Toutes les participations — Albo OS",
   "title": "Participations",
-  "consolidatedNote": "Vue opérationnelle Albo + Calte — pas une conso IFRS",
-  "scope": {
-    "all": "Consolidé",
-    "albo": "Albo",
-    "calte": "Calte"
-  },
+  "allSubtitle": "Toutes tes organisations réunies — lecture seule. L'édition se fait dans une organisation.",
   "col": {
     "company": "Société",
-    "scope": "Scope",
+    "org": "Org",
     "deals": "Deals",
     "committed": "Engagé",
     "paid": "Versé"

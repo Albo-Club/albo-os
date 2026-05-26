@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useConvexMutation } from '@convex-dev/react-query'
-import { Check, ChevronsUpDown, Plus } from 'lucide-react'
+import { Check, ChevronsUpDown, Layers } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '../../../convex/_generated/api'
@@ -37,6 +37,10 @@ export function OrgSwitcher({
   const { t } = useTranslation(['nav', 'common'])
   const setLastOrg = useConvexMutation(api.organizations.setLastOrg)
   const current = orgs.find((o) => o.slug === currentSlug)
+  const isAll = currentSlug === 'all'
+  const triggerName = isAll
+    ? t('nav:orgSwitcher.allOrganizations')
+    : (current?.name ?? currentSlug)
   const roleLabel = (role: string | undefined) =>
     role === 'owner' || role === 'admin' || role === 'member'
       ? t(`common:roles.${role}`)
@@ -58,7 +62,9 @@ export function OrgSwitcher({
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg">
-                {current?.logoUrl ? (
+                {isAll ? (
+                  <Layers className="size-4" />
+                ) : current?.logoUrl ? (
                   <img
                     src={current.logoUrl}
                     alt=""
@@ -66,16 +72,14 @@ export function OrgSwitcher({
                   />
                 ) : (
                   <span className="text-sm font-semibold">
-                    {(current?.name ?? currentSlug).slice(0, 1).toUpperCase()}
+                    {triggerName.slice(0, 1).toUpperCase()}
                   </span>
                 )}
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">
-                  {current?.name ?? currentSlug}
-                </span>
+                <span className="truncate font-semibold">{triggerName}</span>
                 <span className="text-muted-foreground truncate text-xs">
-                  {roleLabel(current?.role)}
+                  {isAll ? '' : roleLabel(current?.role)}
                 </span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
@@ -117,15 +121,16 @@ export function OrgSwitcher({
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onSelect={() => navigate({ to: '/app' })}
+              onSelect={() => navigate({ to: '/app/all/participations' })}
               className="gap-2"
             >
               <div className="bg-background flex size-6 items-center justify-center rounded border">
-                <Plus className="size-4" />
+                <Layers className="size-4" />
               </div>
-              <span className="text-muted-foreground">
+              <span className={currentSlug === 'all' ? 'font-medium' : ''}>
                 {t('nav:orgSwitcher.allOrganizations')}
               </span>
+              {currentSlug === 'all' && <Check className="ml-auto size-4" />}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

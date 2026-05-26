@@ -73,3 +73,19 @@ export function getNavGroups(): Array<NavGroup> {
     },
   ]
 }
+
+/** Nav de la vue agrégée cross-org (`/app/all`, lecture seule). */
+export function getAllNavGroups(): Array<NavGroup> {
+  return [
+    {
+      labelKey: 'groups.platform',
+      items: [
+        {
+          titleKey: 'items.participations',
+          to: '/app/all/participations',
+          icon: PieChart,
+        },
+      ],
+    },
+  ]
+}

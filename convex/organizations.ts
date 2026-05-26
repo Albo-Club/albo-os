@@ -48,7 +48,7 @@ const RESERVED_SLUGS = new Set([
   'invitations', 'onboarding', 'reset-password', 'forgot-password',
   'verify-email', 'accept-invite', 'help', 'docs', 'support', 'status',
   'www', 'public', 'static', 'assets', 'health', 'about', 'terms',
-  'privacy', 'pricing', 'home',
+  'privacy', 'pricing', 'home', 'all',
 ])
 
 export const checkSlug = query({

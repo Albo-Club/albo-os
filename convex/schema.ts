@@ -34,16 +34,14 @@ export const invitationRoleValidator = v.union(
 
 // ─── Enums métier ───────────────────────────────────────────────────────────
 
-/**
- * holdingScope — pilote les 3 vues (consolidé, Albo only, Calte only).
- * Présent sur toute company `group_*`, absent sur `portfolio`.
- * Dénormalisé sur `deals` pour filtre O(1).
- */
-const holdingScope = v.union(v.literal('albo'), v.literal('calte'))
+// Note: le « scope » Albo / Calte est désormais porté par l'ORGANISATION
+// elle-même (une org par véhicule d'invest), plus par un champ. La vue
+// agrégée (convex/aggregate.ts) fait l'union des orgs de l'utilisateur.
 
 const companyKind = v.union(
-  // Racines de vue (les 2 holdings d'invest principales)
-  v.literal('group_root'), // Albo Club, CALTE
+  // Racine de l'org (la holding d'invest : CALTE dans l'org Calte,
+  // Albo Club dans l'org Albo)
+  v.literal('group_root'),
   // Sous-entités du groupe (héritent le scope de leur racine)
   v.literal('group_operating'), // Caltimo, Relais Chapelle, RDB
   v.literal('group_sci'), // SCI Chapelle 1, 2, SCI Upload
@@ -163,13 +161,6 @@ export default defineSchema({
     legalName: v.optional(v.string()),
     kind: companyKind,
 
-    /**
-     * Scope vue. Obligatoire sur les `group_*`, NULL sur `portfolio`.
-     * Pour `group_root` : la company est sa propre racine (Albo Club → "albo",
-     * CALTE → "calte"). Pour les sous-entités : hérite de la racine parente.
-     */
-    holdingScope: v.optional(holdingScope),
-
     // Identifiants — tous optionnels. Uniqueness gérée côté mutation.
     siren: v.optional(v.string()), // FR uniquement
     registrationNumber: v.optional(v.string()), // fallback étranger
@@ -193,7 +184,6 @@ export default defineSchema({
   })
     .index('by_org', ['orgId'])
     .index('by_org_kind', ['orgId', 'kind'])
-    .index('by_org_scope', ['orgId', 'holdingScope'])
     .index('by_org_siren', ['orgId', 'siren'])
     .index('by_attio_company_id', ['attioCompanyId'])
     .index('by_org_domain', ['orgId', 'domain']),
@@ -235,13 +225,6 @@ export default defineSchema({
     // Instrument
     instrumentKind,
 
-    /**
-     * Scope dénormalisé depuis investorCompany.holdingScope. Toujours rempli.
-     * Maintenu en sync par les mutations create/update. Pilote le filtre
-     * Albo / Calte / consolidé de la vue Participations.
-     */
-    holdingScope,
-
     // Financier commun
     currency: v.string(), // "EUR" par défaut
     committedAmount: v.optional(v.number()), // engagement (LP/SAFE/OS…)
@@ -282,7 +265,6 @@ export default defineSchema({
     notes: v.optional(v.string()),
   })
     .index('by_org', ['orgId'])
-    .index('by_org_scope', ['orgId', 'holdingScope'])
     .index('by_org_investor', ['orgId', 'investorCompanyId'])
     .index('by_org_target', ['orgId', 'targetCompanyId'])
     .index('by_org_status', ['orgId', 'status'])

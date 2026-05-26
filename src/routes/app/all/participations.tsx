@@ -7,33 +7,33 @@ import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { ParticipationsTable } from '~/components/participations/ParticipationsTable'
 
-export const Route = createFileRoute('/app/$orgSlug/participations')({
-  component: Participations,
+export const Route = createFileRoute('/app/all/participations')({
+  component: AllParticipations,
   head: () => ({
     meta: [
       {
         title: getI18n(getLocale()).getFixedT(
           null,
           'participations',
-        )('metaTitle'),
+        )('metaTitleAll'),
       },
     ],
   }),
 })
 
-function Participations() {
+function AllParticipations() {
   const { t } = useTranslation('participations')
-  const { orgSlug } = Route.useParams()
-  const org = useConvexQuery(api.organizations.bySlug, { slug: orgSlug })
-  const deals = useConvexQuery(
-    api.deals.list,
-    org ? { orgId: org._id } : 'skip',
-  )
+  const deals = useConvexQuery(api.aggregate.listDeals, {})
 
   return (
     <main className="flex-1 space-y-6 p-6">
-      <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
-      <ParticipationsTable deals={deals} />
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {t('title')}
+        </h1>
+        <p className="text-muted-foreground text-sm">{t('allSubtitle')}</p>
+      </div>
+      <ParticipationsTable deals={deals} showOrg />
     </main>
   )
 }
