@@ -130,19 +130,22 @@ Albo OS = OS de pilotage du family office **CALTE** + holding d'invest
 - Ponts conservés en base : `attioCompanyId` / `attioDealId` (strings,
   uniqueness gérée côté mutation, pas au schéma).
 
-**Distinction critique `orgId` vs `companies.kind`** (source de confusion n°1) :
+**Modèle multi-org (1 véhicule d'invest = 1 organisation)** :
 
-- `orgId` = compte SaaS multi-tenant Better Auth = **une seule** org
-  "Calte Family Office". Tout est scopé par `orgId`.
-- `companies.kind = "group_*"` = les **entités juridiques** du groupe (CALTE,
-  Albo Club, Caltimo, SCIs, Banco 2…), qui vivent dans la table métier
-  `companies`. Ne **jamais** confondre les deux.
-
-**`holdingScope` (`albo` | `calte`)** pilote 3 vues : Albo only, Calte only,
-ou consolidé (union opérationnelle, **pas** une conso IFRS — toujours le
-labelliser comme tel). Présent sur toute company `group_*`, absent sur
-`portfolio`. **Dénormalisé sur `deals`** (maintenu en sync par les mutations
-create/update) pour un filtre O(1).
+- Chaque véhicule est une **organisation Better Auth distincte** : org `calte`
+  (CALTE + Caltimo + RDB + Relais Chapelle + SCIs + Banco 2) et org `albo`
+  (Albo Club). Une nouvelle entité d'invest = une **nouvelle org**.
+- `companies.kind = "group_*"` = les **entités juridiques** d'une org (sa
+  racine `group_root` + sous-entités) ; `portfolio` = les boîtes investies.
+  Ne pas confondre l'**org** (le véhicule) avec ses `companies`.
+- **Droits par org** via `organizationMembers.role` (owner/admin/member).
+- **Vue agrégée cross-org** (`/app/all`, `convex/aggregate.ts`) : union
+  **lecture seule** des deals de **toutes** les orgs dont l'user est membre
+  (une nouvelle org y apparaît d'office). L'édition se fait dans la vue
+  par-org. ⚠️ Il n'y a **plus** de champ `holdingScope` : le « scope » est
+  désormais l'org elle-même.
+- L'investisseur d'un deal est toujours une entité `group_*` de l'org (jamais
+  une `portfolio`) — `assertInvestorIsGroupEntity` dans `convex/deals.ts`.
 
 **Conventions de données** (à respecter partout, formatage à l'affichage
 seulement) :
@@ -160,6 +163,13 @@ seulement) :
 **État du schéma** : `companies`, `companyRelations`, `deals`, `valuations`,
 `kpiSnapshots` (cœur portfolio). `bankAccounts`, `transactions`, `forecasts`
 sont **déclarées mais inertes** (phase 2 cash management — mutations vides).
+
+**Workflow déploiement** : outil interne, **prod-only** (pas de déploiement
+dev). Le code part en prod via le build Vercel sur `main` (`build:vercel` →
+`convex deploy`). Les seeds/migrations : `convex run --prod` (snapshot
+`convex export --prod` avant toute opération destructive ; seeds idempotents).
+Changement de schéma cassant (retrait de champ) : purger la donnée d'abord
+puis resserrer (cf. `convex/seed.ts` `cleanupLegacy`/`seedAll`).
 
 > Contexte complet (structure du groupe, instruments, comptes bancaires,
 > écosystèmes OPRTRS/SIDE) : Notion « Architecture Base de données ».

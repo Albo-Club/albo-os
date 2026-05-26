@@ -1,15 +1,11 @@
 {
   "metaTitle": "Participations — Albo OS",
+  "metaTitleAll": "All participations — Albo OS",
   "title": "Participations",
-  "consolidatedNote": "Operational Albo + Calte view — not an IFRS consolidation",
-  "scope": {
-    "all": "Consolidated",
-    "albo": "Albo",
-    "calte": "Calte"
-  },
+  "allSubtitle": "All your organizations combined — read-only. Edit within an organization.",
   "col": {
     "company": "Company",
-    "scope": "Scope",
+    "org": "Org",
     "deals": "Deals",
     "committed": "Committed",
     "paid": "Paid"
