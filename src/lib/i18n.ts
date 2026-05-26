@@ -9,10 +9,9 @@ import enCommon from '~/locales/en/common.json'
 import enAuth from '~/locales/en/auth.json'
 import enErrors from '~/locales/en/errors.json'
 import enValidation from '~/locales/en/validation.json'
-import enLanding from '~/locales/en/landing.json'
 import enNav from '~/locales/en/nav.json'
 import enDashboard from '~/locales/en/dashboard.json'
-import enItems from '~/locales/en/items.json'
+import enParticipations from '~/locales/en/participations.json'
 import enAccount from '~/locales/en/account.json'
 import enOrg from '~/locales/en/org.json'
 import enSettings from '~/locales/en/settings.json'
@@ -22,10 +21,9 @@ import frCommon from '~/locales/fr/common.json'
 import frAuth from '~/locales/fr/auth.json'
 import frErrors from '~/locales/fr/errors.json'
 import frValidation from '~/locales/fr/validation.json'
-import frLanding from '~/locales/fr/landing.json'
 import frNav from '~/locales/fr/nav.json'
 import frDashboard from '~/locales/fr/dashboard.json'
-import frItems from '~/locales/fr/items.json'
+import frParticipations from '~/locales/fr/participations.json'
 import frAccount from '~/locales/fr/account.json'
 import frOrg from '~/locales/fr/org.json'
 import frSettings from '~/locales/fr/settings.json'
@@ -36,10 +34,9 @@ export const NAMESPACES = [
   'auth',
   'errors',
   'validation',
-  'landing',
   'nav',
   'dashboard',
-  'items',
+  'participations',
   'account',
   'org',
   'settings',
@@ -54,10 +51,9 @@ export const resources = {
     auth: enAuth,
     errors: enErrors,
     validation: enValidation,
-    landing: enLanding,
     nav: enNav,
     dashboard: enDashboard,
-    items: enItems,
+    participations: enParticipations,
     account: enAccount,
     org: enOrg,
     settings: enSettings,
@@ -68,10 +64,9 @@ export const resources = {
     auth: frAuth,
     errors: frErrors,
     validation: frValidation,
-    landing: frLanding,
     nav: frNav,
     dashboard: frDashboard,
-    items: frItems,
+    participations: frParticipations,
     account: frAccount,
     org: frOrg,
     settings: frSettings,

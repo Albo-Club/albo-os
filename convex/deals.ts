@@ -1,0 +1,230 @@
+import { ConvexError, v } from 'convex/values'
+import { mutation, query } from './_generated/server'
+import { requireOrgMember } from './lib/auth'
+import { resolveScope } from './lib/scope'
+import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
+import type { DataModel, Doc, Id } from './_generated/dataModel'
+
+type Ctx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>
+
+const scopeValidator = v.union(v.literal('albo'), v.literal('calte'))
+
+const statusValidator = v.union(
+  v.literal('active'),
+  v.literal('partially_exited'),
+  v.literal('fully_exited'),
+  v.literal('written_off'),
+)
+
+const instrumentValidator = v.union(
+  v.literal('share'),
+  v.literal('bsa'),
+  v.literal('bsa_air'),
+  v.literal('safe'),
+  v.literal('oc'),
+  v.literal('os'),
+  v.literal('convertible_note'),
+  v.literal('cca'),
+  v.literal('royalty'),
+  v.literal('fund_lp'),
+  v.literal('spv_share'),
+  v.literal('secondary'),
+  v.literal('real_estate_direct'),
+  v.literal('scpi'),
+  v.literal('cto'),
+  v.literal('dat'),
+  v.literal('crypto'),
+)
+
+/** Champs financiers/lifecycle communs, tous optionnels. */
+const dealFields = {
+  viaSpvCompanyId: v.optional(v.id('companies')),
+  currency: v.optional(v.string()),
+  committedAmount: v.optional(v.number()),
+  paidAmount: v.optional(v.number()),
+  sharesAcquired: v.optional(v.number()),
+  pricePerShare: v.optional(v.number()),
+  interestRate: v.optional(v.number()),
+  maturityDate: v.optional(v.number()),
+  principalAmount: v.optional(v.number()),
+  repaymentFrequencyMonths: v.optional(v.number()),
+  royaltyRate: v.optional(v.number()),
+  royaltyCapAmount: v.optional(v.number()),
+  valuationCap: v.optional(v.number()),
+  discount: v.optional(v.number()),
+  entryValuation: v.optional(v.number()),
+  roundSize: v.optional(v.number()),
+  signedDate: v.optional(v.number()),
+  closingDate: v.optional(v.number()),
+  exitedDate: v.optional(v.number()),
+  attioDealId: v.optional(v.string()),
+  notes: v.optional(v.string()),
+}
+
+function companyRef(c: Doc<'companies'> | null) {
+  if (!c) return null
+  return {
+    _id: c._id,
+    name: c.name,
+    kind: c.kind,
+    holdingScope: c.holdingScope ?? null,
+    totalShares: c.totalShares ?? null,
+  }
+}
+
+/** Enrichit un deal avec investor / target / spv (pour la vue). */
+async function enrich(ctx: Ctx, deal: Doc<'deals'>) {
+  const [investor, target, spv] = await Promise.all([
+    ctx.db.get(deal.investorCompanyId),
+    ctx.db.get(deal.targetCompanyId),
+    deal.viaSpvCompanyId ? ctx.db.get(deal.viaSpvCompanyId) : null,
+  ])
+  return {
+    ...deal,
+    investor: companyRef(investor),
+    target: companyRef(target),
+    spv: companyRef(spv),
+  }
+}
+
+/**
+ * Liste enrichie des deals (deal + noms investor/target/spv), filtrable par
+ * scope / status / target. Sert la vue Participations (regroupée par société
+ * côté client). Tri par défaut : signedDate desc.
+ */
+export const list = query({
+  args: {
+    orgId: v.id('organizations'),
+    scope: v.optional(scopeValidator),
+    status: v.optional(statusValidator),
+    targetCompanyId: v.optional(v.id('companies')),
+  },
+  handler: async (ctx, { orgId, scope, status, targetCompanyId }) => {
+    await requireOrgMember(ctx, orgId)
+
+    let rows: Array<Doc<'deals'>>
+    if (targetCompanyId) {
+      rows = await ctx.db
+        .query('deals')
+        .withIndex('by_org_target', (q) =>
+          q.eq('orgId', orgId).eq('targetCompanyId', targetCompanyId),
+        )
+        .collect()
+    } else if (scope) {
+      rows = await ctx.db
+        .query('deals')
+        .withIndex('by_org_scope', (q) =>
+          q.eq('orgId', orgId).eq('holdingScope', scope),
+        )
+        .collect()
+    } else {
+      rows = await ctx.db
+        .query('deals')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect()
+    }
+    if (status) rows = rows.filter((d) => d.status === status)
+
+    rows.sort((a, b) => (b.signedDate ?? 0) - (a.signedDate ?? 0))
+    return await Promise.all(rows.map((d) => enrich(ctx, d)))
+  },
+})
+
+export const getById = query({
+  args: { id: v.id('deals') },
+  handler: async (ctx, { id }) => {
+    const deal = await ctx.db.get(id)
+    if (!deal) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, deal.orgId)
+    return await enrich(ctx, deal)
+  },
+})
+
+/** Vérifie qu'une company appartient bien à l'org. */
+async function assertSameOrg(
+  ctx: Ctx,
+  orgId: Id<'organizations'>,
+  companyId: Id<'companies'>,
+  code: string,
+) {
+  const c = await ctx.db.get(companyId)
+  if (!c || c.orgId !== orgId) throw new ConvexError(code)
+}
+
+export const create = mutation({
+  args: {
+    orgId: v.id('organizations'),
+    investorCompanyId: v.id('companies'),
+    targetCompanyId: v.id('companies'),
+    instrumentKind: instrumentValidator,
+    status: v.optional(statusValidator),
+    ...dealFields,
+  },
+  handler: async (ctx, args) => {
+    await requireOrgMember(ctx, args.orgId)
+    await assertSameOrg(
+      ctx,
+      args.orgId,
+      args.targetCompanyId,
+      'target_wrong_org',
+    )
+    if (args.viaSpvCompanyId) {
+      await assertSameOrg(ctx, args.orgId, args.viaSpvCompanyId, 'spv_wrong_org')
+    }
+    // Scope dérivé de l'investisseur (throw si pas une group_*).
+    const holdingScope = await resolveScope(ctx, args.investorCompanyId)
+
+    const { status, currency, ...rest } = args
+    return await ctx.db.insert('deals', {
+      ...rest,
+      holdingScope,
+      currency: currency ?? 'EUR',
+      status: status ?? 'active',
+    })
+  },
+})
+
+export const update = mutation({
+  args: {
+    id: v.id('deals'),
+    patch: v.object({
+      investorCompanyId: v.optional(v.id('companies')),
+      targetCompanyId: v.optional(v.id('companies')),
+      instrumentKind: v.optional(instrumentValidator),
+      status: v.optional(statusValidator),
+      ...dealFields,
+    }),
+  },
+  handler: async (ctx, { id, patch }) => {
+    const deal = await ctx.db.get(id)
+    if (!deal) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, deal.orgId)
+
+    const next: Record<string, unknown> = { ...patch }
+    // Recalcule le scope si l'investisseur change.
+    if (patch.investorCompanyId) {
+      next.holdingScope = await resolveScope(ctx, patch.investorCompanyId)
+    }
+    if (patch.targetCompanyId) {
+      await assertSameOrg(
+        ctx,
+        deal.orgId,
+        patch.targetCompanyId,
+        'target_wrong_org',
+      )
+    }
+    await ctx.db.patch(id, next)
+    return id
+  },
+})
+
+export const remove = mutation({
+  args: { id: v.id('deals') },
+  handler: async (ctx, { id }) => {
+    const deal = await ctx.db.get(id)
+    if (!deal) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, deal.orgId)
+    await ctx.db.delete(id)
+    return { deletedId: id }
+  },
+})

@@ -1,15 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useConvexQuery } from '@convex-dev/react-query'
-import { DollarSign, Mail, Package, Users } from 'lucide-react'
+import { Mail, PieChart, Users, Wallet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '../../../../convex/_generated/api'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { KpiCard } from '~/components/dashboard/KpiCard'
-import { ActivityChart } from '~/components/dashboard/ActivityChart'
-import { RoleBreakdownChart } from '~/components/dashboard/RoleBreakdownChart'
-import { RecentItemsCard } from '~/components/dashboard/RecentItemsCard'
 
 export const Route = createFileRoute('/app/$orgSlug/')({
   component: OrgDashboard,
@@ -34,10 +31,6 @@ function OrgDashboard() {
       : undefined
   const isAdmin = myRole === 'admin' || myRole === 'owner'
 
-  const items = useConvexQuery(
-    api.items.list,
-    org ? { orgId: org._id } : 'skip',
-  )
   const members = useConvexQuery(
     api.organizations.listMembers,
     org ? { orgId: org._id } : 'skip',
@@ -47,7 +40,6 @@ function OrgDashboard() {
     org && isAdmin ? { orgId: org._id } : 'skip',
   )
 
-  const itemsCount = items?.length ?? 0
   const membersCount = members?.length ?? 0
   const pendingInvites = invitations?.length ?? 0
 
@@ -63,13 +55,6 @@ function OrgDashboard() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard
-          label={t('dashboard:kpi.totalItems')}
-          value={itemsCount}
-          delta={12}
-          hint={t('dashboard:kpi.vsLastMonth')}
-          icon={Package}
-        />
         <KpiCard
           label={t('dashboard:kpi.activeMembers')}
           value={membersCount}
@@ -87,22 +72,18 @@ function OrgDashboard() {
           icon={Mail}
         />
         <KpiCard
-          label={t('dashboard:kpi.mrr')}
-          value="$2,847"
-          delta={8.2}
-          hint={t('dashboard:kpi.demoVsLastMonth')}
-          icon={DollarSign}
+          label={t('dashboard:kpi.participations')}
+          value="—"
+          hint={t('dashboard:kpi.comingSoon')}
+          icon={PieChart}
+        />
+        <KpiCard
+          label={t('dashboard:kpi.cash')}
+          value="—"
+          hint={t('dashboard:kpi.comingSoon')}
+          icon={Wallet}
         />
       </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <ActivityChart />
-        </div>
-        <RoleBreakdownChart members={members} />
-      </div>
-
-      <RecentItemsCard items={items} orgSlug={orgSlug} />
     </main>
   )
 }

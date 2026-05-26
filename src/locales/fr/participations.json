@@ -1,0 +1,55 @@
+{
+  "metaTitle": "Participations — Albo OS",
+  "title": "Participations",
+  "consolidatedNote": "Vue opérationnelle Albo + Calte — pas une conso IFRS",
+  "scope": {
+    "all": "Consolidé",
+    "albo": "Albo",
+    "calte": "Calte"
+  },
+  "col": {
+    "company": "Société",
+    "scope": "Scope",
+    "deals": "Deals",
+    "committed": "Engagé",
+    "paid": "Versé"
+  },
+  "deal": {
+    "instrument": "Instrument",
+    "investor": "Investisseur",
+    "viaSpv": "via SPV",
+    "committed": "Engagé",
+    "paid": "Versé",
+    "signed": "Signé le",
+    "status": "Statut"
+  },
+  "status": {
+    "active": "Actif",
+    "partially_exited": "Exit partiel",
+    "fully_exited": "Exité",
+    "written_off": "Déprécié"
+  },
+  "instrument": {
+    "share": "Actions",
+    "spv_share": "Titres SPV",
+    "os": "Obligation simple",
+    "oc": "Obligation convertible",
+    "convertible_note": "Convertible note",
+    "safe": "SAFE",
+    "bsa": "BSA",
+    "bsa_air": "BSA Air",
+    "royalty": "Royalties",
+    "cca": "Compte courant d'associé",
+    "fund_lp": "Fonds (LP)",
+    "secondary": "Secondaire",
+    "real_estate_direct": "Immobilier direct",
+    "scpi": "SCPI",
+    "cto": "Compte-titres",
+    "dat": "Dépôt à terme",
+    "crypto": "Crypto"
+  },
+  "empty": "Aucune participation pour ce scope — crée des deals via le chat IA, ou ajoute-les à la main.",
+  "dealsCount_one": "{{count}} deal",
+  "dealsCount_other": "{{count}} deals",
+  "loading": "Chargement…"
+}

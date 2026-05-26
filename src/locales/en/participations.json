@@ -1,0 +1,55 @@
+{
+  "metaTitle": "Participations — Albo OS",
+  "title": "Participations",
+  "consolidatedNote": "Operational Albo + Calte view — not an IFRS consolidation",
+  "scope": {
+    "all": "Consolidated",
+    "albo": "Albo",
+    "calte": "Calte"
+  },
+  "col": {
+    "company": "Company",
+    "scope": "Scope",
+    "deals": "Deals",
+    "committed": "Committed",
+    "paid": "Paid"
+  },
+  "deal": {
+    "instrument": "Instrument",
+    "investor": "Investor",
+    "viaSpv": "via SPV",
+    "committed": "Committed",
+    "paid": "Paid",
+    "signed": "Signed",
+    "status": "Status"
+  },
+  "status": {
+    "active": "Active",
+    "partially_exited": "Partial exit",
+    "fully_exited": "Exited",
+    "written_off": "Written off"
+  },
+  "instrument": {
+    "share": "Shares",
+    "spv_share": "SPV shares",
+    "os": "Bond",
+    "oc": "Convertible bond",
+    "convertible_note": "Convertible note",
+    "safe": "SAFE",
+    "bsa": "BSA",
+    "bsa_air": "BSA Air",
+    "royalty": "Royalties",
+    "cca": "Shareholder loan",
+    "fund_lp": "Fund (LP)",
+    "secondary": "Secondary",
+    "real_estate_direct": "Direct real estate",
+    "scpi": "SCPI",
+    "cto": "Securities account",
+    "dat": "Term deposit",
+    "crypto": "Crypto"
+  },
+  "empty": "No participations in this scope — create deals via the AI chat, or add them manually.",
+  "dealsCount_one": "{{count}} deal",
+  "dealsCount_other": "{{count}} deals",
+  "loading": "Loading…"
+}

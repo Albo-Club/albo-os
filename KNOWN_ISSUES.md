@@ -463,63 +463,35 @@ on login is a deliberate follow-up, not a bug.
 English wordlist and are not translated — only our own labels around the meter
 are. Translating zxcvbn output would require loading its locale packs.
 
-## Leaflet (and any `window`-touching lib) needs client-only mount
+## Browser-only libs (`window` at module load) need client-only mount
 
-`react-leaflet` and the `leaflet/dist/leaflet.css` import both reference
-`window` at module load time. TanStack Start renders routes on the server
-by default — importing them at the top of a route file crashes SSR with
-`ReferenceError: window is not defined`.
+Any library that touches `window`/`document` at module load time (mapping
+libs, and charting/viz libs like Mermaid or Three.js — relevant once we add
+valuation/KPI charts) crashes SSR with `ReferenceError: window is not
+defined` if imported at the top of a route file. TanStack Start renders
+routes on the server by default.
 
-**Pattern** used in `src/routes/app/$orgSlug/map.tsx` :
+**Pattern** — dynamic-import the lib inside `useEffect`, render a skeleton
+until it resolves:
 
 ```tsx
-function LocationsMap() {
-  const [mods, setMods] = useState<LeafletModules | null>(null)
-
+function ClientOnlyViz() {
+  const [mod, setMod] = useState<Mod | null>(null)
   useEffect(() => {
     let cancelled = false
-    Promise.all([
-      import('react-leaflet'),
-      import('leaflet'),
-      import('leaflet/dist/leaflet.css'), // side-effect, client-only
-    ]).then(([rl, L]) => {
-      if (cancelled) return
-      setMods({ MapContainer: rl.MapContainer, /* … */ divIcon: L.divIcon })
+    import('the-browser-only-lib').then((m) => {
+      if (!cancelled) setMod(m)
     })
     return () => { cancelled = true }
   }, [])
-
-  if (!mods) return <Skeleton />
-  return <mods.MapContainer>…</mods.MapContainer>
+  if (!mod) return <Skeleton />
+  return <mod.Thing>…</mod.Thing>
 }
 ```
 
-Two non-obvious points :
-
-1. **Custom `divIcon` markers, not the default Leaflet icon.** The default
-   `L.Icon.Default` ships PNGs whose URLs assume `/marker-icon.png` at the
-   site root — bundlers (Vite included) don't rewrite those paths, so pins
-   render as broken-image placeholders. `divIcon({ html: '<span …/>' })`
-   sidesteps the whole thing and lets us color-code by status.
-2. **The Popup uses inline HTML/`style={{…}}`, not Tailwind classes.**
-   Leaflet's `<Popup>` renders its content outside the React tree (into a
-   Leaflet-controlled DOM node), so Tailwind utility classes inside it get
-   applied but the popup container itself ignores theme switching. Inline
-   styles with explicit hex are the safe baseline. If you ever need
-   theme-aware popups, read `STATUS_COLOR` from `data-theme` instead.
-
-Same pattern applies to any future browser-only library (Chart.js,
-Mermaid, Three.js, etc.) on TanStack Start.
-
-## react-day-picker v10 vs shadcn calendar template
-
-`pnpm dlx shadcn@latest add calendar` generates a `calendar.tsx` whose
-`classNames` map includes a `table` key, which was valid in
-`react-day-picker` v9 but removed in v10. Symptom: `tsc` errors with
-`'table' does not exist in type 'Partial<ClassNames>'`.
-
-We dropped that one line. If you re-run the shadcn CLI with overwrite,
-re-apply the deletion (or it will reintroduce the type error).
+If the lib renders content outside the React tree (e.g. into its own DOM
+node), Tailwind theme switching won't reach that container — fall back to
+inline styles with explicit values there.
 
 ## Convex dev typecheck
 

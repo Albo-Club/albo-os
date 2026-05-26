@@ -116,14 +116,62 @@ update project overrides if needed — don't mute the check.
 
 # Project-specific guide
 
+## Domaine métier (Albo OS)
+
+Albo OS = OS de pilotage du family office **CALTE** + holding d'invest
+**Albo Club**. Outil interne (2 users : Benjamin + Clément), pas de SaaS public.
+
+**Frontière d'attribution avec Attio** :
+
+- **Attio** = source de vérité **avant** invest (dealflow, sourcing, term
+  sheet, notes de call). Albo OS n'écrit pas dans Attio.
+- **Albo OS** = source de vérité **après** signature (suivi participation,
+  valorisations, KPIs portfolio, et plus tard cash management).
+- Ponts conservés en base : `attioCompanyId` / `attioDealId` (strings,
+  uniqueness gérée côté mutation, pas au schéma).
+
+**Distinction critique `orgId` vs `companies.kind`** (source de confusion n°1) :
+
+- `orgId` = compte SaaS multi-tenant Better Auth = **une seule** org
+  "Calte Family Office". Tout est scopé par `orgId`.
+- `companies.kind = "group_*"` = les **entités juridiques** du groupe (CALTE,
+  Albo Club, Caltimo, SCIs, Banco 2…), qui vivent dans la table métier
+  `companies`. Ne **jamais** confondre les deux.
+
+**`holdingScope` (`albo` | `calte`)** pilote 3 vues : Albo only, Calte only,
+ou consolidé (union opérationnelle, **pas** une conso IFRS — toujours le
+labelliser comme tel). Présent sur toute company `group_*`, absent sur
+`portfolio`. **Dénormalisé sur `deals`** (maintenu en sync par les mutations
+create/update) pour un filtre O(1).
+
+**Conventions de données** (à respecter partout, formatage à l'affichage
+seulement) :
+
+- **Montants** : entiers en **cents EUR**. `committedAmount: 100000` = 1 000 €.
+- **Taux** : **basis points**. `1100` = 11 %, `10000` = 100 %.
+- **Dates** : `number` ms epoch, toujours UTC. `new Date(value)` à l'affichage.
+- **Currency** : `"EUR"` par défaut sur tout deal.
+- **Uniqueness** (`siren`, `attioDealId`, `attioCompanyId`) : Convex ne
+  supporte pas les contraintes unique au schéma → enforcer dans les mutations
+  create/update (helpers dans `convex/lib/`).
+- **Multi-tenant strict** : aucune query/mutation ne lit/écrit sans avoir
+  passé `requireOrgMember(ctx, orgId)`. Pas d'exception.
+
+**État du schéma** : `companies`, `companyRelations`, `deals`, `valuations`,
+`kpiSnapshots` (cœur portfolio). `bankAccounts`, `transactions`, `forecasts`
+sont **déclarées mais inertes** (phase 2 cash management — mutations vides).
+
+> Contexte complet (structure du groupe, instruments, comptes bancaires,
+> écosystèmes OPRTRS/SIDE) : Notion « Architecture Base de données ».
+
 ## Plan de test bout-en-bout
 
 Avant de dériver le template en projet de prod, dérouler `TESTING.md`
 (niveaux 1 → 6, ~70 min). Le niveau 1 est automatisé (`pnpm typecheck`,
 `pnpm lint`, `pnpm build`, `pnpm test:smoke`, `pnpm sync:skills:check`),
 le reste est manuel — checklist de signoff pour valider auth, multi-tenant,
-invitations, items CRUD, uploads, account lifecycle, super-admin, AI chat,
-sécurité.
+invitations, uploads, account lifecycle, super-admin, AI chat, sécurité.
+(Le CRUD métier companies/deals s'ajoute à TESTING.md avec la V0.)
 
 ## Stack
 
@@ -132,7 +180,7 @@ sécurité.
 - **Backend** : Convex (`^1.x`) — queries, mutations, actions, HTTP routes, file storage, components.
 - **Auth** : Better Auth via `@convex-dev/better-auth` with `magicLink()` + `convex()`. Multi-tenant (orgs/members/invitations/roles) is implemented **natively in the Convex schema** (`organizations`, `organizationMembers`, `invitations` tables). The BA `organization()` plugin is deliberately **not loaded** — its tables aren't first-class Convex (no `withIndex` joins). See `KNOWN_ISSUES.md` for trade-offs.
 - **Emails** : `@convex-dev/resend` for transactional.
-- **AI** : `@convex-dev/agent` backend (default model `claude-haiku-4-5`, override via `ANTHROPIC_MODEL`) + `@assistant-ui/react` front + streaming HTTP route `/api/chat`. Provider abstracted via `getModel()` in `convex/agent.ts`. The chat agent ships with **DB-acting tools** (`convex/agentTools.ts`) scoped to the thread's org: list/create/update/delete `items`.
+- **AI** : `@convex-dev/agent` backend (default model `claude-haiku-4-5`, override via `ANTHROPIC_MODEL`) + `@assistant-ui/react` front + streaming HTTP route `/api/chat`. Provider abstracted via `getModel()` in `convex/agent.ts`. L'agent expose des **outils DB scopés à l'org** (`convex/agentTools.ts`) : `listCompanies` / `listDeals`, `createCompany` (portfolio uniquement), `createDeal` (scope dérivé de l'investisseur via `resolveScope`), `updateDeal`. Chaque outil re-vérifie l'appartenance via la scope key `${orgId}:${userId}` du thread (l'action de stream n'a pas d'identité auth → `actorUserId` passé explicitement).
 - **File storage** : Convex native (`ctx.storage.generateUploadUrl()`), 20 MB cap.
 - **Observability** : Sentry (front + Convex actions). CORS strict, security headers, HMAC verify on webhooks.
 
@@ -234,14 +282,14 @@ triviaux — il override tout, y compris les skills upstream.
 ### Query data scoped to an org
 
 ```ts
-// convex/items.ts
+// convex/deals.ts
 export const list = query({
   args: { orgId: v.id('organizations') },
   handler: async (ctx, { orgId }) => {
     const user = await requireAppUser(ctx)
     await requireOrgMember(ctx, { orgId, userId: user._id })
     return ctx.db
-      .query('items')
+      .query('deals')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
   },
@@ -252,17 +300,17 @@ export const list = query({
 
 ```ts
 export const remove = mutation({
-  args: { itemId: v.id('items') },
-  handler: async (ctx, { itemId }) => {
+  args: { dealId: v.id('deals') },
+  handler: async (ctx, { dealId }) => {
     const user = await requireAppUser(ctx)
-    const item = await ctx.db.get(itemId)
-    if (!item) throw new ConvexError('not_found')
+    const deal = await ctx.db.get(dealId)
+    if (!deal) throw new ConvexError('not_found')
     await requireOrgRole(ctx, {
-      orgId: item.orgId,
+      orgId: deal.orgId,
       userId: user._id,
       minRole: 'admin',
     })
-    await ctx.db.delete(itemId)
+    await ctx.db.delete(dealId)
   },
 })
 ```

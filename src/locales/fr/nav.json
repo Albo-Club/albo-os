@@ -2,29 +2,23 @@
   "appShell": {
     "ai": "IA",
     "breadcrumb": {
-      "items": "Éléments",
-      "calendar": "Calendrier",
-      "tasks": "Tâches",
-      "billing": "Facturation",
+      "participations": "Participations",
+      "cash": "Trésorerie",
       "settings": "Paramètres",
       "members": "Membres",
       "invitations": "Invitations",
       "general": "Général"
     }
   },
+  "comingSoon": "Bientôt disponible",
   "groups": {
     "platform": "Plateforme",
-    "billing": "Facturation",
     "workspace": "Espace de travail"
   },
   "items": {
     "dashboard": "Tableau de bord",
-    "items": "Éléments",
-    "locations": "Emplacements",
-    "calendar": "Calendrier",
-    "tasks": "Tâches",
-    "payments": "Paiements",
-    "invoices": "Factures",
+    "participations": "Participations",
+    "cash": "Trésorerie",
     "members": "Membres",
     "invitations": "Invitations",
     "settings": "Paramètres"
