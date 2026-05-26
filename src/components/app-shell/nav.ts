@@ -1,14 +1,10 @@
 import {
-  Calendar,
-  CreditCard,
   LayoutDashboard,
-  ListTodo,
   Mail,
-  MapPin,
-  Package,
-  Receipt,
+  PieChart,
   Settings,
   Users,
+  Wallet,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -40,43 +36,14 @@ export function getNavGroups(): Array<NavGroup> {
           icon: LayoutDashboard,
         },
         {
-          titleKey: 'items.items',
-          to: '/app/$orgSlug/items',
-          icon: Package,
+          titleKey: 'items.participations',
+          to: '/app/$orgSlug/participations',
+          icon: PieChart,
         },
         {
-          titleKey: 'items.locations',
-          to: '/app/$orgSlug/map',
-          icon: MapPin,
-          demo: true,
-        },
-        {
-          titleKey: 'items.calendar',
-          to: '/app/$orgSlug/calendar',
-          icon: Calendar,
-          demo: true,
-        },
-        {
-          titleKey: 'items.tasks',
-          to: '/app/$orgSlug/tasks',
-          icon: ListTodo,
-          demo: true,
-        },
-      ],
-    },
-    {
-      labelKey: 'groups.billing',
-      items: [
-        {
-          titleKey: 'items.payments',
-          to: '/app/$orgSlug/billing',
-          icon: CreditCard,
-          demo: true,
-        },
-        {
-          titleKey: 'items.invoices',
-          to: '/app/$orgSlug/billing',
-          icon: Receipt,
+          titleKey: 'items.cash',
+          to: '/app/$orgSlug/cash',
+          icon: Wallet,
           demo: true,
         },
       ],

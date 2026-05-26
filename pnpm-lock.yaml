@@ -101,9 +101,6 @@ importers:
       i18next:
         specifier: ^26.2.0
         version: 26.2.0(typescript@6.0.3)
-      leaflet:
-        specifier: ^1.9.4
-        version: 1.9.4
       lucide-react:
         specifier: ^0.469.0
         version: 0.469.0(react@19.2.6)
@@ -119,18 +116,12 @@ importers:
       react:
         specifier: ^19.2.5
         version: 19.2.6
-      react-day-picker:
-        specifier: ^10.0.0
-        version: 10.0.0(react@19.2.6)
       react-dom:
         specifier: ^19.2.5
         version: 19.2.6(react@19.2.6)
       react-i18next:
         specifier: ^17.0.8
         version: 17.0.8(i18next@26.2.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
-      react-leaflet:
-        specifier: ^5.0.0
-        version: 5.0.0(leaflet@1.9.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       recharts:
         specifier: 3.8.0
         version: 3.8.0(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react-is@19.2.6)(react@19.2.6)(redux@5.0.1)
@@ -153,9 +144,6 @@ importers:
       '@tanstack/eslint-config':
         specifier: ^0.4.0
         version: 0.4.0(@typescript-eslint/utils@8.59.3(eslint@10.3.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.3.0(jiti@2.7.0))(typescript@6.0.3)
-      '@types/leaflet':
-        specifier: ^1.9.21
-        version: 1.9.21
       '@types/node':
         specifier: ^25.7.0
         version: 25.7.0
@@ -464,9 +452,6 @@ packages:
     peerDependencies:
       convex: ^1.31.7
       convex-helpers: ^0.1.94
-
-  '@date-fns/tz@1.4.1':
-    resolution: {integrity: sha512-P5LUNhtbj6YfI3iJjw5EL9eUAG6OitD0W3fWQcpQjDRc/QIsL0tRNuO1PcDvPccWL1fSTXXdE1ds+l95DV/OFA==}
 
   '@emnapi/core@1.10.0':
     resolution: {integrity: sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw==}
@@ -1651,13 +1636,6 @@ packages:
   '@radix-ui/rect@1.1.1':
     resolution: {integrity: sha512-HPwpGIzkl28mWyZqG52jiqDJ12waP11Pa1lGoiyUkIEuMLBP0oeK/C89esbXrxsky5we7dfd8U58nm0SgAWpVw==}
 
-  '@react-leaflet/core@3.0.0':
-    resolution: {integrity: sha512-3EWmekh4Nz+pGcr+xjf0KNyYfC3U2JjnkWsh0zcqaexYqmmB5ZhH37kz41JXGmKzpaMZCnPofBBm64i+YrEvGQ==}
-    peerDependencies:
-      leaflet: ^1.9.0
-      react: ^19.0.0
-      react-dom: ^19.0.0
-
   '@reduxjs/toolkit@2.11.2':
     resolution: {integrity: sha512-Kd6kAHTA6/nUpp8mySPqj3en3dm0tdMIgbttnQ1xFMVpufoj+ADi8pXLBsd4xzTRHQa7t/Jv8W5UnCuW4kuWMQ==}
     peerDependencies:
@@ -2150,14 +2128,8 @@ packages:
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
 
-  '@types/geojson@7946.0.16':
-    resolution: {integrity: sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg==}
-
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
-
-  '@types/leaflet@1.9.21':
-    resolution: {integrity: sha512-TbAd9DaPGSnzp6QvtYngntMZgcRk+igFELwR2N99XZn7RXUdKgsXMR+28bUO0rPsWp8MIu/f47luLIQuSLYv/w==}
 
   '@types/node@25.7.0':
     resolution: {integrity: sha512-z+pdZyxE+RTQE9AcboAZCb4otwcrvgHD+GlBpPgn0emDVt0ohrTMhAwlr2Wd9nZ+nihhYFxO2pThz3C5qSu2Eg==}
@@ -3196,9 +3168,6 @@ packages:
     resolution: {integrity: sha512-nbD8lB9EB3wNdMhOCdx5Li8DxnLbvKByylRLcJ1h+4SkrowVeECAyZlyiKMThF7xFdRz0jSQ2MoJr+wXux2y0Q==}
     engines: {node: '>=20.0.0'}
 
-  leaflet@1.9.4:
-    resolution: {integrity: sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==}
-
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
     engines: {node: '>= 0.8.0'}
@@ -3451,12 +3420,6 @@ packages:
       '@types/react-dom':
         optional: true
 
-  react-day-picker@10.0.0:
-    resolution: {integrity: sha512-lrEXo5wFPsq5LTcayelM3BPueD00v7zbdipAY+EIdPcseVykYwkOWx4Ujn/EtbBvpnp8ZPUHol17HXH6kVbZoA==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      react: '>=16.8.0'
-
   react-dom@19.2.6:
     resolution: {integrity: sha512-0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==}
     peerDependencies:
@@ -3480,13 +3443,6 @@ packages:
 
   react-is@19.2.6:
     resolution: {integrity: sha512-XjBR15BhXuylgWGuslhDKqlSayuqvqBX91BP8pauG8kd1zY8kotkNWbXksTCNRarse4kuGbe2kIY05ARtwNIvw==}
-
-  react-leaflet@5.0.0:
-    resolution: {integrity: sha512-CWbTpr5vcHw5bt9i4zSlPEVQdTVcML390TjeDG0cK59z1ylexpqC6M1PJFjV8jD7CF+ACBFsLIDs6DRMoLEofw==}
-    peerDependencies:
-      leaflet: ^1.9.0
-      react: ^19.0.0
-      react-dom: ^19.0.0
 
   react-redux@9.2.0:
     resolution: {integrity: sha512-ROY9fvHhwOD9ySfrF0wmvu//bKCQ6AeZZq1nJNtbDC+kk5DuSuNX/n6YWYF/SYy7bSba4D4FSz8DJeKY/S/r+g==}
@@ -4308,8 +4264,6 @@ snapshots:
     dependencies:
       convex: 1.38.0(react@19.2.6)
       convex-helpers: 0.1.116(@standard-schema/spec@1.1.0)(convex@1.38.0(react@19.2.6))(react@19.2.6)(typescript@6.0.3)(zod@4.4.3)
-
-  '@date-fns/tz@1.4.1': {}
 
   '@emnapi/core@1.10.0':
     dependencies:
@@ -5384,12 +5338,6 @@ snapshots:
 
   '@radix-ui/rect@1.1.1': {}
 
-  '@react-leaflet/core@3.0.0(leaflet@1.9.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
-    dependencies:
-      leaflet: 1.9.4
-      react: 19.2.6
-      react-dom: 19.2.6(react@19.2.6)
-
   '@reduxjs/toolkit@2.11.2(react-redux@9.2.0(@types/react@19.2.14)(react@19.2.6)(redux@5.0.1))(react@19.2.6)':
     dependencies:
       '@standard-schema/spec': 1.1.0
@@ -5889,13 +5837,7 @@ snapshots:
 
   '@types/estree@1.0.9': {}
 
-  '@types/geojson@7946.0.16': {}
-
   '@types/json-schema@7.0.15': {}
-
-  '@types/leaflet@1.9.21':
-    dependencies:
-      '@types/geojson': 7946.0.16
 
   '@types/node@25.7.0':
     dependencies:
@@ -6852,8 +6794,6 @@ snapshots:
 
   kysely@0.28.17: {}
 
-  leaflet@1.9.4: {}
-
   levn@0.4.1:
     dependencies:
       prelude-ls: 1.2.1
@@ -7130,12 +7070,6 @@ snapshots:
       '@types/react': 19.2.14
       '@types/react-dom': 19.2.3(@types/react@19.2.14)
 
-  react-day-picker@10.0.0(react@19.2.6):
-    dependencies:
-      '@date-fns/tz': 1.4.1
-      date-fns: 4.1.0
-      react: 19.2.6
-
   react-dom@19.2.6(react@19.2.6):
     dependencies:
       react: 19.2.6
@@ -7153,13 +7087,6 @@ snapshots:
       typescript: 6.0.3
 
   react-is@19.2.6: {}
-
-  react-leaflet@5.0.0(leaflet@1.9.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
-    dependencies:
-      '@react-leaflet/core': 3.0.0(leaflet@1.9.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      leaflet: 1.9.4
-      react: 19.2.6
-      react-dom: 19.2.6(react@19.2.6)
 
   react-redux@9.2.0(@types/react@19.2.14)(react@19.2.6)(redux@5.0.1):
     dependencies:

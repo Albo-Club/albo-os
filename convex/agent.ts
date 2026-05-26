@@ -2,7 +2,6 @@ import { anthropic } from '@ai-sdk/anthropic'
 import { Agent, stepCountIs } from '@convex-dev/agent'
 
 import { components } from './_generated/api'
-import { itemTools } from './agentTools'
 
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5'
 
@@ -14,12 +13,12 @@ export const chatAgent = new Agent(components.agent, {
   name: 'albo-os',
   languageModel: getModel(),
   instructions:
-    "You are albo-os's helpful in-app assistant. Answer concisely. " +
-    "You can act on the user's organization through tools (list/create/" +
-    'update/delete items). Always confirm destructive actions (delete) by ' +
-    'restating the target before calling the tool. ' +
-    'If a user asks something you cannot answer from context or do via ' +
-    'tools, say so and suggest what they might do next.',
-  tools: itemTools,
+    "You are Albo OS's helpful in-app assistant. Answer concisely. " +
+    'You currently have no action tools wired up — answer from context only. ' +
+    'If a user asks you to read or change portfolio data (companies, deals), ' +
+    'say the data tools are not connected yet and suggest doing it from the UI.',
+  // No tools until the deals/companies tools are wired in the V0 build
+  // (mission step 6). The previous demo `items` tools were removed.
+  tools: {},
   stopWhen: stepCountIs(5),
 })

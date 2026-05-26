@@ -92,14 +92,12 @@ If you'd rather rebrand without touching Convex, `pnpm run init my-project
 ```
 convex/                Convex backend
   auth.ts              Better Auth config (email + magic link)
-  schema.ts            users · organizations · members · invitations · items
+  schema.ts            users · organizations · members · invitations
   organizations.ts     org CRUD, members, role helpers
   invitations.ts       invite, accept, revoke (with email send)
   users.ts             me, provisionMe, updateProfile
   admin.ts             super-admin queries + purgeExcept (dev cleanup)
-  items.ts             example multi-tenant CRUD
   agent.ts             AI agent instance (Anthropic, default Haiku 4.5)
-  agentTools.ts        DB-acting tools the chat agent can call (items CRUD)
   chat.ts              threads, sendMessage, listMessages, HTTP /api/chat
   rateLimiters.ts      named limits + consumeLimit helper
   lib/auth.ts          requireAppUser, requireOrgMember, requireOrgRole, …
@@ -112,7 +110,8 @@ src/
       $orgSlug/        Org-scoped routes
         route.tsx      Top app bar + AI chat sidebar mount point
         settings/      General · Members · Invitations
-        items.tsx      CRUD example
+        participations.tsx  Portfolio view (placeholder — built in V0)
+        cash.tsx       Cash management (placeholder — phase 2)
       admin.tsx        Super-admin
       me.tsx           Profile + change password
     login.tsx / register.tsx / accept-invite.$token.tsx
@@ -133,7 +132,7 @@ scripts/
 
 | Path                                  | What it does                          |
 | ------------------------------------- | ------------------------------------- |
-| `/`                                   | Marketing landing with sign-in CTA    |
+| `/`                                   | Redirect to `/app` (no marketing landing) |
 | `/login`, `/register`                 | Email/password + redirect support     |
 | `/accept-invite/:token`               | Token-as-credential state machine     |
 | `/app`                                | Org switcher / onboarding redirect    |
@@ -141,7 +140,8 @@ scripts/
 | `/app/me`                             | Profile, password, sign-out           |
 | `/app/admin`                          | Super-admin overview                  |
 | `/app/:orgSlug`                       | Org dashboard                         |
-| `/app/:orgSlug/items`                 | Example multi-tenant CRUD             |
+| `/app/:orgSlug/participations`        | Portfolio view (placeholder)          |
+| `/app/:orgSlug/cash`                  | Cash management (placeholder)         |
 | `/app/:orgSlug/settings/{general,members,invitations}` | Settings UI |
 
 ## Auth model
@@ -160,10 +160,11 @@ The `AiChat` slide-over uses the Convex Agent's React hooks
 (`useUIMessages`) so streaming deltas arrive via WebSocket — no manual SSE
 plumbing. Threads are keyed by `${orgId}:${userId}`.
 
-The chat agent ships with **DB-acting tools** (`convex/agentTools.ts`) so it
-can list / create / update / delete `items` for the user's current org —
-membership is re-checked inside every tool via the thread's scope key.
-Tool calls cap out at 5 rounds per turn (`stepCountIs(5)`).
+The chat agent currently ships with **no action tools** (`tools: {}`) — it
+answers from context only. DB-acting tools scoped to the org (deals /
+companies) will be wired back in the V0 build, re-checking membership inside
+every tool via the thread's scope key. Tool calls cap out at 5 rounds per
+turn (`stepCountIs(5)`).
 
 There's also an HTTP streaming endpoint at `<convex-site-url>/api/chat` for
 clients that prefer plain HTTP streaming (curl, custom clients).

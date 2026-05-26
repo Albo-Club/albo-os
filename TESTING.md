@@ -88,44 +88,17 @@ Connecté en tant qu'Alice sur `/app/acme/`.
 
 | #    | Étape                                                          | Résultat attendu                                                  |
 | ---- | -------------------------------------------------------------- | ----------------------------------------------------------------- |
-| SH1  | Sidebar `inset` (carte flottante arrondie) : groupes Platform / Billing en haut ; Members / Invitations / Settings épinglés en bas (nav secondaire `mt-auto`, sans label) | OK ; items admin-only masqués si rôle "member"                     |
+| SH1  | Sidebar `inset` (carte flottante arrondie) : groupe Platform (Dashboard / Participations / Cash) en haut ; Members / Invitations / Settings épinglés en bas (nav secondaire `mt-auto`, sans label) | OK ; entrées admin-only masquées si rôle "member" ; badge "demo" sur Cash |
 | SH2  | Clic sur `SidebarTrigger` (header) OU sur la `SidebarRail` (bande fine au bord droit de la sidebar) | Sidebar collapse en `icon` ; cookie `sidebar_state` persiste ; icônes orga/profil non écrasées en mode `icon` |
 | SH3  | Redimensionner < 768px                                         | Sidebar passe en `Sheet` mobile, ouverture via burger              |
-| SH4  | Naviguer Dashboard → Items → Locations → Calendar → Tasks → Billing | Breadcrumb du header se met à jour à chaque route             |
-| SH5  | Dashboard : 4 KPI cards + AreaChart + PieChart + recent items  | Counts cohérents avec items.list / listMembers réels               |
+| SH4  | Naviguer Dashboard → Participations → Cash                     | Breadcrumb du header se met à jour à chaque route ; Participations/Cash affichent "Bientôt" |
+| SH5  | Dashboard : 4 KPI cards (membres, invitations, Participations —, Trésorerie —) | Counts membres/invitations cohérents avec listMembers réels ; cartes Participations/Cash en placeholder "—" |
 | SH6  | Toggle dark mode (icône soleil/lune dans header)               | Page bascule light ↔ dark, sidebar + charts adaptés                |
 | SH7  | Theme picker (footer sidebar) → choisir Blue / Emerald / Violet| Primary + chart-1 changent ; survit au reload (localStorage)       |
 | SH8  | Org switcher (header sidebar), orga **sans** logo             | Initiale (1ʳᵉ lettre) centrée dans le carré arrondi ; liste les orgs ; clic switch route + persiste `lastOrgSlug` |
 | SH9  | NavUser (footer sidebar) → profile / switch org / sign out     | Avatar **rond** ; sans photo, initiales prénom+nom (ex. `BB`) ; mêmes destinations qu'avant refonte |
 | SH10 | Bouton AI dans header                                          | Ouvre le modal chat existant (non-régression)                      |
-| SH11 | Ouvrir une page au contenu plus haut que l'écran (ex. Items long) | Le cadre `inset` reste calé sur la hauteur du viewport ; le scroll se fait **dans** le cadre, bord bas arrondi toujours visible |
-
-## Niveau 2 — Data table items (5 min)
-
-| #   | Étape                                                | Résultat attendu                                                  |
-| --- | ---------------------------------------------------- | ----------------------------------------------------------------- |
-| T1  | Filtre global (champ "Filter items…")                | Réduit les rows en temps réel (title/description/createdBy)        |
-| T2  | Tri par "Created at" (clic header → dropdown)        | Asc/Desc fonctionne, indicateur visible                            |
-| T3  | Pagination (créer >10 items)                         | Boutons next/prev/first/last + page size 10/20/30/50                |
-| T4  | Sélection multiple via checkbox                      | Compteur "X of N row(s) selected" + bouton "Delete X" si admin     |
-| T5  | Bulk delete (admin only)                             | Demande confirmation, supprime tout, toast succès                  |
-| T6  | "New item" → Dialog → submit                         | Item créé, dialog se ferme, ligne apparaît en haut (real-time)     |
-| T7  | Actions row (menu `…`) → Edit / Delete               | Edit ouvre le même Dialog en mode update ; Delete demande confirm  |
-
-## Niveau 2 — Pages démo (mock, 3 min)
-
-| #   | Étape                                                | Résultat attendu                                                  |
-| --- | ---------------------------------------------------- | ----------------------------------------------------------------- |
-| D1  | `/app/acme/billing` Overview                         | 3 cards (plan, next invoice, usage) + alert "demo data"            |
-| D2  | `/app/acme/billing` Invoices                         | Table 8 lignes avec badges Paid/Pending/Failed colorés             |
-| D3  | `/app/acme/billing` Payment methods → "Add card"     | Dialog s'ouvre (placeholder), ferme sans erreur                    |
-| D4  | `/app/acme/calendar`                                 | Calendar avec points sous les dates ayant un event                 |
-| D5  | Cliquer une date dans le calendar                    | Panneau droit liste les events du jour (mock)                      |
-| D6  | `/app/acme/tasks`                                    | 3 colonnes kanban avec 9 tasks, badges priorité                    |
-| D7  | Cliquer flèches `→` / `←` sur une task               | La carte se déplace de colonne (state local)                       |
-| D8  | `/app/acme/map` (Locations)                          | Carte Leaflet de France + 8 pins colorés ; card "Portefeuille" à droite avec compte par statut |
-| D9  | Cliquer un pin sur la carte                          | Popup s'ouvre avec titre, adresse, capacité, prix formaté, badge statut |
-| D10 | Reload `/app/acme/map` 3-4 fois                      | Pas de flash blanc ni erreur d'hydratation (le composant Leaflet est monté en client-only via `useEffect`) |
+| SH11 | Ouvrir une page au contenu plus haut que l'écran (liste longue) | Le cadre `inset` reste calé sur la hauteur du viewport ; le scroll se fait **dans** le cadre, bord bas arrondi toujours visible |
 
 ## Niveau 2 — Multi-tenant (15 min)
 
@@ -136,14 +109,15 @@ Toujours connecté en tant qu'Alice. Préparer un 2e navigateur pour Bob.
 | M1  | `/app/acme/settings/invitations` → invite `bob@test.local`  | Email envoyé, listée en pending                                     |
 | M2  | Browser 2 (incognito) → ouvrir le lien d'invitation         | Page `/accept-invite/<token>` accessible non-authentifié            |
 | M3  | Sign up Bob via le flow d'invitation                        | Bob créé, automatiquement membre d'Acme avec rôle "member"          |
-| M4  | Bob visite `/app/acme/items`                                | Voit la liste (vide ou items d'Alice), peut créer                   |
+| M4  | Bob visite `/app/acme`                                      | Voit le dashboard de l'org en tant que membre                       |
 | M5  | Alice change rôle Bob → "admin"                             | Persiste, Bob voit le badge mis à jour                              |
 | M6  | Bob crée une 2e org "Beta"                                  | Switch vers `/app/beta`, Alice n'est PAS membre                      |
 | M7  | Alice tente `/app/beta` directement                         | Redirige vers `/app` ou 403                                          |
-| M8  | Items isolés : Alice voit items d'Acme uniquement           | Aucun item de Beta côté Alice                                       |
-| M9  | Switch org via dropdown top bar                             | Routes recalculées, items rechargés                                 |
-| M10 | Bob (admin Acme) supprime un item créé par Alice            | Autorisé (admin override sur creator-only)                          |
-| M11 | Member non-admin tente de supprimer item d'un autre         | Erreur "forbidden", pas de delete                                   |
+| M8  | Switch org via dropdown top bar                             | Routes recalculées, scope org rechargé                              |
+
+> **Isolation des données métier** (companies/deals scopés `orgId`, override
+> admin sur les deletes) : à valider en V0 quand les mutations CRUD existent.
+> Cf. `KNOWN_ISSUES.md` / la mission V0.
 
 ## Niveau 3 — Invitations edge cases (8 min)
 
@@ -158,18 +132,10 @@ Toujours connecté en tant qu'Alice. Préparer un 2e navigateur pour Bob.
 | I7 | Révoquer une invitation pending                            | Disparaît de la liste, lien devient invalide                         |
 | I8 | Vérifier que `RESEND_TEST_MODE=true` n'envoie pas d'email réel | Logs Convex montrent "skipped (test mode)"                       |
 
-## Niveau 3 — Items CRUD (8 min)
-
-| #  | Étape                                                  | Résultat attendu                                                  |
-| -- | ------------------------------------------------------ | ----------------------------------------------------------------- |
-| P1 | Create item via formulaire                             | Apparaît instantanément dans la liste                              |
-| P2 | Ouvrir l'app dans un 2e onglet → créer item depuis A   | Onglet B voit l'item sans refresh (real-time Convex)               |
-| P3 | Edit item → save                                       | Title/description mis à jour partout                               |
-| P4 | Delete item par son créateur                           | Disparaît                                                          |
-| P5 | Delete item d'un autre user en tant que member        | Bloqué                                                             |
-| P6 | Title vide / > 120 chars                               | Erreur de validation côté serveur                                  |
-| P7 | Description > 2000 chars                               | Erreur "description_too_long"                                      |
-| P8 | Items invisibles depuis une autre org (cf. M8)         | Isolation confirmée                                                |
+> **Niveau 3 — CRUD métier (companies / deals)** : ce niveau sera écrit en
+> V0 quand les mutations `companies.*` / `deals.*` existeront (real-time
+> Convex, validation serveur titre/montants, isolation par `orgId`, override
+> admin sur les deletes, scope `holdingScope`). Cf. la mission V0.
 
 ## Niveau 4 — Uploads (5 min)
 
@@ -206,9 +172,7 @@ Toujours connecté en tant qu'Alice. Préparer un 2e navigateur pour Bob.
 | -- | ------------------------------------------------------- | ----------------------------------------------------------------- |
 | C1 | Ouvrir le slide-over chat depuis `/app/acme`            | Premier thread créé automatiquement                                |
 | C2 | Envoyer un message simple ("ping")                      | Stream visible token par token, pas de blocage UI                  |
-| C3 | Demander à l'agent "liste mes items"                    | Tool `listItems` appelé, réponse contient les items d'Acme        |
-| C4 | "crée un item titre Test"                               | Tool `createItem` appelé, item visible dans `/app/acme/items` après refresh |
-| C5 | "supprime l'item Test" + confirmation                   | Tool `deleteItem` appelé, item disparaît                          |
+| C3 | Demander à l'agent une action sur les données           | L'agent répond qu'aucun outil d'action n'est branché (V0 étape 6 : tools deals/companies) |
 | C6 | Spammer 30 messages en 1 min                            | Rate-limit `chatSend` se déclenche                                |
 | C7 | Depuis `/app/beta`, vérifier que les threads d'Acme ne sont PAS listés | Isolation org confirmée (scope `${orgId}:${userId}`) |
 
@@ -226,9 +190,10 @@ Toujours connecté en tant qu'Alice. Préparer un 2e navigateur pour Bob.
 ## Seed dev rapide
 
 Pour gagner ~2 min de setup, un seed dev (à appeler via `convex run`)
-peut créer Alice (SA), Bob (member), une org "acme" et 3 items. À écrire
-dans `convex/admin.ts` sous un `internalMutation` `seedDev`, gated derrière
-`process.env.CONVEX_DEPLOYMENT !== 'production'`.
+peut créer Alice (SA), Bob (member) et une org "acme". À écrire dans
+`convex/admin.ts` sous un `internalMutation` `seedDev`, gated derrière
+`process.env.CONVEX_DEPLOYMENT !== 'production'`. Le seed des 9 entités du
+groupe Calte vit séparément dans `convex/seed.ts` (`seedGroup`, mission V0).
 
 ## En cas d'échec
 

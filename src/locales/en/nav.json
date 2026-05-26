@@ -2,29 +2,23 @@
   "appShell": {
     "ai": "AI",
     "breadcrumb": {
-      "items": "Items",
-      "calendar": "Calendar",
-      "tasks": "Tasks",
-      "billing": "Billing",
+      "participations": "Participations",
+      "cash": "Cash",
       "settings": "Settings",
       "members": "Members",
       "invitations": "Invitations",
       "general": "General"
     }
   },
+  "comingSoon": "Coming soon",
   "groups": {
     "platform": "Platform",
-    "billing": "Billing",
     "workspace": "Workspace"
   },
   "items": {
     "dashboard": "Dashboard",
-    "items": "Items",
-    "locations": "Locations",
-    "calendar": "Calendar",
-    "tasks": "Tasks",
-    "payments": "Payments",
-    "invoices": "Invoices",
+    "participations": "Participations",
+    "cash": "Cash",
     "members": "Members",
     "invitations": "Invitations",
     "settings": "Settings"
