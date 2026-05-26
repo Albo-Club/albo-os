@@ -1,17 +1,17 @@
 /**
- * Seed du groupe Calte — données du family office (9 entités + 8 relations
- * capitalistiques). Idempotent : relançable sans créer de doublons (upsert
- * par `name` dans l'org).
+ * Seed du groupe Calte — modèle MULTI-ORG.
  *
- * Personnes physiques (Clément, Felisa, Benjamin) et sociétés externes
- * (MATRIX, Nexity) ne sont PAS modélisées comme `companies` — elles vivent
- * dans les `notes`.
+ * Albo et Calte sont deux organisations Better Auth distinctes. Chaque org
+ * porte ses propres entités juridiques (`companies`). Une nouvelle entité
+ * d'invest = une nouvelle org (apparaît d'office dans la vue agrégée).
  *
- * Lancer (dev) :
- *   pnpm exec convex run seed:seedCalteFamilyOffice   # org + 9 entités
- *   pnpm exec convex run seed:seedExampleDeals         # deals d'exemple
- * Ou cibler une org existante :
- *   pnpm exec convex run seed:seedGroup '{"orgId":"<id>"}'
+ * Idempotent : upsert org par slug, companies par name, relations par couple
+ * parent/child. Personnes physiques et sociétés externes vivent dans `notes`.
+ *
+ * Lancer (prod, dev supprimé) :
+ *   npx convex export --prod                          # snapshot de secours
+ *   npx convex run --prod seed:cleanupLegacy          # purge l'ancienne org combinée
+ *   npx convex run --prod seed:seedAll '{"ownerEmail":"benjamin@alboteam.com"}'
  */
 
 import { ConvexError, v } from 'convex/values'
@@ -20,57 +20,39 @@ import { internalMutation } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import type { MutationCtx } from './_generated/server'
 
-const ORG_NAME = 'Calte Family Office'
-const ORG_SLUG = 'calte-family-office'
+const LEGACY_SLUG = 'calte-family-office'
 
 // UTC ms epoch — dates de constitution (source : Notion « Architecture BDD »).
 const d = (y: number, m: number, day: number) => Date.UTC(y, m - 1, day)
 
-type GroupKind =
-  | 'group_root'
-  | 'group_operating'
-  | 'group_sci'
-  | 'group_manco'
+type GroupKind = 'group_root' | 'group_operating' | 'group_sci' | 'group_manco'
 
 type SeedCompany = {
   name: string
   legalName: string
   kind: GroupKind
-  holdingScope: 'albo' | 'calte'
   siren: string
   legalForm: string
   incorporationDate: number
   notes?: string
 }
 
-const COMPANIES: Array<SeedCompany> = [
+// ─── Org Calte ──────────────────────────────────────────────────────────────
+
+const CALTE_COMPANIES: Array<SeedCompany> = [
   {
     name: 'CALTE',
     legalName: 'CALTE',
     kind: 'group_root',
-    holdingScope: 'calte',
     siren: '802824052',
     legalForm: 'SAS',
     incorporationDate: d(2014, 6, 1),
     notes: 'Holding principale, 100% Clément Alteresco (PP, hors système).',
   },
   {
-    name: 'Albo Club',
-    legalName: 'Albo Club SAS',
-    kind: 'group_root',
-    holdingScope: 'albo',
-    siren: '934657909',
-    legalForm: 'SAS',
-    incorporationDate: d(2024, 10, 18),
-    notes:
-      'Filiale CALTE 97% + Benjamin Bouquet (PP, hors système) 3%. Vue ' +
-      'séparée car portefeuille impact piloté par Benjamin.',
-  },
-  {
     name: 'Caltimo',
     legalName: 'CALTIMO SASU',
     kind: 'group_operating',
-    holdingScope: 'calte',
     siren: '982380032',
     legalForm: 'SASU',
     incorporationDate: d(2023, 12, 7),
@@ -79,7 +61,6 @@ const COMPANIES: Array<SeedCompany> = [
     name: 'RDB',
     legalName: 'RDB SASU',
     kind: 'group_operating',
-    holdingScope: 'calte',
     siren: '100056290',
     legalForm: 'SASU',
     incorporationDate: d(2026, 1, 16),
@@ -88,7 +69,6 @@ const COMPANIES: Array<SeedCompany> = [
     name: 'Relais Chapelle',
     legalName: 'Relais Chapelle SASU',
     kind: 'group_operating',
-    holdingScope: 'calte',
     siren: '922536636',
     legalForm: 'SASU',
     incorporationDate: d(2022, 12, 13),
@@ -100,7 +80,6 @@ const COMPANIES: Array<SeedCompany> = [
     name: 'SCI Chapelle',
     legalName: 'SCI Chapelle',
     kind: 'group_sci',
-    holdingScope: 'calte',
     siren: '897979605',
     legalForm: 'SCI',
     incorporationDate: d(2021, 3, 31),
@@ -112,7 +91,6 @@ const COMPANIES: Array<SeedCompany> = [
     name: 'SCI Chapelle 2',
     legalName: 'SCI Chapelle 2',
     kind: 'group_sci',
-    holdingScope: 'calte',
     siren: '978810299',
     legalForm: 'SCI',
     incorporationDate: d(2023, 8, 23),
@@ -124,7 +102,6 @@ const COMPANIES: Array<SeedCompany> = [
     name: 'SCI Upload',
     legalName: 'SCI Upload',
     kind: 'group_sci',
-    holdingScope: 'calte',
     siren: '987965852',
     legalForm: 'SCI',
     incorporationDate: d(2025, 6, 6),
@@ -136,7 +113,6 @@ const COMPANIES: Array<SeedCompany> = [
     name: 'Banco 2',
     legalName: 'Banco 2 SAS',
     kind: 'group_manco',
-    holdingScope: 'calte',
     siren: '953956737',
     legalForm: 'SAS',
     incorporationDate: d(2023, 6, 28),
@@ -147,9 +123,8 @@ const COMPANIES: Array<SeedCompany> = [
   },
 ]
 
-// Détention : parent toujours CALTE.
-const RELATIONS: Array<{ child: string; ownershipPct: number }> = [
-  { child: 'Albo Club', ownershipPct: 97 },
+// Détention intra-org Calte : parent toujours CALTE.
+const CALTE_RELATIONS: Array<{ child: string; ownershipPct: number }> = [
   { child: 'Caltimo', ownershipPct: 100 },
   { child: 'RDB', ownershipPct: 100 },
   { child: 'Relais Chapelle', ownershipPct: 100 },
@@ -159,22 +134,45 @@ const RELATIONS: Array<{ child: string; ownershipPct: number }> = [
   { child: 'Banco 2', ownershipPct: 50 },
 ]
 
-async function upsertGroup(ctx: MutationCtx, orgId: Id<'organizations'>) {
-  const byName = new Map<string, Id<'companies'>>()
+// ─── Org Albo ────────────────────────────────────────────────────────────────
 
-  for (const c of COMPANIES) {
+const ALBO_COMPANIES: Array<SeedCompany> = [
+  {
+    name: 'Albo Club',
+    legalName: 'Albo Club SAS',
+    kind: 'group_root',
+    siren: '934657909',
+    legalForm: 'SAS',
+    incorporationDate: d(2024, 10, 18),
+    notes:
+      'Holding d\'investissement impact. Filiale CALTE 97% + Benjamin ' +
+      'Bouquet 3% (hors système ; détention inter-org non modélisée).',
+  },
+]
+
+const ALBO_RELATIONS: Array<{ child: string; ownershipPct: number }> = []
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+
+async function upsertGroup(
+  ctx: MutationCtx,
+  orgId: Id<'organizations'>,
+  companies: Array<SeedCompany>,
+  relations: Array<{ child: string; ownershipPct: number }>,
+  rootName: string,
+) {
+  const byName = new Map<string, Id<'companies'>>()
+  for (const c of companies) {
     const existing = await ctx.db
       .query('companies')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .filter((q) => q.eq(q.field('name'), c.name))
       .first()
-
     const fields = {
       orgId,
       name: c.name,
       legalName: c.legalName,
       kind: c.kind,
-      holdingScope: c.holdingScope,
       siren: c.siren,
       countryCode: 'FR',
       legalForm: c.legalForm,
@@ -182,7 +180,6 @@ async function upsertGroup(ctx: MutationCtx, orgId: Id<'organizations'>) {
       notes: c.notes,
       archivedAt: undefined,
     }
-
     if (existing) {
       await ctx.db.patch(existing._id, fields)
       byName.set(c.name, existing._id)
@@ -191,47 +188,80 @@ async function upsertGroup(ctx: MutationCtx, orgId: Id<'organizations'>) {
     }
   }
 
-  const calteId = byName.get('CALTE')!
-  for (const r of RELATIONS) {
-    const childId = byName.get(r.child)!
-    const existing = await ctx.db
-      .query('companyRelations')
-      .withIndex('by_parent', (q) =>
-        q.eq('orgId', orgId).eq('parentCompanyId', calteId),
-      )
-      .filter((q) => q.eq(q.field('childCompanyId'), childId))
-      .first()
-
-    if (existing) {
-      await ctx.db.patch(existing._id, { ownershipPct: r.ownershipPct })
-    } else {
-      await ctx.db.insert('companyRelations', {
-        orgId,
-        parentCompanyId: calteId,
-        childCompanyId: childId,
-        ownershipPct: r.ownershipPct,
-      })
+  if (relations.length > 0) {
+    const rootId = byName.get(rootName)!
+    for (const r of relations) {
+      const childId = byName.get(r.child)!
+      const existing = await ctx.db
+        .query('companyRelations')
+        .withIndex('by_parent', (q) =>
+          q.eq('orgId', orgId).eq('parentCompanyId', rootId),
+        )
+        .filter((q) => q.eq(q.field('childCompanyId'), childId))
+        .first()
+      if (existing) {
+        await ctx.db.patch(existing._id, { ownershipPct: r.ownershipPct })
+      } else {
+        await ctx.db.insert('companyRelations', {
+          orgId,
+          parentCompanyId: rootId,
+          childCompanyId: childId,
+          ownershipPct: r.ownershipPct,
+        })
+      }
     }
   }
 
-  return { companies: COMPANIES.length, relations: RELATIONS.length }
+  return { companies: companies.length, relations: relations.length }
 }
 
-/** Seed les 9 entités + 8 relations dans une org existante. */
-export const seedGroup = internalMutation({
-  args: { orgId: v.id('organizations') },
-  handler: async (ctx, { orgId }) => {
-    const org = await ctx.db.get(orgId)
-    if (!org) throw new ConvexError('org_not_found')
-    return upsertGroup(ctx, orgId)
-  },
-})
+/** Upsert une org par slug (réutilise l'existante, maj le nom) + owner membre. */
+async function ensureOrg(
+  ctx: MutationCtx,
+  slug: string,
+  name: string,
+  ownerId: Id<'users'>,
+): Promise<Id<'organizations'>> {
+  let org = await ctx.db
+    .query('organizations')
+    .withIndex('by_slug', (q) => q.eq('slug', slug))
+    .first()
+  if (org) {
+    if (org.name !== name) await ctx.db.patch(org._id, { name })
+  } else {
+    const id = await ctx.db.insert('organizations', {
+      slug,
+      name,
+      createdBy: ownerId,
+      createdAt: Date.now(),
+    })
+    org = await ctx.db.get(id)
+  }
+  const orgId = org!._id
+  const member = await ctx.db
+    .query('organizationMembers')
+    .withIndex('by_org_and_user', (q) =>
+      q.eq('orgId', orgId).eq('userId', ownerId),
+    )
+    .unique()
+  if (!member) {
+    await ctx.db.insert('organizationMembers', {
+      orgId,
+      userId: ownerId,
+      role: 'owner',
+      joinedAt: Date.now(),
+    })
+  }
+  return orgId
+}
+
+// ─── Mutations ──────────────────────────────────────────────────────────────
 
 /**
- * Bootstrap dev : crée (si absente) l'org "Calte Family Office", y rattache
- * le compte super-admin comme owner, puis seed le groupe. Renvoie l'orgId.
+ * Crée/maj les orgs Calte + Albo, rattache l'owner (super-admin) aux deux,
+ * et seed leurs entités. Idempotent.
  */
-export const seedCalteFamilyOffice = internalMutation({
+export const seedAll = internalMutation({
   args: { ownerEmail: v.optional(v.string()) },
   handler: async (ctx, { ownerEmail }) => {
     const owner = ownerEmail
@@ -245,262 +275,102 @@ export const seedCalteFamilyOffice = internalMutation({
           .first()
     if (!owner) throw new ConvexError('owner_user_not_found')
 
-    let org = await ctx.db
-      .query('organizations')
-      .withIndex('by_slug', (q) => q.eq('slug', ORG_SLUG))
-      .first()
+    const calteId = await ensureOrg(ctx, 'calte', 'Calte', owner._id)
+    const alboId = await ensureOrg(ctx, 'albo', 'Albo', owner._id)
 
-    if (!org) {
-      const orgId = await ctx.db.insert('organizations', {
-        slug: ORG_SLUG,
-        name: ORG_NAME,
-        createdBy: owner._id,
-        createdAt: Date.now(),
-      })
-      org = await ctx.db.get(orgId)
+    const calte = await upsertGroup(
+      ctx,
+      calteId,
+      CALTE_COMPANIES,
+      CALTE_RELATIONS,
+      'CALTE',
+    )
+    const albo = await upsertGroup(
+      ctx,
+      alboId,
+      ALBO_COMPANIES,
+      ALBO_RELATIONS,
+      'Albo Club',
+    )
+
+    return {
+      owner: owner.email,
+      calte: { orgId: calteId, ...calte },
+      albo: { orgId: alboId, ...albo },
     }
-    const orgId = org!._id
-
-    const member = await ctx.db
-      .query('organizationMembers')
-      .withIndex('by_org_and_user', (q) =>
-        q.eq('orgId', orgId).eq('userId', owner._id),
-      )
-      .unique()
-    if (!member) {
-      await ctx.db.insert('organizationMembers', {
-        orgId,
-        userId: owner._id,
-        role: 'owner',
-        joinedAt: Date.now(),
-      })
-    }
-
-    const result = await upsertGroup(ctx, orgId)
-    return { orgId, slug: ORG_SLUG, owner: owner.email, ...result }
   },
 })
 
-// ─── Deals d'exemple (illustratifs, tirés de la Notion) ─────────────────────
-// Montants en cents EUR, taux en bps. Upsert par `attioDealId` synthétique
-// (`seed-example:<clé>`) → idempotent.
-
-type ExtraCompany = {
-  name: string
-  kind: 'portfolio' | 'group_spv'
-  holdingScope?: 'albo' | 'calte'
-  sector?: string
-  notes?: string
-}
-
-const EXAMPLE_COMPANIES: Array<ExtraCompany> = [
-  { name: 'Eben Home', kind: 'portfolio', sector: 'Mobilier/déco B2B' },
-  { name: 'Hectarea', kind: 'portfolio', sector: 'AgTech / foncier' },
-  { name: 'Parallel', kind: 'portfolio', sector: 'Dette immobilière' },
-  { name: 'Via Sana', kind: 'portfolio', sector: 'Proptech santé' },
-  {
-    name: 'SPV Eben Home',
-    kind: 'group_spv',
-    holdingScope: 'albo',
-    notes: 'SPV Albo pour syndiquer des co-investisseurs sur Eben Home.',
-  },
-  {
-    name: 'SPV Hectarea',
-    kind: 'group_spv',
-    holdingScope: 'albo',
-    notes: 'SPV Albo pour syndiquer des co-investisseurs sur Hectarea.',
-  },
-]
-
-// Part d'Albo DANS chaque SPV (régime mère-fille à traiter plus tard).
-const SPV_RELATIONS: Array<{ spv: string; ownershipPct: number }> = [
-  { spv: 'SPV Eben Home', ownershipPct: 40 },
-  { spv: 'SPV Hectarea', ownershipPct: 35 },
-]
-
-type ExampleDeal = {
-  key: string
-  investor: string
-  target: string
-  via?: string
-  instrumentKind: string
-  committedAmount?: number
-  paidAmount?: number
-  interestRate?: number
-  maturityDate?: number
-  signedDate?: number
-  notes?: string
-}
-
-const EXAMPLE_DEALS: Array<ExampleDeal> = [
-  {
-    key: 'eben-direct',
-    investor: 'Albo Club',
-    target: 'Eben Home',
-    instrumentKind: 'share',
-    committedAmount: 2_000_000, // 20 000 €
-    paidAmount: 2_000_000,
-    signedDate: d(2025, 3, 12),
-    notes: 'Ticket equity direct Albo + place au board.',
-  },
-  {
-    key: 'eben-spv',
-    investor: 'Albo Club',
-    target: 'Eben Home',
-    via: 'SPV Eben Home',
-    instrumentKind: 'spv_share',
-    committedAmount: 5_000_000, // 50 000 €
-    paidAmount: 5_000_000,
-    signedDate: d(2025, 6, 18),
-    notes: 'Investissement via SPV pour embarquer des co-investisseurs.',
-  },
-  {
-    key: 'hectarea-spv',
-    investor: 'Albo Club',
-    target: 'Hectarea',
-    via: 'SPV Hectarea',
-    instrumentKind: 'spv_share',
-    committedAmount: 3_000_000, // 30 000 €
-    paidAmount: 3_000_000,
-    signedDate: d(2025, 9, 4),
-    notes: 'Investissement via SPV + place au board.',
-  },
-  {
-    key: 'parallel-os',
-    investor: 'CALTE',
-    target: 'Parallel',
-    instrumentKind: 'os',
-    committedAmount: 20_000_000, // 200 000 €
-    paidAmount: 20_000_000,
-    interestRate: 1100, // 11 %
-    maturityDate: d(2026, 12, 31),
-    signedDate: d(2025, 1, 20),
-    notes: 'Obligation simple ~11 % sur 18/24 mois.',
-  },
-  {
-    key: 'viasana-share',
-    investor: 'CALTE',
-    target: 'Via Sana',
-    instrumentKind: 'share',
-    committedAmount: 10_000_000, // 100 000 €
-    paidAmount: 10_000_000,
-    signedDate: d(2024, 11, 8),
-    notes: 'Equity + board (synergie SCI Upload qui loue un local à Via Sana).',
-  },
-]
-
-async function companyIdByName(
-  ctx: MutationCtx,
-  orgId: Id<'organizations'>,
-  name: string,
-) {
-  const c = await ctx.db
-    .query('companies')
-    .withIndex('by_org', (q) => q.eq('orgId', orgId))
-    .filter((q) => q.eq(q.field('name'), name))
-    .first()
-  return c?._id ?? null
-}
-
-/** Seed quelques deals d'exemple dans l'org "Calte Family Office". */
-export const seedExampleDeals = internalMutation({
+/** Supprime l'ancienne org combinée "Calte Family Office" et toutes ses lignes. */
+export const cleanupLegacy = internalMutation({
   args: {},
   handler: async (ctx) => {
     const org = await ctx.db
       .query('organizations')
-      .withIndex('by_slug', (q) => q.eq('slug', ORG_SLUG))
+      .withIndex('by_slug', (q) => q.eq('slug', LEGACY_SLUG))
       .first()
-    if (!org) throw new ConvexError('org_not_found_run_seedCalteFamilyOffice')
+    if (!org) return { deleted: false, reason: 'legacy_org_absent' }
     const orgId = org._id
 
-    // 1) Portfolio + SPV companies (upsert par name).
-    const ids = new Map<string, Id<'companies'>>()
-    for (const c of EXAMPLE_COMPANIES) {
-      const existing = await companyIdByName(ctx, orgId, c.name)
-      const fields = {
-        orgId,
-        name: c.name,
-        kind: c.kind,
-        holdingScope: c.holdingScope,
-        sector: c.sector,
-        notes: c.notes,
-        countryCode: 'FR',
-      }
-      if (existing) {
-        await ctx.db.patch(existing, fields)
-        ids.set(c.name, existing)
-      } else {
-        ids.set(c.name, await ctx.db.insert('companies', fields))
-      }
+    let n = 0
+    const deals = await ctx.db
+      .query('deals')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    for (const r of deals) {
+      await ctx.db.delete(r._id)
+      n += 1
     }
-
-    // 2) Part d'Albo dans chaque SPV (companyRelations Albo → SPV).
-    const alboId = await companyIdByName(ctx, orgId, 'Albo Club')
-    if (alboId) {
-      for (const r of SPV_RELATIONS) {
-        const spvId = ids.get(r.spv)!
-        const existing = await ctx.db
-          .query('companyRelations')
-          .withIndex('by_parent', (q) =>
-            q.eq('orgId', orgId).eq('parentCompanyId', alboId),
-          )
-          .filter((q) => q.eq(q.field('childCompanyId'), spvId))
-          .first()
-        if (existing) {
-          await ctx.db.patch(existing._id, { ownershipPct: r.ownershipPct })
-        } else {
-          await ctx.db.insert('companyRelations', {
-            orgId,
-            parentCompanyId: alboId,
-            childCompanyId: spvId,
-            ownershipPct: r.ownershipPct,
-          })
-        }
-      }
+    const valuations = await ctx.db
+      .query('valuations')
+      .withIndex('by_org_asof', (q) => q.eq('orgId', orgId))
+      .collect()
+    for (const r of valuations) {
+      await ctx.db.delete(r._id)
+      n += 1
     }
-
-    // 3) Deals (upsert par attioDealId synthétique).
-    for (const dl of EXAMPLE_DEALS) {
-      const investorCompanyId = await companyIdByName(ctx, orgId, dl.investor)
-      const targetCompanyId = ids.get(dl.target) ?? null
-      if (!investorCompanyId || !targetCompanyId) continue
-      const investor = await ctx.db.get(investorCompanyId)
-      const holdingScope = investor?.holdingScope
-      if (!holdingScope) continue
-
-      const attioDealId = `seed-example:${dl.key}`
-      const fields = {
-        orgId,
-        investorCompanyId,
-        targetCompanyId,
-        viaSpvCompanyId: dl.via ? ids.get(dl.via) : undefined,
-        instrumentKind: dl.instrumentKind as never,
-        holdingScope,
-        currency: 'EUR',
-        committedAmount: dl.committedAmount,
-        paidAmount: dl.paidAmount,
-        interestRate: dl.interestRate,
-        maturityDate: dl.maturityDate,
-        signedDate: dl.signedDate,
-        status: 'active' as const,
-        attioDealId,
-        notes: dl.notes,
-      }
-      const existing = await ctx.db
-        .query('deals')
-        .withIndex('by_attio_deal_id', (q) => q.eq('attioDealId', attioDealId))
-        .first()
-      if (existing) {
-        await ctx.db.patch(existing._id, fields)
-      } else {
-        await ctx.db.insert('deals', fields)
-      }
+    const kpis = await ctx.db
+      .query('kpiSnapshots')
+      .withIndex('by_org_period', (q) => q.eq('orgId', orgId))
+      .collect()
+    for (const r of kpis) {
+      await ctx.db.delete(r._id)
+      n += 1
     }
-
-    return {
-      orgId,
-      companies: EXAMPLE_COMPANIES.length,
-      deals: EXAMPLE_DEALS.length,
+    const relations = await ctx.db
+      .query('companyRelations')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    for (const r of relations) {
+      await ctx.db.delete(r._id)
+      n += 1
     }
+    const companies = await ctx.db
+      .query('companies')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    for (const r of companies) {
+      await ctx.db.delete(r._id)
+      n += 1
+    }
+    const invitations = await ctx.db
+      .query('invitations')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    for (const r of invitations) {
+      await ctx.db.delete(r._id)
+      n += 1
+    }
+    const members = await ctx.db
+      .query('organizationMembers')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    for (const r of members) {
+      await ctx.db.delete(r._id)
+      n += 1
+    }
+    await ctx.db.delete(orgId)
+
+    return { deleted: true, orgId, rowsDeleted: n }
   },
 })
