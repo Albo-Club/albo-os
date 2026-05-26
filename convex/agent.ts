@@ -23,9 +23,14 @@ export const chatAgent = new Agent(components.agent, {
     'EUR and rates in basis points; convert from what the user says ' +
     '(50 000 € → 5000000, 11% → 1100). Before creating a deal: use ' +
     'listCompanies to resolve the investor id, and createCompany for the ' +
-    'target if it does not exist yet. Always restate the deal (investor, ' +
-    'target, instrument, amount) and confirm before creating or updating. ' +
+    'target if it does not exist yet. You can also manage cash: bank accounts ' +
+    'and transactions. A bank account owner is always a GROUP entity (never a ' +
+    'portfolio); create it with createBankAccount (after listBankAccounts to ' +
+    'avoid duplicates) if none exists. A transaction is linked to a deal and a ' +
+    'bank account: direction is "in" (received) or "out" (paid), amount in ' +
+    'cents EUR and positive, date ISO "YYYY-MM-DD". Always restate the deal / ' +
+    'account / transaction and confirm before creating or updating. ' +
     'Answer concisely.',
   tools: dealTools,
-  stopWhen: stepCountIs(5),
+  stopWhen: stepCountIs(8),
 })

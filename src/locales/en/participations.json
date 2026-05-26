@@ -4,6 +4,23 @@
   "metaTitleDetail": "Investment — Albo OS",
   "metaTitleDeal": "Deal — Albo OS",
   "dealNotFound": "Deal not found.",
+  "tx": {
+    "title": "Transactions",
+    "empty": "No transactions linked to this deal.",
+    "in": "In",
+    "out": "Out",
+    "yes": "Yes",
+    "no": "No",
+    "col": {
+      "date": "Date",
+      "direction": "Direction",
+      "amount": "Amount",
+      "label": "Label",
+      "counterparty": "Counterparty",
+      "account": "Account",
+      "reconciled": "Reconciled"
+    }
+  },
   "title": "Participations",
   "allSubtitle": "All your organizations combined — read-only. Edit within an organization.",
   "openDetail": "Open details",

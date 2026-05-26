@@ -9,6 +9,14 @@ import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { Badge } from '~/components/ui/badge'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '~/components/ui/table'
 
 export const Route = createFileRoute('/app/$orgSlug/deals/$dealId')({
   component: DealDetail,
@@ -56,6 +64,63 @@ function Info({ label, value }: { label: string; value: ReactNode }) {
       <span className="text-muted-foreground text-xs">{label}</span>
       <span className="text-sm">{value}</span>
     </div>
+  )
+}
+
+function Transactions({ dealId }: { dealId: Id<'deals'> }) {
+  const { t } = useTranslation('participations')
+  const { fmtEur, fmtDate } = useFormatters()
+  const txs = useConvexQuery(api.transactions.listByDeal, { dealId })
+  return (
+    <section className="space-y-3">
+      <h2 className="text-lg font-semibold tracking-tight">{t('tx.title')}</h2>
+      {!txs ? (
+        <div className="text-muted-foreground text-sm">{t('loading')}</div>
+      ) : txs.length === 0 ? (
+        <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+          {t('tx.empty')}
+        </div>
+      ) : (
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('tx.col.date')}</TableHead>
+                <TableHead>{t('tx.col.direction')}</TableHead>
+                <TableHead className="text-right">
+                  {t('tx.col.amount')}
+                </TableHead>
+                <TableHead>{t('tx.col.label')}</TableHead>
+                <TableHead>{t('tx.col.counterparty')}</TableHead>
+                <TableHead>{t('tx.col.account')}</TableHead>
+                <TableHead>{t('tx.col.reconciled')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {txs.map((tx) => (
+                <TableRow key={tx._id}>
+                  <TableCell>{fmtDate(tx.transactionDate)}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={tx.direction === 'in' ? 'default' : 'secondary'}
+                    >
+                      {t(`tx.${tx.direction}`)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {fmtEur(tx.amount)}
+                  </TableCell>
+                  <TableCell>{tx.rawLabel}</TableCell>
+                  <TableCell>{tx.counterparty ?? '—'}</TableCell>
+                  <TableCell>{tx.account?.label ?? '—'}</TableCell>
+                  <TableCell>{tx.reconciled ? t('tx.yes') : t('tx.no')}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -175,6 +240,8 @@ function DealDetail() {
           <p className="text-sm whitespace-pre-wrap">{deal.notes}</p>
         </div>
       )}
+
+      <Transactions dealId={deal._id} />
     </main>
   )
 }
