@@ -88,10 +88,10 @@ Connecté en tant qu'Alice sur `/app/acme/`.
 
 | #    | Étape                                                          | Résultat attendu                                                  |
 | ---- | -------------------------------------------------------------- | ----------------------------------------------------------------- |
-| SH1  | Sidebar `inset` (carte flottante arrondie) : groupe Platform (Dashboard / Participations / Cash) en haut ; Members / Invitations / Settings épinglés en bas (nav secondaire `mt-auto`, sans label) | OK ; entrées admin-only masquées si rôle "member" ; badge "demo" sur Cash |
+| SH1  | Sidebar `inset` (carte flottante arrondie) : groupe Platform (Dashboard / Participations / Cash) en haut ; Members / Invitations / Settings épinglés en bas (nav secondaire `mt-auto`, sans label) | OK ; entrées admin-only masquées si rôle "member" (plus de badge "demo" sur Cash, vue fonctionnelle) |
 | SH2  | Clic sur `SidebarTrigger` (header) OU sur la `SidebarRail` (bande fine au bord droit de la sidebar) | Sidebar collapse en `icon` ; cookie `sidebar_state` persiste ; icônes orga/profil non écrasées en mode `icon` |
 | SH3  | Redimensionner < 768px                                         | Sidebar passe en `Sheet` mobile, ouverture via burger              |
-| SH4  | Naviguer Dashboard → Participations → Cash                     | Breadcrumb du header se met à jour à chaque route ; Participations/Cash affichent "Bientôt" |
+| SH4  | Naviguer Dashboard → Participations → Cash                     | Breadcrumb du header se met à jour à chaque route ; Cash affiche les soldes par compte (cf. Niveau 3 — Vue Cash) |
 | SH5  | Dashboard : 4 KPI cards (membres, invitations, Participations —, Trésorerie —) | Counts membres/invitations cohérents avec listMembers réels ; cartes Participations/Cash en placeholder "—" |
 | SH6  | Toggle dark mode (icône soleil/lune dans header)               | Page bascule light ↔ dark, sidebar + charts adaptés                |
 | SH7  | Theme picker (footer sidebar) → choisir Blue / Emerald / Violet| Primary + chart-1 changent ; survit au reload (localStorage)       |
@@ -118,6 +118,24 @@ Toujours connecté en tant qu'Alice. Préparer un 2e navigateur pour Bob.
 > **Isolation des données métier** (companies/deals scopés `orgId`, override
 > admin sur les deletes) : à valider en V0 quand les mutations CRUD existent.
 > Cf. `KNOWN_ISSUES.md` / la mission V0.
+
+## Niveau 3 — Vue Cash (lecture seule, 5 min)
+
+Route `/app/$orgSlug/cash` (`src/routes/app/$orgSlug/cash.tsx`). Lecture seule :
+pas d'ingestion encore (Powens en cible). Pour tester avec des données, insérer
+temporairement via le dashboard Convex 1–2 `bankAccounts` (`ownerCompanyId` =
+une entité `group_*` de l'org, `currentBalance` en cents) et quelques
+`transactions` (certaines avec `dealId` pointant un deal existant). Nettoyer après.
+
+| #   | Étape                                                              | Résultat attendu                                                                 |
+| --- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| CA1 | Ouvrir `/app/<org>/cash` sans aucun `bankAccounts`                  | Total à 0 € + encart pointillé "Aucun compte bancaire…" (état vide propre)        |
+| CA2 | Avec comptes : soldes regroupés par entité propriétaire (`group_*`) | Une section par entité (titre = nom entité) ; carte "Solde total" = somme des soldes |
+| CA3 | Compte sans `currentBalance`                                        | Affiche "Solde inconnu" ; `balanceAsOf` rendu en sous-texte si présent            |
+| CA4 | Clic sur le solde d'un compte                                       | Ouvre un Sheet listant **uniquement** les transactions avec `dealId`, antéchrono (récent en 1er), labellisées par la boîte investie |
+| CA5 | Transaction `direction: "out"`                                      | Montant en négatif, couleur `text-destructive` ; `in` en positif                  |
+| CA6 | Compte sans transaction liée à un deal                             | Sheet affiche l'état vide "Aucune transaction liée à un deal…"                    |
+| CA7 | i18n EN/FR sur la page + le Sheet                                   | Tous les libellés traduits (namespace `cash`), titre d'onglet = `cash:metaTitle`  |
 
 ## Niveau 3 — Invitations edge cases (8 min)
 

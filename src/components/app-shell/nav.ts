@@ -44,7 +44,6 @@ export function getNavGroups(): Array<NavGroup> {
           titleKey: 'items.cash',
           to: '/app/$orgSlug/cash',
           icon: Wallet,
-          demo: true,
         },
       ],
     },

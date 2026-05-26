@@ -1,0 +1,31 @@
+{
+  "metaTitle": "Trésorerie — Albo OS",
+  "title": "Trésorerie",
+  "totalBalance": "Solde total",
+  "asOf": "au {{date}}",
+  "noBalance": "Solde inconnu",
+  "accountsEmpty": "Aucun compte bancaire pour cette organisation pour l'instant.",
+  "loading": "Chargement…",
+  "col": {
+    "account": "Compte",
+    "bank": "Banque",
+    "kind": "Type",
+    "balance": "Solde"
+  },
+  "tx": {
+    "title": "Transactions liées aux deals",
+    "subtitle": "{{bank}} · {{label}}",
+    "col": {
+      "date": "Date",
+      "label": "Libellé",
+      "deal": "Deal",
+      "amount": "Montant"
+    },
+    "empty": "Aucune transaction liée à un deal sur ce compte.",
+    "loading": "Chargement des transactions…"
+  },
+  "direction": {
+    "in": "Entrée",
+    "out": "Sortie"
+  }
+}
