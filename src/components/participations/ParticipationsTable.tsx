@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ArrowUpRight, ChevronRight } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 
@@ -25,7 +26,7 @@ export type DealRow = {
   committedAmount?: number | null
   paidAmount?: number | null
   signedDate?: number | null
-  org?: { name: string } | null // présent en vue agrégée
+  org?: { name: string; slug: string } | null // présent en vue agrégée
 }
 
 function statusVariant(s: string): 'default' | 'secondary' | 'destructive' {
@@ -43,29 +44,10 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-/**
- * Table des participations regroupée PAR SOCIÉTÉ (une ligne = une boîte,
- * dépliable → ses deals). `showOrg` ajoute une colonne de badges d'org
- * (vue agrégée cross-org).
- */
-export function ParticipationsTable({
-  deals,
-  showOrg = false,
-}: {
-  deals: Array<DealRow> | undefined
-  showOrg?: boolean
-}) {
-  const { t, i18n } = useTranslation('participations')
+/** Formateurs €/date localisés, partagés par les composants ci-dessous. */
+function useFormatters() {
+  const { i18n } = useTranslation('participations')
   const lang = i18n.language
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const toggle = (id: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-
   const fmtEur = (cents?: number | null) =>
     cents == null
       ? '—'
@@ -82,6 +64,76 @@ export function ParticipationsTable({
           month: 'short',
           day: 'numeric',
         })
+  return { fmtEur, fmtDate }
+}
+
+/**
+ * Liste détaillée de deals (un bloc par deal). Réutilisée par l'accordéon
+ * de la table par-société et par la page détail d'une participation.
+ */
+export function DealsList({ deals }: { deals: Array<DealRow> }) {
+  const { t } = useTranslation('participations')
+  const { fmtEur, fmtDate } = useFormatters()
+  return (
+    <div className="divide-y">
+      {deals.map((dl) => (
+        <div
+          key={dl._id}
+          className="grid grid-cols-2 gap-x-6 gap-y-1 px-6 py-3 text-sm sm:grid-cols-5"
+        >
+          <Field label={t('deal.instrument')}>
+            {t(`instrument.${dl.instrumentKind}`, {
+              defaultValue: dl.instrumentKind,
+            })}
+          </Field>
+          <Field label={t('deal.investor')}>
+            {dl.investor?.name ?? '—'}
+            {dl.spv ? (
+              <span className="text-muted-foreground">
+                {' '}
+                · {t('deal.viaSpv')} {dl.spv.name}
+              </span>
+            ) : null}
+          </Field>
+          <Field label={t('deal.committed')}>{fmtEur(dl.committedAmount)}</Field>
+          <Field label={t('deal.paid')}>{fmtEur(dl.paidAmount)}</Field>
+          <Field label={t('deal.status')}>
+            <Badge variant={statusVariant(dl.status)}>
+              {t(`status.${dl.status}`, { defaultValue: dl.status })}
+            </Badge>
+          </Field>
+          <Field label={t('deal.signed')}>{fmtDate(dl.signedDate)}</Field>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Table des participations regroupée PAR SOCIÉTÉ (une ligne = une boîte,
+ * dépliable → ses deals). `showOrg` ajoute une colonne de badges d'org
+ * (vue agrégée cross-org). `orgSlug` (vue par-org) cible le lien de détail ;
+ * en vue agrégée, le slug est dérivé de l'org de chaque deal.
+ */
+export function ParticipationsTable({
+  deals,
+  showOrg = false,
+  orgSlug,
+}: {
+  deals: Array<DealRow> | undefined
+  showOrg?: boolean
+  orgSlug?: string
+}) {
+  const { t } = useTranslation('participations')
+  const { fmtEur } = useFormatters()
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const toggle = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
 
   const groups = useMemo(() => {
     if (!deals) return undefined
@@ -90,6 +142,7 @@ export function ParticipationsTable({
       {
         name: string
         orgs: Set<string>
+        slug: string | undefined
         deals: Array<DealRow>
         committed: number
         paid: number
@@ -100,6 +153,7 @@ export function ParticipationsTable({
       const g = map.get(key) ?? {
         name: d.target?.name ?? '—',
         orgs: new Set<string>(),
+        slug: orgSlug ?? d.org?.slug,
         deals: [],
         committed: 0,
         paid: 0,
@@ -111,7 +165,7 @@ export function ParticipationsTable({
       map.set(key, g)
     }
     return Array.from(map.entries()).map(([id, g]) => ({ id, ...g }))
-  }, [deals])
+  }, [deals, orgSlug])
 
   const colSpan = showOrg ? 5 : 4
 
@@ -157,7 +211,6 @@ export function ParticipationsTable({
                   showOrg={showOrg}
                   colSpan={colSpan}
                   fmtEur={fmtEur}
-                  fmtDate={fmtDate}
                 />
               )
             })
@@ -175,12 +228,12 @@ function CompanyRows({
   showOrg,
   colSpan,
   fmtEur,
-  fmtDate,
 }: {
   group: {
     id: string
     name: string
     orgs: Set<string>
+    slug: string | undefined
     deals: Array<DealRow>
     committed: number
     paid: number
@@ -190,7 +243,6 @@ function CompanyRows({
   showOrg: boolean
   colSpan: number
   fmtEur: (c?: number | null) => string
-  fmtDate: (m?: number | null) => string
 }) {
   const { t } = useTranslation('participations')
   return (
@@ -204,6 +256,18 @@ function CompanyRows({
               }`}
             />
             {group.name}
+            {group.slug && (
+              <Link
+                to="/app/$orgSlug/participations/$companyId"
+                params={{ orgSlug: group.slug, companyId: group.id }}
+                aria-label={t('openDetail')}
+                title={t('openDetail')}
+                onClick={(e) => e.stopPropagation()}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <ArrowUpRight className="size-4" />
+              </Link>
+            )}
           </span>
         </TableCell>
         {showOrg && (
@@ -230,41 +294,7 @@ function CompanyRows({
       {isOpen && (
         <TableRow className="hover:bg-transparent">
           <TableCell colSpan={colSpan} className="bg-muted/30 p-0">
-            <div className="divide-y">
-              {group.deals.map((dl) => (
-                <div
-                  key={dl._id}
-                  className="grid grid-cols-2 gap-x-6 gap-y-1 px-6 py-3 text-sm sm:grid-cols-5"
-                >
-                  <Field label={t('deal.instrument')}>
-                    {t(`instrument.${dl.instrumentKind}`, {
-                      defaultValue: dl.instrumentKind,
-                    })}
-                  </Field>
-                  <Field label={t('deal.investor')}>
-                    {dl.investor?.name ?? '—'}
-                    {dl.spv ? (
-                      <span className="text-muted-foreground">
-                        {' '}
-                        · {t('deal.viaSpv')} {dl.spv.name}
-                      </span>
-                    ) : null}
-                  </Field>
-                  <Field label={t('deal.committed')}>
-                    {fmtEur(dl.committedAmount)}
-                  </Field>
-                  <Field label={t('deal.paid')}>{fmtEur(dl.paidAmount)}</Field>
-                  <Field label={t('deal.status')}>
-                    <Badge variant={statusVariant(dl.status)}>
-                      {t(`status.${dl.status}`, { defaultValue: dl.status })}
-                    </Badge>
-                  </Field>
-                  <Field label={t('deal.signed')}>
-                    {fmtDate(dl.signedDate)}
-                  </Field>
-                </div>
-              ))}
-            </div>
+            <DealsList deals={group.deals} />
           </TableCell>
         </TableRow>
       )}

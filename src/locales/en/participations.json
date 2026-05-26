@@ -1,8 +1,18 @@
 {
   "metaTitle": "Participations — Albo OS",
   "metaTitleAll": "All participations — Albo OS",
+  "metaTitleDetail": "Investment — Albo OS",
   "title": "Participations",
   "allSubtitle": "All your organizations combined — read-only. Edit within an organization.",
+  "openDetail": "Open details",
+  "back": "← Investments",
+  "notFound": "Company not found.",
+  "info": {
+    "sector": "Sector",
+    "siren": "SIREN",
+    "domain": "Domain",
+    "ownership": "Ownership"
+  },
   "col": {
     "company": "Company",
     "org": "Org",
