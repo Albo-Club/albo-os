@@ -24,7 +24,7 @@ Pré-requis :
 | B2 | Lint          | `pnpm lint`              | Exit 0, 0 warning             |
 | B3 | Build         | `pnpm build`             | Bundle écrit dans `.output/`  |
 | B4 | Smoke E2E     | `pnpm test:smoke`        | Tous les scénarios passent    |
-| B5 | Cookies prod  | `pnpm test:cookies`      | `albo.session_token` a Secure+HttpOnly+SameSite=Lax+Max-Age≈604800 |
+| B5 | Cookies prod  | `pnpm test:cookies`      | `albo-os.session_token` a Secure+HttpOnly+SameSite=Lax+Max-Age≈604800 |
 | B6 | Skills à jour | `pnpm sync:skills:check` | `0 skills drifted`            |
 
 ## Niveau 2 — Auth (6 min)

@@ -30,7 +30,7 @@ function Home() {
         <LanguageSwitcher />
       </div>
       <Logo className="h-10" />
-      <h1 className="text-4xl font-bold tracking-tight">albo</h1>
+      <h1 className="text-4xl font-bold tracking-tight">albo-os</h1>
       <p className="text-muted-foreground max-w-md text-center text-sm">
         {t('tagline')}
       </p>

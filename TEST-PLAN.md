@@ -98,7 +98,7 @@ le second utilisateur.
 2. Saisir l'email d'un compte existant.
 3. Soumettre.
 
-✅ **Attendu** : écran de confirmation neutre, **identique** au cas suivant (3.2). Un mail "Reset your albo password" arrive dans la boîte.
+✅ **Attendu** : écran de confirmation neutre, **identique** au cas suivant (3.2). Un mail "Reset your albo-os password" arrive dans la boîte.
 
 ### 3.2 Demande avec email inconnu
 
@@ -136,7 +136,7 @@ le second utilisateur.
 
 ✅ **Attendu** :
 - Un mail **arrive sur l'adresse ACTUELLE** (l'ancienne), pas la nouvelle.
-- Sujet : "Approve email change on albo".
+- Sujet : "Approve email change on albo-os".
 - Texte : "Someone requested to change your account email to <nouveau>. If this was you, click below to approve."
 
 ### 4.2 Approbation

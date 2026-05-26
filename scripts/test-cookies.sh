@@ -10,7 +10,7 @@
 #
 # Usage:
 #   TEST_EMAIL=alice@test.local TEST_PASSWORD=… pnpm test:cookies
-#   BASE_URL=https://albo.team … pnpm test:cookies     # prod (expect Secure)
+#   BASE_URL=https://albo-os.team … pnpm test:cookies     # prod (expect Secure)
 
 set -euo pipefail
 
@@ -37,9 +37,9 @@ if [[ -z "$COOKIE_LINES" ]]; then
   exit 1
 fi
 
-SESSION_LINE=$(echo "$COOKIE_LINES" | grep -i "albo\." | head -1 || true)
+SESSION_LINE=$(echo "$COOKIE_LINES" | grep -i "albo-os\." | head -1 || true)
 if [[ -z "$SESSION_LINE" ]]; then
-  echo "FAIL: no albo.* cookie set on sign-in"
+  echo "FAIL: no albo-os.* cookie set on sign-in"
   echo "$COOKIE_LINES"
   exit 1
 fi

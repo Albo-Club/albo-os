@@ -24,7 +24,7 @@ if (
   /(?:^|\/\/)(?:localhost|127\.0\.0\.1)(?::|\/|$)/.test(siteUrl)
 ) {
   throw new Error(
-    `[albo] SITE_URL is "${siteUrl}" while APP_ENV=production. ` +
+    `[albo-os] SITE_URL is "${siteUrl}" while APP_ENV=production. ` +
       'Emails would ship with broken links. Run: ' +
       'pnpm exec convex env set SITE_URL "https://your-domain" --prod',
   )
@@ -75,7 +75,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) =>
     // explicit attributes BA's defaults vary by adapter — pin them.
     advanced: {
       useSecureCookies: isProd,
-      cookiePrefix: 'albo',
+      cookiePrefix: 'albo-os',
       defaultCookieAttributes: {
         sameSite: 'lax',
         secure: isProd,

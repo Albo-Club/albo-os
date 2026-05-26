@@ -9,7 +9,7 @@ type LogoProps = {
 export function Logo({
   variant = 'full',
   className,
-  alt = 'albo',
+  alt = 'albo-os',
 }: LogoProps) {
   const src = variant === 'mark' ? '/logo-mark.svg' : '/logo.svg'
   return (

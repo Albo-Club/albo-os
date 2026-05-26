@@ -13,7 +13,7 @@
 
 export type EmailLocale = 'en' | 'fr'
 
-const APP_NAME = 'albo'
+const APP_NAME = 'albo-os'
 const BRAND = '#0f0f10'
 const MUTED = '#6b6b73'
 const BORDER = '#e7e7ea'

@@ -1,4 +1,4 @@
-# albo — l'ouvre-boîte
+# albo-os — l'ouvre-boîte
 
 Opinionated B2B SaaS MVP starter: **TanStack Start + Convex + Better Auth + Resend + Anthropic + Tailwind v4**.
 
@@ -33,7 +33,7 @@ This repo is a GitHub template. Either click **"Use this template"** on
 GitHub to create your own repo, or clone it directly:
 
 ```bash
-git clone https://github.com/Albo-Club/albo-ouvre-boite.git my-project
+git clone https://github.com/Albo-Club/albo-os.git my-project
 cd my-project
 ```
 

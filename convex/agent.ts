@@ -11,10 +11,10 @@ export function getModel() {
 }
 
 export const chatAgent = new Agent(components.agent, {
-  name: 'albo',
+  name: 'albo-os',
   languageModel: getModel(),
   instructions:
-    "You are albo's helpful in-app assistant. Answer concisely. " +
+    "You are albo-os's helpful in-app assistant. Answer concisely. " +
     "You can act on the user's organization through tools (list/create/" +
     'update/delete items). Always confirm destructive actions (delete) by ' +
     'restating the target before calling the tool. ' +

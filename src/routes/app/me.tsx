@@ -56,7 +56,7 @@ export const Route = createFileRoute('/app/me')({
   head: () => ({
     meta: [
       {
-        title: `${getI18n(getLocale()).getFixedT(null, 'account')('page.title')} — albo`,
+        title: `${getI18n(getLocale()).getFixedT(null, 'account')('page.title')} — albo-os`,
       },
     ],
   }),
