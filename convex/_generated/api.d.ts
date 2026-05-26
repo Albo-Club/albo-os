@@ -10,7 +10,6 @@
 
 import type * as admin from "../admin.js";
 import type * as agent from "../agent.js";
-import type * as agentTools from "../agentTools.js";
 import type * as auth from "../auth.js";
 import type * as chat from "../chat.js";
 import type * as email from "../email.js";
@@ -18,13 +17,13 @@ import type * as emailTemplates from "../emailTemplates.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as invitations from "../invitations.js";
-import type * as items from "../items.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_storage from "../lib/storage.js";
 import type * as notifications from "../notifications.js";
 import type * as organizations from "../organizations.js";
 import type * as publicConfig from "../publicConfig.js";
 import type * as rateLimiters from "../rateLimiters.js";
+import type * as seed from "../seed.js";
 import type * as users from "../users.js";
 
 import type {
@@ -36,7 +35,6 @@ import type {
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   agent: typeof agent;
-  agentTools: typeof agentTools;
   auth: typeof auth;
   chat: typeof chat;
   email: typeof email;
@@ -44,13 +42,13 @@ declare const fullApi: ApiFromModules<{
   files: typeof files;
   http: typeof http;
   invitations: typeof invitations;
-  items: typeof items;
   "lib/auth": typeof lib_auth;
   "lib/storage": typeof lib_storage;
   notifications: typeof notifications;
   organizations: typeof organizations;
   publicConfig: typeof publicConfig;
   rateLimiters: typeof rateLimiters;
+  seed: typeof seed;
   users: typeof users;
 }>;
 
