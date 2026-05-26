@@ -216,6 +216,126 @@ export const createDealInternal = internalMutation({
   },
 })
 
+export const listBankAccountsInternal = internalQuery({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+  },
+  handler: async (ctx, { orgId, actorUserId }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const rows = await ctx.db
+      .query('bankAccounts')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    return rows
+      .filter((a) => !a.archivedAt)
+      .map((a) => ({ _id: a._id, label: a.label, bankName: a.bankName }))
+  },
+})
+
+export const createBankAccountInternal = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    ownerCompanyId: v.id('companies'),
+    bankName: v.string(),
+    label: v.string(),
+    currency: v.optional(v.string()),
+    accountKind: v.optional(v.string()),
+    iban: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await readMembership(ctx, args.orgId, args.actorUserId)
+    // Le propriétaire d'un compte est toujours une entité du groupe.
+    const owner = await ctx.db.get(args.ownerCompanyId)
+    if (!owner || owner.orgId !== args.orgId) {
+      throw new ConvexError('owner_wrong_org')
+    }
+    if (!owner.kind.startsWith('group_')) {
+      throw new ConvexError('owner_must_be_group_entity')
+    }
+    const id = await ctx.db.insert('bankAccounts', {
+      orgId: args.orgId,
+      ownerCompanyId: args.ownerCompanyId,
+      bankName: args.bankName.trim(),
+      label: args.label.trim(),
+      currency: args.currency ?? 'EUR',
+      accountKind: args.accountKind,
+      iban: args.iban,
+    })
+    return { _id: id, label: args.label.trim() }
+  },
+})
+
+export const listTransactionsInternal = internalQuery({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    dealId: v.id('deals'),
+  },
+  handler: async (ctx, { orgId, actorUserId, dealId }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const rows = await ctx.db
+      .query('transactions')
+      .withIndex('by_deal', (q) => q.eq('dealId', dealId))
+      .collect()
+    return rows
+      .filter((t) => t.orgId === orgId)
+      .map((t) => ({
+        _id: t._id,
+        direction: t.direction,
+        amount: t.amount,
+        transactionDate: t.transactionDate,
+        rawLabel: t.rawLabel,
+      }))
+  },
+})
+
+export const createTransactionInternal = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    bankAccountId: v.id('bankAccounts'),
+    dealId: v.optional(v.id('deals')),
+    direction: v.union(v.literal('in'), v.literal('out')),
+    amount: v.number(),
+    transactionDate: v.number(),
+    rawLabel: v.string(),
+    counterparty: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await readMembership(ctx, args.orgId, args.actorUserId)
+    if (!Number.isInteger(args.amount) || args.amount <= 0) {
+      throw new ConvexError('invalid_amount')
+    }
+    const account = await ctx.db.get(args.bankAccountId)
+    if (!account || account.orgId !== args.orgId) {
+      throw new ConvexError('account_wrong_org')
+    }
+    if (args.dealId) {
+      const deal = await ctx.db.get(args.dealId)
+      if (!deal || deal.orgId !== args.orgId) {
+        throw new ConvexError('deal_wrong_org')
+      }
+    }
+    const id = await ctx.db.insert('transactions', {
+      orgId: args.orgId,
+      bankAccountId: args.bankAccountId,
+      dealId: args.dealId,
+      direction: args.direction,
+      amount: args.amount,
+      transactionDate: args.transactionDate,
+      rawLabel: args.rawLabel.trim(),
+      counterparty: args.counterparty,
+      source: 'manual',
+      reconciled: true,
+      reconciledBy: args.actorUserId,
+      reconciledAt: Date.now(),
+    })
+    return { _id: id }
+  },
+})
+
 export const updateDealInternal = internalMutation({
   args: {
     orgId: v.id('organizations'),
@@ -369,10 +489,115 @@ const updateDeal = createTool({
   },
 })
 
+const listBankAccounts = createTool({
+  description:
+    'List bank accounts in the current org (label + bank name). Use this to ' +
+    'find the bankAccountId before creating a transaction, or to check ' +
+    'whether an account already exists before creating one.',
+  inputSchema: z.object({}),
+  execute: async (ctx): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runQuery(internal.agentTools.listBankAccountsInternal, {
+      orgId,
+      actorUserId: userId,
+    })
+  },
+})
+
+const createBankAccount = createTool({
+  description:
+    'Create a bank account in the current org. The owner MUST be a group ' +
+    'entity (CALTE, Albo Club, an SCI…) — find its id via listCompanies, ' +
+    'never a portfolio company. Call listBankAccounts first to avoid ' +
+    'duplicates. Returns the new account id.',
+  inputSchema: z.object({
+    ownerCompanyId: z.string().describe('Group entity id (CALTE, Albo…)'),
+    bankName: z.string().min(1).describe('Bank name, e.g. "Qonto"'),
+    label: z.string().min(1).describe('Account label, e.g. "Qonto CALTE"'),
+    currency: z.string().optional().describe('ISO currency, defaults to EUR'),
+    accountKind: z
+      .string()
+      .optional()
+      .describe('checking, cto, dat, savings…'),
+    iban: z.string().optional(),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runMutation(internal.agentTools.createBankAccountInternal, {
+      orgId,
+      actorUserId: userId,
+      ownerCompanyId: input.ownerCompanyId as Id<'companies'>,
+      bankName: input.bankName,
+      label: input.label,
+      currency: input.currency,
+      accountKind: input.accountKind,
+      iban: input.iban,
+    })
+  },
+})
+
+const listTransactions = createTool({
+  description:
+    'List transactions linked to a given deal (by deal id). Use listDeals ' +
+    'first if you do not know the deal id.',
+  inputSchema: z.object({
+    dealId: z.string().describe('Deal id'),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runQuery(internal.agentTools.listTransactionsInternal, {
+      orgId,
+      actorUserId: userId,
+      dealId: input.dealId as Id<'deals'>,
+    })
+  },
+})
+
+const createTransaction = createTool({
+  description:
+    'Record a bank transaction, optionally linked to a deal. amount is in ' +
+    'CENTS EUR (50 000 € → 5000000) and always positive. direction is "in" ' +
+    '(money received) or "out" (money paid). Provide the bankAccountId ' +
+    '(listBankAccounts, or createBankAccount first if none exists) and the ' +
+    'dealId to link it. dateISO is "YYYY-MM-DD". Confirm with the user before ' +
+    'calling this.',
+  inputSchema: z.object({
+    bankAccountId: z.string().describe('Bank account id'),
+    dealId: z.string().optional().describe('Deal id to link the transaction'),
+    direction: z.enum(['in', 'out']),
+    amount: z.number().int().positive().describe('cents EUR, positive'),
+    dateISO: z.string().describe('ISO date "YYYY-MM-DD"'),
+    rawLabel: z.string().min(1).describe('Transaction label'),
+    counterparty: z.string().optional(),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    const transactionDate = Date.parse(input.dateISO)
+    if (Number.isNaN(transactionDate)) {
+      throw new ConvexError('invalid_transaction_date')
+    }
+    return await ctx.runMutation(internal.agentTools.createTransactionInternal, {
+      orgId,
+      actorUserId: userId,
+      bankAccountId: input.bankAccountId as Id<'bankAccounts'>,
+      dealId: input.dealId ? (input.dealId as Id<'deals'>) : undefined,
+      direction: input.direction,
+      amount: input.amount,
+      transactionDate,
+      rawLabel: input.rawLabel,
+      counterparty: input.counterparty,
+    })
+  },
+})
+
 export const dealTools = {
   listCompanies,
   listDeals,
   createCompany,
   createDeal,
   updateDeal,
+  listBankAccounts,
+  createBankAccount,
+  listTransactions,
+  createTransaction,
 }

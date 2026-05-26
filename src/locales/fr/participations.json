@@ -4,6 +4,23 @@
   "metaTitleDetail": "Participation — Albo OS",
   "metaTitleDeal": "Deal — Albo OS",
   "dealNotFound": "Deal introuvable.",
+  "tx": {
+    "title": "Transactions",
+    "empty": "Aucune transaction liée à ce deal.",
+    "in": "Entrée",
+    "out": "Sortie",
+    "yes": "Oui",
+    "no": "Non",
+    "col": {
+      "date": "Date",
+      "direction": "Sens",
+      "amount": "Montant",
+      "label": "Libellé",
+      "counterparty": "Contrepartie",
+      "account": "Compte",
+      "reconciled": "Rapproché"
+    }
+  },
   "title": "Participations",
   "allSubtitle": "Toutes tes organisations réunies — lecture seule. L'édition se fait dans une organisation.",
   "openDetail": "Ouvrir la fiche",
