@@ -1,8 +1,18 @@
 {
   "metaTitle": "Participations — Albo OS",
   "metaTitleAll": "Toutes les participations — Albo OS",
+  "metaTitleDetail": "Participation — Albo OS",
   "title": "Participations",
   "allSubtitle": "Toutes tes organisations réunies — lecture seule. L'édition se fait dans une organisation.",
+  "openDetail": "Ouvrir la fiche",
+  "back": "← Participations",
+  "notFound": "Société introuvable.",
+  "info": {
+    "sector": "Secteur",
+    "siren": "SIREN",
+    "domain": "Domaine",
+    "ownership": "Détention"
+  },
   "col": {
     "company": "Société",
     "org": "Org",

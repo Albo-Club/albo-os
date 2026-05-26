@@ -25,14 +25,15 @@ import { Route as AppOrgSlugRouteRouteImport } from './routes/app/$orgSlug/route
 import { Route as AppAllIndexRouteImport } from './routes/app/all/index'
 import { Route as AppOrgSlugIndexRouteImport } from './routes/app/$orgSlug/index'
 import { Route as AppAllParticipationsRouteImport } from './routes/app/all/participations'
-import { Route as AppOrgSlugParticipationsRouteImport } from './routes/app/$orgSlug/participations'
 import { Route as AppOrgSlugCashRouteImport } from './routes/app/$orgSlug/cash'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppOrgSlugSettingsRouteRouteImport } from './routes/app/$orgSlug/settings/route'
 import { Route as AppOrgSlugSettingsIndexRouteImport } from './routes/app/$orgSlug/settings/index'
+import { Route as AppOrgSlugParticipationsIndexRouteImport } from './routes/app/$orgSlug/participations.index'
 import { Route as AppOrgSlugSettingsMembersRouteImport } from './routes/app/$orgSlug/settings/members'
 import { Route as AppOrgSlugSettingsInvitationsRouteImport } from './routes/app/$orgSlug/settings/invitations'
 import { Route as AppOrgSlugSettingsGeneralRouteImport } from './routes/app/$orgSlug/settings/general'
+import { Route as AppOrgSlugParticipationsCompanyIdRouteImport } from './routes/app/$orgSlug/participations.$companyId'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -114,12 +115,6 @@ const AppAllParticipationsRoute = AppAllParticipationsRouteImport.update({
   path: '/participations',
   getParentRoute: () => AppAllRouteRoute,
 } as any)
-const AppOrgSlugParticipationsRoute =
-  AppOrgSlugParticipationsRouteImport.update({
-    id: '/participations',
-    path: '/participations',
-    getParentRoute: () => AppOrgSlugRouteRoute,
-  } as any)
 const AppOrgSlugCashRoute = AppOrgSlugCashRouteImport.update({
   id: '/cash',
   path: '/cash',
@@ -140,6 +135,12 @@ const AppOrgSlugSettingsIndexRoute = AppOrgSlugSettingsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppOrgSlugSettingsRouteRoute,
 } as any)
+const AppOrgSlugParticipationsIndexRoute =
+  AppOrgSlugParticipationsIndexRouteImport.update({
+    id: '/participations/',
+    path: '/participations/',
+    getParentRoute: () => AppOrgSlugRouteRoute,
+  } as any)
 const AppOrgSlugSettingsMembersRoute =
   AppOrgSlugSettingsMembersRouteImport.update({
     id: '/members',
@@ -157,6 +158,12 @@ const AppOrgSlugSettingsGeneralRoute =
     id: '/general',
     path: '/general',
     getParentRoute: () => AppOrgSlugSettingsRouteRoute,
+  } as any)
+const AppOrgSlugParticipationsCompanyIdRoute =
+  AppOrgSlugParticipationsCompanyIdRouteImport.update({
+    id: '/participations/$companyId',
+    path: '/participations/$companyId',
+    getParentRoute: () => AppOrgSlugRouteRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -176,13 +183,14 @@ export interface FileRoutesByFullPath {
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/$orgSlug/cash': typeof AppOrgSlugCashRoute
-  '/app/$orgSlug/participations': typeof AppOrgSlugParticipationsRoute
   '/app/all/participations': typeof AppAllParticipationsRoute
   '/app/$orgSlug/': typeof AppOrgSlugIndexRoute
   '/app/all/': typeof AppAllIndexRoute
+  '/app/$orgSlug/participations/$companyId': typeof AppOrgSlugParticipationsCompanyIdRoute
   '/app/$orgSlug/settings/general': typeof AppOrgSlugSettingsGeneralRoute
   '/app/$orgSlug/settings/invitations': typeof AppOrgSlugSettingsInvitationsRoute
   '/app/$orgSlug/settings/members': typeof AppOrgSlugSettingsMembersRoute
+  '/app/$orgSlug/participations/': typeof AppOrgSlugParticipationsIndexRoute
   '/app/$orgSlug/settings/': typeof AppOrgSlugSettingsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -198,13 +206,14 @@ export interface FileRoutesByTo {
   '/app': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/$orgSlug/cash': typeof AppOrgSlugCashRoute
-  '/app/$orgSlug/participations': typeof AppOrgSlugParticipationsRoute
   '/app/all/participations': typeof AppAllParticipationsRoute
   '/app/$orgSlug': typeof AppOrgSlugIndexRoute
   '/app/all': typeof AppAllIndexRoute
+  '/app/$orgSlug/participations/$companyId': typeof AppOrgSlugParticipationsCompanyIdRoute
   '/app/$orgSlug/settings/general': typeof AppOrgSlugSettingsGeneralRoute
   '/app/$orgSlug/settings/invitations': typeof AppOrgSlugSettingsInvitationsRoute
   '/app/$orgSlug/settings/members': typeof AppOrgSlugSettingsMembersRoute
+  '/app/$orgSlug/participations': typeof AppOrgSlugParticipationsIndexRoute
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsIndexRoute
 }
 export interface FileRoutesById {
@@ -225,13 +234,14 @@ export interface FileRoutesById {
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/$orgSlug/cash': typeof AppOrgSlugCashRoute
-  '/app/$orgSlug/participations': typeof AppOrgSlugParticipationsRoute
   '/app/all/participations': typeof AppAllParticipationsRoute
   '/app/$orgSlug/': typeof AppOrgSlugIndexRoute
   '/app/all/': typeof AppAllIndexRoute
+  '/app/$orgSlug/participations/$companyId': typeof AppOrgSlugParticipationsCompanyIdRoute
   '/app/$orgSlug/settings/general': typeof AppOrgSlugSettingsGeneralRoute
   '/app/$orgSlug/settings/invitations': typeof AppOrgSlugSettingsInvitationsRoute
   '/app/$orgSlug/settings/members': typeof AppOrgSlugSettingsMembersRoute
+  '/app/$orgSlug/participations/': typeof AppOrgSlugParticipationsIndexRoute
   '/app/$orgSlug/settings/': typeof AppOrgSlugSettingsIndexRoute
 }
 export interface FileRouteTypes {
@@ -253,13 +263,14 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/settings'
     | '/api/auth/$'
     | '/app/$orgSlug/cash'
-    | '/app/$orgSlug/participations'
     | '/app/all/participations'
     | '/app/$orgSlug/'
     | '/app/all/'
+    | '/app/$orgSlug/participations/$companyId'
     | '/app/$orgSlug/settings/general'
     | '/app/$orgSlug/settings/invitations'
     | '/app/$orgSlug/settings/members'
+    | '/app/$orgSlug/participations/'
     | '/app/$orgSlug/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -275,13 +286,14 @@ export interface FileRouteTypes {
     | '/app'
     | '/api/auth/$'
     | '/app/$orgSlug/cash'
-    | '/app/$orgSlug/participations'
     | '/app/all/participations'
     | '/app/$orgSlug'
     | '/app/all'
+    | '/app/$orgSlug/participations/$companyId'
     | '/app/$orgSlug/settings/general'
     | '/app/$orgSlug/settings/invitations'
     | '/app/$orgSlug/settings/members'
+    | '/app/$orgSlug/participations'
     | '/app/$orgSlug/settings'
   id:
     | '__root__'
@@ -301,13 +313,14 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/settings'
     | '/api/auth/$'
     | '/app/$orgSlug/cash'
-    | '/app/$orgSlug/participations'
     | '/app/all/participations'
     | '/app/$orgSlug/'
     | '/app/all/'
+    | '/app/$orgSlug/participations/$companyId'
     | '/app/$orgSlug/settings/general'
     | '/app/$orgSlug/settings/invitations'
     | '/app/$orgSlug/settings/members'
+    | '/app/$orgSlug/participations/'
     | '/app/$orgSlug/settings/'
   fileRoutesById: FileRoutesById
 }
@@ -436,13 +449,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAllParticipationsRouteImport
       parentRoute: typeof AppAllRouteRoute
     }
-    '/app/$orgSlug/participations': {
-      id: '/app/$orgSlug/participations'
-      path: '/participations'
-      fullPath: '/app/$orgSlug/participations'
-      preLoaderRoute: typeof AppOrgSlugParticipationsRouteImport
-      parentRoute: typeof AppOrgSlugRouteRoute
-    }
     '/app/$orgSlug/cash': {
       id: '/app/$orgSlug/cash'
       path: '/cash'
@@ -471,6 +477,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrgSlugSettingsIndexRouteImport
       parentRoute: typeof AppOrgSlugSettingsRouteRoute
     }
+    '/app/$orgSlug/participations/': {
+      id: '/app/$orgSlug/participations/'
+      path: '/participations'
+      fullPath: '/app/$orgSlug/participations/'
+      preLoaderRoute: typeof AppOrgSlugParticipationsIndexRouteImport
+      parentRoute: typeof AppOrgSlugRouteRoute
+    }
     '/app/$orgSlug/settings/members': {
       id: '/app/$orgSlug/settings/members'
       path: '/members'
@@ -491,6 +504,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/$orgSlug/settings/general'
       preLoaderRoute: typeof AppOrgSlugSettingsGeneralRouteImport
       parentRoute: typeof AppOrgSlugSettingsRouteRoute
+    }
+    '/app/$orgSlug/participations/$companyId': {
+      id: '/app/$orgSlug/participations/$companyId'
+      path: '/participations/$companyId'
+      fullPath: '/app/$orgSlug/participations/$companyId'
+      preLoaderRoute: typeof AppOrgSlugParticipationsCompanyIdRouteImport
+      parentRoute: typeof AppOrgSlugRouteRoute
     }
   }
 }
@@ -518,15 +538,18 @@ const AppOrgSlugSettingsRouteRouteWithChildren =
 interface AppOrgSlugRouteRouteChildren {
   AppOrgSlugSettingsRouteRoute: typeof AppOrgSlugSettingsRouteRouteWithChildren
   AppOrgSlugCashRoute: typeof AppOrgSlugCashRoute
-  AppOrgSlugParticipationsRoute: typeof AppOrgSlugParticipationsRoute
   AppOrgSlugIndexRoute: typeof AppOrgSlugIndexRoute
+  AppOrgSlugParticipationsCompanyIdRoute: typeof AppOrgSlugParticipationsCompanyIdRoute
+  AppOrgSlugParticipationsIndexRoute: typeof AppOrgSlugParticipationsIndexRoute
 }
 
 const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
   AppOrgSlugSettingsRouteRoute: AppOrgSlugSettingsRouteRouteWithChildren,
   AppOrgSlugCashRoute: AppOrgSlugCashRoute,
-  AppOrgSlugParticipationsRoute: AppOrgSlugParticipationsRoute,
   AppOrgSlugIndexRoute: AppOrgSlugIndexRoute,
+  AppOrgSlugParticipationsCompanyIdRoute:
+    AppOrgSlugParticipationsCompanyIdRoute,
+  AppOrgSlugParticipationsIndexRoute: AppOrgSlugParticipationsIndexRoute,
 }
 
 const AppOrgSlugRouteRouteWithChildren = AppOrgSlugRouteRoute._addFileChildren(

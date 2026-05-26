@@ -7,7 +7,7 @@ import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { ParticipationsTable } from '~/components/participations/ParticipationsTable'
 
-export const Route = createFileRoute('/app/$orgSlug/participations')({
+export const Route = createFileRoute('/app/$orgSlug/participations/')({
   component: Participations,
   head: () => ({
     meta: [
@@ -33,7 +33,7 @@ function Participations() {
   return (
     <main className="flex-1 space-y-6 p-6">
       <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
-      <ParticipationsTable deals={deals} />
+      <ParticipationsTable deals={deals} orgSlug={orgSlug} />
     </main>
   )
 }
