@@ -160,11 +160,12 @@ The `AiChat` slide-over uses the Convex Agent's React hooks
 (`useUIMessages`) so streaming deltas arrive via WebSocket — no manual SSE
 plumbing. Threads are keyed by `${orgId}:${userId}`.
 
-The chat agent currently ships with **no action tools** (`tools: {}`) — it
-answers from context only. DB-acting tools scoped to the org (deals /
-companies) will be wired back in the V0 build, re-checking membership inside
-every tool via the thread's scope key. Tool calls cap out at 5 rounds per
-turn (`stepCountIs(5)`).
+The chat agent ships with **DB-acting tools** (`convex/agentTools.ts`) scoped
+to the org: `listCompanies` / `listDeals`, `createCompany` (portfolio only),
+`createDeal` (scope derived from the investor), and `updateDeal`. Membership
+is re-checked inside every tool via the thread's scope key
+(`${orgId}:${userId}`). Tool calls cap out at 5 rounds per turn
+(`stepCountIs(5)`).
 
 There's also an HTTP streaming endpoint at `<convex-site-url>/api/chat` for
 clients that prefer plain HTTP streaming (curl, custom clients).

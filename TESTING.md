@@ -172,7 +172,9 @@ Toujours connecté en tant qu'Alice. Préparer un 2e navigateur pour Bob.
 | -- | ------------------------------------------------------- | ----------------------------------------------------------------- |
 | C1 | Ouvrir le slide-over chat depuis `/app/acme`            | Premier thread créé automatiquement                                |
 | C2 | Envoyer un message simple ("ping")                      | Stream visible token par token, pas de blocage UI                  |
-| C3 | Demander à l'agent une action sur les données           | L'agent répond qu'aucun outil d'action n'est branché (V0 étape 6 : tools deals/companies) |
+| C3 | "liste mes participations Albo"                         | Tool `listDeals`/`listCompanies` appelé, réponse scopée à l'org    |
+| C4 | "crée un deal Albo Club dans Sezame, share, 50 000 €, signé le 15 janvier 2026" | L'agent confirme puis appelle `createCompany` (si absente) + `createDeal` ; le deal apparaît dans `/participations` (scope Albo + Consolidé, pas Calte) |
+| C5 | Demander un deal avec un investisseur portfolio (non groupe) | Refusé (`investor_must_be_group_entity`) — l'agent explique qu'il faut une entité du groupe |
 | C6 | Spammer 30 messages en 1 min                            | Rate-limit `chatSend` se déclenche                                |
 | C7 | Depuis `/app/beta`, vérifier que les threads d'Acme ne sont PAS listés | Isolation org confirmée (scope `${orgId}:${userId}`) |
 
