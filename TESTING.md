@@ -195,6 +195,9 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | C5 | Demander un deal avec un investisseur portfolio (non groupe) | Refusé (`investor_must_be_group_entity`) — l'agent explique qu'il faut une entité du groupe |
 | C6 | Spammer 30 messages en 1 min                            | Rate-limit `chatSend` se déclenche                                |
 | C7 | Depuis `/app/beta`, vérifier que les threads d'Acme ne sont PAS listés | Isolation org confirmée (scope `${orgId}:${userId}`) |
+| C8 | "crée un compte bancaire Qonto pour CALTE, solde 12 000 €"               | L'agent résout CALTE via `listCompanies` puis appelle `createBankAccount` avec `currentBalanceCents: 1200000` ; le compte apparaît dans `/cash` sous CALTE avec un solde de 12 000 € (pas "Solde inconnu") |
+| C9 | "ajoute une transaction de sortie 5 000 € liée au deal Sezame le 3 février 2026" | L'agent appelle `listBankAccounts`/`listDeals` puis `createTransaction` (dealId rempli) ; visible dans le Sheet du compte (sortie négative) ; le solde affiché reste inchangé (champ manuel) |
+| C10 | Demander un compte bancaire rattaché à une société portfolio            | Refusé (`owner_must_be_group_entity`) — l'agent explique qu'il faut une entité du groupe |
 
 ## Niveau 6 — Sécurité + déploiement (5 min)
 

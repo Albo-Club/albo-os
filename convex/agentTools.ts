@@ -243,6 +243,8 @@ export const createBankAccountInternal = internalMutation({
     currency: v.optional(v.string()),
     accountKind: v.optional(v.string()),
     iban: v.optional(v.string()),
+    currentBalance: v.optional(v.number()),
+    balanceAsOf: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     await readMembership(ctx, args.orgId, args.actorUserId)
@@ -262,6 +264,8 @@ export const createBankAccountInternal = internalMutation({
       currency: args.currency ?? 'EUR',
       accountKind: args.accountKind,
       iban: args.iban,
+      currentBalance: args.currentBalance,
+      balanceAsOf: args.balanceAsOf,
     })
     return { _id: id, label: args.label.trim() }
   },
@@ -509,7 +513,10 @@ const createBankAccount = createTool({
     'Create a bank account in the current org. The owner MUST be a group ' +
     'entity (CALTE, Albo Club, an SCI…) — find its id via listCompanies, ' +
     'never a portfolio company. Call listBankAccounts first to avoid ' +
-    'duplicates. Returns the new account id.',
+    'duplicates. currentBalanceCents is the last known balance in CENTS EUR ' +
+    '(12 000 € → 1200000); it is a manual field, not derived from ' +
+    'transactions. balanceAsOfISO is the date that balance was observed ' +
+    '("YYYY-MM-DD"). Returns the new account id.',
   inputSchema: z.object({
     ownerCompanyId: z.string().describe('Group entity id (CALTE, Albo…)'),
     bankName: z.string().min(1).describe('Bank name, e.g. "Qonto"'),
@@ -520,9 +527,17 @@ const createBankAccount = createTool({
       .optional()
       .describe('checking, cto, dat, savings…'),
     iban: z.string().optional(),
+    currentBalanceCents: z.number().int().optional().describe('cents EUR'),
+    balanceAsOfISO: z.string().optional().describe('ISO date "YYYY-MM-DD"'),
   }),
   execute: async (ctx, input): Promise<unknown> => {
     const { orgId, userId } = parseScope(ctx.userId)
+    const balanceAsOf = input.balanceAsOfISO
+      ? Date.parse(input.balanceAsOfISO)
+      : undefined
+    if (balanceAsOf !== undefined && Number.isNaN(balanceAsOf)) {
+      throw new ConvexError('invalid_balance_date')
+    }
     return await ctx.runMutation(internal.agentTools.createBankAccountInternal, {
       orgId,
       actorUserId: userId,
@@ -532,6 +547,8 @@ const createBankAccount = createTool({
       currency: input.currency,
       accountKind: input.accountKind,
       iban: input.iban,
+      currentBalance: input.currentBalanceCents,
+      balanceAsOf,
     })
   },
 })
