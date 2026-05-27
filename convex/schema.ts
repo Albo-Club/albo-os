@@ -323,6 +323,11 @@ export default defineSchema({
     balanceAsOf: v.optional(v.number()),
     powensConnectionId: v.optional(v.string()),
     powensAccountId: v.optional(v.string()),
+    powensUserId: v.optional(v.string()), // id_user Powens propriétaire de la connexion
+    // "Date de coupure" : aucune NOUVELLE transaction d'opération antérieure à
+    // ce seuil n'est ingérée (pas de backfill). Posée à la 1re persistance.
+    ingestSince: v.optional(v.number()),
+    lastSyncedAt: v.optional(v.number()), // maj à chaque webhook compte
     archivedAt: v.optional(v.number()),
   })
     .index('by_org', ['orgId'])
@@ -345,6 +350,9 @@ export default defineSchema({
     counterparty: v.optional(v.string()),
     source: txSource,
     powensTxId: v.optional(v.string()),
+    valueDate: v.optional(v.number()), // Powens `vdate` (date de valeur), info
+    powensLastUpdate: v.optional(v.number()), // Powens `last_update`, upsert idempotent
+    pending: v.optional(v.boolean()), // Powens `coming` (tx à venir / non appliquée)
     reconciled: v.boolean(),
     reconciledBy: v.optional(v.id('users')),
     reconciledAt: v.optional(v.number()),

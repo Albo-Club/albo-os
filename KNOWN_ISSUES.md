@@ -571,3 +571,43 @@ redirects on `!isAuthenticated` will fire during that gap.
    recreated each render ») — this is the same bug at the router level.
    If you add a new route guard, prefer `useAuthState()` over
    `useConvexAuth()` directly.
+
+## Webhook HMAC in `httpAction`: use Web Crypto, not `node:crypto`
+
+`CLAUDE.md` says « HMAC verify on every incoming webhook
+(`crypto.timingSafeEqual`) ». **`crypto.timingSafeEqual` and `node:crypto` are
+NOT available in a Convex `httpAction`** — httpActions run in the default
+Convex runtime (a V8 isolate), and an httpAction cannot be `"use node"`. Using
+`node:crypto` there fails at runtime, not at typecheck.
+
+**Pattern** (`convex/lib/webhookAuth.ts::verifyHmac`): compute the digest with
+**Web Crypto** (`crypto.subtle.importKey('raw', …, {name:'HMAC',
+hash:'SHA-256'})` + `crypto.subtle.sign`), hex-encode it, and compare with a
+**hand-rolled constant-time** string compare (length check, then XOR fold). The
+helper fails closed when the signature header or the secret is absent.
+
+**Cross-runtime gotcha that bites:** the *sender* (n8n) signs with Node's
+`crypto.createHmac('sha256', secret).update(body).digest('hex')`. This produces
+**the exact same hex digest** as the Web Crypto path above — verified. Both
+sides must sign the **same bytes**: the *raw request body string*, not a
+re-serialized JSON object (key order / whitespace would diverge). In the
+httpAction, read `await request.text()` once and verify that exact string
+before `JSON.parse`.
+
+## Powens → n8n → Convex: two distinct signature layers
+
+The bank-ingestion pipeline has **two** HMAC layers — don't conflate them:
+
+1. **Powens → n8n** uses Powens' `BI-Signature` header =
+   `BASE64(HMAC_SHA256("<METHOD>.<endpoint>.<BI-Signature-Date>.<payload>",
+   secret))`. Validated **in n8n**, with the secret shown **once** at webhook
+   creation in the Powens console.
+2. **n8n → Convex** uses our own `X-Albo-Signature` = hex
+   `HMAC_SHA256(rawBody, ALBO_INGEST_SECRET)`. Validated **in Convex**
+   (`verifyHmac`).
+
+`ALBO_INGEST_SECRET` lives in the Convex env (`convex env set`) **and** in n8n
+credentials. No Powens secret (client_secret, per-user tokens, BI-Signature
+secret) ever touches Convex — those stay in n8n. The no-backfill cutoff
+(`bankAccounts.ingestSince`) is enforced **authoritatively in Convex**
+(`convex/powens.ts`), not in n8n.

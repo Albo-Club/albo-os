@@ -249,6 +249,8 @@ pnpm exec convex env set --prod APP_ENV production
 # optional — only if you use Google social login
 pnpm exec convex env set --prod GOOGLE_CLIENT_ID <id>
 pnpm exec convex env set --prod GOOGLE_CLIENT_SECRET <secret>
+# optional — only if you ingest bank data via Powens → n8n (see KNOWN_ISSUES.md)
+pnpm exec convex env set --prod ALBO_INGEST_SECRET "$(openssl rand -hex 32)"
 pnpm exec convex deploy
 ```
 

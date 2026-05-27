@@ -121,8 +121,9 @@ Toujours connecté en tant qu'Alice. Préparer un 2e navigateur pour Bob.
 
 ## Niveau 3 — Vue Cash (lecture seule, 5 min)
 
-Route `/app/$orgSlug/cash` (`src/routes/app/$orgSlug/cash.tsx`). Lecture seule :
-pas d'ingestion encore (Powens en cible). Pour tester avec des données, insérer
+Route `/app/$orgSlug/cash` (`src/routes/app/$orgSlug/cash.tsx`). Lecture seule
+côté UI. L'ingestion automatique se fait via les webhooks Powens (voir « Niveau 3
+— Ingestion Powens » ci-dessous). Pour tester l'UI avec des données, insérer
 temporairement via le dashboard Convex 1–2 `bankAccounts` (`ownerCompanyId` =
 une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 `transactions` (certaines avec `dealId` pointant un deal existant). Nettoyer après.
@@ -136,6 +137,29 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | CA5 | Transaction `direction: "out"`                                      | Montant en négatif, couleur `text-destructive` ; `in` en positif                  |
 | CA6 | Compte sans transaction liée à un deal                             | Sheet affiche l'état vide "Aucune transaction liée à un deal…"                    |
 | CA7 | i18n EN/FR sur la page + le Sheet                                   | Tous les libellés traduits (namespace `cash`), titre d'onglet = `cash:metaTitle`  |
+
+## Niveau 3 — Ingestion Powens (webhooks n8n → Convex, 8 min)
+
+Routes HTTP `<convex-site-url>/api/powens/accounts` et `/api/powens/transactions`
+(`convex/http.ts` → `convex/powens.ts`). Auth = HMAC-SHA256 du body brut avec
+`ALBO_INGEST_SECRET`, en-tête `X-Albo-Signature` (hex). Pas de UI : on vérifie
+côté `bankAccounts` / `transactions` (dashboard Convex ou page `/cash`).
+Pré-requis : `convex env set ALBO_INGEST_SECRET <valeur>`.
+
+Helper pour signer un payload de test :
+`SIG=$(node -e 'const{createHmac}=require("crypto");process.stdout.write(createHmac("sha256",process.env.S).update(process.env.B).digest("hex"))')`
+(avec `S`=secret, `B`=body), puis `curl -H "X-Albo-Signature: $SIG" -d "$B" <url>`.
+
+| #   | Étape                                                                 | Résultat attendu                                                                                 |
+| --- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| PW1 | POST `/api/powens/accounts` signé (orgSlug `calte`, ownerCompany CALTE) | 200 `{created:[id]}` ; `bankAccounts` créé, `ingestSince` ≈ now, `currentBalance` en cents       |
+| PW2 | Re-POST le même compte (même `powensAccountId`)                        | 200 `{updated:[id]}` ; `ingestSince` **inchangé**, solde/lastSyncedAt mis à jour                 |
+| PW3 | POST `/api/powens/transactions` signé, tx avec `date >= ingestSince`   | 200 `{inserted:1,...}` ; `transactions` : montant cents positif, `direction` selon signe, `source:"powens"` |
+| PW4 | POST une tx **nouvelle** avec `date < ingestSince`                     | `{skippedBeforeCutoff:1}` ; aucune insertion (pas de backfill)                                   |
+| PW5 | Re-POST une tx déjà connue (`powensTxId`) avec montant corrigé         | `{updated:1}` ; montant patché, `reconciled` **non modifié**                                     |
+| PW6 | POST tx avec `powensAccountId` inconnu                                 | `{skippedUnknownAccount:1}` ; rien d'inséré                                                       |
+| PW7 | Payload modifié après signature (HMAC invalide) ou en-tête absent      | 401 Unauthorized                                                                                 |
+| PW8 | ownerCompany introuvable / non `group_*`                              | 422 `{error:"owner_company_not_found"}` ou `"owner_must_be_group_entity"`                        |
 
 ## Niveau 3 — Invitations edge cases (8 min)
 
