@@ -13,7 +13,7 @@
     "balance": "Solde"
   },
   "tx": {
-    "title": "Transactions liées aux deals",
+    "title": "Transactions",
     "subtitle": "{{bank}} · {{label}}",
     "col": {
       "date": "Date",
@@ -21,7 +21,7 @@
       "deal": "Deal",
       "amount": "Montant"
     },
-    "empty": "Aucune transaction liée à un deal sur ce compte.",
+    "empty": "Aucune transaction sur ce compte.",
     "loading": "Chargement des transactions…"
   },
   "direction": {

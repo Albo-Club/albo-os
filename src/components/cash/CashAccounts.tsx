@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { Id } from '../../../convex/_generated/dataModel'
-import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Skeleton } from '~/components/ui/skeleton'
 import {
@@ -127,7 +126,17 @@ export function CashAccounts({
               </TableHeader>
               <TableBody>
                 {g.accounts.map((a) => (
-                  <TableRow key={a._id}>
+                  <TableRow
+                    key={a._id}
+                    className="cursor-pointer"
+                    onClick={() =>
+                      setSelected({
+                        _id: a._id,
+                        bankName: a.bankName,
+                        label: a.label,
+                      })
+                    }
+                  >
                     <TableCell className="font-medium">{a.bankName}</TableCell>
                     <TableCell>
                       <span className="flex flex-col gap-0.5">
@@ -139,20 +148,8 @@ export function CashAccounts({
                         )}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="link"
-                        className="h-auto p-0 tabular-nums"
-                        onClick={() =>
-                          setSelected({
-                            _id: a._id,
-                            bankName: a.bankName,
-                            label: a.label,
-                          })
-                        }
-                      >
-                        {fmtEur(a.currentBalance) ?? t('noBalance')}
-                      </Button>
+                    <TableCell className="text-right tabular-nums">
+                      {fmtEur(a.currentBalance) ?? t('noBalance')}
                     </TableCell>
                   </TableRow>
                 ))}

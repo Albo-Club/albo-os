@@ -44,11 +44,11 @@ export const listAccounts = query({
 })
 
 /**
- * Transactions d'un compte **liées à un deal** (`dealId` rempli), en ordre
- * antéchronologique (plus récente d'abord). Chaque ligne est labellisée par la
- * boîte investie du deal. Le check d'org dérive du compte.
+ * Transactions d'un compte, en ordre antéchronologique (plus récente d'abord).
+ * Quand une transaction est rattachée à un deal, elle est labellisée par la
+ * boîte investie (`deal` sinon `null`). Le check d'org dérive du compte.
  */
-export const listAccountDealTransactions = query({
+export const listAccountTransactions = query({
   args: { bankAccountId: v.id('bankAccounts') },
   handler: async (ctx, { bankAccountId }) => {
     const account = await ctx.db.get(bankAccountId)
@@ -62,10 +62,9 @@ export const listAccountDealTransactions = query({
       )
       .order('desc')
       .take(TX_LIMIT)
-    const linked = rows.filter((t) => t.dealId != null)
 
     return await Promise.all(
-      linked.map(async (t) => {
+      rows.map(async (t) => {
         const deal = t.dealId ? await ctx.db.get(t.dealId) : null
         const target = deal ? await ctx.db.get(deal.targetCompanyId) : null
         return {
