@@ -13,7 +13,7 @@
     "balance": "Balance"
   },
   "tx": {
-    "title": "Deal-linked transactions",
+    "title": "Transactions",
     "subtitle": "{{bank}} · {{label}}",
     "col": {
       "date": "Date",
@@ -21,7 +21,7 @@
       "deal": "Deal",
       "amount": "Amount"
     },
-    "empty": "No deal-linked transactions on this account.",
+    "empty": "No transactions on this account.",
     "loading": "Loading transactions…"
   },
   "direction": {

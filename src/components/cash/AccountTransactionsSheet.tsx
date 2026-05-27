@@ -36,7 +36,7 @@ export function AccountTransactionsSheet({
   const lang = i18n.language
 
   const transactions = useConvexQuery(
-    api.cash.listAccountDealTransactions,
+    api.cash.listAccountTransactions,
     account ? { bankAccountId: account._id } : 'skip',
   )
 

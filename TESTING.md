@@ -132,7 +132,7 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | CA1 | Ouvrir `/app/<org>/cash` sans aucun `bankAccounts`                  | Total à 0 € + encart pointillé "Aucun compte bancaire…" (état vide propre)        |
 | CA2 | Avec comptes : soldes regroupés par entité propriétaire (`group_*`) | Une section par entité (titre = nom entité) ; carte "Solde total" = somme des soldes |
 | CA3 | Compte sans `currentBalance`                                        | Affiche "Solde inconnu" ; `balanceAsOf` rendu en sous-texte si présent            |
-| CA4 | Clic sur le solde d'un compte                                       | Ouvre un Sheet listant **uniquement** les transactions avec `dealId`, antéchrono (récent en 1er), labellisées par la boîte investie |
+| CA4 | Clic sur **la ligne du compte** (n'importe où, pas juste le solde)   | Ouvre un Sheet listant **toutes** les transactions du compte, antéchrono (récent en 1er) ; les rattachées à un deal sont labellisées par la boîte investie, les autres affichent « — » en colonne Deal |
 | CA5 | Transaction `direction: "out"`                                      | Montant en négatif, couleur `text-destructive` ; `in` en positif                  |
 | CA6 | Compte sans transaction liée à un deal                             | Sheet affiche l'état vide "Aucune transaction liée à un deal…"                    |
 | CA7 | i18n EN/FR sur la page + le Sheet                                   | Tous les libellés traduits (namespace `cash`), titre d'onglet = `cash:metaTitle`  |
