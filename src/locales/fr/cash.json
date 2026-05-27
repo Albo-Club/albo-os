@@ -1,6 +1,9 @@
 {
   "metaTitle": "Trésorerie — Albo OS",
+  "metaTitleDetail": "Compte — Albo OS",
   "title": "Trésorerie",
+  "back": "← Trésorerie",
+  "notFound": "Compte introuvable.",
   "totalBalance": "Solde total",
   "asOf": "au {{date}}",
   "noBalance": "Solde inconnu",
@@ -12,9 +15,13 @@
     "kind": "Type",
     "balance": "Solde"
   },
+  "detail": {
+    "owner": "Entité",
+    "asOf": "Solde au",
+    "iban": "IBAN"
+  },
   "tx": {
     "title": "Transactions",
-    "subtitle": "{{bank}} · {{label}}",
     "col": {
       "date": "Date",
       "label": "Libellé",

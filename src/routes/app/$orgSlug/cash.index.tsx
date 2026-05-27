@@ -7,7 +7,7 @@ import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { CashAccounts } from '~/components/cash/CashAccounts'
 
-export const Route = createFileRoute('/app/$orgSlug/cash')({
+export const Route = createFileRoute('/app/$orgSlug/cash/')({
   component: Cash,
   head: () => ({
     meta: [
@@ -30,7 +30,7 @@ function Cash() {
   return (
     <main className="flex-1 space-y-6 p-6">
       <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
-      <CashAccounts accounts={accounts} />
+      <CashAccounts accounts={accounts} orgSlug={orgSlug} />
     </main>
   )
 }

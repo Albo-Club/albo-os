@@ -1,6 +1,9 @@
 {
   "metaTitle": "Cash — Albo OS",
+  "metaTitleDetail": "Account — Albo OS",
   "title": "Cash",
+  "back": "← Cash",
+  "notFound": "Account not found.",
   "totalBalance": "Total balance",
   "asOf": "as of {{date}}",
   "noBalance": "No balance",
@@ -12,9 +15,13 @@
     "kind": "Type",
     "balance": "Balance"
   },
+  "detail": {
+    "owner": "Entity",
+    "asOf": "Balance as of",
+    "iban": "IBAN"
+  },
   "tx": {
     "title": "Transactions",
-    "subtitle": "{{bank}} · {{label}}",
     "col": {
       "date": "Date",
       "label": "Label",
