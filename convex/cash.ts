@@ -44,6 +44,31 @@ export const listAccounts = query({
 })
 
 /**
+ * Un compte bancaire (avec son entité propriétaire), pour la page détail.
+ * Le check d'org dérive du compte.
+ */
+export const getAccount = query({
+  args: { bankAccountId: v.id('bankAccounts') },
+  handler: async (ctx, { bankAccountId }) => {
+    const account = await ctx.db.get(bankAccountId)
+    if (!account) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, account.orgId)
+    const owner = await ctx.db.get(account.ownerCompanyId)
+    return {
+      _id: account._id,
+      bankName: account.bankName,
+      label: account.label,
+      accountKind: account.accountKind ?? null,
+      iban: account.iban ?? null,
+      currency: account.currency,
+      currentBalance: account.currentBalance ?? null,
+      balanceAsOf: account.balanceAsOf ?? null,
+      owner: ownerRef(owner),
+    }
+  },
+})
+
+/**
  * Transactions d'un compte, en ordre antéchronologique (plus récente d'abord).
  * Quand une transaction est rattachée à un deal, elle est labellisée par la
  * boîte investie (`deal` sinon `null`). Le check d'org dérive du compte.

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import type { Id } from '../../../convex/_generated/dataModel'
@@ -12,8 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
-import { AccountTransactionsSheet } from './AccountTransactionsSheet'
-import type { SelectedAccount } from './AccountTransactionsSheet'
 
 export type CashAccount = {
   _id: Id<'bankAccounts'>
@@ -50,12 +49,14 @@ function useFormatters() {
 
 export function CashAccounts({
   accounts,
+  orgSlug,
 }: {
   accounts: Array<CashAccount> | undefined
+  orgSlug: string
 }) {
   const { t } = useTranslation('cash')
   const { fmtEur, fmtDate } = useFormatters()
-  const [selected, setSelected] = useState<SelectedAccount | null>(null)
+  const navigate = useNavigate()
 
   const groups = useMemo(() => {
     if (!accounts) return undefined
@@ -130,10 +131,9 @@ export function CashAccounts({
                     key={a._id}
                     className="cursor-pointer"
                     onClick={() =>
-                      setSelected({
-                        _id: a._id,
-                        bankName: a.bankName,
-                        label: a.label,
+                      navigate({
+                        to: '/app/$orgSlug/cash/$accountId',
+                        params: { orgSlug, accountId: a._id },
                       })
                     }
                   >
@@ -158,11 +158,6 @@ export function CashAccounts({
           </div>
         </section>
       ))}
-
-      <AccountTransactionsSheet
-        account={selected}
-        onClose={() => setSelected(null)}
-      />
     </div>
   )
 }
