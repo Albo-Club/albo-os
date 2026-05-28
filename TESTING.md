@@ -218,6 +218,21 @@ peut créer Alice (SA), Bob (member) et une org "acme". À écrire dans
 `process.env.CONVEX_DEPLOYMENT !== 'production'`. Le seed des 9 entités du
 groupe Calte vit séparément dans `convex/seed.ts` (`seedGroup`, mission V0).
 
+## Import Attio → Convex (portefeuille Albo Club, one-shot)
+
+Migration figée des deals/companies Attio (label Albo, stages Invested/Exit Win)
+vers l'org `albo`. Prérequis : org `albo` + company `group_root` « Albo Club »
+seedées (`convex run --prod seed:seedAll`). Le schéma doit être déployé (champ
+`deals.exitProceeds`).
+
+| #  | Étape                                                       | Résultat attendu                                            |
+| -- | ----------------------------------------------------------- | ----------------------------------------------------------- |
+| A1 | `convex export --prod`                                      | Snapshot de sécurité avant écriture                         |
+| A2 | `convex run --prod migrations/attioAlboImport:run`          | `{ companiesInserted: 34, dealsInserted: 43, ... }`          |
+| A3 | `convex run --prod migrations/attioAlboImport:verify`       | `portfolioCompanies: 34`, `deals: 43`, `exited: 2`          |
+| A4 | Re-lancer `:run` (idempotence)                              | `…Inserted: 0`, `…Patched: 34/43` — aucun doublon            |
+| A5 | Échantillon `verify.sample`                                 | Chaque `attioDealId` pointe sur la bonne `target`           |
+
 ## En cas d'échec
 
 - Smoke échoue → ouvrir `KNOWN_ISSUES.md` (déploiement Convex / `pnpm rebuild esbuild`).
