@@ -256,6 +256,7 @@ export default defineSchema({
     signedDate: v.optional(v.number()),
     closingDate: v.optional(v.number()),
     exitedDate: v.optional(v.number()),
+    exitProceeds: v.optional(v.number()), // cents — produit de cession (exit)
     status: dealStatus,
 
     // Bridge Attio
