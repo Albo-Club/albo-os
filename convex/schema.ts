@@ -69,6 +69,8 @@ const instrumentKind = v.union(
   v.literal('cto'),
   v.literal('dat'), // dépôt à terme
   v.literal('crypto'),
+  v.literal('loan'), // prêt (Airtable « Prêt »)
+  v.literal('capitalization_account'), // contrat de capitalisation (Airtable « Compte de Capitalisation »)
 )
 
 const dealStatus = v.union(
@@ -170,6 +172,9 @@ export default defineSchema({
     // Bridge Attio
     attioCompanyId: v.optional(v.string()),
 
+    // Ancre import Airtable (one-shot, idempotence/résolution de liens)
+    airtableId: v.optional(v.string()),
+
     // Contexte capital (pour calcul % de détention)
     totalShares: v.optional(v.number()),
 
@@ -186,7 +191,8 @@ export default defineSchema({
     .index('by_org_kind', ['orgId', 'kind'])
     .index('by_org_siren', ['orgId', 'siren'])
     .index('by_attio_company_id', ['attioCompanyId'])
-    .index('by_org_domain', ['orgId', 'domain']),
+    .index('by_org_domain', ['orgId', 'domain'])
+    .index('by_airtable_id', ['airtableId']),
 
   /**
    * companyRelations — détention entre entités. Gère les cas non-binaires
@@ -261,6 +267,9 @@ export default defineSchema({
     // Bridge Attio
     attioDealId: v.optional(v.string()),
 
+    // Ancre import Airtable (clé dérivée `${companyRecId}:${instrumentKind}`)
+    airtableId: v.optional(v.string()),
+
     // Meta
     notes: v.optional(v.string()),
   })
@@ -268,7 +277,8 @@ export default defineSchema({
     .index('by_org_investor', ['orgId', 'investorCompanyId'])
     .index('by_org_target', ['orgId', 'targetCompanyId'])
     .index('by_org_status', ['orgId', 'status'])
-    .index('by_attio_deal_id', ['attioDealId']),
+    .index('by_attio_deal_id', ['attioDealId'])
+    .index('by_airtable_id', ['airtableId']),
 
   /**
    * valuations — historique horodaté de la valo d'un deal. Distinct de
@@ -282,9 +292,11 @@ export default defineSchema({
     valuationMethod: v.optional(v.string()), // "last_round", "mark_to_market"…
     source: v.optional(v.string()),
     notes: v.optional(v.string()),
+    airtableId: v.optional(v.string()), // ancre import Airtable
   })
     .index('by_deal_asof', ['dealId', 'asOf'])
-    .index('by_org_asof', ['orgId', 'asOf']),
+    .index('by_org_asof', ['orgId', 'asOf'])
+    .index('by_airtable_id', ['airtableId']),
 
   /**
    * kpiSnapshots — historique KPI portfolio (ARR, GMV, AUM, headcount…).
@@ -323,11 +335,13 @@ export default defineSchema({
     balanceAsOf: v.optional(v.number()),
     powensConnectionId: v.optional(v.string()),
     powensAccountId: v.optional(v.string()),
+    airtableId: v.optional(v.string()), // ancre import Airtable
     archivedAt: v.optional(v.number()),
   })
     .index('by_org', ['orgId'])
     .index('by_owner', ['orgId', 'ownerCompanyId'])
-    .index('by_powens_account', ['powensAccountId']),
+    .index('by_powens_account', ['powensAccountId'])
+    .index('by_airtable_id', ['airtableId']),
 
   /**
    * transactions — flux bancaire réalisé. `dealId` nullable car certains
@@ -349,12 +363,14 @@ export default defineSchema({
     reconciledBy: v.optional(v.id('users')),
     reconciledAt: v.optional(v.number()),
     notes: v.optional(v.string()),
+    airtableId: v.optional(v.string()), // ancre import Airtable
   })
     .index('by_org_date', ['orgId', 'transactionDate'])
     .index('by_account_date', ['bankAccountId', 'transactionDate'])
     .index('by_deal', ['dealId'])
     .index('by_powens_id', ['powensTxId'])
-    .index('by_org_unreconciled', ['orgId', 'reconciled']),
+    .index('by_org_unreconciled', ['orgId', 'reconciled'])
+    .index('by_airtable_id', ['airtableId']),
 
   /**
    * forecasts — flux attendus (appels de fonds, distributions, échéances
@@ -372,9 +388,11 @@ export default defineSchema({
     label: v.string(),
     source: v.optional(v.string()),
     realizedTransactionId: v.optional(v.id('transactions')),
+    airtableId: v.optional(v.string()), // ancre import Airtable
     archivedAt: v.optional(v.number()),
   })
     .index('by_org_date', ['orgId', 'expectedDate'])
     .index('by_deal', ['dealId'])
-    .index('by_account_date', ['bankAccountId', 'expectedDate']),
+    .index('by_account_date', ['bankAccountId', 'expectedDate'])
+    .index('by_airtable_id', ['airtableId']),
 })
