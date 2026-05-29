@@ -115,6 +115,11 @@ const OPERATIONAL = new Set([
   'Nantissement',
 ])
 
+// `sharesAcquired` n'a de sens que pour les instruments « share-like ».
+// Pour la dette (os/oc/loan…) le « Nb d'action » Airtable est un nominal, pas
+// un nombre de titres → on ne le mappe pas.
+const SHARE_LIKE = new Set(['share', 'spv_share', 'secondary', 'scpi'])
+
 const instrumentValidator = v.union(
   v.literal('share'),
   v.literal('bsa'),
@@ -748,7 +753,10 @@ export const runImport = internalAction({
         instrumentKind: d0.instrument as Instrument,
         status: d0.latestStatus as DealStatus,
         paidAmount: d0.paidAmount > 0 ? d0.paidAmount : undefined,
-        sharesAcquired: d0.shares > 0 ? d0.shares : undefined,
+        sharesAcquired:
+          SHARE_LIKE.has(d0.instrument) && d0.shares > 0
+            ? d0.shares
+            : undefined,
         signedDate: d0.minDate,
         exitedDate: d0.latestStatus === 'fully_exited' ? d0.maxDate : undefined,
       }))
