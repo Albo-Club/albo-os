@@ -35,6 +35,8 @@ const INSTRUMENTS = [
   'cto',
   'dat',
   'crypto',
+  'loan',
+  'capitalization_account',
 ] as const
 
 const instrumentValidator = v.union(
@@ -55,6 +57,8 @@ const instrumentValidator = v.union(
   v.literal('cto'),
   v.literal('dat'),
   v.literal('crypto'),
+  v.literal('loan'),
+  v.literal('capitalization_account'),
 )
 
 function parseScope(scope: string | undefined | null): {

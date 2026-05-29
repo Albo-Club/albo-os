@@ -571,3 +571,35 @@ redirects on `!isAuthenticated` will fire during that gap.
    recreated each render ») — this is the same bug at the router level.
    If you add a new route guard, prefer `useAuthState()` over
    `useConvexAuth()` directly.
+
+## Import Airtable one-shot (`convex/airtableImport.ts`)
+
+Migration unique de la base Airtable `appVRf06AHghMkPZG` vers l'org `calte`.
+Le code reste en place comme référence/relance (idempotent), pas de sync.
+
+- **Ancre `airtableId`** : champ `v.optional(v.string())` + index
+  `by_airtable_id` ajoutés sur `companies`, `deals`, `valuations`,
+  `forecasts`, `bankAccounts`, `transactions`. Sert (a) à résoudre les liens
+  Airtable (recordId → `Id<>`) en 2 passes, (b) à upserter sans doublon en
+  relance. **Volontairement non-unique au schéma** (Convex ne le permet pas) ;
+  l'unicité tient parce que chaque upsert lookup `by_airtable_id` d'abord.
+- **Sentinelles** : l'entité investisseuse (`deals.investorCompanyId` doit être
+  `group_*`, absente d'Airtable) est une company `group_root` créée à la volée
+  avec `airtableId = "__import_investor__"`. Les mouvements sans lien banque
+  retombent sur un `bankAccounts` `airtableId = "__unassigned_bank__"`. Ces
+  deux lignes sont des artefacts d'import, pas des données métier réelles.
+- **2 enums `instrumentKind` ajoutés** : `loan` (Airtable « Prêt »),
+  `capitalization_account` (« Compte de Capitalisation »). L'union est
+  redéclarée dans 3 endroits — garder synchronisés : `convex/schema.ts`,
+  `convex/deals.ts`, `convex/agentTools.ts` (array `INSTRUMENTS` + validateur).
+- **Dérivation deals** : 1 deal = `(Entreprise × instrumentKind)`, clé
+  `airtableId = "${entrepriseRecId}:${instrument}"`. Les mouvements
+  opérationnels (Cash, Don, Impot, Honoraires, Virement, Nantissement) ne
+  produisent **pas** de deal — juste une `transaction` sans `dealId`.
+  L'import **throw** `unknown_invest_type:<x>` sur tout `Type d'invest` non
+  mappé (jamais de mapping silencieux).
+- **Montants** : Airtable est en EUR (décimales) → cents (`round(x*100)`).
+- **codegen** : `internal.airtableImport.*` n'existe dans `_generated/api.d.ts`
+  qu'après `convex dev`/`convex deploy`. Le `pnpm typecheck` local échoue tant
+  que la codegen n'a pas tourné contre un déploiement — c'est attendu, le build
+  Vercel (`convex deploy`) régénère l'API.
