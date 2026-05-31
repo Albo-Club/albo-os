@@ -851,3 +851,38 @@ export const startBankConnection = action({
     return { webviewUrl: url.toString() }
   },
 })
+
+/** Réinitialise le lien Powens d'un compte Qonto : remet `powensAccountId` et
+ * `iban` à `undefined`. Utile pour purger des résidus d'un user Powens
+ * temporaire expiré (sinon le compte est « pris » → `qonto_match_ambiguous`).
+ *
+ * Garde-fou : n'agit QUE si le compte appartient à l'org calte ET a
+ * `bankName ≈ 'Qonto'`. Ne touche à rien d'autre (pas aux transactions).
+ * Renvoie l'état avant/après. Lancée par l'opérateur via `convex run --prod`. */
+export const resetQontoPowensLink = internalMutation({
+  args: { bankAccountId: v.id('bankAccounts') },
+  handler: async (ctx, { bankAccountId }) => {
+    const account = await ctx.db.get(bankAccountId)
+    if (!account) throw new ConvexError('account_not_found')
+    const calte = await orgBySlug(ctx, 'calte')
+    if (account.orgId !== calte._id) throw new ConvexError('not_calte')
+    if (!normalizeName(account.bankName).includes('qonto')) {
+      throw new ConvexError('not_qonto')
+    }
+    const before = {
+      powensAccountId: account.powensAccountId ?? null,
+      iban: account.iban ?? null,
+    }
+    await ctx.db.patch(bankAccountId, {
+      powensAccountId: undefined,
+      iban: undefined,
+    })
+    return {
+      bankAccountId,
+      bankName: account.bankName,
+      label: account.label,
+      before,
+      after: { powensAccountId: null, iban: null },
+    }
+  },
+})
