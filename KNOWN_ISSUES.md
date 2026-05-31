@@ -648,3 +648,40 @@ Seule env var requise : `POWENS_WEBHOOK_SECRET` (clé du provider HMAC Powens).
 - **codegen** : comme pour l'import Airtable, `internal.powens.*` n'apparaît
   dans `_generated/api.d.ts` qu'après codegen. L'entrée `powens` y a été ajoutée
   pour passer le `typecheck` local ; `convex deploy` la régénère à l'identique.
+
+## Émission Powens — connexion bancaire depuis l'app (`convex/powens.ts`)
+
+Côté émission du flux Powens : un bouton « Connecter une banque » (page Cash)
+appelle l'action `startBankConnection`, qui crée/réutilise un user Powens
+permanent par org, génère un code temporaire et renvoie l'URL du Webview.
+
+- **Token permanent par org, en clair, en table INTERNE `powensUsers`.** Convex
+  ne chiffre pas nativement les champs ; la protection repose sur l'**isolation**
+  (table lue/écrite uniquement par `internalQuery`/`internalMutation` —
+  `getOrgPowensToken`, `savePowensUser` — jamais par une fonction publique). Même
+  principe de confinement serveur que `POWENS_WEBHOOK_SECRET`. **Ne PAS** mettre
+  le token sur `organizations` : `api.organizations.bySlug` fait `return {...org}`
+  → il partirait au navigateur.
+- **`client_secret` et `authToken` ne quittent jamais le serveur.** L'action ne
+  renvoie au front que `{ webviewUrl }` (le `code` temporaire qu'elle contient
+  n'est pas sensible). Les `ConvexError` n'incluent que le status HTTP Powens
+  (`powens_init_failed:<status>`, `powens_code_failed:<status>`), jamais le
+  secret/token. Ne rien logger de ces valeurs.
+- **Domaine en env var** (`POWENS_DOMAIN`, sans `https://` ni `/2.0`). Base API
+  dérivée en code : `https://${POWENS_DOMAIN}/2.0`. Bascule sandbox→prod en
+  changeant l'env var (+ `POWENS_CLIENT_ID`/`POWENS_CLIENT_SECRET` de l'app prod),
+  sans recommit. Env vars requises : `POWENS_CLIENT_ID`, `POWENS_CLIENT_SECRET`,
+  `POWENS_DOMAIN`, `POWENS_REDIRECT_URI` (+ `POWENS_WEBHOOK_SECRET` pour
+  l'ingestion). Toute absente → `ConvexError('powens_env_missing')`.
+- **Param `type` de `/auth/token/code`** : requis par Powens mais valeur non
+  documentée précisément. Défaut `POWENS_CODE_TYPE = 'singleAccess'`, isolé en
+  constante — **à valider au premier test sandbox** (si 4xx, tester sans le param
+  ou une autre valeur).
+- **`redirect_uri`** doit matcher EXACTEMENT la whitelist Powens
+  (`https://alboteam.com/`, slash final compris).
+- **Rôle requis** : `startBankConnection` exige `admin` (via `powensAuthProbe` →
+  `requireOrgRole(orgId, 'admin')`). Action sensible (ouvre l'accès bancaire de
+  l'org). `savePowensUser` est idempotent par org (garde l'enregistrement
+  existant) — un double-clic ne crée pas de second user côté Convex (mais deux
+  `/auth/init` quasi-simultanés sur une org sans token créeraient un user Powens
+  orphelin côté Powens ; risque faible, bouton désactivé pendant l'appel).

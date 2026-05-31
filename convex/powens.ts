@@ -21,7 +21,13 @@
 
 import { ConvexError, v } from 'convex/values'
 import { internal } from './_generated/api'
-import { httpAction, internalMutation, internalQuery } from './_generated/server'
+import {
+  action,
+  httpAction,
+  internalMutation,
+  internalQuery,
+} from './_generated/server'
+import { requireOrgRole } from './lib/auth'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 
@@ -704,5 +710,138 @@ export const deleteBankAccountsByIds = internalMutation({
       deleted.push({ _id: id, bankName: a.bankName, label: a.label })
     }
     return { deleted, skipped }
+  },
+})
+
+// ─── Émission : connexion bancaire depuis l'app (Webview Powens) ─────────────
+
+/** Type du code temporaire demandé à `/auth/token/code` (param `type`, requis
+ * par Powens — valeur à confirmer en sandbox). */
+const POWENS_CODE_TYPE = 'singleAccess'
+
+/** Auth + rôle pour `startBankConnection`. Connecter une banque = action
+ * sensible → admin (owner inclus). Action sans `ctx.db` → passe par cette
+ * internalQuery (pattern actionAuthProbe de convex/chat.ts). */
+export const powensAuthProbe = internalQuery({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgRole(ctx, orgId, 'admin')
+    return { ok: true as const }
+  },
+})
+
+/** Token permanent Powens d'une org (ou null). INTERNE — ne jamais exposer au
+ * front (authToken = secret). */
+export const getOrgPowensToken = internalQuery({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    const row = await ctx.db
+      .query('powensUsers')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .unique()
+    if (!row) return null
+    return { powensUserId: row.powensUserId, authToken: row.authToken }
+  },
+})
+
+/** Upsert idempotent du user Powens d'une org. Si une ligne existe déjà, on la
+ * GARDE (pas d'écrasement) — évite les doublons sur double-clic. */
+export const savePowensUser = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    powensUserId: v.string(),
+    authToken: v.string(),
+  },
+  handler: async (ctx, { orgId, powensUserId, authToken }) => {
+    const existing = await ctx.db
+      .query('powensUsers')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .unique()
+    if (existing) return existing._id
+    return ctx.db.insert('powensUsers', {
+      orgId,
+      powensUserId,
+      authToken,
+      createdAt: Date.now(),
+    })
+  },
+})
+
+function powensEnv() {
+  const clientId = process.env.POWENS_CLIENT_ID
+  const clientSecret = process.env.POWENS_CLIENT_SECRET
+  const domain = process.env.POWENS_DOMAIN
+  const redirectUri = process.env.POWENS_REDIRECT_URI
+  if (!clientId || !clientSecret || !domain || !redirectUri) {
+    throw new ConvexError('powens_env_missing')
+  }
+  return { clientId, clientSecret, domain, redirectUri }
+}
+
+/** Crée (ou réutilise) le user Powens permanent de l'org, génère un code
+ * temporaire et renvoie l'URL du Webview Powens à ouvrir côté front.
+ *
+ * Sécurité : le `client_secret` et le token permanent restent côté serveur.
+ * Le front ne reçoit QUE `webviewUrl` (qui contient le `code` temporaire, non
+ * sensible). Aucun secret n'est inclus dans les messages d'erreur ni loggé. */
+export const startBankConnection = action({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }): Promise<{ webviewUrl: string }> => {
+    await ctx.runQuery(internal.powens.powensAuthProbe, { orgId })
+    const { clientId, clientSecret, domain, redirectUri } = powensEnv()
+    const base = `https://${domain}/2.0`
+
+    // 1. Token permanent : réutilise celui de l'org, sinon /auth/init.
+    let authToken: string
+    const existing = await ctx.runQuery(internal.powens.getOrgPowensToken, {
+      orgId,
+    })
+    if (existing) {
+      authToken = existing.authToken
+    } else {
+      const initRes = await fetch(`${base}/auth/init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+        }),
+      })
+      if (!initRes.ok) {
+        throw new ConvexError(`powens_init_failed:${initRes.status}`)
+      }
+      const init = (await initRes.json()) as {
+        auth_token?: string
+        id_user?: number
+      }
+      if (!init.auth_token || init.id_user == null) {
+        throw new ConvexError('powens_init_malformed')
+      }
+      authToken = init.auth_token
+      await ctx.runMutation(internal.powens.savePowensUser, {
+        orgId,
+        powensUserId: String(init.id_user),
+        authToken,
+      })
+    }
+
+    // 2. Code temporaire (auth Bearer avec le token permanent).
+    const codeRes = await fetch(
+      `${base}/auth/token/code?type=${POWENS_CODE_TYPE}`,
+      { headers: { Authorization: `Bearer ${authToken}` } },
+    )
+    if (!codeRes.ok) {
+      throw new ConvexError(`powens_code_failed:${codeRes.status}`)
+    }
+    const codeJson = (await codeRes.json()) as { code?: string }
+    if (!codeJson.code) throw new ConvexError('powens_code_malformed')
+
+    // 3. URL du Webview (le code n'est pas sensible).
+    const url = new URL('https://webview.powens.com/connect')
+    url.searchParams.set('domain', domain)
+    url.searchParams.set('client_id', clientId)
+    url.searchParams.set('redirect_uri', redirectUri)
+    url.searchParams.set('code', codeJson.code)
+    return { webviewUrl: url.toString() }
   },
 })

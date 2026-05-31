@@ -255,6 +255,22 @@ La connexion des banques se fait par l'opérateur via le Powens Webview.
 | P10 | Nettoyage Qonto — `convex run --prod powens:listQontoTestTransactions` | Liste les tx `source='manual'` sans `airtableId` ; si vide → ne rien supprimer    |
 | P11 | `convex export --prod` puis `powens:deleteTransactionsByIds '{"ids":[…]}'` | Supprime **uniquement** les ids validés (garde-fou : manual + sans airtableId + compte Qonto) ; retourne `{ deleted, skipped }` |
 
+## Émission Powens (bouton « Connecter une banque » → Webview)
+
+Côté émission : `startBankConnection` (action) crée/réutilise le user Powens
+permanent de l'org, génère un code temporaire, renvoie l'URL du Webview.
+Prérequis : env vars `POWENS_CLIENT_ID/SECRET/DOMAIN/REDIRECT_URI` posées ;
+`redirect_uri` whitelistée chez Powens ; webhook d'ingestion déjà en place.
+
+| #  | Étape                                                              | Résultat attendu                                                                 |
+| -- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| E1 | `/app/calte/cash` en tant qu'**admin** → clic « Connecter une banque » | Redirection vers `webview.powens.com/connect?…` (domain, client_id, redirect_uri, code) |
+| E2 | Même page en tant que **member** (non-admin)                       | L'action refuse (`insufficient_role`) → toast « Seuls les admins… » ; pas de Webview |
+| E3 | Connecter une banque de test dans le Webview                       | Redirection vers `https://alboteam.com/?connection_id=…` puis webhook `CONNECTION_SYNCED` → compte visible dans `cash.listAccounts` |
+| E4 | 2ᵉ clic « Connecter une banque » (même org)                        | **Pas** de nouvel appel `/auth/init` ; un seul enregistrement `powensUsers` pour l'org (dashboard Convex) |
+| E5 | Sécurité — inspecter la réponse réseau du clic (DevTools)          | Seul `{ webviewUrl }` revient ; **aucun** `authToken`/`client_secret` dans le payload ni dans les logs Convex |
+| E6 | Env var manquante (test : retirer `POWENS_DOMAIN`)                 | Toast « connexion bancaire pas configurée » (`powens_env_missing`) ; aucun appel Powens |
+
 ## En cas d'échec
 
 - Smoke échoue → ouvrir `KNOWN_ISSUES.md` (déploiement Convex / `pnpm rebuild esbuild`).

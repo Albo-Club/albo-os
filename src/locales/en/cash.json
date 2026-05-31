@@ -9,6 +9,15 @@
   "noBalance": "No balance",
   "accountsEmpty": "No bank accounts for this organization yet.",
   "loading": "Loading…",
+  "connect": {
+    "button": "Connect a bank",
+    "connecting": "Connecting…",
+    "failed": "Couldn't start the bank connection. Please try again.",
+    "errors": {
+      "insufficient_role": "Only admins can connect a bank.",
+      "powens_env_missing": "Bank connection isn't configured yet. Contact an admin."
+    }
+  },
   "col": {
     "account": "Account",
     "bank": "Bank",
