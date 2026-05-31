@@ -303,7 +303,6 @@ export const upsertBankAccounts = internalMutation({
         label: v.string(),
         currentBalance: v.optional(v.number()),
         balanceAsOf: v.optional(v.number()),
-        notes: v.optional(v.string()),
       }),
     ),
   },
@@ -322,7 +321,6 @@ export const upsertBankAccounts = internalMutation({
         currency: 'EUR',
         currentBalance: r.currentBalance,
         balanceAsOf: r.balanceAsOf,
-        notes: r.notes,
         airtableId: r.airtableId,
       }
       if (existing) {
@@ -613,16 +611,18 @@ export const runImport = internalAction({
       const rows = batch.map((rec) => {
         const f = rec.fields
         const bank = String(f[F.cb.bank] ?? '(sans nom)')
+        // bankAccounts n'a pas de champ `notes` : on replie la Remarque dans
+        // `label` pour ne pas perdre l'info (ex. « NE PAS SUPPRIMER ! »).
+        const remarque =
+          typeof f[F.cb.remarque] === 'string'
+            ? (f[F.cb.remarque] as string).trim()
+            : ''
         return {
           airtableId: rec.id,
           bankName: bank,
-          label: bank,
+          label: remarque ? `${bank} — ${remarque}` : bank,
           currentBalance: eurToCents(f[F.cb.balance]),
           balanceAsOf: parseDate(f[F.cb.lastUpdate]),
-          notes:
-            typeof f[F.cb.remarque] === 'string'
-              ? (f[F.cb.remarque] as string)
-              : undefined,
         }
       })
       const res: { map: Record<string, Id<'bankAccounts'>> } =
