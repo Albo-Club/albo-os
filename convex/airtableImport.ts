@@ -1350,3 +1350,208 @@ export const duplicateReport = internalQuery({
     }
   },
 })
+
+// ─── Nettoyage ciblé des données de test (chat front) ────────────────────────
+
+// IDs explicites à supprimer (essais via le chat, sans airtableId). NE PAS
+// confondre avec les 8 companies du seed (également sans airtableId) qui ne
+// figurent PAS dans cette liste.
+const TEST_DELETE = {
+  companies: [
+    'jx7d7hw606b0t4n0w8ge1gdwcd87fs0p', // Maslow
+    'jx7e5j0y8t6yn4f6q8m5ax86qh87g5yk', // Iroko (doublon)
+  ],
+  deals: [
+    'k57d5htyqprg2n39awzvrzmwx187e9am',
+    'k57fswq87har2c80n2e20gnqed87f5z5',
+    'k57ef9wchckd0wf9q63yqkwrc587h5ym',
+  ],
+  transactions: [
+    'kh7dqq8rq6ca1t7ycdct4gpg2n87hqng',
+    'kh75z5191gzm0h2qgp1pm1x78x87gpzc',
+    'kh720h512j50ebmhfv6rj35bw587h1r2',
+    'kh76sxajnvy14n2rpx6nn61jp187h9b0',
+    'kh7aevmq0gvy2jxsn8n45d7xas87h6y0',
+  ],
+  bankAccounts: [
+    'js73fz8bkn4kd4c5sqwbzfpmhs87hg8q', // Qonto CALTE
+    'js70d4zq613g409x0a0wbt8e2s87gj4p', // Qonto CALTE
+  ],
+} as const
+
+/**
+ * Supprime UNIQUEMENT les lignes de test listées dans TEST_DELETE (par id).
+ * Gardes : refuse toute ligne hors org calte ou portant un `airtableId`
+ * (donnée importée), et BLOQUE si une ligne à supprimer est référencée par une
+ * ligne CONSERVÉE. Ordre : transactions → deals → bankAccounts → companies.
+ *
+ *   pnpm exec convex run --prod airtableImport:cleanupTestData              # dry-run
+ *   pnpm exec convex run --prod airtableImport:cleanupTestData '{"apply":true}'
+ */
+export const cleanupTestData = internalMutation({
+  args: { apply: v.optional(v.boolean()) },
+  handler: async (ctx, { apply }) => {
+    const org = await ctx.db
+      .query('organizations')
+      .withIndex('by_slug', (q) => q.eq('slug', 'calte'))
+      .first()
+    if (!org) throw new ConvexError('calte_org_absent')
+    const orgId = org._id
+
+    const companyIds = TEST_DELETE.companies.map((s) => s as Id<'companies'>)
+    const dealIds = TEST_DELETE.deals.map((s) => s as Id<'deals'>)
+    const txIds = TEST_DELETE.transactions.map((s) => s as Id<'transactions'>)
+    const bankIds = TEST_DELETE.bankAccounts.map((s) => s as Id<'bankAccounts'>)
+
+    const companySet = new Set<string>(companyIds)
+    const dealSet = new Set<string>(dealIds)
+    const txSet = new Set<string>(txIds)
+    const bankSet = new Set<string>(bankIds)
+
+    const problems: Array<string> = []
+    const plan: Record<string, Array<{ id: string; label: string }>> = {
+      companies: [],
+      deals: [],
+      transactions: [],
+      bankAccounts: [],
+    }
+
+    // 1. Validation : existence, org, absence d'airtableId.
+    for (const id of companyIds) {
+      const d = await ctx.db.get(id)
+      if (!d) problems.push(`company ${id} introuvable`)
+      else if (d.orgId !== orgId) problems.push(`company ${id} hors org calte`)
+      else if (d.airtableId)
+        problems.push(`company ${id} a un airtableId (${d.airtableId}) — refus`)
+      else plan.companies.push({ id, label: d.name })
+    }
+    for (const id of dealIds) {
+      const d = await ctx.db.get(id)
+      if (!d) problems.push(`deal ${id} introuvable`)
+      else if (d.orgId !== orgId) problems.push(`deal ${id} hors org calte`)
+      else if (d.airtableId)
+        problems.push(`deal ${id} a un airtableId (${d.airtableId}) — refus`)
+      else plan.deals.push({ id, label: d.instrumentKind })
+    }
+    for (const id of txIds) {
+      const d = await ctx.db.get(id)
+      if (!d) problems.push(`transaction ${id} introuvable`)
+      else if (d.orgId !== orgId) problems.push(`transaction ${id} hors org calte`)
+      else if (d.airtableId)
+        problems.push(`transaction ${id} a un airtableId (${d.airtableId}) — refus`)
+      else plan.transactions.push({ id, label: d.rawLabel })
+    }
+    for (const id of bankIds) {
+      const d = await ctx.db.get(id)
+      if (!d) problems.push(`bankAccount ${id} introuvable`)
+      else if (d.orgId !== orgId) problems.push(`bankAccount ${id} hors org calte`)
+      else if (d.airtableId)
+        problems.push(`bankAccount ${id} a un airtableId (${d.airtableId}) — refus`)
+      else plan.bankAccounts.push({ id, label: d.label })
+    }
+
+    // 2. Références entrantes depuis des lignes CONSERVÉES → bloqueur.
+    const [allDeals, allTx, allValuations, allForecasts, allRelations, allKpis] =
+      await Promise.all([
+        ctx.db.query('deals').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
+        ctx.db.query('transactions').withIndex('by_org_date', (q) => q.eq('orgId', orgId)).collect(),
+        ctx.db.query('valuations').withIndex('by_org_asof', (q) => q.eq('orgId', orgId)).collect(),
+        ctx.db.query('forecasts').withIndex('by_org_date', (q) => q.eq('orgId', orgId)).collect(),
+        ctx.db.query('companyRelations').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
+        ctx.db.query('kpiSnapshots').withIndex('by_org_period', (q) => q.eq('orgId', orgId)).collect(),
+      ])
+
+    // companies référencées par des deals / comptes / relations / kpis conservés
+    for (const d of allDeals) {
+      if (dealSet.has(d._id)) continue
+      for (const ref of [d.investorCompanyId, d.targetCompanyId, d.viaSpvCompanyId]) {
+        if (ref && companySet.has(ref))
+          problems.push(`company ${ref} référencée par deal conservé ${d._id}`)
+      }
+    }
+    const allBanks = await ctx.db
+      .query('bankAccounts')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    for (const b of allBanks) {
+      if (bankSet.has(b._id)) continue
+      if (companySet.has(b.ownerCompanyId))
+        problems.push(`company ${b.ownerCompanyId} référencée par compte conservé ${b._id}`)
+    }
+    for (const r of allRelations) {
+      if (companySet.has(r.parentCompanyId) || companySet.has(r.childCompanyId))
+        problems.push(`company référencée par companyRelation ${r._id}`)
+    }
+    for (const k of allKpis) {
+      if (companySet.has(k.companyId))
+        problems.push(`company ${k.companyId} référencée par kpiSnapshot ${k._id}`)
+    }
+
+    // deals référencés par tx / valuations / forecasts conservés
+    for (const t of allTx) {
+      if (txSet.has(t._id)) continue
+      if (t.dealId && dealSet.has(t.dealId))
+        problems.push(`deal ${t.dealId} référencé par transaction conservée ${t._id}`)
+    }
+    for (const vrow of allValuations) {
+      if (dealSet.has(vrow.dealId))
+        problems.push(`deal ${vrow.dealId} référencé par valuation conservée ${vrow._id}`)
+    }
+    for (const f of allForecasts) {
+      if (f.dealId && dealSet.has(f.dealId))
+        problems.push(`deal ${f.dealId} référencé par forecast conservé ${f._id}`)
+    }
+
+    // bankAccounts référencés par tx / forecasts conservés
+    for (const t of allTx) {
+      if (txSet.has(t._id)) continue
+      if (bankSet.has(t.bankAccountId))
+        problems.push(`bankAccount ${t.bankAccountId} référencé par transaction conservée ${t._id}`)
+    }
+    for (const f of allForecasts) {
+      if (f.bankAccountId && bankSet.has(f.bankAccountId))
+        problems.push(`bankAccount ${f.bankAccountId} référencé par forecast conservé ${f._id}`)
+    }
+
+    // transactions référencées par forecasts.realizedTransactionId conservés
+    for (const f of allForecasts) {
+      if (f.realizedTransactionId && txSet.has(f.realizedTransactionId))
+        problems.push(`transaction ${f.realizedTransactionId} référencée par forecast ${f._id}`)
+    }
+
+    if (problems.length > 0) {
+      return { ok: false, deleted: false, problems, plan }
+    }
+    if (!apply) {
+      return {
+        ok: true,
+        deleted: false,
+        dryRun: true,
+        willDelete: {
+          companies: plan.companies.length,
+          deals: plan.deals.length,
+          transactions: plan.transactions.length,
+          bankAccounts: plan.bankAccounts.length,
+        },
+        plan,
+      }
+    }
+
+    // 3. Suppression dans l'ordre de dépendance.
+    for (const id of txIds) await ctx.db.delete(id)
+    for (const id of dealIds) await ctx.db.delete(id)
+    for (const id of bankIds) await ctx.db.delete(id)
+    for (const id of companyIds) await ctx.db.delete(id)
+
+    return {
+      ok: true,
+      deleted: true,
+      counts: {
+        companies: companyIds.length,
+        deals: dealIds.length,
+        transactions: txIds.length,
+        bankAccounts: bankIds.length,
+      },
+    }
+  },
+})
