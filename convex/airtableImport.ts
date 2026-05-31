@@ -17,7 +17,11 @@
 
 import { ConvexError, v } from 'convex/values'
 import { internal } from './_generated/api'
-import { internalAction, internalMutation } from './_generated/server'
+import {
+  internalAction,
+  internalMutation,
+  internalQuery,
+} from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import type { Infer } from 'convex/values'
 
@@ -896,6 +900,150 @@ export const runImport = internalAction({
         patched: fcPatched,
         source: prRecords.length + psRecords.length,
       },
+    }
+  },
+})
+
+// ─── Vérification read-only (post-import) ────────────────────────────────────
+
+/**
+ * Contrôle live de l'import dans l'org `calte`. Read-only.
+ *   pnpm exec convex run --prod airtableImport:verify
+ *   pnpm exec convex run --prod airtableImport:verify '{"sampleSize":8}'
+ *
+ * Renvoie : comptes globaux (à confronter aux totaux Airtable), contrôles
+ * d'intégrité, et un échantillon de deals enrichis (company cible + détail
+ * in/out des transactions rattachées).
+ */
+export const verify = internalQuery({
+  args: { sampleSize: v.optional(v.number()) },
+  handler: async (ctx, { sampleSize }) => {
+    const n = sampleSize ?? 6
+    const org = await ctx.db
+      .query('organizations')
+      .withIndex('by_slug', (q) => q.eq('slug', 'calte'))
+      .first()
+    if (!org) throw new ConvexError('calte_org_absent')
+    const orgId = org._id
+
+    const [companies, deals, transactions, bankAccounts, valuations, forecasts] =
+      await Promise.all([
+        ctx.db.query('companies').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
+        ctx.db.query('deals').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
+        ctx.db.query('transactions').withIndex('by_org_date', (q) => q.eq('orgId', orgId)).collect(),
+        ctx.db.query('bankAccounts').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
+        ctx.db.query('valuations').withIndex('by_org_asof', (q) => q.eq('orgId', orgId)).collect(),
+        ctx.db.query('forecasts').withIndex('by_org_date', (q) => q.eq('orgId', orgId)).collect(),
+      ])
+
+    // Agrégation transactions par deal (1 passe).
+    const txByDeal = new Map<
+      Id<'deals'>,
+      { count: number; nIn: number; nOut: number; sumIn: number; sumOut: number }
+    >()
+    const dealIds = new Set(deals.map((d) => d._id))
+    let txIn = 0
+    let txOut = 0
+    let txWithDeal = 0
+    let txOrphanDeal = 0 // dealId pointant un deal inexistant / hors org
+    for (const t of transactions) {
+      if (t.direction === 'in') txIn += 1
+      else txOut += 1
+      if (t.dealId) {
+        txWithDeal += 1
+        if (!dealIds.has(t.dealId)) txOrphanDeal += 1
+        const e = txByDeal.get(t.dealId) ?? {
+          count: 0,
+          nIn: 0,
+          nOut: 0,
+          sumIn: 0,
+          sumOut: 0,
+        }
+        e.count += 1
+        if (t.direction === 'in') {
+          e.nIn += 1
+          e.sumIn += t.amount
+        } else {
+          e.nOut += 1
+          e.sumOut += t.amount
+        }
+        txByDeal.set(t.dealId, e)
+      }
+    }
+
+    const companiesByKind: Record<string, number> = {}
+    for (const c of companies) {
+      companiesByKind[c.kind] = (companiesByKind[c.kind] ?? 0) + 1
+    }
+
+    const fallbackBank = bankAccounts.find((b) => b.airtableId === SENTINEL_BANK)
+    const txOnFallbackBank = fallbackBank
+      ? transactions.filter((t) => t.bankAccountId === fallbackBank._id).length
+      : 0
+    const importInvestor = companies.find((c) => c.airtableId === SENTINEL_INVESTOR)
+
+    // Échantillon : deals avec le plus de transactions (le plus parlant pour
+    // le contrôle in/out), enrichis avec la company cible.
+    const sampleDeals = [...deals]
+      .sort(
+        (a, b) =>
+          (txByDeal.get(b._id)?.count ?? 0) -
+          (txByDeal.get(a._id)?.count ?? 0),
+      )
+      .slice(0, n)
+    const samples = await Promise.all(
+      sampleDeals.map(async (d) => {
+        const target = await ctx.db.get(d.targetCompanyId)
+        const investor = await ctx.db.get(d.investorCompanyId)
+        const agg = txByDeal.get(d._id) ?? {
+          count: 0,
+          nIn: 0,
+          nOut: 0,
+          sumIn: 0,
+          sumOut: 0,
+        }
+        return {
+          airtableId: d.airtableId,
+          instrument: d.instrumentKind,
+          status: d.status,
+          targetCompany: target?.name ?? null,
+          targetSameOrg: target?.orgId === orgId,
+          investorCompany: investor?.name ?? null,
+          investorIsGroupRoot: investor?.kind === 'group_root',
+          paidAmountCents: d.paidAmount ?? null,
+          sharesAcquired: d.sharesAcquired ?? null,
+          tx: agg,
+        }
+      }),
+    )
+
+    return {
+      org: { slug: org.slug, id: orgId },
+      counts: {
+        companies: companies.length,
+        companiesByKind,
+        deals: deals.length,
+        bankAccounts: bankAccounts.length,
+        transactions: transactions.length,
+        valuations: valuations.length,
+        forecasts: forecasts.length,
+      },
+      transactionsBreakdown: {
+        in: txIn,
+        out: txOut,
+        withDeal: txWithDeal,
+        withoutDeal: transactions.length - txWithDeal,
+        onFallbackBank: txOnFallbackBank,
+      },
+      integrity: {
+        // tous doivent valoir 0 / true :
+        orphanDealRefs: txOrphanDeal,
+        importInvestorPresent: Boolean(importInvestor),
+        importInvestorIsGroupRoot: importInvestor?.kind === 'group_root',
+        samplesAllTargetSameOrg: samples.every((s) => s.targetSameOrg),
+        samplesAllInvestorGroupRoot: samples.every((s) => s.investorIsGroupRoot),
+      },
+      samples,
     }
   },
 })
