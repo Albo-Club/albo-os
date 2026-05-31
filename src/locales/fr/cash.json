@@ -9,6 +9,15 @@
   "noBalance": "Solde inconnu",
   "accountsEmpty": "Aucun compte bancaire pour cette organisation pour l'instant.",
   "loading": "Chargement…",
+  "connect": {
+    "button": "Connecter une banque",
+    "connecting": "Connexion…",
+    "failed": "Impossible de démarrer la connexion bancaire. Réessayez.",
+    "errors": {
+      "insufficient_role": "Seuls les admins peuvent connecter une banque.",
+      "powens_env_missing": "La connexion bancaire n'est pas encore configurée. Contactez un admin."
+    }
+  },
   "col": {
     "account": "Compte",
     "bank": "Banque",

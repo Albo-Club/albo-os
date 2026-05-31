@@ -145,6 +145,20 @@ export default defineSchema({
     .index('by_org', ['orgId'])
     .index('by_email_and_org', ['email', 'orgId']),
 
+  /**
+   * powensUsers — user Powens permanent par org (émission de connexions
+   * bancaires). INTERNE : `authToken` est un secret au repos, jamais exposé au
+   * front. Lu/écrit uniquement par des internalQuery/internalMutation
+   * (cf. convex/powens.ts). Ne PAS ajouter sur `organizations` (api.bySlug
+   * fait `return {...org}` → fuiterait le token).
+   */
+  powensUsers: defineTable({
+    orgId: v.id('organizations'),
+    powensUserId: v.string(), // id_user renvoyé par POST /auth/init
+    authToken: v.string(), // token permanent — secret
+    createdAt: v.number(),
+  }).index('by_org', ['orgId']),
+
   // ─── Cœur portfolio ──────────────────────────────────────────────────────
 
   /**
