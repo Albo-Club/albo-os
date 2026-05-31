@@ -715,9 +715,12 @@ export const deleteBankAccountsByIds = internalMutation({
 
 // ─── Émission : connexion bancaire depuis l'app (Webview Powens) ─────────────
 
-/** Type du code temporaire demandé à `/auth/token/code` (param `type`, requis
- * par Powens — valeur à confirmer en sandbox). */
-const POWENS_CODE_TYPE = 'singleAccess'
+/** Param `type` de `/auth/token/code`. Test manuel : l'endpoint renvoie un code
+ * valide SANS aucun param → on n'en envoie pas par défaut. Réajout possible sans
+ * recommit en posant l'env var `POWENS_CODE_TYPE`. */
+function powensCodeType(): string | null {
+  return process.env.POWENS_CODE_TYPE ?? null
+}
 
 /** Auth + rôle pour `startBankConnection`. Connecter une banque = action
  * sensible → admin (owner inclus). Action sans `ctx.db` → passe par cette
@@ -825,11 +828,14 @@ export const startBankConnection = action({
       })
     }
 
-    // 2. Code temporaire (auth Bearer avec le token permanent).
-    const codeRes = await fetch(
-      `${base}/auth/token/code?type=${POWENS_CODE_TYPE}`,
-      { headers: { Authorization: `Bearer ${authToken}` } },
-    )
+    // 2. Code temporaire (auth Bearer avec le token permanent). Pas de param
+    // `type` par défaut (cf. powensCodeType).
+    const codeUrl = new URL(`${base}/auth/token/code`)
+    const codeType = powensCodeType()
+    if (codeType) codeUrl.searchParams.set('type', codeType)
+    const codeRes = await fetch(codeUrl.toString(), {
+      headers: { Authorization: `Bearer ${authToken}` },
+    })
     if (!codeRes.ok) {
       throw new ConvexError(`powens_code_failed:${codeRes.status}`)
     }

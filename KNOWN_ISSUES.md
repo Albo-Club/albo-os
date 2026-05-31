@@ -673,10 +673,10 @@ permanent par org, génère un code temporaire et renvoie l'URL du Webview.
   sans recommit. Env vars requises : `POWENS_CLIENT_ID`, `POWENS_CLIENT_SECRET`,
   `POWENS_DOMAIN`, `POWENS_REDIRECT_URI` (+ `POWENS_WEBHOOK_SECRET` pour
   l'ingestion). Toute absente → `ConvexError('powens_env_missing')`.
-- **Param `type` de `/auth/token/code`** : requis par Powens mais valeur non
-  documentée précisément. Défaut `POWENS_CODE_TYPE = 'singleAccess'`, isolé en
-  constante — **à valider au premier test sandbox** (si 4xx, tester sans le param
-  ou une autre valeur).
+- **Param `type` de `/auth/token/code`** : la doc le dit « required », mais le
+  test manuel sandbox renvoie un code valide **sans aucun param** → on n'en
+  envoie pas. Réajout possible **sans recommit** en posant l'env var optionnelle
+  `POWENS_CODE_TYPE` (lue par `powensCodeType()`) ; absente → aucun param.
 - **`redirect_uri`** doit matcher EXACTEMENT la whitelist Powens
   (`https://alboteam.com/`, slash final compris).
 - **Rôle requis** : `startBankConnection` exige `admin` (via `powensAuthProbe` →
