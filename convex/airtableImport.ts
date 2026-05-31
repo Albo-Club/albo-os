@@ -214,18 +214,27 @@ export const ensureImportScaffold = internalMutation({
     if (!org) throw new ConvexError('calte_org_absent')
     const orgId = org._id
 
-    // Investisseur group_root d'import (sert aussi de propriétaire des comptes).
-    let investor = await ctx.db
+    // Investisseur (sert aussi de propriétaire des comptes) : réutiliser le
+    // group_root canonique de l'org (ex. CALTE du seed) s'il existe ; sinon
+    // retomber sur un éventuel placeholder d'import ; sinon le créer. Évite de
+    // dupliquer la racine.
+    const roots = await ctx.db
       .query('companies')
-      .withIndex('by_airtable_id', (q) => q.eq('airtableId', SENTINEL_INVESTOR))
-      .first()
+      .withIndex('by_org_kind', (q) =>
+        q.eq('orgId', orgId).eq('kind', 'group_root'),
+      )
+      .collect()
+    let investor =
+      roots.find((c) => c.airtableId !== SENTINEL_INVESTOR) ??
+      roots.find((c) => c.airtableId === SENTINEL_INVESTOR) ??
+      null
     if (!investor) {
       const id = await ctx.db.insert('companies', {
         orgId,
         name: 'CALTE (import)',
         kind: 'group_root',
         countryCode: 'FR',
-        notes: 'Entité investisseuse créée pour l\'import Airtable one-shot.',
+        notes: "Entité investisseuse créée pour l'import Airtable one-shot.",
         airtableId: SENTINEL_INVESTOR,
       })
       investor = await ctx.db.get(id)
@@ -1044,6 +1053,192 @@ export const verify = internalQuery({
         samplesAllInvestorGroupRoot: samples.every((s) => s.investorIsGroupRoot),
       },
       samples,
+    }
+  },
+})
+
+// ─── Consolidation des group_root (fusion du placeholder d'import) ───────────
+
+/**
+ * Repointe les deals + comptes de l'entité d'import « CALTE (import) » vers le
+ * group_root canonique de l'org (la CALTE du seed), puis supprime le
+ * placeholder. Idempotent (no-op si le placeholder n'existe plus).
+ *   pnpm exec convex run --prod airtableImport:consolidateImportInvestor
+ */
+export const consolidateImportInvestor = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const org = await ctx.db
+      .query('organizations')
+      .withIndex('by_slug', (q) => q.eq('slug', 'calte'))
+      .first()
+    if (!org) throw new ConvexError('calte_org_absent')
+    const orgId = org._id
+
+    const roots = await ctx.db
+      .query('companies')
+      .withIndex('by_org_kind', (q) =>
+        q.eq('orgId', orgId).eq('kind', 'group_root'),
+      )
+      .collect()
+    const importEntity = roots.find((c) => c.airtableId === SENTINEL_INVESTOR)
+    if (!importEntity) {
+      return { consolidated: false, reason: 'no_import_entity' }
+    }
+    const canonicals = roots.filter((c) => c._id !== importEntity._id)
+    if (canonicals.length !== 1) {
+      throw new ConvexError(
+        `expected_single_canonical_root_got_${canonicals.length}`,
+      )
+    }
+    const canonical = canonicals[0]
+
+    let dealsRepointed = 0
+    const deals = await ctx.db
+      .query('deals')
+      .withIndex('by_org_investor', (q) =>
+        q.eq('orgId', orgId).eq('investorCompanyId', importEntity._id),
+      )
+      .collect()
+    for (const d of deals) {
+      await ctx.db.patch(d._id, { investorCompanyId: canonical._id })
+      dealsRepointed += 1
+    }
+
+    let banksRepointed = 0
+    const banks = await ctx.db
+      .query('bankAccounts')
+      .withIndex('by_owner', (q) =>
+        q.eq('orgId', orgId).eq('ownerCompanyId', importEntity._id),
+      )
+      .collect()
+    for (const b of banks) {
+      await ctx.db.patch(b._id, { ownerCompanyId: canonical._id })
+      banksRepointed += 1
+    }
+
+    // Le placeholder n'a plus aucune référence entrante → suppression sûre.
+    await ctx.db.delete(importEntity._id)
+
+    return {
+      consolidated: true,
+      canonical: { id: canonical._id, name: canonical.name },
+      dealsRepointed,
+      banksRepointed,
+    }
+  },
+})
+
+// ─── Reconcile orphelins (read-only) ─────────────────────────────────────────
+
+/**
+ * Compare l'airtableId des lignes Convex aux recId Airtable ACTUELS et liste
+ * les orphelins (lignes importées dont le record source a disparu d'Airtable).
+ * Read-only — ne supprime rien.
+ *   pnpm exec convex run --prod airtableImport:reconcileOrphans
+ */
+export const reconcileOrphans = internalAction({
+  args: {},
+  handler: async (ctx): Promise<Record<string, unknown>> => {
+    const [ent, cb, mv] = await Promise.all([
+      fetchAll(TBL.entreprise),
+      fetchAll(TBL.compte),
+      fetchAll(TBL.mouvement),
+    ])
+    return await ctx.runQuery(internal.airtableImport.orphanReport, {
+      entIds: ent.map((r) => r.id),
+      cbIds: cb.map((r) => r.id),
+      mvIds: mv.map((r) => r.id),
+    })
+  },
+})
+
+export const orphanReport = internalQuery({
+  args: {
+    entIds: v.array(v.string()),
+    cbIds: v.array(v.string()),
+    mvIds: v.array(v.string()),
+  },
+  handler: async (ctx, { entIds, cbIds, mvIds }) => {
+    const org = await ctx.db
+      .query('organizations')
+      .withIndex('by_slug', (q) => q.eq('slug', 'calte'))
+      .first()
+    if (!org) throw new ConvexError('calte_org_absent')
+    const orgId = org._id
+
+    const entSet = new Set(entIds)
+    const cbSet = new Set(cbIds)
+    const mvSet = new Set(mvIds)
+
+    const [companies, bankAccounts, deals, transactions] = await Promise.all([
+      ctx.db.query('companies').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
+      ctx.db.query('bankAccounts').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
+      ctx.db.query('deals').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
+      ctx.db.query('transactions').withIndex('by_org_date', (q) => q.eq('orgId', orgId)).collect(),
+    ])
+
+    const orphanCompanies = companies
+      .filter(
+        (c) =>
+          c.airtableId &&
+          c.airtableId !== SENTINEL_INVESTOR &&
+          !entSet.has(c.airtableId),
+      )
+      .map((c) => ({ id: c._id, airtableId: c.airtableId, name: c.name, kind: c.kind }))
+
+    const orphanBankAccounts = bankAccounts
+      .filter(
+        (b) =>
+          b.airtableId &&
+          b.airtableId !== SENTINEL_BANK &&
+          !cbSet.has(b.airtableId),
+      )
+      .map((b) => ({
+        id: b._id,
+        airtableId: b.airtableId,
+        label: b.label,
+        currentBalanceCents: b.currentBalance ?? null,
+      }))
+
+    const orphanTransactions = transactions
+      .filter((t) => t.airtableId && !mvSet.has(t.airtableId))
+      .map((t) => ({
+        id: t._id,
+        airtableId: t.airtableId,
+        rawLabel: t.rawLabel,
+        direction: t.direction,
+        amountCents: t.amount,
+        transactionDate: t.transactionDate,
+      }))
+
+    // Un deal est orphelin si la société (préfixe recId de l'airtableId) a
+    // disparu d'Airtable.
+    const orphanDeals = deals
+      .filter((d) => d.airtableId && !entSet.has(d.airtableId.split(':')[0]))
+      .map((d) => ({
+        id: d._id,
+        airtableId: d.airtableId,
+        instrument: d.instrumentKind,
+        paidAmountCents: d.paidAmount ?? null,
+      }))
+
+    return {
+      airtableCurrent: {
+        entreprise: entIds.length,
+        compteBancaire: cbIds.length,
+        mouvement: mvIds.length,
+      },
+      orphanCounts: {
+        companies: orphanCompanies.length,
+        bankAccounts: orphanBankAccounts.length,
+        deals: orphanDeals.length,
+        transactions: orphanTransactions.length,
+      },
+      orphanCompanies,
+      orphanBankAccounts,
+      orphanDeals,
+      orphanTransactions,
     }
   },
 })
