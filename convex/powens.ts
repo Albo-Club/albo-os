@@ -322,6 +322,50 @@ async function qontoAccountsOfCalte(
   return accounts.filter((a) => normalizeName(a.bankName).includes('qonto'))
 }
 
+/** Records Qonto éligibles au match automatique : non encore liés à Powens ET
+ * non archivés. C'est ce lot qui doit valoir exactement 1. */
+function eligibleQontoCandidates(
+  accounts: ReadonlyArray<Doc<'bankAccounts'>>,
+): Array<Doc<'bankAccounts'>> {
+  return accounts.filter((a) => !a.powensAccountId && !a.archivedAt)
+}
+
+type TestTxRow = {
+  _id: Id<'transactions'>
+  transactionDate: number
+  amount: number
+  direction: 'in' | 'out'
+  rawLabel: string
+}
+
+/** Tx `manual` sans `airtableId` sur les comptes Qonto donnés (lignes de test
+ * potentielles). */
+async function qontoTestTxRows(
+  ctx: QueryCtx,
+  accounts: ReadonlyArray<Doc<'bankAccounts'>>,
+): Promise<Array<TestTxRow>> {
+  const out: Array<TestTxRow> = []
+  for (const acc of accounts) {
+    const txs = await ctx.db
+      .query('transactions')
+      .withIndex('by_account_date', (q) => q.eq('bankAccountId', acc._id))
+      .order('desc')
+      .collect()
+    for (const t of txs) {
+      if (t.source === 'manual' && !t.airtableId) {
+        out.push({
+          _id: t._id,
+          transactionDate: t.transactionDate,
+          amount: t.amount,
+          direction: t.direction,
+          rawLabel: t.rawLabel,
+        })
+      }
+    }
+  }
+  return out
+}
+
 /** Rapproche un compte Powers Qonto du record existant (importé d'Airtable).
  * Match par IBAN si le record en a un, sinon par unicité du `bankName='Qonto'`
  * (l'import Airtable ne stocke pas l'IBAN) avec backfill de l'IBAN. Arrêt dur
@@ -331,9 +375,7 @@ async function linkQonto(
   acc: NormAccount,
   connectionId: string,
 ): Promise<Doc<'bankAccounts'>> {
-  const candidates = (await qontoAccountsOfCalte(ctx)).filter(
-    (a) => !a.powensAccountId,
-  )
+  const candidates = eligibleQontoCandidates(await qontoAccountsOfCalte(ctx))
   if (candidates.length !== 1) throw new ConvexError('qonto_match_ambiguous')
   const qonto = candidates[0]
   if (
@@ -480,33 +522,34 @@ export const ingestConnectionSync = internalMutation({
 export const listQontoTestTransactions = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const qontoAccounts = await qontoAccountsOfCalte(ctx)
-    const out: Array<{
-      _id: Id<'transactions'>
-      transactionDate: number
-      amount: number
-      direction: 'in' | 'out'
-      rawLabel: string
-    }> = []
-    for (const acc of qontoAccounts) {
-      const txs = await ctx.db
-        .query('transactions')
-        .withIndex('by_account_date', (q) => q.eq('bankAccountId', acc._id))
-        .order('desc')
-        .collect()
-      for (const t of txs) {
-        if (t.source === 'manual' && !t.airtableId) {
-          out.push({
-            _id: t._id,
-            transactionDate: t.transactionDate,
-            amount: t.amount,
-            direction: t.direction,
-            rawLabel: t.rawLabel,
-          })
-        }
-      }
+    return qontoTestTxRows(ctx, await qontoAccountsOfCalte(ctx))
+  },
+})
+
+/** Read-only : diagnostic pré-go-live du match Qonto. Liste tous les
+ * `bankAccounts` Qonto-ish de calte (avec l'état des champs clés), compte les
+ * candidats éligibles (non liés + non archivés) — qui doit valoir exactement 1
+ * — et joint les tx de test (`manual` sans `airtableId`) qui pourraient
+ * expliquer un record en trop. N'écrit rien. */
+export const diagnoseQontoMatch = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const accounts = await qontoAccountsOfCalte(ctx)
+    const eligible = eligibleQontoCandidates(accounts)
+    return {
+      qontoAccounts: accounts.map((a) => ({
+        _id: a._id,
+        bankName: a.bankName,
+        label: a.label,
+        iban: a.iban ?? null,
+        powensAccountId: a.powensAccountId ?? null,
+        airtableId: a.airtableId ?? null,
+        archivedAt: a.archivedAt ?? null,
+      })),
+      eligibleCount: eligible.length,
+      matchOk: eligible.length === 1,
+      testTransactions: await qontoTestTxRows(ctx, accounts),
     }
-    return out
   },
 })
 
