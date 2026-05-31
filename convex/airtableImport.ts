@@ -1242,3 +1242,105 @@ export const orphanReport = internalQuery({
     }
   },
 })
+
+// ─── Détection de doublons (read-only) ───────────────────────────────────────
+
+/**
+ * Détecte les doublons d'insertion : plusieurs lignes Convex partageant le même
+ * `airtableId` (non détectables par reconcileOrphans, qui ne voit que les
+ * suppressions). 100 % Convex, read-only — ne supprime rien.
+ *   pnpm exec convex run --prod airtableImport:duplicateReport
+ *
+ * `extraRows` par table = nombre de lignes en trop (= total avec airtableId −
+ * airtableId distincts). Les lignes sans airtableId (ex. entités du seed) sont
+ * comptées à part dans `withoutAirtableId`.
+ */
+export const duplicateReport = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const org = await ctx.db
+      .query('organizations')
+      .withIndex('by_slug', (q) => q.eq('slug', 'calte'))
+      .first()
+    if (!org) throw new ConvexError('calte_org_absent')
+    const orgId = org._id
+
+    const analyze = <
+      T extends { _id: string; _creationTime: number; airtableId?: string },
+    >(
+      rows: Array<T>,
+      detail: (r: T) => Record<string, unknown>,
+    ) => {
+      const byId = new Map<string, Array<T>>()
+      let withoutAirtableId = 0
+      for (const r of rows) {
+        if (!r.airtableId) {
+          withoutAirtableId += 1
+          continue
+        }
+        const arr = byId.get(r.airtableId) ?? []
+        arr.push(r)
+        byId.set(r.airtableId, arr)
+      }
+      const duplicates = [...byId.entries()]
+        .filter(([, a]) => a.length > 1)
+        .map(([airtableId, a]) => ({
+          airtableId,
+          count: a.length,
+          rows: a
+            .slice()
+            .sort((x, y) => x._creationTime - y._creationTime)
+            .map((r) => ({
+              id: r._id,
+              creationTime: new Date(r._creationTime).toISOString(),
+              ...detail(r),
+            })),
+        }))
+      const withAirtableId = rows.length - withoutAirtableId
+      return {
+        total: rows.length,
+        withAirtableId,
+        distinctAirtableIds: byId.size,
+        withoutAirtableId,
+        extraRows: withAirtableId - byId.size,
+        duplicates,
+      }
+    }
+
+    const [companies, bankAccounts, deals, transactions, valuations, forecasts] =
+      await Promise.all([
+        ctx.db.query('companies').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
+        ctx.db.query('bankAccounts').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
+        ctx.db.query('deals').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
+        ctx.db.query('transactions').withIndex('by_org_date', (q) => q.eq('orgId', orgId)).collect(),
+        ctx.db.query('valuations').withIndex('by_org_asof', (q) => q.eq('orgId', orgId)).collect(),
+        ctx.db.query('forecasts').withIndex('by_org_date', (q) => q.eq('orgId', orgId)).collect(),
+      ])
+
+    return {
+      companies: analyze(companies, (c) => ({ name: c.name, kind: c.kind })),
+      bankAccounts: analyze(bankAccounts, (b) => ({
+        label: b.label,
+        currentBalanceCents: b.currentBalance ?? null,
+      })),
+      deals: analyze(deals, (d) => ({
+        instrument: d.instrumentKind,
+        paidAmountCents: d.paidAmount ?? null,
+      })),
+      transactions: analyze(transactions, (t) => ({
+        rawLabel: t.rawLabel,
+        direction: t.direction,
+        amountCents: t.amount,
+        transactionDate: new Date(t.transactionDate).toISOString().slice(0, 10),
+      })),
+      valuations: analyze(valuations, (vn) => ({
+        fairValueCents: vn.fairValue,
+      })),
+      forecasts: analyze(forecasts, (fc) => ({
+        label: fc.label,
+        direction: fc.direction,
+        expectedAmountCents: fc.expectedAmount,
+      })),
+    }
+  },
+})
