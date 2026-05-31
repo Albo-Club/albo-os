@@ -83,6 +83,11 @@ function normalizeName(s: string): string {
 function normalizeIban(s: string): string {
   return s.replace(/\s+/g, '').toUpperCase()
 }
+/** Comme `normalizeName` mais collapse aussi les espaces internes — pour
+ * comparer des libellés multi-mots ("Neuflize OBC - Compte à terme"). */
+function squashName(s: string): string {
+  return normalizeName(s).replace(/\s+/g, ' ')
+}
 
 function matchConnector(normalizedConnector: string) {
   return (
@@ -550,6 +555,55 @@ export const diagnoseQontoMatch = internalQuery({
       matchOk: eligible.length === 1,
       testTransactions: await qontoTestTxRows(ctx, accounts),
     }
+  },
+})
+
+/** Comptes à conserver lors du nettoyage de `bankAccounts` (org calte).
+ * Comparaison sur `label` OU `bankName` (normalisés). Tout le reste — dont la
+ * ligne technique d'import "__unassigned_bank__" — est candidat à suppression. */
+const KEEP_ACCOUNT_NAMES = [
+  'Qonto',
+  'PALATINE',
+  'HSBC',
+  'Neuflize OBC - Compte à terme',
+  'Palatine AMD',
+]
+
+/** Read-only : pour chaque `bankAccounts` de calte, le nombre de transactions
+ * rattachées (via `by_account_date`) + une décision keep/delete. Trié par
+ * nombre de tx décroissant : en haut, les comptes-à-supprimer avec des
+ * mouvements (migration délicate) ; en bas (txCount 0), suppression triviale.
+ * N'écrit rien. */
+export const diagnoseBankAccountsForCleanup = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const org = await orgBySlug(ctx, 'calte')
+    const accounts = await ctx.db
+      .query('bankAccounts')
+      .withIndex('by_org', (q) => q.eq('orgId', org._id))
+      .collect()
+    const keepSet = new Set(KEEP_ACCOUNT_NAMES.map(squashName))
+    const rows = await Promise.all(
+      accounts.map(async (a) => {
+        const txs = await ctx.db
+          .query('transactions')
+          .withIndex('by_account_date', (q) => q.eq('bankAccountId', a._id))
+          .collect()
+        const keep =
+          keepSet.has(squashName(a.label)) || keepSet.has(squashName(a.bankName))
+        return {
+          _id: a._id,
+          bankName: a.bankName,
+          label: a.label,
+          airtableId: a.airtableId ?? null,
+          archivedAt: a.archivedAt ?? null,
+          txCount: txs.length,
+          decision: keep ? ('keep' as const) : ('delete' as const),
+        }
+      }),
+    )
+    rows.sort((x, y) => y.txCount - x.txCount)
+    return rows
   },
 })
 
