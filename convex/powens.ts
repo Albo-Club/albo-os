@@ -641,3 +641,82 @@ export const deleteTransactionsByIds = internalMutation({
     return { deleted, skipped }
   },
 })
+
+/** Comptes calte à CONSERVER lors du nettoyage `bankAccounts`. Résolu live :
+ * par `label`/`bankName` (normalisés) OU par la sentinelle `airtableId` d'import
+ * (la ligne "mouvement sans banque"). Garde-fou : un compte reconnu "keep"
+ * n'est jamais supprimé, même si son id est passé en entrée par erreur. */
+const CALTE_KEEP_LABELS = [
+  'Qonto — Good',
+  'PALATINE',
+  'HSBC — NE PAS SUPPRIMER !',
+]
+const CALTE_KEEP_AIRTABLE_IDS = ['__unassigned_bank__']
+
+function isCalteKeepAccount(a: Doc<'bankAccounts'>): boolean {
+  if (a.airtableId && CALTE_KEEP_AIRTABLE_IDS.includes(a.airtableId)) {
+    return true
+  }
+  const keep = new Set(CALTE_KEEP_LABELS.map(squashName))
+  return keep.has(squashName(a.label)) || keep.has(squashName(a.bankName))
+}
+
+/** Suppression ciblée de `bankAccounts` (org calte), garde-fous stricts dans
+ * cet ordre : (a) le compte appartient à calte, (b) ce n'est PAS un compte à
+ * conserver (résolu live), (c) il a 0 transaction rattachée (vérif live via
+ * `by_account_date`). Toute condition non remplie → skip + report, jamais de
+ * suppression. Aucune transaction n'est jamais rendue orpheline. */
+export const deleteBankAccountsByIds = internalMutation({
+  args: { ids: v.array(v.id('bankAccounts')) },
+  handler: async (ctx, { ids }) => {
+    const calte = await orgBySlug(ctx, 'calte')
+    const deleted: Array<{
+      _id: Id<'bankAccounts'>
+      bankName: string
+      label: string
+    }> = []
+    const skipped: Array<{
+      id: Id<'bankAccounts'>
+      reason: string
+      bankName?: string
+      label?: string
+      txCount?: number
+    }> = []
+    for (const id of ids) {
+      const a = await ctx.db.get(id)
+      if (!a) {
+        skipped.push({ id, reason: 'not_found' })
+        continue
+      }
+      if (a.orgId !== calte._id) {
+        skipped.push({ id, reason: 'not_calte', bankName: a.bankName, label: a.label })
+        continue
+      }
+      if (isCalteKeepAccount(a)) {
+        skipped.push({ id, reason: 'keep_account', bankName: a.bankName, label: a.label })
+        continue
+      }
+      const probe = await ctx.db
+        .query('transactions')
+        .withIndex('by_account_date', (q) => q.eq('bankAccountId', id))
+        .take(1)
+      if (probe.length > 0) {
+        const all = await ctx.db
+          .query('transactions')
+          .withIndex('by_account_date', (q) => q.eq('bankAccountId', id))
+          .collect()
+        skipped.push({
+          id,
+          reason: 'has_transactions',
+          bankName: a.bankName,
+          label: a.label,
+          txCount: all.length,
+        })
+        continue
+      }
+      await ctx.db.delete(id)
+      deleted.push({ _id: id, bankName: a.bankName, label: a.label })
+    }
+    return { deleted, skipped }
+  },
+})
