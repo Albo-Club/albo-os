@@ -12,6 +12,7 @@ import type * as admin from "../admin.js";
 import type * as agent from "../agent.js";
 import type * as agentTools from "../agentTools.js";
 import type * as aggregate from "../aggregate.js";
+import type * as airtableImport from "../airtableImport.js";
 import type * as auth from "../auth.js";
 import type * as cash from "../cash.js";
 import type * as chat from "../chat.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   agent: typeof agent;
   agentTools: typeof agentTools;
   aggregate: typeof aggregate;
+  airtableImport: typeof airtableImport;
   auth: typeof auth;
   cash: typeof cash;
   chat: typeof chat;
