@@ -207,7 +207,7 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | S2 | Aucun `process.env.X` top-level dans `src/`        | Vérifier client-side bundle                                       |
 | S3 | Headers de sécurité présents (CSP, HSTS, etc.)     | `curl -I http://localhost:3000` → headers attendus                 |
 | S4 | CORS Better Auth limité à `BETTER_AUTH_URL`        | Requête depuis un autre origin → bloquée                          |
-| S5 | Webhooks HMAC : payload modifié → rejeté          | Test manuel avec un payload tampered                              |
+| S5 | Webhooks HMAC : payload modifié → rejeté          | `POST /powens/webhook` avec `BI-Signature` invalide → `401`, rien écrit (cf. Powens ci-dessous) |
 | S6 | `pnpm build` + `pnpm start` (prod local)           | Le bundle prod tourne sans warning                                 |
 
 ## Seed dev rapide
@@ -232,6 +232,28 @@ seedées (`convex run --prod seed:seedAll`). Le schéma doit être déployé (ch
 | A3 | `convex run --prod migrations/attioAlboImport:verify`       | `portfolioCompanies: 34`, `deals: 43`, `exited: 2`          |
 | A4 | Re-lancer `:run` (idempotence)                              | `…Inserted: 0`, `…Patched: 34/43` — aucun doublon            |
 | A5 | Échantillon `verify.sample`                                 | Chaque `attioDealId` pointe sur la bonne `target`           |
+
+## Ingestion Powens (webhook → bankAccounts + transactions)
+
+Webhook `CONNECTION_SYNCED` → `/powens/webhook` (HMAC) → `ingestConnectionSync`.
+Prérequis : `POWENS_WEBHOOK_SECRET` posé en prod ; provider HMAC + URL webhook
+`https://mellow-curlew-738.convex.site/powens/webhook` configurés chez Powens
+(activer `CONNECTION_SYNCED`) ; orgs `calte`/`albo` + entités group seedées.
+La connexion des banques se fait par l'opérateur via le Powens Webview.
+
+| #  | Étape                                                              | Résultat attendu                                                                 |
+| -- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| P1 | `convex export --prod`                                            | Snapshot de sécurité avant le 1ᵉʳ run                                            |
+| P2 | Connecter un compte **neuf** (Palatine/Wormser/Neuflize) via Webview | `cash.listAccounts` (calte) montre le compte sous **CALTE** ; `source='powens'`, montants en centimes positifs, `direction` correcte |
+| P3 | Neuflize (plusieurs comptes sous 1 connexion)                     | Un `bankAccounts` par compte Powens distinct (courants + comptes à terme)         |
+| P4 | Mémo Bank via Webview                                              | Compte sous **Albo Club** (org `albo`)                                            |
+| P5 | Cutover compte neuf                                                | Aucune tx antérieure à `_creationTime` du compte (l'historique du 1ᵉʳ lot ignoré) |
+| P6 | Connecter le **Qonto**                                            | Le record Qonto **existant** est lié (powensConnectionId/AccountId remplis, IBAN backfillé) — **aucun** nouveau compte créé |
+| P7 | Cutover Qonto                                                     | Aucune tx Powens antérieure à la dernière tx Airtable du Qonto (pas de doublon du passé) |
+| P8 | Rejouer le même payload (idempotence)                            | Aucun doublon (`by_powens_id`) ; `{ inserted: 0, patched: N }`                    |
+| P9 | Signature falsifiée                                              | `401`, rien écrit (cf. S5)                                                        |
+| P10 | Nettoyage Qonto — `convex run --prod powens:listQontoTestTransactions` | Liste les tx `source='manual'` sans `airtableId` ; si vide → ne rien supprimer    |
+| P11 | `convex export --prod` puis `powens:deleteTransactionsByIds '{"ids":[…]}'` | Supprime **uniquement** les ids validés (garde-fou : manual + sans airtableId + compte Qonto) ; retourne `{ deleted, skipped }` |
 
 ## En cas d'échec
 

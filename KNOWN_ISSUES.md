@@ -603,3 +603,48 @@ Le code reste en place comme référence/relance (idempotent), pas de sync.
   qu'après `convex dev`/`convex deploy`. Le `pnpm typecheck` local échoue tant
   que la codegen n'a pas tourné contre un déploiement — c'est attendu, le build
   Vercel (`convex deploy`) régénère l'API.
+
+## Ingestion Powens (`convex/powens.ts`)
+
+Webhook `CONNECTION_SYNCED` → HTTP action (`/powens/webhook`) → mutation interne
+`ingestConnectionSync`. La connexion des banques (login + auth forte) se fait
+hors-app via le Powens Webview ; le code n'écrit que l'APRÈS (comptes + tx).
+Seule env var requise : `POWENS_WEBHOOK_SECRET` (clé du provider HMAC Powens).
+
+- **HMAC : pas de `crypto.timingSafeEqual` dans le runtime Convex.** L'isolate
+  V8 n'expose pas l'API `crypto` de Node ; on vérifie via Web Crypto
+  `crypto.subtle.verify('HMAC', …)` (constant-time par construction). Écart
+  assumé vs la formulation littérale « `crypto.timingSafeEqual` » de CLAUDE.md.
+  Le message signé est `"POST.{path}.{BI-Signature-Date}.{rawBody}"` où `{path}`
+  = `WEBHOOK_PATH` (`/powens/webhook`). **Ce chemin doit correspondre EXACTEMENT
+  à l'URL configurée chez Powens** (sans slash final, sans query), sinon toutes
+  les signatures échouent en `401`. Lire le `rawBody` via `request.text()`
+  **avant** tout parse (HMAC sur les octets bruts).
+- **Typage Web Crypto** : `crypto.subtle.verify` veut un `BufferSource` adossé à
+  un `ArrayBuffer`. Les buffers sont typés `Uint8Array<ArrayBuffer>` (les
+  `Uint8Array` génériques sont `ArrayBufferLike` → rejetés par tsc, union
+  `SharedArrayBuffer`). Construire via `new Uint8Array(len)` / `new
+  Uint8Array(enc.encode(s))` produit bien de l'`ArrayBuffer`-backed.
+- **Le record Qonto importé d'Airtable n'a pas d'IBAN.** `upsertBankAccounts`
+  (`airtableImport.ts`) ne stocke pas l'IBAN → le « match par IBAN » littéral
+  ne suffit pas. `linkQonto` rapproche le Qonto existant par **unicité du
+  `bankName='Qonto'`** dans calte (sans `powensAccountId`), exige l'égalité
+  d'IBAN seulement si le record en a déjà un, puis **backfille** l'IBAN Powens.
+  **Arrêt dur** (`qonto_match_ambiguous`, aucune écriture) si 0 ou >1 candidat —
+  jamais de doublon.
+- **Cutover sans champ au schéma.** Aucune date de connexion n'est stockée.
+  Borne par compte dans `computeCutoff` : compte neuf → `_creationTime` (champ
+  Convex natif ≈ date de connexion, l'historique antérieur du 1ᵉʳ lot est
+  ignoré) ; Qonto (a `airtableId`) → date de sa dernière tx d'origine Airtable.
+  On n'ingère que `tx.dateMs > cutoff`.
+- **Idempotence par `powensTxId`** (index `by_powens_id`) : `patch` si existe,
+  sinon `insert`. Rejouable sans effet de bord. Montants Powens = unité
+  monétaire signée → `round(abs(value)*100)` cents + `direction` selon le signe.
+- **Mapping connecteur → entité** (constante `CONNECTOR_OWNER`, comptes neufs
+  uniquement) : Palatine / Wormser / Neuflize → CALTE (org calte) ; Mémo Bank →
+  Albo Club (org albo). Un connecteur non mappé → `unmapped_powens_account`
+  (erreur visible, **pas** d'écriture muette dans la mauvaise org). Qonto n'y
+  figure pas (toujours résolu par match du record existant).
+- **codegen** : comme pour l'import Airtable, `internal.powens.*` n'apparaît
+  dans `_generated/api.d.ts` qu'après codegen. L'entrée `powens` y a été ajoutée
+  pour passer le `typecheck` local ; `convex deploy` la régénère à l'identique.

@@ -28,6 +28,7 @@ import type * as lib_scope from "../lib/scope.js";
 import type * as lib_storage from "../lib/storage.js";
 import type * as notifications from "../notifications.js";
 import type * as organizations from "../organizations.js";
+import type * as powens from "../powens.js";
 import type * as publicConfig from "../publicConfig.js";
 import type * as rateLimiters from "../rateLimiters.js";
 import type * as seed from "../seed.js";
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   "lib/storage": typeof lib_storage;
   notifications: typeof notifications;
   organizations: typeof organizations;
+  powens: typeof powens;
   publicConfig: typeof publicConfig;
   rateLimiters: typeof rateLimiters;
   seed: typeof seed;
