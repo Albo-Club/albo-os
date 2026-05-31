@@ -1272,16 +1272,21 @@ export const duplicateReport = internalQuery({
       detail: (r: T) => Record<string, unknown>,
     ) => {
       const byId = new Map<string, Array<T>>()
-      let withoutAirtableId = 0
+      const unanchoredRows: Array<Record<string, unknown>> = []
       for (const r of rows) {
         if (!r.airtableId) {
-          withoutAirtableId += 1
+          unanchoredRows.push({
+            id: r._id,
+            creationTime: new Date(r._creationTime).toISOString(),
+            ...detail(r),
+          })
           continue
         }
         const arr = byId.get(r.airtableId) ?? []
         arr.push(r)
         byId.set(r.airtableId, arr)
       }
+      const withoutAirtableId = unanchoredRows.length
       const duplicates = [...byId.entries()]
         .filter(([, a]) => a.length > 1)
         .map(([airtableId, a]) => ({
@@ -1304,6 +1309,7 @@ export const duplicateReport = internalQuery({
         withoutAirtableId,
         extraRows: withAirtableId - byId.size,
         duplicates,
+        unanchoredRows,
       }
     }
 
