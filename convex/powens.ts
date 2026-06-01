@@ -486,11 +486,31 @@ export const ingestConnectionSync = internalMutation({
   },
   handler: async (ctx, { connectionId, accounts }) => {
     const summary = { inserted: 0, patched: 0, skipped: 0 }
+    console.log(
+      `[powens] webhook connection=${connectionId}: ${accounts.length} compte(s) dans le payload`,
+    )
     for (const acc of accounts) {
       const account = await resolveAccount(ctx, connectionId, acc)
       const cutoff = await computeCutoff(ctx, account)
+      // Diagnostic : d'où vient la borne (sans changer computeCutoff).
+      const cutoffSource =
+        cutoff === account._creationTime
+          ? '_creationTime'
+          : 'dernière tx Airtable'
+      // Compteurs par compte (alimentent le log ; summary global inchangé).
+      let received = 0
+      let ingested = 0
+      let filteredCutover = 0
+      let filteredDeleted = 0
+      let alreadyExisting = 0
       for (const tx of acc.transactions) {
+        received += 1
         if (tx.deleted || tx.dateMs <= cutoff) {
+          if (tx.deleted) {
+            filteredDeleted += 1
+          } else {
+            filteredCutover += 1
+          }
           summary.skipped += 1
           continue
         }
@@ -515,13 +535,27 @@ export const ingestConnectionSync = internalMutation({
         }
         if (existing) {
           await ctx.db.patch(existing._id, fields)
+          alreadyExisting += 1
           summary.patched += 1
         } else {
           await ctx.db.insert('transactions', fields)
+          ingested += 1
           summary.inserted += 1
         }
       }
+      console.log(
+        `[powens] ${account.bankName} / connecteur "${acc.connectorName}" ` +
+          `(acct ${acc.powensAccountId}): reçu ${received} tx, ` +
+          `cutover=${new Date(cutoff).toISOString().slice(0, 10)} (${cutoffSource}), ` +
+          `ingéré ${ingested}, filtré ${filteredCutover} (cutover)` +
+          `${filteredDeleted > 0 ? ` + ${filteredDeleted} (deleted)` : ''}, ` +
+          `${alreadyExisting} déjà existante(s) (idempotence)`,
+      )
     }
+    console.log(
+      `[powens] webhook connection=${connectionId} terminé: ` +
+        `inserted=${summary.inserted}, patched=${summary.patched}, skipped=${summary.skipped}`,
+    )
     return summary
   },
 })
