@@ -157,7 +157,10 @@ export default defineSchema({
     powensUserId: v.string(), // id_user renvoyé par POST /auth/init
     authToken: v.string(), // token permanent — secret
     createdAt: v.number(),
-  }).index('by_org', ['orgId']),
+  })
+    .index('by_org', ['orgId'])
+    // Filtre des webhooks entrants : seul un id_user connu est ingéré.
+    .index('by_powens_user_id', ['powensUserId']),
 
   // ─── Cœur portfolio ──────────────────────────────────────────────────────
 
