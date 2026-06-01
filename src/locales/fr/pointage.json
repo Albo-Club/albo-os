@@ -1,0 +1,47 @@
+{
+  "metaTitle": "Pointage — Albo OS",
+  "title": "Pointage",
+  "subtitle": "Rattachez les transactions bancaires à vos deals.",
+  "counter_one": "{{count}} à pointer",
+  "counter_other": "{{count}} à pointer",
+  "loading": "Chargement…",
+  "empty": "Aucune transaction à pointer 🎉",
+  "col": {
+    "date": "Date",
+    "label": "Libellé",
+    "amount": "Montant",
+    "account": "Compte",
+    "actions": "Actions"
+  },
+  "actions": {
+    "match": "Rattacher",
+    "ignore": "Ignorer",
+    "undo": "Annuler"
+  },
+  "banner": {
+    "matched": "Rattachée à {{deal}}",
+    "ignored": "Ignorée"
+  },
+  "combobox": {
+    "placeholder": "Choisir un deal",
+    "search": "Rechercher un deal…",
+    "empty": "Aucun deal trouvé."
+  },
+  "detail": {
+    "title": "Transaction",
+    "description": "Détail de la transaction bancaire, en lecture seule.",
+    "rawLabel": "Libellé brut",
+    "counterparty": "Contrepartie",
+    "direction": "Sens",
+    "account": "Compte bancaire"
+  },
+  "direction": {
+    "in": "Entrée",
+    "out": "Sortie"
+  },
+  "errors": {
+    "failed": "L'action a échoué. Veuillez réessayer.",
+    "not_found": "Transaction introuvable.",
+    "deal_wrong_org": "Ce deal appartient à une autre organisation."
+  }
+}

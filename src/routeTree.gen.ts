@@ -28,6 +28,7 @@ import { Route as AppAllParticipationsRouteImport } from './routes/app/all/parti
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppOrgSlugSettingsRouteRouteImport } from './routes/app/$orgSlug/settings/route'
 import { Route as AppOrgSlugSettingsIndexRouteImport } from './routes/app/$orgSlug/settings/index'
+import { Route as AppOrgSlugPointageIndexRouteImport } from './routes/app/$orgSlug/pointage.index'
 import { Route as AppOrgSlugParticipationsIndexRouteImport } from './routes/app/$orgSlug/participations.index'
 import { Route as AppOrgSlugCashIndexRouteImport } from './routes/app/$orgSlug/cash.index'
 import { Route as AppOrgSlugSettingsMembersRouteImport } from './routes/app/$orgSlug/settings/members'
@@ -132,6 +133,11 @@ const AppOrgSlugSettingsIndexRoute = AppOrgSlugSettingsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppOrgSlugSettingsRouteRoute,
 } as any)
+const AppOrgSlugPointageIndexRoute = AppOrgSlugPointageIndexRouteImport.update({
+  id: '/pointage/',
+  path: '/pointage/',
+  getParentRoute: () => AppOrgSlugRouteRoute,
+} as any)
 const AppOrgSlugParticipationsIndexRoute =
   AppOrgSlugParticipationsIndexRouteImport.update({
     id: '/participations/',
@@ -205,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/app/$orgSlug/settings/members': typeof AppOrgSlugSettingsMembersRoute
   '/app/$orgSlug/cash/': typeof AppOrgSlugCashIndexRoute
   '/app/$orgSlug/participations/': typeof AppOrgSlugParticipationsIndexRoute
+  '/app/$orgSlug/pointage/': typeof AppOrgSlugPointageIndexRoute
   '/app/$orgSlug/settings/': typeof AppOrgSlugSettingsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -230,6 +237,7 @@ export interface FileRoutesByTo {
   '/app/$orgSlug/settings/members': typeof AppOrgSlugSettingsMembersRoute
   '/app/$orgSlug/cash': typeof AppOrgSlugCashIndexRoute
   '/app/$orgSlug/participations': typeof AppOrgSlugParticipationsIndexRoute
+  '/app/$orgSlug/pointage': typeof AppOrgSlugPointageIndexRoute
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsIndexRoute
 }
 export interface FileRoutesById {
@@ -260,6 +268,7 @@ export interface FileRoutesById {
   '/app/$orgSlug/settings/members': typeof AppOrgSlugSettingsMembersRoute
   '/app/$orgSlug/cash/': typeof AppOrgSlugCashIndexRoute
   '/app/$orgSlug/participations/': typeof AppOrgSlugParticipationsIndexRoute
+  '/app/$orgSlug/pointage/': typeof AppOrgSlugPointageIndexRoute
   '/app/$orgSlug/settings/': typeof AppOrgSlugSettingsIndexRoute
 }
 export interface FileRouteTypes {
@@ -291,6 +300,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/settings/members'
     | '/app/$orgSlug/cash/'
     | '/app/$orgSlug/participations/'
+    | '/app/$orgSlug/pointage/'
     | '/app/$orgSlug/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -316,6 +326,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/settings/members'
     | '/app/$orgSlug/cash'
     | '/app/$orgSlug/participations'
+    | '/app/$orgSlug/pointage'
     | '/app/$orgSlug/settings'
   id:
     | '__root__'
@@ -345,6 +356,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/settings/members'
     | '/app/$orgSlug/cash/'
     | '/app/$orgSlug/participations/'
+    | '/app/$orgSlug/pointage/'
     | '/app/$orgSlug/settings/'
   fileRoutesById: FileRoutesById
 }
@@ -494,6 +506,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrgSlugSettingsIndexRouteImport
       parentRoute: typeof AppOrgSlugSettingsRouteRoute
     }
+    '/app/$orgSlug/pointage/': {
+      id: '/app/$orgSlug/pointage/'
+      path: '/pointage'
+      fullPath: '/app/$orgSlug/pointage/'
+      preLoaderRoute: typeof AppOrgSlugPointageIndexRouteImport
+      parentRoute: typeof AppOrgSlugRouteRoute
+    }
     '/app/$orgSlug/participations/': {
       id: '/app/$orgSlug/participations/'
       path: '/participations'
@@ -581,6 +600,7 @@ interface AppOrgSlugRouteRouteChildren {
   AppOrgSlugParticipationsCompanyIdRoute: typeof AppOrgSlugParticipationsCompanyIdRoute
   AppOrgSlugCashIndexRoute: typeof AppOrgSlugCashIndexRoute
   AppOrgSlugParticipationsIndexRoute: typeof AppOrgSlugParticipationsIndexRoute
+  AppOrgSlugPointageIndexRoute: typeof AppOrgSlugPointageIndexRoute
 }
 
 const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
@@ -592,6 +612,7 @@ const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
     AppOrgSlugParticipationsCompanyIdRoute,
   AppOrgSlugCashIndexRoute: AppOrgSlugCashIndexRoute,
   AppOrgSlugParticipationsIndexRoute: AppOrgSlugParticipationsIndexRoute,
+  AppOrgSlugPointageIndexRoute: AppOrgSlugPointageIndexRoute,
 }
 
 const AppOrgSlugRouteRouteWithChildren = AppOrgSlugRouteRoute._addFileChildren(
