@@ -15,13 +15,24 @@
   },
   "actions": {
     "match": "Match",
+    "discard": "Discard",
     "ignore": "Ignore",
+    "charge": "Expense",
+    "tax": "Tax",
     "undo": "Undo"
   },
   "banner": {
     "matched": "Matched to {{deal}}",
-    "ignored": "Ignored"
+    "ignored": "Ignored",
+    "charge": "Marked as expense",
+    "tax": "Marked as tax"
   },
+  "view": {
+    "unmatched": "To match",
+    "charge": "Expenses",
+    "tax": "Taxes"
+  },
+  "viewEmpty": "No transactions in this category.",
   "combobox": {
     "placeholder": "Select a deal",
     "search": "Search a deal…",

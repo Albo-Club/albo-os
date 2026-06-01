@@ -274,7 +274,8 @@ Prérequis : env vars `POWENS_CLIENT_ID/SECRET/DOMAIN/REDIRECT_URI` posées ;
 ## Pointage transaction → deal (mutations + backfill)
 
 Pointage manuel (MVP 1) : `matchTransaction` / `ignoreTransaction` /
-`unmatchTransaction` + file `listUnmatched`. Chaque action écrit une ligne
+`categorizeAsCharge` / `categorizeAsTax` / `unmatchTransaction` + file
+`listUnmatched` + consultation `listByStatus`. Chaque action écrit une ligne
 append-only dans `matchingDecisions` (dataset agent, phase 2). Prérequis :
 schéma déployé (champ `matchStatus` + table `matchingDecisions`). Détails et
 pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
@@ -291,6 +292,9 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | R8 | `ignoreTransaction` sur une tx                                    | Tx → `ignored`, `dealId` vidé ; ligne `decision: 'ignored'`                       |
 | R9 | `unmatchTransaction` sur la tx de R6                              | Tx → `unmatched`, `dealId` vidé, `reconciled: false` ; ligne `decision: 'unmatched'` (le retour arrière est loggé) |
 | R10 | Inspecter `matchingDecisions` après R6–R9                        | Une ligne par action, aucune modifiée/supprimée ; `dealAmountExpected`/`amountDelta`/`dateDelta` remplis si le deal a `committedAmount`/`signedDate` |
+| R11 | `categorizeAsCharge` sur une tx                                   | Tx → `charge`, `dealId` vidé, `reconciled: false` ; ligne `decision: 'charge'`     |
+| R12 | `categorizeAsTax` sur une tx                                      | Tx → `tax`, `dealId` vidé, `reconciled: false` ; ligne `decision: 'tax'`           |
+| R13 | `listByStatus` avec `status: 'charge'` (puis `'tax'`)             | Les tx classées dans ce statut, triées date desc, enrichies du compte ; les tx de R11/R12 ne sont plus dans `listUnmatched` |
 
 ### UI de pointage (`/app/$orgSlug/pointage`)
 
@@ -302,10 +306,13 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | RU1 | `/app/calte/pointage` en tant que membre                         | Table des tx `unmatched` triées date desc (Date · Libellé · Montant signé · Compte · Actions) + compteur « N à pointer » |
 | RU2 | `/app/albo/pointage` (org sans tx unmatched)                     | État vide « Aucune transaction à pointer 🎉 »                                      |
 | RU3 | Combobox deal sur une ligne → recherche par nom → « Rattacher »  | Mutation `matchTransaction` ; la ligne affiche « Rattachée à {deal} · Annuler » ~5 s puis disparaît |
-| RU4 | « Ignorer » sur une ligne                                        | Mutation `ignoreTransaction` ; bandeau « Ignorée · Annuler » ~5 s puis la ligne disparaît |
+| RU4 | Menu « Écarter ▾ » → « Ignorer » sur une ligne                   | Mutation `ignoreTransaction` ; bandeau « Ignorée · Annuler » ~5 s puis la ligne disparaît |
 | RU5 | « Annuler » pendant le bandeau (après RU3 ou RU4)                | Mutation `unmatchTransaction` ; la ligne redevient pointable (réactivité Convex)   |
 | RU6 | Clic sur une ligne (hors colonne Actions)                        | Sheet de détail lecture seule (date, libellé brut, contrepartie, montant, sens, compte) + mêmes actions |
-| RU7 | Basculer la langue EN/FR                                         | Toute la page traduite (titres, colonnes, boutons, bandeaux, état vide)            |
+| RU7 | Basculer la langue EN/FR                                         | Toute la page traduite (titres, colonnes, boutons, bandeaux, onglets, état vide)   |
+| RU8 | Menu « Écarter ▾ » → « Charge » (puis « Impôt ») sur une ligne   | Mutation `categorizeAsCharge` / `categorizeAsTax` ; bandeau « Classée en charge/impôt · Annuler » ~5 s puis la ligne disparaît |
+| RU9 | Onglet « Charges » (puis « Impôts »)                             | Vue lecture seule des tx classées (`listByStatus`), triées date desc ; bouton « Annuler » par ligne |
+| RU10 | « Annuler » dans l'onglet Charges/Impôts                        | Mutation `unmatchTransaction` ; la tx disparaît de l'onglet et réapparaît dans « À pointer » |
 
 ## En cas d'échec
 

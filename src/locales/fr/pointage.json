@@ -15,13 +15,24 @@
   },
   "actions": {
     "match": "Rattacher",
+    "discard": "Écarter",
     "ignore": "Ignorer",
+    "charge": "Charge",
+    "tax": "Impôt",
     "undo": "Annuler"
   },
   "banner": {
     "matched": "Rattachée à {{deal}}",
-    "ignored": "Ignorée"
+    "ignored": "Ignorée",
+    "charge": "Classée en charge",
+    "tax": "Classée en impôt"
   },
+  "view": {
+    "unmatched": "À pointer",
+    "charge": "Charges",
+    "tax": "Impôts"
+  },
+  "viewEmpty": "Aucune transaction dans cette catégorie.",
   "combobox": {
     "placeholder": "Choisir un deal",
     "search": "Rechercher un deal…",

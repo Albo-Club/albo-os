@@ -730,12 +730,15 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
 - **`matchStatus` est la source de vérité, `reconciled` n'est qu'un miroir
   dérivé.** Le boolean `reconciled` (+ `reconciledBy`/`reconciledAt`) prédate
   le pointage et reste lu par l'UI deal, la vue Cash et l'outil agent. Les
-  mutations `matchTransaction` / `ignoreTransaction` / `unmatchTransaction`
-  maintiennent le miroir (matched → `true`, sinon `false`). **Ne jamais écrire
-  `reconciled` directement dans du nouveau code** — passer par ces mutations,
-  sinon les deux états divergent.
+  mutations `matchTransaction` / `ignoreTransaction` / `categorizeAsCharge` /
+  `categorizeAsTax` / `unmatchTransaction` maintiennent le miroir (matched →
+  `true`, sinon `false`). **Ne jamais écrire `reconciled` directement dans du
+  nouveau code** — passer par ces mutations, sinon les deux états divergent.
 - **Invariant** : `matchStatus === 'matched'` ⟺ `dealId != null`. Les états
-  `unmatched` / `ignored` ont toujours `dealId == null`.
+  `unmatched` / `ignored` / `charge` / `tax` ont toujours `dealId == null`.
+  `charge` et `tax` sont des sous-types d'« écarté » : même comportement
+  qu'`ignored` (hors file de pointage, pas de deal), seul le statut diffère
+  pour pouvoir les consulter ensuite (`listByStatus`).
 - **`matchStatus` est optionnel au schéma** (les documents pré-existants n'ont
   pas le champ). Absence = logiquement `unmatched`, mais ces lignes sont
   **invisibles** de l'index `by_org_matchStatus` → la query `listUnmatched` ne

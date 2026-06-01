@@ -94,6 +94,8 @@ const txMatchStatus = v.union(
   v.literal('unmatched'), // à traiter (défaut logique)
   v.literal('matched'), // rattachée à un deal — `dealId` obligatoire
   v.literal('ignored'), // décision explicite « ne concerne aucun deal »
+  v.literal('charge'), // écartée : charge courante (sous-type d'« écarté »)
+  v.literal('tax'), // écartée : impôt (sous-type d'« écarté »)
 )
 
 // Action posée dans la decision log (`unmatched` = dé-pointage, loggé aussi).
@@ -101,6 +103,8 @@ const matchDecision = v.union(
   v.literal('matched'),
   v.literal('ignored'),
   v.literal('unmatched'),
+  v.literal('charge'),
+  v.literal('tax'),
 )
 
 // MVP 1 : toujours 'manual'. 'agent_suggested' réservé à la phase 2.
