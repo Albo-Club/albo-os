@@ -424,22 +424,31 @@ export const upsertTransactions = internalMutation({
       const fields = {
         orgId,
         bankAccountId: r.bankAccountId,
-        dealId: r.dealId,
         direction: r.direction,
         amount: r.amount,
         transactionDate: r.transactionDate,
         rawLabel: r.rawLabel,
         counterparty: r.counterparty,
         source: 'imported' as const,
-        reconciled: r.reconciled,
         notes: r.notes,
         airtableId: r.airtableId,
       }
       if (existing) {
+        // Re-run de l'import : ne pas écraser l'état de pointage
+        // (matchStatus / dealId / reconciled) déjà posé sur la ligne.
         await ctx.db.patch(existing._id, fields)
         patched += 1
       } else {
-        await ctx.db.insert('transactions', fields)
+        // Pointage : seul un dealId validé côté Airtable (« Pointé » →
+        // reconciled=true) compte comme matched ; un dealId non validé est
+        // écarté pour préserver l'invariant matched ⟺ dealId présent.
+        const isMatched = r.reconciled && r.dealId !== undefined
+        await ctx.db.insert('transactions', {
+          ...fields,
+          dealId: isMatched ? r.dealId : undefined,
+          matchStatus: isMatched ? ('matched' as const) : ('unmatched' as const),
+          reconciled: isMatched,
+        })
         inserted += 1
       }
     }

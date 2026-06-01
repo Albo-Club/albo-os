@@ -326,19 +326,21 @@ export const createTransactionInternal = internalMutation({
         throw new ConvexError('deal_wrong_org')
       }
     }
+    // Pointage : matched ⟺ dealId présent ; `reconciled` suit (miroir dérivé).
     const id = await ctx.db.insert('transactions', {
       orgId: args.orgId,
       bankAccountId: args.bankAccountId,
       dealId: args.dealId,
+      matchStatus: args.dealId ? 'matched' : 'unmatched',
       direction: args.direction,
       amount: args.amount,
       transactionDate: args.transactionDate,
       rawLabel: args.rawLabel.trim(),
       counterparty: args.counterparty,
       source: 'manual',
-      reconciled: true,
-      reconciledBy: args.actorUserId,
-      reconciledAt: Date.now(),
+      reconciled: args.dealId !== undefined,
+      reconciledBy: args.dealId ? args.actorUserId : undefined,
+      reconciledAt: args.dealId ? Date.now() : undefined,
     })
     return { _id: id }
   },

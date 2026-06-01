@@ -612,15 +612,20 @@ export const ingestConnectionSync = internalMutation({
           rawLabel: tx.wording,
           counterparty: tx.counterparty,
           source: 'powens' as const,
-          reconciled: false,
           powensTxId: tx.powensTxId,
         }
         if (existing) {
+          // Re-livraison webhook : ne pas écraser l'état de pointage
+          // (matchStatus / dealId / reconciled) déjà posé sur la ligne.
           await ctx.db.patch(existing._id, fields)
           alreadyExisting += 1
           summary.patched += 1
         } else {
-          await ctx.db.insert('transactions', fields)
+          await ctx.db.insert('transactions', {
+            ...fields,
+            reconciled: false,
+            matchStatus: 'unmatched' as const,
+          })
           ingested += 1
           summary.inserted += 1
         }

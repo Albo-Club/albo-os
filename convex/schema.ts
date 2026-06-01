@@ -88,6 +88,27 @@ const txSource = v.union(
   v.literal('imported'),
 )
 
+// Pointage transaction → deal. `matchStatus` est la source de vérité de
+// l'intention ; `reconciled` reste un miroir dérivé (cf. KNOWN_ISSUES.md).
+const txMatchStatus = v.union(
+  v.literal('unmatched'), // à traiter (défaut logique)
+  v.literal('matched'), // rattachée à un deal — `dealId` obligatoire
+  v.literal('ignored'), // décision explicite « ne concerne aucun deal »
+)
+
+// Action posée dans la decision log (`unmatched` = dé-pointage, loggé aussi).
+const matchDecision = v.union(
+  v.literal('matched'),
+  v.literal('ignored'),
+  v.literal('unmatched'),
+)
+
+// MVP 1 : toujours 'manual'. 'agent_suggested' réservé à la phase 2.
+const matchDecisionSource = v.union(
+  v.literal('manual'),
+  v.literal('agent_suggested'),
+)
+
 const forecastConfidence = v.union(
   v.literal('low'),
   v.literal('medium'),
@@ -364,12 +385,20 @@ export default defineSchema({
   /**
    * transactions — flux bancaire réalisé. `dealId` nullable car certains
    * mouvements sont opérationnels (impôts, honoraires, charges courantes).
-   * Le rapprochement se fait en remplissant `dealId` + `reconciled`.
+   * Le rapprochement (pointage) se fait via `matchStatus` + `dealId` :
+   * invariant `matchStatus === 'matched'` ⟺ `dealId != null`. `reconciled`
+   * est un miroir dérivé conservé pour les lecteurs existants — ne jamais
+   * l'écrire directement (cf. KNOWN_ISSUES.md « Pointage transaction → deal »).
+   *
+   * `matchStatus` est optionnel au schéma (les docs pré-existants n'ont pas
+   * le champ tant que `transactions:backfillMatchStatus` n'a pas tourné) ;
+   * absence = logiquement 'unmatched'.
    */
   transactions: defineTable({
     orgId: v.id('organizations'),
     bankAccountId: v.id('bankAccounts'),
     dealId: v.optional(v.id('deals')),
+    matchStatus: v.optional(txMatchStatus),
     direction: txDirection,
     amount: v.number(), // cents, toujours positif
     transactionDate: v.number(),
@@ -388,7 +417,42 @@ export default defineSchema({
     .index('by_deal', ['dealId'])
     .index('by_powens_id', ['powensTxId'])
     .index('by_org_unreconciled', ['orgId', 'reconciled'])
+    .index('by_org_matchStatus', ['orgId', 'matchStatus'])
     .index('by_airtable_id', ['airtableId']),
+
+  /**
+   * matchingDecisions — historique append-only des décisions de pointage
+   * (dataset d'apprentissage de l'agent de rattachement, phase 2).
+   * Jamais patché ni supprimé. L'état courant vit sur `transactions`
+   * (`matchStatus` + `dealId`) ; ici on fige ce que voyait le décideur
+   * au moment de la décision (snapshot, jamais recalculé).
+   */
+  matchingDecisions: defineTable({
+    orgId: v.id('organizations'),
+    transactionId: v.id('transactions'),
+    decision: matchDecision,
+    dealId: v.optional(v.id('deals')), // renseigné ssi decision === 'matched'
+    source: matchDecisionSource,
+    decidedBy: v.id('users'),
+    decidedAt: v.number(),
+
+    // Snapshot de la transaction au moment de la décision
+    txLabel: v.string(),
+    txAmount: v.number(), // cents
+    txDate: v.number(), // ms epoch
+    txBankAccountId: v.id('bankAccounts'),
+
+    // Features dérivées (calculées si trivialement disponibles)
+    dealAmountExpected: v.optional(v.number()), // deal.committedAmount, cents
+    amountDelta: v.optional(v.number()), // txAmount - dealAmountExpected
+    dateDelta: v.optional(v.number()), // txDate - deal.signedDate, ms
+
+    // FX — phase 2, jamais écrits en MVP 1
+    fxRate: v.optional(v.number()),
+    amountInDealCurrency: v.optional(v.number()),
+  })
+    .index('by_org', ['orgId'])
+    .index('by_transaction', ['transactionId']),
 
   /**
    * forecasts — flux attendus (appels de fonds, distributions, échéances
