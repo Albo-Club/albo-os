@@ -829,6 +829,83 @@ export const deleteBankAccountsByIds = internalMutation({
   },
 })
 
+/** Suppression de comptes FANTÔMES Powens (org calte) — créés par une vieille
+ * connexion Powens parasite (autre projet), avant le filtre par id_user.
+ *
+ * Différence avec `deleteBankAccountsByIds` : pas de garde `isCalteKeepAccount`
+ * (qui protège tout "PALATINE" par label et bloquerait les fantômes Palatine).
+ * À la place, un ciblage qui ne peut matcher QUE des fantômes Powens :
+ *   (a) org calte, ET
+ *   (b) `airtableId` ABSENT (un vrai compte importé a un airtableId), ET
+ *   (c) `powensAccountId` PRÉSENT (compte d'origine Powens), ET
+ *   (d) 0 transaction rattachée (compté live via `by_account_date`).
+ * Le vrai PALATINE Airtable a un airtableId → jamais matché. Qonto/HSBC liés à
+ * Powens ont des transactions et/ou un airtableId → jamais matchés. */
+export const deletePowensGhostAccounts = internalMutation({
+  args: { ids: v.array(v.id('bankAccounts')) },
+  handler: async (ctx, { ids }) => {
+    const calte = await orgBySlug(ctx, 'calte')
+    const deleted: Array<{
+      _id: Id<'bankAccounts'>
+      bankName: string
+      label: string
+    }> = []
+    const skipped: Array<{
+      id: Id<'bankAccounts'>
+      reason: string
+      bankName?: string
+      label?: string
+      txCount?: number
+    }> = []
+    for (const id of ids) {
+      const a = await ctx.db.get(id)
+      if (!a) {
+        skipped.push({ id, reason: 'not_found' })
+        continue
+      }
+      if (a.orgId !== calte._id) {
+        skipped.push({ id, reason: 'not_calte', bankName: a.bankName, label: a.label })
+        continue
+      }
+      if (a.airtableId) {
+        skipped.push({
+          id,
+          reason: 'has_airtable_id',
+          bankName: a.bankName,
+          label: a.label,
+        })
+        continue
+      }
+      if (!a.powensAccountId) {
+        skipped.push({
+          id,
+          reason: 'no_powens_id',
+          bankName: a.bankName,
+          label: a.label,
+        })
+        continue
+      }
+      const txs = await ctx.db
+        .query('transactions')
+        .withIndex('by_account_date', (q) => q.eq('bankAccountId', id))
+        .collect()
+      if (txs.length > 0) {
+        skipped.push({
+          id,
+          reason: 'has_transactions',
+          bankName: a.bankName,
+          label: a.label,
+          txCount: txs.length,
+        })
+        continue
+      }
+      await ctx.db.delete(id)
+      deleted.push({ _id: id, bankName: a.bankName, label: a.label })
+    }
+    return { deleted, skipped }
+  },
+})
+
 // ─── Émission : connexion bancaire depuis l'app (Webview Powens) ─────────────
 
 /** Param `type` de `/auth/token/code`. Test manuel : l'endpoint renvoie un code
