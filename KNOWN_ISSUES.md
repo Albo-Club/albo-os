@@ -630,8 +630,14 @@ Seule env var requise : `POWENS_WEBHOOK_SECRET` (clé du provider HMAC Powens).
   ne suffit pas. `linkQonto` rapproche le Qonto existant par **unicité du
   `bankName='Qonto'`** dans calte (sans `powensAccountId`), exige l'égalité
   d'IBAN seulement si le record en a déjà un, puis **backfille** l'IBAN Powens.
-  **Arrêt dur** (`qonto_match_ambiguous`, aucune écriture) si 0 ou >1 candidat —
-  jamais de doublon.
+  Deux cas de non-match, traités différemment :
+  - **0 candidat** (Qonto déjà lié à un autre `powensAccountId` — webhook
+    re-sync redondant d'une autre connexion/user Powens) → warning
+    `qonto_already_linked` dans les logs + compte **ignoré** (webhook répond
+    200, rien n'est cassé). Le premier match reste la source de vérité, pas de
+    re-lien automatique.
+  - **≥2 candidats** (vraie ambiguïté) → **arrêt dur** `qonto_match_ambiguous`,
+    aucune écriture — jamais de doublon.
 - **Cutover sans champ au schéma.** Aucune date de connexion n'est stockée.
   Borne par compte dans `computeCutoff` : compte neuf → `_creationTime` (champ
   Convex natif ≈ date de connexion, l'historique antérieur du 1ᵉʳ lot est
