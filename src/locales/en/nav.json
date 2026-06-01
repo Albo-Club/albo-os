@@ -4,6 +4,7 @@
     "breadcrumb": {
       "participations": "Participations",
       "cash": "Cash",
+      "pointage": "Reconciliation",
       "settings": "Settings",
       "members": "Members",
       "invitations": "Invitations",
@@ -19,6 +20,7 @@
     "dashboard": "Dashboard",
     "participations": "Participations",
     "cash": "Cash",
+    "pointage": "Reconciliation",
     "members": "Members",
     "invitations": "Invitations",
     "settings": "Settings"

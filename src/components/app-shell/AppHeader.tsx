@@ -23,6 +23,7 @@ type Crumb = { label: string; href?: string }
 const CRUMB_SEGMENTS = [
   'participations',
   'cash',
+  'pointage',
   'settings',
   'members',
   'invitations',

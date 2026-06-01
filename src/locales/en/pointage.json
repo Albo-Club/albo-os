@@ -1,0 +1,47 @@
+{
+  "metaTitle": "Reconciliation — Albo OS",
+  "title": "Reconciliation",
+  "subtitle": "Match bank transactions to your deals.",
+  "counter_one": "{{count}} to match",
+  "counter_other": "{{count}} to match",
+  "loading": "Loading…",
+  "empty": "No transactions to match 🎉",
+  "col": {
+    "date": "Date",
+    "label": "Label",
+    "amount": "Amount",
+    "account": "Account",
+    "actions": "Actions"
+  },
+  "actions": {
+    "match": "Match",
+    "ignore": "Ignore",
+    "undo": "Undo"
+  },
+  "banner": {
+    "matched": "Matched to {{deal}}",
+    "ignored": "Ignored"
+  },
+  "combobox": {
+    "placeholder": "Select a deal",
+    "search": "Search a deal…",
+    "empty": "No deal found."
+  },
+  "detail": {
+    "title": "Transaction",
+    "description": "Bank transaction details, read only.",
+    "rawLabel": "Raw label",
+    "counterparty": "Counterparty",
+    "direction": "Direction",
+    "account": "Bank account"
+  },
+  "direction": {
+    "in": "Inflow",
+    "out": "Outflow"
+  },
+  "errors": {
+    "failed": "The action failed. Please try again.",
+    "not_found": "Transaction not found.",
+    "deal_wrong_org": "This deal belongs to another organization."
+  }
+}

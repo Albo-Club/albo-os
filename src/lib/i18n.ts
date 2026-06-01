@@ -17,6 +17,7 @@ import enOrg from '~/locales/en/org.json'
 import enSettings from '~/locales/en/settings.json'
 import enChat from '~/locales/en/chat.json'
 import enCash from '~/locales/en/cash.json'
+import enPointage from '~/locales/en/pointage.json'
 
 import frCommon from '~/locales/fr/common.json'
 import frAuth from '~/locales/fr/auth.json'
@@ -30,6 +31,7 @@ import frOrg from '~/locales/fr/org.json'
 import frSettings from '~/locales/fr/settings.json'
 import frChat from '~/locales/fr/chat.json'
 import frCash from '~/locales/fr/cash.json'
+import frPointage from '~/locales/fr/pointage.json'
 
 export const NAMESPACES = [
   'common',
@@ -44,6 +46,7 @@ export const NAMESPACES = [
   'settings',
   'chat',
   'cash',
+  'pointage',
 ] as const
 
 export const defaultNS = 'common'
@@ -62,6 +65,7 @@ export const resources = {
     settings: enSettings,
     chat: enChat,
     cash: enCash,
+    pointage: enPointage,
   },
   fr: {
     common: frCommon,
@@ -76,6 +80,7 @@ export const resources = {
     settings: frSettings,
     chat: frChat,
     cash: frCash,
+    pointage: frPointage,
   },
 } as const
 

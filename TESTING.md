@@ -292,6 +292,21 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | R9 | `unmatchTransaction` sur la tx de R6                              | Tx → `unmatched`, `dealId` vidé, `reconciled: false` ; ligne `decision: 'unmatched'` (le retour arrière est loggé) |
 | R10 | Inspecter `matchingDecisions` après R6–R9                        | Une ligne par action, aucune modifiée/supprimée ; `dealAmountExpected`/`amountDelta`/`dateDelta` remplis si le deal a `committedAmount`/`signedDate` |
 
+### UI de pointage (`/app/$orgSlug/pointage`)
+
+Écran de pointage manuel (front des mutations ci-dessus). Lien sidebar
+« Pointage » dans le groupe Plateforme.
+
+| #   | Étape                                                            | Résultat attendu                                                                  |
+| --- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| RU1 | `/app/calte/pointage` en tant que membre                         | Table des tx `unmatched` triées date desc (Date · Libellé · Montant signé · Compte · Actions) + compteur « N à pointer » |
+| RU2 | `/app/albo/pointage` (org sans tx unmatched)                     | État vide « Aucune transaction à pointer 🎉 »                                      |
+| RU3 | Combobox deal sur une ligne → recherche par nom → « Rattacher »  | Mutation `matchTransaction` ; la ligne affiche « Rattachée à {deal} · Annuler » ~5 s puis disparaît |
+| RU4 | « Ignorer » sur une ligne                                        | Mutation `ignoreTransaction` ; bandeau « Ignorée · Annuler » ~5 s puis la ligne disparaît |
+| RU5 | « Annuler » pendant le bandeau (après RU3 ou RU4)                | Mutation `unmatchTransaction` ; la ligne redevient pointable (réactivité Convex)   |
+| RU6 | Clic sur une ligne (hors colonne Actions)                        | Sheet de détail lecture seule (date, libellé brut, contrepartie, montant, sens, compte) + mêmes actions |
+| RU7 | Basculer la langue EN/FR                                         | Toute la page traduite (titres, colonnes, boutons, bandeaux, état vide)            |
+
 ## En cas d'échec
 
 - Smoke échoue → ouvrir `KNOWN_ISSUES.md` (déploiement Convex / `pnpm rebuild esbuild`).

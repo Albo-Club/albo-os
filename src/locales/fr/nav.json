@@ -4,6 +4,7 @@
     "breadcrumb": {
       "participations": "Participations",
       "cash": "Trésorerie",
+      "pointage": "Pointage",
       "settings": "Paramètres",
       "members": "Membres",
       "invitations": "Invitations",
@@ -19,6 +20,7 @@
     "dashboard": "Tableau de bord",
     "participations": "Participations",
     "cash": "Trésorerie",
+    "pointage": "Pointage",
     "members": "Membres",
     "invitations": "Invitations",
     "settings": "Paramètres"

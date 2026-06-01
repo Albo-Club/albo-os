@@ -362,6 +362,26 @@ pnpm rebuild esbuild   # ensures esbuild's native binary is fetched
 `pnpm rebuild esbuild` is required because pnpm 10 skips lifecycle scripts
 by default, so esbuild's `install.js` doesn't download the platform binary.
 
+## `pnpm lint` après `pnpm build` — faux positifs sur `.output/`
+
+La config eslint (`eslint.config.mjs`) n'ignore que `convex/_generated`. Le
+build Nitro émet `.output/` (et `.nitro/`) à la racine : si on lance
+`pnpm lint` **après** un `pnpm build`, eslint parcourt les bundles générés et
+remonte des centaines d'erreurs fantômes sur ces fichiers. Lancer lint
+**avant** build (l'ordre de `TESTING.md` niveau 1), ou supprimer
+`.output/`/`.nitro/` avant de relancer lint.
+
+## shadcn CLI inaccessible depuis un environnement réseau restreint
+
+`pnpm dlx shadcn@latest add <component>` télécharge le composant depuis
+`ui.shadcn.com` — inaccessible derrière une politique réseau restrictive
+(erreur « You are not authorized to access the item »). Fallback : ajouter la
+dépendance du composant à la main (ex. `pnpm add cmdk` pour Command), puis
+écrire `src/components/ui/<component>.tsx` calqué sur la source shadcn
+officielle et le style des composants ui existants (package `radix-ui`/dep
+dédiée, alias `~/lib/utils`, attributs `data-slot`, prettier du projet).
+Exemple : `command.tsx`.
+
 ## Vercel framework preset traps TanStack Start
 
 Vercel's auto-detection lands on **Vite** the moment it sees `vite.config.ts`,
