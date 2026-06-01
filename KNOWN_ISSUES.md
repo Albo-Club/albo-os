@@ -611,6 +611,16 @@ Webhook `CONNECTION_SYNCED` → HTTP action (`/powens/webhook`) → mutation int
 hors-app via le Powens Webview ; le code n'écrit que l'APRÈS (comptes + tx).
 Seule env var requise : `POWENS_WEBHOOK_SECRET` (clé du provider HMAC Powens).
 
+- **Filtre par user Powens (anti-pollution).** Seuls les webhooks dont le
+  `id_user` correspond à une ligne `powensUsers` (index `by_powens_user_id`)
+  sont ingérés. Les connexions d'autres projets / vieux users Powens non gérés
+  par Albo OS re-syncent encore : sans ce filtre, elles créaient des comptes
+  fantômes. Webhook d'un user inconnu → warning `[powens] webhook ignoré:
+  id_user inconnu (X)` + réponse 200, **rien n'est écrit**. Conséquence :
+  l'**org d'ingestion vient du `powensUsers` matché** (source de vérité), le
+  mapping connecteur→entité ne sert qu'à choisir l'entité propriétaire et doit
+  concorder avec cette org (`connector_org_mismatch` sinon).
+
 - **HMAC : pas de `crypto.timingSafeEqual` dans le runtime Convex.** L'isolate
   V8 n'expose pas l'API `crypto` de Node ; on vérifie via Web Crypto
   `crypto.subtle.verify('HMAC', …)` (constant-time par construction). Écart

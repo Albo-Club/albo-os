@@ -200,6 +200,7 @@ function normalizeAccount(raw: unknown, connectorName: string): NormAccount | nu
 
 function normalizePayload(payload: unknown): {
   connectionId: string
+  powensUserId: string | undefined
   accounts: Array<NormAccount>
 } {
   const root = asRecord(payload)
@@ -210,10 +211,16 @@ function normalizePayload(payload: unknown): {
     asString(connector.name) ?? asString(connector.uuid) ?? ''
   const connectionId =
     asIdStr(connection.id) ?? asIdStr(root.id_connection) ?? ''
+  // Id du user Powens propriétaire de la connexion. Doc CONNECTION_SYNCED :
+  // `connection.id_user` (Connection object) et `user.id` (User object racine).
+  const powensUserId =
+    asIdStr(connection.id_user) ??
+    asIdStr(asRecord(root.user).id) ??
+    asIdStr(root.id_user)
   const accounts = asArray(connection.accounts)
     .map((a) => normalizeAccount(a, connectorName))
     .filter((a): a is NormAccount => a !== null)
-  return { connectionId, accounts }
+  return { connectionId, powensUserId, accounts }
 }
 
 // ─── Vérification de signature HMAC ──────────────────────────────────────────
@@ -426,11 +433,17 @@ async function linkQonto(
 }
 
 /** Résout le `bankAccounts` cible d'un compte du payload. Renvoie `null` si le
- * compte doit être ignoré (cas `qonto_already_linked`, cf. linkQonto). */
+ * compte doit être ignoré (cas `qonto_already_linked`, cf. linkQonto).
+ *
+ * `org` = l'org du user Powens matché (source de vérité de « à qui appartient
+ * cette connexion ») : c'est elle qui scope l'écriture. Le mapping
+ * connecteur→entité ne sert qu'à choisir l'entité propriétaire et doit
+ * concorder avec cette org (sinon erreur visible, pas d'écriture muette). */
 async function resolveAccount(
   ctx: MutationCtx,
   connectionId: string,
   acc: NormAccount,
+  org: Doc<'organizations'>,
 ): Promise<Doc<'bankAccounts'> | null> {
   // 1. Déjà lié par powensAccountId → on réutilise (maj du solde).
   const linked = await ctx.db
@@ -440,6 +453,14 @@ async function resolveAccount(
     )
     .first()
   if (linked) {
+    // Cohérence : le compte lié doit appartenir à l'org du user Powens.
+    if (linked.orgId !== org._id) {
+      console.warn(
+        `[powens] compte acct ${acc.powensAccountId} déjà lié à une autre org ` +
+          `que celle du user Powens (${org.slug}) — ignoré`,
+      )
+      return null
+    }
     await ctx.db.patch(linked._id, balancePatch(acc))
     const refreshed = await ctx.db.get(linked._id)
     if (!refreshed) throw new ConvexError('account_vanished')
@@ -448,17 +469,24 @@ async function resolveAccount(
 
   const connector = normalizeName(acc.connectorName)
 
-  // 2. Match Qonto existant.
+  // 2. Match Qonto existant (le record vit dans l'org calte).
   if (connector.includes('qonto')) {
+    if (org.slug !== 'calte') {
+      throw new ConvexError(`connector_org_mismatch:qonto:${org.slug}`)
+    }
     return linkQonto(ctx, acc, connectionId)
   }
 
-  // 3. Compte neuf via le mapping connecteur → entité.
+  // 3. Compte neuf via le mapping connecteur → entité, scopé à l'org du user.
   const mapping = matchConnector(connector)
   if (!mapping) {
     throw new ConvexError(`unmapped_powens_account:${acc.connectorName}`)
   }
-  const org = await orgBySlug(ctx, mapping.orgSlug)
+  if (mapping.orgSlug !== org.slug) {
+    throw new ConvexError(
+      `connector_org_mismatch:${acc.connectorName}:${org.slug}`,
+    )
+  }
   const owner = await resolveGroupCompany(ctx, org._id, mapping.ownerName)
   const balance = balancePatch(acc)
   const id = await ctx.db.insert('bankAccounts', {
@@ -502,15 +530,44 @@ async function computeCutoff(
 export const ingestConnectionSync = internalMutation({
   args: {
     connectionId: v.string(),
+    powensUserId: v.optional(v.string()),
     accounts: v.array(normAccountValidator),
   },
-  handler: async (ctx, { connectionId, accounts }) => {
+  handler: async (ctx, { connectionId, powensUserId, accounts }) => {
     const summary = { inserted: 0, patched: 0, skipped: 0 }
+
+    // ── Filtre par user Powens : seuls les users gérés par Albo OS sont
+    // ingérés. Les connexions d'autres projets (vieux users non gérés)
+    // re-syncent encore et pollueraient la base.
+    if (!powensUserId) {
+      console.warn(
+        `[powens] webhook ignoré: payload sans id_user (connection=${connectionId})`,
+      )
+      return summary
+    }
+    const powensUser = await ctx.db
+      .query('powensUsers')
+      .withIndex('by_powens_user_id', (q) =>
+        q.eq('powensUserId', powensUserId),
+      )
+      .unique()
+    if (!powensUser) {
+      console.warn(
+        `[powens] webhook ignoré: id_user inconnu (${powensUserId}) — ` +
+          `connexion non gérée par Albo OS (connection=${connectionId})`,
+      )
+      return summary
+    }
+    // L'org du user Powens matché = source de vérité du scope d'écriture.
+    const org = await ctx.db.get(powensUser.orgId)
+    if (!org) throw new ConvexError('powens_user_org_not_found')
+
     console.log(
-      `[powens] webhook connection=${connectionId}: ${accounts.length} compte(s) dans le payload`,
+      `[powens] webhook connection=${connectionId} (user ${powensUserId} → org ${org.slug}): ` +
+        `${accounts.length} compte(s) dans le payload`,
     )
     for (const acc of accounts) {
-      const account = await resolveAccount(ctx, connectionId, acc)
+      const account = await resolveAccount(ctx, connectionId, acc, org)
       if (!account) {
         // Compte ignoré (qonto_already_linked) — ses tx ne sont pas ingérées.
         summary.skipped += acc.transactions.length
