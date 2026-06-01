@@ -161,8 +161,11 @@ seulement) :
   passé `requireOrgMember(ctx, orgId)`. Pas d'exception.
 
 **État du schéma** : `companies`, `companyRelations`, `deals`, `valuations`,
-`kpiSnapshots` (cœur portfolio). `bankAccounts`, `transactions`, `forecasts`
-sont **déclarées mais inertes** (phase 2 cash management — mutations vides).
+`kpiSnapshots` (cœur portfolio). `bankAccounts` + `transactions` sont
+alimentées (Powens/import) ; le pointage transaction → deal vit dans
+`convex/transactions.ts` (`matchStatus` + table `matchingDecisions`
+append-only — cf. `KNOWN_ISSUES.md` « Pointage transaction → deal »).
+`forecasts` reste **déclarée mais inerte** (phase 2 cash management).
 
 **Workflow déploiement** : outil interne, **prod-only** (pas de déploiement
 dev). Le code part en prod via le build Vercel sur `main` (`build:vercel` →

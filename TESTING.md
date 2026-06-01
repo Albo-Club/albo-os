@@ -271,6 +271,27 @@ Prérequis : env vars `POWENS_CLIENT_ID/SECRET/DOMAIN/REDIRECT_URI` posées ;
 | E5 | Sécurité — inspecter la réponse réseau du clic (DevTools)          | Seul `{ webviewUrl }` revient ; **aucun** `authToken`/`client_secret` dans le payload ni dans les logs Convex |
 | E6 | Env var manquante (test : retirer `POWENS_DOMAIN`)                 | Toast « connexion bancaire pas configurée » (`powens_env_missing`) ; aucun appel Powens |
 
+## Pointage transaction → deal (mutations + backfill)
+
+Pointage manuel (MVP 1) : `matchTransaction` / `ignoreTransaction` /
+`unmatchTransaction` + file `listUnmatched`. Chaque action écrit une ligne
+append-only dans `matchingDecisions` (dataset agent, phase 2). Prérequis :
+schéma déployé (champ `matchStatus` + table `matchingDecisions`). Détails et
+pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
+
+| #  | Étape                                                              | Résultat attendu                                                                 |
+| -- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| R1 | `convex export --prod`                                            | Snapshot de sécurité avant le backfill                                            |
+| R2 | `convex run --prod transactions:backfillMatchStatus '{"orgId":"<id calte>"}'` | `{ matched: N, unmatched: M, skipped: 0 }` — matched = tx `reconciled` + `dealId` |
+| R3 | Re-lancer R2 (idempotence)                                        | `{ matched: 0, unmatched: 0, skipped: N+M }` — aucune ré-écriture                 |
+| R4 | Idem pour l'org `albo`                                            | Mêmes invariants                                                                  |
+| R5 | `transactions:listUnmatched` (dashboard, en tant que membre)      | Les tx `unmatched` de l'org, triées par date desc, enrichies du compte            |
+| R6 | `matchTransaction` sur une tx + un deal de la même org            | Tx → `matched` + `dealId` + `reconciled: true` ; 1 ligne `matchingDecisions` (`decision: 'matched'`, snapshot label/montant/date figé) |
+| R7 | `matchTransaction` avec un deal d'une **autre** org               | `ConvexError('deal_wrong_org')`, rien écrit                                       |
+| R8 | `ignoreTransaction` sur une tx                                    | Tx → `ignored`, `dealId` vidé ; ligne `decision: 'ignored'`                       |
+| R9 | `unmatchTransaction` sur la tx de R6                              | Tx → `unmatched`, `dealId` vidé, `reconciled: false` ; ligne `decision: 'unmatched'` (le retour arrière est loggé) |
+| R10 | Inspecter `matchingDecisions` après R6–R9                        | Une ligne par action, aucune modifiée/supprimée ; `dealAmountExpected`/`amountDelta`/`dateDelta` remplis si le deal a `committedAmount`/`signedDate` |
+
 ## En cas d'échec
 
 - Smoke échoue → ouvrir `KNOWN_ISSUES.md` (déploiement Convex / `pnpm rebuild esbuild`).

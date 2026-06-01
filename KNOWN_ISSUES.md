@@ -701,3 +701,32 @@ permanent par org, génère un code temporaire et renvoie l'URL du Webview.
   existant) — un double-clic ne crée pas de second user côté Convex (mais deux
   `/auth/init` quasi-simultanés sur une org sans token créeraient un user Powens
   orphelin côté Powens ; risque faible, bouton désactivé pendant l'appel).
+
+## Pointage transaction → deal (`convex/transactions.ts`)
+
+Le pointage manuel rattache une transaction bancaire à un deal (MVP 1) et
+alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
+
+- **`matchStatus` est la source de vérité, `reconciled` n'est qu'un miroir
+  dérivé.** Le boolean `reconciled` (+ `reconciledBy`/`reconciledAt`) prédate
+  le pointage et reste lu par l'UI deal, la vue Cash et l'outil agent. Les
+  mutations `matchTransaction` / `ignoreTransaction` / `unmatchTransaction`
+  maintiennent le miroir (matched → `true`, sinon `false`). **Ne jamais écrire
+  `reconciled` directement dans du nouveau code** — passer par ces mutations,
+  sinon les deux états divergent.
+- **Invariant** : `matchStatus === 'matched'` ⟺ `dealId != null`. Les états
+  `unmatched` / `ignored` ont toujours `dealId == null`.
+- **`matchStatus` est optionnel au schéma** (les documents pré-existants n'ont
+  pas le champ). Absence = logiquement `unmatched`, mais ces lignes sont
+  **invisibles** de l'index `by_org_matchStatus` → la query `listUnmatched` ne
+  les retourne pas tant que `transactions:backfillMatchStatus` n'a pas tourné
+  (one-shot par org, idempotent, cf. `TESTING.md`).
+- **`matchingDecisions` est append-only.** Une ligne par action de pointage
+  (y compris le dé-pointage, signal négatif pour l'agent). Jamais de patch ni
+  de delete. Le backfill n'y écrit **rien** (pas une décision humaine — ne pas
+  polluer le dataset).
+- **La ré-ingestion ne clobbe pas le pointage.** Powens (re-livraison webhook)
+  et l'import Airtable (re-run) posent l'état de pointage **à l'insert
+  uniquement** ; le patch d'une ligne existante n'écrit ni `matchStatus`, ni
+  `dealId`, ni `reconciled`. Avant le pointage, le re-sync Powens remettait
+  `reconciled: false` à chaque webhook — ce reset a été retiré exprès.
