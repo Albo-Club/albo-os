@@ -379,15 +379,33 @@ async function qontoTestTxRows(
 
 /** Rapproche un compte Powers Qonto du record existant (importé d'Airtable).
  * Match par IBAN si le record en a un, sinon par unicité du `bankName='Qonto'`
- * (l'import Airtable ne stocke pas l'IBAN) avec backfill de l'IBAN. Arrêt dur
- * si 0 ou >1 candidat — jamais de doublon. */
+ * (l'import Airtable ne stocke pas l'IBAN) avec backfill de l'IBAN.
+ *
+ * Cas séparés (ne pas confondre) :
+ * - 0 candidat éligible = le(s) Qonto de calte sont DÉJÀ liés à un autre
+ *   `powensAccountId` (webhook re-sync redondant d'une autre connexion/user
+ *   Powens). On garde le premier match comme source de vérité → warning
+ *   `qonto_already_linked` + on ignore ce compte (return null, pas d'erreur).
+ * - ≥2 candidats = vraie ambiguïté → `qonto_match_ambiguous` (arrêt dur). */
 async function linkQonto(
   ctx: MutationCtx,
   acc: NormAccount,
   connectionId: string,
-): Promise<Doc<'bankAccounts'>> {
-  const candidates = eligibleQontoCandidates(await qontoAccountsOfCalte(ctx))
-  if (candidates.length !== 1) throw new ConvexError('qonto_match_ambiguous')
+): Promise<Doc<'bankAccounts'> | null> {
+  const qontoAccounts = await qontoAccountsOfCalte(ctx)
+  const candidates = eligibleQontoCandidates(qontoAccounts)
+  if (candidates.length === 0) {
+    const linkedIds = qontoAccounts
+      .filter((a) => a.powensAccountId)
+      .map((a) => a.powensAccountId)
+      .join(', ')
+    console.warn(
+      `[powens] qonto_already_linked: compte payload acct ${acc.powensAccountId} ` +
+        `ignoré — record(s) Qonto déjà lié(s) à acct ${linkedIds || '(aucun)'}`,
+    )
+    return null
+  }
+  if (candidates.length > 1) throw new ConvexError('qonto_match_ambiguous')
   const qonto = candidates[0]
   if (
     qonto.iban &&
@@ -407,11 +425,13 @@ async function linkQonto(
   return refreshed
 }
 
+/** Résout le `bankAccounts` cible d'un compte du payload. Renvoie `null` si le
+ * compte doit être ignoré (cas `qonto_already_linked`, cf. linkQonto). */
 async function resolveAccount(
   ctx: MutationCtx,
   connectionId: string,
   acc: NormAccount,
-): Promise<Doc<'bankAccounts'>> {
+): Promise<Doc<'bankAccounts'> | null> {
   // 1. Déjà lié par powensAccountId → on réutilise (maj du solde).
   const linked = await ctx.db
     .query('bankAccounts')
@@ -491,6 +511,11 @@ export const ingestConnectionSync = internalMutation({
     )
     for (const acc of accounts) {
       const account = await resolveAccount(ctx, connectionId, acc)
+      if (!account) {
+        // Compte ignoré (qonto_already_linked) — ses tx ne sont pas ingérées.
+        summary.skipped += acc.transactions.length
+        continue
+      }
       const cutoff = await computeCutoff(ctx, account)
       // Diagnostic : d'où vient la borne (sans changer computeCutoff).
       const cutoffSource =
@@ -888,7 +913,8 @@ export const startBankConnection = action({
 
 /** Réinitialise le lien Powens d'un compte Qonto : remet `powensAccountId` et
  * `iban` à `undefined`. Utile pour purger des résidus d'un user Powens
- * temporaire expiré (sinon le compte est « pris » → `qonto_match_ambiguous`).
+ * temporaire expiré (sinon le compte reste « pris » → les webhooks de la
+ * nouvelle connexion sont ignorés en `qonto_already_linked`).
  *
  * Garde-fou : n'agit QUE si le compte appartient à l'org calte ET a
  * `bankName ≈ 'Qonto'`. Ne touche à rien d'autre (pas aux transactions).
