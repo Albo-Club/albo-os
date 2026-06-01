@@ -946,3 +946,21 @@ export const resetQontoPowensLink = internalMutation({
     }
   },
 })
+
+/** Supprime le user Powens d'une org (ligne `powensUsers`). Cas d'usage :
+ * rotation d'un authToken qui a fuité — le user est supprimé côté Powens, puis
+ * cette mutation vide la ligne en base pour que `startBankConnection` recrée un
+ * user propre (via /auth/init) au prochain clic. Si aucune ligne, no-op.
+ * Lancée par l'opérateur via `convex run --prod`. */
+export const deletePowensUser = internalMutation({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    const row = await ctx.db
+      .query('powensUsers')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .unique()
+    if (!row) return { deleted: false, powensUserId: null }
+    await ctx.db.delete(row._id)
+    return { deleted: true, powensUserId: row.powensUserId }
+  },
+})
