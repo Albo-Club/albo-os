@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { useConvexMutation } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -10,6 +11,12 @@ import type { ReactNode } from 'react'
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { DealOption } from './DealCombobox'
 import { Button } from '~/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu'
 import {
   Sheet,
   SheetContent,
@@ -38,12 +45,15 @@ export type UnmatchedTx = {
   account: { label: string; bankName: string } | null
 }
 
-/** Durée d'affichage du bandeau « Annuler » après un pointage/ignore. */
+/** Durée d'affichage du bandeau « Annuler » après un pointage/écartement. */
 const UNDO_DELAY_MS = 5000
+
+/** Destins « écarté » : ignorée, charge courante ou impôt. */
+type DiscardKind = 'ignored' | 'charge' | 'tax'
 
 type RecentAction = {
   tx: UnmatchedTx
-  kind: 'matched' | 'ignored'
+  kind: 'matched' | DiscardKind
   dealName?: string
 }
 
@@ -82,17 +92,26 @@ function accountLabel(tx: UnmatchedTx) {
   return tx.account ? `${tx.account.bankName} · ${tx.account.label}` : '—'
 }
 
-/** Combobox + Rattacher + Ignorer pour une transaction. */
+/** Toast d'erreur localisé à partir du code `ConvexError` des mutations. */
+function useReportError() {
+  const { t } = useTranslation('pointage')
+  return (err: unknown) => {
+    const code = err instanceof ConvexError ? (err.data as string) : ''
+    toast.error(t(`errors.${code}`, t('errors.failed')))
+  }
+}
+
+/** Combobox + Rattacher + menu « Écarter » (Ignorer/Charge/Impôt). */
 function RowActions({
   deals,
   pending,
   onMatch,
-  onIgnore,
+  onDiscard,
 }: {
   deals: Array<DealOption> | undefined
   pending: boolean
   onMatch: (deal: DealOption) => void
-  onIgnore: () => void
+  onDiscard: (kind: DiscardKind) => void
 }) {
   const { t } = useTranslation('pointage')
   const [deal, setDeal] = useState<DealOption | null>(null)
@@ -111,14 +130,33 @@ function RowActions({
       >
         {t('actions.match')}
       </Button>
-      <Button size="sm" variant="ghost" disabled={pending} onClick={onIgnore}>
-        {t('actions.ignore')}
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="sm" variant="ghost" disabled={pending}>
+            {t('actions.discard')}
+            <ChevronDown className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => onDiscard('ignored')}>
+            {t('actions.ignore')}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onDiscard('charge')}>
+            {t('actions.charge')}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onDiscard('tax')}>
+            {t('actions.tax')}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }
 
-/** Bandeau transitoire « Rattachée à {deal} · Annuler » / « Ignorée · Annuler ». */
+/**
+ * Bandeau transitoire « Rattachée à {deal} · Annuler » / « Ignorée · Annuler »
+ * / « Classée en charge/impôt · Annuler ».
+ */
 function UndoBanner({
   recent,
   pending,
@@ -134,7 +172,7 @@ function UndoBanner({
       <span className="text-muted-foreground text-sm">
         {recent.kind === 'matched'
           ? t('banner.matched', { deal: recent.dealName ?? '—' })
-          : t('banner.ignored')}
+          : t(`banner.${recent.kind}`)}
       </span>
       <Button size="sm" variant="outline" disabled={pending} onClick={onUndo}>
         {t('actions.undo')}
@@ -145,10 +183,11 @@ function UndoBanner({
 
 /**
  * Table de pointage : transactions `unmatched` triées date desc, actions par
- * ligne (rattacher à un deal, ignorer), détail en sheet au clic, et bandeau
- * « Annuler » transitoire (~5 s) après chaque action — qui appelle
- * `unmatchTransaction`. La page n'écrit jamais `matchStatus`/`reconciled`
- * directement : tout passe par les mutations du backend.
+ * ligne (rattacher à un deal, écarter en ignorée/charge/impôt), détail en
+ * sheet au clic, et bandeau « Annuler » transitoire (~5 s) après chaque
+ * action — qui appelle `unmatchTransaction`. La page n'écrit jamais
+ * `matchStatus`/`reconciled` directement : tout passe par les mutations du
+ * backend.
  */
 export function PointageTable({
   transactions,
@@ -159,14 +198,25 @@ export function PointageTable({
 }) {
   const { t } = useTranslation('pointage')
   const { fmtDate, fmtSigned } = useFormatters()
+  const reportError = useReportError()
 
   const matchTransaction = useConvexMutation(api.transactions.matchTransaction)
   const ignoreTransaction = useConvexMutation(
     api.transactions.ignoreTransaction,
   )
+  const categorizeAsCharge = useConvexMutation(
+    api.transactions.categorizeAsCharge,
+  )
+  const categorizeAsTax = useConvexMutation(api.transactions.categorizeAsTax)
   const unmatchTransaction = useConvexMutation(
     api.transactions.unmatchTransaction,
   )
+
+  const discardMutations = {
+    ignored: ignoreTransaction,
+    charge: categorizeAsCharge,
+    tax: categorizeAsTax,
+  }
 
   const [recent, setRecent] = useState<Array<RecentAction>>([])
   const [pendingId, setPendingId] = useState<Id<'transactions'> | null>(null)
@@ -199,11 +249,6 @@ export function PointageTable({
     )
   }
 
-  function reportError(err: unknown) {
-    const code = err instanceof ConvexError ? (err.data as string) : ''
-    toast.error(t(`errors.${code}`, t('errors.failed')))
-  }
-
   async function handleMatch(tx: UnmatchedTx, deal: DealOption) {
     setPendingId(tx._id)
     try {
@@ -217,11 +262,11 @@ export function PointageTable({
     }
   }
 
-  async function handleIgnore(tx: UnmatchedTx) {
+  async function handleDiscard(tx: UnmatchedTx, kind: DiscardKind) {
     setPendingId(tx._id)
     try {
-      await ignoreTransaction({ transactionId: tx._id })
-      addRecent({ tx, kind: 'ignored' })
+      await discardMutations[kind]({ transactionId: tx._id })
+      addRecent({ tx, kind })
       setSheetTx((cur) => (cur?._id === tx._id ? null : cur))
     } catch (err) {
       reportError(err)
@@ -245,7 +290,7 @@ export function PointageTable({
   }
 
   // Lignes affichées = transactions `unmatched` (query) + lignes récemment
-  // pointées/ignorées (state local, le temps du bandeau « Annuler »).
+  // pointées/écartées (state local, le temps du bandeau « Annuler »).
   const rows = useMemo(() => {
     if (!transactions) return undefined
     const recentById = new Map(recent.map((r) => [r.tx._id, r]))
@@ -341,7 +386,7 @@ export function PointageTable({
                         deals={deals}
                         pending={pendingId === tx._id}
                         onMatch={(deal) => void handleMatch(tx, deal)}
-                        onIgnore={() => void handleIgnore(tx)}
+                        onDiscard={(kind) => void handleDiscard(tx, kind)}
                       />
                     )}
                   </TableCell>
@@ -408,7 +453,7 @@ export function PointageTable({
                     deals={deals}
                     pending={pendingId === sheetTx._id}
                     onMatch={(deal) => void handleMatch(sheetTx, deal)}
-                    onIgnore={() => void handleIgnore(sheetTx)}
+                    onDiscard={(kind) => void handleDiscard(sheetTx, kind)}
                   />
                 )}
               </SheetFooter>
@@ -417,5 +462,111 @@ export function PointageTable({
         </SheetContent>
       </Sheet>
     </>
+  )
+}
+
+/**
+ * Vue de consultation des transactions écartées (charges / impôts) : table
+ * lecture seule alimentée par `listByStatus`, avec « Annuler » par ligne
+ * (→ `unmatchTransaction`, la transaction repart dans la file « À pointer »).
+ */
+export function DiscardedTable({
+  transactions,
+}: {
+  transactions: Array<UnmatchedTx> | undefined
+}) {
+  const { t } = useTranslation('pointage')
+  const { fmtDate, fmtSigned } = useFormatters()
+  const reportError = useReportError()
+
+  const unmatchTransaction = useConvexMutation(
+    api.transactions.unmatchTransaction,
+  )
+  const [pendingId, setPendingId] = useState<Id<'transactions'> | null>(null)
+
+  async function handleUndo(tx: UnmatchedTx) {
+    setPendingId(tx._id)
+    try {
+      // La query réactive retire la ligne de cette vue d'elle-même.
+      await unmatchTransaction({ transactionId: tx._id })
+    } catch (err) {
+      reportError(err)
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  if (transactions && transactions.length === 0) {
+    return (
+      <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
+        {t('viewEmpty')}
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t('col.date')}</TableHead>
+            <TableHead>{t('col.label')}</TableHead>
+            <TableHead className="text-right">{t('col.amount')}</TableHead>
+            <TableHead>{t('col.account')}</TableHead>
+            <TableHead className="text-right">{t('col.actions')}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {!transactions ? (
+            <TableRow>
+              <TableCell
+                colSpan={5}
+                className="text-muted-foreground text-center"
+              >
+                {t('loading')}
+              </TableCell>
+            </TableRow>
+          ) : (
+            transactions.map((tx) => (
+              <TableRow key={tx._id}>
+                <TableCell className="whitespace-nowrap tabular-nums">
+                  {fmtDate(tx.transactionDate)}
+                </TableCell>
+                <TableCell>
+                  <span className="block max-w-md truncate">{tx.rawLabel}</span>
+                  {tx.counterparty && (
+                    <span className="text-muted-foreground block max-w-md truncate text-xs">
+                      {tx.counterparty}
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell
+                  className={`text-right tabular-nums ${
+                    tx.direction === 'out'
+                      ? 'text-destructive'
+                      : 'text-foreground'
+                  }`}
+                >
+                  {fmtSigned(tx.amount, tx.direction)}
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {accountLabel(tx)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={pendingId === tx._id}
+                    onClick={() => void handleUndo(tx)}
+                  >
+                    {t('actions.undo')}
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
   )
 }

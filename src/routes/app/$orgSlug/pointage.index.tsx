@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
@@ -6,7 +7,11 @@ import { api } from '../../../../convex/_generated/api'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { Badge } from '~/components/ui/badge'
-import { PointageTable } from '~/components/pointage/PointageTable'
+import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
+import {
+  DiscardedTable,
+  PointageTable,
+} from '~/components/pointage/PointageTable'
 
 export const Route = createFileRoute('/app/$orgSlug/pointage/')({
   component: Pointage,
@@ -19,9 +24,14 @@ export const Route = createFileRoute('/app/$orgSlug/pointage/')({
   }),
 })
 
+/** Vues de la page : file de pointage (défaut) ou consultation des écartées. */
+type View = 'unmatched' | 'charge' | 'tax'
+
 function Pointage() {
   const { t } = useTranslation('pointage')
   const { orgSlug } = Route.useParams()
+  const [view, setView] = useState<View>('unmatched')
+
   const org = useConvexQuery(api.organizations.bySlug, { slug: orgSlug })
   const transactions = useConvexQuery(
     api.transactions.listUnmatched,
@@ -30,6 +40,10 @@ function Pointage() {
   const deals = useConvexQuery(
     api.deals.list,
     org ? { orgId: org._id } : 'skip',
+  )
+  const discarded = useConvexQuery(
+    api.transactions.listByStatus,
+    org && view !== 'unmatched' ? { orgId: org._id, status: view } : 'skip',
   )
 
   return (
@@ -47,7 +61,18 @@ function Pointage() {
         </div>
         <p className="text-muted-foreground text-sm">{t('subtitle')}</p>
       </div>
-      <PointageTable transactions={transactions} deals={deals} />
+      <Tabs value={view} onValueChange={(value) => setView(value as View)}>
+        <TabsList>
+          <TabsTrigger value="unmatched">{t('view.unmatched')}</TabsTrigger>
+          <TabsTrigger value="charge">{t('view.charge')}</TabsTrigger>
+          <TabsTrigger value="tax">{t('view.tax')}</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      {view === 'unmatched' ? (
+        <PointageTable transactions={transactions} deals={deals} />
+      ) : (
+        <DiscardedTable transactions={discarded} />
+      )}
     </main>
   )
 }

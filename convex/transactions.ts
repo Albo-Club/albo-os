@@ -80,6 +80,52 @@ export const listUnmatched = query({
   },
 })
 
+/**
+ * Transactions d'une org dans un statut de pointage donné (consultation des
+ * écartées : ignorées / charges / impôts, ou des rattachées), triées par date
+ * décroissante et enrichies du compte bancaire. Même shape que `listUnmatched`.
+ */
+export const listByStatus = query({
+  args: {
+    orgId: v.id('organizations'),
+    status: v.union(
+      v.literal('matched'),
+      v.literal('ignored'),
+      v.literal('charge'),
+      v.literal('tax'),
+    ),
+  },
+  handler: async (ctx, { orgId, status }) => {
+    await requireOrgMember(ctx, orgId)
+
+    const rows = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_matchStatus', (q) =>
+        q.eq('orgId', orgId).eq('matchStatus', status),
+      )
+      .collect()
+
+    rows.sort((a, b) => b.transactionDate - a.transactionDate)
+
+    return await Promise.all(
+      rows.map(async (tx) => {
+        const account = await ctx.db.get('bankAccounts', tx.bankAccountId)
+        return {
+          _id: tx._id,
+          direction: tx.direction,
+          amount: tx.amount,
+          transactionDate: tx.transactionDate,
+          rawLabel: tx.rawLabel,
+          counterparty: tx.counterparty ?? null,
+          account: account
+            ? { label: account.label, bankName: account.bankName }
+            : null,
+        }
+      }),
+    )
+  },
+})
+
 // ─── Pointage manuel transaction → deal ─────────────────────────────────────
 //
 // Invariant : `matchStatus === 'matched'` ⟺ `dealId != null`. `reconciled`
@@ -142,6 +188,64 @@ export const ignoreTransaction = mutation({
     await recordDecision(ctx, {
       transaction: tx,
       decision: 'ignored',
+      source: 'manual',
+      decidedBy: user._id,
+    })
+    return null
+  },
+})
+
+/**
+ * Classe une transaction en charge courante (loyer, honoraires, frais…).
+ * Sous-type d'« écarté » : même comportement qu'`ignoreTransaction`, seul le
+ * statut diffère pour pouvoir consulter ces transactions plus tard.
+ */
+export const categorizeAsCharge = mutation({
+  args: { transactionId: v.id('transactions') },
+  handler: async (ctx, { transactionId }) => {
+    const tx = await ctx.db.get('transactions', transactionId)
+    if (!tx) throw new ConvexError('not_found')
+    const { user } = await requireOrgMember(ctx, tx.orgId)
+
+    await ctx.db.patch('transactions', tx._id, {
+      matchStatus: 'charge',
+      dealId: undefined,
+      reconciled: false,
+      reconciledBy: undefined,
+      reconciledAt: undefined,
+    })
+    await recordDecision(ctx, {
+      transaction: tx,
+      decision: 'charge',
+      source: 'manual',
+      decidedBy: user._id,
+    })
+    return null
+  },
+})
+
+/**
+ * Classe une transaction en impôt. Sous-type d'« écarté » : même comportement
+ * qu'`ignoreTransaction`, seul le statut diffère pour pouvoir consulter ces
+ * transactions plus tard.
+ */
+export const categorizeAsTax = mutation({
+  args: { transactionId: v.id('transactions') },
+  handler: async (ctx, { transactionId }) => {
+    const tx = await ctx.db.get('transactions', transactionId)
+    if (!tx) throw new ConvexError('not_found')
+    const { user } = await requireOrgMember(ctx, tx.orgId)
+
+    await ctx.db.patch('transactions', tx._id, {
+      matchStatus: 'tax',
+      dealId: undefined,
+      reconciled: false,
+      reconciledBy: undefined,
+      reconciledAt: undefined,
+    })
+    await recordDecision(ctx, {
+      transaction: tx,
+      decision: 'tax',
       source: 'manual',
       decidedBy: user._id,
     })
