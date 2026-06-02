@@ -2,14 +2,18 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { useConvexMutation } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
-import { ConvexError } from 'convex/values'
 import { api } from '../../../convex/_generated/api'
 import { DealCombobox } from './DealCombobox'
-import type { ReactNode } from 'react'
+import {
+  TransactionSheet,
+  accountLabel,
+  useFormatters,
+  useReportError,
+} from './TransactionSheet'
 
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { DealOption } from './DealCombobox'
+import type { TxDetails } from './TransactionSheet'
 import { Button } from '~/components/ui/button'
 import {
   DropdownMenu,
@@ -17,14 +21,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '~/components/ui/sheet'
 import {
   Table,
   TableBody,
@@ -35,15 +31,7 @@ import {
 } from '~/components/ui/table'
 
 /** Forme minimale d'une transaction non pointée (retour de `listUnmatched`). */
-export type UnmatchedTx = {
-  _id: Id<'transactions'>
-  direction: 'in' | 'out'
-  amount: number
-  transactionDate: number
-  rawLabel: string
-  counterparty: string | null
-  account: { label: string; bankName: string } | null
-}
+export type UnmatchedTx = TxDetails
 
 /** Durée d'affichage du bandeau « Annuler » après un pointage/écartement. */
 const UNDO_DELAY_MS = 5000
@@ -55,50 +43,6 @@ type RecentAction = {
   tx: UnmatchedTx
   kind: 'matched' | DiscardKind
   dealName?: string
-}
-
-/** Formateurs date/montant signé localisés (montants en cents EUR). */
-function useFormatters() {
-  const { i18n } = useTranslation('pointage')
-  const lang = i18n.language
-  const fmtDate = (ms: number) =>
-    new Date(ms).toLocaleDateString(lang, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    })
-  const fmtSigned = (cents: number, direction: 'in' | 'out') => {
-    const signed = direction === 'out' ? -cents : cents
-    return new Intl.NumberFormat(lang, {
-      style: 'currency',
-      currency: 'EUR',
-      maximumFractionDigits: 0,
-      signDisplay: 'always',
-    }).format(signed / 100)
-  }
-  return { fmtDate, fmtSigned }
-}
-
-function Info({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="text-sm">{value ?? '—'}</span>
-    </div>
-  )
-}
-
-function accountLabel(tx: UnmatchedTx) {
-  return tx.account ? `${tx.account.bankName} · ${tx.account.label}` : '—'
-}
-
-/** Toast d'erreur localisé à partir du code `ConvexError` des mutations. */
-function useReportError() {
-  const { t } = useTranslation('pointage')
-  return (err: unknown) => {
-    const code = err instanceof ConvexError ? (err.data as string) : ''
-    toast.error(t(`errors.${code}`, t('errors.failed')))
-  }
 }
 
 /** Combobox + Rattacher + menu « Écarter » (Ignorer/Charge/Impôt). */
@@ -397,70 +341,29 @@ export function PointageTable({
         </Table>
       </div>
 
-      <Sheet
-        open={sheetTx != null}
+      <TransactionSheet
+        tx={sheetTx}
         onOpenChange={(open) => {
           if (!open) setSheetTx(null)
         }}
-      >
-        <SheetContent className="overflow-y-auto">
-          {sheetTx && (
-            <>
-              <SheetHeader>
-                <SheetTitle>{t('detail.title')}</SheetTitle>
-                <SheetDescription>{t('detail.description')}</SheetDescription>
-              </SheetHeader>
-              <div className="grid gap-4 px-4">
-                <Info
-                  label={t('col.date')}
-                  value={fmtDate(sheetTx.transactionDate)}
-                />
-                <Info label={t('detail.rawLabel')} value={sheetTx.rawLabel} />
-                <Info
-                  label={t('detail.counterparty')}
-                  value={sheetTx.counterparty}
-                />
-                <Info
-                  label={t('col.amount')}
-                  value={
-                    <span
-                      className={
-                        sheetTx.direction === 'out' ? 'text-destructive' : ''
-                      }
-                    >
-                      {fmtSigned(sheetTx.amount, sheetTx.direction)}
-                    </span>
-                  }
-                />
-                <Info
-                  label={t('detail.direction')}
-                  value={t(`direction.${sheetTx.direction}`)}
-                />
-                <Info
-                  label={t('detail.account')}
-                  value={accountLabel(sheetTx)}
-                />
-              </div>
-              <SheetFooter>
-                {sheetRecent ? (
-                  <UndoBanner
-                    recent={sheetRecent}
-                    pending={pendingId === sheetTx._id}
-                    onUndo={() => void handleUndo(sheetTx)}
-                  />
-                ) : (
-                  <RowActions
-                    deals={deals}
-                    pending={pendingId === sheetTx._id}
-                    onMatch={(deal) => void handleMatch(sheetTx, deal)}
-                    onDiscard={(kind) => void handleDiscard(sheetTx, kind)}
-                  />
-                )}
-              </SheetFooter>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
+        footer={
+          sheetTx &&
+          (sheetRecent ? (
+            <UndoBanner
+              recent={sheetRecent}
+              pending={pendingId === sheetTx._id}
+              onUndo={() => void handleUndo(sheetTx)}
+            />
+          ) : (
+            <RowActions
+              deals={deals}
+              pending={pendingId === sheetTx._id}
+              onMatch={(deal) => void handleMatch(sheetTx, deal)}
+              onDiscard={(kind) => void handleDiscard(sheetTx, kind)}
+            />
+          ))
+        }
+      />
     </>
   )
 }

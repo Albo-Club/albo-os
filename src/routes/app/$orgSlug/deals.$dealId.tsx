@@ -1,14 +1,24 @@
+import { useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { useConvexQuery } from '@convex-dev/react-query'
+import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { api } from '../../../../convex/_generated/api'
 import type { ReactNode } from 'react'
 
 import type { Id } from '../../../../convex/_generated/dataModel'
+import type { DealOption } from '~/components/pointage/DealCombobox'
+import type { TxDetails } from '~/components/pointage/TransactionSheet'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
+import { DealCombobox } from '~/components/pointage/DealCombobox'
+import {
+  TransactionSheet,
+  useReportError,
+} from '~/components/pointage/TransactionSheet'
 import { Badge } from '~/components/ui/badge'
+import { Button } from '~/components/ui/button'
 import {
   Table,
   TableBody,
@@ -67,10 +77,81 @@ function Info({ label, value }: { label: string; value: ReactNode }) {
   )
 }
 
-function Transactions({ dealId }: { dealId: Id<'deals'> }) {
+/** Champs du deal courant utilisés par la section transactions. */
+type CurrentDeal = {
+  _id: Id<'deals'>
+  orgId: Id<'organizations'>
+  target: { name: string } | null
+  investor: { name: string } | null
+  instrumentKind: string
+}
+
+/** Combobox (deal courant pré-sélectionné) + bouton « Réattribuer ». */
+function ReattachActions({
+  deals,
+  currentDeal,
+  pending,
+  onReattach,
+}: {
+  deals: Array<DealOption> | undefined
+  currentDeal: DealOption
+  pending: boolean
+  onReattach: (deal: DealOption) => void
+}) {
+  const { t } = useTranslation('participations')
+  const [deal, setDeal] = useState<DealOption | null>(currentDeal)
+  return (
+    <div className="flex items-center justify-end gap-2">
+      <DealCombobox
+        deals={deals}
+        value={deal}
+        onSelect={setDeal}
+        disabled={pending}
+      />
+      <Button
+        size="sm"
+        disabled={!deal || deal._id === currentDeal._id || pending}
+        onClick={() => deal && onReattach(deal)}
+      >
+        {t('tx.reattach')}
+      </Button>
+    </div>
+  )
+}
+
+function Transactions({ deal }: { deal: CurrentDeal }) {
   const { t } = useTranslation('participations')
   const { fmtEur, fmtDate } = useFormatters()
-  const txs = useConvexQuery(api.transactions.listByDeal, { dealId })
+  const reportError = useReportError()
+  const txs = useConvexQuery(api.transactions.listByDeal, { dealId: deal._id })
+
+  const [sheetTx, setSheetTx] = useState<TxDetails | null>(null)
+  const [pending, setPending] = useState(false)
+
+  // Deals de l'org pour le combobox de réattribution — chargés seulement à
+  // l'ouverture du sheet.
+  const deals = useConvexQuery(
+    api.deals.list,
+    sheetTx ? { orgId: deal.orgId } : 'skip',
+  )
+  const matchTransaction = useConvexMutation(api.transactions.matchTransaction)
+
+  // Réattribuer = re-pointer la transaction sur le nouveau deal via
+  // `matchTransaction` (jamais d'écriture directe de `dealId`/`matchStatus`).
+  async function handleReattach(tx: TxDetails, newDeal: DealOption) {
+    setPending(true)
+    try {
+      await matchTransaction({ transactionId: tx._id, dealId: newDeal._id })
+      toast.success(t('tx.reattached', { deal: newDeal.target?.name ?? '—' }))
+      // `listByDeal` réactif : la transaction sort de la liste d'elle-même.
+      setSheetTx(null)
+    } catch (err) {
+      reportError(err)
+    } finally {
+      setPending(false)
+    }
+  }
+
   return (
     <section className="space-y-3">
       <h2 className="text-lg font-semibold tracking-tight">{t('tx.title')}</h2>
@@ -98,7 +179,11 @@ function Transactions({ dealId }: { dealId: Id<'deals'> }) {
             </TableHeader>
             <TableBody>
               {txs.map((tx) => (
-                <TableRow key={tx._id}>
+                <TableRow
+                  key={tx._id}
+                  className="cursor-pointer"
+                  onClick={() => setSheetTx(tx)}
+                >
                   <TableCell>{fmtDate(tx.transactionDate)}</TableCell>
                   <TableCell>
                     <Badge
@@ -120,6 +205,24 @@ function Transactions({ dealId }: { dealId: Id<'deals'> }) {
           </Table>
         </div>
       )}
+
+      <TransactionSheet
+        tx={sheetTx}
+        onOpenChange={(open) => {
+          if (!open) setSheetTx(null)
+        }}
+        footer={
+          sheetTx && (
+            <ReattachActions
+              key={sheetTx._id}
+              deals={deals}
+              currentDeal={deal}
+              pending={pending}
+              onReattach={(newDeal) => void handleReattach(sheetTx, newDeal)}
+            />
+          )
+        }
+      />
     </section>
   )
 }
@@ -241,7 +344,7 @@ function DealDetail() {
         </div>
       )}
 
-      <Transactions dealId={deal._id} />
+      <Transactions deal={deal} />
     </main>
   )
 }

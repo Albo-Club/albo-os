@@ -11,6 +11,8 @@
     "out": "Out",
     "yes": "Yes",
     "no": "No",
+    "reattach": "Reassign",
+    "reattached": "Transaction moved to {{deal}}",
     "col": {
       "date": "Date",
       "direction": "Direction",

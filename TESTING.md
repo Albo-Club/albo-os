@@ -314,6 +314,18 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | RU9 | Onglet « Charges » (puis « Impôts »)                             | Vue lecture seule des tx classées (`listByStatus`), triées date desc ; bouton « Annuler » par ligne |
 | RU10 | « Annuler » dans l'onglet Charges/Impôts                        | Mutation `unmatchTransaction` ; la tx disparaît de l'onglet et réapparaît dans « À pointer » |
 
+### Réattribution depuis la page d'un deal (`/app/$orgSlug/deals/$dealId`)
+
+Réattribuer une transaction déjà `matched` à un autre deal de la même org,
+depuis la liste des transactions du deal (clic ligne → sheet → combobox).
+
+| #   | Étape                                                            | Résultat attendu                                                                  |
+| --- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| RD1 | Clic sur une ligne de la section « Transactions » du deal A      | Sheet de détail (mêmes champs que le pointage) + combobox avec le deal A pré-sélectionné ; bouton « Réattribuer » désactivé |
+| RD2 | Choisir un deal B (même org) dans le combobox → « Réattribuer »  | Mutation `matchTransaction` ; toast « Transaction déplacée vers {deal B} » ; la tx quitte la liste de A (réactivité) et apparaît sur la page de B ; 1 nouvelle ligne `matchingDecisions` (`source: 'manual'`) |
+| RD3 | Resélectionner le deal A dans le combobox                        | Bouton « Réattribuer » désactivé (no-op)                                          |
+| RD4 | Basculer la langue EN/FR                                         | Bouton, toast et sheet traduits                                                   |
+
 ## En cas d'échec
 
 - Smoke échoue → ouvrir `KNOWN_ISSUES.md` (déploiement Convex / `pnpm rebuild esbuild`).
