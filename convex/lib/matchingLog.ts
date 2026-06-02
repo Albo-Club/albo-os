@@ -24,7 +24,14 @@ export async function recordDecision(
     decidedBy,
   }: {
     transaction: Doc<'transactions'>
-    decision: 'matched' | 'ignored' | 'unmatched' | 'charge' | 'tax'
+    decision:
+      | 'matched'
+      | 'ignored'
+      | 'unmatched'
+      | 'charge'
+      | 'tax'
+      | 'product'
+      | 'internal_transfer'
     dealId?: Id<'deals'>
     source: 'manual' | 'agent_suggested'
     decidedBy: Id<'users'>
