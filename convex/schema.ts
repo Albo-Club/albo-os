@@ -278,6 +278,8 @@ export default defineSchema({
 
     // Meta
     sector: v.optional(v.string()),
+    // Plateforme d'origine pour les SPV externes (ex. "Parallel", "Sezame")
+    sponsor: v.optional(v.string()),
     notes: v.optional(v.string()),
     archivedAt: v.optional(v.number()),
   })
