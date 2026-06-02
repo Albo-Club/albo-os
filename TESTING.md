@@ -26,6 +26,7 @@ Pré-requis :
 | B4 | Smoke E2E     | `pnpm test:smoke`        | Tous les scénarios passent    |
 | B5 | Cookies prod  | `pnpm test:cookies`      | `albo-os.session_token` a Secure+HttpOnly+SameSite=Lax+Max-Age≈604800 |
 | B6 | Skills à jour | `pnpm sync:skills:check` | `0 skills drifted`            |
+| B7 | Tests unitaires | `pnpm test:unit`       | 28 tests verts (logique forecast pure : récurrence, protection overridden, solde mensuel) |
 
 ## Niveau 2 — Auth (6 min)
 
@@ -326,6 +327,31 @@ depuis la liste des transactions du deal (clic ligne → sheet → combobox).
 | RD3 | Resélectionner le deal A dans le combobox                        | Bouton « Réattribuer » désactivé (no-op)                                          |
 | RD4 | Basculer la langue EN/FR                                         | Bouton, toast et sheet traduits                                                   |
 | RD5 | En-tête du deal : « Versé » / « Reçu » (calculés, pas saisis)     | « Versé » = somme des transactions `out` rattachées, « Reçu » = somme des `in` ; après RD2 les montants des deals A et B se mettent à jour sans recharger ; deal sans transaction → 0 € / 0 € |
+
+## Cash flow forecast (règles récurrentes → solde projeté)
+
+Couche prévisionnelle : `forecastRules` (causes récurrentes) →
+`forecasts:expandRules` (occurrences `forecastEntries`, idempotent) →
+`forecasts:getForecastBalance` (solde projeté mensuel par org / consolidé).
+La logique pure (récurrence, protection `overridden`, agrégation mensuelle)
+est couverte par `pnpm test:unit` ; les étapes ci-dessous valident le glue
+Convex (auth, DB, pointage). Détails et pièges : `KNOWN_ISSUES.md`
+« Cash flow forecast ».
+
+| #   | Étape                                                                  | Résultat attendu                                                                 |
+| --  | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| F1  | `forecasts:createRule` (dashboard, membre de l'org) : loyer SCI mensuel, `amountCents: 100000`, `direction: "in"`, `frequency: "monthly"`, `anchorDay: 5`, `startDate: <now>` | Retourne l'id de la règle ; visible dans `forecastRules` |
+| F2  | `forecasts:expandRules '{"orgId":"<org>","horizonMonths":12}'`         | `{ rulesProcessed: 1, created: 12, updated: 0, skippedProtected: 0 }` ; 12 entries `pending`/`confirmed` dans `forecastEntries`, une par mois sur le jour 5 |
+| F3  | Re-lancer F2 à l'identique (**idempotence**)                            | `{ created: 0, updated: 12, skippedProtected: 0 }` — aucun doublon (compter les rows `forecastEntries`) |
+| F4  | `forecasts:updateEntry` sur une entry de F2 : `{"patch":{"amountCents":123456}}` | Entry patchée ET `overridden: true` (dérivée + éditée = protégée) |
+| F5  | `forecasts:updateRule` (montant 200000) puis re-lancer F2 (**protection**) | `{ created: 0, updated: 11, skippedProtected: 1 }` — l'entry de F4 garde 123456, les 11 autres passent à 200000 |
+| F6  | `forecasts:getForecastBalance '{"orgId":"<org>","horizonMonths":12}'`  | `startingBalanceCents` = Σ `bankAccounts.currentBalance` (EUR, non archivés) ; 13 mois ; solde cumulé croissant de +100000/mois (sauf mois de F4) |
+| F7  | Idem avec `"minConfidence":"confirmed"` puis créer une entry manuelle `probable` (`createManualEntry`) et re-query | L'entry `probable` compte sans le filtre, disparaît avec `minConfidence: "confirmed"` |
+| F8  | `getForecastBalance` **sans** `orgId` (consolidé)                       | Somme des soldes + flux de toutes les orgs de l'utilisateur                       |
+| F9  | `forecasts:markEntryRealized` avec une transaction de la même org      | Entry → `status: "realized"` + `realizedTransactionId` ; elle sort du solde projeté (re-query F6) |
+| F10 | `markEntryRealized` avec une transaction d'une **autre** org           | `ConvexError('transaction_wrong_org')`, rien écrit                               |
+| F11 | `forecasts:cancelEntry` sur une entry pending                          | `status: "cancelled"` ; sort du solde projeté ; survit à un re-run d'expandRules (`skippedProtected`) |
+| F12 | `expandRules` / `getForecastBalance` en tant que **non-membre** de l'org | `ConvexError('not_a_member')`                                                    |
 
 ## En cas d'échec
 

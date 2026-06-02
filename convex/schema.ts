@@ -120,6 +120,35 @@ const forecastConfidence = v.union(
   v.literal('high'),
 )
 
+// ─── Enums cash flow forecast (forecastRules / forecastEntries) ─────────────
+
+// Confiance d'un flux prévisionnel. `confirmed` = engagé/contractuel,
+// `expected` = attendu (récurrence connue), `probable` = hypothèse.
+const forecastEntryConfidence = v.union(
+  v.literal('confirmed'),
+  v.literal('expected'),
+  v.literal('probable'),
+)
+
+const forecastFrequency = v.union(
+  v.literal('weekly'),
+  v.literal('monthly'),
+  v.literal('quarterly'),
+  v.literal('yearly'),
+)
+
+// Cycle de vie d'une occurrence prévisionnelle. `realized` une fois pointée
+// sur une transaction réelle, `cancelled` si elle n'aura jamais lieu.
+const forecastEntryStatus = v.union(
+  v.literal('pending'),
+  v.literal('realized'),
+  v.literal('cancelled'),
+)
+
+// MVP : toujours 'manual'. 'derived' réservé aux générateurs futurs
+// (deriveFromDeals, deriveFromPipeline Attio).
+const forecastSourceType = v.union(v.literal('manual'), v.literal('derived'))
+
 // ─── Schema ───────────────────────────────────────────────────────────────
 
 export default defineSchema({
@@ -493,4 +522,66 @@ export default defineSchema({
     .index('by_deal', ['dealId'])
     .index('by_account_date', ['bankAccountId', 'expectedDate'])
     .index('by_airtable_id', ['airtableId']),
+
+  // ─── Cash flow forecast (couche prévisionnelle déterministe) ──────────────
+
+  /**
+   * forecastRules — causes récurrentes de flux prévisionnels (loyers SCI,
+   * salaires, échéances dette, abonnements). L'expansion en occurrences
+   * datées vit dans `forecastEntries` (cf. convex/forecasts.ts:expandRules,
+   * idempotente via `derivedKey`).
+   */
+  forecastRules: defineTable({
+    orgId: v.id('organizations'),
+    label: v.string(),
+    amountCents: v.number(), // cents, toujours positif ; le sens vient de `direction`
+    direction: txDirection,
+    category: v.optional(v.string()), // "loyer", "salaires", "dette"…
+    frequency: forecastFrequency,
+    interval: v.number(), // « tous les N pas » (1 = chaque mois/semaine/…)
+    anchorDay: v.number(), // jour du mois 1-31 (monthly/quarterly/yearly), jour ISO 1-7 (weekly)
+    startDate: v.number(), // ms epoch
+    endDate: v.optional(v.number()), // ms epoch ; absent = sans fin
+    active: v.boolean(),
+    sourceType: forecastSourceType,
+  }).index('by_org', ['orgId']),
+
+  /**
+   * forecastEntries — occurrences datées d'un flux attendu. Soit générées
+   * depuis une règle (`ruleId` + `derivedKey`), soit créées à la main
+   * (les deux à null). `status` est la source de vérité du cycle de vie,
+   * à la manière de `matchStatus` côté transactions. `overridden` protège
+   * une occurrence dérivée éditée manuellement : expandRules ne la
+   * réécrit jamais.
+   *
+   * `derivedKey` = clé d'idempotence des lignes auto, format
+   * "rule:{ruleId}:{YYYY-MM-DD}" (ou "deal:{dealId}:{YYYY-MM-DD}" pour le
+   * futur deriveFromDeals). Null pour les lignes 100 % manuelles.
+   */
+  forecastEntries: defineTable({
+    orgId: v.id('organizations'),
+    date: v.number(), // ms epoch, date ferme de l'occurrence
+    amountCents: v.number(), // cents, toujours positif ; le sens vient de `direction`
+    direction: txDirection,
+    confidence: forecastEntryConfidence,
+    status: forecastEntryStatus,
+    label: v.string(),
+    category: v.optional(v.string()),
+    ruleId: v.optional(v.id('forecastRules')),
+    dealId: v.optional(v.id('deals')), // réservé deriveFromDeals — non écrit en MVP
+    derivedKey: v.optional(v.string()),
+    overridden: v.boolean(),
+    realizedTransactionId: v.optional(v.id('transactions')), // rempli au pointage
+
+    // ── Champs réservés, NON LUS par la logique actuelle ──────────────────
+    // Présents au schéma pour éviter une migration future, mais aucune
+    // query/mutation ne les exploite encore.
+    probabilityPct: v.optional(v.number()), // 0-100 — future couche probabiliste
+    counterpartyOrgId: v.optional(v.id('organizations')), // future neutralisation inter-entités au consolidé
+    currency: v.string(), // "EUR" — future FX ; seul l'EUR est agrégé pour l'instant
+  })
+    .index('by_org', ['orgId'])
+    .index('by_org_and_date', ['orgId', 'date'])
+    .index('by_derivedKey', ['derivedKey'])
+    .index('by_rule', ['ruleId']),
 })

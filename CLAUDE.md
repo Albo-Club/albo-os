@@ -165,7 +165,11 @@ seulement) :
 alimentées (Powens/import) ; le pointage transaction → deal vit dans
 `convex/transactions.ts` (`matchStatus` + table `matchingDecisions`
 append-only — cf. `KNOWN_ISSUES.md` « Pointage transaction → deal »).
-`forecasts` reste **déclarée mais inerte** (phase 2 cash management).
+Le prévisionnel de cash vit dans `forecastRules` + `forecastEntries`
+(`convex/forecasts.ts` : `expandRules` idempotent, `getForecastBalance`
+mensuel, pointage `markEntryRealized` — cf. `KNOWN_ISSUES.md` « Cash flow
+forecast »). La table legacy `forecasts` reste **déclarée mais inerte**
+(alimentée par l'import Airtable uniquement, lue par rien).
 
 **Workflow déploiement** : outil interne, **prod-only** (pas de déploiement
 dev). Le code part en prod via le build Vercel sur `main` (`build:vercel` →

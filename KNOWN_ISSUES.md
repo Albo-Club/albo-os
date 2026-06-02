@@ -753,3 +753,47 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   uniquement** ; le patch d'une ligne existante n'écrit ni `matchStatus`, ni
   `dealId`, ni `reconciled`. Avant le pointage, le re-sync Powens remettait
   `reconciled: false` à chaque webhook — ce reset a été retiré exprès.
+
+## Cash flow forecast (`convex/forecasts.ts`)
+
+Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
+`forecastEntries` → `getForecastBalance`. Pièges à connaître avant d'y toucher.
+
+- **`status` est la source de vérité du cycle de vie** (`pending` / `realized`
+  / `cancelled`), à la manière de `matchStatus` côté transactions. Seules les
+  entries `pending` comptent dans le solde projeté.
+- **`overridden` protège l'édition manuelle.** `expandRules` ne réécrit JAMAIS
+  une entry `overridden: true`, ni une entry `realized`/`cancelled` (décision
+  humaine figée). La décision create/update/skip est une fonction pure
+  (`entryUpsertAction` dans `convex/lib/recurrence.ts`) — toute modification
+  de cette règle doit passer par elle (et ses tests), pas par du code ad hoc
+  dans la mutation.
+- **Idempotence par `derivedKey`** (`"rule:{ruleId}:{YYYY-MM-DD}"`, index
+  `by_derivedKey`). Relancer `expandRules` ne duplique rien. Ne jamais créer
+  d'entry dérivée sans `derivedKey`, sinon la prochaine expansion la
+  dupliquera.
+- **La table legacy `forecasts` coexiste, inerte.** Elle reste alimentée par
+  l'import Airtable uniquement et n'est lue par aucune logique forecast. La
+  nouvelle couche vit dans `forecastRules` / `forecastEntries`. Ne pas
+  mélanger les deux ; la migration/suppression de `forecasts` est un chantier
+  séparé (purge prod requise avant retrait du schéma).
+- **EUR only.** `getForecastBalance` n'agrège que `currency === 'EUR'`
+  (comptes ET entries) ; le reste est compté dans `ignoredNonEur*` pour
+  visibilité. `probabilityPct`, `counterpartyOrgId` et `currency` sont des
+  champs **réservés non lus** (future couche probabiliste / neutralisation
+  inter-entités / FX) — ne pas leur prêter d'effet.
+- **Le pointage prévu → réalisé ne touche pas aux transactions.**
+  `markEntryRealized` écrit uniquement sur `forecastEntries` (`status` +
+  `realizedTransactionId`). Le pointage transaction → deal (`matchStatus`,
+  `reconciled`, `matchingDecisions`) reste exclusivement géré par
+  `convex/transactions.ts` — ne pas écrire ces champs depuis le code forecast.
+- **Tests purs hors de `convex/`.** La logique (récurrence UTC, clamping fin
+  de mois, protection, agrégation mensuelle) vit dans
+  `convex/lib/recurrence.ts` (zéro import Node/Convex) et est testée par
+  `tests/recurrence.test.ts` via `node:test` + tsx (`pnpm test:unit`). Le
+  fichier de test est volontairement **hors** de `convex/` : un import
+  `node:test` dans `convex/` ferait échouer le bundle de déploiement Convex.
+- **Date-math en UTC uniquement.** `anchorDay: 31` est clampé au dernier jour
+  des mois courts (28/29 févr., 30 avr., …) ; hebdo = jour ISO (1 = lundi,
+  7 = dimanche). Toute nouvelle logique de date doit passer par
+  `convex/lib/recurrence.ts`, pas par `new Date()` local (fuseau serveur).
