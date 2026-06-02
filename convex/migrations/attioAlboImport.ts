@@ -3,6 +3,7 @@
  *
  * Donnees figees depuis Attio le 2026-05-28 (objet `deals` filtre sur
  * label "Albo" + stages Invested/Exit Win, et les `companies` liees).
+ * + AUXICARE ajoute post-snapshot (closing 27/05/2026, invest 29/05/2026).
  * Montants en cents EUR, dates en ms epoch UTC (cf. CLAUDE.md).
  *
  * Idempotent : re-upsert sur les ancres natives `attioCompanyId` /
@@ -49,6 +50,7 @@ const COMPANIES: Array<AttioCompany> = [
   { attioCompanyId: "13c90826-4b76-4beb-9458-8495f5f22a89", name: "Ziwig", domain: "ziwig.com", countryCode: "FR" },
   { attioCompanyId: "18040c51-3ac2-41b5-ac63-452e9d8bc65f", name: "BackMarket", domain: "backmarket.com", countryCode: "FR" },
   { attioCompanyId: "1b983a83-6a07-4253-8ab3-0a6e4c908103", name: "Sezame", domain: "hellosezame.com", countryCode: "FR" },
+  { attioCompanyId: "1c5aa51f-a87f-4c0e-a741-19e0bfaf2ab1", name: "Auxicare", domain: "auxicare.fr" },
   { attioCompanyId: "221b8dc1-cfac-4fd4-99b6-4008f95b5a5b", name: "Komeet", domain: "komeet.cc", countryCode: "FR" },
   { attioCompanyId: "222761b9-8f1c-4042-bca0-81646bab05ef", name: "RGOODS", domain: "rgoods.com", countryCode: "FR" },
   { attioCompanyId: "24e4e90d-1b7f-440b-b099-5232113d48f5", name: "Keenest", domain: "keenest.co" },
@@ -94,6 +96,7 @@ const DEALS: Array<AttioDeal> = [
   { attioDealId: "3922494a-44a4-4da4-8f6d-4232b072a413", attioCompanyId: "35389e11-4c46-45e5-82f3-170fb201586d", instrumentKind: "spv_share", status: "active", committedAmount: 2500000, paidAmount: 2500000, roundSize: 40000000, entryValuation: 250000000, signedDate: 1736726400000, notes: "Versant\npas de CA" },
   { attioDealId: "3d2d9ae5-5078-4e6a-a971-7f7e22c49032", attioCompanyId: "d5b7a0a1-a940-4cf1-b430-3b40dffd6415", instrumentKind: "royalty", status: "active", committedAmount: 5000000, paidAmount: 5000000, roundSize: 60000000, signedDate: 1750032000000, notes: "The Fat Broccoli" },
   { attioDealId: "3e78f73d-28dc-4219-8718-89f056c3e48d", attioCompanyId: "3b410d44-3a53-4001-a2f9-006a297f5dc7", instrumentKind: "os", status: "active", committedAmount: 10000000, paidAmount: 10000000, roundSize: 180000000, signedDate: 1765411200000, notes: "Parallel - SPV18 Bour" },
+  { attioDealId: "4067a83c-d76e-4fb0-bc65-ea8a45f76a32", attioCompanyId: "1c5aa51f-a87f-4c0e-a741-19e0bfaf2ab1", instrumentKind: "share", status: "active", committedAmount: 10000200, paidAmount: 10000200, roundSize: 56000000, entryValuation: 370955200, signedDate: 1780012800000, notes: "Auxicare - Seed - 14 286 Actions S3 à 7€ = 2,34% FD post-money. Lead Antler. Closing 27/05/2026, pacte DocuSign signé." },
   { attioDealId: "45a91814-87fc-4f5a-b9f1-ad438c84e3da", attioCompanyId: "5ac61b47-c178-47f2-bbc5-2b5a00024bd5", instrumentKind: "share", status: "active", committedAmount: 24997760, paidAmount: 24997760, roundSize: 400014740, entryValuation: 12000000000, signedDate: 1730332800000, notes: "Resilience\nturnover ARR forceast deck" },
   { attioDealId: "46b513b2-e234-425b-b9ab-2b9bd4acec9b", attioCompanyId: "a081436a-5a22-438d-8d1d-d3c0d7d3d64c", instrumentKind: "os", status: "active", committedAmount: 20000000, paidAmount: 20000000, roundSize: 50000000, signedDate: 1738195200000, notes: "Les constructeurs du bois" },
   { attioDealId: "49b441fe-da97-4b2b-98e8-9482be950e06", attioCompanyId: "be86640b-5a05-43c4-ba81-ba26e0ae9434", instrumentKind: "royalty", status: "active", committedAmount: 30000000, paidAmount: 30000000, roundSize: 200000000, signedDate: 1753747200000, notes: "JOONE Paris - Royalties" },
