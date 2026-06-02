@@ -327,6 +327,7 @@ depuis la liste des transactions du deal (clic ligne → sheet → combobox).
 | RD3 | Resélectionner le deal A dans le combobox                        | Bouton « Réattribuer » désactivé (no-op)                                          |
 | RD4 | Basculer la langue EN/FR                                         | Bouton, toast et sheet traduits                                                   |
 | RD5 | En-tête du deal : « Versé » / « Reçu » (calculés, pas saisis)     | « Versé » = somme des transactions `out` rattachées, « Reçu » = somme des `in` ; après RD2 les montants des deals A et B se mettent à jour sans recharger ; deal sans transaction → 0 € / 0 € |
+| RD6 | Liste des deals (`/app/$orgSlug/participations`, `/app/all/participations`, fiche participation) : colonnes/champs Engagé · Versé · Reçu | Versé/Reçu calculés serveur (`deals.list` / `aggregate.listDeals` enrichis, pas une query `listByDeal` par ligne) ; valeurs identiques à la page détail du même deal ; deal sans transaction → 0 € / 0 € ; lignes groupe (par société) = sommes des deals |
 
 ## Cash flow forecast (règles récurrentes → solde projeté)
 

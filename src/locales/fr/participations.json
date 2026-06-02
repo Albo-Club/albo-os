@@ -39,7 +39,8 @@
     "org": "Org",
     "deals": "Deals",
     "committed": "Engagé",
-    "paid": "Versé"
+    "paid": "Versé",
+    "received": "Reçu"
   },
   "deal": {
     "instrument": "Instrument",

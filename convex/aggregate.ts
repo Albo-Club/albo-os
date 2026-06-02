@@ -7,6 +7,7 @@
  */
 
 import { query } from './_generated/server'
+import { transactionTotals } from './deals'
 import { requireAppUser } from './lib/auth'
 import type { GenericQueryCtx } from 'convex/server'
 import type { DataModel, Doc } from './_generated/dataModel'
@@ -39,6 +40,8 @@ async function enrich(
     investor: companyRef(investor),
     target: companyRef(target),
     spv: companyRef(spv),
+    // Versé / Reçu calculés depuis les transactions (cf. deals.transactionTotals)
+    ...(await transactionTotals(ctx, deal._id)),
   }
 }
 
