@@ -1103,3 +1103,114 @@ export const deletePowensUser = internalMutation({
     return { deleted: true, powensUserId: row.powensUserId }
   },
 })
+
+// ─── Import one-shot historique CSV Mémo Bank (org albo) ─────────────────────
+
+const memoCsvRowValidator = v.object({
+  memoId: v.string(),
+  powensAccountId: v.string(), // compte cible (33 ou 34), résolu en bankAccountId
+  iban: v.optional(v.string()),
+  amount: v.number(), // cents, positif
+  direction: v.union(v.literal('in'), v.literal('out')),
+  transactionDate: v.number(), // ms epoch UTC
+  rawLabel: v.string(),
+  counterparty: v.optional(v.string()),
+  type: v.optional(v.string()),
+  category: v.optional(v.string()),
+  externalRef: v.optional(v.string()),
+  source: v.optional(v.string()), // ignoré (toujours 'memo_csv' à l'écriture)
+})
+
+/** Import one-shot de l'historique CSV Mémo Bank dans `transactions`.
+ *
+ * - Résout chaque ligne vers son compte via `powensAccountId` (index
+ *   `by_powens_account`) ; le compte doit appartenir à l'org albo.
+ * - Idempotence stricte par `memoId` (index `by_memo_id`) : si une transaction
+ *   avec ce memoId existe déjà → skip, jamais de doublon. Rejouable.
+ * - `source: 'memo_csv'`, montants déjà en centimes (positifs).
+ * - `type`/`category`/`externalRef` → champ dédié `importMeta` (métadonnées
+ *   d'origine CSV, utiles au futur pointage/agent). `notes` reste VIDE — il est
+ *   réservé au pointage manuel. `iban` du JSON : ignoré.
+ *
+ * Lancement (562 lignes → passer par un fichier JSON, pas la ligne de commande) :
+ *   pnpm exec convex run --prod powens:importMemoCsvTransactions \
+ *     "$(cat memo-transactions.json)"
+ *   où memo-transactions.json = {"rows":[ … ]}
+ */
+export const importMemoCsvTransactions = internalMutation({
+  args: { rows: v.array(memoCsvRowValidator) },
+  handler: async (ctx, { rows }) => {
+    const albo = await orgBySlug(ctx, 'albo')
+
+    // Résolution des comptes cibles (peu de comptes distincts → petit cache).
+    const accountByPowensId = new Map<string, Doc<'bankAccounts'>>()
+    async function resolveTargetAccount(
+      powensAccountId: string,
+    ): Promise<Doc<'bankAccounts'> | null> {
+      const cached = accountByPowensId.get(powensAccountId)
+      if (cached) return cached
+      const account = await ctx.db
+        .query('bankAccounts')
+        .withIndex('by_powens_account', (q) =>
+          q.eq('powensAccountId', powensAccountId),
+        )
+        .unique()
+      if (!account || account.orgId !== albo._id) return null
+      accountByPowensId.set(powensAccountId, account)
+      return account
+    }
+
+    let inserted = 0
+    const skipped: Array<{ memoId: string; reason: string }> = []
+    for (const row of rows) {
+      // Idempotence stricte par memoId.
+      const existing = await ctx.db
+        .query('transactions')
+        .withIndex('by_memo_id', (q) => q.eq('memoId', row.memoId))
+        .first()
+      if (existing) {
+        skipped.push({ memoId: row.memoId, reason: 'already_imported' })
+        continue
+      }
+
+      const account = await resolveTargetAccount(row.powensAccountId)
+      if (!account) {
+        skipped.push({
+          memoId: row.memoId,
+          reason: `account_not_found:${row.powensAccountId}`,
+        })
+        continue
+      }
+
+      if (row.amount <= 0 || !Number.isInteger(row.amount)) {
+        skipped.push({ memoId: row.memoId, reason: 'invalid_amount' })
+        continue
+      }
+
+      // Métadonnées d'origine CSV → champ dédié `importMeta`, jamais `notes`
+      // (réservé au pointage manuel). Omis si toutes vides.
+      const meta = {
+        type: row.type || undefined,
+        category: row.category || undefined,
+        externalRef: row.externalRef || undefined,
+      }
+      const hasMeta = meta.type || meta.category || meta.externalRef
+
+      await ctx.db.insert('transactions', {
+        orgId: albo._id,
+        bankAccountId: account._id,
+        direction: row.direction,
+        amount: row.amount,
+        transactionDate: row.transactionDate,
+        rawLabel: row.rawLabel,
+        counterparty: row.counterparty,
+        source: 'memo_csv',
+        memoId: row.memoId,
+        importMeta: hasMeta ? meta : undefined,
+        reconciled: false,
+      })
+      inserted += 1
+    }
+    return { inserted, skipped: skipped.length, skippedDetails: skipped }
+  },
+})
