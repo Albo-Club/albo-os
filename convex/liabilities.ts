@@ -1,5 +1,5 @@
 import { ConvexError, v } from 'convex/values'
-import { internalMutation, query } from './_generated/server'
+import { internalMutation, mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import {
   computeLoanBalanceCents,
@@ -9,6 +9,21 @@ import { buildSearchText } from './lib/searchText'
 
 import type { QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
+
+/**
+ * Shape minimale d'une transaction pointée sur une cible passif, pour
+ * l'affichage et le détachement côté front.
+ */
+function pickAllocatedTx(tx: Doc<'transactions'>) {
+  return {
+    _id: tx._id,
+    direction: tx.direction,
+    amount: tx.amount,
+    transactionDate: tx.transactionDate,
+    rawLabel: tx.rawLabel,
+    counterparty: tx.counterparty ?? null,
+  }
+}
 
 /**
  * Logique de lecture du passif, partagée par la query publique (après auth).
@@ -22,11 +37,44 @@ export async function getLiabilitiesForOrg(
   ctx: QueryCtx,
   orgId: Id<'organizations'>,
 ) {
-  // 1. Capitaux propres émis par l'org.
-  const equityPositions = await ctx.db
+  // Transactions de l'org pointées sur une cible donnée (sans le `_id` de la
+  // cible on lirait toute la table : l'index porte orgId + allocation.targetId).
+  const allocatedTxs = async (
+    targetId: string,
+    kind: 'equity' | 'intercompany_loan',
+  ) => {
+    const txs = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_allocation_target', (q) =>
+        q.eq('orgId', orgId).eq('allocation.targetId', targetId),
+      )
+      .collect()
+    return txs.filter((tx) => tx.allocation?.kind === kind)
+  }
+
+  // 1. Capitaux propres émis par l'org, enrichis du nom du détenteur et des
+  //    transactions pointées dessus.
+  const positions = await ctx.db
     .query('equityPositions')
     .withIndex('by_org', (q) => q.eq('orgId', orgId))
     .collect()
+  const equityPositions = await Promise.all(
+    positions.map(async (position) => {
+      const holderOrg = position.holderOrgId
+        ? await ctx.db.get('organizations', position.holderOrgId)
+        : null
+      const allocated = await allocatedTxs(position._id, 'equity')
+      return {
+        ...position,
+        holderName:
+          holderOrg?.name ??
+          position.holderLabel ??
+          position.holderPersonId ??
+          null,
+        transactions: allocated.map(pickAllocatedTx),
+      }
+    }),
+  )
 
   // 2. C/C où l'org est créancière ou débitrice (dédupliqués par _id).
   const asCreditor = await ctx.db
@@ -45,25 +93,25 @@ export async function getLiabilitiesForOrg(
     loansById.set(loan._id, loan)
   }
 
-  // 3. Solde dérivé par prêt, depuis les transactions de CETTE org.
+  // 3. Solde dérivé par prêt, depuis les transactions de CETTE org, enrichi
+  //    du nom de la contrepartie (l'autre org du prêt) et des tx pointées.
   const loans = await Promise.all(
     [...loansById.values()].map(async (loan) => {
-      const txs = await ctx.db
-        .query('transactions')
-        .withIndex('by_org_allocation_target', (q) =>
-          q.eq('orgId', orgId).eq('allocation.targetId', loan._id),
-        )
-        .collect()
-      const allocated = txs.filter(
-        (tx) => tx.allocation?.kind === 'intercompany_loan',
-      )
+      const allocated = await allocatedTxs(loan._id, 'intercompany_loan')
       const side = loanSideForOrg(loan, orgId)
+      const counterpartyOrg = await ctx.db.get(
+        'organizations',
+        loan.fromOrgId === orgId ? loan.toOrgId : loan.fromOrgId,
+      )
       return {
         ...loan,
         // `side` est non-null par construction (le prêt vient des index
         // by_from / by_to de cette org) ; fallback créancier par sûreté.
         side: side ?? 'creditor',
         balanceCents: computeLoanBalanceCents(allocated),
+        counterpartyName:
+          counterpartyOrg?.name ?? loan.fromLabel ?? loan.fromPersonId ?? null,
+        transactions: allocated.map(pickAllocatedTx),
       }
     }),
   )
@@ -80,6 +128,89 @@ export const getLiabilities = query({
   handler: async (ctx, { orgId }) => {
     await requireOrgMember(ctx, orgId)
     return await getLiabilitiesForOrg(ctx, orgId)
+  },
+})
+
+// ─── Pointage transaction → passif (equity / C/C) ───────────────────────────
+//
+// Pendant du pointage transaction → deal (convex/transactions.ts). Une tx
+// allouée au passif passe en `matchStatus: 'matched'` SANS `dealId` — c'est ce
+// qui la distingue d'une tx matchée-deal — et sort donc de la file de pointage.
+// N'écrit JAMAIS dans `matchingDecisions` (dataset réservé au pointage deal),
+// ne touche jamais `reconciled` (miroir dérivé du pointage deal uniquement).
+
+/**
+ * Pointe une transaction sur une position de capital (`equity`) ou un compte
+ * courant inter-entités (`intercompany_loan`). La cible doit appartenir à la
+ * même org que la transaction (pour un C/C : l'org de la tx doit être l'une
+ * des deux parties du prêt).
+ */
+export const allocateTransaction = mutation({
+  args: {
+    transactionId: v.id('transactions'),
+    kind: v.union(v.literal('equity'), v.literal('intercompany_loan')),
+    targetId: v.string(),
+  },
+  handler: async (ctx, { transactionId, kind, targetId }) => {
+    const tx = await ctx.db.get('transactions', transactionId)
+    if (!tx) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, tx.orgId)
+
+    // Garde-fou : pas de double pointage silencieux. Une tx rattachée à un
+    // deal doit être dé-pointée (unmatchTransaction) avant d'aller au passif.
+    if (tx.dealId != null || tx.allocation?.kind === 'deal') {
+      throw new ConvexError('already_matched_to_deal')
+    }
+
+    if (kind === 'equity') {
+      const positionId = ctx.db.normalizeId('equityPositions', targetId)
+      const position = positionId
+        ? await ctx.db.get('equityPositions', positionId)
+        : null
+      if (!position) throw new ConvexError('not_found')
+      if (position.orgId !== tx.orgId) throw new ConvexError('equity_wrong_org')
+    } else {
+      const loanId = ctx.db.normalizeId('intercompanyLoans', targetId)
+      const loan = loanId ? await ctx.db.get('intercompanyLoans', loanId) : null
+      if (!loan) throw new ConvexError('not_found')
+      // La tx doit appartenir à l'une des deux orgs du C/C (créancier ou
+      // débiteur) — sinon elle ne peut pas porter une jambe de ce prêt.
+      if (loanSideForOrg(loan, tx.orgId) === null) {
+        throw new ConvexError('loan_wrong_org')
+      }
+    }
+
+    await ctx.db.patch('transactions', tx._id, {
+      allocation: { kind, targetId },
+      matchStatus: 'matched',
+    })
+    return null
+  },
+})
+
+/**
+ * Détache une transaction du passif : retour à l'état non pointé
+ * (`unmatched`). Idempotent — sans allocation passif, ne touche à rien.
+ * Une tx rattachée à un deal n'est pas concernée : passer par
+ * `transactions:unmatchTransaction`.
+ */
+export const deallocateTransaction = mutation({
+  args: { transactionId: v.id('transactions') },
+  handler: async (ctx, { transactionId }) => {
+    const tx = await ctx.db.get('transactions', transactionId)
+    if (!tx) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, tx.orgId)
+
+    if (tx.allocation?.kind === 'deal') {
+      throw new ConvexError('already_matched_to_deal')
+    }
+    if (!tx.allocation) return null
+
+    await ctx.db.patch('transactions', tx._id, {
+      allocation: undefined,
+      matchStatus: 'unmatched',
+    })
+    return null
   },
 })
 
@@ -171,7 +302,9 @@ export const seedTestScenario = internalMutation({
         rawLabel: `${TEST_MARKER} avance C/C`,
         searchText: buildSearchText(`${TEST_MARKER} avance C/C`, undefined),
         source: 'manual',
-        matchStatus: 'unmatched',
+        // Une tx allouée au passif est `matched` sans dealId (même état que
+        // produirait allocateTransaction).
+        matchStatus: 'matched',
         allocation: { kind: 'intercompany_loan', targetId: loanId },
         reconciled: false,
       })

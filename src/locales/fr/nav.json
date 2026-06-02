@@ -5,6 +5,7 @@
       "participations": "Participations",
       "cash": "Trésorerie",
       "pointage": "Pointage",
+      "passif": "Passif",
       "settings": "Paramètres",
       "members": "Membres",
       "invitations": "Invitations",
@@ -21,6 +22,7 @@
     "participations": "Participations",
     "cash": "Trésorerie",
     "pointage": "Pointage",
+    "passif": "Passif",
     "members": "Membres",
     "invitations": "Invitations",
     "settings": "Paramètres"

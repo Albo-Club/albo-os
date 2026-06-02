@@ -93,7 +93,9 @@ const txSource = v.union(
 // l'intention ; `reconciled` reste un miroir dérivé (cf. KNOWN_ISSUES.md).
 const txMatchStatus = v.union(
   v.literal('unmatched'), // à traiter (défaut logique)
-  v.literal('matched'), // rattachée à un deal — `dealId` obligatoire
+  // Rattachée à un deal (`dealId` obligatoire) OU allouée au passif
+  // (equity / C/C : `allocation` posée, `dealId` null).
+  v.literal('matched'),
   v.literal('ignored'), // décision explicite « ne concerne aucun deal »
   v.literal('charge'), // écartée : charge courante (sous-type d'« écarté »)
   v.literal('tax'), // écartée : impôt (sous-type d'« écarté »)
@@ -496,8 +498,10 @@ export default defineSchema({
    * transactions — flux bancaire réalisé. `dealId` nullable car certains
    * mouvements sont opérationnels (impôts, honoraires, charges courantes).
    * Le rapprochement (pointage) se fait via `matchStatus` + `dealId` :
-   * invariant `matchStatus === 'matched'` ⟺ `dealId != null`. `reconciled`
-   * est un miroir dérivé conservé pour les lecteurs existants — ne jamais
+   * invariant `matchStatus === 'matched'` ⟺ rattachée à un deal
+   * (`dealId != null`) OU allouée au passif (`allocation` equity/C-C,
+   * `dealId` null — cf. convex/liabilities.ts). `reconciled` est un miroir
+   * dérivé du pointage DEAL conservé pour les lecteurs existants — ne jamais
    * l'écrire directement (cf. KNOWN_ISSUES.md « Pointage transaction → deal »).
    *
    * `matchStatus` est optionnel au schéma (les docs pré-existants n'ont pas

@@ -24,6 +24,7 @@ const CRUMB_SEGMENTS = [
   'participations',
   'cash',
   'pointage',
+  'passif',
   'settings',
   'members',
   'invitations',

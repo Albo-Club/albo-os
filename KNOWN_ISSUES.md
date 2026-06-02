@@ -785,12 +785,21 @@ dérivés des transactions pointées (`allocation.kind === 'intercompany_loan'`)
   (`fromOrgId` créancier / `toOrgId` débiteur). Toute query doit vérifier que
   l'utilisateur est membre d'au moins une des deux (pattern `getLiabilities` :
   `requireOrgMember` sur l'org regardante, puis lecture par `by_from`/`by_to`).
-- **Pas encore de mutation publique de pointage vers equity/loan.** Le champ
-  `allocation` accepte `kind: 'equity' | 'intercompany_loan'` mais seuls le
-  seed de test (`liabilities:seedTestScenario`) et le backfill (kind `deal`)
-  l'écrivent. La mutation publique (et le statut `matchStatus` correspondant —
-  aujourd'hui une tx pointée sur un loan reste `unmatched` dans la file) est
-  un follow-up.
+- **Pointage public : `liabilities:allocateTransaction` / `deallocateTransaction`.**
+  Une tx allouée au passif passe en `matchStatus: 'matched'` **sans `dealId`**
+  (elle sort de la file de pointage) ; le détachement la repasse `unmatched`.
+  `matched` est donc ambigu : rattachée à un deal (`dealId != null`) **ou**
+  allouée au passif (`allocation.kind === 'equity' | 'intercompany_loan'`,
+  `dealId` null) — toujours discriminer par `dealId` / `allocation.kind`,
+  jamais supposer « matched ⟹ deal ».
+- **Garde-fous croisés deal ⟷ passif.** Allouer une tx déjà rattachée à un
+  deal → `ConvexError('already_matched_to_deal')` ; matcher / écarter /
+  dé-pointer (unmatch) une tx allouée passif →
+  `ConvexError('allocated_to_liability')` (la détacher passe par
+  `deallocateTransaction` uniquement, sinon allocation orpheline).
+  Le pointage passif n'écrit **jamais** dans `matchingDecisions` (dataset
+  réservé au pointage deal) et ne touche jamais `reconciled` (miroir
+  deal-only : la vue Cash affiche une tx passif comme « non pointée »).
 
 ## Recherche transactions — champ dérivé `searchText` (`convex/lib/searchText.ts`)
 

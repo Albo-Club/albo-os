@@ -324,6 +324,7 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | RU13 | Toast « N classées en charge/impôt/produit/virement interne · Annuler » après RU12 | Clic « Annuler » → les tx du lot reviennent dans « À pointer » (boucle `unmatchTransaction`) |
 | RU14 | « Désélectionner » dans la barre / Annuler dans le dialog        | Sélection vidée / dialog fermé sans aucune mutation |
 | RU15 | Barre de recherche (sous les onglets) : taper un libellé/contrepartie, dans chaque onglet | Filtrage serveur (debounce ~250 ms, insensible casse/accents) scopé org + statut de l'onglet ; compteur « N à pointer » = lignes affichées (filtrées) ; terme sans résultat → « Aucune transaction ne correspond… » ; effacer → file complète ; actions (rattacher/écarter/annuler) inchangées sur les lignes filtrées |
+| RU16 | Une tx allouée au passif depuis la page Passif (cf. « UI Passif »)  | Elle n'apparaît **plus** dans « À pointer » (elle est `matched`) ; un `matchTransaction` / écartement / `unmatchTransaction` forcé dessus (API) → `ConvexError('allocated_to_liability')`, toast explicite |
 
 ### Réattribution depuis la page d'un deal (`/app/$orgSlug/deals/$dealId`)
 
@@ -407,6 +408,28 @@ Détails et pièges : `KNOWN_ISSUES.md` « Passif ».
 | P8 | `liabilities:getLiabilities '{"orgId":"<albo>"}'` (membre)             | `equityPositions: []` ; même loan `side: 'debtor'`, `balanceCents: -10000000` (dette) |
 | P9 | `getLiabilities` en tant que **non-membre** de l'org                   | `ConvexError('not_a_member')`                                                     |
 | P10 | `liabilities:cleanupTestScenario` (mêmes args que P6)                 | Lignes `[TEST liabilities]` supprimées ; P7/P8 retournent des listes vides        |
+| P11 | `liabilities:allocateTransaction` (kind `equity`) sur une tx `unmatched` + une equityPosition de la même org | Tx → `allocation: { kind: 'equity', targetId }` + `matchStatus: 'matched'` ; `dealId` reste null, `reconciled` inchangé ; **aucune** ligne `matchingDecisions` |
+| P12 | `allocateTransaction` (kind `intercompany_loan`) sur une tx d'une org partie au prêt | Idem ; le solde du C/C dans `getLiabilities` intègre la tx (re-query)             |
+| P13 | `allocateTransaction` avec une equityPosition d'une **autre** org      | `ConvexError('equity_wrong_org')`, rien écrit                                     |
+| P14 | `allocateTransaction` (loan) avec une tx dont l'org n'est **ni** créancière **ni** débitrice du C/C | `ConvexError('loan_wrong_org')`, rien écrit                                       |
+| P15 | `allocateTransaction` sur une tx déjà rattachée à un **deal**          | `ConvexError('already_matched_to_deal')`, rien écrit                              |
+| P16 | `matchTransaction` / `ignoreTransaction` / `categorizeAs*` / `unmatchTransaction` sur une tx allouée passif | `ConvexError('allocated_to_liability')`, rien écrit                               |
+| P17 | `liabilities:deallocateTransaction` sur la tx de P11                   | `allocation` vidée + `matchStatus: 'unmatched'` ; relancer = no-op (idempotent)   |
+
+### UI Passif (`/app/$orgSlug/passif`)
+
+Page Passif : lecture des capitaux propres + C/C, et pointage tx → passif
+(front des mutations P11–P17). Lien sidebar « Passif » dans le groupe
+Plateforme. Pré-requis : données du scénario P6 (`seedTestScenario`).
+
+| #   | Étape                                                            | Résultat attendu                                                                  |
+| --- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| PU1 | `/app/calte/passif` en tant que membre                           | Bloc « Capitaux propres » (type, détenteur, date, montant + total) ; bloc « Comptes courants d'associés » (contrepartie, position, solde) ; panneau « Rattacher une transaction » |
+| PU2 | Bloc C/C côté CALTE (créancier, après P6)                        | Badge « Créance », solde **+100 000 €** en vert ; tx pointées en sous-lignes avec « Détacher » |
+| PU3 | `/app/albo/passif` (débiteur du même C/C)                        | Badge « Dette », solde **−100 000 €** en rouge                                     |
+| PU4 | Panneau « Rattacher » : choisir une cible dans le combobox (groupes Capitaux propres / Comptes courants) sur une tx → « Rattacher » | Mutation `allocateTransaction` ; la tx **disparaît** du panneau ET de la file `/pointage` (elle passe `matched`) ; elle apparaît en sous-ligne de sa cible ; le solde du C/C se recalcule sans recharger |
+| PU5 | « Détacher » sur une sous-ligne                                  | Mutation `deallocateTransaction` ; la tx **revient** dans le panneau « Rattacher » ET dans la file `/pointage` ; le solde se recalcule |
+| PU6 | Basculer la langue EN/FR                                         | Page entièrement traduite (titres, colonnes, badges, boutons, états vides)         |
 
 ## En cas d'échec
 
