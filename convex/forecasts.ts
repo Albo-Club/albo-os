@@ -351,3 +351,114 @@ export const getForecastBalance = query({
     }
   },
 })
+
+// ─── Pointage prévu → réalisé ────────────────────────────────────────────────
+
+/**
+ * Marque une entry comme réalisée en la rattachant à une transaction réelle
+ * de la même org (calqué sur transactions.ts:matchTransaction). Ne touche pas
+ * à la transaction elle-même : le pointage transaction → deal (matchStatus,
+ * reconciled) reste exclusivement géré par convex/transactions.ts.
+ */
+export const markEntryRealized = mutation({
+  args: {
+    entryId: v.id('forecastEntries'),
+    transactionId: v.id('transactions'),
+  },
+  handler: async (ctx, { entryId, transactionId }) => {
+    const entry = await ctx.db.get('forecastEntries', entryId)
+    if (!entry) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, entry.orgId)
+
+    const tx = await ctx.db.get('transactions', transactionId)
+    if (!tx || tx.orgId !== entry.orgId) {
+      throw new ConvexError('transaction_wrong_org')
+    }
+
+    await ctx.db.patch('forecastEntries', entry._id, {
+      status: 'realized',
+      realizedTransactionId: transactionId,
+    })
+    return null
+  },
+})
+
+// ─── CRUD manuel des entries ─────────────────────────────────────────────────
+
+/** Crée une entry 100 % manuelle (sans règle ni derivedKey). */
+export const createManualEntry = mutation({
+  args: {
+    orgId: v.id('organizations'),
+    date: v.number(),
+    amountCents: v.number(),
+    direction: directionValidator,
+    confidence: confidenceValidator,
+    label: v.string(),
+    category: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await requireOrgMember(ctx, args.orgId)
+    if (!Number.isInteger(args.amountCents) || args.amountCents <= 0) {
+      throw new ConvexError('invalid_amount')
+    }
+    return await ctx.db.insert('forecastEntries', {
+      orgId: args.orgId,
+      date: args.date,
+      amountCents: args.amountCents,
+      direction: args.direction,
+      confidence: args.confidence,
+      status: 'pending',
+      label: args.label,
+      category: args.category,
+      overridden: false,
+      currency: 'EUR',
+    })
+  },
+})
+
+/**
+ * Édite une entry. Si elle est dérivée d'une règle (`ruleId` non null), elle
+ * passe `overridden: true` : expandRules ne la réécrira plus jamais.
+ */
+export const updateEntry = mutation({
+  args: {
+    entryId: v.id('forecastEntries'),
+    patch: v.object({
+      date: v.optional(v.number()),
+      amountCents: v.optional(v.number()),
+      direction: v.optional(directionValidator),
+      confidence: v.optional(confidenceValidator),
+      label: v.optional(v.string()),
+      category: v.optional(v.string()),
+    }),
+  },
+  handler: async (ctx, { entryId, patch }) => {
+    const entry = await ctx.db.get('forecastEntries', entryId)
+    if (!entry) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, entry.orgId)
+    if (
+      patch.amountCents !== undefined &&
+      (!Number.isInteger(patch.amountCents) || patch.amountCents <= 0)
+    ) {
+      throw new ConvexError('invalid_amount')
+    }
+    await ctx.db.patch('forecastEntries', entry._id, {
+      ...patch,
+      // Une entry dérivée éditée à la main devient protégée de la régénération.
+      ...(entry.ruleId ? { overridden: true } : {}),
+    })
+    return null
+  },
+})
+
+/** Annule une entry : elle ne compte plus dans le solde projeté. */
+export const cancelEntry = mutation({
+  args: { entryId: v.id('forecastEntries') },
+  handler: async (ctx, { entryId }) => {
+    const entry = await ctx.db.get('forecastEntries', entryId)
+    if (!entry) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, entry.orgId)
+    await ctx.db.patch('forecastEntries', entry._id, { status: 'cancelled' })
+    return null
+  },
+})
