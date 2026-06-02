@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
@@ -6,6 +7,7 @@ import { api } from '../../../../convex/_generated/api'
 import type { Id } from '../../../../convex/_generated/dataModel'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
+import { Input } from '~/components/ui/input'
 import {
   Table,
   TableBody,
@@ -14,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+import { useDebouncedValue } from '~/hooks/useDebouncedValue'
 
 export const Route = createFileRoute('/app/$orgSlug/cash/$accountId')({
   component: AccountDetail,
@@ -68,9 +71,21 @@ function AccountDetail() {
   const account = useConvexQuery(api.cash.getAccount, {
     bankAccountId: accountId as Id<'bankAccounts'>,
   })
-  const transactions = useConvexQuery(api.cash.listAccountTransactions, {
+
+  // Recherche serveur (search index Convex), debouncée. Pendant le
+  // rechargement d'un nouveau terme, on garde la dernière liste affichée
+  // (pas de flash de liste vide).
+  const [search, setSearch] = useState('')
+  const searchArg = useDebouncedValue(search).trim() || undefined
+  const liveTransactions = useConvexQuery(api.cash.listAccountTransactions, {
     bankAccountId: accountId as Id<'bankAccounts'>,
+    search: searchArg,
   })
+  const lastTransactionsRef = useRef(liveTransactions)
+  if (liveTransactions !== undefined) {
+    lastTransactionsRef.current = liveTransactions
+  }
+  const transactions = liveTransactions ?? lastTransactionsRef.current
 
   const fmtEur = (cents?: number | null) =>
     cents == null
@@ -118,11 +133,18 @@ function AccountDetail() {
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold tracking-tight">{t('tx.title')}</h2>
+        <Input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t('tx.search.placeholder')}
+          className="max-w-sm"
+        />
         {!transactions ? (
           <p className="text-muted-foreground text-sm">{t('tx.loading')}</p>
         ) : transactions.length === 0 ? (
           <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
-            {t('tx.empty')}
+            {searchArg ? t('tx.search.noResults') : t('tx.empty')}
           </div>
         ) : (
           <div className="rounded-lg border">

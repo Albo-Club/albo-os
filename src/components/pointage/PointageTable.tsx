@@ -153,9 +153,12 @@ function UndoBanner({
 export function PointageTable({
   transactions,
   deals,
+  emptyMessage,
 }: {
   transactions: Array<UnmatchedTx> | undefined
   deals: Array<DealOption> | undefined
+  /** Message d'état vide alternatif (ex. recherche sans résultat). */
+  emptyMessage?: string
 }) {
   const { t } = useTranslation('pointage')
   const { fmtDate, fmtSigned } = useFormatters()
@@ -341,7 +344,7 @@ export function PointageTable({
   if (rows && rows.length === 0) {
     return (
       <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
-        {t('empty')}
+        {emptyMessage ?? t('empty')}
       </div>
     )
   }
@@ -541,8 +544,11 @@ export function PointageTable({
  */
 export function DiscardedTable({
   transactions,
+  emptyMessage,
 }: {
   transactions: Array<UnmatchedTx> | undefined
+  /** Message d'état vide alternatif (ex. recherche sans résultat). */
+  emptyMessage?: string
 }) {
   const { t } = useTranslation('pointage')
   const { fmtDate, fmtSigned } = useFormatters()
@@ -568,7 +574,7 @@ export function DiscardedTable({
   if (transactions && transactions.length === 0) {
     return (
       <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
-        {t('viewEmpty')}
+        {emptyMessage ?? t('viewEmpty')}
       </div>
     )
   }

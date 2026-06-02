@@ -38,7 +38,11 @@
       "amount": "Montant"
     },
     "empty": "Aucune transaction sur ce compte.",
-    "loading": "Chargement des transactions…"
+    "loading": "Chargement des transactions…",
+    "search": {
+      "placeholder": "Rechercher une transaction…",
+      "noResults": "Aucune transaction ne correspond à votre recherche."
+    }
   },
   "direction": {
     "in": "Entrée",

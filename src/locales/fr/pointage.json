@@ -55,6 +55,10 @@
     "tax": "Impôts"
   },
   "viewEmpty": "Aucune transaction dans cette catégorie.",
+  "search": {
+    "placeholder": "Rechercher une transaction…",
+    "noResults": "Aucune transaction ne correspond à votre recherche."
+  },
   "combobox": {
     "placeholder": "Choisir un deal",
     "search": "Rechercher un deal…",

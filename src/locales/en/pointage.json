@@ -55,6 +55,10 @@
     "tax": "Taxes"
   },
   "viewEmpty": "No transactions in this category.",
+  "search": {
+    "placeholder": "Search a transaction…",
+    "noResults": "No transaction matches your search."
+  },
   "combobox": {
     "placeholder": "Select a deal",
     "search": "Search a deal…",

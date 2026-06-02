@@ -38,7 +38,11 @@
       "amount": "Amount"
     },
     "empty": "No transactions on this account.",
-    "loading": "Loading transactions…"
+    "loading": "Loading transactions…",
+    "search": {
+      "placeholder": "Search a transaction…",
+      "noResults": "No transaction matches your search."
+    }
   },
   "direction": {
     "in": "Inflow",
