@@ -21,7 +21,8 @@
     "init": "node scripts/init.mjs",
     "upgrade-template": "node scripts/upgrade-template.mjs",
     "test:smoke": "node scripts/e2e-smoke.mjs",
-    "test:cookies": "bash scripts/test-cookies.sh"
+    "test:cookies": "bash scripts/test-cookies.sh",
+    "test:unit": "node --import tsx --test \"tests/**/*.test.ts\""
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.76",
