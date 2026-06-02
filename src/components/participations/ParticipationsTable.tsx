@@ -178,8 +178,9 @@ export function ParticipationsTable({
       return next
     })
 
-  // Recherche client (volumes faibles) : nom de société, instrument (clé brute
-  // + libellé traduit), investisseur, secteur — insensible casse/accents.
+  // Recherche client (volumes faibles) : nom de société, nom personnalisé du
+  // deal, instrument (clé brute + libellé traduit), investisseur, secteur —
+  // insensible casse/accents.
   const [search, setSearch] = useState('')
   const term = normalizeSearch(useDebouncedValue(search))
 
@@ -188,6 +189,7 @@ export function ParticipationsTable({
     return deals.filter((d) =>
       [
         d.target?.name,
+        d.name,
         d.target?.sector,
         d.investor?.name,
         d.instrumentKind,
