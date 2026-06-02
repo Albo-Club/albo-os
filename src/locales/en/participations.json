@@ -48,6 +48,7 @@
     "target": "Company",
     "committed": "Committed",
     "paid": "Paid",
+    "received": "Received",
     "shares": "Shares acquired",
     "pricePerShare": "Price per share",
     "interestRate": "Interest rate",

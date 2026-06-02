@@ -325,6 +325,7 @@ depuis la liste des transactions du deal (clic ligne → sheet → combobox).
 | RD2 | Choisir un deal B (même org) dans le combobox → « Réattribuer »  | Mutation `matchTransaction` ; toast « Transaction déplacée vers {deal B} » ; la tx quitte la liste de A (réactivité) et apparaît sur la page de B ; 1 nouvelle ligne `matchingDecisions` (`source: 'manual'`) |
 | RD3 | Resélectionner le deal A dans le combobox                        | Bouton « Réattribuer » désactivé (no-op)                                          |
 | RD4 | Basculer la langue EN/FR                                         | Bouton, toast et sheet traduits                                                   |
+| RD5 | En-tête du deal : « Versé » / « Reçu » (calculés, pas saisis)     | « Versé » = somme des transactions `out` rattachées, « Reçu » = somme des `in` ; après RD2 les montants des deals A et B se mettent à jour sans recharger ; deal sans transaction → 0 € / 0 € |
 
 ## En cas d'échec
 
