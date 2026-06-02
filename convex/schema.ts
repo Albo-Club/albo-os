@@ -122,8 +122,9 @@ const matchDecisionSource = v.union(
 
 // ─── Enums passif (equityPositions / intercompanyLoans / allocation) ────────
 
-// Nature d'une position de capitaux propres.
-const equityPositionType = v.union(
+// Nature d'une position de capitaux propres. Exporté pour la mutation
+// publique de création (convex/liabilities.ts:createEquityPosition).
+export const equityPositionType = v.union(
   v.literal('capital_social'),
   v.literal('prime_emission'),
   v.literal('augmentation_capital'),

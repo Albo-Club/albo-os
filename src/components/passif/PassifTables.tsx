@@ -2,13 +2,9 @@ import { Fragment, useState } from 'react'
 import { useConvexMutation } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../../convex/_generated/api'
-import { LiabilityCombobox } from './LiabilityCombobox'
 
 import type { Id } from '../../../convex/_generated/dataModel'
-import type { LiabilityOption } from './LiabilityCombobox'
-import type { TxDetails } from '~/components/pointage/TransactionSheet'
 import {
-  accountLabel,
   useFormatters,
   useReportError,
 } from '~/components/pointage/TransactionSheet'
@@ -56,11 +52,6 @@ export type LoanRow = {
   balanceCents: number
   counterpartyName: string | null
   transactions: Array<AllocatedTx>
-}
-
-/** Transaction rattachable (retour de `transactions:listUnmatched`). */
-export type AllocatableTx = TxDetails & {
-  allocation: { kind: string; targetId: string } | null
 }
 
 // ─── Formatage ───────────────────────────────────────────────────────────────
@@ -310,147 +301,6 @@ export function LoansTable({ loans }: { loans: Array<LoanRow> | undefined }) {
                 </TableRow>
                 <AllocatedTxRows transactions={loan.transactions} colSpan={3} />
               </Fragment>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
-  )
-}
-
-// ─── Panneau « Rattacher une transaction » ──────────────────────────────────
-
-/** Combobox de cible passif + bouton « Rattacher » d'une ligne. */
-function AllocateRowActions({
-  options,
-  pending,
-  onAllocate,
-}: {
-  options: Array<LiabilityOption> | undefined
-  pending: boolean
-  onAllocate: (option: LiabilityOption) => void
-}) {
-  const { t } = useTranslation('passif')
-  const [target, setTarget] = useState<LiabilityOption | null>(null)
-  return (
-    <div className="flex items-center justify-end gap-2">
-      <LiabilityCombobox
-        options={options}
-        value={target}
-        onSelect={setTarget}
-        disabled={pending}
-      />
-      <Button
-        size="sm"
-        disabled={!target || pending}
-        onClick={() => target && onAllocate(target)}
-      >
-        {t('allocate.action')}
-      </Button>
-    </div>
-  )
-}
-
-/**
- * Transactions non pointées de l'org, rattachables à une cible passif via
- * `liabilities:allocateTransaction`. Une fois rattachée, la transaction passe
- * `matched` : elle sort de cette liste ET de la file de pointage (réactivité
- * Convex), et apparaît en sous-ligne de sa cible avec « Détacher ».
- */
-export function AllocateTable({
-  transactions,
-  options,
-}: {
-  transactions: Array<AllocatableTx> | undefined
-  options: Array<LiabilityOption> | undefined
-}) {
-  const { t } = useTranslation('passif')
-  const { fmtDate, fmtSigned } = useFormatters()
-  const reportError = useReportError('passif')
-  const allocateTransaction = useConvexMutation(
-    api.liabilities.allocateTransaction,
-  )
-  const [pendingId, setPendingId] = useState<Id<'transactions'> | null>(null)
-
-  async function handleAllocate(tx: AllocatableTx, option: LiabilityOption) {
-    setPendingId(tx._id)
-    try {
-      await allocateTransaction({
-        transactionId: tx._id,
-        kind: option.kind,
-        targetId: option.targetId,
-      })
-    } catch (err) {
-      reportError(err)
-    } finally {
-      setPendingId(null)
-    }
-  }
-
-  if (transactions && transactions.length === 0) {
-    return (
-      <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
-        {t('allocate.empty')}
-      </div>
-    )
-  }
-
-  return (
-    <div className="rounded-lg border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('col.date')}</TableHead>
-            <TableHead>{t('col.label')}</TableHead>
-            <TableHead className="text-right">{t('col.amount')}</TableHead>
-            <TableHead>{t('col.account')}</TableHead>
-            <TableHead className="text-right">{t('col.actions')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {!transactions ? (
-            <TableRow>
-              <TableCell
-                colSpan={5}
-                className="text-muted-foreground text-center"
-              >
-                {t('loading')}
-              </TableCell>
-            </TableRow>
-          ) : (
-            transactions.map((tx) => (
-              <TableRow key={tx._id}>
-                <TableCell className="whitespace-nowrap tabular-nums">
-                  {fmtDate(tx.transactionDate)}
-                </TableCell>
-                <TableCell>
-                  <span className="block max-w-md truncate">{tx.rawLabel}</span>
-                  {tx.counterparty && (
-                    <span className="text-muted-foreground block max-w-md truncate text-xs">
-                      {tx.counterparty}
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell
-                  className={`text-right tabular-nums ${
-                    tx.direction === 'out'
-                      ? 'text-destructive'
-                      : 'text-foreground'
-                  }`}
-                >
-                  {fmtSigned(tx.amount, tx.direction)}
-                </TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {accountLabel(tx)}
-                </TableCell>
-                <TableCell>
-                  <AllocateRowActions
-                    options={options}
-                    pending={pendingId === tx._id}
-                    onAllocate={(option) => void handleAllocate(tx, option)}
-                  />
-                </TableCell>
-              </TableRow>
             ))
           )}
         </TableBody>

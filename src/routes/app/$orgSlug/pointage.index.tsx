@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '../../../../convex/_generated/api'
+import type { LiabilityOption } from '~/components/pointage/TargetCombobox'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { Badge } from '~/components/ui/badge'
@@ -30,7 +31,7 @@ export const Route = createFileRoute('/app/$orgSlug/pointage/')({
 type View = 'unmatched' | 'charge' | 'tax' | 'product' | 'internal_transfer'
 
 function Pointage() {
-  const { t } = useTranslation('pointage')
+  const { t } = useTranslation(['pointage', 'passif'])
   const { orgSlug } = Route.useParams()
   const [view, setView] = useState<View>('unmatched')
 
@@ -48,12 +49,40 @@ function Pointage() {
     api.deals.list,
     org ? { orgId: org._id } : 'skip',
   )
+  const liabilities = useConvexQuery(
+    api.liabilities.getLiabilities,
+    org ? { orgId: org._id } : 'skip',
+  )
   const liveDiscarded = useConvexQuery(
     api.transactions.listByStatus,
     org && view !== 'unmatched'
       ? { orgId: org._id, status: view, search: searchArg }
       : 'skip',
   )
+
+  // Cibles passif du combobox (groupes Capitaux propres / Comptes courants).
+  // Libellés résolus via le namespace `passif` (mêmes clés que la page Passif).
+  const liabilityTargets = useMemo<Array<LiabilityOption> | undefined>(() => {
+    if (!liabilities) return undefined
+    return [
+      ...liabilities.equityPositions.map((position) => ({
+        kind: 'equity' as const,
+        targetId: position._id,
+        label: t(`passif:equity.type.${position.type}`),
+        sublabel: position.holderName ?? '—',
+      })),
+      ...liabilities.loans.map((loan) => ({
+        kind: 'intercompany_loan' as const,
+        targetId: loan._id,
+        label: loan.counterpartyName ?? '—',
+        sublabel: t(
+          loan.side === 'creditor'
+            ? 'passif:loans.receivable'
+            : 'passif:loans.payable',
+        ),
+      })),
+    ]
+  }, [liabilities, t])
 
   // Pendant le rechargement d'un nouveau terme de recherche, on garde la
   // dernière liste affichée (pas de flash de liste vide). Le cache des
@@ -114,6 +143,7 @@ function Pointage() {
         <PointageTable
           transactions={transactions}
           deals={deals}
+          liabilityTargets={liabilityTargets}
           emptyMessage={searchEmptyMessage}
         />
       ) : (

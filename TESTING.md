@@ -311,7 +311,7 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | --- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | RU1 | `/app/calte/pointage` en tant que membre                         | Table des tx `unmatched` triées date desc (Date · Libellé · Montant signé · Compte · Actions) + compteur « N à pointer » |
 | RU2 | `/app/albo/pointage` (org sans tx unmatched)                     | État vide « Aucune transaction à pointer 🎉 »                                      |
-| RU3 | Combobox deal sur une ligne → recherche par nom → « Rattacher »  | Mutation `matchTransaction` ; la ligne affiche « Rattachée à {deal} · Annuler » ~5 s puis disparaît |
+| RU3 | Combobox sur une ligne (groupes **Deals / Capitaux propres / Comptes courants**) → choisir un deal → « Rattacher » | Mutation `matchTransaction` ; la ligne affiche « Rattachée à {deal} · Annuler » ~5 s puis disparaît |
 | RU4 | Menu « Écarter ▾ » → « Ignorer » sur une ligne                   | Mutation `ignoreTransaction` ; bandeau « Ignorée · Annuler » ~5 s puis la ligne disparaît |
 | RU5 | « Annuler » pendant le bandeau (après RU3 ou RU4)                | Mutation `unmatchTransaction` ; la ligne redevient pointable (réactivité Convex)   |
 | RU6 | Clic sur une ligne (hors colonne Actions)                        | Sheet de détail lecture seule (date, libellé brut, contrepartie, montant, sens, compte) + mêmes actions |
@@ -324,7 +324,9 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | RU13 | Toast « N classées en charge/impôt/produit/virement interne · Annuler » après RU12 | Clic « Annuler » → les tx du lot reviennent dans « À pointer » (boucle `unmatchTransaction`) |
 | RU14 | « Désélectionner » dans la barre / Annuler dans le dialog        | Sélection vidée / dialog fermé sans aucune mutation |
 | RU15 | Barre de recherche (sous les onglets) : taper un libellé/contrepartie, dans chaque onglet | Filtrage serveur (debounce ~250 ms, insensible casse/accents) scopé org + statut de l'onglet ; compteur « N à pointer » = lignes affichées (filtrées) ; terme sans résultat → « Aucune transaction ne correspond… » ; effacer → file complète ; actions (rattacher/écarter/annuler) inchangées sur les lignes filtrées |
-| RU16 | Une tx allouée au passif depuis la page Passif (cf. « UI Passif »)  | Elle n'apparaît **plus** dans « À pointer » (elle est `matched`) ; un `matchTransaction` / écartement / `unmatchTransaction` forcé dessus (API) → `ConvexError('allocated_to_liability')`, toast explicite |
+| RU16 | Une tx allouée au passif (RU17)                                  | Elle n'apparaît **plus** dans « À pointer » (elle est `matched`) ; un `matchTransaction` / écartement / `unmatchTransaction` forcé dessus (API) → `ConvexError('allocated_to_liability')`, toast explicite |
+| RU17 | Combobox → groupe « Capitaux propres » ou « Comptes courants » → choisir une cible passif → « Rattacher » | Mutation `liabilities:allocateTransaction` ; bandeau « Rattachée à {cible} · Annuler » ~5 s puis la ligne disparaît ; le solde du C/C se met à jour sur la page Passif (réactivité Convex) |
+| RU18 | « Annuler » pendant le bandeau de RU17                           | Mutation `deallocateTransaction` (pas `unmatchTransaction`) ; la ligne redevient pointable |
 
 ### Réattribution depuis la page d'un deal (`/app/$orgSlug/deals/$dealId`)
 
@@ -415,21 +417,29 @@ Détails et pièges : `KNOWN_ISSUES.md` « Passif ».
 | P15 | `allocateTransaction` sur une tx déjà rattachée à un **deal**          | `ConvexError('already_matched_to_deal')`, rien écrit                              |
 | P16 | `matchTransaction` / `ignoreTransaction` / `categorizeAs*` / `unmatchTransaction` sur une tx allouée passif | `ConvexError('allocated_to_liability')`, rien écrit                               |
 | P17 | `liabilities:deallocateTransaction` sur la tx de P11                   | `allocation` vidée + `matchStatus: 'unmatched'` ; relancer = no-op (idempotent)   |
+| P18 | `liabilities:createEquityPosition` (membre, montant > 0)               | Insert + id retourné ; visible dans `getLiabilities().equityPositions` et comme cible du combobox Pointage |
+| P19 | `createEquityPosition` avec `amountCents: 0` / avec `holderOrgId` **et** `holderLabel` | `ConvexError('invalid_amount')` / `ConvexError('ambiguous_holder')`, rien écrit   |
+| P20 | `liabilities:createIntercompanyLoan` (membre d'une des deux orgs)      | Insert + id retourné ; le C/C apparaît dans `getLiabilities` des **deux** orgs (solde 0) |
+| P21 | `createIntercompanyLoan` avec `fromOrgId === toOrgId` / entre deux orgs dont l'user n'est membre d'aucune | `ConvexError('same_org')` / `ConvexError('not_a_party')`, rien écrit              |
 
 ### UI Passif (`/app/$orgSlug/passif`)
 
-Page Passif : lecture des capitaux propres + C/C, et pointage tx → passif
-(front des mutations P11–P17). Lien sidebar « Passif » dans le groupe
-Plateforme. Pré-requis : données du scénario P6 (`seedTestScenario`).
+Page Passif : lecture des capitaux propres + C/C (soldes dérivés), création
+(« + Capital » / « + Compte courant »), détachement des tx pointées. Le
+**pointage** vers ces cibles se fait depuis l'onglet Pointage (RU17). Lien
+sidebar « Passif » dans le groupe Plateforme.
 
 | #   | Étape                                                            | Résultat attendu                                                                  |
 | --- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| PU1 | `/app/calte/passif` en tant que membre                           | Bloc « Capitaux propres » (type, détenteur, date, montant + total) ; bloc « Comptes courants d'associés » (contrepartie, position, solde) ; panneau « Rattacher une transaction » |
-| PU2 | Bloc C/C côté CALTE (créancier, après P6)                        | Badge « Créance », solde **+100 000 €** en vert ; tx pointées en sous-lignes avec « Détacher » |
+| PU1 | `/app/calte/passif` en tant que membre                           | Bloc « Capitaux propres » (type, détenteur, date, montant + total, bouton « + Capital ») ; bloc « Comptes courants d'associés » (contrepartie, position, solde, bouton « + Compte courant ») |
+| PU2 | Bloc C/C côté CALTE (créancier, après P6 ou PU6)                 | Badge « Créance », solde **+100 000 €** en vert ; tx pointées en sous-lignes avec « Détacher » |
 | PU3 | `/app/albo/passif` (débiteur du même C/C)                        | Badge « Dette », solde **−100 000 €** en rouge                                     |
-| PU4 | Panneau « Rattacher » : choisir une cible dans le combobox (groupes Capitaux propres / Comptes courants) sur une tx → « Rattacher » | Mutation `allocateTransaction` ; la tx **disparaît** du panneau ET de la file `/pointage` (elle passe `matched`) ; elle apparaît en sous-ligne de sa cible ; le solde du C/C se recalcule sans recharger |
-| PU5 | « Détacher » sur une sous-ligne                                  | Mutation `deallocateTransaction` ; la tx **revient** dans le panneau « Rattacher » ET dans la file `/pointage` ; le solde se recalcule |
-| PU6 | Basculer la langue EN/FR                                         | Page entièrement traduite (titres, colonnes, badges, boutons, états vides)         |
+| PU4 | « Détacher » sur une sous-ligne                                  | Mutation `deallocateTransaction` ; la tx **revient** dans la file `/pointage` ; le solde se recalcule sans recharger |
+| PU5 | « + Capital » → type, montant (€), détenteur (org du groupe / libellé libre / aucun), date, parts → « Créer » | Mutation `createEquityPosition` ; toast succès ; la position apparaît dans le bloc (réactif) **et** dans le combobox de l'onglet Pointage (groupe Capitaux propres) |
+| PU6 | « + Compte courant » → créancier (org courante pré-remplie), débiteur, date, rémunéré (taux %) / bloqué → « Créer » | Mutation `createIntercompanyLoan` ; toast succès ; le C/C apparaît dans le bloc des **deux** orgs (solde 0 €) **et** dans le combobox Pointage (groupe Comptes courants) |
+| PU7 | **Scénario 100 % UI (CALTE → Albo)** : (1) page Passif Albo → « + Capital » (détenteur CALTE) ; (2) onglet Pointage Albo → virement reçu de CALTE → combobox → groupe Capitaux propres → la position créée → « Rattacher » ; (3) retour page Passif Albo | (2) la tx sort de la file de pointage ; (3) elle apparaît en sous-ligne de la position. Idem pour un C/C : le solde passe à ±montant de chaque côté une fois chaque jambe pointée |
+| PU8 | Dialog C/C : choisir la même org en créancier et débiteur        | Bouton « Créer » désactivé + message « …deux organisations différentes »          |
+| PU9 | Basculer la langue EN/FR                                         | Page + dialogs entièrement traduits (titres, colonnes, badges, boutons, états vides) |
 
 ## En cas d'échec
 
