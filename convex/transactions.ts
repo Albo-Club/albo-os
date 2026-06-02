@@ -2,10 +2,16 @@ import { ConvexError, v } from 'convex/values'
 import { internalMutation, mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { recordDecision } from './lib/matchingLog'
-import { buildSearchText } from './lib/searchText'
+import { buildSearchText, normalizeSearch } from './lib/searchText'
 
 import type { MutationCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
+
+/**
+ * Borne des résultats de recherche full-text (le listing sans recherche garde
+ * son `.collect()` historique — la file de pointage doit rester exhaustive).
+ */
+const SEARCH_LIMIT = 200
 
 /**
  * Transactions rattachées à un deal (rapprochement via `dealId`), triées par
@@ -50,18 +56,35 @@ export const listByDeal = query({
  * décroissante et enrichies du compte bancaire. Les transactions sans
  * `matchStatus` (pré-backfill) n'apparaissent pas — lancer
  * `transactions:backfillMatchStatus` d'abord.
+ *
+ * `search` (optionnel) filtre par libellé/contrepartie via le search index
+ * `search_text` (insensible casse/accents), scopé org + statut.
  */
 export const listUnmatched = query({
-  args: { orgId: v.id('organizations') },
-  handler: async (ctx, { orgId }) => {
+  args: {
+    orgId: v.id('organizations'),
+    search: v.optional(v.string()),
+  },
+  handler: async (ctx, { orgId, search }) => {
     await requireOrgMember(ctx, orgId)
 
-    const rows = await ctx.db
-      .query('transactions')
-      .withIndex('by_org_matchStatus', (q) =>
-        q.eq('orgId', orgId).eq('matchStatus', 'unmatched'),
-      )
-      .collect()
+    const term = search ? normalizeSearch(search) : ''
+    const rows = term
+      ? await ctx.db
+          .query('transactions')
+          .withSearchIndex('search_text', (q) =>
+            q
+              .search('searchText', term)
+              .eq('orgId', orgId)
+              .eq('matchStatus', 'unmatched'),
+          )
+          .take(SEARCH_LIMIT)
+      : await ctx.db
+          .query('transactions')
+          .withIndex('by_org_matchStatus', (q) =>
+            q.eq('orgId', orgId).eq('matchStatus', 'unmatched'),
+          )
+          .collect()
 
     rows.sort((a, b) => b.transactionDate - a.transactionDate)
 
@@ -88,6 +111,9 @@ export const listUnmatched = query({
  * Transactions d'une org dans un statut de pointage donné (consultation des
  * écartées : ignorées / charges / impôts, ou des rattachées), triées par date
  * décroissante et enrichies du compte bancaire. Même shape que `listUnmatched`.
+ *
+ * `search` (optionnel) filtre par libellé/contrepartie via le search index
+ * `search_text` (insensible casse/accents), scopé org + statut.
  */
 export const listByStatus = query({
   args: {
@@ -98,16 +124,28 @@ export const listByStatus = query({
       v.literal('charge'),
       v.literal('tax'),
     ),
+    search: v.optional(v.string()),
   },
-  handler: async (ctx, { orgId, status }) => {
+  handler: async (ctx, { orgId, status, search }) => {
     await requireOrgMember(ctx, orgId)
 
-    const rows = await ctx.db
-      .query('transactions')
-      .withIndex('by_org_matchStatus', (q) =>
-        q.eq('orgId', orgId).eq('matchStatus', status),
-      )
-      .collect()
+    const term = search ? normalizeSearch(search) : ''
+    const rows = term
+      ? await ctx.db
+          .query('transactions')
+          .withSearchIndex('search_text', (q) =>
+            q
+              .search('searchText', term)
+              .eq('orgId', orgId)
+              .eq('matchStatus', status),
+          )
+          .take(SEARCH_LIMIT)
+      : await ctx.db
+          .query('transactions')
+          .withIndex('by_org_matchStatus', (q) =>
+            q.eq('orgId', orgId).eq('matchStatus', status),
+          )
+          .collect()
 
     rows.sort((a, b) => b.transactionDate - a.transactionDate)
 
