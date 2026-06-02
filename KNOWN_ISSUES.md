@@ -837,3 +837,30 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   des mois courts (28/29 févr., 30 avr., …) ; hebdo = jour ISO (1 = lundi,
   7 = dimanche). Toute nouvelle logique de date doit passer par
   `convex/lib/recurrence.ts`, pas par `new Date()` local (fuseau serveur).
+
+## Split chapeaux Attio → SPV, org albo (`convex/migrations/splitAlboSponsorSpvs.ts`)
+
+Attio modélise les plateformes de dette immo (Parallel Invest, Sezame) comme
+**une** company avec un deal par SPV. Le modèle Albo OS est « 1 entité
+juridique = 1 company » : la migration crée une company par SPV
+(`kind: 'portfolio'`, `sponsor` = "Parallel"/"Sezame"), re-pointe
+`deals.targetCompanyId` dessus et archive les chapeaux. Rewatt est
+volontairement hors scope (deals laissés sur le chapeau).
+
+- **Re-lancer `attioAlboImport:run` annule le split.** L'import upserte les
+  deals par `attioDealId` et re-patche `targetCompanyId` vers les companies
+  chapeaux. Procédure : après tout re-run de l'import Attio, re-lancer
+  `splitAlboSponsorSpvs:apply` (les deux sont idempotents, l'ordre suffit).
+- **Les companies SPV n'ont pas d'`attioCompanyId`.** Elles n'existent pas
+  comme companies dans Attio (ce sont des deals là-bas) ; le pont Attio reste
+  sur la company chapeau archivée. Leur ancre d'idempotence est
+  `airtableId = "split:attio:{attioDealId}"` (réutilisation du champ ancre
+  d'import + index `by_airtable_id` — même pattern que l'import Airtable,
+  malgré le nom).
+- **Aucun re-rattachement de transactions/valuations.** Elles sont liées par
+  `dealId`, qui ne change pas. Seul `targetCompanyId` bouge.
+- **Workflow prod en 3 temps, validation humaine obligatoire** :
+  `dryRun` (internalQuery, lecture seule) → relire le rapport → `apply`
+  (internalMutation) → `verify`. Jamais de hard delete : archivage via
+  `archivedAt`, et uniquement si plus aucune référence (deals, relations,
+  KPIs, comptes, viaSpv) ne pointe vers le chapeau.
