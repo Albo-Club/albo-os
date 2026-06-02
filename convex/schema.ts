@@ -412,6 +412,15 @@ export default defineSchema({
     source: txSource,
     powensTxId: v.optional(v.string()),
     memoId: v.optional(v.string()), // ancre import CSV Mémo Bank (idempotence)
+    // Métadonnées d'origine import (CSV Mémo Bank…) — JAMAIS dans `notes`
+    // (réservé au pointage manuel). Utile au futur pointage/agent.
+    importMeta: v.optional(
+      v.object({
+        type: v.optional(v.string()), // ex. "Virement entrant"
+        category: v.optional(v.string()), // ex. "Logiciels/SaaS", "Intérêts perçus"
+        externalRef: v.optional(v.string()), // ex. "WARO - OC - albo"
+      }),
+    ),
     reconciled: v.boolean(),
     reconciledBy: v.optional(v.id('users')),
     reconciledAt: v.optional(v.number()),

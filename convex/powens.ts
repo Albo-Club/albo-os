@@ -1128,8 +1128,9 @@ const memoCsvRowValidator = v.object({
  * - Idempotence stricte par `memoId` (index `by_memo_id`) : si une transaction
  *   avec ce memoId existe déjà → skip, jamais de doublon. Rejouable.
  * - `source: 'memo_csv'`, montants déjà en centimes (positifs).
- * - `type`/`category`/`externalRef`/`iban` ne sont pas des champs du schéma :
- *   type + externalRef sont conservés dans `notes` (lisibles, pas de perte).
+ * - `type`/`category`/`externalRef` → champ dédié `importMeta` (métadonnées
+ *   d'origine CSV, utiles au futur pointage/agent). `notes` reste VIDE — il est
+ *   réservé au pointage manuel. `iban` du JSON : ignoré.
  *
  * Lancement (562 lignes → passer par un fichier JSON, pas la ligne de commande) :
  *   pnpm exec convex run --prod powens:importMemoCsvTransactions \
@@ -1186,10 +1187,14 @@ export const importMemoCsvTransactions = internalMutation({
         continue
       }
 
-      // type + externalRef → notes (pas de champ dédié au schéma).
-      const noteBits = [row.type, row.externalRef].filter(
-        (s): s is string => !!s && s.length > 0,
-      )
+      // Métadonnées d'origine CSV → champ dédié `importMeta`, jamais `notes`
+      // (réservé au pointage manuel). Omis si toutes vides.
+      const meta = {
+        type: row.type || undefined,
+        category: row.category || undefined,
+        externalRef: row.externalRef || undefined,
+      }
+      const hasMeta = meta.type || meta.category || meta.externalRef
 
       await ctx.db.insert('transactions', {
         orgId: albo._id,
@@ -1201,8 +1206,8 @@ export const importMemoCsvTransactions = internalMutation({
         counterparty: row.counterparty,
         source: 'memo_csv',
         memoId: row.memoId,
+        importMeta: hasMeta ? meta : undefined,
         reconciled: false,
-        notes: noteBits.length > 0 ? noteBits.join(' — ') : undefined,
       })
       inserted += 1
     }
