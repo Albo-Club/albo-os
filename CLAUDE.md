@@ -168,8 +168,12 @@ append-only — cf. `KNOWN_ISSUES.md` « Pointage transaction → deal »).
 Le prévisionnel de cash vit dans `forecastRules` + `forecastEntries`
 (`convex/forecasts.ts` : `expandRules` idempotent, `getForecastBalance`
 mensuel, pointage `markEntryRealized` — cf. `KNOWN_ISSUES.md` « Cash flow
-forecast »). La table legacy `forecasts` reste **déclarée mais inerte**
-(alimentée par l'import Airtable uniquement, lue par rien).
+forecast »). Le passif vit dans `equityPositions` + `intercompanyLoans`,
+avec pointage généralisé `transactions.allocation` et soldes de C/C
+**dérivés** des transactions (`convex/liabilities.ts:getLiabilities` —
+cf. `KNOWN_ISSUES.md` « Passif »). La table legacy `forecasts` reste
+**déclarée mais inerte** (alimentée par l'import Airtable uniquement, lue
+par rien).
 
 **Workflow déploiement** : outil interne, **prod-only** (pas de déploiement
 dev). Le code part en prod via le build Vercel sur `main` (`build:vercel` →

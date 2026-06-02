@@ -760,6 +760,37 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   uniquement** ; le patch d'une ligne existante n'écrit ni `matchStatus`, ni
   `dealId`, ni `reconciled`. Avant le pointage, le re-sync Powens remettait
   `reconciled: false` à chaque webhook — ce reset a été retiré exprès.
+- **`allocation` cohabite avec `dealId` (pointage généralisé).** Invariant :
+  `dealId != null` ⟺ `allocation = { kind: 'deal', targetId: dealId }`. Les
+  mutations de pointage maintiennent les deux ensemble (match écrit les deux,
+  unmatch/ignore/categorize effacent les deux). Les lignes pré-existantes
+  sont alignées par `transactions:backfillAllocation` (one-shot par org,
+  idempotent, n'écrit rien dans `matchingDecisions`). Tout nouveau code qui
+  écrit `dealId` doit écrire `allocation` dans le même patch.
+
+## Passif — `equityPositions` / `intercompanyLoans` / soldes dérivés (`convex/liabilities.ts`)
+
+Le passif (capitaux propres + C/C d'associés) est modélisé par deux tables
+quasi-statiques ; les **soldes de C/C ne sont jamais stockés**, toujours
+dérivés des transactions pointées (`allocation.kind === 'intercompany_loan'`).
+
+- **Chaque org somme SES PROPRES transactions** (index
+  `by_org_allocation_target` sur `['orgId', 'allocation.targetId']` — les
+  chemins imbriqués sont supportés par les index Convex). Créancier
+  (`fromOrgId`) : out = prêt, in = remboursement → solde + = créance.
+  Débiteur (`toOrgId`) : in = emprunt, out = remboursement → solde − = dette.
+  Si une seule des deux orgs a pointé sa jambe, les deux soldes **divergent** :
+  c'est un signal de réconciliation (trou de pointage), pas un bug.
+- **`intercompanyLoans` n'a pas d'`orgId`** : le prêt appartient aux deux orgs
+  (`fromOrgId` créancier / `toOrgId` débiteur). Toute query doit vérifier que
+  l'utilisateur est membre d'au moins une des deux (pattern `getLiabilities` :
+  `requireOrgMember` sur l'org regardante, puis lecture par `by_from`/`by_to`).
+- **Pas encore de mutation publique de pointage vers equity/loan.** Le champ
+  `allocation` accepte `kind: 'equity' | 'intercompany_loan'` mais seuls le
+  seed de test (`liabilities:seedTestScenario`) et le backfill (kind `deal`)
+  l'écrivent. La mutation publique (et le statut `matchStatus` correspondant —
+  aujourd'hui une tx pointée sur un loan reste `unmatched` dans la file) est
+  un follow-up.
 
 ## Recherche transactions — champ dérivé `searchText` (`convex/lib/searchText.ts`)
 
