@@ -137,6 +137,7 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | CA5 | Transaction `direction: "out"`                                      | Montant en négatif, couleur `text-destructive` ; `in` en positif                  |
 | CA6 | Compte sans transaction liée à un deal                             | Sheet affiche l'état vide "Aucune transaction liée à un deal…"                    |
 | CA7 | i18n EN/FR sur la page + le Sheet                                   | Tous les libellés traduits (namespace `cash`), titre d'onglet = `cash:metaTitle`  |
+| CA8 | Page `/cash/$accountId` : taper un libellé ou une contrepartie dans la barre de recherche (avec/sans accents, casse différente) | Filtrage serveur (~250 ms de debounce) via le search index `search_text` ; résultats triés date desc, cap 200 ; pas de flash de liste vide entre deux frappes ; terme sans résultat → « Aucune transaction ne correspond… » ; effacer → liste complète. ⚠️ Les tx pré-existantes sont invisibles à la recherche tant que `transactions:backfillSearchText` n'a pas tourné (cf. `KNOWN_ISSUES.md` « Recherche transactions ») |
 
 ## Niveau 3 — Invitations edge cases (8 min)
 
@@ -319,6 +320,7 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | RU12 | Barre de sélection → « Charge » (puis « Impôt »)                 | Dialog de confirmation « Classer en charge/impôt ? N transactions… » ; Confirmer → **un seul** appel `bulkCategorize` (onglet réseau) ; les tx sortent de la file et apparaissent dans l'onglet Charges/Impôts ; une ligne `matchingDecisions` par tx |
 | RU13 | Toast « N classées en charge/impôt · Annuler » après RU12        | Clic « Annuler » → les tx du lot reviennent dans « À pointer » (boucle `unmatchTransaction`) |
 | RU14 | « Désélectionner » dans la barre / Annuler dans le dialog        | Sélection vidée / dialog fermé sans aucune mutation |
+| RU15 | Barre de recherche (sous les onglets) : taper un libellé/contrepartie, dans chaque onglet | Filtrage serveur (debounce ~250 ms, insensible casse/accents) scopé org + statut de l'onglet ; compteur « N à pointer » = lignes affichées (filtrées) ; terme sans résultat → « Aucune transaction ne correspond… » ; effacer → file complète ; actions (rattacher/écarter/annuler) inchangées sur les lignes filtrées |
 
 ### Réattribution depuis la page d'un deal (`/app/$orgSlug/deals/$dealId`)
 
@@ -333,6 +335,7 @@ depuis la liste des transactions du deal (clic ligne → sheet → combobox).
 | RD4 | Basculer la langue EN/FR                                         | Bouton, toast et sheet traduits                                                   |
 | RD5 | En-tête du deal : « Versé » / « Reçu » (calculés, pas saisis)     | « Versé » = somme des transactions `out` rattachées, « Reçu » = somme des `in` ; après RD2 les montants des deals A et B se mettent à jour sans recharger ; deal sans transaction → 0 € / 0 € |
 | RD6 | Liste des deals (`/app/$orgSlug/participations`, `/app/all/participations`, fiche participation) : colonnes/champs Engagé · Versé · Reçu | Versé/Reçu calculés serveur (`deals.list` / `aggregate.listDeals` enrichis, pas une query `listByDeal` par ligne) ; valeurs identiques à la page détail du même deal ; deal sans transaction → 0 € / 0 € ; lignes groupe (par société) = sommes des deals |
+| RD7 | Barre de recherche des participations (`/app/$orgSlug/participations` et `/app/all/participations`) : taper un nom de société, un instrument (libellé FR/EN ou clé brute `os`), un investisseur, un secteur — avec/sans accents | Filtrage **client** (debounce ~250 ms, insensible casse/accents) ; regroupements et totaux par société recalculés sur le sous-ensemble ; terme sans résultat → « Aucune participation ne correspond… » ; effacer → liste complète |
 
 ## Cash flow forecast (règles récurrentes → solde projeté)
 
