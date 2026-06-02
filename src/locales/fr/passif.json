@@ -1,0 +1,66 @@
+{
+  "metaTitle": "Passif — Albo OS",
+  "title": "Passif",
+  "subtitle": "Capitaux propres et comptes courants d'associés, soldes dérivés des transactions pointées.",
+  "loading": "Chargement…",
+  "col": {
+    "date": "Date",
+    "label": "Libellé",
+    "amount": "Montant",
+    "account": "Compte",
+    "actions": "Actions"
+  },
+  "equity": {
+    "title": "Capitaux propres",
+    "empty": "Aucune position de capital.",
+    "col": {
+      "type": "Type",
+      "holder": "Détenteur",
+      "date": "Date",
+      "amount": "Montant"
+    },
+    "total": "Total",
+    "type": {
+      "capital_social": "Capital social",
+      "prime_emission": "Prime d'émission",
+      "augmentation_capital": "Augmentation de capital",
+      "report_a_nouveau": "Report à nouveau"
+    }
+  },
+  "loans": {
+    "title": "Comptes courants d'associés",
+    "empty": "Aucun compte courant inter-entités.",
+    "col": {
+      "counterparty": "Contrepartie",
+      "side": "Position",
+      "balance": "Solde"
+    },
+    "receivable": "Créance",
+    "payable": "Dette"
+  },
+  "allocated": {
+    "title": "Transactions pointées",
+    "empty": "Aucune transaction pointée.",
+    "detach": "Détacher"
+  },
+  "allocate": {
+    "title": "Rattacher une transaction",
+    "subtitle": "Pointez une transaction bancaire non rattachée sur une position de capital ou un compte courant.",
+    "empty": "Aucune transaction à rattacher.",
+    "action": "Rattacher"
+  },
+  "combobox": {
+    "placeholder": "Choisir une cible",
+    "search": "Rechercher une cible…",
+    "empty": "Aucune cible trouvée.",
+    "groupEquity": "Capitaux propres",
+    "groupLoans": "Comptes courants"
+  },
+  "errors": {
+    "failed": "L'action a échoué. Veuillez réessayer.",
+    "not_found": "Cible ou transaction introuvable.",
+    "equity_wrong_org": "Cette position de capital appartient à une autre organisation.",
+    "loan_wrong_org": "Cette transaction n'appartient à aucune des deux organisations du compte courant.",
+    "already_matched_to_deal": "Cette transaction est déjà rattachée à un deal. Détachez-la d'abord."
+  }
+}

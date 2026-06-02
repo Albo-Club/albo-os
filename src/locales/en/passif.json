@@ -1,0 +1,66 @@
+{
+  "metaTitle": "Liabilities — Albo OS",
+  "title": "Liabilities",
+  "subtitle": "Equity and intercompany current accounts, with balances derived from allocated transactions.",
+  "loading": "Loading…",
+  "col": {
+    "date": "Date",
+    "label": "Label",
+    "amount": "Amount",
+    "account": "Account",
+    "actions": "Actions"
+  },
+  "equity": {
+    "title": "Equity",
+    "empty": "No equity position.",
+    "col": {
+      "type": "Type",
+      "holder": "Holder",
+      "date": "Date",
+      "amount": "Amount"
+    },
+    "total": "Total",
+    "type": {
+      "capital_social": "Share capital",
+      "prime_emission": "Share premium",
+      "augmentation_capital": "Capital increase",
+      "report_a_nouveau": "Retained earnings"
+    }
+  },
+  "loans": {
+    "title": "Shareholder current accounts",
+    "empty": "No intercompany current account.",
+    "col": {
+      "counterparty": "Counterparty",
+      "side": "Position",
+      "balance": "Balance"
+    },
+    "receivable": "Receivable",
+    "payable": "Payable"
+  },
+  "allocated": {
+    "title": "Allocated transactions",
+    "empty": "No transaction allocated yet.",
+    "detach": "Detach"
+  },
+  "allocate": {
+    "title": "Allocate a transaction",
+    "subtitle": "Point an unreconciled bank transaction to an equity position or a current account.",
+    "empty": "No transaction to allocate.",
+    "action": "Allocate"
+  },
+  "combobox": {
+    "placeholder": "Choose a target",
+    "search": "Search a target…",
+    "empty": "No target found.",
+    "groupEquity": "Equity",
+    "groupLoans": "Current accounts"
+  },
+  "errors": {
+    "failed": "The action failed. Please try again.",
+    "not_found": "Target or transaction not found.",
+    "equity_wrong_org": "This equity position belongs to another organization.",
+    "loan_wrong_org": "This transaction belongs to neither organization of the current account.",
+    "already_matched_to_deal": "This transaction is already matched to a deal. Unmatch it first."
+  }
+}

@@ -98,6 +98,9 @@ export const listUnmatched = query({
           transactionDate: tx.transactionDate,
           rawLabel: tx.rawLabel,
           counterparty: tx.counterparty ?? null,
+          // Pointage généralisé (filtre de sécurité côté page Passif — une tx
+          // allouée au passif est `matched` et ne devrait jamais être ici).
+          allocation: tx.allocation ?? null,
           account: account
             ? { label: account.label, bankName: account.bankName }
             : null,
@@ -111,7 +114,7 @@ export const listUnmatched = query({
  * Transactions d'une org dans un statut de pointage donné (consultation des
  * écartées : ignorées / charges / impôts / produits / virements internes, ou
  * des rattachées), triées par date décroissante et enrichies du compte
- * bancaire. Même shape que `listUnmatched`.
+ * bancaire. Même shape que `listUnmatched` (hors `allocation`).
  *
  * `search` (optionnel) filtre par libellé/contrepartie via le search index
  * `search_text` (insensible casse/accents), scopé org + statut.
@@ -173,14 +176,28 @@ export const listByStatus = query({
 
 // ─── Pointage manuel transaction → deal ─────────────────────────────────────
 //
-// Invariant : `matchStatus === 'matched'` ⟺ `dealId != null`. `reconciled`
-// (+ by/at) est un miroir dérivé maintenu pour les lecteurs existants
-// (UI deal, vue Cash, agent) — ne jamais l'écrire ailleurs qu'ici.
+// Invariant : `matchStatus === 'matched'` ⟺ rattachée à un deal
+// (`dealId != null` + `allocation.kind === 'deal'`) OU allouée au passif
+// (`dealId == null` + `allocation.kind === 'equity' | 'intercompany_loan'`,
+// cf. convex/liabilities.ts:allocateTransaction). `reconciled` (+ by/at) est
+// un miroir dérivé du pointage DEAL uniquement, maintenu pour les lecteurs
+// existants (UI deal, vue Cash, agent) — ne jamais l'écrire ailleurs qu'ici.
 // `allocation` (pointage généralisé) cohabite avec `dealId` :
 // `dealId != null` ⟺ `allocation = { kind: 'deal', targetId: dealId }`
 // (backfill des lignes pré-existantes : transactions:backfillAllocation).
-// Chaque mutation écrit une ligne append-only dans `matchingDecisions`
-// (dataset d'apprentissage de l'agent, phase 2).
+// Chaque mutation deal écrit une ligne append-only dans `matchingDecisions`
+// (dataset d'apprentissage de l'agent, phase 2) ; le pointage passif n'y
+// écrit jamais.
+
+/**
+ * Garde-fou : refuse d'écraser silencieusement un pointage passif
+ * (equity / C/C). Détacher d'abord via `liabilities:deallocateTransaction`.
+ */
+function assertNotAllocatedToLiability(tx: Doc<'transactions'>) {
+  if (tx.allocation && tx.allocation.kind !== 'deal') {
+    throw new ConvexError('allocated_to_liability')
+  }
+}
 
 /**
  * Rattache une transaction à un deal de la même org.
@@ -191,6 +208,7 @@ export const matchTransaction = mutation({
     const tx = await ctx.db.get('transactions', transactionId)
     if (!tx) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, tx.orgId)
+    assertNotAllocatedToLiability(tx)
 
     const deal = await ctx.db.get('deals', dealId)
     if (!deal || deal.orgId !== tx.orgId) {
@@ -226,6 +244,7 @@ export const ignoreTransaction = mutation({
     const tx = await ctx.db.get('transactions', transactionId)
     if (!tx) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, tx.orgId)
+    assertNotAllocatedToLiability(tx)
 
     await ctx.db.patch('transactions', tx._id, {
       matchStatus: 'ignored',
@@ -259,6 +278,7 @@ async function applyCategorization(
   status: 'charge' | 'tax' | 'product' | 'internal_transfer',
   decidedBy: Id<'users'>,
 ) {
+  assertNotAllocatedToLiability(tx)
   await ctx.db.patch('transactions', tx._id, {
     matchStatus: status,
     dealId: undefined,
@@ -397,6 +417,9 @@ export const unmatchTransaction = mutation({
     const tx = await ctx.db.get('transactions', transactionId)
     if (!tx) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, tx.orgId)
+    // Une tx allouée au passif se détache via deallocateTransaction — un
+    // unmatch deal ici laisserait son allocation orpheline.
+    assertNotAllocatedToLiability(tx)
 
     await ctx.db.patch('transactions', tx._id, {
       matchStatus: 'unmatched',

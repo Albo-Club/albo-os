@@ -62,9 +62,12 @@ export function accountLabel(tx: TxDetails) {
   return tx.account ? `${tx.account.bankName} · ${tx.account.label}` : '—'
 }
 
-/** Toast d'erreur localisé à partir du code `ConvexError` des mutations. */
-export function useReportError() {
-  const { t } = useTranslation('pointage')
+/**
+ * Toast d'erreur localisé à partir du code `ConvexError` des mutations.
+ * Le namespace porte les clés `errors.*` (pointage par défaut, passif…).
+ */
+export function useReportError(namespace: 'pointage' | 'passif' = 'pointage') {
+  const { t } = useTranslation(namespace)
   return (err: unknown) => {
     const code = err instanceof ConvexError ? (err.data as string) : ''
     toast.error(t(`errors.${code}`, t('errors.failed')))

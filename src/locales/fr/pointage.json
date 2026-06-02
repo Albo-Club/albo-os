@@ -95,6 +95,7 @@
   "errors": {
     "failed": "L'action a échoué. Veuillez réessayer.",
     "not_found": "Transaction introuvable.",
-    "deal_wrong_org": "Ce deal appartient à une autre organisation."
+    "deal_wrong_org": "Ce deal appartient à une autre organisation.",
+    "allocated_to_liability": "Cette transaction est pointée sur le passif (capital ou compte courant). Détachez-la depuis la page Passif."
   }
 }
