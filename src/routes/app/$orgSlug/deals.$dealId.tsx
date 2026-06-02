@@ -12,7 +12,10 @@ import type { DealOption } from '~/components/pointage/DealCombobox'
 import type { TxDetails } from '~/components/pointage/TransactionSheet'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
-import { useFormatters } from '~/components/participations/ParticipationsTable'
+import {
+  useDealTitle,
+  useFormatters,
+} from '~/components/participations/ParticipationsTable'
 import { DealCombobox } from '~/components/pointage/DealCombobox'
 import {
   TransactionSheet,
@@ -387,6 +390,7 @@ function DealDetail() {
     0,
   )
   const { fmtEur, fmtDate } = useFormatters()
+  const dealTitle = useDealTitle()
   const fmtPct = (bps?: number | null) =>
     bps == null
       ? null
@@ -419,10 +423,7 @@ function DealDetail() {
 
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">
-          {deal.name ??
-            t(`instrument.${deal.instrumentKind}`, {
-              defaultValue: deal.instrumentKind,
-            })}
+          {dealTitle(deal)}
         </h1>
         <Badge variant={statusVariant(deal.status)}>
           {t(`status.${deal.status}`, { defaultValue: deal.status })}

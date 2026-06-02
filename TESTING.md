@@ -349,7 +349,7 @@ d'une entité (`/participations/$companyId`), nom personnalisé d'un compte
 
 | #   | Étape                                                            | Résultat attendu                                                                  |
 | --- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| ED1 | Page deal → « Modifier » → saisir un nom personnalisé → Enregistrer | Toast succès ; le titre devient le nom saisi (réactif, sans reload) ; l'instrument reste visible dans la grille d'infos |
+| ED1 | Page deal → « Modifier » → saisir un nom personnalisé → Enregistrer | Toast succès ; le titre devient le nom saisi (réactif, sans reload) ; l'instrument reste visible dans la grille d'infos ; les listes (`/participations`, `/app/all/participations`, fiche entité) affichent aussi ce nom à la place du libellé d'instrument |
 | ED2 | Même dialog → vider le nom → Enregistrer                          | Le titre retombe sur le libellé de l'instrument (champ `name` effacé en base)     |
 | ED3 | Même dialog → changer l'instrument (dropdown) → Enregistrer       | Étiquette instrument mise à jour (titre si pas de nom, grille, listes) ; **aucun** changement sur les transactions rattachées (Versé/Reçu inchangés) |
 | ED4 | Page entité → « Modifier » → renommer + SIREN valide (9 chiffres, espaces tolérés) → Enregistrer | Toast succès ; titre + SIREN de la grille mis à jour ; SIREN stocké normalisé (sans espaces) |
