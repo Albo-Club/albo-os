@@ -91,7 +91,29 @@
     "scpi": "SCPI",
     "cto": "Compte-titres",
     "dat": "Dépôt à terme",
-    "crypto": "Crypto"
+    "crypto": "Crypto",
+    "loan": "Prêt",
+    "capitalization_account": "Compte de capitalisation"
+  },
+  "edit": {
+    "dealTitle": "Modifier le deal",
+    "dealDescription": "Renommer le deal et changer son type d'instrument.",
+    "companyTitle": "Modifier la société",
+    "companyDescription": "Renommer la société et modifier son SIREN.",
+    "nameLabel": "Nom",
+    "dealNamePlaceholder": "Nom personnalisé (optionnel)",
+    "dealNameHint": "Laisser vide pour utiliser l'instrument comme titre.",
+    "instrumentLabel": "Instrument",
+    "sirenLabel": "SIREN",
+    "sirenPlaceholder": "9 chiffres",
+    "sirenInvalid": "Le SIREN doit contenir exactement 9 chiffres.",
+    "nameRequired": "Le nom est obligatoire.",
+    "saved": "Modifications enregistrées",
+    "errors": {
+      "invalid_siren": "Le SIREN doit contenir exactement 9 chiffres.",
+      "siren_already_used": "Ce SIREN est déjà utilisé par une autre société.",
+      "default": "Impossible d'enregistrer les modifications. Réessayez."
+    }
   },
   "empty": "Aucune participation pour ce scope — crée des deals via le chat IA, ou ajoute-les à la main.",
   "search": {

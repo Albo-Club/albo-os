@@ -1,13 +1,25 @@
 import { useRef, useState } from 'react'
+import { Pencil } from 'lucide-react'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { useConvexQuery } from '@convex-dev/react-query'
+import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { api } from '../../../../convex/_generated/api'
 import type { Id } from '../../../../convex/_generated/dataModel'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
+import { Button } from '~/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
+import { Label } from '~/components/ui/label'
 import {
   Table,
   TableBody,
@@ -64,10 +76,80 @@ function Info({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
+/**
+ * Dialog de renommage du compte : édite UNIQUEMENT `displayName`.
+ * `label` (nom d'origine import/banque) reste en lecture seule ; un nom
+ * vide efface `displayName` et l'affichage retombe sur `label`.
+ */
+function RenameAccountDialog({
+  account,
+  onClose,
+}: {
+  account: {
+    _id: Id<'bankAccounts'>
+    label: string
+    displayName: string | null
+  }
+  onClose: () => void
+}) {
+  const { t } = useTranslation(['cash', 'common'])
+  const renameAccount = useConvexMutation(api.cash.updateAccountName)
+  const [name, setName] = useState(account.displayName ?? '')
+  const [pending, setPending] = useState(false)
+
+  async function handleSave() {
+    setPending(true)
+    try {
+      await renameAccount({
+        bankAccountId: account._id,
+        displayName: name,
+      })
+      toast.success(t('cash:rename.saved'))
+      onClose()
+    } catch {
+      toast.error(t('cash:rename.errors.default'))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('cash:rename.title')}</DialogTitle>
+          <DialogDescription>{t('cash:rename.description')}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="account-name">{t('cash:rename.nameLabel')}</Label>
+          <Input
+            id="account-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={account.label}
+          />
+          <p className="text-muted-foreground text-xs">
+            {t('cash:rename.nameHint')}
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={pending}>
+            {t('common:actions.cancel')}
+          </Button>
+          <Button onClick={handleSave} disabled={pending}>
+            {t('common:actions.save')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function AccountDetail() {
-  const { t, i18n } = useTranslation('cash')
+  const { t, i18n } = useTranslation(['cash', 'common'])
   const lang = i18n.language
   const { orgSlug, accountId } = Route.useParams()
+  const [renameOpen, setRenameOpen] = useState(false)
   const account = useConvexQuery(api.cash.getAccount, {
     bankAccountId: accountId as Id<'bankAccounts'>,
   })
@@ -114,9 +196,31 @@ function AccountDetail() {
   return (
     <main className="flex-1 space-y-6 p-6">
       <BackLink orgSlug={orgSlug} />
-      <h1 className="text-2xl font-semibold tracking-tight">
-        {account ? `${account.bankName} · ${account.label}` : t('loading')}
-      </h1>
+      <div className="space-y-1">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {account
+              ? `${account.bankName} · ${account.displayName ?? account.label}`
+              : t('loading')}
+          </h1>
+          {account && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRenameOpen(true)}
+            >
+              <Pencil className="size-4" />
+              {t('common:actions.edit')}
+            </Button>
+          )}
+        </div>
+        {/* Nom d'origine banque, lecture seule, visible seulement si renommé. */}
+        {account?.displayName && (
+          <p className="text-muted-foreground text-sm">
+            {t('originalName', { name: account.label })}
+          </p>
+        )}
+      </div>
 
       <div className="grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-4">
         <Info label={t('detail.owner')} value={account?.owner?.name} />
@@ -183,6 +287,13 @@ function AccountDetail() {
           </div>
         )}
       </section>
+
+      {account && renameOpen && (
+        <RenameAccountDialog
+          account={account}
+          onClose={() => setRenameOpen(false)}
+        />
+      )}
     </main>
   )
 }

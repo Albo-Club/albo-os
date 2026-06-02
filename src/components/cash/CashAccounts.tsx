@@ -18,6 +18,8 @@ export type CashAccount = {
   _id: Id<'bankAccounts'>
   bankName: string
   label: string
+  /** Nom personnalisé éditable — affiché à la place de `label` si présent. */
+  displayName: string | null
   accountKind: string | null
   currency: string
   currentBalance: number | null
@@ -140,7 +142,7 @@ export function CashAccounts({
                     <TableCell className="font-medium">{a.bankName}</TableCell>
                     <TableCell>
                       <span className="flex flex-col gap-0.5">
-                        <span>{a.label}</span>
+                        <span>{a.displayName ?? a.label}</span>
                         {a.balanceAsOf != null && (
                           <span className="text-muted-foreground text-xs">
                             {t('asOf', { date: fmtDate(a.balanceAsOf) })}

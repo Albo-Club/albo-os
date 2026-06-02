@@ -340,6 +340,25 @@ depuis la liste des transactions du deal (clic ligne → sheet → combobox).
 | RD6 | Liste des deals (`/app/$orgSlug/participations`, `/app/all/participations`, fiche participation) : colonnes/champs Engagé · Versé · Reçu | Versé/Reçu calculés serveur (`deals.list` / `aggregate.listDeals` enrichis, pas une query `listByDeal` par ligne) ; valeurs identiques à la page détail du même deal ; deal sans transaction → 0 € / 0 € ; lignes groupe (par société) = sommes des deals |
 | RD7 | Barre de recherche des participations (`/app/$orgSlug/participations` et `/app/all/participations`) : taper un nom de société, un instrument (libellé FR/EN ou clé brute `os`), un investisseur, un secteur — avec/sans accents | Filtrage **client** (debounce ~250 ms, insensible casse/accents) ; regroupements et totaux par société recalculés sur le sous-ensemble ; terme sans résultat → « Aucune participation ne correspond… » ; effacer → liste complète |
 
+### Édition de champs (deal / entité / compte bancaire)
+
+Édition front : nom + instrument d'un deal (`/deals/$dealId`), nom + SIREN
+d'une entité (`/participations/$companyId`), nom personnalisé d'un compte
+(`/cash/$accountId`). Mutations : `deals.update`, `companies.update`,
+`cash.updateAccountName`.
+
+| #   | Étape                                                            | Résultat attendu                                                                  |
+| --- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| ED1 | Page deal → « Modifier » → saisir un nom personnalisé → Enregistrer | Toast succès ; le titre devient le nom saisi (réactif, sans reload) ; l'instrument reste visible dans la grille d'infos |
+| ED2 | Même dialog → vider le nom → Enregistrer                          | Le titre retombe sur le libellé de l'instrument (champ `name` effacé en base)     |
+| ED3 | Même dialog → changer l'instrument (dropdown) → Enregistrer       | Étiquette instrument mise à jour (titre si pas de nom, grille, listes) ; **aucun** changement sur les transactions rattachées (Versé/Reçu inchangés) |
+| ED4 | Page entité → « Modifier » → renommer + SIREN valide (9 chiffres, espaces tolérés) → Enregistrer | Toast succès ; titre + SIREN de la grille mis à jour ; SIREN stocké normalisé (sans espaces) |
+| ED5 | SIREN invalide (ex. `12345`)                                      | Erreur inline sous le champ + bouton Enregistrer désactivé ; côté serveur la mutation rejette (`invalid_siren`) |
+| ED6 | SIREN déjà porté par une autre entité de l'org                    | Toast d'erreur « déjà utilisé » (`siren_already_used`), rien n'est écrit          |
+| ED7 | Page compte → « Modifier » → saisir un nom personnalisé → Enregistrer | Titre = `banque · nom personnalisé` ; nom d'origine en sous-titre grisé ; la liste `/cash` affiche aussi le nom personnalisé |
+| ED8 | Même dialog → vider le nom → Enregistrer                          | Retombe sur le nom d'origine (`label`) ; `label` n'est **jamais** modifié par ce flux |
+| ED9 | i18n EN/FR sur les 3 dialogs                                      | Libellés, hints, erreurs et toasts traduits (namespaces `participations` / `cash` / `common`) |
+
 ## Cash flow forecast (règles récurrentes → solde projeté)
 
 Couche prévisionnelle : `forecastRules` (causes récurrentes) →

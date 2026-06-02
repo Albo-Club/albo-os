@@ -9,6 +9,17 @@
   "noBalance": "No balance",
   "accountsEmpty": "No bank accounts for this organization yet.",
   "loading": "Loading…",
+  "originalName": "Bank name: {{name}}",
+  "rename": {
+    "title": "Rename account",
+    "description": "Set a custom name for this account. The bank's original name is kept.",
+    "nameLabel": "Custom name",
+    "nameHint": "Leave empty to use the bank's original name.",
+    "saved": "Account renamed",
+    "errors": {
+      "default": "Couldn't rename the account. Please try again."
+    }
+  },
   "connect": {
     "button": "Connect a bank",
     "connecting": "Connecting…",
