@@ -176,6 +176,9 @@ export const listByStatus = query({
 // Invariant : `matchStatus === 'matched'` ⟺ `dealId != null`. `reconciled`
 // (+ by/at) est un miroir dérivé maintenu pour les lecteurs existants
 // (UI deal, vue Cash, agent) — ne jamais l'écrire ailleurs qu'ici.
+// `allocation` (pointage généralisé) cohabite avec `dealId` :
+// `dealId != null` ⟺ `allocation = { kind: 'deal', targetId: dealId }`
+// (backfill des lignes pré-existantes : transactions:backfillAllocation).
 // Chaque mutation écrit une ligne append-only dans `matchingDecisions`
 // (dataset d'apprentissage de l'agent, phase 2).
 
@@ -197,6 +200,7 @@ export const matchTransaction = mutation({
     await ctx.db.patch('transactions', tx._id, {
       matchStatus: 'matched',
       dealId,
+      allocation: { kind: 'deal', targetId: dealId },
       reconciled: true,
       reconciledBy: user._id,
       reconciledAt: Date.now(),
@@ -226,6 +230,7 @@ export const ignoreTransaction = mutation({
     await ctx.db.patch('transactions', tx._id, {
       matchStatus: 'ignored',
       dealId: undefined,
+      allocation: undefined,
       reconciled: false,
       reconciledBy: undefined,
       reconciledAt: undefined,
@@ -257,6 +262,7 @@ async function applyCategorization(
   await ctx.db.patch('transactions', tx._id, {
     matchStatus: status,
     dealId: undefined,
+    allocation: undefined,
     reconciled: false,
     reconciledBy: undefined,
     reconciledAt: undefined,
@@ -395,6 +401,7 @@ export const unmatchTransaction = mutation({
     await ctx.db.patch('transactions', tx._id, {
       matchStatus: 'unmatched',
       dealId: undefined,
+      allocation: undefined,
       reconciled: false,
       reconciledBy: undefined,
       reconciledAt: undefined,
@@ -478,6 +485,43 @@ export const backfillSearchText = internalMutation({
       }
       await ctx.db.patch('transactions', tx._id, {
         searchText: buildSearchText(tx.rawLabel, tx.counterparty),
+      })
+      updated += 1
+    }
+    return { updated, skipped }
+  },
+})
+
+/**
+ * Backfill one-shot (idempotent) du pointage généralisé `allocation` sur les
+ * transactions pré-existantes : toute transaction avec `dealId` non nul et
+ * sans `allocation` reçoit `allocation = { kind: 'deal', targetId: dealId }`.
+ * Ne touche pas `dealId` (cohabitation). Une transaction avec `allocation`
+ * déjà renseignée est ignorée (relancer ne change rien).
+ *
+ * N'écrit RIEN dans `matchingDecisions` : un backfill n'est pas une décision
+ * humaine, on ne pollue pas le dataset.
+ *
+ * À lancer manuellement par org :
+ *   pnpm exec convex run transactions:backfillAllocation '{"orgId": "…"}' --prod
+ */
+export const backfillAllocation = internalMutation({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    const rows = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+      .collect()
+
+    let updated = 0
+    let skipped = 0
+    for (const tx of rows) {
+      if (tx.allocation !== undefined || tx.dealId == null) {
+        skipped += 1
+        continue
+      }
+      await ctx.db.patch('transactions', tx._id, {
+        allocation: { kind: 'deal', targetId: tx.dealId },
       })
       updated += 1
     }

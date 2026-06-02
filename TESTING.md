@@ -365,6 +365,30 @@ Convex (auth, DB, pointage). Détails et pièges : `KNOWN_ISSUES.md`
 | F11 | `forecasts:cancelEntry` sur une entry pending                          | `status: "cancelled"` ; sort du solde projeté ; survit à un re-run d'expandRules (`skippedProtected`) |
 | F12 | `expandRules` / `getForecastBalance` en tant que **non-membre** de l'org | `ConvexError('not_a_member')`                                                    |
 
+## Passif (equityPositions / C/C inter-entités → getLiabilities)
+
+Modélisation du passif : `equityPositions` (capitaux propres émis) +
+`intercompanyLoans` (C/C d'associés, un enregistrement partagé par relation
+créancier → débiteur) + pointage généralisé `transactions.allocation`
+(deal / equity / intercompany_loan). Les soldes de C/C sont **dérivés** des
+transactions pointées, jamais stockés : chaque org somme **ses propres**
+transactions. La logique pure est couverte par `pnpm test:unit`
+(`tests/liabilities.test.ts`) ; les étapes ci-dessous valident le glue Convex.
+Détails et pièges : `KNOWN_ISSUES.md` « Passif ».
+
+| #  | Étape                                                                  | Résultat attendu                                                                 |
+| -- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| P1 | `convex export --prod`                                                 | Snapshot de sécurité avant le backfill                                            |
+| P2 | `convex run --prod transactions:backfillAllocation '{"orgId":"<id calte>"}'` | `{ updated: N, skipped: M }` — N = tx avec `dealId` sans `allocation`            |
+| P3 | Re-lancer P2 (**idempotence**)                                         | `{ updated: 0, skipped: N+M }` — aucune ré-écriture                               |
+| P4 | Idem pour l'org `albo`                                                 | Mêmes invariants                                                                  |
+| P5 | Inspecter une tx backfillée (dashboard)                                | `allocation: { kind: 'deal', targetId: <dealId> }` ; `dealId` et `matchStatus` **inchangés** |
+| P6 | `liabilities:seedTestScenario '{"fromOrgId":"<calte>","toOrgId":"<albo>"}'` (dev) | 1 equityPosition (calte) + 1 loan calte→albo + 2 tx pointées (out chez calte, in chez albo), ids retournés |
+| P7 | `liabilities:getLiabilities '{"orgId":"<calte>"}'` (membre)            | `equityPositions: [1]` ; loan `side: 'creditor'`, `balanceCents: +10000000` (créance) |
+| P8 | `liabilities:getLiabilities '{"orgId":"<albo>"}'` (membre)             | `equityPositions: []` ; même loan `side: 'debtor'`, `balanceCents: -10000000` (dette) |
+| P9 | `getLiabilities` en tant que **non-membre** de l'org                   | `ConvexError('not_a_member')`                                                     |
+| P10 | `liabilities:cleanupTestScenario` (mêmes args que P6)                 | Lignes `[TEST liabilities]` supprimées ; P7/P8 retournent des listes vides        |
+
 ## En cas d'échec
 
 - Smoke échoue → ouvrir `KNOWN_ISSUES.md` (déploiement Convex / `pnpm rebuild esbuild`).

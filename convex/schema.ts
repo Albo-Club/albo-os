@@ -118,6 +118,24 @@ const matchDecisionSource = v.union(
   v.literal('agent_suggested'),
 )
 
+// ─── Enums passif (equityPositions / intercompanyLoans / allocation) ────────
+
+// Nature d'une position de capitaux propres.
+const equityPositionType = v.union(
+  v.literal('capital_social'),
+  v.literal('prime_emission'),
+  v.literal('augmentation_capital'),
+  v.literal('report_a_nouveau'),
+)
+
+// Cible d'un pointage généralisé (`transactions.allocation`). Cohabite avec
+// `dealId` : un pointage deal écrit les deux (cf. convex/transactions.ts).
+const allocationKind = v.union(
+  v.literal('deal'),
+  v.literal('equity'),
+  v.literal('intercompany_loan'),
+)
+
 const forecastConfidence = v.union(
   v.literal('low'),
   v.literal('medium'),
@@ -394,6 +412,54 @@ export default defineSchema({
     .index('by_company_metric', ['companyId', 'metricType'])
     .index('by_org_period', ['orgId', 'periodEnd']),
 
+  // ─── Passif (capitaux propres + comptes courants d'associés) ──────────────
+
+  /**
+   * equityPositions — capitaux propres émis par une org (quasi-statique).
+   * `orgId` = entité émettrice. Le détenteur est SOIT une org du groupe
+   * (`holderOrgId`), SOIT une personne physique (`holderPersonId`), SOIT un
+   * externe en libellé libre (`holderLabel`).
+   */
+  equityPositions: defineTable({
+    orgId: v.id('organizations'), // entité émettrice
+    holderOrgId: v.optional(v.id('organizations')), // détenteur si entité du groupe
+    holderPersonId: v.optional(v.string()), // si personne physique
+    holderLabel: v.optional(v.string()), // libellé libre si externe
+    type: equityPositionType,
+    amountCents: v.number(), // cents EUR
+    shares: v.optional(v.number()),
+    effectiveDate: v.number(), // ms epoch
+    actDriveId: v.optional(v.string()),
+    airtableId: v.optional(v.string()), // ancre import Airtable (idempotence)
+  })
+    .index('by_org', ['orgId'])
+    .index('by_holder_org', ['holderOrgId'])
+    .index('by_airtable_id', ['airtableId']),
+
+  /**
+   * intercompanyLoans — comptes courants d'associés inter-entités.
+   * UN enregistrement partagé par relation créancier → débiteur.
+   *
+   * PAS de champ solde : le solde est toujours dérivé des transactions
+   * pointées dessus (`transactions.allocation.kind === 'intercompany_loan'`),
+   * chaque org sommant SES propres transactions (cf. convex/liabilities.ts
+   * `getLiabilities` + KNOWN_ISSUES.md « Passif »).
+   */
+  intercompanyLoans: defineTable({
+    fromOrgId: v.id('organizations'), // créancier
+    toOrgId: v.id('organizations'), // débiteur
+    fromPersonId: v.optional(v.string()), // si contrepartie personne physique
+    fromLabel: v.optional(v.string()),
+    interestRateBps: v.optional(v.number()), // bps ; absent = 0 = non rémunéré
+    isBlocked: v.boolean(),
+    conventionDriveId: v.optional(v.string()),
+    openedDate: v.number(), // ms epoch
+    airtableId: v.optional(v.string()), // ancre import Airtable (idempotence)
+  })
+    .index('by_from', ['fromOrgId'])
+    .index('by_to', ['toOrgId'])
+    .index('by_airtable_id', ['airtableId']),
+
   // ─── Phase 2 — cash management (tables déclarées, mutations vides) ────────
 
   /**
@@ -444,6 +510,16 @@ export default defineSchema({
     bankAccountId: v.id('bankAccounts'),
     dealId: v.optional(v.id('deals')),
     matchStatus: v.optional(txMatchStatus),
+    // Pointage généralisé : deal, position de capital ou C/C inter-entités.
+    // Cohabite avec `dealId` : `dealId != null` ⟺ `allocation.kind === 'deal'`
+    // (backfill : transactions:backfillAllocation). `targetId` est l'_id de la
+    // cible, stocké en string (pas de v.id() union cross-tables).
+    allocation: v.optional(
+      v.object({
+        kind: allocationKind,
+        targetId: v.string(),
+      }),
+    ),
     direction: txDirection,
     amount: v.number(), // cents, toujours positif
     transactionDate: v.number(),
@@ -475,6 +551,9 @@ export default defineSchema({
     .index('by_memo_id', ['memoId'])
     .index('by_org_unreconciled', ['orgId', 'reconciled'])
     .index('by_org_matchStatus', ['orgId', 'matchStatus'])
+    // Dérivation des soldes de passif : transactions d'UNE org pointées sur
+    // une cible donnée (chemin imbriqué supporté par Convex).
+    .index('by_org_allocation_target', ['orgId', 'allocation.targetId'])
     .index('by_airtable_id', ['airtableId'])
     .searchIndex('search_text', {
       searchField: 'searchText',
