@@ -14,6 +14,7 @@ import { z } from 'zod/v3'
 
 import { internal } from './_generated/api'
 import { internalMutation, internalQuery } from './_generated/server'
+import { buildSearchText } from './lib/searchText'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 
@@ -337,6 +338,7 @@ export const createTransactionInternal = internalMutation({
       transactionDate: args.transactionDate,
       rawLabel: args.rawLabel.trim(),
       counterparty: args.counterparty,
+      searchText: buildSearchText(args.rawLabel.trim(), args.counterparty),
       source: 'manual',
       reconciled: args.dealId !== undefined,
       reconciledBy: args.dealId ? args.actorUserId : undefined,

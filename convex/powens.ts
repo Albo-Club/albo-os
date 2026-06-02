@@ -28,6 +28,7 @@ import {
   internalQuery,
 } from './_generated/server'
 import { requireOrgRole } from './lib/auth'
+import { buildSearchText } from './lib/searchText'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 
@@ -611,6 +612,7 @@ export const ingestConnectionSync = internalMutation({
           transactionDate: tx.dateMs,
           rawLabel: tx.wording,
           counterparty: tx.counterparty,
+          searchText: buildSearchText(tx.wording, tx.counterparty),
           source: 'powens' as const,
           powensTxId: tx.powensTxId,
         }
@@ -1204,6 +1206,7 @@ export const importMemoCsvTransactions = internalMutation({
         transactionDate: row.transactionDate,
         rawLabel: row.rawLabel,
         counterparty: row.counterparty,
+        searchText: buildSearchText(row.rawLabel, row.counterparty),
         source: 'memo_csv',
         memoId: row.memoId,
         importMeta: hasMeta ? meta : undefined,

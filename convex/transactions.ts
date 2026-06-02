@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values'
 import { internalMutation, mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { recordDecision } from './lib/matchingLog'
+import { buildSearchText } from './lib/searchText'
 
 import type { MutationCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
@@ -362,5 +363,38 @@ export const backfillMatchStatus = internalMutation({
       }
     }
     return { matched, unmatched, skipped }
+  },
+})
+
+/**
+ * Backfill one-shot (idempotent) du champ dérivé `searchText` (recherche
+ * full-text) sur les transactions pré-existantes. Les écritures récentes le
+ * posent déjà (Powens, import Airtable, CSV Mémo, agent) — une ligne sans
+ * `searchText` est simplement invisible à la recherche.
+ *
+ * À lancer manuellement par org :
+ *   pnpm exec convex run transactions:backfillSearchText '{"orgId": "…"}' --prod
+ */
+export const backfillSearchText = internalMutation({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    const rows = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+      .collect()
+
+    let updated = 0
+    let skipped = 0
+    for (const tx of rows) {
+      if (tx.searchText !== undefined) {
+        skipped += 1
+        continue
+      }
+      await ctx.db.patch('transactions', tx._id, {
+        searchText: buildSearchText(tx.rawLabel, tx.counterparty),
+      })
+      updated += 1
+    }
+    return { updated, skipped }
   },
 })

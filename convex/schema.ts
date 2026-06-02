@@ -427,6 +427,13 @@ export default defineSchema({
    * `matchStatus` est optionnel au schéma (les docs pré-existants n'ont pas
    * le champ tant que `transactions:backfillMatchStatus` n'a pas tourné) ;
    * absence = logiquement 'unmatched'.
+   *
+   * `searchText` (recherche full-text) est dérivé de `rawLabel` +
+   * `counterparty`, normalisé (minuscules, sans accents) via
+   * `lib/searchText.buildSearchText` — à poser à chaque écriture. Optionnel
+   * au schéma : les lignes pré-existantes ne l'ont pas tant que
+   * `transactions:backfillSearchText` n'a pas tourné (elles sont alors
+   * invisibles à la recherche, pas aux listes).
    */
   transactions: defineTable({
     orgId: v.id('organizations'),
@@ -438,6 +445,7 @@ export default defineSchema({
     transactionDate: v.number(),
     rawLabel: v.string(),
     counterparty: v.optional(v.string()),
+    searchText: v.optional(v.string()), // dérivé rawLabel + counterparty, normalisé
     source: txSource,
     powensTxId: v.optional(v.string()),
     memoId: v.optional(v.string()), // ancre import CSV Mémo Bank (idempotence)
@@ -463,7 +471,11 @@ export default defineSchema({
     .index('by_memo_id', ['memoId'])
     .index('by_org_unreconciled', ['orgId', 'reconciled'])
     .index('by_org_matchStatus', ['orgId', 'matchStatus'])
-    .index('by_airtable_id', ['airtableId']),
+    .index('by_airtable_id', ['airtableId'])
+    .searchIndex('search_text', {
+      searchField: 'searchText',
+      filterFields: ['orgId', 'matchStatus', 'bankAccountId'],
+    }),
 
   /**
    * matchingDecisions — historique append-only des décisions de pointage

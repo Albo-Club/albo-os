@@ -22,6 +22,7 @@ import {
   internalMutation,
   internalQuery,
 } from './_generated/server'
+import { buildSearchText } from './lib/searchText'
 import type { Id } from './_generated/dataModel'
 import type { Infer } from 'convex/values'
 
@@ -429,6 +430,7 @@ export const upsertTransactions = internalMutation({
         transactionDate: r.transactionDate,
         rawLabel: r.rawLabel,
         counterparty: r.counterparty,
+        searchText: buildSearchText(r.rawLabel, r.counterparty),
         source: 'imported' as const,
         notes: r.notes,
         airtableId: r.airtableId,
