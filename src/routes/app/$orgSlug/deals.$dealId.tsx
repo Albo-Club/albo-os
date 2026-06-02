@@ -234,6 +234,19 @@ function DealDetail() {
   const deal = useConvexQuery(api.deals.getById, {
     id: dealId as Id<'deals'>,
   })
+  // Montants calculés depuis les transactions rattachées (même query que le
+  // sous-composant Transactions — souscription partagée, pas de double charge).
+  const txs = useConvexQuery(api.transactions.listByDeal, {
+    dealId: dealId as Id<'deals'>,
+  })
+  const paidActual = txs?.reduce(
+    (sum, tx) => (tx.direction === 'out' ? sum + tx.amount : sum),
+    0,
+  )
+  const received = txs?.reduce(
+    (sum, tx) => (tx.direction === 'in' ? sum + tx.amount : sum),
+    0,
+  )
   const { fmtEur, fmtDate } = useFormatters()
   const fmtPct = (bps?: number | null) =>
     bps == null
@@ -308,7 +321,8 @@ function DealDetail() {
           }
         />
         <Info label={t('deal.committed')} value={fmtEur(deal.committedAmount)} />
-        <Info label={t('deal.paid')} value={fmtEur(deal.paidAmount)} />
+        <Info label={t('deal.paid')} value={fmtEur(paidActual)} />
+        <Info label={t('deal.received')} value={fmtEur(received)} />
         <Info label={t('deal.shares')} value={fmtNum(deal.sharesAcquired)} />
         <Info
           label={t('deal.pricePerShare')}

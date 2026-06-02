@@ -48,6 +48,7 @@
     "target": "Société",
     "committed": "Engagé",
     "paid": "Versé",
+    "received": "Reçu",
     "shares": "Titres acquis",
     "pricePerShare": "Prix par titre",
     "interestRate": "Taux d'intérêt",
