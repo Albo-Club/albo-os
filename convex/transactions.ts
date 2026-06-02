@@ -109,8 +109,9 @@ export const listUnmatched = query({
 
 /**
  * Transactions d'une org dans un statut de pointage donné (consultation des
- * écartées : ignorées / charges / impôts, ou des rattachées), triées par date
- * décroissante et enrichies du compte bancaire. Même shape que `listUnmatched`.
+ * écartées : ignorées / charges / impôts / produits / virements internes, ou
+ * des rattachées), triées par date décroissante et enrichies du compte
+ * bancaire. Même shape que `listUnmatched`.
  *
  * `search` (optionnel) filtre par libellé/contrepartie via le search index
  * `search_text` (insensible casse/accents), scopé org + statut.
@@ -123,6 +124,8 @@ export const listByStatus = query({
       v.literal('ignored'),
       v.literal('charge'),
       v.literal('tax'),
+      v.literal('product'),
+      v.literal('internal_transfer'),
     ),
     search: v.optional(v.string()),
   },
@@ -238,15 +241,17 @@ export const ignoreTransaction = mutation({
 })
 
 /**
- * Logique unitaire de classement charge/impôt : patch de la transaction +
- * ligne `matchingDecisions`. Partagée par `categorizeAsCharge`,
- * `categorizeAsTax` et `bulkCategorize` pour qu'elles ne divergent jamais.
- * L'appelant a déjà chargé la transaction et vérifié l'appartenance à l'org.
+ * Logique unitaire de classement charge/impôt/produit/virement interne :
+ * patch de la transaction + ligne `matchingDecisions`. Partagée par
+ * `categorizeAsCharge`, `categorizeAsTax`, `categorizeAsProduct`,
+ * `categorizeAsInternalTransfer` et `bulkCategorize` pour qu'elles ne
+ * divergent jamais. L'appelant a déjà chargé la transaction et vérifié
+ * l'appartenance à l'org.
  */
 async function applyCategorization(
   ctx: MutationCtx,
   tx: Doc<'transactions'>,
-  status: 'charge' | 'tax',
+  status: 'charge' | 'tax' | 'product' | 'internal_transfer',
   decidedBy: Id<'users'>,
 ) {
   await ctx.db.patch('transactions', tx._id, {
@@ -299,15 +304,58 @@ export const categorizeAsTax = mutation({
 })
 
 /**
- * Classement en masse en charge ou impôt. Chaque transaction est traitée
- * indépendamment (même chemin que l'unitaire : auth par org de la tx, patch,
- * ligne `matchingDecisions`) ; un échec sur l'une n'empêche pas les autres.
- * Retourne les ids classés et les échecs (« appliquer ce qui passe »).
+ * Classe une transaction en produit : argent entrant non rattachable à un
+ * deal (intérêts bancaires, remboursement divers…). Sous-type d'« écarté » :
+ * même comportement qu'`ignoreTransaction`, seul le statut diffère pour
+ * pouvoir consulter ces transactions plus tard.
+ */
+export const categorizeAsProduct = mutation({
+  args: { transactionId: v.id('transactions') },
+  handler: async (ctx, { transactionId }) => {
+    const tx = await ctx.db.get('transactions', transactionId)
+    if (!tx) throw new ConvexError('not_found')
+    const { user } = await requireOrgMember(ctx, tx.orgId)
+
+    await applyCategorization(ctx, tx, 'product', user._id)
+    return null
+  },
+})
+
+/**
+ * Classe une transaction en virement interne (mouvement entre deux comptes de
+ * l'utilisateur). V1 : simple étiquette, pas d'appariement des deux jambes
+ * (sortie ↔ entrée). Sous-type d'« écarté » : même comportement
+ * qu'`ignoreTransaction`, seul le statut diffère pour pouvoir consulter ces
+ * transactions plus tard.
+ */
+export const categorizeAsInternalTransfer = mutation({
+  args: { transactionId: v.id('transactions') },
+  handler: async (ctx, { transactionId }) => {
+    const tx = await ctx.db.get('transactions', transactionId)
+    if (!tx) throw new ConvexError('not_found')
+    const { user } = await requireOrgMember(ctx, tx.orgId)
+
+    await applyCategorization(ctx, tx, 'internal_transfer', user._id)
+    return null
+  },
+})
+
+/**
+ * Classement en masse en charge, impôt, produit ou virement interne. Chaque
+ * transaction est traitée indépendamment (même chemin que l'unitaire : auth
+ * par org de la tx, patch, ligne `matchingDecisions`) ; un échec sur l'une
+ * n'empêche pas les autres. Retourne les ids classés et les échecs
+ * (« appliquer ce qui passe »).
  */
 export const bulkCategorize = mutation({
   args: {
     transactionIds: v.array(v.id('transactions')),
-    status: v.union(v.literal('charge'), v.literal('tax')),
+    status: v.union(
+      v.literal('charge'),
+      v.literal('tax'),
+      v.literal('product'),
+      v.literal('internal_transfer'),
+    ),
   },
   handler: async (ctx, { transactionIds, status }) => {
     const succeeded: Array<Id<'transactions'>> = []

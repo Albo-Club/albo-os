@@ -276,7 +276,8 @@ Prérequis : env vars `POWENS_CLIENT_ID/SECRET/DOMAIN/REDIRECT_URI` posées ;
 ## Pointage transaction → deal (mutations + backfill)
 
 Pointage manuel (MVP 1) : `matchTransaction` / `ignoreTransaction` /
-`categorizeAsCharge` / `categorizeAsTax` / `unmatchTransaction` + file
+`categorizeAsCharge` / `categorizeAsTax` / `categorizeAsProduct` /
+`categorizeAsInternalTransfer` / `unmatchTransaction` + file
 `listUnmatched` + consultation `listByStatus`. Chaque action écrit une ligne
 append-only dans `matchingDecisions` (dataset agent, phase 2). Prérequis :
 schéma déployé (champ `matchStatus` + table `matchingDecisions`). Détails et
@@ -296,8 +297,10 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | R10 | Inspecter `matchingDecisions` après R6–R9                        | Une ligne par action, aucune modifiée/supprimée ; `dealAmountExpected`/`amountDelta`/`dateDelta` remplis si le deal a `committedAmount`/`signedDate` |
 | R11 | `categorizeAsCharge` sur une tx                                   | Tx → `charge`, `dealId` vidé, `reconciled: false` ; ligne `decision: 'charge'`     |
 | R12 | `categorizeAsTax` sur une tx                                      | Tx → `tax`, `dealId` vidé, `reconciled: false` ; ligne `decision: 'tax'`           |
-| R13 | `listByStatus` avec `status: 'charge'` (puis `'tax'`)             | Les tx classées dans ce statut, triées date desc, enrichies du compte ; les tx de R11/R12 ne sont plus dans `listUnmatched` |
-| R14 | `bulkCategorize` avec plusieurs `transactionIds` + `status: 'charge'` (puis `'tax'`) | Retour `{ succeeded: [...], failed: [] }` ; chaque tx → même patch que l'unitaire + une ligne `matchingDecisions` par tx ; un id invalide/d'une autre org atterrit dans `failed` sans bloquer les autres |
+| R13 | `listByStatus` avec `status: 'charge'` (puis `'tax'`, `'product'`, `'internal_transfer'`) | Les tx classées dans ce statut, triées date desc, enrichies du compte ; les tx de R11/R12/R15/R16 ne sont plus dans `listUnmatched` |
+| R14 | `bulkCategorize` avec plusieurs `transactionIds` + `status: 'charge'` (puis `'tax'`, `'product'`, `'internal_transfer'`) | Retour `{ succeeded: [...], failed: [] }` ; chaque tx → même patch que l'unitaire + une ligne `matchingDecisions` par tx ; un id invalide/d'une autre org atterrit dans `failed` sans bloquer les autres |
+| R15 | `categorizeAsProduct` sur une tx                                   | Tx → `product`, `dealId` vidé, `reconciled: false` ; ligne `decision: 'product'` ; aucun impact sur les « Reçu » des deals |
+| R16 | `categorizeAsInternalTransfer` sur une tx                          | Tx → `internal_transfer`, `dealId` vidé, `reconciled: false` ; ligne `decision: 'internal_transfer'` (simple étiquette, pas d'appariement des deux jambes) |
 
 ### UI de pointage (`/app/$orgSlug/pointage`)
 
@@ -313,12 +316,12 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | RU5 | « Annuler » pendant le bandeau (après RU3 ou RU4)                | Mutation `unmatchTransaction` ; la ligne redevient pointable (réactivité Convex)   |
 | RU6 | Clic sur une ligne (hors colonne Actions)                        | Sheet de détail lecture seule (date, libellé brut, contrepartie, montant, sens, compte) + mêmes actions |
 | RU7 | Basculer la langue EN/FR                                         | Toute la page traduite (titres, colonnes, boutons, bandeaux, onglets, état vide)   |
-| RU8 | Menu « Écarter ▾ » → « Charge » (puis « Impôt ») sur une ligne   | Mutation `categorizeAsCharge` / `categorizeAsTax` ; bandeau « Classée en charge/impôt · Annuler » ~5 s puis la ligne disparaît |
-| RU9 | Onglet « Charges » (puis « Impôts »)                             | Vue lecture seule des tx classées (`listByStatus`), triées date desc ; bouton « Annuler » par ligne |
-| RU10 | « Annuler » dans l'onglet Charges/Impôts                        | Mutation `unmatchTransaction` ; la tx disparaît de l'onglet et réapparaît dans « À pointer » |
-| RU11 | Cocher plusieurs lignes (case en tête de ligne)                  | Barre de sélection « N sélectionnées » au-dessus de la table avec boutons Charge / Impôt / Désélectionner ; cocher n'ouvre pas le sheet |
-| RU12 | Barre de sélection → « Charge » (puis « Impôt »)                 | Dialog de confirmation « Classer en charge/impôt ? N transactions… » ; Confirmer → **un seul** appel `bulkCategorize` (onglet réseau) ; les tx sortent de la file et apparaissent dans l'onglet Charges/Impôts ; une ligne `matchingDecisions` par tx |
-| RU13 | Toast « N classées en charge/impôt · Annuler » après RU12        | Clic « Annuler » → les tx du lot reviennent dans « À pointer » (boucle `unmatchTransaction`) |
+| RU8 | Menu « Écarter ▾ » → « Charge » (puis « Impôt », « Produit », « Virement interne ») sur une ligne | Mutation `categorizeAsCharge` / `categorizeAsTax` / `categorizeAsProduct` / `categorizeAsInternalTransfer` ; bandeau « Classée en charge/impôt/produit/virement interne · Annuler » ~5 s puis la ligne disparaît |
+| RU9 | Onglet « Charges » (puis « Impôts », « Produits », « Virements internes ») | Vue lecture seule des tx classées (`listByStatus`), triées date desc ; bouton « Annuler » par ligne |
+| RU10 | « Annuler » dans un onglet Charges/Impôts/Produits/Virements internes | Mutation `unmatchTransaction` ; la tx disparaît de l'onglet et réapparaît dans « À pointer » |
+| RU11 | Cocher plusieurs lignes (case en tête de ligne)                  | Barre de sélection « N sélectionnées » au-dessus de la table avec boutons Charge / Impôt / Produit / Virement interne / Désélectionner ; cocher n'ouvre pas le sheet |
+| RU12 | Barre de sélection → « Charge » (puis « Impôt », « Produit », « Virement interne ») | Dialog de confirmation « Classer en charge/impôt/produit/virement interne ? N transactions… » ; Confirmer → **un seul** appel `bulkCategorize` (onglet réseau) ; les tx sortent de la file et apparaissent dans l'onglet correspondant ; une ligne `matchingDecisions` par tx |
+| RU13 | Toast « N classées en charge/impôt/produit/virement interne · Annuler » après RU12 | Clic « Annuler » → les tx du lot reviennent dans « À pointer » (boucle `unmatchTransaction`) |
 | RU14 | « Désélectionner » dans la barre / Annuler dans le dialog        | Sélection vidée / dialog fermé sans aucune mutation |
 | RU15 | Barre de recherche (sous les onglets) : taper un libellé/contrepartie, dans chaque onglet | Filtrage serveur (debounce ~250 ms, insensible casse/accents) scopé org + statut de l'onglet ; compteur « N à pointer » = lignes affichées (filtrées) ; terme sans résultat → « Aucune transaction ne correspond… » ; effacer → file complète ; actions (rattacher/écarter/annuler) inchangées sur les lignes filtrées |
 

@@ -27,7 +27,7 @@ export const Route = createFileRoute('/app/$orgSlug/pointage/')({
 })
 
 /** Vues de la page : file de pointage (défaut) ou consultation des écartées. */
-type View = 'unmatched' | 'charge' | 'tax'
+type View = 'unmatched' | 'charge' | 'tax' | 'product' | 'internal_transfer'
 
 function Pointage() {
   const { t } = useTranslation('pointage')
@@ -97,6 +97,10 @@ function Pointage() {
           <TabsTrigger value="unmatched">{t('view.unmatched')}</TabsTrigger>
           <TabsTrigger value="charge">{t('view.charge')}</TabsTrigger>
           <TabsTrigger value="tax">{t('view.tax')}</TabsTrigger>
+          <TabsTrigger value="product">{t('view.product')}</TabsTrigger>
+          <TabsTrigger value="internal_transfer">
+            {t('view.internal_transfer')}
+          </TabsTrigger>
         </TabsList>
       </Tabs>
       <Input

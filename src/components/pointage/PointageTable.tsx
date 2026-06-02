@@ -48,11 +48,27 @@ export type UnmatchedTx = TxDetails
 /** Durée d'affichage du bandeau « Annuler » après un pointage/écartement. */
 const UNDO_DELAY_MS = 5000
 
-/** Destins « écarté » : ignorée, charge courante ou impôt. */
-type DiscardKind = 'ignored' | 'charge' | 'tax'
+/** Destins « écarté » : ignorée, charge, impôt, produit ou virement interne. */
+type DiscardKind =
+  | 'ignored'
+  | 'charge'
+  | 'tax'
+  | 'product'
+  | 'internal_transfer'
 
 /** Statuts éligibles au classement en masse (jamais Rattacher ni Ignorer). */
-type BulkStatus = 'charge' | 'tax'
+type BulkStatus = 'charge' | 'tax' | 'product' | 'internal_transfer'
+
+/** Clés i18n du dialog de confirmation bulk, par statut. */
+const bulkConfirmKeys: Record<BulkStatus, { title: string; body: string }> = {
+  charge: { title: 'bulk.confirmCharge', body: 'bulk.confirmBodyCharge' },
+  tax: { title: 'bulk.confirmTax', body: 'bulk.confirmBodyTax' },
+  product: { title: 'bulk.confirmProduct', body: 'bulk.confirmBodyProduct' },
+  internal_transfer: {
+    title: 'bulk.confirmInternalTransfer',
+    body: 'bulk.confirmBodyInternalTransfer',
+  },
+}
 
 type RecentAction = {
   tx: UnmatchedTx
@@ -60,7 +76,7 @@ type RecentAction = {
   dealName?: string
 }
 
-/** Combobox + Rattacher + menu « Écarter » (Ignorer/Charge/Impôt). */
+/** Combobox + Rattacher + menu « Écarter » (Ignorer/Charge/Impôt/Produit/Virement interne). */
 function RowActions({
   deals,
   pending,
@@ -106,6 +122,12 @@ function RowActions({
           <DropdownMenuItem onSelect={() => onDiscard('tax')}>
             {t('actions.tax')}
           </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onDiscard('product')}>
+            {t('actions.product')}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onDiscard('internal_transfer')}>
+            {t('actions.internal_transfer')}
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -114,7 +136,7 @@ function RowActions({
 
 /**
  * Bandeau transitoire « Rattachée à {deal} · Annuler » / « Ignorée · Annuler »
- * / « Classée en charge/impôt · Annuler ».
+ * / « Classée en charge/impôt/produit/virement interne · Annuler ».
  */
 function UndoBanner({
   recent,
@@ -142,10 +164,11 @@ function UndoBanner({
 
 /**
  * Table de pointage : transactions `unmatched` triées date desc, actions par
- * ligne (rattacher à un deal, écarter en ignorée/charge/impôt), détail en
- * sheet au clic, et bandeau « Annuler » transitoire (~5 s) après chaque
- * action — qui appelle `unmatchTransaction`. Classement en masse via les
- * cases à cocher : barre de sélection → Charge/Impôt → confirmation →
+ * ligne (rattacher à un deal, écarter en ignorée/charge/impôt/produit/
+ * virement interne), détail en sheet au clic, et bandeau « Annuler »
+ * transitoire (~5 s) après chaque action — qui appelle `unmatchTransaction`.
+ * Classement en masse via les cases à cocher : barre de sélection →
+ * Charge/Impôt/Produit/Virement interne → confirmation →
  * `bulkCategorize` (un seul appel serveur) + toast « Annuler » groupé.
  * La page n'écrit jamais `matchStatus`/`reconciled` directement : tout passe
  * par les mutations du backend.
@@ -172,6 +195,12 @@ export function PointageTable({
     api.transactions.categorizeAsCharge,
   )
   const categorizeAsTax = useConvexMutation(api.transactions.categorizeAsTax)
+  const categorizeAsProduct = useConvexMutation(
+    api.transactions.categorizeAsProduct,
+  )
+  const categorizeAsInternalTransfer = useConvexMutation(
+    api.transactions.categorizeAsInternalTransfer,
+  )
   const unmatchTransaction = useConvexMutation(
     api.transactions.unmatchTransaction,
   )
@@ -181,6 +210,8 @@ export function PointageTable({
     ignored: ignoreTransaction,
     charge: categorizeAsCharge,
     tax: categorizeAsTax,
+    product: categorizeAsProduct,
+    internal_transfer: categorizeAsInternalTransfer,
   }
 
   const [recent, setRecent] = useState<Array<RecentAction>>([])
@@ -381,6 +412,22 @@ export function PointageTable({
             >
               {t('actions.tax')}
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={bulkPending}
+              onClick={() => setConfirmStatus('product')}
+            >
+              {t('actions.product')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={bulkPending}
+              onClick={() => setConfirmStatus('internal_transfer')}
+            >
+              {t('actions.internal_transfer')}
+            </Button>
           </div>
         </div>
       )}
@@ -508,14 +555,12 @@ export function PointageTable({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirmStatus === 'tax'
-                ? t('bulk.confirmTax')
-                : t('bulk.confirmCharge')}
+              {t(bulkConfirmKeys[confirmStatus ?? 'charge'].title)}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmStatus === 'tax'
-                ? t('bulk.confirmBodyTax', { count: selectedIds.size })
-                : t('bulk.confirmBodyCharge', { count: selectedIds.size })}
+              {t(bulkConfirmKeys[confirmStatus ?? 'charge'].body, {
+                count: selectedIds.size,
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -538,9 +583,10 @@ export function PointageTable({
 }
 
 /**
- * Vue de consultation des transactions écartées (charges / impôts) : table
- * lecture seule alimentée par `listByStatus`, avec « Annuler » par ligne
- * (→ `unmatchTransaction`, la transaction repart dans la file « À pointer »).
+ * Vue de consultation des transactions écartées (charges / impôts / produits
+ * / virements internes) : table lecture seule alimentée par `listByStatus`,
+ * avec « Annuler » par ligne (→ `unmatchTransaction`, la transaction repart
+ * dans la file « À pointer »).
  */
 export function DiscardedTable({
   transactions,

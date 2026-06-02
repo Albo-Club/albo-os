@@ -731,14 +731,21 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   dérivé.** Le boolean `reconciled` (+ `reconciledBy`/`reconciledAt`) prédate
   le pointage et reste lu par l'UI deal, la vue Cash et l'outil agent. Les
   mutations `matchTransaction` / `ignoreTransaction` / `categorizeAsCharge` /
-  `categorizeAsTax` / `unmatchTransaction` maintiennent le miroir (matched →
+  `categorizeAsTax` / `categorizeAsProduct` / `categorizeAsInternalTransfer` /
+  `unmatchTransaction` maintiennent le miroir (matched →
   `true`, sinon `false`). **Ne jamais écrire `reconciled` directement dans du
   nouveau code** — passer par ces mutations, sinon les deux états divergent.
 - **Invariant** : `matchStatus === 'matched'` ⟺ `dealId != null`. Les états
-  `unmatched` / `ignored` / `charge` / `tax` ont toujours `dealId == null`.
-  `charge` et `tax` sont des sous-types d'« écarté » : même comportement
+  `unmatched` / `ignored` / `charge` / `tax` / `product` / `internal_transfer`
+  ont toujours `dealId == null`. `charge`, `tax`, `product` et
+  `internal_transfer` sont des sous-types d'« écarté » : même comportement
   qu'`ignored` (hors file de pointage, pas de deal), seul le statut diffère
-  pour pouvoir les consulter ensuite (`listByStatus`).
+  pour pouvoir les consulter ensuite (`listByStatus`). `product` (argent
+  entrant hors deal) n'affecte jamais le « Reçu » d'un deal.
+- **`internal_transfer` est une simple étiquette en V1.** Pas d'appariement
+  des deux jambes d'un virement (sortie d'un compte ↔ entrée sur l'autre) :
+  chaque transaction est classée indépendamment. L'appariement sera une
+  feature dédiée le jour où une trésorerie consolidée l'exploitera.
 - **`matchStatus` est optionnel au schéma** (les documents pré-existants n'ont
   pas le champ). Absence = logiquement `unmatched`, mais ces lignes sont
   **invisibles** de l'index `by_org_matchStatus` → la query `listUnmatched` ne

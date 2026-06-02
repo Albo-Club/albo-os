@@ -19,13 +19,17 @@
     "ignore": "Ignorer",
     "charge": "Charge",
     "tax": "Impôt",
+    "product": "Produit",
+    "internal_transfer": "Virement interne",
     "undo": "Annuler"
   },
   "banner": {
     "matched": "Rattachée à {{deal}}",
     "ignored": "Ignorée",
     "charge": "Classée en charge",
-    "tax": "Classée en impôt"
+    "tax": "Classée en impôt",
+    "product": "Classée en produit",
+    "internal_transfer": "Classée en virement interne"
   },
   "bulk": {
     "select": "Sélectionner",
@@ -34,17 +38,27 @@
     "deselect": "Désélectionner",
     "confirmCharge": "Classer en charge ?",
     "confirmTax": "Classer en impôt ?",
+    "confirmProduct": "Classer en produit ?",
+    "confirmInternalTransfer": "Classer en virement interne ?",
     "confirmBodyCharge_one": "{{count}} transaction sera classée en charge.",
     "confirmBodyCharge_other": "{{count}} transactions seront classées en charge.",
     "confirmBodyTax_one": "{{count}} transaction sera classée en impôt.",
     "confirmBodyTax_other": "{{count}} transactions seront classées en impôt.",
+    "confirmBodyProduct_one": "{{count}} transaction sera classée en produit.",
+    "confirmBodyProduct_other": "{{count}} transactions seront classées en produit.",
+    "confirmBodyInternalTransfer_one": "{{count}} transaction sera classée en virement interne.",
+    "confirmBodyInternalTransfer_other": "{{count}} transactions seront classées en virement interne.",
     "confirm": "Confirmer",
     "cancel": "Annuler",
     "banner": {
       "charge_one": "{{count}} classée en charge",
       "charge_other": "{{count}} classées en charge",
       "tax_one": "{{count}} classée en impôt",
-      "tax_other": "{{count}} classées en impôt"
+      "tax_other": "{{count}} classées en impôt",
+      "product_one": "{{count}} classée en produit",
+      "product_other": "{{count}} classées en produit",
+      "internal_transfer_one": "{{count}} classée en virement interne",
+      "internal_transfer_other": "{{count}} classées en virement interne"
     },
     "failed_one": "{{count}} transaction n'a pas pu être classée.",
     "failed_other": "{{count}} transactions n'ont pas pu être classées."
@@ -52,7 +66,9 @@
   "view": {
     "unmatched": "À pointer",
     "charge": "Charges",
-    "tax": "Impôts"
+    "tax": "Impôts",
+    "product": "Produits",
+    "internal_transfer": "Virements internes"
   },
   "viewEmpty": "Aucune transaction dans cette catégorie.",
   "search": {
