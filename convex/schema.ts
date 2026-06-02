@@ -86,6 +86,7 @@ const txSource = v.union(
   v.literal('powens'),
   v.literal('manual'),
   v.literal('imported'),
+  v.literal('memo_csv'), // import one-shot historique CSV Mémo Bank
 )
 
 // Pointage transaction → deal. `matchStatus` est la source de vérité de
@@ -410,6 +411,7 @@ export default defineSchema({
     counterparty: v.optional(v.string()),
     source: txSource,
     powensTxId: v.optional(v.string()),
+    memoId: v.optional(v.string()), // ancre import CSV Mémo Bank (idempotence)
     reconciled: v.boolean(),
     reconciledBy: v.optional(v.id('users')),
     reconciledAt: v.optional(v.number()),
@@ -420,6 +422,7 @@ export default defineSchema({
     .index('by_account_date', ['bankAccountId', 'transactionDate'])
     .index('by_deal', ['dealId'])
     .index('by_powens_id', ['powensTxId'])
+    .index('by_memo_id', ['memoId'])
     .index('by_org_unreconciled', ['orgId', 'reconciled'])
     .index('by_org_matchStatus', ['orgId', 'matchStatus'])
     .index('by_airtable_id', ['airtableId']),
