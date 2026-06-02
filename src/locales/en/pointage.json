@@ -19,13 +19,17 @@
     "ignore": "Ignore",
     "charge": "Expense",
     "tax": "Tax",
+    "product": "Income",
+    "internal_transfer": "Internal transfer",
     "undo": "Undo"
   },
   "banner": {
     "matched": "Matched to {{deal}}",
     "ignored": "Ignored",
     "charge": "Marked as expense",
-    "tax": "Marked as tax"
+    "tax": "Marked as tax",
+    "product": "Marked as income",
+    "internal_transfer": "Marked as internal transfer"
   },
   "bulk": {
     "select": "Select",
@@ -34,17 +38,27 @@
     "deselect": "Deselect",
     "confirmCharge": "Mark as expenses?",
     "confirmTax": "Mark as taxes?",
+    "confirmProduct": "Mark as income?",
+    "confirmInternalTransfer": "Mark as internal transfers?",
     "confirmBodyCharge_one": "{{count}} transaction will be marked as an expense.",
     "confirmBodyCharge_other": "{{count}} transactions will be marked as expenses.",
     "confirmBodyTax_one": "{{count}} transaction will be marked as a tax.",
     "confirmBodyTax_other": "{{count}} transactions will be marked as taxes.",
+    "confirmBodyProduct_one": "{{count}} transaction will be marked as income.",
+    "confirmBodyProduct_other": "{{count}} transactions will be marked as income.",
+    "confirmBodyInternalTransfer_one": "{{count}} transaction will be marked as an internal transfer.",
+    "confirmBodyInternalTransfer_other": "{{count}} transactions will be marked as internal transfers.",
     "confirm": "Confirm",
     "cancel": "Cancel",
     "banner": {
       "charge_one": "{{count}} marked as expense",
       "charge_other": "{{count}} marked as expenses",
       "tax_one": "{{count}} marked as tax",
-      "tax_other": "{{count}} marked as taxes"
+      "tax_other": "{{count}} marked as taxes",
+      "product_one": "{{count}} marked as income",
+      "product_other": "{{count}} marked as income",
+      "internal_transfer_one": "{{count}} marked as internal transfer",
+      "internal_transfer_other": "{{count}} marked as internal transfers"
     },
     "failed_one": "{{count}} transaction could not be categorized.",
     "failed_other": "{{count}} transactions could not be categorized."
@@ -52,7 +66,9 @@
   "view": {
     "unmatched": "To match",
     "charge": "Expenses",
-    "tax": "Taxes"
+    "tax": "Taxes",
+    "product": "Income",
+    "internal_transfer": "Internal transfers"
   },
   "viewEmpty": "No transactions in this category.",
   "combobox": {
