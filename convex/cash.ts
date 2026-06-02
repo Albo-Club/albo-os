@@ -1,5 +1,5 @@
 import { ConvexError, v } from 'convex/values'
-import { query } from './_generated/server'
+import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { normalizeSearch } from './lib/searchText'
 import type { Doc } from './_generated/dataModel'
@@ -33,6 +33,7 @@ export const listAccounts = query({
           _id: a._id,
           bankName: a.bankName,
           label: a.label,
+          displayName: a.displayName ?? null,
           accountKind: a.accountKind ?? null,
           currency: a.currency,
           currentBalance: a.currentBalance ?? null,
@@ -59,6 +60,7 @@ export const getAccount = query({
       _id: account._id,
       bankName: account.bankName,
       label: account.label,
+      displayName: account.displayName ?? null,
       accountKind: account.accountKind ?? null,
       iban: account.iban ?? null,
       currency: account.currency,
@@ -66,6 +68,28 @@ export const getAccount = query({
       balanceAsOf: account.balanceAsOf ?? null,
       owner: ownerRef(owner),
     }
+  },
+})
+
+/**
+ * Renomme un compte bancaire (nom personnalisé `displayName`).
+ * Patch ciblé : ne touche JAMAIS `label` (nom d'origine import/banque) ni
+ * `bankName`. '' = effacement → l'affichage retombe sur `label`.
+ */
+export const updateAccountName = mutation({
+  args: {
+    bankAccountId: v.id('bankAccounts'),
+    displayName: v.string(),
+  },
+  handler: async (ctx, { bankAccountId, displayName }) => {
+    const account = await ctx.db.get('bankAccounts', bankAccountId)
+    if (!account) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, account.orgId)
+    const trimmed = displayName.trim()
+    await ctx.db.patch('bankAccounts', bankAccountId, {
+      displayName: trimmed === '' ? undefined : trimmed,
+    })
+    return bankAccountId
   },
 })
 
