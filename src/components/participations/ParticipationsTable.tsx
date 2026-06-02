@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
+import { Input } from '~/components/ui/input'
 import {
   Table,
   TableBody,
@@ -14,12 +15,14 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+import { useDebouncedValue } from '~/hooks/useDebouncedValue'
+import { normalizeSearch } from '~/lib/searchText'
 
 /** Forme minimale d'un deal enrichi, commune aux vues par-org et agrégée. */
 export type DealRow = {
   _id: string
   targetCompanyId: string
-  target: { _id: string; name: string } | null
+  target: { _id: string; name: string; sector?: string | null } | null
   investor: { name: string } | null
   spv: { name: string } | null
   instrumentKind: string
@@ -163,8 +166,28 @@ export function ParticipationsTable({
       return next
     })
 
+  // Recherche client (volumes faibles) : nom de société, instrument (clé brute
+  // + libellé traduit), investisseur, secteur — insensible casse/accents.
+  const [search, setSearch] = useState('')
+  const term = normalizeSearch(useDebouncedValue(search))
+
+  const filtered = useMemo(() => {
+    if (!deals || !term) return deals
+    return deals.filter((d) =>
+      [
+        d.target?.name,
+        d.target?.sector,
+        d.investor?.name,
+        d.instrumentKind,
+        t(`instrument.${d.instrumentKind}`, {
+          defaultValue: d.instrumentKind,
+        }),
+      ].some((s) => s && normalizeSearch(s).includes(term)),
+    )
+  }, [deals, term, t])
+
   const groups = useMemo(() => {
-    if (!deals) return undefined
+    if (!filtered) return undefined
     const map = new Map<
       string,
       {
@@ -177,7 +200,7 @@ export function ParticipationsTable({
         received: number
       }
     >()
-    for (const d of deals) {
+    for (const d of filtered) {
       const key = d.target?._id ?? d.targetCompanyId
       const g = map.get(key) ?? {
         name: d.target?.name ?? '—',
@@ -196,59 +219,77 @@ export function ParticipationsTable({
       map.set(key, g)
     }
     return Array.from(map.entries()).map(([id, g]) => ({ id, ...g }))
-  }, [deals, orgSlug])
+  }, [filtered, orgSlug])
 
   const colSpan = showOrg ? 6 : 5
 
+  // Barre de recherche affichée dès qu'il y a des deals — y compris quand la
+  // recherche courante ne matche rien (sinon impossible de l'effacer).
+  const searchBar = deals && deals.length > 0 && (
+    <Input
+      type="search"
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      placeholder={t('search.placeholder')}
+      className="max-w-sm"
+    />
+  )
+
   if (groups && groups.length === 0) {
     return (
-      <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
-        {t('empty')}
+      <div className="space-y-3">
+        {searchBar}
+        <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
+          {term ? t('search.noResults') : t('empty')}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="rounded-lg border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('col.company')}</TableHead>
-            {showOrg && <TableHead>{t('col.org')}</TableHead>}
-            <TableHead className="text-right">{t('col.deals')}</TableHead>
-            <TableHead className="text-right">{t('col.committed')}</TableHead>
-            <TableHead className="text-right">{t('col.paid')}</TableHead>
-            <TableHead className="text-right">{t('col.received')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {!groups ? (
+    <div className="space-y-3">
+      {searchBar}
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell
-                colSpan={colSpan}
-                className="text-muted-foreground text-center"
-              >
-                {t('loading')}
-              </TableCell>
+              <TableHead>{t('col.company')}</TableHead>
+              {showOrg && <TableHead>{t('col.org')}</TableHead>}
+              <TableHead className="text-right">{t('col.deals')}</TableHead>
+              <TableHead className="text-right">{t('col.committed')}</TableHead>
+              <TableHead className="text-right">{t('col.paid')}</TableHead>
+              <TableHead className="text-right">{t('col.received')}</TableHead>
             </TableRow>
-          ) : (
-            groups.map((g) => {
-              const isOpen = expanded.has(g.id)
-              return (
-                <CompanyRows
-                  key={g.id}
-                  group={g}
-                  isOpen={isOpen}
-                  onToggle={() => toggle(g.id)}
-                  showOrg={showOrg}
+          </TableHeader>
+          <TableBody>
+            {!groups ? (
+              <TableRow>
+                <TableCell
                   colSpan={colSpan}
-                  fmtEur={fmtEur}
-                />
-              )
-            })
-          )}
-        </TableBody>
-      </Table>
+                  className="text-muted-foreground text-center"
+                >
+                  {t('loading')}
+                </TableCell>
+              </TableRow>
+            ) : (
+              groups.map((g) => {
+                const isOpen = expanded.has(g.id)
+                return (
+                  <CompanyRows
+                    key={g.id}
+                    group={g}
+                    isOpen={isOpen}
+                    onToggle={() => toggle(g.id)}
+                    showOrg={showOrg}
+                    colSpan={colSpan}
+                    fmtEur={fmtEur}
+                  />
+                )
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   )
 }

@@ -20,6 +20,7 @@ function companyRef(c: Doc<'companies'> | null) {
     _id: c._id,
     name: c.name,
     kind: c.kind,
+    sector: c.sector ?? null,
     totalShares: c.totalShares ?? null,
   }
 }
