@@ -2,9 +2,16 @@ import { ConvexError, v } from 'convex/values'
 import { internalMutation, mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { recordDecision } from './lib/matchingLog'
+import { buildSearchText, normalizeSearch } from './lib/searchText'
 
 import type { MutationCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
+
+/**
+ * Borne des résultats de recherche full-text (le listing sans recherche garde
+ * son `.collect()` historique — la file de pointage doit rester exhaustive).
+ */
+const SEARCH_LIMIT = 200
 
 /**
  * Transactions rattachées à un deal (rapprochement via `dealId`), triées par
@@ -49,18 +56,35 @@ export const listByDeal = query({
  * décroissante et enrichies du compte bancaire. Les transactions sans
  * `matchStatus` (pré-backfill) n'apparaissent pas — lancer
  * `transactions:backfillMatchStatus` d'abord.
+ *
+ * `search` (optionnel) filtre par libellé/contrepartie via le search index
+ * `search_text` (insensible casse/accents), scopé org + statut.
  */
 export const listUnmatched = query({
-  args: { orgId: v.id('organizations') },
-  handler: async (ctx, { orgId }) => {
+  args: {
+    orgId: v.id('organizations'),
+    search: v.optional(v.string()),
+  },
+  handler: async (ctx, { orgId, search }) => {
     await requireOrgMember(ctx, orgId)
 
-    const rows = await ctx.db
-      .query('transactions')
-      .withIndex('by_org_matchStatus', (q) =>
-        q.eq('orgId', orgId).eq('matchStatus', 'unmatched'),
-      )
-      .collect()
+    const term = search ? normalizeSearch(search) : ''
+    const rows = term
+      ? await ctx.db
+          .query('transactions')
+          .withSearchIndex('search_text', (q) =>
+            q
+              .search('searchText', term)
+              .eq('orgId', orgId)
+              .eq('matchStatus', 'unmatched'),
+          )
+          .take(SEARCH_LIMIT)
+      : await ctx.db
+          .query('transactions')
+          .withIndex('by_org_matchStatus', (q) =>
+            q.eq('orgId', orgId).eq('matchStatus', 'unmatched'),
+          )
+          .collect()
 
     rows.sort((a, b) => b.transactionDate - a.transactionDate)
 
@@ -88,6 +112,9 @@ export const listUnmatched = query({
  * écartées : ignorées / charges / impôts / produits / virements internes, ou
  * des rattachées), triées par date décroissante et enrichies du compte
  * bancaire. Même shape que `listUnmatched`.
+ *
+ * `search` (optionnel) filtre par libellé/contrepartie via le search index
+ * `search_text` (insensible casse/accents), scopé org + statut.
  */
 export const listByStatus = query({
   args: {
@@ -100,16 +127,28 @@ export const listByStatus = query({
       v.literal('product'),
       v.literal('internal_transfer'),
     ),
+    search: v.optional(v.string()),
   },
-  handler: async (ctx, { orgId, status }) => {
+  handler: async (ctx, { orgId, status, search }) => {
     await requireOrgMember(ctx, orgId)
 
-    const rows = await ctx.db
-      .query('transactions')
-      .withIndex('by_org_matchStatus', (q) =>
-        q.eq('orgId', orgId).eq('matchStatus', status),
-      )
-      .collect()
+    const term = search ? normalizeSearch(search) : ''
+    const rows = term
+      ? await ctx.db
+          .query('transactions')
+          .withSearchIndex('search_text', (q) =>
+            q
+              .search('searchText', term)
+              .eq('orgId', orgId)
+              .eq('matchStatus', status),
+          )
+          .take(SEARCH_LIMIT)
+      : await ctx.db
+          .query('transactions')
+          .withIndex('by_org_matchStatus', (q) =>
+            q.eq('orgId', orgId).eq('matchStatus', status),
+          )
+          .collect()
 
     rows.sort((a, b) => b.transactionDate - a.transactionDate)
 
@@ -410,5 +449,38 @@ export const backfillMatchStatus = internalMutation({
       }
     }
     return { matched, unmatched, skipped }
+  },
+})
+
+/**
+ * Backfill one-shot (idempotent) du champ dérivé `searchText` (recherche
+ * full-text) sur les transactions pré-existantes. Les écritures récentes le
+ * posent déjà (Powens, import Airtable, CSV Mémo, agent) — une ligne sans
+ * `searchText` est simplement invisible à la recherche.
+ *
+ * À lancer manuellement par org :
+ *   pnpm exec convex run transactions:backfillSearchText '{"orgId": "…"}' --prod
+ */
+export const backfillSearchText = internalMutation({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    const rows = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+      .collect()
+
+    let updated = 0
+    let skipped = 0
+    for (const tx of rows) {
+      if (tx.searchText !== undefined) {
+        skipped += 1
+        continue
+      }
+      await ctx.db.patch('transactions', tx._id, {
+        searchText: buildSearchText(tx.rawLabel, tx.counterparty),
+      })
+      updated += 1
+    }
+    return { updated, skipped }
   },
 })

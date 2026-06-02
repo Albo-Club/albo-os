@@ -761,6 +761,39 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   `dealId`, ni `reconciled`. Avant le pointage, le re-sync Powens remettait
   `reconciled: false` à chaque webhook — ce reset a été retiré exprès.
 
+## Recherche transactions — champ dérivé `searchText` (`convex/lib/searchText.ts`)
+
+La recherche full-text des transactions (vues tréso + pointage) passe par le
+search index `search_text` sur un champ **dérivé** `searchText`, pas sur
+`rawLabel` directement. Pièges :
+
+- **Pourquoi un champ dérivé ?** Le tokenizer du search index Convex ne fait
+  **pas** de folding d'accents (`énergie` ≠ `energie`) et un index ne cherche
+  que dans **un seul** champ. `searchText` = `rawLabel + counterparty`
+  normalisé (minuscules, sans diacritiques) via `buildSearchText`, et la
+  saisie utilisateur est normalisée pareil côté query (`normalizeSearch`).
+  Le label du compte bancaire est exclu exprès (staleness : renommer un
+  compte obligerait à réécrire toutes ses transactions).
+- **Tout nouveau point d'écriture de transaction DOIT poser `searchText`**
+  via `buildSearchText(rawLabel, counterparty)` — sinon les lignes sont
+  invisibles à la recherche (mais visibles dans les listes). Points
+  d'écriture actuels : sync Powens, import CSV Mémo (`convex/powens.ts`),
+  import Airtable (`convex/airtableImport.ts`), création manuelle agent
+  (`convex/agentTools.ts`). Idem si un code futur patche `rawLabel` ou
+  `counterparty` : recalculer `searchText` dans le même patch.
+- **`searchText` est optionnel au schéma** (même pattern que `matchStatus`) :
+  les lignes pré-existantes ne l'ont pas tant que
+  `transactions:backfillSearchText` (one-shot par org, idempotent) n'a pas
+  tourné en prod.
+- **`normalizeSearch` existe en double** : `convex/lib/searchText.ts` (queries
+  + mutations) et `src/lib/searchText.ts` (filtre client participations,
+  normalisation de la saisie). convex/ et src/ ne partagent pas de modules
+  runtime — garder les deux copies identiques.
+- **Les résultats search sont triés par pertinence**, pas par date — les
+  queries re-trient par `transactionDate` desc avant de retourner. La branche
+  recherche est bornée (`.take(200)`) ; la branche sans recherche garde son
+  comportement historique (`.collect()` pointage, `.take(200)` tréso).
+
 ## Cash flow forecast (`convex/forecasts.ts`)
 
 Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →

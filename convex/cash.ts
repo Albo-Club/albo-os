@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 import { query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import { normalizeSearch } from './lib/searchText'
 import type { Doc } from './_generated/dataModel'
 
 /** Borne raisonnable pour la liste de transactions d'un compte. */
@@ -72,21 +73,37 @@ export const getAccount = query({
  * Transactions d'un compte, en ordre antéchronologique (plus récente d'abord).
  * Quand une transaction est rattachée à un deal, elle est labellisée par la
  * boîte investie (`deal` sinon `null`). Le check d'org dérive du compte.
+ *
+ * `search` (optionnel) filtre par libellé/contrepartie via le search index
+ * `search_text` (insensible casse/accents). Les résultats search arrivent
+ * triés par pertinence → re-tri par date pour garder l'affichage habituel.
  */
 export const listAccountTransactions = query({
-  args: { bankAccountId: v.id('bankAccounts') },
-  handler: async (ctx, { bankAccountId }) => {
+  args: {
+    bankAccountId: v.id('bankAccounts'),
+    search: v.optional(v.string()),
+  },
+  handler: async (ctx, { bankAccountId, search }) => {
     const account = await ctx.db.get(bankAccountId)
     if (!account) throw new ConvexError('not_found')
     await requireOrgMember(ctx, account.orgId)
 
-    const rows = await ctx.db
-      .query('transactions')
-      .withIndex('by_account_date', (q) =>
-        q.eq('bankAccountId', bankAccountId),
-      )
-      .order('desc')
-      .take(TX_LIMIT)
+    const term = search ? normalizeSearch(search) : ''
+    const rows = term
+      ? await ctx.db
+          .query('transactions')
+          .withSearchIndex('search_text', (q) =>
+            q.search('searchText', term).eq('bankAccountId', bankAccountId),
+          )
+          .take(TX_LIMIT)
+      : await ctx.db
+          .query('transactions')
+          .withIndex('by_account_date', (q) =>
+            q.eq('bankAccountId', bankAccountId),
+          )
+          .order('desc')
+          .take(TX_LIMIT)
+    if (term) rows.sort((a, b) => b.transactionDate - a.transactionDate)
 
     return await Promise.all(
       rows.map(async (t) => {

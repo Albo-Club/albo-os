@@ -94,6 +94,10 @@
     "crypto": "Crypto"
   },
   "empty": "No participations in this scope — create deals via the AI chat, or add them manually.",
+  "search": {
+    "placeholder": "Search by company, instrument, sector…",
+    "noResults": "No participation matches your search."
+  },
   "dealsCount_one": "{{count}} deal",
   "dealsCount_other": "{{count}} deals",
   "loading": "Loading…"

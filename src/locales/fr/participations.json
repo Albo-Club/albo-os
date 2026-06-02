@@ -94,6 +94,10 @@
     "crypto": "Crypto"
   },
   "empty": "Aucune participation pour ce scope — crée des deals via le chat IA, ou ajoute-les à la main.",
+  "search": {
+    "placeholder": "Rechercher par société, instrument, secteur…",
+    "noResults": "Aucune participation ne correspond à votre recherche."
+  },
   "dealsCount_one": "{{count}} deal",
   "dealsCount_other": "{{count}} deals",
   "loading": "Chargement…"
