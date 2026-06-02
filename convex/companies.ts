@@ -15,6 +15,15 @@ const kindValidator = v.union(
   v.literal('portfolio'),
 )
 
+/** Normalise un SIREN saisi : retire les espaces. '' = effacement.
+ * Throw 'invalid_siren' si non vide et ≠ 9 chiffres. */
+function normalizeSiren(raw: string): string | undefined {
+  const cleaned = raw.replace(/\s/g, '')
+  if (cleaned === '') return undefined
+  if (!/^\d{9}$/.test(cleaned)) throw new ConvexError('invalid_siren')
+  return cleaned
+}
+
 /** Refuse un SIREN déjà porté par une autre company de l'org. */
 async function assertSirenFree(
   ctx: Ctx,
@@ -77,6 +86,7 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     await requireOrgMember(ctx, args.orgId)
+    if (args.siren !== undefined) args.siren = normalizeSiren(args.siren)
     if (args.siren) await assertSirenFree(ctx, args.orgId, args.siren)
     return await ctx.db.insert('companies', args)
   },
@@ -106,6 +116,10 @@ export const update = mutation({
     // Garde-fou : on ne déclasse pas la racine de l'org.
     if (company.kind === 'group_root' && patch.kind && patch.kind !== 'group_root') {
       throw new ConvexError('cannot_change_root_kind')
+    }
+    // SIREN : normalisé (espaces retirés), '' = effacement du champ.
+    if (patch.siren !== undefined) {
+      patch.siren = normalizeSiren(patch.siren)
     }
     if (patch.siren) {
       await assertSirenFree(ctx, company.orgId, patch.siren, id)

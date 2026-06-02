@@ -22,6 +22,8 @@ import { normalizeSearch } from '~/lib/searchText'
 export type DealRow = {
   _id: string
   targetCompanyId: string
+  /** Nom personnalisé — affiché à la place du titre dérivé quand présent. */
+  name?: string | null
   target: { _id: string; name: string; sector?: string | null } | null
   investor: { name: string } | null
   spv: { name: string } | null
@@ -75,6 +77,19 @@ export function useFormatters() {
 }
 
 /**
+ * Titre d'affichage d'un deal : nom personnalisé s'il existe, sinon le
+ * libellé (i18n) de l'instrument. Même règle que la page détail du deal.
+ */
+export function useDealTitle() {
+  const { t } = useTranslation('participations')
+  return (deal: { name?: string | null; instrumentKind: string }) =>
+    deal.name ??
+    t(`instrument.${deal.instrumentKind}`, {
+      defaultValue: deal.instrumentKind,
+    })
+}
+
+/**
  * Liste détaillée de deals (un bloc par deal). Réutilisée par l'accordéon
  * de la table par-société et par la page détail d'une participation.
  */
@@ -87,6 +102,7 @@ export function DealsList({
 }) {
   const { t } = useTranslation('participations')
   const { fmtEur, fmtDate } = useFormatters()
+  const dealTitle = useDealTitle()
   const cellClass =
     'grid grid-cols-2 gap-x-6 gap-y-1 px-6 py-3 text-sm sm:grid-cols-5'
   return (
@@ -94,11 +110,7 @@ export function DealsList({
       {deals.map((dl) => {
         const body = (
           <>
-            <Field label={t('deal.instrument')}>
-              {t(`instrument.${dl.instrumentKind}`, {
-                defaultValue: dl.instrumentKind,
-              })}
-            </Field>
+            <Field label={t('deal.instrument')}>{dealTitle(dl)}</Field>
             <Field label={t('deal.investor')}>
               {dl.investor?.name ?? '—'}
               {dl.spv ? (
@@ -166,8 +178,9 @@ export function ParticipationsTable({
       return next
     })
 
-  // Recherche client (volumes faibles) : nom de société, instrument (clé brute
-  // + libellé traduit), investisseur, secteur — insensible casse/accents.
+  // Recherche client (volumes faibles) : nom de société, nom personnalisé du
+  // deal, instrument (clé brute + libellé traduit), investisseur, secteur —
+  // insensible casse/accents.
   const [search, setSearch] = useState('')
   const term = normalizeSearch(useDebouncedValue(search))
 
@@ -176,6 +189,7 @@ export function ParticipationsTable({
     return deals.filter((d) =>
       [
         d.target?.name,
+        d.name,
         d.target?.sector,
         d.investor?.name,
         d.instrumentKind,

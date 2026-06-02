@@ -37,6 +37,8 @@ const instrumentValidator = v.union(
 
 /** Champs financiers/lifecycle communs, tous optionnels. */
 const dealFields = {
+  // Nom personnalisé — affiché à la place du titre dérivé quand présent.
+  name: v.optional(v.string()),
   viaSpvCompanyId: v.optional(v.id('companies')),
   currency: v.optional(v.string()),
   committedAmount: v.optional(v.number()),
@@ -244,6 +246,11 @@ export const update = mutation({
         patch.targetCompanyId,
         'target_wrong_org',
       )
+    }
+    // Nom : trim ; '' = effacement (l'affichage retombe sur le titre dérivé).
+    if (patch.name !== undefined) {
+      const trimmed = patch.name.trim()
+      patch.name = trimmed === '' ? undefined : trimmed
     }
     await ctx.db.patch(id, patch)
     return id

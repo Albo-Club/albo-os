@@ -9,6 +9,17 @@
   "noBalance": "Solde inconnu",
   "accountsEmpty": "Aucun compte bancaire pour cette organisation pour l'instant.",
   "loading": "Chargement…",
+  "originalName": "Nom d'origine : {{name}}",
+  "rename": {
+    "title": "Renommer le compte",
+    "description": "Donner un nom personnalisé à ce compte. Le nom d'origine de la banque est conservé.",
+    "nameLabel": "Nom personnalisé",
+    "nameHint": "Laisser vide pour reprendre le nom d'origine de la banque.",
+    "saved": "Compte renommé",
+    "errors": {
+      "default": "Impossible de renommer le compte. Réessayez."
+    }
+  },
   "connect": {
     "button": "Connecter une banque",
     "connecting": "Connexion…",

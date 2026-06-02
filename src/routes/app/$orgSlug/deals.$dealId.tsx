@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Pencil } from 'lucide-react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
@@ -6,12 +7,15 @@ import { toast } from 'sonner'
 import { api } from '../../../../convex/_generated/api'
 import type { ReactNode } from 'react'
 
-import type { Id } from '../../../../convex/_generated/dataModel'
+import type { Doc, Id } from '../../../../convex/_generated/dataModel'
 import type { DealOption } from '~/components/pointage/DealCombobox'
 import type { TxDetails } from '~/components/pointage/TransactionSheet'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
-import { useFormatters } from '~/components/participations/ParticipationsTable'
+import {
+  useDealTitle,
+  useFormatters,
+} from '~/components/participations/ParticipationsTable'
 import { DealCombobox } from '~/components/pointage/DealCombobox'
 import {
   TransactionSheet,
@@ -19,6 +23,23 @@ import {
 } from '~/components/pointage/TransactionSheet'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
+import { Input } from '~/components/ui/input'
+import { Label } from '~/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 import {
   Table,
   TableBody,
@@ -43,6 +64,31 @@ export const Route = createFileRoute('/app/$orgSlug/deals/$dealId')({
     ],
   }),
 })
+
+type InstrumentKind = Doc<'deals'>['instrumentKind']
+
+/** Valeurs de l'enum `instrumentKind` du schéma (ordre d'affichage du dropdown). */
+const INSTRUMENTS = [
+  'share',
+  'bsa',
+  'bsa_air',
+  'safe',
+  'oc',
+  'os',
+  'convertible_note',
+  'cca',
+  'royalty',
+  'fund_lp',
+  'spv_share',
+  'secondary',
+  'real_estate_direct',
+  'scpi',
+  'cto',
+  'dat',
+  'crypto',
+  'loan',
+  'capitalization_account',
+] as const satisfies ReadonlyArray<InstrumentKind>
 
 function statusVariant(s: string): 'default' | 'secondary' | 'destructive' {
   if (s === 'written_off') return 'destructive'
@@ -74,6 +120,101 @@ function Info({ label, value }: { label: string; value: ReactNode }) {
       <span className="text-muted-foreground text-xs">{label}</span>
       <span className="text-sm">{value}</span>
     </div>
+  )
+}
+
+/**
+ * Dialog d'édition du deal : nom personnalisé + type d'instrument.
+ * Le changement d'instrument est une étiquette : aucun effet de bord sur
+ * les transactions rattachées.
+ */
+function EditDealDialog({
+  deal,
+  onClose,
+}: {
+  deal: { _id: Id<'deals'>; name?: string | null; instrumentKind: InstrumentKind }
+  onClose: () => void
+}) {
+  const { t } = useTranslation(['participations', 'common'])
+  const updateDeal = useConvexMutation(api.deals.update)
+  const [name, setName] = useState(deal.name ?? '')
+  const [instrument, setInstrument] = useState<InstrumentKind>(
+    deal.instrumentKind,
+  )
+  const [pending, setPending] = useState(false)
+
+  async function handleSave() {
+    setPending(true)
+    try {
+      // '' = effacement du nom (le titre retombe sur l'instrument).
+      await updateDeal({
+        id: deal._id,
+        patch: { name, instrumentKind: instrument },
+      })
+      toast.success(t('participations:edit.saved'))
+      onClose()
+    } catch {
+      toast.error(t('participations:edit.errors.default'))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('participations:edit.dealTitle')}</DialogTitle>
+          <DialogDescription>
+            {t('participations:edit.dealDescription')}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="deal-name">
+              {t('participations:edit.nameLabel')}
+            </Label>
+            <Input
+              id="deal-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t('participations:edit.dealNamePlaceholder')}
+            />
+            <p className="text-muted-foreground text-xs">
+              {t('participations:edit.dealNameHint')}
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label>{t('participations:edit.instrumentLabel')}</Label>
+            <Select
+              value={instrument}
+              onValueChange={(v) => setInstrument(v as InstrumentKind)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {INSTRUMENTS.map((kind) => (
+                  <SelectItem key={kind} value={kind}>
+                    {t(`participations:instrument.${kind}`, {
+                      defaultValue: kind,
+                    })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={pending}>
+            {t('common:actions.cancel')}
+          </Button>
+          <Button onClick={handleSave} disabled={pending}>
+            {t('common:actions.save')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -228,9 +369,10 @@ function Transactions({ deal }: { deal: CurrentDeal }) {
 }
 
 function DealDetail() {
-  const { t, i18n } = useTranslation('participations')
+  const { t, i18n } = useTranslation(['participations', 'common'])
   const lang = i18n.language
   const { orgSlug, dealId } = Route.useParams()
+  const [editOpen, setEditOpen] = useState(false)
   const deal = useConvexQuery(api.deals.getById, {
     id: dealId as Id<'deals'>,
   })
@@ -248,6 +390,7 @@ function DealDetail() {
     0,
   )
   const { fmtEur, fmtDate } = useFormatters()
+  const dealTitle = useDealTitle()
   const fmtPct = (bps?: number | null) =>
     bps == null
       ? null
@@ -280,16 +423,24 @@ function DealDetail() {
 
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">
-          {t(`instrument.${deal.instrumentKind}`, {
-            defaultValue: deal.instrumentKind,
-          })}
+          {dealTitle(deal)}
         </h1>
         <Badge variant={statusVariant(deal.status)}>
           {t(`status.${deal.status}`, { defaultValue: deal.status })}
         </Badge>
+        <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+          <Pencil className="size-4" />
+          {t('common:actions.edit')}
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-3">
+        <Info
+          label={t('deal.instrument')}
+          value={t(`instrument.${deal.instrumentKind}`, {
+            defaultValue: deal.instrumentKind,
+          })}
+        />
         <Info
           label={t('deal.investor')}
           value={
@@ -359,6 +510,10 @@ function DealDetail() {
       )}
 
       <Transactions deal={deal} />
+
+      {editOpen && (
+        <EditDealDialog deal={deal} onClose={() => setEditOpen(false)} />
+      )}
     </main>
   )
 }

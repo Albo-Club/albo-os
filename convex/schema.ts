@@ -299,6 +299,10 @@ export default defineSchema({
   deals: defineTable({
     orgId: v.id('organizations'),
 
+    // Nom personnalisé (optionnel) — affiché à la place du titre dérivé
+    // (instrument / société cible) quand il est présent.
+    name: v.optional(v.string()),
+
     // Qui achète quoi
     investorCompanyId: v.id('companies'), // entité du groupe (CALTE, Albo…)
     targetCompanyId: v.id('companies'), // boîte investie
@@ -404,7 +408,9 @@ export default defineSchema({
     orgId: v.id('organizations'),
     ownerCompanyId: v.id('companies'), // doit être une "group_*"
     bankName: v.string(), // "Qonto", "Palatine", "Neuflize", "Wormser"
-    label: v.string(),
+    label: v.string(), // nom d'origine import/banque — jamais écrasé après création
+    // Nom personnalisé éditable — affiché à la place de `label` si présent.
+    displayName: v.optional(v.string()),
     iban: v.optional(v.string()),
     accountKind: v.optional(v.string()), // "checking", "cto", "dat", "savings"
     currency: v.string(),

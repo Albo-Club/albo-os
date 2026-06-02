@@ -91,7 +91,29 @@
     "scpi": "SCPI",
     "cto": "Securities account",
     "dat": "Term deposit",
-    "crypto": "Crypto"
+    "crypto": "Crypto",
+    "loan": "Loan",
+    "capitalization_account": "Capitalization account"
+  },
+  "edit": {
+    "dealTitle": "Edit deal",
+    "dealDescription": "Rename the deal and change its instrument type.",
+    "companyTitle": "Edit company",
+    "companyDescription": "Rename the company and edit its SIREN.",
+    "nameLabel": "Name",
+    "dealNamePlaceholder": "Custom name (optional)",
+    "dealNameHint": "Leave empty to use the instrument as title.",
+    "instrumentLabel": "Instrument",
+    "sirenLabel": "SIREN",
+    "sirenPlaceholder": "9 digits",
+    "sirenInvalid": "The SIREN must be exactly 9 digits.",
+    "nameRequired": "Name is required.",
+    "saved": "Changes saved",
+    "errors": {
+      "invalid_siren": "The SIREN must be exactly 9 digits.",
+      "siren_already_used": "This SIREN is already used by another company.",
+      "default": "Couldn't save changes. Please try again."
+    }
   },
   "empty": "No participations in this scope — create deals via the AI chat, or add them manually.",
   "search": {
