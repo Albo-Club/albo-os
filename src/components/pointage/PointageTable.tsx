@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { useConvexMutation } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import { DealCombobox } from './DealCombobox'
 import {
@@ -14,7 +15,18 @@ import {
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { DealOption } from './DealCombobox'
 import type { TxDetails } from './TransactionSheet'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '~/components/ui/alert-dialog'
 import { Button } from '~/components/ui/button'
+import { Checkbox } from '~/components/ui/checkbox'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,6 +50,9 @@ const UNDO_DELAY_MS = 5000
 
 /** Destins « écarté » : ignorée, charge courante ou impôt. */
 type DiscardKind = 'ignored' | 'charge' | 'tax'
+
+/** Statuts éligibles au classement en masse (jamais Rattacher ni Ignorer). */
+type BulkStatus = 'charge' | 'tax'
 
 type RecentAction = {
   tx: UnmatchedTx
@@ -129,9 +144,11 @@ function UndoBanner({
  * Table de pointage : transactions `unmatched` triées date desc, actions par
  * ligne (rattacher à un deal, écarter en ignorée/charge/impôt), détail en
  * sheet au clic, et bandeau « Annuler » transitoire (~5 s) après chaque
- * action — qui appelle `unmatchTransaction`. La page n'écrit jamais
- * `matchStatus`/`reconciled` directement : tout passe par les mutations du
- * backend.
+ * action — qui appelle `unmatchTransaction`. Classement en masse via les
+ * cases à cocher : barre de sélection → Charge/Impôt → confirmation →
+ * `bulkCategorize` (un seul appel serveur) + toast « Annuler » groupé.
+ * La page n'écrit jamais `matchStatus`/`reconciled` directement : tout passe
+ * par les mutations du backend.
  */
 export function PointageTable({
   transactions,
@@ -155,6 +172,7 @@ export function PointageTable({
   const unmatchTransaction = useConvexMutation(
     api.transactions.unmatchTransaction,
   )
+  const bulkCategorize = useConvexMutation(api.transactions.bulkCategorize)
 
   const discardMutations = {
     ignored: ignoreTransaction,
@@ -165,9 +183,25 @@ export function PointageTable({
   const [recent, setRecent] = useState<Array<RecentAction>>([])
   const [pendingId, setPendingId] = useState<Id<'transactions'> | null>(null)
   const [sheetTx, setSheetTx] = useState<UnmatchedTx | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<Id<'transactions'>>>(
+    () => new Set(),
+  )
+  const [bulkPending, setBulkPending] = useState(false)
+  const [confirmStatus, setConfirmStatus] = useState<BulkStatus | null>(null)
   const timeoutsRef = useRef(
     new Map<Id<'transactions'>, ReturnType<typeof setTimeout>>(),
   )
+
+  // Purge la sélection des transactions sorties de la file (réactivité
+  // Convex après classement, pointage par un autre user…).
+  useEffect(() => {
+    if (!transactions) return
+    setSelectedIds((prev) => {
+      const valid = new Set(transactions.map((tx) => tx._id))
+      const next = new Set([...prev].filter((id) => valid.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [transactions])
 
   // Nettoyage des timers du bandeau « Annuler » au démontage.
   useEffect(() => {
@@ -233,6 +267,55 @@ export function PointageTable({
     }
   }
 
+  function toggleSelected(txId: Id<'transactions'>) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(txId)) next.delete(txId)
+      else next.add(txId)
+      return next
+    })
+  }
+
+  // Annulation groupée : boucle de `unmatchTransaction` côté front (volume
+  // faible — uniquement les ids du lot qui viennent d'être classés).
+  async function handleBulkUndo(ids: Array<Id<'transactions'>>) {
+    try {
+      await Promise.all(
+        ids.map((transactionId) => unmatchTransaction({ transactionId })),
+      )
+    } catch (err) {
+      reportError(err)
+    }
+  }
+
+  // Classement en masse : UN SEUL appel serveur pour tout le lot. Les lignes
+  // classées sortent de la file via la réactivité Convex sur `listUnmatched`.
+  async function handleBulkCategorize(status: BulkStatus) {
+    const ids = [...selectedIds]
+    setBulkPending(true)
+    try {
+      const result = await bulkCategorize({ transactionIds: ids, status })
+      setSelectedIds(new Set())
+      if (result.succeeded.length > 0) {
+        toast(t(`bulk.banner.${status}`, { count: result.succeeded.length }), {
+          action: {
+            label: t('actions.undo'),
+            onClick: () => void handleBulkUndo(result.succeeded),
+          },
+          duration: UNDO_DELAY_MS,
+        })
+      }
+      if (result.failed.length > 0) {
+        console.error('bulkCategorize failures', result.failed)
+        toast.error(t('bulk.failed', { count: result.failed.length }))
+      }
+    } catch (err) {
+      reportError(err)
+    } finally {
+      setBulkPending(false)
+    }
+  }
+
   // Lignes affichées = transactions `unmatched` (query) + lignes récemment
   // pointées/écartées (state local, le temps du bandeau « Annuler »).
   const rows = useMemo(() => {
@@ -265,10 +348,45 @@ export function PointageTable({
 
   return (
     <>
+      {selectedIds.size > 0 && (
+        <div className="bg-muted/40 mb-3 flex items-center justify-between rounded-lg border px-4 py-2">
+          <span className="text-sm font-medium">
+            {t('bulk.selected', { count: selectedIds.size })}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={bulkPending}
+              onClick={() => setSelectedIds(new Set())}
+            >
+              {t('bulk.deselect')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={bulkPending}
+              onClick={() => setConfirmStatus('charge')}
+            >
+              {t('actions.charge')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={bulkPending}
+              onClick={() => setConfirmStatus('tax')}
+            >
+              {t('actions.tax')}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10" />
               <TableHead>{t('col.date')}</TableHead>
               <TableHead>{t('col.label')}</TableHead>
               <TableHead className="text-right">{t('col.amount')}</TableHead>
@@ -280,7 +398,7 @@ export function PointageTable({
             {!rows ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="text-muted-foreground text-center"
                 >
                   {t('loading')}
@@ -293,6 +411,19 @@ export function PointageTable({
                   className={`cursor-pointer ${recentAction ? 'bg-muted/40' : ''}`}
                   onClick={() => setSheetTx(tx)}
                 >
+                  <TableCell
+                    className="w-10"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {!recentAction && (
+                      <Checkbox
+                        checked={selectedIds.has(tx._id)}
+                        onCheckedChange={() => toggleSelected(tx._id)}
+                        disabled={bulkPending}
+                        aria-label={t('bulk.select')}
+                      />
+                    )}
+                  </TableCell>
                   <TableCell className="whitespace-nowrap tabular-nums">
                     {fmtDate(tx.transactionDate)}
                   </TableCell>
@@ -364,6 +495,41 @@ export function PointageTable({
           ))
         }
       />
+
+      <AlertDialog
+        open={confirmStatus !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmStatus(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmStatus === 'tax'
+                ? t('bulk.confirmTax')
+                : t('bulk.confirmCharge')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmStatus === 'tax'
+                ? t('bulk.confirmBodyTax', { count: selectedIds.size })
+                : t('bulk.confirmBodyCharge', { count: selectedIds.size })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkPending}>
+              {t('bulk.cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={bulkPending}
+              onClick={() => {
+                if (confirmStatus) void handleBulkCategorize(confirmStatus)
+              }}
+            >
+              {t('bulk.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

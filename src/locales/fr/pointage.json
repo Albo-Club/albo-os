@@ -27,6 +27,28 @@
     "charge": "Classée en charge",
     "tax": "Classée en impôt"
   },
+  "bulk": {
+    "select": "Sélectionner",
+    "selected_one": "{{count}} sélectionnée",
+    "selected_other": "{{count}} sélectionnées",
+    "deselect": "Désélectionner",
+    "confirmCharge": "Classer en charge ?",
+    "confirmTax": "Classer en impôt ?",
+    "confirmBodyCharge_one": "{{count}} transaction sera classée en charge.",
+    "confirmBodyCharge_other": "{{count}} transactions seront classées en charge.",
+    "confirmBodyTax_one": "{{count}} transaction sera classée en impôt.",
+    "confirmBodyTax_other": "{{count}} transactions seront classées en impôt.",
+    "confirm": "Confirmer",
+    "cancel": "Annuler",
+    "banner": {
+      "charge_one": "{{count}} classée en charge",
+      "charge_other": "{{count}} classées en charge",
+      "tax_one": "{{count}} classée en impôt",
+      "tax_other": "{{count}} classées en impôt"
+    },
+    "failed_one": "{{count}} transaction n'a pas pu être classée.",
+    "failed_other": "{{count}} transactions n'ont pas pu être classées."
+  },
   "view": {
     "unmatched": "À pointer",
     "charge": "Charges",
