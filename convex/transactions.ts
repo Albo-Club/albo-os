@@ -3,6 +3,9 @@ import { internalMutation, mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { recordDecision } from './lib/matchingLog'
 
+import type { MutationCtx } from './_generated/server'
+import type { Doc, Id } from './_generated/dataModel'
+
 /**
  * Transactions rattachées à un deal (rapprochement via `dealId`), triées par
  * date décroissante et enrichies du compte bancaire. Scopé à l'org du deal.
@@ -196,6 +199,33 @@ export const ignoreTransaction = mutation({
 })
 
 /**
+ * Logique unitaire de classement charge/impôt : patch de la transaction +
+ * ligne `matchingDecisions`. Partagée par `categorizeAsCharge`,
+ * `categorizeAsTax` et `bulkCategorize` pour qu'elles ne divergent jamais.
+ * L'appelant a déjà chargé la transaction et vérifié l'appartenance à l'org.
+ */
+async function applyCategorization(
+  ctx: MutationCtx,
+  tx: Doc<'transactions'>,
+  status: 'charge' | 'tax',
+  decidedBy: Id<'users'>,
+) {
+  await ctx.db.patch('transactions', tx._id, {
+    matchStatus: status,
+    dealId: undefined,
+    reconciled: false,
+    reconciledBy: undefined,
+    reconciledAt: undefined,
+  })
+  await recordDecision(ctx, {
+    transaction: tx,
+    decision: status,
+    source: 'manual',
+    decidedBy,
+  })
+}
+
+/**
  * Classe une transaction en charge courante (loyer, honoraires, frais…).
  * Sous-type d'« écarté » : même comportement qu'`ignoreTransaction`, seul le
  * statut diffère pour pouvoir consulter ces transactions plus tard.
@@ -207,19 +237,7 @@ export const categorizeAsCharge = mutation({
     if (!tx) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, tx.orgId)
 
-    await ctx.db.patch('transactions', tx._id, {
-      matchStatus: 'charge',
-      dealId: undefined,
-      reconciled: false,
-      reconciledBy: undefined,
-      reconciledAt: undefined,
-    })
-    await recordDecision(ctx, {
-      transaction: tx,
-      decision: 'charge',
-      source: 'manual',
-      decidedBy: user._id,
-    })
+    await applyCategorization(ctx, tx, 'charge', user._id)
     return null
   },
 })
@@ -236,20 +254,43 @@ export const categorizeAsTax = mutation({
     if (!tx) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, tx.orgId)
 
-    await ctx.db.patch('transactions', tx._id, {
-      matchStatus: 'tax',
-      dealId: undefined,
-      reconciled: false,
-      reconciledBy: undefined,
-      reconciledAt: undefined,
-    })
-    await recordDecision(ctx, {
-      transaction: tx,
-      decision: 'tax',
-      source: 'manual',
-      decidedBy: user._id,
-    })
+    await applyCategorization(ctx, tx, 'tax', user._id)
     return null
+  },
+})
+
+/**
+ * Classement en masse en charge ou impôt. Chaque transaction est traitée
+ * indépendamment (même chemin que l'unitaire : auth par org de la tx, patch,
+ * ligne `matchingDecisions`) ; un échec sur l'une n'empêche pas les autres.
+ * Retourne les ids classés et les échecs (« appliquer ce qui passe »).
+ */
+export const bulkCategorize = mutation({
+  args: {
+    transactionIds: v.array(v.id('transactions')),
+    status: v.union(v.literal('charge'), v.literal('tax')),
+  },
+  handler: async (ctx, { transactionIds, status }) => {
+    const succeeded: Array<Id<'transactions'>> = []
+    const failed: Array<{ id: Id<'transactions'>; reason: string }> = []
+
+    for (const transactionId of transactionIds) {
+      try {
+        const tx = await ctx.db.get('transactions', transactionId)
+        if (!tx) throw new ConvexError('not_found')
+        const { user } = await requireOrgMember(ctx, tx.orgId)
+
+        await applyCategorization(ctx, tx, status, user._id)
+        succeeded.push(transactionId)
+      } catch (err) {
+        failed.push({
+          id: transactionId,
+          reason: err instanceof ConvexError ? String(err.data) : 'unknown',
+        })
+      }
+    }
+
+    return { succeeded, failed }
   },
 })
 

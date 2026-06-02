@@ -27,6 +27,28 @@
     "charge": "Marked as expense",
     "tax": "Marked as tax"
   },
+  "bulk": {
+    "select": "Select",
+    "selected_one": "{{count}} selected",
+    "selected_other": "{{count}} selected",
+    "deselect": "Deselect",
+    "confirmCharge": "Mark as expenses?",
+    "confirmTax": "Mark as taxes?",
+    "confirmBodyCharge_one": "{{count}} transaction will be marked as an expense.",
+    "confirmBodyCharge_other": "{{count}} transactions will be marked as expenses.",
+    "confirmBodyTax_one": "{{count}} transaction will be marked as a tax.",
+    "confirmBodyTax_other": "{{count}} transactions will be marked as taxes.",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "banner": {
+      "charge_one": "{{count}} marked as expense",
+      "charge_other": "{{count}} marked as expenses",
+      "tax_one": "{{count}} marked as tax",
+      "tax_other": "{{count}} marked as taxes"
+    },
+    "failed_one": "{{count}} transaction could not be categorized.",
+    "failed_other": "{{count}} transactions could not be categorized."
+  },
   "view": {
     "unmatched": "To match",
     "charge": "Expenses",

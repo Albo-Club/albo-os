@@ -296,6 +296,7 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | R11 | `categorizeAsCharge` sur une tx                                   | Tx → `charge`, `dealId` vidé, `reconciled: false` ; ligne `decision: 'charge'`     |
 | R12 | `categorizeAsTax` sur une tx                                      | Tx → `tax`, `dealId` vidé, `reconciled: false` ; ligne `decision: 'tax'`           |
 | R13 | `listByStatus` avec `status: 'charge'` (puis `'tax'`)             | Les tx classées dans ce statut, triées date desc, enrichies du compte ; les tx de R11/R12 ne sont plus dans `listUnmatched` |
+| R14 | `bulkCategorize` avec plusieurs `transactionIds` + `status: 'charge'` (puis `'tax'`) | Retour `{ succeeded: [...], failed: [] }` ; chaque tx → même patch que l'unitaire + une ligne `matchingDecisions` par tx ; un id invalide/d'une autre org atterrit dans `failed` sans bloquer les autres |
 
 ### UI de pointage (`/app/$orgSlug/pointage`)
 
@@ -314,6 +315,10 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | RU8 | Menu « Écarter ▾ » → « Charge » (puis « Impôt ») sur une ligne   | Mutation `categorizeAsCharge` / `categorizeAsTax` ; bandeau « Classée en charge/impôt · Annuler » ~5 s puis la ligne disparaît |
 | RU9 | Onglet « Charges » (puis « Impôts »)                             | Vue lecture seule des tx classées (`listByStatus`), triées date desc ; bouton « Annuler » par ligne |
 | RU10 | « Annuler » dans l'onglet Charges/Impôts                        | Mutation `unmatchTransaction` ; la tx disparaît de l'onglet et réapparaît dans « À pointer » |
+| RU11 | Cocher plusieurs lignes (case en tête de ligne)                  | Barre de sélection « N sélectionnées » au-dessus de la table avec boutons Charge / Impôt / Désélectionner ; cocher n'ouvre pas le sheet |
+| RU12 | Barre de sélection → « Charge » (puis « Impôt »)                 | Dialog de confirmation « Classer en charge/impôt ? N transactions… » ; Confirmer → **un seul** appel `bulkCategorize` (onglet réseau) ; les tx sortent de la file et apparaissent dans l'onglet Charges/Impôts ; une ligne `matchingDecisions` par tx |
+| RU13 | Toast « N classées en charge/impôt · Annuler » après RU12        | Clic « Annuler » → les tx du lot reviennent dans « À pointer » (boucle `unmatchTransaction`) |
+| RU14 | « Désélectionner » dans la barre / Annuler dans le dialog        | Sélection vidée / dialog fermé sans aucune mutation |
 
 ### Réattribution depuis la page d'un deal (`/app/$orgSlug/deals/$dealId`)
 
