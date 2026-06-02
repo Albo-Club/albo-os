@@ -86,9 +86,29 @@ async function enrich(ctx: Ctx, deal: Doc<'deals'>) {
 }
 
 /**
+ * Sommes des transactions rattachées à un deal (cents) : Versé = sorties,
+ * Reçu = entrées, jamais nettés. Même définition que la page détail
+ * (transactions.listByDeal + reduce côté client).
+ */
+export async function transactionTotals(ctx: Ctx, dealId: Id<'deals'>) {
+  const txs = await ctx.db
+    .query('transactions')
+    .withIndex('by_deal', (q) => q.eq('dealId', dealId))
+    .collect()
+  let paidActual = 0
+  let received = 0
+  for (const tx of txs) {
+    if (tx.direction === 'out') paidActual += tx.amount
+    else received += tx.amount
+  }
+  return { paidActual, received }
+}
+
+/**
  * Liste enrichie des deals (deal + noms investor/target/spv) d'une org,
  * filtrable par status / target. Sert la vue Participations par-org
  * (regroupée par société côté client). Tri par défaut : signedDate desc.
+ * Inclut par deal les montants Versé/Reçu calculés depuis les transactions.
  */
 export const list = query({
   args: {
@@ -116,7 +136,12 @@ export const list = query({
     if (status) rows = rows.filter((d) => d.status === status)
 
     rows.sort((a, b) => (b.signedDate ?? 0) - (a.signedDate ?? 0))
-    return await Promise.all(rows.map((d) => enrich(ctx, d)))
+    return await Promise.all(
+      rows.map(async (d) => ({
+        ...(await enrich(ctx, d)),
+        ...(await transactionTotals(ctx, d._id)),
+      })),
+    )
   },
 })
 

@@ -25,7 +25,10 @@ export type DealRow = {
   instrumentKind: string
   status: string
   committedAmount?: number | null
-  paidAmount?: number | null
+  /** Versé : somme des transactions sortantes rattachées (calculé serveur). */
+  paidActual?: number | null
+  /** Reçu : somme des transactions entrantes rattachées (calculé serveur). */
+  received?: number | null
   signedDate?: number | null
   org?: { name: string; slug: string } | null // présent en vue agrégée
 }
@@ -105,7 +108,8 @@ export function DealsList({
             <Field label={t('deal.committed')}>
               {fmtEur(dl.committedAmount)}
             </Field>
-            <Field label={t('deal.paid')}>{fmtEur(dl.paidAmount)}</Field>
+            <Field label={t('deal.paid')}>{fmtEur(dl.paidActual ?? 0)}</Field>
+            <Field label={t('deal.received')}>{fmtEur(dl.received ?? 0)}</Field>
             <Field label={t('deal.status')}>
               <Badge variant={statusVariant(dl.status)}>
                 {t(`status.${dl.status}`, { defaultValue: dl.status })}
@@ -170,6 +174,7 @@ export function ParticipationsTable({
         deals: Array<DealRow>
         committed: number
         paid: number
+        received: number
       }
     >()
     for (const d of deals) {
@@ -181,17 +186,19 @@ export function ParticipationsTable({
         deals: [],
         committed: 0,
         paid: 0,
+        received: 0,
       }
       g.deals.push(d)
       if (d.org) g.orgs.add(d.org.name)
       g.committed += d.committedAmount ?? 0
-      g.paid += d.paidAmount ?? 0
+      g.paid += d.paidActual ?? 0
+      g.received += d.received ?? 0
       map.set(key, g)
     }
     return Array.from(map.entries()).map(([id, g]) => ({ id, ...g }))
   }, [deals, orgSlug])
 
-  const colSpan = showOrg ? 5 : 4
+  const colSpan = showOrg ? 6 : 5
 
   if (groups && groups.length === 0) {
     return (
@@ -211,6 +218,7 @@ export function ParticipationsTable({
             <TableHead className="text-right">{t('col.deals')}</TableHead>
             <TableHead className="text-right">{t('col.committed')}</TableHead>
             <TableHead className="text-right">{t('col.paid')}</TableHead>
+            <TableHead className="text-right">{t('col.received')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -261,6 +269,7 @@ function CompanyRows({
     deals: Array<DealRow>
     committed: number
     paid: number
+    received: number
   }
   isOpen: boolean
   onToggle: () => void
@@ -313,6 +322,9 @@ function CompanyRows({
         </TableCell>
         <TableCell className="text-right tabular-nums">
           {fmtEur(group.paid)}
+        </TableCell>
+        <TableCell className="text-right tabular-nums">
+          {fmtEur(group.received)}
         </TableCell>
       </TableRow>
       {isOpen && (
