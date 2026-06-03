@@ -422,8 +422,9 @@ function DealDetail() {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
+        {/* Nom seul : l'instrument est déjà affiché dans la grille d'infos. */}
         <h1 className="text-2xl font-semibold tracking-tight">
-          {dealTitle(deal)}
+          {dealTitle(deal, { withInstrument: false })}
         </h1>
         <Badge variant={statusVariant(deal.status)}>
           {t(`status.${deal.status}`, { defaultValue: deal.status })}

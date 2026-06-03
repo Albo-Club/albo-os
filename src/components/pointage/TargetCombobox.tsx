@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import type { DealOption } from './DealCombobox'
 import type { LiabilityOption } from '~/lib/liabilityOptions'
 import { cn } from '~/lib/utils'
+import { useDealTitle } from '~/components/participations/ParticipationsTable'
 import { Button } from '~/components/ui/button'
 import {
   Command,
@@ -51,11 +52,9 @@ export function TargetCombobox({
   onSelect: (target: PointageTarget | null) => void
   disabled?: boolean
 }) {
-  const { t } = useTranslation(['pointage', 'participations'])
+  const { t } = useTranslation('pointage')
   const [open, setOpen] = useState(false)
-
-  const instrumentLabel = (kind: string) =>
-    t(`participations:instrument.${kind}`, { defaultValue: kind })
+  const dealTitle = useDealTitle()
 
   const valueId =
     value == null
@@ -122,8 +121,10 @@ export function TargetCombobox({
                   <CommandItem
                     key={deal._id}
                     // L'_id garantit l'unicité cmdk quand deux deals partagent
-                    // le même nom de boîte ; la recherche matche sur les noms.
-                    value={`${deal.target?.name ?? ''} ${deal.investor?.name ?? ''} ${deal._id}`}
+                    // le même nom de boîte ; la recherche matche sur les noms,
+                    // le nom personnalisé et l'instrument (comme la table
+                    // Participations).
+                    value={`${deal.target?.name ?? ''} ${dealTitle(deal)} ${deal.investor?.name ?? ''} ${deal._id}`}
                     onSelect={() => {
                       onSelect(
                         deal._id === valueId ? null : { kind: 'deal', deal },
@@ -142,7 +143,7 @@ export function TargetCombobox({
                         {deal.target?.name ?? '—'}
                       </span>
                       <span className="text-muted-foreground truncate text-xs">
-                        {instrumentLabel(deal.instrumentKind)}
+                        {dealTitle(deal)}
                         {deal.investor ? ` · ${deal.investor.name}` : ''}
                       </span>
                     </span>

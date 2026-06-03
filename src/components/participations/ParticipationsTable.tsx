@@ -77,16 +77,25 @@ export function useFormatters() {
 }
 
 /**
- * Titre d'affichage d'un deal : nom personnalisé s'il existe, sinon le
- * libellé (i18n) de l'instrument. Même règle que la page détail du deal.
+ * Titre d'affichage d'un deal : `nom personnalisé · instrument` si un nom
+ * existe, sinon le libellé (i18n) de l'instrument seul.
+ * `withInstrument: false` n'affiche que le nom (ex. page détail du deal, où
+ * l'instrument est déjà dans la grille d'infos).
  */
 export function useDealTitle() {
   const { t } = useTranslation('participations')
-  return (deal: { name?: string | null; instrumentKind: string }) =>
-    deal.name ??
-    t(`instrument.${deal.instrumentKind}`, {
+  return (
+    deal: { name?: string | null; instrumentKind: string },
+    opts?: { withInstrument?: boolean },
+  ) => {
+    const instrument = t(`instrument.${deal.instrumentKind}`, {
       defaultValue: deal.instrumentKind,
     })
+    if (!deal.name) return instrument
+    return opts?.withInstrument === false
+      ? deal.name
+      : `${deal.name} · ${instrument}`
+  }
 }
 
 /**
