@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { Id } from '../../../convex/_generated/dataModel'
 import { cn } from '~/lib/utils'
+import { useDealTitle } from '~/components/participations/ParticipationsTable'
 import { Button } from '~/components/ui/button'
 import {
   Command,
@@ -22,6 +23,8 @@ import {
 /** Forme minimale d'un deal enrichi (retour de `api.deals.list`). */
 export type DealOption = {
   _id: Id<'deals'>
+  /** Nom personnalisé — affiché avec l'instrument quand présent. */
+  name?: string | null
   target: { name: string } | null
   investor: { name: string } | null
   instrumentKind: string
@@ -43,11 +46,9 @@ export function DealCombobox({
   onSelect: (deal: DealOption | null) => void
   disabled?: boolean
 }) {
-  const { t } = useTranslation(['pointage', 'participations'])
+  const { t } = useTranslation('pointage')
   const [open, setOpen] = useState(false)
-
-  const instrumentLabel = (kind: string) =>
-    t(`participations:instrument.${kind}`, { defaultValue: kind })
+  const dealTitle = useDealTitle()
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -78,8 +79,10 @@ export function DealCombobox({
                 <CommandItem
                   key={deal._id}
                   // L'_id garantit l'unicité cmdk quand deux deals partagent
-                  // le même nom de boîte ; la recherche matche sur les noms.
-                  value={`${deal.target?.name ?? ''} ${deal.investor?.name ?? ''} ${deal._id}`}
+                  // le même nom de boîte ; la recherche matche sur les noms,
+                  // le nom personnalisé et l'instrument (comme la table
+                  // Participations).
+                  value={`${deal.target?.name ?? ''} ${dealTitle(deal)} ${deal.investor?.name ?? ''} ${deal._id}`}
                   onSelect={() => {
                     onSelect(deal._id === value?._id ? null : deal)
                     setOpen(false)
@@ -94,7 +97,7 @@ export function DealCombobox({
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate">{deal.target?.name ?? '—'}</span>
                     <span className="text-muted-foreground truncate text-xs">
-                      {instrumentLabel(deal.instrumentKind)}
+                      {dealTitle(deal)}
                       {deal.investor ? ` · ${deal.investor.name}` : ''}
                     </span>
                   </span>

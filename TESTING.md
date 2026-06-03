@@ -311,7 +311,7 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | --- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | RU1 | `/app/calte/pointage` en tant que membre                         | Table des tx `unmatched` triées date desc (Date · Libellé · Montant signé · Compte · Actions) + compteur « N à pointer » |
 | RU2 | `/app/albo/pointage` (org sans tx unmatched)                     | État vide « Aucune transaction à pointer 🎉 »                                      |
-| RU3 | Combobox sur une ligne (groupes **Deals / Capitaux propres / Comptes courants**) → choisir un deal → « Rattacher » | Mutation `matchTransaction` ; la ligne affiche « Rattachée à {deal} · Annuler » ~5 s puis disparaît |
+| RU3 | Combobox sur une ligne (groupes **Deals / Capitaux propres / Comptes courants**) → choisir un deal → « Rattacher » | Options du groupe Deals : société en label, `nom personnalisé · instrument · investisseur` en sous-label (instrument seul si pas de nom) ; la recherche du combobox matche aussi le nom personnalisé ; Mutation `matchTransaction` ; la ligne affiche « Rattachée à {deal} · Annuler » ~5 s puis disparaît |
 | RU4 | Menu « Écarter ▾ » → « Ignorer » sur une ligne                   | Mutation `ignoreTransaction` ; bandeau « Ignorée · Annuler » ~5 s puis la ligne disparaît |
 | RU5 | « Annuler » pendant le bandeau (après RU3 ou RU4)                | Mutation `unmatchTransaction` ; la ligne redevient pointable (réactivité Convex)   |
 | RU6 | Clic sur une ligne (hors colonne Actions)                        | Sheet de détail lecture seule (date, libellé brut, contrepartie, montant, sens, compte) + mêmes actions |
@@ -352,7 +352,7 @@ d'une entité (`/participations/$companyId`), nom personnalisé d'un compte
 
 | #   | Étape                                                            | Résultat attendu                                                                  |
 | --- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| ED1 | Page deal → « Modifier » → saisir un nom personnalisé → Enregistrer | Toast succès ; le titre devient le nom saisi (réactif, sans reload) ; l'instrument reste visible dans la grille d'infos ; les listes (`/participations`, `/app/all/participations`, fiche entité) affichent aussi ce nom à la place du libellé d'instrument |
+| ED1 | Page deal → « Modifier » → saisir un nom personnalisé → Enregistrer | Toast succès ; le titre devient le nom saisi **seul** (réactif, sans reload) ; l'instrument reste visible dans la grille d'infos ; les listes (`/participations`, `/app/all/participations`, fiche entité) et le combobox de pointage affichent `nom personnalisé · instrument` (les deux côte à côte) |
 | ED2 | Même dialog → vider le nom → Enregistrer                          | Le titre retombe sur le libellé de l'instrument (champ `name` effacé en base)     |
 | ED3 | Même dialog → changer l'instrument (dropdown) → Enregistrer       | Étiquette instrument mise à jour (titre si pas de nom, grille, listes) ; **aucun** changement sur les transactions rattachées (Versé/Reçu inchangés) |
 | ED4 | Page entité → « Modifier » → renommer + SIREN valide (9 chiffres, espaces tolérés) → Enregistrer | Toast succès ; titre + SIREN de la grille mis à jour ; SIREN stocké normalisé (sans espaces) |
