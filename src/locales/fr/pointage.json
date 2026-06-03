@@ -1,7 +1,7 @@
 {
   "metaTitle": "Pointage — Albo OS",
   "title": "Pointage",
-  "subtitle": "Rattachez les transactions bancaires à vos deals.",
+  "subtitle": "Rattachez les transactions bancaires à vos deals ou à votre passif.",
   "counter_one": "{{count}} à pointer",
   "counter_other": "{{count}} à pointer",
   "loading": "Chargement…",
@@ -76,9 +76,12 @@
     "noResults": "Aucune transaction ne correspond à votre recherche."
   },
   "combobox": {
-    "placeholder": "Choisir un deal",
-    "search": "Rechercher un deal…",
-    "empty": "Aucun deal trouvé."
+    "placeholder": "Choisir une cible",
+    "search": "Rechercher une cible…",
+    "empty": "Aucune cible trouvée.",
+    "groupDeals": "Deals",
+    "groupEquity": "Capitaux propres",
+    "groupLoans": "Comptes courants"
   },
   "detail": {
     "title": "Transaction",
@@ -96,6 +99,9 @@
     "failed": "L'action a échoué. Veuillez réessayer.",
     "not_found": "Transaction introuvable.",
     "deal_wrong_org": "Ce deal appartient à une autre organisation.",
+    "equity_wrong_org": "Cette position de capital appartient à une autre organisation.",
+    "loan_wrong_org": "Cette transaction n'appartient à aucune des deux organisations du compte courant.",
+    "already_matched_to_deal": "Cette transaction est déjà rattachée à un deal. Détachez-la d'abord.",
     "allocated_to_liability": "Cette transaction est pointée sur le passif (capital ou compte courant). Détachez-la depuis la page Passif."
   }
 }

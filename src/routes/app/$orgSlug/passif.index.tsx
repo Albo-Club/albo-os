@@ -1,17 +1,18 @@
-import { useMemo } from 'react'
+import { useState } from 'react'
+import { Plus } from 'lucide-react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '../../../../convex/_generated/api'
-import type { LiabilityOption } from '~/components/passif/LiabilityCombobox'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
+import { Button } from '~/components/ui/button'
 import {
-  AllocateTable,
-  EquityTable,
-  LoansTable,
-} from '~/components/passif/PassifTables'
+  CreateEquityDialog,
+  CreateLoanDialog,
+} from '~/components/passif/CreateLiabilityDialogs'
+import { EquityTable, LoansTable } from '~/components/passif/PassifTables'
 
 export const Route = createFileRoute('/app/$orgSlug/passif/')({
   component: Passif,
@@ -27,42 +28,21 @@ export const Route = createFileRoute('/app/$orgSlug/passif/')({
 function Passif() {
   const { t } = useTranslation('passif')
   const { orgSlug } = Route.useParams()
+  const [openDialog, setOpenDialog] = useState<'equity' | 'loan' | null>(null)
 
   const org = useConvexQuery(api.organizations.bySlug, { slug: orgSlug })
   const liabilities = useConvexQuery(
     api.liabilities.getLiabilities,
     org ? { orgId: org._id } : 'skip',
   )
-  const transactions = useConvexQuery(
-    api.transactions.listUnmatched,
-    org ? { orgId: org._id } : 'skip',
-  )
+  // Orgs de l'utilisateur — alimentent les selects des dialogs de création
+  // (détenteur d'une position de capital, parties d'un C/C).
+  const me = useConvexQuery(api.users.me)
+  const orgs = me?.kind === 'ready' ? me.orgs : undefined
 
-  // Cibles de pointage = positions de capital + C/C de l'org.
-  const options = useMemo<Array<LiabilityOption> | undefined>(() => {
-    if (!liabilities) return undefined
-    return [
-      ...liabilities.equityPositions.map((position) => ({
-        kind: 'equity' as const,
-        targetId: position._id,
-        label: t(`equity.type.${position.type}`),
-        sublabel: position.holderName ?? '—',
-      })),
-      ...liabilities.loans.map((loan) => ({
-        kind: 'intercompany_loan' as const,
-        targetId: loan._id,
-        label: loan.counterpartyName ?? '—',
-        sublabel: t(
-          loan.side === 'creditor' ? 'loans.receivable' : 'loans.payable',
-        ),
-      })),
-    ]
-  }, [liabilities, t])
-
-  // Filtre de sécurité : une tx allouée au passif est `matched` et n'est donc
-  // plus dans `listUnmatched` — on ne garde que les tx sans allocation.
-  const allocatable = transactions?.filter((tx) => tx.allocation == null)
-
+  // Le pointage des transactions vers ces cibles vit dans l'onglet Pointage
+  // (combobox Deals / Capitaux propres / Comptes courants) ; ici on lit les
+  // soldes, on détache, et on crée les cibles.
   return (
     <main className="flex-1 space-y-8 p-6">
       <div className="space-y-1">
@@ -71,24 +51,51 @@ function Passif() {
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-medium">{t('equity.title')}</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-medium">{t('equity.title')}</h2>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!org || !orgs}
+            onClick={() => setOpenDialog('equity')}
+          >
+            <Plus className="mr-1.5 size-4" />
+            {t('create.equity.button')}
+          </Button>
+        </div>
         <EquityTable positions={liabilities?.equityPositions} />
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-medium">{t('loans.title')}</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-medium">{t('loans.title')}</h2>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!org || !orgs}
+            onClick={() => setOpenDialog('loan')}
+          >
+            <Plus className="mr-1.5 size-4" />
+            {t('create.loan.button')}
+          </Button>
+        </div>
         <LoansTable loans={liabilities?.loans} />
       </section>
 
-      <section className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="text-lg font-medium">{t('allocate.title')}</h2>
-          <p className="text-muted-foreground text-sm">
-            {t('allocate.subtitle')}
-          </p>
-        </div>
-        <AllocateTable transactions={allocatable} options={options} />
-      </section>
+      {org && orgs && openDialog === 'equity' && (
+        <CreateEquityDialog
+          orgId={org._id}
+          orgs={orgs}
+          onClose={() => setOpenDialog(null)}
+        />
+      )}
+      {org && orgs && openDialog === 'loan' && (
+        <CreateLoanDialog
+          orgId={org._id}
+          orgs={orgs}
+          onClose={() => setOpenDialog(null)}
+        />
+      )}
     </main>
   )
 }

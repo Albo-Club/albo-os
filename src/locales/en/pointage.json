@@ -1,7 +1,7 @@
 {
   "metaTitle": "Reconciliation — Albo OS",
   "title": "Reconciliation",
-  "subtitle": "Match bank transactions to your deals.",
+  "subtitle": "Match bank transactions to your deals or liabilities.",
   "counter_one": "{{count}} to match",
   "counter_other": "{{count}} to match",
   "loading": "Loading…",
@@ -76,9 +76,12 @@
     "noResults": "No transaction matches your search."
   },
   "combobox": {
-    "placeholder": "Select a deal",
-    "search": "Search a deal…",
-    "empty": "No deal found."
+    "placeholder": "Select a target",
+    "search": "Search a target…",
+    "empty": "No target found.",
+    "groupDeals": "Deals",
+    "groupEquity": "Equity",
+    "groupLoans": "Current accounts"
   },
   "detail": {
     "title": "Transaction",
@@ -96,6 +99,9 @@
     "failed": "The action failed. Please try again.",
     "not_found": "Transaction not found.",
     "deal_wrong_org": "This deal belongs to another organization.",
+    "equity_wrong_org": "This equity position belongs to another organization.",
+    "loan_wrong_org": "This transaction belongs to neither organization of the current account.",
+    "already_matched_to_deal": "This transaction is already matched to a deal. Unmatch it first.",
     "allocated_to_liability": "This transaction is allocated to a liability (equity or current account). Detach it from the Liabilities page first."
   }
 }

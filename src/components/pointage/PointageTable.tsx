@@ -4,7 +4,7 @@ import { useConvexMutation } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
-import { DealCombobox } from './DealCombobox'
+import { TargetCombobox } from './TargetCombobox'
 import {
   TransactionSheet,
   accountLabel,
@@ -14,6 +14,7 @@ import {
 
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { DealOption } from './DealCombobox'
+import type { LiabilityOption, PointageTarget } from './TargetCombobox'
 import type { TxDetails } from './TransactionSheet'
 import {
   AlertDialog,
@@ -72,36 +73,41 @@ const bulkConfirmKeys: Record<BulkStatus, { title: string; body: string }> = {
 
 type RecentAction = {
   tx: UnmatchedTx
-  kind: 'matched' | DiscardKind
-  dealName?: string
+  // `matched` = rattachée à un deal, `allocated` = pointée sur le passif
+  // (l'annulation passe par deallocateTransaction, pas unmatchTransaction).
+  kind: 'matched' | 'allocated' | DiscardKind
+  targetName?: string
 }
 
-/** Combobox + Rattacher + menu « Écarter » (Ignorer/Charge/Impôt/Produit/Virement interne). */
+/** Combobox de cible (deal / passif) + Rattacher + menu « Écarter ». */
 function RowActions({
   deals,
+  liabilityTargets,
   pending,
   onMatch,
   onDiscard,
 }: {
   deals: Array<DealOption> | undefined
+  liabilityTargets: Array<LiabilityOption> | undefined
   pending: boolean
-  onMatch: (deal: DealOption) => void
+  onMatch: (target: PointageTarget) => void
   onDiscard: (kind: DiscardKind) => void
 }) {
   const { t } = useTranslation('pointage')
-  const [deal, setDeal] = useState<DealOption | null>(null)
+  const [target, setTarget] = useState<PointageTarget | null>(null)
   return (
     <div className="flex items-center justify-end gap-2">
-      <DealCombobox
+      <TargetCombobox
         deals={deals}
-        value={deal}
-        onSelect={setDeal}
+        liabilities={liabilityTargets}
+        value={target}
+        onSelect={setTarget}
         disabled={pending}
       />
       <Button
         size="sm"
-        disabled={!deal || pending}
-        onClick={() => deal && onMatch(deal)}
+        disabled={!target || pending}
+        onClick={() => target && onMatch(target)}
       >
         {t('actions.match')}
       </Button>
@@ -135,7 +141,7 @@ function RowActions({
 }
 
 /**
- * Bandeau transitoire « Rattachée à {deal} · Annuler » / « Ignorée · Annuler »
+ * Bandeau transitoire « Rattachée à {cible} · Annuler » / « Ignorée · Annuler »
  * / « Classée en charge/impôt/produit/virement interne · Annuler ».
  */
 function UndoBanner({
@@ -151,8 +157,8 @@ function UndoBanner({
   return (
     <div className="flex items-center justify-end gap-2">
       <span className="text-muted-foreground text-sm">
-        {recent.kind === 'matched'
-          ? t('banner.matched', { deal: recent.dealName ?? '—' })
+        {recent.kind === 'matched' || recent.kind === 'allocated'
+          ? t('banner.matched', { deal: recent.targetName ?? '—' })
           : t(`banner.${recent.kind}`)}
       </span>
       <Button size="sm" variant="outline" disabled={pending} onClick={onUndo}>
@@ -164,9 +170,10 @@ function UndoBanner({
 
 /**
  * Table de pointage : transactions `unmatched` triées date desc, actions par
- * ligne (rattacher à un deal, écarter en ignorée/charge/impôt/produit/
- * virement interne), détail en sheet au clic, et bandeau « Annuler »
- * transitoire (~5 s) après chaque action — qui appelle `unmatchTransaction`.
+ * ligne (rattacher à un deal OU à une cible passif — equity / C/C —, écarter
+ * en ignorée/charge/impôt/produit/virement interne), détail en sheet au clic,
+ * et bandeau « Annuler » transitoire (~5 s) après chaque action — qui appelle
+ * `unmatchTransaction` (deal/écartée) ou `deallocateTransaction` (passif).
  * Classement en masse via les cases à cocher : barre de sélection →
  * Charge/Impôt/Produit/Virement interne → confirmation →
  * `bulkCategorize` (un seul appel serveur) + toast « Annuler » groupé.
@@ -176,10 +183,13 @@ function UndoBanner({
 export function PointageTable({
   transactions,
   deals,
+  liabilityTargets,
   emptyMessage,
 }: {
   transactions: Array<UnmatchedTx> | undefined
   deals: Array<DealOption> | undefined
+  /** Cibles passif (equity / C/C) de l'org, construites par la page. */
+  liabilityTargets: Array<LiabilityOption> | undefined
   /** Message d'état vide alternatif (ex. recherche sans résultat). */
   emptyMessage?: string
 }) {
@@ -188,6 +198,12 @@ export function PointageTable({
   const reportError = useReportError()
 
   const matchTransaction = useConvexMutation(api.transactions.matchTransaction)
+  const allocateTransaction = useConvexMutation(
+    api.liabilities.allocateTransaction,
+  )
+  const deallocateTransaction = useConvexMutation(
+    api.liabilities.deallocateTransaction,
+  )
   const ignoreTransaction = useConvexMutation(
     api.transactions.ignoreTransaction,
   )
@@ -261,11 +277,27 @@ export function PointageTable({
     )
   }
 
-  async function handleMatch(tx: UnmatchedTx, deal: DealOption) {
+  async function handleMatch(tx: UnmatchedTx, target: PointageTarget) {
     setPendingId(tx._id)
     try {
-      await matchTransaction({ transactionId: tx._id, dealId: deal._id })
-      addRecent({ tx, kind: 'matched', dealName: deal.target?.name ?? '—' })
+      if (target.kind === 'deal') {
+        await matchTransaction({
+          transactionId: tx._id,
+          dealId: target.deal._id,
+        })
+        addRecent({
+          tx,
+          kind: 'matched',
+          targetName: target.deal.target?.name ?? '—',
+        })
+      } else {
+        await allocateTransaction({
+          transactionId: tx._id,
+          kind: target.liability.kind,
+          targetId: target.liability.targetId,
+        })
+        addRecent({ tx, kind: 'allocated', targetName: target.liability.label })
+      }
       setSheetTx((cur) => (cur?._id === tx._id ? null : cur))
     } catch (err) {
       reportError(err)
@@ -287,10 +319,17 @@ export function PointageTable({
     }
   }
 
-  async function handleUndo(tx: UnmatchedTx) {
+  async function handleUndo(action: RecentAction) {
+    const tx = action.tx
     setPendingId(tx._id)
     try {
-      await unmatchTransaction({ transactionId: tx._id })
+      // Un pointage passif s'annule via deallocateTransaction (un unmatch
+      // deal sur une tx allouée passif est refusé par le backend).
+      if (action.kind === 'allocated') {
+        await deallocateTransaction({ transactionId: tx._id })
+      } else {
+        await unmatchTransaction({ transactionId: tx._id })
+      }
       // La query réactive ré-inclut la ligne ; on retire le bandeau après le
       // retour de la mutation pour éviter tout flicker.
       removeRecent(tx._id)
@@ -504,13 +543,14 @@ export function PointageTable({
                       <UndoBanner
                         recent={recentAction}
                         pending={pendingId === tx._id}
-                        onUndo={() => void handleUndo(tx)}
+                        onUndo={() => void handleUndo(recentAction)}
                       />
                     ) : (
                       <RowActions
                         deals={deals}
+                        liabilityTargets={liabilityTargets}
                         pending={pendingId === tx._id}
-                        onMatch={(deal) => void handleMatch(tx, deal)}
+                        onMatch={(target) => void handleMatch(tx, target)}
                         onDiscard={(kind) => void handleDiscard(tx, kind)}
                       />
                     )}
@@ -533,13 +573,14 @@ export function PointageTable({
             <UndoBanner
               recent={sheetRecent}
               pending={pendingId === sheetTx._id}
-              onUndo={() => void handleUndo(sheetTx)}
+              onUndo={() => void handleUndo(sheetRecent)}
             />
           ) : (
             <RowActions
               deals={deals}
+              liabilityTargets={liabilityTargets}
               pending={pendingId === sheetTx._id}
-              onMatch={(deal) => void handleMatch(sheetTx, deal)}
+              onMatch={(target) => void handleMatch(sheetTx, target)}
               onDiscard={(kind) => void handleDiscard(sheetTx, kind)}
             />
           ))

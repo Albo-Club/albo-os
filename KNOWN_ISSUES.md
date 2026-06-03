@@ -791,7 +791,10 @@ dérivés des transactions pointées (`allocation.kind === 'intercompany_loan'`)
   `matched` est donc ambigu : rattachée à un deal (`dealId != null`) **ou**
   allouée au passif (`allocation.kind === 'equity' | 'intercompany_loan'`,
   `dealId` null) — toujours discriminer par `dealId` / `allocation.kind`,
-  jamais supposer « matched ⟹ deal ».
+  jamais supposer « matched ⟹ deal ». Le front du pointage passif vit dans
+  l'**onglet Pointage** (combobox groupé Deals / Capitaux propres / Comptes
+  courants, `TargetCombobox`) ; le détachement vit sur la page Passif et dans
+  le bandeau « Annuler » du Pointage.
 - **Garde-fous croisés deal ⟷ passif.** Allouer une tx déjà rattachée à un
   deal → `ConvexError('already_matched_to_deal')` ; matcher / écarter /
   dé-pointer (unmatch) une tx allouée passif →
@@ -800,6 +803,13 @@ dérivés des transactions pointées (`allocation.kind === 'intercompany_loan'`)
   Le pointage passif n'écrit **jamais** dans `matchingDecisions` (dataset
   réservé au pointage deal) et ne touche jamais `reconciled` (miroir
   deal-only : la vue Cash affiche une tx passif comme « non pointée »).
+- **Création depuis l'UI : `createEquityPosition` / `createIntercompanyLoan`**
+  (page Passif, boutons « + Capital » / « + Compte courant »). Création
+  seule — **l'édition et la suppression restent des follow-ups** (passer par
+  le dashboard Convex en attendant). Détenteur d'une equity : org du groupe
+  OU libellé libre (`holderPersonId` jamais exposé, pas de table persons).
+  C/C : l'utilisateur doit être membre d'au moins une des deux orgs
+  (`not_a_party`), `interestRateBps` absent = non rémunéré.
 
 ## Recherche transactions — champ dérivé `searchText` (`convex/lib/searchText.ts`)
 

@@ -1,11 +1,9 @@
 import { ConvexError, v } from 'convex/values'
 import { internalMutation, mutation, query } from './_generated/server'
-import { requireOrgMember } from './lib/auth'
-import {
-  computeLoanBalanceCents,
-  loanSideForOrg,
-} from './lib/liabilities'
+import { requireAppUser, requireOrgMember } from './lib/auth'
+import { computeLoanBalanceCents, loanSideForOrg } from './lib/liabilities'
 import { buildSearchText } from './lib/searchText'
+import { equityPositionType } from './schema'
 
 import type { QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
@@ -85,10 +83,7 @@ export async function getLiabilitiesForOrg(
     .query('intercompanyLoans')
     .withIndex('by_to', (q) => q.eq('toOrgId', orgId))
     .collect()
-  const loansById = new Map<
-    Id<'intercompanyLoans'>,
-    Doc<'intercompanyLoans'>
-  >()
+  const loansById = new Map<Id<'intercompanyLoans'>, Doc<'intercompanyLoans'>>()
   for (const loan of [...asCreditor, ...asDebtor]) {
     loansById.set(loan._id, loan)
   }
@@ -211,6 +206,105 @@ export const deallocateTransaction = mutation({
       matchStatus: 'unmatched',
     })
     return null
+  },
+})
+
+// ─── Création manuelle (equity / C/C) ────────────────────────────────────────
+//
+// Création seule (édition / suppression = follow-up). Les lignes créées
+// deviennent immédiatement des cibles pointables (combobox de l'onglet
+// Pointage, via getLiabilities réactif).
+
+/**
+ * Crée une position de capitaux propres émise par l'org. Le détenteur est
+ * SOIT une org du groupe (`holderOrgId`), SOIT un libellé libre
+ * (`holderLabel`), soit aucun des deux (capital sans détenteur nommé).
+ * `holderPersonId` n'est pas exposé (pas de table persons).
+ */
+export const createEquityPosition = mutation({
+  args: {
+    orgId: v.id('organizations'), // entité émettrice
+    holderOrgId: v.optional(v.id('organizations')),
+    holderLabel: v.optional(v.string()),
+    type: equityPositionType,
+    amountCents: v.number(),
+    shares: v.optional(v.number()),
+    effectiveDate: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await requireOrgMember(ctx, args.orgId)
+
+    if (args.amountCents <= 0) throw new ConvexError('invalid_amount')
+    // Une seule source de détenteur (les deux vides = autorisé).
+    if (args.holderOrgId && args.holderLabel) {
+      throw new ConvexError('ambiguous_holder')
+    }
+    if (args.holderOrgId) {
+      const holderOrg = await ctx.db.get('organizations', args.holderOrgId)
+      if (!holderOrg) throw new ConvexError('not_found')
+    }
+
+    return await ctx.db.insert('equityPositions', {
+      orgId: args.orgId,
+      holderOrgId: args.holderOrgId,
+      holderLabel: args.holderLabel?.trim() || undefined,
+      type: args.type,
+      amountCents: args.amountCents,
+      shares: args.shares,
+      effectiveDate: args.effectiveDate,
+    })
+  },
+})
+
+/**
+ * Crée un compte courant inter-entités créancier → débiteur. L'utilisateur
+ * doit être membre d'au moins une des deux orgs (pas de C/C entre orgs
+ * tierces). `interestRateBps` absent = 0 = non rémunéré.
+ */
+export const createIntercompanyLoan = mutation({
+  args: {
+    fromOrgId: v.id('organizations'), // créancier
+    toOrgId: v.id('organizations'), // débiteur
+    interestRateBps: v.optional(v.number()),
+    isBlocked: v.boolean(),
+    openedDate: v.number(),
+  },
+  handler: async (ctx, args) => {
+    if (args.fromOrgId === args.toOrgId) throw new ConvexError('same_org')
+
+    // Membre d'au moins une des deux parties.
+    const user = await requireAppUser(ctx)
+    const memberships = await Promise.all(
+      [args.fromOrgId, args.toOrgId].map((orgId) =>
+        ctx.db
+          .query('organizationMembers')
+          .withIndex('by_org_and_user', (q) =>
+            q.eq('orgId', orgId).eq('userId', user._id),
+          )
+          .unique(),
+      ),
+    )
+    if (!memberships.some((member) => member !== null)) {
+      throw new ConvexError('not_a_party')
+    }
+
+    const [fromOrg, toOrg] = await Promise.all([
+      ctx.db.get('organizations', args.fromOrgId),
+      ctx.db.get('organizations', args.toOrgId),
+    ])
+    if (!fromOrg || !toOrg) throw new ConvexError('not_found')
+
+    if (args.interestRateBps != null && args.interestRateBps < 0) {
+      throw new ConvexError('invalid_rate')
+    }
+
+    return await ctx.db.insert('intercompanyLoans', {
+      fromOrgId: args.fromOrgId,
+      toOrgId: args.toOrgId,
+      interestRateBps: args.interestRateBps,
+      isBlocked: args.isBlocked,
+      openedDate: args.openedDate,
+    })
   },
 })
 
