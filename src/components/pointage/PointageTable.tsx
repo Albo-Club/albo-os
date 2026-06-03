@@ -14,7 +14,8 @@ import {
 
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { DealOption } from './DealCombobox'
-import type { LiabilityOption, PointageTarget } from './TargetCombobox'
+import type { PointageTarget } from './TargetCombobox'
+import type { LiabilityOptionGroups } from '~/lib/liabilityOptions'
 import type { TxDetails } from './TransactionSheet'
 import {
   AlertDialog,
@@ -82,13 +83,13 @@ type RecentAction = {
 /** Combobox de cible (deal / passif) + Rattacher + menu « Écarter ». */
 function RowActions({
   deals,
-  liabilityTargets,
+  liabilityOptions,
   pending,
   onMatch,
   onDiscard,
 }: {
   deals: Array<DealOption> | undefined
-  liabilityTargets: Array<LiabilityOption> | undefined
+  liabilityOptions: LiabilityOptionGroups | undefined
   pending: boolean
   onMatch: (target: PointageTarget) => void
   onDiscard: (kind: DiscardKind) => void
@@ -99,7 +100,8 @@ function RowActions({
     <div className="flex items-center justify-end gap-2">
       <TargetCombobox
         deals={deals}
-        liabilities={liabilityTargets}
+        equityOptions={liabilityOptions?.equityOptions}
+        loanOptions={liabilityOptions?.loanOptions}
         value={target}
         onSelect={setTarget}
         disabled={pending}
@@ -183,13 +185,13 @@ function UndoBanner({
 export function PointageTable({
   transactions,
   deals,
-  liabilityTargets,
+  liabilityOptions,
   emptyMessage,
 }: {
   transactions: Array<UnmatchedTx> | undefined
   deals: Array<DealOption> | undefined
   /** Cibles passif (equity / C/C) de l'org, construites par la page. */
-  liabilityTargets: Array<LiabilityOption> | undefined
+  liabilityOptions: LiabilityOptionGroups | undefined
   /** Message d'état vide alternatif (ex. recherche sans résultat). */
   emptyMessage?: string
 }) {
@@ -548,7 +550,7 @@ export function PointageTable({
                     ) : (
                       <RowActions
                         deals={deals}
-                        liabilityTargets={liabilityTargets}
+                        liabilityOptions={liabilityOptions}
                         pending={pendingId === tx._id}
                         onMatch={(target) => void handleMatch(tx, target)}
                         onDiscard={(kind) => void handleDiscard(tx, kind)}
@@ -578,7 +580,7 @@ export function PointageTable({
           ) : (
             <RowActions
               deals={deals}
-              liabilityTargets={liabilityTargets}
+              liabilityOptions={liabilityOptions}
               pending={pendingId === sheetTx._id}
               onMatch={(target) => void handleMatch(sheetTx, target)}
               onDiscard={(kind) => void handleDiscard(sheetTx, kind)}

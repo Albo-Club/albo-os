@@ -3,6 +3,7 @@ import { Check, ChevronsUpDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { DealOption } from './DealCombobox'
+import type { LiabilityOption } from '~/lib/liabilityOptions'
 import { cn } from '~/lib/utils'
 import { Button } from '~/components/ui/button'
 import {
@@ -19,37 +20,33 @@ import {
   PopoverTrigger,
 } from '~/components/ui/popover'
 
-/**
- * Cible passif pointable : position de capital (`equity`) ou compte courant
- * inter-entités (`intercompany_loan`). `targetId` est l'_id de la cible en
- * string (convention `transactions.allocation`).
- */
-export type LiabilityOption = {
-  kind: 'equity' | 'intercompany_loan'
-  targetId: string
-  label: string
-  sublabel: string
-}
-
 /** Cible de pointage sélectionnée : un deal OU une cible passif. */
 export type PointageTarget =
   | { kind: 'deal'; deal: DealOption }
   | { kind: 'liability'; liability: LiabilityOption }
 
 /**
- * Combobox cherchable de cibles de pointage (Popover + Command), groupées en
- * Deals / Capitaux propres / Comptes courants. Étend le pattern `DealCombobox`
- * (qui reste utilisé seul pour la réattribution deal → deal).
+ * Combobox cherchable de cibles de pointage (Popover + Command) : trois
+ * groupes Deals / Capitaux propres / Comptes courants, chacun alimenté
+ * directement depuis sa source (`api.deals.list` / `getLiabilities` via
+ * `buildLiabilityOptions`) — jamais de liste aplatie re-filtrée par kind.
+ *
+ * Les trois groupes sont TOUJOURS rendus : un groupe sans cible affiche un
+ * état vide explicite (« absent » et « vide » doivent rester distinguables —
+ * cf. KNOWN_ISSUES.md « Passif »). Étend le pattern `DealCombobox` (qui reste
+ * utilisé seul pour la réattribution deal → deal).
  */
 export function TargetCombobox({
   deals,
-  liabilities,
+  equityOptions,
+  loanOptions,
   value,
   onSelect,
   disabled,
 }: {
   deals: Array<DealOption> | undefined
-  liabilities: Array<LiabilityOption> | undefined
+  equityOptions: Array<LiabilityOption> | undefined
+  loanOptions: Array<LiabilityOption> | undefined
   value: PointageTarget | null
   onSelect: (target: PointageTarget | null) => void
   disabled?: boolean
@@ -75,18 +72,23 @@ export function TargetCombobox({
 
   const liabilityGroups = [
     {
-      kind: 'equity' as const,
+      key: 'equity',
       heading: t('pointage:combobox.groupEquity'),
-      options: (liabilities ?? []).filter((option) => option.kind === 'equity'),
+      emptyLabel: t('pointage:combobox.emptyEquity'),
+      options: equityOptions,
     },
     {
-      kind: 'intercompany_loan' as const,
+      key: 'intercompany_loan',
       heading: t('pointage:combobox.groupLoans'),
-      options: (liabilities ?? []).filter(
-        (option) => option.kind === 'intercompany_loan',
-      ),
+      emptyLabel: t('pointage:combobox.emptyLoans'),
+      options: loanOptions,
     },
   ]
+
+  const loading =
+    deals === undefined &&
+    equityOptions === undefined &&
+    loanOptions === undefined
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -96,9 +98,7 @@ export function TargetCombobox({
           size="sm"
           role="combobox"
           aria-expanded={open}
-          disabled={
-            disabled || (deals === undefined && liabilities === undefined)
-          }
+          disabled={disabled || loading}
           className="w-44 justify-between font-normal"
         >
           <span className="truncate">
@@ -112,9 +112,13 @@ export function TargetCombobox({
           <CommandInput placeholder={t('pointage:combobox.search')} />
           <CommandList>
             <CommandEmpty>{t('pointage:combobox.empty')}</CommandEmpty>
-            {(deals ?? []).length > 0 && (
-              <CommandGroup heading={t('pointage:combobox.groupDeals')}>
-                {(deals ?? []).map((deal) => (
+            <CommandGroup heading={t('pointage:combobox.groupDeals')}>
+              {(deals ?? []).length === 0 ? (
+                <div className="text-muted-foreground px-2 py-1.5 text-xs">
+                  {t('pointage:combobox.emptyDeals')}
+                </div>
+              ) : (
+                (deals ?? []).map((deal) => (
                   <CommandItem
                     key={deal._id}
                     // L'_id garantit l'unicité cmdk quand deux deals partagent
@@ -143,13 +147,17 @@ export function TargetCombobox({
                       </span>
                     </span>
                   </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-            {liabilityGroups.map((group) =>
-              group.options.length === 0 ? null : (
-                <CommandGroup key={group.kind} heading={group.heading}>
-                  {group.options.map((option) => (
+                ))
+              )}
+            </CommandGroup>
+            {liabilityGroups.map((group) => (
+              <CommandGroup key={group.key} heading={group.heading}>
+                {(group.options ?? []).length === 0 ? (
+                  <div className="text-muted-foreground px-2 py-1.5 text-xs">
+                    {group.emptyLabel}
+                  </div>
+                ) : (
+                  (group.options ?? []).map((option) => (
                     <CommandItem
                       key={option.targetId}
                       value={`${option.label} ${option.sublabel} ${option.targetId}`}
@@ -177,10 +185,10 @@ export function TargetCombobox({
                         </span>
                       </span>
                     </CommandItem>
-                  ))}
-                </CommandGroup>
-              ),
-            )}
+                  ))
+                )}
+              </CommandGroup>
+            ))}
           </CommandList>
         </Command>
       </PopoverContent>

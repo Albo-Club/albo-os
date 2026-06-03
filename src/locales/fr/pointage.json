@@ -81,7 +81,10 @@
     "empty": "Aucune cible trouvée.",
     "groupDeals": "Deals",
     "groupEquity": "Capitaux propres",
-    "groupLoans": "Comptes courants"
+    "groupLoans": "Comptes courants",
+    "emptyDeals": "Aucun deal pour cette organisation.",
+    "emptyEquity": "Aucune position de capital pour cette organisation.",
+    "emptyLoans": "Aucun compte courant pour cette organisation."
   },
   "detail": {
     "title": "Transaction",

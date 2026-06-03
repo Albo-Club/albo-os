@@ -4,9 +4,10 @@ import { useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '../../../../convex/_generated/api'
-import type { LiabilityOption } from '~/components/pointage/TargetCombobox'
+import type { LiabilityOptionGroups } from '~/lib/liabilityOptions'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
+import { buildLiabilityOptions } from '~/lib/liabilityOptions'
 import { Badge } from '~/components/ui/badge'
 import { Input } from '~/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
@@ -60,28 +61,17 @@ function Pointage() {
       : 'skip',
   )
 
-  // Cibles passif du combobox (groupes Capitaux propres / Comptes courants).
+  // Cibles passif du combobox (groupes Capitaux propres / Comptes courants),
+  // construites par le helper pur testé (tests/liabilityOptions.test.ts).
   // Libellés résolus via le namespace `passif` (mêmes clés que la page Passif).
-  const liabilityTargets = useMemo<Array<LiabilityOption> | undefined>(() => {
+  const liabilityOptions = useMemo<LiabilityOptionGroups | undefined>(() => {
     if (!liabilities) return undefined
-    return [
-      ...liabilities.equityPositions.map((position) => ({
-        kind: 'equity' as const,
-        targetId: position._id,
-        label: t(`passif:equity.type.${position.type}`),
-        sublabel: position.holderName ?? '—',
-      })),
-      ...liabilities.loans.map((loan) => ({
-        kind: 'intercompany_loan' as const,
-        targetId: loan._id,
-        label: loan.counterpartyName ?? '—',
-        sublabel: t(
-          loan.side === 'creditor'
-            ? 'passif:loans.receivable'
-            : 'passif:loans.payable',
-        ),
-      })),
-    ]
+    return buildLiabilityOptions(liabilities, {
+      equityType: (type) =>
+        t(`passif:equity.type.${type}`, { defaultValue: type }),
+      receivable: t('passif:loans.receivable'),
+      payable: t('passif:loans.payable'),
+    })
   }, [liabilities, t])
 
   // Pendant le rechargement d'un nouveau terme de recherche, on garde la
@@ -143,7 +133,7 @@ function Pointage() {
         <PointageTable
           transactions={transactions}
           deals={deals}
-          liabilityTargets={liabilityTargets}
+          liabilityOptions={liabilityOptions}
           emptyMessage={searchEmptyMessage}
         />
       ) : (

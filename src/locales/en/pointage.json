@@ -81,7 +81,10 @@
     "empty": "No target found.",
     "groupDeals": "Deals",
     "groupEquity": "Equity",
-    "groupLoans": "Current accounts"
+    "groupLoans": "Current accounts",
+    "emptyDeals": "No deal for this organization.",
+    "emptyEquity": "No equity position for this organization.",
+    "emptyLoans": "No current account for this organization."
   },
   "detail": {
     "title": "Transaction",

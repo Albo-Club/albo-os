@@ -795,6 +795,17 @@ dérivés des transactions pointées (`allocation.kind === 'intercompany_loan'`)
   l'**onglet Pointage** (combobox groupé Deals / Capitaux propres / Comptes
   courants, `TargetCombobox`) ; le détachement vit sur la page Passif et dans
   le bandeau « Annuler » du Pointage.
+- **Combobox de pointage : ne JAMAIS masquer un groupe vide.** Un groupe
+  rendu conditionnellement (`options.length > 0 && …`) rend « absent » et
+  « vide » indistinguables — c'est exactement le bug signalé sur le groupe
+  Comptes courants (impossible de savoir si le câblage était cassé ou si la
+  liste était vide). Règle : les trois groupes sont **toujours** rendus, avec
+  un état vide explicite (« Aucun compte courant pour cette organisation »).
+  Le câblage cibles → groupes est verrouillé par
+  `src/lib/liabilityOptions.ts` (pur) + `tests/liabilityOptions.test.ts` :
+  chaque groupe est alimenté **directement** depuis sa source
+  (`equityPositions` / `loans`), jamais via une liste aplatie re-filtrée par
+  `kind`.
 - **Garde-fous croisés deal ⟷ passif.** Allouer une tx déjà rattachée à un
   deal → `ConvexError('already_matched_to_deal')` ; matcher / écarter /
   dé-pointer (unmatch) une tx allouée passif →
