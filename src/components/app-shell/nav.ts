@@ -18,6 +18,8 @@ export type NavLeaf = {
   adminOnly?: boolean
   /** When true, render a `common:demo` badge. */
   demo?: boolean
+  /** When true, render as non-clickable with a `nav:comingSoon` badge. */
+  soon?: boolean
 }
 
 export type NavGroup = {
@@ -36,6 +38,7 @@ export function getNavGroups(): Array<NavGroup> {
           titleKey: 'items.dashboard',
           to: '/app/$orgSlug',
           icon: LayoutDashboard,
+          soon: true,
         },
         {
           titleKey: 'items.participations',
