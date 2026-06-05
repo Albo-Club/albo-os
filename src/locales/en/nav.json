@@ -13,6 +13,7 @@
     }
   },
   "comingSoon": "Coming soon",
+  "soon": "Soon",
   "groups": {
     "platform": "Platform",
     "workspace": "Workspace"

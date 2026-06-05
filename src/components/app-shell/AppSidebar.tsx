@@ -7,6 +7,7 @@ import { ThemePicker } from './ThemePicker'
 import { getNavGroups } from './nav'
 import type { NavGroup } from './nav'
 import { LanguageSwitcher } from '~/components/i18n/LanguageSwitcher'
+import { Badge } from '~/components/ui/badge'
 import {
   Sidebar,
   SidebarContent,
@@ -69,12 +70,17 @@ export function AppSidebar({
             tooltip={title}
             size={size}
             aria-disabled="true"
-            className="cursor-not-allowed opacity-60"
+            className="cursor-not-allowed"
           >
-            {Icon ? <Icon /> : null}
-            <span>{title}</span>
+            {Icon ? <Icon className="opacity-60" /> : null}
+            <span className="opacity-60">{title}</span>
+            <Badge
+              variant="outline"
+              className="ml-auto border-yellow-300 bg-yellow-100 text-yellow-800 dark:border-yellow-800/50 dark:bg-yellow-950/50 dark:text-yellow-300 group-data-[collapsible=icon]:hidden"
+            >
+              {t('nav:soon')}
+            </Badge>
           </SidebarMenuButton>
-          <SidebarMenuBadge>{t('nav:comingSoon')}</SidebarMenuBadge>
         </SidebarMenuItem>
       )
     }
