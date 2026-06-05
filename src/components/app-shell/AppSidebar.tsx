@@ -59,9 +59,28 @@ export function AppSidebar({
 
   const renderItem = (item: NavLeaf, size?: 'sm') => {
     const Icon = item.icon
+    const title = t(`nav:${item.titleKey}`)
+
+    if (item.soon) {
+      return (
+        <SidebarMenuItem key={item.titleKey}>
+          <SidebarMenuButton
+            disabled
+            tooltip={title}
+            size={size}
+            aria-disabled="true"
+            className="cursor-not-allowed opacity-60"
+          >
+            {Icon ? <Icon /> : null}
+            <span>{title}</span>
+          </SidebarMenuButton>
+          <SidebarMenuBadge>{t('nav:comingSoon')}</SidebarMenuBadge>
+        </SidebarMenuItem>
+      )
+    }
+
     const isParam = item.to.includes('$orgSlug')
     const href = isParam ? item.to.replace('$orgSlug', currentSlug) : item.to
-    const title = t(`nav:${item.titleKey}`)
     const isActive =
       item.to === '/app/$orgSlug'
         ? location.pathname === href
