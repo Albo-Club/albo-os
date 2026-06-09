@@ -1,10 +1,13 @@
 import { ConvexError, v } from 'convex/values'
 import { paginationOptsValidator } from 'convex/server'
 import {
+  abortStream,
   createThread,
   getThreadMetadata,
+  listStreams,
   listUIMessages,
   syncStreams,
+  updateThreadMetadata,
   vStreamArgs,
 } from '@convex-dev/agent'
 
@@ -18,6 +21,7 @@ import {
 } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { chatAgent } from './agent'
+import { buildInstructions } from './lib/instructions'
 import { authComponent } from './auth'
 import { consumeLimit } from './rateLimiters'
 import type { DataModel, Id } from './_generated/dataModel'
@@ -125,17 +129,31 @@ export const listMessages = query({
   },
 })
 
+const AUTO_TITLE_MAX = 60
+const ROUTE_CONTEXT_MAX = 200
+
 export const sendMessage = mutation({
   args: {
     orgId: v.id('organizations'),
     threadId: v.string(),
     prompt: v.string(),
+    // Contexte de page (route courante) transmis au system prompt du stream.
+    context: v.optional(v.object({ route: v.string() })),
   },
-  handler: async (ctx, { orgId, threadId, prompt }) => {
+  handler: async (ctx, { orgId, threadId, prompt, context }) => {
     const { user } = await requireOrgMember(ctx, orgId)
     await consumeLimit(ctx, 'chatSend', user._id)
     const scope = scopeKey(orgId, user._id)
-    await authorizeThread(ctx, threadId, scope)
+    const meta = await getThreadMetadata(ctx, components.agent, { threadId })
+    if (meta.userId !== scope) throw new ConvexError('forbidden')
+    if (!meta.title) {
+      // Titre auto bon marché : début du premier message (pas de LLM).
+      await updateThreadMetadata(ctx, components.agent, {
+        threadId,
+        patch: { title: prompt.slice(0, AUTO_TITLE_MAX) },
+      })
+    }
+    const org = await ctx.db.get('organizations', orgId)
     const { messageId } = await chatAgent.saveMessage(ctx, {
       threadId,
       prompt,
@@ -144,18 +162,65 @@ export const sendMessage = mutation({
     await ctx.scheduler.runAfter(0, internal.chat.streamAsync, {
       threadId,
       promptMessageId: messageId,
+      route: context?.route.slice(0, ROUTE_CONTEXT_MAX),
+      orgName: org?.name,
     })
     return { messageId }
   },
 })
 
+export const renameThread = mutation({
+  args: {
+    orgId: v.id('organizations'),
+    threadId: v.string(),
+    title: v.string(),
+  },
+  handler: async (ctx, { orgId, threadId, title }) => {
+    const { user } = await requireOrgMember(ctx, orgId)
+    const scope = scopeKey(orgId, user._id)
+    await authorizeThread(ctx, threadId, scope)
+    const trimmed = title.trim().slice(0, 120)
+    if (!trimmed) throw new ConvexError('invalid_title')
+    await updateThreadMetadata(ctx, components.agent, {
+      threadId,
+      patch: { title: trimmed },
+    })
+    return null
+  },
+})
+
+export const stopStream = mutation({
+  args: { orgId: v.id('organizations'), threadId: v.string() },
+  handler: async (ctx, { orgId, threadId }) => {
+    const { user } = await requireOrgMember(ctx, orgId)
+    const scope = scopeKey(orgId, user._id)
+    await authorizeThread(ctx, threadId, scope)
+    const streams = await listStreams(ctx, components.agent, {
+      threadId,
+      includeStatuses: ['streaming'],
+    })
+    for (const s of streams) {
+      await abortStream(ctx, components.agent, {
+        streamId: s.streamId,
+        reason: 'user_requested',
+      })
+    }
+    return null
+  },
+})
+
 export const streamAsync = internalAction({
-  args: { threadId: v.string(), promptMessageId: v.string() },
-  handler: async (ctx, { threadId, promptMessageId }) => {
+  args: {
+    threadId: v.string(),
+    promptMessageId: v.string(),
+    route: v.optional(v.string()),
+    orgName: v.optional(v.string()),
+  },
+  handler: async (ctx, { threadId, promptMessageId, route, orgName }) => {
     const result = await chatAgent.streamText(
       ctx,
       { threadId },
-      { promptMessageId },
+      { promptMessageId, system: buildInstructions({ route, orgName }) },
       { saveStreamDeltas: { chunking: 'word', throttleMs: 100 } },
     )
     await result.consumeStream()

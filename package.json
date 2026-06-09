@@ -62,7 +62,9 @@
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-i18next": "^17.0.8",
+    "react-markdown": "^10.1.0",
     "recharts": "3.8.0",
+    "remark-gfm": "^4.0.1",
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.6.0",
     "zod": "^4.4.3"

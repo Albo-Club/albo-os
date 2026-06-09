@@ -1,0 +1,46 @@
+/**
+ * Tests purs du system prompt de l'agent (convex/lib/instructions.ts) :
+ * le contexte de page (route + org) est injecté après les instructions de
+ * base, et omis proprement quand absent.
+ *
+ * Lancés avec le test runner natif de Node via tsx (aucune dépendance) :
+ *   pnpm test:unit
+ */
+
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
+import {
+  BASE_INSTRUCTIONS,
+  buildInstructions,
+} from '../convex/lib/instructions'
+
+describe('buildInstructions', () => {
+  it('sans contexte → instructions de base inchangées', () => {
+    assert.equal(buildInstructions(), BASE_INSTRUCTIONS)
+    assert.equal(buildInstructions({}), BASE_INSTRUCTIONS)
+  })
+
+  it('avec orgName → mentionne l’organisation après la base', () => {
+    const out = buildInstructions({ orgName: 'CALTE' })
+    assert.ok(out.startsWith(BASE_INSTRUCTIONS))
+    assert.ok(out.includes('Current organization: CALTE.'))
+    assert.ok(!out.includes('currently on the app page'))
+  })
+
+  it('avec route → mentionne la page courante', () => {
+    const out = buildInstructions({ route: '/app/calte/pointage' })
+    assert.ok(out.startsWith(BASE_INSTRUCTIONS))
+    assert.ok(out.includes('"/app/calte/pointage"'))
+  })
+
+  it('avec route + orgName → les deux, org avant route', () => {
+    const out = buildInstructions({
+      route: '/app/calte/cash',
+      orgName: 'CALTE',
+    })
+    const orgIdx = out.indexOf('Current organization')
+    const routeIdx = out.indexOf('currently on the app page')
+    assert.ok(orgIdx > 0)
+    assert.ok(routeIdx > orgIdx)
+  })
+})

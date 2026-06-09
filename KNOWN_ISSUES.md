@@ -416,8 +416,10 @@ audit.
   reject/cancel invitation states.
 - **AI front uses `useUIMessages` from `@convex-dev/agent/react`** instead of
   `@assistant-ui/react`. No Convex adapter exists for assistant-ui; the brief's
-  pick would require ~200 lines of glue. Loss: markdown rendering, attachments,
-  tool-call UI, edit/regenerate. Migrate later if polish is needed.
+  pick would require ~200 lines of glue. Markdown rendering (`react-markdown`),
+  compact tool-call display, thread history/rename/delete and stop are now
+  hand-rolled in `src/components/ai/AiPanel.tsx`. Remaining loss vs
+  assistant-ui: attachments, edit/regenerate.
 - **Anthropic model default `claude-haiku-4-5`** — choisi pour le ratio
   coût/latence sur un assistant in-app. Override via `ANTHROPIC_MODEL` env var
   (ex. `claude-sonnet-4-6` pour des tâches plus lourdes).

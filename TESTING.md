@@ -186,12 +186,12 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | SA4 | Last-SA guard : retirer son propre flag SA si seul SA | Erreur "cannot_demote_last_superadmin"                          |
 | SA5 | `purgeExcept` (dev cleanup) — uniquement en dev    | Conserve uniquement l'email indiqué, supprime le reste             |
 
-## Niveau 5 — AI chat (8 min)
+## Niveau 5 — AI chat (12 min)
 
 | #  | Étape                                                   | Résultat attendu                                                  |
 | -- | ------------------------------------------------------- | ----------------------------------------------------------------- |
-| C1 | Ouvrir le slide-over chat depuis `/app/acme`            | Premier thread créé automatiquement                                |
-| C2 | Envoyer un message simple ("ping")                      | Stream visible token par token, pas de blocage UI                  |
+| C1 | Charger `/app/acme`                                     | Panneau AI ouvert par défaut à droite du contenu (desktop ≥ lg)    |
+| C2 | Envoyer un message simple ("ping")                      | Stream visible token par token, pas de blocage UI ; thread créé au 1er envoi, titre auto = début du message |
 | C3 | "liste mes participations Albo"                         | Tool `listDeals`/`listCompanies` appelé, réponse scopée à l'org    |
 | C4 | "crée un deal Albo Club dans Sezame, share, 50 000 €, signé le 15 janvier 2026" | L'agent confirme puis appelle `createCompany` (si absente) + `createDeal` ; le deal apparaît dans `/participations` (scope Albo + Consolidé, pas Calte) |
 | C5 | Demander un deal avec un investisseur portfolio (non groupe) | Refusé (`investor_must_be_group_entity`) — l'agent explique qu'il faut une entité du groupe |
@@ -200,6 +200,13 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | C8 | "crée un compte bancaire Qonto pour CALTE, solde 12 000 €"               | L'agent résout CALTE via `listCompanies` puis appelle `createBankAccount` avec `currentBalanceCents: 1200000` ; le compte apparaît dans `/cash` sous CALTE avec un solde de 12 000 € (pas "Solde inconnu") |
 | C9 | "ajoute une transaction de sortie 5 000 € liée au deal Sezame le 3 février 2026" | L'agent appelle `listBankAccounts`/`listDeals` puis `createTransaction` (dealId rempli) ; visible dans le Sheet du compte (sortie négative) ; le solde affiché reste inchangé (champ manuel) |
 | C10 | Demander un compte bancaire rattaché à une société portfolio            | Refusé (`owner_must_be_group_entity`) — l'agent explique qu'il faut une entité du groupe |
+| C11 | Toggle « AI » dans le header → reload                   | Panneau replié, l'état survit au reload (cookie `ai_panel_state`)  |
+| C12 | Naviguer participations → pointage → cash               | Panneau et conversation intacts (monté dans le layout org)         |
+| C13 | Envoyer un message depuis `/app/acme/pointage`          | La réponse montre que l'agent connaît la page courante (contexte route transmis au system prompt) |
+| C14 | Historique : créer 2 conversations, switcher, renommer, supprimer | Liste dans le menu Historique, titres mis à jour, suppression → bascule sur la conversation la plus récente |
+| C15 | Demander une liste/tableau                              | Rendu markdown propre (listes, tableaux) pendant le stream         |
+| C16 | Bouton stop pendant un long stream                      | Le texte s'arrête, pas d'erreur console ; bouton copier sur les réponses |
+| C17 | `/app/all`, `/app/me`, `/app/admin`                     | Aucun panneau AI (scope org uniquement), zéro régression visuelle  |
 
 ## Niveau 6 — Sécurité + déploiement (5 min)
 

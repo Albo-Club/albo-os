@@ -7,11 +7,25 @@ import { api } from '../../../../convex/_generated/api'
 import { SidebarInset, SidebarProvider } from '~/components/ui/sidebar'
 import { AppSidebar } from '~/components/app-shell/AppSidebar'
 import { AppHeader } from '~/components/app-shell/AppHeader'
-import { AiChat } from '~/components/AiChat'
+import { AiPanel } from '~/components/ai/AiPanel'
+import { cn } from '~/lib/utils'
 
 export const Route = createFileRoute('/app/$orgSlug')({
   component: OrgLayout,
 })
+
+// Panneau AI persistant : même pattern de persistance que sidebar_state
+// (cookie 7 jours), ouvert par défaut.
+const AI_PANEL_COOKIE_NAME = 'ai_panel_state'
+const AI_PANEL_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
+
+function readAiPanelCookie(): boolean {
+  if (typeof document === 'undefined') return true
+  const match = document.cookie.match(
+    new RegExp(`(?:^|; )${AI_PANEL_COOKIE_NAME}=([^;]*)`),
+  )
+  return match ? match[1] === 'true' : true
+}
 
 function OrgLayout() {
   const { orgSlug } = Route.useParams()
@@ -20,7 +34,12 @@ function OrgLayout() {
   const me = useConvexQuery(api.users.me)
   const org = useConvexQuery(api.organizations.bySlug, { slug: orgSlug })
   const setLastOrg = useConvexMutation(api.organizations.setLastOrg)
-  const [chatOpen, setChatOpen] = useState(false)
+  const [aiOpen, setAiOpen] = useState(readAiPanelCookie)
+
+  function setAiPanelOpen(open: boolean) {
+    setAiOpen(open)
+    document.cookie = `${AI_PANEL_COOKIE_NAME}=${open}; path=/; max-age=${AI_PANEL_COOKIE_MAX_AGE}`
+  }
 
   useEffect(() => {
     if (me?.kind !== 'ready') return
@@ -67,18 +86,31 @@ function OrgLayout() {
         <AppHeader
           orgSlug={orgSlug}
           orgName={member.name}
-          onOpenAiChat={() => setChatOpen(true)}
+          aiPanelOpen={aiOpen}
+          onToggleAiPanel={() => setAiPanelOpen(!aiOpen)}
         />
         <div className="min-h-0 flex-1 overflow-y-auto">
           <Outlet />
         </div>
       </SidebarInset>
       {org && (
-        <AiChat
-          orgId={org._id}
-          open={chatOpen}
-          onClose={() => setChatOpen(false)}
-        />
+        <aside
+          className={cn(
+            'bg-background flex-col border-l',
+            // Desktop (≥ lg) : panneau dans le flux, à droite du contenu.
+            'lg:static lg:z-auto lg:h-svh lg:w-[400px] lg:shrink-0 lg:shadow-none',
+            // Mobile : overlay plein écran à droite.
+            'fixed inset-y-0 right-0 z-50 w-full max-w-md shadow-xl',
+            aiOpen ? 'flex' : 'hidden',
+          )}
+        >
+          {/* key : remount propre au changement d'org (thread state org-scopé) */}
+          <AiPanel
+            key={org._id}
+            orgId={org._id}
+            onClose={() => setAiPanelOpen(false)}
+          />
+        </aside>
       )}
     </SidebarProvider>
   )
