@@ -1,12 +1,20 @@
 name: Tag release
 
 # Publishes the git tag for the version recorded in `.template-version`.
-# Complements `pnpm run release` for environments that can't push tags
-# (web sessions, CI). Downstream forks need this tag to graft ancestry on
-# their first `pnpm run upgrade-template` — see UPGRADING.md.
+# Runs on every push to main that touches the version file or CHANGELOG —
+# merge a release bump and the tag publishes itself (idempotent if the tag
+# already exists). Also triggerable by hand. Complements `pnpm run release`
+# for environments that can't push tags (web sessions, CI). Downstream
+# forks need this tag to graft ancestry on their first
+# `pnpm run upgrade-template` — see UPGRADING.md.
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.template-version'
+      - 'CHANGELOG.md'
 
 permissions:
   contents: write
