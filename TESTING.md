@@ -207,6 +207,10 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | C15 | Demander une liste/tableau                              | Rendu markdown propre (listes, tableaux) pendant le stream         |
 | C16 | Bouton stop pendant un long stream                      | Le texte s'arrête, pas d'erreur console ; bouton copier sur les réponses |
 | C17 | `/app/all`, `/app/me`, `/app/admin`                     | Aucun panneau AI (scope org uniquement), zéro régression visuelle  |
+| C18 | "liste mes transactions non pointées" puis "suggère des rattachements" | `listUnmatchedTransactions` puis `suggestMatches` appelés ; candidats présentés avec leur évidence ; l'agent ATTEND la confirmation |
+| C19 | Confirmer un rattachement suggéré                       | `matchTransactionToDeal` appelé ; la tx disparaît de l'onglet Pointage ; `matchingDecisions` a une ligne `source: 'agent_suggested'` (dashboard Convex) |
+| C20 | "crée une règle de loyer 1 500 €/mois le 5" puis "projette mon cash sur 12 mois" | `createForecastRule` (après confirmation) → l'agent propose `expandForecastRules` → `getForecastBalance` rend les mois ; cohérent avec la mutation publique |
+| C21 | "ajoute une valo de 1,2 M€ au deal X au 31/12" + "liste le passif" | `createValuation` (après confirmation) visible en base ; `listLiabilities` rend positions + C/C avec soldes dérivés |
 
 ## Niveau 6 — Sécurité + déploiement (5 min)
 
