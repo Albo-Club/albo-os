@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import { instrumentValidator as sharedInstrumentValidator } from './lib/instruments'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
 import type { DataModel, Doc, Id } from './_generated/dataModel'
 
@@ -13,27 +14,8 @@ const statusValidator = v.union(
   v.literal('written_off'),
 )
 
-const instrumentValidator = v.union(
-  v.literal('share'),
-  v.literal('bsa'),
-  v.literal('bsa_air'),
-  v.literal('safe'),
-  v.literal('oc'),
-  v.literal('os'),
-  v.literal('convertible_note'),
-  v.literal('cca'),
-  v.literal('royalty'),
-  v.literal('fund_lp'),
-  v.literal('spv_share'),
-  v.literal('secondary'),
-  v.literal('real_estate_direct'),
-  v.literal('scpi'),
-  v.literal('cto'),
-  v.literal('dat'),
-  v.literal('crypto'),
-  v.literal('loan'),
-  v.literal('capitalization_account'),
-)
+// Source unique : convex/lib/instruments.ts
+const instrumentValidator = sharedInstrumentValidator
 
 /** Champs financiers/lifecycle communs, tous optionnels. */
 const dealFields = {

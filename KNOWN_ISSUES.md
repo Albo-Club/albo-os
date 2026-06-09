@@ -609,9 +609,10 @@ Le code reste en place comme référence/relance (idempotent), pas de sync.
   retombent sur un `bankAccounts` `airtableId = "__unassigned_bank__"`. Ces
   deux lignes sont des artefacts d'import, pas des données métier réelles.
 - **2 enums `instrumentKind` ajoutés** : `loan` (Airtable « Prêt »),
-  `capitalization_account` (« Compte de Capitalisation »). L'union est
-  redéclarée dans 3 endroits — garder synchronisés : `convex/schema.ts`,
-  `convex/deals.ts`, `convex/agentTools.ts` (array `INSTRUMENTS` + validateur).
+  `capitalization_account` (« Compte de Capitalisation »). L'union vit dans
+  **`convex/lib/instruments.ts`** (source unique : `INSTRUMENTS` +
+  `instrumentValidator`), importée par `convex/schema.ts`, `convex/deals.ts`
+  et `convex/agentTools.ts` — ne pas la redéclarer.
 - **Dérivation deals** : 1 deal = `(Entreprise × instrumentKind)`, clé
   `airtableId = "${entrepriseRecId}:${instrument}"`. Les mouvements
   opérationnels (Cash, Don, Impot, Honoraires, Virement, Nantissement) ne

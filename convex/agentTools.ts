@@ -15,52 +15,9 @@ import { z } from 'zod/v3'
 import { internal } from './_generated/api'
 import { internalMutation, internalQuery } from './_generated/server'
 import { buildSearchText } from './lib/searchText'
+import { INSTRUMENTS, instrumentValidator } from './lib/instruments'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
-
-const INSTRUMENTS = [
-  'share',
-  'bsa',
-  'bsa_air',
-  'safe',
-  'oc',
-  'os',
-  'convertible_note',
-  'cca',
-  'royalty',
-  'fund_lp',
-  'spv_share',
-  'secondary',
-  'real_estate_direct',
-  'scpi',
-  'cto',
-  'dat',
-  'crypto',
-  'loan',
-  'capitalization_account',
-] as const
-
-const instrumentValidator = v.union(
-  v.literal('share'),
-  v.literal('bsa'),
-  v.literal('bsa_air'),
-  v.literal('safe'),
-  v.literal('oc'),
-  v.literal('os'),
-  v.literal('convertible_note'),
-  v.literal('cca'),
-  v.literal('royalty'),
-  v.literal('fund_lp'),
-  v.literal('spv_share'),
-  v.literal('secondary'),
-  v.literal('real_estate_direct'),
-  v.literal('scpi'),
-  v.literal('cto'),
-  v.literal('dat'),
-  v.literal('crypto'),
-  v.literal('loan'),
-  v.literal('capitalization_account'),
-)
 
 function parseScope(scope: string | undefined | null): {
   orgId: Id<'organizations'>

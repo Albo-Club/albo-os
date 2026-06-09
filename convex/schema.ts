@@ -18,6 +18,7 @@
 
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
+import { instrumentValidator } from './lib/instruments'
 
 // ─── Better Auth / multi-tenant validators ─────────────────────────────────
 
@@ -51,27 +52,8 @@ const companyKind = v.union(
   v.literal('portfolio'), // boîtes investies, fonds LP, SCPI, mancos externes
 )
 
-const instrumentKind = v.union(
-  v.literal('share'),
-  v.literal('bsa'),
-  v.literal('bsa_air'),
-  v.literal('safe'),
-  v.literal('oc'), // obligation convertible
-  v.literal('os'), // obligation simple
-  v.literal('convertible_note'),
-  v.literal('cca'), // compte courant associé
-  v.literal('royalty'),
-  v.literal('fund_lp'), // commitment LP dans un fond
-  v.literal('spv_share'), // titres d'un SPV
-  v.literal('secondary'),
-  v.literal('real_estate_direct'),
-  v.literal('scpi'),
-  v.literal('cto'),
-  v.literal('dat'), // dépôt à terme
-  v.literal('crypto'),
-  v.literal('loan'), // prêt (Airtable « Prêt »)
-  v.literal('capitalization_account'), // contrat de capitalisation (Airtable « Compte de Capitalisation »)
-)
+// Source unique : convex/lib/instruments.ts
+const instrumentKind = instrumentValidator
 
 const dealStatus = v.union(
   v.literal('active'),
