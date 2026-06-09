@@ -59,10 +59,10 @@ export function LinkedAccounts() {
   const [accounts, setAccounts] = useState<Array<BaAccount> | null>(null)
 
   useEffect(() => {
-    let alive = true
+    const state = { alive: true }
     void (async () => {
       const { data, error } = await authClient.listAccounts()
-      if (!alive) return
+      if (!state.alive) return
       if (error) {
         toast.error(
           formatAuthError(classifyAuthError(error), 'signin', (k) =>
@@ -72,10 +72,10 @@ export function LinkedAccounts() {
         setAccounts([])
         return
       }
-      setAccounts((data ?? []))
+      setAccounts(data)
     })()
     return () => {
-      alive = false
+      state.alive = false
     }
   }, [])
 

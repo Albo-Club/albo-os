@@ -20,7 +20,7 @@ const SEARCH_LIMIT = 200
 export const listByDeal = query({
   args: { dealId: v.id('deals') },
   handler: async (ctx, { dealId }) => {
-    const deal = await ctx.db.get(dealId)
+    const deal = await ctx.db.get("deals", dealId)
     if (!deal) throw new ConvexError('not_found')
     await requireOrgMember(ctx, deal.orgId)
 
@@ -33,7 +33,7 @@ export const listByDeal = query({
 
     return await Promise.all(
       rows.map(async (tx) => {
-        const account = await ctx.db.get(tx.bankAccountId)
+        const account = await ctx.db.get("bankAccounts", tx.bankAccountId)
         return {
           _id: tx._id,
           direction: tx.direction,

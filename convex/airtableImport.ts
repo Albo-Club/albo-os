@@ -238,7 +238,7 @@ export const ensureImportScaffold = internalMutation({
         notes: "Entité investisseuse créée pour l'import Airtable one-shot.",
         airtableId: SENTINEL_INVESTOR,
       })
-      investor = await ctx.db.get(id)
+      investor = await ctx.db.get("companies", id)
     }
     const investorCompanyId = investor!._id
 
@@ -255,7 +255,7 @@ export const ensureImportScaffold = internalMutation({
         currency: 'EUR',
         airtableId: SENTINEL_BANK,
       })
-      fallback = await ctx.db.get(id)
+      fallback = await ctx.db.get("bankAccounts", id)
     }
 
     return {
@@ -296,7 +296,7 @@ export const upsertCompanies = internalMutation({
         airtableId: r.airtableId,
       }
       if (existing) {
-        await ctx.db.patch(existing._id, fields)
+        await ctx.db.patch("companies", existing._id, fields)
         map[r.airtableId] = existing._id
       } else {
         map[r.airtableId] = await ctx.db.insert('companies', fields)
@@ -338,7 +338,7 @@ export const upsertBankAccounts = internalMutation({
         airtableId: r.airtableId,
       }
       if (existing) {
-        await ctx.db.patch(existing._id, fields)
+        await ctx.db.patch("bankAccounts", existing._id, fields)
         map[r.airtableId] = existing._id
       } else {
         map[r.airtableId] = await ctx.db.insert('bankAccounts', fields)
@@ -386,7 +386,7 @@ export const upsertDeals = internalMutation({
         airtableId: r.key,
       }
       if (existing) {
-        await ctx.db.patch(existing._id, fields)
+        await ctx.db.patch("deals", existing._id, fields)
         map[r.key] = existing._id
       } else {
         map[r.key] = await ctx.db.insert('deals', fields)
@@ -438,7 +438,7 @@ export const upsertTransactions = internalMutation({
       if (existing) {
         // Re-run de l'import : ne pas écraser l'état de pointage
         // (matchStatus / dealId / reconciled) déjà posé sur la ligne.
-        await ctx.db.patch(existing._id, fields)
+        await ctx.db.patch("transactions", existing._id, fields)
         patched += 1
       } else {
         // Pointage : seul un dealId validé côté Airtable (« Pointé » →
@@ -475,7 +475,7 @@ export const finalizeValuations = internalMutation({
   },
   handler: async (ctx, { orgId, entryRows, valuationRows }) => {
     for (const r of entryRows) {
-      await ctx.db.patch(r.dealId, { entryValuation: r.entryValuation })
+      await ctx.db.patch("deals", r.dealId, { entryValuation: r.entryValuation })
     }
     let inserted = 0
     let patched = 0
@@ -494,7 +494,7 @@ export const finalizeValuations = internalMutation({
         airtableId: r.airtableId,
       }
       if (existing) {
-        await ctx.db.patch(existing._id, fields)
+        await ctx.db.patch("valuations", existing._id, fields)
         patched += 1
       } else {
         await ctx.db.insert('valuations', fields)
@@ -538,7 +538,7 @@ export const upsertForecasts = internalMutation({
         airtableId: r.airtableId,
       }
       if (existing) {
-        await ctx.db.patch(existing._id, fields)
+        await ctx.db.patch("forecasts", existing._id, fields)
         patched += 1
       } else {
         await ctx.db.insert('forecasts', fields)
@@ -1013,8 +1013,8 @@ export const verify = internalQuery({
       .slice(0, n)
     const samples = await Promise.all(
       sampleDeals.map(async (d) => {
-        const target = await ctx.db.get(d.targetCompanyId)
-        const investor = await ctx.db.get(d.investorCompanyId)
+        const target = await ctx.db.get("companies", d.targetCompanyId)
+        const investor = await ctx.db.get("companies", d.investorCompanyId)
         const agg = txByDeal.get(d._id) ?? {
           count: 0,
           nIn: 0,
@@ -1112,7 +1112,7 @@ export const consolidateImportInvestor = internalMutation({
       )
       .collect()
     for (const d of deals) {
-      await ctx.db.patch(d._id, { investorCompanyId: canonical._id })
+      await ctx.db.patch("deals", d._id, { investorCompanyId: canonical._id })
       dealsRepointed += 1
     }
 
@@ -1124,12 +1124,12 @@ export const consolidateImportInvestor = internalMutation({
       )
       .collect()
     for (const b of banks) {
-      await ctx.db.patch(b._id, { ownerCompanyId: canonical._id })
+      await ctx.db.patch("bankAccounts", b._id, { ownerCompanyId: canonical._id })
       banksRepointed += 1
     }
 
     // Le placeholder n'a plus aucune référence entrante → suppression sûre.
-    await ctx.db.delete(importEntity._id)
+    await ctx.db.delete("companies", importEntity._id)
 
     return {
       consolidated: true,
@@ -1429,7 +1429,7 @@ export const cleanupTestData = internalMutation({
 
     // 1. Validation : existence, org, absence d'airtableId.
     for (const id of companyIds) {
-      const d = await ctx.db.get(id)
+      const d = await ctx.db.get("companies", id)
       if (!d) problems.push(`company ${id} introuvable`)
       else if (d.orgId !== orgId) problems.push(`company ${id} hors org calte`)
       else if (d.airtableId)
@@ -1437,7 +1437,7 @@ export const cleanupTestData = internalMutation({
       else plan.companies.push({ id, label: d.name })
     }
     for (const id of dealIds) {
-      const d = await ctx.db.get(id)
+      const d = await ctx.db.get("deals", id)
       if (!d) problems.push(`deal ${id} introuvable`)
       else if (d.orgId !== orgId) problems.push(`deal ${id} hors org calte`)
       else if (d.airtableId)
@@ -1445,7 +1445,7 @@ export const cleanupTestData = internalMutation({
       else plan.deals.push({ id, label: d.instrumentKind })
     }
     for (const id of txIds) {
-      const d = await ctx.db.get(id)
+      const d = await ctx.db.get("transactions", id)
       if (!d) problems.push(`transaction ${id} introuvable`)
       else if (d.orgId !== orgId) problems.push(`transaction ${id} hors org calte`)
       else if (d.airtableId)
@@ -1453,7 +1453,7 @@ export const cleanupTestData = internalMutation({
       else plan.transactions.push({ id, label: d.rawLabel })
     }
     for (const id of bankIds) {
-      const d = await ctx.db.get(id)
+      const d = await ctx.db.get("bankAccounts", id)
       if (!d) problems.push(`bankAccount ${id} introuvable`)
       else if (d.orgId !== orgId) problems.push(`bankAccount ${id} hors org calte`)
       else if (d.airtableId)
@@ -1549,10 +1549,10 @@ export const cleanupTestData = internalMutation({
     }
 
     // 3. Suppression dans l'ordre de dépendance.
-    for (const id of txIds) await ctx.db.delete(id)
-    for (const id of dealIds) await ctx.db.delete(id)
-    for (const id of bankIds) await ctx.db.delete(id)
-    for (const id of companyIds) await ctx.db.delete(id)
+    for (const id of txIds) await ctx.db.delete("transactions", id)
+    for (const id of dealIds) await ctx.db.delete("deals", id)
+    for (const id of bankIds) await ctx.db.delete("bankAccounts", id)
+    for (const id of companyIds) await ctx.db.delete("companies", id)
 
     return {
       ok: true,

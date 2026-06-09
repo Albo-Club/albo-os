@@ -63,7 +63,7 @@ export const list = query({
 export const getById = query({
   args: { id: v.id('companies') },
   handler: async (ctx, { id }) => {
-    const company = await ctx.db.get(id)
+    const company = await ctx.db.get("companies", id)
     if (!company) throw new ConvexError('not_found')
     await requireOrgMember(ctx, company.orgId)
     return company
@@ -109,7 +109,7 @@ export const update = mutation({
     }),
   },
   handler: async (ctx, { id, patch }) => {
-    const company = await ctx.db.get(id)
+    const company = await ctx.db.get("companies", id)
     if (!company) throw new ConvexError('not_found')
     await requireOrgMember(ctx, company.orgId)
 
@@ -124,7 +124,7 @@ export const update = mutation({
     if (patch.siren) {
       await assertSirenFree(ctx, company.orgId, patch.siren, id)
     }
-    await ctx.db.patch(id, patch)
+    await ctx.db.patch("companies", id, patch)
     return id
   },
 })

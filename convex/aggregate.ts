@@ -31,9 +31,9 @@ async function enrich(
   org: { _id: Doc<'organizations'>['_id']; name: string; slug: string },
 ) {
   const [investor, target, spv] = await Promise.all([
-    ctx.db.get(deal.investorCompanyId),
-    ctx.db.get(deal.targetCompanyId),
-    deal.viaSpvCompanyId ? ctx.db.get(deal.viaSpvCompanyId) : null,
+    ctx.db.get("companies", deal.investorCompanyId),
+    ctx.db.get("companies", deal.targetCompanyId),
+    deal.viaSpvCompanyId ? ctx.db.get("companies", deal.viaSpvCompanyId) : null,
   ])
   return {
     ...deal,
@@ -58,7 +58,7 @@ export const listDeals = query({
 
     const perOrg = await Promise.all(
       memberships.map(async (m) => {
-        const org = await ctx.db.get(m.orgId)
+        const org = await ctx.db.get("organizations", m.orgId)
         if (!org) return []
         const tag = { _id: org._id, name: org.name, slug: org.slug }
         const deals = await ctx.db

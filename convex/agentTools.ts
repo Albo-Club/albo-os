@@ -127,10 +127,10 @@ export const listDealsInternal = internalQuery({
     return await Promise.all(
       rows.map(async (d) => ({
         _id: d._id,
-        investor: companyName(await ctx.db.get(d.investorCompanyId)),
-        target: companyName(await ctx.db.get(d.targetCompanyId)),
+        investor: companyName(await ctx.db.get("companies", d.investorCompanyId)),
+        target: companyName(await ctx.db.get("companies", d.targetCompanyId)),
         viaSpv: d.viaSpvCompanyId
-          ? companyName(await ctx.db.get(d.viaSpvCompanyId))
+          ? companyName(await ctx.db.get("companies", d.viaSpvCompanyId))
           : null,
         instrumentKind: d.instrumentKind,
         committedAmount: d.committedAmount ?? null,
@@ -174,7 +174,7 @@ async function assertSameOrg(
   companyId: Id<'companies'>,
   code: string,
 ) {
-  const c = await ctx.db.get(companyId)
+  const c = await ctx.db.get("companies", companyId)
   if (!c || c.orgId !== orgId) throw new ConvexError(code)
 }
 
@@ -204,7 +204,7 @@ export const createDealInternal = internalMutation({
       await assertSameOrg(ctx, args.orgId, args.viaSpvCompanyId, 'spv_wrong_org')
     }
     // L'investisseur doit être une entité du groupe (pas une portfolio).
-    const investor = await ctx.db.get(args.investorCompanyId)
+    const investor = await ctx.db.get("companies", args.investorCompanyId)
     if (!investor || investor.orgId !== args.orgId) {
       throw new ConvexError('investor_wrong_org')
     }
@@ -254,7 +254,7 @@ export const createBankAccountInternal = internalMutation({
   handler: async (ctx, args) => {
     await readMembership(ctx, args.orgId, args.actorUserId)
     // Le propriétaire d'un compte est toujours une entité du groupe.
-    const owner = await ctx.db.get(args.ownerCompanyId)
+    const owner = await ctx.db.get("companies", args.ownerCompanyId)
     if (!owner || owner.orgId !== args.orgId) {
       throw new ConvexError('owner_wrong_org')
     }
@@ -317,12 +317,12 @@ export const createTransactionInternal = internalMutation({
     if (!Number.isInteger(args.amount) || args.amount <= 0) {
       throw new ConvexError('invalid_amount')
     }
-    const account = await ctx.db.get(args.bankAccountId)
+    const account = await ctx.db.get("bankAccounts", args.bankAccountId)
     if (!account || account.orgId !== args.orgId) {
       throw new ConvexError('account_wrong_org')
     }
     if (args.dealId) {
-      const deal = await ctx.db.get(args.dealId)
+      const deal = await ctx.db.get("deals", args.dealId)
       if (!deal || deal.orgId !== args.orgId) {
         throw new ConvexError('deal_wrong_org')
       }
@@ -367,9 +367,9 @@ export const updateDealInternal = internalMutation({
   },
   handler: async (ctx, { orgId, actorUserId, dealId, ...patch }) => {
     await readMembership(ctx, orgId, actorUserId)
-    const deal = await ctx.db.get(dealId)
+    const deal = await ctx.db.get("deals", dealId)
     if (!deal || deal.orgId !== orgId) throw new ConvexError('not_found')
-    await ctx.db.patch(dealId, patch)
+    await ctx.db.patch("deals", dealId, patch)
     return { _id: dealId }
   },
 })

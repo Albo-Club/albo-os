@@ -422,13 +422,13 @@ async function linkQonto(
   ) {
     throw new ConvexError('qonto_iban_mismatch')
   }
-  await ctx.db.patch(qonto._id, {
+  await ctx.db.patch("bankAccounts", qonto._id, {
     powensConnectionId: connectionId,
     powensAccountId: acc.powensAccountId,
     iban: qonto.iban ?? acc.iban,
     ...balancePatch(acc),
   })
-  const refreshed = await ctx.db.get(qonto._id)
+  const refreshed = await ctx.db.get("bankAccounts", qonto._id)
   if (!refreshed) throw new ConvexError('account_vanished')
   return refreshed
 }
@@ -462,8 +462,8 @@ async function resolveAccount(
       )
       return null
     }
-    await ctx.db.patch(linked._id, balancePatch(acc))
-    const refreshed = await ctx.db.get(linked._id)
+    await ctx.db.patch("bankAccounts", linked._id, balancePatch(acc))
+    const refreshed = await ctx.db.get("bankAccounts", linked._id)
     if (!refreshed) throw new ConvexError('account_vanished')
     return refreshed
   }
@@ -503,7 +503,7 @@ async function resolveAccount(
     powensConnectionId: connectionId,
     powensAccountId: acc.powensAccountId,
   })
-  const created = await ctx.db.get(id)
+  const created = await ctx.db.get("bankAccounts", id)
   if (!created) throw new ConvexError('account_create_failed')
   return created
 }
@@ -560,7 +560,7 @@ export const ingestConnectionSync = internalMutation({
       return summary
     }
     // L'org du user Powens matché = source de vérité du scope d'écriture.
-    const org = await ctx.db.get(powensUser.orgId)
+    const org = await ctx.db.get("organizations", powensUser.orgId)
     if (!org) throw new ConvexError('powens_user_org_not_found')
 
     console.log(
@@ -619,7 +619,7 @@ export const ingestConnectionSync = internalMutation({
         if (existing) {
           // Re-livraison webhook : ne pas écraser l'état de pointage
           // (matchStatus / dealId / reconciled) déjà posé sur la ligne.
-          await ctx.db.patch(existing._id, fields)
+          await ctx.db.patch("transactions", existing._id, fields)
           alreadyExisting += 1
           summary.patched += 1
         } else {
@@ -733,7 +733,7 @@ export const deleteTransactionsByIds = internalMutation({
     let deleted = 0
     const skipped: Array<{ id: Id<'transactions'>; reason: string }> = []
     for (const id of ids) {
-      const t = await ctx.db.get(id)
+      const t = await ctx.db.get("transactions", id)
       if (!t) {
         skipped.push({ id, reason: 'not_found' })
         continue
@@ -750,7 +750,7 @@ export const deleteTransactionsByIds = internalMutation({
         skipped.push({ id, reason: 'not_qonto' })
         continue
       }
-      await ctx.db.delete(id)
+      await ctx.db.delete("transactions", id)
       deleted += 1
     }
     return { deleted, skipped }
@@ -798,7 +798,7 @@ export const deleteBankAccountsByIds = internalMutation({
       txCount?: number
     }> = []
     for (const id of ids) {
-      const a = await ctx.db.get(id)
+      const a = await ctx.db.get("bankAccounts", id)
       if (!a) {
         skipped.push({ id, reason: 'not_found' })
         continue
@@ -829,7 +829,7 @@ export const deleteBankAccountsByIds = internalMutation({
         })
         continue
       }
-      await ctx.db.delete(id)
+      await ctx.db.delete("bankAccounts", id)
       deleted.push({ _id: id, bankName: a.bankName, label: a.label })
     }
     return { deleted, skipped }
@@ -865,7 +865,7 @@ export const deletePowensGhostAccounts = internalMutation({
       txCount?: number
     }> = []
     for (const id of ids) {
-      const a = await ctx.db.get(id)
+      const a = await ctx.db.get("bankAccounts", id)
       if (!a) {
         skipped.push({ id, reason: 'not_found' })
         continue
@@ -906,7 +906,7 @@ export const deletePowensGhostAccounts = internalMutation({
         })
         continue
       }
-      await ctx.db.delete(id)
+      await ctx.db.delete("bankAccounts", id)
       deleted.push({ _id: id, bankName: a.bankName, label: a.label })
     }
     return { deleted, skipped }
@@ -1063,7 +1063,7 @@ export const startBankConnection = action({
 export const resetQontoPowensLink = internalMutation({
   args: { bankAccountId: v.id('bankAccounts') },
   handler: async (ctx, { bankAccountId }) => {
-    const account = await ctx.db.get(bankAccountId)
+    const account = await ctx.db.get("bankAccounts", bankAccountId)
     if (!account) throw new ConvexError('account_not_found')
     const calte = await orgBySlug(ctx, 'calte')
     if (account.orgId !== calte._id) throw new ConvexError('not_calte')
@@ -1074,7 +1074,7 @@ export const resetQontoPowensLink = internalMutation({
       powensAccountId: account.powensAccountId ?? null,
       iban: account.iban ?? null,
     }
-    await ctx.db.patch(bankAccountId, {
+    await ctx.db.patch("bankAccounts", bankAccountId, {
       powensAccountId: undefined,
       iban: undefined,
     })
@@ -1101,7 +1101,7 @@ export const deletePowensUser = internalMutation({
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .unique()
     if (!row) return { deleted: false, powensUserId: null }
-    await ctx.db.delete(row._id)
+    await ctx.db.delete("powensUsers", row._id)
     return { deleted: true, powensUserId: row.powensUserId }
   },
 })
