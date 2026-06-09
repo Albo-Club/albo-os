@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values'
 import { internalMutation, mutation, query } from './_generated/server'
 import { requireAppUser, requireOrgMember } from './lib/auth'
 import { computeLoanBalanceCents, loanSideForOrg } from './lib/liabilities'
+import { applyAllocateToLiability, applyDeallocate } from './lib/pointage'
 import { buildSearchText } from './lib/searchText'
 import { equityPositionType } from './schema'
 
@@ -151,34 +152,8 @@ export const allocateTransaction = mutation({
     if (!tx) throw new ConvexError('not_found')
     await requireOrgMember(ctx, tx.orgId)
 
-    // Garde-fou : pas de double pointage silencieux. Une tx rattachée à un
-    // deal doit être dé-pointée (unmatchTransaction) avant d'aller au passif.
-    if (tx.dealId != null || tx.allocation?.kind === 'deal') {
-      throw new ConvexError('already_matched_to_deal')
-    }
-
-    if (kind === 'equity') {
-      const positionId = ctx.db.normalizeId('equityPositions', targetId)
-      const position = positionId
-        ? await ctx.db.get('equityPositions', positionId)
-        : null
-      if (!position) throw new ConvexError('not_found')
-      if (position.orgId !== tx.orgId) throw new ConvexError('equity_wrong_org')
-    } else {
-      const loanId = ctx.db.normalizeId('intercompanyLoans', targetId)
-      const loan = loanId ? await ctx.db.get('intercompanyLoans', loanId) : null
-      if (!loan) throw new ConvexError('not_found')
-      // La tx doit appartenir à l'une des deux orgs du C/C (créancier ou
-      // débiteur) — sinon elle ne peut pas porter une jambe de ce prêt.
-      if (loanSideForOrg(loan, tx.orgId) === null) {
-        throw new ConvexError('loan_wrong_org')
-      }
-    }
-
-    await ctx.db.patch('transactions', tx._id, {
-      allocation: { kind, targetId },
-      matchStatus: 'matched',
-    })
+    // Cœur partagé avec les outils agent : convex/lib/pointage.ts.
+    await applyAllocateToLiability(ctx, tx, kind, targetId)
     return null
   },
 })
@@ -196,15 +171,8 @@ export const deallocateTransaction = mutation({
     if (!tx) throw new ConvexError('not_found')
     await requireOrgMember(ctx, tx.orgId)
 
-    if (tx.allocation?.kind === 'deal') {
-      throw new ConvexError('already_matched_to_deal')
-    }
-    if (!tx.allocation) return null
-
-    await ctx.db.patch('transactions', tx._id, {
-      allocation: undefined,
-      matchStatus: 'unmatched',
-    })
+    // Cœur partagé avec les outils agent : convex/lib/pointage.ts.
+    await applyDeallocate(ctx, tx)
     return null
   },
 })

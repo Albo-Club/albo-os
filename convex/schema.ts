@@ -96,7 +96,8 @@ const matchDecision = v.union(
   v.literal('internal_transfer'),
 )
 
-// MVP 1 : toujours 'manual'. 'agent_suggested' réservé à la phase 2.
+// 'manual' = mutations publiques (UI) ; 'agent_suggested' = écritures des
+// outils agent (convex/agentToolsPointage.ts) après confirmation utilisateur.
 const matchDecisionSource = v.union(
   v.literal('manual'),
   v.literal('agent_suggested'),

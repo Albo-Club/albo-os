@@ -3,6 +3,7 @@ import { Agent, stepCountIs } from '@convex-dev/agent'
 
 import { components } from './_generated/api'
 import { dealTools } from './agentTools'
+import { pointageTools } from './agentToolsPointage'
 import { BASE_INSTRUCTIONS } from './lib/instructions'
 
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5'
@@ -15,6 +16,8 @@ export const chatAgent = new Agent(components.agent, {
   name: 'albo-os',
   languageModel: getModel(),
   instructions: BASE_INSTRUCTIONS,
-  tools: dealTools,
-  stopWhen: stepCountIs(8),
+  tools: { ...dealTools, ...pointageTools },
+  // Les flux de pointage sont multi-steps (list → suggest → confirmer →
+  // match) : 12 steps au lieu de 8.
+  stopWhen: stepCountIs(12),
 })

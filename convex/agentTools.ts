@@ -14,38 +14,11 @@ import { z } from 'zod/v3'
 
 import { internal } from './_generated/api'
 import { internalMutation, internalQuery } from './_generated/server'
+import { parseScope, readMembership } from './lib/agentScope'
 import { buildSearchText } from './lib/searchText'
 import { INSTRUMENTS, instrumentValidator } from './lib/instruments'
 import type { Doc, Id } from './_generated/dataModel'
-import type { MutationCtx, QueryCtx } from './_generated/server'
-
-function parseScope(scope: string | undefined | null): {
-  orgId: Id<'organizations'>
-  userId: Id<'users'>
-} {
-  if (!scope) throw new ConvexError('agent_tools_missing_scope')
-  const idx = scope.indexOf(':')
-  if (idx <= 0) throw new ConvexError('agent_tools_invalid_scope')
-  return {
-    orgId: scope.slice(0, idx) as Id<'organizations'>,
-    userId: scope.slice(idx + 1) as Id<'users'>,
-  }
-}
-
-async function readMembership(
-  ctx: QueryCtx | MutationCtx,
-  orgId: Id<'organizations'>,
-  userId: Id<'users'>,
-): Promise<Doc<'organizationMembers'>> {
-  const member = await ctx.db
-    .query('organizationMembers')
-    .withIndex('by_org_and_user', (q) =>
-      q.eq('orgId', orgId).eq('userId', userId),
-    )
-    .unique()
-  if (!member) throw new ConvexError('agent_tools_forbidden')
-  return member
-}
+import type { MutationCtx } from './_generated/server'
 
 function companyName(c: Doc<'companies'> | null) {
   return c?.name ?? null
