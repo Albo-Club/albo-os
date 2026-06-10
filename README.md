@@ -266,6 +266,8 @@ curl -sI https://<your-vercel-domain>/             # expect HTTP 200
   pinned `pnpm.overrides` until you bump them.
 - `ci.yml`: install + typecheck on push/PR.
 - `sync-skills.yml`: weekly skill freshness PR.
+- `cleanup-branches.yml`: manual sweep (Actions → Run workflow) deleting
+  branches whose PR is merged.
 
 ## Common commands
 

@@ -16,7 +16,7 @@ bas de page.
 
 ---
 
-## v1.2.0 — 10/06/2026 à 23:19 — Un assistant qui se manie comme les grands
+## v1.2.0 — 10/06/2026 à 23:35 — Un assistant qui se manie comme les grands
 
 ### 💬 Une vraie zone de saisie
 
@@ -37,6 +37,13 @@ statut, demande, résultat.
 ### ⌨️ Au clavier
 
 **⌘J / Ctrl+J** ouvre et ferme le panneau de l'assistant, prêt à taper.
+
+---
+
+## v1.1.1 — 10/06/2026 à 23:30 — Ménage des branches de travail
+
+Un nettoyage à la demande supprime les anciennes branches de travail déjà
+intégrées. Aucun changement visible dans l'app.
 
 ---
 
