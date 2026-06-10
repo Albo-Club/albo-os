@@ -16,6 +16,14 @@ bas de page.
 
 ---
 
+## v1.2.1 — 11/06/2026 à 00:10 — Fondations remises à neuf
+
+Les briques techniques de navigation et de connexion passent sur leurs
+dernières versions corrigées, jusqu'ici gelées à cause de défauts en amont.
+Aucun changement visible dans l'app.
+
+---
+
 ## v1.2.0 — 10/06/2026 à 23:35 — Un assistant qui se manie comme les grands
 
 ### 💬 Une vraie zone de saisie
