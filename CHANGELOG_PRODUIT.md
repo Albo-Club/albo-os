@@ -11,6 +11,10 @@
   CLAUDE.md § « Pre-PR doc audit » (question 5).
 -->
 
+Ce que chaque mise à jour change pour vous, en clair — du plus récent au
+plus ancien. Les termes financiers sont expliqués dans le petit lexique en
+bas de page.
+
 ---
 
 ## Juin 2026 — La finition qui change tout
@@ -23,9 +27,10 @@ voit d'un coup d'œil d'où l'on vient et où l'on va, sans rupture.
 
 ### 📐 Le TVPI partout
 
-La table des participations affiche le **multiple de chaque société et de
-chaque deal** (distribué + valeur résiduelle, rapportés au capital versé).
-Et toutes les colonnes se **trient d'un clic**.
+La table des participations affiche le **TVPI de chaque société et de
+chaque deal** — le multiple qui répond à « pour 1 € investi, combien
+j'en ai aujourd'hui ? » (l'argent déjà revenu + ce que la participation
+vaut encore). Et toutes les colonnes se **trient d'un clic**.
 
 ### 📤 Export Excel
 
@@ -47,7 +52,9 @@ on détache d'abord, on supprime ensuite.
 
 La page d'accueil de chaque organisation affiche enfin l'essentiel :
 **participations actives, capital déployé, distribué, trésorerie, NAV
-estimée et TVPI** — calculés en temps réel depuis vos données. S'y ajoutent
+estimée et TVPI** — calculés en temps réel depuis vos données (NAV = ce
+que vaut le portefeuille aujourd'hui ; TVPI = le multiple sur le capital
+investi). S'y ajoutent
 la répartition du capital par type d'instrument et l'activité bancaire
 récente.
 
@@ -78,7 +85,8 @@ société s'adaptent maintenant au type de projet.
 ### 🏦 Fonds : appelé, distribué, performance
 
 - Les deals de type fonds affichent **Engagé / Appelé / Distribué / DPI /
-  TVPI** d'un coup d'œil, avec l'historique des valorisations.
+  TVPI** d'un coup d'œil (appelé = ce que le fonds a réellement demandé ;
+  DPI = la part déjà rendue en cash), avec l'historique des valorisations.
 
 ### 🏢 Sociétés : reportings et KPIs au même endroit
 
@@ -136,6 +144,23 @@ pré-pointer les transactions bancaires.
 - Fiabilité renforcée du pointage : interface et assistant partagent
   exactement les mêmes règles métier.
 
-*Et après ?* Les vues par type de projet : royalties (BP initial vs réalité
-semestrielle), fonds (appelé / distribué / performance), participations avec
-leurs reportings — à confier directement au copilote.
+---
+
+## Petit lexique
+
+- **Pointage** : rattacher une transaction bancaire à ce qu'elle paie ou
+  rembourse (un deal, une position de capital, un compte courant). C'est ce
+  qui permet de calculer « Versé » et « Reçu » automatiquement, sans saisie.
+- **BP (business plan)** : les flux prévus d'un projet, période par période.
+  « BP révisé » = la version corrigée quand la réalité a dévié du plan.
+- **NAV** : ce que vaut le portefeuille aujourd'hui, d'après les dernières
+  valorisations connues (à défaut, le montant investi).
+- **TVPI** : (argent déjà récupéré + valeur restante) ÷ argent investi.
+  1,50× = pour 1 € mis, 1,50 € de valeur créée.
+- **DPI** : pareil, mais en ne comptant que le cash déjà rendu —
+  argent récupéré ÷ argent investi.
+- **Engagé / Appelé** (fonds) : le montant promis au fonds / la part que le
+  fonds a effectivement demandée à ce jour.
+- **C/C (compte courant d'associé)** : argent avancé entre deux entités du
+  groupe. Son solde n'est jamais saisi à la main : il est calculé depuis les
+  transactions pointées dessus.
