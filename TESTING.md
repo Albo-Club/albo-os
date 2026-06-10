@@ -98,8 +98,9 @@ Connecté en tant qu'Alice sur `/app/acme/`.
 | SH7  | Theme picker (footer sidebar) → choisir Blue / Emerald / Violet| Primary + chart-1 changent ; survit au reload (localStorage)       |
 | SH8  | Org switcher (header sidebar), orga **sans** logo             | Initiale (1ʳᵉ lettre) centrée dans le carré arrondi ; liste les orgs ; clic switch route + persiste `lastOrgSlug` |
 | SH9  | NavUser (footer sidebar) → profile / switch org / sign out     | Avatar **rond** ; sans photo, initiales prénom+nom (ex. `BB`) ; mêmes destinations qu'avant refonte |
-| SH10 | Bouton AI dans header                                          | Ouvre le modal chat existant (non-régression)                      |
+| SH10 | Bouton AI dans header                                          | Toggle du panneau AI persistant (cf. Niveau 5 — AI chat, C1/C11)   |
 | SH11 | Ouvrir une page au contenu plus haut que l'écran (liste longue) | Le cadre `inset` reste calé sur la hauteur du viewport ; le scroll se fait **dans** le cadre, bord bas arrondi toujours visible |
+| SH12 | Lien « Nouveautés » (bas du menu, groupe secondaire) → `/app/$orgSlug/changelog` | Page rendue depuis `CHANGELOG_PRODUIT.md` (markdown stylé, note interne en commentaire HTML invisible) ; breadcrumb « Nouveautés » ; titre d'onglet i18n FR/EN |
 
 ## Niveau 2 — Multi-tenant (15 min)
 

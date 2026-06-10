@@ -29,6 +29,7 @@ const CRUMB_SEGMENTS = [
   'members',
   'invitations',
   'general',
+  'changelog',
 ] as const
 
 function buildCrumbs(

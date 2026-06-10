@@ -1,13 +1,15 @@
-# Changelog produit — Albo OS
+# Nouveautés
 
-> Trace **en prose** des évolutions visibles par les utilisateurs (Benjamin &
-> Clément), une entrée par lot/release, du plus récent au plus ancien.
-> Langage produit, pas technique — utilisable tel quel pour un démo day ou un
-> point d'avancement.
->
-> Ne pas confondre avec `CHANGELOG.md` (généré automatiquement par
-> release-please à partir des commits — technique). Règle d'alimentation :
-> CLAUDE.md § « Pre-PR doc audit ».
+<!--
+  Trace en prose des évolutions visibles par les utilisateurs, une entrée par
+  lot/release, du plus récent au plus ancien. Langage produit, pas technique
+  (pas de chemins de fichiers ni de noms de fonctions) — ce fichier est rendu
+  tel quel dans l'app sur /app/$orgSlug/changelog (import ?raw).
+
+  Ne pas confondre avec CHANGELOG.md (généré automatiquement par
+  release-please à partir des commits — technique). Règle d'alimentation :
+  CLAUDE.md § « Pre-PR doc audit » (question 5).
+-->
 
 ---
 
@@ -46,6 +48,11 @@ pré-pointer les transactions bancaires.
   (soldes calculés en temps réel), en créer de nouveaux.
 - Toujours là : création de sociétés, deals, comptes et transactions — chaque
   organisation reste strictement cloisonnée.
+
+### 📰 Et ce changelog
+
+- **Les nouveautés, dans l'app.** Cette page « Nouveautés » est accessible en
+  bas du menu — chaque release y laisse sa trace, en clair.
 
 ### 🛡️ Sous le capot
 
