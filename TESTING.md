@@ -93,7 +93,7 @@ Connecté en tant qu'Alice sur `/app/acme/`.
 | SH2  | Clic sur `SidebarTrigger` (header) OU sur la `SidebarRail` (bande fine au bord droit de la sidebar) | Sidebar collapse en `icon` ; cookie `sidebar_state` persiste ; icônes orga/profil non écrasées en mode `icon` |
 | SH3  | Redimensionner < 768px                                         | Sidebar passe en `Sheet` mobile, ouverture via burger              |
 | SH4  | Naviguer Dashboard → Participations → Cash                     | Breadcrumb du header se met à jour à chaque route ; Cash affiche les soldes par compte (cf. Niveau 3 — Vue Cash) |
-| SH5  | Dashboard : 4 KPI cards (membres, invitations, Participations —, Trésorerie —) | Counts membres/invitations cohérents avec listMembers réels ; cartes Participations/Cash en placeholder "—" |
+| SH5  | Dashboard (`/app/$orgSlug`) : KPIs réels                       | 6 cards : Participations (sociétés distinctes des deals actifs), Capital déployé (Σ out pointées deal), Distribué (Σ in), Trésorerie (Σ soldes EUR), NAV estimée (dernière valo par deal, fallback versé + hint « partielle »), TVPI ((distribué+NAV)/déployé en ×) — cf. Niveau 3 Dashboard |
 | SH6  | Toggle dark mode (icône soleil/lune dans header)               | Page bascule light ↔ dark, sidebar + charts adaptés                |
 | SH7  | Theme picker (footer sidebar) → choisir Blue / Emerald / Violet| Primary + chart-1 changent ; survit au reload (localStorage)       |
 | SH8  | Org switcher (header sidebar), orga **sans** logo             | Initiale (1ʳᵉ lettre) centrée dans le carré arrondi ; liste les orgs ; clic switch route + persiste `lastOrgSlug` |
@@ -139,6 +139,19 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | CA6 | Compte sans transaction liée à un deal                             | Sheet affiche l'état vide "Aucune transaction liée à un deal…"                    |
 | CA7 | i18n EN/FR sur la page + le Sheet                                   | Tous les libellés traduits (namespace `cash`), titre d'onglet = `cash:metaTitle`  |
 | CA8 | Page `/cash/$accountId` : taper un libellé ou une contrepartie dans la barre de recherche (avec/sans accents, casse différente) | Filtrage serveur (~250 ms de debounce) via le search index `search_text` ; résultats triés date desc, cap 200 ; pas de flash de liste vide entre deux frappes ; terme sans résultat → « Aucune transaction ne correspond… » ; effacer → liste complète. ⚠️ Les tx pré-existantes sont invisibles à la recherche tant que `transactions:backfillSearchText` n'a pas tourné (cf. `KNOWN_ISSUES.md` « Recherche transactions ») |
+
+## Niveau 3 — Dashboard & prévisionnel de trésorerie (10 min)
+
+| #   | Étape                                                              | Résultat attendu                                                                 |
+| --- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| DB1 | `/app/<org>` (entrée « Dashboard » de la sidebar, plus de badge Soon) | 6 KPI cards réels (cf. SH5), répartition « Déployé par instrument » (barres), « Activité récente » (5 dernières tx, montants signés, deal en sous-libellé) + lien vers la trésorerie |
+| DB2 | Org vide (aucun deal/tx)                                            | Cards à 0/—, états vides propres sur répartition et activité                      |
+| FC1 | `/app/<org>/cash` : section « Prévisionnel de trésorerie »          | Courbe du solde projeté (area), solde de départ = Σ soldes réels EUR ; sélecteur d'horizon 6/12/24 mois |
+| FC2 | « Ajouter une règle » : loyer 1 500 €, sortie, mensuelle, jour 5     | Règle listée ; projection recalculée immédiatement (expandRules auto post-save) ; la courbe baisse de 1 500 €/mois |
+| FC3 | Éditer la règle (montant, fréquence, désactivation via checkbox)     | Projection resynchronisée ; règle inactive = badge « Inactive », ses occurrences vierges restent mais ne se régénèrent plus |
+| FC4 | Supprimer la règle (confirm)                                        | Occurrences pending non éditées retirées (réalisées/overridden conservées), courbe revient à plat |
+| FC5 | Solde projeté négatif sur l'horizon                                 | Ligne de référence 0 en pointillés destructive sur la courbe                      |
+| FC6 | i18n EN/FR sur dashboard + prévisionnel                             | Tous les libellés traduits (`dashboard`, `cash:forecast`)                         |
 
 ## Niveau 3 — Vues par type de projet (10 min)
 

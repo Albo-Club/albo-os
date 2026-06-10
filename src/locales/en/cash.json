@@ -58,5 +58,58 @@
   "direction": {
     "in": "Inflow",
     "out": "Outflow"
+  },
+  "forecast": {
+    "title": "Cash forecast",
+    "horizonMonths_one": "{{count}} month",
+    "horizonMonths_other": "{{count}} months",
+    "startingBalance": "Starting balance (real EUR accounts): {{amount}}",
+    "chartLabel": "Projected balance",
+    "rules": {
+      "title": "Recurring rules",
+      "add": "Add a rule",
+      "empty": "No rule yet. Rents, salaries, loan payments… add them here or via the assistant.",
+      "saved": "Rule saved — projection refreshed",
+      "deleted": "Rule deleted",
+      "deleteConfirmTitle": "Delete this rule?",
+      "deleteConfirmBody": "Its pending generated entries will be removed too (realized or manually edited ones are kept).",
+      "dialogTitleCreate": "New recurring rule",
+      "dialogTitleEdit": "Edit rule",
+      "labelLabel": "Label",
+      "labelPlaceholder": "e.g. SCI Chapelle rent",
+      "amountLabel": "Amount (€)",
+      "directionLabel": "Direction",
+      "in": "Inflow",
+      "out": "Outflow",
+      "frequencyLabel": "Frequency",
+      "frequency": {
+        "weekly": "Weekly",
+        "monthly": "Monthly",
+        "quarterly": "Quarterly",
+        "yearly": "Yearly"
+      },
+      "anchorDayLabel": "Day",
+      "anchorDayHintMonthly": "Day of month (1–31, clamped on short months)",
+      "anchorDayHintWeekly": "Day of week (1 = Monday … 7 = Sunday)",
+      "startLabel": "Start",
+      "endLabel": "End (optional)",
+      "activeLabel": "Active rule",
+      "active": "Active",
+      "inactive": "Inactive",
+      "day": "day {{day}}",
+      "col": {
+        "label": "Label",
+        "amount": "Amount",
+        "frequency": "Frequency",
+        "start": "Period",
+        "status": "Status"
+      },
+      "errors": {
+        "invalid_amount": "Invalid amount",
+        "invalid_anchor_day": "Invalid day for this frequency",
+        "invalid_date_range": "End date is before start date",
+        "default": "Something went wrong"
+      }
+    }
   }
 }

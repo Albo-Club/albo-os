@@ -9,6 +9,24 @@
     "comingSoon": "coming soon",
     "pendingInvites_one": "{{count}} pending invite",
     "pendingInvites_other": "{{count}} pending invites",
-    "adminOnly": "admin only"
+    "adminOnly": "admin only",
+    "deployed": "Capital deployed",
+    "distributed": "Distributed",
+    "nav": "Estimated NAV",
+    "navPartial": "partial — deals without valuation counted at cost",
+    "tvpi": "TVPI",
+    "activeDeals_one": "{{count}} active deal",
+    "activeDeals_other": "{{count}} active deals"
+  },
+  "title": "Dashboard",
+  "loading": "Loading…",
+  "allocation": {
+    "title": "Deployed by instrument",
+    "empty": "No deployed capital yet."
+  },
+  "recent": {
+    "title": "Recent activity",
+    "empty": "No transaction yet.",
+    "seeCash": "See cash"
   }
 }

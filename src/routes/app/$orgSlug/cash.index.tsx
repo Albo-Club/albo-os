@@ -10,6 +10,7 @@ import { api } from '../../../../convex/_generated/api'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { CashAccounts } from '~/components/cash/CashAccounts'
+import { ForecastSection } from '~/components/cash/ForecastSection'
 import { Button } from '~/components/ui/button'
 
 export const Route = createFileRoute('/app/$orgSlug/cash/')({
@@ -56,6 +57,7 @@ function Cash() {
         </Button>
       </div>
       <CashAccounts accounts={accounts} orgSlug={orgSlug} />
+      {org && <ForecastSection orgId={org._id} />}
     </main>
   )
 }

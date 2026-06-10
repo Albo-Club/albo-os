@@ -22,6 +22,7 @@ import type * as auth from "../auth.js";
 import type * as cash from "../cash.js";
 import type * as chat from "../chat.js";
 import type * as companies from "../companies.js";
+import type * as dashboard from "../dashboard.js";
 import type * as deals from "../deals.js";
 import type * as documents from "../documents.js";
 import type * as email from "../email.js";
@@ -71,6 +72,7 @@ declare const fullApi: ApiFromModules<{
   cash: typeof cash;
   chat: typeof chat;
   companies: typeof companies;
+  dashboard: typeof dashboard;
   deals: typeof deals;
   documents: typeof documents;
   email: typeof email;
