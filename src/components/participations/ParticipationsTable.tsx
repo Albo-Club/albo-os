@@ -22,6 +22,11 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+import {
+  PAGE_SIZE,
+  PaginationFooter,
+  usePagination,
+} from '~/components/data-table/LocalPagination'
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
 import { downloadCsv, toCsv } from '~/lib/csv'
 import { normalizeSearch } from '~/lib/searchText'
@@ -315,9 +320,10 @@ export function ParticipationsTable({
 
   // Tri par colonne (client, volumes faibles). null = ordre serveur
   // (signedDate desc). Les TVPI absents passent en fin de liste.
-  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' } | null>(
-    null,
-  )
+  const [sort, setSort] = useState<{
+    key: SortKey
+    dir: 'asc' | 'desc'
+  } | null>(null)
   const toggleSort = (key: SortKey) =>
     setSort((prev) =>
       prev?.key === key
@@ -342,6 +348,17 @@ export function ParticipationsTable({
       return sign * (Number(va) - Number(vb))
     })
   }, [groups, sort])
+
+  // Pagination locale (par société, après filtre + tri) ; retour page 1 dès
+  // que la recherche ou le tri change.
+  const { page, pageCount, setPage } = usePagination(
+    sortedGroups?.length ?? 0,
+    `${term}:${sort ? `${sort.key}:${sort.dir}` : ''}`,
+  )
+  const pagedGroups = sortedGroups?.slice(
+    page * PAGE_SIZE,
+    (page + 1) * PAGE_SIZE,
+  )
 
   // Export CSV des deals filtrés (à plat, un deal par ligne).
   function handleExport() {
@@ -462,7 +479,7 @@ export function ParticipationsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {!sortedGroups ? (
+            {!pagedGroups ? (
               <TableRow>
                 <TableCell
                   colSpan={colSpan}
@@ -472,7 +489,7 @@ export function ParticipationsTable({
                 </TableCell>
               </TableRow>
             ) : (
-              sortedGroups.map((g) => {
+              pagedGroups.map((g) => {
                 const isOpen = expanded.has(g.id)
                 return (
                   <CompanyRows
@@ -491,6 +508,11 @@ export function ParticipationsTable({
           </TableBody>
         </Table>
       </div>
+      <PaginationFooter
+        page={page}
+        pageCount={pageCount}
+        onPageChange={setPage}
+      />
     </div>
   )
 }

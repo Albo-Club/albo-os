@@ -1,9 +1,26 @@
 import { useEffect } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useConvexQuery } from '@convex-dev/react-query'
 import { api } from '../../../convex/_generated/api'
+import { getLastOrgSlugCookie } from '~/lib/lastOrg'
 
 export const Route = createFileRoute('/app/')({
+  // Fast-path : la dernière org visitée (cookie device-local) est redirigée
+  // immédiatement — côté serveur dès la requête document, côté client sans
+  // attendre l'auth Convex ni `users.me`. Le layout d'org re-valide la
+  // membership et efface le cookie avant de revenir ici si elle a sauté
+  // (cf. ~/lib/lastOrg). Sans cookie (premier login, post-bounce), le
+  // composant retombe sur la résolution via `users.me` ci-dessous.
+  beforeLoad: () => {
+    const slug = getLastOrgSlugCookie()
+    if (slug) {
+      throw redirect({
+        to: '/app/$orgSlug',
+        params: { orgSlug: slug },
+        replace: true,
+      })
+    }
+  },
   component: AppIndex,
 })
 

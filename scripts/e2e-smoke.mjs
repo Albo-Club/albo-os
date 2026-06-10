@@ -90,9 +90,11 @@ async function checkRoute(path, { expectStatus = 200, expectBody, name } = {}) {
 
 async function checkHeaders() {
   section('Security headers')
+  // `/login` plutôt que `/` : `/` répond désormais par une redirection
+  // serveur (beforeLoad) — on veut asserter les headers sur un 200 SSR.
   let res
   try {
-    res = await fetch(`${BASE}/`, { redirect: 'manual' })
+    res = await fetch(`${BASE}/login`, { redirect: 'manual' })
   } catch (err) {
     ko('Headers fetch', `${(err && err.message) || err}`)
     return
@@ -123,7 +125,19 @@ async function checkHeaders() {
 
 async function checkPublicRoutes() {
   section('Public routes')
-  await checkRoute('/')
+  // `/` redirige côté serveur vers /app (beforeLoad) — asserter le 3xx +
+  // Location, pas un 200.
+  try {
+    const res = await fetch(`${BASE}/`, { redirect: 'manual' })
+    const location = res.headers.get('location') ?? ''
+    if (res.status >= 300 && res.status < 400 && location.includes('/app')) {
+      ok('GET / redirects to /app', `${res.status} → ${location}`)
+    } else {
+      ko('GET / redirects to /app', `got ${res.status} → ${location || '(no location)'}`)
+    }
+  } catch (err) {
+    ko('GET / redirects to /app', `${(err && err.message) || err}`)
+  }
   await checkRoute('/login')
   await checkRoute('/register')
   await checkRoute('/accept-invite/this-token-does-not-exist', {

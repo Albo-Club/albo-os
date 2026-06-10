@@ -28,6 +28,11 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+import {
+  PAGE_SIZE,
+  PaginationFooter,
+  usePagination,
+} from '~/components/data-table/LocalPagination'
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
 import { directionTone } from '~/lib/moneyTone'
 
@@ -170,6 +175,16 @@ function AccountDetail() {
   }
   const transactions = liveTransactions ?? lastTransactionsRef.current
 
+  // Pagination locale d'affichage ; retour page 1 quand la recherche change.
+  const { page, pageCount, setPage } = usePagination(
+    transactions?.length ?? 0,
+    searchArg ?? '',
+  )
+  const pagedTransactions = transactions?.slice(
+    page * PAGE_SIZE,
+    (page + 1) * PAGE_SIZE,
+  )
+
   const fmtEur = (cents?: number | null) =>
     cents == null
       ? null
@@ -227,17 +242,23 @@ function AccountDetail() {
         <Info label={t('detail.owner')} value={account?.owner?.name} />
         <Info
           label={t('col.balance')}
-          value={account ? (fmtEur(account.currentBalance) ?? t('noBalance')) : null}
+          value={
+            account ? (fmtEur(account.currentBalance) ?? t('noBalance')) : null
+          }
         />
         <Info
           label={t('detail.asOf')}
-          value={account?.balanceAsOf != null ? fmtDate(account.balanceAsOf) : null}
+          value={
+            account?.balanceAsOf != null ? fmtDate(account.balanceAsOf) : null
+          }
         />
         <Info label={t('detail.iban')} value={account?.iban} />
       </div>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold tracking-tight">{t('tx.title')}</h2>
+        <h2 className="text-sm font-semibold tracking-tight">
+          {t('tx.title')}
+        </h2>
         <Input
           type="search"
           value={search}
@@ -265,7 +286,7 @@ function AccountDetail() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.map((tx) => (
+                {pagedTransactions?.map((tx) => (
                   <TableRow key={tx._id}>
                     <TableCell className="whitespace-nowrap tabular-nums">
                       {fmtDate(tx.transactionDate)}
@@ -283,6 +304,11 @@ function AccountDetail() {
             </Table>
           </div>
         )}
+        <PaginationFooter
+          page={page}
+          pageCount={pageCount}
+          onPageChange={setPage}
+        />
       </section>
 
       {account && renameOpen && (

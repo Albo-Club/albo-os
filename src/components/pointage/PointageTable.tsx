@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { useConvexMutation } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -17,6 +17,11 @@ import type { DealOption } from './DealCombobox'
 import type { PointageTarget } from './TargetCombobox'
 import type { LiabilityOptionGroups } from '~/lib/liabilityOptions'
 import type { TxDetails } from './TransactionSheet'
+import {
+  PAGE_SIZE,
+  PaginationFooter,
+  usePagination,
+} from '~/components/data-table/LocalPagination'
 import { DEFAULT_VAT_RATE_BPS, VAT_RATES_BPS, vatCentsFromTtc } from '~/lib/vat'
 import { directionTone } from '~/lib/moneyTone'
 import {
@@ -58,9 +63,6 @@ export type UnmatchedTx = TxDetails
 
 /** Durée d'affichage du bandeau « Annuler » après un pointage/écartement. */
 const UNDO_DELAY_MS = 5000
-
-/** Lignes rendues par page (pagination locale des tables de pointage). */
-const PAGE_SIZE = 50
 
 /** Destins « écarté » : ignorée, charge, impôt, produit ou virement interne. */
 type DiscardKind =
@@ -177,63 +179,6 @@ function UndoBanner({
       </span>
       <Button size="sm" variant="outline" disabled={pending} onClick={onUndo}>
         {t('actions.undo')}
-      </Button>
-    </div>
-  )
-}
-
-/**
- * Pagination locale d'affichage : la liste reste complète côté client (le
- * compteur, la sélection bulk et sa purge opèrent sur tout ; la recherche et
- * les onglets filtrent côté serveur, en amont), seul le rendu est découpé en
- * pages de PAGE_SIZE lignes — c'est le nombre de lignes montées (combobox,
- * menus, cases par ligne) qui fait ramer la page, pas la donnée. `resetKey`
- * ramène à la première page (changement de recherche ou d'onglet) ; la page
- * courante est bornée quand la liste rétrécit (lignes pointées/écartées).
- */
-function usePagination(totalRows: number, resetKey: string) {
-  const [page, setPage] = useState(0)
-  useEffect(() => setPage(0), [resetKey])
-  const pageCount = Math.max(1, Math.ceil(totalRows / PAGE_SIZE))
-  return { page: Math.min(page, pageCount - 1), pageCount, setPage }
-}
-
-/** Barre « Page X sur Y » + précédent/suivant, masquée s'il n'y a qu'une page. */
-function PaginationFooter({
-  page,
-  pageCount,
-  onPageChange,
-}: {
-  page: number
-  pageCount: number
-  onPageChange: (page: number) => void
-}) {
-  const { t } = useTranslation('common')
-  if (pageCount <= 1) return null
-  return (
-    <div className="flex items-center justify-end gap-2 py-3">
-      <span className="text-muted-foreground text-sm tabular-nums">
-        {t('pagination.pageOf', { current: page + 1, total: pageCount })}
-      </span>
-      <Button
-        variant="outline"
-        size="icon"
-        className="size-8"
-        disabled={page === 0}
-        onClick={() => onPageChange(page - 1)}
-      >
-        <span className="sr-only">{t('pagination.previous')}</span>
-        <ChevronLeft className="size-4" />
-      </Button>
-      <Button
-        variant="outline"
-        size="icon"
-        className="size-8"
-        disabled={page >= pageCount - 1}
-        onClick={() => onPageChange(page + 1)}
-      >
-        <span className="sr-only">{t('pagination.next')}</span>
-        <ChevronRight className="size-4" />
       </Button>
     </div>
   )
