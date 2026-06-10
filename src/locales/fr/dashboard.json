@@ -9,6 +9,24 @@
     "comingSoon": "bientôt",
     "pendingInvites_one": "{{count}} invitation en attente",
     "pendingInvites_other": "{{count}} invitations en attente",
-    "adminOnly": "réservé aux admins"
+    "adminOnly": "réservé aux admins",
+    "deployed": "Capital déployé",
+    "distributed": "Distribué",
+    "nav": "NAV estimée",
+    "navPartial": "partielle — deals sans valo comptés au versé",
+    "tvpi": "TVPI",
+    "activeDeals_one": "{{count}} deal actif",
+    "activeDeals_other": "{{count}} deals actifs"
+  },
+  "title": "Tableau de bord",
+  "loading": "Chargement…",
+  "allocation": {
+    "title": "Déployé par instrument",
+    "empty": "Aucun capital déployé pour l'instant."
+  },
+  "recent": {
+    "title": "Activité récente",
+    "empty": "Aucune transaction.",
+    "seeCash": "Voir la trésorerie"
   }
 }

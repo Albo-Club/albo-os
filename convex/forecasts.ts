@@ -167,6 +167,48 @@ export const createRule = mutation({
   },
 })
 
+/** Règles d'une org (UI prévisionnel), triées par libellé. */
+export const listRules = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+    const rules = await ctx.db
+      .query('forecastRules')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    rules.sort((a, b) => a.label.localeCompare(b.label))
+    return rules
+  },
+})
+
+/**
+ * Supprime une règle ET ses entries dérivées encore vierges (pending, non
+ * overridden). Les entries réalisées / annulées / éditées à la main sont
+ * conservées — c'est de l'historique, pas de la projection.
+ */
+export const deleteRule = mutation({
+  args: { ruleId: v.id('forecastRules') },
+  handler: async (ctx, { ruleId }) => {
+    const rule = await ctx.db.get('forecastRules', ruleId)
+    if (!rule) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, rule.orgId)
+
+    const entries = await ctx.db
+      .query('forecastEntries')
+      .withIndex('by_rule', (q) => q.eq('ruleId', ruleId))
+      .collect()
+    let entriesRemoved = 0
+    for (const entry of entries) {
+      if (entry.status === 'pending' && !entry.overridden) {
+        await ctx.db.delete('forecastEntries', entry._id)
+        entriesRemoved += 1
+      }
+    }
+    await ctx.db.delete('forecastRules', ruleId)
+    return { entriesRemoved }
+  },
+})
+
 /**
  * Met à jour une règle. N'affecte pas les entries déjà générées : relancer
  * `expandRules` pour resynchroniser les occurrences non protégées.

@@ -13,6 +13,26 @@
 
 ---
 
+## Juin 2026 — Le pilotage en un coup d'œil
+
+### 📊 Un vrai tableau de bord
+
+La page d'accueil de chaque organisation affiche enfin l'essentiel :
+**participations actives, capital déployé, distribué, trésorerie, NAV
+estimée et TVPI** — calculés en temps réel depuis vos données. S'y ajoutent
+la répartition du capital par type d'instrument et l'activité bancaire
+récente.
+
+### 📉 La trésorerie se projette
+
+Sur la page Trésorerie, une **courbe du solde projeté** (6, 12 ou 24 mois)
+part de vos soldes bancaires réels et déroule vos flux récurrents : loyers,
+salaires, échéances… Créez et gérez ces **règles récurrentes** directement
+sur la page (ou via l'assistant) — la projection se recalcule à chaque
+modification, et un passage sous zéro se voit immédiatement.
+
+---
+
 ## Juin 2026 — Chaque projet a enfin sa vue
 
 Tous les investissements ne se suivent pas pareil. Les pages de deal et de

@@ -58,5 +58,58 @@
   "direction": {
     "in": "Entrée",
     "out": "Sortie"
+  },
+  "forecast": {
+    "title": "Prévisionnel de trésorerie",
+    "horizonMonths_one": "{{count}} mois",
+    "horizonMonths_other": "{{count}} mois",
+    "startingBalance": "Solde de départ (comptes EUR réels) : {{amount}}",
+    "chartLabel": "Solde projeté",
+    "rules": {
+      "title": "Règles récurrentes",
+      "add": "Ajouter une règle",
+      "empty": "Aucune règle. Loyers, salaires, échéances… ajoute-les ici ou via l'assistant.",
+      "saved": "Règle enregistrée — projection recalculée",
+      "deleted": "Règle supprimée",
+      "deleteConfirmTitle": "Supprimer cette règle ?",
+      "deleteConfirmBody": "Ses occurrences générées encore en attente seront retirées (les réalisées ou éditées à la main sont conservées).",
+      "dialogTitleCreate": "Nouvelle règle récurrente",
+      "dialogTitleEdit": "Modifier la règle",
+      "labelLabel": "Libellé",
+      "labelPlaceholder": "ex. Loyer SCI Chapelle",
+      "amountLabel": "Montant (€)",
+      "directionLabel": "Sens",
+      "in": "Entrée",
+      "out": "Sortie",
+      "frequencyLabel": "Fréquence",
+      "frequency": {
+        "weekly": "Hebdomadaire",
+        "monthly": "Mensuelle",
+        "quarterly": "Trimestrielle",
+        "yearly": "Annuelle"
+      },
+      "anchorDayLabel": "Jour",
+      "anchorDayHintMonthly": "Jour du mois (1–31, ramené au dernier jour des mois courts)",
+      "anchorDayHintWeekly": "Jour de la semaine (1 = lundi … 7 = dimanche)",
+      "startLabel": "Début",
+      "endLabel": "Fin (optionnel)",
+      "activeLabel": "Règle active",
+      "active": "Active",
+      "inactive": "Inactive",
+      "day": "le {{day}}",
+      "col": {
+        "label": "Libellé",
+        "amount": "Montant",
+        "frequency": "Fréquence",
+        "start": "Période",
+        "status": "Statut"
+      },
+      "errors": {
+        "invalid_amount": "Montant invalide",
+        "invalid_anchor_day": "Jour invalide pour cette fréquence",
+        "invalid_date_range": "La date de fin précède le début",
+        "default": "Une erreur est survenue"
+      }
+    }
   }
 }

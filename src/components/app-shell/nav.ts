@@ -39,7 +39,6 @@ export function getNavGroups(): Array<NavGroup> {
           titleKey: 'items.dashboard',
           to: '/app/$orgSlug',
           icon: LayoutDashboard,
-          soon: true,
         },
         {
           titleKey: 'items.participations',
