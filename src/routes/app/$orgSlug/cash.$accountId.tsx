@@ -275,7 +275,7 @@ function AccountDetail() {
                       className={`text-right tabular-nums ${
                         tx.direction === 'out'
                           ? 'text-destructive'
-                          : 'text-foreground'
+                          : 'text-emerald-600'
                       }`}
                     >
                       {fmtSigned(tx.amount, tx.direction)}

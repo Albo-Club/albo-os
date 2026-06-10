@@ -215,7 +215,7 @@ function AllocatedTxRows({
             <span className="ml-3 text-xs">{tx.rawLabel}</span>
             <span
               className={`ml-3 text-xs tabular-nums ${
-                tx.direction === 'out' ? 'text-destructive' : 'text-foreground'
+                tx.direction === 'out' ? 'text-destructive' : 'text-emerald-600'
               }`}
             >
               {fmtSigned(tx.amount, tx.direction)}

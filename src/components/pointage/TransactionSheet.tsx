@@ -107,7 +107,7 @@ export function TransactionSheet({
                 label={t('col.amount')}
                 value={
                   <span
-                    className={tx.direction === 'out' ? 'text-destructive' : ''}
+                    className={tx.direction === 'out' ? 'text-destructive' : 'text-emerald-600'}
                   >
                     {fmtSigned(tx.amount, tx.direction)}
                   </span>
