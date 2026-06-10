@@ -90,13 +90,13 @@ Connecté en tant qu'Alice sur `/app/acme/`.
 | #    | Étape                                                          | Résultat attendu                                                  |
 | ---- | -------------------------------------------------------------- | ----------------------------------------------------------------- |
 | SH1  | Sidebar `inset` (carte flottante arrondie) : groupe Platform (Dashboard / Participations / Cash) en haut ; Members / Invitations / Settings épinglés en bas (nav secondaire `mt-auto`, sans label) | OK ; entrées admin-only masquées si rôle "member" (plus de badge "demo" sur Cash, vue fonctionnelle) |
-| SH2  | Clic sur `SidebarTrigger` (header) OU sur la `SidebarRail` (bande fine au bord droit de la sidebar) | Sidebar collapse en `icon` ; cookie `sidebar_state` persiste ; icônes orga/profil non écrasées en mode `icon` |
+| SH2  | Clic sur `SidebarTrigger` (header) OU sur la `SidebarRail` (bande fine au bord droit de la sidebar) | Sidebar collapse en `icon` ; cookie `sidebar_state` persiste ; icônes orga/profil non écrasées ni rognées en mode `icon` ; le séparateur vertical à côté du trigger reste court (h-4, pas pleine hauteur du header) |
 | SH3  | Redimensionner < 768px                                         | Sidebar passe en `Sheet` mobile, ouverture via burger              |
 | SH4  | Naviguer Dashboard → Participations → Cash                     | Breadcrumb du header se met à jour à chaque route ; Cash affiche les soldes par compte (cf. Niveau 3 — Vue Cash) |
 | SH5  | Dashboard (`/app/$orgSlug`) : KPIs réels                       | 6 cards : Participations (sociétés distinctes des deals actifs), Capital déployé (Σ out pointées deal), Distribué (Σ in), Trésorerie (Σ soldes EUR), NAV estimée (dernière valo par deal, fallback versé + hint « partielle »), TVPI ((distribué+NAV)/déployé en ×) — cf. Niveau 3 Dashboard |
 | SH6  | Toggle dark mode (icône soleil/lune dans header)               | Page bascule light ↔ dark, sidebar + charts adaptés                |
 | SH7  | Theme picker (footer sidebar) → choisir Blue / Emerald / Violet| Primary + chart-1 changent ; survit au reload (localStorage)       |
-| SH8  | Org switcher (header sidebar), orga **sans** logo             | Initiale (1ʳᵉ lettre) centrée dans le carré arrondi ; liste les orgs ; clic switch route + persiste `lastOrgSlug` |
+| SH8  | Org switcher (header sidebar), orga **sans** logo             | Initiale (1ʳᵉ lettre) centrée dans le carré arrondi ; liste les orgs ; clic switch route + persiste `lastOrgSlug` ; orga **avec** logo : image carrée arrondie, sans fond ni liseré autour |
 | SH9  | NavUser (footer sidebar) → profile / switch org / sign out     | Avatar **rond** ; sans photo, initiales prénom+nom (ex. `BB`) ; mêmes destinations qu'avant refonte |
 | SH10 | Bouton AI dans header                                          | Toggle du panneau AI persistant (cf. Niveau 5 — AI chat, C1/C11)   |
 | SH11 | Ouvrir une page au contenu plus haut que l'écran (liste longue) | Le cadre `inset` reste calé sur la hauteur du viewport ; le scroll se fait **dans** le cadre, bord bas arrondi toujours visible |
