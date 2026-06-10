@@ -262,8 +262,7 @@ curl -sI https://<your-vercel-domain>/             # expect HTTP 200
 
 ## CI / Ops
 
-- Renovate: weekly, groups non-majors, automerges devDeps, freezes the
-  pinned `pnpm.overrides` until you bump them.
+- Renovate: weekly, groups non-majors, automerges devDeps.
 - `ci.yml`: install + typecheck on push/PR.
 - `sync-skills.yml`: weekly skill freshness PR.
 - `cleanup-branches.yml`: manual sweep (Actions → Run workflow) deleting

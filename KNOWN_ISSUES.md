@@ -247,26 +247,11 @@ The shell guard in `package.json` → `build:vercel` requires **both**
 
 ## pnpm.overrides
 
-### `@tanstack/react-router: 1.168.26` + `@tanstack/router-core: 1.169.2`
-
-Two router-core versions coexisting (one pulled by `react-router`, one by
-`start-client-core`) prevented `server.handlers` from being type-augmented
-on `createFileRoute`. Pinning both to compatible versions resolves it.
-
-**Unblock when**: TanStack publishes a release where `react-router` and
-`react-start` agree on a single `router-core` version.
-
-### `@tanstack/react-start: 1.167.65`
-
-Pinned in lockstep with the router pin above.
-
-### `better-call: 1.3.4`
-
-`better-call@1.3.5` ships without `openapi.mjs` and `validator.mjs`,
-breaking Better Auth's runtime imports. Pinned to the last working release.
-
-**Unblock when**: a `better-call` release re-includes the missing files
-(or Better Auth bumps past the regression).
+No active overrides. History of past pins (TanStack router-core duplication
+breaking `server.handlers` type augmentation; `better-call@1.3.5` shipping
+broken) lives in git — pattern to reuse if a dep breaks upstream: pin in
+`pnpm.overrides`, disable it in `renovate.json`, document the unblock
+condition here, and remove all three together when upstream fixes land.
 
 ## Zod v4 required for Better Auth 1.6.10
 

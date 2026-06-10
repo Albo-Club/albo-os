@@ -15,16 +15,6 @@
       "matchDepTypes": ["devDependencies"],
       "matchUpdateTypes": ["patch", "minor"],
       "automerge": true
-    },
-    {
-      "description": "Pinned overrides — bump deliberately, not automatically.",
-      "matchPackageNames": [
-        "@tanstack/react-router",
-        "@tanstack/react-start",
-        "@tanstack/router-core",
-        "better-call"
-      ],
-      "enabled": false
     }
   ]
 }
