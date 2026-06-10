@@ -122,5 +122,86 @@
   },
   "dealsCount_one": "{{count}} deal",
   "dealsCount_other": "{{count}} deals",
-  "loading": "Loading…"
+  "loading": "Loading…",
+  "plan": {
+    "title": "Business plan vs actuals",
+    "empty": "No business plan yet for this deal.",
+    "emptyHint": "Paste the BP into the assistant — it will structure the lines (initial version at closing, revised for updates).",
+    "col": {
+      "period": "Period",
+      "initial": "Initial BP",
+      "revised": "Revised BP",
+      "actual": "Actual",
+      "gap": "Cumulative gap"
+    },
+    "chart": {
+      "initial": "Initial BP",
+      "revised": "Revised BP",
+      "actual": "Actual"
+    }
+  },
+  "fund": {
+    "title": "Fund",
+    "committed": "Committed",
+    "called": "Called",
+    "distributed": "Distributed",
+    "dpi": "DPI",
+    "tvpi": "TVPI",
+    "valuations": "Valuations",
+    "valEmpty": "No valuation yet — add them via the assistant.",
+    "col": {
+      "date": "Date",
+      "fairValue": "Fair value",
+      "method": "Method",
+      "source": "Source"
+    }
+  },
+  "kpis": {
+    "title": "KPIs",
+    "empty": "No KPI recorded for this company.",
+    "emptyHint": "Paste a reporting into the assistant — it will extract the metrics.",
+    "deleted": "KPI deleted",
+    "deleteConfirmTitle": "Delete this KPI?",
+    "col": {
+      "metric": "Metric",
+      "period": "Period",
+      "value": "Value",
+      "source": "Source"
+    },
+    "errors": {
+      "default": "Something went wrong"
+    }
+  },
+  "reportings": {
+    "title": "Reportings & documents",
+    "upload": "Add a document",
+    "uploading": "Uploading…",
+    "empty": "No document yet. Investor updates, BPs and legal docs live here.",
+    "added": "Document added",
+    "deleted": "Document deleted",
+    "deleteConfirmTitle": "Delete this document?",
+    "deleteConfirmBody": "The file will be permanently deleted.",
+    "download": "Download",
+    "dialogTitle": "New document",
+    "titleLabel": "Title",
+    "kindLabel": "Type",
+    "periodLabel": "Covered period (optional)",
+    "col": {
+      "title": "Title",
+      "kind": "Type",
+      "period": "Period",
+      "size": "Size",
+      "date": "Added"
+    },
+    "kind": {
+      "reporting": "Reporting",
+      "bp": "Business plan",
+      "legal": "Legal",
+      "other": "Other"
+    },
+    "errors": {
+      "too_large": "File is larger than 20 MB",
+      "default": "Something went wrong"
+    }
+  }
 }

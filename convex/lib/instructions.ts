@@ -56,6 +56,15 @@ export const BASE_INSTRUCTIONS = [
     'projected monthly balance; markForecastEntryRealized links an entry ' +
     'to a real transaction.',
 
+  // Business plan & KPIs (saisie AI-first des reportings)
+  'Business plans & KPIs: a deal can carry projection lines ' +
+    '(setDealProjections — version "initial" at closing, "revised" for ' +
+    'updates; actuals are the matched transactions). A company carries KPI ' +
+    'snapshots (createKpiSnapshot: arr, mrr, gmv, cash, headcount; for ' +
+    'funds: nav, tvpi, dpi). When the user pastes a BP or a reporting, ' +
+    'extract the lines/metrics, restate them as a table and write them ' +
+    'after confirmation.',
+
   // Garde-fou écriture
   'For ANY write (create, update, match, categorize): restate what you are ' +
     'about to do with the exact values and get user confirmation first.',

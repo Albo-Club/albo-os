@@ -140,6 +140,22 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | CA7 | i18n EN/FR sur la page + le Sheet                                   | Tous les libellés traduits (namespace `cash`), titre d'onglet = `cash:metaTitle`  |
 | CA8 | Page `/cash/$accountId` : taper un libellé ou une contrepartie dans la barre de recherche (avec/sans accents, casse différente) | Filtrage serveur (~250 ms de debounce) via le search index `search_text` ; résultats triés date desc, cap 200 ; pas de flash de liste vide entre deux frappes ; terme sans résultat → « Aucune transaction ne correspond… » ; effacer → liste complète. ⚠️ Les tx pré-existantes sont invisibles à la recherche tant que `transactions:backfillSearchText` n'a pas tourné (cf. `KNOWN_ISSUES.md` « Recherche transactions ») |
 
+## Niveau 3 — Vues par type de projet (10 min)
+
+Sections typées de la page deal (`/deals/$dealId`) et de la page société
+(`/participations/$companyId`). La saisie des BP et des KPIs passe par
+l'assistant (outils `setDealProjections` / `createKpiSnapshot`).
+
+| #   | Étape                                                              | Résultat attendu                                                                 |
+| --- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| TP1 | Deal `royalty` sans BP                                              | Section « Business plan vs réalisé » avec état vide + hint « colle ton BP dans l'assistant » |
+| TP2 | Via le chat : « voilà le BP initial de [deal royalty] : 10 k€ par semestre de juil. 2026 à juil. 2028 » → confirmer | `setDealProjections` (version initial) ; la section affiche chart (courbes cumulées) + table des périodes ; tx `in` pointées sur le deal apparaissent en « Réalisé » dans la bonne période |
+| TP3 | Saisir ensuite un BP révisé dégradé via le chat                     | Colonne/ligne « BP révisé » apparaît ; l'écart cumulé se mesure contre le révisé (négatif en rouge) |
+| TP4 | Deal `fund_lp`                                                      | Section « Fonds » : cards Engagé / Appelé (Σ out) / Distribué (Σ in) / DPI / TVPI (dès qu'une valo existe) + table des valorisations |
+| TP5 | Page société : « ajoute l'ARR de [société] : 2,4 M€ sur 2025, source investor update » via le chat → confirmer | `createKpiSnapshot` ; section « KPIs » liste la métrique (valeur formatée selon l'unité), suppression possible (confirm) |
+| TP6 | Page société : « Ajouter un document » → fichier < 20 Mo → titre/type/période → save | Document listé (type, période, taille), download OK, suppression avec confirm ; > 20 Mo refusé avec message clair |
+| TP7 | i18n EN/FR sur les sections plan/fonds/KPIs/reportings              | Tous les libellés traduits (namespace `participations`)                           |
+
 ## Niveau 3 — Invitations edge cases (8 min)
 
 | #  | Étape                                                      | Résultat attendu                                                    |

@@ -122,5 +122,86 @@
   },
   "dealsCount_one": "{{count}} deal",
   "dealsCount_other": "{{count}} deals",
-  "loading": "Chargement…"
+  "loading": "Chargement…",
+  "plan": {
+    "title": "Business plan vs réalisé",
+    "empty": "Pas encore de business plan pour ce deal.",
+    "emptyHint": "Colle le BP dans l'assistant — il structurera les lignes (version initiale au closing, révisée pour les actualisations).",
+    "col": {
+      "period": "Période",
+      "initial": "BP initial",
+      "revised": "BP révisé",
+      "actual": "Réalisé",
+      "gap": "Écart cumulé"
+    },
+    "chart": {
+      "initial": "BP initial",
+      "revised": "BP révisé",
+      "actual": "Réalisé"
+    }
+  },
+  "fund": {
+    "title": "Fonds",
+    "committed": "Engagé",
+    "called": "Appelé",
+    "distributed": "Distribué",
+    "dpi": "DPI",
+    "tvpi": "TVPI",
+    "valuations": "Valorisations",
+    "valEmpty": "Aucune valorisation — ajoute-les via l'assistant.",
+    "col": {
+      "date": "Date",
+      "fairValue": "Fair value",
+      "method": "Méthode",
+      "source": "Source"
+    }
+  },
+  "kpis": {
+    "title": "KPIs",
+    "empty": "Aucun KPI enregistré pour cette société.",
+    "emptyHint": "Colle un reporting dans l'assistant — il en extraira les métriques.",
+    "deleted": "KPI supprimé",
+    "deleteConfirmTitle": "Supprimer ce KPI ?",
+    "col": {
+      "metric": "Métrique",
+      "period": "Période",
+      "value": "Valeur",
+      "source": "Source"
+    },
+    "errors": {
+      "default": "Une erreur est survenue"
+    }
+  },
+  "reportings": {
+    "title": "Reportings & documents",
+    "upload": "Ajouter un document",
+    "uploading": "Envoi…",
+    "empty": "Aucun document. Les investor updates, BP et docs juridiques vivent ici.",
+    "added": "Document ajouté",
+    "deleted": "Document supprimé",
+    "deleteConfirmTitle": "Supprimer ce document ?",
+    "deleteConfirmBody": "Le fichier sera définitivement supprimé.",
+    "download": "Télécharger",
+    "dialogTitle": "Nouveau document",
+    "titleLabel": "Titre",
+    "kindLabel": "Type",
+    "periodLabel": "Période couverte (optionnel)",
+    "col": {
+      "title": "Titre",
+      "kind": "Type",
+      "period": "Période",
+      "size": "Taille",
+      "date": "Ajouté"
+    },
+    "kind": {
+      "reporting": "Reporting",
+      "bp": "Business plan",
+      "legal": "Juridique",
+      "other": "Autre"
+    },
+    "errors": {
+      "too_large": "Le fichier dépasse 20 Mo",
+      "default": "Une erreur est survenue"
+    }
+  }
 }

@@ -16,6 +16,8 @@ import {
   useDealTitle,
   useFormatters,
 } from '~/components/participations/ParticipationsTable'
+import { FundSection } from '~/components/deals/FundSection'
+import { PlanVsActualSection } from '~/components/deals/PlanVsActualSection'
 import { DealCombobox } from '~/components/pointage/DealCombobox'
 import {
   TransactionSheet,
@@ -509,6 +511,21 @@ function DealDetail() {
           <p className="text-sm whitespace-pre-wrap">{deal.notes}</p>
         </div>
       )}
+
+      {deal.instrumentKind === 'fund_lp' && (
+        <FundSection
+          dealId={deal._id}
+          committedAmount={deal.committedAmount}
+          calledCents={paidActual}
+          distributedCents={received}
+        />
+      )}
+
+      <PlanVsActualSection
+        dealId={deal._id}
+        instrumentKind={deal.instrumentKind}
+        txs={txs}
+      />
 
       <Transactions deal={deal} />
 
