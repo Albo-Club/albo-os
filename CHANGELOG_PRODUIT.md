@@ -1,19 +1,35 @@
 # Nouveautés
 
 <!--
-  Trace en prose des évolutions visibles par les utilisateurs, une entrée par
-  lot/release, du plus récent au plus ancien. Langage produit, pas technique
-  (pas de chemins de fichiers ni de noms de fonctions) — ce fichier est rendu
-  tel quel dans l'app sur /app/$orgSlug/changelog (import ?raw).
+  Trace en prose des évolutions, une entrée versionnée par PR
+  (`## vX.Y.Z — JJ/MM/AAAA à HH:MM — titre`), du plus récent au plus
+  ancien. Langage produit, pas technique (pas de chemins de fichiers ni de
+  noms de fonctions) — ce fichier est rendu tel quel dans l'app sur
+  /app/$orgSlug/changelog (import ?raw).
 
   Ne pas confondre avec CHANGELOG.md (généré automatiquement par
-  release-please à partir des commits — technique). Règle d'alimentation :
-  CLAUDE.md § « Pre-PR doc audit » (question 5).
+  release-please à partir des commits — technique, versions indépendantes).
+  Règle d'alimentation : CLAUDE.md § « Pre-PR doc audit » (question 5).
 -->
 
 Ce que chaque mise à jour change pour vous, en clair — du plus récent au
 plus ancien. Les termes financiers sont expliqués dans le petit lexique en
 bas de page.
+
+---
+
+## v1.0.1 — 10/06/2026 à 22:13 — Le changelog passe au suivi par version
+
+Chaque évolution porte désormais un numéro de version et la date et l'heure
+de sa mise en ligne — cette page devient l'historique précis de l'outil.
+
+---
+
+## v1.0.0 — 10/06/2026 à 21:58 — Les entrées en vert
+
+Dans toutes les vues de transactions (pointage, comptes bancaires, passif),
+les **entrées d'argent s'affichent en vert** — les sorties restent en rouge.
+Le sens d'un mouvement se lit d'un coup d'œil.
 
 ---
 
