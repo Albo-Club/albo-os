@@ -91,8 +91,7 @@ commit message already document the *what*. Question 5 (changelog) fires on
    `## vX.Y.Z — JJ/MM/AAAA à HH:MM — <titre>` :
    - **Version** : increment from the latest entry in the file. Bump
      **minor** for a user-visible feature or UX change, **patch** for a
-     fix, refactor, or internal/doc change. This version is independent
-     from the release-please `CHANGELOG.md` — never try to sync them.
+     fix, refactor, or internal/doc change.
    - **Date/heure** : opening time of the PR, Europe/Paris.
    - **Contenu** : product language for user-visible changes (no file
      paths, no function names) ; a single descriptive line is enough for
@@ -109,8 +108,7 @@ commit message already document the *what*. Question 5 (changelog) fires on
   changelog of completed work.
 - `CHANGELOG_PRODUIT.md` — user-facing release notes in French, **one
   versioned entry per PR** (`vX.Y.Z` + date/heure de la PR), product
-  language. Hand-written (distinct from the technical `CHANGELOG.md` that
-  release-please generates from commits).
+  language. Hand-written.
 - `MIGRATIONS.md` — index of one-shot prod data operations (seeds, imports,
   purges) pointing to the module-level runbooks, plus in-flight chantiers.
 - `AGENTS.md` — pointer to the agent-skill workflow. Static, rarely changes.
