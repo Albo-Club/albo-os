@@ -1211,6 +1211,7 @@ export const importMemoCsvTransactions = internalMutation({
         memoId: row.memoId,
         importMeta: hasMeta ? meta : undefined,
         reconciled: false,
+        matchStatus: 'unmatched' as const,
       })
       inserted += 1
     }

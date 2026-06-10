@@ -454,16 +454,18 @@ export const getVatPosition = query({
  * N'écrit RIEN dans `matchingDecisions` : un backfill n'est pas une décision
  * humaine, on ne pollue pas le dataset.
  *
- * À lancer manuellement par org :
- *   pnpm exec convex run transactions:backfillMatchStatus '{"orgId": "…"}' --prod
+ * À lancer manuellement ('{}' = toutes les orgs, ou cibler '{"orgId": "…"}') :
+ *   pnpm exec convex run transactions:backfillMatchStatus '{}' --prod
  */
 export const backfillMatchStatus = internalMutation({
-  args: { orgId: v.id('organizations') },
+  args: { orgId: v.optional(v.id('organizations')) },
   handler: async (ctx, { orgId }) => {
-    const rows = await ctx.db
-      .query('transactions')
-      .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
-      .collect()
+    const rows = orgId
+      ? await ctx.db
+          .query('transactions')
+          .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+          .collect()
+      : await ctx.db.query('transactions').collect()
 
     let matched = 0
     let unmatched = 0
@@ -494,16 +496,18 @@ export const backfillMatchStatus = internalMutation({
  * posent déjà (Powens, import Airtable, CSV Mémo, agent) — une ligne sans
  * `searchText` est simplement invisible à la recherche.
  *
- * À lancer manuellement par org :
- *   pnpm exec convex run transactions:backfillSearchText '{"orgId": "…"}' --prod
+ * À lancer manuellement ('{}' = toutes les orgs, ou cibler '{"orgId": "…"}') :
+ *   pnpm exec convex run transactions:backfillSearchText '{}' --prod
  */
 export const backfillSearchText = internalMutation({
-  args: { orgId: v.id('organizations') },
+  args: { orgId: v.optional(v.id('organizations')) },
   handler: async (ctx, { orgId }) => {
-    const rows = await ctx.db
-      .query('transactions')
-      .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
-      .collect()
+    const rows = orgId
+      ? await ctx.db
+          .query('transactions')
+          .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+          .collect()
+      : await ctx.db.query('transactions').collect()
 
     let updated = 0
     let skipped = 0
