@@ -18,6 +18,16 @@ bas de page.
 
 ---
 
+## v1.0.2 — 10/06/2026 à 22:36 — Retouches visuelles du menu latéral
+
+Trois finitions sur l'habillage de l'app : le petit trait vertical à côté
+du bouton d'ouverture du menu reprend sa hauteur discrète (il ne barrait
+plus toute la barre du haut), le logo de l'organisation s'affiche sans
+liseré parasite, et le logo comme la photo de profil gardent leurs
+proportions quand le menu est replié en mode icônes.
+
+---
+
 ## v1.0.1 — 10/06/2026 à 22:13 — Le changelog passe au suivi par version
 
 Chaque évolution porte désormais un numéro de version et la date et l'heure

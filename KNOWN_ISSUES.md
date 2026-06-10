@@ -382,6 +382,25 @@ officielle et le style des composants ui existants (package `radix-ui`/dep
 dédiée, alias `~/lib/utils`, attributs `data-slot`, prettier du projet).
 Exemple : `command.tsx`.
 
+## tailwind-merge v3 obligatoire avec les composants shadcn « Tailwind v4 »
+
+Les composants `src/components/ui/*` (générés pour Tailwind v4) utilisent le
+modificateur important **suffixe** (`p-0!`, `size-8!`). tailwind-merge **v2**
+ne connaît que le préfixe v3 (`!p-0`) : il ne déduplique pas ces classes, donc
+deux utilitaires en conflit restent tous les deux dans le `className` et c'est
+l'**ordre CSS** qui tranche — pas l'ordre des arguments de `cn()`. Symptôme
+historique : dans `sidebar.tsx`, `group-data-[collapsible=icon]:p-2!` (base)
+battait `…:p-0!` (variant `size="lg"`) → boutons repliés de 32 px avec 8 px de
+padding → logo d'orga et avatar (32 px, `shrink-0`) rognés/déformés en mode
+icône. Fix : `tailwind-merge@^3` (aligné Tailwind v4). Ne pas redescendre en
+v2.
+
+Piège voisin (non lié à la version) : un utilitaire nu (`h-4`) ne surcharge
+**jamais** la même propriété portée par un variant `data-[…]:` du composant
+(`data-[orientation=vertical]:h-full` gagne en spécificité). Surcharger avec
+le même variant — `data-[orientation=vertical]:h-4` — comme dans les
+templates shadcn officiels.
+
 ## Vercel framework preset traps TanStack Start
 
 Vercel's auto-detection lands on **Vite** the moment it sees `vite.config.ts`,
