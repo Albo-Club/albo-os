@@ -4,6 +4,7 @@ import { Check, ChevronsUpDown, Layers } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '../../../convex/_generated/api'
+import { cn } from '~/lib/utils'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,14 +62,20 @@ export function OrgSwitcher({
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg">
+              <div
+                className={cn(
+                  'flex aspect-square size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg',
+                  (isAll || !current?.logoUrl) &&
+                    'bg-sidebar-primary text-sidebar-primary-foreground',
+                )}
+              >
                 {isAll ? (
                   <Layers className="size-4" />
                 ) : current?.logoUrl ? (
                   <img
                     src={current.logoUrl}
                     alt=""
-                    className="size-8 rounded-lg object-cover"
+                    className="size-full object-cover"
                   />
                 ) : (
                   <span className="text-sm font-semibold">

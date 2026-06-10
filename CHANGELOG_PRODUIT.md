@@ -7,8 +7,6 @@
   noms de fonctions) — ce fichier est rendu tel quel dans l'app sur
   /app/$orgSlug/changelog (import ?raw).
 
-  Ne pas confondre avec CHANGELOG.md (généré automatiquement par
-  release-please à partir des commits — technique, versions indépendantes).
   Règle d'alimentation : CLAUDE.md § « Pre-PR doc audit » (question 5).
 -->
 
@@ -40,6 +38,23 @@ Un vrai suivi de TVA fait son entrée pour fiabiliser les charges réelles :
   Créance/Dette du passif passent en couleur, les entrées oubliées en noir
   (dashboard, prévisionnel) passent au vert — le sens d'un mouvement se lit
   désormais d'un coup d'œil sur toutes les pages.
+
+---
+
+## v1.0.3 — 10/06/2026 à 22:38 — Nettoyage de l'outillage interne
+
+Suppression d'un automatisme de publication qui n'avait jamais fonctionné.
+Aucun changement visible dans l'app.
+
+---
+
+## v1.0.2 — 10/06/2026 à 22:36 — Retouches visuelles du menu latéral
+
+Trois finitions sur l'habillage de l'app : le petit trait vertical à côté
+du bouton d'ouverture du menu reprend sa hauteur discrète (il ne barrait
+plus toute la barre du haut), le logo de l'organisation s'affiche sans
+liseré parasite, et le logo comme la photo de profil gardent leurs
+proportions quand le menu est replié en mode icônes.
 
 ---
 
