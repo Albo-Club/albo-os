@@ -1,6 +1,7 @@
 {
   "appShell": {
     "ai": "AI",
+    "aiShortcut": "Toggle AI panel (⌘J / Ctrl+J)",
     "breadcrumb": {
       "participations": "Participations",
       "cash": "Cash",

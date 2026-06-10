@@ -221,7 +221,7 @@ l'assistant (outils `setDealProjections` / `createKpiSnapshot`).
 | #  | Étape                                                   | Résultat attendu                                                  |
 | -- | ------------------------------------------------------- | ----------------------------------------------------------------- |
 | C1 | Charger `/app/acme`                                     | Panneau AI ouvert par défaut à droite du contenu (desktop ≥ lg)    |
-| C2 | Envoyer un message simple ("ping")                      | Stream visible token par token, pas de blocage UI ; thread créé au 1er envoi, titre auto = début du message |
+| C2 | Envoyer un message simple ("ping")                      | Stream visible token par token, pas de blocage UI ; thread créé au 1er envoi, titre auto = début du message ; composer multiligne : Entrée envoie, Maj+Entrée saute une ligne, le textarea grandit avec le texte (cap ~12rem puis scroll interne) ; indicateur « Réflexion… » avant le 1er token |
 | C3 | "liste mes participations Albo"                         | Tool `listDeals`/`listCompanies` appelé, réponse scopée à l'org    |
 | C4 | "crée un deal Albo Club dans Sezame, share, 50 000 €, signé le 15 janvier 2026" | L'agent confirme puis appelle `createCompany` (si absente) + `createDeal` ; le deal apparaît dans `/participations` (scope Albo + Consolidé, pas Calte) |
 | C5 | Demander un deal avec un investisseur portfolio (non groupe) | Refusé (`investor_must_be_group_entity`) — l'agent explique qu'il faut une entité du groupe |
@@ -234,13 +234,14 @@ l'assistant (outils `setDealProjections` / `createKpiSnapshot`).
 | C12 | Naviguer participations → pointage → cash               | Panneau et conversation intacts (monté dans le layout org)         |
 | C13 | Envoyer un message depuis `/app/acme/pointage`          | La réponse montre que l'agent connaît la page courante (contexte route transmis au system prompt) |
 | C14 | Historique : créer 2 conversations, switcher, renommer, supprimer | Liste dans le menu Historique, titres mis à jour, suppression → bascule sur la conversation la plus récente |
-| C15 | Demander une liste/tableau                              | Rendu markdown propre (listes, tableaux) pendant le stream         |
-| C16 | Bouton stop pendant un long stream                      | Le texte s'arrête, pas d'erreur console ; bouton copier sur les réponses |
+| C15 | Demander une liste/tableau                              | Rendu markdown propre (listes, tableaux scrollables) pendant le stream — rendu streamdown ; si tout sort sans styles, vérifier le `@source` streamdown dans `app.css` |
+| C16 | Stop pendant un long stream                             | Le bouton d'envoi devient stop (icône carré) pendant le stream ; clic → le texte s'arrête, pas d'erreur console ; bouton copier sur les réponses ; remonter l'historique pendant un stream → le défilement se libère + bouton « aller en bas » |
 | C17 | `/app/all`, `/app/me`, `/app/admin`                     | Aucun panneau AI (scope org uniquement), zéro régression visuelle  |
 | C18 | "liste mes transactions non pointées" puis "suggère des rattachements" | `listUnmatchedTransactions` puis `suggestMatches` appelés ; candidats présentés avec leur évidence ; l'agent ATTEND la confirmation |
 | C19 | Confirmer un rattachement suggéré                       | `matchTransactionToDeal` appelé ; la tx disparaît de l'onglet Pointage ; `matchingDecisions` a une ligne `source: 'agent_suggested'` (dashboard Convex) |
 | C20 | "crée une règle de loyer 1 500 €/mois le 5" puis "projette mon cash sur 12 mois" | `createForecastRule` (après confirmation) → l'agent propose `expandForecastRules` → `getForecastBalance` rend les mois ; cohérent avec la mutation publique |
 | C21 | "ajoute une valo de 1,2 M€ au deal X au 31/12" + "liste le passif" | `createValuation` (après confirmation) visible en base ; `listLiabilities` rend positions + C/C avec soldes dérivés |
+| C22 | Nouvelle conversation (état vide) + ⌘J/Ctrl+J          | Suggestions cliquables (position de cash, passif, projection, valos) → envoi direct ; ⌘J/Ctrl+J toggle le panneau et focus le composer à l'ouverture ; un appel d'outil s'affiche en bloc dépliable (statut + paramètres + résultat), labels fr/en |
 
 ## Niveau 6 — Sécurité + déploiement (5 min)
 

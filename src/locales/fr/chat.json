@@ -9,7 +9,23 @@
   "send": "Envoyer",
   "stop": "Arrêter",
   "copy": "Copier",
-  "toolCall": "Outil {{name}}…",
+  "thinking": "Réflexion…",
+  "scrollToBottom": "Aller en bas",
+  "suggestions": {
+    "cash": "Quelle est ma position de cash ?",
+    "liabilities": "Liste le passif",
+    "forecast": "Projette mon cash sur 12 mois",
+    "valuations": "Dernières valorisations du portefeuille"
+  },
+  "tool": {
+    "statePending": "En attente",
+    "stateRunning": "En cours",
+    "stateCompleted": "Terminé",
+    "stateError": "Erreur",
+    "parameters": "Paramètres",
+    "result": "Résultat",
+    "error": "Erreur"
+  },
   "threads": {
     "history": "Historique",
     "empty": "Aucune conversation",

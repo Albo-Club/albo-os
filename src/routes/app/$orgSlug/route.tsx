@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Outlet, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
@@ -36,10 +36,22 @@ function OrgLayout() {
   const setLastOrg = useConvexMutation(api.organizations.setLastOrg)
   const [aiOpen, setAiOpen] = useState(readAiPanelCookie)
 
-  function setAiPanelOpen(open: boolean) {
+  const setAiPanelOpen = useCallback((open: boolean) => {
     setAiOpen(open)
     document.cookie = `${AI_PANEL_COOKIE_NAME}=${open}; path=/; max-age=${AI_PANEL_COOKIE_MAX_AGE}`
-  }
+  }, [])
+
+  // ⌘J / Ctrl+J : toggle du panneau AI (même pattern que le ⌘B de la sidebar).
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'j' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault()
+        setAiPanelOpen(!aiOpen)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [aiOpen, setAiPanelOpen])
 
   useEffect(() => {
     if (me?.kind !== 'ready') return
@@ -109,6 +121,7 @@ function OrgLayout() {
           <AiPanel
             key={org._id}
             orgId={org._id}
+            open={aiOpen}
             onClose={() => setAiPanelOpen(false)}
           />
         </aside>

@@ -107,6 +107,7 @@ export function AppHeader({
             size="sm"
             onClick={onToggleAiPanel}
             aria-pressed={aiPanelOpen}
+            title={t('nav:appShell.aiShortcut')}
           >
             <Sparkles className="mr-1.5 size-4" />
             {t('nav:appShell.ai')}

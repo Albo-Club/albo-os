@@ -17,6 +17,30 @@ bas de page.
 
 ---
 
+## Juin 2026 — Un assistant qui se manie comme les grands
+
+### 💬 Une vraie zone de saisie
+
+La zone de saisie de l'assistant passe en **multiligne** : Entrée envoie,
+**Maj+Entrée** va à la ligne, et le champ **grandit avec votre texte** — fini
+le message long invisible dans une ligne unique. Pendant que l'assistant
+répond, le bouton d'envoi devient un **bouton stop**.
+
+### ✨ Une conversation plus fluide
+
+Le fil **suit la réponse en cours d'écriture** ; si vous remontez relire un
+passage, il vous laisse tranquille et un bouton permet de **revenir en bas**
+d'un clic. Une nouvelle conversation propose des **suggestions de départ**
+(position de cash, passif, projection, valorisations), et quand l'assistant
+consulte vos données, son travail s'affiche dans un **bloc dépliable** —
+statut, demande, résultat.
+
+### ⌨️ Au clavier
+
+**⌘J / Ctrl+J** ouvre et ferme le panneau de l'assistant, prêt à taper.
+
+---
+
 ## Juin 2026 — La finition qui change tout
 
 ### 💶 Le passé et le futur sur la même courbe

@@ -1,6 +1,7 @@
 {
   "appShell": {
     "ai": "IA",
+    "aiShortcut": "Afficher/masquer le panneau IA (⌘J / Ctrl+J)",
     "breadcrumb": {
       "participations": "Participations",
       "cash": "Trésorerie",
