@@ -375,6 +375,7 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | RU19 | « Écarter ▾ » → « Charge » (unitaire ou bulk)                    | La tx part avec `vatRateBps: 2000` (20 % par défaut) ; visible dans l'onglet Charges, colonne TVA ; « dont X € de TVA » sous le sélecteur (TVA dérivée du TTC, ex. 120 € → 20 €) |
 | RU20 | Onglet Charges ou Produits : sélecteur TVA d'une ligne (À qualifier / 0 % / 5,5 % / 10 % / 20 %) | Mutation `setVatRate` ; le montant de TVA affiché et la carte « TVA récupérable » de la page Trésorerie se mettent à jour (réactivité) ; « À qualifier » remet le taux à null ; pas de colonne TVA sur les onglets Impôts/Virements internes |
 | RU21 | « Annuler » sur une charge qualifiée → re-classer en charge      | Le retour en file efface `vatRateBps` (invariant `lib/pointage.ts`) ; le re-classement repart au défaut 20 % |
+| RU22 | Onglet (file ou écartées) avec > 50 lignes                       | Pagination locale 50 lignes/page : barre « Page X sur Y » + ‹ › sous la table (absente à ≤ 50 lignes) ; le compteur « N à pointer », la recherche (RU15), les onglets et la sélection bulk opèrent toujours sur la liste **complète** (la sélection survit au changement de page) ; changer de recherche ou d'onglet ramène page 1 ; pointer/écarter une ligne ne change pas de page (la page se borne si la liste rétrécit) |
 
 ### Réattribution depuis la page d'un deal (`/app/$orgSlug/deals/$dealId`)
 
