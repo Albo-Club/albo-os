@@ -16,11 +16,32 @@ bas de page.
 
 ---
 
-## v1.2.1 — 10/06/2026 à 23:50 — La feuille de route de l'assistant
+## v1.3.0 — 10/06/2026 à 23:50 — L'assistant agit, vous validez d'un clic
 
-Travail préparatoire sur les prochaines évolutions de l'assistant
-(confirmation des actions d'un clic, réponses plus visuelles, brief
-proactif…). Aucun changement visible dans l'app pour l'instant.
+### ✅ Confirmer une action en un clic
+
+Quand l'assistant s'apprête à écrire quelque chose (créer un deal, pointer
+une transaction, ajouter une valorisation…), il ne demande plus un « oui »
+dans la conversation : un bloc **Confirmer / Refuser** apparaît directement
+sous l'action proposée, avec les valeurs exactes qui seront enregistrées.
+Rien ne s'écrit sans votre clic — c'est désormais garanti par l'application
+elle-même, plus seulement par la consigne donnée à l'IA. Une demande
+laissée en attente est automatiquement annulée si la conversation repart
+sur autre chose, et l'historique garde la trace de ce qui a été confirmé
+ou refusé.
+
+### 💡 Des suggestions qui suivent votre page
+
+À l'ouverture d'une nouvelle conversation, les suggestions s'adaptent à
+l'écran où vous êtes : sur le Pointage, l'assistant propose de pointer les
+transactions en attente ; sur la Trésorerie, la position de cash et la
+TVA ; sur le Passif, les comptes courants — et ainsi de suite.
+
+### 📋 En préparation
+
+La feuille de route de l'assistant (réponses plus visuelles, pièces
+jointes, brief proactif) et un guide des bonnes pratiques rejoignent la
+documentation du projet.
 
 ---
 

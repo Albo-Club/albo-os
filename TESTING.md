@@ -26,7 +26,7 @@ Pré-requis :
 | B4 | Smoke E2E     | `pnpm test:smoke`        | Tous les scénarios passent    |
 | B5 | Cookies prod  | `pnpm test:cookies`      | `albo-os.session_token` a Secure+HttpOnly+SameSite=Lax+Max-Age≈604800 |
 | B6 | Skills à jour | `pnpm sync:skills:check` | `0 skills drifted`            |
-| B7 | Tests unitaires | `pnpm test:unit`       | 64 tests verts (logique pure : récurrence/solde forecast + historique cash, ranking suggestions, instructions agent, passif, séries BP, CSV) |
+| B7 | Tests unitaires | `pnpm test:unit`       | 70 tests verts (logique pure : récurrence/solde forecast + historique cash, ranking suggestions, instructions agent, passif, séries BP, CSV) |
 
 ## Niveau 2 — Auth (6 min)
 
@@ -224,7 +224,7 @@ l'assistant (outils `setDealProjections` / `createKpiSnapshot`).
 | C1 | Charger `/app/acme`                                     | Panneau AI ouvert par défaut à droite du contenu (desktop ≥ lg)    |
 | C2 | Envoyer un message simple ("ping")                      | Stream visible token par token, pas de blocage UI ; thread créé au 1er envoi, titre auto = début du message ; composer multiligne : Entrée envoie, Maj+Entrée saute une ligne, le textarea grandit avec le texte (cap ~12rem puis scroll interne) ; indicateur « Réflexion… » avant le 1er token |
 | C3 | "liste mes participations Albo"                         | Tool `listDeals`/`listCompanies` appelé, réponse scopée à l'org    |
-| C4 | "crée un deal Albo Club dans Sezame, share, 50 000 €, signé le 15 janvier 2026" | L'agent confirme puis appelle `createCompany` (si absente) + `createDeal` ; le deal apparaît dans `/participations` (scope Albo + Consolidé, pas Calte) |
+| C4 | "crée un deal Albo Club dans Sezame, share, 50 000 €, signé le 15 janvier 2026" | L'agent annonce l'action puis appelle `createCompany` (si absente) + `createDeal` ; chaque écriture affiche un bloc « Confirmation requise » avec boutons **Confirmer/Refuser** (pas de confirmation textuelle) ; Confirmer → l'outil s'exécute, le deal apparaît dans `/participations` (scope Albo + Consolidé, pas Calte) |
 | C5 | Demander un deal avec un investisseur portfolio (non groupe) | Refusé (`investor_must_be_group_entity`) — l'agent explique qu'il faut une entité du groupe |
 | C6 | Spammer 30 messages en 1 min                            | Rate-limit `chatSend` se déclenche                                |
 | C7 | Depuis `/app/beta`, vérifier que les threads d'Acme ne sont PAS listés | Isolation org confirmée (scope `${orgId}:${userId}`) |
@@ -238,12 +238,15 @@ l'assistant (outils `setDealProjections` / `createKpiSnapshot`).
 | C15 | Demander une liste/tableau                              | Rendu markdown propre (listes, tableaux scrollables) pendant le stream — rendu streamdown ; si tout sort sans styles, vérifier le `@source` streamdown dans `app.css` |
 | C16 | Stop pendant un long stream                             | Le bouton d'envoi devient stop (icône carré) pendant le stream ; clic → le texte s'arrête, pas d'erreur console ; bouton copier sur les réponses ; remonter l'historique pendant un stream → le défilement se libère + bouton « aller en bas » |
 | C17 | `/app/all`, `/app/me`, `/app/admin`                     | Aucun panneau AI (scope org uniquement), zéro régression visuelle  |
-| C18 | "liste mes transactions non pointées" puis "suggère des rattachements" | `listUnmatchedTransactions` puis `suggestMatches` appelés ; candidats présentés avec leur évidence ; l'agent ATTEND la confirmation |
-| C19 | Confirmer un rattachement suggéré                       | `matchTransactionToDeal` appelé ; la tx disparaît de l'onglet Pointage ; `matchingDecisions` a une ligne `source: 'agent_suggested'` (dashboard Convex) |
-| C20 | "crée une règle de loyer 1 500 €/mois le 5" puis "projette mon cash sur 12 mois" | `createForecastRule` (après confirmation) → l'agent propose `expandForecastRules` → `getForecastBalance` rend les mois ; cohérent avec la mutation publique |
-| C21 | "ajoute une valo de 1,2 M€ au deal X au 31/12" + "liste le passif" | `createValuation` (après confirmation) visible en base ; `listLiabilities` rend positions + C/C avec soldes dérivés |
+| C18 | "liste mes transactions non pointées" puis "suggère des rattachements" | `listUnmatchedTransactions` puis `suggestMatches` appelés ; candidat unique évident → l'agent appelle directement l'outil de match (boutons d'approbation) ; plusieurs candidats plausibles → l'agent demande de choisir d'abord |
+| C19 | Approuver un rattachement suggéré (bouton Confirmer)    | `matchTransactionToDeal` exécuté ; la tx disparaît de l'onglet Pointage ; `matchingDecisions` a une ligne `source: 'agent_suggested'` (dashboard Convex) |
+| C20 | "crée une règle de loyer 1 500 €/mois le 5" puis "projette mon cash sur 12 mois" | `createForecastRule` (via boutons d'approbation) → l'agent propose `expandForecastRules` (approbation aussi) → `getForecastBalance` rend les mois ; cohérent avec la mutation publique |
+| C21 | "ajoute une valo de 1,2 M€ au deal X au 31/12" + "liste le passif" | `createValuation` (via boutons d'approbation) visible en base ; `listLiabilities` rend positions + C/C avec soldes dérivés |
 | C22 | "combien a-t-on payé à <fournisseur> au total ?"        | `searchTransactions` appelé (tous statuts, pas seulement la file) ; l'agent répond avec les totaux pré-agrégés retournés (`totalOutCents`, TVA incluse si lignes qualifiées) sans additionner les lignes lui-même ; cohérent avec l'onglet Charges filtré sur le même terme |
-| C23 | Nouvelle conversation (état vide) + ⌘J/Ctrl+J          | Suggestions cliquables (position de cash, passif, projection, valos) → envoi direct ; ⌘J/Ctrl+J toggle le panneau et focus le composer à l'ouverture ; un appel d'outil s'affiche en bloc dépliable (statut + paramètres + résultat), labels fr/en |
+| C23 | Nouvelle conversation (état vide) + ⌘J/Ctrl+J          | Suggestions cliquables **contextuelles à la route** (défaut : cash/passif/projection/valos ; pointage, cash, passif, participations ont leurs variantes) → envoi direct ; ⌘J/Ctrl+J toggle le panneau et focus le composer à l'ouverture ; un appel d'outil s'affiche en bloc dépliable (statut + paramètres + résultat), labels fr/en |
+| C24 | Refuser une écriture (bouton Refuser)                   | L'outil passe en « Refusé » (badge orange, état `output-denied`), rien n'est écrit en base ; l'agent reprend la parole, accuse réception et demande quoi ajuster |
+| C25 | Approbation en suspens + envoyer un autre message       | La demande en attente est auto-refusée (badge « Action refusée ») — un « oui » ne peut pas s'appliquer à une question qui a changé |
+| C26 | Approbation en suspens + refresh de la page             | Le bloc « Confirmation requise » et ses boutons se réaffichent (état persisté côté Convex, pas dans l'état React) ; Confirmer après refresh fonctionne |
 
 ## Niveau 6 — Sécurité + déploiement (5 min)
 
