@@ -820,7 +820,9 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   pas le champ). Absence = logiquement `unmatched`, mais ces lignes sont
   **invisibles** de l'index `by_org_matchStatus` → la query `listUnmatched` ne
   les retourne pas tant que `transactions:backfillMatchStatus` n'a pas tourné
-  (one-shot par org, idempotent, cf. `TESTING.md`).
+  (one-shot idempotent, `'{}'` = toutes les orgs, cf. `TESTING.md`). L'import
+  CSV Mémo Bank a inséré sans `matchStatus` jusqu'au fix de juin 2026 — les
+  lignes albo importées avant nécessitent ce backfill.
 - **`matchingDecisions` est append-only.** Une ligne par action de pointage
   (y compris le dé-pointage, signal négatif pour l'agent). Jamais de patch ni
   de delete. Le backfill n'y écrit **rien** (pas une décision humaine — ne pas
@@ -944,8 +946,11 @@ search index `search_text` sur un champ **dérivé** `searchText`, pas sur
   `counterparty` : recalculer `searchText` dans le même patch.
 - **`searchText` est optionnel au schéma** (même pattern que `matchStatus`) :
   les lignes pré-existantes ne l'ont pas tant que
-  `transactions:backfillSearchText` (one-shot par org, idempotent) n'a pas
-  tourné en prod.
+  `transactions:backfillSearchText` (one-shot idempotent, `'{}'` = toutes les
+  orgs) n'a pas tourné en prod. Symptôme typique : transaction visible dans
+  les listes mais introuvable par la recherche, côté UI **et** outils agent
+  (même index). Concerne toute ligne écrite avant le déploiement du champ
+  (02/06/2026) — ex. sync Powens depuis le 31/05, import CSV Mémo albo.
 - **`normalizeSearch` existe en double** : `convex/lib/searchText.ts` (queries
   - mutations) et `src/lib/searchText.ts` (filtre client participations,
     normalisation de la saisie). convex/ et src/ ne partagent pas de modules

@@ -19,6 +19,7 @@ pnpm exec convex export --prod   # snapshot de secours
 | Import Airtable → Convex | `convex/airtableImport.ts` → `airtableImport:runImport` | Idempotent via `airtableId`. Vérifs : `verify`, `duplicateReport`, `reconcileOrphans`, `cleanupTestData`. Runbook en tête du fichier. |
 | Purge table legacy `forecasts` | `convex/seed.ts` → `seed:purgeLegacyForecasts` | Cf. chantier ci-dessous. |
 | Scénario de test passif | `convex/liabilities.ts` → `liabilities:seedTestScenario` / `cleanupTestScenario` | Données marquées `[TEST liabilities]`, purge idempotente. |
+| Backfills transactions (`matchStatus` / `allocation` / `searchText`) | `convex/transactions.ts` → `transactions:backfillMatchStatus` / `backfillAllocation` / `backfillSearchText` | Idempotents. `'{}'` = toutes les orgs (`backfillAllocation` reste par org). À relancer après tout import historique antérieur à ces champs — cf. `KNOWN_ISSUES.md` « Pointage » et « Recherche transactions ». |
 
 Les ponts Attio (`attioCompanyId` / `attioDealId`) et l'ingestion Powens sont
 des flux **continus**, pas des migrations — cf. `KNOWN_ISSUES.md`

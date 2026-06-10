@@ -16,7 +16,7 @@ bas de page.
 
 ---
 
-## v1.4.0 — 11/06/2026 à 01:05 — Toutes les listes paginées, entrée dans l'app plus directe
+## v1.4.0 — 11/06/2026 à 01:15 — Toutes les listes paginées, entrée dans l'app plus directe
 
 ### 📄 Des listes qui restent fluides partout
 
@@ -32,6 +32,26 @@ L'app vous amène désormais directement sur votre dernière organisation, en
 une seule étape : la redirection se décide immédiatement, avant même le
 chargement de vos données. Sur un nouvel appareil, l'app retrouve votre
 dernière organisation comme avant.
+
+---
+
+## v1.3.2 — 11/06/2026 à 01:10 — Nettoyage après la réindexation
+
+Retrait de l'étape technique ponctuelle qui a réindexé l'historique des
+transactions lors de la mise à jour précédente. Aucun changement visible
+dans l'app.
+
+---
+
+## v1.3.1 — 11/06/2026 à 00:50 — La recherche retrouve les transactions historiques
+
+Chercher « Antese » dans les transactions pouvait ne rien renvoyer alors que
+les lignes existaient bel et bien : les transactions importées avant
+l'arrivée de la recherche (historique Mémo Bank, premières synchros
+bancaires) n'étaient pas indexées — ni pour la barre de recherche, ni pour
+l'assistant. C'est corrigé : l'historique complet redevient cherchable, et
+les lignes de l'import Mémo Bank apparaissent désormais correctement dans la
+file de pointage.
 
 ---
 
