@@ -110,6 +110,7 @@
         "invalid_date_range": "La date de fin précède le début",
         "default": "Une erreur est survenue"
       }
-    }
+    },
+    "chartReal": "Solde réel"
   }
 }

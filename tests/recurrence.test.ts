@@ -13,6 +13,7 @@ import { describe, it } from 'node:test'
 import {
   addMonthsUtc,
   buildMonthlyBalance,
+  buildMonthlyHistory,
   entryUpsertAction,
   expandOccurrences,
   isoDay,
@@ -560,5 +561,86 @@ describe('buildMonthlyBalance — solde projeté mensuel', () => {
     })
     assert.equal(months[0].projectedBalanceCents, -12445)
     assert.ok(Number.isInteger(months[0].projectedBalanceCents))
+  })
+})
+
+describe('buildMonthlyHistory — solde réel reconstruit à rebours', () => {
+  const tx = (
+    y: number,
+    m: number,
+    d: number,
+    amountCents: number,
+    direction: 'in' | 'out',
+  ) => ({ transactionDate: utc(y, m, d), amountCents, direction })
+
+  it('le dernier point est le mois courant au solde courant', () => {
+    const points = buildMonthlyHistory({
+      transactions: [],
+      currentBalanceCents: 50000,
+      monthsBack: 3,
+      now: utc(2026, 6, 10),
+    })
+    assert.equal(points.length, 4)
+    assert.deepEqual(
+      points.map((p) => p.monthKey),
+      ['2026-03', '2026-04', '2026-05', '2026-06'],
+    )
+    assert.equal(points.at(-1)?.balanceCents, 50000)
+  })
+
+  it('retire le net de chaque mois en remontant le temps', () => {
+    // Mai : +1000 ; juin (avant now) : −300. Solde courant 50 000.
+    const points = buildMonthlyHistory({
+      transactions: [
+        tx(2026, 5, 15, 1000, 'in'),
+        tx(2026, 6, 5, 300, 'out'),
+      ],
+      currentBalanceCents: 50000,
+      monthsBack: 2,
+      now: utc(2026, 6, 10),
+    })
+    // Fin juin (now) = 50 000 ; fin mai = 50 000 + 300 = 50 300 ;
+    // fin avril = 50 300 − 1 000 = 49 300.
+    assert.deepEqual(
+      points.map((p) => [p.monthKey, p.balanceCents]),
+      [
+        ['2026-04', 49300],
+        ['2026-05', 50300],
+        ['2026-06', 50000],
+      ],
+    )
+  })
+
+  it('ignore les transactions hors fenêtre ou futures', () => {
+    const points = buildMonthlyHistory({
+      transactions: [
+        tx(2025, 1, 1, 999999, 'in'), // trop ancienne
+        tx(2026, 6, 20, 999999, 'out'), // postérieure à now
+        tx(2026, 5, 2, 100, 'in'),
+      ],
+      currentBalanceCents: 1000,
+      monthsBack: 1,
+      now: utc(2026, 6, 10),
+    })
+    assert.deepEqual(
+      points.map((p) => [p.monthKey, p.balanceCents]),
+      [
+        ['2026-05', 1000],
+        ['2026-06', 1000],
+      ],
+    )
+  })
+
+  it('les mois sans transaction gardent un solde plat', () => {
+    const points = buildMonthlyHistory({
+      transactions: [tx(2026, 3, 1, 500, 'out')],
+      currentBalanceCents: 0,
+      monthsBack: 4,
+      now: utc(2026, 6, 10),
+    })
+    assert.deepEqual(
+      points.map((p) => p.balanceCents),
+      [500, 0, 0, 0, 0],
+    )
   })
 })

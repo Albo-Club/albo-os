@@ -110,6 +110,7 @@
         "invalid_date_range": "End date is before start date",
         "default": "Something went wrong"
       }
-    }
+    },
+    "chartReal": "Actual balance"
   }
 }

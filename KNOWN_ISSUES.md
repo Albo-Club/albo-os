@@ -879,8 +879,8 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
 - **La table legacy `forecasts` coexiste, inerte.** Elle reste alimentée par
   l'import Airtable uniquement et n'est lue par aucune logique forecast. La
   nouvelle couche vit dans `forecastRules` / `forecastEntries`. Ne pas
-  mélanger les deux ; la migration/suppression de `forecasts` est un chantier
-  séparé (purge prod requise avant retrait du schéma).
+  mélanger les deux ; le retrait suit le runbook `MIGRATIONS.md` (purge prod
+  via `seed:purgeLegacyForecasts` AVANT retrait du schéma).
 - **EUR only.** `getForecastBalance` n'agrège que `currency === 'EUR'`
   (comptes ET entries) ; le reste est compté dans `ignoredNonEur*` pour
   visibilité. `probabilityPct`, `counterpartyOrgId` et `currency` sont des

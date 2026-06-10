@@ -5,6 +5,10 @@ import { useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '../../../../convex/_generated/api'
+import type {
+  EquityPositionRow,
+  LoanRow,
+} from '~/components/passif/PassifTables'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { Button } from '~/components/ui/button'
@@ -29,6 +33,8 @@ function Passif() {
   const { t } = useTranslation('passif')
   const { orgSlug } = Route.useParams()
   const [openDialog, setOpenDialog] = useState<'equity' | 'loan' | null>(null)
+  const [editEquity, setEditEquity] = useState<EquityPositionRow | null>(null)
+  const [editLoan, setEditLoan] = useState<LoanRow | null>(null)
 
   const org = useConvexQuery(api.organizations.bySlug, { slug: orgSlug })
   const liabilities = useConvexQuery(
@@ -63,7 +69,10 @@ function Passif() {
             {t('create.equity.button')}
           </Button>
         </div>
-        <EquityTable positions={liabilities?.equityPositions} />
+        <EquityTable
+          positions={liabilities?.equityPositions}
+          onEdit={setEditEquity}
+        />
       </section>
 
       <section className="space-y-3">
@@ -79,7 +88,7 @@ function Passif() {
             {t('create.loan.button')}
           </Button>
         </div>
-        <LoansTable loans={liabilities?.loans} />
+        <LoansTable loans={liabilities?.loans} onEdit={setEditLoan} />
       </section>
 
       {org && orgs && openDialog === 'equity' && (
@@ -94,6 +103,22 @@ function Passif() {
           orgId={org._id}
           orgs={orgs}
           onClose={() => setOpenDialog(null)}
+        />
+      )}
+      {org && orgs && editEquity && (
+        <CreateEquityDialog
+          orgId={org._id}
+          orgs={orgs}
+          position={editEquity}
+          onClose={() => setEditEquity(null)}
+        />
+      )}
+      {org && orgs && editLoan && (
+        <CreateLoanDialog
+          orgId={org._id}
+          orgs={orgs}
+          loan={editLoan}
+          onClose={() => setEditLoan(null)}
         />
       )}
     </main>

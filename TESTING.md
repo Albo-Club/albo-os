@@ -26,7 +26,7 @@ Pré-requis :
 | B4 | Smoke E2E     | `pnpm test:smoke`        | Tous les scénarios passent    |
 | B5 | Cookies prod  | `pnpm test:cookies`      | `albo-os.session_token` a Secure+HttpOnly+SameSite=Lax+Max-Age≈604800 |
 | B6 | Skills à jour | `pnpm sync:skills:check` | `0 skills drifted`            |
-| B7 | Tests unitaires | `pnpm test:unit`       | 28 tests verts (logique forecast pure : récurrence, protection overridden, solde mensuel) |
+| B7 | Tests unitaires | `pnpm test:unit`       | 64 tests verts (logique pure : récurrence/solde forecast + historique cash, ranking suggestions, instructions agent, passif, séries BP, CSV) |
 
 ## Niveau 2 — Auth (6 min)
 
@@ -146,7 +146,7 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | --- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
 | DB1 | `/app/<org>` (entrée « Dashboard » de la sidebar, plus de badge Soon) | 6 KPI cards réels (cf. SH5), répartition « Déployé par instrument » (barres), « Activité récente » (5 dernières tx, montants signés, deal en sous-libellé) + lien vers la trésorerie |
 | DB2 | Org vide (aucun deal/tx)                                            | Cards à 0/—, états vides propres sur répartition et activité                      |
-| FC1 | `/app/<org>/cash` : section « Prévisionnel de trésorerie »          | Courbe du solde projeté (area), solde de départ = Σ soldes réels EUR ; sélecteur d'horizon 6/12/24 mois |
+| FC1 | `/app/<org>/cash` : section « Prévisionnel de trésorerie »          | Courbe **réel + projeté** : solde réel des 6 derniers mois (trait plein, reconstruit à rebours depuis le solde courant) puis solde projeté (pointillé) ; jonction au mois courant au solde courant ; légende « Solde réel / Solde projeté » ; sélecteur d'horizon 6/12/24 mois |
 | FC2 | « Ajouter une règle » : loyer 1 500 €, sortie, mensuelle, jour 5     | Règle listée ; projection recalculée immédiatement (expandRules auto post-save) ; la courbe baisse de 1 500 €/mois |
 | FC3 | Éditer la règle (montant, fréquence, désactivation via checkbox)     | Projection resynchronisée ; règle inactive = badge « Inactive », ses occurrences vierges restent mais ne se régénèrent plus |
 | FC4 | Supprimer la règle (confirm)                                        | Occurrences pending non éditées retirées (réalisées/overridden conservées), courbe revient à plat |
@@ -384,6 +384,9 @@ depuis la liste des transactions du deal (clic ligne → sheet → combobox).
 | RD5 | En-tête du deal : « Versé » / « Reçu » (calculés, pas saisis)     | « Versé » = somme des transactions `out` rattachées, « Reçu » = somme des `in` ; après RD2 les montants des deals A et B se mettent à jour sans recharger ; deal sans transaction → 0 € / 0 € |
 | RD6 | Liste des deals (`/app/$orgSlug/participations`, `/app/all/participations`, fiche participation) : colonnes/champs Engagé · Versé · Reçu | Versé/Reçu calculés serveur (`deals.list` / `aggregate.listDeals` enrichis, pas une query `listByDeal` par ligne) ; valeurs identiques à la page détail du même deal ; deal sans transaction → 0 € / 0 € ; lignes groupe (par société) = sommes des deals |
 | RD7 | Barre de recherche des participations (`/app/$orgSlug/participations` et `/app/all/participations`) : taper un nom de société, un nom personnalisé de deal, un instrument (libellé FR/EN ou clé brute `os`), un investisseur, un secteur — avec/sans accents | Filtrage **client** (debounce ~250 ms, insensible casse/accents) ; regroupements et totaux par société recalculés sur le sous-ensemble ; terme sans résultat → « Aucune participation ne correspond… » ; effacer → liste complète |
+| RD8 | Colonne TVPI (table participations, lignes groupe + deals dépliés) | TVPI = (Reçu + valeur résiduelle) / Versé ; résiduel = dernière valo du deal, fallback coût (convention dashboard), 0 si sorti/passé en perte ; « — » si rien de versé |
+| RD9 | Clic sur les entêtes Société / Engagé / Versé / Reçu / TVPI       | Tri client asc ⇄ desc (icône flèche sur la colonne active) ; TVPI absents en fin de liste ; le dépliage des groupes reste fonctionnel |
+| RD10 | Bouton « Exporter CSV » (à droite de la recherche)               | Télécharge `participations-YYYY-MM-DD.csv` : deals **filtrés** à plat, séparateur `;` + BOM UTF-8 (Excel FR), montants en euros décimaux, entêtes i18n |
 
 ### Édition de champs (deal / entité / compte bancaire)
 
@@ -482,6 +485,8 @@ sidebar « Passif » dans le groupe Plateforme.
 | PU7 | **Scénario 100 % UI (CALTE → Albo)** : (1) page Passif Albo → « + Capital » (détenteur CALTE) ; (2) onglet Pointage Albo → virement reçu de CALTE → combobox → groupe Capitaux propres → la position créée → « Rattacher » ; (3) retour page Passif Albo | (2) la tx sort de la file de pointage ; (3) elle apparaît en sous-ligne de la position. Idem pour un C/C : le solde passe à ±montant de chaque côté une fois chaque jambe pointée |
 | PU8 | Dialog C/C : choisir la même org en créancier et débiteur        | Bouton « Créer » désactivé + message « …deux organisations différentes »          |
 | PU9 | Basculer la langue EN/FR                                         | Page + dialogs entièrement traduits (titres, colonnes, badges, boutons, états vides) |
+| PU10 | Crayon sur une ligne (position de capital / C/C)                | Dialog pré-rempli ; equity : tous les champs éditables (`updateEquityPosition`) ; C/C : créancier/débiteur **grisés**, seuls date/taux/blocage éditables (`updateIntercompanyLoan`) ; toast succès + table réactive |
+| PU11 | Corbeille sur une ligne                                         | Confirm ; cible **sans** tx pointées → supprimée ; **avec** tx pointées → `ConvexError('has_allocations')`, toast « Détachez-les d'abord », rien supprimé |
 
 ## En cas d'échec
 

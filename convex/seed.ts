@@ -374,3 +374,21 @@ export const cleanupLegacy = internalMutation({
     return { deleted: true, orgId, rowsDeleted: n }
   },
 })
+
+/**
+ * Purge la table legacy `forecasts` (alimentée par l'import Airtable, lue par
+ * rien — le prévisionnel vit dans forecastRules/forecastEntries). Préalable
+ * au retrait de la table du schéma : runbook dans MIGRATIONS.md.
+ *
+ *   npx convex run --prod seed:purgeLegacyForecasts
+ */
+export const purgeLegacyForecasts = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query('forecasts').collect()
+    for (const r of rows) {
+      await ctx.db.delete('forecasts', r._id)
+    }
+    return { rowsDeleted: rows.length }
+  },
+})

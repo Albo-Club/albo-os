@@ -7,7 +7,7 @@
  */
 
 import { query } from './_generated/server'
-import { transactionTotals } from './deals'
+import { lastValuationCents, transactionTotals } from './deals'
 import { requireAppUser } from './lib/auth'
 import type { GenericQueryCtx } from 'convex/server'
 import type { DataModel, Doc } from './_generated/dataModel'
@@ -43,6 +43,7 @@ async function enrich(
     spv: companyRef(spv),
     // Versé / Reçu calculés depuis les transactions (cf. deals.transactionTotals)
     ...(await transactionTotals(ctx, deal._id)),
+    lastValuationCents: await lastValuationCents(ctx, deal._id),
   }
 }
 

@@ -276,6 +276,166 @@ export const createIntercompanyLoan = mutation({
   },
 })
 
+// ─── Édition / suppression (equity / C/C) ────────────────────────────────────
+//
+// La suppression est refusée tant que des transactions sont pointées sur la
+// cible (`has_allocations`) : détacher d'abord, supprimer ensuite. Jamais de
+// détachement implicite — le pointage est une décision utilisateur.
+
+/**
+ * Vrai si au moins une transaction d'une des orgs passées est pointée sur la
+ * cible (equity ou C/C). Lecture bornée : `.first()` par org sur l'index
+ * `by_org_allocation_target`.
+ */
+async function hasAllocations(
+  ctx: QueryCtx,
+  orgIds: Array<Id<'organizations'>>,
+  targetId: string,
+) {
+  for (const orgId of orgIds) {
+    const tx = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_allocation_target', (q) =>
+        q.eq('orgId', orgId).eq('allocation.targetId', targetId),
+      )
+      .first()
+    if (tx) return true
+  }
+  return false
+}
+
+/**
+ * Vérifie que l'utilisateur est membre d'au moins une des deux parties d'un
+ * C/C (même règle que createIntercompanyLoan).
+ */
+async function requireLoanParty(ctx: QueryCtx, loan: Doc<'intercompanyLoans'>) {
+  const user = await requireAppUser(ctx)
+  const memberships = await Promise.all(
+    [loan.fromOrgId, loan.toOrgId].map((orgId) =>
+      ctx.db
+        .query('organizationMembers')
+        .withIndex('by_org_and_user', (q) =>
+          q.eq('orgId', orgId).eq('userId', user._id),
+        )
+        .unique(),
+    ),
+  )
+  if (!memberships.some((member) => member !== null)) {
+    throw new ConvexError('not_a_party')
+  }
+}
+
+/**
+ * Met à jour une position de capital (remplacement complet des champs
+ * éditables — le dialog est pré-rempli avec les valeurs courantes).
+ * Mêmes règles de validation que createEquityPosition.
+ */
+export const updateEquityPosition = mutation({
+  args: {
+    positionId: v.id('equityPositions'),
+    holderOrgId: v.optional(v.id('organizations')),
+    holderLabel: v.optional(v.string()),
+    type: equityPositionType,
+    amountCents: v.number(),
+    shares: v.optional(v.number()),
+    effectiveDate: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const position = await ctx.db.get('equityPositions', args.positionId)
+    if (!position) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, position.orgId)
+
+    if (args.amountCents <= 0) throw new ConvexError('invalid_amount')
+    if (args.holderOrgId && args.holderLabel) {
+      throw new ConvexError('ambiguous_holder')
+    }
+    if (args.holderOrgId) {
+      const holderOrg = await ctx.db.get('organizations', args.holderOrgId)
+      if (!holderOrg) throw new ConvexError('not_found')
+    }
+
+    // `undefined` retire le champ (patch Convex) — un détenteur effacé
+    // redevient « aucun ».
+    await ctx.db.patch('equityPositions', position._id, {
+      holderOrgId: args.holderOrgId,
+      holderLabel: args.holderLabel?.trim() || undefined,
+      type: args.type,
+      amountCents: args.amountCents,
+      shares: args.shares,
+      effectiveDate: args.effectiveDate,
+    })
+    return null
+  },
+})
+
+/**
+ * Supprime une position de capital. Refusé (`has_allocations`) si des
+ * transactions sont encore pointées dessus.
+ */
+export const deleteEquityPosition = mutation({
+  args: { positionId: v.id('equityPositions') },
+  handler: async (ctx, { positionId }) => {
+    const position = await ctx.db.get('equityPositions', positionId)
+    if (!position) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, position.orgId)
+
+    if (await hasAllocations(ctx, [position.orgId], position._id)) {
+      throw new ConvexError('has_allocations')
+    }
+    await ctx.db.delete('equityPositions', positionId)
+    return null
+  },
+})
+
+/**
+ * Met à jour un C/C (taux, blocage, date d'ouverture). Les parties
+ * créancier/débiteur ne sont PAS éditables : changer de contrepartie =
+ * supprimer puis recréer (le solde dérivé dépend de l'identité du prêt).
+ */
+export const updateIntercompanyLoan = mutation({
+  args: {
+    loanId: v.id('intercompanyLoans'),
+    interestRateBps: v.optional(v.number()),
+    isBlocked: v.boolean(),
+    openedDate: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const loan = await ctx.db.get('intercompanyLoans', args.loanId)
+    if (!loan) throw new ConvexError('not_found')
+    await requireLoanParty(ctx, loan)
+
+    if (args.interestRateBps != null && args.interestRateBps < 0) {
+      throw new ConvexError('invalid_rate')
+    }
+    await ctx.db.patch('intercompanyLoans', loan._id, {
+      interestRateBps: args.interestRateBps,
+      isBlocked: args.isBlocked,
+      openedDate: args.openedDate,
+    })
+    return null
+  },
+})
+
+/**
+ * Supprime un C/C. Refusé (`has_allocations`) si des transactions d'UNE DES
+ * DEUX orgs sont encore pointées dessus (le solde de chaque partie dérive de
+ * ses propres transactions).
+ */
+export const deleteIntercompanyLoan = mutation({
+  args: { loanId: v.id('intercompanyLoans') },
+  handler: async (ctx, { loanId }) => {
+    const loan = await ctx.db.get('intercompanyLoans', loanId)
+    if (!loan) throw new ConvexError('not_found')
+    await requireLoanParty(ctx, loan)
+
+    if (await hasAllocations(ctx, [loan.fromOrgId, loan.toOrgId], loan._id)) {
+      throw new ConvexError('has_allocations')
+    }
+    await ctx.db.delete('intercompanyLoans', loanId)
+    return null
+  },
+})
+
 // ─── Scénario de vérification manuelle (dev) ────────────────────────────────
 //
 // Cf. TESTING.md « Passif ». Données marquées TEST_MARKER pour pouvoir les

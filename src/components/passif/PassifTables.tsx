@@ -1,6 +1,8 @@
 import { Fragment, useState } from 'react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { useConvexMutation } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 
 import type { Id } from '../../../convex/_generated/dataModel'
@@ -10,6 +12,13 @@ import {
 } from '~/components/pointage/TransactionSheet'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
 import {
   Table,
   TableBody,
@@ -41,6 +50,9 @@ export type EquityPositionRow = {
     | 'report_a_nouveau'
   amountCents: number
   effectiveDate: number
+  holderOrgId?: Id<'organizations'>
+  holderLabel?: string
+  shares?: number
   holderName: string | null
   transactions: Array<AllocatedTx>
 }
@@ -48,6 +60,11 @@ export type EquityPositionRow = {
 /** C/C inter-entités enrichi (contrepartie résolue + solde + tx pointées). */
 export type LoanRow = {
   _id: Id<'intercompanyLoans'>
+  fromOrgId: Id<'organizations'>
+  toOrgId: Id<'organizations'>
+  interestRateBps?: number
+  isBlocked: boolean
+  openedDate: number
   side: 'creditor' | 'debtor'
   balanceCents: number
   counterpartyName: string | null
@@ -79,6 +96,79 @@ function usePassifFormatters() {
 /** Créance (solde ≥ 0) en vert, dette (solde < 0) en rouge. */
 const balanceTone = (cents: number) =>
   cents >= 0 ? 'text-emerald-600' : 'text-destructive'
+
+// ─── Actions de ligne (éditer / supprimer) ──────────────────────────────────
+
+/** Boutons éditer + supprimer d'une ligne passif (icônes fantômes). */
+function RowActions({
+  onEdit,
+  onDelete,
+}: {
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  const { t } = useTranslation('common')
+  return (
+    <div className="flex justify-end gap-1">
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-7"
+        onClick={onEdit}
+        aria-label={t('actions.edit')}
+        title={t('actions.edit')}
+      >
+        <Pencil className="size-4" />
+      </Button>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="text-destructive size-7"
+        onClick={onDelete}
+        aria-label={t('actions.delete')}
+        title={t('actions.delete')}
+      >
+        <Trash2 className="size-4" />
+      </Button>
+    </div>
+  )
+}
+
+/**
+ * Dialog de confirmation de suppression d'une cible passif. Le serveur
+ * refuse (`has_allocations`) tant que des transactions sont pointées dessus.
+ */
+function DeleteConfirmDialog({
+  open,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const { t } = useTranslation(['passif', 'common'])
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{t('passif:delete.confirmTitle')}</DialogTitle>
+        </DialogHeader>
+        <p className="text-muted-foreground text-sm">
+          {t('passif:delete.confirmBody')}
+        </p>
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel}>
+            {t('common:actions.cancel')}
+          </Button>
+          <Button variant="destructive" onClick={onConfirm}>
+            {t('common:actions.delete')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 // ─── Sous-lignes des transactions pointées (+ Détacher) ─────────────────────
 
@@ -156,12 +246,31 @@ function AllocatedTxRows({
  */
 export function EquityTable({
   positions,
+  onEdit,
 }: {
   positions: Array<EquityPositionRow> | undefined
+  onEdit: (position: EquityPositionRow) => void
 }) {
   const { t } = useTranslation('passif')
   const { fmtDate } = useFormatters()
   const { fmtEur } = usePassifFormatters()
+  const reportError = useReportError('passif')
+  const deleteEquityPosition = useConvexMutation(
+    api.liabilities.deleteEquityPosition,
+  )
+  const [deleteId, setDeleteId] = useState<Id<'equityPositions'> | null>(null)
+
+  async function handleDelete() {
+    if (!deleteId) return
+    try {
+      await deleteEquityPosition({ positionId: deleteId })
+      toast.success(t('delete.success'))
+    } catch (err) {
+      reportError(err)
+    } finally {
+      setDeleteId(null)
+    }
+  }
 
   if (positions && positions.length === 0) {
     return (
@@ -213,7 +322,12 @@ export function EquityTable({
                     <TableCell className="text-right tabular-nums">
                       {fmtEur(position.amountCents)}
                     </TableCell>
-                    <TableCell />
+                    <TableCell>
+                      <RowActions
+                        onEdit={() => onEdit(position)}
+                        onDelete={() => setDeleteId(position._id)}
+                      />
+                    </TableCell>
                   </TableRow>
                   <AllocatedTxRows
                     transactions={position.transactions}
@@ -232,6 +346,11 @@ export function EquityTable({
           )}
         </TableBody>
       </Table>
+      <DeleteConfirmDialog
+        open={deleteId !== null}
+        onCancel={() => setDeleteId(null)}
+        onConfirm={() => void handleDelete()}
+      />
     </div>
   )
 }
@@ -243,9 +362,32 @@ export function EquityTable({
  * selon `side`) et solde dérivé signé (vert = créance, rouge = dette). Les
  * transactions pointées apparaissent en sous-lignes avec « Détacher ».
  */
-export function LoansTable({ loans }: { loans: Array<LoanRow> | undefined }) {
+export function LoansTable({
+  loans,
+  onEdit,
+}: {
+  loans: Array<LoanRow> | undefined
+  onEdit: (loan: LoanRow) => void
+}) {
   const { t } = useTranslation('passif')
   const { fmtBalance } = usePassifFormatters()
+  const reportError = useReportError('passif')
+  const deleteIntercompanyLoan = useConvexMutation(
+    api.liabilities.deleteIntercompanyLoan,
+  )
+  const [deleteId, setDeleteId] = useState<Id<'intercompanyLoans'> | null>(null)
+
+  async function handleDelete() {
+    if (!deleteId) return
+    try {
+      await deleteIntercompanyLoan({ loanId: deleteId })
+      toast.success(t('delete.success'))
+    } catch (err) {
+      reportError(err)
+    } finally {
+      setDeleteId(null)
+    }
+  }
 
   if (loans && loans.length === 0) {
     return (
@@ -297,7 +439,12 @@ export function LoansTable({ loans }: { loans: Array<LoanRow> | undefined }) {
                   >
                     {fmtBalance(loan.balanceCents)}
                   </TableCell>
-                  <TableCell />
+                  <TableCell>
+                    <RowActions
+                      onEdit={() => onEdit(loan)}
+                      onDelete={() => setDeleteId(loan._id)}
+                    />
+                  </TableCell>
                 </TableRow>
                 <AllocatedTxRows transactions={loan.transactions} colSpan={3} />
               </Fragment>
@@ -305,6 +452,11 @@ export function LoansTable({ loans }: { loans: Array<LoanRow> | undefined }) {
           )}
         </TableBody>
       </Table>
+      <DeleteConfirmDialog
+        open={deleteId !== null}
+        onCancel={() => setDeleteId(null)}
+        onConfirm={() => void handleDelete()}
+      />
     </div>
   )
 }
