@@ -169,6 +169,40 @@ export const sendMessage = mutation({
   },
 })
 
+/**
+ * Réponse de l'utilisateur à une demande d'approbation d'outil (boutons
+ * Confirmer / Refuser du panneau). Enregistre la décision puis relance la
+ * génération à partir du message d'approbation — le SDK exécute l'outil
+ * (approuvé) ou produit un résultat « execution-denied » (refusé).
+ */
+export const respondToToolApproval = mutation({
+  args: {
+    orgId: v.id('organizations'),
+    threadId: v.string(),
+    approvalId: v.string(),
+    approved: v.boolean(),
+    context: v.optional(v.object({ route: v.string() })),
+  },
+  handler: async (ctx, { orgId, threadId, approvalId, approved, context }) => {
+    const { user } = await requireOrgMember(ctx, orgId)
+    // La reprise déclenche une génération LLM : même budget que sendMessage.
+    await consumeLimit(ctx, 'chatSend', user._id)
+    const scope = scopeKey(orgId, user._id)
+    await authorizeThread(ctx, threadId, scope)
+    const org = await ctx.db.get('organizations', orgId)
+    const { messageId } = approved
+      ? await chatAgent.approveToolCall(ctx, { threadId, approvalId })
+      : await chatAgent.denyToolCall(ctx, { threadId, approvalId })
+    await ctx.scheduler.runAfter(0, internal.chat.streamAsync, {
+      threadId,
+      promptMessageId: messageId,
+      route: context?.route.slice(0, ROUTE_CONTEXT_MAX),
+      orgName: org?.name,
+    })
+    return { messageId }
+  },
+})
+
 export const renameThread = mutation({
   args: {
     orgId: v.id('organizations'),

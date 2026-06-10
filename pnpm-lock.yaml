@@ -18,8 +18,8 @@ importers:
         specifier: ^3.0.76
         version: 3.0.76(zod@4.4.3)
       '@convex-dev/agent':
-        specifier: ^0.6.1
-        version: 0.6.1(@ai-sdk/provider-utils@4.0.27(zod@4.4.3))(ai@6.0.177(zod@4.4.3))(convex-helpers@0.1.116(@standard-schema/spec@1.1.0)(convex@1.38.0(react@19.2.6))(react@19.2.6)(typescript@6.0.3)(zod@4.4.3))(convex@1.38.0(react@19.2.6))(react@19.2.6)
+        specifier: ^0.6.3
+        version: 0.6.3(@ai-sdk/provider-utils@4.0.27(zod@4.4.3))(ai@6.0.177(zod@4.4.3))(convex-helpers@0.1.116(@standard-schema/spec@1.1.0)(convex@1.38.0(react@19.2.6))(react@19.2.6)(typescript@6.0.3)(zod@4.4.3))(convex@1.38.0(react@19.2.6))(react@19.2.6)
       '@convex-dev/better-auth':
         specifier: ^0.12.2
         version: 0.12.2(@standard-schema/spec@1.1.0)(better-auth@1.6.10(@opentelemetry/api@1.9.0)(@tanstack/react-start@1.167.65(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(vite@8.0.12(@types/node@25.7.0)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0)))(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(convex@1.38.0(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
@@ -423,8 +423,8 @@ packages:
   '@chevrotain/types@11.1.2':
     resolution: {integrity: sha512-U+HFai5+zmJCkK86QsaJtoITlboZHBqrVketcO2ROv865xfCMSFpELQoz1GkX5GzME8pTa+3kbKrZHQtI0gdbw==}
 
-  '@convex-dev/agent@0.6.1':
-    resolution: {integrity: sha512-FTHF2r6yuY3Lr/zYu9fBMimg30xVXlGkA+9hU12FH1SUoXtrPWCwU3zUYsCKhkH/5sPpWGyO9JMMuXHrP13DQg==}
+  '@convex-dev/agent@0.6.3':
+    resolution: {integrity: sha512-+SA2ynYHdC4hrY/fImljmDdS1+U9xfZcCpezUg1F8GQ433hHNUQCwbtLt3ZQcK1HqzkSM9RaufB3LICuV6pPSQ==}
     peerDependencies:
       '@ai-sdk/provider-utils': ^4.0.6
       ai: ^6.0.35
@@ -4877,7 +4877,7 @@ snapshots:
 
   '@chevrotain/types@11.1.2': {}
 
-  '@convex-dev/agent@0.6.1(@ai-sdk/provider-utils@4.0.27(zod@4.4.3))(ai@6.0.177(zod@4.4.3))(convex-helpers@0.1.116(@standard-schema/spec@1.1.0)(convex@1.38.0(react@19.2.6))(react@19.2.6)(typescript@6.0.3)(zod@4.4.3))(convex@1.38.0(react@19.2.6))(react@19.2.6)':
+  '@convex-dev/agent@0.6.3(@ai-sdk/provider-utils@4.0.27(zod@4.4.3))(ai@6.0.177(zod@4.4.3))(convex-helpers@0.1.116(@standard-schema/spec@1.1.0)(convex@1.38.0(react@19.2.6))(react@19.2.6)(typescript@6.0.3)(zod@4.4.3))(convex@1.38.0(react@19.2.6))(react@19.2.6)':
     dependencies:
       '@ai-sdk/provider-utils': 4.0.27(zod@4.4.3)
       ai: 6.0.177(zod@4.4.3)
