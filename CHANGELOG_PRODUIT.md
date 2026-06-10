@@ -16,6 +16,14 @@ bas de page.
 
 ---
 
+## v1.3.2 — 11/06/2026 à 01:10 — Nettoyage après la réindexation
+
+Retrait de l'étape technique ponctuelle qui a réindexé l'historique des
+transactions lors de la mise à jour précédente. Aucun changement visible
+dans l'app.
+
+---
+
 ## v1.3.1 — 11/06/2026 à 00:50 — La recherche retrouve les transactions historiques
 
 Chercher « Antese » dans les transactions pouvait ne rien renvoyer alors que
