@@ -222,8 +222,8 @@ The shell guard in `package.json` → `build:vercel` requires **both**
 - **Why `VERCEL_ENV`, not `VERCEL=1`** : `CONVEX_DEPLOY_KEY` is a
   *production* key and, in practice, Vercel forwards it to **Preview**
   builds too (env-var scoping in the dashboard is not always honored).
-  A `VERCEL=1` guard therefore let preview/branch builds (PRs,
-  release-please) run `convex deploy` with a prod key from a non-prod
+  A `VERCEL=1` guard therefore let preview/branch builds (PRs) run
+  `convex deploy` with a prod key from a non-prod
   env → Convex aborts with *"non-production build environment and
   CONVEX_DEPLOY_KEY for a production deployment"* → build exits 1.
   Gating on `VERCEL_ENV = production` is what actually keeps previews

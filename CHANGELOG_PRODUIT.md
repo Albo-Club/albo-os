@@ -7,14 +7,19 @@
   noms de fonctions) — ce fichier est rendu tel quel dans l'app sur
   /app/$orgSlug/changelog (import ?raw).
 
-  Ne pas confondre avec CHANGELOG.md (généré automatiquement par
-  release-please à partir des commits — technique, versions indépendantes).
   Règle d'alimentation : CLAUDE.md § « Pre-PR doc audit » (question 5).
 -->
 
 Ce que chaque mise à jour change pour vous, en clair — du plus récent au
 plus ancien. Les termes financiers sont expliqués dans le petit lexique en
 bas de page.
+
+---
+
+## v1.0.3 — 10/06/2026 à 22:38 — Nettoyage de l'outillage interne
+
+Suppression d'un automatisme de publication qui n'avait jamais fonctionné.
+Aucun changement visible dans l'app.
 
 ---
 
