@@ -59,6 +59,12 @@
     "in": "Inflow",
     "out": "Outflow"
   },
+  "vat": {
+    "title": "Recoverable VAT",
+    "breakdown": "Deductible VAT (expenses) {{deductible}} − collected VAT (income) {{collected}}",
+    "unqualified_one": "{{count}} transaction to qualify in reconciliation",
+    "unqualified_other": "{{count}} transactions to qualify in reconciliation"
+  },
   "forecast": {
     "title": "Cash forecast",
     "horizonMonths_one": "{{count}} month",

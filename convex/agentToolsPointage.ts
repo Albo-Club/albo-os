@@ -27,6 +27,7 @@ import {
 } from './lib/pointage'
 import { rankCandidates } from './lib/suggest'
 import { normalizeSearch } from './lib/searchText'
+import { vatCentsFromTtc, vatRateBpsValidator } from './lib/vat'
 import type { Doc, Id } from './_generated/dataModel'
 import type { QueryCtx } from './_generated/server'
 import type { SimilarTarget } from './lib/suggest'
@@ -37,6 +38,9 @@ const SUGGEST_TX_MAX = 10
 const SUGGEST_TX_DEFAULT = 5
 const SIMILAR_PER_TX = 8
 const DECISIONS_SCAN = 200
+// Borne du scan de searchTransactions (totaux calculés sur cet ensemble),
+// alignée sur SEARCH_LIMIT des queries publiques (convex/transactions.ts).
+const SEARCH_SCAN = 200
 
 function toISODate(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10)
@@ -102,6 +106,126 @@ export const listUnmatchedInternal = internalQuery({
   },
 })
 
+/** Statuts de pointage filtrables par searchTransactions. */
+const matchStatusFilter = v.union(
+  v.literal('unmatched'),
+  v.literal('matched'),
+  v.literal('ignored'),
+  v.literal('charge'),
+  v.literal('tax'),
+  v.literal('product'),
+  v.literal('internal_transfer'),
+)
+
+/**
+ * Recherche exploratoire sur TOUTES les transactions de l'org (tous statuts),
+ * par libellé/contrepartie via le search index, avec totaux pré-agrégés pour
+ * que le LLM ne fasse jamais d'arithmétique. Scan borné à SEARCH_SCAN lignes
+ * (les totaux portent sur cet ensemble, `truncated` le signale) ; `rows` est
+ * borné à `limit` en plus.
+ */
+export const searchTransactionsInternal = internalQuery({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    search: v.optional(v.string()),
+    matchStatus: v.optional(matchStatusFilter),
+    direction: v.optional(v.union(v.literal('in'), v.literal('out'))),
+    limit: v.optional(v.number()),
+  },
+  handler: async (
+    ctx,
+    { orgId, actorUserId, search, matchStatus, direction, limit },
+  ) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const take = Math.min(
+      Math.max(limit ?? LIST_LIMIT_DEFAULT, 1),
+      LIST_LIMIT_MAX,
+    )
+
+    const term = search ? normalizeSearch(search) : ''
+    const scanned = term
+      ? await ctx.db
+          .query('transactions')
+          .withSearchIndex('search_text', (q) => {
+            const base = q.search('searchText', term).eq('orgId', orgId)
+            return matchStatus ? base.eq('matchStatus', matchStatus) : base
+          })
+          .take(SEARCH_SCAN)
+      : matchStatus
+        ? await ctx.db
+            .query('transactions')
+            .withIndex('by_org_matchStatus', (q) =>
+              q.eq('orgId', orgId).eq('matchStatus', matchStatus),
+            )
+            .order('desc')
+            .take(SEARCH_SCAN)
+        : await ctx.db
+            .query('transactions')
+            .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+            .order('desc')
+            .take(SEARCH_SCAN)
+
+    const filtered = direction
+      ? scanned.filter((tx) => tx.direction === direction)
+      : scanned
+
+    let totalInCents = 0
+    let totalOutCents = 0
+    let totalVatInCents = 0
+    let totalVatOutCents = 0
+    let vatUnqualifiedCount = 0
+    for (const tx of filtered) {
+      if (tx.direction === 'in') totalInCents += tx.amount
+      else totalOutCents += tx.amount
+      if (tx.matchStatus === 'charge' || tx.matchStatus === 'product') {
+        if (tx.vatRateBps == null) {
+          vatUnqualifiedCount += 1
+        } else {
+          const vat = vatCentsFromTtc(tx.amount, tx.vatRateBps)
+          if (tx.direction === 'in') totalVatInCents += vat
+          else totalVatOutCents += vat
+        }
+      }
+    }
+
+    const sorted = [...filtered].sort(
+      (a, b) => b.transactionDate - a.transactionDate,
+    )
+    const rows = await Promise.all(
+      sorted.slice(0, take).map(async (tx) => {
+        const account = await ctx.db.get('bankAccounts', tx.bankAccountId)
+        return {
+          _id: tx._id,
+          dateISO: toISODate(tx.transactionDate),
+          direction: tx.direction,
+          amountCents: tx.amount,
+          rawLabel: tx.rawLabel,
+          counterparty: tx.counterparty ?? null,
+          matchStatus: tx.matchStatus ?? null,
+          vatRateBps: tx.vatRateBps ?? null,
+          vatCents:
+            tx.vatRateBps != null
+              ? vatCentsFromTtc(tx.amount, tx.vatRateBps)
+              : null,
+          accountLabel: account?.label ?? null,
+        }
+      }),
+    )
+
+    return {
+      count: filtered.length,
+      totalInCents,
+      totalOutCents,
+      totalVatInCents,
+      totalVatOutCents,
+      vatUnqualifiedCount,
+      truncated: scanned.length === SEARCH_SCAN,
+      rows,
+    }
+  },
+})
+
 export const matchToDealInternal = internalMutation({
   args: {
     orgId: v.id('organizations'),
@@ -145,11 +269,22 @@ export const categorizeInternal = internalMutation({
       v.literal('product'),
       v.literal('internal_transfer'),
     ),
+    vatRateBps: v.optional(vatRateBpsValidator),
   },
-  handler: async (ctx, { orgId, actorUserId, transactionId, status }) => {
+  handler: async (
+    ctx,
+    { orgId, actorUserId, transactionId, status, vatRateBps },
+  ) => {
     await readMembership(ctx, orgId, actorUserId)
     const tx = await getOrgTransaction(ctx, orgId, transactionId)
-    await applyCategorization(ctx, tx, status, actorUserId, 'agent_suggested')
+    await applyCategorization(
+      ctx,
+      tx,
+      status,
+      actorUserId,
+      'agent_suggested',
+      vatRateBps,
+    )
     return { _id: transactionId, matchStatus: status }
   },
 })
@@ -350,6 +485,49 @@ const listUnmatchedTransactions = createTool({
   },
 })
 
+const searchTransactions = createTool({
+  description:
+    'Search bank transactions of the current org across ALL pointage ' +
+    'statuses (matched, charge, tax, product, unmatched…) by ' +
+    'label/counterparty — e.g. "how much did we pay supplier X". Optional ' +
+    'filters: matchStatus, direction ("in"/"out"). Totals (count, ' +
+    'totalInCents/totalOutCents, VAT totals for qualified charge/product ' +
+    'rows) are computed server-side over up to 200 matches — ALWAYS use ' +
+    'them instead of summing rows yourself; if truncated is true, say the ' +
+    'totals are partial and narrow the search. Amounts are in CENTS EUR ' +
+    '(TTC); vatCents is the VAT contained in the amount.',
+  inputSchema: z.object({
+    search: z.string().optional().describe('Label/counterparty term'),
+    matchStatus: z
+      .enum([
+        'unmatched',
+        'matched',
+        'ignored',
+        'charge',
+        'tax',
+        'product',
+        'internal_transfer',
+      ])
+      .optional(),
+    direction: z.enum(['in', 'out']).optional(),
+    limit: z.number().int().min(1).max(50).optional(),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runQuery(
+      internal.agentToolsPointage.searchTransactionsInternal,
+      {
+        orgId,
+        actorUserId: userId,
+        search: input.search,
+        matchStatus: input.matchStatus,
+        direction: input.direction,
+        limit: input.limit,
+      },
+    )
+  },
+})
+
 const suggestMatches = createTool({
   description:
     'Suggest likely reconciliation targets (deal, equity position or ' +
@@ -436,10 +614,17 @@ const categorizeTransaction = createTool({
     'Set aside a transaction that concerns no deal: "ignored", "charge" ' +
     '(operating cost), "tax", "product" (income unrelated to a deal) or ' +
     '"internal_transfer" (between own accounts). The user MUST confirm ' +
-    'first.',
+    'first. For "charge"/"product" you can set vatRateBps (VAT rate in ' +
+    'basis points: 0, 550, 1000 or 2000 — French standard rate is 2000 = ' +
+    '20%); confirm the rate with the user, salaries/insurance/bank fees ' +
+    'carry no VAT (0).',
   inputSchema: z.object({
     transactionId: z.string(),
     status: z.enum(['ignored', 'charge', 'tax', 'product', 'internal_transfer']),
+    vatRateBps: z
+      .union([z.literal(0), z.literal(550), z.literal(1000), z.literal(2000)])
+      .optional()
+      .describe('VAT rate in bps, only for charge/product'),
   }),
   execute: async (ctx, input): Promise<unknown> => {
     const { orgId, userId } = parseScope(ctx.userId)
@@ -448,6 +633,7 @@ const categorizeTransaction = createTool({
       actorUserId: userId,
       transactionId: input.transactionId as Id<'transactions'>,
       status: input.status,
+      vatRateBps: input.vatRateBps,
     })
   },
 })
@@ -472,6 +658,7 @@ const unpointTransaction = createTool({
 
 export const pointageTools = {
   listUnmatchedTransactions,
+  searchTransactions,
   suggestMatches,
   matchTransactionToDeal,
   allocateTransactionToLiability,

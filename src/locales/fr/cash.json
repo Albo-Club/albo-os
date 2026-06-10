@@ -59,6 +59,12 @@
     "in": "Entrée",
     "out": "Sortie"
   },
+  "vat": {
+    "title": "TVA récupérable",
+    "breakdown": "TVA déductible (charges) {{deductible}} − TVA collectée (produits) {{collected}}",
+    "unqualified_one": "{{count}} transaction à qualifier dans le pointage",
+    "unqualified_other": "{{count}} transactions à qualifier dans le pointage"
+  },
   "forecast": {
     "title": "Prévisionnel de trésorerie",
     "horizonMonths_one": "{{count}} mois",

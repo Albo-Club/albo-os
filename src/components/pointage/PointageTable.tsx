@@ -17,6 +17,8 @@ import type { DealOption } from './DealCombobox'
 import type { PointageTarget } from './TargetCombobox'
 import type { LiabilityOptionGroups } from '~/lib/liabilityOptions'
 import type { TxDetails } from './TransactionSheet'
+import { DEFAULT_VAT_RATE_BPS, VAT_RATES_BPS, vatCentsFromTtc } from '~/lib/vat'
+import { directionTone } from '~/lib/moneyTone'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +37,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 import {
   Table,
   TableBody,
@@ -311,7 +320,16 @@ export function PointageTable({
   async function handleDiscard(tx: UnmatchedTx, kind: DiscardKind) {
     setPendingId(tx._id)
     try {
-      await discardMutations[kind]({ transactionId: tx._id })
+      // Une charge part avec un taux de TVA de 20 % par défaut, ajustable
+      // ensuite dans l'onglet Charges (setVatRate).
+      if (kind === 'charge') {
+        await categorizeAsCharge({
+          transactionId: tx._id,
+          vatRateBps: DEFAULT_VAT_RATE_BPS,
+        })
+      } else {
+        await discardMutations[kind]({ transactionId: tx._id })
+      }
       addRecent({ tx, kind })
       setSheetTx((cur) => (cur?._id === tx._id ? null : cur))
     } catch (err) {
@@ -369,7 +387,11 @@ export function PointageTable({
     const ids = [...selectedIds]
     setBulkPending(true)
     try {
-      const result = await bulkCategorize({ transactionIds: ids, status })
+      const result = await bulkCategorize({
+        transactionIds: ids,
+        status,
+        vatRateBps: status === 'charge' ? DEFAULT_VAT_RATE_BPS : undefined,
+      })
       setSelectedIds(new Set())
       if (result.succeeded.length > 0) {
         toast(t(`bulk.banner.${status}`, { count: result.succeeded.length }), {
@@ -529,11 +551,7 @@ export function PointageTable({
                     )}
                   </TableCell>
                   <TableCell
-                    className={`text-right tabular-nums ${
-                      tx.direction === 'out'
-                        ? 'text-destructive'
-                        : 'text-emerald-600'
-                    }`}
+                    className={`text-right tabular-nums ${directionTone(tx.direction)}`}
                   >
                     {fmtSigned(tx.amount, tx.direction)}
                   </TableCell>
@@ -626,18 +644,83 @@ export function PointageTable({
 }
 
 /**
+ * Sélecteur de taux de TVA d'une ligne charge/produit (« À qualifier » /
+ * 0 % / 5,5 % / 10 % / 20 %) → `setVatRate`. Le montant de TVA dérivé du TTC
+ * s'affiche sous le sélecteur quand un taux est posé.
+ */
+function VatRateSelect({
+  tx,
+  pending,
+  onChange,
+}: {
+  tx: UnmatchedTx
+  pending: boolean
+  onChange: (vatRateBps: number | null) => void
+}) {
+  const { t, i18n } = useTranslation('pointage')
+  const fmtRate = (bps: number) =>
+    new Intl.NumberFormat(i18n.language, {
+      style: 'percent',
+      maximumFractionDigits: 1,
+    }).format(bps / 10000)
+  const fmtEur = (cents: number) =>
+    new Intl.NumberFormat(i18n.language, {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 2,
+    }).format(cents / 100)
+
+  return (
+    <div className="flex flex-col items-start gap-0.5">
+      <Select
+        value={tx.vatRateBps != null ? String(tx.vatRateBps) : 'unset'}
+        disabled={pending}
+        onValueChange={(value) =>
+          onChange(value === 'unset' ? null : Number(value))
+        }
+      >
+        <SelectTrigger size="sm" className="w-32">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="unset">{t('vat.toQualify')}</SelectItem>
+          {VAT_RATES_BPS.map((bps) => (
+            <SelectItem key={bps} value={String(bps)}>
+              {fmtRate(bps)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {tx.vatRateBps != null && tx.vatRateBps > 0 && (
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {t('vat.amount', {
+            amount: fmtEur(vatCentsFromTtc(tx.amount, tx.vatRateBps)),
+          })}
+        </span>
+      )}
+    </div>
+  )
+}
+
+/**
  * Vue de consultation des transactions écartées (charges / impôts / produits
  * / virements internes) : table lecture seule alimentée par `listByStatus`,
  * avec « Annuler » par ligne (→ `unmatchTransaction`, la transaction repart
- * dans la file « À pointer »).
+ * dans la file « À pointer »). Sur les onglets Charges/Produits
+ * (`vatEditable`), une colonne TVA permet de qualifier le taux de chaque
+ * ligne (TVA déductible/collectée — cf. carte « TVA récupérable » de la page
+ * Trésorerie).
  */
 export function DiscardedTable({
   transactions,
   emptyMessage,
+  vatEditable = false,
 }: {
   transactions: Array<UnmatchedTx> | undefined
   /** Message d'état vide alternatif (ex. recherche sans résultat). */
   emptyMessage?: string
+  /** Affiche la colonne TVA (onglets Charges et Produits uniquement). */
+  vatEditable?: boolean
 }) {
   const { t } = useTranslation('pointage')
   const { fmtDate, fmtSigned } = useFormatters()
@@ -646,6 +729,7 @@ export function DiscardedTable({
   const unmatchTransaction = useConvexMutation(
     api.transactions.unmatchTransaction,
   )
+  const setVatRate = useConvexMutation(api.transactions.setVatRate)
   const [pendingId, setPendingId] = useState<Id<'transactions'> | null>(null)
 
   async function handleUndo(tx: UnmatchedTx) {
@@ -653,6 +737,20 @@ export function DiscardedTable({
     try {
       // La query réactive retire la ligne de cette vue d'elle-même.
       await unmatchTransaction({ transactionId: tx._id })
+    } catch (err) {
+      reportError(err)
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  async function handleVatRate(tx: UnmatchedTx, vatRateBps: number | null) {
+    setPendingId(tx._id)
+    try {
+      await setVatRate({
+        transactionId: tx._id,
+        vatRateBps: vatRateBps as 0 | 550 | 1000 | 2000 | null,
+      })
     } catch (err) {
       reportError(err)
     } finally {
@@ -676,6 +774,7 @@ export function DiscardedTable({
             <TableHead>{t('col.date')}</TableHead>
             <TableHead>{t('col.label')}</TableHead>
             <TableHead className="text-right">{t('col.amount')}</TableHead>
+            {vatEditable && <TableHead>{t('col.vat')}</TableHead>}
             <TableHead>{t('col.account')}</TableHead>
             <TableHead className="text-right">{t('col.actions')}</TableHead>
           </TableRow>
@@ -684,7 +783,7 @@ export function DiscardedTable({
           {!transactions ? (
             <TableRow>
               <TableCell
-                colSpan={5}
+                colSpan={vatEditable ? 6 : 5}
                 className="text-muted-foreground text-center"
               >
                 {t('loading')}
@@ -705,14 +804,21 @@ export function DiscardedTable({
                   )}
                 </TableCell>
                 <TableCell
-                  className={`text-right tabular-nums ${
-                    tx.direction === 'out'
-                      ? 'text-destructive'
-                      : 'text-emerald-600'
-                  }`}
+                  className={`text-right tabular-nums ${directionTone(tx.direction)}`}
                 >
                   {fmtSigned(tx.amount, tx.direction)}
                 </TableCell>
+                {vatEditable && (
+                  <TableCell>
+                    <VatRateSelect
+                      tx={tx}
+                      pending={pendingId === tx._id}
+                      onChange={(vatRateBps) =>
+                        void handleVatRate(tx, vatRateBps)
+                      }
+                    />
+                  </TableCell>
+                )}
                 <TableCell className="whitespace-nowrap">
                   {accountLabel(tx)}
                 </TableCell>

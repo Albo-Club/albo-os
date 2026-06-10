@@ -771,6 +771,36 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   idempotent, n'écrit rien dans `matchingDecisions`). Tout nouveau code qui
   écrit `dealId` doit écrire `allocation` dans le même patch.
 
+## TVA récupérable (`convex/lib/vat.ts`, `transactions:getVatPosition`)
+
+Suivi minimal de la TVA pour fiabiliser les charges réelles et la position de
+TVA récupérable (carte sur la page Trésorerie). Pas un module de déclaration.
+
+- **Les montants de transaction sont toujours TTC.** Le taux de TVA
+  (`vatRateBps` : 0 / 550 / 1000 / 2000) est stocké sur la transaction ; le
+  montant de TVA est **toujours dérivé, jamais stocké** :
+  `vatCents = round(amount × taux / (10000 + taux))`. La dérivation vit dans
+  `convex/lib/vat.ts`, miroir front `src/lib/vat.ts` (même convention que
+  `searchText.ts`) — garder les deux identiques (testé par
+  `tests/vat.test.ts`).
+- **Invariant : `vatRateBps` n'existe que sur `charge` / `product`.** Tout
+  pointage qui fait quitter ces statuts (match deal, allocation passif,
+  unmatch, re-catégorisation en ignored/tax/internal_transfer) l'efface —
+  enforced dans `convex/lib/pointage.ts`, ne pas contourner.
+- **L'historique n'est pas backfillé, exprès.** Une charge sans taux est
+  « à qualifier » (un /1,2 global serait faux : salaires, assurances, frais
+  bancaires sont exonérés). La qualification se fait ligne à ligne dans les
+  onglets Charges/Produits du pointage (`setVatRate`, accepte `null` pour
+  revenir à « à qualifier »), ou via l'outil agent `categorizeTransaction`.
+  Le défaut 20 % ne s'applique qu'aux **nouvelles** catégorisations en charge
+  depuis l'UI (`DEFAULT_VAT_RATE_BPS`, côté front exprès — backend neutre).
+- **`getVatPosition` est signée par le sens** : une charge `in` (avoir
+  fournisseur) se déduit de la TVA déductible, un produit `out` de la TVA
+  collectée. Les règlements/remboursements de TVA avec l'État restent en
+  statut `tax` et ne sont **pas nettés** contre la position en V1 — la carte
+  montre la position cumulée, pas le solde restant à récupérer après
+  déclarations.
+
 ## Passif — `equityPositions` / `intercompanyLoans` / soldes dérivés (`convex/liabilities.ts`)
 
 Le passif (capitaux propres + C/C d'associés) est modélisé par deux tables

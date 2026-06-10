@@ -135,10 +135,11 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | CA2 | Avec comptes : soldes regroupés par entité propriétaire (`group_*`) | Une section par entité (titre = nom entité) ; carte "Solde total" = somme des soldes |
 | CA3 | Compte sans `currentBalance`                                        | Affiche "Solde inconnu" ; `balanceAsOf` rendu en sous-texte si présent            |
 | CA4 | Clic sur **la ligne du compte** (n'importe où)                       | Navigue vers la page `/cash/$accountId` (en-tête banque · libellé + entité / solde / IBAN, lien retour) listant **toutes** les transactions du compte, antéchrono ; les rattachées à un deal sont labellisées par la boîte investie, les autres affichent « — » en colonne Deal |
-| CA5 | Transaction `direction: "out"`                                      | Montant en négatif, couleur `text-destructive` ; `in` en positif                  |
+| CA5 | Transaction `direction: "out"`                                      | Montant en négatif, couleur `text-destructive` ; `in` en positif, couleur `text-positive` (token vert de brand.css, partout : pointage, comptes, passif, dashboard, prévisionnel, badges deal/créance-dette) |
 | CA6 | Compte sans transaction liée à un deal                             | Sheet affiche l'état vide "Aucune transaction liée à un deal…"                    |
 | CA7 | i18n EN/FR sur la page + le Sheet                                   | Tous les libellés traduits (namespace `cash`), titre d'onglet = `cash:metaTitle`  |
 | CA8 | Page `/cash/$accountId` : taper un libellé ou une contrepartie dans la barre de recherche (avec/sans accents, casse différente) | Filtrage serveur (~250 ms de debounce) via le search index `search_text` ; résultats triés date desc, cap 200 ; pas de flash de liste vide entre deux frappes ; terme sans résultat → « Aucune transaction ne correspond… » ; effacer → liste complète. ⚠️ Les tx pré-existantes sont invisibles à la recherche tant que `transactions:backfillSearchText` n'a pas tourné (cf. `KNOWN_ISSUES.md` « Recherche transactions ») |
+| CA9 | Carte « TVA récupérable » sur `/app/<org>/cash`                     | Montant net = TVA déductible (charges qualifiées) − TVA collectée (produits qualifiés), dérivé des TTC (`getVatPosition`) ; détail en sous-texte ; si des charges/produits sont sans taux, lien « N transactions à qualifier » → page Pointage ; réactif quand un taux change (cf. RU19–RU21, `KNOWN_ISSUES.md` « TVA récupérable ») |
 
 ## Niveau 3 — Dashboard & prévisionnel de trésorerie (10 min)
 
@@ -241,6 +242,7 @@ l'assistant (outils `setDealProjections` / `createKpiSnapshot`).
 | C19 | Confirmer un rattachement suggéré                       | `matchTransactionToDeal` appelé ; la tx disparaît de l'onglet Pointage ; `matchingDecisions` a une ligne `source: 'agent_suggested'` (dashboard Convex) |
 | C20 | "crée une règle de loyer 1 500 €/mois le 5" puis "projette mon cash sur 12 mois" | `createForecastRule` (après confirmation) → l'agent propose `expandForecastRules` → `getForecastBalance` rend les mois ; cohérent avec la mutation publique |
 | C21 | "ajoute une valo de 1,2 M€ au deal X au 31/12" + "liste le passif" | `createValuation` (après confirmation) visible en base ; `listLiabilities` rend positions + C/C avec soldes dérivés |
+| C22 | "combien a-t-on payé à <fournisseur> au total ?"        | `searchTransactions` appelé (tous statuts, pas seulement la file) ; l'agent répond avec les totaux pré-agrégés retournés (`totalOutCents`, TVA incluse si lignes qualifiées) sans additionner les lignes lui-même ; cohérent avec l'onglet Charges filtré sur le même terme |
 
 ## Niveau 6 — Sécurité + déploiement (5 min)
 
@@ -369,6 +371,9 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | RU17 | Combobox → groupe « Capitaux propres » ou « Comptes courants » → choisir une cible passif → « Rattacher » | Mutation `liabilities:allocateTransaction` ; bandeau « Rattachée à {cible} · Annuler » ~5 s puis la ligne disparaît ; le solde du C/C se met à jour sur la page Passif (réactivité Convex) |
 | RU17b | Ouvrir le combobox (recherche vide), org avec/sans deals, equity, C/C | Les **trois** groupes (Deals / Capitaux propres / Comptes courants) sont toujours visibles ; un groupe sans cible affiche « Aucun(e) … pour cette organisation » (jamais de groupe absent) ; un C/C créé via « + Compte courant » apparaît dans le groupe Comptes courants des **deux** orgs parties |
 | RU18 | « Annuler » pendant le bandeau de RU17                           | Mutation `deallocateTransaction` (pas `unmatchTransaction`) ; la ligne redevient pointable |
+| RU19 | « Écarter ▾ » → « Charge » (unitaire ou bulk)                    | La tx part avec `vatRateBps: 2000` (20 % par défaut) ; visible dans l'onglet Charges, colonne TVA ; « dont X € de TVA » sous le sélecteur (TVA dérivée du TTC, ex. 120 € → 20 €) |
+| RU20 | Onglet Charges ou Produits : sélecteur TVA d'une ligne (À qualifier / 0 % / 5,5 % / 10 % / 20 %) | Mutation `setVatRate` ; le montant de TVA affiché et la carte « TVA récupérable » de la page Trésorerie se mettent à jour (réactivité) ; « À qualifier » remet le taux à null ; pas de colonne TVA sur les onglets Impôts/Virements internes |
+| RU21 | « Annuler » sur une charge qualifiée → re-classer en charge      | Le retour en file efface `vatRateBps` (invariant `lib/pointage.ts`) ; le re-classement repart au défaut 20 % |
 
 ### Réattribution depuis la page d'un deal (`/app/$orgSlug/deals/$dealId`)
 

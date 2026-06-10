@@ -140,6 +140,7 @@ function Pointage() {
         <DiscardedTable
           transactions={discarded}
           emptyMessage={searchEmptyMessage}
+          vatEditable={view === 'charge' || view === 'product'}
         />
       )}
     </main>

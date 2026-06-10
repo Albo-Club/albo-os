@@ -12,6 +12,7 @@ import type { DealOption } from '~/components/pointage/DealCombobox'
 import type { TxDetails } from '~/components/pointage/TransactionSheet'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
+import { directionBadgeClass, directionTone } from '~/lib/moneyTone'
 import {
   useDealTitle,
   useFormatters,
@@ -330,12 +331,15 @@ function Transactions({ deal }: { deal: CurrentDeal }) {
                   <TableCell>{fmtDate(tx.transactionDate)}</TableCell>
                   <TableCell>
                     <Badge
-                      variant={tx.direction === 'in' ? 'default' : 'secondary'}
+                      variant="outline"
+                      className={directionBadgeClass(tx.direction === 'in')}
                     >
                       {t(`tx.${tx.direction}`)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell
+                    className={`text-right tabular-nums ${directionTone(tx.direction)}`}
+                  >
                     {fmtEur(tx.amount)}
                   </TableCell>
                   <TableCell>{tx.rawLabel}</TableCell>

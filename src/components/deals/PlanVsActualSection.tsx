@@ -117,7 +117,9 @@ export function PlanVsActualSection({
                         'text-right tabular-nums',
                         row.gapCumCents < 0
                           ? 'text-destructive'
-                          : 'text-muted-foreground',
+                          : row.gapCumCents > 0
+                            ? 'text-positive'
+                            : 'text-muted-foreground',
                       )}
                     >
                       {fmtEur(row.gapCumCents)}

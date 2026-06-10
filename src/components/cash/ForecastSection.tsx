@@ -9,6 +9,7 @@ import { api } from '../../../convex/_generated/api'
 import { ForecastChart } from './ForecastChart'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
+import { directionTone } from '~/lib/moneyTone'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
@@ -420,11 +421,7 @@ export function ForecastSection({ orgId }: { orgId: Id<'organizations'> }) {
                 <TableRow key={rule._id}>
                   <TableCell className="font-medium">{rule.label}</TableCell>
                   <TableCell
-                    className={
-                      rule.direction === 'out'
-                        ? 'text-destructive text-right tabular-nums'
-                        : 'text-right tabular-nums'
-                    }
+                    className={`text-right tabular-nums ${directionTone(rule.direction)}`}
                   >
                     {rule.direction === 'out' ? '−' : '+'}
                     {fmtEur(rule.amountCents)}

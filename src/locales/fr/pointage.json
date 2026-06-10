@@ -10,8 +10,13 @@
     "date": "Date",
     "label": "Libellé",
     "amount": "Montant",
+    "vat": "TVA",
     "account": "Compte",
     "actions": "Actions"
+  },
+  "vat": {
+    "toQualify": "À qualifier",
+    "amount": "dont {{amount}} de TVA"
   },
   "actions": {
     "match": "Rattacher",
@@ -101,6 +106,7 @@
   "errors": {
     "failed": "L'action a échoué. Veuillez réessayer.",
     "not_found": "Transaction introuvable.",
+    "not_categorized": "Le taux de TVA ne se pose que sur une transaction classée en charge ou en produit.",
     "deal_wrong_org": "Ce deal appartient à une autre organisation.",
     "equity_wrong_org": "Cette position de capital appartient à une autre organisation.",
     "loan_wrong_org": "Cette transaction n'appartient à aucune des deux organisations du compte courant.",
