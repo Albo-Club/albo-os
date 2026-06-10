@@ -36,13 +36,13 @@ export function KpiCard({
               <DeltaIcon
                 className={
                   positive
-                    ? 'size-3 text-emerald-600'
-                    : 'size-3 text-rose-600'
+                    ? 'size-3 text-positive'
+                    : 'size-3 text-destructive'
                 }
               />
               <span
                 className={
-                  positive ? 'text-emerald-600' : 'text-rose-600'
+                  positive ? 'text-positive' : 'text-destructive'
                 }
               >
                 {positive ? '+' : ''}

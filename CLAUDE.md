@@ -70,9 +70,10 @@ one file. Surface non-obvious knowledge ; drift kills future you.
 
 ### Pre-PR doc audit (run it yourself, every PR, without being prompted)
 
-Before pushing the final commit, walk through these five questions. If none
-fire, write nothing — the diff and commit message already document the *what*.
-Docs are for the *why* and the *trap*.
+Before pushing the final commit, walk through these five questions. Questions
+1–4 only fire when relevant — if none do, write nothing there; the diff and
+commit message already document the *what*. Question 5 (changelog) fires on
+**every** PR, no exception.
 
 1. **Touched a route, page, env var, or workflow listed in `TESTING.md`** ?
    → update the matching row in the same PR.
@@ -85,10 +86,16 @@ Docs are for the *why* and the *trap*.
 4. **Discovered a behavioral rule worth applying to every future PR** ? → add
    it here in `CLAUDE.md`. Only for *repeatable* guidance, never as a
    changelog of what shipped.
-5. **Shipped a change visible to end users** (new feature, UX change,
-   behavior change) ? → add/extend the entry in `CHANGELOG_PRODUIT.md` in
-   the same PR, in product language (no file paths, no function names).
-   Bug fixes and pure refactors don't qualify.
+5. **Changelog — mandatory on every PR.** Add an entry at the **top** of
+   `CHANGELOG_PRODUIT.md` in the same PR, with the header format
+   `## vX.Y.Z — JJ/MM/AAAA à HH:MM — <titre>` :
+   - **Version** : increment from the latest entry in the file. Bump
+     **minor** for a user-visible feature or UX change, **patch** for a
+     fix, refactor, or internal/doc change.
+   - **Date/heure** : opening time of the PR, Europe/Paris.
+   - **Contenu** : product language for user-visible changes (no file
+     paths, no function names) ; a single descriptive line is enough for
+     purely technical PRs.
 
 ### Where things live (don't duplicate across files)
 
@@ -99,9 +106,9 @@ Docs are for the *why* and the *trap*.
   "we tried X, here's why we chose Y". One section per trap.
 - `CLAUDE.md` — repeatable behavioral rules for future agents. Never a
   changelog of completed work.
-- `CHANGELOG_PRODUIT.md` — user-facing release notes in French, one entry
-  per lot/release, product language. Hand-written (distinct from the
-  technical `CHANGELOG.md` that release-please generates from commits).
+- `CHANGELOG_PRODUIT.md` — user-facing release notes in French, **one
+  versioned entry per PR** (`vX.Y.Z` + date/heure de la PR), product
+  language. Hand-written.
 - `MIGRATIONS.md` — index of one-shot prod data operations (seeds, imports,
   purges) pointing to the module-level runbooks, plus in-flight chantiers.
 - `AGENTS.md` — pointer to the agent-skill workflow. Static, rarely changes.

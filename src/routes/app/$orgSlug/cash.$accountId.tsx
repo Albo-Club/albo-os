@@ -29,6 +29,7 @@ import {
   TableRow,
 } from '~/components/ui/table'
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
+import { directionTone } from '~/lib/moneyTone'
 
 export const Route = createFileRoute('/app/$orgSlug/cash/$accountId')({
   component: AccountDetail,
@@ -272,11 +273,7 @@ function AccountDetail() {
                     <TableCell>{tx.rawLabel}</TableCell>
                     <TableCell>{tx.deal?.targetName ?? '—'}</TableCell>
                     <TableCell
-                      className={`text-right tabular-nums ${
-                        tx.direction === 'out'
-                          ? 'text-destructive'
-                          : 'text-emerald-600'
-                      }`}
+                      className={`text-right tabular-nums ${directionTone(tx.direction)}`}
                     >
                       {fmtSigned(tx.amount, tx.direction)}
                     </TableCell>

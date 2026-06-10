@@ -7,6 +7,7 @@ import {
   applyUnmatch,
 } from './lib/pointage'
 import { buildSearchText, normalizeSearch } from './lib/searchText'
+import { vatCentsFromTtc, vatRateBpsValidator } from './lib/vat'
 
 import type { Id } from './_generated/dataModel'
 
@@ -168,6 +169,8 @@ export const listByStatus = query({
           transactionDate: tx.transactionDate,
           rawLabel: tx.rawLabel,
           counterparty: tx.counterparty ?? null,
+          // TVA (statuts charge/produit uniquement) — null = à qualifier.
+          vatRateBps: tx.vatRateBps ?? null,
           account: account
             ? { label: account.label, bankName: account.bankName }
             : null,
@@ -230,15 +233,20 @@ export const ignoreTransaction = mutation({
  * Classe une transaction en charge courante (loyer, honoraires, frais…).
  * Sous-type d'« écarté » : même comportement qu'`ignoreTransaction`, seul le
  * statut diffère pour pouvoir consulter ces transactions plus tard.
+ * `vatRateBps` (optionnel) pose le taux de TVA déductible — l'UI envoie 20 %
+ * par défaut, ajustable ensuite via `setVatRate`.
  */
 export const categorizeAsCharge = mutation({
-  args: { transactionId: v.id('transactions') },
-  handler: async (ctx, { transactionId }) => {
+  args: {
+    transactionId: v.id('transactions'),
+    vatRateBps: v.optional(vatRateBpsValidator),
+  },
+  handler: async (ctx, { transactionId, vatRateBps }) => {
     const tx = await ctx.db.get('transactions', transactionId)
     if (!tx) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, tx.orgId)
 
-    await applyCategorization(ctx, tx, 'charge', user._id, 'manual')
+    await applyCategorization(ctx, tx, 'charge', user._id, 'manual', vatRateBps)
     return null
   },
 })
@@ -267,13 +275,23 @@ export const categorizeAsTax = mutation({
  * pouvoir consulter ces transactions plus tard.
  */
 export const categorizeAsProduct = mutation({
-  args: { transactionId: v.id('transactions') },
-  handler: async (ctx, { transactionId }) => {
+  args: {
+    transactionId: v.id('transactions'),
+    vatRateBps: v.optional(vatRateBpsValidator),
+  },
+  handler: async (ctx, { transactionId, vatRateBps }) => {
     const tx = await ctx.db.get('transactions', transactionId)
     if (!tx) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, tx.orgId)
 
-    await applyCategorization(ctx, tx, 'product', user._id, 'manual')
+    await applyCategorization(
+      ctx,
+      tx,
+      'product',
+      user._id,
+      'manual',
+      vatRateBps,
+    )
     return null
   },
 })
@@ -313,8 +331,9 @@ export const bulkCategorize = mutation({
       v.literal('product'),
       v.literal('internal_transfer'),
     ),
+    vatRateBps: v.optional(vatRateBpsValidator),
   },
-  handler: async (ctx, { transactionIds, status }) => {
+  handler: async (ctx, { transactionIds, status, vatRateBps }) => {
     const succeeded: Array<Id<'transactions'>> = []
     const failed: Array<{ id: Id<'transactions'>; reason: string }> = []
 
@@ -324,7 +343,7 @@ export const bulkCategorize = mutation({
         if (!tx) throw new ConvexError('not_found')
         const { user } = await requireOrgMember(ctx, tx.orgId)
 
-        await applyCategorization(ctx, tx, status, user._id, 'manual')
+        await applyCategorization(ctx, tx, status, user._id, 'manual', vatRateBps)
         succeeded.push(transactionId)
       } catch (err) {
         failed.push({
@@ -351,6 +370,78 @@ export const unmatchTransaction = mutation({
 
     await applyUnmatch(ctx, tx, user._id, 'manual')
     return null
+  },
+})
+
+// ─── TVA (taux sur charges/produits, position récupérable) ──────────────────
+
+/**
+ * Pose ou efface (`null` = retour « à qualifier ») le taux de TVA d'une
+ * transaction déjà classée en charge ou produit. Métadonnée, pas une décision
+ * de pointage : n'écrit rien dans `matchingDecisions`.
+ */
+export const setVatRate = mutation({
+  args: {
+    transactionId: v.id('transactions'),
+    vatRateBps: v.union(vatRateBpsValidator, v.null()),
+  },
+  handler: async (ctx, { transactionId, vatRateBps }) => {
+    const tx = await ctx.db.get('transactions', transactionId)
+    if (!tx) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, tx.orgId)
+    if (tx.matchStatus !== 'charge' && tx.matchStatus !== 'product') {
+      throw new ConvexError('not_categorized')
+    }
+
+    await ctx.db.patch('transactions', transactionId, {
+      vatRateBps: vatRateBps ?? undefined,
+    })
+    return null
+  },
+})
+
+/**
+ * Position de TVA de l'org : TVA déductible (charges qualifiées) − TVA
+ * collectée (produits qualifiés), dérivée des montants TTC — rien n'est
+ * stocké. Signée par le sens : une charge `in` (avoir fournisseur) se
+ * soustrait, un produit `out` aussi. `unqualifiedCount` compte les
+ * charges/produits sans taux (0 % = qualifié).
+ */
+export const getVatPosition = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+
+    let deductibleCents = 0
+    let collectedCents = 0
+    let unqualifiedCount = 0
+    for (const status of ['charge', 'product'] as const) {
+      const rows = await ctx.db
+        .query('transactions')
+        .withIndex('by_org_matchStatus', (q) =>
+          q.eq('orgId', orgId).eq('matchStatus', status),
+        )
+        .collect()
+      for (const tx of rows) {
+        if (tx.vatRateBps == null) {
+          unqualifiedCount += 1
+          continue
+        }
+        const vat = vatCentsFromTtc(tx.amount, tx.vatRateBps)
+        if (status === 'charge') {
+          deductibleCents += tx.direction === 'out' ? vat : -vat
+        } else {
+          collectedCents += tx.direction === 'in' ? vat : -vat
+        }
+      }
+    }
+
+    return {
+      deductibleCents,
+      collectedCents,
+      netCents: deductibleCents - collectedCents,
+      unqualifiedCount,
+    }
   },
 })
 

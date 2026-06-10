@@ -13,6 +13,11 @@ import {
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import {
+  directionBadgeClass,
+  directionTone,
+  signTone,
+} from '~/lib/moneyTone'
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -94,8 +99,7 @@ function usePassifFormatters() {
 }
 
 /** Créance (solde ≥ 0) en vert, dette (solde < 0) en rouge. */
-const balanceTone = (cents: number) =>
-  cents >= 0 ? 'text-emerald-600' : 'text-destructive'
+const balanceTone = signTone
 
 // ─── Actions de ligne (éditer / supprimer) ──────────────────────────────────
 
@@ -214,9 +218,7 @@ function AllocatedTxRows({
             </span>
             <span className="ml-3 text-xs">{tx.rawLabel}</span>
             <span
-              className={`ml-3 text-xs tabular-nums ${
-                tx.direction === 'out' ? 'text-destructive' : 'text-emerald-600'
-              }`}
+              className={`ml-3 text-xs tabular-nums ${directionTone(tx.direction)}`}
             >
               {fmtSigned(tx.amount, tx.direction)}
             </span>
@@ -426,7 +428,10 @@ export function LoansTable({
                 <TableRow>
                   <TableCell>{loan.counterpartyName ?? '—'}</TableCell>
                   <TableCell>
-                    <Badge variant="outline">
+                    <Badge
+                      variant="outline"
+                      className={directionBadgeClass(loan.side === 'creditor')}
+                    >
                       {t(
                         loan.side === 'creditor'
                           ? 'loans.receivable'

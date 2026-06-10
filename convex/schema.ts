@@ -19,6 +19,7 @@
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
 import { instrumentValidator } from './lib/instruments'
+import { vatRateBpsValidator } from './lib/vat'
 
 // ─── Better Auth / multi-tenant validators ─────────────────────────────────
 
@@ -565,6 +566,11 @@ export default defineSchema({
     ),
     direction: txDirection,
     amount: v.number(), // cents, toujours positif
+    // Taux de TVA en basis points (0/550/1000/2000), posé sur les statuts
+    // `charge` (TVA déductible) et `product` (TVA collectée) uniquement —
+    // effacé quand la transaction quitte ces statuts. Le montant de TVA est
+    // dérivé du TTC (lib/vat.ts), jamais stocké. Absent = « à qualifier ».
+    vatRateBps: v.optional(vatRateBpsValidator),
     transactionDate: v.number(),
     rawLabel: v.string(),
     counterparty: v.optional(v.string()),

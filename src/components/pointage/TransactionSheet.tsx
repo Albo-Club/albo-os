@@ -4,6 +4,7 @@ import { ConvexError } from 'convex/values'
 import type { ReactNode } from 'react'
 
 import type { Id } from '../../../convex/_generated/dataModel'
+import { directionTone } from '~/lib/moneyTone'
 import {
   Sheet,
   SheetContent,
@@ -24,6 +25,8 @@ export type TxDetails = {
   transactionDate: number
   rawLabel: string
   counterparty: string | null
+  /** Taux de TVA (bps) des charges/produits — null = à qualifier. */
+  vatRateBps?: number | null
   account: { label: string; bankName: string } | null
 }
 
@@ -106,9 +109,7 @@ export function TransactionSheet({
               <Info
                 label={t('col.amount')}
                 value={
-                  <span
-                    className={tx.direction === 'out' ? 'text-destructive' : 'text-emerald-600'}
-                  >
+                  <span className={directionTone(tx.direction)}>
                     {fmtSigned(tx.amount, tx.direction)}
                   </span>
                 }

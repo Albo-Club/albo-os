@@ -16,6 +16,7 @@ import { getLocale } from '~/lib/locale'
 import { KpiCard } from '~/components/dashboard/KpiCard'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { cn } from '~/lib/utils'
+import { directionTone } from '~/lib/moneyTone'
 
 export const Route = createFileRoute('/app/$orgSlug/')({
   component: Dashboard,
@@ -174,7 +175,7 @@ function Dashboard() {
                   <span
                     className={cn(
                       'shrink-0 tabular-nums',
-                      tx.direction === 'out' && 'text-destructive',
+                      directionTone(tx.direction),
                     )}
                   >
                     {tx.direction === 'out' ? '−' : '+'}

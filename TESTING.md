@@ -90,13 +90,13 @@ Connecté en tant qu'Alice sur `/app/acme/`.
 | #    | Étape                                                          | Résultat attendu                                                  |
 | ---- | -------------------------------------------------------------- | ----------------------------------------------------------------- |
 | SH1  | Sidebar `inset` (carte flottante arrondie) : groupe Platform (Dashboard / Participations / Cash) en haut ; Members / Invitations / Settings épinglés en bas (nav secondaire `mt-auto`, sans label) | OK ; entrées admin-only masquées si rôle "member" (plus de badge "demo" sur Cash, vue fonctionnelle) |
-| SH2  | Clic sur `SidebarTrigger` (header) OU sur la `SidebarRail` (bande fine au bord droit de la sidebar) | Sidebar collapse en `icon` ; cookie `sidebar_state` persiste ; icônes orga/profil non écrasées en mode `icon` |
+| SH2  | Clic sur `SidebarTrigger` (header) OU sur la `SidebarRail` (bande fine au bord droit de la sidebar) | Sidebar collapse en `icon` ; cookie `sidebar_state` persiste ; icônes orga/profil non écrasées ni rognées en mode `icon` ; le séparateur vertical à côté du trigger reste court (h-4, pas pleine hauteur du header) |
 | SH3  | Redimensionner < 768px                                         | Sidebar passe en `Sheet` mobile, ouverture via burger              |
 | SH4  | Naviguer Dashboard → Participations → Cash                     | Breadcrumb du header se met à jour à chaque route ; Cash affiche les soldes par compte (cf. Niveau 3 — Vue Cash) |
 | SH5  | Dashboard (`/app/$orgSlug`) : KPIs réels                       | 6 cards : Participations (sociétés distinctes des deals actifs), Capital déployé (Σ out pointées deal), Distribué (Σ in), Trésorerie (Σ soldes EUR), NAV estimée (dernière valo par deal, fallback versé + hint « partielle »), TVPI ((distribué+NAV)/déployé en ×) — cf. Niveau 3 Dashboard |
 | SH6  | Toggle dark mode (icône soleil/lune dans header)               | Page bascule light ↔ dark, sidebar + charts adaptés                |
 | SH7  | Theme picker (footer sidebar) → choisir Blue / Emerald / Violet| Primary + chart-1 changent ; survit au reload (localStorage)       |
-| SH8  | Org switcher (header sidebar), orga **sans** logo             | Initiale (1ʳᵉ lettre) centrée dans le carré arrondi ; liste les orgs ; clic switch route + persiste `lastOrgSlug` |
+| SH8  | Org switcher (header sidebar), orga **sans** logo             | Initiale (1ʳᵉ lettre) centrée dans le carré arrondi ; liste les orgs ; clic switch route + persiste `lastOrgSlug` ; orga **avec** logo : image carrée arrondie, sans fond ni liseré autour |
 | SH9  | NavUser (footer sidebar) → profile / switch org / sign out     | Avatar **rond** ; sans photo, initiales prénom+nom (ex. `BB`) ; mêmes destinations qu'avant refonte |
 | SH10 | Bouton AI dans header                                          | Toggle du panneau AI persistant (cf. Niveau 5 — AI chat, C1/C11)   |
 | SH11 | Ouvrir une page au contenu plus haut que l'écran (liste longue) | Le cadre `inset` reste calé sur la hauteur du viewport ; le scroll se fait **dans** le cadre, bord bas arrondi toujours visible |
@@ -135,10 +135,11 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | CA2 | Avec comptes : soldes regroupés par entité propriétaire (`group_*`) | Une section par entité (titre = nom entité) ; carte "Solde total" = somme des soldes |
 | CA3 | Compte sans `currentBalance`                                        | Affiche "Solde inconnu" ; `balanceAsOf` rendu en sous-texte si présent            |
 | CA4 | Clic sur **la ligne du compte** (n'importe où)                       | Navigue vers la page `/cash/$accountId` (en-tête banque · libellé + entité / solde / IBAN, lien retour) listant **toutes** les transactions du compte, antéchrono ; les rattachées à un deal sont labellisées par la boîte investie, les autres affichent « — » en colonne Deal |
-| CA5 | Transaction `direction: "out"`                                      | Montant en négatif, couleur `text-destructive` ; `in` en positif                  |
+| CA5 | Transaction `direction: "out"`                                      | Montant en négatif, couleur `text-destructive` ; `in` en positif, couleur `text-positive` (token vert de brand.css, partout : pointage, comptes, passif, dashboard, prévisionnel, badges deal/créance-dette) |
 | CA6 | Compte sans transaction liée à un deal                             | Sheet affiche l'état vide "Aucune transaction liée à un deal…"                    |
 | CA7 | i18n EN/FR sur la page + le Sheet                                   | Tous les libellés traduits (namespace `cash`), titre d'onglet = `cash:metaTitle`  |
 | CA8 | Page `/cash/$accountId` : taper un libellé ou une contrepartie dans la barre de recherche (avec/sans accents, casse différente) | Filtrage serveur (~250 ms de debounce) via le search index `search_text` ; résultats triés date desc, cap 200 ; pas de flash de liste vide entre deux frappes ; terme sans résultat → « Aucune transaction ne correspond… » ; effacer → liste complète. ⚠️ Les tx pré-existantes sont invisibles à la recherche tant que `transactions:backfillSearchText` n'a pas tourné (cf. `KNOWN_ISSUES.md` « Recherche transactions ») |
+| CA9 | Carte « TVA récupérable » sur `/app/<org>/cash`                     | Montant net = TVA déductible (charges qualifiées) − TVA collectée (produits qualifiés), dérivé des TTC (`getVatPosition`) ; détail en sous-texte ; si des charges/produits sont sans taux, lien « N transactions à qualifier » → page Pointage ; réactif quand un taux change (cf. RU19–RU21, `KNOWN_ISSUES.md` « TVA récupérable ») |
 
 ## Niveau 3 — Dashboard & prévisionnel de trésorerie (10 min)
 
@@ -241,7 +242,8 @@ l'assistant (outils `setDealProjections` / `createKpiSnapshot`).
 | C19 | Confirmer un rattachement suggéré                       | `matchTransactionToDeal` appelé ; la tx disparaît de l'onglet Pointage ; `matchingDecisions` a une ligne `source: 'agent_suggested'` (dashboard Convex) |
 | C20 | "crée une règle de loyer 1 500 €/mois le 5" puis "projette mon cash sur 12 mois" | `createForecastRule` (après confirmation) → l'agent propose `expandForecastRules` → `getForecastBalance` rend les mois ; cohérent avec la mutation publique |
 | C21 | "ajoute une valo de 1,2 M€ au deal X au 31/12" + "liste le passif" | `createValuation` (après confirmation) visible en base ; `listLiabilities` rend positions + C/C avec soldes dérivés |
-| C22 | Nouvelle conversation (état vide) + ⌘J/Ctrl+J          | Suggestions cliquables (position de cash, passif, projection, valos) → envoi direct ; ⌘J/Ctrl+J toggle le panneau et focus le composer à l'ouverture ; un appel d'outil s'affiche en bloc dépliable (statut + paramètres + résultat), labels fr/en |
+| C22 | "combien a-t-on payé à <fournisseur> au total ?"        | `searchTransactions` appelé (tous statuts, pas seulement la file) ; l'agent répond avec les totaux pré-agrégés retournés (`totalOutCents`, TVA incluse si lignes qualifiées) sans additionner les lignes lui-même ; cohérent avec l'onglet Charges filtré sur le même terme |
+| C23 | Nouvelle conversation (état vide) + ⌘J/Ctrl+J          | Suggestions cliquables (position de cash, passif, projection, valos) → envoi direct ; ⌘J/Ctrl+J toggle le panneau et focus le composer à l'ouverture ; un appel d'outil s'affiche en bloc dépliable (statut + paramètres + résultat), labels fr/en |
 
 ## Niveau 6 — Sécurité + déploiement (5 min)
 
@@ -370,6 +372,9 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | RU17 | Combobox → groupe « Capitaux propres » ou « Comptes courants » → choisir une cible passif → « Rattacher » | Mutation `liabilities:allocateTransaction` ; bandeau « Rattachée à {cible} · Annuler » ~5 s puis la ligne disparaît ; le solde du C/C se met à jour sur la page Passif (réactivité Convex) |
 | RU17b | Ouvrir le combobox (recherche vide), org avec/sans deals, equity, C/C | Les **trois** groupes (Deals / Capitaux propres / Comptes courants) sont toujours visibles ; un groupe sans cible affiche « Aucun(e) … pour cette organisation » (jamais de groupe absent) ; un C/C créé via « + Compte courant » apparaît dans le groupe Comptes courants des **deux** orgs parties |
 | RU18 | « Annuler » pendant le bandeau de RU17                           | Mutation `deallocateTransaction` (pas `unmatchTransaction`) ; la ligne redevient pointable |
+| RU19 | « Écarter ▾ » → « Charge » (unitaire ou bulk)                    | La tx part avec `vatRateBps: 2000` (20 % par défaut) ; visible dans l'onglet Charges, colonne TVA ; « dont X € de TVA » sous le sélecteur (TVA dérivée du TTC, ex. 120 € → 20 €) |
+| RU20 | Onglet Charges ou Produits : sélecteur TVA d'une ligne (À qualifier / 0 % / 5,5 % / 10 % / 20 %) | Mutation `setVatRate` ; le montant de TVA affiché et la carte « TVA récupérable » de la page Trésorerie se mettent à jour (réactivité) ; « À qualifier » remet le taux à null ; pas de colonne TVA sur les onglets Impôts/Virements internes |
+| RU21 | « Annuler » sur une charge qualifiée → re-classer en charge      | Le retour en file efface `vatRateBps` (invariant `lib/pointage.ts`) ; le re-classement repart au défaut 20 % |
 
 ### Réattribution depuis la page d'un deal (`/app/$orgSlug/deals/$dealId`)
 

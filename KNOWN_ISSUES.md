@@ -222,8 +222,8 @@ The shell guard in `package.json` → `build:vercel` requires **both**
 - **Why `VERCEL_ENV`, not `VERCEL=1`** : `CONVEX_DEPLOY_KEY` is a
   *production* key and, in practice, Vercel forwards it to **Preview**
   builds too (env-var scoping in the dashboard is not always honored).
-  A `VERCEL=1` guard therefore let preview/branch builds (PRs,
-  release-please) run `convex deploy` with a prod key from a non-prod
+  A `VERCEL=1` guard therefore let preview/branch builds (PRs) run
+  `convex deploy` with a prod key from a non-prod
   env → Convex aborts with *"non-production build environment and
   CONVEX_DEPLOY_KEY for a production deployment"* → build exits 1.
   Gating on `VERCEL_ENV = production` is what actually keeps previews
@@ -408,6 +408,25 @@ cette zone :
    (Pending/Running/Completed/Parameters/Result) sont exposés en props
    (`statusLabel`, `label`, `errorLabel`) renseignées par `AiPanel` via
    `t('chat:tool.*')`. À re-vérifier après une maj du composant.
+
+## tailwind-merge v3 obligatoire avec les composants shadcn « Tailwind v4 »
+
+Les composants `src/components/ui/*` (générés pour Tailwind v4) utilisent le
+modificateur important **suffixe** (`p-0!`, `size-8!`). tailwind-merge **v2**
+ne connaît que le préfixe v3 (`!p-0`) : il ne déduplique pas ces classes, donc
+deux utilitaires en conflit restent tous les deux dans le `className` et c'est
+l'**ordre CSS** qui tranche — pas l'ordre des arguments de `cn()`. Symptôme
+historique : dans `sidebar.tsx`, `group-data-[collapsible=icon]:p-2!` (base)
+battait `…:p-0!` (variant `size="lg"`) → boutons repliés de 32 px avec 8 px de
+padding → logo d'orga et avatar (32 px, `shrink-0`) rognés/déformés en mode
+icône. Fix : `tailwind-merge@^3` (aligné Tailwind v4). Ne pas redescendre en
+v2.
+
+Piège voisin (non lié à la version) : un utilitaire nu (`h-4`) ne surcharge
+**jamais** la même propriété portée par un variant `data-[…]:` du composant
+(`data-[orientation=vertical]:h-full` gagne en spécificité). Surcharger avec
+le même variant — `data-[orientation=vertical]:h-4` — comme dans les
+templates shadcn officiels.
 
 ## Vercel framework preset traps TanStack Start
 
@@ -797,6 +816,36 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   sont alignées par `transactions:backfillAllocation` (one-shot par org,
   idempotent, n'écrit rien dans `matchingDecisions`). Tout nouveau code qui
   écrit `dealId` doit écrire `allocation` dans le même patch.
+
+## TVA récupérable (`convex/lib/vat.ts`, `transactions:getVatPosition`)
+
+Suivi minimal de la TVA pour fiabiliser les charges réelles et la position de
+TVA récupérable (carte sur la page Trésorerie). Pas un module de déclaration.
+
+- **Les montants de transaction sont toujours TTC.** Le taux de TVA
+  (`vatRateBps` : 0 / 550 / 1000 / 2000) est stocké sur la transaction ; le
+  montant de TVA est **toujours dérivé, jamais stocké** :
+  `vatCents = round(amount × taux / (10000 + taux))`. La dérivation vit dans
+  `convex/lib/vat.ts`, miroir front `src/lib/vat.ts` (même convention que
+  `searchText.ts`) — garder les deux identiques (testé par
+  `tests/vat.test.ts`).
+- **Invariant : `vatRateBps` n'existe que sur `charge` / `product`.** Tout
+  pointage qui fait quitter ces statuts (match deal, allocation passif,
+  unmatch, re-catégorisation en ignored/tax/internal_transfer) l'efface —
+  enforced dans `convex/lib/pointage.ts`, ne pas contourner.
+- **L'historique n'est pas backfillé, exprès.** Une charge sans taux est
+  « à qualifier » (un /1,2 global serait faux : salaires, assurances, frais
+  bancaires sont exonérés). La qualification se fait ligne à ligne dans les
+  onglets Charges/Produits du pointage (`setVatRate`, accepte `null` pour
+  revenir à « à qualifier »), ou via l'outil agent `categorizeTransaction`.
+  Le défaut 20 % ne s'applique qu'aux **nouvelles** catégorisations en charge
+  depuis l'UI (`DEFAULT_VAT_RATE_BPS`, côté front exprès — backend neutre).
+- **`getVatPosition` est signée par le sens** : une charge `in` (avoir
+  fournisseur) se déduit de la TVA déductible, un produit `out` de la TVA
+  collectée. Les règlements/remboursements de TVA avec l'État restent en
+  statut `tax` et ne sont **pas nettés** contre la position en V1 — la carte
+  montre la position cumulée, pas le solde restant à récupérer après
+  déclarations.
 
 ## Passif — `equityPositions` / `intercompanyLoans` / soldes dérivés (`convex/liabilities.ts`)
 

@@ -1,14 +1,13 @@
 # Nouveautés
 
 <!--
-  Trace en prose des évolutions visibles par les utilisateurs, une entrée par
-  lot/release, du plus récent au plus ancien. Langage produit, pas technique
-  (pas de chemins de fichiers ni de noms de fonctions) — ce fichier est rendu
-  tel quel dans l'app sur /app/$orgSlug/changelog (import ?raw).
+  Trace en prose des évolutions, une entrée versionnée par PR
+  (`## vX.Y.Z — JJ/MM/AAAA à HH:MM — titre`), du plus récent au plus
+  ancien. Langage produit, pas technique (pas de chemins de fichiers ni de
+  noms de fonctions) — ce fichier est rendu tel quel dans l'app sur
+  /app/$orgSlug/changelog (import ?raw).
 
-  Ne pas confondre avec CHANGELOG.md (généré automatiquement par
-  release-please à partir des commits — technique). Règle d'alimentation :
-  CLAUDE.md § « Pre-PR doc audit » (question 5).
+  Règle d'alimentation : CLAUDE.md § « Pre-PR doc audit » (question 5).
 -->
 
 Ce que chaque mise à jour change pour vous, en clair — du plus récent au
@@ -17,7 +16,7 @@ bas de page.
 
 ---
 
-## Juin 2026 — Un assistant qui se manie comme les grands
+## v1.2.0 — 10/06/2026 à 23:19 — Un assistant qui se manie comme les grands
 
 ### 💬 Une vraie zone de saisie
 
@@ -38,6 +37,63 @@ statut, demande, résultat.
 ### ⌨️ Au clavier
 
 **⌘J / Ctrl+J** ouvre et ferme le panneau de l'assistant, prêt à taper.
+
+---
+
+## v1.1.0 — 10/06/2026 à 22:58 — La TVA récupérable, suivie au plus près
+
+Un vrai suivi de TVA fait son entrée pour fiabiliser les charges réelles :
+
+- **Un taux de TVA sur chaque charge et produit.** Quand vous classez une
+  transaction en charge, elle part avec 20 % de TVA par défaut — ajustable
+  ligne à ligne (0 %, 5,5 %, 10 %, 20 %) dans les onglets Charges et
+  Produits du pointage. Les transactions déjà classées sont marquées
+  « à qualifier » : à vous de poser le bon taux (les salaires, assurances et
+  frais bancaires n'ont pas de TVA — pas de calcul global trompeur).
+- **Une carte « TVA récupérable » sur la page Trésorerie** : la TVA
+  déductible de vos charges moins la TVA collectée sur vos produits, avec le
+  nombre de transactions restant à qualifier. De quoi savoir où en est votre
+  créance de TVA pour le prévisionnel.
+- **L'assistant sait maintenant chercher dans toutes les transactions.**
+  « Combien a-t-on payé à Antese au total ? » : il retrouve tous les
+  paiements d'un fournisseur (rapprochés ou non) et répond avec les totaux —
+  TTC, et TVA incluse quand les lignes sont qualifiées.
+- **Le vert et le rouge partout.** Les badges Entrée/Sortie des deals et
+  Créance/Dette du passif passent en couleur, les entrées oubliées en noir
+  (dashboard, prévisionnel) passent au vert — le sens d'un mouvement se lit
+  désormais d'un coup d'œil sur toutes les pages.
+
+---
+
+## v1.0.3 — 10/06/2026 à 22:38 — Nettoyage de l'outillage interne
+
+Suppression d'un automatisme de publication qui n'avait jamais fonctionné.
+Aucun changement visible dans l'app.
+
+---
+
+## v1.0.2 — 10/06/2026 à 22:36 — Retouches visuelles du menu latéral
+
+Trois finitions sur l'habillage de l'app : le petit trait vertical à côté
+du bouton d'ouverture du menu reprend sa hauteur discrète (il ne barrait
+plus toute la barre du haut), le logo de l'organisation s'affiche sans
+liseré parasite, et le logo comme la photo de profil gardent leurs
+proportions quand le menu est replié en mode icônes.
+
+---
+
+## v1.0.1 — 10/06/2026 à 22:13 — Le changelog passe au suivi par version
+
+Chaque évolution porte désormais un numéro de version et la date et l'heure
+de sa mise en ligne — cette page devient l'historique précis de l'outil.
+
+---
+
+## v1.0.0 — 10/06/2026 à 21:58 — Les entrées en vert
+
+Dans toutes les vues de transactions (pointage, comptes bancaires, passif),
+les **entrées d'argent s'affichent en vert** — les sorties restent en rouge.
+Le sens d'un mouvement se lit d'un coup d'œil.
 
 ---
 
