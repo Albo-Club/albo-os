@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
+import type { EquityPositionRow, LoanRow } from './PassifTables'
 import { useReportError } from '~/components/pointage/TransactionSheet'
 import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
@@ -45,6 +46,9 @@ const EQUITY_TYPES = [
 /** Date du jour au format `YYYY-MM-DD` (valeur par défaut des champs date). */
 const today = () => new Date().toISOString().slice(0, 10)
 
+/** ms epoch → `YYYY-MM-DD` (préremplissage en mode édition). */
+const msToDateInput = (ms: number) => new Date(ms).toISOString().slice(0, 10)
+
 /** Parse un montant saisi en euros → cents (null si invalide ou ≤ 0). */
 function parseEuros(value: string): number | null {
   const parsed = Number.parseFloat(value.replace(',', '.'))
@@ -52,20 +56,23 @@ function parseEuros(value: string): number | null {
   return Math.round(parsed * 100)
 }
 
-// ─── « + Capital » ───────────────────────────────────────────────────────────
+// ─── « + Capital » / éditer ──────────────────────────────────────────────────
 
 /**
- * Dialog de création d'une position de capitaux propres émise par l'org
- * courante (`liabilities:createEquityPosition`). Le détenteur est soit une
- * org du groupe, soit un libellé libre, soit aucun.
+ * Dialog de création OU d'édition d'une position de capitaux propres émise
+ * par l'org courante (`liabilities:createEquityPosition` /
+ * `updateEquityPosition`). `position` absent = création. Le détenteur est
+ * soit une org du groupe, soit un libellé libre, soit aucun.
  */
 export function CreateEquityDialog({
   orgId,
   orgs,
+  position,
   onClose,
 }: {
   orgId: Id<'organizations'>
   orgs: Array<OrgOption>
+  position?: EquityPositionRow
   onClose: () => void
 }) {
   const { t } = useTranslation(['passif', 'common'])
@@ -73,14 +80,25 @@ export function CreateEquityDialog({
   const createEquityPosition = useConvexMutation(
     api.liabilities.createEquityPosition,
   )
+  const updateEquityPosition = useConvexMutation(
+    api.liabilities.updateEquityPosition,
+  )
 
-  const [type, setType] = useState<EquityType>('capital_social')
-  const [amount, setAmount] = useState('')
+  const [type, setType] = useState<EquityType>(position?.type ?? 'capital_social')
+  const [amount, setAmount] = useState(
+    position ? String(position.amountCents / 100) : '',
+  )
   // 'none' | 'external' | un _id d'organisation.
-  const [holder, setHolder] = useState<string>('none')
-  const [holderLabel, setHolderLabel] = useState('')
-  const [date, setDate] = useState(today())
-  const [shares, setShares] = useState('')
+  const [holder, setHolder] = useState<string>(
+    position?.holderOrgId ?? (position?.holderLabel ? 'external' : 'none'),
+  )
+  const [holderLabel, setHolderLabel] = useState(position?.holderLabel ?? '')
+  const [date, setDate] = useState(
+    position ? msToDateInput(position.effectiveDate) : today(),
+  )
+  const [shares, setShares] = useState(
+    position?.shares != null ? String(position.shares) : '',
+  )
   const [pending, setPending] = useState(false)
 
   // L'org émettrice ne peut pas détenir son propre capital.
@@ -92,14 +110,13 @@ export function CreateEquityDialog({
     date !== '' &&
     (holder !== 'external' || holderLabel.trim() !== '')
 
-  async function handleCreate() {
+  async function handleSave() {
     // `valid` implique `amountCents !== null` (narrowing TS par alias).
     if (!valid) return
     setPending(true)
     try {
       const sharesValue = Number.parseInt(shares, 10)
-      await createEquityPosition({
-        orgId,
+      const fields = {
         type,
         amountCents,
         holderOrgId:
@@ -109,8 +126,14 @@ export function CreateEquityDialog({
         holderLabel: holder === 'external' ? holderLabel.trim() : undefined,
         shares: Number.isFinite(sharesValue) ? sharesValue : undefined,
         effectiveDate: new Date(date).getTime(),
-      })
-      toast.success(t('passif:create.equity.success'))
+      }
+      if (position) {
+        await updateEquityPosition({ positionId: position._id, ...fields })
+        toast.success(t('passif:edit.equity.success'))
+      } else {
+        await createEquityPosition({ orgId, ...fields })
+        toast.success(t('passif:create.equity.success'))
+      }
       onClose()
     } catch (err) {
       reportError(err)
@@ -123,7 +146,11 @@ export function CreateEquityDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t('passif:create.equity.title')}</DialogTitle>
+          <DialogTitle>
+            {position
+              ? t('passif:edit.equity.title')
+              : t('passif:create.equity.title')}
+          </DialogTitle>
           <DialogDescription>
             {t('passif:create.equity.description')}
           </DialogDescription>
@@ -222,10 +249,10 @@ export function CreateEquityDialog({
             {t('common:actions.cancel')}
           </Button>
           <Button
-            onClick={() => void handleCreate()}
+            onClick={() => void handleSave()}
             disabled={!valid || pending}
           >
-            {t('common:actions.create')}
+            {position ? t('common:actions.save') : t('common:actions.create')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -233,20 +260,24 @@ export function CreateEquityDialog({
   )
 }
 
-// ─── « + Compte courant » ────────────────────────────────────────────────────
+// ─── « + Compte courant » / éditer ───────────────────────────────────────────
 
 /**
- * Dialog de création d'un compte courant inter-entités créancier → débiteur
- * (`liabilities:createIntercompanyLoan`). L'org courante est pré-remplie
- * côté créancier. Taux en % converti en bps ; absent = non rémunéré.
+ * Dialog de création OU d'édition d'un compte courant inter-entités
+ * créancier → débiteur (`liabilities:createIntercompanyLoan` /
+ * `updateIntercompanyLoan`). `loan` absent = création. En édition les parties
+ * ne sont PAS modifiables (le solde dérivé dépend de l'identité du prêt) :
+ * seuls date, taux et blocage le sont. Taux en % converti en bps.
  */
 export function CreateLoanDialog({
   orgId,
   orgs,
+  loan,
   onClose,
 }: {
   orgId: Id<'organizations'>
   orgs: Array<OrgOption>
+  loan?: LoanRow
   onClose: () => void
 }) {
   const { t } = useTranslation(['passif', 'common'])
@@ -254,13 +285,20 @@ export function CreateLoanDialog({
   const createIntercompanyLoan = useConvexMutation(
     api.liabilities.createIntercompanyLoan,
   )
+  const updateIntercompanyLoan = useConvexMutation(
+    api.liabilities.updateIntercompanyLoan,
+  )
 
-  const [fromOrgId, setFromOrgId] = useState<string>(orgId)
-  const [toOrgId, setToOrgId] = useState<string>('')
-  const [date, setDate] = useState(today())
-  const [remunerated, setRemunerated] = useState(false)
-  const [rate, setRate] = useState('')
-  const [isBlocked, setIsBlocked] = useState(false)
+  const [fromOrgId, setFromOrgId] = useState<string>(loan?.fromOrgId ?? orgId)
+  const [toOrgId, setToOrgId] = useState<string>(loan?.toOrgId ?? '')
+  const [date, setDate] = useState(
+    loan ? msToDateInput(loan.openedDate) : today(),
+  )
+  const [remunerated, setRemunerated] = useState(loan?.interestRateBps != null)
+  const [rate, setRate] = useState(
+    loan?.interestRateBps != null ? String(loan.interestRateBps / 100) : '',
+  )
+  const [isBlocked, setIsBlocked] = useState(loan?.isBlocked ?? false)
   const [pending, setPending] = useState(false)
 
   const ratePct = Number.parseFloat(rate.replace(',', '.'))
@@ -271,18 +309,26 @@ export function CreateLoanDialog({
     date !== '' &&
     (!remunerated || (Number.isFinite(ratePct) && ratePct >= 0))
 
-  async function handleCreate() {
+  async function handleSave() {
     if (!valid) return
     setPending(true)
     try {
-      await createIntercompanyLoan({
-        fromOrgId: fromOrgId as Id<'organizations'>,
-        toOrgId: toOrgId as Id<'organizations'>,
+      const fields = {
         interestRateBps: remunerated ? Math.round(ratePct * 100) : undefined,
         isBlocked,
         openedDate: new Date(date).getTime(),
-      })
-      toast.success(t('passif:create.loan.success'))
+      }
+      if (loan) {
+        await updateIntercompanyLoan({ loanId: loan._id, ...fields })
+        toast.success(t('passif:edit.loan.success'))
+      } else {
+        await createIntercompanyLoan({
+          fromOrgId: fromOrgId as Id<'organizations'>,
+          toOrgId: toOrgId as Id<'organizations'>,
+          ...fields,
+        })
+        toast.success(t('passif:create.loan.success'))
+      }
       onClose()
     } catch (err) {
       reportError(err)
@@ -296,7 +342,7 @@ export function CreateLoanDialog({
     onChange: (value: string) => void,
     placeholder: string,
   ) => (
-    <Select value={value} onValueChange={onChange}>
+    <Select value={value} onValueChange={onChange} disabled={!!loan}>
       <SelectTrigger className="w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
@@ -314,9 +360,13 @@ export function CreateLoanDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t('passif:create.loan.title')}</DialogTitle>
+          <DialogTitle>
+            {loan ? t('passif:edit.loan.title') : t('passif:create.loan.title')}
+          </DialogTitle>
           <DialogDescription>
-            {t('passif:create.loan.description')}
+            {loan
+              ? t('passif:edit.loan.description')
+              : t('passif:create.loan.description')}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -394,10 +444,10 @@ export function CreateLoanDialog({
             {t('common:actions.cancel')}
           </Button>
           <Button
-            onClick={() => void handleCreate()}
+            onClick={() => void handleSave()}
             disabled={!valid || pending}
           >
-            {t('common:actions.create')}
+            {loan ? t('common:actions.save') : t('common:actions.create')}
           </Button>
         </DialogFooter>
       </DialogContent>

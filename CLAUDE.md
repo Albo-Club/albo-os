@@ -102,6 +102,8 @@ Docs are for the *why* and the *trap*.
 - `CHANGELOG_PRODUIT.md` — user-facing release notes in French, one entry
   per lot/release, product language. Hand-written (distinct from the
   technical `CHANGELOG.md` that release-please generates from commits).
+- `MIGRATIONS.md` — index of one-shot prod data operations (seeds, imports,
+  purges) pointing to the module-level runbooks, plus in-flight chantiers.
 - `AGENTS.md` — pointer to the agent-skill workflow. Static, rarely changes.
 
 If you're about to add the same info to two of these files, you're doing it

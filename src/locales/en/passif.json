@@ -74,6 +74,23 @@
     "ambiguous_holder": "Pick either an organization or a free-text label, not both.",
     "same_org": "The creditor and the debtor must be two different organizations.",
     "not_a_party": "You must be a member of at least one of the two organizations of the current account.",
-    "invalid_rate": "The rate must be positive."
+    "invalid_rate": "The rate must be positive.",
+    "has_allocations": "Transactions are still allocated to this line. Detach them first."
+  },
+  "edit": {
+    "equity": {
+      "title": "Edit equity position",
+      "success": "Equity position updated"
+    },
+    "loan": {
+      "title": "Edit current account",
+      "description": "The creditor and debtor cannot be changed — delete and recreate the account instead.",
+      "success": "Current account updated"
+    }
+  },
+  "delete": {
+    "confirmTitle": "Delete this line?",
+    "confirmBody": "Deletion is refused while transactions are still allocated to it — detach them first.",
+    "success": "Deleted"
   }
 }

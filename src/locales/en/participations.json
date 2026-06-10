@@ -40,7 +40,8 @@
     "deals": "Deals",
     "committed": "Committed",
     "paid": "Paid",
-    "received": "Received"
+    "received": "Received",
+    "tvpi": "TVPI"
   },
   "deal": {
     "instrument": "Instrument",
@@ -66,7 +67,8 @@
     "exited": "Exited",
     "currency": "Currency",
     "notes": "Notes",
-    "status": "Status"
+    "status": "Status",
+    "tvpi": "TVPI"
   },
   "status": {
     "active": "Active",
@@ -202,6 +204,13 @@
     "errors": {
       "too_large": "File is larger than 20 MB",
       "default": "Something went wrong"
+    }
+  },
+  "export": {
+    "button": "Export CSV",
+    "col": {
+      "deal": "Deal name",
+      "lastValuation": "Last valuation"
     }
   }
 }

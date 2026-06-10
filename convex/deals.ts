@@ -89,11 +89,25 @@ export async function transactionTotals(ctx: Ctx, dealId: Id<'deals'>) {
   return { paidActual, received }
 }
 
+/** Dernière valorisation connue d'un deal (cents), null si aucune. */
+export async function lastValuationCents(
+  ctx: Ctx,
+  dealId: Id<'deals'>,
+): Promise<number | null> {
+  const last = await ctx.db
+    .query('valuations')
+    .withIndex('by_deal_asof', (q) => q.eq('dealId', dealId))
+    .order('desc')
+    .first()
+  return last?.fairValue ?? null
+}
+
 /**
  * Liste enrichie des deals (deal + noms investor/target/spv) d'une org,
  * filtrable par status / target. Sert la vue Participations par-org
  * (regroupée par société côté client). Tri par défaut : signedDate desc.
- * Inclut par deal les montants Versé/Reçu calculés depuis les transactions.
+ * Inclut par deal les montants Versé/Reçu calculés depuis les transactions
+ * et la dernière valorisation connue (TVPI côté client).
  */
 export const list = query({
   args: {
@@ -125,6 +139,7 @@ export const list = query({
       rows.map(async (d) => ({
         ...(await enrich(ctx, d)),
         ...(await transactionTotals(ctx, d._id)),
+        lastValuationCents: await lastValuationCents(ctx, d._id),
       })),
     )
   },

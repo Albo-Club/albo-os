@@ -13,6 +13,34 @@
 
 ---
 
+## Juin 2026 — La finition qui change tout
+
+### 💶 Le passé et le futur sur la même courbe
+
+La courbe de trésorerie montre désormais **le solde réel des 6 derniers
+mois** (trait plein) qui se prolonge en **solde projeté** (pointillé) — on
+voit d'un coup d'œil d'où l'on vient et où l'on va, sans rupture.
+
+### 📐 Le TVPI partout
+
+La table des participations affiche le **multiple de chaque société et de
+chaque deal** (distribué + valeur résiduelle, rapportés au capital versé).
+Et toutes les colonnes se **trient d'un clic**.
+
+### 📤 Export Excel
+
+Un bouton **Exporter CSV** sur les participations : la liste filtrée part
+dans Excel, prête à retravailler.
+
+### ✏️ Le passif s'édite enfin
+
+Les positions de capital et les comptes courants se **modifient et se
+suppriment** directement depuis la page Passif. Garde-fou : une ligne sur
+laquelle des transactions sont encore pointées ne peut pas être supprimée —
+on détache d'abord, on supprime ensuite.
+
+---
+
 ## Juin 2026 — Le pilotage en un coup d'œil
 
 ### 📊 Un vrai tableau de bord

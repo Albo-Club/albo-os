@@ -74,6 +74,23 @@
     "ambiguous_holder": "Choisissez soit une organisation, soit un libellé libre, pas les deux.",
     "same_org": "Le créancier et le débiteur doivent être deux organisations différentes.",
     "not_a_party": "Vous devez être membre d'au moins une des deux organisations du compte courant.",
-    "invalid_rate": "Le taux doit être positif."
+    "invalid_rate": "Le taux doit être positif.",
+    "has_allocations": "Des transactions sont encore pointées sur cette ligne. Détachez-les d’abord."
+  },
+  "edit": {
+    "equity": {
+      "title": "Modifier la position de capital",
+      "success": "Position de capital mise à jour"
+    },
+    "loan": {
+      "title": "Modifier le compte courant",
+      "description": "Le créancier et le débiteur ne sont pas modifiables — supprimez puis recréez le compte.",
+      "success": "Compte courant mis à jour"
+    }
+  },
+  "delete": {
+    "confirmTitle": "Supprimer cette ligne ?",
+    "confirmBody": "La suppression est refusée tant que des transactions y sont pointées — détachez-les d’abord.",
+    "success": "Supprimé"
   }
 }

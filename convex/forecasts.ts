@@ -17,10 +17,12 @@ import { requireAppUser, requireOrgMember } from './lib/auth'
 import {
   addMonthsUtc,
   buildMonthlyBalance,
+  buildMonthlyHistory,
   entryUpsertAction,
   expandOccurrences,
   ruleDerivedKey,
 } from './lib/recurrence'
+import type { HistoryTx } from './lib/recurrence'
 import type { DataModel, Doc, Id } from './_generated/dataModel'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
 
@@ -355,24 +357,98 @@ export async function expandRulesForOrgs(
  *   `ignoredNonEur*` pour visibilité.
  *
  * Sans `orgId` : consolidé sur toutes les orgs dont l'utilisateur est membre.
+ *
+ * `historyMonths` (optionnel) ajoute `history` : le solde réel de fin de mois
+ * des N derniers mois, reconstruit à rebours depuis le solde courant et les
+ * transactions des comptes EUR — la jonction réel → projeté de la courbe.
  */
 export const getForecastBalance = query({
   args: {
     orgId: v.optional(v.id('organizations')),
     horizonMonths: v.number(),
     minConfidence: v.optional(confidenceValidator),
+    historyMonths: v.optional(v.number()),
   },
-  handler: async (ctx, { orgId, horizonMonths, minConfidence }) => {
+  handler: async (
+    ctx,
+    { orgId, horizonMonths, minConfidence, historyMonths },
+  ) => {
     assertValidHorizon(horizonMonths)
     const orgIds = await resolveOrgScope(ctx, orgId)
-    return await computeForecastBalanceForOrgs(
+    const balance = await computeForecastBalanceForOrgs(
       ctx,
       orgIds,
       horizonMonths,
       minConfidence,
     )
+    if (!historyMonths) return { ...balance, history: null }
+
+    assertValidHorizon(historyMonths)
+    const history = await computeCashHistoryForOrgs(
+      ctx,
+      orgIds,
+      historyMonths,
+      balance.startingBalanceCents,
+    )
+    return { ...balance, history }
   },
 })
+
+/**
+ * Solde réel de fin de mois des `monthsBack` derniers mois (comptes EUR non
+ * archivés uniquement, même périmètre que le solde de départ projeté). Le
+ * calcul à rebours est pur (convex/lib/recurrence.ts:buildMonthlyHistory).
+ */
+async function computeCashHistoryForOrgs(
+  ctx: GenericQueryCtx<DataModel>,
+  orgIds: Array<Id<'organizations'>>,
+  monthsBack: number,
+  currentBalanceCents: number,
+) {
+  const now = Date.now()
+  const nowDate = new Date(now)
+  const windowStart = addMonthsUtc(
+    Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), 1),
+    -monthsBack,
+  )
+
+  const transactions: Array<HistoryTx> = []
+  for (const oid of orgIds) {
+    const accounts = await ctx.db
+      .query('bankAccounts')
+      .withIndex('by_org', (q) => q.eq('orgId', oid))
+      .collect()
+    const eurAccountIds = new Set(
+      accounts
+        .filter((a) => !a.archivedAt && a.currency === 'EUR')
+        .map((a) => a._id),
+    )
+    const txs = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_date', (q) =>
+        q.eq('orgId', oid).gte('transactionDate', windowStart).lte(
+          'transactionDate',
+          now,
+        ),
+      )
+      .collect()
+    for (const tx of txs) {
+      if (!eurAccountIds.has(tx.bankAccountId)) continue
+      transactions.push({
+        transactionDate: tx.transactionDate,
+        amountCents: tx.amount,
+        direction: tx.direction,
+      })
+    }
+  }
+
+  return buildMonthlyHistory({
+    transactions,
+    currentBalanceCents,
+    monthsBack,
+    now,
+  })
+}
 
 /**
  * Cœur du solde projeté (sans auth) — partagé entre la query publique et

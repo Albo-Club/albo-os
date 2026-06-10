@@ -1,5 +1,12 @@
 import { useMemo, useState } from 'react'
-import { ArrowUpRight, ChevronRight } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ArrowUpRight,
+  ChevronRight,
+  Download,
+} from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
@@ -16,6 +23,7 @@ import {
   TableRow,
 } from '~/components/ui/table'
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
+import { downloadCsv, toCsv } from '~/lib/csv'
 import { normalizeSearch } from '~/lib/searchText'
 
 /** Forme minimale d'un deal enrichi, commune aux vues par-org et agrégée. */
@@ -34,8 +42,20 @@ export type DealRow = {
   paidActual?: number | null
   /** Reçu : somme des transactions entrantes rattachées (calculé serveur). */
   received?: number | null
+  /** Dernière valorisation connue (cents), null si aucune (calculé serveur). */
+  lastValuationCents?: number | null
   signedDate?: number | null
   org?: { name: string; slug: string } | null // présent en vue agrégée
+}
+
+/**
+ * Valeur résiduelle d'un deal pour le TVPI : 0 si sorti/passé en perte,
+ * sinon dernière valo connue, à défaut le coût (convention du dashboard —
+ * convex/dashboard.ts NAV).
+ */
+function residualCents(deal: DealRow): number {
+  if (deal.status === 'fully_exited' || deal.status === 'written_off') return 0
+  return deal.lastValuationCents ?? deal.paidActual ?? 0
 }
 
 function statusVariant(s: string): 'default' | 'secondary' | 'destructive' {
@@ -53,7 +73,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-/** Formateurs €/date localisés, partagés par les composants ci-dessous. */
+/** Formateurs €/date/multiple localisés, partagés par les composants ci-dessous. */
 export function useFormatters() {
   const { i18n } = useTranslation('participations')
   const lang = i18n.language
@@ -73,7 +93,14 @@ export function useFormatters() {
           month: 'short',
           day: 'numeric',
         })
-  return { fmtEur, fmtDate }
+  const fmtMultiple = (ratio: number | null) =>
+    ratio == null
+      ? '—'
+      : `${new Intl.NumberFormat(lang, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(ratio)}×`
+  return { fmtEur, fmtDate, fmtMultiple }
 }
 
 /**
@@ -110,13 +137,16 @@ export function DealsList({
   orgSlug?: string
 }) {
   const { t } = useTranslation('participations')
-  const { fmtEur, fmtDate } = useFormatters()
+  const { fmtEur, fmtDate, fmtMultiple } = useFormatters()
   const dealTitle = useDealTitle()
   const cellClass =
     'grid grid-cols-2 gap-x-6 gap-y-1 px-6 py-3 text-sm sm:grid-cols-5'
   return (
     <div className="divide-y">
       {deals.map((dl) => {
+        const paid = dl.paidActual ?? 0
+        const tvpi =
+          paid > 0 ? ((dl.received ?? 0) + residualCents(dl)) / paid : null
         const body = (
           <>
             <Field label={t('deal.instrument')}>{dealTitle(dl)}</Field>
@@ -134,6 +164,7 @@ export function DealsList({
             </Field>
             <Field label={t('deal.paid')}>{fmtEur(dl.paidActual ?? 0)}</Field>
             <Field label={t('deal.received')}>{fmtEur(dl.received ?? 0)}</Field>
+            <Field label={t('deal.tvpi')}>{fmtMultiple(tvpi)}</Field>
             <Field label={t('deal.status')}>
               <Badge variant={statusVariant(dl.status)}>
                 {t(`status.${dl.status}`, { defaultValue: dl.status })}
@@ -167,6 +198,37 @@ export function DealsList({
  * (vue agrégée cross-org). `orgSlug` (vue par-org) cible le lien de détail ;
  * en vue agrégée, le slug est dérivé de l'org de chaque deal.
  */
+type SortKey = 'name' | 'committed' | 'paid' | 'received' | 'tvpi'
+
+/** Entête cliquable de colonne triable (asc ⇄ desc). */
+function SortableHead({
+  label,
+  active,
+  dir,
+  onClick,
+  className,
+}: {
+  label: string
+  active: boolean
+  dir: 'asc' | 'desc'
+  onClick: () => void
+  className?: string
+}) {
+  const Icon = active ? (dir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown
+  return (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={onClick}
+        className="hover:text-foreground inline-flex items-center gap-1"
+      >
+        {label}
+        <Icon className={`size-3.5 ${active ? '' : 'opacity-40'}`} />
+      </button>
+    </TableHead>
+  )
+}
+
 export function ParticipationsTable({
   deals,
   showOrg = false,
@@ -177,7 +239,7 @@ export function ParticipationsTable({
   orgSlug?: string
 }) {
   const { t } = useTranslation('participations')
-  const { fmtEur } = useFormatters()
+  const { fmtEur, fmtMultiple } = useFormatters()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -221,6 +283,7 @@ export function ParticipationsTable({
         committed: number
         paid: number
         received: number
+        residual: number
       }
     >()
     for (const d of filtered) {
@@ -233,29 +296,113 @@ export function ParticipationsTable({
         committed: 0,
         paid: 0,
         received: 0,
+        residual: 0,
       }
       g.deals.push(d)
       if (d.org) g.orgs.add(d.org.name)
       g.committed += d.committedAmount ?? 0
       g.paid += d.paidActual ?? 0
       g.received += d.received ?? 0
+      g.residual += residualCents(d)
       map.set(key, g)
     }
-    return Array.from(map.entries()).map(([id, g]) => ({ id, ...g }))
+    return Array.from(map.entries()).map(([id, g]) => ({
+      id,
+      ...g,
+      tvpi: g.paid > 0 ? (g.received + g.residual) / g.paid : null,
+    }))
   }, [filtered, orgSlug])
 
-  const colSpan = showOrg ? 6 : 5
+  // Tri par colonne (client, volumes faibles). null = ordre serveur
+  // (signedDate desc). Les TVPI absents passent en fin de liste.
+  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' } | null>(
+    null,
+  )
+  const toggleSort = (key: SortKey) =>
+    setSort((prev) =>
+      prev?.key === key
+        ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: key === 'name' ? 'asc' : 'desc' },
+    )
+  const sortedGroups = useMemo(() => {
+    if (!groups || !sort) return groups
+    const value = (g: NonNullable<typeof groups>[number]) =>
+      sort.key === 'name'
+        ? g.name
+        : sort.key === 'tvpi'
+          ? (g.tvpi ?? Number.NEGATIVE_INFINITY)
+          : g[sort.key]
+    const sign = sort.dir === 'asc' ? 1 : -1
+    return [...groups].sort((a, b) => {
+      const va = value(a)
+      const vb = value(b)
+      if (typeof va === 'string' && typeof vb === 'string') {
+        return sign * va.localeCompare(vb)
+      }
+      return sign * (Number(va) - Number(vb))
+    })
+  }, [groups, sort])
+
+  // Export CSV des deals filtrés (à plat, un deal par ligne).
+  function handleExport() {
+    if (!filtered) return
+    const headers = [
+      t('col.company'),
+      t('export.col.deal'),
+      t('deal.instrument'),
+      t('deal.investor'),
+      t('deal.status'),
+      t('col.committed'),
+      t('col.paid'),
+      t('col.received'),
+      t('export.col.lastValuation'),
+      t('col.tvpi'),
+      t('deal.signed'),
+    ]
+    const euros = (cents?: number | null) =>
+      cents == null ? null : (cents / 100).toFixed(2)
+    const rows = filtered.map((d) => {
+      const paid = d.paidActual ?? 0
+      const tvpi =
+        paid > 0 ? ((d.received ?? 0) + residualCents(d)) / paid : null
+      return [
+        d.target?.name ?? '',
+        d.name ?? '',
+        t(`instrument.${d.instrumentKind}`, {
+          defaultValue: d.instrumentKind,
+        }),
+        d.investor?.name ?? '',
+        t(`status.${d.status}`, { defaultValue: d.status }),
+        euros(d.committedAmount),
+        euros(d.paidActual ?? 0),
+        euros(d.received ?? 0),
+        euros(d.lastValuationCents),
+        tvpi == null ? null : tvpi.toFixed(2),
+        d.signedDate ? new Date(d.signedDate).toISOString().slice(0, 10) : null,
+      ]
+    })
+    const day = new Date().toISOString().slice(0, 10)
+    downloadCsv(`participations-${day}.csv`, toCsv(headers, rows))
+  }
+
+  const colSpan = showOrg ? 7 : 6
 
   // Barre de recherche affichée dès qu'il y a des deals — y compris quand la
   // recherche courante ne matche rien (sinon impossible de l'effacer).
   const searchBar = deals && deals.length > 0 && (
-    <Input
-      type="search"
-      value={search}
-      onChange={(e) => setSearch(e.target.value)}
-      placeholder={t('search.placeholder')}
-      className="max-w-sm"
-    />
+    <div className="flex items-center justify-between gap-3">
+      <Input
+        type="search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder={t('search.placeholder')}
+        className="max-w-sm"
+      />
+      <Button variant="outline" size="sm" onClick={handleExport}>
+        <Download className="size-4" />
+        {t('export.button')}
+      </Button>
+    </div>
   )
 
   if (groups && groups.length === 0) {
@@ -276,16 +423,46 @@ export function ParticipationsTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{t('col.company')}</TableHead>
+              <SortableHead
+                label={t('col.company')}
+                active={sort?.key === 'name'}
+                dir={sort?.dir ?? 'asc'}
+                onClick={() => toggleSort('name')}
+              />
               {showOrg && <TableHead>{t('col.org')}</TableHead>}
               <TableHead className="text-right">{t('col.deals')}</TableHead>
-              <TableHead className="text-right">{t('col.committed')}</TableHead>
-              <TableHead className="text-right">{t('col.paid')}</TableHead>
-              <TableHead className="text-right">{t('col.received')}</TableHead>
+              <SortableHead
+                label={t('col.committed')}
+                active={sort?.key === 'committed'}
+                dir={sort?.dir ?? 'desc'}
+                onClick={() => toggleSort('committed')}
+                className="text-right"
+              />
+              <SortableHead
+                label={t('col.paid')}
+                active={sort?.key === 'paid'}
+                dir={sort?.dir ?? 'desc'}
+                onClick={() => toggleSort('paid')}
+                className="text-right"
+              />
+              <SortableHead
+                label={t('col.received')}
+                active={sort?.key === 'received'}
+                dir={sort?.dir ?? 'desc'}
+                onClick={() => toggleSort('received')}
+                className="text-right"
+              />
+              <SortableHead
+                label={t('col.tvpi')}
+                active={sort?.key === 'tvpi'}
+                dir={sort?.dir ?? 'desc'}
+                onClick={() => toggleSort('tvpi')}
+                className="text-right"
+              />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {!groups ? (
+            {!sortedGroups ? (
               <TableRow>
                 <TableCell
                   colSpan={colSpan}
@@ -295,7 +472,7 @@ export function ParticipationsTable({
                 </TableCell>
               </TableRow>
             ) : (
-              groups.map((g) => {
+              sortedGroups.map((g) => {
                 const isOpen = expanded.has(g.id)
                 return (
                   <CompanyRows
@@ -306,6 +483,7 @@ export function ParticipationsTable({
                     showOrg={showOrg}
                     colSpan={colSpan}
                     fmtEur={fmtEur}
+                    fmtMultiple={fmtMultiple}
                   />
                 )
               })
@@ -324,6 +502,7 @@ function CompanyRows({
   showOrg,
   colSpan,
   fmtEur,
+  fmtMultiple,
 }: {
   group: {
     id: string
@@ -334,12 +513,14 @@ function CompanyRows({
     committed: number
     paid: number
     received: number
+    tvpi: number | null
   }
   isOpen: boolean
   onToggle: () => void
   showOrg: boolean
   colSpan: number
   fmtEur: (c?: number | null) => string
+  fmtMultiple: (ratio: number | null) => string
 }) {
   const { t } = useTranslation('participations')
   return (
@@ -389,6 +570,9 @@ function CompanyRows({
         </TableCell>
         <TableCell className="text-right tabular-nums">
           {fmtEur(group.received)}
+        </TableCell>
+        <TableCell className="text-right tabular-nums">
+          {fmtMultiple(group.tvpi)}
         </TableCell>
       </TableRow>
       {isOpen && (

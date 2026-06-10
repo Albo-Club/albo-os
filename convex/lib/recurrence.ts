@@ -143,6 +143,67 @@ export function buildMonthlyBalance(params: {
   return { months, ignoredNonEurEntries }
 }
 
+// ─── Historique mensuel du solde réel ───────────────────────────────────────
+
+/** Champs d'une transaction réelle nécessaires à l'historique du solde. */
+export type HistoryTx = {
+  transactionDate: number
+  amountCents: number
+  direction: 'in' | 'out'
+}
+
+export type MonthlyHistoryPoint = {
+  monthKey: string
+  /** Solde en fin de mois (mois courant : solde à `now`). */
+  balanceCents: number
+}
+
+/**
+ * Reconstruit le solde de fin de mois des `monthsBack` derniers mois à
+ * REBOURS depuis le solde courant : solde(fin de M) = solde courant − somme
+ * des flux nets postérieurs à M. Le dernier point est le mois courant au
+ * solde courant — il sert de jonction avec la courbe projetée.
+ *
+ * Les transactions hors fenêtre (avant `monthsBack` mois ou après `now`)
+ * sont ignorées. Sortie chronologique, `monthsBack + 1` points.
+ */
+export function buildMonthlyHistory(params: {
+  transactions: Array<HistoryTx>
+  currentBalanceCents: number
+  monthsBack: number
+  now: number
+}): Array<MonthlyHistoryPoint> {
+  const currentMonthStart = startOfMonthUtc(params.now)
+
+  // Flux net par mois de la fenêtre (les mois sans flux comptent 0).
+  const netByMonth = new Map<string, number>()
+  for (let k = 0; k <= params.monthsBack; k++) {
+    netByMonth.set(monthKey(addMonthsUtc(currentMonthStart, -k)), 0)
+  }
+  for (const tx of params.transactions) {
+    if (tx.transactionDate > params.now) continue
+    const key = monthKey(tx.transactionDate)
+    const net = netByMonth.get(key)
+    if (net === undefined) continue // hors fenêtre
+    netByMonth.set(
+      key,
+      net + (tx.direction === 'in' ? tx.amountCents : -tx.amountCents),
+    )
+  }
+
+  // À rebours : on retire le net de chaque mois pour obtenir le solde de fin
+  // du mois précédent.
+  const points: Array<MonthlyHistoryPoint> = []
+  let balance = params.currentBalanceCents
+  for (let k = 0; k <= params.monthsBack; k++) {
+    const key = monthKey(addMonthsUtc(currentMonthStart, -k))
+    points.push({ monthKey: key, balanceCents: balance })
+    balance -= netByMonth.get(key) ?? 0
+  }
+  points.reverse()
+  return points
+}
+
 // ─── Décision d'upsert des occurrences générées ─────────────────────────────
 
 /** État minimal d'une entry existante pour décider de l'upsert. */

@@ -40,6 +40,8 @@ import {
 const HORIZONS = [6, 12, 24] as const
 // L'expansion après sauvegarde couvre le plus grand horizon affichable.
 const EXPAND_MONTHS = 24
+// Profondeur de l'historique réel affiché en amont de la projection.
+const HISTORY_MONTHS = 6
 const FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'yearly'] as const
 type Frequency = (typeof FREQUENCIES)[number]
 
@@ -313,6 +315,7 @@ export function ForecastSection({ orgId }: { orgId: Id<'organizations'> }) {
   const balance = useConvexQuery(api.forecasts.getForecastBalance, {
     orgId,
     horizonMonths: horizon,
+    historyMonths: HISTORY_MONTHS,
   })
   const rules = useConvexQuery(api.forecasts.listRules, { orgId })
   const expandRules = useConvexMutation(api.forecasts.expandRules)
@@ -380,7 +383,11 @@ export function ForecastSection({ orgId }: { orgId: Id<'organizations'> }) {
           </p>
           <ForecastChart
             months={balance.months}
-            label={t('cash:forecast.chartLabel')}
+            history={balance.history}
+            labels={{
+              real: t('cash:forecast.chartReal'),
+              projected: t('cash:forecast.chartLabel'),
+            }}
             fmtEur={fmtEur}
           />
         </>
