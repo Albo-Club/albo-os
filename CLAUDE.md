@@ -70,7 +70,7 @@ one file. Surface non-obvious knowledge ; drift kills future you.
 
 ### Pre-PR doc audit (run it yourself, every PR, without being prompted)
 
-Before pushing the final commit, walk through these four questions. If none
+Before pushing the final commit, walk through these five questions. If none
 fire, write nothing — the diff and commit message already document the *what*.
 Docs are for the *why* and the *trap*.
 
@@ -85,6 +85,10 @@ Docs are for the *why* and the *trap*.
 4. **Discovered a behavioral rule worth applying to every future PR** ? → add
    it here in `CLAUDE.md`. Only for *repeatable* guidance, never as a
    changelog of what shipped.
+5. **Shipped a change visible to end users** (new feature, UX change,
+   behavior change) ? → add/extend the entry in `CHANGELOG_PRODUIT.md` in
+   the same PR, in product language (no file paths, no function names).
+   Bug fixes and pure refactors don't qualify.
 
 ### Where things live (don't duplicate across files)
 
@@ -95,6 +99,9 @@ Docs are for the *why* and the *trap*.
   "we tried X, here's why we chose Y". One section per trap.
 - `CLAUDE.md` — repeatable behavioral rules for future agents. Never a
   changelog of completed work.
+- `CHANGELOG_PRODUIT.md` — user-facing release notes in French, one entry
+  per lot/release, product language. Hand-written (distinct from the
+  technical `CHANGELOG.md` that release-please generates from commits).
 - `AGENTS.md` — pointer to the agent-skill workflow. Static, rarely changes.
 
 If you're about to add the same info to two of these files, you're doing it
