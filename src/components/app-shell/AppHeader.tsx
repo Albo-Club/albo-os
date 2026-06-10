@@ -29,6 +29,7 @@ const CRUMB_SEGMENTS = [
   'members',
   'invitations',
   'general',
+  'changelog',
 ] as const
 
 function buildCrumbs(
@@ -61,11 +62,13 @@ function buildCrumbs(
 export function AppHeader({
   orgSlug,
   orgName,
-  onOpenAiChat,
+  aiPanelOpen,
+  onToggleAiPanel,
 }: {
   orgSlug: string
   orgName: string
-  onOpenAiChat?: () => void
+  aiPanelOpen?: boolean
+  onToggleAiPanel?: () => void
 }) {
   const location = useLocation()
   const { t } = useTranslation(['nav'])
@@ -98,8 +101,13 @@ export function AppHeader({
         </BreadcrumbList>
       </Breadcrumb>
       <div className="ml-auto flex items-center gap-1">
-        {onOpenAiChat && (
-          <Button variant="ghost" size="sm" onClick={onOpenAiChat}>
+        {onToggleAiPanel && (
+          <Button
+            variant={aiPanelOpen ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={onToggleAiPanel}
+            aria-pressed={aiPanelOpen}
+          >
             <Sparkles className="mr-1.5 size-4" />
             {t('nav:appShell.ai')}
           </Button>

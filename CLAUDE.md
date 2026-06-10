@@ -70,7 +70,7 @@ one file. Surface non-obvious knowledge ; drift kills future you.
 
 ### Pre-PR doc audit (run it yourself, every PR, without being prompted)
 
-Before pushing the final commit, walk through these four questions. If none
+Before pushing the final commit, walk through these five questions. If none
 fire, write nothing — the diff and commit message already document the *what*.
 Docs are for the *why* and the *trap*.
 
@@ -85,6 +85,10 @@ Docs are for the *why* and the *trap*.
 4. **Discovered a behavioral rule worth applying to every future PR** ? → add
    it here in `CLAUDE.md`. Only for *repeatable* guidance, never as a
    changelog of what shipped.
+5. **Shipped a change visible to end users** (new feature, UX change,
+   behavior change) ? → add/extend the entry in `CHANGELOG_PRODUIT.md` in
+   the same PR, in product language (no file paths, no function names).
+   Bug fixes and pure refactors don't qualify.
 
 ### Where things live (don't duplicate across files)
 
@@ -95,6 +99,9 @@ Docs are for the *why* and the *trap*.
   "we tried X, here's why we chose Y". One section per trap.
 - `CLAUDE.md` — repeatable behavioral rules for future agents. Never a
   changelog of completed work.
+- `CHANGELOG_PRODUIT.md` — user-facing release notes in French, one entry
+  per lot/release, product language. Hand-written (distinct from the
+  technical `CHANGELOG.md` that release-please generates from commits).
 - `AGENTS.md` — pointer to the agent-skill workflow. Static, rarely changes.
 
 If you're about to add the same info to two of these files, you're doing it
@@ -201,7 +208,7 @@ invitations, uploads, account lifecycle, super-admin, AI chat, sécurité.
 - **Backend** : Convex (`^1.x`) — queries, mutations, actions, HTTP routes, file storage, components.
 - **Auth** : Better Auth via `@convex-dev/better-auth` with `magicLink()` + `convex()`. Multi-tenant (orgs/members/invitations/roles) is implemented **natively in the Convex schema** (`organizations`, `organizationMembers`, `invitations` tables). The BA `organization()` plugin is deliberately **not loaded** — its tables aren't first-class Convex (no `withIndex` joins). See `KNOWN_ISSUES.md` for trade-offs.
 - **Emails** : `@convex-dev/resend` for transactional.
-- **AI** : `@convex-dev/agent` backend (default model `claude-haiku-4-5`, override via `ANTHROPIC_MODEL`) + `@assistant-ui/react` front + streaming HTTP route `/api/chat`. Provider abstracted via `getModel()` in `convex/agent.ts`. L'agent expose des **outils DB scopés à l'org** (`convex/agentTools.ts`) : `listCompanies` / `listDeals`, `createCompany` (portfolio uniquement), `createDeal` (scope dérivé de l'investisseur via `resolveScope`), `updateDeal`. Chaque outil re-vérifie l'appartenance via la scope key `${orgId}:${userId}` du thread (l'action de stream n'a pas d'identité auth → `actorUserId` passé explicitement).
+- **AI** : `@convex-dev/agent` backend (default model `claude-haiku-4-5`, override via `ANTHROPIC_MODEL`) + front maison sur `useUIMessages` de `@convex-dev/agent/react` (panneau latéral persistant `src/components/ai/AiPanel.tsx`, markdown via `react-markdown`, threads/rename/stop). Streaming in-app via mutation `sendMessage` + query `listMessages` (la route HTTP `/api/chat` est un one-shot annexe). Provider abstracted via `getModel()` in `convex/agent.ts` ; system prompt par message via `buildInstructions` (`convex/lib/instructions.ts`, contexte route + org). L'agent expose des **outils DB scopés à l'org** (`convex/agentTools.ts`) : `listCompanies` / `listDeals`, `createCompany` (portfolio uniquement), `createDeal` (scope dérivé de l'investisseur via `resolveScope`), `updateDeal`. Chaque outil re-vérifie l'appartenance via la scope key `${orgId}:${userId}` du thread (l'action de stream n'a pas d'identité auth → `actorUserId` passé explicitement).
 - **File storage** : Convex native (`ctx.storage.generateUploadUrl()`), 20 MB cap.
 - **Observability** : Sentry (front + Convex actions). CORS strict, security headers, HMAC verify on webhooks.
 

@@ -1,12 +1,25 @@
 {
   "title": "AI assistant",
   "subtitle": "Powered by Claude. Scoped to this organization.",
-  "new": "New",
+  "new": "New conversation",
   "close": "Close",
   "loading": "Loading…",
   "emptyState": "Ask anything. Messages are streamed and saved.",
   "inputPlaceholder": "Ask the assistant…",
   "send": "Send",
+  "stop": "Stop",
+  "copy": "Copy",
+  "toolCall": "Using {{name}}…",
+  "threads": {
+    "history": "History",
+    "empty": "No conversations yet",
+    "untitled": "Untitled",
+    "actions": "Conversation actions",
+    "rename": "Rename",
+    "renameTitle": "Rename conversation",
+    "deleteConfirmTitle": "Delete this conversation?",
+    "deleteConfirmBody": "Messages will be permanently deleted."
+  },
   "errors": {
     "rate_limited": "Slow down — too many messages",
     "default": "Could not send message"

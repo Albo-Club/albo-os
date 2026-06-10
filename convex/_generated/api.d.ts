@@ -11,6 +11,10 @@
 import type * as admin from "../admin.js";
 import type * as agent from "../agent.js";
 import type * as agentTools from "../agentTools.js";
+import type * as agentToolsForecasts from "../agentToolsForecasts.js";
+import type * as agentToolsLiabilities from "../agentToolsLiabilities.js";
+import type * as agentToolsPointage from "../agentToolsPointage.js";
+import type * as agentToolsValuations from "../agentToolsValuations.js";
 import type * as aggregate from "../aggregate.js";
 import type * as airtableImport from "../airtableImport.js";
 import type * as auth from "../auth.js";
@@ -40,6 +44,7 @@ import type * as rateLimiters from "../rateLimiters.js";
 import type * as seed from "../seed.js";
 import type * as transactions from "../transactions.js";
 import type * as users from "../users.js";
+import type * as valuations from "../valuations.js";
 
 import type {
   ApiFromModules,
@@ -51,6 +56,10 @@ declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   agent: typeof agent;
   agentTools: typeof agentTools;
+  agentToolsForecasts: typeof agentToolsForecasts;
+  agentToolsLiabilities: typeof agentToolsLiabilities;
+  agentToolsPointage: typeof agentToolsPointage;
+  agentToolsValuations: typeof agentToolsValuations;
   aggregate: typeof aggregate;
   airtableImport: typeof airtableImport;
   auth: typeof auth;
@@ -80,6 +89,7 @@ declare const fullApi: ApiFromModules<{
   seed: typeof seed;
   transactions: typeof transactions;
   users: typeof users;
+  valuations: typeof valuations;
 }>;
 
 /**

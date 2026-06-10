@@ -176,7 +176,7 @@ export const run = internalMutation({
         )
         .unique()
       if (existing) {
-        await ctx.db.patch(existing._id, fields)
+        await ctx.db.patch("companies", existing._id, fields)
         companyIdByAttio.set(c.attioCompanyId, existing._id)
         companiesPatched++
       } else {
@@ -218,7 +218,7 @@ export const run = internalMutation({
         )
         .unique()
       if (existing) {
-        await ctx.db.patch(existing._id, fields)
+        await ctx.db.patch("deals", existing._id, fields)
         dealsPatched++
       } else {
         await ctx.db.insert('deals', fields)
@@ -262,7 +262,7 @@ export const verify = internalQuery({
 
     const sample = []
     for (const d of dealsWithAttio.slice(0, 6)) {
-      const target = await ctx.db.get(d.targetCompanyId)
+      const target = await ctx.db.get("companies", d.targetCompanyId)
       sample.push({
         attioDealId: d.attioDealId,
         target: target?.name ?? null,

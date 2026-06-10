@@ -21,4 +21,17 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
+      # lint = tsc + eslint ; toujours avant build (piège .output/, cf. KNOWN_ISSUES)
+      - run: pnpm lint
+      - run: pnpm test:unit
+      - run: pnpm build
+
+  skills-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # exit 2 si une skill upstream a dérivé de skills-lock.json
+      - run: node scripts/sync-skills.mjs --check

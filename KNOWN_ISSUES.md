@@ -416,8 +416,10 @@ audit.
   reject/cancel invitation states.
 - **AI front uses `useUIMessages` from `@convex-dev/agent/react`** instead of
   `@assistant-ui/react`. No Convex adapter exists for assistant-ui; the brief's
-  pick would require ~200 lines of glue. Loss: markdown rendering, attachments,
-  tool-call UI, edit/regenerate. Migrate later if polish is needed.
+  pick would require ~200 lines of glue. Markdown rendering (`react-markdown`),
+  compact tool-call display, thread history/rename/delete and stop are now
+  hand-rolled in `src/components/ai/AiPanel.tsx`. Remaining loss vs
+  assistant-ui: attachments, edit/regenerate.
 - **Anthropic model default `claude-haiku-4-5`** — choisi pour le ratio
   coût/latence sur un assistant in-app. Override via `ANTHROPIC_MODEL` env var
   (ex. `claude-sonnet-4-6` pour des tâches plus lourdes).
@@ -609,9 +611,10 @@ Le code reste en place comme référence/relance (idempotent), pas de sync.
   retombent sur un `bankAccounts` `airtableId = "__unassigned_bank__"`. Ces
   deux lignes sont des artefacts d'import, pas des données métier réelles.
 - **2 enums `instrumentKind` ajoutés** : `loan` (Airtable « Prêt »),
-  `capitalization_account` (« Compte de Capitalisation »). L'union est
-  redéclarée dans 3 endroits — garder synchronisés : `convex/schema.ts`,
-  `convex/deals.ts`, `convex/agentTools.ts` (array `INSTRUMENTS` + validateur).
+  `capitalization_account` (« Compte de Capitalisation »). L'union vit dans
+  **`convex/lib/instruments.ts`** (source unique : `INSTRUMENTS` +
+  `instrumentValidator`), importée par `convex/schema.ts`, `convex/deals.ts`
+  et `convex/agentTools.ts` — ne pas la redéclarer.
 - **Dérivation deals** : 1 deal = `(Entreprise × instrumentKind)`, clé
   `airtableId = "${entrepriseRecId}:${instrument}"`. Les mouvements
   opérationnels (Cash, Don, Impot, Honoraires, Virement, Nantissement) ne

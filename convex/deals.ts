@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import { instrumentValidator as sharedInstrumentValidator } from './lib/instruments'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
 import type { DataModel, Doc, Id } from './_generated/dataModel'
 
@@ -13,27 +14,8 @@ const statusValidator = v.union(
   v.literal('written_off'),
 )
 
-const instrumentValidator = v.union(
-  v.literal('share'),
-  v.literal('bsa'),
-  v.literal('bsa_air'),
-  v.literal('safe'),
-  v.literal('oc'),
-  v.literal('os'),
-  v.literal('convertible_note'),
-  v.literal('cca'),
-  v.literal('royalty'),
-  v.literal('fund_lp'),
-  v.literal('spv_share'),
-  v.literal('secondary'),
-  v.literal('real_estate_direct'),
-  v.literal('scpi'),
-  v.literal('cto'),
-  v.literal('dat'),
-  v.literal('crypto'),
-  v.literal('loan'),
-  v.literal('capitalization_account'),
-)
+// Source unique : convex/lib/instruments.ts
+const instrumentValidator = sharedInstrumentValidator
 
 /** Champs financiers/lifecycle communs, tous optionnels. */
 const dealFields = {
@@ -76,9 +58,9 @@ function companyRef(c: Doc<'companies'> | null) {
 /** Enrichit un deal avec investor / target / spv (pour la vue). */
 async function enrich(ctx: Ctx, deal: Doc<'deals'>) {
   const [investor, target, spv] = await Promise.all([
-    ctx.db.get(deal.investorCompanyId),
-    ctx.db.get(deal.targetCompanyId),
-    deal.viaSpvCompanyId ? ctx.db.get(deal.viaSpvCompanyId) : null,
+    ctx.db.get("companies", deal.investorCompanyId),
+    ctx.db.get("companies", deal.targetCompanyId),
+    deal.viaSpvCompanyId ? ctx.db.get("companies", deal.viaSpvCompanyId) : null,
   ])
   return {
     ...deal,
@@ -151,7 +133,7 @@ export const list = query({
 export const getById = query({
   args: { id: v.id('deals') },
   handler: async (ctx, { id }) => {
-    const deal = await ctx.db.get(id)
+    const deal = await ctx.db.get("deals", id)
     if (!deal) throw new ConvexError('not_found')
     await requireOrgMember(ctx, deal.orgId)
     return await enrich(ctx, deal)
@@ -165,7 +147,7 @@ async function assertSameOrg(
   companyId: Id<'companies'>,
   code: string,
 ) {
-  const c = await ctx.db.get(companyId)
+  const c = await ctx.db.get("companies", companyId)
   if (!c || c.orgId !== orgId) throw new ConvexError(code)
 }
 
@@ -178,7 +160,7 @@ async function assertInvestorIsGroupEntity(
   orgId: Id<'organizations'>,
   investorCompanyId: Id<'companies'>,
 ) {
-  const c = await ctx.db.get(investorCompanyId)
+  const c = await ctx.db.get("companies", investorCompanyId)
   if (!c || c.orgId !== orgId) throw new ConvexError('investor_wrong_org')
   if (!c.kind.startsWith('group_')) {
     throw new ConvexError('investor_must_be_group_entity')
@@ -228,7 +210,7 @@ export const update = mutation({
     }),
   },
   handler: async (ctx, { id, patch }) => {
-    const deal = await ctx.db.get(id)
+    const deal = await ctx.db.get("deals", id)
     if (!deal) throw new ConvexError('not_found')
     await requireOrgMember(ctx, deal.orgId)
 
@@ -252,7 +234,7 @@ export const update = mutation({
       const trimmed = patch.name.trim()
       patch.name = trimmed === '' ? undefined : trimmed
     }
-    await ctx.db.patch(id, patch)
+    await ctx.db.patch("deals", id, patch)
     return id
   },
 })
@@ -260,10 +242,10 @@ export const update = mutation({
 export const remove = mutation({
   args: { id: v.id('deals') },
   handler: async (ctx, { id }) => {
-    const deal = await ctx.db.get(id)
+    const deal = await ctx.db.get("deals", id)
     if (!deal) throw new ConvexError('not_found')
     await requireOrgMember(ctx, deal.orgId)
-    await ctx.db.delete(id)
+    await ctx.db.delete("deals", id)
     return { deletedId: id }
   },
 })

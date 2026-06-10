@@ -25,6 +25,7 @@ import { Route as AppOrgSlugRouteRouteImport } from './routes/app/$orgSlug/route
 import { Route as AppAllIndexRouteImport } from './routes/app/all/index'
 import { Route as AppOrgSlugIndexRouteImport } from './routes/app/$orgSlug/index'
 import { Route as AppAllParticipationsRouteImport } from './routes/app/all/participations'
+import { Route as AppOrgSlugChangelogRouteImport } from './routes/app/$orgSlug/changelog'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppOrgSlugSettingsRouteRouteImport } from './routes/app/$orgSlug/settings/route'
 import { Route as AppOrgSlugSettingsIndexRouteImport } from './routes/app/$orgSlug/settings/index'
@@ -119,6 +120,11 @@ const AppAllParticipationsRoute = AppAllParticipationsRouteImport.update({
   path: '/participations',
   getParentRoute: () => AppAllRouteRoute,
 } as any)
+const AppOrgSlugChangelogRoute = AppOrgSlugChangelogRouteImport.update({
+  id: '/changelog',
+  path: '/changelog',
+  getParentRoute: () => AppOrgSlugRouteRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -206,6 +212,7 @@ export interface FileRoutesByFullPath {
   '/app/': typeof AppIndexRoute
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/app/$orgSlug/changelog': typeof AppOrgSlugChangelogRoute
   '/app/all/participations': typeof AppAllParticipationsRoute
   '/app/$orgSlug/': typeof AppOrgSlugIndexRoute
   '/app/all/': typeof AppAllIndexRoute
@@ -233,6 +240,7 @@ export interface FileRoutesByTo {
   '/app/onboarding': typeof AppOnboardingRoute
   '/app': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/app/$orgSlug/changelog': typeof AppOrgSlugChangelogRoute
   '/app/all/participations': typeof AppAllParticipationsRoute
   '/app/$orgSlug': typeof AppOrgSlugIndexRoute
   '/app/all': typeof AppAllIndexRoute
@@ -265,6 +273,7 @@ export interface FileRoutesById {
   '/app/': typeof AppIndexRoute
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/app/$orgSlug/changelog': typeof AppOrgSlugChangelogRoute
   '/app/all/participations': typeof AppAllParticipationsRoute
   '/app/$orgSlug/': typeof AppOrgSlugIndexRoute
   '/app/all/': typeof AppAllIndexRoute
@@ -298,6 +307,7 @@ export interface FileRouteTypes {
     | '/app/'
     | '/app/$orgSlug/settings'
     | '/api/auth/$'
+    | '/app/$orgSlug/changelog'
     | '/app/all/participations'
     | '/app/$orgSlug/'
     | '/app/all/'
@@ -325,6 +335,7 @@ export interface FileRouteTypes {
     | '/app/onboarding'
     | '/app'
     | '/api/auth/$'
+    | '/app/$orgSlug/changelog'
     | '/app/all/participations'
     | '/app/$orgSlug'
     | '/app/all'
@@ -356,6 +367,7 @@ export interface FileRouteTypes {
     | '/app/'
     | '/app/$orgSlug/settings'
     | '/api/auth/$'
+    | '/app/$orgSlug/changelog'
     | '/app/all/participations'
     | '/app/$orgSlug/'
     | '/app/all/'
@@ -497,6 +509,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAllParticipationsRouteImport
       parentRoute: typeof AppAllRouteRoute
     }
+    '/app/$orgSlug/changelog': {
+      id: '/app/$orgSlug/changelog'
+      path: '/changelog'
+      fullPath: '/app/$orgSlug/changelog'
+      preLoaderRoute: typeof AppOrgSlugChangelogRouteImport
+      parentRoute: typeof AppOrgSlugRouteRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -613,6 +632,7 @@ const AppOrgSlugSettingsRouteRouteWithChildren =
 
 interface AppOrgSlugRouteRouteChildren {
   AppOrgSlugSettingsRouteRoute: typeof AppOrgSlugSettingsRouteRouteWithChildren
+  AppOrgSlugChangelogRoute: typeof AppOrgSlugChangelogRoute
   AppOrgSlugIndexRoute: typeof AppOrgSlugIndexRoute
   AppOrgSlugCashAccountIdRoute: typeof AppOrgSlugCashAccountIdRoute
   AppOrgSlugDealsDealIdRoute: typeof AppOrgSlugDealsDealIdRoute
@@ -625,6 +645,7 @@ interface AppOrgSlugRouteRouteChildren {
 
 const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
   AppOrgSlugSettingsRouteRoute: AppOrgSlugSettingsRouteRouteWithChildren,
+  AppOrgSlugChangelogRoute: AppOrgSlugChangelogRoute,
   AppOrgSlugIndexRoute: AppOrgSlugIndexRoute,
   AppOrgSlugCashAccountIdRoute: AppOrgSlugCashAccountIdRoute,
   AppOrgSlugDealsDealIdRoute: AppOrgSlugDealsDealIdRoute,

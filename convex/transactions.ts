@@ -1,11 +1,14 @@
 import { ConvexError, v } from 'convex/values'
 import { internalMutation, mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
-import { recordDecision } from './lib/matchingLog'
+import {
+  applyCategorization,
+  applyMatchToDeal,
+  applyUnmatch,
+} from './lib/pointage'
 import { buildSearchText, normalizeSearch } from './lib/searchText'
 
-import type { MutationCtx } from './_generated/server'
-import type { Doc, Id } from './_generated/dataModel'
+import type { Id } from './_generated/dataModel'
 
 /**
  * Borne des résultats de recherche full-text (le listing sans recherche garde
@@ -20,7 +23,7 @@ const SEARCH_LIMIT = 200
 export const listByDeal = query({
   args: { dealId: v.id('deals') },
   handler: async (ctx, { dealId }) => {
-    const deal = await ctx.db.get(dealId)
+    const deal = await ctx.db.get("deals", dealId)
     if (!deal) throw new ConvexError('not_found')
     await requireOrgMember(ctx, deal.orgId)
 
@@ -33,7 +36,7 @@ export const listByDeal = query({
 
     return await Promise.all(
       rows.map(async (tx) => {
-        const account = await ctx.db.get(tx.bankAccountId)
+        const account = await ctx.db.get("bankAccounts", tx.bankAccountId)
         return {
           _id: tx._id,
           direction: tx.direction,
@@ -181,23 +184,16 @@ export const listByStatus = query({
 // (`dealId == null` + `allocation.kind === 'equity' | 'intercompany_loan'`,
 // cf. convex/liabilities.ts:allocateTransaction). `reconciled` (+ by/at) est
 // un miroir dérivé du pointage DEAL uniquement, maintenu pour les lecteurs
-// existants (UI deal, vue Cash, agent) — ne jamais l'écrire ailleurs qu'ici.
+// existants (UI deal, vue Cash, agent).
 // `allocation` (pointage généralisé) cohabite avec `dealId` :
 // `dealId != null` ⟺ `allocation = { kind: 'deal', targetId: dealId }`
 // (backfill des lignes pré-existantes : transactions:backfillAllocation).
 // Chaque mutation deal écrit une ligne append-only dans `matchingDecisions`
-// (dataset d'apprentissage de l'agent, phase 2) ; le pointage passif n'y
-// écrit jamais.
-
-/**
- * Garde-fou : refuse d'écraser silencieusement un pointage passif
- * (equity / C/C). Détacher d'abord via `liabilities:deallocateTransaction`.
- */
-function assertNotAllocatedToLiability(tx: Doc<'transactions'>) {
-  if (tx.allocation && tx.allocation.kind !== 'deal') {
-    throw new ConvexError('allocated_to_liability')
-  }
-}
+// (dataset des suggestions de l'agent) ; le pointage passif n'y écrit jamais.
+//
+// Le cœur (patchs + invariants + logging) vit dans convex/lib/pointage.ts,
+// partagé avec les outils agent (convex/agentToolsPointage.ts) — ne jamais
+// réécrire ces patchs ici.
 
 /**
  * Rattache une transaction à un deal de la même org.
@@ -208,28 +204,8 @@ export const matchTransaction = mutation({
     const tx = await ctx.db.get('transactions', transactionId)
     if (!tx) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, tx.orgId)
-    assertNotAllocatedToLiability(tx)
 
-    const deal = await ctx.db.get('deals', dealId)
-    if (!deal || deal.orgId !== tx.orgId) {
-      throw new ConvexError('deal_wrong_org')
-    }
-
-    await ctx.db.patch('transactions', tx._id, {
-      matchStatus: 'matched',
-      dealId,
-      allocation: { kind: 'deal', targetId: dealId },
-      reconciled: true,
-      reconciledBy: user._id,
-      reconciledAt: Date.now(),
-    })
-    await recordDecision(ctx, {
-      transaction: tx,
-      decision: 'matched',
-      dealId,
-      source: 'manual',
-      decidedBy: user._id,
-    })
+    await applyMatchToDeal(ctx, tx, dealId, user._id, 'manual')
     return null
   },
 })
@@ -244,56 +220,11 @@ export const ignoreTransaction = mutation({
     const tx = await ctx.db.get('transactions', transactionId)
     if (!tx) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, tx.orgId)
-    assertNotAllocatedToLiability(tx)
 
-    await ctx.db.patch('transactions', tx._id, {
-      matchStatus: 'ignored',
-      dealId: undefined,
-      allocation: undefined,
-      reconciled: false,
-      reconciledBy: undefined,
-      reconciledAt: undefined,
-    })
-    await recordDecision(ctx, {
-      transaction: tx,
-      decision: 'ignored',
-      source: 'manual',
-      decidedBy: user._id,
-    })
+    await applyCategorization(ctx, tx, 'ignored', user._id, 'manual')
     return null
   },
 })
-
-/**
- * Logique unitaire de classement charge/impôt/produit/virement interne :
- * patch de la transaction + ligne `matchingDecisions`. Partagée par
- * `categorizeAsCharge`, `categorizeAsTax`, `categorizeAsProduct`,
- * `categorizeAsInternalTransfer` et `bulkCategorize` pour qu'elles ne
- * divergent jamais. L'appelant a déjà chargé la transaction et vérifié
- * l'appartenance à l'org.
- */
-async function applyCategorization(
-  ctx: MutationCtx,
-  tx: Doc<'transactions'>,
-  status: 'charge' | 'tax' | 'product' | 'internal_transfer',
-  decidedBy: Id<'users'>,
-) {
-  assertNotAllocatedToLiability(tx)
-  await ctx.db.patch('transactions', tx._id, {
-    matchStatus: status,
-    dealId: undefined,
-    allocation: undefined,
-    reconciled: false,
-    reconciledBy: undefined,
-    reconciledAt: undefined,
-  })
-  await recordDecision(ctx, {
-    transaction: tx,
-    decision: status,
-    source: 'manual',
-    decidedBy,
-  })
-}
 
 /**
  * Classe une transaction en charge courante (loyer, honoraires, frais…).
@@ -307,7 +238,7 @@ export const categorizeAsCharge = mutation({
     if (!tx) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, tx.orgId)
 
-    await applyCategorization(ctx, tx, 'charge', user._id)
+    await applyCategorization(ctx, tx, 'charge', user._id, 'manual')
     return null
   },
 })
@@ -324,7 +255,7 @@ export const categorizeAsTax = mutation({
     if (!tx) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, tx.orgId)
 
-    await applyCategorization(ctx, tx, 'tax', user._id)
+    await applyCategorization(ctx, tx, 'tax', user._id, 'manual')
     return null
   },
 })
@@ -342,7 +273,7 @@ export const categorizeAsProduct = mutation({
     if (!tx) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, tx.orgId)
 
-    await applyCategorization(ctx, tx, 'product', user._id)
+    await applyCategorization(ctx, tx, 'product', user._id, 'manual')
     return null
   },
 })
@@ -361,7 +292,7 @@ export const categorizeAsInternalTransfer = mutation({
     if (!tx) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, tx.orgId)
 
-    await applyCategorization(ctx, tx, 'internal_transfer', user._id)
+    await applyCategorization(ctx, tx, 'internal_transfer', user._id, 'manual')
     return null
   },
 })
@@ -393,7 +324,7 @@ export const bulkCategorize = mutation({
         if (!tx) throw new ConvexError('not_found')
         const { user } = await requireOrgMember(ctx, tx.orgId)
 
-        await applyCategorization(ctx, tx, status, user._id)
+        await applyCategorization(ctx, tx, status, user._id, 'manual')
         succeeded.push(transactionId)
       } catch (err) {
         failed.push({
@@ -417,24 +348,8 @@ export const unmatchTransaction = mutation({
     const tx = await ctx.db.get('transactions', transactionId)
     if (!tx) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, tx.orgId)
-    // Une tx allouée au passif se détache via deallocateTransaction — un
-    // unmatch deal ici laisserait son allocation orpheline.
-    assertNotAllocatedToLiability(tx)
 
-    await ctx.db.patch('transactions', tx._id, {
-      matchStatus: 'unmatched',
-      dealId: undefined,
-      allocation: undefined,
-      reconciled: false,
-      reconciledBy: undefined,
-      reconciledAt: undefined,
-    })
-    await recordDecision(ctx, {
-      transaction: tx,
-      decision: 'unmatched',
-      source: 'manual',
-      decidedBy: user._id,
-    })
+    await applyUnmatch(ctx, tx, user._id, 'manual')
     return null
   },
 })

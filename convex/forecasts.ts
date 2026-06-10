@@ -44,7 +44,7 @@ const confidenceValidator = v.union(
 // expansion démesurée en une seule mutation.
 const MAX_HORIZON_MONTHS = 120
 
-function assertValidHorizon(horizonMonths: number) {
+export function assertValidHorizon(horizonMonths: number) {
   if (
     !Number.isInteger(horizonMonths) ||
     horizonMonths < 1 ||
@@ -107,6 +107,45 @@ function assertValidRuleFields(rule: {
 
 // ─── Règles ──────────────────────────────────────────────────────────────────
 
+/**
+ * Insertion d'une règle (validation incluse) — cœur partagé entre la
+ * mutation publique et l'outil agent (convex/agentToolsForecasts.ts).
+ * L'appelant a déjà vérifié l'appartenance à l'org.
+ */
+export async function insertRule(
+  ctx: GenericMutationCtx<DataModel>,
+  args: {
+    orgId: Id<'organizations'>
+    label: string
+    amountCents: number
+    direction: 'in' | 'out'
+    category?: string
+    frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+    interval?: number
+    anchorDay: number
+    startDate: number
+    endDate?: number
+    active?: boolean
+  },
+): Promise<Id<'forecastRules'>> {
+  const interval = args.interval ?? 1
+  assertValidRuleFields({ ...args, interval })
+  return await ctx.db.insert('forecastRules', {
+    orgId: args.orgId,
+    label: args.label,
+    amountCents: args.amountCents,
+    direction: args.direction,
+    category: args.category,
+    frequency: args.frequency,
+    interval,
+    anchorDay: args.anchorDay,
+    startDate: args.startDate,
+    endDate: args.endDate,
+    active: args.active ?? true,
+    sourceType: 'manual',
+  })
+}
+
 /** Crée une règle récurrente (ex. loyer SCI mensuel) dans une org. */
 export const createRule = mutation({
   args: {
@@ -124,22 +163,7 @@ export const createRule = mutation({
   },
   handler: async (ctx, args) => {
     await requireOrgMember(ctx, args.orgId)
-    const interval = args.interval ?? 1
-    assertValidRuleFields({ ...args, interval })
-    return await ctx.db.insert('forecastRules', {
-      orgId: args.orgId,
-      label: args.label,
-      amountCents: args.amountCents,
-      direction: args.direction,
-      category: args.category,
-      frequency: args.frequency,
-      interval,
-      anchorDay: args.anchorDay,
-      startDate: args.startDate,
-      endDate: args.endDate,
-      active: args.active ?? true,
-      sourceType: 'manual',
-    })
+    return await insertRule(ctx, args)
   },
 })
 
@@ -194,75 +218,86 @@ export const expandRules = mutation({
   handler: async (ctx, { orgId, horizonMonths }) => {
     assertValidHorizon(horizonMonths)
     const orgIds = await resolveOrgScope(ctx, orgId)
+    return await expandRulesForOrgs(ctx, orgIds, horizonMonths)
+  },
+})
 
-    const now = Date.now()
-    const horizonEnd = addMonthsUtc(now, horizonMonths)
+/**
+ * Cœur de l'expansion (sans auth) — partagé entre la mutation publique et
+ * l'outil agent. L'appelant a déjà vérifié l'appartenance aux orgs.
+ */
+export async function expandRulesForOrgs(
+  ctx: GenericMutationCtx<DataModel>,
+  orgIds: Array<Id<'organizations'>>,
+  horizonMonths: number,
+) {
+  const now = Date.now()
+  const horizonEnd = addMonthsUtc(now, horizonMonths)
 
-    let rulesProcessed = 0
-    let created = 0
-    let updated = 0
-    let skippedProtected = 0
+  let rulesProcessed = 0
+  let created = 0
+  let updated = 0
+  let skippedProtected = 0
 
-    for (const oid of orgIds) {
-      const rules = await ctx.db
-        .query('forecastRules')
-        .withIndex('by_org', (q) => q.eq('orgId', oid))
-        .collect()
+  for (const oid of orgIds) {
+    const rules = await ctx.db
+      .query('forecastRules')
+      .withIndex('by_org', (q) => q.eq('orgId', oid))
+      .collect()
 
-      for (const rule of rules) {
-        if (!rule.active) continue
-        rulesProcessed += 1
+    for (const rule of rules) {
+      if (!rule.active) continue
+      rulesProcessed += 1
 
-        const occurrences = expandOccurrences(
-          rule,
-          Math.max(rule.startDate, now),
-          horizonEnd,
-        )
+      const occurrences = expandOccurrences(
+        rule,
+        Math.max(rule.startDate, now),
+        horizonEnd,
+      )
 
-        for (const occurrence of occurrences) {
-          const derivedKey = ruleDerivedKey(rule._id, occurrence)
-          const existing = await ctx.db
-            .query('forecastEntries')
-            .withIndex('by_derivedKey', (q) => q.eq('derivedKey', derivedKey))
-            .unique()
+      for (const occurrence of occurrences) {
+        const derivedKey = ruleDerivedKey(rule._id, occurrence)
+        const existing = await ctx.db
+          .query('forecastEntries')
+          .withIndex('by_derivedKey', (q) => q.eq('derivedKey', derivedKey))
+          .unique()
 
-          // La décision (create/update/skip) est pure et testée dans
-          // tests/recurrence.test.ts — ici uniquement le glue DB.
-          if (existing === null) {
-            await ctx.db.insert('forecastEntries', {
-              orgId: oid,
-              date: occurrence,
-              amountCents: rule.amountCents,
-              direction: rule.direction,
-              confidence: 'confirmed',
-              status: 'pending',
-              label: rule.label,
-              category: rule.category,
-              ruleId: rule._id,
-              derivedKey,
-              overridden: false,
-              currency: 'EUR',
-            })
-            created += 1
-          } else if (entryUpsertAction(existing) === 'skip') {
-            skippedProtected += 1
-          } else {
-            // Resynchro depuis la règle (la date est figée par la derivedKey).
-            await ctx.db.patch('forecastEntries', existing._id, {
-              amountCents: rule.amountCents,
-              direction: rule.direction,
-              label: rule.label,
-              category: rule.category,
-            })
-            updated += 1
-          }
+        // La décision (create/update/skip) est pure et testée dans
+        // tests/recurrence.test.ts — ici uniquement le glue DB.
+        if (existing === null) {
+          await ctx.db.insert('forecastEntries', {
+            orgId: oid,
+            date: occurrence,
+            amountCents: rule.amountCents,
+            direction: rule.direction,
+            confidence: 'confirmed',
+            status: 'pending',
+            label: rule.label,
+            category: rule.category,
+            ruleId: rule._id,
+            derivedKey,
+            overridden: false,
+            currency: 'EUR',
+          })
+          created += 1
+        } else if (entryUpsertAction(existing) === 'skip') {
+          skippedProtected += 1
+        } else {
+          // Resynchro depuis la règle (la date est figée par la derivedKey).
+          await ctx.db.patch('forecastEntries', existing._id, {
+            amountCents: rule.amountCents,
+            direction: rule.direction,
+            label: rule.label,
+            category: rule.category,
+          })
+          updated += 1
         }
       }
     }
+  }
 
-    return { rulesProcessed, created, updated, skippedProtected }
-  },
-})
+  return { rulesProcessed, created, updated, skippedProtected }
+}
 
 // ─── Solde projeté ────────────────────────────────────────────────────────────
 
@@ -288,69 +323,86 @@ export const getForecastBalance = query({
   handler: async (ctx, { orgId, horizonMonths, minConfidence }) => {
     assertValidHorizon(horizonMonths)
     const orgIds = await resolveOrgScope(ctx, orgId)
-
-    const now = Date.now()
-    const nowDate = new Date(now)
-    // Fenêtre : du 1er du mois courant (les entries du mois encore pending
-    // comptent dans la trajectoire) à now + horizon.
-    const windowStart = Date.UTC(
-      nowDate.getUTCFullYear(),
-      nowDate.getUTCMonth(),
-      1,
-    )
-    const windowEnd = addMonthsUtc(now, horizonMonths)
-
-    // 1. Solde de départ = soldes réels courants (Powens) des comptes EUR.
-    let startingBalanceCents = 0
-    let ignoredNonEurAccounts = 0
-    for (const oid of orgIds) {
-      const accounts = await ctx.db
-        .query('bankAccounts')
-        .withIndex('by_org', (q) => q.eq('orgId', oid))
-        .collect()
-      for (const account of accounts) {
-        if (account.archivedAt) continue
-        if (account.currency !== 'EUR') {
-          ignoredNonEurAccounts += 1
-          continue
-        }
-        startingBalanceCents += account.currentBalance ?? 0
-      }
-    }
-
-    // 2. Entries prévisionnelles du périmètre dans la fenêtre.
-    // TODO(neutralisation inter-entités) : au consolidé (orgId absent),
-    // exclure ici les entries dont `counterpartyOrgId` appartient à `orgIds`
-    // (flux internes au groupe). Champ présent au schéma, non lu en MVP.
-    const entries: Array<Doc<'forecastEntries'>> = []
-    for (const oid of orgIds) {
-      const orgEntries = await ctx.db
-        .query('forecastEntries')
-        .withIndex('by_org_and_date', (q) =>
-          q.eq('orgId', oid).gte('date', windowStart).lte('date', windowEnd),
-        )
-        .collect()
-      entries.push(...orgEntries)
-    }
-
-    // 3. Agrégation mensuelle pure (testée dans tests/recurrence.test.ts).
-    const { months, ignoredNonEurEntries } = buildMonthlyBalance({
-      entries,
-      startingBalanceCents,
-      windowStart,
-      windowEnd,
+    return await computeForecastBalanceForOrgs(
+      ctx,
+      orgIds,
+      horizonMonths,
       minConfidence,
-    })
-
-    return {
-      startingBalanceCents,
-      currency: 'EUR',
-      ignoredNonEurAccounts,
-      ignoredNonEurEntries,
-      months,
-    }
+    )
   },
 })
+
+/**
+ * Cœur du solde projeté (sans auth) — partagé entre la query publique et
+ * l'outil agent. L'appelant a déjà vérifié l'appartenance aux orgs.
+ */
+export async function computeForecastBalanceForOrgs(
+  ctx: GenericQueryCtx<DataModel>,
+  orgIds: Array<Id<'organizations'>>,
+  horizonMonths: number,
+  minConfidence?: 'confirmed' | 'expected' | 'probable',
+) {
+  const now = Date.now()
+  const nowDate = new Date(now)
+  // Fenêtre : du 1er du mois courant (les entries du mois encore pending
+  // comptent dans la trajectoire) à now + horizon.
+  const windowStart = Date.UTC(
+    nowDate.getUTCFullYear(),
+    nowDate.getUTCMonth(),
+    1,
+  )
+  const windowEnd = addMonthsUtc(now, horizonMonths)
+
+  // 1. Solde de départ = soldes réels courants (Powens) des comptes EUR.
+  let startingBalanceCents = 0
+  let ignoredNonEurAccounts = 0
+  for (const oid of orgIds) {
+    const accounts = await ctx.db
+      .query('bankAccounts')
+      .withIndex('by_org', (q) => q.eq('orgId', oid))
+      .collect()
+    for (const account of accounts) {
+      if (account.archivedAt) continue
+      if (account.currency !== 'EUR') {
+        ignoredNonEurAccounts += 1
+        continue
+      }
+      startingBalanceCents += account.currentBalance ?? 0
+    }
+  }
+
+  // 2. Entries prévisionnelles du périmètre dans la fenêtre.
+  // TODO(neutralisation inter-entités) : au consolidé (orgId absent),
+  // exclure ici les entries dont `counterpartyOrgId` appartient à `orgIds`
+  // (flux internes au groupe). Champ présent au schéma, non lu en MVP.
+  const entries: Array<Doc<'forecastEntries'>> = []
+  for (const oid of orgIds) {
+    const orgEntries = await ctx.db
+      .query('forecastEntries')
+      .withIndex('by_org_and_date', (q) =>
+        q.eq('orgId', oid).gte('date', windowStart).lte('date', windowEnd),
+      )
+      .collect()
+    entries.push(...orgEntries)
+  }
+
+  // 3. Agrégation mensuelle pure (testée dans tests/recurrence.test.ts).
+  const { months, ignoredNonEurEntries } = buildMonthlyBalance({
+    entries,
+    startingBalanceCents,
+    windowStart,
+    windowEnd,
+    minConfidence,
+  })
+
+  return {
+    startingBalanceCents,
+    currency: 'EUR',
+    ignoredNonEurAccounts,
+    ignoredNonEurEntries,
+    months,
+  }
+}
 
 // ─── Pointage prévu → réalisé ────────────────────────────────────────────────
 

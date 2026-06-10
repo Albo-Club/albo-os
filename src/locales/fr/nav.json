@@ -9,7 +9,8 @@
       "settings": "Paramètres",
       "members": "Membres",
       "invitations": "Invitations",
-      "general": "Général"
+      "general": "Général",
+      "changelog": "Nouveautés"
     }
   },
   "comingSoon": "Bientôt disponible",
@@ -26,7 +27,8 @@
     "passif": "Passif",
     "members": "Membres",
     "invitations": "Invitations",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "changelog": "Nouveautés"
   },
   "navUser": {
     "switchOrg": "Changer d'organisation"
@@ -104,5 +106,8 @@
       "isSuperAdmin": "Super-admin",
       "makeSuperAdmin": "Rendre super-admin"
     }
+  },
+  "changelogPage": {
+    "metaTitle": "Nouveautés — Albo OS"
   }
 }

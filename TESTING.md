@@ -98,8 +98,9 @@ Connecté en tant qu'Alice sur `/app/acme/`.
 | SH7  | Theme picker (footer sidebar) → choisir Blue / Emerald / Violet| Primary + chart-1 changent ; survit au reload (localStorage)       |
 | SH8  | Org switcher (header sidebar), orga **sans** logo             | Initiale (1ʳᵉ lettre) centrée dans le carré arrondi ; liste les orgs ; clic switch route + persiste `lastOrgSlug` |
 | SH9  | NavUser (footer sidebar) → profile / switch org / sign out     | Avatar **rond** ; sans photo, initiales prénom+nom (ex. `BB`) ; mêmes destinations qu'avant refonte |
-| SH10 | Bouton AI dans header                                          | Ouvre le modal chat existant (non-régression)                      |
+| SH10 | Bouton AI dans header                                          | Toggle du panneau AI persistant (cf. Niveau 5 — AI chat, C1/C11)   |
 | SH11 | Ouvrir une page au contenu plus haut que l'écran (liste longue) | Le cadre `inset` reste calé sur la hauteur du viewport ; le scroll se fait **dans** le cadre, bord bas arrondi toujours visible |
+| SH12 | Lien « Nouveautés » (bas du menu, groupe secondaire) → `/app/$orgSlug/changelog` | Page rendue depuis `CHANGELOG_PRODUIT.md` (markdown stylé, note interne en commentaire HTML invisible) ; breadcrumb « Nouveautés » ; titre d'onglet i18n FR/EN |
 
 ## Niveau 2 — Multi-tenant (15 min)
 
@@ -186,12 +187,12 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | SA4 | Last-SA guard : retirer son propre flag SA si seul SA | Erreur "cannot_demote_last_superadmin"                          |
 | SA5 | `purgeExcept` (dev cleanup) — uniquement en dev    | Conserve uniquement l'email indiqué, supprime le reste             |
 
-## Niveau 5 — AI chat (8 min)
+## Niveau 5 — AI chat (12 min)
 
 | #  | Étape                                                   | Résultat attendu                                                  |
 | -- | ------------------------------------------------------- | ----------------------------------------------------------------- |
-| C1 | Ouvrir le slide-over chat depuis `/app/acme`            | Premier thread créé automatiquement                                |
-| C2 | Envoyer un message simple ("ping")                      | Stream visible token par token, pas de blocage UI                  |
+| C1 | Charger `/app/acme`                                     | Panneau AI ouvert par défaut à droite du contenu (desktop ≥ lg)    |
+| C2 | Envoyer un message simple ("ping")                      | Stream visible token par token, pas de blocage UI ; thread créé au 1er envoi, titre auto = début du message |
 | C3 | "liste mes participations Albo"                         | Tool `listDeals`/`listCompanies` appelé, réponse scopée à l'org    |
 | C4 | "crée un deal Albo Club dans Sezame, share, 50 000 €, signé le 15 janvier 2026" | L'agent confirme puis appelle `createCompany` (si absente) + `createDeal` ; le deal apparaît dans `/participations` (scope Albo + Consolidé, pas Calte) |
 | C5 | Demander un deal avec un investisseur portfolio (non groupe) | Refusé (`investor_must_be_group_entity`) — l'agent explique qu'il faut une entité du groupe |
@@ -200,6 +201,17 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | C8 | "crée un compte bancaire Qonto pour CALTE, solde 12 000 €"               | L'agent résout CALTE via `listCompanies` puis appelle `createBankAccount` avec `currentBalanceCents: 1200000` ; le compte apparaît dans `/cash` sous CALTE avec un solde de 12 000 € (pas "Solde inconnu") |
 | C9 | "ajoute une transaction de sortie 5 000 € liée au deal Sezame le 3 février 2026" | L'agent appelle `listBankAccounts`/`listDeals` puis `createTransaction` (dealId rempli) ; visible dans le Sheet du compte (sortie négative) ; le solde affiché reste inchangé (champ manuel) |
 | C10 | Demander un compte bancaire rattaché à une société portfolio            | Refusé (`owner_must_be_group_entity`) — l'agent explique qu'il faut une entité du groupe |
+| C11 | Toggle « AI » dans le header → reload                   | Panneau replié, l'état survit au reload (cookie `ai_panel_state`)  |
+| C12 | Naviguer participations → pointage → cash               | Panneau et conversation intacts (monté dans le layout org)         |
+| C13 | Envoyer un message depuis `/app/acme/pointage`          | La réponse montre que l'agent connaît la page courante (contexte route transmis au system prompt) |
+| C14 | Historique : créer 2 conversations, switcher, renommer, supprimer | Liste dans le menu Historique, titres mis à jour, suppression → bascule sur la conversation la plus récente |
+| C15 | Demander une liste/tableau                              | Rendu markdown propre (listes, tableaux) pendant le stream         |
+| C16 | Bouton stop pendant un long stream                      | Le texte s'arrête, pas d'erreur console ; bouton copier sur les réponses |
+| C17 | `/app/all`, `/app/me`, `/app/admin`                     | Aucun panneau AI (scope org uniquement), zéro régression visuelle  |
+| C18 | "liste mes transactions non pointées" puis "suggère des rattachements" | `listUnmatchedTransactions` puis `suggestMatches` appelés ; candidats présentés avec leur évidence ; l'agent ATTEND la confirmation |
+| C19 | Confirmer un rattachement suggéré                       | `matchTransactionToDeal` appelé ; la tx disparaît de l'onglet Pointage ; `matchingDecisions` a une ligne `source: 'agent_suggested'` (dashboard Convex) |
+| C20 | "crée une règle de loyer 1 500 €/mois le 5" puis "projette mon cash sur 12 mois" | `createForecastRule` (après confirmation) → l'agent propose `expandForecastRules` → `getForecastBalance` rend les mois ; cohérent avec la mutation publique |
+| C21 | "ajoute une valo de 1,2 M€ au deal X au 31/12" + "liste le passif" | `createValuation` (après confirmation) visible en base ; `listLiabilities` rend positions + C/C avec soldes dérivés |
 
 ## Niveau 6 — Sécurité + déploiement (5 min)
 

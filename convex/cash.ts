@@ -28,7 +28,7 @@ export const listAccounts = query({
     const active = accounts.filter((a) => !a.archivedAt)
     return await Promise.all(
       active.map(async (a) => {
-        const owner = await ctx.db.get(a.ownerCompanyId)
+        const owner = await ctx.db.get("companies", a.ownerCompanyId)
         return {
           _id: a._id,
           bankName: a.bankName,
@@ -52,10 +52,10 @@ export const listAccounts = query({
 export const getAccount = query({
   args: { bankAccountId: v.id('bankAccounts') },
   handler: async (ctx, { bankAccountId }) => {
-    const account = await ctx.db.get(bankAccountId)
+    const account = await ctx.db.get("bankAccounts", bankAccountId)
     if (!account) throw new ConvexError('not_found')
     await requireOrgMember(ctx, account.orgId)
-    const owner = await ctx.db.get(account.ownerCompanyId)
+    const owner = await ctx.db.get("companies", account.ownerCompanyId)
     return {
       _id: account._id,
       bankName: account.bankName,
@@ -108,7 +108,7 @@ export const listAccountTransactions = query({
     search: v.optional(v.string()),
   },
   handler: async (ctx, { bankAccountId, search }) => {
-    const account = await ctx.db.get(bankAccountId)
+    const account = await ctx.db.get("bankAccounts", bankAccountId)
     if (!account) throw new ConvexError('not_found')
     await requireOrgMember(ctx, account.orgId)
 
@@ -131,8 +131,8 @@ export const listAccountTransactions = query({
 
     return await Promise.all(
       rows.map(async (t) => {
-        const deal = t.dealId ? await ctx.db.get(t.dealId) : null
-        const target = deal ? await ctx.db.get(deal.targetCompanyId) : null
+        const deal = t.dealId ? await ctx.db.get("deals", t.dealId) : null
+        const target = deal ? await ctx.db.get("companies", deal.targetCompanyId) : null
         return {
           _id: t._id,
           direction: t.direction,

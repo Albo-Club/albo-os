@@ -9,7 +9,8 @@
       "settings": "Settings",
       "members": "Members",
       "invitations": "Invitations",
-      "general": "General"
+      "general": "General",
+      "changelog": "What's new"
     }
   },
   "comingSoon": "Coming soon",
@@ -26,7 +27,8 @@
     "passif": "Liabilities",
     "members": "Members",
     "invitations": "Invitations",
-    "settings": "Settings"
+    "settings": "Settings",
+    "changelog": "What's new"
   },
   "navUser": {
     "switchOrg": "Switch organization"
@@ -104,5 +106,8 @@
       "isSuperAdmin": "Super-admin",
       "makeSuperAdmin": "Make super-admin"
     }
+  },
+  "changelogPage": {
+    "metaTitle": "What's new — Albo OS"
   }
 }

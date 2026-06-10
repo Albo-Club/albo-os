@@ -14,81 +14,11 @@ import { z } from 'zod/v3'
 
 import { internal } from './_generated/api'
 import { internalMutation, internalQuery } from './_generated/server'
+import { parseScope, readMembership } from './lib/agentScope'
 import { buildSearchText } from './lib/searchText'
+import { INSTRUMENTS, instrumentValidator } from './lib/instruments'
 import type { Doc, Id } from './_generated/dataModel'
-import type { MutationCtx, QueryCtx } from './_generated/server'
-
-const INSTRUMENTS = [
-  'share',
-  'bsa',
-  'bsa_air',
-  'safe',
-  'oc',
-  'os',
-  'convertible_note',
-  'cca',
-  'royalty',
-  'fund_lp',
-  'spv_share',
-  'secondary',
-  'real_estate_direct',
-  'scpi',
-  'cto',
-  'dat',
-  'crypto',
-  'loan',
-  'capitalization_account',
-] as const
-
-const instrumentValidator = v.union(
-  v.literal('share'),
-  v.literal('bsa'),
-  v.literal('bsa_air'),
-  v.literal('safe'),
-  v.literal('oc'),
-  v.literal('os'),
-  v.literal('convertible_note'),
-  v.literal('cca'),
-  v.literal('royalty'),
-  v.literal('fund_lp'),
-  v.literal('spv_share'),
-  v.literal('secondary'),
-  v.literal('real_estate_direct'),
-  v.literal('scpi'),
-  v.literal('cto'),
-  v.literal('dat'),
-  v.literal('crypto'),
-  v.literal('loan'),
-  v.literal('capitalization_account'),
-)
-
-function parseScope(scope: string | undefined | null): {
-  orgId: Id<'organizations'>
-  userId: Id<'users'>
-} {
-  if (!scope) throw new ConvexError('agent_tools_missing_scope')
-  const idx = scope.indexOf(':')
-  if (idx <= 0) throw new ConvexError('agent_tools_invalid_scope')
-  return {
-    orgId: scope.slice(0, idx) as Id<'organizations'>,
-    userId: scope.slice(idx + 1) as Id<'users'>,
-  }
-}
-
-async function readMembership(
-  ctx: QueryCtx | MutationCtx,
-  orgId: Id<'organizations'>,
-  userId: Id<'users'>,
-): Promise<Doc<'organizationMembers'>> {
-  const member = await ctx.db
-    .query('organizationMembers')
-    .withIndex('by_org_and_user', (q) =>
-      q.eq('orgId', orgId).eq('userId', userId),
-    )
-    .unique()
-  if (!member) throw new ConvexError('agent_tools_forbidden')
-  return member
-}
+import type { MutationCtx } from './_generated/server'
 
 function companyName(c: Doc<'companies'> | null) {
   return c?.name ?? null
@@ -127,10 +57,10 @@ export const listDealsInternal = internalQuery({
     return await Promise.all(
       rows.map(async (d) => ({
         _id: d._id,
-        investor: companyName(await ctx.db.get(d.investorCompanyId)),
-        target: companyName(await ctx.db.get(d.targetCompanyId)),
+        investor: companyName(await ctx.db.get("companies", d.investorCompanyId)),
+        target: companyName(await ctx.db.get("companies", d.targetCompanyId)),
         viaSpv: d.viaSpvCompanyId
-          ? companyName(await ctx.db.get(d.viaSpvCompanyId))
+          ? companyName(await ctx.db.get("companies", d.viaSpvCompanyId))
           : null,
         instrumentKind: d.instrumentKind,
         committedAmount: d.committedAmount ?? null,
@@ -174,7 +104,7 @@ async function assertSameOrg(
   companyId: Id<'companies'>,
   code: string,
 ) {
-  const c = await ctx.db.get(companyId)
+  const c = await ctx.db.get("companies", companyId)
   if (!c || c.orgId !== orgId) throw new ConvexError(code)
 }
 
@@ -204,7 +134,7 @@ export const createDealInternal = internalMutation({
       await assertSameOrg(ctx, args.orgId, args.viaSpvCompanyId, 'spv_wrong_org')
     }
     // L'investisseur doit être une entité du groupe (pas une portfolio).
-    const investor = await ctx.db.get(args.investorCompanyId)
+    const investor = await ctx.db.get("companies", args.investorCompanyId)
     if (!investor || investor.orgId !== args.orgId) {
       throw new ConvexError('investor_wrong_org')
     }
@@ -254,7 +184,7 @@ export const createBankAccountInternal = internalMutation({
   handler: async (ctx, args) => {
     await readMembership(ctx, args.orgId, args.actorUserId)
     // Le propriétaire d'un compte est toujours une entité du groupe.
-    const owner = await ctx.db.get(args.ownerCompanyId)
+    const owner = await ctx.db.get("companies", args.ownerCompanyId)
     if (!owner || owner.orgId !== args.orgId) {
       throw new ConvexError('owner_wrong_org')
     }
@@ -317,12 +247,12 @@ export const createTransactionInternal = internalMutation({
     if (!Number.isInteger(args.amount) || args.amount <= 0) {
       throw new ConvexError('invalid_amount')
     }
-    const account = await ctx.db.get(args.bankAccountId)
+    const account = await ctx.db.get("bankAccounts", args.bankAccountId)
     if (!account || account.orgId !== args.orgId) {
       throw new ConvexError('account_wrong_org')
     }
     if (args.dealId) {
-      const deal = await ctx.db.get(args.dealId)
+      const deal = await ctx.db.get("deals", args.dealId)
       if (!deal || deal.orgId !== args.orgId) {
         throw new ConvexError('deal_wrong_org')
       }
@@ -367,9 +297,9 @@ export const updateDealInternal = internalMutation({
   },
   handler: async (ctx, { orgId, actorUserId, dealId, ...patch }) => {
     await readMembership(ctx, orgId, actorUserId)
-    const deal = await ctx.db.get(dealId)
+    const deal = await ctx.db.get("deals", dealId)
     if (!deal || deal.orgId !== orgId) throw new ConvexError('not_found')
-    await ctx.db.patch(dealId, patch)
+    await ctx.db.patch("deals", dealId, patch)
     return { _id: dealId }
   },
 })
