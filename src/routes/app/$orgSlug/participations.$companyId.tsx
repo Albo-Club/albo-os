@@ -11,6 +11,8 @@ import type { Id } from '../../../../convex/_generated/dataModel'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { DealsList } from '~/components/participations/ParticipationsTable'
+import { KpisSection } from '~/components/companies/KpisSection'
+import { ReportingsSection } from '~/components/companies/ReportingsSection'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -235,6 +237,9 @@ function ParticipationDetail() {
           <DealsList deals={deals} orgSlug={orgSlug} />
         </div>
       )}
+
+      {company && <KpisSection companyId={company._id} />}
+      {company && <ReportingsSection companyId={company._id} />}
 
       {company && editOpen && (
         <EditCompanyDialog

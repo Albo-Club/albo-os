@@ -404,6 +404,53 @@ export default defineSchema({
     .index('by_company_metric', ['companyId', 'metricType'])
     .index('by_org_period', ['orgId', 'periodEnd']),
 
+  /**
+   * dealProjections — business plan d'un deal en lignes datées attendues
+   * (royalties surtout : BP signé vs BP dégradé vs réalité).
+   * `version: 'initial'` = BP au closing, figé ; `'revised'` = dernière
+   * actualisation. Le « réalisé » n'est PAS ici : ce sont les transactions
+   * pointées sur le deal. Unicité (dealId, version, period) gérée côté
+   * mutation (replaceVersion = delete + insert, cf. convex/projections.ts).
+   */
+  dealProjections: defineTable({
+    orgId: v.id('organizations'),
+    dealId: v.id('deals'),
+    version: v.union(v.literal('initial'), v.literal('revised')),
+    period: v.number(), // ms epoch, début de période (mois/semestre libre)
+    amountCents: v.number(), // attendu sur la période, positif
+    direction: txDirection, // 'in' (retours attendus) | 'out' (déploiement)
+    notes: v.optional(v.string()),
+  })
+    .index('by_deal_version', ['dealId', 'version', 'period'])
+    .index('by_org', ['orgId']),
+
+  /**
+   * documents — reportings & docs rattachés à une company (portfolio
+   * surtout) : investor updates, BP, juridique. Fichier dans le storage
+   * Convex natif (cap 20 MB). `source: 'email'` réservé à l'ingestion
+   * entrante (V2) — V1 = upload manuel.
+   */
+  documents: defineTable({
+    orgId: v.id('organizations'),
+    companyId: v.id('companies'),
+    title: v.string(),
+    kind: v.union(
+      v.literal('reporting'),
+      v.literal('bp'),
+      v.literal('legal'),
+      v.literal('other'),
+    ),
+    period: v.optional(v.number()), // période couverte (ms epoch)
+    storageId: v.id('_storage'),
+    contentType: v.optional(v.string()),
+    size: v.optional(v.number()),
+    source: v.union(v.literal('upload'), v.literal('email')),
+    uploadedBy: v.optional(v.id('users')),
+    uploadedAt: v.number(),
+  })
+    .index('by_company', ['companyId', 'uploadedAt'])
+    .index('by_org', ['orgId']),
+
   // ─── Passif (capitaux propres + comptes courants d'associés) ──────────────
 
   /**

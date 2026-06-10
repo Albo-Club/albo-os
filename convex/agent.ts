@@ -6,6 +6,7 @@ import { dealTools } from './agentTools'
 import { forecastTools } from './agentToolsForecasts'
 import { liabilityTools } from './agentToolsLiabilities'
 import { pointageTools } from './agentToolsPointage'
+import { projectionTools } from './agentToolsProjections'
 import { valuationTools } from './agentToolsValuations'
 import { BASE_INSTRUCTIONS } from './lib/instructions'
 
@@ -25,6 +26,7 @@ export const chatAgent = new Agent(components.agent, {
     ...liabilityTools,
     ...forecastTools,
     ...valuationTools,
+    ...projectionTools,
   },
   // Les flux de pointage sont multi-steps (list → suggest → confirmer →
   // match) : 12 steps au lieu de 8.

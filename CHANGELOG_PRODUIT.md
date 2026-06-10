@@ -13,6 +13,33 @@
 
 ---
 
+## Juin 2026 — Chaque projet a enfin sa vue
+
+Tous les investissements ne se suivent pas pareil. Les pages de deal et de
+société s'adaptent maintenant au type de projet.
+
+### 📈 Royalties : le BP face à la réalité
+
+- Saisissez le **business plan initial** (et ses révisions) en le collant
+  simplement dans l'assistant — il structure les lignes pour vous.
+- La page du deal affiche la **courbe BP initial vs BP révisé vs réalisé**
+  (le réalisé vient automatiquement des transactions pointées) et le tableau
+  des périodes avec l'écart cumulé, en rouge quand on est en retard sur le
+  plan.
+
+### 🏦 Fonds : appelé, distribué, performance
+
+- Les deals de type fonds affichent **Engagé / Appelé / Distribué / DPI /
+  TVPI** d'un coup d'œil, avec l'historique des valorisations.
+
+### 🏢 Sociétés : reportings et KPIs au même endroit
+
+- **Déposez les reportings** (investor updates, BP, juridique) directement
+  sur la page de la société : classés, datés, téléchargeables.
+- **Les KPIs s'historisent** : collez un reporting dans l'assistant, il en
+  extrait les métriques (ARR, cash, effectifs… et NAV/TVPI pour les fonds) —
+  vous confirmez, c'est enregistré.
+
 ## Juin 2026 — L'assistant devient copilote
 
 **En une phrase** : Albo OS passe en AI-first — l'assistant n'est plus un

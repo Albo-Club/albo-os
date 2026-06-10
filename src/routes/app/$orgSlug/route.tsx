@@ -96,11 +96,12 @@ function OrgLayout() {
       {org && (
         <aside
           className={cn(
-            'bg-background flex-col border-l',
-            // Desktop (≥ lg) : panneau dans le flux, à droite du contenu.
-            'lg:static lg:z-auto lg:h-svh lg:w-[400px] lg:shrink-0 lg:shadow-none',
+            'bg-background flex-col',
+            // Desktop (≥ lg) : carte arrondie dans le flux, même langage
+            // visuel que SidebarInset (variant inset : m-2 rounded-xl shadow).
+            'lg:static lg:z-auto lg:my-2 lg:mr-2 lg:ml-0 lg:h-auto lg:w-[400px] lg:max-w-none lg:shrink-0 lg:overflow-hidden lg:rounded-xl lg:border-0 lg:shadow-sm',
             // Mobile : overlay plein écran à droite.
-            'fixed inset-y-0 right-0 z-50 w-full max-w-md shadow-xl',
+            'fixed inset-y-0 right-0 z-50 w-full max-w-md border-l shadow-xl',
             aiOpen ? 'flex' : 'hidden',
           )}
         >
