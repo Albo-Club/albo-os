@@ -560,10 +560,11 @@ const suggestMatches = createTool({
 
 const matchTransactionToDeal = createTool({
   description:
-    'Reconcile a transaction with a deal of the current org. The user MUST ' +
-    'confirm the exact transaction + deal pair first (e.g. after ' +
-    'suggestMatches). Fails if the transaction is allocated to a liability ' +
-    '(unpoint it first).',
+    'Reconcile a transaction with a deal of the current org. Call once the ' +
+    'exact transaction + deal pair is identified (e.g. via suggestMatches); ' +
+    'the user approves via in-app buttons. Fails if the transaction is ' +
+    'allocated to a liability (unpoint it first).',
+  needsApproval: true,
   inputSchema: z.object({
     transactionId: z.string(),
     dealId: z.string(),
@@ -587,8 +588,9 @@ const allocateTransactionToLiability = createTool({
     'Reconcile a transaction with a liability of the current org: an equity ' +
     'position (kind "equity") or an intercompany loan (kind ' +
     '"intercompany_loan"). Find target ids via listLiabilities. The user ' +
-    'MUST confirm first. Fails if the transaction is matched to a deal ' +
-    '(unpoint it first).',
+    'approves via in-app buttons. Fails if the transaction is matched to a ' +
+    'deal (unpoint it first).',
+  needsApproval: true,
   inputSchema: z.object({
     transactionId: z.string(),
     kind: z.enum(['equity', 'intercompany_loan']),
@@ -613,11 +615,12 @@ const categorizeTransaction = createTool({
   description:
     'Set aside a transaction that concerns no deal: "ignored", "charge" ' +
     '(operating cost), "tax", "product" (income unrelated to a deal) or ' +
-    '"internal_transfer" (between own accounts). The user MUST confirm ' +
-    'first. For "charge"/"product" you can set vatRateBps (VAT rate in ' +
-    'basis points: 0, 550, 1000 or 2000 — French standard rate is 2000 = ' +
-    '20%); confirm the rate with the user, salaries/insurance/bank fees ' +
-    'carry no VAT (0).',
+    '"internal_transfer" (between own accounts). The user approves via ' +
+    'in-app buttons. For "charge"/"product" you can set vatRateBps (VAT ' +
+    'rate in basis points: 0, 550, 1000 or 2000 — French standard rate is ' +
+    '2000 = 20%); confirm the rate with the user, salaries/insurance/bank ' +
+    'fees carry no VAT (0).',
+  needsApproval: true,
   inputSchema: z.object({
     transactionId: z.string(),
     status: z.enum(['ignored', 'charge', 'tax', 'product', 'internal_transfer']),
@@ -642,7 +645,8 @@ const unpointTransaction = createTool({
   description:
     'Undo the reconciliation of a transaction (deal match, liability ' +
     'allocation or categorization): it returns to the unmatched queue. The ' +
-    'user MUST confirm first.',
+    'user approves via in-app buttons.',
+  needsApproval: true,
   inputSchema: z.object({
     transactionId: z.string(),
   }),

@@ -39,10 +39,10 @@ export const BASE_INSTRUCTIONS = [
   'Reconciliation (pointage): listUnmatchedTransactions shows the queue of ' +
     'transactions to reconcile. Use suggestMatches to propose likely ' +
     'targets (deal, equity position or intercompany loan) based on past ' +
-    'matches — present the candidates with their evidence and WAIT for ' +
-    'explicit user confirmation before calling matchTransactionToDeal / ' +
-    'allocateTransactionToLiability / categorizeTransaction. Never match ' +
-    'without confirmation, and never guess when suggestMatches returns no ' +
+    'matches — present the candidates with their evidence. If exactly one ' +
+    'candidate clearly stands out, call the matching tool directly — the ' +
+    'user confirms via the in-app approval buttons; if several are plausible, ' +
+    'ask the user to choose first. Never guess when suggestMatches returns no ' +
     'candidates. VAT: "charge"/"product" transactions carry an optional ' +
     'vatRateBps (amounts are TTC; the deductible/collected VAT is derived). ' +
     'When categorizing a charge, suggest 2000 (20%) unless the expense is ' +
@@ -68,12 +68,15 @@ export const BASE_INSTRUCTIONS = [
     'updates; actuals are the matched transactions). A company carries KPI ' +
     'snapshots (createKpiSnapshot: arr, mrr, gmv, cash, headcount; for ' +
     'funds: nav, tvpi, dpi). When the user pastes a BP or a reporting, ' +
-    'extract the lines/metrics, restate them as a table and write them ' +
-    'after confirmation.',
+    'extract the lines/metrics, restate them as a table, then call the ' +
+    'write tool (the user approves via in-app buttons).',
 
-  // Garde-fou écriture
-  'For ANY write (create, update, match, categorize): restate what you are ' +
-    'about to do with the exact values and get user confirmation first.',
+  // Approbation native des outils d'écriture
+  'Write tools (create, update, match, categorize) require explicit user ' +
+    'approval: the app shows Confirm/Reject buttons on each call. Briefly ' +
+    'state what you are about to do, then call the tool directly — do NOT ' +
+    'ask for a textual confirmation and do NOT wait for a "yes". If the ' +
+    'user denies a call, acknowledge it and ask what should change.',
 ].join('\n\n')
 
 /**

@@ -341,6 +341,7 @@ const createCompany = createTool({
     'Create a PORTFOLIO company (an invested startup/fund/asset). Never use ' +
     'this for group entities (CALTE, Albo Club, SCIs… already exist). Call ' +
     'listCompanies first to avoid duplicates. Returns the new company id.',
+  needsApproval: true,
   inputSchema: z.object({
     name: z.string().min(1).describe('Company name, e.g. "Sezame"'),
     sector: z.string().optional(),
@@ -365,8 +366,9 @@ const createDeal = createTool({
     'listCompanies. The target is the invested company — create it with ' +
     'createCompany first if needed. Amounts are in CENTS EUR (50 000 € → ' +
     '5000000). Rates in basis points (11% → 1100). signedDate is an ISO date ' +
-    '"YYYY-MM-DD". For an SPV investment, pass viaSpvCompanyId. Confirm the ' +
-    'details with the user before calling this.',
+    '"YYYY-MM-DD". For an SPV investment, pass viaSpvCompanyId. The user ' +
+    'approves the call via in-app buttons; state the details, then call.',
+  needsApproval: true,
   inputSchema: z.object({
     investorCompanyId: z.string().describe('Group entity id (CALTE, Albo…)'),
     targetCompanyId: z.string().describe('Invested company id'),
@@ -408,6 +410,7 @@ const updateDeal = createTool({
   description:
     'Update an existing deal by id (amounts in cents, status, notes). Use ' +
     'listDeals first if you do not know the id. Confirm before calling.',
+  needsApproval: true,
   inputSchema: z.object({
     dealId: z.string(),
     committedAmount: z.number().int().optional(),
@@ -455,6 +458,7 @@ const createBankAccount = createTool({
     '(12 000 € → 1200000); it is a manual field, not derived from ' +
     'transactions. balanceAsOfISO is the date that balance was observed ' +
     '("YYYY-MM-DD"). Returns the new account id.',
+  needsApproval: true,
   inputSchema: z.object({
     ownerCompanyId: z.string().describe('Group entity id (CALTE, Albo…)'),
     bankName: z.string().min(1).describe('Bank name, e.g. "Qonto"'),
@@ -514,8 +518,9 @@ const createTransaction = createTool({
     'CENTS EUR (50 000 € → 5000000) and always positive. direction is "in" ' +
     '(money received) or "out" (money paid). Provide the bankAccountId ' +
     '(listBankAccounts, or createBankAccount first if none exists) and the ' +
-    'dealId to link it. dateISO is "YYYY-MM-DD". Confirm with the user before ' +
-    'calling this.',
+    'dealId to link it. dateISO is "YYYY-MM-DD". The user approves via ' +
+    'in-app buttons.',
+  needsApproval: true,
   inputSchema: z.object({
     bankAccountId: z.string().describe('Bank account id'),
     dealId: z.string().optional().describe('Deal id to link the transaction'),

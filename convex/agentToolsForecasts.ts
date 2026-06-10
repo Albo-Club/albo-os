@@ -225,7 +225,8 @@ const createForecastRule = createTool({
     'amountCents in CENTS EUR, positive. direction "in" (income) or "out" ' +
     '(expense). anchorDay: day of month (1-31) or day of week (1-7 for ' +
     'weekly). Creating a rule does NOT generate entries: propose to call ' +
-    'expandForecastRules afterwards. Confirm with the user before calling.',
+    'expandForecastRules afterwards. The user approves via in-app buttons.',
+  needsApproval: true,
   inputSchema: z.object({
     label: z.string().min(1).describe('e.g. "Loyer SCI Chapelle"'),
     amountCents: z.number().int().positive().describe('cents EUR'),
@@ -294,6 +295,7 @@ const expandForecastRules = createTool({
     'the current org over the given horizon (months, max 24). Idempotent: ' +
     'manually overridden / realized / cancelled entries are never ' +
     'rewritten. Call this after creating or updating a rule.',
+  needsApproval: true,
   inputSchema: z.object({
     horizonMonths: z.number().int().min(1).max(24),
   }),
@@ -336,7 +338,8 @@ const markForecastEntryRealized = createTool({
     'Mark a forecast entry as realized by linking it to a real bank ' +
     'transaction of the same org (find ids via listForecastEntries and ' +
     'listUnmatchedTransactions / listTransactions). Does NOT touch the ' +
-    'transaction itself. Confirm with the user before calling.',
+    'transaction itself. The user approves via in-app buttons.',
+  needsApproval: true,
   inputSchema: z.object({
     entryId: z.string(),
     transactionId: z.string(),

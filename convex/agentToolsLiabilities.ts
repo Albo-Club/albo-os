@@ -154,10 +154,11 @@ const listLiabilities = createTool({
 const createEquityPosition = createTool({
   description:
     'Create an equity position issued by the current org (capital social, ' +
-    'prime d’émission, augmentation de capital, report à nouveau). ' +
+    "prime d'émission, augmentation de capital, report à nouveau). " +
     'amountCents in CENTS EUR (10 000 € → 1000000). holderLabel is a free ' +
     'label for the holder (optional). effectiveDateISO is "YYYY-MM-DD". ' +
-    'Confirm with the user before calling.',
+    'The user approves via in-app buttons.',
+  needsApproval: true,
   inputSchema: z.object({
     type: z.enum(EQUITY_TYPES),
     amountCents: z.number().int().positive().describe('cents EUR'),
@@ -192,7 +193,8 @@ const createIntercompanyLoan = createTool({
     '"albo"). role is the position of the CURRENT org: "creditor" (it lends) ' +
     'or "debtor" (it borrows). interestRateBps in basis points (11% → 1100), ' +
     'omit for 0. The balance is derived later from allocated transactions. ' +
-    'Confirm with the user before calling.',
+    'The user approves via in-app buttons.',
+  needsApproval: true,
   inputSchema: z.object({
     role: z.enum(['creditor', 'debtor']),
     counterpartyOrgSlug: z.string().describe('Slug of the other org'),

@@ -15,16 +15,32 @@
     "cash": "Quelle est ma position de cash ?",
     "liabilities": "Liste le passif",
     "forecast": "Projette mon cash sur 12 mois",
-    "valuations": "Dernières valorisations du portefeuille"
+    "valuations": "Dernières valorisations du portefeuille",
+    "vat": "Où en est la TVA ce trimestre ?",
+    "currentAccounts": "Solde des comptes courants",
+    "pointagePending": "Pointe les transactions en attente",
+    "pointageBankFees": "Quelles transactions ressemblent à des frais bancaires ?",
+    "missingKpis": "Quels KPIs manquent ce trimestre ?"
+  },
+  "approval": {
+    "pending": "Confirmation requise",
+    "responded": "Réponse envoyée",
+    "approve": "Confirmer",
+    "deny": "Refuser",
+    "accepted": "Action confirmée",
+    "denied": "Action refusée"
   },
   "tool": {
     "statePending": "En attente",
     "stateRunning": "En cours",
+    "stateApprovalRequested": "Confirmation requise",
+    "stateApprovalResponded": "Réponse envoyée",
     "stateCompleted": "Terminé",
     "stateError": "Erreur",
     "parameters": "Paramètres",
     "result": "Résultat",
-    "error": "Erreur"
+    "error": "Erreur",
+    "stateDenied": "Refusé"
   },
   "threads": {
     "history": "Historique",

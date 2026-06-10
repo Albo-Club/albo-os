@@ -43,6 +43,14 @@ import {
 } from '~/components/ai-elements/prompt-input'
 import { Suggestion } from '~/components/ai-elements/suggestion'
 import {
+  Confirmation,
+  ConfirmationAccepted,
+  ConfirmationAction,
+  ConfirmationActions,
+  ConfirmationRejected,
+  ConfirmationRequest,
+} from '~/components/ai-elements/confirmation'
+import {
   Tool,
   ToolContent,
   ToolHeader,
@@ -77,19 +85,33 @@ function errorCode(err: unknown): string {
 }
 
 /** Parties d'un message assistant : texte (markdown) + appels d'outils. */
-function MessageParts({ message }: { message: UIMessage }) {
+function MessageParts({
+  message,
+  onRespondApproval,
+  respondingApprovalId,
+}: {
+  message: UIMessage
+  /** Confirme (true) ou refuse (false) une demande d'approbation d'outil. */
+  onRespondApproval: (approvalId: string, approved: boolean) => void
+  /** Approbation dont la réponse est en cours d'envoi (boutons désactivés). */
+  respondingApprovalId: string | null
+}) {
   const { t } = useTranslation(['chat'])
 
-  // Nos streams ne produisent que les 4 états ci-dessous ; les états
-  // d'approbation gardent le libellé anglais par défaut du composant.
   function stateLabel(state: ToolPart['state']): string | undefined {
     switch (state) {
       case 'input-streaming':
         return t('chat:tool.statePending')
       case 'input-available':
         return t('chat:tool.stateRunning')
+      case 'approval-requested':
+        return t('chat:tool.stateApprovalRequested')
+      case 'approval-responded':
+        return t('chat:tool.stateApprovalResponded')
       case 'output-available':
         return t('chat:tool.stateCompleted')
+      case 'output-denied':
+        return t('chat:tool.stateDenied')
       case 'output-error':
         return t('chat:tool.stateError')
       default:
@@ -105,6 +127,9 @@ function MessageParts({ message }: { message: UIMessage }) {
         }
         if (part.type === 'dynamic-tool' || part.type.startsWith('tool-')) {
           const toolPart = part as ToolPart
+          const approvalId = toolPart.approval?.id
+          const responding =
+            approvalId !== undefined && approvalId === respondingApprovalId
           return (
             <Tool key={i} className="mb-0">
               {toolPart.type === 'dynamic-tool' ? (
@@ -130,6 +155,39 @@ function MessageParts({ message }: { message: UIMessage }) {
                     label={t('chat:tool.parameters')}
                   />
                 )}
+                <Confirmation
+                  approval={toolPart.approval}
+                  state={toolPart.state}
+                >
+                  <ConfirmationRequest className="text-muted-foreground">
+                    {t('chat:approval.pending')}
+                  </ConfirmationRequest>
+                  <ConfirmationActions>
+                    <ConfirmationAction
+                      disabled={responding}
+                      onClick={() =>
+                        approvalId && onRespondApproval(approvalId, true)
+                      }
+                    >
+                      {t('chat:approval.approve')}
+                    </ConfirmationAction>
+                    <ConfirmationAction
+                      variant="outline"
+                      disabled={responding}
+                      onClick={() =>
+                        approvalId && onRespondApproval(approvalId, false)
+                      }
+                    >
+                      {t('chat:approval.deny')}
+                    </ConfirmationAction>
+                  </ConfirmationActions>
+                  <ConfirmationAccepted className="text-muted-foreground">
+                    {t('chat:approval.accepted')}
+                  </ConfirmationAccepted>
+                  <ConfirmationRejected className="text-muted-foreground">
+                    {t('chat:approval.denied')}
+                  </ConfirmationRejected>
+                </Confirmation>
                 <ToolOutput
                   output={toolPart.output}
                   errorText={toolPart.errorText}
@@ -146,7 +204,24 @@ function MessageParts({ message }: { message: UIMessage }) {
   )
 }
 
-const SUGGESTION_KEYS = ['cash', 'liabilities', 'forecast', 'valuations']
+// Suggestions du panneau vide, choisies selon la route courante. Les clés
+// pointent vers `chat:suggestions.*` ; on retombe sur le set par défaut hors
+// des écrans connus.
+function suggestionKeys(pathname: string): Array<string> {
+  if (pathname.includes('/pointage')) {
+    return ['pointagePending', 'pointageBankFees']
+  }
+  if (pathname.includes('/cash')) {
+    return ['cash', 'vat', 'forecast']
+  }
+  if (pathname.includes('/passif')) {
+    return ['liabilities', 'currentAccounts']
+  }
+  if (pathname.includes('/participations') || pathname.includes('/deals')) {
+    return ['valuations', 'missingKpis']
+  }
+  return ['cash', 'liabilities', 'forecast', 'valuations']
+}
 
 export function AiPanel({
   orgId,
@@ -174,11 +249,19 @@ export function AiPanel({
   const [renameValue, setRenameValue] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  // id de l'approbation dont la réponse est en cours d'envoi (désactive les
+  // boutons Confirmer / Refuser le temps de l'accusé de réception).
+  const [respondingApprovalId, setRespondingApprovalId] = useState<
+    string | null
+  >(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const prevOpenRef = useRef(open)
 
   const createThread = useConvexMutation(api.chat.createNewThread)
   const sendMessage = useConvexMutation(api.chat.sendMessage)
+  const respondToToolApproval = useConvexMutation(
+    api.chat.respondToToolApproval,
+  )
   const renameThread = useConvexMutation(api.chat.renameThread)
   const deleteThread = useConvexMutation(api.chat.deleteThread)
   const stopStream = useConvexMutation(api.chat.stopStream)
@@ -260,6 +343,31 @@ export function AiPanel({
 
   function handleSend(message: PromptInputMessage) {
     void submitPrompt(message.text.trim())
+  }
+
+  async function handleRespondApproval(approvalId: string, approved: boolean) {
+    if (!threadId || respondingApprovalId) return
+    setRespondingApprovalId(approvalId)
+    try {
+      await respondToToolApproval({
+        orgId,
+        threadId,
+        approvalId,
+        approved,
+        context: { route: location.pathname },
+      })
+      // La génération reprend par le même flux de deltas que sendMessage :
+      // ranimer l'indicateur « réflexion » jusqu'au premier token.
+      setAwaitingStream(true)
+    } catch (err) {
+      toast.error(
+        errorCode(err) === 'rate_limited'
+          ? t('chat:errors.rate_limited')
+          : t('chat:errors.default'),
+      )
+    } finally {
+      setRespondingApprovalId(null)
+    }
   }
 
   function handleNewThread() {
@@ -424,7 +532,7 @@ export function AiPanel({
                 {t('chat:emptyState')}
               </p>
               <div className="flex flex-wrap justify-center gap-2">
-                {SUGGESTION_KEYS.map((key) => {
+                {suggestionKeys(location.pathname).map((key) => {
                   const prompt = t(`chat:suggestions.${key}`)
                   return (
                     <Suggestion
@@ -454,7 +562,13 @@ export function AiPanel({
                       m.text
                     ) : (
                       <>
-                        <MessageParts message={m} />
+                        <MessageParts
+                          message={m}
+                          onRespondApproval={(approvalId, approved) =>
+                            void handleRespondApproval(approvalId, approved)
+                          }
+                          respondingApprovalId={respondingApprovalId}
+                        />
                         {!m.text && m.status === 'streaming' && (
                           <span className="text-muted-foreground">…</span>
                         )}

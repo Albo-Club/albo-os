@@ -48,6 +48,7 @@ const setDealProjections = createTool({
     'existing lines of that version — restate the full table and get user ' +
     'confirmation first. "initial" should be written once at closing; ' +
     'updates go to "revised".',
+  needsApproval: true,
   inputSchema: z.object({
     dealId: z.string(),
     version: z.enum(['initial', 'revised']),
@@ -108,7 +109,8 @@ const createKpiSnapshot = createTool({
     'CENTS EUR with unit "EUR_cents"; ratios like tvpi/dpi in basis points ' +
     'with unit "bps" (1.45x → 14500); counts with unit "users"/"FTE". ' +
     'periodStartISO/periodEndISO "YYYY-MM-DD". source = where it comes from ' +
-    '(e.g. "investor update Q1 2026"). Confirm with the user before calling.',
+    '(e.g. "investor update Q1 2026"). The user approves via in-app buttons.',
+  needsApproval: true,
   inputSchema: z.object({
     companyId: z.string(),
     metricType: z.string().min(1),

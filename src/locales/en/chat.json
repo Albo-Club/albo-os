@@ -15,16 +15,32 @@
     "cash": "What is my current cash position?",
     "liabilities": "List our liabilities",
     "forecast": "Project my cash over 12 months",
-    "valuations": "Latest portfolio valuations"
+    "valuations": "Latest portfolio valuations",
+    "vat": "Where do we stand on VAT this quarter?",
+    "currentAccounts": "Current account balances",
+    "pointagePending": "Reconcile pending transactions",
+    "pointageBankFees": "Which transactions look like bank fees?",
+    "missingKpis": "Which KPIs are missing this quarter?"
+  },
+  "approval": {
+    "pending": "Confirmation required",
+    "responded": "Response sent",
+    "approve": "Confirm",
+    "deny": "Decline",
+    "accepted": "Action confirmed",
+    "denied": "Action declined"
   },
   "tool": {
     "statePending": "Pending",
     "stateRunning": "Running",
+    "stateApprovalRequested": "Confirmation required",
+    "stateApprovalResponded": "Response sent",
     "stateCompleted": "Done",
     "stateError": "Error",
     "parameters": "Parameters",
     "result": "Result",
-    "error": "Error"
+    "error": "Error",
+    "stateDenied": "Declined"
   },
   "threads": {
     "history": "History",

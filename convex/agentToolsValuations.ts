@@ -35,7 +35,8 @@ const createValuation = createTool({
     'Record a new valuation (fair value) for a deal. fairValueCents in ' +
     'CENTS EUR (1 200 000 € → 120000000), asOfISO is the valuation date ' +
     '"YYYY-MM-DD". valuationMethod e.g. "last_round", "mark_to_market", ' +
-    '"reported_nav". Confirm with the user before calling.',
+    '"reported_nav". The user approves via in-app buttons.',
+  needsApproval: true,
   inputSchema: z.object({
     dealId: z.string(),
     asOfISO: z.string().describe('ISO date "YYYY-MM-DD"'),
