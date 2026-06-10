@@ -12,17 +12,43 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
-  Square,
   Trash2,
-  Wrench,
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
-import { MarkdownMessage } from './MarkdownMessage'
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { UIMessage } from '@convex-dev/agent/react'
+import type { PromptInputMessage } from '~/components/ai-elements/prompt-input'
+import type { ToolPart } from '~/components/ai-elements/tool'
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from '~/components/ai-elements/conversation'
+import {
+  Message,
+  MessageAction,
+  MessageActions,
+  MessageContent,
+  MessageResponse,
+} from '~/components/ai-elements/message'
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
+} from '~/components/ai-elements/prompt-input'
+import { Suggestion } from '~/components/ai-elements/suggestion'
+import {
+  Tool,
+  ToolContent,
+  ToolHeader,
+  ToolInput,
+  ToolOutput,
+} from '~/components/ai-elements/tool'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -38,6 +64,7 @@ import {
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
 import { Input } from '~/components/ui/input'
+import { Spinner } from '~/components/ui/spinner'
 import { cn } from '~/lib/utils'
 
 function errorCode(err: unknown): string {
@@ -52,29 +79,65 @@ function errorCode(err: unknown): string {
 /** Parties d'un message assistant : texte (markdown) + appels d'outils. */
 function MessageParts({ message }: { message: UIMessage }) {
   const { t } = useTranslation(['chat'])
+
+  // Nos streams ne produisent que les 4 états ci-dessous ; les états
+  // d'approbation gardent le libellé anglais par défaut du composant.
+  function stateLabel(state: ToolPart['state']): string | undefined {
+    switch (state) {
+      case 'input-streaming':
+        return t('chat:tool.statePending')
+      case 'input-available':
+        return t('chat:tool.stateRunning')
+      case 'output-available':
+        return t('chat:tool.stateCompleted')
+      case 'output-error':
+        return t('chat:tool.stateError')
+      default:
+        return undefined
+    }
+  }
+
   return (
     <>
       {message.parts.map((part, i) => {
         if (part.type === 'text') {
-          return <MarkdownMessage key={i} text={part.text} />
+          return <MessageResponse key={i}>{part.text}</MessageResponse>
         }
-        const toolName =
-          part.type === 'dynamic-tool'
-            ? part.toolName
-            : part.type.startsWith('tool-')
-              ? part.type.slice('tool-'.length)
-              : null
-        if (toolName) {
+        if (part.type === 'dynamic-tool' || part.type.startsWith('tool-')) {
+          const toolPart = part as ToolPart
           return (
-            <div
-              key={i}
-              className="text-muted-foreground my-1 flex items-center gap-1.5 text-xs"
-            >
-              <Wrench className="size-3 shrink-0" />
-              <span className="truncate">
-                {t('chat:toolCall', { name: toolName })}
-              </span>
-            </div>
+            <Tool key={i} className="mb-0">
+              {toolPart.type === 'dynamic-tool' ? (
+                <ToolHeader
+                  type={toolPart.type}
+                  toolName={toolPart.toolName}
+                  state={toolPart.state}
+                  statusLabel={stateLabel(toolPart.state)}
+                  className="p-2"
+                />
+              ) : (
+                <ToolHeader
+                  type={toolPart.type}
+                  state={toolPart.state}
+                  statusLabel={stateLabel(toolPart.state)}
+                  className="p-2"
+                />
+              )}
+              <ToolContent className="space-y-3 p-3">
+                {toolPart.input !== undefined && (
+                  <ToolInput
+                    input={toolPart.input}
+                    label={t('chat:tool.parameters')}
+                  />
+                )}
+                <ToolOutput
+                  output={toolPart.output}
+                  errorText={toolPart.errorText}
+                  label={t('chat:tool.result')}
+                  errorLabel={t('chat:tool.error')}
+                />
+              </ToolContent>
+            </Tool>
           )
         }
         return null
@@ -83,11 +146,16 @@ function MessageParts({ message }: { message: UIMessage }) {
   )
 }
 
+const SUGGESTION_KEYS = ['cash', 'liabilities', 'forecast', 'valuations']
+
 export function AiPanel({
   orgId,
+  open = true,
   onClose,
 }: {
   orgId: Id<'organizations'>
+  /** Visibilité du panneau (masqué en CSS par le layout) : focus à l'ouverture. */
+  open?: boolean
   /** Fermeture du panneau (collapse desktop / overlay mobile). */
   onClose: () => void
 }) {
@@ -99,11 +167,15 @@ export function AiPanel({
   const [draftNew, setDraftNew] = useState(false)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  // true entre l'accusé de réception de sendMessage et le premier token
+  // streamé : pilote l'indicateur « réflexion ».
+  const [awaitingStream, setAwaitingStream] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameValue, setRenameValue] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const prevOpenRef = useRef(open)
 
   const createThread = useConvexMutation(api.chat.createNewThread)
   const sendMessage = useConvexMutation(api.chat.sendMessage)
@@ -131,20 +203,32 @@ export function AiPanel({
     { initialNumItems: 50, stream: true },
   )
 
+  // Focus du composer à l'ouverture du panneau (pas au montage initial :
+  // le panneau est ouvert par défaut, ne pas voler le focus de la page).
   useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: 'smooth',
-    })
+    if (open && !prevOpenRef.current) textareaRef.current?.focus()
+    prevOpenRef.current = open
+  }, [open])
+
+  // L'indicateur « réflexion » tombe dès que la réponse commence à streamer
+  // (ou qu'on change de conversation).
+  useEffect(() => {
+    if (messages.results.at(-1)?.role === 'assistant') {
+      setAwaitingStream(false)
+    }
   }, [messages.results])
+  useEffect(() => {
+    setAwaitingStream(false)
+  }, [threadId])
 
   const currentThread = threads.results.find((th) => th._id === threadId)
   const currentTitle = currentThread?.title ?? t('chat:threads.untitled')
   const streaming = messages.results.at(-1)?.status === 'streaming'
+  const thinking = (sending || awaitingStream) && !streaming
+  const isEmpty =
+    (!threadId || messages.results.length === 0) && !sending && !awaitingStream
 
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault()
-    const prompt = input.trim()
+  async function submitPrompt(prompt: string) {
     if (!prompt || sending || streaming) return
     setSending(true)
     setInput('')
@@ -161,6 +245,7 @@ export function AiPanel({
         prompt,
         context: { route: location.pathname },
       })
+      setAwaitingStream(true)
     } catch (err) {
       toast.error(
         errorCode(err) === 'rate_limited'
@@ -173,9 +258,14 @@ export function AiPanel({
     }
   }
 
+  function handleSend(message: PromptInputMessage) {
+    void submitPrompt(message.text.trim())
+  }
+
   function handleNewThread() {
     setThreadId(null)
     setDraftNew(true)
+    textareaRef.current?.focus()
   }
 
   function handleSelectThread(id: string) {
@@ -187,6 +277,7 @@ export function AiPanel({
     if (!threadId) return
     try {
       await stopStream({ orgId, threadId })
+      setAwaitingStream(false)
     } catch {
       toast.error(t('chat:errors.default'))
     }
@@ -325,85 +416,117 @@ export function AiPanel({
         </Button>
       </header>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-3">
-        {!threadId || messages.results.length === 0 ? (
-          <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-sm">
-            <p>{t('chat:emptyState')}</p>
-          </div>
-        ) : (
-          <ul className="space-y-3">
-            {messages.results.map((m) => (
-              <li
-                key={m.key}
-                className={cn(
-                  'flex',
-                  m.role === 'user' ? 'justify-end' : 'justify-start',
-                )}
-              >
-                {m.role === 'user' ? (
-                  <div className="bg-primary text-primary-foreground max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap">
-                    {m.text}
-                  </div>
-                ) : (
-                  <div className="group max-w-[92%] text-sm">
-                    <div className="bg-muted rounded-lg px-3 py-2">
-                      <MessageParts message={m} />
-                      {!m.text && m.status === 'streaming' && (
-                        <span className="text-muted-foreground">…</span>
-                      )}
-                    </div>
-                    {m.status !== 'streaming' && m.text && (
-                      <div className="mt-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                        <Button
-                          size="icon"
-                          variant="ghost"
+      <Conversation className="min-h-0 flex-1">
+        <ConversationContent className={cn('gap-3 p-3', isEmpty && 'min-h-full')}>
+          {isEmpty ? (
+            <div className="m-auto flex flex-col items-center gap-4 px-4 text-center">
+              <p className="text-muted-foreground text-sm">
+                {t('chat:emptyState')}
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {SUGGESTION_KEYS.map((key) => {
+                  const prompt = t(`chat:suggestions.${key}`)
+                  return (
+                    <Suggestion
+                      key={key}
+                      suggestion={prompt}
+                      onClick={(s) => void submitPrompt(s)}
+                    />
+                  )
+                })}
+              </div>
+            </div>
+          ) : (
+            <>
+              {messages.results.map((m) => (
+                <Message
+                  from={m.role}
+                  key={m.key}
+                  className={cn(m.role === 'user' && 'max-w-[85%]')}
+                >
+                  <MessageContent
+                    className={cn(
+                      m.role === 'user' && 'whitespace-pre-wrap',
+                      m.role === 'assistant' && 'w-full',
+                    )}
+                  >
+                    {m.role === 'user' ? (
+                      m.text
+                    ) : (
+                      <>
+                        <MessageParts message={m} />
+                        {!m.text && m.status === 'streaming' && (
+                          <span className="text-muted-foreground">…</span>
+                        )}
+                      </>
+                    )}
+                  </MessageContent>
+                  {m.role === 'assistant' &&
+                    m.status !== 'streaming' &&
+                    m.text && (
+                      <MessageActions className="opacity-0 transition-opacity group-hover:opacity-100">
+                        <MessageAction
+                          label={t('chat:copy')}
+                          tooltip={t('chat:copy')}
                           className="text-muted-foreground size-6"
                           onClick={() => void handleCopy(m)}
-                          aria-label={t('chat:copy')}
-                          title={t('chat:copy')}
                         >
                           {copiedKey === m.key ? (
                             <Check className="size-3.5" />
                           ) : (
                             <Copy className="size-3.5" />
                           )}
-                        </Button>
-                      </div>
+                        </MessageAction>
+                      </MessageActions>
                     )}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <form onSubmit={handleSend} className="shrink-0 border-t p-3">
-        <div className="flex gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={t('chat:inputPlaceholder')}
-            disabled={sending}
-          />
-          {streaming ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => void handleStop()}
-              aria-label={t('chat:stop')}
-              title={t('chat:stop')}
-            >
-              <Square className="size-4" />
-            </Button>
-          ) : (
-            <Button type="submit" disabled={!input.trim() || sending}>
-              {t('chat:send')}
-            </Button>
+                </Message>
+              ))}
+              {thinking && (
+                <Message from="assistant">
+                  <MessageContent>
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      <Spinner className="size-3.5" />
+                      {t('chat:thinking')}
+                    </span>
+                  </MessageContent>
+                </Message>
+              )}
+            </>
           )}
-        </div>
-      </form>
+        </ConversationContent>
+        <ConversationScrollButton aria-label={t('chat:scrollToBottom')} />
+      </Conversation>
+
+      <div className="shrink-0 border-t p-3">
+        <PromptInput onSubmit={handleSend}>
+          <PromptInputBody>
+            <PromptInputTextarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.currentTarget.value)}
+              placeholder={t('chat:inputPlaceholder')}
+              className="min-h-12"
+            />
+          </PromptInputBody>
+          <PromptInputFooter className="justify-end">
+            <PromptInputSubmit
+              status={
+                streaming
+                  ? 'streaming'
+                  : sending || awaitingStream
+                    ? 'submitted'
+                    : undefined
+              }
+              onStop={() => void handleStop()}
+              disabled={
+                streaming ? false : sending || awaitingStream || !input.trim()
+              }
+              aria-label={streaming ? t('chat:stop') : t('chat:send')}
+              title={streaming ? t('chat:stop') : t('chat:send')}
+            />
+          </PromptInputFooter>
+        </PromptInput>
+      </div>
 
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
         <DialogContent className="sm:max-w-sm">

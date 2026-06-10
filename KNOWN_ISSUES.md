@@ -380,7 +380,34 @@ dépendance du composant à la main (ex. `pnpm add cmdk` pour Command), puis
 écrire `src/components/ui/<component>.tsx` calqué sur la source shadcn
 officielle et le style des composants ui existants (package `radix-ui`/dep
 dédiée, alias `~/lib/utils`, attributs `data-slot`, prettier du projet).
-Exemple : `command.tsx`.
+Exemple : `command.tsx`. Même topo pour le registry AI Elements
+(`elements.ai-sdk.dev` → 403) : les fichiers de `src/components/ai-elements/`
+sont vendorés depuis `vercel/ai-elements` `packages/elements/src/` via
+`raw.githubusercontent.com` (qui, lui, passe), imports réécrits
+(`@repo/shadcn-ui/...` → `~/components/ui/...`).
+
+## Streamdown (panneau AI) — `@source` Tailwind v4, plugins retirés, labels tool
+
+Le markdown du chat AI est rendu par `streamdown` (via `MessageResponse`
+de `src/components/ai-elements/message.tsx`). Trois pièges si on touche à
+cette zone :
+
+1. **Markdown sans styles** : streamdown style ses éléments avec des classes
+   Tailwind internes à `node_modules`. La ligne
+   `@source '../../node_modules/streamdown/dist/*.js';` dans
+   `src/styles/app.css` est obligatoire — sans elle, Tailwind v4 ne scanne
+   pas le paquet et tout le markdown assistant sort brut.
+2. **Plugins retirés volontairement** : le `message.tsx` upstream importe
+   `@streamdown/{code,math,mermaid,cjk}` (Shiki + KaTeX + Mermaid = des Mo
+   de bundle). On les a retirés (le core garde le GFM : tableaux, listes).
+   Idem `tool.tsx` : le `CodeBlock` upstream (Shiki) est remplacé par un
+   `<pre>` local. **Toute réinstallation/maj depuis le registry AI Elements
+   doit re-appliquer ces deux trims** (commentaires en place dans les
+   fichiers).
+3. **Labels i18n de `tool.tsx`** : les libellés hardcodés anglais upstream
+   (Pending/Running/Completed/Parameters/Result) sont exposés en props
+   (`statusLabel`, `label`, `errorLabel`) renseignées par `AiPanel` via
+   `t('chat:tool.*')`. À re-vérifier après une maj du composant.
 
 ## tailwind-merge v3 obligatoire avec les composants shadcn « Tailwind v4 »
 

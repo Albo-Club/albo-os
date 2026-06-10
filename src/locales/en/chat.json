@@ -9,7 +9,23 @@
   "send": "Send",
   "stop": "Stop",
   "copy": "Copy",
-  "toolCall": "Using {{name}}…",
+  "thinking": "Thinking…",
+  "scrollToBottom": "Scroll to bottom",
+  "suggestions": {
+    "cash": "What is my current cash position?",
+    "liabilities": "List our liabilities",
+    "forecast": "Project my cash over 12 months",
+    "valuations": "Latest portfolio valuations"
+  },
+  "tool": {
+    "statePending": "Pending",
+    "stateRunning": "Running",
+    "stateCompleted": "Done",
+    "stateError": "Error",
+    "parameters": "Parameters",
+    "result": "Result",
+    "error": "Error"
+  },
   "threads": {
     "history": "History",
     "empty": "No conversations yet",

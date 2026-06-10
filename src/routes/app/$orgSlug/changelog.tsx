@@ -22,7 +22,7 @@ export const Route = createFileRoute('/app/$orgSlug/changelog')({
 /**
  * Rend CHANGELOG_PRODUIT.md (importé au build via `?raw` — le contenu suit
  * les déploiements, pas de fetch). Styles document, plus aérés que le
- * markdown du chat (MarkdownMessage).
+ * markdown du chat (streamdown dans le panneau AI).
  */
 function ChangelogPage() {
   return (
