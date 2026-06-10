@@ -16,6 +16,17 @@ bas de page.
 
 ---
 
+## v1.3.0 — 11/06/2026 à 00:20 — Page Pointage fluide même avec beaucoup de transactions
+
+La page Pointage affiche désormais ses transactions par pages de 50 lignes
+(boutons Précédent / Suivant sous le tableau), au lieu de tout dérouler d'un
+bloc. Fini les ralentissements quand la file ou un onglet contient des
+centaines de lignes. Rien ne change pour le reste : le compteur « N à
+pointer », la recherche, les onglets et la sélection multiple continuent de
+porter sur l'ensemble des transactions, pas seulement la page affichée.
+
+---
+
 ## v1.2.1 — 11/06/2026 à 00:10 — Fondations remises à neuf
 
 Les briques techniques de navigation et de connexion passent sur leurs

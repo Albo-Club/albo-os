@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useConvexMutation } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -58,6 +58,9 @@ export type UnmatchedTx = TxDetails
 
 /** Durée d'affichage du bandeau « Annuler » après un pointage/écartement. */
 const UNDO_DELAY_MS = 5000
+
+/** Lignes rendues par page (pagination locale des tables de pointage). */
+const PAGE_SIZE = 50
 
 /** Destins « écarté » : ignorée, charge, impôt, produit ou virement interne. */
 type DiscardKind =
@@ -180,6 +183,63 @@ function UndoBanner({
 }
 
 /**
+ * Pagination locale d'affichage : la liste reste complète côté client (le
+ * compteur, la sélection bulk et sa purge opèrent sur tout ; la recherche et
+ * les onglets filtrent côté serveur, en amont), seul le rendu est découpé en
+ * pages de PAGE_SIZE lignes — c'est le nombre de lignes montées (combobox,
+ * menus, cases par ligne) qui fait ramer la page, pas la donnée. `resetKey`
+ * ramène à la première page (changement de recherche ou d'onglet) ; la page
+ * courante est bornée quand la liste rétrécit (lignes pointées/écartées).
+ */
+function usePagination(totalRows: number, resetKey: string) {
+  const [page, setPage] = useState(0)
+  useEffect(() => setPage(0), [resetKey])
+  const pageCount = Math.max(1, Math.ceil(totalRows / PAGE_SIZE))
+  return { page: Math.min(page, pageCount - 1), pageCount, setPage }
+}
+
+/** Barre « Page X sur Y » + précédent/suivant, masquée s'il n'y a qu'une page. */
+function PaginationFooter({
+  page,
+  pageCount,
+  onPageChange,
+}: {
+  page: number
+  pageCount: number
+  onPageChange: (page: number) => void
+}) {
+  const { t } = useTranslation('common')
+  if (pageCount <= 1) return null
+  return (
+    <div className="flex items-center justify-end gap-2 py-3">
+      <span className="text-muted-foreground text-sm tabular-nums">
+        {t('pagination.pageOf', { current: page + 1, total: pageCount })}
+      </span>
+      <Button
+        variant="outline"
+        size="icon"
+        className="size-8"
+        disabled={page === 0}
+        onClick={() => onPageChange(page - 1)}
+      >
+        <span className="sr-only">{t('pagination.previous')}</span>
+        <ChevronLeft className="size-4" />
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        className="size-8"
+        disabled={page >= pageCount - 1}
+        onClick={() => onPageChange(page + 1)}
+      >
+        <span className="sr-only">{t('pagination.next')}</span>
+        <ChevronRight className="size-4" />
+      </Button>
+    </div>
+  )
+}
+
+/**
  * Table de pointage : transactions `unmatched` triées date desc, actions par
  * ligne (rattacher à un deal OU à une cible passif — equity / C/C —, écarter
  * en ignorée/charge/impôt/produit/virement interne), détail en sheet au clic,
@@ -189,13 +249,14 @@ function UndoBanner({
  * Charge/Impôt/Produit/Virement interne → confirmation →
  * `bulkCategorize` (un seul appel serveur) + toast « Annuler » groupé.
  * La page n'écrit jamais `matchStatus`/`reconciled` directement : tout passe
- * par les mutations du backend.
+ * par les mutations du backend. Rendu paginé localement (cf. `usePagination`).
  */
 export function PointageTable({
   transactions,
   deals,
   liabilityOptions,
   emptyMessage,
+  pageResetKey,
 }: {
   transactions: Array<UnmatchedTx> | undefined
   deals: Array<DealOption> | undefined
@@ -203,6 +264,8 @@ export function PointageTable({
   liabilityOptions: LiabilityOptionGroups | undefined
   /** Message d'état vide alternatif (ex. recherche sans résultat). */
   emptyMessage?: string
+  /** Remet la pagination à la première page quand cette clé change. */
+  pageResetKey: string
 }) {
   const { t } = useTranslation('pointage')
   const { fmtDate, fmtSigned } = useFormatters()
@@ -431,6 +494,12 @@ export function PointageTable({
     return merged
   }, [transactions, recent])
 
+  const { page, pageCount, setPage } = usePagination(
+    rows?.length ?? 0,
+    pageResetKey,
+  )
+  const pagedRows = rows?.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
   const sheetRecent = sheetTx
     ? recent.find((r) => r.tx._id === sheetTx._id)
     : undefined
@@ -508,7 +577,7 @@ export function PointageTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {!rows ? (
+            {!pagedRows ? (
               <TableRow>
                 <TableCell
                   colSpan={6}
@@ -518,7 +587,7 @@ export function PointageTable({
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map(({ tx, recent: recentAction }) => (
+              pagedRows.map(({ tx, recent: recentAction }) => (
                 <TableRow
                   key={tx._id}
                   className={`cursor-pointer ${recentAction ? 'bg-muted/40' : ''}`}
@@ -581,6 +650,12 @@ export function PointageTable({
           </TableBody>
         </Table>
       </div>
+
+      <PaginationFooter
+        page={page}
+        pageCount={pageCount}
+        onPageChange={setPage}
+      />
 
       <TransactionSheet
         tx={sheetTx}
@@ -709,18 +784,21 @@ function VatRateSelect({
  * dans la file « À pointer »). Sur les onglets Charges/Produits
  * (`vatEditable`), une colonne TVA permet de qualifier le taux de chaque
  * ligne (TVA déductible/collectée — cf. carte « TVA récupérable » de la page
- * Trésorerie).
+ * Trésorerie). Rendu paginé localement (cf. `usePagination`).
  */
 export function DiscardedTable({
   transactions,
   emptyMessage,
   vatEditable = false,
+  pageResetKey,
 }: {
   transactions: Array<UnmatchedTx> | undefined
   /** Message d'état vide alternatif (ex. recherche sans résultat). */
   emptyMessage?: string
   /** Affiche la colonne TVA (onglets Charges et Produits uniquement). */
   vatEditable?: boolean
+  /** Remet la pagination à la première page quand cette clé change. */
+  pageResetKey: string
 }) {
   const { t } = useTranslation('pointage')
   const { fmtDate, fmtSigned } = useFormatters()
@@ -731,6 +809,15 @@ export function DiscardedTable({
   )
   const setVatRate = useConvexMutation(api.transactions.setVatRate)
   const [pendingId, setPendingId] = useState<Id<'transactions'> | null>(null)
+
+  const { page, pageCount, setPage } = usePagination(
+    transactions?.length ?? 0,
+    pageResetKey,
+  )
+  const pagedTransactions = transactions?.slice(
+    page * PAGE_SIZE,
+    (page + 1) * PAGE_SIZE,
+  )
 
   async function handleUndo(tx: UnmatchedTx) {
     setPendingId(tx._id)
@@ -767,76 +854,86 @@ export function DiscardedTable({
   }
 
   return (
-    <div className="rounded-lg border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('col.date')}</TableHead>
-            <TableHead>{t('col.label')}</TableHead>
-            <TableHead className="text-right">{t('col.amount')}</TableHead>
-            {vatEditable && <TableHead>{t('col.vat')}</TableHead>}
-            <TableHead>{t('col.account')}</TableHead>
-            <TableHead className="text-right">{t('col.actions')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {!transactions ? (
+    <>
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell
-                colSpan={vatEditable ? 6 : 5}
-                className="text-muted-foreground text-center"
-              >
-                {t('loading')}
-              </TableCell>
+              <TableHead>{t('col.date')}</TableHead>
+              <TableHead>{t('col.label')}</TableHead>
+              <TableHead className="text-right">{t('col.amount')}</TableHead>
+              {vatEditable && <TableHead>{t('col.vat')}</TableHead>}
+              <TableHead>{t('col.account')}</TableHead>
+              <TableHead className="text-right">{t('col.actions')}</TableHead>
             </TableRow>
-          ) : (
-            transactions.map((tx) => (
-              <TableRow key={tx._id}>
-                <TableCell className="whitespace-nowrap tabular-nums">
-                  {fmtDate(tx.transactionDate)}
-                </TableCell>
-                <TableCell>
-                  <span className="block max-w-md truncate">{tx.rawLabel}</span>
-                  {tx.counterparty && (
-                    <span className="text-muted-foreground block max-w-md truncate text-xs">
-                      {tx.counterparty}
-                    </span>
-                  )}
-                </TableCell>
+          </TableHeader>
+          <TableBody>
+            {!pagedTransactions ? (
+              <TableRow>
                 <TableCell
-                  className={`text-right tabular-nums ${directionTone(tx.direction)}`}
+                  colSpan={vatEditable ? 6 : 5}
+                  className="text-muted-foreground text-center"
                 >
-                  {fmtSigned(tx.amount, tx.direction)}
-                </TableCell>
-                {vatEditable && (
-                  <TableCell>
-                    <VatRateSelect
-                      tx={tx}
-                      pending={pendingId === tx._id}
-                      onChange={(vatRateBps) =>
-                        void handleVatRate(tx, vatRateBps)
-                      }
-                    />
-                  </TableCell>
-                )}
-                <TableCell className="whitespace-nowrap">
-                  {accountLabel(tx)}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={pendingId === tx._id}
-                    onClick={() => void handleUndo(tx)}
-                  >
-                    {t('actions.undo')}
-                  </Button>
+                  {t('loading')}
                 </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
+            ) : (
+              pagedTransactions.map((tx) => (
+                <TableRow key={tx._id}>
+                  <TableCell className="whitespace-nowrap tabular-nums">
+                    {fmtDate(tx.transactionDate)}
+                  </TableCell>
+                  <TableCell>
+                    <span className="block max-w-md truncate">
+                      {tx.rawLabel}
+                    </span>
+                    {tx.counterparty && (
+                      <span className="text-muted-foreground block max-w-md truncate text-xs">
+                        {tx.counterparty}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell
+                    className={`text-right tabular-nums ${directionTone(tx.direction)}`}
+                  >
+                    {fmtSigned(tx.amount, tx.direction)}
+                  </TableCell>
+                  {vatEditable && (
+                    <TableCell>
+                      <VatRateSelect
+                        tx={tx}
+                        pending={pendingId === tx._id}
+                        onChange={(vatRateBps) =>
+                          void handleVatRate(tx, vatRateBps)
+                        }
+                      />
+                    </TableCell>
+                  )}
+                  <TableCell className="whitespace-nowrap">
+                    {accountLabel(tx)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={pendingId === tx._id}
+                      onClick={() => void handleUndo(tx)}
+                    >
+                      {t('actions.undo')}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <PaginationFooter
+        page={page}
+        pageCount={pageCount}
+        onPageChange={setPage}
+      />
+    </>
   )
 }

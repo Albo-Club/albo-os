@@ -21,6 +21,11 @@
     "en": "English",
     "fr": "Français"
   },
+  "pagination": {
+    "pageOf": "Page {{current}} sur {{total}}",
+    "previous": "Page précédente",
+    "next": "Page suivante"
+  },
   "roles": {
     "owner": "Propriétaire",
     "admin": "Admin",

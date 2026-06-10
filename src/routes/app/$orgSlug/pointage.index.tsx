@@ -135,12 +135,14 @@ function Pointage() {
           deals={deals}
           liabilityOptions={liabilityOptions}
           emptyMessage={searchEmptyMessage}
+          pageResetKey={searchArg ?? ''}
         />
       ) : (
         <DiscardedTable
           transactions={discarded}
           emptyMessage={searchEmptyMessage}
           vatEditable={view === 'charge' || view === 'product'}
+          pageResetKey={`${view}:${searchArg ?? ''}`}
         />
       )}
     </main>
