@@ -16,6 +16,18 @@ bas de page.
 
 ---
 
+## v1.3.1 — 11/06/2026 à 00:50 — La recherche retrouve les transactions historiques
+
+Chercher « Antese » dans les transactions pouvait ne rien renvoyer alors que
+les lignes existaient bel et bien : les transactions importées avant
+l'arrivée de la recherche (historique Mémo Bank, premières synchros
+bancaires) n'étaient pas indexées — ni pour la barre de recherche, ni pour
+l'assistant. C'est corrigé : l'historique complet redevient cherchable, et
+les lignes de l'import Mémo Bank apparaissent désormais correctement dans la
+file de pointage.
+
+---
+
 ## v1.3.0 — 11/06/2026 à 00:20 — Page Pointage fluide même avec beaucoup de transactions
 
 La page Pointage affiche désormais ses transactions par pages de 50 lignes
