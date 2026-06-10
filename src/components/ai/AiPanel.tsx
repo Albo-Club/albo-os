@@ -7,8 +7,8 @@ import { useConvexMutation } from '@convex-dev/react-query'
 import { ConvexError } from 'convex/values'
 import {
   Check,
+  ChevronDown,
   Copy,
-  History,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -229,34 +229,23 @@ export function AiPanel({
   return (
     <div className="bg-background flex h-full min-h-0 flex-col">
       <header className="flex shrink-0 items-center gap-1 border-b px-3 py-2.5">
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-semibold">
-            {threadId ? currentTitle : t('chat:title')}
-          </h2>
-        </div>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-7"
-          onClick={handleNewThread}
-          aria-label={t('chat:new')}
-          title={t('chat:new')}
-        >
-          <Plus className="size-4" />
-        </Button>
+        {/* Le titre EST le sélecteur de conversations (historique visible
+            d'un clic, pas caché derrière une icône). */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-7"
+            <button
+              type="button"
+              className="hover:bg-muted -ml-1 flex min-w-0 flex-1 items-center gap-1 rounded-md px-1.5 py-1 text-left"
               aria-label={t('chat:threads.history')}
               title={t('chat:threads.history')}
             >
-              <History className="size-4" />
-            </Button>
+              <h2 className="truncate text-sm font-semibold">
+                {threadId ? currentTitle : t('chat:title')}
+              </h2>
+              <ChevronDown className="text-muted-foreground size-3.5 shrink-0" />
+            </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72">
+          <DropdownMenuContent align="start" className="w-72">
             {threads.results.length === 0 ? (
               <DropdownMenuItem disabled>
                 {t('chat:threads.empty')}
@@ -281,6 +270,16 @@ export function AiPanel({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7"
+          onClick={handleNewThread}
+          aria-label={t('chat:new')}
+          title={t('chat:new')}
+        >
+          <Plus className="size-4" />
+        </Button>
         {threadId && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
