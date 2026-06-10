@@ -30,7 +30,10 @@ export const BASE_INSTRUCTIONS = [
     'is always a GROUP entity (never a portfolio); create it with ' +
     'createBankAccount (after listBankAccounts to avoid duplicates) if ' +
     'none exists. A transaction has a direction "in" (received) or "out" ' +
-    '(paid) and a positive amount in cents.',
+    '(paid) and a positive amount in cents. Use searchTransactions to find ' +
+    'transactions by counterparty/label across ALL pointage statuses (e.g. ' +
+    '"how much did we pay supplier X") — report the pre-computed totals it ' +
+    'returns (incl. VAT totals), never sum rows yourself.',
 
   // Pointage (réconciliation)
   'Reconciliation (pointage): listUnmatchedTransactions shows the queue of ' +
@@ -40,7 +43,10 @@ export const BASE_INSTRUCTIONS = [
     'explicit user confirmation before calling matchTransactionToDeal / ' +
     'allocateTransactionToLiability / categorizeTransaction. Never match ' +
     'without confirmation, and never guess when suggestMatches returns no ' +
-    'candidates.',
+    'candidates. VAT: "charge"/"product" transactions carry an optional ' +
+    'vatRateBps (amounts are TTC; the deductible/collected VAT is derived). ' +
+    'When categorizing a charge, suggest 2000 (20%) unless the expense is ' +
+    'VAT-exempt (salaries, insurance, bank fees → 0).',
 
   // Passif
   'Liabilities: listLiabilities shows equity positions and intercompany ' +

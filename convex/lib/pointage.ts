@@ -5,6 +5,7 @@ import { loanSideForOrg } from './liabilities'
 
 import type { GenericMutationCtx } from 'convex/server'
 import type { DataModel, Doc, Id } from '../_generated/dataModel'
+import type { VatRateBps } from './vat'
 
 type MutCtx = GenericMutationCtx<DataModel>
 
@@ -21,6 +22,9 @@ type MutCtx = GenericMutationCtx<DataModel>
  * - Chaque décision deal écrit une ligne append-only dans `matchingDecisions`
  *   (`source: 'manual' | 'agent_suggested'`) ; le pointage passif n'y écrit
  *   jamais.
+ * - `vatRateBps` ne vit que sur les statuts `charge` / `product` : tout
+ *   pointage qui fait quitter ces statuts l'efface (cf. KNOWN_ISSUES.md
+ *   « TVA récupérable »).
  *
  * L'appelant a déjà chargé la transaction et vérifié l'appartenance à l'org.
  */
@@ -63,6 +67,7 @@ export async function applyMatchToDeal(
     matchStatus: 'matched',
     dealId,
     allocation: { kind: 'deal', targetId: dealId },
+    vatRateBps: undefined,
     reconciled: true,
     reconciledBy: decidedBy,
     reconciledAt: Date.now(),
@@ -91,6 +96,7 @@ export async function applyUnmatch(
     matchStatus: 'unmatched',
     dealId: undefined,
     allocation: undefined,
+    vatRateBps: undefined,
     reconciled: false,
     reconciledBy: undefined,
     reconciledAt: undefined,
@@ -106,7 +112,9 @@ export async function applyUnmatch(
 /**
  * Écarte une transaction : ignorée, charge, impôt, produit ou virement
  * interne. Même patch pour tous les statuts — seul le statut diffère pour
- * pouvoir consulter ces transactions plus tard.
+ * pouvoir consulter ces transactions plus tard. `vatRateBps` (TVA) n'existe
+ * que sur charge/produit : posé si fourni (sinon valeur existante conservée),
+ * effacé pour tout autre statut.
  */
 export async function applyCategorization(
   ctx: MutCtx,
@@ -114,12 +122,15 @@ export async function applyCategorization(
   status: CategorizeStatus,
   decidedBy: Id<'users'>,
   source: PointageSource,
+  vatRateBps?: VatRateBps,
 ) {
   assertNotAllocatedToLiability(tx)
+  const vatBearing = status === 'charge' || status === 'product'
   await ctx.db.patch('transactions', tx._id, {
     matchStatus: status,
     dealId: undefined,
     allocation: undefined,
+    vatRateBps: vatBearing ? (vatRateBps ?? tx.vatRateBps) : undefined,
     reconciled: false,
     reconciledBy: undefined,
     reconciledAt: undefined,
@@ -172,6 +183,7 @@ export async function applyAllocateToLiability(
   await ctx.db.patch('transactions', tx._id, {
     allocation: { kind, targetId },
     matchStatus: 'matched',
+    vatRateBps: undefined,
   })
 }
 
@@ -189,5 +201,6 @@ export async function applyDeallocate(ctx: MutCtx, tx: Doc<'transactions'>) {
   await ctx.db.patch('transactions', tx._id, {
     allocation: undefined,
     matchStatus: 'unmatched',
+    vatRateBps: undefined,
   })
 }

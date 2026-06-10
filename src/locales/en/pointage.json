@@ -10,8 +10,13 @@
     "date": "Date",
     "label": "Label",
     "amount": "Amount",
+    "vat": "VAT",
     "account": "Account",
     "actions": "Actions"
+  },
+  "vat": {
+    "toQualify": "To qualify",
+    "amount": "incl. {{amount}} VAT"
   },
   "actions": {
     "match": "Match",
@@ -101,6 +106,7 @@
   "errors": {
     "failed": "The action failed. Please try again.",
     "not_found": "Transaction not found.",
+    "not_categorized": "VAT rates can only be set on transactions marked as expense or income.",
     "deal_wrong_org": "This deal belongs to another organization.",
     "equity_wrong_org": "This equity position belongs to another organization.",
     "loan_wrong_org": "This transaction belongs to neither organization of the current account.",

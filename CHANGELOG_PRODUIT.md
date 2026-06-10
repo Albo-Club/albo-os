@@ -16,6 +16,31 @@ bas de page.
 
 ---
 
+## v1.1.0 — 10/06/2026 à 22:58 — La TVA récupérable, suivie au plus près
+
+Un vrai suivi de TVA fait son entrée pour fiabiliser les charges réelles :
+
+- **Un taux de TVA sur chaque charge et produit.** Quand vous classez une
+  transaction en charge, elle part avec 20 % de TVA par défaut — ajustable
+  ligne à ligne (0 %, 5,5 %, 10 %, 20 %) dans les onglets Charges et
+  Produits du pointage. Les transactions déjà classées sont marquées
+  « à qualifier » : à vous de poser le bon taux (les salaires, assurances et
+  frais bancaires n'ont pas de TVA — pas de calcul global trompeur).
+- **Une carte « TVA récupérable » sur la page Trésorerie** : la TVA
+  déductible de vos charges moins la TVA collectée sur vos produits, avec le
+  nombre de transactions restant à qualifier. De quoi savoir où en est votre
+  créance de TVA pour le prévisionnel.
+- **L'assistant sait maintenant chercher dans toutes les transactions.**
+  « Combien a-t-on payé à Antese au total ? » : il retrouve tous les
+  paiements d'un fournisseur (rapprochés ou non) et répond avec les totaux —
+  TTC, et TVA incluse quand les lignes sont qualifiées.
+- **Le vert et le rouge partout.** Les badges Entrée/Sortie des deals et
+  Créance/Dette du passif passent en couleur, les entrées oubliées en noir
+  (dashboard, prévisionnel) passent au vert — le sens d'un mouvement se lit
+  désormais d'un coup d'œil sur toutes les pages.
+
+---
+
 ## v1.0.3 — 10/06/2026 à 22:38 — Nettoyage de l'outillage interne
 
 Suppression d'un automatisme de publication qui n'avait jamais fonctionné.
