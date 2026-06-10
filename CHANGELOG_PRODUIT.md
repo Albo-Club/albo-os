@@ -16,6 +16,13 @@ bas de page.
 
 ---
 
+## v1.1.1 — 10/06/2026 à 23:30 — Ménage des branches de travail
+
+Un nettoyage à la demande supprime les anciennes branches de travail déjà
+intégrées. Aucun changement visible dans l'app.
+
+---
+
 ## v1.1.0 — 10/06/2026 à 22:58 — La TVA récupérable, suivie au plus près
 
 Un vrai suivi de TVA fait son entrée pour fiabiliser les charges réelles :
