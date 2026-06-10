@@ -16,6 +16,14 @@ bas de page.
 
 ---
 
+## v1.2.1 — 10/06/2026 à 23:50 — La feuille de route de l'assistant
+
+Travail préparatoire sur les prochaines évolutions de l'assistant
+(confirmation des actions d'un clic, réponses plus visuelles, brief
+proactif…). Aucun changement visible dans l'app pour l'instant.
+
+---
+
 ## v1.2.0 — 10/06/2026 à 23:35 — Un assistant qui se manie comme les grands
 
 ### 💬 Une vraie zone de saisie
