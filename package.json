@@ -8,7 +8,7 @@
     "dev:vite": "vite dev",
     "dev:convex": "convex dev",
     "build": "vite build && tsc --noEmit",
-    "build:vercel": "if [ \"$VERCEL_ENV\" = \"production\" ] && [ -n \"$CONVEX_DEPLOY_KEY\" ]; then npx convex deploy --cmd 'pnpm build'; else echo '[albo-os] Skipping convex deploy (not Vercel production env or CONVEX_DEPLOY_KEY missing).'; pnpm build; fi",
+    "build:vercel": "if [ \"$VERCEL_ENV\" = \"production\" ] && [ -n \"$CONVEX_DEPLOY_KEY\" ]; then npx convex deploy --cmd 'pnpm build' && npx convex run transactions:backfillSearchText '{}' && npx convex run transactions:backfillMatchStatus '{}'; else echo '[albo-os] Skipping convex deploy (not Vercel production env or CONVEX_DEPLOY_KEY missing).'; pnpm build; fi",
     "start": "node .output/server/index.mjs",
     "typecheck": "tsc --noEmit",
     "typecheck:native": "tsgo --noEmit",
