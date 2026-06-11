@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { useConvexMutation } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -17,6 +17,11 @@ import type { DealOption } from './DealCombobox'
 import type { PointageTarget } from './TargetCombobox'
 import type { LiabilityOptionGroups } from '~/lib/liabilityOptions'
 import type { TxDetails } from './TransactionSheet'
+import {
+  PAGE_SIZE,
+  PaginationFooter,
+  usePagination,
+} from '~/components/data-table/LocalPagination'
 import { DEFAULT_VAT_RATE_BPS, VAT_RATES_BPS, vatCentsFromTtc } from '~/lib/vat'
 import { directionTone } from '~/lib/moneyTone'
 import {
@@ -58,9 +63,6 @@ export type UnmatchedTx = TxDetails
 
 /** Display duration of the « Annuler » banner after a match/discard. */
 const UNDO_DELAY_MS = 5000
-
-/** Rows rendered per page (local pagination of the pointage tables). */
-const PAGE_SIZE = 50
 
 /** « Écarté » fates: ignored, charge, tax, product or internal transfer. */
 type DiscardKind =
@@ -177,63 +179,6 @@ function UndoBanner({
       </span>
       <Button size="sm" variant="outline" disabled={pending} onClick={onUndo}>
         {t('actions.undo')}
-      </Button>
-    </div>
-  )
-}
-
-/**
- * Local display pagination: the list stays complete client-side (the
- * counter, the bulk selection and its pruning operate on everything; search
- * and tabs filter server-side, upstream), only the rendering is split into
- * pages of PAGE_SIZE rows — it's the number of mounted rows (combobox,
- * menus, per-row checkboxes) that slows the page down, not the data.
- * `resetKey` returns to the first page (search or tab change); the current
- * page is clamped when the list shrinks (matched/discarded rows).
- */
-function usePagination(totalRows: number, resetKey: string) {
-  const [page, setPage] = useState(0)
-  useEffect(() => setPage(0), [resetKey])
-  const pageCount = Math.max(1, Math.ceil(totalRows / PAGE_SIZE))
-  return { page: Math.min(page, pageCount - 1), pageCount, setPage }
-}
-
-/** « Page X sur Y » bar + previous/next, hidden when there is a single page. */
-function PaginationFooter({
-  page,
-  pageCount,
-  onPageChange,
-}: {
-  page: number
-  pageCount: number
-  onPageChange: (page: number) => void
-}) {
-  const { t } = useTranslation('common')
-  if (pageCount <= 1) return null
-  return (
-    <div className="flex items-center justify-end gap-2 py-3">
-      <span className="text-muted-foreground text-sm tabular-nums">
-        {t('pagination.pageOf', { current: page + 1, total: pageCount })}
-      </span>
-      <Button
-        variant="outline"
-        size="icon"
-        className="size-8"
-        disabled={page === 0}
-        onClick={() => onPageChange(page - 1)}
-      >
-        <span className="sr-only">{t('pagination.previous')}</span>
-        <ChevronLeft className="size-4" />
-      </Button>
-      <Button
-        variant="outline"
-        size="icon"
-        className="size-8"
-        disabled={page >= pageCount - 1}
-        onClick={() => onPageChange(page + 1)}
-      >
-        <span className="sr-only">{t('pagination.next')}</span>
-        <ChevronRight className="size-4" />
       </Button>
     </div>
   )

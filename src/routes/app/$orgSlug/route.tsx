@@ -8,6 +8,7 @@ import { SidebarInset, SidebarProvider } from '~/components/ui/sidebar'
 import { AppSidebar } from '~/components/app-shell/AppSidebar'
 import { AppHeader } from '~/components/app-shell/AppHeader'
 import { AiPanel } from '~/components/ai/AiPanel'
+import { clearLastOrgCookie, writeLastOrgCookie } from '~/lib/lastOrg'
 import { cn } from '~/lib/utils'
 
 export const Route = createFileRoute('/app/$orgSlug')({
@@ -57,9 +58,15 @@ function OrgLayout() {
     if (me?.kind !== 'ready') return
     const member = me.orgs.find((o) => o.slug === orgSlug)
     if (!member) {
+      // Clear the cookie BEFORE going back to /app: its beforeLoad would
+      // otherwise redirect here in a loop (see ~/lib/lastOrg).
+      clearLastOrgCookie()
       navigate({ to: '/app' })
       return
     }
+    // Device-local cookie for the /app → /app/$orgSlug fast-path, on top of
+    // the cross-device Convex persistence (`setLastOrg`).
+    writeLastOrgCookie(orgSlug)
     if (me.user.lastOrgSlug !== orgSlug) {
       void setLastOrg({ slug: orgSlug })
     }

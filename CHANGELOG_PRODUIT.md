@@ -16,6 +16,25 @@ bas de page.
 
 ---
 
+## v1.4.0 — 11/06/2026 à 15:05 — Toutes les listes paginées, entrée dans l'app plus directe
+
+### 📄 Des listes qui restent fluides partout
+
+Après la page Pointage, toutes les grandes listes passent en pages de 50
+lignes : les participations (vue par organisation et vue « Tout »), les
+transactions d'un deal et celles d'un compte bancaire. Comme sur le
+Pointage, la recherche, le tri, les totaux et l'export CSV continuent de
+porter sur l'ensemble des données, pas seulement la page affichée.
+
+### ⚡ Fini le « redirection… puis chargement… » à l'ouverture
+
+L'app vous amène désormais directement sur votre dernière organisation, en
+une seule étape : la redirection se décide immédiatement, avant même le
+chargement de vos données. Sur un nouvel appareil, l'app retrouve votre
+dernière organisation comme avant.
+
+---
+
 ## v1.3.4 — 11/06/2026 à 15:00 — Infrastructure de mise à jour des skills agents durcie
 
 Les skills agents (instructions données à l'IA pour utiliser les librairies du projet) sont désormais épinglés à un commit immuable plutôt qu'à une branche mouvante. La source de la skill TanStack Start passe du repo communautaire `deckardger` vers le monorepo officiel TanStack. Une nouvelle commande (`sync:skills:update`) permet de faire des bumps délibérés et reviewables, distincts du simple vendoring reproductible.

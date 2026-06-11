@@ -17,6 +17,11 @@ import {
   useDealTitle,
   useFormatters,
 } from '~/components/participations/ParticipationsTable'
+import {
+  PAGE_SIZE,
+  PaginationFooter,
+  usePagination,
+} from '~/components/data-table/LocalPagination'
 import { FundSection } from '~/components/deals/FundSection'
 import { PlanVsActualSection } from '~/components/deals/PlanVsActualSection'
 import { DealCombobox } from '~/components/pointage/DealCombobox'
@@ -135,7 +140,11 @@ function EditDealDialog({
   deal,
   onClose,
 }: {
-  deal: { _id: Id<'deals'>; name?: string | null; instrumentKind: InstrumentKind }
+  deal: {
+    _id: Id<'deals'>
+    name?: string | null
+    instrumentKind: InstrumentKind
+  }
   onClose: () => void
 }) {
   const { t } = useTranslation(['participations', 'common'])
@@ -272,6 +281,10 @@ function Transactions({ deal }: { deal: CurrentDeal }) {
   const [sheetTx, setSheetTx] = useState<TxDetails | null>(null)
   const [pending, setPending] = useState(false)
 
+  // Local display pagination (no upstream filter on this table).
+  const { page, pageCount, setPage } = usePagination(txs?.length ?? 0, '')
+  const pagedTxs = txs?.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
   // Org deals for the reassignment combobox — only loaded when the
   // sheet opens.
   const deals = useConvexQuery(
@@ -322,7 +335,7 @@ function Transactions({ deal }: { deal: CurrentDeal }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {txs.map((tx) => (
+              {pagedTxs?.map((tx) => (
                 <TableRow
                   key={tx._id}
                   className="cursor-pointer"
@@ -345,13 +358,20 @@ function Transactions({ deal }: { deal: CurrentDeal }) {
                   <TableCell>{tx.rawLabel}</TableCell>
                   <TableCell>{tx.counterparty ?? '—'}</TableCell>
                   <TableCell>{tx.account?.label ?? '—'}</TableCell>
-                  <TableCell>{tx.reconciled ? t('tx.yes') : t('tx.no')}</TableCell>
+                  <TableCell>
+                    {tx.reconciled ? t('tx.yes') : t('tx.no')}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
       )}
+      <PaginationFooter
+        page={page}
+        pageCount={pageCount}
+        onPageChange={setPage}
+      />
 
       <TransactionSheet
         tx={sheetTx}
@@ -478,7 +498,10 @@ function DealDetail() {
             ) : null
           }
         />
-        <Info label={t('deal.committed')} value={fmtEur(deal.committedAmount)} />
+        <Info
+          label={t('deal.committed')}
+          value={fmtEur(deal.committedAmount)}
+        />
         <Info label={t('deal.paid')} value={fmtEur(paidActual)} />
         <Info label={t('deal.received')} value={fmtEur(received)} />
         <Info label={t('deal.shares')} value={fmtNum(deal.sharesAcquired)} />
@@ -486,15 +509,24 @@ function DealDetail() {
           label={t('deal.pricePerShare')}
           value={fmtEur(deal.pricePerShare)}
         />
-        <Info label={t('deal.interestRate')} value={fmtPct(deal.interestRate)} />
+        <Info
+          label={t('deal.interestRate')}
+          value={fmtPct(deal.interestRate)}
+        />
         <Info label={t('deal.maturity')} value={fmtDate(deal.maturityDate)} />
-        <Info label={t('deal.principal')} value={fmtEur(deal.principalAmount)} />
+        <Info
+          label={t('deal.principal')}
+          value={fmtEur(deal.principalAmount)}
+        />
         <Info label={t('deal.royaltyRate')} value={fmtPct(deal.royaltyRate)} />
         <Info
           label={t('deal.royaltyCap')}
           value={fmtEur(deal.royaltyCapAmount)}
         />
-        <Info label={t('deal.valuationCap')} value={fmtEur(deal.valuationCap)} />
+        <Info
+          label={t('deal.valuationCap')}
+          value={fmtEur(deal.valuationCap)}
+        />
         <Info label={t('deal.discount')} value={fmtPct(deal.discount)} />
         <Info
           label={t('deal.entryValuation')}
