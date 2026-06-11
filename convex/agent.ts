@@ -1,4 +1,4 @@
-import { anthropic } from '@ai-sdk/anthropic'
+import { mistral } from '@ai-sdk/mistral'
 import { Agent, stepCountIs } from '@convex-dev/agent'
 
 import { components } from './_generated/api'
@@ -10,10 +10,10 @@ import { projectionTools } from './agentToolsProjections'
 import { valuationTools } from './agentToolsValuations'
 import { BASE_INSTRUCTIONS } from './lib/instructions'
 
-const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5'
+const MISTRAL_MODEL = process.env.MISTRAL_MODEL ?? 'mistral-medium-3.5'
 
 export function getModel() {
-  return anthropic.chat(ANTHROPIC_MODEL)
+  return mistral.chat(MISTRAL_MODEL)
 }
 
 export const chatAgent = new Agent(components.agent, {

@@ -8,7 +8,7 @@
  * What it does:
  *   1. Prompts for your prod domain (e.g. https://app.example.com).
  *   2. Reads your dev Convex env vars (`convex env list`).
- *   3. Mirrors the secrets (RESEND_*, ANTHROPIC_*, optional SENTRY_DSN and
+ *   3. Mirrors the secrets (RESEND_*, MISTRAL_*, optional SENTRY_DSN and
  *      optional Google OAuth credentials) onto the prod deployment, sets
  *      APP_ENV=production, SITE_URL + BETTER_AUTH_URL to the chosen domain,
  *      generates a FRESH BETTER_AUTH_SECRET (never reused from dev), and
@@ -84,7 +84,7 @@ async function main() {
   console.log('\n  Reading dev env vars…')
   const dev = listDevEnv()
 
-  const missing = ['RESEND_API_KEY', 'RESEND_FROM', 'ANTHROPIC_API_KEY'].filter(
+  const missing = ['RESEND_API_KEY', 'RESEND_FROM', 'MISTRAL_API_KEY'].filter(
     (k) => !dev.get(k),
   )
   if (missing.length) {
@@ -104,10 +104,10 @@ async function main() {
     RESEND_API_KEY: dev.get('RESEND_API_KEY'),
     RESEND_FROM: dev.get('RESEND_FROM'),
     RESEND_TEST_MODE: 'false',
-    ANTHROPIC_API_KEY: dev.get('ANTHROPIC_API_KEY'),
+    MISTRAL_API_KEY: dev.get('MISTRAL_API_KEY'),
   }
   for (const k of [
-    'ANTHROPIC_MODEL',
+    'MISTRAL_MODEL',
     'SENTRY_DSN',
     'GOOGLE_CLIENT_ID',
     'GOOGLE_CLIENT_SECRET',

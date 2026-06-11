@@ -284,11 +284,12 @@ find . \( -path ./node_modules -o -path ./.output \) -prune -o \
   -type f \( -name '* 2.ts' -o -name '* 2.tsx' \) -print
 ```
 
-## Anthropic model id
+## Mistral model id
 
-`convex/agent.ts` defaults to `claude-haiku-4-5`. Override via the
-`ANTHROPIC_MODEL` Convex env var to pick a different model. Anthropic
-sometimes ships dated aliases (`claude-haiku-4-5-20251001`) for stability.
+`convex/agent.ts` defaults to `mistral-medium-3.5`. Override via the
+`MISTRAL_MODEL` Convex env var to pick a different model. Mistral also
+ships dated aliases (`mistral-medium-2604`) for stability. The key lives
+in the Convex env as `MISTRAL_API_KEY`.
 
 ## SITE_URL drift in prod = broken email links
 
@@ -488,9 +489,8 @@ audit.
   compact tool-call display, thread history/rename/delete and stop are now
   hand-rolled in `src/components/ai/AiPanel.tsx`. Remaining loss vs
   assistant-ui: attachments, edit/regenerate.
-- **Anthropic model default `claude-haiku-4-5`** — choisi pour le ratio
-  coût/latence sur un assistant in-app. Override via `ANTHROPIC_MODEL` env var
-  (ex. `claude-sonnet-4-6` pour des tâches plus lourdes).
+- **Mistral model default `mistral-medium-3.5`** — remplace l'ancien défaut
+  Anthropic (`claude-haiku-4-5`). Override via `MISTRAL_MODEL` env var.
 - **Rate-limit thresholds** chosen for usable defaults (e.g. invitations 20/h
   burst 5) rather than the brief's tight 3/min example.
 - **Super-admin lacks impersonate** — out of scope for MVP, needs a careful
