@@ -32,3 +32,7 @@ app.config.timestamp_*.js
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 .env*.local
+
+# Convex prod snapshot exports (live data dumps — NEVER commit, repo is public).
+# Produced by the `convex export --prod --path …` safety step in MIGRATIONS.md.
+/albo-backup*.zip
