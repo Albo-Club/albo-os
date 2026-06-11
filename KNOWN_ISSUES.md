@@ -400,6 +400,33 @@ cette zone :
    (`statusLabel`, `label`, `errorLabel`) renseignées par `AiPanel` via
    `t('chat:tool.*')`. À re-vérifier après une maj du composant.
 
+## Approbation d'outils (panneau AI) — reprise du stream obligatoire
+
+Les outils d'écriture de l'agent portent `needsApproval: true`
+(`createTool` de `@convex-dev/agent`). Quatre pièges :
+
+1. **La génération ne reprend pas toute seule.** `approveToolCall` /
+   `denyToolCall` ne font qu'enregistrer la décision et retourner un
+   `messageId` ; il FAUT relancer `streamText` avec
+   `promptMessageId: messageId`, sinon le thread reste figé sur
+   « Confirmation requise ». C'est ce que fait
+   `chat.respondToToolApproval` (décision + re-schedule de
+   `internal.chat.streamAsync`). Tout nouveau point d'entrée d'approbation
+   doit suivre ce pattern.
+2. **Version minimum `@convex-dev/agent` 0.6.2** : en dessous, message
+   dupliqué après approbation avec `saveStreamDeltas` et step final non
+   persisté (get-convex/agent#185, fixé en 0.6.2). On est sur `^0.6.3`.
+3. **Auto-deny intégré** : envoyer un nouveau message pendant qu'une
+   approbation est en suspens la refuse automatiquement (raison
+   `auto-denied: new generation started`). Comportement voulu — l'UI
+   affiche « Action refusée » ; ne pas « corriger ».
+4. **Les états d'approbation transitent par les tool parts** de
+   `useUIMessages` (`approval-requested` → `approval-responded` →
+   `output-available`/`output-denied`, champ `part.approval`) — le
+   composant `confirmation.tsx` est piloté par ça. `dynamicTool()` ne
+   supporte pas l'approbation (vercel/ai#11434) : ne pas convertir nos
+   outils en dynamiques.
+
 ## tailwind-merge v3 obligatoire avec les composants shadcn « Tailwind v4 »
 
 Les composants `src/components/ui/*` (générés pour Tailwind v4) utilisent le
