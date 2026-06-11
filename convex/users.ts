@@ -66,40 +66,6 @@ export const me = query({
   },
 })
 
-/**
- * One-shot: move any legacy `users.lastOrgSlug` value into `userPrefs`
- * (when no prefs row exists yet) then clear the field. Safe to run right
- * after deploy — no need to wait for users to sign in again. Idempotent.
- * Runbook in MIGRATIONS.md.
- *
- *   npx convex run --prod users:purgeLegacyLastOrgSlug
- */
-export const purgeLegacyLastOrgSlug = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const users = await ctx.db.query('users').collect()
-    let migrated = 0
-    let cleared = 0
-    for (const u of users) {
-      if (u.lastOrgSlug === undefined) continue
-      const prefs = await ctx.db
-        .query('userPrefs')
-        .withIndex('by_user', (q) => q.eq('userId', u._id))
-        .unique()
-      if (!prefs) {
-        await ctx.db.insert('userPrefs', {
-          userId: u._id,
-          lastOrgSlug: u.lastOrgSlug,
-        })
-        migrated++
-      }
-      await ctx.db.patch('users', u._id, { lastOrgSlug: undefined })
-      cleared++
-    }
-    return { migrated, cleared }
-  },
-})
-
 export const provisionMe = mutation({
   args: {},
   handler: async (ctx) => {

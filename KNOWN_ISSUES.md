@@ -762,8 +762,10 @@ données.
    via `useRef` : cf. `lastOrgSyncedRef` dans
    `src/routes/app/$orgSlug/route.tsx`.
 
-Le champ legacy `users.lastOrgSlug` reste au schéma (fallback de lecture)
-jusqu'à sa purge — chantier dans `MIGRATIONS.md`.
+Historique : le champ legacy `users.lastOrgSlug` a été migré vers
+`userPrefs` puis retiré du schéma (purge one-shot
+`users:purgeLegacyLastOrgSlug`, juin 2026 — exécutée en prod AVANT le
+déploiement du schéma resserré, règle « purger d'abord »).
 
 ## Import Airtable one-shot (`convex/airtableImport.ts`)
 

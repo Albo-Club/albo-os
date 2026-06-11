@@ -171,9 +171,6 @@ export default defineSchema({
     avatarUrl: v.optional(v.string()),
     avatarStorageId: v.optional(v.id('_storage')),
     superAdmin: v.boolean(),
-    // Legacy — last-org now lives in `userPrefs` (kept until prod data is
-    // purged, see MIGRATIONS.md). Do NOT write it in new code.
-    lastOrgSlug: v.optional(v.string()),
     preferredLanguage: v.optional(v.union(v.literal('en'), v.literal('fr'))),
     createdAt: v.number(),
   })
