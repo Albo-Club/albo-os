@@ -16,6 +16,20 @@ bas de page.
 
 ---
 
+## v1.6.0 — 11/06/2026 à 17:45 — L'assistant arrive sur Telegram
+
+Vous pouvez désormais parler à l'assistant directement depuis Telegram,
+comme à n'importe quel contact : posez vos questions sur le portefeuille,
+le cash ou le passif depuis votre téléphone, sans ouvrir l'application.
+Les actions d'écriture (créer une transaction, pointer, etc.) restent
+protégées : l'assistant propose l'action et vous la validez d'un bouton
+Confirmer ou Refuser, exactement comme dans l'app. Deux commandes
+accompagnent le bot : « /new » pour repartir sur une conversation vierge
+et « /org » pour changer de véhicule d'investissement. L'accès est
+strictement réservé aux comptes liés par un code fourni par
+l'administrateur. En coulisses, le coût des conversations avec
+l'assistant a aussi été fortement optimisé (mise en cache du contexte).
+
 ## v1.5.2 — 11/06/2026 à 11:40 — Tableau de bord et pointage plus rapides
 
 Le tableau de bord d'une organisation s'affiche désormais quasi

@@ -436,6 +436,13 @@ Les outils d'écriture de l'agent portent `needsApproval: true`
    composant `confirmation.tsx` est piloté par ça. `dynamicTool()` ne
    supporte pas l'approbation (vercel/ai#11434) : ne pas convertir nos
    outils en dynamiques.
+5. **Second point d'entrée : le bot Telegram** (`convex/telegram.ts`,
+   boutons inline Confirmer/Refuser). Même contrat de reprise (décision →
+   `generateText` avec `promptMessageId`). Le `callback_data` Telegram est
+   un simple `approve`/`deny` (cap 64 bytes) : l'approbation visée est
+   résolue côté serveur comme « la seule `approval-requested` du thread »
+   — garanti par l'auto-deny du point 3. Boutons obsolètes → réponse
+   « plus en attente », rien n'est écrit.
 
 ## tailwind-merge v3 obligatoire avec les composants shadcn « Tailwind v4 »
 

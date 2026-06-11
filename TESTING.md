@@ -505,6 +505,27 @@ sidebar « Passif » dans le groupe Plateforme.
 | PU10 | Crayon sur une ligne (position de capital / C/C)                                                                                                                                                                                                         | Dialog pré-rempli ; equity : tous les champs éditables (`updateEquityPosition`) ; C/C : créancier/débiteur **grisés**, seuls date/taux/blocage éditables (`updateIntercompanyLoan`) ; toast succès + table réactive |
 | PU11 | Corbeille sur une ligne                                                                                                                                                                                                                                  | Confirm ; cible **sans** tx pointées → supprimée ; **avec** tx pointées → `ConvexError('has_allocations')`, toast « Détachez-les d'abord », rien supprimé                                                           |
 
+## Bot Telegram (webhook → agent)
+
+Pré-requis : setup one-time déroulé (README « Telegram bot » — token,
+secret, `setWebhook`, `createLinkCode`). Env : `TELEGRAM_BOT_TOKEN`,
+`TELEGRAM_WEBHOOK_SECRET`.
+
+| #   | Étape                                                                         | Résultat attendu                                                                                                                  |
+| --- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| T1  | `POST /telegram/webhook` sans header `X-Telegram-Bot-Api-Secret-Token` (curl) | 401, rien n'est traité                                                                                                               |
+| T2  | `/start <code>` avec un code valide (< 24h)                                   | « Compte lié à l'organisation … » ; le code est consommé (un second `/start <code>` → « Code invalide ou expiré. »)                  |
+| T3  | Message d'un compte Telegram non lié                                          | Aucune réponse (ignoré silencieusement), webhook répond 200                                                                          |
+| T4  | « liste mes participations »                                                  | Indicateur « typing », puis réponse texte scopée à l'org courante (outil `listDeals`)                                                |
+| T5  | « crée une transaction de 50 € … » (outil d'écriture)                         | Message avec l'action proposée (`⚙️ <outil>` + paramètres) et boutons **✅ Confirmer / ❌ Refuser**                                  |
+| T6  | Bouton ✅ Confirmer                                                            | « ✅ Confirmé », les boutons disparaissent, l'agent reprend et confirme l'exécution ; l'écriture est visible dans l'app              |
+| T7  | Bouton ❌ Refuser                                                              | « ❌ Refusé », rien n'est écrit, l'agent accuse réception                                                                            |
+| T8  | Re-cliquer un bouton d'une approbation déjà traitée                           | « Cette demande de confirmation n'est plus en attente. », rien n'est écrit                                                           |
+| T9  | `/new` puis un message                                                        | Nouveau thread (l'agent ne « voit » plus la conversation précédente)                                                                 |
+| T10 | `/org <slug>` (membre) / `/org inconnu`                                       | « Organisation courante : … » + thread réinitialisé / « Organisation inconnue ou accès refusé. »                                     |
+| T11 | Spammer ~15 messages d'affilée                                                | « Trop de messages, réessayez dans un instant. » (rate-limit `chatSend`, partagé avec le panneau in-app)                             |
+| T12 | Pendant T4, logs Convex                                                       | Lignes `llm_usage` par appel LLM ; `cacheReadTokens > 0` dès le step 2 d'un message multi-étapes (prompt caching Mistral)            |
+
 ## En cas d'échec
 
 - Smoke échoue → ouvrir `KNOWN_ISSUES.md` (déploiement Convex / `pnpm rebuild esbuild`).
@@ -513,3 +534,6 @@ sidebar « Passif » dans le groupe Plateforme.
   recevoir réellement.
 - AI ne stream pas → `MISTRAL_API_KEY` + vérifier `convex/agent.ts` (modèle
   par défaut `mistral-medium-3.5`).
+- Bot Telegram muet → `TELEGRAM_BOT_TOKEN`/`TELEGRAM_WEBHOOK_SECRET` côté
+  Convex env + `curl https://api.telegram.org/bot<token>/getWebhookInfo`
+  pour vérifier l'URL du webhook et les erreurs de livraison.
