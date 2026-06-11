@@ -286,9 +286,9 @@ function Transactions({ deal }: { deal: CurrentDeal }) {
   const pagedTxs = txs?.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   // Org deals for the reassignment combobox — only loaded when the
-  // sheet opens.
+  // sheet opens (lightweight names-only query, cf. deals.listOptions).
   const deals = useConvexQuery(
-    api.deals.list,
+    api.deals.listOptions,
     sheetTx ? { orgId: deal.orgId } : 'skip',
   )
   const matchTransaction = useConvexMutation(api.transactions.matchTransaction)

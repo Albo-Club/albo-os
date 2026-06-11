@@ -24,6 +24,46 @@ function pickAllocatedTx(tx: Doc<'transactions'>) {
   }
 }
 
+/** Holder display name of an equity position (org name > label > person). */
+async function holderNameOf(ctx: QueryCtx, position: Doc<'equityPositions'>) {
+  const holderOrg = position.holderOrgId
+    ? await ctx.db.get('organizations', position.holderOrgId)
+    : null
+  return (
+    holderOrg?.name ?? position.holderLabel ?? position.holderPersonId ?? null
+  )
+}
+
+/** Counterparty display name of a loan, seen from `orgId`'s side. */
+async function counterpartyNameOf(
+  ctx: QueryCtx,
+  loan: Doc<'intercompanyLoans'>,
+  orgId: Id<'organizations'>,
+) {
+  const counterpartyOrg = await ctx.db.get(
+    'organizations',
+    loan.fromOrgId === orgId ? loan.toOrgId : loan.fromOrgId,
+  )
+  return counterpartyOrg?.name ?? loan.fromLabel ?? loan.fromPersonId ?? null
+}
+
+/** An org's C/C loans (creditor or debtor side), deduped by _id. */
+async function loansOfOrg(ctx: QueryCtx, orgId: Id<'organizations'>) {
+  const asCreditor = await ctx.db
+    .query('intercompanyLoans')
+    .withIndex('by_from', (q) => q.eq('fromOrgId', orgId))
+    .collect()
+  const asDebtor = await ctx.db
+    .query('intercompanyLoans')
+    .withIndex('by_to', (q) => q.eq('toOrgId', orgId))
+    .collect()
+  const loansById = new Map<Id<'intercompanyLoans'>, Doc<'intercompanyLoans'>>()
+  for (const loan of [...asCreditor, ...asDebtor]) {
+    loansById.set(loan._id, loan)
+  }
+  return [...loansById.values()]
+}
+
 /**
  * Liabilities read logic, shared by the public query (after auth).
  *
@@ -59,54 +99,29 @@ export async function getLiabilitiesForOrg(
     .collect()
   const equityPositions = await Promise.all(
     positions.map(async (position) => {
-      const holderOrg = position.holderOrgId
-        ? await ctx.db.get('organizations', position.holderOrgId)
-        : null
       const allocated = await allocatedTxs(position._id, 'equity')
       return {
         ...position,
-        holderName:
-          holderOrg?.name ??
-          position.holderLabel ??
-          position.holderPersonId ??
-          null,
+        holderName: await holderNameOf(ctx, position),
         transactions: allocated.map(pickAllocatedTx),
       }
     }),
   )
 
   // 2. C/C accounts where the org is creditor or debtor (deduped by _id).
-  const asCreditor = await ctx.db
-    .query('intercompanyLoans')
-    .withIndex('by_from', (q) => q.eq('fromOrgId', orgId))
-    .collect()
-  const asDebtor = await ctx.db
-    .query('intercompanyLoans')
-    .withIndex('by_to', (q) => q.eq('toOrgId', orgId))
-    .collect()
-  const loansById = new Map<Id<'intercompanyLoans'>, Doc<'intercompanyLoans'>>()
-  for (const loan of [...asCreditor, ...asDebtor]) {
-    loansById.set(loan._id, loan)
-  }
-
   // 3. Per-loan balance derived from THIS org's transactions, enriched with
   //    the counterparty name (the loan's other org) and the allocated txs.
   const loans = await Promise.all(
-    [...loansById.values()].map(async (loan) => {
+    (await loansOfOrg(ctx, orgId)).map(async (loan) => {
       const allocated = await allocatedTxs(loan._id, 'intercompany_loan')
       const side = loanSideForOrg(loan, orgId)
-      const counterpartyOrg = await ctx.db.get(
-        'organizations',
-        loan.fromOrgId === orgId ? loan.toOrgId : loan.fromOrgId,
-      )
       return {
         ...loan,
         // `side` is non-null by construction (the loan comes from this org's
         // by_from / by_to indexes); creditor fallback for safety.
         side: side ?? 'creditor',
         balanceCents: computeLoanBalanceCents(allocated),
-        counterpartyName:
-          counterpartyOrg?.name ?? loan.fromLabel ?? loan.fromPersonId ?? null,
+        counterpartyName: await counterpartyNameOf(ctx, loan, orgId),
         transactions: allocated.map(pickAllocatedTx),
       }
     }),
@@ -114,6 +129,41 @@ export async function getLiabilitiesForOrg(
 
   return { equityPositions, loans }
 }
+
+/**
+ * Lightweight liability targets for the pointage combobox: ids + display
+ * names only. Unlike `getLiabilities`, reads NO allocated transactions —
+ * so pointage writes never invalidate it, and the pointage page doesn't
+ * pay (nor re-download) the per-target transaction lists.
+ */
+export const listOptions = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+
+    const positions = await ctx.db
+      .query('equityPositions')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    const equityPositions = await Promise.all(
+      positions.map(async (position) => ({
+        _id: position._id,
+        type: position.type,
+        holderName: await holderNameOf(ctx, position),
+      })),
+    )
+
+    const loans = await Promise.all(
+      (await loansOfOrg(ctx, orgId)).map(async (loan) => ({
+        _id: loan._id,
+        side: loanSideForOrg(loan, orgId) ?? ('creditor' as const),
+        counterpartyName: await counterpartyNameOf(ctx, loan, orgId),
+      })),
+    )
+
+    return { equityPositions, loans }
+  },
+})
 
 /**
  * An org's liabilities: issued equity positions + inter-entity current

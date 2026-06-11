@@ -833,6 +833,15 @@ permanent par org, génère un code temporaire et renvoie l'URL du Webview.
 Le pointage manuel rattache une transaction bancaire à un deal (MVP 1) et
 alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
 
+- **La page Pointage souscrit aux queries `listOptions` (deals + passif),
+  jamais aux queries enrichies.** Chaque action de pointage écrit une
+  transaction ; toute query souscrite dont le read set touche `transactions`
+  (`deals.list` via les totaux par deal, `liabilities.getLiabilities` via
+  les transactions allouées) serait re-exécutée et re-téléchargée à CHAQUE
+  clic. Les comboboxes n'ont besoin que d'ids + libellés →
+  `deals.listOptions` / `liabilities.listOptions` (zéro lecture de
+  transactions). Ne pas re-brancher la page sur les queries enrichies.
+
 - **`matchStatus` est la source de vérité, `reconciled` n'est qu'un miroir
   dérivé.** Le boolean `reconciled` (+ `reconciledBy`/`reconciledAt`) prédate
   le pointage et reste lu par l'UI deal, la vue Cash et l'outil agent. Les
