@@ -96,6 +96,14 @@ commit message already document the *what*. Question 5 (changelog) fires on
    - **Contenu** : product language for user-visible changes (no file
      paths, no function names) ; a single descriptive line is enough for
      purely technical PRs.
+   - **Notes techniques — mandatory too.** Every entry ends with a
+     `> **🔧 Notes techniques**` blockquote: a synthetic, PR-description
+     style summary (in French) of what was done technically — key files,
+     functions, decisions — readable by a dev or an AI picking up the
+     code. File paths and function names are allowed here (and only
+     here). A few bullets max ; plain markdown only — no `<details>` or
+     raw HTML, the in-app renderer (react-markdown without rehype-raw)
+     drops it.
 
 ### Where things live (don't duplicate across files)
 

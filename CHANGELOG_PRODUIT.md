@@ -3,9 +3,16 @@
 <!--
   Trace en prose des évolutions, une entrée versionnée par PR
   (`## vX.Y.Z — JJ/MM/AAAA à HH:MM — titre`), du plus récent au plus
-  ancien. Langage produit, pas technique (pas de chemins de fichiers ni de
+  ancien. Corps en langage produit (pas de chemins de fichiers ni de
   noms de fonctions) — ce fichier est rendu tel quel dans l'app sur
   /app/$orgSlug/changelog (import ?raw).
+
+  Chaque entrée se termine par un blockquote « 🔧 Notes techniques » :
+  synthèse de ce qui a été fait techniquement (fichiers, fonctions,
+  décisions), façon description de PR, pour un dev ou un agent qui
+  reprend le code. Fichiers et fonctions autorisés ici (et seulement
+  ici). Markdown pur uniquement — pas de <details>, le rendu in-app
+  (react-markdown sans rehype-raw) ignore le HTML brut.
 
   Règle d'alimentation : CLAUDE.md § « Pre-PR doc audit » (question 5).
 -->
@@ -30,6 +37,41 @@ strictement réservé aux comptes liés par un code fourni par
 l'administrateur. En coulisses, le coût des conversations avec
 l'assistant a aussi été fortement optimisé (mise en cache du contexte).
 
+> **🔧 Notes techniques**
+>
+> - `convex/telegram.ts` (nouveau) : webhook `/telegram/webhook` (secret
+>   token vérifié en temps constant, ACK immédiat + worker schedulé),
+>   table `telegramAccounts` (linking par code one-shot via le runbook CLI
+>   `telegram:createLinkCode`, org courante + thread courant par compte),
+>   tour d'agent non streamé (`chatAgent.generateText` + typing),
+>   approbations en inline keyboard reprises via `promptMessageId` (même
+>   contrat que `chat.respondToToolApproval`, cf. KNOWN_ISSUES).
+> - Prompt caching Mistral (commit séparé) : `prompt_cache_key` injecté
+>   par un `fetch` custom dans `createMistral` (`convex/agent.ts`,
+>   `@ai-sdk/mistral` 3.0.37 n'a pas l'option) + `usageHandler` loggant
+>   `llm_usage` (input/output/cacheRead) par appel LLM.
+> - Setup one-time documenté dans le README « Telegram bot » ; checklist
+>   TESTING « Bot Telegram » (T1–T12).
+
+## v1.5.3 — 11/06/2026 à 17:07 — Notes techniques sur chaque nouveauté
+
+Chaque mise à jour de cette page se termine désormais par un court encadré
+« Notes techniques » qui résume, pour les développeurs (et les IA) qui
+reprennent le code, ce qui a été fait sous le capot — y compris sur toutes
+les mises à jour passées.
+
+> **🔧 Notes techniques**
+>
+> - Rétrofit d'un blockquote « 🔧 Notes techniques » (synthèse façon
+>   description de PR, reconstituée depuis les messages de commit) sur
+>   toutes les entrées existantes de `CHANGELOG_PRODUIT.md`.
+> - Règle pérennisée dans `CLAUDE.md` (pre-PR doc audit, question 5) :
+>   toute nouvelle entrée doit porter la section ; en-tête du fichier et
+>   ligne SH12 de `TESTING.md` mis à jour.
+> - Format blockquote (pas `<details>`) : `/app/$orgSlug/changelog` rend
+>   via react-markdown sans `rehype-raw`, le HTML brut serait ignoré.
+>   Aucun changement de code.
+
 ## v1.5.2 — 11/06/2026 à 11:40 — Tableau de bord et pointage plus rapides
 
 Le tableau de bord d'une organisation s'affiche désormais quasi
@@ -41,9 +83,31 @@ consulte la synthèse de l'organisation, et il sait maintenant dire
 correctement quel moteur le propulse (Mistral Medium 3.5) quand on le lui
 demande.
 
+> **🔧 Notes techniques**
+>
+> - `getDashboard` et l'outil agent `getDashboardSummary` ne scannent plus
+>   toutes les transactions de l'org : lectures par deal via l'index
+>   `by_deal`.
+> - `listUnmatched` / `listByStatus` : plus de `db.get` compte par ligne —
+>   une Map des comptes de l'org chargée une fois.
+> - Pointage : comboboxes branchées sur les nouvelles queries légères
+>   `deals.listOptions` / `liabilities.listOptions` (zéro lecture de
+>   transactions), au lieu de `deals.list` + `getLiabilities` qui se
+>   réinvalidaient à chaque clic de pointage.
+> - Prompt système : déclare l'id du modèle configuré (source unique
+>   `MISTRAL_MODEL` lue dans `convex/lib/instructions.ts`) — interrogé,
+>   l'agent répondait « Mistral Large 2 » faute de connaître son
+>   déploiement.
+
 ## v1.5.1 — 11/06/2026 à 10:21 — Passage de l'assistant IA sur Mistral
 
 L'assistant intégré (panneau ⌘J) tourne désormais sur Mistral Medium 3.5. Mêmes outils, mêmes conversations — seul le moteur de réponse change.
+
+> **🔧 Notes techniques** — `@ai-sdk/anthropic` remplacé par
+> `@ai-sdk/mistral` dans `convex/agent.ts` ; modèle par défaut
+> `mistral-medium-3.5`, override via la variable d'env Convex
+> `MISTRAL_MODEL`, clé dans `MISTRAL_API_KEY`. Wizards de setup, hints du
+> smoke test et docs alignés.
 
 ## v1.5.0 — 11/06/2026 à 10:20 — L'assistant agit, vous validez d'un clic
 
@@ -92,6 +156,30 @@ TVA ; sur le Passif, les comptes courants — et ainsi de suite.
 La feuille de route de l'assistant (pièces jointes, brief proactif) et un
 guide des bonnes pratiques rejoignent la documentation du projet.
 
+> **🔧 Notes techniques**
+>
+> - Bump `@convex-dev/agent` 0.6.3 (support natif `needsApproval` /
+>   `approveToolCall`) ; mutation publique `chat.respondToToolApproval`
+>   (gardes org+thread, rate-limit `chatSend`, enregistrement de la
+>   décision puis reprise du stream via `promptMessageId`).
+> - `needsApproval: true` posé sur tous les outils d'écriture ; composant
+>   ai-elements `Confirmation` branché sur les états de tool part
+>   `approval-requested` / `responded` / `output-denied` ; libellés i18n
+>   en/fr ; system prompt débarrassé de la confirmation conversationnelle.
+> - 14 nouveaux outils (~41 au total) : `getDashboardSummary`,
+>   `getVatPosition`, `listCompanyDocuments`, `bulkCategorizeTransactions`
+>   (lot max 50, une seule approbation), forecast complet (update/delete
+>   de règle, entrées manuelles/override/annulation), updates passif +
+>   `deallocateTransaction`, `updateCompany`, `renameBankAccount` —
+>   helpers métier existants réutilisés, suppressions hors agent (sauf
+>   `deleteForecastRule`).
+> - Rendu riche des résultats d'outils : 7 renderers (deals, transactions,
+>   suggestions de pointage, forecast, passif, valorisations) avec liens
+>   profonds vers les pages et bouton « Pointer » direct (mutation
+>   publique, sans repasser par le modèle) ; fallback JSON conservé.
+> - Suggestions de l'état vide contextuelles à la route courante. Docs :
+>   `KNOWN_ISSUES.md` « Approbation d'outils », TESTING C27–C30.
+
 ---
 
 ## v1.4.0 — 11/06/2026 à 15:05 — Toutes les listes paginées, entrée dans l'app plus directe
@@ -111,11 +199,42 @@ une seule étape : la redirection se décide immédiatement, avant même le
 chargement de vos données. Sur un nouvel appareil, l'app retrouve votre
 dernière organisation comme avant.
 
+> **🔧 Notes techniques**
+>
+> - `usePagination` / `PaginationFooter` extraits dans
+>   `src/components/data-table/LocalPagination.tsx` et appliqués aux
+>   tables qui grossissent avec l'usage : participations (vue par-org +
+>   vue agrégée `/app/all`), transactions d'un deal, transactions d'un
+>   compte bancaire. Recherche, tri, totaux, export CSV et Versé/Reçu
+>   opèrent toujours sur la liste complète ; les tables bornées par nature
+>   (membres, comptes, passif, règles forecast, admin) restent sans
+>   pagination.
+> - `/` redirige vers `/app` en `beforeLoad` (307 serveur, plus d'écran
+>   « redirecting » hydraté) ; `/app` redirige vers la dernière org via le
+>   cookie `last_org_slug` (lecture isomorphe, `src/lib/lastOrg.ts`), sans
+>   attendre l'auth Convex ; fallback `users.lastOrgSlug`. Le layout d'org
+>   écrit le cookie à chaque visite et l'efface avant de bouncer un
+>   non-membre (anti-boucle). Smoke test adapté aux 307 attendus.
+
 ---
 
 ## v1.3.4 — 11/06/2026 à 15:00 — Infrastructure de mise à jour des skills agents durcie
 
 Les skills agents (instructions données à l'IA pour utiliser les librairies du projet) sont désormais épinglés à un commit immuable plutôt qu'à une branche mouvante. La source de la skill TanStack Start passe du repo communautaire `deckardger` vers le monorepo officiel TanStack. Une nouvelle commande (`sync:skills:update`) permet de faire des bumps délibérés et reviewables, distincts du simple vendoring reproductible.
+
+> **🔧 Notes techniques**
+>
+> - `skills-lock.json` : deux refs par skill — `trackingRef` (branche
+>   surveillée pour la dérive) et `pinnedRef` (SHA immuable réellement
+>   vendorisé). Les bumps deviennent délibérés et diffables.
+> - `scripts/sync-skills.mjs` : mode `--update` qui résout le tip du
+>   `trackingRef` via l'API GitHub et avance le `pinnedRef` ; `--check`
+>   compare au tip sans toucher le pin. La GitHub Action hebdo passe sur
+>   `sync:skills:update`.
+> - `tanstack-start-best-practices` re-sourcée de
+>   `deckardger/tanstack-agent-skills` vers `TanStack/router`
+>   (first-party, versionnée avec les releases de
+>   `@tanstack/react-start`).
 
 ---
 
@@ -124,6 +243,12 @@ Les skills agents (instructions données à l'IA pour utiliser les librairies du
 Harmonisation interne du code (commentaires unifiés en anglais). Aucun
 changement visible dans l'app.
 
+> **🔧 Notes techniques** — sweep commentaires uniquement sur 85 fichiers
+> (`src/`, `convex/`, `tests/`, `scripts/`) : tous les commentaires
+> français (`//`, `/* */`, JSDoc, JSX, CSS) passent en anglais. Chaînes
+> i18n, templates email, prompts agent et seeds intacts. Règle ajoutée aux
+> anti-patterns de `CLAUDE.md`.
+
 ---
 
 ## v1.3.2 — 11/06/2026 à 01:10 — Nettoyage après la réindexation
@@ -131,6 +256,11 @@ changement visible dans l'app.
 Retrait de l'étape technique ponctuelle qui a réindexé l'historique des
 transactions lors de la mise à jour précédente. Aucun changement visible
 dans l'app.
+
+> **🔧 Notes techniques** — `build:vercel` revient à `convex deploy` seul,
+> les backfills one-shot de la v1.3.1 ayant tourné au déploiement (logs
+> Vercel : `backfillSearchText` 1278 lignes mises à jour,
+> `backfillMatchStatus` rien à reprendre).
 
 ---
 
@@ -144,6 +274,18 @@ l'assistant. C'est corrigé : l'historique complet redevient cherchable, et
 les lignes de l'import Mémo Bank apparaissent désormais correctement dans la
 file de pointage.
 
+> **🔧 Notes techniques**
+>
+> - Cause : les transactions écrites avant l'arrivée du champ dérivé
+>   `searchText` (import CSV Mémo Bank, premières syncs Powens) n'étaient
+>   indexées ni pour la recherche UI ni pour l'outil agent.
+> - `importMemoCsvTransactions` pose désormais `matchStatus: 'unmatched'`
+>   à l'insert (sinon les lignes manquaient aussi à la file de pointage).
+> - Backfills internes `backfillSearchText` / `backfillMatchStatus`
+>   (arg `{}` = toutes les orgs), exécutés une fois au déploiement via
+>   `build:vercel` (étape temporaire retirée en v1.3.2). Docs :
+>   `KNOWN_ISSUES.md`, `MIGRATIONS.md`.
+
 ---
 
 ## v1.3.0 — 11/06/2026 à 00:20 — Page Pointage fluide même avec beaucoup de transactions
@@ -155,6 +297,13 @@ centaines de lignes. Rien ne change pour le reste : le compteur « N à
 pointer », la recherche, les onglets et la sélection multiple continuent de
 porter sur l'ensemble des transactions, pas seulement la page affichée.
 
+> **🔧 Notes techniques** — pagination purement côté rendu (50 lignes par
+> page) sur les tables de la page Pointage ; les queries Convex sont
+> inchangées : compteur, sélection bulk et sa purge, recherche et onglets
+> opèrent toujours sur la liste complète (filtrage serveur en amont).
+> Changement de recherche/onglet ramène à la page 1 ; la page courante se
+> borne quand la liste rétrécit.
+
 ---
 
 ## v1.2.1 — 11/06/2026 à 00:10 — Fondations remises à neuf
@@ -162,6 +311,13 @@ porter sur l'ensemble des transactions, pas seulement la page affichée.
 Les briques techniques de navigation et de connexion passent sur leurs
 dernières versions corrigées, jusqu'ici gelées à cause de défauts en amont.
 Aucun changement visible dans l'app.
+
+> **🔧 Notes techniques** — retrait des `pnpm.overrides` : TanStack résout
+> de nouveau un `router-core` unique (1.171.13, le typage
+> `server.handlers` tient sans pin) et better-auth 1.6.16 épingle
+> better-call 1.3.6 (`openapi.mjs`/`validator.mjs` restaurés). Règle de
+> gel Renovate et section `KNOWN_ISSUES.md` correspondante supprimées.
+> Vérifié : lint, 70/70 tests unitaires, build.
 
 ---
 
@@ -187,12 +343,34 @@ statut, demande, résultat.
 
 **⌘J / Ctrl+J** ouvre et ferme le panneau de l'assistant, prêt à taper.
 
+> **🔧 Notes techniques**
+>
+> - Rendu maison du panneau (input mono-ligne, scroll manuel,
+>   react-markdown) remplacé par les composants Vercel AI Elements
+>   vendorés dans `src/components/ai-elements/` (registry 403 depuis le
+>   réseau restreint → sources GitHub, imports réécrits).
+> - `PromptInput` : textarea auto-grow (cap ~12rem), garde IME, stop
+>   intégré au bouton d'envoi ; `Conversation` stick-to-bottom ; markdown
+>   streaming via `streamdown` (plugins Shiki/KaTeX/Mermaid trimés,
+>   `@source` Tailwind v4 dans `app.css`) ; tool calls en blocs dépliables
+>   (labels i18n) ; suggestions métier sur l'état vide ; ⌘J/Ctrl+J toggle
+>   + focus du composer.
+> - Threads/rename/delete et toute la couche Convex (`sendMessage`,
+>   `stopStream`, `useUIMessages`) inchangés. Skill `ai-elements` ajoutée
+>   à `skills-lock.json` ; trims documentés dans `KNOWN_ISSUES.md`
+>   « Streamdown ».
+
 ---
 
 ## v1.1.1 — 10/06/2026 à 23:30 — Ménage des branches de travail
 
 Un nettoyage à la demande supprime les anciennes branches de travail déjà
 intégrées. Aucun changement visible dans l'app.
+
+> **🔧 Notes techniques** — workflow GitHub Actions à déclenchement manuel
+> qui supprime les branches dont la PR est mergée (35+ branches `claude/*`
+> accumulées : les sessions ne peuvent pas supprimer leurs refs via le
+> proxy git). PRs ouvertes et branches sans PR préservées.
 
 ---
 
@@ -219,12 +397,30 @@ Un vrai suivi de TVA fait son entrée pour fiabiliser les charges réelles :
   (dashboard, prévisionnel) passent au vert — le sens d'un mouvement se lit
   désormais d'un coup d'œil sur toutes les pages.
 
+> **🔧 Notes techniques**
+>
+> - Taux de TVA par transaction (basis points : 0/550/1000/2000), défaut
+>   20 % à la catégorisation en charge ; la TVA est toujours dérivée du
+>   TTC, jamais stockée. Carte « TVA récupérable » (déductible −
+>   collectée + compteur « à qualifier ») sur la page Trésorerie.
+> - Agent : nouvel outil `searchTransactions` (tous statuts, totaux
+>   pré-agrégés TTC + TVA) ; `categorizeTransaction` accepte le taux de
+>   TVA.
+> - UI : token `--positive` + helpers `moneyTone`, badges Entrée/Sortie et
+>   Créance/Dette teintés, verts manquants ajoutés (dashboard,
+>   prévisionnel, plan vs réel, delta KPI).
+
 ---
 
 ## v1.0.3 — 10/06/2026 à 22:38 — Nettoyage de l'outillage interne
 
 Suppression d'un automatisme de publication qui n'avait jamais fonctionné.
 Aucun changement visible dans l'app.
+
+> **🔧 Notes techniques** — retrait du workflow release-please (47/47 runs
+> en échec : un réglage d'organisation GitHub bloque la création de PR par
+> Actions) et nettoyage de ses mentions dans `CLAUDE.md`, `README.md` et
+> `KNOWN_ISSUES.md`. Le versionnage produit vit dans ce fichier.
 
 ---
 
@@ -236,12 +432,25 @@ plus toute la barre du haut), le logo de l'organisation s'affiche sans
 liseré parasite, et le logo comme la photo de profil gardent leurs
 proportions quand le menu est replié en mode icônes.
 
+> **🔧 Notes techniques** — bump `tailwind-merge` v3 pour que les classes
+> Tailwind v4 à `!` final (`p-0!`, `p-2!`) se dédupliquent correctement
+> (le clipping des boutons de la sidebar repliée venait de là) ; hauteur
+> du séparateur du header via le variant `data-[orientation=vertical]` ;
+> `bg-sidebar-primary` peint uniquement derrière le fallback du switcher
+> d'org, pour que les logos uploadés s'affichent sans halo.
+
 ---
 
 ## v1.0.1 — 10/06/2026 à 22:13 — Le changelog passe au suivi par version
 
 Chaque évolution porte désormais un numéro de version et la date et l'heure
 de sa mise en ligne — cette page devient l'historique précis de l'outil.
+
+> **🔧 Notes techniques** — la question 5 du pre-PR doc audit
+> (`CLAUDE.md`) devient inconditionnelle : chaque PR ajoute une entrée
+> `## vX.Y.Z — JJ/MM/AAAA à HH:MM — titre` en tête de ce fichier (minor =
+> feature visible, patch = fix/technique ; heure d'ouverture de la PR,
+> Europe/Paris).
 
 ---
 
@@ -250,6 +459,11 @@ de sa mise en ligne — cette page devient l'historique précis de l'outil.
 Dans toutes les vues de transactions (pointage, comptes bancaires, passif),
 les **entrées d'argent s'affichent en vert** — les sorties restent en rouge.
 Le sens d'un mouvement se lit d'un coup d'œil.
+
+> **🔧 Notes techniques** — `text-foreground` → `text-emerald-600` pour
+> les transactions `direction === 'in'` dans `PointageTable`,
+> `TransactionSheet`, la page de compte bancaire et `PassifTables` (les
+> sorties restent en `text-destructive`).
 
 ---
 
@@ -280,6 +494,24 @@ suppriment** directement depuis la page Passif. Garde-fou : une ligne sur
 laquelle des transactions sont encore pointées ne peut pas être supprimée —
 on détache d'abord, on supprime ensuite.
 
+> **🔧 Notes techniques**
+>
+> - Passif : mutations update/delete sur `equityPositions` et
+>   `intercompanyLoans` ; suppression refusée si des transactions sont
+>   encore allouées dessus (`has_allocations`) ; dialogs de création
+>   réutilisés en édition.
+> - Trésorerie : `getForecastBalance(historyMonths)` reconstruit le solde
+>   réel de fin de mois à rebours (`buildMonthlyHistory`, fonction pure
+>   testée) ; la courbe fusionne réel (trait plein) et projeté (pointillé)
+>   avec jonction au solde courant.
+> - Participations : TVPI par deal et par société (dernière valo, fallback
+>   coût, 0 si sorti — convention dashboard), tri client sur toutes les
+>   colonnes, export CSV (`;` + BOM UTF-8 pour Excel FR) des deals
+>   filtrés.
+> - Legacy : `seed:purgeLegacyForecasts` + création de `MIGRATIONS.md`
+>   (index des opérations data prod, runbook de retrait de la table
+>   `forecasts`).
+
 ---
 
 ## Juin 2026 — Le pilotage en un coup d'œil
@@ -301,6 +533,22 @@ part de vos soldes bancaires réels et déroule vos flux récurrents : loyers,
 salaires, échéances… Créez et gérez ces **règles récurrentes** directement
 sur la page (ou via l'assistant) — la projection se recalcule à chaque
 modification, et un passage sous zéro se voit immédiatement.
+
+> **🔧 Notes techniques**
+>
+> - `convex/dashboard.ts:getDashboard` : participations actives (cibles
+>   distinctes), déployé/distribué (Σ des transactions pointées par deal),
+>   trésorerie (Σ des soldes EUR réels), NAV estimée (dernière valo par
+>   deal, fallback versé + flag `navIsPartial`), répartition par
+>   instrument, activité récente.
+> - `/app/$orgSlug` : le redirect placeholder devient un vrai dashboard
+>   (6 cartes KPI, barres de répartition, activité récente) ; entrée
+>   sidebar Dashboard activée.
+> - `/app/$orgSlug/cash` : courbe du solde projeté (recharts client-only,
+>   ligne de référence 0 si négatif), horizon 6/12/24 mois, CRUD des
+>   règles récurrentes avec `expandRules` automatique post-save
+>   (idempotent par `derivedKey`) ; `forecasts.listRules` + `deleteRule`
+>   (conserve les entrées réalisées/annulées/éditées).
 
 ---
 
@@ -331,6 +579,26 @@ société s'adaptent maintenant au type de projet.
 - **Les KPIs s'historisent** : collez un reporting dans l'assistant, il en
   extrait les métriques (ARR, cash, effectifs… et NAV/TVPI pour les fonds) —
   vous confirmez, c'est enregistré.
+
+> **🔧 Notes techniques**
+>
+> - Schéma : `dealProjections` (BP en lignes datées, versions `initial`
+>   figée au closing / `revised` actualisée, unicité (deal, version,
+>   période) enforcée par la mutation `replaceVersion`, delete + insert
+>   idempotent) ; `documents` (reportings par société, storage Convex
+>   20 Mo, source upload) ; `kpiSnapshots` (table existante enfin exposée
+>   UI + agent).
+> - Backend : `convex/projections.ts`, `convex/kpis.ts`,
+>   `convex/documents.ts` (queries/mutations publiques + variantes agent
+>   qui re-vérifient l'appartenance) ; outils agent dans
+>   `agentToolsProjections.ts` (lister/poser un BP, lister/créer des
+>   snapshots KPI).
+> - Front : page deal — sections « BP vs réalisé » (recharts client-only,
+>   réalisé issu des transactions pointées, écart cumulé vs BP révisé avec
+>   fallback initial) et « Fonds » (Engagé/Appelé/Distribué/DPI/TVPI +
+>   historique des valos) ; page société — sections KPIs et Reportings &
+>   documents ; séries cumulées pures dans `src/lib/projectionSeries.ts`
+>   (testées).
 
 ## Juin 2026 — L'assistant devient copilote
 
@@ -379,6 +647,30 @@ pré-pointer les transactions bancaires.
   vérifications automatiques avant déploiement.
 - Fiabilité renforcée du pointage : interface et assistant partagent
   exactement les mêmes règles métier.
+
+> **🔧 Notes techniques**
+>
+> - `AiPanel` persistant dans le layout org (400px desktop, overlay
+>   mobile, état en cookie `ai_panel_state` — pattern `sidebar_state`)
+>   remplace le slide-over ; threads list/rename/delete + reprise auto du
+>   plus récent ; stop via `abortStream` ; contexte de page injecté en
+>   system prompt par message (`buildInstructions`,
+>   `convex/lib/instructions.ts`, pur + testé) ; titre auto au premier
+>   message.
+> - Cœur du pointage extrait dans `convex/lib/pointage.ts` (invariants
+>   matched ⟺ deal ∨ allocation, miroir `reconciled`, log append-only
+>   `matchingDecisions`) — partagé entre mutations publiques et outils
+>   agent, zéro divergence de règles.
+> - Outils agent par domaine (`agentToolsPointage.ts` puis passif /
+>   forecast / valuations, ~23 outils) avec scope key `${orgId}:${userId}`
+>   re-vérifiée à chaque appel ; ranking pur des suggestions de pointage
+>   dans `convex/lib/suggest.ts` (similarité de libellés + décisions
+>   passées + Δ montant vs engagé, testé).
+> - CI : job lint → tests unitaires → build + job séparé de dérive des
+>   skills ; enum instruments dédupliquée dans
+>   `convex/lib/instruments.ts`.
+> - Page « Nouveautés » : `/app/$orgSlug/changelog` rend ce fichier via
+>   import `?raw` (react-markdown + remark-gfm), lien sidebar.
 
 ---
 
