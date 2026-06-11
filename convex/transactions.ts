@@ -9,13 +9,26 @@ import {
 import { buildSearchText, normalizeSearch } from './lib/searchText'
 import { vatCentsFromTtc, vatRateBpsValidator } from './lib/vat'
 
-import type { Id } from './_generated/dataModel'
+import type { Doc, Id } from './_generated/dataModel'
+import type { QueryCtx } from './_generated/server'
 
 /**
  * Bound on full-text search results (the no-search listing keeps its
  * historical `.collect()` — the matching queue must stay exhaustive).
  */
 const SEARCH_LIMIT = 200
+
+/** An org's bank accounts keyed by id, to enrich rows without N+1 gets. */
+async function orgAccountsById(
+  ctx: QueryCtx,
+  orgId: Id<'organizations'>,
+): Promise<Map<Id<'bankAccounts'>, Doc<'bankAccounts'>>> {
+  const accounts = await ctx.db
+    .query('bankAccounts')
+    .withIndex('by_org', (q) => q.eq('orgId', orgId))
+    .collect()
+  return new Map(accounts.map((a) => [a._id, a]))
+}
 
 /**
  * Transactions attached to a deal (reconciled via `dealId`), sorted by
@@ -92,25 +105,27 @@ export const listUnmatched = query({
 
     rows.sort((a, b) => b.transactionDate - a.transactionDate)
 
-    return await Promise.all(
-      rows.map(async (tx) => {
-        const account = await ctx.db.get('bankAccounts', tx.bankAccountId)
-        return {
-          _id: tx._id,
-          direction: tx.direction,
-          amount: tx.amount,
-          transactionDate: tx.transactionDate,
-          rawLabel: tx.rawLabel,
-          counterparty: tx.counterparty ?? null,
-          // Generalized allocation (safety filter on the Passif page — a tx
-          // allocated to liabilities is `matched` and should never be here).
-          allocation: tx.allocation ?? null,
-          account: account
-            ? { label: account.label, bankName: account.bankName }
-            : null,
-        }
-      }),
-    )
+    // One indexed read of the org's few accounts instead of one `db.get`
+    // per row (the queue can hold thousands of rows after a bank import).
+    const accountsById = await orgAccountsById(ctx, orgId)
+
+    return rows.map((tx) => {
+      const account = accountsById.get(tx.bankAccountId)
+      return {
+        _id: tx._id,
+        direction: tx.direction,
+        amount: tx.amount,
+        transactionDate: tx.transactionDate,
+        rawLabel: tx.rawLabel,
+        counterparty: tx.counterparty ?? null,
+        // Generalized allocation (safety filter on the Passif page — a tx
+        // allocated to liabilities is `matched` and should never be here).
+        allocation: tx.allocation ?? null,
+        account: account
+          ? { label: account.label, bankName: account.bankName }
+          : null,
+      }
+    })
   },
 })
 
@@ -159,24 +174,26 @@ export const listByStatus = query({
 
     rows.sort((a, b) => b.transactionDate - a.transactionDate)
 
-    return await Promise.all(
-      rows.map(async (tx) => {
-        const account = await ctx.db.get('bankAccounts', tx.bankAccountId)
-        return {
-          _id: tx._id,
-          direction: tx.direction,
-          amount: tx.amount,
-          transactionDate: tx.transactionDate,
-          rawLabel: tx.rawLabel,
-          counterparty: tx.counterparty ?? null,
-          // VAT (charge/product statuses only) — null = to be qualified.
-          vatRateBps: tx.vatRateBps ?? null,
-          account: account
-            ? { label: account.label, bankName: account.bankName }
-            : null,
-        }
-      }),
-    )
+    // Same batching as `listUnmatched`: the matched/charge sets grow with
+    // the bank history, one account read per row does not scale.
+    const accountsById = await orgAccountsById(ctx, orgId)
+
+    return rows.map((tx) => {
+      const account = accountsById.get(tx.bankAccountId)
+      return {
+        _id: tx._id,
+        direction: tx.direction,
+        amount: tx.amount,
+        transactionDate: tx.transactionDate,
+        rawLabel: tx.rawLabel,
+        counterparty: tx.counterparty ?? null,
+        // VAT (charge/product statuses only) — null = to be qualified.
+        vatRateBps: tx.vatRateBps ?? null,
+        account: account
+          ? { label: account.label, bankName: account.bankName }
+          : null,
+      }
+    })
   },
 })
 

@@ -8,9 +8,7 @@ import { liabilityTools } from './agentToolsLiabilities'
 import { pointageTools } from './agentToolsPointage'
 import { projectionTools } from './agentToolsProjections'
 import { valuationTools } from './agentToolsValuations'
-import { BASE_INSTRUCTIONS } from './lib/instructions'
-
-const MISTRAL_MODEL = process.env.MISTRAL_MODEL ?? 'mistral-medium-3.5'
+import { BASE_INSTRUCTIONS, MISTRAL_MODEL } from './lib/instructions'
 
 export function getModel() {
   return mistral.chat(MISTRAL_MODEL)
