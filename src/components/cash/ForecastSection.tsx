@@ -39,9 +39,9 @@ import {
 } from '~/components/ui/table'
 
 const HORIZONS = [6, 12, 24] as const
-// L'expansion après sauvegarde couvre le plus grand horizon affichable.
+// Post-save expansion covers the largest displayable horizon.
 const EXPAND_MONTHS = 24
-// Profondeur de l'historique réel affiché en amont de la projection.
+// Depth of the actual history shown ahead of the projection.
 const HISTORY_MONTHS = 6
 const FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'yearly'] as const
 type Frequency = (typeof FREQUENCIES)[number]
@@ -52,7 +52,7 @@ function msToDateInput(ms: number | undefined): string {
   return ms == null ? '' : new Date(ms).toISOString().slice(0, 10)
 }
 
-/** "1 500" / "1500,50" (euros) → cents entiers, null si invalide. */
+/** "1 500" / "1500,50" (euros) → integer cents, null if invalid. */
 function parseEuros(raw: string): number | null {
   const cleaned = raw.replace(/\s/g, '').replace(',', '.')
   if (!cleaned) return null
@@ -68,7 +68,7 @@ function RuleDialog({
   onSaved,
 }: {
   orgId: Id<'organizations'>
-  rule: Rule | null // null = création
+  rule: Rule | null // null = create
   onClose: () => void
   onSaved: () => Promise<void>
 }) {
@@ -109,7 +109,7 @@ function RuleDialog({
     (endMs != null && endMs < startMs)
 
   async function handleSave() {
-    // TS narrowe amountCents (non-null) à travers l'alias `invalid`.
+    // TS narrows amountCents (non-null) through the `invalid` alias.
     if (invalid) return
     setPending(true)
     try {
@@ -299,10 +299,10 @@ function RuleDialog({
 }
 
 /**
- * Prévisionnel de trésorerie : courbe du solde projeté (solde réel +
- * forecastEntries pending, via getForecastBalance) et CRUD des règles
- * récurrentes. Toute sauvegarde relance `expandRules` (idempotent par
- * derivedKey) pour que la courbe reflète immédiatement les règles.
+ * Cash flow forecast: projected balance curve (actual balance + pending
+ * forecastEntries, via getForecastBalance) and CRUD for recurring rules.
+ * Every save re-runs `expandRules` (idempotent per derivedKey) so the
+ * curve immediately reflects the rules.
  */
 export function ForecastSection({ orgId }: { orgId: Id<'organizations'> }) {
   const { t } = useTranslation(['cash', 'common'])

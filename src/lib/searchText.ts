@@ -1,10 +1,10 @@
 /**
- * Normalisation pour la recherche : minuscules + suppression des diacritiques
- * (insensible casse/accents). Appliquée des deux côtés de la comparaison
- * (donnée et saisie utilisateur).
+ * Search normalization: lowercase + diacritics removal (case- and
+ * accent-insensitive). Applied to both sides of the comparison (stored
+ * data and user input).
  *
- * Copie miroir de `convex/lib/searchText.ts` (convex/ et src/ ne partagent
- * pas de modules runtime) — garder les deux en phase.
+ * Mirror copy of `convex/lib/searchText.ts` (convex/ and src/ don't share
+ * runtime modules) — keep both in sync.
  */
 export function normalizeSearch(input: string): string {
   return input

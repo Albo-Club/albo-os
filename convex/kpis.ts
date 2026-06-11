@@ -1,8 +1,8 @@
 /**
- * KPIs portfolio (`kpiSnapshots`) : une ligne = une valeur de métrique sur
- * une période pour une company (ARR, GMV, cash, headcount, NAV/TVPI d'un
- * fonds…). Table déclarée depuis le départ, exposée ici pour la première
- * fois (UI + agent).
+ * Portfolio KPIs (`kpiSnapshots`): one row = one metric value over a
+ * period for a company (ARR, GMV, cash, headcount, a fund's NAV/TVPI…).
+ * Table declared from the start, exposed here for the first time
+ * (UI + agent).
  */
 
 import { ConvexError, v } from 'convex/values'
@@ -76,7 +76,7 @@ async function listForCompany(
   return rows.map(pickSnapshot)
 }
 
-/** KPIs d'une company, les plus récents d'abord (filtre métrique optionnel). */
+/** A company's KPIs, most recent first (optional metric filter). */
 export const listByCompany = query({
   args: {
     companyId: v.id('companies'),
@@ -136,7 +136,7 @@ export const remove = mutation({
   },
 })
 
-// ─── Variantes agent (re-check membership via actorUserId) ──────────────────
+// ─── Agent variants (re-check membership via actorUserId) ───────────────────
 
 export const listInternal = internalQuery({
   args: {

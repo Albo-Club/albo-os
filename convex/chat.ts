@@ -137,7 +137,7 @@ export const sendMessage = mutation({
     orgId: v.id('organizations'),
     threadId: v.string(),
     prompt: v.string(),
-    // Contexte de page (route courante) transmis au system prompt du stream.
+    // Page context (current route) forwarded to the stream's system prompt.
     context: v.optional(v.object({ route: v.string() })),
   },
   handler: async (ctx, { orgId, threadId, prompt, context }) => {
@@ -147,7 +147,7 @@ export const sendMessage = mutation({
     const meta = await getThreadMetadata(ctx, components.agent, { threadId })
     if (meta.userId !== scope) throw new ConvexError('forbidden')
     if (!meta.title) {
-      // Titre auto bon marché : début du premier message (pas de LLM).
+      // Cheap auto-title: start of the first message (no LLM call).
       await updateThreadMetadata(ctx, components.agent, {
         threadId,
         patch: { title: prompt.slice(0, AUTO_TITLE_MAX) },

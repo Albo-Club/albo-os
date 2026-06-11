@@ -26,11 +26,11 @@ import { useDebouncedValue } from '~/hooks/useDebouncedValue'
 import { downloadCsv, toCsv } from '~/lib/csv'
 import { normalizeSearch } from '~/lib/searchText'
 
-/** Forme minimale d'un deal enrichi, commune aux vues par-org et agrégée. */
+/** Minimal shape of an enriched deal, shared by per-org and aggregated views. */
 export type DealRow = {
   _id: string
   targetCompanyId: string
-  /** Nom personnalisé — affiché à la place du titre dérivé quand présent. */
+  /** Custom name — displayed instead of the derived title when present. */
   name?: string | null
   target: { _id: string; name: string; sector?: string | null } | null
   investor: { name: string } | null
@@ -38,20 +38,20 @@ export type DealRow = {
   instrumentKind: string
   status: string
   committedAmount?: number | null
-  /** Versé : somme des transactions sortantes rattachées (calculé serveur). */
+  /** Paid: sum of the matched outgoing transactions (computed server-side). */
   paidActual?: number | null
-  /** Reçu : somme des transactions entrantes rattachées (calculé serveur). */
+  /** Received: sum of the matched incoming transactions (computed server-side). */
   received?: number | null
-  /** Dernière valorisation connue (cents), null si aucune (calculé serveur). */
+  /** Last known valuation (cents), null if none (computed server-side). */
   lastValuationCents?: number | null
   signedDate?: number | null
-  org?: { name: string; slug: string } | null // présent en vue agrégée
+  org?: { name: string; slug: string } | null // present in aggregated view
 }
 
 /**
- * Valeur résiduelle d'un deal pour le TVPI : 0 si sorti/passé en perte,
- * sinon dernière valo connue, à défaut le coût (convention du dashboard —
- * convex/dashboard.ts NAV).
+ * Residual value of a deal for the TVPI: 0 if exited/written off,
+ * otherwise the last known valuation, falling back to cost (dashboard
+ * convention — convex/dashboard.ts NAV).
  */
 function residualCents(deal: DealRow): number {
   if (deal.status === 'fully_exited' || deal.status === 'written_off') return 0
@@ -73,7 +73,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-/** Formateurs €/date/multiple localisés, partagés par les composants ci-dessous. */
+/** Localized €/date/multiple formatters, shared by the components below. */
 export function useFormatters() {
   const { i18n } = useTranslation('participations')
   const lang = i18n.language
@@ -104,10 +104,10 @@ export function useFormatters() {
 }
 
 /**
- * Titre d'affichage d'un deal : `nom personnalisé · instrument` si un nom
- * existe, sinon le libellé (i18n) de l'instrument seul.
- * `withInstrument: false` n'affiche que le nom (ex. page détail du deal, où
- * l'instrument est déjà dans la grille d'infos).
+ * Display title of a deal: `custom name · instrument` if a name exists,
+ * otherwise the (i18n) label of the instrument alone.
+ * `withInstrument: false` shows only the name (e.g. the deal detail page,
+ * where the instrument already sits in the info grid).
  */
 export function useDealTitle() {
   const { t } = useTranslation('participations')
@@ -126,8 +126,8 @@ export function useDealTitle() {
 }
 
 /**
- * Liste détaillée de deals (un bloc par deal). Réutilisée par l'accordéon
- * de la table par-société et par la page détail d'une participation.
+ * Detailed list of deals (one block per deal). Reused by the per-company
+ * table accordion and by the participation detail page.
  */
 export function DealsList({
   deals,
@@ -193,14 +193,14 @@ export function DealsList({
 }
 
 /**
- * Table des participations regroupée PAR SOCIÉTÉ (une ligne = une boîte,
- * dépliable → ses deals). `showOrg` ajoute une colonne de badges d'org
- * (vue agrégée cross-org). `orgSlug` (vue par-org) cible le lien de détail ;
- * en vue agrégée, le slug est dérivé de l'org de chaque deal.
+ * Participations table grouped BY COMPANY (one row = one company,
+ * expandable → its deals). `showOrg` adds an org badge column
+ * (cross-org aggregated view). `orgSlug` (per-org view) targets the detail
+ * link; in the aggregated view the slug is derived from each deal's org.
  */
 type SortKey = 'name' | 'committed' | 'paid' | 'received' | 'tvpi'
 
-/** Entête cliquable de colonne triable (asc ⇄ desc). */
+/** Clickable header of a sortable column (asc ⇄ desc). */
 function SortableHead({
   label,
   active,
@@ -249,9 +249,9 @@ export function ParticipationsTable({
       return next
     })
 
-  // Recherche client (volumes faibles) : nom de société, nom personnalisé du
-  // deal, instrument (clé brute + libellé traduit), investisseur, secteur —
-  // insensible casse/accents.
+  // Client-side search (low volumes): company name, custom deal name,
+  // instrument (raw key + translated label), investor, sector —
+  // case/accent insensitive.
   const [search, setSearch] = useState('')
   const term = normalizeSearch(useDebouncedValue(search))
 
@@ -313,8 +313,8 @@ export function ParticipationsTable({
     }))
   }, [filtered, orgSlug])
 
-  // Tri par colonne (client, volumes faibles). null = ordre serveur
-  // (signedDate desc). Les TVPI absents passent en fin de liste.
+  // Column sort (client-side, low volumes). null = server order
+  // (signedDate desc). Missing TVPIs go to the end of the list.
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' } | null>(
     null,
   )
@@ -343,7 +343,7 @@ export function ParticipationsTable({
     })
   }, [groups, sort])
 
-  // Export CSV des deals filtrés (à plat, un deal par ligne).
+  // CSV export of the filtered deals (flat, one deal per row).
   function handleExport() {
     if (!filtered) return
     const headers = [
@@ -387,8 +387,8 @@ export function ParticipationsTable({
 
   const colSpan = showOrg ? 7 : 6
 
-  // Barre de recherche affichée dès qu'il y a des deals — y compris quand la
-  // recherche courante ne matche rien (sinon impossible de l'effacer).
+  // Search bar shown as soon as there are deals — including when the
+  // current search matches nothing (otherwise it can't be cleared).
   const searchBar = deals && deals.length > 0 && (
     <div className="flex items-center justify-between gap-3">
       <Input

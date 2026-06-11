@@ -1,11 +1,11 @@
 /**
- * Tests purs de la logique de récurrence (convex/lib/recurrence.ts).
+ * Pure tests for the recurrence logic (convex/lib/recurrence.ts).
  *
- * Lancés avec le test runner natif de Node via tsx (aucune dépendance) :
+ * Run with Node's native test runner via tsx (no dependency):
  *   pnpm test:unit
  *
- * Volontairement HORS de convex/ : un import `node:test` dans convex/ferait
- * échouer le bundle de déploiement Convex.
+ * Deliberately OUTSIDE convex/: a `node:test` import inside convex/ would
+ * break the Convex deployment bundle.
  */
 
 import assert from 'node:assert/strict'
@@ -55,7 +55,7 @@ describe('expandOccurrences — monthly', () => {
       utc(2026, 1, 1),
       utc(2026, 4, 30),
     )
-    // 2026 n'est pas bissextile → février = 28.
+    // 2026 is not a leap year → February = 28.
     assert.deepEqual(occ.map(isoDay), [
       '2026-01-31',
       '2026-02-28',
@@ -102,7 +102,7 @@ describe('expandOccurrences — monthly', () => {
       frequency: 'monthly' as const,
       interval: 1,
       anchorDay: 1,
-      startDate: utc(2026, 3, 15), // anchorDay 1 mars déjà passé → 1er avril
+      startDate: utc(2026, 3, 15), // anchorDay 1 in March already past → April 1
     }
     const occ = expandOccurrences(rule, utc(2026, 1, 1), utc(2026, 6, 30))
     assert.deepEqual(occ.map(isoDay), [
@@ -111,7 +111,7 @@ describe('expandOccurrences — monthly', () => {
       '2026-06-01',
     ])
 
-    // Fenêtre démarrant après startDate : les occurrences antérieures sortent.
+    // Window starting after startDate: earlier occurrences drop out.
     const occ2 = expandOccurrences(rule, utc(2026, 5, 15), utc(2026, 7, 31))
     assert.deepEqual(occ2.map(isoDay), ['2026-06-01', '2026-07-01'])
   })
@@ -123,7 +123,7 @@ describe('expandOccurrences — monthly', () => {
         interval: 1,
         anchorDay: 10,
         startDate: utc(2026, 1, 1),
-        endDate: utc(2026, 3, 10), // pile sur la 3e occurrence
+        endDate: utc(2026, 3, 10), // exactly on the 3rd occurrence
       },
       utc(2026, 1, 1),
       utc(2026, 12, 31),
@@ -161,7 +161,7 @@ describe('expandOccurrences — quarterly / yearly', () => {
         frequency: 'quarterly',
         interval: 1,
         anchorDay: 1,
-        startDate: utc(2026, 3, 1), // mars → juin → sept. → déc.
+        startDate: utc(2026, 3, 1), // March → June → Sept. → Dec.
       },
       utc(2026, 1, 1),
       utc(2026, 12, 31),
@@ -180,7 +180,7 @@ describe('expandOccurrences — quarterly / yearly', () => {
         frequency: 'yearly',
         interval: 1,
         anchorDay: 29,
-        startDate: utc(2028, 2, 1), // févr. 2028 bissextile
+        startDate: utc(2028, 2, 1), // Feb. 2028, leap year
       },
       utc(2028, 1, 1),
       utc(2030, 12, 31),
@@ -195,7 +195,7 @@ describe('expandOccurrences — quarterly / yearly', () => {
 
 describe('expandOccurrences — weekly', () => {
   it('tombe sur le jour ISO demandé (1 = lundi … 7 = dimanche)', () => {
-    // Le 1er janv. 2026 est un jeudi (ISO 4). anchorDay 1 → lundi 5 janv.
+    // Jan 1, 2026 is a Thursday (ISO 4). anchorDay 1 → Monday Jan 5.
     const occ = expandOccurrences(
       {
         frequency: 'weekly',
@@ -212,12 +212,12 @@ describe('expandOccurrences — weekly', () => {
       '2026-01-19',
       '2026-01-26',
     ])
-    // Tous des lundis.
+    // All Mondays.
     for (const ms of occ) assert.equal(new Date(ms).getUTCDay(), 1)
   })
 
   it('inclut startDate si elle tombe pile sur le anchorDay', () => {
-    // Le 4 janv. 2026 est un dimanche (ISO 7).
+    // Jan 4, 2026 is a Sunday (ISO 7).
     const occ = expandOccurrences(
       {
         frequency: 'weekly',
@@ -240,7 +240,7 @@ describe('expandOccurrences — weekly', () => {
       {
         frequency: 'weekly',
         interval: 2,
-        anchorDay: 5, // vendredi
+        anchorDay: 5, // Friday
         startDate: utc(2026, 1, 1),
       },
       utc(2026, 1, 1),
@@ -260,9 +260,9 @@ describe('idempotence des clés et bucketing', () => {
   it('ruleDerivedKey est stable et formatée "rule:{id}:{YYYY-MM-DD}" en UTC', () => {
     const ms = utc(2026, 2, 28)
     assert.equal(ruleDerivedKey('abc123', ms), 'rule:abc123:2026-02-28')
-    // Stable : le même input redonne la même clé.
+    // Stable: the same input yields the same key.
     assert.equal(ruleDerivedKey('abc123', ms), ruleDerivedKey('abc123', ms))
-    // Insensible à l'heure dans la journée UTC.
+    // Insensitive to the time of day within the UTC day.
     assert.equal(
       ruleDerivedKey('abc123', ms + 23 * 60 * 60 * 1000),
       'rule:abc123:2026-02-28',
@@ -287,7 +287,7 @@ describe('idempotence des clés et bucketing', () => {
       utc(2026, 12, 31),
     ).map((ms) => ruleDerivedKey('r1', ms))
     assert.deepEqual(keys1, keys2)
-    // Pas de doublon de clé au sein d'un run.
+    // No duplicate key within a single run.
     assert.equal(new Set(keys1).size, keys1.length)
   })
 
@@ -338,9 +338,9 @@ describe('entryUpsertAction — protection des entries', () => {
 })
 
 describe('simulation de régénération (expandRules sans DB)', () => {
-  // Reproduit la boucle d'expandRules sur un store en mémoire keyé par
-  // derivedKey : occurrences → entryUpsertAction → create/update/skip.
-  // C'est exactement le glue de convex/forecasts.ts, sans Convex.
+  // Reproduces the expandRules loop over an in-memory store keyed by
+  // derivedKey: occurrences → entryUpsertAction → create/update/skip.
+  // This is exactly the glue of convex/forecasts.ts, without Convex.
   type StoredEntry = ExistingEntryState & { amountCents: number; label: string }
 
   const rule = {
@@ -383,19 +383,19 @@ describe('simulation de régénération (expandRules sans DB)', () => {
   it('run 1 crée, run 2 ne duplique rien (idempotence)', () => {
     const store = new Map<string, StoredEntry>()
     const run1 = runExpand(store, 100000)
-    assert.equal(run1.created, 6) // janv. → juin
+    assert.equal(run1.created, 6) // Jan → June
     assert.equal(store.size, 6)
 
     const run2 = runExpand(store, 100000)
     assert.deepEqual(run2, { created: 0, updated: 6, skipped: 0 })
-    assert.equal(store.size, 6) // toujours 6 — aucun doublon
+    assert.equal(store.size, 6) // still 6 — no duplicate
   })
 
   it('une entry éditée à la main survit à la régénération, les autres suivent la règle', () => {
     const store = new Map<string, StoredEntry>()
     runExpand(store, 100000)
 
-    // Édition manuelle de l'occurrence de mars : montant custom + overridden.
+    // Manual edit of the March occurrence: custom amount + overridden.
     const marchKey = ruleDerivedKey('rule1', utc(2026, 3, 1))
     store.set(marchKey, {
       overridden: true,
@@ -404,14 +404,14 @@ describe('simulation de régénération (expandRules sans DB)', () => {
       label: 'Loyer SCI (négocié)',
     })
 
-    // La règle change de montant, puis régénération.
+    // The rule's amount changes, then regeneration.
     const run2 = runExpand(store, 200000)
     assert.deepEqual(run2, { created: 0, updated: 5, skipped: 1 })
 
-    // L'édition manuelle a survécu.
+    // The manual edit survived.
     assert.equal(store.get(marchKey)?.amountCents, 123456)
     assert.equal(store.get(marchKey)?.label, 'Loyer SCI (négocié)')
-    // Les autres occurrences ont bien été resynchronisées.
+    // The other occurrences were indeed resynced.
     const aprilKey = ruleDerivedKey('rule1', utc(2026, 4, 1))
     assert.equal(store.get(aprilKey)?.amountCents, 200000)
   })
@@ -424,7 +424,7 @@ describe('simulation de régénération (expandRules sans DB)', () => {
     store.set(janKey, {
       overridden: false,
       status: 'realized',
-      amountCents: 99500, // montant réellement encaissé
+      amountCents: 99500, // amount actually received
       label: 'Loyer SCI',
     })
 
@@ -452,7 +452,7 @@ describe('buildMonthlyBalance — solde projeté mensuel', () => {
         entry({ date: utc(2026, 1, 5), direction: 'in', amountCents: 100000 }),
         entry({ date: utc(2026, 1, 20), direction: 'out', amountCents: 30000 }),
         entry({ date: utc(2026, 2, 5), direction: 'out', amountCents: 50000 }),
-        // mars : aucun flux → net 0, le solde reste plat
+        // March: no flow → net 0, the balance stays flat
         entry({ date: utc(2026, 4, 1), direction: 'in', amountCents: 20000 }),
       ],
       startingBalanceCents: 500000, // 5 000 €
@@ -527,7 +527,7 @@ describe('buildMonthlyBalance — solde projeté mensuel', () => {
       entries: [
         entry({ status: 'realized', amountCents: 999999 }),
         entry({ status: 'cancelled', amountCents: 999999 }),
-        entry({ date: utc(2027, 6, 1), amountCents: 999999 }), // hors fenêtre
+        entry({ date: utc(2027, 6, 1), amountCents: 999999 }), // outside window
         entry({ amountCents: 100 }),
       ],
       startingBalanceCents: 0,
@@ -589,7 +589,7 @@ describe('buildMonthlyHistory — solde réel reconstruit à rebours', () => {
   })
 
   it('retire le net de chaque mois en remontant le temps', () => {
-    // Mai : +1000 ; juin (avant now) : −300. Solde courant 50 000.
+    // May: +1000; June (before now): −300. Current balance 50 000.
     const points = buildMonthlyHistory({
       transactions: [
         tx(2026, 5, 15, 1000, 'in'),
@@ -599,8 +599,8 @@ describe('buildMonthlyHistory — solde réel reconstruit à rebours', () => {
       monthsBack: 2,
       now: utc(2026, 6, 10),
     })
-    // Fin juin (now) = 50 000 ; fin mai = 50 000 + 300 = 50 300 ;
-    // fin avril = 50 300 − 1 000 = 49 300.
+    // End of June (now) = 50 000; end of May = 50 000 + 300 = 50 300;
+    // end of April = 50 300 − 1 000 = 49 300.
     assert.deepEqual(
       points.map((p) => [p.monthKey, p.balanceCents]),
       [
@@ -614,8 +614,8 @@ describe('buildMonthlyHistory — solde réel reconstruit à rebours', () => {
   it('ignore les transactions hors fenêtre ou futures', () => {
     const points = buildMonthlyHistory({
       transactions: [
-        tx(2025, 1, 1, 999999, 'in'), // trop ancienne
-        tx(2026, 6, 20, 999999, 'out'), // postérieure à now
+        tx(2025, 1, 1, 999999, 'in'), // too old
+        tx(2026, 6, 20, 999999, 'out'), // after now
         tx(2026, 5, 2, 100, 'in'),
       ],
       currentBalanceCents: 1000,

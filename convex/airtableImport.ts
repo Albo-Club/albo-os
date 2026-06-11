@@ -1,18 +1,18 @@
 /**
- * Import one-shot Airtable → Convex (cf. plan migration).
+ * One-shot Airtable → Convex import (cf. migration plan).
  *
- * Base Airtable `appVRf06AHghMkPZG`. Rattaché à l'org `calte`. Idempotent via
- * le champ `airtableId` (index `by_airtable_id`) sur chaque table cible.
+ * Airtable base `appVRf06AHghMkPZG`. Attached to the `calte` org. Idempotent
+ * via the `airtableId` field (index `by_airtable_id`) on each target table.
  *
- * Lancer (prod) :
- *   pnpm exec convex export --prod                 # snapshot de secours
- *   pnpm exec convex env set AIRTABLE_API_KEY pat… # PAT Airtable (scope data.records:read)
+ * Run (prod):
+ *   pnpm exec convex export --prod                 # safety snapshot
+ *   pnpm exec convex env set AIRTABLE_API_KEY pat… # Airtable PAT (scope data.records:read)
  *   pnpm exec convex run --prod airtableImport:runImport
  *
- * Dérivations clés :
- * - deals = (Entreprise × instrumentKind) agrégés depuis Mouvement.
- * - transactions = Mouvement 1:1 (rattachées au deal quand non-opérationnel).
- * - L'import s'ARRÊTE sur toute valeur `Type d'invest` non mappée.
+ * Key derivations:
+ * - deals = (Entreprise × instrumentKind) aggregated from Mouvement.
+ * - transactions = Mouvement 1:1 (attached to the deal when non-operational).
+ * - The import STOPS on any unmapped `Type d'invest` value.
  */
 
 import { ConvexError, v } from 'convex/values'
@@ -36,7 +36,7 @@ const TBL = {
   prevSortie: 'tbluFDWnD0N9aljdw',
 } as const
 
-// Field IDs (returnFieldsByFieldId=true) — stables, robustes aux renommages.
+// Field IDs (returnFieldsByFieldId=true) — stable, robust to renames.
 const F = {
   mv: {
     nom: 'fldCCsGSP18hIT2po',
@@ -81,11 +81,11 @@ const F = {
   },
 } as const
 
-// Sentinelles idempotence.
+// Idempotency sentinels.
 const SENTINEL_INVESTOR = '__import_investor__'
 const SENTINEL_BANK = '__unassigned_bank__'
 
-// ─── Mapping Type d'invest → instrumentKind (clés trimées) ──────────────────
+// ─── Mapping Type d'invest → instrumentKind (trimmed keys) ──────────────────
 
 const INSTRUMENT_MAP: Record<string, string> = {
   Actions: 'share',
@@ -110,7 +110,7 @@ const INSTRUMENT_MAP: Record<string, string> = {
   'Compte de Capitalisation': 'capitalization_account',
 }
 
-// Types non-investissement : transaction sans deal (pas d'erreur).
+// Non-investment types: transaction without a deal (not an error).
 const OPERATIONAL = new Set([
   'Cash',
   'Don',
@@ -120,9 +120,9 @@ const OPERATIONAL = new Set([
   'Nantissement',
 ])
 
-// `sharesAcquired` n'a de sens que pour les instruments « share-like ».
-// Pour la dette (os/oc/loan…) le « Nb d'action » Airtable est un nominal, pas
-// un nombre de titres → on ne le mappe pas.
+// `sharesAcquired` only makes sense for "share-like" instruments.
+// For debt (os/oc/loan…) the Airtable "Nb d'action" is a nominal amount,
+// not a number of securities → we don't map it.
 const SHARE_LIKE = new Set(['share', 'spv_share', 'secondary', 'scpi'])
 
 const instrumentValidator = v.union(
@@ -156,12 +156,12 @@ const statusValidator = v.union(
 )
 type DealStatus = Infer<typeof statusValidator>
 
-// ─── Helpers de transformation (côté action) ────────────────────────────────
+// ─── Transformation helpers (action side) ───────────────────────────────────
 
 const eurToCents = (x: unknown): number | undefined =>
   typeof x === 'number' && Number.isFinite(x) ? Math.round(x * 100) : undefined
 
-/** "2025-07-14" ou ISO → ms epoch UTC. */
+/** "2025-07-14" or ISO → ms epoch UTC. */
 const parseDate = (s: unknown): number | undefined => {
   if (typeof s !== 'string' || !s) return undefined
   const t = Date.parse(s)
@@ -182,8 +182,9 @@ const chunk = <T>(arr: Array<T>, size: number): Array<Array<T>> => {
 }
 
 /**
- * Classe les `Type d'invest` d'un mouvement : retourne le 1er instrument mappé
- * (ou undefined si purement opérationnel / vide). THROW sur valeur inconnue.
+ * Classifies a movement's `Type d'invest` values: returns the 1st mapped
+ * instrument (or undefined if purely operational / empty). THROWS on an
+ * unknown value.
  */
 function classifyInvest(raw: unknown): string | undefined {
   if (!Array.isArray(raw)) return undefined
@@ -200,11 +201,11 @@ function classifyInvest(raw: unknown): string | undefined {
   return instrument
 }
 
-// ─── Mutations d'upsert (contexte interne, pas de requireOrgMember) ──────────
+// ─── Upsert mutations (internal context, no requireOrgMember) ────────────────
 
 const BATCH = 100
 
-/** Résout l'org `calte` + upsert l'entité investisseuse et le compte fallback. */
+/** Resolves the `calte` org + upserts the investor entity and fallback account. */
 export const ensureImportScaffold = internalMutation({
   args: {},
   handler: async (ctx) => {
@@ -215,10 +216,10 @@ export const ensureImportScaffold = internalMutation({
     if (!org) throw new ConvexError('calte_org_absent')
     const orgId = org._id
 
-    // Investisseur (sert aussi de propriétaire des comptes) : réutiliser le
-    // group_root canonique de l'org (ex. CALTE du seed) s'il existe ; sinon
-    // retomber sur un éventuel placeholder d'import ; sinon le créer. Évite de
-    // dupliquer la racine.
+    // Investor (also serves as owner of the accounts): reuse the org's
+    // canonical group_root (e.g. the seed CALTE) if it exists; otherwise
+    // fall back to a possible import placeholder; otherwise create it.
+    // Avoids duplicating the root.
     const roots = await ctx.db
       .query('companies')
       .withIndex('by_org_kind', (q) =>
@@ -354,7 +355,7 @@ export const upsertDeals = internalMutation({
     investorCompanyId: v.id('companies'),
     rows: v.array(
       v.object({
-        key: v.string(), // = airtableId dérivé `${recId}:${instrument}`
+        key: v.string(), // = derived airtableId `${recId}:${instrument}`
         targetCompanyId: v.id('companies'),
         instrumentKind: instrumentValidator,
         status: statusValidator,
@@ -436,14 +437,14 @@ export const upsertTransactions = internalMutation({
         airtableId: r.airtableId,
       }
       if (existing) {
-        // Re-run de l'import : ne pas écraser l'état de pointage
-        // (matchStatus / dealId / reconciled) déjà posé sur la ligne.
+        // Import re-run: do not overwrite the pointage state
+        // (matchStatus / dealId / reconciled) already set on the row.
         await ctx.db.patch("transactions", existing._id, fields)
         patched += 1
       } else {
-        // Pointage : seul un dealId validé côté Airtable (« Pointé » →
-        // reconciled=true) compte comme matched ; un dealId non validé est
-        // écarté pour préserver l'invariant matched ⟺ dealId présent.
+        // Pointage: only a dealId validated on the Airtable side ("Pointé"
+        // → reconciled=true) counts as matched; a non-validated dealId is
+        // dropped to preserve the invariant matched ⟺ dealId present.
         const isMatched = r.reconciled && r.dealId !== undefined
         await ctx.db.insert('transactions', {
           ...fields,
@@ -549,7 +550,7 @@ export const upsertForecasts = internalMutation({
   },
 })
 
-// ─── Action orchestratrice ───────────────────────────────────────────────────
+// ─── Orchestrating action ────────────────────────────────────────────────────
 
 type AirtableRecord = {
   id: string
@@ -635,8 +636,8 @@ export const runImport = internalAction({
       const rows = batch.map((rec) => {
         const f = rec.fields
         const bank = String(f[F.cb.bank] ?? '(sans nom)')
-        // bankAccounts n'a pas de champ `notes` : on replie la Remarque dans
-        // `label` pour ne pas perdre l'info (ex. « NE PAS SUPPRIMER ! »).
+        // bankAccounts has no `notes` field: fold the Remarque into
+        // `label` so the info isn't lost (e.g. « NE PAS SUPPRIMER ! »).
         const remarque =
           typeof f[F.cb.remarque] === 'string'
             ? (f[F.cb.remarque] as string).trim()
@@ -658,7 +659,7 @@ export const runImport = internalAction({
       Object.assign(bankMap, res.map)
     }
 
-    // ── 3. Mouvement (normalisation en mémoire) ──
+    // ── 3. Mouvement (in-memory normalization) ──
     const mvRecords = await fetchAll(TBL.mouvement)
     type Mv = {
       recId: string
@@ -683,7 +684,7 @@ export const runImport = internalAction({
       const typeMouvement = String(f[F.mv.typeMouvement] ?? '').trim()
       const credit = eurToCents(f[F.mv.montantCredit])
       const invest = eurToCents(f[F.mv.montantInvesti])
-      // Direction : Crédit = in, Débit = out ; sinon inféré du montant présent.
+      // Direction: Crédit = in, Débit = out; else inferred from the amount set.
       const direction: 'in' | 'out' =
         typeMouvement === 'Crédit'
           ? 'in'
@@ -729,7 +730,7 @@ export const runImport = internalAction({
       }
     })
 
-    // ── 4. Dérivation des deals (Entreprise × instrument) ──
+    // ── 4. Deal derivation (Entreprise × instrument) ──
     type DealAgg = {
       key: string
       companyRecId: string
@@ -816,8 +817,8 @@ export const runImport = internalAction({
       txPatched += res.patched
     }
 
-    // ── 6. Valuations + entryValuation (depuis Entreprise) ──
-    // Deal primaire par société : 'share' prioritaire, sinon 1er instrument.
+    // ── 6. Valuations + entryValuation (from Entreprise) ──
+    // Primary deal per company: 'share' takes priority, else 1st instrument.
     const dealsByCompany = new Map<string, Array<{ key: string; instrument: string }>>()
     for (const d0 of dealAggList) {
       const arr = dealsByCompany.get(d0.companyRecId) ?? []
@@ -924,16 +925,16 @@ export const runImport = internalAction({
   },
 })
 
-// ─── Vérification read-only (post-import) ────────────────────────────────────
+// ─── Read-only verification (post-import) ────────────────────────────────────
 
 /**
- * Contrôle live de l'import dans l'org `calte`. Read-only.
+ * Live check of the import in the `calte` org. Read-only.
  *   pnpm exec convex run --prod airtableImport:verify
  *   pnpm exec convex run --prod airtableImport:verify '{"sampleSize":8}'
  *
- * Renvoie : comptes globaux (à confronter aux totaux Airtable), contrôles
- * d'intégrité, et un échantillon de deals enrichis (company cible + détail
- * in/out des transactions rattachées).
+ * Returns: global counts (to compare against the Airtable totals),
+ * integrity checks, and a sample of enriched deals (target company +
+ * in/out detail of the attached transactions).
  */
 export const verify = internalQuery({
   args: { sampleSize: v.optional(v.number()) },
@@ -956,7 +957,7 @@ export const verify = internalQuery({
         ctx.db.query('forecasts').withIndex('by_org_date', (q) => q.eq('orgId', orgId)).collect(),
       ])
 
-    // Agrégation transactions par deal (1 passe).
+    // Aggregate transactions per deal (single pass).
     const txByDeal = new Map<
       Id<'deals'>,
       { count: number; nIn: number; nOut: number; sumIn: number; sumOut: number }
@@ -965,7 +966,7 @@ export const verify = internalQuery({
     let txIn = 0
     let txOut = 0
     let txWithDeal = 0
-    let txOrphanDeal = 0 // dealId pointant un deal inexistant / hors org
+    let txOrphanDeal = 0 // dealId pointing at a missing / out-of-org deal
     for (const t of transactions) {
       if (t.direction === 'in') txIn += 1
       else txOut += 1
@@ -1002,8 +1003,8 @@ export const verify = internalQuery({
       : 0
     const importInvestor = companies.find((c) => c.airtableId === SENTINEL_INVESTOR)
 
-    // Échantillon : deals avec le plus de transactions (le plus parlant pour
-    // le contrôle in/out), enrichis avec la company cible.
+    // Sample: the deals with the most transactions (most telling for the
+    // in/out check), enriched with the target company.
     const sampleDeals = [...deals]
       .sort(
         (a, b) =>
@@ -1056,7 +1057,7 @@ export const verify = internalQuery({
         onFallbackBank: txOnFallbackBank,
       },
       integrity: {
-        // tous doivent valoir 0 / true :
+        // all of these must be 0 / true:
         orphanDealRefs: txOrphanDeal,
         importInvestorPresent: Boolean(importInvestor),
         importInvestorIsGroupRoot: importInvestor?.kind === 'group_root',
@@ -1068,12 +1069,12 @@ export const verify = internalQuery({
   },
 })
 
-// ─── Consolidation des group_root (fusion du placeholder d'import) ───────────
+// ─── group_root consolidation (merging the import placeholder) ───────────────
 
 /**
- * Repointe les deals + comptes de l'entité d'import « CALTE (import) » vers le
- * group_root canonique de l'org (la CALTE du seed), puis supprime le
- * placeholder. Idempotent (no-op si le placeholder n'existe plus).
+ * Repoints the deals + accounts of the "CALTE (import)" import entity to
+ * the org's canonical group_root (the seed CALTE), then deletes the
+ * placeholder. Idempotent (no-op if the placeholder no longer exists).
  *   pnpm exec convex run --prod airtableImport:consolidateImportInvestor
  */
 export const consolidateImportInvestor = internalMutation({
@@ -1128,7 +1129,7 @@ export const consolidateImportInvestor = internalMutation({
       banksRepointed += 1
     }
 
-    // Le placeholder n'a plus aucune référence entrante → suppression sûre.
+    // The placeholder has no incoming reference left → safe to delete.
     await ctx.db.delete("companies", importEntity._id)
 
     return {
@@ -1140,12 +1141,12 @@ export const consolidateImportInvestor = internalMutation({
   },
 })
 
-// ─── Reconcile orphelins (read-only) ─────────────────────────────────────────
+// ─── Orphan reconciliation (read-only) ───────────────────────────────────────
 
 /**
- * Compare l'airtableId des lignes Convex aux recId Airtable ACTUELS et liste
- * les orphelins (lignes importées dont le record source a disparu d'Airtable).
- * Read-only — ne supprime rien.
+ * Compares the airtableId of Convex rows against the CURRENT Airtable
+ * recIds and lists orphans (imported rows whose source record disappeared
+ * from Airtable). Read-only — deletes nothing.
  *   pnpm exec convex run --prod airtableImport:reconcileOrphans
  */
 export const reconcileOrphans = internalAction({
@@ -1223,8 +1224,8 @@ export const orphanReport = internalQuery({
         transactionDate: t.transactionDate,
       }))
 
-    // Un deal est orphelin si la société (préfixe recId de l'airtableId) a
-    // disparu d'Airtable.
+    // A deal is orphaned if its company (the recId prefix of the
+    // airtableId) disappeared from Airtable.
     const orphanDeals = deals
       .filter((d) => d.airtableId && !entSet.has(d.airtableId.split(':')[0]))
       .map((d) => ({
@@ -1254,17 +1255,17 @@ export const orphanReport = internalQuery({
   },
 })
 
-// ─── Détection de doublons (read-only) ───────────────────────────────────────
+// ─── Duplicate detection (read-only) ─────────────────────────────────────────
 
 /**
- * Détecte les doublons d'insertion : plusieurs lignes Convex partageant le même
- * `airtableId` (non détectables par reconcileOrphans, qui ne voit que les
- * suppressions). 100 % Convex, read-only — ne supprime rien.
+ * Detects insertion duplicates: several Convex rows sharing the same
+ * `airtableId` (not detectable by reconcileOrphans, which only sees
+ * deletions). 100% Convex, read-only — deletes nothing.
  *   pnpm exec convex run --prod airtableImport:duplicateReport
  *
- * `extraRows` par table = nombre de lignes en trop (= total avec airtableId −
- * airtableId distincts). Les lignes sans airtableId (ex. entités du seed) sont
- * comptées à part dans `withoutAirtableId`.
+ * `extraRows` per table = number of surplus rows (= total with airtableId −
+ * distinct airtableIds). Rows without an airtableId (e.g. seed entities)
+ * are counted separately in `withoutAirtableId`.
  */
 export const duplicateReport = internalQuery({
   args: {},
@@ -1362,15 +1363,15 @@ export const duplicateReport = internalQuery({
   },
 })
 
-// ─── Nettoyage ciblé des données de test (chat front) ────────────────────────
+// ─── Targeted cleanup of test data (front chat) ──────────────────────────────
 
-// IDs explicites à supprimer (essais via le chat, sans airtableId). NE PAS
-// confondre avec les 8 companies du seed (également sans airtableId) qui ne
-// figurent PAS dans cette liste.
+// Explicit IDs to delete (chat experiments, no airtableId). Do NOT
+// confuse with the 8 seed companies (also without airtableId), which are
+// NOT in this list.
 const TEST_DELETE = {
   companies: [
     'jx7d7hw606b0t4n0w8ge1gdwcd87fs0p', // Maslow
-    'jx7e5j0y8t6yn4f6q8m5ax86qh87g5yk', // Iroko (doublon)
+    'jx7e5j0y8t6yn4f6q8m5ax86qh87g5yk', // Iroko (duplicate)
   ],
   deals: [
     'k57d5htyqprg2n39awzvrzmwx187e9am',
@@ -1391,10 +1392,10 @@ const TEST_DELETE = {
 } as const
 
 /**
- * Supprime UNIQUEMENT les lignes de test listées dans TEST_DELETE (par id).
- * Gardes : refuse toute ligne hors org calte ou portant un `airtableId`
- * (donnée importée), et BLOQUE si une ligne à supprimer est référencée par une
- * ligne CONSERVÉE. Ordre : transactions → deals → bankAccounts → companies.
+ * Deletes ONLY the test rows listed in TEST_DELETE (by id).
+ * Guards: rejects any row outside the calte org or carrying an `airtableId`
+ * (imported data), and BLOCKS if a row to delete is referenced by a KEPT
+ * row. Order: transactions → deals → bankAccounts → companies.
  *
  *   pnpm exec convex run --prod airtableImport:cleanupTestData              # dry-run
  *   pnpm exec convex run --prod airtableImport:cleanupTestData '{"apply":true}'
@@ -1427,7 +1428,7 @@ export const cleanupTestData = internalMutation({
       bankAccounts: [],
     }
 
-    // 1. Validation : existence, org, absence d'airtableId.
+    // 1. Validation: existence, org, absence of airtableId.
     for (const id of companyIds) {
       const d = await ctx.db.get("companies", id)
       if (!d) problems.push(`company ${id} introuvable`)
@@ -1461,7 +1462,7 @@ export const cleanupTestData = internalMutation({
       else plan.bankAccounts.push({ id, label: d.label })
     }
 
-    // 2. Références entrantes depuis des lignes CONSERVÉES → bloqueur.
+    // 2. Incoming references from KEPT rows → blocker.
     const [allDeals, allTx, allValuations, allForecasts, allRelations, allKpis] =
       await Promise.all([
         ctx.db.query('deals').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
@@ -1472,7 +1473,7 @@ export const cleanupTestData = internalMutation({
         ctx.db.query('kpiSnapshots').withIndex('by_org_period', (q) => q.eq('orgId', orgId)).collect(),
       ])
 
-    // companies référencées par des deals / comptes / relations / kpis conservés
+    // companies referenced by kept deals / accounts / relations / kpis
     for (const d of allDeals) {
       if (dealSet.has(d._id)) continue
       for (const ref of [d.investorCompanyId, d.targetCompanyId, d.viaSpvCompanyId]) {
@@ -1498,7 +1499,7 @@ export const cleanupTestData = internalMutation({
         problems.push(`company ${k.companyId} référencée par kpiSnapshot ${k._id}`)
     }
 
-    // deals référencés par tx / valuations / forecasts conservés
+    // deals referenced by kept tx / valuations / forecasts
     for (const t of allTx) {
       if (txSet.has(t._id)) continue
       if (t.dealId && dealSet.has(t.dealId))
@@ -1513,7 +1514,7 @@ export const cleanupTestData = internalMutation({
         problems.push(`deal ${f.dealId} référencé par forecast conservé ${f._id}`)
     }
 
-    // bankAccounts référencés par tx / forecasts conservés
+    // bankAccounts referenced by kept tx / forecasts
     for (const t of allTx) {
       if (txSet.has(t._id)) continue
       if (bankSet.has(t.bankAccountId))
@@ -1524,7 +1525,7 @@ export const cleanupTestData = internalMutation({
         problems.push(`bankAccount ${f.bankAccountId} référencé par forecast conservé ${f._id}`)
     }
 
-    // transactions référencées par forecasts.realizedTransactionId conservés
+    // transactions referenced by kept forecasts.realizedTransactionId
     for (const f of allForecasts) {
       if (f.realizedTransactionId && txSet.has(f.realizedTransactionId))
         problems.push(`transaction ${f.realizedTransactionId} référencée par forecast ${f._id}`)
@@ -1548,7 +1549,7 @@ export const cleanupTestData = internalMutation({
       }
     }
 
-    // 3. Suppression dans l'ordre de dépendance.
+    // 3. Delete in dependency order.
     for (const id of txIds) await ctx.db.delete("transactions", id)
     for (const id of dealIds) await ctx.db.delete("deals", id)
     for (const id of bankIds) await ctx.db.delete("bankAccounts", id)

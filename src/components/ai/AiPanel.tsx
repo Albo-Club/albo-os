@@ -76,12 +76,12 @@ function errorCode(err: unknown): string {
   return ''
 }
 
-/** Parties d'un message assistant : texte (markdown) + appels d'outils. */
+/** Parts of an assistant message: text (markdown) + tool calls. */
 function MessageParts({ message }: { message: UIMessage }) {
   const { t } = useTranslation(['chat'])
 
-  // Nos streams ne produisent que les 4 états ci-dessous ; les états
-  // d'approbation gardent le libellé anglais par défaut du composant.
+  // Our streams only produce the 4 states below; the approval states
+  // keep the component's default English label.
   function stateLabel(state: ToolPart['state']): string | undefined {
     switch (state) {
       case 'input-streaming':
@@ -154,21 +154,21 @@ export function AiPanel({
   onClose,
 }: {
   orgId: Id<'organizations'>
-  /** Visibilité du panneau (masqué en CSS par le layout) : focus à l'ouverture. */
+  /** Panel visibility (hidden via CSS by the layout): focus on open. */
   open?: boolean
-  /** Fermeture du panneau (collapse desktop / overlay mobile). */
+  /** Closes the panel (desktop collapse / mobile overlay). */
   onClose: () => void
 }) {
   const { t, i18n } = useTranslation(['chat', 'common'])
   const location = useLocation()
   const [threadId, setThreadId] = useState<string | null>(null)
-  // true = l'utilisateur a demandé un nouveau thread : ne pas ré-adopter le
-  // dernier thread existant tant qu'il n'a rien envoyé.
+  // true = the user asked for a new thread: don't re-adopt the latest
+  // existing thread until they have sent something.
   const [draftNew, setDraftNew] = useState(false)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  // true entre l'accusé de réception de sendMessage et le premier token
-  // streamé : pilote l'indicateur « réflexion ».
+  // true between the sendMessage acknowledgment and the first streamed
+  // token: drives the "thinking" indicator.
   const [awaitingStream, setAwaitingStream] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameValue, setRenameValue] = useState('')
@@ -189,7 +189,7 @@ export function AiPanel({
     { initialNumItems: 20 },
   )
 
-  // Au montage (ou après suppression) : reprendre le thread le plus récent.
+  // On mount (or after deletion): resume the most recent thread.
   useEffect(() => {
     if (threadId || draftNew) return
     if (threads.status === 'LoadingFirstPage') return
@@ -203,15 +203,15 @@ export function AiPanel({
     { initialNumItems: 50, stream: true },
   )
 
-  // Focus du composer à l'ouverture du panneau (pas au montage initial :
-  // le panneau est ouvert par défaut, ne pas voler le focus de la page).
+  // Focus the composer when the panel opens (not on initial mount: the
+  // panel is open by default, don't steal the page's focus).
   useEffect(() => {
     if (open && !prevOpenRef.current) textareaRef.current?.focus()
     prevOpenRef.current = open
   }, [open])
 
-  // L'indicateur « réflexion » tombe dès que la réponse commence à streamer
-  // (ou qu'on change de conversation).
+  // The "thinking" indicator drops as soon as the response starts
+  // streaming (or when switching conversations).
   useEffect(() => {
     if (messages.results.at(-1)?.role === 'assistant') {
       setAwaitingStream(false)
@@ -320,8 +320,8 @@ export function AiPanel({
   return (
     <div className="bg-background flex h-full min-h-0 flex-col">
       <header className="flex shrink-0 items-center gap-1 border-b px-3 py-2.5">
-        {/* Le titre EST le sélecteur de conversations (historique visible
-            d'un clic, pas caché derrière une icône). */}
+        {/* The title IS the conversation selector (history visible in
+            one click, not hidden behind an icon). */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button

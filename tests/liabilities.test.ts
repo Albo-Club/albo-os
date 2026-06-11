@@ -1,11 +1,11 @@
 /**
- * Tests purs de la logique de passif (convex/lib/liabilities.ts).
+ * Pure tests for the liabilities logic (convex/lib/liabilities.ts).
  *
- * Lancés avec le test runner natif de Node via tsx (aucune dépendance) :
+ * Run with Node's native test runner via tsx (no dependency):
  *   pnpm test:unit
  *
- * Volontairement HORS de convex/ : un import `node:test` dans convex/ferait
- * échouer le bundle de déploiement Convex.
+ * Deliberately OUTSIDE convex/: a `node:test` import inside convex/ would
+ * break the Convex deployment bundle.
  */
 
 import assert from 'node:assert/strict'
@@ -71,16 +71,16 @@ describe('computeLoanBalanceCents', () => {
   })
 
   it('scénario de vérification symétrique : CALTE +100 000 € / Albo −100 000 €', () => {
-    // CALTE (créancier) ne voit que SA jambe : out 100 000 €.
+    // CALTE (creditor) only sees ITS leg: out 100 000 €.
     const calteOwnTxs = [{ direction: 'out' as const, amount: 10_000_000 }]
-    // Albo (débiteur) ne voit que SA jambe : in 100 000 €.
+    // Albo (debtor) only sees ITS leg: in 100 000 €.
     const alboOwnTxs = [{ direction: 'in' as const, amount: 10_000_000 }]
 
     const calteBalance = computeLoanBalanceCents(calteOwnTxs)
     const alboBalance = computeLoanBalanceCents(alboOwnTxs)
 
-    assert.equal(calteBalance, 10_000_000) // créance
-    assert.equal(alboBalance, -10_000_000) // dette
-    assert.equal(calteBalance + alboBalance, 0) // symétrie
+    assert.equal(calteBalance, 10_000_000) // receivable
+    assert.equal(alboBalance, -10_000_000) // debt
+    assert.equal(calteBalance + alboBalance, 0) // symmetry
   })
 })

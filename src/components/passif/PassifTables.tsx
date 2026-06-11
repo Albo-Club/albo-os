@@ -33,9 +33,9 @@ import {
   TableRow,
 } from '~/components/ui/table'
 
-// ─── Shapes minimales (retours de `liabilities:getLiabilities`) ─────────────
+// ─── Minimal shapes (returns of `liabilities:getLiabilities`) ───────────────
 
-/** Transaction pointée sur une cible passif. */
+/** Transaction allocated to a liability target. */
 export type AllocatedTx = {
   _id: Id<'transactions'>
   direction: 'in' | 'out'
@@ -45,7 +45,7 @@ export type AllocatedTx = {
   counterparty: string | null
 }
 
-/** Position de capital enrichie (détenteur résolu + tx pointées). */
+/** Enriched equity position (resolved holder + allocated txs). */
 export type EquityPositionRow = {
   _id: Id<'equityPositions'>
   type:
@@ -62,7 +62,7 @@ export type EquityPositionRow = {
   transactions: Array<AllocatedTx>
 }
 
-/** C/C inter-entités enrichi (contrepartie résolue + solde + tx pointées). */
+/** Enriched inter-entity C/C (resolved counterparty + balance + txs). */
 export type LoanRow = {
   _id: Id<'intercompanyLoans'>
   fromOrgId: Id<'organizations'>
@@ -76,9 +76,9 @@ export type LoanRow = {
   transactions: Array<AllocatedTx>
 }
 
-// ─── Formatage ───────────────────────────────────────────────────────────────
+// ─── Formatting ──────────────────────────────────────────────────────────────
 
-/** Formateurs montants en cents EUR (non signé / solde signé), localisés. */
+/** Localized formatters for EUR-cent amounts (unsigned / signed balance). */
 function usePassifFormatters() {
   const { i18n } = useTranslation('passif')
   const lang = i18n.language
@@ -98,12 +98,12 @@ function usePassifFormatters() {
   return { fmtEur, fmtBalance }
 }
 
-/** Créance (solde ≥ 0) en vert, dette (solde < 0) en rouge. */
+/** Receivable (balance ≥ 0) in green, debt (balance < 0) in red. */
 const balanceTone = signTone
 
-// ─── Actions de ligne (éditer / supprimer) ──────────────────────────────────
+// ─── Row actions (edit / delete) ────────────────────────────────────────────
 
-/** Boutons éditer + supprimer d'une ligne passif (icônes fantômes). */
+/** Edit + delete buttons of a liability row (ghost icons). */
 function RowActions({
   onEdit,
   onDelete,
@@ -139,8 +139,8 @@ function RowActions({
 }
 
 /**
- * Dialog de confirmation de suppression d'une cible passif. Le serveur
- * refuse (`has_allocations`) tant que des transactions sont pointées dessus.
+ * Delete confirmation dialog for a liability target. The server refuses
+ * (`has_allocations`) as long as transactions are allocated to it.
  */
 function DeleteConfirmDialog({
   open,
@@ -174,19 +174,19 @@ function DeleteConfirmDialog({
   )
 }
 
-// ─── Sous-lignes des transactions pointées (+ Détacher) ─────────────────────
+// ─── Allocated transaction sub-rows (+ Detach) ──────────────────────────────
 
 /**
- * Lignes indentées des transactions pointées sur une cible passif, avec
- * bouton « Détacher » → `liabilities:deallocateTransaction`. La query
- * `getLiabilities` étant réactive, la ligne et le solde se recalculent seuls.
+ * Indented rows of the transactions allocated to a liability target, with a
+ * « Détacher » button → `liabilities:deallocateTransaction`. Since the
+ * `getLiabilities` query is reactive, the row and balance recompute alone.
  */
 function AllocatedTxRows({
   transactions,
   colSpan,
 }: {
   transactions: Array<AllocatedTx>
-  /** Nombre de colonnes de la table parente, hors colonne du bouton. */
+  /** Number of columns of the parent table, excluding the button column. */
   colSpan: number
 }) {
   const { t } = useTranslation('passif')
@@ -239,12 +239,11 @@ function AllocatedTxRows({
   )
 }
 
-// ─── Capitaux propres ────────────────────────────────────────────────────────
+// ─── Equity ──────────────────────────────────────────────────────────────────
 
 /**
- * Positions de capital émises par l'org : type, détenteur, date, montant et
- * ligne de total. Les transactions pointées apparaissent en sous-lignes avec
- * « Détacher ».
+ * Equity positions issued by the org: type, holder, date, amount and a
+ * total row. Allocated transactions appear as sub-rows with « Détacher ».
  */
 export function EquityTable({
   positions,
@@ -357,12 +356,13 @@ export function EquityTable({
   )
 }
 
-// ─── Comptes courants d'associés ─────────────────────────────────────────────
+// ─── Shareholder current accounts ────────────────────────────────────────────
 
 /**
- * C/C inter-entités vus par l'org : contrepartie, position (créance/dette
- * selon `side`) et solde dérivé signé (vert = créance, rouge = dette). Les
- * transactions pointées apparaissent en sous-lignes avec « Détacher ».
+ * Inter-entity C/C as seen by the org: counterparty, position
+ * (receivable/debt per `side`) and signed derived balance (green =
+ * receivable, red = debt). Allocated transactions appear as sub-rows with
+ * « Détacher ».
  */
 export function LoansTable({
   loans,

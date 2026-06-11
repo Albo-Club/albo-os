@@ -1,16 +1,16 @@
 /**
- * Miroir front de la partie pure de convex/lib/vat.ts (même convention que
- * searchText.ts) — garder les deux dérivations identiques. Montants TTC en
- * cents, taux en basis points, TVA toujours dérivée.
+ * Front-side mirror of the pure part of convex/lib/vat.ts (same convention
+ * as searchText.ts) — keep both derivations identical. Tax-inclusive (TTC)
+ * amounts in cents, rates in basis points, VAT always derived.
  */
 
-/** Taux de TVA français autorisés, en basis points (2000 = 20 %). */
+/** Allowed French VAT rates, in basis points (2000 = 20 %). */
 export const VAT_RATES_BPS = [0, 550, 1000, 2000] as const
 
-/** Taux pré-rempli quand on classe une transaction en charge depuis l'UI. */
+/** Rate pre-filled when classifying a transaction as an expense from the UI. */
 export const DEFAULT_VAT_RATE_BPS = 2000
 
-/** TVA contenue dans un montant TTC : ttc × taux / (10000 + taux). */
+/** VAT contained in a tax-inclusive amount: ttc × rate / (10000 + rate). */
 export function vatCentsFromTtc(amountCents: number, rateBps: number): number {
   return Math.round((amountCents * rateBps) / (10000 + rateBps))
 }

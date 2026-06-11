@@ -1,19 +1,20 @@
 /**
  * Albo OS — Convex schema
  *
- * Scope: post-investment tracking. Attio reste source de vérité avant invest
- * (dealflow, term sheet, sourcing). Albo OS prend la main une fois le deal
- * signé (suivi participation, mouvements, valos, KPIs).
+ * Scope: post-investment tracking. Attio remains the source of truth before
+ * investment (dealflow, term sheet, sourcing). Albo OS takes over once the
+ * deal is signed (stake tracking, movements, valuations, KPIs).
  *
- * Conventions (voir CLAUDE.md § Domaine métier) :
- * - Multi-tenant : chaque table métier porte `orgId` (organization Better
- *   Auth). Ne pas confondre `orgId` (compte SaaS = "Calte Family Office")
- *   avec `companies.kind = "group_*"` (entités juridiques du groupe Calte).
- * - Montants : entiers en cents (EUR par défaut). Éviter les float.
- * - Taux : basis points (bps). 1100 = 11 %. 10000 = 100 %.
- * - Dates : ms epoch (Convex est number, pas Date).
- * - Bridges Attio : `attioDealId` / `attioCompanyId` (strings, uniqueness
- *   gérée côté mutation, pas au schéma).
+ * Conventions (see CLAUDE.md § Domaine métier):
+ * - Multi-tenant: every business table carries `orgId` (Better Auth
+ *   organization). Do not confuse `orgId` (SaaS account = "Calte Family
+ *   Office") with `companies.kind = "group_*"` (legal entities of the Calte
+ *   group).
+ * - Amounts: integers in cents (EUR by default). Avoid floats.
+ * - Rates: basis points (bps). 1100 = 11 %. 10000 = 100 %.
+ * - Dates: ms epoch (Convex stores number, not Date).
+ * - Attio bridges: `attioDealId` / `attioCompanyId` (strings, uniqueness
+ *   enforced in mutations, not at the schema level).
  */
 
 import { defineSchema, defineTable } from 'convex/server'
@@ -34,26 +35,26 @@ export const invitationRoleValidator = v.union(
   v.literal('member'),
 )
 
-// ─── Enums métier ───────────────────────────────────────────────────────────
+// ─── Business enums ─────────────────────────────────────────────────────────
 
-// Note: le « scope » Albo / Calte est désormais porté par l'ORGANISATION
-// elle-même (une org par véhicule d'invest), plus par un champ. La vue
-// agrégée (convex/aggregate.ts) fait l'union des orgs de l'utilisateur.
+// Note: the Albo / Calte "scope" is now carried by the ORGANIZATION itself
+// (one org per investment vehicle), no longer by a field. The aggregated
+// view (convex/aggregate.ts) unions the user's orgs.
 
 const companyKind = v.union(
-  // Racine de l'org (la holding d'invest : CALTE dans l'org Calte,
-  // Albo Club dans l'org Albo)
+  // Root of the org (the investment holding: CALTE in the Calte org,
+  // Albo Club in the Albo org)
   v.literal('group_root'),
-  // Sous-entités du groupe (héritent le scope de leur racine)
+  // Sub-entities of the group (inherit the scope of their root)
   v.literal('group_operating'), // Caltimo, Relais Chapelle, RDB
   v.literal('group_sci'), // SCI Chapelle 1, 2, SCI Upload
   v.literal('group_spv'), // SPV Eben Home, SPV Hectarea…
   v.literal('group_manco'), // Banco 2
-  // Externe
-  v.literal('portfolio'), // boîtes investies, fonds LP, SCPI, mancos externes
+  // External
+  v.literal('portfolio'), // invested companies, LP funds, SCPI, external mancos
 )
 
-// Source unique : convex/lib/instruments.ts
+// Single source: convex/lib/instruments.ts
 const instrumentKind = instrumentValidator
 
 const dealStatus = v.union(
@@ -69,24 +70,24 @@ const txSource = v.union(
   v.literal('powens'),
   v.literal('manual'),
   v.literal('imported'),
-  v.literal('memo_csv'), // import one-shot historique CSV Mémo Bank
+  v.literal('memo_csv'), // one-shot historical Mémo Bank CSV import
 )
 
-// Pointage transaction → deal. `matchStatus` est la source de vérité de
-// l'intention ; `reconciled` reste un miroir dérivé (cf. KNOWN_ISSUES.md).
+// Transaction → deal matching. `matchStatus` is the source of truth for the
+// intent; `reconciled` remains a derived mirror (cf. KNOWN_ISSUES.md).
 const txMatchStatus = v.union(
-  v.literal('unmatched'), // à traiter (défaut logique)
-  // Rattachée à un deal (`dealId` obligatoire) OU allouée au passif
-  // (equity / C/C : `allocation` posée, `dealId` null).
+  v.literal('unmatched'), // to process (logical default)
+  // Attached to a deal (`dealId` required) OR allocated to liabilities
+  // (equity / shareholder account: `allocation` set, `dealId` null).
   v.literal('matched'),
-  v.literal('ignored'), // décision explicite « ne concerne aucun deal »
-  v.literal('charge'), // écartée : charge courante (sous-type d'« écarté »)
-  v.literal('tax'), // écartée : impôt (sous-type d'« écarté »)
-  v.literal('product'), // écartée : produit hors deal (sous-type d'« écarté »)
-  v.literal('internal_transfer'), // écartée : virement entre comptes (sous-type d'« écarté »)
+  v.literal('ignored'), // explicit decision "concerns no deal"
+  v.literal('charge'), // discarded: operating expense (subtype of « écarté »)
+  v.literal('tax'), // discarded: tax (subtype of « écarté »)
+  v.literal('product'), // discarded: non-deal income (subtype of « écarté »)
+  v.literal('internal_transfer'), // discarded: transfer between accounts (subtype of « écarté »)
 )
 
-// Action posée dans la decision log (`unmatched` = dé-pointage, loggé aussi).
+// Action recorded in the decision log (`unmatched` = un-matching, also logged).
 const matchDecision = v.union(
   v.literal('matched'),
   v.literal('ignored'),
@@ -97,17 +98,17 @@ const matchDecision = v.union(
   v.literal('internal_transfer'),
 )
 
-// 'manual' = mutations publiques (UI) ; 'agent_suggested' = écritures des
-// outils agent (convex/agentToolsPointage.ts) après confirmation utilisateur.
+// 'manual' = public mutations (UI); 'agent_suggested' = writes from the
+// agent tools (convex/agentToolsPointage.ts) after user confirmation.
 const matchDecisionSource = v.union(
   v.literal('manual'),
   v.literal('agent_suggested'),
 )
 
-// ─── Enums passif (equityPositions / intercompanyLoans / allocation) ────────
+// ─── Liability enums (equityPositions / intercompanyLoans / allocation) ─────
 
-// Nature d'une position de capitaux propres. Exporté pour la mutation
-// publique de création (convex/liabilities.ts:createEquityPosition).
+// Nature of an equity position. Exported for the public creation
+// mutation (convex/liabilities.ts:createEquityPosition).
 export const equityPositionType = v.union(
   v.literal('capital_social'),
   v.literal('prime_emission'),
@@ -115,8 +116,8 @@ export const equityPositionType = v.union(
   v.literal('report_a_nouveau'),
 )
 
-// Cible d'un pointage généralisé (`transactions.allocation`). Cohabite avec
-// `dealId` : un pointage deal écrit les deux (cf. convex/transactions.ts).
+// Target of a generalized allocation (`transactions.allocation`). Coexists
+// with `dealId`: a deal match writes both (cf. convex/transactions.ts).
 const allocationKind = v.union(
   v.literal('deal'),
   v.literal('equity'),
@@ -129,10 +130,10 @@ const forecastConfidence = v.union(
   v.literal('high'),
 )
 
-// ─── Enums cash flow forecast (forecastRules / forecastEntries) ─────────────
+// ─── Cash flow forecast enums (forecastRules / forecastEntries) ─────────────
 
-// Confiance d'un flux prévisionnel. `confirmed` = engagé/contractuel,
-// `expected` = attendu (récurrence connue), `probable` = hypothèse.
+// Confidence of a forecast flow. `confirmed` = committed/contractual,
+// `expected` = anticipated (known recurrence), `probable` = hypothesis.
 const forecastEntryConfidence = v.union(
   v.literal('confirmed'),
   v.literal('expected'),
@@ -146,22 +147,22 @@ const forecastFrequency = v.union(
   v.literal('yearly'),
 )
 
-// Cycle de vie d'une occurrence prévisionnelle. `realized` une fois pointée
-// sur une transaction réelle, `cancelled` si elle n'aura jamais lieu.
+// Lifecycle of a forecast occurrence. `realized` once matched to a real
+// transaction, `cancelled` if it will never happen.
 const forecastEntryStatus = v.union(
   v.literal('pending'),
   v.literal('realized'),
   v.literal('cancelled'),
 )
 
-// MVP : toujours 'manual'. 'derived' réservé aux générateurs futurs
+// MVP: always 'manual'. 'derived' reserved for future generators
 // (deriveFromDeals, deriveFromPipeline Attio).
 const forecastSourceType = v.union(v.literal('manual'), v.literal('derived'))
 
 // ─── Schema ───────────────────────────────────────────────────────────────
 
 export default defineSchema({
-  // ─── Better Auth / multi-tenant (natif Convex, plugin organization() off) ─
+  // ─── Better Auth / multi-tenant (native Convex, organization() plugin off) ─
 
   users: defineTable({
     betterAuthId: v.string(),
@@ -210,53 +211,53 @@ export default defineSchema({
     .index('by_email_and_org', ['email', 'orgId']),
 
   /**
-   * powensUsers — user Powens permanent par org (émission de connexions
-   * bancaires). INTERNE : `authToken` est un secret au repos, jamais exposé au
-   * front. Lu/écrit uniquement par des internalQuery/internalMutation
-   * (cf. convex/powens.ts). Ne PAS ajouter sur `organizations` (api.bySlug
-   * fait `return {...org}` → fuiterait le token).
+   * powensUsers — permanent Powens user per org (issuing bank connections).
+   * INTERNAL: `authToken` is a secret at rest, never exposed to the front
+   * end. Read/written only by internalQuery/internalMutation
+   * (cf. convex/powens.ts). Do NOT add it to `organizations` (api.bySlug
+   * does `return {...org}` → would leak the token).
    */
   powensUsers: defineTable({
     orgId: v.id('organizations'),
-    powensUserId: v.string(), // id_user renvoyé par POST /auth/init
-    authToken: v.string(), // token permanent — secret
+    powensUserId: v.string(), // id_user returned by POST /auth/init
+    authToken: v.string(), // permanent token — secret
     createdAt: v.number(),
   })
     .index('by_org', ['orgId'])
-    // Filtre des webhooks entrants : seul un id_user connu est ingéré.
+    // Incoming webhook filter: only a known id_user is ingested.
     .index('by_powens_user_id', ['powensUserId']),
 
-  // ─── Cœur portfolio ──────────────────────────────────────────────────────
+  // ─── Portfolio core ──────────────────────────────────────────────────────
 
   /**
-   * companies — entités juridiques. Mélange volontaire groupe + portfolio,
-   * différenciés par `kind`. Une "company" peut aussi représenter un fond,
-   * un SPV, une ManCo, une SCPI.
+   * companies — legal entities. Deliberate mix of group + portfolio,
+   * differentiated by `kind`. A "company" can also represent a fund,
+   * an SPV, a ManCo, an SCPI.
    *
-   * `totalShares` est facultatif. S'il est rempli, on peut déduire le %
-   * de détention d'un deal share-type via `deal.sharesAcquired / totalShares`.
+   * `totalShares` is optional. If set, the ownership % of a share-type
+   * deal can be derived via `deal.sharesAcquired / totalShares`.
    */
   companies: defineTable({
     orgId: v.id('organizations'),
 
-    // Identité
+    // Identity
     name: v.string(),
     legalName: v.optional(v.string()),
     kind: companyKind,
 
-    // Identifiants — tous optionnels. Uniqueness gérée côté mutation.
-    siren: v.optional(v.string()), // FR uniquement
-    registrationNumber: v.optional(v.string()), // fallback étranger
+    // Identifiers — all optional. Uniqueness enforced in mutations.
+    siren: v.optional(v.string()), // FR only
+    registrationNumber: v.optional(v.string()), // foreign fallback
     countryCode: v.optional(v.string()), // ISO-3166-1 alpha-2
     domain: v.optional(v.string()),
 
-    // Bridge Attio
+    // Attio bridge
     attioCompanyId: v.optional(v.string()),
 
-    // Ancre import Airtable (one-shot, idempotence/résolution de liens)
+    // Airtable import anchor (one-shot, idempotency/link resolution)
     airtableId: v.optional(v.string()),
 
-    // Contexte capital (pour calcul % de détention)
+    // Capital context (to compute ownership %)
     totalShares: v.optional(v.number()),
 
     // Group-specific
@@ -265,7 +266,7 @@ export default defineSchema({
 
     // Meta
     sector: v.optional(v.string()),
-    // Plateforme d'origine pour les SPV externes (ex. "Parallel", "Sezame")
+    // Origin platform for external SPVs (e.g. "Parallel", "Sezame")
     sponsor: v.optional(v.string()),
     notes: v.optional(v.string()),
     archivedAt: v.optional(v.number()),
@@ -278,15 +279,15 @@ export default defineSchema({
     .index('by_airtable_id', ['airtableId']),
 
   /**
-   * companyRelations — détention entre entités. Gère les cas non-binaires
-   * (SCI 50/50, Banco 2 50/50…) et la part d'Albo dans un SPV.
-   * Recommandation : matérialiser systématiquement, même les 100 % directs.
+   * companyRelations — ownership between entities. Handles non-binary cases
+   * (SCI 50/50, Banco 2 50/50…) and Albo's stake in an SPV.
+   * Recommendation: always materialize, even direct 100 % stakes.
    */
   companyRelations: defineTable({
     orgId: v.id('organizations'),
     parentCompanyId: v.id('companies'),
     childCompanyId: v.id('companies'),
-    ownershipPct: v.optional(v.number()), // 0 à 100
+    ownershipPct: v.optional(v.number()), // 0 to 100
     sharesHeld: v.optional(v.number()),
     notes: v.optional(v.string()),
     archivedAt: v.optional(v.number()),
@@ -296,38 +297,38 @@ export default defineSchema({
     .index('by_child', ['orgId', 'childCompanyId']),
 
   /**
-   * deals — un investissement = un instrument souscrit à un moment donné.
-   * Follow-on = nouveau deal. Pattern instrument : champs spécifiques
-   * nullables, discriminés par `instrumentKind`.
+   * deals — one investment = one instrument subscribed at a given time.
+   * Follow-on = new deal. Instrument pattern: instrument-specific fields
+   * are nullable, discriminated by `instrumentKind`.
    *
-   * `viaSpvCompanyId` : invest via SPV (1 ligne, le SPV en intermédiaire
-   * dénormalisé). La part d'Albo DANS le SPV vit dans `companyRelations`.
+   * `viaSpvCompanyId`: investment via an SPV (1 row, the SPV as denormalized
+   * intermediary). Albo's stake IN the SPV lives in `companyRelations`.
    */
   deals: defineTable({
     orgId: v.id('organizations'),
 
-    // Nom personnalisé (optionnel) — affiché à la place du titre dérivé
-    // (instrument / société cible) quand il est présent.
+    // Custom name (optional) — displayed instead of the derived title
+    // (instrument / target company) when present.
     name: v.optional(v.string()),
 
-    // Qui achète quoi
-    investorCompanyId: v.id('companies'), // entité du groupe (CALTE, Albo…)
-    targetCompanyId: v.id('companies'), // boîte investie
-    viaSpvCompanyId: v.optional(v.id('companies')), // intermédiaire optionnel
+    // Who buys what
+    investorCompanyId: v.id('companies'), // group entity (CALTE, Albo…)
+    targetCompanyId: v.id('companies'), // invested company
+    viaSpvCompanyId: v.optional(v.id('companies')), // optional intermediary
 
     // Instrument
     instrumentKind,
 
-    // Financier commun
-    currency: v.string(), // "EUR" par défaut
-    committedAmount: v.optional(v.number()), // engagement (LP/SAFE/OS…)
-    paidAmount: v.optional(v.number()), // réellement décaissé à ce jour
+    // Common financials
+    currency: v.string(), // "EUR" by default
+    committedAmount: v.optional(v.number()), // commitment (LP/SAFE/OS…)
+    paidAmount: v.optional(v.number()), // actually disbursed to date
 
-    // Share-based (share, spv_share, secondary, parts SCI…)
+    // Share-based (share, spv_share, secondary, SCI shares…)
     sharesAcquired: v.optional(v.number()),
     pricePerShare: v.optional(v.number()), // cents
 
-    // Dette (os, oc, convertible_note)
+    // Debt (os, oc, convertible_note)
     interestRate: v.optional(v.number()), // bps (1100 = 11 %)
     maturityDate: v.optional(v.number()),
     principalAmount: v.optional(v.number()), // cents
@@ -341,7 +342,7 @@ export default defineSchema({
     valuationCap: v.optional(v.number()), // cents
     discount: v.optional(v.number()), // bps
 
-    // Valorisation au moment du deal (pour share / BSA)
+    // Valuation at deal time (for share / BSA)
     entryValuation: v.optional(v.number()), // cents
     roundSize: v.optional(v.number()), // cents
 
@@ -349,13 +350,13 @@ export default defineSchema({
     signedDate: v.optional(v.number()),
     closingDate: v.optional(v.number()),
     exitedDate: v.optional(v.number()),
-    exitProceeds: v.optional(v.number()), // cents — produit de cession (exit)
+    exitProceeds: v.optional(v.number()), // cents — sale proceeds (exit)
     status: dealStatus,
 
-    // Bridge Attio
+    // Attio bridge
     attioDealId: v.optional(v.string()),
 
-    // Ancre import Airtable (clé dérivée `${companyRecId}:${instrumentKind}`)
+    // Airtable import anchor (derived key `${companyRecId}:${instrumentKind}`)
     airtableId: v.optional(v.string()),
 
     // Meta
@@ -369,8 +370,8 @@ export default defineSchema({
     .index('by_airtable_id', ['airtableId']),
 
   /**
-   * valuations — historique horodaté de la valo d'un deal. Distinct de
-   * kpiSnapshots pour garder une table propre côté calculs MOIC/TVPI.
+   * valuations — timestamped history of a deal's valuation. Separate from
+   * kpiSnapshots to keep a clean table for MOIC/TVPI computations.
    */
   valuations: defineTable({
     orgId: v.id('organizations'),
@@ -380,15 +381,15 @@ export default defineSchema({
     valuationMethod: v.optional(v.string()), // "last_round", "mark_to_market"…
     source: v.optional(v.string()),
     notes: v.optional(v.string()),
-    airtableId: v.optional(v.string()), // ancre import Airtable
+    airtableId: v.optional(v.string()), // Airtable import anchor
   })
     .index('by_deal_asof', ['dealId', 'asOf'])
     .index('by_org_asof', ['orgId', 'asOf'])
     .index('by_airtable_id', ['airtableId']),
 
   /**
-   * kpiSnapshots — historique KPI portfolio (ARR, GMV, AUM, headcount…).
-   * Une ligne = une valeur de métrique à une date pour une company.
+   * kpiSnapshots — portfolio KPI history (ARR, GMV, AUM, headcount…).
+   * One row = one metric value at a date for a company.
    */
   kpiSnapshots: defineTable({
     orgId: v.id('organizations'),
@@ -406,30 +407,30 @@ export default defineSchema({
     .index('by_org_period', ['orgId', 'periodEnd']),
 
   /**
-   * dealProjections — business plan d'un deal en lignes datées attendues
-   * (royalties surtout : BP signé vs BP dégradé vs réalité).
-   * `version: 'initial'` = BP au closing, figé ; `'revised'` = dernière
-   * actualisation. Le « réalisé » n'est PAS ici : ce sont les transactions
-   * pointées sur le deal. Unicité (dealId, version, period) gérée côté
-   * mutation (replaceVersion = delete + insert, cf. convex/projections.ts).
+   * dealProjections — a deal's business plan as dated expected rows
+   * (mostly royalties: signed BP vs degraded BP vs reality).
+   * `version: 'initial'` = BP at closing, frozen; `'revised'` = latest
+   * revision. The "realized" side is NOT here: it lives in the transactions
+   * matched to the deal. Uniqueness (dealId, version, period) enforced in
+   * the mutation (replaceVersion = delete + insert, cf. convex/projections.ts).
    */
   dealProjections: defineTable({
     orgId: v.id('organizations'),
     dealId: v.id('deals'),
     version: v.union(v.literal('initial'), v.literal('revised')),
-    period: v.number(), // ms epoch, début de période (mois/semestre libre)
-    amountCents: v.number(), // attendu sur la période, positif
-    direction: txDirection, // 'in' (retours attendus) | 'out' (déploiement)
+    period: v.number(), // ms epoch, period start (month/half-year, free-form)
+    amountCents: v.number(), // expected over the period, positive
+    direction: txDirection, // 'in' (expected returns) | 'out' (deployment)
     notes: v.optional(v.string()),
   })
     .index('by_deal_version', ['dealId', 'version', 'period'])
     .index('by_org', ['orgId']),
 
   /**
-   * documents — reportings & docs rattachés à une company (portfolio
-   * surtout) : investor updates, BP, juridique. Fichier dans le storage
-   * Convex natif (cap 20 MB). `source: 'email'` réservé à l'ingestion
-   * entrante (V2) — V1 = upload manuel.
+   * documents — reportings & docs attached to a company (mostly
+   * portfolio): investor updates, BP, legal. File stored in native Convex
+   * storage (20 MB cap). `source: 'email'` reserved for inbound
+   * ingestion (V2) — V1 = manual upload.
    */
   documents: defineTable({
     orgId: v.id('organizations'),
@@ -441,7 +442,7 @@ export default defineSchema({
       v.literal('legal'),
       v.literal('other'),
     ),
-    period: v.optional(v.number()), // période couverte (ms epoch)
+    period: v.optional(v.number()), // covered period (ms epoch)
     storageId: v.id('_storage'),
     contentType: v.optional(v.string()),
     size: v.optional(v.number()),
@@ -452,75 +453,75 @@ export default defineSchema({
     .index('by_company', ['companyId', 'uploadedAt'])
     .index('by_org', ['orgId']),
 
-  // ─── Passif (capitaux propres + comptes courants d'associés) ──────────────
+  // ─── Liabilities (equity + shareholder current accounts) ──────────────────
 
   /**
-   * equityPositions — capitaux propres émis par une org (quasi-statique).
-   * `orgId` = entité émettrice. Le détenteur est SOIT une org du groupe
-   * (`holderOrgId`), SOIT une personne physique (`holderPersonId`), SOIT un
-   * externe en libellé libre (`holderLabel`).
+   * equityPositions — equity issued by an org (quasi-static).
+   * `orgId` = issuing entity. The holder is EITHER a group org
+   * (`holderOrgId`), OR a natural person (`holderPersonId`), OR an
+   * external party with a free-form label (`holderLabel`).
    */
   equityPositions: defineTable({
-    orgId: v.id('organizations'), // entité émettrice
-    holderOrgId: v.optional(v.id('organizations')), // détenteur si entité du groupe
-    holderPersonId: v.optional(v.string()), // si personne physique
-    holderLabel: v.optional(v.string()), // libellé libre si externe
+    orgId: v.id('organizations'), // issuing entity
+    holderOrgId: v.optional(v.id('organizations')), // holder if group entity
+    holderPersonId: v.optional(v.string()), // if natural person
+    holderLabel: v.optional(v.string()), // free-form label if external
     type: equityPositionType,
     amountCents: v.number(), // cents EUR
     shares: v.optional(v.number()),
     effectiveDate: v.number(), // ms epoch
     actDriveId: v.optional(v.string()),
-    airtableId: v.optional(v.string()), // ancre import Airtable (idempotence)
+    airtableId: v.optional(v.string()), // Airtable import anchor (idempotency)
   })
     .index('by_org', ['orgId'])
     .index('by_holder_org', ['holderOrgId'])
     .index('by_airtable_id', ['airtableId']),
 
   /**
-   * intercompanyLoans — comptes courants d'associés inter-entités.
-   * UN enregistrement partagé par relation créancier → débiteur.
+   * intercompanyLoans — inter-entity shareholder current accounts.
+   * ONE shared record per creditor → debtor relation.
    *
-   * PAS de champ solde : le solde est toujours dérivé des transactions
-   * pointées dessus (`transactions.allocation.kind === 'intercompany_loan'`),
-   * chaque org sommant SES propres transactions (cf. convex/liabilities.ts
+   * NO balance field: the balance is always derived from the transactions
+   * allocated to it (`transactions.allocation.kind === 'intercompany_loan'`),
+   * each org summing ITS own transactions (cf. convex/liabilities.ts
    * `getLiabilities` + KNOWN_ISSUES.md « Passif »).
    */
   intercompanyLoans: defineTable({
-    fromOrgId: v.id('organizations'), // créancier
-    toOrgId: v.id('organizations'), // débiteur
-    fromPersonId: v.optional(v.string()), // si contrepartie personne physique
+    fromOrgId: v.id('organizations'), // creditor
+    toOrgId: v.id('organizations'), // debtor
+    fromPersonId: v.optional(v.string()), // if counterparty is a natural person
     fromLabel: v.optional(v.string()),
-    interestRateBps: v.optional(v.number()), // bps ; absent = 0 = non rémunéré
+    interestRateBps: v.optional(v.number()), // bps; absent = 0 = non-interest-bearing
     isBlocked: v.boolean(),
     conventionDriveId: v.optional(v.string()),
     openedDate: v.number(), // ms epoch
-    airtableId: v.optional(v.string()), // ancre import Airtable (idempotence)
+    airtableId: v.optional(v.string()), // Airtable import anchor (idempotency)
   })
     .index('by_from', ['fromOrgId'])
     .index('by_to', ['toOrgId'])
     .index('by_airtable_id', ['airtableId']),
 
-  // ─── Phase 2 — cash management (tables déclarées, mutations vides) ────────
+  // ─── Phase 2 — cash management (tables declared, mutations empty) ─────────
 
   /**
-   * bankAccounts — comptes des entités du groupe. Powens en cible,
-   * manuel en attendant.
+   * bankAccounts — accounts of the group entities. Powens as the target,
+   * manual in the meantime.
    */
   bankAccounts: defineTable({
     orgId: v.id('organizations'),
-    ownerCompanyId: v.id('companies'), // doit être une "group_*"
+    ownerCompanyId: v.id('companies'), // must be a "group_*"
     bankName: v.string(), // "Qonto", "Palatine", "Neuflize", "Wormser"
-    label: v.string(), // nom d'origine import/banque — jamais écrasé après création
-    // Nom personnalisé éditable — affiché à la place de `label` si présent.
+    label: v.string(), // original import/bank name — never overwritten after creation
+    // Editable custom name — displayed instead of `label` when present.
     displayName: v.optional(v.string()),
     iban: v.optional(v.string()),
     accountKind: v.optional(v.string()), // "checking", "cto", "dat", "savings"
     currency: v.string(),
-    currentBalance: v.optional(v.number()), // cents, dernier connu
+    currentBalance: v.optional(v.number()), // cents, last known
     balanceAsOf: v.optional(v.number()),
     powensConnectionId: v.optional(v.string()),
     powensAccountId: v.optional(v.string()),
-    airtableId: v.optional(v.string()), // ancre import Airtable
+    airtableId: v.optional(v.string()), // Airtable import anchor
     archivedAt: v.optional(v.number()),
   })
     .index('by_org', ['orgId'])
@@ -529,35 +530,36 @@ export default defineSchema({
     .index('by_airtable_id', ['airtableId']),
 
   /**
-   * transactions — flux bancaire réalisé. `dealId` nullable car certains
-   * mouvements sont opérationnels (impôts, honoraires, charges courantes).
-   * Le rapprochement (pointage) se fait via `matchStatus` + `dealId` :
-   * invariant `matchStatus === 'matched'` ⟺ rattachée à un deal
-   * (`dealId != null`) OU allouée au passif (`allocation` equity/C-C,
-   * `dealId` null — cf. convex/liabilities.ts). `reconciled` est un miroir
-   * dérivé du pointage DEAL conservé pour les lecteurs existants — ne jamais
-   * l'écrire directement (cf. KNOWN_ISSUES.md « Pointage transaction → deal »).
+   * transactions — realized bank flow. `dealId` nullable because some
+   * movements are operational (taxes, fees, recurring expenses).
+   * Reconciliation (matching) goes through `matchStatus` + `dealId`:
+   * invariant `matchStatus === 'matched'` ⟺ attached to a deal
+   * (`dealId != null`) OR allocated to liabilities (`allocation` equity/
+   * shareholder account, `dealId` null — cf. convex/liabilities.ts).
+   * `reconciled` is a mirror derived from the DEAL match, kept for existing
+   * readers — never write it directly (cf. KNOWN_ISSUES.md « Pointage
+   * transaction → deal »).
    *
-   * `matchStatus` est optionnel au schéma (les docs pré-existants n'ont pas
-   * le champ tant que `transactions:backfillMatchStatus` n'a pas tourné) ;
-   * absence = logiquement 'unmatched'.
+   * `matchStatus` is optional in the schema (pre-existing docs lack the
+   * field until `transactions:backfillMatchStatus` has run);
+   * absence = logically 'unmatched'.
    *
-   * `searchText` (recherche full-text) est dérivé de `rawLabel` +
-   * `counterparty`, normalisé (minuscules, sans accents) via
-   * `lib/searchText.buildSearchText` — à poser à chaque écriture. Optionnel
-   * au schéma : les lignes pré-existantes ne l'ont pas tant que
-   * `transactions:backfillSearchText` n'a pas tourné (elles sont alors
-   * invisibles à la recherche, pas aux listes).
+   * `searchText` (full-text search) is derived from `rawLabel` +
+   * `counterparty`, normalized (lowercase, accents stripped) via
+   * `lib/searchText.buildSearchText` — to set on every write. Optional in
+   * the schema: pre-existing rows lack it until
+   * `transactions:backfillSearchText` has run (they are then invisible
+   * to search, not to lists).
    */
   transactions: defineTable({
     orgId: v.id('organizations'),
     bankAccountId: v.id('bankAccounts'),
     dealId: v.optional(v.id('deals')),
     matchStatus: v.optional(txMatchStatus),
-    // Pointage généralisé : deal, position de capital ou C/C inter-entités.
-    // Cohabite avec `dealId` : `dealId != null` ⟺ `allocation.kind === 'deal'`
-    // (backfill : transactions:backfillAllocation). `targetId` est l'_id de la
-    // cible, stocké en string (pas de v.id() union cross-tables).
+    // Generalized matching: deal, equity position or inter-entity loan.
+    // Coexists with `dealId`: `dealId != null` ⟺ `allocation.kind === 'deal'`
+    // (backfill: transactions:backfillAllocation). `targetId` is the target's
+    // _id, stored as a string (no cross-table v.id() union).
     allocation: v.optional(
       v.object({
         kind: allocationKind,
@@ -565,33 +567,34 @@ export default defineSchema({
       }),
     ),
     direction: txDirection,
-    amount: v.number(), // cents, toujours positif
-    // Taux de TVA en basis points (0/550/1000/2000), posé sur les statuts
-    // `charge` (TVA déductible) et `product` (TVA collectée) uniquement —
-    // effacé quand la transaction quitte ces statuts. Le montant de TVA est
-    // dérivé du TTC (lib/vat.ts), jamais stocké. Absent = « à qualifier ».
+    amount: v.number(), // cents, always positive
+    // VAT rate in basis points (0/550/1000/2000), set only on the
+    // `charge` (deductible VAT) and `product` (collected VAT) statuses —
+    // cleared when the transaction leaves these statuses. The VAT amount is
+    // derived from the tax-inclusive total (lib/vat.ts), never stored.
+    // Absent = « à qualifier ».
     vatRateBps: v.optional(vatRateBpsValidator),
     transactionDate: v.number(),
     rawLabel: v.string(),
     counterparty: v.optional(v.string()),
-    searchText: v.optional(v.string()), // dérivé rawLabel + counterparty, normalisé
+    searchText: v.optional(v.string()), // derived from rawLabel + counterparty, normalized
     source: txSource,
     powensTxId: v.optional(v.string()),
-    memoId: v.optional(v.string()), // ancre import CSV Mémo Bank (idempotence)
-    // Métadonnées d'origine import (CSV Mémo Bank…) — JAMAIS dans `notes`
-    // (réservé au pointage manuel). Utile au futur pointage/agent.
+    memoId: v.optional(v.string()), // Mémo Bank CSV import anchor (idempotency)
+    // Import origin metadata (Mémo Bank CSV…) — NEVER in `notes`
+    // (reserved for manual matching). Useful for future matching/agent work.
     importMeta: v.optional(
       v.object({
-        type: v.optional(v.string()), // ex. "Virement entrant"
-        category: v.optional(v.string()), // ex. "Logiciels/SaaS", "Intérêts perçus"
-        externalRef: v.optional(v.string()), // ex. "WARO - OC - albo"
+        type: v.optional(v.string()), // e.g. "Virement entrant"
+        category: v.optional(v.string()), // e.g. "Logiciels/SaaS", "Intérêts perçus"
+        externalRef: v.optional(v.string()), // e.g. "WARO - OC - albo"
       }),
     ),
     reconciled: v.boolean(),
     reconciledBy: v.optional(v.id('users')),
     reconciledAt: v.optional(v.number()),
     notes: v.optional(v.string()),
-    airtableId: v.optional(v.string()), // ancre import Airtable
+    airtableId: v.optional(v.string()), // Airtable import anchor
   })
     .index('by_org_date', ['orgId', 'transactionDate'])
     .index('by_account_date', ['bankAccountId', 'transactionDate'])
@@ -600,8 +603,8 @@ export default defineSchema({
     .index('by_memo_id', ['memoId'])
     .index('by_org_unreconciled', ['orgId', 'reconciled'])
     .index('by_org_matchStatus', ['orgId', 'matchStatus'])
-    // Dérivation des soldes de passif : transactions d'UNE org pointées sur
-    // une cible donnée (chemin imbriqué supporté par Convex).
+    // Liability balance derivation: transactions of ONE org allocated to a
+    // given target (nested path supported by Convex).
     .index('by_org_allocation_target', ['orgId', 'allocation.targetId'])
     .index('by_airtable_id', ['airtableId'])
     .searchIndex('search_text', {
@@ -610,33 +613,33 @@ export default defineSchema({
     }),
 
   /**
-   * matchingDecisions — historique append-only des décisions de pointage
-   * (dataset d'apprentissage de l'agent de rattachement, phase 2).
-   * Jamais patché ni supprimé. L'état courant vit sur `transactions`
-   * (`matchStatus` + `dealId`) ; ici on fige ce que voyait le décideur
-   * au moment de la décision (snapshot, jamais recalculé).
+   * matchingDecisions — append-only history of matching decisions
+   * (training dataset for the matching agent, phase 2).
+   * Never patched nor deleted. The current state lives on `transactions`
+   * (`matchStatus` + `dealId`); here we freeze what the decision-maker
+   * saw at decision time (snapshot, never recomputed).
    */
   matchingDecisions: defineTable({
     orgId: v.id('organizations'),
     transactionId: v.id('transactions'),
     decision: matchDecision,
-    dealId: v.optional(v.id('deals')), // renseigné ssi decision === 'matched'
+    dealId: v.optional(v.id('deals')), // set iff decision === 'matched'
     source: matchDecisionSource,
     decidedBy: v.id('users'),
     decidedAt: v.number(),
 
-    // Snapshot de la transaction au moment de la décision
+    // Snapshot of the transaction at decision time
     txLabel: v.string(),
     txAmount: v.number(), // cents
     txDate: v.number(), // ms epoch
     txBankAccountId: v.id('bankAccounts'),
 
-    // Features dérivées (calculées si trivialement disponibles)
+    // Derived features (computed when trivially available)
     dealAmountExpected: v.optional(v.number()), // deal.committedAmount, cents
     amountDelta: v.optional(v.number()), // txAmount - dealAmountExpected
     dateDelta: v.optional(v.number()), // txDate - deal.signedDate, ms
 
-    // FX — phase 2, jamais écrits en MVP 1
+    // FX — phase 2, never written in MVP 1
     fxRate: v.optional(v.number()),
     amountInDealCurrency: v.optional(v.number()),
   })
@@ -644,9 +647,9 @@ export default defineSchema({
     .index('by_transaction', ['transactionId']),
 
   /**
-   * forecasts — flux attendus (appels de fonds, distributions, échéances
-   * dette, charges récurrentes). `realizedTransactionId` rempli quand un
-   * mouvement réel l'éteint.
+   * forecasts — expected flows (capital calls, distributions, debt
+   * maturities, recurring charges). `realizedTransactionId` filled when a
+   * real movement extinguishes it.
    */
   forecasts: defineTable({
     orgId: v.id('organizations'),
@@ -659,7 +662,7 @@ export default defineSchema({
     label: v.string(),
     source: v.optional(v.string()),
     realizedTransactionId: v.optional(v.id('transactions')),
-    airtableId: v.optional(v.string()), // ancre import Airtable
+    airtableId: v.optional(v.string()), // Airtable import anchor
     archivedAt: v.optional(v.number()),
   })
     .index('by_org_date', ['orgId', 'expectedDate'])
@@ -667,62 +670,62 @@ export default defineSchema({
     .index('by_account_date', ['bankAccountId', 'expectedDate'])
     .index('by_airtable_id', ['airtableId']),
 
-  // ─── Cash flow forecast (couche prévisionnelle déterministe) ──────────────
+  // ─── Cash flow forecast (deterministic forecasting layer) ─────────────────
 
   /**
-   * forecastRules — causes récurrentes de flux prévisionnels (loyers SCI,
-   * salaires, échéances dette, abonnements). L'expansion en occurrences
-   * datées vit dans `forecastEntries` (cf. convex/forecasts.ts:expandRules,
-   * idempotente via `derivedKey`).
+   * forecastRules — recurring causes of forecast flows (SCI rents,
+   * salaries, debt maturities, subscriptions). The expansion into dated
+   * occurrences lives in `forecastEntries` (cf. convex/forecasts.ts:
+   * expandRules, idempotent via `derivedKey`).
    */
   forecastRules: defineTable({
     orgId: v.id('organizations'),
     label: v.string(),
-    amountCents: v.number(), // cents, toujours positif ; le sens vient de `direction`
+    amountCents: v.number(), // cents, always positive; the sign comes from `direction`
     direction: txDirection,
     category: v.optional(v.string()), // "loyer", "salaires", "dette"…
     frequency: forecastFrequency,
-    interval: v.number(), // « tous les N pas » (1 = chaque mois/semaine/…)
-    anchorDay: v.number(), // jour du mois 1-31 (monthly/quarterly/yearly), jour ISO 1-7 (weekly)
+    interval: v.number(), // "every N steps" (1 = every month/week/…)
+    anchorDay: v.number(), // day of month 1-31 (monthly/quarterly/yearly), ISO day 1-7 (weekly)
     startDate: v.number(), // ms epoch
-    endDate: v.optional(v.number()), // ms epoch ; absent = sans fin
+    endDate: v.optional(v.number()), // ms epoch; absent = no end
     active: v.boolean(),
     sourceType: forecastSourceType,
   }).index('by_org', ['orgId']),
 
   /**
-   * forecastEntries — occurrences datées d'un flux attendu. Soit générées
-   * depuis une règle (`ruleId` + `derivedKey`), soit créées à la main
-   * (les deux à null). `status` est la source de vérité du cycle de vie,
-   * à la manière de `matchStatus` côté transactions. `overridden` protège
-   * une occurrence dérivée éditée manuellement : expandRules ne la
-   * réécrit jamais.
+   * forecastEntries — dated occurrences of an expected flow. Either
+   * generated from a rule (`ruleId` + `derivedKey`) or created by hand
+   * (both null). `status` is the source of truth for the lifecycle,
+   * mirroring `matchStatus` on the transactions side. `overridden` protects
+   * a derived occurrence edited manually: expandRules never rewrites
+   * it.
    *
-   * `derivedKey` = clé d'idempotence des lignes auto, format
-   * "rule:{ruleId}:{YYYY-MM-DD}" (ou "deal:{dealId}:{YYYY-MM-DD}" pour le
-   * futur deriveFromDeals). Null pour les lignes 100 % manuelles.
+   * `derivedKey` = idempotency key for auto rows, format
+   * "rule:{ruleId}:{YYYY-MM-DD}" (or "deal:{dealId}:{YYYY-MM-DD}" for the
+   * future deriveFromDeals). Null for 100 % manual rows.
    */
   forecastEntries: defineTable({
     orgId: v.id('organizations'),
-    date: v.number(), // ms epoch, date ferme de l'occurrence
-    amountCents: v.number(), // cents, toujours positif ; le sens vient de `direction`
+    date: v.number(), // ms epoch, firm date of the occurrence
+    amountCents: v.number(), // cents, always positive; the sign comes from `direction`
     direction: txDirection,
     confidence: forecastEntryConfidence,
     status: forecastEntryStatus,
     label: v.string(),
     category: v.optional(v.string()),
     ruleId: v.optional(v.id('forecastRules')),
-    dealId: v.optional(v.id('deals')), // réservé deriveFromDeals — non écrit en MVP
+    dealId: v.optional(v.id('deals')), // reserved for deriveFromDeals — not written in MVP
     derivedKey: v.optional(v.string()),
     overridden: v.boolean(),
-    realizedTransactionId: v.optional(v.id('transactions')), // rempli au pointage
+    realizedTransactionId: v.optional(v.id('transactions')), // filled on matching
 
-    // ── Champs réservés, NON LUS par la logique actuelle ──────────────────
-    // Présents au schéma pour éviter une migration future, mais aucune
-    // query/mutation ne les exploite encore.
-    probabilityPct: v.optional(v.number()), // 0-100 — future couche probabiliste
-    counterpartyOrgId: v.optional(v.id('organizations')), // future neutralisation inter-entités au consolidé
-    currency: v.string(), // "EUR" — future FX ; seul l'EUR est agrégé pour l'instant
+    // ── Reserved fields, NOT READ by current logic ────────────────────────
+    // Present in the schema to avoid a future migration, but no
+    // query/mutation uses them yet.
+    probabilityPct: v.optional(v.number()), // 0-100 — future probabilistic layer
+    counterpartyOrgId: v.optional(v.id('organizations')), // future inter-entity netting at consolidation
+    currency: v.string(), // "EUR" — future FX; only EUR is aggregated for now
   })
     .index('by_org', ['orgId'])
     .index('by_org_and_date', ['orgId', 'date'])

@@ -74,7 +74,7 @@ function Info({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-/** Dialog d'édition de l'entité : nom + SIREN (9 chiffres ou vide). */
+/** Entity edit dialog: name + SIREN (9 digits or empty). */
 function EditCompanyDialog({
   company,
   onClose,
@@ -88,8 +88,8 @@ function EditCompanyDialog({
   const [siren, setSiren] = useState(company.siren ?? '')
   const [pending, setPending] = useState(false)
 
-  // Validation client (miroir de la mutation) : espaces ignorés, 9 chiffres
-  // ou vide (= effacement).
+  // Client-side validation (mirror of the mutation): spaces ignored,
+  // 9 digits or empty (= clears it).
   const cleanedSiren = siren.replace(/\s/g, '')
   const sirenInvalid = cleanedSiren !== '' && !/^\d{9}$/.test(cleanedSiren)
   const nameMissing = name.trim() === ''

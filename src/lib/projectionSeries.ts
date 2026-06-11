@@ -1,23 +1,22 @@
 /**
- * Séries « BP vs réalisé » d'un deal (logique pure, testée par
+ * "BP vs actual" series of a deal (pure logic, tested by
  * tests/projectionSeries.test.ts).
  *
- * Les périodes du tableau = union triée des périodes des deux versions du
- * BP. Le réalisé (transactions pointées) est rangé dans la période dont le
- * début est le plus récent ≤ date de la transaction (les tx antérieures à
- * la première période sont clampées dans la première). Tous les montants
- * sont nets en cents : `in` − `out`.
+ * Table periods = sorted union of the periods of both BP versions. Actuals
+ * (matched transactions) are bucketed into the period whose start is the
+ * most recent ≤ transaction date (txs earlier than the first period are
+ * clamped into the first one). All amounts are net cents: `in` − `out`.
  */
 
 export type ProjectionLine = {
-  period: number // ms epoch, début de période
-  amountCents: number // positif
+  period: number // ms epoch, period start
+  amountCents: number // positive
   direction: 'in' | 'out'
 }
 
 export type ActualTx = {
   transactionDate: number
-  amount: number // positif (cents)
+  amount: number // positive (cents)
   direction: 'in' | 'out'
 }
 
@@ -30,8 +29,8 @@ export type PlanVsActualRow = {
   revisedCumCents: number
   actualCumCents: number
   /**
-   * Écart cumulé réalisé − attendu. Référence = BP révisé s'il existe,
-   * sinon BP initial.
+   * Cumulative gap actual − expected. Reference = revised BP if one
+   * exists, otherwise initial BP.
    */
   gapCumCents: number
 }
@@ -59,7 +58,7 @@ export function buildPlanVsActual({
   ].sort((a, b) => a - b)
   if (periods.length === 0) return []
 
-  // Réalisé net par période (clamp avant la première période).
+  // Net actuals per period (clamped before the first period).
   const actualByPeriod = new Map<number, number>()
   for (const tx of actuals) {
     let bucket = periods[0]

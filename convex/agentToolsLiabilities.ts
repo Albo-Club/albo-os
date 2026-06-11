@@ -1,8 +1,8 @@
 /**
- * Outils agent du passif (equityPositions / intercompanyLoans), scopés à
- * l'org du thread (pattern convex/agentTools.ts). Lecture via
- * `getLiabilitiesForOrg` (soldes C/C dérivés des transactions) ; créations
- * alignées sur les mutations publiques de convex/liabilities.ts.
+ * Agent tools for liabilities (equityPositions / intercompanyLoans), scoped
+ * to the thread's org (convex/agentTools.ts pattern). Reads go through
+ * `getLiabilitiesForOrg` (C/C balances derived from transactions); creations
+ * are aligned with the public mutations in convex/liabilities.ts.
  */
 
 import { ConvexError, v } from 'convex/values'
@@ -115,8 +115,8 @@ export const createIntercompanyLoanInternal = internalMutation({
       throw new ConvexError('invalid_rate')
     }
 
-    // L'org du thread est toujours l'une des deux parties (même règle
-    // « not_a_party » que la mutation publique, garantie par construction).
+    // The thread's org is always one of the two parties (same
+    // "not_a_party" rule as the public mutation, guaranteed by construction).
     const fromOrgId = args.role === 'creditor' ? args.orgId : counterparty._id
     const toOrgId = args.role === 'creditor' ? counterparty._id : args.orgId
 
@@ -131,7 +131,7 @@ export const createIntercompanyLoanInternal = internalMutation({
   },
 })
 
-// ─── Tools exposés à l'agent ────────────────────────────────────────────────
+// ─── Tools exposed to the agent ─────────────────────────────────────────────
 
 const listLiabilities = createTool({
   description:

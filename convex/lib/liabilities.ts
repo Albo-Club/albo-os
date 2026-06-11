@@ -1,17 +1,17 @@
 /**
- * Logique pure du passif (soldes de comptes courants inter-entités).
+ * Pure liabilities (passif) logic (inter-entity current account balances).
  *
- * Volontairement sans dépendance au ctx Convex : testée via node:test
- * (tests/liabilities.test.ts), même pattern que lib/recurrence.ts.
+ * Deliberately free of any Convex ctx dependency: tested via node:test
+ * (tests/liabilities.test.ts), same pattern as lib/recurrence.ts.
  *
- * Règle de dérivation des soldes (cf. KNOWN_ISSUES.md « Passif ») : chaque
- * org dérive le solde d'un C/C de SES PROPRES transactions pointées dessus.
- * - Créancier (fromOrgId) : out = prêt, in = remboursement reçu
- *   → solde positif = créance.
- * - Débiteur (toOrgId) : in = emprunt, out = remboursement versé
- *   → solde négatif = dette.
- * Les deux côtés peuvent diverger si le pointage est incomplet — c'est un
- * signal de réconciliation, pas un bug.
+ * Balance derivation rule (cf. KNOWN_ISSUES.md « Passif »): each org derives
+ * a C/C balance from ITS OWN transactions allocated to it.
+ * - Creditor (fromOrgId): out = loan, in = repayment received
+ *   → positive balance = receivable.
+ * - Debtor (toOrgId): in = borrowing, out = repayment paid
+ *   → negative balance = debt.
+ * The two sides can diverge when matching is incomplete — that is a
+ * reconciliation signal, not a bug.
  */
 
 export type LoanSide = 'creditor' | 'debtor'
@@ -23,12 +23,12 @@ export type LoanOrgRefs = {
 
 export type AllocatedTx = {
   direction: 'in' | 'out'
-  amount: number // cents, toujours positif (convention transactions)
+  amount: number // cents, always positive (transactions convention)
 }
 
 /**
- * Position de l'org regardante sur un C/C : créancier si elle est fromOrgId,
- * débiteur si toOrgId, null si elle n'est pas partie au prêt.
+ * Side of the viewing org on a C/C: creditor if it is fromOrgId, debtor if
+ * toOrgId, null if it is not a party to the loan.
  */
 export function loanSideForOrg(
   loan: LoanOrgRefs,
@@ -40,12 +40,12 @@ export function loanSideForOrg(
 }
 
 /**
- * Solde signé (cents) d'un C/C du point de vue d'une org, dérivé de ses
- * propres transactions pointées sur le prêt : Σ(out) − Σ(in).
+ * Signed balance (cents) of a C/C from one org's point of view, derived from
+ * its own transactions allocated to the loan: Σ(out) − Σ(in).
  *
- * La même formule sert les deux côtés :
- * - Créancier : décaisse pour prêter (out) → solde + = créance.
- * - Débiteur : encaisse pour emprunter (in) → solde − = dette.
+ * The same formula serves both sides:
+ * - Creditor: pays out to lend (out) → balance + = receivable.
+ * - Debtor: receives to borrow (in) → balance − = debt.
  */
 export function computeLoanBalanceCents(txs: Array<AllocatedTx>): number {
   let balance = 0

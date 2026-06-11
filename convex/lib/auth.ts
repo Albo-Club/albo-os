@@ -34,7 +34,7 @@ export async function requireAppUser(ctx: Ctx): Promise<Doc<'users'>> {
  * if Better Auth has the user but our Convex `users` table doesn't yet.
  * First user across the deployment becomes `superAdmin: true`.
  *
- * Dedup strategy (anti-doublon):
+ * Dedup strategy (duplicate prevention):
  *   1. Lookup by `betterAuthId` — happy path for returning users.
  *   2. Fallback lookup by `email` — covers the case where Better Auth linked
  *      accounts on its side (different `betterAuthId`, same email) but our

@@ -28,7 +28,7 @@ export const chatAgent = new Agent(components.agent, {
     ...valuationTools,
     ...projectionTools,
   },
-  // Les flux de pointage sont multi-steps (list → suggest → confirmer →
-  // match) : 12 steps au lieu de 8.
+  // Transaction-matching (pointage) flows are multi-step (list → suggest →
+  // confirm → match): 12 steps instead of 8.
   stopWhen: stepCountIs(12),
 })
