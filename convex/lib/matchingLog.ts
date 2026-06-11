@@ -5,14 +5,14 @@ import type { DataModel, Doc, Id } from '../_generated/dataModel'
 type MutCtx = GenericMutationCtx<DataModel>
 
 /**
- * Écrit une ligne dans `matchingDecisions` (append-only) — le dataset
- * d'apprentissage de l'agent de rattachement (phase 2). Appelé par les
- * mutations de pointage de convex/transactions.ts, jamais exposé en API.
+ * Writes a row to `matchingDecisions` (append-only) — the learning dataset
+ * of the matching agent (phase 2). Called by the pointage mutations in
+ * convex/transactions.ts, never exposed as an API.
  *
- * Le snapshot (label, montant, date, compte) est lu depuis l'objet
- * `transaction` déjà chargé par l'appelant, figé au moment de la décision.
- * Les deltas ne sont calculés que si le deal porte un `committedAmount` /
- * `signedDate` lisibles trivialement.
+ * The snapshot (label, amount, date, account) is read from the `transaction`
+ * object already loaded by the caller, frozen at decision time. Deltas are
+ * only computed when the deal carries a trivially readable
+ * `committedAmount` / `signedDate`.
  */
 export async function recordDecision(
   ctx: MutCtx,
@@ -68,6 +68,6 @@ export async function recordDecision(
     dealAmountExpected,
     amountDelta,
     dateDelta,
-    // FX (fxRate, amountInDealCurrency) : hors scope MVP 1, jamais écrits ici.
+    // FX (fxRate, amountInDealCurrency): out of MVP 1 scope, never written here.
   })
 }

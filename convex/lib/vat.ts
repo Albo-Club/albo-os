@@ -1,17 +1,17 @@
 /**
- * TVA — helpers partagés entre schéma, mutations, queries et outils agent.
- * La dérivation pure est miroir de src/lib/vat.ts (même convention que
- * searchText.ts), testée via node:test (tests/vat.test.ts).
+ * VAT — helpers shared between schema, mutations, queries and agent tools.
+ * The pure derivation mirrors src/lib/vat.ts (same convention as
+ * searchText.ts), tested via node:test (tests/vat.test.ts).
  *
- * Convention (cf. KNOWN_ISSUES.md « TVA récupérable ») : les montants de
- * transaction sont toujours TTC en cents ; le taux est stocké en basis
- * points sur les transactions `charge` / `product` uniquement ; le montant
- * de TVA est TOUJOURS dérivé, jamais stocké.
+ * Convention (cf. KNOWN_ISSUES.md « TVA récupérable »): transaction amounts
+ * are always VAT-inclusive (TTC) in cents; the rate is stored in basis
+ * points on `charge` / `product` transactions only; the VAT amount is
+ * ALWAYS derived, never stored.
  */
 
 import { v } from 'convex/values'
 
-/** Taux de TVA français autorisés, en basis points (2000 = 20 %). */
+/** Allowed French VAT rates, in basis points (2000 = 20 %). */
 export const VAT_RATES_BPS = [0, 550, 1000, 2000] as const
 
 export type VatRateBps = (typeof VAT_RATES_BPS)[number]
@@ -23,7 +23,7 @@ export const vatRateBpsValidator = v.union(
   v.literal(2000),
 )
 
-/** TVA contenue dans un montant TTC : ttc × taux / (10000 + taux). */
+/** VAT contained in a VAT-inclusive (TTC) amount: ttc × rate / (10000 + rate). */
 export function vatCentsFromTtc(amountCents: number, rateBps: number): number {
   return Math.round((amountCents * rateBps) / (10000 + rateBps))
 }

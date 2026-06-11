@@ -1,27 +1,27 @@
 /**
- * Logique pure de la couche cash flow forecast (aucune dépendance Convex,
- * aucun import Node) : date-math de récurrence + décision d'upsert des
- * occurrences. Tout est calculé en UTC sur des ms epoch, conformément aux
- * conventions du schéma. Testé par tests/recurrence.test.ts (node:test,
- * volontairement hors de convex/ pour rester hors du bundle de déploiement).
+ * Pure logic of the cash flow forecast layer (no Convex dependency, no Node
+ * import): recurrence date-math + upsert decision for occurrences.
+ * Everything is computed in UTC on ms epochs, per the schema conventions.
+ * Tested by tests/recurrence.test.ts (node:test, deliberately outside
+ * convex/ to stay out of the deployment bundle).
  */
 
 export type ForecastFrequency = 'weekly' | 'monthly' | 'quarterly' | 'yearly'
 
 export type RecurrenceRule = {
   frequency: ForecastFrequency
-  /** « Tous les N pas » — 1 = chaque semaine/mois/trimestre/année. */
+  /** "Every N steps" — 1 = every week/month/quarter/year. */
   interval: number
-  /** Jour du mois 1-31 (monthly/quarterly/yearly) ou jour ISO 1-7 (weekly). */
+  /** Day of month 1-31 (monthly/quarterly/yearly) or ISO day 1-7 (weekly). */
   anchorDay: number
   startDate: number
-  /** Borne incluse ; absent = sans fin. */
+  /** Inclusive bound; absent = no end. */
   endDate?: number
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-/** Nombre de jours du mois (month 0-based, normalisé par Date.UTC), en UTC. */
+/** Number of days in the month (month 0-based, normalized by Date.UTC), UTC. */
 function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
 }
@@ -31,30 +31,30 @@ export function isoDay(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10)
 }
 
-/** "YYYY-MM" UTC — clé de bucket pour l'agrégation mensuelle du solde. */
+/** "YYYY-MM" UTC — bucket key for the monthly balance aggregation. */
 export function monthKey(ms: number): string {
   return new Date(ms).toISOString().slice(0, 7)
 }
 
-/** Clé d'idempotence d'une occurrence dérivée d'une règle. */
+/** Idempotency key of an occurrence derived from a rule. */
 export function ruleDerivedKey(ruleId: string, occurrenceMs: number): string {
   return `rule:${ruleId}:${isoDay(occurrenceMs)}`
 }
 
-// ─── Agrégation mensuelle du solde projeté ──────────────────────────────────
+// ─── Monthly aggregation of the projected balance ───────────────────────────
 
 export type ForecastConfidence = 'confirmed' | 'expected' | 'probable'
 
 export type ForecastEntryStatus = 'pending' | 'realized' | 'cancelled'
 
-/** Rang de confiance : `minConfidence` inclut tout rang supérieur ou égal. */
+/** Confidence rank: `minConfidence` includes any rank above or equal. */
 export const CONFIDENCE_RANK: Record<ForecastConfidence, number> = {
   confirmed: 2,
   expected: 1,
   probable: 0,
 }
 
-/** Champs d'une entry nécessaires à l'agrégation du solde. */
+/** Entry fields needed for the balance aggregation. */
 export type BalanceEntry = {
   date: number
   amountCents: number
@@ -72,21 +72,21 @@ export type MonthlyBalance = {
   projectedBalanceCents: number
 }
 
-/** Minuit UTC du 1er du mois de `ms`. */
+/** Midnight UTC of the 1st of `ms`'s month. */
 function startOfMonthUtc(ms: number): number {
   const d = new Date(ms)
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)
 }
 
 /**
- * Agrège des entries prévisionnelles en solde projeté mensuel cumulé.
+ * Aggregates forecast entries into a cumulative monthly projected balance.
  *
- * - Seules les entries `pending`, en EUR, de confiance ≥ `minConfidence`
- *   comptent (absent = tout). Les non-EUR sont comptées à part (visibilité),
- *   jamais agrégées.
- * - La grille couvre tous les mois de [windowStart, windowEnd], y compris
- *   ceux sans flux (net 0), pour une trajectoire continue.
- * - Le solde projeté de chaque mois = solde de départ + cumul des nets.
+ * - Only `pending` entries, in EUR, with confidence ≥ `minConfidence` count
+ *   (absent = everything). Non-EUR entries are counted apart (visibility),
+ *   never aggregated.
+ * - The grid covers every month of [windowStart, windowEnd], including
+ *   those without flows (net 0), for a continuous trajectory.
+ * - Each month's projected balance = starting balance + cumulative nets.
  */
 export function buildMonthlyBalance(params: {
   entries: Array<BalanceEntry>
@@ -99,7 +99,7 @@ export function buildMonthlyBalance(params: {
     ? CONFIDENCE_RANK[params.minConfidence]
     : 0
 
-  // Grille de mois (clé → flux), dans l'ordre chronologique.
+  // Month grid (key → flows), in chronological order.
   const buckets = new Map<
     string,
     { inflowCents: number; outflowCents: number }
@@ -121,7 +121,7 @@ export function buildMonthlyBalance(params: {
     }
     if (CONFIDENCE_RANK[entry.confidence] < minRank) continue
     const bucket = buckets.get(monthKey(entry.date))
-    if (!bucket) continue // hors fenêtre
+    if (!bucket) continue // out of window
     if (entry.direction === 'in') bucket.inflowCents += entry.amountCents
     else bucket.outflowCents += entry.amountCents
   }
@@ -143,9 +143,9 @@ export function buildMonthlyBalance(params: {
   return { months, ignoredNonEurEntries }
 }
 
-// ─── Historique mensuel du solde réel ───────────────────────────────────────
+// ─── Monthly history of the actual balance ──────────────────────────────────
 
-/** Champs d'une transaction réelle nécessaires à l'historique du solde. */
+/** Actual transaction fields needed for the balance history. */
 export type HistoryTx = {
   transactionDate: number
   amountCents: number
@@ -154,18 +154,18 @@ export type HistoryTx = {
 
 export type MonthlyHistoryPoint = {
   monthKey: string
-  /** Solde en fin de mois (mois courant : solde à `now`). */
+  /** End-of-month balance (current month: balance at `now`). */
   balanceCents: number
 }
 
 /**
- * Reconstruit le solde de fin de mois des `monthsBack` derniers mois à
- * REBOURS depuis le solde courant : solde(fin de M) = solde courant − somme
- * des flux nets postérieurs à M. Le dernier point est le mois courant au
- * solde courant — il sert de jonction avec la courbe projetée.
+ * Rebuilds the end-of-month balance of the last `monthsBack` months
+ * BACKWARDS from the current balance: balance(end of M) = current balance −
+ * sum of the net flows after M. The last point is the current month at the
+ * current balance — it serves as the junction with the projected curve.
  *
- * Les transactions hors fenêtre (avant `monthsBack` mois ou après `now`)
- * sont ignorées. Sortie chronologique, `monthsBack + 1` points.
+ * Transactions outside the window (before `monthsBack` months ago or after
+ * `now`) are ignored. Chronological output, `monthsBack + 1` points.
  */
 export function buildMonthlyHistory(params: {
   transactions: Array<HistoryTx>
@@ -175,7 +175,7 @@ export function buildMonthlyHistory(params: {
 }): Array<MonthlyHistoryPoint> {
   const currentMonthStart = startOfMonthUtc(params.now)
 
-  // Flux net par mois de la fenêtre (les mois sans flux comptent 0).
+  // Net flow per month of the window (months without flows count as 0).
   const netByMonth = new Map<string, number>()
   for (let k = 0; k <= params.monthsBack; k++) {
     netByMonth.set(monthKey(addMonthsUtc(currentMonthStart, -k)), 0)
@@ -184,15 +184,15 @@ export function buildMonthlyHistory(params: {
     if (tx.transactionDate > params.now) continue
     const key = monthKey(tx.transactionDate)
     const net = netByMonth.get(key)
-    if (net === undefined) continue // hors fenêtre
+    if (net === undefined) continue // out of window
     netByMonth.set(
       key,
       net + (tx.direction === 'in' ? tx.amountCents : -tx.amountCents),
     )
   }
 
-  // À rebours : on retire le net de chaque mois pour obtenir le solde de fin
-  // du mois précédent.
+  // Backwards: subtract each month's net to get the previous month's
+  // end-of-month balance.
   const points: Array<MonthlyHistoryPoint> = []
   let balance = params.currentBalanceCents
   for (let k = 0; k <= params.monthsBack; k++) {
@@ -204,20 +204,20 @@ export function buildMonthlyHistory(params: {
   return points
 }
 
-// ─── Décision d'upsert des occurrences générées ─────────────────────────────
+// ─── Upsert decision for generated occurrences ──────────────────────────────
 
-/** État minimal d'une entry existante pour décider de l'upsert. */
+/** Minimal state of an existing entry to decide the upsert. */
 export type ExistingEntryState = {
   overridden: boolean
   status: ForecastEntryStatus
 }
 
 /**
- * Décision d'upsert d'une occurrence générée par expandRules :
- * - `create` : aucune entry pour cette derivedKey.
- * - `skip` : l'entry existante est protégée — éditée à la main (`overridden`),
- *   déjà réalisée ou annulée. La régénération ne la touche JAMAIS.
- * - `update` : entry dérivée intacte → resynchro depuis la règle.
+ * Upsert decision for an occurrence generated by expandRules:
+ * - `create`: no entry for this derivedKey.
+ * - `skip`: the existing entry is protected — hand-edited (`overridden`),
+ *   already realized or cancelled. Regeneration NEVER touches it.
+ * - `update`: pristine derived entry → resync from the rule.
  */
 export function entryUpsertAction(
   existing: ExistingEntryState | null,
@@ -228,8 +228,8 @@ export function entryUpsertAction(
 }
 
 /**
- * Ajoute n mois (UTC) à un timestamp en clampant le jour du mois
- * (31 janv. + 1 mois = 28/29 févr.). Sert à borner l'horizon de projection.
+ * Adds n months (UTC) to a timestamp, clamping the day of month
+ * (Jan 31 + 1 month = Feb 28/29). Used to bound the projection horizon.
  */
 export function addMonthsUtc(ms: number, months: number): number {
   const d = new Date(ms)
@@ -249,17 +249,17 @@ export function addMonthsUtc(ms: number, months: number): number {
   )
 }
 
-/** Minuit UTC du `anchorDay` (clampé au dernier jour) du mois year/month. */
+/** Midnight UTC of `anchorDay` (clamped to the last day) of month year/month. */
 function monthAnchor(year: number, month: number, anchorDay: number): number {
   const day = Math.min(anchorDay, daysInMonth(year, month))
   return Date.UTC(year, month, day)
 }
 
 /**
- * Déplie les occurrences d'une règle dans la fenêtre [from, to] (bornes
- * incluses). Les occurrences tombent à minuit UTC, jamais avant `startDate`
- * ni après `endDate`. La séquence est ancrée sur `startDate` (un trimestriel
- * démarré en mars tombe en mars/juin/sept./déc., quel que soit `from`).
+ * Expands a rule's occurrences within the [from, to] window (inclusive
+ * bounds). Occurrences fall at midnight UTC, never before `startDate` nor
+ * after `endDate`. The sequence is anchored on `startDate` (a quarterly
+ * started in March falls in March/June/Sept/Dec, whatever `from` is).
  */
 export function expandOccurrences(
   rule: RecurrenceRule,
@@ -280,9 +280,9 @@ export function expandOccurrences(
       start.getUTCMonth(),
       start.getUTCDate(),
     )
-    // getUTCDay() : 0 = dimanche … 6 = samedi → ISO : 1 = lundi … 7 = dimanche.
+    // getUTCDay(): 0 = Sunday … 6 = Saturday → ISO: 1 = Monday … 7 = Sunday.
     const startIsoDay = start.getUTCDay() === 0 ? 7 : start.getUTCDay()
-    // Première occurrence : premier `anchorDay` ISO ≥ startDate.
+    // First occurrence: first ISO `anchorDay` ≥ startDate.
     const offsetDays = (rule.anchorDay - startIsoDay + 7) % 7
     const stepMs = 7 * interval * DAY_MS
     for (
@@ -295,7 +295,7 @@ export function expandOccurrences(
     return out
   }
 
-  // monthly / quarterly / yearly : pas exprimé en mois.
+  // monthly / quarterly / yearly: step expressed in months.
   const monthsPerStep =
     rule.frequency === 'monthly'
       ? interval
@@ -306,8 +306,8 @@ export function expandOccurrences(
   const start = new Date(rule.startDate)
   const year = start.getUTCFullYear()
   let month = start.getUTCMonth()
-  // Première occurrence ≥ startDate : le anchorDay du mois de startDate,
-  // sinon celui du pas suivant.
+  // First occurrence ≥ startDate: the anchorDay of startDate's month,
+  // otherwise the next step's.
   if (monthAnchor(year, month, rule.anchorDay) < rule.startDate) {
     month += monthsPerStep
   }

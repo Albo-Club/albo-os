@@ -1,9 +1,9 @@
 /**
- * Vue agrégée cross-org (lecture seule). Union des deals de TOUTES les
- * organisations dont l'utilisateur courant est membre. Une nouvelle org
- * apparaît d'office (la frontière d'autorisation = les memberships).
+ * Cross-org aggregated view (read-only). Union of the deals of ALL
+ * organizations the current user is a member of. A new org shows up
+ * automatically (the authorization boundary = the memberships).
  *
- * Pas de mutation ici : l'édition se fait dans la vue par-org.
+ * No mutations here: editing happens in the per-org view.
  */
 
 import { query } from './_generated/server'
@@ -41,13 +41,13 @@ async function enrich(
     investor: companyRef(investor),
     target: companyRef(target),
     spv: companyRef(spv),
-    // Versé / Reçu calculés depuis les transactions (cf. deals.transactionTotals)
+    // Versé / Reçu (paid out / received) computed from the transactions (cf. deals.transactionTotals)
     ...(await transactionTotals(ctx, deal._id)),
     lastValuationCents: await lastValuationCents(ctx, deal._id),
   }
 }
 
-/** Tous les deals de toutes mes orgs, enrichis et taggés par org. */
+/** All deals across all my orgs, enriched and tagged by org. */
 export const listDeals = query({
   args: {},
   handler: async (ctx) => {

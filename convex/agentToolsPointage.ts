@@ -1,14 +1,14 @@
 /**
- * Outils agent de pointage transaction → deal / passif, scopés à l'org du
- * thread (même pattern que convex/agentTools.ts : internalQuery /
- * internalMutation + re-check membership via `actorUserId`).
+ * Agent tools for transaction → deal / liability matching (pointage),
+ * scoped to the thread's org (same pattern as convex/agentTools.ts:
+ * internalQuery / internalMutation + re-check membership via `actorUserId`).
  *
- * Le cœur des écritures vit dans convex/lib/pointage.ts (partagé avec les
- * mutations publiques) ; les décisions agent sont loggées
- * `source: 'agent_suggested'` dans `matchingDecisions`.
+ * The write core lives in convex/lib/pointage.ts (shared with the public
+ * mutations); agent decisions are logged with `source: 'agent_suggested'`
+ * in `matchingDecisions`.
  *
- * Toute liste retournée est BORNÉE (`.take`) — jamais le `.collect()`
- * exhaustif des queries publiques (contexte LLM + guidelines Convex).
+ * Every returned list is BOUNDED (`.take`) — never the exhaustive
+ * `.collect()` of the public queries (LLM context + Convex guidelines).
  */
 
 import { ConvexError, v } from 'convex/values'
@@ -38,8 +38,8 @@ const SUGGEST_TX_MAX = 10
 const SUGGEST_TX_DEFAULT = 5
 const SIMILAR_PER_TX = 8
 const DECISIONS_SCAN = 200
-// Borne du scan de searchTransactions (totaux calculés sur cet ensemble),
-// alignée sur SEARCH_LIMIT des queries publiques (convex/transactions.ts).
+// Scan bound for searchTransactions (totals are computed over this set),
+// aligned with SEARCH_LIMIT of the public queries (convex/transactions.ts).
 const SEARCH_SCAN = 200
 
 function toISODate(ms: number): string {
@@ -106,7 +106,7 @@ export const listUnmatchedInternal = internalQuery({
   },
 })
 
-/** Statuts de pointage filtrables par searchTransactions. */
+/** Pointage statuses that searchTransactions can filter on. */
 const matchStatusFilter = v.union(
   v.literal('unmatched'),
   v.literal('matched'),
@@ -118,11 +118,11 @@ const matchStatusFilter = v.union(
 )
 
 /**
- * Recherche exploratoire sur TOUTES les transactions de l'org (tous statuts),
- * par libellé/contrepartie via le search index, avec totaux pré-agrégés pour
- * que le LLM ne fasse jamais d'arithmétique. Scan borné à SEARCH_SCAN lignes
- * (les totaux portent sur cet ensemble, `truncated` le signale) ; `rows` est
- * borné à `limit` en plus.
+ * Exploratory search over ALL the org's transactions (every status), by
+ * label/counterparty via the search index, with pre-aggregated totals so
+ * the LLM never does arithmetic. Scan bounded to SEARCH_SCAN rows (the
+ * totals cover that set, `truncated` flags it); `rows` is additionally
+ * bounded to `limit`.
  */
 export const searchTransactionsInternal = internalQuery({
   args: {
@@ -298,8 +298,8 @@ export const unpointInternal = internalMutation({
   handler: async (ctx, { orgId, actorUserId, transactionId }) => {
     await readMembership(ctx, orgId, actorUserId)
     const tx = await getOrgTransaction(ctx, orgId, transactionId)
-    // Route selon le type de pointage : passif → détachement silencieux,
-    // deal (ou rien) → unmatch loggé.
+    // Route by pointage type: liability → silent deallocation,
+    // deal (or nothing) → logged unmatch.
     if (tx.allocation && tx.allocation.kind !== 'deal') {
       await applyDeallocate(ctx, tx)
     } else {
@@ -310,8 +310,8 @@ export const unpointInternal = internalMutation({
 })
 
 /**
- * Libellé lisible d'une cible de pointage (pour les suggestions).
- * Mise en cache par l'appelant via `labelCache`.
+ * Human-readable label of a pointage target (for the suggestions).
+ * Cached by the caller via `labelCache`.
  */
 async function resolveTargetLabel(
   ctx: QueryCtx,
@@ -373,8 +373,8 @@ export const suggestMatchesInternal = internalQuery({
   handler: async (ctx, { orgId, actorUserId, transactionId, limit }) => {
     await readMembership(ctx, orgId, actorUserId)
 
-    // Transactions à traiter : une seule (id fourni) ou les N plus récentes
-    // de la file.
+    // Transactions to process: a single one (id provided) or the N most
+    // recent from the queue.
     const targets = transactionId
       ? [await getOrgTransaction(ctx, orgId, transactionId)]
       : await ctx.db
@@ -385,7 +385,7 @@ export const suggestMatchesInternal = internalQuery({
           .order('desc')
           .take(Math.min(Math.max(limit ?? SUGGEST_TX_DEFAULT, 1), SUGGEST_TX_MAX))
 
-    // Signal secondaire : décisions `matched` récentes par deal.
+    // Secondary signal: recent `matched` decisions per deal.
     const decisions = await ctx.db
       .query('matchingDecisions')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
@@ -462,7 +462,7 @@ export const suggestMatchesInternal = internalQuery({
   },
 })
 
-// ─── Tools exposés à l'agent ────────────────────────────────────────────────
+// ─── Tools exposed to the agent ─────────────────────────────────────────────
 
 const listUnmatchedTransactions = createTool({
   description:

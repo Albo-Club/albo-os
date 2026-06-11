@@ -41,14 +41,14 @@ function Passif() {
     api.liabilities.getLiabilities,
     org ? { orgId: org._id } : 'skip',
   )
-  // Orgs de l'utilisateur — alimentent les selects des dialogs de création
-  // (détenteur d'une position de capital, parties d'un C/C).
+  // The user's orgs — feed the selects in the creation dialogs
+  // (holder of an equity position, parties of a shareholder loan).
   const me = useConvexQuery(api.users.me)
   const orgs = me?.kind === 'ready' ? me.orgs : undefined
 
-  // Le pointage des transactions vers ces cibles vit dans l'onglet Pointage
-  // (combobox Deals / Capitaux propres / Comptes courants) ; ici on lit les
-  // soldes, on détache, et on crée les cibles.
+  // Matching transactions to these targets lives in the Pointage tab
+  // (Deals / Equity / Shareholder loans combobox); here we read the
+  // balances, detach, and create the targets.
   return (
     <main className="flex-1 space-y-8 p-6">
       <div className="space-y-1">

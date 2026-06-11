@@ -16,7 +16,7 @@ bas de page.
 
 ---
 
-## v1.4.0 — 11/06/2026 à 01:15 — Toutes les listes paginées, entrée dans l'app plus directe
+## v1.4.0 — 11/06/2026 à 09:50 — Toutes les listes paginées, entrée dans l'app plus directe
 
 ### 📄 Des listes qui restent fluides partout
 
@@ -32,6 +32,13 @@ L'app vous amène désormais directement sur votre dernière organisation, en
 une seule étape : la redirection se décide immédiatement, avant même le
 chargement de vos données. Sur un nouvel appareil, l'app retrouve votre
 dernière organisation comme avant.
+
+---
+
+## v1.3.3 — 11/06/2026 à 09:46 — Nettoyage interne
+
+Harmonisation interne du code (commentaires unifiés en anglais). Aucun
+changement visible dans l'app.
 
 ---
 

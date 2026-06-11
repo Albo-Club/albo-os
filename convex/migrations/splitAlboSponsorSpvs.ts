@@ -1,28 +1,28 @@
 /**
- * Split one-shot : éclatement des companies chapeaux Parallel Invest / Sezame
- * de l'org `albo` en une company par SPV émetteur.
+ * One-shot split: breaking up the Parallel Invest / Sezame umbrella companies
+ * of the `albo` org into one company per issuing SPV.
  *
- * Contexte : l'import Attio (`attioAlboImport.ts`) reflète le modèle Attio où
- * 1 company = la plateforme et 1 deal = le SPV. Le modèle cible d'Albo OS est
- * « 1 entité juridique = 1 company » : chaque SPV devient sa propre company
- * (`kind: 'portfolio'`, `sponsor` = nom de la plateforme), et le deal pointe
- * dessus via `targetCompanyId`. Les deals sont déjà distincts (ancre
- * `attioDealId`) : aucun split de deal, aucun re-rattachement de
- * transactions/valuations (liées par `dealId`, inchangé).
+ * Context: the Attio import (`attioAlboImport.ts`) mirrors the Attio model
+ * where 1 company = the platform and 1 deal = the SPV. Albo OS's target model
+ * is "1 legal entity = 1 company": each SPV becomes its own company
+ * (`kind: 'portfolio'`, `sponsor` = platform name), and the deal points to it
+ * via `targetCompanyId`. The deals are already distinct (anchored by
+ * `attioDealId`): no deal split, no re-attachment of transactions/valuations
+ * (linked by `dealId`, unchanged).
  *
- * Scope : Parallel Invest (4 deals) + Sezame (2 deals). Rewatt exclu
- * volontairement — ses deals restent sur la company chapeau.
+ * Scope: Parallel Invest (4 deals) + Sezame (2 deals). Rewatt deliberately
+ * excluded — its deals stay on the umbrella company.
  *
- * Idempotent : les companies SPV sont ancrées par
+ * Idempotent: the SPV companies are anchored by
  * `airtableId = split:attio:{attioDealId}` (index `by_airtable_id`).
- * Re-lancer `apply` ne crée aucun doublon. ⚠️ Re-lancer
- * `attioAlboImport:run` re-pointe les deals vers les chapeaux → re-lancer
- * `apply` ensuite (cf. KNOWN_ISSUES.md « Split chapeaux Attio → SPV »).
+ * Re-running `apply` creates no duplicates. ⚠️ Re-running
+ * `attioAlboImport:run` re-points the deals to the umbrellas → re-run
+ * `apply` afterwards (cf. KNOWN_ISSUES.md « Split chapeaux Attio → SPV »).
  *
- * Ordre d'exécution (prod, manuel) :
+ * Execution order (prod, manual):
  *   pnpm exec convex export --prod                                   # snapshot
  *   pnpm exec convex run --prod migrations/splitAlboSponsorSpvs:dryRun
- *   # STOP : valider le rapport, puis seulement :
+ *   # STOP: validate the report, then and only then:
  *   pnpm exec convex run --prod migrations/splitAlboSponsorSpvs:apply
  *   pnpm exec convex run --prod migrations/splitAlboSponsorSpvs:verify
  */
@@ -31,12 +31,12 @@ import { internalMutation, internalQuery } from '../_generated/server'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
 import type { DataModel, Doc, Id } from '../_generated/dataModel'
 
-/** Helpers partagés entre dryRun/verify (query) et apply (mutation). */
+/** Helpers shared between dryRun/verify (query) and apply (mutation). */
 type Ctx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>
 
 const ORG_SLUG = 'albo'
 
-/** Companies chapeaux à éclater (pont Attio conservé sur le chapeau archivé). */
+/** Umbrella companies to split (Attio bridge kept on the archived umbrella). */
 const UMBRELLAS = [
   {
     sponsor: 'Parallel',
@@ -51,8 +51,8 @@ const UMBRELLAS = [
 ] as const
 
 /**
- * Mapping deal Attio → company SPV cible. Le nom Attio du deal reste dans
- * `deal.notes` (non modifié) pour la traçabilité.
+ * Mapping Attio deal → target SPV company. The deal's Attio name stays in
+ * `deal.notes` (unmodified) for traceability.
  */
 const SPLITS = [
   {
@@ -87,10 +87,10 @@ const SPLITS = [
   },
 ] as const
 
-/** Ancre d'idempotence de la company SPV créée pour un deal donné. */
+/** Idempotency anchor of the SPV company created for a given deal. */
 const splitKey = (attioDealId: string) => `split:attio:${attioDealId}`
 
-// ─── Helpers (lecture) ────────────────────────────────────────────────────────
+// ─── Helpers (read-only) ──────────────────────────────────────────────────────
 
 async function getAlboOrg(ctx: Ctx) {
   const org = await ctx.db
@@ -117,8 +117,8 @@ async function getUmbrellaCompany(
 }
 
 /**
- * Références (hors deals.targetCompanyId) qui pointent encore vers une
- * company : elles bloquent son archivage et sont rapportées telles quelles.
+ * References (besides deals.targetCompanyId) still pointing to a company:
+ * they block its archiving and are reported as-is.
  */
 async function listBlockingRefs(
   ctx: Ctx,
@@ -148,8 +148,8 @@ async function listBlockingRefs(
         q.eq('orgId', orgId).eq('ownerCompanyId', companyId),
       )
       .collect(),
-    // Pas d'index sur viaSpvCompanyId / investorCompanyId : scan des deals de
-    // l'org (volume faible, migration one-shot).
+    // No index on viaSpvCompanyId / investorCompanyId: scan the org's deals
+    // (low volume, one-shot migration).
     ctx.db
       .query('deals')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
@@ -190,7 +190,7 @@ const dealSummary = (deal: Doc<'deals'>) => ({
   notes: deal.notes ?? null,
 })
 
-// ─── dryRun — lecture seule, point d'arrêt avant toute écriture ──────────────
+// ─── dryRun — read-only, stopping point before any write ─────────────────────
 
 export const dryRun = internalQuery({
   args: {},
@@ -244,8 +244,8 @@ export const dryRun = internalQuery({
         attioCompanyId: company.attioCompanyId,
         alreadyArchived: company.archivedAt != null,
         dealCount: deals.length,
-        // Invariant : les montants ne bougent pas (on ne touche pas aux deals,
-        // seulement à leur targetCompanyId) — AVANT = APRÈS par construction.
+        // Invariant: the amounts do not move (we don't touch the deals, only
+        // their targetCompanyId) — BEFORE = AFTER by construction.
         totalPaidAmount: totalPaid,
         totalCommittedAmount: totalCommitted,
         plan,
@@ -258,7 +258,7 @@ export const dryRun = internalQuery({
       })
     }
 
-    // Entrées du mapping dont le deal n'existe pas en prod.
+    // Mapping entries whose deal does not exist in prod.
     const missingDeals = []
     for (const s of SPLITS) {
       const deal = await ctx.db
@@ -282,7 +282,7 @@ export const dryRun = internalQuery({
   },
 })
 
-// ─── apply — écritures, idempotent, à lancer après validation du dryRun ──────
+// ─── apply — writes, idempotent, run after validating the dryRun ─────────────
 
 export const apply = internalMutation({
   args: {},
@@ -310,7 +310,7 @@ export const apply = internalMutation({
         continue
       }
 
-      // Upsert de la company SPV (ancre d'idempotence : airtableId).
+      // Upsert the SPV company (idempotency anchor: airtableId).
       const key = splitKey(s.attioDealId)
       const existing = await ctx.db
         .query('companies')
@@ -337,7 +337,7 @@ export const apply = internalMutation({
       }
     }
 
-    // Archivage des chapeaux : uniquement si plus aucune référence.
+    // Archive the umbrellas: only if no reference remains.
     const umbrellasArchived: Array<string> = []
     const umbrellasKept: Array<{ name: string; reason: string }> = []
     for (const u of UMBRELLAS) {
@@ -379,14 +379,14 @@ export const apply = internalMutation({
   },
 })
 
-// ─── verify — rapport final post-apply ───────────────────────────────────────
+// ─── verify — final post-apply report ────────────────────────────────────────
 
 export const verify = internalQuery({
   args: {},
   handler: async (ctx) => {
     const org = await getAlboOrg(ctx)
 
-    // Deals splittés : target attendue = company SPV non archivée + sponsor.
+    // Split deals: expected target = non-archived SPV company + sponsor.
     const splitDeals = []
     for (const s of SPLITS) {
       const deal = await ctx.db
@@ -412,7 +412,7 @@ export const verify = internalQuery({
       })
     }
 
-    // Orphelins : deals de l'org dont la target est absente ou archivée.
+    // Orphans: org deals whose target is missing or archived.
     const orgDeals = await ctx.db
       .query('deals')
       .withIndex('by_org', (q) => q.eq('orgId', org._id))
@@ -428,7 +428,7 @@ export const verify = internalQuery({
       }
     }
 
-    // État des chapeaux.
+    // State of the umbrellas.
     const umbrellas = []
     for (const u of UMBRELLAS) {
       const company = await getUmbrellaCompany(ctx, org._id, u.attioCompanyId)

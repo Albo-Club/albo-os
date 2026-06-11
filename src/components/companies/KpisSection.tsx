@@ -25,10 +25,9 @@ import {
 } from '~/components/ui/table'
 
 /**
- * KPIs d'une company (kpiSnapshots), les plus récents d'abord. Saisie
- * AI-first : on colle le reporting dans l'assistant qui extrait les
- * métriques (createKpiSnapshot) — pas de formulaire ici, juste lecture et
- * suppression.
+ * KPIs of a company (kpiSnapshots), most recent first. AI-first entry:
+ * paste the reporting into the assistant, which extracts the metrics
+ * (createKpiSnapshot) — no form here, just read and delete.
  */
 export function KpisSection({ companyId }: { companyId: Id<'companies'> }) {
   const { t, i18n } = useTranslation(['participations', 'common'])
@@ -37,8 +36,8 @@ export function KpisSection({ companyId }: { companyId: Id<'companies'> }) {
   const removeKpi = useConvexMutation(api.kpis.remove)
   const [deleteId, setDeleteId] = useState<Id<'kpiSnapshots'> | null>(null)
 
-  // Valeur formatée selon l'unité : cents EUR → €, bps → multiple ×, sinon
-  // nombre brut (+ unité).
+  // Value formatted per unit: EUR cents → €, bps → × multiple, otherwise
+  // raw number (+ unit).
   function fmtValue(value: number, unit: string | null): string {
     if (unit === 'EUR_cents') return fmtEur(value)
     if (unit === 'bps') {

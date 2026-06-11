@@ -13,8 +13,8 @@ http.route({
   handler: streamOverHttp,
 })
 
-// Webhook Powens (CONNECTION_SYNCED) — signature HMAC vérifiée dans le handler.
-// Le chemin doit matcher l'URL configurée chez Powens (cf. WEBHOOK_PATH).
+// Powens webhook (CONNECTION_SYNCED) — HMAC signature verified in the handler.
+// The path must match the URL configured on the Powens side (cf. WEBHOOK_PATH).
 http.route({
   path: '/powens/webhook',
   method: 'POST',

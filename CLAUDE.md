@@ -406,6 +406,12 @@ export const remove = mutation({
   (`ConvexError('not_found')`, `AuthErrorCode` values), logs, comments,
   i18n key names. New strings need both an `en` and a `fr` entry. See
   `KNOWN_ISSUES.md` "i18n (react-i18next) SSR" for the no-flash rules.
+- ❌ A code comment written in French. **All code comments are in English**
+  — `//`, `/* */`, JSDoc, JSX `{/* */}` and CSS comments, in every file
+  (`src/`, `convex/`, `tests/`, `scripts/`). French stays reserved for
+  user-facing copy (i18n strings, `convex/emailTemplates.ts`, agent
+  prompts/tool descriptions, `CHANGELOG_PRODUIT.md`) and for the docs
+  written in French.
 - ❌ Module-level Zod schema carrying a hardcoded user-facing message. Build
   the schema inside the component via `useMemo(() => z.object({...}), [t])`
   so messages resolve from the `validation` namespace.

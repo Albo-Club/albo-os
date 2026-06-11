@@ -83,9 +83,9 @@ function Info({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 /**
- * Dialog de renommage du compte : édite UNIQUEMENT `displayName`.
- * `label` (nom d'origine import/banque) reste en lecture seule ; un nom
- * vide efface `displayName` et l'affichage retombe sur `label`.
+ * Account rename dialog: edits ONLY `displayName`.
+ * `label` (original import/bank name) stays read-only; an empty name
+ * clears `displayName` and the display falls back to `label`.
  */
 function RenameAccountDialog({
   account,
@@ -160,9 +160,9 @@ function AccountDetail() {
     bankAccountId: accountId as Id<'bankAccounts'>,
   })
 
-  // Recherche serveur (search index Convex), debouncée. Pendant le
-  // rechargement d'un nouveau terme, on garde la dernière liste affichée
-  // (pas de flash de liste vide).
+  // Server-side search (Convex search index), debounced. While a new
+  // term is reloading, keep the last displayed list (no empty-list
+  // flash).
   const [search, setSearch] = useState('')
   const searchArg = useDebouncedValue(search).trim() || undefined
   const liveTransactions = useConvexQuery(api.cash.listAccountTransactions, {
@@ -230,7 +230,7 @@ function AccountDetail() {
             </Button>
           )}
         </div>
-        {/* Nom d'origine banque, lecture seule, visible seulement si renommé. */}
+        {/* Original bank name, read-only, shown only when renamed. */}
         {account?.displayName && (
           <p className="text-muted-foreground text-sm">
             {t('originalName', { name: account.label })}

@@ -1,9 +1,9 @@
 /**
- * Tests purs des séries « BP vs réalisé » (src/lib/projectionSeries.ts) :
- * alignement des périodes, cumuls, écart vs BP révisé (fallback initial),
- * clamp des transactions antérieures à la première période.
+ * Pure tests for the "plan vs actual" series (src/lib/projectionSeries.ts):
+ * period alignment, cumulative sums, gap vs the revised plan (falling back
+ * to the initial one), clamping of transactions before the first period.
  *
- * Lancés avec le test runner natif de Node via tsx (aucune dépendance) :
+ * Run with Node's native test runner via tsx (no dependency):
  *   pnpm test:unit
  */
 
@@ -47,7 +47,7 @@ describe('buildPlanVsActual', () => {
       actuals: [{ transactionDate: JAN + 1000, amount: 5_000, direction: 'in' }],
     })
     assert.equal(rows[0].actualCumCents, 5_000)
-    // vs révisé (6 000), pas vs initial (10 000)
+    // vs revised (6 000), not vs initial (10 000)
     assert.equal(rows[0].gapCumCents, -1_000)
   })
 
@@ -69,11 +69,11 @@ describe('buildPlanVsActual', () => {
       ],
       revised: [],
       actuals: [
-        // antérieure à la 1ʳᵉ période → clampée en janvier 2026
+        // before the 1st period → clamped to January 2026
         { transactionDate: Date.UTC(2025, 5, 1), amount: 100, direction: 'in' },
-        // entre juillet 2026 et janvier 2027 → juillet 2026
+        // between July 2026 and January 2027 → July 2026
         { transactionDate: Date.UTC(2026, 9, 15), amount: 200, direction: 'in' },
-        // après la dernière période → dernière période
+        // after the last period → last period
         { transactionDate: Date.UTC(2027, 5, 1), amount: 300, direction: 'out' },
       ],
     })

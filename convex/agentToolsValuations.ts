@@ -1,6 +1,6 @@
 /**
- * Outils agent des valorisations de deals, scopés à l'org du thread
- * (pattern convex/agentTools.ts). Les internals vivent dans
+ * Agent tools for deal valuations, scoped to the thread's org
+ * (convex/agentTools.ts pattern). The internals live in
  * convex/valuations.ts (listInternal / createInternal).
  */
 

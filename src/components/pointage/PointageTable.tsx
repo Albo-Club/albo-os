@@ -58,13 +58,13 @@ import {
   TableRow,
 } from '~/components/ui/table'
 
-/** Forme minimale d'une transaction non pointée (retour de `listUnmatched`). */
+/** Minimal shape of an unmatched transaction (return of `listUnmatched`). */
 export type UnmatchedTx = TxDetails
 
-/** Durée d'affichage du bandeau « Annuler » après un pointage/écartement. */
+/** Display duration of the « Annuler » banner after a match/discard. */
 const UNDO_DELAY_MS = 5000
 
-/** Destins « écarté » : ignorée, charge, impôt, produit ou virement interne. */
+/** « Écarté » fates: ignored, charge, tax, product or internal transfer. */
 type DiscardKind =
   | 'ignored'
   | 'charge'
@@ -72,10 +72,10 @@ type DiscardKind =
   | 'product'
   | 'internal_transfer'
 
-/** Statuts éligibles au classement en masse (jamais Rattacher ni Ignorer). */
+/** Statuses eligible for bulk categorization (never Match nor Ignore). */
 type BulkStatus = 'charge' | 'tax' | 'product' | 'internal_transfer'
 
-/** Clés i18n du dialog de confirmation bulk, par statut. */
+/** i18n keys of the bulk confirmation dialog, per status. */
 const bulkConfirmKeys: Record<BulkStatus, { title: string; body: string }> = {
   charge: { title: 'bulk.confirmCharge', body: 'bulk.confirmBodyCharge' },
   tax: { title: 'bulk.confirmTax', body: 'bulk.confirmBodyTax' },
@@ -88,13 +88,13 @@ const bulkConfirmKeys: Record<BulkStatus, { title: string; body: string }> = {
 
 type RecentAction = {
   tx: UnmatchedTx
-  // `matched` = rattachée à un deal, `allocated` = pointée sur le passif
-  // (l'annulation passe par deallocateTransaction, pas unmatchTransaction).
+  // `matched` = attached to a deal, `allocated` = allocated to a liability
+  // (undo goes through deallocateTransaction, not unmatchTransaction).
   kind: 'matched' | 'allocated' | DiscardKind
   targetName?: string
 }
 
-/** Combobox de cible (deal / passif) + Rattacher + menu « Écarter ». */
+/** Target combobox (deal / liability) + Match + « Écarter » menu. */
 function RowActions({
   deals,
   liabilityOptions,
@@ -157,8 +157,8 @@ function RowActions({
 }
 
 /**
- * Bandeau transitoire « Rattachée à {cible} · Annuler » / « Ignorée · Annuler »
- * / « Classée en charge/impôt/produit/virement interne · Annuler ».
+ * Transient « Rattachée à {cible} · Annuler » / « Ignorée · Annuler »
+ * / « Classée en charge/impôt/produit/virement interne · Annuler » banner.
  */
 function UndoBanner({
   recent,
@@ -185,17 +185,17 @@ function UndoBanner({
 }
 
 /**
- * Table de pointage : transactions `unmatched` triées date desc, actions par
- * ligne (rattacher à un deal OU à une cible passif — equity / C/C —, écarter
- * en ignorée/charge/impôt/produit/virement interne), détail en sheet au clic,
- * et bandeau « Annuler » transitoire (~5 s) après chaque action — qui appelle
- * `unmatchTransaction` (deal/écartée) ou `deallocateTransaction` (passif).
- * Classement en masse via les cases à cocher : barre de sélection →
- * Charge/Impôt/Produit/Virement interne → confirmation →
- * `bulkCategorize` (un seul appel serveur) + toast « Annuler » groupé.
- * La page n'écrit jamais `matchStatus`/`reconciled` directement : tout passe
- * par les mutations du backend. Rendered with local pagination (see
- * `usePagination`).
+ * Matching table: `unmatched` transactions sorted by date desc, per-row
+ * actions (match to a deal OR to a liability target — equity / C/C —,
+ * discard as ignored/charge/tax/product/internal transfer), detail sheet on
+ * click, and a transient « Annuler » banner (~5 s) after each action — which
+ * calls `unmatchTransaction` (deal/discarded) or `deallocateTransaction`
+ * (liability). Bulk categorization via the checkboxes: selection bar →
+ * Charge/Tax/Product/Internal transfer → confirmation →
+ * `bulkCategorize` (a single server call) + grouped « Annuler » toast.
+ * The page never writes `matchStatus`/`reconciled` directly: everything
+ * goes through the backend mutations. Rendering is paginated locally
+ * (cf. `usePagination`).
  */
 export function PointageTable({
   transactions,
@@ -206,11 +206,11 @@ export function PointageTable({
 }: {
   transactions: Array<UnmatchedTx> | undefined
   deals: Array<DealOption> | undefined
-  /** Cibles passif (equity / C/C) de l'org, construites par la page. */
+  /** Liability targets (equity / C/C) of the org, built by the page. */
   liabilityOptions: LiabilityOptionGroups | undefined
-  /** Message d'état vide alternatif (ex. recherche sans résultat). */
+  /** Alternative empty-state message (e.g. search with no results). */
   emptyMessage?: string
-  /** Remet la pagination à la première page quand cette clé change. */
+  /** Resets the pagination to the first page when this key changes. */
   pageResetKey: string
 }) {
   const { t } = useTranslation('pointage')
@@ -262,8 +262,8 @@ export function PointageTable({
     new Map<Id<'transactions'>, ReturnType<typeof setTimeout>>(),
   )
 
-  // Purge la sélection des transactions sorties de la file (réactivité
-  // Convex après classement, pointage par un autre user…).
+  // Prune the selection of transactions that left the queue (Convex
+  // reactivity after categorization, matching by another user…).
   useEffect(() => {
     if (!transactions) return
     setSelectedIds((prev) => {
@@ -273,7 +273,7 @@ export function PointageTable({
     })
   }, [transactions])
 
-  // Nettoyage des timers du bandeau « Annuler » au démontage.
+  // Clean up the « Annuler » undo-banner timers on unmount.
   useEffect(() => {
     const timeouts = timeoutsRef.current
     return () => {
@@ -329,8 +329,8 @@ export function PointageTable({
   async function handleDiscard(tx: UnmatchedTx, kind: DiscardKind) {
     setPendingId(tx._id)
     try {
-      // Une charge part avec un taux de TVA de 20 % par défaut, ajustable
-      // ensuite dans l'onglet Charges (setVatRate).
+      // A charge starts with a default 20% VAT rate, adjustable later in
+      // the Charges tab (setVatRate).
       if (kind === 'charge') {
         await categorizeAsCharge({
           transactionId: tx._id,
@@ -352,15 +352,15 @@ export function PointageTable({
     const tx = action.tx
     setPendingId(tx._id)
     try {
-      // Un pointage passif s'annule via deallocateTransaction (un unmatch
-      // deal sur une tx allouée passif est refusé par le backend).
+      // A liability allocation is undone via deallocateTransaction (a deal
+      // unmatch on a liability-allocated tx is rejected by the backend).
       if (action.kind === 'allocated') {
         await deallocateTransaction({ transactionId: tx._id })
       } else {
         await unmatchTransaction({ transactionId: tx._id })
       }
-      // La query réactive ré-inclut la ligne ; on retire le bandeau après le
-      // retour de la mutation pour éviter tout flicker.
+      // The reactive query re-includes the row; remove the banner after the
+      // mutation returns to avoid any flicker.
       removeRecent(tx._id)
     } catch (err) {
       reportError(err)
@@ -378,8 +378,8 @@ export function PointageTable({
     })
   }
 
-  // Annulation groupée : boucle de `unmatchTransaction` côté front (volume
-  // faible — uniquement les ids du lot qui viennent d'être classés).
+  // Grouped undo: front-side loop of `unmatchTransaction` (low volume —
+  // only the ids of the batch that was just categorized).
   async function handleBulkUndo(ids: Array<Id<'transactions'>>) {
     try {
       await Promise.all(
@@ -390,8 +390,8 @@ export function PointageTable({
     }
   }
 
-  // Classement en masse : UN SEUL appel serveur pour tout le lot. Les lignes
-  // classées sortent de la file via la réactivité Convex sur `listUnmatched`.
+  // Bulk categorization: a SINGLE server call for the whole batch. The rows
+  // leave the queue via Convex reactivity on `listUnmatched` once classed.
   async function handleBulkCategorize(status: BulkStatus) {
     const ids = [...selectedIds]
     setBulkPending(true)
@@ -422,8 +422,8 @@ export function PointageTable({
     }
   }
 
-  // Lignes affichées = transactions `unmatched` (query) + lignes récemment
-  // pointées/écartées (state local, le temps du bandeau « Annuler »).
+  // Displayed rows = `unmatched` transactions (query) + recently
+  // matched/discarded rows (local state, while the « Annuler » banner shows).
   const rows = useMemo(() => {
     if (!transactions) return undefined
     const recentById = new Map(recent.map((r) => [r.tx._id, r]))
@@ -665,9 +665,9 @@ export function PointageTable({
 }
 
 /**
- * Sélecteur de taux de TVA d'une ligne charge/produit (« À qualifier » /
- * 0 % / 5,5 % / 10 % / 20 %) → `setVatRate`. Le montant de TVA dérivé du TTC
- * s'affiche sous le sélecteur quand un taux est posé.
+ * VAT rate selector for a charge/product row (« À qualifier » /
+ * 0% / 5.5% / 10% / 20%) → `setVatRate`. The VAT amount derived from the
+ * tax-inclusive total shows below the selector once a rate is set.
  */
 function VatRateSelect({
   tx,
@@ -724,13 +724,13 @@ function VatRateSelect({
 }
 
 /**
- * Vue de consultation des transactions écartées (charges / impôts / produits
- * / virements internes) : table lecture seule alimentée par `listByStatus`,
- * avec « Annuler » par ligne (→ `unmatchTransaction`, la transaction repart
- * dans la file « À pointer »). Sur les onglets Charges/Produits
- * (`vatEditable`), une colonne TVA permet de qualifier le taux de chaque
- * ligne (TVA déductible/collectée — cf. carte « TVA récupérable » de la page
- * Trésorerie). Rendered with local pagination (see `usePagination`).
+ * Read-only view of the discarded transactions (charges / taxes / products
+ * / internal transfers): table fed by `listByStatus`, with a per-row
+ * « Annuler » action (→ `unmatchTransaction`, the transaction goes back to
+ * the « À pointer » queue). On the Charges/Products tabs (`vatEditable`),
+ * a VAT column qualifies each row's rate (deductible/collected VAT — see
+ * the « TVA récupérable » card on the Treasury page). Rendering is
+ * paginated locally (cf. `usePagination`).
  */
 export function DiscardedTable({
   transactions,
@@ -739,11 +739,11 @@ export function DiscardedTable({
   pageResetKey,
 }: {
   transactions: Array<UnmatchedTx> | undefined
-  /** Message d'état vide alternatif (ex. recherche sans résultat). */
+  /** Alternative empty-state message (e.g. search with no results). */
   emptyMessage?: string
-  /** Affiche la colonne TVA (onglets Charges et Produits uniquement). */
+  /** Shows the VAT column (Charges and Products tabs only). */
   vatEditable?: boolean
-  /** Remet la pagination à la première page quand cette clé change. */
+  /** Resets the pagination to the first page when this key changes. */
   pageResetKey: string
 }) {
   const { t } = useTranslation('pointage')
@@ -768,7 +768,7 @@ export function DiscardedTable({
   async function handleUndo(tx: UnmatchedTx) {
     setPendingId(tx._id)
     try {
-      // La query réactive retire la ligne de cette vue d'elle-même.
+      // The reactive query removes the row from this view on its own.
       await unmatchTransaction({ transactionId: tx._id })
     } catch (err) {
       reportError(err)

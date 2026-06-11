@@ -1,8 +1,9 @@
 /**
- * Tests purs de la dérivation TVA (convex/lib/vat.ts, miroir src/lib/vat.ts) :
- * montants TTC en cents, taux en basis points, TVA jamais stockée.
+ * Pure tests for the VAT derivation (convex/lib/vat.ts, mirrored in
+ * src/lib/vat.ts): VAT-inclusive amounts in cents, rates in basis points,
+ * VAT never stored.
  *
- * Lancés avec le test runner natif de Node via tsx (aucune dépendance) :
+ * Run with Node's native test runner via tsx (no dependency):
  *   pnpm test:unit
  */
 

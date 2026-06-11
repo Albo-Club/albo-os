@@ -1,8 +1,8 @@
 /**
- * Outils agent du business plan (dealProjections) et des KPIs portfolio
- * (kpiSnapshots), scopés à l'org du thread (pattern convex/agentTools.ts).
- * C'est le canal de saisie AI-first du Lot 2 : coller un BP ou un reporting
- * dans le chat → l'agent structure les lignes/métriques.
+ * Agent tools for the business plan (dealProjections) and portfolio KPIs
+ * (kpiSnapshots), scoped to the thread's org (convex/agentTools.ts pattern).
+ * This is the AI-first input channel of Lot 2: paste a BP or a reporting
+ * into the chat → the agent structures the lines/metrics.
  */
 
 import { ConvexError } from 'convex/values'

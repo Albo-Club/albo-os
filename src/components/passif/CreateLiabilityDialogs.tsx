@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 
-/** Org sélectionnable (sous-ensemble de `api.users.me` → `orgs`). */
+/** Selectable org (subset of `api.users.me` → `orgs`). */
 export type OrgOption = {
   _id: Id<'organizations'>
   name: string
@@ -35,7 +35,7 @@ export type OrgOption = {
 
 type EquityType = Doc<'equityPositions'>['type']
 
-/** Valeurs de l'enum `equityPositionType` du schéma (ordre du dropdown). */
+/** Values of the schema's `equityPositionType` enum (dropdown order). */
 const EQUITY_TYPES = [
   'capital_social',
   'prime_emission',
@@ -43,26 +43,26 @@ const EQUITY_TYPES = [
   'report_a_nouveau',
 ] as const satisfies ReadonlyArray<EquityType>
 
-/** Date du jour au format `YYYY-MM-DD` (valeur par défaut des champs date). */
+/** Today's date as `YYYY-MM-DD` (default value of the date fields). */
 const today = () => new Date().toISOString().slice(0, 10)
 
-/** ms epoch → `YYYY-MM-DD` (préremplissage en mode édition). */
+/** ms epoch → `YYYY-MM-DD` (prefill in edit mode). */
 const msToDateInput = (ms: number) => new Date(ms).toISOString().slice(0, 10)
 
-/** Parse un montant saisi en euros → cents (null si invalide ou ≤ 0). */
+/** Parse an amount typed in euros → cents (null if invalid or ≤ 0). */
 function parseEuros(value: string): number | null {
   const parsed = Number.parseFloat(value.replace(',', '.'))
   if (!Number.isFinite(parsed) || parsed <= 0) return null
   return Math.round(parsed * 100)
 }
 
-// ─── « + Capital » / éditer ──────────────────────────────────────────────────
+// ─── « + Capital » / edit ────────────────────────────────────────────────────
 
 /**
- * Dialog de création OU d'édition d'une position de capitaux propres émise
- * par l'org courante (`liabilities:createEquityPosition` /
- * `updateEquityPosition`). `position` absent = création. Le détenteur est
- * soit une org du groupe, soit un libellé libre, soit aucun.
+ * Dialog to create OR edit an equity position issued by the current org
+ * (`liabilities:createEquityPosition` / `updateEquityPosition`). Absent
+ * `position` = creation. The holder is either a group org, a free-form
+ * label, or none.
  */
 export function CreateEquityDialog({
   orgId,
@@ -88,7 +88,7 @@ export function CreateEquityDialog({
   const [amount, setAmount] = useState(
     position ? String(position.amountCents / 100) : '',
   )
-  // 'none' | 'external' | un _id d'organisation.
+  // 'none' | 'external' | an organization _id.
   const [holder, setHolder] = useState<string>(
     position?.holderOrgId ?? (position?.holderLabel ? 'external' : 'none'),
   )
@@ -101,7 +101,7 @@ export function CreateEquityDialog({
   )
   const [pending, setPending] = useState(false)
 
-  // L'org émettrice ne peut pas détenir son propre capital.
+  // The issuing org cannot hold its own capital.
   const holderOrgs = orgs.filter((org) => org._id !== orgId)
 
   const amountCents = parseEuros(amount)
@@ -111,7 +111,7 @@ export function CreateEquityDialog({
     (holder !== 'external' || holderLabel.trim() !== '')
 
   async function handleSave() {
-    // `valid` implique `amountCents !== null` (narrowing TS par alias).
+    // `valid` implies `amountCents !== null` (TS narrowing via alias).
     if (!valid) return
     setPending(true)
     try {
@@ -260,14 +260,15 @@ export function CreateEquityDialog({
   )
 }
 
-// ─── « + Compte courant » / éditer ───────────────────────────────────────────
+// ─── « + Compte courant » / edit ─────────────────────────────────────────────
 
 /**
- * Dialog de création OU d'édition d'un compte courant inter-entités
- * créancier → débiteur (`liabilities:createIntercompanyLoan` /
- * `updateIntercompanyLoan`). `loan` absent = création. En édition les parties
- * ne sont PAS modifiables (le solde dérivé dépend de l'identité du prêt) :
- * seuls date, taux et blocage le sont. Taux en % converti en bps.
+ * Dialog to create OR edit a creditor → debtor inter-entity current
+ * account (`liabilities:createIntercompanyLoan` /
+ * `updateIntercompanyLoan`). Absent `loan` = creation. In edit mode the
+ * parties are NOT editable (the derived balance depends on the loan's
+ * identity): only date, rate and blocked flag are. Rate in % converted
+ * to bps.
  */
 export function CreateLoanDialog({
   orgId,

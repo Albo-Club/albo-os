@@ -1,8 +1,8 @@
 /**
- * Tests purs du ranking des suggestions de pointage
- * (convex/lib/suggest.ts, outil agent `suggestMatches`).
+ * Pure tests for the ranking of pointage suggestions
+ * (convex/lib/suggest.ts, agent tool `suggestMatches`).
  *
- * Lancés avec le test runner natif de Node via tsx (aucune dépendance) :
+ * Run with Node's native test runner via tsx (no dependency):
  *   pnpm test:unit
  */
 
@@ -56,7 +56,7 @@ describe('rankCandidates', () => {
     })
     assert.equal(out[0].targetId, 'd1')
     assert.equal(out[0].evidence.decisionsCount, 100)
-    // Cap : 100 décisions ne pèsent pas plus que 5.
+    // Cap: 100 decisions weigh no more than 5.
     assert.equal(out[0].score, 1 * 3 + 5)
   })
 

@@ -1,7 +1,7 @@
 /**
- * Valorisations d'un deal — historique horodaté `valuations` (fairValue en
- * cents). Jusqu'ici la table n'était écrite que par seed/import Airtable ;
- * ce module expose la lecture/création (UI + agent).
+ * Deal valuations — timestamped history in `valuations` (fairValue in
+ * cents). Until now the table was only written by seed/Airtable import;
+ * this module exposes read/create (UI + agent).
  */
 
 import { ConvexError, v } from 'convex/values'
@@ -42,7 +42,7 @@ function pickValuation(row: Doc<'valuations'>) {
   }
 }
 
-/** Historique des valos d'un deal, la plus récente d'abord. */
+/** Valuation history of a deal, most recent first. */
 export const list = query({
   args: { dealId: v.id('deals') },
   handler: async (ctx, { dealId }) => {
@@ -59,7 +59,7 @@ export const list = query({
   },
 })
 
-/** Ajoute une valorisation à un deal (fairValue en cents, asOf ms epoch). */
+/** Adds a valuation to a deal (fairValue in cents, asOf ms epoch). */
 export const create = mutation({
   args: {
     dealId: v.id('deals'),
@@ -87,7 +87,7 @@ export const create = mutation({
   },
 })
 
-// ─── Variantes agent (re-check membership via actorUserId) ──────────────────
+// ─── Agent variants (re-check membership via actorUserId) ───────────────────
 
 export const listInternal = internalQuery({
   args: {

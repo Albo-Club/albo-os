@@ -1,12 +1,12 @@
 /**
- * Tests purs du câblage des cibles passif du combobox de pointage
- * (src/lib/liabilityOptions.ts).
+ * Pure tests for the wiring of the liability targets in the pointage
+ * combobox (src/lib/liabilityOptions.ts).
  *
- * Régression du bug « le groupe Comptes courants n'apparaît pas » : un
- * intercompanyLoan retourné par getLiabilities DOIT produire une option de
- * groupe Comptes courants (kind 'intercompany_loan', targetId = loan._id).
+ * Regression for the "Comptes courants group does not show up" bug: an
+ * intercompanyLoan returned by getLiabilities MUST produce a Comptes
+ * courants group option (kind 'intercompany_loan', targetId = loan._id).
  *
- * Lancés avec le test runner natif de Node via tsx (aucune dépendance) :
+ * Run with Node's native test runner via tsx (no dependency):
  *   pnpm test:unit
  */
 
@@ -78,10 +78,10 @@ describe('buildLiabilityOptions', () => {
 
     assert.equal(groups.equityOptions.length, 1)
     assert.equal(groups.loanOptions.length, 1)
-    // Détenteur / contrepartie absents → placeholder.
+    // Missing holder / counterparty → placeholder.
     assert.equal(groups.equityOptions[0].sublabel, '—')
     assert.equal(groups.loanOptions[0].label, '—')
-    // Côté débiteur → sous-libellé « Dette ».
+    // Debtor side → "Dette" sublabel.
     assert.equal(groups.loanOptions[0].sublabel, 'Dette')
   })
 

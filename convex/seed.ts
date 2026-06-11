@@ -1,16 +1,16 @@
 /**
- * Seed du groupe Calte — modèle MULTI-ORG.
+ * Calte group seed — MULTI-ORG model.
  *
- * Albo et Calte sont deux organisations Better Auth distinctes. Chaque org
- * porte ses propres entités juridiques (`companies`). Une nouvelle entité
- * d'invest = une nouvelle org (apparaît d'office dans la vue agrégée).
+ * Albo and Calte are two distinct Better Auth organizations. Each org
+ * carries its own legal entities (`companies`). A new investment entity
+ * = a new org (automatically appears in the aggregated view).
  *
- * Idempotent : upsert org par slug, companies par name, relations par couple
- * parent/child. Personnes physiques et sociétés externes vivent dans `notes`.
+ * Idempotent: upsert orgs by slug, companies by name, relations by
+ * parent/child pair. Natural persons and external companies live in `notes`.
  *
- * Lancer (prod, dev supprimé) :
- *   npx convex export --prod                          # snapshot de secours
- *   npx convex run --prod seed:cleanupLegacy          # purge l'ancienne org combinée
+ * Run (prod only, dev deleted):
+ *   npx convex export --prod                          # safety snapshot
+ *   npx convex run --prod seed:cleanupLegacy          # purge the old combined org
  *   npx convex run --prod seed:seedAll '{"ownerEmail":"benjamin@alboteam.com"}'
  */
 
@@ -22,7 +22,7 @@ import type { MutationCtx } from './_generated/server'
 
 const LEGACY_SLUG = 'calte-family-office'
 
-// UTC ms epoch — dates de constitution (source : Notion « Architecture BDD »).
+// UTC ms epoch — incorporation dates (source: Notion « Architecture BDD »).
 const d = (y: number, m: number, day: number) => Date.UTC(y, m - 1, day)
 
 type GroupKind = 'group_root' | 'group_operating' | 'group_sci' | 'group_manco'
@@ -123,7 +123,7 @@ const CALTE_COMPANIES: Array<SeedCompany> = [
   },
 ]
 
-// Détention intra-org Calte : parent toujours CALTE.
+// Intra-org Calte ownership: parent is always CALTE.
 const CALTE_RELATIONS: Array<{ child: string; ownershipPct: number }> = [
   { child: 'Caltimo', ownershipPct: 100 },
   { child: 'RDB', ownershipPct: 100 },
@@ -215,7 +215,7 @@ async function upsertGroup(
   return { companies: companies.length, relations: relations.length }
 }
 
-/** Upsert une org par slug (réutilise l'existante, maj le nom) + owner membre. */
+/** Upsert an org by slug (reuse existing, update name) + owner membership. */
 async function ensureOrg(
   ctx: MutationCtx,
   slug: string,
@@ -258,8 +258,8 @@ async function ensureOrg(
 // ─── Mutations ──────────────────────────────────────────────────────────────
 
 /**
- * Crée/maj les orgs Calte + Albo, rattache l'owner (super-admin) aux deux,
- * et seed leurs entités. Idempotent.
+ * Create/update the Calte + Albo orgs, attach the owner (super-admin) to
+ * both, and seed their entities. Idempotent.
  */
 export const seedAll = internalMutation({
   args: { ownerEmail: v.optional(v.string()) },
@@ -301,7 +301,7 @@ export const seedAll = internalMutation({
   },
 })
 
-/** Supprime l'ancienne org combinée "Calte Family Office" et toutes ses lignes. */
+/** Delete the old combined "Calte Family Office" org and all its rows. */
 export const cleanupLegacy = internalMutation({
   args: {},
   handler: async (ctx) => {
@@ -376,9 +376,10 @@ export const cleanupLegacy = internalMutation({
 })
 
 /**
- * Purge la table legacy `forecasts` (alimentée par l'import Airtable, lue par
- * rien — le prévisionnel vit dans forecastRules/forecastEntries). Préalable
- * au retrait de la table du schéma : runbook dans MIGRATIONS.md.
+ * Purge the legacy `forecasts` table (fed by the Airtable import, read by
+ * nothing — the cash forecast lives in forecastRules/forecastEntries).
+ * Prerequisite to removing the table from the schema: runbook in
+ * MIGRATIONS.md.
  *
  *   npx convex run --prod seed:purgeLegacyForecasts
  */

@@ -1,11 +1,11 @@
 /**
- * Outils DB de l'agent chat, scopés à l'org du thread.
+ * Chat agent DB tools, scoped to the thread's org.
  *
- * La scope key du thread est `${orgId}:${userId}` (cf. chat.ts). L'action de
- * streaming n'a pas d'identité auth → chaque outil re-vérifie l'appartenance
- * via `actorUserId` passé aux internalQuery/internalMutation (readMembership).
+ * The thread's scope key is `${orgId}:${userId}` (cf. chat.ts). The streaming
+ * action has no auth identity → each tool re-checks membership via
+ * `actorUserId` passed to the internalQuery/internalMutation (readMembership).
  *
- * Montants : cents EUR (50 000 € → 5000000). Taux : bps (11 % → 1100).
+ * Amounts: cents EUR (50 000 € → 5000000). Rates: bps (11 % → 1100).
  */
 
 import { ConvexError, v } from 'convex/values'
@@ -85,7 +85,7 @@ export const createCompanyInternal = internalMutation({
     await readMembership(ctx, orgId, actorUserId)
     const trimmed = name.trim()
     if (!trimmed) throw new ConvexError('invalid_name')
-    // L'agent ne crée que des sociétés portfolio (jamais d'entités groupe).
+    // The agent only creates portfolio companies (never group entities).
     const id = await ctx.db.insert('companies', {
       orgId,
       name: trimmed,
@@ -133,7 +133,7 @@ export const createDealInternal = internalMutation({
     if (args.viaSpvCompanyId) {
       await assertSameOrg(ctx, args.orgId, args.viaSpvCompanyId, 'spv_wrong_org')
     }
-    // L'investisseur doit être une entité du groupe (pas une portfolio).
+    // The investor must be a group entity (not a portfolio company).
     const investor = await ctx.db.get("companies", args.investorCompanyId)
     if (!investor || investor.orgId !== args.orgId) {
       throw new ConvexError('investor_wrong_org')
@@ -183,7 +183,7 @@ export const createBankAccountInternal = internalMutation({
   },
   handler: async (ctx, args) => {
     await readMembership(ctx, args.orgId, args.actorUserId)
-    // Le propriétaire d'un compte est toujours une entité du groupe.
+    // An account's owner is always a group entity.
     const owner = await ctx.db.get("companies", args.ownerCompanyId)
     if (!owner || owner.orgId !== args.orgId) {
       throw new ConvexError('owner_wrong_org')
@@ -257,7 +257,7 @@ export const createTransactionInternal = internalMutation({
         throw new ConvexError('deal_wrong_org')
       }
     }
-    // Pointage : matched ⟺ dealId présent ; `reconciled` suit (miroir dérivé).
+    // Pointage: matched ⟺ dealId present; `reconciled` follows (derived mirror).
     const id = await ctx.db.insert('transactions', {
       orgId: args.orgId,
       bankAccountId: args.bankAccountId,
@@ -304,7 +304,7 @@ export const updateDealInternal = internalMutation({
   },
 })
 
-// ─── Tools exposés à l'agent ────────────────────────────────────────────────
+// ─── Tools exposed to the agent─────────────────────────────────────────────
 
 const listCompanies = createTool({
   description:

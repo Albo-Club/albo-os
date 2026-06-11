@@ -15,8 +15,8 @@ export const Route = createFileRoute('/app/$orgSlug')({
   component: OrgLayout,
 })
 
-// Panneau AI persistant : même pattern de persistance que sidebar_state
-// (cookie 7 jours), ouvert par défaut.
+// Persistent AI panel: same persistence pattern as sidebar_state
+// (7-day cookie), open by default.
 const AI_PANEL_COOKIE_NAME = 'ai_panel_state'
 const AI_PANEL_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 
@@ -42,7 +42,7 @@ function OrgLayout() {
     document.cookie = `${AI_PANEL_COOKIE_NAME}=${open}; path=/; max-age=${AI_PANEL_COOKIE_MAX_AGE}`
   }, [])
 
-  // ⌘J / Ctrl+J : toggle du panneau AI (même pattern que le ⌘B de la sidebar).
+  // ⌘J / Ctrl+J: toggle the AI panel (same pattern as the sidebar's ⌘B).
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'j' && (event.metaKey || event.ctrlKey)) {
@@ -116,15 +116,15 @@ function OrgLayout() {
         <aside
           className={cn(
             'bg-background flex-col',
-            // Desktop (≥ lg) : carte arrondie dans le flux, même langage
-            // visuel que SidebarInset (variant inset : m-2 rounded-xl shadow).
+            // Desktop (≥ lg): rounded card in the flow, same visual
+            // language as SidebarInset (inset variant: m-2 rounded-xl shadow).
             'lg:static lg:z-auto lg:my-2 lg:mr-2 lg:ml-0 lg:h-auto lg:w-[400px] lg:max-w-none lg:shrink-0 lg:overflow-hidden lg:rounded-xl lg:border-0 lg:shadow-sm',
-            // Mobile : overlay plein écran à droite.
+            // Mobile: full-screen overlay on the right.
             'fixed inset-y-0 right-0 z-50 w-full max-w-md border-l shadow-xl',
             aiOpen ? 'flex' : 'hidden',
           )}
         >
-          {/* key : remount propre au changement d'org (thread state org-scopé) */}
+          {/* key: clean remount on org change (org-scoped thread state) */}
           <AiPanel
             key={org._id}
             orgId={org._id}

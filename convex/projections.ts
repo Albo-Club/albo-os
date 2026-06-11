@@ -1,10 +1,10 @@
 /**
- * Business plan d'un deal (`dealProjections`) : lignes datées attendues,
- * versions 'initial' (BP au closing, figé) et 'revised' (BP actualisé).
- * Le réalisé vit dans les transactions pointées sur le deal — jamais ici.
+ * Deal business plan (`dealProjections`): expected dated lines, versions
+ * 'initial' (BP at closing, frozen) and 'revised' (updated BP).
+ * Actuals live in the transactions matched to the deal — never here.
  *
- * Saisie en bloc par version (`replaceVersion` = delete + insert) : c'est ce
- * qui rend l'écriture idempotente et triviale pour l'agent (coller un BP).
+ * Bulk entry per version (`replaceVersion` = delete + insert): this is what
+ * makes writes idempotent and trivial for the agent (paste a BP).
  */
 
 import { ConvexError, v } from 'convex/values'
@@ -23,8 +23,8 @@ import type { MutationCtx, QueryCtx } from './_generated/server'
 const versionValidator = v.union(v.literal('initial'), v.literal('revised'))
 
 const lineValidator = v.object({
-  period: v.number(), // ms epoch, début de période
-  amountCents: v.number(), // positif
+  period: v.number(), // ms epoch, start of period
+  amountCents: v.number(), // positive
   direction: v.union(v.literal('in'), v.literal('out')),
   notes: v.optional(v.string()),
 })
@@ -56,7 +56,7 @@ function assertValidLines(lines: Array<Line>) {
       throw new ConvexError('invalid_amount')
     }
     if (!Number.isFinite(line.period)) throw new ConvexError('invalid_period')
-    // Unicité (version, period) — Convex n'a pas d'unique au schéma.
+    // Uniqueness (version, period) — Convex has no unique constraint at the schema.
     if (seen.has(line.period)) throw new ConvexError('duplicate_period')
     seen.add(line.period)
   }
@@ -85,7 +85,7 @@ async function listForDeal(ctx: QueryCtx, dealId: Id<'deals'>) {
   }
 }
 
-/** Remplace TOUTES les lignes d'une version (saisie en bloc, idempotent). */
+/** Replaces ALL lines of a version (bulk entry, idempotent). */
 async function replaceVersionCore(
   ctx: MutationCtx,
   deal: Doc<'deals'>,
@@ -116,7 +116,7 @@ async function replaceVersionCore(
   return { replaced: existing.length, inserted: lines.length }
 }
 
-/** BP d'un deal, lignes triées par période, groupées par version. */
+/** A deal's BP, lines sorted by period, grouped by version. */
 export const listByDeal = query({
   args: { dealId: v.id('deals') },
   handler: async (ctx, { dealId }) => {
@@ -141,7 +141,7 @@ export const replaceVersion = mutation({
   },
 })
 
-// ─── Variantes agent (re-check membership via actorUserId) ──────────────────
+// ─── Agent variants (re-check membership via actorUserId) ───────────────────
 
 export const listInternal = internalQuery({
   args: {
