@@ -11,7 +11,7 @@ Pré-requis :
   - `BETTER_AUTH_SECRET`
   - `SITE_URL` (`http://localhost:3000` en local)
   - `RESEND_API_KEY` + `RESEND_FROM` + `RESEND_TEST_MODE=true` en dev
-  - `ANTHROPIC_API_KEY` (modèle par défaut : `claude-haiku-4-5`)
+  - `MISTRAL_API_KEY` (modèle par défaut : `mistral-medium-3.5`)
 - `.env.local` rempli (`VITE_CONVEX_URL`, `CONVEX_DEPLOYMENT`)
 - 2 navigateurs (ou 1 navigateur + 1 fenêtre incognito) prêts pour les
   tests multi-tenant
@@ -511,5 +511,5 @@ sidebar « Passif » dans le groupe Plateforme.
 - Auth échoue → vérifier `BETTER_AUTH_SECRET` + `SITE_URL` côté Convex env.
 - Emails non reçus → `RESEND_API_KEY` valide + `RESEND_TEST_MODE=false` pour
   recevoir réellement.
-- AI ne stream pas → `ANTHROPIC_API_KEY` + vérifier `convex/agent.ts` (modèle
-  par défaut `claude-haiku-4-5`).
+- AI ne stream pas → `MISTRAL_API_KEY` + vérifier `convex/agent.ts` (modèle
+  par défaut `mistral-medium-3.5`).

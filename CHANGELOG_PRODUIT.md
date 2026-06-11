@@ -16,6 +16,10 @@ bas de page.
 
 ---
 
+## v1.5.1 — 11/06/2026 à 10:21 — Passage de l'assistant IA sur Mistral
+
+L'assistant intégré (panneau ⌘J) tourne désormais sur Mistral Medium 3.5. Mêmes outils, mêmes conversations — seul le moteur de réponse change.
+
 ## v1.5.0 — 11/06/2026 à 10:20 — L'assistant agit, vous validez d'un clic
 
 ### ✅ Confirmer une action en un clic
