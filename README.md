@@ -1,23 +1,23 @@
 # albo-os — l'ouvre-boîte
 
-Opinionated B2B SaaS MVP starter: **TanStack Start + Convex + Better Auth + Resend + Anthropic + Tailwind v4**.
+Opinionated B2B SaaS MVP starter: **TanStack Start + Convex + Better Auth + Resend + Mistral + Tailwind v4**.
 
 Multi-tenant by default (orgs, members, invitations, roles), with an AI chat
 sidebar wired in, transactional emails, rate-limiting, and CI/CD on day one.
 
 ## Stack
 
-| Layer        | Choice                                                          |
-| ------------ | --------------------------------------------------------------- |
-| Front-end    | React 19 · TanStack Start v1 · TanStack Router (file-based)     |
-| State / data | TanStack Query · Convex (real-time queries, mutations, HTTP)    |
-| Forms        | TanStack Form · Zod                                             |
-| Styling      | Tailwind v4 (CSS-first) · shadcn/ui · Inter · tokens in oklch   |
-| Auth         | Better Auth (email/password + magic link) + `organization()`    |
-| Email        | Resend (HTML + plain text templates)                            |
-| AI           | Convex Agent + Anthropic Claude (Haiku 4.5 default, with tools) |
-| Limiter      | `@convex-dev/rate-limiter`                                      |
-| Observ.      | Sentry (front-end), Convex built-in logs                        |
+| Layer        | Choice                                                        |
+| ------------ | ------------------------------------------------------------- |
+| Front-end    | React 19 · TanStack Start v1 · TanStack Router (file-based)   |
+| State / data | TanStack Query · Convex (real-time queries, mutations, HTTP)  |
+| Forms        | TanStack Form · Zod                                           |
+| Styling      | Tailwind v4 (CSS-first) · shadcn/ui · Inter · tokens in oklch |
+| Auth         | Better Auth (email/password + magic link) + `organization()`  |
+| Email        | Resend (HTML + plain text templates)                          |
+| AI           | Convex Agent + Mistral (Medium 3.5 default, with tools)       |
+| Limiter      | `@convex-dev/rate-limiter`                                    |
+| Observ.      | Sentry (front-end), Convex built-in logs                      |
 
 ## Getting started
 
@@ -71,7 +71,7 @@ Then open **http://localhost:3000** and create your first account.
 2. **Project name** — rebrands page titles, agent identity, cookie prefix.
 3. **Convex backend** — opens a browser to log in, provisions your dev
    deployment, writes `CONVEX_DEPLOYMENT` + `VITE_CONVEX_URL` to `.env.local`.
-4. **API keys** — prompts for Anthropic + Resend with direct dashboard links
+4. **API keys** — prompts for Mistral + Resend with direct dashboard links
    so you don't have to hunt for the URLs.
 5. **Better Auth secret** — auto-generated.
 6. **Google OAuth** _(optional)_ — prompts for `GOOGLE_CLIENT_ID` /
@@ -97,7 +97,7 @@ convex/                Convex backend
   invitations.ts       invite, accept, revoke (with email send)
   users.ts             me, provisionMe, updateProfile
   admin.ts             super-admin queries + purgeExcept (dev cleanup)
-  agent.ts             AI agent instance (Anthropic, default Haiku 4.5)
+  agent.ts             AI agent instance (Mistral, default Medium 3.5)
   chat.ts              threads, sendMessage, listMessages, HTTP /api/chat
   rateLimiters.ts      named limits + consumeLimit helper
   lib/auth.ts          requireAppUser, requireOrgMember, requireOrgRole, …
@@ -218,7 +218,7 @@ pnpm run setup:prod
 ```
 
 The script prompts for your prod domain, reads your dev env, mirrors the
-secrets (Resend, Anthropic, optional Sentry, and the Google OAuth credentials
+secrets (Resend, Mistral, optional Sentry, and the Google OAuth credentials
 if you set them in dev) to prod, generates a **fresh** `BETTER_AUTH_SECRET`
 (never reused from dev — same secret across envs would let a dev session token
 unlock prod), sets `APP_ENV=production`, `SITE_URL`, `BETTER_AUTH_URL`,
@@ -241,7 +241,7 @@ If you prefer the manual route:
 pnpm exec convex env set --prod BETTER_AUTH_SECRET "$(openssl rand -hex 32)"
 pnpm exec convex env set --prod BETTER_AUTH_URL https://<your-domain>
 pnpm exec convex env set --prod SITE_URL https://<your-domain>
-pnpm exec convex env set --prod ANTHROPIC_API_KEY sk-ant-...
+pnpm exec convex env set --prod MISTRAL_API_KEY <key>...
 pnpm exec convex env set --prod RESEND_API_KEY re_...
 pnpm exec convex env set --prod RESEND_FROM "hello@yourdomain.com"
 pnpm exec convex env set --prod RESEND_TEST_MODE false
@@ -291,7 +291,7 @@ Vercel frontend, isolated from prod. Architecture:
    ```
 
    The script prompts for the staging deploy key + staging domain, mirrors
-   Resend/Anthropic (and Google OAuth if set) from your dev env, generates
+   Resend/Mistral (and Google OAuth if set) from your dev env, generates
    a **fresh** `BETTER_AUTH_SECRET`, sets `APP_ENV=production`,
    `SITE_URL`/`BETTER_AUTH_URL` to the staging domain and
    `RESEND_TEST_MODE=false`, then runs `convex deploy` against staging.

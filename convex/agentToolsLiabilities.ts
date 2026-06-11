@@ -12,8 +12,11 @@ import { z } from 'zod/v3'
 import { internal } from './_generated/api'
 import { internalMutation, internalQuery } from './_generated/server'
 import { getLiabilitiesForOrg } from './liabilities'
+import { applyDeallocate } from './lib/pointage'
 import { parseScope, readMembership } from './lib/agentScope'
 import { equityPositionType } from './schema'
+import type { Id } from './_generated/dataModel'
+import type { QueryCtx } from './_generated/server'
 
 const EQUITY_TYPES = [
   'capital_social',
@@ -154,10 +157,11 @@ const listLiabilities = createTool({
 const createEquityPosition = createTool({
   description:
     'Create an equity position issued by the current org (capital social, ' +
-    'prime d’émission, augmentation de capital, report à nouveau). ' +
+    "prime d'émission, augmentation de capital, report à nouveau). " +
     'amountCents in CENTS EUR (10 000 € → 1000000). holderLabel is a free ' +
     'label for the holder (optional). effectiveDateISO is "YYYY-MM-DD". ' +
-    'Confirm with the user before calling.',
+    'The user approves via in-app buttons.',
+  needsApproval: true,
   inputSchema: z.object({
     type: z.enum(EQUITY_TYPES),
     amountCents: z.number().int().positive().describe('cents EUR'),
@@ -192,7 +196,8 @@ const createIntercompanyLoan = createTool({
     '"albo"). role is the position of the CURRENT org: "creditor" (it lends) ' +
     'or "debtor" (it borrows). interestRateBps in basis points (11% → 1100), ' +
     'omit for 0. The balance is derived later from allocated transactions. ' +
-    'Confirm with the user before calling.',
+    'The user approves via in-app buttons.',
+  needsApproval: true,
   inputSchema: z.object({
     role: z.enum(['creditor', 'debtor']),
     counterpartyOrgSlug: z.string().describe('Slug of the other org'),
@@ -217,8 +222,188 @@ const createIntercompanyLoan = createTool({
   },
 })
 
+async function getOrgTransaction(
+  ctx: QueryCtx,
+  orgId: Id<'organizations'>,
+  transactionId: Id<'transactions'>,
+) {
+  const tx = await ctx.db.get('transactions', transactionId)
+  if (!tx || tx.orgId !== orgId) throw new ConvexError('not_found')
+  return tx
+}
+
+export const updateEquityPositionInternal = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    positionId: v.id('equityPositions'),
+    holderLabel: v.optional(v.string()),
+    type: equityPositionType,
+    amountCents: v.number(),
+    shares: v.optional(v.number()),
+    effectiveDate: v.number(),
+  },
+  handler: async (ctx, { orgId, actorUserId, positionId, ...patch }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const position = await ctx.db.get('equityPositions', positionId)
+    if (!position || position.orgId !== orgId) throw new ConvexError('not_found')
+    if (patch.amountCents <= 0) throw new ConvexError('invalid_amount')
+
+    await ctx.db.patch('equityPositions', position._id, {
+      holderLabel: patch.holderLabel?.trim() || undefined,
+      type: patch.type,
+      amountCents: patch.amountCents,
+      shares: patch.shares,
+      effectiveDate: patch.effectiveDate,
+    })
+    return { _id: positionId }
+  },
+})
+
+export const updateIntercompanyLoanInternal = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    loanId: v.id('intercompanyLoans'),
+    interestRateBps: v.optional(v.number()),
+    isBlocked: v.boolean(),
+    openedDate: v.number(),
+  },
+  handler: async (ctx, { orgId, actorUserId, loanId, interestRateBps, isBlocked, openedDate }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const loan = await ctx.db.get('intercompanyLoans', loanId)
+    if (!loan) throw new ConvexError('not_found')
+    // Verify the actor's org is a party to this loan.
+    if (loan.fromOrgId !== orgId && loan.toOrgId !== orgId) {
+      throw new ConvexError('not_a_party')
+    }
+    if (interestRateBps != null && interestRateBps < 0) {
+      throw new ConvexError('invalid_rate')
+    }
+    await ctx.db.patch('intercompanyLoans', loan._id, {
+      interestRateBps,
+      isBlocked,
+      openedDate,
+    })
+    return { _id: loanId }
+  },
+})
+
+export const deallocateTransactionInternal = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    transactionId: v.id('transactions'),
+  },
+  handler: async (ctx, { orgId, actorUserId, transactionId }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const tx = await getOrgTransaction(ctx, orgId, transactionId)
+    await applyDeallocate(ctx, tx)
+    return { _id: transactionId, matchStatus: 'unmatched' as const }
+  },
+})
+
+// ─── Additional tools ────────────────────────────────────────────────────────
+
+const updateEquityPosition = createTool({
+  description:
+    'Update an equity position of the current org: type, amountCents, ' +
+    'holderLabel, shares, effectiveDate. All non-optional fields must be ' +
+    'provided (the dialog pre-fills with current values). amountCents in ' +
+    'CENTS EUR (positive integer). effectiveDateISO is "YYYY-MM-DD". ' +
+    'Use listLiabilities to find the positionId. The user approves via ' +
+    'in-app buttons.',
+  needsApproval: true,
+  inputSchema: z.object({
+    positionId: z.string().describe('equityPositions id'),
+    type: z.enum(EQUITY_TYPES),
+    amountCents: z.number().int().positive().describe('cents EUR'),
+    holderLabel: z.string().optional().describe('Holder name (free label)'),
+    shares: z.number().int().positive().optional(),
+    effectiveDateISO: z.string().describe('"YYYY-MM-DD"'),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    const effectiveDate = Date.parse(input.effectiveDateISO)
+    if (Number.isNaN(effectiveDate)) throw new ConvexError('invalid_effective_date')
+    return await ctx.runMutation(
+      internal.agentToolsLiabilities.updateEquityPositionInternal,
+      {
+        orgId,
+        actorUserId: userId,
+        positionId: input.positionId as Id<'equityPositions'>,
+        type: input.type,
+        amountCents: input.amountCents,
+        holderLabel: input.holderLabel,
+        shares: input.shares,
+        effectiveDate,
+      },
+    )
+  },
+})
+
+const updateIntercompanyLoan = createTool({
+  description:
+    'Update an intercompany current account (C/C): interest rate, blocked ' +
+    'status, and opened date. The creditor/debtor parties are NOT editable ' +
+    '— to change counterparty, delete and recreate. interestRateBps in ' +
+    'basis points (0 = non-interest-bearing; omit to clear). isBlocked and ' +
+    'openedDateISO ("YYYY-MM-DD") are required. Use listLiabilities to find ' +
+    'the loanId. The user approves via in-app buttons.',
+  needsApproval: true,
+  inputSchema: z.object({
+    loanId: z.string().describe('intercompanyLoans id'),
+    interestRateBps: z.number().int().min(0).optional(),
+    isBlocked: z.boolean(),
+    openedDateISO: z.string().describe('"YYYY-MM-DD"'),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    const openedDate = Date.parse(input.openedDateISO)
+    if (Number.isNaN(openedDate)) throw new ConvexError('invalid_opened_date')
+    return await ctx.runMutation(
+      internal.agentToolsLiabilities.updateIntercompanyLoanInternal,
+      {
+        orgId,
+        actorUserId: userId,
+        loanId: input.loanId as Id<'intercompanyLoans'>,
+        interestRateBps: input.interestRateBps,
+        isBlocked: input.isBlocked,
+        openedDate,
+      },
+    )
+  },
+})
+
+const deallocateTransaction = createTool({
+  description:
+    'Detach a transaction from its liability allocation (equity position or ' +
+    'intercompany loan): returns it to "unmatched" status. This is the ' +
+    'liability-side symmetric of unpointTransaction. Only works on ' +
+    'transactions allocated to a liability — for deal-matched transactions, ' +
+    'use unpointTransaction. The user approves via in-app buttons.',
+  needsApproval: true,
+  inputSchema: z.object({
+    transactionId: z.string(),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runMutation(
+      internal.agentToolsLiabilities.deallocateTransactionInternal,
+      {
+        orgId,
+        actorUserId: userId,
+        transactionId: input.transactionId as Id<'transactions'>,
+      },
+    )
+  },
+})
+
 export const liabilityTools = {
   listLiabilities,
   createEquityPosition,
   createIntercompanyLoan,
+  updateEquityPosition,
+  updateIntercompanyLoan,
+  deallocateTransaction,
 }

@@ -20,6 +20,7 @@ import { INSTRUMENTS, instrumentValidator } from './lib/instruments'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx } from './_generated/server'
 
+
 function companyName(c: Doc<'companies'> | null) {
   return c?.name ?? null
 }
@@ -341,6 +342,7 @@ const createCompany = createTool({
     'Create a PORTFOLIO company (an invested startup/fund/asset). Never use ' +
     'this for group entities (CALTE, Albo Club, SCIs… already exist). Call ' +
     'listCompanies first to avoid duplicates. Returns the new company id.',
+  needsApproval: true,
   inputSchema: z.object({
     name: z.string().min(1).describe('Company name, e.g. "Sezame"'),
     sector: z.string().optional(),
@@ -365,8 +367,9 @@ const createDeal = createTool({
     'listCompanies. The target is the invested company — create it with ' +
     'createCompany first if needed. Amounts are in CENTS EUR (50 000 € → ' +
     '5000000). Rates in basis points (11% → 1100). signedDate is an ISO date ' +
-    '"YYYY-MM-DD". For an SPV investment, pass viaSpvCompanyId. Confirm the ' +
-    'details with the user before calling this.',
+    '"YYYY-MM-DD". For an SPV investment, pass viaSpvCompanyId. The user ' +
+    'approves the call via in-app buttons; state the details, then call.',
+  needsApproval: true,
   inputSchema: z.object({
     investorCompanyId: z.string().describe('Group entity id (CALTE, Albo…)'),
     targetCompanyId: z.string().describe('Invested company id'),
@@ -408,6 +411,7 @@ const updateDeal = createTool({
   description:
     'Update an existing deal by id (amounts in cents, status, notes). Use ' +
     'listDeals first if you do not know the id. Confirm before calling.',
+  needsApproval: true,
   inputSchema: z.object({
     dealId: z.string(),
     committedAmount: z.number().int().optional(),
@@ -455,6 +459,7 @@ const createBankAccount = createTool({
     '(12 000 € → 1200000); it is a manual field, not derived from ' +
     'transactions. balanceAsOfISO is the date that balance was observed ' +
     '("YYYY-MM-DD"). Returns the new account id.',
+  needsApproval: true,
   inputSchema: z.object({
     ownerCompanyId: z.string().describe('Group entity id (CALTE, Albo…)'),
     bankName: z.string().min(1).describe('Bank name, e.g. "Qonto"'),
@@ -514,8 +519,9 @@ const createTransaction = createTool({
     'CENTS EUR (50 000 € → 5000000) and always positive. direction is "in" ' +
     '(money received) or "out" (money paid). Provide the bankAccountId ' +
     '(listBankAccounts, or createBankAccount first if none exists) and the ' +
-    'dealId to link it. dateISO is "YYYY-MM-DD". Confirm with the user before ' +
-    'calling this.',
+    'dealId to link it. dateISO is "YYYY-MM-DD". The user approves via ' +
+    'in-app buttons.',
+  needsApproval: true,
   inputSchema: z.object({
     bankAccountId: z.string().describe('Bank account id'),
     dealId: z.string().optional().describe('Deal id to link the transaction'),
@@ -545,6 +551,256 @@ const createTransaction = createTool({
   },
 })
 
+export const getDashboardSummaryInternal = internalQuery({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+  },
+  handler: async (ctx, { orgId, actorUserId }) => {
+    await readMembership(ctx, orgId, actorUserId)
+
+    const deals = await ctx.db
+      .query('deals')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    const activeDeals = deals.filter(
+      (d) => d.status === 'active' || d.status === 'partially_exited',
+    )
+
+    const txs = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+      .collect()
+    const paidByDeal = new Map<string, number>()
+    const receivedByDeal = new Map<string, number>()
+    for (const tx of txs) {
+      if (!tx.dealId) continue
+      const map = tx.direction === 'out' ? paidByDeal : receivedByDeal
+      map.set(tx.dealId, (map.get(tx.dealId) ?? 0) + tx.amount)
+    }
+    let deployedCents = 0
+    let distributedCents = 0
+    for (const deal of deals) {
+      deployedCents += paidByDeal.get(deal._id) ?? 0
+      distributedCents += receivedByDeal.get(deal._id) ?? 0
+    }
+
+    let navCents = 0
+    let navIsPartial = false
+    for (const deal of activeDeals) {
+      const lastValuation = await ctx.db
+        .query('valuations')
+        .withIndex('by_deal_asof', (q) => q.eq('dealId', deal._id))
+        .order('desc')
+        .first()
+      if (lastValuation) {
+        navCents += lastValuation.fairValue
+      } else {
+        navCents += paidByDeal.get(deal._id) ?? 0
+        navIsPartial = true
+      }
+    }
+
+    const accounts = await ctx.db
+      .query('bankAccounts')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    let cashCents = 0
+    for (const account of accounts) {
+      if (account.archivedAt || account.currency !== 'EUR') continue
+      cashCents += account.currentBalance ?? 0
+    }
+
+    const participationsCount = new Set(
+      activeDeals.map((d) => d.targetCompanyId),
+    ).size
+
+    return {
+      participationsCount,
+      activeDealsCount: activeDeals.length,
+      totalDealsCount: deals.length,
+      deployedCents,
+      distributedCents,
+      cashCents,
+      navCents,
+      navIsPartial,
+    }
+  },
+})
+
+export const listCompanyDocumentsInternal = internalQuery({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    companyId: v.id('companies'),
+  },
+  handler: async (ctx, { orgId, actorUserId, companyId }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const company = await ctx.db.get('companies', companyId)
+    if (!company || company.orgId !== orgId) throw new ConvexError('not_found')
+
+    const rows = await ctx.db
+      .query('documents')
+      .withIndex('by_company', (q) => q.eq('companyId', companyId))
+      .order('desc')
+      .take(50)
+
+    return rows.map((doc) => ({
+      _id: doc._id,
+      title: doc.title,
+      kind: doc.kind,
+      period: doc.period ?? null,
+      contentType: doc.contentType ?? null,
+      size: doc.size ?? null,
+      source: doc.source,
+      uploadedAt: doc.uploadedAt,
+    }))
+  },
+})
+
+export const updateCompanyInternal = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    companyId: v.id('companies'),
+    name: v.optional(v.string()),
+    legalName: v.optional(v.string()),
+    sector: v.optional(v.string()),
+    domain: v.optional(v.string()),
+    countryCode: v.optional(v.string()),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, { orgId, actorUserId, companyId, ...patch }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const company = await ctx.db.get('companies', companyId)
+    if (!company || company.orgId !== orgId) throw new ConvexError('not_found')
+    await ctx.db.patch('companies', companyId, patch)
+    return { _id: companyId }
+  },
+})
+
+export const renameBankAccountInternal = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    bankAccountId: v.id('bankAccounts'),
+    displayName: v.string(),
+  },
+  handler: async (ctx, { orgId, actorUserId, bankAccountId, displayName }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const account = await ctx.db.get('bankAccounts', bankAccountId)
+    if (!account || account.orgId !== orgId) throw new ConvexError('not_found')
+    const trimmed = displayName.trim()
+    await ctx.db.patch('bankAccounts', bankAccountId, {
+      displayName: trimmed === '' ? undefined : trimmed,
+    })
+    return { _id: bankAccountId }
+  },
+})
+
+// ─── Additional tools ────────────────────────────────────────────────────────
+
+const getDashboardSummary = createTool({
+  description:
+    'Return a compact summary of the current org: cash total (EUR bank ' +
+    'accounts), number of active deals/participations, deployed and ' +
+    'distributed amounts, and estimated NAV. All amounts in CENTS EUR. ' +
+    'navIsPartial is true when at least one active deal has no valuation ' +
+    '(NAV falls back to paid amount for that deal). Use this to give a ' +
+    'quick overview without listing all deals.',
+  inputSchema: z.object({}),
+  execute: async (ctx): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runQuery(
+      internal.agentTools.getDashboardSummaryInternal,
+      { orgId, actorUserId: userId },
+    )
+  },
+})
+
+const listCompanyDocuments = createTool({
+  description:
+    'List document metadata (investor updates, business plans, legal docs) ' +
+    'attached to a company of the current org. Returns title, kind ' +
+    '(reporting/bp/legal/other), period (ms epoch), contentType, size, ' +
+    'source and uploadedAt. Does NOT return download URLs — to download, ' +
+    'use the app UI. Use listCompanies to resolve the companyId first.',
+  inputSchema: z.object({
+    companyId: z.string().describe('Id of the company'),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runQuery(
+      internal.agentTools.listCompanyDocumentsInternal,
+      {
+        orgId,
+        actorUserId: userId,
+        companyId: input.companyId as Id<'companies'>,
+      },
+    )
+  },
+})
+
+const updateCompany = createTool({
+  description:
+    'Update editable metadata of a company in the current org: name, ' +
+    'legalName, sector, domain (website), countryCode (ISO-2), notes. ' +
+    'Only pass fields to change — omitted fields are left unchanged. ' +
+    'Changing the kind (group_root/portfolio…) is restricted; prefer not ' +
+    'to change it unless the user explicitly asks. The user approves via ' +
+    'in-app buttons.',
+  needsApproval: true,
+  inputSchema: z.object({
+    companyId: z.string().describe('Company id (from listCompanies)'),
+    name: z.string().min(1).optional(),
+    legalName: z.string().optional(),
+    sector: z.string().optional(),
+    domain: z.string().optional().describe('Website domain, e.g. acme.io'),
+    countryCode: z.string().length(2).optional().describe('ISO-2 country code'),
+    notes: z.string().optional(),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runMutation(internal.agentTools.updateCompanyInternal, {
+      orgId,
+      actorUserId: userId,
+      companyId: input.companyId as Id<'companies'>,
+      name: input.name,
+      legalName: input.legalName,
+      sector: input.sector,
+      domain: input.domain,
+      countryCode: input.countryCode,
+      notes: input.notes,
+    })
+  },
+})
+
+const renameBankAccount = createTool({
+  description:
+    'Set a custom display name on a bank account of the current org. ' +
+    'displayName is a free label shown in the UI instead of the original ' +
+    'bank-import label; pass an empty string to clear it (reverts to the ' +
+    'original label). Does NOT change the underlying label or bankName. ' +
+    'Use listBankAccounts to resolve the bankAccountId. The user approves ' +
+    'via in-app buttons.',
+  needsApproval: true,
+  inputSchema: z.object({
+    bankAccountId: z.string().describe('Bank account id'),
+    displayName: z
+      .string()
+      .describe('New display name, or empty string to clear'),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runMutation(internal.agentTools.renameBankAccountInternal, {
+      orgId,
+      actorUserId: userId,
+      bankAccountId: input.bankAccountId as Id<'bankAccounts'>,
+      displayName: input.displayName,
+    })
+  },
+})
+
 export const dealTools = {
   listCompanies,
   listDeals,
@@ -555,4 +811,8 @@ export const dealTools = {
   createBankAccount,
   listTransactions,
   createTransaction,
+  getDashboardSummary,
+  listCompanyDocuments,
+  updateCompany,
+  renameBankAccount,
 }

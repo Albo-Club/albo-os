@@ -27,8 +27,8 @@
     "sync:skills:update": "node scripts/sync-skills.mjs --update"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.76",
-    "@convex-dev/agent": "^0.6.1",
+    "@ai-sdk/mistral": "^3.0.37",
+    "@convex-dev/agent": "^0.6.3",
     "@convex-dev/better-auth": "^0.12.2",
     "@convex-dev/rate-limiter": "^0.3.2",
     "@convex-dev/react-query": "^0.1.0",

@@ -560,10 +560,11 @@ const suggestMatches = createTool({
 
 const matchTransactionToDeal = createTool({
   description:
-    'Reconcile a transaction with a deal of the current org. The user MUST ' +
-    'confirm the exact transaction + deal pair first (e.g. after ' +
-    'suggestMatches). Fails if the transaction is allocated to a liability ' +
-    '(unpoint it first).',
+    'Reconcile a transaction with a deal of the current org. Call once the ' +
+    'exact transaction + deal pair is identified (e.g. via suggestMatches); ' +
+    'the user approves via in-app buttons. Fails if the transaction is ' +
+    'allocated to a liability (unpoint it first).',
+  needsApproval: true,
   inputSchema: z.object({
     transactionId: z.string(),
     dealId: z.string(),
@@ -587,8 +588,9 @@ const allocateTransactionToLiability = createTool({
     'Reconcile a transaction with a liability of the current org: an equity ' +
     'position (kind "equity") or an intercompany loan (kind ' +
     '"intercompany_loan"). Find target ids via listLiabilities. The user ' +
-    'MUST confirm first. Fails if the transaction is matched to a deal ' +
-    '(unpoint it first).',
+    'approves via in-app buttons. Fails if the transaction is matched to a ' +
+    'deal (unpoint it first).',
+  needsApproval: true,
   inputSchema: z.object({
     transactionId: z.string(),
     kind: z.enum(['equity', 'intercompany_loan']),
@@ -613,11 +615,12 @@ const categorizeTransaction = createTool({
   description:
     'Set aside a transaction that concerns no deal: "ignored", "charge" ' +
     '(operating cost), "tax", "product" (income unrelated to a deal) or ' +
-    '"internal_transfer" (between own accounts). The user MUST confirm ' +
-    'first. For "charge"/"product" you can set vatRateBps (VAT rate in ' +
-    'basis points: 0, 550, 1000 or 2000 — French standard rate is 2000 = ' +
-    '20%); confirm the rate with the user, salaries/insurance/bank fees ' +
-    'carry no VAT (0).',
+    '"internal_transfer" (between own accounts). The user approves via ' +
+    'in-app buttons. For "charge"/"product" you can set vatRateBps (VAT ' +
+    'rate in basis points: 0, 550, 1000 or 2000 — French standard rate is ' +
+    '2000 = 20%); confirm the rate with the user, salaries/insurance/bank ' +
+    'fees carry no VAT (0).',
+  needsApproval: true,
   inputSchema: z.object({
     transactionId: z.string(),
     status: z.enum(['ignored', 'charge', 'tax', 'product', 'internal_transfer']),
@@ -642,7 +645,8 @@ const unpointTransaction = createTool({
   description:
     'Undo the reconciliation of a transaction (deal match, liability ' +
     'allocation or categorization): it returns to the unmatched queue. The ' +
-    'user MUST confirm first.',
+    'user approves via in-app buttons.',
+  needsApproval: true,
   inputSchema: z.object({
     transactionId: z.string(),
   }),
@@ -656,6 +660,159 @@ const unpointTransaction = createTool({
   },
 })
 
+const BULK_CATEGORIZE_MAX = 50
+
+export const getVatPositionInternal = internalQuery({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+  },
+  handler: async (ctx, { orgId, actorUserId }) => {
+    await readMembership(ctx, orgId, actorUserId)
+
+    // Same logic as transactions:getVatPosition — re-implemented here because
+    // that function is a public `query` (requires ctx.auth), not callable from
+    // an internal context. vatCentsFromTtc is already imported at top of file.
+    let deductibleCents = 0
+    let collectedCents = 0
+    let unqualifiedCount = 0
+    for (const status of ['charge', 'product'] as const) {
+      const rows = await ctx.db
+        .query('transactions')
+        .withIndex('by_org_matchStatus', (q) =>
+          q.eq('orgId', orgId).eq('matchStatus', status),
+        )
+        .collect()
+      for (const tx of rows) {
+        if (tx.vatRateBps == null) {
+          unqualifiedCount += 1
+          continue
+        }
+        const vat = vatCentsFromTtc(tx.amount, tx.vatRateBps)
+        if (status === 'charge') {
+          deductibleCents += tx.direction === 'out' ? vat : -vat
+        } else {
+          collectedCents += tx.direction === 'in' ? vat : -vat
+        }
+      }
+    }
+
+    return {
+      deductibleCents,
+      collectedCents,
+      netCents: deductibleCents - collectedCents,
+      unqualifiedCount,
+    }
+  },
+})
+
+export const bulkCategorizeInternal = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    transactionIds: v.array(v.id('transactions')),
+    status: v.union(
+      v.literal('charge'),
+      v.literal('tax'),
+      v.literal('product'),
+      v.literal('internal_transfer'),
+    ),
+    vatRateBps: v.optional(vatRateBpsValidator),
+  },
+  handler: async (
+    ctx,
+    { orgId, actorUserId, transactionIds, status, vatRateBps },
+  ) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const succeeded: Array<Id<'transactions'>> = []
+    const failed: Array<{ id: Id<'transactions'>; reason: string }> = []
+
+    for (const transactionId of transactionIds) {
+      try {
+        const tx = await ctx.db.get('transactions', transactionId)
+        if (!tx) throw new ConvexError('not_found')
+        // Scope check: tx must belong to the agent's org.
+        if (tx.orgId !== orgId) throw new ConvexError('wrong_org')
+        await applyCategorization(
+          ctx,
+          tx,
+          status,
+          actorUserId,
+          'agent_suggested',
+          vatRateBps,
+        )
+        succeeded.push(transactionId)
+      } catch (err) {
+        failed.push({
+          id: transactionId,
+          reason: err instanceof ConvexError ? String(err.data) : 'unknown',
+        })
+      }
+    }
+
+    return { succeeded: succeeded.length, failed }
+  },
+})
+
+// ─── Additional tools ────────────────────────────────────────────────────────
+
+const getVatPosition = createTool({
+  description:
+    'Return the VAT position of the current org: deductibleCents (input VAT ' +
+    'on qualified "charge" transactions), collectedCents (output VAT on ' +
+    'qualified "product" transactions), netCents = deductible − collected ' +
+    '(positive = net recoverable), unqualifiedCount = charge/product rows ' +
+    'still without a vatRateBps. All amounts in CENTS EUR, derived from TTC ' +
+    'amounts. A charge direction "in" (supplier credit note) subtracts from ' +
+    'deductible; a product direction "out" subtracts from collected.',
+  inputSchema: z.object({}),
+  execute: async (ctx): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runQuery(
+      internal.agentToolsPointage.getVatPositionInternal,
+      { orgId, actorUserId: userId },
+    )
+  },
+})
+
+const bulkCategorizeTransactions = createTool({
+  description:
+    'Categorize up to 50 transactions in one batch as "charge" (operating ' +
+    'cost), "tax", "product" (non-deal income), or "internal_transfer". ' +
+    'Each transaction is processed independently — partial success is ' +
+    'possible (see "failed" in the result). For "charge"/"product" you can ' +
+    'set vatRateBps (0, 550, 1000 or 2000; French standard = 2000 = 20%). ' +
+    'Before calling: state the number of transactions and the chosen ' +
+    'category so the user can approve the whole batch in one click. Max 50 ' +
+    'ids per call.',
+  needsApproval: true,
+  inputSchema: z.object({
+    transactionIds: z
+      .array(z.string())
+      .min(1)
+      .max(BULK_CATEGORIZE_MAX)
+      .describe('Array of transaction ids (max 50)'),
+    status: z.enum(['charge', 'tax', 'product', 'internal_transfer']),
+    vatRateBps: z
+      .union([z.literal(0), z.literal(550), z.literal(1000), z.literal(2000)])
+      .optional()
+      .describe('VAT rate in bps, only for charge/product'),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runMutation(
+      internal.agentToolsPointage.bulkCategorizeInternal,
+      {
+        orgId,
+        actorUserId: userId,
+        transactionIds: input.transactionIds as Array<Id<'transactions'>>,
+        status: input.status,
+        vatRateBps: input.vatRateBps,
+      },
+    )
+  },
+})
+
 export const pointageTools = {
   listUnmatchedTransactions,
   searchTransactions,
@@ -664,4 +821,6 @@ export const pointageTools = {
   allocateTransactionToLiability,
   categorizeTransaction,
   unpointTransaction,
+  getVatPosition,
+  bulkCategorizeTransactions,
 }

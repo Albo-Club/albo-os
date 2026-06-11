@@ -224,10 +224,10 @@ async function checkHtmlShape() {
 async function checkEnv() {
   section('Environment hints (best-effort)')
   // The script can't read Convex env directly; we look at side-effects.
-  // AI chat needs ANTHROPIC_API_KEY — if absent, /api/chat returns 500
+  // AI chat needs MISTRAL_API_KEY — if absent, /api/chat returns 500
   // on an authed request. We can't auth from here, so this is informational.
   warn(
-    'ANTHROPIC_API_KEY',
+    'MISTRAL_API_KEY',
     'run `pnpm exec convex env list` to confirm before testing AI chat',
   )
   warn(

@@ -225,7 +225,8 @@ const createForecastRule = createTool({
     'amountCents in CENTS EUR, positive. direction "in" (income) or "out" ' +
     '(expense). anchorDay: day of month (1-31) or day of week (1-7 for ' +
     'weekly). Creating a rule does NOT generate entries: propose to call ' +
-    'expandForecastRules afterwards. Confirm with the user before calling.',
+    'expandForecastRules afterwards. The user approves via in-app buttons.',
+  needsApproval: true,
   inputSchema: z.object({
     label: z.string().min(1).describe('e.g. "Loyer SCI Chapelle"'),
     amountCents: z.number().int().positive().describe('cents EUR'),
@@ -294,6 +295,7 @@ const expandForecastRules = createTool({
     'the current org over the given horizon (months, max 24). Idempotent: ' +
     'manually overridden / realized / cancelled entries are never ' +
     'rewritten. Call this after creating or updating a rule.',
+  needsApproval: true,
   inputSchema: z.object({
     horizonMonths: z.number().int().min(1).max(24),
   }),
@@ -336,7 +338,8 @@ const markForecastEntryRealized = createTool({
     'Mark a forecast entry as realized by linking it to a real bank ' +
     'transaction of the same org (find ids via listForecastEntries and ' +
     'listUnmatchedTransactions / listTransactions). Does NOT touch the ' +
-    'transaction itself. Confirm with the user before calling.',
+    'transaction itself. The user approves via in-app buttons.',
+  needsApproval: true,
   inputSchema: z.object({
     entryId: z.string(),
     transactionId: z.string(),
@@ -355,6 +358,361 @@ const markForecastEntryRealized = createTool({
   },
 })
 
+// ─── New internal mutations / tools ─────────────────────────────────────────
+
+export const updateRuleInternal = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    ruleId: v.id('forecastRules'),
+    label: v.optional(v.string()),
+    amountCents: v.optional(v.number()),
+    direction: v.optional(
+      v.union(v.literal('in'), v.literal('out')),
+    ),
+    category: v.optional(v.string()),
+    frequency: v.optional(
+      v.union(
+        v.literal('weekly'),
+        v.literal('monthly'),
+        v.literal('quarterly'),
+        v.literal('yearly'),
+      ),
+    ),
+    interval: v.optional(v.number()),
+    anchorDay: v.optional(v.number()),
+    startDateISO: v.optional(v.string()),
+    endDateISO: v.optional(v.string()),
+    active: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { orgId, actorUserId, ruleId, startDateISO, endDateISO, ...rest }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const rule = await ctx.db.get('forecastRules', ruleId)
+    if (!rule || rule.orgId !== orgId) throw new ConvexError('not_found')
+
+    const patch: Record<string, unknown> = {}
+    // Collect only defined fields.
+    if (rest.label !== undefined) patch.label = rest.label
+    if (rest.amountCents !== undefined) patch.amountCents = rest.amountCents
+    if (rest.direction !== undefined) patch.direction = rest.direction
+    if (rest.category !== undefined) patch.category = rest.category
+    if (rest.frequency !== undefined) patch.frequency = rest.frequency
+    if (rest.interval !== undefined) patch.interval = rest.interval
+    if (rest.anchorDay !== undefined) patch.anchorDay = rest.anchorDay
+    if (rest.active !== undefined) patch.active = rest.active
+    if (startDateISO !== undefined) {
+      patch.startDate = parseISODate(startDateISO, 'invalid_start_date')
+    }
+    if (endDateISO !== undefined) {
+      patch.endDate = parseISODate(endDateISO, 'invalid_end_date')
+    }
+
+    // Validate merged state (amountCents must be positive integer).
+    if (patch.amountCents !== undefined) {
+      if (!Number.isInteger(patch.amountCents) || (patch.amountCents as number) <= 0) {
+        throw new ConvexError('invalid_amount')
+      }
+    }
+
+    await ctx.db.patch('forecastRules', ruleId, patch)
+    return { _id: ruleId }
+  },
+})
+
+export const deleteRuleInternal = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    ruleId: v.id('forecastRules'),
+  },
+  handler: async (ctx, { orgId, actorUserId, ruleId }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const rule = await ctx.db.get('forecastRules', ruleId)
+    if (!rule || rule.orgId !== orgId) throw new ConvexError('not_found')
+
+    // Delete only pending, non-overridden derived entries (same logic as
+    // forecasts:deleteRule). Realized/cancelled/overridden entries are
+    // historical — preserve them.
+    const entries = await ctx.db
+      .query('forecastEntries')
+      .withIndex('by_rule', (q) => q.eq('ruleId', ruleId))
+      .collect()
+    let entriesRemoved = 0
+    for (const entry of entries) {
+      if (entry.status === 'pending' && !entry.overridden) {
+        await ctx.db.delete('forecastEntries', entry._id)
+        entriesRemoved += 1
+      }
+    }
+    await ctx.db.delete('forecastRules', ruleId)
+    return { entriesRemoved }
+  },
+})
+
+export const createManualEntryInternal = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    dateISO: v.string(),
+    amountCents: v.number(),
+    direction: v.union(v.literal('in'), v.literal('out')),
+    confidence: v.union(
+      v.literal('confirmed'),
+      v.literal('expected'),
+      v.literal('probable'),
+    ),
+    label: v.string(),
+    category: v.optional(v.string()),
+  },
+  handler: async (ctx, { orgId, actorUserId, dateISO, ...rest }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    if (!Number.isInteger(rest.amountCents) || rest.amountCents <= 0) {
+      throw new ConvexError('invalid_amount')
+    }
+    const date = parseISODate(dateISO, 'invalid_date')
+    const id = await ctx.db.insert('forecastEntries', {
+      orgId,
+      date,
+      amountCents: rest.amountCents,
+      direction: rest.direction,
+      confidence: rest.confidence,
+      status: 'pending',
+      label: rest.label,
+      category: rest.category,
+      overridden: false,
+      currency: 'EUR',
+    })
+    return { _id: id }
+  },
+})
+
+export const updateEntryInternal = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    entryId: v.id('forecastEntries'),
+    dateISO: v.optional(v.string()),
+    amountCents: v.optional(v.number()),
+    direction: v.optional(v.union(v.literal('in'), v.literal('out'))),
+    confidence: v.optional(
+      v.union(
+        v.literal('confirmed'),
+        v.literal('expected'),
+        v.literal('probable'),
+      ),
+    ),
+    label: v.optional(v.string()),
+    category: v.optional(v.string()),
+  },
+  handler: async (ctx, { orgId, actorUserId, entryId, dateISO, ...rest }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const entry = await ctx.db.get('forecastEntries', entryId)
+    if (!entry || entry.orgId !== orgId) throw new ConvexError('not_found')
+    if (
+      rest.amountCents !== undefined &&
+      (!Number.isInteger(rest.amountCents) || rest.amountCents <= 0)
+    ) {
+      throw new ConvexError('invalid_amount')
+    }
+
+    const patch: Record<string, unknown> = {}
+    if (dateISO !== undefined) patch.date = parseISODate(dateISO, 'invalid_date')
+    if (rest.amountCents !== undefined) patch.amountCents = rest.amountCents
+    if (rest.direction !== undefined) patch.direction = rest.direction
+    if (rest.confidence !== undefined) patch.confidence = rest.confidence
+    if (rest.label !== undefined) patch.label = rest.label
+    if (rest.category !== undefined) patch.category = rest.category
+    // A derived entry edited manually becomes protected from re-expansion.
+    if (entry.ruleId) patch.overridden = true
+
+    await ctx.db.patch('forecastEntries', entry._id, patch)
+    return { _id: entryId }
+  },
+})
+
+export const cancelEntryInternal = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    entryId: v.id('forecastEntries'),
+  },
+  handler: async (ctx, { orgId, actorUserId, entryId }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const entry = await ctx.db.get('forecastEntries', entryId)
+    if (!entry || entry.orgId !== orgId) throw new ConvexError('not_found')
+    await ctx.db.patch('forecastEntries', entry._id, { status: 'cancelled' })
+    return { _id: entryId, status: 'cancelled' as const }
+  },
+})
+
+// ─── Exposed tools ───────────────────────────────────────────────────────────
+
+const updateForecastRule = createTool({
+  description:
+    'Update fields of an existing forecast rule (label, amount, direction, ' +
+    'category, frequency, interval, anchorDay, startDate, endDate, active). ' +
+    'Only pass fields to change. IMPORTANT: updateRule does NOT regenerate ' +
+    'already-expanded entries — call expandForecastRules afterwards to ' +
+    'resync non-protected (pending, not overridden) occurrences with the ' +
+    'new values. Realized/cancelled/manually-overridden entries are never ' +
+    'affected. amountCents in CENTS EUR, dates as "YYYY-MM-DD". The user ' +
+    'approves via in-app buttons.',
+  needsApproval: true,
+  inputSchema: z.object({
+    ruleId: z.string(),
+    label: z.string().min(1).optional(),
+    amountCents: z.number().int().positive().optional().describe('cents EUR'),
+    direction: z.enum(['in', 'out']).optional(),
+    category: z.string().optional(),
+    frequency: z.enum(['weekly', 'monthly', 'quarterly', 'yearly']).optional(),
+    interval: z.number().int().min(1).optional(),
+    anchorDay: z.number().int().min(1).max(31).optional(),
+    startDateISO: z.string().optional().describe('"YYYY-MM-DD"'),
+    endDateISO: z.string().optional().describe('"YYYY-MM-DD"'),
+    active: z.boolean().optional(),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runMutation(
+      internal.agentToolsForecasts.updateRuleInternal,
+      {
+        orgId,
+        actorUserId: userId,
+        ruleId: input.ruleId as Id<'forecastRules'>,
+        label: input.label,
+        amountCents: input.amountCents,
+        direction: input.direction,
+        category: input.category,
+        frequency: input.frequency,
+        interval: input.interval,
+        anchorDay: input.anchorDay,
+        startDateISO: input.startDateISO,
+        endDateISO: input.endDateISO,
+        active: input.active,
+      },
+    )
+  },
+})
+
+const deleteForecastRule = createTool({
+  description:
+    'Delete a forecast rule and its pending, non-overridden derived entries. ' +
+    'Realized, cancelled, or manually-overridden entries are preserved as ' +
+    'history. This is one of the few delete operations available to the ' +
+    'agent (rules are projections, not financial records). Use ' +
+    'listForecastRules to find the ruleId. The user approves via in-app ' +
+    'buttons.',
+  needsApproval: true,
+  inputSchema: z.object({
+    ruleId: z.string(),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runMutation(
+      internal.agentToolsForecasts.deleteRuleInternal,
+      {
+        orgId,
+        actorUserId: userId,
+        ruleId: input.ruleId as Id<'forecastRules'>,
+      },
+    )
+  },
+})
+
+const createManualForecastEntry = createTool({
+  description:
+    'Create a one-off (manual) forecast entry for a specific date, not ' +
+    'linked to any rule. Use for exceptional cash flows (one-time tax ' +
+    'payment, asset sale, etc.). amountCents in CENTS EUR (positive). ' +
+    'confidence: "confirmed" (committed), "expected", or "probable". ' +
+    'dateISO is "YYYY-MM-DD". The user approves via in-app buttons.',
+  needsApproval: true,
+  inputSchema: z.object({
+    dateISO: z.string().describe('"YYYY-MM-DD"'),
+    amountCents: z.number().int().positive().describe('cents EUR'),
+    direction: z.enum(['in', 'out']),
+    confidence: z.enum(['confirmed', 'expected', 'probable']),
+    label: z.string().min(1),
+    category: z.string().optional(),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runMutation(
+      internal.agentToolsForecasts.createManualEntryInternal,
+      {
+        orgId,
+        actorUserId: userId,
+        dateISO: input.dateISO,
+        amountCents: input.amountCents,
+        direction: input.direction,
+        confidence: input.confidence,
+        label: input.label,
+        category: input.category,
+      },
+    )
+  },
+})
+
+const updateForecastEntry = createTool({
+  description:
+    'Edit a forecast entry (date, amount, direction, confidence, label, ' +
+    'category). If the entry was derived from a rule, it becomes ' +
+    '"overridden" — expandForecastRules will no longer touch it. Only ' +
+    'pass fields to change. amountCents in CENTS EUR, dateISO "YYYY-MM-DD". ' +
+    'Use listForecastEntries to find the entryId. The user approves via ' +
+    'in-app buttons.',
+  needsApproval: true,
+  inputSchema: z.object({
+    entryId: z.string(),
+    dateISO: z.string().optional().describe('"YYYY-MM-DD"'),
+    amountCents: z.number().int().positive().optional().describe('cents EUR'),
+    direction: z.enum(['in', 'out']).optional(),
+    confidence: z.enum(['confirmed', 'expected', 'probable']).optional(),
+    label: z.string().min(1).optional(),
+    category: z.string().optional(),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runMutation(
+      internal.agentToolsForecasts.updateEntryInternal,
+      {
+        orgId,
+        actorUserId: userId,
+        entryId: input.entryId as Id<'forecastEntries'>,
+        dateISO: input.dateISO,
+        amountCents: input.amountCents,
+        direction: input.direction,
+        confidence: input.confidence,
+        label: input.label,
+        category: input.category,
+      },
+    )
+  },
+})
+
+const cancelForecastEntry = createTool({
+  description:
+    'Cancel a forecast entry: it will no longer count in the projected ' +
+    'balance (status → "cancelled"). Idempotent if already cancelled. Use ' +
+    'listForecastEntries to find the entryId. The user approves via in-app ' +
+    'buttons.',
+  needsApproval: true,
+  inputSchema: z.object({
+    entryId: z.string(),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runMutation(
+      internal.agentToolsForecasts.cancelEntryInternal,
+      {
+        orgId,
+        actorUserId: userId,
+        entryId: input.entryId as Id<'forecastEntries'>,
+      },
+    )
+  },
+})
+
 export const forecastTools = {
   listForecastRules,
   createForecastRule,
@@ -362,4 +720,9 @@ export const forecastTools = {
   expandForecastRules,
   getForecastBalance,
   markForecastEntryRealized,
+  updateForecastRule,
+  deleteForecastRule,
+  createManualForecastEntry,
+  updateForecastEntry,
+  cancelForecastEntry,
 }
