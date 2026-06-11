@@ -1075,3 +1075,29 @@ volontairement hors scope (deals laissés sur le chapeau).
   (internalMutation) → `verify`. Jamais de hard delete : archivage via
   `archivedAt`, et uniquement si plus aucune référence (deals, relations,
   KPIs, comptes, viaSpv) ne pointe vers le chapeau.
+
+## Upgrade depuis le template (albo-ouvre-boite)
+
+Le repo partage l'historique git du template : `pnpm run upgrade-template`
+fait un merge 3-way normal. Le graft `.template-version` décrit dans
+`UPGRADING.md` ne concerne que les snapshots « Use this template » sans
+historique commun — pas nous.
+
+Le raccord initial (merge du 11/06/2026) a été fait en `-s ours` :
+le lien de parenté est enregistré, mais **aucun code du template n'a été
+adopté**. Tout ce que le template avait shippé entre le point de fork (#28)
+et v0.2.0+ était soit déjà refait ici indépendamment (traduction EN des
+commentaires, retrait des démos, nettoyage lint, job CI skills-drift), soit
+non voulu :
+
+- `WhatsNew.tsx` + `src/lib/changelog.ts` — on a notre propre page
+  changelog (`CHANGELOG_PRODUIT.md` rendu sur `/app/$orgSlug/changelog`).
+- `README.product.md`, `release-tag.yml`, `scripts/release.mjs` —
+  machinerie de release du template lui-même, sans objet dans un dérivé.
+- Notification dev au signup (`DEV_NOTIFY_EMAIL`, template #33) — valeur
+  ~nulle à 2 utilisateurs sur invitation.
+- Bumps de majors (template #34) — Renovate s'en charge ici.
+
+Conséquence : un futur `upgrade-template` ne re-proposera **pas** ces
+éléments (ils sont considérés mergés). Si l'un devient pertinent,
+cherry-picker depuis `template/main`.
