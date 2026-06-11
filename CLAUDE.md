@@ -228,10 +228,21 @@ domaines ci-dessous, lis la skill correspondante dans `.agents/skills/`
 (symlinkée dans `.claude/skills/`). Elle remplace tes connaissances
 d'entraînement, qui sont périmées sur ces libs.
 
-Manifest : `skills-lock.json` (source, chemin upstream, hash SHA-256).
-Sync hebdo via GitHub Action (`.github/workflows/sync-skills.yml`,
-lundi 06:00 UTC) + manuel via `pnpm run sync:skills`.
-Vérifier la dérive : `pnpm run sync:skills:check`.
+Manifest : `skills-lock.json` (source, chemin upstream, `trackingRef` (branche
+surveillée), `pinnedRef` (SHA immuable vendorisé), hash SHA-256).
+Sync hebdo via GitHub Action (`.github/workflows/sync-skills.yml`, lundi
+06:00 UTC) + manuel :
+
+- `pnpm run sync:skills` — vendorise chaque skill au `pinnedRef` déclaré
+  (reproductible, pas de réseau surprise ; idempotent).
+- `pnpm run sync:skills:check` — compare le `trackingRef` tip au contenu
+  vendorisé ; exit 2 si dérive (upstream a bougé depuis le dernier bump).
+- `pnpm run sync:skills:update` — avance le `pinnedRef` au SHA courant du
+  `trackingRef`, re-vendorise, écrit le lock. C'est le bump délibéré — à
+  faire après avoir relu le diff.
+
+Règle : `--check` détecte, `--update` bumpe. Ne jamais `--update` sans avoir
+relu ce que la nouvelle version change.
 
 | Skill                                     | Domaine                                | Source upstream                            | Officiel ? |
 | ----------------------------------------- | -------------------------------------- | ------------------------------------------ | ---------- |
@@ -247,7 +258,7 @@ Vérifier la dérive : `pnpm run sync:skills:check`.
 | `two-factor-authentication-best-practices`| 2FA / TOTP / backup codes              | `better-auth/skills`                       | ✅ officiel |
 | `organization-best-practices`             | Plugin `organization()` BA             | `better-auth/skills`                       | ✅ officiel ⚠️ |
 | `create-auth-skill`                       | Scaffolding auth BA                    | `better-auth/skills`                       | ✅ officiel |
-| `tanstack-start-best-practices`           | SSR, server functions, middleware      | `deckardger/tanstack-agent-skills`         | ⚠️ communauté |
+| `tanstack-start-best-practices`           | SSR, server functions, middleware      | `TanStack/router` (monorepo officiel)      | ✅ officiel |
 | `ai-elements`                             | Composants chat AI (panneau AiPanel)   | `vercel/ai-elements`                       | ✅ officiel |
 
 **⚠️ `organization-best-practices`** : skill officielle BA, mais le plugin
@@ -255,14 +266,11 @@ Vérifier la dérive : `pnpm run sync:skills:check`.
 Lis-la pour comprendre les concepts ; n'applique pas le code BA tel quel —
 nos orgs/membres vivent dans le schéma Convex maison.
 
-**⚠️ TanStack Start (`deckardger/tanstack-agent-skills`)** : TanStack ne
-publie pas (encore) de skill officielle. La meilleure source communautaire est
-le repo de Deckardger. Stratégie de maintenance :
-1. Vérifier le repo upstream tous les 1–2 mois (le sync hebdo détecte la dérive).
-2. Si la qualité se dégrade ou si TanStack publie un repo officiel, changer le
-   `source` + `skillPath` dans `skills-lock.json` et relancer `pnpm run sync:skills`.
-3. À défaut, fallback sur le MCP `context7` (`mcp__…__query-docs`) pour
-   `/tanstack/start` à la demande.
+**TanStack Start (`TanStack/router`)** : source officielle depuis juin 2026
+(`packages/react-start/skills/react-start/SKILL.md`). La skill est versionnée
+avec les releases de `@tanstack/react-start` dans le monorepo. En cas de doute
+sur un changement de comportement, fallback sur le MCP `context7`
+(`mcp__…__query-docs`) pour `/tanstack/start`.
 
 **shadcn/ui** : pas de skill agent à ce jour. Les conventions vivent dans
 `components.json` (alias `@/components`, neutral theme, radius 0.5rem, tokens
