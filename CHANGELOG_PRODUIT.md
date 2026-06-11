@@ -23,6 +23,23 @@ bas de page.
 
 ---
 
+## v1.6.2 — 11/06/2026 à 18:20 — Nettoyage final de la migration précédente
+
+Suite et fin de la correction v1.6.1 : suppression de l'ancien emplacement
+de la « dernière organisation visitée », désormais inutile. Aucun
+changement visible dans l'app.
+
+> **🔧 Notes techniques**
+>
+> - Retrait du champ legacy `users.lastOrgSlug` du schéma, du fallback de
+>   lecture dans `convex/lib/userPrefs.ts:getLastOrgSlug`, du nettoyage
+>   legacy dans `admin:purgeExcept` et de la mutation one-shot
+>   `users:purgeLegacyLastOrgSlug` (chantier `MIGRATIONS.md` soldé).
+> - ⚠️ Pré-requis au merge : avoir exécuté la purge en prod
+>   (`pnpm exec convex run --prod users:purgeLegacyLastOrgSlug`) — sinon
+>   la validation de schéma fait échouer le `convex deploy` du build
+>   Vercel (garde-fou voulu, la prod en place n'est pas affectée).
+
 ## v1.6.1 — 11/06/2026 à 18:11 — Consommation de données divisée, fin d'une boucle invisible
 
 L'application relisait inutilement vos données en continu : garder deux

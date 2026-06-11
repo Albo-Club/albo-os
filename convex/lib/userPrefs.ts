@@ -19,9 +19,7 @@ export async function getLastOrgSlug(
     .query('userPrefs')
     .withIndex('by_user', (q) => q.eq('userId', user._id))
     .unique()
-  // Legacy fallback: rows written before `userPrefs` existed kept the value
-  // on the users row (cleanup tracked in MIGRATIONS.md).
-  return prefs?.lastOrgSlug ?? user.lastOrgSlug ?? null
+  return prefs?.lastOrgSlug ?? null
 }
 
 export async function setLastOrgSlug(
