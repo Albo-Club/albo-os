@@ -1,23 +1,23 @@
 # albo-os — l'ouvre-boîte
 
-Opinionated B2B SaaS MVP starter: **TanStack Start + Convex + Better Auth + Resend + Anthropic + Tailwind v4**.
+Opinionated B2B SaaS MVP starter: **TanStack Start + Convex + Better Auth + Resend + Mistral + Tailwind v4**.
 
 Multi-tenant by default (orgs, members, invitations, roles), with an AI chat
 sidebar wired in, transactional emails, rate-limiting, and CI/CD on day one.
 
 ## Stack
 
-| Layer        | Choice                                                       |
-| ------------ | ------------------------------------------------------------ |
-| Front-end    | React 19 · TanStack Start v1 · TanStack Router (file-based)  |
-| State / data | TanStack Query · Convex (real-time queries, mutations, HTTP) |
-| Forms        | TanStack Form · Zod                                          |
+| Layer        | Choice                                                        |
+| ------------ | ------------------------------------------------------------- |
+| Front-end    | React 19 · TanStack Start v1 · TanStack Router (file-based)   |
+| State / data | TanStack Query · Convex (real-time queries, mutations, HTTP)  |
+| Forms        | TanStack Form · Zod                                           |
 | Styling      | Tailwind v4 (CSS-first) · shadcn/ui · Inter · tokens in oklch |
-| Auth         | Better Auth (email/password + magic link) + `organization()` |
-| Email        | Resend (HTML + plain text templates)                         |
-| AI           | Convex Agent + Anthropic Claude (Haiku 4.5 default, with tools) |
-| Limiter      | `@convex-dev/rate-limiter`                                   |
-| Observ.      | Sentry (front-end), Convex built-in logs                     |
+| Auth         | Better Auth (email/password + magic link) + `organization()`  |
+| Email        | Resend (HTML + plain text templates)                          |
+| AI           | Convex Agent + Mistral (Medium 3.5 default, with tools)       |
+| Limiter      | `@convex-dev/rate-limiter`                                    |
+| Observ.      | Sentry (front-end), Convex built-in logs                      |
 
 ## Getting started
 
@@ -71,10 +71,10 @@ Then open **http://localhost:3000** and create your first account.
 2. **Project name** — rebrands page titles, agent identity, cookie prefix.
 3. **Convex backend** — opens a browser to log in, provisions your dev
    deployment, writes `CONVEX_DEPLOYMENT` + `VITE_CONVEX_URL` to `.env.local`.
-4. **API keys** — prompts for Anthropic + Resend with direct dashboard links
+4. **API keys** — prompts for Mistral + Resend with direct dashboard links
    so you don't have to hunt for the URLs.
 5. **Better Auth secret** — auto-generated.
-6. **Google OAuth** *(optional)* — prompts for `GOOGLE_CLIENT_ID` /
+6. **Google OAuth** _(optional)_ — prompts for `GOOGLE_CLIENT_ID` /
    `GOOGLE_CLIENT_SECRET`; press Enter to skip. When set, a "Continue with
    Google" button appears on `/login` and `/register`; otherwise it stays
    hidden. Authorized redirect URI: `${SITE_URL}/api/auth/callback/google`.
@@ -97,7 +97,7 @@ convex/                Convex backend
   invitations.ts       invite, accept, revoke (with email send)
   users.ts             me, provisionMe, updateProfile
   admin.ts             super-admin queries + purgeExcept (dev cleanup)
-  agent.ts             AI agent instance (Anthropic, default Haiku 4.5)
+  agent.ts             AI agent instance (Mistral, default Medium 3.5)
   chat.ts              threads, sendMessage, listMessages, HTTP /api/chat
   rateLimiters.ts      named limits + consumeLimit helper
   lib/auth.ts          requireAppUser, requireOrgMember, requireOrgRole, …
@@ -130,19 +130,19 @@ scripts/
 
 ## Routes at a glance
 
-| Path                                  | What it does                          |
-| ------------------------------------- | ------------------------------------- |
-| `/`                                   | Redirect to `/app` (no marketing landing) |
-| `/login`, `/register`                 | Email/password + redirect support     |
-| `/accept-invite/:token`               | Token-as-credential state machine     |
-| `/app`                                | Org switcher / onboarding redirect    |
-| `/app/onboarding`                     | First-org creation                    |
-| `/app/me`                             | Profile, password, sign-out           |
-| `/app/admin`                          | Super-admin overview                  |
-| `/app/:orgSlug`                       | Org dashboard                         |
-| `/app/:orgSlug/participations`        | Portfolio view (placeholder)          |
-| `/app/:orgSlug/cash`                  | Cash management (placeholder)         |
-| `/app/:orgSlug/settings/{general,members,invitations}` | Settings UI |
+| Path                                                   | What it does                              |
+| ------------------------------------------------------ | ----------------------------------------- |
+| `/`                                                    | Redirect to `/app` (no marketing landing) |
+| `/login`, `/register`                                  | Email/password + redirect support         |
+| `/accept-invite/:token`                                | Token-as-credential state machine         |
+| `/app`                                                 | Org switcher / onboarding redirect        |
+| `/app/onboarding`                                      | First-org creation                        |
+| `/app/me`                                              | Profile, password, sign-out               |
+| `/app/admin`                                           | Super-admin overview                      |
+| `/app/:orgSlug`                                        | Org dashboard                             |
+| `/app/:orgSlug/participations`                         | Portfolio view (placeholder)              |
+| `/app/:orgSlug/cash`                                   | Cash management (placeholder)             |
+| `/app/:orgSlug/settings/{general,members,invitations}` | Settings UI                               |
 
 ## Auth model
 
@@ -150,7 +150,7 @@ scripts/
 - `organizationMembers.role`: `owner` > `admin` > `member`.
 - Roles are **never** stored on the Better Auth user table.
 - Every Convex query/mutation reads roles via `requireAppUser` / `requireOrgRole` / `requireSuperAdmin`.
-- Invitations: 7-day expiry, token *is* the credential; UI never bounces the
+- Invitations: 7-day expiry, token _is_ the credential; UI never bounces the
   invitee through sign-in unless the email already has an account.
 - Last-owner protection on every demote/remove path.
 
@@ -208,7 +208,7 @@ pnpm dlx vercel@latest env add CONVEX_DEPLOY_KEY production
 
 Then set the Vercel build command to
 `pnpm exec convex deploy --cmd "pnpm build"` — Convex deploys the
-backend and injects `VITE_CONVEX_URL` automatically (the manual VITE_*
+backend and injects `VITE_CONVEX_URL` automatically (the manual VITE\_\*
 env vars become unnecessary).
 
 **Convex prod env** — one command, instead of pasting 8 `convex env set`:
@@ -218,7 +218,7 @@ pnpm run setup:prod
 ```
 
 The script prompts for your prod domain, reads your dev env, mirrors the
-secrets (Resend, Anthropic, optional Sentry, and the Google OAuth credentials
+secrets (Resend, Mistral, optional Sentry, and the Google OAuth credentials
 if you set them in dev) to prod, generates a **fresh** `BETTER_AUTH_SECRET`
 (never reused from dev — same secret across envs would let a dev session token
 unlock prod), sets `APP_ENV=production`, `SITE_URL`, `BETTER_AUTH_URL`,
