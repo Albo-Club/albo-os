@@ -234,9 +234,11 @@ The shell guard in `package.json` → `build:vercel` requires **both**
 - Preview/branch deployments → skip `convex deploy`, just `pnpm build`.
   The frontend builds **green** but runs against the current prod
   Convex backend. Fine for read-only UI review ; **never ship preview
-  deploys that depend on un-deployed schema/function changes**. If you
-  need preview-isolated Convex, generate a Preview Deploy Key and add
-  `CONVEX_DEPLOY_KEY` scoped to Preview in Vercel (and relax the guard).
+  deploys that depend on un-deployed schema/function changes**. For an
+  isolated full-stack test env, use the staging setup (separate Convex
+  project + second Vercel project whose Production Branch is `staging`,
+  so `VERCEL_ENV = production` and this same guard passes unchanged) —
+  runbook in `README.md` § "Staging environment".
 - Local `pnpm build:vercel` → `$VERCEL_ENV` is empty, so the script
   always skips `convex deploy` even if a dev happens to have a deploy
   key in their shell env. Safe to run locally for build smoke-tests.

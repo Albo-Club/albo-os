@@ -16,6 +16,13 @@ bas de page.
 
 ---
 
+## v1.4.1 — 11/06/2026 à 10:51 — Environnement de test (staging)
+
+Mise en place d'un environnement de test complet, séparé de la
+production : une copie de l'application avec sa propre base de données,
+pour valider chaque évolution en conditions réelles avant sa mise en
+ligne. Aucun changement visible dans l'app elle-même.
+
 ## v1.4.0 — 11/06/2026 à 15:05 — Toutes les listes paginées, entrée dans l'app plus directe
 
 ### 📄 Des listes qui restent fluides partout

@@ -16,6 +16,10 @@ Pré-requis :
 - 2 navigateurs (ou 1 navigateur + 1 fenêtre incognito) prêts pour les
   tests multi-tenant
 
+Les niveaux 2 → 6 peuvent aussi se dérouler contre l'environnement de
+staging (URL stable, données isolées de la prod) au lieu du localhost —
+mise en place et process : `README.md` § « Staging environment ».
+
 ## Niveau 1 — Build & smoke (automatisé, 2 min)
 
 | #   | Étape           | Commande                 | Résultat attendu                                                                                                                             |

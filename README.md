@@ -7,17 +7,17 @@ sidebar wired in, transactional emails, rate-limiting, and CI/CD on day one.
 
 ## Stack
 
-| Layer        | Choice                                                       |
-| ------------ | ------------------------------------------------------------ |
-| Front-end    | React 19 · TanStack Start v1 · TanStack Router (file-based)  |
-| State / data | TanStack Query · Convex (real-time queries, mutations, HTTP) |
-| Forms        | TanStack Form · Zod                                          |
-| Styling      | Tailwind v4 (CSS-first) · shadcn/ui · Inter · tokens in oklch |
-| Auth         | Better Auth (email/password + magic link) + `organization()` |
-| Email        | Resend (HTML + plain text templates)                         |
+| Layer        | Choice                                                          |
+| ------------ | --------------------------------------------------------------- |
+| Front-end    | React 19 · TanStack Start v1 · TanStack Router (file-based)     |
+| State / data | TanStack Query · Convex (real-time queries, mutations, HTTP)    |
+| Forms        | TanStack Form · Zod                                             |
+| Styling      | Tailwind v4 (CSS-first) · shadcn/ui · Inter · tokens in oklch   |
+| Auth         | Better Auth (email/password + magic link) + `organization()`    |
+| Email        | Resend (HTML + plain text templates)                            |
 | AI           | Convex Agent + Anthropic Claude (Haiku 4.5 default, with tools) |
-| Limiter      | `@convex-dev/rate-limiter`                                   |
-| Observ.      | Sentry (front-end), Convex built-in logs                     |
+| Limiter      | `@convex-dev/rate-limiter`                                      |
+| Observ.      | Sentry (front-end), Convex built-in logs                        |
 
 ## Getting started
 
@@ -74,7 +74,7 @@ Then open **http://localhost:3000** and create your first account.
 4. **API keys** — prompts for Anthropic + Resend with direct dashboard links
    so you don't have to hunt for the URLs.
 5. **Better Auth secret** — auto-generated.
-6. **Google OAuth** *(optional)* — prompts for `GOOGLE_CLIENT_ID` /
+6. **Google OAuth** _(optional)_ — prompts for `GOOGLE_CLIENT_ID` /
    `GOOGLE_CLIENT_SECRET`; press Enter to skip. When set, a "Continue with
    Google" button appears on `/login` and `/register`; otherwise it stays
    hidden. Authorized redirect URI: `${SITE_URL}/api/auth/callback/google`.
@@ -130,19 +130,19 @@ scripts/
 
 ## Routes at a glance
 
-| Path                                  | What it does                          |
-| ------------------------------------- | ------------------------------------- |
-| `/`                                   | Redirect to `/app` (no marketing landing) |
-| `/login`, `/register`                 | Email/password + redirect support     |
-| `/accept-invite/:token`               | Token-as-credential state machine     |
-| `/app`                                | Org switcher / onboarding redirect    |
-| `/app/onboarding`                     | First-org creation                    |
-| `/app/me`                             | Profile, password, sign-out           |
-| `/app/admin`                          | Super-admin overview                  |
-| `/app/:orgSlug`                       | Org dashboard                         |
-| `/app/:orgSlug/participations`        | Portfolio view (placeholder)          |
-| `/app/:orgSlug/cash`                  | Cash management (placeholder)         |
-| `/app/:orgSlug/settings/{general,members,invitations}` | Settings UI |
+| Path                                                   | What it does                              |
+| ------------------------------------------------------ | ----------------------------------------- |
+| `/`                                                    | Redirect to `/app` (no marketing landing) |
+| `/login`, `/register`                                  | Email/password + redirect support         |
+| `/accept-invite/:token`                                | Token-as-credential state machine         |
+| `/app`                                                 | Org switcher / onboarding redirect        |
+| `/app/onboarding`                                      | First-org creation                        |
+| `/app/me`                                              | Profile, password, sign-out               |
+| `/app/admin`                                           | Super-admin overview                      |
+| `/app/:orgSlug`                                        | Org dashboard                             |
+| `/app/:orgSlug/participations`                         | Portfolio view (placeholder)              |
+| `/app/:orgSlug/cash`                                   | Cash management (placeholder)             |
+| `/app/:orgSlug/settings/{general,members,invitations}` | Settings UI                               |
 
 ## Auth model
 
@@ -150,7 +150,7 @@ scripts/
 - `organizationMembers.role`: `owner` > `admin` > `member`.
 - Roles are **never** stored on the Better Auth user table.
 - Every Convex query/mutation reads roles via `requireAppUser` / `requireOrgRole` / `requireSuperAdmin`.
-- Invitations: 7-day expiry, token *is* the credential; UI never bounces the
+- Invitations: 7-day expiry, token _is_ the credential; UI never bounces the
   invitee through sign-in unless the email already has an account.
 - Last-owner protection on every demote/remove path.
 
@@ -208,7 +208,7 @@ pnpm dlx vercel@latest env add CONVEX_DEPLOY_KEY production
 
 Then set the Vercel build command to
 `pnpm exec convex deploy --cmd "pnpm build"` — Convex deploys the
-backend and injects `VITE_CONVEX_URL` automatically (the manual VITE_*
+backend and injects `VITE_CONVEX_URL` automatically (the manual VITE\_\*
 env vars become unnecessary).
 
 **Convex prod env** — one command, instead of pasting 8 `convex env set`:
@@ -259,6 +259,110 @@ pnpm dlx vercel@latest ls --prod                   # latest deployments
 pnpm dlx vercel@latest inspect <url> --wait        # block until Ready
 curl -sI https://<your-vercel-domain>/             # expect HTTP 200
 ```
+
+## Staging environment
+
+A persistent test environment with its own Convex database and its own
+Vercel frontend, isolated from prod. Architecture:
+
+- **Convex**: a _separate Convex project_ (e.g. `albo-os-staging`) in the
+  same team. Its "production" deployment is the staging database. This is
+  the [officially recommended setup](https://docs.convex.dev/production)
+  for a permanent staging env (Convex preview deployments are ephemeral
+  and their rotating URLs break magic-link auth — `SITE_URL` must be
+  stable).
+- **Vercel**: a _second Vercel project_ importing the same repo, whose
+  **Production Branch is `staging`**. Builds of that branch therefore run
+  with `VERCEL_ENV=production`, so the existing `build:vercel` guard and
+  the Convex CLI's deploy-key check both pass unchanged — front and
+  backend deploy in lockstep, exactly like prod, just against the staging
+  Convex project.
+
+**One-time setup**
+
+1. Convex dashboard → Create Project (same team), e.g. `albo-os-staging`.
+   Project Settings → URL & Deploy Key → Generate **Production** Deploy
+   Key. Keep it: this key is what distinguishes staging from prod
+   everywhere below.
+2. Provision the staging Convex env in one command:
+
+   ```bash
+   pnpm run setup:staging
+   ```
+
+   The script prompts for the staging deploy key + staging domain, mirrors
+   Resend/Anthropic (and Google OAuth if set) from your dev env, generates
+   a **fresh** `BETTER_AUTH_SECRET`, sets `APP_ENV=production`,
+   `SITE_URL`/`BETTER_AUTH_URL` to the staging domain and
+   `RESEND_TEST_MODE=false`, then runs `convex deploy` against staging.
+   It deliberately does **not** mirror `POWENS_*` / `AIRTABLE_API_KEY`
+   (Powens webhooks are registered per Powens domain — connecting banks
+   from staging would leak real events across environments; staging gets
+   bank data via snapshot import) nor `SENTRY_DSN` (keep staging noise out
+   of prod Sentry).
+
+3. Vercel dashboard → Add New → Project → import this repo **again** as a
+   second project (e.g. `albo-os-staging`). Settings → Git → Production
+   Branch = `staging`. Settings → Environment Variables (scope:
+   Production):
+   - `CONVEX_DEPLOY_KEY` = the staging deploy key from step 1
+   - `VITE_CONVEX_SITE_URL` = the staging `.convex.site` URL
+     (`VITE_CONVEX_URL` is injected by `convex deploy --cmd` at build
+     time.)
+
+   Optional: Settings → Git → Ignored Build Step →
+   `[ "$VERCEL_ENV" = "production" ] || exit 0` so the staging project
+   doesn't duplicate the PR previews already built by the main project.
+
+4. Create the branch and trigger the first deploy:
+
+   ```bash
+   git push origin main:staging
+   ```
+
+5. If Google OAuth is enabled: register
+   `https://<staging-domain>/api/auth/callback/google` as an extra
+   redirect URI on the same OAuth client (see
+   [KNOWN_ISSUES.md](KNOWN_ISSUES.md) § Google OAuth).
+
+**Day-to-day process**
+
+```bash
+# 1. Develop on a feature branch, open a PR as usual.
+# 2. To test on staging, point the staging branch at your branch:
+git push origin my-feature-branch:staging --force
+# → Vercel builds the staging project: convex deploy (staging) + front,
+#   in lockstep, at the stable staging URL.
+# 3. Validate by hand (TESTING.md levels 2-6 where relevant).
+# 4. Merge the PR into main → prod deploys. Re-align staging when needed:
+git push origin main:staging --force
+```
+
+`staging` is a throwaway pointer — force-pushing it is the intended
+workflow; never base work on it.
+
+**Test data on staging**
+
+All `convex` CLI commands target staging by prefixing the deploy key:
+
+```bash
+# Option A — seeds (clean, idempotent):
+CONVEX_DEPLOY_KEY="<staging-key>" pnpm exec convex run seed:seedAll '{"ownerEmail":"you@yourco.com"}'
+
+# Option B — realistic copy of prod (snapshot export → import):
+pnpm exec convex export --prod --path /tmp/albo-snapshot
+CONVEX_DEPLOY_KEY="<staging-key>" pnpm exec convex import --replace /tmp/albo-snapshot/<file>.zip
+
+# Inspect / tweak staging env:
+CONVEX_DEPLOY_KEY="<staging-key>" pnpm exec convex env list
+```
+
+Accounts: Better Auth credentials live in a Convex component with a
+staging-specific `BETTER_AUTH_SECRET`, so prod sessions never work on
+staging. If after a snapshot import your email has an app `users` row but
+no staging login, just sign up again on `/register` with the **same
+email** — provisioning dedups by email and re-links the imported row
+(roles and `superAdmin` included).
 
 ## CI / Ops
 

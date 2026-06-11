@@ -18,6 +18,7 @@
     "sync:skills:check": "node scripts/sync-skills.mjs --check",
     "setup": "node scripts/setup.mjs",
     "setup:prod": "node scripts/setup-prod.mjs",
+    "setup:staging": "node scripts/setup-staging.mjs",
     "init": "node scripts/init.mjs",
     "upgrade-template": "node scripts/upgrade-template.mjs",
     "test:smoke": "node scripts/e2e-smoke.mjs",
