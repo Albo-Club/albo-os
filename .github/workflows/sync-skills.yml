@@ -23,15 +23,22 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run sync:skills
+      - run: pnpm run sync:skills:update
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Open PR if anything changed
         uses: peter-evans/create-pull-request@v7
         with:
           branch: chore/sync-skills
           base: main
-          commit-message: 'chore: sync skills from upstream'
-          title: 'chore: sync skills from upstream'
+          commit-message: 'chore: bump skill pins to upstream tips'
+          title: 'chore: bump skill pins to upstream tips'
           body: |
-            Automated `pnpm run sync:skills` run. Review the diff before merging.
+            Automated `pnpm run sync:skills:update` run.
+
+            Each skill's `pinnedRef` has been advanced to the current tip of its
+            `trackingRef`. **Review the diff in `.agents/skills/` before merging**
+            — a skill update is a prompt-injection surface and should be read, not
+            rubber-stamped.
           labels: skills
           delete-branch: true
