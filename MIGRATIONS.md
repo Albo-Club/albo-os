@@ -51,8 +51,9 @@ La dernière org visitée vit désormais dans la table `userPrefs`
 n'est plus écrit, seulement lu en fallback quand la ligne `userPrefs`
 n'existe pas encore. Retrait en deux temps :
 
-1. **Purge (à exécuter en prod, une fois que chaque user actif s'est
-   reconnecté au moins une fois — sa ligne `userPrefs` existe alors)** :
+1. **Purge (à exécuter en prod dès que ce code est déployé — la mutation
+   migre la valeur legacy vers `userPrefs` avant de la nettoyer, donc pas
+   besoin d'attendre que les users se reconnectent ; idempotente)** :
 
    ```bash
    pnpm exec convex export --prod

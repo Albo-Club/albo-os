@@ -47,9 +47,12 @@ l'app ne refait plus de travail en arrière-plan quand rien n'a changé.
 > - Front : garde `lastOrgSyncedRef` — on ne persiste qu'une fois par slug
 >   visité, plus jamais en réaction à un update de `me`.
 > - Champ legacy `users.lastOrgSlug` conservé en lecture seule ; purge
->   one-shot `users:purgeLegacyLastOrgSlug` (chantier `MIGRATIONS.md`).
-> - Audit perf annexe : RAS de comparable ; `Date.now()` dans 2 queries
->   forecast (cache défait, impact négligeable à 2 users — non traité).
+>   one-shot `users:purgeLegacyLastOrgSlug` (migre la valeur vers
+>   `userPrefs` puis nettoie — exécutable dès le déploiement, runbook
+>   `MIGRATIONS.md`).
+> - Audit perf annexe : RAS de comparable ; `Date.now()` dans les queries
+>   forecast (cache défait) → wontfix documenté dans `KNOWN_ISSUES.md`,
+>   à ré-évaluer si ces queries montent dans le breakdown Usage.
 > - Docs : `KNOWN_ISSUES.md` « Hot `users` row », anti-pattern `CLAUDE.md`,
 >   TESTING A2b (test anti-boucle 2 onglets).
 

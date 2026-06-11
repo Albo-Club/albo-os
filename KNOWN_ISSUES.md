@@ -1082,6 +1082,14 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   des mois courts (28/29 févr., 30 avr., …) ; hebdo = jour ISO (1 = lundi,
   7 = dimanche). Toute nouvelle logique de date doit passer par
   `convex/lib/recurrence.ts`, pas par `new Date()` local (fuseau serveur).
+- **`Date.now()` dans les queries de solde = cache Convex défait — accepté.**
+  `computeCashHistoryForOrgs` / `getForecastBalance` bornent « le mois
+  courant » avec `Date.now()`, ce qui re-exécute la query plus souvent que
+  nécessaire (audit perf juin 2026). Trade-off assumé : le vrai fix (passer
+  l'horodatage arrondi en argument depuis le client) toucherait signatures,
+  callsites et outils agent pour un gain nul à l'échelle actuelle — ces
+  queries n'apparaissent pas dans le breakdown Usage. À ré-évaluer si elles
+  y montent.
 
 ## Split chapeaux Attio → SPV, org albo (`convex/migrations/splitAlboSponsorSpvs.ts`)
 
