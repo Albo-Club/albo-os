@@ -30,6 +30,27 @@ laissée en attente est automatiquement annulée si la conversation repart
 sur autre chose, et l'historique garde la trace de ce qui a été confirmé
 ou refusé.
 
+### 📊 Des réponses qui se lisent d'un coup d'œil
+
+Quand l'assistant consulte vos données, le résultat s'affiche désormais en
+clair : tableau des participations (cliquable — chaque ligne ouvre la page
+du deal), totaux et lignes des recherches de transactions, projection de
+trésorerie mois par mois, passif groupé, valorisations. Le détail technique
+reste disponible dans le bloc dépliable. Et sur les suggestions de
+pointage, un bouton **« Pointer »** rattache la transaction immédiatement,
+sans repasser par la conversation.
+
+### 🧰 Un assistant qui couvre (presque) tout
+
+L'assistant sait maintenant : résumer l'organisation (« où en est-on ? »),
+donner la position de TVA, lister les documents d'une société, classer
+plusieurs transactions d'un coup (une seule confirmation pour le lot),
+gérer le prévisionnel de bout en bout (modifier ou supprimer une règle,
+ajouter/modifier/annuler une échéance ponctuelle), corriger le passif et
+détacher une transaction mal allouée, renommer un compte bancaire et
+mettre à jour la fiche d'une société. Les suppressions importantes restent
+volontairement réservées à l'application.
+
 ### 💡 Des suggestions qui suivent votre page
 
 À l'ouverture d'une nouvelle conversation, les suggestions s'adaptent à
@@ -39,9 +60,8 @@ TVA ; sur le Passif, les comptes courants — et ainsi de suite.
 
 ### 📋 En préparation
 
-La feuille de route de l'assistant (réponses plus visuelles, pièces
-jointes, brief proactif) et un guide des bonnes pratiques rejoignent la
-documentation du projet.
+La feuille de route de l'assistant (pièces jointes, brief proactif) et un
+guide des bonnes pratiques rejoignent la documentation du projet.
 
 ---
 

@@ -247,6 +247,10 @@ l'assistant (outils `setDealProjections` / `createKpiSnapshot`).
 | C24 | Refuser une écriture (bouton Refuser)                   | L'outil passe en « Refusé » (badge orange, état `output-denied`), rien n'est écrit en base ; l'agent reprend la parole, accuse réception et demande quoi ajuster |
 | C25 | Approbation en suspens + envoyer un autre message       | La demande en attente est auto-refusée (badge « Action refusée ») — un « oui » ne peut pas s'appliquer à une question qui a changé |
 | C26 | Approbation en suspens + refresh de la page             | Le bloc « Confirmation requise » et ses boutons se réaffichent (état persisté côté Convex, pas dans l'état React) ; Confirmer après refresh fonctionne |
+| C27 | "liste mes participations"                              | Tableau riche au-dessus du bloc dépliable (cible, instrument, montant €, statut) ; chaque ligne est un lien qui ouvre la page du deal ; le JSON brut reste dans le collapsible |
+| C28 | "suggère des rattachements" → bouton « Pointer » d'un candidat | Pointage immédiat SANS génération LLM : toast succès, candidat « Pointé ✓ » (groupe figé), la tx disparaît de l'onglet Pointage en temps réel ; `matchingDecisions` a une ligne `source: 'manual'` (action utilisateur directe, ≠ C19 `agent_suggested`) |
+| C29 | "classe ces 5 transactions en frais bancaires (TVA 0)"  | `bulkCategorizeTransactions` appelé avec le lot (max 50) ; UNE seule approbation pour tout le lot ; l'agent récapitule le nombre de lignes et la catégorie avant l'appel |
+| C30 | "où en est-on ?" / "quelle TVA ce trimestre ?" / "quels documents a-t-on sur X ?" | `getDashboardSummary` / `getVatPosition` / `listCompanyDocuments` appelés (lectures sans approbation) ; réponses cohérentes avec le dashboard, la carte TVA et la page société |
 
 ## Niveau 6 — Sécurité + déploiement (5 min)
 

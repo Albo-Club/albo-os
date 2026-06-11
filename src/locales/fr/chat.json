@@ -55,5 +55,97 @@
   "errors": {
     "rate_limited": "Ralentissez — trop de messages",
     "default": "Impossible d'envoyer le message"
+  },
+  "renderers": {
+    "deals": {
+      "target": "Société",
+      "instrument": "Instrument",
+      "committed": "Engagé",
+      "status": "Statut"
+    },
+    "instrument": {
+      "share": "Actions",
+      "spv_share": "Parts SPV",
+      "os": "Obligation",
+      "oc": "Obligation convertible",
+      "convertible_note": "Note convertible",
+      "safe": "SAFE",
+      "bsa": "BSA",
+      "bsa_air": "BSA Air",
+      "royalty": "Royalties",
+      "cca": "Compte courant d'associé",
+      "fund_lp": "Fonds (LP)",
+      "secondary": "Secondaire",
+      "real_estate_direct": "Immobilier direct",
+      "scpi": "SCPI",
+      "cto": "Compte-titres"
+    },
+    "status": {
+      "active": "Actif",
+      "partially_exited": "Sortie partielle",
+      "fully_exited": "Sorti",
+      "written_off": "Passé en perte"
+    },
+    "tx": {
+      "date": "Date",
+      "label": "Libellé",
+      "amount": "Montant"
+    },
+    "search": {
+      "count_one": "{{count}} transaction",
+      "count_other": "{{count}} transactions",
+      "in": "Entrées",
+      "out": "Sorties",
+      "vat": "TVA",
+      "partial": "Total partiel"
+    },
+    "suggest": {
+      "point": "Pointer",
+      "pointed": "Transaction pointée",
+      "pointedShort": "Pointé",
+      "noCandidate": "Aucune suggestion",
+      "unknownTarget": "Cible inconnue",
+      "score": "Score {{score}}",
+      "kind": {
+        "deal": "Deal",
+        "equity": "Capital",
+        "intercompany_loan": "Compte courant"
+      }
+    },
+    "forecast": {
+      "starting": "Solde de départ",
+      "month": "Mois",
+      "in": "Entrées",
+      "out": "Sorties",
+      "balance": "Solde"
+    },
+    "liabilities": {
+      "equity": "Positions de capital",
+      "loans": "Comptes courants",
+      "type": "Type",
+      "holder": "Détenteur",
+      "amount": "Montant",
+      "counterparty": "Contrepartie",
+      "side": "Rôle",
+      "balance": "Solde",
+      "creditor": "Créancier",
+      "debtor": "Débiteur",
+      "equityType": {
+        "capital_social": "Capital social",
+        "prime_emission": "Prime d'émission",
+        "augmentation_capital": "Augmentation de capital",
+        "report_a_nouveau": "Report à nouveau"
+      }
+    },
+    "valuations": {
+      "date": "Date",
+      "value": "Valeur",
+      "source": "Source"
+    },
+    "errors": {
+      "default": "Action échouée",
+      "not_found": "Élément introuvable",
+      "already_matched": "Déjà pointé"
+    }
   }
 }

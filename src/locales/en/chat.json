@@ -55,5 +55,97 @@
   "errors": {
     "rate_limited": "Slow down — too many messages",
     "default": "Could not send message"
+  },
+  "renderers": {
+    "deals": {
+      "target": "Company",
+      "instrument": "Instrument",
+      "committed": "Committed",
+      "status": "Status"
+    },
+    "instrument": {
+      "share": "Shares",
+      "spv_share": "SPV shares",
+      "os": "Bond",
+      "oc": "Convertible bond",
+      "convertible_note": "Convertible note",
+      "safe": "SAFE",
+      "bsa": "BSA",
+      "bsa_air": "BSA Air",
+      "royalty": "Royalties",
+      "cca": "Shareholder loan",
+      "fund_lp": "Fund (LP)",
+      "secondary": "Secondary",
+      "real_estate_direct": "Direct real estate",
+      "scpi": "SCPI",
+      "cto": "Securities account"
+    },
+    "status": {
+      "active": "Active",
+      "partially_exited": "Partial exit",
+      "fully_exited": "Exited",
+      "written_off": "Written off"
+    },
+    "tx": {
+      "date": "Date",
+      "label": "Label",
+      "amount": "Amount"
+    },
+    "search": {
+      "count_one": "{{count}} transaction",
+      "count_other": "{{count}} transactions",
+      "in": "In",
+      "out": "Out",
+      "vat": "VAT",
+      "partial": "Partial total"
+    },
+    "suggest": {
+      "point": "Reconcile",
+      "pointed": "Transaction reconciled",
+      "pointedShort": "Reconciled",
+      "noCandidate": "No suggestion",
+      "unknownTarget": "Unknown target",
+      "score": "Score {{score}}",
+      "kind": {
+        "deal": "Deal",
+        "equity": "Equity",
+        "intercompany_loan": "Current account"
+      }
+    },
+    "forecast": {
+      "starting": "Starting balance",
+      "month": "Month",
+      "in": "In",
+      "out": "Out",
+      "balance": "Balance"
+    },
+    "liabilities": {
+      "equity": "Equity positions",
+      "loans": "Current accounts",
+      "type": "Type",
+      "holder": "Holder",
+      "amount": "Amount",
+      "counterparty": "Counterparty",
+      "side": "Role",
+      "balance": "Balance",
+      "creditor": "Creditor",
+      "debtor": "Debtor",
+      "equityType": {
+        "capital_social": "Share capital",
+        "prime_emission": "Issue premium",
+        "augmentation_capital": "Capital increase",
+        "report_a_nouveau": "Retained earnings"
+      }
+    },
+    "valuations": {
+      "date": "Date",
+      "value": "Value",
+      "source": "Source"
+    },
+    "errors": {
+      "default": "Action failed",
+      "not_found": "Item not found",
+      "already_matched": "Already reconciled"
+    }
   }
 }
