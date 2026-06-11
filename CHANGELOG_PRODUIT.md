@@ -23,6 +23,25 @@ bas de page.
 
 ---
 
+## v1.6.3 — 11/06/2026 à 18:29 — Raccordement au template Ouvre-Boîte
+
+Mise à jour technique, rien ne change à l'écran : Albo OS est désormais
+raccordé à son template d'origine, ce qui permettra de récupérer proprement
+ses futures améliorations de socle (authentification, sécurité, outillage).
+
+> **🔧 Notes techniques**
+>
+> - Merge `-s ours` de `template/main` (albo-ouvre-boite) : enregistre le
+>   lien de parenté sans adopter de code — les prochains
+>   `pnpm run upgrade-template` seront des merges 3-way propres.
+> - Adoptés explicitement : `.template-version` (v0.2.0), `UPGRADING.md`
+>   (lien changelog repointé vers le repo template),
+>   `scripts/upgrade-template.mjs` (version capable de graft).
+> - Volontairement non repris (déjà refait ici, ou machinerie propre au
+>   template) : WhatsNew.tsx, README.product, release-tag.yml, notif
+>   signup, bumps de majors (Renovate). Détail et conséquences dans
+>   `KNOWN_ISSUES.md` § « Upgrade depuis le template ».
+
 ## v1.6.2 — 11/06/2026 à 18:20 — Nettoyage final de la migration précédente
 
 Suite et fin de la correction v1.6.1 : suppression de l'ancien emplacement
