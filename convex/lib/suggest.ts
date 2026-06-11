@@ -1,15 +1,15 @@
 /**
- * Ranking pur des suggestions de pointage (outil agent `suggestMatches`).
- * Module sans import Convex pour rester testable via node:test
+ * Pure ranking of pointage suggestions (agent tool `suggestMatches`).
+ * Module without Convex imports so it stays testable via node:test
  * (cf. tests/suggest.test.ts).
  *
- * Signaux (chargés par l'internalQuery, cf. convex/agentToolsPointage.ts) :
- * - `similarTargets` : cibles des transactions DÉJÀ matchées dont le libellé
- *   est similaire (search index `search_text`) — une entrée par transaction
- *   similaire, les doublons font la fréquence.
- * - `decisionsCountByTarget` : nb de décisions `matched` récentes par cible
- *   (table `matchingDecisions`).
- * - Δ montant vs `committedAmount` du deal (si connu).
+ * Signals (loaded by the internalQuery, cf. convex/agentToolsPointage.ts):
+ * - `similarTargets`: targets of the ALREADY matched transactions whose
+ *   label is similar (search index `search_text`) — one entry per similar
+ *   transaction, duplicates build the frequency.
+ * - `decisionsCountByTarget`: count of recent `matched` decisions per
+ *   target (`matchingDecisions` table).
+ * - amount Δ vs the deal's `committedAmount` (when known).
  */
 
 export type CandidateKind = 'deal' | 'equity' | 'intercompany_loan'
@@ -18,7 +18,7 @@ export type SimilarTarget = {
   kind: CandidateKind
   targetId: string
   targetLabel: string | null
-  /** committedAmount du deal en cents — null pour equity/C-C ou si absent. */
+  /** Deal committedAmount in cents — null for equity/C-C or when absent. */
   committedAmountCents: number | null
 }
 
@@ -67,9 +67,9 @@ export function rankCandidates({
       target.committedAmountCents != null
         ? Math.abs(txAmountCents - target.committedAmountCents)
         : null
-    // Le libellé similaire est le signal dominant ; les décisions passées
-    // départagent ; un montant proche du committedAmount (±1 %, min 1 €)
-    // donne un bonus.
+    // The similar label is the dominant signal; past decisions break
+    // ties; an amount close to committedAmount (±1 %, min 1 €) gives a
+    // bonus.
     const amountBonus =
       amountDeltaCents != null &&
       target.committedAmountCents != null &&

@@ -4,14 +4,14 @@ import type * as RechartsModule from 'recharts'
 import type { PlanVsActualRow } from '~/lib/projectionSeries'
 import { Skeleton } from '~/components/ui/skeleton'
 
-// `import type` est effacé à la compilation — pas d'import runtime de
-// recharts au chargement du module (le vrai import reste dans useEffect).
+// `import type` is erased at compile time — no runtime import of recharts
+// at module load (the real import stays inside useEffect).
 type RechartsMod = typeof RechartsModule
 
 /**
- * Courbes cumulées BP initial / BP révisé / réalisé. recharts touche
- * `window` au chargement → dynamic-import dans useEffect + skeleton
- * (pattern KNOWN_ISSUES « Browser-only libs »).
+ * Cumulative curves for initial BP / revised BP / actual. recharts touches
+ * `window` at load time → dynamic-import inside useEffect + skeleton
+ * (KNOWN_ISSUES pattern "Browser-only libs").
  */
 export function PlanVsActualChart({
   rows,

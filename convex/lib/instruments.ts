@@ -1,30 +1,30 @@
 import { literals } from 'convex-helpers/validators'
 
 /**
- * Source unique des types d'instruments (deal.instrumentKind).
- * Importée par le schéma, les mutations deals et les outils agent —
- * ne JAMAIS redéclarer cette liste ailleurs.
+ * Single source of truth for instrument kinds (deal.instrumentKind).
+ * Imported by the schema, the deals mutations and the agent tools —
+ * NEVER redeclare this list elsewhere.
  */
 export const INSTRUMENTS = [
   'share',
   'bsa',
   'bsa_air',
   'safe',
-  'oc', // obligation convertible
-  'os', // obligation simple
+  'oc', // convertible bond (obligation convertible)
+  'os', // plain bond (obligation simple)
   'convertible_note',
-  'cca', // compte courant associé
+  'cca', // shareholder current account (compte courant associé)
   'royalty',
-  'fund_lp', // commitment LP dans un fond
-  'spv_share', // titres d'un SPV
+  'fund_lp', // LP commitment in a fund
+  'spv_share', // shares of an SPV
   'secondary',
   'real_estate_direct',
   'scpi',
   'cto',
-  'dat', // dépôt à terme
+  'dat', // term deposit (dépôt à terme)
   'crypto',
-  'loan', // prêt (Airtable « Prêt »)
-  'capitalization_account', // contrat de capitalisation (Airtable « Compte de Capitalisation »)
+  'loan', // loan (Airtable « Prêt »)
+  'capitalization_account', // capitalization contract (Airtable « Compte de Capitalisation »)
 ] as const
 
 export type InstrumentKind = (typeof INSTRUMENTS)[number]

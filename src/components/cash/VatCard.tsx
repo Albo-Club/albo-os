@@ -7,10 +7,10 @@ import type { Id } from '../../../convex/_generated/dataModel'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 
 /**
- * Carte « TVA récupérable » de la page Trésorerie : TVA déductible (charges
- * qualifiées) − TVA collectée (produits qualifiés), dérivée des montants TTC
- * par `transactions:getVatPosition`. Le lien « à qualifier » renvoie vers la
- * page Pointage (onglets Charges/Produits) où le taux se pose ligne à ligne.
+ * "Recoverable VAT" card on the Cash page: deductible VAT (qualified
+ * expenses) − collected VAT (qualified income), derived from tax-inclusive
+ * amounts by `transactions:getVatPosition`. The "to qualify" link points to
+ * the Pointage page (Expenses/Income tabs) where the rate is set per line.
  */
 export function VatCard({
   orgId,

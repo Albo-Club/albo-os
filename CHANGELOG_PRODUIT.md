@@ -16,6 +16,13 @@ bas de page.
 
 ---
 
+## v1.3.3 — 11/06/2026 à 09:46 — Nettoyage interne
+
+Harmonisation interne du code (commentaires unifiés en anglais). Aucun
+changement visible dans l'app.
+
+---
+
 ## v1.3.2 — 11/06/2026 à 01:10 — Nettoyage après la réindexation
 
 Retrait de l'étape technique ponctuelle qui a réindexé l'historique des

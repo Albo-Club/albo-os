@@ -20,10 +20,10 @@ import {
   PopoverTrigger,
 } from '~/components/ui/popover'
 
-/** Forme minimale d'un deal enrichi (retour de `api.deals.list`). */
+/** Minimal shape of an enriched deal (return of `api.deals.list`). */
 export type DealOption = {
   _id: Id<'deals'>
-  /** Nom personnalisé — affiché avec l'instrument quand présent. */
+  /** Custom name — displayed with the instrument when present. */
   name?: string | null
   target: { name: string } | null
   investor: { name: string } | null
@@ -31,9 +31,9 @@ export type DealOption = {
 }
 
 /**
- * Combobox cherchable de deals (Popover + Command). Le label affiché est le
- * nom de la target company ; l'investisseur + l'instrument désambiguïsent les
- * deals d'une même boîte.
+ * Searchable deal combobox (Popover + Command). The displayed label is the
+ * target company name; the investor + the instrument disambiguate deals of
+ * the same company.
  */
 export function DealCombobox({
   deals,
@@ -78,10 +78,10 @@ export function DealCombobox({
               {(deals ?? []).map((deal) => (
                 <CommandItem
                   key={deal._id}
-                  // L'_id garantit l'unicité cmdk quand deux deals partagent
-                  // le même nom de boîte ; la recherche matche sur les noms,
-                  // le nom personnalisé et l'instrument (comme la table
-                  // Participations).
+                  // The _id guarantees cmdk uniqueness when two deals share
+                  // the same company name; search matches on the names, the
+                  // custom name and the instrument (like the Participations
+                  // table).
                   value={`${deal.target?.name ?? ''} ${dealTitle(deal)} ${deal.investor?.name ?? ''} ${deal._id}`}
                   onSelect={() => {
                     onSelect(deal._id === value?._id ? null : deal)

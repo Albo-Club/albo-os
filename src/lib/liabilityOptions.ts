@@ -1,33 +1,33 @@
 /**
- * Construction pure des cibles passif du combobox de pointage, à partir du
- * retour de `liabilities:getLiabilities`.
+ * Pure construction of the pointage combobox liability targets, from the
+ * return of `liabilities:getLiabilities`.
  *
- * Extraite de la page Pointage pour être testable en node:test
- * (tests/liabilityOptions.test.ts) : le câblage « un loan dans getLiabilities
- * DOIT produire une option de groupe Comptes courants » est verrouillé par
- * test — un C/C absent du combobox ne peut plus venir d'un oubli de mapping
- * ou d'un filtre par kind erroné (chaque groupe est alimenté directement
- * depuis sa source, sans liste aplatie intermédiaire).
+ * Extracted from the Pointage page to be testable in node:test
+ * (tests/liabilityOptions.test.ts): the wiring « a loan in getLiabilities
+ * MUST produce a Comptes courants group option » is locked by test — a C/C
+ * missing from the combobox can no longer come from a mapping oversight or
+ * a wrong kind filter (each group is fed directly from its source, without
+ * an intermediate flattened list).
  *
- * Volontairement sans dépendance React/i18n : les libellés arrivent résolus.
+ * Deliberately free of React/i18n dependencies: labels arrive resolved.
  */
 
-/** Cible passif pointable (option d'un groupe du combobox de pointage). */
+/** Pointable liability target (option of a pointage combobox group). */
 export type LiabilityOption = {
   kind: 'equity' | 'intercompany_loan'
-  /** _id de la cible en string (convention `transactions.allocation`). */
+  /** Target _id as a string (`transactions.allocation` convention). */
   targetId: string
   label: string
   sublabel: string
 }
 
-/** Les deux groupes passif du combobox, construits séparément. */
+/** The two liability groups of the combobox, built separately. */
 export type LiabilityOptionGroups = {
   equityOptions: Array<LiabilityOption>
   loanOptions: Array<LiabilityOption>
 }
 
-/** Sous-ensemble du retour de `getLiabilities` consommé par le combobox. */
+/** Subset of the `getLiabilities` return consumed by the combobox. */
 export type LiabilitiesForOptions = {
   equityPositions: Array<{
     _id: string
@@ -41,20 +41,20 @@ export type LiabilitiesForOptions = {
   }>
 }
 
-/** Libellés résolus (i18n côté appelant). */
+/** Resolved labels (i18n on the caller side). */
 export type LiabilityOptionLabels = {
-  /** Libellé d'un type de position de capital (ex. « Capital social »). */
+  /** Label of an equity position type (e.g. « Capital social »). */
   equityType: (type: string) => string
-  /** « Créance » */
+  /** « Créance » (receivable) */
   receivable: string
-  /** « Dette » */
+  /** « Dette » (payable) */
   payable: string
 }
 
 /**
- * Construit les options des groupes « Capitaux propres » et « Comptes
- * courants » du combobox de pointage. Un loan est identifié par son `_id`
- * (un `intercompanyLoan` n'a PAS d'`orgId` — seulement fromOrgId/toOrgId).
+ * Builds the « Capitaux propres » and « Comptes courants » group options of
+ * the pointage combobox. A loan is identified by its `_id` (an
+ * `intercompanyLoan` has NO `orgId` — only fromOrgId/toOrgId).
  */
 export function buildLiabilityOptions(
   liabilities: LiabilitiesForOptions,

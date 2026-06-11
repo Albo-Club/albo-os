@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 
 /**
- * Valeur debouncée : ne se met à jour qu'après `delayMs` ms sans changement.
- * Sert aux barres de recherche (éviter une query/un filtre par frappe).
+ * Debounced value: only updates after `delayMs` ms without changes.
+ * Used by search bars (avoids one query/filter per keystroke).
  */
 export function useDebouncedValue<T>(value: T, delayMs = 250): T {
   const [debounced, setDebounced] = useState(value)

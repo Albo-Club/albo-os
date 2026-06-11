@@ -1,9 +1,9 @@
 /**
- * Tests purs du system prompt de l'agent (convex/lib/instructions.ts) :
- * le contexte de page (route + org) est injecté après les instructions de
- * base, et omis proprement quand absent.
+ * Pure tests for the agent system prompt (convex/lib/instructions.ts):
+ * the page context (route + org) is injected after the base instructions,
+ * and cleanly omitted when absent.
  *
- * Lancés avec le test runner natif de Node via tsx (aucune dépendance) :
+ * Run with Node's native test runner via tsx (no dependency):
  *   pnpm test:unit
  */
 

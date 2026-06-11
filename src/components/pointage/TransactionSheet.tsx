@@ -15,8 +15,8 @@ import {
 } from '~/components/ui/sheet'
 
 /**
- * Forme minimale d'une transaction affichable dans le sheet de détail
- * (retours de `listUnmatched`, `listByStatus` ou `listByDeal`).
+ * Minimal shape of a transaction displayable in the detail sheet
+ * (returns of `listUnmatched`, `listByStatus` or `listByDeal`).
  */
 export type TxDetails = {
   _id: Id<'transactions'>
@@ -25,12 +25,12 @@ export type TxDetails = {
   transactionDate: number
   rawLabel: string
   counterparty: string | null
-  /** Taux de TVA (bps) des charges/produits — null = à qualifier. */
+  /** VAT rate (bps) of expenses/income — null = still to qualify. */
   vatRateBps?: number | null
   account: { label: string; bankName: string } | null
 }
 
-/** Formateurs date/montant signé localisés (montants en cents EUR). */
+/** Localized date / signed-amount formatters (amounts in EUR cents). */
 export function useFormatters() {
   const { i18n } = useTranslation('pointage')
   const lang = i18n.language
@@ -66,8 +66,8 @@ export function accountLabel(tx: TxDetails) {
 }
 
 /**
- * Toast d'erreur localisé à partir du code `ConvexError` des mutations.
- * Le namespace porte les clés `errors.*` (pointage par défaut, passif…).
+ * Localized error toast built from the `ConvexError` code of mutations.
+ * The namespace holds the `errors.*` keys (pointage by default, passif…).
  */
 export function useReportError(namespace: 'pointage' | 'passif' = 'pointage') {
   const { t } = useTranslation(namespace)
@@ -78,9 +78,9 @@ export function useReportError(namespace: 'pointage' | 'passif' = 'pointage') {
 }
 
 /**
- * Sheet de détail lecture seule d'une transaction bancaire (date, libellé
- * brut, contrepartie, montant, sens, compte). Les actions par contexte
- * (pointage, réattribution…) sont injectées via `footer`.
+ * Read-only detail sheet of a bank transaction (date, raw label,
+ * counterparty, amount, direction, account). Context-specific actions
+ * (matching, reassignment…) are injected via `footer`.
  */
 export function TransactionSheet({
   tx,

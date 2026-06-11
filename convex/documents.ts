@@ -1,9 +1,9 @@
 /**
- * Documents & reportings rattachés à une company (investor updates, BP,
- * juridique). Fichiers dans le storage Convex natif — upload via
- * `files:generateUploadUrl` (existant), puis `documents:create` avec le
- * storageId. V1 = upload manuel ; l'ingestion email (`source: 'email'`)
- * viendra en V2.
+ * Documents & reportings attached to a company (investor updates, BP,
+ * legal). Files live in native Convex storage — upload via
+ * `files:generateUploadUrl` (existing), then `documents:create` with the
+ * storageId. V1 = manual upload; email ingestion (`source: 'email'`)
+ * will come in V2.
  */
 
 import { ConvexError, v } from 'convex/values'
@@ -13,7 +13,7 @@ import { requireOrgMember } from './lib/auth'
 import type { Id } from './_generated/dataModel'
 import type { MutationCtx } from './_generated/server'
 
-const MAX_BYTES = 20 * 1024 * 1024 // cap storage projet (cf. files.ts)
+const MAX_BYTES = 20 * 1024 * 1024 // project storage cap (cf. files.ts)
 
 const kindValidator = v.union(
   v.literal('reporting'),
@@ -35,7 +35,7 @@ async function validateUpload(
   return { contentType: meta.contentType ?? undefined, size: meta.size }
 }
 
-/** Documents d'une company, les plus récents d'abord, avec URL de download. */
+/** A company's documents, most recent first, with download URL. */
 export const listByCompany = query({
   args: { companyId: v.id('companies') },
   handler: async (ctx, { companyId }) => {

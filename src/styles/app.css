@@ -2,9 +2,9 @@
 @import 'tw-animate-css';
 @import './brand.css';
 
-/* Streamdown (markdown du chat AI) style ses éléments avec des classes
-   Tailwind internes : sans ce @source, Tailwind v4 ne scanne pas
-   node_modules et le markdown rend sans styles. */
+/* Streamdown (AI chat markdown) styles its elements with internal
+   Tailwind classes: without this @source, Tailwind v4 does not scan
+   node_modules and the markdown renders unstyled. */
 @source '../../node_modules/streamdown/dist/*.js';
 
 @custom-variant dark (&:is(.dark *));

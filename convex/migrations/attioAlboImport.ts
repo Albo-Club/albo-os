@@ -1,20 +1,20 @@
 /**
- * Import one-shot Attio -> Convex : portefeuille Albo Club.
+ * One-shot Attio -> Convex import: Albo Club portfolio.
  *
- * Donnees figees depuis Attio le 2026-05-28 (objet `deals` filtre sur
- * label "Albo" + stages Invested/Exit Win, et les `companies` liees).
- * + AUXICARE ajoute post-snapshot (closing 27/05/2026, invest 29/05/2026).
- * Montants en cents EUR, dates en ms epoch UTC (cf. CLAUDE.md).
+ * Data frozen from Attio on 2026-05-28 (`deals` object filtered on
+ * label "Albo" + stages Invested/Exit Win, plus the linked `companies`).
+ * + AUXICARE added post-snapshot (closing 27/05/2026, invest 29/05/2026).
+ * Amounts in cents EUR, dates in ms epoch UTC (cf. CLAUDE.md).
  *
- * Idempotent : re-upsert sur les ancres natives `attioCompanyId` /
+ * Idempotent: re-upserts on the native anchors `attioCompanyId` /
  * `attioDealId` (indexes `by_attio_company_id` / `by_attio_deal_id`).
- * Relancer ne cree aucun doublon.
+ * Re-running creates no duplicates.
  *
  *   npx convex run --prod migrations/attioAlboImport:run
  *   npx convex run --prod migrations/attioAlboImport:verify
  *
- * Note : la table `deals` n'a pas de champ `name` ; le nom Attio du deal
- * est prefixe dans `notes` pour ne rien perdre.
+ * Note: the `deals` table has no `name` field; the deal's Attio name is
+ * prefixed into `notes` so nothing is lost.
  */
 import { ConvexError } from 'convex/values'
 import { internalMutation, internalQuery } from '../_generated/server'

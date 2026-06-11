@@ -10,8 +10,8 @@ import type { QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 
 /**
- * Shape minimale d'une transaction pointée sur une cible passif, pour
- * l'affichage et le détachement côté front.
+ * Minimal shape of a transaction allocated to a liability target, for
+ * display and detaching on the front end.
  */
 function pickAllocatedTx(tx: Doc<'transactions'>) {
   return {
@@ -25,19 +25,19 @@ function pickAllocatedTx(tx: Doc<'transactions'>) {
 }
 
 /**
- * Logique de lecture du passif, partagée par la query publique (après auth).
+ * Liabilities read logic, shared by the public query (after auth).
  *
- * Les soldes ne sont JAMAIS stockés : chaque org somme SES propres
- * transactions dont `allocation` cible le prêt (index
- * `by_org_allocation_target`). Signe : + = créance (org créancière),
- * − = dette (org débitrice). Cf. convex/lib/liabilities.ts.
+ * Balances are NEVER stored: each org sums ITS OWN transactions whose
+ * `allocation` targets the loan (index `by_org_allocation_target`).
+ * Sign: + = receivable (org is creditor), − = debt (org is debtor).
+ * Cf. convex/lib/liabilities.ts.
  */
 export async function getLiabilitiesForOrg(
   ctx: QueryCtx,
   orgId: Id<'organizations'>,
 ) {
-  // Transactions de l'org pointées sur une cible donnée (sans le `_id` de la
-  // cible on lirait toute la table : l'index porte orgId + allocation.targetId).
+  // The org's transactions allocated to a given target (without the target
+  // `_id` we'd read the whole table: the index covers orgId + allocation.targetId).
   const allocatedTxs = async (
     targetId: string,
     kind: 'equity' | 'intercompany_loan',
@@ -51,8 +51,8 @@ export async function getLiabilitiesForOrg(
     return txs.filter((tx) => tx.allocation?.kind === kind)
   }
 
-  // 1. Capitaux propres émis par l'org, enrichis du nom du détenteur et des
-  //    transactions pointées dessus.
+  // 1. Equity issued by the org, enriched with the holder's name and the
+  //    transactions allocated to it.
   const positions = await ctx.db
     .query('equityPositions')
     .withIndex('by_org', (q) => q.eq('orgId', orgId))
@@ -75,7 +75,7 @@ export async function getLiabilitiesForOrg(
     }),
   )
 
-  // 2. C/C où l'org est créancière ou débitrice (dédupliqués par _id).
+  // 2. C/C accounts where the org is creditor or debtor (deduped by _id).
   const asCreditor = await ctx.db
     .query('intercompanyLoans')
     .withIndex('by_from', (q) => q.eq('fromOrgId', orgId))
@@ -89,8 +89,8 @@ export async function getLiabilitiesForOrg(
     loansById.set(loan._id, loan)
   }
 
-  // 3. Solde dérivé par prêt, depuis les transactions de CETTE org, enrichi
-  //    du nom de la contrepartie (l'autre org du prêt) et des tx pointées.
+  // 3. Per-loan balance derived from THIS org's transactions, enriched with
+  //    the counterparty name (the loan's other org) and the allocated txs.
   const loans = await Promise.all(
     [...loansById.values()].map(async (loan) => {
       const allocated = await allocatedTxs(loan._id, 'intercompany_loan')
@@ -101,8 +101,8 @@ export async function getLiabilitiesForOrg(
       )
       return {
         ...loan,
-        // `side` est non-null par construction (le prêt vient des index
-        // by_from / by_to de cette org) ; fallback créancier par sûreté.
+        // `side` is non-null by construction (the loan comes from this org's
+        // by_from / by_to indexes); creditor fallback for safety.
         side: side ?? 'creditor',
         balanceCents: computeLoanBalanceCents(allocated),
         counterpartyName:
@@ -116,8 +116,8 @@ export async function getLiabilitiesForOrg(
 }
 
 /**
- * Passif d'une org : positions de capital émises + comptes courants
- * inter-entités, avec soldes dérivés des transactions pointées.
+ * An org's liabilities: issued equity positions + inter-entity current
+ * accounts, with balances derived from the allocated transactions.
  */
 export const getLiabilities = query({
   args: { orgId: v.id('organizations') },
@@ -127,19 +127,20 @@ export const getLiabilities = query({
   },
 })
 
-// ─── Pointage transaction → passif (equity / C/C) ───────────────────────────
+// ─── Transaction → liability allocation (equity / C/C) ──────────────────────
 //
-// Pendant du pointage transaction → deal (convex/transactions.ts). Une tx
-// allouée au passif passe en `matchStatus: 'matched'` SANS `dealId` — c'est ce
-// qui la distingue d'une tx matchée-deal — et sort donc de la file de pointage.
-// N'écrit JAMAIS dans `matchingDecisions` (dataset réservé au pointage deal),
-// ne touche jamais `reconciled` (miroir dérivé du pointage deal uniquement).
+// Counterpart of the transaction → deal matching (convex/transactions.ts). A
+// tx allocated to liabilities goes `matchStatus: 'matched'` WITHOUT `dealId` —
+// that is what distinguishes it from a deal-matched tx — and thus leaves the
+// matching queue. NEVER writes to `matchingDecisions` (dataset reserved for
+// deal matching), never touches `reconciled` (mirror derived from deal
+// matching only).
 
 /**
- * Pointe une transaction sur une position de capital (`equity`) ou un compte
- * courant inter-entités (`intercompany_loan`). La cible doit appartenir à la
- * même org que la transaction (pour un C/C : l'org de la tx doit être l'une
- * des deux parties du prêt).
+ * Allocates a transaction to an equity position (`equity`) or an
+ * inter-entity current account (`intercompany_loan`). The target must belong
+ * to the same org as the transaction (for a C/C: the tx's org must be one of
+ * the loan's two parties).
  */
 export const allocateTransaction = mutation({
   args: {
@@ -152,16 +153,16 @@ export const allocateTransaction = mutation({
     if (!tx) throw new ConvexError('not_found')
     await requireOrgMember(ctx, tx.orgId)
 
-    // Cœur partagé avec les outils agent : convex/lib/pointage.ts.
+    // Core shared with the agent tools: convex/lib/pointage.ts.
     await applyAllocateToLiability(ctx, tx, kind, targetId)
     return null
   },
 })
 
 /**
- * Détache une transaction du passif : retour à l'état non pointé
- * (`unmatched`). Idempotent — sans allocation passif, ne touche à rien.
- * Une tx rattachée à un deal n'est pas concernée : passer par
+ * Detaches a transaction from liabilities: back to the unallocated state
+ * (`unmatched`). Idempotent — with no liability allocation, touches nothing.
+ * A tx attached to a deal is not concerned: go through
  * `transactions:unmatchTransaction`.
  */
 export const deallocateTransaction = mutation({
@@ -171,27 +172,27 @@ export const deallocateTransaction = mutation({
     if (!tx) throw new ConvexError('not_found')
     await requireOrgMember(ctx, tx.orgId)
 
-    // Cœur partagé avec les outils agent : convex/lib/pointage.ts.
+    // Core shared with the agent tools: convex/lib/pointage.ts.
     await applyDeallocate(ctx, tx)
     return null
   },
 })
 
-// ─── Création manuelle (equity / C/C) ────────────────────────────────────────
+// ─── Manual creation (equity / C/C) ──────────────────────────────────────────
 //
-// Création seule (édition / suppression = follow-up). Les lignes créées
-// deviennent immédiatement des cibles pointables (combobox de l'onglet
-// Pointage, via getLiabilities réactif).
+// Creation only (edit / delete = follow-up). Created rows immediately become
+// allocatable targets (combobox of the Pointage tab, via the reactive
+// getLiabilities).
 
 /**
- * Crée une position de capitaux propres émise par l'org. Le détenteur est
- * SOIT une org du groupe (`holderOrgId`), SOIT un libellé libre
- * (`holderLabel`), soit aucun des deux (capital sans détenteur nommé).
- * `holderPersonId` n'est pas exposé (pas de table persons).
+ * Creates an equity position issued by the org. The holder is EITHER a group
+ * org (`holderOrgId`), OR a free-text label (`holderLabel`), or neither
+ * (equity with no named holder). `holderPersonId` is not exposed (no persons
+ * table).
  */
 export const createEquityPosition = mutation({
   args: {
-    orgId: v.id('organizations'), // entité émettrice
+    orgId: v.id('organizations'), // issuing entity
     holderOrgId: v.optional(v.id('organizations')),
     holderLabel: v.optional(v.string()),
     type: equityPositionType,
@@ -203,7 +204,7 @@ export const createEquityPosition = mutation({
     await requireOrgMember(ctx, args.orgId)
 
     if (args.amountCents <= 0) throw new ConvexError('invalid_amount')
-    // Une seule source de détenteur (les deux vides = autorisé).
+    // A single holder source (both empty = allowed).
     if (args.holderOrgId && args.holderLabel) {
       throw new ConvexError('ambiguous_holder')
     }
@@ -225,14 +226,14 @@ export const createEquityPosition = mutation({
 })
 
 /**
- * Crée un compte courant inter-entités créancier → débiteur. L'utilisateur
- * doit être membre d'au moins une des deux orgs (pas de C/C entre orgs
- * tierces). `interestRateBps` absent = 0 = non rémunéré.
+ * Creates a creditor → debtor inter-entity current account. The user must
+ * be a member of at least one of the two orgs (no C/C between third-party
+ * orgs). `interestRateBps` absent = 0 = non interest-bearing.
  */
 export const createIntercompanyLoan = mutation({
   args: {
-    fromOrgId: v.id('organizations'), // créancier
-    toOrgId: v.id('organizations'), // débiteur
+    fromOrgId: v.id('organizations'), // creditor
+    toOrgId: v.id('organizations'), // debtor
     interestRateBps: v.optional(v.number()),
     isBlocked: v.boolean(),
     openedDate: v.number(),
@@ -240,7 +241,7 @@ export const createIntercompanyLoan = mutation({
   handler: async (ctx, args) => {
     if (args.fromOrgId === args.toOrgId) throw new ConvexError('same_org')
 
-    // Membre d'au moins une des deux parties.
+    // Member of at least one of the two parties.
     const user = await requireAppUser(ctx)
     const memberships = await Promise.all(
       [args.fromOrgId, args.toOrgId].map((orgId) =>
@@ -276,16 +277,16 @@ export const createIntercompanyLoan = mutation({
   },
 })
 
-// ─── Édition / suppression (equity / C/C) ────────────────────────────────────
+// ─── Edit / delete (equity / C/C) ────────────────────────────────────────────
 //
-// La suppression est refusée tant que des transactions sont pointées sur la
-// cible (`has_allocations`) : détacher d'abord, supprimer ensuite. Jamais de
-// détachement implicite — le pointage est une décision utilisateur.
+// Deletion is refused while transactions are still allocated to the target
+// (`has_allocations`): detach first, delete second. Never any implicit
+// detaching — allocation is a user decision.
 
 /**
- * Vrai si au moins une transaction d'une des orgs passées est pointée sur la
- * cible (equity ou C/C). Lecture bornée : `.first()` par org sur l'index
- * `by_org_allocation_target`.
+ * True if at least one transaction of the given orgs is allocated to the
+ * target (equity or C/C). Bounded read: `.first()` per org on the
+ * `by_org_allocation_target` index.
  */
 async function hasAllocations(
   ctx: QueryCtx,
@@ -305,8 +306,8 @@ async function hasAllocations(
 }
 
 /**
- * Vérifie que l'utilisateur est membre d'au moins une des deux parties d'un
- * C/C (même règle que createIntercompanyLoan).
+ * Checks that the user is a member of at least one of the two parties of a
+ * C/C (same rule as createIntercompanyLoan).
  */
 async function requireLoanParty(ctx: QueryCtx, loan: Doc<'intercompanyLoans'>) {
   const user = await requireAppUser(ctx)
@@ -326,9 +327,9 @@ async function requireLoanParty(ctx: QueryCtx, loan: Doc<'intercompanyLoans'>) {
 }
 
 /**
- * Met à jour une position de capital (remplacement complet des champs
- * éditables — le dialog est pré-rempli avec les valeurs courantes).
- * Mêmes règles de validation que createEquityPosition.
+ * Updates an equity position (full replacement of the editable fields — the
+ * dialog is pre-filled with the current values).
+ * Same validation rules as createEquityPosition.
  */
 export const updateEquityPosition = mutation({
   args: {
@@ -354,8 +355,8 @@ export const updateEquityPosition = mutation({
       if (!holderOrg) throw new ConvexError('not_found')
     }
 
-    // `undefined` retire le champ (patch Convex) — un détenteur effacé
-    // redevient « aucun ».
+    // `undefined` removes the field (Convex patch) — a cleared holder
+    // becomes "none" again.
     await ctx.db.patch('equityPositions', position._id, {
       holderOrgId: args.holderOrgId,
       holderLabel: args.holderLabel?.trim() || undefined,
@@ -369,8 +370,8 @@ export const updateEquityPosition = mutation({
 })
 
 /**
- * Supprime une position de capital. Refusé (`has_allocations`) si des
- * transactions sont encore pointées dessus.
+ * Deletes an equity position. Refused (`has_allocations`) if transactions
+ * are still allocated to it.
  */
 export const deleteEquityPosition = mutation({
   args: { positionId: v.id('equityPositions') },
@@ -388,9 +389,9 @@ export const deleteEquityPosition = mutation({
 })
 
 /**
- * Met à jour un C/C (taux, blocage, date d'ouverture). Les parties
- * créancier/débiteur ne sont PAS éditables : changer de contrepartie =
- * supprimer puis recréer (le solde dérivé dépend de l'identité du prêt).
+ * Updates a C/C (rate, blocked flag, opening date). The creditor/debtor
+ * parties are NOT editable: changing counterparty = delete then recreate
+ * (the derived balance depends on the loan's identity).
  */
 export const updateIntercompanyLoan = mutation({
   args: {
@@ -417,9 +418,9 @@ export const updateIntercompanyLoan = mutation({
 })
 
 /**
- * Supprime un C/C. Refusé (`has_allocations`) si des transactions d'UNE DES
- * DEUX orgs sont encore pointées dessus (le solde de chaque partie dérive de
- * ses propres transactions).
+ * Deletes a C/C. Refused (`has_allocations`) if transactions of EITHER of
+ * the two orgs are still allocated to it (each party's balance derives from
+ * its own transactions).
  */
 export const deleteIntercompanyLoan = mutation({
   args: { loanId: v.id('intercompanyLoans') },
@@ -436,21 +437,21 @@ export const deleteIntercompanyLoan = mutation({
   },
 })
 
-// ─── Scénario de vérification manuelle (dev) ────────────────────────────────
+// ─── Manual verification scenario (dev) ─────────────────────────────────────
 //
-// Cf. TESTING.md « Passif ». Données marquées TEST_MARKER pour pouvoir les
-// purger via cleanupTestScenario. Jamais appelé par le code applicatif.
+// Cf. TESTING.md « Passif ». Data tagged TEST_MARKER so it can be purged via
+// cleanupTestScenario. Never called by application code.
 
 const TEST_MARKER = '[TEST liabilities]'
 
 /**
- * Seed du scénario de vérification : 1 equityPosition émise par fromOrg,
- * 1 C/C fromOrg → toOrg, et 2 transactions pointées dessus (une jambe par
- * org : `out` chez le créancier, `in` chez le débiteur, 100 000 € chacune).
+ * Seeds the verification scenario: 1 equityPosition issued by fromOrg,
+ * 1 C/C fromOrg → toOrg, and 2 transactions allocated to them (one leg per
+ * org: `out` on the creditor side, `in` on the debtor side, 100 000 € each).
  *
- * Attendu ensuite via getLiabilities :
- *   fromOrg (créancier) → side 'creditor', balanceCents +10_000_000
- *   toOrg (débiteur)    → side 'debtor',   balanceCents −10_000_000
+ * Then expected via getLiabilities:
+ *   fromOrg (creditor) → side 'creditor', balanceCents +10_000_000
+ *   toOrg (debtor)     → side 'debtor',   balanceCents −10_000_000
  *
  *   pnpm exec convex run liabilities:seedTestScenario \
  *     '{"fromOrgId": "…", "toOrgId": "…"}'
@@ -465,7 +466,7 @@ export const seedTestScenario = internalMutation({
     const now = Date.now()
     const amountCents = 10_000_000 // 100 000 €
 
-    // Un compte bancaire par org (créé si absent, marqué TEST pour cleanup).
+    // One bank account per org (created if absent, tagged TEST for cleanup).
     const accountFor = async (orgId: Id<'organizations'>) => {
       const existing = await ctx.db
         .query('bankAccounts')
@@ -491,7 +492,7 @@ export const seedTestScenario = internalMutation({
     const fromAccountId = await accountFor(fromOrgId)
     const toAccountId = await accountFor(toOrgId)
 
-    // 1 position de capital émise par le créancier (détenteur libre TEST).
+    // 1 equity position issued by the creditor (free-text TEST holder).
     const equityPositionId = await ctx.db.insert('equityPositions', {
       orgId: fromOrgId,
       holderLabel: TEST_MARKER,
@@ -500,7 +501,7 @@ export const seedTestScenario = internalMutation({
       effectiveDate: now,
     })
 
-    // 1 C/C créancier → débiteur.
+    // 1 C/C creditor → debtor.
     const loanId = await ctx.db.insert('intercompanyLoans', {
       fromOrgId,
       toOrgId,
@@ -509,7 +510,7 @@ export const seedTestScenario = internalMutation({
       openedDate: now,
     })
 
-    // 2 transactions pointées sur le prêt : une jambe par org.
+    // 2 transactions allocated to the loan: one leg per org.
     const insertLeg = async (
       orgId: Id<'organizations'>,
       bankAccountId: Id<'bankAccounts'>,
@@ -524,8 +525,8 @@ export const seedTestScenario = internalMutation({
         rawLabel: `${TEST_MARKER} avance C/C`,
         searchText: buildSearchText(`${TEST_MARKER} avance C/C`, undefined),
         source: 'manual',
-        // Une tx allouée au passif est `matched` sans dealId (même état que
-        // produirait allocateTransaction).
+        // A tx allocated to liabilities is `matched` without dealId (same
+        // state allocateTransaction would produce).
         matchStatus: 'matched',
         allocation: { kind: 'intercompany_loan', targetId: loanId },
         reconciled: false,
@@ -538,8 +539,8 @@ export const seedTestScenario = internalMutation({
 })
 
 /**
- * Purge des données créées par seedTestScenario (idempotent : ne supprime
- * que les lignes marquées TEST_MARKER des deux orgs passées en args).
+ * Purges the data created by seedTestScenario (idempotent: only deletes the
+ * TEST_MARKER-tagged rows of the two orgs passed as args).
  *
  *   pnpm exec convex run liabilities:cleanupTestScenario \
  *     '{"fromOrgId": "…", "toOrgId": "…"}'

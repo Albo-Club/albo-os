@@ -17,10 +17,10 @@ import {
 } from '~/components/ui/table'
 
 /**
- * Section « Business plan vs réalisé » d'un deal. Toujours montée (la query
- * est triviale) mais ne rend quelque chose que pour les royalties — ou dès
- * qu'un BP existe, quel que soit l'instrument. La saisie du BP passe par
- * l'assistant (setDealProjections), pas par un formulaire.
+ * "Business plan vs actual" section of a deal. Always mounted (the query
+ * is trivial) but only renders something for royalties — or as soon as a
+ * BP exists, whatever the instrument. BP entry goes through the assistant
+ * (setDealProjections), not a form.
  */
 export function PlanVsActualSection({
   dealId,

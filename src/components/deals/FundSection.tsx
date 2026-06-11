@@ -14,9 +14,9 @@ import {
 } from '~/components/ui/table'
 
 /**
- * Section « Fonds » d'un deal fund_lp : engagé / appelé / distribué + DPI,
- * et TVPI dès qu'une valorisation existe (NAV de la position). Appelé =
- * Σ transactions out, distribué = Σ in — mêmes agrégats que l'en-tête.
+ * "Fund" section of a fund_lp deal: committed / called / distributed + DPI,
+ * plus TVPI once a valuation exists (NAV of the position). Called =
+ * Σ out transactions, distributed = Σ in — same aggregates as the header.
  */
 export function FundSection({
   dealId,

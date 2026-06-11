@@ -1,9 +1,9 @@
 'use client'
 
 /* eslint-disable @typescript-eslint/no-unnecessary-condition --
-   Code vendoré depuis vercel/ai-elements (packages/elements/src) : les
-   gardes défensives upstream (SSR, optional chaining) sont conservées
-   telles quelles pour limiter la divergence. */
+   Code vendored from vercel/ai-elements (packages/elements/src): the
+   upstream defensive guards (SSR, optional chaining) are kept as-is to
+   limit divergence. */
 
 import {
   CornerDownLeftIcon,

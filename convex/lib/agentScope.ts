@@ -6,9 +6,9 @@ import type { DataModel, Doc, Id } from '../_generated/dataModel'
 type Ctx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>
 
 /**
- * Scope d'un thread agent : `${orgId}:${userId}` (cf. convex/chat.ts).
- * L'action de streaming n'a pas d'identité auth → chaque outil parse le scope
- * puis re-vérifie l'appartenance via `readMembership`.
+ * Scope of an agent thread: `${orgId}:${userId}` (cf. convex/chat.ts).
+ * The streaming action has no auth identity → each tool parses the scope
+ * then re-checks membership via `readMembership`.
  */
 export function parseScope(scope: string | undefined | null): {
   orgId: Id<'organizations'>
