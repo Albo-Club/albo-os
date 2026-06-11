@@ -23,6 +23,39 @@ bas de page.
 
 ---
 
+## v1.6.1 — 11/06/2026 à 18:11 — Consommation de données divisée, fin d'une boucle invisible
+
+L'application relisait inutilement vos données en continu : garder deux
+onglets ouverts sur deux organisations différentes déclenchait une boucle
+invisible où chaque onglet réécrivait sans fin la « dernière organisation
+visitée », forçant tout l'écran à se recharger des milliers de fois. C'est
+corrigé — la consommation de données du compte redescend très nettement, et
+l'app ne refait plus de travail en arrière-plan quand rien n'a changé.
+
+> **🔧 Notes techniques**
+>
+> - Cause racine double : (1) `setLastOrg` patchait la ligne `users`, lue
+>   par `requireAppUser` dans **toutes** les queries → chaque write
+>   ré-exécutait toutes les subscriptions ouvertes ; (2) l'effect de
+>   `src/routes/app/$orgSlug/route.tsx` dépendait de `users.me` → deux
+>   onglets sur deux orgs se ré-écrivaient en ping-pong (~16K mutations,
+>   4,83 GB de DB bandwidth sur le quota Free de 1 GB).
+> - `lastOrgSlug` déplacé vers la nouvelle table `userPrefs` (index
+>   `by_user`, helpers `convex/lib/userPrefs.ts`), lue par `users.me` avec
+>   fallback sur le champ legacy ; writers migrés (`setLastOrg`,
+>   `organizations.create`, `invitations.accept`, purge `admin`).
+> - Front : garde `lastOrgSyncedRef` — on ne persiste qu'une fois par slug
+>   visité, plus jamais en réaction à un update de `me`.
+> - Champ legacy `users.lastOrgSlug` conservé en lecture seule ; purge
+>   one-shot `users:purgeLegacyLastOrgSlug` (migre la valeur vers
+>   `userPrefs` puis nettoie — exécutable dès le déploiement, runbook
+>   `MIGRATIONS.md`).
+> - Audit perf annexe : RAS de comparable ; `Date.now()` dans les queries
+>   forecast (cache défait) → wontfix documenté dans `KNOWN_ISSUES.md`,
+>   à ré-évaluer si ces queries montent dans le breakdown Usage.
+> - Docs : `KNOWN_ISSUES.md` « Hot `users` row », anti-pattern `CLAUDE.md`,
+>   TESTING A2b (test anti-boucle 2 onglets).
+
 ## v1.6.0 — 11/06/2026 à 17:45 — L'assistant arrive sur Telegram
 
 Vous pouvez désormais parler à l'assistant directement depuis Telegram,
@@ -354,7 +387,7 @@ statut, demande, résultat.
 >   streaming via `streamdown` (plugins Shiki/KaTeX/Mermaid trimés,
 >   `@source` Tailwind v4 dans `app.css`) ; tool calls en blocs dépliables
 >   (labels i18n) ; suggestions métier sur l'état vide ; ⌘J/Ctrl+J toggle
->   + focus du composer.
+>   - focus du composer.
 > - Threads/rename/delete et toute la couche Convex (`sendMessage`,
 >   `stopStream`, `useUIMessages`) inchangés. Skill `ai-elements` ajoutée
 >   à `skills-lock.json` ; trims documentés dans `KNOWN_ISSUES.md`

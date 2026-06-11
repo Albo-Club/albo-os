@@ -17,7 +17,7 @@ function sanitize(value: string | null | undefined): string | null {
  * as `getLocale`). Fast-path for the `/app` → `/app/$orgSlug` redirect: on the
  * server the document request is redirected before any render, on the client
  * we don't wait for Convex auth nor `users.me` just to recover the slug. The
- * cross-device source of truth stays `users.lastOrgSlug` (mutation
+ * cross-device source of truth stays the `userPrefs` row (mutation
  * `setLastOrg`) — the cookie is only a device-local shortcut, re-validated by
  * the org layout (non-member → `clearLastOrgCookie()` then back to `/app`,
  * otherwise a redirect loop).

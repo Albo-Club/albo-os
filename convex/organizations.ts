@@ -7,6 +7,7 @@ import {
   requireOrgRole,
   safeAppUser,
 } from './lib/auth'
+import { setLastOrgSlug } from './lib/userPrefs'
 import { resolveAvatarUrl, resolveLogoUrl } from './lib/storage'
 import type { DataModel, Id } from './_generated/dataModel'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
@@ -21,7 +22,7 @@ export const listMembers = query({
       .collect()
     return await Promise.all(
       members.map(async (m) => {
-        const u = await ctx.db.get("users", m.userId)
+        const u = await ctx.db.get('users', m.userId)
         return {
           _id: m._id,
           userId: m.userId,
@@ -43,19 +44,49 @@ const SLUG_RE = /^[a-z0-9-]{3,40}$/
 // segments. If a new route is added under `app/$orgSlug/...` that uses a
 // previously unreserved word, add it here.
 const RESERVED_SLUGS = new Set([
-  'admin', 'api', 'app', 'auth', 'login', 'register', 'logout', 'signin',
-  'signup', 'sign-in', 'sign-up', 'me', 'settings', 'billing',
-  'invitations', 'onboarding', 'reset-password', 'forgot-password',
-  'verify-email', 'accept-invite', 'help', 'docs', 'support', 'status',
-  'www', 'public', 'static', 'assets', 'health', 'about', 'terms',
-  'privacy', 'pricing', 'home', 'all',
+  'admin',
+  'api',
+  'app',
+  'auth',
+  'login',
+  'register',
+  'logout',
+  'signin',
+  'signup',
+  'sign-in',
+  'sign-up',
+  'me',
+  'settings',
+  'billing',
+  'invitations',
+  'onboarding',
+  'reset-password',
+  'forgot-password',
+  'verify-email',
+  'accept-invite',
+  'help',
+  'docs',
+  'support',
+  'status',
+  'www',
+  'public',
+  'static',
+  'assets',
+  'health',
+  'about',
+  'terms',
+  'privacy',
+  'pricing',
+  'home',
+  'all',
 ])
 
 export const checkSlug = query({
   args: { slug: v.string() },
   handler: async (ctx, { slug }) => {
     const normalized = slug.toLowerCase().trim()
-    if (!SLUG_RE.test(normalized)) return { available: false, reason: 'invalid' as const }
+    if (!SLUG_RE.test(normalized))
+      return { available: false, reason: 'invalid' as const }
     if (RESERVED_SLUGS.has(normalized))
       return { available: false, reason: 'reserved' as const }
     const conflict = await ctx.db
@@ -96,7 +127,7 @@ export const create = mutation({
       role: 'owner',
       joinedAt: Date.now(),
     })
-    await ctx.db.patch("users", user._id, { lastOrgSlug: normalizedSlug })
+    await setLastOrgSlug(ctx, user, normalizedSlug)
     return { orgId, slug: normalizedSlug }
   },
 })
@@ -135,9 +166,7 @@ export const setLastOrg = mutation({
       .unique()
     if (!org) throw new ConvexError('not_found')
     await requireOrgMember(ctx, org._id)
-    if (user.lastOrgSlug !== slug) {
-      await ctx.db.patch("users", user._id, { lastOrgSlug: slug })
-    }
+    await setLastOrgSlug(ctx, user, slug)
     return null
   },
 })
@@ -151,7 +180,7 @@ export const updateGeneral = mutation({
     await requireOrgRole(ctx, orgId, 'admin')
     const trimmedName = name.trim()
     if (!trimmedName) throw new ConvexError('invalid_name')
-    await ctx.db.patch("organizations", orgId, { name: trimmedName })
+    await ctx.db.patch('organizations', orgId, { name: trimmedName })
     return null
   },
 })
@@ -175,7 +204,7 @@ export const updateMemberRole = mutation({
   },
   handler: async (ctx, { orgId, memberId, role }) => {
     const { member: acting } = await requireOrgRole(ctx, orgId, 'admin')
-    const target = await ctx.db.get("organizationMembers", memberId)
+    const target = await ctx.db.get('organizationMembers', memberId)
     if (!target || target.orgId !== orgId) throw new ConvexError('not_found')
 
     if (target.role === 'owner' || role === 'owner') {
@@ -186,7 +215,7 @@ export const updateMemberRole = mutation({
       if (owners <= 1) throw new ConvexError('last_owner')
     }
     if (target.role === role) return null
-    await ctx.db.patch("organizationMembers", memberId, { role })
+    await ctx.db.patch('organizationMembers', memberId, { role })
     return null
   },
 })
@@ -198,7 +227,7 @@ export const removeMember = mutation({
   },
   handler: async (ctx, { orgId, memberId }) => {
     const { user, member: acting } = await requireOrgRole(ctx, orgId, 'admin')
-    const target = await ctx.db.get("organizationMembers", memberId)
+    const target = await ctx.db.get('organizationMembers', memberId)
     if (!target || target.orgId !== orgId) throw new ConvexError('not_found')
     if (target.role === 'owner') {
       if (acting.role !== 'owner') throw new ConvexError('owner_only')
@@ -209,7 +238,7 @@ export const removeMember = mutation({
       const owners = await countOwners(ctx, orgId)
       if (owners <= 1) throw new ConvexError('last_owner')
     }
-    await ctx.db.delete("organizationMembers", memberId)
+    await ctx.db.delete('organizationMembers', memberId)
     return null
   },
 })
