@@ -21,6 +21,7 @@ export const purgeExcept = internalMutation({
       'invitations',
       'organizationMembers',
       'organizations',
+      'userPrefs',
     ] as const) {
       const rows = await ctx.db.query(table).collect()
       for (const r of rows) await ctx.db.delete(table, r._id)
@@ -31,9 +32,9 @@ export const purgeExcept = internalMutation({
     for (const u of users) {
       if (u.email.toLowerCase() === target) {
         keptConvexUserId = u._id
-        await ctx.db.patch("users", u._id, { lastOrgSlug: undefined })
+        await ctx.db.patch('users', u._id, { lastOrgSlug: undefined })
       } else {
-        await ctx.db.delete("users", u._id)
+        await ctx.db.delete('users', u._id)
       }
     }
 
@@ -157,10 +158,10 @@ export const setSuperAdmin = mutation({
       const remaining = all.filter((u) => u.superAdmin && u._id !== me._id)
       if (remaining.length === 0) throw new ConvexError('last_super_admin')
     }
-    const target = await ctx.db.get("users", userId)
+    const target = await ctx.db.get('users', userId)
     if (!target) throw new ConvexError('not_found')
     if (target.superAdmin === value) return null
-    await ctx.db.patch("users", userId, { superAdmin: value })
+    await ctx.db.patch('users', userId, { superAdmin: value })
     return null
   },
 })

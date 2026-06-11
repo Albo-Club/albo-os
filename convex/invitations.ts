@@ -3,6 +3,7 @@ import { mutation, query } from './_generated/server'
 import { components } from './_generated/api'
 import { invitationRoleValidator } from './schema'
 import { provisionAppUser, requireOrgRole } from './lib/auth'
+import { setLastOrgSlug } from './lib/userPrefs'
 import { RESEND_FROM, resend } from './email'
 import { invitationEmail } from './emailTemplates'
 import { consumeLimit } from './rateLimiters'
@@ -27,7 +28,7 @@ export const create = mutation({
   handler: async (ctx, { orgId, email, role }) => {
     const { user: inviter } = await requireOrgRole(ctx, orgId, 'admin')
     await consumeLimit(ctx, 'invitationCreate', inviter._id)
-    const org = await ctx.db.get("organizations", orgId)
+    const org = await ctx.db.get('organizations', orgId)
     if (!org) throw new ConvexError('not_found')
 
     const normalizedEmail = email.toLowerCase().trim()
@@ -99,7 +100,7 @@ export const preview = query({
     if (inv.acceptedAt) return { kind: 'already_accepted' as const }
     if (inv.expiresAt < Date.now()) return { kind: 'expired' as const }
 
-    const org = await ctx.db.get("organizations", inv.orgId)
+    const org = await ctx.db.get('organizations', inv.orgId)
     if (!org) return { kind: 'not_found' as const }
 
     const adapter = (
@@ -157,11 +158,11 @@ export const accept = mutation({
         joinedAt: Date.now(),
       })
     }
-    await ctx.db.patch("invitations", inv._id, { acceptedAt: Date.now() })
+    await ctx.db.patch('invitations', inv._id, { acceptedAt: Date.now() })
 
-    const org = await ctx.db.get("organizations", inv.orgId)
+    const org = await ctx.db.get('organizations', inv.orgId)
     if (!org) throw new ConvexError('not_found')
-    await ctx.db.patch("users", user._id, { lastOrgSlug: org.slug })
+    await setLastOrgSlug(ctx, user, org.slug)
     return { orgSlug: org.slug }
   },
 })
@@ -169,11 +170,11 @@ export const accept = mutation({
 export const revoke = mutation({
   args: { invitationId: v.id('invitations') },
   handler: async (ctx, { invitationId }) => {
-    const inv = await ctx.db.get("invitations", invitationId)
+    const inv = await ctx.db.get('invitations', invitationId)
     if (!inv) throw new ConvexError('not_found')
     await requireOrgRole(ctx, inv.orgId, 'admin')
     if (inv.acceptedAt) throw new ConvexError('already_accepted')
-    await ctx.db.delete("invitations", invitationId)
+    await ctx.db.delete('invitations', invitationId)
     return null
   },
 })

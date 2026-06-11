@@ -681,8 +681,10 @@ La redirection `/app` → `/app/$orgSlug` n'attend plus l'auth Convex :
 (isomorphe, même pattern que `getLocale` — `src/lib/lastOrg.ts`) et redirige
 immédiatement, côté serveur dès la requête document (et `/` redirige vers
 `/app` en `beforeLoad` aussi — plus d'écran « redirection » hydraté).
-`users.lastOrgSlug` (Convex, mutation `setLastOrg`) reste la source de
-vérité cross-device et le fallback quand le cookie est absent.
+La table `userPrefs` (Convex, mutation `setLastOrg`) reste la source de
+vérité cross-device et le fallback quand le cookie est absent (cf. la
+section « Hot `users` row » ci-dessous pour pourquoi ce n'est PAS un champ
+de `users`).
 
 Pièges :
 
@@ -696,6 +698,38 @@ Pièges :
   relâcher cette validation (un cookie est une entrée non fiable).
 - Un visiteur signé-out avec un cookie est redirigé vers l'org **puis** vers
   `/login` par le guard `/app` (inchangé) — ordre voulu, pas un bug.
+
+## Hot `users` row — un write y invalide TOUTES les queries ouvertes
+
+Chaque query/mutation passe par `requireAppUser`/`safeAppUser`
+(`convex/lib/auth.ts`), qui lit la ligne `users` de l'appelant. En Convex
+réactif, cette ligne fait donc partie du **read set de toutes les
+subscriptions ouvertes** : le moindre `patch` dessus ré-exécute toutes les
+queries montées (dashboard, listes, chat…), qui relisent leurs tables.
+
+**L'incident (juin 2026)** : `lastOrgSlug` vivait sur `users` et la mutation
+`setLastOrg` était déclenchée par un `useEffect` dépendant de `users.me`.
+Deux onglets ouverts sur deux orgs différentes se ré-écrivaient mutuellement
+la valeur en boucle (ping-pong inter-onglets) : ~16 000 mutations en 10
+jours, chacune ré-exécutant toutes les queries ouvertes → **4,83 GB de
+Database Bandwidth** (quota Free : 1 GB) pour 2 utilisateurs et 10 MB de
+données.
+
+**Les règles (anti-récidive)** :
+
+1. **Aucun champ fréquemment écrit sur `users`.** Tout état par-user qui
+   bouge souvent va dans la table `userPrefs` (lue uniquement par
+   `users.me`, helpers `convex/lib/userPrefs.ts`) ou dans sa propre table.
+   Les writes rares (profil, avatar, locale, superAdmin) restent acceptables.
+2. **Jamais de mutation déclenchée par un `useEffect` dépendant d'une query
+   Convex qui observe la donnée écrite** — c'est la recette de la boucle
+   (la mutation invalide la query, qui re-déclenche l'effect, à l'infini
+   dès que deux clients divergent). Garde « write-once par intention »
+   via `useRef` : cf. `lastOrgSyncedRef` dans
+   `src/routes/app/$orgSlug/route.tsx`.
+
+Le champ legacy `users.lastOrgSlug` reste au schéma (fallback de lecture)
+jusqu'à sa purge — chantier dans `MIGRATIONS.md`.
 
 ## Import Airtable one-shot (`convex/airtableImport.ts`)
 

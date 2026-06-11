@@ -72,19 +72,19 @@ one file. Surface non-obvious knowledge ; drift kills future you.
 
 Before pushing the final commit, walk through these five questions. Questions
 1–4 only fire when relevant — if none do, write nothing there; the diff and
-commit message already document the *what*. Question 5 (changelog) fires on
+commit message already document the _what_. Question 5 (changelog) fires on
 **every** PR, no exception.
 
 1. **Touched a route, page, env var, or workflow listed in `TESTING.md`** ?
    → update the matching row in the same PR.
 2. **Hit a non-obvious gotcha that'd cost the next dev > 30 min** (SSR trap,
    pinned version, bundler quirk, API edge case) ? → add a section to
-   `KNOWN_ISSUES.md`. Include the *why* and the workaround pattern.
+   `KNOWN_ISSUES.md`. Include the _why_ and the workaround pattern.
 3. **Found a stale claim while reading existing docs** (file path that no
    longer exists, flag that was renamed, API that changed) ? → fix it in the
    same commit as the change that made it stale.
 4. **Discovered a behavioral rule worth applying to every future PR** ? → add
-   it here in `CLAUDE.md`. Only for *repeatable* guidance, never as a
+   it here in `CLAUDE.md`. Only for _repeatable_ guidance, never as a
    changelog of what shipped.
 5. **Changelog — mandatory on every PR.** Add an entry at the **top** of
    `CHANGELOG_PRODUIT.md` in the same PR, with the header format
@@ -252,22 +252,22 @@ Sync hebdo via GitHub Action (`.github/workflows/sync-skills.yml`, lundi
 Règle : `--check` détecte, `--update` bumpe. Ne jamais `--update` sans avoir
 relu ce que la nouvelle version change.
 
-| Skill                                     | Domaine                                | Source upstream                            | Officiel ? |
-| ----------------------------------------- | -------------------------------------- | ------------------------------------------ | ---------- |
-| `convex`                                  | Routeur entre skills Convex            | `get-convex/agent-skills`                  | ✅ officiel |
-| `convex-quickstart`                       | Bootstrap Convex                       | `get-convex/agent-skills`                  | ✅ officiel |
-| `convex-setup-auth`                       | Auth Convex + identité + RBAC          | `get-convex/agent-skills`                  | ✅ officiel |
-| `convex-create-component`                 | Construire un composant Convex         | `get-convex/agent-skills`                  | ✅ officiel |
-| `convex-migration-helper`                 | Migrations de schéma / data            | `get-convex/agent-skills`                  | ✅ officiel |
-| `convex-performance-audit`                | Audit perf reads/subscriptions/OCC     | `get-convex/agent-skills`                  | ✅ officiel |
-| `better-auth-best-practices`              | Config Better Auth générale            | `better-auth/skills`                       | ✅ officiel |
-| `better-auth-security-best-practices`     | Hardening (rate-limit, CSRF, sessions) | `better-auth/skills`                       | ✅ officiel |
-| `email-and-password-best-practices`       | Email/password BA                      | `better-auth/skills`                       | ✅ officiel |
-| `two-factor-authentication-best-practices`| 2FA / TOTP / backup codes              | `better-auth/skills`                       | ✅ officiel |
-| `organization-best-practices`             | Plugin `organization()` BA             | `better-auth/skills`                       | ✅ officiel ⚠️ |
-| `create-auth-skill`                       | Scaffolding auth BA                    | `better-auth/skills`                       | ✅ officiel |
-| `tanstack-start-best-practices`           | SSR, server functions, middleware      | `TanStack/router` (monorepo officiel)      | ✅ officiel |
-| `ai-elements`                             | Composants chat AI (panneau AiPanel)   | `vercel/ai-elements`                       | ✅ officiel |
+| Skill                                      | Domaine                                | Source upstream                       | Officiel ?     |
+| ------------------------------------------ | -------------------------------------- | ------------------------------------- | -------------- |
+| `convex`                                   | Routeur entre skills Convex            | `get-convex/agent-skills`             | ✅ officiel    |
+| `convex-quickstart`                        | Bootstrap Convex                       | `get-convex/agent-skills`             | ✅ officiel    |
+| `convex-setup-auth`                        | Auth Convex + identité + RBAC          | `get-convex/agent-skills`             | ✅ officiel    |
+| `convex-create-component`                  | Construire un composant Convex         | `get-convex/agent-skills`             | ✅ officiel    |
+| `convex-migration-helper`                  | Migrations de schéma / data            | `get-convex/agent-skills`             | ✅ officiel    |
+| `convex-performance-audit`                 | Audit perf reads/subscriptions/OCC     | `get-convex/agent-skills`             | ✅ officiel    |
+| `better-auth-best-practices`               | Config Better Auth générale            | `better-auth/skills`                  | ✅ officiel    |
+| `better-auth-security-best-practices`      | Hardening (rate-limit, CSRF, sessions) | `better-auth/skills`                  | ✅ officiel    |
+| `email-and-password-best-practices`        | Email/password BA                      | `better-auth/skills`                  | ✅ officiel    |
+| `two-factor-authentication-best-practices` | 2FA / TOTP / backup codes              | `better-auth/skills`                  | ✅ officiel    |
+| `organization-best-practices`              | Plugin `organization()` BA             | `better-auth/skills`                  | ✅ officiel ⚠️ |
+| `create-auth-skill`                        | Scaffolding auth BA                    | `better-auth/skills`                  | ✅ officiel    |
+| `tanstack-start-best-practices`            | SSR, server functions, middleware      | `TanStack/router` (monorepo officiel) | ✅ officiel    |
+| `ai-elements`                              | Composants chat AI (panneau AiPanel)   | `vercel/ai-elements`                  | ✅ officiel    |
 
 **⚠️ `organization-best-practices`** : skill officielle BA, mais le plugin
 `organization()` est **désactivé** dans ce projet (voir `KNOWN_ISSUES.md`).
@@ -402,6 +402,12 @@ export const remove = mutation({
 - ❌ Dedup users by `betterAuthId` only in any new code path. Always
   also fall back to email via `withIndex('by_email', ...)` — pattern in
   `convex/lib/auth.ts:provisionAppUser`.
+- ❌ A frequently-written field on the `users` row. Every query reads the
+  caller's row via `requireAppUser`, so each write re-runs ALL open
+  subscriptions. Per-user mutable state goes to `userPrefs`
+  (`convex/lib/userPrefs.ts`). Same family: a mutation fired from a
+  `useEffect` that depends on a Convex query observing the written data
+  (cross-tab infinite loop). See `KNOWN_ISSUES.md` "Hot `users` row".
 - ❌ Surfacing Better Auth errors via `error.message` (or worse, a regex
   on it) in any new client code. Always classify through
   `classifyAuthError()` + `formatAuthError(code, ctx)` from
