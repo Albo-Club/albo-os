@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.5.4 — 11/06/2026 à 18:02 — Raccordement au template Ouvre-Boîte
+## v1.6.3 — 11/06/2026 à 18:29 — Raccordement au template Ouvre-Boîte
 
 Mise à jour technique, rien ne change à l'écran : Albo OS est désormais
 raccordé à son template d'origine, ce qui permettra de récupérer proprement
@@ -41,6 +41,86 @@ ses futures améliorations de socle (authentification, sécurité, outillage).
 >   template) : WhatsNew.tsx, README.product, release-tag.yml, notif
 >   signup, bumps de majors (Renovate). Détail et conséquences dans
 >   `KNOWN_ISSUES.md` § « Upgrade depuis le template ».
+
+## v1.6.2 — 11/06/2026 à 18:20 — Nettoyage final de la migration précédente
+
+Suite et fin de la correction v1.6.1 : suppression de l'ancien emplacement
+de la « dernière organisation visitée », désormais inutile. Aucun
+changement visible dans l'app.
+
+> **🔧 Notes techniques**
+>
+> - Retrait du champ legacy `users.lastOrgSlug` du schéma, du fallback de
+>   lecture dans `convex/lib/userPrefs.ts:getLastOrgSlug`, du nettoyage
+>   legacy dans `admin:purgeExcept` et de la mutation one-shot
+>   `users:purgeLegacyLastOrgSlug` (chantier `MIGRATIONS.md` soldé).
+> - ⚠️ Pré-requis au merge : avoir exécuté la purge en prod
+>   (`pnpm exec convex run --prod users:purgeLegacyLastOrgSlug`) — sinon
+>   la validation de schéma fait échouer le `convex deploy` du build
+>   Vercel (garde-fou voulu, la prod en place n'est pas affectée).
+
+## v1.6.1 — 11/06/2026 à 18:11 — Consommation de données divisée, fin d'une boucle invisible
+
+L'application relisait inutilement vos données en continu : garder deux
+onglets ouverts sur deux organisations différentes déclenchait une boucle
+invisible où chaque onglet réécrivait sans fin la « dernière organisation
+visitée », forçant tout l'écran à se recharger des milliers de fois. C'est
+corrigé — la consommation de données du compte redescend très nettement, et
+l'app ne refait plus de travail en arrière-plan quand rien n'a changé.
+
+> **🔧 Notes techniques**
+>
+> - Cause racine double : (1) `setLastOrg` patchait la ligne `users`, lue
+>   par `requireAppUser` dans **toutes** les queries → chaque write
+>   ré-exécutait toutes les subscriptions ouvertes ; (2) l'effect de
+>   `src/routes/app/$orgSlug/route.tsx` dépendait de `users.me` → deux
+>   onglets sur deux orgs se ré-écrivaient en ping-pong (~16K mutations,
+>   4,83 GB de DB bandwidth sur le quota Free de 1 GB).
+> - `lastOrgSlug` déplacé vers la nouvelle table `userPrefs` (index
+>   `by_user`, helpers `convex/lib/userPrefs.ts`), lue par `users.me` avec
+>   fallback sur le champ legacy ; writers migrés (`setLastOrg`,
+>   `organizations.create`, `invitations.accept`, purge `admin`).
+> - Front : garde `lastOrgSyncedRef` — on ne persiste qu'une fois par slug
+>   visité, plus jamais en réaction à un update de `me`.
+> - Champ legacy `users.lastOrgSlug` conservé en lecture seule ; purge
+>   one-shot `users:purgeLegacyLastOrgSlug` (migre la valeur vers
+>   `userPrefs` puis nettoie — exécutable dès le déploiement, runbook
+>   `MIGRATIONS.md`).
+> - Audit perf annexe : RAS de comparable ; `Date.now()` dans les queries
+>   forecast (cache défait) → wontfix documenté dans `KNOWN_ISSUES.md`,
+>   à ré-évaluer si ces queries montent dans le breakdown Usage.
+> - Docs : `KNOWN_ISSUES.md` « Hot `users` row », anti-pattern `CLAUDE.md`,
+>   TESTING A2b (test anti-boucle 2 onglets).
+
+## v1.6.0 — 11/06/2026 à 17:45 — L'assistant arrive sur Telegram
+
+Vous pouvez désormais parler à l'assistant directement depuis Telegram,
+comme à n'importe quel contact : posez vos questions sur le portefeuille,
+le cash ou le passif depuis votre téléphone, sans ouvrir l'application.
+Les actions d'écriture (créer une transaction, pointer, etc.) restent
+protégées : l'assistant propose l'action et vous la validez d'un bouton
+Confirmer ou Refuser, exactement comme dans l'app. Deux commandes
+accompagnent le bot : « /new » pour repartir sur une conversation vierge
+et « /org » pour changer de véhicule d'investissement. L'accès est
+strictement réservé aux comptes liés par un code fourni par
+l'administrateur. En coulisses, le coût des conversations avec
+l'assistant a aussi été fortement optimisé (mise en cache du contexte).
+
+> **🔧 Notes techniques**
+>
+> - `convex/telegram.ts` (nouveau) : webhook `/telegram/webhook` (secret
+>   token vérifié en temps constant, ACK immédiat + worker schedulé),
+>   table `telegramAccounts` (linking par code one-shot via le runbook CLI
+>   `telegram:createLinkCode`, org courante + thread courant par compte),
+>   tour d'agent non streamé (`chatAgent.generateText` + typing),
+>   approbations en inline keyboard reprises via `promptMessageId` (même
+>   contrat que `chat.respondToToolApproval`, cf. KNOWN_ISSUES).
+> - Prompt caching Mistral (commit séparé) : `prompt_cache_key` injecté
+>   par un `fetch` custom dans `createMistral` (`convex/agent.ts`,
+>   `@ai-sdk/mistral` 3.0.37 n'a pas l'option) + `usageHandler` loggant
+>   `llm_usage` (input/output/cacheRead) par appel LLM.
+> - Setup one-time documenté dans le README « Telegram bot » ; checklist
+>   TESTING « Bot Telegram » (T1–T12).
 
 ## v1.5.3 — 11/06/2026 à 17:07 — Notes techniques sur chaque nouveauté
 
@@ -343,7 +423,7 @@ statut, demande, résultat.
 >   streaming via `streamdown` (plugins Shiki/KaTeX/Mermaid trimés,
 >   `@source` Tailwind v4 dans `app.css`) ; tool calls en blocs dépliables
 >   (labels i18n) ; suggestions métier sur l'état vide ; ⌘J/Ctrl+J toggle
->   + focus du composer.
+>   - focus du composer.
 > - Threads/rename/delete et toute la couche Convex (`sendMessage`,
 >   `stopStream`, `useUIMessages`) inchangés. Skill `ai-elements` ajoutée
 >   à `skills-lock.json` ; trims documentés dans `KNOWN_ISSUES.md`

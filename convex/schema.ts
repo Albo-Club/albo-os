@@ -171,12 +171,20 @@ export default defineSchema({
     avatarUrl: v.optional(v.string()),
     avatarStorageId: v.optional(v.id('_storage')),
     superAdmin: v.boolean(),
-    lastOrgSlug: v.optional(v.string()),
     preferredLanguage: v.optional(v.union(v.literal('en'), v.literal('fr'))),
     createdAt: v.number(),
   })
     .index('by_betterAuthId', ['betterAuthId'])
     .index('by_email', ['email']),
+
+  // Frequently-written per-user state, isolated from `users` on purpose:
+  // every query reads the caller's `users` row (requireAppUser), so writes
+  // there invalidate ALL open subscriptions. See KNOWN_ISSUES.md
+  // § "Hot `users` row".
+  userPrefs: defineTable({
+    userId: v.id('users'),
+    lastOrgSlug: v.optional(v.string()),
+  }).index('by_user', ['userId']),
 
   organizations: defineTable({
     slug: v.string(),
@@ -226,6 +234,30 @@ export default defineSchema({
     .index('by_org', ['orgId'])
     // Incoming webhook filter: only a known id_user is ingested.
     .index('by_powens_user_id', ['powensUserId']),
+
+  /**
+   * telegramAccounts — one row per app user bridging their Telegram account
+   * to the AI agent (cf. convex/telegram.ts). Linked via a one-shot
+   * `linkCode` (CLI runbook `telegram:createLinkCode` + `/start <code>`).
+   * `orgId` is the current org of the bot conversation (`/org` switches it),
+   * `threadId` the current agent thread (`/new` resets it).
+   * INTERNAL: read/written only by internal functions — the webhook has no
+   * auth identity, membership is re-checked on every message.
+   */
+  telegramAccounts: defineTable({
+    userId: v.id('users'),
+    orgId: v.id('organizations'),
+    telegramUserId: v.optional(v.string()), // absent until /start links it
+    chatId: v.optional(v.string()),
+    threadId: v.optional(v.string()),
+    linkCode: v.optional(v.string()), // one-shot, cleared after /start
+    linkCodeCreatedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    // Incoming webhook filter: only a linked telegram user id is served.
+    .index('by_telegram_user_id', ['telegramUserId'])
+    .index('by_link_code', ['linkCode']),
 
   // ─── Portfolio core ──────────────────────────────────────────────────────
 

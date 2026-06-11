@@ -8,6 +8,7 @@ import {
 } from './_generated/server'
 import { authComponent } from './auth'
 import { provisionAppUser, requireAppUser, safeAppUser } from './lib/auth'
+import { getLastOrgSlug } from './lib/userPrefs'
 import { resolveAvatarUrl, resolveLogoUrl } from './lib/storage'
 
 export const me = query({
@@ -36,7 +37,7 @@ export const me = query({
     const orgs = (
       await Promise.all(
         memberships.map(async (m) => {
-          const org = await ctx.db.get("organizations", m.orgId)
+          const org = await ctx.db.get('organizations', m.orgId)
           if (!org) return null
           return {
             _id: org._id,
@@ -57,7 +58,7 @@ export const me = query({
         name: user.name ?? null,
         avatarUrl: await resolveAvatarUrl(ctx, user),
         superAdmin: user.superAdmin,
-        lastOrgSlug: user.lastOrgSlug ?? null,
+        lastOrgSlug: await getLastOrgSlug(ctx, user),
         preferredLanguage: user.preferredLanguage ?? null,
       },
       orgs,
@@ -79,7 +80,7 @@ export const updateProfile = mutation({
     const user = await requireAppUser(ctx)
     const trimmed = name.trim()
     if (!trimmed) throw new ConvexError('invalid_name')
-    await ctx.db.patch("users", user._id, { name: trimmed })
+    await ctx.db.patch('users', user._id, { name: trimmed })
     return null
   },
 })
@@ -88,7 +89,7 @@ export const setPreferredLanguage = mutation({
   args: { language: v.union(v.literal('en'), v.literal('fr')) },
   handler: async (ctx, { language }) => {
     const user = await requireAppUser(ctx)
-    await ctx.db.patch("users", user._id, { preferredLanguage: language })
+    await ctx.db.patch('users', user._id, { preferredLanguage: language })
     return null
   },
 })
@@ -124,9 +125,7 @@ export const cascadeDelete = internalMutation({
   handler: async (ctx, { betterAuthId }) => {
     const appUser = await ctx.db
       .query('users')
-      .withIndex('by_betterAuthId', (q) =>
-        q.eq('betterAuthId', betterAuthId),
-      )
+      .withIndex('by_betterAuthId', (q) => q.eq('betterAuthId', betterAuthId))
       .unique()
     if (!appUser) return null
 
@@ -135,8 +134,14 @@ export const cascadeDelete = internalMutation({
       .withIndex('by_user', (q) => q.eq('userId', appUser._id))
       .collect()
     for (const m of memberships) {
-      await ctx.db.delete("organizationMembers", m._id)
+      await ctx.db.delete('organizationMembers', m._id)
     }
+
+    const prefs = await ctx.db
+      .query('userPrefs')
+      .withIndex('by_user', (q) => q.eq('userId', appUser._id))
+      .unique()
+    if (prefs) await ctx.db.delete('userPrefs', prefs._id)
 
     if (appUser.avatarStorageId) {
       try {
@@ -146,7 +151,7 @@ export const cascadeDelete = internalMutation({
       }
     }
 
-    await ctx.db.delete("users", appUser._id)
+    await ctx.db.delete('users', appUser._id)
     return null
   },
 })

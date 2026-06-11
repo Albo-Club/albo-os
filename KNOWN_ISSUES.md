@@ -300,6 +300,33 @@ answers correctly. To verify the model actually served in prod, check the
 env (`pnpm exec convex env list --prod` — make sure `MISTRAL_MODEL` is
 unset or set to the intended id), not the agent's self-description.
 
+## Mistral prompt caching — injecté via un `fetch` custom
+
+Mistral facture les tokens de prompt en cache à **10 % du prix input**
+quand la requête porte un `prompt_cache_key` (matching de préfixe).
+Indispensable ici : chaque message déclenche jusqu'à 12 round-trips LLM
+(`stopWhen`), chacun renvoyant system prompt + ~45 schémas d'outils +
+historique — les steps 2..N d'un même message sont des hits quasi totaux.
+
+1. **`@ai-sdk/mistral` (3.0.37) ne sait pas envoyer `prompt_cache_key`**
+   (schéma de providerOptions fermé, options inconnues strippées). D'où le
+   wrapper `fetch` dans `convex/agent.ts` (`createMistral({ fetch })`) qui
+   injecte le champ dans le body JSON. **À chaque bump de
+   `@ai-sdk/mistral`, vérifier si l'option native a atterri** — si oui,
+   retirer le wrapper au profit de la providerOption.
+2. **Clé statique volontaire** (`albo-os-chat`) : le matching de préfixe
+   fait le vrai travail, la clé ne sert qu'au routage du cache ; une clé
+   unique partage le bloc system+tools entre tous les threads (2 users).
+3. **Stabilité du préfixe** : le system prompt est fixé pour toute la durée
+   d'un `streamText`/`generateText` (route/orgName figés à l'appel) → hits
+   intra-message garantis. Un changement de route entre deux messages ne
+   coûte qu'un miss sur la fin du system prompt. Ne PAS rendre la liste
+   d'outils dynamique (filtrage par route) : ça casserait le préfixe.
+4. **Vérification** : le `usageHandler` de `convex/agent.ts` logge une
+   ligne `llm_usage` par appel LLM (logs Convex) — `cacheReadTokens > 0`
+   attendu dès le step 2 d'un message multi-étapes ; la ligne « cached
+   tokens » doit apparaître sur le dashboard Mistral.
+
 ## SITE_URL drift in prod = broken email links
 
 `SITE_URL` is the Convex env var that builds every email URL (magic link,
@@ -436,6 +463,13 @@ Les outils d'écriture de l'agent portent `needsApproval: true`
    composant `confirmation.tsx` est piloté par ça. `dynamicTool()` ne
    supporte pas l'approbation (vercel/ai#11434) : ne pas convertir nos
    outils en dynamiques.
+5. **Second point d'entrée : le bot Telegram** (`convex/telegram.ts`,
+   boutons inline Confirmer/Refuser). Même contrat de reprise (décision →
+   `generateText` avec `promptMessageId`). Le `callback_data` Telegram est
+   un simple `approve`/`deny` (cap 64 bytes) : l'approbation visée est
+   résolue côté serveur comme « la seule `approval-requested` du thread »
+   — garanti par l'auto-deny du point 3. Boutons obsolètes → réponse
+   « plus en attente », rien n'est écrit.
 
 ## tailwind-merge v3 obligatoire avec les composants shadcn « Tailwind v4 »
 
@@ -681,8 +715,10 @@ La redirection `/app` → `/app/$orgSlug` n'attend plus l'auth Convex :
 (isomorphe, même pattern que `getLocale` — `src/lib/lastOrg.ts`) et redirige
 immédiatement, côté serveur dès la requête document (et `/` redirige vers
 `/app` en `beforeLoad` aussi — plus d'écran « redirection » hydraté).
-`users.lastOrgSlug` (Convex, mutation `setLastOrg`) reste la source de
-vérité cross-device et le fallback quand le cookie est absent.
+La table `userPrefs` (Convex, mutation `setLastOrg`) reste la source de
+vérité cross-device et le fallback quand le cookie est absent (cf. la
+section « Hot `users` row » ci-dessous pour pourquoi ce n'est PAS un champ
+de `users`).
 
 Pièges :
 
@@ -696,6 +732,40 @@ Pièges :
   relâcher cette validation (un cookie est une entrée non fiable).
 - Un visiteur signé-out avec un cookie est redirigé vers l'org **puis** vers
   `/login` par le guard `/app` (inchangé) — ordre voulu, pas un bug.
+
+## Hot `users` row — un write y invalide TOUTES les queries ouvertes
+
+Chaque query/mutation passe par `requireAppUser`/`safeAppUser`
+(`convex/lib/auth.ts`), qui lit la ligne `users` de l'appelant. En Convex
+réactif, cette ligne fait donc partie du **read set de toutes les
+subscriptions ouvertes** : le moindre `patch` dessus ré-exécute toutes les
+queries montées (dashboard, listes, chat…), qui relisent leurs tables.
+
+**L'incident (juin 2026)** : `lastOrgSlug` vivait sur `users` et la mutation
+`setLastOrg` était déclenchée par un `useEffect` dépendant de `users.me`.
+Deux onglets ouverts sur deux orgs différentes se ré-écrivaient mutuellement
+la valeur en boucle (ping-pong inter-onglets) : ~16 000 mutations en 10
+jours, chacune ré-exécutant toutes les queries ouvertes → **4,83 GB de
+Database Bandwidth** (quota Free : 1 GB) pour 2 utilisateurs et 10 MB de
+données.
+
+**Les règles (anti-récidive)** :
+
+1. **Aucun champ fréquemment écrit sur `users`.** Tout état par-user qui
+   bouge souvent va dans la table `userPrefs` (lue uniquement par
+   `users.me`, helpers `convex/lib/userPrefs.ts`) ou dans sa propre table.
+   Les writes rares (profil, avatar, locale, superAdmin) restent acceptables.
+2. **Jamais de mutation déclenchée par un `useEffect` dépendant d'une query
+   Convex qui observe la donnée écrite** — c'est la recette de la boucle
+   (la mutation invalide la query, qui re-déclenche l'effect, à l'infini
+   dès que deux clients divergent). Garde « write-once par intention »
+   via `useRef` : cf. `lastOrgSyncedRef` dans
+   `src/routes/app/$orgSlug/route.tsx`.
+
+Historique : le champ legacy `users.lastOrgSlug` a été migré vers
+`userPrefs` puis retiré du schéma (purge one-shot
+`users:purgeLegacyLastOrgSlug`, juin 2026 — exécutée en prod AVANT le
+déploiement du schéma resserré, règle « purger d'abord »).
 
 ## Import Airtable one-shot (`convex/airtableImport.ts`)
 
@@ -1048,6 +1118,14 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   des mois courts (28/29 févr., 30 avr., …) ; hebdo = jour ISO (1 = lundi,
   7 = dimanche). Toute nouvelle logique de date doit passer par
   `convex/lib/recurrence.ts`, pas par `new Date()` local (fuseau serveur).
+- **`Date.now()` dans les queries de solde = cache Convex défait — accepté.**
+  `computeCashHistoryForOrgs` / `getForecastBalance` bornent « le mois
+  courant » avec `Date.now()`, ce qui re-exécute la query plus souvent que
+  nécessaire (audit perf juin 2026). Trade-off assumé : le vrai fix (passer
+  l'horodatage arrondi en argument depuis le client) toucherait signatures,
+  callsites et outils agent pour un gain nul à l'échelle actuelle — ces
+  queries n'apparaissent pas dans le breakdown Usage. À ré-évaluer si elles
+  y montent.
 
 ## Split chapeaux Attio → SPV, org albo (`convex/migrations/splitAlboSponsorSpvs.ts`)
 
