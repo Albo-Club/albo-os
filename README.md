@@ -164,11 +164,42 @@ The chat agent ships with **DB-acting tools** (`convex/agentTools.ts`) scoped
 to the org: `listCompanies` / `listDeals`, `createCompany` (portfolio only),
 `createDeal` (scope derived from the investor), and `updateDeal`. Membership
 is re-checked inside every tool via the thread's scope key
-(`${orgId}:${userId}`). Tool calls cap out at 5 rounds per turn
-(`stepCountIs(5)`).
+(`${orgId}:${userId}`). Tool calls cap out at 12 rounds per turn
+(`stepCountIs(12)`).
 
 There's also an HTTP streaming endpoint at `<convex-site-url>/api/chat` for
 clients that prefer plain HTTP streaming (curl, custom clients).
+
+## Telegram bot
+
+The same agent (same tools, same org scoping, same write approvals) is
+reachable from Telegram (`convex/telegram.ts`, webhook at
+`<convex-site-url>/telegram/webhook`). Write tools show inline
+**Confirmer / Refuser** buttons. Commands: `/new` (fresh thread),
+`/org <slug>` (switch the current org, membership re-checked).
+
+**One-time setup**
+
+1. Create the bot with [@BotFather](https://t.me/BotFather) (`/newbot`) and
+   grab the token.
+2. ```bash
+   pnpm exec convex env set --prod TELEGRAM_BOT_TOKEN <token>
+   pnpm exec convex env set --prod TELEGRAM_WEBHOOK_SECRET <random-string>
+   ```
+3. Register the webhook (secret echoed by Telegram on every update, verified
+   by the handler):
+   ```bash
+   curl "https://api.telegram.org/bot<token>/setWebhook" \
+     -d "url=<convex-site-url>/telegram/webhook" \
+     -d "secret_token=<random-string>"
+   ```
+4. Link each user (one-shot code, valid 24h):
+   ```bash
+   pnpm exec convex run --prod telegram:createLinkCode \
+     '{"email":"<user email>","orgSlug":"<org>"}'
+   ```
+   The user opens `https://t.me/<bot>?start=<code>` (or sends
+   `/start <code>` to the bot).
 
 ## Deploy to Vercel
 

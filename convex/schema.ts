@@ -238,6 +238,30 @@ export default defineSchema({
     // Incoming webhook filter: only a known id_user is ingested.
     .index('by_powens_user_id', ['powensUserId']),
 
+  /**
+   * telegramAccounts — one row per app user bridging their Telegram account
+   * to the AI agent (cf. convex/telegram.ts). Linked via a one-shot
+   * `linkCode` (CLI runbook `telegram:createLinkCode` + `/start <code>`).
+   * `orgId` is the current org of the bot conversation (`/org` switches it),
+   * `threadId` the current agent thread (`/new` resets it).
+   * INTERNAL: read/written only by internal functions — the webhook has no
+   * auth identity, membership is re-checked on every message.
+   */
+  telegramAccounts: defineTable({
+    userId: v.id('users'),
+    orgId: v.id('organizations'),
+    telegramUserId: v.optional(v.string()), // absent until /start links it
+    chatId: v.optional(v.string()),
+    threadId: v.optional(v.string()),
+    linkCode: v.optional(v.string()), // one-shot, cleared after /start
+    linkCodeCreatedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    // Incoming webhook filter: only a linked telegram user id is served.
+    .index('by_telegram_user_id', ['telegramUserId'])
+    .index('by_link_code', ['linkCode']),
+
   // ─── Portfolio core ──────────────────────────────────────────────────────
 
   /**

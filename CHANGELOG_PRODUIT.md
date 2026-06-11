@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.5.4 — 11/06/2026 à 17:50 — Consommation de données divisée, fin d'une boucle invisible
+## v1.6.1 — 11/06/2026 à 18:11 — Consommation de données divisée, fin d'une boucle invisible
 
 L'application relisait inutilement vos données en continu : garder deux
 onglets ouverts sur deux organisations différentes déclenchait une boucle
@@ -55,6 +55,36 @@ l'app ne refait plus de travail en arrière-plan quand rien n'a changé.
 >   à ré-évaluer si ces queries montent dans le breakdown Usage.
 > - Docs : `KNOWN_ISSUES.md` « Hot `users` row », anti-pattern `CLAUDE.md`,
 >   TESTING A2b (test anti-boucle 2 onglets).
+
+## v1.6.0 — 11/06/2026 à 17:45 — L'assistant arrive sur Telegram
+
+Vous pouvez désormais parler à l'assistant directement depuis Telegram,
+comme à n'importe quel contact : posez vos questions sur le portefeuille,
+le cash ou le passif depuis votre téléphone, sans ouvrir l'application.
+Les actions d'écriture (créer une transaction, pointer, etc.) restent
+protégées : l'assistant propose l'action et vous la validez d'un bouton
+Confirmer ou Refuser, exactement comme dans l'app. Deux commandes
+accompagnent le bot : « /new » pour repartir sur une conversation vierge
+et « /org » pour changer de véhicule d'investissement. L'accès est
+strictement réservé aux comptes liés par un code fourni par
+l'administrateur. En coulisses, le coût des conversations avec
+l'assistant a aussi été fortement optimisé (mise en cache du contexte).
+
+> **🔧 Notes techniques**
+>
+> - `convex/telegram.ts` (nouveau) : webhook `/telegram/webhook` (secret
+>   token vérifié en temps constant, ACK immédiat + worker schedulé),
+>   table `telegramAccounts` (linking par code one-shot via le runbook CLI
+>   `telegram:createLinkCode`, org courante + thread courant par compte),
+>   tour d'agent non streamé (`chatAgent.generateText` + typing),
+>   approbations en inline keyboard reprises via `promptMessageId` (même
+>   contrat que `chat.respondToToolApproval`, cf. KNOWN_ISSUES).
+> - Prompt caching Mistral (commit séparé) : `prompt_cache_key` injecté
+>   par un `fetch` custom dans `createMistral` (`convex/agent.ts`,
+>   `@ai-sdk/mistral` 3.0.37 n'a pas l'option) + `usageHandler` loggant
+>   `llm_usage` (input/output/cacheRead) par appel LLM.
+> - Setup one-time documenté dans le README « Telegram bot » ; checklist
+>   TESTING « Bot Telegram » (T1–T12).
 
 ## v1.5.3 — 11/06/2026 à 17:07 — Notes techniques sur chaque nouveauté
 
