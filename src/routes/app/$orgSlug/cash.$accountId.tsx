@@ -175,7 +175,7 @@ function AccountDetail() {
   }
   const transactions = liveTransactions ?? lastTransactionsRef.current
 
-  // Pagination locale d'affichage ; retour page 1 quand la recherche change.
+  // Local display pagination; snaps back to page 1 when the search changes.
   const { page, pageCount, setPage } = usePagination(
     transactions?.length ?? 0,
     searchArg ?? '',

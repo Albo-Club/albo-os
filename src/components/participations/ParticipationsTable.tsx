@@ -349,8 +349,8 @@ export function ParticipationsTable({
     })
   }, [groups, sort])
 
-  // Pagination locale (par société, après filtre + tri) ; retour page 1 dès
-  // que la recherche ou le tri change.
+  // Local pagination (by company, after filter + sort); snaps back to page 1
+  // whenever the search or sort changes.
   const { page, pageCount, setPage } = usePagination(
     sortedGroups?.length ?? 0,
     `${term}:${sort ? `${sort.key}:${sort.dir}` : ''}`,

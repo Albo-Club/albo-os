@@ -281,7 +281,7 @@ function Transactions({ deal }: { deal: CurrentDeal }) {
   const [sheetTx, setSheetTx] = useState<TxDetails | null>(null)
   const [pending, setPending] = useState(false)
 
-  // Pagination locale d'affichage (pas de filtre amont sur cette table).
+  // Local display pagination (no upstream filter on this table).
   const { page, pageCount, setPage } = usePagination(txs?.length ?? 0, '')
   const pagedTxs = txs?.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 

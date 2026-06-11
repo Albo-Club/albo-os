@@ -5,12 +5,12 @@ import { api } from '../../../convex/_generated/api'
 import { getLastOrgSlugCookie } from '~/lib/lastOrg'
 
 export const Route = createFileRoute('/app/')({
-  // Fast-path : la dernière org visitée (cookie device-local) est redirigée
-  // immédiatement — côté serveur dès la requête document, côté client sans
-  // attendre l'auth Convex ni `users.me`. Le layout d'org re-valide la
-  // membership et efface le cookie avant de revenir ici si elle a sauté
-  // (cf. ~/lib/lastOrg). Sans cookie (premier login, post-bounce), le
-  // composant retombe sur la résolution via `users.me` ci-dessous.
+  // Fast-path: the last visited org (device-local cookie) is redirected
+  // immediately — server-side on the document request, client-side without
+  // waiting for Convex auth nor `users.me`. The org layout re-validates
+  // membership and clears the cookie before bouncing back here if it lapsed
+  // (see ~/lib/lastOrg). Without a cookie (first login, post-bounce), the
+  // component falls back to resolving via `users.me` below.
   beforeLoad: () => {
     const slug = getLastOrgSlugCookie()
     if (slug) {

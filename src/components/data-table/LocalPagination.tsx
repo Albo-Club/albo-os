@@ -4,16 +4,16 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
 
-/** Lignes rendues par page (pagination locale d'affichage des tables). */
+/** Rows rendered per page (local display pagination for tables). */
 export const PAGE_SIZE = 50
 
 /**
- * Pagination locale d'affichage : les données restent complètes côté client
- * (recherche, filtres, compteurs et sélections amont inchangés), seul le
- * rendu est découpé en pages de PAGE_SIZE lignes — c'est le nombre de lignes
- * montées qui fait ramer une table, pas la donnée. `resetKey` ramène à la
- * première page (changement de recherche/tri/onglet) ; la page courante est
- * bornée quand la liste rétrécit (lignes retirées par la réactivité).
+ * Local display pagination: the data stays complete on the client (upstream
+ * search, filters, counters and selections are unchanged), only the render is
+ * sliced into pages of PAGE_SIZE rows — it's the number of mounted rows that
+ * makes a table janky, not the data. `resetKey` snaps back to the first page
+ * (search/sort/tab change); the current page is clamped when the list shrinks
+ * (rows removed by reactivity).
  */
 export function usePagination(totalRows: number, resetKey: string) {
   const [page, setPage] = useState(0)
@@ -22,7 +22,7 @@ export function usePagination(totalRows: number, resetKey: string) {
   return { page: Math.min(page, pageCount - 1), pageCount, setPage }
 }
 
-/** Barre « Page X sur Y » + précédent/suivant, masquée s'il n'y a qu'une page. */
+/** "Page X of Y" bar + prev/next, hidden when there's only one page. */
 export function PaginationFooter({
   page,
   pageCount,

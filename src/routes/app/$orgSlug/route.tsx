@@ -58,14 +58,14 @@ function OrgLayout() {
     if (me?.kind !== 'ready') return
     const member = me.orgs.find((o) => o.slug === orgSlug)
     if (!member) {
-      // Effacer le cookie AVANT de repartir sur /app : son beforeLoad
-      // re-redirigerait ici en boucle sinon (cf. ~/lib/lastOrg).
+      // Clear the cookie BEFORE going back to /app: its beforeLoad would
+      // otherwise redirect here in a loop (see ~/lib/lastOrg).
       clearLastOrgCookie()
       navigate({ to: '/app' })
       return
     }
-    // Cookie device-local du fast-path /app → /app/$orgSlug, en plus de la
-    // persistance Convex cross-device (`setLastOrg`).
+    // Device-local cookie for the /app → /app/$orgSlug fast-path, on top of
+    // the cross-device Convex persistence (`setLastOrg`).
     writeLastOrgCookie(orgSlug)
     if (me.user.lastOrgSlug !== orgSlug) {
       void setLastOrg({ slug: orgSlug })

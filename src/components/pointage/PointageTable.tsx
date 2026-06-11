@@ -194,7 +194,8 @@ function UndoBanner({
  * Charge/Impôt/Produit/Virement interne → confirmation →
  * `bulkCategorize` (un seul appel serveur) + toast « Annuler » groupé.
  * La page n'écrit jamais `matchStatus`/`reconciled` directement : tout passe
- * par les mutations du backend. Rendu paginé localement (cf. `usePagination`).
+ * par les mutations du backend. Rendered with local pagination (see
+ * `usePagination`).
  */
 export function PointageTable({
   transactions,
@@ -729,7 +730,7 @@ function VatRateSelect({
  * dans la file « À pointer »). Sur les onglets Charges/Produits
  * (`vatEditable`), une colonne TVA permet de qualifier le taux de chaque
  * ligne (TVA déductible/collectée — cf. carte « TVA récupérable » de la page
- * Trésorerie). Rendu paginé localement (cf. `usePagination`).
+ * Trésorerie). Rendered with local pagination (see `usePagination`).
  */
 export function DiscardedTable({
   transactions,
