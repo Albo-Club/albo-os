@@ -286,10 +286,19 @@ find . \( -path ./node_modules -o -path ./.output \) -prune -o \
 
 ## Mistral model id
 
-`convex/agent.ts` defaults to `mistral-medium-3.5`. Override via the
+`convex/agent.ts` defaults to `mistral-medium-3.5` (single source:
+`convex/lib/instructions.ts:MISTRAL_MODEL`). Override via the
 `MISTRAL_MODEL` Convex env var to pick a different model. Mistral also
 ships dated aliases (`mistral-medium-2604`) for stability. The key lives
 in the Convex env as `MISTRAL_API_KEY`.
+
+**The agent claiming to be another model is NOT proof of the model used.**
+LLMs don't know their own deployment id: asked "which model are you?",
+Mistral Medium happily answers "Mistral Large 2". The system prompt now
+states the configured id (`convex/lib/instructions.ts`) so the agent
+answers correctly. To verify the model actually served in prod, check the
+env (`pnpm exec convex env list --prod` — make sure `MISTRAL_MODEL` is
+unset or set to the intended id), not the agent's self-description.
 
 ## SITE_URL drift in prod = broken email links
 
@@ -823,6 +832,15 @@ permanent par org, génère un code temporaire et renvoie l'URL du Webview.
 
 Le pointage manuel rattache une transaction bancaire à un deal (MVP 1) et
 alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
+
+- **La page Pointage souscrit aux queries `listOptions` (deals + passif),
+  jamais aux queries enrichies.** Chaque action de pointage écrit une
+  transaction ; toute query souscrite dont le read set touche `transactions`
+  (`deals.list` via les totaux par deal, `liabilities.getLiabilities` via
+  les transactions allouées) serait re-exécutée et re-téléchargée à CHAQUE
+  clic. Les comboboxes n'ont besoin que d'ids + libellés →
+  `deals.listOptions` / `liabilities.listOptions` (zéro lecture de
+  transactions). Ne pas re-brancher la page sur les queries enrichies.
 
 - **`matchStatus` est la source de vérité, `reconciled` n'est qu'un miroir
   dérivé.** Le boolean `reconciled` (+ `reconciledBy`/`reconciledAt`) prédate

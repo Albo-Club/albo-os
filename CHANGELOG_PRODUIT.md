@@ -16,6 +16,17 @@ bas de page.
 
 ---
 
+## v1.5.2 — 11/06/2026 à 11:40 — Tableau de bord et pointage plus rapides
+
+Le tableau de bord d'une organisation s'affiche désormais quasi
+instantanément (il relisait tout l'historique bancaire à chaque ouverture),
+et les tables de pointage chargent nettement plus vite. Pointer une
+transaction ne fait plus recharger toute la page : chaque clic de la file
+est maintenant immédiat. L'assistant répond aussi plus vite quand il
+consulte la synthèse de l'organisation, et il sait maintenant dire
+correctement quel moteur le propulse (Mistral Medium 3.5) quand on le lui
+demande.
+
 ## v1.5.1 — 11/06/2026 à 10:21 — Passage de l'assistant IA sur Mistral
 
 L'assistant intégré (panneau ⌘J) tourne désormais sur Mistral Medium 3.5. Mêmes outils, mêmes conversations — seul le moteur de réponse change.

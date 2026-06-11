@@ -3,12 +3,15 @@
  * query: counts participations, sums deployed/distributed from the
  * deal-matched transactions, cash from the real balances, and the
  * estimated NAV from each deal's latest valuation (fallback: amount paid
- * if no valuation). The org-scoped `.collect()` calls are acceptable at
- * this tool's scale (2 users, low volumes).
+ * if no valuation). Transactions are read per deal via the `by_deal`
+ * index (+ an indexed `take` for the recent feed) — never a full org
+ * collect: the transactions table grows unbounded with bank imports and
+ * a full scan here made the dashboard take seconds to render.
  */
 
 import { v } from 'convex/values'
 import { query } from './_generated/server'
+import { lastValuationCents, transactionTotals } from './deals'
 import { requireOrgMember } from './lib/auth'
 
 const RECENT_TX = 5
@@ -27,42 +30,37 @@ export const getDashboard = query({
       (deal) => deal.status === 'active' || deal.status === 'partially_exited',
     )
 
-    // 2. Transactions: deployed (out) / distributed (in) per matched deal.
-    const txs = await ctx.db
-      .query('transactions')
-      .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
-      .collect()
+    // 2. Transactions: deployed (out) / distributed (in) per matched deal,
+    //    read per deal via the `by_deal` index (only matched rows are read).
+    const totals = await Promise.all(
+      deals.map((deal) => transactionTotals(ctx, deal._id)),
+    )
     const paidByDeal = new Map<string, number>()
-    const receivedByDeal = new Map<string, number>()
-    for (const tx of txs) {
-      if (!tx.dealId) continue
-      const map = tx.direction === 'out' ? paidByDeal : receivedByDeal
-      map.set(tx.dealId, (map.get(tx.dealId) ?? 0) + tx.amount)
-    }
     let deployedCents = 0
     let distributedCents = 0
-    for (const deal of deals) {
-      deployedCents += paidByDeal.get(deal._id) ?? 0
-      distributedCents += receivedByDeal.get(deal._id) ?? 0
-    }
+    deals.forEach((deal, i) => {
+      paidByDeal.set(deal._id, totals[i].paidActual)
+      deployedCents += totals[i].paidActual
+      distributedCents += totals[i].received
+    })
 
-    // 3. Estimated NAV: latest valuation per active deal, fallback amount
-    //    paid (navIsPartial = at least one active deal without valuation).
+    // 3. Estimated NAV: latest valuation per active deal (parallel indexed
+    //    point reads), fallback amount paid (navIsPartial = at least one
+    //    active deal without valuation).
+    const lastValuations = await Promise.all(
+      activeDeals.map((deal) => lastValuationCents(ctx, deal._id)),
+    )
     let navCents = 0
     let navIsPartial = false
-    for (const deal of activeDeals) {
-      const lastValuation = await ctx.db
-        .query('valuations')
-        .withIndex('by_deal_asof', (q) => q.eq('dealId', deal._id))
-        .order('desc')
-        .first()
-      if (lastValuation) {
-        navCents += lastValuation.fairValue
+    activeDeals.forEach((deal, i) => {
+      const fairValue = lastValuations[i]
+      if (fairValue !== null) {
+        navCents += fairValue
       } else {
         navCents += paidByDeal.get(deal._id) ?? 0
         navIsPartial = true
       }
-    }
+    })
 
     // 4. Cash: real EUR balances of non-archived accounts.
     const accounts = await ctx.db
@@ -91,10 +89,13 @@ export const getDashboard = query({
       activeDeals.map((deal) => deal.targetCompanyId),
     ).size
 
-    // 7. Recent activity: latest transactions, enriched with account + deal.
-    const recent = [...txs]
-      .sort((a, b) => b.transactionDate - a.transactionDate)
-      .slice(0, RECENT_TX)
+    // 7. Recent activity: latest transactions (indexed `take`, not a full
+    //    collect + sort), enriched with account + deal.
+    const recent = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+      .order('desc')
+      .take(RECENT_TX)
     const recentTransactions = await Promise.all(
       recent.map(async (tx) => {
         const account = await ctx.db.get('bankAccounts', tx.bankAccountId)

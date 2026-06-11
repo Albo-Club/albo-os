@@ -145,6 +145,44 @@ export const list = query({
   },
 })
 
+/**
+ * Lightweight org deals for pickers (pointage combobox, re-match sheet):
+ * ids + display names only. Unlike `list`, reads NO transactions and NO
+ * valuations — so pointage writes never invalidate it, and subscribing
+ * pages don't pay the per-deal enrichment.
+ */
+export const listOptions = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+
+    const rows = await ctx.db
+      .query('deals')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    rows.sort((a, b) => (b.signedDate ?? 0) - (a.signedDate ?? 0))
+
+    // One indexed read of the org's companies instead of two gets per deal.
+    const companies = await ctx.db
+      .query('companies')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    const companiesById = new Map(companies.map((c) => [c._id, c]))
+    const nameRef = (id: Id<'companies'>) => {
+      const company = companiesById.get(id)
+      return company ? { name: company.name } : null
+    }
+
+    return rows.map((d) => ({
+      _id: d._id,
+      name: d.name ?? null,
+      instrumentKind: d.instrumentKind,
+      target: nameRef(d.targetCompanyId),
+      investor: nameRef(d.investorCompanyId),
+    }))
+  },
+})
+
 export const getById = query({
   args: { id: v.id('deals') },
   handler: async (ctx, { id }) => {

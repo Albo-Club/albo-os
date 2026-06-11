@@ -46,12 +46,15 @@ function Pointage() {
     api.transactions.listUnmatched,
     org ? { orgId: org._id, search: searchArg } : 'skip',
   )
+  // Lightweight options queries: the comboboxes only need ids + names, and
+  // unlike deals.list / getLiabilities these don't read transactions — so
+  // each pointage write doesn't re-run (and re-download) them.
   const deals = useConvexQuery(
-    api.deals.list,
+    api.deals.listOptions,
     org ? { orgId: org._id } : 'skip',
   )
   const liabilities = useConvexQuery(
-    api.liabilities.getLiabilities,
+    api.liabilities.listOptions,
     org ? { orgId: org._id } : 'skip',
   )
   const liveDiscarded = useConvexQuery(

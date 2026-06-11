@@ -14,6 +14,7 @@ import { z } from 'zod/v3'
 
 import { internal } from './_generated/api'
 import { internalMutation, internalQuery } from './_generated/server'
+import { lastValuationCents, transactionTotals } from './deals'
 import { parseScope, readMembership } from './lib/agentScope'
 import { buildSearchText } from './lib/searchText'
 import { INSTRUMENTS, instrumentValidator } from './lib/instruments'
@@ -567,39 +568,35 @@ export const getDashboardSummaryInternal = internalQuery({
       (d) => d.status === 'active' || d.status === 'partially_exited',
     )
 
-    const txs = await ctx.db
-      .query('transactions')
-      .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
-      .collect()
+    // Per-deal indexed reads (cf. convex/dashboard.ts): a full org-wide
+    // transactions collect here made every agent answer using this tool
+    // pay a multi-second query.
+    const totals = await Promise.all(
+      deals.map((deal) => transactionTotals(ctx, deal._id)),
+    )
     const paidByDeal = new Map<string, number>()
-    const receivedByDeal = new Map<string, number>()
-    for (const tx of txs) {
-      if (!tx.dealId) continue
-      const map = tx.direction === 'out' ? paidByDeal : receivedByDeal
-      map.set(tx.dealId, (map.get(tx.dealId) ?? 0) + tx.amount)
-    }
     let deployedCents = 0
     let distributedCents = 0
-    for (const deal of deals) {
-      deployedCents += paidByDeal.get(deal._id) ?? 0
-      distributedCents += receivedByDeal.get(deal._id) ?? 0
-    }
+    deals.forEach((deal, i) => {
+      paidByDeal.set(deal._id, totals[i].paidActual)
+      deployedCents += totals[i].paidActual
+      distributedCents += totals[i].received
+    })
 
+    const lastValuations = await Promise.all(
+      activeDeals.map((deal) => lastValuationCents(ctx, deal._id)),
+    )
     let navCents = 0
     let navIsPartial = false
-    for (const deal of activeDeals) {
-      const lastValuation = await ctx.db
-        .query('valuations')
-        .withIndex('by_deal_asof', (q) => q.eq('dealId', deal._id))
-        .order('desc')
-        .first()
-      if (lastValuation) {
-        navCents += lastValuation.fairValue
+    activeDeals.forEach((deal, i) => {
+      const fairValue = lastValuations[i]
+      if (fairValue !== null) {
+        navCents += fairValue
       } else {
         navCents += paidByDeal.get(deal._id) ?? 0
         navIsPartial = true
       }
-    }
+    })
 
     const accounts = await ctx.db
       .query('bankAccounts')
