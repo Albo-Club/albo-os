@@ -4,7 +4,7 @@ import { requireOrgMember } from './lib/auth'
 import { normalizeSearch } from './lib/searchText'
 import type { Doc } from './_generated/dataModel'
 
-/** Borne raisonnable pour la liste de transactions d'un compte. */
+/** Reasonable cap for an account's transaction list. */
 const TX_LIMIT = 200
 
 function ownerRef(c: Doc<'companies'> | null) {
@@ -13,9 +13,9 @@ function ownerRef(c: Doc<'companies'> | null) {
 }
 
 /**
- * Comptes bancaires (non archivés) d'une org, enrichis de leur entité
- * propriétaire (`group_*`). Le regroupement par entité et le total se font
- * côté UI. Sert la vue Cash par-org.
+ * Bank accounts (non-archived) of an org, enriched with their owning
+ * entity (`group_*`). Grouping by entity and the total are done UI-side.
+ * Serves the per-org Cash view.
  */
 export const listAccounts = query({
   args: { orgId: v.id('organizations') },
@@ -46,8 +46,8 @@ export const listAccounts = query({
 })
 
 /**
- * Un compte bancaire (avec son entité propriétaire), pour la page détail.
- * Le check d'org dérive du compte.
+ * A bank account (with its owning entity), for the detail page.
+ * The org check derives from the account.
  */
 export const getAccount = query({
   args: { bankAccountId: v.id('bankAccounts') },
@@ -72,9 +72,9 @@ export const getAccount = query({
 })
 
 /**
- * Renomme un compte bancaire (nom personnalisé `displayName`).
- * Patch ciblé : ne touche JAMAIS `label` (nom d'origine import/banque) ni
- * `bankName`. '' = effacement → l'affichage retombe sur `label`.
+ * Renames a bank account (custom name `displayName`).
+ * Targeted patch: NEVER touches `label` (original import/bank name) nor
+ * `bankName`. '' = clears the field → display falls back to `label`.
  */
 export const updateAccountName = mutation({
   args: {
@@ -94,13 +94,14 @@ export const updateAccountName = mutation({
 })
 
 /**
- * Transactions d'un compte, en ordre antéchronologique (plus récente d'abord).
- * Quand une transaction est rattachée à un deal, elle est labellisée par la
- * boîte investie (`deal` sinon `null`). Le check d'org dérive du compte.
+ * Transactions of an account, in reverse chronological order (most recent
+ * first). When a transaction is attached to a deal, it is labelled with the
+ * invested company (`deal` otherwise `null`). The org check derives from
+ * the account.
  *
- * `search` (optionnel) filtre par libellé/contrepartie via le search index
- * `search_text` (insensible casse/accents). Les résultats search arrivent
- * triés par pertinence → re-tri par date pour garder l'affichage habituel.
+ * `search` (optional) filters by label/counterparty via the `search_text`
+ * search index (case/accent insensitive). Search results come sorted by
+ * relevance → re-sort by date to keep the usual display.
  */
 export const listAccountTransactions = query({
   args: {

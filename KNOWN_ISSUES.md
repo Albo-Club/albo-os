@@ -8,6 +8,7 @@ fixes land so renovate (which respects `pnpm.overrides`) can be unblocked.
 ### What went wrong (the trap)
 
 Initial config in `convex/auth.ts` had:
+
 - `emailAndPassword.requireEmailVerification: false` — password sign-up
   produced an **untrusted** BA account (BA can't confirm the user owns
   the mailbox).
@@ -77,10 +78,11 @@ template. It activates only when **both** `GOOGLE_CLIENT_ID` and
 `GOOGLE_CLIENT_SECRET` are set in the Convex env. The `socialProviders` block in
 `convex/auth.ts` is spread conditionally on that, and the frontend hides the
 button via `api.publicConfig.enabledSocialProviders` (a boolean query — env
-presence, never the secret). Pattern: a missing provider must render *nothing*,
+presence, never the secret). Pattern: a missing provider must render _nothing_,
 not a dead/broken button.
 
 ### Enabling it
+
 1. Create an OAuth client in Google Cloud Console → Credentials.
 2. **Authorized redirect URI** = `${SITE_URL}/api/auth/callback/google` (the BA
    default; the request flows through the TanStack proxy `src/routes/api/auth/$.ts`
@@ -89,11 +91,12 @@ not a dead/broken button.
 3. `pnpm exec convex env set GOOGLE_CLIENT_ID …` / `… GOOGLE_CLIENT_SECRET …`
    (or answer the optional prompt in `pnpm run setup`).
 4. **Prod**: `pnpm run setup:prod` mirrors the dev `GOOGLE_*` creds to the prod
-   deployment automatically (same OAuth client). The prod redirect URI is *not*
+   deployment automatically (same OAuth client). The prod redirect URI is _not_
    set for you — add `https://<prod-domain>/api/auth/callback/google` to the same
    Google client by hand (step 2), or sign-in fails with `redirect_uri_mismatch`.
 
 ### Why it's safe vs the account-linking trap
+
 Google returns a **verified** email on first sign-in, so it satisfies rule (1)
 of "Account linking & verified email" above (all enabled methods trusted). With
 `accountLinking.enabled: true` (already set) plus `provisionAppUser`'s email
@@ -112,7 +115,7 @@ The handler that fires on **email-change** lives under
 in `node_modules/better-auth/dist/api/routes/update-user.mjs:427`). An
 earlier revision used `sendChangeEmailVerification`, which **does not
 exist** — BA silently swallowed the callback and only sent the
-verification email to the *new* address. A hijacked session could
+verification email to the _new_ address. A hijacked session could
 change the email to attacker@evil.com without the legitimate owner of
 the current inbox ever being notified.
 
@@ -123,8 +126,8 @@ and match it byte-for-byte. The TypeScript types here are permissive
 
 ### Anti-enumeration on `/register`
 
-When a signup hits `USER_ALREADY_EXISTS`, the UI renders the *exact
-same* "Check your inbox" screen as a successful new signup
+When a signup hits `USER_ALREADY_EXISTS`, the UI renders the _exact
+same_ "Check your inbox" screen as a successful new signup
 (`src/routes/register.tsx`). No verification email is actually sent in
 the duplicate case — BA aborts at 422. An attacker can no longer
 enumerate registered emails by watching the signup response.
@@ -165,7 +168,7 @@ on it for `/sign-in/email`, `/sign-up/email`, `/forgot-password`,
 `/change-email`, `/change-password`, `/delete-user`.
 
 `convex/rateLimiters.ts` (the `@convex-dev/rate-limiter` component) is
-*separate* — it covers application-level limits (invitations, chat,
+_separate_ — it covers application-level limits (invitations, chat,
 email-send wrappers). Do not confuse the two : BA's limiter is on the
 auth HTTP edge, ours is on Convex mutations/actions.
 
@@ -220,12 +223,12 @@ The shell guard in `package.json` → `build:vercel` requires **both**
 `convex deploy`. Falls back to plain `pnpm build` otherwise. Effects :
 
 - **Why `VERCEL_ENV`, not `VERCEL=1`** : `CONVEX_DEPLOY_KEY` is a
-  *production* key and, in practice, Vercel forwards it to **Preview**
+  _production_ key and, in practice, Vercel forwards it to **Preview**
   builds too (env-var scoping in the dashboard is not always honored).
   A `VERCEL=1` guard therefore let preview/branch builds (PRs) run
   `convex deploy` with a prod key from a non-prod
-  env → Convex aborts with *"non-production build environment and
-  CONVEX_DEPLOY_KEY for a production deployment"* → build exits 1.
+  env → Convex aborts with _"non-production build environment and
+  CONVEX_DEPLOY_KEY for a production deployment"_ → build exits 1.
   Gating on `VERCEL_ENV = production` is what actually keeps previews
   off the prod deploy path.
 - Preview/branch deployments → skip `convex deploy`, just `pnpm build`.
@@ -239,34 +242,20 @@ The shell guard in `package.json` → `build:vercel` requires **both**
   key in their shell env. Safe to run locally for build smoke-tests.
 
 **When you DO need the manual command** :
+
 - Local dev (`pnpm exec convex dev` — different command, runs the dev
   deployment with hot reload).
 - Emergency hotfix where Vercel is broken : `pnpm exec convex deploy
-  --prod` works but is a footgun (frontend still pointing at old
+--prod` works but is a footgun (frontend still pointing at old
   code). Prefer reverting the bad commit and letting Vercel redeploy.
 
 ## pnpm.overrides
 
-### `@tanstack/react-router: 1.168.26` + `@tanstack/router-core: 1.169.2`
-
-Two router-core versions coexisting (one pulled by `react-router`, one by
-`start-client-core`) prevented `server.handlers` from being type-augmented
-on `createFileRoute`. Pinning both to compatible versions resolves it.
-
-**Unblock when**: TanStack publishes a release where `react-router` and
-`react-start` agree on a single `router-core` version.
-
-### `@tanstack/react-start: 1.167.65`
-
-Pinned in lockstep with the router pin above.
-
-### `better-call: 1.3.4`
-
-`better-call@1.3.5` ships without `openapi.mjs` and `validator.mjs`,
-breaking Better Auth's runtime imports. Pinned to the last working release.
-
-**Unblock when**: a `better-call` release re-includes the missing files
-(or Better Auth bumps past the regression).
+No active overrides. History of past pins (TanStack router-core duplication
+breaking `server.handlers` type augmentation; `better-call@1.3.5` shipping
+broken) lives in git — pattern to reuse if a dep breaks upstream: pin in
+`pnpm.overrides`, disable it in `renovate.json`, document the unblock
+condition here, and remove all three together when upstream fixes land.
 
 ## Zod v4 required for Better Auth 1.6.10
 
@@ -344,6 +333,7 @@ binding, not a deploy target.
 ## Vite / Convex dev fails after partial install state
 
 If `pnpm dev` errors with one of:
+
 - `_gensync(...) is not a function`
 - `Cannot destructure property 'isCompatTag' of 'react'`
 - `esbuild failed: import_esbuild2.default.build is not a function`
@@ -353,6 +343,7 @@ mid-session `pnpm dedupe` or after pnpm skipped postinstall scripts on
 `esbuild`).
 
 **Fix**:
+
 ```bash
 rm -rf node_modules
 pnpm install
@@ -464,12 +455,16 @@ preset and the actual output never meet, and every route returns 404.
 
 Two things must both be true:
 
-1. `vite.config.ts` loads `nitro()` from `nitro/vite` *after* `tanstackStart()`.
+1. `vite.config.ts` loads `nitro()` from `nitro/vite` _after_ `tanstackStart()`.
    Without Nitro, `pnpm build` only produces `.output/server/index.mjs`
    (generic Node server) which Vercel cannot serve.
 2. `vercel.json` overrides the preset:
    ```json
-   { "framework": null, "buildCommand": "pnpm build", "installCommand": "pnpm install --frozen-lockfile=false" }
+   {
+     "framework": null,
+     "buildCommand": "pnpm build",
+     "installCommand": "pnpm install --frozen-lockfile=false"
+   }
    ```
    Editing the preset in the dashboard works too, but the file is the
    durable answer — survives team handoffs and project re-imports.
@@ -525,7 +520,7 @@ theme directly.
 The app is bilingual (FR/EN). Three non-obvious decisions keep SSR correct:
 
 1. **One i18next instance per server request, never a shared singleton.**
-   `getI18n()` in `src/lib/i18n.ts` caches one read-only instance *per locale*
+   `getI18n()` in `src/lib/i18n.ts` caches one read-only instance _per locale_
    on the server and a single mutable instance on the client. A single shared
    server instance whose `lng` we mutate with `changeLanguage` would leak one
    request's locale into another concurrent request (the Node server is
@@ -543,7 +538,7 @@ The app is bilingual (FR/EN). Three non-obvious decisions keep SSR correct:
    it reads the `lang` cookie, else parses `Accept-Language`, then **writes the
    resolved value back into the `lang` cookie**. The client branch reads the
    same cookie (else `navigator.language`). Writing the cookie server-side is
-   what guarantees the client reads the *exact* value the server rendered with —
+   what guarantees the client reads the _exact_ value the server rendered with —
    without it, `Accept-Language` (server) vs `navigator.language` (client) can
    disagree and cause a hydration mismatch. This is the cookie-based approach
    the "Color theme picker SSR flash" section suggests as the future fix —
@@ -586,7 +581,9 @@ function ClientOnlyViz() {
     import('the-browser-only-lib').then((m) => {
       if (!cancelled) setMod(m)
     })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
   if (!mod) return <Skeleton />
   return <mod.Thing>…</mod.Thing>
@@ -610,12 +607,13 @@ deploy time anyway.
 `authClient.changePassword()` succeeds on `/app/me`. **It does NOT fire on
 the `/forgot-password` → `/reset-password` flow** because that path runs
 server-side inside Better Auth and we don't have a clean hook (BA exposes
-`sendResetPassword` for sending the *link*, not a post-reset callback). The
+`sendResetPassword` for sending the _link_, not a post-reset callback). The
 existing `revokeSessionsOnPasswordReset: true` covers the takeover-mitigation
 side (all sessions revoked, user must re-auth) so a hijacker is locked out;
-the missing piece is the *informational* email to the rightful owner.
+the missing piece is the _informational_ email to the rightful owner.
 
 Two paths if/when this matters:
+
 1. Add `databaseHooks.account.update.after(account)` in `convex/auth.ts` and
    gate on `providerId === 'credential'`. Risk: BA's `databaseHooks` type
    surface is heavy and may trigger the TS inference cycle that CLAUDE.md
@@ -667,6 +665,29 @@ redirects on `!isAuthenticated` will fire during that gap.
    If you add a new route guard, prefer `useAuthState()` over
    `useConvexAuth()` directly.
 
+## Entrée `/app` — fast-path cookie `last_org_slug`
+
+La redirection `/app` → `/app/$orgSlug` n'attend plus l'auth Convex :
+`src/routes/app/index.tsx` lit le cookie `last_org_slug` dans `beforeLoad`
+(isomorphe, même pattern que `getLocale` — `src/lib/lastOrg.ts`) et redirige
+immédiatement, côté serveur dès la requête document (et `/` redirige vers
+`/app` en `beforeLoad` aussi — plus d'écran « redirection » hydraté).
+`users.lastOrgSlug` (Convex, mutation `setLastOrg`) reste la source de
+vérité cross-device et le fallback quand le cookie est absent.
+
+Pièges :
+
+- **Boucle de redirection** : le layout d'org renvoie un non-membre sur
+  `/app` — il DOIT effacer le cookie avant (`clearLastOrgCookie()`), sinon
+  le `beforeLoad` de `/app` renvoie aussitôt sur l'org refusée, en boucle.
+  Tout nouveau chemin qui « quitte » une org (suppression d'org, retrait de
+  membership) doit penser à ce nettoyage.
+- Le contenu du cookie est borné à un slug plausible (`SLUG_RE` dans
+  `lastOrg.ts`) avant d'être utilisé comme cible de redirection — ne pas
+  relâcher cette validation (un cookie est une entrée non fiable).
+- Un visiteur signé-out avec un cookie est redirigé vers l'org **puis** vers
+  `/login` par le guard `/app` (inchangé) — ordre voulu, pas un bug.
+
 ## Import Airtable one-shot (`convex/airtableImport.ts`)
 
 Migration unique de la base Airtable `appVRf06AHghMkPZG` vers l'org `calte`.
@@ -712,7 +733,7 @@ Seule env var requise : `POWENS_WEBHOOK_SECRET` (clé du provider HMAC Powens).
   sont ingérés. Les connexions d'autres projets / vieux users Powens non gérés
   par Albo OS re-syncent encore : sans ce filtre, elles créaient des comptes
   fantômes. Webhook d'un user inconnu → warning `[powens] webhook ignoré:
-  id_user inconnu (X)` + réponse 200, **rien n'est écrit**. Conséquence :
+id_user inconnu (X)` + réponse 200, **rien n'est écrit**. Conséquence :
   l'**org d'ingestion vient du `powensUsers` matché** (source de vérité), le
   mapping connecteur→entité ne sert qu'à choisir l'entité propriétaire et doit
   concorder avec cette org (`connector_org_mismatch` sinon).
@@ -730,7 +751,7 @@ Seule env var requise : `POWENS_WEBHOOK_SECRET` (clé du provider HMAC Powens).
   un `ArrayBuffer`. Les buffers sont typés `Uint8Array<ArrayBuffer>` (les
   `Uint8Array` génériques sont `ArrayBufferLike` → rejetés par tsc, union
   `SharedArrayBuffer`). Construire via `new Uint8Array(len)` / `new
-  Uint8Array(enc.encode(s))` produit bien de l'`ArrayBuffer`-backed.
+Uint8Array(enc.encode(s))` produit bien de l'`ArrayBuffer`-backed.
 - **Le record Qonto importé d'Airtable n'a pas d'IBAN.** `upsertBankAccounts`
   (`airtableImport.ts`) ne stocke pas l'IBAN → le « match par IBAN » littéral
   ne suffit pas. `linkQonto` rapproche le Qonto existant par **unicité du
@@ -826,7 +847,9 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   pas le champ). Absence = logiquement `unmatched`, mais ces lignes sont
   **invisibles** de l'index `by_org_matchStatus` → la query `listUnmatched` ne
   les retourne pas tant que `transactions:backfillMatchStatus` n'a pas tourné
-  (one-shot par org, idempotent, cf. `TESTING.md`).
+  (one-shot idempotent, `'{}'` = toutes les orgs, cf. `TESTING.md`). L'import
+  CSV Mémo Bank a inséré sans `matchStatus` jusqu'au fix de juin 2026 — les
+  lignes albo importées avant nécessitent ce backfill.
 - **`matchingDecisions` est append-only.** Une ligne par action de pointage
   (y compris le dé-pointage, signal négatif pour l'agent). Jamais de patch ni
   de delete. Le backfill n'y écrit **rien** (pas une décision humaine — ne pas
@@ -950,12 +973,15 @@ search index `search_text` sur un champ **dérivé** `searchText`, pas sur
   `counterparty` : recalculer `searchText` dans le même patch.
 - **`searchText` est optionnel au schéma** (même pattern que `matchStatus`) :
   les lignes pré-existantes ne l'ont pas tant que
-  `transactions:backfillSearchText` (one-shot par org, idempotent) n'a pas
-  tourné en prod.
+  `transactions:backfillSearchText` (one-shot idempotent, `'{}'` = toutes les
+  orgs) n'a pas tourné en prod. Symptôme typique : transaction visible dans
+  les listes mais introuvable par la recherche, côté UI **et** outils agent
+  (même index). Concerne toute ligne écrite avant le déploiement du champ
+  (02/06/2026) — ex. sync Powens depuis le 31/05, import CSV Mémo albo.
 - **`normalizeSearch` existe en double** : `convex/lib/searchText.ts` (queries
-  + mutations) et `src/lib/searchText.ts` (filtre client participations,
-  normalisation de la saisie). convex/ et src/ ne partagent pas de modules
-  runtime — garder les deux copies identiques.
+  - mutations) et `src/lib/searchText.ts` (filtre client participations,
+    normalisation de la saisie). convex/ et src/ ne partagent pas de modules
+    runtime — garder les deux copies identiques.
 - **Les résultats search sont triés par pertinence**, pas par date — les
   queries re-trient par `transactionDate` desc avant de retourner. La branche
   recherche est bornée (`.take(200)`) ; la branche sans recherche garde son

@@ -1,17 +1,17 @@
 /**
- * Rendus riches des résultats d'outils de l'agent chat (« montrer, pas
- * raconter ») : tableaux compacts, cartes, liens profonds, boutons d'action.
+ * Rich renderers for chat-agent tool results ("show, don't tell"): compact
+ * tables, cards, deep links, action buttons.
  *
- * Chaque renderer est DÉFENSIF : si la shape ne correspond pas (champ manquant
- * ou type inattendu), il retourne `null` et le JSON brut du collapsible
- * (`ToolOutput` dans AiPanel) reste la source de vérité — jamais de crash.
+ * Every renderer is DEFENSIVE: if the shape doesn't match (missing field or
+ * unexpected type) it returns `null` and the raw JSON in the collapsible
+ * (`ToolOutput` in AiPanel) stays the source of truth — never a render crash.
  *
- * Les shapes sont celles construites par les internalQuery de convex/ :
+ * Shapes are the ones built by the internalQuery functions in convex/:
  * agentTools.ts (listDeals), agentToolsPointage.ts (searchTransactions,
  * listUnmatchedTransactions, suggestMatches), agentToolsForecasts.ts
  * (getForecastBalance), agentToolsLiabilities.ts (listLiabilities),
- * valuations.ts (listValuations). Montants en cents EUR, taux en bps, dates
- * en ms epoch ou ISO selon l'outil — voir chaque renderer.
+ * valuations.ts (listValuations). Amounts in cents EUR, rates in bps, dates
+ * in ms epoch or ISO depending on the tool — see each renderer.
  */
 
 import { useState } from 'react'
@@ -29,13 +29,13 @@ import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { directionTone, signTone } from '~/lib/moneyTone'
 
-// ─── Helpers de formatage local (cents → €, ms/ISO → date, bps → %) ─────────
+// ─── Local formatting helpers (cents → €, ms/ISO → date, bps → %) ───────────
 
-/** Formateurs localisés ; `i18n.language` pilote la locale d'affichage. */
+/** Localized formatters; `i18n.language` drives the display locale. */
 function useFmt() {
   const { i18n } = useTranslation()
   const lang = i18n.language
-  /** cents → € (sans décimales : montants métier toujours entiers d'euros). */
+  /** cents → € (no decimals: business amounts are always whole euros). */
   const eur = (cents?: number | null) =>
     typeof cents === 'number'
       ? new Intl.NumberFormat(lang, {
@@ -44,16 +44,16 @@ function useFmt() {
           maximumFractionDigits: 0,
         }).format(cents / 100)
       : '—'
-  /** Date ms epoch → date locale courte. */
+  /** ms-epoch date → short local date. */
   const dateMs = (ms?: number | null) =>
     typeof ms === 'number' ? new Date(ms).toLocaleDateString(lang) : '—'
-  /** Date ISO "YYYY-MM-DD" → date locale courte. */
+  /** ISO date "YYYY-MM-DD" → short local date. */
   const dateISO = (iso?: string | null) =>
     iso ? new Date(iso).toLocaleDateString(lang) : '—'
   return { eur, dateMs, dateISO }
 }
 
-// ─── Garde-fous de shape (les outils renvoient `unknown`) ───────────────────
+// ─── Shape guards (tools return `unknown`) ──────────────────────────────────
 
 function isObj(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null
@@ -68,13 +68,13 @@ function num(v: unknown): number | null {
   return typeof v === 'number' ? v : null
 }
 
-/** Lit `slug` de la route courante (panneau monté sous /app/$orgSlug). */
+/** Reads `slug` from the current route (panel mounted under /app/$orgSlug). */
 function useOrgSlug(): string | undefined {
   const params = useParams({ strict: false })
   return (params as { orgSlug?: string }).orgSlug
 }
 
-/** Extrait un code d'erreur Convex lisible (même pattern qu'AiPanel). */
+/** Extracts a readable Convex error code (same pattern as AiPanel). */
 function errorCode(err: unknown): string {
   const data = err instanceof ConvexError ? err.data : null
   if (typeof data === 'string') return data
@@ -84,9 +84,9 @@ function errorCode(err: unknown): string {
   return ''
 }
 
-// ─── Primitives de présentation (denses, panneau ~24rem) ────────────────────
+// ─── Presentation primitives (dense, ~24rem-wide panel) ─────────────────────
 
-/** Tableau compact scrollable horizontalement. */
+/** Compact, horizontally scrollable table. */
 function MiniTable({
   head,
   children,
@@ -113,7 +113,7 @@ function MiniTable({
 }
 
 // ═══ 1. listDeals ════════════════════════════════════════════════════════════
-// Shape (agentTools.listDealsInternal) : Array<{ _id, investor, target, viaSpv,
+// Shape (agentTools.listDealsInternal): Array<{ _id, investor, target, viaSpv,
 // instrumentKind, committedAmount, paidAmount, status, signedDate }>.
 
 function DealsRenderer({ output }: { output: unknown }) {
@@ -157,7 +157,7 @@ function DealsRenderer({ output }: { output: unknown }) {
             </td>
           </>
         )
-        // Lien profond vers le détail du deal (si on connaît le slug + id).
+        // Deep link to the deal detail (when slug + id are known).
         return id && slug ? (
           <tr key={i} className="hover:bg-accent/50">
             <td className="p-0" colSpan={4}>
@@ -179,7 +179,7 @@ function DealsRenderer({ output }: { output: unknown }) {
 }
 
 // ═══ 2. searchTransactions ═══════════════════════════════════════════════════
-// Shape (agentToolsPointage.searchTransactionsInternal) : { count, totalInCents,
+// Shape (agentToolsPointage.searchTransactionsInternal): { count, totalInCents,
 // totalOutCents, totalVatInCents, totalVatOutCents, vatUnqualifiedCount,
 // truncated, rows: Array<{ _id, dateISO, direction, amountCents, rawLabel,
 // counterparty, matchStatus, vatRateBps, vatCents, accountLabel }> }.
@@ -201,7 +201,7 @@ function SearchTransactionsRenderer({ output }: { output: unknown }) {
 
   return (
     <div className="space-y-2">
-      {/* En-tête de totaux pré-agrégés (jamais recalculés ici). */}
+      {/* Pre-aggregated totals header (never recomputed here). */}
       <div className="bg-muted/40 flex flex-wrap gap-x-4 gap-y-1 rounded-md border px-2.5 py-2 text-xs">
         <span className="text-muted-foreground">
           {t('renderers.search.count', { count })}
@@ -279,7 +279,7 @@ function SearchTransactionsRenderer({ output }: { output: unknown }) {
 }
 
 // ═══ 3. listUnmatchedTransactions ════════════════════════════════════════════
-// Shape (agentToolsPointage.listUnmatchedInternal) : Array<{ _id, dateISO,
+// Shape (agentToolsPointage.listUnmatchedInternal): Array<{ _id, dateISO,
 // direction, amountCents, rawLabel, counterparty, accountLabel }>.
 
 function UnmatchedTransactionsRenderer({ output }: { output: unknown }) {
@@ -327,15 +327,15 @@ function UnmatchedTransactionsRenderer({ output }: { output: unknown }) {
 }
 
 // ═══ 4. suggestMatches ═══════════════════════════════════════════════════════
-// Shape (agentToolsPointage.suggestMatchesInternal) : Array<{ transactionId,
+// Shape (agentToolsPointage.suggestMatchesInternal): Array<{ transactionId,
 // dateISO, direction, amountCents, rawLabel, candidates: Array<{ kind,
 // targetId, targetLabel, evidence: { similarMatchedCount, decisionsCount,
 // amountDeltaCents }, score }> }>.
-// Action directe (pas d'approbation modèle) : « Pointer » par candidat via les
-// mutations PUBLIQUES api.transactions.matchTransaction (cible deal) /
-// api.liabilities.allocateTransaction (cible passif).
+// Direct action (no model approval): per-candidate "Pointer" button via the
+// PUBLIC mutations api.transactions.matchTransaction (deal target) /
+// api.liabilities.allocateTransaction (liability target).
 
-/** Bouton « Pointer » d'un candidat : action utilisateur directe. */
+/** Candidate "Pointer" button: direct user action. */
 function PointButton({
   txId,
   candidate,
@@ -418,7 +418,7 @@ function PointButton({
 function SuggestMatchesRenderer({ output }: { output: unknown }) {
   const { t } = useTranslation('chat')
   const { eur, dateISO } = useFmt()
-  // État local « pointé » par transaction (désactive le groupe au succès).
+  // Local "matched" state per transaction (freezes the group on success).
   const [pointed, setPointed] = useState<Record<string, string>>({})
   const groups = asArray(output)
   if (!groups || groups.length === 0) return null
@@ -436,7 +436,7 @@ function SuggestMatchesRenderer({ output }: { output: unknown }) {
 
         return (
           <div key={i} className="space-y-1.5 rounded-md border p-2">
-            {/* Infos de la transaction analysée. */}
+            {/* Analyzed transaction info. */}
             <div className="flex items-baseline justify-between gap-2 text-xs">
               <span className="min-w-0 flex-1 truncate font-medium">
                 {str(g.rawLabel) ?? '—'}
@@ -466,7 +466,7 @@ function SuggestMatchesRenderer({ output }: { output: unknown }) {
                   const targetId = str(c.targetId) ?? ''
                   const score = num(c.score)
                   const isDone = pointedTarget === targetId
-                  // Le groupe se fige dès qu'un candidat est pointé.
+                  // The group freezes as soon as one candidate is matched.
                   const groupDone = Boolean(pointedTarget)
                   return (
                     <li
@@ -520,7 +520,7 @@ function SuggestMatchesRenderer({ output }: { output: unknown }) {
 }
 
 // ═══ 5. getForecastBalance ═══════════════════════════════════════════════════
-// Shape (forecasts.computeForecastBalanceForOrgs) : { startingBalanceCents,
+// Shape (forecasts.computeForecastBalanceForOrgs): { startingBalanceCents,
 // currency, ignoredNonEurAccounts, ignoredNonEurEntries, months: Array<{
 // monthKey, inflowCents, outflowCents, netCents, projectedBalanceCents }> }.
 
@@ -577,7 +577,7 @@ function ForecastBalanceRenderer({ output }: { output: unknown }) {
 }
 
 // ═══ 6. listLiabilities ══════════════════════════════════════════════════════
-// Shape (agentToolsLiabilities.listLiabilitiesInternal) : { equityPositions:
+// Shape (agentToolsLiabilities.listLiabilitiesInternal): { equityPositions:
 // Array<{ _id, type, holderName, amountCents, effectiveDateISO,
 // allocatedTransactions }>, loans: Array<{ _id, counterpartyName, side,
 // balanceCents, interestRateBps, isBlocked, allocatedTransactions }> }.
@@ -674,8 +674,8 @@ function LiabilitiesRenderer({ output }: { output: unknown }) {
 }
 
 // ═══ 7. listValuations ═══════════════════════════════════════════════════════
-// Shape (valuations.listInternal) : Array<{ _id, asOf, fairValue,
-// valuationMethod, source, notes }>. asOf en ms epoch.
+// Shape (valuations.listInternal): Array<{ _id, asOf, fairValue,
+// valuationMethod, source, notes }>. asOf in ms epoch.
 
 function ValuationsRenderer({ output }: { output: unknown }) {
   const { t } = useTranslation('chat')
@@ -708,7 +708,7 @@ function ValuationsRenderer({ output }: { output: unknown }) {
   )
 }
 
-// ─── Registre nom d'outil → renderer ────────────────────────────────────────
+// ─── Tool-name → renderer registry ──────────────────────────────────────────
 
 const toolRenderers: Record<string, ComponentType<{ output: unknown }>> = {
   listDeals: DealsRenderer,
@@ -720,7 +720,7 @@ const toolRenderers: Record<string, ComponentType<{ output: unknown }>> = {
   listValuations: ValuationsRenderer,
 }
 
-/** Renderer riche d'un outil, ou `undefined` si aucun (→ fallback JSON). */
+/** Rich renderer for a tool, or `undefined` when none (→ JSON fallback). */
 export function getToolRenderer(
   toolName: string,
 ): ComponentType<{ output: unknown }> | undefined {

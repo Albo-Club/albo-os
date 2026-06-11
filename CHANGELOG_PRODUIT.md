@@ -16,7 +16,7 @@ bas de page.
 
 ---
 
-## v1.3.0 — 10/06/2026 à 23:50 — L'assistant agit, vous validez d'un clic
+## v1.5.0 — 11/06/2026 à 10:20 — L'assistant agit, vous validez d'un clic
 
 ### ✅ Confirmer une action en un clic
 
@@ -62,6 +62,77 @@ TVA ; sur le Passif, les comptes courants — et ainsi de suite.
 
 La feuille de route de l'assistant (pièces jointes, brief proactif) et un
 guide des bonnes pratiques rejoignent la documentation du projet.
+
+---
+
+## v1.4.0 — 11/06/2026 à 15:05 — Toutes les listes paginées, entrée dans l'app plus directe
+
+### 📄 Des listes qui restent fluides partout
+
+Après la page Pointage, toutes les grandes listes passent en pages de 50
+lignes : les participations (vue par organisation et vue « Tout »), les
+transactions d'un deal et celles d'un compte bancaire. Comme sur le
+Pointage, la recherche, le tri, les totaux et l'export CSV continuent de
+porter sur l'ensemble des données, pas seulement la page affichée.
+
+### ⚡ Fini le « redirection… puis chargement… » à l'ouverture
+
+L'app vous amène désormais directement sur votre dernière organisation, en
+une seule étape : la redirection se décide immédiatement, avant même le
+chargement de vos données. Sur un nouvel appareil, l'app retrouve votre
+dernière organisation comme avant.
+
+---
+
+## v1.3.4 — 11/06/2026 à 15:00 — Infrastructure de mise à jour des skills agents durcie
+
+Les skills agents (instructions données à l'IA pour utiliser les librairies du projet) sont désormais épinglés à un commit immuable plutôt qu'à une branche mouvante. La source de la skill TanStack Start passe du repo communautaire `deckardger` vers le monorepo officiel TanStack. Une nouvelle commande (`sync:skills:update`) permet de faire des bumps délibérés et reviewables, distincts du simple vendoring reproductible.
+
+---
+
+## v1.3.3 — 11/06/2026 à 09:46 — Nettoyage interne
+
+Harmonisation interne du code (commentaires unifiés en anglais). Aucun
+changement visible dans l'app.
+
+---
+
+## v1.3.2 — 11/06/2026 à 01:10 — Nettoyage après la réindexation
+
+Retrait de l'étape technique ponctuelle qui a réindexé l'historique des
+transactions lors de la mise à jour précédente. Aucun changement visible
+dans l'app.
+
+---
+
+## v1.3.1 — 11/06/2026 à 00:50 — La recherche retrouve les transactions historiques
+
+Chercher « Antese » dans les transactions pouvait ne rien renvoyer alors que
+les lignes existaient bel et bien : les transactions importées avant
+l'arrivée de la recherche (historique Mémo Bank, premières synchros
+bancaires) n'étaient pas indexées — ni pour la barre de recherche, ni pour
+l'assistant. C'est corrigé : l'historique complet redevient cherchable, et
+les lignes de l'import Mémo Bank apparaissent désormais correctement dans la
+file de pointage.
+
+---
+
+## v1.3.0 — 11/06/2026 à 00:20 — Page Pointage fluide même avec beaucoup de transactions
+
+La page Pointage affiche désormais ses transactions par pages de 50 lignes
+(boutons Précédent / Suivant sous le tableau), au lieu de tout dérouler d'un
+bloc. Fini les ralentissements quand la file ou un onglet contient des
+centaines de lignes. Rien ne change pour le reste : le compteur « N à
+pointer », la recherche, les onglets et la sélection multiple continuent de
+porter sur l'ensemble des transactions, pas seulement la page affichée.
+
+---
+
+## v1.2.1 — 11/06/2026 à 00:10 — Fondations remises à neuf
+
+Les briques techniques de navigation et de connexion passent sur leurs
+dernières versions corrigées, jusqu'ici gelées à cause de défauts en amont.
+Aucun changement visible dans l'app.
 
 ---
 

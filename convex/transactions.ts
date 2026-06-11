@@ -12,14 +12,14 @@ import { vatCentsFromTtc, vatRateBpsValidator } from './lib/vat'
 import type { Id } from './_generated/dataModel'
 
 /**
- * Borne des résultats de recherche full-text (le listing sans recherche garde
- * son `.collect()` historique — la file de pointage doit rester exhaustive).
+ * Bound on full-text search results (the no-search listing keeps its
+ * historical `.collect()` — the matching queue must stay exhaustive).
  */
 const SEARCH_LIMIT = 200
 
 /**
- * Transactions rattachées à un deal (rapprochement via `dealId`), triées par
- * date décroissante et enrichies du compte bancaire. Scopé à l'org du deal.
+ * Transactions attached to a deal (reconciled via `dealId`), sorted by
+ * descending date and enriched with the bank account. Scoped to the deal's org.
  */
 export const listByDeal = query({
   args: { dealId: v.id('deals') },
@@ -56,13 +56,13 @@ export const listByDeal = query({
 })
 
 /**
- * File de pointage : les transactions `unmatched` d'une org, triées par date
- * décroissante et enrichies du compte bancaire. Les transactions sans
- * `matchStatus` (pré-backfill) n'apparaissent pas — lancer
- * `transactions:backfillMatchStatus` d'abord.
+ * Matching queue: an org's `unmatched` transactions, sorted by descending
+ * date and enriched with the bank account. Transactions without
+ * `matchStatus` (pre-backfill) do not appear — run
+ * `transactions:backfillMatchStatus` first.
  *
- * `search` (optionnel) filtre par libellé/contrepartie via le search index
- * `search_text` (insensible casse/accents), scopé org + statut.
+ * `search` (optional) filters by label/counterparty via the `search_text`
+ * search index (case/accent-insensitive), scoped to org + status.
  */
 export const listUnmatched = query({
   args: {
@@ -102,8 +102,8 @@ export const listUnmatched = query({
           transactionDate: tx.transactionDate,
           rawLabel: tx.rawLabel,
           counterparty: tx.counterparty ?? null,
-          // Pointage généralisé (filtre de sécurité côté page Passif — une tx
-          // allouée au passif est `matched` et ne devrait jamais être ici).
+          // Generalized allocation (safety filter on the Passif page — a tx
+          // allocated to liabilities is `matched` and should never be here).
           allocation: tx.allocation ?? null,
           account: account
             ? { label: account.label, bankName: account.bankName }
@@ -115,13 +115,13 @@ export const listUnmatched = query({
 })
 
 /**
- * Transactions d'une org dans un statut de pointage donné (consultation des
- * écartées : ignorées / charges / impôts / produits / virements internes, ou
- * des rattachées), triées par date décroissante et enrichies du compte
- * bancaire. Même shape que `listUnmatched` (hors `allocation`).
+ * An org's transactions in a given matching status (to browse the set-aside
+ * ones: ignored / charges / taxes / products / internal transfers, or the
+ * matched ones), sorted by descending date and enriched with the bank
+ * account. Same shape as `listUnmatched` (minus `allocation`).
  *
- * `search` (optionnel) filtre par libellé/contrepartie via le search index
- * `search_text` (insensible casse/accents), scopé org + statut.
+ * `search` (optional) filters by label/counterparty via the `search_text`
+ * search index (case/accent-insensitive), scoped to org + status.
  */
 export const listByStatus = query({
   args: {
@@ -169,7 +169,7 @@ export const listByStatus = query({
           transactionDate: tx.transactionDate,
           rawLabel: tx.rawLabel,
           counterparty: tx.counterparty ?? null,
-          // TVA (statuts charge/produit uniquement) — null = à qualifier.
+          // VAT (charge/product statuses only) — null = to be qualified.
           vatRateBps: tx.vatRateBps ?? null,
           account: account
             ? { label: account.label, bankName: account.bankName }
@@ -180,26 +180,27 @@ export const listByStatus = query({
   },
 })
 
-// ─── Pointage manuel transaction → deal ─────────────────────────────────────
+// ─── Manual transaction → deal matching ─────────────────────────────────────
 //
-// Invariant : `matchStatus === 'matched'` ⟺ rattachée à un deal
-// (`dealId != null` + `allocation.kind === 'deal'`) OU allouée au passif
-// (`dealId == null` + `allocation.kind === 'equity' | 'intercompany_loan'`,
-// cf. convex/liabilities.ts:allocateTransaction). `reconciled` (+ by/at) est
-// un miroir dérivé du pointage DEAL uniquement, maintenu pour les lecteurs
-// existants (UI deal, vue Cash, agent).
-// `allocation` (pointage généralisé) cohabite avec `dealId` :
+// Invariant: `matchStatus === 'matched'` ⟺ attached to a deal
+// (`dealId != null` + `allocation.kind === 'deal'`) OR allocated to
+// liabilities (`dealId == null` + `allocation.kind === 'equity' |
+// 'intercompany_loan'`, cf. convex/liabilities.ts:allocateTransaction).
+// `reconciled` (+ by/at) is a mirror derived from the DEAL matching only,
+// kept for existing readers (deal UI, Cash view, agent).
+// `allocation` (generalized matching) coexists with `dealId`:
 // `dealId != null` ⟺ `allocation = { kind: 'deal', targetId: dealId }`
-// (backfill des lignes pré-existantes : transactions:backfillAllocation).
-// Chaque mutation deal écrit une ligne append-only dans `matchingDecisions`
-// (dataset des suggestions de l'agent) ; le pointage passif n'y écrit jamais.
+// (backfill of pre-existing rows: transactions:backfillAllocation).
+// Each deal mutation writes an append-only row to `matchingDecisions`
+// (dataset for the agent's suggestions); liability matching never writes
+// there.
 //
-// Le cœur (patchs + invariants + logging) vit dans convex/lib/pointage.ts,
-// partagé avec les outils agent (convex/agentToolsPointage.ts) — ne jamais
-// réécrire ces patchs ici.
+// The core (patches + invariants + logging) lives in convex/lib/pointage.ts,
+// shared with the agent tools (convex/agentToolsPointage.ts) — never rewrite
+// those patches here.
 
 /**
- * Rattache une transaction à un deal de la même org.
+ * Attaches a transaction to a deal in the same org.
  */
 export const matchTransaction = mutation({
   args: { transactionId: v.id('transactions'), dealId: v.id('deals') },
@@ -214,8 +215,8 @@ export const matchTransaction = mutation({
 })
 
 /**
- * Marque une transaction comme ne concernant aucun deal (loyer, paie, frais
- * bancaires, mouvement interne…).
+ * Marks a transaction as unrelated to any deal (rent, payroll, bank fees,
+ * internal movement…).
  */
 export const ignoreTransaction = mutation({
   args: { transactionId: v.id('transactions') },
@@ -230,11 +231,11 @@ export const ignoreTransaction = mutation({
 })
 
 /**
- * Classe une transaction en charge courante (loyer, honoraires, frais…).
- * Sous-type d'« écarté » : même comportement qu'`ignoreTransaction`, seul le
- * statut diffère pour pouvoir consulter ces transactions plus tard.
- * `vatRateBps` (optionnel) pose le taux de TVA déductible — l'UI envoie 20 %
- * par défaut, ajustable ensuite via `setVatRate`.
+ * Categorizes a transaction as a running charge (rent, fees, expenses…).
+ * Subtype of "set aside": same behavior as `ignoreTransaction`, only the
+ * status differs so these transactions can be browsed later.
+ * `vatRateBps` (optional) sets the deductible VAT rate — the UI sends 20 %
+ * by default, adjustable later via `setVatRate`.
  */
 export const categorizeAsCharge = mutation({
   args: {
@@ -252,9 +253,9 @@ export const categorizeAsCharge = mutation({
 })
 
 /**
- * Classe une transaction en impôt. Sous-type d'« écarté » : même comportement
- * qu'`ignoreTransaction`, seul le statut diffère pour pouvoir consulter ces
- * transactions plus tard.
+ * Categorizes a transaction as a tax. Subtype of "set aside": same behavior
+ * as `ignoreTransaction`, only the status differs so these transactions can
+ * be browsed later.
  */
 export const categorizeAsTax = mutation({
   args: { transactionId: v.id('transactions') },
@@ -269,10 +270,10 @@ export const categorizeAsTax = mutation({
 })
 
 /**
- * Classe une transaction en produit : argent entrant non rattachable à un
- * deal (intérêts bancaires, remboursement divers…). Sous-type d'« écarté » :
- * même comportement qu'`ignoreTransaction`, seul le statut diffère pour
- * pouvoir consulter ces transactions plus tard.
+ * Categorizes a transaction as a product: incoming money not attachable to a
+ * deal (bank interest, miscellaneous refunds…). Subtype of "set aside": same
+ * behavior as `ignoreTransaction`, only the status differs so these
+ * transactions can be browsed later.
  */
 export const categorizeAsProduct = mutation({
   args: {
@@ -297,11 +298,10 @@ export const categorizeAsProduct = mutation({
 })
 
 /**
- * Classe une transaction en virement interne (mouvement entre deux comptes de
- * l'utilisateur). V1 : simple étiquette, pas d'appariement des deux jambes
- * (sortie ↔ entrée). Sous-type d'« écarté » : même comportement
- * qu'`ignoreTransaction`, seul le statut diffère pour pouvoir consulter ces
- * transactions plus tard.
+ * Categorizes a transaction as an internal transfer (movement between two of
+ * the user's accounts). V1: a simple label, no pairing of the two legs
+ * (out ↔ in). Subtype of "set aside": same behavior as `ignoreTransaction`,
+ * only the status differs so these transactions can be browsed later.
  */
 export const categorizeAsInternalTransfer = mutation({
   args: { transactionId: v.id('transactions') },
@@ -316,11 +316,11 @@ export const categorizeAsInternalTransfer = mutation({
 })
 
 /**
- * Classement en masse en charge, impôt, produit ou virement interne. Chaque
- * transaction est traitée indépendamment (même chemin que l'unitaire : auth
- * par org de la tx, patch, ligne `matchingDecisions`) ; un échec sur l'une
- * n'empêche pas les autres. Retourne les ids classés et les échecs
- * (« appliquer ce qui passe »).
+ * Bulk categorization as charge, tax, product or internal transfer. Each
+ * transaction is processed independently (same path as the unitary one: auth
+ * via the tx's org, patch, `matchingDecisions` row); a failure on one does
+ * not block the others. Returns the categorized ids and the failures
+ * ("apply whatever goes through").
  */
 export const bulkCategorize = mutation({
   args: {
@@ -358,8 +358,8 @@ export const bulkCategorize = mutation({
 })
 
 /**
- * Dé-pointe une transaction (retour à l'état `unmatched`). Le retour arrière
- * est loggé aussi — signal négatif utile à l'agent.
+ * Unmatches a transaction (back to the `unmatched` state). The rollback is
+ * logged too — a negative signal useful to the agent.
  */
 export const unmatchTransaction = mutation({
   args: { transactionId: v.id('transactions') },
@@ -373,12 +373,12 @@ export const unmatchTransaction = mutation({
   },
 })
 
-// ─── TVA (taux sur charges/produits, position récupérable) ──────────────────
+// ─── VAT (rate on charges/products, recoverable position) ───────────────────
 
 /**
- * Pose ou efface (`null` = retour « à qualifier ») le taux de TVA d'une
- * transaction déjà classée en charge ou produit. Métadonnée, pas une décision
- * de pointage : n'écrit rien dans `matchingDecisions`.
+ * Sets or clears (`null` = back to « à qualifier ») the VAT rate of a
+ * transaction already categorized as charge or product. Metadata, not a
+ * matching decision: writes nothing to `matchingDecisions`.
  */
 export const setVatRate = mutation({
   args: {
@@ -401,11 +401,11 @@ export const setVatRate = mutation({
 })
 
 /**
- * Position de TVA de l'org : TVA déductible (charges qualifiées) − TVA
- * collectée (produits qualifiés), dérivée des montants TTC — rien n'est
- * stocké. Signée par le sens : une charge `in` (avoir fournisseur) se
- * soustrait, un produit `out` aussi. `unqualifiedCount` compte les
- * charges/produits sans taux (0 % = qualifié).
+ * The org's VAT position: deductible VAT (qualified charges) − collected VAT
+ * (qualified products), derived from the VAT-inclusive (TTC) amounts —
+ * nothing is stored. Signed by direction: an `in` charge (supplier credit
+ * note) subtracts, and so does an `out` product. `unqualifiedCount` counts
+ * the charges/products without a rate (0 % = qualified).
  */
 export const getVatPosition = query({
   args: { orgId: v.id('organizations') },
@@ -446,24 +446,26 @@ export const getVatPosition = query({
 })
 
 /**
- * Backfill one-shot (idempotent) des transactions pré-existantes sans
- * `matchStatus`. Règle : `reconciled === true` + `dealId` → 'matched' ;
- * tout le reste → 'unmatched' (un `dealId` non validé humainement est
- * effacé pour préserver l'invariant matched ⟺ dealId).
+ * One-shot (idempotent) backfill of pre-existing transactions without
+ * `matchStatus`. Rule: `reconciled === true` + `dealId` → 'matched';
+ * everything else → 'unmatched' (a `dealId` not validated by a human is
+ * cleared to preserve the matched ⟺ dealId invariant).
  *
- * N'écrit RIEN dans `matchingDecisions` : un backfill n'est pas une décision
- * humaine, on ne pollue pas le dataset.
+ * Writes NOTHING to `matchingDecisions`: a backfill is not a human decision,
+ * we don't pollute the dataset.
  *
- * À lancer manuellement par org :
- *   pnpm exec convex run transactions:backfillMatchStatus '{"orgId": "…"}' --prod
+ * To run manually ('{}' = all orgs, or target '{"orgId": "…"}'):
+ *   pnpm exec convex run transactions:backfillMatchStatus '{}' --prod
  */
 export const backfillMatchStatus = internalMutation({
-  args: { orgId: v.id('organizations') },
+  args: { orgId: v.optional(v.id('organizations')) },
   handler: async (ctx, { orgId }) => {
-    const rows = await ctx.db
-      .query('transactions')
-      .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
-      .collect()
+    const rows = orgId
+      ? await ctx.db
+          .query('transactions')
+          .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+          .collect()
+      : await ctx.db.query('transactions').collect()
 
     let matched = 0
     let unmatched = 0
@@ -489,21 +491,23 @@ export const backfillMatchStatus = internalMutation({
 })
 
 /**
- * Backfill one-shot (idempotent) du champ dérivé `searchText` (recherche
- * full-text) sur les transactions pré-existantes. Les écritures récentes le
- * posent déjà (Powens, import Airtable, CSV Mémo, agent) — une ligne sans
- * `searchText` est simplement invisible à la recherche.
+ * One-shot (idempotent) backfill of the derived `searchText` field (full-text
+ * search) on pre-existing transactions. Recent writes already set it (Powens,
+ * Airtable import, Mémo CSV, agent) — a row without `searchText` is simply
+ * invisible to search.
  *
- * À lancer manuellement par org :
- *   pnpm exec convex run transactions:backfillSearchText '{"orgId": "…"}' --prod
+ * To run manually ('{}' = all orgs, or target '{"orgId": "…"}'):
+ *   pnpm exec convex run transactions:backfillSearchText '{}' --prod
  */
 export const backfillSearchText = internalMutation({
-  args: { orgId: v.id('organizations') },
+  args: { orgId: v.optional(v.id('organizations')) },
   handler: async (ctx, { orgId }) => {
-    const rows = await ctx.db
-      .query('transactions')
-      .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
-      .collect()
+    const rows = orgId
+      ? await ctx.db
+          .query('transactions')
+          .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+          .collect()
+      : await ctx.db.query('transactions').collect()
 
     let updated = 0
     let skipped = 0
@@ -522,16 +526,16 @@ export const backfillSearchText = internalMutation({
 })
 
 /**
- * Backfill one-shot (idempotent) du pointage généralisé `allocation` sur les
- * transactions pré-existantes : toute transaction avec `dealId` non nul et
- * sans `allocation` reçoit `allocation = { kind: 'deal', targetId: dealId }`.
- * Ne touche pas `dealId` (cohabitation). Une transaction avec `allocation`
- * déjà renseignée est ignorée (relancer ne change rien).
+ * One-shot (idempotent) backfill of the generalized `allocation` matching on
+ * pre-existing transactions: every transaction with a non-null `dealId` and
+ * no `allocation` gets `allocation = { kind: 'deal', targetId: dealId }`.
+ * Does not touch `dealId` (coexistence). A transaction with `allocation`
+ * already set is skipped (re-running changes nothing).
  *
- * N'écrit RIEN dans `matchingDecisions` : un backfill n'est pas une décision
- * humaine, on ne pollue pas le dataset.
+ * Writes NOTHING to `matchingDecisions`: a backfill is not a human decision,
+ * we don't pollute the dataset.
  *
- * À lancer manuellement par org :
+ * To run manually per org:
  *   pnpm exec convex run transactions:backfillAllocation '{"orgId": "…"}' --prod
  */
 export const backfillAllocation = internalMutation({

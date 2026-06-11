@@ -1,14 +1,14 @@
 /**
- * Génération CSV côté client (logique pure, testée par tests/csv.test.ts).
+ * Client-side CSV generation (pure logic, tested by tests/csv.test.ts).
  *
- * Séparateur `;` + BOM UTF-8 : c'est ce qu'Excel en locale française ouvre
- * correctement par double-clic (le `,` y est le séparateur décimal).
+ * `;` separator + UTF-8 BOM: that's what Excel in French locale opens
+ * correctly on double-click (`,` is the decimal separator there).
  */
 
 const SEPARATOR = ';'
 const BOM = '\uFEFF'
 
-/** Échappe une cellule : guillemets si séparateur/guillemet/retour ligne. */
+/** Escape a cell: quote it if it contains a separator/quote/newline. */
 function escapeCell(value: string | number | null | undefined): string {
   if (value == null) return ''
   const s = String(value)
@@ -18,7 +18,7 @@ function escapeCell(value: string | number | null | undefined): string {
   return s
 }
 
-/** Sérialise entêtes + lignes en CSV (BOM inclus, lignes CRLF). */
+/** Serialize headers + rows to CSV (BOM included, CRLF line endings). */
 export function toCsv(
   headers: Array<string>,
   rows: Array<Array<string | number | null | undefined>>,
@@ -29,7 +29,7 @@ export function toCsv(
   return BOM + lines.join('\r\n')
 }
 
-/** Déclenche le téléchargement d'un CSV dans le navigateur. */
+/** Trigger a CSV download in the browser. */
 export function downloadCsv(filename: string, csv: string): void {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)

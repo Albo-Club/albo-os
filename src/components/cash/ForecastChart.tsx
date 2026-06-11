@@ -3,17 +3,17 @@ import { useEffect, useState } from 'react'
 import type * as RechartsModule from 'recharts'
 import { Skeleton } from '~/components/ui/skeleton'
 
-// `import type` est effacé à la compilation — pas d'import runtime de
-// recharts au chargement du module (le vrai import reste dans useEffect).
+// `import type` is erased at compile time — no runtime import of recharts
+// at module load (the real import stays inside useEffect).
 type RechartsMod = typeof RechartsModule
 
 /**
- * Courbe du solde de trésorerie : historique réel (plein) + projeté
- * (pointillé) sur le même axe. La jonction se fait au mois courant : le
- * dernier point réel ET le premier point projeté valent le solde courant,
- * les deux tracés se touchent. recharts touche `window` au chargement →
- * dynamic-import dans useEffect + skeleton (pattern KNOWN_ISSUES
- * « Browser-only libs »).
+ * Cash balance curve: actual history (solid) + projected (dashed) on the
+ * same axis. The junction happens at the current month: the last actual
+ * point AND the first projected point both equal the current balance, so
+ * the two lines touch. recharts touches `window` at load time →
+ * dynamic-import inside useEffect + skeleton (KNOWN_ISSUES pattern
+ * "Browser-only libs").
  */
 export function ForecastChart({
   months,
@@ -22,7 +22,7 @@ export function ForecastChart({
   fmtEur,
 }: {
   months: Array<{ monthKey: string; projectedBalanceCents: number }>
-  /** Solde réel de fin de mois, dernier point = mois courant au solde courant. */
+  /** Actual end-of-month balance, last point = current month at current balance. */
   history?: Array<{ monthKey: string; balanceCents: number }> | null
   labels: { real: string; projected: string }
   fmtEur: (cents?: number | null) => string
@@ -53,9 +53,9 @@ export function ForecastChart({
     YAxis,
   } = recharts
 
-  // Une ligne par mois ; `real` et `projected` cohabitent au mois courant
-  // (jonction). La valeur projetée du mois courant est remplacée par le solde
-  // courant : ses flux restants sont déjà cumulés dans le mois suivant.
+  // One row per month; `real` and `projected` coexist at the current month
+  // (junction). The current month's projected value is replaced by the
+  // current balance: its remaining flows are already rolled into next month.
   const byMonth = new Map<
     string,
     { month: string; real?: number; projected?: number }

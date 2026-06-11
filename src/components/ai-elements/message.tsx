@@ -314,10 +314,10 @@ export const MessageBranchPage = ({
 
 export type MessageResponseProps = ComponentProps<typeof Streamdown>
 
-// Streamdown plugins (@streamdown/code|math|mermaid|cjk) volontairement
-// retirés : Shiki + KaTeX + Mermaid pèseraient des Mo dans le bundle pour un
-// chat finance. Re-trimmer après toute réinstallation depuis le registry —
-// cf. KNOWN_ISSUES.md « Streamdown (panneau AI) ».
+// Streamdown plugins (@streamdown/code|math|mermaid|cjk) deliberately
+// removed: Shiki + KaTeX + Mermaid would add MBs to the bundle for a finance
+// chat. Re-trim after any reinstall from the registry — see KNOWN_ISSUES.md
+// "Streamdown (AI panel)".
 export const MessageResponse = memo(
   ({ className, ...props }: MessageResponseProps) => (
     <Streamdown

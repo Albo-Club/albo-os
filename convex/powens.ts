@@ -1,22 +1,22 @@
 /**
- * Ingestion Powens → Convex (bankAccounts + transactions).
+ * Powens → Convex ingestion (bankAccounts + transactions).
  *
- * La connexion des banques (login + auth forte) se fait hors-app via le Powens
- * Webview. Ici on traite l'APRÈS : le webhook `CONNECTION_SYNCED` de Powens
- * pousse les comptes + transactions, on les écrit idempotemment et scopés à
- * l'org.
+ * Bank connection (login + strong auth) happens off-app via the Powens
+ * Webview. Here we handle the AFTER: the Powens `CONNECTION_SYNCED` webhook
+ * pushes the accounts + transactions, which we write idempotently, scoped to
+ * the org.
  *
- * Flux : `powensWebhook` (httpAction, vérif HMAC + normalisation du payload)
- *   → `ingestConnectionSync` (internalMutation : résolution du compte, cutover
- *   par compte, upsert idempotent par `powensTxId`).
+ * Flow: `powensWebhook` (httpAction, HMAC check + payload normalization)
+ *   → `ingestConnectionSync` (internalMutation: account resolution, per-account
+ *   cutover, idempotent upsert by `powensTxId`).
  *
- * Sécurité du webhook : signature HMAC-SHA256 (headers `BI-Signature` +
- * `BI-Signature-Date`) vérifiée via Web Crypto (`crypto.subtle.verify`).
- * Le runtime Convex n'expose pas `crypto.timingSafeEqual` de Node ;
- * `crypto.subtle.verify` est l'équivalent constant-time. Cf. KNOWN_ISSUES.md.
+ * Webhook security: HMAC-SHA256 signature (headers `BI-Signature` +
+ * `BI-Signature-Date`) verified via Web Crypto (`crypto.subtle.verify`).
+ * The Convex runtime does not expose Node's `crypto.timingSafeEqual`;
+ * `crypto.subtle.verify` is the constant-time equivalent. Cf. KNOWN_ISSUES.md.
  *
- * Mapping connecteur → entité propriétaire : comptes neufs uniquement. Qonto
- * n'y figure pas : il est rapproché du record existant (importé d'Airtable).
+ * Connector → owner entity mapping: new accounts only. Qonto is not in it:
+ * it is matched to the existing record (imported from Airtable).
  */
 
 import { ConvexError, v } from 'convex/values'
@@ -32,12 +32,12 @@ import { buildSearchText } from './lib/searchText'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 
-/** Doit correspondre EXACTEMENT au chemin de l'URL webhook configurée chez
- * Powens (sans slash final) : le HMAC est calculé dessus. */
+/** Must match EXACTLY the path of the webhook URL configured on the Powens
+ * side (no trailing slash): the HMAC is computed over it. */
 const WEBHOOK_PATH = '/powens/webhook'
 
-/** Connecteur Powens (nom normalisé, match par inclusion) → org + entité
- * `group_*` propriétaire, pour la CRÉATION d'un compte neuf. Qonto exclu. */
+/** Powens connector (normalized name, matched by inclusion) → org + owning
+ * `group_*` entity, for the CREATION of a new account. Qonto excluded. */
 const CONNECTOR_OWNER: ReadonlyArray<{
   match: string
   orgSlug: string
@@ -50,7 +50,7 @@ const CONNECTOR_OWNER: ReadonlyArray<{
   { match: 'memo', orgSlug: 'albo', ownerName: 'Albo Club', bankName: 'Mémo Bank' },
 ]
 
-/** Type de compte Powens → `accountKind` maison. Défaut : type Powens brut. */
+/** Powens account type → our own `accountKind`. Default: raw Powens type. */
 const ACCOUNT_KIND: Record<string, string> = {
   checking: 'checking',
   savings: 'savings',
@@ -58,7 +58,7 @@ const ACCOUNT_KIND: Record<string, string> = {
   market: 'cto',
 }
 
-// ─── Helpers de normalisation (payload Powens = JSON non typé) ───────────────
+// ─── Normalization helpers (Powens payload = untyped JSON) ───────────────────
 
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -90,8 +90,8 @@ function normalizeName(s: string): string {
 function normalizeIban(s: string): string {
   return s.replace(/\s+/g, '').toUpperCase()
 }
-/** Comme `normalizeName` mais collapse aussi les espaces internes — pour
- * comparer des libellés multi-mots ("Neuflize OBC - Compte à terme"). */
+/** Like `normalizeName` but also collapses internal whitespace — to compare
+ * multi-word labels ("Neuflize OBC - Compte à terme"). */
 function squashName(s: string): string {
   return normalizeName(s).replace(/\s+/g, ' ')
 }
@@ -106,11 +106,11 @@ function mapAccountKind(type: string | undefined): string | undefined {
   return ACCOUNT_KIND[type] ?? type
 }
 
-// ─── Forme normalisée (frontière action → mutation) ──────────────────────────
+// ─── Normalized shape (action → mutation boundary) ───────────────────────────
 
 const normTxValidator = v.object({
   powensTxId: v.string(),
-  valueUnits: v.number(), // unité monétaire signée (ex: -56.78)
+  valueUnits: v.number(), // signed currency units (e.g. -56.78)
   dateMs: v.number(),
   wording: v.string(),
   counterparty: v.optional(v.string()),
@@ -123,7 +123,7 @@ const normAccountValidator = v.object({
   connectorName: v.string(),
   iban: v.optional(v.string()),
   accountType: v.optional(v.string()),
-  balanceUnits: v.optional(v.number()), // unité monétaire signée
+  balanceUnits: v.optional(v.number()), // signed currency units
   currency: v.string(),
   transactions: v.array(normTxValidator),
 })
@@ -205,15 +205,15 @@ function normalizePayload(payload: unknown): {
   accounts: Array<NormAccount>
 } {
   const root = asRecord(payload)
-  // Tolère un payload au niveau racine OU enveloppé dans `connection`.
+  // Tolerates a root-level payload OR one wrapped in `connection`.
   const connection = root.connection != null ? asRecord(root.connection) : root
   const connector = asRecord(connection.connector)
   const connectorName =
     asString(connector.name) ?? asString(connector.uuid) ?? ''
   const connectionId =
     asIdStr(connection.id) ?? asIdStr(root.id_connection) ?? ''
-  // Id du user Powens propriétaire de la connexion. Doc CONNECTION_SYNCED :
-  // `connection.id_user` (Connection object) et `user.id` (User object racine).
+  // Id of the Powens user owning the connection. CONNECTION_SYNCED doc:
+  // `connection.id_user` (Connection object) and `user.id` (root User object).
   const powensUserId =
     asIdStr(connection.id_user) ??
     asIdStr(asRecord(root.user).id) ??
@@ -224,7 +224,7 @@ function normalizePayload(payload: unknown): {
   return { connectionId, powensUserId, accounts }
 }
 
-// ─── Vérification de signature HMAC ──────────────────────────────────────────
+// ─── HMAC signature verification ─────────────────────────────────────────────
 
 function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
   const bin = atob(b64)
@@ -287,7 +287,7 @@ export const powensWebhook = httpAction(async (ctx, request) => {
   return Response.json({ status: 'received' })
 })
 
-// ─── Résolution du compte + ingestion (mutation interne) ─────────────────────
+// ─── Account resolution + ingestion (internal mutation) ──────────────────────
 
 function balancePatch(acc: NormAccount): {
   currentBalance?: number
@@ -341,8 +341,8 @@ async function qontoAccountsOfCalte(
   return accounts.filter((a) => normalizeName(a.bankName).includes('qonto'))
 }
 
-/** Records Qonto éligibles au match automatique : non encore liés à Powens ET
- * non archivés. C'est ce lot qui doit valoir exactement 1. */
+/** Qonto records eligible for the automatic match: not yet linked to Powens
+ * AND not archived. This is the set that must contain exactly 1. */
 function eligibleQontoCandidates(
   accounts: ReadonlyArray<Doc<'bankAccounts'>>,
 ): Array<Doc<'bankAccounts'>> {
@@ -357,8 +357,8 @@ type TestTxRow = {
   rawLabel: string
 }
 
-/** Tx `manual` sans `airtableId` sur les comptes Qonto donnés (lignes de test
- * potentielles). */
+/** `manual` txs without an `airtableId` on the given Qonto accounts (potential
+ * test rows). */
 async function qontoTestTxRows(
   ctx: QueryCtx,
   accounts: ReadonlyArray<Doc<'bankAccounts'>>,
@@ -385,16 +385,18 @@ async function qontoTestTxRows(
   return out
 }
 
-/** Rapproche un compte Powers Qonto du record existant (importé d'Airtable).
- * Match par IBAN si le record en a un, sinon par unicité du `bankName='Qonto'`
- * (l'import Airtable ne stocke pas l'IBAN) avec backfill de l'IBAN.
+/** Matches a Powens Qonto account to the existing record (imported from
+ * Airtable). Match by IBAN if the record has one, otherwise by uniqueness of
+ * `bankName='Qonto'` (the Airtable import does not store the IBAN), with IBAN
+ * backfill.
  *
- * Cas séparés (ne pas confondre) :
- * - 0 candidat éligible = le(s) Qonto de calte sont DÉJÀ liés à un autre
- *   `powensAccountId` (webhook re-sync redondant d'une autre connexion/user
- *   Powens). On garde le premier match comme source de vérité → warning
- *   `qonto_already_linked` + on ignore ce compte (return null, pas d'erreur).
- * - ≥2 candidats = vraie ambiguïté → `qonto_match_ambiguous` (arrêt dur). */
+ * Separate cases (do not confuse):
+ * - 0 eligible candidates = calte's Qonto record(s) are ALREADY linked to
+ *   another `powensAccountId` (redundant re-sync webhook from another Powens
+ *   connection/user). We keep the first match as the source of truth →
+ *   `qonto_already_linked` warning + this account is ignored (return null,
+ *   no error).
+ * - ≥2 candidates = real ambiguity → `qonto_match_ambiguous` (hard stop). */
 async function linkQonto(
   ctx: MutationCtx,
   acc: NormAccount,
@@ -433,20 +435,21 @@ async function linkQonto(
   return refreshed
 }
 
-/** Résout le `bankAccounts` cible d'un compte du payload. Renvoie `null` si le
- * compte doit être ignoré (cas `qonto_already_linked`, cf. linkQonto).
+/** Resolves the target `bankAccounts` row for a payload account. Returns
+ * `null` if the account must be ignored (`qonto_already_linked` case, cf.
+ * linkQonto).
  *
- * `org` = l'org du user Powens matché (source de vérité de « à qui appartient
- * cette connexion ») : c'est elle qui scope l'écriture. Le mapping
- * connecteur→entité ne sert qu'à choisir l'entité propriétaire et doit
- * concorder avec cette org (sinon erreur visible, pas d'écriture muette). */
+ * `org` = the org of the matched Powens user (source of truth for "who owns
+ * this connection"): it is what scopes the write. The connector→entity
+ * mapping only picks the owning entity and must agree with this org
+ * (otherwise a visible error, no silent write). */
 async function resolveAccount(
   ctx: MutationCtx,
   connectionId: string,
   acc: NormAccount,
   org: Doc<'organizations'>,
 ): Promise<Doc<'bankAccounts'> | null> {
-  // 1. Déjà lié par powensAccountId → on réutilise (maj du solde).
+  // 1. Already linked by powensAccountId → reuse it (balance update).
   const linked = await ctx.db
     .query('bankAccounts')
     .withIndex('by_powens_account', (q) =>
@@ -454,7 +457,7 @@ async function resolveAccount(
     )
     .first()
   if (linked) {
-    // Cohérence : le compte lié doit appartenir à l'org du user Powens.
+    // Consistency: the linked account must belong to the Powens user's org.
     if (linked.orgId !== org._id) {
       console.warn(
         `[powens] compte acct ${acc.powensAccountId} déjà lié à une autre org ` +
@@ -470,7 +473,7 @@ async function resolveAccount(
 
   const connector = normalizeName(acc.connectorName)
 
-  // 2. Match Qonto existant (le record vit dans l'org calte).
+  // 2. Existing Qonto match (the record lives in the calte org).
   if (connector.includes('qonto')) {
     if (org.slug !== 'calte') {
       throw new ConvexError(`connector_org_mismatch:qonto:${org.slug}`)
@@ -478,7 +481,7 @@ async function resolveAccount(
     return linkQonto(ctx, acc, connectionId)
   }
 
-  // 3. Compte neuf via le mapping connecteur → entité, scopé à l'org du user.
+  // 3. New account via the connector → entity mapping, scoped to the user's org.
   const mapping = matchConnector(connector)
   if (!mapping) {
     throw new ConvexError(`unmapped_powens_account:${acc.connectorName}`)
@@ -508,10 +511,10 @@ async function resolveAccount(
   return created
 }
 
-/** Borne de cutover par compte (aucun stockage) :
- * - Qonto (record Airtable, a `airtableId`) → date de sa dernière tx d'origine
- *   Airtable ; on n'ingère que ce qui est strictement postérieur.
- * - Compte neuf → `_creationTime` (≈ date de connexion). */
+/** Per-account cutover bound (nothing stored):
+ * - Qonto (Airtable record, has `airtableId`) → date of its latest
+ *   Airtable-originated tx; we only ingest what is strictly later.
+ * - New account → `_creationTime` (≈ connection date). */
 async function computeCutoff(
   ctx: QueryCtx,
   account: Doc<'bankAccounts'>,
@@ -537,9 +540,9 @@ export const ingestConnectionSync = internalMutation({
   handler: async (ctx, { connectionId, powensUserId, accounts }) => {
     const summary = { inserted: 0, patched: 0, skipped: 0 }
 
-    // ── Filtre par user Powens : seuls les users gérés par Albo OS sont
-    // ingérés. Les connexions d'autres projets (vieux users non gérés)
-    // re-syncent encore et pollueraient la base.
+    // ── Filter by Powens user: only the users managed by Albo OS are
+    // ingested. Connections from other projects (old unmanaged users)
+    // still re-sync and would pollute the database.
     if (!powensUserId) {
       console.warn(
         `[powens] webhook ignoré: payload sans id_user (connection=${connectionId})`,
@@ -559,7 +562,7 @@ export const ingestConnectionSync = internalMutation({
       )
       return summary
     }
-    // L'org du user Powens matché = source de vérité du scope d'écriture.
+    // The matched Powens user's org = source of truth for the write scope.
     const org = await ctx.db.get("organizations", powensUser.orgId)
     if (!org) throw new ConvexError('powens_user_org_not_found')
 
@@ -570,17 +573,17 @@ export const ingestConnectionSync = internalMutation({
     for (const acc of accounts) {
       const account = await resolveAccount(ctx, connectionId, acc, org)
       if (!account) {
-        // Compte ignoré (qonto_already_linked) — ses tx ne sont pas ingérées.
+        // Account ignored (qonto_already_linked) — its txs are not ingested.
         summary.skipped += acc.transactions.length
         continue
       }
       const cutoff = await computeCutoff(ctx, account)
-      // Diagnostic : d'où vient la borne (sans changer computeCutoff).
+      // Diagnostic: where the bound comes from (without changing computeCutoff).
       const cutoffSource =
         cutoff === account._creationTime
           ? '_creationTime'
           : 'dernière tx Airtable'
-      // Compteurs par compte (alimentent le log ; summary global inchangé).
+      // Per-account counters (feed the log; the global summary is unchanged).
       let received = 0
       let ingested = 0
       let filteredCutover = 0
@@ -617,8 +620,8 @@ export const ingestConnectionSync = internalMutation({
           powensTxId: tx.powensTxId,
         }
         if (existing) {
-          // Re-livraison webhook : ne pas écraser l'état de pointage
-          // (matchStatus / dealId / reconciled) déjà posé sur la ligne.
+          // Webhook redelivery: do not overwrite the matching state
+          // (matchStatus / dealId / reconciled) already set on the row.
           await ctx.db.patch("transactions", existing._id, fields)
           alreadyExisting += 1
           summary.patched += 1
@@ -649,10 +652,10 @@ export const ingestConnectionSync = internalMutation({
   },
 })
 
-// ─── Nettoyage Qonto (lignes de test) — opérateur via `convex run --prod` ─────
+// ─── Qonto cleanup (test rows) — operator via `convex run --prod` ─────────────
 
-/** Read-only : tx du Qonto où `source='manual'` ET pas d'`airtableId`.
- * Interne → pas de garde auth (lancée en CLI avec deploy key). */
+/** Read-only: Qonto txs where `source='manual'` AND no `airtableId`.
+ * Internal → no auth guard (run from the CLI with a deploy key). */
 export const listQontoTestTransactions = internalQuery({
   args: {},
   handler: async (ctx) => {
@@ -660,11 +663,11 @@ export const listQontoTestTransactions = internalQuery({
   },
 })
 
-/** Read-only : diagnostic pré-go-live du match Qonto. Liste tous les
- * `bankAccounts` Qonto-ish de calte (avec l'état des champs clés), compte les
- * candidats éligibles (non liés + non archivés) — qui doit valoir exactement 1
- * — et joint les tx de test (`manual` sans `airtableId`) qui pourraient
- * expliquer un record en trop. N'écrit rien. */
+/** Read-only: pre-go-live diagnostic of the Qonto match. Lists all Qonto-ish
+ * `bankAccounts` of calte (with the state of the key fields), counts the
+ * eligible candidates (unlinked + unarchived) — which must be exactly 1 —
+ * and joins the test txs (`manual` without `airtableId`) that could explain
+ * an extra record. Writes nothing. */
 export const diagnoseQontoMatch = internalQuery({
   args: {},
   handler: async (ctx) => {
@@ -687,11 +690,11 @@ export const diagnoseQontoMatch = internalQuery({
   },
 })
 
-/** Read-only : pour chaque `bankAccounts` de calte, le nombre de transactions
- * rattachées (via `by_account_date`) + une décision keep/delete (même règle que
- * la suppression : `isCalteKeepAccount`). Trié par nombre de tx décroissant :
- * en haut, les comptes-à-supprimer avec des mouvements (migration délicate) ;
- * en bas (txCount 0), suppression triviale. N'écrit rien. */
+/** Read-only: for each calte `bankAccounts` row, the number of attached
+ * transactions (via `by_account_date`) + a keep/delete decision (same rule as
+ * the deletion: `isCalteKeepAccount`). Sorted by descending tx count: at the
+ * top, the to-delete accounts with movements (tricky migration); at the
+ * bottom (txCount 0), trivial deletion. Writes nothing. */
 export const diagnoseBankAccountsForCleanup = internalQuery({
   args: {},
   handler: async (ctx) => {
@@ -722,8 +725,8 @@ export const diagnoseBankAccountsForCleanup = internalQuery({
   },
 })
 
-/** Suppression ciblée, garde-fou strict : ne supprime QUE les tx `manual` sans
- * `airtableId` rattachées à un compte Qonto de calte. Tout le reste est skip. */
+/** Targeted deletion, strict guard: only deletes `manual` txs without an
+ * `airtableId` attached to a calte Qonto account. Everything else is skipped. */
 export const deleteTransactionsByIds = internalMutation({
   args: { ids: v.array(v.id('transactions')) },
   handler: async (ctx, { ids }) => {
@@ -757,10 +760,10 @@ export const deleteTransactionsByIds = internalMutation({
   },
 })
 
-/** Comptes calte à CONSERVER lors du nettoyage `bankAccounts`. Résolu live :
- * par `label`/`bankName` (normalisés) OU par la sentinelle `airtableId` d'import
- * (la ligne "mouvement sans banque"). Garde-fou : un compte reconnu "keep"
- * n'est jamais supprimé, même si son id est passé en entrée par erreur. */
+/** Calte accounts to KEEP during the `bankAccounts` cleanup. Resolved live:
+ * by `label`/`bankName` (normalized) OR by the import `airtableId` sentinel
+ * (the "mouvement sans banque" row). Guard: an account recognized as "keep"
+ * is never deleted, even if its id is passed as input by mistake. */
 const CALTE_KEEP_LABELS = [
   'Qonto — Good',
   'PALATINE',
@@ -776,11 +779,11 @@ function isCalteKeepAccount(a: Doc<'bankAccounts'>): boolean {
   return keep.has(squashName(a.label)) || keep.has(squashName(a.bankName))
 }
 
-/** Suppression ciblée de `bankAccounts` (org calte), garde-fous stricts dans
- * cet ordre : (a) le compte appartient à calte, (b) ce n'est PAS un compte à
- * conserver (résolu live), (c) il a 0 transaction rattachée (vérif live via
- * `by_account_date`). Toute condition non remplie → skip + report, jamais de
- * suppression. Aucune transaction n'est jamais rendue orpheline. */
+/** Targeted deletion of `bankAccounts` (calte org), strict guards in this
+ * order: (a) the account belongs to calte, (b) it is NOT an account to
+ * keep (resolved live), (c) it has 0 attached transactions (live check via
+ * `by_account_date`). Any unmet condition → skip + report, never a
+ * deletion. No transaction is ever orphaned. */
 export const deleteBankAccountsByIds = internalMutation({
   args: { ids: v.array(v.id('bankAccounts')) },
   handler: async (ctx, { ids }) => {
@@ -836,18 +839,18 @@ export const deleteBankAccountsByIds = internalMutation({
   },
 })
 
-/** Suppression de comptes FANTÔMES Powens (org calte) — créés par une vieille
- * connexion Powens parasite (autre projet), avant le filtre par id_user.
+/** Deletion of Powens GHOST accounts (calte org) — created by an old stray
+ * Powens connection (another project), before the id_user filter.
  *
- * Différence avec `deleteBankAccountsByIds` : pas de garde `isCalteKeepAccount`
- * (qui protège tout "PALATINE" par label et bloquerait les fantômes Palatine).
- * À la place, un ciblage qui ne peut matcher QUE des fantômes Powens :
- *   (a) org calte, ET
- *   (b) `airtableId` ABSENT (un vrai compte importé a un airtableId), ET
- *   (c) `powensAccountId` PRÉSENT (compte d'origine Powens), ET
- *   (d) 0 transaction rattachée (compté live via `by_account_date`).
- * Le vrai PALATINE Airtable a un airtableId → jamais matché. Qonto/HSBC liés à
- * Powens ont des transactions et/ou un airtableId → jamais matchés. */
+ * Difference from `deleteBankAccountsByIds`: no `isCalteKeepAccount` guard
+ * (which protects anything "PALATINE" by label and would block the Palatine
+ * ghosts). Instead, a targeting that can ONLY match Powens ghosts:
+ *   (a) calte org, AND
+ *   (b) `airtableId` ABSENT (a real imported account has an airtableId), AND
+ *   (c) `powensAccountId` PRESENT (Powens-originated account), AND
+ *   (d) 0 attached transactions (counted live via `by_account_date`).
+ * The real Airtable PALATINE has an airtableId → never matched. Qonto/HSBC
+ * linked to Powens have transactions and/or an airtableId → never matched. */
 export const deletePowensGhostAccounts = internalMutation({
   args: { ids: v.array(v.id('bankAccounts')) },
   handler: async (ctx, { ids }) => {
@@ -913,18 +916,18 @@ export const deletePowensGhostAccounts = internalMutation({
   },
 })
 
-// ─── Émission : connexion bancaire depuis l'app (Webview Powens) ─────────────
+// ─── Issuing: bank connection from the app (Powens Webview) ──────────────────
 
-/** Param `type` de `/auth/token/code`. Test manuel : l'endpoint renvoie un code
- * valide SANS aucun param → on n'en envoie pas par défaut. Réajout possible sans
- * recommit en posant l'env var `POWENS_CODE_TYPE`. */
+/** `type` param of `/auth/token/code`. Manual test: the endpoint returns a
+ * valid code WITHOUT any param → we send none by default. Can be re-added
+ * without a recommit by setting the `POWENS_CODE_TYPE` env var. */
 function powensCodeType(): string | null {
   return process.env.POWENS_CODE_TYPE ?? null
 }
 
-/** Auth + rôle pour `startBankConnection`. Connecter une banque = action
- * sensible → admin (owner inclus). Action sans `ctx.db` → passe par cette
- * internalQuery (pattern actionAuthProbe de convex/chat.ts). */
+/** Auth + role for `startBankConnection`. Connecting a bank = sensitive
+ * action → admin (owner included). Actions have no `ctx.db` → goes through
+ * this internalQuery (actionAuthProbe pattern from convex/chat.ts). */
 export const powensAuthProbe = internalQuery({
   args: { orgId: v.id('organizations') },
   handler: async (ctx, { orgId }) => {
@@ -933,8 +936,8 @@ export const powensAuthProbe = internalQuery({
   },
 })
 
-/** Token permanent Powens d'une org (ou null). INTERNE — ne jamais exposer au
- * front (authToken = secret). */
+/** An org's permanent Powens token (or null). INTERNAL — never expose to the
+ * front end (authToken = secret). */
 export const getOrgPowensToken = internalQuery({
   args: { orgId: v.id('organizations') },
   handler: async (ctx, { orgId }) => {
@@ -947,8 +950,8 @@ export const getOrgPowensToken = internalQuery({
   },
 })
 
-/** Upsert idempotent du user Powens d'une org. Si une ligne existe déjà, on la
- * GARDE (pas d'écrasement) — évite les doublons sur double-clic. */
+/** Idempotent upsert of an org's Powens user. If a row already exists, we
+ * KEEP it (no overwrite) — avoids duplicates on double-click. */
 export const savePowensUser = internalMutation({
   args: {
     orgId: v.id('organizations'),
@@ -981,12 +984,12 @@ function powensEnv() {
   return { clientId, clientSecret, domain, redirectUri }
 }
 
-/** Crée (ou réutilise) le user Powens permanent de l'org, génère un code
- * temporaire et renvoie l'URL du Webview Powens à ouvrir côté front.
+/** Creates (or reuses) the org's permanent Powens user, generates a temporary
+ * code and returns the Powens Webview URL to open on the front end.
  *
- * Sécurité : le `client_secret` et le token permanent restent côté serveur.
- * Le front ne reçoit QUE `webviewUrl` (qui contient le `code` temporaire, non
- * sensible). Aucun secret n'est inclus dans les messages d'erreur ni loggé. */
+ * Security: the `client_secret` and the permanent token stay server-side.
+ * The front end ONLY receives `webviewUrl` (which contains the temporary,
+ * non-sensitive `code`). No secret is included in error messages or logged. */
 export const startBankConnection = action({
   args: { orgId: v.id('organizations') },
   handler: async (ctx, { orgId }): Promise<{ webviewUrl: string }> => {
@@ -994,7 +997,7 @@ export const startBankConnection = action({
     const { clientId, clientSecret, domain, redirectUri } = powensEnv()
     const base = `https://${domain}/2.0`
 
-    // 1. Token permanent : réutilise celui de l'org, sinon /auth/init.
+    // 1. Permanent token: reuse the org's, otherwise /auth/init.
     let authToken: string
     const existing = await ctx.runQuery(internal.powens.getOrgPowensToken, {
       orgId,
@@ -1028,8 +1031,8 @@ export const startBankConnection = action({
       })
     }
 
-    // 2. Code temporaire (auth Bearer avec le token permanent). Pas de param
-    // `type` par défaut (cf. powensCodeType).
+    // 2. Temporary code (Bearer auth with the permanent token). No `type`
+    // param by default (cf. powensCodeType).
     const codeUrl = new URL(`${base}/auth/token/code`)
     const codeType = powensCodeType()
     if (codeType) codeUrl.searchParams.set('type', codeType)
@@ -1042,7 +1045,7 @@ export const startBankConnection = action({
     const codeJson = (await codeRes.json()) as { code?: string }
     if (!codeJson.code) throw new ConvexError('powens_code_malformed')
 
-    // 3. URL du Webview (le code n'est pas sensible).
+    // 3. Webview URL (the code is not sensitive).
     const url = new URL('https://webview.powens.com/connect')
     url.searchParams.set('domain', domain)
     url.searchParams.set('client_id', clientId)
@@ -1052,14 +1055,14 @@ export const startBankConnection = action({
   },
 })
 
-/** Réinitialise le lien Powens d'un compte Qonto : remet `powensAccountId` et
- * `iban` à `undefined`. Utile pour purger des résidus d'un user Powens
- * temporaire expiré (sinon le compte reste « pris » → les webhooks de la
- * nouvelle connexion sont ignorés en `qonto_already_linked`).
+/** Resets a Qonto account's Powens link: sets `powensAccountId` and `iban`
+ * back to `undefined`. Useful to purge residue from an expired temporary
+ * Powens user (otherwise the account stays "taken" → the webhooks of the
+ * new connection are ignored as `qonto_already_linked`).
  *
- * Garde-fou : n'agit QUE si le compte appartient à l'org calte ET a
- * `bankName ≈ 'Qonto'`. Ne touche à rien d'autre (pas aux transactions).
- * Renvoie l'état avant/après. Lancée par l'opérateur via `convex run --prod`. */
+ * Guard: only acts if the account belongs to the calte org AND has
+ * `bankName ≈ 'Qonto'`. Touches nothing else (not the transactions).
+ * Returns the before/after state. Run by the operator via `convex run --prod`. */
 export const resetQontoPowensLink = internalMutation({
   args: { bankAccountId: v.id('bankAccounts') },
   handler: async (ctx, { bankAccountId }) => {
@@ -1088,11 +1091,11 @@ export const resetQontoPowensLink = internalMutation({
   },
 })
 
-/** Supprime le user Powens d'une org (ligne `powensUsers`). Cas d'usage :
- * rotation d'un authToken qui a fuité — le user est supprimé côté Powens, puis
- * cette mutation vide la ligne en base pour que `startBankConnection` recrée un
- * user propre (via /auth/init) au prochain clic. Si aucune ligne, no-op.
- * Lancée par l'opérateur via `convex run --prod`. */
+/** Deletes an org's Powens user (`powensUsers` row). Use case: rotating a
+ * leaked authToken — the user is deleted on the Powens side, then this
+ * mutation clears the row in the database so that `startBankConnection`
+ * recreates a clean user (via /auth/init) on the next click. If no row, no-op.
+ * Run by the operator via `convex run --prod`. */
 export const deletePowensUser = internalMutation({
   args: { orgId: v.id('organizations') },
   handler: async (ctx, { orgId }) => {
@@ -1106,13 +1109,13 @@ export const deletePowensUser = internalMutation({
   },
 })
 
-// ─── Import one-shot historique CSV Mémo Bank (org albo) ─────────────────────
+// ─── One-shot historical Mémo Bank CSV import (albo org) ─────────────────────
 
 const memoCsvRowValidator = v.object({
   memoId: v.string(),
-  powensAccountId: v.string(), // compte cible (33 ou 34), résolu en bankAccountId
+  powensAccountId: v.string(), // target account (33 or 34), resolved to bankAccountId
   iban: v.optional(v.string()),
-  amount: v.number(), // cents, positif
+  amount: v.number(), // cents, positive
   direction: v.union(v.literal('in'), v.literal('out')),
   transactionDate: v.number(), // ms epoch UTC
   rawLabel: v.string(),
@@ -1120,31 +1123,31 @@ const memoCsvRowValidator = v.object({
   type: v.optional(v.string()),
   category: v.optional(v.string()),
   externalRef: v.optional(v.string()),
-  source: v.optional(v.string()), // ignoré (toujours 'memo_csv' à l'écriture)
+  source: v.optional(v.string()), // ignored (always 'memo_csv' on write)
 })
 
-/** Import one-shot de l'historique CSV Mémo Bank dans `transactions`.
+/** One-shot import of the Mémo Bank CSV history into `transactions`.
  *
- * - Résout chaque ligne vers son compte via `powensAccountId` (index
- *   `by_powens_account`) ; le compte doit appartenir à l'org albo.
- * - Idempotence stricte par `memoId` (index `by_memo_id`) : si une transaction
- *   avec ce memoId existe déjà → skip, jamais de doublon. Rejouable.
- * - `source: 'memo_csv'`, montants déjà en centimes (positifs).
- * - `type`/`category`/`externalRef` → champ dédié `importMeta` (métadonnées
- *   d'origine CSV, utiles au futur pointage/agent). `notes` reste VIDE — il est
- *   réservé au pointage manuel. `iban` du JSON : ignoré.
+ * - Resolves each row to its account via `powensAccountId` (index
+ *   `by_powens_account`); the account must belong to the albo org.
+ * - Strict idempotency by `memoId` (index `by_memo_id`): if a transaction
+ *   with this memoId already exists → skip, never a duplicate. Replayable.
+ * - `source: 'memo_csv'`, amounts already in cents (positive).
+ * - `type`/`category`/`externalRef` → dedicated `importMeta` field (CSV
+ *   origin metadata, useful for future matching/agent work). `notes` stays
+ *   EMPTY — it is reserved for manual matching. `iban` from the JSON: ignored.
  *
- * Lancement (562 lignes → passer par un fichier JSON, pas la ligne de commande) :
+ * Run (562 rows → go through a JSON file, not the command line):
  *   pnpm exec convex run --prod powens:importMemoCsvTransactions \
  *     "$(cat memo-transactions.json)"
- *   où memo-transactions.json = {"rows":[ … ]}
+ *   where memo-transactions.json = {"rows":[ … ]}
  */
 export const importMemoCsvTransactions = internalMutation({
   args: { rows: v.array(memoCsvRowValidator) },
   handler: async (ctx, { rows }) => {
     const albo = await orgBySlug(ctx, 'albo')
 
-    // Résolution des comptes cibles (peu de comptes distincts → petit cache).
+    // Target account resolution (few distinct accounts → small cache).
     const accountByPowensId = new Map<string, Doc<'bankAccounts'>>()
     async function resolveTargetAccount(
       powensAccountId: string,
@@ -1165,7 +1168,7 @@ export const importMemoCsvTransactions = internalMutation({
     let inserted = 0
     const skipped: Array<{ memoId: string; reason: string }> = []
     for (const row of rows) {
-      // Idempotence stricte par memoId.
+      // Strict idempotency by memoId.
       const existing = await ctx.db
         .query('transactions')
         .withIndex('by_memo_id', (q) => q.eq('memoId', row.memoId))
@@ -1189,8 +1192,8 @@ export const importMemoCsvTransactions = internalMutation({
         continue
       }
 
-      // Métadonnées d'origine CSV → champ dédié `importMeta`, jamais `notes`
-      // (réservé au pointage manuel). Omis si toutes vides.
+      // CSV origin metadata → dedicated `importMeta` field, never `notes`
+      // (reserved for manual matching). Omitted if all empty.
       const meta = {
         type: row.type || undefined,
         category: row.category || undefined,
@@ -1211,6 +1214,7 @@ export const importMemoCsvTransactions = internalMutation({
         memoId: row.memoId,
         importMeta: hasMeta ? meta : undefined,
         reconciled: false,
+        matchStatus: 'unmatched' as const,
       })
       inserted += 1
     }

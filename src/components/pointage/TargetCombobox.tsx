@@ -21,21 +21,21 @@ import {
   PopoverTrigger,
 } from '~/components/ui/popover'
 
-/** Cible de pointage sélectionnée : un deal OU une cible passif. */
+/** Selected pointage target: a deal OR a liability target. */
 export type PointageTarget =
   | { kind: 'deal'; deal: DealOption }
   | { kind: 'liability'; liability: LiabilityOption }
 
 /**
- * Combobox cherchable de cibles de pointage (Popover + Command) : trois
- * groupes Deals / Capitaux propres / Comptes courants, chacun alimenté
- * directement depuis sa source (`api.deals.list` / `getLiabilities` via
- * `buildLiabilityOptions`) — jamais de liste aplatie re-filtrée par kind.
+ * Searchable combobox of pointage targets (Popover + Command): three groups
+ * Deals / Capitaux propres / Comptes courants, each fed directly from its
+ * source (`api.deals.list` / `getLiabilities` via `buildLiabilityOptions`)
+ * — never a flattened list re-filtered by kind.
  *
- * Les trois groupes sont TOUJOURS rendus : un groupe sans cible affiche un
- * état vide explicite (« absent » et « vide » doivent rester distinguables —
- * cf. KNOWN_ISSUES.md « Passif »). Étend le pattern `DealCombobox` (qui reste
- * utilisé seul pour la réattribution deal → deal).
+ * The three groups are ALWAYS rendered: a group with no target shows an
+ * explicit empty state ("missing" and "empty" must stay distinguishable —
+ * see KNOWN_ISSUES.md « Passif »). Extends the `DealCombobox` pattern
+ * (still used on its own for deal → deal reassignment).
  */
 export function TargetCombobox({
   deals,
@@ -120,10 +120,10 @@ export function TargetCombobox({
                 (deals ?? []).map((deal) => (
                   <CommandItem
                     key={deal._id}
-                    // L'_id garantit l'unicité cmdk quand deux deals partagent
-                    // le même nom de boîte ; la recherche matche sur les noms,
-                    // le nom personnalisé et l'instrument (comme la table
-                    // Participations).
+                    // The _id guarantees cmdk uniqueness when two deals share
+                    // the same company name; search matches on the names, the
+                    // custom name and the instrument (like the Participations
+                    // table).
                     value={`${deal.target?.name ?? ''} ${dealTitle(deal)} ${deal.investor?.name ?? ''} ${deal._id}`}
                     onSelect={() => {
                       onSelect(

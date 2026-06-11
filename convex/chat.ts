@@ -137,7 +137,7 @@ export const sendMessage = mutation({
     orgId: v.id('organizations'),
     threadId: v.string(),
     prompt: v.string(),
-    // Contexte de page (route courante) transmis au system prompt du stream.
+    // Page context (current route) forwarded to the stream's system prompt.
     context: v.optional(v.object({ route: v.string() })),
   },
   handler: async (ctx, { orgId, threadId, prompt, context }) => {
@@ -147,7 +147,7 @@ export const sendMessage = mutation({
     const meta = await getThreadMetadata(ctx, components.agent, { threadId })
     if (meta.userId !== scope) throw new ConvexError('forbidden')
     if (!meta.title) {
-      // Titre auto bon marché : début du premier message (pas de LLM).
+      // Cheap auto-title: start of the first message (no LLM call).
       await updateThreadMetadata(ctx, components.agent, {
         threadId,
         patch: { title: prompt.slice(0, AUTO_TITLE_MAX) },
@@ -170,10 +170,10 @@ export const sendMessage = mutation({
 })
 
 /**
- * Réponse de l'utilisateur à une demande d'approbation d'outil (boutons
- * Confirmer / Refuser du panneau). Enregistre la décision puis relance la
- * génération à partir du message d'approbation — le SDK exécute l'outil
- * (approuvé) ou produit un résultat « execution-denied » (refusé).
+ * User response to a tool approval request (the panel's Confirm / Reject
+ * buttons). Records the decision then resumes generation from the approval
+ * message — the SDK executes the tool (approved) or produces an
+ * "execution-denied" result (rejected).
  */
 export const respondToToolApproval = mutation({
   args: {
@@ -185,7 +185,7 @@ export const respondToToolApproval = mutation({
   },
   handler: async (ctx, { orgId, threadId, approvalId, approved, context }) => {
     const { user } = await requireOrgMember(ctx, orgId)
-    // La reprise déclenche une génération LLM : même budget que sendMessage.
+    // Resuming triggers an LLM generation: same budget as sendMessage.
     await consumeLimit(ctx, 'chatSend', user._id)
     const scope = scopeKey(orgId, user._id)
     await authorizeThread(ctx, threadId, scope)

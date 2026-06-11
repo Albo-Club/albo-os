@@ -65,8 +65,8 @@
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  /* Sémantique monétaire : entrées d'argent / soldes positifs (pendant
-     vert de --destructive pour les sorties). Valeur = emerald-600. */
+  /* Monetary semantics: cash inflows / positive balances (green
+     counterpart of --destructive for outflows). Value = emerald-600. */
   --positive: oklch(0.596 0.145 163.225);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
@@ -103,7 +103,7 @@
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
-  /* emerald-500 — plus lumineux pour le contraste sur fond sombre. */
+  /* emerald-500 — brighter for contrast on a dark background. */
   --positive: oklch(0.696 0.17 162.48);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);

@@ -28,7 +28,7 @@ export const Route = createFileRoute('/app/$orgSlug/pointage/')({
   }),
 })
 
-/** Vues de la page : file de pointage (défaut) ou consultation des écartées. */
+/** Page views: matching queue (default) or browsing discarded ones. */
 type View = 'unmatched' | 'charge' | 'tax' | 'product' | 'internal_transfer'
 
 function Pointage() {
@@ -36,8 +36,8 @@ function Pointage() {
   const { orgSlug } = Route.useParams()
   const [view, setView] = useState<View>('unmatched')
 
-  // Recherche serveur (search index Convex), debouncée, partagée entre les
-  // onglets. `undefined` = pas de recherche → chemin de query inchangé.
+  // Server-side search (Convex search index), debounced, shared across
+  // tabs. `undefined` = no search → query path unchanged.
   const [search, setSearch] = useState('')
   const searchArg = useDebouncedValue(search).trim() || undefined
 
@@ -61,9 +61,9 @@ function Pointage() {
       : 'skip',
   )
 
-  // Cibles passif du combobox (groupes Capitaux propres / Comptes courants),
-  // construites par le helper pur testé (tests/liabilityOptions.test.ts).
-  // Libellés résolus via le namespace `passif` (mêmes clés que la page Passif).
+  // Liability targets for the combobox (Equity / Shareholder loan groups),
+  // built by the tested pure helper (tests/liabilityOptions.test.ts).
+  // Labels resolved via the `passif` namespace (same keys as the Passif page).
   const liabilityOptions = useMemo<LiabilityOptionGroups | undefined>(() => {
     if (!liabilities) return undefined
     return buildLiabilityOptions(liabilities, {
@@ -74,9 +74,9 @@ function Pointage() {
     })
   }, [liabilities, t])
 
-  // Pendant le rechargement d'un nouveau terme de recherche, on garde la
-  // dernière liste affichée (pas de flash de liste vide). Le cache des
-  // écartées est lié à son onglet pour ne jamais montrer un autre statut.
+  // While a new search term is reloading, keep the last displayed list
+  // (no empty-list flash). The discarded cache is tied to its tab so it
+  // never shows another status.
   const lastTransactionsRef = useRef(liveTransactions)
   if (liveTransactions !== undefined)
     lastTransactionsRef.current = liveTransactions
@@ -135,12 +135,14 @@ function Pointage() {
           deals={deals}
           liabilityOptions={liabilityOptions}
           emptyMessage={searchEmptyMessage}
+          pageResetKey={searchArg ?? ''}
         />
       ) : (
         <DiscardedTable
           transactions={discarded}
           emptyMessage={searchEmptyMessage}
           vatEditable={view === 'charge' || view === 'product'}
+          pageResetKey={`${view}:${searchArg ?? ''}`}
         />
       )}
     </main>

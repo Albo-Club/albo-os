@@ -1,7 +1,7 @@
 /**
- * Outils agent du prévisionnel de cash (forecastRules / forecastEntries),
- * scopés à l'org du thread (pattern convex/agentTools.ts). Réutilisent les
- * cœurs partagés de convex/forecasts.ts (`insertRule`, `expandRulesForOrgs`,
+ * Agent tools for the cash-flow forecast (forecastRules / forecastEntries),
+ * scoped to the thread's org (convex/agentTools.ts pattern). They reuse the
+ * shared cores from convex/forecasts.ts (`insertRule`, `expandRulesForOrgs`,
  * `computeForecastBalanceForOrgs`).
  */
 
@@ -20,8 +20,8 @@ import {
 import { parseScope, readMembership } from './lib/agentScope'
 import type { Id } from './_generated/dataModel'
 
-// L'agent ne déclenche jamais une expansion au-delà de 24 mois (la mutation
-// publique monte à 120) — garde-fou contre une expansion massive silencieuse.
+// The agent never triggers an expansion beyond 24 months (the public
+// mutation goes up to 120) — guardrail against a silent massive expansion.
 const AGENT_EXPAND_MAX_MONTHS = 24
 const ENTRIES_LIMIT_MAX = 100
 const ENTRIES_LIMIT_DEFAULT = 50
@@ -119,7 +119,7 @@ export const listEntriesInternal = internalQuery({
         const from = dateFrom != null ? base.gte('date', dateFrom) : base
         return dateTo != null ? from.lte('date', dateTo) : from
       })
-      .take(take * 2) // marge pour le filtre status ci-dessous
+      .take(take * 2) // headroom for the status filter below
     const filtered = status ? rows.filter((e) => e.status === status) : rows
     return filtered.slice(0, take).map((entry) => ({
       _id: entry._id,
@@ -188,8 +188,8 @@ export const markEntryRealizedInternal = internalMutation({
     const entry = await ctx.db.get('forecastEntries', entryId)
     if (!entry || entry.orgId !== orgId) throw new ConvexError('not_found')
 
-    // Mêmes garde-fous que forecasts.ts:markEntryRealized : la transaction
-    // doit être de la même org ; on ne touche jamais à la transaction.
+    // Same guardrails as forecasts.ts:markEntryRealized: the transaction
+    // must belong to the same org; we never touch the transaction itself.
     const tx = await ctx.db.get('transactions', transactionId)
     if (!tx || tx.orgId !== entry.orgId) {
       throw new ConvexError('transaction_wrong_org')
@@ -203,7 +203,7 @@ export const markEntryRealizedInternal = internalMutation({
   },
 })
 
-// ─── Tools exposés à l'agent ────────────────────────────────────────────────
+// ─── Tools exposed to the agent─────────────────────────────────────────────
 
 const listForecastRules = createTool({
   description:
@@ -545,7 +545,7 @@ export const cancelEntryInternal = internalMutation({
   },
 })
 
-// ─── Tools exposés ───────────────────────────────────────────────────────────
+// ─── Exposed tools ───────────────────────────────────────────────────────────
 
 const updateForecastRule = createTool({
   description:

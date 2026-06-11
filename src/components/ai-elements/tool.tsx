@@ -19,10 +19,10 @@ import {
 } from '~/components/ui/collapsible'
 import { cn } from '~/lib/utils'
 
-// Remplace le CodeBlock upstream (./code-block, rendu Shiki) : pour des
-// payloads JSON d'outils, un <pre> suffit et évite d'embarquer Shiki dans le
-// bundle. Re-appliquer après toute réinstallation depuis le registry — cf.
-// KNOWN_ISSUES.md « Streamdown (panneau AI) ».
+// Replaces the upstream CodeBlock (./code-block, Shiki rendering): for tool
+// JSON payloads a <pre> is enough and avoids shipping Shiki in the bundle.
+// Re-apply after any reinstall from the registry — see KNOWN_ISSUES.md
+// "Streamdown (AI panel)".
 const CodeBlock = ({ code }: { code: string; language?: string }) => (
   <pre className="overflow-x-auto p-3 font-mono text-xs">
     <code>{code}</code>
@@ -43,7 +43,7 @@ export type ToolPart = ToolUIPart | DynamicToolUIPart
 export type ToolHeaderProps = {
   title?: string
   className?: string
-  /** Libellé localisé du statut (sinon défauts anglais de statusLabels). */
+  /** Localized status label (falls back to the English statusLabels defaults). */
   statusLabel?: string
 } & (
   | { type: ToolUIPart['type']; state: ToolUIPart['state']; toolName?: never }
@@ -125,7 +125,7 @@ export const ToolContent = ({ className, ...props }: ToolContentProps) => (
 
 export type ToolInputProps = ComponentProps<'div'> & {
   input: ToolPart['input']
-  /** Titre localisé de la section (défaut anglais). */
+  /** Localized section title (English default). */
   label?: string
 }
 
@@ -148,7 +148,7 @@ export const ToolInput = ({
 export type ToolOutputProps = ComponentProps<'div'> & {
   output: ToolPart['output']
   errorText: ToolPart['errorText']
-  /** Titres localisés des sections (défauts anglais). */
+  /** Localized section titles (English defaults). */
   label?: string
   errorLabel?: string
 }

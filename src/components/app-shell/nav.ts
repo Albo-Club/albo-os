@@ -93,7 +93,7 @@ export function getNavGroups(): Array<NavGroup> {
   ]
 }
 
-/** Nav de la vue agrégée cross-org (`/app/all`, lecture seule). */
+/** Nav for the cross-org aggregated view (`/app/all`, read-only). */
 export function getAllNavGroups(): Array<NavGroup> {
   return [
     {

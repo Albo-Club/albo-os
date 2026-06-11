@@ -6,12 +6,12 @@ import type { ToolPart } from '~/components/ai-elements/tool'
 import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/utils'
 
-// Bloc d'approbation d'un appel d'outil (boutons Confirmer / Refuser). Inspiré
-// de l'upstream vercel/ai-elements : aucune chaîne en dur, tout le user-facing
-// arrive en children depuis le call site (qui a `t()`). Le `state` et le champ
-// `approval` viennent des tool parts du SDK AI (cf. ToolPart de tool.tsx).
+// Approval block for a tool call (Confirm / Reject buttons). Modeled on
+// upstream vercel/ai-elements: no hardcoded strings, all user-facing copy
+// arrives as children from the call site (which has `t()`). `state` and the
+// `approval` field come from the AI SDK tool parts (cf. ToolPart in tool.tsx).
 
-/** Approbation portée par un tool part : id + (après réponse) approved/reason. */
+/** Approval carried by a tool part: id + (after response) approved/reason. */
 type ToolApproval = NonNullable<Extract<ToolPart, { approval: object }>['approval']>
 
 type ConfirmationContextValue = {
@@ -41,8 +41,8 @@ export const Confirmation = ({
   children,
   ...props
 }: ConfirmationProps) => {
-  // Rien à montrer tant que l'input streame ou que l'outil n'attend pas
-  // d'approbation (pas d'objet `approval`).
+  // Nothing to show while the input streams or when the tool does not
+  // await approval (no `approval` object).
   if (!approval || state === 'input-streaming' || state === 'input-available') {
     return null
   }

@@ -18,7 +18,7 @@ export type CashAccount = {
   _id: Id<'bankAccounts'>
   bankName: string
   label: string
-  /** Nom personnalisé éditable — affiché à la place de `label` si présent. */
+  /** Editable custom name — shown instead of `label` when present. */
   displayName: string | null
   accountKind: string | null
   currency: string

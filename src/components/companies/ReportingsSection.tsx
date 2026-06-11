@@ -45,9 +45,9 @@ function formatSize(bytes: number | null): string {
 }
 
 /**
- * Reportings & documents d'une company : upload manuel (storage Convex,
- * cap 20 MB) + liste avec download/suppression. L'extraction des KPIs d'un
- * reporting passe par l'assistant (createKpiSnapshot), pas par ce composant.
+ * Reportings & documents of a company: manual upload (Convex storage,
+ * 20 MB cap) + list with download/delete. KPI extraction from a reporting
+ * goes through the assistant (createKpiSnapshot), not this component.
  */
 export function ReportingsSection({
   companyId,
@@ -95,7 +95,7 @@ export function ReportingsSection({
         return
       }
       const { storageId } = (await res.json()) as { storageId: Id<'_storage'> }
-      // "YYYY-MM" → 1er du mois UTC.
+      // "YYYY-MM" → first of the month, UTC.
       const period = periodMonth
         ? Date.UTC(
             Number(periodMonth.slice(0, 4)),
@@ -225,7 +225,7 @@ export function ReportingsSection({
         </div>
       )}
 
-      {/* Dialog métadonnées post-sélection du fichier */}
+      {/* Metadata dialog shown after the file is picked */}
       <Dialog
         open={pendingFile !== null}
         onOpenChange={(open) => !open && setPendingFile(null)}
@@ -294,7 +294,7 @@ export function ReportingsSection({
         </DialogContent>
       </Dialog>
 
-      {/* Confirmation de suppression */}
+      {/* Delete confirmation */}
       <Dialog
         open={deleteId !== null}
         onOpenChange={(open) => !open && setDeleteId(null)}

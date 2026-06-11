@@ -28,6 +28,11 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+import {
+  PAGE_SIZE,
+  PaginationFooter,
+  usePagination,
+} from '~/components/data-table/LocalPagination'
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
 import { directionTone } from '~/lib/moneyTone'
 
@@ -78,9 +83,9 @@ function Info({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 /**
- * Dialog de renommage du compte : édite UNIQUEMENT `displayName`.
- * `label` (nom d'origine import/banque) reste en lecture seule ; un nom
- * vide efface `displayName` et l'affichage retombe sur `label`.
+ * Account rename dialog: edits ONLY `displayName`.
+ * `label` (original import/bank name) stays read-only; an empty name
+ * clears `displayName` and the display falls back to `label`.
  */
 function RenameAccountDialog({
   account,
@@ -155,9 +160,9 @@ function AccountDetail() {
     bankAccountId: accountId as Id<'bankAccounts'>,
   })
 
-  // Recherche serveur (search index Convex), debouncée. Pendant le
-  // rechargement d'un nouveau terme, on garde la dernière liste affichée
-  // (pas de flash de liste vide).
+  // Server-side search (Convex search index), debounced. While a new
+  // term is reloading, keep the last displayed list (no empty-list
+  // flash).
   const [search, setSearch] = useState('')
   const searchArg = useDebouncedValue(search).trim() || undefined
   const liveTransactions = useConvexQuery(api.cash.listAccountTransactions, {
@@ -169,6 +174,16 @@ function AccountDetail() {
     lastTransactionsRef.current = liveTransactions
   }
   const transactions = liveTransactions ?? lastTransactionsRef.current
+
+  // Local display pagination; snaps back to page 1 when the search changes.
+  const { page, pageCount, setPage } = usePagination(
+    transactions?.length ?? 0,
+    searchArg ?? '',
+  )
+  const pagedTransactions = transactions?.slice(
+    page * PAGE_SIZE,
+    (page + 1) * PAGE_SIZE,
+  )
 
   const fmtEur = (cents?: number | null) =>
     cents == null
@@ -215,7 +230,7 @@ function AccountDetail() {
             </Button>
           )}
         </div>
-        {/* Nom d'origine banque, lecture seule, visible seulement si renommé. */}
+        {/* Original bank name, read-only, shown only when renamed. */}
         {account?.displayName && (
           <p className="text-muted-foreground text-sm">
             {t('originalName', { name: account.label })}
@@ -227,17 +242,23 @@ function AccountDetail() {
         <Info label={t('detail.owner')} value={account?.owner?.name} />
         <Info
           label={t('col.balance')}
-          value={account ? (fmtEur(account.currentBalance) ?? t('noBalance')) : null}
+          value={
+            account ? (fmtEur(account.currentBalance) ?? t('noBalance')) : null
+          }
         />
         <Info
           label={t('detail.asOf')}
-          value={account?.balanceAsOf != null ? fmtDate(account.balanceAsOf) : null}
+          value={
+            account?.balanceAsOf != null ? fmtDate(account.balanceAsOf) : null
+          }
         />
         <Info label={t('detail.iban')} value={account?.iban} />
       </div>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold tracking-tight">{t('tx.title')}</h2>
+        <h2 className="text-sm font-semibold tracking-tight">
+          {t('tx.title')}
+        </h2>
         <Input
           type="search"
           value={search}
@@ -265,7 +286,7 @@ function AccountDetail() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.map((tx) => (
+                {pagedTransactions?.map((tx) => (
                   <TableRow key={tx._id}>
                     <TableCell className="whitespace-nowrap tabular-nums">
                       {fmtDate(tx.transactionDate)}
@@ -283,6 +304,11 @@ function AccountDetail() {
             </Table>
           </div>
         )}
+        <PaginationFooter
+          page={page}
+          pageCount={pageCount}
+          onPageChange={setPage}
+        />
       </section>
 
       {account && renameOpen && (

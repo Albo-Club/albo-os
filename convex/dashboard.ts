@@ -1,10 +1,10 @@
 /**
- * Agrégats du tableau de bord d'une org (`/app/$orgSlug`). Une seule query
- * réactive : compte les participations, somme le déployé/distribué depuis
- * les transactions pointées deal, la trésorerie depuis les soldes réels,
- * et la NAV estimée depuis la dernière valo de chaque deal (fallback :
- * montant versé si aucune valo). Les `.collect()` org-scopés sont
- * acceptables à l'échelle de l'outil (2 users, volumes faibles).
+ * Dashboard aggregates for an org (`/app/$orgSlug`). A single reactive
+ * query: counts participations, sums deployed/distributed from the
+ * deal-matched transactions, cash from the real balances, and the
+ * estimated NAV from each deal's latest valuation (fallback: amount paid
+ * if no valuation). The org-scoped `.collect()` calls are acceptable at
+ * this tool's scale (2 users, low volumes).
  */
 
 import { v } from 'convex/values'
@@ -18,7 +18,7 @@ export const getDashboard = query({
   handler: async (ctx, { orgId }) => {
     await requireOrgMember(ctx, orgId)
 
-    // 1. Deals de l'org (les exités restent dans déployé/distribué).
+    // 1. Org deals (exited ones stay in deployed/distributed).
     const deals = await ctx.db
       .query('deals')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
@@ -27,7 +27,7 @@ export const getDashboard = query({
       (deal) => deal.status === 'active' || deal.status === 'partially_exited',
     )
 
-    // 2. Transactions : déployé (out) / distribué (in) par deal pointé.
+    // 2. Transactions: deployed (out) / distributed (in) per matched deal.
     const txs = await ctx.db
       .query('transactions')
       .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
@@ -46,8 +46,8 @@ export const getDashboard = query({
       distributedCents += receivedByDeal.get(deal._id) ?? 0
     }
 
-    // 3. NAV estimée : dernière valo par deal actif, fallback montant versé
-    //    (navIsPartial = au moins un deal actif sans valo).
+    // 3. Estimated NAV: latest valuation per active deal, fallback amount
+    //    paid (navIsPartial = at least one active deal without valuation).
     let navCents = 0
     let navIsPartial = false
     for (const deal of activeDeals) {
@@ -64,7 +64,7 @@ export const getDashboard = query({
       }
     }
 
-    // 4. Trésorerie : soldes réels EUR des comptes non archivés.
+    // 4. Cash: real EUR balances of non-archived accounts.
     const accounts = await ctx.db
       .query('bankAccounts')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
@@ -75,7 +75,7 @@ export const getDashboard = query({
       cashCents += account.currentBalance ?? 0
     }
 
-    // 5. Répartition du déployé par instrument (deals actifs).
+    // 5. Breakdown of deployed capital by instrument (active deals).
     const byInstrument = new Map<string, number>()
     for (const deal of activeDeals) {
       const paid = paidByDeal.get(deal._id) ?? 0
@@ -86,12 +86,12 @@ export const getDashboard = query({
       )
     }
 
-    // 6. Participations = sociétés cibles distinctes des deals actifs.
+    // 6. Participations = distinct target companies of active deals.
     const participationsCount = new Set(
       activeDeals.map((deal) => deal.targetCompanyId),
     ).size
 
-    // 7. Activité récente : dernières transactions, enrichies compte + deal.
+    // 7. Recent activity: latest transactions, enriched with account + deal.
     const recent = [...txs]
       .sort((a, b) => b.transactionDate - a.transactionDate)
       .slice(0, RECENT_TX)

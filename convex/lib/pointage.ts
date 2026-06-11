@@ -10,23 +10,23 @@ import type { VatRateBps } from './vat'
 type MutCtx = GenericMutationCtx<DataModel>
 
 /**
- * Cœur du pointage transaction → deal / passif, partagé par les mutations
- * publiques (convex/transactions.ts, convex/liabilities.ts) et les outils
- * agent (convex/agentToolsPointage.ts) pour qu'ils ne divergent jamais.
+ * Core of transaction → deal / liability matching (pointage), shared by the
+ * public mutations (convex/transactions.ts, convex/liabilities.ts) and the
+ * agent tools (convex/agentToolsPointage.ts) so they never diverge.
  *
- * Invariants (cf. KNOWN_ISSUES.md « Pointage » / « Passif ») :
- * - `matchStatus === 'matched'` ⟺ rattachée à un deal (`dealId != null` +
- *   `allocation.kind === 'deal'`) OU allouée au passif (`dealId == null` +
- *   `allocation.kind === 'equity' | 'intercompany_loan'`).
- * - `reconciled` (+ by/at) est un miroir dérivé du pointage DEAL uniquement.
- * - Chaque décision deal écrit une ligne append-only dans `matchingDecisions`
- *   (`source: 'manual' | 'agent_suggested'`) ; le pointage passif n'y écrit
- *   jamais.
- * - `vatRateBps` ne vit que sur les statuts `charge` / `product` : tout
- *   pointage qui fait quitter ces statuts l'efface (cf. KNOWN_ISSUES.md
+ * Invariants (cf. KNOWN_ISSUES.md « Pointage » / « Passif »):
+ * - `matchStatus === 'matched'` ⟺ matched to a deal (`dealId != null` +
+ *   `allocation.kind === 'deal'`) OR allocated to liability (`dealId == null`
+ *   + `allocation.kind === 'equity' | 'intercompany_loan'`).
+ * - `reconciled` (+ by/at) is a mirror derived from DEAL matching only.
+ * - Every deal decision writes an append-only row to `matchingDecisions`
+ *   (`source: 'manual' | 'agent_suggested'`); liability matching never
+ *   writes there.
+ * - `vatRateBps` only lives on the `charge` / `product` statuses: any
+ *   matching that leaves these statuses clears it (cf. KNOWN_ISSUES.md
  *   « TVA récupérable »).
  *
- * L'appelant a déjà chargé la transaction et vérifié l'appartenance à l'org.
+ * The caller has already loaded the transaction and checked org membership.
  */
 
 export type PointageSource = 'manual' | 'agent_suggested'
@@ -39,8 +39,8 @@ export type CategorizeStatus =
   | 'internal_transfer'
 
 /**
- * Garde-fou : refuse d'écraser silencieusement un pointage passif
- * (equity / C/C). Détacher d'abord via `applyDeallocate`.
+ * Guardrail: refuses to silently overwrite a liability allocation
+ * (equity / C/C). Detach first via `applyDeallocate`.
  */
 export function assertNotAllocatedToLiability(tx: Doc<'transactions'>) {
   if (tx.allocation && tx.allocation.kind !== 'deal') {
@@ -48,7 +48,7 @@ export function assertNotAllocatedToLiability(tx: Doc<'transactions'>) {
   }
 }
 
-/** Rattache une transaction à un deal de la même org. */
+/** Matches a transaction to a deal of the same org. */
 export async function applyMatchToDeal(
   ctx: MutCtx,
   tx: Doc<'transactions'>,
@@ -81,15 +81,15 @@ export async function applyMatchToDeal(
   })
 }
 
-/** Dé-pointe une transaction deal (retour à `unmatched`), décision loggée. */
+/** Unmatches a deal transaction (back to `unmatched`), decision logged. */
 export async function applyUnmatch(
   ctx: MutCtx,
   tx: Doc<'transactions'>,
   decidedBy: Id<'users'>,
   source: PointageSource,
 ) {
-  // Une tx allouée au passif se détache via applyDeallocate — un unmatch
-  // deal ici laisserait son allocation orpheline.
+  // A tx allocated to liability is detached via applyDeallocate — a deal
+  // unmatch here would leave its allocation orphaned.
   assertNotAllocatedToLiability(tx)
 
   await ctx.db.patch('transactions', tx._id, {
@@ -110,11 +110,11 @@ export async function applyUnmatch(
 }
 
 /**
- * Écarte une transaction : ignorée, charge, impôt, produit ou virement
- * interne. Même patch pour tous les statuts — seul le statut diffère pour
- * pouvoir consulter ces transactions plus tard. `vatRateBps` (TVA) n'existe
- * que sur charge/produit : posé si fourni (sinon valeur existante conservée),
- * effacé pour tout autre statut.
+ * Sets a transaction aside: ignored, charge, tax, product or internal
+ * transfer. Same patch for every status — only the status differs so these
+ * transactions can be looked up later. `vatRateBps` (VAT) only exists on
+ * charge/product: set when provided (existing value kept otherwise),
+ * cleared for any other status.
  */
 export async function applyCategorization(
   ctx: MutCtx,
@@ -144,11 +144,11 @@ export async function applyCategorization(
 }
 
 /**
- * Pointe une transaction sur une position de capital (`equity`) ou un compte
- * courant inter-entités (`intercompany_loan`). La cible doit appartenir à la
- * même org que la transaction (pour un C/C : l'org de la tx doit être l'une
- * des deux parties du prêt). N'écrit JAMAIS dans `matchingDecisions`, ne
- * touche jamais `reconciled` (miroir du pointage deal uniquement).
+ * Allocates a transaction to an equity position (`equity`) or an
+ * inter-entity current account (`intercompany_loan`). The target must belong
+ * to the same org as the transaction (for a C/C: the tx org must be one of
+ * the two parties to the loan). NEVER writes to `matchingDecisions`, never
+ * touches `reconciled` (mirror of deal matching only).
  */
 export async function applyAllocateToLiability(
   ctx: MutCtx,
@@ -156,8 +156,8 @@ export async function applyAllocateToLiability(
   kind: 'equity' | 'intercompany_loan',
   targetId: string,
 ) {
-  // Garde-fou : pas de double pointage silencieux. Une tx rattachée à un
-  // deal doit être dé-pointée (applyUnmatch) avant d'aller au passif.
+  // Guardrail: no silent double matching. A tx matched to a deal must be
+  // unmatched (applyUnmatch) before going to liability.
   if (tx.dealId != null || tx.allocation?.kind === 'deal') {
     throw new ConvexError('already_matched_to_deal')
   }
@@ -173,8 +173,8 @@ export async function applyAllocateToLiability(
     const loanId = ctx.db.normalizeId('intercompanyLoans', targetId)
     const loan = loanId ? await ctx.db.get('intercompanyLoans', loanId) : null
     if (!loan) throw new ConvexError('not_found')
-    // La tx doit appartenir à l'une des deux orgs du C/C (créancier ou
-    // débiteur) — sinon elle ne peut pas porter une jambe de ce prêt.
+    // The tx must belong to one of the two orgs of the C/C (creditor or
+    // debtor) — otherwise it cannot carry a leg of this loan.
     if (loanSideForOrg(loan, tx.orgId) === null) {
       throw new ConvexError('loan_wrong_org')
     }
@@ -188,9 +188,9 @@ export async function applyAllocateToLiability(
 }
 
 /**
- * Détache une transaction du passif : retour à l'état non pointé
- * (`unmatched`). Idempotent — sans allocation passif, ne touche à rien.
- * Une tx rattachée à un deal n'est pas concernée : passer par `applyUnmatch`.
+ * Detaches a transaction from liability: back to the unmatched state
+ * (`unmatched`). Idempotent — without a liability allocation, touches
+ * nothing. A tx matched to a deal is not covered: go through `applyUnmatch`.
  */
 export async function applyDeallocate(ctx: MutCtx, tx: Doc<'transactions'>) {
   if (tx.allocation?.kind === 'deal') {

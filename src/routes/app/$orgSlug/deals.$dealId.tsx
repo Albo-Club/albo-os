@@ -17,6 +17,11 @@ import {
   useDealTitle,
   useFormatters,
 } from '~/components/participations/ParticipationsTable'
+import {
+  PAGE_SIZE,
+  PaginationFooter,
+  usePagination,
+} from '~/components/data-table/LocalPagination'
 import { FundSection } from '~/components/deals/FundSection'
 import { PlanVsActualSection } from '~/components/deals/PlanVsActualSection'
 import { DealCombobox } from '~/components/pointage/DealCombobox'
@@ -70,7 +75,7 @@ export const Route = createFileRoute('/app/$orgSlug/deals/$dealId')({
 
 type InstrumentKind = Doc<'deals'>['instrumentKind']
 
-/** Valeurs de l'enum `instrumentKind` du schéma (ordre d'affichage du dropdown). */
+/** Values of the schema's `instrumentKind` enum (dropdown display order). */
 const INSTRUMENTS = [
   'share',
   'bsa',
@@ -127,15 +132,19 @@ function Info({ label, value }: { label: string; value: ReactNode }) {
 }
 
 /**
- * Dialog d'édition du deal : nom personnalisé + type d'instrument.
- * Le changement d'instrument est une étiquette : aucun effet de bord sur
- * les transactions rattachées.
+ * Deal edit dialog: custom name + instrument type.
+ * Changing the instrument is just a label: no side effects on the
+ * attached transactions.
  */
 function EditDealDialog({
   deal,
   onClose,
 }: {
-  deal: { _id: Id<'deals'>; name?: string | null; instrumentKind: InstrumentKind }
+  deal: {
+    _id: Id<'deals'>
+    name?: string | null
+    instrumentKind: InstrumentKind
+  }
   onClose: () => void
 }) {
   const { t } = useTranslation(['participations', 'common'])
@@ -149,7 +158,7 @@ function EditDealDialog({
   async function handleSave() {
     setPending(true)
     try {
-      // '' = effacement du nom (le titre retombe sur l'instrument).
+      // '' = clears the name (title falls back to the instrument).
       await updateDeal({
         id: deal._id,
         patch: { name, instrumentKind: instrument },
@@ -221,7 +230,7 @@ function EditDealDialog({
   )
 }
 
-/** Champs du deal courant utilisés par la section transactions. */
+/** Fields of the current deal used by the transactions section. */
 type CurrentDeal = {
   _id: Id<'deals'>
   orgId: Id<'organizations'>
@@ -230,7 +239,7 @@ type CurrentDeal = {
   instrumentKind: string
 }
 
-/** Combobox (deal courant pré-sélectionné) + bouton « Réattribuer ». */
+/** Combobox (current deal pre-selected) + "Reassign" button. */
 function ReattachActions({
   deals,
   currentDeal,
@@ -272,22 +281,26 @@ function Transactions({ deal }: { deal: CurrentDeal }) {
   const [sheetTx, setSheetTx] = useState<TxDetails | null>(null)
   const [pending, setPending] = useState(false)
 
-  // Deals de l'org pour le combobox de réattribution — chargés seulement à
-  // l'ouverture du sheet.
+  // Local display pagination (no upstream filter on this table).
+  const { page, pageCount, setPage } = usePagination(txs?.length ?? 0, '')
+  const pagedTxs = txs?.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
+  // Org deals for the reassignment combobox — only loaded when the
+  // sheet opens.
   const deals = useConvexQuery(
     api.deals.list,
     sheetTx ? { orgId: deal.orgId } : 'skip',
   )
   const matchTransaction = useConvexMutation(api.transactions.matchTransaction)
 
-  // Réattribuer = re-pointer la transaction sur le nouveau deal via
-  // `matchTransaction` (jamais d'écriture directe de `dealId`/`matchStatus`).
+  // Reassign = re-match the transaction onto the new deal via
+  // `matchTransaction` (never write `dealId`/`matchStatus` directly).
   async function handleReattach(tx: TxDetails, newDeal: DealOption) {
     setPending(true)
     try {
       await matchTransaction({ transactionId: tx._id, dealId: newDeal._id })
       toast.success(t('tx.reattached', { deal: newDeal.target?.name ?? '—' }))
-      // `listByDeal` réactif : la transaction sort de la liste d'elle-même.
+      // `listByDeal` is reactive: the transaction drops out of the list by itself.
       setSheetTx(null)
     } catch (err) {
       reportError(err)
@@ -322,7 +335,7 @@ function Transactions({ deal }: { deal: CurrentDeal }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {txs.map((tx) => (
+              {pagedTxs?.map((tx) => (
                 <TableRow
                   key={tx._id}
                   className="cursor-pointer"
@@ -345,13 +358,20 @@ function Transactions({ deal }: { deal: CurrentDeal }) {
                   <TableCell>{tx.rawLabel}</TableCell>
                   <TableCell>{tx.counterparty ?? '—'}</TableCell>
                   <TableCell>{tx.account?.label ?? '—'}</TableCell>
-                  <TableCell>{tx.reconciled ? t('tx.yes') : t('tx.no')}</TableCell>
+                  <TableCell>
+                    {tx.reconciled ? t('tx.yes') : t('tx.no')}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
       )}
+      <PaginationFooter
+        page={page}
+        pageCount={pageCount}
+        onPageChange={setPage}
+      />
 
       <TransactionSheet
         tx={sheetTx}
@@ -382,8 +402,8 @@ function DealDetail() {
   const deal = useConvexQuery(api.deals.getById, {
     id: dealId as Id<'deals'>,
   })
-  // Montants calculés depuis les transactions rattachées (même query que le
-  // sous-composant Transactions — souscription partagée, pas de double charge).
+  // Amounts computed from the attached transactions (same query as the
+  // Transactions subcomponent — shared subscription, no double load).
   const txs = useConvexQuery(api.transactions.listByDeal, {
     dealId: dealId as Id<'deals'>,
   })
@@ -428,7 +448,7 @@ function DealDetail() {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        {/* Nom seul : l'instrument est déjà affiché dans la grille d'infos. */}
+        {/* Name only: the instrument is already shown in the info grid. */}
         <h1 className="text-2xl font-semibold tracking-tight">
           {dealTitle(deal, { withInstrument: false })}
         </h1>
@@ -478,7 +498,10 @@ function DealDetail() {
             ) : null
           }
         />
-        <Info label={t('deal.committed')} value={fmtEur(deal.committedAmount)} />
+        <Info
+          label={t('deal.committed')}
+          value={fmtEur(deal.committedAmount)}
+        />
         <Info label={t('deal.paid')} value={fmtEur(paidActual)} />
         <Info label={t('deal.received')} value={fmtEur(received)} />
         <Info label={t('deal.shares')} value={fmtNum(deal.sharesAcquired)} />
@@ -486,15 +509,24 @@ function DealDetail() {
           label={t('deal.pricePerShare')}
           value={fmtEur(deal.pricePerShare)}
         />
-        <Info label={t('deal.interestRate')} value={fmtPct(deal.interestRate)} />
+        <Info
+          label={t('deal.interestRate')}
+          value={fmtPct(deal.interestRate)}
+        />
         <Info label={t('deal.maturity')} value={fmtDate(deal.maturityDate)} />
-        <Info label={t('deal.principal')} value={fmtEur(deal.principalAmount)} />
+        <Info
+          label={t('deal.principal')}
+          value={fmtEur(deal.principalAmount)}
+        />
         <Info label={t('deal.royaltyRate')} value={fmtPct(deal.royaltyRate)} />
         <Info
           label={t('deal.royaltyCap')}
           value={fmtEur(deal.royaltyCapAmount)}
         />
-        <Info label={t('deal.valuationCap')} value={fmtEur(deal.valuationCap)} />
+        <Info
+          label={t('deal.valuationCap')}
+          value={fmtEur(deal.valuationCap)}
+        />
         <Info label={t('deal.discount')} value={fmtPct(deal.discount)} />
         <Info
           label={t('deal.entryValuation')}

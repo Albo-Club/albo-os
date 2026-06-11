@@ -1,5 +1,5 @@
 /**
- * Tests purs de la sérialisation CSV (src/lib/csv.ts).
+ * Pure tests for the CSV serialization (src/lib/csv.ts).
  *
  *   pnpm test:unit
  */

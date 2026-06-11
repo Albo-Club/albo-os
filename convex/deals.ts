@@ -14,12 +14,12 @@ const statusValidator = v.union(
   v.literal('written_off'),
 )
 
-// Source unique : convex/lib/instruments.ts
+// Single source of truth: convex/lib/instruments.ts
 const instrumentValidator = sharedInstrumentValidator
 
-/** Champs financiers/lifecycle communs, tous optionnels. */
+/** Shared financial/lifecycle fields, all optional. */
 const dealFields = {
-  // Nom personnalisé — affiché à la place du titre dérivé quand présent.
+  // Custom name — shown instead of the derived title when present.
   name: v.optional(v.string()),
   viaSpvCompanyId: v.optional(v.id('companies')),
   currency: v.optional(v.string()),
@@ -55,7 +55,7 @@ function companyRef(c: Doc<'companies'> | null) {
   }
 }
 
-/** Enrichit un deal avec investor / target / spv (pour la vue). */
+/** Enriches a deal with investor / target / spv (for the view). */
 async function enrich(ctx: Ctx, deal: Doc<'deals'>) {
   const [investor, target, spv] = await Promise.all([
     ctx.db.get("companies", deal.investorCompanyId),
@@ -71,9 +71,9 @@ async function enrich(ctx: Ctx, deal: Doc<'deals'>) {
 }
 
 /**
- * Sommes des transactions rattachées à un deal (cents) : Versé = sorties,
- * Reçu = entrées, jamais nettés. Même définition que la page détail
- * (transactions.listByDeal + reduce côté client).
+ * Sums of the transactions attached to a deal (cents): Versé (paid) =
+ * outflows, Reçu (received) = inflows, never netted. Same definition as
+ * the detail page (transactions.listByDeal + client-side reduce).
  */
 export async function transactionTotals(ctx: Ctx, dealId: Id<'deals'>) {
   const txs = await ctx.db
@@ -89,7 +89,7 @@ export async function transactionTotals(ctx: Ctx, dealId: Id<'deals'>) {
   return { paidActual, received }
 }
 
-/** Dernière valorisation connue d'un deal (cents), null si aucune. */
+/** Latest known valuation of a deal (cents), null if none. */
 export async function lastValuationCents(
   ctx: Ctx,
   dealId: Id<'deals'>,
@@ -103,11 +103,11 @@ export async function lastValuationCents(
 }
 
 /**
- * Liste enrichie des deals (deal + noms investor/target/spv) d'une org,
- * filtrable par status / target. Sert la vue Participations par-org
- * (regroupée par société côté client). Tri par défaut : signedDate desc.
- * Inclut par deal les montants Versé/Reçu calculés depuis les transactions
- * et la dernière valorisation connue (TVPI côté client).
+ * Enriched list of an org's deals (deal + investor/target/spv names),
+ * filterable by status / target. Serves the per-org Participations view
+ * (grouped by company client-side). Default sort: signedDate desc.
+ * Includes per deal the Versé/Reçu amounts computed from the transactions
+ * and the latest known valuation (TVPI computed client-side).
  */
 export const list = query({
   args: {
@@ -155,7 +155,7 @@ export const getById = query({
   },
 })
 
-/** Vérifie qu'une company appartient bien à l'org. */
+/** Checks that a company indeed belongs to the org. */
 async function assertSameOrg(
   ctx: Ctx,
   orgId: Id<'organizations'>,
@@ -167,8 +167,8 @@ async function assertSameOrg(
 }
 
 /**
- * L'investisseur d'un deal est toujours une entité du groupe (`group_*`),
- * jamais une société portfolio. (Remplace l'ancienne dérivation de scope.)
+ * A deal's investor is always a group entity (`group_*`), never a
+ * portfolio company. (Replaces the old scope derivation.)
  */
 async function assertInvestorIsGroupEntity(
   ctx: Ctx,
@@ -244,7 +244,7 @@ export const update = mutation({
         'target_wrong_org',
       )
     }
-    // Nom : trim ; '' = effacement (l'affichage retombe sur le titre dérivé).
+    // Name: trimmed; '' = clears it (display falls back to derived title).
     if (patch.name !== undefined) {
       const trimmed = patch.name.trim()
       patch.name = trimmed === '' ? undefined : trimmed

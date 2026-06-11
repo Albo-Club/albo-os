@@ -85,16 +85,16 @@ function errorCode(err: unknown): string {
   return ''
 }
 
-/** Parties d'un message assistant : texte (markdown) + appels d'outils. */
+/** Parts of an assistant message: text (markdown) + tool calls. */
 function MessageParts({
   message,
   onRespondApproval,
   respondingApprovalId,
 }: {
   message: UIMessage
-  /** Confirme (true) ou refuse (false) une demande d'approbation d'outil. */
+  /** Approve (true) or deny (false) a tool approval request. */
   onRespondApproval: (approvalId: string, approved: boolean) => void
-  /** Approbation dont la réponse est en cours d'envoi (boutons désactivés). */
+  /** Approval whose response is being sent (buttons disabled). */
   respondingApprovalId: string | null
 }) {
   const { t } = useTranslation(['chat'])
@@ -131,17 +131,17 @@ function MessageParts({
           const approvalId = toolPart.approval?.id
           const responding =
             approvalId !== undefined && approvalId === respondingApprovalId
-          // Nom d'outil : `tool-listDeals` → `listDeals` ; `dynamic-tool` →
-          // `toolName`. Un renderer riche s'affiche sous le bloc dépliable
-          // quand l'outil a terminé avec une sortie non vide ; sinon le JSON
-          // du collapsible reste seul (comportement inchangé).
+          // Tool name: `tool-listDeals` → `listDeals`; `dynamic-tool` →
+          // `toolName`. A rich renderer shows below the collapsible block
+          // once the tool completed with an output; otherwise the JSON in
+          // the collapsible stands alone (unchanged behavior).
           const toolName =
             toolPart.type === 'dynamic-tool'
               ? toolPart.toolName
               : toolPart.type.slice('tool-'.length)
           const Renderer = getToolRenderer(toolName)
-          // Le renderer est lui-même défensif (null si shape inattendue) ;
-          // l'état `output-available` garantit la présence de `output`.
+          // The renderer is defensive itself (null on unexpected shape);
+          // the `output-available` state guarantees `output` is present.
           const rich =
             Renderer && toolPart.state === 'output-available' ? (
               <Renderer output={toolPart.output} />
@@ -223,9 +223,8 @@ function MessageParts({
   )
 }
 
-// Suggestions du panneau vide, choisies selon la route courante. Les clés
-// pointent vers `chat:suggestions.*` ; on retombe sur le set par défaut hors
-// des écrans connus.
+// Empty-state suggestions, picked from the current route. Keys point to
+// `chat:suggestions.*`; falls back to the default set outside known screens.
 function suggestionKeys(pathname: string): Array<string> {
   if (pathname.includes('/pointage')) {
     return ['pointagePending', 'pointageBankFees']
@@ -248,28 +247,28 @@ export function AiPanel({
   onClose,
 }: {
   orgId: Id<'organizations'>
-  /** Visibilité du panneau (masqué en CSS par le layout) : focus à l'ouverture. */
+  /** Panel visibility (hidden via CSS by the layout): focus on open. */
   open?: boolean
-  /** Fermeture du panneau (collapse desktop / overlay mobile). */
+  /** Closes the panel (desktop collapse / mobile overlay). */
   onClose: () => void
 }) {
   const { t, i18n } = useTranslation(['chat', 'common'])
   const location = useLocation()
   const [threadId, setThreadId] = useState<string | null>(null)
-  // true = l'utilisateur a demandé un nouveau thread : ne pas ré-adopter le
-  // dernier thread existant tant qu'il n'a rien envoyé.
+  // true = the user asked for a new thread: don't re-adopt the latest
+  // existing thread until they have sent something.
   const [draftNew, setDraftNew] = useState(false)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  // true entre l'accusé de réception de sendMessage et le premier token
-  // streamé : pilote l'indicateur « réflexion ».
+  // true between the sendMessage acknowledgment and the first streamed
+  // token: drives the "thinking" indicator.
   const [awaitingStream, setAwaitingStream] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameValue, setRenameValue] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
-  // id de l'approbation dont la réponse est en cours d'envoi (désactive les
-  // boutons Confirmer / Refuser le temps de l'accusé de réception).
+  // Approval id whose response is being sent (disables the Confirm /
+  // Reject buttons until the mutation acks).
   const [respondingApprovalId, setRespondingApprovalId] = useState<
     string | null
   >(null)
@@ -291,7 +290,7 @@ export function AiPanel({
     { initialNumItems: 20 },
   )
 
-  // Au montage (ou après suppression) : reprendre le thread le plus récent.
+  // On mount (or after deletion): resume the most recent thread.
   useEffect(() => {
     if (threadId || draftNew) return
     if (threads.status === 'LoadingFirstPage') return
@@ -305,15 +304,15 @@ export function AiPanel({
     { initialNumItems: 50, stream: true },
   )
 
-  // Focus du composer à l'ouverture du panneau (pas au montage initial :
-  // le panneau est ouvert par défaut, ne pas voler le focus de la page).
+  // Focus the composer when the panel opens (not on initial mount: the
+  // panel is open by default, don't steal the page's focus).
   useEffect(() => {
     if (open && !prevOpenRef.current) textareaRef.current?.focus()
     prevOpenRef.current = open
   }, [open])
 
-  // L'indicateur « réflexion » tombe dès que la réponse commence à streamer
-  // (ou qu'on change de conversation).
+  // The "thinking" indicator drops as soon as the response starts
+  // streaming (or when switching conversations).
   useEffect(() => {
     if (messages.results.at(-1)?.role === 'assistant') {
       setAwaitingStream(false)
@@ -375,8 +374,8 @@ export function AiPanel({
         approved,
         context: { route: location.pathname },
       })
-      // La génération reprend par le même flux de deltas que sendMessage :
-      // ranimer l'indicateur « réflexion » jusqu'au premier token.
+      // Generation resumes through the same delta flow as sendMessage:
+      // revive the "thinking" indicator until the first token.
       setAwaitingStream(true)
     } catch (err) {
       toast.error(
@@ -447,8 +446,8 @@ export function AiPanel({
   return (
     <div className="bg-background flex h-full min-h-0 flex-col">
       <header className="flex shrink-0 items-center gap-1 border-b px-3 py-2.5">
-        {/* Le titre EST le sélecteur de conversations (historique visible
-            d'un clic, pas caché derrière une icône). */}
+        {/* The title IS the conversation selector (history visible in
+            one click, not hidden behind an icon). */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
