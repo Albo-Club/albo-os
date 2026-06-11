@@ -9,7 +9,7 @@
  * parent/child pair. Natural persons and external companies live in `notes`.
  *
  * Run (prod only, dev deleted):
- *   npx convex export --prod                          # safety snapshot
+ *   npx convex export --prod --path ./backup.zip      # safety snapshot
  *   npx convex run --prod seed:cleanupLegacy          # purge the old combined org
  *   npx convex run --prod seed:seedAll '{"ownerEmail":"benjamin@alboteam.com"}'
  */
@@ -145,7 +145,7 @@ const ALBO_COMPANIES: Array<SeedCompany> = [
     legalForm: 'SAS',
     incorporationDate: d(2024, 10, 18),
     notes:
-      'Holding d\'investissement impact. Filiale CALTE 97% + Benjamin ' +
+      "Holding d'investissement impact. Filiale CALTE 97% + Benjamin " +
       'Bouquet 3% (hors système ; détention inter-org non modélisée).',
   },
 ]
@@ -181,7 +181,7 @@ async function upsertGroup(
       archivedAt: undefined,
     }
     if (existing) {
-      await ctx.db.patch("companies", existing._id, fields)
+      await ctx.db.patch('companies', existing._id, fields)
       byName.set(c.name, existing._id)
     } else {
       byName.set(c.name, await ctx.db.insert('companies', fields))
@@ -200,7 +200,9 @@ async function upsertGroup(
         .filter((q) => q.eq(q.field('childCompanyId'), childId))
         .first()
       if (existing) {
-        await ctx.db.patch("companyRelations", existing._id, { ownershipPct: r.ownershipPct })
+        await ctx.db.patch('companyRelations', existing._id, {
+          ownershipPct: r.ownershipPct,
+        })
       } else {
         await ctx.db.insert('companyRelations', {
           orgId,
@@ -227,7 +229,8 @@ async function ensureOrg(
     .withIndex('by_slug', (q) => q.eq('slug', slug))
     .first()
   if (org) {
-    if (org.name !== name) await ctx.db.patch("organizations", org._id, { name })
+    if (org.name !== name)
+      await ctx.db.patch('organizations', org._id, { name })
   } else {
     const id = await ctx.db.insert('organizations', {
       slug,
@@ -235,7 +238,7 @@ async function ensureOrg(
       createdBy: ownerId,
       createdAt: Date.now(),
     })
-    org = await ctx.db.get("organizations", id)
+    org = await ctx.db.get('organizations', id)
   }
   const orgId = org!._id
   const member = await ctx.db
@@ -318,7 +321,7 @@ export const cleanupLegacy = internalMutation({
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
     for (const r of deals) {
-      await ctx.db.delete("deals", r._id)
+      await ctx.db.delete('deals', r._id)
       n += 1
     }
     const valuations = await ctx.db
@@ -326,7 +329,7 @@ export const cleanupLegacy = internalMutation({
       .withIndex('by_org_asof', (q) => q.eq('orgId', orgId))
       .collect()
     for (const r of valuations) {
-      await ctx.db.delete("valuations", r._id)
+      await ctx.db.delete('valuations', r._id)
       n += 1
     }
     const kpis = await ctx.db
@@ -334,7 +337,7 @@ export const cleanupLegacy = internalMutation({
       .withIndex('by_org_period', (q) => q.eq('orgId', orgId))
       .collect()
     for (const r of kpis) {
-      await ctx.db.delete("kpiSnapshots", r._id)
+      await ctx.db.delete('kpiSnapshots', r._id)
       n += 1
     }
     const relations = await ctx.db
@@ -342,7 +345,7 @@ export const cleanupLegacy = internalMutation({
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
     for (const r of relations) {
-      await ctx.db.delete("companyRelations", r._id)
+      await ctx.db.delete('companyRelations', r._id)
       n += 1
     }
     const companies = await ctx.db
@@ -350,7 +353,7 @@ export const cleanupLegacy = internalMutation({
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
     for (const r of companies) {
-      await ctx.db.delete("companies", r._id)
+      await ctx.db.delete('companies', r._id)
       n += 1
     }
     const invitations = await ctx.db
@@ -358,7 +361,7 @@ export const cleanupLegacy = internalMutation({
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
     for (const r of invitations) {
-      await ctx.db.delete("invitations", r._id)
+      await ctx.db.delete('invitations', r._id)
       n += 1
     }
     const members = await ctx.db
@@ -366,10 +369,10 @@ export const cleanupLegacy = internalMutation({
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
     for (const r of members) {
-      await ctx.db.delete("organizationMembers", r._id)
+      await ctx.db.delete('organizationMembers', r._id)
       n += 1
     }
-    await ctx.db.delete("organizations", orgId)
+    await ctx.db.delete('organizations', orgId)
 
     return { deleted: true, orgId, rowsDeleted: n }
   },

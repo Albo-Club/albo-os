@@ -282,7 +282,7 @@ seedées (`convex run --prod seed:seedAll`). Le schéma doit être déployé (ch
 
 | #   | Étape                                                 | Résultat attendu                                    |
 | --- | ----------------------------------------------------- | --------------------------------------------------- |
-| A1  | `convex export --prod`                                | Snapshot de sécurité avant écriture                 |
+| A1  | `convex export --prod --path …`                       | Snapshot de sécurité avant écriture                 |
 | A2  | `convex run --prod migrations/attioAlboImport:run`    | `{ companiesInserted: 34, dealsInserted: 43, ... }` |
 | A3  | `convex run --prod migrations/attioAlboImport:verify` | `portfolioCompanies: 34`, `deals: 43`, `exited: 2`  |
 | A4  | Re-lancer `:run` (idempotence)                        | `…Inserted: 0`, `…Patched: 34/43` — aucun doublon   |
@@ -296,19 +296,19 @@ Prérequis : `POWENS_WEBHOOK_SECRET` posé en prod ; provider HMAC + URL webhook
 (activer `CONNECTION_SYNCED`) ; orgs `calte`/`albo` + entités group seedées.
 La connexion des banques se fait par l'opérateur via le Powens Webview.
 
-| #   | Étape                                                                      | Résultat attendu                                                                                                                     |
-| --- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| P1  | `convex export --prod`                                                     | Snapshot de sécurité avant le 1ᵉʳ run                                                                                                |
-| P2  | Connecter un compte **neuf** (Palatine/Wormser/Neuflize) via Webview       | `cash.listAccounts` (calte) montre le compte sous **CALTE** ; `source='powens'`, montants en centimes positifs, `direction` correcte |
-| P3  | Neuflize (plusieurs comptes sous 1 connexion)                              | Un `bankAccounts` par compte Powens distinct (courants + comptes à terme)                                                            |
-| P4  | Mémo Bank via Webview                                                      | Compte sous **Albo Club** (org `albo`)                                                                                               |
-| P5  | Cutover compte neuf                                                        | Aucune tx antérieure à `_creationTime` du compte (l'historique du 1ᵉʳ lot ignoré)                                                    |
-| P6  | Connecter le **Qonto**                                                     | Le record Qonto **existant** est lié (powensConnectionId/AccountId remplis, IBAN backfillé) — **aucun** nouveau compte créé          |
-| P7  | Cutover Qonto                                                              | Aucune tx Powens antérieure à la dernière tx Airtable du Qonto (pas de doublon du passé)                                             |
-| P8  | Rejouer le même payload (idempotence)                                      | Aucun doublon (`by_powens_id`) ; `{ inserted: 0, patched: N }`                                                                       |
-| P9  | Signature falsifiée                                                        | `401`, rien écrit (cf. S5)                                                                                                           |
-| P10 | Nettoyage Qonto — `convex run --prod powens:listQontoTestTransactions`     | Liste les tx `source='manual'` sans `airtableId` ; si vide → ne rien supprimer                                                       |
-| P11 | `convex export --prod` puis `powens:deleteTransactionsByIds '{"ids":[…]}'` | Supprime **uniquement** les ids validés (garde-fou : manual + sans airtableId + compte Qonto) ; retourne `{ deleted, skipped }`      |
+| #   | Étape                                                                               | Résultat attendu                                                                                                                     |
+| --- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| P1  | `convex export --prod --path …`                                                     | Snapshot de sécurité avant le 1ᵉʳ run                                                                                                |
+| P2  | Connecter un compte **neuf** (Palatine/Wormser/Neuflize) via Webview                | `cash.listAccounts` (calte) montre le compte sous **CALTE** ; `source='powens'`, montants en centimes positifs, `direction` correcte |
+| P3  | Neuflize (plusieurs comptes sous 1 connexion)                                       | Un `bankAccounts` par compte Powens distinct (courants + comptes à terme)                                                            |
+| P4  | Mémo Bank via Webview                                                               | Compte sous **Albo Club** (org `albo`)                                                                                               |
+| P5  | Cutover compte neuf                                                                 | Aucune tx antérieure à `_creationTime` du compte (l'historique du 1ᵉʳ lot ignoré)                                                    |
+| P6  | Connecter le **Qonto**                                                              | Le record Qonto **existant** est lié (powensConnectionId/AccountId remplis, IBAN backfillé) — **aucun** nouveau compte créé          |
+| P7  | Cutover Qonto                                                                       | Aucune tx Powens antérieure à la dernière tx Airtable du Qonto (pas de doublon du passé)                                             |
+| P8  | Rejouer le même payload (idempotence)                                               | Aucun doublon (`by_powens_id`) ; `{ inserted: 0, patched: N }`                                                                       |
+| P9  | Signature falsifiée                                                                 | `401`, rien écrit (cf. S5)                                                                                                           |
+| P10 | Nettoyage Qonto — `convex run --prod powens:listQontoTestTransactions`              | Liste les tx `source='manual'` sans `airtableId` ; si vide → ne rien supprimer                                                       |
+| P11 | `convex export --prod --path …` puis `powens:deleteTransactionsByIds '{"ids":[…]}'` | Supprime **uniquement** les ids validés (garde-fou : manual + sans airtableId + compte Qonto) ; retourne `{ deleted, skipped }`      |
 
 ## Émission Powens (bouton « Connecter une banque » → Webview)
 
@@ -338,7 +338,7 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 
 | #   | Étape                                                                                                                    | Résultat attendu                                                                                                                                                                                         |
 | --- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R1  | `convex export --prod`                                                                                                   | Snapshot de sécurité avant le backfill                                                                                                                                                                   |
+| R1  | `convex export --prod --path …`                                                                                          | Snapshot de sécurité avant le backfill                                                                                                                                                                   |
 | R2  | `convex run --prod transactions:backfillMatchStatus '{"orgId":"<id calte>"}'`                                            | `{ matched: N, unmatched: M, skipped: 0 }` — matched = tx `reconciled` + `dealId`                                                                                                                        |
 | R3  | Re-lancer R2 (idempotence)                                                                                               | `{ matched: 0, unmatched: 0, skipped: N+M }` — aucune ré-écriture                                                                                                                                        |
 | R4  | Idem pour l'org `albo`                                                                                                   | Mêmes invariants                                                                                                                                                                                         |
@@ -463,7 +463,7 @@ Détails et pièges : `KNOWN_ISSUES.md` « Passif ».
 
 | #   | Étape                                                                                                        | Résultat attendu                                                                                                                                               |
 | --- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P1  | `convex export --prod`                                                                                       | Snapshot de sécurité avant le backfill                                                                                                                         |
+| P1  | `convex export --prod --path …`                                                                              | Snapshot de sécurité avant le backfill                                                                                                                         |
 | P2  | `convex run --prod transactions:backfillAllocation '{"orgId":"<id calte>"}'`                                 | `{ updated: N, skipped: M }` — N = tx avec `dealId` sans `allocation`                                                                                          |
 | P3  | Re-lancer P2 (**idempotence**)                                                                               | `{ updated: 0, skipped: N+M }` — aucune ré-écriture                                                                                                            |
 | P4  | Idem pour l'org `albo`                                                                                       | Mêmes invariants                                                                                                                                               |
@@ -512,20 +512,20 @@ Pré-requis : setup one-time déroulé (README « Telegram bot » — token,
 secret, `setWebhook`, `createLinkCode`). Env : `TELEGRAM_BOT_TOKEN`,
 `TELEGRAM_WEBHOOK_SECRET`.
 
-| #   | Étape                                                                         | Résultat attendu                                                                                                                  |
-| --- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| T1  | `POST /telegram/webhook` sans header `X-Telegram-Bot-Api-Secret-Token` (curl) | 401, rien n'est traité                                                                                                               |
-| T2  | `/start <code>` avec un code valide (< 24h)                                   | « Compte lié à l'organisation … » ; le code est consommé (un second `/start <code>` → « Code invalide ou expiré. »)                  |
-| T3  | Message d'un compte Telegram non lié                                          | Aucune réponse (ignoré silencieusement), webhook répond 200                                                                          |
-| T4  | « liste mes participations »                                                  | Indicateur « typing », puis réponse texte scopée à l'org courante (outil `listDeals`)                                                |
-| T5  | « crée une transaction de 50 € … » (outil d'écriture)                         | Message avec l'action proposée (`⚙️ <outil>` + paramètres) et boutons **✅ Confirmer / ❌ Refuser**                                  |
-| T6  | Bouton ✅ Confirmer                                                            | « ✅ Confirmé », les boutons disparaissent, l'agent reprend et confirme l'exécution ; l'écriture est visible dans l'app              |
-| T7  | Bouton ❌ Refuser                                                              | « ❌ Refusé », rien n'est écrit, l'agent accuse réception                                                                            |
-| T8  | Re-cliquer un bouton d'une approbation déjà traitée                           | « Cette demande de confirmation n'est plus en attente. », rien n'est écrit                                                           |
-| T9  | `/new` puis un message                                                        | Nouveau thread (l'agent ne « voit » plus la conversation précédente)                                                                 |
-| T10 | `/org <slug>` (membre) / `/org inconnu`                                       | « Organisation courante : … » + thread réinitialisé / « Organisation inconnue ou accès refusé. »                                     |
-| T11 | Spammer ~15 messages d'affilée                                                | « Trop de messages, réessayez dans un instant. » (rate-limit `chatSend`, partagé avec le panneau in-app)                             |
-| T12 | Pendant T4, logs Convex                                                       | Lignes `llm_usage` par appel LLM ; `cacheReadTokens > 0` dès le step 2 d'un message multi-étapes (prompt caching Mistral)            |
+| #   | Étape                                                                         | Résultat attendu                                                                                                          |
+| --- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| T1  | `POST /telegram/webhook` sans header `X-Telegram-Bot-Api-Secret-Token` (curl) | 401, rien n'est traité                                                                                                    |
+| T2  | `/start <code>` avec un code valide (< 24h)                                   | « Compte lié à l'organisation … » ; le code est consommé (un second `/start <code>` → « Code invalide ou expiré. »)       |
+| T3  | Message d'un compte Telegram non lié                                          | Aucune réponse (ignoré silencieusement), webhook répond 200                                                               |
+| T4  | « liste mes participations »                                                  | Indicateur « typing », puis réponse texte scopée à l'org courante (outil `listDeals`)                                     |
+| T5  | « crée une transaction de 50 € … » (outil d'écriture)                         | Message avec l'action proposée (`⚙️ <outil>` + paramètres) et boutons **✅ Confirmer / ❌ Refuser**                       |
+| T6  | Bouton ✅ Confirmer                                                           | « ✅ Confirmé », les boutons disparaissent, l'agent reprend et confirme l'exécution ; l'écriture est visible dans l'app   |
+| T7  | Bouton ❌ Refuser                                                             | « ❌ Refusé », rien n'est écrit, l'agent accuse réception                                                                 |
+| T8  | Re-cliquer un bouton d'une approbation déjà traitée                           | « Cette demande de confirmation n'est plus en attente. », rien n'est écrit                                                |
+| T9  | `/new` puis un message                                                        | Nouveau thread (l'agent ne « voit » plus la conversation précédente)                                                      |
+| T10 | `/org <slug>` (membre) / `/org inconnu`                                       | « Organisation courante : … » + thread réinitialisé / « Organisation inconnue ou accès refusé. »                          |
+| T11 | Spammer ~15 messages d'affilée                                                | « Trop de messages, réessayez dans un instant. » (rate-limit `chatSend`, partagé avec le panneau in-app)                  |
+| T12 | Pendant T4, logs Convex                                                       | Lignes `llm_usage` par appel LLM ; `cacheReadTokens > 0` dès le step 2 d'un message multi-étapes (prompt caching Mistral) |
 
 ## En cas d'échec
 

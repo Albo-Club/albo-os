@@ -7,7 +7,8 @@ fichier liste _quoi existe_ et _où_, plus les chantiers en cours.
 **Règle invariable avant toute opération destructive :**
 
 ```bash
-pnpm exec convex export --prod   # snapshot de secours
+# snapshot de secours (`--path` est obligatoire : répertoire ou .zip)
+pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip
 ```
 
 ## Opérations disponibles
@@ -35,7 +36,7 @@ conformément à la règle « purger d'abord, resserrer ensuite » :
 1. **Purge (à exécuter en prod)** :
 
    ```bash
-   pnpm exec convex export --prod
+   pnpm exec convex export --prod --path ./albo-backup.zip
    pnpm exec convex run --prod seed:purgeLegacyForecasts
    ```
 
