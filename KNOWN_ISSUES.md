@@ -300,6 +300,33 @@ answers correctly. To verify the model actually served in prod, check the
 env (`pnpm exec convex env list --prod` — make sure `MISTRAL_MODEL` is
 unset or set to the intended id), not the agent's self-description.
 
+## Mistral prompt caching — injecté via un `fetch` custom
+
+Mistral facture les tokens de prompt en cache à **10 % du prix input**
+quand la requête porte un `prompt_cache_key` (matching de préfixe).
+Indispensable ici : chaque message déclenche jusqu'à 12 round-trips LLM
+(`stopWhen`), chacun renvoyant system prompt + ~45 schémas d'outils +
+historique — les steps 2..N d'un même message sont des hits quasi totaux.
+
+1. **`@ai-sdk/mistral` (3.0.37) ne sait pas envoyer `prompt_cache_key`**
+   (schéma de providerOptions fermé, options inconnues strippées). D'où le
+   wrapper `fetch` dans `convex/agent.ts` (`createMistral({ fetch })`) qui
+   injecte le champ dans le body JSON. **À chaque bump de
+   `@ai-sdk/mistral`, vérifier si l'option native a atterri** — si oui,
+   retirer le wrapper au profit de la providerOption.
+2. **Clé statique volontaire** (`albo-os-chat`) : le matching de préfixe
+   fait le vrai travail, la clé ne sert qu'au routage du cache ; une clé
+   unique partage le bloc system+tools entre tous les threads (2 users).
+3. **Stabilité du préfixe** : le system prompt est fixé pour toute la durée
+   d'un `streamText`/`generateText` (route/orgName figés à l'appel) → hits
+   intra-message garantis. Un changement de route entre deux messages ne
+   coûte qu'un miss sur la fin du system prompt. Ne PAS rendre la liste
+   d'outils dynamique (filtrage par route) : ça casserait le préfixe.
+4. **Vérification** : le `usageHandler` de `convex/agent.ts` logge une
+   ligne `llm_usage` par appel LLM (logs Convex) — `cacheReadTokens > 0`
+   attendu dès le step 2 d'un message multi-étapes ; la ligne « cached
+   tokens » doit apparaître sur le dashboard Mistral.
+
 ## SITE_URL drift in prod = broken email links
 
 `SITE_URL` is the Convex env var that builds every email URL (magic link,
