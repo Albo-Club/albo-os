@@ -23,6 +23,21 @@ bas de page.
 
 ---
 
+## v1.6.4 — 11/06/2026 à 19:05 — Garde-fou : les sauvegardes de données ne partent plus dans le code
+
+Changement purement technique, rien ne change à l'écran : les sauvegardes
+de la base de données (créées avant chaque opération sensible) sont
+désormais automatiquement exclues du dépôt de code, pour éviter tout risque
+de fuite de données.
+
+> **🔧 Notes techniques**
+>
+> - Ajout de `/albo-backup*.zip` au `.gitignore` : les snapshots produits
+>   par l'étape `convex export --prod --path …` (runbook `MIGRATIONS.md`)
+>   ne peuvent plus être commités par mégarde. Le repo est **public** → un
+>   dump de données prod commité serait une fuite. Aucun zip n'était suivi
+>   jusqu'ici ; protection préventive.
+
 ## v1.6.3 — 11/06/2026 à 18:29 — Raccordement au template Ouvre-Boîte
 
 Mise à jour technique, rien ne change à l'écran : Albo OS est désormais
