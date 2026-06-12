@@ -529,7 +529,10 @@ Pièges et décisions :
    outil + dans les `instructions` (`orgAwareSchema`,
    `convex/mcp/server.ts`). Chaque outil doit rester **auto-suffisant** —
    ne jamais concevoir un outil MCP qui dépend du résultat d'un autre pour
-   être appelable.
+   être appelable. ⚠️ claude.ai **fige les schémas d'outils au moment de
+   la connexion** : après un déploiement qui les modifie, déconnecter puis
+   reconnecter le connecteur (Customize → Connectors → Albo OS), sinon le
+   modèle continue de voir les anciens schémas.
 
 ## tailwind-merge v3 obligatoire avec les composants shadcn « Tailwind v4 »
 
