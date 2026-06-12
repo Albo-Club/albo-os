@@ -23,6 +23,17 @@ bas de page.
 
 ---
 
+## v1.7.2 — 12/06/2026 à 16:05 — Documentation du connecteur Claude
+
+Mise à jour purement documentaire, rien ne change à l'écran.
+
+> **🔧 Notes techniques**
+>
+> - `KNOWN_ISSUES.md` § « Serveur MCP distant » : claude.ai fige les
+>   schémas d'outils à la connexion du connecteur → après un déploiement
+>   qui les modifie, déconnecter/reconnecter le connecteur (constat du
+>   test live de la v1.7.1).
+
 ## v1.7.1 — 12/06/2026 à 15:02 — Connecteur Claude : fini les organisations devinées
 
 Amélioration du connecteur Claude : vos organisations (et uniquement les
