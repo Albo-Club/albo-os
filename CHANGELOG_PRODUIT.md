@@ -23,6 +23,25 @@ bas de page.
 
 ---
 
+## v1.7.1 — 12/06/2026 à 15:02 — Connecteur Claude : fini les organisations devinées
+
+Amélioration du connecteur Claude : vos organisations (et uniquement les
+vôtres) sont désormais annoncées automatiquement à Claude, qui ne peut plus
+se tromper de nom quand il interroge vos données. Une nouvelle organisation
+créée dans Albo OS apparaît dans le connecteur sans aucune manipulation.
+
+> **🔧 Notes techniques**
+>
+> - Constat en test : claude.ai ne charge qu'un sous-ensemble des outils
+>   par conversation → `listOrgs` peut manquer et le modèle devinait des
+>   slugs erronés (`albo-club`).
+> - `convex/mcp/server.ts` : à `initialize` et `tools/list` (requêtes
+>   authentifiées), les orgs du user sont résolues
+>   (`internal.mcp.queries.listOrgsForUser`) et injectées — `enum` sur le
+>   paramètre `org` de chaque outil (`orgAwareSchema`) + liste des slugs
+>   dans les `instructions` du serveur. Aucun slug en dur ; l'autorisation
+>   reste le re-check `readMembership` à chaque `tools/call`.
+
 ## v1.7.0 — 12/06/2026 à 11:36 — L'assistant arrive dans Claude (connecteur MCP)
 
 Vos données de pilotage sont désormais consultables directement depuis

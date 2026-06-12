@@ -521,6 +521,15 @@ Pièges et décisions :
    (inline), incompatibles `z.toJSONSchema()` → `convex/mcp/registry.ts`
    re-déclare les schémas en zod v4. Si les args d'un internal changent,
    tenir les deux en phase.
+8. **claude.ai ne charge qu'un sous-ensemble des outils par conversation**
+   (sélection dynamique côté Anthropic, ~5 sur 18 observés). Conséquence :
+   `listOrgs` peut être absent et le modèle devine des slugs erronés.
+   Mitigation en place : à `initialize`/`tools/list` (authentifiés), les
+   orgs du caller sont injectées en `enum` sur le paramètre `org` de chaque
+   outil + dans les `instructions` (`orgAwareSchema`,
+   `convex/mcp/server.ts`). Chaque outil doit rester **auto-suffisant** —
+   ne jamais concevoir un outil MCP qui dépend du résultat d'un autre pour
+   être appelable.
 
 ## tailwind-merge v3 obligatoire avec les composants shadcn « Tailwind v4 »
 

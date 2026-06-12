@@ -37,8 +37,8 @@ const SERVER_INSTRUCTIONS =
   'Read-only access to Albo OS portfolio data (family office CALTE + Albo ' +
   'Club). Monetary amounts are integers in EUR CENTS (100000 = 1 000 €). ' +
   'Rates are in BASIS POINTS (1100 = 11%). Dates are ISO strings or ms ' +
-  'epoch. One investment vehicle = one organization: call listOrgs first, ' +
-  'then pass the `org` slug to every other tool.'
+  'epoch. One investment vehicle = one organization: pass the `org` slug ' +
+  'to every tool.'
 
 // Permissive CORS so browser-based clients (MCP Inspector) can connect; the
 // endpoint is bearer-only, no ambient cookie auth, so this is safe.
@@ -157,6 +157,49 @@ function toolJsonSchema(tool: McpTool): Record<string, unknown> {
   return schema
 }
 
+type OrgInfo = { slug: string; name: string; role: string }
+
+/** The caller's orgs — injected into schemas/instructions at discovery time. */
+async function orgsForActor(
+  ctx: ActionCtx,
+  actorUserId: Id<'users'>,
+): Promise<Array<OrgInfo>> {
+  const orgs: Array<OrgInfo> = await ctx.runQuery(
+    internal.mcp.queries.listOrgsForUser,
+    { actorUserId },
+  )
+  return orgs
+}
+
+function describeOrgs(orgs: Array<OrgInfo>): string {
+  return orgs.map((org) => `"${org.slug}" (${org.name})`).join(', ')
+}
+
+/**
+ * Same as toolJsonSchema, but pins the `org` parameter to the caller's
+ * actual org slugs (enum). claude.ai loads only a subset of tools per
+ * conversation, so listOrgs may be absent — every tool must be
+ * self-sufficient or the model guesses (wrong) slugs. Authorization does
+ * NOT rely on this: membership is re-checked server-side on every call.
+ */
+function orgAwareSchema(
+  tool: McpTool,
+  orgs: Array<OrgInfo>,
+): Record<string, unknown> {
+  const schema = toolJsonSchema(tool)
+  const properties = schema.properties as
+    | Record<string, unknown>
+    | undefined
+  if (properties?.org && orgs.length > 0) {
+    properties.org = {
+      type: 'string',
+      enum: orgs.map((org) => org.slug),
+      description: `Organization slug. Your organizations: ${describeOrgs(orgs)}.`,
+    }
+  }
+  return schema
+}
+
 export const mcpEndpoint = httpAction(async (ctx, request) => {
   // Absent on initialize and from older clients (spec: assume 2025-03-26).
   const version = request.headers.get('Mcp-Protocol-Version')
@@ -200,27 +243,34 @@ export const mcpEndpoint = httpAction(async (ctx, request) => {
         SUPPORTED_PROTOCOL_VERSIONS.includes(requested)
           ? requested
           : SUPPORTED_PROTOCOL_VERSIONS[0]
+      const orgs = await orgsForActor(ctx, actorUserId)
+      const instructions =
+        orgs.length > 0
+          ? `${SERVER_INSTRUCTIONS} Your organizations: ${describeOrgs(orgs)}.`
+          : SERVER_INSTRUCTIONS
       return jsonResponse(
         rpcResult(id, {
           protocolVersion,
           capabilities: { tools: {} },
           serverInfo: { name: 'albo-os', title: 'Albo OS', version: '1.0.0' },
-          instructions: SERVER_INSTRUCTIONS,
+          instructions,
         }),
       )
     }
     case 'ping':
       return jsonResponse(rpcResult(id, {}))
-    case 'tools/list':
+    case 'tools/list': {
+      const orgs = await orgsForActor(ctx, actorUserId)
       return jsonResponse(
         rpcResult(id, {
           tools: mcpTools.map((tool) => ({
             name: tool.name,
             description: tool.description,
-            inputSchema: toolJsonSchema(tool),
+            inputSchema: orgAwareSchema(tool, orgs),
           })),
         }),
       )
+    }
     case 'tools/call': {
       const name = params?.name
       const tool = mcpTools.find((t) => t.name === name)
