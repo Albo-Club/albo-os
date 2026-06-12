@@ -23,6 +23,36 @@ bas de page.
 
 ---
 
+## v1.7.0 — 12/06/2026 à 11:36 — L'assistant arrive dans Claude (connecteur MCP)
+
+Vos données de pilotage sont désormais consultables directement depuis
+Claude (claude.ai, web et mobile) : ajoutez Albo OS comme « connecteur
+personnalisé » et posez vos questions — participations, trésorerie, passif,
+prévisionnel, valorisations, KPIs. Claude interroge vos données en **lecture
+seule**, après connexion avec votre compte Albo OS (chaque utilisateur ne
+voit que ses organisations). Aucune écriture possible par ce canal : la
+création et la modification restent dans l'app et le bot Telegram.
+
+> **🔧 Notes techniques**
+>
+> - `convex/mcp/` : serveur MCP distant Streamable HTTP **stateless** fait
+>   main (`server.ts` — JSON-RPC `initialize`/`tools/list`/`tools/call` ;
+>   le SDK MCP officiel est Node-only, incompatible avec le runtime des
+>   httpActions Convex). Registre de 18 outils lecture (`registry.ts`,
+>   schémas zod v4 → `z.toJSONSchema`) qui réutilise les internals des
+>   outils agent (`{orgId, actorUserId}` + `readMembership`) ; résolutions
+>   user BA → `users` et slug → org dans `queries.ts`.
+> - OAuth 2.1 : plugin Better Auth `mcp({ loginPage: '/login' })` (DCR +
+>   PKCE ; tables `oauthApplication`/`oauthAccessToken` déjà présentes dans
+>   le composant Convex BA). Métadonnées RFC 9728 servies sur convex.site,
+>   RFC 8414 au root du domaine app
+>   (`src/routes/[.]well-known.oauth-authorization-server.ts`). Reprise du
+>   flow après login dans `/login` via `callbackURL` (survit au roundtrip
+>   email du magic link).
+> - Rate limit `mcpToolCall` (60/min/user), 401 + `WWW-Authenticate`,
+>   bypass dev `MCP_DEV_TOKEN`/`MCP_DEV_EMAIL` pour curl/Inspector. Pièges
+>   et fallbacks : `KNOWN_ISSUES.md` « Serveur MCP distant ».
+
 ## v1.6.4 — 11/06/2026 à 19:05 — Garde-fou : les sauvegardes de données ne partent plus dans le code
 
 Changement purement technique, rien ne change à l'écran : les sauvegardes

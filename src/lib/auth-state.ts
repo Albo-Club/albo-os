@@ -49,11 +49,15 @@ export function useAuthState() {
 // showing them the landing/sign-in screen. Keys off the BA session alone (not
 // Convex) so the redirect fires as soon as a session is confirmed; the `/app`
 // guard then covers the Convex-JWT loading gap.
-export function useRedirectWhenAuthenticated() {
+export function useRedirectWhenAuthenticated(target?: string) {
   const navigate = useNavigate()
   const { user } = useAuthState()
 
   useEffect(() => {
-    if (user) navigate({ to: '/app' })
-  }, [user, navigate])
+    if (!user) return
+    // `target` is for non-route destinations (e.g. the MCP OAuth authorize
+    // endpoint) that the router cannot navigate to.
+    if (target) window.location.replace(target)
+    else navigate({ to: '/app' })
+  }, [user, navigate, target])
 }

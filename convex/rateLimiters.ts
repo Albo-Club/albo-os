@@ -30,6 +30,8 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   },
   // Chat messages: per user. AI calls are expensive.
   chatSend: { kind: 'token bucket', rate: 30, period: MINUTE, capacity: 10 },
+  // MCP tool calls: per user. Reads only, but external clients can loop.
+  mcpToolCall: { kind: 'token bucket', rate: 60, period: MINUTE, capacity: 20 },
 })
 
 type LimitName =
@@ -38,6 +40,7 @@ type LimitName =
   | 'verificationSend'
   | 'passwordResetSend'
   | 'chatSend'
+  | 'mcpToolCall'
 
 /**
  * Throws a friendly ConvexError when a limit is hit. The data payload includes

@@ -30,7 +30,33 @@ const searchSchema = z.object({
   // Better Auth appends ?error=... when a social sign-in fails via
   // `errorCallbackURL`. We surface it as a toast on mount.
   error: z.string().optional(),
+  // OAuth authorize params forwarded by the Better Auth `mcp` plugin when an
+  // unauthenticated user starts the MCP connector flow. When present, the
+  // post-login target becomes the authorize endpoint instead of /app.
+  client_id: z.string().optional(),
+  redirect_uri: z.string().optional(),
+  response_type: z.string().optional(),
+  scope: z.string().optional(),
+  state: z.string().optional(),
+  code_challenge: z.string().optional(),
+  code_challenge_method: z.string().optional(),
+  prompt: z.string().optional(),
+  nonce: z.string().optional(),
+  resource: z.string().optional(),
 })
+
+const oauthParamKeys = [
+  'client_id',
+  'redirect_uri',
+  'response_type',
+  'scope',
+  'state',
+  'code_challenge',
+  'code_challenge_method',
+  'prompt',
+  'nonce',
+  'resource',
+] as const
 
 export const Route = createFileRoute('/login')({
   component: LoginPage,
@@ -45,7 +71,25 @@ export const Route = createFileRoute('/login')({
 })
 
 function LoginPage() {
-  useRedirectWhenAuthenticated()
+  const search = Route.useSearch()
+  const { redirect, error: socialError } = search
+  // MCP connector flow: rebuild the authorize URL from the OAuth params so
+  // every sign-in path (password, magic link, social) resumes the flow after
+  // authentication. Embedded in `callbackURL`, it survives the magic-link
+  // email roundtrip. Does not depend on the BA plugin's cookie-based resume.
+  const oauthResume = useMemo(() => {
+    if (!search.client_id || !search.redirect_uri || !search.response_type) {
+      return null
+    }
+    const params = new URLSearchParams()
+    for (const key of oauthParamKeys) {
+      const value = search[key]
+      if (value !== undefined) params.set(key, value)
+    }
+    return `/api/auth/mcp/authorize?${params.toString()}`
+  }, [search])
+  const postLoginRedirect = oauthResume ?? redirect
+  useRedirectWhenAuthenticated(oauthResume ?? undefined)
   const { t } = useTranslation(['auth', 'validation', 'errors'])
   const te = (k: string) => t(`errors:${k}`)
   const schema = useMemo(
@@ -60,7 +104,6 @@ function LoginPage() {
     () => z.email(t('validation:email.enterValid')),
     [t],
   )
-  const { redirect, error: socialError } = Route.useSearch()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [magicLoading, setMagicLoading] = useState(false)
@@ -90,7 +133,7 @@ function LoginPage() {
         return
       }
       setUnverifiedEmail(null)
-      if (redirect) window.location.replace(redirect)
+      if (postLoginRedirect) window.location.replace(postLoginRedirect)
       else navigate({ to: '/app' })
     },
   })
@@ -100,7 +143,7 @@ function LoginPage() {
     setResendLoading(true)
     const { error } = await authClient.sendVerificationEmail({
       email: unverifiedEmail,
-      callbackURL: redirect ?? '/app',
+      callbackURL: postLoginRedirect ?? '/app',
     })
     setResendLoading(false)
     if (error) {
@@ -124,7 +167,7 @@ function LoginPage() {
     setMagicLoading(true)
     const { error } = await authClient.signIn.magicLink({
       email,
-      callbackURL: redirect ?? '/app',
+      callbackURL: postLoginRedirect ?? '/app',
     })
     setMagicLoading(false)
     if (error) {
@@ -160,7 +203,7 @@ function LoginPage() {
         }}
       >
         <CardContent className="flex flex-col gap-6">
-          <SocialAuthButtons redirect={redirect} />
+          <SocialAuthButtons redirect={postLoginRedirect} />
           {submitError && !unverifiedEmail && (
             <Alert variant="destructive">
               <AlertDescription>{submitError}</AlertDescription>

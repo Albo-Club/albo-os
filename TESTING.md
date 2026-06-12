@@ -527,6 +527,25 @@ secret, `setWebhook`, `createLinkCode`). Env : `TELEGRAM_BOT_TOKEN`,
 | T11 | Spammer ~15 messages d'affilée                                                | « Trop de messages, réessayez dans un instant. » (rate-limit `chatSend`, partagé avec le panneau in-app)                  |
 | T12 | Pendant T4, logs Convex                                                       | Lignes `llm_usage` par appel LLM ; `cacheReadTokens > 0` dès le step 2 d'un message multi-étapes (prompt caching Mistral) |
 
+## Serveur MCP (connector claude.ai)
+
+Pré-requis : déploiement prod (routes `/mcp` + métadonnées well-known —
+cf. `KNOWN_ISSUES.md` « Serveur MCP distant »). Pour M2-M5, poser
+`MCP_DEV_TOKEN` + `MCP_DEV_EMAIL` (env Convex) — **les retirer après**.
+
+| #   | Étape                                                                                                  | Résultat attendu                                                                                                  |
+| --- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| M1  | `POST <convex-site-url>/mcp` sans header `Authorization` (curl)                                        | 401 + header `WWW-Authenticate` pointant `/.well-known/oauth-protected-resource`                                  |
+| M2  | `initialize` avec `Authorization: Bearer $MCP_DEV_TOKEN`                                               | 200, `result.protocolVersion`, `capabilities.tools`, `instructions` (conventions cents/bps)                       |
+| M3  | `tools/list`                                                                                            | 18 outils, chacun avec `description` + `inputSchema` JSON Schema                                                  |
+| M4  | `tools/call listOrgs` puis `listDeals {org:"<slug>"}`                                                  | Orgs du user `MCP_DEV_EMAIL`, puis deals scopés à l'org                                                           |
+| M5  | `tools/call listDeals` avec un slug d'org dont l'user n'est **pas** membre                             | Résultat `isError` (`agent_tools_forbidden` / `org_not_found`), aucune donnée ne fuite                            |
+| M6  | GET `<site-url>/.well-known/oauth-authorization-server`                                                | 200 JSON, `issuer` = domaine app, endpoints sous `/api/auth/mcp/*`                                                |
+| M7  | `npx @modelcontextprotocol/inspector` → URL `<convex-site-url>/mcp`, auth OAuth                        | DCR → redirect `/login` → sign-in → retour → outils listés et appelables                                          |
+| M8  | claude.ai → Settings → Connectors → *Add custom connector* (URL `/mcp`), puis « liste les deals de … » | Flow OAuth via `/login`, connector actif, réponse avec les données de l'org                                       |
+| M9  | Rejouer M8 en se connectant par **lien magique**                                                       | Après le clic dans l'email, le flow OAuth reprend et aboutit (callbackURL)                                        |
+| M10 | Spammer ~25 `tools/call` d'affilée                                                                     | Résultat `isError` `rate_limited` (bucket `mcpToolCall`, 60/min/user)                                             |
+
 ## En cas d'échec
 
 - Smoke échoue → ouvrir `KNOWN_ISSUES.md` (déploiement Convex / `pnpm rebuild esbuild`).
@@ -538,3 +557,7 @@ secret, `setWebhook`, `createLinkCode`). Env : `TELEGRAM_BOT_TOKEN`,
 - Bot Telegram muet → `TELEGRAM_BOT_TOKEN`/`TELEGRAM_WEBHOOK_SECRET` côté
   Convex env + `curl https://api.telegram.org/bot<token>/getWebhookInfo`
   pour vérifier l'URL du webhook et les erreurs de livraison.
+- Connector MCP qui ne se connecte pas → dérouler M1 puis M6 (curl) : si le
+  401 ne porte pas `WWW-Authenticate` ou si les métadonnées ne répondent
+  pas, le client n'engage jamais le flow OAuth. Voir `KNOWN_ISSUES.md`
+  « Serveur MCP distant » (fallback *Advanced settings* claude.ai).

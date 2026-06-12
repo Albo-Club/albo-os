@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth/minimal'
 import { magicLink } from 'better-auth/plugins/magic-link'
+import { mcp } from 'better-auth/plugins'
 import { createClient } from '@convex-dev/better-auth'
 import { convex } from '@convex-dev/better-auth/plugins'
 import { requireRunMutationCtx } from '@convex-dev/better-auth/utils'
@@ -69,6 +70,10 @@ export const createAuth = (ctx: GenericCtx<DataModel>) =>
         '/change-email': { window: 60, max: 3 },
         '/change-password': { window: 60, max: 5 },
         '/delete-user': { window: 60, max: 3 },
+        // MCP OAuth provider endpoints (claude.ai connector flow).
+        '/mcp/authorize': { window: 60, max: 10 },
+        '/mcp/token': { window: 60, max: 10 },
+        '/mcp/register': { window: 60, max: 5 },
       },
     },
     // Force secure cookies in prod, sensible defaults everywhere. Without
@@ -264,6 +269,11 @@ export const createAuth = (ctx: GenericCtx<DataModel>) =>
           })
         },
       }),
+      // OAuth 2.1 provider for the remote MCP server (convex/mcp/server.ts):
+      // DCR + PKCE endpoints under /api/auth/mcp/*, ridden by the app-domain
+      // proxy so the authorize flow shares the login page's session cookies.
+      // See KNOWN_ISSUES.md « Serveur MCP distant ».
+      mcp({ loginPage: '/login' }),
       convex({ authConfig }),
     ],
   })

@@ -471,6 +471,57 @@ Les outils d'écriture de l'agent portent `needsApproval: true`
    — garanti par l'auto-deny du point 3. Boutons obsolètes → réponse
    « plus en attente », rien n'est écrit.
 
+## Serveur MCP distant (connector claude.ai) — OAuth via plugin BA `mcp`
+
+Le serveur MCP (`convex/mcp/`) expose ~18 outils **lecture seule** aux
+clients MCP externes. Architecture : resource server = httpAction `/mcp`
+(JSON-RPC Streamable HTTP **stateless**, fait main — le SDK
+`@modelcontextprotocol/sdk` est Node-only et les httpActions tournent dans
+le runtime V8 Convex, sans `"use node"`) ; authorization server = plugin
+Better Auth `mcp` dont les endpoints (`/api/auth/mcp/authorize|token|register`)
+passent par le proxy app-domain existant — donc same-origin avec `/login`
+et ses cookies de session.
+
+Pièges et décisions :
+
+1. **Plugin `mcp` hors liste « supported plugins » du composant
+   `@convex-dev/better-auth`.** Ça fonctionne parce que le schéma du
+   composant (0.12.x) embarque déjà `oauthApplication`, `oauthAccessToken`,
+   `oauthConsent` et `jwks`. À re-vérifier à chaque upgrade du composant.
+   Si le plugin casse, fallbacks dans l'ordre : (a) seeder un
+   `oauthApplication` à la main et utiliser les *Advanced settings* du
+   connector claude.ai (client_id pré-enregistré, pas de DCR) ; (b) local
+   install du composant avec schéma régénéré ; (c) mini-AS maison.
+2. **Pas de binding d'audience RFC 8707** : les tokens BA sont opaques et
+   le paramètre `resource` n'est pas validé. Accepté pour un outil interne
+   à 2 users — à revoir si le serveur expose un jour des écritures.
+3. **Reprise du flow OAuth après login.** Le plugin redirige les
+   non-authentifiés vers `/login?<query OAuth>` et pose un cookie signé
+   `oidc_login_prompt` (after-hook de reprise). On ne dépend **pas** de ce
+   mécanisme : `/login` reconstruit l'URL `/api/auth/mcp/authorize?…` à
+   partir des params et la passe en `callbackURL` — embarquée dans le lien
+   magique, elle survit au roundtrip email (méthode de connexion
+   principale). Ne pas retirer ce fallback.
+4. **Métadonnées de découverte à deux endroits.** RFC 9728
+   (`/.well-known/oauth-protected-resource`, + variante `/mcp`) est servie
+   sur **convex.site** (l'hôte de la ressource) et pointe vers le domaine
+   app ; RFC 8414 (`/.well-known/oauth-authorization-server`) doit être au
+   **root du domaine app** (issuer = `SITE_URL`) → route TanStack
+   `src/routes/[.]well-known.oauth-authorization-server.ts` qui proxifie la
+   route BA. Le 401 du `/mcp` porte `WWW-Authenticate: Bearer
+   resource_metadata="…"` — c'est ce qui déclenche le flow côté client.
+5. **`MCP_DEV_TOKEN` / `MCP_DEV_EMAIL`** (env Convex) : bypass OAuth pour
+   curl et MCP Inspector. Les deux doivent être posés pour être actifs —
+   ne jamais les laisser en prod hors session de test.
+6. **Écritures interdites par principe (v1).** MCP n'a pas d'équivalent de
+   `needsApproval` : une écriture exposée en MCP reposerait sur la
+   confirmation du client (Claude), pas sur nos boutons in-app. Si un jour
+   on en ajoute, décision explicite + section dédiée ici.
+7. **Registre de schémas séparé.** Les outils agent sont en `zod/v3`
+   (inline), incompatibles `z.toJSONSchema()` → `convex/mcp/registry.ts`
+   re-déclare les schémas en zod v4. Si les args d'un internal changent,
+   tenir les deux en phase.
+
 ## tailwind-merge v3 obligatoire avec les composants shadcn « Tailwind v4 »
 
 Les composants `src/components/ui/*` (générés pour Tailwind v4) utilisent le

@@ -201,6 +201,35 @@ reachable from Telegram (`convex/telegram.ts`, webhook at
    The user opens `https://t.me/<bot>?start=<code>` (or sends
    `/start <code>` to the bot).
 
+## MCP server (claude.ai connector)
+
+A remote MCP server (`convex/mcp/`, Streamable HTTP endpoint at
+`<convex-site-url>/mcp`) exposes the **read-only** portfolio tools (~18:
+deals, cash, pointage, liabilities, forecasts, valuations, KPIs) to external
+MCP clients. No write tools on this surface. Auth is OAuth 2.1 (PKCE +
+dynamic client registration) provided by the Better Auth `mcp` plugin — the
+flow goes through the regular `/login` page, and each user only sees the
+orgs they are a member of.
+
+**Connect from claude.ai**
+
+1. claude.ai → Settings → Connectors → *Add custom connector*.
+2. URL: `<convex-site-url>/mcp`
+   (e.g. `https://<deployment>.convex.site/mcp`).
+3. Complete the OAuth sign-in with your Albo OS account.
+
+**Testing without OAuth** (curl / MCP Inspector): set both env vars, then
+send `Authorization: Bearer <random-string>`. Unset them when done — never
+leave them in prod outside a test session.
+
+```bash
+pnpm exec convex env set --prod MCP_DEV_TOKEN <random-string>
+pnpm exec convex env set --prod MCP_DEV_EMAIL <user email>
+```
+
+Validation checklist: `TESTING.md` « Serveur MCP » ; OAuth gotchas and
+fallbacks: `KNOWN_ISSUES.md` « Serveur MCP distant ».
+
 ## Deploy to Vercel
 
 The frontend runs on Vercel (serverless via Nitro's Vercel preset); the
