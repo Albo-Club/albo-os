@@ -20,6 +20,7 @@ import { Route as AppOnboardingRouteImport } from './routes/app/onboarding'
 import { Route as AppMeRouteImport } from './routes/app/me'
 import { Route as AppAdminRouteImport } from './routes/app/admin'
 import { Route as AcceptInviteTokenRouteImport } from './routes/accept-invite.$token'
+import { Route as DotwellKnownOauthAuthorizationServerRouteImport } from './routes/[.]well-known.oauth-authorization-server'
 import { Route as AppAllRouteRouteImport } from './routes/app/all/route'
 import { Route as AppOrgSlugRouteRouteImport } from './routes/app/$orgSlug/route'
 import { Route as AppAllIndexRouteImport } from './routes/app/all/index'
@@ -95,6 +96,12 @@ const AcceptInviteTokenRoute = AcceptInviteTokenRouteImport.update({
   path: '/accept-invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DotwellKnownOauthAuthorizationServerRoute =
+  DotwellKnownOauthAuthorizationServerRouteImport.update({
+    id: '/.well-known/oauth-authorization-server',
+    path: '/.well-known/oauth-authorization-server',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AppAllRouteRoute = AppAllRouteRouteImport.update({
   id: '/all',
   path: '/all',
@@ -205,6 +212,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
   '/app/all': typeof AppAllRouteRouteWithChildren
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
   '/app/admin': typeof AppAdminRoute
   '/app/me': typeof AppMeRoute
@@ -234,6 +242,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
   '/app/admin': typeof AppAdminRoute
   '/app/me': typeof AppMeRoute
@@ -266,6 +275,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
   '/app/all': typeof AppAllRouteRouteWithChildren
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
   '/app/admin': typeof AppAdminRoute
   '/app/me': typeof AppMeRoute
@@ -300,6 +310,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/app/$orgSlug'
     | '/app/all'
+    | '/.well-known/oauth-authorization-server'
     | '/accept-invite/$token'
     | '/app/admin'
     | '/app/me'
@@ -329,6 +340,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/reset-password'
+    | '/.well-known/oauth-authorization-server'
     | '/accept-invite/$token'
     | '/app/admin'
     | '/app/me'
@@ -360,6 +372,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/app/$orgSlug'
     | '/app/all'
+    | '/.well-known/oauth-authorization-server'
     | '/accept-invite/$token'
     | '/app/admin'
     | '/app/me'
@@ -391,6 +404,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  DotwellKnownOauthAuthorizationServerRoute: typeof DotwellKnownOauthAuthorizationServerRoute
   AcceptInviteTokenRoute: typeof AcceptInviteTokenRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
@@ -472,6 +486,13 @@ declare module '@tanstack/react-router' {
       path: '/accept-invite/$token'
       fullPath: '/accept-invite/$token'
       preLoaderRoute: typeof AcceptInviteTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.well-known/oauth-authorization-server': {
+      id: '/.well-known/oauth-authorization-server'
+      path: '/.well-known/oauth-authorization-server'
+      fullPath: '/.well-known/oauth-authorization-server'
+      preLoaderRoute: typeof DotwellKnownOauthAuthorizationServerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/all': {
@@ -704,6 +725,8 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  DotwellKnownOauthAuthorizationServerRoute:
+    DotwellKnownOauthAuthorizationServerRoute,
   AcceptInviteTokenRoute: AcceptInviteTokenRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
