@@ -6,12 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 export function KpiCard({
   label,
   value,
+  title,
   delta,
   hint,
   icon: Icon,
 }: {
   label: string
   value: string | number
+  /** Exact value, surfaced as a native tooltip when `value` is abbreviated. */
+  title?: string
   delta?: number
   hint?: string
   icon?: LucideIcon
@@ -29,7 +32,12 @@ export function KpiCard({
         ) : null}
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-semibold">{value}</div>
+        <div
+          className="text-2xl font-semibold tabular-nums whitespace-nowrap"
+          title={title}
+        >
+          {value}
+        </div>
         <div className="text-muted-foreground mt-1 flex items-center gap-1 text-xs">
           {delta !== undefined ? (
             <>

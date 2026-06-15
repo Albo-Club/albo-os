@@ -90,6 +90,18 @@ export function useFormatters() {
           currency: 'EUR',
           maximumFractionDigits: 0,
         }).format(cents / 100)
+  // Compact form for dense KPI tiles (e.g. "54,0 M€", "19,2 k€"); the exact
+  // amount is surfaced via a title tooltip on the value.
+  const fmtEurCompact = (cents?: number | null) =>
+    cents == null
+      ? '—'
+      : new Intl.NumberFormat(lang, {
+          style: 'currency',
+          currency: 'EUR',
+          notation: 'compact',
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        }).format(cents / 100)
   const fmtDate = (ms?: number | null) =>
     ms == null
       ? '—'
@@ -105,7 +117,7 @@ export function useFormatters() {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         }).format(ratio)}×`
-  return { fmtEur, fmtDate, fmtMultiple }
+  return { fmtEur, fmtEurCompact, fmtDate, fmtMultiple }
 }
 
 /**
