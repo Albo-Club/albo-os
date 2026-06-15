@@ -11,6 +11,7 @@ import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 
+import { CompanyLogo } from '~/components/CompanyLogo'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
@@ -37,7 +38,12 @@ export type DealRow = {
   targetCompanyId: string
   /** Custom name — displayed instead of the derived title when present. */
   name?: string | null
-  target: { _id: string; name: string; sector?: string | null } | null
+  target: {
+    _id: string
+    name: string
+    sector?: string | null
+    domain?: string | null
+  } | null
   investor: { name: string } | null
   spv: { name: string } | null
   instrumentKind: string
@@ -294,6 +300,7 @@ export function ParticipationsTable({
       string,
       {
         name: string
+        domain: string | undefined
         orgs: Set<string>
         slug: string | undefined
         deals: Array<DealRow>
@@ -307,6 +314,7 @@ export function ParticipationsTable({
       const key = d.target?._id ?? d.targetCompanyId
       const g = map.get(key) ?? {
         name: d.target?.name ?? '—',
+        domain: d.target?.domain ?? undefined,
         orgs: new Set<string>(),
         slug: orgSlug ?? d.org?.slug,
         deals: [],
@@ -541,6 +549,7 @@ function CompanyRows({
   group: {
     id: string
     name: string
+    domain: string | undefined
     orgs: Set<string>
     slug: string | undefined
     deals: Array<DealRow>
@@ -566,6 +575,11 @@ function CompanyRows({
               className={`text-muted-foreground size-4 transition-transform ${
                 isOpen ? 'rotate-90' : ''
               }`}
+            />
+            <CompanyLogo
+              domain={group.domain}
+              companyName={group.name}
+              size="sm"
             />
             {group.name}
             {group.slug && (

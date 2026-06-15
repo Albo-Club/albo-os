@@ -11,6 +11,7 @@ import type { Id } from '../../../../convex/_generated/dataModel'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { DealsList } from '~/components/participations/ParticipationsTable'
+import { CompanyLogo } from '~/components/CompanyLogo'
 import { KpisSection } from '~/components/companies/KpisSection'
 import { ReportingsSection } from '~/components/companies/ReportingsSection'
 import { Button } from '~/components/ui/button'
@@ -204,6 +205,11 @@ function ParticipationDetail() {
     <main className="flex-1 space-y-6 p-6">
       <BackLink orgSlug={orgSlug} />
       <div className="flex flex-wrap items-center gap-3">
+        <CompanyLogo
+          domain={company?.domain}
+          companyName={company?.name}
+          size="lg"
+        />
         <h1 className="text-2xl font-semibold tracking-tight">
           {company ? company.name : t('loading')}
         </h1>

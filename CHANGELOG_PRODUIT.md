@@ -23,6 +23,28 @@ bas de page.
 
 ---
 
+## v1.8.0 — 15/06/2026 à 16:52 — Logos des entreprises du portefeuille
+
+Les participations affichent désormais le logo de chaque société : dans la
+liste des participations (par véhicule et dans la vue consolidée) ainsi qu'en
+en-tête de la fiche société. Quand le logo n'est pas disponible (société sans
+site renseigné), une icône neutre prend le relais — aucune image cassée.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau composant `src/components/CompanyLogo.tsx` : URL CDN logo.dev
+>   construite côté client depuis `companies.domain` + clé publishable
+>   `VITE_LOGO_DEV_TOKEN` ; fallback `Building2` sur domaine/token absent ou
+>   `onError`. **Pas de stockage** (hotlink CDN, cf. `KNOWN_ISSUES.md`
+>   « Logos d'entreprises »).
+> - `domain` remonté dans l'enrichissement des deals (`companyRef` de
+>   `convex/deals.ts` et `convex/aggregate.ts`) puis threadé dans
+>   `ParticipationsTable.tsx` (type `DealRow.target`, groupe) ; logo ajouté à
+>   l'en-tête de `routes/app/$orgSlug/participations.$companyId.tsx`.
+> - Le `domain` provient du snapshot Attio figé (`attioAlboImport.ts`),
+>   éditable via `EditCompanyDialog`. Env var publishable à poser
+>   (`.env.example`, Vercel).
+
 ## v1.7.5 — 15/06/2026 à 16:28 — Outillage : assistant Resend dans Claude Code
 
 Outillage développeur, rien ne change dans l'app : le plugin Resend officiel
