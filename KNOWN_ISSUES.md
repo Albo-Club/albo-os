@@ -1257,3 +1257,26 @@ non voulu :
 Conséquence : un futur `upgrade-template` ne re-proposera **pas** ces
 éléments (ils sont considérés mergés). Si l'un devient pertinent,
 cherry-picker depuis `template/main`.
+
+## Resend: two integrations (runtime Convex vs Claude Code plugin)
+
+There are **two unrelated Resend setups** here and they read the same env var
+name from **different places** — don't conflate them.
+
+1. **Runtime email** (`@convex-dev/resend`, `convex/email.ts`). Sends the app's
+   transactional mail (auth, invitations, notifications). Its `RESEND_API_KEY`
+   and `RESEND_FROM` live in the **Convex deployment env** (`pnpm exec convex
+   env set …`). Nothing here touches your shell.
+
+2. **Dev tooling** (the `resend@claude-plugins-official` Claude Code plugin,
+   enabled in `.claude/settings.json`). Its bundled MCP server runs
+   `npx -y resend-mcp` and reads `RESEND_API_KEY` from the environment Claude
+   Code passes it — **not** the Convex env. Put it in the gitignored
+   `.claude/settings.local.json` `env` block (never committed); **restart
+   Claude Code** to apply. A shell-profile `export` also works.
+
+So a missing/incorrect key produces different symptoms depending on which
+side: app emails failing → check the **Convex** env; the Claude Code Resend
+tools failing → check `.claude/settings.local.json` and restart. The plugin's
+skills auto-update via the marketplace and are deliberately **not** vendored
+in `skills-lock.json`.
