@@ -171,6 +171,7 @@ l'assistant (outils `setDealProjections` / `createKpiSnapshot`).
 | TP5 | Page société : « ajoute l'ARR de [société] : 2,4 M€ sur 2025, source investor update » via le chat → confirmer      | `createKpiSnapshot` ; section « KPIs » liste la métrique (valeur formatée selon l'unité), suppression possible (confirm)                                                                   |
 | TP6 | Page société : « Ajouter un document » → fichier < 20 Mo → titre/type/période → save                                | Document listé (type, période, taille), download OK, suppression avec confirm ; > 20 Mo refusé avec message clair                                                                          |
 | TP7 | i18n EN/FR sur les sections plan/fonds/KPIs/reportings                                                              | Tous les libellés traduits (namespace `participations`)                                                                                                                                    |
+| TP8 | Logos boîtes (env `VITE_LOGO_DEV_TOKEN` posée) : liste `/participations`, vue `/app/all`, en-tête page société      | Sociétés avec domaine → logo logo.dev ; sans domaine (ou token absent) → fallback icône bâtiment, aucune image cassée                                                                       |
 
 ## Niveau 3 — Invitations edge cases (8 min)
 

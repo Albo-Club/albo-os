@@ -1280,3 +1280,28 @@ side: app emails failing → check the **Convex** env; the Claude Code Resend
 tools failing → check `.claude/settings.local.json` and restart. The plugin's
 skills auto-update via the marketplace and are deliberately **not** vendored
 in `skills-lock.json`.
+
+## Logos d'entreprises (logo.dev) — hotlink, pas de stockage
+
+`src/components/CompanyLogo.tsx` affiche les logos des boîtes du portefeuille
+(liste participations, vue `/app/all`, en-tête fiche société). Trois choix
+non-évidents :
+
+1. **Pas de stockage en base, ni Convex file storage.** La doc logo.dev
+   recommande explicitement de hotlinker l'URL CDN
+   (`https://img.logo.dev/:domain?token=…`) — _« a global CDN serves every
+   logo, you never host a logo file yourself »_. On construit donc l'URL côté
+   client à la volée ; pas de champ `logoUrl`/`logoStorageId` sur `companies`.
+   N'ajoute pas de pipeline de copie/cache sans raison.
+
+2. **Le token `VITE_LOGO_DEV_TOKEN` est une clé _publishable_ (`pk_…`)**,
+   conçue pour être embarquée côté client. L'anti-pattern « pas de `VITE_` sur
+   un secret » **ne s'applique pas** ici — ne la migre pas vers la Convex env.
+   Absente → fallback icône bâtiment partout (aucune image cassée).
+
+3. **Le `domain` vient d'un snapshot Attio figé**
+   (`convex/migrations/attioAlboImport.ts`, 28/05/2026), pas d'une sync live.
+   Les ~35 boîtes Albo importées l'ont ; les autres (CALTE, créations manuelles)
+   peuvent ne pas l'avoir → fallback, et le champ reste éditable via
+   `EditCompanyDialog`. Si un domaine change côté Attio, il faut le ressaisir
+   à la main.

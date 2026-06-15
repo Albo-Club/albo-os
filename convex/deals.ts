@@ -51,6 +51,7 @@ function companyRef(c: Doc<'companies'> | null) {
     name: c.name,
     kind: c.kind,
     sector: c.sector ?? null,
+    domain: c.domain ?? null,
     totalShares: c.totalShares ?? null,
   }
 }
