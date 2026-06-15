@@ -37,7 +37,7 @@ function Dashboard() {
     api.dashboard.getDashboard,
     org ? { orgId: org._id } : 'skip',
   )
-  const { fmtEur, fmtDate } = useFormatters()
+  const { fmtEur, fmtEurCompact, fmtDate } = useFormatters()
 
   if (!data) {
     return (
@@ -82,22 +82,26 @@ function Dashboard() {
         />
         <KpiCard
           label={t('dashboard:kpi.deployed')}
-          value={fmtEur(data.deployedCents)}
+          value={fmtEurCompact(data.deployedCents)}
+          title={fmtEur(data.deployedCents)}
           icon={Banknote}
         />
         <KpiCard
           label={t('dashboard:kpi.distributed')}
-          value={fmtEur(data.distributedCents)}
+          value={fmtEurCompact(data.distributedCents)}
+          title={fmtEur(data.distributedCents)}
           icon={TrendingUp}
         />
         <KpiCard
           label={t('dashboard:kpi.cash')}
-          value={fmtEur(data.cashCents)}
+          value={fmtEurCompact(data.cashCents)}
+          title={fmtEur(data.cashCents)}
           icon={Wallet}
         />
         <KpiCard
           label={t('dashboard:kpi.nav')}
-          value={fmtEur(data.navCents)}
+          value={fmtEurCompact(data.navCents)}
+          title={fmtEur(data.navCents)}
           hint={data.navIsPartial ? t('dashboard:kpi.navPartial') : undefined}
           icon={LineChart}
         />

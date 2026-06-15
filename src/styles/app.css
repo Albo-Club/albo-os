@@ -20,4 +20,12 @@
   .using-mouse * {
     outline: none !important;
   }
+  /* Hide native scrollbars app-wide; scrolling stays functional.
+     Radix ScrollArea's thumb is a div, unaffected by these rules. */
+  * {
+    scrollbar-width: none; /* Firefox */
+  }
+  *::-webkit-scrollbar {
+    display: none; /* Chromium / WebKit */
+  }
 }

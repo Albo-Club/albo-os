@@ -23,6 +23,29 @@ bas de page.
 
 ---
 
+## v1.7.3 — 15/06/2026 à 13:58 — Lisibilité des montants du tableau de bord
+
+Sur le tableau de bord, les gros montants des tuiles (capital déployé, NAV,
+trésorerie…) débordaient de leur carte : le symbole € et les séparateurs de
+milliers étaient rognés. Ils s'affichent désormais en notation abrégée —
+« 54,0 M€ », « 6,2 M€ » — et le montant exact apparaît en survolant la tuile.
+Les barres de défilement, jusqu'ici visibles un peu partout, sont également
+masquées pour une interface plus nette (le défilement reste inchangé).
+
+> **🔧 Notes techniques**
+>
+> - Nouveau formateur `fmtEurCompact` dans `useFormatters()`
+>   (`src/components/participations/ParticipationsTable.tsx`) : `Intl.NumberFormat`
+>   en `notation: 'compact'`, 1 décimale.
+> - `KpiCard` (`src/components/dashboard/KpiCard.tsx`) gagne une prop `title`
+>   (tooltip natif du montant exact) ; valeur passée en `tabular-nums
+>   whitespace-nowrap`.
+> - Tableau de bord (`src/routes/app/$orgSlug/index.tsx`) : KPI monétaires
+>   (deployed/distributed/cash/nav) en compact, montant complet en `title`.
+> - Masquage global des scrollbars natives dans `src/styles/app.css`
+>   (`scrollbar-width: none` + `::-webkit-scrollbar { display: none }`) ; le
+>   pouce custom de `ScrollArea` (Radix, un div) n'est pas affecté.
+
 ## v1.7.2 — 12/06/2026 à 16:05 — Documentation du connecteur Claude
 
 Mise à jour purement documentaire, rien ne change à l'écran.
