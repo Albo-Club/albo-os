@@ -284,6 +284,21 @@ find . \( -path ./node_modules -o -path ./.output \) -prune -o \
   -type f \( -name '* 2.ts' -o -name '* 2.tsx' \) -print
 ```
 
+## Why Mistral (and not Claude)
+
+The AI agent ran on Anthropic Claude until v1.5.1, then switched to Mistral
+Medium 3.5. Three reasons, in order:
+
+1. **EU data residency / sovereignty.** The agent reads scoped portfolio data
+   (deals, valuations, bank transactions). Keeping inference on an EU provider
+   avoids sending family-office financials outside the EU.
+2. **Cost.** Each agent turn fans out across ~45 tool schemas over up to ~12
+   LLM round-trips; Mistral Medium is materially cheaper than Claude at that
+   call volume (see "Mistral prompt caching" for the further 10× input saving).
+3. **Reversible by design.** `getModel()` in `convex/agent.ts` abstracts the
+   provider — this is a deliberate trial, not a one-way door. To revert, swap
+   the provider in `getModel()` and set the matching `MISTRAL_MODEL`/API key.
+
 ## Mistral model id
 
 `convex/agent.ts` defaults to `mistral-medium-3.5` (single source:

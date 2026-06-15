@@ -23,6 +23,19 @@ bas de page.
 
 ---
 
+## v1.7.4 — 15/06/2026 à 15:17 — Note interne : pourquoi l'assistant tourne sur Mistral
+
+Note interne pour l'équipe : la raison du choix de Mistral pour l'assistant —
+souveraineté des données en Europe, coût, et choix volontairement réversible —
+est désormais consignée. Rien ne change à l'usage.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle section « Why Mistral (and not Claude) » dans `KNOWN_ISSUES.md` :
+>   résidence EU de la donnée, coût sur le volume d'appels multi-outils, et
+>   réversibilité via `getModel()` (`convex/agent.ts`). Complète les sections
+>   mécaniques existantes (« Mistral model id », « Mistral prompt caching »).
+
 ## v1.7.3 — 15/06/2026 à 13:58 — Lisibilité des montants du tableau de bord
 
 Sur le tableau de bord, les gros montants des tuiles (capital déployé, NAV,
