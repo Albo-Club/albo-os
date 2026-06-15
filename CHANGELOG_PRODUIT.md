@@ -23,6 +23,23 @@ bas de page.
 
 ---
 
+## v1.7.5 — 15/06/2026 à 16:28 — Outillage : assistant Resend dans Claude Code
+
+Outillage développeur, rien ne change dans l'app : le plugin Resend officiel
+pour Claude Code est désormais activé dans le dépôt — Claude peut envoyer et
+inspecter les emails Resend directement pendant le développement.
+
+> **🔧 Notes techniques**
+>
+> - `.claude/settings.json` : `enabledPlugins: { "resend@claude-plugins-official": true }`
+>   (serveur MCP + skills Resend, auto-update via le marketplace officiel, donc
+>   hors `skills-lock.json`).
+> - La clé `RESEND_API_KEY` du plugin se met dans le gitignored
+>   `.claude/settings.local.json` (`env`), **distincte** de la clé runtime de
+>   l'app (Convex env, `convex/email.ts`).
+> - `KNOWN_ISSUES.md` § « Resend: two integrations » documente le piège des
+>   deux clés homonymes.
+
 ## v1.7.4 — 15/06/2026 à 15:17 — Note interne : pourquoi l'assistant tourne sur Mistral
 
 Note interne pour l'équipe : la raison du choix de Mistral pour l'assistant —
