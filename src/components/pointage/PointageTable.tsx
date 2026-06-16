@@ -34,6 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '~/components/ui/alert-dialog'
+import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
 import {
@@ -203,6 +204,7 @@ export function PointageTable({
   liabilityOptions,
   emptyMessage,
   pageResetKey,
+  statusColumn = false,
 }: {
   transactions: Array<UnmatchedTx> | undefined
   deals: Array<DealOption> | undefined
@@ -212,6 +214,15 @@ export function PointageTable({
   emptyMessage?: string
   /** Resets the pagination to the first page when this key changes. */
   pageResetKey: string
+  /**
+   * Ledger mode (Transactions tab): show a status column and resolve the
+   * per-row action from `tx.matchStatus` (match/discard for unmatched, VAT
+   * select + detach for charge/product, detach otherwise). Rows stay visible
+   * after an action (reactivity), so the transient « Annuler » banner is
+   * bypassed here — it is kept only for the pure « À pointer » inbox
+   * (`statusColumn = false`, the default).
+   */
+  statusColumn?: boolean
 }) {
   const { t } = useTranslation('pointage')
   const { fmtDate, fmtSigned } = useFormatters()
@@ -241,6 +252,7 @@ export function PointageTable({
     api.transactions.unmatchTransaction,
   )
   const bulkCategorize = useConvexMutation(api.transactions.bulkCategorize)
+  const setVatRate = useConvexMutation(api.transactions.setVatRate)
 
   const discardMutations = {
     ignored: ignoreTransaction,
@@ -263,11 +275,17 @@ export function PointageTable({
   )
 
   // Prune the selection of transactions that left the queue (Convex
-  // reactivity after categorization, matching by another user…).
+  // reactivity after categorization, matching by another user…). In ledger
+  // mode a row can stay in the list but flip out of `unmatched` — only
+  // unmatched rows are bulk-selectable, so drop the rest too.
   useEffect(() => {
     if (!transactions) return
     setSelectedIds((prev) => {
-      const valid = new Set(transactions.map((tx) => tx._id))
+      const valid = new Set(
+        transactions
+          .filter((tx) => (tx.matchStatus ?? 'unmatched') === 'unmatched')
+          .map((tx) => tx._id),
+      )
       const next = new Set([...prev].filter((id) => valid.has(id)))
       return next.size === prev.size ? prev : next
     })
@@ -305,18 +323,21 @@ export function PointageTable({
           transactionId: tx._id,
           dealId: target.deal._id,
         })
-        addRecent({
-          tx,
-          kind: 'matched',
-          targetName: target.deal.target?.name ?? '—',
-        })
+        // Ledger mode keeps the row visible (reactivity) — no transient banner.
+        if (!statusColumn)
+          addRecent({
+            tx,
+            kind: 'matched',
+            targetName: target.deal.target?.name ?? '—',
+          })
       } else {
         await allocateTransaction({
           transactionId: tx._id,
           kind: target.liability.kind,
           targetId: target.liability.targetId,
         })
-        addRecent({ tx, kind: 'allocated', targetName: target.liability.label })
+        if (!statusColumn)
+          addRecent({ tx, kind: 'allocated', targetName: target.liability.label })
       }
       setSheetTx((cur) => (cur?._id === tx._id ? null : cur))
     } catch (err) {
@@ -339,8 +360,44 @@ export function PointageTable({
       } else {
         await discardMutations[kind]({ transactionId: tx._id })
       }
-      addRecent({ tx, kind })
+      if (!statusColumn) addRecent({ tx, kind })
       setSheetTx((cur) => (cur?._id === tx._id ? null : cur))
+    } catch (err) {
+      reportError(err)
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  // Ledger mode: return a matched/categorized row to « À pointer ». Routes
+  // by allocation kind (a deal unmatch on a liability-allocated tx is rejected
+  // by the backend), mirroring handleUndo.
+  async function handleDetach(tx: UnmatchedTx) {
+    setPendingId(tx._id)
+    try {
+      if (
+        tx.allocation?.kind === 'equity' ||
+        tx.allocation?.kind === 'intercompany_loan'
+      ) {
+        await deallocateTransaction({ transactionId: tx._id })
+      } else {
+        await unmatchTransaction({ transactionId: tx._id })
+      }
+    } catch (err) {
+      reportError(err)
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  // Ledger mode: qualify a charge/product VAT rate inline (feeds the VAT card).
+  async function handleVatRate(tx: UnmatchedTx, vatRateBps: number | null) {
+    setPendingId(tx._id)
+    try {
+      await setVatRate({
+        transactionId: tx._id,
+        vatRateBps: vatRateBps as 0 | 550 | 1000 | 2000 | null,
+      })
     } catch (err) {
       reportError(err)
     } finally {
@@ -450,6 +507,66 @@ export function PointageTable({
     ? recent.find((r) => r.tx._id === sheetTx._id)
     : undefined
 
+  // Per-row (and sheet-footer) actions. Inbox mode (no status column) keeps
+  // the historical match/discard + transient « Annuler » banner. Ledger mode
+  // resolves the action from the row's status and acts immediately (the row
+  // updates via reactivity, no banner).
+  function actionsFor(tx: UnmatchedTx, recentAction: RecentAction | undefined) {
+    const status = tx.matchStatus ?? 'unmatched'
+    const pending = pendingId === tx._id
+    if (!statusColumn) {
+      return recentAction ? (
+        <UndoBanner
+          recent={recentAction}
+          pending={pending}
+          onUndo={() => void handleUndo(recentAction)}
+        />
+      ) : (
+        <RowActions
+          deals={deals}
+          liabilityOptions={liabilityOptions}
+          pending={pending}
+          onMatch={(target) => void handleMatch(tx, target)}
+          onDiscard={(kind) => void handleDiscard(tx, kind)}
+        />
+      )
+    }
+    if (status === 'unmatched') {
+      return (
+        <RowActions
+          deals={deals}
+          liabilityOptions={liabilityOptions}
+          pending={pending}
+          onMatch={(target) => void handleMatch(tx, target)}
+          onDiscard={(kind) => void handleDiscard(tx, kind)}
+        />
+      )
+    }
+    const detach = (
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={pending}
+        onClick={() => void handleDetach(tx)}
+      >
+        {t('actions.detach')}
+      </Button>
+    )
+    if (status === 'charge' || status === 'product') {
+      return (
+        <div className="flex items-center justify-end gap-2">
+          <VatRateSelect
+            tx={tx}
+            pending={pending}
+            onChange={(vatRateBps) => void handleVatRate(tx, vatRateBps)}
+          />
+          {detach}
+        </div>
+      )
+    }
+    return <div className="flex justify-end">{detach}</div>
+  }
+
   if (rows && rows.length === 0) {
     return (
       <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
@@ -519,6 +636,7 @@ export function PointageTable({
               <TableHead>{t('col.label')}</TableHead>
               <TableHead className="text-right">{t('col.amount')}</TableHead>
               <TableHead>{t('col.account')}</TableHead>
+              {statusColumn && <TableHead>{t('col.status')}</TableHead>}
               <TableHead className="text-right">{t('col.actions')}</TableHead>
             </TableRow>
           </TableHeader>
@@ -526,7 +644,7 @@ export function PointageTable({
             {!pagedRows ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={statusColumn ? 7 : 6}
                   className="text-muted-foreground text-center"
                 >
                   {t('loading')}
@@ -543,14 +661,15 @@ export function PointageTable({
                     className="w-10"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {!recentAction && (
-                      <Checkbox
-                        checked={selectedIds.has(tx._id)}
-                        onCheckedChange={() => toggleSelected(tx._id)}
-                        disabled={bulkPending}
-                        aria-label={t('bulk.select')}
-                      />
-                    )}
+                    {!recentAction &&
+                      (tx.matchStatus ?? 'unmatched') === 'unmatched' && (
+                        <Checkbox
+                          checked={selectedIds.has(tx._id)}
+                          onCheckedChange={() => toggleSelected(tx._id)}
+                          disabled={bulkPending}
+                          aria-label={t('bulk.select')}
+                        />
+                      )}
                   </TableCell>
                   <TableCell className="whitespace-nowrap tabular-nums">
                     {fmtDate(tx.transactionDate)}
@@ -573,22 +692,15 @@ export function PointageTable({
                   <TableCell className="whitespace-nowrap">
                     {accountLabel(tx)}
                   </TableCell>
+                  {statusColumn && (
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {t(`status.${tx.matchStatus ?? 'unmatched'}`)}
+                      </Badge>
+                    </TableCell>
+                  )}
                   <TableCell onClick={(e) => e.stopPropagation()}>
-                    {recentAction ? (
-                      <UndoBanner
-                        recent={recentAction}
-                        pending={pendingId === tx._id}
-                        onUndo={() => void handleUndo(recentAction)}
-                      />
-                    ) : (
-                      <RowActions
-                        deals={deals}
-                        liabilityOptions={liabilityOptions}
-                        pending={pendingId === tx._id}
-                        onMatch={(target) => void handleMatch(tx, target)}
-                        onDiscard={(kind) => void handleDiscard(tx, kind)}
-                      />
-                    )}
+                    {actionsFor(tx, recentAction)}
                   </TableCell>
                 </TableRow>
               ))
@@ -608,24 +720,7 @@ export function PointageTable({
         onOpenChange={(open) => {
           if (!open) setSheetTx(null)
         }}
-        footer={
-          sheetTx &&
-          (sheetRecent ? (
-            <UndoBanner
-              recent={sheetRecent}
-              pending={pendingId === sheetTx._id}
-              onUndo={() => void handleUndo(sheetRecent)}
-            />
-          ) : (
-            <RowActions
-              deals={deals}
-              liabilityOptions={liabilityOptions}
-              pending={pendingId === sheetTx._id}
-              onMatch={(target) => void handleMatch(sheetTx, target)}
-              onDiscard={(kind) => void handleDiscard(sheetTx, kind)}
-            />
-          ))
-        }
+        footer={sheetTx && actionsFor(sheetTx, sheetRecent)}
       />
 
       <AlertDialog
@@ -720,166 +815,5 @@ function VatRateSelect({
         </span>
       )}
     </div>
-  )
-}
-
-/**
- * Read-only view of the discarded transactions (charges / taxes / products
- * / internal transfers): table fed by `listByStatus`, with a per-row
- * « Annuler » action (→ `unmatchTransaction`, the transaction goes back to
- * the « À pointer » queue). On the Charges/Products tabs (`vatEditable`),
- * a VAT column qualifies each row's rate (deductible/collected VAT — see
- * the « TVA récupérable » card on the Treasury page). Rendering is
- * paginated locally (cf. `usePagination`).
- */
-export function DiscardedTable({
-  transactions,
-  emptyMessage,
-  vatEditable = false,
-  pageResetKey,
-}: {
-  transactions: Array<UnmatchedTx> | undefined
-  /** Alternative empty-state message (e.g. search with no results). */
-  emptyMessage?: string
-  /** Shows the VAT column (Charges and Products tabs only). */
-  vatEditable?: boolean
-  /** Resets the pagination to the first page when this key changes. */
-  pageResetKey: string
-}) {
-  const { t } = useTranslation('pointage')
-  const { fmtDate, fmtSigned } = useFormatters()
-  const reportError = useReportError()
-
-  const unmatchTransaction = useConvexMutation(
-    api.transactions.unmatchTransaction,
-  )
-  const setVatRate = useConvexMutation(api.transactions.setVatRate)
-  const [pendingId, setPendingId] = useState<Id<'transactions'> | null>(null)
-
-  const { page, pageCount, setPage } = usePagination(
-    transactions?.length ?? 0,
-    pageResetKey,
-  )
-  const pagedTransactions = transactions?.slice(
-    page * PAGE_SIZE,
-    (page + 1) * PAGE_SIZE,
-  )
-
-  async function handleUndo(tx: UnmatchedTx) {
-    setPendingId(tx._id)
-    try {
-      // The reactive query removes the row from this view on its own.
-      await unmatchTransaction({ transactionId: tx._id })
-    } catch (err) {
-      reportError(err)
-    } finally {
-      setPendingId(null)
-    }
-  }
-
-  async function handleVatRate(tx: UnmatchedTx, vatRateBps: number | null) {
-    setPendingId(tx._id)
-    try {
-      await setVatRate({
-        transactionId: tx._id,
-        vatRateBps: vatRateBps as 0 | 550 | 1000 | 2000 | null,
-      })
-    } catch (err) {
-      reportError(err)
-    } finally {
-      setPendingId(null)
-    }
-  }
-
-  if (transactions && transactions.length === 0) {
-    return (
-      <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
-        {emptyMessage ?? t('viewEmpty')}
-      </div>
-    )
-  }
-
-  return (
-    <>
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('col.date')}</TableHead>
-              <TableHead>{t('col.label')}</TableHead>
-              <TableHead className="text-right">{t('col.amount')}</TableHead>
-              {vatEditable && <TableHead>{t('col.vat')}</TableHead>}
-              <TableHead>{t('col.account')}</TableHead>
-              <TableHead className="text-right">{t('col.actions')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {!pagedTransactions ? (
-              <TableRow>
-                <TableCell
-                  colSpan={vatEditable ? 6 : 5}
-                  className="text-muted-foreground text-center"
-                >
-                  {t('loading')}
-                </TableCell>
-              </TableRow>
-            ) : (
-              pagedTransactions.map((tx) => (
-                <TableRow key={tx._id}>
-                  <TableCell className="whitespace-nowrap tabular-nums">
-                    {fmtDate(tx.transactionDate)}
-                  </TableCell>
-                  <TableCell>
-                    <span className="block max-w-md truncate">
-                      {tx.rawLabel}
-                    </span>
-                    {tx.counterparty && (
-                      <span className="text-muted-foreground block max-w-md truncate text-xs">
-                        {tx.counterparty}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell
-                    className={`text-right tabular-nums ${directionTone(tx.direction)}`}
-                  >
-                    {fmtSigned(tx.amount, tx.direction)}
-                  </TableCell>
-                  {vatEditable && (
-                    <TableCell>
-                      <VatRateSelect
-                        tx={tx}
-                        pending={pendingId === tx._id}
-                        onChange={(vatRateBps) =>
-                          void handleVatRate(tx, vatRateBps)
-                        }
-                      />
-                    </TableCell>
-                  )}
-                  <TableCell className="whitespace-nowrap">
-                    {accountLabel(tx)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={pendingId === tx._id}
-                      onClick={() => void handleUndo(tx)}
-                    >
-                      {t('actions.undo')}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      <PaginationFooter
-        page={page}
-        pageCount={pageCount}
-        onPageChange={setPage}
-      />
-    </>
   )
 }

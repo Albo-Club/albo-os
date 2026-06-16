@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexQuery } from '@convex-dev/react-query'
 import { useAction } from 'convex/react'
 import { useTranslation } from 'react-i18next'
@@ -10,12 +10,24 @@ import { api } from '../../../../convex/_generated/api'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { CashAccounts } from '~/components/cash/CashAccounts'
-import { ForecastSection } from '~/components/cash/ForecastSection'
+import {
+  ForecastChartCard,
+  ForecastRulesSection,
+} from '~/components/cash/ForecastSection'
+import { TransactionsLedger } from '~/components/cash/TransactionsLedger'
 import { VatCard } from '~/components/cash/VatCard'
 import { Button } from '~/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
+
+type CashTab = 'apercu' | 'transactions'
 
 export const Route = createFileRoute('/app/$orgSlug/cash/')({
   component: Cash,
+  // `?tab=` keeps the active tab linkable (and is the landing of the /pointage
+  // redirect). Optional so existing `<Link to="/cash">` callers need not pass
+  // it; absent / unknown = overview, and the URL stays clean on the overview.
+  validateSearch: (search: Record<string, unknown>): { tab?: CashTab } =>
+    search.tab === 'transactions' ? { tab: 'transactions' } : {},
   head: () => ({
     meta: [
       {
@@ -28,6 +40,8 @@ export const Route = createFileRoute('/app/$orgSlug/cash/')({
 function Cash() {
   const { t } = useTranslation('cash')
   const { orgSlug } = Route.useParams()
+  const { tab = 'apercu' } = Route.useSearch()
+  const navigate = useNavigate()
   const org = useConvexQuery(api.organizations.bySlug, { slug: orgSlug })
   const accounts = useConvexQuery(
     api.cash.listAccounts,
@@ -57,9 +71,33 @@ function Cash() {
           {connecting ? t('connect.connecting') : t('connect.button')}
         </Button>
       </div>
-      <CashAccounts accounts={accounts} orgSlug={orgSlug} />
-      {org && <VatCard orgId={org._id} orgSlug={orgSlug} />}
-      {org && <ForecastSection orgId={org._id} />}
+      <Tabs
+        value={tab}
+        onValueChange={(value) =>
+          navigate({
+            to: '/app/$orgSlug/cash',
+            params: { orgSlug },
+            search: value === 'transactions' ? { tab: 'transactions' } : {},
+            replace: true,
+          })
+        }
+      >
+        <TabsList>
+          <TabsTrigger value="apercu">{t('tabs.apercu')}</TabsTrigger>
+          <TabsTrigger value="transactions">
+            {t('tabs.transactions')}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="apercu" className="space-y-6 pt-4">
+          {org && <ForecastChartCard orgId={org._id} />}
+          <CashAccounts accounts={accounts} orgSlug={orgSlug} />
+          {org && <VatCard orgId={org._id} orgSlug={orgSlug} />}
+          {org && <ForecastRulesSection orgId={org._id} />}
+        </TabsContent>
+        <TabsContent value="transactions" className="pt-4">
+          {org && <TransactionsLedger orgId={org._id} />}
+        </TabsContent>
+      </Tabs>
     </main>
   )
 }

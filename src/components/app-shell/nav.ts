@@ -1,6 +1,5 @@
 import {
   LayoutDashboard,
-  ListChecks,
   Mail,
   Megaphone,
   PieChart,
@@ -49,11 +48,6 @@ export function getNavGroups(): Array<NavGroup> {
           titleKey: 'items.cash',
           to: '/app/$orgSlug/cash',
           icon: Wallet,
-        },
-        {
-          titleKey: 'items.pointage',
-          to: '/app/$orgSlug/pointage',
-          icon: ListChecks,
         },
         {
           titleKey: 'items.passif',

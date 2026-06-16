@@ -12,6 +12,7 @@
     "amount": "Montant",
     "vat": "TVA",
     "account": "Compte",
+    "status": "Statut",
     "actions": "Actions"
   },
   "vat": {
@@ -26,7 +27,8 @@
     "tax": "Impôt",
     "product": "Produit",
     "internal_transfer": "Virement interne",
-    "undo": "Annuler"
+    "undo": "Annuler",
+    "detach": "Détacher"
   },
   "banner": {
     "matched": "Rattachée à {{deal}}",
@@ -69,13 +71,27 @@
     "failed_other": "{{count}} transactions n'ont pas pu être classées."
   },
   "view": {
+    "all": "Tout",
     "unmatched": "À pointer",
+    "matched": "Pointé",
     "charge": "Charges",
     "tax": "Impôts",
     "product": "Produits",
     "internal_transfer": "Virements internes"
   },
   "viewEmpty": "Aucune transaction dans cette catégorie.",
+  "status": {
+    "unmatched": "À pointer",
+    "matched": "Pointé",
+    "ignored": "Ignoré",
+    "charge": "Charge",
+    "tax": "Impôt",
+    "product": "Produit",
+    "internal_transfer": "Virement interne"
+  },
+  "filter": {
+    "allAccounts": "Tous les comptes"
+  },
   "search": {
     "placeholder": "Rechercher une transaction…",
     "noResults": "Aucune transaction ne correspond à votre recherche."

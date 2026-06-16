@@ -14,6 +14,7 @@ import { SidebarMenuButton } from '~/components/ui/sidebar'
 
 const THEMES = [
   { id: 'neutral', swatch: 'oklch(0.205 0 0)' },
+  { id: 'albo', swatch: 'oklch(0.588 0.17 36.5)' },
   { id: 'blue', swatch: 'oklch(0.55 0.2 250)' },
   { id: 'emerald', swatch: 'oklch(0.55 0.16 160)' },
   { id: 'violet', swatch: 'oklch(0.55 0.21 290)' },
