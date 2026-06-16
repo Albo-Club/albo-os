@@ -124,6 +124,23 @@
 }
 
 /* Color themes — applied via `data-theme` on <html> */
+:root[data-theme='albo'] {
+  /* Albo brand orange — rgb(205, 77, 40). */
+  --primary: oklch(0.588 0.17 36.5);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.588 0.17 36.5);
+  --sidebar-primary: oklch(0.588 0.17 36.5);
+  --chart-1: oklch(0.62 0.17 36.5);
+}
+.dark[data-theme='albo'],
+:root.dark[data-theme='albo'] {
+  --primary: oklch(0.7 0.16 36.5);
+  --primary-foreground: oklch(0.145 0 0);
+  --ring: oklch(0.7 0.16 36.5);
+  --sidebar-primary: oklch(0.62 0.17 36.5);
+  --chart-1: oklch(0.7 0.16 36.5);
+}
+
 :root[data-theme='blue'] {
   --primary: oklch(0.55 0.2 250);
   --primary-foreground: oklch(0.985 0 0);

@@ -27,6 +27,20 @@ export type TxDetails = {
   counterparty: string | null
   /** VAT rate (bps) of expenses/income — null = still to qualify. */
   vatRateBps?: number | null
+  /** Matching status — present on `listLedger` rows; drives the status badge. */
+  matchStatus?:
+    | 'unmatched'
+    | 'matched'
+    | 'ignored'
+    | 'charge'
+    | 'tax'
+    | 'product'
+    | 'internal_transfer'
+  /** Generalized allocation — routes the un-match (deal vs liability). */
+  allocation?: {
+    kind: 'deal' | 'equity' | 'intercompany_loan'
+    targetId: string
+  } | null
   account: { label: string; bankName: string } | null
 }
 

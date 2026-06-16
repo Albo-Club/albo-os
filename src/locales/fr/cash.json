@@ -2,6 +2,10 @@
   "metaTitle": "Trésorerie — Albo OS",
   "metaTitleDetail": "Compte — Albo OS",
   "title": "Trésorerie",
+  "tabs": {
+    "apercu": "Aperçu",
+    "transactions": "Transactions"
+  },
   "back": "← Trésorerie",
   "notFound": "Compte introuvable.",
   "totalBalance": "Solde total",

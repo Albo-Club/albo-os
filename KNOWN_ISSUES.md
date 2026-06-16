@@ -1032,6 +1032,16 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   sont alignées par `transactions:backfillAllocation` (one-shot par org,
   idempotent, n'écrit rien dans `matchingDecisions`). Tout nouveau code qui
   écrit `dealId` doit écrire `allocation` dans le même patch.
+- **Registre Transactions (`listLedger`) — plafond 1000, plus récent
+  d'abord.** L'onglet Transactions de la page Trésorerie (qui absorbe la file
+  de pointage : « À pointer » = filtre `unmatched`) lit `listLedger`, borné aux
+  **1000 transactions les plus récentes** par filtre actif (`LEDGER_LIMIT`).
+  Au-delà, la queue la plus ancienne est masquée — le browse exhaustif (capé
+  200) reste sur `/cash/$accountId`. Comme `listUnmatched`, le registre passe
+  par l'index `search_text` en mode recherche : une ligne sans `searchText`
+  (pré-`backfillSearchText`) reste invisible à la recherche. Pas de pagination
+  serveur (`usePaginatedQuery` n'est utilisé que par le chat) : on garde le
+  pattern `.take()` + `LocalPagination` partagé avec `PointageTable`.
 
 ## TVA récupérable (`convex/lib/vat.ts`, `transactions:getVatPosition`)
 

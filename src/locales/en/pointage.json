@@ -12,6 +12,7 @@
     "amount": "Amount",
     "vat": "VAT",
     "account": "Account",
+    "status": "Status",
     "actions": "Actions"
   },
   "vat": {
@@ -26,7 +27,8 @@
     "tax": "Tax",
     "product": "Income",
     "internal_transfer": "Internal transfer",
-    "undo": "Undo"
+    "undo": "Undo",
+    "detach": "Detach"
   },
   "banner": {
     "matched": "Matched to {{deal}}",
@@ -69,13 +71,27 @@
     "failed_other": "{{count}} transactions could not be categorized."
   },
   "view": {
+    "all": "All",
     "unmatched": "To match",
+    "matched": "Matched",
     "charge": "Expenses",
     "tax": "Taxes",
     "product": "Income",
     "internal_transfer": "Internal transfers"
   },
   "viewEmpty": "No transactions in this category.",
+  "status": {
+    "unmatched": "To match",
+    "matched": "Matched",
+    "ignored": "Ignored",
+    "charge": "Expense",
+    "tax": "Tax",
+    "product": "Income",
+    "internal_transfer": "Internal transfer"
+  },
+  "filter": {
+    "allAccounts": "All accounts"
+  },
   "search": {
     "placeholder": "Search a transaction…",
     "noResults": "No transaction matches your search."

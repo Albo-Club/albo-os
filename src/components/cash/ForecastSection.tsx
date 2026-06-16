@@ -299,25 +299,87 @@ function RuleDialog({
 }
 
 /**
- * Cash flow forecast: projected balance curve (actual balance + pending
- * forecastEntries, via getForecastBalance) and CRUD for recurring rules.
- * Every save re-runs `expandRules` (idempotent per derivedKey) so the
- * curve immediately reflects the rules.
+ * Cash flow forecast curve: projected balance (actual balance + pending
+ * forecastEntries via getForecastBalance) with a selectable horizon. Shown at
+ * the top of the Cash « Aperçu » tab.
  */
-export function ForecastSection({ orgId }: { orgId: Id<'organizations'> }) {
+export function ForecastChartCard({ orgId }: { orgId: Id<'organizations'> }) {
   const { t } = useTranslation(['cash', 'common'])
-  const { fmtEur, fmtDate } = useFormatters()
+  const { fmtEur } = useFormatters()
   const [horizon, setHorizon] = useState<(typeof HORIZONS)[number]>(12)
-  const [dialogRule, setDialogRule] = useState<Rule | null | 'create'>(null)
-  const [deleteRuleId, setDeleteRuleId] = useState<Id<'forecastRules'> | null>(
-    null,
-  )
 
   const balance = useConvexQuery(api.forecasts.getForecastBalance, {
     orgId,
     horizonMonths: horizon,
     historyMonths: HISTORY_MONTHS,
   })
+
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 className="text-lg font-semibold tracking-tight">
+          {t('cash:forecast.title')}
+        </h2>
+        <Select
+          value={String(horizon)}
+          onValueChange={(value) =>
+            setHorizon(Number(value) as (typeof HORIZONS)[number])
+          }
+        >
+          <SelectTrigger className="w-32">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {HORIZONS.map((months) => (
+              <SelectItem key={months} value={String(months)}>
+                {t('cash:forecast.horizonMonths', { count: months })}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {!balance ? (
+        <div className="text-muted-foreground text-sm">{t('cash:loading')}</div>
+      ) : (
+        <>
+          <p className="text-muted-foreground text-xs">
+            {t('cash:forecast.startingBalance', {
+              amount: fmtEur(balance.startingBalanceCents),
+            })}
+          </p>
+          <ForecastChart
+            months={balance.months}
+            history={balance.history}
+            labels={{
+              real: t('cash:forecast.chartReal'),
+              projected: t('cash:forecast.chartLabel'),
+            }}
+            fmtEur={fmtEur}
+          />
+        </>
+      )}
+    </section>
+  )
+}
+
+/**
+ * CRUD for recurring forecast rules (cash in/out — the « prévisionnel »).
+ * Every save re-runs `expandRules` (idempotent per derivedKey) so the curve
+ * reflects the rules. Shown lower in the Cash « Aperçu » tab.
+ */
+export function ForecastRulesSection({
+  orgId,
+}: {
+  orgId: Id<'organizations'>
+}) {
+  const { t } = useTranslation(['cash', 'common'])
+  const { fmtEur, fmtDate } = useFormatters()
+  const [dialogRule, setDialogRule] = useState<Rule | null | 'create'>(null)
+  const [deleteRuleId, setDeleteRuleId] = useState<Id<'forecastRules'> | null>(
+    null,
+  )
+
   const rules = useConvexQuery(api.forecasts.listRules, { orgId })
   const expandRules = useConvexMutation(api.forecasts.expandRules)
   const deleteRule = useConvexMutation(api.forecasts.deleteRule)
@@ -341,60 +403,18 @@ export function ForecastSection({ orgId }: { orgId: Id<'organizations'> }) {
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold tracking-tight">
-          {t('cash:forecast.title')}
-        </h2>
-        <div className="flex items-center gap-2">
-          <Select
-            value={String(horizon)}
-            onValueChange={(value) =>
-              setHorizon(Number(value) as (typeof HORIZONS)[number])
-            }
-          >
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {HORIZONS.map((months) => (
-                <SelectItem key={months} value={String(months)}>
-                  {t('cash:forecast.horizonMonths', { count: months })}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setDialogRule('create')}
-          >
-            <Plus className="size-4" />
-            {t('cash:forecast.rules.add')}
-          </Button>
-        </div>
+        <h3 className="text-sm font-semibold">
+          {t('cash:forecast.rules.title')}
+        </h3>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setDialogRule('create')}
+        >
+          <Plus className="size-4" />
+          {t('cash:forecast.rules.add')}
+        </Button>
       </div>
-
-      {!balance ? (
-        <div className="text-muted-foreground text-sm">{t('cash:loading')}</div>
-      ) : (
-        <>
-          <p className="text-muted-foreground text-xs">
-            {t('cash:forecast.startingBalance', {
-              amount: fmtEur(balance.startingBalanceCents),
-            })}
-          </p>
-          <ForecastChart
-            months={balance.months}
-            history={balance.history}
-            labels={{
-              real: t('cash:forecast.chartReal'),
-              projected: t('cash:forecast.chartLabel'),
-            }}
-            fmtEur={fmtEur}
-          />
-        </>
-      )}
-
-      <h3 className="text-sm font-semibold">{t('cash:forecast.rules.title')}</h3>
       {!rules ? (
         <div className="text-muted-foreground text-sm">{t('cash:loading')}</div>
       ) : rules.length === 0 ? (

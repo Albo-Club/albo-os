@@ -18,6 +18,13 @@ import type { QueryCtx } from './_generated/server'
  */
 const SEARCH_LIMIT = 200
 
+/**
+ * Bound on the complete ledger (`listLedger`). Newest-first, so the cap drops
+ * the oldest tail of a >LEDGER_LIMIT-tx org — the exhaustive per-account
+ * browse stays on /cash/$accountId. See KNOWN_ISSUES.md « Registre Transactions ».
+ */
+const LEDGER_LIMIT = 1000
+
 /** An org's bank accounts keyed by id, to enrich rows without N+1 gets. */
 async function orgAccountsById(
   ctx: QueryCtx,
@@ -194,6 +201,143 @@ export const listByStatus = query({
           : null,
       }
     })
+  },
+})
+
+/**
+ * Complete transactions ledger (Pennylane-style): an org's transactions across
+ * ALL accounts and statuses, optionally narrowed by `status`, `bankAccountId`
+ * and `search`, sorted by descending date and enriched with the bank account.
+ * Drives the Transactions tab of the Cash section — a matched row stays visible
+ * (with its `matchStatus`), unlike `listUnmatched`. Rows without `matchStatus`
+ * (pre-backfill) surface as 'unmatched'.
+ *
+ * Bounded to the LEDGER_LIMIT most recent rows per filter.
+ */
+export const listLedger = query({
+  args: {
+    orgId: v.id('organizations'),
+    status: v.optional(
+      v.union(
+        v.literal('unmatched'),
+        v.literal('matched'),
+        v.literal('ignored'),
+        v.literal('charge'),
+        v.literal('tax'),
+        v.literal('product'),
+        v.literal('internal_transfer'),
+      ),
+    ),
+    bankAccountId: v.optional(v.id('bankAccounts')),
+    search: v.optional(v.string()),
+  },
+  handler: async (ctx, { orgId, status, bankAccountId, search }) => {
+    await requireOrgMember(ctx, orgId)
+
+    // The org's accounts, read once — also gates the by-account branch below
+    // (that index is not org-scoped, so we must verify ownership ourselves).
+    const accountsById = await orgAccountsById(ctx, orgId)
+    if (bankAccountId && !accountsById.has(bankAccountId)) return []
+
+    const term = search ? normalizeSearch(search) : ''
+    let rows: Array<Doc<'transactions'>>
+    // The `search_text` filter fields are declared [orgId, matchStatus,
+    // bankAccountId] and must be applied in order without a gap — so
+    // `bankAccountId` only enters the index when `status` is set too;
+    // otherwise (and for the no-search status branch) we narrow the account in
+    // JS after the bounded read.
+    let filterAccountInJs = false
+
+    if (term) {
+      rows = await ctx.db
+        .query('transactions')
+        .withSearchIndex('search_text', (q) => {
+          let s = q.search('searchText', term).eq('orgId', orgId)
+          if (status) s = s.eq('matchStatus', status)
+          if (status && bankAccountId) s = s.eq('bankAccountId', bankAccountId)
+          return s
+        })
+        .take(LEDGER_LIMIT)
+      if (bankAccountId && !status) filterAccountInJs = true
+    } else if (status) {
+      rows = await ctx.db
+        .query('transactions')
+        .withIndex('by_org_matchStatus', (q) =>
+          q.eq('orgId', orgId).eq('matchStatus', status),
+        )
+        .take(LEDGER_LIMIT)
+      if (bankAccountId) filterAccountInJs = true
+    } else if (bankAccountId) {
+      // "Tout" scoped to one account — naturally newest-first.
+      rows = await ctx.db
+        .query('transactions')
+        .withIndex('by_account_date', (q) => q.eq('bankAccountId', bankAccountId))
+        .order('desc')
+        .take(LEDGER_LIMIT)
+    } else {
+      // "Tout", all accounts — newest-first.
+      rows = await ctx.db
+        .query('transactions')
+        .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+        .order('desc')
+        .take(LEDGER_LIMIT)
+    }
+
+    if (filterAccountInJs) {
+      rows = rows.filter((tx) => tx.bankAccountId === bankAccountId)
+    }
+
+    rows.sort((a, b) => b.transactionDate - a.transactionDate)
+
+    return rows.map((tx) => {
+      const account = accountsById.get(tx.bankAccountId)
+      return {
+        _id: tx._id,
+        direction: tx.direction,
+        amount: tx.amount,
+        transactionDate: tx.transactionDate,
+        rawLabel: tx.rawLabel,
+        counterparty: tx.counterparty ?? null,
+        // Drives the status badge + per-row action; absence = 'unmatched'.
+        matchStatus: tx.matchStatus ?? 'unmatched',
+        // Routes the un-match (deal vs liability) + Passif safety filter.
+        allocation: tx.allocation ?? null,
+        // VAT (charge/product only) — null = to qualify.
+        vatRateBps: tx.vatRateBps ?? null,
+        account: account
+          ? { label: account.label, bankName: account.bankName }
+          : null,
+      }
+    })
+  },
+})
+
+/**
+ * Count of an org's transactions in a given matching status — feeds the
+ * "À pointer" badge of the Transactions tab (returns a number, not the rows).
+ */
+export const countByStatus = query({
+  args: {
+    orgId: v.id('organizations'),
+    status: v.union(
+      v.literal('unmatched'),
+      v.literal('matched'),
+      v.literal('ignored'),
+      v.literal('charge'),
+      v.literal('tax'),
+      v.literal('product'),
+      v.literal('internal_transfer'),
+    ),
+  },
+  handler: async (ctx, { orgId, status }) => {
+    await requireOrgMember(ctx, orgId)
+    const rows = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_matchStatus', (q) =>
+        q.eq('orgId', orgId).eq('matchStatus', status),
+      )
+      .collect()
+    return rows.length
   },
 })
 

@@ -23,6 +23,52 @@ bas de page.
 
 ---
 
+## v1.9.0 — 16/06/2026 à 10:45 — Trésorerie unifiée : Aperçu + Transactions
+
+Le Pointage rejoint la Trésorerie : une seule entrée de menu, deux onglets.
+
+- **Aperçu** : la courbe de trésorerie passe **tout en haut**, suivie du solde
+  et des comptes, de la TVA récupérable, puis du prévisionnel (règles
+  d'entrées/sorties récurrentes — inchangé).
+- **Transactions** : un registre complet façon Pennylane, avec **toutes** les
+  transactions de tous les comptes. Une transaction rapprochée ne disparaît
+  plus — elle reste visible avec son statut. « À pointer » devient un simple
+  filtre (par défaut, avec son compteur), aux côtés de Tout / Pointé / Charges
+  / Impôts / Produits / Virements internes ; on peut aussi filtrer par compte
+  et rechercher. Le rapprochement se fait directement dans le tableau, et on
+  peut détacher une ligne déjà pointée d'un clic.
+
+L'ancien menu « Pointage » disparaît ; les anciens liens vers cette page
+redirigent automatiquement vers l'onglet Transactions.
+
+Nouveau thème de couleur **« Albo (orange) »** dans le sélecteur de thème.
+
+> **🔧 Notes techniques**
+>
+> - Backend : `convex/transactions.ts` gagne `listLedger` (registre complet,
+>   filtres `status?`/`bankAccountId?`/`search?`, enrichi du compte, borné aux
+>   `LEDGER_LIMIT = 1000` plus récentes, plus récent d'abord — choix d'index
+>   selon le filtre, post-filtre compte en JS quand l'index de recherche ne
+>   peut l'appliquer) et `countByStatus` (badge « À pointer »). Mutations de
+>   pointage réutilisées telles quelles.
+> - `PointageTable.tsx` paramétré par `statusColumn` : colonne Statut + action
+>   par ligne résolue selon `matchStatus` (match/écarter pour unmatched, sélecteur
+>   TVA + Détacher pour charge/produit, Détacher sinon). Le bandeau « Annuler »
+>   transitoire reste réservé à l'inbox « À pointer » ; en mode registre la
+>   ligne reste visible via la réactivité. `DiscardedTable` supprimée (couverte
+>   par le registre). `TxDetails` (`TransactionSheet.tsx`) gagne `matchStatus?`
+>   et `allocation?`.
+> - Nouveau `src/components/cash/TransactionsLedger.tsx` (filtres statut/compte/
+>   recherche → `PointageTable` en mode `statusColumn`).
+> - `cash.index.tsx` : page à 2 onglets via `validateSearch` `?tab=` (optionnel,
+>   défaut Aperçu). `ForecastSection.tsx` scindé en `ForecastChartCard` (courbe,
+>   en haut) et `ForecastRulesSection` (règles, en bas).
+> - `pointage.index.tsx` → redirect `beforeLoad` vers `/cash?tab=transactions`.
+>   `nav.ts` (item Pointage retiré), `VatCard.tsx` (lien « à qualifier » →
+>   registre), `ThemePicker.tsx` + `brand.css` (`data-theme='albo'`,
+>   `oklch(0.588 0.17 36.5)`), i18n `cash`/`pointage`/`nav` (en+fr).
+> - Plafond du registre documenté dans `KNOWN_ISSUES.md` « Registre Transactions ».
+
 ## v1.8.0 — 15/06/2026 à 16:52 — Logos des entreprises du portefeuille
 
 Les participations affichent désormais le logo de chaque société : dans la

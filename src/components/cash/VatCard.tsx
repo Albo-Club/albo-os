@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
  * "Recoverable VAT" card on the Cash page: deductible VAT (qualified
  * expenses) − collected VAT (qualified income), derived from tax-inclusive
  * amounts by `transactions:getVatPosition`. The "to qualify" link points to
- * the Pointage page (Expenses/Income tabs) where the rate is set per line.
+ * the Transactions ledger (Cash section) where the rate is set per line.
  */
 export function VatCard({
   orgId,
@@ -53,8 +53,9 @@ export function VatCard({
             {position.unqualifiedCount > 0 && (
               <p className="text-muted-foreground text-xs">
                 <Link
-                  to="/app/$orgSlug/pointage"
+                  to="/app/$orgSlug/cash"
                   params={{ orgSlug }}
+                  search={{ tab: 'transactions' }}
                   className="hover:text-foreground underline underline-offset-4"
                 >
                   {t('vat.unqualified', {

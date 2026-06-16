@@ -2,6 +2,10 @@
   "metaTitle": "Cash — Albo OS",
   "metaTitleDetail": "Account — Albo OS",
   "title": "Cash",
+  "tabs": {
+    "apercu": "Overview",
+    "transactions": "Transactions"
+  },
   "back": "← Cash",
   "notFound": "Account not found.",
   "totalBalance": "Total balance",
