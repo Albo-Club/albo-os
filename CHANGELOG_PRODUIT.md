@@ -23,6 +23,34 @@ bas de page.
 
 ---
 
+## v1.10.0 — 16/06/2026 à 15:30 — Tableau de bord repensé
+
+Le tableau de bord adopte une mise en page plus éditoriale et plus dense.
+
+- Une **carte héros** met en avant la **valeur estimée du portefeuille** (NAV),
+  avec un badge **TVPI** et une **courbe d'évolution** mensuelle.
+- Les indicateurs clés passent en grille **2×2** : Capital déployé (sur N
+  participations), Distribué (avec le **DPI**), Trésorerie (nombre de comptes
+  connectés) et Participations (nombre de deals actifs).
+- En bas, **Répartition par instrument** (barres) et **Activité récente** (les 5
+  dernières opérations, débits en rouge / crédits en vert) côte à côte, avec le
+  lien vers la trésorerie.
+
+> **🔧 Notes techniques**
+> - `convex/dashboard.ts` (`getDashboard`) : ajout de `accountsCount` (comptes
+>   EUR non archivés) et de `navSeries` (série NAV mensuelle, plafonnée à ~24
+>   points). Les transactions et valuations sont désormais lues une seule fois
+>   par deal — passe unique réutilisée pour les totaux **et** la série — donc le
+>   dernier point de la courbe réconcilie avec le NAV ponctuel. Le DPI
+>   (distribué / déployé) est calculé côté client.
+> - Refonte de `src/routes/app/$orgSlug/index.tsx` en composants
+>   `src/components/dashboard/{HeroCard,AllocationCard,ActivityCard}.tsx` :
+>   sparkline recharts en import dynamique (fill via `--chart-1`), barres
+>   d'allocation au token accent en opacité dégressive (pas de couleur en dur),
+>   lignes d'activité avec `directionTone`. `KpiCard` réutilisée. Nouvelles clés
+>   i18n `dashboard` FR/EN : `overview`, `hero.*`, `kpi.dpi*`,
+>   `kpi.deployedHint*`, `kpi.accounts*`.
+
 ## v1.9.0 — 16/06/2026 à 10:45 — Trésorerie unifiée : Aperçu + Transactions
 
 Le Pointage rejoint la Trésorerie : une seule entrée de menu, deux onglets.

@@ -1,6 +1,11 @@
 {
   "metaTitle": "Dashboard — Albo OS",
   "subtitle": "Overview of your workspace",
+  "overview": "Portfolio overview · as of {{date}}",
+  "hero": {
+    "eyebrow": "Estimated portfolio value",
+    "navPartialNote": "Partial NAV — deals without a valuation are counted at cost."
+  },
   "kpi": {
     "activeMembers": "Active members",
     "pendingInvitations": "Pending invitations",
@@ -11,10 +16,16 @@
     "pendingInvites_other": "{{count}} pending invites",
     "adminOnly": "admin only",
     "deployed": "Capital deployed",
+    "deployedHint_one": "across {{count}} participation",
+    "deployedHint_other": "across {{count}} participations",
     "distributed": "Distributed",
+    "dpi": "DPI",
+    "dpiHint": "DPI {{value}}",
     "nav": "Estimated NAV",
     "navPartial": "partial — deals without valuation counted at cost",
     "tvpi": "TVPI",
+    "accounts_one": "{{count}} connected account",
+    "accounts_other": "{{count}} connected accounts",
     "activeDeals_one": "{{count}} active deal",
     "activeDeals_other": "{{count}} active deals"
   },

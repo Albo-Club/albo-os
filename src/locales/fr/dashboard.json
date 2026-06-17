@@ -1,6 +1,11 @@
 {
   "metaTitle": "Tableau de bord — Albo OS",
   "subtitle": "Aperçu de votre espace de travail",
+  "overview": "Vue d'ensemble du portefeuille · au {{date}}",
+  "hero": {
+    "eyebrow": "Valeur estimée du portefeuille",
+    "navPartialNote": "NAV partielle — deals sans valorisation comptés au montant versé."
+  },
   "kpi": {
     "activeMembers": "Membres actifs",
     "pendingInvitations": "Invitations en attente",
@@ -11,10 +16,16 @@
     "pendingInvites_other": "{{count}} invitations en attente",
     "adminOnly": "réservé aux admins",
     "deployed": "Capital déployé",
+    "deployedHint_one": "sur {{count}} participation",
+    "deployedHint_other": "sur {{count}} participations",
     "distributed": "Distribué",
+    "dpi": "DPI",
+    "dpiHint": "DPI {{value}}",
     "nav": "NAV estimée",
     "navPartial": "partielle — deals sans valo comptés au versé",
     "tvpi": "TVPI",
+    "accounts_one": "{{count}} compte connecté",
+    "accounts_other": "{{count}} comptes connectés",
     "activeDeals_one": "{{count}} deal actif",
     "activeDeals_other": "{{count}} deals actifs"
   },
