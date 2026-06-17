@@ -100,10 +100,13 @@ export function TransactionSheet({
   tx,
   onOpenChange,
   footer,
+  match,
 }: {
   tx: TxDetails | null
   onOpenChange: (open: boolean) => void
   footer?: ReactNode
+  /** Linked deal / liability entity (resolved + linked by the caller). */
+  match?: ReactNode
 }) {
   const { t } = useTranslation('pointage')
   const { fmtDate, fmtSigned } = useFormatters()
@@ -133,6 +136,7 @@ export function TransactionSheet({
                 value={t(`direction.${tx.direction}`)}
               />
               <Info label={t('detail.account')} value={accountLabel(tx)} />
+              {match && <Info label={t('detail.matchedTo')} value={match} />}
             </div>
             <SheetFooter>{footer}</SheetFooter>
           </>

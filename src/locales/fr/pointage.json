@@ -113,7 +113,8 @@
     "rawLabel": "Libellé brut",
     "counterparty": "Contrepartie",
     "direction": "Sens",
-    "account": "Compte bancaire"
+    "account": "Compte bancaire",
+    "matchedTo": "Rattaché à"
   },
   "direction": {
     "in": "Entrée",

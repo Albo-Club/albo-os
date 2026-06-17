@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ArrowUpRight, ChevronDown } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 import { useConvexMutation } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -15,7 +16,10 @@ import {
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { DealOption } from './DealCombobox'
 import type { PointageTarget } from './TargetCombobox'
-import type { LiabilityOptionGroups } from '~/lib/liabilityOptions'
+import type {
+  LiabilityOption,
+  LiabilityOptionGroups,
+} from '~/lib/liabilityOptions'
 import type { TxDetails } from './TransactionSheet'
 import {
   PAGE_SIZE,
@@ -186,6 +190,65 @@ function UndoBanner({
 }
 
 /**
+ * Linked target (deal / liability) of a matched transaction, rendered as a
+ * clickable link to its detail: a deal → its fiche, an equity/loan allocation
+ * → the Passif page (no per-entity detail). The label is resolved from the
+ * already-loaded picker options (`deals` / `liabilityOptions`), so no extra
+ * server read. `stopPropagation` keeps the row's open-sheet click from firing.
+ * Without `orgSlug` (e.g. aggregated view) the label stays plain text.
+ */
+function MatchLink({
+  allocation,
+  dealsById,
+  liabilityByTarget,
+  orgSlug,
+}: {
+  allocation: { kind: 'deal' | 'equity' | 'intercompany_loan'; targetId: string }
+  dealsById: Map<string, DealOption>
+  liabilityByTarget: Map<string, LiabilityOption>
+  orgSlug?: string
+}) {
+  const linkClass =
+    'text-muted-foreground hover:text-foreground inline-flex max-w-xs items-center gap-0.5 truncate text-xs hover:underline'
+
+  if (allocation.kind === 'deal') {
+    const deal = dealsById.get(allocation.targetId)
+    const label = deal?.target?.name ?? deal?.name ?? null
+    if (!label) return null
+    return orgSlug ? (
+      <Link
+        to="/app/$orgSlug/deals/$dealId"
+        params={{ orgSlug, dealId: allocation.targetId }}
+        onClick={(e) => e.stopPropagation()}
+        className={linkClass}
+      >
+        <span className="truncate">{label}</span>
+        <ArrowUpRight className="size-3 shrink-0" />
+      </Link>
+    ) : (
+      <span className="text-muted-foreground text-xs">{label}</span>
+    )
+  }
+
+  // equity | intercompany_loan → no per-entity detail, link to the Passif page.
+  const label = liabilityByTarget.get(allocation.targetId)?.label ?? null
+  if (!label) return null
+  return orgSlug ? (
+    <Link
+      to="/app/$orgSlug/passif"
+      params={{ orgSlug }}
+      onClick={(e) => e.stopPropagation()}
+      className={linkClass}
+    >
+      <span className="truncate">{label}</span>
+      <ArrowUpRight className="size-3 shrink-0" />
+    </Link>
+  ) : (
+    <span className="text-muted-foreground text-xs">{label}</span>
+  )
+}
+
+/**
  * Matching table: `unmatched` transactions sorted by date desc, per-row
  * actions (match to a deal OR to a liability target — equity / C/C —,
  * discard as ignored/charge/tax/product/internal transfer), detail sheet on
@@ -202,6 +265,7 @@ export function PointageTable({
   transactions,
   deals,
   liabilityOptions,
+  orgSlug,
   emptyMessage,
   pageResetKey,
   statusColumn = false,
@@ -210,6 +274,8 @@ export function PointageTable({
   deals: Array<DealOption> | undefined
   /** Liability targets (equity / C/C) of the org, built by the page. */
   liabilityOptions: LiabilityOptionGroups | undefined
+  /** Org slug, to link a matched row to its deal / Passif. Absent = no link. */
+  orgSlug?: string
   /** Alternative empty-state message (e.g. search with no results). */
   emptyMessage?: string
   /** Resets the pagination to the first page when this key changes. */
@@ -227,6 +293,23 @@ export function PointageTable({
   const { t } = useTranslation('pointage')
   const { fmtDate, fmtSigned } = useFormatters()
   const reportError = useReportError()
+
+  // Resolve a matched row's `allocation.targetId` → display label + link, from
+  // the picker options already loaded for the comboboxes (no extra read).
+  const dealsById = useMemo(
+    () => new Map((deals ?? []).map((d) => [d._id as string, d])),
+    [deals],
+  )
+  const liabilityByTarget = useMemo(
+    () =>
+      new Map(
+        [
+          ...(liabilityOptions?.equityOptions ?? []),
+          ...(liabilityOptions?.loanOptions ?? []),
+        ].map((o) => [o.targetId, o]),
+      ),
+    [liabilityOptions],
+  )
 
   const matchTransaction = useConvexMutation(api.transactions.matchTransaction)
   const allocateTransaction = useConvexMutation(
@@ -694,9 +777,19 @@ export function PointageTable({
                   </TableCell>
                   {statusColumn && (
                     <TableCell>
-                      <Badge variant="secondary">
-                        {t(`status.${tx.matchStatus ?? 'unmatched'}`)}
-                      </Badge>
+                      <div className="flex flex-col items-start gap-1">
+                        <Badge variant="secondary">
+                          {t(`status.${tx.matchStatus ?? 'unmatched'}`)}
+                        </Badge>
+                        {tx.allocation && (
+                          <MatchLink
+                            allocation={tx.allocation}
+                            dealsById={dealsById}
+                            liabilityByTarget={liabilityByTarget}
+                            orgSlug={orgSlug}
+                          />
+                        )}
+                      </div>
                     </TableCell>
                   )}
                   <TableCell onClick={(e) => e.stopPropagation()}>
@@ -721,6 +814,16 @@ export function PointageTable({
           if (!open) setSheetTx(null)
         }}
         footer={sheetTx && actionsFor(sheetTx, sheetRecent)}
+        match={
+          sheetTx?.allocation ? (
+            <MatchLink
+              allocation={sheetTx.allocation}
+              dealsById={dealsById}
+              liabilityByTarget={liabilityByTarget}
+              orgSlug={orgSlug}
+            />
+          ) : undefined
+        }
       />
 
       <AlertDialog

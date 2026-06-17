@@ -23,6 +23,33 @@ bas de page.
 
 ---
 
+## v1.28.0 — 24/06/2026 à 20:30 — Transactions : voir le deal rattaché en un coup d'œil
+
+Dans la Trésorerie, une transaction déjà pointée montrait son statut (« Pointé »)
+sans dire **à quoi** elle était rattachée. C'est corrigé.
+
+- Sous le statut, chaque transaction pointée affiche désormais **le deal**
+  rattaché (ou l'entité de passif — capital, compte courant), en **lien
+  cliquable** : un clic ouvre la fiche du deal (ou la page Passif).
+- Même lien dans le détail d'une transaction (volet latéral) et dans la colonne
+  « Deal » de la fiche d'un compte.
+
+> **🔧 Notes techniques**
+>
+> - Résolution **100 % front**, sans nouveau read serveur : `listLedger` renvoie
+>   déjà `allocation = { kind, targetId }`, et `PointageTable` charge déjà
+>   `deals` (`deals.listOptions`) + `liabilityOptions` pour ses comboboxes. On en
+>   dérive deux maps (`dealsById`, `liabilityByTarget`) pour le libellé.
+> - Nouveau composant `MatchLink` (`src/components/pointage/PointageTable.tsx`) :
+>   deal → `/app/$orgSlug/deals/$dealId`, equity/loan → `/app/$orgSlug/passif`
+>   (pas de fiche par-entité). `stopPropagation` pour ne pas ouvrir le sheet au
+>   clic. `orgSlug` threadé via `TransactionsLedger` ← `cash.index.tsx` ; absent
+>   = texte brut (vue agrégée).
+> - Rendu sous le badge dans la cellule **Statut** ; ligne « Rattaché à » ajoutée
+>   au `TransactionSheet` (prop `match`, clé i18n `pointage:detail.matchedTo`).
+> - Fiche compte (`cash.$accountId.tsx`) : colonne « Deal » rendue cliquable
+>   (le serveur renvoyait déjà `tx.deal`). Reste deal-only par design.
+
 ## v1.27.2 — 24/06/2026 à 20:20 — Nom de la société dans le fil d'Ariane
 
 Sur la fiche d'une entreprise, le dernier élément du fil d'Ariane (en haut de

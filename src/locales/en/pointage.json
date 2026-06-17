@@ -113,7 +113,8 @@
     "rawLabel": "Raw label",
     "counterparty": "Counterparty",
     "direction": "Direction",
-    "account": "Bank account"
+    "account": "Bank account",
+    "matchedTo": "Matched to"
   },
   "direction": {
     "in": "Inflow",
