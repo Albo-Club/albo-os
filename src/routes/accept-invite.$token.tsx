@@ -143,7 +143,7 @@ function AcceptInvitePage() {
   return preview.accountExists ? (
     <SignInToAccept preview={preview} />
   ) : (
-    <SignUpToAccept preview={preview} />
+    <SignUpToAccept preview={preview} token={token} />
   )
 }
 
@@ -194,6 +194,7 @@ function SwitchAccountCard({
   currentEmail: string
 }) {
   const { t } = useTranslation('auth')
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   return (
     <main className="flex min-h-svh items-center justify-center p-4">
@@ -201,23 +202,20 @@ function SwitchAccountCard({
         <CardHeader>
           <CardTitle>{t('acceptInvite.wrongAccount.title')}</CardTitle>
           <CardDescription>
-            <span className="block break-all">
+            <span className="block break-words">
               <Trans
                 t={t}
-                i18nKey="acceptInvite.wrongAccount.signedInAs"
-                values={{ email: currentEmail }}
-              />
-            </span>
-            <span className="mt-2 block break-all">
-              <Trans
-                t={t}
-                i18nKey="acceptInvite.wrongAccount.invitationFor"
-                values={{ email: preview.email }}
+                i18nKey="acceptInvite.wrongAccount.body"
+                values={{ currentEmail, invitedEmail: preview.email }}
               />
             </span>
           </CardDescription>
         </CardHeader>
         <CardFooter className="flex-col gap-3">
+          {/* Consented sign-out: the user explicitly chooses to drop their
+              current session. We reload the same /accept-invite/<token> URL so
+              the token is preserved and the page re-renders into the sign-in /
+              sign-up flow for the invited email. */}
           <Button
             className="w-full"
             disabled={loading}
@@ -228,7 +226,16 @@ function SwitchAccountCard({
             }}
           >
             {loading && <Spinner />}
-            {t('acceptInvite.wrongAccount.switch')}
+            {t('acceptInvite.wrongAccount.signOut')}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            disabled={loading}
+            onClick={() => navigate({ to: '/app' })}
+          >
+            {t('acceptInvite.wrongAccount.cancel')}
           </Button>
         </CardFooter>
       </Card>
@@ -374,8 +381,10 @@ function SignInToAccept({
 
 function SignUpToAccept({
   preview,
+  token,
 }: {
   preview: Extract<Preview, { kind: 'ok' }>
+  token: string
 }) {
   const { t } = useTranslation(['auth', 'validation', 'errors'])
   const te = (k: string) => t(`errors:${k}`)
@@ -395,18 +404,39 @@ function SignUpToAccept({
     validators: { onChange: signUpSchema, onSubmit: signUpSchema },
     onSubmit: async ({ value }) => {
       setLoading(true)
+      // Carry the invitation token in the signup body: the user.create.before
+      // hook (convex/auth.ts) validates it and marks the invitee emailVerified,
+      // so no inbox round-trip is needed. `callbackURL` is a safety net — if the
+      // token-gated bypass ever doesn't apply, the verification email still
+      // lands back here so the invitation is accepted on return. `inviteToken`
+      // is an extra body field (forwarded by the BA client, read server-side,
+      // never persisted) — hence the cast past BA's declared signup fields.
       const { error } = await authClient.signUp.email({
         email: preview.email,
         password: value.password,
         name: value.name,
-      })
-      setLoading(false)
+        callbackURL: `/accept-invite/${token}`,
+        inviteToken: token,
+      } as Parameters<typeof authClient.signUp.email>[0])
       if (error) {
+        setLoading(false)
         toast.error(formatAuthError(classifyAuthError(error), 'signup', te))
         return
       }
-      setVerificationSent(true)
-      // After verification click → useConvexAuth flips → auto-accept fires
+      // signUp never opens a session while requireEmailVerification is on, so
+      // sign in to get one — the invitee is already verified by the hook. The
+      // parent's auto-accept effect fires once useConvexAuth flips.
+      const { error: signInError } = await authClient.signIn.email({
+        email: preview.email,
+        password: value.password,
+      })
+      setLoading(false)
+      if (signInError) {
+        // Bypass didn't apply (e.g. token consumed mid-flight): fall back to
+        // the standard verification screen. The verification email was already
+        // sent on signup with the accept-invite callbackURL.
+        setVerificationSent(true)
+      }
     },
   })
 

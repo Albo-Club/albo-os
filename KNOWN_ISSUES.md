@@ -71,6 +71,49 @@ Pour les doublons `users` déjà créés en prod, `provisionAppUser` les
 convergera vers une seule rangée au prochain login du user, mais le
 second BA user reste en base. Cleanup manuel via dashboard Convex.
 
+## Invitation : signup sans vérification email (token-gated)
+
+Un invité qui suit le lien signé `/accept-invite/<token>` a déjà prouvé la
+possession de sa boîte mail. On lui évite donc l'écran « vérifie ton email ».
+Trois pièges, dans l'ordre où on s'y est cogné :
+
+1. **`emailVerified: true` ne suffit PAS à ouvrir une session au signup.**
+   Avec `requireEmailVerification: true` (global), better-auth calcule
+   `shouldSkipAutoSignIn = autoSignIn === false || requireEmailVerification`
+   (`sign-up.mjs`), donc `signUp.email` renvoie **toujours** `token: null`
+   (pas de session), **quelle que soit** la valeur de `emailVerified`. Le hook
+   `databaseHooks.user.create.before` (`convex/auth.ts`) peut bien forcer
+   `emailVerified` à la création (il enveloppe l'écriture de l'adapter), mais
+   ça ne déclenche pas l'auto-sign-in. **Le front doit enchaîner
+   `signUp → signIn` lui-même** : une fois l'utilisateur vérifié, `signIn.email`
+   passe (`sign-in.mjs` ne bloque que `requireEmailVerification && !verified`)
+   et crée la session, puis l'effet d'auto-accept de la page accept-invite
+   tire `invitations.accept`.
+
+2. **Token-gated, pas email-gated.** Le hook ne pose `emailVerified` que si le
+   signup porte un **token d'invitation valide** pour cet email exact
+   (`internal.invitations.validateInviteForSignup`). Connaître un email invité
+   ne suffit pas → on ne peut pas pré-enregistrer un compte vérifié sans le
+   token. Défaut sûr : token absent/invalide/expiré/déjà utilisé → vérification
+   email normale, **sans throw** (le signup suit son cours). Conséquence : ne
+   **jamais** rendre le hook email-gated (il rouvrirait ce trou).
+
+3. **Le token transite dans le body du signup.** Le front passe `inviteToken`
+   en plus des champs BA déclarés ; le client better-auth forwarde tout le
+   premier argument (sauf `fetchOptions`/`query`) dans le body (`proxy.mjs`),
+   et `sign-up.mjs` conserve `ctx.body` intact (les champs inconnus ne sont pas
+   persistés sur le user, juste lisibles par le hook). Comme `inviteToken`
+   n'est pas un champ BA déclaré, l'objet littéral passé à `signUp.email` exige
+   un cast `as Parameters<typeof authClient.signUp.email>[0]` (l'excess property
+   check frappe les littéraux ; un spread, comme dans `register.tsx`, n'en a pas
+   besoin). On joint aussi `callbackURL=/accept-invite/<token>` comme **filet** :
+   si le bypass ne s'applique pas, le lien de vérification ramène quand même sur
+   la page d'accept et l'invitation est honorée au retour.
+
+Logique pure isolée dans `convex/lib/invitations.ts` (`isInviteLiveForSignup`,
+`emailsMatch`) et testée dans `tests/invitations.test.ts` ; le parcours complet
+(signup → signin → accept) se valide à la main via TESTING.md (M3, I5, I9–I12).
+
 ## Google OAuth (template — opt-in)
 
 Google social login is wired but **off by default** so the repo stays a clean

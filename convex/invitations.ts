@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values'
 import { internalQuery, mutation, query } from './_generated/server'
 import { components } from './_generated/api'
 import { invitationRoleValidator } from './schema'
+import { emailsMatch, isInviteLiveForSignup } from './lib/invitations'
 import { provisionAppUser, requireOrgRole } from './lib/auth'
 import { setLastOrgSlug } from './lib/userPrefs'
 import { RESEND_FROM, resend } from './email'
@@ -145,7 +146,7 @@ export const accept = mutation({
     // Case-insensitive, whitespace-tolerant match on both sides. `inv.email`
     // is normalized at creation; the BA-sourced user email may carry casing,
     // so normalize it too — casing must never block a legitimate accept.
-    if (inv.email.trim().toLowerCase() !== user.email.trim().toLowerCase()) {
+    if (!emailsMatch(inv.email, user.email)) {
       throw new ConvexError('email_mismatch')
     }
 
@@ -200,9 +201,7 @@ export const validateInviteForSignup = internalQuery({
       .withIndex('by_token', (q) => q.eq('token', token))
       .unique()
     if (!inv) return false
-    if (inv.acceptedAt) return false
-    if (inv.expiresAt < Date.now()) return false
-    return inv.email.trim().toLowerCase() === email.trim().toLowerCase()
+    return isInviteLiveForSignup(inv, email, Date.now())
   },
 })
 
