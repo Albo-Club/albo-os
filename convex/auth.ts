@@ -185,6 +185,44 @@ export const createAuth = (ctx: GenericCtx<DataModel>) =>
         enabled: true,
       },
     },
+    databaseHooks: {
+      user: {
+        create: {
+          // Invited users prove inbox possession by following the signed,
+          // single-use invitation link, so the standard email-verification
+          // step is redundant for them. When the signup carries a valid
+          // invitation token for this exact email, mark the user
+          // emailVerified — a follow-up signIn (chained by the accept-invite
+          // UI) then yields a session immediately, skipping the "check your
+          // inbox" screen. `autoSignIn` cannot do this on its own: signUp
+          // always skips it while `requireEmailVerification` is on
+          // (better-auth sign-up.mjs). Token-gated: knowing an invited email
+          // is not enough — without a valid token the signup follows the
+          // normal verification path. The token rides in the signup body
+          // (`inviteToken`), set by the accept-invite UI; it is validated
+          // server-side and never persisted on the user. Safe default: any
+          // missing/invalid/expired/used token leaves verification on.
+          // Normal /register signups carry no token and are unaffected.
+          before: async (user, context) => {
+            const token = (
+              context?.body as { inviteToken?: unknown } | undefined
+            )?.inviteToken
+            if (typeof token !== 'string' || token.length === 0) {
+              return undefined
+            }
+            const queryCtx = requireRunMutationCtx(ctx)
+            const valid = await queryCtx.runQuery(
+              internal.invitations.validateInviteForSignup,
+              { token, email: user.email },
+            )
+            if (valid) {
+              return { data: { ...user, emailVerified: true } }
+            }
+            return undefined
+          },
+        },
+      },
+    },
     user: {
       changeEmail: {
         enabled: true,
