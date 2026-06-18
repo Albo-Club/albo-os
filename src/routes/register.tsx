@@ -62,14 +62,32 @@ function RegisterPage() {
   const [sentTo, setSentTo] = useState<string | null>(null)
   const [resendLoading, setResendLoading] = useState(false)
 
+  // When the signup originates from an invitation link, the token is the last
+  // path segment of `redirect` (`/accept-invite/<token>`). It rides in the
+  // signup body so the user.create.before hook (convex/auth.ts) can validate
+  // it and skip the redundant email verification.
+  const inviteToken =
+    redirect?.startsWith('/accept-invite/') ?
+      redirect.slice('/accept-invite/'.length)
+    : null
+  const isInviteFlow = inviteToken !== null
+
   const form = useForm({
     defaultValues: { name: '', email: '', password: '' },
     validators: { onChange: schema, onSubmit: schema },
     onSubmit: async ({ value }) => {
       setLoading(true)
-      const { error } = await authClient.signUp.email(value)
-      setLoading(false)
+      // `callbackURL` is a safety net for the residual verification path;
+      // `inviteToken` (extra body field, forwarded by the BA client, read
+      // server-side, never persisted) drives the token-gated bypass — hence
+      // the cast past BA's declared signup fields.
+      const { error } = await authClient.signUp.email({
+        ...value,
+        ...(redirect ? { callbackURL: redirect } : {}),
+        ...(inviteToken ? { inviteToken } : {}),
+      })
       if (error) {
+        setLoading(false)
         const code = classifyAuthError(error)
         // Anti-enumeration: surface the same "Check your inbox" screen
         // whether the email is fresh or already taken. The legitimate owner
@@ -81,11 +99,28 @@ function RegisterPage() {
         toast.error(formatAuthError(code, 'signup', te))
         return
       }
+      if (inviteToken) {
+        // Invited signup: the token-gated hook verified the user, so sign in
+        // to open a session, then hand off to the accept-invite page (full
+        // navigation wins over the authenticated-redirect guard). It accepts
+        // the invitation and routes to the org.
+        const { error: signInError } = await authClient.signIn.email({
+          email: value.email,
+          password: value.password,
+        })
+        if (signInError) {
+          // Bypass didn't apply: fall back to the verification screen.
+          setLoading(false)
+          setSentTo(value.email)
+          return
+        }
+        window.location.assign(`/accept-invite/${inviteToken}`)
+        return
+      }
+      setLoading(false)
       setSentTo(value.email)
     },
   })
-
-  const isInviteFlow = redirect?.startsWith('/accept-invite/') ?? false
 
   const onResendVerification = async () => {
     if (!sentTo) return

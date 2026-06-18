@@ -23,6 +23,42 @@ bas de page.
 
 ---
 
+## v1.11.0 — 18/06/2026 à 17:29 — Invitations : entrée directe dans l'organisation
+
+Accepter une invitation est désormais plus simple et fiable.
+
+- Un **nouvel invité** définit son nom et son mot de passe et **entre
+  directement** dans l'organisation, sans étape « vérifiez votre e-mail » :
+  cliquer sur le lien d'invitation reçu prouve déjà que la boîte mail est la
+  sienne.
+- Si vous êtes **déjà connecté avec un autre compte** que celui invité, un écran
+  clair vous le signale et vous propose de **vous déconnecter pour continuer**
+  (ou d'annuler) — plus de déconnexion subie.
+- Après acceptation, vous atterrissez **dans l'organisation de l'invitation**,
+  même si vous étiez déjà membre d'une autre.
+- Rouvrir un lien déjà accepté ne provoque plus d'erreur.
+- Les inscriptions classiques (hors invitation) continuent, elles, de demander
+  la vérification de l'e-mail.
+
+> **🔧 Notes techniques**
+> - Cause racine : `signUp.email` n'embarquait pas le token d'invitation et,
+>   sous `requireEmailVerification`, n'ouvrait jamais de session → `invitations.accept`
+>   ne se rejouait jamais. Fix : hook `databaseHooks.user.create.before`
+>   (`convex/auth.ts`) qui pose `emailVerified` **uniquement** si le body du
+>   signup porte un token valide (`internal.invitations.validateInviteForSignup`,
+>   token + email + pending + non expiré). `autoSignIn` ne se déclenche pas sous
+>   `requireEmailVerification`, donc le front enchaîne `signUp → signIn → accept`
+>   (`src/routes/accept-invite.$token.tsx`, `register.tsx`), avec
+>   `callbackURL=/accept-invite/<token>` en filet. `inviteToken` est un champ de
+>   body extra (forwardé par le client BA, jamais persisté).
+> - `invitations.accept` rendu idempotent (réconcilie `acceptedAt` si déjà
+>   membre, retourne toujours `orgSlug`) ; match email insensible casse + trim.
+>   Logique pure extraite dans `convex/lib/invitations.ts` + `tests/invitations.test.ts`.
+> - Écran de désambiguïsation (`SwitchAccountCard`) : déconnexion consentie,
+>   token préservé, clés i18n `auth:acceptInvite.wrongAccount.*` (EN/FR).
+>   Détails et pièges : `KNOWN_ISSUES.md` « Invitation : signup sans vérification
+>   email (token-gated) ».
+
 ## v1.10.0 — 16/06/2026 à 15:30 — Tableau de bord repensé
 
 Le tableau de bord adopte une mise en page plus éditoriale et plus dense.

@@ -111,7 +111,7 @@ Toujours connecté en tant qu'Alice. Préparer un 2e navigateur pour Bob.
 | --- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | M1  | `/app/acme/settings/invitations` → invite `bob@test.local` | Email envoyé, listée en pending                                                                                                                  |
 | M2  | Browser 2 (incognito) → ouvrir le lien d'invitation        | Page `/accept-invite/<token>` accessible non-authentifié                                                                                         |
-| M3  | Sign up Bob via le flow d'invitation                       | Bob créé, automatiquement membre d'Acme avec rôle "member"                                                                                       |
+| M3  | Sign up Bob via le flow d'invitation (`/accept-invite/<token>`, nouveau compte) | Bob créé **et connecté directement** (pas d'écran « vérifie ton email » : le token signé prouve la possession), automatiquement membre d'Acme rôle "member", atterrit sur `/app/acme`                                |
 | M4  | Bob visite `/app/acme`                                     | Voit le dashboard de l'org en tant que membre                                                                                                    |
 | M5  | Alice change rôle Bob → "admin"                            | Persiste, Bob voit le badge mis à jour                                                                                                           |
 | M6  | Bob crée une 2e org "Beta"                                 | Switch vers `/app/beta`, Alice n'est PAS membre                                                                                                  |
@@ -184,10 +184,14 @@ l'assistant (outils `setDealProjections` / `createKpiSnapshot`).
 | I2  | Inviter le même email 2× (en pending)                          | Refusé ou remplace l'invitation, pas de doublon   |
 | I3  | Accepter une invitation expirée (forcer `expiresAt` passé)     | Erreur "invitation_expired", pas d'ajout          |
 | I4  | Accepter une invitation déjà acceptée                          | Erreur "already_accepted"                         |
-| I5  | Accepter invitation avec un autre compte que celui invité      | Refus ("wrong_account") OU rejet selon politique  |
+| I5  | Déjà connecté avec un AUTRE compte que l'invité, ouvrir le lien | Écran « Cette invitation est destinée à un autre compte » : déconnexion **consentie** (bouton « Se déconnecter et continuer ») ou « Annuler » → `/app`. Pas de déconnexion silencieuse ; token préservé |
 | I6  | Spammer 25 invitations en < 1h                                 | Rate-limit déclenche → "rate_limited" après seuil |
 | I7  | Révoquer une invitation pending                                | Disparaît de la liste, lien devient invalide      |
 | I8  | Vérifier que `RESEND_TEST_MODE=true` n'envoie pas d'email réel | Logs Convex montrent "skipped (test mode)"        |
+| I9  | Compte existant invité → ouvrir le lien, saisir le mot de passe | Connexion sur place (pas de navigation), accept auto, redirige vers l'org de l'invitation |
+| I10 | Multi-org : user déjà membre de Beta, accepte une invitation pour Acme | Atterrit sur `/app/acme` (org de l'invitation), pas sur Beta ; membre des deux |
+| I11 | Rejouer un lien déjà accepté en étant déjà membre (recharger la page) | Pas d'erreur : accept idempotent, retour silencieux vers l'org, pas de membre en double |
+| I12 | Signup hors invitation (`/register` sans `redirect=/accept-invite/...`) | Écran « vérifie ton email » **toujours** présent (la non-régression : seul un token valide saute la vérif) |
 
 > **Niveau 3 — CRUD métier (companies / deals)** : ce niveau sera écrit en
 > V0 quand les mutations `companies.*` / `deals.*` existeront (real-time

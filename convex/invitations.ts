@@ -1,7 +1,8 @@
 import { ConvexError, v } from 'convex/values'
-import { mutation, query } from './_generated/server'
+import { internalQuery, mutation, query } from './_generated/server'
 import { components } from './_generated/api'
 import { invitationRoleValidator } from './schema'
+import { emailsMatch, isInviteLiveForSignup } from './lib/invitations'
 import { provisionAppUser, requireOrgRole } from './lib/auth'
 import { setLastOrgSlug } from './lib/userPrefs'
 import { RESEND_FROM, resend } from './email'
@@ -138,32 +139,69 @@ export const accept = mutation({
       .withIndex('by_token', (q) => q.eq('token', token))
       .unique()
     if (!inv) throw new ConvexError('not_found')
-    if (inv.acceptedAt) throw new ConvexError('already_accepted')
-    if (inv.expiresAt < Date.now()) throw new ConvexError('expired')
-    if (inv.email !== user.email.toLowerCase()) {
+
+    const org = await ctx.db.get('organizations', inv.orgId)
+    if (!org) throw new ConvexError('not_found')
+
+    // Case-insensitive, whitespace-tolerant match on both sides. `inv.email`
+    // is normalized at creation; the BA-sourced user email may carry casing,
+    // so normalize it too — casing must never block a legitimate accept.
+    if (!emailsMatch(inv.email, user.email)) {
       throw new ConvexError('email_mismatch')
     }
 
-    const alreadyMember = await ctx.db
+    const existingMember = await ctx.db
       .query('organizationMembers')
       .withIndex('by_org_and_user', (q) =>
         q.eq('orgId', inv.orgId).eq('userId', user._id),
       )
       .unique()
-    if (!alreadyMember) {
-      await ctx.db.insert('organizationMembers', {
-        orgId: inv.orgId,
-        userId: user._id,
-        role: inv.role,
-        joinedAt: Date.now(),
-      })
-    }
-    await ctx.db.patch('invitations', inv._id, { acceptedAt: Date.now() })
 
-    const org = await ctx.db.get('organizations', inv.orgId)
-    if (!org) throw new ConvexError('not_found')
+    // Idempotent replay: the user is already in the org (e.g. the accept
+    // effect fired twice, or they reopened the link). Reconcile a missing
+    // acceptedAt stamp and succeed — never throw on a benign re-accept.
+    if (existingMember) {
+      if (!inv.acceptedAt) {
+        await ctx.db.patch('invitations', inv._id, { acceptedAt: Date.now() })
+      }
+      await setLastOrgSlug(ctx, user, org.slug)
+      return { orgSlug: org.slug }
+    }
+
+    // First-time accept: the invitation must still be live.
+    if (inv.acceptedAt) throw new ConvexError('already_accepted')
+    if (inv.expiresAt < Date.now()) throw new ConvexError('expired')
+
+    await ctx.db.insert('organizationMembers', {
+      orgId: inv.orgId,
+      userId: user._id,
+      role: inv.role,
+      joinedAt: Date.now(),
+    })
+    await ctx.db.patch('invitations', inv._id, { acceptedAt: Date.now() })
     await setLastOrgSlug(ctx, user, org.slug)
     return { orgSlug: org.slug }
+  },
+})
+
+/**
+ * Internal — is this invitation token valid for a brand-new signup of `email`?
+ * True only when the token resolves to a still-pending, unexpired invitation
+ * whose recipient email matches (case-insensitive, trimmed). Used by the
+ * Better Auth `user.create.before` hook in `convex/auth.ts` to skip email
+ * verification for invited signups: following the signed, single-use
+ * invitation link already proves inbox possession. Token-gated — merely
+ * knowing an invited email is not enough to bypass verification.
+ */
+export const validateInviteForSignup = internalQuery({
+  args: { token: v.string(), email: v.string() },
+  handler: async (ctx, { token, email }): Promise<boolean> => {
+    const inv = await ctx.db
+      .query('invitations')
+      .withIndex('by_token', (q) => q.eq('token', token))
+      .unique()
+    if (!inv) return false
+    return isInviteLiveForSignup(inv, email, Date.now())
   },
 })
 
