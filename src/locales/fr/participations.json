@@ -91,7 +91,14 @@
     "kpisTitle": "KPI consolidés",
     "entitiesTitle": "Entités du groupe",
     "entityCount_one": "{{count}} entité",
-    "entityCount_other": "{{count}} entités"
+    "entityCount_other": "{{count}} entités",
+    "addEntity": "Ajouter une entité",
+    "addEntityTitle": "Ajouter des entités au groupe",
+    "addEntityDescription": "Sélectionnez les sociétés à rattacher à {{name}}.",
+    "addEntityEmpty": "Aucune entité disponible — toutes les sociétés du portefeuille appartiennent déjà à un groupe.",
+    "addEntityError": "Impossible d'ajouter les entités. Réessayez.",
+    "entitiesAdded_one": "{{count}} entité ajoutée",
+    "entitiesAdded_other": "{{count}} entités ajoutées"
   },
   "status": {
     "active": "Actif",
