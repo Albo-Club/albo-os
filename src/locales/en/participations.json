@@ -91,7 +91,14 @@
     "kpisTitle": "Consolidated KPIs",
     "entitiesTitle": "Group entities",
     "entityCount_one": "{{count}} entity",
-    "entityCount_other": "{{count}} entities"
+    "entityCount_other": "{{count}} entities",
+    "addEntity": "Add an entity",
+    "addEntityTitle": "Add entities to the group",
+    "addEntityDescription": "Select the companies to attach to {{name}}.",
+    "addEntityEmpty": "No entity available — every portfolio company already belongs to a group.",
+    "addEntityError": "Couldn't add the entities. Please try again.",
+    "entitiesAdded_one": "{{count}} entity added",
+    "entitiesAdded_other": "{{count}} entities added"
   },
   "status": {
     "active": "Active",

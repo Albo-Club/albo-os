@@ -23,6 +23,26 @@ bas de page.
 
 ---
 
+## v1.12.1 — 21/06/2026 à 18:30 — Participations : rattacher des entités depuis la page groupe
+
+Sur la **page consolidée d'un groupe**, un bouton **« Ajouter une entité »**
+permet désormais de rattacher plusieurs sociétés au groupe en une seule fois,
+sans passer par la fiche de chacune. Le sélecteur ne propose que les sociétés
+du portefeuille **qui n'appartiennent à aucun groupe** ; cochez-en plusieurs,
+validez, et elles rejoignent aussitôt la liste et les KPI consolidés.
+
+> **🔧 Notes techniques**
+> - Front uniquement, dans `participations.group.$slug.tsx` : nouveau
+>   `AddEntityDialog` (Dialog + liste de `Checkbox`) ouvert depuis l'en-tête de
+>   `EntityList` (qui reçoit désormais `orgId`).
+> - Source : `api.companies.list({ orgId, kind: 'portfolio' })` filtrée
+>   client-side sur `!c.group`. Validation = `Promise.all` de
+>   `companies.update({ id, patch: { group } })` (clé logique du groupe courant) —
+>   **aucune nouvelle mutation**. La query `getGroup` se rafraîchit seule (Convex
+>   réactif).
+> - i18n EN/FR ajoutée sous `group.*` (libellés bouton/dialog, état vide, toast
+>   pluralisé).
+
 ## v1.12.0 — 21/06/2026 à 12:55 — Participations : regrouper plusieurs entités
 
 Vous pouvez désormais **regrouper plusieurs sociétés du portefeuille** sous une

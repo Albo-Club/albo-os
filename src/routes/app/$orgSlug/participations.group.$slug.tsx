@@ -6,6 +6,7 @@ import {
   Eye,
   EyeOff,
   Pencil,
+  Plus,
 } from 'lucide-react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
@@ -22,6 +23,15 @@ import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
+import { Checkbox } from '~/components/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 
 export const Route = createFileRoute(
@@ -103,7 +113,7 @@ function GroupConso() {
       <BackLink orgSlug={orgSlug} />
       <Header group={group} orgId={org._id} />
       <KpiGrid group={group} orgId={org._id} />
-      <EntityList group={group} orgSlug={orgSlug} />
+      <EntityList group={group} orgSlug={orgSlug} orgId={org._id} />
     </main>
   )
 }
@@ -302,15 +312,31 @@ function KpiGrid({
 function EntityList({
   group,
   orgSlug,
+  orgId,
 }: {
   group: GroupData
   orgSlug: string
+  orgId: Id<'organizations'>
 }) {
   const { t } = useTranslation('participations')
   const { fmtEur, fmtMultiple } = useFormatters()
+  const [adding, setAdding] = useState(false)
   return (
     <div className="space-y-3">
-      <h2 className="text-sm font-medium">{t('group.entitiesTitle')}</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-medium">{t('group.entitiesTitle')}</h2>
+        <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
+          <Plus className="size-4" />
+          {t('group.addEntity')}
+        </Button>
+      </div>
+      {adding && (
+        <AddEntityDialog
+          group={group}
+          orgId={orgId}
+          onClose={() => setAdding(false)}
+        />
+      )}
       <div className="divide-y rounded-lg border">
         {group.entities.map((e) => (
           <Link
@@ -338,5 +364,111 @@ function EntityList({
         ))}
       </div>
     </div>
+  )
+}
+
+/**
+ * Attaches existing portfolio entities to the current group. Only lists
+ * entities without a group (a move between groups is done from the entity's
+ * own page). Reuses `companies.update` — no dedicated mutation.
+ */
+function AddEntityDialog({
+  group,
+  orgId,
+  onClose,
+}: {
+  group: GroupData
+  orgId: Id<'organizations'>
+  onClose: () => void
+}) {
+  const { t } = useTranslation(['participations', 'common'])
+  const updateCompany = useConvexMutation(api.companies.update)
+  const companies = useConvexQuery(api.companies.list, {
+    orgId,
+    kind: 'portfolio',
+  })
+  const available = companies?.filter((c) => !c.group)
+  const [selected, setSelected] = useState<Set<Id<'companies'>>>(new Set())
+  const [pending, setPending] = useState(false)
+
+  const toggle = (id: Id<'companies'>) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+
+  async function handleSave() {
+    setPending(true)
+    try {
+      const ids = Array.from(selected)
+      await Promise.all(
+        ids.map((id) =>
+          updateCompany({ id, patch: { group: group.group } }),
+        ),
+      )
+      toast.success(
+        t('participations:group.entitiesAdded', { count: ids.length }),
+      )
+      onClose()
+    } catch {
+      toast.error(t('participations:group.addEntityError'))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('participations:group.addEntityTitle')}</DialogTitle>
+          <DialogDescription>
+            {t('participations:group.addEntityDescription', {
+              name: group.displayName,
+            })}
+          </DialogDescription>
+        </DialogHeader>
+        {!available ? (
+          <p className="text-muted-foreground text-sm">{t('loading')}</p>
+        ) : available.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            {t('participations:group.addEntityEmpty')}
+          </p>
+        ) : (
+          <div className="max-h-72 divide-y overflow-y-auto rounded-lg border">
+            {available.map((c) => (
+              <label
+                key={c._id}
+                className="hover:bg-accent/60 flex cursor-pointer items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+              >
+                <Checkbox
+                  checked={selected.has(c._id)}
+                  onCheckedChange={() => toggle(c._id)}
+                />
+                <CompanyLogo
+                  domain={c.domain ?? undefined}
+                  companyName={c.name}
+                  size="sm"
+                />
+                {c.name}
+              </label>
+            ))}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={pending}>
+            {t('common:actions.cancel')}
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={pending || selected.size === 0}
+          >
+            {t('common:actions.save')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

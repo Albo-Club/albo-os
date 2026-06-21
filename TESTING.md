@@ -466,6 +466,8 @@ Page conso : `/app/$orgSlug/participations/group/$slug`
 | GR9 | Fiche entité A → « Modifier » → vider le champ **Groupe** → Enregistrer                                       | A quitte le groupe (redevient une ligne propre) ; le groupe disparaît de la liste s'il n'a plus d'entité (ligne settings conservée, réutilisable si réassignation)                               |
 | GR10| Vue agrégée `/app/all/participations`                                                                         | Le groupe se consolide aussi ; « Voir le groupe » pointe la bonne organisation (slug d'org du deal + slug du groupe via `target.groupSlug`)                                                       |
 | GR11| i18n EN/FR (badge, page conso, champ Groupe, blocs)                                                           | Tous les libellés traduits (namespace `participations`)                                                                                                                                          |
+| GR12| Page conso → en-tête « Entités du groupe » → bouton **« Ajouter une entité »** → cocher 2 entités sans groupe → Enregistrer | Toast pluralisé (« 2 entités ajoutées ») ; elles apparaissent aussitôt dans la liste et dans les KPI consolidés (`getGroup` réactif) ; rattachement via `companies.update` (pas de nouvelle mutation) |
+| GR13| Sélecteur « Ajouter une entité »                                                                              | Ne propose **que** les sociétés `portfolio` sans groupe (les déjà groupées et les entités `group_*` sont exclues) ; si aucune dispo → message « Aucune entité disponible », bouton Enregistrer désactivé |
 
 ## Cash flow forecast (règles récurrentes → solde projeté)
 
