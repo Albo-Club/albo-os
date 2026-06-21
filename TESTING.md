@@ -445,6 +445,28 @@ d'une entité (`/participations/$companyId`), nom personnalisé d'un compte
 | ED8 | Même dialog → vider le nom → Enregistrer                                                         | Retombe sur le nom d'origine (`label`) ; `label` n'est **jamais** modifié par ce flux                                                                                                                                                                                                                  |
 | ED9 | i18n EN/FR sur les 3 dialogs                                                                     | Libellés, hints, erreurs et toasts traduits (namespaces `participations` / `cash` / `common`)                                                                                                                                                                                                          |
 
+## Regroupement des participations par groupe (8 min)
+
+Consolidation de plusieurs entités du portefeuille sous une seule ligne via le
+champ `companies.group`. Assignation : `EditCompanyDialog`
+(`/participations/$companyId`). Liste : reducer client de `ParticipationsTable`.
+Page conso : `/app/$orgSlug/participations/group/$slug`
+(`participations.getGroup` / `setGroupBlocks` / `setGroupDisplayName`).
+
+| #   | Étape                                                                                                          | Résultat attendu                                                                                                                                                                                  |
+| --- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GR1 | Fiche entité A → « Modifier » → champ **Groupe** : taper un nouveau nom (ex. `Parallel`) → Enregistrer        | Toast succès ; le groupe est créé (ligne `portfolioGroupSettings` + slug stable), l'entité y est rattachée                                                                                       |
+| GR2 | Fiche entité B → « Modifier » → champ **Groupe** : choisir `Parallel` dans le `datalist` → Enregistrer        | B rejoint le même groupe ; le `datalist` propose les groupes existants (valeur = clé logique, libellé = nom d'affichage)                                                                          |
+| GR3 | Liste `/app/$orgSlug/participations`                                                                          | A et B fusionnent en **une seule ligne** avec badge « groupe » ; Engagé/Versé/Reçu = sommes ; TVPI = (Reçu+résiduel)/Versé agrégé ; les entités sans groupe restent inchangées                   |
+| GR4 | Déplier la ligne groupe (chevron)                                                                             | `DealsList` à plat de **tous** les deals du groupe ; chaque deal affiche un champ « Entité » (nom de sa société)                                                                                  |
+| GR5 | Bouton **« Voir le groupe »** sur la ligne groupe                                                             | Navigue vers `/app/$orgSlug/participations/group/$slug` (slug stable) ; en-tête = nom d'affichage + badge + nb d'entités ; cartes KPI consolidées (Exposition totale / Versé / Reçu / TVPI)       |
+| GR6 | Page conso → « Personnaliser » → masquer un bloc (œil) puis réordonner (↑/↓) → recharger                      | La disposition persiste (`setGroupBlocks`, validée contre le catalogue `KPI_BLOCKS`) ; blocs masqués absents des cartes                                                                            |
+| GR7 | Page conso → « Renommer » → saisir un nouveau nom d'affichage → Enregistrer                                   | Le nom d'affichage change partout ; **le slug d'URL ne change pas** (`setGroupDisplayName`)                                                                                                       |
+| GR8 | Liste des entités sur la page conso → clic sur une entité                                                     | Ouvre sa fiche `/participations/$companyId`                                                                                                                                                       |
+| GR9 | Fiche entité A → « Modifier » → vider le champ **Groupe** → Enregistrer                                       | A quitte le groupe (redevient une ligne propre) ; le groupe disparaît de la liste s'il n'a plus d'entité (ligne settings conservée, réutilisable si réassignation)                               |
+| GR10| Vue agrégée `/app/all/participations`                                                                         | Le groupe se consolide aussi ; « Voir le groupe » pointe la bonne organisation (slug d'org du deal + slug du groupe via `target.groupSlug`)                                                       |
+| GR11| i18n EN/FR (badge, page conso, champ Groupe, blocs)                                                           | Tous les libellés traduits (namespace `participations`)                                                                                                                                          |
+
 ## Cash flow forecast (règles récurrentes → solde projeté)
 
 Couche prévisionnelle : `forecastRules` (causes récurrentes) →

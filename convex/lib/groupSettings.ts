@@ -35,6 +35,26 @@ export async function getGroupBySlug(
     .first()
 }
 
+export type GroupMeta = { slug: string; displayName: string }
+
+/**
+ * Map of an org's group settings keyed by logical key (`companies.group`),
+ * built in one indexed read. Lets deal enrichment attach a group's slug +
+ * display name without a per-row lookup.
+ */
+export async function buildGroupMeta(
+  ctx: QueryCtx | MutationCtx,
+  orgId: Id<'organizations'>,
+): Promise<Map<string, GroupMeta>> {
+  const rows = await ctx.db
+    .query('portfolioGroupSettings')
+    .withIndex('by_org_group', (q) => q.eq('orgId', orgId))
+    .collect()
+  return new Map(
+    rows.map((r) => [r.group, { slug: r.slug, displayName: r.displayName ?? r.group }]),
+  )
+}
+
 /**
  * Ensures a settings row exists for `group`: returns the existing one, or
  * creates it with a stable slug (generated once, never changes) and

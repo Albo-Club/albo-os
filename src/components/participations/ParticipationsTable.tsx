@@ -43,6 +43,12 @@ export type DealRow = {
     name: string
     sector?: string | null
     domain?: string | null
+    /** Portfolio group logical key (consolidates entities on one row). */
+    group?: string | null
+    /** Stable URL slug of the group (for the conso route link). */
+    groupSlug?: string | null
+    /** Editable display name of the group (falls back to the logical key). */
+    groupDisplayName?: string | null
   } | null
   investor: { name: string } | null
   spv: { name: string } | null
@@ -155,9 +161,13 @@ export function useDealTitle() {
 export function DealsList({
   deals,
   orgSlug,
+  showEntity = false,
 }: {
   deals: Array<DealRow>
   orgSlug?: string
+  /** Shows each deal's entity name — used when listing a group's deals
+   * (which span several entities) to keep the membership visible. */
+  showEntity?: boolean
 }) {
   const { t } = useTranslation('participations')
   const { fmtEur, fmtDate, fmtMultiple } = useFormatters()
@@ -172,6 +182,9 @@ export function DealsList({
           paid > 0 ? ((dl.received ?? 0) + residualCents(dl)) / paid : null
         const body = (
           <>
+            {showEntity && (
+              <Field label={t('deal.entity')}>{dl.target?.name ?? '—'}</Field>
+            )}
             <Field label={t('deal.instrument')}>{dealTitle(dl)}</Field>
             <Field label={t('deal.investor')}>
               {dl.investor?.name ?? '—'}
@@ -303,6 +316,10 @@ export function ParticipationsTable({
         domain: string | undefined
         orgs: Set<string>
         slug: string | undefined
+        // Group consolidation: true when the row aggregates several entities
+        // sharing a `group`. `groupSlug` targets the conso route.
+        isGroup: boolean
+        groupSlug: string | undefined
         deals: Array<DealRow>
         committed: number
         paid: number
@@ -311,12 +328,20 @@ export function ParticipationsTable({
       }
     >()
     for (const d of filtered) {
-      const key = d.target?._id ?? d.targetCompanyId
+      // Consolidate by group when set, else by company. Group keys are
+      // prefixed to never collide with a companyId.
+      const group = d.target?.group
+      const key = group ? `g:${group}` : (d.target?._id ?? d.targetCompanyId)
       const g = map.get(key) ?? {
-        name: d.target?.name ?? '—',
-        domain: d.target?.domain ?? undefined,
+        name: group
+          ? (d.target?.groupDisplayName ?? group)
+          : (d.target?.name ?? '—'),
+        // No single domain for a group: CompanyLogo falls back to initials.
+        domain: group ? undefined : (d.target?.domain ?? undefined),
         orgs: new Set<string>(),
         slug: orgSlug ?? d.org?.slug,
+        isGroup: Boolean(group),
+        groupSlug: group ? (d.target?.groupSlug ?? undefined) : undefined,
         deals: [],
         committed: 0,
         paid: 0,
@@ -552,6 +577,8 @@ function CompanyRows({
     domain: string | undefined
     orgs: Set<string>
     slug: string | undefined
+    isGroup: boolean
+    groupSlug: string | undefined
     deals: Array<DealRow>
     committed: number
     paid: number
@@ -582,17 +609,34 @@ function CompanyRows({
               size="sm"
             />
             {group.name}
-            {group.slug && (
+            {group.isGroup && (
+              <Badge variant="secondary">{t('badge.group')}</Badge>
+            )}
+            {group.isGroup && group.slug && group.groupSlug ? (
               <Button asChild variant="outline" size="sm" className="ml-2">
                 <Link
-                  to="/app/$orgSlug/participations/$companyId"
-                  params={{ orgSlug: group.slug, companyId: group.id }}
+                  to="/app/$orgSlug/participations/group/$slug"
+                  params={{ orgSlug: group.slug, slug: group.groupSlug }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <ArrowUpRight className="size-4" />
-                  {t('openDetail')}
+                  {t('group.viewGroup')}
                 </Link>
               </Button>
+            ) : (
+              !group.isGroup &&
+              group.slug && (
+                <Button asChild variant="outline" size="sm" className="ml-2">
+                  <Link
+                    to="/app/$orgSlug/participations/$companyId"
+                    params={{ orgSlug: group.slug, companyId: group.id }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ArrowUpRight className="size-4" />
+                    {t('openDetail')}
+                  </Link>
+                </Button>
+              )
             )}
           </span>
         </TableCell>
@@ -626,7 +670,11 @@ function CompanyRows({
       {isOpen && (
         <TableRow className="hover:bg-transparent">
           <TableCell colSpan={colSpan} className="bg-muted/30 p-0">
-            <DealsList deals={group.deals} orgSlug={group.slug} />
+            <DealsList
+              deals={group.deals}
+              orgSlug={group.slug}
+              showEntity={group.isGroup}
+            />
           </TableCell>
         </TableRow>
       )}

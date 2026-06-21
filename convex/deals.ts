@@ -1,7 +1,9 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import { buildGroupMeta } from './lib/groupSettings'
 import { instrumentValidator as sharedInstrumentValidator } from './lib/instruments'
+import type { GroupMeta } from './lib/groupSettings'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
 import type { DataModel, Doc, Id } from './_generated/dataModel'
 
@@ -44,8 +46,9 @@ const dealFields = {
   notes: v.optional(v.string()),
 }
 
-function companyRef(c: Doc<'companies'> | null) {
+function companyRef(c: Doc<'companies'> | null, groupMeta?: Map<string, GroupMeta>) {
   if (!c) return null
+  const meta = c.group ? groupMeta?.get(c.group) : undefined
   return {
     _id: c._id,
     name: c.name,
@@ -53,12 +56,14 @@ function companyRef(c: Doc<'companies'> | null) {
     sector: c.sector ?? null,
     domain: c.domain ?? null,
     group: c.group ?? null,
+    groupSlug: meta?.slug ?? null,
+    groupDisplayName: meta?.displayName ?? null,
     totalShares: c.totalShares ?? null,
   }
 }
 
 /** Enriches a deal with investor / target / spv (for the view). */
-async function enrich(ctx: Ctx, deal: Doc<'deals'>) {
+async function enrich(ctx: Ctx, deal: Doc<'deals'>, groupMeta?: Map<string, GroupMeta>) {
   const [investor, target, spv] = await Promise.all([
     ctx.db.get("companies", deal.investorCompanyId),
     ctx.db.get("companies", deal.targetCompanyId),
@@ -66,9 +71,9 @@ async function enrich(ctx: Ctx, deal: Doc<'deals'>) {
   ])
   return {
     ...deal,
-    investor: companyRef(investor),
-    target: companyRef(target),
-    spv: companyRef(spv),
+    investor: companyRef(investor, groupMeta),
+    target: companyRef(target, groupMeta),
+    spv: companyRef(spv, groupMeta),
   }
 }
 
@@ -137,9 +142,10 @@ export const list = query({
     if (status) rows = rows.filter((d) => d.status === status)
 
     rows.sort((a, b) => (b.signedDate ?? 0) - (a.signedDate ?? 0))
+    const groupMeta = await buildGroupMeta(ctx, orgId)
     return await Promise.all(
       rows.map(async (d) => ({
-        ...(await enrich(ctx, d)),
+        ...(await enrich(ctx, d, groupMeta)),
         ...(await transactionTotals(ctx, d._id)),
         lastValuationCents: await lastValuationCents(ctx, d._id),
       })),
@@ -191,7 +197,8 @@ export const getById = query({
     const deal = await ctx.db.get("deals", id)
     if (!deal) throw new ConvexError('not_found')
     await requireOrgMember(ctx, deal.orgId)
-    return await enrich(ctx, deal)
+    const groupMeta = await buildGroupMeta(ctx, deal.orgId)
+    return await enrich(ctx, deal, groupMeta)
   },
 })
 

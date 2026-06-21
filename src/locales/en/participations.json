@@ -68,7 +68,30 @@
     "currency": "Currency",
     "notes": "Notes",
     "status": "Status",
+    "tvpi": "TVPI",
+    "entity": "Entity"
+  },
+  "badge": {
+    "group": "group"
+  },
+  "block": {
+    "expo_totale": "Total exposure",
+    "verse": "Paid",
+    "recu": "Received",
     "tvpi": "TVPI"
+  },
+  "group": {
+    "metaTitle": "Group — Albo OS",
+    "notFound": "Group not found.",
+    "viewGroup": "View group",
+    "rename": "Rename",
+    "renameError": "Couldn't rename the group.",
+    "customize": "Customize",
+    "customizeError": "Couldn't save the layout.",
+    "kpisTitle": "Consolidated KPIs",
+    "entitiesTitle": "Group entities",
+    "entityCount_one": "{{count}} entity",
+    "entityCount_other": "{{count}} entities"
   },
   "status": {
     "active": "Active",
@@ -109,6 +132,9 @@
     "sirenLabel": "SIREN",
     "sirenPlaceholder": "9 digits",
     "sirenInvalid": "The SIREN must be exactly 9 digits.",
+    "groupLabel": "Group",
+    "groupPlaceholder": "No group",
+    "groupHint": "Type to create a new group, or pick an existing one. Leave empty to remove.",
     "nameRequired": "Name is required.",
     "saved": "Changes saved",
     "errors": {

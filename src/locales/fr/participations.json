@@ -68,7 +68,30 @@
     "currency": "Devise",
     "notes": "Notes",
     "status": "Statut",
+    "tvpi": "TVPI",
+    "entity": "Entité"
+  },
+  "badge": {
+    "group": "groupe"
+  },
+  "block": {
+    "expo_totale": "Exposition totale",
+    "verse": "Versé",
+    "recu": "Reçu",
     "tvpi": "TVPI"
+  },
+  "group": {
+    "metaTitle": "Groupe — Albo OS",
+    "notFound": "Groupe introuvable.",
+    "viewGroup": "Voir le groupe",
+    "rename": "Renommer",
+    "renameError": "Impossible de renommer le groupe.",
+    "customize": "Personnaliser",
+    "customizeError": "Impossible d'enregistrer la disposition.",
+    "kpisTitle": "KPI consolidés",
+    "entitiesTitle": "Entités du groupe",
+    "entityCount_one": "{{count}} entité",
+    "entityCount_other": "{{count}} entités"
   },
   "status": {
     "active": "Actif",
@@ -109,6 +132,9 @@
     "sirenLabel": "SIREN",
     "sirenPlaceholder": "9 chiffres",
     "sirenInvalid": "Le SIREN doit contenir exactement 9 chiffres.",
+    "groupLabel": "Groupe",
+    "groupPlaceholder": "Aucun groupe",
+    "groupHint": "Tapez pour créer un nouveau groupe, ou choisissez-en un existant. Laisser vide pour retirer.",
     "nameRequired": "Le nom est obligatoire.",
     "saved": "Modifications enregistrées",
     "errors": {
