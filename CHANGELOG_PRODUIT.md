@@ -23,6 +23,48 @@ bas de page.
 
 ---
 
+## v1.12.0 — 21/06/2026 à 12:55 — Participations : regrouper plusieurs entités
+
+Vous pouvez désormais **regrouper plusieurs sociétés du portefeuille** sous une
+seule ligne dans Participations (par exemple tous les SPV d'une même plateforme,
+ou les boutiques d'une même enseigne).
+
+- Depuis la fiche d'une société, un champ **Groupe** permet de l'assigner à un
+  groupe existant ou d'en **créer un nouveau** (il suffit de taper son nom).
+  Laisser le champ vide retire la société du groupe.
+- Dans la liste des participations, les sociétés d'un même groupe se
+  **consolident sur une seule ligne** (montants engagés / versés / reçus et TVPI
+  additionnés), avec un badge « groupe ». Les sociétés sans groupe ne changent
+  pas. Déplier la ligne montre tous les deals du groupe en précisant à quelle
+  entité chacun appartient.
+- Un bouton **« Voir le groupe »** ouvre une **page consolidée** dédiée : KPI
+  agrégés que vous pouvez **réordonner et masquer** selon vos préférences, nom
+  d'affichage **renommable**, et la liste des entités cliquables vers leur fiche.
+- La vue **toutes organisations** bénéficie aussi de ce regroupement.
+
+> **🔧 Notes techniques**
+> - Schéma : champ optionnel `companies.group` (clé logique, distinct de
+>   `sponsor`) + index `by_org_group` ; nouvelle table `portfolioGroupSettings`
+>   (slug d'URL stable généré une fois, `displayName` renommable, config `blocks`)
+>   avec index `by_org_group` / `by_org_slug`.
+> - Logique pure testée (`convex/lib/portfolioGroups.ts` + `tests/portfolioGroups.test.ts`) :
+>   `aggregateEntities` (TVPI = (reçu+résiduel)/versé, même formule que le reducer
+>   client), `resolveBlocks`/`sanitizeBlocks` (catalogue `KPI_BLOCKS` extensible
+>   sans migration), `slugify`/`uniqueSlug`. Helpers ctx dans
+>   `convex/lib/groupSettings.ts` (`ensureGroupSettings`, `getGroupBySlug`,
+>   `buildGroupMeta`).
+> - Back : `companies.update` étendu (`group`, trim, upsert settings via
+>   `ensureGroupSettings`) ; `convex/participations.ts` (`getGroup`, `listGroups`,
+>   `setGroupBlocks`, `setGroupDisplayName`). Les `companyRef` de `deals.ts` et
+>   `aggregate.ts` portent `group`/`groupSlug`/`groupDisplayName` (via `buildGroupMeta`,
+>   une lecture indexée par org) → la liste consolide dans les deux vues sans
+>   requête de rendu supplémentaire.
+> - Front : reducer de `ParticipationsTable` regroupé par `group` (clé préfixée
+>   `g:`), bouton « Voir le groupe », `DealsList` avec `showEntity` ; champ Groupe
+>   (`Input` + `datalist`) dans `EditCompanyDialog` ; nouvelle route
+>   `participations.group.$slug.tsx` (en-tête + KPI réordonnables/masquables +
+>   liste d'entités). i18n EN/FR.
+
 ## v1.11.0 — 18/06/2026 à 17:29 — Invitations : entrée directe dans l'organisation
 
 Accepter une invitation est désormais plus simple et fiable.

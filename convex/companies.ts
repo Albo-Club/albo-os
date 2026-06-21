@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import { ensureGroupSettings } from './lib/groupSettings'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
 import type { DataModel, Id } from './_generated/dataModel'
 
@@ -105,6 +106,7 @@ export const update = mutation({
       legalForm: v.optional(v.string()),
       sector: v.optional(v.string()),
       totalShares: v.optional(v.number()),
+      group: v.optional(v.string()),
       notes: v.optional(v.string()),
     }),
   },
@@ -123,6 +125,13 @@ export const update = mutation({
     }
     if (patch.siren) {
       await assertSirenFree(ctx, company.orgId, patch.siren, id)
+    }
+    // Group: trimmed; '' = removes from group. Assigning to a (new) group
+    // ensures its settings row + stable slug exist.
+    if (patch.group !== undefined) {
+      const trimmed = patch.group.trim()
+      patch.group = trimmed === '' ? undefined : trimmed
+      if (patch.group) await ensureGroupSettings(ctx, company.orgId, patch.group)
     }
     await ctx.db.patch("companies", id, patch)
     return id

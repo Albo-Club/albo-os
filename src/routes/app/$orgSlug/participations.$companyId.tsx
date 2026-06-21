@@ -75,18 +75,27 @@ function Info({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-/** Entity edit dialog: name + SIREN (9 digits or empty). */
+/** Entity edit dialog: name + SIREN (9 digits or empty) + portfolio group. */
 function EditCompanyDialog({
   company,
+  orgId,
   onClose,
 }: {
-  company: { _id: Id<'companies'>; name: string; siren?: string | null }
+  company: {
+    _id: Id<'companies'>
+    name: string
+    siren?: string | null
+    group?: string | null
+  }
+  orgId: Id<'organizations'>
   onClose: () => void
 }) {
   const { t } = useTranslation(['participations', 'common'])
   const updateCompany = useConvexMutation(api.companies.update)
+  const groups = useConvexQuery(api.participations.listGroups, { orgId })
   const [name, setName] = useState(company.name)
   const [siren, setSiren] = useState(company.siren ?? '')
+  const [group, setGroup] = useState(company.group ?? '')
   const [pending, setPending] = useState(false)
 
   // Client-side validation (mirror of the mutation): spaces ignored,
@@ -100,7 +109,7 @@ function EditCompanyDialog({
     try {
       await updateCompany({
         id: company._id,
-        patch: { name: name.trim(), siren },
+        patch: { name: name.trim(), siren, group },
       })
       toast.success(t('participations:edit.saved'))
       onClose()
@@ -159,6 +168,28 @@ function EditCompanyDialog({
                 {t('participations:edit.sirenInvalid')}
               </p>
             )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="company-group">
+              {t('participations:edit.groupLabel')}
+            </Label>
+            <Input
+              id="company-group"
+              list="company-group-options"
+              value={group}
+              onChange={(e) => setGroup(e.target.value)}
+              placeholder={t('participations:edit.groupPlaceholder')}
+            />
+            <datalist id="company-group-options">
+              {groups?.map((g) => (
+                <option key={g.group} value={g.group}>
+                  {g.displayName}
+                </option>
+              ))}
+            </datalist>
+            <p className="text-muted-foreground text-xs">
+              {t('participations:edit.groupHint')}
+            </p>
           </div>
         </div>
         <DialogFooter>
@@ -247,9 +278,10 @@ function ParticipationDetail() {
       {company && <KpisSection companyId={company._id} />}
       {company && <ReportingsSection companyId={company._id} />}
 
-      {company && editOpen && (
+      {company && editOpen && org && (
         <EditCompanyDialog
           company={company}
+          orgId={org._id}
           onClose={() => setEditOpen(false)}
         />
       )}

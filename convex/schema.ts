@@ -300,15 +300,38 @@ export default defineSchema({
     sector: v.optional(v.string()),
     // Origin platform for external SPVs (e.g. "Parallel", "Sezame")
     sponsor: v.optional(v.string()),
+    // Portfolio group: consolidates several entities under one line in the
+    // Participations view (e.g. the SPVs of "Parallel"). Logical key — a group
+    // "exists" as soon as one entity carries its value. Distinct from sponsor.
+    group: v.optional(v.string()),
     notes: v.optional(v.string()),
     archivedAt: v.optional(v.number()),
   })
     .index('by_org', ['orgId'])
     .index('by_org_kind', ['orgId', 'kind'])
     .index('by_org_siren', ['orgId', 'siren'])
+    .index('by_org_group', ['orgId', 'group'])
     .index('by_attio_company_id', ['attioCompanyId'])
     .index('by_org_domain', ['orgId', 'domain'])
     .index('by_airtable_id', ['airtableId']),
+
+  /**
+   * portfolioGroupSettings — canonical record of a portfolio group: a stable
+   * URL slug (generated once, never changes), an editable display name, and
+   * the consolidated KPI blocks config (order + visibility). The logical key
+   * stays `companies.group`; this table only carries presentation state. A row
+   * is ensured on first assignment of an entity to a group.
+   */
+  portfolioGroupSettings: defineTable({
+    orgId: v.id('organizations'),
+    group: v.string(), // logical key = companies.group
+    slug: v.string(), // stable URL identifier, generated at creation
+    displayName: v.optional(v.string()), // editable; fallback = group
+    // Ordered KPI blocks; keys validated against the catalogue in mutations.
+    blocks: v.array(v.object({ key: v.string(), visible: v.boolean() })),
+  })
+    .index('by_org_group', ['orgId', 'group'])
+    .index('by_org_slug', ['orgId', 'slug']),
 
   /**
    * companyRelations — ownership between entities. Handles non-binary cases
