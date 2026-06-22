@@ -23,6 +23,30 @@ bas de page.
 
 ---
 
+## v1.13.0 — 22/06/2026 à 12:00 — Participations : créer une entité depuis la liste
+
+La page **Participations** dispose désormais d'un bouton **« Nouvelle entité »**
+dans son en-tête, qui ouvre un dialog de création. Renseignez le nom (obligatoire),
+éventuellement le SIREN (9 chiffres) et un groupe — nouveau ou choisi dans la liste
+des groupes existants. À la validation, l'entité est créée et vous êtes redirigé
+vers sa fiche. Si le SIREN est invalide ou déjà utilisé, un message clair s'affiche
+sans rien créer.
+
+> **🔧 Notes techniques**
+> - Front uniquement, dans `participations.index.tsx` : nouveau
+>   `CreateCompanyDialog` (calqué sur `EditCompanyDialog` pour le style, la
+>   validation SIREN et le `<datalist>` groupe via `api.participations.listGroups`)
+>   + bouton « Nouvelle entité » dans l'en-tête de la liste.
+> - Soumission : `companies.create({ orgId, name, kind: 'portfolio', siren? })`
+>   (`kind` forcé, non exposé), puis `companies.update({ id, patch: { group } })`
+>   **conditionnel** si un groupe est saisi (`create` n'accepte pas `group`).
+>   **Aucune mutation backend ajoutée ni modifiée.**
+> - Cas create OK / update groupe KO : navigation vers la fiche créée + toast
+>   d'avertissement explicite (l'entité n'est pas perdue). Erreurs `invalid_siren`
+>   / `siren_already_used` classées comme dans l'edit dialog (`ConvexError.data`).
+> - i18n EN/FR ajoutée sous `create.*` ; les libellés de champs réutilisent
+>   `edit.*`.
+
 ## v1.12.1 — 21/06/2026 à 18:30 — Participations : rattacher des entités depuis la page groupe
 
 Sur la **page consolidée d'un groupe**, un bouton **« Ajouter une entité »**

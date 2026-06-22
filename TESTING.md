@@ -445,6 +445,22 @@ d'une entité (`/participations/$companyId`), nom personnalisé d'un compte
 | ED8 | Même dialog → vider le nom → Enregistrer                                                         | Retombe sur le nom d'origine (`label`) ; `label` n'est **jamais** modifié par ce flux                                                                                                                                                                                                                  |
 | ED9 | i18n EN/FR sur les 3 dialogs                                                                     | Libellés, hints, erreurs et toasts traduits (namespaces `participations` / `cash` / `common`)                                                                                                                                                                                                          |
 
+### Création d'entité depuis Participations (`/app/$orgSlug/participations`)
+
+Bouton **« Nouvelle entité »** dans l'en-tête de la liste → dialog de création
+(`CreateCompanyDialog`). `kind` forcé à `portfolio` (non exposé). Mutations :
+`companies.create` puis, si un groupe est saisi, `companies.update` (le groupe
+n'est pas accepté par `create`).
+
+| #   | Étape                                                                                       | Résultat attendu                                                                                                                                              |
+| --- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CR1 | Liste → « Nouvelle entité » → saisir un nom seul → Créer                                     | Toast succès ; navigation vers la fiche `/participations/$companyId` de la nouvelle entité ; elle apparaît dans la liste (kind `portfolio`)                   |
+| CR2 | Même dialog → renseigner aussi un groupe (nouveau ou via `datalist`) → Créer                | L'entité est créée **et** rattachée au groupe ; elle apparaît sous la ligne groupe consolidée                                                                 |
+| CR3 | SIREN invalide (ex. `12345`)                                                                 | Erreur inline sous le champ + bouton Créer désactivé ; côté serveur `create` rejette (`invalid_siren`)                                                        |
+| CR4 | SIREN déjà porté par une autre entité de l'org                                               | Toast d'erreur « déjà utilisé » (`siren_already_used`), rien n'est créé                                                                                       |
+| CR5 | Nom vide                                                                                     | Message « nom obligatoire » + bouton Créer désactivé                                                                                                          |
+| CR6 | i18n EN/FR sur le dialog                                                                     | Libellés, hints, erreurs et toasts traduits (namespaces `participations` / `common`)                                                                          |
+
 ## Regroupement des participations par groupe (8 min)
 
 Consolidation de plusieurs entités du portefeuille sous une seule ligne via le
