@@ -162,6 +162,27 @@
       "default": "Couldn't create the entity. Please try again."
     }
   },
+  "createDeal": {
+    "button": "New deal",
+    "title": "New deal",
+    "description": "Create an investment in this company.",
+    "targetLabel": "Company",
+    "investorLabel": "Investor",
+    "investorPlaceholder": "Pick a group entity",
+    "instrumentPlaceholder": "Pick an instrument",
+    "committedLabel": "Committed amount (€)",
+    "committedPlaceholder": "Optional",
+    "amountInvalid": "Enter a valid amount.",
+    "signedLabel": "Signed date",
+    "created": "Deal created",
+    "errors": {
+      "investor_must_be_group_entity": "The investor must be a group entity.",
+      "investor_wrong_org": "The investor must belong to this organization.",
+      "target_wrong_org": "The company must belong to this organization.",
+      "spv_wrong_org": "The SPV must belong to this organization.",
+      "default": "Couldn't create the deal. Please try again."
+    }
+  },
   "empty": "No participations in this scope — create deals via the AI chat, or add them manually.",
   "search": {
     "placeholder": "Search by company, instrument, sector…",
