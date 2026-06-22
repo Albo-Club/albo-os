@@ -45,6 +45,33 @@ la société.
 > - Filet de sécurité : l'erreur `deal_has_transactions` est aussi gérée dans le
 >   `catch` (toast clair), au cas où. i18n EN/FR sous `deleteDeal.*`.
 
+## v1.14.1 — 22/06/2026 à 12:11 — Synchronisation Attio (préparation technique)
+
+Préparation de la synchronisation automatique depuis Attio : lorsqu'un deal
+change d'étape dans Attio (passage en « Term Sheet » ou « Invested »), Albo OS
+pourra bientôt créer ou mettre à jour le deal correspondant. Ce lot pose la
+plomberie technique côté serveur ; rien n'est encore visible ni écrit en base.
+
+> **🔧 Notes techniques**
+> - Nouveau endpoint webhook `POST /attio/webhook` (`convex/http.ts` →
+>   `convex/attioSync.ts:attioWebhook`). Vérification de signature
+>   HMAC-SHA256 (hex) sur le corps brut, header `Attio-Signature`, secret
+>   `ATTIO_WEBHOOK_SECRET` — même approche Web Crypto que Powens
+>   (`crypto.subtle.verify`), adaptée (Powens = base64 + message préfixé).
+> - Pour chaque event : re-fetch du record via `GET /v2/objects/deals/records/{id}`
+>   (Bearer `ATTIO_API_KEY`), lecture de la valeur **active**
+>   (`active_until === null`) de `stage` / `value` / `albo_or_calte` /
+>   `associated_company` / `type_d_invest` / `date_de_l_investissement`.
+>   Filtre serveur sur les status id Term Sheet (`bb580481…`) et Invested
+>   (`b59066ed…`) ; tout autre stage → 200 no-op. 401 seulement si signature
+>   invalide.
+> - `internal.attioSync.upsertFromDeal` : **squelette** (Lot 1), signature
+>   d'args complète mais ne fait que logger, aucune écriture DB. L'upsert réel
+>   (deal `pending`/`active` + forecast, investor = `group_root`, idempotent
+>   sur `attioDealId`) est le Lot 2.
+> - Env à positionner en prod : `ATTIO_WEBHOOK_SECRET` (nouveau),
+>   `ATTIO_API_KEY` (déjà set).
+
 ## v1.14.0 — 22/06/2026 à 15:30 — Participations : créer un deal depuis la fiche entité
 
 La fiche d'une société dispose désormais d'un bouton **« Nouveau deal »** dans son
