@@ -183,6 +183,17 @@
       "default": "Impossible de créer le deal. Réessayez."
     }
   },
+  "deleteDeal": {
+    "confirmTitle": "Supprimer ce deal ?",
+    "confirmBody": "Cette action est définitive.",
+    "blocked_one": "Ce deal a {{count}} mouvement rapproché. Dé-rapprochez-le avant de supprimer.",
+    "blocked_other": "Ce deal a {{count}} mouvements rapprochés. Dé-rapprochez-les avant de supprimer.",
+    "deleted": "Deal supprimé",
+    "errors": {
+      "deal_has_transactions": "Ce deal a des mouvements rapprochés. Dé-rapprochez-les avant de supprimer.",
+      "default": "Impossible de supprimer le deal. Réessayez."
+    }
+  },
   "empty": "Aucune participation pour ce scope — crée des deals via le chat IA, ou ajoute-les à la main.",
   "search": {
     "placeholder": "Rechercher par société, instrument, secteur…",
