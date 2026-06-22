@@ -23,6 +23,44 @@ bas de page.
 
 ---
 
+## v1.15.0 — 22/06/2026 à 15:07 — Synchronisation Attio : création automatique des deals
+
+Quand un deal passe en **« Term Sheet »** dans Attio, Albo OS crée
+automatiquement l'investissement correspondant (statut **« en attente »**) et
+une **entrée de prévisionnel de trésorerie** pour le décaissement anticipé.
+Quand il passe en **« Invested »**, le deal devient actif et son prévisionnel
+est confirmé (il se soldera tout seul au pointage du vrai virement). Les autres
+étapes Attio sont ignorées. La société investie est rattachée (ou créée) au
+passage, et le véhicule (Calte / Albo) est déduit du deal Attio.
+
+Un investissement dont la **date n'est pas encore connue** apparaît bien mais
+**ne pèse pas sur la courbe de trésorerie** tant que la date n'est pas
+renseignée à la main.
+
+> **🔧 Notes techniques**
+> - `convex/attioSync.ts:upsertFromDeal` n'est plus un squelette : upsert réel,
+>   idempotent sur `attioDealId` (sociétés sur `attioCompanyId`). Investor =
+>   `group_root` de l'org (mapping `albo_or_calte` option id → slug
+>   calte/albo). Mapping `type_d_invest` → `instrumentKind` ; absent →
+>   `unknown`. Société cible résolue/créée (stub `kind:'portfolio'`).
+> - Statut et instrument **forward-only** au patch : un événement Invested ne
+>   régresse jamais un deal déjà sorti, un instrument Attio absent n'écrase pas
+>   un instrument connu (protège les deals Airtable/manuels au backfill).
+> - Forecast lié par `derivedKey = deal:{dealId}` **stable** (la date vit dans
+>   `date`, jamais dans la clé → pas d'orphelin Term Sheet→Invested). Term Sheet
+>   → entrée `direction:'out'`, `confidence:'expected'` ; Invested → la passe à
+>   `confirmed` sans la supprimer.
+> - Nouveau champ `forecastEntries.dateMissing` : entrée exclue de
+>   `getForecastBalance` (`computeForecastBalanceForOrgs`) tant que la date est
+>   inconnue ; `forecasts.ts:updateEntry` le remet à `false` dès qu'une date est
+>   saisie. `buildMonthlyBalance` (pur, testé) intouché.
+> - Schéma additif : `dealStatus` += `pending`, `INSTRUMENTS` += `unknown`,
+>   `forecastEntries` += `dateMissing?`.
+> - Webhook durci : erreur de config (secret/clé manquant) ou erreur non
+>   rejouable → 200 + log (pas de tempête de retries Attio) ; échec de re-fetch
+>   transitoire (réseau / 5xx Attio) → 503 (retry). À set en prod :
+>   `ATTIO_WEBHOOK_SECRET` (`ATTIO_API_KEY` déjà set).
+
 ## v1.14.1 — 22/06/2026 à 12:11 — Synchronisation Attio (préparation technique)
 
 Préparation de la synchronisation automatique depuis Attio : lorsqu'un deal

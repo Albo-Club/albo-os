@@ -1358,3 +1358,37 @@ non-évidents :
    peuvent ne pas l'avoir → fallback, et le champ reste éditable via
    `EditCompanyDialog`. Si un domaine change côté Attio, il faut le ressaisir
    à la main.
+
+## Sync Attio → deals (`convex/attioSync.ts`)
+
+Webhook Attio `record.updated` sur l'objet `deals` → re-fetch du record →
+`upsertFromDeal`. Quatre choix non-évidents :
+
+1. **`derivedKey` du forecast = `deal:{dealId}` (SANS date).** La clé d'identité
+   d'une entrée de prévisionnel liée à un deal ne doit **jamais** contenir la
+   date : sinon, au passage Term Sheet (souvent sans date) → Invested (daté), la
+   clé change et l'entrée d'origine devient **orpheline** (doublon). La date vit
+   dans le champ `date` ; la clé reste stable, un seul lookup `by_derivedKey`.
+   `forecastEntries` n'a volontairement pas d'index `by_deal`.
+
+2. **`dateMissing` exclut l'entrée du calcul de balance, pas des listes.** Un
+   deal Term Sheet sans `date_de_l_investissement` crée une entrée avec un
+   `date` **placeholder** + `dateMissing: true`. L'exclusion se fait en **un
+   seul point** : `convex/forecasts.ts:computeForecastBalanceForOrgs`
+   (`.filter(e => !e.dateMissing)`). `buildMonthlyBalance` (pur, testé) est
+   intouché. `updateEntry` remet `dateMissing` à `false` dès qu'un `patch.date`
+   arrive — sans ça, une date saisie plus tard ne réactiverait jamais l'entrée.
+
+3. **Statut et instrument sont forward-only au patch.** Un événement Invested
+   (`status:'active'`) ne doit pas **régresser** un deal déjà `fully_exited`
+   (cas des 2 deals sortis importés d'Airtable) → on garde le rang le plus
+   avancé (`STATUS_RANK`). De même, un `type_d_invest` Attio absent (→ `unknown`)
+   n'**écrase pas** un instrument déjà connu sur un deal existant. Ces deux
+   garde-fous protègent les deals Airtable/manuels lors du backfill.
+
+4. **Politique de retry du webhook = anti-tempête.** Erreur de **config**
+   (`ATTIO_WEBHOOK_SECRET` / `ATTIO_API_KEY` manquant) ou erreur de **donnée non
+   rejouable** (org absente, mapping…) → **200 + log** : un retry n'y changerait
+   rien, inutile de déclencher la file de retries Attio. Seul un échec de
+   re-fetch **transitoire** (réseau / 5xx Attio, classe `RetryableError`) → **503**
+   pour qu'Attio rejoue. Signature invalide → 401, JSON malformé → 400.
