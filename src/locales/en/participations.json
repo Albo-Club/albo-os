@@ -150,6 +150,18 @@
       "default": "Couldn't save changes. Please try again."
     }
   },
+  "create": {
+    "button": "New entity",
+    "title": "New entity",
+    "description": "Create a portfolio company. You can edit it afterwards.",
+    "created": "Entity created",
+    "groupApplyFailed": "Entity created, but the group couldn't be applied — you can add it via Edit.",
+    "errors": {
+      "invalid_siren": "The SIREN must be exactly 9 digits.",
+      "siren_already_used": "This SIREN is already used by another company.",
+      "default": "Couldn't create the entity. Please try again."
+    }
+  },
   "empty": "No participations in this scope — create deals via the AI chat, or add them manually.",
   "search": {
     "placeholder": "Search by company, instrument, sector…",

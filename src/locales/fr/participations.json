@@ -150,6 +150,18 @@
       "default": "Impossible d'enregistrer les modifications. Réessayez."
     }
   },
+  "create": {
+    "button": "Nouvelle entité",
+    "title": "Nouvelle entité",
+    "description": "Créer une société du portefeuille. Vous pourrez la modifier ensuite.",
+    "created": "Entité créée",
+    "groupApplyFailed": "Entité créée, mais le groupe n'a pas pu être appliqué — vous pouvez l'ajouter via Éditer.",
+    "errors": {
+      "invalid_siren": "Le SIREN doit contenir exactement 9 chiffres.",
+      "siren_already_used": "Ce SIREN est déjà utilisé par une autre société.",
+      "default": "Impossible de créer l'entité. Réessayez."
+    }
+  },
   "empty": "Aucune participation pour ce scope — crée des deals via le chat IA, ou ajoute-les à la main.",
   "search": {
     "placeholder": "Rechercher par société, instrument, secteur…",
