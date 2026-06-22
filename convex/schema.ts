@@ -58,6 +58,9 @@ const companyKind = v.union(
 const instrumentKind = instrumentValidator
 
 const dealStatus = v.union(
+  // Anticipated investment (Attio « Term Sheet ») — not yet signed. Excluded
+  // from active-portfolio aggregations (cf. dashboard.ts / agentTools.ts).
+  v.literal('pending'),
   v.literal('active'),
   v.literal('partially_exited'),
   v.literal('fully_exited'),
@@ -774,6 +777,12 @@ export default defineSchema({
     derivedKey: v.optional(v.string()),
     overridden: v.boolean(),
     realizedTransactionId: v.optional(v.id('transactions')), // filled on matching
+    // True when the entry was derived from a deal with no known investment
+    // date (Attio Term Sheet without `date_de_l_investissement`): `date` is a
+    // placeholder and the entry is EXCLUDED from the projected balance
+    // (convex/forecasts.ts:computeForecastBalanceForOrgs) until a real date is
+    // set (forecasts.ts:updateEntry clears it when `patch.date` is provided).
+    dateMissing: v.optional(v.boolean()),
 
     // ── Reserved fields, NOT READ by current logic ────────────────────────
     // Present in the schema to avoid a future migration, but no

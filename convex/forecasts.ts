@@ -502,7 +502,9 @@ export async function computeForecastBalanceForOrgs(
         q.eq('orgId', oid).gte('date', windowStart).lte('date', windowEnd),
       )
       .collect()
-    entries.push(...orgEntries)
+    // Skip entries flagged `dateMissing` (deal-derived without a known date):
+    // their `date` is a placeholder, they must not weigh on the projection.
+    entries.push(...orgEntries.filter((e) => !e.dateMissing))
   }
 
   // 3. Pure monthly aggregation (tested in tests/recurrence.test.ts).
@@ -617,6 +619,9 @@ export const updateEntry = mutation({
       ...patch,
       // A hand-edited derived entry becomes protected from regeneration.
       ...(entry.ruleId ? { overridden: true } : {}),
+      // Setting a real date re-activates a deal-derived `dateMissing` entry
+      // (it now counts toward the projected balance again).
+      ...(patch.date !== undefined ? { dateMissing: false } : {}),
     })
     return null
   },
