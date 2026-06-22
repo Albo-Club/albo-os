@@ -183,6 +183,17 @@
       "default": "Couldn't create the deal. Please try again."
     }
   },
+  "deleteDeal": {
+    "confirmTitle": "Delete this deal?",
+    "confirmBody": "This action is permanent.",
+    "blocked_one": "This deal has {{count}} reconciled transaction. Unreconcile it before deleting.",
+    "blocked_other": "This deal has {{count}} reconciled transactions. Unreconcile them before deleting.",
+    "deleted": "Deal deleted",
+    "errors": {
+      "deal_has_transactions": "This deal has reconciled transactions. Unreconcile them before deleting.",
+      "default": "Couldn't delete the deal. Please try again."
+    }
+  },
   "empty": "No participations in this scope — create deals via the AI chat, or add them manually.",
   "search": {
     "placeholder": "Search by company, instrument, sector…",

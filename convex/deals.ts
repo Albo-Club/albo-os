@@ -307,6 +307,13 @@ export const remove = mutation({
     const deal = await ctx.db.get("deals", id)
     if (!deal) throw new ConvexError('not_found')
     await requireOrgMember(ctx, deal.orgId)
+    // Hard delete is only safe with no reconciled transaction attached
+    // (invariant: matched ⟺ dealId). Refuse otherwise to avoid orphans.
+    const linked = await ctx.db
+      .query('transactions')
+      .withIndex('by_deal', (q) => q.eq('dealId', id))
+      .first()
+    if (linked) throw new ConvexError('deal_has_transactions')
     await ctx.db.delete("deals", id)
     return { deletedId: id }
   },

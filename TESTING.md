@@ -477,6 +477,22 @@ signature → ms epoch.
 | CD4 | Montant invalide (négatif ou non numérique)                                                        | Erreur inline sous le champ + bouton Créer désactivé                                                                                             |
 | CD5 | i18n EN/FR sur le dialog                                                                           | Libellés, placeholders, erreurs et toasts traduits ; les 19 instruments viennent de `convex/lib/instruments.ts` (libellés `instrument.*`)         |
 
+### Suppression de deal depuis la fiche deal (`/app/$orgSlug/deals/$dealId`)
+
+Bouton **« Supprimer »** dans l'en-tête de la fiche → dialog de confirmation
+(« Cette action est définitive »). Hard delete via `deals.remove`, protégé par une
+garde backend : refus (`deal_has_transactions`) si au moins une transaction est
+rapprochée sur le deal (index `by_deal`). Côté front, le bouton est désactivé
+quand `listByDeal(dealId).length > 0`, avec un message indiquant le nombre.
+
+| #   | Étape                                                                                              | Résultat attendu                                                                                                                                  |
+| --- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| DD1 | Fiche d'un deal **sans** transaction rapprochée → « Supprimer » → confirmer                        | Toast succès ; le deal est supprimé ; navigation vers la fiche entité (`deal.target`) ou Participations ; le deal a disparu de la liste           |
+| DD2 | Fiche d'un deal **avec** au moins une transaction rapprochée                                       | Bouton « Supprimer » **désactivé** + message « Ce deal a N mouvement(s) rapproché(s)… » (pluriel correct EN/FR)                                   |
+| DD3 | Filet de sécurité backend (ex. via console/agent) : `deals.remove` sur un deal avec transactions  | Rejet `deal_has_transactions` ; rien n'est supprimé ; aucune transaction orpheline (`dealId` fantôme)                                             |
+| DD4 | Dialog de confirmation → « Annuler »                                                               | Aucune suppression ; retour à la fiche inchangée                                                                                                 |
+| DD5 | i18n EN/FR                                                                                         | Titre, corps, message bloquant et toasts traduits (namespace `participations` / `common`)                                                        |
+
 ## Regroupement des participations par groupe (8 min)
 
 Consolidation de plusieurs entités du portefeuille sous une seule ligne via le

@@ -23,6 +23,28 @@ bas de page.
 
 ---
 
+## v1.15.0 — 22/06/2026 à 17:45 — Participations : supprimer un deal (protégé)
+
+La fiche d'un deal dispose désormais d'un bouton **« Supprimer »** qui efface
+définitivement l'investissement, après une confirmation explicite. Garde-fou :
+la suppression est **bloquée** tant que des mouvements bancaires sont rapprochés
+sur le deal — le bouton est alors désactivé et indique combien de mouvements
+dé-rapprocher au préalable. Une fois le deal supprimé, on revient sur la fiche de
+la société.
+
+> **🔧 Notes techniques**
+> - Backend : garde ajoutée dans `convex/deals.ts` `remove` — avant le hard
+>   delete, lecture de l'index `by_deal` ; si une transaction est liée →
+>   `ConvexError('deal_has_transactions')` (préserve l'invariant
+>   `matched ⟺ dealId`, évite les transactions orphelines). Existence +
+>   `requireOrgMember` inchangés.
+> - Front : dans `deals.$dealId.tsx`, bouton « Supprimer » (destructive) +
+>   `Dialog` de confirmation. Bouton désactivé quand
+>   `listByDeal(dealId).length > 0`, avec message pluralisé. Au succès,
+>   navigation vers `deal.target` (fiche entité) ou `/participations`.
+> - Filet de sécurité : l'erreur `deal_has_transactions` est aussi gérée dans le
+>   `catch` (toast clair), au cas où. i18n EN/FR sous `deleteDeal.*`.
+
 ## v1.14.1 — 22/06/2026 à 12:11 — Synchronisation Attio (préparation technique)
 
 Préparation de la synchronisation automatique depuis Attio : lorsqu'un deal

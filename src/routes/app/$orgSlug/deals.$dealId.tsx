@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Pencil } from 'lucide-react'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Pencil, Trash2 } from 'lucide-react'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { ConvexError } from 'convex/values'
 import { api } from '../../../../convex/_generated/api'
 import type { ReactNode } from 'react'
 
@@ -398,7 +399,11 @@ function DealDetail() {
   const { t, i18n } = useTranslation(['participations', 'common'])
   const lang = i18n.language
   const { orgSlug, dealId } = Route.useParams()
+  const navigate = useNavigate()
   const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const removeDeal = useConvexMutation(api.deals.remove)
   const deal = useConvexQuery(api.deals.getById, {
     id: dealId as Id<'deals'>,
   })
@@ -426,6 +431,40 @@ function DealDetail() {
         }).format(bps / 10000)
   const fmtNum = (n?: number | null) =>
     n == null ? null : new Intl.NumberFormat(lang).format(n)
+
+  // Reconciled transactions block deletion (invariant: matched ⟺ dealId,
+  // so every row of listByDeal is a reconciled transaction).
+  const linkedCount = txs?.length ?? 0
+
+  async function handleDelete() {
+    if (!deal) return
+    setDeleting(true)
+    try {
+      await removeDeal({ id: deal._id })
+      toast.success(t('participations:deleteDeal.deleted'))
+      setDeleteOpen(false)
+      // The deal no longer exists: leave the page (entity sheet or list).
+      if (deal.target) {
+        navigate({
+          to: '/app/$orgSlug/participations/$companyId',
+          params: { orgSlug, companyId: deal.target._id },
+        })
+      } else {
+        navigate({ to: '/app/$orgSlug/participations', params: { orgSlug } })
+      }
+    } catch (err) {
+      const code = err instanceof ConvexError ? (err.data as string) : ''
+      toast.error(
+        t(
+          code === 'deal_has_transactions'
+            ? 'participations:deleteDeal.errors.deal_has_transactions'
+            : 'participations:deleteDeal.errors.default',
+        ),
+      )
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   if (!deal) {
     return (
@@ -459,7 +498,23 @@ function DealDetail() {
           <Pencil className="size-4" />
           {t('common:actions.edit')}
         </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-destructive hover:text-destructive"
+          disabled={linkedCount > 0}
+          onClick={() => setDeleteOpen(true)}
+        >
+          <Trash2 className="size-4" />
+          {t('common:actions.delete')}
+        </Button>
       </div>
+
+      {linkedCount > 0 && (
+        <p className="text-muted-foreground text-xs">
+          {t('deleteDeal.blocked', { count: linkedCount })}
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-3">
         <Info
@@ -568,6 +623,36 @@ function DealDetail() {
       {editOpen && (
         <EditDealDialog deal={deal} onClose={() => setEditOpen(false)} />
       )}
+
+      <Dialog
+        open={deleteOpen}
+        onOpenChange={(open) => !open && setDeleteOpen(false)}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('deleteDeal.confirmTitle')}</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground text-sm">
+            {t('deleteDeal.confirmBody')}
+          </p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+              disabled={deleting}
+            >
+              {t('common:actions.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void handleDelete()}
+              disabled={deleting}
+            >
+              {t('common:actions.delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }
