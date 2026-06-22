@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Pencil } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Pencil, Plus } from 'lucide-react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
@@ -7,7 +7,10 @@ import { toast } from 'sonner'
 import { ConvexError } from 'convex/values'
 
 import { api } from '../../../../convex/_generated/api'
+// Single source of truth for instrument kinds (cf. convex/lib/instruments.ts).
+import { INSTRUMENTS } from '../../../../convex/lib/instruments'
 import type { Id } from '../../../../convex/_generated/dataModel'
+import type { InstrumentKind } from '../../../../convex/lib/instruments'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { DealsList } from '~/components/participations/ParticipationsTable'
@@ -25,6 +28,13 @@ import {
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 
 export const Route = createFileRoute('/app/$orgSlug/participations/$companyId')({
   component: ParticipationDetail,
@@ -208,10 +218,187 @@ function EditCompanyDialog({
   )
 }
 
+/**
+ * Deal creation dialog, scoped to the current entity (the target).
+ * Investor = a group entity (`group_*`) of the org. status ('active') and
+ * currency ('EUR') keep their backend defaults — not exposed here.
+ */
+function CreateDealDialog({
+  orgId,
+  company,
+  onClose,
+}: {
+  company: { _id: Id<'companies'>; name: string }
+  orgId: Id<'organizations'>
+  onClose: () => void
+}) {
+  const { t } = useTranslation(['participations', 'common'])
+  const createDeal = useConvexMutation(api.deals.create)
+  const companies = useConvexQuery(api.companies.list, { orgId })
+  // Investor must be a group entity — same rule as the backend
+  // (assertInvestorIsGroupEntity).
+  const groupEntities = useMemo(
+    () => (companies ?? []).filter((c) => c.kind.startsWith('group_')),
+    [companies],
+  )
+
+  const [investorId, setInvestorId] = useState('')
+  const [instrument, setInstrument] = useState('')
+  const [amount, setAmount] = useState('') // euros (UI), converted to cents
+  const [signed, setSigned] = useState('') // YYYY-MM-DD, converted to ms epoch
+  const [pending, setPending] = useState(false)
+
+  // Preselect the investor when the org has a single group entity; never
+  // guess a default when several exist.
+  useEffect(() => {
+    if (groupEntities.length === 1 && investorId === '') {
+      setInvestorId(groupEntities[0]._id)
+    }
+  }, [groupEntities, investorId])
+
+  const amountInvalid =
+    amount.trim() !== '' && (Number.isNaN(Number(amount)) || Number(amount) < 0)
+  const canSubmit =
+    investorId !== '' && instrument !== '' && !amountInvalid && !pending
+
+  async function handleCreate() {
+    setPending(true)
+    try {
+      await createDeal({
+        orgId,
+        investorCompanyId: investorId as Id<'companies'>,
+        targetCompanyId: company._id,
+        instrumentKind: instrument as InstrumentKind,
+        committedAmount:
+          amount.trim() === '' ? undefined : Math.round(Number(amount) * 100),
+        signedDate: signed === '' ? undefined : new Date(signed).getTime(),
+      })
+      toast.success(t('participations:createDeal.created'))
+      onClose()
+    } catch (err) {
+      const code = err instanceof ConvexError ? (err.data as string) : ''
+      const known = [
+        'investor_must_be_group_entity',
+        'investor_wrong_org',
+        'target_wrong_org',
+        'spv_wrong_org',
+      ]
+      toast.error(
+        t(
+          known.includes(code)
+            ? `participations:createDeal.errors.${code}`
+            : 'participations:createDeal.errors.default',
+        ),
+      )
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('participations:createDeal.title')}</DialogTitle>
+          <DialogDescription>
+            {t('participations:createDeal.description')}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="deal-target">
+              {t('participations:createDeal.targetLabel')}
+            </Label>
+            <Input id="deal-target" value={company.name} disabled />
+          </div>
+          <div className="space-y-2">
+            <Label>{t('participations:createDeal.investorLabel')}</Label>
+            <Select value={investorId} onValueChange={setInvestorId}>
+              <SelectTrigger className="w-full">
+                <SelectValue
+                  placeholder={t(
+                    'participations:createDeal.investorPlaceholder',
+                  )}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {groupEntities.map((c) => (
+                  <SelectItem key={c._id} value={c._id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>{t('participations:edit.instrumentLabel')}</Label>
+            <Select value={instrument} onValueChange={setInstrument}>
+              <SelectTrigger className="w-full">
+                <SelectValue
+                  placeholder={t(
+                    'participations:createDeal.instrumentPlaceholder',
+                  )}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {INSTRUMENTS.map((kind) => (
+                  <SelectItem key={kind} value={kind}>
+                    {t(`participations:instrument.${kind}`, {
+                      defaultValue: kind,
+                    })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="deal-amount">
+              {t('participations:createDeal.committedLabel')}
+            </Label>
+            <Input
+              id="deal-amount"
+              type="number"
+              min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder={t('participations:createDeal.committedPlaceholder')}
+            />
+            {amountInvalid && (
+              <p className="text-destructive text-xs">
+                {t('participations:createDeal.amountInvalid')}
+              </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="deal-signed">
+              {t('participations:createDeal.signedLabel')}
+            </Label>
+            <Input
+              id="deal-signed"
+              type="date"
+              value={signed}
+              onChange={(e) => setSigned(e.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={pending}>
+            {t('common:actions.cancel')}
+          </Button>
+          <Button onClick={handleCreate} disabled={!canSubmit}>
+            {t('common:actions.create')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function ParticipationDetail() {
   const { t, i18n } = useTranslation(['participations', 'common'])
   const { orgSlug, companyId } = Route.useParams()
   const [editOpen, setEditOpen] = useState(false)
+  const [createDealOpen, setCreateDealOpen] = useState(false)
   const org = useConvexQuery(api.organizations.bySlug, { slug: orgSlug })
   const company = useConvexQuery(api.companies.getById, {
     id: companyId as Id<'companies'>,
@@ -254,6 +441,12 @@ function ParticipationDetail() {
             {t('common:actions.edit')}
           </Button>
         )}
+        {company && org && (
+          <Button size="sm" onClick={() => setCreateDealOpen(true)}>
+            <Plus className="size-4" />
+            {t('createDeal.button')}
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-4">
@@ -283,6 +476,14 @@ function ParticipationDetail() {
           company={company}
           orgId={org._id}
           onClose={() => setEditOpen(false)}
+        />
+      )}
+
+      {company && createDealOpen && org && (
+        <CreateDealDialog
+          company={company}
+          orgId={org._id}
+          onClose={() => setCreateDealOpen(false)}
         />
       )}
     </main>

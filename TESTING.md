@@ -461,6 +461,22 @@ n'est pas accepté par `create`).
 | CR5 | Nom vide                                                                                     | Message « nom obligatoire » + bouton Créer désactivé                                                                                                          |
 | CR6 | i18n EN/FR sur le dialog                                                                     | Libellés, hints, erreurs et toasts traduits (namespaces `participations` / `common`)                                                                          |
 
+### Création de deal depuis la fiche entité (`/app/$orgSlug/participations/$companyId`)
+
+Bouton **« Nouveau deal »** dans l'en-tête de la fiche → dialog de création
+(`CreateDealDialog`). Cible = l'entité courante (pré-remplie, affichée). Mutation :
+`deals.create`. `status` ('active') et `currency` ('EUR') gardent leurs défauts
+backend (non exposés). Montant saisi en euros → converti en cents ; date de
+signature → ms epoch.
+
+| #   | Étape                                                                                              | Résultat attendu                                                                                                                                  |
+| --- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| CD1 | Fiche entité → « Nouveau deal » : org à **une seule** entité `group_*`                             | L'investisseur est **présélectionné** ; la cible affiche le nom de l'entité courante (champ désactivé)                                            |
+| CD2 | Org à **plusieurs** entités `group_*`                                                              | Aucun investisseur deviné ; sélection obligatoire ; bouton Créer désactivé tant qu'investisseur **et** instrument ne sont pas choisis            |
+| CD3 | Choisir investisseur + instrument (+ montant en € + date optionnels) → Créer                       | Toast succès ; le deal apparaît dans la liste de la fiche (réactif, sans reload) ; **on reste sur la fiche** ; montant stocké en cents           |
+| CD4 | Montant invalide (négatif ou non numérique)                                                        | Erreur inline sous le champ + bouton Créer désactivé                                                                                             |
+| CD5 | i18n EN/FR sur le dialog                                                                           | Libellés, placeholders, erreurs et toasts traduits ; les 19 instruments viennent de `convex/lib/instruments.ts` (libellés `instrument.*`)         |
+
 ## Regroupement des participations par groupe (8 min)
 
 Consolidation de plusieurs entités du portefeuille sous une seule ligne via le

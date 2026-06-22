@@ -23,6 +23,32 @@ bas de page.
 
 ---
 
+## v1.14.0 — 22/06/2026 à 15:30 — Participations : créer un deal depuis la fiche entité
+
+La fiche d'une société dispose désormais d'un bouton **« Nouveau deal »** dans son
+en-tête, qui ouvre un dialog de création d'investissement rattaché à cette société.
+Choisissez l'investisseur (une entité du groupe — présélectionné s'il n'y en a
+qu'une) et l'instrument parmi la liste complète, et renseignez éventuellement un
+montant engagé et une date de signature. À la validation, le deal apparaît
+aussitôt dans la liste de la fiche. Les erreurs de cohérence (investisseur invalide,
+mauvaise organisation) affichent un message clair.
+
+> **🔧 Notes techniques**
+> - Front uniquement, dans `participations.$companyId.tsx` : nouveau
+>   `CreateDealDialog` (Dialog shadcn + `Select` investisseur/instrument) ouvert
+>   depuis l'en-tête de la fiche. **Aucune mutation backend ajoutée ni modifiée.**
+> - Soumission : `deals.create({ orgId, investorCompanyId, targetCompanyId, instrumentKind, committedAmount?, signedDate? })`.
+>   `status` ('active') et `currency` ('EUR') gardent leurs défauts backend (non
+>   exposés). Montant euros → cents (`Math.round(x * 100)`) ; date → ms epoch
+>   (`new Date(v).getTime()`).
+> - Investisseur = entités `group_*` via `api.companies.list({ orgId })` filtrées
+>   client-side (`kind.startsWith('group_')`, miroir de `assertInvestorIsGroupEntity`) ;
+>   présélection si une seule, sinon choix obligatoire (pas de défaut deviné).
+> - Instruments importés de la source unique `convex/lib/instruments.ts`
+>   (`INSTRUMENTS`), pas de liste recopiée. Erreurs `investor_must_be_group_entity`
+>   / `investor_wrong_org` / `target_wrong_org` / `spv_wrong_org` classées via
+>   `ConvexError.data`. i18n EN/FR sous `createDeal.*`.
+
 ## v1.13.0 — 22/06/2026 à 12:00 — Participations : créer une entité depuis la liste
 
 La page **Participations** dispose désormais d'un bouton **« Nouvelle entité »**
