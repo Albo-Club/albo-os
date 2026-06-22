@@ -1,4 +1,5 @@
 import { httpRouter } from 'convex/server'
+import { attioWebhook } from './attioSync'
 import { authComponent, createAuth } from './auth'
 import { streamOverHttp } from './chat'
 import {
@@ -26,6 +27,15 @@ http.route({
   path: '/powens/webhook',
   method: 'POST',
   handler: powensWebhook,
+})
+
+// Attio webhook (deals stage change) — HMAC-SHA256 (hex) signature over the
+// raw body verified in the handler (header `Attio-Signature`). The handler
+// re-fetches the record and filters server-side on stage. Cf. convex/attioSync.ts.
+http.route({
+  path: '/attio/webhook',
+  method: 'POST',
+  handler: attioWebhook,
 })
 
 // Telegram bot webhook — secret token (set at setWebhook time) verified in
