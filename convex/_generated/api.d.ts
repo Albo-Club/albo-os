@@ -18,6 +18,7 @@ import type * as agentToolsProjections from "../agentToolsProjections.js";
 import type * as agentToolsValuations from "../agentToolsValuations.js";
 import type * as aggregate from "../aggregate.js";
 import type * as airtableImport from "../airtableImport.js";
+import type * as attioSync from "../attioSync.js";
 import type * as auth from "../auth.js";
 import type * as cash from "../cash.js";
 import type * as chat from "../chat.js";
@@ -75,6 +76,7 @@ declare const fullApi: ApiFromModules<{
   agentToolsValuations: typeof agentToolsValuations;
   aggregate: typeof aggregate;
   airtableImport: typeof airtableImport;
+  attioSync: typeof attioSync;
   auth: typeof auth;
   cash: typeof cash;
   chat: typeof chat;
