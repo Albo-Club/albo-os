@@ -23,6 +23,30 @@ bas de page.
 
 ---
 
+## v1.20.0 — 24/06/2026 à 00:31 — Changer le type d'un deal sans rien perdre
+
+Changer le **type d'instrument** d'un deal depuis l'écran « Modifier » est
+désormais **enregistré** comme les autres champs. Et pour éviter toute
+inquiétude : quand vous sélectionnez un nouveau type, un **message** vous
+confirme que les champs propres à l'ancien type ne sont **pas effacés**. Ils
+sont simplement mis en sommeil — masqués tant que le deal reste sur le nouveau
+type, et **rétablis à l'identique** si vous repassez au type d'origine. Aucune
+donnée n'est perdue lors d'un changement de type.
+
+> **🔧 Notes techniques**
+>
+> - Bannière de confirmation conditionnelle dans `EditDealDialog`
+>   (`src/routes/app/$orgSlug/deals.$dealId.tsx`), affichée quand
+>   `instrument !== deal.instrumentKind` ; libellé `participations:edit.typeChangeNotice`
+>   (interpolation `from`/`to` via `t('participations:instrument.<kind>')`), EN/FR.
+> - **Aucun changement backend** : `convex/deals.ts:update` persistait déjà
+>   `{ instrumentKind }` (clé du validateur de patch) et ajoutait toute clé du
+>   patch à `manuallyEditedFields` (shipé en Lot 3, PR #96). L'invariant
+>   « sommeil » vient de la sémantique du patch partiel `ctx.db.patch` : seules
+>   les clés fournies sont écrites, donc changer le type ne touche que la colonne
+>   `instrumentKind` — aucune mise à null collatérale des champs hors-type.
+> - Scénario de survie documenté dans `TESTING.md` (FD15).
+
 ## v1.19.0 — 23/06/2026 à 23:15 — Modifier les champs d'un deal à la main
 
 La fiche d'un investissement devient **éditable**. Le bouton « Modifier » ouvre

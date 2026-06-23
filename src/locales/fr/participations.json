@@ -296,6 +296,7 @@
     "dealNamePlaceholder": "Nom personnalisé (optionnel)",
     "dealNameHint": "Laisser vide pour utiliser l'instrument comme titre.",
     "instrumentLabel": "Instrument",
+    "typeChangeNotice": "Le type passe de {{from}} à {{to}}. Les champs propres à {{from}} sont conservés mais masqués ; ils réapparaîtront si vous repassez en {{from}}.",
     "sirenLabel": "SIREN",
     "sirenPlaceholder": "9 chiffres",
     "sirenInvalid": "Le SIREN doit contenir exactement 9 chiffres.",
