@@ -23,6 +23,40 @@ bas de page.
 
 ---
 
+## v1.16.0 — 23/06/2026 à 18:36 — Participations : distinguer sponsors et groupes
+
+Les **groupes de participations** peuvent désormais être de deux natures :
+**sponsor** ou **groupe**. Un badge dédié les distingue d'un coup d'œil dans la
+liste des participations et sur la page consolidée. À la **création d'un
+nouveau groupe** (en tapant un nom inédit depuis une fiche société), le choix
+du type est **obligatoire** — impossible d'enregistrer tant qu'il n'est pas
+fait. Les groupes existants restent affichés comme avant ; vous pouvez les
+classer (ou les reclasser) à tout moment depuis leur page consolidée. Ce
+réglage est purement visuel : il ne change aucun calcul ni aucun KPI.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau champ optionnel `groupKind` (`'sponsor' | 'group'`) sur
+>   `portfolioGroupSettings` (`convex/schema.ts`). Rétro-compatible, sans
+>   backfill : un groupe sans `groupKind` retombe sur le badge « groupe ».
+> - `ensureGroupSettings` (`convex/lib/groupSettings.ts`) accepte un 4e
+>   paramètre `groupKind` écrit **uniquement à l'insert** ; l'early-return sur
+>   groupe existant garantit l'idempotence (jamais réécrit). `GroupMeta` +
+>   `buildGroupMeta` propagent le champ.
+> - `companies.update` accepte `groupKind` dans le `patch`, le transmet à
+>   `ensureGroupSettings` puis le retire avant le `ctx.db.patch('companies')`
+>   (ce n'est pas un champ société). Backend permissif : le forçage du choix
+>   est côté front.
+> - Nouvelle mutation `participations.setGroupKind` (reclassement depuis la
+>   page conso) ; `getGroup` renvoie `groupKind`. Les `companyRef` de
+>   `convex/deals.ts` et `convex/aggregate.ts` exposent `groupKind`.
+> - Front : sélecteur de type dans `EditCompanyDialog`
+>   (`participations.$companyId.tsx`) affiché et requis **seulement quand le
+>   nom de groupe saisi est nouveau** ; badges sponsor/groupe dans
+>   `ParticipationsTable.tsx` et `participations.group.$slug.tsx` (avec
+>   sélecteur de reclassement, état « À classer » pour les groupes legacy).
+> - i18n EN/FR : `badge.sponsor`, `kind.*`, `edit.kind*`, `group.kind*`.
+
 ## v1.15.0 — 22/06/2026 à 17:45 — Participations : supprimer un deal (protégé)
 
 La fiche d'un deal dispose désormais d'un bouton **« Supprimer »** qui efface

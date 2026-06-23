@@ -106,6 +106,7 @@ function EditCompanyDialog({
   const [name, setName] = useState(company.name)
   const [siren, setSiren] = useState(company.siren ?? '')
   const [group, setGroup] = useState(company.group ?? '')
+  const [groupKind, setGroupKind] = useState<'sponsor' | 'group' | ''>('')
   const [pending, setPending] = useState(false)
 
   // Client-side validation (mirror of the mutation): spaces ignored,
@@ -114,12 +115,25 @@ function EditCompanyDialog({
   const sirenInvalid = cleanedSiren !== '' && !/^\d{9}$/.test(cleanedSiren)
   const nameMissing = name.trim() === ''
 
+  // A group is "new" when the typed name doesn't match any existing one.
+  // Creating one forces a kind choice (sponsor | group); assigning to an
+  // existing group never asks (its kind is already set).
+  const trimmedGroup = group.trim()
+  const isNewGroup =
+    trimmedGroup !== '' && !groups?.some((g) => g.group === trimmedGroup)
+  const kindMissing = isNewGroup && groupKind === ''
+
   async function handleSave() {
     setPending(true)
     try {
       await updateCompany({
         id: company._id,
-        patch: { name: name.trim(), siren, group },
+        patch: {
+          name: name.trim(),
+          siren,
+          group,
+          ...(isNewGroup && groupKind ? { groupKind } : {}),
+        },
       })
       toast.success(t('participations:edit.saved'))
       onClose()
@@ -201,6 +215,36 @@ function EditCompanyDialog({
               {t('participations:edit.groupHint')}
             </p>
           </div>
+          {isNewGroup && (
+            <div className="space-y-2">
+              <Label htmlFor="company-group-kind">
+                {t('participations:edit.kindLabel')}
+              </Label>
+              <Select
+                value={groupKind}
+                onValueChange={(v) => setGroupKind(v as 'sponsor' | 'group')}
+              >
+                <SelectTrigger id="company-group-kind">
+                  <SelectValue
+                    placeholder={t('participations:edit.kindPlaceholder')}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sponsor">
+                    {t('participations:kind.sponsor')}
+                  </SelectItem>
+                  <SelectItem value="group">
+                    {t('participations:kind.group')}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {kindMissing && (
+                <p className="text-destructive text-xs">
+                  {t('participations:edit.kindRequired')}
+                </p>
+              )}
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={pending}>
@@ -208,7 +252,7 @@ function EditCompanyDialog({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={pending || sirenInvalid || nameMissing}
+            disabled={pending || sirenInvalid || nameMissing || kindMissing}
           >
             {t('common:actions.save')}
           </Button>

@@ -72,7 +72,12 @@
     "entity": "Entité"
   },
   "badge": {
-    "group": "groupe"
+    "group": "groupe",
+    "sponsor": "sponsor"
+  },
+  "kind": {
+    "sponsor": "Sponsor",
+    "group": "Groupe"
   },
   "block": {
     "expo_totale": "Exposition totale",
@@ -86,6 +91,8 @@
     "viewGroup": "Voir le groupe",
     "rename": "Renommer",
     "renameError": "Impossible de renommer le groupe.",
+    "kindUnset": "À classer",
+    "kindError": "Impossible de changer le type du groupe.",
     "customize": "Personnaliser",
     "customizeError": "Impossible d'enregistrer la disposition.",
     "kpisTitle": "KPI consolidés",
@@ -142,6 +149,9 @@
     "groupLabel": "Groupe",
     "groupPlaceholder": "Aucun groupe",
     "groupHint": "Tapez pour créer un nouveau groupe, ou choisissez-en un existant. Laisser vide pour retirer.",
+    "kindLabel": "Type de groupe",
+    "kindPlaceholder": "Choisir un type",
+    "kindRequired": "Choisissez un type pour le nouveau groupe.",
     "nameRequired": "Le nom est obligatoire.",
     "saved": "Modifications enregistrées",
     "errors": {

@@ -107,6 +107,9 @@ export const update = mutation({
       sector: v.optional(v.string()),
       totalShares: v.optional(v.number()),
       group: v.optional(v.string()),
+      // Nature of a NEWLY created group (sponsor | group). Not a company
+      // field — consumed by ensureGroupSettings, stripped before the patch.
+      groupKind: v.optional(v.union(v.literal('sponsor'), v.literal('group'))),
       notes: v.optional(v.string()),
     }),
   },
@@ -126,14 +129,18 @@ export const update = mutation({
     if (patch.siren) {
       await assertSirenFree(ctx, company.orgId, patch.siren, id)
     }
+    // groupKind drives the group settings row, not the company; pull it out.
+    const { groupKind, ...companyPatch } = patch
     // Group: trimmed; '' = removes from group. Assigning to a (new) group
-    // ensures its settings row + stable slug exist.
-    if (patch.group !== undefined) {
-      const trimmed = patch.group.trim()
-      patch.group = trimmed === '' ? undefined : trimmed
-      if (patch.group) await ensureGroupSettings(ctx, company.orgId, patch.group)
+    // ensures its settings row + stable slug exist. groupKind is honored only
+    // when the group is created here (existing groups keep their kind).
+    if (companyPatch.group !== undefined) {
+      const trimmed = companyPatch.group.trim()
+      companyPatch.group = trimmed === '' ? undefined : trimmed
+      if (companyPatch.group)
+        await ensureGroupSettings(ctx, company.orgId, companyPatch.group, groupKind)
     }
-    await ctx.db.patch("companies", id, patch)
+    await ctx.db.patch("companies", id, companyPatch)
     return id
   },
 })

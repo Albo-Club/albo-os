@@ -33,6 +33,13 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 
 export const Route = createFileRoute(
   '/app/$orgSlug/participations/group/$slug',
@@ -127,6 +134,7 @@ function Header({
 }) {
   const { t } = useTranslation(['participations', 'common'])
   const rename = useConvexMutation(api.participations.setGroupDisplayName)
+  const setKind = useConvexMutation(api.participations.setGroupKind)
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(group.displayName)
   const [pending, setPending] = useState(false)
@@ -140,6 +148,14 @@ function Header({
       toast.error(t('participations:group.renameError'))
     } finally {
       setPending(false)
+    }
+  }
+
+  async function changeKind(groupKind: 'sponsor' | 'group') {
+    try {
+      await setKind({ orgId, slug: group.slug, groupKind })
+    } catch {
+      toast.error(t('participations:group.kindError'))
     }
   }
 
@@ -173,7 +189,29 @@ function Header({
           <h1 className="text-2xl font-semibold tracking-tight">
             {group.displayName}
           </h1>
-          <Badge variant="secondary">{t('participations:badge.group')}</Badge>
+          {group.groupKind === 'sponsor' ? (
+            <Badge variant="outline">{t('participations:badge.sponsor')}</Badge>
+          ) : (
+            <Badge variant="secondary">{t('participations:badge.group')}</Badge>
+          )}
+          <Select
+            value={group.groupKind ?? undefined}
+            onValueChange={(v) => changeKind(v as 'sponsor' | 'group')}
+          >
+            <SelectTrigger size="sm" className="w-40">
+              <SelectValue
+                placeholder={t('participations:group.kindUnset')}
+              />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sponsor">
+                {t('participations:kind.sponsor')}
+              </SelectItem>
+              <SelectItem value="group">
+                {t('participations:kind.group')}
+              </SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             variant="outline"
             size="sm"
