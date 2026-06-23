@@ -79,6 +79,29 @@
     "sponsor": "Sponsor",
     "group": "Group"
   },
+  "nature": {
+    "company": "Company",
+    "sponsor": "Debt sponsor",
+    "group": "Group"
+  },
+  "identity": {
+    "title": "Identity",
+    "name": "Name",
+    "type": "Type",
+    "slug": "Identifier (slug)",
+    "attio": "Attio record",
+    "attioOpen": "Open in Attio",
+    "attioLinked": "Linked to Attio",
+    "founders": "Founder(s)",
+    "board": "Board members",
+    "coInvestors": "Co-investors",
+    "platformType": "Platform type",
+    "mainContact": "Main contact",
+    "sponsorDealsNote": "Attached debt deals come up through the member entities.",
+    "empty": "To be filled in",
+    "documents": "Documents",
+    "documentsAtEntity": "Documents are attached to each entity of the group."
+  },
   "block": {
     "expo_totale": "Total exposure",
     "verse": "Paid",

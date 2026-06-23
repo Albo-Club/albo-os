@@ -23,6 +23,43 @@ bas de page.
 
 ---
 
+## v1.17.0 — 23/06/2026 à 21:38 — Fiches entités : un socle commun par nature
+
+Les fiches d'entité s'organisent désormais autour d'un même squelette, quel que
+soit le type : un en-tête (nom, nature, détention), un bloc d'identité qui
+s'adapte à la nature de l'entité, puis les zones Reporting/KPIs et Documents.
+
+- **Entreprise** : secteur, SIREN, nom de domaine, détention, lien vers la fiche
+  Attio, et des sections Fondateur(s) / Membres du board / Co-investisseurs (pour
+  l'instant à renseigner — leur saisie viendra plus tard).
+- **Sponsor dette** : nom, type de plateforme, lien Attio et contact principal
+  (à renseigner) ; rappel que les deals de dette rattachés remontent via les
+  entités membres.
+- **Groupe** : nom, identifiant stable, type, et la liste des entités membres.
+
+Tout reste en lecture seule sur le bloc d'identité — l'édition fine (le crayon)
+arrivera dans une prochaine étape. Les actions déjà en place (modifier une
+société, créer un deal, renommer/classer un groupe) sont conservées.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau module présentation `src/components/companies/EntityFiche.tsx`
+>   (`EntityNatureBadge`, `IdentityField`, `IdentitySection`, `PeopleList`,
+>   `ReservedSection`, `AttioCompanyLink`) — briques read-only partagées.
+> - Refonte de `participations.$companyId.tsx` (nature « company ») et
+>   `participations.group.$slug.tsx` (natures « sponsor »/« group ») au même
+>   squelette, **édition existante conservée**. Nature dérivée : company
+>   `portfolio` → Entreprise ; `portfolioGroupSettings.groupKind === 'sponsor'`
+>   → Sponsor dette ; sinon → Groupe (le `groupKind` vit sur
+>   `portfolioGroupSettings`, pas sur `companies`).
+> - Aucun champ ajouté au schéma : fondateurs/board/co-investisseurs, type de
+>   plateforme et contact sponsor sont rendus en « À renseigner » (cf.
+>   `KNOWN_ISSUES.md` « Fiche entité »).
+> - Lien Attio via `src/lib/attio.ts:attioCompanyUrl`, base d'URL publique
+>   `VITE_ATTIO_WORKSPACE_URL` (sans elle : pas de lien, jamais d'URL devinée).
+> - i18n EN/FR : blocs `nature` et `identity` dans
+>   `src/locales/{en,fr}/participations.json`.
+
 ## v1.16.2 — 23/06/2026 à 20:33 — Placements de trésorerie : socle de fiche (technique)
 
 Suite du socle des fiches par type d'instrument : les placements de trésorerie

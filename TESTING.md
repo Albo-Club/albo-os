@@ -528,6 +528,26 @@ Page conso : `/app/$orgSlug/participations/group/$slug`
 | GR12| Page conso → en-tête « Entités du groupe » → bouton **« Ajouter une entité »** → cocher 2 entités sans groupe → Enregistrer | Toast pluralisé (« 2 entités ajoutées ») ; elles apparaissent aussitôt dans la liste et dans les KPI consolidés (`getGroup` réactif) ; rattachement via `companies.update` (pas de nouvelle mutation) |
 | GR13| Sélecteur « Ajouter une entité »                                                                              | Ne propose **que** les sociétés `portfolio` sans groupe (les déjà groupées et les entités `group_*` sont exclues) ; si aucune dispo → message « Aucune entité disponible », bouton Enregistrer désactivé |
 
+## Fiche entité par nature (lecture seule)
+
+Squelette commun des fiches (en-tête → bloc d'identité piloté par la nature →
+Reporting/KPIs → Documents), partagé par la fiche société
+(`/participations/$companyId`, nature « Entreprise ») et la conso de groupe
+(`/participations/group/$slug`, natures « Sponsor dette » / « Groupe »). Nature
+dérivée : company `portfolio` → Entreprise ; `portfolioGroupSettings` avec
+`groupKind === 'sponsor'` → Sponsor dette ; sinon → Groupe. Briques read-only
+dans `src/components/companies/EntityFiche.tsx` ; les actions d'édition
+existantes restent (seul le bloc d'identité est en lecture seule). Champs
+manquants & lien Attio : `KNOWN_ISSUES.md` « Fiche entité ».
+
+| #   | Étape                                                              | Résultat attendu                                                                                                                                                                                                              |
+| --- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FE1 | Fiche société `/participations/$companyId`                        | En-tête : nom + badge « Entreprise » + détention (si calculable) + boutons Éditer/Nouveau deal ; bloc Identité (Secteur, SIREN, Domaine, Détention, Fiche Attio) ; sections Fondateur(s)/Board/Co-investisseurs vides « À renseigner » ; Deals ; KPIs ; Documents |
+| FE2 | Groupe `groupKind = 'group'` → `/participations/group/$slug`      | Badge « Groupe » ; bloc Identité = Nom + Identifiant (slug) + Type ; KPI conso ; entités membres ; zone Documents réservée (« rattachés à chaque entité du groupe »)                                                            |
+| FE3 | Groupe `groupKind = 'sponsor'`                                    | Badge « Sponsor dette » ; bloc Identité = Nom + Type de plateforme / Fiche Attio / Contact principal en « À renseigner » + note « deals dette rattachés via les entités membres »                                              |
+| FE4 | Lien Attio sur la fiche société                                   | Avec `VITE_ATTIO_WORKSPACE_URL` posée → lien « Ouvrir dans Attio » (nouvel onglet, `{base}/company/{attioCompanyId}`) ; sans → mention grisée « Lié à Attio » (jamais d'URL devinée) ; « — » si pas d'`attioCompanyId`         |
+| FE5 | i18n EN/FR                                                        | `nature.*`, `identity.*`, « À renseigner », note sponsor, Documents réservés — tous traduits (namespace `participations`)                                                                                                      |
+
 ## Cash flow forecast (règles récurrentes → solde projeté)
 
 Couche prévisionnelle : `forecastRules` (causes récurrentes) →

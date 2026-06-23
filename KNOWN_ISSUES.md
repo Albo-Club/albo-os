@@ -1412,3 +1412,43 @@ ce mapping ailleurs. Décisions non-évidentes :
    par aucune mutation** (`deals.ts` non étendu) : elles attendent le câblage
    front + l'extension des args de mutation (Lot 2). Aucune migration de données
    n'est nécessaire (champs optionnels).
+
+## Fiche entité (lecture seule) — natures, champs manquants & lien Attio
+
+Le squelette commun des fiches (en-tête → bloc d'identité piloté par la nature
+→ Reporting/KPIs → Documents) vit dans `src/components/companies/EntityFiche.tsx`
+et est partagé par la fiche société (`participations.$companyId.tsx`, nature
+« Entreprise ») et la conso de groupe (`participations.group.$slug.tsx`, natures
+« Sponsor dette » / « Groupe »). Pièges non-évidents :
+
+1. **La nature n'est PAS un champ.** Elle se **dérive** : une company
+   `kind: 'portfolio'` ouverte par `companyId` → **Entreprise** ; un
+   `portfolioGroupSettings` ouvert par `slug` → **Sponsor dette** si
+   `groupKind === 'sponsor'`, sinon **Groupe**. ⚠️ `groupKind` vit sur
+   `portfolioGroupSettings`, **pas** sur `companies`. Le champ libre
+   `companies.sponsor` (« plateforme d'origine », posé par l'import Attio) **ne
+   pilote pas** la nature et n'est affiché nulle part — ne pas le confondre avec
+   le `groupKind === 'sponsor'`.
+
+2. **Champs d'identité sans stockage — affichés « À renseigner », à ne pas
+   inventer.** Plusieurs champs demandés n'ont **aucune** colonne au schéma et
+   sont rendus en état vide (jamais de champ schéma créé dans ce lot) :
+   - Entreprise : **Fondateur(s)**, **Membres du board**, **Co-investisseurs**
+     (personnes structurées avec liens Attio/LinkedIn/mailto). `PeopleList`
+     sait les rendre, mais reçoit `[]` aujourd'hui → état « À renseigner ».
+   - Sponsor dette : **Type de plateforme**, **Contact principal**, **lien
+     Attio** (pas d'`attioCompanyId` au niveau groupe).
+   - Groupe : zone **Documents** réservée — `documents` est indexé par
+     `companyId`, il n'y a pas de stockage doc au niveau groupe.
+   Pour stocker tout ça : lot édition (table `people` ou champs structurés sur
+   `companies` ; `platformType`/`attioId`/`contact` au niveau
+   `portfolioGroupSettings`).
+
+3. **Lien Attio = base d'URL configurable, jamais devinée.** La REST Attio ne
+   renvoie pas de `web_url`, et le slug d'URL du workspace n'est pas déductible
+   de l'`attioCompanyId` seul. `src/lib/attio.ts:attioCompanyUrl` lit la var
+   publique `VITE_ATTIO_WORKSPACE_URL` (ex. `https://app.attio.com/albo`) et
+   construit `{base}/company/{attioCompanyId}`. **Var absente → pas de lien**
+   (mention grisée « Lié à Attio » à la place) : on ne hardcode pas un format
+   d'URL potentiellement faux. C'est une base d'URL **publique**, pas un secret
+   (l'anti-pattern « pas de `VITE_` sur un secret » ne s'applique pas).

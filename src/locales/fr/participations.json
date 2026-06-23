@@ -79,6 +79,29 @@
     "sponsor": "Sponsor",
     "group": "Groupe"
   },
+  "nature": {
+    "company": "Entreprise",
+    "sponsor": "Sponsor dette",
+    "group": "Groupe"
+  },
+  "identity": {
+    "title": "Identité",
+    "name": "Nom",
+    "type": "Type",
+    "slug": "Identifiant (slug)",
+    "attio": "Fiche Attio",
+    "attioOpen": "Ouvrir dans Attio",
+    "attioLinked": "Lié à Attio",
+    "founders": "Fondateur(s)",
+    "board": "Membres du board",
+    "coInvestors": "Co-investisseurs",
+    "platformType": "Type de plateforme",
+    "mainContact": "Contact principal",
+    "sponsorDealsNote": "Les deals dette rattachés remontent via les entités membres.",
+    "empty": "À renseigner",
+    "documents": "Documents",
+    "documentsAtEntity": "Les documents sont rattachés à chaque entité du groupe."
+  },
   "block": {
     "expo_totale": "Exposition totale",
     "verse": "Versé",
