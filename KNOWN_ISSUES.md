@@ -1466,3 +1466,41 @@ et est partagé par la fiche société (`participations.$companyId.tsx`, nature
    (mention grisée « Lié à Attio » à la place) : on ne hardcode pas un format
    d'URL potentiellement faux. C'est une base d'URL **publique**, pas un secret
    (l'anti-pattern « pas de `VITE_` sur un secret » ne s'applique pas).
+
+## Édition manuelle deals & `manuallyEditedFields`
+
+L'édition des champs d'un deal depuis la fiche (`EditDealDialog`) écrit via
+`deals.update`. Le garde-fou contre l'écrasement par le ré-import Airtable est
+un **set de noms de champs**, pas un booléen au niveau deal.
+
+### Mécanisme
+
+- Colonne `deals.manuallyEditedFields: v.optional(v.array(v.string()))`
+  (additif/optionnel → pas de migration ; absent = `[]`).
+- **Côté écriture (uniforme)** : `convex/deals.ts:update` fait l'union du set
+  existant avec **toutes** les clés présentes dans le `patch` reçu. Le front
+  n'envoie qu'un **diff** (champs réellement modifiés, cf.
+  `deals.$dealId.tsx`), donc le set ne grossit que des champs vraiment touchés.
+- **Côté import** : `convex/airtableImport.ts:upsertDeals` retire du patch
+  toute clé présente dans `existing.manuallyEditedFields` avant
+  `ctx.db.patch`. Un champ saisi à la main n'est donc jamais réécrasé.
+
+### Intersection import (le point subtil)
+
+Le set est consulté **uniquement** pour les colonnes que l'import écrit
+réellement : `paidAmount`, `sharesAcquired`, `signedDate`, `exitedDate`,
+`status`, `instrumentKind`, `targetCompanyId`, `currency`. Tout autre champ
+marqué (ex. `interestRate`, `roundType`, `preMoneyValuation`…) est **inerte**
+dans le set : sans effet (l'import ne l'écrit pas) et sans risque. C'est
+volontaire — marquer uniformément côté écriture garde la mutation simple ; le
+filtre import ne « voit » que l'intersection.
+
+### Limite assumée
+
+Une saisie **vide** est traitée comme « pas de changement » (le champ n'est ni
+envoyé ni effacé). **Vider** un champ déjà rempli n'est donc pas supporté par
+ce lot (on évite la sérialisation de `undefined` côté client Convex). Le `name`
+fait exception : `''` le réinitialise (géré serveur, retombe sur le titre
+dérivé). `paidActual` (décaissé réel) est **calculé** depuis les transactions
+(`transactionTotals`) et n'est jamais éditable — distinct de `paidAmount`
+(colonne, « montant contractuel »).

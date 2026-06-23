@@ -387,7 +387,15 @@ export const upsertDeals = internalMutation({
         airtableId: r.key,
       }
       if (existing) {
-        await ctx.db.patch("deals", existing._id, fields)
+        // Preserve hand-edited columns: drop from the patch any field the user
+        // edited from the deal sheet (deals.update sets manuallyEditedFields).
+        // The set is consulted only for the columns this import writes; other
+        // marked fields are inert. See KNOWN_ISSUES « Édition manuelle deals ».
+        const patch = { ...fields }
+        for (const key of existing.manuallyEditedFields ?? []) {
+          delete (patch as Record<string, unknown>)[key]
+        }
+        await ctx.db.patch("deals", existing._id, patch)
         map[r.key] = existing._id
       } else {
         map[r.key] = await ctx.db.insert('deals', fields)

@@ -49,7 +49,7 @@
     "viaSpv": "via SPV",
     "target": "Company",
     "committed": "Committed",
-    "paid": "Paid",
+    "paid": "Disbursed (actual)",
     "received": "Received",
     "shares": "Shares acquired",
     "pricePerShare": "Price per share",
@@ -162,7 +162,7 @@
     "signedDate": "Signed date",
     "conversionDeadlineDate": "Conversion deadline",
     "maturityDate": "Maturity date",
-    "paidAmount": "Amount paid",
+    "paidAmount": "Contractual amount",
     "committedAmount": "Committed amount",
     "roundSize": "Round size",
     "preMoneyValuation": "Pre-money valuation",
@@ -254,6 +254,7 @@
   "fiche": {
     "instrumentTitle": "Instrument details",
     "typeLabel": "Instrument type",
+    "manuallyEdited": "Edited by hand — protected from the Airtable re-import",
     "preview": {
       "unsaved": "Preview — not saved",
       "note": "Switching the type here only previews the layout — nothing is written to the database.",
@@ -286,7 +287,9 @@
   },
   "edit": {
     "dealTitle": "Edit deal",
-    "dealDescription": "Rename the deal and change its instrument type.",
+    "dealDescription": "Rename the deal, change its instrument type, and edit its field values.",
+    "fieldsHint": "Edited values are protected from the next Airtable re-import.",
+    "selectPlaceholder": "Select…",
     "companyTitle": "Edit company",
     "companyDescription": "Rename the company and edit its SIREN.",
     "nameLabel": "Name",

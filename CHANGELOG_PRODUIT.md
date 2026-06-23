@@ -23,6 +23,51 @@ bas de page.
 
 ---
 
+## v1.19.0 — 23/06/2026 à 23:15 — Modifier les champs d'un deal à la main
+
+La fiche d'un investissement devient **éditable**. Le bouton « Modifier » ouvre
+désormais, en plus du nom et du type, **tous les champs propres au type
+d'instrument** : on peut corriger un taux, une valorisation, une date de
+closing, un type de tour, un montant… chacun dans le bon format (euros, %,
+date, liste de choix).
+
+- Chaque champ modifié à la main est **protégé** : le prochain ré-import depuis
+  Airtable ne l'écrasera plus. Un **petit point** à côté du champ, sur la fiche,
+  signale qu'il a été saisi à la main.
+- Une saisie incohérente (lettres dans un montant, par exemple) **bloque
+  l'enregistrement** — rien n'est sauvegardé à moitié.
+- Les libellés lèvent une ambiguïté : le **« Montant contractuel »** (saisi à la
+  main) est distinct du **« Décaissé (réel) »**, qui reste calculé
+  automatiquement à partir des mouvements bancaires et n'est pas modifiable.
+
+Le type d'instrument, lui, reste pour l'instant un aperçu non enregistré sur la
+fiche : son changement définitif arrivera dans un lot dédié.
+
+> **🔧 Notes techniques**
+>
+> - Backend : 7 validateurs enum d'archétype (`roundType`, `safeType`,
+>   `couponPeriodicity`, `repaymentModality`, `termDuration`, `fundType`,
+>   `propertyType`) déplacés vers `convex/lib/instruments.ts` (source unique,
+>   + tableaux `ENUM_FIELD_VALUES` pour les selects) ; `schema.ts` et
+>   `deals.ts` les importent. `dealFields` (partagé `create`/`update`) étendu
+>   des ~25 champs d'archétype manquants.
+> - Garde-fou : nouvelle colonne `deals.manuallyEditedFields: string[]`.
+>   `deals.update` ajoute au set **toute** clé patchée (uniforme côté écriture) ;
+>   `airtableImport.ts:upsertDeals` retire du patch les colonnes présentes dans
+>   ce set (intersection effective : `paidAmount`, `sharesAcquired`,
+>   `signedDate`, `exitedDate`, `status`, `instrumentKind`, `targetCompanyId`,
+>   `currency`). Champ additif/optionnel → pas de migration. Détaillé dans
+>   `KNOWN_ISSUES.md` « Édition manuelle deals ».
+> - Front : `EditDealDialog` (`src/routes/app/$orgSlug/deals.$dealId.tsx`)
+>   étendu — rend les `INSTRUMENT_FIELDS[deal.instrumentKind]` en inputs typés
+>   par `FIELD_FORMAT` (exporté depuis `InstrumentBlock.tsx`). Patch en diff
+>   (seuls les champs réellement changés sont envoyés), gate `valid` qui
+>   désactive Save. Parsers partagés dans `src/lib/parse.ts` (€→cents, %→bps,
+>   date→ms). Marqueur « édité à la main » via tooltip dans `InstrumentBlock`.
+>   `paidActual` jamais éditable (calculé, hors dialog).
+> - i18n EN/FR : `edit.fieldsHint`, `edit.selectPlaceholder`,
+>   `fiche.manuallyEdited`, libellés `deal.paid` / `field.paidAmount` clarifiés.
+
 ## v1.18.0 — 23/06/2026 à 21:40 — Fiche deal qui s'adapte au type d'instrument
 
 La fiche d'un investissement change désormais de visage selon son type. Le bloc

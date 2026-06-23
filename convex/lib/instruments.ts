@@ -30,3 +30,64 @@ export const INSTRUMENTS = [
 export type InstrumentKind = (typeof INSTRUMENTS)[number]
 
 export const instrumentValidator = literals(...INSTRUMENTS)
+
+/**
+ * Instrument-archetype enums (dashboard refonte). Single source of truth for
+ * the per-archetype `deals` columns: the schema and the deals mutations read
+ * the validators, the edit UI reads the value arrays (same lists). NEVER
+ * redeclare these elsewhere — see convex/lib/instrumentMapping.ts for the
+ * instrumentKind → fields mapping.
+ */
+
+export const ROUND_TYPES = [
+  'preseed',
+  'seed',
+  'serieA',
+  'serieB',
+  'serieC_plus',
+  'bridge',
+] as const
+export const roundTypeValidator = literals(...ROUND_TYPES)
+
+export const SAFE_TYPES = ['safe', 'bsa_air', 'oc'] as const
+export const safeTypeValidator = literals(...SAFE_TYPES)
+
+export const COUPON_PERIODICITIES = [
+  'mensuel',
+  'trimestriel',
+  'annuel',
+  'in_fine',
+] as const
+export const couponPeriodicityValidator = literals(...COUPON_PERIODICITIES)
+
+export const REPAYMENT_MODALITIES = [
+  'in_fine',
+  'amortissable',
+  'bullet',
+] as const
+export const repaymentModalityValidator = literals(...REPAYMENT_MODALITIES)
+
+export const TERM_DURATIONS = ['1m', '3m', '6m', '12m', '24m'] as const
+export const termDurationValidator = literals(...TERM_DURATIONS)
+
+export const FUND_TYPES = ['vc', 'pe', 'dette', 'secondaire', 'fof'] as const
+export const fundTypeValidator = literals(...FUND_TYPES)
+
+export const PROPERTY_TYPES = [
+  'residentiel',
+  'commercial',
+  'bureau',
+  'autre',
+] as const
+export const propertyTypeValidator = literals(...PROPERTY_TYPES)
+
+/** Field name → value array, for the enum-rendered editable fields. */
+export const ENUM_FIELD_VALUES: Record<string, ReadonlyArray<string>> = {
+  roundType: ROUND_TYPES,
+  safeType: SAFE_TYPES,
+  couponPeriodicity: COUPON_PERIODICITIES,
+  repaymentModality: REPAYMENT_MODALITIES,
+  termDuration: TERM_DURATIONS,
+  fundType: FUND_TYPES,
+  propertyType: PROPERTY_TYPES,
+}

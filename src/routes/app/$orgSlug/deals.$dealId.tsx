@@ -7,9 +7,12 @@ import { toast } from 'sonner'
 import { ConvexError } from 'convex/values'
 import { api } from '../../../../convex/_generated/api'
 
+import { INSTRUMENT_FIELDS } from '../../../../convex/lib/instrumentMapping'
+import { ENUM_FIELD_VALUES } from '../../../../convex/lib/instruments'
 import type { Doc, Id } from '../../../../convex/_generated/dataModel'
 import type { DealOption } from '~/components/pointage/DealCombobox'
 import type { TxDetails } from '~/components/pointage/TransactionSheet'
+import type { FieldFormat } from '~/components/deals/InstrumentBlock'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { directionBadgeClass, directionTone } from '~/lib/moneyTone'
@@ -23,8 +26,17 @@ import {
   usePagination,
 } from '~/components/data-table/LocalPagination'
 import { FundSection } from '~/components/deals/FundSection'
-import { InstrumentBlock } from '~/components/deals/InstrumentBlock'
+import { FIELD_FORMAT, InstrumentBlock } from '~/components/deals/InstrumentBlock'
 import { PlanVsActualSection } from '~/components/deals/PlanVsActualSection'
+import {
+  bpsToPctInput,
+  centsToEurosInput,
+  dateInputToMs,
+  eurosToCents,
+  intToNumber,
+  msToDateInput,
+  pctToBps,
+} from '~/lib/parse'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { DealCombobox } from '~/components/pointage/DealCombobox'
 import {
@@ -133,20 +145,122 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
+/** Stored deal value → input string, in the UI unit of the field's format. */
+function fieldToInput(deal: Doc<'deals'>, field: string): string {
+  const raw = (deal as Record<string, unknown>)[field]
+  if (raw == null) return ''
+  switch (FIELD_FORMAT[field] ?? 'text') {
+    case 'eur':
+      return centsToEurosInput(raw as number)
+    case 'pct':
+      return bpsToPctInput(raw as number)
+    case 'date':
+      return msToDateInput(raw as number)
+    default:
+      return String(raw)
+  }
+}
+
 /**
- * Deal edit dialog: custom name + instrument type.
- * Changing the instrument is just a label: no side effects on the
- * attached transactions.
+ * Input string → stored value. `undefined` = empty (left unchanged, never
+ * sent), `null` = invalid (blocks the save), otherwise the parsed value in
+ * the storage unit (cents / bps / ms / enum literal / text).
+ */
+function parseField(
+  format: FieldFormat,
+  value: string,
+): number | string | null | undefined {
+  const trimmed = value.trim()
+  if (trimmed === '') return undefined
+  switch (format) {
+    case 'eur':
+      return eurosToCents(trimmed)
+    case 'pct':
+      return pctToBps(trimmed)
+    case 'date':
+      return dateInputToMs(value)
+    case 'number':
+    case 'year':
+      return intToNumber(trimmed)
+    default:
+      return trimmed
+  }
+}
+
+/** One editable instrument field, rendered by its display format. */
+function DealFieldInput({
+  field,
+  format,
+  value,
+  onChange,
+}: {
+  field: string
+  format: FieldFormat
+  value: string
+  onChange: (value: string) => void
+}) {
+  const { t } = useTranslation('participations')
+  const label = t(`field.${field}`, { defaultValue: field })
+  const id = `deal-${field}`
+
+  if (format === 'enum') {
+    const options = ENUM_FIELD_VALUES[field] ?? []
+    return (
+      <div className="space-y-2">
+        <Label>{label}</Label>
+        <Select value={value || undefined} onValueChange={onChange}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder={t('edit.selectPlaceholder')} />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((opt) => (
+              <SelectItem key={opt} value={opt}>
+                {t(`enum.${field}.${opt}`, { defaultValue: opt })}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    )
+  }
+
+  const isNumeric =
+    format === 'eur' ||
+    format === 'pct' ||
+    format === 'number' ||
+    format === 'year'
+  const inputType = format === 'date' ? 'date' : isNumeric ? 'number' : 'text'
+  const step = format === 'eur' || format === 'pct' ? '0.01' : '1'
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        type={inputType}
+        min={isNumeric ? '0' : undefined}
+        step={isNumeric ? step : undefined}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  )
+}
+
+/**
+ * Deal edit dialog: custom name, instrument type, and the editable instrument
+ * fields of the saved type (Lot 3). Inputs are typed by FIELD_FORMAT
+ * (€ / % / date / enum / number) and parsed back to the storage unit on save.
+ * Only changed fields are sent; `deals.update` marks them as manually edited
+ * so the Airtable re-import leaves them untouched. `paidActual` (disbursed,
+ * computed from transactions) never appears here — it stays read-only on the
+ * sheet. Changing the instrument type is a no-op on the attached transactions.
  */
 function EditDealDialog({
   deal,
   onClose,
 }: {
-  deal: {
-    _id: Id<'deals'>
-    name?: string | null
-    instrumentKind: InstrumentKind
-  }
+  deal: Doc<'deals'>
   onClose: () => void
 }) {
   const { t } = useTranslation(['participations', 'common'])
@@ -155,16 +269,40 @@ function EditDealDialog({
   const [instrument, setInstrument] = useState<InstrumentKind>(
     deal.instrumentKind,
   )
+  // Editable fields of the SAVED type (fixed in this lot — the type change
+  // itself is Lot 3b). Values are strings in the display unit.
+  const fields = INSTRUMENT_FIELDS[deal.instrumentKind] ?? []
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(fields.map((f) => [f, fieldToInput(deal, f)])),
+  )
   const [pending, setPending] = useState(false)
 
+  // A non-empty input that fails to parse (e.g. letters in a € field) blocks
+  // the save → no partial write.
+  const valid = fields.every(
+    (f) => parseField(FIELD_FORMAT[f] ?? 'text', values[f]) !== null,
+  )
+
   async function handleSave() {
+    if (!valid) return
     setPending(true)
     try {
-      // '' = clears the name (title falls back to the instrument).
-      await updateDeal({
-        id: deal._id,
-        patch: { name, instrumentKind: instrument },
-      })
+      // Diff: send only changed fields. name '' clears it (server trims).
+      const patch: Record<string, unknown> = {}
+      if (name.trim() !== (deal.name ?? '')) patch.name = name
+      if (instrument !== deal.instrumentKind) patch.instrumentKind = instrument
+      for (const field of fields) {
+        const parsed = parseField(FIELD_FORMAT[field] ?? 'text', values[field])
+        if (parsed === undefined || parsed === null) continue
+        if (parsed !== (deal as Record<string, unknown>)[field]) {
+          patch[field] = parsed
+        }
+      }
+      if (Object.keys(patch).length === 0) {
+        onClose()
+        return
+      }
+      await updateDeal({ id: deal._id, patch })
       toast.success(t('participations:edit.saved'))
       onClose()
     } catch {
@@ -176,7 +314,7 @@ function EditDealDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t('participations:edit.dealTitle')}</DialogTitle>
           <DialogDescription>
@@ -218,12 +356,30 @@ function EditDealDialog({
               </SelectContent>
             </Select>
           </div>
+          {fields.length > 0 && (
+            <div className="space-y-4 border-t pt-4">
+              <p className="text-muted-foreground text-xs">
+                {t('participations:edit.fieldsHint')}
+              </p>
+              {fields.map((field) => (
+                <DealFieldInput
+                  key={field}
+                  field={field}
+                  format={FIELD_FORMAT[field] ?? 'text'}
+                  value={values[field]}
+                  onChange={(v) =>
+                    setValues((s) => ({ ...s, [field]: v }))
+                  }
+                />
+              ))}
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={pending}>
             {t('common:actions.cancel')}
           </Button>
-          <Button onClick={handleSave} disabled={pending}>
+          <Button onClick={() => void handleSave()} disabled={!valid || pending}>
             {t('common:actions.save')}
           </Button>
         </DialogFooter>

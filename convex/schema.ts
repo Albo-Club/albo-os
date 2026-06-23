@@ -19,7 +19,16 @@
 
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
-import { instrumentValidator } from './lib/instruments'
+import {
+  couponPeriodicityValidator,
+  fundTypeValidator,
+  instrumentValidator,
+  propertyTypeValidator,
+  repaymentModalityValidator,
+  roundTypeValidator,
+  safeTypeValidator,
+  termDurationValidator,
+} from './lib/instruments'
 import { vatRateBpsValidator } from './lib/vat'
 
 // ─── Better Auth / multi-tenant validators ─────────────────────────────────
@@ -65,58 +74,16 @@ const dealStatus = v.union(
 )
 
 // Instrument-archetype enums (dashboard refonte). Consumed only by the
-// optional per-archetype columns on `deals`; see
-// convex/lib/instrumentMapping.ts for the instrumentKind → fields mapping.
-const roundType = v.union(
-  v.literal('preseed'),
-  v.literal('seed'),
-  v.literal('serieA'),
-  v.literal('serieB'),
-  v.literal('serieC_plus'),
-  v.literal('bridge'),
-)
-
-const safeType = v.union(
-  v.literal('safe'),
-  v.literal('bsa_air'),
-  v.literal('oc'),
-)
-
-const couponPeriodicity = v.union(
-  v.literal('mensuel'),
-  v.literal('trimestriel'),
-  v.literal('annuel'),
-  v.literal('in_fine'),
-)
-
-const repaymentModality = v.union(
-  v.literal('in_fine'),
-  v.literal('amortissable'),
-  v.literal('bullet'),
-)
-
-const termDuration = v.union(
-  v.literal('1m'),
-  v.literal('3m'),
-  v.literal('6m'),
-  v.literal('12m'),
-  v.literal('24m'),
-)
-
-const fundType = v.union(
-  v.literal('vc'),
-  v.literal('pe'),
-  v.literal('dette'),
-  v.literal('secondaire'),
-  v.literal('fof'),
-)
-
-const propertyType = v.union(
-  v.literal('residentiel'),
-  v.literal('commercial'),
-  v.literal('bureau'),
-  v.literal('autre'),
-)
+// optional per-archetype columns on `deals`; see convex/lib/instruments.ts
+// for the validators (single source) and convex/lib/instrumentMapping.ts for
+// the instrumentKind → fields mapping.
+const roundType = roundTypeValidator
+const safeType = safeTypeValidator
+const couponPeriodicity = couponPeriodicityValidator
+const repaymentModality = repaymentModalityValidator
+const termDuration = termDurationValidator
+const fundType = fundTypeValidator
+const propertyType = propertyTypeValidator
 
 const txDirection = v.union(v.literal('in'), v.literal('out'))
 
@@ -512,6 +479,11 @@ export default defineSchema({
 
     // Placement (crypto / capitalization_account)
     currentValue: v.optional(v.number()), // cents — current value of a placement
+
+    // Field names edited by hand on the deal sheet. The Airtable re-import
+    // (convex/airtableImport.ts:upsertDeals) skips these columns so manual
+    // corrections survive a re-run. See KNOWN_ISSUES « Édition manuelle deals ».
+    manuallyEditedFields: v.optional(v.array(v.string())),
 
     // Meta
     notes: v.optional(v.string()),

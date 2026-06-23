@@ -14,6 +14,12 @@ import { signTone } from '~/lib/moneyTone'
 import { cn } from '~/lib/utils'
 import { Badge } from '~/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '~/components/ui/tooltip'
 
 /**
  * Read-only central block of the deal sheet, driven by
@@ -26,14 +32,22 @@ import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
  * previews a layout (cf. deals.$dealId.tsx).
  */
 
-type FieldFormat = 'eur' | 'pct' | 'date' | 'enum' | 'number' | 'year' | 'text'
+export type FieldFormat =
+  | 'eur'
+  | 'pct'
+  | 'date'
+  | 'enum'
+  | 'number'
+  | 'year'
+  | 'text'
 
 /**
  * `deals` column → display format. This is NOT the instrument→fields mapping
  * (that lives in instrumentMapping.ts and is read below); it only says how a
- * given column is rendered: cents→€, bps→%, ms→date, enum→i18n label.
+ * given column is rendered: cents→€, bps→%, ms→date, enum→i18n label. Exported
+ * so the deal edit dialog renders the matching input per field (Lot 3).
  */
-const FIELD_FORMAT: Record<string, FieldFormat> = {
+export const FIELD_FORMAT: Record<string, FieldFormat> = {
   // Dates (ms epoch)
   closingDate: 'date',
   signedDate: 'date',
@@ -99,10 +113,34 @@ const ARCHETYPE_BADGE: Record<Archetype, string> = {
   unassigned: 'text-muted-foreground',
 }
 
-function FieldRow({ label, value }: { label: string; value: string }) {
+function FieldRow({
+  label,
+  value,
+  manuallyEdited,
+}: {
+  label: string
+  value: string
+  manuallyEdited?: boolean
+}) {
+  const { t } = useTranslation('participations')
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-muted-foreground text-xs">{label}</span>
+      <span className="text-muted-foreground flex items-center gap-1 text-xs">
+        {label}
+        {manuallyEdited && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className="bg-chart-4 inline-block size-1.5 shrink-0 rounded-full"
+                  aria-label={t('fiche.manuallyEdited')}
+                />
+              </TooltipTrigger>
+              <TooltipContent>{t('fiche.manuallyEdited')}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </span>
       <span className="text-sm">{value}</span>
     </div>
   )
@@ -147,6 +185,7 @@ function FieldsView({
 }) {
   const { t } = useTranslation('participations')
   const fields = INSTRUMENT_FIELDS[instrumentKind] ?? []
+  const editedSet = new Set(deal.manuallyEditedFields ?? [])
   const splitIdx = fields.indexOf(SAFE_SPLIT_FIELD)
   const isSafe = splitIdx >= 0
 
@@ -173,6 +212,7 @@ function FieldsView({
             key={field}
             label={t(`field.${field}`, { defaultValue: field })}
             value={formatField(field)}
+            manuallyEdited={editedSet.has(field)}
           />
         ))}
       </div>

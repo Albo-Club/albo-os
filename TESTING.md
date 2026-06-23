@@ -189,9 +189,10 @@ l'assistant (outils `setDealProjections` / `createKpiSnapshot`).
 
 ### Fiche deal pilotée par l'instrument (`/app/$orgSlug/deals/$dealId`)
 
-Bloc central **lecture seule** piloté par `convex/lib/instrumentMapping.ts`
-(les 3 `Record` : archétype, mode de rendu, champs ordonnés). Aucune mutation
-dans ce niveau ; le sélecteur de type en en-tête ne fait que **prévisualiser**.
+Bloc central piloté par `convex/lib/instrumentMapping.ts` (les 3 `Record` :
+archétype, mode de rendu, champs ordonnés). Le bloc lui-même reste un **affichage
+lecture seule** ; le sélecteur de type en en-tête ne fait que **prévisualiser**.
+L'**édition des valeurs** passe par le dialog « Modifier » (Lot 3, tests FD11+).
 
 | #    | Étape                                                                                          | Résultat attendu                                                                                                                                                                                                              |
 | ---- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -205,6 +206,10 @@ dans ce niveau ; le sélecteur de type en en-tête ne fait que **prévisualiser*
 | FD8  | Sélecteur de type en en-tête → choisir un autre type                                           | Le bloc central se recompose **à l'écran** ; bandeau **« Aperçu — non enregistré » bien visible** ; **aucune** mutation (vérifier Convex) ; « Revenir au type enregistré » restaure ; **au reload, retour au type réel en base** |
 | FD9  | Overview + entité liée + placeholders                                                          | Strip Engagé / Versé / Reçu ; carte « Entité liée » → lien vers la fiche société (`targetCompanyId`) + investisseur (· via SPV si présent) ; blocs « Reporting & KPIs » et « Documents » en placeholder « à venir »            |
 | FD10 | i18n EN/FR                                                                                     | Libellés champs (`field.*`), enums (`enum.*`), archétypes (`archetype.*`) et fiche (`fiche.*`) traduits ; le bloc central **lit** `instrumentMapping.ts` (aucune liste de champs en dur dans le front)                          |
+| FD11 | « Modifier » sur un deal `os` → changer **Taux d'intérêt** (ex. 11 → 12), Enregistrer          | Le dialog liste les champs du type courant en plus de nom + type ; le taux est saisi en **%** ; après save, la valeur persiste (stockée en bps) ; un **point** apparaît à côté du champ sur la fiche (tooltip « modifié à la main »)                                              |
+| FD12 | « Modifier » → champ € (ex. **Montant contractuel**) éditable ; vérifier l'overview            | `paidAmount` (« Montant contractuel ») est éditable dans le dialog ; le strip d'overview **« Décaissé (réel) »** reste **calculé** depuis les transactions et **non éditable** (libellés distincts, pas de confusion)                                                             |
+| FD13 | « Modifier » → taper des lettres dans un champ € puis tenter d'enregistrer                      | Le bouton **Enregistrer est désactivé** (saisie invalide) ; aucune écriture partielle                                                                                                                                                                                            |
+| FD14 | Champ marqué `manuallyEditedFields` puis ré-import Airtable (mécanisme, sans lancer d'import)   | `upsertDeals` retire du patch les colonnes présentes dans `manuallyEditedFields` → le champ saisi à la main n'est pas écrasé ; le set n'est consulté que pour les colonnes que l'import écrit (cf. `KNOWN_ISSUES` « Édition manuelle deals »)                                       |
 
 ## Niveau 3 — Invitations edge cases (8 min)
 
