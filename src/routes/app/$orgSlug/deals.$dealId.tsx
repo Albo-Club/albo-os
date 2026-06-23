@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowRight, Eye, Pencil, Trash2 } from 'lucide-react'
+import { ArrowRight, Eye, Info, Pencil, Trash2 } from 'lucide-react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
@@ -356,6 +356,24 @@ function EditDealDialog({
               </SelectContent>
             </Select>
           </div>
+          {instrument !== deal.instrumentKind && (
+            <div
+              role="status"
+              className="border-chart-4/50 bg-chart-4/10 flex items-start gap-2 rounded-lg border px-3 py-2"
+            >
+              <Info className="text-chart-4 mt-0.5 size-4 shrink-0" />
+              <p className="text-muted-foreground text-xs">
+                {t('participations:edit.typeChangeNotice', {
+                  from: t(`participations:instrument.${deal.instrumentKind}`, {
+                    defaultValue: deal.instrumentKind,
+                  }),
+                  to: t(`participations:instrument.${instrument}`, {
+                    defaultValue: instrument,
+                  }),
+                })}
+              </p>
+            </div>
+          )}
           {fields.length > 0 && (
             <div className="space-y-4 border-t pt-4">
               <p className="text-muted-foreground text-xs">

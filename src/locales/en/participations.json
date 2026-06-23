@@ -296,6 +296,7 @@
     "dealNamePlaceholder": "Custom name (optional)",
     "dealNameHint": "Leave empty to use the instrument as title.",
     "instrumentLabel": "Instrument",
+    "typeChangeNotice": "The type changes from {{from}} to {{to}}. The fields specific to {{from}} are kept but hidden — they'll reappear if you switch back to {{from}}.",
     "sirenLabel": "SIREN",
     "sirenPlaceholder": "9 digits",
     "sirenInvalid": "The SIREN must be exactly 9 digits.",
