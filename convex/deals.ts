@@ -2,7 +2,16 @@ import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { buildGroupMeta } from './lib/groupSettings'
-import { instrumentValidator as sharedInstrumentValidator } from './lib/instruments'
+import {
+  couponPeriodicityValidator,
+  fundTypeValidator,
+  propertyTypeValidator,
+  repaymentModalityValidator,
+  roundTypeValidator,
+  safeTypeValidator,
+  instrumentValidator as sharedInstrumentValidator,
+  termDurationValidator,
+} from './lib/instruments'
 import type { GroupMeta } from './lib/groupSettings'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
 import type { DataModel, Doc, Id } from './_generated/dataModel'
@@ -44,6 +53,34 @@ const dealFields = {
   exitedDate: v.optional(v.number()),
   attioDealId: v.optional(v.string()),
   notes: v.optional(v.string()),
+
+  // Instrument-archetype fields (dashboard refonte) — editable from the deal
+  // sheet (Lot 3). Same columns as the schema; validators from lib/instruments.
+  roundType: v.optional(roundTypeValidator),
+  preMoneyValuation: v.optional(v.number()), // cents
+  postMoneyValuation: v.optional(v.number()), // cents
+  ownershipPct: v.optional(v.number()), // bps
+  safeType: v.optional(safeTypeValidator),
+  conversionDeadlineDate: v.optional(v.number()), // ms
+  conversionValuation: v.optional(v.number()), // cents
+  couponPeriodicity: v.optional(couponPeriodicityValidator),
+  repaymentModality: v.optional(repaymentModalityValidator),
+  termDuration: v.optional(termDurationValidator),
+  bankName: v.optional(v.string()),
+  fundType: v.optional(fundTypeValidator),
+  vintageYear: v.optional(v.number()),
+  managementCompany: v.optional(v.string()),
+  underlyingTarget: v.optional(v.string()),
+  spvOwnershipPct: v.optional(v.number()), // bps
+  structuringFees: v.optional(v.number()), // cents
+  distributionRate: v.optional(v.number()), // bps
+  enjoymentDelayMonths: v.optional(v.number()),
+  acquisitionFees: v.optional(v.number()), // cents
+  surfaceSqm: v.optional(v.number()),
+  location: v.optional(v.string()),
+  propertyType: v.optional(propertyTypeValidator),
+  rentReceived: v.optional(v.number()), // cents
+  currentValue: v.optional(v.number()), // cents
 }
 
 function companyRef(c: Doc<'companies'> | null, groupMeta?: Map<string, GroupMeta>) {
@@ -297,7 +334,16 @@ export const update = mutation({
       const trimmed = patch.name.trim()
       patch.name = trimmed === '' ? undefined : trimmed
     }
-    await ctx.db.patch("deals", id, patch)
+    // Mark every patched field as manually edited so the Airtable re-import
+    // (upsertDeals) leaves these columns untouched. Uniform on write: the set
+    // grows with whatever the caller patched; the import only consults it for
+    // the columns it actually writes (cf. KNOWN_ISSUES « Édition manuelle deals »).
+    const editedFields = new Set(deal.manuallyEditedFields ?? [])
+    for (const key of Object.keys(patch)) editedFields.add(key)
+    await ctx.db.patch("deals", id, {
+      ...patch,
+      manuallyEditedFields: [...editedFields],
+    })
     return id
   },
 })
