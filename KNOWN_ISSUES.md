@@ -1358,3 +1358,54 @@ non-évidents :
    peuvent ne pas l'avoir → fallback, et le champ reste éditable via
    `EditCompanyDialog`. Si un domaine change côté Attio, il faut le ressaisir
    à la main.
+
+## Archétypes d'instruments (fiches deal — dashboard refonte)
+
+`convex/lib/instrumentMapping.ts` est la **source unique** qui mappe chaque
+`instrumentKind` (les 19 valeurs de `convex/lib/instruments.ts`) à un archétype,
+un mode de rendu et — pour les types configurés — la liste ordonnée des colonnes
+`deals` à afficher. Front et reporting lisent ce module ; ne **jamais** dupliquer
+ce mapping ailleurs. Décisions non-évidentes :
+
+1. **`INSTRUMENT_ARCHETYPE` / `INSTRUMENT_RENDER` sont des `Record` totaux**
+   (19 clés) → un `instrumentKind` oublié casse la compilation TS. C'est le
+   garde-fou : ajouter une valeur à l'enum force à la classer ici.
+   `INSTRUMENT_FIELDS` est volontairement **partiel** : seuls les 15 types en
+   render `'fields'` y figurent.
+
+2. **`unassigned` + `placeholder` = parking assumé.** `cto`, `crypto`,
+   `capitalization_account` n'ont pas encore de layout décidé : ils rendent un
+   bloc neutre « type non encore configuré » plutôt que des champs au jugé. Ne
+   leur invente pas de field config sans repasser par une décision de design
+   (avant Lot 2).
+
+3. **`royalty` en render `'custom'`** (et le carried/manco aussi, plus tard) :
+   le bloc central viendra d'un panel dédié (`RoyaltiesPanel`), pas de
+   `INSTRUMENT_FIELDS`. Réservé, non implémenté dans ce lot.
+
+4. **Valorisations : `preMoneyValuation` / `postMoneyValuation` sont neufs.** On
+   n'a **pas** aliasé l'`entryValuation` existant sur `valoPre` : son sens réel
+   en prod n'a pas été vérifié (commentaire ambigu « valuation at deal time »).
+   `entryValuation` reste donc **dormant et intact**. Un backfill
+   `entryValuation → preMoneyValuation` est une **décision future explicite**
+   (migration vérifiée, snapshot d'abord), pas un alias posé à l'aveugle.
+
+5. **`couponPeriodicity` (enum) vs `repaymentFrequencyMonths` (number).** La
+   config `os` utilise le nouvel enum `couponPeriodicity` ; l'ancien
+   `repaymentFrequencyMonths` reste **dormant** (représentations différentes,
+   redondance potentielle). Non fusionnés ici — hors périmètre, à arbitrer plus
+   tard.
+
+6. **Config `safe` partagée.** L'enum `safeType` vaut exactement
+   `safe`/`bsa_air`/`oc`. `bsa` et `convertible_note` réutilisent la **liste de
+   champs** `safe` mais n'ont pas de littéral `safeType` correspondant (le champ
+   reste vide pour ces deux types ; à revoir au câblage Lot 2).
+
+7. **`os` reste rattaché à `debt`** sans désambiguïsation (SPV equity vs dette
+   obligataire immo) : reportée explicitement, ne pas la traiter dans ce lot.
+
+8. **Colonnes dormantes.** Les 24 colonnes ajoutées sur `deals` sont toutes
+   `v.optional` et **ne sont écrites par aucune mutation** dans ce lot (`deals.ts`
+   non étendu) : elles attendent le câblage front + l'extension des args de
+   mutation (Lot 2). Aucune migration de données n'est nécessaire (champs
+   optionnels).

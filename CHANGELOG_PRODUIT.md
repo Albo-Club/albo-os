@@ -23,6 +23,35 @@ bas de page.
 
 ---
 
+## v1.16.1 — 23/06/2026 à 19:56 — Socle des fiches par type d'instrument (technique)
+
+Préparation interne de la refonte des fiches deal/instrument : le socle de
+données par type d'instrument est posé côté serveur. Rien de visible pour
+l'instant ; les nouvelles informations s'afficheront avec les prochaines mises
+à jour de l'interface.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau module source unique `convex/lib/instrumentMapping.ts` : 5
+>   archétypes (`equity`, `debt`, `funds_lp`, `real_estate`, `royalties`) + un
+>   bucket d'attente `unassigned`. `INSTRUMENT_ARCHETYPE` et `INSTRUMENT_RENDER`
+>   sont des `Record` totaux sur les 19 `instrumentKind` ; `INSTRUMENT_FIELDS`
+>   est partiel (15 types configurés, ordre = ordre d'affichage). `royalty` en
+>   render `custom` (panel réservé) ; `cto`, `crypto`, `capitalization_account`
+>   en `placeholder` (design reporté avant Lot 2). `bsa`/`convertible_note`
+>   réutilisent la config `safe`, `loan` la config `os`, `secondary` la config
+>   `fonds`.
+> - `convex/schema.ts` : 7 enums (`roundType`, `safeType`, `couponPeriodicity`,
+>   `repaymentModality`, `termDuration`, `fundType`, `propertyType`) + 24
+>   colonnes optionnelles dormantes sur `deals`. Colonnes de valorisation
+>   neuves `preMoneyValuation`/`postMoneyValuation` (l'`entryValuation`
+>   existant n'est pas touché). Réutilisation des colonnes existantes quand le
+>   sens correspond (roundSize, interestRate, maturityDate, principalAmount,
+>   committedAmount, paidAmount, sharesAcquired, pricePerShare, valuationCap,
+>   discount).
+> - Aucune mutation, aucune migration, aucune commande `--prod` : colonnes en
+>   sommeil jusqu'au câblage du front (Lot 2).
+
 ## v1.16.0 — 23/06/2026 à 18:36 — Participations : distinguer sponsors et groupes
 
 Les **groupes de participations** peuvent désormais être de deux natures :

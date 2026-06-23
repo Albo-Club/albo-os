@@ -28,6 +28,14 @@ Pré-requis :
 | B6  | Skills à jour   | `pnpm sync:skills:check` | `0 skills drifted`                                                                                                                           |
 | B7  | Tests unitaires | `pnpm test:unit`         | 70 tests verts (logique pure : récurrence/solde forecast + historique cash, ranking suggestions, instructions agent, passif, séries BP, CSV) |
 
+> **Schéma & mapping d'instruments** (refonte fiches deal, `convex/schema.ts` +
+> `convex/lib/instrumentMapping.ts`). Validés par B1 : `INSTRUMENT_ARCHETYPE` et
+> `INSTRUMENT_RENDER` sont des `Record` totaux sur les 19 `instrumentKind` → un
+> type oublié casse la compilation. Vérifier en plus, à la revue, que chaque
+> colonne listée dans `INSTRUMENT_FIELDS` existe bien sur la table `deals`.
+> Aucune surface UI à tester : les colonnes d'archétype sont dormantes tant que
+> le front n'est pas câblé (Lot 2).
+
 ## Niveau 2 — Auth (6 min)
 
 Les minutiae UI (texte exact, spinners, skeletons, aria-label) ne sont pas
