@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { Pencil, Trash2 } from 'lucide-react'
+import { ArrowRight, Eye, Pencil, Trash2 } from 'lucide-react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { ConvexError } from 'convex/values'
 import { api } from '../../../../convex/_generated/api'
-import type { ReactNode } from 'react'
 
 import type { Doc, Id } from '../../../../convex/_generated/dataModel'
 import type { DealOption } from '~/components/pointage/DealCombobox'
@@ -24,7 +23,9 @@ import {
   usePagination,
 } from '~/components/data-table/LocalPagination'
 import { FundSection } from '~/components/deals/FundSection'
+import { InstrumentBlock } from '~/components/deals/InstrumentBlock'
 import { PlanVsActualSection } from '~/components/deals/PlanVsActualSection'
+import { CompanyLogo } from '~/components/CompanyLogo'
 import { DealCombobox } from '~/components/pointage/DealCombobox'
 import {
   TransactionSheet,
@@ -32,6 +33,7 @@ import {
 } from '~/components/pointage/TransactionSheet'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
+import { Card, CardContent } from '~/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -122,12 +124,11 @@ function NotFound() {
   )
 }
 
-function Info({ label, value }: { label: string; value: ReactNode }) {
-  if (value == null || value === '') return null
+function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="text-sm">{value}</span>
+    <div className="rounded-lg border p-4">
+      <div className="text-muted-foreground text-xs">{label}</div>
+      <div className="mt-1 text-lg font-semibold tabular-nums">{value}</div>
     </div>
   )
 }
@@ -396,13 +397,15 @@ function Transactions({ deal }: { deal: CurrentDeal }) {
 }
 
 function DealDetail() {
-  const { t, i18n } = useTranslation(['participations', 'common'])
-  const lang = i18n.language
+  const { t } = useTranslation(['participations', 'common'])
   const { orgSlug, dealId } = Route.useParams()
   const navigate = useNavigate()
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // Instrument-type preview: local-only, writes nothing (cf. Lot 3). null =
+  // showing the saved type; any other value previews a layout.
+  const [previewKind, setPreviewKind] = useState<InstrumentKind | null>(null)
   const removeDeal = useConvexMutation(api.deals.remove)
   const deal = useConvexQuery(api.deals.getById, {
     id: dealId as Id<'deals'>,
@@ -420,17 +423,8 @@ function DealDetail() {
     (sum, tx) => (tx.direction === 'in' ? sum + tx.amount : sum),
     0,
   )
-  const { fmtEur, fmtDate } = useFormatters()
+  const { fmtEur } = useFormatters()
   const dealTitle = useDealTitle()
-  const fmtPct = (bps?: number | null) =>
-    bps == null
-      ? null
-      : new Intl.NumberFormat(lang, {
-          style: 'percent',
-          maximumFractionDigits: 2,
-        }).format(bps / 10000)
-  const fmtNum = (n?: number | null) =>
-    n == null ? null : new Intl.NumberFormat(lang).format(n)
 
   // Reconciled transactions block deletion (invariant: matched ⟺ dealId,
   // so every row of listByDeal is a reconciled transaction).
@@ -474,6 +468,10 @@ function DealDetail() {
     )
   }
 
+  // Previewed instrument type (local only) vs the one saved in DB.
+  const effectiveKind = previewKind ?? deal.instrumentKind
+  const unsaved = previewKind != null && previewKind !== deal.instrumentKind
+
   return (
     <main className="flex-1 space-y-6 p-6">
       {deal.target && (
@@ -487,7 +485,7 @@ function DealDetail() {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        {/* Name only: the instrument is already shown in the info grid. */}
+        {/* Name only: the instrument type sits in the selector below. */}
         <h1 className="text-2xl font-semibold tracking-tight">
           {dealTitle(deal, { withInstrument: false })}
         </h1>
@@ -510,89 +508,68 @@ function DealDetail() {
         </Button>
       </div>
 
+      {/* Instrument-type selector — previews the central block only. The
+          change is local and never written to DB (the write lands in Lot 3). */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground text-sm">
+            {t('fiche.typeLabel')}
+          </span>
+          <Select
+            value={effectiveKind}
+            onValueChange={(v) => setPreviewKind(v as InstrumentKind)}
+          >
+            <SelectTrigger className="w-[220px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {INSTRUMENTS.map((kind) => (
+                <SelectItem key={kind} value={kind}>
+                  {t(`instrument.${kind}`, { defaultValue: kind })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {unsaved && (
+          <div
+            role="status"
+            className="border-chart-4/50 bg-chart-4/10 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2"
+          >
+            <span className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
+              <Eye className="text-chart-4 size-4" />
+              {t('fiche.preview.unsaved')}
+            </span>
+            <span className="text-muted-foreground text-xs">
+              {t('fiche.preview.note')}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto"
+              onClick={() => setPreviewKind(null)}
+            >
+              {t('fiche.preview.reset')}
+            </Button>
+          </div>
+        )}
+      </div>
+
       {linkedCount > 0 && (
         <p className="text-muted-foreground text-xs">
           {t('deleteDeal.blocked', { count: linkedCount })}
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-3">
-        <Info
-          label={t('deal.instrument')}
-          value={t(`instrument.${deal.instrumentKind}`, {
-            defaultValue: deal.instrumentKind,
-          })}
-        />
-        <Info
-          label={t('deal.investor')}
-          value={
-            deal.investor ? (
-              <>
-                {deal.investor.name}
-                {deal.spv ? (
-                  <span className="text-muted-foreground">
-                    {' '}
-                    · {t('deal.viaSpv')} {deal.spv.name}
-                  </span>
-                ) : null}
-              </>
-            ) : null
-          }
-        />
-        <Info
-          label={t('deal.target')}
-          value={
-            deal.target ? (
-              <Link
-                to="/app/$orgSlug/participations/$companyId"
-                params={{ orgSlug, companyId: deal.target._id }}
-                className="underline-offset-4 hover:underline"
-              >
-                {deal.target.name}
-              </Link>
-            ) : null
-          }
-        />
-        <Info
-          label={t('deal.committed')}
-          value={fmtEur(deal.committedAmount)}
-        />
-        <Info label={t('deal.paid')} value={fmtEur(paidActual)} />
-        <Info label={t('deal.received')} value={fmtEur(received)} />
-        <Info label={t('deal.shares')} value={fmtNum(deal.sharesAcquired)} />
-        <Info
-          label={t('deal.pricePerShare')}
-          value={fmtEur(deal.pricePerShare)}
-        />
-        <Info
-          label={t('deal.interestRate')}
-          value={fmtPct(deal.interestRate)}
-        />
-        <Info label={t('deal.maturity')} value={fmtDate(deal.maturityDate)} />
-        <Info
-          label={t('deal.principal')}
-          value={fmtEur(deal.principalAmount)}
-        />
-        <Info label={t('deal.royaltyRate')} value={fmtPct(deal.royaltyRate)} />
-        <Info
-          label={t('deal.royaltyCap')}
-          value={fmtEur(deal.royaltyCapAmount)}
-        />
-        <Info
-          label={t('deal.valuationCap')}
-          value={fmtEur(deal.valuationCap)}
-        />
-        <Info label={t('deal.discount')} value={fmtPct(deal.discount)} />
-        <Info
-          label={t('deal.entryValuation')}
-          value={fmtEur(deal.entryValuation)}
-        />
-        <Info label={t('deal.roundSize')} value={fmtEur(deal.roundSize)} />
-        <Info label={t('deal.signed')} value={fmtDate(deal.signedDate)} />
-        <Info label={t('deal.closing')} value={fmtDate(deal.closingDate)} />
-        <Info label={t('deal.exited')} value={fmtDate(deal.exitedDate)} />
-        <Info label={t('deal.currency')} value={deal.currency} />
+      {/* Overview: commitment + actuals (computed from the transactions). */}
+      <div className="grid grid-cols-3 gap-4">
+        <Stat label={t('deal.committed')} value={fmtEur(deal.committedAmount)} />
+        <Stat label={t('deal.paid')} value={fmtEur(paidActual)} />
+        <Stat label={t('deal.received')} value={fmtEur(received)} />
       </div>
+
+      {/* Central block: layout driven by the previewed instrument type. */}
+      <InstrumentBlock deal={deal} instrumentKind={effectiveKind} />
 
       {deal.notes && (
         <div className="space-y-1">
@@ -619,6 +596,74 @@ function DealDetail() {
       />
 
       <Transactions deal={deal} />
+
+      {/* Linked entity: card to the target company sheet. */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">
+          {t('fiche.entity.title')}
+        </h2>
+        <Card>
+          <CardContent className="flex items-center gap-4">
+            <CompanyLogo
+              domain={deal.target?.domain}
+              companyName={deal.target?.name}
+              size="lg"
+            />
+            <div className="flex-1 space-y-1">
+              {deal.target ? (
+                <Link
+                  to="/app/$orgSlug/participations/$companyId"
+                  params={{ orgSlug, companyId: deal.target._id }}
+                  className="font-medium underline-offset-4 hover:underline"
+                >
+                  {deal.target.name}
+                </Link>
+              ) : (
+                <span className="text-muted-foreground text-sm">—</span>
+              )}
+              <div className="text-muted-foreground text-xs">
+                {t('deal.investor')}: {deal.investor?.name ?? '—'}
+                {deal.spv ? (
+                  <>
+                    {' '}
+                    · {t('deal.viaSpv')} {deal.spv.name}
+                  </>
+                ) : null}
+              </div>
+            </div>
+            {deal.target && (
+              <Link
+                to="/app/$orgSlug/participations/$companyId"
+                params={{ orgSlug, companyId: deal.target._id }}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label={deal.target.name}
+              >
+                <ArrowRight className="size-4" />
+              </Link>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Reporting / KPIs — reserved (deal-scoped reporting lands later). */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">
+          {t('fiche.reporting.title')}
+        </h2>
+        <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+          {t('fiche.reporting.body')}
+        </div>
+      </section>
+
+      {/* Documents — reserved (deal-scoped documents land later). */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">
+          {t('fiche.documents.title')}
+        </h2>
+        <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+          {t('fiche.documents.body')}
+        </div>
+      </section>
 
       {editOpen && (
         <EditDealDialog deal={deal} onClose={() => setEditOpen(false)} />

@@ -1413,6 +1413,20 @@ ce mapping ailleurs. Décisions non-évidentes :
    front + l'extension des args de mutation (Lot 2). Aucune migration de données
    n'est nécessaire (champs optionnels).
 
+9. **`INSTRUMENTS` dupliqué dans la route deal (dette à nettoyer).**
+   `src/routes/app/$orgSlug/deals.$dealId.tsx` redéclare en dur sa propre liste
+   `INSTRUMENTS` (≈ l.80-100, ordre d'affichage du dropdown) alors que la source
+   unique est `convex/lib/instruments.ts`, déjà réimportée ailleurs
+   (`participations.$companyId.tsx`, `ParticipationsTable.tsx`). Les deux listes
+   couvrent les 19 mêmes `instrumentKind` mais dans un **ordre différent**. Laissé
+   tel quel au Lot 2 (hors périmètre, pas de fix adjacent) : le sélecteur de
+   prévisualisation ajouté réutilise la copie locale pour ne pas introniser deux
+   sources dans le même fichier. **Risque** : un instrument ajouté dans
+   `instruments.ts` n'apparaît pas dans ce dropdown tant que la copie locale n'est
+   pas mise à jour (divergence silencieuse). **À faire (lot ultérieur)** :
+   supprimer la copie locale, importer `INSTRUMENTS` depuis `instruments.ts`, et y
+   porter l'ordre d'affichage souhaité si besoin.
+
 ## Fiche entité (lecture seule) — natures, champs manquants & lien Attio
 
 Le squelette commun des fiches (en-tête → bloc d'identité piloté par la nature

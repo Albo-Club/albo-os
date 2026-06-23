@@ -157,6 +157,133 @@
     "loan": "Loan",
     "capitalization_account": "Capitalization account"
   },
+  "field": {
+    "closingDate": "Closing date",
+    "signedDate": "Signed date",
+    "conversionDeadlineDate": "Conversion deadline",
+    "maturityDate": "Maturity date",
+    "paidAmount": "Amount paid",
+    "committedAmount": "Committed amount",
+    "roundSize": "Round size",
+    "preMoneyValuation": "Pre-money valuation",
+    "postMoneyValuation": "Post-money valuation",
+    "valuationCap": "Valuation cap",
+    "conversionValuation": "Conversion valuation",
+    "principalAmount": "Principal",
+    "pricePerShare": "Price per share",
+    "structuringFees": "Structuring fees",
+    "acquisitionFees": "Acquisition fees",
+    "rentReceived": "Rent received",
+    "currentValue": "Current value",
+    "ownershipPct": "Ownership",
+    "discount": "Discount",
+    "interestRate": "Interest rate",
+    "spvOwnershipPct": "SPV ownership",
+    "distributionRate": "Distribution rate",
+    "roundType": "Round",
+    "safeType": "Instrument type",
+    "couponPeriodicity": "Coupon frequency",
+    "repaymentModality": "Repayment",
+    "termDuration": "Term",
+    "fundType": "Fund type",
+    "propertyType": "Property type",
+    "sharesAcquired": "Shares acquired",
+    "enjoymentDelayMonths": "Enjoyment delay (months)",
+    "surfaceSqm": "Surface (m²)",
+    "vintageYear": "Vintage",
+    "bankName": "Bank",
+    "managementCompany": "Management company",
+    "underlyingTarget": "Underlying",
+    "location": "Location"
+  },
+  "enum": {
+    "roundType": {
+      "preseed": "Pre-seed",
+      "seed": "Seed",
+      "serieA": "Series A",
+      "serieB": "Series B",
+      "serieC_plus": "Series C+",
+      "bridge": "Bridge"
+    },
+    "safeType": {
+      "safe": "SAFE",
+      "bsa_air": "BSA Air",
+      "oc": "Convertible bond"
+    },
+    "couponPeriodicity": {
+      "mensuel": "Monthly",
+      "trimestriel": "Quarterly",
+      "annuel": "Annual",
+      "in_fine": "In fine"
+    },
+    "repaymentModality": {
+      "in_fine": "In fine",
+      "amortissable": "Amortizing",
+      "bullet": "Bullet"
+    },
+    "termDuration": {
+      "1m": "1 month",
+      "3m": "3 months",
+      "6m": "6 months",
+      "12m": "12 months",
+      "24m": "24 months"
+    },
+    "fundType": {
+      "vc": "Venture capital",
+      "pe": "Private equity",
+      "dette": "Private debt",
+      "secondaire": "Secondary",
+      "fof": "Fund of funds"
+    },
+    "propertyType": {
+      "residentiel": "Residential",
+      "commercial": "Commercial",
+      "bureau": "Office",
+      "autre": "Other"
+    }
+  },
+  "archetype": {
+    "equity": "Equity",
+    "debt": "Debt",
+    "funds_lp": "Fund (LP)",
+    "real_estate": "Real estate",
+    "royalties": "Royalties",
+    "placement": "Treasury",
+    "unassigned": "Unassigned"
+  },
+  "fiche": {
+    "instrumentTitle": "Instrument details",
+    "typeLabel": "Instrument type",
+    "preview": {
+      "unsaved": "Preview — not saved",
+      "note": "Switching the type here only previews the layout — nothing is written to the database.",
+      "reset": "Back to saved type"
+    },
+    "safe": {
+      "pre": "Pre-conversion",
+      "post": "Post-conversion"
+    },
+    "placement": {
+      "latentGain": "Latent gain/loss"
+    },
+    "royalty": {
+      "placeholder": "Royalties panel coming soon."
+    },
+    "cto": {
+      "placeholder": "This instrument type isn't configured yet."
+    },
+    "entity": {
+      "title": "Linked entity"
+    },
+    "reporting": {
+      "title": "Reporting & KPIs",
+      "body": "Coming soon — reporting and KPIs for this deal will appear here."
+    },
+    "documents": {
+      "title": "Documents",
+      "body": "Coming soon — documents attached to this deal will appear here."
+    }
+  },
   "edit": {
     "dealTitle": "Edit deal",
     "dealDescription": "Rename the deal and change its instrument type.",
