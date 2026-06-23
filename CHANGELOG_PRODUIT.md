@@ -23,6 +23,28 @@ bas de page.
 
 ---
 
+## v1.16.2 — 23/06/2026 à 20:33 — Placements de trésorerie : socle de fiche (technique)
+
+Suite du socle des fiches par type d'instrument : les placements de trésorerie
+(crypto, contrats de capitalisation) sortent du « type non encore configuré » et
+disposent d'une fiche minimale côté serveur (date de placement, montant placé,
+valeur actuelle, établissement). Rien de visible pour l'instant ; l'affichage et
+le calcul de plus-value latente viendront avec l'interface.
+
+> **🔧 Notes techniques**
+>
+> - Nouvel archétype `placement` dans `convex/lib/instrumentMapping.ts` :
+>   `crypto` et `capitalization_account` passent de `unassigned`/`placeholder` à
+>   `placement`/`fields`, config partagée `PLACEMENT_FIELDS` (`closingDate`,
+>   `paidAmount`, `currentValue`, `bankName`). `cto` reste seul en
+>   `unassigned`/`placeholder` (pas de deal en prod pour cadrer son layout). Les
+>   `Record` restent totaux (19 clés) ; `INSTRUMENT_FIELDS` passe à 17 types.
+> - `convex/schema.ts` : une seule colonne neuve optionnelle `currentValue`
+>   (cents). Date de placement / montant placé / établissement réutilisent
+>   `closingDate` / `paidAmount` / `bankName`. La plus-value latente
+>   (`currentValue − paidAmount`) sera calculée côté front (Lot 2), non stockée.
+> - Aucune mutation, aucune migration, aucune commande `--prod`.
+
 ## v1.16.1 — 23/06/2026 à 19:56 — Socle des fiches par type d'instrument (technique)
 
 Préparation interne de la refonte des fiches deal/instrument : le socle de
