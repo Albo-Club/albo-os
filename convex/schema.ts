@@ -64,6 +64,60 @@ const dealStatus = v.union(
   v.literal('written_off'),
 )
 
+// Instrument-archetype enums (dashboard refonte). Consumed only by the
+// optional per-archetype columns on `deals`; see
+// convex/lib/instrumentMapping.ts for the instrumentKind → fields mapping.
+const roundType = v.union(
+  v.literal('preseed'),
+  v.literal('seed'),
+  v.literal('serieA'),
+  v.literal('serieB'),
+  v.literal('serieC_plus'),
+  v.literal('bridge'),
+)
+
+const safeType = v.union(
+  v.literal('safe'),
+  v.literal('bsa_air'),
+  v.literal('oc'),
+)
+
+const couponPeriodicity = v.union(
+  v.literal('mensuel'),
+  v.literal('trimestriel'),
+  v.literal('annuel'),
+  v.literal('in_fine'),
+)
+
+const repaymentModality = v.union(
+  v.literal('in_fine'),
+  v.literal('amortissable'),
+  v.literal('bullet'),
+)
+
+const termDuration = v.union(
+  v.literal('1m'),
+  v.literal('3m'),
+  v.literal('6m'),
+  v.literal('12m'),
+  v.literal('24m'),
+)
+
+const fundType = v.union(
+  v.literal('vc'),
+  v.literal('pe'),
+  v.literal('dette'),
+  v.literal('secondaire'),
+  v.literal('fof'),
+)
+
+const propertyType = v.union(
+  v.literal('residentiel'),
+  v.literal('commercial'),
+  v.literal('bureau'),
+  v.literal('autre'),
+)
+
 const txDirection = v.union(v.literal('in'), v.literal('out'))
 
 const txSource = v.union(
@@ -416,6 +470,45 @@ export default defineSchema({
 
     // Airtable import anchor (derived key `${companyRecId}:${instrumentKind}`)
     airtableId: v.optional(v.string()),
+
+    // ─── Instrument-archetype fields (dashboard refonte) ──────────────────
+    // All optional, dormant: each deal only fills the columns of its
+    // instrumentKind config (see convex/lib/instrumentMapping.ts). Never
+    // destroyed when the instrumentKind changes.
+
+    // Equity / round
+    roundType: v.optional(roundType),
+    preMoneyValuation: v.optional(v.number()), // cents
+    postMoneyValuation: v.optional(v.number()), // cents
+    ownershipPct: v.optional(v.number()), // bps (pctDetention / pctDetentionResultant)
+
+    // SAFE / convertible
+    safeType: v.optional(safeType),
+    conversionDeadlineDate: v.optional(v.number()), // ms
+    conversionValuation: v.optional(v.number()), // cents
+
+    // Debt (os / dat)
+    couponPeriodicity: v.optional(couponPeriodicity),
+    repaymentModality: v.optional(repaymentModality),
+    termDuration: v.optional(termDuration),
+    bankName: v.optional(v.string()),
+
+    // Funds / SPV
+    fundType: v.optional(fundType),
+    vintageYear: v.optional(v.number()),
+    managementCompany: v.optional(v.string()), // shared scpi + fonds
+    underlyingTarget: v.optional(v.string()),
+    spvOwnershipPct: v.optional(v.number()), // bps
+    structuringFees: v.optional(v.number()), // cents
+
+    // Real estate (scpi / immo)
+    distributionRate: v.optional(v.number()), // bps
+    enjoymentDelayMonths: v.optional(v.number()),
+    acquisitionFees: v.optional(v.number()), // cents
+    surfaceSqm: v.optional(v.number()),
+    location: v.optional(v.string()),
+    propertyType: v.optional(propertyType),
+    rentReceived: v.optional(v.number()), // cents
 
     // Meta
     notes: v.optional(v.string()),
