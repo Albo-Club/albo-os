@@ -35,7 +35,11 @@ export async function getGroupBySlug(
     .first()
 }
 
-export type GroupMeta = { slug: string; displayName: string }
+export type GroupMeta = {
+  slug: string
+  displayName: string
+  groupKind: 'sponsor' | 'group' | null
+}
 
 /**
  * Map of an org's group settings keyed by logical key (`companies.group`),
@@ -51,7 +55,14 @@ export async function buildGroupMeta(
     .withIndex('by_org_group', (q) => q.eq('orgId', orgId))
     .collect()
   return new Map(
-    rows.map((r) => [r.group, { slug: r.slug, displayName: r.displayName ?? r.group }]),
+    rows.map((r) => [
+      r.group,
+      {
+        slug: r.slug,
+        displayName: r.displayName ?? r.group,
+        groupKind: r.groupKind ?? null,
+      },
+    ]),
   )
 }
 
@@ -59,11 +70,16 @@ export async function buildGroupMeta(
  * Ensures a settings row exists for `group`: returns the existing one, or
  * creates it with a stable slug (generated once, never changes) and
  * displayName = group. Idempotent — safe to call on every assignment.
+ *
+ * `groupKind` (sponsor | group) is written ONLY on creation. An existing
+ * group is returned untouched, so the kind is never overwritten by a later
+ * assignment.
  */
 export async function ensureGroupSettings(
   ctx: MutationCtx,
   orgId: Id<'organizations'>,
   group: string,
+  groupKind?: 'sponsor' | 'group',
 ): Promise<Doc<'portfolioGroupSettings'>> {
   const existing = await getGroupSettings(ctx, orgId, group)
   if (existing) return existing
@@ -81,6 +97,7 @@ export async function ensureGroupSettings(
     group,
     slug,
     displayName: group,
+    ...(groupKind ? { groupKind } : {}),
     blocks: [],
   })
   return (await ctx.db.get('portfolioGroupSettings', id))!

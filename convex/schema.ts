@@ -327,6 +327,9 @@ export default defineSchema({
     group: v.string(), // logical key = companies.group
     slug: v.string(), // stable URL identifier, generated at creation
     displayName: v.optional(v.string()), // editable; fallback = group
+    // Organizational nature of the group (badge label only — no KPI impact).
+    // Set once at creation (forced choice); reclassifiable on the conso page.
+    groupKind: v.optional(v.union(v.literal('sponsor'), v.literal('group'))),
     // Ordered KPI blocks; keys validated against the catalogue in mutations.
     blocks: v.array(v.object({ key: v.string(), visible: v.boolean() })),
   })

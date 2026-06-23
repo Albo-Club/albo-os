@@ -72,7 +72,12 @@
     "entity": "Entity"
   },
   "badge": {
-    "group": "group"
+    "group": "group",
+    "sponsor": "sponsor"
+  },
+  "kind": {
+    "sponsor": "Sponsor",
+    "group": "Group"
   },
   "block": {
     "expo_totale": "Total exposure",
@@ -86,6 +91,8 @@
     "viewGroup": "View group",
     "rename": "Rename",
     "renameError": "Couldn't rename the group.",
+    "kindUnset": "Unclassified",
+    "kindError": "Couldn't change the group type.",
     "customize": "Customize",
     "customizeError": "Couldn't save the layout.",
     "kpisTitle": "Consolidated KPIs",
@@ -142,6 +149,9 @@
     "groupLabel": "Group",
     "groupPlaceholder": "No group",
     "groupHint": "Type to create a new group, or pick an existing one. Leave empty to remove.",
+    "kindLabel": "Group type",
+    "kindPlaceholder": "Choose a type",
+    "kindRequired": "Choose a type for the new group.",
     "nameRequired": "Name is required.",
     "saved": "Changes saved",
     "errors": {

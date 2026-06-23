@@ -49,6 +49,8 @@ export type DealRow = {
     groupSlug?: string | null
     /** Editable display name of the group (falls back to the logical key). */
     groupDisplayName?: string | null
+    /** Organizational nature of the group (badge label only). */
+    groupKind?: 'sponsor' | 'group' | null
   } | null
   investor: { name: string } | null
   spv: { name: string } | null
@@ -320,6 +322,7 @@ export function ParticipationsTable({
         // sharing a `group`. `groupSlug` targets the conso route.
         isGroup: boolean
         groupSlug: string | undefined
+        groupKind: 'sponsor' | 'group' | null
         deals: Array<DealRow>
         committed: number
         paid: number
@@ -342,6 +345,7 @@ export function ParticipationsTable({
         slug: orgSlug ?? d.org?.slug,
         isGroup: Boolean(group),
         groupSlug: group ? (d.target?.groupSlug ?? undefined) : undefined,
+        groupKind: group ? (d.target?.groupKind ?? null) : null,
         deals: [],
         committed: 0,
         paid: 0,
@@ -579,6 +583,7 @@ function CompanyRows({
     slug: string | undefined
     isGroup: boolean
     groupSlug: string | undefined
+    groupKind: 'sponsor' | 'group' | null
     deals: Array<DealRow>
     committed: number
     paid: number
@@ -609,9 +614,12 @@ function CompanyRows({
               size="sm"
             />
             {group.name}
-            {group.isGroup && (
-              <Badge variant="secondary">{t('badge.group')}</Badge>
-            )}
+            {group.isGroup &&
+              (group.groupKind === 'sponsor' ? (
+                <Badge variant="outline">{t('badge.sponsor')}</Badge>
+              ) : (
+                <Badge variant="secondary">{t('badge.group')}</Badge>
+              ))}
             {group.isGroup && group.slug && group.groupSlug ? (
               <Button asChild variant="outline" size="sm" className="ml-2">
                 <Link

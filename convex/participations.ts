@@ -95,6 +95,7 @@ export const getGroup = query({
     return {
       group: settings.group,
       displayName: settings.displayName ?? settings.group,
+      groupKind: settings.groupKind ?? null,
       slug: settings.slug,
       entities: entities.map(({ residual: _r, ...e }) => e),
       totals,
@@ -170,6 +171,22 @@ export const setGroupDisplayName = mutation({
     await ctx.db.patch('portfolioGroupSettings', settings._id, {
       displayName: trimmed === '' ? settings.group : trimmed,
     })
+    return settings._id
+  },
+})
+
+/** Sets a group's organizational nature (badge label only — no KPI impact). */
+export const setGroupKind = mutation({
+  args: {
+    orgId: v.id('organizations'),
+    slug: v.string(),
+    groupKind: v.union(v.literal('sponsor'), v.literal('group')),
+  },
+  handler: async (ctx, { orgId, slug, groupKind }) => {
+    await requireOrgMember(ctx, orgId)
+    const settings = await getGroupBySlug(ctx, orgId, slug)
+    if (!settings) throw new ConvexError('not_found')
+    await ctx.db.patch('portfolioGroupSettings', settings._id, { groupKind })
     return settings._id
   },
 })

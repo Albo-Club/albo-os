@@ -58,6 +58,7 @@ function companyRef(c: Doc<'companies'> | null, groupMeta?: Map<string, GroupMet
     group: c.group ?? null,
     groupSlug: meta?.slug ?? null,
     groupDisplayName: meta?.displayName ?? null,
+    groupKind: meta?.groupKind ?? null,
     totalShares: c.totalShares ?? null,
   }
 }
