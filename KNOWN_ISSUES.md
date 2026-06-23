@@ -1370,14 +1370,17 @@ ce mapping ailleurs. Décisions non-évidentes :
 1. **`INSTRUMENT_ARCHETYPE` / `INSTRUMENT_RENDER` sont des `Record` totaux**
    (19 clés) → un `instrumentKind` oublié casse la compilation TS. C'est le
    garde-fou : ajouter une valeur à l'enum force à la classer ici.
-   `INSTRUMENT_FIELDS` est volontairement **partiel** : seuls les 15 types en
+   `INSTRUMENT_FIELDS` est volontairement **partiel** : seuls les 17 types en
    render `'fields'` y figurent.
 
-2. **`unassigned` + `placeholder` = parking assumé.** `cto`, `crypto`,
-   `capitalization_account` n'ont pas encore de layout décidé : ils rendent un
-   bloc neutre « type non encore configuré » plutôt que des champs au jugé. Ne
-   leur invente pas de field config sans repasser par une décision de design
-   (avant Lot 2).
+2. **`placement` = relevé de trésorerie minimal.** `crypto` et
+   `capitalization_account` sont configurés en archétype `placement` / render
+   `'fields'`, config partagée `PLACEMENT_FIELDS` (`closingDate`, `paidAmount`,
+   `currentValue`, `bankName`). La **plus-value latente** se déduit
+   `currentValue − paidAmount` **côté front (Lot 2)** — elle n'est **pas**
+   stockée en base. Seul `cto` reste en `unassigned` / `placeholder` (pas de
+   deal en prod pour cadrer son layout) ; ne lui invente pas de field config
+   sans repasser par une décision de design.
 
 3. **`royalty` en render `'custom'`** (et le carried/manco aussi, plus tard) :
    le bloc central viendra d'un panel dédié (`RoyaltiesPanel`), pas de
@@ -1404,8 +1407,8 @@ ce mapping ailleurs. Décisions non-évidentes :
 7. **`os` reste rattaché à `debt`** sans désambiguïsation (SPV equity vs dette
    obligataire immo) : reportée explicitement, ne pas la traiter dans ce lot.
 
-8. **Colonnes dormantes.** Les 24 colonnes ajoutées sur `deals` sont toutes
-   `v.optional` et **ne sont écrites par aucune mutation** dans ce lot (`deals.ts`
-   non étendu) : elles attendent le câblage front + l'extension des args de
-   mutation (Lot 2). Aucune migration de données n'est nécessaire (champs
-   optionnels).
+8. **Colonnes dormantes.** Les 25 colonnes d'archétype ajoutées sur `deals`
+   (24 au Lot 1 + `currentValue`) sont toutes `v.optional` et **ne sont écrites
+   par aucune mutation** (`deals.ts` non étendu) : elles attendent le câblage
+   front + l'extension des args de mutation (Lot 2). Aucune migration de données
+   n'est nécessaire (champs optionnels).

@@ -510,6 +510,9 @@ export default defineSchema({
     propertyType: v.optional(propertyType),
     rentReceived: v.optional(v.number()), // cents
 
+    // Placement (crypto / capitalization_account)
+    currentValue: v.optional(v.number()), // cents — current value of a placement
+
     // Meta
     notes: v.optional(v.string()),
   })

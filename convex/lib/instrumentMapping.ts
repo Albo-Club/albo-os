@@ -10,11 +10,11 @@ import type { InstrumentKind } from './instruments'
  *   - 'fields'      → INSTRUMENT_FIELDS lists the ordered `deals` columns to show
  *   - 'custom'      → a bespoke panel renders the central block (royalty)
  *   - 'placeholder' → layout not designed yet; show a neutral "type non encore
- *                     configuré" block (cto / crypto / capitalization_account).
+ *                     configuré" block (cto only).
  *
- * 'unassigned' is the holding bucket for the placeholder kinds, so
- * INSTRUMENT_ARCHETYPE stays a total Record over the 19 real values. Their
- * dashboard design is deferred (decision before Lot 2).
+ * 'unassigned' is the holding bucket for the placeholder kinds (only `cto`
+ * remains, lacking a prod deal to model its layout from), so
+ * INSTRUMENT_ARCHETYPE stays a total Record over the 19 real values.
  */
 export type Archetype =
   | 'equity'
@@ -22,6 +22,7 @@ export type Archetype =
   | 'funds_lp'
   | 'real_estate'
   | 'royalties'
+  | 'placement'
   | 'unassigned'
 
 export type RenderMode = 'fields' | 'custom' | 'placeholder'
@@ -50,10 +51,12 @@ export const INSTRUMENT_ARCHETYPE: Record<InstrumentKind, Archetype> = {
   scpi: 'real_estate',
   // royalties (custom panel, reserved)
   royalty: 'royalties',
-  // parked — layout deferred, render placeholder
+  // placement (minimal treasury statement; capitalization_account reuses the
+  // placement field config)
+  crypto: 'placement',
+  capitalization_account: 'placement',
+  // parked — layout deferred, render placeholder (only cto, no prod deal yet)
   cto: 'unassigned',
-  crypto: 'unassigned',
-  capitalization_account: 'unassigned',
 }
 
 /** instrumentKind → render mode. Total Record (all 19 kinds). */
@@ -74,9 +77,9 @@ export const INSTRUMENT_RENDER: Record<InstrumentKind, RenderMode> = {
   real_estate_direct: 'fields',
   scpi: 'fields',
   royalty: 'custom',
+  crypto: 'fields',
+  capitalization_account: 'fields',
   cto: 'placeholder',
-  crypto: 'placeholder',
-  capitalization_account: 'placeholder',
 }
 
 // Shared field configs — ordered `deals` column names (convex/schema.ts), in
@@ -165,10 +168,17 @@ const IMMO_FIELDS = [
   'rentReceived',
 ]
 
+const PLACEMENT_FIELDS = [
+  'closingDate',
+  'paidAmount',
+  'currentValue',
+  'bankName',
+]
+
 /**
  * instrumentKind → ordered `deals` columns for the 'fields'-rendered kinds.
- * Partial: 'custom' (royalty) and 'placeholder' (cto/crypto/
- * capitalization_account) kinds are intentionally absent.
+ * Partial: 'custom' (royalty) and 'placeholder' (cto) kinds are intentionally
+ * absent.
  */
 export const INSTRUMENT_FIELDS: Partial<Record<InstrumentKind, Array<string>>> =
   {
@@ -187,4 +197,6 @@ export const INSTRUMENT_FIELDS: Partial<Record<InstrumentKind, Array<string>>> =
     spv_share: SPV_FIELDS,
     scpi: SCPI_FIELDS,
     real_estate_direct: IMMO_FIELDS,
+    crypto: PLACEMENT_FIELDS,
+    capitalization_account: PLACEMENT_FIELDS,
   }
