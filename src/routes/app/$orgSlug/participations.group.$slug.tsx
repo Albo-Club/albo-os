@@ -17,11 +17,17 @@ import { api } from '../../../../convex/_generated/api'
 import type { FunctionReturnType } from 'convex/server'
 
 import type { Id } from '../../../../convex/_generated/dataModel'
+import type { EntityNature } from '~/components/companies/EntityFiche'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { CompanyLogo } from '~/components/CompanyLogo'
-import { Badge } from '~/components/ui/badge'
+import {
+  EntityNatureBadge,
+  IdentityField,
+  IdentitySection,
+  ReservedSection,
+} from '~/components/companies/EntityFiche'
 import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
 import {
@@ -115,22 +121,85 @@ function GroupConso() {
     )
   }
 
+  // Nature derives from groupKind: 'sponsor' → debt sponsor, else → group.
+  const nature: EntityNature = group.groupKind === 'sponsor' ? 'sponsor' : 'group'
+
   return (
     <main className="flex-1 space-y-6 p-6">
       <BackLink orgSlug={orgSlug} />
-      <Header group={group} orgId={org._id} />
+      <Header group={group} orgId={org._id} nature={nature} />
+      <IdentityBlock group={group} nature={nature} />
       <KpiGrid group={group} orgId={org._id} />
       <EntityList group={group} orgSlug={orgSlug} orgId={org._id} />
+      {/* Documents have no group-level storage — kept as a reserved zone. */}
+      <ReservedSection
+        title={t('identity.documents')}
+        note={t('identity.documentsAtEntity')}
+      />
     </main>
+  )
+}
+
+/**
+ * Nature-driven identity block. "group": name + stable slug + type. "sponsor"
+ * (debt sponsor): name + platform type / Attio link / main contact, none of
+ * which have schema storage yet (shown as "to be filled in"), plus a note that
+ * attached debt deals come up through the member entities.
+ */
+function IdentityBlock({
+  group,
+  nature,
+}: {
+  group: GroupData
+  nature: EntityNature
+}) {
+  const { t } = useTranslation('participations')
+  const toFill = (
+    <span className="text-muted-foreground text-xs">{t('identity.empty')}</span>
+  )
+
+  if (nature === 'sponsor') {
+    return (
+      <IdentitySection title={t('identity.title')}>
+        <div className="grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-4">
+          <IdentityField label={t('identity.name')} value={group.displayName} />
+          <IdentityField label={t('identity.platformType')} value={toFill} />
+          <IdentityField label={t('identity.attio')} value={toFill} />
+          <IdentityField label={t('identity.mainContact')} value={toFill} />
+        </div>
+        <p className="text-muted-foreground text-xs">
+          {t('identity.sponsorDealsNote')}
+        </p>
+      </IdentitySection>
+    )
+  }
+
+  return (
+    <IdentitySection title={t('identity.title')}>
+      <div className="grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-3">
+        <IdentityField label={t('identity.name')} value={group.displayName} />
+        <IdentityField label={t('identity.slug')} value={group.slug} />
+        <IdentityField
+          label={t('identity.type')}
+          value={
+            group.groupKind
+              ? t(`kind.${group.groupKind}`)
+              : t('group.kindUnset')
+          }
+        />
+      </div>
+    </IdentitySection>
   )
 }
 
 function Header({
   group,
   orgId,
+  nature,
 }: {
   group: GroupData
   orgId: Id<'organizations'>
+  nature: EntityNature
 }) {
   const { t } = useTranslation(['participations', 'common'])
   const rename = useConvexMutation(api.participations.setGroupDisplayName)
@@ -189,11 +258,7 @@ function Header({
           <h1 className="text-2xl font-semibold tracking-tight">
             {group.displayName}
           </h1>
-          {group.groupKind === 'sponsor' ? (
-            <Badge variant="outline">{t('participations:badge.sponsor')}</Badge>
-          ) : (
-            <Badge variant="secondary">{t('participations:badge.group')}</Badge>
-          )}
+          <EntityNatureBadge nature={nature} />
           <Select
             value={group.groupKind ?? undefined}
             onValueChange={(v) => changeKind(v as 'sponsor' | 'group')}

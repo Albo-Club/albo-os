@@ -15,6 +15,13 @@ import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { DealsList } from '~/components/participations/ParticipationsTable'
 import { CompanyLogo } from '~/components/CompanyLogo'
+import {
+  AttioCompanyLink,
+  EntityNatureBadge,
+  IdentityField,
+  IdentitySection,
+  PeopleList,
+} from '~/components/companies/EntityFiche'
 import { KpisSection } from '~/components/companies/KpisSection'
 import { ReportingsSection } from '~/components/companies/ReportingsSection'
 import { Button } from '~/components/ui/button'
@@ -73,15 +80,6 @@ function NotFound() {
       <BackLink orgSlug={orgSlug} />
       <p className="text-muted-foreground text-sm">{t('notFound')}</p>
     </main>
-  )
-}
-
-function Info({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="text-sm">{value ?? '—'}</span>
-    </div>
   )
 }
 
@@ -466,6 +464,7 @@ function ParticipationDetail() {
   return (
     <main className="flex-1 space-y-6 p-6">
       <BackLink orgSlug={orgSlug} />
+      {/* Header: name + nature + ownership + (kept) edit actions. */}
       <div className="flex flex-wrap items-center gap-3">
         <CompanyLogo
           domain={company?.domain}
@@ -475,6 +474,12 @@ function ParticipationDetail() {
         <h1 className="text-2xl font-semibold tracking-tight">
           {company ? company.name : t('loading')}
         </h1>
+        {company && <EntityNatureBadge nature="company" />}
+        {ownership && (
+          <span className="text-muted-foreground text-sm">
+            {t('info.ownership')} {ownership}
+          </span>
+        )}
         {company && (
           <Button
             variant="outline"
@@ -493,25 +498,50 @@ function ParticipationDetail() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-4">
-        <Info label={t('info.sector')} value={company?.sector} />
-        <Info label={t('info.siren')} value={company?.siren} />
-        <Info label={t('info.domain')} value={company?.domain} />
-        <Info label={t('info.ownership')} value={ownership} />
+      {/* Identity block — nature "company". */}
+      <IdentitySection title={t('identity.title')}>
+        <div className="grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-4">
+          <IdentityField label={t('info.sector')} value={company?.sector} />
+          <IdentityField label={t('info.siren')} value={company?.siren} />
+          <IdentityField label={t('info.domain')} value={company?.domain} />
+          <IdentityField label={t('info.ownership')} value={ownership} />
+          <IdentityField
+            label={t('identity.attio')}
+            value={
+              <AttioCompanyLink attioCompanyId={company?.attioCompanyId} />
+            }
+          />
+        </div>
+      </IdentitySection>
+
+      {/* People — no schema stores these yet (empty "to be filled in"). */}
+      <div className="grid gap-6 sm:grid-cols-3">
+        <IdentitySection title={t('identity.founders')}>
+          <PeopleList people={[]} />
+        </IdentitySection>
+        <IdentitySection title={t('identity.board')}>
+          <PeopleList people={[]} />
+        </IdentitySection>
+        <IdentitySection title={t('identity.coInvestors')}>
+          <PeopleList people={[]} />
+        </IdentitySection>
       </div>
 
-      {!deals ? (
-        <div className="text-muted-foreground text-sm">{t('loading')}</div>
-      ) : deals.length === 0 ? (
-        <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
-          {t('empty')}
-        </div>
-      ) : (
-        <div className="rounded-lg border">
-          <DealsList deals={deals} orgSlug={orgSlug} />
-        </div>
-      )}
+      <IdentitySection title={t('col.deals')}>
+        {!deals ? (
+          <div className="text-muted-foreground text-sm">{t('loading')}</div>
+        ) : deals.length === 0 ? (
+          <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
+            {t('empty')}
+          </div>
+        ) : (
+          <div className="rounded-lg border">
+            <DealsList deals={deals} orgSlug={orgSlug} />
+          </div>
+        )}
+      </IdentitySection>
 
+      {/* Reporting/KPIs + Documents zones of the skeleton. */}
       {company && <KpisSection companyId={company._id} />}
       {company && <ReportingsSection companyId={company._id} />}
 
