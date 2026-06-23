@@ -23,6 +23,54 @@ bas de page.
 
 ---
 
+## v1.18.0 — 23/06/2026 à 21:40 — Fiche deal qui s'adapte au type d'instrument
+
+La fiche d'un investissement change désormais de visage selon son type. Le bloc
+central affiche, dans le bon ordre et avec le bon format (montants en euros, taux
+en %, dates), exactement les informations qui comptent pour ce type d'instrument :
+actions, obligations, SAFE, fonds, immobilier, SCPI, placements de trésorerie…
+Les royalties affichent un panneau « à venir » et les types pas encore configurés
+un bloc neutre.
+
+Quelques nouveautés visibles :
+
+- Un **badge de couleur** indique la grande famille de l'instrument (capital,
+  dette, fonds, immobilier, royalties, placement…).
+- Un **sélecteur de type** en haut de la fiche permet de **prévisualiser** à quoi
+  ressemblerait la fiche dans un autre type, sans rien enregistrer : un bandeau
+  « Aperçu — non enregistré » le rappelle clairement, et tout revient à la normale
+  au rechargement.
+- Les **SAFE** proposent une vue Pré / Post-conversion.
+- Les **placements** (crypto, contrats de capitalisation) affichent la
+  **plus-value latente** (valeur actuelle − montant versé), en vert ou en rouge.
+- Une carte **Entité liée** renvoie vers la société investie ; des emplacements
+  **Reporting & KPIs** et **Documents** sont réservés pour la suite.
+
+Cette fiche reste en lecture seule : l'édition du type et des champs arrivera
+ensuite.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau composant `src/components/deals/InstrumentBlock.tsx` : bloc central
+>   **lecture seule** piloté par `convex/lib/instrumentMapping.ts` (lit
+>   `INSTRUMENT_RENDER` pour le mode, `INSTRUMENT_FIELDS` pour les colonnes
+>   ordonnées, `INSTRUMENT_ARCHETYPE` pour le badge). Aucune liste de champs en
+>   dur : seul un `FIELD_FORMAT` (champ → format cents/bps/ms/enum) vit côté
+>   front. Modèle deux-états SAFE déduit de la position de `conversionValuation`
+>   dans le mapping (pas de liste codée en dur) ; plus-value placement via
+>   `signTone`. Badges d'archétype via tokens `chart-1..5` / `positive`.
+> - `src/routes/app/$orgSlug/deals.$dealId.tsx` : la grille d'infos à plat est
+>   remplacée par un overview (Engagé/Versé/Reçu) + `InstrumentBlock`. Sélecteur
+>   de type = état local `previewKind` (jamais persisté, cf. Lot 3) avec bandeau
+>   « aperçu non enregistré » + reset. Ajout carte entité + placeholders
+>   reporting/documents. Helpers orphelins (`Info`, `fmtPct`, `fmtNum`) retirés.
+> - i18n EN/FR : nouveaux namespaces `field.*`, `enum.*`, `archetype.*`,
+>   `fiche.*` dans `src/locales/{en,fr}/participations.json`.
+> - Dette tracée dans `KNOWN_ISSUES.md` : `INSTRUMENTS` dupliqué dans la route
+>   deal vs `convex/lib/instruments.ts` (à nettoyer dans un lot ultérieur).
+> - Front uniquement : aucune mutation, aucun changement de schéma, aucune
+>   commande `--prod`.
+
 ## v1.17.0 — 23/06/2026 à 21:38 — Fiches entités : un socle commun par nature
 
 Les fiches d'entité s'organisent désormais autour d'un même squelette, quel que

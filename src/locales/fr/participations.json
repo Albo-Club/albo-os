@@ -157,6 +157,133 @@
     "loan": "Prêt",
     "capitalization_account": "Compte de capitalisation"
   },
+  "field": {
+    "closingDate": "Date de closing",
+    "signedDate": "Date de signature",
+    "conversionDeadlineDate": "Échéance de conversion",
+    "maturityDate": "Date d'échéance",
+    "paidAmount": "Montant versé",
+    "committedAmount": "Montant engagé",
+    "roundSize": "Taille du tour",
+    "preMoneyValuation": "Valorisation pre-money",
+    "postMoneyValuation": "Valorisation post-money",
+    "valuationCap": "Cap de valorisation",
+    "conversionValuation": "Valorisation à la conversion",
+    "principalAmount": "Principal",
+    "pricePerShare": "Prix par titre",
+    "structuringFees": "Frais de structuration",
+    "acquisitionFees": "Frais d'acquisition",
+    "rentReceived": "Loyers perçus",
+    "currentValue": "Valeur actuelle",
+    "ownershipPct": "Détention",
+    "discount": "Discount",
+    "interestRate": "Taux d'intérêt",
+    "spvOwnershipPct": "Détention SPV",
+    "distributionRate": "Taux de distribution",
+    "roundType": "Tour",
+    "safeType": "Type d'instrument",
+    "couponPeriodicity": "Périodicité du coupon",
+    "repaymentModality": "Remboursement",
+    "termDuration": "Durée",
+    "fundType": "Type de fonds",
+    "propertyType": "Type de bien",
+    "sharesAcquired": "Titres acquis",
+    "enjoymentDelayMonths": "Délai de jouissance (mois)",
+    "surfaceSqm": "Surface (m²)",
+    "vintageYear": "Millésime",
+    "bankName": "Banque",
+    "managementCompany": "Société de gestion",
+    "underlyingTarget": "Sous-jacent",
+    "location": "Localisation"
+  },
+  "enum": {
+    "roundType": {
+      "preseed": "Pre-seed",
+      "seed": "Seed",
+      "serieA": "Série A",
+      "serieB": "Série B",
+      "serieC_plus": "Série C+",
+      "bridge": "Bridge"
+    },
+    "safeType": {
+      "safe": "SAFE",
+      "bsa_air": "BSA Air",
+      "oc": "Obligation convertible"
+    },
+    "couponPeriodicity": {
+      "mensuel": "Mensuel",
+      "trimestriel": "Trimestriel",
+      "annuel": "Annuel",
+      "in_fine": "In fine"
+    },
+    "repaymentModality": {
+      "in_fine": "In fine",
+      "amortissable": "Amortissable",
+      "bullet": "Bullet"
+    },
+    "termDuration": {
+      "1m": "1 mois",
+      "3m": "3 mois",
+      "6m": "6 mois",
+      "12m": "12 mois",
+      "24m": "24 mois"
+    },
+    "fundType": {
+      "vc": "Capital-risque",
+      "pe": "Private equity",
+      "dette": "Dette privée",
+      "secondaire": "Secondaire",
+      "fof": "Fonds de fonds"
+    },
+    "propertyType": {
+      "residentiel": "Résidentiel",
+      "commercial": "Commercial",
+      "bureau": "Bureau",
+      "autre": "Autre"
+    }
+  },
+  "archetype": {
+    "equity": "Capital",
+    "debt": "Dette",
+    "funds_lp": "Fonds (LP)",
+    "real_estate": "Immobilier",
+    "royalties": "Royalties",
+    "placement": "Placement",
+    "unassigned": "Non classé"
+  },
+  "fiche": {
+    "instrumentTitle": "Détails de l'instrument",
+    "typeLabel": "Type d'instrument",
+    "preview": {
+      "unsaved": "Aperçu — non enregistré",
+      "note": "Changer le type ici ne fait que prévisualiser la mise en page — rien n'est écrit en base.",
+      "reset": "Revenir au type enregistré"
+    },
+    "safe": {
+      "pre": "Pré-conversion",
+      "post": "Post-conversion"
+    },
+    "placement": {
+      "latentGain": "Plus-value latente"
+    },
+    "royalty": {
+      "placeholder": "Panneau royalties à venir."
+    },
+    "cto": {
+      "placeholder": "Type d'instrument pas encore configuré."
+    },
+    "entity": {
+      "title": "Entité liée"
+    },
+    "reporting": {
+      "title": "Reporting & KPIs",
+      "body": "À venir — le reporting et les KPIs de ce deal s'afficheront ici."
+    },
+    "documents": {
+      "title": "Documents",
+      "body": "À venir — les documents rattachés à ce deal s'afficheront ici."
+    }
+  },
   "edit": {
     "dealTitle": "Modifier le deal",
     "dealDescription": "Renommer le deal et changer son type d'instrument.",
