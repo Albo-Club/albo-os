@@ -23,6 +23,48 @@ bas de page.
 
 ---
 
+## v1.27.0 — 24/06/2026 à 20:10 — Réaffecter un deal & archiver une entité
+
+Deux nouveautés pour ranger le portefeuille quand un deal a été créé sous la
+mauvaise société :
+
+- **Réaffecter un deal** : depuis la page d'un deal, **Modifier** propose
+  désormais un sélecteur d'**entité cible**. On déplace le deal vers la bonne
+  entreprise du portefeuille ; ses transactions rapprochées et ses valorisations
+  **suivent** automatiquement (le rapprochement reste intact).
+- **Archiver / restaurer une entité** : une entreprise du portefeuille peut être
+  **archivée** (masquée des listes, de façon réversible) depuis sa fiche. Par
+  sécurité, l'archivage est **refusé** tant que l'entité est encore reliée à
+  des deals, des relations, des KPI, des comptes bancaires ou des documents —
+  un message indique alors quoi traiter d'abord. Les entités archivées se
+  retrouvent (et se **restaurent**) via une section dédiée en bas de la liste
+  des entreprises.
+
+> **🔧 Notes techniques**
+>
+> - **Réaffectation** : aucune mutation créée — `deals.update`
+>   (`convex/deals.ts`) accepte déjà `targetCompanyId` dans le `patch` avec le
+>   garde-fou same-org (`assertSameOrg` / `target_wrong_org`). Front : nouveau
+>   combobox local `CompanyCombobox` (Popover + Command, calqué sur
+>   `DealCombobox`) dans `EditDealDialog` (`deals.$dealId.tsx`), alimenté par
+>   `companies.list { kind: 'portfolio' }` (déjà filtré non-archivé) ; ajout de
+>   `targetCompanyId` au patch diff de la nouvelle structure d'édition.
+> - **Archivage** : `companies.archive` / `companies.restore` /
+>   `companies.listArchived` (`convex/companies.ts`). `archive` pose
+>   `archivedAt = Date.now()` après le garde-fou `listBlockingRefs` (deals
+>   target + investisseur + viaSpv, `companyRelations` parent/enfant,
+>   `kpiSnapshots`, `bankAccounts`, `documents`) → `ConvexError('company_has_references')`.
+>   `restore` efface `archivedAt` (`patch` avec `undefined`). Les deux sont
+>   idempotents. Pas de hard delete.
+> - Front : bouton **Archiver** + dialog de confirmation sur
+>   `participations.$companyId.tsx` (calqué sur la suppression de deal,
+>   désactivé si des deals visibles ciblent l'entité) ; section repliable
+>   `ArchivedSection` + **Restaurer** sur `participations.index.tsx`.
+> - i18n EN/FR : bloc `archive.*` + clés `edit.target*` du namespace
+>   `participations`.
+
+---
+
 ## v1.26.0 — 24/06/2026 à 19:30 — Fil d'Ariane de la fiche deal
 
 Sur la **fiche d'un deal**, le fil d'Ariane en haut de page indique désormais
@@ -421,7 +463,6 @@ l'instant ; les nouvelles informations s'afficheront avec les prochaines mises
 >   discount).
 > - Aucune mutation, aucune migration, aucune commande `--prod` : colonnes en
 >   sommeil jusqu'au câblage du front (Lot 2).
-
 ## v1.16.0 — 23/06/2026 à 18:36 — Participations : distinguer sponsors et groupes
 
 Les **groupes de participations** peuvent désormais être de deux natures :

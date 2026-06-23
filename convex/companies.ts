@@ -93,6 +93,125 @@ export const create = mutation({
   },
 })
 
+/**
+ * Incoming references that block archiving a company. Mirrors the one-shot
+ * migration helper (splitAlboSponsorSpvs.ts) but ALSO counts deals where the
+ * company is the target — archiving must refuse while any deal still points
+ * to it (the Sezame case: reassign the deals first). No direct `companyId`
+ * exists on transactions/valuations: they are reached via `dealId`
+ * (covered by deals) and `bankAccountId` (covered by bankAccounts).
+ */
+async function listBlockingRefs(
+  ctx: Ctx,
+  orgId: Id<'organizations'>,
+  companyId: Id<'companies'>,
+) {
+  const [asTarget, asInvestor, asParent, asChild, kpis, accounts, docs, orgDeals] =
+    await Promise.all([
+      ctx.db
+        .query('deals')
+        .withIndex('by_org_target', (q) =>
+          q.eq('orgId', orgId).eq('targetCompanyId', companyId),
+        )
+        .collect(),
+      ctx.db
+        .query('deals')
+        .withIndex('by_org_investor', (q) =>
+          q.eq('orgId', orgId).eq('investorCompanyId', companyId),
+        )
+        .collect(),
+      ctx.db
+        .query('companyRelations')
+        .withIndex('by_parent', (q) =>
+          q.eq('orgId', orgId).eq('parentCompanyId', companyId),
+        )
+        .collect(),
+      ctx.db
+        .query('companyRelations')
+        .withIndex('by_child', (q) =>
+          q.eq('orgId', orgId).eq('childCompanyId', companyId),
+        )
+        .collect(),
+      ctx.db
+        .query('kpiSnapshots')
+        .withIndex('by_company_metric', (q) => q.eq('companyId', companyId))
+        .collect(),
+      ctx.db
+        .query('bankAccounts')
+        .withIndex('by_owner', (q) =>
+          q.eq('orgId', orgId).eq('ownerCompanyId', companyId),
+        )
+        .collect(),
+      ctx.db
+        .query('documents')
+        .withIndex('by_company', (q) => q.eq('companyId', companyId))
+        .collect(),
+      // No index on viaSpvCompanyId: scan the org's deals (low volume).
+      ctx.db
+        .query('deals')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+    ])
+  return {
+    dealsAsTarget: asTarget.length,
+    dealsAsInvestor: asInvestor.length,
+    dealsAsViaSpv: orgDeals.filter((d) => d.viaSpvCompanyId === companyId)
+      .length,
+    companyRelations: asParent.length + asChild.length,
+    kpiSnapshots: kpis.length,
+    bankAccounts: accounts.length,
+    documents: docs.length,
+  }
+}
+
+const hasBlockingRefs = (refs: Awaited<ReturnType<typeof listBlockingRefs>>) =>
+  Object.values(refs).some((count) => count > 0)
+
+/**
+ * Archives a company (reversible soft delete: sets `archivedAt`). Refuses if
+ * the entity is still referenced by any deal, relation, KPI, bank account or
+ * document — reassign/empty it first. Idempotent: archiving an already
+ * archived company is a no-op.
+ */
+export const archive = mutation({
+  args: { id: v.id('companies') },
+  handler: async (ctx, { id }) => {
+    const company = await ctx.db.get("companies", id)
+    if (!company) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, company.orgId)
+    if (company.archivedAt != null) return id
+    const refs = await listBlockingRefs(ctx, company.orgId, id)
+    if (hasBlockingRefs(refs)) throw new ConvexError('company_has_references')
+    await ctx.db.patch("companies", id, { archivedAt: Date.now() })
+    return id
+  },
+})
+
+/** Restores an archived company (clears `archivedAt`). Idempotent. */
+export const restore = mutation({
+  args: { id: v.id('companies') },
+  handler: async (ctx, { id }) => {
+    const company = await ctx.db.get("companies", id)
+    if (!company) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, company.orgId)
+    await ctx.db.patch("companies", id, { archivedAt: undefined })
+    return id
+  },
+})
+
+/** Archived companies of the org (the regular queries filter them out). */
+export const listArchived = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+    const rows = await ctx.db
+      .query('companies')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    return rows.filter((c) => c.archivedAt != null)
+  },
+})
+
 export const update = mutation({
   args: {
     id: v.id('companies'),

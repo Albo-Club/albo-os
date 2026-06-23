@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { ArchiveRestore, ChevronDown, Plus } from 'lucide-react'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -10,6 +10,7 @@ import { api } from '../../../../convex/_generated/api'
 import type { Id } from '../../../../convex/_generated/dataModel'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
+import { cn } from '~/lib/utils'
 import { ParticipationsTable } from '~/components/participations/ParticipationsTable'
 import { Button } from '~/components/ui/button'
 import {
@@ -149,6 +150,78 @@ function CreateCompanyDialog({
   )
 }
 
+/** Collapsible list of the org's archived entities, with a Restore action. */
+function ArchivedSection({
+  orgId,
+  orgSlug,
+}: {
+  orgId: Id<'organizations'>
+  orgSlug: string
+}) {
+  const { t } = useTranslation('participations')
+  const [open, setOpen] = useState(false)
+  const restoreCompany = useConvexMutation(api.companies.restore)
+  const archived = useConvexQuery(api.companies.listArchived, { orgId })
+  const [pendingId, setPendingId] = useState<Id<'companies'> | null>(null)
+
+  // Nothing archived: render nothing (keeps the page clean).
+  if (!archived || archived.length === 0) return null
+
+  async function handleRestore(id: Id<'companies'>) {
+    setPendingId(id)
+    try {
+      await restoreCompany({ id })
+      toast.success(t('archive.restored'))
+    } catch {
+      toast.error(t('archive.errors.default'))
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  return (
+    <section className="space-y-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm"
+      >
+        <ChevronDown
+          className={cn('size-4 transition-transform', open && 'rotate-180')}
+        />
+        {t('archive.sectionTitle', { count: archived.length })}
+      </button>
+      {open && (
+        <div className="rounded-lg border divide-y">
+          {archived.map((company) => (
+            <div
+              key={company._id}
+              className="flex items-center justify-between gap-3 px-4 py-2"
+            >
+              <Link
+                to="/app/$orgSlug/participations/$companyId"
+                params={{ orgSlug, companyId: company._id }}
+                className="truncate text-sm underline-offset-4 hover:underline"
+              >
+                {company.name}
+              </Link>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pendingId === company._id}
+                onClick={() => void handleRestore(company._id)}
+              >
+                <ArchiveRestore className="size-4" />
+                {t('archive.restore')}
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function Participations() {
   const { t } = useTranslation('participations')
   const { orgSlug } = Route.useParams()
@@ -171,6 +244,8 @@ function Participations() {
         )}
       </div>
       <ParticipationsTable deals={deals} orgSlug={orgSlug} />
+
+      {org && <ArchivedSection orgId={org._id} orgSlug={orgSlug} />}
 
       {createOpen && org && (
         <CreateCompanyDialog
