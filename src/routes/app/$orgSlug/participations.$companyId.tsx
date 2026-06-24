@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Pencil, Plus } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
@@ -9,8 +9,12 @@ import { ConvexError } from 'convex/values'
 import { api } from '../../../../convex/_generated/api'
 // Single source of truth for instrument kinds (cf. convex/lib/instruments.ts).
 import { INSTRUMENTS } from '../../../../convex/lib/instruments'
+// Single source of truth for people roles (cf. convex/lib/people.ts).
+import { PERSON_ROLES } from '../../../../convex/lib/people'
 import type { Id } from '../../../../convex/_generated/dataModel'
 import type { InstrumentKind } from '../../../../convex/lib/instruments'
+import type { PersonRole } from '../../../../convex/lib/people'
+import { attioPersonUrl } from '~/lib/attio'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { DealsList } from '~/components/participations/ParticipationsTable'
@@ -83,7 +87,12 @@ function NotFound() {
   )
 }
 
-/** Entity edit dialog: name + SIREN (9 digits or empty) + portfolio group. */
+// A person row in the edit dialog. attioRecordId is preserved silently for
+// already-linked people (no UI to enter it in this lot) and never cleared.
+type PersonDraft = { role: PersonRole; name: string; attioRecordId?: string }
+
+/** Entity edit dialog: name + SIREN (9 digits or empty) + portfolio group +
+ * people (founders / board / co-investors, full-list replacement at save). */
 function EditCompanyDialog({
   company,
   orgId,
@@ -94,6 +103,7 @@ function EditCompanyDialog({
     name: string
     siren?: string | null
     group?: string | null
+    people?: Array<PersonDraft>
   }
   orgId: Id<'organizations'>
   onClose: () => void
@@ -105,6 +115,7 @@ function EditCompanyDialog({
   const [siren, setSiren] = useState(company.siren ?? '')
   const [group, setGroup] = useState(company.group ?? '')
   const [groupKind, setGroupKind] = useState<'sponsor' | 'group' | ''>('')
+  const [people, setPeople] = useState<Array<PersonDraft>>(company.people ?? [])
   const [pending, setPending] = useState(false)
 
   // Client-side validation (mirror of the mutation): spaces ignored,
@@ -112,6 +123,18 @@ function EditCompanyDialog({
   const cleanedSiren = siren.replace(/\s/g, '')
   const sirenInvalid = cleanedSiren !== '' && !/^\d{9}$/.test(cleanedSiren)
   const nameMissing = name.trim() === ''
+  // Mirror of the backend reject (invalid_person_name): any empty name blocks.
+  const someNameEmpty = people.some((p) => p.name.trim() === '')
+
+  // updatePerson spreads the existing row, so attioRecordId survives an edit.
+  const addPerson = () =>
+    setPeople((prev) => [...prev, { role: 'founder', name: '' }])
+  const removePerson = (index: number) =>
+    setPeople((prev) => prev.filter((_, i) => i !== index))
+  const updatePerson = (index: number, patch: Partial<PersonDraft>) =>
+    setPeople((prev) =>
+      prev.map((p, i) => (i === index ? { ...p, ...patch } : p)),
+    )
 
   // A group is "new" when the typed name doesn't match any existing one.
   // Creating one forces a kind choice (sponsor | group); assigning to an
@@ -131,13 +154,23 @@ function EditCompanyDialog({
           siren,
           group,
           ...(isNewGroup && groupKind ? { groupKind } : {}),
+          // Full-list replacement. Trim names; keep attioRecordId when present.
+          people: people.map((p) => ({
+            role: p.role,
+            name: p.name.trim(),
+            ...(p.attioRecordId ? { attioRecordId: p.attioRecordId } : {}),
+          })),
         },
       })
       toast.success(t('participations:edit.saved'))
       onClose()
     } catch (err) {
       const code = err instanceof ConvexError ? (err.data as string) : ''
-      const known = ['invalid_siren', 'siren_already_used']
+      const known = [
+        'invalid_siren',
+        'siren_already_used',
+        'invalid_person_name',
+      ]
       toast.error(
         t(
           known.includes(code)
@@ -243,6 +276,67 @@ function EditCompanyDialog({
               )}
             </div>
           )}
+          {/* People — founders / board / co-investors, by name (no Attio
+              search in this lot). attioRecordId of linked people is preserved
+              silently; there is no UI to enter it here. */}
+          <div className="space-y-2">
+            <Label>{t('participations:edit.peopleLabel')}</Label>
+            <div className="space-y-2">
+              {people.map((p, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Select
+                    value={p.role}
+                    onValueChange={(v) =>
+                      updatePerson(i, { role: v as PersonRole })
+                    }
+                  >
+                    <SelectTrigger className="w-40 shrink-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PERSON_ROLES.map((role) => (
+                        <SelectItem key={role} value={role}>
+                          {t(`participations:personRole.${role}`)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    className="flex-1"
+                    value={p.name}
+                    onChange={(e) => updatePerson(i, { name: e.target.value })}
+                    placeholder={t(
+                      'participations:edit.peopleNamePlaceholder',
+                    )}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={() => removePerson(i)}
+                    aria-label={t('participations:edit.peopleRemove')}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addPerson}
+            >
+              <Plus className="size-4" />
+              {t('participations:edit.peopleAdd')}
+            </Button>
+            {someNameEmpty && (
+              <p className="text-destructive text-xs">
+                {t('participations:edit.peopleNameRequired')}
+              </p>
+            )}
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={pending}>
@@ -250,7 +344,13 @@ function EditCompanyDialog({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={pending || sirenInvalid || nameMissing || kindMissing}
+            disabled={
+              pending ||
+              sirenInvalid ||
+              nameMissing ||
+              kindMissing ||
+              someNameEmpty
+            }
           >
             {t('common:actions.save')}
           </Button>
@@ -461,6 +561,25 @@ function ParticipationDetail() {
     }).format(held / total)
   }, [deals, company?.totalShares, i18n.language])
 
+  // Group people by role for the three sections. The name links to the Attio
+  // person record when attioRecordId is set (and the workspace base is
+  // configured); plain text otherwise.
+  const peopleByRole = useMemo(() => {
+    const people = company?.people ?? []
+    const group = (role: PersonRole) =>
+      people
+        .filter((p) => p.role === role)
+        .map((p) => ({
+          name: p.name,
+          attioUrl: p.attioRecordId ? attioPersonUrl(p.attioRecordId) : undefined,
+        }))
+    return {
+      founder: group('founder'),
+      board: group('board'),
+      coinvestor: group('coinvestor'),
+    }
+  }, [company?.people])
+
   return (
     <main className="flex-1 space-y-6 p-6">
       <BackLink orgSlug={orgSlug} />
@@ -514,16 +633,17 @@ function ParticipationDetail() {
         </div>
       </IdentitySection>
 
-      {/* People — no schema stores these yet (empty "to be filled in"). */}
+      {/* People — founders / board / co-investors, fed from company.people.
+          Empty sections render the discreet "to be filled in" state. */}
       <div className="grid gap-6 sm:grid-cols-3">
         <IdentitySection title={t('identity.founders')}>
-          <PeopleList people={[]} />
+          <PeopleList people={peopleByRole.founder} />
         </IdentitySection>
         <IdentitySection title={t('identity.board')}>
-          <PeopleList people={[]} />
+          <PeopleList people={peopleByRole.board} />
         </IdentitySection>
         <IdentitySection title={t('identity.coInvestors')}>
-          <PeopleList people={[]} />
+          <PeopleList people={peopleByRole.coinvestor} />
         </IdentitySection>
       </div>
 

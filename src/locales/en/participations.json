@@ -79,6 +79,11 @@
     "sponsor": "Sponsor",
     "group": "Group"
   },
+  "personRole": {
+    "founder": "Founder",
+    "board": "Board",
+    "coinvestor": "Co-investor"
+  },
   "nature": {
     "company": "Company",
     "sponsor": "Debt sponsor",
@@ -307,10 +312,16 @@
     "kindPlaceholder": "Choose a type",
     "kindRequired": "Choose a type for the new group.",
     "nameRequired": "Name is required.",
+    "peopleLabel": "People",
+    "peopleAdd": "Add a person",
+    "peopleRemove": "Remove",
+    "peopleNamePlaceholder": "Person's name",
+    "peopleNameRequired": "Name is required.",
     "saved": "Changes saved",
     "errors": {
       "invalid_siren": "The SIREN must be exactly 9 digits.",
       "siren_already_used": "This SIREN is already used by another company.",
+      "invalid_person_name": "A person's name is empty.",
       "default": "Couldn't save changes. Please try again."
     }
   },

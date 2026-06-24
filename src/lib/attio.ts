@@ -16,3 +16,10 @@ export function attioCompanyUrl(attioCompanyId: string): string | null {
   if (!ATTIO_WORKSPACE_URL) return null
   return `${ATTIO_WORKSPACE_URL.replace(/\/$/, '')}/company/${attioCompanyId}`
 }
+
+/** Deep link to an Attio person record, or null when no workspace base is set.
+ * Mirror of attioCompanyUrl; the person object uses the `person` URL segment. */
+export function attioPersonUrl(attioRecordId: string): string | null {
+  if (!ATTIO_WORKSPACE_URL) return null
+  return `${ATTIO_WORKSPACE_URL.replace(/\/$/, '')}/person/${attioRecordId}`
+}
