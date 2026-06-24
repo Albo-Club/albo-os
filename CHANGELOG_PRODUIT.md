@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.27.1 — 24/06/2026 à 20:15 — Nom de la société dans le fil d'Ariane
+## v1.27.2 — 24/06/2026 à 20:20 — Nom de la société dans le fil d'Ariane
 
 Sur la fiche d'une entreprise, le dernier élément du fil d'Ariane (en haut de
 page) affiche désormais le **nom de la société** au lieu de son identifiant
@@ -46,6 +46,30 @@ la page pointe vers une société introuvable (le fil s'arrête alors à
 > - Libellé « Entreprises » inchangé (clé i18n existante
 >   `nav:appShell.breadcrumb.participations`). Route deal et autres routes
 >   strictement inchangées.
+
+---
+
+## v1.27.1 — 24/06/2026 à 20:15 — Mise à jour d'une skill agent (interne)
+
+Mise à jour interne d'une fiche de bonnes pratiques destinée aux assistants
+IA qui travaillent sur le projet. Aucun impact sur l'application ni sur vos
+données.
+
+> **🔧 Notes techniques**
+>
+> - `skills/convex-performance-audit` re-vendorisée au tip upstream courant
+>   (`get-convex/agent-skills@main`, `pinnedRef` `7a6fcc6` → `ec1e6ba`) — le
+>   seul skill ayant dérivé. Changement de contenu purement cosmétique (un
+>   renvoi « `skills/convex-migration-helper/SKILL.md` » devient « le skill
+>   `convex-migration-helper` ») ; aucune guidance comportementale modifiée,
+>   donc aucun override projet à ajuster. `pnpm run sync:skills:check` repasse
+>   au vert.
+> - Bump fait à la main (résolution du tip via un appel unauth à
+>   `api.github.com`, puis `pnpm run sync:skills`) car `sync:skills:update`
+>   échoue dans le sandbox cloud — nouvelle section `KNOWN_ISSUES.md`
+>   « `sync:skills:update` échoue dans le sandbox cloud ».
+
+---
 
 ## v1.27.0 — 24/06/2026 à 20:10 — Réaffecter un deal & archiver une entité
 

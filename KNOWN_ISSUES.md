@@ -472,6 +472,29 @@ sont vendorés depuis `vercel/ai-elements` `packages/elements/src/` via
 `raw.githubusercontent.com` (qui, lui, passe), imports réécrits
 (`@repo/shadcn-ui/...` → `~/components/ui/...`).
 
+## `sync:skills:update` échoue dans le sandbox cloud (api.github.com)
+
+`pnpm run sync:skills:check` (détection de drift) et `pnpm run sync:skills`
+(vendor au `pinnedRef`) passent par `raw.githubusercontent.com` — accessible
+derrière le proxy. Mais `pnpm run sync:skills:update` résout d'abord le tip de
+chaque `trackingRef` via **`api.github.com`** (`resolveTip` dans
+`scripts/sync-skills.mjs`), et là ça coince en environnement cloud restreint :
+
+- avec le `GITHUB_TOKEN`/`GH_TOKEN` injecté → **401** (token scopé au repo du
+  job, pas un PAT github.com valide, envoyé en `Authorization: Bearer`) ;
+- sans token (unauth) → **403** dès le 2ᵉ/3ᵉ repo (GitHub flague les appels
+  API en rafale ; un appel unauth isolé, lui, passe).
+
+Fallback **chirurgical** quand un seul skill a dérivé (le cas courant) :
+récupérer le SHA du tip du repo concerné en **un** appel unauth
+(`curl -H "Accept: application/vnd.github.sha" https://api.github.com/repos/<source>/commits/<trackingRef>`),
+l'écrire dans le `pinnedRef` de ce skill dans `skills-lock.json`, puis lancer
+`pnpm run sync:skills` (mode défaut : vendor via `raw`, met à jour le SKILL.md
++ le `computedHash`). `pnpm run sync:skills:check` repasse alors vert. Relire le
+diff de contenu du SKILL.md avant de committer (obligation CLAUDE.md), et ne
+bumper que le(s) skill(s) réellement dérivé(s) — laisser les autres `pinnedRef`
+en place est sans risque (pas de drift de contenu = check vert).
+
 ## Streamdown (panneau AI) — `@source` Tailwind v4, plugins retirés, labels tool
 
 Le markdown du chat AI est rendu par `streamdown` (via `MessageResponse`
