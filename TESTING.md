@@ -183,9 +183,6 @@ l'assistant (outils `setDealProjections` / `createKpiSnapshot`).
 | TP6 | Page société : « Ajouter un document » → fichier < 20 Mo → titre/type/période → save                                | Document listé (type, période, taille), download OK, suppression avec confirm ; > 20 Mo refusé avec message clair                                                                          |
 | TP7 | i18n EN/FR sur les sections plan/fonds/KPIs/reportings                                                              | Tous les libellés traduits (namespace `participations`)                                                                                                                                    |
 | TP8 | Logos boîtes (env `VITE_LOGO_DEV_TOKEN` posée) : liste `/participations`, vue `/app/all`, en-tête page société      | Sociétés avec domaine → logo logo.dev ; sans domaine (ou token absent) → fallback icône bâtiment, aucune image cassée                                                                       |
-| TP9 | Fiche société → Modifier → taper un **nouveau** nom de groupe                                                       | Un sélecteur « Type de groupe » (Sponsor / Groupe) apparaît ; **Enregistrer reste désactivé** tant qu'aucun type n'est choisi. Choisir « Sponsor » → badge « sponsor » sur la ligne groupe de `/participations` **et** sur la page conso |
-| TP10 | Modifier → choisir un groupe **existant** (datalist) ou rattacher via « Ajouter une entité »                       | **Aucun** sélecteur de type, aucun blocage : le type du groupe existant n'est jamais redemandé ni réécrit                                                                                  |
-| TP11 | Page conso d'un groupe **legacy** (sans type) → sélecteur de type (état « À classer ») → choisir « Groupe »        | Badge neutre « groupe » avant choix ; après sélection le badge se met à jour (sponsor/groupe) sans toucher aux KPIs ni à la consolidation                                                  |
 
 ### Fiche deal pilotée par l'instrument (`/app/$orgSlug/deals/$dealId`)
 
@@ -492,18 +489,16 @@ d'une entité (`/participations/$companyId`), nom personnalisé d'un compte
 ### Création d'entité depuis Participations (`/app/$orgSlug/participations`)
 
 Bouton **« Nouvelle entité »** dans l'en-tête de la liste → dialog de création
-(`CreateCompanyDialog`). `kind` forcé à `portfolio` (non exposé). Mutations :
-`companies.create` puis, si un groupe est saisi, `companies.update` (le groupe
-n'est pas accepté par `create`).
+(`CreateCompanyDialog`). `kind` forcé à `portfolio` (non exposé). Mutation :
+`companies.create`.
 
 | #   | Étape                                                                                       | Résultat attendu                                                                                                                                              |
 | --- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | CR1 | Liste → « Nouvelle entité » → saisir un nom seul → Créer                                     | Toast succès ; navigation vers la fiche `/participations/$companyId` de la nouvelle entité ; elle apparaît dans la liste (kind `portfolio`)                   |
-| CR2 | Même dialog → renseigner aussi un groupe (nouveau ou via `datalist`) → Créer                | L'entité est créée **et** rattachée au groupe ; elle apparaît sous la ligne groupe consolidée                                                                 |
-| CR3 | SIREN invalide (ex. `12345`)                                                                 | Erreur inline sous le champ + bouton Créer désactivé ; côté serveur `create` rejette (`invalid_siren`)                                                        |
-| CR4 | SIREN déjà porté par une autre entité de l'org                                               | Toast d'erreur « déjà utilisé » (`siren_already_used`), rien n'est créé                                                                                       |
-| CR5 | Nom vide                                                                                     | Message « nom obligatoire » + bouton Créer désactivé                                                                                                          |
-| CR6 | i18n EN/FR sur le dialog                                                                     | Libellés, hints, erreurs et toasts traduits (namespaces `participations` / `common`)                                                                          |
+| CR2 | SIREN invalide (ex. `12345`)                                                                 | Erreur inline sous le champ + bouton Créer désactivé ; côté serveur `create` rejette (`invalid_siren`)                                                        |
+| CR3 | SIREN déjà porté par une autre entité de l'org                                               | Toast d'erreur « déjà utilisé » (`siren_already_used`), rien n'est créé                                                                                       |
+| CR4 | Nom vide                                                                                     | Message « nom obligatoire » + bouton Créer désactivé                                                                                                          |
+| CR5 | i18n EN/FR sur le dialog                                                                     | Libellés, hints, erreurs et toasts traduits (namespaces `participations` / `common`)                                                                          |
 
 ### Création de deal depuis la fiche entité (`/app/$orgSlug/participations/$companyId`)
 
@@ -537,52 +532,22 @@ quand `listByDeal(dealId).length > 0`, avec un message indiquant le nombre.
 | DD4 | Dialog de confirmation → « Annuler »                                                               | Aucune suppression ; retour à la fiche inchangée                                                                                                 |
 | DD5 | i18n EN/FR                                                                                         | Titre, corps, message bloquant et toasts traduits (namespace `participations` / `common`)                                                        |
 
-## Regroupement des participations par groupe (8 min)
+## Fiche société (lecture seule)
 
-Consolidation de plusieurs entités du portefeuille sous une seule ligne via le
-champ `companies.group`. Assignation : `EditCompanyDialog`
-(`/participations/$companyId`). Liste : reducer client de `ParticipationsTable`.
-Page conso : `/app/$orgSlug/participations/group/$slug`
-(`participations.getGroup` / `setGroupBlocks` / `setGroupDisplayName`).
-
-| #   | Étape                                                                                                          | Résultat attendu                                                                                                                                                                                  |
-| --- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GR1 | Fiche entité A → « Modifier » → champ **Groupe** : taper un nouveau nom (ex. `Parallel`) → Enregistrer        | Toast succès ; le groupe est créé (ligne `portfolioGroupSettings` + slug stable), l'entité y est rattachée                                                                                       |
-| GR2 | Fiche entité B → « Modifier » → champ **Groupe** : choisir `Parallel` dans le `datalist` → Enregistrer        | B rejoint le même groupe ; le `datalist` propose les groupes existants (valeur = clé logique, libellé = nom d'affichage)                                                                          |
-| GR3 | Liste `/app/$orgSlug/participations`                                                                          | A et B fusionnent en **une seule ligne** avec badge « groupe » ; Engagé/Versé/Reçu = sommes ; TVPI = (Reçu+résiduel)/Versé agrégé ; les entités sans groupe restent inchangées                   |
-| GR4 | Déplier la ligne groupe (chevron)                                                                             | `DealsList` à plat de **tous** les deals du groupe ; chaque deal affiche un champ « Entité » (nom de sa société)                                                                                  |
-| GR5 | Bouton **« Voir le groupe »** sur la ligne groupe                                                             | Navigue vers `/app/$orgSlug/participations/group/$slug` (slug stable) ; en-tête = nom d'affichage + badge + nb d'entités ; cartes KPI consolidées (Exposition totale / Versé / Reçu / TVPI)       |
-| GR6 | Page conso → « Personnaliser » → masquer un bloc (œil) puis réordonner (↑/↓) → recharger                      | La disposition persiste (`setGroupBlocks`, validée contre le catalogue `KPI_BLOCKS`) ; blocs masqués absents des cartes                                                                            |
-| GR7 | Page conso → « Renommer » → saisir un nouveau nom d'affichage → Enregistrer                                   | Le nom d'affichage change partout ; **le slug d'URL ne change pas** (`setGroupDisplayName`)                                                                                                       |
-| GR8 | Liste des entités sur la page conso → clic sur une entité                                                     | Ouvre sa fiche `/participations/$companyId`                                                                                                                                                       |
-| GR9 | Fiche entité A → « Modifier » → vider le champ **Groupe** → Enregistrer                                       | A quitte le groupe (redevient une ligne propre) ; le groupe disparaît de la liste s'il n'a plus d'entité (ligne settings conservée, réutilisable si réassignation)                               |
-| GR10| Vue agrégée `/app/all/participations`                                                                         | Le groupe se consolide aussi ; « Voir le groupe » pointe la bonne organisation (slug d'org du deal + slug du groupe via `target.groupSlug`)                                                       |
-| GR11| i18n EN/FR (badge, page conso, champ Groupe, blocs)                                                           | Tous les libellés traduits (namespace `participations`)                                                                                                                                          |
-| GR12| Page conso → en-tête « Entités du groupe » → bouton **« Ajouter une entité »** → cocher 2 entités sans groupe → Enregistrer | Toast pluralisé (« 2 entités ajoutées ») ; elles apparaissent aussitôt dans la liste et dans les KPI consolidés (`getGroup` réactif) ; rattachement via `companies.update` (pas de nouvelle mutation) |
-| GR13| Sélecteur « Ajouter une entité »                                                                              | Ne propose **que** les sociétés `portfolio` sans groupe (les déjà groupées et les entités `group_*` sont exclues) ; si aucune dispo → message « Aucune entité disponible », bouton Enregistrer désactivé |
-
-## Fiche entité par nature (lecture seule)
-
-Squelette commun des fiches (en-tête → bloc d'identité piloté par la nature →
-Reporting/KPIs → Documents), partagé par la fiche société
-(`/participations/$companyId`, nature « Entreprise ») et la conso de groupe
-(`/participations/group/$slug`, natures « Sponsor dette » / « Groupe »). Nature
-dérivée : company `portfolio` → Entreprise ; `portfolioGroupSettings` avec
-`groupKind === 'sponsor'` → Sponsor dette ; sinon → Groupe. Briques read-only
-dans `src/components/companies/EntityFiche.tsx` ; les actions d'édition
-existantes restent (seul le bloc d'identité est en lecture seule). Champs
-manquants & lien Attio : `KNOWN_ISSUES.md` « Fiche entité ».
+Squelette commun des fiches (en-tête → bloc d'identité → Reporting/KPIs →
+Documents) pour la fiche société (`/participations/$companyId`, nature
+« Entreprise »). Briques read-only dans `src/components/companies/EntityFiche.tsx` ;
+les actions d'édition existantes restent (seul le bloc d'identité est en lecture
+seule). Champs manquants & lien Attio : `KNOWN_ISSUES.md` « Fiche entité ».
 
 | #   | Étape                                                              | Résultat attendu                                                                                                                                                                                                              |
 | --- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| FE1 | Fiche société `/participations/$companyId`                        | En-tête : nom + badge « Entreprise » + détention (si calculable) + boutons Éditer/Nouveau deal ; bloc Identité (Secteur, SIREN, Domaine, Détention, Fiche Attio) ; sections Fondateur(s)/Board/Co-investisseurs (personnes groupées par rôle ; « À renseigner » si la section est vide) ; Deals ; KPIs ; Documents — ces 3 sections n'existent que pour la nature Entreprise |
-| FE2 | Groupe `groupKind = 'group'` → `/participations/group/$slug`      | Badge « Groupe » ; bloc Identité = Nom + Identifiant (slug) + Type ; KPI conso ; entités membres ; zone Documents réservée (« rattachés à chaque entité du groupe »)                                                            |
-| FE3 | Groupe `groupKind = 'sponsor'`                                    | Badge « Sponsor dette » ; bloc Identité = Nom + Type de plateforme / Fiche Attio / Contact principal en « À renseigner » + note « deals dette rattachés via les entités membres »                                              |
-| FE4 | Lien Attio sur la fiche société                                   | Avec `VITE_ATTIO_WORKSPACE_URL` posée → lien « Ouvrir dans Attio » (nouvel onglet, `{base}/company/{attioCompanyId}`) ; sans → mention grisée « Lié à Attio » (jamais d'URL devinée) ; « — » si pas d'`attioCompanyId`         |
-| FE5 | i18n EN/FR                                                        | `nature.*`, `identity.*`, `personRole.*`, `edit.people*`, « À renseigner », note sponsor, Documents réservés — tous traduits (namespace `participations`)                                                                      |
-| FE6 | Édition des personnes via **« Modifier la société »** → bloc « Personnes » | « Ajouter une personne » crée une ligne (select rôle + nom) ; saisir nom + rôle → Enregistrer → la personne apparaît aussitôt dans la bonne section de la fiche ; « Retirer » puis Enregistrer → elle disparaît ; **nom vide** → bouton Enregistrer **désactivé** (miroir backend `invalid_person_name`) ; la **liste complète** part dans `companies.update` (`patch.people`, remplacement total, pas de nouvelle mutation) |
-| FE7 | Lien Attio sur une personne                                       | Personne **sans** `attioRecordId` → nom en **texte simple** (pas de lien) ; **avec** `attioRecordId` (+ `VITE_ATTIO_WORKSPACE_URL` posée) → **nom cliquable** vers `{base}/person/{record_id}` (nouvel onglet) ; sans env → texte simple (pas d'URL devinée). L'`attioRecordId` d'une personne liée est **préservé** au save, ou posé par la recherche Attio (FE8) |
-| FE8 | Recherche Attio dans **« Modifier la société »** → bloc « Personnes » | Taper ≥ 2 caractères dans un champ nom → après ~300 ms, **suggestions Attio** (nom + badge « Attio ») ; cliquer une suggestion → remplit **nom + `attioRecordId`** + indicateur discret « Lié à Attio » → Enregistrer → nom **cliquable** vers la fiche person Attio (cf. FE7). Taper un nom **sans** choisir → personne **non liée** (comme FE6). **Éditer** un nom déjà lié → **délie** (`attioRecordId` effacé). Clé absente / Attio en erreur → message neutre « Recherche Attio indisponible », **aucun crash**, ajout manuel toujours possible. Prérequis : `ATTIO_API_KEY` (serveur) avec lecture sur l'objet `people` ; la clé reste **serveur-only** (action `api.attio.searchPeople`), jamais dans le bundle front |
+| FE1 | Fiche société `/participations/$companyId`                        | En-tête : nom + badge « Entreprise » + détention (si calculable) + boutons Éditer/Nouveau deal ; bloc Identité (Secteur, SIREN, Domaine, Détention, Fiche Attio) ; sections Fondateur(s)/Board/Co-investisseurs (personnes groupées par rôle ; « À renseigner » si la section est vide) ; Deals ; KPIs ; Documents |
+| FE2 | Lien Attio sur la fiche société                                   | Avec `VITE_ATTIO_WORKSPACE_URL` posée → lien « Ouvrir dans Attio » (nouvel onglet, `{base}/company/{attioCompanyId}`) ; sans → mention grisée « Lié à Attio » (jamais d'URL devinée) ; « — » si pas d'`attioCompanyId`         |
+| FE3 | i18n EN/FR                                                        | `nature.company`, `identity.*`, `personRole.*`, `edit.people*`, « À renseigner » — tous traduits (namespace `participations`)                                                                                                  |
+| FE4 | Édition des personnes via **« Modifier la société »** → bloc « Personnes » | « Ajouter une personne » crée une ligne (select rôle + nom) ; saisir nom + rôle → Enregistrer → la personne apparaît aussitôt dans la bonne section de la fiche ; « Retirer » puis Enregistrer → elle disparaît ; **nom vide** → bouton Enregistrer **désactivé** (miroir backend `invalid_person_name`) ; la **liste complète** part dans `companies.update` (`patch.people`, remplacement total, pas de nouvelle mutation) |
+| FE5 | Lien Attio sur une personne                                       | Personne **sans** `attioRecordId` → nom en **texte simple** (pas de lien) ; **avec** `attioRecordId` (+ `VITE_ATTIO_WORKSPACE_URL` posée) → **nom cliquable** vers `{base}/person/{record_id}` (nouvel onglet) ; sans env → texte simple (pas d'URL devinée). L'`attioRecordId` d'une personne liée est **préservé** au save, ou posé par la recherche Attio (FE6) |
+| FE6 | Recherche Attio dans **« Modifier la société »** → bloc « Personnes » | Taper ≥ 2 caractères dans un champ nom → après ~300 ms, **suggestions Attio** (nom + badge « Attio ») ; cliquer une suggestion → remplit **nom + `attioRecordId`** + indicateur discret « Lié à Attio » → Enregistrer → nom **cliquable** vers la fiche person Attio (cf. FE5). Taper un nom **sans** choisir → personne **non liée** (comme FE4). **Éditer** un nom déjà lié → **délie** (`attioRecordId` effacé). Clé absente / Attio en erreur → message neutre « Recherche Attio indisponible », **aucun crash**, ajout manuel toujours possible. Prérequis : `ATTIO_API_KEY` (serveur) avec lecture sur l'objet `people` ; la clé reste **serveur-only** (action `api.attio.searchPeople`), jamais dans le bundle front |
 
 ## Cash flow forecast (règles récurrentes → solde projeté)
 

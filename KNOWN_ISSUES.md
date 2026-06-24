@@ -1427,38 +1427,30 @@ ce mapping ailleurs. Décisions non-évidentes :
    supprimer la copie locale, importer `INSTRUMENTS` depuis `instruments.ts`, et y
    porter l'ordre d'affichage souhaité si besoin.
 
-## Fiche entité (lecture seule) — natures, champs manquants & lien Attio
+## Fiche entité (lecture seule) — champs manquants & lien Attio
 
-Le squelette commun des fiches (en-tête → bloc d'identité piloté par la nature
-→ Reporting/KPIs → Documents) vit dans `src/components/companies/EntityFiche.tsx`
-et est partagé par la fiche société (`participations.$companyId.tsx`, nature
-« Entreprise ») et la conso de groupe (`participations.group.$slug.tsx`, natures
-« Sponsor dette » / « Groupe »). Pièges non-évidents :
+Le squelette commun des fiches (en-tête → bloc d'identité → Reporting/KPIs →
+Documents) vit dans `src/components/companies/EntityFiche.tsx`. Depuis le retrait
+de la couche de regroupement (Étape A), il n'est plus utilisé que par la fiche
+société (`participations.$companyId.tsx`, nature « Entreprise ») — la page de
+consolidation de groupe et ses natures « Sponsor dette » / « Groupe » ont été
+supprimées. Les champs `companies.group` / `companies.sponsor`, la table
+`portfolioGroupSettings` et `groupKind` **restent déclarés au schéma mais inertes**
+(plus aucun code ne les lit/écrit ; nettoyage données + schéma prévu en Étape B).
+Pièges non-évidents :
 
-1. **La nature n'est PAS un champ.** Elle se **dérive** : une company
-   `kind: 'portfolio'` ouverte par `companyId` → **Entreprise** ; un
-   `portfolioGroupSettings` ouvert par `slug` → **Sponsor dette** si
-   `groupKind === 'sponsor'`, sinon **Groupe**. ⚠️ `groupKind` vit sur
-   `portfolioGroupSettings`, **pas** sur `companies`. Le champ libre
-   `companies.sponsor` (« plateforme d'origine », posé par l'import Attio) **ne
-   pilote pas** la nature et n'est affiché nulle part — ne pas le confondre avec
-   le `groupKind === 'sponsor'`.
+1. **La nature n'est PAS un champ — et il n'y en a plus qu'une.** `EntityNature`
+   est figé à `'company'` : une company `kind: 'portfolio'` ouverte par `companyId`
+   → **Entreprise**. Le champ libre `companies.sponsor` (« plateforme d'origine »,
+   posé par l'import Attio) n'est affiché nulle part et ne pilote rien.
 
 2. **Champs d'identité sans stockage — affichés « À renseigner », à ne pas
-   inventer.** Plusieurs champs demandés n'ont **aucune** colonne au schéma et
-   sont rendus en état vide :
-   - Entreprise : **Fondateur(s)**, **Membres du board**, **Co-investisseurs**
-     sont **stockés (Lot 5a), affichés et éditables (Lot 5b)** via le champ
-     `companies.people` (cf. point 4). L'état « À renseigner » ne s'affiche
-     plus que pour une section **vide**.
-   - Sponsor dette : **Type de plateforme**, **Contact principal**, **lien
-     Attio** (pas d'`attioCompanyId` au niveau groupe).
-   - Groupe : zone **Documents** réservée — `documents` est indexé par
-     `companyId`, il n'y a pas de stockage doc au niveau groupe.
-   Restent à stocker : `platformType`/`attioId`/`contact` au niveau
-   `portfolioGroupSettings` (les personnes, elles, sont faites — point 4).
+   inventer.** **Fondateur(s)**, **Membres du board**, **Co-investisseurs** sont
+   **stockés (Lot 5a), affichés et éditables (Lot 5b)** via le champ
+   `companies.people` (cf. point 3). L'état « À renseigner » ne s'affiche plus que
+   pour une section **vide**.
 
-4. **`people` est un champ sur `companies`, pas une table dédiée (Lot 5a).**
+3. **`people` est un champ sur `companies`, pas une table dédiée (Lot 5a).**
    Choix assumé « afficher, pas gérer activement » : `companies.people` est un
    `v.optional(v.array(...))` (cf. `convex/lib/people.ts` pour l'enum `role`
    `founder|board|coinvestor` + le validateur d'objet). Conséquences :
@@ -1471,7 +1463,7 @@ et est partagé par la fiche société (`participations.$companyId.tsx`, nature
      via le lien Attio de la personne (cliquer le **nom** → fiche Attio),
      construit par `src/lib/attio.ts:attioPersonUrl` à partir de
      `attioRecordId` + `VITE_ATTIO_WORKSPACE_URL` (`{base}/person/{record_id}`,
-     même logique que le lien company du point 3). On ne stocke que le
+     même logique que le lien company du point 4). On ne stocke que le
      `record_id` Attio, jamais de lecture live. ⚠️ **`PeopleList` porte encore
      des branches JSX `linkedin`/`email` non alimentées** (design assumé : ces
      infos passent par le lien Attio) — code inerte, à nettoyer ou à brancher
@@ -1479,7 +1471,7 @@ et est partagé par la fiche société (`participations.$companyId.tsx`, nature
    - **Réversible** : si un jour on veut gérer les personnes activement
      (dédup cross-company, relations), migrer vers une table `people` dédiée.
 
-3. **Lien Attio = base d'URL configurable, jamais devinée.** La REST Attio ne
+4. **Lien Attio = base d'URL configurable, jamais devinée.** La REST Attio ne
    renvoie pas de `web_url`, et le slug d'URL du workspace n'est pas déductible
    de l'`attioCompanyId` seul. `src/lib/attio.ts:attioCompanyUrl` lit la var
    publique `VITE_ATTIO_WORKSPACE_URL` (ex. `https://app.attio.com/albo`) et
