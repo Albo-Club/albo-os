@@ -1,6 +1,6 @@
 {
-  "metaTitle": "Participations — Albo OS",
-  "metaTitleAll": "All participations — Albo OS",
+  "metaTitle": "Companies — Albo OS",
+  "metaTitleAll": "All companies — Albo OS",
   "metaTitleDetail": "Investment — Albo OS",
   "metaTitleDeal": "Deal — Albo OS",
   "dealNotFound": "Deal not found.",
@@ -23,7 +23,7 @@
       "reconciled": "Reconciled"
     }
   },
-  "title": "Participations",
+  "title": "Companies",
   "allSubtitle": "All your organizations combined — read-only. Edit within an organization.",
   "openDetail": "Open details",
   "back": "← Investments",
@@ -320,10 +320,10 @@
       "default": "Couldn't delete the deal. Please try again."
     }
   },
-  "empty": "No participations in this scope — create deals via the AI chat, or add them manually.",
+  "empty": "No companies in this scope — create deals via the AI chat, or add them manually.",
   "search": {
     "placeholder": "Search by company, instrument, sector…",
-    "noResults": "No participation matches your search."
+    "noResults": "No company matches your search."
   },
   "dealsCount_one": "{{count}} deal",
   "dealsCount_other": "{{count}} deals",

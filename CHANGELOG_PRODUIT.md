@@ -23,6 +23,30 @@ bas de page.
 
 ---
 
+## v1.25.0 — 24/06/2026 à 18:55 — « Participations » devient « Entreprises »
+
+Le terme **« Participations »** est renommé **« Entreprises »** (et
+**« Companies »** en anglais) partout dans l'interface : l'entrée du menu
+latéral, le fil d'Ariane, l'indicateur du tableau de bord, le titre de la
+page liste et celui de la fiche société. Rien d'autre ne change — les pages,
+les adresses et vos données restent identiques.
+
+> **🔧 Notes techniques**
+>
+> - Renommage **cosmétique** limité aux valeurs de strings i18n (EN →
+>   « Companies », FR → « Entreprises ») : `src/locales/{en,fr}/nav.json`
+>   (`appShell.breadcrumb.participations`, `items.participations`),
+>   `dashboard.json` (`kpi.participations`, `kpi.deployedHint_one/other`),
+>   `participations.json` (`metaTitle`, `metaTitleAll`, `metaTitleDetail` en
+>   FR, `title`, `back` en FR, `empty`, `search.noResults`). Les libellés EN
+>   `metaTitleDetail`/`back` étaient déjà migrés (« Investment » / « ←
+>   Investments »), non touchés.
+> - Aucune clé JSON, route, namespace i18n, composant ni code Convex modifié :
+>   le namespace `participations`, les chemins `/participations*` et la table
+>   restent inchangés ; `{{count}}` et les suffixes de phrases préservés.
+> - `TESTING.md` : libellés rafraîchis dans la section App shell (SH1/SH4/SH5)
+>   + nouvelle vérif SH13 (nav/breadcrumb/KPI/liste/fiche, EN et FR).
+
 ## v1.24.0 — 24/06/2026 à 18:14 — Participations : clic sur une ligne ouvre la fiche
 
 Dans les **Participations**, cliquer **n'importe où sur une ligne** ouvre

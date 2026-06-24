@@ -3,7 +3,7 @@
     "ai": "IA",
     "aiShortcut": "Afficher/masquer le panneau IA (⌘J / Ctrl+J)",
     "breadcrumb": {
-      "participations": "Participations",
+      "participations": "Entreprises",
       "cash": "Trésorerie",
       "pointage": "Pointage",
       "passif": "Passif",
@@ -22,7 +22,7 @@
   },
   "items": {
     "dashboard": "Tableau de bord",
-    "participations": "Participations",
+    "participations": "Entreprises",
     "cash": "Trésorerie",
     "pointage": "Pointage",
     "passif": "Passif",

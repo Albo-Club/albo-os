@@ -3,7 +3,7 @@
     "ai": "AI",
     "aiShortcut": "Toggle AI panel (⌘J / Ctrl+J)",
     "breadcrumb": {
-      "participations": "Participations",
+      "participations": "Companies",
       "cash": "Cash",
       "pointage": "Reconciliation",
       "passif": "Liabilities",
@@ -22,7 +22,7 @@
   },
   "items": {
     "dashboard": "Dashboard",
-    "participations": "Participations",
+    "participations": "Companies",
     "cash": "Cash",
     "pointage": "Reconciliation",
     "passif": "Liabilities",
