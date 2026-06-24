@@ -23,6 +23,27 @@ bas de page.
 
 ---
 
+## v1.28.2 — 24/06/2026 à 21:55 — Diagnostic interne des entités chapeau (lecture seule)
+
+Ajout d'un diagnostic interne, en lecture seule, pour mesurer les entités
+« chapeau » à nettoyer (deals encore rattachés à « Sezame » / « Parallel
+Invest » archivées, et homonymes côté Calte). Aucun changement visible dans
+l'application, aucune donnée modifiée.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/diagnoseAlboUmbrellas.ts` : `internalQuery dryRun`
+>   (les queries Convex ne peuvent pas écrire → `convex run --prod … :dryRun`
+>   ne mute rien). Pour chaque umbrella albo (ancrée par `attioCompanyId`) :
+>   statut archivé, deals encore rattachés (`by_org_target`) avec
+>   `name`/`notes`/`attioDealId`/montant/tx pour le mapping manuel, entités
+>   cibles candidates (existence + archivé), refs bloquantes (mirror de
+>   `companies.listBlockingRefs`) et `archivableOnceDealsReassigned`.
+> - Calte : doublons de nom normalisé (casse/accents/espaces) + collisions de
+>   préfixe (`SEZAME` vs `SEZAME IMMO 1`). Liste seule, aucun plan d'action.
+
+---
+
 ## v1.28.1 — 24/06/2026 à 21:50 — Procédure interne en cas de dérive des skills
 
 Ajout d'une consigne interne pour l'assistant : pas d'impact visible dans
@@ -63,7 +84,6 @@ sans dire **à quoi** elle était rattachée. C'est corrigé.
 >   au `TransactionSheet` (prop `match`, clé i18n `pointage:detail.matchedTo`).
 > - Fiche compte (`cash.$accountId.tsx`) : colonne « Deal » rendue cliquable
 >   (le serveur renvoyait déjà `tx.deal`). Reste deal-only par design.
-
 ## v1.27.2 — 24/06/2026 à 20:20 — Nom de la société dans le fil d'Ariane
 
 Sur la fiche d'une entreprise, le dernier élément du fil d'Ariane (en haut de
