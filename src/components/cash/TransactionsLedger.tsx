@@ -49,7 +49,13 @@ const ALL_ACCOUNTS = 'all'
  * detach/VAT action (PointageTable `statusColumn` mode). Reconciliation reuses
  * the same row actions as the historical pointage queue.
  */
-export function TransactionsLedger({ orgId }: { orgId: Id<'organizations'> }) {
+export function TransactionsLedger({
+  orgId,
+  orgSlug,
+}: {
+  orgId: Id<'organizations'>
+  orgSlug: string
+}) {
   const { t } = useTranslation(['pointage', 'passif'])
   const [status, setStatus] = useState<LedgerFilter>('unmatched')
   const [accountId, setAccountId] = useState<Id<'bankAccounts'> | undefined>(
@@ -146,6 +152,7 @@ export function TransactionsLedger({ orgId }: { orgId: Id<'organizations'> }) {
         transactions={transactions}
         deals={deals}
         liabilityOptions={liabilityOptions}
+        orgSlug={orgSlug}
         emptyMessage={emptyMessage}
         statusColumn={status !== 'unmatched'}
         pageResetKey={`${status}:${accountId ?? ''}:${searchArg ?? ''}`}

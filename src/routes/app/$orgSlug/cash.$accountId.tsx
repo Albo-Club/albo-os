@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Pencil } from 'lucide-react'
+import { ArrowUpRight, Pencil } from 'lucide-react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
@@ -292,7 +292,20 @@ function AccountDetail() {
                       {fmtDate(tx.transactionDate)}
                     </TableCell>
                     <TableCell>{tx.rawLabel}</TableCell>
-                    <TableCell>{tx.deal?.targetName ?? '—'}</TableCell>
+                    <TableCell>
+                      {tx.deal ? (
+                        <Link
+                          to="/app/$orgSlug/deals/$dealId"
+                          params={{ orgSlug, dealId: tx.deal._id }}
+                          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 hover:underline"
+                        >
+                          {tx.deal.targetName ?? '—'}
+                          <ArrowUpRight className="size-3 shrink-0" />
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
+                    </TableCell>
                     <TableCell
                       className={`text-right tabular-nums ${directionTone(tx.direction)}`}
                     >

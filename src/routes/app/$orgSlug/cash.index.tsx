@@ -95,7 +95,7 @@ function Cash() {
           {org && <ForecastRulesSection orgId={org._id} />}
         </TabsContent>
         <TabsContent value="transactions" className="pt-4">
-          {org && <TransactionsLedger orgId={org._id} />}
+          {org && <TransactionsLedger orgId={org._id} orgSlug={orgSlug} />}
         </TabsContent>
       </Tabs>
     </main>
