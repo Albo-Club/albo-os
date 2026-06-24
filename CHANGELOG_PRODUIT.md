@@ -23,6 +23,28 @@ bas de page.
 
 ---
 
+## v1.24.0 — 24/06/2026 à 18:14 — Participations : clic sur une ligne ouvre la fiche
+
+Dans les **Participations**, cliquer **n'importe où sur une ligne** ouvre
+désormais directement la **fiche de la société** — où ses deals sont listés.
+Le dépliage de la ligne (chevron) qui affichait les deals sous la table est
+retiré : un clic vous emmène droit à la fiche, et le bouton « Ouvrir la fiche »
+reste disponible. La recherche, le tri, la pagination et l'export CSV ne
+changent pas.
+
+> **🔧 Notes techniques**
+>
+> - Front pur, dans `src/components/participations/ParticipationsTable.tsx` :
+>   retrait de l'état d'expansion (`expanded`/`toggle`), du chevron et de la
+>   ligne `DealsList` inline ; `CompanyRows` n'a plus les props
+>   `isOpen`/`onToggle`/`colSpan`.
+> - Le clic ligne câble `useNavigate` vers
+>   `/app/$orgSlug/participations/$companyId`, gardé par `slug` (la vue agrégée
+>   `/app/all` dérive l'org de chaque deal ; sans slug la ligne n'est pas
+>   cliquable). Le bouton « Ouvrir la fiche » et son `stopPropagation` sont
+>   conservés ; les deals restent atteignables via la fiche entité (qui liste
+>   déjà `DealsList`).
+
 ## v1.23.0 — 24/06/2026 à 17:11 — Participations : retour à une liste simple
 
 Les **Participations** reviennent à une présentation simple : **une ligne par

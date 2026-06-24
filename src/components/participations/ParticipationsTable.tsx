@@ -4,10 +4,9 @@ import {
   ArrowUp,
   ArrowUpDown,
   ArrowUpRight,
-  ChevronRight,
   Download,
 } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 
@@ -149,8 +148,8 @@ export function useDealTitle() {
 }
 
 /**
- * Detailed list of deals (one block per deal). Reused by the per-company
- * table accordion and by the participation detail page.
+ * Detailed list of deals (one block per deal). Used by the participation
+ * detail page (entity sheet) to list an entity's deals.
  */
 export function DealsList({
   deals,
@@ -216,10 +215,11 @@ export function DealsList({
 }
 
 /**
- * Participations table grouped BY COMPANY (one row = one company,
- * expandable → its deals). `showOrg` adds an org badge column
- * (cross-org aggregated view). `orgSlug` (per-org view) targets the detail
- * link; in the aggregated view the slug is derived from each deal's org.
+ * Participations table grouped BY COMPANY (one row = one company; clicking a
+ * row opens its detail sheet, where the deals are listed). `showOrg` adds an
+ * org badge column (cross-org aggregated view). `orgSlug` (per-org view)
+ * targets the detail link; in the aggregated view the slug is derived from
+ * each deal's org.
  */
 type SortKey = 'name' | 'committed' | 'paid' | 'received' | 'tvpi'
 
@@ -263,14 +263,6 @@ export function ParticipationsTable({
 }) {
   const { t } = useTranslation('participations')
   const { fmtEur, fmtMultiple } = useFormatters()
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const toggle = (id: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
 
   // Client-side search (low volumes): company name, custom deal name,
   // instrument (raw key + translated label), investor, sector —
@@ -509,21 +501,15 @@ export function ParticipationsTable({
                 </TableCell>
               </TableRow>
             ) : (
-              pagedGroups.map((g) => {
-                const isOpen = expanded.has(g.id)
-                return (
-                  <CompanyRows
-                    key={g.id}
-                    group={g}
-                    isOpen={isOpen}
-                    onToggle={() => toggle(g.id)}
-                    showOrg={showOrg}
-                    colSpan={colSpan}
-                    fmtEur={fmtEur}
-                    fmtMultiple={fmtMultiple}
-                  />
-                )
-              })
+              pagedGroups.map((g) => (
+                <CompanyRows
+                  key={g.id}
+                  group={g}
+                  showOrg={showOrg}
+                  fmtEur={fmtEur}
+                  fmtMultiple={fmtMultiple}
+                />
+              ))
             )}
           </TableBody>
         </Table>
@@ -539,10 +525,7 @@ export function ParticipationsTable({
 
 function CompanyRows({
   group,
-  isOpen,
-  onToggle,
   showOrg,
-  colSpan,
   fmtEur,
   fmtMultiple,
 }: {
@@ -558,78 +541,77 @@ function CompanyRows({
     received: number
     tvpi: number | null
   }
-  isOpen: boolean
-  onToggle: () => void
   showOrg: boolean
-  colSpan: number
   fmtEur: (c?: number | null) => string
   fmtMultiple: (ratio: number | null) => string
 }) {
   const { t } = useTranslation('participations')
+  const navigate = useNavigate()
+  // Whole-row click opens the entity sheet (its deals are listed there).
+  // Guarded by `slug`: the per-org view passes orgSlug, the aggregated view
+  // derives it from each deal's org; without a slug the row isn't clickable
+  // (mirrors the "Open details" button's own render guard).
+  const slug = group.slug
+  const openDetail = slug
+    ? () =>
+        navigate({
+          to: '/app/$orgSlug/participations/$companyId',
+          params: { orgSlug: slug, companyId: group.id },
+        })
+    : undefined
   return (
-    <>
-      <TableRow className="cursor-pointer" onClick={onToggle}>
-        <TableCell className="font-medium">
-          <span className="flex items-center gap-2">
-            <ChevronRight
-              className={`text-muted-foreground size-4 transition-transform ${
-                isOpen ? 'rotate-90' : ''
-              }`}
-            />
-            <CompanyLogo
-              domain={group.domain}
-              companyName={group.name}
-              size="sm"
-            />
-            {group.name}
-            {group.slug && (
-              <Button asChild variant="outline" size="sm" className="ml-2">
-                <Link
-                  to="/app/$orgSlug/participations/$companyId"
-                  params={{ orgSlug: group.slug, companyId: group.id }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <ArrowUpRight className="size-4" />
-                  {t('openDetail')}
-                </Link>
-              </Button>
-            )}
+    <TableRow
+      className={openDetail ? 'cursor-pointer' : undefined}
+      onClick={openDetail}
+    >
+      <TableCell className="font-medium">
+        <span className="flex items-center gap-2">
+          <CompanyLogo
+            domain={group.domain}
+            companyName={group.name}
+            size="sm"
+          />
+          {group.name}
+          {group.slug && (
+            <Button asChild variant="outline" size="sm" className="ml-2">
+              <Link
+                to="/app/$orgSlug/participations/$companyId"
+                params={{ orgSlug: group.slug, companyId: group.id }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <ArrowUpRight className="size-4" />
+                {t('openDetail')}
+              </Link>
+            </Button>
+          )}
+        </span>
+      </TableCell>
+      {showOrg && (
+        <TableCell>
+          <span className="flex flex-wrap gap-1">
+            {Array.from(group.orgs).map((o) => (
+              <Badge key={o} variant="outline">
+                {o}
+              </Badge>
+            ))}
           </span>
         </TableCell>
-        {showOrg && (
-          <TableCell>
-            <span className="flex flex-wrap gap-1">
-              {Array.from(group.orgs).map((o) => (
-                <Badge key={o} variant="outline">
-                  {o}
-                </Badge>
-              ))}
-            </span>
-          </TableCell>
-        )}
-        <TableCell className="text-right tabular-nums">
-          {t('dealsCount', { count: group.deals.length })}
-        </TableCell>
-        <TableCell className="text-right tabular-nums">
-          {fmtEur(group.committed)}
-        </TableCell>
-        <TableCell className="text-right tabular-nums">
-          {fmtEur(group.paid)}
-        </TableCell>
-        <TableCell className="text-right tabular-nums">
-          {fmtEur(group.received)}
-        </TableCell>
-        <TableCell className="text-right tabular-nums">
-          {fmtMultiple(group.tvpi)}
-        </TableCell>
-      </TableRow>
-      {isOpen && (
-        <TableRow className="hover:bg-transparent">
-          <TableCell colSpan={colSpan} className="bg-muted/30 p-0">
-            <DealsList deals={group.deals} orgSlug={group.slug} />
-          </TableCell>
-        </TableRow>
       )}
-    </>
+      <TableCell className="text-right tabular-nums">
+        {t('dealsCount', { count: group.deals.length })}
+      </TableCell>
+      <TableCell className="text-right tabular-nums">
+        {fmtEur(group.committed)}
+      </TableCell>
+      <TableCell className="text-right tabular-nums">
+        {fmtEur(group.paid)}
+      </TableCell>
+      <TableCell className="text-right tabular-nums">
+        {fmtEur(group.received)}
+      </TableCell>
+      <TableCell className="text-right tabular-nums">
+        {fmtMultiple(group.tvpi)}
+      </TableCell>
+    </TableRow>
   )
 }
