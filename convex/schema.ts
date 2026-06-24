@@ -29,6 +29,7 @@ import {
   safeTypeValidator,
   termDurationValidator,
 } from './lib/instruments'
+import { personValidator } from './lib/people'
 import { vatRateBpsValidator } from './lib/vat'
 
 // ─── Better Auth / multi-tenant validators ─────────────────────────────────
@@ -326,6 +327,9 @@ export default defineSchema({
     // "exists" as soon as one entity carries its value. Distinct from sponsor.
     group: v.optional(v.string()),
     notes: v.optional(v.string()),
+    // Founders / board / co-investors. Display-only list (Lot 5a backend; UI
+    // in Lot 5b). Each entry is either Attio-linked (attioRecordId) or free.
+    people: v.optional(v.array(personValidator)),
     archivedAt: v.optional(v.number()),
   })
     .index('by_org', ['orgId'])
