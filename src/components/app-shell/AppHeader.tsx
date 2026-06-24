@@ -1,10 +1,14 @@
 import { Fragment } from 'react'
-import { Link, useLocation } from '@tanstack/react-router'
+import { Link, useLocation, useParams } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
+import { convexQuery } from '@convex-dev/react-query'
 import { Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { api } from '../../../convex/_generated/api'
 import { ThemeToggle } from './ThemeToggle'
 import type { TFunction } from 'i18next'
 
+import type { Id } from '../../../convex/_generated/dataModel'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -17,8 +21,16 @@ import { Button } from '~/components/ui/button'
 import { Separator } from '~/components/ui/separator'
 import { SidebarTrigger } from '~/components/ui/sidebar'
 import { UserButton } from '~/components/auth/user-button'
+import { useDealTitle } from '~/components/participations/ParticipationsTable'
 
 type Crumb = { label: string; href?: string }
+
+/** Minimal deal shape the deal-page breadcrumb needs (from `deals.getById`). */
+type DealCrumbData = {
+  name?: string | null
+  instrumentKind: string
+  target: { _id: string; name: string } | null
+}
 
 const CRUMB_SEGMENTS = [
   'participations',
@@ -59,6 +71,44 @@ function buildCrumbs(
   return crumbs
 }
 
+/**
+ * Breadcrumb for the deal sheet (`/app/$orgSlug/deals/$dealId`). The generic
+ * builder would emit a dead "Deals" crumb (no `/app/$orgSlug/deals` route) and
+ * a raw Convex id as the leaf, so this route is handled on its own:
+ * `Org › Companies › <company> › <deal>`. The "Companies" label reuses the
+ * existing `nav:appShell.breadcrumb.participations` key. While the deal is
+ * loading or not found (`deal` undefined) we stop at the Companies crumb — never
+ * a raw id, never a broken entity link, in any state. A deal with no target
+ * degrades to `Org › Companies › <deal>`.
+ */
+function buildDealCrumbs(
+  orgSlug: string,
+  orgName: string,
+  t: TFunction<['nav']>,
+  deal: DealCrumbData | undefined,
+  dealTitle: (
+    deal: { name?: string | null; instrumentKind: string },
+    opts?: { withInstrument?: boolean },
+  ) => string,
+): Array<Crumb> {
+  const base = `/app/${orgSlug}`
+  const companiesLabel = t('nav:appShell.breadcrumb.participations')
+  const crumbs: Array<Crumb> = [{ label: orgName, href: base }]
+  if (!deal) {
+    crumbs.push({ label: companiesLabel })
+    return crumbs
+  }
+  crumbs.push({ label: companiesLabel, href: `${base}/participations` })
+  if (deal.target) {
+    crumbs.push({
+      label: deal.target.name,
+      href: `${base}/participations/${deal.target._id}`,
+    })
+  }
+  crumbs.push({ label: dealTitle(deal, { withInstrument: false }) })
+  return crumbs
+}
+
 export function AppHeader({
   orgSlug,
   orgName,
@@ -72,7 +122,22 @@ export function AppHeader({
 }) {
   const location = useLocation()
   const { t } = useTranslation(['nav'])
-  const crumbs = buildCrumbs(location.pathname, orgSlug, orgName, t)
+  // Deal sheet gets a bespoke breadcrumb (Org › Companies › company › deal).
+  // `strict: false` reads `dealId` from whichever route matched (undefined off
+  // the deal route). `useQuery(convexQuery(...))` is used over `useConvexQuery`
+  // on purpose: it surfaces errors via state instead of throwing, so an invalid
+  // dealId can't crash this shared header through the parent route boundary.
+  const params = useParams({ strict: false })
+  const dealId = typeof params.dealId === 'string' ? params.dealId : undefined
+  const { data: deal } = useQuery({
+    ...convexQuery(api.deals.getById, { id: (dealId ?? '') as Id<'deals'> }),
+    enabled: dealId != null,
+  })
+  const dealTitle = useDealTitle()
+  const crumbs =
+    dealId != null
+      ? buildDealCrumbs(orgSlug, orgName, t, deal, dealTitle)
+      : buildCrumbs(location.pathname, orgSlug, orgName, t)
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 px-4">

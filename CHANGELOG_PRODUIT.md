@@ -23,6 +23,36 @@ bas de page.
 
 ---
 
+## v1.26.0 — 24/06/2026 à 19:30 — Fil d'Ariane de la fiche deal
+
+Sur la **fiche d'un deal**, le fil d'Ariane en haut de page indique désormais
+le chemin complet et lisible : **Organisation › Entreprises › ‹société› ›
+‹deal›**. « Entreprises » et le nom de la société sont cliquables (retour à la
+liste ou à la fiche société), et le dernier élément reprend le nom du deal.
+Fini l'identifiant technique illisible et le maillon « Deals » mort qui
+s'affichaient auparavant. Un deal sans société rattachée affiche simplement
+**Organisation › Entreprises › ‹deal›**.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/app-shell/AppHeader.tsx` : nouveau `buildDealCrumbs`
+>   dédié à la route `/app/$orgSlug/deals/$dealId` (le `buildCrumbs` générique
+>   produisait un crumb « Deals » avec `href` vers une route inexistante + l'id
+>   Convex brut en feuille). Le libellé entreprise **réutilise** la clé i18n
+>   existante `nav:appShell.breadcrumb.participations` (aucune nouvelle clé) ;
+>   la feuille reprend `useDealTitle({ withInstrument: false })`.
+> - `dealId` lu via `useParams({ strict: false })` ; deal chargé via
+>   `useQuery(convexQuery(api.deals.getById, …))` (et non `useConvexQuery`) :
+>   ce pattern **ne jette pas** sur erreur, donc un `dealId` invalide ne casse
+>   pas le header partagé via la boundary de la route parente. Query `enabled`
+>   uniquement sur la route deal.
+> - États dégradés sûrs : pendant le chargement / not-found (`deal` undefined),
+>   le fil s'arrête à « Entreprises » ; `target` null → crumb société omis.
+>   **Jamais** d'id brut ni de lien cassé, dans aucun état.
+> - `TESTING.md` : nouvelle vérif SH14 (breadcrumb fiche deal, EN/FR + états
+>   dégradés). Hors scope (follow-up) : l'id brut en feuille de la fiche
+>   société `/participations/$companyId`.
+
 ## v1.25.0 — 24/06/2026 à 18:55 — « Participations » devient « Entreprises »
 
 Le terme **« Participations »** est renommé **« Entreprises »** (et
