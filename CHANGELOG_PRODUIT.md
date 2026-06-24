@@ -23,6 +23,32 @@ bas de page.
 
 ---
 
+## v1.27.2 — 24/06/2026 à 20:20 — Nom de la société dans le fil d'Ariane
+
+Sur la fiche d'une entreprise, le dernier élément du fil d'Ariane (en haut de
+page) affiche désormais le **nom de la société** au lieu de son identifiant
+technique. Le fil se lit « Organisation › Entreprises › ‹Nom de la société› ».
+Aucun identifiant brut n'apparaît plus, y compris pendant le chargement ou si
+la page pointe vers une société introuvable (le fil s'arrête alors à
+« Entreprises »).
+
+> **🔧 Notes techniques**
+>
+> - Défaut d'affichage pur, front only. `buildCompanyCrumbs` ajouté dans
+>   `src/components/app-shell/AppHeader.tsx`, calqué sur `buildDealCrumbs`
+>   (déjà en place pour la route deal).
+> - La company est lue via la query existante `api.companies.getById`
+>   (réutilisée, pas de nouvelle query) au pattern **non-throwing**
+>   `useQuery(convexQuery(...))` + `enabled: companyId != null` : un
+>   `companyId` invalide dégrade le breadcrumb au lieu de jeter vers
+>   l'`errorComponent` parent et de casser le header. Leaf = `company.name`
+>   (aligné sur le H1), non cliquable.
+> - Libellé « Entreprises » inchangé (clé i18n existante
+>   `nav:appShell.breadcrumb.participations`). Route deal et autres routes
+>   strictement inchangées.
+
+---
+
 ## v1.27.1 — 24/06/2026 à 20:15 — Mise à jour d'une skill agent (interne)
 
 Mise à jour interne d'une fiche de bonnes pratiques destinée aux assistants

@@ -109,6 +109,32 @@ function buildDealCrumbs(
   return crumbs
 }
 
+/**
+ * Breadcrumb for the company sheet (`/app/$orgSlug/participations/$companyId`).
+ * The generic builder would emit a raw Convex id as the leaf, so this route is
+ * handled on its own: `Org › Companies › <company>`. The "Companies" label
+ * reuses the existing `nav:appShell.breadcrumb.participations` key. While the
+ * company is loading or not found (`company` undefined) we stop at the Companies
+ * crumb — never a raw id, in any state.
+ */
+function buildCompanyCrumbs(
+  orgSlug: string,
+  orgName: string,
+  t: TFunction<['nav']>,
+  company: { name: string } | undefined,
+): Array<Crumb> {
+  const base = `/app/${orgSlug}`
+  const companiesLabel = t('nav:appShell.breadcrumb.participations')
+  const crumbs: Array<Crumb> = [{ label: orgName, href: base }]
+  if (!company) {
+    crumbs.push({ label: companiesLabel })
+    return crumbs
+  }
+  crumbs.push({ label: companiesLabel, href: `${base}/participations` })
+  crumbs.push({ label: company.name })
+  return crumbs
+}
+
 export function AppHeader({
   orgSlug,
   orgName,
@@ -133,11 +159,24 @@ export function AppHeader({
     ...convexQuery(api.deals.getById, { id: (dealId ?? '') as Id<'deals'> }),
     enabled: dealId != null,
   })
+  // Company sheet gets the same bespoke treatment (Org › Companies › company):
+  // same non-throwing query so an invalid companyId degrades the breadcrumb
+  // instead of crashing this shared header through the parent route boundary.
+  const companyId =
+    typeof params.companyId === 'string' ? params.companyId : undefined
+  const { data: company } = useQuery({
+    ...convexQuery(api.companies.getById, {
+      id: (companyId ?? '') as Id<'companies'>,
+    }),
+    enabled: companyId != null,
+  })
   const dealTitle = useDealTitle()
   const crumbs =
     dealId != null
       ? buildDealCrumbs(orgSlug, orgName, t, deal, dealTitle)
-      : buildCrumbs(location.pathname, orgSlug, orgName, t)
+      : companyId != null
+        ? buildCompanyCrumbs(orgSlug, orgName, t, company)
+        : buildCrumbs(location.pathname, orgSlug, orgName, t)
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 px-4">
