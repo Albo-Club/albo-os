@@ -1,7 +1,7 @@
 {
-  "metaTitle": "Participations — Albo OS",
-  "metaTitleAll": "Toutes les participations — Albo OS",
-  "metaTitleDetail": "Participation — Albo OS",
+  "metaTitle": "Entreprises — Albo OS",
+  "metaTitleAll": "Toutes les entreprises — Albo OS",
+  "metaTitleDetail": "Entreprise — Albo OS",
   "metaTitleDeal": "Deal — Albo OS",
   "dealNotFound": "Deal introuvable.",
   "tx": {
@@ -23,10 +23,10 @@
       "reconciled": "Rapproché"
     }
   },
-  "title": "Participations",
+  "title": "Entreprises",
   "allSubtitle": "Toutes tes organisations réunies — lecture seule. L'édition se fait dans une organisation.",
   "openDetail": "Ouvrir la fiche",
-  "back": "← Participations",
+  "back": "← Entreprises",
   "notFound": "Société introuvable.",
   "info": {
     "sector": "Secteur",
@@ -320,10 +320,10 @@
       "default": "Impossible de supprimer le deal. Réessayez."
     }
   },
-  "empty": "Aucune participation pour ce scope — crée des deals via le chat IA, ou ajoute-les à la main.",
+  "empty": "Aucune entreprise pour ce scope — crée des deals via le chat IA, ou ajoute-les à la main.",
   "search": {
     "placeholder": "Rechercher par société, instrument, secteur…",
-    "noResults": "Aucune participation ne correspond à votre recherche."
+    "noResults": "Aucune entreprise ne correspond à votre recherche."
   },
   "dealsCount_one": "{{count}} deal",
   "dealsCount_other": "{{count}} deals",
