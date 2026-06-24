@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { ensureGroupSettings } from './lib/groupSettings'
+import { personValidator } from './lib/people'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
 import type { DataModel, Id } from './_generated/dataModel'
 
@@ -111,6 +112,9 @@ export const update = mutation({
       // field — consumed by ensureGroupSettings, stripped before the patch.
       groupKind: v.optional(v.union(v.literal('sponsor'), v.literal('group'))),
       notes: v.optional(v.string()),
+      // Full replacement of the people list (founders/board/co-investors).
+      // role is enforced by the validator; name is checked non-empty below.
+      people: v.optional(v.array(personValidator)),
     }),
   },
   handler: async (ctx, { id, patch }) => {
@@ -121,6 +125,14 @@ export const update = mutation({
     // Guardrail: never demote the org's root entity.
     if (company.kind === 'group_root' && patch.kind && patch.kind !== 'group_root') {
       throw new ConvexError('cannot_change_root_kind')
+    }
+    // People: full-list replacement. Reject empty names before any write so
+    // an invalid entry never produces a partial update. role is already
+    // guaranteed valid by the Convex validator.
+    if (patch.people) {
+      for (const p of patch.people) {
+        if (p.name.trim() === '') throw new ConvexError('invalid_person_name')
+      }
     }
     // SIREN: normalized (spaces stripped), '' = clears the field.
     if (patch.siren !== undefined) {

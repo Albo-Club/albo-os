@@ -469,6 +469,14 @@ d'une entité (`/participations/$companyId`), nom personnalisé d'un compte
 (`/cash/$accountId`). Mutations : `deals.update`, `companies.update`,
 `cash.updateAccountName`.
 
+> **Lot 5a (backend seul)** : `companies.update` accepte désormais un champ
+> `people` (liste de personnes `role` `founder|board|coinvestor` + `name` +
+> `attioRecordId?`). Remplacement total de la liste à chaque édition ; `role`
+> hors enum rejeté par le validateur, `name` vide rejeté (`invalid_person_name`).
+> **Aucune surface UI à tester à la main dans ce lot** — l'affichage et le
+> dialog (ajout/retrait) arrivent au Lot 5b ; les lignes de vérification
+> manuelle seront ajoutées ici à ce moment-là.
+
 | #   | Étape                                                                                            | Résultat attendu                                                                                                                                                                                                                                                                                       |
 | --- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | ED1 | Page deal → « Modifier » → saisir un nom personnalisé → Enregistrer                              | Toast succès ; le titre devient le nom saisi **seul** (réactif, sans reload) ; l'instrument reste visible via le sélecteur de type ; les listes (`/participations`, `/app/all/participations`, fiche entité) et le combobox de pointage affichent `nom personnalisé · instrument` (les deux côte à côte) |

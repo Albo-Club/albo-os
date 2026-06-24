@@ -23,7 +23,31 @@ bas de page.
 
 ---
 
-## v1.20.0 — 24/06/2026 à 00:31 — Changer le type d'un deal sans rien perdre
+## v1.20.1 — 24/06/2026 à 09:15 — Préparer fondateurs, board et co-investisseurs
+
+Les fiches société pourront bientôt lister leurs **fondateurs**, **membres du
+board** et **co-investisseurs**. Cette mise à jour pose la **fondation
+technique** côté base de données : rien ne change encore à l'écran, mais ces
+personnes peuvent désormais être enregistrées (avec, si besoin, un lien vers
+leur fiche Attio). L'affichage et la saisie arriveront dans une prochaine
+mise à jour.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau champ `people` sur la table `companies`
+>   (`v.optional(v.array(...))`, donc additif — pas de migration) : liste
+>   d'objets `{ role, name, attioRecordId? }`.
+> - Enum `role` (`founder | board | coinvestor`) + validateur d'objet
+>   `personValidator` centralisés dans `convex/lib/people.ts`, selon la
+>   convention `literals(...)` du Lot 3 ; importés par `convex/schema.ts` et la
+>   mutation.
+> - `companies.update` étendue (pas de nouvelle mutation) : accepte `people` en
+>   **remplacement total** de la liste ; `role` invalide rejeté par le
+>   validateur Convex, `name` vide rejeté (`invalid_person_name`) avant tout
+>   write. Scoping `requireOrgMember` inchangé.
+> - Choix assumé : `people` est un **champ**, pas une table dédiée ;
+>   `linkedin`/`email` non stockés (accessibles via Attio). Cf. `KNOWN_ISSUES.md`
+>   « Fiche entité ». Affichage + dialog d'édition = Lot 5b.
 
 Changer le **type d'instrument** d'un deal depuis l'écran « Modifier » est
 désormais **enregistré** comme les autres champs. Et pour éviter toute
