@@ -54,8 +54,8 @@
       "sourceType": "github",
       "skillPath": "skills/convex-performance-audit/SKILL.md",
       "trackingRef": "main",
-      "pinnedRef": "7a6fcc6882f344577a34365fdadbd0f8f8c467d7",
-      "computedHash": "829b60b8d56df95a149656f9e832f6545ce07c08d00c722539630a028c17b5dd"
+      "pinnedRef": "ec1e6baae7d86c7843c22938c75979c016f5c6e9",
+      "computedHash": "7a3943446e7c654d4d37b960cd75f10eae89d6e9ef57c9bf72fd4b9754cd31d1"
     },
     "convex-quickstart": {
       "source": "get-convex/agent-skills",

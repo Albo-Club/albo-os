@@ -23,6 +23,26 @@ bas de page.
 
 ---
 
+## v1.26.1 — 24/06/2026 à 19:45 — Mise à jour d'une skill agent (interne)
+
+Mise à jour interne d'une fiche de bonnes pratiques destinée aux assistants
+IA qui travaillent sur le projet. Aucun impact sur l'application ni sur vos
+données.
+
+> **🔧 Notes techniques**
+>
+> - `skills/convex-performance-audit` re-vendorisée au tip upstream courant
+>   (`get-convex/agent-skills@main`, `pinnedRef` `7a6fcc6` → `ec1e6ba`) — le
+>   seul skill ayant dérivé. Changement de contenu purement cosmétique (un
+>   renvoi « `skills/convex-migration-helper/SKILL.md` » devient « le skill
+>   `convex-migration-helper` ») ; aucune guidance comportementale modifiée,
+>   donc aucun override projet à ajuster. `pnpm run sync:skills:check` repasse
+>   au vert.
+> - Bump fait à la main (résolution du tip via un appel unauth à
+>   `api.github.com`, puis `pnpm run sync:skills`) car `sync:skills:update`
+>   échoue dans le sandbox cloud — nouvelle section `KNOWN_ISSUES.md`
+>   « `sync:skills:update` échoue dans le sandbox cloud ».
+
 ## v1.26.0 — 24/06/2026 à 19:30 — Fil d'Ariane de la fiche deal
 
 Sur la **fiche d'un deal**, le fil d'Ariane en haut de page indique désormais
