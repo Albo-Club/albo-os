@@ -1447,11 +1447,10 @@ et est partagé par la fiche société (`participations.$companyId.tsx`, nature
 2. **Champs d'identité sans stockage — affichés « À renseigner », à ne pas
    inventer.** Plusieurs champs demandés n'ont **aucune** colonne au schéma et
    sont rendus en état vide :
-   - Entreprise : **Fondateur(s)**, **Membres du board**, **Co-investisseurs**.
-     Le **stockage existe depuis le Lot 5a** : champ `companies.people`
-     (cf. point 4 ci-dessous). Mais l'affichage et l'édition (`PeopleList`,
-     dialog) arrivent au **Lot 5b** — la fiche reçoit encore `[]` aujourd'hui,
-     donc état « À renseigner ».
+   - Entreprise : **Fondateur(s)**, **Membres du board**, **Co-investisseurs**
+     sont **stockés (Lot 5a), affichés et éditables (Lot 5b)** via le champ
+     `companies.people` (cf. point 4). L'état « À renseigner » ne s'affiche
+     plus que pour une section **vide**.
    - Sponsor dette : **Type de plateforme**, **Contact principal**, **lien
      Attio** (pas d'`attioCompanyId` au niveau groupe).
    - Groupe : zone **Documents** réservée — `documents` est indexé par
@@ -1465,12 +1464,18 @@ et est partagé par la fiche société (`participations.$companyId.tsx`, nature
    `founder|board|coinvestor` + le validateur d'objet). Conséquences :
    - **Remplacement total** à chaque édition — `companies.update` reçoit la
      **liste complète** (pas un delta) ; `people` omis = inchangé, `[]` = vide.
-     Le merge fin (ajout/retrait d'une personne) est géré côté UI au 5b.
+     Le merge fin (ajout/retrait d'une personne) est géré côté UI dans
+     `EditCompanyDialog` (Lot 5b), qui **préserve `attioRecordId`** d'une
+     personne déjà liée au rebuild de la liste (aucune UI pour le saisir).
    - **`linkedin`/`email` volontairement NON stockés.** Ils sont accessibles
-     via le lien Attio de la personne (cliquer le nom → fiche Attio), construit
-     au 5b à partir de `attioRecordId` + `VITE_ATTIO_WORKSPACE_URL`
-     (même logique que le lien company du point 3). On ne stocke que le
-     `record_id` Attio, jamais de lecture live.
+     via le lien Attio de la personne (cliquer le **nom** → fiche Attio),
+     construit par `src/lib/attio.ts:attioPersonUrl` à partir de
+     `attioRecordId` + `VITE_ATTIO_WORKSPACE_URL` (`{base}/person/{record_id}`,
+     même logique que le lien company du point 3). On ne stocke que le
+     `record_id` Attio, jamais de lecture live. ⚠️ **`PeopleList` porte encore
+     des branches JSX `linkedin`/`email` non alimentées** (design assumé : ces
+     infos passent par le lien Attio) — code inerte, à nettoyer ou à brancher
+     plus tard.
    - **Réversible** : si un jour on veut gérer les personnes activement
      (dédup cross-company, relations), migrer vers une table `people` dédiée.
 

@@ -23,6 +23,33 @@ bas de page.
 
 ---
 
+## v1.21.0 — 24/06/2026 à 11:45 — Fondateurs, board et co-investisseurs sur la fiche
+
+Les fiches société affichent désormais leurs **fondateurs**, **membres du
+board** et **co-investisseurs**, regroupés par rôle. Un nouveau bloc dans la
+fenêtre **Modifier la société** permet de les **ajouter, renommer ou
+retirer**, à la main par leur nom. Quand une personne est déjà liée à Attio,
+son nom devient un **lien cliquable** vers sa fiche Attio ; sinon il s'affiche
+en texte simple. Les sections sans personne restent discrètes (« À
+renseigner »).
+
+> **🔧 Notes techniques**
+>
+> - Affichage : `PeopleList` (`src/components/companies/EntityFiche.tsx`) rend
+>   le **nom** en lien quand un `attioUrl` est fourni. L'URL est fabriquée par
+>   `attioPersonUrl` (`src/lib/attio.ts`, miroir de `attioCompanyUrl`, segment
+>   `/person/<record_id>`, `null` si `VITE_ATTIO_WORKSPACE_URL` absente). Le
+>   groupement par rôle se fait dans `participations.$companyId.tsx`
+>   (`peopleByRole`).
+> - Édition : section « Personnes » greffée sur `EditCompanyDialog` (liste de
+>   lignes rôle + nom + retirer, bouton « ajouter »). Au save, la **liste
+>   complète** part dans `companies.update` (`patch.people`, remplacement
+>   total). `attioRecordId` d'une personne déjà liée est **préservé** au
+>   rebuild (aucune UI pour le saisir en 5b). Gate Save : un nom vide bloque
+>   (miroir du rejet backend `invalid_person_name`).
+> - i18n EN/FR : `personRole.{founder,board,coinvestor}`, `edit.people*`,
+>   `edit.errors.invalid_person_name`.
+
 ## v1.20.1 — 24/06/2026 à 09:15 — Préparer fondateurs, board et co-investisseurs
 
 Les fiches société pourront bientôt lister leurs **fondateurs**, **membres du

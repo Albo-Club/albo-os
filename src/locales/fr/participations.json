@@ -79,6 +79,11 @@
     "sponsor": "Sponsor",
     "group": "Groupe"
   },
+  "personRole": {
+    "founder": "Fondateur",
+    "board": "Board",
+    "coinvestor": "Co-investisseur"
+  },
   "nature": {
     "company": "Entreprise",
     "sponsor": "Sponsor dette",
@@ -307,10 +312,16 @@
     "kindPlaceholder": "Choisir un type",
     "kindRequired": "Choisissez un type pour le nouveau groupe.",
     "nameRequired": "Le nom est obligatoire.",
+    "peopleLabel": "Personnes",
+    "peopleAdd": "Ajouter une personne",
+    "peopleRemove": "Retirer",
+    "peopleNamePlaceholder": "Nom de la personne",
+    "peopleNameRequired": "Le nom est obligatoire.",
     "saved": "Modifications enregistrées",
     "errors": {
       "invalid_siren": "Le SIREN doit contenir exactement 9 chiffres.",
       "siren_already_used": "Ce SIREN est déjà utilisé par une autre société.",
+      "invalid_person_name": "Le nom d'une personne est vide.",
       "default": "Impossible d'enregistrer les modifications. Réessayez."
     }
   },

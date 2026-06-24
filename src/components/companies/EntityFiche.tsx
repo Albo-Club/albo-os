@@ -101,11 +101,12 @@ export type Person = {
 }
 
 /**
- * People list (founders / board / co-investors). Each person shows their name
- * plus whichever links exist (Attio, LinkedIn, mailto). No schema stores these
- * people yet (see KNOWN_ISSUES "Fiche entité — personnes & sponsor"): the list
- * is empty for now, so the "to be filled in" state is what renders. The
- * rendering is ready for the future edit lot that will populate the data.
+ * People list (founders / board / co-investors), fed from `companies.people`
+ * (Lot 5b). Each person shows their name; the name links to the Attio person
+ * record when `attioUrl` is set, plain text otherwise. An empty list renders
+ * the "to be filled in" state. The LinkedIn/mailto branches are inert — those
+ * fields are not stored (see KNOWN_ISSUES "PeopleList — branches linkedin/email
+ * non alimentées").
  */
 export function PeopleList({ people }: { people: Array<Person> }) {
   const { t } = useTranslation('participations')
@@ -118,17 +119,18 @@ export function PeopleList({ people }: { people: Array<Person> }) {
     <ul className="space-y-1.5">
       {people.map((p) => (
         <li key={p.name} className="flex items-center gap-2 text-sm">
-          <span>{p.name}</span>
-          {p.attioUrl && (
+          {p.attioUrl ? (
             <a
               href={p.attioUrl}
               target="_blank"
               rel="noreferrer"
-              className="text-muted-foreground hover:text-foreground"
-              aria-label="Attio"
+              className="inline-flex items-center gap-1 underline-offset-4 hover:underline"
             >
+              {p.name}
               <ArrowUpRight className="size-3.5" />
             </a>
+          ) : (
+            <span>{p.name}</span>
           )}
           {p.linkedinUrl && (
             <a
