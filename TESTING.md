@@ -210,6 +210,19 @@ L'**édition des valeurs** passe par le dialog « Modifier » (Lot 3, tests FD11
 | FD13 | « Modifier » → taper des lettres dans un champ € puis tenter d'enregistrer                      | Le bouton **Enregistrer est désactivé** (saisie invalide) ; aucune écriture partielle                                                                                                                                                                                            |
 | FD14 | Champ marqué `manuallyEditedFields` puis ré-import Airtable (mécanisme, sans lancer d'import)   | `upsertDeals` retire du patch les colonnes présentes dans `manuallyEditedFields` → le champ saisi à la main n'est pas écrasé ; le set n'est consulté que pour les colonnes que l'import écrit (cf. `KNOWN_ISSUES` « Édition manuelle deals »)                                       |
 | FD15 | **Sommeil au changement de type.** Deal `share` avec valos pre/post + détention remplies → « Modifier » → changer le type en `os` (Dette) → un **bandeau** confirme « le type passe de Capital à Dette, champs propres à Capital conservés mais masqués » → Enregistrer. Rouvrir → repasser en `share` → Enregistrer | Après le 1er save : en base `instrumentKind = os`, `manuallyEditedFields` **contient** `"instrumentKind"`, et `preMoneyValuation`/`postMoneyValuation`/`ownershipPct` **toujours présents (non null)**, juste plus affichés. Après le retour en `share` : les 3 champs equity **réapparaissent** sur la fiche **avec leurs valeurs d'origine intactes**. Le changement de type n'écrit **que** `instrumentKind` (patch partiel `deals.update`) — zéro mise à null collatérale |
+| FD16 | « Modifier » → sélecteur **« Entité cible »** (combobox des sociétés portfolio non archivées) → choisir une autre société → Enregistrer | Le deal apparaît désormais sous la nouvelle société (`/participations/$companyId`) ; ses transactions/valorisations rapprochées **suivent** (liées par `dealId`, rapprochement intact) |
+
+### Archivage / restauration d'une entité (`/app/$orgSlug/participations`)
+
+Archivage réversible (`archivedAt`) avec garde-fou de références (refus si
+deals/relations/KPI/comptes/documents) ; restauration depuis une section
+repliable de la liste des entreprises.
+
+| #   | Étape                                                                                          | Résultat attendu                                                                                                                                                                                          |
+| --- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AR1 | Fiche entreprise qui porte ≥ 1 deal → bouton **Archiver**                                      | Bouton **désactivé** + ligne « Cette entité porte N deal(s)… réaffectez-les avant d'archiver »                                                                                                            |
+| AR2 | Fiche entreprise **vide** (aucun deal/relation/KPI/compte/document) → **Archiver** → confirmer | Entité archivée, redirige vers la liste, disparaît des listes ; si encore référencée (investisseur/SPV/relation/KPI/compte/document non visible) → refus serveur `company_has_references` avec message clair |
+| AR3 | Liste des entreprises → section repliable « Entités archivées (N) » → **Restaurer**            | L'entité réapparaît dans les listes ; archivage/restauration idempotents ; i18n EN/FR sur libellés réaffectation + archivage                                                                              |
 
 ## Niveau 3 — Invitations edge cases (8 min)
 

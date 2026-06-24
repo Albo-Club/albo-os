@@ -255,6 +255,11 @@
     "dealNameHint": "Leave empty to use the instrument as title.",
     "instrumentLabel": "Instrument",
     "typeChangeNotice": "The type changes from {{from}} to {{to}}. The fields specific to {{from}} are kept but hidden — they'll reappear if you switch back to {{from}}.",
+    "targetLabel": "Target entity",
+    "targetHint": "Reassign the deal to another portfolio company.",
+    "targetPlaceholder": "Pick a company",
+    "targetSearch": "Search a company…",
+    "targetEmpty": "No company.",
     "sirenLabel": "SIREN",
     "sirenPlaceholder": "9 digits",
     "sirenInvalid": "The SIREN must be exactly 9 digits.",
@@ -318,6 +323,22 @@
     "errors": {
       "deal_has_transactions": "This deal has reconciled transactions. Unreconcile them before deleting.",
       "default": "Couldn't delete the deal. Please try again."
+    }
+  },
+  "archive": {
+    "button": "Archive",
+    "blocked_one": "This entity carries {{count}} deal. Reassign it to another entity before archiving.",
+    "blocked_other": "This entity carries {{count}} deals. Reassign them to another entity before archiving.",
+    "confirmTitle": "Archive this entity?",
+    "confirmBody": "The entity will be hidden from the lists. You can restore it from the companies list.",
+    "archived": "Entity archived",
+    "restored": "Entity restored",
+    "restore": "Restore",
+    "sectionTitle_one": "Archived entities ({{count}})",
+    "sectionTitle_other": "Archived entities ({{count}})",
+    "errors": {
+      "company_has_references": "This entity is still referenced (deals, relations, KPIs, accounts or documents) — reassign or empty it first.",
+      "default": "Something went wrong. Please try again."
     }
   },
   "empty": "No companies in this scope — create deals via the AI chat, or add them manually.",

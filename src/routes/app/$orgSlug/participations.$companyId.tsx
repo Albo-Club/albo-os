@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link2, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Archive, Link2, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useAction } from 'convex/react'
 import { useTranslation } from 'react-i18next'
@@ -622,8 +622,12 @@ function CreateDealDialog({
 function ParticipationDetail() {
   const { t, i18n } = useTranslation(['participations', 'common'])
   const { orgSlug, companyId } = Route.useParams()
+  const navigate = useNavigate()
   const [editOpen, setEditOpen] = useState(false)
   const [createDealOpen, setCreateDealOpen] = useState(false)
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [archiving, setArchiving] = useState(false)
+  const archiveCompany = useConvexMutation(api.companies.archive)
   const org = useConvexQuery(api.organizations.bySlug, { slug: orgSlug })
   const company = useConvexQuery(api.companies.getById, {
     id: companyId as Id<'companies'>,
@@ -632,6 +636,33 @@ function ParticipationDetail() {
     api.deals.list,
     org ? { orgId: org._id, targetCompanyId: companyId as Id<'companies'> } : 'skip',
   )
+
+  // Deals targeting this entity block archiving (the obvious Sezame case).
+  // Other references (investor/SPV, relations, KPI, accounts, documents) are
+  // caught server-side and surfaced via the error toast below.
+  const dealCount = deals?.length ?? 0
+
+  async function handleArchive() {
+    if (!company) return
+    setArchiving(true)
+    try {
+      await archiveCompany({ id: company._id })
+      toast.success(t('participations:archive.archived'))
+      setArchiveOpen(false)
+      navigate({ to: '/app/$orgSlug/participations', params: { orgSlug } })
+    } catch (err) {
+      const code = err instanceof ConvexError ? (err.data as string) : ''
+      toast.error(
+        t(
+          code === 'company_has_references'
+            ? 'participations:archive.errors.company_has_references'
+            : 'participations:archive.errors.default',
+        ),
+      )
+    } finally {
+      setArchiving(false)
+    }
+  }
 
   const ownership = useMemo(() => {
     const total = company?.totalShares
@@ -698,7 +729,25 @@ function ParticipationDetail() {
             {t('createDeal.button')}
           </Button>
         )}
+        {company && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            disabled={dealCount > 0}
+            onClick={() => setArchiveOpen(true)}
+          >
+            <Archive className="size-4" />
+            {t('archive.button')}
+          </Button>
+        )}
       </div>
+
+      {dealCount > 0 && (
+        <p className="text-muted-foreground text-xs">
+          {t('archive.blocked', { count: dealCount })}
+        </p>
+      )}
 
       {/* Identity block — nature "company". */}
       <IdentitySection title={t('identity.title')}>
@@ -763,6 +812,36 @@ function ParticipationDetail() {
           onClose={() => setCreateDealOpen(false)}
         />
       )}
+
+      <Dialog
+        open={archiveOpen}
+        onOpenChange={(open) => !open && setArchiveOpen(false)}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('archive.confirmTitle')}</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground text-sm">
+            {t('archive.confirmBody')}
+          </p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setArchiveOpen(false)}
+              disabled={archiving}
+            >
+              {t('common:actions.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void handleArchive()}
+              disabled={archiving}
+            >
+              {t('archive.button')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }
