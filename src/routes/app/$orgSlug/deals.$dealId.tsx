@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowRight, Eye, Info, Pencil, Trash2 } from 'lucide-react'
+import { ArrowRight, Check, ChevronsUpDown, Eye, Info, Pencil, Trash2 } from 'lucide-react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
@@ -37,6 +37,7 @@ import {
   msToDateInput,
   pctToBps,
 } from '~/lib/parse'
+import { cn } from '~/lib/utils'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { DealCombobox } from '~/components/pointage/DealCombobox'
 import {
@@ -47,6 +48,14 @@ import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent } from '~/components/ui/card'
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '~/components/ui/command'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -56,6 +65,11 @@ import {
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '~/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -256,6 +270,76 @@ function DealFieldInput({
  * computed from transactions) never appears here — it stays read-only on the
  * sheet. Changing the instrument type is a no-op on the attached transactions.
  */
+/** Minimal portfolio company shape for the target combobox. */
+type CompanyOption = { _id: Id<'companies'>; name: string }
+
+/**
+ * Searchable combobox of the org's portfolio companies (Popover + Command),
+ * to reassign a deal's target entity. Mirrors `DealCombobox`.
+ */
+function CompanyCombobox({
+  companies,
+  value,
+  onSelect,
+  disabled,
+}: {
+  companies: Array<CompanyOption> | undefined
+  value: Id<'companies'>
+  onSelect: (id: Id<'companies'>) => void
+  disabled?: boolean
+}) {
+  const { t } = useTranslation('participations')
+  const [open, setOpen] = useState(false)
+  const selected = companies?.find((c) => c._id === value)
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled || !companies}
+          className="w-full justify-between font-normal"
+        >
+          <span className="truncate">
+            {selected?.name ?? t('participations:edit.targetPlaceholder')}
+          </span>
+          <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+        <Command>
+          <CommandInput placeholder={t('participations:edit.targetSearch')} />
+          <CommandList>
+            <CommandEmpty>{t('participations:edit.targetEmpty')}</CommandEmpty>
+            <CommandGroup>
+              {(companies ?? []).map((company) => (
+                <CommandItem
+                  key={company._id}
+                  value={`${company.name} ${company._id}`}
+                  onSelect={() => {
+                    onSelect(company._id)
+                    setOpen(false)
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      'size-4',
+                      company._id === value ? 'opacity-100' : 'opacity-0',
+                    )}
+                  />
+                  <span className="truncate">{company.name}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function EditDealDialog({
   deal,
   onClose,
@@ -265,9 +349,17 @@ function EditDealDialog({
 }) {
   const { t } = useTranslation(['participations', 'common'])
   const updateDeal = useConvexMutation(api.deals.update)
+  // Portfolio companies of the org (already filtered to non-archived).
+  const companies = useConvexQuery(api.companies.list, {
+    orgId: deal.orgId,
+    kind: 'portfolio',
+  })
   const [name, setName] = useState(deal.name ?? '')
   const [instrument, setInstrument] = useState<InstrumentKind>(
     deal.instrumentKind,
+  )
+  const [targetId, setTargetId] = useState<Id<'companies'>>(
+    deal.targetCompanyId,
   )
   // Editable fields of the SAVED type (fixed in this lot — the type change
   // itself is Lot 3b). Values are strings in the display unit.
@@ -291,6 +383,7 @@ function EditDealDialog({
       const patch: Record<string, unknown> = {}
       if (name.trim() !== (deal.name ?? '')) patch.name = name
       if (instrument !== deal.instrumentKind) patch.instrumentKind = instrument
+      if (targetId !== deal.targetCompanyId) patch.targetCompanyId = targetId
       for (const field of fields) {
         const parsed = parseField(FIELD_FORMAT[field] ?? 'text', values[field])
         if (parsed === undefined || parsed === null) continue
@@ -355,6 +448,18 @@ function EditDealDialog({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>{t('participations:edit.targetLabel')}</Label>
+            <CompanyCombobox
+              companies={companies}
+              value={targetId}
+              onSelect={setTargetId}
+              disabled={pending}
+            />
+            <p className="text-muted-foreground text-xs">
+              {t('participations:edit.targetHint')}
+            </p>
           </div>
           {instrument !== deal.instrumentKind && (
             <div

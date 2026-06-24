@@ -255,6 +255,11 @@
     "dealNameHint": "Laisser vide pour utiliser l'instrument comme titre.",
     "instrumentLabel": "Instrument",
     "typeChangeNotice": "Le type passe de {{from}} à {{to}}. Les champs propres à {{from}} sont conservés mais masqués ; ils réapparaîtront si vous repassez en {{from}}.",
+    "targetLabel": "Entité cible",
+    "targetHint": "Réaffecter le deal à une autre société du portefeuille.",
+    "targetPlaceholder": "Choisir une société",
+    "targetSearch": "Rechercher une société…",
+    "targetEmpty": "Aucune société.",
     "sirenLabel": "SIREN",
     "sirenPlaceholder": "9 chiffres",
     "sirenInvalid": "Le SIREN doit contenir exactement 9 chiffres.",
@@ -318,6 +323,22 @@
     "errors": {
       "deal_has_transactions": "Ce deal a des mouvements rapprochés. Dé-rapprochez-les avant de supprimer.",
       "default": "Impossible de supprimer le deal. Réessayez."
+    }
+  },
+  "archive": {
+    "button": "Archiver",
+    "blocked_one": "Cette entité porte {{count}} deal. Réaffectez-le à une autre entité avant d'archiver.",
+    "blocked_other": "Cette entité porte {{count}} deals. Réaffectez-les à une autre entité avant d'archiver.",
+    "confirmTitle": "Archiver cette entité ?",
+    "confirmBody": "L'entité sera masquée des listes. Vous pourrez la restaurer depuis la liste des entreprises.",
+    "archived": "Entité archivée",
+    "restored": "Entité restaurée",
+    "restore": "Restaurer",
+    "sectionTitle_one": "Entités archivées ({{count}})",
+    "sectionTitle_other": "Entités archivées ({{count}})",
+    "errors": {
+      "company_has_references": "Cette entité est encore référencée (deals, relations, KPI, comptes ou documents) — réaffectez-les ou videz-la d'abord.",
+      "default": "Une erreur est survenue. Réessayez."
     }
   },
   "empty": "Aucune entreprise pour ce scope — crée des deals via le chat IA, ou ajoute-les à la main.",
