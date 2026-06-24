@@ -150,22 +150,3 @@ export function PeopleList({ people }: { people: Array<Person> }) {
     </ul>
   )
 }
-
-/** Reserved zone: a titled placeholder kept in the skeleton for a surface that
- * has no data source yet (e.g. group-level documents). */
-export function ReservedSection({
-  title,
-  note,
-}: {
-  title: string
-  note: string
-}) {
-  return (
-    <section className="space-y-2">
-      <h2 className="text-sm font-medium">{title}</h2>
-      <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
-        {note}
-      </div>
-    </section>
-  )
-}
