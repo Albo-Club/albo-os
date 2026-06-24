@@ -23,6 +23,43 @@ bas de page.
 
 ---
 
+## v1.22.0 — 24/06/2026 à 12:30 — Recherche Attio des personnes
+
+Dans la fenêtre **Modifier la société**, chaque ligne de personne propose
+désormais une **recherche Attio** : tapez un nom, les **suggestions** issues
+d'Attio apparaissent (avec un repère « Attio »), et un clic **remplit le nom et
+le lien** vers la fiche Attio de la personne — son nom devient ensuite cliquable
+sur la fiche. L'ajout **à la main** reste possible : si vous ne choisissez
+aucune suggestion, la personne est simplement enregistrée **sans lien**, comme
+avant. Une personne liée affiche un discret « **Lié à Attio** ». Si la recherche
+est momentanément indisponible, un message neutre s'affiche et la saisie
+manuelle continue de fonctionner.
+
+> **🔧 Notes techniques**
+>
+> - Backend : nouvelle **action** `convex/attio.ts:searchPeople` (seules les
+>   actions font du réseau externe). POST `…/v2/objects/people/records/query`,
+>   filtre `name $contains`, 8 résultats max, **lecture seule**. La clé
+>   `ATTIO_API_KEY` (réutilisée du webhook entrant `attioSync.ts`) est lue
+>   **côté serveur uniquement** et jamais loggée. Auth via l'`internalQuery`
+>   probe `requireMember` → `requireOrgMember` appelé en `ctx.runQuery` (une
+>   action n'a pas `ctx.db`).
+> - Dégradation propre : clé manquante → `error:'config'`, Attio en erreur /
+>   transport KO → `error:'upstream'`, liste vide, **pas de crash** (seul un
+>   non-membre lève). Le front affiche un message neutre et garde l'ajout manuel.
+> - Front : `participations.$companyId.tsx` — extraction d'un composant
+>   `PersonRow` (état de recherche local par ligne), `useAction` débouncé 300 ms
+>   (`useDebouncedValue`), suggestions dans un `Popover`/`PopoverAnchor` ancré
+>   sur l'input (badge « Attio »). Éditer le nom remet `attioRecordId: undefined`
+>   (délie). **Save inchangé** : `companies.update`, remplacement total, pas de
+>   nouvelle mutation.
+> - Le lien vers la fiche est déjà fabriqué par `attioPersonUrl` (5b) dès que
+>   `attioRecordId` est rempli. i18n EN/FR : `edit.personSearching`,
+>   `personSearchNoResults`, `personSearchError`, `personLinkedToAttio`,
+>   `attioBadge`.
+> - Hors périmètre : pré-remplissage depuis le team Attio de l'entité (5d),
+>   toute écriture vers Attio, resync des noms snapshotés.
+
 ## v1.21.0 — 24/06/2026 à 11:45 — Fondateurs, board et co-investisseurs sur la fiche
 
 Les fiches société affichent désormais leurs **fondateurs**, **membres du

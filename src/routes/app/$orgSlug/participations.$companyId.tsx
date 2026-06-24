@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link2, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
+import { useAction } from 'convex/react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { ConvexError } from 'convex/values'
@@ -37,8 +38,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
+import { Badge } from '~/components/ui/badge'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+} from '~/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -46,6 +53,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { useDebouncedValue } from '~/hooks/useDebouncedValue'
 
 export const Route = createFileRoute('/app/$orgSlug/participations/$companyId')({
   component: ParticipationDetail,
@@ -87,8 +95,8 @@ function NotFound() {
   )
 }
 
-// A person row in the edit dialog. attioRecordId is preserved silently for
-// already-linked people (no UI to enter it in this lot) and never cleared.
+// A person row in the edit dialog. attioRecordId is set by picking an Attio
+// search suggestion (Lot 5c) and cleared when the name is edited by hand.
 type PersonDraft = { role: PersonRole; name: string; attioRecordId?: string }
 
 /** Entity edit dialog: name + SIREN (9 digits or empty) + portfolio group +
@@ -276,50 +284,21 @@ function EditCompanyDialog({
               )}
             </div>
           )}
-          {/* People — founders / board / co-investors, by name (no Attio
-              search in this lot). attioRecordId of linked people is preserved
-              silently; there is no UI to enter it here. */}
+          {/* People — founders / board / co-investors. Each row searches Attio
+              by name (Lot 5c): picking a suggestion fills name + attioRecordId
+              (the link is built at display time), while typing a free name
+              keeps the person unlinked (Lot 5b). */}
           <div className="space-y-2">
             <Label>{t('participations:edit.peopleLabel')}</Label>
             <div className="space-y-2">
               {people.map((p, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <Select
-                    value={p.role}
-                    onValueChange={(v) =>
-                      updatePerson(i, { role: v as PersonRole })
-                    }
-                  >
-                    <SelectTrigger className="w-40 shrink-0">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PERSON_ROLES.map((role) => (
-                        <SelectItem key={role} value={role}>
-                          {t(`participations:personRole.${role}`)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    className="flex-1"
-                    value={p.name}
-                    onChange={(e) => updatePerson(i, { name: e.target.value })}
-                    placeholder={t(
-                      'participations:edit.peopleNamePlaceholder',
-                    )}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0"
-                    onClick={() => removePerson(i)}
-                    aria-label={t('participations:edit.peopleRemove')}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
+                <PersonRow
+                  key={i}
+                  person={p}
+                  orgId={orgId}
+                  onChange={(patch) => updatePerson(i, patch)}
+                  onRemove={() => removePerson(i)}
+                />
               ))}
             </div>
             <Button
@@ -357,6 +336,177 @@ function EditCompanyDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * One person row: role select + name input with Attio search (Lot 5c) + remove.
+ * Typing debounces a backend search on Attio's people object; picking a result
+ * fills name + attioRecordId. Editing the name by hand unlinks (Lot 5b path).
+ * The search is an aid — the manual entry keeps working if Attio is down or the
+ * key is missing (the action degrades to an empty list + a neutral error).
+ */
+function PersonRow({
+  person,
+  orgId,
+  onChange,
+  onRemove,
+}: {
+  person: PersonDraft
+  orgId: Id<'organizations'>
+  onChange: (patch: Partial<PersonDraft>) => void
+  onRemove: () => void
+}) {
+  const { t } = useTranslation('participations')
+  const searchPeople = useAction(api.attio.searchPeople)
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false)
+  const [results, setResults] = useState<
+    Array<{ name: string; attioRecordId: string }>
+  >([])
+  // The name the user actively picked / a pre-linked name — never re-searched
+  // (avoids reopening the dropdown right after a selection or on mount).
+  const skipNameRef = useRef<string | null>(
+    person.attioRecordId ? person.name : null,
+  )
+  // Only search once the user has typed in THIS field, so opening the dialog
+  // never fires a search for every existing person.
+  const touchedRef = useRef(false)
+  const debounced = useDebouncedValue(person.name, 300)
+
+  useEffect(() => {
+    const q = debounced.trim()
+    if (!touchedRef.current || q.length < 2 || q === skipNameRef.current) {
+      setResults([])
+      setError(false)
+      setLoading(false)
+      setOpen(false)
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    setError(false)
+    setOpen(true)
+    searchPeople({ orgId, query: q })
+      .then((res) => {
+        if (cancelled) return
+        setResults(res.results)
+        setError(res.error != null)
+        setLoading(false)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setResults([])
+        setError(true)
+        setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [debounced, orgId, searchPeople])
+
+  function handleNameChange(value: string) {
+    // Editing the name by hand breaks the Attio link.
+    touchedRef.current = true
+    skipNameRef.current = null
+    onChange({ name: value, attioRecordId: undefined })
+  }
+
+  function handleSelect(s: { name: string; attioRecordId: string }) {
+    skipNameRef.current = s.name
+    onChange({ name: s.name, attioRecordId: s.attioRecordId })
+    setOpen(false)
+    setResults([])
+  }
+
+  const linked = Boolean(person.attioRecordId)
+
+  return (
+    <div className="flex items-start gap-2">
+      <Select
+        value={person.role}
+        onValueChange={(v) => onChange({ role: v as PersonRole })}
+      >
+        <SelectTrigger className="w-40 shrink-0">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {PERSON_ROLES.map((role) => (
+            <SelectItem key={role} value={role}>
+              {t(`participations:personRole.${role}`)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <div className="flex-1 space-y-1">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverAnchor asChild>
+            <Input
+              value={person.name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              onFocus={() => {
+                if (results.length > 0 || loading || error) setOpen(true)
+              }}
+              placeholder={t('participations:edit.peopleNamePlaceholder')}
+            />
+          </PopoverAnchor>
+          <PopoverContent
+            align="start"
+            className="w-[var(--radix-popover-trigger-width)] p-1"
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
+            {loading ? (
+              <div className="text-muted-foreground flex items-center gap-2 px-2 py-1.5 text-sm">
+                <Loader2 className="size-4 animate-spin" />
+                {t('participations:edit.personSearching')}
+              </div>
+            ) : error ? (
+              <div className="text-muted-foreground px-2 py-1.5 text-sm">
+                {t('participations:edit.personSearchError')}
+              </div>
+            ) : results.length === 0 ? (
+              <div className="text-muted-foreground px-2 py-1.5 text-sm">
+                {t('participations:edit.personSearchNoResults')}
+              </div>
+            ) : (
+              <ul>
+                {results.map((s) => (
+                  <li key={s.attioRecordId}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(s)}
+                      className="hover:bg-accent hover:text-accent-foreground flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm"
+                    >
+                      <span className="truncate">{s.name}</span>
+                      <Badge variant="secondary" className="shrink-0">
+                        {t('participations:edit.attioBadge')}
+                      </Badge>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </PopoverContent>
+        </Popover>
+        {linked && (
+          <p className="text-muted-foreground flex items-center gap-1 text-xs">
+            <Link2 className="size-3" />
+            {t('participations:edit.personLinkedToAttio')}
+          </p>
+        )}
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="shrink-0"
+        onClick={onRemove}
+        aria-label={t('participations:edit.peopleRemove')}
+      >
+        <Trash2 className="size-4" />
+      </Button>
+    </div>
   )
 }
 
