@@ -37,7 +37,7 @@ export const Route = createFileRoute('/app/$orgSlug/participations/')({
   }),
 })
 
-/** Entity creation dialog: name + SIREN (9 digits or empty) + portfolio group.
+/** Entity creation dialog: name + SIREN (9 digits or empty).
  * kind is forced to 'portfolio' (not exposed). */
 function CreateCompanyDialog({
   orgId,
@@ -51,11 +51,8 @@ function CreateCompanyDialog({
   const { t } = useTranslation(['participations', 'common'])
   const navigate = useNavigate()
   const createCompany = useConvexMutation(api.companies.create)
-  const updateCompany = useConvexMutation(api.companies.update)
-  const groups = useConvexQuery(api.participations.listGroups, { orgId })
   const [name, setName] = useState('')
   const [siren, setSiren] = useState('')
-  const [group, setGroup] = useState('')
   const [pending, setPending] = useState(false)
 
   // Client-side validation (mirror of the mutation): spaces ignored,
@@ -73,16 +70,6 @@ function CreateCompanyDialog({
         kind: 'portfolio',
         siren: cleanedSiren === '' ? undefined : siren,
       })
-      // Group lives only on update (create doesn't accept it). If applying
-      // it fails, the entity still exists: navigate to it and warn explicitly.
-      const trimmedGroup = group.trim()
-      if (trimmedGroup !== '') {
-        try {
-          await updateCompany({ id: newId, patch: { group } })
-        } catch {
-          toast.warning(t('participations:create.groupApplyFailed'))
-        }
-      }
       toast.success(t('participations:create.created'))
       onClose()
       navigate({
@@ -144,28 +131,6 @@ function CreateCompanyDialog({
                 {t('participations:edit.sirenInvalid')}
               </p>
             )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="new-company-group">
-              {t('participations:edit.groupLabel')}
-            </Label>
-            <Input
-              id="new-company-group"
-              list="new-company-group-options"
-              value={group}
-              onChange={(e) => setGroup(e.target.value)}
-              placeholder={t('participations:edit.groupPlaceholder')}
-            />
-            <datalist id="new-company-group-options">
-              {groups?.map((g) => (
-                <option key={g.group} value={g.group}>
-                  {g.displayName}
-                </option>
-              ))}
-            </datalist>
-            <p className="text-muted-foreground text-xs">
-              {t('participations:edit.groupHint')}
-            </p>
           </div>
         </div>
         <DialogFooter>

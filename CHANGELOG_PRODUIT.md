@@ -23,6 +23,36 @@ bas de page.
 
 ---
 
+## v1.23.0 — 24/06/2026 à 17:11 — Participations : retour à une liste simple
+
+Les **Participations** reviennent à une présentation simple : **une ligne par
+société**, dépliable vers ses deals. Le regroupement de plusieurs sociétés sous
+un même « groupe » (badges *groupe*/*sponsor*, bouton « Voir le groupe » et page
+de consolidation dédiée) est **retiré** — il ajoutait de la complexité sans usage
+réel. Le tri, la recherche, la pagination et l'export CSV restent identiques. Côté
+société, le champ **« Groupe »** disparaît des fenêtres de création et de
+modification ; tout le reste (nom, SIREN, personnes, deals) est intact.
+
+> **🔧 Notes techniques**
+>
+> - Étape A (code uniquement) : on retire le code qui lit/écrit/affiche le
+>   regroupement, **le schéma reste inchangé** — `companies.group`, `companies.sponsor`,
+>   la table `portfolioGroupSettings` et leurs index restent déclarés, inertes (le
+>   nettoyage données + schéma sera une Étape B dédiée, avec snapshot).
+> - Front : suppression de la route `participations.group.$slug.tsx` ; reducer de
+>   `ParticipationsTable.tsx` reclassé par société (forme pré‑#83), retrait des
+>   badges groupe/sponsor et du bouton « Voir le groupe », retrait de `showEntity` ;
+>   retrait du champ Groupe + select de type dans `participations.$companyId.tsx` et
+>   `participations.index.tsx` ; `EntityFiche.tsx` simplifié (nature « company »
+>   uniquement) ; nettoyage des clés i18n `participations` (badge/kind/block/group,
+>   natures sponsor/group, identity de conso).
+> - Back : suppression de `convex/participations.ts`, `convex/lib/groupSettings.ts`,
+>   `convex/lib/portfolioGroups.ts` et de `tests/portfolioGroups.test.ts` ;
+>   `companies.update`, `deals.ts` et `aggregate.ts` allégés de la méta‑groupe
+>   (`buildGroupMeta`/`groupMeta`, `companyRef` sans champs groupe).
+>   `assertInvestorIsGroupEntity` (entités juridiques `group_*`) est conservé — sans
+>   rapport avec la feature de regroupement.
+
 ## v1.22.0 — 24/06/2026 à 12:30 — Recherche Attio des personnes
 
 Dans la fenêtre **Modifier la société**, chaque ligne de personne propose

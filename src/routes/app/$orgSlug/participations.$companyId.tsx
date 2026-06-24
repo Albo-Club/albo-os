@@ -99,7 +99,7 @@ function NotFound() {
 // search suggestion (Lot 5c) and cleared when the name is edited by hand.
 type PersonDraft = { role: PersonRole; name: string; attioRecordId?: string }
 
-/** Entity edit dialog: name + SIREN (9 digits or empty) + portfolio group +
+/** Entity edit dialog: name + SIREN (9 digits or empty) +
  * people (founders / board / co-investors, full-list replacement at save). */
 function EditCompanyDialog({
   company,
@@ -110,7 +110,6 @@ function EditCompanyDialog({
     _id: Id<'companies'>
     name: string
     siren?: string | null
-    group?: string | null
     people?: Array<PersonDraft>
   }
   orgId: Id<'organizations'>
@@ -118,11 +117,8 @@ function EditCompanyDialog({
 }) {
   const { t } = useTranslation(['participations', 'common'])
   const updateCompany = useConvexMutation(api.companies.update)
-  const groups = useConvexQuery(api.participations.listGroups, { orgId })
   const [name, setName] = useState(company.name)
   const [siren, setSiren] = useState(company.siren ?? '')
-  const [group, setGroup] = useState(company.group ?? '')
-  const [groupKind, setGroupKind] = useState<'sponsor' | 'group' | ''>('')
   const [people, setPeople] = useState<Array<PersonDraft>>(company.people ?? [])
   const [pending, setPending] = useState(false)
 
@@ -144,14 +140,6 @@ function EditCompanyDialog({
       prev.map((p, i) => (i === index ? { ...p, ...patch } : p)),
     )
 
-  // A group is "new" when the typed name doesn't match any existing one.
-  // Creating one forces a kind choice (sponsor | group); assigning to an
-  // existing group never asks (its kind is already set).
-  const trimmedGroup = group.trim()
-  const isNewGroup =
-    trimmedGroup !== '' && !groups?.some((g) => g.group === trimmedGroup)
-  const kindMissing = isNewGroup && groupKind === ''
-
   async function handleSave() {
     setPending(true)
     try {
@@ -160,8 +148,6 @@ function EditCompanyDialog({
         patch: {
           name: name.trim(),
           siren,
-          group,
-          ...(isNewGroup && groupKind ? { groupKind } : {}),
           // Full-list replacement. Trim names; keep attioRecordId when present.
           people: people.map((p) => ({
             role: p.role,
@@ -232,58 +218,6 @@ function EditCompanyDialog({
               </p>
             )}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="company-group">
-              {t('participations:edit.groupLabel')}
-            </Label>
-            <Input
-              id="company-group"
-              list="company-group-options"
-              value={group}
-              onChange={(e) => setGroup(e.target.value)}
-              placeholder={t('participations:edit.groupPlaceholder')}
-            />
-            <datalist id="company-group-options">
-              {groups?.map((g) => (
-                <option key={g.group} value={g.group}>
-                  {g.displayName}
-                </option>
-              ))}
-            </datalist>
-            <p className="text-muted-foreground text-xs">
-              {t('participations:edit.groupHint')}
-            </p>
-          </div>
-          {isNewGroup && (
-            <div className="space-y-2">
-              <Label htmlFor="company-group-kind">
-                {t('participations:edit.kindLabel')}
-              </Label>
-              <Select
-                value={groupKind}
-                onValueChange={(v) => setGroupKind(v as 'sponsor' | 'group')}
-              >
-                <SelectTrigger id="company-group-kind">
-                  <SelectValue
-                    placeholder={t('participations:edit.kindPlaceholder')}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sponsor">
-                    {t('participations:kind.sponsor')}
-                  </SelectItem>
-                  <SelectItem value="group">
-                    {t('participations:kind.group')}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              {kindMissing && (
-                <p className="text-destructive text-xs">
-                  {t('participations:edit.kindRequired')}
-                </p>
-              )}
-            </div>
-          )}
           {/* People — founders / board / co-investors. Each row searches Attio
               by name (Lot 5c): picking a suggestion fills name + attioRecordId
               (the link is built at display time), while typing a free name
@@ -327,7 +261,6 @@ function EditCompanyDialog({
               pending ||
               sirenInvalid ||
               nameMissing ||
-              kindMissing ||
               someNameEmpty
             }
           >

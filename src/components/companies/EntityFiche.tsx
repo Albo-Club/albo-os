@@ -7,23 +7,16 @@ import { Badge } from '~/components/ui/badge'
 
 /**
  * Shared, read-only building blocks for the entity fiche skeleton (header →
- * nature-driven identity block → reporting/KPIs → documents). Used by the
- * company fiche (nature "company") and the group conso (natures "sponsor" /
- * "group"). No mutation here — editing comes in a later lot.
+ * identity block → reporting/KPIs → documents). Used by the company fiche.
+ * No mutation here — editing comes in a later lot.
  */
 
-export type EntityNature = 'company' | 'sponsor' | 'group'
+export type EntityNature = 'company'
 
-/** Nature badge shown in the header; it drives which identity block renders. */
+/** Nature badge shown in the header. */
 export function EntityNatureBadge({ nature }: { nature: EntityNature }) {
   const { t } = useTranslation('participations')
-  const variant =
-    nature === 'sponsor'
-      ? 'outline'
-      : nature === 'group'
-        ? 'secondary'
-        : 'default'
-  return <Badge variant={variant}>{t(`nature.${nature}`)}</Badge>
+  return <Badge variant="default">{t(`nature.${nature}`)}</Badge>
 }
 
 /** One labelled identity field; shows an em dash when the value is empty. */
@@ -155,24 +148,5 @@ export function PeopleList({ people }: { people: Array<Person> }) {
         </li>
       ))}
     </ul>
-  )
-}
-
-/** Reserved zone: a titled placeholder kept in the skeleton for a surface that
- * has no data source yet (e.g. group-level documents). */
-export function ReservedSection({
-  title,
-  note,
-}: {
-  title: string
-  note: string
-}) {
-  return (
-    <section className="space-y-2">
-      <h2 className="text-sm font-medium">{title}</h2>
-      <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
-        {note}
-      </div>
-    </section>
   )
 }

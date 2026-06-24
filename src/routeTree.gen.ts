@@ -40,7 +40,6 @@ import { Route as AppOrgSlugSettingsGeneralRouteImport } from './routes/app/$org
 import { Route as AppOrgSlugParticipationsCompanyIdRouteImport } from './routes/app/$orgSlug/participations.$companyId'
 import { Route as AppOrgSlugDealsDealIdRouteImport } from './routes/app/$orgSlug/deals.$dealId'
 import { Route as AppOrgSlugCashAccountIdRouteImport } from './routes/app/$orgSlug/cash.$accountId'
-import { Route as AppOrgSlugParticipationsGroupSlugRouteImport } from './routes/app/$orgSlug/participations.group.$slug'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -203,12 +202,6 @@ const AppOrgSlugCashAccountIdRoute = AppOrgSlugCashAccountIdRouteImport.update({
   path: '/cash/$accountId',
   getParentRoute: () => AppOrgSlugRouteRoute,
 } as any)
-const AppOrgSlugParticipationsGroupSlugRoute =
-  AppOrgSlugParticipationsGroupSlugRouteImport.update({
-    id: '/participations/group/$slug',
-    path: '/participations/group/$slug',
-    getParentRoute: () => AppOrgSlugRouteRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -242,7 +235,6 @@ export interface FileRoutesByFullPath {
   '/app/$orgSlug/passif/': typeof AppOrgSlugPassifIndexRoute
   '/app/$orgSlug/pointage/': typeof AppOrgSlugPointageIndexRoute
   '/app/$orgSlug/settings/': typeof AppOrgSlugSettingsIndexRoute
-  '/app/$orgSlug/participations/group/$slug': typeof AppOrgSlugParticipationsGroupSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -272,7 +264,6 @@ export interface FileRoutesByTo {
   '/app/$orgSlug/passif': typeof AppOrgSlugPassifIndexRoute
   '/app/$orgSlug/pointage': typeof AppOrgSlugPointageIndexRoute
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsIndexRoute
-  '/app/$orgSlug/participations/group/$slug': typeof AppOrgSlugParticipationsGroupSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -307,7 +298,6 @@ export interface FileRoutesById {
   '/app/$orgSlug/passif/': typeof AppOrgSlugPassifIndexRoute
   '/app/$orgSlug/pointage/': typeof AppOrgSlugPointageIndexRoute
   '/app/$orgSlug/settings/': typeof AppOrgSlugSettingsIndexRoute
-  '/app/$orgSlug/participations/group/$slug': typeof AppOrgSlugParticipationsGroupSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -343,7 +333,6 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/passif/'
     | '/app/$orgSlug/pointage/'
     | '/app/$orgSlug/settings/'
-    | '/app/$orgSlug/participations/group/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -373,7 +362,6 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/passif'
     | '/app/$orgSlug/pointage'
     | '/app/$orgSlug/settings'
-    | '/app/$orgSlug/participations/group/$slug'
   id:
     | '__root__'
     | '/'
@@ -407,7 +395,6 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/passif/'
     | '/app/$orgSlug/pointage/'
     | '/app/$orgSlug/settings/'
-    | '/app/$orgSlug/participations/group/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -641,13 +628,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrgSlugCashAccountIdRouteImport
       parentRoute: typeof AppOrgSlugRouteRoute
     }
-    '/app/$orgSlug/participations/group/$slug': {
-      id: '/app/$orgSlug/participations/group/$slug'
-      path: '/participations/group/$slug'
-      fullPath: '/app/$orgSlug/participations/group/$slug'
-      preLoaderRoute: typeof AppOrgSlugParticipationsGroupSlugRouteImport
-      parentRoute: typeof AppOrgSlugRouteRoute
-    }
   }
 }
 
@@ -682,7 +662,6 @@ interface AppOrgSlugRouteRouteChildren {
   AppOrgSlugParticipationsIndexRoute: typeof AppOrgSlugParticipationsIndexRoute
   AppOrgSlugPassifIndexRoute: typeof AppOrgSlugPassifIndexRoute
   AppOrgSlugPointageIndexRoute: typeof AppOrgSlugPointageIndexRoute
-  AppOrgSlugParticipationsGroupSlugRoute: typeof AppOrgSlugParticipationsGroupSlugRoute
 }
 
 const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
@@ -697,8 +676,6 @@ const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
   AppOrgSlugParticipationsIndexRoute: AppOrgSlugParticipationsIndexRoute,
   AppOrgSlugPassifIndexRoute: AppOrgSlugPassifIndexRoute,
   AppOrgSlugPointageIndexRoute: AppOrgSlugPointageIndexRoute,
-  AppOrgSlugParticipationsGroupSlugRoute:
-    AppOrgSlugParticipationsGroupSlugRoute,
 }
 
 const AppOrgSlugRouteRouteWithChildren = AppOrgSlugRouteRoute._addFileChildren(

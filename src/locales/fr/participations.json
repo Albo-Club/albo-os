@@ -68,16 +68,7 @@
     "currency": "Devise",
     "notes": "Notes",
     "status": "Statut",
-    "tvpi": "TVPI",
-    "entity": "Entité"
-  },
-  "badge": {
-    "group": "groupe",
-    "sponsor": "sponsor"
-  },
-  "kind": {
-    "sponsor": "Sponsor",
-    "group": "Groupe"
+    "tvpi": "TVPI"
   },
   "personRole": {
     "founder": "Fondateur",
@@ -85,55 +76,17 @@
     "coinvestor": "Co-investisseur"
   },
   "nature": {
-    "company": "Entreprise",
-    "sponsor": "Sponsor dette",
-    "group": "Groupe"
+    "company": "Entreprise"
   },
   "identity": {
     "title": "Identité",
-    "name": "Nom",
-    "type": "Type",
-    "slug": "Identifiant (slug)",
     "attio": "Fiche Attio",
     "attioOpen": "Ouvrir dans Attio",
     "attioLinked": "Lié à Attio",
     "founders": "Fondateur(s)",
     "board": "Membres du board",
     "coInvestors": "Co-investisseurs",
-    "platformType": "Type de plateforme",
-    "mainContact": "Contact principal",
-    "sponsorDealsNote": "Les deals dette rattachés remontent via les entités membres.",
-    "empty": "À renseigner",
-    "documents": "Documents",
-    "documentsAtEntity": "Les documents sont rattachés à chaque entité du groupe."
-  },
-  "block": {
-    "expo_totale": "Exposition totale",
-    "verse": "Versé",
-    "recu": "Reçu",
-    "tvpi": "TVPI"
-  },
-  "group": {
-    "metaTitle": "Groupe — Albo OS",
-    "notFound": "Groupe introuvable.",
-    "viewGroup": "Voir le groupe",
-    "rename": "Renommer",
-    "renameError": "Impossible de renommer le groupe.",
-    "kindUnset": "À classer",
-    "kindError": "Impossible de changer le type du groupe.",
-    "customize": "Personnaliser",
-    "customizeError": "Impossible d'enregistrer la disposition.",
-    "kpisTitle": "KPI consolidés",
-    "entitiesTitle": "Entités du groupe",
-    "entityCount_one": "{{count}} entité",
-    "entityCount_other": "{{count}} entités",
-    "addEntity": "Ajouter une entité",
-    "addEntityTitle": "Ajouter des entités au groupe",
-    "addEntityDescription": "Sélectionnez les sociétés à rattacher à {{name}}.",
-    "addEntityEmpty": "Aucune entité disponible — toutes les sociétés du portefeuille appartiennent déjà à un groupe.",
-    "addEntityError": "Impossible d'ajouter les entités. Réessayez.",
-    "entitiesAdded_one": "{{count}} entité ajoutée",
-    "entitiesAdded_other": "{{count}} entités ajoutées"
+    "empty": "À renseigner"
   },
   "status": {
     "active": "Actif",
@@ -305,12 +258,6 @@
     "sirenLabel": "SIREN",
     "sirenPlaceholder": "9 chiffres",
     "sirenInvalid": "Le SIREN doit contenir exactement 9 chiffres.",
-    "groupLabel": "Groupe",
-    "groupPlaceholder": "Aucun groupe",
-    "groupHint": "Tapez pour créer un nouveau groupe, ou choisissez-en un existant. Laisser vide pour retirer.",
-    "kindLabel": "Type de groupe",
-    "kindPlaceholder": "Choisir un type",
-    "kindRequired": "Choisissez un type pour le nouveau groupe.",
     "nameRequired": "Le nom est obligatoire.",
     "peopleLabel": "Personnes",
     "peopleAdd": "Ajouter une personne",
@@ -335,7 +282,6 @@
     "title": "Nouvelle entité",
     "description": "Créer une société du portefeuille. Vous pourrez la modifier ensuite.",
     "created": "Entité créée",
-    "groupApplyFailed": "Entité créée, mais le groupe n'a pas pu être appliqué — vous pouvez l'ajouter via Éditer.",
     "errors": {
       "invalid_siren": "Le SIREN doit contenir exactement 9 chiffres.",
       "siren_already_used": "Ce SIREN est déjà utilisé par une autre société.",
