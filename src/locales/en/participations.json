@@ -317,6 +317,11 @@
     "peopleRemove": "Remove",
     "peopleNamePlaceholder": "Person's name",
     "peopleNameRequired": "Name is required.",
+    "personSearching": "Searching Attio…",
+    "personSearchNoResults": "No matching person in Attio",
+    "personSearchError": "Attio search unavailable",
+    "personLinkedToAttio": "Linked to Attio",
+    "attioBadge": "Attio",
     "saved": "Changes saved",
     "errors": {
       "invalid_siren": "The SIREN must be exactly 9 digits.",
