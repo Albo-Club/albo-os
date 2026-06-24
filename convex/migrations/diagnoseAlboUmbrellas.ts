@@ -281,3 +281,85 @@ export const dryRun = internalQuery({
     }
   },
 })
+
+/** Full identity dump (read-only) of one company — every field + creation date,
+ * plus a flag list to tell a complete entity from a migration shell. */
+function entityView(company: Doc<'companies'>) {
+  const filled = (v: unknown) =>
+    v !== undefined && v !== null && !(typeof v === 'string' && v.trim() === '')
+  return {
+    companyId: company._id,
+    createdAt: company._creationTime, // ms epoch
+    name: company.name,
+    kind: company.kind,
+    archived: company.archivedAt != null,
+    archivedAt: company.archivedAt ?? null,
+    // Identity fields (null when absent — the point of the check).
+    legalName: company.legalName ?? null,
+    siren: company.siren ?? null,
+    registrationNumber: company.registrationNumber ?? null,
+    countryCode: company.countryCode ?? null,
+    legalForm: company.legalForm ?? null,
+    incorporationDate: company.incorporationDate ?? null,
+    domain: company.domain ?? null,
+    sector: company.sector ?? null,
+    totalShares: company.totalShares ?? null,
+    sponsor: company.sponsor ?? null,
+    group: company.group ?? null,
+    notes: company.notes ?? null,
+    // Bridges / import anchors.
+    attioCompanyId: company.attioCompanyId ?? null,
+    airtableId: company.airtableId ?? null,
+    // "Shell or complete?" — which identity fields are actually filled.
+    identityFilled: {
+      legalName: filled(company.legalName),
+      siren: filled(company.siren),
+      countryCode: filled(company.countryCode),
+      legalForm: filled(company.legalForm),
+      incorporationDate: filled(company.incorporationDate),
+      domain: filled(company.domain),
+      sector: filled(company.sector),
+      totalShares: filled(company.totalShares),
+    },
+  }
+}
+
+/**
+ * READ-ONLY full detail of the umbrella + candidate target entities on albo.
+ * Tells whether each candidate is a complete entity or a migration shell.
+ *
+ *   pnpm exec convex run --prod migrations/diagnoseAlboUmbrellas:entityDetails
+ */
+export const entityDetails = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const albo = await getOrgBySlug(ctx, 'albo')
+    const orgCompanies = await ctx.db
+      .query('companies')
+      .withIndex('by_org', (q) => q.eq('orgId', albo._id))
+      .collect()
+    const byAttio = new Map(
+      orgCompanies.filter((c) => c.attioCompanyId).map((c) => [c.attioCompanyId, c]),
+    )
+    const byName = new Map(orgCompanies.map((c) => [c.name, c]))
+
+    return {
+      readOnly: true,
+      note: 'Lecture seule — aucune écriture. createdAt = ms epoch (new Date(value) à l’affichage).',
+      groups: UMBRELLAS.map((u) => {
+        const umbrella = byAttio.get(u.attioCompanyId)
+        return {
+          label: u.label,
+          umbrella: umbrella ? entityView(umbrella) : { found: false },
+          candidateTargets: u.targetNames.map((name) => {
+            const match = byName.get(name)
+            return match
+              ? entityView(match)
+              : { name, found: false }
+          }),
+        }
+      }),
+    }
+  },
+})
+

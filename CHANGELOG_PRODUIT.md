@@ -23,6 +23,24 @@ bas de page.
 
 ---
 
+## v1.28.3 — 24/06/2026 à 22:10 — Diagnostic : détail d'identité des entités cibles (lecture seule)
+
+Complément au diagnostic interne : un relevé en lecture seule du détail complet
+(nom, SIREN, forme juridique, date de création…) des entités cibles, pour
+distinguer une entité renseignée d'une coquille créée par migration. Aucun
+changement visible, aucune donnée modifiée.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/diagnoseAlboUmbrellas.ts` : nouvel `internalQuery
+>   entityDetails` (lecture seule). Pour chaque umbrella albo + ses entités
+>   cibles candidates, renvoie le doc complet via `entityView` (tous les champs
+>   d'identité + `_creationTime` + `archivedAt`) avec un bloc `identityFilled`
+>   indiquant quels champs sont réellement remplis (coquille vs entité complète).
+>   `pnpm exec convex run --prod migrations/diagnoseAlboUmbrellas:entityDetails`.
+
+---
+
 ## v1.28.2 — 24/06/2026 à 21:55 — Diagnostic interne des entités chapeau (lecture seule)
 
 Ajout d'un diagnostic interne, en lecture seule, pour mesurer les entités
