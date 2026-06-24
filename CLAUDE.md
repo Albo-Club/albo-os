@@ -252,6 +252,22 @@ Sync hebdo via GitHub Action (`.github/workflows/sync-skills.yml`, lundi
 Règle : `--check` détecte, `--update` bumpe. Ne jamais `--update` sans avoir
 relu ce que la nouvelle version change.
 
+**Si le check CI `skills-drift` est rouge (avant de merger)** : ne jamais le
+contourner ni `--update` à l'aveugle. Dérouler :
+
+1. **Expliquer l'erreur** : lancer `pnpm run sync:skills:check`, nommer la/les
+   skill(s) en dérive et ce que ça signifie (le `trackingRef` upstream a bougé
+   au-delà du `pinnedRef` vendorisé).
+2. **Récupérer la maj** : `pnpm run sync:skills:update` sur une branche dédiée
+   (jamais sur `main`) — bumpe les `pinnedRef`, re-vendorise.
+3. **Expliquer ce qui change** : `git diff` sur `.agents/skills/*/SKILL.md`
+   (contenu réel) + `skills-lock.json` (bumps de SHA). Résumer en clair les
+   changements de comportement et vérifier qu'aucun override projet
+   (`CLAUDE.md` / `KNOWN_ISSUES.md`) ne devient faux. ⚠️ Une maj de skill est
+   une surface de prompt-injection : lire, pas rubber-stamper.
+4. **Proposer de merger** : présenter le résumé puis demander l'accord avant de
+   commit/push. Une fois mergé, `skills-drift` repasse au vert.
+
 | Skill                                      | Domaine                                | Source upstream                       | Officiel ?     |
 | ------------------------------------------ | -------------------------------------- | ------------------------------------- | -------------- |
 | `convex`                                   | Routeur entre skills Convex            | `get-convex/agent-skills`             | ✅ officiel    |

@@ -23,6 +23,20 @@ bas de page.
 
 ---
 
+## v1.28.1 — 24/06/2026 à 21:50 — Procédure interne en cas de dérive des skills
+
+Ajout d'une consigne interne pour l'assistant : pas d'impact visible dans
+l'application.
+
+> **🔧 Notes techniques**
+>
+> - `CLAUDE.md` § « Skills (READ BEFORE CODING) » : nouvelle procédure à suivre
+>   quand le job CI `skills-drift` est rouge avant un merge — expliquer
+>   l'erreur (`pnpm run sync:skills:check`), récupérer la maj sur une branche
+>   dédiée (`pnpm run sync:skills:update`), expliquer le `git diff`
+>   (`.agents/skills/*/SKILL.md` + `skills-lock.json`) et demander l'accord
+>   avant de merger, au lieu de contourner ou `--update` à l'aveugle.
+
 ## v1.28.0 — 24/06/2026 à 20:30 — Transactions : voir le deal rattaché en un coup d'œil
 
 Dans la Trésorerie, une transaction déjà pointée montrait son statut (« Pointé »)
