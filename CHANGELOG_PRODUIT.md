@@ -23,6 +23,32 @@ bas de page.
 
 ---
 
+## v1.33.1 — 25/06/2026 à 22:32 — Diagnostic : entités portfolio sans deal (lecture seule)
+
+Nouveau diagnostic interne, en lecture seule, qui mesure sur les deux véhicules
+(Albo et Calte) les entités du portefeuille qu'aucun investissement ne référence
+— les candidates potentielles à un futur ménage. Il liste, pour chacune, son
+identité (SIREN, forme juridique, date de création…) et sa provenance, signale
+les doublons de noms exacts et les copies portant le nom d'une entité juridique
+protégée. Aucun changement visible, aucune donnée modifiée.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/diagnoseDeadEntities.ts` : nouvel `internalQuery dryRun`
+>   (lecture seule, modèle `diagnoseAlboUmbrellas`). Pour chaque org (`albo`,
+>   `calte`) : résumé chiffré (total entités archivées comprises, `group_*`
+>   protégées, portfolio sans deal, archivées), liste détaillée des entités
+>   portfolio sans deal (identité + `identityFilled` + provenance `airtableId`/
+>   `attioCompanyId` + flag heuristique `isLikelyShell`), et rapport de doublons
+>   (groupes de noms exacts avec présence de deals par ID, portfolio dont le nom
+>   matche un `group_*`).
+> - Matching deal → entité strictement **par ID** (`targetCompanyId`,
+>   `investorCompanyId`, `viaSpvCompanyId`) pour ne pas être trompé par les
+>   doublons de noms. Les `group_*` ne sont jamais candidates, listées à part.
+> - `pnpm exec convex run --prod migrations/diagnoseDeadEntities:dryRun`.
+
+---
+
 ## v1.33.0 — 25/06/2026 à 11:38 — Secteur éditable depuis la fiche entité
 
 Le **secteur** d'une entité du portefeuille se modifie désormais directement
@@ -163,7 +189,6 @@ et l'icône de secours reprend sa place.
 >   `edit.companyDescription` mise à jour.
 > - Aucun stockage de logo (cf. `KNOWN_ISSUES.md` « Logos d'entreprises ») :
 >   le domaine continue d'être hotlinké à la volée par `CompanyLogo`.
-
 ## v1.28.3 — 24/06/2026 à 22:10 — Diagnostic : détail d'identité des entités cibles (lecture seule)
 
 Complément au diagnostic interne : un relevé en lecture seule du détail complet
