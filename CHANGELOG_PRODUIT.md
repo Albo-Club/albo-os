@@ -23,6 +23,30 @@ bas de page.
 
 ---
 
+## v1.37.0 — 25/06/2026 à 23:15 — Nouveautés : affichage par paliers
+
+La page « Nouveautés » n'affiche plus tout l'historique d'un coup : seules les
+**10 dernières** mises à jour sont visibles à l'ouverture, et un bouton « Voir
+les nouveautés plus anciennes » en déroule 10 de plus à chaque clic. L'intro en
+haut et le petit lexique en bas restent toujours là. La page reste légère et
+rapide à mesure que l'historique s'allonge (une entrée par release), sans rien
+perdre du contenu.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/$orgSlug/changelog.tsx` : `parseChangelog()` (pur, exécuté
+>   une fois au chargement du module) découpe l'import `?raw` en
+>   `header` / `entries[]` / `footer`. Les entrées sont les sections `## …`
+>   dont le titre porte le séparateur ` — ` (couvre `## vX.Y.Z — …` **et** les
+>   4 entrées historiques `## Mois AAAA — …`) ; le premier titre sans ` — `
+>   (le « Petit lexique ») démarre le footer, toujours épinglé.
+> - Rendu en deux blocs `ReactMarkdown` (entête + N entrées visibles, puis
+>   footer) partageant le même `markdownComponents` extrait au niveau module ;
+>   `visibleCount` (`useState`, pas de 10) borne le slice — le coût de rendu
+>   suit le nombre d'entrées affichées, plus l'historique complet.
+> - Libellé bouton i18n `nav:changelogPage.showOlder` (FR/EN, interpolation
+>   `{{remaining}}` — pas `count` pour éviter la pluralisation i18next).
+
 ## v1.36.0 — 25/06/2026 à 23:14 — Filtres et tri sur la liste Entreprises
 
 La page **Entreprises** gagne des filtres et de nouveaux tris pour retrouver
@@ -109,7 +133,6 @@ qu'on ne cherche pas réellement à supprimer.
 >   `disabled={…|| dealCount > 0}` / `disabled={…|| linkedCount > 0}`. Garde
 >   serveur (`company_has_references`, `deal_has_transactions`) inchangée.
 > - `TESTING.md` : lignes AR1 et DD2 mises à jour.
-
 ## v1.33.1 — 25/06/2026 à 22:32 — Diagnostic : entités portfolio sans deal (lecture seule)
 
 Nouveau diagnostic interne, en lecture seule, qui mesure sur les deux véhicules
