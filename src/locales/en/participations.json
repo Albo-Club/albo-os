@@ -32,7 +32,9 @@
     "sector": "Sector",
     "siren": "SIREN",
     "domain": "Domain",
-    "ownership": "Ownership"
+    "ownership": "Ownership",
+    "ownershipGlobal": "Global ownership (%)",
+    "sharesConsolidated": "Consolidated shares"
   },
   "col": {
     "company": "Company",
@@ -402,7 +404,7 @@
     }
   },
   "reportings": {
-    "title": "Reportings & documents",
+    "title": "Reporting",
     "upload": "Add a document",
     "uploading": "Uploading…",
     "empty": "No document yet. Investor updates, BPs and legal docs live here.",
