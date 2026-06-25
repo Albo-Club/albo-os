@@ -23,6 +23,31 @@ bas de page.
 
 ---
 
+## v1.35.0 — 25/06/2026 à 22:44 — Notes éditables depuis la fiche deal
+
+Les **notes** d'un deal se modifient désormais directement depuis sa fiche,
+sans passer par le dialog « Modifier » :
+
+- La section **Notes** affiche un petit crayon ; un clic ouvre une zone de
+  saisie multi-lignes avec **Enregistrer** / **Annuler**.
+- La section reste **toujours visible**, même quand le deal n'a pas encore de
+  note (« Aucune note pour le moment. »), ce qui permet d'en **ajouter** une.
+- Vider entièrement le champ puis enregistrer **efface** la note.
+- Une note saisie à la main est protégée d'un éventuel ré-import (comme les
+  autres champs édités manuellement).
+
+> **🔧 Notes techniques**
+>
+> - Nouveau composant `NotesSection` dans
+>   `src/routes/app/$orgSlug/deals.$dealId.tsx` : édition inline (état local
+>   `editing`/`value`/`pending`), `Textarea` shadcn, toggle crayon.
+> - Sauvegarde via `api.deals.update` avec un **patch partiel** `{ notes }`
+>   (la mutation acceptait déjà le champ et marque `notes` dans
+>   `manuallyEditedFields`). Diff sur la valeur trimmée → no-op si inchangé,
+>   chaîne vide → note effacée (l'affichage retombe sur l'état vide).
+> - Bloc lecture-seule précédent remplacé ; clés i18n
+>   `participations:notes.empty` / `notes.placeholder` (EN/FR).
+
 ## v1.34.0 — 25/06/2026 à 23:10 — Avertissements de suppression rangés dans la confirmation
 
 Les avertissements qui empêchent d'archiver une entité ou de supprimer un deal

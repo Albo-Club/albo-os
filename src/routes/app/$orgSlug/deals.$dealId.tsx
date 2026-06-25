@@ -80,6 +80,7 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
+import { Textarea } from '~/components/ui/textarea'
 import { Label } from '~/components/ui/label'
 import {
   Popover,
@@ -691,6 +692,97 @@ function Transactions({ deal }: { deal: CurrentDeal }) {
   )
 }
 
+/** Free-text notes for the deal, editable inline (read-only until the
+    pencil is clicked). The notes field is also writable from the edit
+    dialog's mutation — here we patch only `notes` so other fields stay put. */
+function NotesSection({ deal }: { deal: Doc<'deals'> }) {
+  const { t } = useTranslation(['participations', 'common'])
+  const updateDeal = useConvexMutation(api.deals.update)
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(deal.notes ?? '')
+  const [pending, setPending] = useState(false)
+
+  function startEdit() {
+    // Reset the draft to the saved value each time (covers external updates).
+    setValue(deal.notes ?? '')
+    setEditing(true)
+  }
+
+  async function handleSave() {
+    const next = value.trim()
+    // No-op if unchanged. Empty string clears the note (display falls back to
+    // the empty state); the saved field marks `notes` as manually edited.
+    if (next === (deal.notes ?? '')) {
+      setEditing(false)
+      return
+    }
+    setPending(true)
+    try {
+      await updateDeal({ id: deal._id, patch: { notes: next } })
+      toast.success(t('participations:edit.saved'))
+      setEditing(false)
+    } catch {
+      toast.error(t('participations:edit.errors.default'))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-1.5">
+        <span className="text-muted-foreground text-xs">{t('deal.notes')}</span>
+        {!editing && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="size-6"
+            onClick={startEdit}
+            aria-label={t('common:actions.edit')}
+          >
+            <Pencil className="size-3.5" />
+          </Button>
+        )}
+      </div>
+      {editing ? (
+        <div className="space-y-2">
+          <Textarea
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={t('participations:notes.placeholder')}
+            rows={4}
+            autoFocus
+            disabled={pending}
+          />
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={() => void handleSave()}
+              disabled={pending}
+            >
+              {t('common:actions.save')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditing(false)}
+              disabled={pending}
+            >
+              {t('common:actions.cancel')}
+            </Button>
+          </div>
+        </div>
+      ) : deal.notes ? (
+        <p className="text-sm whitespace-pre-wrap">{deal.notes}</p>
+      ) : (
+        <p className="text-muted-foreground text-sm italic">
+          {t('participations:notes.empty')}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function DealDetail() {
   const { t } = useTranslation(['participations', 'common'])
   const { orgSlug, dealId } = Route.useParams()
@@ -872,14 +964,7 @@ function DealDetail() {
       {/* Central block: layout driven by the previewed instrument type. */}
       <InstrumentBlock deal={deal} instrumentKind={effectiveKind} />
 
-      {deal.notes && (
-        <div className="space-y-1">
-          <span className="text-muted-foreground text-xs">
-            {t('deal.notes')}
-          </span>
-          <p className="text-sm whitespace-pre-wrap">{deal.notes}</p>
-        </div>
-      )}
+      <NotesSection deal={deal} />
 
       {deal.instrumentKind === 'fund_lp' && (
         <FundSection

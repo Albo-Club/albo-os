@@ -90,6 +90,10 @@
     "status": "Status",
     "tvpi": "TVPI"
   },
+  "notes": {
+    "empty": "No notes yet.",
+    "placeholder": "Add notes about this deal…"
+  },
   "personRole": {
     "founder": "Founder",
     "board": "Board",
