@@ -23,6 +23,38 @@ bas de page.
 
 ---
 
+## v1.38.0 — 25/06/2026 à 23:20 — Suppression définitive d'une entité
+
+Depuis la fiche d'une entité, un nouveau bouton **Supprimer** permet de la
+retirer **définitivement** — utile pour faire le ménage des coquilles vides
+créées par erreur. C'est différent de l'**archivage** (qui masque l'entité mais
+la garde et reste réversible) : ici, l'entité disparaît pour de bon, l'action
+est **irréversible**. Deux garde-fous protègent des erreurs : on ne peut pas
+supprimer une **entité juridique** du groupe (SCI, holding…), ni une entité
+encore **reliée** à des deals, mouvements ou autres éléments — un message
+l'explique alors et propose de tout détacher d'abord. En cas de doute,
+l'archivage reste recommandé.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle mutation `convex/companies.ts` `remove({ id })`, calquée sur
+>   `deals.remove` : `requireOrgMember`, refus des `kind` `group_*`
+>   (`ConvexError('cannot_delete_group_entity')`), réutilisation du helper
+>   existant `listBlockingRefs` (refus `company_has_references` si une référence
+>   subsiste), puis `ctx.db.delete`. Hard delete réel, distinct de `archive`
+>   (soft delete `archivedAt`) — schéma et archivage inchangés.
+> - `listBlockingRefs` est déjà exhaustif sur les 8 champs du schéma qui
+>   pointent vers une `company` (deals target/investor/viaSpv, companyRelations
+>   parent/child, kpiSnapshots, bankAccounts, documents). `equityPositions` /
+>   `intercompanyLoans` référencent l'**org**, jamais une `company` : rien à y
+>   vérifier (commenté dans le code).
+> - UI dans `src/routes/app/$orgSlug/participations.$companyId.tsx` : item
+>   destructif « Supprimer » dans le menu de la fiche + `Dialog` de
+>   confirmation calqué sur l'archivage (bouton désactivé si `group_*` ou si
+>   l'entité porte des deals, message contextuel ; `err.data` ConvexError mappé
+>   en i18n). Succès → toast + redirection vers la liste.
+> - i18n EN/FR : namespace `deleteCompany` dans `src/locales/{en,fr}/participations.json`.
+
 ## v1.37.0 — 25/06/2026 à 23:15 — Nouveautés : affichage par paliers
 
 La page « Nouveautés » n'affiche plus tout l'historique d'un coup : seules les

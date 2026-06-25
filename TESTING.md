@@ -226,6 +226,20 @@ repliable de la liste des entreprises.
 | AR2 | Fiche entreprise **vide** (aucun deal/relation/KPI/compte/document) → **Archiver** → confirmer | Entité archivée, redirige vers la liste, disparaît des listes ; si encore référencée (investisseur/SPV/relation/KPI/compte/document non visible) → refus serveur `company_has_references` avec message clair |
 | AR3 | Liste des entreprises → section repliable « Entités archivées (N) » → **Restaurer**            | L'entité réapparaît dans les listes ; archivage/restauration idempotents ; i18n EN/FR sur libellés réaffectation + archivage                                                                              |
 
+### Suppression définitive d'une entité (`/app/$orgSlug/participations`)
+
+Hard delete réel et irréversible (`companies.remove`), distinct de l'archivage.
+Garde-fous : refus des entités juridiques (`kind` `group_*`) et de toute entité
+encore référencée (réutilise `listBlockingRefs`). On ne supprime rien en prod
+sans snapshot (`convex export --prod`) au préalable.
+
+| #   | Étape                                                                                                  | Résultat attendu                                                                                                                                                                            |
+| --- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| HD1 | Fiche entité **vide** (portfolio, aucun deal/relation/KPI/compte/document) → menu **⋯** → **Supprimer** → confirmer | L'entité est supprimée pour de bon, toast « Entité supprimée », redirige vers la liste et disparaît (absente aussi des « Entités archivées »)                                              |
+| HD2 | Fiche entité portfolio qui porte ≥ 1 deal → **Supprimer**                                              | Dialog : « Cette entité porte N deal(s)… réaffectez-les avant de supprimer » + bouton **Supprimer** **désactivé** ; toute autre référence (investisseur/SPV/relation/KPI/compte/document) → refus serveur `company_has_references` avec message clair |
+| HD3 | Fiche entité **juridique** (`group_*` : SCI, holding, SPV…) → **Supprimer**                            | Dialog : « Les entités juridiques ne peuvent pas être supprimées » + bouton **Supprimer** **désactivé** ; le serveur refuse aussi (`cannot_delete_group_entity`)                          |
+| HD4 | Régression archivage : AR1–AR3 toujours OK après l'ajout de la suppression                             | Archivage/restauration inchangés ; les deux actions cohabitent dans le menu de la fiche                                                                                                    |
+
 ## Niveau 3 — Invitations edge cases (8 min)
 
 | #   | Étape                                                          | Résultat attendu                                  |

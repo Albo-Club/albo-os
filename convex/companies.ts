@@ -199,6 +199,30 @@ export const restore = mutation({
   },
 })
 
+/**
+ * Hard delete (irreversible) of a company. Distinct from `archive` (reversible
+ * soft delete): this removes the row for good. Refuses for legal entities
+ * (`kind` group_*) and for any company still referenced by anything — reuses
+ * `listBlockingRefs`, which is exhaustive over every table that points to a
+ * company. (The passif tables `equityPositions` / `intercompanyLoans` reference
+ * the ORG, never a company, so there is nothing to check there.)
+ */
+export const remove = mutation({
+  args: { id: v.id('companies') },
+  handler: async (ctx, { id }) => {
+    const company = await ctx.db.get("companies", id)
+    if (!company) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, company.orgId)
+    if (company.kind.startsWith('group_')) {
+      throw new ConvexError('cannot_delete_group_entity')
+    }
+    const refs = await listBlockingRefs(ctx, company.orgId, id)
+    if (hasBlockingRefs(refs)) throw new ConvexError('company_has_references')
+    await ctx.db.delete("companies", id)
+    return { deletedId: id }
+  },
+})
+
 /** Archived companies of the org (the regular queries filter them out). */
 export const listArchived = query({
   args: { orgId: v.id('organizations') },
