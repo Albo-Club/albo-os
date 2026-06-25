@@ -1,5 +1,11 @@
-import { useState } from 'react'
-import { ArchiveRestore, ChevronDown, Plus } from 'lucide-react'
+import { useRef, useState } from 'react'
+import {
+  ArchiveRestore,
+  ChevronDown,
+  Download,
+  MoreHorizontal,
+  Plus,
+} from 'lucide-react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
@@ -13,6 +19,12 @@ import { getLocale } from '~/lib/locale'
 import { cn } from '~/lib/utils'
 import { ParticipationsTable } from '~/components/participations/ParticipationsTable'
 import { Button } from '~/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu'
 import {
   Dialog,
   DialogContent,
@@ -223,7 +235,7 @@ function ArchivedSection({
 }
 
 function Participations() {
-  const { t } = useTranslation('participations')
+  const { t } = useTranslation(['participations', 'common'])
   const { orgSlug } = Route.useParams()
   const [createOpen, setCreateOpen] = useState(false)
   const org = useConvexQuery(api.organizations.bySlug, { slug: orgSlug })
@@ -231,23 +243,42 @@ function Participations() {
     api.deals.list,
     org ? { orgId: org._id } : 'skip',
   )
+  // Filled by the table; lets the header menu trigger the (search-aware) export.
+  const exportRef = useRef<(() => void) | null>(null)
+  const hasDeals = Boolean(deals && deals.length > 0)
 
   return (
     <main className="flex-1 space-y-6 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
         {org && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCreateOpen(true)}
-          >
-            <Plus className="size-4" />
-            {t('create.button')}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                aria-label={t('common:actions.menu')}
+              >
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setCreateOpen(true)}>
+                <Plus className="size-4" />
+                {t('create.button')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!hasDeals}
+                onSelect={() => exportRef.current?.()}
+              >
+                <Download className="size-4" />
+                {t('export.button')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
-      <ParticipationsTable deals={deals} orgSlug={orgSlug} />
+      <ParticipationsTable deals={deals} orgSlug={orgSlug} exportRef={exportRef} />
 
       {org && <ArchivedSection orgId={org._id} orgSlug={orgSlug} />}
 

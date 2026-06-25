@@ -23,21 +23,34 @@ bas de page.
 
 ---
 
-## v1.31.0 — 25/06/2026 à 11:00 — Boutons d'action plus discrets
+## v1.31.0 — 25/06/2026 à 11:00 — Actions des pages regroupées dans un menu
 
-Les boutons « Nouvelle entité » et « Nouveau deal » sont désormais affichés
-en contour plutôt qu'en aplat coloré, et le bouton « Archiver » reste effacé
-jusqu'au survol. Les listes et fiches restent ainsi au premier plan, les
-actions de création et d'archivage passent au second.
+Les actions de modification de chaque page sont désormais regroupées derrière
+un unique bouton menu (icône « … ») aligné à droite du titre, au lieu d'occuper
+l'en-tête sous forme de boutons bien visibles :
+
+- **Entreprises** : « Nouvelle entité » et « Exporter CSV » passent dans le menu.
+- **Fiche d'une entité** : « Modifier », « Nouveau deal » et « Archiver »
+  passent dans le menu (Archiver en rouge).
+- **Fiche d'un deal** : « Modifier » et « Supprimer » passent dans le menu
+  (Supprimer en rouge).
+
+Les listes et les fiches restent ainsi au premier plan, l'écran est plus épuré.
 
 > **🔧 Notes techniques**
 >
-> - `src/routes/app/$orgSlug/participations.index.tsx` : le bouton de création
->   d'entité passe de la variante `default` (aplat primaire) à `outline`.
-> - `src/routes/app/$orgSlug/participations.$companyId.tsx` : le bouton
->   « Nouveau deal » passe à la variante `outline` ; le bouton « Archiver »
->   passe de `outline` (texte destructive permanent) à `ghost` avec
->   `text-muted-foreground hover:text-destructive` (rouge au survol seulement).
+> - Nouveau libellé i18n `common:actions.menu` (nom accessible du déclencheur).
+> - `ParticipationsTable` accepte une prop `exportRef` : quand elle est fournie,
+>   le bouton CSV de la barre d'outils est masqué et `handleExport` est exposé
+>   via la ref, pour que le menu d'en-tête déclenche l'export en conservant le
+>   filtre de recherche/tri. La vue cross-org `/app/all` n'a pas de menu et garde
+>   son bouton d'export dans la barre d'outils.
+> - `participations.index.tsx`, `participations.$companyId.tsx` et
+>   `deals.$dealId.tsx` : les boutons d'en-tête sont remplacés par un
+>   `DropdownMenu` (déclencheur `Button variant="outline" size="icon-sm"` +
+>   `MoreHorizontal`, `align="end"`). Items destructifs (`Archiver`, `Supprimer`)
+>   en `variant="destructive"`, désactivés quand une référence bloque l'action
+>   (deals rattachés / transactions liées).
 
 ## v1.30.0 — 25/06/2026 à 10:31 — Fiche deal : entité liée entièrement cliquable
 

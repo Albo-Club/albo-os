@@ -14,7 +14,8 @@
     "back": "Back",
     "retry": "Retry",
     "search": "Search",
-    "remove": "Remove"
+    "remove": "Remove",
+    "menu": "Actions"
   },
   "language": {
     "label": "Language",
