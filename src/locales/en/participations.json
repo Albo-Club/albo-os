@@ -56,11 +56,18 @@
   "col": {
     "company": "Company",
     "org": "Org",
+    "invested": "Invested",
     "deals": "Deals",
     "committed": "Committed",
     "paid": "Paid",
     "received": "Received",
     "tvpi": "TVPI"
+  },
+  "filters": {
+    "instrument": "Instrument",
+    "status": "Status",
+    "sector": "Sector",
+    "reset": "Reset"
   },
   "deal": {
     "name": "Name",

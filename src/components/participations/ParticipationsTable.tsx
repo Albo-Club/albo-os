@@ -5,6 +5,8 @@ import {
   ArrowUpDown,
   ArrowUpRight,
   Download,
+  ListFilter,
+  X,
 } from 'lucide-react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
@@ -14,6 +16,13 @@ import { CompanyLogo } from '~/components/CompanyLogo'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
+import { Separator } from '~/components/ui/separator'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu'
 import {
   Table,
   TableBody,
@@ -225,7 +234,63 @@ export function DealsList({
  * targets the detail link; in the aggregated view the slug is derived from
  * each deal's org.
  */
-type SortKey = 'name' | 'committed' | 'paid' | 'received' | 'tvpi'
+type SortKey = 'name' | 'invested' | 'deals' | 'paid' | 'received' | 'tvpi'
+
+/** A multi-select facet option: stored raw value + its localized label. */
+type FacetOption = { value: string; label: string }
+
+/**
+ * Dashed-border dropdown holding the checkbox options of one facet
+ * (instrument / status / sector). The menu stays open across clicks so
+ * several values can be toggled in a row; the trigger shows a count badge
+ * once anything is selected.
+ */
+function FacetFilter({
+  label,
+  options,
+  selected,
+  onToggle,
+}: {
+  label: string
+  options: Array<FacetOption>
+  selected: Set<string>
+  onToggle: (value: string) => void
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="border-dashed">
+          <ListFilter className="size-4" />
+          {label}
+          {selected.size > 0 && (
+            <>
+              <Separator orientation="vertical" className="mx-0.5 h-4" />
+              <Badge
+                variant="secondary"
+                className="rounded-sm px-1 font-normal tabular-nums"
+              >
+                {selected.size}
+              </Badge>
+            </>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-h-72 w-52 overflow-auto">
+        {options.map((opt) => (
+          <DropdownMenuCheckboxItem
+            key={opt.value}
+            checked={selected.has(opt.value)}
+            // Keep the menu open so multiple values can be toggled at once.
+            onSelect={(e) => e.preventDefault()}
+            onCheckedChange={() => onToggle(opt.value)}
+          >
+            {opt.label}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
 
 /** Clickable header of a sortable column (asc ⇄ desc). */
 function SortableHead({
@@ -271,7 +336,7 @@ export function ParticipationsTable({
   exportRef?: RefObject<(() => void) | null>
 }) {
   const { t } = useTranslation('participations')
-  const { fmtEur, fmtMultiple } = useFormatters()
+  const { fmtEur, fmtDate, fmtMultiple } = useFormatters()
 
   // Client-side search (low volumes): company name, custom deal name,
   // instrument (raw key + translated label), investor, sector —
@@ -279,25 +344,96 @@ export function ParticipationsTable({
   const [search, setSearch] = useState('')
   const term = normalizeSearch(useDebouncedValue(search))
 
-  const filtered = useMemo(() => {
-    if (!deals || !term) return deals
-    return deals.filter((d) =>
-      [
-        d.target?.name,
-        d.name,
-        d.target?.sector,
-        d.target?.sector &&
-          t(`sectors.${d.target.sector}`, {
-            defaultValue: d.target.sector,
-          }),
-        d.investor?.name,
+  // Faceted filters (multi-select), applied at the deal level alongside the
+  // search, before grouping by company. A company shows up if it keeps at
+  // least one deal; its aggregates reflect only the surviving deals.
+  const [instrumentFilter, setInstrumentFilter] = useState<Set<string>>(
+    new Set(),
+  )
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set())
+  const [sectorFilter, setSectorFilter] = useState<Set<string>>(new Set())
+  const toggle =
+    (setter: React.Dispatch<React.SetStateAction<Set<string>>>) =>
+    (value: string) =>
+      setter((prev) => {
+        const next = new Set(prev)
+        if (next.has(value)) next.delete(value)
+        else next.add(value)
+        return next
+      })
+  const hasFilters =
+    instrumentFilter.size > 0 || statusFilter.size > 0 || sectorFilter.size > 0
+  const resetFilters = () => {
+    setInstrumentFilter(new Set())
+    setStatusFilter(new Set())
+    setSectorFilter(new Set())
+  }
+
+  // Facet options derived from the full deal set (not the filtered one, so
+  // options never vanish mid-selection), localized and sorted by label.
+  const facets = useMemo(() => {
+    const instruments = new Map<string, string>()
+    const statuses = new Map<string, string>()
+    const sectors = new Map<string, string>()
+    for (const d of deals ?? []) {
+      instruments.set(
         d.instrumentKind,
-        t(`instrument.${d.instrumentKind}`, {
-          defaultValue: d.instrumentKind,
-        }),
-      ].some((s) => s && normalizeSearch(s).includes(term)),
-    )
-  }, [deals, term, t])
+        t(`instrument.${d.instrumentKind}`, { defaultValue: d.instrumentKind }),
+      )
+      statuses.set(
+        d.status,
+        t(`status.${d.status}`, { defaultValue: d.status }),
+      )
+      if (d.target?.sector) {
+        sectors.set(
+          d.target.sector,
+          t(`sectors.${d.target.sector}`, { defaultValue: d.target.sector }),
+        )
+      }
+    }
+    const toOptions = (m: Map<string, string>): Array<FacetOption> =>
+      Array.from(m, ([value, label]) => ({ value, label })).sort((a, b) =>
+        a.label.localeCompare(b.label),
+      )
+    return {
+      instruments: toOptions(instruments),
+      statuses: toOptions(statuses),
+      sectors: toOptions(sectors),
+    }
+  }, [deals, t])
+
+  const filtered = useMemo(() => {
+    if (!deals) return deals
+    if (!term && !hasFilters) return deals
+    return deals.filter((d) => {
+      const matchesSearch =
+        !term ||
+        [
+          d.target?.name,
+          d.name,
+          d.target?.sector,
+          d.target?.sector &&
+            t(`sectors.${d.target.sector}`, {
+              defaultValue: d.target.sector,
+            }),
+          d.investor?.name,
+          d.instrumentKind,
+          t(`instrument.${d.instrumentKind}`, {
+            defaultValue: d.instrumentKind,
+          }),
+        ].some((s) => s && normalizeSearch(s).includes(term))
+      if (!matchesSearch) return false
+      if (instrumentFilter.size > 0 && !instrumentFilter.has(d.instrumentKind))
+        return false
+      if (statusFilter.size > 0 && !statusFilter.has(d.status)) return false
+      if (
+        sectorFilter.size > 0 &&
+        !(d.target?.sector != null && sectorFilter.has(d.target.sector))
+      )
+        return false
+      return true
+    })
+  }, [deals, term, t, instrumentFilter, statusFilter, sectorFilter, hasFilters])
 
   const groups = useMemo(() => {
     if (!filtered) return undefined
@@ -309,7 +445,8 @@ export function ParticipationsTable({
         orgs: Set<string>
         slug: string | undefined
         deals: Array<DealRow>
-        committed: number
+        // Company entry date: earliest signed deal (null if none dated).
+        signedDate: number | null
         paid: number
         received: number
         residual: number
@@ -323,14 +460,19 @@ export function ParticipationsTable({
         orgs: new Set<string>(),
         slug: orgSlug ?? d.org?.slug,
         deals: [],
-        committed: 0,
+        signedDate: null,
         paid: 0,
         received: 0,
         residual: 0,
       }
       g.deals.push(d)
       if (d.org) g.orgs.add(d.org.name)
-      g.committed += d.committedAmount ?? 0
+      if (d.signedDate != null) {
+        g.signedDate =
+          g.signedDate == null
+            ? d.signedDate
+            : Math.min(g.signedDate, d.signedDate)
+      }
       g.paid += d.paidActual ?? 0
       g.received += d.received ?? 0
       g.residual += residualCents(d)
@@ -362,7 +504,11 @@ export function ParticipationsTable({
         ? g.name
         : sort.key === 'tvpi'
           ? (g.tvpi ?? Number.NEGATIVE_INFINITY)
-          : g[sort.key]
+          : sort.key === 'invested'
+            ? (g.signedDate ?? Number.NEGATIVE_INFINITY)
+            : sort.key === 'deals'
+              ? g.deals.length
+              : g[sort.key]
     const sign = sort.dir === 'asc' ? 1 : -1
     return [...groups].sort((a, b) => {
       const va = value(a)
@@ -376,9 +522,15 @@ export function ParticipationsTable({
 
   // Local pagination (by company, after filter + sort); snaps back to page 1
   // whenever the search or sort changes.
+  // Reset to page 1 whenever search, sort or any filter changes.
+  const filterKey = [
+    [...instrumentFilter].sort().join(','),
+    [...statusFilter].sort().join(','),
+    [...sectorFilter].sort().join(','),
+  ].join('|')
   const { page, pageCount, setPage } = usePagination(
     sortedGroups?.length ?? 0,
-    `${term}:${sort ? `${sort.key}:${sort.dir}` : ''}`,
+    `${term}:${sort ? `${sort.key}:${sort.dir}` : ''}:${filterKey}`,
   )
   const pagedGroups = sortedGroups?.slice(
     page * PAGE_SIZE,
@@ -438,17 +590,59 @@ export function ParticipationsTable({
 
   // Search bar shown as soon as there are deals — including when the
   // current search matches nothing (otherwise it can't be cleared).
+  // A facet is only worth showing when it can actually partition the data
+  // (≥2 distinct values) — a single-value facet would match every row.
   const searchBar = deals && deals.length > 0 && (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex flex-wrap items-center gap-2">
       <Input
         type="search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder={t('search.placeholder')}
-        className="max-w-sm"
+        className="max-w-xs"
       />
+      {facets.instruments.length >= 2 && (
+        <FacetFilter
+          label={t('filters.instrument')}
+          options={facets.instruments}
+          selected={instrumentFilter}
+          onToggle={toggle(setInstrumentFilter)}
+        />
+      )}
+      {facets.statuses.length >= 2 && (
+        <FacetFilter
+          label={t('filters.status')}
+          options={facets.statuses}
+          selected={statusFilter}
+          onToggle={toggle(setStatusFilter)}
+        />
+      )}
+      {facets.sectors.length >= 2 && (
+        <FacetFilter
+          label={t('filters.sector')}
+          options={facets.sectors}
+          selected={sectorFilter}
+          onToggle={toggle(setSectorFilter)}
+        />
+      )}
+      {hasFilters && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={resetFilters}
+          className="text-muted-foreground"
+        >
+          {t('filters.reset')}
+          <X className="size-4" />
+        </Button>
+      )}
       {!exportRef && (
-        <Button variant="outline" size="sm" onClick={handleExport}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExport}
+          className="ml-auto"
+        >
           <Download className="size-4" />
           {t('export.button')}
         </Button>
@@ -461,7 +655,7 @@ export function ParticipationsTable({
       <div className="space-y-3">
         {searchBar}
         <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
-          {term ? t('search.noResults') : t('empty')}
+          {term || hasFilters ? t('search.noResults') : t('empty')}
         </div>
       </div>
     )
@@ -481,12 +675,17 @@ export function ParticipationsTable({
                 onClick={() => toggleSort('name')}
               />
               {showOrg && <TableHead>{t('col.org')}</TableHead>}
-              <TableHead className="text-right">{t('col.deals')}</TableHead>
               <SortableHead
-                label={t('col.committed')}
-                active={sort?.key === 'committed'}
+                label={t('col.invested')}
+                active={sort?.key === 'invested'}
                 dir={sort?.dir ?? 'desc'}
-                onClick={() => toggleSort('committed')}
+                onClick={() => toggleSort('invested')}
+              />
+              <SortableHead
+                label={t('col.deals')}
+                active={sort?.key === 'deals'}
+                dir={sort?.dir ?? 'desc'}
+                onClick={() => toggleSort('deals')}
                 className="text-right"
               />
               <SortableHead
@@ -529,6 +728,7 @@ export function ParticipationsTable({
                   group={g}
                   showOrg={showOrg}
                   fmtEur={fmtEur}
+                  fmtDate={fmtDate}
                   fmtMultiple={fmtMultiple}
                 />
               ))
@@ -549,6 +749,7 @@ function CompanyRows({
   group,
   showOrg,
   fmtEur,
+  fmtDate,
   fmtMultiple,
 }: {
   group: {
@@ -558,13 +759,14 @@ function CompanyRows({
     orgs: Set<string>
     slug: string | undefined
     deals: Array<DealRow>
-    committed: number
+    signedDate: number | null
     paid: number
     received: number
     tvpi: number | null
   }
   showOrg: boolean
   fmtEur: (c?: number | null) => string
+  fmtDate: (ms?: number | null) => string
   fmtMultiple: (ratio: number | null) => string
 }) {
   const { t } = useTranslation('participations')
@@ -619,11 +821,11 @@ function CompanyRows({
           </span>
         </TableCell>
       )}
-      <TableCell className="text-right tabular-nums">
-        {t('dealsCount', { count: group.deals.length })}
+      <TableCell className="tabular-nums">
+        {fmtDate(group.signedDate)}
       </TableCell>
       <TableCell className="text-right tabular-nums">
-        {fmtEur(group.committed)}
+        {t('dealsCount', { count: group.deals.length })}
       </TableCell>
       <TableCell className="text-right tabular-nums">
         {fmtEur(group.paid)}

@@ -23,6 +23,44 @@ bas de page.
 
 ---
 
+## v1.36.0 — 25/06/2026 à 23:14 — Filtres et tri sur la liste Entreprises
+
+La page **Entreprises** gagne des filtres et de nouveaux tris pour retrouver
+plus vite une participation :
+
+- **Filtres** (multi-sélection, cumulables avec la recherche) : par **type
+  d'instrument**, par **statut** et par **secteur**. Un filtre n'apparaît que
+  s'il y a au moins deux valeurs à distinguer. Un bouton **« Réinitialiser »**
+  efface tous les filtres actifs.
+- **Tri par date d'investissement** : une nouvelle colonne **« Investi le »**
+  affiche la date du premier investissement dans la société et permet de
+  classer du plus récent au plus ancien (et inversement).
+- **Tri par nombre de deals** : la colonne **Deals** est désormais cliquable
+  pour trier les sociétés par nombre d'investissements.
+- La colonne **« Engagé »** (montant engagé) a été **retirée** de la vue
+  liste ; seul le **montant versé** y reste affiché. Le montant engagé reste
+  visible sur la fiche de chaque deal et dans l'export CSV.
+
+> **🔧 Notes techniques**
+>
+> - Tout est porté par `src/components/participations/ParticipationsTable.tsx`
+>   (composant partagé par la vue par-org et la vue agrégée `/app/all`).
+> - Nouveau composant interne `FacetFilter` (dropdown + `DropdownMenuCheckboxItem`,
+>   menu maintenu ouvert via `onSelect preventDefault`). Trois facettes
+>   (`instrument`, `status`, `sector`) dérivées du jeu de deals complet et
+>   localisées ; rendues seulement si ≥ 2 valeurs distinctes.
+> - Les filtres s'appliquent au **niveau deal** dans le `useMemo` `filtered`
+>   (avant regroupement par société), composables avec la recherche. La
+>   pagination se réinitialise via une `filterKey` ajoutée à la clé de reset.
+> - `SortKey` : `committed` retiré, `invested` et `deals` ajoutés. Le groupe
+>   société porte désormais `signedDate` (= **min** des dates de deals = date
+>   d'entrée) à la place de `committed`. Colonnes `committed` retirées du
+>   header et de `CompanyRows` ; colonne `invested` (via `fmtDate`) ajoutée.
+> - L'export CSV et la `DealsList` de la fiche conservent le montant engagé
+>   (`col.committed` toujours utilisée par l'export).
+> - i18n : `participations.col.invested` + bloc `participations.filters.*`
+>   (EN/FR).
+
 ## v1.35.0 — 25/06/2026 à 22:44 — Notes éditables depuis la fiche deal
 
 Les **notes** d'un deal se modifient désormais directement depuis sa fiche,

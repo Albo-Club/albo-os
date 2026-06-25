@@ -56,11 +56,18 @@
   "col": {
     "company": "Société",
     "org": "Org",
+    "invested": "Investi le",
     "deals": "Deals",
     "committed": "Engagé",
     "paid": "Versé",
     "received": "Reçu",
     "tvpi": "TVPI"
+  },
+  "filters": {
+    "instrument": "Instrument",
+    "status": "Statut",
+    "sector": "Secteur",
+    "reset": "Réinitialiser"
   },
   "deal": {
     "name": "Nom",
