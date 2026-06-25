@@ -90,6 +90,10 @@
     "status": "Statut",
     "tvpi": "TVPI"
   },
+  "notes": {
+    "empty": "Aucune note pour le moment.",
+    "placeholder": "Ajouter des notes sur ce deal…"
+  },
   "personRole": {
     "founder": "Fondateur",
     "board": "Board",
