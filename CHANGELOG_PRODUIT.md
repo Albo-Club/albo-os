@@ -23,6 +23,32 @@ bas de page.
 
 ---
 
+## v1.31.0 — 25/06/2026 à 11:01 — Fiche entreprise : focus identité + reporting
+
+La fiche d'une entreprise est allégée et recentrée sur l'essentiel :
+
+- Le bloc « Identité » affiche désormais la **détention globale (%)** et le
+  **nombre d'actions consolidé** (cumul des titres acquis sur tous les deals
+  de la société).
+- La section « Reportings & documents » s'appelle simplement **« Reporting »**
+  (l'ajout de documents reste inchangé).
+- La section **« KPIs » est retirée** de la fiche.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/$orgSlug/participations.$companyId.tsx` : extraction d'un
+>   mémo `heldShares` (Σ `sharesAcquired` des deals) réutilisé par le calcul
+>   `ownership` et par le nouveau `sharesConsolidated`. Deux `IdentityField`
+>   dans le bloc identité — `info.ownershipGlobal` (ex-`info.ownership`,
+>   conservé pour l'en-tête) et `info.sharesConsolidated`.
+> - Suppression de `<KpisSection>` et de son import ; le composant
+>   `src/components/companies/KpisSection.tsx` (orphelin) est supprimé, ainsi
+>   que le bloc i18n `participations:kpis` (fr/en). Le backend KPIs
+>   (`convex/kpis.ts`, outil agent `createKpiSnapshot`) reste intact — seul
+>   l'affichage front est retiré.
+> - i18n : `reportings.title` → « Reporting » (fr/en), ajout de
+>   `info.ownershipGlobal` / `info.sharesConsolidated` (fr/en).
+
 ## v1.30.0 — 25/06/2026 à 10:31 — Fiche deal : entité liée entièrement cliquable
 
 Sur la fiche d'un deal, le bloc « Entité liée » est désormais cliquable sur

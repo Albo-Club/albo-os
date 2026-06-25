@@ -32,7 +32,9 @@
     "sector": "Sector",
     "siren": "SIREN",
     "domain": "Domain",
-    "ownership": "Ownership"
+    "ownership": "Ownership",
+    "ownershipGlobal": "Global ownership (%)",
+    "sharesConsolidated": "Consolidated shares"
   },
   "col": {
     "company": "Company",
@@ -385,24 +387,8 @@
       "source": "Source"
     }
   },
-  "kpis": {
-    "title": "KPIs",
-    "empty": "No KPI recorded for this company.",
-    "emptyHint": "Paste a reporting into the assistant — it will extract the metrics.",
-    "deleted": "KPI deleted",
-    "deleteConfirmTitle": "Delete this KPI?",
-    "col": {
-      "metric": "Metric",
-      "period": "Period",
-      "value": "Value",
-      "source": "Source"
-    },
-    "errors": {
-      "default": "Something went wrong"
-    }
-  },
   "reportings": {
-    "title": "Reportings & documents",
+    "title": "Reporting",
     "upload": "Add a document",
     "uploading": "Uploading…",
     "empty": "No document yet. Investor updates, BPs and legal docs live here.",
