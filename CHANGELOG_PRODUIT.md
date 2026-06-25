@@ -23,6 +23,22 @@ bas de page.
 
 ---
 
+## v1.30.0 — 25/06/2026 à 10:31 — Fiche deal : entité liée entièrement cliquable
+
+Sur la fiche d'un deal, le bloc « Entité liée » est désormais cliquable sur
+toute sa surface (et plus seulement sur la flèche au bout de la ligne) pour
+ouvrir la fiche de l'entité investie.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/$orgSlug/deals.$dealId.tsx`, section « Entité liée » :
+>   la ligne enveloppe désormais tout le `CardContent` dans un seul `Link`
+>   (classe `group block`) vers `/app/$orgSlug/participations/$companyId`,
+>   au lieu de deux liens distincts (nom + flèche) qui auraient été imbriqués.
+>   Le nom redevient un `span` avec `group-hover:underline` et la flèche
+>   `ArrowRight` réagit au survol via `group-hover`. La branche sans
+>   `deal.target` reste un `CardContent` non cliquable.
+
 ## v1.29.1 — 25/06/2026 à 10:08 — Fiche entreprise : nom et instrument du deal séparés
 
 Sur la fiche d'une entreprise, la ligne d'un deal affichait son nom personnalisé
