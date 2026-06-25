@@ -23,6 +23,25 @@ bas de page.
 
 ---
 
+## v1.29.1 — 25/06/2026 à 10:08 — Fiche entreprise : nom et instrument du deal séparés
+
+Sur la fiche d'une entreprise, la ligne d'un deal affichait son nom personnalisé
+collé à son type d'instrument (par ex. « Sezame immo 6 · Titres SPV »).
+Désormais deux champs distincts : un champ **Nom** (le nom personnalisé du deal,
+« — » s'il n'y en a pas) et un champ **Instrument** (le type seul). L'en-tête de
+la fiche du deal, qui n'affichait déjà que le nom, est inchangé.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/participations/ParticipationsTable.tsx` (`DealsList`) :
+>   le champ unique `deal.instrument` rendait `dealTitle(dl)` (nom + instrument
+>   combinés). Scindé en deux `Field` : `deal.name` (`dl.name ?? '—'`) et
+>   `deal.instrument` (libellé d'instrument seul via `t('instrument.<kind>')`).
+>   `useDealTitle` (titre combiné) reste utilisé tel quel par les comboboxes de
+>   pointage et le fil d'Ariane — non touché.
+> - Nouvelle clé i18n `deal.name` (`Nom` / `Name`) dans
+>   `src/locales/{fr,en}/participations.json`.
+
 ## v1.29.0 — 25/06/2026 à 10:00 — Domaine de société éditable depuis la fiche
 
 Le domaine d'une société se modifie maintenant directement depuis la fiche, via
