@@ -794,7 +794,6 @@ function ParticipationDetail() {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 variant="destructive"
-                disabled={dealCount > 0}
                 onSelect={() => setArchiveOpen(true)}
               >
                 <Archive className="size-4" />
@@ -804,12 +803,6 @@ function ParticipationDetail() {
           </DropdownMenu>
         )}
       </div>
-
-      {dealCount > 0 && (
-        <p className="text-muted-foreground text-xs">
-          {t('archive.blocked', { count: dealCount })}
-        </p>
-      )}
 
       {/* Identity block — nature "company". */}
       <IdentitySection title={t('identity.title')}>
@@ -898,8 +891,12 @@ function ParticipationDetail() {
           <DialogHeader>
             <DialogTitle>{t('archive.confirmTitle')}</DialogTitle>
           </DialogHeader>
+          {/* Deals targeting this entity block archiving: surface the reason
+              here, behind the archive action, rather than inline on the page. */}
           <p className="text-muted-foreground text-sm">
-            {t('archive.confirmBody')}
+            {dealCount > 0
+              ? t('archive.blocked', { count: dealCount })
+              : t('archive.confirmBody')}
           </p>
           <DialogFooter>
             <Button
@@ -912,7 +909,7 @@ function ParticipationDetail() {
             <Button
               variant="destructive"
               onClick={() => void handleArchive()}
-              disabled={archiving}
+              disabled={archiving || dealCount > 0}
             >
               {t('archive.button')}
             </Button>

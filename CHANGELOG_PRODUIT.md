@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.34.0 — 25/06/2026 à 12:30 — Notes éditables depuis la fiche deal
+## v1.35.0 — 25/06/2026 à 22:44 — Notes éditables depuis la fiche deal
 
 Les **notes** d'un deal se modifient désormais directement depuis sa fiche,
 sans passer par le dialog « Modifier » :
@@ -47,6 +47,54 @@ sans passer par le dialog « Modifier » :
 >   chaîne vide → note effacée (l'affichage retombe sur l'état vide).
 > - Bloc lecture-seule précédent remplacé ; clés i18n
 >   `participations:notes.empty` / `notes.placeholder` (EN/FR).
+
+## v1.34.0 — 25/06/2026 à 23:10 — Avertissements de suppression rangés dans la confirmation
+
+Les avertissements qui empêchent d'archiver une entité ou de supprimer un deal
+ne s'affichent plus en permanence sur la fiche. Désormais, l'action reste
+accessible dans le menu : c'est en cliquant sur **Archiver** (fiche entité) ou
+**Supprimer** (fiche deal) que la fenêtre de confirmation explique, le cas
+échéant, pourquoi l'opération est bloquée — « Cette entité porte N deal(s)… »
+ou « Ce deal a N mouvement(s) rapproché(s)… » — et désactive le bouton de
+validation tant que le blocage subsiste. La fiche reste ainsi dégagée tant
+qu'on ne cherche pas réellement à supprimer.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/$orgSlug/participations.$companyId.tsx` et
+>   `src/routes/app/$orgSlug/deals.$dealId.tsx` : suppression du bandeau inline
+>   `archive.blocked` / `deleteDeal.blocked` rendu en haut de page.
+> - L'entrée de menu destructive (`Archiver` / `Supprimer`) n'est plus
+>   `disabled` quand `dealCount > 0` / `linkedCount > 0` : le dialog s'ouvre.
+> - Le message bloquant est déplacé dans le `DialogContent` (ternaire vs
+>   `confirmBody`) et le bouton de validation porte désormais
+>   `disabled={…|| dealCount > 0}` / `disabled={…|| linkedCount > 0}`. Garde
+>   serveur (`company_has_references`, `deal_has_transactions`) inchangée.
+> - `TESTING.md` : lignes AR1 et DD2 mises à jour.
+
+## v1.33.1 — 25/06/2026 à 22:32 — Diagnostic : entités portfolio sans deal (lecture seule)
+
+Nouveau diagnostic interne, en lecture seule, qui mesure sur les deux véhicules
+(Albo et Calte) les entités du portefeuille qu'aucun investissement ne référence
+— les candidates potentielles à un futur ménage. Il liste, pour chacune, son
+identité (SIREN, forme juridique, date de création…) et sa provenance, signale
+les doublons de noms exacts et les copies portant le nom d'une entité juridique
+protégée. Aucun changement visible, aucune donnée modifiée.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/diagnoseDeadEntities.ts` : nouvel `internalQuery dryRun`
+>   (lecture seule, modèle `diagnoseAlboUmbrellas`). Pour chaque org (`albo`,
+>   `calte`) : résumé chiffré (total entités archivées comprises, `group_*`
+>   protégées, portfolio sans deal, archivées), liste détaillée des entités
+>   portfolio sans deal (identité + `identityFilled` + provenance `airtableId`/
+>   `attioCompanyId` + flag heuristique `isLikelyShell`), et rapport de doublons
+>   (groupes de noms exacts avec présence de deals par ID, portfolio dont le nom
+>   matche un `group_*`).
+> - Matching deal → entité strictement **par ID** (`targetCompanyId`,
+>   `investorCompanyId`, `viaSpvCompanyId`) pour ne pas être trompé par les
+>   doublons de noms. Les `group_*` ne sont jamais candidates, listées à part.
+> - `pnpm exec convex run --prod migrations/diagnoseDeadEntities:dryRun`.
 
 ---
 
@@ -190,7 +238,6 @@ et l'icône de secours reprend sa place.
 >   `edit.companyDescription` mise à jour.
 > - Aucun stockage de logo (cf. `KNOWN_ISSUES.md` « Logos d'entreprises ») :
 >   le domaine continue d'être hotlinké à la volée par `CompanyLogo`.
-
 ## v1.28.3 — 24/06/2026 à 22:10 — Diagnostic : détail d'identité des entités cibles (lecture seule)
 
 Complément au diagnostic interne : un relevé en lecture seule du détail complet
