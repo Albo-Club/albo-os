@@ -806,7 +806,6 @@ function DealDetail() {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               variant="destructive"
-              disabled={linkedCount > 0}
               onSelect={() => setDeleteOpen(true)}
             >
               <Trash2 className="size-4" />
@@ -862,12 +861,6 @@ function DealDetail() {
           </div>
         )}
       </div>
-
-      {linkedCount > 0 && (
-        <p className="text-muted-foreground text-xs">
-          {t('deleteDeal.blocked', { count: linkedCount })}
-        </p>
-      )}
 
       {/* Overview: commitment + actuals (computed from the transactions). */}
       <div className="grid grid-cols-3 gap-4">
@@ -993,8 +986,12 @@ function DealDetail() {
           <DialogHeader>
             <DialogTitle>{t('deleteDeal.confirmTitle')}</DialogTitle>
           </DialogHeader>
+          {/* Reconciled transactions block deletion: surface the reason here,
+              behind the delete action, rather than inline on the page. */}
           <p className="text-muted-foreground text-sm">
-            {t('deleteDeal.confirmBody')}
+            {linkedCount > 0
+              ? t('deleteDeal.blocked', { count: linkedCount })
+              : t('deleteDeal.confirmBody')}
           </p>
           <DialogFooter>
             <Button
@@ -1007,7 +1004,7 @@ function DealDetail() {
             <Button
               variant="destructive"
               onClick={() => void handleDelete()}
-              disabled={deleting}
+              disabled={deleting || linkedCount > 0}
             >
               {t('common:actions.delete')}
             </Button>

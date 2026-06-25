@@ -23,6 +23,30 @@ bas de page.
 
 ---
 
+## v1.34.0 — 25/06/2026 à 23:10 — Avertissements de suppression rangés dans la confirmation
+
+Les avertissements qui empêchent d'archiver une entité ou de supprimer un deal
+ne s'affichent plus en permanence sur la fiche. Désormais, l'action reste
+accessible dans le menu : c'est en cliquant sur **Archiver** (fiche entité) ou
+**Supprimer** (fiche deal) que la fenêtre de confirmation explique, le cas
+échéant, pourquoi l'opération est bloquée — « Cette entité porte N deal(s)… »
+ou « Ce deal a N mouvement(s) rapproché(s)… » — et désactive le bouton de
+validation tant que le blocage subsiste. La fiche reste ainsi dégagée tant
+qu'on ne cherche pas réellement à supprimer.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/$orgSlug/participations.$companyId.tsx` et
+>   `src/routes/app/$orgSlug/deals.$dealId.tsx` : suppression du bandeau inline
+>   `archive.blocked` / `deleteDeal.blocked` rendu en haut de page.
+> - L'entrée de menu destructive (`Archiver` / `Supprimer`) n'est plus
+>   `disabled` quand `dealCount > 0` / `linkedCount > 0` : le dialog s'ouvre.
+> - Le message bloquant est déplacé dans le `DialogContent` (ternaire vs
+>   `confirmBody`) et le bouton de validation porte désormais
+>   `disabled={…|| dealCount > 0}` / `disabled={…|| linkedCount > 0}`. Garde
+>   serveur (`company_has_references`, `deal_has_transactions`) inchangée.
+> - `TESTING.md` : lignes AR1 et DD2 mises à jour.
+
 ## v1.33.1 — 25/06/2026 à 22:32 — Diagnostic : entités portfolio sans deal (lecture seule)
 
 Nouveau diagnostic interne, en lecture seule, qui mesure sur les deux véhicules

@@ -221,7 +221,7 @@ repliable de la liste des entreprises.
 
 | #   | Étape                                                                                          | Résultat attendu                                                                                                                                                                                          |
 | --- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AR1 | Fiche entreprise qui porte ≥ 1 deal → bouton **Archiver**                                      | Bouton **désactivé** + ligne « Cette entité porte N deal(s)… réaffectez-les avant d'archiver »                                                                                                            |
+| AR1 | Fiche entreprise qui porte ≥ 1 deal → bouton **Archiver**                                      | Dialog de confirmation : ligne « Cette entité porte N deal(s)… réaffectez-les avant d'archiver » + bouton **Archiver** **désactivé**                                                                       |
 | AR2 | Fiche entreprise **vide** (aucun deal/relation/KPI/compte/document) → **Archiver** → confirmer | Entité archivée, redirige vers la liste, disparaît des listes ; si encore référencée (investisseur/SPV/relation/KPI/compte/document non visible) → refus serveur `company_has_references` avec message clair |
 | AR3 | Liste des entreprises → section repliable « Entités archivées (N) » → **Restaurer**            | L'entité réapparaît dans les listes ; archivage/restauration idempotents ; i18n EN/FR sur libellés réaffectation + archivage                                                                              |
 
@@ -541,13 +541,15 @@ signature → ms epoch.
 Bouton **« Supprimer »** dans l'en-tête de la fiche → dialog de confirmation
 (« Cette action est définitive »). Hard delete via `deals.remove`, protégé par une
 garde backend : refus (`deal_has_transactions`) si au moins une transaction est
-rapprochée sur le deal (index `by_deal`). Côté front, le bouton est désactivé
-quand `listByDeal(dealId).length > 0`, avec un message indiquant le nombre.
+rapprochée sur le deal (index `by_deal`). Côté front, l'entrée de menu
+« Supprimer » reste cliquable ; le message indiquant le nombre de mouvements
+rapprochés s'affiche **dans le dialog de confirmation**, où le bouton de
+suppression est désactivé quand `listByDeal(dealId).length > 0`.
 
 | #   | Étape                                                                                              | Résultat attendu                                                                                                                                  |
 | --- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | DD1 | Fiche d'un deal **sans** transaction rapprochée → « Supprimer » → confirmer                        | Toast succès ; le deal est supprimé ; navigation vers la fiche entité (`deal.target`) ou Participations ; le deal a disparu de la liste           |
-| DD2 | Fiche d'un deal **avec** au moins une transaction rapprochée                                       | Bouton « Supprimer » **désactivé** + message « Ce deal a N mouvement(s) rapproché(s)… » (pluriel correct EN/FR)                                   |
+| DD2 | Fiche d'un deal **avec** au moins une transaction rapprochée → « Supprimer »                       | Dialog de confirmation : message « Ce deal a N mouvement(s) rapproché(s)… » (pluriel correct EN/FR) + bouton de suppression **désactivé**         |
 | DD3 | Filet de sécurité backend (ex. via console/agent) : `deals.remove` sur un deal avec transactions  | Rejet `deal_has_transactions` ; rien n'est supprimé ; aucune transaction orpheline (`dealId` fantôme)                                             |
 | DD4 | Dialog de confirmation → « Annuler »                                                               | Aucune suppression ; retour à la fiche inchangée                                                                                                 |
 | DD5 | i18n EN/FR                                                                                         | Titre, corps, message bloquant et toasts traduits (namespace `participations` / `common`)                                                        |
