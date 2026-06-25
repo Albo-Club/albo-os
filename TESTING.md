@@ -478,9 +478,9 @@ depuis la liste des transactions du deal (clic ligne → sheet → combobox).
 
 ### Édition de champs (deal / entité / compte bancaire)
 
-Édition front : nom + instrument d'un deal (`/deals/$dealId`), nom + SIREN
-d'une entité (`/participations/$companyId`), nom personnalisé d'un compte
-(`/cash/$accountId`). Mutations : `deals.update`, `companies.update`,
+Édition front : nom + instrument d'un deal (`/deals/$dealId`), nom + SIREN +
+domaine d'une entité (`/participations/$companyId`), nom personnalisé d'un
+compte (`/cash/$accountId`). Mutations : `deals.update`, `companies.update`,
 `cash.updateAccountName`.
 
 > **Lot 5a (backend seul)** : `companies.update` accepte désormais un champ
@@ -499,6 +499,8 @@ d'une entité (`/participations/$companyId`), nom personnalisé d'un compte
 | ED4 | Page entité → « Modifier » → renommer + SIREN valide (9 chiffres, espaces tolérés) → Enregistrer | Toast succès ; titre + SIREN de la grille mis à jour ; SIREN stocké normalisé (sans espaces)                                                                                                                                                                                                           |
 | ED5 | SIREN invalide (ex. `12345`)                                                                     | Erreur inline sous le champ + bouton Enregistrer désactivé ; côté serveur la mutation rejette (`invalid_siren`)                                                                                                                                                                                        |
 | ED6 | SIREN déjà porté par une autre entité de l'org                                                   | Toast d'erreur « déjà utilisé » (`siren_already_used`), rien n'est écrit                                                                                                                                                                                                                               |
+| ED6b | Page entité → « Modifier » → saisir un domaine (ex. `stripe.com`) → Enregistrer                  | Toast succès ; bloc Identité → « Domaine » mis à jour ; le logo de l'en-tête (fiche, listes, `/app/all`) passe au logo logo.dev de ce domaine                                                                                                                                                          |
+| ED6c | Même dialog → vider le domaine → Enregistrer                                                     | Champ effacé en base (`domain` retiré) ; le logo retombe sur l'icône bâtiment de secours                                                                                                                                                                                                              |
 | ED7 | Page compte → « Modifier » → saisir un nom personnalisé → Enregistrer                            | Titre = `banque · nom personnalisé` ; nom d'origine en sous-titre grisé ; la liste `/cash` affiche aussi le nom personnalisé                                                                                                                                                                           |
 | ED8 | Même dialog → vider le nom → Enregistrer                                                         | Retombe sur le nom d'origine (`label`) ; `label` n'est **jamais** modifié par ce flux                                                                                                                                                                                                                  |
 | ED9 | i18n EN/FR sur les 3 dialogs                                                                     | Libellés, hints, erreurs et toasts traduits (namespaces `participations` / `cash` / `common`)                                                                                                                                                                                                          |

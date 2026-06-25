@@ -23,6 +23,26 @@ bas de page.
 
 ---
 
+## v1.29.0 — 25/06/2026 à 10:00 — Domaine de société éditable depuis la fiche
+
+Le domaine d'une société se modifie maintenant directement depuis la fiche, via
+le bouton « Modifier » (à côté du nom et du SIREN). C'est ce domaine qui
+alimente le logo affiché en en-tête de fiche et dans les listes : renseignez
+par exemple `stripe.com` et le logo apparaît automatiquement ; videz le champ
+et l'icône de secours reprend sa place.
+
+> **🔧 Notes techniques**
+>
+> - `companies.update` acceptait déjà `domain` ; ajout d'une normalisation
+>   serveur (`convex/companies.ts`) : domaine `trim()`, chaîne vide → champ
+>   effacé (`undefined`), calquée sur le traitement du SIREN.
+> - `EditCompanyDialog` (`src/routes/app/$orgSlug/participations.$companyId.tsx`) :
+>   nouvel état `domain` + champ de saisie sous le SIREN, envoyé dans le `patch`.
+> - i18n : clés `edit.domainLabel` / `edit.domainPlaceholder` (en + fr),
+>   `edit.companyDescription` mise à jour.
+> - Aucun stockage de logo (cf. `KNOWN_ISSUES.md` « Logos d'entreprises ») :
+>   le domaine continue d'être hotlinké à la volée par `CompanyLogo`.
+
 ## v1.28.3 — 24/06/2026 à 22:10 — Diagnostic : détail d'identité des entités cibles (lecture seule)
 
 Complément au diagnostic interne : un relevé en lecture seule du détail complet
