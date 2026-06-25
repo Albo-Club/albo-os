@@ -363,6 +363,19 @@
       "default": "Couldn't delete the deal. Please try again."
     }
   },
+  "deleteCompany": {
+    "confirmTitle": "Delete this entity for good?",
+    "confirmBody": "This action is permanent and cannot be undone. Use Archive instead if you may need it later.",
+    "blocked_one": "This entity carries {{count}} deal. Reassign it to another entity before deleting.",
+    "blocked_other": "This entity carries {{count}} deals. Reassign them to another entity before deleting.",
+    "blockedGroup": "Legal entities cannot be deleted.",
+    "deleted": "Entity deleted",
+    "errors": {
+      "company_has_references": "This entity is still linked to deals, transactions or other items. Detach them first.",
+      "cannot_delete_group_entity": "Legal entities cannot be deleted.",
+      "default": "Couldn't delete the entity. Please try again."
+    }
+  },
   "archive": {
     "button": "Archive",
     "blocked_one": "This entity carries {{count}} deal. Reassign it to another entity before archiving.",

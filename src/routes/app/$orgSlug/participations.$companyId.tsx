@@ -669,7 +669,10 @@ function ParticipationDetail() {
   const [createDealOpen, setCreateDealOpen] = useState(false)
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [archiving, setArchiving] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const archiveCompany = useConvexMutation(api.companies.archive)
+  const removeCompany = useConvexMutation(api.companies.remove)
   const org = useConvexQuery(api.organizations.bySlug, { slug: orgSlug })
   const company = useConvexQuery(api.companies.getById, {
     id: companyId as Id<'companies'>,
@@ -683,6 +686,9 @@ function ParticipationDetail() {
   // Other references (investor/SPV, relations, KPI, accounts, documents) are
   // caught server-side and surfaced via the error toast below.
   const dealCount = deals?.length ?? 0
+
+  // Legal entities (group_*) can never be hard-deleted (server refuses too).
+  const isGroup = company?.kind.startsWith('group_') ?? false
 
   async function handleArchive() {
     if (!company) return
@@ -703,6 +709,29 @@ function ParticipationDetail() {
       )
     } finally {
       setArchiving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!company) return
+    setDeleting(true)
+    try {
+      await removeCompany({ id: company._id })
+      toast.success(t('participations:deleteCompany.deleted'))
+      setDeleteOpen(false)
+      navigate({ to: '/app/$orgSlug/participations', params: { orgSlug } })
+    } catch (err) {
+      const code = err instanceof ConvexError ? (err.data as string) : ''
+      toast.error(
+        t(
+          code === 'company_has_references' ||
+            code === 'cannot_delete_group_entity'
+            ? `participations:deleteCompany.errors.${code}`
+            : 'participations:deleteCompany.errors.default',
+        ),
+      )
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -798,6 +827,13 @@ function ParticipationDetail() {
               >
                 <Archive className="size-4" />
                 {t('archive.button')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="size-4" />
+                {t('common:actions.delete')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -912,6 +948,43 @@ function ParticipationDetail() {
               disabled={archiving || dealCount > 0}
             >
               {t('archive.button')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteOpen}
+        onOpenChange={(open) => !open && setDeleteOpen(false)}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('deleteCompany.confirmTitle')}</DialogTitle>
+          </DialogHeader>
+          {/* Legal entities and still-referenced entities can't be deleted:
+              surface the reason here, behind the delete action. The server
+              enforces both guards too. */}
+          <p className="text-muted-foreground text-sm">
+            {isGroup
+              ? t('deleteCompany.blockedGroup')
+              : dealCount > 0
+                ? t('deleteCompany.blocked', { count: dealCount })
+                : t('deleteCompany.confirmBody')}
+          </p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+              disabled={deleting}
+            >
+              {t('common:actions.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void handleDelete()}
+              disabled={deleting || isGroup || dealCount > 0}
+            >
+              {t('common:actions.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -363,6 +363,19 @@
       "default": "Impossible de supprimer le deal. Réessayez."
     }
   },
+  "deleteCompany": {
+    "confirmTitle": "Supprimer définitivement cette entité ?",
+    "confirmBody": "Cette action est définitive et irréversible. Préférez l'archivage si vous pourriez en avoir besoin plus tard.",
+    "blocked_one": "Cette entité porte {{count}} deal. Réaffectez-le à une autre entité avant de supprimer.",
+    "blocked_other": "Cette entité porte {{count}} deals. Réaffectez-les à une autre entité avant de supprimer.",
+    "blockedGroup": "Les entités juridiques ne peuvent pas être supprimées.",
+    "deleted": "Entité supprimée",
+    "errors": {
+      "company_has_references": "Cette entité est encore reliée à des deals, mouvements ou autres éléments. Détachez-les d'abord.",
+      "cannot_delete_group_entity": "Les entités juridiques ne peuvent pas être supprimées.",
+      "default": "Impossible de supprimer l'entité. Réessayez."
+    }
+  },
   "archive": {
     "button": "Archiver",
     "blocked_one": "Cette entité porte {{count}} deal. Réaffectez-le à une autre entité avant d'archiver.",
