@@ -41,11 +41,11 @@ La fiche d'une entreprise est allégée et recentrée sur l'essentiel :
 >   `ownership` et par le nouveau `sharesConsolidated`. Deux `IdentityField`
 >   dans le bloc identité — `info.ownershipGlobal` (ex-`info.ownership`,
 >   conservé pour l'en-tête) et `info.sharesConsolidated`.
-> - Suppression de `<KpisSection>` et de son import ; le composant
->   `src/components/companies/KpisSection.tsx` (orphelin) est supprimé, ainsi
->   que le bloc i18n `participations:kpis` (fr/en). Le backend KPIs
->   (`convex/kpis.ts`, outil agent `createKpiSnapshot`) reste intact — seul
->   l'affichage front est retiré.
+> - Le rendu `<KpisSection>` et son import sont retirés de la fiche, mais le
+>   composant `src/components/companies/KpisSection.tsx` et le bloc i18n
+>   `participations:kpis` (fr/en) sont **conservés** (non câblés) pour un
+>   éventuel ré-affichage. Le backend KPIs (`convex/kpis.ts`, outil agent
+>   `createKpiSnapshot`) reste intact — seul l'affichage front est retiré.
 > - i18n : `reportings.title` → « Reporting » (fr/en), ajout de
 >   `info.ownershipGlobal` / `info.sharesConsolidated` (fr/en).
 

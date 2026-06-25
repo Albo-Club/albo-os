@@ -387,6 +387,22 @@
       "source": "Source"
     }
   },
+  "kpis": {
+    "title": "KPIs",
+    "empty": "No KPI recorded for this company.",
+    "emptyHint": "Paste a reporting into the assistant — it will extract the metrics.",
+    "deleted": "KPI deleted",
+    "deleteConfirmTitle": "Delete this KPI?",
+    "col": {
+      "metric": "Metric",
+      "period": "Period",
+      "value": "Value",
+      "source": "Source"
+    },
+    "errors": {
+      "default": "Something went wrong"
+    }
+  },
   "reportings": {
     "title": "Reporting",
     "upload": "Add a document",

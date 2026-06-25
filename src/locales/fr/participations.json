@@ -387,6 +387,22 @@
       "source": "Source"
     }
   },
+  "kpis": {
+    "title": "KPIs",
+    "empty": "Aucun KPI enregistré pour cette société.",
+    "emptyHint": "Colle un reporting dans l'assistant — il en extraira les métriques.",
+    "deleted": "KPI supprimé",
+    "deleteConfirmTitle": "Supprimer ce KPI ?",
+    "col": {
+      "metric": "Métrique",
+      "period": "Période",
+      "value": "Valeur",
+      "source": "Source"
+    },
+    "errors": {
+      "default": "Une erreur est survenue"
+    }
+  },
   "reportings": {
     "title": "Reporting",
     "upload": "Ajouter un document",
