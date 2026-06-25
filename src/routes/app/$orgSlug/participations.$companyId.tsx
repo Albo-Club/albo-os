@@ -110,6 +110,7 @@ function EditCompanyDialog({
     _id: Id<'companies'>
     name: string
     siren?: string | null
+    domain?: string | null
     people?: Array<PersonDraft>
   }
   orgId: Id<'organizations'>
@@ -119,6 +120,7 @@ function EditCompanyDialog({
   const updateCompany = useConvexMutation(api.companies.update)
   const [name, setName] = useState(company.name)
   const [siren, setSiren] = useState(company.siren ?? '')
+  const [domain, setDomain] = useState(company.domain ?? '')
   const [people, setPeople] = useState<Array<PersonDraft>>(company.people ?? [])
   const [pending, setPending] = useState(false)
 
@@ -148,6 +150,8 @@ function EditCompanyDialog({
         patch: {
           name: name.trim(),
           siren,
+          // Trimmed; '' clears it (normalized backend-side, mirror of SIREN).
+          domain: domain.trim(),
           // Full-list replacement. Trim names; keep attioRecordId when present.
           people: people.map((p) => ({
             role: p.role,
@@ -217,6 +221,19 @@ function EditCompanyDialog({
                 {t('participations:edit.sirenInvalid')}
               </p>
             )}
+          </div>
+          {/* Domain — feeds the company logo (logo.dev hotlink). Bare host,
+              e.g. "exemple.com"; empty clears it back to the fallback icon. */}
+          <div className="space-y-2">
+            <Label htmlFor="company-domain">
+              {t('participations:edit.domainLabel')}
+            </Label>
+            <Input
+              id="company-domain"
+              value={domain}
+              onChange={(e) => setDomain(e.target.value)}
+              placeholder={t('participations:edit.domainPlaceholder')}
+            />
           </div>
           {/* People — founders / board / co-investors. Each row searches Attio
               by name (Lot 5c): picking a suggestion fills name + attioRecordId

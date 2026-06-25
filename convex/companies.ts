@@ -255,6 +255,10 @@ export const update = mutation({
     if (patch.siren) {
       await assertSirenFree(ctx, company.orgId, patch.siren, id)
     }
+    // Domain: trimmed; '' clears the field (mirror of SIREN behaviour).
+    if (patch.domain !== undefined) {
+      patch.domain = patch.domain.trim() || undefined
+    }
     await ctx.db.patch("companies", id, patch)
     return id
   },
