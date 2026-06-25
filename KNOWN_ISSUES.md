@@ -1334,6 +1334,29 @@ Conséquence : un futur `upgrade-template` ne re-proposera **pas** ces
 éléments (ils sont considérés mergés). Si l'un devient pertinent,
 cherry-picker depuis `template/main`.
 
+## Pagination « Nouveautés » (couplage format ↔ parser)
+
+La page `/app/$orgSlug/changelog` (`src/routes/app/$orgSlug/changelog.tsx`)
+n'affiche que les 10 dernières entrées et révèle le reste par paliers. Pour
+ça, `parseChangelog()` découpe l'import `?raw` de `CHANGELOG_PRODUIT.md` sur
+les frontières `^## ` et **classe chaque section par son titre** :
+
+- Une section est une **entrée** (paginée) si son titre contient le séparateur
+  ` — ` (em-dash entouré d'espaces). C'est garanti par le format imposé dans
+  `CLAUDE.md` (`## vX.Y.Z — JJ/MM/AAAA à HH:MM — titre`), et ça couvre aussi les
+  4 entrées historiques `## Mois AAAA — …`.
+- La **première** section sans ` — ` démarre le **footer** épinglé (en pratique
+  le « Petit lexique » de bas de page, toujours en dernier).
+
+Conséquence à connaître avant d'éditer `CHANGELOG_PRODUIT.md` :
+
+- Un titre d'entrée **sans** ` — ` serait traité comme footer → toutes les
+  entrées suivantes disparaîtraient de la pagination. Garder le format.
+- Toute nouvelle section de bas de page (après le lexique) doit rester **sans**
+  ` — ` pour être épinglée, ou elle sera paginée comme une entrée.
+
+Le découpage est sans perte (roundtrip `header + entries + footer === raw`).
+
 ## Resend: two integrations (runtime Convex vs Claude Code plugin)
 
 There are **two unrelated Resend setups** here and they read the same env var

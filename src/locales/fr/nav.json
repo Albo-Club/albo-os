@@ -110,6 +110,7 @@
     }
   },
   "changelogPage": {
-    "metaTitle": "Nouveautés — Albo OS"
+    "metaTitle": "Nouveautés — Albo OS",
+    "showOlder": "Voir les nouveautés plus anciennes ({{remaining}})"
   }
 }
