@@ -882,45 +882,53 @@ function DealDetail() {
           {t('fiche.entity.title')}
         </h2>
         <Card>
-          <CardContent className="flex items-center gap-4">
-            <CompanyLogo
-              domain={deal.target?.domain}
-              companyName={deal.target?.name}
-              size="lg"
-            />
-            <div className="flex-1 space-y-1">
-              {deal.target ? (
-                <Link
-                  to="/app/$orgSlug/participations/$companyId"
-                  params={{ orgSlug, companyId: deal.target._id }}
-                  className="font-medium underline-offset-4 hover:underline"
-                >
-                  {deal.target.name}
-                </Link>
-              ) : (
+          {deal.target ? (
+            <Link
+              to="/app/$orgSlug/participations/$companyId"
+              params={{ orgSlug, companyId: deal.target._id }}
+              className="group block"
+              aria-label={deal.target.name}
+            >
+              <CardContent className="flex items-center gap-4">
+                <CompanyLogo
+                  domain={deal.target.domain}
+                  companyName={deal.target.name}
+                  size="lg"
+                />
+                <div className="flex-1 space-y-1">
+                  <span className="font-medium underline-offset-4 group-hover:underline">
+                    {deal.target.name}
+                  </span>
+                  <div className="text-muted-foreground text-xs">
+                    {t('deal.investor')}: {deal.investor?.name ?? '—'}
+                    {deal.spv ? (
+                      <>
+                        {' '}
+                        · {t('deal.viaSpv')} {deal.spv.name}
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+                <ArrowRight className="text-muted-foreground group-hover:text-foreground size-4" />
+              </CardContent>
+            </Link>
+          ) : (
+            <CardContent className="flex items-center gap-4">
+              <CompanyLogo size="lg" />
+              <div className="flex-1 space-y-1">
                 <span className="text-muted-foreground text-sm">—</span>
-              )}
-              <div className="text-muted-foreground text-xs">
-                {t('deal.investor')}: {deal.investor?.name ?? '—'}
-                {deal.spv ? (
-                  <>
-                    {' '}
-                    · {t('deal.viaSpv')} {deal.spv.name}
-                  </>
-                ) : null}
+                <div className="text-muted-foreground text-xs">
+                  {t('deal.investor')}: {deal.investor?.name ?? '—'}
+                  {deal.spv ? (
+                    <>
+                      {' '}
+                      · {t('deal.viaSpv')} {deal.spv.name}
+                    </>
+                  ) : null}
+                </div>
               </div>
-            </div>
-            {deal.target && (
-              <Link
-                to="/app/$orgSlug/participations/$companyId"
-                params={{ orgSlug, companyId: deal.target._id }}
-                className="text-muted-foreground hover:text-foreground"
-                aria-label={deal.target.name}
-              >
-                <ArrowRight className="size-4" />
-              </Link>
-            )}
-          </CardContent>
+            </CardContent>
+          )}
         </Card>
       </section>
 
