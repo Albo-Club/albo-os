@@ -160,7 +160,6 @@ export function DealsList({
 }) {
   const { t } = useTranslation('participations')
   const { fmtEur, fmtDate, fmtMultiple } = useFormatters()
-  const dealTitle = useDealTitle()
   const cellClass =
     'grid grid-cols-2 gap-x-6 gap-y-1 px-6 py-3 text-sm sm:grid-cols-5'
   return (
@@ -171,7 +170,12 @@ export function DealsList({
           paid > 0 ? ((dl.received ?? 0) + residualCents(dl)) / paid : null
         const body = (
           <>
-            <Field label={t('deal.instrument')}>{dealTitle(dl)}</Field>
+            <Field label={t('deal.name')}>{dl.name ?? '—'}</Field>
+            <Field label={t('deal.instrument')}>
+              {t(`instrument.${dl.instrumentKind}`, {
+                defaultValue: dl.instrumentKind,
+              })}
+            </Field>
             <Field label={t('deal.investor')}>
               {dl.investor?.name ?? '—'}
               {dl.spv ? (

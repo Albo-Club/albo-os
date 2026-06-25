@@ -44,6 +44,7 @@
     "tvpi": "TVPI"
   },
   "deal": {
+    "name": "Nom",
     "instrument": "Instrument",
     "investor": "Investisseur",
     "viaSpv": "via SPV",
