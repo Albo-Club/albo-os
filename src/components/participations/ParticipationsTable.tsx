@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowDown,
   ArrowUp,
@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import type { ReactNode } from 'react'
+import type { ReactNode, RefObject } from 'react'
 
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { Badge } from '~/components/ui/badge'
@@ -260,10 +260,15 @@ export function ParticipationsTable({
   deals,
   showOrg = false,
   orgSlug,
+  exportRef,
 }: {
   deals: Array<DealRow> | undefined
   showOrg?: boolean
   orgSlug?: string
+  // When provided, the toolbar export button is hidden and the export handler
+  // is exposed here so a parent (e.g. the header menu) can trigger it — the
+  // current search/sort filter still applies.
+  exportRef?: RefObject<(() => void) | null>
 }) {
   const { t } = useTranslation('participations')
   const { fmtEur, fmtMultiple } = useFormatters()
@@ -418,6 +423,13 @@ export function ParticipationsTable({
     downloadCsv(`participations-${day}.csv`, toCsv(headers, rows))
   }
 
+  // Expose the export handler to a parent (header menu) when asked. No deps:
+  // refresh every render so the ref always points at the latest closure
+  // (which reads the current `filtered` set).
+  useEffect(() => {
+    if (exportRef) exportRef.current = handleExport
+  })
+
   const colSpan = showOrg ? 7 : 6
 
   // Search bar shown as soon as there are deals — including when the
@@ -431,10 +443,12 @@ export function ParticipationsTable({
         placeholder={t('search.placeholder')}
         className="max-w-sm"
       />
-      <Button variant="outline" size="sm" onClick={handleExport}>
-        <Download className="size-4" />
-        {t('export.button')}
-      </Button>
+      {!exportRef && (
+        <Button variant="outline" size="sm" onClick={handleExport}>
+          <Download className="size-4" />
+          {t('export.button')}
+        </Button>
+      )}
     </div>
   )
 

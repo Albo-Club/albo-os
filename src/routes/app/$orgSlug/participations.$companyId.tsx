@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Archive, Link2, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import {
+  Archive,
+  Link2,
+  Loader2,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+} from 'lucide-react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useAction } from 'convex/react'
@@ -29,6 +37,13 @@ import {
 } from '~/components/companies/EntityFiche'
 import { ReportingsSection } from '~/components/companies/ReportingsSection'
 import { Button } from '~/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu'
 import {
   Dialog,
   DialogContent,
@@ -743,32 +758,39 @@ function ParticipationDetail() {
           </span>
         )}
         {company && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setEditOpen(true)}
-          >
-            <Pencil className="size-4" />
-            {t('common:actions.edit')}
-          </Button>
-        )}
-        {company && org && (
-          <Button size="sm" onClick={() => setCreateDealOpen(true)}>
-            <Plus className="size-4" />
-            {t('createDeal.button')}
-          </Button>
-        )}
-        {company && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive hover:text-destructive"
-            disabled={dealCount > 0}
-            onClick={() => setArchiveOpen(true)}
-          >
-            <Archive className="size-4" />
-            {t('archive.button')}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                className="ml-auto"
+                aria-label={t('common:actions.menu')}
+              >
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+                <Pencil className="size-4" />
+                {t('common:actions.edit')}
+              </DropdownMenuItem>
+              {org && (
+                <DropdownMenuItem onSelect={() => setCreateDealOpen(true)}>
+                  <Plus className="size-4" />
+                  {t('createDeal.button')}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={dealCount > 0}
+                onSelect={() => setArchiveOpen(true)}
+              >
+                <Archive className="size-4" />
+                {t('archive.button')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
 

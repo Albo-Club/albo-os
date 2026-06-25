@@ -23,6 +23,35 @@ bas de page.
 
 ---
 
+## v1.32.0 — 25/06/2026 à 10:40 — Actions des pages regroupées dans un menu
+
+Les actions de modification de chaque page sont désormais regroupées derrière
+un unique bouton menu (icône « … ») aligné à droite du titre, au lieu d'occuper
+l'en-tête sous forme de boutons bien visibles :
+
+- **Entreprises** : « Nouvelle entité » et « Exporter CSV » passent dans le menu.
+- **Fiche d'une entité** : « Modifier », « Nouveau deal » et « Archiver »
+  passent dans le menu (Archiver en rouge).
+- **Fiche d'un deal** : « Modifier » et « Supprimer » passent dans le menu
+  (Supprimer en rouge).
+
+Les listes et les fiches restent ainsi au premier plan, l'écran est plus épuré.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau libellé i18n `common:actions.menu` (nom accessible du déclencheur).
+> - `ParticipationsTable` accepte une prop `exportRef` : quand elle est fournie,
+>   le bouton CSV de la barre d'outils est masqué et `handleExport` est exposé
+>   via la ref, pour que le menu d'en-tête déclenche l'export en conservant le
+>   filtre de recherche/tri. La vue cross-org `/app/all` n'a pas de menu et garde
+>   son bouton d'export dans la barre d'outils.
+> - `participations.index.tsx`, `participations.$companyId.tsx` et
+>   `deals.$dealId.tsx` : les boutons d'en-tête sont remplacés par un
+>   `DropdownMenu` (déclencheur `Button variant="outline" size="icon-sm"` +
+>   `MoreHorizontal`, `align="end"`). Items destructifs (`Archiver`, `Supprimer`)
+>   en `variant="destructive"`, désactivés quand une référence bloque l'action
+>   (deals rattachés / transactions liées).
+
 ## v1.31.0 — 25/06/2026 à 11:01 — Fiche entreprise : focus identité + reporting
 
 La fiche d'une entreprise est allégée et recentrée sur l'essentiel :

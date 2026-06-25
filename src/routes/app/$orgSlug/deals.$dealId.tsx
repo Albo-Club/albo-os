@@ -1,5 +1,14 @@
 import { useState } from 'react'
-import { ArrowRight, Check, ChevronsUpDown, Eye, Info, Pencil, Trash2 } from 'lucide-react'
+import {
+  ArrowRight,
+  Check,
+  ChevronsUpDown,
+  Eye,
+  Info,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+} from 'lucide-react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
@@ -47,6 +56,13 @@ import {
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent } from '~/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu'
 import {
   Command,
   CommandEmpty,
@@ -771,20 +787,33 @@ function DealDetail() {
         <Badge variant={statusVariant(deal.status)}>
           {t(`status.${deal.status}`, { defaultValue: deal.status })}
         </Badge>
-        <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-          <Pencil className="size-4" />
-          {t('common:actions.edit')}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="text-destructive hover:text-destructive"
-          disabled={linkedCount > 0}
-          onClick={() => setDeleteOpen(true)}
-        >
-          <Trash2 className="size-4" />
-          {t('common:actions.delete')}
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              className="ml-auto"
+              aria-label={t('common:actions.menu')}
+            >
+              <MoreHorizontal className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+              <Pencil className="size-4" />
+              {t('common:actions.edit')}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={linkedCount > 0}
+              onSelect={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="size-4" />
+              {t('common:actions.delete')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Instrument-type selector — previews the central block only. The
