@@ -35,7 +35,6 @@ import {
   IdentitySection,
   PeopleList,
 } from '~/components/companies/EntityFiche'
-import { KpisSection } from '~/components/companies/KpisSection'
 import { ReportingsSection } from '~/components/companies/ReportingsSection'
 import { Button } from '~/components/ui/button'
 import {
@@ -696,16 +695,29 @@ function ParticipationDetail() {
     }
   }
 
+  // Shares held across all deals on this company (consolidated), and the
+  // resulting global ownership % when the company's total share count is known.
+  const heldShares = useMemo(
+    () => deals?.reduce((s, d) => s + (d.sharesAcquired ?? 0), 0) ?? 0,
+    [deals],
+  )
+
+  const sharesConsolidated = useMemo(
+    () =>
+      heldShares > 0
+        ? new Intl.NumberFormat(i18n.language).format(heldShares)
+        : null,
+    [heldShares, i18n.language],
+  )
+
   const ownership = useMemo(() => {
     const total = company?.totalShares
-    if (!deals || !total || total <= 0) return null
-    const held = deals.reduce((s, d) => s + (d.sharesAcquired ?? 0), 0)
-    if (held <= 0) return null
+    if (!total || total <= 0 || heldShares <= 0) return null
     return new Intl.NumberFormat(i18n.language, {
       style: 'percent',
       maximumFractionDigits: 1,
-    }).format(held / total)
-  }, [deals, company?.totalShares, i18n.language])
+    }).format(heldShares / total)
+  }, [heldShares, company?.totalShares, i18n.language])
 
   // Group people by role for the three sections. The name links to the Attio
   // person record when attioRecordId is set (and the workspace base is
@@ -794,7 +806,14 @@ function ParticipationDetail() {
           <IdentityField label={t('info.sector')} value={company?.sector} />
           <IdentityField label={t('info.siren')} value={company?.siren} />
           <IdentityField label={t('info.domain')} value={company?.domain} />
-          <IdentityField label={t('info.ownership')} value={ownership} />
+          <IdentityField
+            label={t('info.ownershipGlobal')}
+            value={ownership}
+          />
+          <IdentityField
+            label={t('info.sharesConsolidated')}
+            value={sharesConsolidated}
+          />
           <IdentityField
             label={t('identity.attio')}
             value={
@@ -832,8 +851,7 @@ function ParticipationDetail() {
         )}
       </IdentitySection>
 
-      {/* Reporting/KPIs + Documents zones of the skeleton. */}
-      {company && <KpisSection companyId={company._id} />}
+      {/* Reporting zone of the skeleton. */}
       {company && <ReportingsSection companyId={company._id} />}
 
       {company && editOpen && org && (

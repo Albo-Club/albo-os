@@ -32,7 +32,9 @@
     "sector": "Secteur",
     "siren": "SIREN",
     "domain": "Domaine",
-    "ownership": "Détention"
+    "ownership": "Détention",
+    "ownershipGlobal": "Détention globale (%)",
+    "sharesConsolidated": "Nb d'actions consolidé"
   },
   "col": {
     "company": "Société",
@@ -402,7 +404,7 @@
     }
   },
   "reportings": {
-    "title": "Reportings & documents",
+    "title": "Reporting",
     "upload": "Ajouter un document",
     "uploading": "Envoi…",
     "empty": "Aucun document. Les investor updates, BP et docs juridiques vivent ici.",

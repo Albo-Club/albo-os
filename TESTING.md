@@ -173,8 +173,8 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 ## Niveau 3 — Vues par type de projet (10 min)
 
 Sections typées de la page deal (`/deals/$dealId`) et de la page société
-(`/participations/$companyId`). La saisie des BP et des KPIs passe par
-l'assistant (outils `setDealProjections` / `createKpiSnapshot`).
+(`/participations/$companyId`). La saisie des BP passe par l'assistant
+(outil `setDealProjections`).
 
 | #   | Étape                                                                                                               | Résultat attendu                                                                                                                                                                           |
 | --- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -182,9 +182,9 @@ l'assistant (outils `setDealProjections` / `createKpiSnapshot`).
 | TP2 | Via le chat : « voilà le BP initial de [deal royalty] : 10 k€ par semestre de juil. 2026 à juil. 2028 » → confirmer | `setDealProjections` (version initial) ; la section affiche chart (courbes cumulées) + table des périodes ; tx `in` pointées sur le deal apparaissent en « Réalisé » dans la bonne période |
 | TP3 | Saisir ensuite un BP révisé dégradé via le chat                                                                     | Colonne/ligne « BP révisé » apparaît ; l'écart cumulé se mesure contre le révisé (négatif en rouge)                                                                                        |
 | TP4 | Deal `fund_lp`                                                                                                      | Section « Fonds » : cards Engagé / Appelé (Σ out) / Distribué (Σ in) / DPI / TVPI (dès qu'une valo existe) + table des valorisations                                                       |
-| TP5 | Page société : « ajoute l'ARR de [société] : 2,4 M€ sur 2025, source investor update » via le chat → confirmer      | `createKpiSnapshot` ; section « KPIs » liste la métrique (valeur formatée selon l'unité), suppression possible (confirm)                                                                   |
-| TP6 | Page société : « Ajouter un document » → fichier < 20 Mo → titre/type/période → save                                | Document listé (type, période, taille), download OK, suppression avec confirm ; > 20 Mo refusé avec message clair                                                                          |
-| TP7 | i18n EN/FR sur les sections plan/fonds/KPIs/reportings                                                              | Tous les libellés traduits (namespace `participations`)                                                                                                                                    |
+| TP5 | Page société : bloc « Identité » → champs « Détention globale (%) » (Σ titres acquis / `totalShares`) et « Nb d'actions consolidé » (Σ titres acquis sur tous les deals) | Détention en % (— si `totalShares` absent) ; nb d'actions formaté selon la locale (— si aucun titre acquis). Pas de section « KPIs » sur la fiche                                          |
+| TP6 | Page société : section « Reporting » → « Ajouter un document » → fichier < 20 Mo → titre/type/période → save        | Document listé (type, période, taille), download OK, suppression avec confirm ; > 20 Mo refusé avec message clair                                                                          |
+| TP7 | i18n EN/FR sur les sections plan/fonds/reporting                                                                   | Tous les libellés traduits (namespace `participations`)                                                                                                                                    |
 | TP8 | Logos boîtes (env `VITE_LOGO_DEV_TOKEN` posée) : liste `/participations`, vue `/app/all`, en-tête page société      | Sociétés avec domaine → logo logo.dev ; sans domaine (ou token absent) → fallback icône bâtiment, aucune image cassée                                                                       |
 
 ### Fiche deal pilotée par l'instrument (`/app/$orgSlug/deals/$dealId`)
