@@ -237,7 +237,11 @@ function Participations() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
         {org && (
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCreateOpen(true)}
+          >
             <Plus className="size-4" />
             {t('create.button')}
           </Button>

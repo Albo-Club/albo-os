@@ -23,6 +23,22 @@ bas de page.
 
 ---
 
+## v1.31.0 — 25/06/2026 à 11:00 — Boutons d'action plus discrets
+
+Les boutons « Nouvelle entité » et « Nouveau deal » sont désormais affichés
+en contour plutôt qu'en aplat coloré, et le bouton « Archiver » reste effacé
+jusqu'au survol. Les listes et fiches restent ainsi au premier plan, les
+actions de création et d'archivage passent au second.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/$orgSlug/participations.index.tsx` : le bouton de création
+>   d'entité passe de la variante `default` (aplat primaire) à `outline`.
+> - `src/routes/app/$orgSlug/participations.$companyId.tsx` : le bouton
+>   « Nouveau deal » passe à la variante `outline` ; le bouton « Archiver »
+>   passe de `outline` (texte destructive permanent) à `ghost` avec
+>   `text-muted-foreground hover:text-destructive` (rouge au survol seulement).
+
 ## v1.30.0 — 25/06/2026 à 10:31 — Fiche deal : entité liée entièrement cliquable
 
 Sur la fiche d'un deal, le bloc « Entité liée » est désormais cliquable sur

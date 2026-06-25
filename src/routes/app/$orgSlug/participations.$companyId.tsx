@@ -741,16 +741,20 @@ function ParticipationDetail() {
           </Button>
         )}
         {company && org && (
-          <Button size="sm" onClick={() => setCreateDealOpen(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCreateDealOpen(true)}
+          >
             <Plus className="size-4" />
             {t('createDeal.button')}
           </Button>
         )}
         {company && (
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="text-destructive hover:text-destructive"
+            className="text-muted-foreground hover:text-destructive"
             disabled={dealCount > 0}
             onClick={() => setArchiveOpen(true)}
           >
