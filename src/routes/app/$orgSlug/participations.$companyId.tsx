@@ -28,6 +28,7 @@ import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { DealsList } from '~/components/participations/ParticipationsTable'
 import { CompanyLogo } from '~/components/CompanyLogo'
+import { SectorCombobox } from '~/components/companies/SectorCombobox'
 import {
   AttioCompanyLink,
   EntityNatureBadge,
@@ -125,6 +126,7 @@ function EditCompanyDialog({
     name: string
     siren?: string | null
     domain?: string | null
+    sector?: string | null
     people?: Array<PersonDraft>
   }
   orgId: Id<'organizations'>
@@ -135,6 +137,7 @@ function EditCompanyDialog({
   const [name, setName] = useState(company.name)
   const [siren, setSiren] = useState(company.siren ?? '')
   const [domain, setDomain] = useState(company.domain ?? '')
+  const [sector, setSector] = useState(company.sector ?? '')
   const [people, setPeople] = useState<Array<PersonDraft>>(company.people ?? [])
   const [pending, setPending] = useState(false)
 
@@ -166,6 +169,8 @@ function EditCompanyDialog({
           siren,
           // Trimmed; '' clears it (normalized backend-side, mirror of SIREN).
           domain: domain.trim(),
+          // Slug for a predefined sector, free text otherwise; '' clears it.
+          sector,
           // Full-list replacement. Trim names; keep attioRecordId when present.
           people: people.map((p) => ({
             role: p.role,
@@ -248,6 +253,12 @@ function EditCompanyDialog({
               onChange={(e) => setDomain(e.target.value)}
               placeholder={t('participations:edit.domainPlaceholder')}
             />
+          </div>
+          {/* Sector — predefined list + free entry (creatable combobox).
+              Stored as a slug for predefined sectors, verbatim otherwise. */}
+          <div className="space-y-2">
+            <Label>{t('participations:edit.sectorLabel')}</Label>
+            <SectorCombobox value={sector} onChange={setSector} />
           </div>
           {/* People — founders / board / co-investors. Each row searches Attio
               by name (Lot 5c): picking a suggestion fills name + attioRecordId
@@ -803,7 +814,16 @@ function ParticipationDetail() {
       {/* Identity block — nature "company". */}
       <IdentitySection title={t('identity.title')}>
         <div className="grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-4">
-          <IdentityField label={t('info.sector')} value={company?.sector} />
+          <IdentityField
+            label={t('info.sector')}
+            value={
+              company?.sector
+                ? t(`sectors.${company.sector}`, {
+                    defaultValue: company.sector,
+                  })
+                : undefined
+            }
+          />
           <IdentityField label={t('info.siren')} value={company?.siren} />
           <IdentityField label={t('info.domain')} value={company?.domain} />
           <IdentityField

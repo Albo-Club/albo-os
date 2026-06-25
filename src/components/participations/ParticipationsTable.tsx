@@ -286,6 +286,10 @@ export function ParticipationsTable({
         d.target?.name,
         d.name,
         d.target?.sector,
+        d.target?.sector &&
+          t(`sectors.${d.target.sector}`, {
+            defaultValue: d.target.sector,
+          }),
         d.investor?.name,
         d.instrumentKind,
         t(`instrument.${d.instrumentKind}`, {

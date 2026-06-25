@@ -23,6 +23,37 @@ bas de page.
 
 ---
 
+## v1.33.0 — 25/06/2026 à 11:38 — Secteur éditable depuis la fiche entité
+
+Le **secteur** d'une entité du portefeuille se modifie désormais directement
+depuis l'application :
+
+- Dans le dialog **« Modifier la société »**, un nouveau champ **« Secteur »**
+  propose un sélecteur recherchable avec une liste de secteurs courants (SaaS,
+  Fintech, Santé, Climat, Immobilier, Fonds, Crypto…).
+- Vous pouvez **choisir un secteur de la liste** ou **saisir votre propre
+  valeur** si aucune ne convient (« Créer … »).
+- Pour retirer le secteur, rouvrez le sélecteur et recliquez sur le secteur
+  déjà sélectionné.
+- Le secteur reste visible dans le bloc Identité de la fiche et la recherche
+  des participations le prend en compte (libellé traduit ou valeur libre).
+
+> **🔧 Notes techniques**
+>
+> - Liste canonique des secteurs dans `src/lib/sectors.ts` (`SECTOR_SLUGS`,
+>   slugs stables) ; libellés via i18n `participations:sectors.<slug>` (EN/FR).
+> - Nouveau composant `src/components/companies/SectorCombobox.tsx` : combobox
+>   créatif (Popover + `Command` cmdk) calqué sur `TargetCombobox`. Un secteur
+>   prédéfini est stocké comme **slug**, une saisie libre **verbatim** — le
+>   champ `companies.sector` reste `v.optional(v.string())`, donc **aucune
+>   migration**. Toggle pour vider (reclic sur le secteur actif → `''`).
+> - Câblage dans `EditCompanyDialog` (`participations.$companyId.tsx`) : état
+>   `sector`, champ après le domaine, `sector` ajouté au `patch` de
+>   `companies.update` (qui l'acceptait déjà). Affichage fiche via
+>   `t('sectors.<v>', { defaultValue: v })` (fallback valeur brute).
+> - Recherche `ParticipationsTable` enrichie : slug brut **+** libellé traduit
+>   ajoutés au haystack (même pattern que l'instrument).
+
 ## v1.32.0 — 25/06/2026 à 10:40 — Actions des pages regroupées dans un menu
 
 Les actions de modification de chaque page sont désormais regroupées derrière
