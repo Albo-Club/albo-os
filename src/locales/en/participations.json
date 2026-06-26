@@ -128,6 +128,7 @@
   "instrument": {
     "share": "Shares",
     "spv_share": "Equity via SPV",
+    "lead_spv": "SPV lead (management)",
     "os": "Bond",
     "oc": "Convertible bond",
     "convertible_note": "Convertible note",
@@ -169,6 +170,10 @@
     "interestRate": "Interest rate",
     "spvOwnershipPct": "SPV ownership",
     "spvName": "SPV name",
+    "amountRaised": "Capital raised",
+    "managementFeeRate": "Management fee",
+    "hurdleRate": "Hurdle rate",
+    "carriedRate": "Carried interest",
     "distributionRate": "Distribution rate",
     "roundType": "Round",
     "safeType": "Instrument type",
@@ -246,6 +251,7 @@
     "funds_lp": "Fund (LP)",
     "real_estate": "Real estate",
     "royalties": "Royalties",
+    "management": "Management",
     "placement": "Treasury",
     "unassigned": "Unassigned"
   },
@@ -267,6 +273,12 @@
     },
     "royalty": {
       "placeholder": "Royalties panel coming soon."
+    },
+    "leadSpv": {
+      "collected": "Collected to date",
+      "collectedHint": "Gross sum of inbound transactions linked to this deal (fees + carried, not split).",
+      "paramsTitle": "Management parameters",
+      "edit": "Edit"
     },
     "cto": {
       "placeholder": "This instrument type isn't configured yet."

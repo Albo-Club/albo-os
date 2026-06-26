@@ -1420,16 +1420,18 @@ non-évidents :
 ## Archétypes d'instruments (fiches deal — dashboard refonte)
 
 `convex/lib/instrumentMapping.ts` est la **source unique** qui mappe chaque
-`instrumentKind` (les 19 valeurs de `convex/lib/instruments.ts`) à un archétype,
+`instrumentKind` (les 20 valeurs de `convex/lib/instruments.ts`) à un archétype,
 un mode de rendu et — pour les types configurés — la liste ordonnée des colonnes
 `deals` à afficher. Front et reporting lisent ce module ; ne **jamais** dupliquer
 ce mapping ailleurs. Décisions non-évidentes :
 
 1. **`INSTRUMENT_ARCHETYPE` / `INSTRUMENT_RENDER` sont des `Record` totaux**
-   (19 clés) → un `instrumentKind` oublié casse la compilation TS. C'est le
+   (20 clés) → un `instrumentKind` oublié casse la compilation TS. C'est le
    garde-fou : ajouter une valeur à l'enum force à la classer ici.
-   `INSTRUMENT_FIELDS` est volontairement **partiel** : seuls les 17 types en
-   render `'fields'` y figurent.
+   `INSTRUMENT_FIELDS` est volontairement **partiel** : les 17 types en render
+   `'fields'` **plus** `lead_spv` (custom, mais présent pour que le dialog
+   d'édition partagé édite ses 4 paramètres — cf. point 11). `royalty` (custom
+   sans panel) et `cto` (placeholder) restent absents.
 
 2. **`placement` = relevé de trésorerie minimal.** `crypto` et
    `capitalization_account` sont configurés en archétype `placement` / render
@@ -1440,9 +1442,9 @@ ce mapping ailleurs. Décisions non-évidentes :
    deal en prod pour cadrer son layout) ; ne lui invente pas de field config
    sans repasser par une décision de design.
 
-3. **`royalty` en render `'custom'`** (et le carried/manco aussi, plus tard) :
-   le bloc central viendra d'un panel dédié (`RoyaltiesPanel`), pas de
-   `INSTRUMENT_FIELDS`. Réservé, non implémenté dans ce lot.
+3. **`render: 'custom'` = panel dédié** (cf. point 11 pour le routage). `royalty`
+   reste réservé (pas de panel → placeholder). `lead_spv` est le **premier vrai
+   panel custom** (`LeadSpvPanel`) — modèle du futur `RoyaltiesPanel`.
 
 4. **Valorisations : `preMoneyValuation` / `postMoneyValuation` sont neufs.** On
    n'a **pas** aliasé l'`entryValuation` existant sur `valoPre` : son sens réel
@@ -1501,8 +1503,9 @@ ce mapping ailleurs. Décisions non-évidentes :
    `INSTRUMENTS` (≈ l.80-100, ordre d'affichage du dropdown) alors que la source
    unique est `convex/lib/instruments.ts`, déjà réimportée ailleurs
    (`participations.$companyId.tsx`, `ParticipationsTable.tsx`). Les deux listes
-   couvrent les 19 mêmes `instrumentKind` mais dans un **ordre différent**. Laissé
-   tel quel au Lot 2 (hors périmètre, pas de fix adjacent) : le sélecteur de
+   couvrent les 20 mêmes `instrumentKind` mais dans un **ordre différent** (penser
+   à y ajouter tout nouveau kind — `lead_spv` l'a été). Laissé tel quel (hors
+   périmètre, pas de fix adjacent) : le sélecteur de
    prévisualisation ajouté réutilise la copie locale pour ne pas introniser deux
    sources dans le même fichier. **Risque** : un instrument ajouté dans
    `instruments.ts` n'apparaît pas dans ce dropdown tant que la copie locale n'est
@@ -1532,6 +1535,36 @@ ce mapping ailleurs. Décisions non-évidentes :
       (leur donnée vit dans `spvOwnershipPct`). Unifier sur `ownershipPct` est une
       **décision future explicite** (migration vérifiée, snapshot d'abord), hors
       périmètre.
+
+11. **`lead_spv` = « Lead SPV (gestion) » + premier panel custom réel.** Le
+    pendant gestion d'un SPV dont on est lead (Hectarea, Eben Home) : là où
+    `spv_share` suit **l'invest**, `lead_spv` suit les **revenus de gérant**
+    (frais + carried). Les deux deals coexistent sur la **même cible**
+    (`targetCompanyId`) et s'affichent côte à côte sur la fiche entité — pas de
+    lien dur. Décisions :
+    - **Archétype neuf `management`** (badge « Gestion » / « Management »,
+      réutilise le token `positive` = revenu, comme `placement`) + render
+      `'custom'`. Économiquement c'est un revenu de gestion, pas un placement.
+    - **Niveau 1, déclaratif.** 4 colonnes neuves `v.optional` : `amountRaised`
+      (cents), `managementFeeRate` / `hurdleRate` / `carriedRate` (bps). **Pas**
+      de waterfall/projection, **pas** de ventilation frais/carried. Le **perçu à
+      date** = `received` (somme brute des flux entrants rattachés, déjà calculée
+      par `transactionTotals` / la page deal), **lecture seule, jamais stocké**.
+    - **Routage `render: 'custom'` → composant (le point technique central).**
+      Avant ce lot, `render === 'custom'` n'affichait qu'un placeholder codé en
+      dur (libellé royalty). Désormais un **registre `CUSTOM_PANELS`**
+      (`instrumentKind → composant`, `InstrumentBlock.tsx`) dispatche : une entrée
+      → le panel (`lead_spv → LeadSpvPanel`), pas d'entrée → fallback placeholder
+      (royalty). `InstrumentBlock` reçoit deux props neuves, `received` et
+      `onEdit`, transmises aux panels. **Ajouter un futur panel = une ligne dans
+      le registre** (`royalty: RoyaltiesPanel`), rien d'autre.
+    - **Édition réutilise le dialog existant.** `lead_spv` est listé dans
+      `INSTRUMENT_FIELDS` (4 champs) → `EditDealDialog` les édite via
+      `FIELD_FORMAT` (€ / %), comme tout type `'fields'`. **Mode de rendu (custom)
+      et champs éditables (INSTRUMENT_FIELDS) restent orthogonaux** : un panel
+      custom peut s'appuyer sur le dialog générique sans formulaire dédié. Le
+      `LeadSpvPanel` n'expose qu'un bouton « Modifier » qui appelle `onEdit`
+      (ouvre ce même dialog).
 
 ## Fiche entité (lecture seule) — champs manquants & lien Attio
 

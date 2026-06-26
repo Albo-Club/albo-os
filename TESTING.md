@@ -30,7 +30,7 @@ Pré-requis :
 
 > **Schéma & mapping d'instruments** (refonte fiches deal, `convex/schema.ts` +
 > `convex/lib/instrumentMapping.ts`). Validés par B1 : `INSTRUMENT_ARCHETYPE` et
-> `INSTRUMENT_RENDER` sont des `Record` totaux sur les 19 `instrumentKind` → un
+> `INSTRUMENT_RENDER` sont des `Record` totaux sur les 20 `instrumentKind` → un
 > type oublié casse la compilation. Vérifier en plus, à la revue, que chaque
 > colonne listée dans `INSTRUMENT_FIELDS` existe bien sur la table `deals`.
 > Aucune surface UI à tester : les colonnes d'archétype sont dormantes tant que
@@ -222,6 +222,8 @@ L'**édition des valeurs** passe par le dialog « Modifier » (Lot 3, tests FD11
 | FD19 | **Deal `oc` ou `convertible_note` (config propre).** Ouvrir un deal `oc` | Badge « Capital » ; toggle Pré/Post (marqueur `conversionValuation`), défaut **Pré** : date d'invest / montant / taux d'intérêt (%) / date de maturité / ratio de conversion / discount à la conversion (%) ; **Post** ajoute valo à la conversion / titres / détention. « Modifier » → le **ratio de conversion** accepte une valeur **décimale** |
 | FD20 | **Select type d'instrument côté SAFE.** Sur un deal `safe`/`bsa_air` → « Modifier » → champ **Type d'instrument** | Le select ne propose plus que **SAFE / BSA Air** (`oc` retiré de l'affichage) ; un deal legacy portant `safeType='oc'` en base reste valide (validateur inchangé) et son libellé « Obligation convertible » reste rendu en lecture |
 | FD21 | **Deal `spv_share` (« Equity via SPV »).** Ouvrir un deal `spv_share` existant (ex. Wandercraft / BackMarket, org `albo`) | Libellé d'instrument « Equity via SPV » (EN/FR) ; badge archétype **« Capital »** (plus « Fonds (LP) ») ; bloc « Détails de l'instrument » : closing / montant versé / **nom du SPV** / détention SPV / frais de structuration / valos pre+post, **dans l'ordre du mapping** ; champs vides → « — ». La cible reste rattachée via `targetCompanyId` (carte « Entité liée »). En base, `spvOwnershipPct` et `underlyingTarget` **conservent leurs valeurs** ; `underlyingTarget` n'est **plus affiché** (la cible = `targetCompanyId`). « Modifier » → **Nom du SPV** éditable (texte) |
+| FD22 | **Deal `lead_spv` (« Lead SPV (gestion) ») — premier panel custom.** Sur une entité ayant déjà un `spv_share` (ex. Hectarea), créer/ouvrir un second deal `lead_spv` | Libellé d'instrument « Lead SPV (gestion) » / « SPV lead (management) » ; badge archétype **« Gestion » / « Management »** (token `positive`, vert) ; bloc central = **panel dédié** (pas la grille plate ni un placeholder) : carte **« Perçu à date »** en vert = somme des **flux entrants** rattachés (`received`, lecture seule) + carte **« Paramètres de gestion »** avec montant levé / % frais de gestion / hurdle / % carried. Le bouton **« Modifier »** du panel ouvre le **dialog d'édition existant** (pas un formulaire dédié) qui liste ces 4 champs (€ / %). Sur la fiche entité, `lead_spv` et `spv_share` apparaissent **côte à côte** (même `targetCompanyId`) |
+| FD23 | **`lead_spv` — perçu à date reflète les flux.** Rapprocher une transaction **entrante** (encaissement) sur le deal `lead_spv` | La carte « Perçu à date » du panel **augmente** du montant encaissé (réactif) ; une transaction **sortante** ne l'affecte pas (seuls les `in` comptent) ; le strip d'overview « Reçu » est cohérent avec la carte |
 
 ### Archivage / restauration d'une entité (`/app/$orgSlug/participations`)
 
@@ -573,7 +575,7 @@ signature → ms epoch.
 | CD2 | Org à **plusieurs** entités `group_*`                                                              | Aucun investisseur deviné ; sélection obligatoire ; bouton Créer désactivé tant qu'investisseur **et** instrument ne sont pas choisis            |
 | CD3 | Choisir investisseur + instrument (+ montant en € + date optionnels) → Créer                       | Toast succès ; le deal apparaît dans la liste de la fiche (réactif, sans reload) ; **on reste sur la fiche** ; montant stocké en cents           |
 | CD4 | Montant invalide (négatif ou non numérique)                                                        | Erreur inline sous le champ + bouton Créer désactivé                                                                                             |
-| CD5 | i18n EN/FR sur le dialog                                                                           | Libellés, placeholders, erreurs et toasts traduits ; les 19 instruments viennent de `convex/lib/instruments.ts` (libellés `instrument.*`)         |
+| CD5 | i18n EN/FR sur le dialog                                                                           | Libellés, placeholders, erreurs et toasts traduits ; les 20 instruments viennent de `convex/lib/instruments.ts` (libellés `instrument.*`)         |
 
 ### Suppression de deal depuis la fiche deal (`/app/$orgSlug/deals/$dealId`)
 

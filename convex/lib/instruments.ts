@@ -17,6 +17,7 @@ export const INSTRUMENTS = [
   'royalty',
   'fund_lp', // LP commitment in a fund
   'spv_share', // shares of an SPV
+  'lead_spv', // management revenue as lead of an SPV (fees + carried)
   'secondary',
   'real_estate_direct',
   'scpi',

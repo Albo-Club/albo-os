@@ -135,6 +135,7 @@ const INSTRUMENTS = [
   'royalty',
   'fund_lp',
   'spv_share',
+  'lead_spv',
   'secondary',
   'real_estate_direct',
   'scpi',
@@ -970,8 +971,14 @@ function DealDetail() {
         <Stat label={t('deal.received')} value={fmtEur(received)} />
       </div>
 
-      {/* Central block: layout driven by the previewed instrument type. */}
-      <InstrumentBlock deal={deal} instrumentKind={effectiveKind} />
+      {/* Central block: layout driven by the previewed instrument type. The
+          custom panels (lead_spv) read `received` and open the edit dialog. */}
+      <InstrumentBlock
+        deal={deal}
+        instrumentKind={effectiveKind}
+        received={received}
+        onEdit={() => setEditOpen(true)}
+      />
 
       <NotesSection deal={deal} />
 
