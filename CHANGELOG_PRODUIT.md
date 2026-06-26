@@ -23,6 +23,26 @@ bas de page.
 
 ---
 
+## v1.39.1 — 26/06/2026 à 09:57 — Ménage d'outillage interne
+
+Retrait de deux scripts de diagnostic temporaires qui avaient servi à
+cartographier les entités orphelines avant leur réparation manuelle. Ils ont
+fait leur travail et n'avaient plus de raison d'exister. Aucun changement
+visible côté application.
+
+> **🔧 Notes techniques**
+>
+> - Suppression de `convex/migrations/diagnoseAlboUmbrellas.ts` et
+>   `convex/migrations/diagnoseDeadEntities.ts` — deux `internalQuery dryRun`
+>   en lecture seule, invoqués manuellement via `convex run`, créés pour
+>   l'enquête sur les entités orphelines (réparation des chapeaux Sezame /
+>   Parallel sur `albo`, repérage des entités sans deal). Diagnostics
+>   ponctuels, jamais référencés par le code (front, crons, tests) ni par un
+>   export — d'où une suppression purement chirurgicale.
+> - Une fois mergé, ces fonctions disparaissent de la prod au prochain build
+>   Vercel (`build:vercel` → `convex deploy`) ; elles ne s'affichent plus dans
+>   la liste `convex run`.
+
 ## v1.39.0 — 26/06/2026 à 09:46 — Retrouver les entités sans deal
 
 Sur la page **Participations**, les entités qui n'ont **aucun deal** étaient
