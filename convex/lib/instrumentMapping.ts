@@ -5,16 +5,17 @@ import type { InstrumentKind } from './instruments'
  * dashboard refonte. The front (deal fiche, forms) and reporting read these
  * constants. NEVER duplicate this mapping elsewhere.
  *
- * Each `instrumentKind` (the 19 values in ./instruments) belongs to exactly
+ * Each `instrumentKind` (the 20 values in ./instruments) belongs to exactly
  * one archetype and has exactly one render mode:
  *   - 'fields'      → INSTRUMENT_FIELDS lists the ordered `deals` columns to show
- *   - 'custom'      → a bespoke panel renders the central block (royalty)
+ *   - 'custom'      → a bespoke panel renders the central block (lead_spv →
+ *                     LeadSpvPanel; royalty still on a placeholder)
  *   - 'placeholder' → layout not designed yet; show a neutral "type non encore
  *                     configuré" block (cto only).
  *
  * 'unassigned' is the holding bucket for the placeholder kinds (only `cto`
  * remains, lacking a prod deal to model its layout from), so
- * INSTRUMENT_ARCHETYPE stays a total Record over the 19 real values.
+ * INSTRUMENT_ARCHETYPE stays a total Record over the 20 real values.
  */
 export type Archetype =
   | 'equity'
@@ -22,6 +23,7 @@ export type Archetype =
   | 'funds_lp'
   | 'real_estate'
   | 'royalties'
+  | 'management'
   | 'placement'
   | 'unassigned'
 
@@ -41,6 +43,9 @@ export const INSTRUMENT_ARCHETYPE: Record<InstrumentKind, Archetype> = {
   // equity held indirectly through an SPV — the deal's target is the underlying
   // company (targetCompanyId), the SPV is just a holding method (spvName + fees).
   spv_share: 'equity',
+  // management revenue as lead of an SPV (fees + carried) — not a placement:
+  // the deal tracks what you earn managing the SPV, not an investment.
+  lead_spv: 'management',
   // debt (loan reuses the os field config)
   os: 'debt',
   loan: 'debt',
@@ -76,6 +81,7 @@ export const INSTRUMENT_RENDER: Record<InstrumentKind, RenderMode> = {
   dat: 'fields',
   fund_lp: 'fields',
   spv_share: 'fields',
+  lead_spv: 'custom',
   secondary: 'fields',
   real_estate_direct: 'fields',
   scpi: 'fields',
@@ -187,6 +193,17 @@ const SPV_FIELDS = [
   'postMoneyValuation',
 ]
 
+// Lead SPV: declarative parameters (level 1, no waterfall). Rendered by the
+// custom LeadSpvPanel, but listed here so the shared edit dialog (driven by
+// INSTRUMENT_FIELDS + FIELD_FORMAT) edits them — render mode (custom) and
+// editable fields stay orthogonal.
+const LEAD_SPV_FIELDS = [
+  'amountRaised',
+  'managementFeeRate',
+  'hurdleRate',
+  'carriedRate',
+]
+
 const SCPI_FIELDS = [
   'closingDate',
   'paidAmount',
@@ -215,9 +232,10 @@ const PLACEMENT_FIELDS = [
 ]
 
 /**
- * instrumentKind → ordered `deals` columns for the 'fields'-rendered kinds.
- * Partial: 'custom' (royalty) and 'placeholder' (cto) kinds are intentionally
- * absent.
+ * instrumentKind → ordered `deals` columns for the fields-rendered kinds, plus
+ * lead_spv. Partial: 'placeholder' (cto) and the custom royalty kind are
+ * absent. lead_spv is custom-rendered but kept here so the shared edit dialog
+ * can edit its declarative parameters (render mode ≠ editable fields).
  */
 export const INSTRUMENT_FIELDS: Partial<Record<InstrumentKind, Array<string>>> =
   {
@@ -234,6 +252,7 @@ export const INSTRUMENT_FIELDS: Partial<Record<InstrumentKind, Array<string>>> =
     fund_lp: FONDS_FIELDS,
     secondary: FONDS_FIELDS,
     spv_share: SPV_FIELDS,
+    lead_spv: LEAD_SPV_FIELDS,
     scpi: SCPI_FIELDS,
     real_estate_direct: IMMO_FIELDS,
     crypto: PLACEMENT_FIELDS,

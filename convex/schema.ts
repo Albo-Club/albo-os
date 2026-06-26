@@ -473,6 +473,14 @@ export default defineSchema({
     structuringFees: v.optional(v.number()), // cents
     spvName: v.optional(v.string()), // SPV legal name (text — SPV not modeled as entity)
 
+    // Lead SPV (management revenue as SPV lead — declarative, level 1). The
+    // amount actually collected is derived from inbound transactions
+    // (received), never stored. See convex/lib/instrumentMapping.ts.
+    amountRaised: v.optional(v.number()), // cents — third-party capital raised
+    managementFeeRate: v.optional(v.number()), // bps — annual management fee
+    hurdleRate: v.optional(v.number()), // bps — preferred return threshold
+    carriedRate: v.optional(v.number()), // bps — carried interest share
+
     // Real estate (scpi / immo)
     distributionRate: v.optional(v.number()), // bps
     enjoymentDelayMonths: v.optional(v.number()),

@@ -23,6 +23,41 @@ bas de page.
 
 ---
 
+## v1.43.0 — 26/06/2026 à 15:30 — Lead SPV (gestion)
+
+Quand vous êtes **lead d'un SPV** (Hectarea, Eben Home), vous ne faites pas que
+co-investir : vous **gérez**, et à ce titre vous percevez des **frais de gestion**
+et du **carried**. Ce volet gestion a désormais son propre type de deal,
+**Lead SPV (gestion)**, distinct du deal d'investissement « Equity via SPV ». Sur
+une même société, les deux deals coexistent côte à côte : l'un suit votre invest,
+l'autre vos revenus de gérant.
+
+Le deal Lead SPV affiche un panneau dédié : les **paramètres** que vous renseignez
+(montant levé, % de frais de gestion, hurdle, % de carried) et, en lecture seule,
+le **perçu à date** — la somme des encaissements rattachés au deal. Niveau 1, donc
+pas encore de projection ni de ventilation frais/carried : on suit ce qui est
+réellement tombé.
+
+> **🔧 Notes techniques**
+>
+> - Nouvel `instrumentKind` **`lead_spv`** (additif) dans
+>   `convex/lib/instruments.ts` + liste du sélecteur dans
+>   `src/routes/app/$orgSlug/deals.$dealId.tsx`.
+> - Nouvel archétype **`management`** et `render: 'custom'` dans
+>   `convex/lib/instrumentMapping.ts`. 4 colonnes `deals` neuves (`v.optional`) :
+>   `amountRaised` (cents), `managementFeeRate` / `hurdleRate` / `carriedRate`
+>   (bps) — schéma + validateur `patch` de `deals.update` + `FIELD_FORMAT`.
+> - **Premier vrai panel custom** : registre `CUSTOM_PANELS`
+>   (`instrumentKind → composant`) dans `InstrumentBlock.tsx`, branché sur
+>   `render === 'custom'` (royalty reste sur son placeholder, faute d'entrée).
+>   Nouveau `src/components/deals/LeadSpvPanel.tsx`. `InstrumentBlock` reçoit
+>   `received` (somme des flux entrants, déjà calculée page) + `onEdit` (ouvre le
+>   dialog d'édition existant). `lead_spv` est listé dans `INSTRUMENT_FIELDS` pour
+>   que ce dialog édite ses 4 paramètres — le mode de rendu (custom) et les champs
+>   éditables restent orthogonaux.
+> - i18n EN/FR (`instrument.lead_spv`, 4 `field.*`, `archetype.management`,
+>   `fiche.leadSpv.*`) ; badge `management` réutilise le token `positive`.
+
 ## v1.42.0 — 26/06/2026 à 12:30 — Equity via SPV
 
 Les participations détenues **via un SPV** sont désormais reconnues pour ce

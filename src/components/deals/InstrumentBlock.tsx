@@ -6,10 +6,12 @@ import {
   INSTRUMENT_FIELDS,
   INSTRUMENT_RENDER,
 } from '../../../convex/lib/instrumentMapping'
+import type { ComponentType } from 'react'
 import type { Archetype } from '../../../convex/lib/instrumentMapping'
 import type { InstrumentKind } from '../../../convex/lib/instruments'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
+import { LeadSpvPanel } from '~/components/deals/LeadSpvPanel'
 import { signTone } from '~/lib/moneyTone'
 import { cn } from '~/lib/utils'
 import { Badge } from '~/components/ui/badge'
@@ -67,6 +69,7 @@ export const FIELD_FORMAT: Record<string, FieldFormat> = {
   principalAmount: 'eur',
   pricePerShare: 'eur',
   structuringFees: 'eur',
+  amountRaised: 'eur',
   acquisitionFees: 'eur',
   rentReceived: 'eur',
   currentValue: 'eur',
@@ -79,6 +82,9 @@ export const FIELD_FORMAT: Record<string, FieldFormat> = {
   spvOwnershipPct: 'pct',
   distributionRate: 'pct',
   conversionDiscount: 'pct',
+  managementFeeRate: 'pct',
+  hurdleRate: 'pct',
+  carriedRate: 'pct',
   // Decimals (parity / conversion ratio — fractional allowed)
   warrantParity: 'decimal',
   conversionRatio: 'decimal',
@@ -120,8 +126,33 @@ const ARCHETYPE_BADGE: Record<Archetype, string> = {
   funds_lp: 'border-chart-3/40 bg-chart-3/10 text-chart-3',
   real_estate: 'border-chart-4/40 bg-chart-4/10 text-chart-4',
   royalties: 'border-chart-5/40 bg-chart-5/10 text-chart-5',
+  // management revenue (fees + carried) reuses the income-green token —
+  // it's income, like placement, so the same positive family fits.
+  management: 'border-positive/40 bg-positive/10 text-positive',
   placement: 'border-positive/40 bg-positive/10 text-positive',
   unassigned: 'text-muted-foreground',
+}
+
+/**
+ * Props every custom panel receives. `received` (inbound transactions sum) and
+ * `onEdit` (opens the shared deal edit dialog) are threaded from the page.
+ */
+export type CustomPanelProps = {
+  deal: Doc<'deals'>
+  received?: number
+  onEdit?: () => void
+}
+
+/**
+ * instrumentKind → custom panel, for the 'custom'-rendered kinds. A kind with
+ * render='custom' but no entry here falls back to a neutral placeholder (the
+ * royalty case, until RoyaltiesPanel lands). This is the routing point for the
+ * first real custom panel — add a line per future panel, nothing else.
+ */
+const CUSTOM_PANELS: Partial<
+  Record<InstrumentKind, ComponentType<CustomPanelProps>>
+> = {
+  lead_spv: LeadSpvPanel,
 }
 
 function FieldRow({
@@ -238,9 +269,13 @@ function FieldsView({
 export function InstrumentBlock({
   deal,
   instrumentKind,
+  received,
+  onEdit,
 }: {
   deal: Doc<'deals'>
   instrumentKind: InstrumentKind
+  received?: number
+  onEdit?: () => void
 }) {
   const { t, i18n } = useTranslation('participations')
   const lang = i18n.language
@@ -288,7 +323,15 @@ export function InstrumentBlock({
       </div>
 
       {render === 'custom' ? (
-        <Placeholder text={t('fiche.royalty.placeholder')} />
+        (() => {
+          const Panel = CUSTOM_PANELS[instrumentKind]
+          return Panel ? (
+            <Panel deal={deal} received={received} onEdit={onEdit} />
+          ) : (
+            // render='custom' without a registered panel yet (royalty).
+            <Placeholder text={t('fiche.royalty.placeholder')} />
+          )
+        })()
       ) : render === 'placeholder' ? (
         <Placeholder text={t('fiche.cto.placeholder')} />
       ) : (
