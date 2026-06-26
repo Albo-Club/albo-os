@@ -392,6 +392,10 @@
       "default": "Une erreur est survenue. Réessayez."
     }
   },
+  "withoutDeal": {
+    "sectionTitle_one": "{{count}} entité sans deal",
+    "sectionTitle_other": "{{count}} entités sans deal"
+  },
   "empty": "Aucune entreprise pour ce scope — crée des deals via le chat IA, ou ajoute-les à la main.",
   "search": {
     "placeholder": "Rechercher par société, instrument, secteur…",
