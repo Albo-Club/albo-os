@@ -65,7 +65,7 @@
     },
     "instrument": {
       "share": "Shares",
-      "spv_share": "SPV shares",
+      "spv_share": "Equity via SPV",
       "os": "Bond",
       "oc": "Convertible bond",
       "convertible_note": "Convertible note",

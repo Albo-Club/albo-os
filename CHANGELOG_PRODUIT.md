@@ -23,6 +23,40 @@ bas de page.
 
 ---
 
+## v1.42.0 — 26/06/2026 à 12:30 — Equity via SPV
+
+Les participations détenues **via un SPV** sont désormais reconnues pour ce
+qu'elles sont : de l'**equity** sur la société cible, simplement détenue de façon
+indirecte. Ce type d'instrument, jusqu'ici présenté comme « Titres SPV » dans la
+catégorie des fonds, s'appelle maintenant **« Equity via SPV »** et apparaît dans
+la catégorie **Capital**, comme une prise de participation classique.
+
+Sa fiche affiche désormais : date et montant d'investissement, **nom du SPV**,
+détention via le SPV, frais de structuration, puis valorisations pre-money et
+post-money. La société cible reste rattachée au deal comme pour toute
+participation. Les participations « via SPV » déjà saisies conservent toutes
+leurs valeurs et s'affichent simplement avec ces champs.
+
+> **🔧 Notes techniques**
+>
+> - Pas de nouveau `instrumentKind` : `spv_share` (12 deals réels en org `albo`)
+>   est **reclassé** `funds_lp → equity` dans `INSTRUMENT_ARCHETYPE`
+>   (`convex/lib/instrumentMapping.ts`), render `fields` inchangé. La valeur enum
+>   et les données en base ne bougent pas — aucune migration.
+> - Nouvelle config `SPV_FIELDS` : `closingDate`, `paidAmount`, `spvName`,
+>   `spvOwnershipPct`, `structuringFees`, `preMoneyValuation`,
+>   `postMoneyValuation`. `underlyingTarget` **retiré de l'affichage** (la cible
+>   passe par `targetCompanyId`) mais conservé en base, en sommeil.
+> - 1 seule colonne neuve : `spvName v.optional(v.string())` (`convex/schema.ts`
+>   + `dealFields` dans `convex/deals.ts`, éditable) ; `FIELD_FORMAT: 'text'`
+>   (`InstrumentBlock.tsx`). `spvOwnershipPct` / `structuringFees` réutilisés tels
+>   quels. `viaSpvCompanyId` (référence entité) **non** utilisé : le SPV n'est pas
+>   modélisé comme entité.
+> - Libellé i18n EN/FR « Equity via SPV » (fiche `participations.json` + vue agent
+>   `chat.json`) ; nouveau libellé `field.spvName`. Incohérence assumée et
+>   documentée : equity direct → `ownershipPct`, equity via SPV →
+>   `spvOwnershipPct` (unification = migration future, hors périmètre).
+
 ## v1.41.0 — 26/06/2026 à 11:30 — Fiches dédiées pour les BSA et les obligations convertibles
 
 Les **BSA** et les **obligations convertibles (OC)** ont désormais leur propre

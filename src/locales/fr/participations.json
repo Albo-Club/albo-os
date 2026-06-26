@@ -127,7 +127,7 @@
   },
   "instrument": {
     "share": "Actions",
-    "spv_share": "Titres SPV",
+    "spv_share": "Equity via SPV",
     "os": "Obligation simple",
     "oc": "Obligation convertible",
     "convertible_note": "Convertible note",
@@ -168,6 +168,7 @@
     "discount": "Discount",
     "interestRate": "Taux d'intérêt",
     "spvOwnershipPct": "Détention SPV",
+    "spvName": "Nom du SPV",
     "distributionRate": "Taux de distribution",
     "roundType": "Tour",
     "safeType": "Type d'instrument",

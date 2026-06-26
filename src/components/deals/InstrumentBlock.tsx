@@ -101,6 +101,7 @@ export const FIELD_FORMAT: Record<string, FieldFormat> = {
   bankName: 'text',
   managementCompany: 'text',
   underlyingTarget: 'text',
+  spvName: 'text',
   location: 'text',
 }
 

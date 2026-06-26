@@ -71,6 +71,7 @@ const dealFields = {
   underlyingTarget: v.optional(v.string()),
   spvOwnershipPct: v.optional(v.number()), // bps
   structuringFees: v.optional(v.number()), // cents
+  spvName: v.optional(v.string()),
   distributionRate: v.optional(v.number()), // bps
   enjoymentDelayMonths: v.optional(v.number()),
   acquisitionFees: v.optional(v.number()), // cents

@@ -38,6 +38,9 @@ export const INSTRUMENT_ARCHETYPE: Record<InstrumentKind, Archetype> = {
   safe: 'equity',
   oc: 'equity',
   convertible_note: 'equity',
+  // equity held indirectly through an SPV — the deal's target is the underlying
+  // company (targetCompanyId), the SPV is just a holding method (spvName + fees).
+  spv_share: 'equity',
   // debt (loan reuses the os field config)
   os: 'debt',
   loan: 'debt',
@@ -45,7 +48,6 @@ export const INSTRUMENT_ARCHETYPE: Record<InstrumentKind, Archetype> = {
   dat: 'debt',
   // funds_lp (secondary reuses the fonds field config)
   fund_lp: 'funds_lp',
-  spv_share: 'funds_lp',
   secondary: 'funds_lp',
   // real_estate
   real_estate_direct: 'real_estate',
@@ -171,12 +173,18 @@ const FONDS_FIELDS = [
   'managementCompany',
 ]
 
+// Equity via SPV: equity archetype. The underlying target is carried by
+// targetCompanyId (the deal's company), so underlyingTarget stays dormant in
+// the schema but is no longer displayed (it duplicated targetCompanyId).
+// spvOwnershipPct (not ownershipPct) holds the stake — kept as-is, no migration.
 const SPV_FIELDS = [
   'closingDate',
   'paidAmount',
-  'underlyingTarget',
+  'spvName',
   'spvOwnershipPct',
   'structuringFees',
+  'preMoneyValuation',
+  'postMoneyValuation',
 ]
 
 const SCPI_FIELDS = [
