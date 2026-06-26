@@ -121,6 +121,48 @@
         "default": "Une erreur est survenue"
       }
     },
+    "entries": {
+      "title": "Échéances ponctuelles",
+      "add": "Ajouter une échéance",
+      "empty": "Aucune échéance ponctuelle. Appels de capital, distributions, impôts one-shot, cessions… ajoute-les ici.",
+      "saved": "Échéance enregistrée",
+      "cancelled": "Échéance annulée",
+      "dialogTitleCreate": "Nouvelle échéance ponctuelle",
+      "dialogTitleEdit": "Modifier l'échéance",
+      "labelLabel": "Libellé",
+      "labelPlaceholder": "ex. Appel de capital Fonds III",
+      "amountLabel": "Montant (€)",
+      "directionLabel": "Sens",
+      "dateLabel": "Date",
+      "confidenceLabel": "Confiance",
+      "confidence": {
+        "confirmed": "Confirmé",
+        "expected": "Attendu",
+        "probable": "Probable"
+      },
+      "categoryLabel": "Catégorie (optionnel)",
+      "categoryPlaceholder": "ex. investissement, impôt",
+      "cancelAction": "Annuler l'échéance",
+      "cancelConfirmTitle": "Annuler cette échéance ?",
+      "cancelConfirmBody": "Elle ne comptera plus dans le solde projeté. Cela ne la supprime pas — l'historique réalisé est conservé.",
+      "col": {
+        "date": "Date",
+        "label": "Libellé",
+        "amount": "Montant",
+        "confidence": "Confiance",
+        "status": "Statut"
+      },
+      "status": {
+        "pending": "À venir",
+        "realized": "Réalisé",
+        "cancelled": "Annulé"
+      },
+      "errors": {
+        "invalid_amount": "Montant invalide",
+        "invalid_date": "Date invalide",
+        "default": "Une erreur est survenue"
+      }
+    },
     "chartReal": "Solde réel"
   }
 }

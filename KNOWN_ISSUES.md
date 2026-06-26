@@ -1280,6 +1280,18 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   callsites et outils agent pour un gain nul à l'échelle actuelle — ces
   queries n'apparaissent pas dans le breakdown Usage. À ré-évaluer si elles
   y montent.
+- **La table front des échéances ne liste que les one-shot pures — limitation
+  V1 assumée.** `forecasts.listEntries` (consommée par `ForecastEntriesSection`,
+  onglet Cash « Aperçu ») filtre `ruleId == null` : les occurrences générées
+  par une règle n'y apparaissent jamais. Conséquence : une occurrence de règle
+  passée en `overridden` (éditée à la main — aujourd'hui faisable uniquement
+  via l'agent IA, `updateForecastEntry`) n'est visible **ni** dans cette table
+  (filtre `ruleId == null`), **ni** dans la table des règles (qui liste les
+  règles, pas leurs occurrences) — seulement dans la courbe
+  `getForecastBalance`. Non corrigé délibérément : la surface humaine se limite
+  aux règles récurrentes + aux ponctuelles pures ; l'override d'une occurrence
+  dérivée reste un geste agent. À revoir si l'édition d'occurrence dérivée
+  passe un jour en front.
 
 ## Split chapeaux Attio → SPV, org albo (`convex/migrations/splitAlboSponsorSpvs.ts`)
 

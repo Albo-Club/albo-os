@@ -23,6 +23,40 @@ bas de page.
 
 ---
 
+## v1.40.0 — 26/06/2026 à 09:57 — Saisir vos flux de trésorerie ponctuels
+
+Le prévisionnel de trésorerie gagne une section **« Échéances ponctuelles »**,
+juste sous les règles récurrentes dans l'onglet **Aperçu** de la page Cash.
+Vous pouvez désormais **lister, créer, modifier et annuler** un flux unique —
+appel de capital, distribution, impôt one-shot, cession — directement depuis
+l'écran, sans passer par l'assistant. Les échéances sont triées par date, avec
+montant signé (−/+), un niveau de **confiance** (confirmé / attendu / probable)
+et un **statut** (à venir / réalisé / annulé). Annuler une échéance la retire
+du solde projeté sans l'effacer : l'historique reste intact, et la **courbe se
+met à jour immédiatement**.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle query publique `convex/forecasts.ts` `listEntries({ orgId,
+>   status? })` : `requireOrgMember`, index `by_org_and_date` (tri date
+>   ascendant gratuit), filtre `ruleId == null` (seules les one-shot pures),
+>   renvoie les Doc bruts. Calquée sur `agentToolsForecasts.listEntriesInternal`
+>   mais sans filtre date ni limite (V1).
+> - Front : `ForecastEntriesSection` + `EntryDialog` dans
+>   `src/components/cash/ForecastSection.tsx`, montés sous `ForecastRulesSection`
+>   dans `cash.index.tsx`. `EntryDialog` calqué sur `RuleDialog` (création →
+>   `createManualEntry`, édition → `updateEntry`, annulation → `cancelEntry` via
+>   Dialog de confirmation), sans champ fréquence/jour. Lignes `pending`
+>   éditables/annulables ; `realized`/`cancelled` atténuées et figées. Aucun
+>   appel à `expandRules` : la réactivité Convex rafraîchit table +
+>   `getForecastBalance`.
+> - i18n `cash:forecast.entries.*` (en/fr), réutilise `cash:forecast.rules.in/out`
+>   et `common:actions.*`.
+> - Limitation V1 assumée : une occurrence de règle passée en `overridden`
+>   (faisable uniquement via l'agent IA aujourd'hui) n'apparaît ni dans cette
+>   table (`ruleId == null`) ni dans la table des règles — seulement dans la
+>   courbe. Cf. `KNOWN_ISSUES.md` « Cash flow forecast ».
+
 ## v1.39.1 — 26/06/2026 à 09:57 — Ménage d'outillage interne
 
 Retrait de deux scripts de diagnostic temporaires qui avaient servi à
