@@ -12,6 +12,7 @@ import { getLocale } from '~/lib/locale'
 import { CashAccounts } from '~/components/cash/CashAccounts'
 import {
   ForecastChartCard,
+  ForecastEntriesSection,
   ForecastRulesSection,
 } from '~/components/cash/ForecastSection'
 import { TransactionsLedger } from '~/components/cash/TransactionsLedger'
@@ -93,6 +94,7 @@ function Cash() {
           <CashAccounts accounts={accounts} orgSlug={orgSlug} />
           {org && <VatCard orgId={org._id} orgSlug={orgSlug} />}
           {org && <ForecastRulesSection orgId={org._id} />}
+          {org && <ForecastEntriesSection orgId={org._id} />}
         </TabsContent>
         <TabsContent value="transactions" className="pt-4">
           {org && <TransactionsLedger orgId={org._id} orgSlug={orgSlug} />}
