@@ -556,6 +556,36 @@ export const markEntryRealized = mutation({
 
 // ─── Manual entry CRUD ───────────────────────────────────────────────────────
 
+/**
+ * An org's pure one-shot entries (`ruleId == null`) for the forecast UI,
+ * date ascending (the `by_org_and_date` index order). Rule-derived
+ * occurrences are intentionally excluded — they live on the rules surface
+ * and in the projected-balance curve, not in this hand-managed list.
+ */
+export const listEntries = query({
+  args: {
+    orgId: v.id('organizations'),
+    status: v.optional(
+      v.union(
+        v.literal('pending'),
+        v.literal('realized'),
+        v.literal('cancelled'),
+      ),
+    ),
+  },
+  handler: async (ctx, { orgId, status }) => {
+    await requireOrgMember(ctx, orgId)
+    const rows = await ctx.db
+      .query('forecastEntries')
+      .withIndex('by_org_and_date', (q) => q.eq('orgId', orgId))
+      .collect()
+    // A1: only pure one-shot entries; rule-derived occurrences are filtered.
+    return rows.filter(
+      (e) => e.ruleId == null && (status === undefined || e.status === status),
+    )
+  },
+})
+
 /** Creates a 100% manual entry (no rule, no derivedKey). */
 export const createManualEntry = mutation({
   args: {

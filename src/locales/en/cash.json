@@ -121,6 +121,48 @@
         "default": "Something went wrong"
       }
     },
+    "entries": {
+      "title": "One-off entries",
+      "add": "Add an entry",
+      "empty": "No one-off entry yet. Capital calls, distributions, one-shot taxes, disposals… add them here.",
+      "saved": "Entry saved",
+      "cancelled": "Entry cancelled",
+      "dialogTitleCreate": "New one-off entry",
+      "dialogTitleEdit": "Edit entry",
+      "labelLabel": "Label",
+      "labelPlaceholder": "e.g. Fund III capital call",
+      "amountLabel": "Amount (€)",
+      "directionLabel": "Direction",
+      "dateLabel": "Date",
+      "confidenceLabel": "Confidence",
+      "confidence": {
+        "confirmed": "Confirmed",
+        "expected": "Expected",
+        "probable": "Probable"
+      },
+      "categoryLabel": "Category (optional)",
+      "categoryPlaceholder": "e.g. investment, tax",
+      "cancelAction": "Cancel entry",
+      "cancelConfirmTitle": "Cancel this entry?",
+      "cancelConfirmBody": "It will no longer count toward the projected balance. This does not delete it — realized history is preserved.",
+      "col": {
+        "date": "Date",
+        "label": "Label",
+        "amount": "Amount",
+        "confidence": "Confidence",
+        "status": "Status"
+      },
+      "status": {
+        "pending": "Upcoming",
+        "realized": "Realized",
+        "cancelled": "Cancelled"
+      },
+      "errors": {
+        "invalid_amount": "Invalid amount",
+        "invalid_date": "Invalid date",
+        "default": "Something went wrong"
+      }
+    },
     "chartReal": "Actual balance"
   }
 }
