@@ -127,7 +127,7 @@
   },
   "instrument": {
     "share": "Shares",
-    "spv_share": "SPV shares",
+    "spv_share": "Equity via SPV",
     "os": "Bond",
     "oc": "Convertible bond",
     "convertible_note": "Convertible note",
@@ -168,6 +168,7 @@
     "discount": "Discount",
     "interestRate": "Interest rate",
     "spvOwnershipPct": "SPV ownership",
+    "spvName": "SPV name",
     "distributionRate": "Distribution rate",
     "roundType": "Round",
     "safeType": "Instrument type",

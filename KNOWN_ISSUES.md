@@ -1510,6 +1510,29 @@ ce mapping ailleurs. Décisions non-évidentes :
    supprimer la copie locale, importer `INSTRUMENTS` depuis `instruments.ts`, et y
    porter l'ordre d'affichage souhaité si besoin.
 
+10. **`spv_share` = « Equity via SPV » (reclassé `funds_lp` → `equity`).** Un
+    `spv_share` est économiquement de l'equity sur une cible sous-jacente, détenue
+    indirectement via un SPV ; le SPV n'est qu'une méthode de détention, **pas une
+    entité** (on ne le modélise pas comme `company`). Décisions :
+    - **Pas de nouveau kind, pas de migration de la valeur enum.** `spv_share`
+      reste la valeur en base (12 deals réels en org `albo`, 0 en `calte`) ; seuls
+      changent l'archétype (`equity`, donc badge « Capital »), la config de champs
+      et le **libellé affiché** (« Equity via SPV », EN/FR, fiche + vue agent).
+    - **Config `SPV_FIELDS`** : `closingDate`, `paidAmount`, `spvName` (neuf),
+      `spvOwnershipPct`, `structuringFees`, `preMoneyValuation`,
+      `postMoneyValuation`. `spvName v.optional(v.string())` est la **seule colonne
+      neuve** (nom du SPV en texte) — on **ne** réutilise **ni** `viaSpvCompanyId`
+      (référence entité, exclue par le modèle) **ni** `underlyingTarget` (= la
+      cible, pas le SPV).
+    - **`underlyingTarget` conservé en base mais retiré de l'affichage** : la cible
+      passe déjà par `targetCompanyId` (doublon confirmé). Dormant, non détruit,
+      aucune migration.
+    - **Incohérence assumée** : l'equity direct (`share`) utilise `ownershipPct`,
+      l'equity via SPV utilise `spvOwnershipPct`. On **ne migre pas** les 12 deals
+      (leur donnée vit dans `spvOwnershipPct`). Unifier sur `ownershipPct` est une
+      **décision future explicite** (migration vérifiée, snapshot d'abord), hors
+      périmètre.
+
 ## Fiche entité (lecture seule) — champs manquants & lien Attio
 
 Le squelette commun des fiches (en-tête → bloc d'identité → Reporting/KPIs →

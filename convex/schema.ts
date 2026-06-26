@@ -471,6 +471,7 @@ export default defineSchema({
     underlyingTarget: v.optional(v.string()),
     spvOwnershipPct: v.optional(v.number()), // bps
     structuringFees: v.optional(v.number()), // cents
+    spvName: v.optional(v.string()), // SPV legal name (text — SPV not modeled as entity)
 
     // Real estate (scpi / immo)
     distributionRate: v.optional(v.number()), // bps
