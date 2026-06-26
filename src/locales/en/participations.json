@@ -392,6 +392,10 @@
       "default": "Something went wrong. Please try again."
     }
   },
+  "withoutDeal": {
+    "sectionTitle_one": "{{count}} entity without a deal",
+    "sectionTitle_other": "{{count}} entities without a deal"
+  },
   "empty": "No companies in this scope — create deals via the AI chat, or add them manually.",
   "search": {
     "placeholder": "Search by company, instrument, sector…",

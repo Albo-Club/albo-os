@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   ArchiveRestore,
+  ArrowUpRight,
   ChevronDown,
   Download,
   MoreHorizontal,
@@ -234,6 +235,96 @@ function ArchivedSection({
   )
 }
 
+/**
+ * Collapsible list of the org's portfolio entities not referenced by any deal
+ * (as target, investor or via-SPV). A discreet door to reach orphan entities
+ * so they can be completed / archived / deleted from their detail sheet —
+ * otherwise they'd be invisible (the table derives from deals). Mirrors
+ * ArchivedSection. Orphans are matched by ID, never by name; group_* legal
+ * entities are excluded by querying companies.list with kind 'portfolio'.
+ */
+function WithoutDealSection({
+  orgId,
+  orgSlug,
+  deals,
+}: {
+  orgId: Id<'organizations'>
+  orgSlug: string
+  deals:
+    | Array<{
+        targetCompanyId: Id<'companies'>
+        investorCompanyId: Id<'companies'>
+        viaSpvCompanyId?: Id<'companies'>
+      }>
+    | undefined
+}) {
+  const { t } = useTranslation('participations')
+  const [open, setOpen] = useState(false)
+  const companies = useConvexQuery(api.companies.list, {
+    orgId,
+    kind: 'portfolio',
+  })
+
+  // Orphans = portfolio entities (non-archived, from companies.list) whose _id
+  // is referenced by no deal. Matched strictly by ID. Both queries must have
+  // resolved before we can tell an entity is truly orphan.
+  const withoutDeal = useMemo(() => {
+    if (!companies || !deals) return undefined
+    const referenced = new Set<string>()
+    for (const d of deals) {
+      referenced.add(d.targetCompanyId)
+      referenced.add(d.investorCompanyId)
+      if (d.viaSpvCompanyId) referenced.add(d.viaSpvCompanyId)
+    }
+    return companies.filter((c) => !referenced.has(c._id))
+  }, [companies, deals])
+
+  // No orphan entity: render nothing (the normal case — keeps the page clean).
+  if (!withoutDeal || withoutDeal.length === 0) return null
+
+  return (
+    <section className="space-y-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm"
+      >
+        <ChevronDown
+          className={cn('size-4 transition-transform', open && 'rotate-180')}
+        />
+        {t('withoutDeal.sectionTitle', { count: withoutDeal.length })}
+      </button>
+      {open && (
+        <div className="rounded-lg border divide-y">
+          {withoutDeal.map((company) => (
+            <div
+              key={company._id}
+              className="flex items-center justify-between gap-3 px-4 py-2"
+            >
+              <Link
+                to="/app/$orgSlug/participations/$companyId"
+                params={{ orgSlug, companyId: company._id }}
+                className="truncate text-sm underline-offset-4 hover:underline"
+              >
+                {company.name}
+              </Link>
+              <Button asChild variant="outline" size="sm">
+                <Link
+                  to="/app/$orgSlug/participations/$companyId"
+                  params={{ orgSlug, companyId: company._id }}
+                >
+                  <ArrowUpRight className="size-4" />
+                  {t('openDetail')}
+                </Link>
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function Participations() {
   const { t } = useTranslation(['participations', 'common'])
   const { orgSlug } = Route.useParams()
@@ -279,6 +370,10 @@ function Participations() {
         )}
       </div>
       <ParticipationsTable deals={deals} orgSlug={orgSlug} exportRef={exportRef} />
+
+      {org && (
+        <WithoutDealSection orgId={org._id} orgSlug={orgSlug} deals={deals} />
+      )}
 
       {org && <ArchivedSection orgId={org._id} orgSlug={orgSlug} />}
 

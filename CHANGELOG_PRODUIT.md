@@ -23,6 +23,34 @@ bas de page.
 
 ---
 
+## v1.39.0 — 26/06/2026 à 09:46 — Retrouver les entités sans deal
+
+Sur la page **Participations**, les entités qui n'ont **aucun deal** étaient
+jusqu'ici invisibles, puisque la liste se construit à partir des deals. Pour les
+retrouver (les compléter, les archiver ou les supprimer), il fallait passer par
+des liens bruts — pas pratique. Désormais, **s'il existe au moins une entité sans
+deal**, un petit lien discret apparaît en bas de la liste : « N entités sans
+deal ». Un clic le **déroule sur place** (comme la section « Archivées ») et
+liste chaque entité avec un accès direct à sa fiche. S'il n'y en a aucune, rien
+ne s'affiche — la page reste propre. Les entités juridiques du groupe (SCI,
+holdings…) n'apparaissent jamais dans cette liste.
+
+> **🔧 Notes techniques**
+>
+> - Ajout 100 % front + lecture dans
+>   `src/routes/app/$orgSlug/participations.index.tsx` : nouveau composant
+>   `WithoutDealSection`, calqué sur `ArchivedSection` (toggle `useState`,
+>   chevron, rendu `null` si liste vide).
+> - Dérivation côté client : `companies.list({ kind: 'portfolio' })` (déjà
+>   filtré non-archivé + exclut nativement les `group_*` via l'index
+>   `by_org_kind`) croisé avec l'ensemble des IDs référencés par
+>   `api.deals.list` (`targetCompanyId` / `investorCompanyId` /
+>   `viaSpvCompanyId`). Matching **par `_id`**, jamais par nom. Aucune nouvelle
+>   query, mutation, route ni schéma — `deals` est déjà chargé par la page.
+> - Ouverture de la fiche via le même `<Link>` que les lignes existantes
+>   (`/app/$orgSlug/participations/$companyId`). Libellés i18n
+>   `participations:withoutDeal.sectionTitle_one/_other` (EN/FR).
+
 ## v1.38.0 — 25/06/2026 à 23:20 — Suppression définitive d'une entité
 
 Depuis la fiche d'une entité, un nouveau bouton **Supprimer** permet de la

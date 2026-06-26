@@ -226,6 +226,20 @@ repliable de la liste des entreprises.
 | AR2 | Fiche entreprise **vide** (aucun deal/relation/KPI/compte/document) → **Archiver** → confirmer | Entité archivée, redirige vers la liste, disparaît des listes ; si encore référencée (investisseur/SPV/relation/KPI/compte/document non visible) → refus serveur `company_has_references` avec message clair |
 | AR3 | Liste des entreprises → section repliable « Entités archivées (N) » → **Restaurer**            | L'entité réapparaît dans les listes ; archivage/restauration idempotents ; i18n EN/FR sur libellés réaffectation + archivage                                                                              |
 
+### Accès aux entités sans deal (`/app/$orgSlug/participations`)
+
+Lien discret repliable en bas de la liste, calqué sur « Entités archivées ».
+Liste dérivée **côté client** : entités `companies.list` (portfolio, non
+archivées) dont l'`_id` n'est référencé par aucun deal (target/investor/viaSpv) —
+matching **par ID**. Aucune nouvelle query, mutation ni route.
+
+| #   | Étape                                                                                                  | Résultat attendu                                                                                                                                                                            |
+| --- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| WD1 | Org **albo** (propre, 0 entité sans deal) → page Participations                                        | **Aucun** lien « sans deal » affiché (comme « Archivées » quand rien n'est archivé)                                                                                                        |
+| WD2 | Créer une entité portfolio **sans** lui rattacher de deal → revenir sur la liste                       | Un lien discret « 1 entité sans deal » apparaît en bas (texte secondaire + chevron) ; clic → déroule sur place ; ligne = nom + bouton **Ouvrir** ; clic → ouvre la fiche `/participations/$companyId` ; i18n EN/FR |
+| WD3 | Rattacher un deal à cette entité (ou l'archiver) → recharger la liste                                  | L'entité quitte la liste « sans deal » ; si c'était la dernière, le lien disparaît entièrement                                                                                            |
+| WD4 | Entités **juridiques** du groupe (`group_*` : SCI, holding, SPV…) sans deal                            | N'apparaissent **jamais** dans « sans deal » (`companies.list` filtré sur `kind: 'portfolio'`)                                                                                            |
+
 ### Suppression définitive d'une entité (`/app/$orgSlug/participations`)
 
 Hard delete réel et irréversible (`companies.remove`), distinct de l'archivage.
