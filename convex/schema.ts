@@ -481,6 +481,20 @@ export default defineSchema({
     propertyType: v.optional(propertyType),
     rentReceived: v.optional(v.number()), // cents
 
+    // BSA (warrants) — own config, split from safe
+    grantDate: v.optional(v.number()), // ms — warrant grant date
+    warrantsCount: v.optional(v.number()),
+    warrantPrice: v.optional(v.number()), // cents — per-warrant acquisition price
+    strikePrice: v.optional(v.number()), // cents — exercise price
+    warrantParity: v.optional(v.number()), // warrants → shares ratio (decimal)
+    exerciseDeadlineDate: v.optional(v.number()), // ms
+
+    // OC (convertible bond) — own config, split from safe. Reuses interestRate
+    // + maturityDate (debt block above) and conversionValuation/sharesAcquired/
+    // ownershipPct (post-conversion).
+    conversionRatio: v.optional(v.number()), // decimal
+    conversionDiscount: v.optional(v.number()), // bps
+
     // Placement (crypto / capitalization_account)
     currentValue: v.optional(v.number()), // cents — current value of a placement
 

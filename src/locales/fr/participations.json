@@ -183,7 +183,15 @@
     "bankName": "Banque",
     "managementCompany": "Société de gestion",
     "underlyingTarget": "Sous-jacent",
-    "location": "Localisation"
+    "location": "Localisation",
+    "grantDate": "Date d'attribution",
+    "warrantsCount": "Nombre de BSA",
+    "warrantPrice": "Prix d'acquisition du BSA",
+    "strikePrice": "Prix d'exercice",
+    "warrantParity": "Parité",
+    "exerciseDeadlineDate": "Date limite d'exercice",
+    "conversionRatio": "Ratio de conversion",
+    "conversionDiscount": "Discount à la conversion"
   },
   "enum": {
     "roundType": {

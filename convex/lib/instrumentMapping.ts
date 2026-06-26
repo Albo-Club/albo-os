@@ -29,8 +29,9 @@ export type RenderMode = 'fields' | 'custom' | 'placeholder'
 
 /** instrumentKind → archetype. Total Record (all 19 kinds). */
 export const INSTRUMENT_ARCHETYPE: Record<InstrumentKind, Archetype> = {
-  // equity (safe config absorbs safe / bsa_air / oc; bsa & convertible_note
-  // reuse the safe field list — see KNOWN_ISSUES "Archétypes d'instruments").
+  // equity. safe config keeps only safe / bsa_air; bsa has its own config
+  // (warrants), oc + convertible_note share the oc config (convertible bond) —
+  // see KNOWN_ISSUES "Archétypes d'instruments".
   share: 'equity',
   bsa: 'equity',
   bsa_air: 'equity',
@@ -101,6 +102,36 @@ const SAFE_FIELDS = [
   'valuationCap',
   'discount',
   'conversionDeadlineDate',
+  'conversionValuation',
+  'sharesAcquired',
+  'ownershipPct',
+]
+
+// BSA (warrants): own list. No conversionValuation marker → the deal sheet
+// renders these flat (no pre/post tabs), unlike safe/oc — see KNOWN_ISSUES.
+const BSA_FIELDS = [
+  'grantDate',
+  'warrantsCount',
+  'warrantPrice',
+  'strikePrice',
+  'warrantParity',
+  'exerciseDeadlineDate',
+  // post-exercise
+  'sharesAcquired',
+  'ownershipPct',
+]
+
+// OC (convertible bond): own list. Reuses interestRate + maturityDate (debt)
+// and the safe post-conversion trio. conversionValuation as split marker →
+// the deal sheet shows pre/post tabs (same mechanism as safe).
+const OC_FIELDS = [
+  'closingDate',
+  'paidAmount',
+  'interestRate',
+  'maturityDate',
+  'conversionRatio',
+  'conversionDiscount',
+  // post-conversion
   'conversionValuation',
   'sharesAcquired',
   'ownershipPct',
@@ -184,10 +215,10 @@ export const INSTRUMENT_FIELDS: Partial<Record<InstrumentKind, Array<string>>> =
   {
     share: EQUITY_FIELDS,
     safe: SAFE_FIELDS,
-    bsa: SAFE_FIELDS,
     bsa_air: SAFE_FIELDS,
-    oc: SAFE_FIELDS,
-    convertible_note: SAFE_FIELDS,
+    bsa: BSA_FIELDS,
+    oc: OC_FIELDS,
+    convertible_note: OC_FIELDS,
     os: OS_FIELDS,
     loan: OS_FIELDS,
     cca: CCA_FIELDS,

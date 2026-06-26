@@ -41,6 +41,7 @@ import {
   bpsToPctInput,
   centsToEurosInput,
   dateInputToMs,
+  decimalToNumber,
   eurosToCents,
   intToNumber,
   msToDateInput,
@@ -213,6 +214,8 @@ function parseField(
     case 'number':
     case 'year':
       return intToNumber(trimmed)
+    case 'decimal':
+      return decimalToNumber(trimmed)
     default:
       return trimmed
   }
@@ -259,9 +262,15 @@ function DealFieldInput({
     format === 'eur' ||
     format === 'pct' ||
     format === 'number' ||
+    format === 'decimal' ||
     format === 'year'
   const inputType = format === 'date' ? 'date' : isNumeric ? 'number' : 'text'
-  const step = format === 'eur' || format === 'pct' ? '0.01' : '1'
+  const step =
+    format === 'eur' || format === 'pct'
+      ? '0.01'
+      : format === 'decimal'
+        ? 'any'
+        : '1'
 
   return (
     <div className="space-y-2">

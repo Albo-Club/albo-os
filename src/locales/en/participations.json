@@ -183,7 +183,15 @@
     "bankName": "Bank",
     "managementCompany": "Management company",
     "underlyingTarget": "Underlying",
-    "location": "Location"
+    "location": "Location",
+    "grantDate": "Grant date",
+    "warrantsCount": "Number of warrants",
+    "warrantPrice": "Warrant acquisition price",
+    "strikePrice": "Strike price",
+    "warrantParity": "Parity",
+    "exerciseDeadlineDate": "Exercise deadline",
+    "conversionRatio": "Conversion ratio",
+    "conversionDiscount": "Conversion discount"
   },
   "enum": {
     "roundType": {

@@ -23,6 +23,45 @@ bas de page.
 
 ---
 
+## v1.41.0 — 26/06/2026 à 11:30 — Fiches dédiées pour les BSA et les obligations convertibles
+
+Les **BSA** et les **obligations convertibles (OC)** ont désormais leur propre
+fiche, distincte du SAFE. Jusqu'ici ces trois instruments partageaient la même
+liste de champs ; ils sont pourtant économiquement différents.
+
+- Un **BSA** affiche maintenant ses champs propres : date d'attribution, nombre
+  de BSA, prix d'acquisition, prix d'exercice, parité, date limite d'exercice,
+  puis les titres obtenus et la détention résultante en cas d'exercice.
+- Une **OC** affiche les siens : montant et date d'investissement, taux
+  d'intérêt, date de maturité, ratio et discount de conversion, puis la
+  valorisation à la conversion, les titres obtenus et la détention résultante.
+- Le **SAFE** et le **BSA Air** restent ensemble, et le sélecteur de type
+  d'instrument côté SAFE ne propose plus que **SAFE / BSA Air**.
+
+Les participations BSA et OC déjà saisies conservent toutes leurs valeurs : elles
+s'affichent simplement avec les champs adaptés à leur nature.
+
+> **🔧 Notes techniques**
+>
+> - Séparation des configs d'archétype dans `convex/lib/instrumentMapping.ts` :
+>   `bsa` pointe sur un nouveau `BSA_FIELDS`, `oc` + `convertible_note` sur un
+>   nouveau `OC_FIELDS` ; tous deux retirés de `SAFE_FIELDS`. Archétype `equity`
+>   et render `fields` inchangés pour les trois.
+> - 8 colonnes neuves (toutes `v.optional`, en sommeil) dans `convex/schema.ts`
+>   + `convex/deals.ts` `dealFields` : `grantDate`, `warrantsCount`,
+>   `warrantPrice`, `strikePrice`, `warrantParity`, `exerciseDeadlineDate`
+>   (BSA), `conversionRatio`, `conversionDiscount` (OC). L'OC réutilise
+>   `interestRate` + `maturityDate` (bloc debt) et le trio post-conversion
+>   `conversionValuation` / `sharesAcquired` / `ownershipPct`.
+> - `SAFE_TYPES` garde `oc` (validateur, en sommeil) ; nouveau
+>   `SAFE_TYPE_OPTIONS = ['safe','bsa_air']` alimente le select via
+>   `ENUM_FIELD_VALUES.safeType`.
+> - Front : `FIELD_FORMAT` (`InstrumentBlock.tsx`) étendu des 8 champs ; nouveau
+>   format `decimal` (parité / ratio fractionnaires, parseur `decimalToNumber`
+>   dans `src/lib/parse.ts`, input `step="any"`). Le BSA s'affiche à plat (pas
+>   d'onglets pré/post, faute de marqueur `conversionValuation`) ; l'OC garde
+>   les onglets. Libellés i18n EN/FR des 8 champs.
+
 ## v1.40.0 — 26/06/2026 à 09:57 — Saisir vos flux de trésorerie ponctuels
 
 Le prévisionnel de trésorerie gagne une section **« Échéances ponctuelles »**,
