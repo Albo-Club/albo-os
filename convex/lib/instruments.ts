@@ -49,8 +49,15 @@ export const ROUND_TYPES = [
 ] as const
 export const roundTypeValidator = literals(...ROUND_TYPES)
 
+// Validator keeps 'oc' valid (dormant): legacy deals may still carry
+// safeType='oc'. Tightening this needs a prod check first that no deal holds
+// that value — see KNOWN_ISSUES "Séparation BSA/OC".
 export const SAFE_TYPES = ['safe', 'bsa_air', 'oc'] as const
 export const safeTypeValidator = literals(...SAFE_TYPES)
+
+// Values offered in the deal-sheet select: oc deals now have their own config,
+// so the safe config only offers SAFE / BSA Air.
+export const SAFE_TYPE_OPTIONS = ['safe', 'bsa_air'] as const
 
 export const COUPON_PERIODICITIES = [
   'mensuel',
@@ -84,7 +91,7 @@ export const propertyTypeValidator = literals(...PROPERTY_TYPES)
 /** Field name → value array, for the enum-rendered editable fields. */
 export const ENUM_FIELD_VALUES: Record<string, ReadonlyArray<string>> = {
   roundType: ROUND_TYPES,
-  safeType: SAFE_TYPES,
+  safeType: SAFE_TYPE_OPTIONS,
   couponPeriodicity: COUPON_PERIODICITIES,
   repaymentModality: REPAYMENT_MODALITIES,
   termDuration: TERM_DURATIONS,

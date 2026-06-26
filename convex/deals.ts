@@ -79,6 +79,18 @@ const dealFields = {
   propertyType: v.optional(propertyTypeValidator),
   rentReceived: v.optional(v.number()), // cents
   currentValue: v.optional(v.number()), // cents
+
+  // BSA (warrants) — own config, split from safe
+  grantDate: v.optional(v.number()), // ms
+  warrantsCount: v.optional(v.number()),
+  warrantPrice: v.optional(v.number()), // cents
+  strikePrice: v.optional(v.number()), // cents
+  warrantParity: v.optional(v.number()), // decimal
+  exerciseDeadlineDate: v.optional(v.number()), // ms
+
+  // OC (convertible bond) — own config, split from safe
+  conversionRatio: v.optional(v.number()), // decimal
+  conversionDiscount: v.optional(v.number()), // bps
 }
 
 function companyRef(c: Doc<'companies'> | null) {

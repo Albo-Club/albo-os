@@ -27,6 +27,17 @@ export function intToNumber(value: string): number | null {
   return parsed
 }
 
+/**
+ * Decimal (warrant parity, conversion ratio) → number (null if invalid or
+ * negative). Unlike intToNumber, keeps the fractional part (e.g. 1.5 warrants
+ * → 1 share, conversion ratio 1.25).
+ */
+export function decimalToNumber(value: string): number | null {
+  const parsed = Number.parseFloat(value.replace(',', '.'))
+  if (!Number.isFinite(parsed) || parsed < 0) return null
+  return parsed
+}
+
 /** `YYYY-MM-DD` (date input) → ms epoch (null if empty or invalid). */
 export function dateInputToMs(value: string): number | null {
   if (value === '') return null

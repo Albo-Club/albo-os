@@ -1457,10 +1457,35 @@ ce mapping ailleurs. Décisions non-évidentes :
    redondance potentielle). Non fusionnés ici — hors périmètre, à arbitrer plus
    tard.
 
-6. **Config `safe` partagée.** L'enum `safeType` vaut exactement
-   `safe`/`bsa_air`/`oc`. `bsa` et `convertible_note` réutilisent la **liste de
-   champs** `safe` mais n'ont pas de littéral `safeType` correspondant (le champ
-   reste vide pour ces deux types ; à revoir au câblage Lot 2).
+6. **Séparation BSA / OC de la config `safe`.** Depuis la série instruments,
+   `safe` et `bsa_air` partagent `SAFE_FIELDS` ; `bsa` a sa propre config
+   `BSA_FIELDS` (warrants : `grantDate`, `warrantsCount`, `warrantPrice`,
+   `strikePrice`, `warrantParity`, `exerciseDeadlineDate` + post-exercice
+   `sharesAcquired`/`ownershipPct`) et `oc` + `convertible_note` partagent
+   `OC_FIELDS` (obligation convertible). Décisions :
+   - **Réutilisations validées** : l'OC réutilise `interestRate` + `maturityDate`
+     (bloc debt, sens identique — taux et maturité de l'OC), et le trio
+     post-conversion `conversionValuation` / `sharesAcquired` / `ownershipPct` ;
+     le BSA réutilise `sharesAcquired` / `ownershipPct` (titres obtenus à
+     l'exercice). 8 colonnes neuves seulement : les 6 BSA + `conversionRatio` /
+     `conversionDiscount` (OC). Pas de duplication de `interestRate`/`maturityDate`.
+   - **`safeType` — nettoyage différé.** Le validateur `SAFE_TYPES` garde `oc`
+     (`safe`/`bsa_air`/`oc`) **en sommeil** : des deals legacy peuvent porter
+     `safeType='oc'` et le resserrer les ferait rejeter par Convex. La vérif
+     impossible en read-only (le MCP n'expose pas la colonne). Retirer `oc` de
+     `SAFE_TYPES` exige d'abord une query prod confirmant qu'aucun deal ne le
+     porte. En attendant, seul le **select** est restreint : nouveau
+     `SAFE_TYPE_OPTIONS = ['safe','bsa_air']` câblé sur `ENUM_FIELD_VALUES.safeType`.
+   - **BSA rendu à plat.** Le split pré/post du bloc central est piloté par le
+     marqueur `SAFE_SPLIT_FIELD = 'conversionValuation'` (`InstrumentBlock.tsx`).
+     L'OC le contient → onglets pré/post. Le BSA ne l'a pas → il s'affiche à plat
+     (8 champs en une grille), ce qui est acceptable (le split a moins de sens
+     pour un BSA). **Micro-suite possible** : généraliser `SAFE_SPLIT_FIELD` en
+     marqueur par config pour donner des onglets pré/post au BSA.
+   - **Format `decimal`.** `warrantParity` et `conversionRatio` peuvent être
+     fractionnaires (ex. parité 1,5 ; ratio 1,25) → nouveau `FieldFormat`
+     `'decimal'` (parseur `decimalToNumber`, input `step="any"`) plutôt que le
+     `'number'` entier (`intToNumber`) qui les aurait tronqués.
 
 7. **`os` reste rattaché à `debt`** sans désambiguïsation (SPV equity vs dette
    obligataire immo) : reportée explicitement, ne pas la traiter dans ce lot.

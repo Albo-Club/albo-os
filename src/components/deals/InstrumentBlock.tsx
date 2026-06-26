@@ -38,6 +38,7 @@ export type FieldFormat =
   | 'date'
   | 'enum'
   | 'number'
+  | 'decimal'
   | 'year'
   | 'text'
 
@@ -53,6 +54,8 @@ export const FIELD_FORMAT: Record<string, FieldFormat> = {
   signedDate: 'date',
   conversionDeadlineDate: 'date',
   maturityDate: 'date',
+  grantDate: 'date',
+  exerciseDeadlineDate: 'date',
   // Amounts (cents)
   paidAmount: 'eur',
   committedAmount: 'eur',
@@ -67,12 +70,18 @@ export const FIELD_FORMAT: Record<string, FieldFormat> = {
   acquisitionFees: 'eur',
   rentReceived: 'eur',
   currentValue: 'eur',
+  warrantPrice: 'eur',
+  strikePrice: 'eur',
   // Rates (bps)
   ownershipPct: 'pct',
   discount: 'pct',
   interestRate: 'pct',
   spvOwnershipPct: 'pct',
   distributionRate: 'pct',
+  conversionDiscount: 'pct',
+  // Decimals (parity / conversion ratio — fractional allowed)
+  warrantParity: 'decimal',
+  conversionRatio: 'decimal',
   // Enums (i18n key `enum.<field>.<value>`)
   roundType: 'enum',
   safeType: 'enum',
@@ -85,6 +94,7 @@ export const FIELD_FORMAT: Record<string, FieldFormat> = {
   sharesAcquired: 'number',
   enjoymentDelayMonths: 'number',
   surfaceSqm: 'number',
+  warrantsCount: 'number',
   // Year (no thousands grouping)
   vintageYear: 'year',
   // Free text
@@ -255,6 +265,7 @@ export function InstrumentBlock({
       case 'enum':
         return t(`enum.${field}.${String(raw)}`, { defaultValue: String(raw) })
       case 'number':
+      case 'decimal':
         return fmtNum(raw as number)
       default:
         return String(raw)
