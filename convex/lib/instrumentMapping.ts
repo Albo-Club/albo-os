@@ -204,6 +204,12 @@ const LEAD_SPV_FIELDS = [
   'carriedRate',
 ]
 
+// Royalties: the three declarative parameters (level 1). Rendered by the
+// custom RoyaltiesPanel, but listed here so the shared edit dialog edits them
+// (render mode ≠ editable fields). The BP / actuals lists are NOT here — they
+// have a dedicated UI in the panel (deals.update patch).
+const ROYALTY_FIELDS = ['capitalInvested', 'depreciationRate', 'royaltyRate']
+
 const SCPI_FIELDS = [
   'closingDate',
   'paidAmount',
@@ -233,9 +239,11 @@ const PLACEMENT_FIELDS = [
 
 /**
  * instrumentKind → ordered `deals` columns for the fields-rendered kinds, plus
- * lead_spv. Partial: 'placeholder' (cto) and the custom royalty kind are
- * absent. lead_spv is custom-rendered but kept here so the shared edit dialog
- * can edit its declarative parameters (render mode ≠ editable fields).
+ * the custom-rendered lead_spv and royalty. Partial: only 'placeholder' (cto)
+ * is absent. lead_spv and royalty are custom-rendered but kept here so the
+ * shared edit dialog can edit their declarative scalar parameters (render mode
+ * ≠ editable fields). Their lists (royalty BP / actuals) are NOT here — they
+ * have a dedicated UI in RoyaltiesPanel.
  */
 export const INSTRUMENT_FIELDS: Partial<Record<InstrumentKind, Array<string>>> =
   {
@@ -253,6 +261,7 @@ export const INSTRUMENT_FIELDS: Partial<Record<InstrumentKind, Array<string>>> =
     secondary: FONDS_FIELDS,
     spv_share: SPV_FIELDS,
     lead_spv: LEAD_SPV_FIELDS,
+    royalty: ROYALTY_FIELDS,
     scpi: SCPI_FIELDS,
     real_estate_direct: IMMO_FIELDS,
     crypto: PLACEMENT_FIELDS,

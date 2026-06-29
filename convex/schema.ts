@@ -420,6 +420,20 @@ export default defineSchema({
     // Royalties
     royaltyRate: v.optional(v.number()), // bps
     royaltyCapAmount: v.optional(v.number()), // cents
+    // Royalties custom panel (1 deal = 1 underlying). Declarative scalars
+    // edited via the standard dialog; the two lists below are edited via a
+    // dedicated UI in RoyaltiesPanel (deals.update patch). All derived figures
+    // (degraded BP, royalties, gaps) are computed at display, never stored.
+    capitalInvested: v.optional(v.number()), // cents
+    depreciationRate: v.optional(v.number()), // bps — BP degradation factor
+    // Initial business plan, pasted once (quarter → planned revenue, cents).
+    bpPoints: v.optional(
+      v.array(v.object({ quarter: v.string(), plannedRevenue: v.number() })),
+    ),
+    // Actuals, one point added per quarter (quarter → actual revenue, cents).
+    actualPoints: v.optional(
+      v.array(v.object({ quarter: v.string(), actualRevenue: v.number() })),
+    ),
 
     // SAFE / BSA Air
     valuationCap: v.optional(v.number()), // cents

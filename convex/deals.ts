@@ -42,6 +42,16 @@ const dealFields = {
   repaymentFrequencyMonths: v.optional(v.number()),
   royaltyRate: v.optional(v.number()),
   royaltyCapAmount: v.optional(v.number()),
+  // Royalties custom panel (cf. schema.ts). The two lists are patched from
+  // RoyaltiesPanel via deals.update — they are NOT in INSTRUMENT_FIELDS.
+  capitalInvested: v.optional(v.number()), // cents
+  depreciationRate: v.optional(v.number()), // bps
+  bpPoints: v.optional(
+    v.array(v.object({ quarter: v.string(), plannedRevenue: v.number() })),
+  ),
+  actualPoints: v.optional(
+    v.array(v.object({ quarter: v.string(), actualRevenue: v.number() })),
+  ),
   valuationCap: v.optional(v.number()),
   discount: v.optional(v.number()),
   entryValuation: v.optional(v.number()),

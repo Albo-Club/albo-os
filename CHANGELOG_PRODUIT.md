@@ -23,6 +23,40 @@ bas de page.
 
 ---
 
+## v1.46.0 — 29/06/2026 à 19:11 — Suivi des royalties trimestre par trimestre
+
+Les deals en **royalties** (ex. La Vie de Quartier) ont désormais leur propre
+panneau de suivi. Renseignez une fois les trois paramètres — capital investi,
+taux de dépréciation, taux de royalties — puis **collez votre business plan**
+depuis Excel ou Google Sheets (deux colonnes : trimestre, chiffre d'affaires
+prévu). Un aperçu vous montre ce qui a été reconnu **avant** d'enregistrer.
+
+Ensuite, **ajoutez le chiffre d'affaires réalisé** trimestre par trimestre :
+c'est la seule donnée à saisir. Le tableau compare automatiquement, pour chaque
+trimestre, le BP initial, le BP dégradé (BP moins la dépréciation) et le réel —
+en chiffre d'affaires **et** en royalties — avec l'écart entre le réel et le BP
+dégradé (en euros et en pourcentage, coloré en vert ou rouge) et les cumuls en
+bas de tableau.
+
+> **🔧 Notes techniques**
+>
+> - 2e panel custom après Lead SPV (PR #127), même pattern : `RoyaltiesPanel`
+>   branché dans `CUSTOM_PANELS` (`src/components/deals/InstrumentBlock.tsx`),
+>   props `CustomPanelProps`, édition des 3 scalaires via `EditDealDialog` +
+>   `INSTRUMENT_FIELDS['royalty']` (`convex/lib/instrumentMapping.ts`).
+> - Nouveauté vs Lead SPV : deux **listes** sur `deals`
+>   (`bpPoints`/`actualPoints`, `v.array(v.object(...))` dans `schema.ts` et
+>   `dealFields` de `convex/deals.ts`), mises à jour par patch partiel via
+>   `deals.update` depuis le panneau (pas via `INSTRUMENT_FIELDS`).
+> - Calculs (BP dégradé, royalties, écart, cumuls) dérivés à l'affichage,
+>   rien de stocké : `buildRoyaltyRows` dans `src/lib/royalties.ts`. Parsing du
+>   collage tabulé tolérant FR/US (`parseAmountToCents`) + normalisation des
+>   trimestres en clé canonique `"Qn YYYY"` (`normalizeQuarter`, `parseBpPaste`),
+>   couverts par `tests/royalties.test.ts`.
+> - Nouveaux champs `capitalInvested` (cents) / `depreciationRate` (bps) +
+>   formats dans `FIELD_FORMAT`. Champs optionnels → aucune migration sur les
+>   4 deals royalty existants.
+
 ## v1.45.0 — 29/06/2026 à 18:05 — Liste des entreprises plus lisible
 
 La liste des entreprises se lit plus vite. **Cliquez n'importe où sur une

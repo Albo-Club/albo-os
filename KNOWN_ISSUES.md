@@ -1633,3 +1633,47 @@ fait exception : `''` le réinitialise (géré serveur, retombe sur le titre
 dérivé). `paidActual` (décaissé réel) est **calculé** depuis les transactions
 (`transactionTotals`) et n'est jamais éditable — distinct de `paidAmount`
 (colonne, « montant contractuel »).
+
+## Panneau Royalties — listes sur `deals` & collage du BP (`src/components/deals/RoyaltiesPanel.tsx`)
+
+2e panel custom après Lead SPV (même pattern : `CUSTOM_PANELS` dans
+`InstrumentBlock.tsx`, props `CustomPanelProps`, 3 scalaires édités via
+`EditDealDialog` + `INSTRUMENT_FIELDS['royalty']`). Deux écarts à connaître.
+
+### Listes éditées hors `INSTRUMENT_FIELDS`
+
+- Le BP initial et le réalisé sont **deux listes** sur `deals` —
+  `bpPoints: v.array(v.object({ quarter, plannedRevenue }))` et
+  `actualPoints: v.array(v.object({ quarter, actualRevenue }))` (cents).
+  Déclarées dans `schema.ts` **et** dans `dealFields` (`convex/deals.ts`),
+  sinon le validateur de patch de `deals.update` les rejette.
+- `INSTRUMENT_FIELDS` ne gère que des **scalaires** (le dialog standard rend un
+  input par champ). Les listes ont donc leur UI dédiée dans le panneau, qui
+  appelle `deals.update` avec un **patch partiel** (`{ bpPoints }` /
+  `{ actualPoints }`). C'est le même `deals.update` que le dialog — il accepte
+  n'importe quel sous-ensemble de `dealFields`.
+- Effet de bord voulu : chaque patch marque `bpPoints`/`actualPoints` dans
+  `manuallyEditedFields` (cf. section ci-dessus). Inerte ici — l'import
+  Airtable n'écrit pas ces colonnes.
+
+### Jointure et collage (le point subtil)
+
+- Les lignes du tableau se joignent **sur la clé trimestre** (string). Pour que
+  BP et réalisé s'alignent, la clé est normalisée en canonique `"Qn YYYY"` des
+  deux côtés : `normalizeQuarter` (collage tolérant `T3`/`Q3`, ordre libre) et
+  le picker année+trimestre (`AddQuarterDialog`) produisent **la même forme**.
+  Un point réalisé sans BP (ou l'inverse) apparaît quand même, colonnes
+  manquantes en `—`.
+- Le collage est du **texte tabulé** Excel/Sheets : lignes sur `\n`, colonnes
+  sur `\t`, col0 = trimestre, col1 = CA. `parseAmountToCents` est tolérant
+  FR/US (€, espaces insécables, `,`/`.`) ; heuristique documentée :
+  une virgule seule suivie de **3 chiffres** = séparateur de milliers
+  (`12,000` → 12000), sinon décimale (`12,50` → 12,5). Les lignes non
+  reconnues sont **comptées et affichées** dans l'aperçu, jamais écrites
+  silencieusement. Logique pure dans `src/lib/royalties.ts`, testée
+  (`tests/royalties.test.ts`).
+- Tout le reste (BP dégradé, royalties, écart, cumuls) est **dérivé à
+  l'affichage** (`buildRoyaltyRows`) — rien n'est stocké hors les deux listes
+  et les 3 paramètres. L'écart € est calculé sur les **royalties** (réel −
+  dégradé) ; le % est identique qu'on le calcule sur le CA ou les royalties
+  (le taux se simplifie).
