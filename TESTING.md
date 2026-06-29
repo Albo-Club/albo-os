@@ -11,7 +11,7 @@ Pré-requis :
   - `BETTER_AUTH_SECRET`
   - `SITE_URL` (`http://localhost:3000` en local)
   - `RESEND_API_KEY` + `RESEND_FROM` + `RESEND_TEST_MODE=true` en dev
-  - `MISTRAL_API_KEY` (modèle par défaut : `mistral-medium-3.5`)
+  - `OPENROUTER_API_KEY` (modèle par défaut : `deepseek/deepseek-v4-pro`)
 - `.env.local` rempli (`VITE_CONVEX_URL`, `CONVEX_DEPLOYMENT`)
 - 2 navigateurs (ou 1 navigateur + 1 fenêtre incognito) prêts pour les
   tests multi-tenant
@@ -713,7 +713,7 @@ secret, `setWebhook`, `createLinkCode`). Env : `TELEGRAM_BOT_TOKEN`,
 | T9  | `/new` puis un message                                                        | Nouveau thread (l'agent ne « voit » plus la conversation précédente)                                                      |
 | T10 | `/org <slug>` (membre) / `/org inconnu`                                       | « Organisation courante : … » + thread réinitialisé / « Organisation inconnue ou accès refusé. »                          |
 | T11 | Spammer ~15 messages d'affilée                                                | « Trop de messages, réessayez dans un instant. » (rate-limit `chatSend`, partagé avec le panneau in-app)                  |
-| T12 | Pendant T4, logs Convex                                                       | Lignes `llm_usage` par appel LLM ; `cacheReadTokens > 0` dès le step 2 d'un message multi-étapes (prompt caching Mistral) |
+| T12 | Pendant T4, logs Convex                                                       | Lignes `llm_usage` par appel LLM ; `cacheReadTokens > 0` dès le step 2 d'un message multi-étapes (prompt caching DeepSeek, si OpenRouter remonte le détail) |
 
 ## Serveur MCP (connector claude.ai)
 
@@ -740,8 +740,8 @@ cf. `KNOWN_ISSUES.md` « Serveur MCP distant »). Pour M2-M5, poser
 - Auth échoue → vérifier `BETTER_AUTH_SECRET` + `SITE_URL` côté Convex env.
 - Emails non reçus → `RESEND_API_KEY` valide + `RESEND_TEST_MODE=false` pour
   recevoir réellement.
-- AI ne stream pas → `MISTRAL_API_KEY` + vérifier `convex/agent.ts` (modèle
-  par défaut `mistral-medium-3.5`).
+- AI ne stream pas → `OPENROUTER_API_KEY` + vérifier `convex/agent.ts` (modèle
+  par défaut `deepseek/deepseek-v4-pro`).
 - Bot Telegram muet → `TELEGRAM_BOT_TOKEN`/`TELEGRAM_WEBHOOK_SECRET` côté
   Convex env + `curl https://api.telegram.org/bot<token>/getWebhookInfo`
   pour vérifier l'URL du webhook et les erreurs de livraison.

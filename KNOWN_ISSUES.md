@@ -327,63 +327,39 @@ find . \( -path ./node_modules -o -path ./.output \) -prune -o \
   -type f \( -name '* 2.ts' -o -name '* 2.tsx' \) -print
 ```
 
-## Why Mistral (and not Claude)
+## Modèle de l'agent (OpenRouter / DeepSeek)
 
-The AI agent ran on Anthropic Claude until v1.5.1, then switched to Mistral
-Medium 3.5. Three reasons, in order:
+L'agent IA a tourné sur Anthropic Claude (≤ v1.5.1), puis Mistral Medium 3.5,
+et tourne désormais sur **`deepseek/deepseek-v4-pro` servi via OpenRouter**.
 
-1. **EU data residency / sovereignty.** The agent reads scoped portfolio data
-   (deals, valuations, bank transactions). Keeping inference on an EU provider
-   avoids sending family-office financials outside the EU.
-2. **Cost.** Each agent turn fans out across ~45 tool schemas over up to ~12
-   LLM round-trips; Mistral Medium is materially cheaper than Claude at that
-   call volume (see "Mistral prompt caching" for the further 10× input saving).
-3. **Reversible by design.** `getModel()` in `convex/agent.ts` abstracts the
-   provider — this is a deliberate trial, not a one-way door. To revert, swap
-   the provider in `getModel()` and set the matching `MISTRAL_MODEL`/API key.
-
-## Mistral model id
-
-`convex/agent.ts` defaults to `mistral-medium-3.5` (single source:
-`convex/lib/instructions.ts:MISTRAL_MODEL`). Override via the
-`MISTRAL_MODEL` Convex env var to pick a different model. Mistral also
-ships dated aliases (`mistral-medium-2604`) for stability. The key lives
-in the Convex env as `MISTRAL_API_KEY`.
-
-**The agent claiming to be another model is NOT proof of the model used.**
-LLMs don't know their own deployment id: asked "which model are you?",
-Mistral Medium happily answers "Mistral Large 2". The system prompt now
-states the configured id (`convex/lib/instructions.ts`) so the agent
-answers correctly. To verify the model actually served in prod, check the
-env (`pnpm exec convex env list --prod` — make sure `MISTRAL_MODEL` is
-unset or set to the intended id), not the agent's self-description.
-
-## Mistral prompt caching — injecté via un `fetch` custom
-
-Mistral facture les tokens de prompt en cache à **10 % du prix input**
-quand la requête porte un `prompt_cache_key` (matching de préfixe).
-Indispensable ici : chaque message déclenche jusqu'à 12 round-trips LLM
-(`stopWhen`), chacun renvoyant system prompt + ~45 schémas d'outils +
-historique — les steps 2..N d'un même message sont des hits quasi totaux.
-
-1. **`@ai-sdk/mistral` (3.0.37) ne sait pas envoyer `prompt_cache_key`**
-   (schéma de providerOptions fermé, options inconnues strippées). D'où le
-   wrapper `fetch` dans `convex/agent.ts` (`createMistral({ fetch })`) qui
-   injecte le champ dans le body JSON. **À chaque bump de
-   `@ai-sdk/mistral`, vérifier si l'option native a atterri** — si oui,
-   retirer le wrapper au profit de la providerOption.
-2. **Clé statique volontaire** (`albo-os-chat`) : le matching de préfixe
-   fait le vrai travail, la clé ne sert qu'au routage du cache ; une clé
-   unique partage le bloc system+tools entre tous les threads (2 users).
-3. **Stabilité du préfixe** : le system prompt est fixé pour toute la durée
-   d'un `streamText`/`generateText` (route/orgName figés à l'appel) → hits
-   intra-message garantis. Un changement de route entre deux messages ne
-   coûte qu'un miss sur la fin du system prompt. Ne PAS rendre la liste
-   d'outils dynamique (filtrage par route) : ça casserait le préfixe.
-4. **Vérification** : le `usageHandler` de `convex/agent.ts` logge une
-   ligne `llm_usage` par appel LLM (logs Convex) — `cacheReadTokens > 0`
-   attendu dès le step 2 d'un message multi-étapes ; la ligne « cached
-   tokens » doit apparaître sur le dashboard Mistral.
+- **Provider abstrait.** `getModel()` dans `convex/agent.ts` isole le
+  provider : `createOpenRouter({ apiKey })` puis `openrouter.chat(AGENT_MODEL)`.
+  OpenRouter est une gateway OpenAI-compatible — changer de modèle (DeepSeek,
+  Mistral, Claude…) ne touche qu'`AGENT_MODEL` ; changer de provider ne
+  touche que cette fonction. Pas un one-way door.
+- **Id du modèle.** Source unique `convex/lib/instructions.ts:AGENT_MODEL`,
+  défaut `deepseek/deepseek-v4-pro`. Override via la var d'env Convex
+  `OPENROUTER_MODEL` (n'importe quel slug du catalogue OpenRouter, ex.
+  `deepseek/deepseek-v4-flash` pour moins cher). La clé vit dans l'env Convex
+  sous `OPENROUTER_API_KEY`.
+- **L'agent qui prétend être un autre modèle n'est PAS une preuve.** Les LLM
+  ne connaissent pas leur deployment id : interrogé « quel modèle es-tu ? »,
+  il invente. Le system prompt (`convex/lib/instructions.ts`) injecte l'id
+  configuré pour qu'il réponde juste. Pour vérifier le modèle réellement
+  servi en prod, regarder l'env (`pnpm exec convex env list --prod` →
+  `OPENROUTER_MODEL`) ou le dashboard OpenRouter (activité par modèle), pas
+  l'auto-description de l'agent.
+- **Prompt caching.** DeepSeek cache automatiquement le préfixe partagé
+  (system prompt + ~45 schémas d'outils) côté serveur, facturé à tarif
+  réduit, **sans clé de cache à injecter** — d'où la suppression du wrapper
+  `fetch` qui était nécessaire pour Mistral (`prompt_cache_key`). Le préfixe
+  doit rester stable : le system prompt est figé pour toute la durée d'un
+  `streamText`/`generateText` (route/orgName figés à l'appel). Ne PAS rendre
+  la liste d'outils dynamique (filtrage par route) : ça casserait le cache.
+- **Vérification.** Le `usageHandler` de `convex/agent.ts` logge une ligne
+  `llm_usage` par appel LLM (logs Convex) ; `cacheReadTokens > 0` est attendu
+  dès le step 2 d'un message multi-étapes si OpenRouter remonte le détail de
+  cache pour le modèle servi.
 
 ## SITE_URL drift in prod = broken email links
 
@@ -676,8 +652,9 @@ audit.
   compact tool-call display, thread history/rename/delete and stop are now
   hand-rolled in `src/components/ai/AiPanel.tsx`. Remaining loss vs
   assistant-ui: attachments, edit/regenerate.
-- **Mistral model default `mistral-medium-3.5`** — remplace l'ancien défaut
-  Anthropic (`claude-haiku-4-5`). Override via `MISTRAL_MODEL` env var.
+- **Agent model default `deepseek/deepseek-v4-pro` via OpenRouter** —
+  remplace les défauts précédents (Mistral Medium, puis Anthropic). Override
+  via `OPENROUTER_MODEL` env var.
 - **Rate-limit thresholds** chosen for usable defaults (e.g. invitations 20/h
   burst 5) rather than the brief's tight 3/min example.
 - **Super-admin lacks impersonate** — out of scope for MVP, needs a careful

@@ -4,19 +4,21 @@
  */
 
 /**
- * Single source of truth for the Mistral model id, shared with
- * convex/agent.ts. Server-only module — never imported client-side, so the
- * top-level env read is safe (and works under node:test).
+ * Single source of truth for the agent model id (OpenRouter slug), shared
+ * with convex/agent.ts. Server-only module — never imported client-side, so
+ * the top-level env read is safe (and works under node:test).
  */
-export const MISTRAL_MODEL = process.env.MISTRAL_MODEL ?? 'mistral-medium-3.5'
+export const AGENT_MODEL =
+  process.env.OPENROUTER_MODEL ?? 'deepseek/deepseek-v4-pro'
 
 export const BASE_INSTRUCTIONS = [
   // Identity & scope. The model id is stated explicitly: without it, the
   // model guesses when asked ("I am Mistral Large 2") — LLMs do not know
   // their own deployment id.
   "You are Albo OS's assistant — the in-app copilot of a family office / " +
-    'investment holding tool. You run on the Mistral model ' +
-    `"${MISTRAL_MODEL}"; if asked which model you are, state that exact id ` +
+    'investment holding tool. You run on the DeepSeek model ' +
+    `"${AGENT_MODEL}" (served via OpenRouter); if asked which model you ` +
+    'are, state that exact id ' +
     'and never claim to be another model. Each organization is one ' +
     'investment vehicle (e.g. CALTE, Albo Club); you act within the current ' +
     'org only. Answer concisely, in the language the user writes in.',
