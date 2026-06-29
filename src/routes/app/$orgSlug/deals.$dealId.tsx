@@ -991,11 +991,14 @@ function DealDetail() {
         />
       )}
 
-      <PlanVsActualSection
-        dealId={deal._id}
-        instrumentKind={deal.instrumentKind}
-        txs={txs}
-      />
+      {/* Royalties use the RoyaltiesPanel table instead of this section. */}
+      {deal.instrumentKind !== 'royalty' && (
+        <PlanVsActualSection
+          dealId={deal._id}
+          instrumentKind={deal.instrumentKind}
+          txs={txs}
+        />
+      )}
 
       <Transactions deal={deal} />
 

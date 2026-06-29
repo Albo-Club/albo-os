@@ -34,6 +34,16 @@ describe('parseAmountToCents', () => {
     assert.equal(parseAmountToCents('12,50'), 1250)
   })
 
+  it('space grouping forces the comma to be decimal (not thousands)', () => {
+    // Regression: "311 995,152" used to be read as the integer 311995152
+    // (comma + 3 digits → thousands) then ×100 → an absurd 311 995 152 €.
+    // The space already grouped the thousands, so the comma is the decimal.
+    assert.equal(parseAmountToCents('311 995,152'), 31199515)
+    assert.equal(parseAmountToCents('174 300,00 €'), 17430000)
+    assert.equal(parseAmountToCents('12 000'), 1200000)
+    assert.equal(parseAmountToCents('12,000.00'), 1200000)
+  })
+
   it('rejects non-numeric / negative', () => {
     assert.equal(parseAmountToCents('abc'), null)
     assert.equal(parseAmountToCents('-5'), null)

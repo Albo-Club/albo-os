@@ -1666,14 +1666,30 @@ dérivé). `paidActual` (décaissé réel) est **calculé** depuis les transacti
   manquantes en `—`.
 - Le collage est du **texte tabulé** Excel/Sheets : lignes sur `\n`, colonnes
   sur `\t`, col0 = trimestre, col1 = CA. `parseAmountToCents` est tolérant
-  FR/US (€, espaces insécables, `,`/`.`) ; heuristique documentée :
-  une virgule seule suivie de **3 chiffres** = séparateur de milliers
-  (`12,000` → 12000), sinon décimale (`12,50` → 12,5). Les lignes non
-  reconnues sont **comptées et affichées** dans l'aperçu, jamais écrites
-  silencieusement. Logique pure dans `src/lib/royalties.ts`, testée
-  (`tests/royalties.test.ts`).
+  FR/US (€, espaces insécables, `,`/`.`). Les lignes non reconnues sont
+  **comptées et affichées** dans l'aperçu, jamais écrites silencieusement.
+  Logique pure dans `src/lib/royalties.ts`, testée (`tests/royalties.test.ts`).
+- **Heuristique milliers vs décimale (piège FR/US).** Une virgule seule suivie
+  de **3 chiffres** est un séparateur de milliers (`12,000` → 12000), sinon une
+  décimale (`12,50` → 12,5). **Mais** dès qu'un **espace groupe déjà les
+  milliers** (`311 995,152`), la virgule est forcément une **décimale** — un
+  espace et une virgule ne peuvent pas être tous deux séparateurs de milliers.
+  Sans cette règle, `311 995,152` était lu comme l'entier `311995152` puis ×100
+  → un montant absurde (311 995 152 €). Le garde est
+  `hadSpaceGroup = /\d\s\d/.test(raw)` **avant** de stripper les espaces (`\s`
+  couvre l'insécable et l'insécable fine). Régression couverte par
+  `tests/royalties.test.ts`. Le même parseur sert au collage **et** à l'édition
+  inline d'une cellule (`EditableCa`) — corriger ici corrige les deux.
 - Tout le reste (BP dégradé, royalties, écart, cumuls) est **dérivé à
   l'affichage** (`buildRoyaltyRows`) — rien n'est stocké hors les deux listes
-  et les 3 paramètres. L'écart € est calculé sur les **royalties** (réel −
-  dégradé) ; le % est identique qu'on le calcule sur le CA ou les royalties
-  (le taux se simplifie).
+  et les paramètres scalaires. L'écart € est calculé sur les **royalties**
+  (réel − dégradé) ; le % est identique qu'on le calcule sur le CA ou les
+  royalties (le taux se simplifie).
+- **Paramètres génériques (plancher/plafond/dates).** `investmentDate`,
+  `floorMultiple`, `capMultiple`, `endDate` sont de simples champs **saisis**
+  (aucune règle métier codée). Plancher/plafond sont stockés en **multiple** du
+  capital ; le montant euro est **dérivé à l'affichage** (`multiple ×
+  capitalInvested`), jamais stocké. La barre de progression compare le cumul
+  des royalties réelles (`totals.actualRoyalty`) à ces deux montants — pur
+  positionnement, aucune règle d'achèvement. Édités via le dialog partagé
+  (`INSTRUMENT_FIELDS['royalty']` + `FIELD_FORMAT`).

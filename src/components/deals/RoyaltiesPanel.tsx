@@ -44,6 +44,82 @@ import {
   TableRow,
 } from '~/components/ui/table'
 
+// Column hierarchy (visual priority Réel > BP dégradé > BP initial). Brand
+// tokens only — never hardcoded colors. BP initial is the most faded
+// (secondary reference), BP dégradé is marked (the main comparison baseline),
+// Réel is the most prominent (the data that matters).
+const COL_BP_INITIAL = 'text-muted-foreground'
+const COL_BP_DEGRADED = 'bg-muted/40'
+const COL_REAL = 'font-medium'
+
+/**
+ * A single revenue cell editable inline (click → input → Enter/blur saves,
+ * Escape cancels). Reuses the corrected FR/US parser. Used for the two
+ * user-entered CA columns (BP initial and Réel); the column style class is
+ * passed through so the cell keeps its visual hierarchy.
+ */
+function EditableCa({
+  value,
+  onSave,
+  className,
+}: {
+  value: number | undefined
+  onSave: (cents: number) => void
+  className?: string
+}) {
+  const { fmtEur } = useFormatters()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  function begin() {
+    setDraft(value != null ? String(value / 100) : '')
+    setEditing(true)
+  }
+
+  function commit() {
+    const cents = parseAmountToCents(draft)
+    setEditing(false)
+    if (cents != null && cents !== value) onSave(cents)
+  }
+
+  if (editing) {
+    return (
+      <TableCell className={cn('text-right tabular-nums', className)}>
+        <Input
+          autoFocus
+          type="text"
+          inputMode="decimal"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              commit()
+            } else if (e.key === 'Escape') {
+              e.preventDefault()
+              setEditing(false)
+            }
+          }}
+          className="h-7 text-right tabular-nums"
+        />
+      </TableCell>
+    )
+  }
+
+  return (
+    <TableCell
+      className={cn(
+        'hover:bg-muted/50 cursor-pointer text-right tabular-nums',
+        className,
+      )}
+      onClick={begin}
+    >
+      {value == null ? '—' : fmtEur(value)}
+    </TableCell>
+  )
+}
+
 /**
  * Custom central block for a `royalty` deal (e.g. La Vie de Quartier): a
  * royalties investment indexed on a shop's revenue. 1 deal = 1 underlying.
@@ -65,7 +141,7 @@ export function RoyaltiesPanel({
 }) {
   const { t, i18n } = useTranslation('participations')
   const lang = i18n.language
-  const { fmtEur } = useFormatters()
+  const { fmtEur, fmtDate, fmtMultiple } = useFormatters()
   const updateDeal = useConvexMutation(api.deals.update)
 
   const [importOpen, setImportOpen] = useState(false)
@@ -86,10 +162,45 @@ export function RoyaltiesPanel({
       signDisplay: 'always',
     }).format(ratio)
 
+  const fmtRatioPct = (ratio: number) =>
+    new Intl.NumberFormat(lang, {
+      style: 'percent',
+      maximumFractionDigits: 0,
+    }).format(ratio)
+
+  // Floor / cap are stored as multiples; their euro amount is derived from the
+  // invested capital at display, never stored. `—` when either is missing.
+  const capital = deal.capitalInvested
+  const floorAmount =
+    deal.floorMultiple != null && capital != null
+      ? Math.round(deal.floorMultiple * capital)
+      : undefined
+  const capAmount =
+    deal.capMultiple != null && capital != null
+      ? Math.round(deal.capMultiple * capital)
+      : undefined
+
+  const fmtMultipleAmount = (mult?: number, amount?: number) =>
+    mult == null
+      ? '—'
+      : amount == null
+        ? fmtMultiple(mult)
+        : `${fmtMultiple(mult)} — ${fmtEur(amount)}`
+
   const params = [
     { key: 'capitalInvested', value: fmtEur(deal.capitalInvested) },
     { key: 'depreciationRate', value: fmtPct(deal.depreciationRate) },
     { key: 'royaltyRate', value: fmtPct(deal.royaltyRate) },
+    { key: 'investmentDate', value: fmtDate(deal.investmentDate) },
+    {
+      key: 'floorMultiple',
+      value: fmtMultipleAmount(deal.floorMultiple, floorAmount),
+    },
+    {
+      key: 'capMultiple',
+      value: fmtMultipleAmount(deal.capMultiple, capAmount),
+    },
+    { key: 'endDate', value: fmtDate(deal.endDate) },
   ]
 
   const { rows, totals } = useMemo(
@@ -102,6 +213,11 @@ export function RoyaltiesPanel({
       ),
     [deal.bpPoints, deal.actualPoints, deal.depreciationRate, deal.royaltyRate],
   )
+
+  // Progress: cumulative actual royalties (already computed) positioned on the
+  // 0 → floor → cap scale. Pure display — no completion rule, just comparison.
+  const cumul = totals.actualRoyalty
+  const reached = floorAmount != null && cumul >= floorAmount
 
   async function saveBp(bpPoints: Array<BpPoint>) {
     try {
@@ -121,6 +237,19 @@ export function RoyaltiesPanel({
       await updateDeal({ id: deal._id, patch: { actualPoints: next } })
       toast.success(t('edit.saved'))
       setQuarterOpen(false)
+    } catch {
+      toast.error(t('edit.errors.default'))
+    }
+  }
+
+  // Inline edit of a single BP point (same dedup-and-replace mechanism as
+  // addActual). Editing a quarter that only had an actual creates its BP point.
+  async function saveBpPoint(quarter: string, plannedRevenue: number) {
+    const next = (deal.bpPoints ?? []).filter((p) => p.quarter !== quarter)
+    next.push({ quarter, plannedRevenue })
+    try {
+      await updateDeal({ id: deal._id, patch: { bpPoints: next } })
+      toast.success(t('edit.saved'))
     } catch {
       toast.error(t('edit.errors.default'))
     }
@@ -190,13 +319,19 @@ export function RoyaltiesPanel({
                 <TableHead rowSpan={2} className="align-bottom">
                   {t('fiche.royalty.colQuarter')}
                 </TableHead>
-                <TableHead colSpan={2} className="text-center">
+                <TableHead
+                  colSpan={2}
+                  className={cn('text-center', COL_BP_INITIAL)}
+                >
                   {t('fiche.royalty.colBpInitial')}
                 </TableHead>
-                <TableHead colSpan={2} className="text-center">
+                <TableHead
+                  colSpan={2}
+                  className={cn('text-center font-medium', COL_BP_DEGRADED)}
+                >
                   {t('fiche.royalty.colBpDegraded')}
                 </TableHead>
-                <TableHead colSpan={2} className="text-center">
+                <TableHead colSpan={2} className={cn('text-center', COL_REAL)}>
                   {t('fiche.royalty.colReal')}
                 </TableHead>
                 <TableHead colSpan={2} className="text-center">
@@ -204,22 +339,22 @@ export function RoyaltiesPanel({
                 </TableHead>
               </TableRow>
               <TableRow>
-                <TableHead className="text-right">
+                <TableHead className={cn('text-right', COL_BP_INITIAL)}>
                   {t('fiche.royalty.subCa')}
                 </TableHead>
-                <TableHead className="text-right">
+                <TableHead className={cn('text-right', COL_BP_INITIAL)}>
                   {t('fiche.royalty.subRoyalties')}
                 </TableHead>
-                <TableHead className="text-right">
+                <TableHead className={cn('text-right', COL_BP_DEGRADED)}>
                   {t('fiche.royalty.subCa')}
                 </TableHead>
-                <TableHead className="text-right">
+                <TableHead className={cn('text-right', COL_BP_DEGRADED)}>
                   {t('fiche.royalty.subRoyalties')}
                 </TableHead>
-                <TableHead className="text-right">
+                <TableHead className={cn('text-right', COL_REAL)}>
                   {t('fiche.royalty.subCa')}
                 </TableHead>
-                <TableHead className="text-right">
+                <TableHead className={cn('text-right', COL_REAL)}>
                   {t('fiche.royalty.subRoyalties')}
                 </TableHead>
                 <TableHead className="text-right">€</TableHead>
@@ -230,26 +365,38 @@ export function RoyaltiesPanel({
               {rows.map((r) => (
                 <TableRow key={r.quarter}>
                   <TableCell className="font-medium">{r.quarter}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {r.plannedRevenue == null ? '—' : fmtEur(r.plannedRevenue)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <EditableCa
+                    value={r.plannedRevenue}
+                    onSave={(c) => void saveBpPoint(r.quarter, c)}
+                    className={COL_BP_INITIAL}
+                  />
+                  <TableCell
+                    className={cn('text-right tabular-nums', COL_BP_INITIAL)}
+                  >
                     {r.plannedRoyalty == null ? '—' : fmtEur(r.plannedRoyalty)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell
+                    className={cn('text-right tabular-nums', COL_BP_DEGRADED)}
+                  >
                     {r.degradedRevenue == null
                       ? '—'
                       : fmtEur(r.degradedRevenue)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell
+                    className={cn('text-right tabular-nums', COL_BP_DEGRADED)}
+                  >
                     {r.degradedRoyalty == null
                       ? '—'
                       : fmtEur(r.degradedRoyalty)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {r.actualRevenue == null ? '—' : fmtEur(r.actualRevenue)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <EditableCa
+                    value={r.actualRevenue}
+                    onSave={(c) => void addActual(r.quarter, c)}
+                    className={COL_REAL}
+                  />
+                  <TableCell
+                    className={cn('text-right tabular-nums', COL_REAL)}
+                  >
                     {r.actualRoyalty == null ? '—' : fmtEur(r.actualRoyalty)}
                   </TableCell>
                   <TableCell
@@ -278,22 +425,30 @@ export function RoyaltiesPanel({
                 <TableCell className="font-medium">
                   {t('fiche.royalty.cumul')}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">
+                <TableCell
+                  className={cn('text-right tabular-nums', COL_BP_INITIAL)}
+                >
                   {fmtEur(totals.plannedRevenue)}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">
+                <TableCell
+                  className={cn('text-right tabular-nums', COL_BP_INITIAL)}
+                >
                   {fmtEur(totals.plannedRoyalty)}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">
+                <TableCell
+                  className={cn('text-right tabular-nums', COL_BP_DEGRADED)}
+                >
                   {fmtEur(totals.degradedRevenue)}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">
+                <TableCell
+                  className={cn('text-right tabular-nums', COL_BP_DEGRADED)}
+                >
                   {fmtEur(totals.degradedRoyalty)}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">
+                <TableCell className={cn('text-right tabular-nums', COL_REAL)}>
                   {fmtEur(totals.actualRevenue)}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">
+                <TableCell className={cn('text-right tabular-nums', COL_REAL)}>
                   {fmtEur(totals.actualRoyalty)}
                 </TableCell>
                 <TableCell
@@ -315,6 +470,68 @@ export function RoyaltiesPanel({
           </p>
         )}
       </div>
+
+      {/* Progress: cumulative actual royalties on the 0 → floor → cap scale.
+          Pure positioning — only shown once floor/cap multiples and capital
+          are entered. */}
+      {floorAmount != null && capAmount != null && (
+        <div className="space-y-3 rounded-lg border p-4">
+          <div className="flex items-baseline justify-between">
+            <span className="text-sm font-medium">
+              {t('fiche.royalty.progressTitle')}
+            </span>
+            <span
+              className={cn(
+                'text-sm tabular-nums',
+                reached && 'text-positive font-medium',
+              )}
+            >
+              {fmtEur(cumul)}
+              {reached && (
+                <span className="ml-2 text-xs">
+                  {t('fiche.royalty.progressReached')}
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="bg-muted relative h-3 w-full overflow-hidden rounded-full">
+            <div
+              className={cn(
+                'h-full rounded-full transition-all',
+                reached ? 'bg-positive' : 'bg-primary',
+              )}
+              style={{
+                width: `${capAmount > 0 ? Math.min(100, (cumul / capAmount) * 100) : 0}%`,
+              }}
+            />
+            {capAmount > 0 && (
+              <div
+                className="bg-foreground/60 absolute inset-y-0 w-px"
+                style={{
+                  left: `${Math.min(100, (floorAmount / capAmount) * 100)}%`,
+                }}
+                aria-hidden
+              />
+            )}
+          </div>
+          <div className="flex justify-between text-xs tabular-nums">
+            <span className={cn(reached && 'text-positive')}>
+              {t('fiche.royalty.progressFloor')} · {fmtEur(floorAmount)} (
+              {t('fiche.royalty.progressVsFloor', {
+                pct: fmtRatioPct(floorAmount > 0 ? cumul / floorAmount : 0),
+              })}
+              )
+            </span>
+            <span className="text-muted-foreground">
+              {t('fiche.royalty.progressCap')} · {fmtEur(capAmount)} (
+              {t('fiche.royalty.progressVsCap', {
+                pct: fmtRatioPct(capAmount > 0 ? cumul / capAmount : 0),
+              })}
+              )
+            </span>
+          </div>
+        </div>
+      )}
 
       {importOpen && (
         <ImportBpDialog
