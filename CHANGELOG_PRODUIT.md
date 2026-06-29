@@ -23,6 +23,29 @@ bas de page.
 
 ---
 
+## v1.44.0 — 29/06/2026 à 17:44 — Nouveau moteur pour l'assistant IA
+
+L'assistant IA d'Albo OS change de moteur : il tourne désormais sur le modèle
+**DeepSeek V4 Pro**, via la passerelle OpenRouter. Au quotidien rien ne change
+dans l'usage — même panneau, mêmes outils, mêmes garde-fous de confirmation
+avant chaque écriture — mais les réponses s'appuient sur un modèle plus récent
+et plus capable. Si vous demandez à l'assistant quel modèle il utilise, il
+répond maintenant « DeepSeek V4 Pro ».
+
+> **🔧 Notes techniques**
+>
+> - Swap de provider isolé dans `getModel()` (`convex/agent.ts`) : remplacement
+>   de `@ai-sdk/mistral` par `@openrouter/ai-sdk-provider` (`createOpenRouter` →
+>   `openrouter.chat(AGENT_MODEL)`). Le wrapper `fetch` qui injectait
+>   `prompt_cache_key` (spécifique Mistral) est supprimé — DeepSeek cache le
+>   préfixe automatiquement côté serveur.
+> - Id du modèle : source unique `convex/lib/instructions.ts:AGENT_MODEL`
+>   (ex-`MISTRAL_MODEL`), défaut `deepseek/deepseek-v4-pro`, override via la var
+>   d'env Convex `OPENROUTER_MODEL`. Clé sous `OPENROUTER_API_KEY`.
+> - Scripts (`setup.mjs`, `setup-prod.mjs`, `e2e-smoke.mjs`), `.env.example` et
+>   docs (README, KNOWN_ISSUES, TESTING, CLAUDE) alignés sur les nouvelles vars.
+>   Identité de l'agent dans le system prompt mise à jour.
+
 ## v1.43.0 — 26/06/2026 à 15:30 — Lead SPV (gestion)
 
 Quand vous êtes **lead d'un SPV** (Hectarea, Eben Home), vous ne faites pas que

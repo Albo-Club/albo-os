@@ -1,4 +1,4 @@
-import { createMistral } from '@ai-sdk/mistral'
+import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { Agent, stepCountIs } from '@convex-dev/agent'
 
 import { components } from './_generated/api'
@@ -8,33 +8,22 @@ import { liabilityTools } from './agentToolsLiabilities'
 import { pointageTools } from './agentToolsPointage'
 import { projectionTools } from './agentToolsProjections'
 import { valuationTools } from './agentToolsValuations'
-import { BASE_INSTRUCTIONS, MISTRAL_MODEL } from './lib/instructions'
+import { AGENT_MODEL, BASE_INSTRUCTIONS } from './lib/instructions'
 
 /**
- * Mistral bills cached prompt tokens at 10% of the input price when the
- * request carries a `prompt_cache_key`, but @ai-sdk/mistral (3.0.37) has no
- * provider option to send it — so it is injected at the fetch layer. A
- * static key is enough: prefix matching does the real work, and the
- * system-prompt + tool-schemas block is shared across all threads. See
- * KNOWN_ISSUES.md « Mistral prompt caching ».
+ * OpenRouter gateway (OpenAI-compatible). The model id lives in
+ * `AGENT_MODEL` (single source, overridable via the OPENROUTER_MODEL env
+ * var); the key is read from OPENROUTER_API_KEY in the Convex env. DeepSeek
+ * caches the shared system-prompt + tool-schemas prefix automatically
+ * server-side (no per-request cache key to inject), so no fetch wrapper is
+ * needed — cf. KNOWN_ISSUES.md « Modèle de l'agent (OpenRouter / DeepSeek) ».
  */
-const mistral = createMistral({
-  fetch: async (url, options) => {
-    if (typeof options?.body === 'string') {
-      try {
-        const body = JSON.parse(options.body) as Record<string, unknown>
-        body.prompt_cache_key = 'albo-os-chat'
-        return fetch(url, { ...options, body: JSON.stringify(body) })
-      } catch {
-        // Non-JSON body: forward untouched.
-      }
-    }
-    return fetch(url, options)
-  },
+const openrouter = createOpenRouter({
+  apiKey: process.env.OPENROUTER_API_KEY,
 })
 
 export function getModel() {
-  return mistral.chat(MISTRAL_MODEL)
+  return openrouter.chat(AGENT_MODEL)
 }
 
 export const chatAgent = new Agent(components.agent, {
