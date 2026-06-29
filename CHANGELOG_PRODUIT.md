@@ -23,6 +23,55 @@ bas de page.
 
 ---
 
+## v1.47.0 — 29/06/2026 à 21:30 — Suivi des royalties : édition, plancher/plafond et progression
+
+Le panneau de suivi des royalties s'enrichit et corrige plusieurs points :
+
+- **Montants collés mieux interprétés.** Un chiffre d'affaires avec décimales
+  fines (ex. « 311 995,152 ») n'est plus lu comme une valeur géante : quand les
+  milliers sont déjà séparés par un espace, la virgule est traitée comme une
+  décimale. Plus de montants absurdes après un collage.
+- **Cellules de CA modifiables.** Vous pouvez désormais corriger directement un
+  chiffre d'affaires dans le tableau — aussi bien la colonne **BP initial** que
+  la colonne **Réel** — en cliquant sur la cellule, sans repasser par l'import.
+- **Lecture hiérarchisée.** Les colonnes sont mises en valeur selon leur
+  importance : le **Réel** ressort, le **BP dégradé** (la référence de
+  comparaison) est marqué, le **BP initial** reste discret.
+- **Nouveaux paramètres.** Date d'investissement, **plancher** et **plafond**
+  (saisis en multiple du capital, ex. « 1,25x », « 2x », avec le montant calculé
+  affiché), et date de fin.
+- **Barre de progression.** Le cumul des royalties perçues se positionne sur une
+  échelle plancher → plafond, avec le pourcentage atteint ; la barre passe au
+  vert dès que le plancher est franchi.
+
+L'ancien bloc « Business plan vs réalisé » disparaît des fiches royalties (il est
+remplacé par ce tableau) ; il reste disponible pour les autres instruments.
+
+> **🔧 Notes techniques**
+>
+> - Parsing : `parseAmountToCents` (`src/lib/royalties.ts`) devient
+>   *space-aware* — `hadSpaceGroup = /\d\s\d/.test(raw)` ; une virgule seule
+>   suivie de 3 chiffres n'est traitée comme séparateur de milliers que si aucun
+>   espace n'a déjà groupé les milliers, sinon c'est une décimale. Régression
+>   couverte dans `tests/royalties.test.ts` (cas « 311 995,152 » → 31199515).
+> - Édition inline : composant local `EditableCa` dans `RoyaltiesPanel.tsx`
+>   (clic → `Input` → Enter/blur → `parseAmountToCents`). Sauvegarde via le même
+>   mécanisme de liste que `addActual` (dedup-replace + `deals.update` patch) :
+>   `saveBpPoint` pour `bpPoints`, `addActual` réutilisé pour `actualPoints`.
+> - Style : constantes `COL_BP_INITIAL` / `COL_BP_DEGRADED` / `COL_REAL`
+>   (tokens `text-muted-foreground`, `bg-muted/40`, `font-medium`) appliquées en
+>   en-tête, corps et pied.
+> - Paramètres : champs `investmentDate`, `floorMultiple`, `capMultiple`,
+>   `endDate` (optionnels) ajoutés à `convex/schema.ts`, `dealFields`
+>   (`convex/deals.ts`), `ROYALTY_FIELDS` (`convex/lib/instrumentMapping.ts`) et
+>   `FIELD_FORMAT` (`InstrumentBlock.tsx`, formats `date` / `decimal` existants).
+>   Plancher/plafond stockés en multiple ; montant = `multiple × capitalInvested`
+>   dérivé à l'affichage, rien de stocké.
+> - Progression : `totals.actualRoyalty` (déjà calculé) comparé à `floorAmount` /
+>   `capAmount` ; barre `div` stylée par tokens, repère plancher en marqueur.
+> - `PlanVsActualSection` conditionné sur `instrumentKind !== 'royalty'` dans
+>   `deals.$dealId.tsx` (modèle `FundSection`).
+
 ## v1.46.1 — 29/06/2026 à 20:30 — Correction : enregistrement d'une règle récurrente de trésorerie
 
 Dans la trésorerie, lors de la création d'une **règle récurrente**, le bouton

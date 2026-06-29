@@ -38,9 +38,16 @@ export function quarterSortKey(quarter: string): number {
  * present the rightmost is the decimal separator and the other is the
  * thousands grouping. A lone comma followed by exactly 3 digits is read as a
  * thousands separator ("12,000" → 12000), otherwise as a decimal ("12,50" →
- * 12.5). Returns null for a non-finite or negative result.
+ * 12.5) — UNLESS a space already groups the thousands ("311 995,152"), in
+ * which case the comma is always the decimal separator (a space and a comma
+ * can't both be thousands groupers). Returns null for a non-finite or negative
+ * result.
  */
 export function parseAmountToCents(raw: string): number | null {
+  // A space between digits means the thousands are already grouped by spaces,
+  // so a lone comma further right must be the decimal separator. `\s` covers
+  // regular, non-breaking and narrow spaces.
+  const hadSpaceGroup = /\d\s\d/.test(raw)
   let s = raw.trim().replace(/[\u20ac$\s]/g, '')
   if (!s) return null
   const lastComma = s.lastIndexOf(',')
@@ -53,7 +60,8 @@ export function parseAmountToCents(raw: string): number | null {
     }
   } else if (lastComma > -1) {
     const decimals = s.length - lastComma - 1
-    s = decimals === 3 ? s.replace(/,/g, '') : s.replace(',', '.')
+    const isThousands = !hadSpaceGroup && decimals === 3
+    s = isThousands ? s.replace(/,/g, '') : s.replace(',', '.')
   }
   const n = Number.parseFloat(s)
   if (!Number.isFinite(n) || n < 0) return null

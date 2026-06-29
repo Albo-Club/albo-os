@@ -434,6 +434,13 @@ export default defineSchema({
     actualPoints: v.optional(
       v.array(v.object({ quarter: v.string(), actualRevenue: v.number() })),
     ),
+    // Generic contract parameters (user-entered, no business rule baked in).
+    // Floor/cap are stored as MULTIPLES of capitalInvested (e.g. 1.25, 2.0);
+    // their euro amount is computed at display (multiple × capitalInvested).
+    investmentDate: v.optional(v.number()), // ms epoch
+    floorMultiple: v.optional(v.number()), // decimal (e.g. 1.25)
+    capMultiple: v.optional(v.number()), // decimal (e.g. 2.0)
+    endDate: v.optional(v.number()), // ms epoch
 
     // SAFE / BSA Air
     valuationCap: v.optional(v.number()), // cents

@@ -178,6 +178,10 @@
     "capitalInvested": "Capital investi",
     "depreciationRate": "Dépréciation",
     "royaltyRate": "Taux de royalties",
+    "investmentDate": "Date d'investissement",
+    "floorMultiple": "Plancher",
+    "capMultiple": "Plafond",
+    "endDate": "Date de fin",
     "distributionRate": "Taux de distribution",
     "roundType": "Tour",
     "safeType": "Type d'instrument",
@@ -301,7 +305,13 @@
       "quarterDescription": "Saisissez le trimestre et le CA réalisé. Les royalties se calculent automatiquement.",
       "quarterLabel": "Trimestre",
       "yearLabel": "Année",
-      "revenueLabel": "CA réalisé (€)"
+      "revenueLabel": "CA réalisé (€)",
+      "progressTitle": "Progression des royalties",
+      "progressFloor": "Plancher",
+      "progressCap": "Plafond",
+      "progressVsFloor": "{{pct}} du plancher",
+      "progressVsCap": "{{pct}} du plafond",
+      "progressReached": "Plancher atteint"
     },
     "leadSpv": {
       "collected": "Perçu à date",

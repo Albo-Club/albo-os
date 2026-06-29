@@ -59,6 +59,8 @@ export const FIELD_FORMAT: Record<string, FieldFormat> = {
   maturityDate: 'date',
   grantDate: 'date',
   exerciseDeadlineDate: 'date',
+  investmentDate: 'date',
+  endDate: 'date',
   // Amounts (cents)
   paidAmount: 'eur',
   committedAmount: 'eur',
@@ -92,6 +94,8 @@ export const FIELD_FORMAT: Record<string, FieldFormat> = {
   // Decimals (parity / conversion ratio — fractional allowed)
   warrantParity: 'decimal',
   conversionRatio: 'decimal',
+  floorMultiple: 'decimal',
+  capMultiple: 'decimal',
   // Enums (i18n key `enum.<field>.<value>`)
   roundType: 'enum',
   safeType: 'enum',

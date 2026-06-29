@@ -52,6 +52,12 @@ const dealFields = {
   actualPoints: v.optional(
     v.array(v.object({ quarter: v.string(), actualRevenue: v.number() })),
   ),
+  // Generic royalty contract parameters (cf. schema.ts). Floor/cap are
+  // multiples of capitalInvested; the euro amount is derived at display.
+  investmentDate: v.optional(v.number()), // ms
+  floorMultiple: v.optional(v.number()), // decimal
+  capMultiple: v.optional(v.number()), // decimal
+  endDate: v.optional(v.number()), // ms
   valuationCap: v.optional(v.number()),
   discount: v.optional(v.number()),
   entryValuation: v.optional(v.number()),

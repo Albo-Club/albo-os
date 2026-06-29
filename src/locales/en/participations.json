@@ -178,6 +178,10 @@
     "capitalInvested": "Capital invested",
     "depreciationRate": "Depreciation",
     "royaltyRate": "Royalty rate",
+    "investmentDate": "Investment date",
+    "floorMultiple": "Floor",
+    "capMultiple": "Cap",
+    "endDate": "End date",
     "distributionRate": "Distribution rate",
     "roundType": "Round",
     "safeType": "Instrument type",
@@ -301,7 +305,13 @@
       "quarterDescription": "Enter the quarter and the realized revenue. Royalties are computed automatically.",
       "quarterLabel": "Quarter",
       "yearLabel": "Year",
-      "revenueLabel": "Realized revenue (€)"
+      "revenueLabel": "Realized revenue (€)",
+      "progressTitle": "Royalties progress",
+      "progressFloor": "Floor",
+      "progressCap": "Cap",
+      "progressVsFloor": "{{pct}} of floor",
+      "progressVsCap": "{{pct}} of cap",
+      "progressReached": "Floor reached"
     },
     "leadSpv": {
       "collected": "Collected to date",

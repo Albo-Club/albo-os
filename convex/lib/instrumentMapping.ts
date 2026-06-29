@@ -208,7 +208,15 @@ const LEAD_SPV_FIELDS = [
 // custom RoyaltiesPanel, but listed here so the shared edit dialog edits them
 // (render mode ≠ editable fields). The BP / actuals lists are NOT here — they
 // have a dedicated UI in the panel (deals.update patch).
-const ROYALTY_FIELDS = ['capitalInvested', 'depreciationRate', 'royaltyRate']
+const ROYALTY_FIELDS = [
+  'capitalInvested',
+  'depreciationRate',
+  'royaltyRate',
+  'investmentDate',
+  'floorMultiple',
+  'capMultiple',
+  'endDate',
+]
 
 const SCPI_FIELDS = [
   'closingDate',
