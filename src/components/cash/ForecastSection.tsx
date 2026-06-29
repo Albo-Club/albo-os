@@ -52,9 +52,9 @@ function msToDateInput(ms: number | undefined): string {
   return ms == null ? '' : new Date(ms).toISOString().slice(0, 10)
 }
 
-/** "1 500" / "1500,50" (euros) → integer cents, null if invalid. */
+/** "1 500" / "1500,50" / "5 580 €" (euros) → integer cents, null if invalid. */
 function parseEuros(raw: string): number | null {
-  const cleaned = raw.replace(/\s/g, '').replace(',', '.')
+  const cleaned = raw.replace(/[\s€]/g, '').replace(',', '.')
   if (!cleaned) return null
   const value = Number(cleaned)
   if (!Number.isFinite(value) || value <= 0) return null
