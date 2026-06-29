@@ -26,6 +26,7 @@
   "title": "Companies",
   "allSubtitle": "All your organizations combined — read-only. Edit within an organization.",
   "openDetail": "Open details",
+  "rowOpenAria": "Open {{name}}'s details",
   "back": "← Investments",
   "notFound": "Company not found.",
   "info": {
