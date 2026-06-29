@@ -23,6 +23,33 @@ bas de page.
 
 ---
 
+## v1.45.0 — 29/06/2026 à 18:05 — Liste des entreprises plus lisible
+
+La liste des entreprises se lit plus vite. **Cliquez n'importe où sur une
+ligne** pour ouvrir la fiche — le bouton « Ouvrir la fiche » répété sur chaque
+ligne disparaît, et une discrète flèche apparaît à droite au survol. Les noms
+de société s'alignent désormais proprement à gauche.
+
+Les valeurs « neutres » s'effacent visuellement pour laisser ressortir
+l'essentiel : un montant **reçu à 0 €** et un **TVPI à 1,00×** s'affichent en
+gris clair. L'œil va d'abord aux lignes qui ont distribué quelque chose ou dont
+le multiple s'écarte de 1.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/participations/ParticipationsTable.tsx` (`CompanyRows`) :
+>   suppression du bouton/pilule `openDetail` ; la `TableRow` devient le seul
+>   point de navigation (`onClick` existant + `tabIndex`/`role="link"`/
+>   `onKeyDown` Enter pour le clavier, `aria-label` via la clé i18n
+>   `rowOpenAria`). Colonne traînante ajoutée avec une flèche `ArrowRight`
+>   en `opacity-0 group-hover/group-focus-visible:opacity-100` ; `colSpan` du
+>   loader passé à 7/8.
+> - Mise en muted des valeurs neutres via deux helpers locaux
+>   `isNeutralAmount` (reçu `=== 0`) et `isNeutralTvpi` (arrondi à `1,00×`),
+>   appliquant `text-muted-foreground` sur les cellules Reçu et TVPI. Token DS
+>   existant réutilisé, aucune couleur en dur.
+> - Périmètre strict liste entreprises ; le même rendu muted pourrait être
+>   partagé plus tard avec la fiche deal / les cards KPI du dashboard (autre PR).
 ## v1.44.0 — 29/06/2026 à 17:44 — Nouveau moteur pour l'assistant IA
 
 L'assistant IA d'Albo OS change de moteur : il tourne désormais sur le modèle

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowDown,
+  ArrowRight,
   ArrowUp,
   ArrowUpDown,
-  ArrowUpRight,
   Download,
   ListFilter,
   X,
@@ -76,6 +76,18 @@ function residualCents(deal: DealRow): number {
   if (deal.status === 'fully_exited' || deal.status === 'written_off') return 0
   return deal.lastValuationCents ?? deal.paidActual ?? 0
 }
+
+/**
+ * Neutral-value tests for the list's "Received" and "TVPI" columns: a 0 €
+ * received or a 1,00× multiple carries no signal, so it's rendered muted to
+ * push the eye toward the rows that actually moved. (List-only styling — see
+ * the PR note about possibly sharing with the deal sheet / dashboard later.)
+ */
+const isNeutralAmount = (cents: number) => cents === 0
+// Neutral when it rounds to the displayed 1,00× (e.g. cost-based residual, no
+// distribution yet), not only when the raw ratio is exactly 1.
+const isNeutralTvpi = (ratio: number | null) =>
+  ratio != null && Math.round(ratio * 100) === 100
 
 function statusVariant(s: string): 'default' | 'secondary' | 'destructive' {
   if (s === 'written_off') return 'destructive'
@@ -586,7 +598,8 @@ export function ParticipationsTable({
     if (exportRef) exportRef.current = handleExport
   })
 
-  const colSpan = showOrg ? 7 : 6
+  // +1 for the trailing hover-chevron column (header cell is empty).
+  const colSpan = showOrg ? 8 : 7
 
   // Search bar shown as soon as there are deals — including when the
   // current search matches nothing (otherwise it can't be cleared).
@@ -709,6 +722,8 @@ export function ParticipationsTable({
                 onClick={() => toggleSort('tvpi')}
                 className="text-right"
               />
+              {/* Trailing column for the per-row hover chevron. */}
+              <TableHead className="w-8" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -785,8 +800,22 @@ function CompanyRows({
     : undefined
   return (
     <TableRow
-      className={openDetail ? 'cursor-pointer' : undefined}
+      className={openDetail ? 'group cursor-pointer' : undefined}
       onClick={openDetail}
+      // Keyboard path (the row replaces the old "Open details" link): focusable
+      // and Enter-activated only when there's a destination.
+      tabIndex={openDetail ? 0 : undefined}
+      role={openDetail ? 'link' : undefined}
+      aria-label={
+        openDetail ? t('rowOpenAria', { name: group.name }) : undefined
+      }
+      onKeyDown={
+        openDetail
+          ? (e) => {
+              if (e.key === 'Enter') openDetail()
+            }
+          : undefined
+      }
     >
       <TableCell className="font-medium">
         <span className="flex items-center gap-2">
@@ -796,18 +825,6 @@ function CompanyRows({
             size="sm"
           />
           {group.name}
-          {group.slug && (
-            <Button asChild variant="outline" size="sm" className="ml-2">
-              <Link
-                to="/app/$orgSlug/participations/$companyId"
-                params={{ orgSlug: group.slug, companyId: group.id }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ArrowUpRight className="size-4" />
-                {t('openDetail')}
-              </Link>
-            </Button>
-          )}
         </span>
       </TableCell>
       {showOrg && (
@@ -830,11 +847,27 @@ function CompanyRows({
       <TableCell className="text-right tabular-nums">
         {fmtEur(group.paid)}
       </TableCell>
-      <TableCell className="text-right tabular-nums">
+      <TableCell
+        className={`text-right tabular-nums${
+          isNeutralAmount(group.received) ? ' text-muted-foreground' : ''
+        }`}
+      >
         {fmtEur(group.received)}
       </TableCell>
-      <TableCell className="text-right tabular-nums">
+      <TableCell
+        className={`text-right tabular-nums${
+          isNeutralTvpi(group.tvpi) ? ' text-muted-foreground' : ''
+        }`}
+      >
         {fmtMultiple(group.tvpi)}
+      </TableCell>
+      <TableCell className="w-8 text-right">
+        {openDetail && (
+          <ArrowRight
+            aria-hidden
+            className="text-muted-foreground inline size-4 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+          />
+        )}
       </TableCell>
     </TableRow>
   )
