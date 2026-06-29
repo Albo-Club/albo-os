@@ -5,8 +5,11 @@ import { toast } from 'sonner'
 import { useConvexMutation } from '@convex-dev/react-query'
 
 import { api } from '../../../convex/_generated/api'
+import type { ReactNode } from 'react'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import type { BpPoint } from '~/lib/royalties'
+import type { PanelTransaction } from '~/components/deals/InstrumentBlock'
+import { xirr } from '~/lib/xirr'
 import {
   buildRoyaltyRows,
   parseAmountToCents,
@@ -133,10 +136,14 @@ function EditableCa({
  */
 export function RoyaltiesPanel({
   deal,
+  transactions,
+  notesSlot,
   onEdit,
 }: {
   deal: Doc<'deals'>
   received?: number
+  transactions?: Array<PanelTransaction>
+  notesSlot?: ReactNode
   onEdit?: () => void
 }) {
   const { t, i18n } = useTranslation('participations')
@@ -162,10 +169,12 @@ export function RoyaltiesPanel({
       signDisplay: 'always',
     }).format(ratio)
 
-  const fmtRatioPct = (ratio: number) =>
+  // Annualized TRI: a signed decimal ratio (e.g. -0.42, 0.15) → percent.
+  const fmtTriPct = (ratio: number) =>
     new Intl.NumberFormat(lang, {
       style: 'percent',
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 1,
+      signDisplay: 'always',
     }).format(ratio)
 
   // Floor / cap are stored as multiples; their euro amount is derived from the
@@ -214,10 +223,46 @@ export function RoyaltiesPanel({
     [deal.bpPoints, deal.actualPoints, deal.depreciationRate, deal.royaltyRate],
   )
 
-  // Progress: cumulative actual royalties (already computed) positioned on the
-  // 0 → floor → cap scale. Pure display — no completion rule, just comparison.
-  const cumul = totals.actualRoyalty
-  const reached = floorAmount != null && cumul >= floorAmount
+  // Realized indicators (bar, CoC, TRI) live in a different world from the
+  // projection table above: they are built from the actual incoming transactions
+  // attached to the deal, de-VAT'd to HT (amounts are stored TTC; rate is a flat
+  // 20%, so HT = TTC / 1.20). Never compute these from the table. The invested
+  // capital (`capitalInvested`) is already HT and is NEVER de-VAT'd.
+  const incoming = useMemo(
+    () => (transactions ?? []).filter((tx) => tx.direction === 'in'),
+    [transactions],
+  )
+  // Cumulative realized royalties (HT, cents): the cash actually received.
+  const realizedCumul = useMemo(
+    () => Math.round(incoming.reduce((s, tx) => s + tx.amount, 0) / 1.2),
+    [incoming],
+  )
+  const reached = floorAmount != null && realizedCumul >= floorAmount
+
+  // Position (0–100%) of an amount on the 0 → cap bar scale.
+  const barPct = (amount: number) =>
+    capAmount != null && capAmount > 0
+      ? Math.min(100, (amount / capAmount) * 100)
+      : 0
+
+  // Cash-on-cash: realized HT royalties / invested capital, as a multiple.
+  const coc =
+    capital != null && capital > 0 ? realizedCumul / capital : null
+
+  // TRI (XIRR): one outflow (invested capital, HT, at investmentDate) plus each
+  // incoming transaction de-VAT'd at its own date. Negative early on (capital
+  // not yet recovered) — mathematically correct, shown as-is.
+  const tri = useMemo(() => {
+    if (capital == null || deal.investmentDate == null || incoming.length === 0)
+      return null
+    return xirr([
+      { amount: -capital, date: deal.investmentDate },
+      ...incoming.map((tx) => ({
+        amount: tx.amount / 1.2,
+        date: tx.transactionDate,
+      })),
+    ])
+  }, [capital, deal.investmentDate, incoming])
 
   async function saveBp(bpPoints: Array<BpPoint>) {
     try {
@@ -283,6 +328,137 @@ export function RoyaltiesPanel({
           ))}
         </div>
       </div>
+
+      {/* Deal notes (injected by the page) sit between the parameters and the
+          realized indicators on the royalty fiche. */}
+      {notesSlot}
+
+      {/* Realized performance — built from the incoming transactions de-VAT'd to
+          HT, NOT from the projection table. Only shown once floor/cap multiples
+          and capital are entered. */}
+      {floorAmount != null && capAmount != null && (
+        <div className="space-y-4 rounded-lg border p-4">
+          <div className="flex items-baseline justify-between">
+            <span className="text-sm font-medium">
+              {t('fiche.royalty.realizedTitle')}
+            </span>
+            <span
+              className={cn(
+                'text-sm tabular-nums',
+                reached ? 'text-positive font-medium' : 'text-muted-foreground',
+              )}
+            >
+              {fmtEur(realizedCumul)}
+            </span>
+          </div>
+
+          {/* Bar: 0 → floor → cap scale, two zones, markers under their traits,
+              floating cursor label for the realized cumulative. */}
+          <div className="relative pt-6 pb-10">
+            <div
+              className="absolute top-0 -translate-x-1/2 text-xs font-medium tabular-nums whitespace-nowrap"
+              style={{ left: `${barPct(realizedCumul)}%` }}
+            >
+              {fmtEur(realizedCumul)}
+            </div>
+            <div className="bg-muted relative h-3 w-full overflow-hidden rounded-full">
+              {/* 0 → floor: securing zone. */}
+              <div
+                className="bg-primary/15 absolute inset-y-0 left-0"
+                style={{ width: `${barPct(floorAmount)}%` }}
+                aria-hidden
+              />
+              {/* floor → cap: yield zone. */}
+              <div
+                className="bg-positive/15 absolute inset-y-0 right-0"
+                style={{ left: `${barPct(floorAmount)}%` }}
+                aria-hidden
+              />
+              {/* Achieved fill (turns positive once the floor is reached). */}
+              <div
+                className={cn(
+                  'absolute inset-y-0 left-0 rounded-full transition-all',
+                  reached ? 'bg-positive' : 'bg-primary',
+                )}
+                style={{ width: `${barPct(realizedCumul)}%` }}
+              />
+              {/* Floor trait. */}
+              <div
+                className="bg-foreground/60 absolute inset-y-0 w-px"
+                style={{ left: `${barPct(floorAmount)}%` }}
+                aria-hidden
+              />
+            </div>
+            {/* Marker labels aligned under their trait (floor centered, cap at
+                the right edge). */}
+            <div className="text-muted-foreground absolute inset-x-0 bottom-0 text-xs tabular-nums">
+              <span
+                className={cn(
+                  'absolute -translate-x-1/2 whitespace-nowrap',
+                  reached && 'text-positive',
+                )}
+                style={{ left: `${barPct(floorAmount)}%` }}
+              >
+                {fmtEur(floorAmount)} · {fmtMultiple(deal.floorMultiple ?? null)}
+              </span>
+              <span className="absolute right-0 whitespace-nowrap">
+                {fmtEur(capAmount)} · {fmtMultiple(deal.capMultiple ?? null)}
+              </span>
+            </div>
+          </div>
+
+          {/* Actionable state message. */}
+          <p className="text-sm">
+            {realizedCumul < floorAmount
+              ? t('fiche.royalty.stateBeforeFloor', {
+                  amount: fmtEur(floorAmount - realizedCumul),
+                })
+              : realizedCumul < capAmount
+                ? t('fiche.royalty.stateBeforeCap', {
+                    amount: fmtEur(capAmount - realizedCumul),
+                  })
+                : t('fiche.royalty.stateCapReached')}
+          </p>
+
+          {/* CoC + TRI indicators. */}
+          <div className="grid grid-cols-2 gap-4 border-t pt-3">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-muted-foreground text-xs">
+                {t('fiche.royalty.cocLabel')}
+              </span>
+              <span className="text-sm font-medium tabular-nums">
+                {fmtMultiple(coc)}
+              </span>
+              <span className="text-muted-foreground text-xs tabular-nums">
+                {t('fiche.royalty.cocBounds', {
+                  floor: fmtMultiple(deal.floorMultiple ?? null),
+                  cap: fmtMultiple(deal.capMultiple ?? null),
+                })}
+              </span>
+            </div>
+            {tri != null && (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-muted-foreground text-xs">
+                  {t('fiche.royalty.triLabel')}
+                </span>
+                <span
+                  className={cn(
+                    'text-sm font-medium tabular-nums',
+                    signTone(tri),
+                  )}
+                >
+                  {fmtTriPct(tri)}
+                </span>
+                {tri < 0 && (
+                  <span className="text-muted-foreground text-xs">
+                    {t('fiche.royalty.triRecovering')}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Quarterly comparison table. */}
       <div className="rounded-lg border">
@@ -470,68 +646,6 @@ export function RoyaltiesPanel({
           </p>
         )}
       </div>
-
-      {/* Progress: cumulative actual royalties on the 0 → floor → cap scale.
-          Pure positioning — only shown once floor/cap multiples and capital
-          are entered. */}
-      {floorAmount != null && capAmount != null && (
-        <div className="space-y-3 rounded-lg border p-4">
-          <div className="flex items-baseline justify-between">
-            <span className="text-sm font-medium">
-              {t('fiche.royalty.progressTitle')}
-            </span>
-            <span
-              className={cn(
-                'text-sm tabular-nums',
-                reached && 'text-positive font-medium',
-              )}
-            >
-              {fmtEur(cumul)}
-              {reached && (
-                <span className="ml-2 text-xs">
-                  {t('fiche.royalty.progressReached')}
-                </span>
-              )}
-            </span>
-          </div>
-          <div className="bg-muted relative h-3 w-full overflow-hidden rounded-full">
-            <div
-              className={cn(
-                'h-full rounded-full transition-all',
-                reached ? 'bg-positive' : 'bg-primary',
-              )}
-              style={{
-                width: `${capAmount > 0 ? Math.min(100, (cumul / capAmount) * 100) : 0}%`,
-              }}
-            />
-            {capAmount > 0 && (
-              <div
-                className="bg-foreground/60 absolute inset-y-0 w-px"
-                style={{
-                  left: `${Math.min(100, (floorAmount / capAmount) * 100)}%`,
-                }}
-                aria-hidden
-              />
-            )}
-          </div>
-          <div className="flex justify-between text-xs tabular-nums">
-            <span className={cn(reached && 'text-positive')}>
-              {t('fiche.royalty.progressFloor')} · {fmtEur(floorAmount)} (
-              {t('fiche.royalty.progressVsFloor', {
-                pct: fmtRatioPct(floorAmount > 0 ? cumul / floorAmount : 0),
-              })}
-              )
-            </span>
-            <span className="text-muted-foreground">
-              {t('fiche.royalty.progressCap')} · {fmtEur(capAmount)} (
-              {t('fiche.royalty.progressVsCap', {
-                pct: fmtRatioPct(capAmount > 0 ? cumul / capAmount : 0),
-              })}
-              )
-            </span>
-          </div>
-        </div>
-      )}
 
       {importOpen && (
         <ImportBpDialog

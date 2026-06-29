@@ -306,12 +306,14 @@
       "quarterLabel": "Quarter",
       "yearLabel": "Year",
       "revenueLabel": "Realized revenue (€)",
-      "progressTitle": "Royalties progress",
-      "progressFloor": "Floor",
-      "progressCap": "Cap",
-      "progressVsFloor": "{{pct}} of floor",
-      "progressVsCap": "{{pct}} of cap",
-      "progressReached": "Floor reached"
+      "realizedTitle": "Royalties received (actual)",
+      "stateBeforeFloor": "{{amount}} to go before the guaranteed minimum",
+      "stateBeforeCap": "Guaranteed minimum reached · {{amount}} to go before the cap",
+      "stateCapReached": "Cap reached",
+      "cocLabel": "Recovered multiple (CoC)",
+      "cocBounds": "Floor {{floor}} · Cap {{cap}}",
+      "triLabel": "Annualized IRR",
+      "triRecovering": "(still recovering)"
     },
     "leadSpv": {
       "collected": "Collected to date",

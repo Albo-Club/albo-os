@@ -6,7 +6,7 @@ import {
   INSTRUMENT_FIELDS,
   INSTRUMENT_RENDER,
 } from '../../../convex/lib/instrumentMapping'
-import type { ComponentType } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import type { Archetype } from '../../../convex/lib/instrumentMapping'
 import type { InstrumentKind } from '../../../convex/lib/instruments'
 import type { Doc } from '../../../convex/_generated/dataModel'
@@ -120,6 +120,17 @@ export const FIELD_FORMAT: Record<string, FieldFormat> = {
 }
 
 /**
+ * Display unit per format, shown as a trailing suffix next to inputs (edit
+ * dialog) and values (panels). Symbols, not translatable copy — generic by
+ * format, never coded field-by-field. Formats without a unit are omitted.
+ */
+export const FORMAT_UNIT: Partial<Record<FieldFormat, string>> = {
+  eur: '€',
+  pct: '%',
+  decimal: '×',
+}
+
+/**
  * Marker column splitting a SAFE field list into pre/post-conversion. Its
  * presence in INSTRUMENT_FIELDS[kind] identifies the SAFE two-state config;
  * everything from this column onwards is post-conversion (the split is read
@@ -142,12 +153,28 @@ const ARCHETYPE_BADGE: Record<Archetype, string> = {
 }
 
 /**
- * Props every custom panel receives. `received` (inbound transactions sum) and
- * `onEdit` (opens the shared deal edit dialog) are threaded from the page.
+ * Minimal shape a custom panel needs from a deal's transactions: the dated,
+ * signed cash flows (the royalty panel uses them for the realized bar, CoC and
+ * TRI). Structurally a subset of `transactions.listByDeal`'s rows.
+ */
+export type PanelTransaction = {
+  direction: 'in' | 'out'
+  amount: number
+  transactionDate: number
+}
+
+/**
+ * Props every custom panel receives. `received` (inbound transactions sum),
+ * `transactions` (the dated flows, for realized indicators) and `onEdit`
+ * (opens the shared deal edit dialog) are threaded from the page. `notesSlot`
+ * lets the page inject the deal notes inside the panel (royalty ordering:
+ * parameters → notes → realized → table).
  */
 export type CustomPanelProps = {
   deal: Doc<'deals'>
   received?: number
+  transactions?: Array<PanelTransaction>
+  notesSlot?: ReactNode
   onEdit?: () => void
 }
 
@@ -279,11 +306,15 @@ export function InstrumentBlock({
   deal,
   instrumentKind,
   received,
+  transactions,
+  notesSlot,
   onEdit,
 }: {
   deal: Doc<'deals'>
   instrumentKind: InstrumentKind
   received?: number
+  transactions?: Array<PanelTransaction>
+  notesSlot?: ReactNode
   onEdit?: () => void
 }) {
   const { t, i18n } = useTranslation('participations')
@@ -335,7 +366,13 @@ export function InstrumentBlock({
         (() => {
           const Panel = CUSTOM_PANELS[instrumentKind]
           return Panel ? (
-            <Panel deal={deal} received={received} onEdit={onEdit} />
+            <Panel
+              deal={deal}
+              received={received}
+              transactions={transactions}
+              notesSlot={notesSlot}
+              onEdit={onEdit}
+            />
           ) : (
             // render='custom' but no panel registered yet — neutral fallback
             // (none today: lead_spv + royalty both have panels).

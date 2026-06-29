@@ -35,7 +35,11 @@ import {
   usePagination,
 } from '~/components/data-table/LocalPagination'
 import { FundSection } from '~/components/deals/FundSection'
-import { FIELD_FORMAT, InstrumentBlock } from '~/components/deals/InstrumentBlock'
+import {
+  FIELD_FORMAT,
+  FORMAT_UNIT,
+  InstrumentBlock,
+} from '~/components/deals/InstrumentBlock'
 import { PlanVsActualSection } from '~/components/deals/PlanVsActualSection'
 import {
   bpsToPctInput,
@@ -81,6 +85,12 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from '~/components/ui/input-group'
 import { Textarea } from '~/components/ui/textarea'
 import { Label } from '~/components/ui/label'
 import {
@@ -273,17 +283,35 @@ function DealFieldInput({
         ? 'any'
         : '1'
 
+  const unit = FORMAT_UNIT[format]
+
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
-      <Input
-        id={id}
-        type={inputType}
-        min={isNumeric ? '0' : undefined}
-        step={isNumeric ? step : undefined}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      {unit ? (
+        <InputGroup>
+          <InputGroupInput
+            id={id}
+            type={inputType}
+            min={isNumeric ? '0' : undefined}
+            step={isNumeric ? step : undefined}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          <InputGroupAddon align="inline-end">
+            <InputGroupText>{unit}</InputGroupText>
+          </InputGroupAddon>
+        </InputGroup>
+      ) : (
+        <Input
+          id={id}
+          type={inputType}
+          min={isNumeric ? '0' : undefined}
+          step={isNumeric ? step : undefined}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
     </div>
   )
 }
@@ -972,15 +1000,21 @@ function DealDetail() {
       </div>
 
       {/* Central block: layout driven by the previewed instrument type. The
-          custom panels (lead_spv) read `received` and open the edit dialog. */}
+          custom panels (lead_spv) read `received` and open the edit dialog.
+          For royalty, the notes are injected inside the panel (parameters →
+          notes → realized → table); other instruments keep them below. */}
       <InstrumentBlock
         deal={deal}
         instrumentKind={effectiveKind}
         received={received}
+        transactions={txs}
+        notesSlot={
+          effectiveKind === 'royalty' ? <NotesSection deal={deal} /> : undefined
+        }
         onEdit={() => setEditOpen(true)}
       />
 
-      <NotesSection deal={deal} />
+      {effectiveKind !== 'royalty' && <NotesSection deal={deal} />}
 
       {deal.instrumentKind === 'fund_lp' && (
         <FundSection
