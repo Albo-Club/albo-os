@@ -306,12 +306,14 @@
       "quarterLabel": "Trimestre",
       "yearLabel": "Année",
       "revenueLabel": "CA réalisé (€)",
-      "progressTitle": "Progression des royalties",
-      "progressFloor": "Plancher",
-      "progressCap": "Plafond",
-      "progressVsFloor": "{{pct}} du plancher",
-      "progressVsCap": "{{pct}} du plafond",
-      "progressReached": "Plancher atteint"
+      "realizedTitle": "Royalties perçues (réel)",
+      "stateBeforeFloor": "Encore {{amount}} avant le minimum garanti",
+      "stateBeforeCap": "Minimum garanti atteint · encore {{amount}} avant le plafond",
+      "stateCapReached": "Plafond atteint",
+      "cocLabel": "Multiple récupéré (CoC)",
+      "cocBounds": "Plancher {{floor}} · Plafond {{cap}}",
+      "triLabel": "TRI annualisé",
+      "triRecovering": "(en cours de récupération)"
     },
     "leadSpv": {
       "collected": "Perçu à date",

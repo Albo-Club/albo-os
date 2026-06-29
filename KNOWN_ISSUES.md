@@ -1640,6 +1640,25 @@ dérivé). `paidActual` (décaissé réel) est **calculé** depuis les transacti
 `InstrumentBlock.tsx`, props `CustomPanelProps`, 3 scalaires édités via
 `EditDealDialog` + `INSTRUMENT_FIELDS['royalty']`). Deux écarts à connaître.
 
+### Indicateurs de réalisé (barre, CoC, TRI) — deux sources à ne pas mélanger
+
+- Le **tableau** est une **projection** (basée sur `actualPoints`, le CA saisi).
+  La **barre**, le **CoC** et le **TRI** sont du **réalisé** : ils somment les
+  **transactions entrantes** du deal (`transactions.listByDeal`, passées au
+  panel via `CustomPanelProps.transactions`), **dé-TVA-ées à 20 %**
+  (`amount / 1.2`, HT). Ne **jamais** recalculer la barre/CoC/TRI sur le
+  tableau, ni dé-TVA-er le capital (`capitalInvested` est déjà HT) — c'est le
+  piège n°1.
+- TRI via `src/lib/xirr.ts` (Newton-Raphson + repli bissection, actual/365).
+  Flux : un sortant `-capitalInvested` à `investmentDate` + chaque entrant
+  `amount/1.2` à sa `transactionDate`. Négatif tant que le capital n'est pas
+  récupéré — correct, affiché tel quel.
+- **À raffiner plus tard.** Ces indicateurs somment **toutes** les transactions
+  entrantes du deal. Quand le module trésorerie introduira la distinction
+  transactions **prévisionnelles** vs **réalisées**, ils devront ne compter que
+  les **réalisées** (les prévisionnelles ne sont pas du cash reçu). À reprendre
+  à ce moment-là.
+
 ### Listes éditées hors `INSTRUMENT_FIELDS`
 
 - Le BP initial et le réalisé sont **deux listes** sur `deals` —

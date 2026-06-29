@@ -23,6 +23,49 @@ bas de page.
 
 ---
 
+## v1.48.0 — 29/06/2026 à 22:30 — Royalties : performance réelle (CoC, TRI) et fiche réorganisée
+
+Le suivi des royalties distingue désormais clairement la **projection** (le
+tableau, basé sur le chiffre d'affaires saisi) du **réalisé** (ce qui a
+vraiment été encaissé) :
+
+- **Barre de progression repensée.** Elle se base maintenant sur le cash
+  réellement reçu (transactions entrantes ramenées hors taxes), plus sur la
+  projection du tableau. Deux zones colorées (sécurisation jusqu'au plancher,
+  rendement au-delà), les repères **plancher** et **plafond** affichent montant
+  et multiple alignés sous leur trait, et un message d'état indique ce qu'il
+  reste à percevoir avant le minimum garanti ou le plafond.
+- **Multiple récupéré (CoC).** Combien le capital a déjà rapporté, exprimé en
+  multiple (ex. « 0,18x »), en regard du plancher et du plafond.
+- **TRI annualisé.** Le taux de rendement interne, calculé sur le capital
+  investi et les encaissements réels à leurs dates. Négatif tant que le capital
+  n'est pas récupéré (mention « en cours de récupération »).
+- **Fiche réorganisée.** Pour un deal royalty : paramètres → notes → indicateurs
+  de réalisé → tableau de suivi.
+- **Unités dans l'édition.** Les champs du formulaire d'édition affichent leur
+  unité (€, %, ×) pour lever toute ambiguïté.
+
+> **🔧 Notes techniques**
+>
+> - Séparation stricte projection / réalisé. La barre, le CoC et le TRI sont
+>   calculés **uniquement** sur les transactions entrantes du deal
+>   (`transactions.listByDeal`), dé-TVA-ées à 20 % (`amount / 1.2`) ; le tableau
+>   reste sur `actualPoints`. Le capital (`capitalInvested`) n'est **jamais**
+>   dé-TVA-é.
+> - Helper XIRR : nouveau `src/lib/xirr.ts` (Newton-Raphson + repli bissection,
+>   day-count actual/365), couvert par `tests/xirr.test.ts`. Flux du TRI : un
+>   sortant `-capitalInvested` à `investmentDate` + chaque entrant `amount/1.2` à
+>   sa `transactionDate`.
+> - Threading : `CustomPanelProps` reçoit `transactions?` et `notesSlot?`
+>   (`InstrumentBlock.tsx`) ; `deals.$dealId.tsx` passe `txs` et injecte
+>   `NotesSection` dans le panneau pour les deals royalty (sinon rendue dessous).
+> - Unités d'édition : map `FORMAT_UNIT` (`eur`→€, `pct`→%, `decimal`→×) dans
+>   `InstrumentBlock.tsx` ; `DealFieldInput` (`deals.$dealId.tsx`) enveloppe
+>   l'`Input` dans `InputGroup` + `InputGroupAddon align="inline-end"`.
+> - Barre : positions via `barPct(amount)` sur l'échelle 0→`capAmount`, repères
+>   en éléments absolus, message d'état selon `realizedCumul` vs
+>   `floorAmount`/`capAmount`.
+
 ## v1.47.0 — 29/06/2026 à 21:30 — Suivi des royalties : édition, plancher/plafond et progression
 
 Le panneau de suivi des royalties s'enrichit et corrige plusieurs points :
