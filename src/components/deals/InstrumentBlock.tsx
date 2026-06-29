@@ -12,6 +12,7 @@ import type { InstrumentKind } from '../../../convex/lib/instruments'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { LeadSpvPanel } from '~/components/deals/LeadSpvPanel'
+import { RoyaltiesPanel } from '~/components/deals/RoyaltiesPanel'
 import { signTone } from '~/lib/moneyTone'
 import { cn } from '~/lib/utils'
 import { Badge } from '~/components/ui/badge'
@@ -70,6 +71,7 @@ export const FIELD_FORMAT: Record<string, FieldFormat> = {
   pricePerShare: 'eur',
   structuringFees: 'eur',
   amountRaised: 'eur',
+  capitalInvested: 'eur',
   acquisitionFees: 'eur',
   rentReceived: 'eur',
   currentValue: 'eur',
@@ -85,6 +87,8 @@ export const FIELD_FORMAT: Record<string, FieldFormat> = {
   managementFeeRate: 'pct',
   hurdleRate: 'pct',
   carriedRate: 'pct',
+  royaltyRate: 'pct',
+  depreciationRate: 'pct',
   // Decimals (parity / conversion ratio — fractional allowed)
   warrantParity: 'decimal',
   conversionRatio: 'decimal',
@@ -145,14 +149,15 @@ export type CustomPanelProps = {
 
 /**
  * instrumentKind → custom panel, for the 'custom'-rendered kinds. A kind with
- * render='custom' but no entry here falls back to a neutral placeholder (the
- * royalty case, until RoyaltiesPanel lands). This is the routing point for the
- * first real custom panel — add a line per future panel, nothing else.
+ * render='custom' but no entry here falls back to a neutral placeholder. This
+ * is the routing point for custom panels — add a line per future panel,
+ * nothing else.
  */
 const CUSTOM_PANELS: Partial<
   Record<InstrumentKind, ComponentType<CustomPanelProps>>
 > = {
   lead_spv: LeadSpvPanel,
+  royalty: RoyaltiesPanel,
 }
 
 function FieldRow({
@@ -328,8 +333,9 @@ export function InstrumentBlock({
           return Panel ? (
             <Panel deal={deal} received={received} onEdit={onEdit} />
           ) : (
-            // render='custom' without a registered panel yet (royalty).
-            <Placeholder text={t('fiche.royalty.placeholder')} />
+            // render='custom' but no panel registered yet — neutral fallback
+            // (none today: lead_spv + royalty both have panels).
+            <Placeholder text={t('fiche.cto.placeholder')} />
           )
         })()
       ) : render === 'placeholder' ? (
