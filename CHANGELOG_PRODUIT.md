@@ -23,6 +23,20 @@ bas de page.
 
 ---
 
+## v1.46.1 — 29/06/2026 à 20:30 — Correction : enregistrement d'une règle récurrente de trésorerie
+
+Dans la trésorerie, lors de la création d'une **règle récurrente**, le bouton
+**Enregistrer** restait grisé si le montant était saisi avec le symbole **€**
+(ex. « 5 580 € »). Le montant est désormais correctement interprété même
+lorsqu'il contient le symbole de l'euro : la règle s'enregistre normalement.
+
+> **🔧 Notes techniques**
+>
+> - `parseEuros` (`src/components/cash/ForecastSection.tsx`) ne retirait que les
+>   espaces et la virgule ; un `€` collé au montant donnait `Number("5580€") =
+>   NaN`, donc `amountCents === null` → `invalid === true` → bouton désactivé.
+> - Fix : la regex de nettoyage retire aussi le symbole `€` (`/[\s€]/g`).
+
 ## v1.46.0 — 29/06/2026 à 19:11 — Suivi des royalties trimestre par trimestre
 
 Les deals en **royalties** (ex. La Vie de Quartier) ont désormais leur propre
