@@ -313,7 +313,8 @@
       "cocLabel": "Multiple récupéré (CoC)",
       "cocBounds": "Plancher {{floor}} · Plafond {{cap}}",
       "triLabel": "TRI annualisé",
-      "triRecovering": "(en cours de récupération)"
+      "triNotRecovered": "n/a — capital non recouvré",
+      "htTag": "(HT)"
     },
     "leadSpv": {
       "collected": "Perçu à date",

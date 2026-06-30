@@ -313,7 +313,8 @@
       "cocLabel": "Recovered multiple (CoC)",
       "cocBounds": "Floor {{floor}} · Cap {{cap}}",
       "triLabel": "Annualized IRR",
-      "triRecovering": "(still recovering)"
+      "triNotRecovered": "n/a — capital not recovered",
+      "htTag": "(excl. VAT)"
     },
     "leadSpv": {
       "collected": "Collected to date",

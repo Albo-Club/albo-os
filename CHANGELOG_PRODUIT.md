@@ -23,6 +23,35 @@ bas de page.
 
 ---
 
+## v1.48.1 — 30/06/2026 à 10:30 — Royalties : TRI masqué tant que le capital n'est pas recouvré + barre plus lisible
+
+Sur la fiche d'un investissement à royalties, le **TRI annualisé** ne s'affiche
+plus tant que le capital investi n'a pas été recouvré (multiple récupéré
+inférieur à 1×) : dans cette phase le taux est mathématiquement exact mais très
+instable et trompeur, on affiche donc « **n/a — capital non recouvré** ». Le
+TRI réapparaît automatiquement dès que le capital est recouvré.
+
+La **barre de progression** gagne en lisibilité : un repère vertical **explicite
+sur le plafond** (en plus du plancher), et un **code couleur à trois zones**
+(avant le minimum garanti, entre le minimum et le plafond, plafond atteint). Le
+montant de royalties perçues affiché est désormais suivi d'un discret « (HT) »
+pour rappeler qu'il s'agit du montant hors taxes (l'écart avec le total TTC des
+encaissements correspond à la TVA).
+
+> **🔧 Notes techniques**
+>
+> - `RoyaltiesPanel.tsx` : le bloc TRI n'est plus gardé par `tri != null` mais
+>   par le CoC — `coc < 1` → libellé `triNotRecovered` ; sinon la valeur signée
+>   (`signTone`) ; `xirr()` à `null` → « — ». La sous-note `triRecovering` et ses
+>   clés i18n (fr/en) sont retirées (devenues mortes).
+> - Barre : nouveau drapeau `capReached` ; le remplissage passe à trois états
+>   (`bg-primary` / `bg-positive` / `bg-chart-5`). Trait plafond ajouté en
+>   **dehors** de la track `overflow-hidden` (sinon le coin `rounded-full` le
+>   masque), aligné via `top-6`. Cumul réalisé suffixé de la clé `htTag`.
+> - Le calcul `src/lib/xirr.ts` est **inchangé** (déjà un XIRR daté actual/365,
+>   `r` annualisé) : seul l'affichage évolue. `KNOWN_ISSUES.md` et `TESTING.md`
+>   (FD31, FD34) mis à jour en conséquence.
+
 ## v1.48.0 — 29/06/2026 à 22:30 — Royalties : performance réelle (CoC, TRI) et fiche réorganisée
 
 Le suivi des royalties distingue désormais clairement la **projection** (le
