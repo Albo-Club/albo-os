@@ -23,6 +23,20 @@ bas de page.
 
 ---
 
+## v1.51.2 — 30/06/2026 à 18:00 — Favicon Albo agrandi dans l'onglet
+
+Le **« a » d'Albo** occupe désormais une plus grande part de l'icône :
+la marge autour du logo a été réduite pour qu'il soit plus lisible dans
+l'onglet du navigateur et sur l'écran d'accueil.
+
+> **🔧 Notes techniques**
+>
+> - Régénération des assets `public/` (mêmes fichiers que v1.51.1) avec un
+>   padding réduit autour du glyphe : `pad=12` sur 100 pour les favicons web
+>   arrondis (zone utile 76 vs 48 auparavant), `pad=14` pour
+>   `apple-touch-icon` / `android-chrome` (carrés pleins). Couleurs
+>   inchangées (a `#0A0A0A` sur fond crème `#F4F3EF`).
+
 ## v1.51.1 — 30/06/2026 à 17:30 — Nouveau favicon Albo
 
 L'onglet du navigateur affiche désormais le **« a » d'Albo** (le logo de
