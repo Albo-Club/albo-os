@@ -179,6 +179,7 @@
     "depreciationRate": "Depreciation",
     "royaltyRate": "Royalty rate",
     "investmentDate": "Investment date",
+    "royaltyStartDate": "Royalty start date",
     "floorMultiple": "Floor",
     "capMultiple": "Cap",
     "endDate": "End date",
