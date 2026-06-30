@@ -37,6 +37,9 @@ import {
   PeopleList,
 } from '~/components/companies/EntityFiche'
 import { ReportingsSection } from '~/components/companies/ReportingsSection'
+import { CompanyReportsSection } from '~/components/companies/CompanyReportsSection'
+import { CompanyIntelligenceCard } from '~/components/companies/CompanyIntelligenceCard'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { Button } from '~/components/ui/button'
 import {
   DropdownMenu,
@@ -900,8 +903,34 @@ function ParticipationDetail() {
         )}
       </IdentitySection>
 
-      {/* Reporting zone of the skeleton. */}
-      {company && <ReportingsSection companyId={company._id} />}
+      {/* Reporting zone: manual documents, email-ingested reports, AI synthesis. */}
+      {company && (
+        <section>
+          <Tabs defaultValue="documents">
+            <TabsList variant="line">
+              <TabsTrigger value="documents">
+                {t('tabs.documents')}
+              </TabsTrigger>
+              <TabsTrigger value="reports">{t('tabs.reports')}</TabsTrigger>
+              <TabsTrigger value="intelligence">
+                {t('tabs.intelligence')}
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="documents" className="pt-4">
+              <ReportingsSection companyId={company._id} />
+            </TabsContent>
+            <TabsContent value="reports" className="space-y-3 pt-4">
+              <h2 className="text-lg font-semibold tracking-tight">
+                {t('reports.title')}
+              </h2>
+              <CompanyReportsSection companyId={company._id} />
+            </TabsContent>
+            <TabsContent value="intelligence" className="pt-4">
+              <CompanyIntelligenceCard companyId={company._id} />
+            </TabsContent>
+          </Tabs>
+        </section>
+      )}
 
       {company && editOpen && org && (
         <EditCompanyDialog

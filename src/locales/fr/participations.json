@@ -572,6 +572,53 @@
       "default": "Une erreur est survenue"
     }
   },
+  "tabs": {
+    "documents": "Documents",
+    "reports": "Reports",
+    "intelligence": "Synthèse IA"
+  },
+  "reports": {
+    "title": "Reports investisseur",
+    "empty": "Aucun report reçu par email pour l'instant.",
+    "untitled": "Report sans titre",
+    "metrics": "Métriques",
+    "content": "Contenu",
+    "col": {
+      "title": "Titre",
+      "period": "Période",
+      "type": "Type",
+      "date": "Reçu le",
+      "status": "Statut"
+    },
+    "type": {
+      "monthly": "Mensuel",
+      "bimonthly": "Bimestriel",
+      "quarterly": "Trimestriel",
+      "semi-annual": "Semestriel",
+      "annual": "Annuel"
+    },
+    "status": {
+      "processing": "Traitement…",
+      "completed": "Traité",
+      "failed": "Échec"
+    }
+  },
+  "intelligence": {
+    "title": "Synthèse IA",
+    "updated": "Mis à jour {{date}}",
+    "status": {
+      "processing": "Analyse en cours…",
+      "error": "L'analyse a échoué.",
+      "no_data": "Pas assez de données pour analyser.",
+      "empty": "Pas encore de synthèse. Elle est générée après le premier report."
+    },
+    "section": {
+      "good": "Points forts",
+      "bad": "Points de vigilance",
+      "insights": "Indicateurs clés",
+      "alerts": "Alertes"
+    }
+  },
   "export": {
     "button": "Exporter CSV",
     "col": {

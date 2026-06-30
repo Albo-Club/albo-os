@@ -572,6 +572,53 @@
       "default": "Something went wrong"
     }
   },
+  "tabs": {
+    "documents": "Documents",
+    "reports": "Reports",
+    "intelligence": "AI Synthesis"
+  },
+  "reports": {
+    "title": "Investor reports",
+    "empty": "No report received by email yet.",
+    "untitled": "Untitled report",
+    "metrics": "Metrics",
+    "content": "Content",
+    "col": {
+      "title": "Title",
+      "period": "Period",
+      "type": "Type",
+      "date": "Received",
+      "status": "Status"
+    },
+    "type": {
+      "monthly": "Monthly",
+      "bimonthly": "Bi-monthly",
+      "quarterly": "Quarterly",
+      "semi-annual": "Semi-annual",
+      "annual": "Annual"
+    },
+    "status": {
+      "processing": "Processing…",
+      "completed": "Completed",
+      "failed": "Failed"
+    }
+  },
+  "intelligence": {
+    "title": "AI synthesis",
+    "updated": "Updated {{date}}",
+    "status": {
+      "processing": "Analysis in progress…",
+      "error": "Analysis failed.",
+      "no_data": "Not enough data to analyze yet.",
+      "empty": "No synthesis yet. It is generated after the first report."
+    },
+    "section": {
+      "good": "Strengths",
+      "bad": "Watch points",
+      "insights": "Key insights",
+      "alerts": "Alerts"
+    }
+  },
   "export": {
     "button": "Export CSV",
     "col": {
