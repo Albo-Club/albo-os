@@ -62,7 +62,8 @@
     "committed": "Committed",
     "paid": "Paid",
     "received": "Received",
-    "tvpi": "TVPI"
+    "tvpi": "TVPI",
+    "moic": "MOIC"
   },
   "filters": {
     "instrument": "Instrument",
@@ -477,6 +478,10 @@
   "withoutDeal": {
     "sectionTitle_one": "{{count}} entity without a deal",
     "sectionTitle_other": "{{count}} entities without a deal"
+  },
+  "settled": {
+    "sectionTitle_one": "Settled participation ({{count}})",
+    "sectionTitle_other": "Settled participations ({{count}})"
   },
   "empty": "No companies in this scope — create deals via the AI chat, or add them manually.",
   "search": {

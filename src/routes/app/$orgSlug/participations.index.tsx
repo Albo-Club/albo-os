@@ -18,7 +18,7 @@ import type { Id } from '../../../../convex/_generated/dataModel'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { cn } from '~/lib/utils'
-import { ParticipationsTable } from '~/components/participations/ParticipationsTable'
+import { ParticipationsView } from '~/components/participations/ParticipationsView'
 import { Button } from '~/components/ui/button'
 import {
   DropdownMenu,
@@ -334,7 +334,8 @@ function Participations() {
     api.deals.list,
     org ? { orgId: org._id } : 'skip',
   )
-  // Filled by the table; lets the header menu trigger the (search-aware) export.
+  // Filled by the table; lets the header menu trigger the export of the full
+  // deal set (active + settled).
   const exportRef = useRef<(() => void) | null>(null)
   const hasDeals = Boolean(deals && deals.length > 0)
 
@@ -369,7 +370,7 @@ function Participations() {
           </DropdownMenu>
         )}
       </div>
-      <ParticipationsTable deals={deals} orgSlug={orgSlug} exportRef={exportRef} />
+      <ParticipationsView deals={deals} orgSlug={orgSlug} exportRef={exportRef} />
 
       {org && (
         <WithoutDealSection orgId={org._id} orgSlug={orgSlug} deals={deals} />

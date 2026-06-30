@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../../../../convex/_generated/api'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
-import { ParticipationsTable } from '~/components/participations/ParticipationsTable'
+import { ParticipationsView } from '~/components/participations/ParticipationsView'
 
 export const Route = createFileRoute('/app/all/participations')({
   component: AllParticipations,
@@ -33,7 +33,7 @@ function AllParticipations() {
         </h1>
         <p className="text-muted-foreground text-sm">{t('allSubtitle')}</p>
       </div>
-      <ParticipationsTable deals={deals} showOrg />
+      <ParticipationsView deals={deals} showOrg />
     </main>
   )
 }
