@@ -12,7 +12,10 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import type { ReactNode, RefObject } from 'react'
 
+import type { Doc } from '../../../convex/_generated/dataModel'
+import type { MoicTransaction } from '~/lib/dealMetrics'
 import { CompanyLogo } from '~/components/CompanyLogo'
+import { ExitBadge } from '~/components/deals/ExitBadge'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
@@ -311,13 +314,17 @@ function SortableHead({
   dir,
   onClick,
   className,
+  sortable = true,
 }: {
   label: string
   active: boolean
   dir: 'asc' | 'desc'
   onClick: () => void
   className?: string
+  // When false, render a plain (inert) header — the settled table has no sort.
+  sortable?: boolean
 }) {
+  if (!sortable) return <TableHead className={className}>{label}</TableHead>
   const Icon = active ? (dir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown
   return (
     <TableHead className={className}>
@@ -338,14 +345,23 @@ export function ParticipationsTable({
   showOrg = false,
   orgSlug,
   exportRef,
+  settled = false,
+  exportDeals,
 }: {
   deals: Array<DealRow> | undefined
   showOrg?: boolean
   orgSlug?: string
   // When provided, the toolbar export button is hidden and the export handler
-  // is exposed here so a parent (e.g. the header menu) can trigger it — the
-  // current search/sort filter still applies.
+  // is exposed here so a parent (e.g. the header menu) can trigger it.
   exportRef?: RefObject<(() => void) | null>
+  // Settled variant (fully_exited / written_off): adds a MOIC column + an
+  // ExitBadge per row and drops sorting. Used by the collapsed section below
+  // the active table.
+  settled?: boolean
+  // When set, the export covers this deal set instead of the displayed
+  // (filtered) one — lets the wrapper keep the export on the full, unsplit
+  // deals (active + settled) even though this instance only shows a subset.
+  exportDeals?: Array<DealRow>
 }) {
   const { t } = useTranslation('participations')
   const { fmtEur, fmtDate, fmtMultiple } = useFormatters()
@@ -462,6 +478,11 @@ export function ParticipationsTable({
         paid: number
         received: number
         residual: number
+        // Settled-only MOIC inputs (capital deployed, proceeds net of VAT).
+        capital: number
+        proceeds: number
+        // Group exit outcome for the badge: a write-off anywhere wins.
+        writtenOff: boolean
       }
     >()
     for (const d of filtered) {
@@ -476,6 +497,9 @@ export function ParticipationsTable({
         paid: 0,
         received: 0,
         residual: 0,
+        capital: 0,
+        proceeds: 0,
+        writtenOff: false,
       }
       g.deals.push(d)
       if (d.org) g.orgs.add(d.org.name)
@@ -488,12 +512,23 @@ export function ParticipationsTable({
       g.paid += d.paidActual ?? 0
       g.received += d.received ?? 0
       g.residual += residualCents(d)
+      // MOIC capital/proceeds, accumulated per-deal so each deal's own VAT
+      // convention applies (royalty proceeds are net of VAT — mirrors
+      // dealMoic in ~/lib/dealMetrics). De-VATing only ever lowers the
+      // multiple, so a mixed group is never overvalued (no false Exit win).
+      g.capital += d.paidActual ?? 0
+      g.proceeds +=
+        d.instrumentKind === 'royalty'
+          ? (d.received ?? 0) / 1.2
+          : (d.received ?? 0)
+      if (d.status === 'written_off') g.writtenOff = true
       map.set(key, g)
     }
     return Array.from(map.entries()).map(([id, g]) => ({
       id,
       ...g,
       tvpi: g.paid > 0 ? (g.received + g.residual) / g.paid : null,
+      moic: g.capital > 0 ? g.proceeds / g.capital : null,
     }))
   }, [filtered, orgSlug])
 
@@ -549,9 +584,11 @@ export function ParticipationsTable({
     (page + 1) * PAGE_SIZE,
   )
 
-  // CSV export of the filtered deals (flat, one deal per row).
+  // CSV export, flat (one deal per row). Defaults to the displayed (filtered)
+  // set; `exportDeals` lets the wrapper export the full, unsplit deal list.
   function handleExport() {
-    if (!filtered) return
+    const source = exportDeals ?? filtered
+    if (!source) return
     const headers = [
       t('col.company'),
       t('export.col.deal'),
@@ -567,7 +604,7 @@ export function ParticipationsTable({
     ]
     const euros = (cents?: number | null) =>
       cents == null ? null : (cents / 100).toFixed(2)
-    const rows = filtered.map((d) => {
+    const rows = source.map((d) => {
       const paid = d.paidActual ?? 0
       const tvpi =
         paid > 0 ? ((d.received ?? 0) + residualCents(d)) / paid : null
@@ -598,8 +635,9 @@ export function ParticipationsTable({
     if (exportRef) exportRef.current = handleExport
   })
 
-  // +1 for the trailing hover-chevron column (header cell is empty).
-  const colSpan = showOrg ? 8 : 7
+  // Base 7 (company, invested, deals, paid, received, tvpi, chevron) + the
+  // optional org and settled-only MOIC columns.
+  const colSpan = 7 + (showOrg ? 1 : 0) + (settled ? 1 : 0)
 
   // Search bar shown as soon as there are deals — including when the
   // current search matches nothing (otherwise it can't be cleared).
@@ -649,7 +687,7 @@ export function ParticipationsTable({
           <X className="size-4" />
         </Button>
       )}
-      {!exportRef && (
+      {!exportRef && !settled && (
         <Button
           variant="outline"
           size="sm"
@@ -686,6 +724,7 @@ export function ParticipationsTable({
                 active={sort?.key === 'name'}
                 dir={sort?.dir ?? 'asc'}
                 onClick={() => toggleSort('name')}
+                sortable={!settled}
               />
               {showOrg && <TableHead>{t('col.org')}</TableHead>}
               <SortableHead
@@ -693,6 +732,7 @@ export function ParticipationsTable({
                 active={sort?.key === 'invested'}
                 dir={sort?.dir ?? 'desc'}
                 onClick={() => toggleSort('invested')}
+                sortable={!settled}
               />
               <SortableHead
                 label={t('col.deals')}
@@ -700,6 +740,7 @@ export function ParticipationsTable({
                 dir={sort?.dir ?? 'desc'}
                 onClick={() => toggleSort('deals')}
                 className="text-right"
+                sortable={!settled}
               />
               <SortableHead
                 label={t('col.paid')}
@@ -707,6 +748,7 @@ export function ParticipationsTable({
                 dir={sort?.dir ?? 'desc'}
                 onClick={() => toggleSort('paid')}
                 className="text-right"
+                sortable={!settled}
               />
               <SortableHead
                 label={t('col.received')}
@@ -714,6 +756,7 @@ export function ParticipationsTable({
                 dir={sort?.dir ?? 'desc'}
                 onClick={() => toggleSort('received')}
                 className="text-right"
+                sortable={!settled}
               />
               <SortableHead
                 label={t('col.tvpi')}
@@ -721,7 +764,11 @@ export function ParticipationsTable({
                 dir={sort?.dir ?? 'desc'}
                 onClick={() => toggleSort('tvpi')}
                 className="text-right"
+                sortable={!settled}
               />
+              {settled && (
+                <TableHead className="text-right">{t('col.moic')}</TableHead>
+              )}
               {/* Trailing column for the per-row hover chevron. */}
               <TableHead className="w-8" />
             </TableRow>
@@ -742,6 +789,7 @@ export function ParticipationsTable({
                   key={g.id}
                   group={g}
                   showOrg={showOrg}
+                  settled={settled}
                   fmtEur={fmtEur}
                   fmtDate={fmtDate}
                   fmtMultiple={fmtMultiple}
@@ -763,6 +811,7 @@ export function ParticipationsTable({
 function CompanyRows({
   group,
   showOrg,
+  settled,
   fmtEur,
   fmtDate,
   fmtMultiple,
@@ -778,14 +827,33 @@ function CompanyRows({
     paid: number
     received: number
     tvpi: number | null
+    moic: number | null
+    capital: number
+    proceeds: number
+    writtenOff: boolean
   }
   showOrg: boolean
+  settled: boolean
   fmtEur: (c?: number | null) => string
   fmtDate: (ms?: number | null) => string
   fmtMultiple: (ratio: number | null) => string
 }) {
   const { t } = useTranslation('participations')
   const navigate = useNavigate()
+  // Settled rows carry a win/lost badge + a MOIC column. The badge reuses
+  // ExitBadge, which only reads `status` + `instrumentKind`: feed it a
+  // synthetic deal whose proceeds are already net of VAT (a non-royalty
+  // instrument so dealMoic doesn't de-VAT a second time) and the group's
+  // aggregated capital/proceeds. A write-off anywhere in the group forces
+  // "lost".
+  const exitDeal = {
+    status: group.writtenOff ? 'written_off' : 'fully_exited',
+    instrumentKind: 'share',
+  } as unknown as Doc<'deals'>
+  const exitTxs: Array<MoicTransaction> = [
+    { direction: 'out', amount: group.capital },
+    { direction: 'in', amount: group.proceeds },
+  ]
   // Whole-row click opens the entity sheet (its deals are listed there).
   // Guarded by `slug`: the per-org view passes orgSlug, the aggregated view
   // derives it from each deal's org; without a slug the row isn't clickable
@@ -825,6 +893,7 @@ function CompanyRows({
             size="sm"
           />
           {group.name}
+          {settled && <ExitBadge deal={exitDeal} transactions={exitTxs} />}
         </span>
       </TableCell>
       {showOrg && (
@@ -861,6 +930,11 @@ function CompanyRows({
       >
         {fmtMultiple(group.tvpi)}
       </TableCell>
+      {settled && (
+        <TableCell className="text-right tabular-nums">
+          {fmtMultiple(group.moic)}
+        </TableCell>
+      )}
       <TableCell className="w-8 text-right">
         {openDetail && (
           <ArrowRight

@@ -62,7 +62,8 @@
     "committed": "Engagé",
     "paid": "Versé",
     "received": "Reçu",
-    "tvpi": "TVPI"
+    "tvpi": "TVPI",
+    "moic": "MOIC"
   },
   "filters": {
     "instrument": "Instrument",
@@ -477,6 +478,10 @@
   "withoutDeal": {
     "sectionTitle_one": "{{count}} entité sans deal",
     "sectionTitle_other": "{{count}} entités sans deal"
+  },
+  "settled": {
+    "sectionTitle_one": "Participation soldée ({{count}})",
+    "sectionTitle_other": "Participations soldées ({{count}})"
   },
   "empty": "Aucune entreprise pour ce scope — crée des deals via le chat IA, ou ajoute-les à la main.",
   "search": {

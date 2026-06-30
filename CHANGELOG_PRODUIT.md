@@ -23,6 +23,43 @@ bas de page.
 
 ---
 
+## v1.51.0 — 30/06/2026 à 17:00 — Participations : actives en haut, soldées repliées en bas
+
+La liste des participations est désormais scindée en **deux tableaux empilés** :
+
+- en **haut**, les participations **actives** (et en sortie partielle) — le
+  tableau habituel, inchangé ;
+- en **bas**, une section **« Participations soldées (N) »**, **repliée par
+  défaut** (un clic pour la déplier), qui regroupe les sorties totales et les
+  pertes totales. Le compteur reste visible même repliée.
+
+Le tableau des soldées reprend la même présentation (regroupement par société,
+formatage) et ajoute une colonne **MOIC** ainsi que le **badge** gagnant /
+perdant / « Sorti ». Une perte totale s'affiche toujours en perdant. S'il n'y a
+aucune participation soldée, la section n'apparaît pas. La séparation s'applique
+à la vue d'une organisation comme à la vue agrégée toutes organisations, et
+l'export CSV continue de couvrir l'ensemble des deals (actifs + soldés).
+
+> **🔧 Notes techniques**
+>
+> - Nouveau wrapper `ParticipationsView`
+>   (`src/components/participations/ParticipationsView.tsx`) : scinde le `deals`
+>   déjà chargé (un seul aller-retour) en actifs / soldés sur `status` et empile
+>   deux `ParticipationsTable`. La section soldés réutilise le pattern
+>   collapsible maison (`useState` + chevron) comme `ArchivedSection`.
+> - `ParticipationsTable` gagne deux props : `settled` (ajoute la colonne MOIC +
+>   `ExitBadge`, en-têtes non triables) et `exportDeals` (l'export reste branché
+>   sur le jeu complet, en amont du split — comportement export inchangé).
+> - MOIC du groupe **dérivé des sommes agrégées** déjà en scope (`paidActual` /
+>   `received`) — les transactions brutes ne sont pas chargées. Dé-TVA royalty
+>   appliquée **par deal** (`received / 1.2`, convention de `dealMoic`) pour ne
+>   **jamais surévaluer** un groupe à instruments mixtes. `ExitBadge` réutilisé
+>   tel quel via un deal synthétique (statut + instrument non-royalty) et des
+>   transactions synthétiques portant les proceeds déjà nets de TVA.
+> - Routes `app/$orgSlug/participations.index.tsx` et
+>   `app/all/participations.tsx` consomment `ParticipationsView`. i18n :
+>   `col.moic` + `settled.sectionTitle` (EN + FR).
+
 ## v1.50.0 — 30/06/2026 à 16:30 — Sortie d'un deal : badge gagnant/perdant et geste dédié
 
 Sur la fiche d'une participation, un nouveau geste **« Marquer comme sorti »**
