@@ -10,12 +10,18 @@
  */
 
 import { Agent, createThread, stepCountIs } from '@convex-dev/agent'
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 import { components, internal } from './_generated/api'
-import { internalAction, internalMutation, internalQuery } from './_generated/server'
+import {
+  internalAction,
+  internalMutation,
+  internalQuery,
+  query,
+} from './_generated/server'
 import { getModel } from './agent'
 import { intelligenceTools } from './agentToolsIntelligence'
 import { INTELLIGENCE_SYSTEM_PROMPT } from './lib/reportPrompts'
+import { requireOrgMember } from './lib/auth'
 import type { Id } from './_generated/dataModel'
 
 const MAX_REPORTS = 5
@@ -33,7 +39,7 @@ export const intelligenceAgent = new Agent(components.agent, {
 
 export const linkupSearch = internalAction({
   args: { query: v.string() },
-  handler: async (_ctx, { query }): Promise<string> => {
+  handler: async (_ctx, { query: searchQuery }): Promise<string> => {
     const apiKey = process.env.LINKUP_API_KEY
     if (!apiKey) return 'Recherche web indisponible (LINKUP_API_KEY manquante).'
 
@@ -42,7 +48,7 @@ export const linkupSearch = internalAction({
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          q: query,
+          q: searchQuery,
           depth: 'deep',
           outputType: 'searchResults',
           maxResults: 5,
@@ -140,6 +146,28 @@ export const upsertIntelligence = internalMutation({
       companyId: args.companyId,
       ...patch,
     })
+  },
+})
+
+/** Public read of a company's AI synthesis (CompanyIntelligenceCard). */
+export const getByCompany = query({
+  args: { companyId: v.id('companies') },
+  handler: async (ctx, { companyId }) => {
+    const company = await ctx.db.get('companies', companyId)
+    if (!company) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, company.orgId)
+
+    const intel = await ctx.db
+      .query('companyIntelligence')
+      .withIndex('by_company', (q) => q.eq('companyId', companyId))
+      .unique()
+    if (!intel) return null
+
+    return {
+      aiAnalysis: intel.aiAnalysis ?? null,
+      aiAnalysisStatus: intel.aiAnalysisStatus ?? null,
+      aiAnalysisUpdatedAt: intel.aiAnalysisUpdatedAt ?? null,
+    }
   },
 })
 
