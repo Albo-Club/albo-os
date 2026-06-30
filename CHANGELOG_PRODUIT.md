@@ -23,6 +23,37 @@ bas de page.
 
 ---
 
+## v1.49.0 — 30/06/2026 à 11:45 — Royalties : barre plus lisible et distinction « rien saisi » / « zéro »
+
+Sur la fiche d'un investissement à royalties, la **barre de progression** gagne
+deux libellés discrets — **« Plancher »** et **« Plafond »** — placés au-dessus
+de leurs montants respectifs, pour lire la jauge d'un coup d'œil. Le montant de
+royalties perçues n'apparaît **plus qu'une seule fois**, sur l'étiquette posée
+sur la barre (avec sa mention « (HT) ») : le doublon affiché en haut à droite du
+bloc a été retiré.
+
+Dans le **tableau de suivi trimestriel**, on distingue désormais clairement un
+trimestre **sans relevé** d'un trimestre **à zéro** : une cellule réelle (ou
+prévue) sans point affiche « — », tandis qu'un point réellement saisi à 0
+affiche « 0 € ». À l'édition, **vider** une cellule **supprime** le point (la
+cellule repasse à « — »), alors que saisir **« 0 »** conserve un point à zéro.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/deals/RoyaltiesPanel.tsx` — barre : libellés
+>   `field.floorMultiple` / `field.capMultiple` empilés au-dessus des montants
+>   de repère (spans `bottom-0 flex flex-col`, ancrés au trait, libellé qui
+>   pousse vers le haut). Retrait du span cumul `realizedCumul` en haut à droite
+>   du bloc réalisé ; ajout du `htTag` sur l'étiquette flottante de la barre
+>   (seul affichage du cumul désormais).
+> - `EditableCa` : ajout d'un callback `onDelete` et réécriture de `commit` en
+>   trois cas — `draft.trim() === ''` → `onDelete` (suppression du point) ;
+>   parse réussi (0 inclus) → `onSave` ; parse `null` sur saisie non vide
+>   (« abc ») → no-op sans suppression. Branché sur les deux colonnes BP et réel
+>   via `removeBpPoint` / `removeActual` (filter sans réinsertion, patch
+>   `deals.update`). L'affichage `value == null ? '—' : fmtEur(value)` distingue
+>   déjà point absent / point à 0 — seul le comportement d'édition changeait.
+
 ## v1.48.1 — 30/06/2026 à 10:30 — Royalties : TRI masqué tant que le capital n'est pas recouvré + barre plus lisible
 
 Sur la fiche d'un investissement à royalties, le **TRI annualisé** ne s'affiche
