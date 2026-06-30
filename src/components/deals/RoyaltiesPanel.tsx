@@ -257,6 +257,10 @@ export function RoyaltiesPanel({
       ? Math.min(100, (amount / capAmount) * 100)
       : 0
 
+  // Position of the realized-cumul cursor on the bar, reused by the floating
+  // label (for edge-aware anchoring) and the achieved fill.
+  const cursorPct = barPct(realizedCumul)
+
   // Cash-on-cash: realized HT royalties / invested capital, as a multiple.
   const coc =
     capital != null && capital > 0 ? realizedCumul / capital : null
@@ -384,8 +388,18 @@ export function RoyaltiesPanel({
               realized cumulative. */}
           <div className="relative pt-6 pb-10">
             <div
-              className="absolute top-0 -translate-x-1/2 text-xs font-medium tabular-nums whitespace-nowrap"
-              style={{ left: `${barPct(realizedCumul)}%` }}
+              className={cn(
+                'absolute top-0 text-xs font-medium tabular-nums whitespace-nowrap',
+                // Edge-aware anchoring so the floating label never clips out of
+                // the track: left-anchored near 0 (e.g. 0 € realized),
+                // right-anchored near the cap, centered in between.
+                cursorPct <= 5
+                  ? 'translate-x-0'
+                  : cursorPct >= 95
+                    ? '-translate-x-full'
+                    : '-translate-x-1/2',
+              )}
+              style={{ left: `${cursorPct}%` }}
             >
               {fmtEur(realizedCumul)}{' '}
               <span className="text-muted-foreground text-xs font-normal">
@@ -416,7 +430,7 @@ export function RoyaltiesPanel({
                       ? 'bg-positive'
                       : 'bg-primary',
                 )}
-                style={{ width: `${barPct(realizedCumul)}%` }}
+                style={{ width: `${cursorPct}%` }}
               />
               {/* Floor trait. */}
               <div

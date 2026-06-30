@@ -23,6 +23,21 @@ bas de page.
 
 ---
 
+## v1.49.2 — 30/06/2026 à 10:51 — Royalties : correction d'affichage de la jauge
+
+Sur la fiche d'un investissement à royalties, l'étiquette flottante des
+**royalties perçues (réel)** est désormais correctement alignée aux extrémités
+de la jauge : à 0 € reçu elle ne déborde plus à gauche, et au plafond elle ne
+déborde plus à droite.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/deals/RoyaltiesPanel.tsx` : ancrage de l'étiquette flottante
+>   du curseur rendu sensible aux bords. Extraction de `cursorPct =
+>   barPct(realizedCumul)` (réutilisé par l'étiquette et le remplissage), puis
+>   bascule de `-translate-x-1/2` vers `translate-x-0` (≤ 5 %) ou
+>   `-translate-x-full` (≥ 95 %) pour éviter le clipping hors de la piste.
+
 ## v1.49.1 — 30/06/2026 à 12:00 — Royalties : date de début des royalties
 
 Les paramètres d'un investissement à royalties accueillent un nouveau champ
