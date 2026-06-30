@@ -12,6 +12,7 @@ Pré-requis :
   - `SITE_URL` (`http://localhost:3000` en local)
   - `RESEND_API_KEY` + `RESEND_FROM` + `RESEND_TEST_MODE=true` en dev
   - `OPENROUTER_API_KEY` (modèle par défaut : `deepseek/deepseek-v4-pro`)
+  - `REPORTS_WEBHOOK_SECRET` (ingestion des reportings — HMAC du webhook)
 - `.env.local` rempli (`VITE_CONVEX_URL`, `CONVEX_DEPLOYMENT`)
 - 2 navigateurs (ou 1 navigateur + 1 fenêtre incognito) prêts pour les
   tests multi-tenant
@@ -423,6 +424,25 @@ La connexion des banques se fait par l'opérateur via le Powens Webview.
 | P9  | Signature falsifiée                                                                 | `401`, rien écrit (cf. S5)                                                                                                           |
 | P10 | Nettoyage Qonto — `convex run --prod powens:listQontoTestTransactions`              | Liste les tx `source='manual'` sans `airtableId` ; si vide → ne rien supprimer                                                       |
 | P11 | `convex export --prod --path …` puis `powens:deleteTransactionsByIds '{"ids":[…]}'` | Supprime **uniquement** les ids validés (garde-fou : manual + sans airtableId + compte Qonto) ; retourne `{ deleted, skipped }`      |
+
+## Ingestion reporting (webhook → companyReports + reportMetrics)
+
+La machine d'import (session séparée) parse l'email + pièces jointes, en
+extrait les métriques, puis pousse un reporting **structuré** vers Albo OS.
+Flux : upload des fichiers via `POST /reports/upload-url` (HMAC) →
+`POST /reports/ingest` (HMAC) → `reports:ingestReport`. Prérequis :
+`REPORTS_WEBHOOK_SECRET` posé ; orgs `calte`/`albo` + sociétés portfolio
+seedées. Contrat d'API + conventions (cents/bps) : `KNOWN_ISSUES.md`
+« Ingestion reporting ».
+
+| #   | Étape                                                                              | Résultat attendu                                                                                                          |
+| --- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| RP1 | `POST /reports/ingest` signature falsifiée **ou** `X-Albo-Timestamp` vieux >5 min  | `401`, rien écrit (cf. S5)                                                                                               |
+| RP2 | Ingestion avec `companyDomain`/`companyName` matchant une société de l'org         | `companyReports` `resolutionStatus='resolved'`, `companyId` rempli ; une ligne `reportMetrics` par métrique (companyId miroir) |
+| RP3 | Ingestion sans indice résoluble                                                    | Reporting `resolutionStatus='unresolved'`, `companyId` null ; visible dans `reports:listUnresolved`                     |
+| RP4 | Rejouer le même payload (même `report.emailMessageId`)                             | Aucun doublon ; réponse `{ duplicate: true }`, le reporting existant est renvoyé                                         |
+| RP5 | `reports:assignCompany` sur un reporting `unresolved`                              | `resolutionStatus='resolved'` + `companyId` posé ; les `reportMetrics` du reporting héritent du `companyId`              |
+| RP6 | `reports:get` sur un reporting                                                     | Renvoie l'enveloppe + métriques + URLs de téléchargement des fichiers                                                    |
 
 ## Émission Powens (bouton « Connecter une banque » → Webview)
 

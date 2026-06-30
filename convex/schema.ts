@@ -181,6 +181,53 @@ const forecastEntryStatus = v.union(
 // (deriveFromDeals, deriveFromPipeline Attio).
 const forecastSourceType = v.union(v.literal('manual'), v.literal('derived'))
 
+// ─── Reporting ingestion enums (companyReports / reportMetrics) ─────────────
+
+// Cadence of an investor update. `other` = unknown / non-periodic.
+export const reportType = v.union(
+  v.literal('monthly'),
+  v.literal('bimonthly'),
+  v.literal('quarterly'),
+  v.literal('semi_annual'),
+  v.literal('annual'),
+  v.literal('other'),
+)
+
+// Where the report entered Albo OS. `email` = pushed by the ingestion
+// pipeline (the "machine"), `upload` = manual, `api` = any other caller.
+export const reportSource = v.union(
+  v.literal('email'),
+  v.literal('upload'),
+  v.literal('api'),
+)
+
+// Company-resolution lifecycle. `unresolved` rows wait for manual triage
+// (assignCompany); `ignored` = explicitly discarded (spam, off-topic).
+export const reportResolutionStatus = v.union(
+  v.literal('resolved'),
+  v.literal('unresolved'),
+  v.literal('ignored'),
+)
+
+// Role of an embedded file inside a report.
+export const reportFileType = v.union(
+  v.literal('report'), // the report document itself (PDF/Excel/Notion export)
+  v.literal('inline_image'), // image inlined in the email body
+  v.literal('attachment'), // any other attached file
+)
+
+// Shape of an extracted metric value. Drives display formatting only — the
+// numeric `value` follows Albo OS conventions (currency in EUR cents,
+// percentage in basis points; cf. companyReports / reportMetrics comments).
+export const reportMetricValueType = v.union(
+  v.literal('currency'),
+  v.literal('percentage'),
+  v.literal('number'),
+  v.literal('months'),
+  v.literal('ratio'),
+  v.literal('text'),
+)
+
 // ─── Schema ───────────────────────────────────────────────────────────────
 
 export default defineSchema({
@@ -627,6 +674,115 @@ export default defineSchema({
   })
     .index('by_company', ['companyId', 'uploadedAt'])
     .index('by_org', ['orgId']),
+
+  // ─── Reporting ingestion (inbound portfolio reports) ──────────────────────
+
+  /**
+   * companyReports — one investor/portfolio report (the unit pushed by the
+   * ingestion pipeline once a report email is parsed). Holds the report
+   * envelope: identity (period/type/date), the analysed narrative
+   * (`headline` / `keyHighlights`), the raw extracted text (`rawContent` /
+   * `cleanedContent`, kept so a later re-analysis can replay), the email
+   * provenance (dedup via `emailMessageId`), and the embedded files.
+   *
+   * `companyId` is optional: a report whose target company could not be
+   * resolved at ingestion lands with `resolutionStatus: 'unresolved'` and
+   * waits for manual triage (convex/reports.ts:assignCompany). The extracted
+   * metrics live in `reportMetrics` (one row per metric).
+   *
+   * Idempotency: enforced in the mutation on `(orgId, emailMessageId)` — a
+   * re-pushed email returns the existing row instead of duplicating it.
+   */
+  companyReports: defineTable({
+    orgId: v.id('organizations'),
+    companyId: v.optional(v.id('companies')), // null while unresolved
+    resolutionStatus: reportResolutionStatus,
+
+    // Resolution hints — kept verbatim so unresolved rows can be retriaged.
+    companyHintName: v.optional(v.string()),
+    companyHintDomain: v.optional(v.string()),
+
+    // Report identity
+    reportType: v.optional(reportType),
+    reportPeriod: v.optional(v.string()), // human label, e.g. "January 2026"
+    periodStart: v.optional(v.number()), // ms epoch
+    periodEnd: v.optional(v.number()), // ms epoch — primary sort key
+    reportDate: v.optional(v.number()), // ms epoch — date carried by the report
+
+    // Analysed narrative (produced by the pipeline)
+    headline: v.optional(v.string()),
+    keyHighlights: v.optional(v.array(v.string())),
+
+    // Raw content, kept for audit / re-analysis
+    rawContent: v.optional(v.string()), // combined extracted text (OCR + body)
+    cleanedContent: v.optional(v.string()), // normalized body
+
+    // Email provenance
+    emailSubject: v.optional(v.string()),
+    emailFrom: v.optional(v.string()),
+    emailDate: v.optional(v.number()), // ms epoch
+    emailMessageId: v.optional(v.string()), // dedup key (RFC 5322 Message-ID)
+    sourceThreadId: v.optional(v.string()),
+
+    // Embedded files (uploaded to Convex storage before ingestion). A report
+    // owns its files (≈ Airtable-free `report_files`); dropping the report
+    // drops them, no orphan in `documents`.
+    files: v.optional(
+      v.array(
+        v.object({
+          storageId: v.id('_storage'),
+          fileName: v.string(),
+          mimeType: v.optional(v.string()),
+          size: v.optional(v.number()),
+          fileType: reportFileType,
+          sourceUrl: v.optional(v.string()), // Notion/GDrive/DocSend origin
+        }),
+      ),
+    ),
+
+    // Lifecycle
+    source: reportSource,
+    pipelineVersion: v.optional(v.string()), // pipeline build that produced it
+    ingestedAt: v.number(), // ms epoch
+    archivedAt: v.optional(v.number()),
+  })
+    .index('by_org', ['orgId'])
+    .index('by_company', ['companyId', 'periodEnd'])
+    .index('by_org_status', ['orgId', 'resolutionStatus'])
+    .index('by_email_message_id', ['orgId', 'emailMessageId']),
+
+  /**
+   * reportMetrics — normalized metrics extracted from a report (≈ albo's
+   * `portfolio_company_metrics`). One row = one metric value for the report's
+   * period. `companyId` mirrors the parent report (backfilled on triage) so
+   * a company's metric time-series is queryable without joining through
+   * `companyReports`.
+   *
+   * Value conventions (Albo OS, enforced by the ingest mutation's contract):
+   * - `valueType: 'currency'` → `value` in EUR cents (100000 = 1 000 €).
+   * - `valueType: 'percentage'` → `value` in basis points (1100 = 11 %).
+   * - `'number' | 'months' | 'ratio'` → `value` as-is.
+   * - `'text'` → free text in `textValue`, `value` absent.
+   */
+  reportMetrics: defineTable({
+    orgId: v.id('organizations'),
+    reportId: v.id('companyReports'),
+    companyId: v.optional(v.id('companies')), // mirrors the report; null while unresolved
+
+    metricKey: v.string(), // raw key as extracted
+    canonicalKey: v.string(), // alias-resolved key (stable across reports)
+    category: v.optional(v.string()), // revenue|cash|profitability|growth|clients|team|fund|other
+    valueType: reportMetricValueType,
+    value: v.optional(v.number()), // absent for valueType 'text'
+    textValue: v.optional(v.string()), // set only for valueType 'text'
+    unit: v.optional(v.string()), // "EUR"/"USD" for currency; informational
+
+    reportPeriod: v.optional(v.string()), // label, e.g. "January 2026"
+    periodSortDate: v.optional(v.number()), // ms epoch — time-series ordering
+  })
+    .index('by_report', ['reportId'])
+    .index('by_org', ['orgId'])
+    .index('by_company_canonical', ['companyId', 'canonicalKey', 'periodSortDate']),
 
   // ─── Liabilities (equity + shareholder current accounts) ──────────────────
 

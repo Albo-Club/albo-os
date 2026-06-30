@@ -9,6 +9,7 @@ import {
   protectedResourceMetadata,
 } from './mcp/server'
 import { powensWebhook } from './powens'
+import { reportsIngest, reportsUploadUrl } from './reports'
 import { telegramWebhook } from './telegram'
 
 const http = httpRouter()
@@ -45,6 +46,22 @@ http.route({
   path: '/telegram/webhook',
   method: 'POST',
   handler: telegramWebhook,
+})
+
+// Reporting ingestion (the external pipeline pushes parsed portfolio
+// reports) — HMAC-SHA256 (hex) over `${X-Albo-Timestamp}.${rawBody}`
+// verified in the handlers. `/reports/upload-url` hands out a Convex storage
+// upload URL; `/reports/ingest` stores the report envelope + metrics.
+// Cf. convex/reports.ts.
+http.route({
+  path: '/reports/upload-url',
+  method: 'POST',
+  handler: reportsUploadUrl,
+})
+http.route({
+  path: '/reports/ingest',
+  method: 'POST',
+  handler: reportsIngest,
 })
 
 // Remote MCP server (claude.ai custom connector) — OAuth bearer verified in

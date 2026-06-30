@@ -23,6 +23,34 @@ bas de page.
 
 ---
 
+## v1.51.3 — 30/06/2026 à 18:30 — Préparation de l'ingestion des reportings
+
+Le back est désormais prêt à **recevoir les reportings** des sociétés du
+portefeuille. Une fois un reporting reçu et analysé par la machine d'import,
+Albo OS le stocke (enveloppe, métriques, pièces jointes), le rattache
+automatiquement à la bonne société quand c'est possible, et met de côté pour
+tri manuel ceux qu'il n'a pas su rattacher. Rien de visible dans l'app à ce
+stade : c'est la plomberie qui prépare l'arrivée des reportings.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau schéma (`convex/schema.ts`) : tables `companyReports` (enveloppe
+>   du reporting — période/type, narratif headline/highlights, contenu brut
+>   conservé pour rejeu, provenance email + dédup `emailMessageId`, fichiers
+>   embarqués) et `reportMetrics` (métriques normalisées,
+>   `canonicalKey`/`category`/`valueType`).
+> - `convex/reports.ts` : mutation interne `ingestReport` (résolution org par
+>   slug + société par id/attio/domaine/nom, idempotence
+>   `(orgId, emailMessageId)`), routes HTTP `/reports/upload-url` et
+>   `/reports/ingest` (HMAC-SHA256 hex sur `${timestamp}.${body}`, headers
+>   `X-Albo-Signature` + `X-Albo-Timestamp`, fenêtre anti-rejeu 5 min, secret
+>   `REPORTS_WEBHOOK_SECRET`). Reads `listByCompany`/`get`/`listUnresolved` +
+>   triage `assignCompany`/`ignoreReport`.
+> - Les fichiers vivent sur le reporting (façon `report_files`), pas dans
+>   `documents` ni `kpiSnapshots` : ingestion auto-contenue et réversible.
+>   Contrat d'API pour la machine d'import (conventions cents/bps, upload,
+>   idempotence) : `KNOWN_ISSUES.md` « Ingestion reporting ».
+
 ## v1.51.2 — 30/06/2026 à 18:00 — Favicon Albo agrandi dans l'onglet
 
 Le **« a » d'Albo** occupe désormais une plus grande part de l'icône :

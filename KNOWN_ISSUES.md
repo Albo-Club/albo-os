@@ -1744,3 +1744,48 @@ de « ne touche pas ». Et le validateur `v.optional(v.number())` **refuse**
 C'est exactement le même mécanisme que le clear de `name` (chaîne vide →
 `undefined`), généralisé aux champs numériques nullable. Tout nouveau champ
 lifecycle « réversible » doit suivre ce pattern, pas réinventer un sentinel.
+
+## Ingestion reporting (contrat machine → Albo OS)
+
+Albo OS est la **destination** des reportings, pas l'extracteur : tout le
+parsing (email, OCR PDF/Excel/Notion, analyse LLM, extraction de métriques)
+vit dans une pipeline externe (« la machine », session séparée). Albo OS ne
+fait que **stocker + dédupliquer + résoudre la société** (`convex/reports.ts`,
+tables `companyReports` + `reportMetrics`). Le contrat que la machine doit
+respecter — sinon données fausses ou silencieusement perdues :
+
+- **Auth webhook** : HMAC-SHA256 (hex) sur `${X-Albo-Timestamp}.${rawBody}`,
+  headers `X-Albo-Signature` + `X-Albo-Timestamp` (ms epoch). Fenêtre
+  anti-rejeu de 5 min (timestamp trop vieux → `401`). Secret
+  `REPORTS_WEBHOOK_SECRET`. Vérifié via `crypto.subtle.verify` — le runtime
+  Convex n'expose pas `timingSafeEqual` (même contrainte que Powens/Attio).
+- **Upload des fichiers d'abord** : `POST /reports/upload-url` (corps vide,
+  signé) renvoie une URL d'upload Convex ; la machine y POST chaque fichier,
+  récupère un `storageId`, puis le passe dans `files[]` du payload d'ingest.
+  Cap 20 Mo/fichier (mêmes garde-fous que `documents`). On ne reçoit jamais
+  les octets dans le JSON d'ingest.
+- **Conventions de valeurs des métriques** (sinon faux à l'affichage) :
+  `valueType:'currency'` → `value` en **cents EUR** ; `'percentage'` →
+  **basis points** (1100 = 11 %) ; `'number'|'months'|'ratio'` → brut ;
+  `'text'` → `textValue` (et `value` absent). Aligné sur les conventions
+  Albo OS (cf. CLAUDE.md § Conventions de données) — la machine produit
+  aujourd'hui du décimal/brut côté albo, c'est à elle de convertir avant
+  d'envoyer.
+- **Idempotence** : clé `(orgId, emailMessageId)`. Un même email re-poussé
+  renvoie le reporting existant (`{ duplicate: true }`) sans réinsérer ni
+  re-créer les métriques. Toujours fournir `report.emailMessageId` pour en
+  bénéficier ; sans lui, chaque rejeu crée un doublon.
+- **Résolution société** : payload = `orgSlug` (obligatoire) + indices
+  (`companyId` / `attioCompanyId` / `companyDomain` / `companyName`, le plus
+  fort gagne, domaine/nom normalisés). Non résolu → reporting `unresolved`,
+  file de tri `reports:listUnresolved` → `reports:assignCompany` (qui
+  rétro-remplit le `companyId` sur les `reportMetrics`).
+
+**Choix de design** : les fichiers vivent **sur le reporting**
+(`companyReports.files[]`, façon `report_files` d'albo), pas dans `documents`
+ni `kpiSnapshots`. L'ingestion est ainsi auto-contenue et réversible (drop des
+deux tables = zéro orphelin). La **promotion** des `reportMetrics` vers
+`kpiSnapshots` (les KPIs curés du dashboard) est un choix **ultérieur**
+délibéré, pas automatique : les métriques extraites sont brutes/bruitées
+(~20+ clés par reporting), on ne pollue pas l'historique KPI curé sans
+décision explicite.

@@ -60,6 +60,7 @@ import type * as powens from "../powens.js";
 import type * as projections from "../projections.js";
 import type * as publicConfig from "../publicConfig.js";
 import type * as rateLimiters from "../rateLimiters.js";
+import type * as reports from "../reports.js";
 import type * as seed from "../seed.js";
 import type * as telegram from "../telegram.js";
 import type * as transactions from "../transactions.js";
@@ -125,6 +126,7 @@ declare const fullApi: ApiFromModules<{
   projections: typeof projections;
   publicConfig: typeof publicConfig;
   rateLimiters: typeof rateLimiters;
+  reports: typeof reports;
   seed: typeof seed;
   telegram: typeof telegram;
   transactions: typeof transactions;
