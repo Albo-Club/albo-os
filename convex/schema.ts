@@ -624,8 +624,105 @@ export default defineSchema({
     source: v.union(v.literal('upload'), v.literal('email')),
     uploadedBy: v.optional(v.id('users')),
     uploadedAt: v.number(),
+    // ── Email ingestion (AgentMail report pipeline) ───────────────────────
+    // Set when the file arrives as an email attachment. `reportId` links the
+    // file to its `companyReports` row; `extractedText` holds the OCR/parsed
+    // text (deferred — null until OCR is wired); `inline` flags inline images
+    // (cid:) which are hidden from the Docs tab. All optional → manual uploads
+    // leave them unset.
+    reportId: v.optional(v.id('companyReports')),
+    extractedText: v.optional(v.string()),
+    inline: v.optional(v.boolean()),
   })
     .index('by_company', ['companyId', 'uploadedAt'])
+    .index('by_org', ['orgId'])
+    .index('by_report', ['reportId']),
+
+  /**
+   * companyReports — investor updates ingested by email (AgentMail report
+   * pipeline). One row per report. The `orgId` is DERIVED from the matched
+   * company (single shared inbox, no per-org inbox). Extracted metrics are a
+   * raw JSON snapshot on `metrics` (granular KPI tracking is deferred).
+   *
+   * Dedup: `agentmailMessageId` (webhook fired twice) and `companyId +
+   * reportPeriod` (re-import of the same period → update in place).
+   */
+  companyReports: defineTable({
+    orgId: v.id('organizations'),
+    companyId: v.id('companies'),
+
+    // Provenance
+    source: v.union(v.literal('email'), v.literal('upload')),
+    agentmailInboxId: v.optional(v.string()),
+    agentmailMessageId: v.optional(v.string()), // dedup key
+    agentmailThreadId: v.optional(v.string()),
+    fromEmail: v.optional(v.string()),
+    subject: v.optional(v.string()),
+    emailDate: v.optional(v.number()), // ms epoch
+
+    // Analysis — extraction brain (Cerveau 1)
+    title: v.optional(v.string()),
+    headline: v.optional(v.string()),
+    keyHighlights: v.optional(v.array(v.string())),
+    reportPeriod: v.optional(v.string()), // "January 2026", "Q4 2025"
+    periodSortDate: v.optional(v.number()), // ms epoch (sorting)
+    reportType: v.optional(
+      v.union(
+        v.literal('monthly'),
+        v.literal('bimonthly'),
+        v.literal('quarterly'),
+        v.literal('semi-annual'),
+        v.literal('annual'),
+      ),
+    ),
+    reportAbout: v.optional(
+      v.union(
+        v.literal('company_self'),
+        v.literal('fund_portfolio_company'),
+      ),
+    ),
+    metrics: v.optional(v.any()), // raw snapshot { key: number }
+
+    // Content (input for the synthesis brain)
+    rawContent: v.optional(v.string()), // all extracted text combined
+    cleanedHtml: v.optional(v.string()), // email HTML (inline imgs rewritten)
+
+    // Pipeline state
+    status: v.union(
+      v.literal('processing'),
+      v.literal('completed'),
+      v.literal('failed'),
+    ),
+    error: v.optional(v.string()),
+    pipelineVersion: v.optional(v.string()),
+    processedAt: v.optional(v.number()),
+  })
+    .index('by_company', ['companyId', 'periodSortDate'])
+    .index('by_org', ['orgId'])
+    .index('by_message_id', ['agentmailMessageId'])
+    .index('by_company_period', ['companyId', 'reportPeriod']),
+
+  /**
+   * companyIntelligence — one row per company holding the AI synthesis
+   * (Cerveau 3) output. Updated after each report ingestion. Equivalent of
+   * the `ai_analysis*` fields on Albo's `portfolio_companies`.
+   */
+  companyIntelligence: defineTable({
+    orgId: v.id('organizations'),
+    companyId: v.id('companies'),
+    aiAnalysis: v.optional(v.any()), // { executive_summary, health_score, top_insights, alerts }
+    aiAnalysisStatus: v.optional(
+      v.union(
+        v.literal('processing'),
+        v.literal('completed'),
+        v.literal('error'),
+        v.literal('no_data'),
+      ),
+    ),
+    aiAnalysisUpdatedAt: v.optional(v.number()),
+    latestReportId: v.optional(v.id('companyReports')),
+  })
+    .index('by_company', ['companyId'])
     .index('by_org', ['orgId']),
 
   // ─── Liabilities (equity + shareholder current accounts) ──────────────────
