@@ -35,3 +35,28 @@ jobs:
           node-version: 22
       # exit 2 si une skill upstream a dérivé de skills-lock.json
       - run: node scripts/sync-skills.mjs --check
+
+  changelog:
+    # Changelog entry mandatory on every PR (CLAUDE.md § Pre-PR doc audit, q.5).
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require a new changelog entry at the top
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          file=CHANGELOG_PRODUIT.md
+          # The newest versioned entry (top `## vX.Y.Z`) must be new in this PR.
+          head_top=$(grep -m1 -E '^## v[0-9]+\.[0-9]+\.[0-9]+ ' "$file" || true)
+          if [ -z "$head_top" ]; then
+            echo "::error file=$file::No versioned entry (## vX.Y.Z) found in $file."
+            exit 1
+          fi
+          if git show "$BASE_SHA:$file" 2>/dev/null | grep -Fxq "$head_top"; then
+            echo "::error file=$file::This PR adds no new changelog entry. Add a '## vX.Y.Z — JJ/MM/AAAA à HH:MM — titre' line at the top of $file (CLAUDE.md § Pre-PR doc audit, q.5)."
+            exit 1
+          fi
+          echo "New top changelog entry: $head_top"

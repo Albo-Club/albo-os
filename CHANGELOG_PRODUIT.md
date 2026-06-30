@@ -23,6 +23,23 @@ bas de page.
 
 ---
 
+## v1.53.1 — 30/06/2026 à 20:15 — Garde-fou : changelog obligatoire en CI
+
+Pour éviter qu'une évolution n'arrive en ligne sans être documentée dans
+« Nouveautés » (ce qui était arrivé pour le reporting par email), la
+chaîne d'intégration **refuse désormais toute pull request qui n'ajoute pas
+de nouvelle entrée de changelog**. Aucun changement visible côté application.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau job `changelog` dans `.github/workflows/ci.yml` (sur `pull_request`
+>   uniquement) : échoue si l'entrée `## vX.Y.Z` en tête de
+>   `CHANGELOG_PRODUIT.md` est déjà présente sur la base de la PR (donc aucune
+>   nouvelle entrée ajoutée). Compare via `git show $BASE_SHA:…` + `grep -Fxq`,
+>   `fetch-depth: 0` pour disposer de l'historique.
+> - Matérialise la règle `CLAUDE.md` § « Pre-PR doc audit » (question 5),
+>   jusqu'ici uniquement sur la confiance.
+
 ## v1.53.0 — 30/06/2026 à 19:52 — Reporting : suivi des reports et synthèse IA sur la fiche
 
 La fiche d'une participation gagne une zone **« Reporting »** organisée en
