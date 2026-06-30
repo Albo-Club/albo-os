@@ -238,6 +238,7 @@ export function RoyaltiesPanel({
     [incoming],
   )
   const reached = floorAmount != null && realizedCumul >= floorAmount
+  const capReached = capAmount != null && realizedCumul >= capAmount
 
   // Position (0–100%) of an amount on the 0 → cap bar scale.
   const barPct = (amount: number) =>
@@ -348,12 +349,16 @@ export function RoyaltiesPanel({
                 reached ? 'text-positive font-medium' : 'text-muted-foreground',
               )}
             >
-              {fmtEur(realizedCumul)}
+              {fmtEur(realizedCumul)}{' '}
+              <span className="text-muted-foreground text-xs font-normal">
+                {t('fiche.royalty.htTag')}
+              </span>
             </span>
           </div>
 
-          {/* Bar: 0 → floor → cap scale, two zones, markers under their traits,
-              floating cursor label for the realized cumulative. */}
+          {/* Bar: 0 → floor → cap scale, two background zones, explicit floor
+              and cap traits with a label each, floating cursor label for the
+              realized cumulative. */}
           <div className="relative pt-6 pb-10">
             <div
               className="absolute top-0 -translate-x-1/2 text-xs font-medium tabular-nums whitespace-nowrap"
@@ -374,11 +379,16 @@ export function RoyaltiesPanel({
                 style={{ left: `${barPct(floorAmount)}%` }}
                 aria-hidden
               />
-              {/* Achieved fill (turns positive once the floor is reached). */}
+              {/* Achieved fill, three zones: before floor (primary), floor →
+                  cap (positive), cap reached (chart-5 — the royalties accent). */}
               <div
                 className={cn(
                   'absolute inset-y-0 left-0 rounded-full transition-all',
-                  reached ? 'bg-positive' : 'bg-primary',
+                  capReached
+                    ? 'bg-chart-5'
+                    : reached
+                      ? 'bg-positive'
+                      : 'bg-primary',
                 )}
                 style={{ width: `${barPct(realizedCumul)}%` }}
               />
@@ -389,6 +399,14 @@ export function RoyaltiesPanel({
                 aria-hidden
               />
             </div>
+            {/* Cap trait — explicit hard-ceiling marker, drawn over the track
+                edge (outside the clipped, rounded track so the corner doesn't
+                hide it). Marked stronger than the floor trait. `top-6` aligns
+                with the track under the container's `pt-6`. */}
+            <div
+              className="bg-foreground absolute top-6 right-0 h-3 w-0.5"
+              aria-hidden
+            />
             {/* Marker labels aligned under their trait (floor centered, cap at
                 the right edge). */}
             <div className="text-muted-foreground absolute inset-x-0 bottom-0 text-xs tabular-nums">
@@ -436,11 +454,20 @@ export function RoyaltiesPanel({
                 })}
               </span>
             </div>
-            {tri != null && (
-              <div className="flex flex-col gap-0.5">
-                <span className="text-muted-foreground text-xs">
-                  {t('fiche.royalty.triLabel')}
+            {/* TRI: hidden while the capital isn't recovered (CoC < 1) — the
+                XIRR is mathematically correct there but hyper-volatile and
+                misleading, so we show « n/a » instead. The computation stays,
+                it surfaces once CoC ≥ 1. Falls back to « — » on a null XIRR
+                (no convergence / no opposing flow). */}
+            <div className="flex flex-col gap-0.5">
+              <span className="text-muted-foreground text-xs">
+                {t('fiche.royalty.triLabel')}
+              </span>
+              {coc != null && coc < 1 ? (
+                <span className="text-muted-foreground text-sm tabular-nums">
+                  {t('fiche.royalty.triNotRecovered')}
                 </span>
+              ) : tri != null ? (
                 <span
                   className={cn(
                     'text-sm font-medium tabular-nums',
@@ -449,13 +476,12 @@ export function RoyaltiesPanel({
                 >
                   {fmtTriPct(tri)}
                 </span>
-                {tri < 0 && (
-                  <span className="text-muted-foreground text-xs">
-                    {t('fiche.royalty.triRecovering')}
-                  </span>
-                )}
-              </div>
-            )}
+              ) : (
+                <span className="text-muted-foreground text-sm tabular-nums">
+                  —
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}

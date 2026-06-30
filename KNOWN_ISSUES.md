@@ -1651,8 +1651,13 @@ dérivé). `paidActual` (décaissé réel) est **calculé** depuis les transacti
   piège n°1.
 - TRI via `src/lib/xirr.ts` (Newton-Raphson + repli bissection, actual/365).
   Flux : un sortant `-capitalInvested` à `investmentDate` + chaque entrant
-  `amount/1.2` à sa `transactionDate`. Négatif tant que le capital n'est pas
-  récupéré — correct, affiché tel quel.
+  `amount/1.2` à sa `transactionDate`. Le `r` renvoyé est **déjà annualisé**
+  (exposant en **années**, pas en jours) — ne **jamais** le ré-annualiser.
+  Mathématiquement négatif tant que le capital n'est pas récupéré, mais
+  hyper-volatile dans cette zone : l'UI **masque** alors le chiffre et affiche
+  « n/a — capital non recouvré » (`triNotRecovered`) **tant que CoC < 1**. Le
+  calcul reste, il refait surface dès CoC ≥ 1. `xirr()` renvoie `null` (pas de
+  changement de signe / pas de convergence) → fallback « — ».
 - **À raffiner plus tard.** Ces indicateurs somment **toutes** les transactions
   entrantes du deal. Quand le module trésorerie introduira la distinction
   transactions **prévisionnelles** vs **réalisées**, ils devront ne compter que
