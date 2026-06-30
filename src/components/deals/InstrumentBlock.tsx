@@ -60,6 +60,7 @@ export const FIELD_FORMAT: Record<string, FieldFormat> = {
   grantDate: 'date',
   exerciseDeadlineDate: 'date',
   investmentDate: 'date',
+  royaltyStartDate: 'date',
   endDate: 'date',
   // Amounts (cents)
   paidAmount: 'eur',

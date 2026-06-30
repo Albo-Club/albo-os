@@ -55,6 +55,7 @@ const dealFields = {
   // Generic royalty contract parameters (cf. schema.ts). Floor/cap are
   // multiples of capitalInvested; the euro amount is derived at display.
   investmentDate: v.optional(v.number()), // ms
+  royaltyStartDate: v.optional(v.number()), // ms — informational only
   floorMultiple: v.optional(v.number()), // decimal
   capMultiple: v.optional(v.number()), // decimal
   endDate: v.optional(v.number()), // ms

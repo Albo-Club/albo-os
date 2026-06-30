@@ -23,6 +23,28 @@ bas de page.
 
 ---
 
+## v1.49.1 — 30/06/2026 à 12:00 — Royalties : date de début des royalties
+
+Les paramètres d'un investissement à royalties accueillent un nouveau champ
+optionnel **« Début des royalties »**. Purement informatif, il se saisit dans
+la fenêtre d'édition (sélecteur de date) et s'affiche dans le bloc paramètres,
+entre la date d'investissement et la date de fin. Laissé vide, il affiche
+« — ». Il ne modifie **aucun calcul** (TRI, multiple, barre de progression
+restent inchangés).
+
+> **🔧 Notes techniques**
+>
+> - Nouveau champ `royaltyStartDate` (`v.optional(v.number())`, ms epoch)
+>   ajouté sur le modèle exact de `investmentDate`/`endDate`, sur les cinq
+>   points de la chaîne : groupe royalty de `convex/schema.ts`, `dealFields`
+>   dans `convex/deals.ts` (patchable via `deals.update`), `ROYALTY_FIELDS`
+>   dans `convex/lib/instrumentMapping.ts`, `FIELD_FORMAT` (`'date'`) dans
+>   `InstrumentBlock.tsx`, et le tableau `params` de `RoyaltiesPanel.tsx`
+>   (`fmtDate`). Clé i18n `field.royaltyStartDate` (EN/FR). Découvert
+>   automatiquement par `EditDealDialog` (date picker via le format `date`).
+> - Strictement informatif : absent de toute formule (TRI/CoC/barre). Pas de
+>   migration, pas de donnée dérivée.
+
 ## v1.49.0 — 30/06/2026 à 11:45 — Royalties : barre plus lisible et distinction « rien saisi » / « zéro »
 
 Sur la fiche d'un investissement à royalties, la **barre de progression** gagne
@@ -53,7 +75,6 @@ cellule repasse à « — »), alors que saisir **« 0 »** conserve un point à
 >   via `removeBpPoint` / `removeActual` (filter sans réinsertion, patch
 >   `deals.update`). L'affichage `value == null ? '—' : fmtEur(value)` distingue
 >   déjà point absent / point à 0 — seul le comportement d'édition changeait.
-
 ## v1.48.1 — 30/06/2026 à 10:30 — Royalties : TRI masqué tant que le capital n'est pas recouvré + barre plus lisible
 
 Sur la fiche d'un investissement à royalties, le **TRI annualisé** ne s'affiche

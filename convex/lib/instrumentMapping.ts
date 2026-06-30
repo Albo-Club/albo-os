@@ -213,6 +213,7 @@ const ROYALTY_FIELDS = [
   'depreciationRate',
   'royaltyRate',
   'investmentDate',
+  'royaltyStartDate',
   'floorMultiple',
   'capMultiple',
   'endDate',

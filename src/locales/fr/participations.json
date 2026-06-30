@@ -179,6 +179,7 @@
     "depreciationRate": "Dépréciation",
     "royaltyRate": "Taux de royalties",
     "investmentDate": "Date d'investissement",
+    "royaltyStartDate": "Début des royalties",
     "floorMultiple": "Plancher",
     "capMultiple": "Plafond",
     "endDate": "Date de fin",

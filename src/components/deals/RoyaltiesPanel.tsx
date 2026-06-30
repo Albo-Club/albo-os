@@ -211,6 +211,7 @@ export function RoyaltiesPanel({
     { key: 'depreciationRate', value: fmtPct(deal.depreciationRate) },
     { key: 'royaltyRate', value: fmtPct(deal.royaltyRate) },
     { key: 'investmentDate', value: fmtDate(deal.investmentDate) },
+    { key: 'royaltyStartDate', value: fmtDate(deal.royaltyStartDate) },
     {
       key: 'floorMultiple',
       value: fmtMultipleAmount(deal.floorMultiple, floorAmount),
