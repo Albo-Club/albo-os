@@ -126,6 +126,24 @@
     "fully_exited": "Exited",
     "written_off": "Written off"
   },
+  "exitBadge": {
+    "win": "Exit win",
+    "lost": "Exit lost",
+    "exited": "Exited"
+  },
+  "exit": {
+    "action": "Mark as exited",
+    "manage": "Manage exit",
+    "title": "Deal exit",
+    "description": "Record the exit of this holding: status, date and proceeds.",
+    "statusLabel": "Exit type",
+    "dateLabel": "Exit date",
+    "proceedsLabel": "Exit proceeds",
+    "proceedsHint": "Pre-filled with the total incoming flows. Freely editable.",
+    "cancelExit": "Cancel exit",
+    "saved": "Exit recorded",
+    "reverted": "Exit cancelled, deal back to active"
+  },
   "instrument": {
     "share": "Shares",
     "spv_share": "Equity via SPV",

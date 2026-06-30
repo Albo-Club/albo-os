@@ -5,6 +5,7 @@ import {
   ChevronsUpDown,
   Eye,
   Info,
+  LogOut,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -34,6 +35,8 @@ import {
   PaginationFooter,
   usePagination,
 } from '~/components/data-table/LocalPagination'
+import { ExitBadge } from '~/components/deals/ExitBadge'
+import { ExitDealDialog } from '~/components/deals/ExitDealDialog'
 import { FundSection } from '~/components/deals/FundSection'
 import {
   FIELD_FORMAT,
@@ -826,6 +829,7 @@ function DealDetail() {
   const { orgSlug, dealId } = Route.useParams()
   const navigate = useNavigate()
   const [editOpen, setEditOpen] = useState(false)
+  const [exitOpen, setExitOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   // Instrument-type preview: local-only, writes nothing (cf. Lot 3). null =
@@ -917,6 +921,7 @@ function DealDetail() {
         <Badge variant={statusVariant(deal.status)}>
           {t(`status.${deal.status}`, { defaultValue: deal.status })}
         </Badge>
+        <ExitBadge deal={deal} transactions={txs} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -932,6 +937,12 @@ function DealDetail() {
             <DropdownMenuItem onSelect={() => setEditOpen(true)}>
               <Pencil className="size-4" />
               {t('common:actions.edit')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setExitOpen(true)}>
+              <LogOut className="size-4" />
+              {deal.status === 'active'
+                ? t('participations:exit.action')
+                : t('participations:exit.manage')}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -1114,6 +1125,14 @@ function DealDetail() {
 
       {editOpen && (
         <EditDealDialog deal={deal} onClose={() => setEditOpen(false)} />
+      )}
+
+      {exitOpen && (
+        <ExitDealDialog
+          deal={deal}
+          received={received}
+          onClose={() => setExitOpen(false)}
+        />
       )}
 
       <Dialog

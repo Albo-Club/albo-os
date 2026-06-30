@@ -66,6 +66,7 @@ const dealFields = {
   signedDate: v.optional(v.number()),
   closingDate: v.optional(v.number()),
   exitedDate: v.optional(v.number()),
+  exitProceeds: v.optional(v.number()), // cents — sale proceeds (exit)
   attioDealId: v.optional(v.string()),
   notes: v.optional(v.string()),
 
@@ -332,6 +333,10 @@ export const update = mutation({
       instrumentKind: v.optional(instrumentValidator),
       status: v.optional(statusValidator),
       ...dealFields,
+      // Lifecycle fields accept an explicit null to CLEAR them (reversibility
+      // of an exit — Convex can't transmit `undefined` from the client).
+      exitedDate: v.optional(v.union(v.null(), v.number())),
+      exitProceeds: v.optional(v.union(v.null(), v.number())),
     }),
   },
   handler: async (ctx, { id, patch }) => {
@@ -365,8 +370,17 @@ export const update = mutation({
     // the columns it actually writes (cf. KNOWN_ISSUES « Édition manuelle deals »).
     const editedFields = new Set(deal.manuallyEditedFields ?? [])
     for (const key of Object.keys(patch)) editedFields.add(key)
+    // Lifecycle: an explicit null on exitedDate/exitProceeds clears the field
+    // (cancelling an exit). `null ?? undefined` → undefined, which tells
+    // db.patch to drop the column; absent keys are left untouched (so editing
+    // an unrelated field never wipes a recorded exit).
+    const { exitedDate, exitProceeds, ...rest } = patch
     await ctx.db.patch("deals", id, {
-      ...patch,
+      ...rest,
+      ...('exitedDate' in patch ? { exitedDate: exitedDate ?? undefined } : {}),
+      ...('exitProceeds' in patch
+        ? { exitProceeds: exitProceeds ?? undefined }
+        : {}),
       manuallyEditedFields: [...editedFields],
     })
     return id
