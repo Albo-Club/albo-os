@@ -23,6 +23,27 @@ bas de page.
 
 ---
 
+## v1.51.1 — 30/06/2026 à 17:30 — Nouveau favicon Albo
+
+L'onglet du navigateur affiche désormais le **« a » d'Albo** (le logo de
+la marque, repris du site alboteam.com) à la place de l'icône générique du
+template. Les icônes d'écran d'accueil (iOS / Android) et la tuile
+d'application reprennent le même logo.
+
+> **🔧 Notes techniques**
+>
+> - Favicon source récupéré sur `alboteam.com` (site Framer, lien
+>   `rel="icon"`) : le mark « a » de la marque.
+> - Régénération de tous les assets dans `public/` à partir du tracé SVG
+>   officiel recoloré (a noir `#0A0A0A` sur fond crème `#F4F3EF`) :
+>   `favicon.ico` (multi-tailles 16/32/48/64), `favicon.png`,
+>   `favicon-16x16.png`, `favicon-32x32.png` (coins arrondis), plus
+>   `apple-touch-icon.png` (180, carré plein), `android-chrome-192x192.png`
+>   et `android-chrome-512x512.png`.
+> - Aucun changement dans `src/routes/__root.tsx` : les balises `<link>`
+>   pointaient déjà sur ces noms de fichiers. `logo.svg` / `logo-mark.svg`
+>   (logos applicatifs) laissés inchangés.
+
 ## v1.51.0 — 30/06/2026 à 17:00 — Participations : actives en haut, soldées repliées en bas
 
 La liste des participations est désormais scindée en **deux tableaux empilés** :
