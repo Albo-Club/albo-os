@@ -126,6 +126,24 @@
     "fully_exited": "Exité",
     "written_off": "Déprécié"
   },
+  "exitBadge": {
+    "win": "Exit gagnant",
+    "lost": "Exit perdant",
+    "exited": "Sorti"
+  },
+  "exit": {
+    "action": "Marquer comme sorti",
+    "manage": "Gérer la sortie",
+    "title": "Sortie du deal",
+    "description": "Enregistre la sortie de la participation : statut, date et produit de sortie.",
+    "statusLabel": "Type de sortie",
+    "dateLabel": "Date de sortie",
+    "proceedsLabel": "Produit de sortie",
+    "proceedsHint": "Pré-rempli avec le total des flux entrants. Modifiable librement.",
+    "cancelExit": "Annuler la sortie",
+    "saved": "Sortie enregistrée",
+    "reverted": "Sortie annulée, deal repassé en actif"
+  },
   "instrument": {
     "share": "Actions",
     "spv_share": "Equity via SPV",

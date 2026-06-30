@@ -23,6 +23,44 @@ bas de page.
 
 ---
 
+## v1.50.0 — 30/06/2026 à 16:30 — Sortie d'un deal : badge gagnant/perdant et geste dédié
+
+Sur la fiche d'une participation, un nouveau geste **« Marquer comme sorti »**
+(menu en haut à droite) permet d'enregistrer la sortie d'un investissement :
+type de sortie (totale, partielle ou perte totale), date de sortie et produit
+de sortie. Le produit est pré-rempli avec le total des sommes déjà reçues, mais
+reste librement modifiable. La sortie est **réversible** : un bouton
+« Annuler la sortie » repasse le deal en actif et efface les informations de
+sortie.
+
+Une fois le deal sorti, un **badge** apparaît à côté du statut :
+
+- **Exit gagnant** (vert) quand l'argent récupéré dépasse le capital investi,
+- **Exit perdant** (rouge) quand il est inférieur,
+- **Sorti** (neutre) quand le multiple n'est pas calculable (aucun flux), sans
+  rien affirmer sur la performance.
+
+Une participation explicitement **dépréciée** affiche toujours « Exit perdant ».
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `src/lib/dealMetrics.ts` : `dealMoic(deal, transactions)` →
+>   `{ moic, isWin }`. Assiette = Σ flux entrants / Σ flux sortants, les deux
+>   issus des transactions réelles (pas de `exitProceeds`). Dé-TVA ÷1.2 sur les
+>   entrants **uniquement** si `instrumentKind === 'royalty'` ; le capital
+>   (sortants) n'est jamais dé-TVA-é. `moic = null` si Σ sortants = 0.
+> - `src/components/deals/ExitBadge.tsx` : badge à 3 états rendu seulement pour
+>   `status ∈ {fully_exited, written_off}`. `written_off` force « perdant » ;
+>   sinon `isWin` décide (`null` → « Sorti » neutre). RoyaltiesPanel n'est pas
+>   touché (son CoC garde le scalaire `capitalInvested`).
+> - `src/components/deals/ExitDealDialog.tsx` : dialog dédié (select statut,
+>   date, produit pré-rempli depuis `received`), persiste via `deals.update`
+>   existant. Bouton « Annuler la sortie » → `status: 'active'` + clear.
+> - `convex/deals.ts` : ajout de `exitProceeds` à `dealFields` (absent
+>   auparavant) ; dans `update`, `exitedDate`/`exitProceeds` acceptent un `null`
+>   explicite qui efface le champ (Convex ne transmet pas `undefined` côté
+>   client). Greffe UI dans `deals.$dealId.tsx` (badge + entrée de menu).
+
 ## v1.49.2 — 30/06/2026 à 10:51 — Royalties : correction d'affichage de la jauge
 
 Sur la fiche d'un investissement à royalties, l'étiquette flottante des

@@ -1717,3 +1717,30 @@ dérivé). `paidActual` (décaissé réel) est **calculé** depuis les transacti
   des royalties réelles (`totals.actualRoyalty`) à ces deux montants — pur
   positionnement, aucune règle d'achèvement. Édités via le dialog partagé
   (`INSTRUMENT_FIELDS['royalty']` + `FIELD_FORMAT`).
+
+## Effacer un champ optional via `deals.update` (clear vs leave-untouched)
+
+**Le piège.** Pour vider une colonne optional sur un deal (ici `exitedDate` /
+`exitProceeds` quand on annule une sortie), on ne peut PAS s'appuyer sur un
+`undefined` envoyé par le client : la sérialisation Convex **strippe** les
+`undefined` d'un objet d'arguments, donc le handler ne distingue pas « efface »
+de « ne touche pas ». Et le validateur `v.optional(v.number())` **refuse**
+`null`.
+
+**Le pattern retenu** (`convex/deals.ts`, mutation `update`) :
+
+- Côté validateur du patch, élargir les champs concernés à
+  `v.optional(v.union(v.null(), v.number()))` — `null` devient une valeur
+  transmissible et valide.
+- Côté handler, traiter `null` comme un clear : on ne ré-injecte la clé dans le
+  payload `db.patch` que si elle est **présente** dans le patch reçu
+  (`'exitedDate' in patch`), avec `value ?? undefined`. Un `undefined` passé à
+  `db.patch` **supprime** la colonne ; une clé absente laisse le champ
+  intact (éditer un champ sans rapport ne doit jamais effacer une sortie
+  enregistrée).
+- Garder les clés d'origine pour `manuallyEditedFields` (le clear compte comme
+  une édition manuelle, sinon le ré-import Airtable repeuplerait le champ).
+
+C'est exactement le même mécanisme que le clear de `name` (chaîne vide →
+`undefined`), généralisé aux champs numériques nullable. Tout nouveau champ
+lifecycle « réversible » doit suivre ce pattern, pas réinventer un sentinel.
