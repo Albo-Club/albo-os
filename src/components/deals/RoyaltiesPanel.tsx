@@ -64,10 +64,12 @@ const COL_REAL = 'font-medium'
 function EditableCa({
   value,
   onSave,
+  onDelete,
   className,
 }: {
   value: number | undefined
   onSave: (cents: number) => void
+  onDelete: () => void
   className?: string
 }) {
   const { fmtEur } = useFormatters()
@@ -80,8 +82,16 @@ function EditableCa({
   }
 
   function commit() {
-    const cents = parseAmountToCents(draft)
     setEditing(false)
+    // Three cases — never conflate "emptied" with "parse failed":
+    // - emptied (trim === '') → delete the point, cell goes back to "—".
+    // - parsed (0 included) → save (a real 0 stays "0 €", not "—").
+    // - non-empty but unparseable ("abc") → no-op, keep the existing point.
+    if (draft.trim() === '') {
+      if (value != null) onDelete()
+      return
+    }
+    const cents = parseAmountToCents(draft)
     if (cents != null && cents !== value) onSave(cents)
   }
 
@@ -301,6 +311,29 @@ export function RoyaltiesPanel({
     }
   }
 
+  // Remove a point by clearing its cell (filter without re-insertion). The row
+  // survives if the other column still has a point; otherwise the quarter drops
+  // out of the union. Distinct from saving a 0 — only an absent point shows "—".
+  async function removeActual(quarter: string) {
+    const next = (deal.actualPoints ?? []).filter((p) => p.quarter !== quarter)
+    try {
+      await updateDeal({ id: deal._id, patch: { actualPoints: next } })
+      toast.success(t('edit.saved'))
+    } catch {
+      toast.error(t('edit.errors.default'))
+    }
+  }
+
+  async function removeBpPoint(quarter: string) {
+    const next = (deal.bpPoints ?? []).filter((p) => p.quarter !== quarter)
+    try {
+      await updateDeal({ id: deal._id, patch: { bpPoints: next } })
+      toast.success(t('edit.saved'))
+    } catch {
+      toast.error(t('edit.errors.default'))
+    }
+  }
+
   const hasData = rows.length > 0
 
   return (
@@ -343,17 +376,6 @@ export function RoyaltiesPanel({
             <span className="text-sm font-medium">
               {t('fiche.royalty.realizedTitle')}
             </span>
-            <span
-              className={cn(
-                'text-sm tabular-nums',
-                reached ? 'text-positive font-medium' : 'text-muted-foreground',
-              )}
-            >
-              {fmtEur(realizedCumul)}{' '}
-              <span className="text-muted-foreground text-xs font-normal">
-                {t('fiche.royalty.htTag')}
-              </span>
-            </span>
           </div>
 
           {/* Bar: 0 → floor → cap scale, two background zones, explicit floor
@@ -364,7 +386,10 @@ export function RoyaltiesPanel({
               className="absolute top-0 -translate-x-1/2 text-xs font-medium tabular-nums whitespace-nowrap"
               style={{ left: `${barPct(realizedCumul)}%` }}
             >
-              {fmtEur(realizedCumul)}
+              {fmtEur(realizedCumul)}{' '}
+              <span className="text-muted-foreground text-xs font-normal">
+                {t('fiche.royalty.htTag')}
+              </span>
             </div>
             <div className="bg-muted relative h-3 w-full overflow-hidden rounded-full">
               {/* 0 → floor: securing zone. */}
@@ -408,19 +433,32 @@ export function RoyaltiesPanel({
               aria-hidden
             />
             {/* Marker labels aligned under their trait (floor centered, cap at
-                the right edge). */}
+                the right edge). Each carries a discreet "Plancher"/"Plafond"
+                caption stacked above its amount (bottom-anchored so the amount
+                keeps its place and the caption grows upward). */}
             <div className="text-muted-foreground absolute inset-x-0 bottom-0 text-xs tabular-nums">
               <span
                 className={cn(
-                  'absolute -translate-x-1/2 whitespace-nowrap',
+                  'absolute bottom-0 flex -translate-x-1/2 flex-col items-center whitespace-nowrap',
                   reached && 'text-positive',
                 )}
                 style={{ left: `${barPct(floorAmount)}%` }}
               >
-                {fmtEur(floorAmount)} · {fmtMultiple(deal.floorMultiple ?? null)}
+                <span className="text-muted-foreground text-[10px]">
+                  {t('field.floorMultiple')}
+                </span>
+                <span>
+                  {fmtEur(floorAmount)} ·{' '}
+                  {fmtMultiple(deal.floorMultiple ?? null)}
+                </span>
               </span>
-              <span className="absolute right-0 whitespace-nowrap">
-                {fmtEur(capAmount)} · {fmtMultiple(deal.capMultiple ?? null)}
+              <span className="absolute right-0 bottom-0 flex flex-col items-end whitespace-nowrap">
+                <span className="text-muted-foreground text-[10px]">
+                  {t('field.capMultiple')}
+                </span>
+                <span>
+                  {fmtEur(capAmount)} · {fmtMultiple(deal.capMultiple ?? null)}
+                </span>
               </span>
             </div>
           </div>
@@ -570,6 +608,7 @@ export function RoyaltiesPanel({
                   <EditableCa
                     value={r.plannedRevenue}
                     onSave={(c) => void saveBpPoint(r.quarter, c)}
+                    onDelete={() => void removeBpPoint(r.quarter)}
                     className={COL_BP_INITIAL}
                   />
                   <TableCell
@@ -594,6 +633,7 @@ export function RoyaltiesPanel({
                   <EditableCa
                     value={r.actualRevenue}
                     onSave={(c) => void addActual(r.quarter, c)}
+                    onDelete={() => void removeActual(r.quarter)}
                     className={COL_REAL}
                   />
                   <TableCell
