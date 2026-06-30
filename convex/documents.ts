@@ -49,8 +49,11 @@ export const listByCompany = query({
       .order('desc')
       .take(200)
 
+    // Hide inline email images (cid:) — they're analysis artefacts, not docs.
+    const visible = rows.filter((doc) => doc.inline !== true)
+
     return await Promise.all(
-      rows.map(async (doc) => ({
+      visible.map(async (doc) => ({
         _id: doc._id,
         title: doc.title,
         kind: doc.kind,

@@ -1,4 +1,5 @@
 import { httpRouter } from 'convex/server'
+import { agentmailWebhook } from './agentmail'
 import { attioWebhook } from './attioSync'
 import { authComponent, createAuth } from './auth'
 import { streamOverHttp } from './chat'
@@ -45,6 +46,15 @@ http.route({
   path: '/telegram/webhook',
   method: 'POST',
   handler: telegramWebhook,
+})
+
+// AgentMail webhook (message.received) — Svix signature verified in the
+// handler. Configure this URL (…/agentmail/webhook) in the AgentMail console
+// for the report-albo-os@agentmail.to inbox.
+http.route({
+  path: '/agentmail/webhook',
+  method: 'POST',
+  handler: agentmailWebhook,
 })
 
 // Remote MCP server (claude.ai custom connector) — OAuth bearer verified in

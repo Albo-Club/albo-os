@@ -10,7 +10,9 @@
 
 import type * as admin from "../admin.js";
 import type * as agent from "../agent.js";
+import type * as agentmail from "../agentmail.js";
 import type * as agentTools from "../agentTools.js";
+import type * as agentToolsIntelligence from "../agentToolsIntelligence.js";
 import type * as agentToolsForecasts from "../agentToolsForecasts.js";
 import type * as agentToolsLiabilities from "../agentToolsLiabilities.js";
 import type * as agentToolsPointage from "../agentToolsPointage.js";
@@ -38,6 +40,9 @@ import type * as liabilities from "../liabilities.js";
 import type * as lib_agentScope from "../lib/agentScope.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_instructions from "../lib/instructions.js";
+import type * as lib_reportLinks from "../lib/reportLinks.js";
+import type * as lib_reportMatching from "../lib/reportMatching.js";
+import type * as lib_reportPrompts from "../lib/reportPrompts.js";
 import type * as lib_instruments from "../lib/instruments.js";
 import type * as lib_invitations from "../lib/invitations.js";
 import type * as lib_liabilities from "../lib/liabilities.js";
@@ -58,6 +63,9 @@ import type * as notifications from "../notifications.js";
 import type * as organizations from "../organizations.js";
 import type * as powens from "../powens.js";
 import type * as projections from "../projections.js";
+import type * as intelligence from "../intelligence.js";
+import type * as reportAnalysis from "../reportAnalysis.js";
+import type * as reportPipeline from "../reportPipeline.js";
 import type * as publicConfig from "../publicConfig.js";
 import type * as rateLimiters from "../rateLimiters.js";
 import type * as seed from "../seed.js";
@@ -75,7 +83,9 @@ import type {
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   agent: typeof agent;
+  agentmail: typeof agentmail;
   agentTools: typeof agentTools;
+  agentToolsIntelligence: typeof agentToolsIntelligence;
   agentToolsForecasts: typeof agentToolsForecasts;
   agentToolsLiabilities: typeof agentToolsLiabilities;
   agentToolsPointage: typeof agentToolsPointage;
@@ -103,6 +113,9 @@ declare const fullApi: ApiFromModules<{
   "lib/agentScope": typeof lib_agentScope;
   "lib/auth": typeof lib_auth;
   "lib/instructions": typeof lib_instructions;
+  "lib/reportLinks": typeof lib_reportLinks;
+  "lib/reportMatching": typeof lib_reportMatching;
+  "lib/reportPrompts": typeof lib_reportPrompts;
   "lib/instruments": typeof lib_instruments;
   "lib/invitations": typeof lib_invitations;
   "lib/liabilities": typeof lib_liabilities;
@@ -123,6 +136,9 @@ declare const fullApi: ApiFromModules<{
   organizations: typeof organizations;
   powens: typeof powens;
   projections: typeof projections;
+  intelligence: typeof intelligence;
+  reportAnalysis: typeof reportAnalysis;
+  reportPipeline: typeof reportPipeline;
   publicConfig: typeof publicConfig;
   rateLimiters: typeof rateLimiters;
   seed: typeof seed;
