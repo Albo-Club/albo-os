@@ -16,6 +16,7 @@ import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { internalAction, internalMutation, internalQuery } from './_generated/server'
 import { downloadAttachment, getMessage, replyToMessage } from './agentmail'
+import { ocrAttachment } from './lib/ocr'
 import { detectLinks, htmlToText } from './lib/reportLinks'
 import {
   buildBodyMentionText,
@@ -264,7 +265,7 @@ export const run = internalAction({
       return
     }
 
-    // 2. Extract content (text/html only; OCR of attachments deferred)
+    // 2. Email content (text + detected links)
     let text = m.text.trim() || htmlToText(m.html)
     if (!text) {
       const full = await getMessage(m.inboxId, m.messageId)
@@ -275,14 +276,14 @@ export const run = internalAction({
     }
     const links = detectLinks(`${text} ${m.html}`)
     const linkLines = [...links.notion, ...links.googleDrive, ...links.docSend]
-    const rawContent = [
+    const emailContent = [
       text,
       linkLines.length ? `Liens détectés:\n${linkLines.join('\n')}` : '',
     ]
       .filter(Boolean)
       .join('\n\n')
 
-    // 3. Resolve company / org
+    // 3. Resolve company / org (on the email body)
     let company = await ctx.runQuery(internal.reportPipeline.resolveCompanyInternal, {
       fromEmail: m.from,
       subject: m.subject,
@@ -298,17 +299,51 @@ export const run = internalAction({
       return
     }
 
-    // 4. Cerveau 1 — extraction
+    // 4. Download attachments → Convex storage + OCR (PDF/images via Mistral)
+    const files: Array<{
+      storageId: Id<'_storage'>
+      filename: string
+      contentType?: string
+      size?: number
+      inline: boolean
+      extractedText?: string
+    }> = []
+    const ocrParts: Array<string> = []
+    for (const att of m.attachments) {
+      const buf = await downloadAttachment(m.inboxId, m.messageId, att.attachmentId)
+      if (!buf) continue
+      if (buf.byteLength > MAX_FILE_BYTES) {
+        console.warn(`[reportPipeline] skip oversized attachment ${att.filename} (${buf.byteLength}B)`)
+        continue
+      }
+      const storageId = await ctx.storage.store(
+        new Blob([buf], { type: att.contentType ?? 'application/octet-stream' }),
+      )
+      const ocrText = await ocrAttachment(buf, att.filename, att.contentType)
+      if (ocrText) ocrParts.push(`--- ${att.filename} ---\n${ocrText}`)
+      files.push({
+        storageId,
+        filename: att.filename,
+        contentType: att.contentType,
+        size: buf.byteLength,
+        inline: att.inline ?? false,
+        extractedText: ocrText || undefined,
+      })
+    }
+    const ocrContent = ocrParts.join('\n\n')
+
+    // 5. Cerveau 1 — extraction (email body + OCR of attachments)
     const emailDateIso = m.date ? new Date(m.date).toISOString() : new Date(Date.now()).toISOString()
     const analysis = await ctx.runAction(internal.reportAnalysis.analyze, {
-      textContent: rawContent,
+      textContent: emailContent,
+      ocrContent: ocrContent || undefined,
       companyName: company.companyName,
       subject: m.subject,
       fromEmail: m.from,
       emailDate: emailDateIso,
     })
 
-    // 4b. Fund → portfolio company redirect (with a loose name guard)
+    // 5b. Fund → portfolio company redirect (with a loose name guard)
     if (analysis.reportAbout === 'fund_portfolio_company' && analysis.targetCompanyName) {
       const re = await ctx.runQuery(internal.reportPipeline.resolveCompanyInternal, {
         fromEmail: m.from,
@@ -322,34 +357,12 @@ export const run = internalAction({
       }
     }
 
-    // 5. Download attachments → Convex storage (no OCR yet)
-    const files: Array<{
-      storageId: Id<'_storage'>
-      filename: string
-      contentType?: string
-      size?: number
-      inline: boolean
-    }> = []
-    for (const att of m.attachments) {
-      const buf = await downloadAttachment(m.inboxId, m.messageId, att.attachmentId)
-      if (!buf) continue
-      if (buf.byteLength > MAX_FILE_BYTES) {
-        console.warn(`[reportPipeline] skip oversized attachment ${att.filename} (${buf.byteLength}B)`)
-        continue
-      }
-      const storageId = await ctx.storage.store(
-        new Blob([buf], { type: att.contentType ?? 'application/octet-stream' }),
-      )
-      files.push({
-        storageId,
-        filename: att.filename,
-        contentType: att.contentType,
-        size: buf.byteLength,
-        inline: att.inline ?? false,
-      })
-    }
+    // 6. Combined raw content (email + OCR) for storage + synthesis brain
+    const rawContent = [emailContent, ocrContent]
+      .filter(Boolean)
+      .join('\n\n---\n\n')
 
-    // 6. Store
+    // 7. Store
     const reportPeriod = normalizePeriodDisplay(analysis.reportPeriod)
     const periodSortMs = reportPeriod ? parsePeriodToSortMs(reportPeriod) : null
     await ctx.runMutation(internal.reportPipeline.storeReport, {
@@ -374,13 +387,13 @@ export const run = internalAction({
       files,
     })
 
-    // 7. Cerveau 3 — synthesis (fire-and-forget)
+    // 8. Cerveau 3 — synthesis (fire-and-forget)
     await ctx.scheduler.runAfter(0, internal.intelligence.runAnalysis, {
       companyId: company.companyId,
       orgId: company.orgId,
     })
 
-    // 8. Confirmation reply
+    // 9. Confirmation reply
     await replyToMessage(
       m.inboxId,
       m.messageId,
