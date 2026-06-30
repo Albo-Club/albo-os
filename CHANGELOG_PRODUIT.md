@@ -23,6 +23,57 @@ bas de page.
 
 ---
 
+## v1.53.0 — 30/06/2026 à 19:52 — Reporting : suivi des reports et synthèse IA sur la fiche
+
+La fiche d'une participation gagne une zone **« Reporting »** organisée en
+onglets :
+
+- **Documents** — l'espace d'upload manuel existant, inchangé.
+- **Reports** — la liste des **reports reçus par email** (période, type, date,
+  statut). Un clic sur une ligne ouvre le détail : titre, points clés,
+  métriques et contenu brut du report.
+- **Synthèse IA** — une lecture synthétique générée automatiquement :
+  résumé exécutif, **note de santé** (avec points forts et points de
+  vigilance), indicateurs clés avec tendance, et alertes. La carte indique
+  clairement si l'analyse est en cours, en échec, ou en attente de données.
+
+> **🔧 Notes techniques**
+>
+> - Onglets ajoutés sur `src/routes/app/$orgSlug/participations.$companyId.tsx`
+>   (`Tabs` shadcn) : `ReportingsSection` (existant) + deux nouveaux composants
+>   `src/components/companies/CompanyReportsSection.tsx` (tableau + dialog
+>   détail) et `CompanyIntelligenceCard.tsx` (synthèse IA).
+> - Lecture seule, scoping org via `requireOrgMember` : queries publiques
+>   `convex/companyReports.ts` (`listByCompany`, `getById`) et
+>   `convex/intelligence.ts:getByCompany`. La donnée est produite par le
+>   pipeline d'ingestion (#143).
+> - i18n EN + FR, namespace `participations` : `tabs`, `reports`,
+>   `intelligence`.
+
+## v1.52.0 — 30/06/2026 à 19:40 — Reporting : réception automatique des reports par email
+
+Un email envoyé à l'**adresse de reporting dédiée** est désormais traité
+automatiquement : Albo OS crée le report, le **rattache à la bonne société**,
+stocke les pièces jointes, extrait les informations structurées, génère une
+**synthèse IA** et répond une confirmation à l'expéditeur. Plus besoin de
+saisir les reports investisseurs à la main.
+
+> **🔧 Notes techniques**
+>
+> - Transport email via **AgentMail** (inbox dédiée + webhook `message.received`
+>   signé Svix) : `convex/agentmail.ts` (wrapper REST `fetch`, vérif signature
+>   Web Crypto) + route dans `convex/http.ts`.
+> - Orchestrateur `convex/reportPipeline.ts` : dédup → extraction texte/liens →
+>   résolution company/org cross-org → extraction structurée
+>   (`convex/reportAnalysis.ts`, `generateObject` + Zod) → stockage
+>   (`companyReports` + `documents`) → synthèse IA (`convex/intelligence.ts`,
+>   agent dédié + tool `webSearch` Linkup) → reply de confirmation.
+> - Schéma : tables `companyReports` et `companyIntelligence` ; `documents`
+>   gagne `reportId` / `extractedText` / `inline`.
+> - Env requis (Convex) : `AGENTMAIL_API_KEY`, `AGENTMAIL_INBOX_ID`,
+>   `AGENTMAIL_WEBHOOK_SECRET`, `LINKUP_API_KEY`. OCR des PJ et suivi KPI
+>   structuré différés.
+
 ## v1.51.2 — 30/06/2026 à 18:00 — Favicon Albo agrandi dans l'onglet
 
 Le **« a » d'Albo** occupe désormais une plus grande part de l'icône :
