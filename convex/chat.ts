@@ -132,13 +132,27 @@ export const listMessages = query({
 const AUTO_TITLE_MAX = 60
 const ROUTE_CONTEXT_MAX = 200
 
+// Page context forwarded from the client: current route + optionally the entity
+// (deal / company) the user is viewing, so the agent can ground "this deal".
+const contextValidator = v.optional(
+  v.object({
+    route: v.string(),
+    entity: v.optional(
+      v.object({
+        kind: v.union(v.literal('deal'), v.literal('company')),
+        id: v.string(),
+      }),
+    ),
+  }),
+)
+
 export const sendMessage = mutation({
   args: {
     orgId: v.id('organizations'),
     threadId: v.string(),
     prompt: v.string(),
-    // Page context (current route) forwarded to the stream's system prompt.
-    context: v.optional(v.object({ route: v.string() })),
+    // Page context (current route + entity) forwarded to the system prompt.
+    context: contextValidator,
   },
   handler: async (ctx, { orgId, threadId, prompt, context }) => {
     const { user } = await requireOrgMember(ctx, orgId)
@@ -164,6 +178,8 @@ export const sendMessage = mutation({
       promptMessageId: messageId,
       route: context?.route.slice(0, ROUTE_CONTEXT_MAX),
       orgName: org?.name,
+      entityKind: context?.entity?.kind,
+      entityId: context?.entity?.id,
     })
     return { messageId }
   },
@@ -181,7 +197,7 @@ export const respondToToolApproval = mutation({
     threadId: v.string(),
     approvalId: v.string(),
     approved: v.boolean(),
-    context: v.optional(v.object({ route: v.string() })),
+    context: contextValidator,
   },
   handler: async (ctx, { orgId, threadId, approvalId, approved, context }) => {
     const { user } = await requireOrgMember(ctx, orgId)
@@ -198,6 +214,8 @@ export const respondToToolApproval = mutation({
       promptMessageId: messageId,
       route: context?.route.slice(0, ROUTE_CONTEXT_MAX),
       orgName: org?.name,
+      entityKind: context?.entity?.kind,
+      entityId: context?.entity?.id,
     })
     return { messageId }
   },
@@ -249,12 +267,22 @@ export const streamAsync = internalAction({
     promptMessageId: v.string(),
     route: v.optional(v.string()),
     orgName: v.optional(v.string()),
+    entityKind: v.optional(v.union(v.literal('deal'), v.literal('company'))),
+    entityId: v.optional(v.string()),
   },
-  handler: async (ctx, { threadId, promptMessageId, route, orgName }) => {
+  handler: async (
+    ctx,
+    { threadId, promptMessageId, route, orgName, entityKind, entityId },
+  ) => {
+    const entity =
+      entityKind && entityId ? { kind: entityKind, id: entityId } : undefined
     const result = await chatAgent.streamText(
       ctx,
       { threadId },
-      { promptMessageId, system: buildInstructions({ route, orgName }) },
+      {
+        promptMessageId,
+        system: buildInstructions({ route, orgName, entity }),
+      },
       { saveStreamDeltas: { chunking: 'word', throttleMs: 100 } },
     )
     await result.consumeStream()

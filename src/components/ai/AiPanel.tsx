@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useLocation } from '@tanstack/react-router'
+import { useLocation, useParams } from '@tanstack/react-router'
 import { useUIMessages } from '@convex-dev/agent/react'
 import { usePaginatedQuery } from 'convex/react'
 import { useConvexMutation } from '@convex-dev/react-query'
@@ -245,15 +245,34 @@ export function AiPanel({
   orgId,
   open = true,
   onClose,
+  initialPrompt,
+  onPromptConsumed,
 }: {
   orgId: Id<'organizations'>
   /** Panel visibility (hidden via CSS by the layout): focus on open. */
   open?: boolean
   /** Closes the panel (desktop collapse / mobile overlay). */
   onClose: () => void
+  /** One-shot prompt pushed from the command palette's "Ask the AI" action. */
+  initialPrompt?: string | null
+  /** Called once `initialPrompt` has been submitted, so the parent can clear it. */
+  onPromptConsumed?: () => void
 }) {
   const { t, i18n } = useTranslation(['chat', 'common'])
   const location = useLocation()
+  // Entity currently in view (deal / company sheet), read from the matched
+  // route params — forwarded to the agent so it knows what "this deal / this
+  // company" refers to. `strict: false`: undefined off those routes.
+  const params = useParams({ strict: false })
+  const entity = useMemo(() => {
+    if (typeof params.dealId === 'string') {
+      return { kind: 'deal' as const, id: params.dealId }
+    }
+    if (typeof params.companyId === 'string') {
+      return { kind: 'company' as const, id: params.companyId }
+    }
+    return undefined
+  }, [params.dealId, params.companyId])
   const [threadId, setThreadId] = useState<string | null>(null)
   // true = the user asked for a new thread: don't re-adopt the latest
   // existing thread until they have sent something.
@@ -322,6 +341,17 @@ export function AiPanel({
     setAwaitingStream(false)
   }, [threadId])
 
+  // One-shot: submit the prompt handed from the command palette's "Ask the AI"
+  // action, exactly once per distinct value (the parent clears it right after).
+  const consumedPromptRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!initialPrompt || consumedPromptRef.current === initialPrompt) return
+    consumedPromptRef.current = initialPrompt
+    void submitPrompt(initialPrompt)
+    onPromptConsumed?.()
+    // Only react to the prompt itself; submitPrompt is a hoisted closure.
+  }, [initialPrompt])
+
   const currentThread = threads.results.find((th) => th._id === threadId)
   const currentTitle = currentThread?.title ?? t('chat:threads.untitled')
   const streaming = messages.results.at(-1)?.status === 'streaming'
@@ -344,7 +374,7 @@ export function AiPanel({
         orgId,
         threadId: target,
         prompt,
-        context: { route: location.pathname },
+        context: { route: location.pathname, entity },
       })
       setAwaitingStream(true)
     } catch (err) {
@@ -372,7 +402,7 @@ export function AiPanel({
         threadId,
         approvalId,
         approved,
-        context: { route: location.pathname },
+        context: { route: location.pathname, entity },
       })
       // Generation resumes through the same delta flow as sendMessage:
       // revive the "thinking" indicator until the first token.

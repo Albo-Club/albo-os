@@ -242,6 +242,41 @@ L'**édition des valeurs** passe par le dialog « Modifier » (Lot 3, tests FD11
 | FD36 | **`royalty` — séparation projection / réalisé.** Comparer le tableau et la barre/CoC/TRI | Le **tableau** (projection) reste basé sur le CA saisi (`actualPoints`) ; la **barre/CoC/TRI** (réalisé) ne bougent qu'avec les **transactions entrantes** rattachées au deal. Modifier une cellule **Réel** du tableau ne change **pas** la barre/CoC/TRI ; pointer une transaction entrante sur le deal **les** met à jour |
 | FD37 | **`royalty` — distinction « rien saisi » / « zéro » (colonnes Réel et BP initial).** Sur un trimestre, éditer une cellule **Réel** (puis idem **BP initial**) : (a) la **vider** entièrement et valider (Entrée/blur) ; (b) y saisir **« 0 »** et valider | (a) **Vider** → le point est **supprimé** (`actualPoints` / `bpPoints` filtré, sans réinsertion via `deals.update`) ; la cellule repasse à **« — »** ; si l'autre colonne du trimestre n'a plus de point non plus, la ligne sort de l'union. (b) Saisir **« 0 »** → un point à **valeur 0** est **conservé/créé** ; la cellule affiche **« 0 € »** (pas « — »). Un trimestre déjà à **0** (vrai zéro) reste **« 0 € »**, jamais transformé en tiret. Saisie **non vide non parsable** (ex. « abc ») → **aucun** changement (point conservé). **Échap** annule sans rien toucher |
 
+### Liste transversale des deals (`/app/$orgSlug/deals`, `/app/all/deals`)
+
+Liste plate, une ligne = un deal (à distinguer de `/participations`, regroupée
+par société). Réutilise `api.deals.list` (par-org) / `api.aggregate.listDeals`
+(agrégé). Entrée nav « Deals », composant `src/components/deals/DealsListView.tsx`.
+
+| #   | Étape                                                                                              | Résultat attendu                                                                                                                                                    |
+| --- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DL1 | Sidebar → **Deals**                                                                                | Tableau plat de tous les deals de l'org ; chaque ligne montre **société cible** (logo) + **investisseur** (· via SPV) + instrument + engagé/versé/reçu/TVPI + statut + date de signature |
+| DL2 | Cliquer une ligne                                                                                  | Ouvre la fiche deal `/app/$orgSlug/deals/$dealId` (ligne entière cliquable + Entrée au clavier)                                                                    |
+| DL3 | Recherche + facettes (instrument / statut / secteur) + tri colonnes + export CSV                   | Filtrage en mémoire (société, nom de deal, investisseur, secteur, instrument) ; tri asc/desc sur société/engagé/versé/reçu/TVPI/signé ; export `deals-<date>.csv` |
+| DL4 | Vue agrégée `/app/all/deals`                                                                       | Mêmes colonnes + colonne **Organisation** ; lien de ligne dérive le slug de l'org du deal ; lecture seule                                                          |
+| DL5 | Breadcrumb + i18n EN/FR                                                                            | Fil « Org › Deals » propre (pas d'id brut) ; libellés traduits (namespaces `deals` + `participations`)                                                              |
+
+### Recherche globale — palette ⌘K (`src/components/search/CommandPalette.tsx`)
+
+Palette app-wide (bouton « Rechercher » dans le header + ⌘K/Ctrl+K), org-scoped.
+Query `convex/search.ts:global` (deals + sociétés en mémoire, mouvements via
+l'index full-text `search_text`).
+
+| #   | Étape                                                            | Résultat attendu                                                                                                                    |
+| --- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| GS1 | ⌘K (ou bouton header) puis taper ≥ 2 caractères                | Palette ouverte ; résultats **groupés** Deals / Sociétés / Mouvements (< 2 caractères → rien)                                     |
+| GS2 | Sélectionner un résultat Deal / Société                        | Navigue vers la fiche deal / société correspondante ; la palette se ferme                                                          |
+| GS3 | Sélectionner un Mouvement                                      | Navigue vers la fiche du deal rattaché si `dealId`, sinon vers `/app/$orgSlug/cash`                                                |
+| GS4 | Item **« Demander à l'IA : … »**                               | Ouvre le panneau IA et envoie la requête (une seule fois) ; la réponse tient compte de la page/entité courante                    |
+| GS5 | i18n EN/FR                                                     | Placeholder, en-têtes de groupes, « Demander à l'IA », vide traduits (namespace `search`)                                          |
+
+### Contexte entité pour l'assistant (fiche deal / société)
+
+| #   | Étape                                                                          | Résultat attendu                                                                                                        |
+| --- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| CE1 | Sur `/app/$orgSlug/deals/$dealId`, demander « résume ce deal »                | L'agent opère sur CE deal (récupère ses détails par id via ses outils) sans qu'on le nomme — contexte `entity` transmis |
+| CE2 | Sur `/app/$orgSlug/participations/$companyId`, demander « quels KPIs ? »       | L'agent cible CETTE société ; hors fiche (ex. `/cash`), aucun contexte entité n'est injecté (couvert par `tests/instructions.test.ts`) |
+
 ### Archivage / restauration d'une entité (`/app/$orgSlug/participations`)
 
 Archivage réversible (`archivedAt`) avec garde-fou de références (refus si

@@ -1,0 +1,13 @@
+{
+  "placeholder": "Rechercher deals, sociétés, mouvements…",
+  "empty": "Aucun résultat.",
+  "hint": "Tapez pour chercher dans les deals, sociétés et mouvements.",
+  "groups": {
+    "deals": "Deals",
+    "companies": "Sociétés",
+    "transactions": "Mouvements"
+  },
+  "askAi": "Demander à l'IA : « {{query}} »",
+  "movementIn": "Entrée",
+  "movementOut": "Sortie"
+}

@@ -12,6 +12,8 @@ import enValidation from '~/locales/en/validation.json'
 import enNav from '~/locales/en/nav.json'
 import enDashboard from '~/locales/en/dashboard.json'
 import enParticipations from '~/locales/en/participations.json'
+import enDeals from '~/locales/en/deals.json'
+import enSearch from '~/locales/en/search.json'
 import enAccount from '~/locales/en/account.json'
 import enOrg from '~/locales/en/org.json'
 import enSettings from '~/locales/en/settings.json'
@@ -27,6 +29,8 @@ import frValidation from '~/locales/fr/validation.json'
 import frNav from '~/locales/fr/nav.json'
 import frDashboard from '~/locales/fr/dashboard.json'
 import frParticipations from '~/locales/fr/participations.json'
+import frDeals from '~/locales/fr/deals.json'
+import frSearch from '~/locales/fr/search.json'
 import frAccount from '~/locales/fr/account.json'
 import frOrg from '~/locales/fr/org.json'
 import frSettings from '~/locales/fr/settings.json'
@@ -43,6 +47,8 @@ export const NAMESPACES = [
   'nav',
   'dashboard',
   'participations',
+  'deals',
+  'search',
   'account',
   'org',
   'settings',
@@ -63,6 +69,8 @@ export const resources = {
     nav: enNav,
     dashboard: enDashboard,
     participations: enParticipations,
+    deals: enDeals,
+    search: enSearch,
     account: enAccount,
     org: enOrg,
     settings: enSettings,
@@ -79,6 +87,8 @@ export const resources = {
     nav: frNav,
     dashboard: frDashboard,
     participations: frParticipations,
+    deals: frDeals,
+    search: frSearch,
     account: frAccount,
     org: frOrg,
     settings: frSettings,
