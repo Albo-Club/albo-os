@@ -15,14 +15,23 @@ import { internal } from './_generated/api'
 
 const API_BASE = 'https://api.agentmail.to/v0'
 
-function apiKey(): string {
-  const key = process.env.AGENTMAIL_API_KEY
-  if (!key) throw new Error('AGENTMAIL_API_KEY missing')
-  return key
+// Returns null (not throw) when unset, so a missing key degrades gracefully
+// instead of crashing the whole pipeline run.
+function apiKey(): string | null {
+  return process.env.AGENTMAIL_API_KEY ?? null
 }
 
-function authHeaders(): Record<string, string> {
-  return { Authorization: `Bearer ${apiKey()}`, 'Content-Type': 'application/json' }
+function authHeaders(): Record<string, string> | null {
+  const key = apiKey()
+  return key
+    ? { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }
+    : null
+}
+
+/** Extract the bare email from a "Name <email>" (or plain) From value. */
+function parseFromAddress(raw: string): string {
+  const angle = raw.match(/<([^>]+)>/)
+  return (angle ? angle[1] : raw).trim().toLowerCase()
 }
 
 // ─── Normalized event shape passed to the pipeline ───────────────────────────
@@ -45,6 +54,9 @@ export interface AgentmailMessage {
   subject: string
   text: string
   html: string
+  /** Presigned URL (S3) holding the full body JSON when text/html are absent
+   *  from the webhook payload. Fetched in the pipeline via fetchBody(). */
+  bodyUrl?: string
   date?: number // ms epoch
   attachments: Array<AgentmailAttachmentMeta>
 }
@@ -83,7 +95,8 @@ export function normalizeMessage(payload: Record<string, unknown>): AgentmailMes
     typeof msg.from_ === 'string' ? msg.from_ : undefined,
     addrList(msg.from ?? msg.from_)[0],
   ]
-  const from = fromCandidates.find((x): x is string => !!x) ?? ''
+  const fromRaw = fromCandidates.find((x): x is string => !!x) ?? ''
+  const from = parseFromAddress(fromRaw)
 
   const dateRaw = msg.timestamp ?? msg.date ?? msg.received_at
   const date = dateRaw ? Date.parse(String(dateRaw)) : undefined
@@ -103,14 +116,36 @@ export function normalizeMessage(payload: Record<string, unknown>): AgentmailMes
     inboxId,
     messageId,
     threadId: msg.thread_id ? String(msg.thread_id) : undefined,
-    from: String(from).toLowerCase(),
+    from,
     to: addrList(msg.to),
     cc: addrList(msg.cc),
     subject: String(msg.subject ?? '(no subject)'),
     text: String(msg.text ?? ''),
     html: String(msg.html ?? ''),
+    bodyUrl: msg.body_url ? String(msg.body_url) : undefined,
     date: date && !Number.isNaN(date) ? date : undefined,
     attachments: attachments.filter((a) => a.attachmentId),
+  }
+}
+
+/**
+ * Fetch the full email body from a presigned `body_url` (the webhook payload
+ * omits text/html for large messages). No auth — the URL is already signed.
+ */
+export async function fetchBody(bodyUrl: string): Promise<{ text: string; html: string }> {
+  try {
+    const res = await fetch(bodyUrl)
+    if (!res.ok) {
+      console.warn(`[agentmail] fetchBody status=${res.status}`)
+      return { text: '', html: '' }
+    }
+    const data = (await res.json()) as Record<string, unknown>
+    const text = String(data.text ?? data.body_plain ?? data.plain ?? data.body_text ?? '')
+    const html = String(data.html ?? data.body_html ?? data.body ?? '')
+    return { text, html }
+  } catch (err) {
+    console.warn('[agentmail] fetchBody failed:', err instanceof Error ? err.message : String(err))
+    return { text: '', html: '' }
   }
 }
 
@@ -121,9 +156,14 @@ export async function getMessage(
   inboxId: string,
   messageId: string,
 ): Promise<Record<string, unknown> | null> {
+  const headers = authHeaders()
+  if (!headers) {
+    console.warn('[agentmail] getMessage skipped — no AGENTMAIL_API_KEY')
+    return null
+  }
   const res = await fetch(
     `${API_BASE}/inboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}`,
-    { headers: authHeaders() },
+    { headers },
   )
   if (!res.ok) {
     console.warn(`[agentmail] getMessage status=${res.status}`)
@@ -141,9 +181,14 @@ export async function downloadAttachment(
   messageId: string,
   attachmentId: string,
 ): Promise<ArrayBuffer | null> {
+  const key = apiKey()
+  if (!key) {
+    console.warn('[agentmail] downloadAttachment skipped — no AGENTMAIL_API_KEY')
+    return null
+  }
   const res = await fetch(
     `${API_BASE}/inboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`,
-    { headers: { Authorization: `Bearer ${apiKey()}` } },
+    { headers: { Authorization: `Bearer ${key}` } },
   )
   if (!res.ok) {
     console.warn(`[agentmail] downloadAttachment status=${res.status}`)
@@ -178,9 +223,14 @@ export async function replyToMessage(
   messageId: string,
   html: string,
 ): Promise<boolean> {
+  const headers = authHeaders()
+  if (!headers) {
+    console.warn('[agentmail] reply skipped — no AGENTMAIL_API_KEY')
+    return false
+  }
   const res = await fetch(
     `${API_BASE}/inboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}/reply`,
-    { method: 'POST', headers: authHeaders(), body: JSON.stringify({ html }) },
+    { method: 'POST', headers, body: JSON.stringify({ html }) },
   )
   if (!res.ok) console.error(`[agentmail] reply status=${res.status}`)
   return res.ok
@@ -193,9 +243,14 @@ export async function sendMessage(
   subject: string,
   html: string,
 ): Promise<boolean> {
+  const headers = authHeaders()
+  if (!headers) {
+    console.warn('[agentmail] send skipped — no AGENTMAIL_API_KEY')
+    return false
+  }
   const res = await fetch(
     `${API_BASE}/inboxes/${encodeURIComponent(inboxId)}/messages/send`,
-    { method: 'POST', headers: authHeaders(), body: JSON.stringify({ to, subject, html }) },
+    { method: 'POST', headers, body: JSON.stringify({ to, subject, html }) },
   )
   if (!res.ok) console.error(`[agentmail] send status=${res.status}`)
   return res.ok

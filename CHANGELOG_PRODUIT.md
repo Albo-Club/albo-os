@@ -23,6 +23,29 @@ bas de page.
 
 ---
 
+## v1.53.2 — 01/07/2026 à 11:00 — Reporting par email : le corps des mails est enfin lu
+
+Certains reports transférés par email n'apparaissaient pas dans l'app. En cause :
+le contenu des mails un peu volumineux (typiquement un transfert avec pièce
+jointe) n'était pas récupéré, ce qui empêchait la création du report — sans
+message d'erreur visible. C'est corrigé : un report transféré est désormais
+traité à partir du corps du mail et rattaché à la bonne participation, même si
+les clés optionnelles (lecture des PDF, réponse de confirmation) ne sont pas
+encore configurées.
+
+> **🔧 Notes techniques**
+>
+> - Le webhook AgentMail `message.received` omet `text`/`html` pour les gros
+>   messages : le corps vit derrière un `body_url` présigné (S3). Nouveau
+>   `fetchBody()` dans `convex/agentmail.ts` (GET du lien, sans auth) ;
+>   `reportPipeline.run` extrait le corps dans l'ordre inline → `body_url` →
+>   `getMessage`.
+> - `apiKey()` ne throw plus : `getMessage` / `downloadAttachment` / `reply` /
+>   `send` dégradent proprement (warn + null/false) quand `AGENTMAIL_API_KEY` est
+>   absente — le run ne crashe plus après le 200 du webhook.
+> - Parsing du `From` « Nom <email> » → email seul ; logs `[reportPipeline]`
+>   (received / body chars / matched / stored) pour l'observabilité dans Convex.
+
 ## v1.53.1 — 30/06/2026 à 20:15 — Garde-fou : changelog obligatoire en CI
 
 Pour éviter qu'une évolution n'arrive en ligne sans être documentée dans
