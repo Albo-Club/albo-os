@@ -7,15 +7,16 @@
  * (intelligence, non-blocking) → reply confirmation.
  *
  * Notes:
- * - OCR of PDF/Excel attachments is deferred (Mistral). Files are stored as-is;
- *   only the email text/html feeds the analysis for now.
+ * - Email body: the webhook omits text/html for large messages; we fetch it
+ *   from the presigned `body_url` (fallback: getMessage API).
+ * - Attachments (PDF/images) are OCR'd via Mistral when MISTRAL_API_KEY is set.
  * - Single shared inbox: the orgId is derived from the matched company.
  */
 
 import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { internalAction, internalMutation, internalQuery } from './_generated/server'
-import { downloadAttachment, getMessage, replyToMessage } from './agentmail'
+import { downloadAttachment, fetchBody, getMessage, replyToMessage } from './agentmail'
 import { ocrAttachment } from './lib/ocr'
 import { detectLinks, htmlToText } from './lib/reportLinks'
 import {
@@ -41,6 +42,7 @@ const messageValidator = v.object({
   subject: v.string(),
   text: v.string(),
   html: v.string(),
+  bodyUrl: v.optional(v.string()),
   date: v.optional(v.number()),
   attachments: v.array(
     v.object({
@@ -256,6 +258,10 @@ export const storeReport = internalMutation({
 export const run = internalAction({
   args: { message: messageValidator },
   handler: async (ctx, { message: m }) => {
+    console.log(
+      `[reportPipeline] received from=${m.from} subject="${m.subject}" id=${m.messageId} attachments=${m.attachments.length}`,
+    )
+
     // 1. Dedup
     const dup = await ctx.runQuery(internal.reportPipeline.findByMessageId, {
       messageId: m.messageId,
@@ -265,16 +271,25 @@ export const run = internalAction({
       return
     }
 
-    // 2. Email content (text + detected links)
+    // 2. Email content — the webhook often omits text/html (large messages):
+    //    inline → body_url (presigned S3) → getMessage API fallback.
+    let html = m.html
     let text = m.text.trim() || htmlToText(m.html)
+    if (!text && m.bodyUrl) {
+      const body = await fetchBody(m.bodyUrl)
+      if (body.html) html = body.html
+      text = body.text.trim() || htmlToText(body.html)
+    }
     if (!text) {
       const full = await getMessage(m.inboxId, m.messageId)
       if (full) {
+        if (full.html) html = String(full.html)
         text =
           String(full.text ?? '').trim() || htmlToText(String(full.html ?? ''))
       }
     }
-    const links = detectLinks(`${text} ${m.html}`)
+    console.log(`[reportPipeline] body extracted: ${text.length} chars`)
+    const links = detectLinks(`${text} ${html}`)
     const linkLines = [...links.notion, ...links.googleDrive, ...links.docSend]
     const emailContent = [
       text,
@@ -298,6 +313,9 @@ export const run = internalAction({
       )
       return
     }
+    console.log(
+      `[reportPipeline] matched company "${company.companyName}" (org ${company.orgId})`,
+    )
 
     // 4. Download attachments → Convex storage + OCR (PDF/images via Mistral)
     const files: Array<{
@@ -365,7 +383,7 @@ export const run = internalAction({
     // 7. Store
     const reportPeriod = normalizePeriodDisplay(analysis.reportPeriod)
     const periodSortMs = reportPeriod ? parsePeriodToSortMs(reportPeriod) : null
-    await ctx.runMutation(internal.reportPipeline.storeReport, {
+    const reportId = await ctx.runMutation(internal.reportPipeline.storeReport, {
       orgId: company.orgId,
       companyId: company.companyId,
       agentmailInboxId: m.inboxId,
@@ -383,9 +401,12 @@ export const run = internalAction({
       reportAbout: analysis.reportAbout,
       metrics: analysis.metrics,
       rawContent,
-      cleanedHtml: m.html,
+      cleanedHtml: html,
       files,
     })
+    console.log(
+      `[reportPipeline] stored report ${reportId} for "${company.companyName}" period="${reportPeriod}"`,
+    )
 
     // 8. Cerveau 3 — synthesis (fire-and-forget)
     await ctx.scheduler.runAfter(0, internal.intelligence.runAnalysis, {
