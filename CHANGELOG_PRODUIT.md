@@ -23,6 +23,32 @@ bas de page.
 
 ---
 
+## v1.59.0 — 01/07/2026 à 18:04 — Royalties : trimestres en colonnes dans le suivi
+
+Sur la fiche d'une participation en royalties, le tableau de suivi trimestriel
+est désormais présenté « à l'horizontale » : chaque trimestre occupe une
+**colonne**, et les lignes portent les métriques (CA et royalties du BP
+initial, du BP dégradé, du réel, puis l'écart en euros et en pourcentage). Le
+cumul reste affiché, à droite du tableau. Cette orientation colle à la lecture
+habituelle d'un business plan et facilite la comparaison d'un trimestre à
+l'autre. Les cases de CA (BP initial et réel) restent modifiables au clic comme
+avant.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/deals/RoyaltiesPanel.tsx` : transposition purement
+>   présentationnelle du tableau. `buildRoyaltyRows` (et `royalties.ts`) est
+>   inchangé — `rows` (une entrée par trimestre) et `totals` sont réutilisés
+>   tels quels, seul le rendu change.
+> - Les trimestres deviennent les en-têtes de colonnes ; deux colonnes de
+>   gauche portent le groupe (rowSpan=2 : BP initial / BP dégradé / Réel /
+>   Écart) et le sous-libellé (CA / Royalties / € / %). Le `Cumul` passe du
+>   `TableFooter` (supprimé) à une colonne de droite.
+> - Hiérarchie visuelle (`COL_BP_INITIAL` / `COL_BP_DEGRADED` / `COL_REAL`)
+>   appliquée aux `TableRow` au lieu des colonnes. Helper local `euroCell`
+>   pour les cellules euros en lecture seule ; `EditableCa` réutilisé pour les
+>   deux lignes de CA éditables.
+
 ## v1.58.0 — 01/07/2026 à 17:48 — Vue transversale des deals + recherche globale
 
 Les deals ne se retrouvaient qu'en passant par leur entreprise, alors qu'une
