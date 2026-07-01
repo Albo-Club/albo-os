@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Download, X } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
+import { tvpi as tvpiRatio } from '../../../convex/lib/metrics'
 import type { RefObject } from 'react'
 
 import type { DealRow } from '~/components/participations/ParticipationsTable'
@@ -35,8 +36,11 @@ import { normalizeSearch } from '~/lib/searchText'
 
 /** TVPI of a single deal: (received + residual) / paid, null when nothing paid. */
 function dealTvpi(d: DealRow): number | null {
-  const paid = d.paidActual ?? 0
-  return paid > 0 ? ((d.received ?? 0) + residualCents(d)) / paid : null
+  return tvpiRatio({
+    capital: d.paidActual ?? 0,
+    proceeds: d.received ?? 0,
+    residual: residualCents(d),
+  })
 }
 
 function statusVariant(s: string): 'default' | 'secondary' | 'destructive' {

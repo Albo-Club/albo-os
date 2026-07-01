@@ -4,6 +4,7 @@ import { Banknote, PieChart, TrendingUp, Wallet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '../../../../convex/_generated/api'
+import { dpi as dpiRatio, tvpi as tvpiRatio } from '../../../../convex/lib/metrics'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { KpiCard } from '~/components/dashboard/KpiCard'
@@ -42,12 +43,15 @@ function Dashboard() {
     )
   }
 
-  const tvpi =
-    data.deployedCents > 0
-      ? (data.distributedCents + data.navCents) / data.deployedCents
-      : null
-  const dpi =
-    data.deployedCents > 0 ? data.distributedCents / data.deployedCents : null
+  const tvpi = tvpiRatio({
+    capital: data.deployedCents,
+    proceeds: data.distributedCents,
+    residual: data.navCents,
+  })
+  const dpi = dpiRatio({
+    called: data.deployedCents,
+    distributed: data.distributedCents,
+  })
 
   return (
     <main className="flex-1 space-y-6 p-6">

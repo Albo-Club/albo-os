@@ -2,6 +2,13 @@ import { useMemo, useState } from 'react'
 import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
+import {
+  annualizedTri,
+  moic as moicRatio,
+  proceedsFromReceived,
+  residualValueCents,
+  tvpi as tvpiRatio,
+} from '../../../convex/lib/metrics'
 import type { ReactNode } from 'react'
 
 import type { Doc } from '../../../convex/_generated/dataModel'
@@ -52,17 +59,18 @@ export type DealRow = {
   org?: { name: string; slug: string } | null // present in aggregated view
 }
 
-/** Milliseconds in an average year — annualization basis for the settled TRI. */
-const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000
-
 /**
- * Residual value of a deal for the TVPI: 0 if exited/written off,
- * otherwise the last known valuation, falling back to cost (dashboard
- * convention — convex/dashboard.ts NAV).
+ * Residual value of a deal for the TVPI (thin wrapper over the shared
+ * `residualValueCents`, kept for the `DealRow` call sites here and in
+ * ParticipationsView): 0 if exited/written off, otherwise the last known
+ * valuation, falling back to cost.
  */
 export function residualCents(deal: DealRow): number {
-  if (deal.status === 'fully_exited' || deal.status === 'written_off') return 0
-  return deal.lastValuationCents ?? deal.paidActual ?? 0
+  return residualValueCents({
+    status: deal.status,
+    lastValuationCents: deal.lastValuationCents,
+    paidActual: deal.paidActual,
+  })
 }
 
 /**
@@ -182,9 +190,11 @@ export function DealsList({
   return (
     <div className="divide-y">
       {deals.map((dl) => {
-        const paid = dl.paidActual ?? 0
-        const tvpi =
-          paid > 0 ? ((dl.received ?? 0) + residualCents(dl)) / paid : null
+        const tvpi = tvpiRatio({
+          capital: dl.paidActual ?? 0,
+          proceeds: dl.received ?? 0,
+          residual: residualCents(dl),
+        })
         const body = (
           <>
             <Field label={t('deal.name')}>{dl.name ?? '—'}</Field>
@@ -369,28 +379,28 @@ export function ParticipationsTable({
       // dealMoic in ~/lib/dealMetrics). De-VATing only ever lowers the
       // multiple, so a mixed group is never overvalued (no false Exit win).
       g.capital += d.paidActual ?? 0
-      g.proceeds +=
-        d.instrumentKind === 'royalty'
-          ? (d.received ?? 0) / 1.2
-          : (d.received ?? 0)
+      g.proceeds += proceedsFromReceived(d.received ?? 0, d.instrumentKind)
       if (d.status === 'written_off') g.writtenOff = true
       map.set(key, g)
     }
     return Array.from(map.entries()).map(([id, g]) => {
-      const moic = g.capital > 0 ? g.proceeds / g.capital : null
+      const moic = moicRatio({ capital: g.capital, proceeds: g.proceeds })
       // Annualized TRI on the SAME aggregate as the MOIC: the two-point IRR of
-      // {−capital at entry, +proceeds at exit}, i.e. MOIC^(1/years) − 1. Needs
-      // both an entry and an exit date and a positive holding period; a total
-      // loss (MOIC = 0) yields −100 %.
-      let tri: number | null = null
-      if (moic != null && g.signedDate != null && g.exitedDate != null) {
-        const years = (g.exitedDate - g.signedDate) / MS_PER_YEAR
-        if (years > 0) tri = Math.pow(moic, 1 / years) - 1
-      }
+      // {−capital at entry, +proceeds at exit}, i.e. MOIC^(1/years) − 1.
+      const tri = annualizedTri({
+        moic,
+        entryDate: g.signedDate,
+        exitDate: g.exitedDate,
+      })
       return {
         id,
         ...g,
-        tvpi: g.paid > 0 ? (g.received + g.residual) / g.paid : null,
+        // TVPI keeps the GROSS received (not de-VAT'd), unlike the MOIC.
+        tvpi: tvpiRatio({
+          capital: g.paid,
+          proceeds: g.received,
+          residual: g.residual,
+        }),
         moic,
         tri,
       }

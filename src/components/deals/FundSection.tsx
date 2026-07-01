@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { useConvexQuery } from '@convex-dev/react-query'
 
 import { api } from '../../../convex/_generated/api'
+import { dpi as dpiRatio, tvpi as tvpiRatio } from '../../../convex/lib/metrics'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import {
@@ -44,10 +45,11 @@ export function FundSection({
 
   const called = calledCents ?? 0
   const distributed = distributedCents ?? 0
-  const dpi = called > 0 ? distributed / called : null
+  const dpi = dpiRatio({ called, distributed })
+  // TVPI only once a valuation exists (NAV of the position).
   const tvpi =
-    called > 0 && lastFairValue != null
-      ? (distributed + lastFairValue) / called
+    lastFairValue != null
+      ? tvpiRatio({ capital: called, proceeds: distributed, residual: lastFairValue })
       : null
 
   const cards: Array<{ label: string; value: string }> = [

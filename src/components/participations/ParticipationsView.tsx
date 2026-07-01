@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Download, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { tvpi as tvpiRatio } from '../../../convex/lib/metrics'
 import { ParticipationsTable, residualCents } from './ParticipationsTable'
 import { FacetFilter } from './FacetFilter'
 import type { RefObject } from 'react'
@@ -166,9 +167,11 @@ export function ParticipationsView({
     const euros = (cents?: number | null) =>
       cents == null ? null : (cents / 100).toFixed(2)
     const rows = deals.map((d) => {
-      const paid = d.paidActual ?? 0
-      const tvpi =
-        paid > 0 ? ((d.received ?? 0) + residualCents(d)) / paid : null
+      const tvpi = tvpiRatio({
+        capital: d.paidActual ?? 0,
+        proceeds: d.received ?? 0,
+        residual: residualCents(d),
+      })
       return [
         d.target?.name ?? '',
         d.name ?? '',
