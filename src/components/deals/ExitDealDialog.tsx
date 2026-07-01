@@ -22,6 +22,7 @@ import {
   InputGroupText,
 } from '~/components/ui/input-group'
 import { Input } from '~/components/ui/input'
+import { useAmountField } from '~/components/ui/amount-input'
 import { Label } from '~/components/ui/label'
 import {
   Select,
@@ -165,11 +166,7 @@ export function ExitDealDialog({
             <InputGroup>
               <InputGroupInput
                 id="exit-proceeds"
-                type="number"
-                min="0"
-                step="0.01"
-                value={proceeds}
-                onChange={(e) => setProceeds(e.target.value)}
+                {...useAmountField(proceeds, setProceeds)}
               />
               <InputGroupAddon align="inline-end">
                 <InputGroupText>€</InputGroupText>

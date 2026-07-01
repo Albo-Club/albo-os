@@ -437,6 +437,13 @@ export const remove = mutation({
   leaks enumeration. Raw `error.message` is also locale-fragile and may
   change between BA versions. The classifier collapses safe equivalence
   classes and centralises the user-facing copy.
+- ❌ A raw `<input type="number">` for an editable **euro amount**. Use
+  `AmountInput` (or the `useAmountField(value, onChange)` hook for an
+  `InputGroupInput`/inline cell) from `src/components/ui/amount-input.tsx`:
+  it groups thousands with spaces while typing (`1 000 000`) and emits the
+  raw unformatted string, so the euro parsers (`eurosToCents`, `parseEuros`,
+  `parseAmountToCents`) work unchanged. Percentages, share counts and years
+  keep the native numeric input.
 - ❌ Anchor `#section` for nav between major sections.
 - ❌ Unrequested dark/light toggle.
 - ❌ `tailwind.config.js` (Tailwind v4 is CSS-first).

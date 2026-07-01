@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
+import { AmountInput } from '~/components/ui/amount-input'
 import { Label } from '~/components/ui/label'
 import {
   Select,
@@ -178,13 +179,10 @@ export function CreateEquityDialog({
             <Label htmlFor="equity-amount">
               {t('passif:create.equity.amountLabel')}
             </Label>
-            <Input
+            <AmountInput
               id="equity-amount"
-              type="number"
-              min="0"
-              step="0.01"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={setAmount}
               placeholder={t('passif:create.equity.amountPlaceholder')}
             />
           </div>

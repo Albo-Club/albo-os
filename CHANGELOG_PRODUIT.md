@@ -23,6 +23,33 @@ bas de page.
 
 ---
 
+## v1.55.0 — 01/07/2026 à 16:32 — Montants plus lisibles pendant la saisie
+
+Quand vous saisissez un montant en euros dans un champ (création d'un deal,
+édition d'une fiche participation, prévisionnel de trésorerie, passif, sorties,
+revenus royalties…), les milliers s'espacent automatiquement au fil de la
+frappe : `1 000 000` au lieu de `1000000`. Plus besoin de compter les zéros
+pour vérifier qu'on tape le bon montant. La valeur enregistrée ne change pas —
+seul l'affichage pendant la saisie est mis en forme.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau composant partagé `src/components/ui/amount-input.tsx` : hook
+>   `useAmountField(value, onChange)` (props à spread, gère le formatage, le
+>   nettoyage et la restauration du caret via `ref`) + wrapper `AmountInput`
+>   pour un `<Input>` simple. Le contrat reste une string brute non formatée
+>   côté parent, donc les parsers euros existants (`eurosToCents`,
+>   `parseAmountToCents`, `parseEuros`) fonctionnent sans changement.
+> - Groupement à l'espace (et non la virgule locale) car le séparateur décimal
+>   peut être une virgule ; l'espace est la seule marque de milliers non
+>   ambiguë pour de la saisie.
+> - Câblé sur tous les champs montant EUR éditables : `CreateDealDialog` et
+>   `DealFieldInput` (format `eur` uniquement), `ExitDealDialog`,
+>   `ForecastSection`, `CreateEquityDialog`, `RoyaltiesPanel` (cellule inline
+>   `EditableCa` + revenu trimestriel). `CreateDealDialog` bascule aussi sur
+>   `eurosToCents` (gère la virgule décimale, l'input passant de `number` à
+>   `text`).
+
 ## v1.54.1 — 01/07/2026 à 16:33 — Nouveautés : les horaires affichés passent à l'heure de Paris
 
 Sur la page Nouveautés, l'heure de chaque mise à jour était écrite en UTC, ce qui
