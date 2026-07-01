@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
+import { AmountInput } from '~/components/ui/amount-input'
 import { Label } from '~/components/ui/label'
 import {
   Select,
@@ -184,11 +185,10 @@ function RuleDialog({
               <Label htmlFor="rule-amount">
                 {t('cash:forecast.rules.amountLabel')}
               </Label>
-              <Input
+              <AmountInput
                 id="rule-amount"
-                inputMode="decimal"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={setAmount}
                 placeholder="1 500"
               />
             </div>
