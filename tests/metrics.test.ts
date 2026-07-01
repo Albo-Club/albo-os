@@ -15,6 +15,7 @@ import {
   dpi,
   moic,
   proceedsFromReceived,
+  realizedCashflows,
   residualValueCents,
   sumCashflows,
   tvpi,
@@ -46,6 +47,44 @@ describe('proceedsFromReceived', () => {
   it('matches the per-transaction de-VAT on the aggregate', () => {
     assert.equal(proceedsFromReceived(12000, 'royalty'), 12000 / 1.2)
     assert.equal(proceedsFromReceived(12000, 'share'), 12000)
+  })
+})
+
+describe('realizedCashflows', () => {
+  const t0 = Date.UTC(2024, 0, 1)
+  const t1 = Date.UTC(2025, 0, 1)
+
+  it('signs flows (out negative, in positive) and preserves dates', () => {
+    const flows = realizedCashflows(
+      [
+        { direction: 'out', amount: 100000, date: t0 },
+        { direction: 'in', amount: 150000, date: t1 },
+      ],
+      'share',
+    )
+    assert.deepEqual(flows, [
+      { amount: -100000, date: t0 },
+      { amount: 150000, date: t1 },
+    ])
+  })
+
+  it('de-VATs incoming ÷1.2 only for royalty; capital stays gross', () => {
+    const txs = [
+      { direction: 'out' as const, amount: 100000, date: t0 },
+      { direction: 'in' as const, amount: 12000, date: t1 },
+    ]
+    assert.deepEqual(realizedCashflows(txs, 'royalty'), [
+      { amount: -100000, date: t0 },
+      { amount: 12000 / 1.2, date: t1 },
+    ])
+    assert.deepEqual(realizedCashflows(txs, 'share'), [
+      { amount: -100000, date: t0 },
+      { amount: 12000, date: t1 },
+    ])
+  })
+
+  it('empty transactions → empty flows', () => {
+    assert.deepEqual(realizedCashflows([], 'share'), [])
   })
 })
 

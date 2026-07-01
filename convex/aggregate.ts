@@ -7,7 +7,7 @@
  */
 
 import { query } from './_generated/server'
-import { lastValuationCents, transactionTotals } from './deals'
+import { dealRealizedMetrics, lastValuationCents } from './deals'
 import { requireAppUser } from './lib/auth'
 import type { GenericQueryCtx } from 'convex/server'
 import type { DataModel, Doc } from './_generated/dataModel'
@@ -42,8 +42,9 @@ async function enrich(
     investor: companyRef(investor),
     target: companyRef(target),
     spv: companyRef(spv),
-    // Versé / Reçu (paid out / received) computed from the transactions (cf. deals.transactionTotals)
-    ...(await transactionTotals(ctx, deal._id)),
+    // Versé / Reçu + realized MOIC / EXACT XIRR + dated flows (cf.
+    // deals.dealRealizedMetrics) — same authoritative metrics as the per-org list.
+    ...(await dealRealizedMetrics(ctx, deal)),
     lastValuationCents: await lastValuationCents(ctx, deal._id),
   }
 }

@@ -11,6 +11,12 @@ import {
   instrumentValidator as sharedInstrumentValidator,
   termDurationValidator,
 } from './lib/instruments'
+import {
+  moic as moicRatio,
+  proceedsFromReceived,
+  realizedCashflows,
+} from './lib/metrics'
+import { xirr } from './lib/xirr'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
 import type { DataModel, Doc, Id } from './_generated/dataModel'
 
@@ -162,6 +168,42 @@ export async function transactionTotals(ctx: Ctx, dealId: Id<'deals'>) {
   return { paidActual, received }
 }
 
+/**
+ * Realized metrics of a single deal, transaction-true (reads the matched
+ * transactions ONCE). Returns the Versé/Reçu totals, the realized MOIC and the
+ * EXACT XIRR (annualized), plus the per-transaction dated `flows` (signed and
+ * de-VAT'd via the shared convention) so consumers can build a company-level
+ * IRR by concatenating the flows of a company's deals and solving `xirr` on the
+ * union — IRR is not additive, so it can't be derived from the per-deal rates.
+ * `irr` is null when the flow set has no sign change (e.g. a total loss with no
+ * proceeds) or does not converge.
+ */
+export async function dealRealizedMetrics(ctx: Ctx, deal: Doc<'deals'>) {
+  const txs = await ctx.db
+    .query('transactions')
+    .withIndex('by_deal', (q) => q.eq('dealId', deal._id))
+    .collect()
+  let paidActual = 0
+  let received = 0
+  for (const tx of txs) {
+    if (tx.direction === 'out') paidActual += tx.amount
+    else received += tx.amount
+  }
+  const flows = realizedCashflows(
+    txs.map((tx) => ({
+      direction: tx.direction,
+      amount: tx.amount,
+      date: tx.transactionDate,
+    })),
+    deal.instrumentKind,
+  )
+  const moic = moicRatio({
+    capital: paidActual,
+    proceeds: proceedsFromReceived(received, deal.instrumentKind),
+  })
+  return { paidActual, received, flows, moic, irr: xirr(flows) }
+}
+
 /** Latest known valuation of a deal (cents), null if none. */
 export async function lastValuationCents(
   ctx: Ctx,
@@ -179,8 +221,10 @@ export async function lastValuationCents(
  * Enriched list of an org's deals (deal + investor/target/spv names),
  * filterable by status / target. Serves the per-org Participations view
  * (grouped by company client-side). Default sort: signedDate desc.
- * Includes per deal the Versé/Reçu amounts computed from the transactions
- * and the latest known valuation (TVPI computed client-side).
+ * Includes per deal the Versé/Reçu amounts, the realized MOIC + EXACT XIRR,
+ * and the dated `flows` (so the view unions them per company for a company
+ * IRR) computed from the transactions, plus the latest known valuation
+ * (TVPI computed client-side from the aggregates).
  */
 export const list = query({
   args: {
@@ -211,7 +255,7 @@ export const list = query({
     return await Promise.all(
       rows.map(async (d) => ({
         ...(await enrich(ctx, d)),
-        ...(await transactionTotals(ctx, d._id)),
+        ...(await dealRealizedMetrics(ctx, d)),
         lastValuationCents: await lastValuationCents(ctx, d._id),
       })),
     )

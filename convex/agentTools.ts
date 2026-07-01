@@ -14,7 +14,11 @@ import { z } from 'zod/v3'
 
 import { internal } from './_generated/api'
 import { internalMutation, internalQuery } from './_generated/server'
-import { lastValuationCents, transactionTotals } from './deals'
+import {
+  dealRealizedMetrics,
+  lastValuationCents,
+  transactionTotals,
+} from './deals'
 import { parseScope, readMembership } from './lib/agentScope'
 import { buildSearchText } from './lib/searchText'
 import { INSTRUMENTS, instrumentValidator } from './lib/instruments'
@@ -58,19 +62,33 @@ export const listDealsInternal = internalQuery({
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
     return await Promise.all(
-      rows.map(async (d) => ({
-        _id: d._id,
-        investor: companyName(await ctx.db.get("companies", d.investorCompanyId)),
-        target: companyName(await ctx.db.get("companies", d.targetCompanyId)),
-        viaSpv: d.viaSpvCompanyId
-          ? companyName(await ctx.db.get("companies", d.viaSpvCompanyId))
-          : null,
-        instrumentKind: d.instrumentKind,
-        committedAmount: d.committedAmount ?? null,
-        paidAmount: d.paidAmount ?? null,
-        status: d.status,
-        signedDate: d.signedDate ?? null,
-      })),
+      rows.map(async (d) => {
+        // Realized metrics are transaction-true (Versé/Reçu/MOIC/TRI), unlike
+        // the stored reporting field `paidAmount`. `realized.flows` is left out
+        // of the payload (it only serves the client-side company-IRR union).
+        const realized = await dealRealizedMetrics(ctx, d)
+        return {
+          _id: d._id,
+          investor: companyName(
+            await ctx.db.get('companies', d.investorCompanyId),
+          ),
+          target: companyName(await ctx.db.get('companies', d.targetCompanyId)),
+          viaSpv: d.viaSpvCompanyId
+            ? companyName(await ctx.db.get('companies', d.viaSpvCompanyId))
+            : null,
+          instrumentKind: d.instrumentKind,
+          committedAmount: d.committedAmount ?? null,
+          paidAmount: d.paidAmount ?? null,
+          status: d.status,
+          signedDate: d.signedDate ?? null,
+          // Transaction-true realized figures (cents; MOIC/IRR are decimals,
+          // IRR annualized, null when undefined).
+          paidActual: realized.paidActual,
+          received: realized.received,
+          moic: realized.moic,
+          irr: realized.irr,
+        }
+      }),
     )
   },
 })
@@ -328,7 +346,10 @@ const listCompanies = createTool({
 const listDeals = createTool({
   description:
     'List investments (deals) in the current org, with investor/target ' +
-    'company names.',
+    'company names and transaction-true realized figures: paidActual ' +
+    '(Versé) and received (Reçu) in cents, moic (realized multiple) and irr ' +
+    '(exact annualized XIRR, decimal, null when undefined). Prefer these ' +
+    'over the stored committedAmount/paidAmount, which are reporting fields.',
   inputSchema: z.object({}),
   execute: async (ctx): Promise<unknown> => {
     const { orgId, userId } = parseScope(ctx.userId)
