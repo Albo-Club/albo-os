@@ -92,7 +92,12 @@ commit message already document the _what_. Question 5 (changelog) fires on
    - **Version** : increment from the latest entry in the file. Bump
      **minor** for a user-visible feature or UX change, **patch** for a
      fix, refactor, or internal/doc change.
-   - **Date/heure** : opening time of the PR, Europe/Paris.
+   - **Date/heure** : opening time of the PR, in the **Europe/Paris**
+     wall-clock. ⚠️ The execution environment's clock runs in **UTC**, so
+     the current time you read is NOT Paris time — convert it before
+     writing the header: add **+2h in summer** (CEST, DST) or **+1h in
+     winter** (CET). E.g. an env clock at `12:00` UTC in July is written
+     `14:00`. This offset is the reason past entries looked ~2h early.
    - **Contenu** : product language for user-visible changes (no file
      paths, no function names) ; a single descriptive line is enough for
      purely technical PRs.
