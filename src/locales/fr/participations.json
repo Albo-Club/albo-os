@@ -286,7 +286,6 @@
   "fiche": {
     "instrumentTitle": "Détails de l'instrument",
     "typeLabel": "Type d'instrument",
-    "manuallyEdited": "Modifié à la main — protégé contre le ré-import Airtable",
     "preview": {
       "unsaved": "Aperçu — non enregistré",
       "note": "Changer le type ici ne fait que prévisualiser la mise en page — rien n'est écrit en base.",
@@ -360,7 +359,6 @@
   "edit": {
     "dealTitle": "Modifier le deal",
     "dealDescription": "Renommer le deal, changer son type d'instrument et modifier les valeurs de ses champs.",
-    "fieldsHint": "Les valeurs modifiées sont protégées contre le prochain ré-import Airtable.",
     "selectPlaceholder": "Sélectionner…",
     "companyTitle": "Modifier la société",
     "companyDescription": "Renommer la société et modifier son secteur, son SIREN et son domaine.",

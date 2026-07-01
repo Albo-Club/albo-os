@@ -23,6 +23,26 @@ bas de page.
 
 ---
 
+## v1.54.0 — 01/07/2026 à 15:00 — Fiches deals : suppression des mentions d'import externe
+
+Sur la fiche d'un deal, la petite pastille jaune « Modifié à la main » et la
+note associée dans la fenêtre d'édition ont été retirées : elles faisaient
+référence à un mécanisme d'import externe qui n'a plus lieu d'être ici. Les
+champs restent modifiables comme avant, l'affichage est simplement plus épuré.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/deals/InstrumentBlock.tsx` : `FieldRow` ne prend plus le
+>   flag `manuallyEdited` ; suppression du point `bg-chart-4` + tooltip et des
+>   imports `Tooltip*` désormais inutilisés, ainsi que du `editedSet` dérivé de
+>   `deal.manuallyEditedFields`.
+> - `deals.$dealId.tsx` : retrait du paragraphe `edit.fieldsHint` dans le
+>   dialogue d'édition ; commentaire de mécanisme reformulé sans « Airtable ».
+> - i18n : suppression des clés `fiche.manuallyEdited` et `edit.fieldsHint`
+>   (fr/en), et retrait de « Airtable » de `org.settings.demoDescription`.
+> - Le garde-fou `manuallyEditedFields` reste actif côté backend (`upsertDeals`)
+>   — seule sa surface UI disparaît.
+
 ## v1.53.3 — 01/07/2026 à 12:00 — Secteur d'une entité : un secteur créé réapparaît dans la liste
 
 Quand vous ajoutiez un secteur qui n'était pas dans la liste proposée (en le

@@ -50,7 +50,7 @@
     "subtitle_one": "{{count}} office in your portfolio. Click a pin to view details.",
     "subtitle_other": "{{count}} offices in your portfolio. Click a pin to view details.",
     "demoTitle": "Demo data",
-    "demoDescription": "These offices are fictional — connect your own source (Convex, Airtable, ERP) to display your real spaces.",
+    "demoDescription": "These offices are fictional — connect your own source (Convex, ERP) to display your real spaces.",
     "portfolio": "Portfolio",
     "byStatus": "Breakdown by status",
     "list": "List",

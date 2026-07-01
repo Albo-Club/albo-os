@@ -50,7 +50,7 @@
     "subtitle_one": "{{count}} bureau dans votre portefeuille. Cliquez sur un pin pour voir le détail.",
     "subtitle_other": "{{count}} bureaux dans votre portefeuille. Cliquez sur un pin pour voir le détail.",
     "demoTitle": "Données de démo",
-    "demoDescription": "Ces bureaux sont fictifs — branchez votre propre source (Convex, Airtable, ERP) pour afficher vos vrais espaces.",
+    "demoDescription": "Ces bureaux sont fictifs — branchez votre propre source (Convex, ERP) pour afficher vos vrais espaces.",
     "portfolio": "Portefeuille",
     "byStatus": "Répartition par statut",
     "list": "Liste",
