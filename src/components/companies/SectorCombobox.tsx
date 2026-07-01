@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { Check, ChevronsUpDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { SECTOR_SLUGS } from '~/lib/sectors'
 import type { SectorSlug } from '~/lib/sectors'
+import { SECTOR_SLUGS } from '~/lib/sectors'
 import { cn } from '~/lib/utils'
 import { Button } from '~/components/ui/button'
 import {
