@@ -16,6 +16,7 @@
 import { v } from 'convex/values'
 import { query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import { residualValueCents } from './lib/metrics'
 
 const RECENT_TX = 5
 // Cap the sparkline to the last two years of monthly points.
@@ -80,14 +81,15 @@ export const getDashboard = query({
     let navCents = 0
     let navIsPartial = false
     for (const { deal, valuations, isActive } of perDeal) {
-      if (!isActive) continue
       const last = valuations.at(-1)
-      if (last) {
-        navCents += last.fairValue
-      } else {
-        navCents += paidByDeal.get(deal._id) ?? 0
-        navIsPartial = true
-      }
+      // residualValueCents returns 0 for exited/written-off deals, so the
+      // non-active ones contribute nothing (same as the previous `continue`).
+      navCents += residualValueCents({
+        status: deal.status,
+        lastValuationCents: last?.fairValue ?? null,
+        paidActual: paidByDeal.get(deal._id) ?? 0,
+      })
+      if (isActive && !last) navIsPartial = true
     }
 
     // 5. Cash: real EUR balances of non-archived accounts (+ their count).

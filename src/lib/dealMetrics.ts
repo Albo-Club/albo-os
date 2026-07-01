@@ -15,6 +15,7 @@
  * match it.
  */
 
+import { moic as moicRatio, sumCashflows } from '../../convex/lib/metrics'
 import type { Doc } from '../../convex/_generated/dataModel'
 
 /** Minimal cash-flow shape needed for the MOIC (subset of listByDeal rows). */
@@ -38,20 +39,10 @@ export function dealMoic(
   deal: Doc<'deals'>,
   transactions: Array<MoicTransaction> | undefined,
 ): DealMoic {
-  const txs = transactions ?? []
-  const capital = txs.reduce(
-    (sum, tx) => (tx.direction === 'out' ? sum + tx.amount : sum),
-    0,
+  const { capital, proceeds } = sumCashflows(
+    transactions ?? [],
+    deal.instrumentKind,
   )
-  if (capital <= 0) return { moic: null, isWin: null }
-
-  const deVat = deal.instrumentKind === 'royalty'
-  const proceeds = txs.reduce(
-    (sum, tx) =>
-      tx.direction === 'in' ? sum + (deVat ? tx.amount / 1.2 : tx.amount) : sum,
-    0,
-  )
-
-  const moic = proceeds / capital
-  return { moic, isWin: moic >= 1 }
+  const moic = moicRatio({ capital, proceeds })
+  return { moic, isWin: moic == null ? null : moic >= 1 }
 }

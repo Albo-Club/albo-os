@@ -23,6 +23,37 @@ bas de page.
 
 ---
 
+## v1.59.1 — 01/07/2026 à 18:00 — Cohérence des indicateurs de portefeuille
+
+Les multiples et taux de performance (MOIC, TVPI, TRI, DPI, valeur
+résiduelle / NAV) sont désormais calculés à partir d'une seule et même
+formule partagée par tous les écrans (liste des participations, tableau de
+bord, export CSV, fiche fonds). Auparavant chaque écran refaisait le calcul
+de son côté, avec un risque de voir les chiffres diverger d'un endroit à
+l'autre. Aucun chiffre affiché ne change : c'est un nettoyage interne qui
+garantit que tous les écrans parlent le même langage.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau module pur `convex/lib/metrics.ts`, source unique de vérité :
+>   `sumCashflows` (capital = Σ sortantes jamais dé-TVA'ées ; proceeds = Σ
+>   entrantes, ÷1,2 uniquement pour `royalty`), `proceedsFromReceived`,
+>   `residualValueCents`, `moic`, `tvpi` (sur le reçu brut), `dpi`,
+>   `annualizedTri`, et un `MS_PER_YEAR` unique aligné sur actual/365.
+> - `src/lib/xirr.ts` déplacé vers `convex/lib/xirr.ts` (importe le
+>   `MS_PER_YEAR` partagé) ; l'ancien chemin ré-exporte pour ne rien casser
+>   (`RoyaltiesPanel`).
+> - Sites rebranchés sans changer les valeurs : `dealMetrics.dealMoic`
+>   (wrapper mince), `ParticipationsTable` (résiduel + MOIC/TVPI/TRI groupe
+>   et fiche), `ParticipationsView` (TVPI export CSV), `FundSection`
+>   (DPI/TVPI fonds), dashboard `index.tsx` (TVPI/DPI), `convex/dashboard.ts`
+>   et `agentTools.getDashboardSummaryInternal` (NAV via `residualValueCents`).
+> - Correction d'une incohérence : le TRI de la liste passait de 365,25 à 365
+>   jours pour s'aligner sur le XIRR (variation d'affichage négligeable).
+> - Nouveau `tests/metrics.test.ts` (node:test) verrouillant dé-TVA
+>   royalty-only, capital jamais dé-TVA'é, MOIC=0 → TRI −100 %, capital=0 →
+>   null, day-count.
+
 ## v1.59.0 — 01/07/2026 à 18:04 — Royalties : trimestres en colonnes dans le suivi
 
 Sur la fiche d'une participation en royalties, le tableau de suivi trimestriel

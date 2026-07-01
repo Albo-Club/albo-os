@@ -18,6 +18,7 @@ import { lastValuationCents, transactionTotals } from './deals'
 import { parseScope, readMembership } from './lib/agentScope'
 import { buildSearchText } from './lib/searchText'
 import { INSTRUMENTS, instrumentValidator } from './lib/instruments'
+import { residualValueCents } from './lib/metrics'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx } from './_generated/server'
 
@@ -590,12 +591,12 @@ export const getDashboardSummaryInternal = internalQuery({
     let navIsPartial = false
     activeDeals.forEach((deal, i) => {
       const fairValue = lastValuations[i]
-      if (fairValue !== null) {
-        navCents += fairValue
-      } else {
-        navCents += paidByDeal.get(deal._id) ?? 0
-        navIsPartial = true
-      }
+      navCents += residualValueCents({
+        status: deal.status,
+        lastValuationCents: fairValue,
+        paidActual: paidByDeal.get(deal._id) ?? 0,
+      })
+      if (fairValue === null) navIsPartial = true
     })
 
     const accounts = await ctx.db
