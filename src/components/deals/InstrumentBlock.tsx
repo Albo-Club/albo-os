@@ -17,12 +17,6 @@ import { signTone } from '~/lib/moneyTone'
 import { cn } from '~/lib/utils'
 import { Badge } from '~/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '~/components/ui/tooltip'
 
 /**
  * Read-only central block of the deal sheet, driven by
@@ -192,34 +186,10 @@ const CUSTOM_PANELS: Partial<
   royalty: RoyaltiesPanel,
 }
 
-function FieldRow({
-  label,
-  value,
-  manuallyEdited,
-}: {
-  label: string
-  value: string
-  manuallyEdited?: boolean
-}) {
-  const { t } = useTranslation('participations')
+function FieldRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-muted-foreground flex items-center gap-1 text-xs">
-        {label}
-        {manuallyEdited && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span
-                  className="bg-chart-4 inline-block size-1.5 shrink-0 rounded-full"
-                  aria-label={t('fiche.manuallyEdited')}
-                />
-              </TooltipTrigger>
-              <TooltipContent>{t('fiche.manuallyEdited')}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-      </span>
+      <span className="text-muted-foreground text-xs">{label}</span>
       <span className="text-sm">{value}</span>
     </div>
   )
@@ -264,7 +234,6 @@ function FieldsView({
 }) {
   const { t } = useTranslation('participations')
   const fields = INSTRUMENT_FIELDS[instrumentKind] ?? []
-  const editedSet = new Set(deal.manuallyEditedFields ?? [])
   const splitIdx = fields.indexOf(SAFE_SPLIT_FIELD)
   const isSafe = splitIdx >= 0
 
@@ -291,7 +260,6 @@ function FieldsView({
             key={field}
             label={t(`field.${field}`, { defaultValue: field })}
             value={formatField(field)}
-            manuallyEdited={editedSet.has(field)}
           />
         ))}
       </div>

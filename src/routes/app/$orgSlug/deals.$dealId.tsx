@@ -324,7 +324,7 @@ function DealFieldInput({
  * fields of the saved type (Lot 3). Inputs are typed by FIELD_FORMAT
  * (€ / % / date / enum / number) and parsed back to the storage unit on save.
  * Only changed fields are sent; `deals.update` marks them as manually edited
- * so the Airtable re-import leaves them untouched. `paidActual` (disbursed,
+ * so a data re-import leaves them untouched. `paidActual` (disbursed,
  * computed from transactions) never appears here — it stays read-only on the
  * sheet. Changing the instrument type is a no-op on the attached transactions.
  */
@@ -539,9 +539,6 @@ function EditDealDialog({
           )}
           {fields.length > 0 && (
             <div className="space-y-4 border-t pt-4">
-              <p className="text-muted-foreground text-xs">
-                {t('participations:edit.fieldsHint')}
-              </p>
               {fields.map((field) => (
                 <DealFieldInput
                   key={field}
