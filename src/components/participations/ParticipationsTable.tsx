@@ -249,7 +249,7 @@ export function DealsList({
 type SortKey = 'name' | 'deals' | 'paid' | 'received' | 'tvpi'
 
 /** Clickable header of a sortable column (asc ⇄ desc). */
-function SortableHead({
+export function SortableHead({
   label,
   active,
   dir,

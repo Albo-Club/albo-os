@@ -1,4 +1,5 @@
 import {
+  Handshake,
   LayoutDashboard,
   Mail,
   Megaphone,
@@ -43,6 +44,11 @@ export function getNavGroups(): Array<NavGroup> {
           titleKey: 'items.participations',
           to: '/app/$orgSlug/participations',
           icon: PieChart,
+        },
+        {
+          titleKey: 'items.deals',
+          to: '/app/$orgSlug/deals',
+          icon: Handshake,
         },
         {
           titleKey: 'items.cash',
@@ -97,6 +103,11 @@ export function getAllNavGroups(): Array<NavGroup> {
           titleKey: 'items.participations',
           to: '/app/all/participations',
           icon: PieChart,
+        },
+        {
+          titleKey: 'items.deals',
+          to: '/app/all/deals',
+          icon: Handshake,
         },
       ],
     },

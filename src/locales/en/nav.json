@@ -2,8 +2,11 @@
   "appShell": {
     "ai": "AI",
     "aiShortcut": "Toggle AI panel (⌘J / Ctrl+J)",
+    "search": "Search",
+    "searchShortcut": "Search (⌘K / Ctrl+K)",
     "breadcrumb": {
       "participations": "Companies",
+      "deals": "Deals",
       "cash": "Cash",
       "pointage": "Reconciliation",
       "passif": "Liabilities",
@@ -23,6 +26,7 @@
   "items": {
     "dashboard": "Dashboard",
     "participations": "Companies",
+    "deals": "Deals",
     "cash": "Cash",
     "pointage": "Reconciliation",
     "passif": "Liabilities",

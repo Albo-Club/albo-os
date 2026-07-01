@@ -1,79 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Download, ListFilter, X } from 'lucide-react'
+import { Download, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ParticipationsTable, residualCents } from './ParticipationsTable'
+import { FacetFilter } from './FacetFilter'
 import type { RefObject } from 'react'
 
+import type { FacetOption } from './FacetFilter'
 import type { DealRow } from './ParticipationsTable'
-import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
-import { Separator } from '~/components/ui/separator'
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '~/components/ui/dropdown-menu'
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
 import { downloadCsv, toCsv } from '~/lib/csv'
 import { normalizeSearch } from '~/lib/searchText'
-
-/** A multi-select facet option: stored raw value + its localized label. */
-type FacetOption = { value: string; label: string }
-
-/**
- * Dashed-border dropdown holding the checkbox options of one facet
- * (instrument / status / sector). The menu stays open across clicks so
- * several values can be toggled in a row; the trigger shows a count badge
- * once anything is selected.
- */
-function FacetFilter({
-  label,
-  options,
-  selected,
-  onToggle,
-}: {
-  label: string
-  options: Array<FacetOption>
-  selected: Set<string>
-  onToggle: (value: string) => void
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="border-dashed">
-          <ListFilter className="size-4" />
-          {label}
-          {selected.size > 0 && (
-            <>
-              <Separator orientation="vertical" className="mx-0.5 h-4" />
-              <Badge
-                variant="secondary"
-                className="rounded-sm px-1 font-normal tabular-nums"
-              >
-                {selected.size}
-              </Badge>
-            </>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-h-72 w-52 overflow-auto">
-        {options.map((opt) => (
-          <DropdownMenuCheckboxItem
-            key={opt.value}
-            checked={selected.has(opt.value)}
-            // Keep the menu open so multiple values can be toggled at once.
-            onSelect={(e) => e.preventDefault()}
-            onCheckedChange={() => onToggle(opt.value)}
-          >
-            {opt.label}
-          </DropdownMenuCheckboxItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
 
 /**
  * Stacks two participation tables sharing ONE toolbar: the active deals on top

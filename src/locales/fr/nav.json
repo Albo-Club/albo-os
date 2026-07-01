@@ -2,8 +2,11 @@
   "appShell": {
     "ai": "IA",
     "aiShortcut": "Afficher/masquer le panneau IA (⌘J / Ctrl+J)",
+    "search": "Rechercher",
+    "searchShortcut": "Rechercher (⌘K / Ctrl+K)",
     "breadcrumb": {
       "participations": "Entreprises",
+      "deals": "Deals",
       "cash": "Trésorerie",
       "pointage": "Pointage",
       "passif": "Passif",
@@ -23,6 +26,7 @@
   "items": {
     "dashboard": "Tableau de bord",
     "participations": "Entreprises",
+    "deals": "Deals",
     "cash": "Trésorerie",
     "pointage": "Pointage",
     "passif": "Passif",
