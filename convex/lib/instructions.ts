@@ -117,6 +117,7 @@ export const BASE_INSTRUCTIONS = [
 export function buildInstructions(pageContext?: {
   route?: string
   orgName?: string
+  entity?: { kind: 'deal' | 'company'; id: string }
 }): string {
   const parts = [BASE_INSTRUCTIONS]
   if (pageContext?.orgName) {
@@ -127,6 +128,19 @@ export function buildInstructions(pageContext?: {
       `The user is currently on the app page "${pageContext.route}". ` +
         'Use it as context when relevant (e.g. on the pointage page, ' +
         'they are reconciling transactions).',
+    )
+  }
+  if (pageContext?.entity) {
+    const { kind, id } = pageContext.entity
+    parts.push(
+      `The user is viewing the ${kind} with id "${id}". When they say ` +
+        `"this ${kind}" (or "ce deal" / "cette société"), they mean this one — ` +
+        'operate on it. Fetch its details first with the matching tool ' +
+        `(${
+          kind === 'deal'
+            ? 'listDeals then filter by this id, listValuations, listTransactions'
+            : 'listCompanies then filter by this id, listCompanyDocuments'
+        }) before answering.`,
     )
   }
   return parts.join('\n\n')

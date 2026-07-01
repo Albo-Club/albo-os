@@ -1,0 +1,12 @@
+{
+  "metaTitle": "Deals — Albo OS",
+  "metaTitleAll": "Tous les deals — Albo OS",
+  "title": "Deals",
+  "subtitle": "Tous les deals, toutes entités confondues — cliquez un deal pour l'ouvrir.",
+  "allSubtitle": "Toutes vos organisations réunies — lecture seule. L'édition se fait dans une organisation.",
+  "empty": "Aucun deal pour l'instant — créez-en depuis une fiche société ou via le chat IA.",
+  "search": {
+    "placeholder": "Rechercher un deal, une société, un investisseur…",
+    "noResults": "Aucun deal ne correspond à votre recherche."
+  }
+}

@@ -43,4 +43,21 @@ describe('buildInstructions', () => {
     assert.ok(orgIdx > 0)
     assert.ok(routeIdx > orgIdx)
   })
+
+  it('avec entity deal → grounde sur ce deal + son id', () => {
+    const out = buildInstructions({
+      entity: { kind: 'deal', id: 'deal_123' },
+    })
+    assert.ok(out.startsWith(BASE_INSTRUCTIONS))
+    assert.ok(out.includes('viewing the deal with id "deal_123"'))
+    assert.ok(out.includes('listValuations'))
+  })
+
+  it('avec entity company → grounde sur cette société', () => {
+    const out = buildInstructions({
+      entity: { kind: 'company', id: 'company_456' },
+    })
+    assert.ok(out.includes('viewing the company with id "company_456"'))
+    assert.ok(out.includes('listCompanyDocuments'))
+  })
 })

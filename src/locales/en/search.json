@@ -1,0 +1,13 @@
+{
+  "placeholder": "Search deals, companies, movements…",
+  "empty": "No results.",
+  "hint": "Type to search across deals, companies and movements.",
+  "groups": {
+    "deals": "Deals",
+    "companies": "Companies",
+    "transactions": "Movements"
+  },
+  "askAi": "Ask the AI: \"{{query}}\"",
+  "movementIn": "In",
+  "movementOut": "Out"
+}

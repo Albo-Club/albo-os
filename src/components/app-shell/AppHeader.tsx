@@ -2,7 +2,7 @@ import { Fragment } from 'react'
 import { Link, useLocation, useParams } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
-import { Sparkles } from 'lucide-react'
+import { Search, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../../convex/_generated/api'
 import { ThemeToggle } from './ThemeToggle'
@@ -34,6 +34,7 @@ type DealCrumbData = {
 
 const CRUMB_SEGMENTS = [
   'participations',
+  'deals',
   'cash',
   'pointage',
   'passif',
@@ -140,11 +141,13 @@ export function AppHeader({
   orgName,
   aiPanelOpen,
   onToggleAiPanel,
+  onOpenSearch,
 }: {
   orgSlug: string
   orgName: string
   aiPanelOpen?: boolean
   onToggleAiPanel?: () => void
+  onOpenSearch?: () => void
 }) {
   const location = useLocation()
   const { t } = useTranslation(['nav'])
@@ -208,6 +211,17 @@ export function AppHeader({
         </BreadcrumbList>
       </Breadcrumb>
       <div className="ml-auto flex items-center gap-1">
+        {onOpenSearch && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onOpenSearch}
+            title={t('nav:appShell.searchShortcut')}
+          >
+            <Search className="mr-1.5 size-4" />
+            {t('nav:appShell.search')}
+          </Button>
+        )}
         {onToggleAiPanel && (
           <Button
             variant={aiPanelOpen ? 'secondary' : 'ghost'}

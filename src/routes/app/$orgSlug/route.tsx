@@ -8,6 +8,7 @@ import { SidebarInset, SidebarProvider } from '~/components/ui/sidebar'
 import { AppSidebar } from '~/components/app-shell/AppSidebar'
 import { AppHeader } from '~/components/app-shell/AppHeader'
 import { AiPanel } from '~/components/ai/AiPanel'
+import { CommandPalette } from '~/components/search/CommandPalette'
 import { clearLastOrgCookie, writeLastOrgCookie } from '~/lib/lastOrg'
 import { cn } from '~/lib/utils'
 
@@ -40,6 +41,9 @@ function OrgLayout() {
   // write updates `me` in the other tab, whose effect writes back, etc.
   const lastOrgSyncedRef = useRef<string | null>(null)
   const [aiOpen, setAiOpen] = useState(readAiPanelCookie)
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  // Prompt handed from the palette's "Ask the AI" action to the AI panel.
+  const [askAiPrompt, setAskAiPrompt] = useState<string | null>(null)
 
   const setAiPanelOpen = useCallback((open: boolean) => {
     setAiOpen(open)
@@ -57,6 +61,27 @@ function OrgLayout() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [aiOpen, setAiPanelOpen])
+
+  // ⌘K / Ctrl+K: open the global command palette (mirrors the ⌘J pattern).
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'k' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault()
+        setPaletteOpen((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  // Palette → AI: open the panel and forward the query as a prompt.
+  const handleAskAi = useCallback(
+    (query: string) => {
+      setAiPanelOpen(true)
+      setAskAiPrompt(query)
+    },
+    [setAiPanelOpen],
+  )
 
   useEffect(() => {
     if (me?.kind !== 'ready') return
@@ -116,6 +141,7 @@ function OrgLayout() {
           orgName={member.name}
           aiPanelOpen={aiOpen}
           onToggleAiPanel={() => setAiPanelOpen(!aiOpen)}
+          onOpenSearch={() => setPaletteOpen(true)}
         />
         <div className="min-h-0 flex-1 overflow-y-auto">
           <Outlet />
@@ -139,8 +165,19 @@ function OrgLayout() {
             orgId={org._id}
             open={aiOpen}
             onClose={() => setAiPanelOpen(false)}
+            initialPrompt={askAiPrompt}
+            onPromptConsumed={() => setAskAiPrompt(null)}
           />
         </aside>
+      )}
+      {org && (
+        <CommandPalette
+          orgId={org._id}
+          orgSlug={orgSlug}
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          onAskAi={handleAskAi}
+        />
       )}
     </SidebarProvider>
   )

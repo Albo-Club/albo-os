@@ -1744,3 +1744,30 @@ de « ne touche pas ». Et le validateur `v.optional(v.number())` **refuse**
 C'est exactement le même mécanisme que le clear de `name` (chaîne vide →
 `undefined`), généralisé aux champs numériques nullable. Tout nouveau champ
 lifecycle « réversible » doit suivre ce pattern, pas réinventer un sentinel.
+
+## Recherche globale (palette ⌘K) — portée & implémentation
+
+La palette ⌘K (`src/components/search/CommandPalette.tsx` +
+`convex/search.ts:global`) a deux limites assumées, à connaître avant de
+l'étendre :
+
+- **Deals & sociétés filtrés en mémoire**, pas via un index full-text. Choix
+  volontaire : petits volumes (family office, quelques dizaines/centaines de
+  deals), et cohérent avec le filtrage déjà en place dans `ParticipationsView` /
+  `DealsListView` (substring normalisé, accent-insensible via `normalizeSearch`).
+  Les **mouvements** (transactions), eux, peuvent être nombreux → l'index
+  `search_text` existant est réutilisé (`.withSearchIndex`). Si le nombre de
+  deals/sociétés explose un jour, ajouter un `searchText` dérivé + `searchIndex`
+  sur ces tables (comme `transactions`) plutôt que de charger `.collect()`.
+- **Palette org-scoped**, montée dans `/app/$orgSlug/route.tsx` uniquement (pas
+  dans `/app/all`). `search.global` prend un `orgId` unique ; la vue agrégée
+  `/app/all` est en lecture seule et n'a pas d'org courante. Une recherche
+  cross-org (union sur toutes les orgs membres, façon `aggregate.listDeals`)
+  reste un follow-up — ne pas câbler la palette actuelle sur `/app/all` sans
+  cette query dédiée.
+
+Côté cmdk : `shouldFilter={false}` car le filtrage est fait côté serveur — sans
+ça, cmdk re-filtrerait les résultats déjà filtrés sur le `value` des items
+(`deal-<id>`…) et masquerait tout. `CommandDialog` n'est pas exporté par notre
+`command.tsx` → la palette wrappe `Command` dans un `Dialog` maison (avec un
+`DialogTitle` `sr-only` pour l'a11y Radix).

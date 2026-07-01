@@ -23,6 +23,46 @@ bas de page.
 
 ---
 
+## v1.58.0 — 01/07/2026 à 17:48 — Vue transversale des deals + recherche globale
+
+Les deals ne se retrouvaient qu'en passant par leur entreprise, alors qu'une
+même boîte peut porter plusieurs deals — impossible de savoir dans quelle entité
+vivait un deal donné. Trois nouveautés y répondent :
+
+- **Une liste « Deals »** dans le menu de gauche : tous vos deals, toutes
+  entités confondues, sur une seule page. Chaque ligne montre à la fois la
+  société investie **et** l'entité investisseuse, avec recherche, filtres
+  (instrument, statut, secteur), tri et export CSV. Disponible aussi dans la vue
+  agrégée « Toutes les organisations » (avec la colonne Organisation).
+- **Une recherche globale (⌘K / Ctrl+K)**, accessible partout depuis le bouton
+  « Rechercher » de l'en-tête : elle interroge d'un coup les **deals**, les
+  **sociétés** et les **mouvements** bancaires, résultats regroupés par type —
+  on choisit d'un clic si l'on ouvre la société ou le deal.
+- **L'assistant IA sait sur quoi vous travaillez** : quand vous consultez une
+  fiche deal ou société, il opère directement dessus (« résume ce deal » sans
+  avoir à le nommer). La recherche propose aussi « Demander à l'IA » pour
+  envoyer votre requête à l'assistant.
+
+> **🔧 Notes techniques**
+>
+> - Liste plate : `src/components/deals/DealsListView.tsx` (une ligne = un
+>   deal, cible + investisseur), montée sur les routes
+>   `src/routes/app/$orgSlug/deals.index.tsx` et `src/routes/app/all/deals.tsx`
+>   (réutilise `api.deals.list` / `api.aggregate.listDeals`). `FacetFilter`
+>   extrait de `ParticipationsView` vers un module partagé ; `SortableHead`,
+>   `useFormatters`, `useDealTitle`, `residualCents` réutilisés. Entrée nav
+>   `items.deals` + segment breadcrumb `deals`.
+> - Recherche : query `convex/search.ts:global` (deals + sociétés filtrés en
+>   mémoire, transactions via l'index full-text `search_text`), palette
+>   `src/components/search/CommandPalette.tsx` (shadcn `command` + `Dialog`),
+>   montée dans `route.tsx` avec un listener ⌘K et un bouton dans `AppHeader`.
+>   Palette org-scoped.
+> - Contexte IA : `AiPanel` dérive l'entité courante (`useParams`) et la passe
+>   dans `context.entity` de `sendMessage` / `respondToToolApproval`
+>   (`convex/chat.ts`), transmise à `buildInstructions`
+>   (`convex/lib/instructions.ts`). Pont « Demander à l'IA » via les props
+>   `initialPrompt` / `onPromptConsumed` du panneau.
+
 ## v1.57.0 — 01/07/2026 à 16:54 — Participations : retrait de la colonne « Investi le »
 
 La liste des participations (regroupée par entreprise) affichait une colonne

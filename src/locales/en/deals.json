@@ -1,0 +1,12 @@
+{
+  "metaTitle": "Deals — Albo OS",
+  "metaTitleAll": "All deals — Albo OS",
+  "title": "Deals",
+  "subtitle": "Every deal across your entities — click a deal to open it.",
+  "allSubtitle": "All your organizations combined — read-only. Edit within an organization.",
+  "empty": "No deals yet — create them from a company sheet or via the AI chat.",
+  "search": {
+    "placeholder": "Search a deal, company, investor…",
+    "noResults": "No deal matches your search."
+  }
+}

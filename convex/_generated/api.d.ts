@@ -69,6 +69,7 @@ import type * as reportAnalysis from "../reportAnalysis.js";
 import type * as reportPipeline from "../reportPipeline.js";
 import type * as publicConfig from "../publicConfig.js";
 import type * as rateLimiters from "../rateLimiters.js";
+import type * as search from "../search.js";
 import type * as seed from "../seed.js";
 import type * as telegram from "../telegram.js";
 import type * as transactions from "../transactions.js";
@@ -143,6 +144,7 @@ declare const fullApi: ApiFromModules<{
   reportPipeline: typeof reportPipeline;
   publicConfig: typeof publicConfig;
   rateLimiters: typeof rateLimiters;
+  search: typeof search;
   seed: typeof seed;
   telegram: typeof telegram;
   transactions: typeof transactions;
