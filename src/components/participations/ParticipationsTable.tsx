@@ -249,7 +249,7 @@ export function DealsList({
  * targets the detail link; in the aggregated view the slug is derived from
  * each deal's org.
  */
-type SortKey = 'name' | 'invested' | 'deals' | 'paid' | 'received' | 'tvpi'
+type SortKey = 'name' | 'deals' | 'paid' | 'received' | 'tvpi'
 
 /** A multi-select facet option: stored raw value + its localized label. */
 type FacetOption = { value: string; label: string }
@@ -364,7 +364,7 @@ export function ParticipationsTable({
   exportDeals?: Array<DealRow>
 }) {
   const { t } = useTranslation('participations')
-  const { fmtEur, fmtDate, fmtMultiple } = useFormatters()
+  const { fmtEur, fmtMultiple } = useFormatters()
 
   // Client-side search (low volumes): company name, custom deal name,
   // instrument (raw key + translated label), investor, sector —
@@ -473,8 +473,6 @@ export function ParticipationsTable({
         orgs: Set<string>
         slug: string | undefined
         deals: Array<DealRow>
-        // Company entry date: earliest signed deal (null if none dated).
-        signedDate: number | null
         paid: number
         received: number
         residual: number
@@ -493,7 +491,6 @@ export function ParticipationsTable({
         orgs: new Set<string>(),
         slug: orgSlug ?? d.org?.slug,
         deals: [],
-        signedDate: null,
         paid: 0,
         received: 0,
         residual: 0,
@@ -503,12 +500,6 @@ export function ParticipationsTable({
       }
       g.deals.push(d)
       if (d.org) g.orgs.add(d.org.name)
-      if (d.signedDate != null) {
-        g.signedDate =
-          g.signedDate == null
-            ? d.signedDate
-            : Math.min(g.signedDate, d.signedDate)
-      }
       g.paid += d.paidActual ?? 0
       g.received += d.received ?? 0
       g.residual += residualCents(d)
@@ -532,8 +523,8 @@ export function ParticipationsTable({
     }))
   }, [filtered, orgSlug])
 
-  // Column sort (client-side, low volumes). null = server order
-  // (signedDate desc). Missing TVPIs go to the end of the list.
+  // Column sort (client-side, low volumes). null = server order.
+  // Missing TVPIs go to the end of the list.
   const [sort, setSort] = useState<{
     key: SortKey
     dir: 'asc' | 'desc'
@@ -551,11 +542,9 @@ export function ParticipationsTable({
         ? g.name
         : sort.key === 'tvpi'
           ? (g.tvpi ?? Number.NEGATIVE_INFINITY)
-          : sort.key === 'invested'
-            ? (g.signedDate ?? Number.NEGATIVE_INFINITY)
-            : sort.key === 'deals'
-              ? g.deals.length
-              : g[sort.key]
+          : sort.key === 'deals'
+            ? g.deals.length
+            : g[sort.key]
     const sign = sort.dir === 'asc' ? 1 : -1
     return [...groups].sort((a, b) => {
       const va = value(a)
@@ -635,9 +624,9 @@ export function ParticipationsTable({
     if (exportRef) exportRef.current = handleExport
   })
 
-  // Base 7 (company, invested, deals, paid, received, tvpi, chevron) + the
+  // Base 6 (company, deals, paid, received, tvpi, chevron) + the
   // optional org and settled-only MOIC columns.
-  const colSpan = 7 + (showOrg ? 1 : 0) + (settled ? 1 : 0)
+  const colSpan = 6 + (showOrg ? 1 : 0) + (settled ? 1 : 0)
 
   // Search bar shown as soon as there are deals — including when the
   // current search matches nothing (otherwise it can't be cleared).
@@ -728,13 +717,6 @@ export function ParticipationsTable({
               />
               {showOrg && <TableHead>{t('col.org')}</TableHead>}
               <SortableHead
-                label={t('col.invested')}
-                active={sort?.key === 'invested'}
-                dir={sort?.dir ?? 'desc'}
-                onClick={() => toggleSort('invested')}
-                sortable={!settled}
-              />
-              <SortableHead
                 label={t('col.deals')}
                 active={sort?.key === 'deals'}
                 dir={sort?.dir ?? 'desc'}
@@ -791,7 +773,6 @@ export function ParticipationsTable({
                   showOrg={showOrg}
                   settled={settled}
                   fmtEur={fmtEur}
-                  fmtDate={fmtDate}
                   fmtMultiple={fmtMultiple}
                 />
               ))
@@ -813,7 +794,6 @@ function CompanyRows({
   showOrg,
   settled,
   fmtEur,
-  fmtDate,
   fmtMultiple,
 }: {
   group: {
@@ -823,7 +803,6 @@ function CompanyRows({
     orgs: Set<string>
     slug: string | undefined
     deals: Array<DealRow>
-    signedDate: number | null
     paid: number
     received: number
     tvpi: number | null
@@ -835,7 +814,6 @@ function CompanyRows({
   showOrg: boolean
   settled: boolean
   fmtEur: (c?: number | null) => string
-  fmtDate: (ms?: number | null) => string
   fmtMultiple: (ratio: number | null) => string
 }) {
   const { t } = useTranslation('participations')
@@ -907,9 +885,6 @@ function CompanyRows({
           </span>
         </TableCell>
       )}
-      <TableCell className="tabular-nums">
-        {fmtDate(group.signedDate)}
-      </TableCell>
       <TableCell className="text-right tabular-nums">
         {t('dealsCount', { count: group.deals.length })}
       </TableCell>

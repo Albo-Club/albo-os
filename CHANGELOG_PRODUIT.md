@@ -23,6 +23,26 @@ bas de page.
 
 ---
 
+## v1.55.0 — 01/07/2026 à 16:54 — Participations : retrait de la colonne « Investi le »
+
+La liste des participations (regroupée par entreprise) affichait une colonne
+« Investi le ». Comme une même entreprise peut porter plusieurs deals à des
+dates différentes, cette date agrégée n'était pas pertinente et pouvait
+rester vide. Elle a été retirée de la liste. Les dates propres à chaque deal
+(closing, signature) restent visibles sur la fiche du deal et dans l'export.
+
+> **🔧 Notes techniques**
+>
+> - Suppression de la colonne « Investi le » dans
+>   `src/components/participations/ParticipationsTable.tsx` : en-tête, cellule,
+>   clé de tri `invested`, et l'agrégat `group.signedDate` (min des
+>   `signedDate` des deals) qui n'alimentait plus que cette colonne. `colSpan`
+>   ramené de 7 à 6, `fmtDate` retiré des dépendances de la table et de
+>   `CompanyRows`.
+> - Le champ per-deal `signedDate` (`DealRow`) reste utilisé par la liste des
+>   deals de la fiche entité (`DealsList`) et l'export CSV — non touché.
+> - Clé i18n orpheline `col.invested` retirée de `src/locales/{fr,en}/participations.json`.
+
 ## v1.54.1 — 01/07/2026 à 16:33 — Nouveautés : les horaires affichés passent à l'heure de Paris
 
 Sur la page Nouveautés, l'heure de chaque mise à jour était écrite en UTC, ce qui
