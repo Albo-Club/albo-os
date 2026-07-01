@@ -3,6 +3,7 @@ import { Check, ChevronsUpDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { SECTOR_SLUGS } from '~/lib/sectors'
+import type { SectorSlug } from '~/lib/sectors'
 import { cn } from '~/lib/utils'
 import { Button } from '~/components/ui/button'
 import {
@@ -25,24 +26,36 @@ import {
  * stored verbatim — `companies.sector` stays a free-form string. Selecting the
  * active sector again clears it (toggle, like the pointage combobox). Empty
  * value = no sector.
+ *
+ * `extraSectors` are free-typed sector values already used by other entities in
+ * the org: they get merged into the option list (displayed verbatim, no i18n
+ * label) so a sector created once reappears in the picker afterwards.
  */
 export function SectorCombobox({
   value,
   onChange,
   disabled,
+  extraSectors,
 }: {
   value: string
   onChange: (value: string) => void
   disabled?: boolean
+  extraSectors?: Array<string>
 }) {
   const { t } = useTranslation('participations')
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
 
-  const options = SECTOR_SLUGS.map((slug) => ({
+  const predefined = SECTOR_SLUGS.map((slug) => ({
     slug,
     label: t(`participations:sectors.${slug}`),
   }))
+  // Free-typed sectors already stored on other entities: dedup, drop any that
+  // collide with a predefined slug, and display them verbatim.
+  const extras = Array.from(new Set(extraSectors ?? []))
+    .filter((s) => s !== '' && !SECTOR_SLUGS.includes(s as SectorSlug))
+    .map((s) => ({ slug: s, label: s }))
+  const options = [...predefined, ...extras]
 
   // Resolve the current value to a label: a known slug → its i18n label, a free
   // value → itself, empty → the placeholder.

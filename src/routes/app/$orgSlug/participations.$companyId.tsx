@@ -137,6 +137,16 @@ function EditCompanyDialog({
 }) {
   const { t } = useTranslation(['participations', 'common'])
   const updateCompany = useConvexMutation(api.companies.update)
+  // Sectors already used by other entities in the org, so a free-typed sector
+  // reappears in the picker afterwards (cf. SectorCombobox `extraSectors`).
+  const orgCompanies = useConvexQuery(api.companies.list, { orgId })
+  const existingSectors = useMemo(
+    () =>
+      (orgCompanies ?? [])
+        .map((c) => c.sector)
+        .filter((s): s is string => !!s),
+    [orgCompanies],
+  )
   const [name, setName] = useState(company.name)
   const [siren, setSiren] = useState(company.siren ?? '')
   const [domain, setDomain] = useState(company.domain ?? '')
@@ -261,7 +271,11 @@ function EditCompanyDialog({
               Stored as a slug for predefined sectors, verbatim otherwise. */}
           <div className="space-y-2">
             <Label>{t('participations:edit.sectorLabel')}</Label>
-            <SectorCombobox value={sector} onChange={setSector} />
+            <SectorCombobox
+              value={sector}
+              onChange={setSector}
+              extraSectors={existingSectors}
+            />
           </div>
           {/* People — founders / board / co-investors. Each row searches Attio
               by name (Lot 5c): picking a suggestion fills name + attioRecordId

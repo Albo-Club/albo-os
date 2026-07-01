@@ -23,6 +23,24 @@ bas de page.
 
 ---
 
+## v1.53.3 — 01/07/2026 à 12:00 — Secteur d'une entité : un secteur créé réapparaît dans la liste
+
+Quand vous ajoutiez un secteur qui n'était pas dans la liste proposée (en le
+tapant à la main sur une entité), il n'était plus proposé ensuite : sur une
+autre entité, il fallait le retaper à l'identique. Désormais, tout secteur déjà
+utilisé par une entité de l'organisation apparaît directement dans la liste de
+sélection du champ secteur.
+
+> **🔧 Notes techniques**
+>
+> - `SectorCombobox` accepte une prop `extraSectors` : les valeurs de secteur
+>   libres (hors `SECTOR_SLUGS`) déjà stockées sur d'autres entités sont
+>   fusionnées dans la liste d'options, affichées telles quelles (pas de label
+>   i18n), dédupliquées.
+> - Dans `EditCompanyDialog` (`participations.$companyId.tsx`), on lit
+>   `api.companies.list` scopée à l'org pour dériver les secteurs existants et
+>   les passer au combobox. `companies.sector` reste un champ texte libre.
+
 ## v1.53.2 — 01/07/2026 à 11:00 — Reporting par email : le corps des mails est enfin lu
 
 Certains reports transférés par email n'apparaissaient pas dans l'app. En cause :
