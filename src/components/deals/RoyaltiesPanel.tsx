@@ -42,7 +42,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -339,6 +338,18 @@ export function RoyaltiesPanel({
 
   const hasData = rows.length > 0
 
+  // Read-only euro cell used across the transposed body rows (all quarter and
+  // cumulative cells except the two editable CA lines and the gap rows).
+  const euroCell = (
+    value: number | undefined,
+    key: string,
+    className?: string,
+  ) => (
+    <TableCell key={key} className={cn('text-right tabular-nums', className)}>
+      {value == null ? '—' : fmtEur(value)}
+    </TableCell>
+  )
+
   return (
     <div className="space-y-4">
       {/* Declarative parameters (stored), edited via the shared dialog. */}
@@ -567,94 +578,107 @@ export function RoyaltiesPanel({
 
         {hasData ? (
           <Table>
+            {/* Transposed layout: quarters run in COLUMNS, the BP / Réel / Écart
+                metrics in ROWS. Two left header columns (group + sub-metric),
+                one column per quarter, then the cumulative column. */}
             <TableHeader>
               <TableRow>
-                <TableHead rowSpan={2} className="align-bottom">
+                <TableHead colSpan={2} className="align-bottom">
                   {t('fiche.royalty.colQuarter')}
                 </TableHead>
-                <TableHead
-                  colSpan={2}
-                  className={cn('text-center', COL_BP_INITIAL)}
-                >
-                  {t('fiche.royalty.colBpInitial')}
+                {rows.map((r) => (
+                  <TableHead key={r.quarter} className="text-right">
+                    {r.quarter}
+                  </TableHead>
+                ))}
+                <TableHead className="text-right font-medium">
+                  {t('fiche.royalty.cumul')}
                 </TableHead>
-                <TableHead
-                  colSpan={2}
-                  className={cn('text-center font-medium', COL_BP_DEGRADED)}
-                >
-                  {t('fiche.royalty.colBpDegraded')}
-                </TableHead>
-                <TableHead colSpan={2} className={cn('text-center', COL_REAL)}>
-                  {t('fiche.royalty.colReal')}
-                </TableHead>
-                <TableHead colSpan={2} className="text-center">
-                  {t('fiche.royalty.colGap')}
-                </TableHead>
-              </TableRow>
-              <TableRow>
-                <TableHead className={cn('text-right', COL_BP_INITIAL)}>
-                  {t('fiche.royalty.subCa')}
-                </TableHead>
-                <TableHead className={cn('text-right', COL_BP_INITIAL)}>
-                  {t('fiche.royalty.subRoyalties')}
-                </TableHead>
-                <TableHead className={cn('text-right', COL_BP_DEGRADED)}>
-                  {t('fiche.royalty.subCa')}
-                </TableHead>
-                <TableHead className={cn('text-right', COL_BP_DEGRADED)}>
-                  {t('fiche.royalty.subRoyalties')}
-                </TableHead>
-                <TableHead className={cn('text-right', COL_REAL)}>
-                  {t('fiche.royalty.subCa')}
-                </TableHead>
-                <TableHead className={cn('text-right', COL_REAL)}>
-                  {t('fiche.royalty.subRoyalties')}
-                </TableHead>
-                <TableHead className="text-right">€</TableHead>
-                <TableHead className="text-right">%</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.quarter}>
-                  <TableCell className="font-medium">{r.quarter}</TableCell>
+              {/* BP initial — CA (editable) + Royalties (derived). */}
+              <TableRow className={COL_BP_INITIAL}>
+                <TableCell
+                  rowSpan={2}
+                  className="align-top font-medium whitespace-normal"
+                >
+                  {t('fiche.royalty.colBpInitial')}
+                </TableCell>
+                <TableCell>{t('fiche.royalty.subCa')}</TableCell>
+                {rows.map((r) => (
                   <EditableCa
+                    key={r.quarter}
                     value={r.plannedRevenue}
                     onSave={(c) => void saveBpPoint(r.quarter, c)}
                     onDelete={() => void removeBpPoint(r.quarter)}
-                    className={COL_BP_INITIAL}
                   />
-                  <TableCell
-                    className={cn('text-right tabular-nums', COL_BP_INITIAL)}
-                  >
-                    {r.plannedRoyalty == null ? '—' : fmtEur(r.plannedRoyalty)}
-                  </TableCell>
-                  <TableCell
-                    className={cn('text-right tabular-nums', COL_BP_DEGRADED)}
-                  >
-                    {r.degradedRevenue == null
-                      ? '—'
-                      : fmtEur(r.degradedRevenue)}
-                  </TableCell>
-                  <TableCell
-                    className={cn('text-right tabular-nums', COL_BP_DEGRADED)}
-                  >
-                    {r.degradedRoyalty == null
-                      ? '—'
-                      : fmtEur(r.degradedRoyalty)}
-                  </TableCell>
+                ))}
+                {euroCell(totals.plannedRevenue, 'total', 'font-medium')}
+              </TableRow>
+              <TableRow className={COL_BP_INITIAL}>
+                <TableCell>{t('fiche.royalty.subRoyalties')}</TableCell>
+                {rows.map((r) =>
+                  euroCell(r.plannedRoyalty, r.quarter),
+                )}
+                {euroCell(totals.plannedRoyalty, 'total', 'font-medium')}
+              </TableRow>
+
+              {/* BP dégradé — CA + Royalties (both derived). */}
+              <TableRow className={COL_BP_DEGRADED}>
+                <TableCell
+                  rowSpan={2}
+                  className="align-top font-medium whitespace-normal"
+                >
+                  {t('fiche.royalty.colBpDegraded')}
+                </TableCell>
+                <TableCell>{t('fiche.royalty.subCa')}</TableCell>
+                {rows.map((r) => euroCell(r.degradedRevenue, r.quarter))}
+                {euroCell(totals.degradedRevenue, 'total', 'font-medium')}
+              </TableRow>
+              <TableRow className={COL_BP_DEGRADED}>
+                <TableCell>{t('fiche.royalty.subRoyalties')}</TableCell>
+                {rows.map((r) => euroCell(r.degradedRoyalty, r.quarter))}
+                {euroCell(totals.degradedRoyalty, 'total', 'font-medium')}
+              </TableRow>
+
+              {/* Réel — CA (editable) + Royalties (derived). */}
+              <TableRow className={COL_REAL}>
+                <TableCell
+                  rowSpan={2}
+                  className="align-top font-medium whitespace-normal"
+                >
+                  {t('fiche.royalty.colReal')}
+                </TableCell>
+                <TableCell>{t('fiche.royalty.subCa')}</TableCell>
+                {rows.map((r) => (
                   <EditableCa
+                    key={r.quarter}
                     value={r.actualRevenue}
                     onSave={(c) => void addActual(r.quarter, c)}
                     onDelete={() => void removeActual(r.quarter)}
-                    className={COL_REAL}
                   />
+                ))}
+                {euroCell(totals.actualRevenue, 'total', 'font-medium')}
+              </TableRow>
+              <TableRow className={COL_REAL}>
+                <TableCell>{t('fiche.royalty.subRoyalties')}</TableCell>
+                {rows.map((r) => euroCell(r.actualRoyalty, r.quarter))}
+                {euroCell(totals.actualRoyalty, 'total', 'font-medium')}
+              </TableRow>
+
+              {/* Écart — € then %. Only the € line carries a cumulative total. */}
+              <TableRow>
+                <TableCell
+                  rowSpan={2}
+                  className="align-top font-medium whitespace-normal"
+                >
+                  {t('fiche.royalty.colGap')}
+                </TableCell>
+                <TableCell>€</TableCell>
+                {rows.map((r) => (
                   <TableCell
-                    className={cn('text-right tabular-nums', COL_REAL)}
-                  >
-                    {r.actualRoyalty == null ? '—' : fmtEur(r.actualRoyalty)}
-                  </TableCell>
-                  <TableCell
+                    key={r.quarter}
                     className={cn(
                       'text-right tabular-nums',
                       r.gapAbs != null && signTone(r.gapAbs),
@@ -664,7 +688,22 @@ export function RoyaltiesPanel({
                       ? '—'
                       : `${r.gapAbs > 0 ? '+' : ''}${fmtEur(r.gapAbs)}`}
                   </TableCell>
+                ))}
+                <TableCell
+                  className={cn(
+                    'text-right font-medium tabular-nums',
+                    signTone(totals.gapAbs),
+                  )}
+                >
+                  {totals.gapAbs > 0 ? '+' : ''}
+                  {fmtEur(totals.gapAbs)}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>%</TableCell>
+                {rows.map((r) => (
                   <TableCell
+                    key={r.quarter}
                     className={cn(
                       'text-right tabular-nums',
                       r.gapAbs != null && signTone(r.gapAbs),
@@ -672,52 +711,10 @@ export function RoyaltiesPanel({
                   >
                     {r.gapPct == null ? '—' : fmtPctSigned(r.gapPct)}
                   </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter>
-              <TableRow>
-                <TableCell className="font-medium">
-                  {t('fiche.royalty.cumul')}
-                </TableCell>
-                <TableCell
-                  className={cn('text-right tabular-nums', COL_BP_INITIAL)}
-                >
-                  {fmtEur(totals.plannedRevenue)}
-                </TableCell>
-                <TableCell
-                  className={cn('text-right tabular-nums', COL_BP_INITIAL)}
-                >
-                  {fmtEur(totals.plannedRoyalty)}
-                </TableCell>
-                <TableCell
-                  className={cn('text-right tabular-nums', COL_BP_DEGRADED)}
-                >
-                  {fmtEur(totals.degradedRevenue)}
-                </TableCell>
-                <TableCell
-                  className={cn('text-right tabular-nums', COL_BP_DEGRADED)}
-                >
-                  {fmtEur(totals.degradedRoyalty)}
-                </TableCell>
-                <TableCell className={cn('text-right tabular-nums', COL_REAL)}>
-                  {fmtEur(totals.actualRevenue)}
-                </TableCell>
-                <TableCell className={cn('text-right tabular-nums', COL_REAL)}>
-                  {fmtEur(totals.actualRoyalty)}
-                </TableCell>
-                <TableCell
-                  className={cn(
-                    'text-right tabular-nums',
-                    signTone(totals.gapAbs),
-                  )}
-                >
-                  {totals.gapAbs > 0 ? '+' : ''}
-                  {fmtEur(totals.gapAbs)}
-                </TableCell>
+                ))}
                 <TableCell />
               </TableRow>
-            </TableFooter>
+            </TableBody>
           </Table>
         ) : (
           <p className="text-muted-foreground p-8 text-center text-sm">
