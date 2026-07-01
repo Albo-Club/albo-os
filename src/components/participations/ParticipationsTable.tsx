@@ -246,7 +246,7 @@ export function DealsList({
  * feeds each instance an already-filtered `deals` set (the active table and the
  * settled section share one toolbar).
  */
-type SortKey = 'name' | 'invested' | 'deals' | 'paid' | 'received' | 'tvpi'
+type SortKey = 'name' | 'deals' | 'paid' | 'received' | 'tvpi'
 
 /** Clickable header of a sortable column (asc ⇄ desc). */
 function SortableHead({
@@ -304,7 +304,7 @@ export function ParticipationsTable({
   resetKey?: string
 }) {
   const { t } = useTranslation('participations')
-  const { fmtEur, fmtDate, fmtMultiple, fmtPercent } = useFormatters()
+  const { fmtEur, fmtMultiple, fmtPercent } = useFormatters()
 
   const groups = useMemo(() => {
     if (!deals) return undefined
@@ -416,11 +416,9 @@ export function ParticipationsTable({
         ? g.name
         : sort.key === 'tvpi'
           ? (g.tvpi ?? Number.NEGATIVE_INFINITY)
-          : sort.key === 'invested'
-            ? (g.signedDate ?? Number.NEGATIVE_INFINITY)
-            : sort.key === 'deals'
-              ? g.deals.length
-              : g[sort.key]
+          : sort.key === 'deals'
+            ? g.deals.length
+            : g[sort.key]
     const sign = sort.dir === 'asc' ? 1 : -1
     return [...groups].sort((a, b) => {
       const va = value(a)
@@ -443,9 +441,9 @@ export function ParticipationsTable({
     (page + 1) * PAGE_SIZE,
   )
 
-  // Base 6 (company, invested, deals, paid, received, chevron) + the optional
+  // Base 5 (company, deals, paid, received, chevron) + the optional
   // org column, plus TVPI (active) or MOIC + TRI (settled).
-  const colSpan = 6 + (showOrg ? 1 : 0) + (settled ? 2 : 1)
+  const colSpan = 5 + (showOrg ? 1 : 0) + (settled ? 2 : 1)
 
   if (groups && groups.length === 0) {
     return (
@@ -469,13 +467,6 @@ export function ParticipationsTable({
                 sortable={!settled}
               />
               {showOrg && <TableHead>{t('col.org')}</TableHead>}
-              <SortableHead
-                label={t('col.invested')}
-                active={sort?.key === 'invested'}
-                dir={sort?.dir ?? 'desc'}
-                onClick={() => toggleSort('invested')}
-                sortable={!settled}
-              />
               <SortableHead
                 label={t('col.deals')}
                 active={sort?.key === 'deals'}
@@ -538,7 +529,6 @@ export function ParticipationsTable({
                   showOrg={showOrg}
                   settled={settled}
                   fmtEur={fmtEur}
-                  fmtDate={fmtDate}
                   fmtMultiple={fmtMultiple}
                   fmtPercent={fmtPercent}
                 />
@@ -561,7 +551,6 @@ function CompanyRows({
   showOrg,
   settled,
   fmtEur,
-  fmtDate,
   fmtMultiple,
   fmtPercent,
 }: {
@@ -572,7 +561,6 @@ function CompanyRows({
     orgs: Set<string>
     slug: string | undefined
     deals: Array<DealRow>
-    signedDate: number | null
     paid: number
     received: number
     tvpi: number | null
@@ -585,7 +573,6 @@ function CompanyRows({
   showOrg: boolean
   settled: boolean
   fmtEur: (c?: number | null) => string
-  fmtDate: (ms?: number | null) => string
   fmtMultiple: (ratio: number | null) => string
   fmtPercent: (ratio: number | null) => string
 }) {
@@ -658,9 +645,6 @@ function CompanyRows({
           </span>
         </TableCell>
       )}
-      <TableCell className="tabular-nums">
-        {fmtDate(group.signedDate)}
-      </TableCell>
       <TableCell className="text-right tabular-nums">
         {t('dealsCount', { count: group.deals.length })}
       </TableCell>
