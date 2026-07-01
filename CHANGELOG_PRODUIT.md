@@ -23,6 +23,43 @@ bas de page.
 
 ---
 
+## v1.56.0 — 01/07/2026 à 16:45 — Participations soldées : toujours visibles, avec le TRI
+
+La section « Participations soldées » en bas de la liste Entreprises est
+désormais **toujours dépliée** : plus de bouton pour la replier, elle reste
+visible en bas de page. La **barre de recherche et les filtres** du haut de la
+liste s'appliquent maintenant **aussi** aux participations soldées — il n'y a
+donc plus qu'une seule barre, celle du haut (celle qui était juste au-dessus des
+soldées a été retirée).
+
+Côté indicateurs, la colonne **TVPI** a été retirée des participations soldées
+(elle vaut toujours le MOIC une fois sorti) et une colonne **TRI** (taux de
+rendement annualisé) a été ajoutée à côté du MOIC : elle traduit le multiple en
+rendement par an sur la durée de détention. Une perte totale s'affiche à −100 %,
+et le TRI reste « — » tant qu'aucune date de sortie n'est renseignée.
+
+> **🔧 Notes techniques**
+>
+> - `ParticipationsView.tsx` devient le propriétaire unique de la recherche +
+>   des facettes (état, `useMemo` `facets`/`filtered`, toolbar, export CSV
+>   `handleExport` sur le set complet non splitté, `exportRef`). Il applique le
+>   filtre puis splitte en `active` / `settled` et passe chaque sous-ensemble
+>   déjà filtré à `ParticipationsTable`. Section soldés rendue en `<section>`
+>   avec un simple `<h3>` (plus d'état `open`/chevron), masquée si `settled`
+>   filtré est vide.
+> - `ParticipationsTable.tsx` perd sa toolbar/recherche/facettes/export
+>   (remontés) ; il ne fait plus que grouper par société, trier et paginer. Le
+>   variant `settled` remplace la colonne TVPI par **MOIC + TRI**. Nouveaux
+>   props `isFiltered` (message vide) et `resetKey` (reset pagination). Helper
+>   `residualCents` désormais exporté (réutilisé par l'export dans la vue).
+> - TRI = IRR à deux points sur le **même** agrégat que le MOIC :
+>   `MOIC^(1/années) − 1`, avec années = (`exitedDate` la plus récente −
+>   `signedDate` la plus ancienne) du groupe / `MS_PER_YEAR`. Nécessite les deux
+>   dates et une durée positive, sinon `null` → « — ». `exitedDate` ajouté au
+>   type `DealRow` (déjà présent côté serveur via le spread `...deal`).
+>   Formateur `fmtPercent` ajouté à `useFormatters`. Clé i18n `col.tri`
+>   (FR « TRI » / EN « IRR »).
+
 ## v1.55.0 — 01/07/2026 à 16:32 — Montants plus lisibles pendant la saisie
 
 Quand vous saisissez un montant en euros dans un champ (création d'un deal,
