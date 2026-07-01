@@ -23,6 +23,51 @@ bas de page.
 
 ---
 
+## v1.60.0 — 01/07/2026 à 18:41 — TRI des participations exact (calcul serveur)
+
+Le taux de rendement interne (TRI) affiché pour une société soldée est
+désormais **exact**. Il est calculé côté serveur sur l'enchaînement daté des
+flux réels (versements et encaissements) de **tous** les deals de la société,
+au lieu d'une approximation qui annualisait le multiple entre la première
+entrée et la dernière sortie.
+
+Concrètement, pour une société qui a plusieurs investissements à des dates
+d'entrée et de sortie différentes, le TRI affiché **change** — il devient plus
+juste. L'écart avec l'ancien chiffre peut être important quand les opérations
+sont étalées dans le temps. Le TRI reste vide (« — ») lorsqu'il n'est pas
+définissable mathématiquement, par exemple une perte totale sans aucun
+encaissement — le multiple 0,00× et le badge « perdu » signalent déjà la perte.
+
+L'export CSV des participations gagne deux colonnes, **MOIC** et **TRI**
+réalisés par ligne, alignées sur ces mêmes chiffres. L'assistant IA lit lui
+aussi ces valeurs réelles (versé, reçu, MOIC, TRI) plutôt que les seuls
+montants saisis.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau helper pur `realizedCashflows(txs, instrumentKind)` dans
+>   `convex/lib/metrics.ts` : flux signés et dé-TVA-és (÷1,2 pour `royalty`),
+>   prêts pour `xirr()`. Le TRI d'une société se résout sur l'**union** des flux
+>   de ses deals — le TRI/IRR n'est pas additif, il ne se déduit pas des TRI par
+>   deal.
+> - `convex/deals.ts` : helper `dealRealizedMetrics(ctx, deal)` (une seule
+>   lecture des transactions) → `{ paidActual, received, flows, moic, irr }`
+>   avec `irr = xirr(flows)`. `deals.list` renvoie ces champs par deal ; idem
+>   `convex/aggregate.ts` pour la vue cross-org `/app/all`.
+> - Front `ParticipationsTable.tsx` : le groupement par société accumule les
+>   `flows` et calcule `tri = xirr(g.flows)` (solveur partagé `~/lib/xirr`).
+>   Suppression de `annualizedTri` et des dates de groupe `signedDate` /
+>   `exitedDate` qui ne servaient qu'à l'approximation. Le MOIC société reste
+>   calculé côté client (Σproceeds / Σcapital, additif donc exact).
+> - Export CSV `ParticipationsView.tsx` : colonnes MOIC (`d.moic`) et TRI
+>   (`d.irr`, ratio décimal), lues depuis les champs autoritatifs.
+> - Outil IA `agentTools.ts` (`listDealsInternal` / `listDeals`) : expose le
+>   réalisé `paidActual` / `received` / `moic` / `irr` par deal.
+> - Tests purs : `realizedCashflows` (`tests/metrics.test.ts`) et un cas de
+>   divergence à 2 deals (`tests/groupTri.test.ts`) — XIRR exact ≈ 28,6 % vs
+>   ancienne approximation ≈ 7,8 %. Dashboard inchangé (TVPI/DPI dérivés
+>   d'agrégats additifs).
+
 ## v1.59.1 — 01/07/2026 à 18:00 — Cohérence des indicateurs de portefeuille
 
 Les multiples et taux de performance (MOIC, TVPI, TRI, DPI, valeur

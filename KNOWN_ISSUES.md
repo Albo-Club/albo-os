@@ -1718,6 +1718,39 @@ dérivé). `paidActual` (décaissé réel) est **calculé** depuis les transacti
   positionnement, aucune règle d'achèvement. Édités via le dialog partagé
   (`INSTRUMENT_FIELDS['royalty']` + `FIELD_FORMAT`).
 
+## TRI société (liste participations) — le TRI/IRR n'est PAS additif
+
+**Le piège n°1.** Le TRI d'une société multi-deals **ne se déduit pas** des TRI
+par deal, ni d'un MOIC agrégé annualisé. Il faut le résoudre sur l'**union des
+flux datés** de tous les deals de la société. C'est la raison pour laquelle le
+calcul vit côté serveur, là où sont les transactions datées.
+
+- **Source des flux = serveur.** `convex/deals.ts:dealRealizedMetrics` lit les
+  transactions du deal **une seule fois** et renvoie, en plus de `paidActual` /
+  `received` / `moic` / `irr` (XIRR par deal), un tableau `flows` : des flux
+  **déjà signés et dé-TVA-és** via `convex/lib/metrics.ts:realizedCashflows`
+  (`out` → `−montant`, `in` → `+proceeds`, ÷1,2 uniquement `royalty`). `deals.list`
+  et `convex/aggregate.ts` (vue cross-org) exposent ces champs par deal.
+- **Le front unionne, ne recalcule pas la convention.** `ParticipationsTable.tsx`
+  groupe par société, **concatène** les `flows` des deals du groupe et appelle
+  le solveur partagé `xirr(g.flows)` (`~/lib/xirr` → `convex/lib/xirr.ts`). Ne
+  **jamais** re-dériver le signe / la TVA côté client, ni tenter de moyenner des
+  TRI par deal. Le MOIC société, lui, **reste** client-side car il **est**
+  additif (`Σproceeds / Σcapital`) — ne pas confondre les deux.
+- **Périmètre = l'ensemble affiché.** Le TRI porte sur exactement les deals du
+  groupe visible (donc respecte recherche + filtres à facettes), cohérent avec
+  le MOIC société montré à côté. C'est voulu : ne pas déplacer le groupement
+  côté serveur (il dépendrait de l'état de filtre client).
+- **`xirr` renvoie `null`** sans changement de signe (perte totale sans
+  encaissement, ou moins de 2 flux) → affiché « — ». On **n'affiche plus** le
+  « −100 % » que produisait l'ancienne approximation `annualizedTri(moic=0)` ;
+  le multiple `0,00×` + le badge « perdu » signalent déjà la perte.
+- **Ne pas ressusciter `annualizedTri` pour la liste.** Cette fonction (MOIC
+  annualisé 2 points sur `signedDate` → `exitedDate`) reste dans `metrics.ts`
+  (util testé) mais n'alimente **plus** la liste : elle était une approximation
+  (dates de cycle de vie ≠ dates de transaction, non additive). Voir le cas de
+  divergence chiffré dans `tests/groupTri.test.ts`.
+
 ## Effacer un champ optional via `deals.update` (clear vs leave-untouched)
 
 **Le piège.** Pour vider une colonne optional sur un deal (ici `exitedDate` /

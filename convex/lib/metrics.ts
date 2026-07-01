@@ -54,6 +54,41 @@ export function proceedsFromReceived(
   return instrumentKind === 'royalty' ? receivedCents / 1.2 : receivedCents
 }
 
+/** A matched transaction with its date, for the realized (dated) XIRR. */
+export type DatedCashflowTx = {
+  direction: 'in' | 'out'
+  amount: number
+  date: number /* ms epoch */
+}
+
+/**
+ * Signed, dated cash flows for the realized XIRR of a position, mirroring the
+ * MOIC's VAT convention: an outgoing tx becomes a −amount outflow, an incoming
+ * tx a +proceeds inflow (de-VAT'd ÷1.2 only for `royalty`, gross otherwise).
+ *
+ * Feed the result to `xirr()`. To get a company / multi-deal position IRR,
+ * CONCATENATE the per-deal arrays (each built with its own `instrumentKind`)
+ * and solve once on the union — IRR is NOT additive, so it cannot be derived
+ * from the per-deal rates. Kept here (not in `xirr.ts`) so this module stays
+ * free of the reverse import (`xirr.ts` already imports `MS_PER_YEAR` from
+ * here); callers compose `xirr(realizedCashflows(...))`.
+ */
+export function realizedCashflows(
+  txs: ReadonlyArray<DatedCashflowTx>,
+  instrumentKind: string,
+): Array<{ amount: number; date: number }> {
+  const deVat = instrumentKind === 'royalty'
+  return txs.map((tx) => ({
+    amount:
+      tx.direction === 'out'
+        ? -tx.amount
+        : deVat
+          ? tx.amount / 1.2
+          : tx.amount,
+    date: tx.date,
+  }))
+}
+
 /**
  * Residual value of a deal for the TVPI / NAV: 0 once exited or written off,
  * otherwise the last known valuation, falling back to cost (amount paid).

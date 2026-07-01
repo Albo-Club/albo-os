@@ -162,6 +162,8 @@ export function ParticipationsView({
       t('col.received'),
       t('export.col.lastValuation'),
       t('col.tvpi'),
+      t('col.moic'),
+      t('col.tri'),
       t('deal.signed'),
     ]
     const euros = (cents?: number | null) =>
@@ -185,6 +187,11 @@ export function ParticipationsView({
         euros(d.received ?? 0),
         euros(d.lastValuationCents),
         tvpi == null ? null : tvpi.toFixed(2),
+        // Realized MOIC + exact XIRR straight from the authoritative server
+        // fields (no client recompute). TRI is a raw decimal ratio (unitless,
+        // like TVPI/MOIC); null when undefined (e.g. total loss, no proceeds).
+        d.moic == null ? null : d.moic.toFixed(2),
+        d.irr == null ? null : d.irr.toFixed(4),
         d.signedDate ? new Date(d.signedDate).toISOString().slice(0, 10) : null,
       ]
     })

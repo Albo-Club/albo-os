@@ -3,7 +3,6 @@ import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import {
-  annualizedTri,
   moic as moicRatio,
   proceedsFromReceived,
   residualValueCents,
@@ -13,6 +12,7 @@ import type { ReactNode } from 'react'
 
 import type { Doc } from '../../../convex/_generated/dataModel'
 import type { MoicTransaction } from '~/lib/dealMetrics'
+import { xirr } from '~/lib/xirr'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { ExitBadge } from '~/components/deals/ExitBadge'
 import { Badge } from '~/components/ui/badge'
@@ -53,6 +53,15 @@ export type DealRow = {
   received?: number | null
   /** Last known valuation (cents), null if none (computed server-side). */
   lastValuationCents?: number | null
+  /** Realized MOIC (proceeds/capital), computed server-side. */
+  moic?: number | null
+  /** Exact per-deal annualized XIRR (decimal), server-side; null if undefined. */
+  irr?: number | null
+  /**
+   * Signed, de-VAT'd dated flows (server-side). Concatenated across a company's
+   * deals to solve the company-level IRR on the union — IRR isn't additive.
+   */
+  flows?: Array<{ amount: number; date: number }>
   signedDate?: number | null
   /** Exit date (ms), set on fully_exited / written_off deals. */
   exitedDate?: number | null
@@ -326,16 +335,16 @@ export function ParticipationsTable({
         orgs: Set<string>
         slug: string | undefined
         deals: Array<DealRow>
-        // Company entry date: earliest signed deal (null if none dated).
-        signedDate: number | null
-        // Company exit date: latest exited deal (null if none dated) — TRI basis.
-        exitedDate: number | null
         paid: number
         received: number
         residual: number
         // Settled-only MOIC inputs (capital deployed, proceeds net of VAT).
         capital: number
         proceeds: number
+        // Union of the deals' signed, de-VAT'd dated flows — solved by `xirr`
+        // for the EXACT company TRI. IRR is not additive, so it must run on the
+        // union, never be derived from per-deal rates.
+        flows: Array<{ amount: number; date: number }>
         // Group exit outcome for the badge: a write-off anywhere wins.
         writtenOff: boolean
       }
@@ -348,29 +357,16 @@ export function ParticipationsTable({
         orgs: new Set<string>(),
         slug: orgSlug ?? d.org?.slug,
         deals: [],
-        signedDate: null,
-        exitedDate: null,
         paid: 0,
         received: 0,
         residual: 0,
         capital: 0,
         proceeds: 0,
+        flows: [],
         writtenOff: false,
       }
       g.deals.push(d)
       if (d.org) g.orgs.add(d.org.name)
-      if (d.signedDate != null) {
-        g.signedDate =
-          g.signedDate == null
-            ? d.signedDate
-            : Math.min(g.signedDate, d.signedDate)
-      }
-      if (d.exitedDate != null) {
-        g.exitedDate =
-          g.exitedDate == null
-            ? d.exitedDate
-            : Math.max(g.exitedDate, d.exitedDate)
-      }
       g.paid += d.paidActual ?? 0
       g.received += d.received ?? 0
       g.residual += residualCents(d)
@@ -380,18 +376,18 @@ export function ParticipationsTable({
       // multiple, so a mixed group is never overvalued (no false Exit win).
       g.capital += d.paidActual ?? 0
       g.proceeds += proceedsFromReceived(d.received ?? 0, d.instrumentKind)
+      // Server-side flows already carry the sign + per-deal VAT convention;
+      // the union feeds the shared solver for the company IRR.
+      if (d.flows) g.flows.push(...d.flows)
       if (d.status === 'written_off') g.writtenOff = true
       map.set(key, g)
     }
     return Array.from(map.entries()).map(([id, g]) => {
       const moic = moicRatio({ capital: g.capital, proceeds: g.proceeds })
-      // Annualized TRI on the SAME aggregate as the MOIC: the two-point IRR of
-      // {−capital at entry, +proceeds at exit}, i.e. MOIC^(1/years) − 1.
-      const tri = annualizedTri({
-        moic,
-        entryDate: g.signedDate,
-        exitDate: g.exitedDate,
-      })
+      // EXACT company TRI: annualized XIRR on the union of the company's dated
+      // flows (the shared, server-consistent solver). Null — shown "—" — when
+      // undefined, e.g. a total loss with no proceeds (no sign change).
+      const tri = xirr(g.flows)
       return {
         id,
         ...g,
