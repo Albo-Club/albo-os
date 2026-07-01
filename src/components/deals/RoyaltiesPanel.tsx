@@ -20,6 +20,7 @@ import { signTone } from '~/lib/moneyTone'
 import { cn } from '~/lib/utils'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
+import { AmountInput, useAmountField } from '~/components/ui/amount-input'
 import { Label } from '~/components/ui/label'
 import { Textarea } from '~/components/ui/textarea'
 import {
@@ -100,10 +101,7 @@ function EditableCa({
       <TableCell className={cn('text-right tabular-nums', className)}>
         <Input
           autoFocus
-          type="text"
-          inputMode="decimal"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          {...useAmountField(draft, setDraft)}
           onBlur={commit}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -899,12 +897,10 @@ function AddQuarterDialog({
             <Label htmlFor="royalty-revenue">
               {t('participations:fiche.royalty.revenueLabel')}
             </Label>
-            <Input
+            <AmountInput
               id="royalty-revenue"
-              type="text"
-              inputMode="decimal"
               value={revenue}
-              onChange={(e) => setRevenue(e.target.value)}
+              onChange={setRevenue}
               placeholder="0,00"
             />
           </div>

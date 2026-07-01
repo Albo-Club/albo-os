@@ -1,31 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
-import {
-  ArrowDown,
-  ArrowRight,
-  ArrowUp,
-  ArrowUpDown,
-  Download,
-  ListFilter,
-  X,
-} from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import type { ReactNode, RefObject } from 'react'
+import type { ReactNode } from 'react'
 
 import type { Doc } from '../../../convex/_generated/dataModel'
 import type { MoicTransaction } from '~/lib/dealMetrics'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { ExitBadge } from '~/components/deals/ExitBadge'
 import { Badge } from '~/components/ui/badge'
-import { Button } from '~/components/ui/button'
-import { Input } from '~/components/ui/input'
-import { Separator } from '~/components/ui/separator'
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '~/components/ui/dropdown-menu'
 import {
   Table,
   TableBody,
@@ -39,9 +22,6 @@ import {
   PaginationFooter,
   usePagination,
 } from '~/components/data-table/LocalPagination'
-import { useDebouncedValue } from '~/hooks/useDebouncedValue'
-import { downloadCsv, toCsv } from '~/lib/csv'
-import { normalizeSearch } from '~/lib/searchText'
 
 /** Minimal shape of an enriched deal, shared by per-org and aggregated views. */
 export type DealRow = {
@@ -67,15 +47,20 @@ export type DealRow = {
   /** Last known valuation (cents), null if none (computed server-side). */
   lastValuationCents?: number | null
   signedDate?: number | null
+  /** Exit date (ms), set on fully_exited / written_off deals. */
+  exitedDate?: number | null
   org?: { name: string; slug: string } | null // present in aggregated view
 }
+
+/** Milliseconds in an average year — annualization basis for the settled TRI. */
+const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000
 
 /**
  * Residual value of a deal for the TVPI: 0 if exited/written off,
  * otherwise the last known valuation, falling back to cost (dashboard
  * convention — convex/dashboard.ts NAV).
  */
-function residualCents(deal: DealRow): number {
+export function residualCents(deal: DealRow): number {
   if (deal.status === 'fully_exited' || deal.status === 'written_off') return 0
   return deal.lastValuationCents ?? deal.paidActual ?? 0
 }
@@ -107,7 +92,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-/** Localized €/date/multiple formatters, shared by the components below. */
+/** Localized €/date/multiple/percent formatters, shared by the components below. */
 export function useFormatters() {
   const { i18n } = useTranslation('participations')
   const lang = i18n.language
@@ -146,7 +131,15 @@ export function useFormatters() {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         }).format(ratio)}×`
-  return { fmtEur, fmtEurCompact, fmtDate, fmtMultiple }
+  // Signed decimal ratio (e.g. -1, 0.15) → percent, for the annualized TRI.
+  const fmtPercent = (ratio: number | null) =>
+    ratio == null
+      ? '—'
+      : new Intl.NumberFormat(lang, {
+          style: 'percent',
+          maximumFractionDigits: 1,
+        }).format(ratio)
+  return { fmtEur, fmtEurCompact, fmtDate, fmtMultiple, fmtPercent }
 }
 
 /**
@@ -248,64 +241,12 @@ export function DealsList({
  * org badge column (cross-org aggregated view). `orgSlug` (per-org view)
  * targets the detail link; in the aggregated view the slug is derived from
  * each deal's org.
+ *
+ * The search + facet filters live in the parent `ParticipationsView`, which
+ * feeds each instance an already-filtered `deals` set (the active table and the
+ * settled section share one toolbar).
  */
 type SortKey = 'name' | 'deals' | 'paid' | 'received' | 'tvpi'
-
-/** A multi-select facet option: stored raw value + its localized label. */
-type FacetOption = { value: string; label: string }
-
-/**
- * Dashed-border dropdown holding the checkbox options of one facet
- * (instrument / status / sector). The menu stays open across clicks so
- * several values can be toggled in a row; the trigger shows a count badge
- * once anything is selected.
- */
-function FacetFilter({
-  label,
-  options,
-  selected,
-  onToggle,
-}: {
-  label: string
-  options: Array<FacetOption>
-  selected: Set<string>
-  onToggle: (value: string) => void
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="border-dashed">
-          <ListFilter className="size-4" />
-          {label}
-          {selected.size > 0 && (
-            <>
-              <Separator orientation="vertical" className="mx-0.5 h-4" />
-              <Badge
-                variant="secondary"
-                className="rounded-sm px-1 font-normal tabular-nums"
-              >
-                {selected.size}
-              </Badge>
-            </>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-h-72 w-52 overflow-auto">
-        {options.map((opt) => (
-          <DropdownMenuCheckboxItem
-            key={opt.value}
-            checked={selected.has(opt.value)}
-            // Keep the menu open so multiple values can be toggled at once.
-            onSelect={(e) => e.preventDefault()}
-            onCheckedChange={() => onToggle(opt.value)}
-          >
-            {opt.label}
-          </DropdownMenuCheckboxItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
 
 /** Clickable header of a sortable column (asc ⇄ desc). */
 function SortableHead({
@@ -344,127 +285,29 @@ export function ParticipationsTable({
   deals,
   showOrg = false,
   orgSlug,
-  exportRef,
   settled = false,
-  exportDeals,
+  isFiltered = false,
+  resetKey = '',
 }: {
+  // Already filtered by the parent toolbar (search + facets).
   deals: Array<DealRow> | undefined
   showOrg?: boolean
   orgSlug?: string
-  // When provided, the toolbar export button is hidden and the export handler
-  // is exposed here so a parent (e.g. the header menu) can trigger it.
-  exportRef?: RefObject<(() => void) | null>
-  // Settled variant (fully_exited / written_off): adds a MOIC column + an
-  // ExitBadge per row and drops sorting. Used by the collapsed section below
-  // the active table.
+  // Settled variant (fully_exited / written_off): swaps TVPI for a MOIC + an
+  // annualized TRI column, adds an ExitBadge per row and drops sorting. Used by
+  // the always-open section below the active table.
   settled?: boolean
-  // When set, the export covers this deal set instead of the displayed
-  // (filtered) one — lets the wrapper keep the export on the full, unsplit
-  // deals (active + settled) even though this instance only shows a subset.
-  exportDeals?: Array<DealRow>
+  // True when the parent search/filters are active — drives the empty message
+  // (no results vs. empty scope).
+  isFiltered?: boolean
+  // Snaps pagination back to page 1 when the upstream search/filters change.
+  resetKey?: string
 }) {
   const { t } = useTranslation('participations')
-  const { fmtEur, fmtMultiple } = useFormatters()
-
-  // Client-side search (low volumes): company name, custom deal name,
-  // instrument (raw key + translated label), investor, sector —
-  // case/accent insensitive.
-  const [search, setSearch] = useState('')
-  const term = normalizeSearch(useDebouncedValue(search))
-
-  // Faceted filters (multi-select), applied at the deal level alongside the
-  // search, before grouping by company. A company shows up if it keeps at
-  // least one deal; its aggregates reflect only the surviving deals.
-  const [instrumentFilter, setInstrumentFilter] = useState<Set<string>>(
-    new Set(),
-  )
-  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set())
-  const [sectorFilter, setSectorFilter] = useState<Set<string>>(new Set())
-  const toggle =
-    (setter: React.Dispatch<React.SetStateAction<Set<string>>>) =>
-    (value: string) =>
-      setter((prev) => {
-        const next = new Set(prev)
-        if (next.has(value)) next.delete(value)
-        else next.add(value)
-        return next
-      })
-  const hasFilters =
-    instrumentFilter.size > 0 || statusFilter.size > 0 || sectorFilter.size > 0
-  const resetFilters = () => {
-    setInstrumentFilter(new Set())
-    setStatusFilter(new Set())
-    setSectorFilter(new Set())
-  }
-
-  // Facet options derived from the full deal set (not the filtered one, so
-  // options never vanish mid-selection), localized and sorted by label.
-  const facets = useMemo(() => {
-    const instruments = new Map<string, string>()
-    const statuses = new Map<string, string>()
-    const sectors = new Map<string, string>()
-    for (const d of deals ?? []) {
-      instruments.set(
-        d.instrumentKind,
-        t(`instrument.${d.instrumentKind}`, { defaultValue: d.instrumentKind }),
-      )
-      statuses.set(
-        d.status,
-        t(`status.${d.status}`, { defaultValue: d.status }),
-      )
-      if (d.target?.sector) {
-        sectors.set(
-          d.target.sector,
-          t(`sectors.${d.target.sector}`, { defaultValue: d.target.sector }),
-        )
-      }
-    }
-    const toOptions = (m: Map<string, string>): Array<FacetOption> =>
-      Array.from(m, ([value, label]) => ({ value, label })).sort((a, b) =>
-        a.label.localeCompare(b.label),
-      )
-    return {
-      instruments: toOptions(instruments),
-      statuses: toOptions(statuses),
-      sectors: toOptions(sectors),
-    }
-  }, [deals, t])
-
-  const filtered = useMemo(() => {
-    if (!deals) return deals
-    if (!term && !hasFilters) return deals
-    return deals.filter((d) => {
-      const matchesSearch =
-        !term ||
-        [
-          d.target?.name,
-          d.name,
-          d.target?.sector,
-          d.target?.sector &&
-            t(`sectors.${d.target.sector}`, {
-              defaultValue: d.target.sector,
-            }),
-          d.investor?.name,
-          d.instrumentKind,
-          t(`instrument.${d.instrumentKind}`, {
-            defaultValue: d.instrumentKind,
-          }),
-        ].some((s) => s && normalizeSearch(s).includes(term))
-      if (!matchesSearch) return false
-      if (instrumentFilter.size > 0 && !instrumentFilter.has(d.instrumentKind))
-        return false
-      if (statusFilter.size > 0 && !statusFilter.has(d.status)) return false
-      if (
-        sectorFilter.size > 0 &&
-        !(d.target?.sector != null && sectorFilter.has(d.target.sector))
-      )
-        return false
-      return true
-    })
-  }, [deals, term, t, instrumentFilter, statusFilter, sectorFilter, hasFilters])
+  const { fmtEur, fmtMultiple, fmtPercent } = useFormatters()
 
   const groups = useMemo(() => {
-    if (!filtered) return undefined
+    if (!deals) return undefined
     const map = new Map<
       string,
       {
@@ -473,6 +316,10 @@ export function ParticipationsTable({
         orgs: Set<string>
         slug: string | undefined
         deals: Array<DealRow>
+        // Company entry date: earliest signed deal (null if none dated).
+        signedDate: number | null
+        // Company exit date: latest exited deal (null if none dated) — TRI basis.
+        exitedDate: number | null
         paid: number
         received: number
         residual: number
@@ -483,7 +330,7 @@ export function ParticipationsTable({
         writtenOff: boolean
       }
     >()
-    for (const d of filtered) {
+    for (const d of deals) {
       const key = d.target?._id ?? d.targetCompanyId
       const g = map.get(key) ?? {
         name: d.target?.name ?? '—',
@@ -491,6 +338,8 @@ export function ParticipationsTable({
         orgs: new Set<string>(),
         slug: orgSlug ?? d.org?.slug,
         deals: [],
+        signedDate: null,
+        exitedDate: null,
         paid: 0,
         received: 0,
         residual: 0,
@@ -500,6 +349,18 @@ export function ParticipationsTable({
       }
       g.deals.push(d)
       if (d.org) g.orgs.add(d.org.name)
+      if (d.signedDate != null) {
+        g.signedDate =
+          g.signedDate == null
+            ? d.signedDate
+            : Math.min(g.signedDate, d.signedDate)
+      }
+      if (d.exitedDate != null) {
+        g.exitedDate =
+          g.exitedDate == null
+            ? d.exitedDate
+            : Math.max(g.exitedDate, d.exitedDate)
+      }
       g.paid += d.paidActual ?? 0
       g.received += d.received ?? 0
       g.residual += residualCents(d)
@@ -515,16 +376,29 @@ export function ParticipationsTable({
       if (d.status === 'written_off') g.writtenOff = true
       map.set(key, g)
     }
-    return Array.from(map.entries()).map(([id, g]) => ({
-      id,
-      ...g,
-      tvpi: g.paid > 0 ? (g.received + g.residual) / g.paid : null,
-      moic: g.capital > 0 ? g.proceeds / g.capital : null,
-    }))
-  }, [filtered, orgSlug])
+    return Array.from(map.entries()).map(([id, g]) => {
+      const moic = g.capital > 0 ? g.proceeds / g.capital : null
+      // Annualized TRI on the SAME aggregate as the MOIC: the two-point IRR of
+      // {−capital at entry, +proceeds at exit}, i.e. MOIC^(1/years) − 1. Needs
+      // both an entry and an exit date and a positive holding period; a total
+      // loss (MOIC = 0) yields −100 %.
+      let tri: number | null = null
+      if (moic != null && g.signedDate != null && g.exitedDate != null) {
+        const years = (g.exitedDate - g.signedDate) / MS_PER_YEAR
+        if (years > 0) tri = Math.pow(moic, 1 / years) - 1
+      }
+      return {
+        id,
+        ...g,
+        tvpi: g.paid > 0 ? (g.received + g.residual) / g.paid : null,
+        moic,
+        tri,
+      }
+    })
+  }, [deals, orgSlug])
 
-  // Column sort (client-side, low volumes). null = server order.
-  // Missing TVPIs go to the end of the list.
+  // Column sort (client-side, low volumes). null = server order
+  // (signedDate desc). Missing TVPIs go to the end of the list.
   const [sort, setSort] = useState<{
     key: SortKey
     dir: 'asc' | 'desc'
@@ -556,154 +430,31 @@ export function ParticipationsTable({
     })
   }, [groups, sort])
 
-  // Local pagination (by company, after filter + sort); snaps back to page 1
-  // whenever the search or sort changes.
-  // Reset to page 1 whenever search, sort or any filter changes.
-  const filterKey = [
-    [...instrumentFilter].sort().join(','),
-    [...statusFilter].sort().join(','),
-    [...sectorFilter].sort().join(','),
-  ].join('|')
+  // Local pagination (by company, after sort); snaps back to page 1 whenever
+  // the upstream search/filters (resetKey) or the sort changes.
   const { page, pageCount, setPage } = usePagination(
     sortedGroups?.length ?? 0,
-    `${term}:${sort ? `${sort.key}:${sort.dir}` : ''}:${filterKey}`,
+    `${resetKey}:${sort ? `${sort.key}:${sort.dir}` : ''}`,
   )
   const pagedGroups = sortedGroups?.slice(
     page * PAGE_SIZE,
     (page + 1) * PAGE_SIZE,
   )
 
-  // CSV export, flat (one deal per row). Defaults to the displayed (filtered)
-  // set; `exportDeals` lets the wrapper export the full, unsplit deal list.
-  function handleExport() {
-    const source = exportDeals ?? filtered
-    if (!source) return
-    const headers = [
-      t('col.company'),
-      t('export.col.deal'),
-      t('deal.instrument'),
-      t('deal.investor'),
-      t('deal.status'),
-      t('col.committed'),
-      t('col.paid'),
-      t('col.received'),
-      t('export.col.lastValuation'),
-      t('col.tvpi'),
-      t('deal.signed'),
-    ]
-    const euros = (cents?: number | null) =>
-      cents == null ? null : (cents / 100).toFixed(2)
-    const rows = source.map((d) => {
-      const paid = d.paidActual ?? 0
-      const tvpi =
-        paid > 0 ? ((d.received ?? 0) + residualCents(d)) / paid : null
-      return [
-        d.target?.name ?? '',
-        d.name ?? '',
-        t(`instrument.${d.instrumentKind}`, {
-          defaultValue: d.instrumentKind,
-        }),
-        d.investor?.name ?? '',
-        t(`status.${d.status}`, { defaultValue: d.status }),
-        euros(d.committedAmount),
-        euros(d.paidActual ?? 0),
-        euros(d.received ?? 0),
-        euros(d.lastValuationCents),
-        tvpi == null ? null : tvpi.toFixed(2),
-        d.signedDate ? new Date(d.signedDate).toISOString().slice(0, 10) : null,
-      ]
-    })
-    const day = new Date().toISOString().slice(0, 10)
-    downloadCsv(`participations-${day}.csv`, toCsv(headers, rows))
-  }
-
-  // Expose the export handler to a parent (header menu) when asked. No deps:
-  // refresh every render so the ref always points at the latest closure
-  // (which reads the current `filtered` set).
-  useEffect(() => {
-    if (exportRef) exportRef.current = handleExport
-  })
-
-  // Base 6 (company, deals, paid, received, tvpi, chevron) + the
-  // optional org and settled-only MOIC columns.
-  const colSpan = 6 + (showOrg ? 1 : 0) + (settled ? 1 : 0)
-
-  // Search bar shown as soon as there are deals — including when the
-  // current search matches nothing (otherwise it can't be cleared).
-  // A facet is only worth showing when it can actually partition the data
-  // (≥2 distinct values) — a single-value facet would match every row.
-  const searchBar = deals && deals.length > 0 && (
-    <div className="flex flex-wrap items-center gap-2">
-      <Input
-        type="search"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder={t('search.placeholder')}
-        className="max-w-xs"
-      />
-      {facets.instruments.length >= 2 && (
-        <FacetFilter
-          label={t('filters.instrument')}
-          options={facets.instruments}
-          selected={instrumentFilter}
-          onToggle={toggle(setInstrumentFilter)}
-        />
-      )}
-      {facets.statuses.length >= 2 && (
-        <FacetFilter
-          label={t('filters.status')}
-          options={facets.statuses}
-          selected={statusFilter}
-          onToggle={toggle(setStatusFilter)}
-        />
-      )}
-      {facets.sectors.length >= 2 && (
-        <FacetFilter
-          label={t('filters.sector')}
-          options={facets.sectors}
-          selected={sectorFilter}
-          onToggle={toggle(setSectorFilter)}
-        />
-      )}
-      {hasFilters && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={resetFilters}
-          className="text-muted-foreground"
-        >
-          {t('filters.reset')}
-          <X className="size-4" />
-        </Button>
-      )}
-      {!exportRef && !settled && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleExport}
-          className="ml-auto"
-        >
-          <Download className="size-4" />
-          {t('export.button')}
-        </Button>
-      )}
-    </div>
-  )
+  // Base 5 (company, deals, paid, received, chevron) + the optional
+  // org column, plus TVPI (active) or MOIC + TRI (settled).
+  const colSpan = 5 + (showOrg ? 1 : 0) + (settled ? 2 : 1)
 
   if (groups && groups.length === 0) {
     return (
-      <div className="space-y-3">
-        {searchBar}
-        <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
-          {term || hasFilters ? t('search.noResults') : t('empty')}
-        </div>
+      <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
+        {isFiltered ? t('search.noResults') : t('empty')}
       </div>
     )
   }
 
   return (
     <div className="space-y-3">
-      {searchBar}
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
@@ -740,16 +491,21 @@ export function ParticipationsTable({
                 className="text-right"
                 sortable={!settled}
               />
-              <SortableHead
-                label={t('col.tvpi')}
-                active={sort?.key === 'tvpi'}
-                dir={sort?.dir ?? 'desc'}
-                onClick={() => toggleSort('tvpi')}
-                className="text-right"
-                sortable={!settled}
-              />
+              {!settled && (
+                <SortableHead
+                  label={t('col.tvpi')}
+                  active={sort?.key === 'tvpi'}
+                  dir={sort?.dir ?? 'desc'}
+                  onClick={() => toggleSort('tvpi')}
+                  className="text-right"
+                  sortable={!settled}
+                />
+              )}
               {settled && (
-                <TableHead className="text-right">{t('col.moic')}</TableHead>
+                <>
+                  <TableHead className="text-right">{t('col.moic')}</TableHead>
+                  <TableHead className="text-right">{t('col.tri')}</TableHead>
+                </>
               )}
               {/* Trailing column for the per-row hover chevron. */}
               <TableHead className="w-8" />
@@ -774,6 +530,7 @@ export function ParticipationsTable({
                   settled={settled}
                   fmtEur={fmtEur}
                   fmtMultiple={fmtMultiple}
+                  fmtPercent={fmtPercent}
                 />
               ))
             )}
@@ -795,6 +552,7 @@ function CompanyRows({
   settled,
   fmtEur,
   fmtMultiple,
+  fmtPercent,
 }: {
   group: {
     id: string
@@ -807,6 +565,7 @@ function CompanyRows({
     received: number
     tvpi: number | null
     moic: number | null
+    tri: number | null
     capital: number
     proceeds: number
     writtenOff: boolean
@@ -815,6 +574,7 @@ function CompanyRows({
   settled: boolean
   fmtEur: (c?: number | null) => string
   fmtMultiple: (ratio: number | null) => string
+  fmtPercent: (ratio: number | null) => string
 }) {
   const { t } = useTranslation('participations')
   const navigate = useNavigate()
@@ -898,17 +658,24 @@ function CompanyRows({
       >
         {fmtEur(group.received)}
       </TableCell>
-      <TableCell
-        className={`text-right tabular-nums${
-          isNeutralTvpi(group.tvpi) ? ' text-muted-foreground' : ''
-        }`}
-      >
-        {fmtMultiple(group.tvpi)}
-      </TableCell>
-      {settled && (
-        <TableCell className="text-right tabular-nums">
-          {fmtMultiple(group.moic)}
+      {!settled && (
+        <TableCell
+          className={`text-right tabular-nums${
+            isNeutralTvpi(group.tvpi) ? ' text-muted-foreground' : ''
+          }`}
+        >
+          {fmtMultiple(group.tvpi)}
         </TableCell>
+      )}
+      {settled && (
+        <>
+          <TableCell className="text-right tabular-nums">
+            {fmtMultiple(group.moic)}
+          </TableCell>
+          <TableCell className="text-right tabular-nums">
+            {fmtPercent(group.tri)}
+          </TableCell>
+        </>
       )}
       <TableCell className="w-8 text-right">
         {openDetail && (

@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.55.0 — 01/07/2026 à 16:54 — Participations : retrait de la colonne « Investi le »
+## v1.57.0 — 01/07/2026 à 16:54 — Participations : retrait de la colonne « Investi le »
 
 La liste des participations (regroupée par entreprise) affichait une colonne
 « Investi le ». Comme une même entreprise peut porter plusieurs deals à des
@@ -36,12 +36,74 @@ rester vide. Elle a été retirée de la liste. Les dates propres à chaque deal
 > - Suppression de la colonne « Investi le » dans
 >   `src/components/participations/ParticipationsTable.tsx` : en-tête, cellule,
 >   clé de tri `invested`, et l'agrégat `group.signedDate` (min des
->   `signedDate` des deals) qui n'alimentait plus que cette colonne. `colSpan`
->   ramené de 7 à 6, `fmtDate` retiré des dépendances de la table et de
->   `CompanyRows`.
+>   `signedDate` des deals) qui n'alimentait plus que cette colonne. `fmtDate`
+>   retiré des dépendances de la table et de `CompanyRows`.
 > - Le champ per-deal `signedDate` (`DealRow`) reste utilisé par la liste des
 >   deals de la fiche entité (`DealsList`) et l'export CSV — non touché.
-> - Clé i18n orpheline `col.invested` retirée de `src/locales/{fr,en}/participations.json`.
+
+## v1.56.0 — 01/07/2026 à 16:45 — Participations soldées : toujours visibles, avec le TRI
+
+La section « Participations soldées » en bas de la liste Entreprises est
+désormais **toujours dépliée** : plus de bouton pour la replier, elle reste
+visible en bas de page. La **barre de recherche et les filtres** du haut de la
+liste s'appliquent maintenant **aussi** aux participations soldées — il n'y a
+donc plus qu'une seule barre, celle du haut (celle qui était juste au-dessus des
+soldées a été retirée).
+
+Côté indicateurs, la colonne **TVPI** a été retirée des participations soldées
+(elle vaut toujours le MOIC une fois sorti) et une colonne **TRI** (taux de
+rendement annualisé) a été ajoutée à côté du MOIC : elle traduit le multiple en
+rendement par an sur la durée de détention. Une perte totale s'affiche à −100 %,
+et le TRI reste « — » tant qu'aucune date de sortie n'est renseignée.
+
+> **🔧 Notes techniques**
+>
+> - `ParticipationsView.tsx` devient le propriétaire unique de la recherche +
+>   des facettes (état, `useMemo` `facets`/`filtered`, toolbar, export CSV
+>   `handleExport` sur le set complet non splitté, `exportRef`). Il applique le
+>   filtre puis splitte en `active` / `settled` et passe chaque sous-ensemble
+>   déjà filtré à `ParticipationsTable`. Section soldés rendue en `<section>`
+>   avec un simple `<h3>` (plus d'état `open`/chevron), masquée si `settled`
+>   filtré est vide.
+> - `ParticipationsTable.tsx` perd sa toolbar/recherche/facettes/export
+>   (remontés) ; il ne fait plus que grouper par société, trier et paginer. Le
+>   variant `settled` remplace la colonne TVPI par **MOIC + TRI**. Nouveaux
+>   props `isFiltered` (message vide) et `resetKey` (reset pagination). Helper
+>   `residualCents` désormais exporté (réutilisé par l'export dans la vue).
+> - TRI = IRR à deux points sur le **même** agrégat que le MOIC :
+>   `MOIC^(1/années) − 1`, avec années = (`exitedDate` la plus récente −
+>   `signedDate` la plus ancienne) du groupe / `MS_PER_YEAR`. Nécessite les deux
+>   dates et une durée positive, sinon `null` → « — ». `exitedDate` ajouté au
+>   type `DealRow` (déjà présent côté serveur via le spread `...deal`).
+>   Formateur `fmtPercent` ajouté à `useFormatters`. Clé i18n `col.tri`
+>   (FR « TRI » / EN « IRR »).
+
+## v1.55.0 — 01/07/2026 à 16:32 — Montants plus lisibles pendant la saisie
+
+Quand vous saisissez un montant en euros dans un champ (création d'un deal,
+édition d'une fiche participation, prévisionnel de trésorerie, passif, sorties,
+revenus royalties…), les milliers s'espacent automatiquement au fil de la
+frappe : `1 000 000` au lieu de `1000000`. Plus besoin de compter les zéros
+pour vérifier qu'on tape le bon montant. La valeur enregistrée ne change pas —
+seul l'affichage pendant la saisie est mis en forme.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau composant partagé `src/components/ui/amount-input.tsx` : hook
+>   `useAmountField(value, onChange)` (props à spread, gère le formatage, le
+>   nettoyage et la restauration du caret via `ref`) + wrapper `AmountInput`
+>   pour un `<Input>` simple. Le contrat reste une string brute non formatée
+>   côté parent, donc les parsers euros existants (`eurosToCents`,
+>   `parseAmountToCents`, `parseEuros`) fonctionnent sans changement.
+> - Groupement à l'espace (et non la virgule locale) car le séparateur décimal
+>   peut être une virgule ; l'espace est la seule marque de milliers non
+>   ambiguë pour de la saisie.
+> - Câblé sur tous les champs montant EUR éditables : `CreateDealDialog` et
+>   `DealFieldInput` (format `eur` uniquement), `ExitDealDialog`,
+>   `ForecastSection`, `CreateEquityDialog`, `RoyaltiesPanel` (cellule inline
+>   `EditableCa` + revenu trimestriel). `CreateDealDialog` bascule aussi sur
+>   `eurosToCents` (gère la virgule décimale, l'input passant de `number` à
+>   `text`).
 
 ## v1.54.1 — 01/07/2026 à 16:33 — Nouveautés : les horaires affichés passent à l'heure de Paris
 

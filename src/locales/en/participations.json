@@ -62,7 +62,8 @@
     "paid": "Paid",
     "received": "Received",
     "tvpi": "TVPI",
-    "moic": "MOIC"
+    "moic": "MOIC",
+    "tri": "IRR"
   },
   "filters": {
     "instrument": "Instrument",

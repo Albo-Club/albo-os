@@ -19,6 +19,7 @@ import { api } from '../../../../convex/_generated/api'
 
 import { INSTRUMENT_FIELDS } from '../../../../convex/lib/instrumentMapping'
 import { ENUM_FIELD_VALUES } from '../../../../convex/lib/instruments'
+import type { ChangeEvent } from 'react'
 import type { Doc, Id } from '../../../../convex/_generated/dataModel'
 import type { DealOption } from '~/components/pointage/DealCombobox'
 import type { TxDetails } from '~/components/pointage/TransactionSheet'
@@ -88,6 +89,7 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
+import { useAmountField } from '~/components/ui/amount-input'
 import {
   InputGroup,
   InputGroupAddon,
@@ -250,6 +252,9 @@ function DealFieldInput({
   const { t } = useTranslation('participations')
   const label = t(`field.${field}`, { defaultValue: field })
   const id = `deal-${field}`
+  // Euro fields get live thousand-separator formatting; the hook must run
+  // before the enum early-return to respect the rules of hooks.
+  const amountProps = useAmountField(value, onChange)
 
   if (format === 'enum') {
     const options = ENUM_FIELD_VALUES[field] ?? []
@@ -287,33 +292,32 @@ function DealFieldInput({
         : '1'
 
   const unit = FORMAT_UNIT[format]
+  // Euro fields use the formatted amount props; everything else keeps the
+  // native numeric/text/date input.
+  const controlProps =
+    format === 'eur'
+      ? amountProps
+      : {
+          type: inputType,
+          min: isNumeric ? '0' : undefined,
+          step: isNumeric ? step : undefined,
+          value,
+          onChange: (e: ChangeEvent<HTMLInputElement>) =>
+            onChange(e.target.value),
+        }
 
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
       {unit ? (
         <InputGroup>
-          <InputGroupInput
-            id={id}
-            type={inputType}
-            min={isNumeric ? '0' : undefined}
-            step={isNumeric ? step : undefined}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-          />
+          <InputGroupInput id={id} {...controlProps} />
           <InputGroupAddon align="inline-end">
             <InputGroupText>{unit}</InputGroupText>
           </InputGroupAddon>
         </InputGroup>
       ) : (
-        <Input
-          id={id}
-          type={inputType}
-          min={isNumeric ? '0' : undefined}
-          step={isNumeric ? step : undefined}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        <Input id={id} {...controlProps} />
       )}
     </div>
   )

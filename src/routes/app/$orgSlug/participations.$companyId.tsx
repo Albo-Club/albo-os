@@ -58,6 +58,8 @@ import {
 } from '~/components/ui/dialog'
 import { Badge } from '~/components/ui/badge'
 import { Input } from '~/components/ui/input'
+import { AmountInput } from '~/components/ui/amount-input'
+import { eurosToCents } from '~/lib/parse'
 import { Label } from '~/components/ui/label'
 import {
   Popover,
@@ -540,8 +542,7 @@ function CreateDealDialog({
     }
   }, [groupEntities, investorId])
 
-  const amountInvalid =
-    amount.trim() !== '' && (Number.isNaN(Number(amount)) || Number(amount) < 0)
+  const amountInvalid = amount.trim() !== '' && eurosToCents(amount) == null
   const canSubmit =
     investorId !== '' && instrument !== '' && !amountInvalid && !pending
 
@@ -554,7 +555,7 @@ function CreateDealDialog({
         targetCompanyId: company._id,
         instrumentKind: instrument as InstrumentKind,
         committedAmount:
-          amount.trim() === '' ? undefined : Math.round(Number(amount) * 100),
+          amount.trim() === '' ? undefined : (eurosToCents(amount) ?? undefined),
         signedDate: signed === '' ? undefined : new Date(signed).getTime(),
       })
       toast.success(t('participations:createDeal.created'))
@@ -639,12 +640,10 @@ function CreateDealDialog({
             <Label htmlFor="deal-amount">
               {t('participations:createDeal.committedLabel')}
             </Label>
-            <Input
+            <AmountInput
               id="deal-amount"
-              type="number"
-              min="0"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={setAmount}
               placeholder={t('participations:createDeal.committedPlaceholder')}
             />
             {amountInvalid && (
