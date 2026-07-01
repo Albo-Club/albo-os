@@ -23,6 +23,23 @@ bas de page.
 
 ---
 
+## v1.54.1 — 01/07/2026 à 16:33 — Nouveautés : les horaires affichés passent à l'heure de Paris
+
+Sur la page Nouveautés, l'heure de chaque mise à jour était écrite en UTC, ce qui
+la faisait apparaître environ 2h en avance sur l'heure réelle (heure de Paris).
+La convention de rédaction est désormais explicite : l'horaire est écrit en heure
+de Paris. Les prochaines entrées afficheront donc la bonne heure.
+
+> **🔧 Notes techniques**
+>
+> - Aucun changement de code : la page `changelog.tsx` rend `CHANGELOG_PRODUIT.md`
+>   tel quel (`?raw`), les horaires sont saisis à la main dans le fichier.
+> - Cause du décalage : l'horloge de l'environnement d'exécution est en UTC, mais
+>   la règle demande l'heure d'ouverture de PR en Europe/Paris. Sans conversion,
+>   les horaires sortaient ~2h trop tôt (CEST) / ~1h (CET).
+> - Correctif : renforcement de la règle « Pre-PR doc audit » (question 5) dans
+>   `CLAUDE.md` — l'offset UTC→Paris (+2h été / +1h hiver) est maintenant explicité.
+
 ## v1.54.0 — 01/07/2026 à 15:00 — Fiches deals : suppression des mentions d'import externe
 
 Sur la fiche d'un deal, la petite pastille jaune « Modifié à la main » et la
