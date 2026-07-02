@@ -610,6 +610,30 @@ Piège voisin (non lié à la version) : un utilitaire nu (`h-4`) ne surcharge
 le même variant — `data-[orientation=vertical]:h-4` — comme dans les
 templates shadcn officiels.
 
+## Colonne figée (`sticky`) dans une table — fond opaque ET hover composité
+
+Pour figer une colonne au scroll horizontal (`sticky left-0` sur les `th`/`td`
+de la colonne, le conteneur `overflow-x-auto` vient de `ui/table.tsx`), deux
+pièges en cascade :
+
+1. **Fond opaque obligatoire.** Une cellule sticky sans background laisse
+   transparaître les colonnes qui glissent dessous. Il faut `bg-background`
+   (opaque) + `z-10` sur chaque cellule figée.
+2. **Le hover de ligne devient invisible sous la cellule figée.** Le hover de
+   `TableRow` est **translucide** (`hover:bg-muted/50`, composité par-dessus le
+   fond de page) : le fond opaque du point 1 le masque, et reprendre
+   `bg-muted/50` sur la cellule la rendrait à nouveau transparente (elle
+   compositerait par-dessus les colonnes qui défilent, pas le fond de page).
+   Fix : la cellule figée peint elle-même la couleur **composée équivalente**,
+   déclenchée par le survol de la ligne —
+   `group-hover:bg-[color-mix(in_oklab,var(--muted)_50%,var(--background))]`
+   avec la classe `group` posée sur **toutes** les lignes (pas seulement les
+   cliquables).
+
+Implémentation de référence : `stickyHeadClass` / `stickyCellClass` dans
+`src/components/participations/ParticipationsTable.tsx`. À réutiliser tel quel
+pour figer une colonne d'une autre table (vue Deals…).
+
 ## Vercel framework preset traps TanStack Start
 
 Vercel's auto-detection lands on **Vite** the moment it sees `vite.config.ts`,

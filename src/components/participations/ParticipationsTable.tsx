@@ -12,6 +12,8 @@ import type { ReactNode } from 'react'
 
 import type { Doc } from '../../../convex/_generated/dataModel'
 import type { MoicTransaction } from '~/lib/dealMetrics'
+import { cn } from '~/lib/utils'
+import { scoreVerdict, verdictSquareClass } from '~/lib/reportScore'
 import { xirr } from '~/lib/xirr'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { ExitBadge } from '~/components/deals/ExitBadge'
@@ -40,6 +42,10 @@ export type DealRow = {
     _id: string
     name: string
     sector?: string | null
+    /** One-line pitch (companies.oneLiner), hand-filled. */
+    oneLiner?: string | null
+    /** Cerveau 3 health score (1-10), null while no synthesis exists. */
+    aiScore?: number | null
     domain?: string | null
   } | null
   investor: { name: string } | null
@@ -93,6 +99,18 @@ const isNeutralAmount = (cents: number) => cents === 0
 // distribution yet), not only when the raw ratio is exactly 1.
 const isNeutralTvpi = (ratio: number | null) =>
   ratio != null && Math.round(ratio * 100) === 100
+
+/**
+ * Frozen first column (company) for the horizontal scroll: sticky + an OPAQUE
+ * background, otherwise the cells sliding underneath show through. The row
+ * hover tint (`hover:bg-muted/50` on the <tr>) is translucent, so it can't be
+ * inherited either — the cell composites the same color over the page
+ * background via color-mix, driven by the row's `group` hover.
+ */
+const stickyHeadClass = 'sticky left-0 z-10 bg-background'
+const stickyCellClass =
+  'sticky left-0 z-10 bg-background transition-colors ' +
+  'group-hover:bg-[color-mix(in_oklab,var(--muted)_50%,var(--background))]'
 
 function statusVariant(s: string): 'default' | 'secondary' | 'destructive' {
   if (s === 'written_off') return 'destructive'
@@ -332,6 +350,10 @@ export function ParticipationsTable({
       {
         name: string
         domain: string | undefined
+        oneLiner: string | undefined
+        sector: string | undefined
+        // Defensive: only a numeric score is kept (aiAnalysis is untyped).
+        aiScore: number | undefined
         orgs: Set<string>
         slug: string | undefined
         deals: Array<DealRow>
@@ -354,6 +376,10 @@ export function ParticipationsTable({
       const g = map.get(key) ?? {
         name: d.target?.name ?? '—',
         domain: d.target?.domain ?? undefined,
+        oneLiner: d.target?.oneLiner ?? undefined,
+        sector: d.target?.sector ?? undefined,
+        aiScore:
+          typeof d.target?.aiScore === 'number' ? d.target.aiScore : undefined,
         orgs: new Set<string>(),
         slug: orgSlug ?? d.org?.slug,
         deals: [],
@@ -447,9 +473,10 @@ export function ParticipationsTable({
     (page + 1) * PAGE_SIZE,
   )
 
-  // Base 5 (company, deals, paid, received, chevron) + the optional
-  // org column, plus TVPI (active) or MOIC + TRI (settled).
-  const colSpan = 5 + (showOrg ? 1 : 0) + (settled ? 2 : 1)
+  // Base 8 (company, one-liner, sector, AI score, deals, invested, received,
+  // chevron) + the optional org column, plus TVPI (active) or MOIC + TRI
+  // (settled).
+  const colSpan = 8 + (showOrg ? 1 : 0) + (settled ? 2 : 1)
 
   if (groups && groups.length === 0) {
     return (
@@ -471,8 +498,12 @@ export function ParticipationsTable({
                 dir={sort?.dir ?? 'asc'}
                 onClick={() => toggleSort('name')}
                 sortable={!settled}
+                className={stickyHeadClass}
               />
               {showOrg && <TableHead>{t('col.org')}</TableHead>}
+              <TableHead>{t('col.oneLiner')}</TableHead>
+              <TableHead>{t('col.sector')}</TableHead>
+              <TableHead>{t('col.aiScore')}</TableHead>
               <SortableHead
                 label={t('col.deals')}
                 active={sort?.key === 'deals'}
@@ -482,7 +513,7 @@ export function ParticipationsTable({
                 sortable={!settled}
               />
               <SortableHead
-                label={t('col.paid')}
+                label={t('col.invested')}
                 active={sort?.key === 'paid'}
                 dir={sort?.dir ?? 'desc'}
                 onClick={() => toggleSort('paid')}
@@ -564,6 +595,9 @@ function CompanyRows({
     id: string
     name: string
     domain: string | undefined
+    oneLiner: string | undefined
+    sector: string | undefined
+    aiScore: number | undefined
     orgs: Set<string>
     slug: string | undefined
     deals: Array<DealRow>
@@ -612,7 +646,9 @@ function CompanyRows({
     : undefined
   return (
     <TableRow
-      className={openDetail ? 'group cursor-pointer' : undefined}
+      // `group` on EVERY row: the frozen cell's hover tint is driven by
+      // group-hover (see stickyCellClass), clickable or not.
+      className={cn('group', openDetail && 'cursor-pointer')}
       onClick={openDetail}
       // Keyboard path (the row replaces the old "Open details" link): focusable
       // and Enter-activated only when there's a destination.
@@ -629,7 +665,7 @@ function CompanyRows({
           : undefined
       }
     >
-      <TableCell className="font-medium">
+      <TableCell className={cn('font-medium', stickyCellClass)}>
         <span className="flex items-center gap-2">
           <CompanyLogo
             domain={group.domain}
@@ -651,6 +687,32 @@ function CompanyRows({
           </span>
         </TableCell>
       )}
+      <TableCell
+        className="text-muted-foreground max-w-72 truncate"
+        title={group.oneLiner}
+      >
+        {group.oneLiner ?? '—'}
+      </TableCell>
+      <TableCell>
+        {group.sector
+          ? t(`sectors.${group.sector}`, { defaultValue: group.sector })
+          : '—'}
+      </TableCell>
+      <TableCell>
+        {group.aiScore != null ? (
+          // Same idiom as the entity sheet's synthesis hero (reportScore).
+          <span
+            className={cn(
+              'inline-flex size-6 items-center justify-center rounded-md border text-xs font-semibold',
+              verdictSquareClass(scoreVerdict(group.aiScore)),
+            )}
+          >
+            {group.aiScore}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </TableCell>
       <TableCell className="text-right tabular-nums">
         {t('dealsCount', { count: group.deals.length })}
       </TableCell>

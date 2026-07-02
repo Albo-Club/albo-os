@@ -320,6 +320,8 @@ export default defineSchema({
 
     // Meta
     sector: v.optional(v.string()),
+    // One-line pitch shown in the Participations table (hand-filled, no backfill)
+    oneLiner: v.optional(v.string()),
     // Origin platform for external SPVs (e.g. "Parallel", "Sezame")
     sponsor: v.optional(v.string()),
     // Portfolio group: consolidates several entities under one line in the

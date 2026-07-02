@@ -7,7 +7,7 @@
  */
 
 import { query } from './_generated/server'
-import { dealRealizedMetrics, lastValuationCents } from './deals'
+import { aiScoresByCompany, dealRealizedMetrics, lastValuationCents } from './deals'
 import { requireAppUser } from './lib/auth'
 import type { GenericQueryCtx } from 'convex/server'
 import type { DataModel, Doc } from './_generated/dataModel'
@@ -21,6 +21,7 @@ function companyRef(c: Doc<'companies'> | null) {
     name: c.name,
     kind: c.kind,
     sector: c.sector ?? null,
+    oneLiner: c.oneLiner ?? null,
     domain: c.domain ?? null,
     totalShares: c.totalShares ?? null,
   }
@@ -68,7 +69,20 @@ export const listDeals = query({
           .query('deals')
           .withIndex('by_org', (q) => q.eq('orgId', m.orgId))
           .collect()
-        return Promise.all(deals.map((dd) => enrich(ctx, dd, tag)))
+        // Same batched AI-score join as the per-org deals.list.
+        const aiScores = await aiScoresByCompany(ctx, m.orgId)
+        return Promise.all(
+          deals.map(async (dd) => {
+            const enriched = await enrich(ctx, dd, tag)
+            return {
+              ...enriched,
+              target: enriched.target && {
+                ...enriched.target,
+                aiScore: aiScores.get(dd.targetCompanyId) ?? null,
+              },
+            }
+          }),
+        )
       }),
     )
 

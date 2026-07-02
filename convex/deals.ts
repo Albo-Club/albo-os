@@ -129,9 +129,43 @@ function companyRef(c: Doc<'companies'> | null) {
     name: c.name,
     kind: c.kind,
     sector: c.sector ?? null,
+    oneLiner: c.oneLiner ?? null,
     domain: c.domain ?? null,
     totalShares: c.totalShares ?? null,
   }
+}
+
+/**
+ * Defensive read of the Cerveau 3 health score (`aiAnalysis` is `v.any()`:
+ * the shape is enforced by the synthesis prompt, never by the schema).
+ * Returns null unless a numeric `health_score.score` is present.
+ */
+export function aiHealthScore(aiAnalysis: unknown): number | null {
+  const score = (
+    aiAnalysis as { health_score?: { score?: unknown } } | null | undefined
+  )?.health_score?.score
+  return typeof score === 'number' ? score : null
+}
+
+/**
+ * One indexed read of an org's `companyIntelligence` rows → companyId →
+ * health score (1-10). Feeds the AI score column of the Participations
+ * views (per-org and aggregated) without a per-deal read.
+ */
+export async function aiScoresByCompany(
+  ctx: Ctx,
+  orgId: Id<'organizations'>,
+): Promise<Map<Id<'companies'>, number>> {
+  const rows = await ctx.db
+    .query('companyIntelligence')
+    .withIndex('by_org', (q) => q.eq('orgId', orgId))
+    .collect()
+  const map = new Map<Id<'companies'>, number>()
+  for (const row of rows) {
+    const score = aiHealthScore(row.aiAnalysis)
+    if (score !== null) map.set(row.companyId, score)
+  }
+  return map
 }
 
 /** Enriches a deal with investor / target / spv (for the view). */
@@ -252,12 +286,20 @@ export const list = query({
     if (status) rows = rows.filter((d) => d.status === status)
 
     rows.sort((a, b) => (b.signedDate ?? 0) - (a.signedDate ?? 0))
+    const aiScores = await aiScoresByCompany(ctx, orgId)
     return await Promise.all(
-      rows.map(async (d) => ({
-        ...(await enrich(ctx, d)),
-        ...(await dealRealizedMetrics(ctx, d)),
-        lastValuationCents: await lastValuationCents(ctx, d._id),
-      })),
+      rows.map(async (d) => {
+        const enriched = await enrich(ctx, d)
+        return {
+          ...enriched,
+          target: enriched.target && {
+            ...enriched.target,
+            aiScore: aiScores.get(d.targetCompanyId) ?? null,
+          },
+          ...(await dealRealizedMetrics(ctx, d)),
+          lastValuationCents: await lastValuationCents(ctx, d._id),
+        }
+      }),
     )
   },
 })
