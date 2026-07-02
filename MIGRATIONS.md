@@ -26,6 +26,18 @@ Les ponts Attio (`attioCompanyId` / `attioDealId`) et l'ingestion Powens sont
 des flux **continus**, pas des migrations — cf. `KNOWN_ISSUES.md`
 (« Ingestion Powens ») et `CLAUDE.md` (frontière d'attribution Attio).
 
+## Chantier : migration des reports Albo App (Supabase) → Albo OS
+
+En cours, par lots bornés avec GO explicite entre chaque lot. Le Lot 0
+(reconnaissance read-only) est livré : jointure par **domaine** (clé de
+l'ingestion existante) avec fallback nom, fan-out multi-entités, clé
+d'idempotence proposée — constat dans `LOT0_MIGRATION_REPORTS_2026-07-02.md`
+et mapping report → entités cible dans
+`MAPPING_REPORTS_RESOLUTION_2026-07-02.csv`. Cadrage amont : PR #167
+(`CADRAGE_MIGRATION_REPORTS_2026-07-02.md`) et PR #168 (table de
+correspondance par nom). Aucun code de migration n'existe encore ; les
+`--prod` restent à la main d'Albo.
+
 ## Chantier : retrait de la table legacy `forecasts`
 
 La table `forecasts` est inerte (alimentée par l'import Airtable uniquement,
