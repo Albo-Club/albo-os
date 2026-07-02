@@ -23,6 +23,25 @@ bas de page.
 
 ---
 
+## v1.60.1 — 02/07/2026 à 10:58 — Isolation inter-organisations renforcée (deals)
+
+Correctif de sécurité interne. À la modification d'un deal, le SPV
+intermédiaire ne peut plus être rattaché à une société d'une autre
+organisation : l'isolation des données entre organisations est désormais
+vérifiée de la même façon à la création **et** à la modification d'un deal.
+Aucun changement visible à l'usage.
+
+> **🔧 Notes techniques**
+>
+> - `convex/deals.ts`, mutation `update` : ajout de la revalidation
+>   `assertSameOrg(ctx, deal.orgId, patch.viaSpvCompanyId, 'spv_wrong_org')`
+>   quand le patch porte un `viaSpvCompanyId`, symétrique de celle déjà
+>   présente dans `create`. `investorCompanyId` et `targetCompanyId` étaient
+>   déjà revalidés dans `update` ; seul `viaSpvCompanyId` manquait.
+> - Sans ce contrôle, un membre pouvait pointer le SPV d'un de ses deals vers
+>   une société d'une autre org et lire ses données au travers de l'enrichissement
+>   du deal — seule faille d'isolation cross-org restante côté backend.
+
 ## v1.60.0 — 01/07/2026 à 18:41 — TRI des participations exact (calcul serveur)
 
 Le taux de rendement interne (TRI) affiché pour une société soldée est
