@@ -46,4 +46,4 @@ generic slice only and note what needs stripping before it goes upstream.
 
 | Date       | Candidate | Files (Albo OS) | Why it's generic | Status |
 | ---------- | --------- | --------------- | ---------------- | ------ |
-| _(nothing yet — first candidates land here as PRs ship)_ | | | | |
+| 2026-07-02 | `InlineField` — click-to-edit field primitive | `src/components/ui/inline-field.tsx` | Generic inline editor (click → format-aware input → Enter/blur save, Esc cancel) usable on any fiche. **Strip before upstream:** decouple from `~/lib/parse` `FieldFormat`/`parseField`/`rawToInput` (instrument display formats) — make the format/parse layer injectable so it isn't tied to the portfolio domain. | ⏳ flagged |
