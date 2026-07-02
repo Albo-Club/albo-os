@@ -23,6 +23,37 @@ bas de page.
 
 ---
 
+## v1.60.3 — 02/07/2026 à 12:01 — Chat IA : budget et validation sur l'accès HTTP
+
+Durcissement de sécurité interne. L'accès HTTP annexe du chat IA (un point
+d'entrée direct utilisé pour des tests, en marge du panneau intégré) applique
+désormais le **même budget d'usage par utilisateur** que le panneau : un membre
+authentifié ne peut plus contourner la limite en bouclant sur cet accès, ce qui
+protège le coût des appels au modèle. Le corps de chaque requête est aussi
+validé — JSON malformé rejeté proprement, taille du message plafonnée,
+organisation vérifiée — au lieu d'être traité sans contrôle. Aucun changement
+visible à l'usage normal.
+
+> **🔧 Notes techniques**
+>
+> - `convex/chat.ts`, handler `streamOverHttp` (route `/api/chat`) : 4
+>   correctifs chirurgicaux, la logique de streaming et
+>   `sendMessage`/`respondToToolApproval` restent inchangées.
+> - `request.json()` est enveloppé dans un `try/catch` → `400 Bad JSON` si le
+>   corps n'est pas du JSON valide (avant : seule httpAction sans garde,
+>   audit §5.1).
+> - `consumeLimit(ctx, 'chatSend', probeUser._id)` ajouté **après**
+>   `actionAuthProbe` (user résolu), même clé/budget que `sendMessage`
+>   (30/min/user, `convex/rateLimiters.ts`) — comble le contournement §4.1.
+> - Plafond `PROMPT_MAX = 30_000` caractères sur le prompt (aligné sur
+>   `MAX_TEXT` de `reportAnalysis.ts`) → `400 Prompt too long` si dépassé.
+> - L'appel `actionAuthProbe` est enveloppé dans un `try/catch` → `403`
+>   propre : un `orgId` malformé (rejeté par le validateur `v.id`) ou un
+>   non-membre ne fuit plus en `500`. Signature d'`actionAuthProbe` et casts
+>   `as Id<>` laissés tels quels (option légère).
+> - `TESTING.md` : cas C31–C34 ajoutés au Niveau 5 (JSON malformé, 31e
+>   requête/min, prompt géant, `orgId` invalide).
+
 ## v1.60.2 — 02/07/2026 à 11:14 — Réception d'e-mails : vérification obligatoire
 
 Durcissement de sécurité interne. Le point d'entrée qui reçoit les e-mails

@@ -24,7 +24,7 @@ import { chatAgent } from './agent'
 import { buildInstructions } from './lib/instructions'
 import { authComponent } from './auth'
 import { consumeLimit } from './rateLimiters'
-import type { DataModel, Id } from './_generated/dataModel'
+import type { DataModel, Doc, Id } from './_generated/dataModel'
 import type {
   GenericActionCtx,
   GenericMutationCtx,
@@ -131,6 +131,11 @@ export const listMessages = query({
 
 const AUTO_TITLE_MAX = 60
 const ROUTE_CONTEXT_MAX = 200
+// Upper bound on a single /api/chat prompt, aligned with the LLM text ceiling
+// in reportAnalysis (MAX_TEXT = 30_000): generous for a real message, blocks
+// pathological multi-MB payloads. The rate limiter caps frequency; this caps
+// per-call size.
+const PROMPT_MAX = 30_000
 
 // Page context forwarded from the client: current route + optionally the entity
 // (deal / company) the user is viewing, so the agent can ground "this deal".
@@ -299,18 +304,36 @@ export const streamOverHttp = httpAction(async (ctx, request) => {
   const baUser = await authComponent.safeGetAuthUser(ctx)
   if (!baUser) return new Response('Unauthorized', { status: 401 })
 
-  const body = (await request.json()) as {
+  let body: {
     orgId?: string
     threadId?: string
     prompt?: string
   }
+  try {
+    body = (await request.json()) as typeof body
+  } catch {
+    return new Response('Bad JSON', { status: 400 })
+  }
   if (!body.orgId || !body.prompt) {
     return new Response('Bad request', { status: 400 })
   }
+  if (body.prompt.length > PROMPT_MAX) {
+    return new Response('Prompt too long', { status: 400 })
+  }
 
-  const probeUser = await ctx.runQuery(internal.chat.actionAuthProbe, {
-    orgId: body.orgId as Id<'organizations'>,
-  })
+  // Resolve + authorize the caller. A malformed orgId (rejected by the v.id
+  // validator) or a non-member both surface here as a thrown error; render
+  // them as a clean 403 rather than letting them escape as a 500.
+  let probeUser: Doc<'users'>
+  try {
+    probeUser = await ctx.runQuery(internal.chat.actionAuthProbe, {
+      orgId: body.orgId as Id<'organizations'>,
+    })
+  } catch {
+    return new Response('Forbidden', { status: 403 })
+  }
+  // Same per-user LLM budget as sendMessage; the caller is now resolved.
+  await consumeLimit(ctx, 'chatSend', probeUser._id)
   const scope = scopeKey(body.orgId as Id<'organizations'>, probeUser._id)
 
   const threadId =
