@@ -798,6 +798,7 @@ cf. `KNOWN_ISSUES.md` « Serveur MCP distant »). Pour M2-M5, poser
 | M8  | claude.ai → Settings → Connectors → *Add custom connector* (URL `/mcp`), puis « liste les deals de … » | Flow OAuth via `/login`, connector actif, réponse avec les données de l'org                                       |
 | M9  | Rejouer M8 en se connectant par **lien magique**                                                       | Après le clic dans l'email, le flow OAuth reprend et aboutit (callbackURL)                                        |
 | M10 | Spammer ~25 `tools/call` d'affilée                                                                     | Résultat `isError` `rate_limited` (bucket `mcpToolCall`, 60/min/user)                                             |
+| M11 | `tools/call listCompanies {org:"<slug>"}`                                                              | Entités actives avec `_id`/`name`/`kind`/`domain` (nullable) — `domain` est la clé de jointure des reports        |
 
 ## En cas d'échec
 

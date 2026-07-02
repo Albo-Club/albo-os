@@ -43,3 +43,24 @@ conformément à la règle « purger d'abord, resserrer ensuite » :
 2. **PR de suivi** (après purge effective) : retirer la table `forecasts` du
    `convex/schema.ts`, la dérivation `prevRentree`/`prevSortie` de l'import
    Airtable, et la section correspondante de `KNOWN_ISSUES.md`.
+
+## Chantier : migration des reports Albo App (Supabase) → `companyReports`
+
+Reprise de l'historique des reports investisseurs de l'ancienne app Albo
+(Supabase `kpvbcqilzfeitxzwhmou`, workspaces « Albo 1 » → org albo et
+« CALTE portfolio » → org calte ; 390 reports, 405 fichiers). État :
+**dry-run terminé, écriture en attente de GO.**
+
+- **Constat Lot 0 (proxy)** : `LOT0_MIGRATION_REPORTS_2026-07-02.md` (PR #169,
+  domaines OS reconstruits depuis les fichiers d'import).
+- **Dry-run sur les VRAIS domaines prod** : `LOT0B_DRYRUN_REPORTS_2026-07-03.md`
+  + `MAPPING_REPORTS_RESOLUTION_FINALE_2026-07-03.csv` (PR #171) — jointure
+  domaine-d'abord/nom-en-fallback recalculée via le MCP (`listCompanies`
+  expose `domain`), 420 écritures attendues (400 hors archivés/doublons).
+- **Idempotence (posée au schéma, non exécutée)** : clé d'upsert
+  (`companyReports.supabaseReportId`, `companyId`) via `by_supabase_report` ;
+  fichiers idem via `documents.supabaseFileId` + `by_supabase_file`. La dédup
+  `(companyId, reportPeriod)` est disqualifiée (collisions + périodes NULL).
+- **À trancher avant le GO** : domaines de plateforme (3+ entités OS), 5
+  conflits de domaine (17 reports), orphelins Marble + Sant Roch, Onima ×1
+  vs ×2, Artefact→LA VIRGULE — liste complète dans le doc LOT0B.
