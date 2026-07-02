@@ -57,6 +57,7 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Badge } from '~/components/ui/badge'
+import { InlineField } from '~/components/ui/inline-field'
 import { Input } from '~/components/ui/input'
 import { AmountInput } from '~/components/ui/amount-input'
 import { eurosToCents } from '~/lib/parse'
@@ -689,6 +690,7 @@ function ParticipationDetail() {
   const [deleting, setDeleting] = useState(false)
   const archiveCompany = useConvexMutation(api.companies.archive)
   const removeCompany = useConvexMutation(api.companies.remove)
+  const updateCompany = useConvexMutation(api.companies.update)
   const org = useConvexQuery(api.organizations.bySlug, { slug: orgSlug })
   const company = useConvexQuery(api.companies.getById, {
     id: companyId as Id<'companies'>,
@@ -748,6 +750,31 @@ function ParticipationDetail() {
       )
     } finally {
       setDeleting(false)
+    }
+  }
+
+  // Inline save of one Identity field (sector / SIREN / domain), reusing the
+  // shared companies.update mutation. SIREN uniqueness/format is enforced
+  // server-side; surface the specific reason on reject.
+  async function saveCompany(patch: {
+    sector?: string
+    siren?: string
+    domain?: string
+  }) {
+    if (!company) return
+    try {
+      await updateCompany({ id: company._id, patch })
+      toast.success(t('participations:edit.saved'))
+    } catch (err) {
+      const code = err instanceof ConvexError ? (err.data as string) : ''
+      const known = ['invalid_siren', 'siren_already_used']
+      toast.error(
+        t(
+          known.includes(code)
+            ? `participations:edit.errors.${code}`
+            : 'participations:edit.errors.default',
+        ),
+      )
     }
   }
 
@@ -856,21 +883,56 @@ function ParticipationDetail() {
         )}
       </div>
 
-      {/* Identity block — nature "company". */}
+      {/* Identity block — nature "company". Sector / SIREN / domain edit
+          inline (click the value); ownership, share count and the Attio link
+          are computed/derived and stay read-only. */}
       <IdentitySection title={t('identity.title')}>
         <div className="grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-4">
-          <IdentityField
+          <InlineField
             label={t('info.sector')}
-            value={
+            format="text"
+            rawValue={company?.sector}
+            display={
               company?.sector
                 ? t(`sectors.${company.sector}`, {
                     defaultValue: company.sector,
                   })
-                : undefined
+                : ''
+            }
+            ariaLabel={t('edit.inlineLabel', { field: t('info.sector') })}
+            disabled={!company}
+            renderEditor={({ done }) =>
+              company ? (
+                <SectorCombobox
+                  value={company.sector ?? ''}
+                  defaultOpen
+                  onOpenChange={(o) => !o && done()}
+                  onChange={(v) => void saveCompany({ sector: v })}
+                  extraSectors={company.sector ? [company.sector] : []}
+                />
+              ) : null
             }
           />
-          <IdentityField label={t('info.siren')} value={company?.siren} />
-          <IdentityField label={t('info.domain')} value={company?.domain} />
+          <InlineField
+            label={t('info.siren')}
+            format="text"
+            rawValue={company?.siren}
+            display={company?.siren ?? ''}
+            ariaLabel={t('edit.inlineLabel', { field: t('info.siren') })}
+            disabled={!company}
+            onCommit={(v) => saveCompany({ siren: String(v) })}
+            onClear={() => saveCompany({ siren: '' })}
+          />
+          <InlineField
+            label={t('info.domain')}
+            format="text"
+            rawValue={company?.domain}
+            display={company?.domain ?? ''}
+            ariaLabel={t('edit.inlineLabel', { field: t('info.domain') })}
+            disabled={!company}
+            onCommit={(v) => saveCompany({ domain: String(v) })}
+            onClear={() => saveCompany({ domain: '' })}
+          />
           <IdentityField
             label={t('info.ownershipGlobal')}
             value={ownership}

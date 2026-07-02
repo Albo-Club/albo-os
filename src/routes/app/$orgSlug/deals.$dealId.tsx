@@ -23,7 +23,7 @@ import type { ChangeEvent } from 'react'
 import type { Doc, Id } from '../../../../convex/_generated/dataModel'
 import type { DealOption } from '~/components/pointage/DealCombobox'
 import type { TxDetails } from '~/components/pointage/TransactionSheet'
-import type { FieldFormat } from '~/components/deals/InstrumentBlock'
+import type { FieldFormat } from '~/lib/parse'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { directionBadgeClass, directionTone } from '~/lib/moneyTone'
@@ -45,16 +45,7 @@ import {
   InstrumentBlock,
 } from '~/components/deals/InstrumentBlock'
 import { PlanVsActualSection } from '~/components/deals/PlanVsActualSection'
-import {
-  bpsToPctInput,
-  centsToEurosInput,
-  dateInputToMs,
-  decimalToNumber,
-  eurosToCents,
-  intToNumber,
-  msToDateInput,
-  pctToBps,
-} from '~/lib/parse'
+import { parseField, rawToInput } from '~/lib/parse'
 import { cn } from '~/lib/utils'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { DealCombobox } from '~/components/pointage/DealCombobox'
@@ -195,46 +186,10 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 /** Stored deal value → input string, in the UI unit of the field's format. */
 function fieldToInput(deal: Doc<'deals'>, field: string): string {
-  const raw = (deal as Record<string, unknown>)[field]
-  if (raw == null) return ''
-  switch (FIELD_FORMAT[field] ?? 'text') {
-    case 'eur':
-      return centsToEurosInput(raw as number)
-    case 'pct':
-      return bpsToPctInput(raw as number)
-    case 'date':
-      return msToDateInput(raw as number)
-    default:
-      return String(raw)
-  }
-}
-
-/**
- * Input string → stored value. `undefined` = empty (left unchanged, never
- * sent), `null` = invalid (blocks the save), otherwise the parsed value in
- * the storage unit (cents / bps / ms / enum literal / text).
- */
-function parseField(
-  format: FieldFormat,
-  value: string,
-): number | string | null | undefined {
-  const trimmed = value.trim()
-  if (trimmed === '') return undefined
-  switch (format) {
-    case 'eur':
-      return eurosToCents(trimmed)
-    case 'pct':
-      return pctToBps(trimmed)
-    case 'date':
-      return dateInputToMs(value)
-    case 'number':
-    case 'year':
-      return intToNumber(trimmed)
-    case 'decimal':
-      return decimalToNumber(trimmed)
-    default:
-      return trimmed
-  }
+  return rawToInput(
+    FIELD_FORMAT[field] ?? 'text',
+    (deal as Record<string, unknown>)[field],
+  )
 }
 
 /** One editable instrument field, rendered by its display format. */
@@ -1024,6 +979,7 @@ function DealDetail() {
           effectiveKind === 'royalty' ? <NotesSection deal={deal} /> : undefined
         }
         onEdit={() => setEditOpen(true)}
+        editable={!unsaved}
       />
 
       {effectiveKind !== 'royalty' && <NotesSection deal={deal} />}

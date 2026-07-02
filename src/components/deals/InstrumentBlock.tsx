@@ -1,21 +1,27 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useConvexMutation } from '@convex-dev/react-query'
+import { toast } from 'sonner'
 
 import {
   INSTRUMENT_ARCHETYPE,
   INSTRUMENT_FIELDS,
   INSTRUMENT_RENDER,
 } from '../../../convex/lib/instrumentMapping'
+import { ENUM_FIELD_VALUES } from '../../../convex/lib/instruments'
+import { api } from '../../../convex/_generated/api'
 import type { ComponentType, ReactNode } from 'react'
 import type { Archetype } from '../../../convex/lib/instrumentMapping'
 import type { InstrumentKind } from '../../../convex/lib/instruments'
 import type { Doc } from '../../../convex/_generated/dataModel'
+import type { FieldFormat } from '~/lib/parse'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { LeadSpvPanel } from '~/components/deals/LeadSpvPanel'
 import { RoyaltiesPanel } from '~/components/deals/RoyaltiesPanel'
 import { signTone } from '~/lib/moneyTone'
 import { cn } from '~/lib/utils'
 import { Badge } from '~/components/ui/badge'
+import { InlineField } from '~/components/ui/inline-field'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 
 /**
@@ -25,19 +31,11 @@ import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
  * columns to show, and INSTRUMENT_ARCHETYPE for the colored badge. It NEVER
  * duplicates the instrument→fields mapping.
  *
- * No mutation, no editable field: the parent's instrument selector only
- * previews a layout (cf. deals.$dealId.tsx).
+ * Fields in the standard grid edit inline when `editable` (click a value →
+ * InlineField → one-field `deals.update`); the block stays read-only while the
+ * parent previews a different instrument type. The instrument-type selector
+ * itself only previews a layout (cf. deals.$dealId.tsx).
  */
-
-export type FieldFormat =
-  | 'eur'
-  | 'pct'
-  | 'date'
-  | 'enum'
-  | 'number'
-  | 'decimal'
-  | 'year'
-  | 'text'
 
 /**
  * `deals` column → display format. This is NOT the instrument→fields mapping
@@ -226,13 +224,16 @@ function FieldsView({
   instrumentKind,
   archetype,
   formatField,
+  editable,
 }: {
   deal: Doc<'deals'>
   instrumentKind: InstrumentKind
   archetype: Archetype
   formatField: (field: string) => string
+  editable?: boolean
 }) {
   const { t } = useTranslation('participations')
+  const updateDeal = useConvexMutation(api.deals.update)
   const fields = INSTRUMENT_FIELDS[instrumentKind] ?? []
   const splitIdx = fields.indexOf(SAFE_SPLIT_FIELD)
   const isSafe = splitIdx >= 0
@@ -242,6 +243,18 @@ function FieldsView({
   const [post, setPost] = useState(deal.conversionValuation != null)
 
   const visible = isSafe ? (post ? fields : fields.slice(0, splitIdx)) : fields
+
+  // Inline save: one-field patch on the shared `deals.update` mutation (same
+  // path as the edit dialog, so the field is marked manually edited and the
+  // Airtable re-import leaves it untouched).
+  async function saveField(field: string, parsed: number | string) {
+    try {
+      await updateDeal({ id: deal._id, patch: { [field]: parsed } })
+      toast.success(t('edit.saved'))
+    } catch {
+      toast.error(t('edit.errors.default'))
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -255,13 +268,34 @@ function FieldsView({
       )}
 
       <div className="grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-3">
-        {visible.map((field) => (
-          <FieldRow
-            key={field}
-            label={t(`field.${field}`, { defaultValue: field })}
-            value={formatField(field)}
-          />
-        ))}
+        {visible.map((field) => {
+          const label = t(`field.${field}`, { defaultValue: field })
+          if (!editable) {
+            return (
+              <FieldRow key={field} label={label} value={formatField(field)} />
+            )
+          }
+          const format = FIELD_FORMAT[field] ?? 'text'
+          return (
+            <InlineField
+              key={field}
+              label={label}
+              format={format}
+              rawValue={(deal as Record<string, unknown>)[field]}
+              display={formatField(field)}
+              unit={FORMAT_UNIT[format]}
+              enumOptions={
+                format === 'enum' ? ENUM_FIELD_VALUES[field] : undefined
+              }
+              renderEnumLabel={(opt) =>
+                t(`enum.${field}.${opt}`, { defaultValue: opt })
+              }
+              selectPlaceholder={t('edit.selectPlaceholder')}
+              ariaLabel={t('edit.inlineLabel', { field: label })}
+              onCommit={(parsed) => saveField(field, parsed)}
+            />
+          )
+        })}
       </div>
 
       {archetype === 'placement' && deal.currentValue != null && (
@@ -278,6 +312,7 @@ export function InstrumentBlock({
   transactions,
   notesSlot,
   onEdit,
+  editable,
 }: {
   deal: Doc<'deals'>
   instrumentKind: InstrumentKind
@@ -285,6 +320,9 @@ export function InstrumentBlock({
   transactions?: Array<PanelTransaction>
   notesSlot?: ReactNode
   onEdit?: () => void
+  // Inline-edit the standard field grid. Off while previewing a different
+  // instrument type (the shown fields wouldn't match the saved type).
+  editable?: boolean
 }) {
   const { t, i18n } = useTranslation('participations')
   const lang = i18n.language
@@ -356,6 +394,7 @@ export function InstrumentBlock({
           instrumentKind={instrumentKind}
           archetype={archetype}
           formatField={formatField}
+          editable={editable}
         />
       )}
     </section>

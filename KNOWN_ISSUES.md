@@ -1543,7 +1543,7 @@ ce mapping ailleurs. Décisions non-évidentes :
       `LeadSpvPanel` n'expose qu'un bouton « Modifier » qui appelle `onEdit`
       (ouvre ce même dialog).
 
-## Fiche entité (lecture seule) — champs manquants & lien Attio
+## Fiche entité — identité (édition inline), champs manquants & lien Attio
 
 Le squelette commun des fiches (en-tête → bloc d'identité → Reporting/KPIs →
 Documents) vit dans `src/components/companies/EntityFiche.tsx`. Depuis le retrait
@@ -1596,6 +1596,17 @@ Pièges non-évidents :
    d'URL potentiellement faux. C'est une base d'URL **publique**, pas un secret
    (l'anti-pattern « pas de `VITE_` sur un secret » ne s'applique pas).
 
+5. **Identité éditable inline (secteur / SIREN / domaine) ; le reste en lecture
+   seule.** Ces trois champs s'éditent **au clic** via `InlineField`
+   (`src/components/ui/inline-field.tsx`) câblé sur `companies.update` — plus de
+   détour par le dialog « Modifier » pour eux (le dialog reste la voie pour nom
+   + personnes). Les champs **calculés/dérivés** — détention globale, nb
+   d'actions consolidé, lien Attio — **restent en lecture seule** (rendus par
+   `IdentityField`). Vider SIREN/domaine puis valider les **efface** (`''`,
+   normalisé côté mutation) ; le **secteur** réutilise `SectorCombobox` (props
+   additives `defaultOpen` + `onOpenChange` pour l'ouvrir/fermer en inline). Le
+   détail du composant partagé : section « Édition inline des fiches ».
+
 ## Édition manuelle deals & `manuallyEditedFields`
 
 L'édition des champs d'un deal depuis la fiche (`EditDealDialog`) écrit via
@@ -1633,6 +1644,42 @@ fait exception : `''` le réinitialise (géré serveur, retombe sur le titre
 dérivé). `paidActual` (décaissé réel) est **calculé** depuis les transactions
 (`transactionTotals`) et n'est jamais éditable — distinct de `paidAmount`
 (colonne, « montant contractuel »).
+
+## Édition inline des fiches (`src/components/ui/inline-field.tsx`)
+
+Les blocs **« Détails de l'instrument »** (fiche deal) et **« Identité »** (fiche
+société) s'éditent **au clic sur la valeur**, sans passer par le dialog du menu
+« … ». Un seul composant partagé, `InlineField`, généralise l'interaction de la
+cellule CA royalties (`EditableCa`) — clic → input adapté au format →
+**Entrée/blur** valide, **Échap** annule — à une grille de champs multi-formats.
+Points non-évidents :
+
+- **Réutilisation, pas réinvention.** `InlineField` est **format-driven** : il
+  reçoit un `FieldFormat` (`~/lib/parse`) et rend l'input correspondant (€ via
+  `useAmountField`, %/nombre/décimal/année en `number`, `date`, texte, `Select`
+  pour les enums). Le parsing/sérialisation vit dans `~/lib/parse`
+  (`parseField` / `rawToInput`, **source unique** partagée avec le dialog
+  `EditDealDialog` — le `parseField` local de `deals.$dealId.tsx` a été supprimé
+  au profit de l'import). Ne pas dupliquer un parseur ailleurs.
+- **Deal : édition coupée en aperçu de type.** `InstrumentBlock` reçoit
+  `editable = !unsaved` : quand le sélecteur d'en-tête **prévisualise** un autre
+  `instrumentKind`, les champs affichés n'appartiennent pas au type enregistré →
+  la grille repasse **lecture seule** (on n'écrit jamais un champ d'un type que
+  le deal n'a pas). L'écriture est un **patch à un seul champ** sur `deals.update`
+  (marque `manuallyEditedFields`, cf. section « Édition manuelle deals »).
+- **Vider un champ : sémantique différente deal vs société.** Côté **deal**, une
+  saisie vide est un **no-op** (les colonnes ne se vident pas via un `undefined`
+  client — cf. « Effacer un champ optional via `deals.update` » et « Limite
+  assumée » ci-dessus) : `InlineField` n'appelle `onClear` que si le caller le
+  fournit, ce que la grille deal **ne fait pas**. Côté **société**, SIREN/domaine
+  fournissent `onClear` → envoient `''` → `companies.update` efface. Une saisie
+  **non parsable** (lettres dans un champ €) est toujours un no-op (garde le
+  `null` de `parseField`).
+- **Enum & secteur ouverts au clic.** Pour un enum, l'éditeur est un `Select`
+  rendu **déjà ouvert** (`open`) qui valide au choix ; pour le secteur (combobox
+  créable), `renderEditor` branche `SectorCombobox` avec `defaultOpen` +
+  `onOpenChange` (props additives, défaut = comportement dialog inchangé) — un
+  seul clic ouvre le picker, la fermeture quitte le mode édition.
 
 ## Panneau Royalties — listes sur `deals` & collage du BP (`src/components/deals/RoyaltiesPanel.tsx`)
 

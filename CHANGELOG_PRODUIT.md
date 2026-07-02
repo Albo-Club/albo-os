@@ -23,6 +23,45 @@ bas de page.
 
 ---
 
+## v1.63.0 — 02/07/2026 à 19:09 — Édition au clic des fiches deal & société
+
+Fini le détour par le menu « … » pour corriger une valeur. Sur la fiche d'un
+**deal**, les champs du bloc **« Détails de l'instrument »** (montants, taux,
+dates, listes) s'éditent maintenant **directement au clic** : on clique sur la
+valeur, on la modifie, **Entrée** (ou un clic ailleurs) enregistre, **Échap**
+annule. Même geste sur la fiche d'une **société**, pour le bloc **« Identité »** :
+**secteur**, **SIREN** et **domaine** se corrigent d'un clic.
+
+Les valeurs **calculées** ne bougent pas — détention, nombre d'actions, décaissé
+réel et lien Attio restent en lecture seule — et un champ ajusté à la main est
+**protégé** : un ré-import de données ne l'écrase plus. Le menu « … » reste là
+pour ce qu'il fait seul (renommer, changer le type d'instrument, réaffecter le
+deal, gérer les personnes). Enfin, tant qu'on **prévisualise** un autre type
+d'instrument, l'édition au clic est mise en pause pour éviter toute confusion.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau composant partagé `src/components/ui/inline-field.tsx` (`InlineField`) :
+>   généralise l'interaction clic → saisie → Entrée/blur commit / Échap cancel de
+>   `EditableCa` (`RoyaltiesPanel`) à une grille de champs multi-formats. L'éditeur
+>   est piloté par le `FieldFormat` (€ / % / date / nombre / décimal / année /
+>   texte, `Select` pour les enums) ; `renderEditor` sert d'échappatoire pour le
+>   combobox créable du secteur.
+> - Parsing/sérialisation factorisés dans `src/lib/parse.ts` (`parseField`,
+>   `rawToInput`, type `FieldFormat`) — source unique partagée avec le dialog
+>   d'édition ; `deals.$dealId.tsx` s'y branche (suppression du `parseField`
+>   local dupliqué, `fieldToInput` délègue à `rawToInput`).
+> - Deal : `InstrumentBlock` / `FieldsView` reçoivent `editable` (= `!unsaved`,
+>   coupé en aperçu de type) et écrivent via un patch à un seul champ sur
+>   `deals.update` (qui marque `manuallyEditedFields`). Société : bloc Identité
+>   câblé sur `companies.update` (secteur / SIREN / domaine) ; `SectorCombobox`
+>   gagne `defaultOpen` + `onOpenChange` pour s'ouvrir puis se refermer en inline.
+> - Les colonnes deal ne se vident pas via la mutation → un champ vidé est un
+>   no-op ; côté société, SIREN / domaine vidés partent en `''` (efface). Nouvelle
+>   clé i18n `participations:edit.inlineLabel` (EN + FR).
+
+---
+
 ## v1.62.0 — 02/07/2026 à 15:17 — Fiche entreprise : synthèse IA en pleine largeur
 
 Sur la page d'une société, la **synthèse IA** quitte les onglets pour devenir
