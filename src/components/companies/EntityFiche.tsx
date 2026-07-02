@@ -8,7 +8,8 @@ import { Badge } from '~/components/ui/badge'
 /**
  * Shared, read-only building blocks for the entity fiche skeleton (header →
  * identity block → reporting/KPIs → documents). Used by the company fiche.
- * No mutation here — editing comes in a later lot.
+ * These primitives stay display-only: the editable Identity fields (sector /
+ * SIREN / domain) are rendered inline by `InlineField` in the route, not here.
  */
 
 export type EntityNature = 'company'

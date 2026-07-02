@@ -59,3 +59,67 @@ export function centsToEurosInput(cents: number): string {
 export function bpsToPctInput(bps: number): string {
   return String(bps / 100)
 }
+
+/**
+ * Display format of a `deals` column (and, by extension, any fiche field):
+ * how a stored value is rendered and parsed back — cents→€, bps→%, ms→date,
+ * enum literal, plain number/decimal/year, or free text. Shared by the
+ * read-only panels (InstrumentBlock), the edit dialog and the inline editor.
+ */
+export type FieldFormat =
+  | 'eur'
+  | 'pct'
+  | 'date'
+  | 'enum'
+  | 'number'
+  | 'decimal'
+  | 'year'
+  | 'text'
+
+/**
+ * Input string → stored value. `undefined` = empty (the caller decides: leave
+ * unchanged, or clear when the field supports it), `null` = invalid (blocks the
+ * save), otherwise the parsed value in the storage unit (cents / bps / ms /
+ * enum literal / text).
+ */
+export function parseField(
+  format: FieldFormat,
+  value: string,
+): number | string | null | undefined {
+  const trimmed = value.trim()
+  if (trimmed === '') return undefined
+  switch (format) {
+    case 'eur':
+      return eurosToCents(trimmed)
+    case 'pct':
+      return pctToBps(trimmed)
+    case 'date':
+      return dateInputToMs(value)
+    case 'number':
+    case 'year':
+      return intToNumber(trimmed)
+    case 'decimal':
+      return decimalToNumber(trimmed)
+    default:
+      return trimmed
+  }
+}
+
+/**
+ * Stored value → input string, in the UI unit of the field's format. The
+ * inverse of parseField, for seeding an editor (dialog or inline) from the
+ * saved value.
+ */
+export function rawToInput(format: FieldFormat, raw: unknown): string {
+  if (raw == null) return ''
+  switch (format) {
+    case 'eur':
+      return centsToEurosInput(raw as number)
+    case 'pct':
+      return bpsToPctInput(raw as number)
+    case 'date':
+      return msToDateInput(raw as number)
+    default:
+      return String(raw)
+  }
+}

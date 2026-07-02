@@ -394,6 +394,7 @@
     "personLinkedToAttio": "Lié à Attio",
     "attioBadge": "Attio",
     "saved": "Modifications enregistrées",
+    "inlineLabel": "Modifier {{field}}",
     "errors": {
       "invalid_siren": "Le SIREN doit contenir exactement 9 chiffres.",
       "siren_already_used": "Ce SIREN est déjà utilisé par une autre société.",

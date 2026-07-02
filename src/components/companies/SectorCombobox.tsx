@@ -36,15 +36,28 @@ export function SectorCombobox({
   onChange,
   disabled,
   extraSectors,
+  defaultOpen,
+  onOpenChange,
 }: {
   value: string
   onChange: (value: string) => void
   disabled?: boolean
   extraSectors?: Array<string>
+  // Inline use (fiche Identité): open on mount and notify on close so the
+  // parent can leave edit mode. Defaults keep the dialog behaviour unchanged.
+  defaultOpen?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
   const { t } = useTranslation('participations')
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen ?? false)
   const [search, setSearch] = useState('')
+
+  // Route every open/close through here so selection-driven closes notify the
+  // parent too (Radix's onOpenChange only fires on its own close paths).
+  function handleOpenChange(next: boolean) {
+    setOpen(next)
+    onOpenChange?.(next)
+  }
 
   const predefined = SECTOR_SLUGS.map((slug) => ({
     slug,
@@ -76,12 +89,12 @@ export function SectorCombobox({
 
   function select(next: string) {
     onChange(next)
-    setOpen(false)
+    handleOpenChange(false)
     setSearch('')
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           type="button"
