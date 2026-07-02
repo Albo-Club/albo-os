@@ -10,6 +10,7 @@
  * errors, manual signature verification via Web Crypto).
  */
 
+import { ConvexError } from 'convex/values'
 import { httpAction } from './_generated/server'
 import { internal } from './_generated/api'
 
@@ -302,17 +303,14 @@ export const agentmailWebhook = httpAction(async (ctx, request) => {
   const body = await request.text()
 
   const secret = process.env.AGENTMAIL_WEBHOOK_SECRET
-  if (secret) {
-    const svixId = request.headers.get('svix-id') ?? ''
-    const svixTs = request.headers.get('svix-timestamp') ?? ''
-    const svixSig = request.headers.get('svix-signature') ?? ''
-    const ok =
-      svixId && svixTs && svixSig &&
-      (await verifySvix(secret, svixId, svixTs, svixSig, body))
-    if (!ok) return new Response('Invalid signature', { status: 401 })
-  } else {
-    console.warn('[agentmail] AGENTMAIL_WEBHOOK_SECRET unset — skipping signature check')
-  }
+  if (!secret) throw new ConvexError('missing_agentmail_webhook_secret')
+  const svixId = request.headers.get('svix-id') ?? ''
+  const svixTs = request.headers.get('svix-timestamp') ?? ''
+  const svixSig = request.headers.get('svix-signature') ?? ''
+  const ok =
+    svixId && svixTs && svixSig &&
+    (await verifySvix(secret, svixId, svixTs, svixSig, body))
+  if (!ok) return new Response('Invalid signature', { status: 401 })
 
   let payload: Record<string, unknown>
   try {
