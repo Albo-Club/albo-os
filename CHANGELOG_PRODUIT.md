@@ -23,6 +23,31 @@ bas de page.
 
 ---
 
+## v1.64.1 — 02/07/2026 à 23:59 — Migration des reports : jointure recalculée sur les données réelles
+
+Préparation technique de la reprise de l'historique des reports investisseurs
+depuis l'ancienne application Albo. La correspondance entre chaque report et
+la ou les sociétés du portefeuille est recalculée sur les données réelles de
+l'application (et plus sur une reconstruction), et le socle est posé pour que
+l'import puisse être relancé sans jamais créer de doublon. Aucune donnée
+n'est encore écrite : l'import lui-même attend la validation du mapping.
+
+> **🔧 Notes techniques**
+>
+> - Schéma (additif) : `companyReports.supabaseReportId` + index
+>   `by_supabase_report` et `documents.supabaseFileId` + index
+>   `by_supabase_file`. Clé d'idempotence d'upsert = (`supabaseReportId`,
+>   `companyId`) — le fan-out écrit une ligne par entité cible ; la dédup
+>   `(companyId, reportPeriod)` reste disqualifiée (collisions + périodes
+>   NULL côté source).
+> - `convex/agentTools.ts:listCompaniesInternal` expose `companies.domain`
+>   (lecture seule, consommé par le MCP) : débloque le dry-run de la
+>   jointure par domaine sur les données prod, invisible au Lot 0 (PR #169).
+> - Dry-run read-only : source Supabase revalidée par checksum (390 reports
+>   identiques au Lot 0), jointure domaine-d'abord/nom-en-fallback recalculée
+>   sur les vrais domaines ; livrables `LOT0B_*.md` + CSV de résolution
+>   finale. Aucune écriture de report.
+
 ## v1.64.0 — 02/07/2026 à 23:31 — Vue Entreprises : nouvelles colonnes et colonne figée
 
 La liste des **entreprises** (par organisation et vue agrégée) gagne trois
