@@ -23,6 +23,30 @@ bas de page.
 
 ---
 
+## v1.63.1 — 02/07/2026 à 22:40 — Migration des reports : table de correspondance des sociétés
+
+Étape préparatoire de la migration des reportings (aucun changement dans
+l'app, aucune donnée modifiée) : la table de correspondance entre les sociétés
+de l'ancien outil de reporting et celles d'Albo OS est prête à être relue.
+Pour chaque société ayant des reports à migrer, elle propose son équivalente
+dans Albo OS avec un niveau de confiance, et met en évidence les cas à
+arbitrer à la main ainsi que les doublons repérés.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau fichier `MAPPING_REPORTS_COMPANIES_2026-07-02.csv` (racine) : 116
+>   companies source (34 org albo / 82 org calte, 390 reports), matching par
+>   nom strictement intra-org, colonnes org / nom_source / nb_reports /
+>   periode / match_propose_OS / id_OS / confiance / doublon_OS_possible /
+>   note. Bilan : 46 exact, 47 haute, 19 moyenne, 4 aucune.
+> - Extraction read-only : `SELECT` via MCP Supabase (`company_reports` ×
+>   `portfolio_companies` × `workspaces`) + `listCompanies` MCP Albo OS.
+>   Aucune écriture Convex, aucun code de migration.
+> - Doublons OS et problèmes adjacents (report CrushON sans période, conflit
+>   iArtisan / Renovation Man vers la même company OS) signalés en tête de
+>   fichier, non résolus. Suite du cadrage
+>   `CADRAGE_MIGRATION_REPORTS_2026-07-02.md` (PR #167, non mergée).
+
 ## v1.63.0 — 02/07/2026 à 19:09 — Édition au clic des fiches deal & société
 
 Fini le détour par le menu « … » pour corriger une valeur. Sur la fiche d'un

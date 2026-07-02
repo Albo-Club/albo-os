@@ -1,0 +1,143 @@
+# Table de correspondance — reports Albo App (Supabase) -> companies Albo OS (Convex mellow-curlew-738)
+# Générée le 02/07/2026 (read-only, aucune écriture). Matching PAR NOM uniquement, strictement intra-org : albo->albo, calte->calte (aucun match cross-org).
+# Suite du cadrage CADRAGE_MIGRATION_REPORTS_2026-07-02.md (PR #167). Fichier à curer à la main : colonnes match_propose_OS / id_OS / confiance éditables.
+#
+# RÉSUMÉ ORG ALBO  : 34 companies source / 183 reports — 30 exact, 1 haute, 2 moyenne, 1 aucune
+# RÉSUMÉ ORG CALTE : 82 companies source / 207 reports — 16 exact, 46 haute, 17 moyenne, 3 aucune
+# TOTAL            : 116 companies source / 390 reports — 46 exact, 47 haute, 19 moyenne, 4 aucune
+#
+# Confiance : exact = nom identique (casse/espaces près) ; haute = variation évidente (accents, préfixe/suffixe SIDE/ASTERION, alias entre parenthèses) ;
+#             moyenne = plausible mais à trancher (plusieurs candidats, nom produit vs véhicule) ; aucune = pas de correspondance dans le vivier de l'org.
+#
+# DOUBLONS OS DÉTECTÉS (signalés, non résolus — org calte sauf mention) :
+#  - "ASTERION SIDE ONIMA (ex:YEASTY)" x2 : jx7csjxyd8kne6mq1s03pb307587sveg / jx7cjv10jz9n1ez90vswy0z5rd87snx5
+#  - "COEUR PIGALLE" x2 : jx7bw98edracbjs9kcqw2dpnrs87rebe / jx7dxbp40qfy14pky4fkqybt8987rakm
+#  - "RDB" x2 en portfolio (jx7eqe5g16qvnvhbqp0k4jf8q587sta9 / jx73k3xwa1f614jaddg7k630q587r53r) + 1 en group_operating
+#  - "FLEXLIVING" (jx79rp6ptbzz6yvn2nscv16h3587sw9n) vs "FLEX LIVING" (jx728qebawmwfj08h49z37110s87rs66)
+#  - Entités group_* dupliquées en portfolio : CALTIMO, Banco 2, SCI CHAPELLE, SCI CHAPELLE 2, SCI UPLOAD, SAS RELAIS CHAPELLE
+#  - Trio confus : "Good TECH LAB" / "TECH LAB (The Good factory)" / "THE GOOD FACTORY (Drink Dong)"
+#  - Bruit cross-org : des homonymes de companies albo existent en calte (Eben Home, WARO, Upcyclea, HECTAREA, The Fat Broccoli, JEEN, REWATT, SEZAME…) — hors vivier par la règle de routage, listés à titre de signal.
+#
+# PROBLÈMES ADJACENTS (remontés, non corrigés) :
+#  - CrushON (calte) : period_sort_date NULL sur son unique report (période inconnue).
+#  - iArtisan (calte) : son unique report est archivé, ET sa cible OS est la même que celle de "Renovation Man" -> 2 companies source vers 1 company OS, à arbitrer ensemble.
+#  - Reports avec lignes archivées/duplicates dans le lot : voir colonne note (AZmed, Eben Home, Jeen albo, Keenest, Tango, Wandercraft, Waro, Capté, Corma, Ordalie, Stockoss, Virgil Properties).
+#  - Le workspace OPRTRS séparé (34 reports) reste hors périmètre (cf. cadrage D3) ; "OPRTRS CLUB" ci-dessous ne couvre que les 4 reports du workspace CALTE portfolio.
+#
+org,nom_source,nb_reports,periode,match_propose_OS,id_OS,confiance,doublon_OS_possible,note
+albo,ACT Running,6,2025-02→2026-05,ACT Running,jx7dazc018z5t2g9pf75my07k987rbt1,exact,,
+albo,AZmed,15,2024-01→2026-06,AZmed,jx787ry5qajvmtxmpxn6zzqzf187r6bb,exact,,"1 report archivé + 1 is_duplicate dans le lot"
+albo,BackMarket,1,2026-01→2026-01,BackMarket,jx7c2j6x8zm19cg2dky1nfdv6x87sfy5,exact,,
+albo,Beyond Green,4,2025-01→2026-02,Beyond Green,jx78qs3pr8tq0ksxtywz5rrq6587rdmt,exact,,
+albo,Bleen,5,2025-01→2025-12,Bleen,jx770j9q5sqva04t4gkq3fyerd87s6fz,exact,,
+albo,Carbonfarm,1,2026-05→2026-05,CarbonFarm,jx7f66x612xx0zrzce4k41a9rh87shkp,exact,,"Casse : Carbonfarm vs CarbonFarm"
+albo,Cockpit Agriculture,6,2025-10→2026-04,Cockpit Agriculture,jx77vx2npwy75w80xdmcgrs04987s3ea,exact,,
+albo,Eben Home,25,2024-04→2026-04,Eben Home,jx71nk6w56zzbngapd4pzvj59x87r7d2,exact,,"2 is_duplicate dans le lot ; homonyme « Eben Home » côté org calte (hors vivier)"
+albo,Eclo Beauty,9,2024-01→2026-06,Eclo Beauty,jx78d1g9n2868k4g9az7ag4b8s87sk5t,exact,,
+albo,Genomines,1,2025-12→2025-12,Genomines,jx7d25nz1ed4q0p9xd875py76587r4g3,exact,,
+albo,Goodvest,11,2025-07→2026-05,Goodvest,jx72ej20pak0mqq05hshae3ayn87rjvy,exact,,
+albo,Hectarea,1,2025-01→2025-01,Hectarea,jx79z9rcha003f9910kh88f64s87rs51,exact,,"Homonyme « HECTAREA » côté org calte (hors vivier)"
+albo,Jeen,7,2025-11→2026-05,Jeen,jx7ez9pt7m8a6jab1zyfseawgd87rgxf,exact,,"2 reports archivés dans le lot ; distincte de « Jeen » org calte"
+albo,JOONE Paris,3,2025-12→2026-05,JOONE Paris,jx7e35h5h91mmk8nw531yq482s87r1nn,exact,,
+albo,Keenest,3,2025-02→2025-07,Keenest,jx7c3wgzp70vn1hftqb1p6wv9987ranq,exact,,"2 reports archivés dans le lot"
+albo,Komeet,2,2025-07→2025-10,Komeet,jx78h5ac4qbqva6bdfqz9kbn7d87smbh,exact,,"Distincte de « Komeet » org calte (cf. ligne calte → SIDE WENABI)"
+albo,Les constructeurs du bois,2,2026-03→2026-03,Les constructeurs du bois,jx7901c7f8zvbm3vryrkgcssmh87rhh3,exact,,
+albo,Losanje,2,2025-04→2025-07,Losanje,jx728f588hby64q8y4c7twcb9587sz2v,exact,,
+albo,Ouisub,5,2025-12→2026-04,Ouisub,jx78942c82np78n3gvyy7s4e5187s975,exact,,
+albo,Reekom,2,2026-01→2026-01,Reekom,jx71fa19ezp2vzaaj0k09gkmzn87rq97,exact,,
+albo,RegenSchool,3,2025-09→2026-03,RegenSchool,jx774qf54r5v58sxaew582x76587rtmt,exact,,
+albo,Resilience,6,2025-01→2026-06,Resilience,jx73memhv6nh8qhtpt3e8ytqjx87rvxh,exact,,
+albo,Rewatt,1,2026-06→2026-06,Rewatt,jx74fyn7n16pchhsq7eby61dss87sphz,exact,,"Nombreuses lignes « REWATT - <adresse> » côté org calte (hors vivier)"
+albo,Tango,11,2025-01→2026-05,Tango,jx79jwd3y9rmsakghwagm48st187skyz,exact,,"3 is_duplicate dans le lot"
+albo,The Fat Broccoli,3,2025-10→2026-04,The Fat Broccoli,jx72f9jrbntwwvhvcj026dd7z987sz2n,exact,,"Homonyme « The Fat Broccoli » côté org calte (hors vivier)"
+albo,Upcyclea,2,2025-07→2025-10,Upcyclea,jx72bsqr4wr6j5wqzeb2zbwkex87s6tx,exact,,"Homonyme « Upcyclea » côté org calte (hors vivier)"
+albo,Versant,12,2024-04→2026-04,Versant,jx71te1271bdq9qt5qpny56zw187rz88,exact,,
+albo,Wandercraft,5,2026-03→2026-03,Wandercraft,jx78rdch9avsme496sqg8pw88x87rchk,exact,,"1 report archivé dans le lot"
+albo,Waro,7,2024-01→2025-07,Waro,jx7dn3qdmqpxthb16q338v2trd87smzy,exact,,"1 is_duplicate dans le lot ; homonyme « WARO » côté org calte (hors vivier)"
+albo,Ziwig,3,2025-02→2026-04,Ziwig,jx77eqqaeggwwdemjgy20xa4k187r7cv,exact,,
+albo,Loewi,7,2025-07→2026-05,Wheelee - Loewi,jx7fgc6r15rydb31jpn4jyvc6x88dkmp,haute,,"Nom OS = « Wheelee - Loewi » (containment unique)"
+albo,La vie de quartier,3,2026-01→2026-04,,,moyenne,"4 entités « La Vie de Quartier » dans l'org","Candidats : Holding (jx7agg7khvm20qt2pryer2rxb987r8w5) / Rue du RDV (jx7332wvprgbtksfsnsnbvd35d8990c2) / Rue St Maur (jx74e2822v5aazcewpmy94bhb1898xv0) / Bdv Voltaire (jx720ph745f5wx0ba2nchad8xd89kjfv) — reports probablement au niveau Holding, à trancher"
+albo,Sezame,7,2024-01→2026-04,,,moyenne,"2 SPV « Sezame Immo » dans l'org","Candidats : Sezame Immo 2 (jx7fdmxmrmm12w20mydzkdn7fx87xxdd) / Sezame Immo 6 (jx7d3vsve9fqx891gbk6phqgf587wgdn) — aucune entité « Sezame » tout court, à trancher"
+albo,Marble,2,2025-01→2026-01,,,aucune,,"Aucun candidat dans le vivier albo — à créer ou à mapper à la main"
+calte,50 Partners,2,2025-01→2025-12,50 PARTNERS,jx79q7x7f4hx9fdaf96r75rfp587r2mb,exact,,
+calte,Climate Club,1,2025-01→2025-01,CLIMATE CLUB,jx776pj5v1g1atcx3ebdb1mycs87r9jt,exact,,
+calte,Corma,5,2025-04→2026-05,Corma,jx7aj8p8s9jy9w1a8k9ffawxns87rx47,exact,,"1 report archivé dans le lot"
+calte,CrushON,1,→,CrushON,jx713ftzeqrjcxabktntdveew587sdvc,exact,,"⚠️ period_sort_date NULL sur son unique report — période à vérifier avant migration"
+calte,Extracadabra,6,2023-01→2026-06,EXTRACADABRA,jx7bgfs9zwa70nmk6fjrxcmy0x87rep7,exact,,
+calte,Good Only Ventures,2,2025-01→2026-05,GOOD ONLY VENTURES,jx7ed316rxp65x64z21qjbnasd87rbbq,exact,,
+calte,Jeen,4,2025-12→2026-04,JEEN,jx7c72wk80x7mhr63p2qdbs32587skqj,exact,,"Distincte de « Jeen » org albo (routage strict)"
+calte,Layan,2,2026-01→2026-01,LAYAN,jx7edfzmc3zsfzs43nzfyd1fc187sg4g,exact,,
+calte,OpenClimat,2,2025-01→2026-03,OPENCLIMAT,jx774fgf7bw87gxgwa7wm4hs3987re5y,exact,,
+calte,OPRTRS CLUB,4,2025-01→2026-04,OPRTRS CLUB,jx7c3nw0ftckbdbqx31p0t0k3n87ss1b,exact,,"Ne couvre que les 4 reports du workspace CALTE ; le workspace OPRTRS séparé (34 reports) reste hors périmètre (D3)"
+calte,Osol,1,2026-01→2026-01,OSOL,jx76zpnzpmy1rz0sa645myqm9x87rjvs,exact,,
+calte,Ostrea,1,2026-03→2026-03,OSTREA,jx7390hnj247qv72p168f5p6g587rq8p,exact,,
+calte,Pollen,2,2025-10→2026-01,POLLEN,jx7fs1pq8r090fq78y7p3g3z3d87s5g1,exact,,
+calte,Revolte,3,2026-01→2026-03,REVOLTE,jx725dk9ce3r3bvkfwb22c59hh87s6p7,exact,,
+calte,SCI OUTWORK VERDONNE,4,2025-03→2026-05,SCI OUTWORK VERDONNE,jx70rm9ymy9zmteqkk4477anbn87sdqq,exact,,
+calte,Wind Capital 2,3,2025-01→2026-01,WIND CAPITAL 2,jx7bv9eka7a313ak687jgff08n87ssq0,exact,,
+calte,Agilitest,3,2026-01→2026-04,SIDE AGILITEST,jx73se1xz8w1mesfx32vw0vb0s87rxrf,haute,,
+calte,Aktio,1,2026-01→2026-01,SIDE ASTERION AKTIO,jx767rfyk66q93ptb7nrqmewcd87sn73,haute,,
+calte,Alaya,1,2026-04→2026-04,ALAYA.BIO INC,jx73c5zyzvdekfdrh278wsesm587sd9p,haute,,
+calte,Arkéa Investment Services,2,2025-01→2025-10,ARKEA,jx75gm6pb39w58m6fyjz7eg6pn87sm4e,haute,,
+calte,Baker Staff,2,2026-01→2026-04,SIDE BAKERSTAFF,jx76wtp3s2gdxh0f3eff51d0kn87smpf,haute,,
+calte,Bib Batteries,5,2026-01→2026-05,SIDE FAMILY VENTURES BIB BATTERIES,jx7bsj7nb7h16er1kq631magjn87r0xv,haute,,
+calte,Bocoloco,2,2026-03→2026-05,ASTERION SIDE BOCOLOCO,jx7cfvpdwkrs3w7nvw47vv5s0x87s3jb,haute,,
+calte,Caeli Energie,3,2025-04→2026-03,Asterion Side CAELI,jx7aschz534c7cyz4vdjxjj3x187sdrx,haute,,
+calte,Capté,4,2026-01→2026-05,SIDE  - CAPTE,jx7cc2wtssg3ejetg1ck2cxskn87rdvz,haute,,"1 is_duplicate dans le lot ; double espace dans le nom OS"
+calte,CircularPlace,1,2026-01→2026-01,CIRCULARPLACE PARTNERS,jx77505rzw2rakrbwdhvncjtbd87s98k,haute,,
+calte,COCOLI,3,2026-01→2026-06,COCOLI GMBH,jx776564szk0v2f5t71tr2egd987sbyd,haute,,
+calte,Delicity,2,2026-01→2026-03,SIDE Delicity,jx79bfkf01kgsajnphkjvxxyqs87s879,haute,,
+calte,Doinsport,3,2025-01→2026-04,SIDE DOINSPORT,jx7fyw1xpej8ggc21b5wsvr2ms87rdy3,haute,,
+calte,Eiffel Investment Group,4,2025-01→2026-04,EIFFEL,jx78nrw35nyed6ehag2dhzv5ws87r52t,haute,,
+calte,Emprunte Mon toutou,2,2025-11→2026-04,SIDE EMPRUNTE MON TOUTOU,jx79ys6rwr9c1v5ht3t7av997987stgr,haute,,
+calte,Feeli,1,2026-01→2026-01,SIDE FEELI,jx70bz9yvagvbe3f7qnbq3gt6h87r1k5,haute,,"Domaine source incohérent (tylia.fr) signalé au cadrage"
+calte,Galion.exe,2,2025-01→2026-01,Galion.exe Origin,jx790f70expa8667vb6z2p77tx87rwdc,haute,,
+calte,GreenGo,3,2026-01→2026-02,GREENGO PARTNERS,jx71j72h065dphskdf2sm8ghr587snch,haute,,
+calte,GVA (Global Venture Access),2,2025-01→2025-12,GVA,jx76gexpebkcq92tvphf18r8k987sqy1,haute,,
+calte,Hop3team,1,2026-04→2026-04,SIDE HOP3TEAM,jx732vebx3k66t2ne4jp8sgwz587rzcf,haute,,
+calte,Inari Properties,3,2025-01→2025-12,Virgil - Inari Properties 2023,jx721m6kkr9xx2v1ywjcezfvp187sydr,haute,,
+calte,Interstis,1,2026-03→2026-03,SIDE - INTERSTIS,jx79gw4cdnk0wgqnz6h6vdg3ks87sf7m,haute,,
+calte,Kazaden,1,2026-05→2026-05,SIDE KAZADEN,jx7az31n8vr9cmd9n9se304hgn87ryjm,haute,,"Espace final dans le nom OS (« SIDE KAZADEN  »)"
+calte,KIDIBAM,1,2025-07→2025-07,LE TRICYCLE (KIDIBAM),jx7d8y8dvswq178padk9fvvv1n87rk29,haute,,"Alias exact entre parenthèses"
+calte,Klara,6,2025-01→2026-05,SIDE KLARA (MOOVEO),jx72qbzzf84q375bv6gs3dcax187sxtx,haute,,
+calte,La Ceinture Verte,2,2025-01→2026-04,CEINTURE VERT GROUP,jx7dqbks892h56sjqcq7eram3n87rjr4,haute,,
+calte,Latour Capital,3,2025-01→2026-01,LATOUR CAPITAL IV,jx7eh5fq9n01ye2c04g9065gpd87s0ar,haute,,
+calte,Le Comptoir Des Pharmacies,1,2026-06→2026-06,SIDE - COMPTOIR DES PHARMACIES,jx730j9j7cxc69qfxyzewattj987rprs,haute,,"Espace final dans le nom OS"
+calte,Live Tonight,1,2026-01→2026-01,Side Live Tonight,jx755m6q3yymasxnbkq5kt8rn587rd13,haute,,
+calte,Maslow Group,6,2025-01→2026-05,MASLOW,jx74pe256mrjm18s5jfemqgj5s87ryat,haute,,
+calte,Monstock,1,2026-05→2026-05,SIDE MONSTOCK (mon stock),jx70v5vj6nf4st73p7x98jtty187rhdt,haute,,
+calte,Oghji,4,2026-02→2026-05,SIDE - OGHJI,jx7epzmg2rvqxv7n8j9xpj2y7187ssmt,haute,,
+calte,Ordalie - Legal OS,4,2026-01→2026-02,SIDE INOVEXUS Ordalie,jx77d8scs7m0q60raasxeyrz1h87ss0s,haute,,"1 is_duplicate dans le lot ; cible = véhicule de co-invest INOVEXUS sur Ordalie"
+calte,Orus Energy,5,2025-10→2026-04,Asterion Side - Projet Orus Energy,jx764dr0zg8gxdasjaa1r5hemh87s7fw,haute,,
+calte,OVNI Capital,1,2026-01→2026-01,OVNI VENTURES,jx7bchwhd1ys8cw7astsyqkvj987rhxh,haute,,"« Capital » vs « VENTURES » — même GP OVNI a priori"
+calte,Reglo,6,2024-01→2026-01,REGLO PET FOOD,jx7d0zaf8rj52c3xkcpzgsvptn87r9y8,haute,,
+calte,Renovation Man,1,2026-03→2026-03,I ARTISAN (renovation man),jx77ta1nxqqnam5be7by2m31vs87rvtt,haute,,"⚠️ Même cible OS que la ligne source « iArtisan » (confiance moyenne) — 2 companies source → 1 company OS, à arbitrer ensemble"
+calte,Seelab,1,2026-06→2026-06,SIDE  Seelab,jx77kdnkvsvnb33dq1xzy8jzgx87rw4c,haute,,"Double espace dans le nom OS"
+calte,Smart-Services,3,2026-01→2026-04,SMART SERVICES,jx7fc4d6pma8ab41p0qy0pjwpn87s0ye,haute,,"Tiret vs espace"
+calte,Stockoss,6,2025-12→2026-05,SPACELY STOCKAGE (STOCKOSS),jx76efk3zh3e2jyy7ev3kt5eqx87s144,haute,,"1 is_duplicate dans le lot ; alias exact entre parenthèses"
+calte,Timeleft,5,2026-01→2026-05,SIDE  TIMELEFT,jx7a7689wegfrby47b93cy4yk987rpmj,haute,,"Double espace dans le nom OS"
+calte,Tulip,1,2026-01→2026-01,SIDE Tulip,jx7cq6hv5634745qvtjt6vmxj987rkdt,haute,,
+calte,Urbyn,1,2026-01→2026-01,ASTERION SIDE URBYN,jx7e7hdv1v100wt2nqyfpmr21h87s7km,haute,,"Espace final dans le nom OS"
+calte,Veevart,2,2026-01→2026-04,VEEVART eCLUB,jx743pv08k8jndw2j20nf67p4d87sfgx,haute,,
+calte,Velvet House,3,2025-03→2026-06,VELVET,jx793zq3fkx132ghp0ypjhafdx87s7m3,haute,,
+calte,WeeFin,2,2026-01→2026-06,SIDE ASTERION WEEFIN,jx78y9b14rmbw271816rb223gn87r7fy,haute,,
+calte,Apnée Paris,2,2025-01→2025-01,SIDE - OneGreen APNEE,jx7dvqekhzcxst4nm2s4zhw68s87rcza,moyenne,,"Candidat unique via « APNEE » mais préfixe « OneGreen » à confirmer"
+calte,Asterion Ventures,3,2025-01→2026-02,,,moyenne,"ASTERION F1 / ASTERION F2","Reports du GP Asterion — 2 candidats fonds : ASTERION F1 (jx7969hfvsm7g6vjas80eeysqs87rrrh) / ASTERION F2 (jx72czysjmcb0tq6ynn8va3x2x87r13f), à trancher (ou 2 lignes si les reports couvrent les 2 fonds)"
+calte,Batch Ventures,2,2026-01→2026-03,,,moyenne,"6 véhicules Batch dans l'org","Candidats : Batch Venture  2025 (Fund n°2) (jx7867nq6qxj696x1ybg2f7zxd87ram7) / Batch Ventures - 2026 fund (jx7131pf4dfsrs4577xr7fe1nx87r0h1) / Batch Venture 1 (jx70a5900cmrqkt0a9an14mc1987sm40) / batchVent (jx73rcrg1y8cqwed853s8v7rk587rwcr) / Batch Venture - CTO Fund (jx7ap03syhqx2tpqm7n0qg8v5x87stza) / Batch Venture YC 2026 (jx7cgcjb2sw4nx39dx7ewhmc6187sp71)"
+calte,billiv,2,2026-01→2026-02,SIDE ASTERION BILLIV,jx7aqyk12f19aqae93jdfq7cp987rjft,moyenne,"2 véhicules BILLIV","Alternative : SIDE ASTERION - Projet BILLIV 2024 T2 (jx7e7sde3nbxky1jw3en14jh5x87sfff)"
+calte,Chilli,4,2026-02→2026-05,Roundtable Regroop (Chilli.club),jx7bsdasyav04ygp3qcjryw6g187rp3h,moyenne,,"Nom produit vs véhicule — alias « Chilli.club » entre parenthèses"
+calte,Eutopia,5,2024-10→2026-01,,,moyenne,"EUTOPIA 2 / Eutopia Co Invest Dynamo","Candidats : EUTOPIA 2 (jx78ygxttsegwz6q5dpzvdq5d187rte7) / Eutopia Co Invest Dynamo (jx75ysvhgpqrb1ysfax2p01nn187rfap) — reports du GP Eutopia, à trancher"
+calte,Flexliving,5,2026-01→2026-05,FLEXLIVING,jx79rp6ptbzz6yvn2nscv16h3587sw9n,moyenne,"FLEXLIVING vs FLEX LIVING","2 lignes OS quasi identiques — choisir la canonique : FLEXLIVING (jx79rp6ptbzz6yvn2nscv16h3587sw9n) / FLEX LIVING (jx728qebawmwfj08h49z37110s87rs66)"
+calte,iArtisan - Newsletter business-innovation,1,2026-01→2026-01,I ARTISAN (renovation man),jx77ta1nxqqnam5be7by2m31vs87rvtt,moyenne,,"⚠️ Son unique report est archivé ; même cible OS que « Renovation Man » — 2 sources → 1 company OS ; les 2 partagent i-artisan.fr à la source"
+calte,Komeet,1,2026-01→2026-01,SIDE WENABI,jx70ng7853e6ma6ckdak14wavn87sqr3,moyenne,,"Komeet = ex-Wenabi (domaine source wenabi.com) ; distincte de « Komeet » org albo"
+calte,makesense,1,2026-01→2026-01,JOBS THAT MAKSENSE,jx77ydhjej9v8qra10erj6e5ns87sxhe,moyenne,,"« Jobs that make sense » = plateforme makesense — orthographe OS « MAKSENSE » à confirmer"
+calte,Mineral,1,2025-01→2025-01,,,moyenne,"Holding Mineral Capital 3 / 7","Candidats : Holding Mineral Capital 7 (jx7fersxp0kea617gjxn1yjqen87s5rk) / Holding Mineral Capital 3 (jx720k1e90v35wym19q1r0z0b987s4xz)"
+calte,MIO Group,2,2026-01→2026-02,MIO Agence Marketing Pote Benhamou,jx77xd7xttqzw5ep3bhmmxpjg587rqjr,moyenne,,"Nom OS très différent (« MIO Agence Marketing Pote Benhamou ») — plausible mais à confirmer"
+calte,Omni,3,2026-03→2026-04,OMNI COMMUNITY,jx7bfj9232sp1r49p0rptdw7s187sesm,moyenne,,"Alternative possible : BALTIS - OMN LE CLUB (jx7dkr8ff7y80d3gcbqpfv7r7187ssrd)"
+calte,Onima,2,2026-03→2026-06,ASTERION SIDE ONIMA (ex:YEASTY),jx7csjxyd8kne6mq1s03pb307587sveg,moyenne,"2 lignes OS strictement identiques","Doublon OS : jx7csjxyd8kne6mq1s03pb307587sveg / jx7cjv10jz9n1ez90vswy0z5rd87snx5 — choisir la canonique avant migration"
+calte,Tudigo,1,2026-01→2026-01,TUDIGO - CAP'ETUDES (Tudi Holding 90),jx79p9knkqrbphvhpdksv92zax87sy05,moyenne,,"La cible OS est un deal Tudigo précis (CAP'ETUDES), pas la plateforme — à confirmer"
+calte,Virgil,1,2025-10→2025-10,VIRGIL SAS - Serie A - invest dans la boite,jx7fnmfsfh1p4v46a9zkgk4t1x87s1k3,moyenne,"5 lignes Virgil* dans l'org","Report sur la société Virgil elle-même a priori ; autres véhicules : PARALLEL INVEST SPV2 (Virgil) (jx766zk524wfagn6arq4z7cqg987s9hd) / VIRGIL Properties 2020 / Virgil Properties 2025 / Virgil - Inari Properties 2023"
+calte,Virgil Properties,3,2025-01→2025-10,,,moyenne,"VIRGIL Properties 2020 / Virgil Properties 2025","1 is_duplicate dans le lot ; candidats : VIRGIL Properties 2020 (jx7f2h3wcs68pr3ap2peb12x4d87sbqg) / Virgil Properties 2025 (jx7ay4a9p61hbgy3v63wmjbb9d87scm5)"
+calte,Artefact,2,2024-01→2026-06,,,aucune,,"Aucun candidat plausible dans le vivier calte — à créer ou à mapper à la main"
+calte,Sant Roch,4,2026-03→2026-05,,,aucune,,"Aucun candidat dans le vivier calte — à créer ou à mapper à la main"
+calte,SIDE Capital,1,2025-11→2025-11,,,aucune,,"Report du GP SIDE lui-même ; les véhicules SIDE 1 (jx75zy634aen5bz3hbene34y8187r5jg) / SIDE 2 (jx748rcwmgvh3jbtkhjxmv29w187s4e5) / SIDE 3 (jx75ghv0qty72mees4t4x0yfrh87r6s9) / SIDE INVEST (jx7enwg3pq78h2czkkbnvbd4yn87spa1) / SIDE Invest 3 (jx73qg55ttmr4j2d9kj9rd6vpn87rxwp) existent mais aucun ne désigne le GP — à trancher"
