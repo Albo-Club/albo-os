@@ -23,6 +23,43 @@ bas de page.
 
 ---
 
+## v1.61.0 — 02/07/2026 à 13:41 — Fiche entreprise : onglet Reports repensé
+
+L'onglet **Reports** d'une société a été réorganisé en deux zones plus
+lisibles.
+
+En tête, une **synthèse IA** met en avant le dernier report reçu : un score
+sur 10 dans un carré coloré selon le verdict (vert « en bonne voie », ambre
+« à surveiller », rouge « à risque »), une phrase de synthèse, les points
+forts et les points de vigilance côte à côte, trois indicateurs clés, et —
+seulement s'il y en a une — une alerte critique intégrée et dépliable.
+
+En dessous, l'**historique des reports** se présente comme une pile de cartes
+cliquables, de la plus récente à la plus ancienne. Chaque carte affiche la
+période, un résumé en une ligne, sa date de réception et son ancienneté
+(« il y a 13 j »), un badge « à jour » sur le dernier report, et un raccourci
+« Voir les docs » vers les documents source. Un clic ouvre le détail complet
+du report.
+
+> **🔧 Notes techniques**
+>
+> - `CompanyReportsSection.tsx` refondu en deux zones : héros `SynthesisHero`
+>   (query `intelligence.getByCompany`, même payload Cerveau 3 que
+>   `CompanyIntelligenceCard`, présentation différente) + `ReportHistory`
+>   (cartes issues de `companyReports.listByCompany`, dialog détail conservé).
+> - Helper couleur centralisé `src/lib/reportScore.ts` : `scoreVerdict`
+>   (seuils ≥7 / 5-6 / ≤4) → carrés teintés sur les tokens
+>   `positive` / `warning` / `destructive`. Nouveau token sémantique
+>   `--warning` (+ `--warning-foreground`), light+dark, dans `brand.css` —
+>   seul changement hors onglet.
+> - `documents.listByCompany` renvoie désormais `reportId` : les pièces
+>   jointes email d'un report sont regroupées côté client pour alimenter
+>   « Voir les docs » (aucun nouvel endpoint).
+> - Le score reste au niveau société : les cartes de l'historique ont un
+>   carré neutre (pas de score par report). Bouton « Ajouter un report »
+>   désactivé avec tooltip (ingestion email uniquement, pas de création
+>   manuelle). L'onglet « Synthèse IA » (intelligence) est conservé tel quel.
+
 ## v1.60.3 — 02/07/2026 à 12:01 — Chat IA : budget et validation sur l'accès HTTP
 
 Durcissement de sécurité interne. L'accès HTTP annexe du chat IA (un point

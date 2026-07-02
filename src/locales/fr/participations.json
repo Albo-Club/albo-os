@@ -599,6 +599,24 @@
       "processing": "Traitement…",
       "completed": "Traité",
       "failed": "Échec"
+    },
+    "synthesis": {
+      "header": "Synthèse IA · dernier report reçu",
+      "generatedAt": "Généré le {{date}}",
+      "scoreValue": "Score {{score}}/10"
+    },
+    "verdict": {
+      "good": "En bonne voie",
+      "watch": "À surveiller",
+      "risk": "À risque"
+    },
+    "history": {
+      "title": "Historique des reports",
+      "add": "Ajouter un report",
+      "addHint": "Les reports sont ingérés automatiquement par email.",
+      "current": "À jour",
+      "received": "Reçu le {{date}}",
+      "viewDocs": "Voir les docs"
     }
   },
   "intelligence": {

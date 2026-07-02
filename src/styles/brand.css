@@ -15,6 +15,8 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-positive: var(--positive);
   --color-border: var(--border);
   --color-input: var(--input);
@@ -65,6 +67,11 @@
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
+  /* Caution / mid-scale verdict (amber). Sibling of --positive / --destructive
+     for tri-state semantics (health-score verdict: watch). ≈ amber-600, dark
+     enough to read as text on a light tint. */
+  --warning: oklch(0.666 0.145 62);
+  --warning-foreground: oklch(0.985 0 0);
   /* Monetary semantics: cash inflows / positive balances (green
      counterpart of --destructive for outflows). Value = emerald-600. */
   --positive: oklch(0.596 0.145 163.225);
@@ -103,6 +110,9 @@
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
+  /* amber-400 — brighter for contrast on a dark background. */
+  --warning: oklch(0.79 0.15 75);
+  --warning-foreground: oklch(0.216 0 0);
   /* emerald-500 — brighter for contrast on a dark background. */
   --positive: oklch(0.696 0.17 162.48);
   --border: oklch(1 0 0 / 10%);

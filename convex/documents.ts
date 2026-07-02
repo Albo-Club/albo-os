@@ -62,6 +62,9 @@ export const listByCompany = query({
         size: doc.size ?? null,
         source: doc.source,
         uploadedAt: doc.uploadedAt,
+        // Links an email-ingested attachment to its report (companyReports),
+        // so the Reports timeline can surface a report's source docs.
+        reportId: doc.reportId ?? null,
         url: await ctx.storage.getUrl(doc.storageId),
       })),
     )

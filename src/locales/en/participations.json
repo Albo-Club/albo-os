@@ -599,6 +599,24 @@
       "processing": "Processing…",
       "completed": "Completed",
       "failed": "Failed"
+    },
+    "synthesis": {
+      "header": "AI synthesis · latest report",
+      "generatedAt": "Generated {{date}}",
+      "scoreValue": "Score {{score}}/10"
+    },
+    "verdict": {
+      "good": "On track",
+      "watch": "To monitor",
+      "risk": "At risk"
+    },
+    "history": {
+      "title": "Report history",
+      "add": "Add a report",
+      "addHint": "Reports are ingested automatically by email.",
+      "current": "Up to date",
+      "received": "Received {{date}}",
+      "viewDocs": "View documents"
     }
   },
   "intelligence": {

@@ -932,10 +932,7 @@ function ParticipationDetail() {
             <TabsContent value="documents" className="pt-4">
               <ReportingsSection companyId={company._id} />
             </TabsContent>
-            <TabsContent value="reports" className="space-y-3 pt-4">
-              <h2 className="text-lg font-semibold tracking-tight">
-                {t('reports.title')}
-              </h2>
+            <TabsContent value="reports" className="pt-4">
               <CompanyReportsSection companyId={company._id} />
             </TabsContent>
             <TabsContent value="intelligence" className="pt-4">
