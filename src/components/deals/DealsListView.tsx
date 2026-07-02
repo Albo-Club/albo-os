@@ -33,6 +33,29 @@ import {
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
 import { downloadCsv, toCsv } from '~/lib/csv'
 import { normalizeSearch } from '~/lib/searchText'
+import { cn } from '~/lib/utils'
+
+/**
+ * `roundType` (the equity-round enum) rides along on the query result — the
+ * server `enrich()` spreads `...deal` in both `deals.list` and
+ * `aggregate.listDeals` — but it isn't declared on the shared `DealRow`.
+ * Surface it here for the read-only Stage column (reuses the existing field:
+ * no schema change, no backfill; "—" for non-equity instruments).
+ */
+type DealListRow = DealRow & { roundType?: string | null }
+
+/**
+ * Frozen first column (company) for the horizontal scroll. Same pattern as
+ * ParticipationsTable: an OPAQUE background so the cells sliding underneath
+ * don't show through, plus a color-mix hover so the translucent row tint stays
+ * visible under the sticky cell (it can't inherit `hover:bg-muted/50`, which
+ * would composite over the scrolled columns instead of the page background).
+ * See KNOWN_ISSUES.md § "Colonne figée". Requires `group` on every row.
+ */
+const stickyHeadClass = 'sticky left-0 z-10 bg-background'
+const stickyCellClass =
+  'sticky left-0 z-10 bg-background transition-colors ' +
+  'group-hover:bg-[color-mix(in_oklab,var(--muted)_50%,var(--background))]'
 
 /** TVPI of a single deal: (received + residual) / paid, null when nothing paid. */
 function dealTvpi(d: DealRow): number | null {
@@ -49,14 +72,16 @@ function statusVariant(s: string): 'default' | 'secondary' | 'destructive' {
   return 'secondary'
 }
 
-type SortKey = 'company' | 'committed' | 'paid' | 'received' | 'tvpi' | 'signed'
+type SortKey = 'company' | 'paid' | 'received' | 'tvpi' | 'signed'
 
 /**
- * Flat, deal-centric table: ONE row per deal (unlike the grouped
- * ParticipationsTable, which folds a company's deals into a single row). Each
- * row surfaces both sides of the deal — target company AND investor entity — so
- * a deal can be found and its entity identified without opening a company sheet.
- * Reuses the participation formatters / deal title / TVPI residual convention.
+ * Flat, deal-centric list: ONE row per deal (unlike the grouped
+ * ParticipationsTable, which folds a company's deals into a single row).
+ *
+ * Orchestrates the shared toolbar (search + facets), the split into active vs.
+ * settled (fully_exited / written_off) — same model as the Companies view — and
+ * the CSV export. The company column is frozen on horizontal scroll; the Status
+ * badge is dropped from the active table and reappears only in the settled one.
  *
  * `orgSlug` targets the detail links (per-org view); the aggregated view omits
  * it and derives the slug from each deal's own org, and sets `showOrg` to add an
@@ -68,13 +93,12 @@ export function DealsListView({
   showOrg = false,
   exportRef,
 }: {
-  deals: Array<DealRow> | undefined
+  deals: Array<DealListRow> | undefined
   orgSlug?: string
   showOrg?: boolean
   exportRef?: RefObject<(() => void) | null>
 }) {
   const { t } = useTranslation(['deals', 'participations'])
-  const { fmtEur, fmtDate, fmtMultiple } = useFormatters()
 
   const [search, setSearch] = useState('')
   const term = normalizeSearch(useDebouncedValue(search))
@@ -172,55 +196,22 @@ export function DealsListView({
     })
   }, [deals, term, t, instrumentFilter, statusFilter, sectorFilter, hasFilters])
 
-  // Column sort (client-side, low volumes). null = server order (signedDate
-  // desc). Missing numeric values sort last.
-  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' } | null>(
-    null,
-  )
-  const toggleSort = (key: SortKey) =>
-    setSort((prev) =>
-      prev?.key === key
-        ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
-        : { key, dir: key === 'company' ? 'asc' : 'desc' },
-    )
-  const sorted = useMemo(() => {
-    if (!filtered || !sort) return filtered
-    const value = (d: DealRow): string | number =>
-      sort.key === 'company'
-        ? (d.target?.name ?? '')
-        : sort.key === 'committed'
-          ? (d.committedAmount ?? Number.NEGATIVE_INFINITY)
-          : sort.key === 'paid'
-            ? (d.paidActual ?? Number.NEGATIVE_INFINITY)
-            : sort.key === 'received'
-              ? (d.received ?? Number.NEGATIVE_INFINITY)
-              : sort.key === 'tvpi'
-                ? (dealTvpi(d) ?? Number.NEGATIVE_INFINITY)
-                : (d.signedDate ?? Number.NEGATIVE_INFINITY)
-    const sign = sort.dir === 'asc' ? 1 : -1
-    return [...filtered].sort((a, b) => {
-      const va = value(a)
-      const vb = value(b)
-      if (typeof va === 'string' && typeof vb === 'string') {
-        return sign * va.localeCompare(vb)
+  // Split on status: fully_exited / written_off drop to the settled section
+  // below; everything else (including partially_exited) stays active. Same rule
+  // as the Companies view (ParticipationsView).
+  const { active, settled } = useMemo(() => {
+    if (!filtered) return { active: undefined, settled: undefined }
+    const activeDeals: Array<DealListRow> = []
+    const settledDeals: Array<DealListRow> = []
+    for (const d of filtered) {
+      if (d.status === 'fully_exited' || d.status === 'written_off') {
+        settledDeals.push(d)
+      } else {
+        activeDeals.push(d)
       }
-      return sign * (Number(va) - Number(vb))
-    })
-  }, [filtered, sort])
-
-  const isFiltered = Boolean(term) || hasFilters
-  const resetKey = [
-    term,
-    [...instrumentFilter].sort().join(','),
-    [...statusFilter].sort().join(','),
-    [...sectorFilter].sort().join(','),
-  ].join('|')
-
-  const { page, pageCount, setPage } = usePagination(
-    sorted?.length ?? 0,
-    `${resetKey}:${sort ? `${sort.key}:${sort.dir}` : ''}`,
-  )
-  const paged = sorted?.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+    }
+    return { active: activeDeals, settled: settledDeals }
+  }, [filtered])
 
   // CSV export — flat, one deal per row, covering the full unsplit set
   // (independent of the current search / filters).
@@ -267,10 +258,17 @@ export function DealsListView({
     if (exportRef) exportRef.current = handleExport
   })
 
+  const isFiltered = Boolean(term) || hasFilters
+  // Pagination reset key shared by both tables: reset to page 1 on any
+  // search / filter change.
+  const filterKey = [
+    term,
+    [...instrumentFilter].sort().join(','),
+    [...statusFilter].sort().join(','),
+    [...sectorFilter].sort().join(','),
+  ].join('|')
+
   const showToolbar = deals && deals.length > 0
-  // Company + investor + instrument + committed + paid + received + tvpi +
-  // status + signed + chevron (10), plus the optional org column.
-  const colSpan = 10 + (showOrg ? 1 : 0)
 
   return (
     <div className="space-y-6">
@@ -332,99 +330,196 @@ export function DealsListView({
         </div>
       )}
 
-      {filtered && filtered.length === 0 ? (
-        <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
-          {isFiltered ? t('deals:search.noResults') : t('deals:empty')}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <SortableHead
-                    label={t('participations:col.company')}
-                    active={sort?.key === 'company'}
-                    dir={sort?.dir ?? 'asc'}
-                    onClick={() => toggleSort('company')}
-                  />
-                  <TableHead>{t('participations:deal.investor')}</TableHead>
-                  <TableHead>{t('participations:deal.instrument')}</TableHead>
-                  {showOrg && (
-                    <TableHead>{t('participations:col.org')}</TableHead>
-                  )}
-                  <SortableHead
-                    label={t('participations:col.committed')}
-                    active={sort?.key === 'committed'}
-                    dir={sort?.dir ?? 'desc'}
-                    onClick={() => toggleSort('committed')}
-                    className="text-right"
-                  />
-                  <SortableHead
-                    label={t('participations:col.paid')}
-                    active={sort?.key === 'paid'}
-                    dir={sort?.dir ?? 'desc'}
-                    onClick={() => toggleSort('paid')}
-                    className="text-right"
-                  />
-                  <SortableHead
-                    label={t('participations:col.received')}
-                    active={sort?.key === 'received'}
-                    dir={sort?.dir ?? 'desc'}
-                    onClick={() => toggleSort('received')}
-                    className="text-right"
-                  />
-                  <SortableHead
-                    label={t('participations:col.tvpi')}
-                    active={sort?.key === 'tvpi'}
-                    dir={sort?.dir ?? 'desc'}
-                    onClick={() => toggleSort('tvpi')}
-                    className="text-right"
-                  />
-                  <TableHead>{t('participations:deal.status')}</TableHead>
-                  <SortableHead
-                    label={t('participations:deal.signed')}
-                    active={sort?.key === 'signed'}
-                    dir={sort?.dir ?? 'desc'}
-                    onClick={() => toggleSort('signed')}
-                    className="text-right"
-                  />
-                  <TableHead className="w-8" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {!paged ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={colSpan}
-                      className="text-muted-foreground text-center"
-                    >
-                      {t('participations:loading')}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paged.map((d) => (
-                    <DealRowCells
-                      key={d._id}
-                      deal={d}
-                      slug={orgSlug ?? d.org?.slug}
-                      showOrg={showOrg}
-                      fmtEur={fmtEur}
-                      fmtDate={fmtDate}
-                      fmtMultiple={fmtMultiple}
-                    />
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          <PaginationFooter
-            page={page}
-            pageCount={pageCount}
-            onPageChange={setPage}
+      <DealsTable
+        deals={active}
+        orgSlug={orgSlug}
+        showOrg={showOrg}
+        isFiltered={isFiltered}
+        resetKey={filterKey}
+      />
+
+      {settled && settled.length > 0 && (
+        <section className="space-y-3">
+          <h3 className="text-muted-foreground text-sm font-medium">
+            {t('deals:settled.sectionTitle', { count: settled.length })}
+          </h3>
+          <DealsTable
+            deals={settled}
+            orgSlug={orgSlug}
+            showOrg={showOrg}
+            settled
+            isFiltered={isFiltered}
+            resetKey={filterKey}
           />
-        </div>
+        </section>
       )}
+    </div>
+  )
+}
+
+/**
+ * One deals table (active or settled). Owns its own column sort + pagination;
+ * the parent feeds it an already-filtered, already-split deal set. The `settled`
+ * variant re-adds the Status column and drops sorting (mirrors the settled
+ * Companies table).
+ */
+function DealsTable({
+  deals,
+  orgSlug,
+  showOrg = false,
+  settled = false,
+  isFiltered = false,
+  resetKey = '',
+}: {
+  deals: Array<DealListRow> | undefined
+  orgSlug?: string
+  showOrg?: boolean
+  settled?: boolean
+  isFiltered?: boolean
+  resetKey?: string
+}) {
+  const { t } = useTranslation(['participations', 'deals'])
+  const { fmtEur, fmtDate, fmtMultiple } = useFormatters()
+
+  // Column sort (client-side, low volumes). null = server order (signedDate
+  // desc). Missing numeric values sort last. Disabled on the settled table.
+  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' } | null>(
+    null,
+  )
+  const toggleSort = (key: SortKey) =>
+    setSort((prev) =>
+      prev?.key === key
+        ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: key === 'company' ? 'asc' : 'desc' },
+    )
+  const sorted = useMemo(() => {
+    if (!deals || !sort) return deals
+    const value = (d: DealListRow): string | number =>
+      sort.key === 'company'
+        ? (d.target?.name ?? '')
+        : sort.key === 'paid'
+          ? (d.paidActual ?? Number.NEGATIVE_INFINITY)
+          : sort.key === 'received'
+            ? (d.received ?? Number.NEGATIVE_INFINITY)
+            : sort.key === 'tvpi'
+              ? (dealTvpi(d) ?? Number.NEGATIVE_INFINITY)
+              : (d.signedDate ?? Number.NEGATIVE_INFINITY)
+    const sign = sort.dir === 'asc' ? 1 : -1
+    return [...deals].sort((a, b) => {
+      const va = value(a)
+      const vb = value(b)
+      if (typeof va === 'string' && typeof vb === 'string') {
+        return sign * va.localeCompare(vb)
+      }
+      return sign * (Number(va) - Number(vb))
+    })
+  }, [deals, sort])
+
+  const { page, pageCount, setPage } = usePagination(
+    sorted?.length ?? 0,
+    `${resetKey}:${sort ? `${sort.key}:${sort.dir}` : ''}`,
+  )
+  const paged = sorted?.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
+  // Company + sector + instrument + stage + investedOn + invested + received +
+  // tvpi + chevron (9), plus the optional org column and the settled-only
+  // status column.
+  const colSpan = 9 + (showOrg ? 1 : 0) + (settled ? 1 : 0)
+
+  if (deals && deals.length === 0) {
+    return (
+      <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
+        {isFiltered ? t('deals:search.noResults') : t('deals:empty')}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <SortableHead
+                label={t('col.company')}
+                active={sort?.key === 'company'}
+                dir={sort?.dir ?? 'asc'}
+                onClick={() => toggleSort('company')}
+                sortable={!settled}
+                className={stickyHeadClass}
+              />
+              {showOrg && <TableHead>{t('col.org')}</TableHead>}
+              <TableHead>{t('col.sector')}</TableHead>
+              <TableHead>{t('deal.instrument')}</TableHead>
+              <TableHead>{t('col.stage')}</TableHead>
+              <SortableHead
+                label={t('col.investedOn')}
+                active={sort?.key === 'signed'}
+                dir={sort?.dir ?? 'desc'}
+                onClick={() => toggleSort('signed')}
+                sortable={!settled}
+                className="text-right"
+              />
+              <SortableHead
+                label={t('col.invested')}
+                active={sort?.key === 'paid'}
+                dir={sort?.dir ?? 'desc'}
+                onClick={() => toggleSort('paid')}
+                sortable={!settled}
+                className="text-right"
+              />
+              <SortableHead
+                label={t('col.received')}
+                active={sort?.key === 'received'}
+                dir={sort?.dir ?? 'desc'}
+                onClick={() => toggleSort('received')}
+                sortable={!settled}
+                className="text-right"
+              />
+              <SortableHead
+                label={t('col.tvpi')}
+                active={sort?.key === 'tvpi'}
+                dir={sort?.dir ?? 'desc'}
+                onClick={() => toggleSort('tvpi')}
+                sortable={!settled}
+                className="text-right"
+              />
+              {settled && <TableHead>{t('deal.status')}</TableHead>}
+              <TableHead className="w-8" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {!paged ? (
+              <TableRow>
+                <TableCell
+                  colSpan={colSpan}
+                  className="text-muted-foreground text-center"
+                >
+                  {t('loading')}
+                </TableCell>
+              </TableRow>
+            ) : (
+              paged.map((d) => (
+                <DealRowCells
+                  key={d._id}
+                  deal={d}
+                  slug={orgSlug ?? d.org?.slug}
+                  showOrg={showOrg}
+                  settled={settled}
+                  fmtEur={fmtEur}
+                  fmtDate={fmtDate}
+                  fmtMultiple={fmtMultiple}
+                />
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      <PaginationFooter
+        page={page}
+        pageCount={pageCount}
+        onPageChange={setPage}
+      />
     </div>
   )
 }
@@ -433,13 +528,15 @@ function DealRowCells({
   deal,
   slug,
   showOrg,
+  settled,
   fmtEur,
   fmtDate,
   fmtMultiple,
 }: {
-  deal: DealRow
+  deal: DealListRow
   slug: string | undefined
   showOrg: boolean
+  settled: boolean
   fmtEur: (c?: number | null) => string
   fmtDate: (ms?: number | null) => string
   fmtMultiple: (ratio: number | null) => string
@@ -459,7 +556,9 @@ function DealRowCells({
     : undefined
   return (
     <TableRow
-      className={open ? 'group cursor-pointer' : undefined}
+      // `group` on EVERY row so the frozen cell's hover tint (see
+      // stickyCellClass) fires whether or not the row is clickable.
+      className={cn('group', open && 'cursor-pointer')}
       onClick={open}
       tabIndex={open ? 0 : undefined}
       role={open ? 'link' : undefined}
@@ -471,7 +570,8 @@ function DealRowCells({
           : undefined
       }
     >
-      <TableCell className="font-medium">
+      {/* Company — frozen on horizontal scroll; content unchanged. */}
+      <TableCell className={cn('font-medium', stickyCellClass)}>
         <span className="flex items-center gap-2">
           <CompanyLogo
             domain={deal.target?.domain ?? undefined}
@@ -486,27 +586,32 @@ function DealRowCells({
           </span>
         </span>
       </TableCell>
+      {showOrg && (
+        <TableCell>
+          {deal.org ? <Badge variant="outline">{deal.org.name}</Badge> : null}
+        </TableCell>
+      )}
       <TableCell>
-        {deal.investor?.name ?? '—'}
-        {deal.spv ? (
-          <span className="text-muted-foreground">
-            {' '}
-            · {t('deal.viaSpv')} {deal.spv.name}
-          </span>
-        ) : null}
+        {deal.target?.sector
+          ? t(`sectors.${deal.target.sector}`, {
+              defaultValue: deal.target.sector,
+            })
+          : '—'}
       </TableCell>
       <TableCell>
         {t(`instrument.${deal.instrumentKind}`, {
           defaultValue: deal.instrumentKind,
         })}
       </TableCell>
-      {showOrg && (
-        <TableCell>
-          {deal.org ? <Badge variant="outline">{deal.org.name}</Badge> : null}
-        </TableCell>
-      )}
+      <TableCell>
+        {deal.roundType
+          ? t(`enum.roundType.${deal.roundType}`, {
+              defaultValue: deal.roundType,
+            })
+          : '—'}
+      </TableCell>
       <TableCell className="text-right tabular-nums">
-        {fmtEur(deal.committedAmount)}
+        {fmtDate(deal.signedDate)}
       </TableCell>
       <TableCell className="text-right tabular-nums">
         {fmtEur(deal.paidActual ?? 0)}
@@ -527,14 +632,13 @@ function DealRowCells({
       >
         {fmtMultiple(tvpi)}
       </TableCell>
-      <TableCell>
-        <Badge variant={statusVariant(deal.status)}>
-          {t(`status.${deal.status}`, { defaultValue: deal.status })}
-        </Badge>
-      </TableCell>
-      <TableCell className="text-right tabular-nums">
-        {fmtDate(deal.signedDate)}
-      </TableCell>
+      {settled && (
+        <TableCell>
+          <Badge variant={statusVariant(deal.status)}>
+            {t(`status.${deal.status}`, { defaultValue: deal.status })}
+          </Badge>
+        </TableCell>
+      )}
       <TableCell className="w-8 text-right">
         {open && (
           <ArrowRight

@@ -67,7 +67,9 @@
     "received": "Reçu",
     "tvpi": "TVPI",
     "moic": "MOIC",
-    "tri": "TRI"
+    "tri": "TRI",
+    "stage": "Stage",
+    "investedOn": "Investi le"
   },
   "filters": {
     "instrument": "Instrument",

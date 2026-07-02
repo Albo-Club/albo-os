@@ -8,5 +8,9 @@
   "search": {
     "placeholder": "Rechercher un deal, une société, un investisseur…",
     "noResults": "Aucun deal ne correspond à votre recherche."
+  },
+  "settled": {
+    "sectionTitle_one": "Deal soldé ({{count}})",
+    "sectionTitle_other": "Deals soldés ({{count}})"
   }
 }

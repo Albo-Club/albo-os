@@ -8,5 +8,9 @@
   "search": {
     "placeholder": "Search a deal, company, investor…",
     "noResults": "No deal matches your search."
+  },
+  "settled": {
+    "sectionTitle_one": "Settled deal ({{count}})",
+    "sectionTitle_other": "Settled deals ({{count}})"
   }
 }

@@ -23,6 +23,49 @@ bas de page.
 
 ---
 
+## v1.65.0 — 03/07/2026 à 00:05 — Vue Deals : nouvelles colonnes, colonne figée et deals soldés à part
+
+La liste transversale des **deals** (par organisation et vue agrégée) adopte
+les mêmes repères que la vue Entreprises. L'ordre de lecture devient :
+**Société · Secteur · Instrument · Stage · Investi le · Montant investi ·
+Reçu · TVPI**. Les colonnes Investisseur et Engagé disparaissent pour alléger
+le tableau ; le **Stage** reprend le tour de table du deal (Seed, Série A…)
+quand il est renseigné, « — » sinon.
+
+Quand le tableau déborde en largeur, la **colonne Société reste figée** à
+gauche pendant le défilement horizontal — le nom de la boîte reste toujours
+sous les yeux. Et comme pour les entreprises, les **deals soldés** (sortie
+totale ou perte) passent dans une **section dédiée en bas de page**, où la
+colonne **Statut** réapparaît pour distinguer les sorties des dépréciations.
+Une seule barre de recherche et de filtres pilote les deux tables ; l'export
+CSV reste inchangé et couvre l'ensemble des deals.
+
+> **🔧 Notes techniques**
+>
+> - `DealsListView.tsx` refondu : d'une table plate unique à un orchestrateur
+>   (recherche + facettes + split actives/soldées) rendant deux `DealsTable` —
+>   le bas porte le flag `settled` (colonne Statut réaffichée, tri désactivé),
+>   sur le modèle `ParticipationsView`/`ParticipationsTable`.
+> - Colonnes : Secteur (`col.sector`), Stage (nouveau `col.stage`, lit le champ
+>   **existant** `roundType` via `enum.roundType.*` — aucun ajout au schéma, pas
+>   de backfill), Investi le (nouveau `col.investedOn`, affiche `signedDate`),
+>   Montant investi (`col.invested`, donnée `paidActual`). Retrait des colonnes
+>   Investisseur / Engagé / Statut de la table active (facette Statut conservée).
+> - `roundType` remonte déjà via le `...deal` de `enrich` (`deals.list` +
+>   `aggregate.listDeals`, pas de validateur `returns`) ; surfacé côté client par
+>   un type local `DealListRow = DealRow & { roundType? }` — le `DealRow` partagé
+>   et `ParticipationsTable.tsx` ne sont pas touchés.
+> - Colonne figée : `stickyHeadClass`/`stickyCellClass` dupliqués localement
+>   (fond opaque + hover `color-mix` piloté par `group-hover`, cf.
+>   `KNOWN_ISSUES.md` « Colonne figée »). Split : `fully_exited`/`written_off`
+>   en bas, le reste (dont `partially_exited`) reste actif. Routes
+>   `deals.index.tsx` / `all/deals.tsx` inchangées (prop compatible).
+> - i18n EN + FR : `col.stage`, `col.investedOn` (participations),
+>   `settled.sectionTitle` (deals). TESTING.md : DL1/DL3/DL4 mis à jour,
+>   nouvelles lignes DL6 (colonne figée) + DL7 (split soldés).
+
+---
+
 ## v1.64.0 — 02/07/2026 à 23:31 — Vue Entreprises : nouvelles colonnes et colonne figée
 
 La liste des **entreprises** (par organisation et vue agrégée) gagne trois
