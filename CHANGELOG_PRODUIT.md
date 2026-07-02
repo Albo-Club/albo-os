@@ -23,6 +23,27 @@ bas de page.
 
 ---
 
+## v1.60.2 — 02/07/2026 à 11:14 — Réception d'e-mails : vérification obligatoire
+
+Durcissement de sécurité interne. Le point d'entrée qui reçoit les e-mails
+entrants (utilisés pour la génération de rapports) rejette désormais
+systématiquement toute requête tant que son secret de vérification n'est pas
+configuré, au lieu de la traiter sans contrôle. Le comportement est aligné sur
+les autres intégrations entrantes (banque, CRM, Telegram). Aucun changement
+visible à l'usage : le secret est bien en place en production.
+
+> **🔧 Notes techniques**
+>
+> - `convex/agentmail.ts`, handler `agentmailWebhook` : le chemin fail-open
+>   (`console.warn` + traitement du payload quand `AGENTMAIL_WEBHOOK_SECRET`
+>   est absent) est remplacé par un guard fail-closed
+>   `if (!secret) throw new ConvexError('missing_agentmail_webhook_secret')`,
+>   identique à `telegram.ts`, `powens.ts` et `attioSync.ts`. La vérification
+>   Svix devient inconditionnelle (le secret est garanti présent) ; import de
+>   `ConvexError` ajouté.
+> - Hors périmètre, signalés par l'audit et à traiter dans des PR séparées :
+>   comparaison Svix non constant-time (§3.4) et absence d'anti-rejeu (§3.5).
+
 ## v1.60.1 — 02/07/2026 à 10:58 — Isolation inter-organisations renforcée (deals)
 
 Correctif de sécurité interne. À la modification d'un deal, le SPV

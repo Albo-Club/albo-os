@@ -413,6 +413,7 @@ sans snapshot (`convex export --prod`) au préalable.
 | S4  | CORS Better Auth limité à `BETTER_AUTH_URL`    | Requête depuis un autre origin → bloquée                                                        |
 | S5  | Webhooks HMAC : payload modifié → rejeté       | `POST /powens/webhook` avec `BI-Signature` invalide → `401`, rien écrit (cf. Powens ci-dessous) |
 | S6  | `pnpm build` + `pnpm start` (prod local)       | Le bundle prod tourne sans warning                                                              |
+| S7  | Webhooks fail-closed : secret d'env absent      | `POST /agentmail/webhook` alors que `AGENTMAIL_WEBHOOK_SECRET` n'est pas configuré → rejeté (le handler `throw`, HTTP `500`), aucun payload traité ni rapport planifié — comme `powens`/`attio`/`telegram`. Vérifier hors prod ou par lecture du handler ; ne pas retirer le secret en prod |
 
 ## Seed dev rapide
 
