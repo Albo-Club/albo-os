@@ -5,6 +5,9 @@ What changed in each release lives in the template's
 [CHANGELOG.md](https://github.com/Albo-Club/albo-ouvre-boite/blob/main/CHANGELOG.md);
 this file covers the mechanics plus any manual migration steps per version.
 
+> **Reverse direction** — core improvements made *here* that are worth pushing
+> back into the template are tracked in [`TEMPLATE_SYNC.md`](TEMPLATE_SYNC.md).
+
 ## How it works
 
 ```bash

@@ -70,9 +70,9 @@ one file. Surface non-obvious knowledge ; drift kills future you.
 
 ### Pre-PR doc audit (run it yourself, every PR, without being prompted)
 
-Before pushing the final commit, walk through these five questions. Questions
-1–4 only fire when relevant — if none do, write nothing there; the diff and
-commit message already document the _what_. Question 5 (changelog) fires on
+Before pushing the final commit, walk through these six questions. Questions
+1–4 and 6 only fire when relevant — if none do, write nothing there; the diff
+and commit message already document the _what_. Question 5 (changelog) fires on
 **every** PR, no exception.
 
 1. **Touched a route, page, env var, or workflow listed in `TESTING.md`** ?
@@ -109,6 +109,13 @@ commit message already document the _what_. Question 5 (changelog) fires on
      here). A few bullets max ; plain markdown only — no `<details>` or
      raw HTML, the in-app renderer (react-markdown without rehype-raw)
      drops it.
+6. **Touched reusable "core" code the template would want** (generic infra,
+   auth, `convex/lib/` helpers, security, `src/components/ui/*`, DX/CI, a
+   shared-code bugfix — **not** business logic: deals, portfolio, cash,
+   valuations, domain-specific AI tools) ? → add a row to `TEMPLATE_SYNC.md`
+   **and** a short "Template sync" section in the PR description listing the
+   candidate(s). Flag only — Benjamin/Clément port it into `albo-ouvre-boite`;
+   the agent never opens the template PR itself (reverse of `UPGRADING.md`).
 
 ### Where things live (don't duplicate across files)
 
@@ -124,6 +131,9 @@ commit message already document the _what_. Question 5 (changelog) fires on
   language. Hand-written.
 - `MIGRATIONS.md` — index of one-shot prod data operations (seeds, imports,
   purges) pointing to the module-level runbooks, plus in-flight chantiers.
+- `TEMPLATE_SYNC.md` — backlog of Albo OS "core" improvements that are
+  candidates to push back into the `albo-ouvre-boite` template (the reverse
+  direction of `UPGRADING.md`). One row per candidate.
 - `AGENTS.md` — pointer to the agent-skill workflow. Static, rarely changes.
 
 If you're about to add the same info to two of these files, you're doing it

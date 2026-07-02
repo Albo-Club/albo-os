@@ -23,6 +23,25 @@ bas de page.
 
 ---
 
+## v1.61.1 — 02/07/2026 à 15:16 — Suivi des remontées vers le template
+
+Changement interne, sans effet visible dans l'app : on met en place un suivi
+des améliorations « cœur » d'Albo OS qui pourraient être reversées dans le
+template de départ (le starter SaaS dont Albo OS est dérivé), pour ne plus les
+perdre au fil des développements.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `TEMPLATE_SYNC.md` : backlog des candidats à remonter vers
+>   `albo-ouvre-boite` (sens inverse de `UPGRADING.md`), avec l'heuristique
+>   ✅/❌ (générique vs métier) et un tableau de suivi par candidat.
+> - `CLAUDE.md` § « Pre-PR doc audit » : ajout de la question 6 — à chaque PR,
+>   flaguer le code réutilisable (infra, auth, `convex/lib/`,
+>   `src/components/ui/*`, DX/CI) dans `TEMPLATE_SYNC.md` + une section
+>   « Template sync » dans la description de la PR.
+> - L'agent se contente de flaguer ; Benjamin/Clément portent le code dans le
+>   template. Pointeur croisé ajouté en tête de `UPGRADING.md`.
+
 ## v1.61.0 — 02/07/2026 à 13:41 — Fiche entreprise : onglet Reports repensé
 
 L'onglet **Reports** d'une société a été réorganisé en deux zones plus
