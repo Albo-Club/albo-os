@@ -572,8 +572,7 @@
   },
   "tabs": {
     "documents": "Documents",
-    "reports": "Reports",
-    "intelligence": "Synthèse IA"
+    "reports": "Reports"
   },
   "reports": {
     "title": "Reports investisseur",
@@ -612,16 +611,12 @@
     },
     "history": {
       "title": "Historique des reports",
-      "add": "Ajouter un report",
-      "addHint": "Les reports sont ingérés automatiquement par email.",
       "current": "À jour",
       "received": "Reçu le {{date}}",
       "viewDocs": "Voir les docs"
     }
   },
   "intelligence": {
-    "title": "Synthèse IA",
-    "updated": "Mis à jour {{date}}",
     "status": {
       "processing": "Analyse en cours…",
       "error": "L'analyse a échoué.",
@@ -630,9 +625,7 @@
     },
     "section": {
       "good": "Points forts",
-      "bad": "Points de vigilance",
-      "insights": "Indicateurs clés",
-      "alerts": "Alertes"
+      "bad": "Points de vigilance"
     }
   },
   "export": {

@@ -572,8 +572,7 @@
   },
   "tabs": {
     "documents": "Documents",
-    "reports": "Reports",
-    "intelligence": "AI Synthesis"
+    "reports": "Reports"
   },
   "reports": {
     "title": "Investor reports",
@@ -612,16 +611,12 @@
     },
     "history": {
       "title": "Report history",
-      "add": "Add a report",
-      "addHint": "Reports are ingested automatically by email.",
       "current": "Up to date",
       "received": "Received {{date}}",
       "viewDocs": "View documents"
     }
   },
   "intelligence": {
-    "title": "AI synthesis",
-    "updated": "Updated {{date}}",
     "status": {
       "processing": "Analysis in progress…",
       "error": "Analysis failed.",
@@ -630,9 +625,7 @@
     },
     "section": {
       "good": "Strengths",
-      "bad": "Watch points",
-      "insights": "Key insights",
-      "alerts": "Alerts"
+      "bad": "Watch points"
     }
   },
   "export": {
