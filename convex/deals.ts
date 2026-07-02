@@ -403,6 +403,9 @@ export const update = mutation({
         'target_wrong_org',
       )
     }
+    if (patch.viaSpvCompanyId) {
+      await assertSameOrg(ctx, deal.orgId, patch.viaSpvCompanyId, 'spv_wrong_org')
+    }
     // Name: trimmed; '' = clears it (display falls back to derived title).
     if (patch.name !== undefined) {
       const trimmed = patch.name.trim()
