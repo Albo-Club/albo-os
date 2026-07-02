@@ -635,10 +635,15 @@ export default defineSchema({
     reportId: v.optional(v.id('companyReports')),
     extractedText: v.optional(v.string()),
     inline: v.optional(v.boolean()),
+    // Supabase migration anchor (Albo App report_files import). Idempotency
+    // key = (supabaseFileId, companyId) via `by_supabase_file` — a re-run
+    // skips already-imported files instead of re-downloading the blobs.
+    supabaseFileId: v.optional(v.string()),
   })
     .index('by_company', ['companyId', 'uploadedAt'])
     .index('by_org', ['orgId'])
-    .index('by_report', ['reportId']),
+    .index('by_report', ['reportId'])
+    .index('by_supabase_file', ['supabaseFileId', 'companyId']),
 
   /**
    * companyReports — investor updates ingested by email (AgentMail report
@@ -658,6 +663,11 @@ export default defineSchema({
     agentmailInboxId: v.optional(v.string()),
     agentmailMessageId: v.optional(v.string()), // dedup key
     agentmailThreadId: v.optional(v.string()),
+    // Supabase migration anchor (Albo App reports import). The migration
+    // fans one source report out to N target companies: the idempotency key
+    // is the pair (supabaseReportId, companyId) via `by_supabase_report` —
+    // a re-run upserts on the pair, never duplicates. Pattern: `airtableId`.
+    supabaseReportId: v.optional(v.string()),
     fromEmail: v.optional(v.string()),
     subject: v.optional(v.string()),
     emailDate: v.optional(v.number()), // ms epoch
@@ -678,10 +688,7 @@ export default defineSchema({
       ),
     ),
     reportAbout: v.optional(
-      v.union(
-        v.literal('company_self'),
-        v.literal('fund_portfolio_company'),
-      ),
+      v.union(v.literal('company_self'), v.literal('fund_portfolio_company')),
     ),
     metrics: v.optional(v.any()), // raw snapshot { key: number }
 
@@ -702,7 +709,8 @@ export default defineSchema({
     .index('by_company', ['companyId', 'periodSortDate'])
     .index('by_org', ['orgId'])
     .index('by_message_id', ['agentmailMessageId'])
-    .index('by_company_period', ['companyId', 'reportPeriod']),
+    .index('by_company_period', ['companyId', 'reportPeriod'])
+    .index('by_supabase_report', ['supabaseReportId', 'companyId']),
 
   /**
    * companyIntelligence — one row per company holding the AI synthesis

@@ -26,7 +26,6 @@ import { residualValueCents } from './lib/metrics'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx } from './_generated/server'
 
-
 function companyName(c: Doc<'companies'> | null) {
   return c?.name ?? null
 }
@@ -44,9 +43,19 @@ export const listCompaniesInternal = internalQuery({
       .query('companies')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
-    return rows
-      .filter((c) => !c.archivedAt)
-      .map((c) => ({ _id: c._id, name: c.name, kind: c.kind }))
+    return (
+      rows
+        .filter((c) => !c.archivedAt)
+        // `domain` is the matching key of the report pipeline (and of the
+        // Supabase reports migration): exposing it keeps the read-only MCP
+        // channel usable for domain-join dry-runs on prod data.
+        .map((c) => ({
+          _id: c._id,
+          name: c.name,
+          kind: c.kind,
+          domain: c.domain ?? null,
+        }))
+    )
   },
 })
 
@@ -102,7 +111,10 @@ export const createCompanyInternal = internalMutation({
     domain: v.optional(v.string()),
     countryCode: v.optional(v.string()),
   },
-  handler: async (ctx, { orgId, actorUserId, name, sector, domain, countryCode }) => {
+  handler: async (
+    ctx,
+    { orgId, actorUserId, name, sector, domain, countryCode },
+  ) => {
     await readMembership(ctx, orgId, actorUserId)
     const trimmed = name.trim()
     if (!trimmed) throw new ConvexError('invalid_name')
@@ -125,7 +137,7 @@ async function assertSameOrg(
   companyId: Id<'companies'>,
   code: string,
 ) {
-  const c = await ctx.db.get("companies", companyId)
+  const c = await ctx.db.get('companies', companyId)
   if (!c || c.orgId !== orgId) throw new ConvexError(code)
 }
 
@@ -152,10 +164,15 @@ export const createDealInternal = internalMutation({
       'target_wrong_org',
     )
     if (args.viaSpvCompanyId) {
-      await assertSameOrg(ctx, args.orgId, args.viaSpvCompanyId, 'spv_wrong_org')
+      await assertSameOrg(
+        ctx,
+        args.orgId,
+        args.viaSpvCompanyId,
+        'spv_wrong_org',
+      )
     }
     // The investor must be a group entity (not a portfolio company).
-    const investor = await ctx.db.get("companies", args.investorCompanyId)
+    const investor = await ctx.db.get('companies', args.investorCompanyId)
     if (!investor || investor.orgId !== args.orgId) {
       throw new ConvexError('investor_wrong_org')
     }
@@ -205,7 +222,7 @@ export const createBankAccountInternal = internalMutation({
   handler: async (ctx, args) => {
     await readMembership(ctx, args.orgId, args.actorUserId)
     // An account's owner is always a group entity.
-    const owner = await ctx.db.get("companies", args.ownerCompanyId)
+    const owner = await ctx.db.get('companies', args.ownerCompanyId)
     if (!owner || owner.orgId !== args.orgId) {
       throw new ConvexError('owner_wrong_org')
     }
@@ -268,12 +285,12 @@ export const createTransactionInternal = internalMutation({
     if (!Number.isInteger(args.amount) || args.amount <= 0) {
       throw new ConvexError('invalid_amount')
     }
-    const account = await ctx.db.get("bankAccounts", args.bankAccountId)
+    const account = await ctx.db.get('bankAccounts', args.bankAccountId)
     if (!account || account.orgId !== args.orgId) {
       throw new ConvexError('account_wrong_org')
     }
     if (args.dealId) {
-      const deal = await ctx.db.get("deals", args.dealId)
+      const deal = await ctx.db.get('deals', args.dealId)
       if (!deal || deal.orgId !== args.orgId) {
         throw new ConvexError('deal_wrong_org')
       }
@@ -318,9 +335,9 @@ export const updateDealInternal = internalMutation({
   },
   handler: async (ctx, { orgId, actorUserId, dealId, ...patch }) => {
     await readMembership(ctx, orgId, actorUserId)
-    const deal = await ctx.db.get("deals", dealId)
+    const deal = await ctx.db.get('deals', dealId)
     if (!deal || deal.orgId !== orgId) throw new ConvexError('not_found')
-    await ctx.db.patch("deals", dealId, patch)
+    await ctx.db.patch('deals', dealId, patch)
     return { _id: dealId }
   },
 })
@@ -397,7 +414,10 @@ const createDeal = createTool({
     investorCompanyId: z.string().describe('Group entity id (CALTE, Albo…)'),
     targetCompanyId: z.string().describe('Invested company id'),
     instrumentKind: z.enum(INSTRUMENTS),
-    viaSpvCompanyId: z.string().optional().describe('SPV entity id, if via SPV'),
+    viaSpvCompanyId: z
+      .string()
+      .optional()
+      .describe('SPV entity id, if via SPV'),
     committedAmount: z.number().int().optional().describe('cents EUR'),
     paidAmount: z.number().int().optional().describe('cents EUR'),
     interestRate: z.number().int().optional().describe('basis points'),
@@ -488,10 +508,7 @@ const createBankAccount = createTool({
     bankName: z.string().min(1).describe('Bank name, e.g. "Qonto"'),
     label: z.string().min(1).describe('Account label, e.g. "Qonto CALTE"'),
     currency: z.string().optional().describe('ISO currency, defaults to EUR'),
-    accountKind: z
-      .string()
-      .optional()
-      .describe('checking, cto, dat, savings…'),
+    accountKind: z.string().optional().describe('checking, cto, dat, savings…'),
     iban: z.string().optional(),
     currentBalanceCents: z.number().int().optional().describe('cents EUR'),
     balanceAsOfISO: z.string().optional().describe('ISO date "YYYY-MM-DD"'),
@@ -504,18 +521,21 @@ const createBankAccount = createTool({
     if (balanceAsOf !== undefined && Number.isNaN(balanceAsOf)) {
       throw new ConvexError('invalid_balance_date')
     }
-    return await ctx.runMutation(internal.agentTools.createBankAccountInternal, {
-      orgId,
-      actorUserId: userId,
-      ownerCompanyId: input.ownerCompanyId as Id<'companies'>,
-      bankName: input.bankName,
-      label: input.label,
-      currency: input.currency,
-      accountKind: input.accountKind,
-      iban: input.iban,
-      currentBalance: input.currentBalanceCents,
-      balanceAsOf,
-    })
+    return await ctx.runMutation(
+      internal.agentTools.createBankAccountInternal,
+      {
+        orgId,
+        actorUserId: userId,
+        ownerCompanyId: input.ownerCompanyId as Id<'companies'>,
+        bankName: input.bankName,
+        label: input.label,
+        currency: input.currency,
+        accountKind: input.accountKind,
+        iban: input.iban,
+        currentBalance: input.currentBalanceCents,
+        balanceAsOf,
+      },
+    )
   },
 })
 
@@ -560,17 +580,20 @@ const createTransaction = createTool({
     if (Number.isNaN(transactionDate)) {
       throw new ConvexError('invalid_transaction_date')
     }
-    return await ctx.runMutation(internal.agentTools.createTransactionInternal, {
-      orgId,
-      actorUserId: userId,
-      bankAccountId: input.bankAccountId as Id<'bankAccounts'>,
-      dealId: input.dealId ? (input.dealId as Id<'deals'>) : undefined,
-      direction: input.direction,
-      amount: input.amount,
-      transactionDate,
-      rawLabel: input.rawLabel,
-      counterparty: input.counterparty,
-    })
+    return await ctx.runMutation(
+      internal.agentTools.createTransactionInternal,
+      {
+        orgId,
+        actorUserId: userId,
+        bankAccountId: input.bankAccountId as Id<'bankAccounts'>,
+        dealId: input.dealId ? (input.dealId as Id<'deals'>) : undefined,
+        direction: input.direction,
+        amount: input.amount,
+        transactionDate,
+        rawLabel: input.rawLabel,
+        counterparty: input.counterparty,
+      },
+    )
   },
 })
 
@@ -730,10 +753,10 @@ const getDashboardSummary = createTool({
   inputSchema: z.object({}),
   execute: async (ctx): Promise<unknown> => {
     const { orgId, userId } = parseScope(ctx.userId)
-    return await ctx.runQuery(
-      internal.agentTools.getDashboardSummaryInternal,
-      { orgId, actorUserId: userId },
-    )
+    return await ctx.runQuery(internal.agentTools.getDashboardSummaryInternal, {
+      orgId,
+      actorUserId: userId,
+    })
   },
 })
 
@@ -811,12 +834,15 @@ const renameBankAccount = createTool({
   }),
   execute: async (ctx, input): Promise<unknown> => {
     const { orgId, userId } = parseScope(ctx.userId)
-    return await ctx.runMutation(internal.agentTools.renameBankAccountInternal, {
-      orgId,
-      actorUserId: userId,
-      bankAccountId: input.bankAccountId as Id<'bankAccounts'>,
-      displayName: input.displayName,
-    })
+    return await ctx.runMutation(
+      internal.agentTools.renameBankAccountInternal,
+      {
+        orgId,
+        actorUserId: userId,
+        bankAccountId: input.bankAccountId as Id<'bankAccounts'>,
+        displayName: input.displayName,
+      },
+    )
   },
 })
 
