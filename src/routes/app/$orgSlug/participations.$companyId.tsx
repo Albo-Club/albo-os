@@ -38,7 +38,7 @@ import {
 } from '~/components/companies/EntityFiche'
 import { ReportingsSection } from '~/components/companies/ReportingsSection'
 import { CompanyReportsSection } from '~/components/companies/CompanyReportsSection'
-import { CompanyIntelligenceCard } from '~/components/companies/CompanyIntelligenceCard'
+import { CompanyAiSynthesisBlock } from '~/components/companies/CompanyAiSynthesisBlock'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { Button } from '~/components/ui/button'
 import {
@@ -916,27 +916,25 @@ function ParticipationDetail() {
         )}
       </IdentitySection>
 
-      {/* Reporting zone: manual documents, email-ingested reports, AI synthesis. */}
+      {/* Full-width AI synthesis block (company-level Cerveau 3), above the
+          reporting tabs and outside them. */}
+      {company && <CompanyAiSynthesisBlock companyId={company._id} />}
+
+      {/* Reporting zone: email-ingested report history + manual documents. */}
       {company && (
         <section>
-          <Tabs defaultValue="documents">
+          <Tabs defaultValue="reports">
             <TabsList variant="line">
+              <TabsTrigger value="reports">{t('tabs.reports')}</TabsTrigger>
               <TabsTrigger value="documents">
                 {t('tabs.documents')}
               </TabsTrigger>
-              <TabsTrigger value="reports">{t('tabs.reports')}</TabsTrigger>
-              <TabsTrigger value="intelligence">
-                {t('tabs.intelligence')}
-              </TabsTrigger>
             </TabsList>
-            <TabsContent value="documents" className="pt-4">
-              <ReportingsSection companyId={company._id} />
-            </TabsContent>
             <TabsContent value="reports" className="pt-4">
               <CompanyReportsSection companyId={company._id} />
             </TabsContent>
-            <TabsContent value="intelligence" className="pt-4">
-              <CompanyIntelligenceCard companyId={company._id} />
+            <TabsContent value="documents" className="pt-4">
+              <ReportingsSection companyId={company._id} />
             </TabsContent>
           </Tabs>
         </section>

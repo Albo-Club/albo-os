@@ -23,6 +23,42 @@ bas de page.
 
 ---
 
+## v1.62.0 — 02/07/2026 à 15:17 — Fiche entreprise : synthèse IA en pleine largeur
+
+Sur la page d'une société, la **synthèse IA** quitte les onglets pour devenir
+un **bloc pleine largeur**, placé juste sous le bloc des deals et au-dessus des
+onglets. Son contenu ne change pas : le score coloré selon le verdict, la phrase
+de synthèse, les points forts et de vigilance, les trois indicateurs clés et
+l'alerte critique (uniquement si elle existe). Tant qu'aucune synthèse n'a été
+générée, une simple ligne discrète prend sa place.
+
+Les onglets en dessous sont simplifiés et réordonnés : **Reports** (l'historique
+des reports) d'abord, puis **Documents**. L'ancien onglet « Synthèse IA » est
+supprimé — son contenu vit désormais dans le bloc au-dessus. Le bouton
+« Ajouter un report » (désactivé) disparaît lui aussi.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau composant `CompanyAiSynthesisBlock.tsx`, extrait tel quel de
+>   l'ex-zone 1 (héros `SynthesisHero`) de `CompanyReportsSection.tsx` : même
+>   query `intelligence.getByCompany`, même rendu. Monté dans la route
+>   `participations.$companyId.tsx` en pleine largeur entre le bloc Deals et le
+>   `<Tabs>`, gardé par `company`.
+> - `CompanyReportsSection.tsx` ne rend plus que l'historique (ex-zone 2) ;
+>   en-tête « Historique des reports » conservé, bouton « Ajouter un report »
+>   désactivé retiré (+ imports orphelins `Plus`, `Tooltip*`, `cn`,
+>   `reportScore`, `moneyTone`).
+> - `<Tabs>` réordonné (`defaultValue="reports"`, Reports puis Documents) ;
+>   onglet `intelligence` + composant `CompanyIntelligenceCard.tsx` supprimés.
+>   Query `intelligence.getByCompany` **conservée** (utilisée par le bloc).
+> - État vide standalone = une ligne sobre (plus d'encart en pointillés).
+> - i18n EN+FR : retrait de `tabs.intelligence`, `reports.history.add/addHint`,
+>   `intelligence.title/updated/section.insights/section.alerts` ; clés
+>   partagées avec le bloc (`intelligence.status.*`, `section.good/bad`)
+>   conservées.
+
+---
+
 ## v1.61.1 — 02/07/2026 à 15:16 — Suivi des remontées vers le template
 
 Changement interne, sans effet visible dans l'app : on met en place un suivi
