@@ -23,6 +23,37 @@ bas de page.
 
 ---
 
+## v1.63.1 — 02/07/2026 à 23:35 — Migration des reports : jointure par domaine résolue
+
+Étape préparatoire de la migration des reportings (aucun changement dans
+l'app, aucune donnée modifiée) : chaque report de l'ancien outil connaît
+désormais sa ou ses sociétés de destination dans Albo OS, rapprochées en
+priorité par **nom de domaine** — la même clé que celle utilisée pour
+rattacher les reports reçus par email. Quand une société correspond à
+plusieurs véhicules d'investissement, le report sera dupliqué sur chacun.
+Le récapitulatif liste les volumes attendus, les cas à arbitrer à la main
+et la garantie anti-doublons prévue en cas de relance. Rien ne sera migré
+sans validation explicite.
+
+> **🔧 Notes techniques**
+>
+> - Lot 0 read-only (aucune écriture, aucun `--prod`). Constat :
+>   `LOT0_MIGRATION_REPORTS_2026-07-02.md` ; mapping résolu (390 lignes,
+>   report → entités cible) : `MAPPING_REPORTS_RESOLUTION_2026-07-02.csv` ;
+>   section chantier ajoutée à `MIGRATIONS.md`.
+> - Clé de jointure : `portfolio_companies.domain` ∪ `company_domains`
+>   (source) vs `companies.domain` (cible, index `by_org_domain`) — même clé
+>   que `reportPipeline.resolveCompanyInternal`. Fallback nom via le CSV de
+>   la PR #168. Domaines OS lus par proxy (`attioAlboImport.ts` + Airtable),
+>   le MCP ne les exposant pas : dry-run Convex à prévoir au Lot 1.
+> - Chiffres : 390 reports → 432 écritures `companyReports` (fan-out), 412
+>   net des exclusions D5 ; 7 orphelins dont 5 conflits de domaine ; cas
+>   Virgil ×15 (domaine plateforme `parallel-invest.com`) à arbitrer.
+> - Idempotence proposée (non implémentée) : champs additifs
+>   `supabaseReportId` / `supabaseFileId` + clé (`supabaseReportId`,
+>   `companyId`) — la dédup `(companyId, reportPeriod)` est disqualifiée
+>   (48 collisions source, 26 `period_sort_date` NULL).
+
 ## v1.63.0 — 02/07/2026 à 19:09 — Édition au clic des fiches deal & société
 
 Fini le détour par le menu « … » pour corriger une valeur. Sur la fiche d'un
