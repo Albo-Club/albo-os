@@ -57,9 +57,13 @@
   "col": {
     "company": "Société",
     "org": "Org",
+    "oneLiner": "One-liner",
+    "sector": "Secteur",
+    "aiScore": "Score IA",
     "deals": "Deals",
     "committed": "Engagé",
     "paid": "Versé",
+    "invested": "Montant investi",
     "received": "Reçu",
     "tvpi": "TVPI",
     "moic": "MOIC",

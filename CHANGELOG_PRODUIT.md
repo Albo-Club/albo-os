@@ -23,6 +23,47 @@ bas de page.
 
 ---
 
+## v1.64.0 — 02/07/2026 à 23:31 — Vue Entreprises : nouvelles colonnes et colonne figée
+
+La liste des **entreprises** (par organisation et vue agrégée) gagne trois
+colonnes : le **one-liner** (le pitch de la boîte en une ligne, à remplir à la
+main sur chaque société), le **secteur**, et le **score IA** — la note sur 10
+issue de la synthèse automatique des reports investisseurs, avec le même code
+couleur que la fiche société (vert ≥ 7, orange 5-6, rouge ≤ 4). Une société
+sans synthèse affiche simplement « — » ; le score apparaîtra au fil des
+reports reçus.
+
+L'ordre de lecture devient : société · one-liner · secteur · score IA ·
+deals · **montant investi** (le décaissé réel) · reçu · TVPI. Et quand la
+table déborde en largeur, la **colonne société reste figée** à gauche pendant
+le défilement horizontal — on garde toujours le nom sous les yeux. La section
+des participations soldées (avec son badge de sortie) est inchangée.
+
+> **🔧 Notes techniques**
+>
+> - Schéma : nouveau champ `companies.oneLiner` (`v.optional(v.string())`),
+>   sans backfill ni UI de saisie (remplissage manuel).
+> - `convex/deals.ts` : `companyRef` expose `oneLiner` ; nouveaux helpers
+>   exportés `aiHealthScore` (lecture défensive de
+>   `aiAnalysis?.health_score?.score`, null si non numérique) et
+>   `aiScoresByCompany` (une lecture indexée `companyIntelligence.by_org` →
+>   map companyId → score, pas de N+1). `deals.list` attache `target.aiScore` ;
+>   `convex/aggregate.ts` fait la même jointure batchée par org.
+> - `ParticipationsTable.tsx` : colonnes One-liner (tronquée, tooltip),
+>   Secteur (libellé i18n `sectors.*`), Score IA (carré teinté via
+>   `scoreVerdict`/`verdictSquareClass` de `src/lib/reportScore.ts`) ; en-tête
+>   « Versé » remplacé par la clé `col.invested` (« Montant investi », même
+>   donnée `paid`). Première colonne figée : `sticky left-0` + fond **opaque**
+>   `bg-background` (sinon les cellules transparaissent en glissant dessous) ;
+>   le hover de ligne étant translucide (`bg-muted/50`), la cellule figée
+>   composite la même teinte via `color-mix` piloté par `group-hover` (classe
+>   `group` posée sur toutes les lignes). `ui/table.tsx` intact (le
+>   passthrough `className` suffisait).
+> - i18n EN + FR : `col.oneLiner`, `col.sector`, `col.aiScore`,
+>   `col.invested`. TESTING.md : nouvelle ligne SH19.
+
+---
+
 ## v1.63.0 — 02/07/2026 à 19:09 — Édition au clic des fiches deal & société
 
 Fini le détour par le menu « … » pour corriger une valeur. Sur la fiche d'un
