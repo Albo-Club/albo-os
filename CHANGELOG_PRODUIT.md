@@ -23,6 +23,27 @@ bas de page.
 
 ---
 
+## v1.63.1 — 02/07/2026 à 22:20 — Cadrage de la migration des reports historiques
+
+Document de cadrage (lecture seule, aucune donnée modifiée) pour rapatrier
+dans Albo OS l'historique des reports du portefeuille aujourd'hui stockés dans
+l'ancienne application : périmètre, volumes, correspondance des schémas,
+points de décision et plan par lots.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau document `CADRAGE_MIGRATION_REPORTS_2026-07-02.md` : reco
+>   read-only Supabase (`company_reports` 390 en périmètre, `report_files`
+>   405, `portfolio_company_metrics` 19 138) → Convex (`companyReports`,
+>   `documents`, `companyIntelligence`), mapping champ à champ, estimation
+>   des orphelins de rattachement (~14 % des reports à arbitrer), 9 points
+>   de décision (D1–D9) et plan en 5 lots bornés.
+> - Point bloquant documenté : aucune trace repo/PR/MCP de la migration
+>   companies+metrics précédente (« option B ») — mapping d'IDs à localiser
+>   avant tout lot.
+> - Section « Chantier » ajoutée à `MIGRATIONS.md` pointant vers le cadrage.
+> - Aucun code applicatif touché.
+
 ## v1.63.0 — 02/07/2026 à 19:09 — Édition au clic des fiches deal & société
 
 Fini le détour par le menu « … » pour corriger une valeur. Sur la fiche d'un

@@ -26,6 +26,14 @@ Les ponts Attio (`attioCompanyId` / `attioDealId`) et l'ingestion Powens sont
 des flux **continus**, pas des migrations — cf. `KNOWN_ISSUES.md`
 (« Ingestion Powens ») et `CLAUDE.md` (frontière d'attribution Attio).
 
+## Chantier : migration des reports historiques Albo App (Supabase) → Convex
+
+Cadrage complet (périmètre, volumes, mapping de schémas, décisions D1–D9,
+plan en 5 lots) : `CADRAGE_MIGRATION_REPORTS_2026-07-02.md`. **En attente de
+validation** — aucun lot ne démarre sans GO explicite ; point bloquant : la
+localisation du mapping d'IDs de la migration companies+metrics précédente
+(décision D1 du cadrage).
+
 ## Chantier : retrait de la table legacy `forecasts`
 
 La table `forecasts` est inerte (alimentée par l'import Airtable uniquement,
