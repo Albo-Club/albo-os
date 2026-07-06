@@ -587,6 +587,7 @@
     "untitled": "Report sans titre",
     "metrics": "Métriques",
     "content": "Contenu",
+    "failedDetail": "Le traitement de ce report a échoué",
     "col": {
       "title": "Titre",
       "period": "Période",

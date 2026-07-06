@@ -361,6 +361,39 @@ et tourne désormais sur **`deepseek/deepseek-v4-pro` servi via OpenRouter**.
   dès le step 2 d'un message multi-étapes si OpenRouter remonte le détail de
   cache pour le modèle servi.
 
+## Report pipeline (AgentMail) — échecs & extraction `metrics`
+
+Ingestion d'un investor update par email : webhook AgentMail
+(`convex/agentmail.ts`) → `convex/reportPipeline.ts:run` (dédup → extraction
+corps → résolution company → Cerveau 1 → store → Cerveau 3 → reply).
+
+- **Un échec après le webhook ne se voit QUE dans les logs Convex.** Le
+  webhook AgentMail qui renvoie 2xx prouve seulement que le mail est arrivé et
+  scheduled — pas que le pipeline a abouti. Pour diagnostiquer, filtrer les
+  logs Convex sur `reportPipeline` et lire la **dernière** ligne
+  `[reportPipeline] …` : `matched company "X"` puis rien/une erreur = mort à
+  Cerveau 1 ; `company not found` = résolution ratée (un mail de refus est
+  renvoyé) ; `stored report …` = stocké (problème ailleurs, ex. affichage).
+- **Les échecs sont désormais persistés** (`recordFailure` + try/catch autour
+  de `run`) : une ligne `companyReports` `status:'failed'` + `error` apparaît
+  dans l'onglet Reports de la fiche société, **mais seulement si la company a
+  déjà été résolue** (avant ça, pas d'`orgId`/`companyId` où l'accrocher →
+  logs uniquement). Le catch re-throw pour garder l'erreur visible côté
+  logs/Sentry.
+- **Piège `metrics` (schéma vs prompt).** Le schéma Zod attend
+  `metrics: [{key, value}]` ; `EXTRACTION_SYSTEM_PROMPT` décrit un dict
+  `{revenue: 123}`. `generateObject` impose le schéma (OK), mais le fallback
+  `generateText` (déclenché quand le modèle ne supporte pas le structured
+  output — cf. `deepseek-v4-pro`) suit le prompt → dict → `safeParse` throw →
+  pipeline mort. Corrigé par `convex/lib/reportMetrics.ts:coerceMetrics`
+  (dict→tableau) appliqué avant `safeParse`. Si tu réécris cette étape, garde
+  le prompt et le schéma d'accord, ou la coercion.
+- **Dépendances d'env prod à vérifier en premier** si un import échoue :
+  `OPENROUTER_API_KEY` + slug du modèle (Cerveau 1 et sa synthèse Cerveau 3),
+  `AGENTMAIL_API_KEY` (download des PJ **et** envoi des replies confirmation/
+  échec), `AGENTMAIL_WEBHOOK_SECRET` (sinon le webhook 500 en fail-closed,
+  cf. #161).
+
 ## SITE_URL drift in prod = broken email links
 
 `SITE_URL` is the Convex env var that builds every email URL (magic link,

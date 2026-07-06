@@ -15,8 +15,17 @@
 
 import { v } from 'convex/values'
 import { internal } from './_generated/api'
-import { internalAction, internalMutation, internalQuery } from './_generated/server'
-import { downloadAttachment, fetchBody, getMessage, replyToMessage } from './agentmail'
+import {
+  internalAction,
+  internalMutation,
+  internalQuery,
+} from './_generated/server'
+import {
+  downloadAttachment,
+  fetchBody,
+  getMessage,
+  replyToMessage,
+} from './agentmail'
 import { ocrAttachment } from './lib/ocr'
 import { detectLinks, htmlToText } from './lib/reportLinks'
 import {
@@ -81,7 +90,10 @@ export const findByMessageId = internalQuery({
       .query('companyReports')
       .withIndex('by_message_id', (q) => q.eq('agentmailMessageId', messageId))
       .first()
-    return existing?._id ?? null
+    // Only a COMPLETED report counts as a duplicate. A prior `failed` row must
+    // NOT block reprocessing — otherwise AgentMail's retry (or a manual
+    // re-send of the same message) could never recover from a transient error.
+    return existing?.status === 'completed' ? existing._id : null
   },
 })
 
@@ -95,7 +107,10 @@ interface ResolvedCompany {
 
 export const resolveCompanyInternal = internalQuery({
   args: { fromEmail: v.string(), subject: v.string(), bodyText: v.string() },
-  handler: async (ctx, { fromEmail, subject, bodyText }): Promise<ResolvedCompany | null> => {
+  handler: async (
+    ctx,
+    { fromEmail, subject, bodyText },
+  ): Promise<ResolvedCompany | null> => {
     const domain = extractCompanyDomain(bodyText, fromEmail)
     const names = extractCompanyNamesFromSubject(subject)
     const mentionText = buildBodyMentionText(subject, bodyText)
@@ -199,13 +214,15 @@ export const storeReport = internalMutation({
       ? await ctx.db
           .query('companyReports')
           .withIndex('by_company_period', (q) =>
-            q.eq('companyId', args.companyId).eq('reportPeriod', args.reportPeriod),
+            q
+              .eq('companyId', args.companyId)
+              .eq('reportPeriod', args.reportPeriod),
           )
           .first()
       : null
 
     if (existing) {
-      await ctx.db.patch("companyReports", existing._id, reportFields)
+      await ctx.db.patch('companyReports', existing._id, reportFields)
       reportId = existing._id
       const olds = await ctx.db
         .query('documents')
@@ -217,6 +234,21 @@ export const storeReport = internalMutation({
       }
     } else {
       reportId = await ctx.db.insert('companyReports', reportFields)
+    }
+
+    // Clear any stale `failed` row left by a prior attempt on the same email
+    // (recordFailure keys on messageId and carries no period, so the
+    // period-based dedup above never reuses it). The success supersedes it.
+    const sameMessage = await ctx.db
+      .query('companyReports')
+      .withIndex('by_message_id', (q) =>
+        q.eq('agentmailMessageId', args.agentmailMessageId),
+      )
+      .collect()
+    for (const r of sameMessage) {
+      if (r._id !== reportId && r.status === 'failed') {
+        await ctx.db.delete('companyReports', r._id)
+      }
     }
 
     for (const f of args.files) {
@@ -241,7 +273,10 @@ export const storeReport = internalMutation({
       .query('companyIntelligence')
       .withIndex('by_company', (q) => q.eq('companyId', args.companyId))
       .unique()
-    if (ci) await ctx.db.patch("companyIntelligence", ci._id, { latestReportId: reportId })
+    if (ci)
+      await ctx.db.patch('companyIntelligence', ci._id, {
+        latestReportId: reportId,
+      })
     else
       await ctx.db.insert('companyIntelligence', {
         orgId: args.orgId,
@@ -250,6 +285,54 @@ export const storeReport = internalMutation({
       })
 
     return reportId
+  },
+})
+
+// ─── Failure recording ───────────────────────────────────────────────────────
+
+/**
+ * Persist a `failed` report row when the pipeline throws after the company is
+ * resolved. Deduped on `agentmailMessageId` (a re-delivery updates in place);
+ * never downgrades an already-`completed` report.
+ */
+export const recordFailure = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    companyId: v.id('companies'),
+    agentmailInboxId: v.string(),
+    agentmailMessageId: v.string(),
+    agentmailThreadId: v.optional(v.string()),
+    fromEmail: v.string(),
+    subject: v.string(),
+    emailDate: v.optional(v.number()),
+    error: v.string(),
+  },
+  handler: async (ctx, args): Promise<void> => {
+    const existing = await ctx.db
+      .query('companyReports')
+      .withIndex('by_message_id', (q) =>
+        q.eq('agentmailMessageId', args.agentmailMessageId),
+      )
+      .first()
+    if (existing?.status === 'completed') return
+
+    const fields = {
+      orgId: args.orgId,
+      companyId: args.companyId,
+      source: 'email' as const,
+      agentmailInboxId: args.agentmailInboxId,
+      agentmailMessageId: args.agentmailMessageId,
+      agentmailThreadId: args.agentmailThreadId,
+      fromEmail: args.fromEmail,
+      subject: args.subject,
+      emailDate: args.emailDate,
+      status: 'failed' as const,
+      error: args.error.slice(0, 2000),
+      pipelineVersion: PIPELINE_VERSION,
+      processedAt: Date.now(),
+    }
+    if (existing) await ctx.db.patch('companyReports', existing._id, fields)
+    else await ctx.db.insert('companyReports', fields)
   },
 })
 
@@ -262,165 +345,230 @@ export const run = internalAction({
       `[reportPipeline] received from=${m.from} subject="${m.subject}" id=${m.messageId} attachments=${m.attachments.length}`,
     )
 
-    // 1. Dedup
-    const dup = await ctx.runQuery(internal.reportPipeline.findByMessageId, {
-      messageId: m.messageId,
-    })
-    if (dup) {
-      console.log(`[reportPipeline] skip duplicate message ${m.messageId}`)
-      return
-    }
-
-    // 2. Email content — the webhook often omits text/html (large messages):
-    //    inline → body_url (presigned S3) → getMessage API fallback.
-    let html = m.html
-    let text = m.text.trim() || htmlToText(m.html)
-    if (!text && m.bodyUrl) {
-      const body = await fetchBody(m.bodyUrl)
-      if (body.html) html = body.html
-      text = body.text.trim() || htmlToText(body.html)
-    }
-    if (!text) {
-      const full = await getMessage(m.inboxId, m.messageId)
-      if (full) {
-        if (full.html) html = String(full.html)
-        text =
-          String(full.text ?? '').trim() || htmlToText(String(full.html ?? ''))
+    // Resolved at step 3; hoisted so the catch below can attach a visible
+    // `failed` report row to the right company. Pre-resolution failures have
+    // no org/company to attach to and only surface in the Convex logs.
+    let company: ResolvedCompany | null = null
+    try {
+      // 1. Dedup
+      const dup = await ctx.runQuery(internal.reportPipeline.findByMessageId, {
+        messageId: m.messageId,
+      })
+      if (dup) {
+        console.log(`[reportPipeline] skip duplicate message ${m.messageId}`)
+        return
       }
-    }
-    console.log(`[reportPipeline] body extracted: ${text.length} chars`)
-    const links = detectLinks(`${text} ${html}`)
-    const linkLines = [...links.notion, ...links.googleDrive, ...links.docSend]
-    const emailContent = [
-      text,
-      linkLines.length ? `Liens détectés:\n${linkLines.join('\n')}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n\n')
 
-    // 3. Resolve company / org (on the email body)
-    let company = await ctx.runQuery(internal.reportPipeline.resolveCompanyInternal, {
-      fromEmail: m.from,
-      subject: m.subject,
-      bodyText: text,
-    })
-    if (!company) {
-      console.warn(`[reportPipeline] company not found for ${m.from} / "${m.subject}"`)
+      // 2. Email content — the webhook often omits text/html (large messages):
+      //    inline → body_url (presigned S3) → getMessage API fallback.
+      let html = m.html
+      let text = m.text.trim() || htmlToText(m.html)
+      if (!text && m.bodyUrl) {
+        const body = await fetchBody(m.bodyUrl)
+        if (body.html) html = body.html
+        text = body.text.trim() || htmlToText(body.html)
+      }
+      if (!text) {
+        const full = await getMessage(m.inboxId, m.messageId)
+        if (full) {
+          if (full.html) html = String(full.html)
+          text =
+            String(full.text ?? '').trim() ||
+            htmlToText(String(full.html ?? ''))
+        }
+      }
+      console.log(`[reportPipeline] body extracted: ${text.length} chars`)
+      const links = detectLinks(`${text} ${html}`)
+      const linkLines = [
+        ...links.notion,
+        ...links.googleDrive,
+        ...links.docSend,
+      ]
+      const emailContent = [
+        text,
+        linkLines.length ? `Liens détectés:\n${linkLines.join('\n')}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n')
+
+      // 3. Resolve company / org (on the email body)
+      company = await ctx.runQuery(
+        internal.reportPipeline.resolveCompanyInternal,
+        {
+          fromEmail: m.from,
+          subject: m.subject,
+          bodyText: text,
+        },
+      )
+      if (!company) {
+        console.warn(
+          `[reportPipeline] company not found for ${m.from} / "${m.subject}"`,
+        )
+        await replyToMessage(
+          m.inboxId,
+          m.messageId,
+          `<p>Bonjour,</p><p>Nous n'avons pas pu rattacher ce message à une entreprise du portefeuille. Vérifiez l'expéditeur ou mentionnez le nom de l'entreprise dans l'objet.</p>`,
+        )
+        return
+      }
+      console.log(
+        `[reportPipeline] matched company "${company.companyName}" (org ${company.orgId})`,
+      )
+
+      // 4. Download attachments → Convex storage + OCR (PDF/images via Mistral)
+      const files: Array<{
+        storageId: Id<'_storage'>
+        filename: string
+        contentType?: string
+        size?: number
+        inline: boolean
+        extractedText?: string
+      }> = []
+      const ocrParts: Array<string> = []
+      for (const att of m.attachments) {
+        const buf = await downloadAttachment(
+          m.inboxId,
+          m.messageId,
+          att.attachmentId,
+        )
+        if (!buf) continue
+        if (buf.byteLength > MAX_FILE_BYTES) {
+          console.warn(
+            `[reportPipeline] skip oversized attachment ${att.filename} (${buf.byteLength}B)`,
+          )
+          continue
+        }
+        const storageId = await ctx.storage.store(
+          new Blob([buf], {
+            type: att.contentType ?? 'application/octet-stream',
+          }),
+        )
+        const ocrText = await ocrAttachment(buf, att.filename, att.contentType)
+        if (ocrText) ocrParts.push(`--- ${att.filename} ---\n${ocrText}`)
+        files.push({
+          storageId,
+          filename: att.filename,
+          contentType: att.contentType,
+          size: buf.byteLength,
+          inline: att.inline ?? false,
+          extractedText: ocrText || undefined,
+        })
+      }
+      const ocrContent = ocrParts.join('\n\n')
+
+      // 5. Cerveau 1 — extraction (email body + OCR of attachments)
+      const emailDateIso = m.date
+        ? new Date(m.date).toISOString()
+        : new Date(Date.now()).toISOString()
+      const analysis = await ctx.runAction(internal.reportAnalysis.analyze, {
+        textContent: emailContent,
+        ocrContent: ocrContent || undefined,
+        companyName: company.companyName,
+        subject: m.subject,
+        fromEmail: m.from,
+        emailDate: emailDateIso,
+      })
+
+      // 5b. Fund → portfolio company redirect (with a loose name guard)
+      if (
+        analysis.reportAbout === 'fund_portfolio_company' &&
+        analysis.targetCompanyName
+      ) {
+        const re = await ctx.runQuery(
+          internal.reportPipeline.resolveCompanyInternal,
+          {
+            fromEmail: m.from,
+            subject: analysis.targetCompanyName,
+            bodyText: text,
+          },
+        )
+        if (re) {
+          const tl = analysis.targetCompanyName.toLowerCase()
+          const rl = re.companyName.toLowerCase()
+          if (rl.includes(tl) || tl.includes(rl)) company = re
+        }
+      }
+
+      // 6. Combined raw content (email + OCR) for storage + synthesis brain
+      const rawContent = [emailContent, ocrContent]
+        .filter(Boolean)
+        .join('\n\n---\n\n')
+
+      // 7. Store
+      const reportPeriod = normalizePeriodDisplay(analysis.reportPeriod)
+      const periodSortMs = reportPeriod
+        ? parsePeriodToSortMs(reportPeriod)
+        : null
+      const reportId = await ctx.runMutation(
+        internal.reportPipeline.storeReport,
+        {
+          orgId: company.orgId,
+          companyId: company.companyId,
+          agentmailInboxId: m.inboxId,
+          agentmailMessageId: m.messageId,
+          agentmailThreadId: m.threadId,
+          fromEmail: m.from,
+          subject: m.subject,
+          emailDate: m.date,
+          title: analysis.reportTitle,
+          headline: analysis.headline,
+          keyHighlights: analysis.keyHighlights,
+          reportPeriod,
+          periodSortDate: periodSortMs ?? undefined,
+          reportType: analysis.reportType,
+          reportAbout: analysis.reportAbout,
+          metrics: analysis.metrics,
+          rawContent,
+          cleanedHtml: html,
+          files,
+        },
+      )
+      console.log(
+        `[reportPipeline] stored report ${reportId} for "${company.companyName}" period="${reportPeriod}"`,
+      )
+
+      // 8. Cerveau 3 — synthesis (fire-and-forget)
+      await ctx.scheduler.runAfter(0, internal.intelligence.runAnalysis, {
+        companyId: company.companyId,
+        orgId: company.orgId,
+      })
+
+      // 9. Confirmation reply
       await replyToMessage(
         m.inboxId,
         m.messageId,
-        `<p>Bonjour,</p><p>Nous n'avons pas pu rattacher ce message à une entreprise du portefeuille. Vérifiez l'expéditeur ou mentionnez le nom de l'entreprise dans l'objet.</p>`,
+        `<p>Report bien reçu pour <b>${company.companyName}</b>${
+          reportPeriod ? ` — ${reportPeriod}` : ''
+        }. Il est désormais disponible dans Albo OS.</p>`,
       )
-      return
-    }
-    console.log(
-      `[reportPipeline] matched company "${company.companyName}" (org ${company.orgId})`,
-    )
-
-    // 4. Download attachments → Convex storage + OCR (PDF/images via Mistral)
-    const files: Array<{
-      storageId: Id<'_storage'>
-      filename: string
-      contentType?: string
-      size?: number
-      inline: boolean
-      extractedText?: string
-    }> = []
-    const ocrParts: Array<string> = []
-    for (const att of m.attachments) {
-      const buf = await downloadAttachment(m.inboxId, m.messageId, att.attachmentId)
-      if (!buf) continue
-      if (buf.byteLength > MAX_FILE_BYTES) {
-        console.warn(`[reportPipeline] skip oversized attachment ${att.filename} (${buf.byteLength}B)`)
-        continue
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.error(`[reportPipeline] FAILED id=${m.messageId}: ${message}`)
+      // Persist a visible `failed` row so the import stops vanishing silently
+      // (the pipeline otherwise only ever writes `completed`). Best-effort: a
+      // failure while recording must not mask the original error, and we can
+      // only attach it once the company is known.
+      if (company) {
+        try {
+          await ctx.runMutation(internal.reportPipeline.recordFailure, {
+            orgId: company.orgId,
+            companyId: company.companyId,
+            agentmailInboxId: m.inboxId,
+            agentmailMessageId: m.messageId,
+            agentmailThreadId: m.threadId,
+            fromEmail: m.from,
+            subject: m.subject,
+            emailDate: m.date,
+            error: message,
+          })
+        } catch (recErr) {
+          console.error(
+            '[reportPipeline] recordFailure failed:',
+            recErr instanceof Error ? recErr.message : String(recErr),
+          )
+        }
       }
-      const storageId = await ctx.storage.store(
-        new Blob([buf], { type: att.contentType ?? 'application/octet-stream' }),
-      )
-      const ocrText = await ocrAttachment(buf, att.filename, att.contentType)
-      if (ocrText) ocrParts.push(`--- ${att.filename} ---\n${ocrText}`)
-      files.push({
-        storageId,
-        filename: att.filename,
-        contentType: att.contentType,
-        size: buf.byteLength,
-        inline: att.inline ?? false,
-        extractedText: ocrText || undefined,
-      })
+      throw err
     }
-    const ocrContent = ocrParts.join('\n\n')
-
-    // 5. Cerveau 1 — extraction (email body + OCR of attachments)
-    const emailDateIso = m.date ? new Date(m.date).toISOString() : new Date(Date.now()).toISOString()
-    const analysis = await ctx.runAction(internal.reportAnalysis.analyze, {
-      textContent: emailContent,
-      ocrContent: ocrContent || undefined,
-      companyName: company.companyName,
-      subject: m.subject,
-      fromEmail: m.from,
-      emailDate: emailDateIso,
-    })
-
-    // 5b. Fund → portfolio company redirect (with a loose name guard)
-    if (analysis.reportAbout === 'fund_portfolio_company' && analysis.targetCompanyName) {
-      const re = await ctx.runQuery(internal.reportPipeline.resolveCompanyInternal, {
-        fromEmail: m.from,
-        subject: analysis.targetCompanyName,
-        bodyText: text,
-      })
-      if (re) {
-        const tl = analysis.targetCompanyName.toLowerCase()
-        const rl = re.companyName.toLowerCase()
-        if (rl.includes(tl) || tl.includes(rl)) company = re
-      }
-    }
-
-    // 6. Combined raw content (email + OCR) for storage + synthesis brain
-    const rawContent = [emailContent, ocrContent]
-      .filter(Boolean)
-      .join('\n\n---\n\n')
-
-    // 7. Store
-    const reportPeriod = normalizePeriodDisplay(analysis.reportPeriod)
-    const periodSortMs = reportPeriod ? parsePeriodToSortMs(reportPeriod) : null
-    const reportId = await ctx.runMutation(internal.reportPipeline.storeReport, {
-      orgId: company.orgId,
-      companyId: company.companyId,
-      agentmailInboxId: m.inboxId,
-      agentmailMessageId: m.messageId,
-      agentmailThreadId: m.threadId,
-      fromEmail: m.from,
-      subject: m.subject,
-      emailDate: m.date,
-      title: analysis.reportTitle,
-      headline: analysis.headline,
-      keyHighlights: analysis.keyHighlights,
-      reportPeriod,
-      periodSortDate: periodSortMs ?? undefined,
-      reportType: analysis.reportType,
-      reportAbout: analysis.reportAbout,
-      metrics: analysis.metrics,
-      rawContent,
-      cleanedHtml: html,
-      files,
-    })
-    console.log(
-      `[reportPipeline] stored report ${reportId} for "${company.companyName}" period="${reportPeriod}"`,
-    )
-
-    // 8. Cerveau 3 — synthesis (fire-and-forget)
-    await ctx.scheduler.runAfter(0, internal.intelligence.runAnalysis, {
-      companyId: company.companyId,
-      orgId: company.orgId,
-    })
-
-    // 9. Confirmation reply
-    await replyToMessage(
-      m.inboxId,
-      m.messageId,
-      `<p>Report bien reçu pour <b>${company.companyName}</b>${
-        reportPeriod ? ` — ${reportPeriod}` : ''
-      }. Il est désormais disponible dans Albo OS.</p>`,
-    )
   },
 })

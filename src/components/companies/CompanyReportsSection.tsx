@@ -38,7 +38,15 @@ function useRelativeAge() {
 
 // ─── Report history ──────────────────────────────────────────────────────────
 
-type ReportRow = { _id: Id<'companyReports'>; title: string | null; headline: string | null; reportPeriod: string | null; emailDate: number | null; processedAt: number | null }
+type ReportRow = {
+  _id: Id<'companyReports'>
+  title: string | null
+  headline: string | null
+  reportPeriod: string | null
+  emailDate: number | null
+  processedAt: number | null
+  status: 'processing' | 'completed' | 'failed'
+}
 
 function ReportHistory({
   companyId,
@@ -131,10 +139,16 @@ function ReportCard({
               report.title ??
               t('reports.untitled')}
           </span>
-          {isLatest && (
-            <Badge variant="secondary" className="shrink-0">
-              {t('reports.history.current')}
+          {report.status === 'failed' ? (
+            <Badge variant="destructive" className="shrink-0">
+              {t('reports.status.failed')}
             </Badge>
+          ) : (
+            isLatest && (
+              <Badge variant="secondary" className="shrink-0">
+                {t('reports.history.current')}
+              </Badge>
+            )
           )}
         </div>
         {report.headline && (
@@ -246,6 +260,16 @@ function ReportDetailDialog({
           </div>
         ) : (
           <div className="space-y-4 text-sm">
+            {detail.status === 'failed' && (
+              <div className="border-destructive/25 bg-destructive/15 text-destructive rounded-md border p-3">
+                <p className="font-medium">{t('reports.failedDetail')}</p>
+                {detail.error && (
+                  <p className="mt-1 font-mono text-xs whitespace-pre-wrap">
+                    {detail.error}
+                  </p>
+                )}
+              </div>
+            )}
             {detail.headline && <p className="font-medium">{detail.headline}</p>}
 
             {detail.keyHighlights.length > 0 && (

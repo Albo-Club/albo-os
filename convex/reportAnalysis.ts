@@ -17,6 +17,7 @@ import { v } from 'convex/values'
 import { internalAction } from './_generated/server'
 import { getModel } from './agent'
 import { EXTRACTION_SYSTEM_PROMPT } from './lib/reportPrompts'
+import { coerceMetrics } from './lib/reportMetrics'
 
 const MAX_TEXT = 30_000
 const MAX_OCR = 30_000
@@ -142,10 +143,12 @@ export const analyze = internalAction({
       )
       const { text } = await generateText({
         model,
-        system: `${EXTRACTION_SYSTEM_PROMPT}\n\nRéponds UNIQUEMENT avec un JSON valide, sans markdown.`,
+        system: `${EXTRACTION_SYSTEM_PROMPT}\n\nRéponds UNIQUEMENT avec un JSON valide, sans markdown. Le champ "metrics" doit être un tableau d'objets {"key": string, "value": number}.`,
         prompt: userPrompt,
       })
-      const parsed = analysisSchema.safeParse(extractJson(text))
+      // The fallback has no schema to steer the model, so `metrics` often comes
+      // back as a dict — coerce it to the {key,value}[] shape before validating.
+      const parsed = analysisSchema.safeParse(coerceMetrics(extractJson(text)))
       if (!parsed.success) {
         throw new Error(`[reportAnalysis] could not parse analysis: ${parsed.error.message}`)
       }

@@ -587,6 +587,7 @@
     "untitled": "Untitled report",
     "metrics": "Metrics",
     "content": "Content",
+    "failedDetail": "This report failed to process",
     "col": {
       "title": "Title",
       "period": "Period",

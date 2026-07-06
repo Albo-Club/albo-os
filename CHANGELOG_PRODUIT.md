@@ -23,6 +23,43 @@ bas de page.
 
 ---
 
+## v1.66.0 — 06/07/2026 à 17:43 — Reports par email : imports fiabilisés et échecs visibles
+
+Les **reports transférés par email** s'importent à nouveau de façon fiable.
+Surtout, quand un report ne peut pas être traité, il n'échoue plus **en
+silence** : il apparaît désormais dans l'onglet **Reports** de la fiche
+société avec un statut **« Échec »** et le détail de l'erreur, au lieu de
+disparaître sans laisser de trace. Vous savez immédiatement qu'un envoi a
+été reçu mais n'a pas abouti — et pourquoi.
+
+> **🔧 Notes techniques**
+>
+> - **Cause racine (échecs muets)** : `convex/reportPipeline.ts:run` n'avait
+>   aucun try/catch et n'écrivait `status` qu'en `completed`. Tout throw après
+>   le webhook (Cerveau 1, store…) faisait échouer l'action sans rien
+>   persister — l'erreur ne vivait que dans les logs Convex. Ajout d'une
+>   internalMutation `recordFailure` + try/catch autour des étapes 1→9 :
+>   persiste une ligne `companyReports` `status:'failed'` + `error` (dédup par
+>   `agentmailMessageId`, ne dégrade jamais un `completed`), best-effort dans
+>   le catch puis re-throw pour garder le signal dans les logs/Sentry.
+> - **Fix Cerveau 1 (metrics)** : incohérence entre le schéma Zod
+>   (`metrics: [{key,value}]`) et `EXTRACTION_SYSTEM_PROMPT` (qui décrit un
+>   dict). En chemin `generateObject` le schéma pilote le modèle ; mais le
+>   fallback `generateText` (déclenché si le modèle ne supporte pas le
+>   structured output) suivait le prompt et renvoyait un dict → `safeParse`
+>   throw → pipeline mort. Nouveau helper pur `convex/lib/reportMetrics.ts`
+>   (`coerceMetrics` : dict→tableau, strings→nombres, non-numériques écartés)
+>   appliqué avant `safeParse`, shape explicitée dans le prompt fallback,
+>   couvert par `tests/reportMetrics.test.ts`.
+> - **Visibilité UI** : `companyReports.getById` expose `status` + `error` ;
+>   `CompanyReportsSection` affiche un badge « Échec » sur la carte et le
+>   détail de l'erreur dans le dialog. i18n `reports.failedDetail` (fr/en).
+> - **Non couvert (opérationnel)** : si un import échoue toujours, vérifier
+>   `OPENROUTER_API_KEY` / le slug du modèle et `AGENTMAIL_API_KEY` dans l'env
+>   Convex prod, et lire la ligne `[reportPipeline] …` des logs Convex.
+
+---
+
 ## v1.65.1 — 09/07/2026 à 14:31 — Fiche deal Royalties : saisie du CA réel réparée
 
 Sur un deal **Royalties**, cliquer sur une case **CA réel** (ou CA du BP

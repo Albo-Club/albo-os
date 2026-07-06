@@ -58,6 +58,8 @@ export const getById = query({
       fromEmail: report.fromEmail ?? null,
       subject: report.subject ?? null,
       emailDate: report.emailDate ?? null,
+      status: report.status,
+      error: report.error ?? null,
     }
   },
 })
