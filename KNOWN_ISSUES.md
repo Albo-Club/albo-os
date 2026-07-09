@@ -1789,6 +1789,27 @@ Points non-évidents :
   positionnement, aucune règle d'achèvement. Édités via le dialog partagé
   (`INSTRUMENT_FIELDS['royalty']` + `FIELD_FORMAT`).
 
+### « Deal introuvable » au clic sur une cellule = crash de render masqué
+
+- Symptôme trompeur : cliquer sur une cellule CA éditable (`EditableCa`, BP
+  initial ou Réel) faisait afficher **« Deal introuvable »**. Ce n'était pas un
+  problème de donnée : la route `deals.$dealId.tsx` utilise **le même**
+  composant `NotFound` pour `errorComponent` **et** `notFoundComponent`, donc
+  **n'importe quelle** erreur de render dans la fiche remonte à l'error boundary
+  et s'affiche comme un deal absent. Devant un « Deal introuvable » inattendu,
+  **regarder d'abord la console** (erreur React) avant de suspecter la query.
+- Cause : `EditableCa` appelait `useAmountField(draft, setDraft)` **dans** la
+  branche `if (editing)`. Passer en édition faisait apparaître un hook qui
+  n'existait pas au render précédent → `Rendered more hooks than during the
+  previous render` → crash. **Règle** : `useAmountField` (et tout hook) se
+  déclare au **top-level** du composant, ses props ne sont *spreadées* que
+  quand l'input est rendu. Même pattern déjà appliqué dans `DealFieldInput`
+  (`deals.$dealId.tsx`).
+- Filet manquant : `eslint-plugin-react-hooks` n'est **pas** dans la config
+  (`@tanstack/eslint-config` ne l'embarque pas), donc `rules-of-hooks` ne
+  détecte **pas** ce type d'appel conditionnel au lint/CI. Vérifier le
+  placement des hooks à la main tant que le plugin n'est pas ajouté.
+
 ## TRI société (liste participations) — le TRI/IRR n'est PAS additif
 
 **Le piège n°1.** Le TRI d'une société multi-deals **ne se déduit pas** des TRI
