@@ -75,6 +75,12 @@ function EditableCa({
   const { fmtEur } = useFormatters()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
+  // The amount-field hook must run on every render, not only while editing —
+  // calling it inside the `if (editing)` branch below changes the hook count
+  // when the cell toggles into edit mode and crashes the deal fiche (the route
+  // errorComponent then swallows it as "deal not found"). Same rule-of-hooks
+  // pattern as DealFieldInput. Props are only spread onto the input when open.
+  const amountProps = useAmountField(draft, setDraft)
 
   function begin() {
     setDraft(value != null ? String(value / 100) : '')
@@ -100,7 +106,7 @@ function EditableCa({
       <TableCell className={cn('text-right tabular-nums', className)}>
         <Input
           autoFocus
-          {...useAmountField(draft, setDraft)}
+          {...amountProps}
           onBlur={commit}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {

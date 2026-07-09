@@ -23,6 +23,33 @@ bas de page.
 
 ---
 
+## v1.65.1 — 09/07/2026 à 14:31 — Fiche deal Royalties : saisie du CA réel réparée
+
+Sur un deal **Royalties**, cliquer sur une case **CA réel** (ou CA du BP
+initial) du tableau trimestriel pour saisir un montant faisait quitter la
+fiche et afficher **« Deal introuvable »**, sans jamais laisser rien
+renseigner. La case s'ouvre désormais **en édition directe**, on tape le
+montant et il s'enregistre **sans changer de page**.
+
+> **🔧 Notes techniques**
+>
+> - Bug de _rules of hooks_ : `EditableCa` (`RoyaltiesPanel.tsx`) appelait
+>   `useAmountField` **dans** la branche `if (editing)`. Le passage en édition
+>   ajoutait un hook absent du render précédent → `Rendered more hooks than
+>   during the previous render`. Le hook est remonté au **top-level** du
+>   composant, ses props n'étant _spreadées_ sur l'input que quand la cellule
+>   est ouverte (même pattern que `DealFieldInput`).
+> - Pourquoi « Deal introuvable » : la route `deals.$dealId.tsx` déclare **le
+>   même** composant `NotFound` en `errorComponent` **et** `notFoundComponent`,
+>   donc tout crash de render dans la fiche s'affiche comme un deal absent. Ni
+>   donnée ni schéma touchés.
+> - Filet manquant relevé : `eslint-plugin-react-hooks` n'est pas dans la
+>   config lint (`@tanstack/eslint-config` ne l'embarque pas), d'où le passage
+>   en prod sans alerte. Piège de debug + recommandation documentés dans
+>   `KNOWN_ISSUES.md` (section panneau Royalties).
+
+---
+
 ## v1.65.0 — 03/07/2026 à 00:05 — Vue Deals : nouvelles colonnes, colonne figée et deals soldés à part
 
 La liste transversale des **deals** (par organisation et vue agrégée) adopte
