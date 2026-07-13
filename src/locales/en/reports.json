@@ -17,5 +17,9 @@
     "processed": "Processed",
     "needs_review": "Needs review",
     "rejected": "Rejected"
+  },
+  "reasons": {
+    "unknown_sender": "Unknown sender",
+    "spam": "Spam"
   }
 }

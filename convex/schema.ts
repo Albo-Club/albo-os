@@ -772,6 +772,10 @@ export default defineSchema({
       v.literal('rejected'),
     ),
     statusReason: v.optional(v.string()), // machine code, e.g. "unknown_sender"
+    // Sender authentication (brick 2): set when fromEmail matches an app user
+    // who is a member of ≥1 org. Unknown senders / spam → needs_review, and
+    // NEVER get any outbound reply (anti-enumeration).
+    senderUserId: v.optional(v.id('users')),
     error: v.optional(v.string()),
     // Fan-out targets once matched (one report per company/org) — later bricks
     reportIds: v.optional(v.array(v.id('companyReports'))),

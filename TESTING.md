@@ -490,15 +490,18 @@ Prérequis : env vars `POWENS_CLIENT_ID/SECRET/DOMAIN/REDIRECT_URI` posées ;
 | E5  | Sécurité — inspecter la réponse réseau du clic (DevTools)              | Seul `{ webviewUrl }` revient ; **aucun** `authToken`/`client_secret` dans le payload ni dans les logs Convex                       |
 | E6  | Env var manquante (test : retirer `POWENS_DOMAIN`)                     | Toast « connexion bancaire pas configurée » (`powens_env_missing`) ; aucun appel Powens                                             |
 
-## Ingestion reports (AgentMail → inboundEmails, brique 1)
+## Ingestion reports (AgentMail → inboundEmails, briques 1-2)
 
 Webhook `message.received` → `/agentmail/webhook` (signature Svix) →
-`reportInbox.ingest` (dédup par message id, insert statut `received`) →
-hydratation asynchrone du corps. Page de suivi : `/app/all/reports`.
-Prérequis : `AGENTMAIL_API_KEY`, `AGENTMAIL_WEBHOOK_SECRET` posés en prod ;
-URL webhook `<CONVEX_SITE_URL>/agentmail/webhook` configurée dans la console
-AgentMail pour l'inbox reports. Brique 1 = réception seule : pas encore
-d'auth expéditeur, de matching ni d'extraction (statut reste `received`).
+`reportInbox.ingest` (dédup par message id + **auth expéditeur inline** :
+`From` doit matcher un `users` membre d'au moins une org, sinon quarantaine
+`needs_review`/`unknown_sender` ; label AgentMail `spam` → quarantaine aussi ;
+jamais aucun mail sortant) → hydratation asynchrone du corps. Page de
+suivi : `/app/all/reports`. Prérequis : `AGENTMAIL_API_KEY`,
+`AGENTMAIL_WEBHOOK_SECRET` posés en prod ; URL webhook
+`<CONVEX_SITE_URL>/agentmail/webhook` configurée dans la console AgentMail
+pour l'inbox reports. Pas encore de matching participation ni d'extraction
+(briques 3+).
 
 | #   | Étape                                                          | Résultat attendu                                                                                            |
 | --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -508,6 +511,9 @@ d'auth expéditeur, de matching ni d'extraction (statut reste `received`).
 | R4  | Message émis par l'inbox elle-même (réponse future du récap)   | Ignoré (`{ status: "ignored", reason: "self" }`), aucune ligne                                               |
 | R5  | Signature Svix falsifiée                                       | `401`, rien écrit (cf. S5/S7)                                                                                 |
 | R6  | Accès `/app/all/reports` sans session                          | Redirect `/login` (guard `/app`) ; la query `reportInbox.list` exige un membre d'au moins une org            |
+| R7  | Forwarder depuis l'adresse d'un **membre** (Benjamin/Clément)  | Badge « Reçu » (expéditeur authentifié, `senderUserId` posé)                                                  |
+| R8  | Email envoyé par une **adresse inconnue** (tiers direct)       | Badge « À traiter » + raison « Expéditeur inconnu » ; **aucun** email sortant vers l'expéditeur (anti-énum)  |
+| R9  | Email flaggé `spam` par AgentMail                              | Badge « À traiter » + raison « Spam » ; aucun traitement, aucun mail sortant                                  |
 
 ## Pointage transaction → deal (mutations + backfill)
 
