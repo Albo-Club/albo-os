@@ -23,6 +23,19 @@ bas de page.
 
 ---
 
+## v1.65.3 — 13/07/2026 à 12:31 — Mise à jour des fiches Better Auth de l'assistant
+
+Changement interne, sans effet visible dans l'app : les fiches de référence
+Better Auth utilisées par l'assistant IA ont été resynchronisées avec leur
+version à jour en amont, et une fiche qui ne se chargeait plus a été réparée.
+
+> **🔧 Notes techniques**
+>
+> - Bump des 6 skills `better-auth/skills` au commit upstream `17dfe3a` dans `skills-lock.json`. Contenu mis à jour pour `better-auth-best-practices`, `create-auth`, `organization-best-practices`, `two-factor-authentication-best-practices` ; inchangé pour `email-and-password-best-practices` et `better-auth-security-best-practices`.
+> - Échec `skills-drift` réparé : l'upstream a renommé `security/SKILL.MD` → `security/SKILL.md` (casse du nom de fichier, `raw.githubusercontent` est sensible à la casse) ; `skillPath` corrigé dans le lock, contenu identique.
+> - Skill `create-auth-skill` renommé `create-auth` pour suivre le `name` amont : dossier `.agents/skills/`, symlink `.claude/skills/`, clé de lock et ligne du tableau `CLAUDE.md`.
+> - Diffs upstream relus un par un (aucune prompt-injection) ; re-vendorisation via `raw` (SHA résolu par `git ls-remote`, sans `--update` car `api.github.com` est bloqué dans le sandbox).
+
 ## v1.65.2 — 13/07/2026 à 11:56 — Cadre de travail de l'assistant IA
 
 Changement interne, sans effet visible dans l'app : l'assistant IA suit

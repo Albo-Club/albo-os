@@ -296,7 +296,7 @@ contourner ni `--update` à l'aveugle. Dérouler :
 | `email-and-password-best-practices`        | Email/password BA                      | `better-auth/skills`                  | ✅ officiel    |
 | `two-factor-authentication-best-practices` | 2FA / TOTP / backup codes              | `better-auth/skills`                  | ✅ officiel    |
 | `organization-best-practices`              | Plugin `organization()` BA             | `better-auth/skills`                  | ✅ officiel ⚠️ |
-| `create-auth-skill`                        | Scaffolding auth BA                    | `better-auth/skills`                  | ✅ officiel    |
+| `create-auth`                              | Scaffolding auth BA                    | `better-auth/skills`                  | ✅ officiel    |
 | `tanstack-start-best-practices`            | SSR, server functions, middleware      | `TanStack/router` (monorepo officiel) | ✅ officiel    |
 | `ai-elements`                              | Composants chat AI (panneau AiPanel)   | `vercel/ai-elements`                  | ✅ officiel    |
 
