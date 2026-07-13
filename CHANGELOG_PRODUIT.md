@@ -23,6 +23,30 @@ bas de page.
 
 ---
 
+## v1.72.0 — 13/07/2026 à 20:50 — Reports par email : récaps et file d'attente (brique 6)
+
+Sixième et dernière brique du circuit des reports par email — la boucle est
+fermée. Chaque report transféré reçoit désormais un récapitulatif **en
+réponse dans le fil même du transfert** : participation(s) rattachée(s) avec
+lien vers la fiche, période, sources traitées, métriques enregistrées, et
+trois signaux de contrôle — métriques non reconnues, valeurs inhabituelles
+par rapport au report précédent (erreur d'unité probable), et métriques
+habituellement présentes mais absentes. En cas d'échec, la réponse indique
+la raison et renvoie vers la file. Un email d'un expéditeur inconnu ou du
+spam déclenche un message séparé aux membres — jamais de réponse à
+l'inconnu. Sur la page « Reports entrants », trois actions ferment la
+boucle : **Rattacher** (choisir la participation, le traitement reprend tout
+seul), **Retraiter** (rejouer de zéro, par exemple après avoir complété une
+fiche), **Rejeter**.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau module `convex/reportNotify.ts` : `send` (success/failure/quarantine), idempotent via claim `notifiedAt` ; routing anti-énumération re-vérifié **au moment de l'envoi** (`isMemberEmail`) — membre → `replyToMessage` in-thread, sinon mail neuf aux membres (`sendMessage`, destinataires = tous les `organizationMembers`). Wrappers reply/send ré-ajoutés à `convex/agentmail.ts`.
+> - Gabarits français dans `convex/emailTemplates.ts` (§ recaps, HTML compact) : formatage cents/bps → €/%, libellés de méthode de match, détails de sources actionnables, raisons de review.
+> - Récap succès construit dans `reportStore.run` avec la mémoire PRE-stockage : non-reconnues (échec `toCanonical`), inhabituelles (ratio ≥ 8 vs dernière valeur connue, même unité), habituelles absentes. Hooks échec : `reportIdentify.setReview`, `no_content` (extraction), quarantaine à l'ingestion.
+> - Actions publiques `reportInbox` : `assignCompany` (garde `requireOrgMember` sur l'org de la cible, fan-out même domaine/nom cross-org, reprise `reportExtract`/`reportStore` selon l'état, `matchMethod: 'manual'`), `reprocess` (reset complet + re-auth du From), `reject` (`manual_reject`) + query `listAssignTargets`. Helpers factorisés `memberUserIdFor`/`requireAnyMember`.
+> - Page `/app/all/reports` : colonne Actions (Rattacher via Dialog+Select, Retraiter, Rejeter), toasts sonner, i18n fr/en. `convex/_generated/api.d.ts` re-synchronisé à la main (codegen indisponible dans l'environnement).
+
 ## v1.71.0 — 13/07/2026 à 20:20 — Reports par email : fiche, métriques et rangement (brique 5)
 
 Cinquième brique du circuit des reports par email — celle qui transforme le

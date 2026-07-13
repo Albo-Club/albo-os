@@ -213,6 +213,12 @@ export const setReview = internalMutation({
       realSenderEmail: args.realSenderEmail,
       error: args.error,
     })
+    // Failure recap (brick 6) — replied in-thread for member senders only.
+    await ctx.scheduler.runAfter(0, internal.reportNotify.send, {
+      inboundEmailId: args.inboundEmailId,
+      kind: 'failure',
+      reason: args.statusReason,
+    })
     return null
   },
 })

@@ -462,6 +462,51 @@ export const run = internalAction({
     }
 
     await ctx.runMutation(internal.reportStore.markProcessed, { inboundEmailId, reportIds })
+
+    // Success recap (brick 6): quality-control signals computed against the
+    // PRE-STORE known metrics (the memory), then sent in-thread.
+    const canonicalKeys = new Set(canonical.map((c) => c.metricType))
+    const knownMap = new Map(known.map((k) => [k.metricType, k]))
+    const unrecognized = (analysis.metrics as Array<RawMetric>)
+      .filter((m) => !toCanonical(m))
+      .map((m) => `${m.raw_label} (${m.value} ${m.unit})`)
+      .slice(0, 10)
+    const suspicious = canonical
+      .filter((c) => {
+        const k = knownMap.get(c.metricType)
+        if (!k || k.unit !== c.unit || !k.value || !c.value) return false
+        const ratio = Math.abs(c.value / k.value)
+        return ratio >= 8 || ratio <= 1 / 8
+      })
+      .map((c) => ({
+        metricType: c.metricType,
+        value: c.value,
+        unit: c.unit,
+        previousValue: knownMap.get(c.metricType)?.value ?? 0,
+      }))
+    const missingUsual = known
+      .map((k) => k.metricType)
+      .filter((k) => !canonicalKeys.has(k))
+      .slice(0, 6)
+
+    await ctx.scheduler.runAfter(0, internal.reportNotify.send, {
+      inboundEmailId,
+      kind: 'success',
+      success: {
+        reportPeriod,
+        reportType: analysis.report_type,
+        matchMethod: row.matchMethod ?? 'unknown',
+        metricsFound: canonical.map((c) => ({
+          metricType: c.metricType,
+          value: c.value,
+          unit: c.unit,
+        })),
+        suspicious,
+        unrecognized,
+        missingUsual,
+      },
+    })
+
     console.log(
       `[reportStore] ${row.agentmailMessageId}: stored ${reportIds.length} report(s), period="${reportPeriod}", ${canonical.length} canonical metrics, ${(analysis.metrics as Array<RawMetric>).length - canonical.length} raw-only`,
     )

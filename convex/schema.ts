@@ -815,6 +815,9 @@ export default defineSchema({
     // Fan-out targets once matched (one report per company/org) — later bricks
     reportIds: v.optional(v.array(v.id('companyReports'))),
     processedAt: v.optional(v.number()),
+    // Recap notification guard (brick 6): set once the recap/quarantine
+    // email went out — retries never double-send.
+    notifiedAt: v.optional(v.number()),
   })
     .index('by_message_id', ['agentmailMessageId'])
     .index('by_status', ['status']),

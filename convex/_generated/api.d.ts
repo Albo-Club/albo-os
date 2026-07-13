@@ -72,6 +72,7 @@ import type * as intelligence from "../intelligence.js";
 import type * as reportExtract from "../reportExtract.js";
 import type * as reportIdentify from "../reportIdentify.js";
 import type * as reportInbox from "../reportInbox.js";
+import type * as reportNotify from "../reportNotify.js";
 import type * as reportStore from "../reportStore.js";
 import type * as publicConfig from "../publicConfig.js";
 import type * as rateLimiters from "../rateLimiters.js";
@@ -153,6 +154,7 @@ declare const fullApi: ApiFromModules<{
   reportExtract: typeof reportExtract;
   reportIdentify: typeof reportIdentify;
   reportInbox: typeof reportInbox;
+  reportNotify: typeof reportNotify;
   reportStore: typeof reportStore;
   publicConfig: typeof publicConfig;
   rateLimiters: typeof rateLimiters;

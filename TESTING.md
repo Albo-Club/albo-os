@@ -490,7 +490,7 @@ Prérequis : env vars `POWENS_CLIENT_ID/SECRET/DOMAIN/REDIRECT_URI` posées ;
 | E5  | Sécurité — inspecter la réponse réseau du clic (DevTools)              | Seul `{ webviewUrl }` revient ; **aucun** `authToken`/`client_secret` dans le payload ni dans les logs Convex                       |
 | E6  | Env var manquante (test : retirer `POWENS_DOMAIN`)                     | Toast « connexion bancaire pas configurée » (`powens_env_missing`) ; aucun appel Powens                                             |
 
-## Ingestion reports (AgentMail → inboundEmails, briques 1-5)
+## Ingestion reports (AgentMail → inboundEmails, briques 1-6)
 
 Webhook `message.received` → `/agentmail/webhook` (signature Svix) →
 `reportInbox.ingest` (dédup par message id + **auth expéditeur inline** :
@@ -529,8 +529,19 @@ les séries). Page de suivi : `/app/all/reports`. Prérequis :
 `AGENTMAIL_API_KEY`, `AGENTMAIL_WEBHOOK_SECRET`, `OPENROUTER_API_KEY`,
 `MISTRAL_API_KEY` posés en prod ; URL webhook
 `<CONVEX_SITE_URL>/agentmail/webhook` configurée dans la console AgentMail ;
-**domaines remplis sur les `companies` portfolio**. Reste la brique 6
-(récaps in-thread + actions de la file).
+**domaines remplis sur les `companies` portfolio**. Boucle fermée par la
+brique 6 : **récaps 100 % AgentMail** (`reportNotify.send`, idempotent via
+`notifiedAt`) — succès/échec en **réponse dans le fil du forward** (routing
+anti-énumération : l'expéditeur est re-vérifié membre AU MOMENT de l'envoi ;
+non-membre → jamais de réponse, un mail **neuf** part aux membres) ; récap
+succès = participations (liens fiches) + méthode de match + sources
+✅/📦/⚠️ + métriques enregistrées / **non reconnues** / **valeurs
+inhabituelles** (×8 vs dernière valeur connue) / **habituelles absentes** ;
+quarantaine = mail neuf aux membres. **Actions de la file** (page
+`/app/all/reports`) : Rattacher (dialog participation → fan-out même
+domaine/nom → reprise du pipeline où il s'était arrêté), Retraiter (reset
+complet + re-auth), Rejeter. Gabarits français dans
+`convex/emailTemplates.ts` (§ recaps).
 
 | #   | Étape                                                          | Résultat attendu                                                                                            |
 | --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -558,6 +569,12 @@ les séries). Page de suivi : `/app/all/reports`. Prérequis :
 | R22 | Métriques standard (CA, EBITDA, cash, effectif)                 | `kpiSnapshots` alimentés en conventions (cents, bps), visibles sur la fiche ; « 1,2 M€ » stocké 120000000 cents |
 | R23 | Métrique inconnue du catalogue (ex. taux d'occupation)          | Absente des `kpiSnapshots` ; présente dans le snapshot brut du report (`rawMetrics`) — jamais de pollution des séries |
 | R24 | Rejouer `reportStore.run` sur le même mail (idempotence)        | Aucun doublon de `kpiSnapshots` (clé company+métrique+période+report) ni de report                             |
+| R25 | Forward complet réussi                                          | Récap **en réponse dans le fil** du forward : participations (liens fiches), période, sources, métriques, non-reconnues/inhabituelles/absentes ; un seul récap même si rejoué (`notifiedAt`) |
+| R26 | Forward d'un membre qui échoue (participation introuvable)      | Réponse dans le fil « Report non traité » + lien vers la file ; jamais de mail à un tiers                      |
+| R27 | Email d'un inconnu (quarantaine)                                | Mail **neuf** aux membres (« Email en quarantaine ») ; **aucune** réponse dans le fil de l'inconnu             |
+| R28 | Action « Rattacher » sur une ligne « À traiter »                | Dialog → choix participation → traitement reprend (extraction si pas faite, sinon fiche) → « Traité » + récap  |
+| R29 | Action « Retraiter »                                            | Pipeline rejoué de zéro (re-auth incluse) ; utile après avoir rempli un domaine manquant                       |
+| R30 | Action « Rejeter »                                              | Ligne « Rejeté / Rejeté manuellement », aucun traitement ni email                                              |
 
 ## Pointage transaction → deal (mutations + backfill)
 
