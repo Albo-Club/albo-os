@@ -874,7 +874,7 @@ function DealDetail() {
         <h1 className="text-2xl font-semibold tracking-tight">
           {dealTitle(deal, { withInstrument: false })}
         </h1>
-        <Badge variant={statusVariant(deal.status)}>
+        <Badge variant={statusVariant(deal.status)} className="ms-1.5">
           {t(`status.${deal.status}`, { defaultValue: deal.status })}
         </Badge>
         <ExitBadge deal={deal} transactions={txs} />

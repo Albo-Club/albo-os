@@ -14,10 +14,21 @@ import { Badge } from '~/components/ui/badge'
 
 export type EntityNature = 'company'
 
-/** Nature badge shown in the header. */
-export function EntityNatureBadge({ nature }: { nature: EntityNature }) {
+/** Nature badge shown in the header. `className` lets the header own the
+ * spacing (e.g. a bit of separation from the title). */
+export function EntityNatureBadge({
+  nature,
+  className,
+}: {
+  nature: EntityNature
+  className?: string
+}) {
   const { t } = useTranslation('participations')
-  return <Badge variant="default">{t(`nature.${nature}`)}</Badge>
+  return (
+    <Badge variant="default" className={className}>
+      {t(`nature.${nature}`)}
+    </Badge>
+  )
 }
 
 /** One labelled identity field; shows an em dash when the value is empty. */

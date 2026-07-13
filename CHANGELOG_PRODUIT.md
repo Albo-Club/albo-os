@@ -23,6 +23,27 @@ bas de page.
 
 ---
 
+## v1.73.2 — 13/07/2026 à 22:47 — Un peu d'air entre le nom d'une fiche et son badge
+
+Sur la fiche d'une entreprise et sur la fiche d'un deal, le badge affiché
+juste à droite du nom (« Entreprise », statut du deal) était collé un peu
+trop près du titre. On a ajouté un léger espace pour qu'il respire, de la
+même manière sur les deux pages.
+
+> **🔧 Notes techniques**
+>
+> - Ajout d'un `ms-1.5` sur le badge d'en-tête : cette marge inline-start
+>   (~6 px) s'ajoute au `gap-3` du header et porte l'écart nom↔badge de ~12
+>   à ~18 px, sans toucher aux autres écarts (logo↔nom, badge↔actions) ni
+>   aux vues liste (où le badge de statut vit dans sa propre colonne).
+> - `EntityNatureBadge` (`src/components/companies/EntityFiche.tsx`) accepte
+>   désormais un `className` optionnel, passé depuis le header de
+>   `participations.$companyId.tsx` — la marge vit côté header, pas dans le
+>   composant partagé.
+> - Même `ms-1.5` sur le badge de statut du header de `deals.$dealId.tsx` :
+>   les deux seuls en-têtes où un badge est directement collé au nom, gardés
+>   cohérents.
+
 ## v1.73.1 — 13/07/2026 à 22:24 — Correctif : défilement de la fenêtre « Modifier » d'une société
 
 La fenêtre « Modifier » d'une participation ou d'une entité pouvait devenir
