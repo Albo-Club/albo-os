@@ -128,6 +128,13 @@ export const getRow = internalQuery({
   },
 })
 
+export const getCompany = internalQuery({
+  args: { companyId: v.id('companies') },
+  handler: async (ctx, { companyId }) => {
+    return await ctx.db.get('companies', companyId)
+  },
+})
+
 /** All active portfolio companies across ALL orgs (the LLM's candidate list). */
 export const listCandidates = internalQuery({
   args: {},

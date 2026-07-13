@@ -26,6 +26,7 @@
     "no_match": "No matching company",
     "ambiguous": "Several possible companies",
     "identify_error": "Identification error",
-    "no_content": "No usable content"
+    "no_content": "No usable content",
+    "analyze_error": "Analysis error"
   }
 }
