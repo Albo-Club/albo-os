@@ -26,6 +26,7 @@
     "no_match": "Participation introuvable",
     "ambiguous": "Plusieurs participations possibles",
     "identify_error": "Erreur d'identification",
-    "no_content": "Aucun contenu exploitable"
+    "no_content": "Aucun contenu exploitable",
+    "analyze_error": "Erreur d'analyse"
   }
 }

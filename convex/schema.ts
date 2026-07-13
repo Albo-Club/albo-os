@@ -683,7 +683,10 @@ export default defineSchema({
         v.literal('fund_portfolio_company'),
       ),
     ),
-    metrics: v.optional(v.any()), // raw snapshot { key: number }
+    metrics: v.optional(v.any()), // flat canonical map { key: converted number }
+    // Full as-written metric snapshot (label, value, seen unit, catalog key) —
+    // the audit trail that lets normalization be replayed without the LLM.
+    rawMetrics: v.optional(v.any()),
 
     // Content (input for the synthesis brain)
     rawContent: v.optional(v.string()), // all extracted text combined

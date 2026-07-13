@@ -23,6 +23,31 @@ bas de page.
 
 ---
 
+## v1.71.0 — 13/07/2026 à 20:20 — Reports par email : fiche, métriques et rangement (brique 5)
+
+Cinquième brique du circuit des reports par email — celle qui transforme le
+contenu extrait en données exploitables. Chaque report traité produit
+désormais une fiche complète (titre, période, résumé, points clés) rangée
+sur la fiche de **chaque** entité concernée, dans les deux organisations si
+besoin, avec ses pièces jointes dans l'onglet Documents. Les métriques sont
+extraites avec un garde-fou anti-dérive : un **catalogue fermé** de
+métriques officielles (CA, EBITDA, trésorerie, effectif…), la mémoire des
+métriques déjà connues de chaque boîte pour rester cohérent d'un mois à
+l'autre, et les conversions d'unités (« 1,2 M€ », « 15 % ») faites par du
+code vérifié — jamais par l'IA. Une métrique inconnue du catalogue est
+conservée sur le report mais n'entre jamais dans les séries temporelles.
+Renvoyer un report déjà importé met à jour la fiche existante au lieu de
+créer un doublon, et la synthèse IA de la participation se relance
+automatiquement à chaque nouveau report.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau module `convex/reportStore.ts`, chaîné depuis `reportExtract.setExtraction` (verrou `markStoring`). Un appel LLM (pattern `generateObject`/fallback) produit fiche + métriques **telles qu'écrites** (valeur + unité vue : EUR/kEUR/MEUR/percent/count/months) ; devise étrangère et budget/forecast → jamais sur une clé canonique.
+> - `lib/metricCatalog.ts` : catalogue fermé (~35 clés typées eur/percent/count/months), `toCanonical` = conversion déterministe (cents, bps), rejet des clés hallucinées et unités incompatibles → snapshot brut seulement. `lib/reportPeriod.ts` : parsing déterministe des périodes (mois/trimestre/semestre/année/plage). **13 tests unitaires** ajoutés (135 au total).
+> - Rangement démultiplié : `storeForCompany` par entité matchée — `companyReports` (dédup index `by_company_period`, renvoi = patch ; nouveau champ `rawMetrics` pour le snapshot audit), `documents` par entité (blob storage partagé, jamais supprimé au re-import), `kpiSnapshots` idempotents (clé company+metricType+periodStart+`source: report:<id>`), `companyIntelligence.latestReportId` + `intelligence.runAnalysis` re-déclenchée.
+> - Mémoire anti-dérive : `knownMetrics` (dernière valeur par metricType via `by_company_metric`) injectée dans le prompt. Échec d'analyse → `needs_review`/`analyze_error`. Statut final `processed` + `reportIds` sur le courrier entrant.
+> - `convex/_generated/api.d.ts` re-synchronisé à la main (codegen indisponible dans l'environnement).
+
 ## v1.70.0 — 13/07/2026 à 19:25 — Reports par email : extraction du contenu (brique 4)
 
 Quatrième brique du circuit des reports par email. Une fois le report

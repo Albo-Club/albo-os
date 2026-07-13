@@ -490,7 +490,7 @@ Prérequis : env vars `POWENS_CLIENT_ID/SECRET/DOMAIN/REDIRECT_URI` posées ;
 | E5  | Sécurité — inspecter la réponse réseau du clic (DevTools)              | Seul `{ webviewUrl }` revient ; **aucun** `authToken`/`client_secret` dans le payload ni dans les logs Convex                       |
 | E6  | Env var manquante (test : retirer `POWENS_DOMAIN`)                     | Toast « connexion bancaire pas configurée » (`powens_env_missing`) ; aucun appel Powens                                             |
 
-## Ingestion reports (AgentMail → inboundEmails, briques 1-4)
+## Ingestion reports (AgentMail → inboundEmails, briques 1-5)
 
 Webhook `message.received` → `/agentmail/webhook` (signature Svix) →
 `reportInbox.ingest` (dédup par message id + **auth expéditeur inline** :
@@ -513,13 +513,24 @@ bloque jamais. Sources : corps, PDF et images (OCR Mistral, petites images
 docsend2pdf.com, décision validée), liens de tracking (résolus si aucun
 lien direct). PJ stockées dans le storage Convex (cap 20 Mo, au-delà =
 `failed`/`file_too_large`). Rien d'exploitable nulle part →
-`needs_review`/`no_content`. Page de suivi : `/app/all/reports` (colonnes
-Participation + Contenu ✅/📦/⚠️). Prérequis : `AGENTMAIL_API_KEY`,
-`AGENTMAIL_WEBHOOK_SECRET`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY` posés
-en prod ; URL webhook `<CONVEX_SITE_URL>/agentmail/webhook` configurée dans
-la console AgentMail ; **domaines remplis sur les `companies` portfolio**
-(sinon la corroboration retombe sur le nom seul). Pas encore de fiche
-report ni de métriques (briques 5+).
+`needs_review`/`no_content`. Après extraction : **fiche + métriques +
+rangement** (`reportStore.run`) — un appel LLM produit la fiche (titre,
+période, points clés) et les métriques **telles qu'écrites** (valeur +
+unité vue) avec le **catalogue canonique fermé** (`lib/metricCatalog`) et
+les clés déjà connues de la boîte en contexte (mémoire anti-dérive) ; la
+conversion (cents, bps) et le parsing de période sont du code
+(`lib/reportPeriod`, testés unitairement). Rangement **démultiplié** : un
+`companyReports` par entité matchée (dédup `(company, period)` → un renvoi
+met à jour), fichiers → `documents` (blob storage partagé), métriques
+canoniques → `kpiSnapshots` (idempotent par company+métrique+période+report
+source), `companyIntelligence` re-déclenchée, statut → `processed`. Une
+métrique hors catalogue reste sur le snapshot brut du report (jamais dans
+les séries). Page de suivi : `/app/all/reports`. Prérequis :
+`AGENTMAIL_API_KEY`, `AGENTMAIL_WEBHOOK_SECRET`, `OPENROUTER_API_KEY`,
+`MISTRAL_API_KEY` posés en prod ; URL webhook
+`<CONVEX_SITE_URL>/agentmail/webhook` configurée dans la console AgentMail ;
+**domaines remplis sur les `companies` portfolio**. Reste la brique 6
+(récaps in-thread + actions de la file).
 
 | #   | Étape                                                          | Résultat attendu                                                                                            |
 | --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -542,6 +553,11 @@ report ni de métriques (briques 5+).
 | R17 | Lien Notion privé comme seule source                            | ⚠️ `notion_unreachable` ; si rien d'autre d'exploitable → « À traiter / Aucun contenu exploitable »           |
 | R18 | Fichier inconnu (zip…) joint                                    | 📦 stocké sans extraction, jamais d'erreur                                                                     |
 | R19 | Google Drive non partagé « avec le lien »                       | ⚠️ `gdrive_unreachable`, le reste du mail est traité normalement                                               |
+| R20 | Forward complet d'un vrai report (PDF)                          | Statut « Traité » ; le report apparaît sur la fiche de **chaque** entité matchée (onglet Reports) avec titre, période, points clés ; les PJ dans l'onglet Documents |
+| R21 | Renvoyer le même report (même boîte, même période)              | Pas de doublon : la fiche est mise à jour, une seule ligne par période dans l'onglet Reports                  |
+| R22 | Métriques standard (CA, EBITDA, cash, effectif)                 | `kpiSnapshots` alimentés en conventions (cents, bps), visibles sur la fiche ; « 1,2 M€ » stocké 120000000 cents |
+| R23 | Métrique inconnue du catalogue (ex. taux d'occupation)          | Absente des `kpiSnapshots` ; présente dans le snapshot brut du report (`rawMetrics`) — jamais de pollution des séries |
+| R24 | Rejouer `reportStore.run` sur le même mail (idempotence)        | Aucun doublon de `kpiSnapshots` (clé company+métrique+période+report) ni de report                             |
 
 ## Pointage transaction → deal (mutations + backfill)
 
