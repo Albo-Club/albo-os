@@ -14,7 +14,8 @@
       "members": "Members",
       "invitations": "Invitations",
       "general": "General",
-      "changelog": "What's new"
+      "changelog": "What's new",
+      "reports": "Inbound reports"
     }
   },
   "comingSoon": "Coming soon",
@@ -33,7 +34,8 @@
     "members": "Members",
     "invitations": "Invitations",
     "settings": "Settings",
-    "changelog": "What's new"
+    "changelog": "What's new",
+    "reports": "Inbound reports"
   },
   "navUser": {
     "switchOrg": "Switch organization"

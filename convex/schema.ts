@@ -727,6 +727,59 @@ export default defineSchema({
     .index('by_company', ['companyId'])
     .index('by_org', ['orgId']),
 
+  /**
+   * inboundEmails — every email received on the AgentMail report inbox,
+   * recorded BEFORE any processing (store-first). The pipeline only ever
+   * advances `status`; the review-queue page reads this table. No `orgId`:
+   * a row is cross-org until a company match assigns the report(s) to org(s).
+   *
+   * Dedup: `agentmailMessageId`, enforced in `reportInbox.ingest` (Convex has
+   * no unique constraints). Body snapshots are truncated (1MB doc cap) —
+   * later pipeline stages re-fetch the full body from AgentMail when needed.
+   */
+  inboundEmails: defineTable({
+    // AgentMail provenance
+    agentmailInboxId: v.string(),
+    agentmailMessageId: v.string(), // dedup key
+    agentmailThreadId: v.optional(v.string()),
+
+    // Envelope
+    fromEmail: v.string(),
+    toEmails: v.array(v.string()),
+    ccEmails: v.array(v.string()),
+    subject: v.string(),
+    receivedAt: v.number(), // ms epoch (email date; fallback: webhook arrival)
+
+    // Content snapshot (may be hydrated async — the webhook can omit bodies)
+    bodyText: v.optional(v.string()),
+    bodyHtml: v.optional(v.string()),
+    attachments: v.array(
+      v.object({
+        attachmentId: v.string(),
+        filename: v.string(),
+        contentType: v.optional(v.string()),
+        size: v.optional(v.number()),
+        inline: v.optional(v.boolean()),
+      }),
+    ),
+
+    // Pipeline state machine
+    status: v.union(
+      v.literal('received'),
+      v.literal('processing'),
+      v.literal('processed'),
+      v.literal('needs_review'),
+      v.literal('rejected'),
+    ),
+    statusReason: v.optional(v.string()), // machine code, e.g. "unknown_sender"
+    error: v.optional(v.string()),
+    // Fan-out targets once matched (one report per company/org) — later bricks
+    reportIds: v.optional(v.array(v.id('companyReports'))),
+    processedAt: v.optional(v.number()),
+  })
+    .index('by_message_id', ['agentmailMessageId'])
+    .index('by_status', ['status']),
+
   // ─── Liabilities (equity + shareholder current accounts) ──────────────────
 
   /**

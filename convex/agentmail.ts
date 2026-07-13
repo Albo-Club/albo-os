@@ -1,9 +1,13 @@
 /**
- * AgentMail integration — REST wrapper (fetch, no SDK → runs in the default
- * Convex runtime) + the inbound webhook.
+ * AgentMail integration — REST wrapper (fetch, default Convex runtime) + the
+ * inbound webhook for the report inbox.
  *
- * Flow: `agentmailWebhook` (httpAction, Svix signature check) → normalize the
- * `message.received` event → `ctx.scheduler.runAfter(0, internal.reportPipeline.run)`.
+ * Store-first flow: `agentmailWebhook` (httpAction, Svix signature check)
+ * → normalize the `message.received` event → `internal.reportInbox.ingest`
+ * (dedup by message id + insert with status "received") → async body
+ * hydration. All further processing (sender auth, company matching,
+ * extraction) belongs to later pipeline bricks and only ever advances the
+ * `inboundEmails` status — the webhook itself never does business logic.
  *
  * REST base: https://api.agentmail.to/v0 — auth `Authorization: Bearer <key>`.
  * Pattern mirrors convex/attio.ts + convex/powens.ts (env keys, graceful
@@ -16,8 +20,7 @@ import { internal } from './_generated/api'
 
 const API_BASE = 'https://api.agentmail.to/v0'
 
-// Returns null (not throw) when unset, so a missing key degrades gracefully
-// instead of crashing the whole pipeline run.
+// Returns null (not throw) when unset, so a missing key degrades gracefully.
 function apiKey(): string | null {
   return process.env.AGENTMAIL_API_KEY ?? null
 }
@@ -35,7 +38,7 @@ function parseFromAddress(raw: string): string {
   return (angle ? angle[1] : raw).trim().toLowerCase()
 }
 
-// ─── Normalized event shape passed to the pipeline ───────────────────────────
+// ─── Normalized event shape passed to the ingest mutation ────────────────────
 
 export interface AgentmailAttachmentMeta {
   attachmentId: string
@@ -56,7 +59,7 @@ export interface AgentmailMessage {
   text: string
   html: string
   /** Presigned URL (S3) holding the full body JSON when text/html are absent
-   *  from the webhook payload. Fetched in the pipeline via fetchBody(). */
+   *  from the webhook payload. Fetched async via fetchBody(). */
   bodyUrl?: string
   date?: number // ms epoch
   attachments: Array<AgentmailAttachmentMeta>
@@ -83,6 +86,7 @@ function addrList(v: unknown): Array<string> {
  * `from_`), so we read defensively.
  */
 export function normalizeMessage(payload: Record<string, unknown>): AgentmailMessage | null {
+  // `?? payload` guarantees a non-null fallback, so no null check needed.
   const rawMsg = payload.message ?? payload.data ?? payload
   if (typeof rawMsg !== 'object') return null
   const msg = rawMsg as Record<string, unknown>
@@ -129,6 +133,8 @@ export function normalizeMessage(payload: Record<string, unknown>): AgentmailMes
   }
 }
 
+// ─── REST helpers (callable from actions) ────────────────────────────────────
+
 /**
  * Fetch the full email body from a presigned `body_url` (the webhook payload
  * omits text/html for large messages). No auth — the URL is already signed.
@@ -150,9 +156,7 @@ export async function fetchBody(bodyUrl: string): Promise<{ text: string; html: 
   }
 }
 
-// ─── REST helpers (callable from actions) ────────────────────────────────────
-
-/** Full message (used as a fallback when the webhook body was truncated >1MB). */
+/** Full message (fallback when the webhook body was truncated or absent). */
 export async function getMessage(
   inboxId: string,
   messageId: string,
@@ -171,90 +175,6 @@ export async function getMessage(
     return null
   }
   return (await res.json()) as Record<string, unknown>
-}
-
-/**
- * Download an attachment's bytes. The endpoint returns JSON (a presigned `url`
- * or base64 `content`); we handle both, plus a raw-binary fallback.
- */
-export async function downloadAttachment(
-  inboxId: string,
-  messageId: string,
-  attachmentId: string,
-): Promise<ArrayBuffer | null> {
-  const key = apiKey()
-  if (!key) {
-    console.warn('[agentmail] downloadAttachment skipped — no AGENTMAIL_API_KEY')
-    return null
-  }
-  const res = await fetch(
-    `${API_BASE}/inboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`,
-    { headers: { Authorization: `Bearer ${key}` } },
-  )
-  if (!res.ok) {
-    console.warn(`[agentmail] downloadAttachment status=${res.status}`)
-    return null
-  }
-
-  const contentType = res.headers.get('content-type') ?? ''
-  if (!contentType.includes('application/json')) {
-    return await res.arrayBuffer()
-  }
-
-  const json = (await res.json()) as Record<string, unknown>
-  const url = json.url ?? json.download_url ?? json.signed_url
-  if (typeof url === 'string') {
-    const fileRes = await fetch(url)
-    if (!fileRes.ok) {
-      console.warn(`[agentmail] attachment url fetch status=${fileRes.status}`)
-      return null
-    }
-    return await fileRes.arrayBuffer()
-  }
-  const content = json.content ?? json.data
-  if (typeof content === 'string') return base64ToArrayBuffer(content)
-
-  console.warn('[agentmail] downloadAttachment: no url/content in response')
-  return null
-}
-
-/** Reply to a message within its thread (confirmation email). */
-export async function replyToMessage(
-  inboxId: string,
-  messageId: string,
-  html: string,
-): Promise<boolean> {
-  const headers = authHeaders()
-  if (!headers) {
-    console.warn('[agentmail] reply skipped — no AGENTMAIL_API_KEY')
-    return false
-  }
-  const res = await fetch(
-    `${API_BASE}/inboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}/reply`,
-    { method: 'POST', headers, body: JSON.stringify({ html }) },
-  )
-  if (!res.ok) console.error(`[agentmail] reply status=${res.status}`)
-  return res.ok
-}
-
-/** Send a fresh message from the inbox. */
-export async function sendMessage(
-  inboxId: string,
-  to: Array<string>,
-  subject: string,
-  html: string,
-): Promise<boolean> {
-  const headers = authHeaders()
-  if (!headers) {
-    console.warn('[agentmail] send skipped — no AGENTMAIL_API_KEY')
-    return false
-  }
-  const res = await fetch(
-    `${API_BASE}/inboxes/${encodeURIComponent(inboxId)}/messages/send`,
-    { method: 'POST', headers, body: JSON.stringify({ to, subject, html }) },
-  )
-  if (!res.ok) console.error(`[agentmail] send status=${res.status}`)
-  return res.ok
 }
 
 function base64ToArrayBuffer(b64: string): ArrayBuffer {
@@ -328,6 +248,12 @@ export const agentmailWebhook = httpAction(async (ctx, request) => {
   const message = normalizeMessage(payload)
   if (!message) return new Response('Unparseable message', { status: 400 })
 
-  await ctx.scheduler.runAfter(0, internal.reportPipeline.run, { message })
-  return Response.json({ status: 'received' })
+  // Loop guard: never ingest a message sent by the inbox itself (e.g. our
+  // own confirmation replies landing back as thread activity).
+  if (message.from && message.from === message.inboxId.toLowerCase()) {
+    return Response.json({ status: 'ignored', reason: 'self' })
+  }
+
+  const inboundEmailId = await ctx.runMutation(internal.reportInbox.ingest, { message })
+  return Response.json({ status: inboundEmailId ? 'received' : 'duplicate' })
 })

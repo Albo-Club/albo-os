@@ -131,10 +131,9 @@ export const listMessages = query({
 
 const AUTO_TITLE_MAX = 60
 const ROUTE_CONTEXT_MAX = 200
-// Upper bound on a single /api/chat prompt, aligned with the LLM text ceiling
-// in reportAnalysis (MAX_TEXT = 30_000): generous for a real message, blocks
-// pathological multi-MB payloads. The rate limiter caps frequency; this caps
-// per-call size.
+// Upper bound on a single /api/chat prompt (30k chars): generous for a real
+// message, blocks pathological multi-MB payloads. The rate limiter caps
+// frequency; this caps per-call size.
 const PROMPT_MAX = 30_000
 
 // Page context forwarded from the client: current route + optionally the entity

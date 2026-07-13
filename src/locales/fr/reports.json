@@ -1,0 +1,21 @@
+{
+  "metaTitle": "Reports entrants · Albo OS",
+  "title": "Reports entrants",
+  "subtitle": "Chaque email reçu sur la boîte reports, avec son statut de traitement.",
+  "empty": "Aucun report reçu pour l'instant. Transférez un email vers la boîte reports pour le voir apparaître ici.",
+  "loading": "Chargement…",
+  "columns": {
+    "received": "Reçu le",
+    "from": "Expéditeur",
+    "subject": "Objet",
+    "attachments": "PJ",
+    "status": "Statut"
+  },
+  "status": {
+    "received": "Reçu",
+    "processing": "En traitement",
+    "processed": "Traité",
+    "needs_review": "À traiter",
+    "rejected": "Rejeté"
+  }
+}

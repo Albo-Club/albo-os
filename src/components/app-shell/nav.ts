@@ -1,5 +1,6 @@
 import {
   Handshake,
+  Inbox,
   LayoutDashboard,
   Mail,
   Megaphone,
@@ -108,6 +109,11 @@ export function getAllNavGroups(): Array<NavGroup> {
           titleKey: 'items.deals',
           to: '/app/all/deals',
           icon: Handshake,
+        },
+        {
+          titleKey: 'items.reports',
+          to: '/app/all/reports',
+          icon: Inbox,
         },
       ],
     },

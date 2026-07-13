@@ -23,6 +23,26 @@ bas de page.
 
 ---
 
+## v1.66.0 — 13/07/2026 à 17:40 — Réception des reports par email (brique 1)
+
+Première brique du nouveau circuit de traitement des reports envoyés par
+email. Chaque email transféré vers la boîte reports dédiée est désormais
+enregistré dans Albo OS dès sa réception — avant tout traitement — et visible
+sur une nouvelle page « Reports entrants » (vue toutes organisations) : date
+de réception, expéditeur, objet, nombre de pièces jointes et statut. Un même
+email reçu deux fois n'apparaît qu'une seule fois. Les étapes suivantes
+(vérification de l'expéditeur, rattachement à la participation, extraction du
+contenu et des métriques, récap) arriveront brique par brique ; l'ancienne
+version expérimentale de ce circuit a été retirée.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle table `inboundEmails` (store-first) : chaque webhook AgentMail `message.received` est inséré avec le statut `received` avant tout traitement ; dédup par `agentmailMessageId` (index `by_message_id`) dans `reportInbox.ingest` ; snapshots de corps tronqués à 100k chars (cap document 1 Mo), hydratation asynchrone via `body_url`/API quand le webhook arrive sans corps.
+> - `convex/agentmail.ts` réécrit : wrapper REST minimal (normalize, fetchBody, getMessage), vérif Svix inchangée, garde anti-boucle (message émis par l'inbox → ignoré), le webhook ne fait plus aucune logique métier.
+> - Pipeline legacy supprimé : `convex/reportPipeline.ts`, `convex/reportAnalysis.ts`, `convex/lib/reportMatching.ts`, `convex/lib/reportLinks.ts`, `convex/lib/ocr.ts` + test orphelin. Les tables `companyReports`/`documents`/`companyIntelligence` et leurs queries de lecture restent.
+> - Nouvelle page `/app/all/reports` (`src/routes/app/all/reports.tsx`) branchée sur `reportInbox.list` (accès : membre d'au moins une org, même frontière que la vue agrégée) ; entrée nav « Reports entrants », namespace i18n `reports` (fr+en).
+> - `convex/_generated/api.d.ts` synchronisé à la main (codegen indisponible dans l'environnement d'exécution — pas d'auth Convex) : à régénérer au prochain `convex dev` local.
+
 ## v1.65.3 — 13/07/2026 à 12:31 — Mise à jour des fiches Better Auth de l'assistant
 
 Changement interne, sans effet visible dans l'app : les fiches de référence
