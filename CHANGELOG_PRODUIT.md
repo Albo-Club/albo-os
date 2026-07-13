@@ -23,6 +23,41 @@ bas de page.
 
 ---
 
+## v1.73.0 — 13/07/2026 à 21:35 — Import de l'identité des participations Albo (Drive + Attio)
+
+Les fiches des participations Albo se remplissent : SIREN, raison sociale,
+secteur, nombre total d'actions (qui fait apparaître la détention globale),
+et les trois listes Fondateurs / Membres du board / Co-investisseurs,
+extraits des documents juridiques du Drive et vérifiés ligne à ligne.
+Chaque personne retrouvée dans Attio devient cliquable : son nom ouvre
+directement sa fiche Attio. Les fonds et les personnes absentes d'Attio
+restent affichés en texte simple. Une valeur déjà saisie à la main n'est
+jamais écrasée, et l'import ne s'exécute qu'après validation d'un rapport
+de contrôle.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle migration one-shot `convex/migrations/alboIdentityImport.ts`
+>   (`dryRun` / `apply` / `verify`) : 45 sociétés de l'org `albo`, ancrées
+>   par `_id` prod + garde sur le nom exact. Champs scalaires écrits
+>   seulement si `undefined` ; `people` posé seulement si la fiche n'en a
+>   aucun ; unicité SIREN re-vérifiée via l'index `by_org_siren` (conflit
+>   → rapporté, pas écrit).
+> - Données extraites des docs du dossier Drive « ⚠️ Investissements »
+>   (8 agents parallèles, chaque valeur avec doc source + citation) ; les
+>   44 SIREN passent la clé de Luhn. 158 personnes physiques résolues
+>   contre l'objet `people` d'Attio (98 liées via `attioRecordId`, dont 16
+>   « probables » signalées dans la table de revue partagée avec Benjamin).
+> - Exclusions volontaires : `totalShares` non importé pour les positions
+>   détenues via SPV (le % de détention serait faux) ou quand le chiffre
+>   documenté est périmé (Waro, Bleen) ; rien d'importé pour « LVDQ Bdv
+>   Voltaire » (aucun doc juridique n'existe encore). Runbook en tête du
+>   module ; exécution prod manuelle (snapshot → dryRun → apply → verify).
+
+---
+
+---
+
 ## v1.72.0 — 13/07/2026 à 20:50 — Reports par email : récaps et file d'attente (brique 6)
 
 Sixième et dernière brique du circuit des reports par email — la boucle est
