@@ -454,6 +454,11 @@ export const remove = mutation({
   raw unformatted string, so the euro parsers (`eurosToCents`, `parseEuros`,
   `parseAmountToCents`) work unchanged. Percentages, share counts and years
   keep the native numeric input.
+- ❌ A `DialogContent` whose content can grow tall (long lists, repeatable
+  rows, many fields) without `max-h-[85vh] overflow-y-auto`. shadcn's dialog
+  has no built-in height cap, so tall content overflows the viewport with no
+  way to reach the lower fields or the footer actions. Pattern already in
+  `deals.$dealId.tsx`, `RoyaltiesPanel.tsx`, `CompanyReportsSection.tsx`.
 - ❌ Anchor `#section` for nav between major sections.
 - ❌ Unrequested dark/light toggle.
 - ❌ `tailwind.config.js` (Tailwind v4 is CSS-first).

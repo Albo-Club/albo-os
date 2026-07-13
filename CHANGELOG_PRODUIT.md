@@ -23,6 +23,25 @@ bas de page.
 
 ---
 
+## v1.73.1 — 13/07/2026 à 22:24 — Correctif : défilement de la fenêtre « Modifier » d'une société
+
+La fenêtre « Modifier » d'une participation ou d'une entité pouvait devenir
+trop haute pour l'écran lorsqu'une société comptait beaucoup de personnes
+(fondateurs, co-investisseurs…) : le bas du formulaire et le bouton
+« Enregistrer » se retrouvaient hors de portée, sans possibilité de faire
+défiler. La fenêtre défile désormais dès que son contenu dépasse la hauteur
+de l'écran, comme les autres grandes fenêtres de l'application.
+
+> **🔧 Notes techniques**
+>
+> - `EditCompanyDialog` (`participations.$companyId.tsx`) : ajout de
+>   `max-h-[85vh] overflow-y-auto` sur le `DialogContent`, alignant le dialog
+>   sur le pattern déjà en place ailleurs (`deals.$dealId.tsx`,
+>   `RoyaltiesPanel.tsx`, `CompanyReportsSection.tsx`).
+> - Ce même dialog édite aussi bien les participations `portfolio` que les
+>   entités `group_*` (même route, même composant) : les deux cas signalés
+>   sont donc couverts par un seul correctif.
+
 ## v1.73.0 — 13/07/2026 à 21:35 — Import de l'identité des participations Albo (Drive + Attio)
 
 Les fiches des participations Albo se remplissent : SIREN, raison sociale,
