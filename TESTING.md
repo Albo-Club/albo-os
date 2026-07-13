@@ -427,7 +427,7 @@ sans snapshot (`convex export --prod`) au préalable.
 | S4  | CORS Better Auth limité à `BETTER_AUTH_URL`    | Requête depuis un autre origin → bloquée                                                        |
 | S5  | Webhooks HMAC : payload modifié → rejeté       | `POST /powens/webhook` avec `BI-Signature` invalide → `401`, rien écrit (cf. Powens ci-dessous) |
 | S6  | `pnpm build` + `pnpm start` (prod local)       | Le bundle prod tourne sans warning                                                              |
-| S7  | Webhooks fail-closed : secret d'env absent      | `POST /agentmail/webhook` alors que `AGENTMAIL_WEBHOOK_SECRET` n'est pas configuré → rejeté (le handler `throw`, HTTP `500`), aucun payload traité ni rapport planifié — comme `powens`/`attio`/`telegram`. Vérifier hors prod ou par lecture du handler ; ne pas retirer le secret en prod |
+| S7  | Webhooks fail-closed : secret d'env absent      | `POST /agentmail/webhook` alors que `AGENTMAIL_WEBHOOK_SECRET` n'est pas configuré → rejeté (le handler `throw`, HTTP `500`), aucun payload traité ni email ingéré — comme `powens`/`attio`/`telegram`. Vérifier hors prod ou par lecture du handler ; ne pas retirer le secret en prod |
 
 ## Seed dev rapide
 
@@ -489,6 +489,25 @@ Prérequis : env vars `POWENS_CLIENT_ID/SECRET/DOMAIN/REDIRECT_URI` posées ;
 | E4  | 2ᵉ clic « Connecter une banque » (même org)                            | **Pas** de nouvel appel `/auth/init` ; un seul enregistrement `powensUsers` pour l'org (dashboard Convex)                           |
 | E5  | Sécurité — inspecter la réponse réseau du clic (DevTools)              | Seul `{ webviewUrl }` revient ; **aucun** `authToken`/`client_secret` dans le payload ni dans les logs Convex                       |
 | E6  | Env var manquante (test : retirer `POWENS_DOMAIN`)                     | Toast « connexion bancaire pas configurée » (`powens_env_missing`) ; aucun appel Powens                                             |
+
+## Ingestion reports (AgentMail → inboundEmails, brique 1)
+
+Webhook `message.received` → `/agentmail/webhook` (signature Svix) →
+`reportInbox.ingest` (dédup par message id, insert statut `received`) →
+hydratation asynchrone du corps. Page de suivi : `/app/all/reports`.
+Prérequis : `AGENTMAIL_API_KEY`, `AGENTMAIL_WEBHOOK_SECRET` posés en prod ;
+URL webhook `<CONVEX_SITE_URL>/agentmail/webhook` configurée dans la console
+AgentMail pour l'inbox reports. Brique 1 = réception seule : pas encore
+d'auth expéditeur, de matching ni d'extraction (statut reste `received`).
+
+| #   | Étape                                                          | Résultat attendu                                                                                            |
+| --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| R1  | Forwarder un vrai email (avec PJ) vers l'inbox AgentMail       | Ligne visible sur `/app/all/reports` : date, expéditeur, objet, nb de PJ, badge « Reçu »                     |
+| R2  | Re-livrer le même webhook (redelivery Svix / re-forward exact) | Aucune 2ᵉ ligne (dédup `by_message_id`) ; réponse `{ status: "duplicate" }`                                  |
+| R3  | Email volumineux (corps absent du payload webhook)             | La ligne apparaît quand même ; le corps est hydraté ensuite via `body_url`/API (champ `hasBody` passe à vrai) |
+| R4  | Message émis par l'inbox elle-même (réponse future du récap)   | Ignoré (`{ status: "ignored", reason: "self" }`), aucune ligne                                               |
+| R5  | Signature Svix falsifiée                                       | `401`, rien écrit (cf. S5/S7)                                                                                 |
+| R6  | Accès `/app/all/reports` sans session                          | Redirect `/login` (guard `/app`) ; la query `reportInbox.list` exige un membre d'au moins une org            |
 
 ## Pointage transaction → deal (mutations + backfill)
 

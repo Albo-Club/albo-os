@@ -1,7 +1,7 @@
 /**
  * Public read queries for investor reports ingested by email (see
- * convex/reportPipeline.ts). Writes are internal-only; the UI reads through
- * these org-scoped queries (CompanyReportsSection).
+ * convex/reportInbox.ts for the ingestion pipeline). Writes are internal-only;
+ * the UI reads through these org-scoped queries (CompanyReportsSection).
  */
 
 import { ConvexError, v } from 'convex/values'

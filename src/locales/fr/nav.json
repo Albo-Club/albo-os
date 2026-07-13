@@ -14,7 +14,8 @@
       "members": "Membres",
       "invitations": "Invitations",
       "general": "Général",
-      "changelog": "Nouveautés"
+      "changelog": "Nouveautés",
+      "reports": "Reports entrants"
     }
   },
   "comingSoon": "Bientôt disponible",
@@ -33,7 +34,8 @@
     "members": "Membres",
     "invitations": "Invitations",
     "settings": "Paramètres",
-    "changelog": "Nouveautés"
+    "changelog": "Nouveautés",
+    "reports": "Reports entrants"
   },
   "navUser": {
     "switchOrg": "Changer d'organisation"

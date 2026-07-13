@@ -1,0 +1,21 @@
+{
+  "metaTitle": "Inbound reports · Albo OS",
+  "title": "Inbound reports",
+  "subtitle": "Every email received on the reports inbox, with its processing status.",
+  "empty": "No report received yet. Forward an email to the reports inbox to see it here.",
+  "loading": "Loading…",
+  "columns": {
+    "received": "Received",
+    "from": "From",
+    "subject": "Subject",
+    "attachments": "Files",
+    "status": "Status"
+  },
+  "status": {
+    "received": "Received",
+    "processing": "Processing",
+    "processed": "Processed",
+    "needs_review": "Needs review",
+    "rejected": "Rejected"
+  }
+}
