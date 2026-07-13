@@ -129,13 +129,21 @@ export const ingest = internalMutation({
     })
 
     // Large messages arrive without bodies in the webhook payload — hydrate
-    // from the presigned body_url (fallback: the messages API).
+    // from the presigned body_url (fallback: the messages API). For an
+    // authenticated sender, identification (brick 3) runs right after the
+    // body is available: directly, or chained after hydration.
+    const authenticated = Boolean(senderUserId)
     if (!bodyText && !bodyHtml) {
       await ctx.scheduler.runAfter(0, internal.reportInbox.hydrateBody, {
         inboundEmailId: id,
         inboxId: message.inboxId,
         messageId: message.messageId,
         bodyUrl: message.bodyUrl,
+        thenIdentify: authenticated,
+      })
+    } else if (authenticated) {
+      await ctx.scheduler.runAfter(0, internal.reportIdentify.run, {
+        inboundEmailId: id,
       })
     }
 
@@ -164,8 +172,11 @@ export const hydrateBody = internalAction({
     inboxId: v.string(),
     messageId: v.string(),
     bodyUrl: v.optional(v.string()),
+    // Chain identification (brick 3) once the body is in — only set for
+    // authenticated senders.
+    thenIdentify: v.optional(v.boolean()),
   },
-  handler: async (ctx, { inboundEmailId, inboxId, messageId, bodyUrl }) => {
+  handler: async (ctx, { inboundEmailId, inboxId, messageId, bodyUrl, thenIdentify }) => {
     let text = ''
     let html = ''
     if (bodyUrl) {
@@ -191,6 +202,11 @@ export const hydrateBody = internalAction({
     } else {
       console.warn(`[reportInbox] hydrateBody: no body found for ${messageId}`)
     }
+    // Identify even with an empty body: subject + attachments may still be
+    // enough, and a failed match lands in the review queue (never silent).
+    if (thenIdentify) {
+      await ctx.scheduler.runAfter(0, internal.reportIdentify.run, { inboundEmailId })
+    }
     return null
   },
 })
@@ -214,16 +230,29 @@ export const list = query({
 
     const rows = await ctx.db.query('inboundEmails').order('desc').take(100)
 
-    return rows.map((r) => ({
-      _id: r._id,
-      fromEmail: r.fromEmail,
-      subject: r.subject,
-      receivedAt: r.receivedAt,
-      status: r.status,
-      statusReason: r.statusReason ?? null,
-      senderVerified: Boolean(r.senderUserId),
-      attachmentsCount: r.attachments.length,
-      hasBody: Boolean(r.bodyText || r.bodyHtml),
-    }))
+    return Promise.all(
+      rows.map(async (r) => {
+        // Resolve matched participation names for display (≤100 rows × a few
+        // entities each — bounded).
+        const matched = await Promise.all(
+          (r.matchedCompanies ?? []).map(async (m) => {
+            const company = await ctx.db.get('companies', m.companyId)
+            return company?.name ?? null
+          }),
+        )
+        return {
+          _id: r._id,
+          fromEmail: r.fromEmail,
+          subject: r.subject,
+          receivedAt: r.receivedAt,
+          status: r.status,
+          statusReason: r.statusReason ?? null,
+          senderVerified: Boolean(r.senderUserId),
+          matchedNames: [...new Set(matched.filter((n): n is string => !!n))],
+          attachmentsCount: r.attachments.length,
+          hasBody: Boolean(r.bodyText || r.bodyHtml),
+        }
+      }),
+    )
   },
 })

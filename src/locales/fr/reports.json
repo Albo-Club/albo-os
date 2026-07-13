@@ -8,6 +8,7 @@
     "received": "Reçu le",
     "from": "Expéditeur",
     "subject": "Objet",
+    "participation": "Participation",
     "attachments": "PJ",
     "status": "Statut"
   },
@@ -20,6 +21,9 @@
   },
   "reasons": {
     "unknown_sender": "Expéditeur inconnu",
-    "spam": "Spam"
+    "spam": "Spam",
+    "no_match": "Participation introuvable",
+    "ambiguous": "Plusieurs participations possibles",
+    "identify_error": "Erreur d'identification"
   }
 }
