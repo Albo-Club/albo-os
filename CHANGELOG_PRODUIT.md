@@ -23,6 +23,19 @@ bas de page.
 
 ---
 
+## v1.65.2 — 13/07/2026 à 11:56 — Cadre de travail de l'assistant IA
+
+Changement interne, sans effet visible dans l'app : l'assistant IA suit
+désormais un cadre explicite avant chaque tâche de code — comprendre la
+demande, proposer un plan et le faire valider avant d'écrire, puis rester au
+plus près de ce qui est demandé sans y ajouter de « petit plus » non demandé.
+
+> **🔧 Notes techniques**
+>
+> - Section « Règles de travail » ajoutée en fin de `CLAUDE.md` (append-only, aucun contenu existant modifié).
+> - Nouveau skill `.claude/skills/golden-rules/SKILL.md` (`/golden-rules`) : reformulation de l'intention → plan-first → 5 règles d'exécution → étape de vérification.
+> - Fichier réel sous `.claude/skills/` (délibérément pas sous `.agents/skills/`, que `pnpm run sync:skills` écrase depuis l'upstream).
+
 ## v1.65.1 — 09/07/2026 à 14:31 — Fiche deal Royalties : saisie du CA réel réparée
 
 Sur un deal **Royalties**, cliquer sur une case **CA réel** (ou CA du BP
