@@ -23,6 +23,39 @@ bas de page.
 
 ---
 
+## v1.69.0 — 13/07/2026 à 20:14 — Import des instruments du portefeuille Albo
+
+Les fiches des 51 participations Albo se remplissent d'un coup : les
+caractéristiques de chaque instrument (taux et échéances des obligations,
+paramètres des contrats de royalties, valorisations et pourcentages de
+détention des tours, caps et décotes des convertibles, véhicules SPV,
+conditions de carried des SPV menés en lead) ont été extraites des documents
+juridiques du Drive, vérifiées ligne à ligne, puis importées en masse — sans
+toucher aux montants, statuts et dates déjà saisis. Chaque valeur importée est
+traçable vers son document source. Au passage, la périodicité de coupon
+« Semestriel » fait son entrée dans les fiches obligataires, et la
+participation Keenest est requalifiée en BSA Air (c'était un investissement
+direct, pas un véhicule SPV).
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle migration one-shot `convex/migrations/alboInstrumentImport.ts`
+>   (`dryRun`/`apply`/`verify`, modèle `splitAlboSponsorSpvs`) : ~46 deals
+>   patchés par `_id` prod avec garde org + nom de la cible, écriture
+>   uniquement des champs `undefined` (sauf requalification Keenest
+>   `instrumentKind`→`bsa_air`, idempotente par valeur). Données en dur dans
+>   le module, converties aux conventions du schéma (cents, bps, ms epoch,
+>   multiples décimaux).
+> - `'semestriel'` ajouté à `COUPON_PERIODICITIES`
+>   (`convex/lib/instruments.ts`) + labels `enum.couponPeriodicity` dans
+>   `src/locales/{fr,en}/participations.json` — schéma, mutations et UI
+>   suivent automatiquement.
+> - Extraction amont : 8 agents parallèles sur le Drive (dossier
+>   « ⚠️ Investissements »), ~240 valeurs sourcées (doc + citation +
+>   confiance) ; les estimations fragiles (% SPV sur émission max, valos de
+>   tours absentes des docs) ne sont volontairement PAS importées. Runbook
+>   prod dans le doc-comment du module + ligne dans `MIGRATIONS.md`.
+
 ## v1.68.0 — 13/07/2026 à 18:55 — Reports par email : rattachement automatique à la participation (brique 3)
 
 Troisième brique du circuit des reports par email. Chaque email transféré est

@@ -63,6 +63,7 @@ export const SAFE_TYPE_OPTIONS = ['safe', 'bsa_air'] as const
 export const COUPON_PERIODICITIES = [
   'mensuel',
   'trimestriel',
+  'semestriel',
   'annuel',
   'in_fine',
 ] as const
