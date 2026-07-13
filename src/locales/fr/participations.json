@@ -250,6 +250,7 @@
     "couponPeriodicity": {
       "mensuel": "Mensuel",
       "trimestriel": "Trimestriel",
+      "semestriel": "Semestriel",
       "annuel": "Annuel",
       "in_fine": "In fine"
     },
