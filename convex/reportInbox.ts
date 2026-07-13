@@ -41,6 +41,7 @@ const messageValidator = v.object({
   html: v.string(),
   bodyUrl: v.optional(v.string()),
   date: v.optional(v.number()),
+  labels: v.array(v.string()),
   attachments: v.array(attachmentValidator),
 })
 
@@ -56,6 +57,12 @@ function truncate(s: string): string | undefined {
  * Record an inbound message. Idempotent: a message id already seen returns
  * null and writes nothing (webhooks can be redelivered). Schedules async body
  * hydration when the webhook payload came without text/html.
+ *
+ * Sender authentication (brick 2) happens inline, in the same transaction:
+ * every mail is forwarded by a workspace member, so the From address must
+ * match an app user who belongs to ≥1 org. Anything else — unknown sender,
+ * or a message AgentMail flagged as spam — is quarantined (needs_review)
+ * and NEVER gets any outbound reply (anti-enumeration).
  */
 export const ingest = internalMutation({
   args: { message: messageValidator },
@@ -72,6 +79,38 @@ export const ingest = internalMutation({
     const bodyText = truncate(message.text)
     const bodyHtml = truncate(message.html)
 
+    // Brick 2 — sender authentication + spam quarantine. `message.from` is
+    // lowercased at normalization; users.email is lowercase (Better Auth).
+    // A case mismatch fails safe: the row lands in quarantine, not in the
+    // pipeline.
+    let status: 'received' | 'needs_review' = 'received'
+    let statusReason: string | undefined
+    let senderUserId: Id<'users'> | undefined
+
+    if (message.labels.includes('spam')) {
+      status = 'needs_review'
+      statusReason = 'spam'
+    } else {
+      const sender = message.from
+        ? await ctx.db
+            .query('users')
+            .withIndex('by_email', (q) => q.eq('email', message.from))
+            .first()
+        : null
+      const membership = sender
+        ? await ctx.db
+            .query('organizationMembers')
+            .withIndex('by_user', (q) => q.eq('userId', sender._id))
+            .first()
+        : null
+      if (sender && membership) {
+        senderUserId = sender._id
+      } else {
+        status = 'needs_review'
+        statusReason = 'unknown_sender'
+      }
+    }
+
     const id = await ctx.db.insert('inboundEmails', {
       agentmailInboxId: message.inboxId,
       agentmailMessageId: message.messageId,
@@ -84,7 +123,9 @@ export const ingest = internalMutation({
       bodyText,
       bodyHtml,
       attachments: message.attachments,
-      status: 'received',
+      status,
+      statusReason,
+      senderUserId,
     })
 
     // Large messages arrive without bodies in the webhook payload — hydrate
@@ -99,7 +140,7 @@ export const ingest = internalMutation({
     }
 
     console.log(
-      `[reportInbox] ingested ${message.messageId} from=${message.from} subject="${message.subject}" attachments=${message.attachments.length}`,
+      `[reportInbox] ingested ${message.messageId} from=${message.from} subject="${message.subject}" attachments=${message.attachments.length} status=${status}${statusReason ? ` reason=${statusReason}` : ''}`,
     )
     return id
   },
@@ -180,6 +221,7 @@ export const list = query({
       receivedAt: r.receivedAt,
       status: r.status,
       statusReason: r.statusReason ?? null,
+      senderVerified: Boolean(r.senderUserId),
       attachmentsCount: r.attachments.length,
       hasBody: Boolean(r.bodyText || r.bodyHtml),
     }))

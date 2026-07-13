@@ -23,6 +23,24 @@ bas de page.
 
 ---
 
+## v1.67.0 — 13/07/2026 à 18:00 — Reports par email : contrôle de l'expéditeur (brique 2)
+
+Deuxième brique du circuit des reports par email. Chaque email reçu est
+désormais authentifié dès son arrivée : seuls les emails transférés par un
+membre de l'équipe sont acceptés pour traitement. Un email venant d'une
+adresse inconnue, ou marqué comme spam, part en quarantaine — visible sur la
+page « Reports entrants » avec le badge « À traiter » et sa raison
+(« Expéditeur inconnu » ou « Spam ») — et ne reçoit jamais aucune réponse
+automatique : impossible pour un tiers de deviner que l'adresse existe.
+
+> **🔧 Notes techniques**
+>
+> - Auth expéditeur inline dans `reportInbox.ingest` (même transaction que l'insert) : `From` doit matcher un `users` (index `by_email`) membre d'au moins une org (`organizationMembers.by_user`) → `senderUserId` posé ; sinon statut `needs_review` + `statusReason: 'unknown_sender'`. Échec de casse = fail-safe vers la quarantaine.
+> - Label AgentMail `spam` (détection native) capturé dans `normalizeMessage` (nouveau champ `labels`) → quarantaine `statusReason: 'spam'` avant même le check expéditeur.
+> - Nouveau champ `inboundEmails.senderUserId` (optional) ; `reportInbox.list` expose `senderVerified` ; la page `/app/all/reports` affiche la raison à côté du badge (i18n `reports:reasons.*` fr/en).
+> - Log d'observabilité des clés du payload webhook (préparation du contrôle SPF/DKIM : on décidera sur la forme réelle des messages, cf. design).
+> - Aucun email sortant dans toute la brique (anti-énumération) — les notifications arrivent en brique 6.
+
 ## v1.66.0 — 13/07/2026 à 17:40 — Réception des reports par email (brique 1)
 
 Première brique du nouveau circuit de traitement des reports envoyés par

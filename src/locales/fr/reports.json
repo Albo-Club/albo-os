@@ -17,5 +17,9 @@
     "processed": "Traité",
     "needs_review": "À traiter",
     "rejected": "Rejeté"
+  },
+  "reasons": {
+    "unknown_sender": "Expéditeur inconnu",
+    "spam": "Spam"
   }
 }

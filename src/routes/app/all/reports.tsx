@@ -98,9 +98,18 @@ function InboundReports() {
                   {row.attachmentsCount}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={STATUS_VARIANT[row.status]}>
-                    {t(`status.${row.status}`)}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={STATUS_VARIANT[row.status]}>
+                      {t(`status.${row.status}`)}
+                    </Badge>
+                    {row.statusReason ? (
+                      <span className="text-muted-foreground text-xs">
+                        {t(`reasons.${row.statusReason}`, {
+                          defaultValue: row.statusReason,
+                        })}
+                      </span>
+                    ) : null}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
