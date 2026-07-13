@@ -511,3 +511,25 @@ Convex agent skills for common tasks can be installed by running
 `npx convex ai-files install`.
 
 <!-- convex-ai-end -->
+
+## Règles de travail (à appliquer à chaque tâche)
+
+Benjamin n'est pas développeur : il donne une intention, parfois brute.
+Ton job est de la cadrer, pas de deviner et foncer. Le piège à éviter :
+faire 99 % du demandé puis rajouter un micro-truc non demandé qui part
+de travers. C'est le "petit plus" de trop le problème, pas le manque.
+
+1. **Penser avant d'écrire.** Comprendre le problème et le code existant
+   avant de produire. Ne pas supposer — si un doute est matériel, le dire.
+2. **Penser simple.** Le minimum qui résout le problème. Rien de spéculatif :
+   pas de feature au-delà du demandé, pas d'abstraction pour un usage unique,
+   pas de gestion d'erreur pour des cas impossibles. Simplifier rend robuste.
+3. **Une chose à la fois.** Une tâche = un objectif.
+4. **Changements chirurgicaux.** Toucher uniquement ce qui est nécessaire.
+   Ne pas "améliorer" du code adjacent non demandé. Respecter le style existant.
+5. **Fidélité exacte.** Livrer ce qui est demandé — ni moins, ni plus. Pas de
+   micro-ajout "pendant que j'y suis". Un vrai problème hors périmètre : le
+   SIGNALER, pas le corriger en silence.
+
+**Mode plan systématique.** Avant d'exécuter, proposer un plan court (étapes,
+fichiers touchés, critère de succès) et attendre validation avant d'écrire du code.
