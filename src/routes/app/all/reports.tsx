@@ -72,6 +72,7 @@ function InboundReports() {
               <TableHead>{t('columns.from')}</TableHead>
               <TableHead>{t('columns.subject')}</TableHead>
               <TableHead>{t('columns.participation')}</TableHead>
+              <TableHead>{t('columns.content')}</TableHead>
               <TableHead className="text-right">
                 {t('columns.attachments')}
               </TableHead>
@@ -98,6 +99,23 @@ function InboundReports() {
                 <TableCell className="max-w-xs truncate">
                   {row.matchedNames.length > 0 ? (
                     row.matchedNames.join(', ')
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-xs">
+                  {row.sourcesSummary ? (
+                    <span>
+                      {row.sourcesSummary.extracted > 0 && (
+                        <span>✅ {row.sourcesSummary.extracted} </span>
+                      )}
+                      {row.sourcesSummary.stored > 0 && (
+                        <span>📦 {row.sourcesSummary.stored} </span>
+                      )}
+                      {row.sourcesSummary.failed > 0 && (
+                        <span>⚠️ {row.sourcesSummary.failed}</span>
+                      )}
+                    </span>
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}

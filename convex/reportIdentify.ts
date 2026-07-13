@@ -178,12 +178,15 @@ export const setMatch = internalMutation({
   },
   handler: async (ctx, args) => {
     await ctx.db.patch('inboundEmails', args.inboundEmailId, {
-      // Back to 'received': matched, waiting for the next pipeline bricks
-      // (extraction, storage). The match itself is visible on the page.
+      // Back to 'received' so the extraction claim (brick 4) can pick it up.
       status: 'received',
       matchedCompanies: args.matchedCompanies,
       matchMethod: args.matchMethod,
       realSenderEmail: args.realSenderEmail,
+    })
+    // Chain content extraction (brick 4).
+    await ctx.scheduler.runAfter(0, internal.reportExtract.run, {
+      inboundEmailId: args.inboundEmailId,
     })
     return null
   },

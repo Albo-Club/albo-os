@@ -183,6 +183,49 @@ export async function getMessage(
   return (await res.json()) as Record<string, unknown>
 }
 
+/**
+ * Download an attachment's bytes. The endpoint returns either the raw file,
+ * or JSON carrying a presigned `url` / base64 `content` — all three handled.
+ * Returns null on failure (the router records a failed source instead).
+ */
+export async function downloadAttachment(
+  inboxId: string,
+  messageId: string,
+  attachmentId: string,
+): Promise<ArrayBuffer | null> {
+  const key = apiKey()
+  if (!key) {
+    console.warn('[agentmail] downloadAttachment skipped — no AGENTMAIL_API_KEY')
+    return null
+  }
+  const res = await fetch(
+    `${API_BASE}/inboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`,
+    { headers: { Authorization: `Bearer ${key}` } },
+  )
+  if (!res.ok) {
+    console.warn(`[agentmail] downloadAttachment status=${res.status}`)
+    return null
+  }
+  const contentType = res.headers.get('content-type') ?? ''
+  if (!contentType.includes('application/json')) {
+    return await res.arrayBuffer()
+  }
+  const json = (await res.json()) as Record<string, unknown>
+  const url = json.url ?? json.download_url ?? json.signed_url
+  if (typeof url === 'string') {
+    const fileRes = await fetch(url)
+    if (!fileRes.ok) {
+      console.warn(`[agentmail] attachment url fetch status=${fileRes.status}`)
+      return null
+    }
+    return await fileRes.arrayBuffer()
+  }
+  const content = json.content ?? json.data
+  if (typeof content === 'string') return base64ToArrayBuffer(content)
+  console.warn('[agentmail] downloadAttachment: no url/content in response')
+  return null
+}
+
 function base64ToArrayBuffer(b64: string): ArrayBuffer {
   const binary = atob(b64)
   const bytes = new Uint8Array(binary.length)

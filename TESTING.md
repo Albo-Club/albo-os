@@ -490,7 +490,7 @@ Prérequis : env vars `POWENS_CLIENT_ID/SECRET/DOMAIN/REDIRECT_URI` posées ;
 | E5  | Sécurité — inspecter la réponse réseau du clic (DevTools)              | Seul `{ webviewUrl }` revient ; **aucun** `authToken`/`client_secret` dans le payload ni dans les logs Convex                       |
 | E6  | Env var manquante (test : retirer `POWENS_DOMAIN`)                     | Toast « connexion bancaire pas configurée » (`powens_env_missing`) ; aucun appel Powens                                             |
 
-## Ingestion reports (AgentMail → inboundEmails, briques 1-3)
+## Ingestion reports (AgentMail → inboundEmails, briques 1-4)
 
 Webhook `message.received` → `/agentmail/webhook` (signature Svix) →
 `reportInbox.ingest` (dédup par message id + **auth expéditeur inline** :
@@ -504,12 +504,22 @@ dur** (domaine de l'auteur réel = domaine de la boîte, ou nom présent dans
 objet/corps — jamais la parole du modèle seule), puis **démultipliée** sur
 toutes les entités de même domaine/nom (multi-orgs). Introuvable / ambigu /
 erreur LLM → `needs_review` (`no_match` / `ambiguous` / `identify_error`).
-Page de suivi : `/app/all/reports` (colonne Participation). Prérequis :
-`AGENTMAIL_API_KEY`, `AGENTMAIL_WEBHOOK_SECRET`, `OPENROUTER_API_KEY` posés
+Après le match : **extraction de contenu** (`reportExtract.run`) — routeur
+en monde fermé : chaque PJ et chaque lien finit dans exactement un de 3
+états (`extracted` / `stored` / `failed` + code), une source qui échoue ne
+bloque jamais. Sources : corps, PDF et images (OCR Mistral, petites images
+= logos ignorées), Excel/CSV (dump cellules), Notion (pages publiques,
+échec = cas courant), Google Drive (exports publics), DocSend (via
+docsend2pdf.com, décision validée), liens de tracking (résolus si aucun
+lien direct). PJ stockées dans le storage Convex (cap 20 Mo, au-delà =
+`failed`/`file_too_large`). Rien d'exploitable nulle part →
+`needs_review`/`no_content`. Page de suivi : `/app/all/reports` (colonnes
+Participation + Contenu ✅/📦/⚠️). Prérequis : `AGENTMAIL_API_KEY`,
+`AGENTMAIL_WEBHOOK_SECRET`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY` posés
 en prod ; URL webhook `<CONVEX_SITE_URL>/agentmail/webhook` configurée dans
 la console AgentMail ; **domaines remplis sur les `companies` portfolio**
-(sinon la corroboration retombe sur le nom seul). Pas encore d'extraction
-de contenu ni de métriques (briques 4+).
+(sinon la corroboration retombe sur le nom seul). Pas encore de fiche
+report ni de métriques (briques 5+).
 
 | #   | Étape                                                          | Résultat attendu                                                                                            |
 | --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -526,6 +536,12 @@ de contenu ni de métriques (briques 4+).
 | R11 | Forwarder un report ne matchant aucune participation           | Badge « À traiter » + raison « Participation introuvable » ; `realSenderEmail` posé si l'auteur réel était lisible |
 | R12 | Report d'un fonds transmettant une de ses lignes               | La participation matchée est la **cible** du report (corroborée par son nom dans le texte), pas le fonds     |
 | R13 | Sujet piégeux (nom court, mention de plateforme type LinkedIn) | Pas de faux match : corroboration domaine/nom obligatoire, emails et URLs exclus du matching par nom          |
+| R14 | Report matché avec PDF joint                                    | Colonne Contenu : ✅ ≥ 2 (corps + PDF) ; PJ dans le storage (attachments.storageId posé)                       |
+| R15 | Report avec capture d'écran de tableau collée dans le corps     | Image OCRisée (✅) ; un logo/signature (petite image) reste 📦 `small_image_skipped`                           |
+| R16 | Report avec Excel joint                                         | ✅ excel, dump cellules dans `extractedText`                                                                   |
+| R17 | Lien Notion privé comme seule source                            | ⚠️ `notion_unreachable` ; si rien d'autre d'exploitable → « À traiter / Aucun contenu exploitable »           |
+| R18 | Fichier inconnu (zip…) joint                                    | 📦 stocké sans extraction, jamais d'erreur                                                                     |
+| R19 | Google Drive non partagé « avec le lien »                       | ⚠️ `gdrive_unreachable`, le reste du mail est traité normalement                                               |
 
 ## Pointage transaction → deal (mutations + backfill)
 
