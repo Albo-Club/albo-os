@@ -8,6 +8,7 @@
     "received": "Reçu le",
     "from": "Expéditeur",
     "subject": "Objet",
+    "participation": "Participation",
     "attachments": "PJ",
     "status": "Statut"
   },
@@ -17,5 +18,12 @@
     "processed": "Traité",
     "needs_review": "À traiter",
     "rejected": "Rejeté"
+  },
+  "reasons": {
+    "unknown_sender": "Expéditeur inconnu",
+    "spam": "Spam",
+    "no_match": "Participation introuvable",
+    "ambiguous": "Plusieurs participations possibles",
+    "identify_error": "Erreur d'identification"
   }
 }

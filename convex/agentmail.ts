@@ -62,6 +62,9 @@ export interface AgentmailMessage {
    *  from the webhook payload. Fetched async via fetchBody(). */
   bodyUrl?: string
   date?: number // ms epoch
+  /** AgentMail labels, lowercased — includes "spam" when flagged by their
+   *  native spam detection. */
+  labels: Array<string>
   attachments: Array<AgentmailAttachmentMeta>
 }
 
@@ -129,6 +132,9 @@ export function normalizeMessage(payload: Record<string, unknown>): AgentmailMes
     html: String(msg.html ?? ''),
     bodyUrl: msg.body_url ? String(msg.body_url) : undefined,
     date: date && !Number.isNaN(date) ? date : undefined,
+    labels: asArray(msg.labels)
+      .map((l) => String(l).toLowerCase())
+      .filter(Boolean),
     attachments: attachments.filter((a) => a.attachmentId),
   }
 }
@@ -247,6 +253,14 @@ export const agentmailWebhook = httpAction(async (ctx, request) => {
 
   const message = normalizeMessage(payload)
   if (!message) return new Response('Unparseable message', { status: 400 })
+
+  // Observability: log the payload shape — used to discover which
+  // authentication fields (SPF/DKIM verdicts, labels) AgentMail actually
+  // exposes on real messages before wiring stricter checks (design note).
+  const rawMsg = payload.message ?? payload.data ?? payload
+  console.log(
+    `[agentmail] payload keys: [${Object.keys(payload).join(', ')}] message keys: [${Object.keys(rawMsg).join(', ')}]`,
+  )
 
   // Loop guard: never ingest a message sent by the inbox itself (e.g. our
   // own confirmation replies landing back as thread activity).

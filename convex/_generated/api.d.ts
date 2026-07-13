@@ -63,6 +63,7 @@ import type * as organizations from "../organizations.js";
 import type * as powens from "../powens.js";
 import type * as projections from "../projections.js";
 import type * as intelligence from "../intelligence.js";
+import type * as reportIdentify from "../reportIdentify.js";
 import type * as reportInbox from "../reportInbox.js";
 import type * as publicConfig from "../publicConfig.js";
 import type * as rateLimiters from "../rateLimiters.js";
@@ -135,6 +136,7 @@ declare const fullApi: ApiFromModules<{
   powens: typeof powens;
   projections: typeof projections;
   intelligence: typeof intelligence;
+  reportIdentify: typeof reportIdentify;
   reportInbox: typeof reportInbox;
   publicConfig: typeof publicConfig;
   rateLimiters: typeof rateLimiters;

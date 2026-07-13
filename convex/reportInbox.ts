@@ -41,6 +41,7 @@ const messageValidator = v.object({
   html: v.string(),
   bodyUrl: v.optional(v.string()),
   date: v.optional(v.number()),
+  labels: v.array(v.string()),
   attachments: v.array(attachmentValidator),
 })
 
@@ -56,6 +57,12 @@ function truncate(s: string): string | undefined {
  * Record an inbound message. Idempotent: a message id already seen returns
  * null and writes nothing (webhooks can be redelivered). Schedules async body
  * hydration when the webhook payload came without text/html.
+ *
+ * Sender authentication (brick 2) happens inline, in the same transaction:
+ * every mail is forwarded by a workspace member, so the From address must
+ * match an app user who belongs to ≥1 org. Anything else — unknown sender,
+ * or a message AgentMail flagged as spam — is quarantined (needs_review)
+ * and NEVER gets any outbound reply (anti-enumeration).
  */
 export const ingest = internalMutation({
   args: { message: messageValidator },
@@ -72,6 +79,38 @@ export const ingest = internalMutation({
     const bodyText = truncate(message.text)
     const bodyHtml = truncate(message.html)
 
+    // Brick 2 — sender authentication + spam quarantine. `message.from` is
+    // lowercased at normalization; users.email is lowercase (Better Auth).
+    // A case mismatch fails safe: the row lands in quarantine, not in the
+    // pipeline.
+    let status: 'received' | 'needs_review' = 'received'
+    let statusReason: string | undefined
+    let senderUserId: Id<'users'> | undefined
+
+    if (message.labels.includes('spam')) {
+      status = 'needs_review'
+      statusReason = 'spam'
+    } else {
+      const sender = message.from
+        ? await ctx.db
+            .query('users')
+            .withIndex('by_email', (q) => q.eq('email', message.from))
+            .first()
+        : null
+      const membership = sender
+        ? await ctx.db
+            .query('organizationMembers')
+            .withIndex('by_user', (q) => q.eq('userId', sender._id))
+            .first()
+        : null
+      if (sender && membership) {
+        senderUserId = sender._id
+      } else {
+        status = 'needs_review'
+        statusReason = 'unknown_sender'
+      }
+    }
+
     const id = await ctx.db.insert('inboundEmails', {
       agentmailInboxId: message.inboxId,
       agentmailMessageId: message.messageId,
@@ -84,22 +123,32 @@ export const ingest = internalMutation({
       bodyText,
       bodyHtml,
       attachments: message.attachments,
-      status: 'received',
+      status,
+      statusReason,
+      senderUserId,
     })
 
     // Large messages arrive without bodies in the webhook payload — hydrate
-    // from the presigned body_url (fallback: the messages API).
+    // from the presigned body_url (fallback: the messages API). For an
+    // authenticated sender, identification (brick 3) runs right after the
+    // body is available: directly, or chained after hydration.
+    const authenticated = Boolean(senderUserId)
     if (!bodyText && !bodyHtml) {
       await ctx.scheduler.runAfter(0, internal.reportInbox.hydrateBody, {
         inboundEmailId: id,
         inboxId: message.inboxId,
         messageId: message.messageId,
         bodyUrl: message.bodyUrl,
+        thenIdentify: authenticated,
+      })
+    } else if (authenticated) {
+      await ctx.scheduler.runAfter(0, internal.reportIdentify.run, {
+        inboundEmailId: id,
       })
     }
 
     console.log(
-      `[reportInbox] ingested ${message.messageId} from=${message.from} subject="${message.subject}" attachments=${message.attachments.length}`,
+      `[reportInbox] ingested ${message.messageId} from=${message.from} subject="${message.subject}" attachments=${message.attachments.length} status=${status}${statusReason ? ` reason=${statusReason}` : ''}`,
     )
     return id
   },
@@ -123,8 +172,11 @@ export const hydrateBody = internalAction({
     inboxId: v.string(),
     messageId: v.string(),
     bodyUrl: v.optional(v.string()),
+    // Chain identification (brick 3) once the body is in — only set for
+    // authenticated senders.
+    thenIdentify: v.optional(v.boolean()),
   },
-  handler: async (ctx, { inboundEmailId, inboxId, messageId, bodyUrl }) => {
+  handler: async (ctx, { inboundEmailId, inboxId, messageId, bodyUrl, thenIdentify }) => {
     let text = ''
     let html = ''
     if (bodyUrl) {
@@ -150,6 +202,11 @@ export const hydrateBody = internalAction({
     } else {
       console.warn(`[reportInbox] hydrateBody: no body found for ${messageId}`)
     }
+    // Identify even with an empty body: subject + attachments may still be
+    // enough, and a failed match lands in the review queue (never silent).
+    if (thenIdentify) {
+      await ctx.scheduler.runAfter(0, internal.reportIdentify.run, { inboundEmailId })
+    }
     return null
   },
 })
@@ -173,15 +230,29 @@ export const list = query({
 
     const rows = await ctx.db.query('inboundEmails').order('desc').take(100)
 
-    return rows.map((r) => ({
-      _id: r._id,
-      fromEmail: r.fromEmail,
-      subject: r.subject,
-      receivedAt: r.receivedAt,
-      status: r.status,
-      statusReason: r.statusReason ?? null,
-      attachmentsCount: r.attachments.length,
-      hasBody: Boolean(r.bodyText || r.bodyHtml),
-    }))
+    return Promise.all(
+      rows.map(async (r) => {
+        // Resolve matched participation names for display (≤100 rows × a few
+        // entities each — bounded).
+        const matched = await Promise.all(
+          (r.matchedCompanies ?? []).map(async (m) => {
+            const company = await ctx.db.get('companies', m.companyId)
+            return company?.name ?? null
+          }),
+        )
+        return {
+          _id: r._id,
+          fromEmail: r.fromEmail,
+          subject: r.subject,
+          receivedAt: r.receivedAt,
+          status: r.status,
+          statusReason: r.statusReason ?? null,
+          senderVerified: Boolean(r.senderUserId),
+          matchedNames: [...new Set(matched.filter((n): n is string => !!n))],
+          attachmentsCount: r.attachments.length,
+          hasBody: Boolean(r.bodyText || r.bodyHtml),
+        }
+      }),
+    )
   },
 })

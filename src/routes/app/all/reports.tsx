@@ -71,6 +71,7 @@ function InboundReports() {
               <TableHead>{t('columns.received')}</TableHead>
               <TableHead>{t('columns.from')}</TableHead>
               <TableHead>{t('columns.subject')}</TableHead>
+              <TableHead>{t('columns.participation')}</TableHead>
               <TableHead className="text-right">
                 {t('columns.attachments')}
               </TableHead>
@@ -94,13 +95,29 @@ function InboundReports() {
                 <TableCell className="max-w-md truncate">
                   {row.subject}
                 </TableCell>
+                <TableCell className="max-w-xs truncate">
+                  {row.matchedNames.length > 0 ? (
+                    row.matchedNames.join(', ')
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {row.attachmentsCount}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={STATUS_VARIANT[row.status]}>
-                    {t(`status.${row.status}`)}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={STATUS_VARIANT[row.status]}>
+                      {t(`status.${row.status}`)}
+                    </Badge>
+                    {row.statusReason ? (
+                      <span className="text-muted-foreground text-xs">
+                        {t(`reasons.${row.statusReason}`, {
+                          defaultValue: row.statusReason,
+                        })}
+                      </span>
+                    ) : null}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

@@ -772,6 +772,24 @@ export default defineSchema({
       v.literal('rejected'),
     ),
     statusReason: v.optional(v.string()), // machine code, e.g. "unknown_sender"
+    // Sender authentication (brick 2): set when fromEmail matches an app user
+    // who is a member of ≥1 org. Unknown senders / spam → needs_review, and
+    // NEVER get any outbound reply (anti-enumeration).
+    senderUserId: v.optional(v.id('users')),
+    // Identification (brick 3): the real author extracted from the forward
+    // wrapper, and ALL entities representing the matched participation
+    // (multi-entity / multi-org fan-out). `matchMethod` says how the LLM pick
+    // was corroborated deterministically ('domain' | 'name' | 'domain+name').
+    realSenderEmail: v.optional(v.string()),
+    matchedCompanies: v.optional(
+      v.array(
+        v.object({
+          companyId: v.id('companies'),
+          orgId: v.id('organizations'),
+        }),
+      ),
+    ),
+    matchMethod: v.optional(v.string()),
     error: v.optional(v.string()),
     // Fan-out targets once matched (one report per company/org) — later bricks
     reportIds: v.optional(v.array(v.id('companyReports'))),

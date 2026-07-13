@@ -490,15 +490,26 @@ Prérequis : env vars `POWENS_CLIENT_ID/SECRET/DOMAIN/REDIRECT_URI` posées ;
 | E5  | Sécurité — inspecter la réponse réseau du clic (DevTools)              | Seul `{ webviewUrl }` revient ; **aucun** `authToken`/`client_secret` dans le payload ni dans les logs Convex                       |
 | E6  | Env var manquante (test : retirer `POWENS_DOMAIN`)                     | Toast « connexion bancaire pas configurée » (`powens_env_missing`) ; aucun appel Powens                                             |
 
-## Ingestion reports (AgentMail → inboundEmails, brique 1)
+## Ingestion reports (AgentMail → inboundEmails, briques 1-3)
 
 Webhook `message.received` → `/agentmail/webhook` (signature Svix) →
-`reportInbox.ingest` (dédup par message id, insert statut `received`) →
-hydratation asynchrone du corps. Page de suivi : `/app/all/reports`.
-Prérequis : `AGENTMAIL_API_KEY`, `AGENTMAIL_WEBHOOK_SECRET` posés en prod ;
-URL webhook `<CONVEX_SITE_URL>/agentmail/webhook` configurée dans la console
-AgentMail pour l'inbox reports. Brique 1 = réception seule : pas encore
-d'auth expéditeur, de matching ni d'extraction (statut reste `received`).
+`reportInbox.ingest` (dédup par message id + **auth expéditeur inline** :
+`From` doit matcher un `users` membre d'au moins une org, sinon quarantaine
+`needs_review`/`unknown_sender` ; label AgentMail `spam` → quarantaine aussi ;
+jamais aucun mail sortant) → hydratation asynchrone du corps →
+**identification** (`reportIdentify.run`, expéditeurs authentifiés seulement) :
+un appel LLM voit l'email + le portefeuille des 2 orgs, propose l'auteur réel
+du forward et les entités candidates ; la proposition est **corroborée en
+dur** (domaine de l'auteur réel = domaine de la boîte, ou nom présent dans
+objet/corps — jamais la parole du modèle seule), puis **démultipliée** sur
+toutes les entités de même domaine/nom (multi-orgs). Introuvable / ambigu /
+erreur LLM → `needs_review` (`no_match` / `ambiguous` / `identify_error`).
+Page de suivi : `/app/all/reports` (colonne Participation). Prérequis :
+`AGENTMAIL_API_KEY`, `AGENTMAIL_WEBHOOK_SECRET`, `OPENROUTER_API_KEY` posés
+en prod ; URL webhook `<CONVEX_SITE_URL>/agentmail/webhook` configurée dans
+la console AgentMail ; **domaines remplis sur les `companies` portfolio**
+(sinon la corroboration retombe sur le nom seul). Pas encore d'extraction
+de contenu ni de métriques (briques 4+).
 
 | #   | Étape                                                          | Résultat attendu                                                                                            |
 | --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -508,6 +519,13 @@ d'auth expéditeur, de matching ni d'extraction (statut reste `received`).
 | R4  | Message émis par l'inbox elle-même (réponse future du récap)   | Ignoré (`{ status: "ignored", reason: "self" }`), aucune ligne                                               |
 | R5  | Signature Svix falsifiée                                       | `401`, rien écrit (cf. S5/S7)                                                                                 |
 | R6  | Accès `/app/all/reports` sans session                          | Redirect `/login` (guard `/app`) ; la query `reportInbox.list` exige un membre d'au moins une org            |
+| R7  | Forwarder depuis l'adresse d'un **membre** (Benjamin/Clément)  | Badge « Reçu » (expéditeur authentifié, `senderUserId` posé)                                                  |
+| R8  | Email envoyé par une **adresse inconnue** (tiers direct)       | Badge « À traiter » + raison « Expéditeur inconnu » ; **aucun** email sortant vers l'expéditeur (anti-énum)  |
+| R9  | Email flaggé `spam` par AgentMail                              | Badge « À traiter » + raison « Spam » ; aucun traitement, aucun mail sortant                                  |
+| R10 | Forwarder un report d'une boîte du portefeuille (domaine connu) | Colonne Participation remplie avec la/les entité(s) ; si la boîte existe dans les 2 orgs ou via plusieurs entités de même domaine → **toutes** listées |
+| R11 | Forwarder un report ne matchant aucune participation           | Badge « À traiter » + raison « Participation introuvable » ; `realSenderEmail` posé si l'auteur réel était lisible |
+| R12 | Report d'un fonds transmettant une de ses lignes               | La participation matchée est la **cible** du report (corroborée par son nom dans le texte), pas le fonds     |
+| R13 | Sujet piégeux (nom court, mention de plateforme type LinkedIn) | Pas de faux match : corroboration domaine/nom obligatoire, emails et URLs exclus du matching par nom          |
 
 ## Pointage transaction → deal (mutations + backfill)
 

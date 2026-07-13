@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.67.0 — 13/07/2026 à 20:14 — Import des instruments du portefeuille Albo
+## v1.69.0 — 13/07/2026 à 20:14 — Import des instruments du portefeuille Albo
 
 Les fiches des 51 participations Albo se remplissent d'un coup : les
 caractéristiques de chaque instrument (taux et échéances des obligations,
@@ -55,6 +55,47 @@ direct, pas un véhicule SPV).
 >   confiance) ; les estimations fragiles (% SPV sur émission max, valos de
 >   tours absentes des docs) ne sont volontairement PAS importées. Runbook
 >   prod dans le doc-comment du module + ligne dans `MIGRATIONS.md`.
+
+## v1.68.0 — 13/07/2026 à 18:55 — Reports par email : rattachement automatique à la participation (brique 3)
+
+Troisième brique du circuit des reports par email. Chaque email transféré est
+désormais rattaché automatiquement à la bonne participation : l'assistant lit
+le message (y compris le bloc de transfert pour retrouver l'auteur d'origine),
+le compare au portefeuille des deux organisations, et sa proposition n'est
+acceptée que si elle est confirmée par un signal vérifiable (le domaine email
+de l'auteur ou le nom de la boîte présent dans le message) — jamais sur sa
+seule intuition. Si la boîte existe dans les deux organisations ou via
+plusieurs entités, le rattachement s'applique à toutes. Le cas « un fonds
+transmet le report d'une de ses participations » est reconnu et rattaché à la
+bonne cible. En cas de doute (introuvable, plusieurs candidates possibles),
+l'email part en file « À traiter » avec la raison affichée, et la page
+« Reports entrants » montre désormais la participation rattachée.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau module `convex/reportIdentify.ts` : `run` (internalAction) chaîné après l'auth de la brique 2 (directement, ou après hydratation du corps via `thenIdentify`). Verrou `markProcessing` (statut `received` + `senderUserId` + pas déjà matché) contre les doubles exécutions.
+> - Appel LLM au pattern projet (`generateObject` Zod sur `getModel()` OpenRouter, fallback `generateText` + parse JSON) : candidates = toutes les `companies` kind `portfolio` non archivées des 2 orgs (id, nom, domaine, org) ; sortie = auteur réel, ids candidats, cas fonds→participation, confiance. Garde anti-injection dans le system prompt (le contenu du mail est une donnée).
+> - **Corroboration déterministe obligatoire** : domaine de l'auteur réel = `companies.domain` (freemails et domaines internes exclus), ou nom en mot entier dans objet+corps (emails/URLs strippés — leçon Albo App). Pick non corroboré = pas de match. Cas fonds : corroboration par nom uniquement.
+> - **Démultiplication** : expansion du match à toutes les entités de même domaine ou même nom (cross-org) → `inboundEmails.matchedCompanies` (+ `realSenderEmail`, `matchMethod`). Ambiguïté = clés d'identité distinctes parmi les picks corroborés → `needs_review`/`ambiguous` ; sinon `no_match` / `identify_error`.
+> - Page `/app/all/reports` : colonne Participation (noms résolus dans `reportInbox.list`) ; nouvelles raisons i18n fr/en. `convex/_generated/api.d.ts` re-synchronisé à la main (codegen indisponible dans l'environnement).
+
+## v1.67.0 — 13/07/2026 à 18:00 — Reports par email : contrôle de l'expéditeur (brique 2)
+
+Deuxième brique du circuit des reports par email. Chaque email reçu est
+désormais authentifié dès son arrivée : seuls les emails transférés par un
+membre de l'équipe sont acceptés pour traitement. Un email venant d'une
+adresse inconnue, ou marqué comme spam, part en quarantaine — visible sur la
+page « Reports entrants » avec le badge « À traiter » et sa raison
+(« Expéditeur inconnu » ou « Spam ») — et ne reçoit jamais aucune réponse
+automatique : impossible pour un tiers de deviner que l'adresse existe.
+
+> **🔧 Notes techniques**
+>
+> - Auth expéditeur inline dans `reportInbox.ingest` (même transaction que l'insert) : `From` doit matcher un `users` (index `by_email`) membre d'au moins une org (`organizationMembers.by_user`) → `senderUserId` posé ; sinon statut `needs_review` + `statusReason: 'unknown_sender'`. Échec de casse = fail-safe vers la quarantaine.
+> - Label AgentMail `spam` (détection native) capturé dans `normalizeMessage` (nouveau champ `labels`) → quarantaine `statusReason: 'spam'` avant même le check expéditeur.
+> - Nouveau champ `inboundEmails.senderUserId` (optional) ; `reportInbox.list` expose `senderVerified` ; la page `/app/all/reports` affiche la raison à côté du badge (i18n `reports:reasons.*` fr/en).
+> - Log d'observabilité des clés du payload webhook (préparation du contrôle SPF/DKIM : on décidera sur la forme réelle des messages, cf. design).
+> - Aucun email sortant dans toute la brique (anti-énumération) — les notifications arrivent en brique 6.
 
 ## v1.66.0 — 13/07/2026 à 17:40 — Réception des reports par email (brique 1)
 
