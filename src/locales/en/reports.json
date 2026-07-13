@@ -8,6 +8,7 @@
     "received": "Received",
     "from": "From",
     "subject": "Subject",
+    "participation": "Company",
     "attachments": "Files",
     "status": "Status"
   },
@@ -20,6 +21,9 @@
   },
   "reasons": {
     "unknown_sender": "Unknown sender",
-    "spam": "Spam"
+    "spam": "Spam",
+    "no_match": "No matching company",
+    "ambiguous": "Several possible companies",
+    "identify_error": "Identification error"
   }
 }
