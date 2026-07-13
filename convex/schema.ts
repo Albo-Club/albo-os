@@ -760,6 +760,8 @@ export default defineSchema({
         contentType: v.optional(v.string()),
         size: v.optional(v.number()),
         inline: v.optional(v.boolean()),
+        // Set by the content router (brick 4) once the file is in storage.
+        storageId: v.optional(v.id('_storage')),
       }),
     ),
 
@@ -790,6 +792,22 @@ export default defineSchema({
       ),
     ),
     matchMethod: v.optional(v.string()),
+    // Content router outcomes (brick 4) — closed world: every attachment and
+    // link ends in exactly one of three states. `detail` is a machine code
+    // ('ocr_failed', 'file_too_large', 'notion_unreachable', …).
+    sources: v.optional(
+      v.array(
+        v.object({
+          kind: v.string(), // 'body' | 'pdf' | 'excel' | 'image' | 'notion' | 'gdrive' | 'docsend' | 'other'
+          label: v.string(), // filename or URL
+          state: v.union(v.literal('extracted'), v.literal('stored'), v.literal('failed')),
+          detail: v.optional(v.string()),
+          chars: v.optional(v.number()),
+        }),
+      ),
+    ),
+    // Combined extracted text (bounded) — input for metric extraction (brick 5).
+    extractedText: v.optional(v.string()),
     error: v.optional(v.string()),
     // Fan-out targets once matched (one report per company/org) — later bricks
     reportIds: v.optional(v.array(v.id('companyReports'))),

@@ -23,6 +23,28 @@ bas de page.
 
 ---
 
+## v1.70.0 — 13/07/2026 à 19:25 — Reports par email : extraction du contenu (brique 4)
+
+Quatrième brique du circuit des reports par email. Une fois le report
+rattaché à sa participation, tout son contenu est extrait automatiquement :
+le corps du mail, les PDF (lecture OCR), les captures d'écran de tableaux
+collées dans le message (les logos et signatures sont ignorés), les Excel et
+CSV, les pages Notion publiques, les fichiers Google Drive partagés par lien,
+les documents DocSend, et même les liens cachés derrière des redirections de
+tracking. Chaque élément finit dans exactement un de trois états — extrait,
+stocké tel quel, ou échec signalé avec sa raison — visibles dans la nouvelle
+colonne « Contenu » (✅/📦/⚠️) : un format inconnu ne produit jamais d'erreur
+imprévue, et une source qui échoue n'empêche jamais de traiter le reste. Les
+pièces jointes sont conservées. Si aucun contenu exploitable n'est trouvé
+nulle part, l'email part en « À traiter / Aucun contenu exploitable ».
+
+> **🔧 Notes techniques**
+>
+> - Nouveau module `convex/reportExtract.ts` (routeur monde fermé), chaîné depuis `reportIdentify.setMatch` ; verrou `markExtracting` (matché + pas encore de `sources`). Résultats sur `inboundEmails` : `sources[]` (kind/label/state/detail/chars), `extractedText` (agrégé, cap 150k chars), `attachments[].storageId` (fichiers dans le storage Convex, cap 20 Mo → `file_too_large` au-delà, non stocké).
+> - Helpers : `lib/ocr.ts` (Mistral OCR PDF+images — le modèle chat OpenRouter ne lit pas les PDF, décision assumée d'un seul chemin OCR ; jamais de throw, `''` en échec), `lib/excel.ts` (dump cellules borné via `xlsx`, pas de pré-digestion — leçon « llmPrompt vide mais truthy »), `lib/notion.ts` (loadPageChunk non officiel, échec = cas nominal), `lib/reportLinks.ts` (détection Notion/GDrive/DocSend + résolution des liens de tracking seulement si aucun lien direct).
+> - `downloadAttachment` ré-ajouté au wrapper AgentMail (raw / presigned URL / base64 gérés). Petites images (<15 Ko) = logos → stockées sans OCR. GDrive : exports publics (Sheets→xlsx, Docs/Slides→pdf), page HTML de login détectée = non partagé. DocSend via docsend2pdf.com (choix validé, confidentialité assumée).
+> - Dépendance ajoutée : `xlsx`. Env requis : `MISTRAL_API_KEY` (déjà documenté dans `.env.example`). `convex/_generated/api.d.ts` re-synchronisé à la main (codegen indisponible dans l'environnement).
+
 ## v1.69.0 — 13/07/2026 à 20:14 — Import des instruments du portefeuille Albo
 
 Les fiches des 51 participations Albo se remplissent d'un coup : les

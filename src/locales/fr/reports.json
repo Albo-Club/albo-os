@@ -9,6 +9,7 @@
     "from": "Expéditeur",
     "subject": "Objet",
     "participation": "Participation",
+    "content": "Contenu",
     "attachments": "PJ",
     "status": "Statut"
   },
@@ -24,6 +25,7 @@
     "spam": "Spam",
     "no_match": "Participation introuvable",
     "ambiguous": "Plusieurs participations possibles",
-    "identify_error": "Erreur d'identification"
+    "identify_error": "Erreur d'identification",
+    "no_content": "Aucun contenu exploitable"
   }
 }

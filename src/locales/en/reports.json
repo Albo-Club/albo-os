@@ -9,6 +9,7 @@
     "from": "From",
     "subject": "Subject",
     "participation": "Company",
+    "content": "Content",
     "attachments": "Files",
     "status": "Status"
   },
@@ -24,6 +25,7 @@
     "spam": "Spam",
     "no_match": "No matching company",
     "ambiguous": "Several possible companies",
-    "identify_error": "Identification error"
+    "identify_error": "Identification error",
+    "no_content": "No usable content"
   }
 }

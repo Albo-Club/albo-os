@@ -240,6 +240,7 @@ export const list = query({
             return company?.name ?? null
           }),
         )
+        const sources = r.sources ?? []
         return {
           _id: r._id,
           fromEmail: r.fromEmail,
@@ -251,6 +252,13 @@ export const list = query({
           matchedNames: [...new Set(matched.filter((n): n is string => !!n))],
           attachmentsCount: r.attachments.length,
           hasBody: Boolean(r.bodyText || r.bodyHtml),
+          sourcesSummary: r.sources
+            ? {
+                extracted: sources.filter((s) => s.state === 'extracted').length,
+                stored: sources.filter((s) => s.state === 'stored').length,
+                failed: sources.filter((s) => s.state === 'failed').length,
+              }
+            : null,
         }
       }),
     )
