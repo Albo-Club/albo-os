@@ -218,7 +218,9 @@ function EditCompanyDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      {/* Scrollable: the people list can grow past the viewport, so the dialog
+          must scroll to keep every field and the footer actions reachable. */}
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t('participations:edit.companyTitle')}</DialogTitle>
           <DialogDescription>
