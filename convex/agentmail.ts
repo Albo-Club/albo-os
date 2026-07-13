@@ -226,6 +226,49 @@ export async function downloadAttachment(
   return null
 }
 
+/**
+ * Reply within a message's thread (success/failure recap to the forwarder).
+ * NEVER call this for a message whose sender is not an authenticated member
+ * — the reply would leak to the external sender (anti-enumeration).
+ */
+export async function replyToMessage(
+  inboxId: string,
+  messageId: string,
+  html: string,
+): Promise<boolean> {
+  const headers = authHeaders()
+  if (!headers) {
+    console.warn('[agentmail] reply skipped — no AGENTMAIL_API_KEY')
+    return false
+  }
+  const res = await fetch(
+    `${API_BASE}/inboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}/reply`,
+    { method: 'POST', headers, body: JSON.stringify({ html }) },
+  )
+  if (!res.ok) console.error(`[agentmail] reply status=${res.status}`)
+  return res.ok
+}
+
+/** Send a fresh message from the inbox (quarantine notices to the members). */
+export async function sendMessage(
+  inboxId: string,
+  to: Array<string>,
+  subject: string,
+  html: string,
+): Promise<boolean> {
+  const headers = authHeaders()
+  if (!headers) {
+    console.warn('[agentmail] send skipped — no AGENTMAIL_API_KEY')
+    return false
+  }
+  const res = await fetch(
+    `${API_BASE}/inboxes/${encodeURIComponent(inboxId)}/messages/send`,
+    { method: 'POST', headers, body: JSON.stringify({ to, subject, html }) },
+  )
+  if (!res.ok) console.error(`[agentmail] send status=${res.status}`)
+  return res.ok
+}
+
 function base64ToArrayBuffer(b64: string): ArrayBuffer {
   const binary = atob(b64)
   const bytes = new Uint8Array(binary.length)

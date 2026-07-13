@@ -482,3 +482,178 @@ export function magicLinkEmail({
 
   return { subject: c.subject, html, text: plainText(c.text) }
 }
+
+// ─── Report pipeline recaps (AgentMail, brick 6) ─────────────────────────────
+// French-only on purpose: these are internal pipeline notifications for the
+// two members (both French), sent via the AgentMail inbox — not Resend.
+// Compact inline-styled HTML (no multipart machinery needed for replies).
+
+export interface RecapMetric {
+  metricType: string
+  value: number
+  unit: string
+}
+
+export interface RecapSuspicious {
+  metricType: string
+  value: number
+  unit: string
+  previousValue: number
+}
+
+export interface RecapSource {
+  kind: string
+  label: string
+  state: 'extracted' | 'stored' | 'failed'
+  detail?: string
+}
+
+export interface ReportRecapData {
+  companies: Array<{ name: string; orgName: string; url: string | null }>
+  reportPeriod: string
+  reportType: string
+  matchMethod: string
+  sources: Array<RecapSource>
+  metricsFound: Array<RecapMetric>
+  unrecognized: Array<string>
+  suspicious: Array<RecapSuspicious>
+  missingUsual: Array<string>
+}
+
+const EUR_FMT = new Intl.NumberFormat('fr-FR', {
+  style: 'currency',
+  currency: 'EUR',
+  maximumFractionDigits: 0,
+})
+
+function formatMetricValue(value: number, unit: string): string {
+  if (unit === 'EUR_cents') return EUR_FMT.format(value / 100)
+  if (unit === 'bps') return `${(value / 100).toLocaleString('fr-FR')} %`
+  if (unit === 'months') return `${value.toLocaleString('fr-FR')} mois`
+  return value.toLocaleString('fr-FR')
+}
+
+const MATCH_METHOD_LABELS: Record<string, string> = {
+  domain: "domaine de l'expéditeur",
+  name: 'nom dans le message',
+  'domain+name': 'domaine + nom',
+  manual: 'rattachement manuel',
+}
+
+function matchMethodLabel(method: string): string {
+  const fund = method.startsWith('fund_forward:')
+  const base = fund ? method.slice('fund_forward:'.length) : method
+  const label = MATCH_METHOD_LABELS[base] ?? base
+  return fund ? `${label} (report transmis par un fonds)` : label
+}
+
+const SOURCE_DETAIL_LABELS: Record<string, string> = {
+  ocr_failed: 'lecture impossible — vérifie le fichier',
+  parse_failed: 'fichier illisible',
+  download_failed: 'téléchargement impossible',
+  file_too_large: 'fichier > 20 Mo — non conservé',
+  notion_unreachable: 'page Notion privée — partage-la publiquement puis re-transfère',
+  gdrive_unreachable: 'fichier Drive non partagé — active « accès par lien » ou joins le fichier',
+  docsend_failed: 'conversion DocSend impossible — télécharge le PDF et re-transfère',
+  small_image_skipped: 'petite image (logo) ignorée',
+  empty_workbook: 'classeur vide',
+}
+
+const REVIEW_REASON_LABELS: Record<string, string> = {
+  no_match: 'participation introuvable',
+  ambiguous: 'plusieurs participations possibles',
+  identify_error: "erreur technique pendant l'identification",
+  analyze_error: "erreur technique pendant l'analyse",
+  no_content: 'aucun contenu exploitable',
+  unknown_sender: 'expéditeur inconnu',
+  spam: 'marqué comme spam',
+}
+
+export function reviewReasonLabel(reason: string): string {
+  return REVIEW_REASON_LABELS[reason] ?? reason
+}
+
+const STATE_ICONS: Record<string, string> = {
+  extracted: '✅',
+  stored: '📦',
+  failed: '⚠️',
+}
+
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function recapShell(title: string, blocks: Array<string>): string {
+  return `<div style="font-family: ui-sans-serif, system-ui, sans-serif; font-size: 14px; color: ${BRAND}; max-width: 560px;">
+  <p style="margin: 0 0 12px; font-weight: 600;">${title}</p>
+  ${blocks.join('\n')}
+</div>`
+}
+
+function listBlock(heading: string, items: Array<string>): string {
+  if (items.length === 0) return ''
+  return `<p style="margin: 12px 0 4px; font-weight: 600;">${heading}</p>
+<ul style="margin: 0; padding-left: 18px; color: ${MUTED};">
+  ${items.map((i) => `<li style="margin: 2px 0;">${i}</li>`).join('\n  ')}
+</ul>`
+}
+
+/** Success recap — replied in the forward's thread. */
+export function reportRecapSuccessHtml(d: ReportRecapData): string {
+  const companies = d.companies
+    .map((c) => {
+      const label = `${esc(c.name)} <span style="color:${MUTED};">(${esc(c.orgName)})</span>`
+      return c.url ? `<a href="${c.url}" style="color:${BRAND};">${label}</a>` : label
+    })
+    .join(' · ')
+
+  const sources = d.sources.map((s) => {
+    const icon = STATE_ICONS[s.state] ?? ''
+    const detail = s.detail ? ` — ${esc(SOURCE_DETAIL_LABELS[s.detail] ?? s.detail)}` : ''
+    return `${icon} ${esc(s.label)}${detail}`
+  })
+
+  const metrics = d.metricsFound.map(
+    (m) => `${esc(m.metricType)} : <b>${formatMetricValue(m.value, m.unit)}</b>`,
+  )
+  const suspicious = d.suspicious.map(
+    (s) =>
+      `${esc(s.metricType)} : ${formatMetricValue(s.value, s.unit)} (précédent : ${formatMetricValue(
+        s.previousValue,
+        s.unit,
+      )}) — vérifier une éventuelle erreur d'unité`,
+  )
+
+  return recapShell(`✅ Report rangé — ${esc(d.reportPeriod)} (${esc(d.reportType)})`, [
+    `<p style="margin: 0 0 4px;">${companies}</p>`,
+    `<p style="margin: 0; color: ${MUTED};">Rattachement confirmé par : ${esc(matchMethodLabel(d.matchMethod))}</p>`,
+    listBlock('Sources', sources),
+    listBlock('Métriques enregistrées', metrics),
+    listBlock('⚠️ Valeurs inhabituelles', suspicious),
+    listBlock('Métriques non reconnues (conservées sur le report, hors séries)', d.unrecognized.map(esc)),
+    listBlock('Habituelles mais absentes de ce report', d.missingUsual.map(esc)),
+  ])
+}
+
+/** Failure recap — replied in the thread (member senders only). */
+export function reportRecapFailureHtml(reason: string, queueUrl: string): string {
+  return recapShell(`⚠️ Report non traité — ${esc(reviewReasonLabel(reason))}`, [
+    `<p style="margin: 0; color: ${MUTED};">L'email est conservé dans la file « Reports entrants ». Tu peux le rattacher à une participation ou le retraiter depuis Albo OS.</p>`,
+    `<p style="margin: 12px 0 0;"><a href="${queueUrl}" style="color:${BRAND};">Ouvrir la file des reports entrants</a></p>`,
+  ])
+}
+
+/** Quarantine notice — a FRESH email to the members (never a thread reply). */
+export function reportQuarantineHtml(
+  fromEmail: string,
+  subject: string,
+  reason: string,
+  queueUrl: string,
+): string {
+  return recapShell(`🛡️ Email en quarantaine — ${esc(reviewReasonLabel(reason))}`, [
+    `<p style="margin: 0;">Expéditeur : <b>${esc(fromEmail)}</b></p>`,
+    `<p style="margin: 4px 0 0;">Objet : ${esc(subject)}</p>`,
+    `<p style="margin: 12px 0 0; color: ${MUTED};">Aucune réponse n'a été envoyée à l'expéditeur. Si cet email est légitime, rattache-le ou retraite-le depuis la file.</p>`,
+    `<p style="margin: 12px 0 0;"><a href="${queueUrl}" style="color:${BRAND};">Ouvrir la file des reports entrants</a></p>`,
+  ])
+}

@@ -11,7 +11,8 @@
     "participation": "Company",
     "content": "Content",
     "attachments": "Files",
-    "status": "Status"
+    "status": "Status",
+    "actions": "Actions"
   },
   "status": {
     "received": "Received",
@@ -27,6 +28,25 @@
     "ambiguous": "Several possible companies",
     "identify_error": "Identification error",
     "no_content": "No usable content",
-    "analyze_error": "Analysis error"
+    "analyze_error": "Analysis error",
+    "manual_reject": "Manually rejected"
+  },
+  "actions": {
+    "assign": "Assign",
+    "reprocess": "Reprocess",
+    "reject": "Reject"
+  },
+  "assignDialog": {
+    "title": "Assign to a company",
+    "description": "The report will be attached to this company (and every entity sharing its domain or name, across all organizations), then processing resumes automatically.",
+    "placeholder": "Pick a company…",
+    "confirm": "Assign and process",
+    "cancel": "Cancel"
+  },
+  "toasts": {
+    "assigned": "Report assigned — processing resumed",
+    "reprocessed": "Processing restarted from scratch",
+    "rejected": "Email rejected",
+    "error": "Action failed — try again"
   }
 }

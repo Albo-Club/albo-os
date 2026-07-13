@@ -98,10 +98,17 @@ export const setExtraction = internalMutation({
         ? { status: 'needs_review' as const, statusReason: 'no_content' }
         : { status: 'received' as const }),
     })
-    // Chain report sheet + metrics + storage (brick 5).
+    // Chain report sheet + metrics + storage (brick 5), or notify the
+    // no-content failure (brick 6).
     if (!args.noContent) {
       await ctx.scheduler.runAfter(0, internal.reportStore.run, {
         inboundEmailId: args.inboundEmailId,
+      })
+    } else {
+      await ctx.scheduler.runAfter(0, internal.reportNotify.send, {
+        inboundEmailId: args.inboundEmailId,
+        kind: 'failure',
+        reason: 'no_content',
       })
     }
     return null

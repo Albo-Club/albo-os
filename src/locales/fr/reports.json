@@ -11,7 +11,8 @@
     "participation": "Participation",
     "content": "Contenu",
     "attachments": "PJ",
-    "status": "Statut"
+    "status": "Statut",
+    "actions": "Actions"
   },
   "status": {
     "received": "Reçu",
@@ -27,6 +28,25 @@
     "ambiguous": "Plusieurs participations possibles",
     "identify_error": "Erreur d'identification",
     "no_content": "Aucun contenu exploitable",
-    "analyze_error": "Erreur d'analyse"
+    "analyze_error": "Erreur d'analyse",
+    "manual_reject": "Rejeté manuellement"
+  },
+  "actions": {
+    "assign": "Rattacher",
+    "reprocess": "Retraiter",
+    "reject": "Rejeter"
+  },
+  "assignDialog": {
+    "title": "Rattacher à une participation",
+    "description": "Le report sera rattaché à cette participation (et à toutes les entités du même domaine ou du même nom, dans toutes les organisations), puis le traitement reprend automatiquement.",
+    "placeholder": "Choisir une participation…",
+    "confirm": "Rattacher et traiter",
+    "cancel": "Annuler"
+  },
+  "toasts": {
+    "assigned": "Report rattaché — traitement relancé",
+    "reprocessed": "Traitement relancé depuis le début",
+    "rejected": "Email rejeté",
+    "error": "Action impossible — réessaie"
   }
 }

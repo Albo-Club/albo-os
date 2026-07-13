@@ -12,9 +12,10 @@
 
 import { ConvexError, v } from 'convex/values'
 import { internal } from './_generated/api'
-import { internalAction, internalMutation, query } from './_generated/server'
+import { internalAction, internalMutation, mutation, query } from './_generated/server'
 import { fetchBody, getMessage } from './agentmail'
-import { requireAppUser } from './lib/auth'
+import { requireAppUser, requireOrgMember } from './lib/auth'
+import type { QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 
 // Keep stored body snapshots well under the 1MB Convex document cap. Later
@@ -49,6 +50,32 @@ function truncate(s: string): string | undefined {
   const trimmed = s.trim()
   if (!trimmed) return undefined
   return trimmed.length > BODY_SNAPSHOT_MAX ? trimmed.slice(0, BODY_SNAPSHOT_MAX) : trimmed
+}
+
+/** The user id when `email` belongs to a member of ≥1 org, else null. */
+async function memberUserIdFor(ctx: QueryCtx, email: string): Promise<Id<'users'> | null> {
+  if (!email) return null
+  const user = await ctx.db
+    .query('users')
+    .withIndex('by_email', (q) => q.eq('email', email))
+    .first()
+  if (!user) return null
+  const membership = await ctx.db
+    .query('organizationMembers')
+    .withIndex('by_user', (q) => q.eq('userId', user._id))
+    .first()
+  return membership ? user._id : null
+}
+
+/** Same access boundary as the aggregated view: any member of ≥1 org. */
+async function requireAnyMember(ctx: QueryCtx) {
+  const user = await requireAppUser(ctx)
+  const membership = await ctx.db
+    .query('organizationMembers')
+    .withIndex('by_user', (q) => q.eq('userId', user._id))
+    .first()
+  if (!membership) throw new ConvexError('forbidden')
+  return user
 }
 
 // ─── Ingest (called by the webhook) ──────────────────────────────────────────
@@ -91,20 +118,9 @@ export const ingest = internalMutation({
       status = 'needs_review'
       statusReason = 'spam'
     } else {
-      const sender = message.from
-        ? await ctx.db
-            .query('users')
-            .withIndex('by_email', (q) => q.eq('email', message.from))
-            .first()
-        : null
-      const membership = sender
-        ? await ctx.db
-            .query('organizationMembers')
-            .withIndex('by_user', (q) => q.eq('userId', sender._id))
-            .first()
-        : null
-      if (sender && membership) {
-        senderUserId = sender._id
+      const memberId = await memberUserIdFor(ctx, message.from)
+      if (memberId) {
+        senderUserId = memberId
       } else {
         status = 'needs_review'
         statusReason = 'unknown_sender'
@@ -144,6 +160,16 @@ export const ingest = internalMutation({
     } else if (authenticated) {
       await ctx.scheduler.runAfter(0, internal.reportIdentify.run, {
         inboundEmailId: id,
+      })
+    }
+
+    // Quarantine notice (brick 6): a FRESH email to the members — never any
+    // reply to the unknown sender (anti-enumeration).
+    if (status === 'needs_review' && statusReason) {
+      await ctx.scheduler.runAfter(0, internal.reportNotify.send, {
+        inboundEmailId: id,
+        kind: 'quarantine',
+        reason: statusReason,
       })
     }
 
@@ -221,12 +247,7 @@ export const hydrateBody = internalAction({
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requireAppUser(ctx)
-    const membership = await ctx.db
-      .query('organizationMembers')
-      .withIndex('by_user', (q) => q.eq('userId', user._id))
-      .first()
-    if (!membership) throw new ConvexError('forbidden')
+    await requireAnyMember(ctx)
 
     const rows = await ctx.db.query('inboundEmails').order('desc').take(100)
 
@@ -262,5 +283,141 @@ export const list = query({
         }
       }),
     )
+  },
+})
+
+// ─── Review-queue actions (brick 6, public) ──────────────────────────────────
+
+/** Assignable targets: the caller's orgs' active portfolio companies. */
+export const listAssignTargets = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireAnyMember(ctx)
+    const memberships = await ctx.db
+      .query('organizationMembers')
+      .withIndex('by_user', (q) => q.eq('userId', user._id))
+      .collect()
+    const out: Array<{ companyId: Id<'companies'>; name: string; orgName: string }> = []
+    for (const m of memberships) {
+      const org = await ctx.db.get('organizations', m.orgId)
+      if (!org) continue
+      const companies = await ctx.db
+        .query('companies')
+        .withIndex('by_org_kind', (q) => q.eq('orgId', m.orgId).eq('kind', 'portfolio'))
+        .collect()
+      for (const c of companies) {
+        if (c.archivedAt) continue
+        out.push({ companyId: c._id, name: c.name, orgName: org.name })
+      }
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name))
+  },
+})
+
+/**
+ * Manually attach a reviewed email to a participation, then resume the
+ * pipeline where it stopped (extraction if not done, else storage). The
+ * match fans out to every entity sharing the chosen company's domain or
+ * exact name — the same rule as automatic identification.
+ */
+export const assignCompany = mutation({
+  args: { inboundEmailId: v.id('inboundEmails'), companyId: v.id('companies') },
+  handler: async (ctx, { inboundEmailId, companyId }) => {
+    const user = await requireAppUser(ctx)
+    const row = await ctx.db.get('inboundEmails', inboundEmailId)
+    if (!row) throw new ConvexError('not_found')
+    if (row.status !== 'needs_review' && row.status !== 'rejected') {
+      throw new ConvexError('invalid_status')
+    }
+    const company = await ctx.db.get('companies', companyId)
+    if (!company || company.kind !== 'portfolio') throw new ConvexError('not_found')
+    await requireOrgMember(ctx, company.orgId)
+
+    const domain = company.domain?.toLowerCase() ?? null
+    const nameLc = company.name.toLowerCase()
+    const matched: Array<{ companyId: Id<'companies'>; orgId: Id<'organizations'> }> = []
+    const orgs = await ctx.db.query('organizations').collect()
+    for (const org of orgs) {
+      const companies = await ctx.db
+        .query('companies')
+        .withIndex('by_org_kind', (q) => q.eq('orgId', org._id).eq('kind', 'portfolio'))
+        .collect()
+      for (const c of companies) {
+        if (c.archivedAt) continue
+        const same =
+          c._id === companyId ||
+          (domain !== null && (c.domain ?? '').toLowerCase() === domain) ||
+          c.name.toLowerCase() === nameLc
+        if (same) matched.push({ companyId: c._id, orgId: c.orgId })
+      }
+    }
+
+    await ctx.db.patch('inboundEmails', inboundEmailId, {
+      status: 'received',
+      statusReason: undefined,
+      error: undefined,
+      matchedCompanies: matched,
+      matchMethod: 'manual',
+      reportIds: undefined,
+      notifiedAt: undefined,
+      // Manual assignment vouches for the mail. Recap routing still
+      // re-checks the ORIGINAL sender at send time (anti-enumeration).
+      senderUserId: row.senderUserId ?? user._id,
+    })
+    await ctx.scheduler.runAfter(
+      0,
+      row.sources ? internal.reportStore.run : internal.reportExtract.run,
+      { inboundEmailId },
+    )
+    return null
+  },
+})
+
+/** Replay the whole pipeline for a row (auth re-checked, state reset). */
+export const reprocess = mutation({
+  args: { inboundEmailId: v.id('inboundEmails') },
+  handler: async (ctx, { inboundEmailId }) => {
+    await requireAnyMember(ctx)
+    const row = await ctx.db.get('inboundEmails', inboundEmailId)
+    if (!row) throw new ConvexError('not_found')
+    if (row.status === 'processing') throw new ConvexError('invalid_status')
+
+    const senderUserId = await memberUserIdFor(ctx, row.fromEmail)
+    await ctx.db.patch('inboundEmails', inboundEmailId, {
+      status: senderUserId ? 'received' : 'needs_review',
+      statusReason: senderUserId ? undefined : 'unknown_sender',
+      senderUserId: senderUserId ?? undefined,
+      matchedCompanies: undefined,
+      matchMethod: undefined,
+      realSenderEmail: undefined,
+      sources: undefined,
+      extractedText: undefined,
+      reportIds: undefined,
+      error: undefined,
+      notifiedAt: undefined,
+      processedAt: undefined,
+    })
+    if (senderUserId) {
+      await ctx.scheduler.runAfter(0, internal.reportIdentify.run, { inboundEmailId })
+    }
+    return null
+  },
+})
+
+/** Discard a reviewed email (kept in the list, never processed). */
+export const reject = mutation({
+  args: { inboundEmailId: v.id('inboundEmails') },
+  handler: async (ctx, { inboundEmailId }) => {
+    await requireAnyMember(ctx)
+    const row = await ctx.db.get('inboundEmails', inboundEmailId)
+    if (!row) throw new ConvexError('not_found')
+    if (row.status !== 'needs_review' && row.status !== 'received') {
+      throw new ConvexError('invalid_status')
+    }
+    await ctx.db.patch('inboundEmails', inboundEmailId, {
+      status: 'rejected',
+      statusReason: 'manual_reject',
+    })
+    return null
   },
 })
