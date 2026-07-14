@@ -59,6 +59,7 @@ import {
 import { Badge } from '~/components/ui/badge'
 import { InlineField } from '~/components/ui/inline-field'
 import { Input } from '~/components/ui/input'
+import { Textarea } from '~/components/ui/textarea'
 import { AmountInput } from '~/components/ui/amount-input'
 import { eurosToCents } from '~/lib/parse'
 import { Label } from '~/components/ui/label'
@@ -133,6 +134,7 @@ function EditCompanyDialog({
     siren?: string | null
     domain?: string | null
     sector?: string | null
+    summary?: string | null
     people?: Array<PersonDraft>
   }
   orgId: Id<'organizations'>
@@ -154,6 +156,7 @@ function EditCompanyDialog({
   const [siren, setSiren] = useState(company.siren ?? '')
   const [domain, setDomain] = useState(company.domain ?? '')
   const [sector, setSector] = useState(company.sector ?? '')
+  const [summary, setSummary] = useState(company.summary ?? '')
   const [people, setPeople] = useState<Array<PersonDraft>>(company.people ?? [])
   const [pending, setPending] = useState(false)
 
@@ -187,6 +190,8 @@ function EditCompanyDialog({
           domain: domain.trim(),
           // Slug for a predefined sector, free text otherwise; '' clears it.
           sector,
+          // Trimmed backend-side; '' clears it (mirror of domain).
+          summary,
           // Full-list replacement. Trim names; keep attioRecordId when present.
           people: people.map((p) => ({
             role: p.role,
@@ -280,6 +285,20 @@ function EditCompanyDialog({
               value={sector}
               onChange={setSector}
               extraSectors={existingSectors}
+            />
+          </div>
+          {/* Summary — 2-3 line description shown under the entity page
+              header (longer than the table one-liner). Empty clears it. */}
+          <div className="space-y-2">
+            <Label htmlFor="company-summary">
+              {t('participations:edit.summaryLabel')}
+            </Label>
+            <Textarea
+              id="company-summary"
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              placeholder={t('participations:edit.summaryPlaceholder')}
+              rows={3}
             />
           </div>
           {/* People — founders / board / co-investors. Each row searches Attio
@@ -882,6 +901,13 @@ function ParticipationDetail() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        )}
+        {/* Optional 2-3 line summary — w-full wraps it onto its own row
+            under the name (the header container is flex-wrap). */}
+        {company?.summary && (
+          <p className="text-muted-foreground w-full max-w-3xl whitespace-pre-line text-sm">
+            {company.summary}
+          </p>
         )}
       </div>
 

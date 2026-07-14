@@ -249,6 +249,7 @@ export const update = mutation({
       legalForm: v.optional(v.string()),
       sector: v.optional(v.string()),
       totalShares: v.optional(v.number()),
+      summary: v.optional(v.string()),
       notes: v.optional(v.string()),
       // Full replacement of the people list (founders/board/co-investors).
       // role is enforced by the validator; name is checked non-empty below.
@@ -282,6 +283,10 @@ export const update = mutation({
     // Domain: trimmed; '' clears the field (mirror of SIREN behaviour).
     if (patch.domain !== undefined) {
       patch.domain = patch.domain.trim() || undefined
+    }
+    // Summary: trimmed; '' clears the field (mirror of domain behaviour).
+    if (patch.summary !== undefined) {
+      patch.summary = patch.summary.trim() || undefined
     }
     await ctx.db.patch("companies", id, patch)
     return id

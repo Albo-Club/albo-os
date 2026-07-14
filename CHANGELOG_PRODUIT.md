@@ -23,6 +23,27 @@ bas de page.
 
 ---
 
+## v1.80.0 — 14/07/2026 à 11:38 — Résumé de la société sur sa fiche
+
+Chaque fiche société peut maintenant porter un **résumé** de deux à trois
+lignes, affiché juste sous le nom de la société en haut de sa fiche — plus
+complet que le one-liner du tableau des entreprises, qui reste inchangé. Le
+résumé se saisit via le dialog « Modifier » de la fiche (nouveau champ
+« Résumé ») ; le vider le retire de la fiche. Le champ est prêt partout — il
+sera rempli dans un premier temps sur les participations Albo.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau champ optionnel `companies.summary` (`convex/schema.ts`), accepté
+>   par le patch de `companies.update` (`convex/companies.ts`) : trim, `''`
+>   efface (miroir de `domain`).
+> - Fiche entité (`src/routes/app/$orgSlug/participations.$companyId.tsx`) :
+>   affichage du résumé sous l'en-tête (`whitespace-pre-line`, texte muted) +
+>   `Textarea` « Résumé » dans `EditCompanyDialog`.
+> - i18n FR/EN (`participations.json` : `edit.summaryLabel`,
+>   `edit.summaryPlaceholder`) ; TESTING.md ligne ED6e. Pas de seed dans cette
+>   PR — remplissage Albo à suivre.
+
 ## v1.79.0 — 14/07/2026 à 11:38 — La page Trésorerie devient un cockpit
 
 L'onglet Aperçu de la Trésorerie est réorganisé pour répondre d'abord aux
