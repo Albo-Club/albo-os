@@ -23,6 +23,38 @@ bas de page.
 
 ---
 
+## v1.74.1 — 14/07/2026 à 09:50 — Parallel (VASCO) : première brique de connexion
+
+Vos participations, valorisations et reportings passés par **Parallel Invest**
+ne vivent aujourd'hui que sur leur plateforme — rien n'arrive par e-mail. On a
+commencé à les rapatrier dans Albo OS. Cette première étape pose la **connexion
+sécurisée** : Albo OS sait désormais s'authentifier auprès de Parallel et lire
+les données d'un véhicule, avec un accès distinct par véhicule et par entité
+(Parallel–Calte aujourd'hui, Parallel–Albo et d'autres ensuite). Rien de
+visible dans l'application pour l'instant — l'affichage des lignes, des
+valorisations et des reportings arrive dans les étapes suivantes. La connexion
+a été validée sur le vrai compte Calte (portefeuille réel : STOA Bordeaux,
+NG Invest, obligations, etc.).
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle table interne `vascoConnections` (secrets au repos, une ligne par
+>   couple client VASCO × org Albo OS, upsert sur `by_client_and_username`) et
+>   module `convex/vasco.ts` : helpers `fetch` en runtime Convex par défaut pour
+>   `POST /auth/login` → JWT et appels GraphQL authentifiés, registre de
+>   connexions (`authorizeAndListConnections`, `markConnected`, `seedConnection`)
+>   et action `fetchParticipations` (gardée par appartenance à l'org, lecture
+>   seule — aucune écriture dans les tables portefeuille à ce stade).
+> - Scoping investisseur : `api.<client>.vasco.fund` a l'introspection coupée et
+>   le persona `ROLE_DISTRIBUTED_CUSTOMER` n'accède pas à `GetAccounts` /
+>   `GetSecurities` / `GetParticipationsSummary`. Les positions se lisent via
+>   `GetUser(id).accounts` → `GetAccount(id).accountSecurityContracts` (id user
+>   extrait des claims du JWT). Détaillé dans `KNOWN_ISSUES.md` « VASCO API ».
+> - `convex/_generated/api.d.ts` synchronisé à la main (ajout du module `vasco`)
+>   car `convex codegen` exige un déploiement authentifié, indisponible dans
+>   l'environnement distant ; `pnpm dev` le régénère à l'identique. `pnpm lint`
+>   et `pnpm test:unit` au vert.
+
 ## v1.74.0 — 14/07/2026 à 10:05 — Trésorerie : solde disponible, grandes catégories et classement automatique
 
 Premier jalon de la refonte de la trésorerie (socle du futur prévisionnel).
