@@ -30,6 +30,7 @@ import {
 } from './_generated/server'
 import { getModel } from './agent'
 import { normalizeDomain } from './lib/domain'
+import { applyPitchToDomainGroup, pickCanonicalPitch } from './lib/pitch'
 import { htmlToText } from './lib/reportLinks'
 
 // Homepage text passed to the LLM (title + meta description + body text).
@@ -40,12 +41,29 @@ export const getTarget = internalQuery({
   handler: async (ctx, { companyId }) => {
     const company = await ctx.db.get('companies', companyId)
     if (!company) return null
+    const domain = company.domain ?? null
+    // Domain group = every non-archived entity of the org sharing the domain
+    // (just this company when it has no domain). Same-domain entities must end
+    // up with the SAME pitch (cf. convex/lib/pitch.ts).
+    let group = [company]
+    if (domain) {
+      const all = await ctx.db
+        .query('companies')
+        .withIndex('by_org', (q) => q.eq('orgId', company.orgId))
+        .collect()
+      group = all.filter((c) => c.archivedAt == null && c.domain === domain)
+    }
+    const needsFill = group.some(
+      (c) => c.oneLiner === undefined || c.summary === undefined,
+    )
+    const canonical = pickCanonicalPitch(group)
     return {
       name: company.name,
       kind: company.kind,
-      domain: company.domain ?? null,
-      hasOneLiner: company.oneLiner !== undefined,
-      hasSummary: company.summary !== undefined,
+      domain,
+      needsFill,
+      canonicalOneLiner: canonical?.oneLiner ?? null,
+      canonicalSummary: canonical?.summary ?? null,
     }
   },
 })
@@ -59,15 +77,24 @@ export const applyEnrichment = internalMutation({
   handler: async (ctx, { companyId, oneLiner, summary }) => {
     const company = await ctx.db.get('companies', companyId)
     if (!company) return null
-    // Additive: re-checked at write time (a hand edit may have landed while
-    // the action was fetching the site).
-    const patch: { oneLiner?: string; summary?: string } = {}
-    if (oneLiner?.trim() && company.oneLiner === undefined)
-      patch.oneLiner = oneLiner.trim()
-    if (summary?.trim() && company.summary === undefined)
-      patch.summary = summary.trim()
-    if (Object.keys(patch).length > 0)
-      await ctx.db.patch('companies', companyId, patch)
+    const fields: { oneLiner?: string; summary?: string } = {}
+    if (oneLiner?.trim()) fields.oneLiner = oneLiner.trim()
+    if (summary?.trim()) fields.summary = summary.trim()
+    if (Object.keys(fields).length === 0) return null
+    // Additive fill. With a domain, fill every same-domain sibling that's
+    // still empty, so the group converges to one text; without a domain, just
+    // this company. Never overwrites a hand-entered value.
+    if (company.domain) {
+      await applyPitchToDomainGroup(ctx, company.orgId, company.domain, fields, 'fill')
+    } else {
+      const patch: { oneLiner?: string; summary?: string } = {}
+      if (fields.oneLiner && company.oneLiner === undefined)
+        patch.oneLiner = fields.oneLiner
+      if (fields.summary && company.summary === undefined)
+        patch.summary = fields.summary
+      if (Object.keys(patch).length > 0)
+        await ctx.db.patch('companies', companyId, patch)
+    }
     return null
   },
 })
@@ -135,15 +162,27 @@ export const enrich = internalAction({
       name: string
       kind: string
       domain: string | null
-      hasOneLiner: boolean
-      hasSummary: boolean
+      needsFill: boolean
+      canonicalOneLiner: string | null
+      canonicalSummary: string | null
     } | null = await ctx.runQuery(internal.companyEnrichment.getTarget, {
       companyId,
     })
     // A pitch is meaningless for group/legal entities — portfolio only.
     if (!target || target.kind !== 'portfolio') return null
-    if (!target.domain || (target.hasOneLiner && target.hasSummary))
+    // Whole domain group already has both fields → nothing to do.
+    if (!target.domain || !target.needsFill) return null
+
+    // A same-domain sibling already carries a complete pitch → reuse it (no
+    // LLM call, and the group stays identical) instead of paraphrasing.
+    if (target.canonicalOneLiner && target.canonicalSummary) {
+      await ctx.runMutation(internal.companyEnrichment.applyEnrichment, {
+        companyId,
+        oneLiner: target.canonicalOneLiner,
+        summary: target.canonicalSummary,
+      })
       return null
+    }
 
     const siteText = await fetchSiteText(target.domain)
     if (!siteText) {
