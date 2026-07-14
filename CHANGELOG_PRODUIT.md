@@ -23,6 +23,56 @@ bas de page.
 
 ---
 
+## v1.75.0 — 14/07/2026 à 10:30 — Prévisionnel de trésorerie par catégorie : la grille réalisé / engagé / prévu
+
+Deuxième jalon de la refonte de la trésorerie : le prévisionnel devient
+lisible et honnête.
+
+**Une grille catégories × mois.** Sous la courbe, un tableau croise chaque
+grande catégorie avec les mois passés et à venir : le passé montre le
+réalisé (ce qui s'est vraiment passé), le futur montre ce qui est engagé et
+ce qui est prévu, et la dernière ligne donne le solde projeté mois par
+mois. Le mois en cours fusionne les deux mondes : le réalisé à date, plus
+le « reste à venir ».
+
+**Fini le double comptage.** Une échéance prévue qui s'est déjà réalisée ce
+mois-ci ne compte plus deux fois : le réalisé consomme le prévu, catégorie
+par catégorie. Et une échéance en retard (prévue le mois dernier, jamais
+passée en banque) reste attendue — elle glisse sur le mois en cours au lieu
+de disparaître en silence.
+
+**Deux courbes de certitude.** La projection distingue désormais le
+scénario « engagé » (les flux confirmés uniquement) du scénario « avec
+prévu » (tout compris) — deux trajectoires superposées sur le graphique.
+
+**Le reste à déployer, enfin visible.** Une carte affiche le capital engagé
+sur les deals signés qui n'a pas encore été versé — deal par deal. Ce sont
+des obligations réelles sans date : elles sont comptées à part, jamais
+inventées dans la courbe.
+
+**Les prévisions parlent la même langue que le réalisé.** Les règles
+récurrentes et les échéances ponctuelles se rangent dans les mêmes grandes
+catégories que les transactions (salaires, loyers, deals, comptes
+courants…) via un sélecteur — plus de texte libre.
+
+> **🔧 Notes techniques**
+>
+> - Moteur pur `convex/lib/recurrence.ts:buildForecastGrid` (testé par
+>   `tests/forecastGrid.test.ts`) : axe mois historique→horizon,
+>   consommation par cellule (direction × catégorie) sur le mois courant
+>   (engagé d'abord, puis prévu avec le reliquat), rollover des échéances
+>   en retard, projection cumulée en deux scénarios.
+> - Query `forecasts.getForecastGrid` (périmètre = comptes EUR disponibles,
+>   buckets réalisés via `effectiveCategory`) + `getCommittedPipeline`
+>   (reste à déployer = `committedAmount` − Versé dérivé des transactions).
+> - `ForecastOverview.tsx` remplace `ForecastChartCard` (courbe 2 séries
+>   projetées via `ForecastChart` remanié, carte pipeline, grille) ;
+>   sélecteurs de catégorie dans `RuleDialog`/`EntryDialog`
+>   (`forecastCategories(direction)`, clear via `null` dans
+>   `updateRule`/`updateEntry`).
+> - `getForecastBalance` (outil agent/MCP) garde l'ancienne sémantique
+>   fenêtrée — divergence documentée dans `KNOWN_ISSUES.md`.
+
 ## v1.74.1 — 14/07/2026 à 09:50 — Parallel (VASCO) : première brique de connexion
 
 Vos participations, valorisations et reportings passés par **Parallel Invest**

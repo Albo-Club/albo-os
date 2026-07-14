@@ -6,9 +6,9 @@ import { ConvexError } from 'convex/values'
 import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
-import { ForecastChart } from './ForecastChart'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
+import { forecastCategories } from '~/lib/categories'
 import { directionTone } from '~/lib/moneyTone'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
@@ -39,11 +39,8 @@ import {
   TableRow,
 } from '~/components/ui/table'
 
-const HORIZONS = [6, 12, 24] as const
 // Post-save expansion covers the largest displayable horizon.
 const EXPAND_MONTHS = 24
-// Depth of the actual history shown ahead of the projection.
-const HISTORY_MONTHS = 6
 const FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'yearly'] as const
 type Frequency = (typeof FREQUENCIES)[number]
 
@@ -60,6 +57,44 @@ function parseEuros(raw: string): number | null {
   const value = Number(cleaned)
   if (!Number.isFinite(value) || value <= 0) return null
   return Math.round(value * 100)
+}
+
+const NO_CATEGORY = 'none'
+
+/**
+ * Forecast category selector (rules + one-off entries): slugs scoped to
+ * the direction (src/lib/categories.ts), labels from `common:categories`,
+ * plus a "—" none option. A legacy free-text category (pre-slug rows)
+ * shows as-is until re-selected.
+ */
+function ForecastCategorySelect({
+  direction,
+  value,
+  onChange,
+}: {
+  direction: 'in' | 'out'
+  value: string
+  onChange: (value: string) => void
+}) {
+  const { t } = useTranslation('common')
+  const options = forecastCategories(direction)
+  const isLegacy = value !== NO_CATEGORY && !options.includes(value)
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={NO_CATEGORY}>—</SelectItem>
+        {isLegacy && <SelectItem value={value}>{value}</SelectItem>}
+        {options.map((slug) => (
+          <SelectItem key={slug} value={slug}>
+            {t(`categories.${slug}`, { defaultValue: slug })}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
 }
 
 function RuleDialog({
@@ -84,6 +119,7 @@ function RuleDialog({
   const [direction, setDirection] = useState<'in' | 'out'>(
     rule?.direction ?? 'out',
   )
+  const [category, setCategory] = useState(rule?.category ?? NO_CATEGORY)
   const [frequency, setFrequency] = useState<Frequency>(
     rule?.frequency ?? 'monthly',
   )
@@ -121,6 +157,8 @@ function RuleDialog({
             label: label.trim(),
             amountCents,
             direction,
+            // null clears a previously set category ("—" selected).
+            category: category === NO_CATEGORY ? null : category,
             frequency,
             anchorDay: anchor,
             startDate: startMs,
@@ -134,6 +172,7 @@ function RuleDialog({
           label: label.trim(),
           amountCents,
           direction,
+          category: category === NO_CATEGORY ? undefined : category,
           frequency,
           anchorDay: anchor,
           startDate: startMs,
@@ -196,7 +235,18 @@ function RuleDialog({
               <Label>{t('cash:forecast.rules.directionLabel')}</Label>
               <Select
                 value={direction}
-                onValueChange={(value) => setDirection(value as 'in' | 'out')}
+                onValueChange={(value) => {
+                  const next = value as 'in' | 'out'
+                  setDirection(next)
+                  // The category lists differ per direction — drop a slug
+                  // that no longer applies.
+                  if (
+                    category !== NO_CATEGORY &&
+                    !forecastCategories(next).includes(category)
+                  ) {
+                    setCategory(NO_CATEGORY)
+                  }
+                }}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -211,6 +261,14 @@ function RuleDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label>{t('cash:forecast.rules.categoryLabel')}</Label>
+            <ForecastCategorySelect
+              direction={direction}
+              value={category}
+              onChange={setCategory}
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -295,71 +353,6 @@ function RuleDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
-}
-
-/**
- * Cash flow forecast curve: projected balance (actual balance + pending
- * forecastEntries via getForecastBalance) with a selectable horizon. Shown at
- * the top of the Cash « Aperçu » tab.
- */
-export function ForecastChartCard({ orgId }: { orgId: Id<'organizations'> }) {
-  const { t } = useTranslation(['cash', 'common'])
-  const { fmtEur } = useFormatters()
-  const [horizon, setHorizon] = useState<(typeof HORIZONS)[number]>(12)
-
-  const balance = useConvexQuery(api.forecasts.getForecastBalance, {
-    orgId,
-    horizonMonths: horizon,
-    historyMonths: HISTORY_MONTHS,
-  })
-
-  return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold tracking-tight">
-          {t('cash:forecast.title')}
-        </h2>
-        <Select
-          value={String(horizon)}
-          onValueChange={(value) =>
-            setHorizon(Number(value) as (typeof HORIZONS)[number])
-          }
-        >
-          <SelectTrigger className="w-32">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {HORIZONS.map((months) => (
-              <SelectItem key={months} value={String(months)}>
-                {t('cash:forecast.horizonMonths', { count: months })}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {!balance ? (
-        <div className="text-muted-foreground text-sm">{t('cash:loading')}</div>
-      ) : (
-        <>
-          <p className="text-muted-foreground text-xs">
-            {t('cash:forecast.startingBalance', {
-              amount: fmtEur(balance.startingBalanceCents),
-            })}
-          </p>
-          <ForecastChart
-            months={balance.months}
-            history={balance.history}
-            labels={{
-              real: t('cash:forecast.chartReal'),
-              projected: t('cash:forecast.chartLabel'),
-            }}
-            fmtEur={fmtEur}
-          />
-        </>
-      )}
-    </section>
   )
 }
 
@@ -571,7 +564,7 @@ function EntryDialog({
   const [confidence, setConfidence] = useState<Confidence>(
     entry?.confidence ?? 'confirmed',
   )
-  const [category, setCategory] = useState(entry?.category ?? '')
+  const [category, setCategory] = useState(entry?.category ?? NO_CATEGORY)
   const [pending, setPending] = useState(false)
 
   const amountCents = parseEuros(amount)
@@ -592,7 +585,8 @@ function EntryDialog({
             direction,
             confidence,
             date: dateMs,
-            category: category.trim() || undefined,
+            // null clears a previously set category ("—" selected).
+            category: category === NO_CATEGORY ? null : category,
           },
         })
       } else {
@@ -603,7 +597,7 @@ function EntryDialog({
           direction,
           confidence,
           date: dateMs,
-          category: category.trim() || undefined,
+          category: category === NO_CATEGORY ? undefined : category,
         })
       }
       toast.success(t('cash:forecast.entries.saved'))
@@ -662,7 +656,18 @@ function EntryDialog({
               <Label>{t('cash:forecast.entries.directionLabel')}</Label>
               <Select
                 value={direction}
-                onValueChange={(value) => setDirection(value as 'in' | 'out')}
+                onValueChange={(value) => {
+                  const next = value as 'in' | 'out'
+                  setDirection(next)
+                  // The category lists differ per direction — drop a slug
+                  // that no longer applies.
+                  if (
+                    category !== NO_CATEGORY &&
+                    !forecastCategories(next).includes(category)
+                  ) {
+                    setCategory(NO_CATEGORY)
+                  }
+                }}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -710,14 +715,11 @@ function EntryDialog({
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="entry-category">
-              {t('cash:forecast.entries.categoryLabel')}
-            </Label>
-            <Input
-              id="entry-category"
+            <Label>{t('cash:forecast.entries.categoryLabel')}</Label>
+            <ForecastCategorySelect
+              direction={direction}
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder={t('cash:forecast.entries.categoryPlaceholder')}
+              onChange={setCategory}
             />
           </div>
         </div>

@@ -15,15 +15,17 @@ import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireAppUser, requireOrgMember } from './lib/auth'
 import { isAvailableAccount } from './lib/bankAccounts'
+import { effectiveCategory, isValidForecastCategory } from './lib/categories'
 import {
   addMonthsUtc,
+  buildForecastGrid,
   buildMonthlyBalance,
   buildMonthlyHistory,
   entryUpsertAction,
   expandOccurrences,
   ruleDerivedKey,
 } from './lib/recurrence'
-import type { HistoryTx } from './lib/recurrence'
+import type { GridTx, HistoryTx } from './lib/recurrence'
 import type { DataModel, Doc, Id } from './_generated/dataModel'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
 
@@ -82,6 +84,8 @@ async function resolveOrgScope(
 
 function assertValidRuleFields(rule: {
   amountCents: number
+  direction: 'in' | 'out'
+  category?: string
   frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly'
   interval: number
   anchorDay: number
@@ -91,6 +95,14 @@ function assertValidRuleFields(rule: {
   // Strictly positive integer cents — no monetary floats.
   if (!Number.isInteger(rule.amountCents) || rule.amountCents <= 0) {
     throw new ConvexError('invalid_amount')
+  }
+  // Category slug scoped to the direction (lib/categories.ts). Legacy
+  // free-text categories on pre-existing rows stay untouched until edited.
+  if (
+    rule.category !== undefined &&
+    !isValidForecastCategory(rule.direction, rule.category)
+  ) {
+    throw new ConvexError('invalid_category')
   }
   if (!Number.isInteger(rule.interval) || rule.interval < 1) {
     throw new ConvexError('invalid_interval')
@@ -223,7 +235,9 @@ export const updateRule = mutation({
       label: v.optional(v.string()),
       amountCents: v.optional(v.number()),
       direction: v.optional(directionValidator),
-      category: v.optional(v.string()),
+      // `null` clears the category (absent = leave untouched — an optional
+      // arg cannot carry `undefined` over the wire).
+      category: v.optional(v.union(v.string(), v.null())),
       frequency: v.optional(frequencyValidator),
       interval: v.optional(v.number()),
       anchorDay: v.optional(v.number()),
@@ -236,8 +250,16 @@ export const updateRule = mutation({
     const rule = await ctx.db.get('forecastRules', ruleId)
     if (!rule) throw new ConvexError('not_found')
     await requireOrgMember(ctx, rule.orgId)
-    assertValidRuleFields({ ...rule, ...patch })
-    await ctx.db.patch('forecastRules', ruleId, patch)
+    // null (clear) validates as "no category"; a set category is checked
+    // against the (possibly patched) direction.
+    const { category: rawCategory, ...rest } = patch
+    const category = rawCategory === null ? undefined : rawCategory
+    assertValidRuleFields({ ...rule, ...rest, category })
+    await ctx.db.patch('forecastRules', ruleId, {
+      ...rest,
+      // Patching `category: undefined` removes the field (clear).
+      ...(rawCategory !== undefined ? { category } : {}),
+    })
     return null
   },
 })
@@ -610,6 +632,12 @@ export const createManualEntry = mutation({
     if (!Number.isInteger(args.amountCents) || args.amountCents <= 0) {
       throw new ConvexError('invalid_amount')
     }
+    if (
+      args.category !== undefined &&
+      !isValidForecastCategory(args.direction, args.category)
+    ) {
+      throw new ConvexError('invalid_category')
+    }
     return await ctx.db.insert('forecastEntries', {
       orgId: args.orgId,
       date: args.date,
@@ -638,7 +666,8 @@ export const updateEntry = mutation({
       direction: v.optional(directionValidator),
       confidence: v.optional(confidenceValidator),
       label: v.optional(v.string()),
-      category: v.optional(v.string()),
+      // `null` clears the category (absent = leave untouched).
+      category: v.optional(v.union(v.string(), v.null())),
     }),
   },
   handler: async (ctx, { entryId, patch }) => {
@@ -651,8 +680,19 @@ export const updateEntry = mutation({
     ) {
       throw new ConvexError('invalid_amount')
     }
+    // Only a category being SET is validated — a legacy free-text category
+    // on the row must not block an unrelated edit.
+    const { category: rawCategory, ...rest } = patch
+    if (
+      typeof rawCategory === 'string' &&
+      !isValidForecastCategory(patch.direction ?? entry.direction, rawCategory)
+    ) {
+      throw new ConvexError('invalid_category')
+    }
     await ctx.db.patch('forecastEntries', entry._id, {
-      ...patch,
+      ...rest,
+      // Patching `category: undefined` removes the field (clear).
+      ...(rawCategory !== undefined ? { category: rawCategory ?? undefined } : {}),
       // A hand-edited derived entry becomes protected from regeneration.
       ...(entry.ruleId ? { overridden: true } : {}),
     })
@@ -669,5 +709,157 @@ export const cancelEntry = mutation({
     await requireOrgMember(ctx, entry.orgId)
     await ctx.db.patch('forecastEntries', entry._id, { status: 'cancelled' })
     return null
+  },
+})
+
+// ─── Forecast grid (category × month) ────────────────────────────────────────
+
+/**
+ * Category × month forecast grid + consumption-aware projected balance
+ * (pure core: lib/recurrence.ts:buildForecastGrid — realized flows consume
+ * the current month's pending flows per cell, overdue entries roll into the
+ * current month; two scenarios: committed-only / with planned).
+ *
+ * Scope: single org, EUR, AVAILABLE accounts only (active, non-pledged —
+ * same scope as the starting balance so the trajectory stays coherent).
+ * Realized buckets derive from the pointage (lib/categories.ts
+ * effectiveCategory); ignored/internal transfers are excluded.
+ *
+ * `history` (real end-of-month balances) ships alongside so the chart keeps
+ * a single subscription.
+ */
+export const getForecastGrid = query({
+  args: {
+    orgId: v.id('organizations'),
+    historyMonths: v.number(),
+    horizonMonths: v.number(),
+  },
+  handler: async (ctx, { orgId, historyMonths, horizonMonths }) => {
+    assertValidHorizon(historyMonths)
+    assertValidHorizon(horizonMonths)
+    await requireOrgMember(ctx, orgId)
+    const now = Date.now()
+
+    // Available EUR accounts: starting balance + realized-flow scope.
+    const accounts = await ctx.db
+      .query('bankAccounts')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    const eurAvailable = accounts.filter(
+      (a) => isAvailableAccount(a) && a.currency === 'EUR',
+    )
+    const eurAccountIds = new Set(eurAvailable.map((a) => a._id))
+    const startingBalanceCents = eurAvailable.reduce(
+      (sum, a) => sum + (a.currentBalance ?? 0),
+      0,
+    )
+
+    // Realized flows over the history window (current month included).
+    const nowDate = new Date(now)
+    const currentMonthStart = Date.UTC(
+      nowDate.getUTCFullYear(),
+      nowDate.getUTCMonth(),
+      1,
+    )
+    const windowStart = addMonthsUtc(currentMonthStart, -historyMonths)
+    const txs = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_date', (q) =>
+        q.eq('orgId', orgId).gte('transactionDate', windowStart),
+      )
+      .collect()
+    const realized: Array<GridTx> = []
+    for (const tx of txs) {
+      if (!eurAccountIds.has(tx.bankAccountId)) continue
+      realized.push({
+        transactionDate: tx.transactionDate,
+        amountCents: tx.amount,
+        direction: tx.direction,
+        category: effectiveCategory(tx),
+      })
+    }
+
+    // Pending entries — read WITHOUT a lower date bound so overdue ones
+    // (date < current month) roll into the current month.
+    const horizonEnd = addMonthsUtc(now, horizonMonths)
+    const entries = await ctx.db
+      .query('forecastEntries')
+      .withIndex('by_org_and_date', (q) =>
+        q.eq('orgId', orgId).lte('date', horizonEnd),
+      )
+      .collect()
+
+    const grid = buildForecastGrid({
+      realized,
+      entries,
+      startingBalanceCents,
+      now,
+      historyMonths,
+      horizonMonths,
+    })
+
+    const history = await computeCashHistoryForOrgs(
+      ctx,
+      [orgId],
+      historyMonths,
+      startingBalanceCents,
+    )
+
+    return { ...grid, startingBalanceCents, history }
+  },
+})
+
+/**
+ * Committed capital still to deploy on the org's signed deals:
+ * `committedAmount` − realized "Versé" (sum of the deal-matched `out`
+ * transactions — same derivation as the deal pages, never `paidAmount`).
+ * This is the UNDATED committed layer of the forecast: real obligations
+ * with no schedule — shown next to the curve, never invented into months.
+ */
+export const getCommittedPipeline = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+
+    const deals = await ctx.db
+      .query('deals')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+
+    const rows: Array<{
+      dealId: string
+      name: string
+      committedCents: number
+      paidCents: number
+      remainingCents: number
+    }> = []
+    for (const deal of deals) {
+      if (deal.status !== 'active') continue
+      const committed = deal.committedAmount ?? 0
+      if (committed <= 0) continue
+      const dealTxs = await ctx.db
+        .query('transactions')
+        .withIndex('by_deal', (q) => q.eq('dealId', deal._id))
+        .collect()
+      let paid = 0
+      for (const tx of dealTxs) {
+        if (tx.direction === 'out') paid += tx.amount
+      }
+      const remaining = committed - paid
+      if (remaining <= 0) continue
+      const target = await ctx.db.get('companies', deal.targetCompanyId)
+      rows.push({
+        dealId: deal._id,
+        name: deal.name ?? target?.name ?? '—',
+        committedCents: committed,
+        paidCents: paid,
+        remainingCents: remaining,
+      })
+    }
+    rows.sort((a, b) => b.remainingCents - a.remainingCents)
+    return {
+      rows,
+      totalRemainingCents: rows.reduce((sum, r) => sum + r.remainingCents, 0),
+    }
   },
 })
