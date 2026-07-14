@@ -23,6 +23,41 @@ bas de page.
 
 ---
 
+## v1.81.0 — 14/07/2026 à 12:05 — Résumés des participations Albo + remplissage automatique depuis le domaine
+
+Deux nouveautés autour du résumé de société introduit en v1.80 :
+
+- **Les 35 participations opérationnelles d'Albo ont leur résumé** : 2-3
+  phrases factuelles rédigées à partir du site officiel de chaque société
+  (même périmètre que les one-liners — les SPV immobiliers et véhicules
+  d'investissement n'en ont pas, un résumé n'y a pas de sens). Les domaines
+  manquants de Redesk et Loewi ont été retrouvés au passage. L'import est
+  prêt à être exécuté en prod (dry-run puis apply, commandes dans le module).
+- **Remplissage automatique pour les prochaines entités, dans les deux
+  espaces (Calte et Albo)** : dès qu'une société portfolio a un domaine —
+  posé à la création (y compris via l'assistant) ou plus tard sur sa fiche —
+  le one-liner du tableau **et** le résumé de la fiche se génèrent tout
+  seuls en arrière-plan à partir du site web. Une valeur déjà renseignée
+  n'est jamais écrasée : on peut toujours corriger à la main, la correction
+  reste. Si le site est inaccessible, les champs restent simplement vides.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau module `convex/companyEnrichment.ts` : action interne `enrich`
+>   (fetch homepage + `htmlToText`, puis `generateObject` sur `getModel()`
+>   avec fallback `generateText`, prompt FR) → mutation `applyEnrichment`
+>   **additive** (n'écrit que les champs encore `undefined`, re-vérifié à
+>   l'écriture). Schedulée via `ctx.scheduler.runAfter(0, …)` depuis
+>   `companies.create` (si domaine), `companies.update` (pose de domaine,
+>   kind `portfolio` uniquement) et `agentTools.createCompanyInternal`.
+>   Échecs silencieux (warn logs), aucun impact UI.
+> - Migration one-shot `convex/migrations/alboSummaryImport.ts`
+>   (`dryRun`/`apply`/`verify`, pattern d'`alboOneLinerImport`) : 35
+>   `summary` + 2 `domain` (Redesk `redesk.fr`, Wheelee - Loewi `loewi.fr`),
+>   ancrée par `_id` prod + garde nom. Ligne ajoutée à `MIGRATIONS.md`.
+> - `convex/_generated/api.d.ts` re-synchronisé à la main (codegen
+>   indisponible dans l'environnement). TESTING.md : lignes ED6f/ED6g.
+
 ## v1.80.1 — 14/07/2026 à 11:28 — Parallel (VASCO) : outillage pour débusquer le login qui échoue en prod
 
 Correctif technique. Le diagnostic a montré que Parallel renvoie « identifiants

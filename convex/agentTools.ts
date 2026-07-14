@@ -116,6 +116,13 @@ export const createCompanyInternal = internalMutation({
       domain,
       countryCode,
     })
+    // Domain provided → auto-fill oneLiner + summary from the website
+    // (additive — cf. convex/companyEnrichment.ts).
+    if (domain) {
+      await ctx.scheduler.runAfter(0, internal.companyEnrichment.enrich, {
+        companyId: id,
+      })
+    }
     return { _id: id, name: trimmed }
   },
 })
