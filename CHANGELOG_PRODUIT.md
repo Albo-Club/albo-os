@@ -23,6 +23,24 @@ bas de page.
 
 ---
 
+## v1.77.1 — 14/07/2026 à 11:09 — Parallel (VASCO) : diagnostic de connexion depuis la prod
+
+Correctif technique. La connexion à Parallel échoue depuis les serveurs de
+production alors que les identifiants sont valides (elle marche depuis un autre
+environnement). Ajout d'un outil de diagnostic pour identifier précisément la
+cause, et d'un en-tête d'identification qui peut à lui seul débloquer.
+
+> **🔧 Notes techniques**
+>
+> - `convex/vasco.ts` : en-tête `User-Agent` sur les appels VASCO (certains WAF
+>   rejettent une requête sans UA) ; l'erreur `vasco_login_failed` remonte
+>   désormais le **code HTTP + un extrait du corps** de la réponse.
+> - Nouvelle action interne `debugVascoLogin`
+>   (`convex run --prod vasco:debugVascoLogin '{"orgSlug":"calte"}'`) : renvoie
+>   l'**IP de sortie** de Convex + la réponse brute du login par connexion
+>   (status/corps, token masqué) — pour trancher entre blocage IP/WAF et autre.
+>   `pnpm lint` + `pnpm test:unit` au vert.
+
 ## v1.77.0 — 14/07/2026 à 11:01 — Rapprochement des échéances prévues avec les mouvements réels
 
 La page Trésorerie sait désormais **rapprocher le prévu du réel**. Une carte
