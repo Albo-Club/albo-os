@@ -692,9 +692,9 @@ depuis la liste des transactions du deal (clic ligne → sheet → combobox).
 ### Édition de champs (deal / entité / compte bancaire)
 
 Édition front : nom + instrument d'un deal (`/deals/$dealId`), nom + SIREN +
-domaine + secteur d'une entité (`/participations/$companyId`), nom personnalisé
-d'un compte (`/cash/$accountId`). Mutations : `deals.update`, `companies.update`,
-`cash.updateAccountName`.
+domaine + secteur + résumé d'une entité (`/participations/$companyId`), nom
+personnalisé d'un compte (`/cash/$accountId`). Mutations : `deals.update`,
+`companies.update`, `cash.updateAccountName`.
 
 > **Lot 5a (backend seul)** : `companies.update` accepte désormais un champ
 > `people` (liste de personnes `role` `founder|board|coinvestor` + `name` +
@@ -715,6 +715,7 @@ d'un compte (`/cash/$accountId`). Mutations : `deals.update`, `companies.update`
 | ED6b | Page entité → « Modifier » → saisir un domaine (ex. `stripe.com`) → Enregistrer                  | Toast succès ; bloc Identité → « Domaine » mis à jour ; le logo de l'en-tête (fiche, listes, `/app/all`) passe au logo logo.dev de ce domaine                                                                                                                                                          |
 | ED6c | Même dialog → vider le domaine → Enregistrer                                                     | Champ effacé en base (`domain` retiré) ; le logo retombe sur l'icône bâtiment de secours                                                                                                                                                                                                              |
 | ED6d | Page entité → « Modifier » → sélecteur **« Secteur »** (combobox) → choisir un secteur de la liste **ou** taper une valeur libre puis « Créer « … » » → Enregistrer | Toast succès ; bloc Identité → « Secteur » mis à jour ; un secteur de la liste s'affiche traduit (FR/EN), une valeur libre telle quelle ; rouvrir le sélecteur sur le secteur actif puis recliquer dessus l'efface (champ vidé) |
+| ED6e | Page entité → « Modifier » → champ **« Résumé »** (textarea) → saisir 2-3 lignes → Enregistrer | Toast succès ; le résumé s'affiche sous l'en-tête de la fiche (texte gris, retours à la ligne conservés) ; le vider puis Enregistrer le retire de la fiche (`summary` effacé en base) |
 | ED7 | Page compte → « Modifier » → saisir un nom personnalisé → Enregistrer                            | Titre = `banque · nom personnalisé` ; nom d'origine en sous-titre grisé ; la liste `/cash` affiche aussi le nom personnalisé                                                                                                                                                                           |
 | ED8 | Même dialog → vider le nom → Enregistrer                                                         | Retombe sur le nom d'origine (`label`) ; `label` n'est **jamais** modifié par ce flux                                                                                                                                                                                                                  |
 | ED9 | i18n EN/FR sur les 3 dialogs                                                                     | Libellés, hints, erreurs et toasts traduits (namespaces `participations` / `cash` / `common`)                                                                                                                                                                                                          |

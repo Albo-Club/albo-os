@@ -365,6 +365,9 @@ export default defineSchema({
     // One-line pitch shown in the Participations table. Seeded once for the
     // albo portfolio via migrations/alboOneLinerImport; hand-edited thereafter.
     oneLiner: v.optional(v.string()),
+    // Longer 2-3 line summary shown under the entity page header. Hand-filled
+    // (albo portfolio first).
+    summary: v.optional(v.string()),
     // Origin platform for external SPVs (e.g. "Parallel", "Sezame")
     sponsor: v.optional(v.string()),
     // Portfolio group: consolidates several entities under one line in the
