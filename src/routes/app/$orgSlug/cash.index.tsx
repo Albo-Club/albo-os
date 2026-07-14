@@ -12,10 +12,10 @@ import { getLocale } from '~/lib/locale'
 import { CashAccounts } from '~/components/cash/CashAccounts'
 import { CategoryBreakdown } from '~/components/cash/CategoryBreakdown'
 import {
-  ForecastChartCard,
   ForecastEntriesSection,
   ForecastRulesSection,
 } from '~/components/cash/ForecastSection'
+import { ForecastOverview } from '~/components/cash/ForecastOverview'
 import { TransactionsLedger } from '~/components/cash/TransactionsLedger'
 import { VatCard } from '~/components/cash/VatCard'
 import { Button } from '~/components/ui/button'
@@ -97,7 +97,7 @@ function Cash() {
           <TabsTrigger value="analyse">{t('tabs.analyse')}</TabsTrigger>
         </TabsList>
         <TabsContent value="apercu" className="space-y-6 pt-4">
-          {org && <ForecastChartCard orgId={org._id} />}
+          {org && <ForecastOverview orgId={org._id} />}
           <CashAccounts accounts={accounts} orgSlug={orgSlug} />
           {org && <VatCard orgId={org._id} orgSlug={orgSlug} />}
           {org && <ForecastRulesSection orgId={org._id} />}

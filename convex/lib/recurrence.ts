@@ -204,6 +204,212 @@ export function buildMonthlyHistory(params: {
   return points
 }
 
+// ─── Forecast grid (category × month, realized/committed/planned) ───────────
+
+/** Realized flow already resolved to its analysis bucket (effectiveCategory). */
+export type GridTx = {
+  transactionDate: number
+  amountCents: number
+  direction: 'in' | 'out'
+  /** Analysis bucket — null = excluded (ignored / internal transfer). */
+  category: string | null
+}
+
+/** Pending forecast entry fields needed for the grid. */
+export type GridEntry = BalanceEntry & { category?: string | null }
+
+export type ForecastGridCell = {
+  realizedCents: number
+  /** Confirmed pending flows (current month: AFTER consumption). */
+  committedCents: number
+  /** Expected/probable pending flows (current month: AFTER consumption). */
+  plannedCents: number
+}
+
+export type ForecastGridRow = {
+  direction: 'in' | 'out'
+  category: string
+  /** Sparse: a month with no flow has no key. */
+  byMonth: Record<string, ForecastGridCell | undefined>
+  totals: ForecastGridCell
+}
+
+export type ForecastProjectionPoint = {
+  monthKey: string
+  /** Starting balance + cumulated confirmed nets only. */
+  committedBalanceCents: number
+  /** Starting balance + cumulated confirmed AND expected/probable nets. */
+  plannedBalanceCents: number
+}
+
+function emptyCell(): ForecastGridCell {
+  return { realizedCents: 0, committedCents: 0, plannedCents: 0 }
+}
+
+/**
+ * Builds the category × month forecast grid and the consumption-aware
+ * projected balance, merging the realized and pending layers:
+ *
+ * - Past months ([now − historyMonths, current month[): realized only.
+ * - Current month: realized so far + the REMAINDER of the pending flows,
+ *   consumed per (direction, category) cell — the Float "largest value"
+ *   pattern: an expected flow that already happened must not count twice on
+ *   top of the (already moved) bank balance. Confirmed flows are consumed
+ *   first, then expected/probable with the leftover.
+ * - OVERDUE pending entries (dated before the current month) roll INTO the
+ *   current month: they are still expected, just late — dropping them would
+ *   silently improve/worsen the trajectory.
+ * - Future months (]current, now + horizonMonths]): pending flows as-is,
+ *   split confirmed (committed) vs expected/probable (planned).
+ *
+ * Only `pending` EUR entries count (`ignoredNonEurEntries` for visibility).
+ * The projection = startingBalance + cumulated nets from the current month
+ * on, in two scenarios (committed-only / committed + planned).
+ */
+export function buildForecastGrid(params: {
+  realized: Array<GridTx>
+  entries: Array<GridEntry>
+  startingBalanceCents: number
+  now: number
+  historyMonths: number
+  horizonMonths: number
+}): {
+  months: Array<string>
+  currentMonthKey: string
+  rows: Array<ForecastGridRow>
+  projection: Array<ForecastProjectionPoint>
+  ignoredNonEurEntries: number
+} {
+  const currentMonthStart = startOfMonthUtc(params.now)
+  const currentKey = monthKey(currentMonthStart)
+  const horizonEnd = addMonthsUtc(params.now, params.horizonMonths)
+
+  // Month axis: history … current … horizon.
+  const months: Array<string> = []
+  for (let k = params.historyMonths; k >= 1; k--) {
+    months.push(monthKey(addMonthsUtc(currentMonthStart, -k)))
+  }
+  for (
+    let cursor = currentMonthStart;
+    cursor <= horizonEnd;
+    cursor = addMonthsUtc(cursor, 1)
+  ) {
+    months.push(monthKey(cursor))
+  }
+  const monthSet = new Set(months)
+
+  const rows = new Map<string, ForecastGridRow>()
+  function cellOf(
+    direction: 'in' | 'out',
+    category: string,
+    key: string,
+  ): ForecastGridCell {
+    const rowKey = `${direction}:${category}`
+    let row = rows.get(rowKey)
+    if (!row) {
+      row = { direction, category, byMonth: {}, totals: emptyCell() }
+      rows.set(rowKey, row)
+    }
+    let cell = row.byMonth[key]
+    if (!cell) {
+      cell = emptyCell()
+      row.byMonth[key] = cell
+    }
+    return cell
+  }
+
+  // 1. Realized flows (history + current month-to-date).
+  for (const tx of params.realized) {
+    if (tx.category === null) continue
+    if (tx.transactionDate > params.now) continue
+    const key = monthKey(tx.transactionDate)
+    if (!monthSet.has(key)) continue
+    cellOf(tx.direction, tx.category, key).realizedCents += tx.amountCents
+  }
+
+  // 2. Pending entries — overdue ones roll into the current month.
+  let ignoredNonEurEntries = 0
+  for (const entry of params.entries) {
+    if (entry.status !== 'pending') continue
+    if (entry.currency !== 'EUR') {
+      ignoredNonEurEntries += 1
+      continue
+    }
+    if (entry.date > horizonEnd) continue
+    const key =
+      entry.date < currentMonthStart ? currentKey : monthKey(entry.date)
+    const cell = cellOf(entry.direction, entry.category ?? 'uncategorized', key)
+    if (entry.confidence === 'confirmed') cell.committedCents += entry.amountCents
+    else cell.plannedCents += entry.amountCents
+  }
+
+  // 3. Current-month consumption, per cell: confirmed first, then planned
+  // with the realized leftover.
+  for (const row of rows.values()) {
+    const cell = row.byMonth[currentKey]
+    if (!cell) continue
+    const remainingCommitted = Math.max(
+      0,
+      cell.committedCents - cell.realizedCents,
+    )
+    const leftover = Math.max(0, cell.realizedCents - cell.committedCents)
+    cell.committedCents = remainingCommitted
+    cell.plannedCents = Math.max(0, cell.plannedCents - leftover)
+  }
+
+  // 4. Row totals.
+  for (const row of rows.values()) {
+    for (const cell of Object.values(row.byMonth)) {
+      if (!cell) continue
+      row.totals.realizedCents += cell.realizedCents
+      row.totals.committedCents += cell.committedCents
+      row.totals.plannedCents += cell.plannedCents
+    }
+  }
+
+  // 5. Projection from the current month on: the bank balance already holds
+  // the realized flows, so only the REMAINING pending nets accumulate.
+  const projection: Array<ForecastProjectionPoint> = []
+  let committedRunning = params.startingBalanceCents
+  let plannedRunning = params.startingBalanceCents
+  for (const key of months) {
+    if (key < currentKey) continue
+    let committedNet = 0
+    let plannedNet = 0
+    for (const row of rows.values()) {
+      const cell = row.byMonth[key]
+      if (!cell) continue
+      const sign = row.direction === 'in' ? 1 : -1
+      committedNet += sign * cell.committedCents
+      plannedNet += sign * (cell.committedCents + cell.plannedCents)
+    }
+    committedRunning += committedNet
+    plannedRunning += plannedNet
+    projection.push({
+      monthKey: key,
+      committedBalanceCents: committedRunning,
+      plannedBalanceCents: plannedRunning,
+    })
+  }
+
+  // Stable order: biggest rows first (all layers included).
+  const sortedRows = [...rows.values()].sort(
+    (a, b) =>
+      b.totals.realizedCents +
+      b.totals.committedCents +
+      b.totals.plannedCents -
+      (a.totals.realizedCents + a.totals.committedCents + a.totals.plannedCents),
+  )
+
+  return {
+    months,
+    currentMonthKey: currentKey,
+    rows: sortedRows,
+    projection,
+    ignoredNonEurEntries,
+  }
+}
+
 // ─── Upsert decision for generated occurrences ──────────────────────────────
 
 /** Minimal state of an existing entry to decide the upsert. */

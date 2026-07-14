@@ -22,3 +22,19 @@ export const PRODUCT_CATEGORIES = [
 export type ChargeCategory = (typeof CHARGE_CATEGORIES)[number]
 export type ProductCategory = (typeof PRODUCT_CATEGORIES)[number]
 export type StoredCategory = ChargeCategory | ProductCategory
+
+export const DERIVED_FORECAST_CATEGORIES = [
+  'deals',
+  'equity',
+  'intercos',
+  'taxes',
+] as const
+
+/** Categories a forecast rule/entry can carry, by direction. */
+export function forecastCategories(
+  direction: 'in' | 'out',
+): ReadonlyArray<string> {
+  return direction === 'out'
+    ? [...CHARGE_CATEGORIES, ...DERIVED_FORECAST_CATEGORIES]
+    : [...PRODUCT_CATEGORIES, ...DERIVED_FORECAST_CATEGORIES]
+}

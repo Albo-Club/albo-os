@@ -1322,6 +1322,26 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   callsites et outils agent pour un gain nul à l'échelle actuelle — ces
   queries n'apparaissent pas dans le breakdown Usage. À ré-évaluer si elles
   y montent.
+- **Deux sémantiques de projection coexistent — assumé.** La courbe et la
+  grille de l'UI passent par `getForecastGrid` (consommation par cellule
+  direction × catégorie sur le mois courant, rollover des échéances en
+  retard, périmètre comptes **disponibles** — cœur pur
+  `lib/recurrence.ts:buildForecastGrid`, testé par
+  `tests/forecastGrid.test.ts`). `getForecastBalance` (outil agent +
+  MCP `getForecastBalance`) garde l'ancienne sémantique fenêtrée : toutes
+  les échéances pending du mois courant comptent, même si le flux réel est
+  déjà passé en banque (double comptage possible sur le mois courant), et
+  les échéances en retard sont ignorées. Aligner l'agent sur
+  `getForecastGrid` est un follow-up — ne pas « corriger » l'un vers
+  l'autre à moitié.
+- **La consommation prévu/réalisé est par cellule (direction × catégorie),
+  pas par échéance.** Une échéance sans catégorie n'est consommée que par
+  du réalisé « À qualifier » (`uncategorized`) ; une grosse entrée
+  unmatched ne consomme rien (bucket `unmatched`, hors catégories de
+  prévision). D'où l'intérêt de catégoriser règles ET transactions avec
+  les mêmes slugs. Le rapprochement unitaire échéance ↔ transaction
+  (avec gestion du reliquat) est la phase 2b — `markEntryRealized` existe
+  déjà côté back.
 - **La table front des échéances ne liste que les one-shot pures — limitation
   V1 assumée.** `forecasts.listEntries` (consommée par `ForecastEntriesSection`,
   onglet Cash « Aperçu ») filtre `ruleId == null` : les occurrences générées

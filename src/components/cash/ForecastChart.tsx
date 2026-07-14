@@ -8,23 +8,29 @@ import { Skeleton } from '~/components/ui/skeleton'
 type RechartsMod = typeof RechartsModule
 
 /**
- * Cash balance curve: actual history (solid) + projected (dashed) on the
- * same axis. The junction happens at the current month: the last actual
- * point AND the first projected point both equal the current balance, so
- * the two lines touch. recharts touches `window` at load time →
- * dynamic-import inside useEffect + skeleton (KNOWN_ISSUES pattern
- * "Browser-only libs").
+ * Cash balance curve: actual history (solid) + TWO projected scenarios on
+ * the same axis — committed-only (confirmed flows) and with-planned
+ * (confirmed + expected/probable), both dashed. The junction happens at the
+ * current month: the last actual point AND the first point of each
+ * projected line equal the current balance (the month's remaining flows
+ * are already cumulated into the following months). recharts touches
+ * `window` at load time → dynamic-import inside useEffect + skeleton
+ * (KNOWN_ISSUES pattern "Browser-only libs").
  */
 export function ForecastChart({
-  months,
+  projection,
   history,
   labels,
   fmtEur,
 }: {
-  months: Array<{ monthKey: string; projectedBalanceCents: number }>
+  projection: Array<{
+    monthKey: string
+    committedBalanceCents: number
+    plannedBalanceCents: number
+  }>
   /** Actual end-of-month balance, last point = current month at current balance. */
   history?: Array<{ monthKey: string; balanceCents: number }> | null
-  labels: { real: string; projected: string }
+  labels: { real: string; committed: string; planned: string }
   fmtEur: (cents?: number | null) => string
 }) {
   const [recharts, setRecharts] = useState<RechartsMod | null>(null)
@@ -53,12 +59,11 @@ export function ForecastChart({
     YAxis,
   } = recharts
 
-  // One row per month; `real` and `projected` coexist at the current month
-  // (junction). The current month's projected value is replaced by the
-  // current balance: its remaining flows are already rolled into next month.
+  // One row per month; `real` and the projected series coexist at the
+  // current month (junction at the current balance).
   const byMonth = new Map<
     string,
-    { month: string; real?: number; projected?: number }
+    { month: string; real?: number; committed?: number; planned?: number }
   >()
   for (const point of history ?? []) {
     byMonth.set(point.monthKey, {
@@ -67,17 +72,27 @@ export function ForecastChart({
     })
   }
   const junction = history?.at(-1)
-  for (const month of months) {
-    const row = byMonth.get(month.monthKey) ?? { month: month.monthKey }
-    row.projected =
-      junction && month.monthKey === junction.monthKey
-        ? junction.balanceCents
-        : month.projectedBalanceCents
-    byMonth.set(month.monthKey, row)
+  for (const point of projection) {
+    const row = byMonth.get(point.monthKey) ?? { month: point.monthKey }
+    const isJunction = junction && point.monthKey === junction.monthKey
+    row.committed = isJunction
+      ? junction.balanceCents
+      : point.committedBalanceCents
+    row.planned = isJunction ? junction.balanceCents : point.plannedBalanceCents
+    byMonth.set(point.monthKey, row)
   }
   const data = [...byMonth.values()]
   const hasNegative = data.some(
-    (row) => (row.real ?? 0) < 0 || (row.projected ?? 0) < 0,
+    (row) =>
+      (row.real ?? 0) < 0 || (row.committed ?? 0) < 0 || (row.planned ?? 0) < 0,
+  )
+  // The two scenarios only diverge when expected/probable entries exist —
+  // hide the redundant planned line otherwise.
+  const scenariosDiverge = data.some(
+    (row) =>
+      row.committed !== undefined &&
+      row.planned !== undefined &&
+      row.committed !== row.planned,
   )
 
   return (
@@ -118,9 +133,7 @@ export function ForecastChart({
               fontSize: 12,
             }}
           />
-          {history && history.length > 0 && (
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-          )}
+          <Legend wrapperStyle={{ fontSize: 12 }} />
           {hasNegative && (
             <ReferenceLine y={0} stroke="var(--destructive)" strokeDasharray="4 4" />
           )}
@@ -136,13 +149,24 @@ export function ForecastChart({
           )}
           <Area
             type="monotone"
-            dataKey="projected"
-            name={labels.projected}
+            dataKey="committed"
+            name={labels.committed}
             stroke="var(--chart-1)"
             strokeWidth={2.5}
-            strokeDasharray={history && history.length > 0 ? '6 4' : undefined}
+            strokeDasharray="6 4"
             fill="url(#forecastFill)"
           />
+          {scenariosDiverge && (
+            <Area
+              type="monotone"
+              dataKey="planned"
+              name={labels.planned}
+              stroke="var(--chart-3)"
+              strokeWidth={2}
+              strokeDasharray="2 4"
+              fill="none"
+            />
+          )}
         </AreaChart>
       </ResponsiveContainer>
     </div>

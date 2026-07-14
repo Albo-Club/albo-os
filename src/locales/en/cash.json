@@ -111,7 +111,20 @@
     "horizonMonths_one": "{{count}} month",
     "horizonMonths_other": "{{count}} months",
     "startingBalance": "Starting balance (available, EUR accounts): {{amount}}",
-    "chartLabel": "Projected balance",
+    "chartCommitted": "Projected (committed)",
+    "chartPlanned": "Projected (with planned)",
+    "grid": {
+      "colCategory": "Category",
+      "upcoming": "+ {{amount}} to come",
+      "plannedShare": "incl. {{amount}} planned",
+      "balance": "Projected balance"
+    },
+    "pipeline": {
+      "title": "Left to deploy (signed deals)",
+      "more_one": "+ {{count}} other deal",
+      "more_other": "+ {{count}} other deals",
+      "hint": "Committed amounts with no call date — counted here, not in the curve. Create a one-off entry to schedule a capital call."
+    },
     "rules": {
       "title": "Recurring rules",
       "add": "Add a rule",
@@ -140,6 +153,7 @@
       "anchorDayHintWeekly": "Day of week (1 = Monday … 7 = Sunday)",
       "startLabel": "Start",
       "endLabel": "End (optional)",
+      "categoryLabel": "Category (optional)",
       "activeLabel": "Active rule",
       "active": "Active",
       "inactive": "Inactive",
@@ -178,7 +192,6 @@
         "probable": "Probable"
       },
       "categoryLabel": "Category (optional)",
-      "categoryPlaceholder": "e.g. investment, tax",
       "cancelAction": "Cancel entry",
       "cancelConfirmTitle": "Cancel this entry?",
       "cancelConfirmBody": "It will no longer count toward the projected balance. This does not delete it — realized history is preserved.",

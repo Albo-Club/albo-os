@@ -111,7 +111,20 @@
     "horizonMonths_one": "{{count}} mois",
     "horizonMonths_other": "{{count}} mois",
     "startingBalance": "Solde de départ (disponible, comptes EUR) : {{amount}}",
-    "chartLabel": "Solde projeté",
+    "chartCommitted": "Projeté (engagé)",
+    "chartPlanned": "Projeté (avec prévu)",
+    "grid": {
+      "colCategory": "Catégorie",
+      "upcoming": "+ {{amount}} à venir",
+      "plannedShare": "dont {{amount}} prévu",
+      "balance": "Solde projeté"
+    },
+    "pipeline": {
+      "title": "Reste à déployer (deals signés)",
+      "more_one": "+ {{count}} autre deal",
+      "more_other": "+ {{count}} autres deals",
+      "hint": "Montants engagés sans date d'appel — comptés ici, pas dans la courbe. Crée une échéance ponctuelle pour dater un appel de fonds."
+    },
     "rules": {
       "title": "Règles récurrentes",
       "add": "Ajouter une règle",
@@ -140,6 +153,7 @@
       "anchorDayHintWeekly": "Jour de la semaine (1 = lundi … 7 = dimanche)",
       "startLabel": "Début",
       "endLabel": "Fin (optionnel)",
+      "categoryLabel": "Catégorie (optionnel)",
       "activeLabel": "Règle active",
       "active": "Active",
       "inactive": "Inactive",
@@ -178,7 +192,6 @@
         "probable": "Probable"
       },
       "categoryLabel": "Catégorie (optionnel)",
-      "categoryPlaceholder": "ex. investissement, impôt",
       "cancelAction": "Annuler l'échéance",
       "cancelConfirmTitle": "Annuler cette échéance ?",
       "cancelConfirmBody": "Elle ne comptera plus dans le solde projeté. Cela ne la supprime pas — l'historique réalisé est conservé.",
