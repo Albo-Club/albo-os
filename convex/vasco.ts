@@ -43,6 +43,9 @@ function vascoBaseUrl(clientSlug: string): string {
   return `https://api.${clientSlug}.vasco.fund`
 }
 
+// Identify the integration; some WAFs reject requests with an empty/unknown UA.
+const USER_AGENT = 'Albo-OS VASCO integration (+https://alboteam.com)'
+
 /** Decode a base64url JWT segment to UTF-8 (same primitives as powens.ts). */
 function decodeBase64Url(input: string): string {
   const b64 = input.replace(/-/g, '+').replace(/_/g, '/')
@@ -57,10 +60,15 @@ async function vascoLogin(
 ): Promise<{ token: string; userId: string }> {
   const res = await fetch(`${vascoBaseUrl(creds.clientSlug)}/auth/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'User-Agent': USER_AGENT },
     body: JSON.stringify({ username: creds.username, password: creds.password }),
   })
-  if (!res.ok) throw new ConvexError('vasco_login_failed')
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new ConvexError(
+      `vasco_login_failed: HTTP ${res.status} ${body.slice(0, 160)}`,
+    )
+  }
   const json = (await res.json()) as { token?: string }
   if (!json.token) throw new ConvexError('vasco_login_no_token')
   const claims = JSON.parse(
@@ -82,6 +90,7 @@ async function vascoGraphql<T>(
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
+      'User-Agent': USER_AGENT,
     },
     body: JSON.stringify({ query, variables }),
   })
@@ -421,5 +430,75 @@ export const verifyConnection = internalAction({
       { orgSlug },
     )
     return { orgSlug, connections: await runConnections(ctx, conns) }
+  },
+})
+
+/**
+ * Diagnostic (CLI): why does the VASCO login fail from Convex prod when the
+ * same creds work elsewhere? Returns Convex's egress IP + the RAW login
+ * response (status + body) per connection — no throwing, token redacted.
+ *   npx convex run --prod vasco:debugVascoLogin '{"orgSlug":"calte"}'
+ */
+export const debugVascoLogin = internalAction({
+  args: { orgSlug: v.string() },
+  handler: async (ctx, { orgSlug }) => {
+    const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
+      internal.vasco.getConnectionsByOrgSlug,
+      { orgSlug },
+    )
+    const egressIp = await fetch('https://api.ipify.org')
+      .then((r) => r.text())
+      .catch(
+        (e) => `ipify_failed: ${e instanceof Error ? e.message : String(e)}`,
+      )
+    const results: Array<{
+      label: string
+      clientSlug: string
+      status: number
+      ok: boolean
+      hasToken: boolean
+      bodySnippet: string
+    }> = []
+    for (const conn of conns) {
+      try {
+        const res = await fetch(`${vascoBaseUrl(conn.clientSlug)}/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': USER_AGENT,
+          },
+          body: JSON.stringify({
+            username: conn.username,
+            password: conn.password,
+          }),
+        })
+        const body = await res.text().catch(() => '')
+        let hasToken = false
+        try {
+          hasToken = Boolean((JSON.parse(body) as { token?: string }).token)
+        } catch {
+          hasToken = false
+        }
+        results.push({
+          label: conn.label,
+          clientSlug: conn.clientSlug,
+          status: res.status,
+          ok: res.ok,
+          hasToken,
+          // Redact the token on success; surface the error body on failure.
+          bodySnippet: res.ok ? '(token received)' : body.slice(0, 200),
+        })
+      } catch (err) {
+        results.push({
+          label: conn.label,
+          clientSlug: conn.clientSlug,
+          status: 0,
+          ok: false,
+          hasToken: false,
+          bodySnippet: `fetch_threw: ${err instanceof Error ? err.message : String(err)}`,
+        })
+      }
+    }
+    return { orgSlug, egressIp, results }
   },
 })
