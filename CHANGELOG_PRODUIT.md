@@ -23,6 +23,26 @@ bas de page.
 
 ---
 
+## v1.78.0 — 14/07/2026 à 11:10 — Voir un one-liner en entier d'un clic
+
+Dans le tableau des entreprises, un one-liner un peu long était coupé (« … ») et
+on n'en voyait pas la fin. Désormais, quand un one-liner est tronqué, il devient
+**cliquable** (petit souligné pointillé au survol) : un clic ouvre une petite
+carte avec le **texte complet**. Le reste de la ligne continue d'ouvrir la fiche
+de la société comme avant. Les one-liners courts, qui tiennent déjà en entier,
+ne changent pas.
+
+> **🔧 Notes techniques**
+>
+> - `ParticipationsTable.tsx` : sous-composant `OneLinerCell` qui détecte la
+>   troncature via un callback ref stable + `ResizeObserver` (`scrollWidth >
+>   clientWidth`), robuste au resize et au swap span↔bouton. Seuls les
+>   one-liners coupés deviennent un `PopoverTrigger` ; `stopPropagation` sur le
+>   clic/keydown du bouton et sur le `PopoverContent` pour ne jamais déclencher
+>   la navigation de ligne (`role="link"`).
+> - Remplace l'ancien `title` natif (tooltip navigateur) sur la cellule.
+> - Nouvelle clé i18n `participations.oneLinerExpand` (FR/EN) pour l'aria-label.
+
 ## v1.77.1 — 14/07/2026 à 11:09 — Parallel (VASCO) : diagnostic de connexion depuis la prod
 
 Correctif technique. La connexion à Parallel échoue depuis les serveurs de
@@ -83,7 +103,6 @@ partiel quand vous lui demandez de pointer une échéance.
 >   (`historyMonths: 0`) ; l'ancienne sémantique fenêtrée
 >   (`buildMonthlyBalance`, query publique `getForecastBalance`) est
 >   supprimée. KNOWN_ISSUES/TESTING mis à jour (F6-F14, FC16-FC18).
-
 ## v1.76.1 — 14/07/2026 à 10:44 — Parallel (VASCO) : lecture des positions + vérif en prod
 
 Suite de la connexion Parallel. Albo OS lit désormais tes **positions réelles**

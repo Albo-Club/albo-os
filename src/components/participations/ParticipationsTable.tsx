@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
@@ -27,10 +27,79 @@ import {
   TableRow,
 } from '~/components/ui/table'
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '~/components/ui/popover'
+import {
   PAGE_SIZE,
   PaginationFooter,
   usePagination,
 } from '~/components/data-table/LocalPagination'
+
+/**
+ * One-liner cell: truncated to the column width, and — only when the text is
+ * actually clipped — it becomes a click target that reveals the full pitch in
+ * a popover. Short one-liners stay plain text so a row click still opens the
+ * company sheet; the click that expands is stopped from bubbling so it never
+ * navigates.
+ */
+function OneLinerCell({
+  text,
+  expandLabel,
+}: {
+  text?: string | null
+  expandLabel: string
+}) {
+  const [truncated, setTruncated] = useState(false)
+  // Stable callback ref: measures on mount, on resize, and again when the
+  // element swaps between the plain-span and button branches below.
+  const measureRef = useCallback((el: HTMLElement | null) => {
+    if (!el) return
+    const measure = () => setTruncated(el.scrollWidth > el.clientWidth)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  if (!text) return <span className="text-muted-foreground">—</span>
+
+  if (!truncated) {
+    return (
+      <span
+        ref={measureRef}
+        className="block max-w-72 truncate text-muted-foreground"
+      >
+        {text}
+      </span>
+    )
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          ref={measureRef}
+          type="button"
+          aria-label={expandLabel}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          className="block max-w-72 cursor-pointer truncate text-left text-muted-foreground underline decoration-dotted decoration-muted-foreground/40 underline-offset-4 transition-colors hover:text-foreground"
+        >
+          {text}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        onClick={(e) => e.stopPropagation()}
+        className="w-auto max-w-xs p-3 text-sm leading-snug text-foreground"
+      >
+        {text}
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 /** Minimal shape of an enriched deal, shared by per-org and aggregated views. */
 export type DealRow = {
@@ -687,11 +756,8 @@ function CompanyRows({
           </span>
         </TableCell>
       )}
-      <TableCell
-        className="text-muted-foreground max-w-72 truncate"
-        title={group.oneLiner}
-      >
-        {group.oneLiner ?? '—'}
+      <TableCell>
+        <OneLinerCell text={group.oneLiner} expandLabel={t('oneLinerExpand')} />
       </TableCell>
       <TableCell>
         {group.sector

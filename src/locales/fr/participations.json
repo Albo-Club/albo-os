@@ -27,6 +27,7 @@
   "allSubtitle": "Toutes tes organisations réunies — lecture seule. L'édition se fait dans une organisation.",
   "openDetail": "Ouvrir la fiche",
   "rowOpenAria": "Ouvrir la fiche de {{name}}",
+  "oneLinerExpand": "Voir le one-liner complet",
   "back": "← Entreprises",
   "notFound": "Société introuvable.",
   "info": {
