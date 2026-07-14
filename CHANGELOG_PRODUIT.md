@@ -31,15 +31,16 @@ récemment fermé l'accès technique que le monde entier utilisait pour lire
 ses pages sans navigateur. L'extraction passe désormais par un service de
 rendu (la page est ouverte dans un vrai navigateur distant, son contenu est
 récupéré en texte), avec l'ancienne méthode toujours tentée en premier au
-cas où Notion rouvrirait l'accès. Une clé gratuite est à configurer (voir
-notes techniques) ; les reports Notion déjà en échec peuvent ensuite être
-relancés avec « Retraiter » depuis la page Reports entrants.
+cas où Notion rouvrirait l'accès. Une clé gratuite est à configurer sur
+browserless.io (voir notes techniques) ; les reports Notion déjà en échec
+peuvent ensuite être relancés avec « Retraiter » depuis la page Reports
+entrants.
 
 > **🔧 Notes techniques**
 >
 > - Diagnostic (13/07/2026) : `loadPageChunk`/`loadCachedPageChunkV2` → 400 même sur page publique (www + sous-domaine), `notion-client` npm cassé pareil, HTML public = coquille SPA, UA Googlebot → 403. Aucune voie sans navigateur — documenté dans `KNOWN_ISSUES.md` « Notion : extraction ».
-> - `convex/lib/notion.ts` : chaîne API interne (auto-guérison) → **Jina Reader** (`r.jina.ai`, headers `X-Timeout: 30` + `X-Wait-For-Selector: .notion-page-content`, format markdown, garde anti-coquille `MIN_USEFUL_CHARS`). `extractPageId` accepte aussi les UUID avec tirets.
-> - Nouvel env **`JINA_API_KEY`** (clé gratuite sur jina.ai — l'accès anonyme est bloqué pour les IP datacenter) : `pnpm exec convex env set JINA_API_KEY <clé> --prod`. Sans clé, comportement précédent (échec actionnable).
+> - `convex/lib/notion.ts` : chaîne API interne (auto-guérison) → **Browserless** (`POST /content`, `waitForSelector: .notion-page-content`, `bestAttempt`, HTML → texte via `htmlToText`, garde anti-coquille `MIN_USEFUL_CHARS`) → **Jina Reader** (`r.jina.ai`, payant, utilisé seulement si `BROWSERLESS_TOKEN` absent). `extractPageId` accepte aussi les UUID avec tirets.
+> - Nouvel env **`BROWSERLESS_TOKEN`** (browserless.io, plan gratuit 1000 unités/mois — largement assez pour 2-3 reports/jour) : `pnpm exec convex env set BROWSERLESS_TOKEN <token> --prod`. `BROWSERLESS_URL` optionnel (région, défaut `production-sfo`). `JINA_API_KEY` reste supporté en alternative payante. Sans aucune clé, comportement précédent (échec actionnable).
 > - Libellé du récap `notion_unreachable` reformulé (la cause n'est plus forcément une page privée) ; TESTING R17/R17b mis à jour.
 
 ## v1.86.1 — 14/07/2026 à 14:48 — Reportings Parallel : le rattachement s'affiche sur toutes les entités investies

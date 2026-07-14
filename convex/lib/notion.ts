@@ -6,14 +6,16 @@
  *    internal API: 400 even on public pages, notion-client broken too, no
  *    SSR fallback, crawler UAs blocked). Kept as a cheap first attempt so
  *    the pipeline self-heals if Notion ever reopens it.
- * 2. Jina Reader (r.jina.ai) — headless-browser rendering returning
- *    markdown. Requires JINA_API_KEY (anonymous access is blocked for
- *    datacenter IPs); without the key this step is skipped and the old
- *    behavior (actionable failure) remains.
+ * 2. Headless-browser rendering — provider picked by whichever env key is
+ *    set: BROWSERLESS_TOKEN (browserless.io, free tier 1000 units/month)
+ *    first, else JINA_API_KEY (r.jina.ai, paid). Without any key this step
+ *    is skipped and the old behavior (actionable failure) remains.
  *
  * Always returns '' instead of throwing: a failed Notion source is a
  * NOMINAL outcome for the content router (private page, dead link…).
  */
+
+import { htmlToText } from './reportLinks'
 
 interface NotionBlock {
   value?: {
@@ -90,14 +92,54 @@ const JINA_CONTENT_MARKER = 'Markdown Content:'
 // Below this, the rendered output is an empty shell (SPA not loaded,
 // login wall, generic Notion landing) — treat as a failure.
 const MIN_USEFUL_CHARS = 200
+// Give the Notion SPA time to render before snapshotting.
+const RENDER_WAIT_MS = 30_000
+const NOTION_CONTENT_SELECTOR = '.notion-page-content'
 
-/** Step 2 — Jina Reader rendering (needs JINA_API_KEY). */
-async function fetchViaJinaReader(url: string): Promise<string> {
-  const key = process.env.JINA_API_KEY
-  if (!key) {
-    console.warn('[notion] JINA_API_KEY not set — rendering fallback skipped')
+/** Step 2a — browserless.io /content rendering (free tier). */
+async function fetchViaBrowserless(url: string): Promise<string> {
+  const token = process.env.BROWSERLESS_TOKEN
+  if (!token) return ''
+  const base = process.env.BROWSERLESS_URL ?? 'https://production-sfo.browserless.io'
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 60_000)
+    const res = await fetch(`${base}/content?token=${encodeURIComponent(token)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url,
+        gotoOptions: { waitUntil: 'networkidle2', timeout: RENDER_WAIT_MS },
+        waitForSelector: { selector: NOTION_CONTENT_SELECTOR, timeout: RENDER_WAIT_MS },
+        bestAttempt: true,
+      }),
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+    if (!res.ok) {
+      console.warn(`[notion] browserless status=${res.status} for ${url}`)
+      return ''
+    }
+    const html = await res.text()
+    const text = htmlToText(html)
+    if (text.length < MIN_USEFUL_CHARS) {
+      console.warn(`[notion] browserless returned an empty shell (${text.length} chars) for ${url}`)
+      return ''
+    }
+    return text
+  } catch (err) {
+    console.warn(
+      '[notion] browserless fetch failed:',
+      err instanceof Error ? err.message : String(err),
+    )
     return ''
   }
+}
+
+/** Step 2b — Jina Reader rendering (needs JINA_API_KEY, paid). */
+async function fetchViaJinaReader(url: string): Promise<string> {
+  const key = process.env.JINA_API_KEY
+  if (!key) return ''
   try {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 60_000)
@@ -105,9 +147,8 @@ async function fetchViaJinaReader(url: string): Promise<string> {
       headers: {
         Authorization: `Bearer ${key}`,
         'X-Return-Format': 'markdown',
-        // Give the Notion SPA time to render before snapshotting.
         'X-Timeout': '30',
-        'X-Wait-For-Selector': '.notion-page-content',
+        'X-Wait-For-Selector': NOTION_CONTENT_SELECTOR,
       },
       signal: controller.signal,
     })
@@ -133,5 +174,12 @@ async function fetchViaJinaReader(url: string): Promise<string> {
 export async function fetchNotionText(url: string): Promise<string> {
   const viaApi = await fetchViaInternalApi(url)
   if (viaApi) return viaApi
-  return await fetchViaJinaReader(url)
+  const viaBrowserless = await fetchViaBrowserless(url)
+  if (viaBrowserless) return viaBrowserless
+  const viaJina = await fetchViaJinaReader(url)
+  if (viaJina) return viaJina
+  if (!process.env.BROWSERLESS_TOKEN && !process.env.JINA_API_KEY) {
+    console.warn('[notion] no rendering provider configured (BROWSERLESS_TOKEN or JINA_API_KEY)')
+  }
+  return ''
 }

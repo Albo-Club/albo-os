@@ -2204,16 +2204,19 @@ public est une coquille SPA sans contenu ; l'accès avec un User-Agent
 crawler (Googlebot) est bloqué (403). **Aucune voie sans navigateur ne
 fonctionne** — ne pas re-tenter ces pistes.
 
-**Solution en place** (`convex/lib/notion.ts`) : chaîne à deux étages —
+**Solution en place** (`convex/lib/notion.ts`) : chaîne à trois étages —
 (1) l'API interne est toujours tentée en premier (coût quasi nul,
-auto-guérison si Notion la rouvre), (2) fallback **Jina Reader**
-(`r.jina.ai`) qui rend la page dans un navigateur headless et renvoie le
-markdown. Headers importants : `X-Timeout: 30` + `X-Wait-For-Selector:
-.notion-page-content` (sans eux, snapshot avant le rendu SPA → coquille
-vide, détectée par le seuil `MIN_USEFUL_CHARS`). Nécessite `JINA_API_KEY`
-(clé gratuite, l'accès anonyme est refusé aux IP datacenter — vérifié :
-401 « bad IP reputation »). Sans clé : comportement dégradé assumé, échec
-actionnable dans le récap.
+auto-guérison si Notion la rouvre), (2) rendu headless **browserless.io**
+(`POST /content`, `waitForSelector: .notion-page-content` +
+`waitUntil: networkidle2`, `bestAttempt`) si `BROWSERLESS_TOKEN` est posé —
+**free tier 1000 unités/mois** (1 unité = 30 s de navigateur), largement
+suffisant à 2-3 reports/jour, (3) sinon **Jina Reader** (`r.jina.ai`,
+payant, headers `X-Timeout: 30` + `X-Wait-For-Selector`) si `JINA_API_KEY`
+est posé. Dans les deux cas : sans attente du sélecteur, le snapshot part
+avant le rendu SPA → coquille vide, détectée par le seuil
+`MIN_USEFUL_CHARS`. L'accès anonyme Jina est refusé aux IP datacenter
+(vérifié : 401 « bad IP reputation »). Sans aucune clé : comportement
+dégradé assumé, échec actionnable dans le récap.
 
 **Limites connues** : les fichiers *attachés dans* une page Notion ne sont
 pas téléchargés (le markdown rendu contient leurs liens signés — extraction
