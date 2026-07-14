@@ -13,6 +13,7 @@ import { internal } from './_generated/api'
 import { internalMutation, internalQuery } from './_generated/server'
 import {
   applyMarkEntryRealized,
+  assertDealInOrg,
   assertValidHorizon,
   computeForecastGridForOrg,
   expandRulesForOrgs,
@@ -56,6 +57,7 @@ export const listRulesInternal = internalQuery({
       amountCents: rule.amountCents,
       direction: rule.direction,
       category: rule.category ?? null,
+      dealId: rule.dealId ?? null,
       frequency: rule.frequency,
       interval: rule.interval,
       anchorDay: rule.anchorDay,
@@ -74,6 +76,7 @@ export const createRuleInternal = internalMutation({
     amountCents: v.number(),
     direction: v.union(v.literal('in'), v.literal('out')),
     category: v.optional(v.string()),
+    dealId: v.optional(v.id('deals')),
     frequency: v.union(
       v.literal('weekly'),
       v.literal('monthly'),
@@ -131,6 +134,7 @@ export const listEntriesInternal = internalQuery({
       status: entry.status,
       label: entry.label,
       category: entry.category ?? null,
+      dealId: entry.dealId ?? null,
       derivedFromRule: entry.ruleId != null,
     }))
   },
@@ -262,13 +266,16 @@ const createForecastRule = createTool({
     'amountCents in CENTS EUR, positive. direction "in" (income) or "out" ' +
     '(expense). anchorDay: day of month (1-31) or day of week (1-7 for ' +
     'weekly). Creating a rule does NOT generate entries: propose to call ' +
-    'expandForecastRules afterwards. The user approves via in-app buttons.',
+    'expandForecastRules afterwards. dealId (optional, from listDeals) ' +
+    'links the flow to a deal (SCPI rents, coupons…) and surfaces it on ' +
+    'the deal page. The user approves via in-app buttons.',
   needsApproval: true,
   inputSchema: z.object({
     label: z.string().min(1).describe('e.g. "Loyer SCI Chapelle"'),
     amountCents: z.number().int().positive().describe('cents EUR'),
     direction: z.enum(['in', 'out']),
     category: z.string().optional(),
+    dealId: z.string().optional().describe('link the flow to a deal'),
     frequency: z.enum(['weekly', 'monthly', 'quarterly', 'yearly']),
     interval: z.number().int().min(1).optional().describe('default 1'),
     anchorDay: z.number().int().min(1).max(31),
@@ -286,6 +293,7 @@ const createForecastRule = createTool({
         amountCents: input.amountCents,
         direction: input.direction,
         category: input.category,
+        dealId: input.dealId ? (input.dealId as Id<'deals'>) : undefined,
         frequency: input.frequency,
         interval: input.interval,
         anchorDay: input.anchorDay,
@@ -417,6 +425,7 @@ export const updateRuleInternal = internalMutation({
       v.union(v.literal('in'), v.literal('out')),
     ),
     category: v.optional(v.string()),
+    dealId: v.optional(v.id('deals')),
     frequency: v.optional(
       v.union(
         v.literal('weekly'),
@@ -442,6 +451,10 @@ export const updateRuleInternal = internalMutation({
     if (rest.amountCents !== undefined) patch.amountCents = rest.amountCents
     if (rest.direction !== undefined) patch.direction = rest.direction
     if (rest.category !== undefined) patch.category = rest.category
+    if (rest.dealId !== undefined) {
+      await assertDealInOrg(ctx, orgId, rest.dealId)
+      patch.dealId = rest.dealId
+    }
     if (rest.frequency !== undefined) patch.frequency = rest.frequency
     if (rest.interval !== undefined) patch.interval = rest.interval
     if (rest.anchorDay !== undefined) patch.anchorDay = rest.anchorDay
@@ -509,12 +522,14 @@ export const createManualEntryInternal = internalMutation({
     ),
     label: v.string(),
     category: v.optional(v.string()),
+    dealId: v.optional(v.id('deals')),
   },
   handler: async (ctx, { orgId, actorUserId, dateISO, ...rest }) => {
     await readMembership(ctx, orgId, actorUserId)
     if (!Number.isInteger(rest.amountCents) || rest.amountCents <= 0) {
       throw new ConvexError('invalid_amount')
     }
+    if (rest.dealId) await assertDealInOrg(ctx, orgId, rest.dealId)
     const date = parseISODate(dateISO, 'invalid_date')
     const id = await ctx.db.insert('forecastEntries', {
       orgId,
@@ -525,6 +540,7 @@ export const createManualEntryInternal = internalMutation({
       status: 'pending',
       label: rest.label,
       category: rest.category,
+      dealId: rest.dealId,
       overridden: false,
       currency: 'EUR',
     })
@@ -549,6 +565,7 @@ export const updateEntryInternal = internalMutation({
     ),
     label: v.optional(v.string()),
     category: v.optional(v.string()),
+    dealId: v.optional(v.id('deals')),
   },
   handler: async (ctx, { orgId, actorUserId, entryId, dateISO, ...rest }) => {
     await readMembership(ctx, orgId, actorUserId)
@@ -568,6 +585,10 @@ export const updateEntryInternal = internalMutation({
     if (rest.confidence !== undefined) patch.confidence = rest.confidence
     if (rest.label !== undefined) patch.label = rest.label
     if (rest.category !== undefined) patch.category = rest.category
+    if (rest.dealId !== undefined) {
+      await assertDealInOrg(ctx, orgId, rest.dealId)
+      patch.dealId = rest.dealId
+    }
     // A derived entry edited manually becomes protected from re-expansion.
     if (entry.ruleId) patch.overridden = true
 
@@ -610,6 +631,7 @@ const updateForecastRule = createTool({
     amountCents: z.number().int().positive().optional().describe('cents EUR'),
     direction: z.enum(['in', 'out']).optional(),
     category: z.string().optional(),
+    dealId: z.string().optional().describe('link the flow to a deal'),
     frequency: z.enum(['weekly', 'monthly', 'quarterly', 'yearly']).optional(),
     interval: z.number().int().min(1).optional(),
     anchorDay: z.number().int().min(1).max(31).optional(),
@@ -629,6 +651,7 @@ const updateForecastRule = createTool({
         amountCents: input.amountCents,
         direction: input.direction,
         category: input.category,
+        dealId: input.dealId ? (input.dealId as Id<'deals'>) : undefined,
         frequency: input.frequency,
         interval: input.interval,
         anchorDay: input.anchorDay,
@@ -680,6 +703,7 @@ const createManualForecastEntry = createTool({
     confidence: z.enum(['confirmed', 'expected', 'probable']),
     label: z.string().min(1),
     category: z.string().optional(),
+    dealId: z.string().optional().describe('link the flow to a deal'),
   }),
   execute: async (ctx, input): Promise<unknown> => {
     const { orgId, userId } = parseScope(ctx.userId)
@@ -694,6 +718,7 @@ const createManualForecastEntry = createTool({
         confidence: input.confidence,
         label: input.label,
         category: input.category,
+        dealId: input.dealId ? (input.dealId as Id<'deals'>) : undefined,
       },
     )
   },
@@ -716,6 +741,7 @@ const updateForecastEntry = createTool({
     confidence: z.enum(['confirmed', 'expected', 'probable']).optional(),
     label: z.string().min(1).optional(),
     category: z.string().optional(),
+    dealId: z.string().optional().describe('link the flow to a deal'),
   }),
   execute: async (ctx, input): Promise<unknown> => {
     const { orgId, userId } = parseScope(ctx.userId)
@@ -731,6 +757,7 @@ const updateForecastEntry = createTool({
         confidence: input.confidence,
         label: input.label,
         category: input.category,
+        dealId: input.dealId ? (input.dealId as Id<'deals'>) : undefined,
       },
     )
   },

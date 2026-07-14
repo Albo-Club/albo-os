@@ -1194,6 +1194,10 @@ export default defineSchema({
     amountCents: v.number(), // cents, always positive; the sign comes from `direction`
     direction: txDirection,
     category: v.optional(v.string()), // "loyer", "salaires", "dette"…
+    // Optional link to the deal this flow belongs to (SCPI rents, coupons,
+    // distributions…) — propagated to the derived entries by expandRules
+    // and surfaced on the deal page. Same-org enforced in the mutations.
+    dealId: v.optional(v.id('deals')),
     frequency: forecastFrequency,
     interval: v.number(), // "every N steps" (1 = every month/week/…)
     anchorDay: v.number(), // day of month 1-31 (monthly/quarterly/yearly), ISO day 1-7 (weekly)
@@ -1227,7 +1231,9 @@ export default defineSchema({
     label: v.string(),
     category: v.optional(v.string()),
     ruleId: v.optional(v.id('forecastRules')),
-    dealId: v.optional(v.id('deals')), // reserved for deriveFromDeals — not written in MVP
+    // Optional deal link: copied from the rule by expandRules, or set by
+    // hand on a one-off. Feeds the deal page's forecast section.
+    dealId: v.optional(v.id('deals')),
     derivedKey: v.optional(v.string()),
     overridden: v.boolean(),
     realizedTransactionId: v.optional(v.id('transactions')), // filled on matching
@@ -1242,5 +1248,6 @@ export default defineSchema({
     .index('by_org', ['orgId'])
     .index('by_org_and_date', ['orgId', 'date'])
     .index('by_derivedKey', ['derivedKey'])
-    .index('by_rule', ['ruleId']),
+    .index('by_rule', ['ruleId'])
+    .index('by_deal', ['dealId']),
 })

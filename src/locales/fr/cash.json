@@ -144,6 +144,8 @@
     "horizonMonths_other": "{{count}} mois",
     "startingBalance": "Solde de départ (disponible, comptes EUR) : {{amount}}",
     "reliability": "Fiabilité : fin {{month}}, projeté {{projected}} (au 1er du mois) · réalisé {{actual}} · écart {{delta}}",
+    "dealLabel": "Deal (optionnel)",
+    "dealHint": "Rattache ce flux à un deal (loyers SCPI, coupons, distributions…) — il apparaîtra sur la fiche du deal.",
     "chartCommitted": "Projeté (engagé)",
     "chartPlanned": "Projeté (avec prévu)",
     "grid": {
@@ -172,7 +174,9 @@
       "keepRemainderHint": "Conserver le reliquat : paiement partiel — le solde reste attendu comme nouvelle échéance ponctuelle.",
       "matched": "Échéance rapprochée",
       "remainderKept": "Échéance rapprochée — reliquat de {{amount}} conservé",
-      "error": "Une erreur est survenue"
+      "error": "Une erreur est survenue",
+      "pointAction": "Pointer sur le deal",
+      "pointed": "Transaction pointée sur le deal"
     },
     "suggestedRules": {
       "title": "Règles suggérées",

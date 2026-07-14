@@ -1396,6 +1396,17 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   direction) et est définitif côté UI — pour ré-afficher une suggestion,
   supprimer la ligne via le dashboard Convex (même stance V1 que
   `categoryRules`).
+- **Lien deal ↔ prévisionnel : le `dealId` d'une règle est resynchronisé
+  sur ses occurrences non protégées.** `expandRules` propage `rule.dealId`
+  à l'insert ET au resync — changer le deal d'une règle re-pointe donc ses
+  occurrences pending non `overridden` (les réalisées/annulées/éditées
+  gardent le leur, comme pour le montant). Le deal doit appartenir à l'org
+  (`assertDealInOrg` → `deal_wrong_org`) sur toutes les écritures, agent
+  compris. Le reliquat d'un paiement partiel hérite du `dealId`. Ce lien
+  n'affecte NI la grille (le bucket reste la catégorie), NI le pointage
+  (`transactions.dealId` reste géré par `convex/transactions.ts` — le
+  toast « Pointer sur le deal » appelle `matchTransaction`, jamais le code
+  forecast).
 - **La table front des échéances ne liste que les one-shot pures — limitation
   V1 assumée.** `forecasts.listEntries` (consommée par `ForecastEntriesSection`,
   onglet Cash « Aperçu ») filtre `ruleId == null` : les occurrences générées

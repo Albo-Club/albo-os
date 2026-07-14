@@ -646,5 +646,22 @@
       "deal": "Deal name",
       "lastValuation": "Last valuation"
     }
+  },
+  "dealForecast": {
+    "title": "Forecast",
+    "committed": "Still to deploy: {{remaining}} (committed {{committed}} − paid {{paid}}) — no call date, counted apart from the curve.",
+    "col": {
+      "date": "Date",
+      "label": "Label",
+      "confidence": "Confidence",
+      "amount": "Amount"
+    },
+    "ruleBadge": "Rule",
+    "confidence": {
+      "confirmed": "Committed",
+      "expected": "Expected",
+      "probable": "Probable"
+    },
+    "hint": "Forecast entries linked to this deal (managed from the Cash page). The realized layer is the Transactions section below."
   }
 }
