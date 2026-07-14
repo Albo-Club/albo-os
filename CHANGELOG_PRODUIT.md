@@ -23,6 +23,30 @@ bas de page.
 
 ---
 
+## v1.82.2 — 14/07/2026 à 12:50 — Parallel : préparation de l'affichage des communications par deal
+
+Travail préparatoire (rien de visible pour l'instant) en vue d'afficher, dans la
+section « Report » de chaque entité, les communications publiées par Parallel sur
+chaque deal (datées, avec pièces jointes). Cette étape ajoute un outil de
+diagnostic interne pour vérifier que ces communications sont bien lisibles via
+l'API avant de construire l'affichage.
+
+> **🔧 Notes techniques**
+>
+> - `convex/vasco.ts` : nouvelle `internalAction` `probeCommunications`
+>   (diagnostic CLI — `npx convex run --prod vasco:probeCommunications
+>   '{"orgSlug":"calte"}'`) : login, liste des comptes, puis `GetCommunications`
+>   sous chaque scoping candidat (`userId`, `accountId`). Renvoie la réponse
+>   GraphQL **brute** (`data` + `errors` + `extensions.warnings`), car le refus
+>   d'accès de la persona investisseur arrive en `warnings` (champ `null`) et non
+>   en `errors`.
+> - Ajoute `vascoGraphqlRaw` (variante non-throwing de `vascoGraphql`) et la
+>   requête `GET_COMMUNICATIONS` (`id`, `title`, `period`, `publishDate`,
+>   `issuer { id label }`, `communicationDocuments { document { … downloadUrl } }`).
+> - Aucune UI ni écriture DB. Phase 1 (dé-risquage) de l'étape 2b VASCO ;
+>   l'affichage (read path org-guardé + rattachement entité↔émetteur + bloc dans
+>   `CompanyReportsSection` + roll-up org) suivra une fois l'accès prouvé.
+
 ## v1.82.1 — 14/07/2026 à 12:26 — Rattrapage des résumés/one-liners pour les entités déjà existantes
 
 Le remplissage automatique du one-liner et du résumé (v1.81) ne se déclenchait
