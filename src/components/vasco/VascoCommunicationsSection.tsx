@@ -372,10 +372,10 @@ function LinkParallelDialog({
 }
 
 /**
- * Parallel communications for an entity, in its Report section. Shown for
- * entities that are already linked, or that carry a Parallel origin
- * (`sponsor`/`group`) — so the linker isn't noise on non-Parallel entities.
- * All data is read live (on-demand actions); nothing is stored.
+ * Parallel communications for an entity, in its Report section. Shown on
+ * portfolio (invested) entities — where Parallel deals live — plus any entity
+ * already linked. Unlinked → a link prompt; linked → the live list. All data is
+ * read live (on-demand actions); nothing is stored.
  */
 export function VascoCommunicationsSection({
   company,
@@ -385,11 +385,10 @@ export function VascoCommunicationsSection({
   const { t } = useTranslation('vasco')
   const [linkOpen, setLinkOpen] = useState(false)
   const isLinked = Boolean(company.vascoClientSlug && company.vascoIssuerId)
-  const looksParallel = /parallel/i.test(
-    `${company.sponsor ?? ''} ${company.group ?? ''}`,
-  )
 
-  if (!isLinked && !looksParallel) return null
+  // Show on invested (portfolio) entities — where Parallel deals live — plus any
+  // already-linked entity. Off on the org's own legal entities (group_*).
+  if (!isLinked && company.kind !== 'portfolio') return null
 
   return (
     <div className="space-y-3">
@@ -399,8 +398,11 @@ export function VascoCommunicationsSection({
           onChangeLink={() => setLinkOpen(true)}
         />
       ) : (
-        <div className="flex justify-end">
-          <Button variant="ghost" size="sm" onClick={() => setLinkOpen(true)}>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed p-3">
+          <span className="text-muted-foreground text-sm">
+            {t('link.prompt')}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => setLinkOpen(true)}>
             <Link2 className="size-4" />
             {t('link.cta')}
           </Button>

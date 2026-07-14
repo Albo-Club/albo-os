@@ -23,6 +23,22 @@ bas de page.
 
 ---
 
+## v1.86.1 — 14/07/2026 à 14:48 — Reportings Parallel : le rattachement s'affiche sur toutes les entités investies
+
+Le bloc « Rattacher à Parallel » n'apparaissait que si l'entité portait la
+mention « Parallel » dans un champ d'origine — du coup il restait invisible sur
+beaucoup de fiches. Il s'affiche désormais sur **toutes les entités investies**,
+sous forme d'un encart clair dans l'onglet Reports : un clic pour lier la fiche
+à son deal Parallel, et ses communications apparaissent. (Rien ne change sur les
+entités juridiques du groupe.)
+
+> **🔧 Notes techniques**
+>
+> - `VascoCommunicationsSection` : suppression du gate `sponsor`/`group`. Le bloc
+>   s'affiche si `company.kind === 'portfolio'` **ou** entité déjà rattachée ;
+>   l'état non-rattaché passe d'un bouton fantôme discret à un encart pointillé
+>   visible (nouvelle clé i18n `vasco:link.prompt`, en+fr).
+
 ## v1.86.0 — 14/07/2026 à 14:25 — Les reportings Parallel arrivent sur vos fiches deals
 
 Les entités investies via **Parallel** (les SPV Youse, Bernay, Abel Garnier,

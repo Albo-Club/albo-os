@@ -13,6 +13,7 @@
   },
   "link": {
     "cta": "Rattacher à Parallel",
+    "prompt": "Rattachez cette entité à son deal Parallel pour voir ses communications.",
     "linkedTo": "Rattaché à {{label}}",
     "change": "Modifier le rattachement",
     "unlink": "Détacher",
