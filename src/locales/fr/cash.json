@@ -153,6 +153,17 @@
       "remainderKept": "Échéance rapprochée — reliquat de {{amount}} conservé",
       "error": "Une erreur est survenue"
     },
+    "suggestedRules": {
+      "title": "Règles suggérées",
+      "hint": "Flux récurrents détectés dans les 12 derniers mois, sans règle correspondante. Créer une règle l'ajoute au prévisionnel ; ignorer est définitif.",
+      "create": "Créer la règle",
+      "ignore": "Ignorer",
+      "occurrences_one": "{{count}} occurrence ({{min}} → {{max}})",
+      "occurrences_other": "{{count}} occurrences ({{min}} → {{max}})",
+      "lastSeen": "vu le {{date}}",
+      "dismissed": "Suggestion ignorée",
+      "error": "Une erreur est survenue"
+    },
     "rules": {
       "title": "Règles récurrentes",
       "add": "Ajouter une règle",

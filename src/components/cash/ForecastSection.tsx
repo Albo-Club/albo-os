@@ -6,6 +6,7 @@ import { ConvexError } from 'convex/values'
 import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
+import { SuggestedRulesCard } from './SuggestedRules'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { forecastCategories } from '~/lib/categories'
@@ -45,6 +46,17 @@ const FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'yearly'] as const
 type Frequency = (typeof FREQUENCIES)[number]
 
 type Rule = Doc<'forecastRules'>
+
+/** Prefill for a fresh rule (suggested-rules card) — create mode only. */
+export type RulePrefill = {
+  label: string
+  amountCents: number
+  direction: 'in' | 'out'
+  category: string | null
+  frequency: Frequency
+  anchorDay: number
+  startDate: number
+}
 
 function msToDateInput(ms: number | undefined): string {
   return ms == null ? '' : new Date(ms).toISOString().slice(0, 10)
@@ -100,11 +112,14 @@ function ForecastCategorySelect({
 function RuleDialog({
   orgId,
   rule,
+  prefill,
   onClose,
   onSaved,
 }: {
   orgId: Id<'organizations'>
   rule: Rule | null // null = create
+  /** Initial values in create mode (suggested rule) — ignored when editing. */
+  prefill?: RulePrefill | null
   onClose: () => void
   onSaved: () => Promise<void>
 }) {
@@ -112,20 +127,21 @@ function RuleDialog({
   const createRule = useConvexMutation(api.forecasts.createRule)
   const updateRule = useConvexMutation(api.forecasts.updateRule)
 
-  const [label, setLabel] = useState(rule?.label ?? '')
+  const initial = rule ?? prefill ?? null
+  const [label, setLabel] = useState(initial?.label ?? '')
   const [amount, setAmount] = useState(
-    rule ? String(rule.amountCents / 100) : '',
+    initial ? String(initial.amountCents / 100) : '',
   )
   const [direction, setDirection] = useState<'in' | 'out'>(
-    rule?.direction ?? 'out',
+    initial?.direction ?? 'out',
   )
-  const [category, setCategory] = useState(rule?.category ?? NO_CATEGORY)
+  const [category, setCategory] = useState(initial?.category ?? NO_CATEGORY)
   const [frequency, setFrequency] = useState<Frequency>(
-    rule?.frequency ?? 'monthly',
+    initial?.frequency ?? 'monthly',
   )
-  const [anchorDay, setAnchorDay] = useState(String(rule?.anchorDay ?? 1))
+  const [anchorDay, setAnchorDay] = useState(String(initial?.anchorDay ?? 1))
   const [startDate, setStartDate] = useState(
-    msToDateInput(rule?.startDate ?? Date.now()),
+    msToDateInput(initial?.startDate ?? Date.now()),
   )
   const [endDate, setEndDate] = useState(msToDateInput(rule?.endDate))
   const [active, setActive] = useState(rule?.active ?? true)
@@ -369,6 +385,8 @@ export function ForecastRulesSection({
   const { t } = useTranslation(['cash', 'common'])
   const { fmtEur, fmtDate } = useFormatters()
   const [dialogRule, setDialogRule] = useState<Rule | null | 'create'>(null)
+  // Prefill of the create dialog when opened from a suggested rule.
+  const [dialogPrefill, setDialogPrefill] = useState<RulePrefill | null>(null)
   const [deleteRuleId, setDeleteRuleId] = useState<Id<'forecastRules'> | null>(
     null,
   )
@@ -408,6 +426,13 @@ export function ForecastRulesSection({
           {t('cash:forecast.rules.add')}
         </Button>
       </div>
+      <SuggestedRulesCard
+        orgId={orgId}
+        onCreate={(prefill) => {
+          setDialogPrefill(prefill)
+          setDialogRule('create')
+        }}
+      />
       {!rules ? (
         <div className="text-muted-foreground text-sm">{t('cash:loading')}</div>
       ) : rules.length === 0 ? (
@@ -491,7 +516,11 @@ export function ForecastRulesSection({
         <RuleDialog
           orgId={orgId}
           rule={dialogRule === 'create' ? null : dialogRule}
-          onClose={() => setDialogRule(null)}
+          prefill={dialogPrefill}
+          onClose={() => {
+            setDialogRule(null)
+            setDialogPrefill(null)
+          }}
           onSaved={refreshEntries}
         />
       )}

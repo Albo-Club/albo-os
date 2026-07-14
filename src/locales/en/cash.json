@@ -153,6 +153,17 @@
       "remainderKept": "Entry reconciled — {{amount}} remainder kept",
       "error": "Something went wrong"
     },
+    "suggestedRules": {
+      "title": "Suggested rules",
+      "hint": "Recurring flows detected over the last 12 months with no matching rule. Creating a rule adds it to the forecast; ignoring is permanent.",
+      "create": "Create rule",
+      "ignore": "Ignore",
+      "occurrences_one": "{{count}} occurrence ({{min}} → {{max}})",
+      "occurrences_other": "{{count}} occurrences ({{min}} → {{max}})",
+      "lastSeen": "last seen {{date}}",
+      "dismissed": "Suggestion ignored",
+      "error": "Something went wrong"
+    },
     "rules": {
       "title": "Recurring rules",
       "add": "Add a rule",
