@@ -32,6 +32,23 @@
     "admin": "Admin",
     "member": "Membre"
   },
+  "categories": {
+    "salaries": "Salaires & charges",
+    "fees": "Honoraires & conseils",
+    "subscriptions": "Abonnements & logiciels",
+    "rent": "Loyers & charges immo",
+    "bank_fees": "Frais bancaires",
+    "general": "Frais généraux",
+    "investment_income": "Royalties, dividendes & intérêts",
+    "rent_income": "Loyers reçus",
+    "other_income": "Autres produits",
+    "deals": "Deals",
+    "equity": "Capitaux propres",
+    "intercos": "Comptes courants & intercos",
+    "taxes": "Impôts & taxes",
+    "unmatched": "À pointer",
+    "uncategorized": "À qualifier"
+  },
   "demo": "Démo",
   "comingSoon": "Bientôt disponible",
   "theme": {

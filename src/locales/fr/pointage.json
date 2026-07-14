@@ -19,6 +19,16 @@
     "toQualify": "À qualifier",
     "amount": "dont {{amount}} de TVA"
   },
+  "category": {
+    "toQualify": "À qualifier"
+  },
+  "rules": {
+    "created": "Règle mémorisée — les prochaines transactions similaires seront classées automatiquement",
+    "apply": "Appliquer les règles",
+    "applied_one": "{{count}} transaction classée par les règles",
+    "applied_other": "{{count}} transactions classées par les règles",
+    "nothingToApply": "Aucune transaction en attente ne correspond à une règle"
+  },
   "actions": {
     "match": "Rattacher",
     "discard": "Écarter",

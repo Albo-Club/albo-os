@@ -1,6 +1,12 @@
 import { ConvexError, v } from 'convex/values'
 import { internalMutation, mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import { effectiveCategory, isValidCategory } from './lib/categories'
+import {
+  loadOrgRules,
+  ruleFieldsFor,
+  upsertRuleFromGesture,
+} from './lib/categoryRules'
 import {
   applyCategorization,
   applyMatchToDeal,
@@ -196,6 +202,8 @@ export const listByStatus = query({
         counterparty: tx.counterparty ?? null,
         // VAT (charge/product statuses only) — null = to be qualified.
         vatRateBps: tx.vatRateBps ?? null,
+        // Broad treasury category (charge/product only) — null = to qualify.
+        category: tx.category ?? null,
         account: account
           ? { label: account.label, bankName: account.bankName }
           : null,
@@ -304,6 +312,8 @@ export const listLedger = query({
         allocation: tx.allocation ?? null,
         // VAT (charge/product only) — null = to qualify.
         vatRateBps: tx.vatRateBps ?? null,
+        // Broad treasury category (charge/product only) — null = to qualify.
+        category: tx.category ?? null,
         account: account
           ? { label: account.label, bankName: account.bankName }
           : null,
@@ -396,20 +406,45 @@ export const ignoreTransaction = mutation({
  * Subtype of "set aside": same behavior as `ignoreTransaction`, only the
  * status differs so these transactions can be browsed later.
  * `vatRateBps` (optional) sets the deductible VAT rate — the UI sends 20 %
- * by default, adjustable later via `setVatRate`.
+ * by default, adjustable later via `setVatRate`. `category` (optional)
+ * sets the broad treasury category (lib/categories.ts).
+ *
+ * The gesture is memorized as a learned rule (categoryRules) replayed on
+ * future ingested transactions with the same label pattern — returns
+ * `ruleCreated` so the UI can surface it once.
  */
 export const categorizeAsCharge = mutation({
   args: {
     transactionId: v.id('transactions'),
     vatRateBps: v.optional(vatRateBpsValidator),
+    category: v.optional(v.string()),
   },
-  handler: async (ctx, { transactionId, vatRateBps }) => {
+  handler: async (ctx, { transactionId, vatRateBps, category }) => {
     const tx = await ctx.db.get('transactions', transactionId)
     if (!tx) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, tx.orgId)
+    if (category !== undefined && !isValidCategory('charge', category)) {
+      throw new ConvexError('invalid_category')
+    }
 
-    await applyCategorization(ctx, tx, 'charge', user._id, 'manual', vatRateBps)
-    return null
+    await applyCategorization(
+      ctx,
+      tx,
+      'charge',
+      user._id,
+      'manual',
+      vatRateBps,
+      category,
+    )
+    const rule = await upsertRuleFromGesture(ctx, {
+      orgId: tx.orgId,
+      tx,
+      status: 'charge',
+      category: category ?? tx.category,
+      vatRateBps: vatRateBps ?? tx.vatRateBps,
+      createdBy: user._id,
+    })
+    return { ruleCreated: rule?.created ?? false }
   },
 })
 
@@ -426,7 +461,13 @@ export const categorizeAsTax = mutation({
     const { user } = await requireOrgMember(ctx, tx.orgId)
 
     await applyCategorization(ctx, tx, 'tax', user._id, 'manual')
-    return null
+    const rule = await upsertRuleFromGesture(ctx, {
+      orgId: tx.orgId,
+      tx,
+      status: 'tax',
+      createdBy: user._id,
+    })
+    return { ruleCreated: rule?.created ?? false }
   },
 })
 
@@ -440,11 +481,15 @@ export const categorizeAsProduct = mutation({
   args: {
     transactionId: v.id('transactions'),
     vatRateBps: v.optional(vatRateBpsValidator),
+    category: v.optional(v.string()),
   },
-  handler: async (ctx, { transactionId, vatRateBps }) => {
+  handler: async (ctx, { transactionId, vatRateBps, category }) => {
     const tx = await ctx.db.get('transactions', transactionId)
     if (!tx) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, tx.orgId)
+    if (category !== undefined && !isValidCategory('product', category)) {
+      throw new ConvexError('invalid_category')
+    }
 
     await applyCategorization(
       ctx,
@@ -453,8 +498,17 @@ export const categorizeAsProduct = mutation({
       user._id,
       'manual',
       vatRateBps,
+      category,
     )
-    return null
+    const rule = await upsertRuleFromGesture(ctx, {
+      orgId: tx.orgId,
+      tx,
+      status: 'product',
+      category: category ?? tx.category,
+      vatRateBps: vatRateBps ?? tx.vatRateBps,
+      createdBy: user._id,
+    })
+    return { ruleCreated: rule?.created ?? false }
   },
 })
 
@@ -472,7 +526,13 @@ export const categorizeAsInternalTransfer = mutation({
     const { user } = await requireOrgMember(ctx, tx.orgId)
 
     await applyCategorization(ctx, tx, 'internal_transfer', user._id, 'manual')
-    return null
+    const rule = await upsertRuleFromGesture(ctx, {
+      orgId: tx.orgId,
+      tx,
+      status: 'internal_transfer',
+      createdBy: user._id,
+    })
+    return { ruleCreated: rule?.created ?? false }
   },
 })
 
@@ -531,6 +591,168 @@ export const unmatchTransaction = mutation({
 
     await applyUnmatch(ctx, tx, user._id, 'manual')
     return null
+  },
+})
+
+// ─── Categories (broad treasury buckets on charges/products) ────────────────
+
+/**
+ * Sets or clears (`null` = back to « à qualifier ») the broad treasury
+ * category of a transaction already categorized as charge or product.
+ * Setting a category also memorizes the gesture as a learned rule
+ * (categoryRules — with the transaction's current VAT rate), so future
+ * ingested transactions with the same label pattern are classified
+ * automatically. Clearing removes nothing from the rules.
+ */
+export const setCategory = mutation({
+  args: {
+    transactionId: v.id('transactions'),
+    category: v.union(v.string(), v.null()),
+  },
+  handler: async (ctx, { transactionId, category }) => {
+    const tx = await ctx.db.get('transactions', transactionId)
+    if (!tx) throw new ConvexError('not_found')
+    const { user } = await requireOrgMember(ctx, tx.orgId)
+    if (tx.matchStatus !== 'charge' && tx.matchStatus !== 'product') {
+      throw new ConvexError('not_categorized')
+    }
+    if (category !== null && !isValidCategory(tx.matchStatus, category)) {
+      throw new ConvexError('invalid_category')
+    }
+
+    await ctx.db.patch('transactions', transactionId, {
+      category: category ?? undefined,
+    })
+    if (category === null) return { ruleCreated: false }
+    const rule = await upsertRuleFromGesture(ctx, {
+      orgId: tx.orgId,
+      tx,
+      status: tx.matchStatus,
+      category,
+      vatRateBps: tx.vatRateBps,
+      createdBy: user._id,
+    })
+    return { ruleCreated: rule?.created ?? false }
+  },
+})
+
+/**
+ * Replays the org's learned rules on the whole `unmatched` queue (on-demand
+ * catch-up — new ingested transactions get the rules applied at insert).
+ * Direct patch, NO `matchingDecisions` row (machine decision, same principle
+ * as the backfills). Rows without `searchText` (pre-backfill) never match.
+ */
+export const applyCategoryRules = mutation({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+    const rules = await loadOrgRules(ctx, orgId)
+    if (rules.length === 0) return { applied: 0 }
+
+    const unmatched = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_matchStatus', (q) =>
+        q.eq('orgId', orgId).eq('matchStatus', 'unmatched'),
+      )
+      .collect()
+
+    let applied = 0
+    for (const tx of unmatched) {
+      const fields = ruleFieldsFor(rules, tx.searchText)
+      if (!fields) continue
+      await ctx.db.patch('transactions', tx._id, fields)
+      applied += 1
+    }
+    return { applied }
+  },
+})
+
+/**
+ * Monthly in/out breakdown by analysis bucket over the last `monthsBack`
+ * months (current month included) — the « Analyse » tab of the Cash page.
+ * Buckets derive from the pointage state (lib/categories.ts
+ * effectiveCategory): deal matches, liability allocations, taxes, then the
+ * stored charge/product categories; `unmatched` rows surface as their own
+ * bucket so the analysis is honest about what is not qualified yet.
+ * Internal transfers and explicitly ignored rows are excluded (not flows),
+ * tallied separately for visibility.
+ */
+export const getCategoryBreakdown = query({
+  args: {
+    orgId: v.id('organizations'),
+    monthsBack: v.number(),
+  },
+  handler: async (ctx, { orgId, monthsBack }) => {
+    await requireOrgMember(ctx, orgId)
+    if (!Number.isInteger(monthsBack) || monthsBack < 1 || monthsBack > 24) {
+      throw new ConvexError('invalid_horizon')
+    }
+
+    // Date.now() here defeats the query cache — same accepted trade-off as
+    // getForecastBalance (cf. KNOWN_ISSUES.md « Cash flow forecast »).
+    const now = new Date()
+    const windowStart = Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth() - (monthsBack - 1),
+      1,
+    )
+    const months: Array<string> = []
+    for (let i = monthsBack - 1; i >= 0; i--) {
+      months.push(
+        new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1))
+          .toISOString()
+          .slice(0, 7),
+      )
+    }
+
+    const txs = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_date', (q) =>
+        q.eq('orgId', orgId).gte('transactionDate', windowStart),
+      )
+      .collect()
+
+    const buckets = new Map<
+      string,
+      {
+        direction: 'in' | 'out'
+        category: string
+        byMonth: Record<string, number>
+        totalCents: number
+      }
+    >()
+    let internalTransferCents = 0
+    let ignoredCents = 0
+
+    for (const tx of txs) {
+      const category = effectiveCategory(tx)
+      if (category === null) {
+        if ((tx.matchStatus ?? 'unmatched') === 'internal_transfer') {
+          internalTransferCents += tx.amount
+        } else {
+          ignoredCents += tx.amount
+        }
+        continue
+      }
+      const monthKey = new Date(tx.transactionDate).toISOString().slice(0, 7)
+      const key = `${tx.direction}:${category}`
+      const bucket = buckets.get(key) ?? {
+        direction: tx.direction,
+        category,
+        byMonth: {},
+        totalCents: 0,
+      }
+      bucket.byMonth[monthKey] = (bucket.byMonth[monthKey] ?? 0) + tx.amount
+      bucket.totalCents += tx.amount
+      buckets.set(key, bucket)
+    }
+
+    return {
+      months,
+      rows: [...buckets.values()].sort((a, b) => b.totalCents - a.totalCents),
+      internalTransferCents,
+      ignoredCents,
+    }
   },
 })
 

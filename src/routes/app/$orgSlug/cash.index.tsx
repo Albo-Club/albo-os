@@ -10,6 +10,7 @@ import { api } from '../../../../convex/_generated/api'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { CashAccounts } from '~/components/cash/CashAccounts'
+import { CategoryBreakdown } from '~/components/cash/CategoryBreakdown'
 import {
   ForecastChartCard,
   ForecastEntriesSection,
@@ -20,7 +21,7 @@ import { VatCard } from '~/components/cash/VatCard'
 import { Button } from '~/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 
-type CashTab = 'apercu' | 'transactions'
+type CashTab = 'apercu' | 'transactions' | 'analyse'
 
 export const Route = createFileRoute('/app/$orgSlug/cash/')({
   component: Cash,
@@ -28,7 +29,9 @@ export const Route = createFileRoute('/app/$orgSlug/cash/')({
   // redirect). Optional so existing `<Link to="/cash">` callers need not pass
   // it; absent / unknown = overview, and the URL stays clean on the overview.
   validateSearch: (search: Record<string, unknown>): { tab?: CashTab } =>
-    search.tab === 'transactions' ? { tab: 'transactions' } : {},
+    search.tab === 'transactions' || search.tab === 'analyse'
+      ? { tab: search.tab }
+      : {},
   head: () => ({
     meta: [
       {
@@ -78,7 +81,10 @@ function Cash() {
           navigate({
             to: '/app/$orgSlug/cash',
             params: { orgSlug },
-            search: value === 'transactions' ? { tab: 'transactions' } : {},
+            search:
+              value === 'transactions' || value === 'analyse'
+                ? { tab: value as CashTab }
+                : {},
             replace: true,
           })
         }
@@ -88,6 +94,7 @@ function Cash() {
           <TabsTrigger value="transactions">
             {t('tabs.transactions')}
           </TabsTrigger>
+          <TabsTrigger value="analyse">{t('tabs.analyse')}</TabsTrigger>
         </TabsList>
         <TabsContent value="apercu" className="space-y-6 pt-4">
           {org && <ForecastChartCard orgId={org._id} />}
@@ -98,6 +105,9 @@ function Cash() {
         </TabsContent>
         <TabsContent value="transactions" className="pt-4">
           {org && <TransactionsLedger orgId={org._id} orgSlug={orgSlug} />}
+        </TabsContent>
+        <TabsContent value="analyse" className="pt-4">
+          {org && <CategoryBreakdown orgId={org._id} />}
         </TabsContent>
       </Tabs>
     </main>

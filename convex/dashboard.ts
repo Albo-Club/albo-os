@@ -16,6 +16,7 @@
 import { v } from 'convex/values'
 import { query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import { isAvailableAccount } from './lib/bankAccounts'
 import { residualValueCents } from './lib/metrics'
 
 const RECENT_TX = 5
@@ -92,7 +93,8 @@ export const getDashboard = query({
       if (isActive && !last) navIsPartial = true
     }
 
-    // 5. Cash: real EUR balances of non-archived accounts (+ their count).
+    // 5. Cash: real EUR balances of AVAILABLE accounts (+ their count) —
+    // closed/pledged accounts are not mobilizable cash (lib/bankAccounts.ts).
     const accounts = await ctx.db
       .query('bankAccounts')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
@@ -100,7 +102,7 @@ export const getDashboard = query({
     let cashCents = 0
     let accountsCount = 0
     for (const account of accounts) {
-      if (account.archivedAt || account.currency !== 'EUR') continue
+      if (!isAvailableAccount(account) || account.currency !== 'EUR') continue
       cashCents += account.currentBalance ?? 0
       accountsCount += 1
     }

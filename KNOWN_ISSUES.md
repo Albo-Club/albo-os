@@ -1110,6 +1110,47 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   serveur (`usePaginatedQuery` n'est utilisé que par le chat) : on garde le
   pattern `.take()` + `LocalPagination` partagé avec `PointageTable`.
 
+## Catégories & règles apprenantes (`convex/lib/categories.ts`, `categoryRules`)
+
+Les grandes catégories de trésorerie (analyse entrées/sorties + futur
+prévisionnel par catégorie) et leur automatisation « à la Fygr » : un geste
+manuel = une règle mémorisée, rejouée sur les transactions suivantes.
+
+- **`category` n'existe que sur `charge` / `product`** — même famille
+  d'invariants que `vatRateBps` : tout pointage qui fait quitter ces statuts
+  l'efface (enforced dans `convex/lib/pointage.ts`). Les autres statuts
+  dérivent leur bucket d'analyse du pointage lui-même
+  (`effectiveCategory` : deal → « Deals », allocation passif → « Capitaux
+  propres »/« Comptes courants & intercos », tax → « Impôts & taxes »,
+  unmatched → « À pointer » ; `ignored` et `internal_transfer` sont
+  **exclus** de l'analyse et comptés à part). Ne jamais stocker de
+  `category` sur un autre statut.
+- **Les listes de slugs sont dupliquées** `convex/lib/categories.ts` ↔
+  `src/lib/categories.ts` (convex/ et src/ ne partagent pas de modules
+  runtime, même pattern que `searchText`/`vat`) — sync verrouillée par
+  `tests/categories.test.ts`. Les libellés user-facing vivent dans
+  `common:categories.<slug>` (fr + en).
+- **Une règle = un geste mémorisé, upsert par `(orgId, pattern)`.** Le
+  pattern est dérivé du libellé (`deriveCategoryPattern` : contrepartie si
+  présente, sinon tokens stables du libellé — les tokens majoritairement
+  numériques (dates, références) sont retirés, 4 tokens max). Matching par
+  sous-ensemble de tokens sur `searchText` (une ligne sans `searchText`,
+  pré-backfill, ne matche jamais). Le dernier geste gagne (la règle est
+  réécrite). Statuts appris : charge / tax / product / internal_transfer —
+  **jamais** `matched` (jugement humain) ni `ignored` (angle mort silencieux
+  trop facile). Créées par les gestes **unitaires** seulement (pas le bulk,
+  libellés trop variés).
+- **Application : à l'insert (webhook Powens + import Mémo CSV) et à la
+  demande** (`transactions:applyCategoryRules`, bouton « Appliquer les
+  règles » du filtre À pointer). Jamais sur un patch de re-livraison webhook
+  (l'état de pointage existant n'est pas réécrit). Une application de règle
+  n'écrit **rien** dans `matchingDecisions` (décision machine — même
+  principe que les backfills) et ne touche pas `reconciled`.
+- **Pas d'édition/suppression de règles en V1** — passer par le dashboard
+  Convex (table `categoryRules`) pour corriger une règle trop large. Une
+  règle erronée ne casse rien d'irréversible : les lignes classées se
+  détachent (« Détacher ») et se reclassent normalement.
+
 ## TVA récupérable (`convex/lib/vat.ts`, `transactions:getVatPosition`)
 
 Suivi minimal de la TVA pour fiabiliser les charges réelles et la position de

@@ -27,6 +27,8 @@ export type TxDetails = {
   counterparty: string | null
   /** VAT rate (bps) of expenses/income — null = still to qualify. */
   vatRateBps?: number | null
+  /** Broad treasury category (charge/product only) — null = to qualify. */
+  category?: string | null
   /** Matching status — present on `listLedger` rows; drives the status badge. */
   matchStatus?:
     | 'unmatched'

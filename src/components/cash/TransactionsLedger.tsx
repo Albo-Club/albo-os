@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
-import { useConvexQuery } from '@convex-dev/react-query'
+import { Wand2 } from 'lucide-react'
+import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
@@ -8,6 +10,7 @@ import type { LiabilityOptionGroups } from '~/lib/liabilityOptions'
 import { buildLiabilityOptions } from '~/lib/liabilityOptions'
 import { PointageTable } from '~/components/pointage/PointageTable'
 import { Badge } from '~/components/ui/badge'
+import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import {
   Select,
@@ -61,6 +64,28 @@ export function TransactionsLedger({
   const [accountId, setAccountId] = useState<Id<'bankAccounts'> | undefined>(
     undefined,
   )
+  const [applyingRules, setApplyingRules] = useState(false)
+  const applyCategoryRules = useConvexMutation(
+    api.transactions.applyCategoryRules,
+  )
+
+  // On-demand replay of the learned categorization rules on the queue
+  // (new ingested transactions get them applied automatically at insert).
+  async function handleApplyRules() {
+    setApplyingRules(true)
+    try {
+      const { applied } = await applyCategoryRules({ orgId })
+      toast(
+        applied > 0
+          ? t('rules.applied', { count: applied })
+          : t('rules.nothingToApply'),
+      )
+    } catch {
+      toast.error(t('errors.failed'))
+    } finally {
+      setApplyingRules(false)
+    }
+  }
 
   // Server-side search (Convex search index), debounced.
   const [search, setSearch] = useState('')
@@ -147,6 +172,17 @@ export function TransactionsLedger({
           placeholder={t('search.placeholder')}
           className="max-w-sm"
         />
+        {status === 'unmatched' && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={applyingRules}
+            onClick={() => void handleApplyRules()}
+          >
+            <Wand2 className="size-4" />
+            {t('rules.apply')}
+          </Button>
+        )}
       </div>
       <PointageTable
         transactions={transactions}

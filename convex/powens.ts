@@ -28,6 +28,7 @@ import {
   internalQuery,
 } from './_generated/server'
 import { requireOrgRole } from './lib/auth'
+import { loadOrgRules, ruleFieldsFor } from './lib/categoryRules'
 import { buildSearchText } from './lib/searchText'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
@@ -570,6 +571,9 @@ export const ingestConnectionSync = internalMutation({
       `[powens] webhook connection=${connectionId} (user ${powensUserId} → org ${org.slug}): ` +
         `${accounts.length} compte(s) dans le payload`,
     )
+    // Learned auto-categorization rules, replayed on every NEW transaction
+    // (never on a patch — redelivery must not overwrite the matching state).
+    const categoryRules = await loadOrgRules(ctx, org._id)
     for (const acc of accounts) {
       const account = await resolveAccount(ctx, connectionId, acc, org)
       if (!account) {
@@ -626,10 +630,13 @@ export const ingestConnectionSync = internalMutation({
           alreadyExisting += 1
           summary.patched += 1
         } else {
+          // A matching learned rule classifies the new row at insert
+          // (charge/tax/product/internal transfer + category + VAT).
+          const ruleFields = ruleFieldsFor(categoryRules, fields.searchText)
           await ctx.db.insert('transactions', {
             ...fields,
+            ...(ruleFields ?? { matchStatus: 'unmatched' as const }),
             reconciled: false,
-            matchStatus: 'unmatched' as const,
           })
           ingested += 1
           summary.inserted += 1
@@ -1165,6 +1172,9 @@ export const importMemoCsvTransactions = internalMutation({
       return account
     }
 
+    // Learned auto-categorization rules of the target org (albo).
+    const categoryRules = await loadOrgRules(ctx, albo._id)
+
     let inserted = 0
     const skipped: Array<{ memoId: string; reason: string }> = []
     for (const row of rows) {
@@ -1201,6 +1211,9 @@ export const importMemoCsvTransactions = internalMutation({
       }
       const hasMeta = meta.type || meta.category || meta.externalRef
 
+      const searchText = buildSearchText(row.rawLabel, row.counterparty)
+      // A matching learned rule classifies the new row at insert.
+      const ruleFields = ruleFieldsFor(categoryRules, searchText)
       await ctx.db.insert('transactions', {
         orgId: albo._id,
         bankAccountId: account._id,
@@ -1209,12 +1222,12 @@ export const importMemoCsvTransactions = internalMutation({
         transactionDate: row.transactionDate,
         rawLabel: row.rawLabel,
         counterparty: row.counterparty,
-        searchText: buildSearchText(row.rawLabel, row.counterparty),
+        searchText,
         source: 'memo_csv',
         memoId: row.memoId,
         importMeta: hasMeta ? meta : undefined,
         reconciled: false,
-        matchStatus: 'unmatched' as const,
+        ...(ruleFields ?? { matchStatus: 'unmatched' as const }),
       })
       inserted += 1
     }

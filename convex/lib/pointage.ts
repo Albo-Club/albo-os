@@ -22,9 +22,9 @@ type MutCtx = GenericMutationCtx<DataModel>
  * - Every deal decision writes an append-only row to `matchingDecisions`
  *   (`source: 'manual' | 'agent_suggested'`); liability matching never
  *   writes there.
- * - `vatRateBps` only lives on the `charge` / `product` statuses: any
- *   matching that leaves these statuses clears it (cf. KNOWN_ISSUES.md
- *   « TVA récupérable »).
+ * - `vatRateBps` AND `category` only live on the `charge` / `product`
+ *   statuses: any matching that leaves these statuses clears them
+ *   (cf. KNOWN_ISSUES.md « TVA récupérable »).
  *
  * The caller has already loaded the transaction and checked org membership.
  */
@@ -68,6 +68,7 @@ export async function applyMatchToDeal(
     dealId,
     allocation: { kind: 'deal', targetId: dealId },
     vatRateBps: undefined,
+    category: undefined,
     reconciled: true,
     reconciledBy: decidedBy,
     reconciledAt: Date.now(),
@@ -97,6 +98,7 @@ export async function applyUnmatch(
     dealId: undefined,
     allocation: undefined,
     vatRateBps: undefined,
+    category: undefined,
     reconciled: false,
     reconciledBy: undefined,
     reconciledAt: undefined,
@@ -112,9 +114,9 @@ export async function applyUnmatch(
 /**
  * Sets a transaction aside: ignored, charge, tax, product or internal
  * transfer. Same patch for every status — only the status differs so these
- * transactions can be looked up later. `vatRateBps` (VAT) only exists on
- * charge/product: set when provided (existing value kept otherwise),
- * cleared for any other status.
+ * transactions can be looked up later. `vatRateBps` (VAT) and `category`
+ * only exist on charge/product: set when provided (existing value kept
+ * otherwise), cleared for any other status.
  */
 export async function applyCategorization(
   ctx: MutCtx,
@@ -123,6 +125,7 @@ export async function applyCategorization(
   decidedBy: Id<'users'>,
   source: PointageSource,
   vatRateBps?: VatRateBps,
+  category?: string,
 ) {
   assertNotAllocatedToLiability(tx)
   const vatBearing = status === 'charge' || status === 'product'
@@ -131,6 +134,7 @@ export async function applyCategorization(
     dealId: undefined,
     allocation: undefined,
     vatRateBps: vatBearing ? (vatRateBps ?? tx.vatRateBps) : undefined,
+    category: vatBearing ? (category ?? tx.category) : undefined,
     reconciled: false,
     reconciledBy: undefined,
     reconciledAt: undefined,
@@ -184,6 +188,7 @@ export async function applyAllocateToLiability(
     allocation: { kind, targetId },
     matchStatus: 'matched',
     vatRateBps: undefined,
+    category: undefined,
   })
 }
 
@@ -202,5 +207,6 @@ export async function applyDeallocate(ctx: MutCtx, tx: Doc<'transactions'>) {
     allocation: undefined,
     matchStatus: 'unmatched',
     vatRateBps: undefined,
+    category: undefined,
   })
 }

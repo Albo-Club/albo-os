@@ -4,12 +4,35 @@
   "title": "Trésorerie",
   "tabs": {
     "apercu": "Aperçu",
-    "transactions": "Transactions"
+    "transactions": "Transactions",
+    "analyse": "Analyse"
+  },
+  "analysis": {
+    "title": "Entrées / sorties par catégorie",
+    "window_one": "{{count}} mois",
+    "window_other": "{{count}} mois",
+    "empty": "Aucune transaction sur la période.",
+    "colCategory": "Catégorie",
+    "colTotal": "Total",
+    "inflows": "Entrées",
+    "outflows": "Sorties",
+    "net": "Net",
+    "excluded": "Hors analyse : {{internal}} de virements internes, {{ignored}} de transactions ignorées."
   },
   "back": "← Trésorerie",
   "notFound": "Compte introuvable.",
   "totalBalance": "Solde total",
+  "availableBalance": "Solde disponible",
+  "totalHint": "dont {{amount}} bloqués ou clôturés",
   "asOf": "au {{date}}",
+  "manualAsOf": "solde manuel au {{date}}",
+  "notConnected": "non connecté — solde à saisir",
+  "closedSection": "Comptes clôturés",
+  "badges": {
+    "pledged": "Nanti",
+    "closed": "Clôturé",
+    "notConnected": "Non connecté"
+  },
   "noBalance": "Solde inconnu",
   "accountsEmpty": "Aucun compte bancaire pour cette organisation pour l'instant.",
   "loading": "Chargement…",
@@ -22,6 +45,20 @@
     "saved": "Compte renommé",
     "errors": {
       "default": "Impossible de renommer le compte. Réessayez."
+    }
+  },
+  "edit": {
+    "title": "Modifier le compte",
+    "description": "Nom, statut et solde du compte. Rien n'est supprimé : un compte clôturé garde tout son historique.",
+    "saved": "Compte mis à jour",
+    "balanceLabel": "Solde actuel (€)",
+    "balanceHint": "Compte non connecté à la banque : le solde se met à jour à la main, avec sa date de saisie.",
+    "pledged": "Fonds nantis / bloqués",
+    "pledgedHint": "Le compte reste visible mais sort du solde disponible et du prévisionnel.",
+    "closed": "Compte clôturé à la banque",
+    "closedHint": "Conservé pour son historique de transactions, hors des soldes.",
+    "errors": {
+      "default": "Impossible de mettre à jour le compte. Réessayez."
     }
   },
   "connect": {
@@ -73,7 +110,7 @@
     "title": "Prévisionnel de trésorerie",
     "horizonMonths_one": "{{count}} mois",
     "horizonMonths_other": "{{count}} mois",
-    "startingBalance": "Solde de départ (comptes EUR réels) : {{amount}}",
+    "startingBalance": "Solde de départ (disponible, comptes EUR) : {{amount}}",
     "chartLabel": "Solde projeté",
     "rules": {
       "title": "Règles récurrentes",
