@@ -54,6 +54,19 @@ function decodeBase64Url(input: string): string {
   return new TextDecoder().decode(bytes)
 }
 
+/** First 12 hex chars of the SHA-256 of `input` — a non-reversible fingerprint
+ * to compare a stored secret against an expected one without exposing it. */
+async function sha256Hex12(input: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(input),
+  )
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 12)
+}
+
 /** POST /auth/login → JWT, plus the user `id` decoded from its claims. */
 async function vascoLogin(
   creds: VascoCreds,
@@ -351,9 +364,14 @@ export const seedConnection = internalMutation({
     clientSlug: v.string(),
     label: v.string(),
     username: v.string(),
-    password: v.string(),
+    // Provide exactly one: `password` (plain) or `passwordB64` (base64 — use
+    // this to avoid shell/paste mangling of special characters).
+    password: v.optional(v.string()),
+    passwordB64: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const password = args.passwordB64 ? atob(args.passwordB64) : args.password
+    if (!password) throw new ConvexError('password_required')
     const org = await ctx.db
       .query('organizations')
       .withIndex('by_slug', (q) => q.eq('slug', args.orgSlug))
@@ -369,7 +387,7 @@ export const seedConnection = internalMutation({
       await ctx.db.patch('vascoConnections', existing._id, {
         orgId: org._id,
         label: args.label,
-        password: args.password,
+        password,
         active: true,
       })
       return existing._id
@@ -379,7 +397,7 @@ export const seedConnection = internalMutation({
       clientSlug: args.clientSlug,
       label: args.label,
       username: args.username,
-      password: args.password,
+      password,
       active: true,
       createdAt: Date.now(),
     })
@@ -454,12 +472,18 @@ export const debugVascoLogin = internalAction({
     const results: Array<{
       label: string
       clientSlug: string
+      storedUsername: string
+      storedPasswordLen: number
+      storedPasswordSha12: string
       status: number
       ok: boolean
       hasToken: boolean
       bodySnippet: string
     }> = []
     for (const conn of conns) {
+      const storedUsername = conn.username
+      const storedPasswordLen = conn.password.length
+      const storedPasswordSha12 = await sha256Hex12(conn.password)
       try {
         const res = await fetch(`${vascoBaseUrl(conn.clientSlug)}/auth/login`, {
           method: 'POST',
@@ -482,6 +506,9 @@ export const debugVascoLogin = internalAction({
         results.push({
           label: conn.label,
           clientSlug: conn.clientSlug,
+          storedUsername,
+          storedPasswordLen,
+          storedPasswordSha12,
           status: res.status,
           ok: res.ok,
           hasToken,
@@ -492,6 +519,9 @@ export const debugVascoLogin = internalAction({
         results.push({
           label: conn.label,
           clientSlug: conn.clientSlug,
+          storedUsername,
+          storedPasswordLen,
+          storedPasswordSha12,
           status: 0,
           ok: false,
           hasToken: false,
