@@ -19,6 +19,16 @@
     "toQualify": "To qualify",
     "amount": "incl. {{amount}} VAT"
   },
+  "category": {
+    "toQualify": "To qualify"
+  },
+  "rules": {
+    "created": "Rule memorized — future similar transactions will be classified automatically",
+    "apply": "Apply rules",
+    "applied_one": "{{count}} transaction classified by the rules",
+    "applied_other": "{{count}} transactions classified by the rules",
+    "nothingToApply": "No pending transaction matches a rule"
+  },
   "actions": {
     "match": "Match",
     "discard": "Discard",

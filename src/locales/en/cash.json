@@ -4,12 +4,35 @@
   "title": "Cash",
   "tabs": {
     "apercu": "Overview",
-    "transactions": "Transactions"
+    "transactions": "Transactions",
+    "analyse": "Analysis"
+  },
+  "analysis": {
+    "title": "Inflows / outflows by category",
+    "window_one": "{{count}} month",
+    "window_other": "{{count}} months",
+    "empty": "No transactions over the period.",
+    "colCategory": "Category",
+    "colTotal": "Total",
+    "inflows": "Inflows",
+    "outflows": "Outflows",
+    "net": "Net",
+    "excluded": "Out of scope: {{internal}} internal transfers, {{ignored}} ignored transactions."
   },
   "back": "← Cash",
   "notFound": "Account not found.",
   "totalBalance": "Total balance",
+  "availableBalance": "Available balance",
+  "totalHint": "incl. {{amount}} pledged or closed",
   "asOf": "as of {{date}}",
+  "manualAsOf": "manual balance as of {{date}}",
+  "notConnected": "not connected — enter the balance manually",
+  "closedSection": "Closed accounts",
+  "badges": {
+    "pledged": "Pledged",
+    "closed": "Closed",
+    "notConnected": "Not connected"
+  },
   "noBalance": "No balance",
   "accountsEmpty": "No bank accounts for this organization yet.",
   "loading": "Loading…",
@@ -22,6 +45,20 @@
     "saved": "Account renamed",
     "errors": {
       "default": "Couldn't rename the account. Please try again."
+    }
+  },
+  "edit": {
+    "title": "Edit account",
+    "description": "Name, status and balance. Nothing is deleted: a closed account keeps its full history.",
+    "saved": "Account updated",
+    "balanceLabel": "Current balance (€)",
+    "balanceHint": "This account is not bank-connected: its balance is updated by hand, stamped with its entry date.",
+    "pledged": "Pledged / blocked funds",
+    "pledgedHint": "The account stays visible but leaves the available balance and the forecast.",
+    "closed": "Closed at the bank",
+    "closedHint": "Kept for its transaction history, out of the balances.",
+    "errors": {
+      "default": "Couldn't update the account. Please try again."
     }
   },
   "connect": {
@@ -73,7 +110,7 @@
     "title": "Cash forecast",
     "horizonMonths_one": "{{count}} month",
     "horizonMonths_other": "{{count}} months",
-    "startingBalance": "Starting balance (real EUR accounts): {{amount}}",
+    "startingBalance": "Starting balance (available, EUR accounts): {{amount}}",
     "chartLabel": "Projected balance",
     "rules": {
       "title": "Recurring rules",

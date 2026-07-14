@@ -23,6 +23,56 @@ bas de page.
 
 ---
 
+## v1.74.0 — 14/07/2026 à 10:05 — Trésorerie : solde disponible, grandes catégories et classement automatique
+
+Premier jalon de la refonte de la trésorerie (socle du futur prévisionnel).
+
+**Des soldes auxquels on peut se fier.** La page Trésorerie affiche
+désormais le **solde disponible** — le cash réellement mobilisable — à côté
+du solde total. Chaque compte peut être qualifié depuis sa fiche : fonds
+nantis ou bloqués (comptés à part), compte clôturé à la banque (conservé
+avec tout son historique, mais hors des soldes), et pour les comptes non
+connectés à la banque, le solde se saisit à la main avec sa date, pour
+toujours savoir de quand date le chiffre.
+
+**Des grandes catégories, sans comptabilité analytique.** Les charges et
+produits se classent en une douzaine de grandes familles (salaires,
+honoraires, abonnements, loyers, frais bancaires, royalties & dividendes…)
+directement depuis le registre des transactions. Les rattachements
+existants comptent d'office : un deal, un compte courant, un impôt sont
+déjà des catégories.
+
+**Le classement apprend tout seul.** Classer une transaction une fois
+suffit : l'outil mémorise une règle et classe automatiquement les
+transactions similaires à leur arrivée de la banque. Un bouton « Appliquer
+les règles » rattrape la file en attente d'un clic.
+
+**Un nouvel onglet Analyse.** Entrées et sorties par catégorie et par mois
+(3, 6 ou 12 mois), avec le net mensuel — pour voir enfin d'où vient et où
+part l'argent, virements internes exclus.
+
+> **🔧 Notes techniques**
+>
+> - `bankAccounts` : nouveaux champs `accountStatus` (active/closed) et
+>   `pledged` ; prédicat partagé `convex/lib/bankAccounts.ts:isAvailableAccount`
+>   appliqué au solde de départ du prévisionnel (`forecasts.ts`), au cash du
+>   dashboard (`dashboard.ts`) et à l'outil agent ; mutations
+>   `cash.updateAccountSettings` / `cash.updateAccountBalance` (refusée sur
+>   un compte Powens), dialog d'édition sur `/cash/$accountId`.
+> - `transactions.category` (slug, statuts charge/product uniquement, même
+>   invariant que `vatRateBps` dans `convex/lib/pointage.ts`) ; listes de
+>   catégories dupliquées `convex/lib/categories.ts` ↔ `src/lib/categories.ts`
+>   (sync testée par `tests/categories.test.ts`).
+> - Table `categoryRules` (upsert par org + pattern stable du libellé,
+>   `deriveCategoryPattern`) : règles créées par les gestes unitaires de
+>   pointage et `setCategory`, rejouées à l'insert (webhook Powens, import
+>   Mémo CSV) et à la demande (`transactions.applyCategoryRules`) — jamais de
+>   ligne `matchingDecisions` (décision machine). Cf. `KNOWN_ISSUES.md`
+>   « Catégories & règles apprenantes ».
+> - Query `transactions.getCategoryBreakdown` (buckets dérivés via
+>   `effectiveCategory`) + composant `CategoryBreakdown` (onglet Analyse,
+>   `?tab=analyse`).
+
 ## v1.73.2 — 13/07/2026 à 22:47 — Un peu d'air entre le nom d'une fiche et son badge
 
 Sur la fiche d'une entreprise et sur la fiche d'un deal, le badge affiché

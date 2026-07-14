@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import { isListedAccount } from './lib/bankAccounts'
 import { normalizeSearch } from './lib/searchText'
 import type { Doc } from './_generated/dataModel'
 
@@ -25,7 +26,7 @@ export const listAccounts = query({
       .query('bankAccounts')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
-    const active = accounts.filter((a) => !a.archivedAt)
+    const active = accounts.filter(isListedAccount)
     return await Promise.all(
       active.map(async (a) => {
         const owner = await ctx.db.get("companies", a.ownerCompanyId)
@@ -38,6 +39,11 @@ export const listAccounts = query({
           currency: a.currency,
           currentBalance: a.currentBalance ?? null,
           balanceAsOf: a.balanceAsOf ?? null,
+          accountStatus: a.accountStatus ?? 'active',
+          pledged: a.pledged ?? false,
+          // Powens-synced accounts refresh their balance on webhook; the
+          // others expose a manual balance edit (updateAccountBalance).
+          isConnected: a.powensAccountId != null,
           owner: ownerRef(owner),
         }
       }),
@@ -66,8 +72,65 @@ export const getAccount = query({
       currency: account.currency,
       currentBalance: account.currentBalance ?? null,
       balanceAsOf: account.balanceAsOf ?? null,
+      accountStatus: account.accountStatus ?? 'active',
+      pledged: account.pledged ?? false,
+      isConnected: account.powensAccountId != null,
       owner: ownerRef(owner),
     }
+  },
+})
+
+/**
+ * Qualifies an account: lifecycle (`active` / `closed`) and pledge flag
+ * (nantissement / blocked funds). Never deletes anything — a closed account
+ * keeps its full transaction history (deals still reference it); it simply
+ * leaves the available balance (convex/lib/bankAccounts.ts).
+ */
+export const updateAccountSettings = mutation({
+  args: {
+    bankAccountId: v.id('bankAccounts'),
+    accountStatus: v.union(v.literal('active'), v.literal('closed')),
+    pledged: v.boolean(),
+  },
+  handler: async (ctx, { bankAccountId, accountStatus, pledged }) => {
+    const account = await ctx.db.get('bankAccounts', bankAccountId)
+    if (!account) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, account.orgId)
+    await ctx.db.patch('bankAccounts', bankAccountId, {
+      accountStatus: accountStatus === 'active' ? undefined : accountStatus,
+      pledged: pledged ? true : undefined,
+    })
+    return bankAccountId
+  },
+})
+
+/**
+ * Manual balance entry for a NON-connected account (no `powensAccountId`) —
+ * Wormser, Neuflize… whose balances would otherwise go stale silently.
+ * Refused on a Powens-synced account: the webhook is the source of truth
+ * there and would overwrite the manual value at the next sync anyway.
+ * `balanceAsOf` is stamped now so the UI can show how fresh the figure is.
+ */
+export const updateAccountBalance = mutation({
+  args: {
+    bankAccountId: v.id('bankAccounts'),
+    currentBalance: v.number(), // cents; may be negative (overdraft)
+  },
+  handler: async (ctx, { bankAccountId, currentBalance }) => {
+    const account = await ctx.db.get('bankAccounts', bankAccountId)
+    if (!account) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, account.orgId)
+    if (account.powensAccountId != null) {
+      throw new ConvexError('account_connected')
+    }
+    if (!Number.isInteger(currentBalance)) {
+      throw new ConvexError('invalid_amount')
+    }
+    await ctx.db.patch('bankAccounts', bankAccountId, {
+      currentBalance,
+      balanceAsOf: Date.now(),
+    })
+    return bankAccountId
   },
 })
 

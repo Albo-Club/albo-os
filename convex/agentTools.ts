@@ -20,6 +20,7 @@ import {
   transactionTotals,
 } from './deals'
 import { parseScope, readMembership } from './lib/agentScope'
+import { isAvailableAccount } from './lib/bankAccounts'
 import { buildSearchText } from './lib/searchText'
 import { INSTRUMENTS, instrumentValidator } from './lib/instruments'
 import { residualValueCents } from './lib/metrics'
@@ -626,7 +627,8 @@ export const getDashboardSummaryInternal = internalQuery({
       .collect()
     let cashCents = 0
     for (const account of accounts) {
-      if (account.archivedAt || account.currency !== 'EUR') continue
+      // Available cash only — same scope as dashboard.ts (closed/pledged out).
+      if (!isAvailableAccount(account) || account.currency !== 'EUR') continue
       cashCents += account.currentBalance ?? 0
     }
 

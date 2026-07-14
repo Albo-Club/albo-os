@@ -14,6 +14,7 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireAppUser, requireOrgMember } from './lib/auth'
+import { isAvailableAccount } from './lib/bankAccounts'
 import {
   addMonthsUtc,
   buildMonthlyBalance,
@@ -348,8 +349,9 @@ export async function expandRulesForOrgs(
 /**
  * Projected cash balance, aggregated BY MONTH over `horizonMonths` months.
  *
- * - Starting balance = sum of the real `bankAccounts.currentBalance`
- *   (non-archived EUR accounts) across the in-scope orgs.
+ * - Starting balance = sum of the real `bankAccounts.currentBalance` of
+ *   AVAILABLE EUR accounts (non-archived, active, non-pledged —
+ *   lib/bankAccounts.ts) across the in-scope orgs.
  * - Monthly flow = sum of the month's `pending` `forecastEntries` (from the
  *   start of the current month to now + horizon), filtered by
  *   `minConfidence` (`confirmed` = committed only; `expected` = committed +
@@ -419,9 +421,13 @@ async function computeCashHistoryForOrgs(
       .query('bankAccounts')
       .withIndex('by_org', (q) => q.eq('orgId', oid))
       .collect()
+    // Same availability scope as the starting balance (pledged accounts
+    // are out of the "available cash" curve entirely). Closed accounts are
+    // excluded too: their balance is 0-or-stale, and rebuilding backwards
+    // from a balance they no longer contribute to would skew the curve.
     const eurAccountIds = new Set(
       accounts
-        .filter((a) => !a.archivedAt && a.currency === 'EUR')
+        .filter((a) => isAvailableAccount(a) && a.currency === 'EUR')
         .map((a) => a._id),
     )
     const txs = await ctx.db
@@ -472,7 +478,9 @@ export async function computeForecastBalanceForOrgs(
   )
   const windowEnd = addMonthsUtc(now, horizonMonths)
 
-  // 1. Starting balance = current real balances (Powens) of EUR accounts.
+  // 1. Starting balance = current real balances of AVAILABLE EUR accounts
+  // (active and not pledged — nantissements and closed accounts are not
+  // mobilizable cash, cf. convex/lib/bankAccounts.ts).
   let startingBalanceCents = 0
   let ignoredNonEurAccounts = 0
   for (const oid of orgIds) {
@@ -481,7 +489,7 @@ export async function computeForecastBalanceForOrgs(
       .withIndex('by_org', (q) => q.eq('orgId', oid))
       .collect()
     for (const account of accounts) {
-      if (account.archivedAt) continue
+      if (!isAvailableAccount(account)) continue
       if (account.currency !== 'EUR') {
         ignoredNonEurAccounts += 1
         continue

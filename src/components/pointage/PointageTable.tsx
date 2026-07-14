@@ -26,6 +26,7 @@ import {
   PaginationFooter,
   usePagination,
 } from '~/components/data-table/LocalPagination'
+import { CHARGE_CATEGORIES, PRODUCT_CATEGORIES } from '~/lib/categories'
 import { DEFAULT_VAT_RATE_BPS, VAT_RATES_BPS, vatCentsFromTtc } from '~/lib/vat'
 import { directionTone } from '~/lib/moneyTone'
 import {
@@ -336,6 +337,7 @@ export function PointageTable({
   )
   const bulkCategorize = useConvexMutation(api.transactions.bulkCategorize)
   const setVatRate = useConvexMutation(api.transactions.setVatRate)
+  const setCategory = useConvexMutation(api.transactions.setCategory)
 
   const discardMutations = {
     ignored: ignoreTransaction,
@@ -435,14 +437,16 @@ export function PointageTable({
     try {
       // A charge starts with a default 20% VAT rate, adjustable later in
       // the Charges tab (setVatRate).
-      if (kind === 'charge') {
-        await categorizeAsCharge({
-          transactionId: tx._id,
-          vatRateBps: DEFAULT_VAT_RATE_BPS,
-        })
-      } else {
-        await discardMutations[kind]({ transactionId: tx._id })
-      }
+      const result =
+        kind === 'charge'
+          ? await categorizeAsCharge({
+              transactionId: tx._id,
+              vatRateBps: DEFAULT_VAT_RATE_BPS,
+            })
+          : await discardMutations[kind]({ transactionId: tx._id })
+      // The gesture was memorized as a learned rule — surface it once so
+      // the automatic classification of future rows is never a surprise.
+      if (result?.ruleCreated) toast(t('rules.created'))
       if (!statusColumn) addRecent({ tx, kind })
       setSheetTx((cur) => (cur?._id === tx._id ? null : cur))
     } catch (err) {
@@ -481,6 +485,20 @@ export function PointageTable({
         transactionId: tx._id,
         vatRateBps: vatRateBps as 0 | 550 | 1000 | 2000 | null,
       })
+    } catch (err) {
+      reportError(err)
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  // Ledger mode: qualify a charge/product broad category inline. Setting a
+  // category memorizes a learned rule (surfaced once via toast).
+  async function handleCategory(tx: UnmatchedTx, category: string | null) {
+    setPendingId(tx._id)
+    try {
+      const result = await setCategory({ transactionId: tx._id, category })
+      if (result.ruleCreated) toast(t('rules.created'))
     } catch (err) {
       reportError(err)
     } finally {
@@ -638,6 +656,12 @@ export function PointageTable({
     if (status === 'charge' || status === 'product') {
       return (
         <div className="flex items-center justify-end gap-2">
+          <CategorySelect
+            tx={tx}
+            status={status}
+            pending={pending}
+            onChange={(category) => void handleCategory(tx, category)}
+          />
           <VatRateSelect
             tx={tx}
             pending={pending}
@@ -859,6 +883,45 @@ export function PointageTable({
         </AlertDialogContent>
       </AlertDialog>
     </>
+  )
+}
+
+/**
+ * Broad treasury category selector for a charge/product row (« À qualifier »
+ * / salaries, fees, subscriptions… — src/lib/categories.ts) → `setCategory`.
+ * Labels resolve from `common:categories.<slug>`.
+ */
+function CategorySelect({
+  tx,
+  status,
+  pending,
+  onChange,
+}: {
+  tx: UnmatchedTx
+  status: 'charge' | 'product'
+  pending: boolean
+  onChange: (category: string | null) => void
+}) {
+  const { t } = useTranslation(['pointage', 'common'])
+  const options = status === 'charge' ? CHARGE_CATEGORIES : PRODUCT_CATEGORIES
+  return (
+    <Select
+      value={tx.category ?? 'unset'}
+      disabled={pending}
+      onValueChange={(value) => onChange(value === 'unset' ? null : value)}
+    >
+      <SelectTrigger size="sm" className="w-40">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="unset">{t('pointage:category.toQualify')}</SelectItem>
+        {options.map((slug) => (
+          <SelectItem key={slug} value={slug}>
+            {t(`common:categories.${slug}`)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   )
 }
 

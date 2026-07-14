@@ -127,6 +127,16 @@ const matchDecisionSource = v.union(
   v.literal('agent_suggested'),
 )
 
+// Statuses a learned categorization rule can replay (never 'matched' — a
+// deal match needs human judgment; never 'ignored' — too easy to create a
+// silent blind spot from a one-off gesture).
+const categoryRuleStatus = v.union(
+  v.literal('charge'),
+  v.literal('tax'),
+  v.literal('product'),
+  v.literal('internal_transfer'),
+)
+
 // ─── Liability enums (equityPositions / intercompanyLoans / allocation) ─────
 
 // Nature of an equity position. Exported for the public creation
@@ -885,6 +895,16 @@ export default defineSchema({
     displayName: v.optional(v.string()),
     iban: v.optional(v.string()),
     accountKind: v.optional(v.string()), // "checking", "cto", "dat", "savings"
+    // Lifecycle: 'closed' = account closed at the bank, kept for its
+    // transaction history (deals still reference it). Absent = active.
+    // Distinct from `archivedAt` (import artifacts hidden everywhere).
+    accountStatus: v.optional(
+      v.union(v.literal('active'), v.literal('closed')),
+    ),
+    // Pledged/blocked funds (nantissement, escrow, blocked savings): the
+    // account stays listed but its balance is excluded from the AVAILABLE
+    // balance and from the forecast starting balance. Absent = false.
+    pledged: v.optional(v.boolean()),
     currency: v.string(),
     currentBalance: v.optional(v.number()), // cents, last known
     balanceAsOf: v.optional(v.number()),
@@ -943,6 +963,13 @@ export default defineSchema({
     // derived from the tax-inclusive total (lib/vat.ts), never stored.
     // Absent = « à qualifier ».
     vatRateBps: v.optional(vatRateBpsValidator),
+    // Broad treasury category (slug from convex/lib/categories.ts), set only
+    // on the `charge` / `product` statuses — cleared when the transaction
+    // leaves them (same invariant family as `vatRateBps`). The other
+    // statuses derive their analysis bucket from the status itself
+    // (deal / equity / intercos / taxes — cf. lib/categories.ts
+    // effectiveCategory). Absent = « à qualifier ».
+    category: v.optional(v.string()),
     transactionDate: v.number(),
     rawLabel: v.string(),
     counterparty: v.optional(v.string()),
@@ -980,6 +1007,27 @@ export default defineSchema({
       searchField: 'searchText',
       filterFields: ['orgId', 'matchStatus', 'bankAccountId'],
     }),
+
+  /**
+   * categoryRules — learned auto-categorization rules ("Fygr pattern"):
+   * one manual categorization gesture (charge/tax/product/internal transfer,
+   * optionally with a category + VAT rate) is memorized as a rule keyed by a
+   * normalized label pattern (lib/categories.ts:deriveCategoryPattern), then
+   * replayed on newly ingested transactions (Powens webhook, Mémo CSV) and on
+   * demand (transactions:applyCategoryRules). One rule per (org, pattern) —
+   * the latest gesture wins. Rule applications NEVER write to
+   * `matchingDecisions` (machine decision, not a human one).
+   */
+  categoryRules: defineTable({
+    orgId: v.id('organizations'),
+    pattern: v.string(), // normalized stable tokens (lib/categories.ts)
+    status: categoryRuleStatus, // charge | product | tax | internal_transfer
+    category: v.optional(v.string()), // charge/product only
+    vatRateBps: v.optional(vatRateBpsValidator), // charge/product only
+    createdBy: v.id('users'),
+  })
+    .index('by_org', ['orgId'])
+    .index('by_org_and_pattern', ['orgId', 'pattern']),
 
   /**
    * matchingDecisions — append-only history of matching decisions

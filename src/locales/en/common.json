@@ -32,6 +32,23 @@
     "admin": "Admin",
     "member": "Member"
   },
+  "categories": {
+    "salaries": "Salaries & payroll",
+    "fees": "Professional fees",
+    "subscriptions": "Subscriptions & software",
+    "rent": "Rent & property costs",
+    "bank_fees": "Bank fees",
+    "general": "General expenses",
+    "investment_income": "Royalties, dividends & interest",
+    "rent_income": "Rental income",
+    "other_income": "Other income",
+    "deals": "Deals",
+    "equity": "Equity",
+    "intercos": "Shareholder accounts & intercos",
+    "taxes": "Taxes",
+    "unmatched": "To reconcile",
+    "uncategorized": "To qualify"
+  },
   "demo": "Demo",
   "comingSoon": "Coming soon",
   "theme": {
