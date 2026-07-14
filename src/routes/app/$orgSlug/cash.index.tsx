@@ -15,6 +15,7 @@ import {
   ForecastEntriesSection,
   ForecastRulesSection,
 } from '~/components/cash/ForecastSection'
+import { ForecastMatchSuggestions } from '~/components/cash/ForecastMatchSuggestions'
 import { ForecastOverview } from '~/components/cash/ForecastOverview'
 import { TransactionsLedger } from '~/components/cash/TransactionsLedger'
 import { VatCard } from '~/components/cash/VatCard'
@@ -100,6 +101,7 @@ function Cash() {
           {org && <ForecastOverview orgId={org._id} />}
           <CashAccounts accounts={accounts} orgSlug={orgSlug} />
           {org && <VatCard orgId={org._id} orgSlug={orgSlug} />}
+          {org && <ForecastMatchSuggestions orgId={org._id} />}
           {org && <ForecastRulesSection orgId={org._id} />}
           {org && <ForecastEntriesSection orgId={org._id} />}
         </TabsContent>

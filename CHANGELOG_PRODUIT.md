@@ -23,6 +23,49 @@ bas de page.
 
 ---
 
+## v1.77.0 — 14/07/2026 à 11:01 — Rapprochement des échéances prévues avec les mouvements réels
+
+La page Trésorerie sait désormais **rapprocher le prévu du réel**. Une carte
+« Rapprochements suggérés » repère les échéances dues ou en retard qui
+ressemblent à un mouvement bancaire récent (même sens, montant proche, date
+proche, libellé qui colle) et propose de les rapprocher en un clic — les
+occurrences des règles récurrentes (loyers, salaires…) comme les échéances
+ponctuelles.
+
+Quand les montants ne collent pas exactement, la décision vous appartient,
+explicitement :
+
+- **Clore avec l'écart** (par défaut) : l'échéance est considérée réalisée
+  telle quelle, l'écart reste visible.
+- **Conserver le reliquat** (paiement partiel) : la partie payée est
+  réalisée et le solde restant redevient une échéance à venir, visible dans
+  les échéances ponctuelles.
+
+Au passage, **l'assistant IA parle désormais le même prévisionnel que la
+page** : sa projection de trésorerie utilise exactement la même logique que
+la courbe et la grille (flux du mois courant déjà passés en banque non
+recomptés, échéances en retard glissées sur le mois courant, comptes
+disponibles uniquement). Il sait aussi gérer le reliquat d'un paiement
+partiel quand vous lui demandez de pointer une échéance.
+
+> **🔧 Notes techniques**
+>
+> - Moteur de suggestion pur `convex/lib/entryMatching.ts` (fenêtres
+>   sens/date ±10 j/montant 50–150 %, score montant+date+libellé,
+>   affectation greedy 1↔1) + `tests/entryMatching.test.ts` ; query
+>   `forecasts.suggestForecastMatches` (exclut les tx `ignored`/virements
+>   internes et celles déjà portées par un `realizedTransactionId`).
+> - `markEntryRealized` (+ outil agent) prend `mode: 'close' |
+>   'keepRemainder'` via le cœur partagé `applyMarkEntryRealized` ; le
+>   reliquat devient une entry one-shot pure (sans `ruleId`/`derivedKey`).
+> - UI : `src/components/cash/ForecastMatchSuggestions.tsx` (carte + dialog
+>   de décision), i18n fr/en `cash:forecast.suggestions`.
+> - Alignement agent/MCP : `getForecastBalanceInternal` rebranché sur le
+>   cœur grille extrait `forecasts.ts:computeForecastGridForOrg`
+>   (`historyMonths: 0`) ; l'ancienne sémantique fenêtrée
+>   (`buildMonthlyBalance`, query publique `getForecastBalance`) est
+>   supprimée. KNOWN_ISSUES/TESTING mis à jour (F6-F14, FC16-FC18).
+
 ## v1.76.1 — 14/07/2026 à 10:44 — Parallel (VASCO) : lecture des positions + vérif en prod
 
 Suite de la connexion Parallel. Albo OS lit désormais tes **positions réelles**

@@ -41,20 +41,13 @@ export function ruleDerivedKey(ruleId: string, occurrenceMs: number): string {
   return `rule:${ruleId}:${isoDay(occurrenceMs)}`
 }
 
-// ─── Monthly aggregation of the projected balance ───────────────────────────
+// ─── Forecast entry shape ────────────────────────────────────────────────────
 
 export type ForecastConfidence = 'confirmed' | 'expected' | 'probable'
 
 export type ForecastEntryStatus = 'pending' | 'realized' | 'cancelled'
 
-/** Confidence rank: `minConfidence` includes any rank above or equal. */
-export const CONFIDENCE_RANK: Record<ForecastConfidence, number> = {
-  confirmed: 2,
-  expected: 1,
-  probable: 0,
-}
-
-/** Entry fields needed for the balance aggregation. */
+/** Entry fields needed for the monthly aggregations. */
 export type BalanceEntry = {
   date: number
   amountCents: number
@@ -64,83 +57,10 @@ export type BalanceEntry = {
   currency: string
 }
 
-export type MonthlyBalance = {
-  monthKey: string
-  inflowCents: number
-  outflowCents: number
-  netCents: number
-  projectedBalanceCents: number
-}
-
 /** Midnight UTC of the 1st of `ms`'s month. */
 function startOfMonthUtc(ms: number): number {
   const d = new Date(ms)
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)
-}
-
-/**
- * Aggregates forecast entries into a cumulative monthly projected balance.
- *
- * - Only `pending` entries, in EUR, with confidence ≥ `minConfidence` count
- *   (absent = everything). Non-EUR entries are counted apart (visibility),
- *   never aggregated.
- * - The grid covers every month of [windowStart, windowEnd], including
- *   those without flows (net 0), for a continuous trajectory.
- * - Each month's projected balance = starting balance + cumulative nets.
- */
-export function buildMonthlyBalance(params: {
-  entries: Array<BalanceEntry>
-  startingBalanceCents: number
-  windowStart: number
-  windowEnd: number
-  minConfidence?: ForecastConfidence
-}): { months: Array<MonthlyBalance>; ignoredNonEurEntries: number } {
-  const minRank = params.minConfidence
-    ? CONFIDENCE_RANK[params.minConfidence]
-    : 0
-
-  // Month grid (key → flows), in chronological order.
-  const buckets = new Map<
-    string,
-    { inflowCents: number; outflowCents: number }
-  >()
-  for (
-    let cursor = startOfMonthUtc(params.windowStart);
-    cursor <= params.windowEnd;
-    cursor = addMonthsUtc(cursor, 1)
-  ) {
-    buckets.set(monthKey(cursor), { inflowCents: 0, outflowCents: 0 })
-  }
-
-  let ignoredNonEurEntries = 0
-  for (const entry of params.entries) {
-    if (entry.status !== 'pending') continue
-    if (entry.currency !== 'EUR') {
-      ignoredNonEurEntries += 1
-      continue
-    }
-    if (CONFIDENCE_RANK[entry.confidence] < minRank) continue
-    const bucket = buckets.get(monthKey(entry.date))
-    if (!bucket) continue // out of window
-    if (entry.direction === 'in') bucket.inflowCents += entry.amountCents
-    else bucket.outflowCents += entry.amountCents
-  }
-
-  let runningCents = params.startingBalanceCents
-  const months: Array<MonthlyBalance> = []
-  for (const [key, bucket] of buckets) {
-    const netCents = bucket.inflowCents - bucket.outflowCents
-    runningCents += netCents
-    months.push({
-      monthKey: key,
-      inflowCents: bucket.inflowCents,
-      outflowCents: bucket.outflowCents,
-      netCents,
-      projectedBalanceCents: runningCents,
-    })
-  }
-
-  return { months, ignoredNonEurEntries }
 }
 
 // ─── Monthly history of the actual balance ──────────────────────────────────

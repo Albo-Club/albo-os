@@ -2,7 +2,7 @@
  * Agent tools for the cash-flow forecast (forecastRules / forecastEntries),
  * scoped to the thread's org (convex/agentTools.ts pattern). They reuse the
  * shared cores from convex/forecasts.ts (`insertRule`, `expandRulesForOrgs`,
- * `computeForecastBalanceForOrgs`).
+ * `computeForecastGridForOrg`, `applyMarkEntryRealized`).
  */
 
 import { ConvexError, v } from 'convex/values'
@@ -12,8 +12,9 @@ import { z } from 'zod/v3'
 import { internal } from './_generated/api'
 import { internalMutation, internalQuery } from './_generated/server'
 import {
+  applyMarkEntryRealized,
   assertValidHorizon,
-  computeForecastBalanceForOrgs,
+  computeForecastGridForOrg,
   expandRulesForOrgs,
   insertRule,
 } from './forecasts'
@@ -151,12 +152,52 @@ export const getForecastBalanceInternal = internalQuery({
   handler: async (ctx, { orgId, actorUserId, horizonMonths, minConfidence }) => {
     await readMembership(ctx, orgId, actorUserId)
     assertValidHorizon(horizonMonths)
-    return await computeForecastBalanceForOrgs(
-      ctx,
-      [orgId],
-      horizonMonths,
-      minConfidence,
+
+    // Same consumption semantics as the UI (forecasts.getForecastGrid):
+    // current-month pending flows are consumed by the realized ones per
+    // (direction, category) cell, overdue entries roll into the current
+    // month, scope = available EUR accounts. `historyMonths: 0` — no
+    // history needed, the current month's realized flows are still read.
+    const grid = await computeForecastGridForOrg(ctx, orgId, 0, horizonMonths)
+    // The grid splits pending flows committed vs planned (expected AND
+    // probable): "confirmed" maps to the committed-only scenario, anything
+    // else to the with-planned scenario.
+    const committedOnly = minConfidence === 'confirmed'
+    const balanceByMonth = new Map(
+      grid.projection.map((point) => [
+        point.monthKey,
+        committedOnly ? point.committedBalanceCents : point.plannedBalanceCents,
+      ]),
     )
+    const months = grid.months.map((key) => {
+      let inflowCents = 0
+      let outflowCents = 0
+      for (const row of grid.rows) {
+        const cell = row.byMonth[key]
+        if (!cell) continue
+        const pending =
+          cell.committedCents + (committedOnly ? 0 : cell.plannedCents)
+        if (row.direction === 'in') inflowCents += pending
+        else outflowCents += pending
+      }
+      return {
+        monthKey: key,
+        // Pending flows still to come (current month: AFTER consumption).
+        inflowCents,
+        outflowCents,
+        netCents: inflowCents - outflowCents,
+        projectedBalanceCents: balanceByMonth.get(key) ?? 0,
+      }
+    })
+
+    return {
+      startingBalanceCents: grid.startingBalanceCents,
+      currency: 'EUR',
+      currentMonthKey: grid.currentMonthKey,
+      ignoredNonEurAccounts: grid.ignoredNonEurAccounts,
+      ignoredNonEurEntries: grid.ignoredNonEurEntries,
+      months,
+    }
   },
 })
 
@@ -182,23 +223,19 @@ export const markEntryRealizedInternal = internalMutation({
     actorUserId: v.id('users'),
     entryId: v.id('forecastEntries'),
     transactionId: v.id('transactions'),
+    mode: v.optional(
+      v.union(v.literal('close'), v.literal('keepRemainder')),
+    ),
   },
-  handler: async (ctx, { orgId, actorUserId, entryId, transactionId }) => {
+  handler: async (ctx, { orgId, actorUserId, entryId, transactionId, mode }) => {
     await readMembership(ctx, orgId, actorUserId)
     const entry = await ctx.db.get('forecastEntries', entryId)
     if (!entry || entry.orgId !== orgId) throw new ConvexError('not_found')
 
-    // Same guardrails as forecasts.ts:markEntryRealized: the transaction
-    // must belong to the same org; we never touch the transaction itself.
-    const tx = await ctx.db.get('transactions', transactionId)
-    if (!tx || tx.orgId !== entry.orgId) {
-      throw new ConvexError('transaction_wrong_org')
-    }
-
-    await ctx.db.patch('forecastEntries', entry._id, {
-      status: 'realized',
-      realizedTransactionId: transactionId,
-    })
+    // Shared core (forecasts.ts): same-org guardrail, never touches the
+    // transaction itself; `keepRemainder` splits off a pending one-shot
+    // entry carrying the unpaid balance.
+    await applyMarkEntryRealized(ctx, entry, transactionId, mode ?? 'close')
     return { _id: entryId, status: 'realized' as const }
   },
 })
@@ -310,11 +347,13 @@ const expandForecastRules = createTool({
 
 const getForecastBalance = createTool({
   description:
-    'Projected monthly cash balance of the current org: starting balance = ' +
-    'sum of real EUR bank account balances, then pending forecast entries ' +
-    'month by month over the horizon. minConfidence "confirmed" = committed ' +
-    'flows only, "expected" = committed + expected, omit for all. Amounts ' +
-    'in CENTS EUR.',
+    'Projected monthly cash balance of the current org, same semantics as ' +
+    'the Cash page: starting balance = available EUR accounts (active, ' +
+    'non-pledged), current-month pending flows are consumed by the flows ' +
+    'already realized in the same category, overdue entries roll into the ' +
+    'current month. inflow/outflow are the pending flows still to come. ' +
+    'minConfidence "confirmed" = committed scenario only; omit (or ' +
+    '"expected") to include planned flows. Amounts in CENTS EUR.',
   inputSchema: z.object({
     horizonMonths: z.number().int().min(1).max(120),
     minConfidence: z.enum(['confirmed', 'expected']).optional(),
@@ -338,11 +377,17 @@ const markForecastEntryRealized = createTool({
     'Mark a forecast entry as realized by linking it to a real bank ' +
     'transaction of the same org (find ids via listForecastEntries and ' +
     'listUnmatchedTransactions / listTransactions). Does NOT touch the ' +
-    'transaction itself. The user approves via in-app buttons.',
+    'transaction itself. When the transaction amount differs from the ' +
+    'forecast amount, mode picks the explicit decision: "close" (default) ' +
+    'realizes with the gap; "keepRemainder" (partial payment, transaction ' +
+    'amount strictly below the forecast) realizes the paid part and keeps ' +
+    'the balance as a new pending one-off entry. The user approves via ' +
+    'in-app buttons.',
   needsApproval: true,
   inputSchema: z.object({
     entryId: z.string(),
     transactionId: z.string(),
+    mode: z.enum(['close', 'keepRemainder']).optional(),
   }),
   execute: async (ctx, input): Promise<unknown> => {
     const { orgId, userId } = parseScope(ctx.userId)
@@ -353,6 +398,7 @@ const markForecastEntryRealized = createTool({
         actorUserId: userId,
         entryId: input.entryId as Id<'forecastEntries'>,
         transactionId: input.transactionId as Id<'transactions'>,
+        mode: input.mode,
       },
     )
   },

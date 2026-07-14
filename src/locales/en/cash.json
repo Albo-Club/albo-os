@@ -125,6 +125,22 @@
       "more_other": "+ {{count}} other deals",
       "hint": "Committed amounts with no call date — counted here, not in the curve. Create a one-off entry to schedule a capital call."
     },
+    "suggestions": {
+      "title": "Suggested reconciliations",
+      "hint": "Due or overdue entries close to a recent transaction (amount, date, label).",
+      "ruleBadge": "Rule",
+      "match": "Reconcile",
+      "delta": "gap {{amount}}",
+      "dialogTitle": "Amounts differ",
+      "dialogBody": "The entry forecasts {{expected}}, the transaction is {{actual}}.",
+      "closeWithGap": "Close with the gap",
+      "closeWithGapHint": "Close with the gap: the entry is realized as-is, the gap stays readable on the row.",
+      "keepRemainder": "Keep the remainder ({{amount}})",
+      "keepRemainderHint": "Keep the remainder: partial payment — the balance stays expected as a new one-off entry.",
+      "matched": "Entry reconciled",
+      "remainderKept": "Entry reconciled — {{amount}} remainder kept",
+      "error": "Something went wrong"
+    },
     "rules": {
       "title": "Recurring rules",
       "add": "Add a rule",

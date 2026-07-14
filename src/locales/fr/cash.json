@@ -125,6 +125,22 @@
       "more_other": "+ {{count}} autres deals",
       "hint": "Montants engagés sans date d'appel — comptés ici, pas dans la courbe. Crée une échéance ponctuelle pour dater un appel de fonds."
     },
+    "suggestions": {
+      "title": "Rapprochements suggérés",
+      "hint": "Échéances dues ou en retard proches d'une transaction récente (montant, date, libellé).",
+      "ruleBadge": "Règle",
+      "match": "Rapprocher",
+      "delta": "écart {{amount}}",
+      "dialogTitle": "Les montants diffèrent",
+      "dialogBody": "L'échéance prévoit {{expected}}, la transaction fait {{actual}}.",
+      "closeWithGap": "Clore avec l'écart",
+      "closeWithGapHint": "Clore avec l'écart : l'échéance est réalisée telle quelle, l'écart reste lisible sur la ligne.",
+      "keepRemainder": "Conserver le reliquat ({{amount}})",
+      "keepRemainderHint": "Conserver le reliquat : paiement partiel — le solde reste attendu comme nouvelle échéance ponctuelle.",
+      "matched": "Échéance rapprochée",
+      "remainderKept": "Échéance rapprochée — reliquat de {{amount}} conservé",
+      "error": "Une erreur est survenue"
+    },
     "rules": {
       "title": "Règles récurrentes",
       "add": "Ajouter une règle",
