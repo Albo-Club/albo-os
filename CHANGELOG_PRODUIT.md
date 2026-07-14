@@ -23,6 +23,24 @@ bas de page.
 
 ---
 
+## v1.83.3 — 14/07/2026 à 13:39 — Moins d'interruptions de l'assistant sur les tâches planifiées
+
+L'assistant n'a plus besoin d'une validation manuelle à chaque fois qu'il
+crée, met à jour ou supprime un **rappel planifié** (par exemple la
+revérification automatique d'une pull request). Ces actions n'ont aucun
+effet sur vos données : elles sont désormais autorisées d'office — fini les
+clics de confirmation à répétition.
+
+> **🔧 Notes techniques**
+> Ajout d'un bloc `permissions.allow` dans `.claude/settings.json`
+> auto-autorisant les 4 outils de planification du serveur MCP « Claude
+> Code Remote » : `create_trigger`, `update_trigger`, `delete_trigger`,
+> `send_later`. Périmètre volontairement restreint à ces 4-là (pas de
+> `fire_trigger` ni `list_triggers`). Config versionnée et partagée → vaut
+> pour les deux utilisateurs ; effet immédiat en session, persistance
+> assurée par le commit (le conteneur des sessions web est recréé à zéro,
+> seul le versionné survit).
+
 ## v1.83.2 — 14/07/2026 à 13:20 — Résumés : exclure les produits d'épargne et nettoyer les scories
 
 Deux ajustements au rattrapage des résumés :
