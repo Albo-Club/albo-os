@@ -23,6 +23,38 @@ bas de page.
 
 ---
 
+## v1.82.0 — 14/07/2026 à 12:20 — La Trésorerie repère vos flux récurrents et propose des règles
+
+Le prévisionnel apprend de votre historique. La Trésorerie détecte désormais
+les **flux qui reviennent régulièrement** dans les 12 derniers mois — même
+sens, même rythme (hebdo, mensuel, trimestriel), montants stables — et les
+propose comme **règles récurrentes** quand aucune règle existante ne les
+couvre déjà.
+
+- Une carte « Règles suggérées » apparaît en tête de la section Règles
+  récurrentes (uniquement quand il y a quelque chose à proposer) : libellé,
+  montant médian avec la fourchette observée, rythme détecté, nombre
+  d'occurrences.
+- **« Créer la règle »** ouvre le formulaire habituel **prérempli** — vous
+  ajustez si besoin, vous enregistrez, la projection se recalcule. Rien ne
+  se crée jamais tout seul.
+- **« Ignorer »** est définitif : la suggestion ne reviendra pas.
+
+> **🔧 Notes techniques**
+>
+> - Moteur pur `convex/lib/recurrenceDetection.ts` (+ 11 tests) : groupement
+>   par `(direction, pattern)` via `deriveCategoryPattern` (même clé que les
+>   règles apprenantes de catégorie), ≥ 3 occurrences, intervalles réguliers
+>   (médiane + 60 % dans la tolérance — survit à une occurrence manquée),
+>   montants tous à ±30 % de la médiane ; dédup contre les règles actives
+>   (même sens/fréquence, montant ±15 %).
+> - Query `forecasts.suggestRules` (12 mois, comptes EUR) + mutation
+>   `dismissRuleSuggestion` ; nouvelle table `dismissedRuleSuggestions`
+>   (orgId, pattern, direction — pas de surface d'édition en V1, dashboard
+>   Convex comme `categoryRules`).
+> - UI : `src/components/cash/SuggestedRules.tsx` ; `RuleDialog` accepte un
+>   `prefill` (mode création). i18n fr/en `cash:forecast.suggestedRules`.
+
 ## v1.81.0 — 14/07/2026 à 12:05 — Résumés des participations Albo + remplissage automatique depuis le domaine
 
 Deux nouveautés autour du résumé de société introduit en v1.80 :

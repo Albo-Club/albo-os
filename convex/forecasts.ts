@@ -20,6 +20,7 @@ import {
   MATCH_DATE_WINDOW_DAYS,
   suggestEntryMatches as pairEntryMatches,
 } from './lib/entryMatching'
+import { detectRecurringFlows } from './lib/recurrenceDetection'
 import {
   addMonthsUtc,
   buildForecastGrid,
@@ -631,6 +632,101 @@ export const suggestForecastMatches = query({
         },
       ]
     })
+  },
+})
+
+// ─── Rule suggestions (recurrence detection) ─────────────────────────────────
+
+// History window scanned for recurring flows.
+const DETECTION_LOOKBACK_MONTHS = 12
+
+/**
+ * Recurring flows detected in the last 12 months of transactions that are
+ * not covered by an active rule nor dismissed — candidates for forecast
+ * rules, biggest amounts first. Detection is pure and tested
+ * (lib/recurrenceDetection.ts); it only SUGGESTS — creating the rule stays
+ * a human gesture through the prefilled rule dialog (createRule).
+ */
+export const suggestRules = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+    const now = Date.now()
+    const windowStart = addMonthsUtc(now, -DETECTION_LOOKBACK_MONTHS)
+
+    // EUR accounts only — rule amounts are EUR cents.
+    const accounts = await ctx.db
+      .query('bankAccounts')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    const eurAccountIds = new Set(
+      accounts.filter((a) => a.currency === 'EUR').map((a) => a._id),
+    )
+
+    const txs = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_date', (q) =>
+        q
+          .eq('orgId', orgId)
+          .gte('transactionDate', windowStart)
+          .lte('transactionDate', now),
+      )
+      .collect()
+
+    const rules = await ctx.db
+      .query('forecastRules')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    const dismissed = await ctx.db
+      .query('dismissedRuleSuggestions')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+
+    return detectRecurringFlows({
+      transactions: txs
+        .filter((tx) => eurAccountIds.has(tx.bankAccountId))
+        .map((tx) => ({
+          transactionDate: tx.transactionDate,
+          amountCents: tx.amount,
+          direction: tx.direction,
+          rawLabel: tx.rawLabel,
+          counterparty: tx.counterparty ?? null,
+          category: effectiveCategory(tx),
+        })),
+      existingRules: rules.map((rule) => ({
+        direction: rule.direction,
+        frequency: rule.frequency,
+        amountCents: rule.amountCents,
+        active: rule.active,
+      })),
+      dismissed: dismissed.map((d) => ({
+        pattern: d.pattern,
+        direction: d.direction,
+      })),
+    })
+  },
+})
+
+/**
+ * "Ignorer" on a suggested rule: remembers the (pattern, direction) so the
+ * suggestion never comes back. No edit/delete surface in V1 (Convex
+ * dashboard, like categoryRules).
+ */
+export const dismissRuleSuggestion = mutation({
+  args: {
+    orgId: v.id('organizations'),
+    pattern: v.string(),
+    direction: directionValidator,
+  },
+  handler: async (ctx, { orgId, pattern, direction }) => {
+    const { user } = await requireOrgMember(ctx, orgId)
+    await ctx.db.insert('dismissedRuleSuggestions', {
+      orgId,
+      pattern,
+      direction,
+      createdBy: user._id,
+    })
+    return null
   },
 })
 

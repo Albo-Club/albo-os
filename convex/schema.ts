@@ -1066,6 +1066,21 @@ export default defineSchema({
     .index('by_org_and_pattern', ['orgId', 'pattern']),
 
   /**
+   * dismissedRuleSuggestions — recurring-flow groups the user explicitly
+   * declined to turn into a forecast rule ("Ignorer" on the suggested-rules
+   * card). Keyed by the same stable label pattern as `categoryRules`
+   * (lib/categories.ts deriveCategoryPattern) so the suggestion never nags
+   * again. No edit/delete surface in V1 (Convex dashboard, like
+   * categoryRules).
+   */
+  dismissedRuleSuggestions: defineTable({
+    orgId: v.id('organizations'),
+    pattern: v.string(),
+    direction: txDirection,
+    createdBy: v.id('users'),
+  }).index('by_org', ['orgId']),
+
+  /**
    * matchingDecisions — append-only history of matching decisions
    * (training dataset for the matching agent, phase 2).
    * Never patched nor deleted. The current state lives on `transactions`

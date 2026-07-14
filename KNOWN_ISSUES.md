@@ -1363,6 +1363,17 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   que son flux est passé en banque, passer par le rapprochement unitaire
   (cf. le point rapprochement ci-dessus) — c'est lui qui fige l'échéance,
   la consommation par cellule n'est qu'un anti-double-comptage d'affichage.
+- **La détection de récurrences ne crée JAMAIS de règle seule.**
+  `forecasts.suggestRules` (moteur pur `lib/recurrenceDetection.ts`, testé)
+  propose des règles depuis l'historique 12 mois ; la création passe
+  toujours par le dialog prérempli (geste humain, `createRule` +
+  `expandRules` habituels). Le groupement réutilise la MÊME clé de pattern
+  que les règles apprenantes de catégorie (`deriveCategoryPattern`) — si le
+  pattern d'un libellé change, les deux mécanismes bougent ensemble.
+  « Ignorer » écrit dans `dismissedRuleSuggestions` (org, pattern,
+  direction) et est définitif côté UI — pour ré-afficher une suggestion,
+  supprimer la ligne via le dashboard Convex (même stance V1 que
+  `categoryRules`).
 - **La table front des échéances ne liste que les one-shot pures — limitation
   V1 assumée.** `forecasts.listEntries` (consommée par `ForecastEntriesSection`,
   onglet Cash « Aperçu ») filtre `ruleId == null` : les occurrences générées
