@@ -1996,13 +1996,25 @@ The **working investor read path** for holdings:
 2. `GetUser(id: <jwtId>) { accounts { __typename id label } }` → the user's
    accounts (e.g. one `IndividualAccount`, one `CorporateAccount`; the corporate
    one is the vehicle, labelled "Calte").
-3. `GetAccount(id) { accountSecurityContracts { … security { id name } } }` →
-   the holdings. Same object also exposes `accountDocuments` (reportings,
-   reachable), `investments`, `portfolio`, `investmentsAndTransfers` (cash).
+3. Holdings **list**: `GetAccount(id) { accountSecurityContracts { id security { id name } } }`.
+   ⚠️ Its monetary fields are **masked for the investor persona** — `amount`
+   (contract-level), `currentWithdrawalPrice`, `redeemableSecuritiesNumber` and
+   `security.latestValue` (NAV) all come back 0/null. Some array elements are
+   also `null` (filter them). `amount`/`startAt`/`endAt` live on the concrete
+   `RecurrenceContract` (inline fragment), not the `AccountSecurityContract`
+   interface.
+4. **Invested amounts (the real data): `GetAccount(id) { investments { … } }`.**
+   Each `Investment` carries `amount`, `securityName`, `vehicleName`,
+   `securitiesNumber`, `priceBySecurity`, `effectiveDate`,
+   `capitalCallPercentage` — this is what `pullPositions` uses (verified: 16
+   Calte positions, ~4 M€ via Parallel SPVs). Also on `Account`:
+   `accountDocuments` (reportings, reachable), `investmentsAndTransfers` (cash),
+   `portfolio`.
 
-Field notes: `Amount` is a **scalar** (no sub-selection). Field suggestions are
-mostly off (occasional "Did you mean …") → reconstruct queries from the docs,
-not by probing. The docs are a Docusaurus site; enumerate every schema page from
+Field notes: `Amount` is a **scalar** serialized as `{ amountInCents, currency }`
+(cents, like Albo OS — no sub-selection). Field suggestions are mostly off
+(occasional "Did you mean …") → reconstruct queries from the docs, not by
+probing. The docs are a Docusaurus site; enumerate every schema page from
 `https://docs.vasco.fund/sitemap.xml` — individual
 `/api-reference/authenticated/{queries,types,…}/<kebab>` pages render statically
 (readable), unlike the SPA index and `/api-reference/graphql`.

@@ -13,15 +13,24 @@
  * Investor scoping (see KNOWN_ISSUES.md "VASCO API"): introspection is
  * disabled, and the investor persona (ROLE_DISTRIBUTED_CUSTOMER) only sees a
  * subset — `GetAccounts` / `GetSecurities` / `GetParticipationsSummary` are
- * denied. Holdings are therefore read via
- *   JWT `id` → GetUser(id).accounts → GetAccount(id).accountSecurityContracts.
+ * denied, and the monetary fields on `accountSecurityContracts` come back
+ * masked (zeroed). The real invested amounts live on `Account.investments`,
+ * read via  JWT `id` → GetUser(id).accounts → GetAccount(id).investments.
  */
 
 import { ConvexError, v } from 'convex/values'
-import { action, internalMutation, internalQuery } from './_generated/server'
+import {
+  action,
+  internalAction,
+  internalMutation,
+  internalQuery,
+} from './_generated/server'
 import { internal } from './_generated/api'
 import { requireOrgMember } from './lib/auth'
-import type { Doc } from './_generated/dataModel'
+import type { GenericActionCtx } from 'convex/server'
+import type { DataModel, Doc } from './_generated/dataModel'
+
+type ActionCtx = GenericActionCtx<DataModel>
 
 // ── HTTP / GraphQL helpers ──────────────────────────────────────────────────
 
@@ -95,15 +104,21 @@ const GET_USER = `query($id: ID!) {
   GetUser(id: $id) { id accounts { __typename id label } }
 }`
 
+// `amount` is the custom scalar `Amount`, serialized as { amountInCents,
+// currency } — it takes no sub-selection.
 const GET_ACCOUNT = `query($id: ID!) {
   GetAccount(id: $id) {
     id
     label
-    accountSecurityContracts {
+    investments {
       id
-      redeemableSecuritiesNumber
-      currentWithdrawalPrice
-      security { id name }
+      securityName
+      vehicleName
+      amount
+      securitiesNumber
+      priceBySecurity
+      effectiveDate
+      capitalCallPercentage
     }
     accountDocuments { __typename }
   }
@@ -116,38 +131,53 @@ type GetUserResult = {
   } | null
 }
 
+type VascoAmount = { amountInCents?: number | null; currency?: string | null }
+
+type InvestmentNode = {
+  id: string
+  securityName?: string | null
+  vehicleName?: string | null
+  amount?: VascoAmount | null
+  securitiesNumber?: number | null
+  priceBySecurity?: number | null
+  effectiveDate?: string | null
+  capitalCallPercentage?: number | null
+}
+
 type GetAccountResult = {
   GetAccount: {
     id: string
     label: string
-    accountSecurityContracts: Array<{
-      id: string
-      redeemableSecuritiesNumber: number | null
-      currentWithdrawalPrice: number | null
-      security: { id: string; name: string }
-    }> | null
+    investments: Array<InvestmentNode | null> | null
     accountDocuments: Array<{ __typename: string }> | null
   } | null
 }
 
-export type VascoAccountParticipations = {
+export type VascoInvestment = {
+  investmentId: string
+  securityName: string | null
+  vehicleName: string | null
+  investedCents: number | null
+  currency: string | null
+  securitiesNumber: number | null
+  priceBySecurity: number | null
+  effectiveDate: string | null
+  capitalCallPercentage: number | null
+}
+
+export type VascoAccountPositions = {
   accountId: string
   accountLabel: string
   accountType: string
   documentsCount: number
-  holdings: Array<{
-    contractId: string
-    securityId: string
-    securityName: string
-    redeemableSecuritiesNumber: number | null
-    currentWithdrawalPrice: number | null
-  }>
+  totalInvestedCents: number
+  investments: Array<VascoInvestment>
 }
 
-/** Log in for one connection and read every account's holdings. */
-async function pullParticipations(
+/** Log in for one connection and read every account's investments. */
+async function pullPositions(
   creds: VascoCreds,
-): Promise<Array<VascoAccountParticipations>> {
+): Promise<Array<VascoAccountPositions>> {
   const { token, userId } = await vascoLogin(creds)
   const userData = await vascoGraphql<GetUserResult>(
     creds.clientSlug,
@@ -156,7 +186,7 @@ async function pullParticipations(
     { id: userId },
   )
   const accounts = userData.GetUser?.accounts ?? []
-  const out: Array<VascoAccountParticipations> = []
+  const out: Array<VascoAccountPositions> = []
   for (const acc of accounts) {
     const accData = await vascoGraphql<GetAccountResult>(
       creds.clientSlug,
@@ -166,21 +196,82 @@ async function pullParticipations(
     )
     const a = accData.GetAccount
     if (!a) continue
+    const investments: Array<VascoInvestment> = (a.investments ?? [])
+      .filter((inv): inv is InvestmentNode => inv != null)
+      .map((inv) => ({
+        investmentId: inv.id,
+        securityName: inv.securityName ?? null,
+        vehicleName: inv.vehicleName ?? null,
+        investedCents: inv.amount?.amountInCents ?? null,
+        currency: inv.amount?.currency ?? null,
+        securitiesNumber: inv.securitiesNumber ?? null,
+        priceBySecurity: inv.priceBySecurity ?? null,
+        effectiveDate: inv.effectiveDate ?? null,
+        capitalCallPercentage: inv.capitalCallPercentage ?? null,
+      }))
+    const totalInvestedCents = investments.reduce(
+      (s, i) => s + (i.investedCents ?? 0),
+      0,
+    )
     out.push({
       accountId: a.id,
       accountLabel: a.label,
       accountType: acc.__typename,
       documentsCount: (a.accountDocuments ?? []).length,
-      holdings: (a.accountSecurityContracts ?? []).map((c) => ({
-        contractId: c.id,
-        securityId: c.security.id,
-        securityName: c.security.name,
-        redeemableSecuritiesNumber: c.redeemableSecuritiesNumber,
-        currentWithdrawalPrice: c.currentWithdrawalPrice,
-      })),
+      totalInvestedCents,
+      investments,
     })
   }
   return out
+}
+
+type ConnectionResult = {
+  clientSlug: string
+  label: string
+  totalInvestedCents: number
+  accounts: Array<VascoAccountPositions>
+  error?: string
+}
+
+/** Log in and read each connection, recording the outcome. Shared by the two
+ * read entry points (public action + CLI internal action). */
+async function runConnections(
+  ctx: ActionCtx,
+  conns: Array<Doc<'vascoConnections'>>,
+): Promise<Array<ConnectionResult>> {
+  const results: Array<ConnectionResult> = []
+  for (const conn of conns) {
+    try {
+      const accounts = await pullPositions(conn)
+      const totalInvestedCents = accounts.reduce(
+        (s, a) => s + a.totalInvestedCents,
+        0,
+      )
+      results.push({
+        clientSlug: conn.clientSlug,
+        label: conn.label,
+        totalInvestedCents,
+        accounts,
+      })
+      await ctx.runMutation(internal.vasco.markConnected, {
+        connectionId: conn._id,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      results.push({
+        clientSlug: conn.clientSlug,
+        label: conn.label,
+        totalInvestedCents: 0,
+        accounts: [],
+        error: message,
+      })
+      await ctx.runMutation(internal.vasco.markConnected, {
+        connectionId: conn._id,
+        error: message,
+      })
+    }
+  }
+  return results
 }
 
 // ── Connection registry (internal-only — rows carry credentials) ────────────
@@ -198,6 +289,27 @@ export const authorizeAndListConnections = internalQuery({
     const conns = await ctx.db
       .query('vascoConnections')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    return conns.filter((c) => c.active)
+  },
+})
+
+/**
+ * Like `authorizeAndListConnections` but resolved by org slug and WITHOUT an
+ * auth check — for CLI-run internal actions (`convex run`), which have no user
+ * identity. INTERNAL ONLY (never exposed publicly); rows carry credentials.
+ */
+export const getConnectionsByOrgSlug = internalQuery({
+  args: { orgSlug: v.string() },
+  handler: async (ctx, { orgSlug }) => {
+    const org = await ctx.db
+      .query('organizations')
+      .withIndex('by_slug', (q) => q.eq('slug', orgSlug))
+      .unique()
+    if (!org) throw new ConvexError('org_not_found')
+    const conns = await ctx.db
+      .query('vascoConnections')
+      .withIndex('by_org', (q) => q.eq('orgId', org._id))
       .collect()
     return conns.filter((c) => c.active)
   },
@@ -265,13 +377,24 @@ export const seedConnection = internalMutation({
   },
 })
 
-// ── Proof action (étape 1) ──────────────────────────────────────────────────
+/**
+ * Delete a connection row (e.g. remove a mistakenly-seeded one). One-shot CLI:
+ *   npx convex run --prod vasco:deleteConnection '{"connectionId":"<id>"}'
+ */
+export const deleteConnection = internalMutation({
+  args: { connectionId: v.id('vascoConnections') },
+  handler: async (ctx, { connectionId }) => {
+    await ctx.db.delete('vascoConnections', connectionId)
+    return { deleted: connectionId }
+  },
+})
+
+// ── Read actions ────────────────────────────────────────────────────────────
 
 /**
  * For every active VASCO connection of `orgId`, log in and return the accounts
- * and their holdings (+ a reportings count). Org-member-guarded. Read-only:
- * nothing is written to the portfolio tables yet — the deal bridge, valuations
- * and documents land in later steps.
+ * and their investments. Org-member-guarded. Read-only — nothing is written to
+ * the portfolio tables yet (the deal bridge + valuations land in a later step).
  */
 export const fetchParticipations = action({
   args: { orgId: v.id('organizations') },
@@ -280,37 +403,23 @@ export const fetchParticipations = action({
       internal.vasco.authorizeAndListConnections,
       { orgId },
     )
-    const connections: Array<{
-      clientSlug: string
-      label: string
-      accounts: Array<VascoAccountParticipations>
-      error?: string
-    }> = []
-    for (const conn of conns) {
-      try {
-        const accounts = await pullParticipations(conn)
-        connections.push({
-          clientSlug: conn.clientSlug,
-          label: conn.label,
-          accounts,
-        })
-        await ctx.runMutation(internal.vasco.markConnected, {
-          connectionId: conn._id,
-        })
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        connections.push({
-          clientSlug: conn.clientSlug,
-          label: conn.label,
-          accounts: [],
-          error: message,
-        })
-        await ctx.runMutation(internal.vasco.markConnected, {
-          connectionId: conn._id,
-          error: message,
-        })
-      }
-    }
-    return { orgId, connections }
+    return { orgId, connections: await runConnections(ctx, conns) }
+  },
+})
+
+/**
+ * Same read as `fetchParticipations`, resolved by org slug and runnable from
+ * the CLI without an auth session (internal action):
+ *   npx convex run --prod vasco:verifyConnection '{"orgSlug":"calte"}'
+ * Handy to confirm a seeded connection actually reaches VASCO in prod.
+ */
+export const verifyConnection = internalAction({
+  args: { orgSlug: v.string() },
+  handler: async (ctx, { orgSlug }) => {
+    const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
+      internal.vasco.getConnectionsByOrgSlug,
+      { orgSlug },
+    )
+    return { orgSlug, connections: await runConnections(ctx, conns) }
   },
 })

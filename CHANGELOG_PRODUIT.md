@@ -23,6 +23,30 @@ bas de page.
 
 ---
 
+## v1.76.1 — 14/07/2026 à 10:44 — Parallel (VASCO) : lecture des positions + vérif en prod
+
+Suite de la connexion Parallel. Albo OS lit désormais tes **positions réelles**
+depuis Parallel (montant investi par ligne, société, véhicule, date), et une
+commande permet de **vérifier la connexion directement en prod**. Toujours rien
+d'affiché dans l'app pour l'instant : c'est la fondation pour rattacher ces
+lignes à tes deals et remonter les valorisations (étape suivante).
+
+> **🔧 Notes techniques**
+>
+> - `convex/vasco.ts` : les positions se lisent maintenant via
+>   `GetAccount(id).investments` (montant investi réel par ligne : `amount` en
+>   cents, `securityName`, `vehicleName`, `securitiesNumber`, dates) — les
+>   `accountSecurityContracts` renvoyaient des montants **masqués** (0) pour le
+>   persona investisseur. Cf. `KNOWN_ISSUES.md` « VASCO API ».
+> - Nouvelle action interne `verifyConnection` (lançable en
+>   `convex run --prod vasco:verifyConnection '{"orgSlug":"calte"}'`, sans
+>   session auth) : remonte les positions par connexion pour valider un accès en
+>   prod. `fetchParticipations` (publique, org-gardée) partage le même code.
+> - Mutation `deleteConnection` (retirer une connexion, ex. ligne seedée par
+>   erreur) + lecture par slug `getConnectionsByOrgSlug` ; parsing null-safe des
+>   contrats. `pnpm lint` + `pnpm test:unit` au vert ; pas de resync
+>   `_generated` (module `vasco` déjà enregistré).
+
 ## v1.76.0 — 14/07/2026 à 10:43 — One-liners des participations Albo + nouveau secteur « Consumer »
 
 Chaque société opérationnelle du portefeuille Albo a désormais un **one-liner** :
