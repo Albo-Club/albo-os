@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 
 import type { Id } from '../../../convex/_generated/dataModel'
 import { Badge } from '~/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Skeleton } from '~/components/ui/skeleton'
 import {
   Table,
@@ -129,9 +128,9 @@ function AccountsTable({
 }
 
 /**
- * Bank accounts of the org, grouped by owning entity, with the two headline
- * figures: the AVAILABLE balance (active, non-pledged accounts — the cash
- * actually mobilizable) and the total. Closed accounts are kept (their
+ * Bank accounts of the org, grouped by owning entity. The headline
+ * available/total figures moved to the cockpit KPI band (CashKpis) — this
+ * section keeps the tables only. Closed accounts are kept (their
  * transaction history still backs deals) in a separate muted section.
  */
 export function CashAccounts({
@@ -142,18 +141,12 @@ export function CashAccounts({
   orgSlug: string
 }) {
   const { t } = useTranslation('cash')
-  const { fmtEur } = useFormatters()
 
-  const { open, closed, availableCents, totalCents } = useMemo(() => {
+  const { open, closed } = useMemo(() => {
     const all = accounts ?? []
-    const openAccounts = all.filter((a) => a.accountStatus === 'active')
     return {
-      open: openAccounts,
+      open: all.filter((a) => a.accountStatus === 'active'),
       closed: all.filter((a) => a.accountStatus === 'closed'),
-      availableCents: openAccounts
-        .filter((a) => !a.pledged)
-        .reduce((sum, a) => sum + (a.currentBalance ?? 0), 0),
-      totalCents: all.reduce((sum, a) => sum + (a.currentBalance ?? 0), 0),
     }
   }, [accounts])
 
@@ -190,38 +183,6 @@ export function CashAccounts({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-4">
-        <Card className="min-w-56">
-          <CardHeader>
-            <CardTitle className="text-muted-foreground text-sm font-medium">
-              {t('availableBalance')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold tabular-nums">
-              {fmtEur(availableCents)}
-            </p>
-          </CardContent>
-        </Card>
-        {totalCents !== availableCents && (
-          <Card className="min-w-56">
-            <CardHeader>
-              <CardTitle className="text-muted-foreground text-sm font-medium">
-                {t('totalBalance')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground text-3xl font-semibold tabular-nums">
-                {fmtEur(totalCents)}
-              </p>
-              <p className="text-muted-foreground text-xs">
-                {t('totalHint', { amount: fmtEur(totalCents - availableCents) })}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
       {groups.map((g) => (
         <section key={g.id} className="space-y-2">
           <h2 className="text-sm font-semibold tracking-tight">{g.name}</h2>

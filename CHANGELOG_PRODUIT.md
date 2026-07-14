@@ -23,6 +23,38 @@ bas de page.
 
 ---
 
+## v1.79.0 — 14/07/2026 à 11:38 — La page Trésorerie devient un cockpit
+
+L'onglet Aperçu de la Trésorerie est réorganisé pour répondre d'abord aux
+questions qui comptent : combien j'ai, où j'atterris, qu'est-ce qui tombe
+bientôt.
+
+- **Bandeau de chiffres clés** en tête de page : solde disponible (avec le
+  détail des fonds bloqués ou clôturés), atterrissage projeté fin de mois,
+  et net des échéances à 30 et 90 jours (entrées − sorties, retards
+  compris).
+- **Échéances à venir** : une nouvelle liste 30/90 jours montre tout ce qui
+  tombe bientôt — y compris les occurrences des règles récurrentes (loyers,
+  salaires…), qui n'étaient visibles jusqu'ici que dans la courbe. Les
+  retards remontent en premier, marqués en rouge.
+- **Nouvel ordre de lecture** : chiffres clés, courbe, grille, échéances et
+  rapprochements suggérés d'abord ; comptes bancaires, TVA et gestion des
+  règles/échéances ponctuelles en dessous.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle query `forecasts.getUpcomingEntries` (pending EUR ≤ 90 j,
+>   retards inclus sans borne basse — même position que le rollover de la
+>   grille ; renvoie aussi `net30Cents`/`net90Cents`), partagée entre le
+>   bandeau et la liste (dédup de souscription Convex).
+> - Nouveaux composants `src/components/cash/CashKpis.tsx` (bandeau, 4
+>   tuiles ; atterrissage = `projection[0]` de la grille) et
+>   `UpcomingEntries.tsx` (toggle 30/90 j, lecture seule) ;
+>   `ForecastOverview` accueille le bandeau (prop `accounts`) ; les cartes
+>   Solde disponible/total quittent `CashAccounts` (tables seules) ;
+>   réordonnancement dans `cash.index.tsx`. i18n fr/en (`cash:kpis`,
+>   `cash:upcoming`). TESTING CA2/FC1 mis à jour + FC19-FC20.
+
 ## v1.78.0 — 14/07/2026 à 11:10 — Voir un one-liner en entier d'un clic
 
 Dans le tableau des entreprises, un one-liner un peu long était coupé (« … ») et

@@ -18,6 +18,7 @@ import {
 import { ForecastMatchSuggestions } from '~/components/cash/ForecastMatchSuggestions'
 import { ForecastOverview } from '~/components/cash/ForecastOverview'
 import { TransactionsLedger } from '~/components/cash/TransactionsLedger'
+import { UpcomingEntriesSection } from '~/components/cash/UpcomingEntries'
 import { VatCard } from '~/components/cash/VatCard'
 import { Button } from '~/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
@@ -98,10 +99,14 @@ function Cash() {
           <TabsTrigger value="analyse">{t('tabs.analyse')}</TabsTrigger>
         </TabsList>
         <TabsContent value="apercu" className="space-y-6 pt-4">
-          {org && <ForecastOverview orgId={org._id} />}
+          {/* Cockpit first: KPIs + curve + grid, then the 30/90-day
+              maturities and suggested reconciliations; accounts/VAT and the
+              rules/one-off management move below. */}
+          {org && <ForecastOverview orgId={org._id} accounts={accounts} />}
+          {org && <UpcomingEntriesSection orgId={org._id} />}
+          {org && <ForecastMatchSuggestions orgId={org._id} />}
           <CashAccounts accounts={accounts} orgSlug={orgSlug} />
           {org && <VatCard orgId={org._id} orgSlug={orgSlug} />}
-          {org && <ForecastMatchSuggestions orgId={org._id} />}
           {org && <ForecastRulesSection orgId={org._id} />}
           {org && <ForecastEntriesSection orgId={org._id} />}
         </TabsContent>

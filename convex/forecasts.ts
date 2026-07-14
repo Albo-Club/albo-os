@@ -634,6 +634,60 @@ export const suggestForecastMatches = query({
   },
 })
 
+// ─── Upcoming entries (cockpit) ──────────────────────────────────────────────
+
+// KPI/list windows of the cockpit "upcoming entries" section.
+const UPCOMING_WINDOW_DAYS = 90
+const UPCOMING_KPI_WINDOW_DAYS = 30
+
+/**
+ * Pending entries due within the next 90 days for the cockpit list —
+ * OVERDUE ones included (same rollover stance as the grid: still expected,
+ * just late), rule-derived occurrences included, EUR only, date ascending.
+ * Ships the 30/90-day nets (in − out, overdue included) alongside so the
+ * KPI band shares this single subscription.
+ */
+export const getUpcomingEntries = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+    const now = Date.now()
+    const horizonEnd = now + UPCOMING_WINDOW_DAYS * DAY_MS
+    const kpiEnd = now + UPCOMING_KPI_WINDOW_DAYS * DAY_MS
+
+    // No lower date bound: overdue entries surface until realized or
+    // cancelled (dropping them would silently improve the outlook).
+    const rows = await ctx.db
+      .query('forecastEntries')
+      .withIndex('by_org_and_date', (q) =>
+        q.eq('orgId', orgId).lte('date', horizonEnd),
+      )
+      .collect()
+
+    let net30Cents = 0
+    let net90Cents = 0
+    const entries = []
+    for (const entry of rows) {
+      if (entry.status !== 'pending' || entry.currency !== 'EUR') continue
+      const signed =
+        entry.direction === 'in' ? entry.amountCents : -entry.amountCents
+      net90Cents += signed
+      if (entry.date <= kpiEnd) net30Cents += signed
+      entries.push({
+        _id: entry._id,
+        date: entry.date,
+        label: entry.label,
+        amountCents: entry.amountCents,
+        direction: entry.direction,
+        confidence: entry.confidence,
+        derivedFromRule: entry.ruleId != null,
+        overdue: entry.date < now,
+      })
+    }
+    return { entries, net30Cents, net90Cents }
+  },
+})
+
 // ─── Manual entry CRUD ───────────────────────────────────────────────────────
 
 /**

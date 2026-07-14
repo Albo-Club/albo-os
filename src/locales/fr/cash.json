@@ -21,9 +21,21 @@
   },
   "back": "← Trésorerie",
   "notFound": "Compte introuvable.",
-  "totalBalance": "Solde total",
   "availableBalance": "Solde disponible",
   "totalHint": "dont {{amount}} bloqués ou clôturés",
+  "kpis": {
+    "landing": "Atterrissage fin de mois",
+    "landingCommitted": "engagé seul : {{amount}}",
+    "net30": "Net 30 jours",
+    "net90": "Net 90 jours",
+    "netHint": "échéances à venir, retards inclus"
+  },
+  "upcoming": {
+    "title": "Échéances à venir",
+    "window": "{{count}} j",
+    "empty": "Aucune échéance sur cette fenêtre.",
+    "overdue": "En retard"
+  },
   "asOf": "au {{date}}",
   "manualAsOf": "solde manuel au {{date}}",
   "notConnected": "non connecté — solde à saisir",
