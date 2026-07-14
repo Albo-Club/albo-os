@@ -23,6 +23,38 @@ bas de page.
 
 ---
 
+## v1.86.0 — 14/07/2026 à 14:25 — Les reportings Parallel arrivent sur vos fiches deals
+
+Les entités investies via **Parallel** (les SPV Youse, Bernay, Abel Garnier,
+STOA, NG Invest…) peuvent désormais afficher leurs **communications Parallel**
+directement dans l'onglet « Reports » de leur fiche : chaque annonce datée
+(coupons, reportings, actualités de l'opération) avec, quand il y en a, le
+**document à télécharger** (le reporting PDF). On rattache une fiche à son deal
+Parallel en un clic (« Rattacher à Parallel » → on choisit le SPV) ; les
+communications s'affichent alors, rafraîchies à la demande. Rien n'est stocké :
+tout est lu en direct depuis Parallel. Une entité non concernée ne voit aucun
+changement.
+
+> **🔧 Notes techniques**
+>
+> - `convex/vasco.ts` : trois actions org-guardées, lecture live (login +
+>   appels externes, non réactives) — `fetchCommunications({orgId, clientSlug,
+>   issuerId})` (scope `GetCommunications(userId)`, filtré par issuer, tri date
+>   desc), `listVascoIssuers` (émetteurs distincts + dernier titre pour le
+>   picker), `downloadCommunicationDocument` (le `downloadUrl` VASCO est
+>   authentifié → proxy : login + fetch bearer → `ctx.storage` → `getUrl`).
+>   `htmlContent` nettoyé en texte (`stripHtml`) côté serveur.
+> - Mapping entité↔émetteur **par id** : champs `companies.vascoClientSlug` +
+>   `companies.vascoIssuerId` (schéma), mutation `companies.setVascoLink`
+>   (set/unset ensemble ; jamais par nom, les labels sont opaques « SPVn »).
+> - Front : `src/components/vasco/VascoCommunicationsSection.tsx` dans l'onglet
+>   Report de `participations.$companyId` (bloc communications + dialog de
+>   rattachement) ; namespace i18n `vasco` (en+fr). Le linker n'apparaît que sur
+>   une entité Parallel (`sponsor`/`group`) ou déjà rattachée.
+> - Détails et pièges (accès investisseur, proxy download, doublon de connexion
+>   401) : `KNOWN_ISSUES.md` § « VASCO API » ; recette de test : `TESTING.md`
+>   § « Communications Parallel ».
+
 ## v1.85.0 — 14/07/2026 à 14:23 — Le prévisionnel se rattache aux deals
 
 Les flux prévisionnels peuvent désormais être **rattachés à un deal** — les

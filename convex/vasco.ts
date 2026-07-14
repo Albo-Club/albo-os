@@ -28,7 +28,7 @@ import {
 import { internal } from './_generated/api'
 import { requireOrgMember } from './lib/auth'
 import type { GenericActionCtx } from 'convex/server'
-import type { DataModel, Doc } from './_generated/dataModel'
+import type { DataModel, Doc, Id } from './_generated/dataModel'
 
 type ActionCtx = GenericActionCtx<DataModel>
 
@@ -186,6 +186,7 @@ const GET_COMMUNICATIONS = `query($accountId: ID, $userId: ID, $issuerId: ID) {
   GetCommunications(accountId: $accountId, userId: $userId, issuerId: $issuerId) {
     id
     title
+    htmlContent
     period
     publishDate
     issuer { id label }
@@ -659,5 +660,264 @@ export const probeCommunications = internalAction({
       }
     }
     return { orgSlug, connections }
+  },
+})
+
+// ── Communications (per-issuer investor updates) ────────────────────────────
+
+export type VascoCommunicationDoc = {
+  documentId: string
+  name: string | null
+  contentType: string | null
+  createdAt: string | null
+}
+
+export type VascoCommunication = {
+  communicationId: string
+  issuerId: string
+  issuerLabel: string | null
+  title: string | null
+  // `htmlContent` stripped to plain text — it is raw HTML from an external
+  // source, never rendered as markup (see stripHtml).
+  bodyText: string | null
+  period: string | null
+  publishDate: string | null
+  documents: Array<VascoCommunicationDoc>
+}
+
+type CommunicationNode = {
+  id: string
+  title?: string | null
+  htmlContent?: string | null
+  period?: string | null
+  publishDate?: string | null
+  issuer?: { id: string; label?: string | null } | null
+  communicationDocuments?: Array<{
+    id: string
+    document?: {
+      id: string
+      name?: string | null
+      contentType?: string | null
+      createdAt?: string | null
+      downloadUrl?: string | null
+    } | null
+  } | null> | null
+}
+
+type GetCommunicationsResult = {
+  GetCommunications: Array<CommunicationNode | null> | null
+}
+
+/**
+ * Strip HTML tags/entities to plain text. Communications carry `htmlContent` as
+ * raw HTML from an external source, so we never render it as markup (the in-app
+ * markdown renderer drops raw HTML anyway, and rendering it would be an XSS
+ * vector). Block tags become newlines so the text keeps its paragraphs.
+ */
+function stripHtml(html: string | null | undefined): string | null {
+  if (!html) return null
+  const text = html
+    .replace(/<\s*(br|\/p|\/div|\/li|\/h[1-6])\s*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return text || null
+}
+
+function shapeCommunication(node: CommunicationNode): VascoCommunication {
+  return {
+    communicationId: node.id,
+    issuerId: node.issuer?.id ?? '',
+    issuerLabel: node.issuer?.label ?? null,
+    title: node.title ?? null,
+    bodyText: stripHtml(node.htmlContent),
+    period: node.period ?? null,
+    publishDate: node.publishDate ?? null,
+    documents: (node.communicationDocuments ?? [])
+      .filter(
+        (d): d is NonNullable<typeof d> => d != null && d.document != null,
+      )
+      .map((d) => ({
+        documentId: d.document!.id,
+        name: d.document!.name ?? null,
+        contentType: d.document!.contentType ?? null,
+        createdAt: d.document!.createdAt ?? null,
+      })),
+  }
+}
+
+/** Log in and return ALL communications for the user (investor scope — the
+ * `userId` scoping returns the full set; see KNOWN_ISSUES.md "VASCO API"). */
+async function pullCommunications(
+  creds: VascoCreds,
+): Promise<Array<VascoCommunication>> {
+  const { token, userId } = await vascoLogin(creds)
+  const data = await vascoGraphql<GetCommunicationsResult>(
+    creds.clientSlug,
+    token,
+    GET_COMMUNICATIONS,
+    { userId },
+  )
+  return (data.GetCommunications ?? [])
+    .filter((c): c is CommunicationNode => c != null)
+    .map(shapeCommunication)
+}
+
+/** Active connections of `orgId` matching `clientSlug`. Org-member-guarded via
+ * the caller's identity (propagated from the calling action). */
+async function activeConnectionsForClient(
+  ctx: ActionCtx,
+  orgId: Id<'organizations'>,
+  clientSlug: string,
+): Promise<Array<Doc<'vascoConnections'>>> {
+  const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
+    internal.vasco.authorizeAndListConnections,
+    { orgId },
+  )
+  return conns.filter((c) => c.clientSlug === clientSlug)
+}
+
+/**
+ * Distinct VASCO issuers (Parallel SPVs) reachable for `orgId`, each annotated
+ * with the most recent communication title so the entity↔issuer link is
+ * pickable (labels alone are opaque "SPVn"). Org-member-guarded. On-demand
+ * action (login + external call) — NOT reactive.
+ */
+export const listVascoIssuers = action({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
+      internal.vasco.authorizeAndListConnections,
+      { orgId },
+    )
+    const byKey = new Map<
+      string,
+      {
+        clientSlug: string
+        issuerId: string
+        issuerLabel: string | null
+        sampleTitle: string | null
+        latest: string
+      }
+    >()
+    const errors: Array<{ clientSlug: string; label: string; error: string }> =
+      []
+    for (const conn of conns) {
+      try {
+        const comms = await pullCommunications(conn)
+        for (const c of comms) {
+          if (!c.issuerId) continue
+          const key = `${conn.clientSlug}:${c.issuerId}`
+          const stamp = c.publishDate ?? c.period ?? ''
+          const existing = byKey.get(key)
+          if (!existing || stamp > existing.latest) {
+            byKey.set(key, {
+              clientSlug: conn.clientSlug,
+              issuerId: c.issuerId,
+              issuerLabel: c.issuerLabel,
+              sampleTitle: c.title,
+              latest: stamp,
+            })
+          }
+        }
+      } catch (err) {
+        errors.push({
+          clientSlug: conn.clientSlug,
+          label: conn.label,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+    const issuers = Array.from(byKey.values())
+      .sort((a, b) => (a.issuerLabel ?? '').localeCompare(b.issuerLabel ?? ''))
+      .map((i) => ({
+        clientSlug: i.clientSlug,
+        issuerId: i.issuerId,
+        issuerLabel: i.issuerLabel,
+        sampleTitle: i.sampleTitle,
+      }))
+    return { orgId, issuers, errors }
+  },
+})
+
+/**
+ * Communications for one entity's linked VASCO issuer, date-desc.
+ * Org-member-guarded. On-demand action (login + external call) — NOT reactive.
+ */
+export const fetchCommunications = action({
+  args: {
+    orgId: v.id('organizations'),
+    clientSlug: v.string(),
+    issuerId: v.string(),
+  },
+  handler: async (ctx, { orgId, clientSlug, issuerId }) => {
+    const conns = await activeConnectionsForClient(ctx, orgId, clientSlug)
+    if (conns.length === 0) throw new ConvexError('vasco_no_connection')
+    // Try each matching connection until one logs in (tolerates a stale dup).
+    let lastError: string | null = null
+    for (const conn of conns) {
+      try {
+        const all = await pullCommunications(conn)
+        const communications = all
+          .filter((c) => c.issuerId === issuerId)
+          .sort((a, b) =>
+            (b.publishDate ?? '').localeCompare(a.publishDate ?? ''),
+          )
+        return { orgId, clientSlug, issuerId, communications }
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err)
+      }
+    }
+    throw new ConvexError(`vasco_fetch_failed: ${lastError ?? 'unknown'}`)
+  },
+})
+
+/**
+ * Download proxy for a communication's attached document. The VASCO
+ * `downloadUrl` is an authenticated endpoint (not a public signed URL), so the
+ * browser can't fetch it directly: this logs in, fetches the bytes with the
+ * bearer token, stores them in Convex storage, and returns a short-lived URL
+ * the browser can open. Org-member-guarded.
+ */
+export const downloadCommunicationDocument = action({
+  args: {
+    orgId: v.id('organizations'),
+    clientSlug: v.string(),
+    documentId: v.string(),
+  },
+  handler: async (ctx, { orgId, clientSlug, documentId }) => {
+    const conns = await activeConnectionsForClient(ctx, orgId, clientSlug)
+    if (conns.length === 0) throw new ConvexError('vasco_no_connection')
+    let lastError: string | null = null
+    for (const conn of conns) {
+      try {
+        const { token } = await vascoLogin(conn)
+        const res = await fetch(
+          `${vascoBaseUrl(conn.clientSlug)}/documents/${documentId}/download`,
+          { headers: { Authorization: `Bearer ${token}`, 'User-Agent': USER_AGENT } },
+        )
+        if (!res.ok) {
+          lastError = `HTTP ${res.status}`
+          continue
+        }
+        const blob = await res.blob()
+        const storageId = await ctx.storage.store(blob)
+        const url = await ctx.storage.getUrl(storageId)
+        if (!url) {
+          lastError = 'storage_url_null'
+          continue
+        }
+        return { url }
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err)
+      }
+    }
+    throw new ConvexError(`vasco_download_failed: ${lastError ?? 'unknown'}`)
   },
 })

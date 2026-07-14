@@ -38,6 +38,7 @@ import {
 } from '~/components/companies/EntityFiche'
 import { ReportingsSection } from '~/components/companies/ReportingsSection'
 import { CompanyReportsSection } from '~/components/companies/CompanyReportsSection'
+import { VascoCommunicationsSection } from '~/components/vasco/VascoCommunicationsSection'
 import { CompanyAiSynthesisBlock } from '~/components/companies/CompanyAiSynthesisBlock'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { Button } from '~/components/ui/button'
@@ -1021,7 +1022,10 @@ function ParticipationDetail() {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="reports" className="pt-4">
-              <CompanyReportsSection companyId={company._id} />
+              <div className="space-y-6">
+                <VascoCommunicationsSection company={company} />
+                <CompanyReportsSection companyId={company._id} />
+              </div>
             </TabsContent>
             <TabsContent value="documents" className="pt-4">
               <ReportingsSection companyId={company._id} />

@@ -22,6 +22,7 @@ import enCash from '~/locales/en/cash.json'
 import enPointage from '~/locales/en/pointage.json'
 import enPassif from '~/locales/en/passif.json'
 import enReports from '~/locales/en/reports.json'
+import enVasco from '~/locales/en/vasco.json'
 
 import frCommon from '~/locales/fr/common.json'
 import frAuth from '~/locales/fr/auth.json'
@@ -40,6 +41,7 @@ import frCash from '~/locales/fr/cash.json'
 import frPointage from '~/locales/fr/pointage.json'
 import frPassif from '~/locales/fr/passif.json'
 import frReports from '~/locales/fr/reports.json'
+import frVasco from '~/locales/fr/vasco.json'
 
 export const NAMESPACES = [
   'common',
@@ -59,6 +61,7 @@ export const NAMESPACES = [
   'pointage',
   'passif',
   'reports',
+  'vasco',
 ] as const
 
 export const defaultNS = 'common'
@@ -82,6 +85,7 @@ export const resources = {
     pointage: enPointage,
     passif: enPassif,
     reports: enReports,
+    vasco: enVasco,
   },
   fr: {
     common: frCommon,
@@ -101,6 +105,7 @@ export const resources = {
     pointage: frPointage,
     passif: frPassif,
     reports: frReports,
+    vasco: frVasco,
   },
 } as const
 

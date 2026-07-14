@@ -2084,6 +2084,40 @@ probing. The docs are a Docusaurus site; enumerate every schema page from
 `/api-reference/authenticated/{queries,types,…}/<kebab>` pages render statically
 (readable), unlike the SPA index and `/api-reference/graphql`.
 
+### Communications (investor-reachable) → per-entity Report section (étape 2b)
+
+`GetCommunications(userId | accountId)` **is** reachable by the investor persona
+(unlike `accountComments`) — verified in prod via `vasco:probeCommunications`.
+`userId=<jwt id>` and `accountId=<the corporate account, "Calte">` both return
+the full set; the individual account returns `[]`. Each `Communication` is
+**per-issuer** (`issuer { id label }` = a Parallel SPV, e.g. "Parallel Invest
+SPV13"), dated (`publishDate`/`period`), with `title`, `htmlContent`, and
+`communicationDocuments { document { … downloadUrl } }` (the real reporting PDFs).
+
+- **Entity ↔ issuer mapping.** Issuer labels are opaque ("SPVn") — the human name
+  lives in the `title` / position `securityName`. So an Albo OS entity is linked
+  to its issuer **by id**, stored on `companies.vascoClientSlug` +
+  `companies.vascoIssuerId` (set together via `companies.setVascoLink`; matched
+  by id, never by name). The entity's Report section then reads
+  `fetchCommunications({orgId, clientSlug, issuerId})`; the issuer picker is fed
+  by `listVascoIssuers` (distinct issuers + latest title as a human hint).
+- **Download = server proxy, mandatory.** `document.downloadUrl` is an
+  **authenticated** endpoint (`api.<client>.vasco.fund/documents/<id>/download`),
+  not a public signed URL → a browser `<a href>` fails.
+  `downloadCommunicationDocument` logs in, fetches with the bearer token, stores
+  the bytes in Convex storage, and returns a short-lived `getUrl`. (Those stored
+  blobs accumulate — a cleanup pass can be added if it ever matters.)
+- **`htmlContent` is stripped to plain text** server-side (`stripHtml`) before it
+  reaches the client: it's raw HTML from an external source and the in-app
+  renderer drops HTML anyway. Full formatting stays in the attached PDF.
+- All three actions are org-member-guarded and **live-read only** (no valuation
+  or communication is persisted). They are actions (login + external calls), so
+  the UI fetches on mount + a Refresh button — not reactive.
+- **Stale duplicate connection.** calte still has a second `parallel` connection
+  row whose login 401s; the read actions iterate matching active connections and
+  use the first that logs in, so it degrades gracefully. Delete it with
+  `vasco:deleteConnection` when convenient.
+
 ### `convex codegen` can't run in the remote exec environment
 
 `convex codegen` requires an authenticated deployment (`CONVEX_DEPLOYMENT` +

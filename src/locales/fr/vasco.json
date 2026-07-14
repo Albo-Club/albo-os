@@ -1,0 +1,30 @@
+{
+  "communications": {
+    "title": "Communications Parallel",
+    "refresh": "Rafraîchir",
+    "loading": "Chargement des communications…",
+    "error": "Impossible de charger les communications Parallel.",
+    "empty": "Aucune communication pour ce deal pour l'instant.",
+    "publishedOn": "Publié le {{date}}",
+    "download": "Télécharger",
+    "downloadError": "Échec du téléchargement du document.",
+    "documents_one": "{{count}} document",
+    "documents_other": "{{count}} documents"
+  },
+  "link": {
+    "cta": "Rattacher à Parallel",
+    "linkedTo": "Rattaché à {{label}}",
+    "change": "Modifier le rattachement",
+    "unlink": "Détacher",
+    "unlinking": "Détachement…",
+    "dialogTitle": "Rattacher cette entité à un deal Parallel",
+    "dialogDescription": "Choisissez le SPV Parallel correspondant à cette entité. Ses communications apparaîtront alors ici.",
+    "loadingIssuers": "Chargement des deals Parallel…",
+    "issuersError": "Impossible de charger les deals Parallel.",
+    "noIssuers": "Aucun deal Parallel disponible pour cette organisation.",
+    "current": "Actuellement rattaché à {{label}}",
+    "saved": "Entité rattachée à Parallel.",
+    "unlinked": "Rattachement supprimé.",
+    "saveError": "Échec de l'enregistrement du rattachement."
+  }
+}

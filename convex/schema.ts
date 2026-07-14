@@ -370,6 +370,12 @@ export default defineSchema({
     summary: v.optional(v.string()),
     // Origin platform for external SPVs (e.g. "Parallel", "Sezame")
     sponsor: v.optional(v.string()),
+    // VASCO / Parallel bridge — links this entity to its VASCO issuer (the SPV)
+    // so the issuer's investor communications surface in the entity's Report
+    // section. Set together; matched by issuer id, never by name (labels are
+    // opaque "SPVn"). cf. KNOWN_ISSUES.md "VASCO API".
+    vascoClientSlug: v.optional(v.string()),
+    vascoIssuerId: v.optional(v.string()),
     // Portfolio group: consolidates several entities under one line in the
     // Participations view (e.g. the SPVs of "Parallel"). Logical key — a group
     // "exists" as soon as one entity carries its value. Distinct from sponsor.
