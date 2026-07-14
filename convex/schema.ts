@@ -291,6 +291,38 @@ export default defineSchema({
     .index('by_telegram_user_id', ['telegramUserId'])
     .index('by_link_code', ['linkCode']),
 
+  /**
+   * vascoConnections — investor-side connections to VASCO (https://vasco.fund),
+   * the fund-admin platform backing vehicles like Parallel Invest
+   * (`parallel.vasco.fund`). Albo OS pulls the data that only lives on the
+   * platform (positions, valuations, documents/reportings, communications) —
+   * distinct from the email report pipeline.
+   *
+   * One row per (VASCO client × Albo OS org): `Parallel → Calte` and
+   * `Parallel → Albo` are two rows (same `clientSlug`, different `username` +
+   * `orgId`). Adding a vehicle = adding a row. Each connection feeds exactly
+   * one org, so the pulled data stays within that org's tenant boundary.
+   *
+   * INTERNAL: `username`/`password` are secrets at rest, never exposed to the
+   * front end. Read/written only by internalQuery/internalMutation
+   * (cf. convex/vasco.ts). Do NOT return a raw row from a public query — it
+   * would leak the credentials (same rule as `powensUsers`).
+   */
+  vascoConnections: defineTable({
+    orgId: v.id('organizations'), // Albo OS org fed by this connection
+    clientSlug: v.string(), // → https://api.<clientSlug>.vasco.fund
+    label: v.string(), // human label, e.g. "Parallel — Calte"
+    username: v.string(), // login email — secret
+    password: v.string(), // login password — secret at rest
+    active: v.boolean(),
+    createdAt: v.number(),
+    createdBy: v.optional(v.id('users')),
+    lastConnectedAt: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+  })
+    .index('by_org', ['orgId'])
+    .index('by_client_and_username', ['clientSlug', 'username']),
+
   // ─── Portfolio core ──────────────────────────────────────────────────────
 
   /**

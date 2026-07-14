@@ -1937,3 +1937,65 @@ Côté cmdk : `shouldFilter={false}` car le filtrage est fait côté serveur —
 (`deal-<id>`…) et masquerait tout. `CommandDialog` n'est pas exporté par notre
 `command.tsx` → la palette wrappe `Command` dans un `Dialog` maison (avec un
 `DialogTitle` `sr-only` pour l'a11y Radix).
+
+## VASCO API (Parallel Invest) — investor scoping, introspection, codegen (`convex/vasco.ts`)
+
+VASCO (`https://vasco.fund`) is the fund-admin platform behind investor portals
+like Parallel Invest (`parallel.vasco.fund`). Albo OS pulls the investor-side
+data that only lives on the platform (positions, valuations, documents) — a
+*pull* integration, distinct from the *push* AgentMail report pipeline.
+
+### Endpoints & auth
+
+- GraphQL at `https://api.<clientSlug>.vasco.fund/graphql/` (public sibling
+  `/public/graphql/`, preprod `api.preprod.<clientSlug>…`). `<clientSlug>` = the
+  VASCO client, e.g. `parallel`.
+- Auth = `POST /auth/login {username,password}` → `{ token }` (JWT, short-lived,
+  re-login on 401). **No machine-to-machine API key** — a login is stored per
+  connection, in the internal-only `vascoConnections` table (one row per
+  `clientSlug × orgId`), never returned to the client (same rule as
+  `powensUsers`).
+
+### The investor-scoping trap (this cost the reverse-engineering)
+
+Introspection is **disabled**, and the investor persona
+(`ROLE_DISTRIBUTED_CUSTOMER`) only sees a subset. These return
+`"Access denied to this field"` — delivered as `extensions.warnings` with
+`data: <field> = null`, NOT as a top-level `errors` entry (so a naive "no
+errors ⇒ ok" check passes while the field is null):
+
+- `GetAccounts`, `GetSecurities`, `GetParticipationsSummary` (GP/back-office).
+- `GetInvestorDashboard` ("not enabled on this environment", BETA).
+- `Account.accountComments` → investor **communications are NOT reachable** this
+  way; use the top-level `GetCommunications` query (later step).
+
+The **working investor read path** for holdings:
+
+1. `POST /auth/login` → JWT. The user id is the **`id` claim inside the JWT**
+   (there is no accountId in the token — decode the payload).
+2. `GetUser(id: <jwtId>) { accounts { __typename id label } }` → the user's
+   accounts (e.g. one `IndividualAccount`, one `CorporateAccount`; the corporate
+   one is the vehicle, labelled "Calte").
+3. `GetAccount(id) { accountSecurityContracts { … security { id name } } }` →
+   the holdings. Same object also exposes `accountDocuments` (reportings,
+   reachable), `investments`, `portfolio`, `investmentsAndTransfers` (cash).
+
+Field notes: `Amount` is a **scalar** (no sub-selection). Field suggestions are
+mostly off (occasional "Did you mean …") → reconstruct queries from the docs,
+not by probing. The docs are a Docusaurus site; enumerate every schema page from
+`https://docs.vasco.fund/sitemap.xml` — individual
+`/api-reference/authenticated/{queries,types,…}/<kebab>` pages render statically
+(readable), unlike the SPA index and `/api-reference/graphql`.
+
+### `convex codegen` can't run in the remote exec environment
+
+`convex codegen` requires an authenticated deployment (`CONVEX_DEPLOYMENT` +
+a call to api.convex.dev), which the remote agent environment lacks. When a new
+Convex module is added there, `convex/_generated/api.d.ts` must be **hand-synced**
+(add the `import type * as <mod> from "../<mod>.js"` line **and** the
+`<mod>: typeof <mod>;` entry in `fullApi`). `convex/_generated/api.js` is a
+dynamic `anyApi` proxy — no change. `pnpm dev` regenerates the identical output;
+the hand edit only keeps `pnpm lint` (`tsc`) green in CI until then. Note
+`Doc<'table'>` / `ctx.db.query('table')` already resolve from the live
+`schema.ts` — only the function-reference file (`api.d.ts`) is static and needs
+the manual entry.
