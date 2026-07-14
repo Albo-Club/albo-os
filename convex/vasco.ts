@@ -120,6 +120,36 @@ async function vascoGraphql<T>(
   return json.data
 }
 
+/**
+ * Like `vascoGraphql` but non-throwing and diagnostic: returns the FULL parsed
+ * response (`data` + `errors` + `extensions`) plus the HTTP status. Access
+ * denial on this API arrives as `extensions.warnings` with the field nulled
+ * (NOT a top-level `errors` entry), so a probe must surface the raw body to be
+ * useful — hence no throwing and no `data`-only unwrap.
+ */
+async function vascoGraphqlRaw(
+  clientSlug: string,
+  token: string,
+  query: string,
+  variables: Record<string, unknown> = {},
+): Promise<{ httpStatus: number; body: unknown }> {
+  const res = await fetch(`${vascoBaseUrl(clientSlug)}/graphql/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      'User-Agent': USER_AGENT,
+    },
+    body: JSON.stringify({ query, variables }),
+  })
+  const text = await res.text().catch(() => '')
+  try {
+    return { httpStatus: res.status, body: JSON.parse(text) as unknown }
+  } catch {
+    return { httpStatus: res.status, body: text }
+  }
+}
+
 // ── Investor read path (hand-written queries — introspection is disabled) ────
 
 const GET_USER = `query($id: ID!) {
@@ -143,6 +173,23 @@ const GET_ACCOUNT = `query($id: ID!) {
       capitalCallPercentage
     }
     accountDocuments { __typename }
+  }
+}`
+
+// Investor-side communications (per-issuer, dated, with attached documents).
+// Selection kept to fields whose kind is known from the docs (introspection is
+// off): `period`/`publishDate` are Date/DateTime scalars, `issuer` a Company,
+// `communicationDocuments` wrap a Document. `communicationType`/`state` are left
+// out of the probe to avoid an object-without-subselection validation error
+// before we've confirmed their kind live.
+const GET_COMMUNICATIONS = `query($accountId: ID, $userId: ID, $issuerId: ID) {
+  GetCommunications(accountId: $accountId, userId: $userId, issuerId: $issuerId) {
+    id
+    title
+    period
+    publishDate
+    issuer { id label }
+    communicationDocuments { id document { id name createdAt contentType downloadUrl } }
   }
 }`
 
@@ -530,5 +577,87 @@ export const debugVascoLogin = internalAction({
       }
     }
     return { orgSlug, egressIp, results }
+  },
+})
+
+/**
+ * Diagnostic (CLI): can the investor persona actually READ `GetCommunications`,
+ * and under what scoping? Introspection is off and `accountComments` is refused
+ * to the investor persona (KNOWN_ISSUES "VASCO API"), so reachability is unknown
+ * until probed live. Per connection: logs in, lists the accounts, then runs
+ * `GetCommunications` under each candidate scope (by user, then by each account)
+ * and returns the RAW response (`data` + `errors` + `extensions.warnings`) so
+ * access-denial stays visible. Non-throwing — a bad connection is recorded, not
+ * fatal.
+ *   npx convex run --prod vasco:probeCommunications '{"orgSlug":"calte"}'
+ */
+export const probeCommunications = internalAction({
+  args: { orgSlug: v.string() },
+  handler: async (ctx, { orgSlug }) => {
+    const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
+      internal.vasco.getConnectionsByOrgSlug,
+      { orgSlug },
+    )
+    const connections: Array<{
+      label: string
+      clientSlug: string
+      error?: string
+      userId?: string
+      accounts?: Array<{ id: string; label?: string | null; type: string }>
+      probes?: Array<{ scope: string; httpStatus: number; body: unknown }>
+    }> = []
+    for (const conn of conns) {
+      try {
+        const { token, userId } = await vascoLogin(conn)
+        const userData = await vascoGraphql<GetUserResult>(
+          conn.clientSlug,
+          token,
+          GET_USER,
+          { id: userId },
+        )
+        const accounts = (userData.GetUser?.accounts ?? []).map((a) => ({
+          id: a.id,
+          label: a.label,
+          type: a.__typename,
+        }))
+        const probes: Array<{
+          scope: string
+          httpStatus: number
+          body: unknown
+        }> = []
+        // Candidate investor scopings: by user, then by each account id.
+        probes.push({
+          scope: `userId=${userId}`,
+          ...(await vascoGraphqlRaw(conn.clientSlug, token, GET_COMMUNICATIONS, {
+            userId,
+          })),
+        })
+        for (const acc of accounts) {
+          probes.push({
+            scope: `accountId=${acc.id} (${acc.label ?? acc.type})`,
+            ...(await vascoGraphqlRaw(
+              conn.clientSlug,
+              token,
+              GET_COMMUNICATIONS,
+              { accountId: acc.id },
+            )),
+          })
+        }
+        connections.push({
+          label: conn.label,
+          clientSlug: conn.clientSlug,
+          userId,
+          accounts,
+          probes,
+        })
+      } catch (err) {
+        connections.push({
+          label: conn.label,
+          clientSlug: conn.clientSlug,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+    return { orgSlug, connections }
   },
 })
