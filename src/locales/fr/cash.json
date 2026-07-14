@@ -118,11 +118,32 @@
     "unqualified_one": "{{count}} transaction à qualifier dans le pointage",
     "unqualified_other": "{{count}} transactions à qualifier dans le pointage"
   },
+  "vatSuggestion": {
+    "quarter": "T{{quarter}} {{year}}",
+    "title": "Échéance TVA estimée — {{quarter}}",
+    "body": "{{amount}} de TVA à payer sur le trimestre clos (collectée {{collected}} − déductible {{deductible}}).",
+    "unqualified_one": "{{count}} transaction du trimestre reste à qualifier — le montant peut bouger.",
+    "unqualified_other": "{{count}} transactions du trimestre restent à qualifier — le montant peut bouger.",
+    "create": "Créer l'échéance (le {{date}})",
+    "entryLabel": "TVA {{quarter}}",
+    "created": "Échéance TVA créée",
+    "alreadyExists": "L'échéance de ce trimestre existe déjà",
+    "error": "Une erreur est survenue"
+  },
+  "alert": {
+    "title": "Alerte de seuil",
+    "hint": "Un email si le solde projeté des 3 prochains mois (ou le solde disponible) passe sous le seuil. Au plus une alerte par semaine.",
+    "thresholdLabel": "Seuil (€)",
+    "activeLabel": "Alerte active",
+    "saved": "Alerte enregistrée",
+    "error": "Une erreur est survenue"
+  },
   "forecast": {
     "title": "Prévisionnel de trésorerie",
     "horizonMonths_one": "{{count}} mois",
     "horizonMonths_other": "{{count}} mois",
     "startingBalance": "Solde de départ (disponible, comptes EUR) : {{amount}}",
+    "reliability": "Fiabilité : fin {{month}}, projeté {{projected}} (au 1er du mois) · réalisé {{actual}} · écart {{delta}}",
     "chartCommitted": "Projeté (engagé)",
     "chartPlanned": "Projeté (avec prévu)",
     "grid": {

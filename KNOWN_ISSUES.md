@@ -1363,6 +1363,28 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   que son flux est passé en banque, passer par le rapprochement unitaire
   (cf. le point rapprochement ci-dessus) — c'est lui qui fige l'échéance,
   la consommation par cellule n'est qu'un anti-double-comptage d'affichage.
+- **Crons (`convex/crons.ts`) = fonctions internal SANS auth — exception,
+  pas un précédent.** `captureSnapshots` (mensuel, 1er 05:00 UTC) et
+  `checkCashAlerts` (quotidien 07:00 UTC) itèrent toutes les orgs sans
+  `requireOrgMember`, comme les backfills. La règle multi-tenant reste
+  absolue pour toute fonction **publique**. Un cron raté se rejoue à la
+  main (`convex run forecasts:captureSnapshots '{}' --prod`) — idempotent
+  par (org, mois). Les snapshots sont **append-only** ; la fiabilité
+  affichée compare le snapshot du mois M-1 (pris le 1er de M-1, scénario
+  avec prévu) au solde réel de fin M-1 — rien ne s'affiche tant que le
+  premier snapshot n'existe pas.
+- **Alerte de seuil : cooldown 7 jours, remis à zéro à chaque save.**
+  `setCashAlert` efface `lastNotifiedAt` pour qu'un nouveau seuil puisse
+  notifier immédiatement ; en contrepartie, re-sauvegarder sans rien
+  changer ré-arme aussi l'alerte (accepté, 2 users).
+- **Échéance TVA suggérée : `derivedKey` "vat:{orgId}:{YYYY-Qn}", sans
+  `ruleId`.** L'idempotence passe par la clé (créée une fois par trimestre,
+  quelle que soit sa vie ensuite : réalisée, annulée, éditée — la
+  suggestion ne revient pas). Pas de bouton « Ignorer » en V1 : la carte
+  n'apparaît que si la TVA du trimestre clos est à payer, ce qui est rare
+  pour des holdings en position récupérable ; pour la faire taire sans
+  créer d'échéance au prévisionnel, créer l'échéance puis l'annuler
+  (`cancelled` garde la clé).
 - **La détection de récurrences ne crée JAMAIS de règle seule.**
   `forecasts.suggestRules` (moteur pur `lib/recurrenceDetection.ts`, testé)
   propose des règles depuis l'historique 12 mois ; la création passe

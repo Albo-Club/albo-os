@@ -1081,6 +1081,42 @@ export default defineSchema({
   }).index('by_org', ['orgId']),
 
   /**
+   * forecastSnapshots — monthly photo of the projected balance, captured by
+   * cron on the 1st of each month (convex/crons.ts → forecasts.
+   * captureSnapshots, idempotent per (orgId, snapshotMonth)). Feeds the
+   * forecast-reliability measure: what we projected for a month vs the real
+   * end-of-month balance once the month is over. Append-only.
+   */
+  forecastSnapshots: defineTable({
+    orgId: v.id('organizations'),
+    snapshotMonth: v.string(), // "YYYY-MM" — the month the capture ran in
+    capturedAt: v.number(),
+    startingBalanceCents: v.number(),
+    /** Projection at capture time (consumption semantics, 12-month horizon). */
+    months: v.array(
+      v.object({
+        monthKey: v.string(),
+        committedBalanceCents: v.number(),
+        plannedBalanceCents: v.number(),
+      }),
+    ),
+  }).index('by_org_month', ['orgId', 'snapshotMonth']),
+
+  /**
+   * cashAlertSettings — one optional row per org: threshold alert on the
+   * projected balance (90-day planned scenario) and on the available
+   * balance. Evaluated daily by cron (forecasts.checkCashAlerts) with a
+   * 7-day cooldown (`lastNotifiedAt`); members are notified by email.
+   */
+  cashAlertSettings: defineTable({
+    orgId: v.id('organizations'),
+    thresholdCents: v.number(),
+    active: v.boolean(),
+    lastNotifiedAt: v.optional(v.number()),
+    updatedBy: v.id('users'),
+  }).index('by_org', ['orgId']),
+
+  /**
    * matchingDecisions — append-only history of matching decisions
    * (training dataset for the matching agent, phase 2).
    * Never patched nor deleted. The current state lives on `transactions`
@@ -1170,8 +1206,10 @@ export default defineSchema({
    * it.
    *
    * `derivedKey` = idempotency key for auto rows, format
-   * "rule:{ruleId}:{YYYY-MM-DD}" (or "deal:{dealId}:{YYYY-MM-DD}" for the
-   * future deriveFromDeals). Null for 100 % manual rows.
+   * "rule:{ruleId}:{YYYY-MM-DD}", "vat:{orgId}:{YYYY-Qn}" (quarterly VAT
+   * suggestion — no ruleId, so the row stays a plain editable one-off) or
+   * "deal:{dealId}:{YYYY-MM-DD}" for the future deriveFromDeals. Null for
+   * 100 % manual rows.
    */
   forecastEntries: defineTable({
     orgId: v.id('organizations'),

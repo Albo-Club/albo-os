@@ -330,6 +330,40 @@ export function buildForecastGrid(params: {
   }
 }
 
+// ─── Civil quarters (VAT suggestion) ─────────────────────────────────────────
+
+export type QuarterWindow = {
+  /** e.g. "2026-Q2" */
+  quarterKey: string
+  /** Inclusive start (1st of the quarter, midnight UTC). */
+  startMs: number
+  /** Exclusive end (1st of the next quarter, midnight UTC). */
+  endMs: number
+  /** Suggested VAT due date: the 24th of the month after the quarter ends. */
+  dueDateMs: number
+}
+
+/**
+ * Last COMPLETE civil quarter relative to `now` (UTC) — the period a VAT
+ * declaration would cover. In July–September, that's Q2 (Apr–Jun) with a
+ * due date on July 24th.
+ */
+export function previousQuarter(now: number): QuarterWindow {
+  const d = new Date(now)
+  // 0-based index of the current quarter's first month.
+  const currentQuarterMonth = Math.floor(d.getUTCMonth() / 3) * 3
+  const startMs = Date.UTC(d.getUTCFullYear(), currentQuarterMonth - 3, 1)
+  const endMs = Date.UTC(d.getUTCFullYear(), currentQuarterMonth, 1)
+  const start = new Date(startMs)
+  const quarterKey = `${start.getUTCFullYear()}-Q${Math.floor(start.getUTCMonth() / 3) + 1}`
+  return {
+    quarterKey,
+    startMs,
+    endMs,
+    dueDateMs: Date.UTC(d.getUTCFullYear(), currentQuarterMonth, 24),
+  }
+}
+
 // ─── Upsert decision for generated occurrences ──────────────────────────────
 
 /** Minimal state of an existing entry to decide the upsert. */

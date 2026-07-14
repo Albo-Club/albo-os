@@ -12,7 +12,9 @@
  */
 
 import { ConvexError, v } from 'convex/values'
-import { mutation, query } from './_generated/server'
+import { internalMutation, mutation, query } from './_generated/server'
+import { RESEND_FROM, resend } from './email'
+import { cashAlertEmail } from './emailTemplates'
 import { requireAppUser, requireOrgMember } from './lib/auth'
 import { isAvailableAccount } from './lib/bankAccounts'
 import { effectiveCategory, isValidForecastCategory } from './lib/categories'
@@ -27,9 +29,12 @@ import {
   buildMonthlyHistory,
   entryUpsertAction,
   expandOccurrences,
+  monthKey,
+  previousQuarter,
   ruleDerivedKey,
 } from './lib/recurrence'
 import { buildSearchText } from './lib/searchText'
+import { computeVatPositionForOrg } from './transactions'
 import type { GridTx, HistoryTx } from './lib/recurrence'
 import type { DataModel, Doc, Id } from './_generated/dataModel'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
@@ -1084,5 +1089,325 @@ export const getCommittedPipeline = query({
       rows,
       totalRemainingCents: rows.reduce((sum, r) => sum + r.remainingCents, 0),
     }
+  },
+})
+
+// ─── Monthly snapshots, threshold alerts, VAT suggestion (phase 4b) ──────────
+
+// Snapshot horizon and alert evaluation window / cooldown.
+const SNAPSHOT_HORIZON_MONTHS = 12
+const ALERT_HORIZON_MONTHS = 3
+const ALERT_COOLDOWN_MS = 7 * DAY_MS
+
+/**
+ * Monthly photo of every org's projection (cron, 1st of month 05:00 UTC —
+ * convex/crons.ts). Runs WITHOUT auth on purpose (same exception family as
+ * the backfills — cf. KNOWN_ISSUES « Cash flow forecast »). Idempotent per
+ * (orgId, month): re-running the same month skips already-captured orgs, so
+ * a missed cron can be replayed by hand:
+ *   pnpm exec convex run forecasts:captureSnapshots '{}' --prod
+ */
+export const captureSnapshots = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now()
+    const snapshotMonth = monthKey(now)
+    const orgs = await ctx.db.query('organizations').collect()
+
+    let captured = 0
+    let skipped = 0
+    for (const org of orgs) {
+      const existing = await ctx.db
+        .query('forecastSnapshots')
+        .withIndex('by_org_month', (q) =>
+          q.eq('orgId', org._id).eq('snapshotMonth', snapshotMonth),
+        )
+        .unique()
+      if (existing) {
+        skipped += 1
+        continue
+      }
+      const grid = await computeForecastGridForOrg(
+        ctx,
+        org._id,
+        0,
+        SNAPSHOT_HORIZON_MONTHS,
+      )
+      await ctx.db.insert('forecastSnapshots', {
+        orgId: org._id,
+        snapshotMonth,
+        capturedAt: now,
+        startingBalanceCents: grid.startingBalanceCents,
+        months: grid.projection.map((point) => ({
+          monthKey: point.monthKey,
+          committedBalanceCents: point.committedBalanceCents,
+          plannedBalanceCents: point.plannedBalanceCents,
+        })),
+      })
+      captured += 1
+    }
+    return { captured, skipped }
+  },
+})
+
+/**
+ * Forecast reliability of the LAST month: what the 1st-of-month snapshot
+ * projected for its end (planned scenario) vs the real end-of-month balance
+ * rebuilt from the transactions. Null until a snapshot of that month exists
+ * (the first one lands one month after phase 4b ships).
+ */
+export const getForecastReliability = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+    const now = Date.now()
+    const nowDate = new Date(now)
+    const currentMonthStart = Date.UTC(
+      nowDate.getUTCFullYear(),
+      nowDate.getUTCMonth(),
+      1,
+    )
+    const prevMonthKey = monthKey(addMonthsUtc(currentMonthStart, -1))
+
+    const snapshot = await ctx.db
+      .query('forecastSnapshots')
+      .withIndex('by_org_month', (q) =>
+        q.eq('orgId', orgId).eq('snapshotMonth', prevMonthKey),
+      )
+      .unique()
+    const projected = snapshot?.months.find((m) => m.monthKey === prevMonthKey)
+    if (!snapshot || !projected) return null
+
+    // Real end-of-month balance, rebuilt backwards from the CURRENT
+    // available balance (same scope as the projection's starting balance).
+    const accounts = await ctx.db
+      .query('bankAccounts')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    const currentBalanceCents = accounts
+      .filter((a) => isAvailableAccount(a) && a.currency === 'EUR')
+      .reduce((sum, a) => sum + (a.currentBalance ?? 0), 0)
+    const history = await computeCashHistoryForOrgs(
+      ctx,
+      [orgId],
+      1,
+      currentBalanceCents,
+    )
+    const actual = history.find((p) => p.monthKey === prevMonthKey)
+    if (!actual) return null
+
+    return {
+      monthKey: prevMonthKey,
+      projectedCents: projected.plannedBalanceCents,
+      actualCents: actual.balanceCents,
+      deltaCents: actual.balanceCents - projected.plannedBalanceCents,
+    }
+  },
+})
+
+/** The org's threshold-alert setting (null = never configured). */
+export const getCashAlert = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+    return await ctx.db
+      .query('cashAlertSettings')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .unique()
+  },
+})
+
+/**
+ * Creates/updates the org's threshold alert. Any change clears the
+ * notification cooldown so the new threshold can fire immediately.
+ */
+export const setCashAlert = mutation({
+  args: {
+    orgId: v.id('organizations'),
+    thresholdCents: v.number(),
+    active: v.boolean(),
+  },
+  handler: async (ctx, { orgId, thresholdCents, active }) => {
+    const { user } = await requireOrgMember(ctx, orgId)
+    if (!Number.isInteger(thresholdCents) || thresholdCents < 0) {
+      throw new ConvexError('invalid_amount')
+    }
+    const existing = await ctx.db
+      .query('cashAlertSettings')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .unique()
+    if (existing) {
+      await ctx.db.patch('cashAlertSettings', existing._id, {
+        thresholdCents,
+        active,
+        lastNotifiedAt: undefined,
+        updatedBy: user._id,
+      })
+      return null
+    }
+    await ctx.db.insert('cashAlertSettings', {
+      orgId,
+      thresholdCents,
+      active,
+      updatedBy: user._id,
+    })
+    return null
+  },
+})
+
+/**
+ * Daily threshold-alert evaluation (cron, 07:00 UTC — convex/crons.ts, no
+ * auth like captureSnapshots). Breach = the available balance or any
+ * projected month over the next 3 months (planned scenario) under the
+ * threshold → email to every org member, then 7-day cooldown.
+ */
+export const checkCashAlerts = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now()
+    const siteUrl = process.env.SITE_URL ?? ''
+    const settings = await ctx.db.query('cashAlertSettings').collect()
+
+    let notified = 0
+    for (const setting of settings) {
+      if (!setting.active) continue
+      if (
+        setting.lastNotifiedAt !== undefined &&
+        now - setting.lastNotifiedAt < ALERT_COOLDOWN_MS
+      ) {
+        continue
+      }
+      const grid = await computeForecastGridForOrg(
+        ctx,
+        setting.orgId,
+        0,
+        ALERT_HORIZON_MONTHS,
+      )
+      const minProjectedCents = Math.min(
+        grid.startingBalanceCents,
+        ...grid.projection.map((point) => point.plannedBalanceCents),
+      )
+      if (minProjectedCents >= setting.thresholdCents) continue
+
+      const org = await ctx.db.get('organizations', setting.orgId)
+      if (!org) continue
+      const members = await ctx.db
+        .query('organizationMembers')
+        .withIndex('by_org', (q) => q.eq('orgId', setting.orgId))
+        .collect()
+      for (const member of members) {
+        const user = await ctx.db.get('users', member.userId)
+        if (!user?.email) continue
+        const { subject, html, text } = cashAlertEmail({
+          locale: user.preferredLanguage === 'fr' ? 'fr' : 'en',
+          orgName: org.name,
+          thresholdCents: setting.thresholdCents,
+          minProjectedCents,
+          cashUrl: `${siteUrl}/app/${org.slug}/cash`,
+        })
+        await resend.sendEmail(ctx, {
+          from: RESEND_FROM,
+          to: user.email,
+          subject,
+          html,
+          text,
+        })
+      }
+      await ctx.db.patch('cashAlertSettings', setting._id, {
+        lastNotifiedAt: now,
+      })
+      notified += 1
+    }
+    return { notified }
+  },
+})
+
+/** Idempotency key of the quarterly VAT entry suggestion. */
+function vatDerivedKey(orgId: Id<'organizations'>, quarterKey: string): string {
+  return `vat:${orgId}:${quarterKey}`
+}
+
+/**
+ * Quarterly VAT entry suggestion: the net VAT of the last CLOSED civil
+ * quarter, when it is OWED (collected > deductible), proposed as a
+ * committed `taxes` outflow due on the 24th of the month after the quarter.
+ * Null when nothing is owed or the entry was already created (idempotent
+ * via derivedKey "vat:{orgId}:{quarter}"). Like the suggested rules, this
+ * never writes on its own — creation is the explicit gesture below.
+ */
+export const suggestVatEntry = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+    const quarter = previousQuarter(Date.now())
+
+    const existing = await ctx.db
+      .query('forecastEntries')
+      .withIndex('by_derivedKey', (q) =>
+        q.eq('derivedKey', vatDerivedKey(orgId, quarter.quarterKey)),
+      )
+      .unique()
+    if (existing) return null
+
+    const position = await computeVatPositionForOrg(ctx, orgId, {
+      startMs: quarter.startMs,
+      endMs: quarter.endMs,
+    })
+    // Owed to the state = collected − deductible (the opposite sign of the
+    // "recoverable VAT" card).
+    const owedCents = position.collectedCents - position.deductibleCents
+    if (owedCents <= 0) return null
+
+    return {
+      quarterKey: quarter.quarterKey,
+      dueDateMs: quarter.dueDateMs,
+      owedCents,
+      deductibleCents: position.deductibleCents,
+      collectedCents: position.collectedCents,
+      unqualifiedCount: position.unqualifiedCount,
+    }
+  },
+})
+
+/**
+ * Creates the suggested quarterly VAT entry (committed `taxes` outflow due
+ * the 24th after the quarter). The amount is recomputed server-side —
+ * only the user-facing label comes from the client (i18n). Idempotent by
+ * derivedKey; the entry then lives like any one-off (editable/cancellable,
+ * never touched by expandRules).
+ */
+export const createVatEntry = mutation({
+  args: { orgId: v.id('organizations'), label: v.string() },
+  handler: async (ctx, { orgId, label }) => {
+    await requireOrgMember(ctx, orgId)
+    const quarter = previousQuarter(Date.now())
+    const derivedKey = vatDerivedKey(orgId, quarter.quarterKey)
+
+    const existing = await ctx.db
+      .query('forecastEntries')
+      .withIndex('by_derivedKey', (q) => q.eq('derivedKey', derivedKey))
+      .unique()
+    if (existing) throw new ConvexError('already_exists')
+
+    const position = await computeVatPositionForOrg(ctx, orgId, {
+      startMs: quarter.startMs,
+      endMs: quarter.endMs,
+    })
+    const owedCents = position.collectedCents - position.deductibleCents
+    if (owedCents <= 0) throw new ConvexError('nothing_due')
+
+    return await ctx.db.insert('forecastEntries', {
+      orgId,
+      date: quarter.dueDateMs,
+      amountCents: owedCents,
+      direction: 'out',
+      confidence: 'confirmed',
+      status: 'pending',
+      label,
+      category: 'taxes',
+      derivedKey,
+      overridden: false,
+      currency: 'EUR',
+    })
   },
 })
