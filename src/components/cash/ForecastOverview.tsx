@@ -71,6 +71,10 @@ export function ForecastOverview({
   const pipeline = useConvexQuery(api.forecasts.getCommittedPipeline, { orgId })
   // Shared subscription with UpcomingEntriesSection (same query + args).
   const upcoming = useConvexQuery(api.forecasts.getUpcomingEntries, { orgId })
+  // Null until a 1st-of-month snapshot exists for the previous month.
+  const reliability = useConvexQuery(api.forecasts.getForecastReliability, {
+    orgId,
+  })
 
   // Headline balances (moved here from CashAccounts): available = active,
   // non-pledged accounts — the phase-0 perimeter, all currencies.
@@ -137,6 +141,19 @@ export function ForecastOverview({
             {t('cash:forecast.startingBalance', {
               amount: fmtEur(grid.startingBalanceCents),
             })}
+            {reliability && (
+              <>
+                {' · '}
+                {t('cash:forecast.reliability', {
+                  month: fmtMonth(reliability.monthKey),
+                  projected: fmtEur(reliability.projectedCents),
+                  actual: fmtEur(reliability.actualCents),
+                  delta: `${reliability.deltaCents >= 0 ? '+' : '−'}${fmtEur(
+                    Math.abs(reliability.deltaCents),
+                  )}`,
+                })}
+              </>
+            )}
           </p>
           <ForecastChart
             projection={grid.projection}

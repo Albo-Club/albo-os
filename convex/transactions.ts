@@ -794,39 +794,58 @@ export const getVatPosition = query({
   args: { orgId: v.id('organizations') },
   handler: async (ctx, { orgId }) => {
     await requireOrgMember(ctx, orgId)
-
-    let deductibleCents = 0
-    let collectedCents = 0
-    let unqualifiedCount = 0
-    for (const status of ['charge', 'product'] as const) {
-      const rows = await ctx.db
-        .query('transactions')
-        .withIndex('by_org_matchStatus', (q) =>
-          q.eq('orgId', orgId).eq('matchStatus', status),
-        )
-        .collect()
-      for (const tx of rows) {
-        if (tx.vatRateBps == null) {
-          unqualifiedCount += 1
-          continue
-        }
-        const vat = vatCentsFromTtc(tx.amount, tx.vatRateBps)
-        if (status === 'charge') {
-          deductibleCents += tx.direction === 'out' ? vat : -vat
-        } else {
-          collectedCents += tx.direction === 'in' ? vat : -vat
-        }
-      }
-    }
-
-    return {
-      deductibleCents,
-      collectedCents,
-      netCents: deductibleCents - collectedCents,
-      unqualifiedCount,
-    }
+    return await computeVatPositionForOrg(ctx, orgId)
   },
 })
+
+/**
+ * VAT-position core (no auth) — shared between the public query (all-time)
+ * and the quarterly VAT forecast suggestion (forecasts.ts, windowed).
+ * `window.endMs` is exclusive. The caller has verified org membership.
+ */
+export async function computeVatPositionForOrg(
+  ctx: QueryCtx,
+  orgId: Id<'organizations'>,
+  window?: { startMs: number; endMs: number },
+) {
+  let deductibleCents = 0
+  let collectedCents = 0
+  let unqualifiedCount = 0
+  for (const status of ['charge', 'product'] as const) {
+    const rows = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_matchStatus', (q) =>
+        q.eq('orgId', orgId).eq('matchStatus', status),
+      )
+      .collect()
+    for (const tx of rows) {
+      if (
+        window &&
+        (tx.transactionDate < window.startMs ||
+          tx.transactionDate >= window.endMs)
+      ) {
+        continue
+      }
+      if (tx.vatRateBps == null) {
+        unqualifiedCount += 1
+        continue
+      }
+      const vat = vatCentsFromTtc(tx.amount, tx.vatRateBps)
+      if (status === 'charge') {
+        deductibleCents += tx.direction === 'out' ? vat : -vat
+      } else {
+        collectedCents += tx.direction === 'in' ? vat : -vat
+      }
+    }
+  }
+
+  return {
+    deductibleCents,
+    collectedCents,
+    netCents: deductibleCents - collectedCents,
+    unqualifiedCount,
+  }
+}
 
 /**
  * One-shot (idempotent) backfill of pre-existing transactions without

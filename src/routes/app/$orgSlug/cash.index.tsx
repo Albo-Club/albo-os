@@ -10,6 +10,7 @@ import { api } from '../../../../convex/_generated/api'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { CashAccounts } from '~/components/cash/CashAccounts'
+import { CashAlertCard } from '~/components/cash/CashAlertCard'
 import { CategoryBreakdown } from '~/components/cash/CategoryBreakdown'
 import {
   ForecastEntriesSection,
@@ -20,6 +21,7 @@ import { ForecastOverview } from '~/components/cash/ForecastOverview'
 import { TransactionsLedger } from '~/components/cash/TransactionsLedger'
 import { UpcomingEntriesSection } from '~/components/cash/UpcomingEntries'
 import { VatCard } from '~/components/cash/VatCard'
+import { VatSuggestionCard } from '~/components/cash/VatSuggestionCard'
 import { Button } from '~/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 
@@ -107,6 +109,8 @@ function Cash() {
           {org && <ForecastMatchSuggestions orgId={org._id} />}
           <CashAccounts accounts={accounts} orgSlug={orgSlug} />
           {org && <VatCard orgId={org._id} orgSlug={orgSlug} />}
+          {org && <VatSuggestionCard orgId={org._id} />}
+          {org && <CashAlertCard orgId={org._id} />}
           {org && <ForecastRulesSection orgId={org._id} />}
           {org && <ForecastEntriesSection orgId={org._id} />}
         </TabsContent>
