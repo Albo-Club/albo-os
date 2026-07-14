@@ -43,6 +43,53 @@ type Candidate = {
   missing: Array<'oneLiner' | 'summary'>
 }
 
+// Non-company lines to keep OUT of enrichment: deal lines, SPVs, funds and
+// investment vehicles. A generated "what does it do" pitch is meaningless for
+// them (their domain usually points at the parent platform). Structural
+// markers first (platform names shared across many deal lines), then an
+// explicit list for the one-off vehicles that carry no such marker. Reviewed
+// against the prod dryRun — extend the explicit list from its `excluded`
+// output if a non-company slips through.
+const EXCLUDE_PATTERNS: Array<{ re: RegExp; reason: string }> = [
+  { re: /\bside\b/i, reason: 'side_deal' },
+  { re: /\basterion\b/i, reason: 'asterion_line' },
+  { re: /\banaxago\b/i, reason: 'anaxago_line' },
+  { re: /parallel\s*invest/i, reason: 'parallel_spv' },
+  { re: /\bsezame\b/i, reason: 'sezame_spv' },
+  { re: /vie\s*de\s*quartier\s*-/i, reason: 'lvdq_sub_entity' },
+  { re: /\bspv\b/i, reason: 'spv' },
+  { re: /\bhexa\s+sprint\b/i, reason: 'fund' },
+  { re: /\boprtrs\b/i, reason: 'vehicle' },
+  { re: /\bco[\s-]?invest/i, reason: 'co_invest' },
+  { re: /\bfund\b/i, reason: 'fund' },
+]
+
+// Normalised (upper, collapsed spaces) exact names — one-off vehicles/funds
+// with no structural marker above.
+const EXCLUDE_NAMES = new Set(
+  [
+    'Etoro',
+    'Crypto AM',
+    'Batch Venture 1',
+    'Batch Venture 2025 (Fund n°2)',
+    'Eutopia 2',
+    'Wind Capital 2',
+    'Galion.exe Origin',
+    'Good Only Ventures',
+    'Holding Mineral Capital 7',
+  ].map((n) => n.toUpperCase().replace(/\s+/g, ' ').trim()),
+)
+
+/** Reason a name is a non-company line, or null if it should be enriched. */
+function classifyExclusion(name: string): string | null {
+  const norm = name.toUpperCase().replace(/\s+/g, ' ').trim()
+  if (EXCLUDE_NAMES.has(norm)) return 'named_vehicle'
+  for (const { re, reason } of EXCLUDE_PATTERNS) {
+    if (re.test(name)) return reason
+  }
+  return null
+}
+
 /**
  * Every portfolio company (all orgs) that has a `domain` but is missing at
  * least one pitch field — the exact set `enrich` would still fill.
@@ -70,36 +117,59 @@ async function listCandidates(ctx: Ctx): Promise<Array<Candidate>> {
   return candidates
 }
 
+/** Split candidates into the ones to enrich and the excluded non-company lines. */
+function partition(candidates: Array<Candidate>): {
+  willEnrich: Array<Candidate>
+  excluded: Array<{ candidate: Candidate; reason: string }>
+} {
+  const willEnrich: Array<Candidate> = []
+  const excluded: Array<{ candidate: Candidate; reason: string }> = []
+  for (const c of candidates) {
+    const reason = classifyExclusion(c.company.name)
+    if (reason) excluded.push({ candidate: c, reason })
+    else willEnrich.push(c)
+  }
+  return { willEnrich, excluded }
+}
+
 // ─── dryRun — read-only, stopping point before scheduling anything ──────────
 
 export const dryRun = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const candidates = await listCandidates(ctx)
+    const { willEnrich, excluded } = partition(await listCandidates(ctx))
     return {
-      candidateCount: candidates.length,
-      estimatedDurationSec: Math.round((candidates.length * STAGGER_MS) / 1000),
-      candidates: candidates.map((c) => ({
+      willEnrichCount: willEnrich.length,
+      excludedCount: excluded.length,
+      estimatedDurationSec: Math.round((willEnrich.length * STAGGER_MS) / 1000),
+      willEnrich: willEnrich.map((c) => ({
         org: c.orgSlug,
         name: c.company.name,
         domain: c.company.domain,
         missing: c.missing,
       })),
+      excluded: excluded.map((e) => ({
+        org: e.candidate.orgSlug,
+        name: e.candidate.company.name,
+        reason: e.reason,
+      })),
       note:
-        'Lecture seule. Valider la liste puis lancer ' +
+        'Lecture seule. Vérifier surtout willEnrich (aucune non-société ?) ' +
+        'et excluded (aucune vraie société écartée ?). Signaler les erreurs ' +
+        'pour ajuster le tri, puis lancer ' +
         'migrations/backfillCompanyEnrichment:apply',
     }
   },
 })
 
-// ─── apply — schedules enrich for each candidate (staggered) ────────────────
+// ─── apply — schedules enrich for the non-excluded candidates (staggered) ────
 
 export const apply = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const candidates = await listCandidates(ctx)
+    const { willEnrich, excluded } = partition(await listCandidates(ctx))
     let scheduled = 0
-    for (const c of candidates) {
+    for (const c of willEnrich) {
       await ctx.scheduler.runAfter(
         scheduled * STAGGER_MS,
         internal.companyEnrichment.enrich,
@@ -109,33 +179,34 @@ export const apply = internalMutation({
     }
     return {
       scheduled,
+      excludedCount: excluded.length,
       estimatedDurationSec: Math.round((scheduled * STAGGER_MS) / 1000),
       note:
-        'Génération lancée en arrière-plan. Relancer ' +
+        'Génération lancée en arrière-plan (non-sociétés exclues). Relancer ' +
         'migrations/backfillCompanyEnrichment:report dans quelques minutes ' +
         'pour voir ce qui reste vide (site injoignable → à remplir à la main).',
     }
   },
 })
 
-// ─── report — post-apply state: which candidates are still empty ────────────
+// ─── report — post-apply state: non-excluded candidates still empty ─────────
 
 export const report = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const stillEmpty = await listCandidates(ctx)
+    const { willEnrich } = partition(await listCandidates(ctx))
     return {
-      stillEmptyCount: stillEmpty.length,
-      stillEmpty: stillEmpty.map((c) => ({
+      stillEmptyCount: willEnrich.length,
+      stillEmpty: willEnrich.map((c) => ({
         org: c.orgSlug,
         name: c.company.name,
         domain: c.company.domain,
         missing: c.missing,
       })),
       note:
-        stillEmpty.length === 0
-          ? 'Toutes les entités portfolio avec domaine ont désormais one-liner + résumé.'
-          : 'Ces entités sont encore vides (site injoignable ou génération en cours) — à remplir à la main si besoin.',
+        willEnrich.length === 0
+          ? 'Toutes les sociétés visées (hors non-sociétés exclues) ont one-liner + résumé.'
+          : 'Ces sociétés sont encore vides (site injoignable ou génération en cours) — à remplir à la main si besoin.',
     }
   },
 })

@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.82.2 — 14/07/2026 à 12:50 — Parallel : préparation de l'affichage des communications par deal
+## v1.82.3 — 14/07/2026 à 12:50 — Parallel : préparation de l'affichage des communications par deal
 
 Travail préparatoire (rien de visible pour l'instant) en vue d'afficher, dans la
 section « Report » de chaque entité, les communications publiées par Parallel sur
@@ -46,6 +46,37 @@ l'API avant de construire l'affichage.
 > - Aucune UI ni écriture DB. Phase 1 (dé-risquage) de l'étape 2b VASCO ;
 >   l'affichage (read path org-guardé + rattachement entité↔émetteur + bloc dans
 >   `CompanyReportsSection` + roll-up org) suivra une fois l'accès prouvé.
+
+## v1.82.2 — 14/07/2026 à 12:49 — Nettoyage des domaines et ciblage du rattrapage
+
+En lançant le rattrapage des résumés, on a découvert que beaucoup de fiches
+Calte avaient un **domaine mal enregistré** (collé sous forme de lien ou
+d'adresse complète avec des paramètres de suivi). Conséquence : leur **logo
+était cassé** et le résumé ne pouvait pas se générer. Cette mise à jour :
+
+- **répare les domaines** existants (ils redeviennent un simple nom de site,
+  ex. `anaxago.com`), ce qui rétablit les logos **et** débloque la génération ;
+- **normalise désormais tout domaine à la saisie** — coller une adresse
+  complète ou un lien fonctionne, c'est nettoyé automatiquement ;
+- **cible mieux le rattrapage** : les lignes qui ne sont pas des sociétés
+  (lignes de deal, SPV, fonds, véhicules d'investissement) sont désormais
+  écartées de la génération de résumé, où elle n'a pas de sens.
+
+> **🔧 Notes techniques**
+>
+> - Helper pur `convex/lib/domain.ts:normalizeDomain` (retire wrapper markdown
+>   `[…](…)`, protocole, chemin/query, `www.` ; `null` si irréductible) +
+>   tests `tests/domain.test.ts`. Appliqué à l'écriture (`companies.create`/
+>   `update`, `agentTools.createCompanyInternal`) et défensivement au fetch
+>   (`companyEnrichment.fetchSiteText`).
+> - Migration `convex/migrations/normalizeCompanyDomains.ts` (`dryRun`/`apply`/
+>   `report`) : réécrit les domaines corrompus en base (idempotent, non
+>   destructif — illisible → `needsManualReview`). **À lancer avant** le
+>   backfill.
+> - `backfillCompanyEnrichment` : filtre `classifyExclusion` (motifs
+>   structurels + liste nominative) ; `dryRun` sort `willEnrich` vs `excluded`.
+> - Contexte complet : `KNOWN_ISSUES.md` « Domaines corrompus ». `MIGRATIONS.md`
+>   mis à jour (2 lignes).
 
 ## v1.82.1 — 14/07/2026 à 12:26 — Rattrapage des résumés/one-liners pour les entités déjà existantes
 

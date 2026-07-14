@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values'
 import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import { normalizeDomain } from './lib/domain'
 import { personValidator } from './lib/people'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
 import type { DataModel, Id } from './_generated/dataModel'
@@ -90,6 +91,11 @@ export const create = mutation({
     await requireOrgMember(ctx, args.orgId)
     if (args.siren !== undefined) args.siren = normalizeSiren(args.siren)
     if (args.siren) await assertSirenFree(ctx, args.orgId, args.siren)
+    // Domain: reduce to a bare hostname (keep raw if unparseable, '' clears).
+    if (args.domain !== undefined) {
+      const trimmed = args.domain.trim()
+      args.domain = trimmed ? (normalizeDomain(trimmed) ?? trimmed) : undefined
+    }
     const id = await ctx.db.insert('companies', args)
     // Domain provided at creation → auto-fill oneLiner + summary from the
     // website (additive, portfolio only — cf. convex/companyEnrichment.ts).
@@ -289,9 +295,10 @@ export const update = mutation({
     if (patch.siren) {
       await assertSirenFree(ctx, company.orgId, patch.siren, id)
     }
-    // Domain: trimmed; '' clears the field (mirror of SIREN behaviour).
+    // Domain: reduce to a bare hostname (keep raw if unparseable, '' clears).
     if (patch.domain !== undefined) {
-      patch.domain = patch.domain.trim() || undefined
+      const trimmed = patch.domain.trim()
+      patch.domain = trimmed ? (normalizeDomain(trimmed) ?? trimmed) : undefined
     }
     // Summary: trimmed; '' clears the field (mirror of domain behaviour).
     if (patch.summary !== undefined) {
