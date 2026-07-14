@@ -23,6 +23,29 @@ bas de page.
 
 ---
 
+## v1.82.1 — 14/07/2026 à 12:26 — Rattrapage des résumés/one-liners pour les entités déjà existantes
+
+Le remplissage automatique du one-liner et du résumé (v1.81) ne se déclenchait
+que pour les **nouvelles** entités, ou quand on posait un domaine pour la
+première fois. Les entités déjà en base avec un domaine — SPV, véhicules, et
+autres sociétés dont le domaine avait été rempli lors des imports précédents —
+restaient donc vides. Cette mise à jour ajoute une **opération de rattrapage**
+qui relance la génération sur toutes ces entités (Calte et Albo) d'un coup. À
+noter : pour les SPV et véhicules, le domaine pointe souvent vers le site de la
+plateforme mère, donc le texte généré peut décrire la plateforme plutôt que le
+véhicule — ces quelques cas sont à relire à la main.
+
+> **🔧 Notes techniques**
+>
+> - Migration one-shot `convex/migrations/backfillCompanyEnrichment.ts`
+>   (`dryRun` / `apply` / `report`) : liste toute entité `kind: 'portfolio'`
+>   non archivée, toutes orgs, ayant un `domain` mais `oneLiner` et/ou
+>   `summary` vide, et schedule `companyEnrichment.enrich` sur chacune
+>   (staggeré `STAGGER_MS` pour lisser les appels site + LLM). Additive et
+>   idempotent (l'action ne remplit que les champs `undefined`). `report`
+>   reliste ce qui reste vide après coup (site injoignable → saisie manuelle).
+> - Ligne ajoutée à `MIGRATIONS.md`. Aucun changement de schéma ni d'UI.
+
 ## v1.82.0 — 14/07/2026 à 12:20 — La Trésorerie repère vos flux récurrents et propose des règles
 
 Le prévisionnel apprend de votre historique. La Trésorerie détecte désormais
