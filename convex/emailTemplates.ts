@@ -569,6 +569,69 @@ const REVIEW_REASON_LABELS: Record<string, string> = {
   spam: 'marqué comme spam',
 }
 
+export function cashAlertEmail({
+  locale,
+  orgName,
+  thresholdCents,
+  minProjectedCents,
+  cashUrl,
+}: {
+  locale: EmailLocale
+  orgName: string
+  thresholdCents: number
+  minProjectedCents: number
+  cashUrl: string
+}) {
+  const eur = (cents: number) =>
+    new Intl.NumberFormat(locale === 'fr' ? 'fr-FR' : 'en-US', {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 0,
+    }).format(cents / 100)
+
+  const c = pick(locale, {
+    en: {
+      subject: `Cash alert — ${orgName} projected below ${eur(thresholdCents)}`,
+      heading: `Cash below your threshold`,
+      intro: `The projected cash balance of <strong>${orgName}</strong> drops to <strong>${eur(minProjectedCents)}</strong> within the next 3 months — below your ${eur(thresholdCents)} alert threshold.`,
+      followup: `The projection includes committed and planned entries (overdue ones included). Review the forecast to see which month dips and what drives it.`,
+      footer: `You receive this because a cash threshold alert is active for ${orgName}. Adjust or disable it on the Cash page. No more than one alert per week.`,
+      preheader: `Projected balance ${eur(minProjectedCents)} — under your ${eur(thresholdCents)} threshold.`,
+      cta: 'Open the cash forecast',
+      text: [
+        `The projected cash balance of ${orgName} drops to ${eur(minProjectedCents)} within the next 3 months — below your ${eur(thresholdCents)} alert threshold.`,
+        `Review the forecast: ${cashUrl}`,
+        `You receive this because a cash threshold alert is active for ${orgName}. No more than one alert per week.`,
+      ],
+    },
+    fr: {
+      subject: `Alerte trésorerie — ${orgName} projetée sous ${eur(thresholdCents)}`,
+      heading: `Trésorerie sous votre seuil`,
+      intro: `Le solde projeté de <strong>${orgName}</strong> descend à <strong>${eur(minProjectedCents)}</strong> dans les 3 prochains mois — sous votre seuil d'alerte de ${eur(thresholdCents)}.`,
+      followup: `La projection inclut l'engagé et le prévu (retards compris). Ouvrez le prévisionnel pour voir quel mois creuse et ce qui l'explique.`,
+      footer: `Vous recevez cet email car une alerte de seuil est active pour ${orgName}. Ajustez-la ou désactivez-la sur la page Trésorerie. Au plus une alerte par semaine.`,
+      preheader: `Solde projeté ${eur(minProjectedCents)} — sous votre seuil de ${eur(thresholdCents)}.`,
+      cta: 'Ouvrir le prévisionnel',
+      text: [
+        `Le solde projeté de ${orgName} descend à ${eur(minProjectedCents)} dans les 3 prochains mois — sous votre seuil d'alerte de ${eur(thresholdCents)}.`,
+        `Ouvrir le prévisionnel : ${cashUrl}`,
+        `Vous recevez cet email car une alerte de seuil est active pour ${orgName}. Au plus une alerte par semaine.`,
+      ],
+    },
+  })
+
+  const html = layout({
+    locale,
+    preheader: c.preheader,
+    heading: c.heading,
+    paragraphs: [c.intro, c.followup, urlFallback(locale, cashUrl)],
+    cta: { label: c.cta, url: cashUrl },
+    footer: c.footer,
+  })
+
+  return { subject: c.subject, html, text: plainText(c.text) }
+}
+
 export function reviewReasonLabel(reason: string): string {
   return REVIEW_REASON_LABELS[reason] ?? reason
 }

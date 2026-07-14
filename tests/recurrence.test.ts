@@ -17,6 +17,7 @@ import {
   expandOccurrences,
   isoDay,
   monthKey,
+  previousQuarter,
   ruleDerivedKey,
 } from '../convex/lib/recurrence'
 import type { ExistingEntryState } from '../convex/lib/recurrence'
@@ -431,6 +432,24 @@ describe('simulation de régénération (expandRules sans DB)', () => {
     assert.deepEqual(run2, { created: 0, updated: 5, skipped: 1 })
     assert.equal(store.get(janKey)?.amountCents, 99500)
     assert.equal(store.get(janKey)?.status, 'realized')
+  })
+})
+
+describe('previousQuarter — dernier trimestre civil clos', () => {
+  it('en juillet, retourne T2 (avr–juin) avec échéance au 24 juillet', () => {
+    const q = previousQuarter(utc(2026, 7, 14))
+    assert.equal(q.quarterKey, '2026-Q2')
+    assert.equal(q.startMs, utc(2026, 4, 1))
+    assert.equal(q.endMs, utc(2026, 7, 1))
+    assert.equal(q.dueDateMs, utc(2026, 7, 24))
+  })
+
+  it('en février, retourne le T4 de l\'année précédente (échéance 24 janvier, passée)', () => {
+    const q = previousQuarter(utc(2026, 2, 10))
+    assert.equal(q.quarterKey, '2025-Q4')
+    assert.equal(q.startMs, utc(2025, 10, 1))
+    assert.equal(q.endMs, utc(2026, 1, 1))
+    assert.equal(q.dueDateMs, utc(2026, 1, 24))
   })
 })
 

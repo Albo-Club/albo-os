@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.82.3 — 14/07/2026 à 12:50 — Parallel : préparation de l'affichage des communications par deal
+## v1.83.1 — 14/07/2026 à 13:18 — Parallel : préparation de l'affichage des communications par deal
 
 Travail préparatoire (rien de visible pour l'instant) en vue d'afficher, dans la
 section « Report » de chaque entité, les communications publiées par Parallel sur
@@ -46,6 +46,44 @@ l'API avant de construire l'affichage.
 > - Aucune UI ni écriture DB. Phase 1 (dé-risquage) de l'étape 2b VASCO ;
 >   l'affichage (read path org-guardé + rattachement entité↔émetteur + bloc dans
 >   `CompanyReportsSection` + roll-up org) suivra une fois l'accès prouvé.
+
+## v1.83.0 — 14/07/2026 à 13:09 — Le prévisionnel se mesure, vous alerte, et anticipe la TVA
+
+Trois compléments au prévisionnel de trésorerie :
+
+- **Fiabilité mesurée** : chaque 1er du mois, une photo du prévisionnel est
+  prise automatiquement. Dès le mois suivant, la page Trésorerie affiche
+  l'écart entre ce qui était projeté pour le mois écoulé et ce qui s'est
+  réellement passé — pour savoir à quel point faire confiance à la courbe.
+- **Alerte de seuil** : réglez un seuil (ex. 50 000 €) sur la page
+  Trésorerie ; si le solde projeté des 3 prochains mois passe dessous, vous
+  recevez un email — au plus un par semaine, et le réglage se modifie ou se
+  coupe à tout moment.
+- **Échéance TVA estimée** : quand la TVA du trimestre clos est à payer
+  (collectée > déductible), une carte propose de créer l'échéance
+  correspondante (datée du 24 du mois suivant le trimestre) dans le
+  prévisionnel — en un clic, jamais automatiquement, avec un avertissement
+  si des transactions du trimestre restent à qualifier.
+
+> **🔧 Notes techniques**
+>
+> - Premiers **crons Convex** du repo (`convex/crons.ts`) : snapshot
+>   mensuel (1er, 05:00 UTC → `forecasts.captureSnapshots`, idempotent par
+>   (org, mois), relançable via `convex run`) et alertes quotidiennes
+>   (07:00 UTC → `checkCashAlerts`, cooldown 7 j, email bilingue
+>   `emailTemplates.ts:cashAlertEmail` via Resend). Fonctions internal sans
+>   auth — même famille d'exceptions que les backfills (KNOWN_ISSUES).
+> - Nouvelles tables `forecastSnapshots` (append-only, projection 12 mois
+>   au 1er du mois) et `cashAlertSettings` (une par org, `lastNotifiedAt`
+>   remis à zéro à chaque modification). Query `getForecastReliability`
+>   (snapshot M-1 vs solde réel fin M-1), `getCashAlert`/`setCashAlert`.
+> - TVA trimestrielle : `previousQuarter` (pur, `lib/recurrence.ts`, testé),
+>   `computeVatPositionForOrg` extrait de `getVatPosition` avec fenêtre de
+>   dates, `suggestVatEntry`/`createVatEntry` (montant recalculé serveur,
+>   idempotent par `derivedKey` "vat:{org}:{trimestre}" — sans `ruleId`,
+>   l'échéance reste une ponctuelle éditable). UI :
+>   `VatSuggestionCard.tsx`, `CashAlertCard.tsx`, ligne fiabilité dans
+>   `ForecastOverview.tsx`.
 
 ## v1.82.2 — 14/07/2026 à 12:49 — Nettoyage des domaines et ciblage du rattrapage
 

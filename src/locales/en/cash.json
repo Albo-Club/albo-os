@@ -118,11 +118,32 @@
     "unqualified_one": "{{count}} transaction to qualify in reconciliation",
     "unqualified_other": "{{count}} transactions to qualify in reconciliation"
   },
+  "vatSuggestion": {
+    "quarter": "Q{{quarter}} {{year}}",
+    "title": "Estimated VAT entry — {{quarter}}",
+    "body": "{{amount}} of VAT owed for the closed quarter (collected {{collected}} − deductible {{deductible}}).",
+    "unqualified_one": "{{count}} transaction of the quarter still to qualify — the amount may move.",
+    "unqualified_other": "{{count}} transactions of the quarter still to qualify — the amount may move.",
+    "create": "Create the entry (due {{date}})",
+    "entryLabel": "VAT {{quarter}}",
+    "created": "VAT entry created",
+    "alreadyExists": "This quarter's entry already exists",
+    "error": "Something went wrong"
+  },
+  "alert": {
+    "title": "Threshold alert",
+    "hint": "An email when the projected balance over the next 3 months (or the available balance) drops under the threshold. At most one alert per week.",
+    "thresholdLabel": "Threshold (€)",
+    "activeLabel": "Alert active",
+    "saved": "Alert saved",
+    "error": "Something went wrong"
+  },
   "forecast": {
     "title": "Cash forecast",
     "horizonMonths_one": "{{count}} month",
     "horizonMonths_other": "{{count}} months",
     "startingBalance": "Starting balance (available, EUR accounts): {{amount}}",
+    "reliability": "Reliability: end of {{month}}, projected {{projected}} (as of the 1st) · actual {{actual}} · gap {{delta}}",
     "chartCommitted": "Projected (committed)",
     "chartPlanned": "Projected (with planned)",
     "grid": {
