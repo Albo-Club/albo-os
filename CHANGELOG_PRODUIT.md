@@ -23,6 +23,33 @@ bas de page.
 
 ---
 
+## v1.84.0 — 14/07/2026 à 14:17 — Même domaine, même description
+
+Quand plusieurs entités partagent le même site web (par exemple les différentes
+sociétés « La Vie de Quartier »), elles affichent maintenant **le même
+one-liner et le même résumé**, pour rester cohérentes. Concrètement :
+
+- **Si vous modifiez le résumé de l'une, il se met à jour sur toutes** celles
+  qui ont le même domaine (au sein d'un même espace) — plus besoin de recopier.
+- **À la génération automatique**, une nouvelle entité reprend le texte d'une
+  entité sœur déjà décrite (même domaine) au lieu d'en réécrire une variante.
+- L'existant est **harmonisé** en une passe : pour chaque domaine partagé, le
+  résumé le plus complet devient le résumé commun.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `convex/lib/pitch.ts` : `pickCanonicalPitch` (résumé le plus long
+>   du groupe) + `applyPitchToDomainGroup(ctx, orgId, domain, fields, mode)`
+>   (`overwrite` = propagation/unif, `fill` = enrichissement additif). Tests
+>   `tests/pitch.test.ts`.
+> - `companies.update` propage un `summary` édité à tout le groupe de même
+>   domaine (par org). `companyEnrichment.enrich` réutilise le pitch d'un voisin
+>   (pas d'appel LLM) sinon génère ; `applyEnrichment` remplit tout le groupe en
+>   mode `fill`.
+> - Migration one-shot `convex/migrations/unifyDomainPitches.ts` (`dryRun`/
+>   `apply`/`report`) pour figer l'existant. Invariant documenté dans
+>   `KNOWN_ISSUES.md` « Pitch partagé par domaine ». `MIGRATIONS.md` mis à jour.
+
 ## v1.83.4 — 14/07/2026 à 13:53 — Nettoyage des résumés génériques par lot
 
 Complément à l'outillage de nettoyage : le premier passage (non filtré) avait

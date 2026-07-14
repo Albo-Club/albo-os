@@ -2153,3 +2153,28 @@ portefeuille Calte contient beaucoup de **lignes de deal** (SIDE, Anaxago, SPV
 Parallel, fonds) qui ne sont pas des sociétés — un résumé n'y a pas de sens.
 D'où le filtre `classifyExclusion` (motifs structurels + liste nominative) ; le
 `dryRun` sort `willEnrich` vs `excluded` pour relire le tri avant l'`apply`.
+
+## Pitch partagé par domaine (one-liner + résumé)
+
+Règle produit (14/07/2026) : deux entités `companies` qui partagent le même
+`domain` (dans une **même org**) doivent porter le **même** `oneLiner` et le
+**même** `summary` — sinon on a de la paraphrase incohérente (ex. les 4
+« La Vie de Quartier » sur `laviedequartier.fr`). L'invariant est **maintenu à
+l'écriture** (pas dérivé au read), en trois points — tout nouveau code qui
+écrit `oneLiner`/`summary` doit passer par le helper, sous peine de re-créer de
+la dérive :
+
+- **Édition** (`companies.update`) : un `summary` édité est propagé à tout le
+  groupe de même domaine via `lib/pitch.ts:applyPitchToDomainGroup(…, 'overwrite')`.
+  Un `''` (clear) se propage aussi.
+- **Enrichissement auto** (`companyEnrichment`) : `enrich` réutilise le pitch
+  d'un voisin de même domaine s'il existe (pas de nouvel appel LLM), sinon
+  génère une fois ; `applyEnrichment` remplit en mode `'fill'` (n'écrase pas un
+  texte saisi à la main) sur tout le groupe.
+- **Existant** : `migrations/unifyDomainPitches` fige rétroactivement (canonique
+  = résumé le plus long, cf. `pickCanonicalPitch`).
+
+Portée **par org** (multi-tenant) : on ne propage jamais une édition Albo vers
+Calte, même si un domaine était partagé entre les deux. Le `oneLiner` n'a pas
+d'éditeur inline aujourd'hui (édité via génération/unif) ; s'il en gagne un,
+propager de la même façon (ajouter `'oneLiner' in patch` dans `companies.update`).

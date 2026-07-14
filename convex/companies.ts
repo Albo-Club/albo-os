@@ -3,6 +3,7 @@ import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { normalizeDomain } from './lib/domain'
+import { applyPitchToDomainGroup } from './lib/pitch'
 import { personValidator } from './lib/people'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
 import type { DataModel, Id } from './_generated/dataModel'
@@ -305,6 +306,21 @@ export const update = mutation({
       patch.summary = patch.summary.trim() || undefined
     }
     await ctx.db.patch("companies", id, patch)
+    // Same-domain propagation: a pitch edit applies to every non-archived
+    // entity of the org sharing the domain, so they stay identical (product
+    // rule — cf. convex/lib/pitch.ts). '' clears propagate too.
+    if ('summary' in patch) {
+      const domain = patch.domain !== undefined ? patch.domain : company.domain
+      if (domain) {
+        await applyPitchToDomainGroup(
+          ctx,
+          company.orgId,
+          domain,
+          { summary: patch.summary },
+          'overwrite',
+        )
+      }
+    }
     // Domain set → auto-fill the missing pitch fields from the website
     // (additive: existing/hand-edited values are never overwritten —
     // cf. convex/companyEnrichment.ts).
