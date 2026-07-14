@@ -144,6 +144,8 @@
     "horizonMonths_other": "{{count}} months",
     "startingBalance": "Starting balance (available, EUR accounts): {{amount}}",
     "reliability": "Reliability: end of {{month}}, projected {{projected}} (as of the 1st) · actual {{actual}} · gap {{delta}}",
+    "dealLabel": "Deal (optional)",
+    "dealHint": "Links this flow to a deal (SCPI rents, coupons, distributions…) — it will show on the deal page.",
     "chartCommitted": "Projected (committed)",
     "chartPlanned": "Projected (with planned)",
     "grid": {
@@ -172,7 +174,9 @@
       "keepRemainderHint": "Keep the remainder: partial payment — the balance stays expected as a new one-off entry.",
       "matched": "Entry reconciled",
       "remainderKept": "Entry reconciled — {{amount}} remainder kept",
-      "error": "Something went wrong"
+      "error": "Something went wrong",
+      "pointAction": "Match to the deal",
+      "pointed": "Transaction matched to the deal"
     },
     "suggestedRules": {
       "title": "Suggested rules",

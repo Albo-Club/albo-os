@@ -90,6 +90,20 @@ async function resolveOrgScope(
   return memberships.map((m) => m.orgId)
 }
 
+/**
+ * A forecast rule/entry may link to a deal (SCPI rents, coupons…): the deal
+ * must belong to the same org — same guard family as
+ * deals.ts:assertInvestorIsGroupEntity.
+ */
+export async function assertDealInOrg(
+  ctx: GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>,
+  orgId: Id<'organizations'>,
+  dealId: Id<'deals'>,
+) {
+  const deal = await ctx.db.get('deals', dealId)
+  if (!deal || deal.orgId !== orgId) throw new ConvexError('deal_wrong_org')
+}
+
 // ─── Rule field validation ──────────────────────────────────────────────────
 
 function assertValidRuleFields(rule: {
@@ -145,6 +159,7 @@ export async function insertRule(
     amountCents: number
     direction: 'in' | 'out'
     category?: string
+    dealId?: Id<'deals'>
     frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly'
     interval?: number
     anchorDay: number
@@ -155,12 +170,14 @@ export async function insertRule(
 ): Promise<Id<'forecastRules'>> {
   const interval = args.interval ?? 1
   assertValidRuleFields({ ...args, interval })
+  if (args.dealId) await assertDealInOrg(ctx, args.orgId, args.dealId)
   return await ctx.db.insert('forecastRules', {
     orgId: args.orgId,
     label: args.label,
     amountCents: args.amountCents,
     direction: args.direction,
     category: args.category,
+    dealId: args.dealId,
     frequency: args.frequency,
     interval,
     anchorDay: args.anchorDay,
@@ -179,6 +196,7 @@ export const createRule = mutation({
     amountCents: v.number(),
     direction: directionValidator,
     category: v.optional(v.string()),
+    dealId: v.optional(v.id('deals')),
     frequency: frequencyValidator,
     interval: v.optional(v.number()), // default 1
     anchorDay: v.number(),
@@ -248,6 +266,8 @@ export const updateRule = mutation({
       // `null` clears the category (absent = leave untouched — an optional
       // arg cannot carry `undefined` over the wire).
       category: v.optional(v.union(v.string(), v.null())),
+      // Same convention: `null` unlinks the deal.
+      dealId: v.optional(v.union(v.id('deals'), v.null())),
       frequency: v.optional(frequencyValidator),
       interval: v.optional(v.number()),
       anchorDay: v.optional(v.number()),
@@ -262,13 +282,15 @@ export const updateRule = mutation({
     await requireOrgMember(ctx, rule.orgId)
     // null (clear) validates as "no category"; a set category is checked
     // against the (possibly patched) direction.
-    const { category: rawCategory, ...rest } = patch
+    const { category: rawCategory, dealId: rawDealId, ...rest } = patch
     const category = rawCategory === null ? undefined : rawCategory
     assertValidRuleFields({ ...rule, ...rest, category })
+    if (rawDealId) await assertDealInOrg(ctx, rule.orgId, rawDealId)
     await ctx.db.patch('forecastRules', ruleId, {
       ...rest,
       // Patching `category: undefined` removes the field (clear).
       ...(rawCategory !== undefined ? { category } : {}),
+      ...(rawDealId !== undefined ? { dealId: rawDealId ?? undefined } : {}),
     })
     return null
   },
@@ -351,6 +373,7 @@ export async function expandRulesForOrgs(
             status: 'pending',
             label: rule.label,
             category: rule.category,
+            dealId: rule.dealId,
             ruleId: rule._id,
             derivedKey,
             overridden: false,
@@ -366,6 +389,7 @@ export async function expandRulesForOrgs(
             direction: rule.direction,
             label: rule.label,
             category: rule.category,
+            dealId: rule.dealId,
           })
           updated += 1
         }
@@ -490,6 +514,7 @@ export async function applyMarkEntryRealized(
       status: 'pending',
       label: entry.label,
       category: entry.category,
+      dealId: entry.dealId,
       overridden: false,
       currency: entry.currency,
     })
@@ -634,9 +659,67 @@ export const suggestForecastMatches = query({
             counterparty: tx.counterparty ?? null,
             amountCents: tx.amount,
           },
+          // Deal-linked entry + still-unpointed transaction → the UI offers
+          // to match the transaction onto the deal right after reconciling
+          // (two distinct gestures; matching stays transactions.ts's job).
+          pointToDealId:
+            entry.dealId != null && tx.dealId == null && tx.allocation == null
+              ? entry.dealId
+              : null,
         },
       ]
     })
+  },
+})
+
+// ─── Deal-page forecast section ──────────────────────────────────────────────
+
+/**
+ * The forecast side of a deal page: its pending linked entries (planned
+ * flows — SCPI rents, coupons, capital calls…) plus the undated committed
+ * remainder (committedAmount − realized "Versé", same derivation as
+ * getCommittedPipeline). Realized transactions already live on the page.
+ */
+export const getDealForecast = query({
+  args: { dealId: v.id('deals') },
+  handler: async (ctx, { dealId }) => {
+    const deal = await ctx.db.get('deals', dealId)
+    if (!deal) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, deal.orgId)
+
+    const rows = await ctx.db
+      .query('forecastEntries')
+      .withIndex('by_deal', (q) => q.eq('dealId', dealId))
+      .collect()
+    const entries = rows
+      .filter((e) => e.status === 'pending')
+      .sort((a, b) => a.date - b.date)
+      .map((e) => ({
+        _id: e._id,
+        date: e.date,
+        label: e.label,
+        amountCents: e.amountCents,
+        direction: e.direction,
+        confidence: e.confidence,
+        derivedFromRule: e.ruleId != null,
+      }))
+
+    const committedCents = deal.committedAmount ?? 0
+    let paidCents = 0
+    const dealTxs = await ctx.db
+      .query('transactions')
+      .withIndex('by_deal', (q) => q.eq('dealId', dealId))
+      .collect()
+    for (const tx of dealTxs) {
+      if (tx.direction === 'out') paidCents += tx.amount
+    }
+
+    return {
+      entries,
+      committedCents,
+      paidCents,
+      remainingCents: Math.max(0, committedCents - paidCents),
+    }
   },
 })
 
@@ -831,6 +914,7 @@ export const createManualEntry = mutation({
     confidence: confidenceValidator,
     label: v.string(),
     category: v.optional(v.string()),
+    dealId: v.optional(v.id('deals')),
   },
   handler: async (ctx, args) => {
     await requireOrgMember(ctx, args.orgId)
@@ -843,6 +927,7 @@ export const createManualEntry = mutation({
     ) {
       throw new ConvexError('invalid_category')
     }
+    if (args.dealId) await assertDealInOrg(ctx, args.orgId, args.dealId)
     return await ctx.db.insert('forecastEntries', {
       orgId: args.orgId,
       date: args.date,
@@ -852,6 +937,7 @@ export const createManualEntry = mutation({
       status: 'pending',
       label: args.label,
       category: args.category,
+      dealId: args.dealId,
       overridden: false,
       currency: 'EUR',
     })
@@ -873,6 +959,8 @@ export const updateEntry = mutation({
       label: v.optional(v.string()),
       // `null` clears the category (absent = leave untouched).
       category: v.optional(v.union(v.string(), v.null())),
+      // Same convention: `null` unlinks the deal.
+      dealId: v.optional(v.union(v.id('deals'), v.null())),
     }),
   },
   handler: async (ctx, { entryId, patch }) => {
@@ -887,17 +975,19 @@ export const updateEntry = mutation({
     }
     // Only a category being SET is validated — a legacy free-text category
     // on the row must not block an unrelated edit.
-    const { category: rawCategory, ...rest } = patch
+    const { category: rawCategory, dealId: rawDealId, ...rest } = patch
     if (
       typeof rawCategory === 'string' &&
       !isValidForecastCategory(patch.direction ?? entry.direction, rawCategory)
     ) {
       throw new ConvexError('invalid_category')
     }
+    if (rawDealId) await assertDealInOrg(ctx, entry.orgId, rawDealId)
     await ctx.db.patch('forecastEntries', entry._id, {
       ...rest,
       // Patching `category: undefined` removes the field (clear).
       ...(rawCategory !== undefined ? { category: rawCategory ?? undefined } : {}),
+      ...(rawDealId !== undefined ? { dealId: rawDealId ?? undefined } : {}),
       // A hand-edited derived entry becomes protected from regeneration.
       ...(entry.ruleId ? { overridden: true } : {}),
     })

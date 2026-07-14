@@ -646,5 +646,22 @@
       "deal": "Nom du deal",
       "lastValuation": "Dernière valorisation"
     }
+  },
+  "dealForecast": {
+    "title": "Prévisionnel",
+    "committed": "Reste à déployer : {{remaining}} (engagé {{committed}} − versé {{paid}}) — sans date d'appel, compté à part de la courbe.",
+    "col": {
+      "date": "Date",
+      "label": "Libellé",
+      "confidence": "Confiance",
+      "amount": "Montant"
+    },
+    "ruleBadge": "Règle",
+    "confidence": {
+      "confirmed": "Engagé",
+      "expected": "Prévu",
+      "probable": "Probable"
+    },
+    "hint": "Échéances prévisionnelles rattachées à ce deal (gérées depuis la page Trésorerie). Le réalisé est la section Transactions ci-dessous."
   }
 }

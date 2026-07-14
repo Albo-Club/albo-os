@@ -38,6 +38,7 @@ import {
 } from '~/components/data-table/LocalPagination'
 import { ExitBadge } from '~/components/deals/ExitBadge'
 import { ExitDealDialog } from '~/components/deals/ExitDealDialog'
+import { DealForecastSection } from '~/components/deals/DealForecastSection'
 import { FundSection } from '~/components/deals/FundSection'
 import {
   FIELD_FORMAT,
@@ -1001,6 +1002,10 @@ function DealDetail() {
           txs={txs}
         />
       )}
+
+      {/* Planned + committed layers (linked forecast entries); the
+          realized layer is the Transactions section below. */}
+      <DealForecastSection dealId={deal._id} />
 
       <Transactions deal={deal} />
 

@@ -23,6 +23,47 @@ bas de page.
 
 ---
 
+## v1.85.0 — 14/07/2026 à 14:23 — Le prévisionnel se rattache aux deals
+
+Les flux prévisionnels peuvent désormais être **rattachés à un deal** — les
+loyers Iroko à votre deal SCPI, un coupon à son obligation, un appel de
+fonds daté à son deal signé.
+
+- Dans les formulaires de règle récurrente et d'échéance ponctuelle, un
+  nouveau champ **« Deal (optionnel) »** : choisissez le deal, et toutes
+  les occurrences générées portent le lien (le retirer est tout aussi
+  simple).
+- La **fiche deal** gagne une section **« Prévisionnel »** : les échéances
+  à venir rattachées au deal (avec leur confiance) et le reste à déployer
+  engagé — juste au-dessus des transactions réalisées. Les trois couches
+  au même endroit : réalisé, prévu, engagé.
+- Bonus de cohérence : quand vous **rapprochez** une échéance rattachée à
+  un deal avec un mouvement bancaire pas encore pointé, l'application vous
+  propose dans la foulée de **pointer la transaction sur ce deal** — un
+  clic dans la notification, et le geste reste explicite.
+- L'assistant IA sait faire pareil : créer ou modifier une règle/échéance
+  avec son deal.
+
+> **🔧 Notes techniques**
+>
+> - `dealId` optionnel sur `forecastRules` (nouveau) + activation du champ
+>   réservé sur `forecastEntries` (+ index `by_deal`) ; garde-fou
+>   `assertDealInOrg` (`deal_wrong_org`) sur toutes les écritures ;
+>   `expandRules` propage le `dealId` de la règle (insert **et** resync) ;
+>   le reliquat d'un paiement partiel hérite du lien. Clear par `null`
+>   (même convention wire que `category`).
+> - Query `forecasts.getDealForecast` (échéances pending par `by_deal` +
+>   reste à déployer, même dérivation que `getCommittedPipeline`) →
+>   section `src/components/deals/DealForecastSection.tsx` sur la fiche
+>   deal. Sélecteur `DealCombobox` (réutilisé du pointage) dans
+>   `RuleDialog`/`EntryDialog` via `deals.listOptions`.
+> - `suggestForecastMatches` renvoie `pointToDealId` (échéance liée + tx
+>   non pointée) → toast avec action « Pointer sur le deal »
+>   (`transactions.matchTransaction`, le pointage reste un geste distinct).
+> - Outils agent : `dealId` sur create/update règle et échéance, exposé
+>   dans les listes. i18n fr/en (`cash:forecast.dealLabel`,
+>   `participations:dealForecast`).
+
 ## v1.84.0 — 14/07/2026 à 14:17 — Même domaine, même description
 
 Quand plusieurs entités partagent le même site web (par exemple les différentes
