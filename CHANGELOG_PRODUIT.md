@@ -23,6 +23,39 @@ bas de page.
 
 ---
 
+## v1.76.0 — 14/07/2026 à 10:43 — One-liners des participations Albo + nouveau secteur « Consumer »
+
+Chaque société opérationnelle du portefeuille Albo a désormais un **one-liner** :
+une phrase courte qui dit en un coup d'œil ce qu'elle fait, affichée dans le
+tableau des participations (par ex. « Marketplace de produits électroniques
+reconditionnés » pour BackMarket, ou « Exosquelettes de marche et robots
+humanoïdes » pour Wandercraft). Les SPV immobiliers et véhicules
+d'investissement (Parallel Invest, Sezame Immo, fonds…) restent volontairement
+sans one-liner — une accroche produit n'aurait pas de sens pour eux.
+
+Côté **secteurs**, les quelques sociétés qui n'en avaient pas encore un sont
+désormais classées (Wandercraft, AZmed, Genomines, Versant, Jeen, ACT Running,
+Oprtrs & Co). Et un nouveau secteur **« Consumer / Marques »** fait son
+apparition pour les marques qui vendent leur propre produit (Eclo Beauty,
+Bleen, JOONE, ACT Running), là où « Marketplace » ne collait pas vraiment.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau slug `consumer` ajouté à `SECTOR_SLUGS` (`src/lib/sectors.ts`) +
+>   libellés i18n `participations.sectors.consumer` (« Consumer / Marques » /
+>   « Consumer / Brands »). Repris automatiquement par `SectorCombobox` et le
+>   filtre secteur, sans autre changement.
+> - Migration one-shot idempotente `convex/migrations/alboOneLinerImport.ts`
+>   (`dryRun`/`apply`/`verify`, prod-only manuelle, calquée sur
+>   `alboIdentityImport`) : `ENTRIES` n'écrit `oneLiner`/`sector` que si le
+>   champ est vide (valeurs saisies à la main préservées), `SECTOR_OVERRIDES`
+>   force `consumer` sur les 4 marques D2C. Sociétés ancrées par `_id` prod +
+>   contrôle du nom exact avant tout patch.
+> - One-liners FR (~3-7 mots) rédigés à partir des sites officiels, périmètre
+>   startups opérationnelles uniquement.
+> - Commentaire `oneLiner` dans `convex/schema.ts` mis à jour : la convention
+>   « hand-filled, no backfill » est levée pour ce seed unique.
+
 ## v1.75.0 — 14/07/2026 à 10:30 — Prévisionnel de trésorerie par catégorie : la grille réalisé / engagé / prévu
 
 Deuxième jalon de la refonte de la trésorerie : le prévisionnel devient

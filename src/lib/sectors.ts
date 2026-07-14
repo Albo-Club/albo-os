@@ -13,6 +13,7 @@ export const SECTOR_SLUGS = [
   'mobility',
   'industry',
   'marketplace',
+  'consumer',
   'media',
   'realestate',
   'services',

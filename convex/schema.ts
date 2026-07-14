@@ -362,7 +362,8 @@ export default defineSchema({
 
     // Meta
     sector: v.optional(v.string()),
-    // One-line pitch shown in the Participations table (hand-filled, no backfill)
+    // One-line pitch shown in the Participations table. Seeded once for the
+    // albo portfolio via migrations/alboOneLinerImport; hand-edited thereafter.
     oneLiner: v.optional(v.string()),
     // Origin platform for external SPVs (e.g. "Parallel", "Sezame")
     sponsor: v.optional(v.string()),
