@@ -26,6 +26,7 @@
  *   # wait a few minutes (LLM calls run in the background), then:
  *   pnpm exec convex run --prod migrations/backfillCompanyEnrichment:report
  */
+import { v } from 'convex/values'
 import { internal } from '../_generated/api'
 import { internalMutation, internalQuery } from '../_generated/server'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
@@ -62,6 +63,9 @@ const EXCLUDE_PATTERNS: Array<{ re: RegExp; reason: string }> = [
   { re: /\boprtrs\b/i, reason: 'vehicle' },
   { re: /\bco[\s-]?invest/i, reason: 'co_invest' },
   { re: /\bfund\b/i, reason: 'fund' },
+  // Savings/insurance products (e.g. "CAPITALISATION PALATINE - La Mondiale"):
+  // the domain is the bank's, so a pitch would describe the bank, not the line.
+  { re: /\bcapitalisation\b/i, reason: 'capitalisation_contract' },
 ]
 
 // Normalised (upper, collapsed spaces) exact names — one-off vehicles/funds
@@ -208,5 +212,90 @@ export const report = internalQuery({
           ? 'Toutes les sociétés visées (hors non-sociétés exclues) ont one-liner + résumé.'
           : 'Ces sociétés sont encore vides (site injoignable ou génération en cours) — à remplir à la main si besoin.',
     }
+  },
+})
+
+// ─── listEnrichedNonCompanies — leftovers from the first, UNFILTERED run ─────
+//
+// The initial backfill (PR #201) ran WITHOUT the exclusion filter, so any
+// non-company line (SIDE, Anaxago, SPV, fund…) with a reachable domain got a
+// pitch. Those are now "done" and invisible to `report`. This read-only query
+// lists every exclusion-matched portfolio entity that ALREADY carries a pitch,
+// with its text, so a human can judge which are wrong and clear them via
+// `clearByIds`. ⚠️ It also surfaces legitimately-curated ones that happen to
+// match a pattern (e.g. "La vie de Quartier - Holding", summarised by
+// alboSummaryImport) — do NOT clear those; that's why clearing is by explicit
+// id, never a blanket wipe.
+
+export const listEnrichedNonCompanies = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const orgs = await ctx.db.query('organizations').collect()
+    const rows: Array<{
+      id: Doc<'companies'>['_id']
+      org: string
+      name: string
+      reason: string
+      oneLiner: string | null
+      summary: string | null
+    }> = []
+    for (const org of orgs) {
+      const companies = await ctx.db
+        .query('companies')
+        .withIndex('by_org_kind', (q) =>
+          q.eq('orgId', org._id).eq('kind', 'portfolio'),
+        )
+        .collect()
+      for (const c of companies) {
+        if (c.archivedAt != null) continue
+        const reason = classifyExclusion(c.name)
+        if (!reason) continue
+        if (c.oneLiner === undefined && c.summary === undefined) continue
+        rows.push({
+          id: c._id,
+          org: org.slug,
+          name: c.name,
+          reason,
+          oneLiner: c.oneLiner ?? null,
+          summary: c.summary ?? null,
+        })
+      }
+    }
+    return {
+      count: rows.length,
+      rows,
+      note:
+        'Non-sociétés (motif d’exclusion) portant déjà un résumé/one-liner — ' +
+        'probablement écrit par le 1er passage non filtré. Relire, puis vider ' +
+        'les mauvaises via clearByIds avec la liste des id (NE PAS inclure les ' +
+        'résumés légitimes, ex. « La vie de Quartier - Holding »).',
+    }
+  },
+})
+
+// ─── clearByIds — blank oneLiner + summary on an EXPLICIT id list ────────────
+
+export const clearByIds = internalMutation({
+  args: { ids: v.array(v.id('companies')) },
+  handler: async (ctx, { ids }) => {
+    let cleared = 0
+    const skipped: Array<{ id: string; reason: string }> = []
+    for (const id of ids) {
+      const c = await ctx.db.get('companies', id)
+      if (!c) {
+        skipped.push({ id, reason: 'not_found' })
+        continue
+      }
+      if (c.kind !== 'portfolio') {
+        skipped.push({ id, reason: 'not_portfolio' })
+        continue
+      }
+      await ctx.db.patch('companies', id, {
+        oneLiner: undefined,
+        summary: undefined,
+      })
+      cleared++
+    }
+    return { cleared, skipped }
   },
 })

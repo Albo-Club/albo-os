@@ -23,6 +23,30 @@ bas de page.
 
 ---
 
+## v1.83.2 — 14/07/2026 à 13:20 — Résumés : exclure les produits d'épargne et nettoyer les scories
+
+Deux ajustements au rattrapage des résumés :
+
+- Les **contrats de capitalisation** (ex. « Capitalisation Palatine ») sont
+  désormais écartés de la génération, comme les autres lignes qui ne sont pas
+  des sociétés — leur domaine est celui de la banque, un résumé n'aurait pas
+  de sens.
+- Un **outil de vérification** permet de repérer les lignes non-sociétés qui
+  auraient reçu un résumé générique lors du tout premier passage (avant la
+  mise en place du filtre), pour les vider proprement — en préservant les
+  résumés rédigés à la main.
+
+> **🔧 Notes techniques**
+>
+> - `backfillCompanyEnrichment` : motif `capitalisation_contract` ajouté à
+>   `classifyExclusion`.
+> - Nouveau `listEnrichedNonCompanies` (lecture seule) : liste les entités
+>   motif-exclu portant déjà `oneLiner`/`summary` (scories du 1er backfill
+>   #201, non filtré), avec le texte. `clearByIds` vide `oneLiner`+`summary`
+>   sur une **liste d'id explicite** (jamais de wipe global — protège les
+>   résumés curés type « La vie de Quartier - Holding »).
+> - `MIGRATIONS.md` mis à jour.
+
 ## v1.83.1 — 14/07/2026 à 13:18 — Parallel : préparation de l'affichage des communications par deal
 
 Travail préparatoire (rien de visible pour l'instant) en vue d'afficher, dans la
@@ -46,7 +70,6 @@ l'API avant de construire l'affichage.
 > - Aucune UI ni écriture DB. Phase 1 (dé-risquage) de l'étape 2b VASCO ;
 >   l'affichage (read path org-guardé + rattachement entité↔émetteur + bloc dans
 >   `CompanyReportsSection` + roll-up org) suivra une fois l'accès prouvé.
-
 ## v1.83.0 — 14/07/2026 à 13:09 — Le prévisionnel se mesure, vous alerte, et anticipe la TVA
 
 Trois compléments au prévisionnel de trésorerie :
