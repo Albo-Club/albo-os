@@ -17,14 +17,18 @@ import { requireAppUser, requireOrgMember } from './lib/auth'
 import { isAvailableAccount } from './lib/bankAccounts'
 import { effectiveCategory, isValidForecastCategory } from './lib/categories'
 import {
+  MATCH_DATE_WINDOW_DAYS,
+  suggestEntryMatches as pairEntryMatches,
+} from './lib/entryMatching'
+import {
   addMonthsUtc,
   buildForecastGrid,
-  buildMonthlyBalance,
   buildMonthlyHistory,
   entryUpsertAction,
   expandOccurrences,
   ruleDerivedKey,
 } from './lib/recurrence'
+import { buildSearchText } from './lib/searchText'
 import type { GridTx, HistoryTx } from './lib/recurrence'
 import type { DataModel, Doc, Id } from './_generated/dataModel'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
@@ -366,58 +370,7 @@ export async function expandRulesForOrgs(
   return { rulesProcessed, created, updated, skippedProtected }
 }
 
-// ─── Projected balance ───────────────────────────────────────────────────────
-
-/**
- * Projected cash balance, aggregated BY MONTH over `horizonMonths` months.
- *
- * - Starting balance = sum of the real `bankAccounts.currentBalance` of
- *   AVAILABLE EUR accounts (non-archived, active, non-pledged —
- *   lib/bankAccounts.ts) across the in-scope orgs.
- * - Monthly flow = sum of the month's `pending` `forecastEntries` (from the
- *   start of the current month to now + horizon), filtered by
- *   `minConfidence` (`confirmed` = committed only; `expected` = committed +
- *   expected; absent = everything).
- * - Only EUR is aggregated; non-EUR accounts/entries are counted in
- *   `ignoredNonEur*` for visibility.
- *
- * Without `orgId`: consolidated over all orgs the user is a member of.
- *
- * `historyMonths` (optional) adds `history`: the real end-of-month balance
- * for the last N months, rebuilt backwards from the current balance and the
- * EUR accounts' transactions — the real → projected junction of the curve.
- */
-export const getForecastBalance = query({
-  args: {
-    orgId: v.optional(v.id('organizations')),
-    horizonMonths: v.number(),
-    minConfidence: v.optional(confidenceValidator),
-    historyMonths: v.optional(v.number()),
-  },
-  handler: async (
-    ctx,
-    { orgId, horizonMonths, minConfidence, historyMonths },
-  ) => {
-    assertValidHorizon(horizonMonths)
-    const orgIds = await resolveOrgScope(ctx, orgId)
-    const balance = await computeForecastBalanceForOrgs(
-      ctx,
-      orgIds,
-      horizonMonths,
-      minConfidence,
-    )
-    if (!historyMonths) return { ...balance, history: null }
-
-    assertValidHorizon(historyMonths)
-    const history = await computeCashHistoryForOrgs(
-      ctx,
-      orgIds,
-      historyMonths,
-      balance.startingBalanceCents,
-    )
-    return { ...balance, history }
-  },
-})
+// ─── Real balance history ────────────────────────────────────────────────────
 
 /**
  * Real end-of-month balance for the last `monthsBack` months (non-archived
@@ -479,108 +432,205 @@ async function computeCashHistoryForOrgs(
   })
 }
 
-/**
- * Projected-balance core (no auth) — shared between the public query and
- * the agent tool. The caller has already verified membership of the orgs.
- */
-export async function computeForecastBalanceForOrgs(
-  ctx: GenericQueryCtx<DataModel>,
-  orgIds: Array<Id<'organizations'>>,
-  horizonMonths: number,
-  minConfidence?: 'confirmed' | 'expected' | 'probable',
-) {
-  const now = Date.now()
-  const nowDate = new Date(now)
-  // Window: from the 1st of the current month (the month's still-pending
-  // entries count toward the trajectory) to now + horizon.
-  const windowStart = Date.UTC(
-    nowDate.getUTCFullYear(),
-    nowDate.getUTCMonth(),
-    1,
-  )
-  const windowEnd = addMonthsUtc(now, horizonMonths)
-
-  // 1. Starting balance = current real balances of AVAILABLE EUR accounts
-  // (active and not pledged — nantissements and closed accounts are not
-  // mobilizable cash, cf. convex/lib/bankAccounts.ts).
-  let startingBalanceCents = 0
-  let ignoredNonEurAccounts = 0
-  for (const oid of orgIds) {
-    const accounts = await ctx.db
-      .query('bankAccounts')
-      .withIndex('by_org', (q) => q.eq('orgId', oid))
-      .collect()
-    for (const account of accounts) {
-      if (!isAvailableAccount(account)) continue
-      if (account.currency !== 'EUR') {
-        ignoredNonEurAccounts += 1
-        continue
-      }
-      startingBalanceCents += account.currentBalance ?? 0
-    }
-  }
-
-  // 2. In-scope forecast entries within the window.
-  // TODO(inter-entity netting): in consolidated mode (orgId absent),
-  // exclude entries whose `counterpartyOrgId` belongs to `orgIds`
-  // (intra-group flows). Field exists in the schema, not read in the MVP.
-  const entries: Array<Doc<'forecastEntries'>> = []
-  for (const oid of orgIds) {
-    const orgEntries = await ctx.db
-      .query('forecastEntries')
-      .withIndex('by_org_and_date', (q) =>
-        q.eq('orgId', oid).gte('date', windowStart).lte('date', windowEnd),
-      )
-      .collect()
-    entries.push(...orgEntries)
-  }
-
-  // 3. Pure monthly aggregation (tested in tests/recurrence.test.ts).
-  const { months, ignoredNonEurEntries } = buildMonthlyBalance({
-    entries,
-    startingBalanceCents,
-    windowStart,
-    windowEnd,
-    minConfidence,
-  })
-
-  return {
-    startingBalanceCents,
-    currency: 'EUR',
-    ignoredNonEurAccounts,
-    ignoredNonEurEntries,
-    months,
-  }
-}
-
 // ─── Forecast → realized matching ────────────────────────────────────────────
+
+const realizeModeValidator = v.union(
+  v.literal('close'),
+  v.literal('keepRemainder'),
+)
+
+/**
+ * Realization core (no auth) — shared between the public mutation and the
+ * agent tool. The caller has already verified membership of the entry's org.
+ *
+ * - `close` (default): the entry goes `realized` as-is; a gap between the
+ *   forecast amount and the transaction amount is deliberate (still
+ *   readable next to `realizedTransactionId`).
+ * - `keepRemainder` (partial payment): the entry is split — the realized
+ *   part takes the transaction amount, and the remainder stays expected as
+ *   a NEW pure one-shot entry (no ruleId/derivedKey: it shows in the
+ *   one-shot table and expandRules never touches it). Requires a pending
+ *   entry and a transaction amount strictly below the forecast amount.
+ */
+export async function applyMarkEntryRealized(
+  ctx: GenericMutationCtx<DataModel>,
+  entry: Doc<'forecastEntries'>,
+  transactionId: Id<'transactions'>,
+  mode: 'close' | 'keepRemainder',
+) {
+  // Same guardrail in both modes: the transaction must belong to the same
+  // org; we never touch the transaction itself (matchStatus, reconciled and
+  // matchingDecisions stay exclusively managed by convex/transactions.ts).
+  const tx = await ctx.db.get('transactions', transactionId)
+  if (!tx || tx.orgId !== entry.orgId) {
+    throw new ConvexError('transaction_wrong_org')
+  }
+
+  if (mode === 'keepRemainder') {
+    if (entry.status !== 'pending') throw new ConvexError('not_pending')
+    const remainderCents = entry.amountCents - tx.amount
+    if (remainderCents <= 0) throw new ConvexError('no_remainder')
+    await ctx.db.patch('forecastEntries', entry._id, {
+      amountCents: tx.amount,
+      status: 'realized',
+      realizedTransactionId: transactionId,
+    })
+    await ctx.db.insert('forecastEntries', {
+      orgId: entry.orgId,
+      date: entry.date,
+      amountCents: remainderCents,
+      direction: entry.direction,
+      confidence: entry.confidence,
+      status: 'pending',
+      label: entry.label,
+      category: entry.category,
+      overridden: false,
+      currency: entry.currency,
+    })
+    return
+  }
+
+  await ctx.db.patch('forecastEntries', entry._id, {
+    status: 'realized',
+    realizedTransactionId: transactionId,
+  })
+}
 
 /**
  * Marks an entry as realized by attaching it to a real transaction in the
- * same org (modeled on transactions.ts:matchTransaction). Does not touch the
- * transaction itself: the transaction → deal matching (matchStatus,
- * reconciled) stays exclusively managed by convex/transactions.ts.
+ * same org (modeled on transactions.ts:matchTransaction). `mode` picks the
+ * explicit decision when amounts differ: `close` (default — realize with
+ * the gap) or `keepRemainder` (partial payment — the balance stays
+ * expected). Cf. `applyMarkEntryRealized`.
  */
 export const markEntryRealized = mutation({
   args: {
     entryId: v.id('forecastEntries'),
     transactionId: v.id('transactions'),
+    mode: v.optional(realizeModeValidator),
   },
-  handler: async (ctx, { entryId, transactionId }) => {
+  handler: async (ctx, { entryId, transactionId, mode }) => {
     const entry = await ctx.db.get('forecastEntries', entryId)
     if (!entry) throw new ConvexError('not_found')
     await requireOrgMember(ctx, entry.orgId)
-
-    const tx = await ctx.db.get('transactions', transactionId)
-    if (!tx || tx.orgId !== entry.orgId) {
-      throw new ConvexError('transaction_wrong_org')
-    }
-
-    await ctx.db.patch('forecastEntries', entry._id, {
-      status: 'realized',
-      realizedTransactionId: transactionId,
-    })
+    await applyMarkEntryRealized(ctx, entry, transactionId, mode ?? 'close')
     return null
+  },
+})
+
+// How far back a pending entry (overdue) is still offered for matching, and
+// how many suggestions the UI card shows at most.
+const SUGGEST_ENTRY_LOOKBACK_DAYS = 90
+const SUGGEST_ENTRY_MAX = 20
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Suggested entry ↔ transaction reconciliations for the org: due or
+ * overdue pending EUR entries (rule-derived occurrences INCLUDED — rents
+ * are the main use case) paired with recent transactions on EUR accounts.
+ * The pairing itself is pure and tested (lib/entryMatching.ts): direction +
+ * date window + amount window, scored by amount/date/label, one transaction
+ * suggested at most once. Transactions already attached to a realized entry
+ * and `ignored` / `internal_transfer` rows are excluded.
+ */
+export const suggestForecastMatches = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+    const now = Date.now()
+    const entriesFrom = now - SUGGEST_ENTRY_LOOKBACK_DAYS * DAY_MS
+    const entriesTo = now + MATCH_DATE_WINDOW_DAYS * DAY_MS
+
+    // One org-wide read: the matchable window AND the set of transactions
+    // already consumed by a realized entry (whatever their date).
+    const allEntries = await ctx.db
+      .query('forecastEntries')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    const usedTxIds = new Set(
+      allEntries
+        .map((e) => e.realizedTransactionId)
+        .filter((id): id is Id<'transactions'> => id != null),
+    )
+    const matchable = allEntries.filter(
+      (e) =>
+        e.status === 'pending' &&
+        e.currency === 'EUR' &&
+        e.date >= entriesFrom &&
+        e.date <= entriesTo,
+    )
+    if (matchable.length === 0) return []
+
+    const accounts = await ctx.db
+      .query('bankAccounts')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    const eurAccountIds = new Set(
+      accounts.filter((a) => a.currency === 'EUR').map((a) => a._id),
+    )
+
+    const txs = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_date', (q) =>
+        q
+          .eq('orgId', orgId)
+          .gte('transactionDate', entriesFrom - MATCH_DATE_WINDOW_DAYS * DAY_MS)
+          .lte('transactionDate', now),
+      )
+      .collect()
+    const candidates = txs.filter(
+      (tx) =>
+        eurAccountIds.has(tx.bankAccountId) &&
+        !usedTxIds.has(tx._id) &&
+        tx.matchStatus !== 'ignored' &&
+        tx.matchStatus !== 'internal_transfer',
+    )
+
+    const pairs = pairEntryMatches({
+      entries: matchable.map((e) => ({
+        id: e._id,
+        date: e.date,
+        amountCents: e.amountCents,
+        direction: e.direction,
+        label: e.label,
+      })),
+      transactions: candidates.map((tx) => ({
+        id: tx._id,
+        transactionDate: tx.transactionDate,
+        amountCents: tx.amount,
+        direction: tx.direction,
+        searchText:
+          tx.searchText ?? buildSearchText(tx.rawLabel, tx.counterparty),
+      })),
+    })
+
+    const entryById = new Map(matchable.map((e) => [e._id as string, e]))
+    const txById = new Map(candidates.map((tx) => [tx._id as string, tx]))
+    return pairs.slice(0, SUGGEST_ENTRY_MAX).flatMap((pair) => {
+      const entry = entryById.get(pair.entryId)
+      const tx = txById.get(pair.transactionId)
+      if (!entry || !tx) return []
+      return [
+        {
+          entry: {
+            _id: entry._id,
+            date: entry.date,
+            label: entry.label,
+            amountCents: entry.amountCents,
+            direction: entry.direction,
+            confidence: entry.confidence,
+            derivedFromRule: entry.ruleId != null,
+          },
+          transaction: {
+            _id: tx._id,
+            transactionDate: tx.transactionDate,
+            rawLabel: tx.rawLabel,
+            counterparty: tx.counterparty ?? null,
+            amountCents: tx.amount,
+          },
+        },
+      ]
+    })
   },
 })
 
@@ -738,76 +788,99 @@ export const getForecastGrid = query({
     assertValidHorizon(historyMonths)
     assertValidHorizon(horizonMonths)
     await requireOrgMember(ctx, orgId)
-    const now = Date.now()
 
-    // Available EUR accounts: starting balance + realized-flow scope.
-    const accounts = await ctx.db
-      .query('bankAccounts')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .collect()
-    const eurAvailable = accounts.filter(
-      (a) => isAvailableAccount(a) && a.currency === 'EUR',
-    )
-    const eurAccountIds = new Set(eurAvailable.map((a) => a._id))
-    const startingBalanceCents = eurAvailable.reduce(
-      (sum, a) => sum + (a.currentBalance ?? 0),
-      0,
-    )
-
-    // Realized flows over the history window (current month included).
-    const nowDate = new Date(now)
-    const currentMonthStart = Date.UTC(
-      nowDate.getUTCFullYear(),
-      nowDate.getUTCMonth(),
-      1,
-    )
-    const windowStart = addMonthsUtc(currentMonthStart, -historyMonths)
-    const txs = await ctx.db
-      .query('transactions')
-      .withIndex('by_org_date', (q) =>
-        q.eq('orgId', orgId).gte('transactionDate', windowStart),
-      )
-      .collect()
-    const realized: Array<GridTx> = []
-    for (const tx of txs) {
-      if (!eurAccountIds.has(tx.bankAccountId)) continue
-      realized.push({
-        transactionDate: tx.transactionDate,
-        amountCents: tx.amount,
-        direction: tx.direction,
-        category: effectiveCategory(tx),
-      })
-    }
-
-    // Pending entries — read WITHOUT a lower date bound so overdue ones
-    // (date < current month) roll into the current month.
-    const horizonEnd = addMonthsUtc(now, horizonMonths)
-    const entries = await ctx.db
-      .query('forecastEntries')
-      .withIndex('by_org_and_date', (q) =>
-        q.eq('orgId', orgId).lte('date', horizonEnd),
-      )
-      .collect()
-
-    const grid = buildForecastGrid({
-      realized,
-      entries,
-      startingBalanceCents,
-      now,
+    const grid = await computeForecastGridForOrg(
+      ctx,
+      orgId,
       historyMonths,
       horizonMonths,
-    })
-
+    )
     const history = await computeCashHistoryForOrgs(
       ctx,
       [orgId],
       historyMonths,
-      startingBalanceCents,
+      grid.startingBalanceCents,
     )
-
-    return { ...grid, startingBalanceCents, history }
+    return { ...grid, history }
   },
 })
+
+/**
+ * Grid core (no auth) — shared between the public query above and the
+ * agent / MCP `getForecastBalance` tool, which runs it with
+ * `historyMonths: 0` (the current month's realized flows are still read,
+ * so the consumption semantics hold). The caller has already verified
+ * membership of the org.
+ */
+export async function computeForecastGridForOrg(
+  ctx: GenericQueryCtx<DataModel>,
+  orgId: Id<'organizations'>,
+  historyMonths: number,
+  horizonMonths: number,
+) {
+  const now = Date.now()
+
+  // Available EUR accounts: starting balance + realized-flow scope.
+  // Non-EUR available accounts are counted apart for visibility.
+  const accounts = await ctx.db
+    .query('bankAccounts')
+    .withIndex('by_org', (q) => q.eq('orgId', orgId))
+    .collect()
+  const available = accounts.filter((a) => isAvailableAccount(a))
+  const eurAvailable = available.filter((a) => a.currency === 'EUR')
+  const ignoredNonEurAccounts = available.length - eurAvailable.length
+  const eurAccountIds = new Set(eurAvailable.map((a) => a._id))
+  const startingBalanceCents = eurAvailable.reduce(
+    (sum, a) => sum + (a.currentBalance ?? 0),
+    0,
+  )
+
+  // Realized flows over the history window (current month included).
+  const nowDate = new Date(now)
+  const currentMonthStart = Date.UTC(
+    nowDate.getUTCFullYear(),
+    nowDate.getUTCMonth(),
+    1,
+  )
+  const windowStart = addMonthsUtc(currentMonthStart, -historyMonths)
+  const txs = await ctx.db
+    .query('transactions')
+    .withIndex('by_org_date', (q) =>
+      q.eq('orgId', orgId).gte('transactionDate', windowStart),
+    )
+    .collect()
+  const realized: Array<GridTx> = []
+  for (const tx of txs) {
+    if (!eurAccountIds.has(tx.bankAccountId)) continue
+    realized.push({
+      transactionDate: tx.transactionDate,
+      amountCents: tx.amount,
+      direction: tx.direction,
+      category: effectiveCategory(tx),
+    })
+  }
+
+  // Pending entries — read WITHOUT a lower date bound so overdue ones
+  // (date < current month) roll into the current month.
+  const horizonEnd = addMonthsUtc(now, horizonMonths)
+  const entries = await ctx.db
+    .query('forecastEntries')
+    .withIndex('by_org_and_date', (q) =>
+      q.eq('orgId', orgId).lte('date', horizonEnd),
+    )
+    .collect()
+
+  const grid = buildForecastGrid({
+    realized,
+    entries,
+    startingBalanceCents,
+    now,
+    historyMonths,
+    horizonMonths,
+  })
+
+  return { ...grid, startingBalanceCents, ignoredNonEurAccounts }
+}
 
 /**
  * Committed capital still to deploy on the org's signed deals:

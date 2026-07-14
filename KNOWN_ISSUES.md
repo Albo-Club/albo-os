@@ -1274,7 +1274,7 @@ search index `search_text` sur un champ **dérivé** `searchText`, pas sur
 ## Cash flow forecast (`convex/forecasts.ts`)
 
 Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
-`forecastEntries` → `getForecastBalance`. Pièges à connaître avant d'y toucher.
+`forecastEntries` → `getForecastGrid`. Pièges à connaître avant d'y toucher.
 
 - **`status` est la source de vérité du cycle de vie** (`pending` / `realized`
   / `cancelled`), à la manière de `matchStatus` côté transactions. Seules les
@@ -1294,16 +1294,34 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   nouvelle couche vit dans `forecastRules` / `forecastEntries`. Ne pas
   mélanger les deux ; le retrait suit le runbook `MIGRATIONS.md` (purge prod
   via `seed:purgeLegacyForecasts` AVANT retrait du schéma).
-- **EUR only.** `getForecastBalance` n'agrège que `currency === 'EUR'`
-  (comptes ET entries) ; le reste est compté dans `ignoredNonEur*` pour
-  visibilité. `probabilityPct`, `counterpartyOrgId` et `currency` sont des
-  champs **réservés non lus** (future couche probabiliste / neutralisation
+- **EUR only.** La grille n'agrège que `currency === 'EUR'` (comptes ET
+  entries) ; le reste est compté dans `ignoredNonEur*` pour visibilité.
+  `probabilityPct`, `counterpartyOrgId` et `currency` sont des champs
+  **réservés non lus** (future couche probabiliste / neutralisation
   inter-entités / FX) — ne pas leur prêter d'effet.
 - **Le pointage prévu → réalisé ne touche pas aux transactions.**
   `markEntryRealized` écrit uniquement sur `forecastEntries` (`status` +
-  `realizedTransactionId`). Le pointage transaction → deal (`matchStatus`,
-  `reconciled`, `matchingDecisions`) reste exclusivement géré par
-  `convex/transactions.ts` — ne pas écrire ces champs depuis le code forecast.
+  `realizedTransactionId`, et le split du reliquat). Le pointage
+  transaction → deal (`matchStatus`, `reconciled`, `matchingDecisions`)
+  reste exclusivement géré par `convex/transactions.ts` — ne pas écrire ces
+  champs depuis le code forecast.
+- **Rapprochement échéance ↔ transaction : deux modes, un seul split.**
+  `markEntryRealized` (et l'outil agent `markForecastEntryRealized`)
+  prennent `mode: 'close' | 'keepRemainder'` via le cœur partagé
+  `applyMarkEntryRealized`. `close` (défaut) réalise l'échéance **telle
+  quelle** : le montant prévu n'est PAS aligné sur la transaction, l'écart
+  reste lisible. `keepRemainder` (paiement partiel, exige une entry
+  `pending` et `tx.amount < entry.amountCents`, sinon
+  `no_remainder`/`not_pending`) réalise l'entry au montant payé et crée le
+  reliquat comme **one-shot pur** (sans `ruleId` ni `derivedKey` — visible
+  dans la table des ponctuelles, jamais re-générée par `expandRules` ; ne
+  pas lui remettre le `ruleId`, il re-entrerait en collision avec le filtre
+  `listEntries` et l'expansion). Les suggestions (`suggestForecastMatches` +
+  carte « Rapprochements suggérés ») viennent du moteur pur
+  `convex/lib/entryMatching.ts` (fenêtres sens/date/montant + score
+  montant/date/libellé, testé par `tests/entryMatching.test.ts`) ; une
+  transaction déjà portée par un `realizedTransactionId` n'est jamais
+  re-suggérée.
 - **Tests purs hors de `convex/`.** La logique (récurrence UTC, clamping fin
   de mois, protection, agrégation mensuelle) vit dans
   `convex/lib/recurrence.ts` (zéro import Node/Convex) et est testée par
@@ -1315,33 +1333,36 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   7 = dimanche). Toute nouvelle logique de date doit passer par
   `convex/lib/recurrence.ts`, pas par `new Date()` local (fuseau serveur).
 - **`Date.now()` dans les queries de solde = cache Convex défait — accepté.**
-  `computeCashHistoryForOrgs` / `getForecastBalance` bornent « le mois
-  courant » avec `Date.now()`, ce qui re-exécute la query plus souvent que
-  nécessaire (audit perf juin 2026). Trade-off assumé : le vrai fix (passer
-  l'horodatage arrondi en argument depuis le client) toucherait signatures,
-  callsites et outils agent pour un gain nul à l'échelle actuelle — ces
-  queries n'apparaissent pas dans le breakdown Usage. À ré-évaluer si elles
-  y montent.
-- **Deux sémantiques de projection coexistent — assumé.** La courbe et la
-  grille de l'UI passent par `getForecastGrid` (consommation par cellule
-  direction × catégorie sur le mois courant, rollover des échéances en
-  retard, périmètre comptes **disponibles** — cœur pur
-  `lib/recurrence.ts:buildForecastGrid`, testé par
-  `tests/forecastGrid.test.ts`). `getForecastBalance` (outil agent +
-  MCP `getForecastBalance`) garde l'ancienne sémantique fenêtrée : toutes
-  les échéances pending du mois courant comptent, même si le flux réel est
-  déjà passé en banque (double comptage possible sur le mois courant), et
-  les échéances en retard sont ignorées. Aligner l'agent sur
-  `getForecastGrid` est un follow-up — ne pas « corriger » l'un vers
-  l'autre à moitié.
+  `computeCashHistoryForOrgs` / `computeForecastGridForOrg` /
+  `suggestForecastMatches` bornent leurs fenêtres avec `Date.now()`, ce qui
+  re-exécute la query plus souvent que nécessaire (audit perf juin 2026).
+  Trade-off assumé : le vrai fix (passer l'horodatage arrondi en argument
+  depuis le client) toucherait signatures, callsites et outils agent pour
+  un gain nul à l'échelle actuelle — ces queries n'apparaissent pas dans le
+  breakdown Usage. À ré-évaluer si elles y montent.
+- **Une seule sémantique de projection : la consommation.** UI
+  (`getForecastGrid`) et outil agent + MCP `getForecastBalance` partagent
+  le cœur `forecasts.ts:computeForecastGridForOrg` (consommation par
+  cellule direction × catégorie sur le mois courant, rollover des échéances
+  en retard, périmètre comptes **disponibles** — logique pure
+  `lib/recurrence.ts:buildForecastGrid`, testée par
+  `tests/forecastGrid.test.ts`). L'agent le lance avec `historyMonths: 0`
+  (le réalisé du mois courant est quand même lu, sinon la consommation
+  tombe) et re-projette les cellules en `inflow/outflow` mensuels ;
+  `minConfidence: 'confirmed'` = scénario engagé seul, tout le reste =
+  scénario avec prévu (`expected` et `probable` sont le même « prévu »).
+  L'ancienne sémantique fenêtrée (`buildMonthlyBalance`, query publique
+  `getForecastBalance`) a été **supprimée** en phase 2b — ne pas la
+  réintroduire pour un nouveau besoin, brancher le cœur grille.
 - **La consommation prévu/réalisé est par cellule (direction × catégorie),
   pas par échéance.** Une échéance sans catégorie n'est consommée que par
   du réalisé « À qualifier » (`uncategorized`) ; une grosse entrée
   unmatched ne consomme rien (bucket `unmatched`, hors catégories de
   prévision). D'où l'intérêt de catégoriser règles ET transactions avec
-  les mêmes slugs. Le rapprochement unitaire échéance ↔ transaction
-  (avec gestion du reliquat) est la phase 2b — `markEntryRealized` existe
-  déjà côté back.
+  les mêmes slugs. Pour sortir une échéance précise du prévisionnel dès
+  que son flux est passé en banque, passer par le rapprochement unitaire
+  (cf. le point rapprochement ci-dessus) — c'est lui qui fige l'échéance,
+  la consommation par cellule n'est qu'un anti-double-comptage d'affichage.
 - **La table front des échéances ne liste que les one-shot pures — limitation
   V1 assumée.** `forecasts.listEntries` (consommée par `ForecastEntriesSection`,
   onglet Cash « Aperçu ») filtre `ruleId == null` : les occurrences générées
@@ -1349,8 +1370,8 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   passée en `overridden` (éditée à la main — aujourd'hui faisable uniquement
   via l'agent IA, `updateForecastEntry`) n'est visible **ni** dans cette table
   (filtre `ruleId == null`), **ni** dans la table des règles (qui liste les
-  règles, pas leurs occurrences) — seulement dans la courbe
-  `getForecastBalance`. Non corrigé délibérément : la surface humaine se limite
+  règles, pas leurs occurrences) — seulement dans la courbe/grille
+  `getForecastGrid`. Non corrigé délibérément : la surface humaine se limite
   aux règles récurrentes + aux ponctuelles pures ; l'override d'une occurrence
   dérivée reste un geste agent. À revoir si l'édition d'occurrence dérivée
   passe un jour en front.

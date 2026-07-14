@@ -520,9 +520,11 @@ function SuggestMatchesRenderer({ output }: { output: unknown }) {
 }
 
 // ═══ 5. getForecastBalance ═══════════════════════════════════════════════════
-// Shape (forecasts.computeForecastBalanceForOrgs): { startingBalanceCents,
-// currency, ignoredNonEurAccounts, ignoredNonEurEntries, months: Array<{
-// monthKey, inflowCents, outflowCents, netCents, projectedBalanceCents }> }.
+// Shape (agentToolsForecasts.getForecastBalanceInternal, consumption
+// semantics of forecasts.computeForecastGridForOrg): { startingBalanceCents,
+// currency, currentMonthKey, ignoredNonEurAccounts, ignoredNonEurEntries,
+// months: Array<{ monthKey, inflowCents, outflowCents, netCents,
+// projectedBalanceCents }> }.
 
 function ForecastBalanceRenderer({ output }: { output: unknown }) {
   const { t } = useTranslation('chat')

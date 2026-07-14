@@ -689,7 +689,7 @@ export const getCategoryBreakdown = query({
     }
 
     // Date.now() here defeats the query cache — same accepted trade-off as
-    // getForecastBalance (cf. KNOWN_ISSUES.md « Cash flow forecast »).
+    // getForecastGrid (cf. KNOWN_ISSUES.md « Cash flow forecast »).
     const now = new Date()
     const windowStart = Date.UTC(
       now.getUTCFullYear(),

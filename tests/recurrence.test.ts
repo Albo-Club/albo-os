@@ -12,7 +12,6 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   addMonthsUtc,
-  buildMonthlyBalance,
   buildMonthlyHistory,
   entryUpsertAction,
   expandOccurrences,
@@ -20,7 +19,7 @@ import {
   monthKey,
   ruleDerivedKey,
 } from '../convex/lib/recurrence'
-import type { BalanceEntry, ExistingEntryState } from '../convex/lib/recurrence'
+import type { ExistingEntryState } from '../convex/lib/recurrence'
 
 const utc = (y: number, m: number, d: number) => Date.UTC(y, m - 1, d)
 
@@ -432,135 +431,6 @@ describe('simulation de régénération (expandRules sans DB)', () => {
     assert.deepEqual(run2, { created: 0, updated: 5, skipped: 1 })
     assert.equal(store.get(janKey)?.amountCents, 99500)
     assert.equal(store.get(janKey)?.status, 'realized')
-  })
-})
-
-describe('buildMonthlyBalance — solde projeté mensuel', () => {
-  const entry = (over: Partial<BalanceEntry>): BalanceEntry => ({
-    date: utc(2026, 1, 15),
-    amountCents: 100000, // 1 000 €
-    direction: 'in',
-    confidence: 'confirmed',
-    status: 'pending',
-    currency: 'EUR',
-    ...over,
-  })
-
-  it('agrège in/out par mois et cumule le solde projeté', () => {
-    const { months } = buildMonthlyBalance({
-      entries: [
-        entry({ date: utc(2026, 1, 5), direction: 'in', amountCents: 100000 }),
-        entry({ date: utc(2026, 1, 20), direction: 'out', amountCents: 30000 }),
-        entry({ date: utc(2026, 2, 5), direction: 'out', amountCents: 50000 }),
-        // March: no flow → net 0, the balance stays flat
-        entry({ date: utc(2026, 4, 1), direction: 'in', amountCents: 20000 }),
-      ],
-      startingBalanceCents: 500000, // 5 000 €
-      windowStart: utc(2026, 1, 1),
-      windowEnd: utc(2026, 4, 30),
-    })
-
-    assert.deepEqual(months, [
-      {
-        monthKey: '2026-01',
-        inflowCents: 100000,
-        outflowCents: 30000,
-        netCents: 70000,
-        projectedBalanceCents: 570000,
-      },
-      {
-        monthKey: '2026-02',
-        inflowCents: 0,
-        outflowCents: 50000,
-        netCents: -50000,
-        projectedBalanceCents: 520000,
-      },
-      {
-        monthKey: '2026-03',
-        inflowCents: 0,
-        outflowCents: 0,
-        netCents: 0,
-        projectedBalanceCents: 520000,
-      },
-      {
-        monthKey: '2026-04',
-        inflowCents: 20000,
-        outflowCents: 0,
-        netCents: 20000,
-        projectedBalanceCents: 540000,
-      },
-    ])
-  })
-
-  it('filtre par minConfidence (confirmed seul, ou confirmed + expected)', () => {
-    const entries = [
-      entry({ confidence: 'confirmed', amountCents: 100 }),
-      entry({ confidence: 'expected', amountCents: 1000 }),
-      entry({ confidence: 'probable', amountCents: 10000 }),
-    ]
-    const window = {
-      startingBalanceCents: 0,
-      windowStart: utc(2026, 1, 1),
-      windowEnd: utc(2026, 1, 31),
-    }
-
-    const confirmedOnly = buildMonthlyBalance({
-      entries,
-      ...window,
-      minConfidence: 'confirmed',
-    })
-    assert.equal(confirmedOnly.months[0].inflowCents, 100)
-
-    const confirmedExpected = buildMonthlyBalance({
-      entries,
-      ...window,
-      minConfidence: 'expected',
-    })
-    assert.equal(confirmedExpected.months[0].inflowCents, 1100)
-
-    const all = buildMonthlyBalance({ entries, ...window })
-    assert.equal(all.months[0].inflowCents, 11100)
-  })
-
-  it('ignore les entries non-pending (réalisées/annulées) et hors fenêtre', () => {
-    const { months } = buildMonthlyBalance({
-      entries: [
-        entry({ status: 'realized', amountCents: 999999 }),
-        entry({ status: 'cancelled', amountCents: 999999 }),
-        entry({ date: utc(2027, 6, 1), amountCents: 999999 }), // outside window
-        entry({ amountCents: 100 }),
-      ],
-      startingBalanceCents: 0,
-      windowStart: utc(2026, 1, 1),
-      windowEnd: utc(2026, 1, 31),
-    })
-    assert.equal(months[0].inflowCents, 100)
-  })
-
-  it('compte les entries non-EUR sans les agréger (visibilité FX)', () => {
-    const { months, ignoredNonEurEntries } = buildMonthlyBalance({
-      entries: [
-        entry({ currency: 'USD', amountCents: 999999 }),
-        entry({ currency: 'CHF', amountCents: 999999 }),
-        entry({ amountCents: 100 }),
-      ],
-      startingBalanceCents: 0,
-      windowStart: utc(2026, 1, 1),
-      windowEnd: utc(2026, 1, 31),
-    })
-    assert.equal(ignoredNonEurEntries, 2)
-    assert.equal(months[0].inflowCents, 100)
-  })
-
-  it('un solde de départ négatif et des sorties donnent un projeté négatif (cents entiers)', () => {
-    const { months } = buildMonthlyBalance({
-      entries: [entry({ direction: 'out', amountCents: 12345 })],
-      startingBalanceCents: -100,
-      windowStart: utc(2026, 1, 1),
-      windowEnd: utc(2026, 1, 31),
-    })
-    assert.equal(months[0].projectedBalanceCents, -12445)
-    assert.ok(Number.isInteger(months[0].projectedBalanceCents))
   })
 })
 

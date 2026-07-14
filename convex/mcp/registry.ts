@@ -299,7 +299,10 @@ export const mcpTools: Array<McpTool> = [
     name: 'getForecastBalance',
     description:
       'Projected month-by-month cash balance of an org over a horizon, ' +
-      'combining bank balances and pending forecast entries. Amounts in ' +
+      'same semantics as the app (available EUR accounts, current-month ' +
+      'pending flows consumed by realized ones, overdue entries rolled ' +
+      'into the current month). minConfidence "confirmed" = committed ' +
+      'scenario only; otherwise planned flows are included. Amounts in ' +
       'CENTS EUR.',
     schema: {
       org: orgSlug,

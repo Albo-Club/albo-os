@@ -205,9 +205,9 @@ alimentées (Powens/import) ; le pointage transaction → deal vit dans
 `convex/transactions.ts` (`matchStatus` + table `matchingDecisions`
 append-only — cf. `KNOWN_ISSUES.md` « Pointage transaction → deal »).
 Le prévisionnel de cash vit dans `forecastRules` + `forecastEntries`
-(`convex/forecasts.ts` : `expandRules` idempotent, `getForecastBalance`
-mensuel, pointage `markEntryRealized` — cf. `KNOWN_ISSUES.md` « Cash flow
-forecast »). Le passif vit dans `equityPositions` + `intercompanyLoans`,
+(`convex/forecasts.ts` : `expandRules` idempotent, `getForecastGrid`
+catégories × mois, rapprochement `markEntryRealized` +
+`suggestForecastMatches` — cf. `KNOWN_ISSUES.md` « Cash flow forecast »). Le passif vit dans `equityPositions` + `intercompanyLoans`,
 avec pointage généralisé `transactions.allocation` et soldes de C/C
 **dérivés** des transactions (`convex/liabilities.ts:getLiabilities` —
 cf. `KNOWN_ISSUES.md` « Passif »). La table legacy `forecasts` reste
