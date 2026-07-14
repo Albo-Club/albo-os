@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import { SuggestedRulesCard } from './SuggestedRules'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
+import { DealCombobox } from '~/components/pointage/DealCombobox'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { forecastCategories } from '~/lib/categories'
 import { directionTone } from '~/lib/moneyTone'
@@ -128,6 +129,11 @@ function RuleDialog({
   const updateRule = useConvexMutation(api.forecasts.updateRule)
 
   const initial = rule ?? prefill ?? null
+  // Org deals for the optional deal link (lightweight names-only query).
+  const deals = useConvexQuery(api.deals.listOptions, { orgId })
+  const [dealId, setDealId] = useState<Id<'deals'> | null>(
+    rule?.dealId ?? null,
+  )
   const [label, setLabel] = useState(initial?.label ?? '')
   const [amount, setAmount] = useState(
     initial ? String(initial.amountCents / 100) : '',
@@ -175,6 +181,8 @@ function RuleDialog({
             direction,
             // null clears a previously set category ("—" selected).
             category: category === NO_CATEGORY ? null : category,
+            // null unlinks the deal (same wire convention as category).
+            dealId,
             frequency,
             anchorDay: anchor,
             startDate: startMs,
@@ -189,6 +197,7 @@ function RuleDialog({
           amountCents,
           direction,
           category: category === NO_CATEGORY ? undefined : category,
+          dealId: dealId ?? undefined,
           frequency,
           anchorDay: anchor,
           startDate: startMs,
@@ -285,6 +294,17 @@ function RuleDialog({
               value={category}
               onChange={setCategory}
             />
+          </div>
+          <div className="space-y-2">
+            <Label>{t('cash:forecast.dealLabel')}</Label>
+            <DealCombobox
+              deals={deals}
+              value={deals?.find((d) => d._id === dealId) ?? null}
+              onSelect={(deal) => setDealId(deal?._id ?? null)}
+            />
+            <p className="text-muted-foreground text-xs">
+              {t('cash:forecast.dealHint')}
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -582,6 +602,12 @@ function EntryDialog({
   const createManualEntry = useConvexMutation(api.forecasts.createManualEntry)
   const updateEntry = useConvexMutation(api.forecasts.updateEntry)
 
+  // Org deals for the optional deal link (shared subscription with the
+  // rule dialog — same query + args).
+  const deals = useConvexQuery(api.deals.listOptions, { orgId })
+  const [dealId, setDealId] = useState<Id<'deals'> | null>(
+    entry?.dealId ?? null,
+  )
   const [label, setLabel] = useState(entry?.label ?? '')
   const [amount, setAmount] = useState(
     entry ? String(entry.amountCents / 100) : '',
@@ -616,6 +642,8 @@ function EntryDialog({
             date: dateMs,
             // null clears a previously set category ("—" selected).
             category: category === NO_CATEGORY ? null : category,
+            // null unlinks the deal (same wire convention as category).
+            dealId,
           },
         })
       } else {
@@ -627,6 +655,7 @@ function EntryDialog({
           confidence,
           date: dateMs,
           category: category === NO_CATEGORY ? undefined : category,
+          dealId: dealId ?? undefined,
         })
       }
       toast.success(t('cash:forecast.entries.saved'))
@@ -750,6 +779,17 @@ function EntryDialog({
               value={category}
               onChange={setCategory}
             />
+          </div>
+          <div className="space-y-2">
+            <Label>{t('cash:forecast.dealLabel')}</Label>
+            <DealCombobox
+              deals={deals}
+              value={deals?.find((d) => d._id === dealId) ?? null}
+              onSelect={(deal) => setDealId(deal?._id ?? null)}
+            />
+            <p className="text-muted-foreground text-xs">
+              {t('cash:forecast.dealHint')}
+            </p>
           </div>
         </div>
         <DialogFooter>

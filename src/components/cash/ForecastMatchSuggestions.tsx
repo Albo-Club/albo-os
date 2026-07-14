@@ -37,6 +37,9 @@ type Suggestion = {
     counterparty: string | null
     amountCents: number
   }
+  /** Deal-linked entry + unpointed transaction → offer the match after
+   * reconciling (computed server-side). */
+  pointToDealId: Id<'deals'> | null
 }
 
 /**
@@ -58,11 +61,25 @@ export function ForecastMatchSuggestions({
     orgId,
   })
   const markEntryRealized = useConvexMutation(api.forecasts.markEntryRealized)
+  const matchTransaction = useConvexMutation(api.transactions.matchTransaction)
 
   const [decision, setDecision] = useState<Suggestion | null>(null)
   const [pending, setPending] = useState(false)
 
   if (!suggestions || suggestions.length === 0) return null
+
+  async function pointToDeal(suggestion: Suggestion) {
+    if (!suggestion.pointToDealId) return
+    try {
+      await matchTransaction({
+        transactionId: suggestion.transaction._id,
+        dealId: suggestion.pointToDealId,
+      })
+      toast.success(t('cash:forecast.suggestions.pointed'))
+    } catch {
+      toast.error(t('cash:forecast.suggestions.error'))
+    }
+  }
 
   async function reconcile(
     suggestion: Suggestion,
@@ -75,15 +92,27 @@ export function ForecastMatchSuggestions({
         transactionId: suggestion.transaction._id,
         mode,
       })
-      toast.success(
+      const message =
         mode === 'keepRemainder'
           ? t('cash:forecast.suggestions.remainderKept', {
               amount: fmtEur(
                 suggestion.entry.amountCents - suggestion.transaction.amountCents,
               ),
             })
-          : t('cash:forecast.suggestions.matched'),
-      )
+          : t('cash:forecast.suggestions.matched')
+      // Deal-linked entry + still-unpointed transaction: offer the second
+      // gesture right away (matching stays a distinct, explicit action).
+      if (suggestion.pointToDealId) {
+        toast.success(message, {
+          action: {
+            label: t('cash:forecast.suggestions.pointAction'),
+            onClick: () => void pointToDeal(suggestion),
+          },
+          duration: 10000,
+        })
+      } else {
+        toast.success(message)
+      }
       setDecision(null)
     } catch {
       toast.error(t('cash:forecast.suggestions.error'))
