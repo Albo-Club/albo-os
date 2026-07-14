@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '../../../convex/_generated/api'
+import { CashKpis } from './CashKpis'
 import { ForecastChart } from './ForecastChart'
+import type { CashAccount } from './CashAccounts'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
@@ -43,13 +45,20 @@ type GridRow = {
 }
 
 /**
- * Forecast overview of the Cash « Aperçu » tab: projected-balance curve
- * (two scenarios: committed-only / with planned), the undated committed
- * pipeline of signed deals, and the category × month grid merging the
- * realized, committed and planned layers (forecasts.getForecastGrid —
+ * Forecast cockpit of the Cash « Aperçu » tab: the KPI band (available
+ * balance, end-of-month landing, 30/90-day nets), the projected-balance
+ * curve (two scenarios: committed-only / with planned), the undated
+ * committed pipeline of signed deals, and the category × month grid merging
+ * the realized, committed and planned layers (forecasts.getForecastGrid —
  * current-month consumption, cf. KNOWN_ISSUES « Cash flow forecast »).
  */
-export function ForecastOverview({ orgId }: { orgId: Id<'organizations'> }) {
+export function ForecastOverview({
+  orgId,
+  accounts,
+}: {
+  orgId: Id<'organizations'>
+  accounts: Array<CashAccount> | undefined
+}) {
   const { t, i18n } = useTranslation(['cash', 'common'])
   const { fmtEur } = useFormatters()
   const [horizon, setHorizon] = useState<(typeof HORIZONS)[number]>(12)
@@ -60,6 +69,22 @@ export function ForecastOverview({ orgId }: { orgId: Id<'organizations'> }) {
     horizonMonths: horizon,
   })
   const pipeline = useConvexQuery(api.forecasts.getCommittedPipeline, { orgId })
+  // Shared subscription with UpcomingEntriesSection (same query + args).
+  const upcoming = useConvexQuery(api.forecasts.getUpcomingEntries, { orgId })
+
+  // Headline balances (moved here from CashAccounts): available = active,
+  // non-pledged accounts — the phase-0 perimeter, all currencies.
+  const { availableCents, blockedCents } = useMemo(() => {
+    if (!accounts) return { availableCents: null, blockedCents: 0 }
+    const available = accounts
+      .filter((a) => a.accountStatus === 'active' && !a.pledged)
+      .reduce((sum, a) => sum + (a.currentBalance ?? 0), 0)
+    const total = accounts.reduce((sum, a) => sum + (a.currentBalance ?? 0), 0)
+    return { availableCents: available, blockedCents: total - available }
+  }, [accounts])
+
+  // End-of-month landing = the current month's projection point.
+  const landing = grid?.projection[0] ?? null
 
   const fmtMonth = (monthKey: string) =>
     new Date(`${monthKey}-01T00:00:00Z`).toLocaleDateString(i18n.language, {
@@ -72,6 +97,15 @@ export function ForecastOverview({ orgId }: { orgId: Id<'organizations'> }) {
 
   return (
     <section className="space-y-4">
+      <CashKpis
+        availableCents={availableCents}
+        blockedCents={blockedCents}
+        landingPlannedCents={landing?.plannedBalanceCents ?? null}
+        landingCommittedCents={landing?.committedBalanceCents ?? null}
+        net30Cents={upcoming?.net30Cents ?? null}
+        net90Cents={upcoming?.net90Cents ?? null}
+        fmtEur={fmtEur}
+      />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-lg font-semibold tracking-tight">
           {t('cash:forecast.title')}

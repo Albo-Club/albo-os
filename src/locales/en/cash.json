@@ -21,9 +21,21 @@
   },
   "back": "← Cash",
   "notFound": "Account not found.",
-  "totalBalance": "Total balance",
   "availableBalance": "Available balance",
   "totalHint": "incl. {{amount}} pledged or closed",
+  "kpis": {
+    "landing": "End-of-month landing",
+    "landingCommitted": "committed only: {{amount}}",
+    "net30": "30-day net",
+    "net90": "90-day net",
+    "netHint": "upcoming entries, overdue included"
+  },
+  "upcoming": {
+    "title": "Upcoming entries",
+    "window": "{{count}}d",
+    "empty": "No entry in this window.",
+    "overdue": "Overdue"
+  },
   "asOf": "as of {{date}}",
   "manualAsOf": "manual balance as of {{date}}",
   "notConnected": "not connected — enter the balance manually",
