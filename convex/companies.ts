@@ -1,4 +1,5 @@
 import { ConvexError, v } from 'convex/values'
+import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { personValidator } from './lib/people'
@@ -89,7 +90,15 @@ export const create = mutation({
     await requireOrgMember(ctx, args.orgId)
     if (args.siren !== undefined) args.siren = normalizeSiren(args.siren)
     if (args.siren) await assertSirenFree(ctx, args.orgId, args.siren)
-    return await ctx.db.insert('companies', args)
+    const id = await ctx.db.insert('companies', args)
+    // Domain provided at creation → auto-fill oneLiner + summary from the
+    // website (additive, portfolio only — cf. convex/companyEnrichment.ts).
+    if (args.kind === 'portfolio' && args.domain) {
+      await ctx.scheduler.runAfter(0, internal.companyEnrichment.enrich, {
+        companyId: id,
+      })
+    }
+    return id
   },
 })
 
@@ -289,6 +298,14 @@ export const update = mutation({
       patch.summary = patch.summary.trim() || undefined
     }
     await ctx.db.patch("companies", id, patch)
+    // Domain set → auto-fill the missing pitch fields from the website
+    // (additive: existing/hand-edited values are never overwritten —
+    // cf. convex/companyEnrichment.ts).
+    if (patch.domain && company.kind === 'portfolio') {
+      await ctx.scheduler.runAfter(0, internal.companyEnrichment.enrich, {
+        companyId: id,
+      })
+    }
     return id
   },
 })
