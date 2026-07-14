@@ -21,6 +21,7 @@ import {
 } from './deals'
 import { parseScope, readMembership } from './lib/agentScope'
 import { isAvailableAccount } from './lib/bankAccounts'
+import { normalizeDomain } from './lib/domain'
 import { buildSearchText } from './lib/searchText'
 import { INSTRUMENTS, instrumentValidator } from './lib/instruments'
 import { residualValueCents } from './lib/metrics'
@@ -107,18 +108,22 @@ export const createCompanyInternal = internalMutation({
     await readMembership(ctx, orgId, actorUserId)
     const trimmed = name.trim()
     if (!trimmed) throw new ConvexError('invalid_name')
+    // Domain: reduce to a bare hostname (keep raw if unparseable).
+    const cleanedDomain = domain?.trim()
+      ? (normalizeDomain(domain.trim()) ?? domain.trim())
+      : undefined
     // The agent only creates portfolio companies (never group entities).
     const id = await ctx.db.insert('companies', {
       orgId,
       name: trimmed,
       kind: 'portfolio',
       sector,
-      domain,
+      domain: cleanedDomain,
       countryCode,
     })
     // Domain provided → auto-fill oneLiner + summary from the website
     // (additive — cf. convex/companyEnrichment.ts).
-    if (domain) {
+    if (cleanedDomain) {
       await ctx.scheduler.runAfter(0, internal.companyEnrichment.enrich, {
         companyId: id,
       })

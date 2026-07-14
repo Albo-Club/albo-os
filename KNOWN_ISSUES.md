@@ -2063,3 +2063,37 @@ the hand edit only keeps `pnpm lint` (`tsc`) green in CI until then. Note
 `Doc<'table'>` / `ctx.db.query('table')` already resolve from the live
 `schema.ts` — only the function-reference file (`api.d.ts`) is static and needs
 the manual entry.
+
+## Domaines corrompus en base (import Calte) → logos + enrichissement KO
+
+`companies.domain` doit être un **hostname nu** (`anaxago.com`) : il sert au
+logo (hotlink logo.dev, `https://logo.dev/<domain>`) et à l'auto-enrichissement
+one-liner/résumé (`companyEnrichment.enrich` fetch `https://<domain>`).
+
+L'import Calte a stocké un gros paquet de domaines en **lien markdown** ou en
+**URL de tracking** — `[www.anaxago.com](https://www.anaxago.com)`,
+`monstock.net/fr_fr/?utm_term=…&gclid=…`. Symptômes : logo cassé sur la fiche,
+et l'enrichissement échoue en silence (l'URL construite est invalide → `fetch`
+throw → champ laissé vide, warn en logs). Découvert via
+`backfillCompanyEnrichment:report` (14/07/2026) : ~200 candidats, un seul
+rempli, le reste bloqué par des domaines illisibles.
+
+**Correctif** : helper pur `convex/lib/domain.ts:normalizeDomain` (retire le
+wrapper markdown `[…](…)`, le protocole, le chemin/query, le `www.`, lowercase ;
+`null` si irréductible). Appliqué à trois endroits :
+
+- **à l'écriture** (`companies.create`/`update`, `agentTools.createCompanyInternal`)
+  → un domaine collé sale est normalisé avant insertion (garde le brut si
+  irréductible, ne perd jamais la saisie) ;
+- **défensivement au fetch** (`companyEnrichment.fetchSiteText`) → normalise
+  encore avant de construire l'URL ;
+- **en rattrapage sur l'existant** : `migrations/normalizeCompanyDomains`
+  (`dryRun`/`apply`/`report`), **à lancer AVANT** `backfillCompanyEnrichment`
+  (sinon les fiches à domaine corrompu restent vides). Les domaines
+  irréductibles remontent dans `needsManualReview` (à corriger à la main).
+
+**Piège adjacent** : `backfillCompanyEnrichment` vise `kind: 'portfolio'`, or le
+portefeuille Calte contient beaucoup de **lignes de deal** (SIDE, Anaxago, SPV
+Parallel, fonds) qui ne sont pas des sociétés — un résumé n'y a pas de sens.
+D'où le filtre `classifyExclusion` (motifs structurels + liste nominative) ; le
+`dryRun` sort `willEnrich` vs `excluded` pour relire le tri avant l'`apply`.

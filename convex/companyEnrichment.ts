@@ -29,6 +29,7 @@ import {
   internalQuery,
 } from './_generated/server'
 import { getModel } from './agent'
+import { normalizeDomain } from './lib/domain'
 import { htmlToText } from './lib/reportLinks'
 
 // Homepage text passed to the LLM (title + meta description + body text).
@@ -76,10 +77,14 @@ export const applyEnrichment = internalMutation({
  * site is unreachable or does not answer with HTML.
  */
 async function fetchSiteText(domain: string): Promise<string | null> {
+  // Defensive: a stored domain may still be a markdown link or full URL
+  // (legacy imports) — reduce it to a bare hostname before building the URL.
+  const host = normalizeDomain(domain)
+  if (!host) return null
   try {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 15_000)
-    const res = await fetch(`https://${domain}`, {
+    const res = await fetch(`https://${host}`, {
       redirect: 'follow',
       signal: controller.signal,
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AlboOS/1.0)' },
