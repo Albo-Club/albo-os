@@ -597,6 +597,23 @@ complet + re-auth), Rejeter. Gabarits français dans
 | R29 | Action « Retraiter »                                            | Pipeline rejoué de zéro (re-auth incluse) ; utile après avoir rempli un domaine manquant                       |
 | R30 | Action « Rejeter »                                              | Ligne « Rejeté / Rejeté manuellement », aucun traitement ni email                                              |
 
+## Communications Parallel (VASCO) → section Report par entité
+
+Lecture **live** (actions, non réactif) ; scoping org + rattachement entité ↔
+émetteur **par id**. Le linker n'apparaît que sur une entité « Parallel »
+(`sponsor`/`group` ~ "Parallel") ou déjà rattachée. Nécessite une connexion
+VASCO active (org `calte`).
+
+| Ref | Scénario | Attendu |
+| --- | --- | --- |
+| VC1 | Fiche entité Parallel non rattachée → onglet Reports | Bouton discret « Rattacher à Parallel » ; **aucun** bloc sur une entité non-Parallel |
+| VC2 | « Rattacher à Parallel » → dialog | Liste des SPV (label + dernier titre) chargée live ; clic sur un SPV → toast, dialog fermé, entité rattachée |
+| VC3 | Entité rattachée → onglet Reports | Bloc « Communications Parallel » : communications datées (desc), titre, corps texte, PJ ; « Rafraîchir » recharge |
+| VC4 | Communication avec PJ → « Télécharger » | Le document s'ouvre (proxy authentifié Convex) ; échec → toast, jamais de lien cassé |
+| VC5 | « Modifier le rattachement » → « Détacher » | Rattachement supprimé (toast) ; le bloc redevient le bouton « Rattacher » |
+| VC6 | Émetteur sans communication | État vide « Aucune communication pour ce deal » (pas d'erreur) |
+| VC7 | i18n EN/FR sur tout le bloc | Titres, boutons, états et toasts traduits (namespace `vasco`) |
+
 ## Pointage transaction → deal (mutations + backfill)
 
 Pointage manuel (MVP 1) : `matchTransaction` / `ignoreTransaction` /

@@ -1,0 +1,30 @@
+{
+  "communications": {
+    "title": "Parallel communications",
+    "refresh": "Refresh",
+    "loading": "Loading communications…",
+    "error": "Couldn't load Parallel communications.",
+    "empty": "No communication for this deal yet.",
+    "publishedOn": "Published {{date}}",
+    "download": "Download",
+    "downloadError": "Document download failed.",
+    "documents_one": "{{count}} document",
+    "documents_other": "{{count}} documents"
+  },
+  "link": {
+    "cta": "Link to Parallel",
+    "linkedTo": "Linked to {{label}}",
+    "change": "Change link",
+    "unlink": "Unlink",
+    "unlinking": "Unlinking…",
+    "dialogTitle": "Link this entity to a Parallel deal",
+    "dialogDescription": "Pick the Parallel SPV that matches this entity. Its communications will then show up here.",
+    "loadingIssuers": "Loading Parallel deals…",
+    "issuersError": "Couldn't load Parallel deals.",
+    "noIssuers": "No Parallel deal available for this organisation.",
+    "current": "Currently linked to {{label}}",
+    "saved": "Entity linked to Parallel.",
+    "unlinked": "Link removed.",
+    "saveError": "Couldn't save the link."
+  }
+}

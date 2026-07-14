@@ -316,3 +316,28 @@ export const update = mutation({
     return id
   },
 })
+
+/**
+ * Link (or unlink) an entity to its VASCO issuer (the Parallel SPV), so the
+ * issuer's investor communications surface in the entity's Report section.
+ * Pass both `clientSlug` and `issuerId` to link; omit either to unlink. The two
+ * fields are set/cleared together — matched by issuer id, never by name.
+ */
+export const setVascoLink = mutation({
+  args: {
+    id: v.id('companies'),
+    clientSlug: v.optional(v.string()),
+    issuerId: v.optional(v.string()),
+  },
+  handler: async (ctx, { id, clientSlug, issuerId }) => {
+    const company = await ctx.db.get('companies', id)
+    if (!company) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, company.orgId)
+    const link =
+      clientSlug && issuerId
+        ? { vascoClientSlug: clientSlug, vascoIssuerId: issuerId }
+        : { vascoClientSlug: undefined, vascoIssuerId: undefined }
+    await ctx.db.patch('companies', id, link)
+    return id
+  },
+})
