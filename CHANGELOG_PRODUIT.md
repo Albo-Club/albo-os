@@ -23,6 +23,23 @@ bas de page.
 
 ---
 
+## v1.80.1 — 14/07/2026 à 11:28 — Parallel (VASCO) : outillage pour débusquer le login qui échoue en prod
+
+Correctif technique. Le diagnostic a montré que Parallel renvoie « identifiants
+invalides » depuis la prod — donc pas un blocage réseau, mais un mot de passe
+stocké qui ne correspond pas. Ce patch ajoute de quoi le confirmer sans exposer
+le secret, et de quoi ré-enregistrer le mot de passe sans risque de corruption.
+
+> **🔧 Notes techniques**
+>
+> - `debugVascoLogin` remonte désormais, par connexion, `storedUsername`,
+>   `storedPasswordLen` et `storedPasswordSha12` (empreinte SHA-256 tronquée,
+>   non réversible) — pour comparer le secret stocké à l'attendu sans le
+>   divulguer.
+> - `seedConnection` accepte `passwordB64` (mot de passe en base64) en plus de
+>   `password`, pour ré-enregistrer un mot de passe à l'abri du mangling
+>   shell/copier-coller. `pnpm lint` + `pnpm test:unit` au vert.
+
 ## v1.80.0 — 14/07/2026 à 11:38 — Résumé de la société sur sa fiche
 
 Chaque fiche société peut maintenant porter un **résumé** de deux à trois
