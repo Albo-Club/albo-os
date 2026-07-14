@@ -23,6 +23,25 @@ bas de page.
 
 ---
 
+## v1.83.4 — 14/07/2026 à 13:53 — Nettoyage des résumés génériques par lot
+
+Complément à l'outillage de nettoyage : le premier passage (non filtré) avait
+posé un résumé sur beaucoup de lignes de plateforme (les SPV Parallel, les
+opérations Anaxago, des fonds…), toutes avec le même texte générique décrivant
+la plateforme plutôt que l'actif. Un outil permet maintenant de vider ces
+résumés **par catégorie** en une fois, tout en préservant les résumés utiles
+(lignes de deal décrivant la vraie société investie) et ceux rédigés à la main.
+
+> **🔧 Notes techniques**
+>
+> - `backfillCompanyEnrichment.clearByReason({ reasons })` : vide
+>   `oneLiner`+`summary` sur les entités portfolio dont le motif
+>   `classifyExclusion` est dans la liste passée (buckets plateformes/
+>   véhicules). Ne touche jamais `side_deal` (décrit la boîte sous-jacente) ni
+>   `lvdq_sub_entity` (curé) sauf si explicitement nommés. Complète
+>   `clearByIds` (liste d'id) et `listEnrichedNonCompanies` (revue).
+> - `MIGRATIONS.md` mis à jour.
+
 ## v1.83.3 — 14/07/2026 à 13:39 — Moins d'interruptions de l'assistant sur les tâches planifiées
 
 L'assistant n'a plus besoin d'une validation manuelle à chaque fois qu'il

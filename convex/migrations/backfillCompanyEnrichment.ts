@@ -299,3 +299,44 @@ export const clearByIds = internalMutation({
     return { cleared, skipped }
   },
 })
+
+// ─── clearByReason — blank oneLiner + summary on whole exclusion buckets ──────
+//
+// Bucket-based companion to `clearByIds`, for when a whole `classifyExclusion`
+// reason is platform boilerplate (e.g. every `parallel_spv` line got the same
+// "Parallel Invest est une boutique…" text). Clears ONLY portfolio entities
+// whose reason is in the passed list AND that currently carry a pitch.
+// ⚠️ Whatever reason you pass is wiped — do NOT pass `lvdq_sub_entity` (its
+// summaries are hand-curated) or `side_deal` (those describe the real
+// underlying company). Recommended set (14/07/2026): parallel_spv,
+// anaxago_line, named_vehicle, co_invest, fund, vehicle, asterion_line,
+// sezame_spv.
+
+export const clearByReason = internalMutation({
+  args: { reasons: v.array(v.string()) },
+  handler: async (ctx, { reasons }) => {
+    const wanted = new Set(reasons)
+    const orgs = await ctx.db.query('organizations').collect()
+    const cleared: Array<{ org: string; name: string; reason: string }> = []
+    for (const org of orgs) {
+      const companies = await ctx.db
+        .query('companies')
+        .withIndex('by_org_kind', (q) =>
+          q.eq('orgId', org._id).eq('kind', 'portfolio'),
+        )
+        .collect()
+      for (const c of companies) {
+        if (c.archivedAt != null) continue
+        if (c.oneLiner === undefined && c.summary === undefined) continue
+        const reason = classifyExclusion(c.name)
+        if (!reason || !wanted.has(reason)) continue
+        await ctx.db.patch('companies', c._id, {
+          oneLiner: undefined,
+          summary: undefined,
+        })
+        cleared.push({ org: org.slug, name: c.name, reason })
+      }
+    }
+    return { clearedCount: cleared.length, cleared }
+  },
+})
