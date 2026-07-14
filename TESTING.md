@@ -585,7 +585,8 @@ complet + re-auth), Rejeter. Gabarits français dans
 | R14 | Report matché avec PDF joint                                    | Colonne Contenu : ✅ ≥ 2 (corps + PDF) ; PJ dans le storage (attachments.storageId posé)                       |
 | R15 | Report avec capture d'écran de tableau collée dans le corps     | Image OCRisée (✅) ; un logo/signature (petite image) reste 📦 `small_image_skipped`                           |
 | R16 | Report avec Excel joint                                         | ✅ excel, dump cellules dans `extractedText`                                                                   |
-| R17 | Lien Notion privé comme seule source                            | ⚠️ `notion_unreachable` ; si rien d'autre d'exploitable → « À traiter / Aucun contenu exploitable »           |
+| R17 | Lien Notion **public** dans un report                           | ✅ extrait via rendu Jina Reader (`JINA_API_KEY` posée en prod — l'API interne Notion est morte, cf. `KNOWN_ISSUES.md` « Notion : extraction ») |
+| R17b | Lien Notion privé (ou sans `JINA_API_KEY`) comme seule source  | ⚠️ `notion_unreachable` ; si rien d'autre d'exploitable → « À traiter / Aucun contenu exploitable » ; après correction → « Retraiter » |
 | R18 | Fichier inconnu (zip…) joint                                    | 📦 stocké sans extraction, jamais d'erreur                                                                     |
 | R19 | Google Drive non partagé « avec le lien »                       | ⚠️ `gdrive_unreachable`, le reste du mail est traité normalement                                               |
 | R20 | Forward complet d'un vrai report (PDF)                          | Statut « Traité » ; le report apparaît sur la fiche de **chaque** entité matchée (onglet Reports) avec titre, période, points clés ; les PJ dans l'onglet Documents |

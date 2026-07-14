@@ -23,6 +23,25 @@ bas de page.
 
 ---
 
+## v1.86.2 — 14/07/2026 à 12:20 — Reports par email : extraction Notion fiabilisée
+
+Correctif sur le circuit des reports : l'extraction des pages Notion
+échouait systématiquement, y compris sur des pages publiques — Notion a
+récemment fermé l'accès technique que le monde entier utilisait pour lire
+ses pages sans navigateur. L'extraction passe désormais par un service de
+rendu (la page est ouverte dans un vrai navigateur distant, son contenu est
+récupéré en texte), avec l'ancienne méthode toujours tentée en premier au
+cas où Notion rouvrirait l'accès. Une clé gratuite est à configurer (voir
+notes techniques) ; les reports Notion déjà en échec peuvent ensuite être
+relancés avec « Retraiter » depuis la page Reports entrants.
+
+> **🔧 Notes techniques**
+>
+> - Diagnostic (13/07/2026) : `loadPageChunk`/`loadCachedPageChunkV2` → 400 même sur page publique (www + sous-domaine), `notion-client` npm cassé pareil, HTML public = coquille SPA, UA Googlebot → 403. Aucune voie sans navigateur — documenté dans `KNOWN_ISSUES.md` « Notion : extraction ».
+> - `convex/lib/notion.ts` : chaîne API interne (auto-guérison) → **Jina Reader** (`r.jina.ai`, headers `X-Timeout: 30` + `X-Wait-For-Selector: .notion-page-content`, format markdown, garde anti-coquille `MIN_USEFUL_CHARS`). `extractPageId` accepte aussi les UUID avec tirets.
+> - Nouvel env **`JINA_API_KEY`** (clé gratuite sur jina.ai — l'accès anonyme est bloqué pour les IP datacenter) : `pnpm exec convex env set JINA_API_KEY <clé> --prod`. Sans clé, comportement précédent (échec actionnable).
+> - Libellé du récap `notion_unreachable` reformulé (la cause n'est plus forcément une page privée) ; TESTING R17/R17b mis à jour.
+
 ## v1.86.1 — 14/07/2026 à 14:48 — Reportings Parallel : le rattachement s'affiche sur toutes les entités investies
 
 Le bloc « Rattacher à Parallel » n'apparaissait que si l'entité portait la

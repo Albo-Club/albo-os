@@ -2189,3 +2189,33 @@ Portée **par org** (multi-tenant) : on ne propage jamais une édition Albo vers
 Calte, même si un domaine était partagé entre les deux. Le `oneLiner` n'a pas
 d'éditeur inline aujourd'hui (édité via génération/unif) ; s'il en gagne un,
 propager de la même façon (ajouter `'oneLiner' in patch` dans `companies.update`).
+
+## Notion : extraction des pages publiques (API interne morte)
+
+**Symptôme** : tous les liens Notion des reports finissent en
+`notion_unreachable`, y compris des pages parfaitement publiques.
+
+**Cause** : depuis ~juillet 2026, Notion a durci son API interne. Vérifié
+empiriquement (13/07/2026) : `loadPageChunk` et `loadCachedPageChunkV2`
+renvoient 400 « Invalid input » même sur une page publique, aussi bien sur
+`www.notion.so` que sur le sous-domaine public de la page ; la lib
+communautaire `notion-client` (dernière version npm) casse pareil ; le HTML
+public est une coquille SPA sans contenu ; l'accès avec un User-Agent
+crawler (Googlebot) est bloqué (403). **Aucune voie sans navigateur ne
+fonctionne** — ne pas re-tenter ces pistes.
+
+**Solution en place** (`convex/lib/notion.ts`) : chaîne à deux étages —
+(1) l'API interne est toujours tentée en premier (coût quasi nul,
+auto-guérison si Notion la rouvre), (2) fallback **Jina Reader**
+(`r.jina.ai`) qui rend la page dans un navigateur headless et renvoie le
+markdown. Headers importants : `X-Timeout: 30` + `X-Wait-For-Selector:
+.notion-page-content` (sans eux, snapshot avant le rendu SPA → coquille
+vide, détectée par le seuil `MIN_USEFUL_CHARS`). Nécessite `JINA_API_KEY`
+(clé gratuite, l'accès anonyme est refusé aux IP datacenter — vérifié :
+401 « bad IP reputation »). Sans clé : comportement dégradé assumé, échec
+actionnable dans le récap.
+
+**Limites connues** : les fichiers *attachés dans* une page Notion ne sont
+pas téléchargés (le markdown rendu contient leurs liens signés — extraction
+dédiée à faire si le besoin réel se confirme) ; une page derrière un mur de
+login rend une coquille → échec normal.
