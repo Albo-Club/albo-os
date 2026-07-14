@@ -13,6 +13,7 @@
   },
   "link": {
     "cta": "Link to Parallel",
+    "prompt": "Link this entity to its Parallel deal to see its communications.",
     "linkedTo": "Linked to {{label}}",
     "change": "Change link",
     "unlink": "Unlink",
