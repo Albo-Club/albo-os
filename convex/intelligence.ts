@@ -16,6 +16,7 @@ import {
   internalAction,
   internalMutation,
   internalQuery,
+  mutation,
   query,
 } from './_generated/server'
 import { getModel } from './agent'
@@ -23,9 +24,12 @@ import { intelligenceTools } from './agentToolsIntelligence'
 import { INTELLIGENCE_SYSTEM_PROMPT } from './lib/reportPrompts'
 import { requireOrgMember } from './lib/auth'
 import type { Id } from './_generated/dataModel'
+import type { VascoCommunication } from './vasco'
 
 const MAX_REPORTS = 5
 const MAX_RAW_PER_REPORT = 3000
+const MAX_COMMUNICATIONS = 5
+const MAX_COMM_BODY = 3000
 
 export const intelligenceAgent = new Agent(components.agent, {
   name: 'company-intelligence',
@@ -76,9 +80,17 @@ export const linkupSearch = internalAction({
 
 export const getContext = internalQuery({
   args: { companyId: v.id('companies') },
-  handler: async (ctx, { companyId }): Promise<string> => {
+  handler: async (
+    ctx,
+    { companyId },
+  ): Promise<{
+    text: string
+    vascoClientSlug: string | null
+    vascoIssuerId: string | null
+  }> => {
     const company = await ctx.db.get('companies', companyId)
-    if (!company) return ''
+    if (!company)
+      return { text: '', vascoClientSlug: null, vascoIssuerId: null }
 
     const parts: Array<string> = [`## Entreprise: ${company.name}`]
     if (company.domain) parts.push(`Domaine: ${company.domain}`)
@@ -102,9 +114,37 @@ export const getContext = internalQuery({
       }
     }
 
-    return parts.join('\n')
+    return {
+      text: parts.join('\n'),
+      vascoClientSlug: company.vascoClientSlug ?? null,
+      vascoIssuerId: company.vascoIssuerId ?? null,
+    }
   },
 })
+
+/**
+ * Format the entity's recent VASCO/Parallel investor communications as a text
+ * block appended to the analysis context. Body text is already plain (stripped
+ * of HTML server-side in vasco.ts). Kept parallel to the reports block above.
+ */
+function formatCommunications(comms: Array<VascoCommunication>): string {
+  if (comms.length === 0) return ''
+  const parts: Array<string> = [
+    '\n## Communications investisseur (Parallel/VASCO, récentes)',
+  ]
+  for (const c of comms.slice(0, MAX_COMMUNICATIONS)) {
+    const stamp = c.publishDate ?? c.period ?? ''
+    parts.push(
+      `\n### ${c.title ?? 'Communication'}${stamp ? ` (${stamp})` : ''}`,
+    )
+    if (c.bodyText) parts.push(c.bodyText.slice(0, MAX_COMM_BODY))
+    const docNames = c.documents
+      .map((d) => d.name)
+      .filter((n): n is string => Boolean(n))
+    if (docNames.length) parts.push(`Documents: ${docNames.join(', ')}`)
+  }
+  return parts.join('\n')
+}
 
 // ─── Persistence ─────────────────────────────────────────────────────────────
 
@@ -199,8 +239,26 @@ export const runAnalysis = internalAction({
     })
 
     try {
-      const context = await ctx.runQuery(internal.intelligence.getContext, { companyId })
-      if (!context) {
+      const { text, vascoClientSlug, vascoIssuerId } = await ctx.runQuery(
+        internal.intelligence.getContext,
+        { companyId },
+      )
+
+      // Live-pull the entity's Parallel/VASCO investor communications, if
+      // linked, and fold them into the context. getContext is a query (can't
+      // fetch); this action can. Best-effort — [] on any VASCO failure.
+      let vascoBlock = ''
+      if (vascoClientSlug && vascoIssuerId) {
+        const comms = await ctx.runAction(
+          internal.vasco.pullCommunicationsForSynthesis,
+          { orgId, clientSlug: vascoClientSlug, issuerId: vascoIssuerId },
+        )
+        vascoBlock = formatCommunications(comms)
+      }
+
+      // Empty only when there is neither company/report context nor comms — a
+      // bare Parallel entity with communications is still worth analyzing.
+      if (!text && !vascoBlock) {
         await ctx.runMutation(internal.intelligence.upsertIntelligence, {
           companyId,
           orgId,
@@ -208,6 +266,8 @@ export const runAnalysis = internalAction({
         })
         return
       }
+
+      const context = `${text}${vascoBlock}`
 
       const threadId = await createThread(ctx, components.agent, {
         userId: `${orgId}:system`,
@@ -240,6 +300,44 @@ export const runAnalysis = internalAction({
         status: 'error',
       })
     }
+  },
+})
+
+/**
+ * Manually (re)trigger the AI synthesis for one entity. Public, org-member
+ * guarded (same as `getByCompany`). Sets the row to `processing` so the
+ * reactive UI flips immediately, then schedules `runAnalysis`. This is the
+ * on-demand path: the synthesis is otherwise only (re)triggered on report-mail
+ * ingestion (`reportStore`), so Parallel/VASCO entities — which receive no mail
+ * report — rely on this button to get analyzed.
+ */
+export const rerun = mutation({
+  args: { companyId: v.id('companies') },
+  handler: async (ctx, { companyId }) => {
+    const company = await ctx.db.get('companies', companyId)
+    if (!company) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, company.orgId)
+
+    const existing = await ctx.db
+      .query('companyIntelligence')
+      .withIndex('by_company', (q) => q.eq('companyId', companyId))
+      .unique()
+    if (existing) {
+      await ctx.db.patch('companyIntelligence', existing._id, {
+        aiAnalysisStatus: 'processing',
+      })
+    } else {
+      await ctx.db.insert('companyIntelligence', {
+        orgId: company.orgId,
+        companyId,
+        aiAnalysisStatus: 'processing',
+      })
+    }
+
+    await ctx.scheduler.runAfter(0, internal.intelligence.runAnalysis, {
+      companyId,
+      orgId: company.orgId,
+    })
   },
 })
 

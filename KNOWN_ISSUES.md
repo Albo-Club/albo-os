@@ -2171,6 +2171,31 @@ SPV13"), dated (`publishDate`/`period`), with `title`, `htmlContent`, and
   use the first that logs in, so it degrades gracefully. Delete it with
   `vasco:deleteConnection` when convenient.
 
+### Communications → AI synthesis (« Cerveau », étape 2c)
+
+The company AI synthesis (`intelligence.runAnalysis`) folds the linked issuer's
+communications into its prompt context, **pulled live on each run** (nothing
+new is persisted — the result still lands in `companyIntelligence`).
+
+- **System-context read path.** `runAnalysis` is a scheduled internalAction with
+  **no user identity**, so it can't use the org-member-guarded
+  `fetchCommunications`. It calls `vasco.pullCommunicationsForSynthesis` (an
+  internalAction) which resolves connections via `vasco.getActiveConnectionsByOrgId`
+  — an **auth-less** internalQuery keyed by orgId (sibling of
+  `getConnectionsByOrgSlug`, do **not** reuse `authorizeAndListConnections`,
+  which guards). Best-effort: it returns `[]` on any VASCO failure so the
+  synthesis still runs on the company/report context alone. The `no_data` guard
+  is evaluated on (context **OR** comms), so a bare Parallel entity with only
+  communications is still analyzed.
+- **Trigger = report mail OR the manual button, never automatic on link.** The
+  synthesis auto-runs **only** from the report-mail ingestion fan-out
+  (`reportStore`). Parallel/VASCO entities receive no mail report, so they are
+  never auto-analyzed. The on-demand path is the public mutation
+  `intelligence.rerun` (org-member-guarded, "Relancer l'analyse" button) — it
+  sets `processing` and schedules `runAnalysis`. **By design there is no
+  auto-trigger** on `companies.setVascoLink` and no cron; the button is the only
+  new trigger.
+
 ### `convex codegen` can't run in the remote exec environment
 
 `convex codegen` requires an authenticated deployment (`CONVEX_DEPLOYMENT` +

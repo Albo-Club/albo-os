@@ -1,7 +1,16 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, ArrowDown, ArrowUp, ChevronRight, Minus } from 'lucide-react'
-import { useConvexQuery } from '@convex-dev/react-query'
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ChevronRight,
+  Loader2,
+  Minus,
+  RefreshCw,
+} from 'lucide-react'
+import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
+import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
@@ -9,6 +18,7 @@ import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { directionBadgeClass } from '~/lib/moneyTone'
 import { scoreVerdict, verdictSquareClass } from '~/lib/reportScore'
 import { cn } from '~/lib/utils'
+import { Button } from '~/components/ui/button'
 
 // Shape of companyIntelligence.aiAnalysis (Cerveau 3).
 interface Insight {
@@ -74,9 +84,12 @@ export function CompanyAiSynthesisBlock({
             ? 'no_data'
             : 'empty'
     // Standalone placeholder: a single sober line, not a boxed empty state.
+    // The rerun button sits at the right so empty/error entities (e.g. Parallel
+    // ones, which never receive a mail report) can trigger the synthesis.
     return (
-      <div className="text-muted-foreground text-sm">
-        {t(`intelligence.status.${key}`)}
+      <div className="text-muted-foreground flex items-center justify-between gap-2 text-sm">
+        <span>{t(`intelligence.status.${key}`)}</span>
+        <RerunButton companyId={companyId} status={status} />
       </div>
     )
   }
@@ -93,16 +106,19 @@ export function CompanyAiSynthesisBlock({
 
   return (
     <div className="bg-card space-y-4 rounded-xl border p-5">
-      {/* Light header: label left, generation date right. */}
+      {/* Light header: label left, generation date + rerun button right. */}
       <div className="text-muted-foreground flex items-center justify-between gap-2 text-xs">
         <span>{t('reports.synthesis.header')}</span>
-        {intel?.aiAnalysisUpdatedAt && (
-          <span>
-            {t('reports.synthesis.generatedAt', {
-              date: fmtDate(intel.aiAnalysisUpdatedAt),
-            })}
-          </span>
-        )}
+        <div className="flex items-center gap-1">
+          {intel?.aiAnalysisUpdatedAt && (
+            <span>
+              {t('reports.synthesis.generatedAt', {
+                date: fmtDate(intel.aiAnalysisUpdatedAt),
+              })}
+            </span>
+          )}
+          <RerunButton companyId={companyId} status={status} />
+        </div>
       </div>
 
       {/* Hero line: score square + verdict + one-line TL;DR. */}
@@ -189,6 +205,54 @@ export function CompanyAiSynthesisBlock({
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * "Rerun analysis" trigger. Kicks `intelligence.rerun` (org-guarded); the block
+ * re-renders reactively as the status moves processing → completed. `busy`
+ * combines the in-flight mutation and the backend `processing` status so the
+ * spinner stays continuous from click to result (no flicker in between).
+ */
+function RerunButton({
+  companyId,
+  status,
+}: {
+  companyId: Id<'companies'>
+  status: string | null
+}) {
+  const { t } = useTranslation('participations')
+  const rerun = useConvexMutation(api.intelligence.rerun)
+  const [pending, setPending] = useState(false)
+  const busy = pending || status === 'processing'
+
+  async function handleClick() {
+    setPending(true)
+    try {
+      await rerun({ companyId })
+    } catch {
+      toast.error(t('intelligence.rerunError'))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="text-muted-foreground hover:text-foreground h-auto gap-1.5 px-2 py-1 text-xs"
+      onClick={handleClick}
+      disabled={busy}
+    >
+      {busy ? (
+        <Loader2 className="size-3.5 animate-spin" />
+      ) : (
+        <RefreshCw className="size-3.5" />
+      )}
+      {t('intelligence.rerun')}
+    </Button>
   )
 }
 

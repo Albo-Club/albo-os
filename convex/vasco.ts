@@ -385,6 +385,24 @@ export const getConnectionsByOrgSlug = internalQuery({
   },
 })
 
+/**
+ * Active connections of `orgId` — auth-less, keyed by orgId. Mirrors
+ * `getConnectionsByOrgSlug` but for system-context callers that already hold an
+ * orgId (e.g. `intelligence.runAnalysis`, which runs with no user identity, so
+ * `requireOrgMember` can't apply). INTERNAL ONLY (never exposed publicly); rows
+ * carry credentials.
+ */
+export const getActiveConnectionsByOrgId = internalQuery({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    const conns = await ctx.db
+      .query('vascoConnections')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    return conns.filter((c) => c.active)
+  },
+})
+
 /** Record the outcome of a connection attempt (clears `lastError` on success). */
 export const markConnected = internalMutation({
   args: {
@@ -875,6 +893,50 @@ export const fetchCommunications = action({
       }
     }
     throw new ConvexError(`vasco_fetch_failed: ${lastError ?? 'unknown'}`)
+  },
+})
+
+/**
+ * Same issuer-scoped read as `fetchCommunications`, but for the AI-synthesis
+ * runner (`intelligence.runAnalysis`), which runs in system context (no user
+ * identity → can't go through the org-member-guarded path). Resolves the org's
+ * active connections for `clientSlug` via the auth-less internal query, logs
+ * in, and returns the issuer's communications date-desc. Best-effort: returns
+ * `[]` if no connection logs in, so the synthesis still runs on the
+ * company/report context alone.
+ */
+export const pullCommunicationsForSynthesis = internalAction({
+  args: {
+    orgId: v.id('organizations'),
+    clientSlug: v.string(),
+    issuerId: v.string(),
+  },
+  handler: async (
+    ctx,
+    { orgId, clientSlug, issuerId },
+  ): Promise<Array<VascoCommunication>> => {
+    const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
+      internal.vasco.getActiveConnectionsByOrgId,
+      { orgId },
+    )
+    const matching = conns.filter((c) => c.clientSlug === clientSlug)
+    // Try each matching connection until one logs in (tolerates a stale dup).
+    for (const conn of matching) {
+      try {
+        const all = await pullCommunications(conn)
+        return all
+          .filter((c) => c.issuerId === issuerId)
+          .sort((a, b) =>
+            (b.publishDate ?? '').localeCompare(a.publishDate ?? ''),
+          )
+      } catch (err) {
+        console.warn(
+          `[vasco] synthesis comms pull failed for ${conn.clientSlug}:`,
+          err instanceof Error ? err.message : String(err),
+        )
+      }
+    }
+    return []
   },
 })
 
