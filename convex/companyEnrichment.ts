@@ -162,11 +162,17 @@ const SYSTEM_PROMPT = `Tu rédiges les fiches d'un outil interne de suivi de par
 Interdits : superlatifs et langage marketing (« leader », « révolutionnaire »), chiffres de levée de fonds, contenu non déductible du texte fourni.`
 
 // Parallel SPVs have no usable website — their pitch is derived from the VASCO
-// investor communications instead (they describe the underlying operation).
-const VASCO_PITCH_PROMPT = `Tu rédiges la fiche d'une opération d'investissement (un SPV Parallel) dans un outil interne de family office. À partir des communications investisseur fournies, produis deux champs en FRANÇAIS décrivant CE QU'EST l'opération :
-- "oneLiner" : 3 à 8 mots, sans point final, style annuaire — nature de l'opération + repère géographique si connu, ex. « Promotion immobilière — Bordeaux », « Club deal — SaaS RH ».
-- "summary" : 2 à 3 phrases (30 à 50 mots) — type d'opération (promotion immobilière, club deal, dette, foncière, growth…), actif ou secteur, géographie, et stade d'avancement si mentionné.
-Factuel, déductible des communications uniquement. Interdits : superlatifs, langage marketing, chiffres de performance non fournis.`
+// investor communications instead. Describe the operation AS PITCHED (timeless),
+// never its current status/progress (Benjamin wants « le résumé de l'opération
+// qu'on nous a vendue », not the latest update).
+const VASCO_PITCH_PROMPT = `Tu rédiges la fiche d'une opération d'investissement (un SPV Parallel) dans un outil interne de family office. À partir des communications investisseur fournies, décris **l'opération elle-même, telle qu'elle a été présentée au départ** — PAS son avancement ni sa performance.
+
+Produis deux champs en FRANÇAIS :
+- "oneLiner" : 3 à 8 mots, sans point final, style annuaire — nature de l'opération + repère géographique ou sectoriel, ex. « Promotion immobilière — Bordeaux », « Club deal — SaaS RH », « Dette obligataire — hôtellerie ».
+- "summary" : 2 à 3 phrases (30 à 50 mots) décrivant CE QU'EST l'opération : type (promotion immobilière, club deal, dette, foncière, growth, secondaire…), actif ou société sous-jacente, secteur, géographie, et structure (equity ou dette) si elle ressort de la présentation.
+
+INTERDIT — n'écris RIEN sur l'avancement ni le statut : pas de ventes réalisées, remboursements, coupons versés, appels de fonds, retards, valorisations ou performances « à date ». On veut la description intemporelle de l'opération vendue, pas son actualité.
+Factuel, déductible des communications uniquement. Pas de superlatifs ni de langage marketing.`
 
 /**
  * Shared LLM call producing the `{oneLiner, summary}` pitch. Tries structured
@@ -289,7 +295,10 @@ export const getVascoEnrichmentTarget = internalQuery({
           r.clientSlug === company.vascoClientSlug &&
           r.issuerId === company.vascoIssuerId,
       )
-      .sort((a, b) => (b.publishDate ?? '').localeCompare(a.publishDate ?? ''))
+      // Oldest first: the initial communication is the deal presentation (what
+      // the operation IS), which leads the pitch context; later comms are
+      // progress updates we don't want in a timeless description.
+      .sort((a, b) => (a.publishDate ?? '').localeCompare(b.publishDate ?? ''))
       .map((r) => ({
         title: r.title ?? null,
         bodyText: r.bodyText ?? null,

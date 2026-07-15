@@ -2228,7 +2228,10 @@ points at the platform (SPVs are deliberately excluded from the domain backfill,
 cf. MIGRATIONS.md `parallel_spv`). So Parallel entities get their pitch from a
 second source: `enrichFromVasco` reads the entity's **cached communications**
 (`vascoCommunicationsCache`, by `vascoClientSlug` + `vascoIssuerId`) and asks the
-LLM to describe the operation (nature / geography / stage), then **overwrites**
+LLM to describe the operation **as pitched** — nature / asset / geography /
+structure, **never its progress or status** (`VASCO_PITCH_PROMPT` forbids
+dated/performance content; the comms are fed **oldest-first** so the initial deal
+presentation dominates the context, not later updates). It then **overwrites**
 `oneLiner` + `summary` via `applyVascoPitch` (unlike the additive
 `applyEnrichment` — the VASCO description supersedes the domain-derived one).
 
