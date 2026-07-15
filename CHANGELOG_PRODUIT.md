@@ -23,6 +23,37 @@ bas de page.
 
 ---
 
+## v1.88.0 — 15/07/2026 à 10:49 — Synthèse IA : bouton « Relancer l'analyse » et prise en compte des communications Parallel
+
+La **synthèse IA** (« Cerveau ») de chaque fiche entité peut désormais être
+**relancée à la demande** : un bouton « Relancer l'analyse » apparaît dans
+l'en-tête du bloc (et sur la ligne d'attente tant qu'aucune synthèse n'existe).
+Un clic lance l'analyse — le bloc passe en « Analyse en cours… » puis se met à
+jour tout seul en « terminé ». Surtout, pour les entités investies via
+**Parallel**, la synthèse tient maintenant compte de leurs **communications
+Parallel** (titres, contenus, documents), en plus des reports reçus par mail.
+Jusqu'ici la synthèse ne se déclenchait qu'à la réception d'un report par mail :
+les entités Parallel, qui n'en reçoivent pas, restaient sans synthèse — elles
+peuvent désormais être analysées d'un clic.
+
+> **🔧 Notes techniques**
+>
+> - `intelligence.rerun` : nouvelle mutation publique (org-member-guarded) qui
+>   passe la ligne `companyIntelligence` en `processing` (UI réactive immédiate)
+>   puis planifie `runAnalysis`. Le trigger mail (`reportStore`, fan-out
+>   d'ingestion) reste l'unique autre déclencheur — inchangé.
+> - `runAnalysis` : après `getContext` (élargi pour renvoyer aussi les liens
+>   `vascoClientSlug`/`vascoIssuerId`), pull **live** des communications de
+>   l'émetteur VASCO lié via `vasco.pullCommunicationsForSynthesis`
+>   (internalAction system-context : `getActiveConnectionsByOrgId` auth-less →
+>   `pullCommunications` → filtre `issuerId`), concaténées au contexte du prompt.
+>   Best-effort (`[]` si échec VASCO). Garde `no_data` ré-évaluée sur
+>   (contexte **OU** comms).
+> - Front : `CompanyAiSynthesisBlock` → sous-composant `RerunButton` (icône
+>   refresh, spinner tant que `pending || status === 'processing'`), visible en
+>   états vide/erreur/terminé. i18n `participations:intelligence.rerun` /
+>   `rerunError` (en+fr). Aucun changement de schéma.
+
 ## v1.87.1 — 15/07/2026 à 12:50 — Reports par email : les liens Notion en notion.com sont détectés
 
 Correctif sur le circuit des reports : les liens Notion au nouveau format

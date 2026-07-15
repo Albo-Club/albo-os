@@ -640,7 +640,9 @@
     "section": {
       "good": "Points forts",
       "bad": "Points de vigilance"
-    }
+    },
+    "rerun": "Relancer l'analyse",
+    "rerunError": "Impossible de relancer l'analyse."
   },
   "export": {
     "button": "Exporter CSV",

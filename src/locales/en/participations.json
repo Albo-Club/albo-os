@@ -640,7 +640,9 @@
     "section": {
       "good": "Strengths",
       "bad": "Watch points"
-    }
+    },
+    "rerun": "Rerun analysis",
+    "rerunError": "Couldn't rerun the analysis."
   },
   "export": {
     "button": "Export CSV",
