@@ -23,7 +23,28 @@ bas de page.
 
 ---
 
-## v1.89.0 — 15/07/2026 à 13:40 — Communications Parallel : chargement instantané (cache + rafraîchissement automatique)
+## v1.89.1 — 15/07/2026 à 17:24 — Documentation produit complète
+
+Albo dispose désormais d'une **documentation produit** qui explique, page par
+page, comment fonctionne chaque partie de l'outil — participations, deals,
+trésorerie, pointage, prévisionnel, passif, assistant IA, intégrations,
+comptes et organisations. Écrite pour quelqu'un qui n'a pas construit
+l'outil, en langage simple, elle décrit l'état courant de chaque
+fonctionnalité (là où ces Nouveautés racontent ce qui change au fil du
+temps). Elle sera tenue à jour à chaque évolution, et une copie de lecture
+est disponible dans les documents du projet Linear « Albo OS ».
+
+> **🔧 Notes techniques**
+>
+> - Nouveau dossier `docs/produit/` : 16 pages markdown (README sommaire +
+>   15 pages par module), gabarit commun « à quoi ça sert / comment ça
+>   marche / points d'attention / pages liées », rédigées depuis une
+>   exploration complète du code (routes, modules Convex, agent, MCP).
+> - `CLAUDE.md` : question 7 ajoutée à l'audit doc pré-PR (toute feature
+>   visible ajoutée/modifiée/retirée → mettre à jour la page
+>   `docs/produit/` correspondante dans la même PR) + entrée dans « Where
+>   things live ». Le dossier repo est la source de vérité, miroir Linear
+>   en lecture.
 
 Ouvrir le rattachement à un SPV Parallel et afficher les communications d'une
 entité étaient **lents** : à chaque clic, Albo se reconnectait à Parallel et

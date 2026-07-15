@@ -1,0 +1,76 @@
+# Deals
+
+## À quoi ça sert
+
+Un **deal** = un investissement précis : un instrument souscrit à un instant
+donné. Un réinvestissement (follow-on) est un nouveau deal. La section Deals
+(`/app/<org>/deals`) montre le portefeuille **à plat** — une ligne par deal —
+là où [Participations](04-participations.md) regroupe par société.
+
+## Anatomie d'un deal
+
+- **Investisseur** : l'entité du groupe qui a investi — toujours une entité
+  du groupe, jamais une participation. C'est une règle stricte de l'outil.
+- **Cible** : la société investie.
+- **Via SPV** (optionnel) : quand l'investissement passe par un SPV
+  intermédiaire.
+- **Instrument** : le type d'investissement. Une vingtaine sont gérés —
+  actions, BSA, BSA-AIR, SAFE, obligations convertibles ou simples, compte
+  courant d'associé, royalties, engagement LP dans un fonds, parts de SPV,
+  lead SPV (fees + carried), secondaire, immobilier direct, SCPI, CTO, dépôt
+  à terme, crypto, prêt, compte de capitalisation. Chaque instrument a ses
+  champs propres (prix par action et valorisation d'entrée pour les actions,
+  taux et maturité pour la dette, cap et discount pour un SAFE, etc.).
+- **Montants** : l'**engagé** (ce qu'on s'est engagé à investir) et le
+  **décaissé** (ce qui est réellement sorti — calculé depuis les
+  transactions bancaires pointées, jamais saisi à la main).
+- **Statut** : *engagé* (term sheet signée, pas encore câblé — créé
+  automatiquement depuis Attio), *actif*, *sorti partiellement*, *sorti*,
+  *passé en perte*.
+- **Dates** : signature (tri par défaut), closing, sortie.
+
+## La fiche deal
+
+- **Trois stats** en tête : Engagé, Décaissé, Reçu.
+- **Bloc instrument** : les champs propres au type d'instrument, éditables en
+  ligne. Changer le type dans le sélecteur **prévisualise** la nouvelle mise
+  en page sans rien enregistrer (bannière « non enregistré »).
+- **Panneau Royalties** (deals royalties) : capital investi, taux de
+  royalties, plafond, multiples plancher/plafond, business plan initial
+  trimestre par trimestre et réels — les écarts et le BP dégradé sont
+  calculés à l'affichage.
+- **Section Fonds** (engagements LP) : appels et distributions.
+- **Business plan vs réalisé** : graphique et tableau comparant le BP initial
+  (figé au closing), le BP révisé et le réel. La saisie du BP se fait via
+  l'[assistant IA](11-assistant-ia.md) (coller le BP suffit), pas par un
+  formulaire.
+- **Prévisionnel du deal** : les échéances prévisionnelles liées (loyers
+  SCPI, coupons, appels programmés) et le reste engagé à déployer.
+- **Transactions** : les mouvements bancaires rattachés au deal. Un clic
+  ouvre le détail avec possibilité de **réaffecter** la transaction à un
+  autre deal.
+- **Notes** : texte libre.
+
+## Gérer une sortie
+
+Le dialogue « Gérer la sortie » pose le statut (sortie totale, partielle,
+perte), la date et le produit de cession. Une sortie est **réversible** : on
+peut l'annuler et le deal redevient actif.
+
+## Points d'attention
+
+- **Supprimer un deal est refusé** tant que des transactions lui sont
+  rattachées — il faut les détacher d'abord (aucune transaction orpheline).
+- Les métriques affichées (Versé, Reçu, MOIC, TRI) sont **toujours
+  recalculées** depuis les transactions pointées — le pointage est donc la
+  condition pour que les chiffres soient justes. Voir
+  [Pointage](08-pointage.md) et
+  [Valorisations, KPIs et métriques](06-valorisations-et-kpis.md).
+- Les deals venus d'Attio gardent leur lien (identifiant Attio) ; une fois
+  actifs, Attio ne peut plus écraser leurs données financières.
+
+## Pages liées
+
+- [Participations](04-participations.md), [Pointage](08-pointage.md),
+  [Valorisations, KPIs et métriques](06-valorisations-et-kpis.md),
+  [Intégrations](15-integrations.md) (synchro Attio)
