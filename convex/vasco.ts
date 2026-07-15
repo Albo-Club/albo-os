@@ -194,6 +194,21 @@ const GET_COMMUNICATIONS = `query($accountId: ID, $userId: ID, $issuerId: ID) {
   }
 }`
 
+// Lightweight selection for the issuer picker: issuer + title + dates only, no
+// `htmlContent` (full bodies) and no `communicationDocuments` (per-doc arrays).
+// `listVascoIssuers` only needs distinct issuers + a sample title, so pulling
+// the heavy fields for every communication just to dedupe was the main cost of
+// opening the linker. cf. KNOWN_ISSUES.md "VASCO API".
+const GET_COMMUNICATIONS_LIGHT = `query($accountId: ID, $userId: ID, $issuerId: ID) {
+  GetCommunications(accountId: $accountId, userId: $userId, issuerId: $issuerId) {
+    id
+    title
+    period
+    publishDate
+    issuer { id label }
+  }
+}`
+
 type GetUserResult = {
   GetUser: {
     id: string
@@ -787,6 +802,51 @@ async function pullCommunications(
     .map(shapeCommunication)
 }
 
+// Minimal shape returned by the light pull — just what the issuer picker needs.
+type VascoCommunicationLight = {
+  issuerId: string
+  issuerLabel: string | null
+  title: string | null
+  period: string | null
+  publishDate: string | null
+}
+
+type CommunicationLightNode = {
+  id: string
+  title?: string | null
+  period?: string | null
+  publishDate?: string | null
+  issuer?: { id: string; label?: string | null } | null
+}
+
+type GetCommunicationsLightResult = {
+  GetCommunications: Array<CommunicationLightNode | null> | null
+}
+
+/** Like `pullCommunications`, but with the light selection (no bodies/documents)
+ * — for the issuer picker (`listVascoIssuers`), which only dedupes issuers and
+ * shows a sample title. */
+async function pullCommunicationsLight(
+  creds: VascoCreds,
+): Promise<Array<VascoCommunicationLight>> {
+  const { token, userId } = await vascoLogin(creds)
+  const data = await vascoGraphql<GetCommunicationsLightResult>(
+    creds.clientSlug,
+    token,
+    GET_COMMUNICATIONS_LIGHT,
+    { userId },
+  )
+  return (data.GetCommunications ?? [])
+    .filter((c): c is CommunicationLightNode => c != null)
+    .map((node) => ({
+      issuerId: node.issuer?.id ?? '',
+      issuerLabel: node.issuer?.label ?? null,
+      title: node.title ?? null,
+      period: node.period ?? null,
+      publishDate: node.publishDate ?? null,
+    }))
+}
+
 /** Active connections of `orgId` matching `clientSlug`. Org-member-guarded via
  * the caller's identity (propagated from the calling action). */
 async function activeConnectionsForClient(
@@ -828,7 +888,7 @@ export const listVascoIssuers = action({
       []
     for (const conn of conns) {
       try {
-        const comms = await pullCommunications(conn)
+        const comms = await pullCommunicationsLight(conn)
         for (const c of comms) {
           if (!c.issuerId) continue
           const key = `${conn.clientSlug}:${c.issuerId}`

@@ -2154,6 +2154,19 @@ SPV13"), dated (`publishDate`/`period`), with `title`, `htmlContent`, and
   by id, never by name). The entity's Report section then reads
   `fetchCommunications({orgId, clientSlug, issuerId})`; the issuer picker is fed
   by `listVascoIssuers` (distinct issuers + latest title as a human hint).
+- **Picker uses a light query.** `listVascoIssuers` only needs distinct issuers +
+  a sample title, so it pulls `GET_COMMUNICATIONS_LIGHT` (`pullCommunicationsLight`)
+  — issuer + title + dates, **no** `htmlContent` / `communicationDocuments`.
+  Pulling the full bodies for every communication just to dedupe issuers was the
+  main latency of opening the linker. `fetchCommunications` keeps the full query
+  (the list needs bodies + attachments).
+- **Which entities show the linker.** `VascoCommunicationsSection` renders only on
+  `kind: 'portfolio'` entities that look like Parallel investments —
+  `/parallel/i` over `name + domain + sponsor + group` — plus any already-linked
+  entity. The union is deliberate: the live `domain` isn't reliably filled on
+  SPVs (often empty or the parent platform), so keying on it alone would hide the
+  block on real Parallel entities (the v1.86.1 regression); the name
+  ("PARALLEL INVEST …") backstops it. `group_*` legal entities never show it.
 - **Download = server proxy, mandatory.** `document.downloadUrl` is an
   **authenticated** endpoint (`api.<client>.vasco.fund/documents/<id>/download`),
   not a public signed URL → a browser `<a href>` fails.

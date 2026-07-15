@@ -627,7 +627,8 @@ Nécessite une connexion VASCO active (org `calte`).
 
 | Ref | Scénario | Attendu |
 | --- | --- | --- |
-| VC1 | Fiche entité **portfolio** non rattachée → onglet Reports | Encart pointillé « Rattachez cette entité à son deal Parallel… » + bouton « Rattacher à Parallel » ; **aucun** bloc sur une entité `group_*` |
+| VC1 | Fiche entité **portfolio Parallel** (nom/domaine/origine contient « Parallel »), non rattachée → onglet Reports | Encart pointillé « Rattachez cette entité à son deal Parallel… » + bouton « Rattacher à Parallel » |
+| VC1b | Fiche entité **portfolio non-Parallel** (boîte lambda) **ou** entité `group_*` → onglet Reports | **Aucun** bloc de rattachement — l'encart ne s'affiche que sur les entités Parallel ou déjà rattachées |
 | VC2 | « Rattacher à Parallel » → dialog | Liste des SPV (label + dernier titre) chargée live ; clic sur un SPV → toast, dialog fermé, entité rattachée |
 | VC3 | Entité rattachée → onglet Reports | Bloc « Communications Parallel » : communications datées (desc), titre, corps texte, PJ ; « Rafraîchir » recharge |
 | VC4 | Communication avec PJ → « Télécharger » | Le document s'ouvre (proxy authentifié Convex) ; échec → toast, jamais de lien cassé |
