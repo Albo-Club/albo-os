@@ -35,7 +35,10 @@ En-tête : logo, nom, nature, % de détention global. Puis :
   lien vers la fiche Attio quand la personne y est rattachée. L'édition passe
   par le dialogue Éditer, qui propose une recherche dans les personnes Attio.
 - **Deals de la société** : blocs détaillés cliquables vers chaque
-  [fiche deal](05-deals.md).
+  [fiche deal](05-deals.md). Un deal se crée depuis cette fiche (menu ⋯) ; le
+  formulaire propose d'emblée **tous les champs de l'instrument** choisi
+  (montant, dates dont le closing, tour, valorisations, titres acquis…) pour
+  tout renseigner en une fois.
 - **Synthèse IA** : score de santé, résumé exécutif, alerte critique
   éventuelle, points forts / points de vigilance, trois KPIs avec tendance.
   Elle est régénérée automatiquement à chaque rapport ingéré, et peut être
