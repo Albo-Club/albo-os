@@ -16,6 +16,10 @@ export interface DetectedLinks {
 const NOTION_PATTERNS = [
   /https?:\/\/(?:www\.)?notion\.so\/[^\s<>"')\]]+/gi,
   /https?:\/\/[a-zA-Z0-9-]+\.notion\.site\/[^\s<>"')\]]+/gi,
+  // notion.com — Notion's current domain (share links like
+  // app.notion.com/p/<workspace>/<Page-32hex>). Requiring the 32-hex page id
+  // keeps marketing pages (notion.com/blog, /pricing…) out of the sources.
+  /https?:\/\/(?:[a-zA-Z0-9-]+\.)?notion\.com\/[^\s<>"')\]]*[0-9a-f]{32}[^\s<>"')\]]*/gi,
 ]
 
 const GDRIVE_PATTERNS: Array<{ rx: RegExp; grp: number }> = [

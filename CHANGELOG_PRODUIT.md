@@ -23,6 +23,20 @@ bas de page.
 
 ---
 
+## v1.87.1 — 15/07/2026 à 12:50 — Reports par email : les liens Notion en notion.com sont détectés
+
+Correctif sur le circuit des reports : les liens Notion au nouveau format
+`notion.com` (celui que Notion génère désormais avec « Copier le lien »,
+comme dans l'update Tango du jour) n'étaient pas reconnus — le report
+était rangé sans la page Notion. Ils sont maintenant détectés comme les
+anciens formats. Pour un report déjà rangé sans sa page Notion :
+« Retraiter » depuis la page Reports entrants.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/reportLinks.ts` : troisième pattern `NOTION_PATTERNS` pour `(*.)notion.com` (ex. `app.notion.com/p/<workspace>/<page>`), avec exigence d'un id de page 32-hex dans l'URL pour ne pas embarquer les pages marketing (`notion.com/pricing`…). Les domaines historiques `notion.so` / `*.notion.site` sont inchangés.
+> - Nouveau `tests/reportLinks.test.ts` (4 cas, dont l'URL Tango réelle et le cas marketing exclu).
+
 ## v1.87.0 — 15/07/2026 à 10:42 — Vos deals en term sheet arrivent tout seuls depuis Attio
 
 Quand un deal passe en **Term Sheet** dans Attio (vous vous êtes engagé à
