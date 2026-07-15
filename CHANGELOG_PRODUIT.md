@@ -23,6 +23,28 @@ bas de page.
 
 ---
 
+## v1.91.2 — 15/07/2026 à 19:16 — Correction : DOKA rebasculé de Albo vers Calte
+
+Le deal **DOKA - Pre-seed** avait été rattaché à **Albo** au lieu de **Calte**
+(erreur de tag côté Attio). Corriger le tag dans Attio ne suffit pas : re-parenter
+un deal d'une organisation à l'autre est une opération sensible qui reste manuelle.
+Le deal (encore en term sheet), sa ligne de prévisionnel et sa société cible ont
+été déplacés vers Calte ; côté Albo, il n'en reste plus rien.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/reassignDealOrg.ts` (one-off `run`) : re-parente un deal
+>   **`pending`** vers une autre org par `attioDealId`. Déplace l'investisseur
+>   (le `group_root` de l'org cible), la ligne `forecastEntries` liée (retrouvée
+>   via `dealForecastKey`), et le stub `companies` cible **si** c'est un stub de
+>   sync (`kind:'portfolio'` + `attioCompanyId`) utilisé par aucun autre deal —
+>   sinon crée un stub neuf dans l'org cible. Refuse un deal non-`pending`
+>   (post-signature = Albo OS est source de vérité). Idempotent (no-op si déjà
+>   dans l'org). Lancé pour DOKA vers `calte`.
+> - Volontairement **hors webhook** : le sync Attio ne fixe l'org qu'à la
+>   création (cf. `KNOWN_ISSUES.md` « Sync Attio → deals »). Une correction de
+>   `albo_or_calte` dans Attio ne repropage donc pas — d'où ce one-off.
+
 ## v1.91.1 — 15/07/2026 à 18:16 — Fiches Parallel : la description colle à l'opération, pas à son avancement
 
 La description générée pour les SPV Parallel donnait l'**actualité** de
