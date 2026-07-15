@@ -875,7 +875,14 @@ function DealDetail() {
         <h1 className="text-2xl font-semibold tracking-tight">
           {dealTitle(deal, { withInstrument: false })}
         </h1>
-        <Badge variant={statusVariant(deal.status)} className="ms-1.5">
+        <Badge
+          variant={statusVariant(deal.status)}
+          className={
+            deal.status === 'pending'
+              ? 'ms-1.5 bg-warning text-warning-foreground'
+              : 'ms-1.5'
+          }
+        >
           {t(`status.${deal.status}`, { defaultValue: deal.status })}
         </Badge>
         <ExitBadge deal={deal} transactions={txs} />

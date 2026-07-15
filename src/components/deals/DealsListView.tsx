@@ -579,7 +579,14 @@ function DealRowCells({
             size="sm"
           />
           <span className="flex flex-col">
-            <span>{deal.target?.name ?? '—'}</span>
+            <span className="flex items-center gap-1.5">
+              {deal.target?.name ?? '—'}
+              {deal.status === 'pending' && (
+                <Badge className="bg-warning text-warning-foreground">
+                  {t('participations:status.pending')}
+                </Badge>
+              )}
+            </span>
             {deal.name && (
               <span className="text-muted-foreground text-xs">{deal.name}</span>
             )}

@@ -887,7 +887,16 @@ export function ForecastEntriesSection({
                 return (
                   <TableRow key={entry._id} className={rowClass}>
                     <TableCell>{fmtDate(entry.date)}</TableCell>
-                    <TableCell className="font-medium">{entry.label}</TableCell>
+                    <TableCell className="font-medium">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        {entry.label}
+                        {entry.dateMissing && (
+                          <Badge className="bg-warning text-warning-foreground">
+                            {t('common:dateMissing')}
+                          </Badge>
+                        )}
+                      </span>
+                    </TableCell>
                     <TableCell
                       className={`text-right tabular-nums ${
                         entry.status === 'pending'

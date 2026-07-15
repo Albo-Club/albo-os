@@ -3,6 +3,7 @@
   "appTitle": "albo — starter MVP",
   "loadingEllipsis": "Chargement…",
   "notFound": "Page introuvable",
+  "dateMissing": "date à préciser",
   "actions": {
     "save": "Enregistrer",
     "cancel": "Annuler",

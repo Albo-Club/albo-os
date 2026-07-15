@@ -130,7 +130,7 @@
     "empty": "À renseigner"
   },
   "status": {
-    "pending": "Term sheet",
+    "pending": "TS",
     "active": "Actif",
     "partially_exited": "Exit partiel",
     "fully_exited": "Exité",
