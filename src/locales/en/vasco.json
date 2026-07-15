@@ -4,6 +4,7 @@
     "refresh": "Refresh",
     "loading": "Loading communications…",
     "error": "Couldn't load Parallel communications.",
+    "refreshError": "Couldn't refresh from Parallel.",
     "empty": "No communication for this deal yet.",
     "publishedOn": "Published {{date}}",
     "download": "Download",

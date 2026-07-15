@@ -2151,15 +2151,21 @@ SPV13"), dated (`publishDate`/`period`), with `title`, `htmlContent`, and
   lives in the `title` / position `securityName`. So an Albo OS entity is linked
   to its issuer **by id**, stored on `companies.vascoClientSlug` +
   `companies.vascoIssuerId` (set together via `companies.setVascoLink`; matched
-  by id, never by name). The entity's Report section then reads
-  `fetchCommunications({orgId, clientSlug, issuerId})`; the issuer picker is fed
-  by `listVascoIssuers` (distinct issuers + latest title as a human hint).
-- **Picker uses a light query.** `listVascoIssuers` only needs distinct issuers +
-  a sample title, so it pulls `GET_COMMUNICATIONS_LIGHT` (`pullCommunicationsLight`)
-  — issuer + title + dates, **no** `htmlContent` / `communicationDocuments`.
-  Pulling the full bodies for every communication just to dedupe issuers was the
-  main latency of opening the linker. `fetchCommunications` keeps the full query
-  (the list needs bodies + attachments).
+  by id, never by name). The entity's Report section reads the cache query
+  `getCachedCommunications({orgId, clientSlug, issuerId})`; the issuer picker is
+  fed by `listCachedVascoIssuers` (distinct issuers + latest title as a human
+  hint) — both reactive, both reading `vascoCommunicationsCache`.
+- **Cached, not live-on-open (the big perf lever).** Reading VASCO live on every
+  UI open is slow (login + full `GetCommunications`) and there is **no webhook**
+  for the investor persona to push updates (pull-only — verified against the API
+  docs). So communications are cached in `vascoCommunicationsCache` and refreshed
+  by (a) a cron every 48h (`refreshAllVascoCaches` → `refreshVascoCacheForOrg` →
+  `pullCommunications` → `replaceCommunicationsCache`, atomic replace per
+  `(orgId, clientSlug)`) and (b) a manual "refresh" button (`refreshVascoCacheNow`,
+  org-member-guarded). The UI reads the cache (instant, reactive). First-ever view
+  bootstraps by triggering one refresh. A failed pull KEEPS the existing cache
+  (never wiped). Only communication metadata is cached — the document BYTES are
+  still fetched live on demand.
 - **Which entities show the linker.** `VascoCommunicationsSection` renders only on
   `kind: 'portfolio'` entities that look like Parallel investments —
   `/parallel/i` over `name + domain + sponsor + group` — plus any already-linked
@@ -2176,9 +2182,10 @@ SPV13"), dated (`publishDate`/`period`), with `title`, `htmlContent`, and
 - **`htmlContent` is stripped to plain text** server-side (`stripHtml`) before it
   reaches the client: it's raw HTML from an external source and the in-app
   renderer drops HTML anyway. Full formatting stays in the attached PDF.
-- All three actions are org-member-guarded and **live-read only** (no valuation
-  or communication is persisted). They are actions (login + external calls), so
-  the UI fetches on mount + a Refresh button — not reactive.
+- **Positions stay live.** `fetchParticipations` (positions / valuations) is an
+  org-member-guarded live read, nothing persisted — actions (login + external
+  calls), fetched on mount + Refresh. Communications are the exception: cached
+  (above), so their UI is reactive and instant.
 - **Stale duplicate connection.** calte still has a second `parallel` connection
   row whose login 401s; the read actions iterate matching active connections and
   use the first that logs in, so it degrades gracefully. Delete it with

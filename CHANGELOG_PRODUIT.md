@@ -23,6 +23,44 @@ bas de page.
 
 ---
 
+## v1.89.0 — 15/07/2026 à 13:40 — Communications Parallel : chargement instantané (cache + rafraîchissement automatique)
+
+Ouvrir le rattachement à un SPV Parallel et afficher les communications d'une
+entité étaient **lents** : à chaque clic, Albo se reconnectait à Parallel et
+retéléchargeait tout. Désormais Albo garde une **copie locale** des
+communications Parallel : l'ouverture du sélecteur de SPV **et** l'affichage des
+communications sont **instantanés**. Cette copie est **rafraîchie automatiquement
+tous les 2 jours** en arrière-plan, et un bouton **« Rafraîchir »** permet de
+forcer une mise à jour immédiate (par exemple juste après un nouveau deal). La
+toute première ouverture reste un chargement en direct — le temps de remplir la
+copie — puis tout est instantané.
+
+À noter : Parallel n'envoie aucune notification quand une communication ou un SPV
+est ajouté, donc un nouvel élément apparaît au prochain rafraîchissement
+(automatique sous 2 jours, ou immédiat via le bouton).
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle table `vascoCommunicationsCache` (1 ligne par communication ;
+>   remplacement **atomique** par `(orgId, clientSlug)`). Métadonnées seulement —
+>   les octets des PDF restent téléchargés en direct
+>   (`downloadCommunicationDocument`).
+> - `vasco.ts` : lectures **réactives** `listCachedVascoIssuers` /
+>   `getCachedCommunications` (l'UI lit le cache → instantané) ; rafraîchissement
+>   `refreshVascoCacheForOrg` (pull complet → `replaceCommunicationsCache`,
+>   best-effort : un échec garde l'ancien cache) exposé via un cron
+>   `refreshAllVascoCaches` (`crons.ts`, toutes les 48 h) **et** une action
+>   publique `refreshVascoCacheNow` (org-guardée, bouton « Rafraîchir »).
+>   Suppression des actions live `listVascoIssuers` / `fetchCommunications` (+ le
+>   pull allégé de la v1.88.2), remplacées par le cache.
+> - Front `VascoCommunicationsSection` : picker + liste lisent les queries du
+>   cache ; amorçage (option 1) = un pull au 1er affichage si le cache est vide ;
+>   bouton « Rafraîchir » via le hook `useVascoRefresh`. i18n
+>   `vasco:communications.refreshError` (en+fr).
+> - Contexte : VASCO n'expose **pas** de webhook pour le persona investisseur
+>   (pull-only, vérifié sur la doc API) → cache + cron + refresh manuel est la
+>   seule voie « rapide ET frais ».
+
 ## v1.88.2 — 15/07/2026 à 11:59 — Rattachement Parallel : ciblé sur les bonnes entités et plus rapide à ouvrir
 
 Deux réglages sur la section Reports des participations :
