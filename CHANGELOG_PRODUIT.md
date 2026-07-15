@@ -23,6 +23,34 @@ bas de page.
 
 ---
 
+## v1.88.2 — 15/07/2026 à 11:59 — Rattachement Parallel : ciblé sur les bonnes entités et plus rapide à ouvrir
+
+Deux réglages sur la section Reports des participations :
+
+- Le bloc **« Rattacher à Parallel »** ne s'affiche désormais **que sur les
+  entités Parallel** — repérées par leur nom, leur domaine ou leur origine — et
+  sur celles déjà rattachées. Fini l'encart sur les ~185 autres participations
+  où il n'avait rien à faire. (Rien ne change sur les entités juridiques du
+  groupe, ni sur une entité déjà liée.)
+- **Ouvrir le sélecteur de SPV est plus rapide** : Albo ne télécharge plus tout
+  le contenu des communications juste pour lister les SPV, seulement l'essentiel
+  (nom du SPV + dernier titre).
+
+> **🔧 Notes techniques**
+>
+> - `VascoCommunicationsSection` : gate resserré —
+>   `looksParallel = kind === 'portfolio' && /parallel/i.test(name + domain + sponsor + group)`
+>   **OU** déjà rattaché. Union multi-champs délibérée : le domaine seul n'est
+>   pas fiable sur les SPV (souvent vide ou pointant la plateforme mère), le nom
+>   (« PARALLEL INVEST … ») rattrape. Corrige le bruit sans retomber dans le trou
+>   de la v1.86.1 (aucune entité Parallel cachée).
+> - `vasco.ts` : `GET_COMMUNICATIONS_LIGHT` (émetteur + titre + dates, **sans**
+>   `htmlContent` ni `communicationDocuments`) + `pullCommunicationsLight`,
+>   branchés dans `listVascoIssuers`. Le picker ne rapatrie plus les corps
+>   complets de toutes les communications juste pour dédupliquer les émetteurs.
+>   `fetchCommunications` (liste des comms d'une entité rattachée) inchangé — il
+>   a besoin des corps et des pièces jointes.
+
 ## v1.88.1 — 15/07/2026 à 11:17 — Validations « tâches planifiées » : réglage sans effet retiré
 
 La mise à jour v1.83.3 annonçait la fin des demandes de validation à

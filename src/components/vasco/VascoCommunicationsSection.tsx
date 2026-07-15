@@ -372,10 +372,13 @@ function LinkParallelDialog({
 }
 
 /**
- * Parallel communications for an entity, in its Report section. Shown on
- * portfolio (invested) entities — where Parallel deals live — plus any entity
- * already linked. Unlinked → a link prompt; linked → the live list. All data is
- * read live (on-demand actions); nothing is stored.
+ * Parallel communications for an entity, in its Report section. Shown only on
+ * portfolio entities that look like Parallel investments — "parallel" in the
+ * name (the SPVs are all "PARALLEL INVEST …"), the domain, or an origin field
+ * (`sponsor`/`group`) — plus any entity already linked. Off on the org's legal
+ * entities (group_*) and on the many non-Parallel portfolio lines, so the
+ * linker isn't noise. All data is read live (on-demand actions); nothing is
+ * stored.
  */
 export function VascoCommunicationsSection({
   company,
@@ -386,9 +389,16 @@ export function VascoCommunicationsSection({
   const [linkOpen, setLinkOpen] = useState(false)
   const isLinked = Boolean(company.vascoClientSlug && company.vascoIssuerId)
 
-  // Show on invested (portfolio) entities — where Parallel deals live — plus any
-  // already-linked entity. Off on the org's own legal entities (group_*).
-  if (!isLinked && company.kind !== 'portfolio') return null
+  // Detect a Parallel investment across every field that may carry the marker
+  // (name OR domain OR sponsor/group) so none slip through, whatever the data
+  // state — the live domain isn't always filled on SPVs. Portfolio-only; the
+  // org's legal entities (group_*) never show the linker.
+  const looksParallel =
+    company.kind === 'portfolio' &&
+    /parallel/i.test(
+      `${company.name} ${company.domain ?? ''} ${company.sponsor ?? ''} ${company.group ?? ''}`,
+    )
+  if (!isLinked && !looksParallel) return null
 
   return (
     <div className="space-y-3">
