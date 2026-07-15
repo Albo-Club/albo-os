@@ -1,5 +1,11 @@
 /**
- * Auto-enrichment of a portfolio company's pitch fields from its website.
+ * Auto-enrichment of a portfolio company's pitch fields (`oneLiner` + `summary`).
+ * Two sources share one LLM helper (`generatePitch`):
+ *   - website (`enrich`): the default — reads the company's `domain` homepage,
+ *     ADDITIVE (fills only empty fields). See below.
+ *   - VASCO (`enrichFromVasco`): for Parallel SPVs, which have no usable website
+ *     — reads the entity's cached investor communications and OVERWRITES the
+ *     pitch with the operation's description. See the VASCO section at the end.
  *
  * When a portfolio company gets a `domain` (at creation, via the edit dialog
  * or the inline Identity field), a background action fetches the site's
@@ -155,6 +161,56 @@ const SYSTEM_PROMPT = `Tu rédiges les fiches d'un outil interne de suivi de par
 - "summary" : résumé factuel de 2 à 3 phrases (30 à 50 mots) commençant par le nom de la société : ce qu'elle fait, pour qui, et son angle distinctif (techno, modèle économique).
 Interdits : superlatifs et langage marketing (« leader », « révolutionnaire »), chiffres de levée de fonds, contenu non déductible du texte fourni.`
 
+// Parallel SPVs have no usable website — their pitch is derived from the VASCO
+// investor communications instead (they describe the underlying operation).
+const VASCO_PITCH_PROMPT = `Tu rédiges la fiche d'une opération d'investissement (un SPV Parallel) dans un outil interne de family office. À partir des communications investisseur fournies, produis deux champs en FRANÇAIS décrivant CE QU'EST l'opération :
+- "oneLiner" : 3 à 8 mots, sans point final, style annuaire — nature de l'opération + repère géographique si connu, ex. « Promotion immobilière — Bordeaux », « Club deal — SaaS RH ».
+- "summary" : 2 à 3 phrases (30 à 50 mots) — type d'opération (promotion immobilière, club deal, dette, foncière, growth…), actif ou secteur, géographie, et stade d'avancement si mentionné.
+Factuel, déductible des communications uniquement. Interdits : superlatifs, langage marketing, chiffres de performance non fournis.`
+
+/**
+ * Shared LLM call producing the `{oneLiner, summary}` pitch. Tries structured
+ * output, falls back to free-text JSON (some models reject schemas). Returns
+ * null on failure (the caller leaves the fields as-is).
+ */
+async function generatePitch(
+  system: string,
+  prompt: string,
+): Promise<{ oneLiner: string; summary: string } | null> {
+  try {
+    const { object } = await generateObject({
+      model: getModel(),
+      schema: enrichmentSchema,
+      system,
+      prompt,
+    })
+    return object
+  } catch (err) {
+    console.warn(
+      '[companyEnrichment] generateObject failed, falling back to generateText:',
+      err instanceof Error ? err.message : String(err),
+    )
+    try {
+      const { text } = await generateText({
+        model: getModel(),
+        system: `${system}\n\nRéponds UNIQUEMENT avec un JSON valide {"oneLiner": "...", "summary": "..."}, sans markdown.`,
+        prompt,
+      })
+      const jsonMatch = /\{[\s\S]*\}/.exec(text)
+      if (!jsonMatch) throw new Error('no JSON in fallback answer')
+      return enrichmentSchema.parse(JSON.parse(jsonMatch[0]))
+    } catch (fallbackErr) {
+      console.warn(
+        '[companyEnrichment] LLM pitch failed:',
+        fallbackErr instanceof Error
+          ? fallbackErr.message
+          : String(fallbackErr),
+      )
+      return null
+    }
+  }
+}
+
 export const enrich = internalAction({
   args: { companyId: v.id('companies') },
   handler: async (ctx, { companyId }) => {
@@ -193,41 +249,8 @@ export const enrich = internalAction({
     }
 
     const prompt = `SOCIÉTÉ : ${target.name}\nSITE (${target.domain}) :\n${siteText}`
-    let fields: { oneLiner: string; summary: string }
-    try {
-      const { object } = await generateObject({
-        model: getModel(),
-        schema: enrichmentSchema,
-        system: SYSTEM_PROMPT,
-        prompt,
-      })
-      fields = object
-    } catch (err) {
-      // Mirror of reportIdentify: some models reject structured output —
-      // retry as free text and parse the JSON by hand.
-      console.warn(
-        '[companyEnrichment] generateObject failed, falling back to generateText:',
-        err instanceof Error ? err.message : String(err),
-      )
-      try {
-        const { text } = await generateText({
-          model: getModel(),
-          system: `${SYSTEM_PROMPT}\n\nRéponds UNIQUEMENT avec un JSON valide {"oneLiner": "...", "summary": "..."}, sans markdown.`,
-          prompt,
-        })
-        const jsonMatch = /\{[\s\S]*\}/.exec(text)
-        if (!jsonMatch) throw new Error('no JSON in fallback answer')
-        fields = enrichmentSchema.parse(JSON.parse(jsonMatch[0]))
-      } catch (fallbackErr) {
-        console.warn(
-          `[companyEnrichment] LLM failed for ${target.name} — fields left empty:`,
-          fallbackErr instanceof Error
-            ? fallbackErr.message
-            : String(fallbackErr),
-        )
-        return null
-      }
-    }
+    const fields = await generatePitch(SYSTEM_PROMPT, prompt)
+    if (!fields) return null
 
     await ctx.runMutation(internal.companyEnrichment.applyEnrichment, {
       companyId,
@@ -235,5 +258,166 @@ export const enrich = internalAction({
       summary: fields.summary,
     })
     return null
+  },
+})
+
+// ── VASCO-sourced pitch (Parallel SPVs — no usable website) ─────────────────
+
+const MAX_VASCO_PITCH_TEXT = 8_000
+
+/** A linked Parallel entity + its cached communications, for the pitch LLM.
+ * Returns null unless the entity is a portfolio company linked to a VASCO
+ * issuer. */
+export const getVascoEnrichmentTarget = internalQuery({
+  args: { companyId: v.id('companies') },
+  handler: async (ctx, { companyId }) => {
+    const company = await ctx.db.get('companies', companyId)
+    if (
+      !company ||
+      company.kind !== 'portfolio' ||
+      !company.vascoClientSlug ||
+      !company.vascoIssuerId
+    )
+      return null
+    const rows = await ctx.db
+      .query('vascoCommunicationsCache')
+      .withIndex('by_org', (q) => q.eq('orgId', company.orgId))
+      .collect()
+    const comms = rows
+      .filter(
+        (r) =>
+          r.clientSlug === company.vascoClientSlug &&
+          r.issuerId === company.vascoIssuerId,
+      )
+      .sort((a, b) => (b.publishDate ?? '').localeCompare(a.publishDate ?? ''))
+      .map((r) => ({
+        title: r.title ?? null,
+        bodyText: r.bodyText ?? null,
+        publishDate: r.publishDate ?? null,
+        issuerLabel: r.issuerLabel ?? null,
+        docNames: r.documents
+          .map((d) => d.name ?? null)
+          .filter((n): n is string => Boolean(n)),
+      }))
+    return {
+      name: company.name,
+      issuerLabel: comms[0]?.issuerLabel ?? null,
+      comms,
+    }
+  },
+})
+
+/** Portfolio entities of `orgId` linked to a VASCO issuer (for the backfill). */
+export const listLinkedParallelCompanies = internalQuery({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    const companies = await ctx.db
+      .query('companies')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    return companies
+      .filter(
+        (c) =>
+          c.kind === 'portfolio' &&
+          c.archivedAt == null &&
+          Boolean(c.vascoClientSlug) &&
+          Boolean(c.vascoIssuerId),
+      )
+      .map((c) => c._id)
+  },
+})
+
+/** Overwrite the entity's pitch with the VASCO-derived one. Unlike the
+ * website-based `applyEnrichment` (additive), this REPLACES `oneLiner` +
+ * `summary`: the Parallel operation description supersedes the domain-derived
+ * one. Single company (each SPV is a distinct operation — no domain group). */
+export const applyVascoPitch = internalMutation({
+  args: {
+    companyId: v.id('companies'),
+    oneLiner: v.string(),
+    summary: v.string(),
+  },
+  handler: async (ctx, { companyId, oneLiner, summary }) => {
+    const company = await ctx.db.get('companies', companyId)
+    if (!company) return null
+    const patch: { oneLiner?: string; summary?: string } = {}
+    if (oneLiner.trim()) patch.oneLiner = oneLiner.trim()
+    if (summary.trim()) patch.summary = summary.trim()
+    if (Object.keys(patch).length > 0)
+      await ctx.db.patch('companies', companyId, patch)
+    return null
+  },
+})
+
+/**
+ * Describe a Parallel SPV's operation from its cached investor communications
+ * and (over)write the entity's `oneLiner` + `summary`. Best-effort: skips if the
+ * entity isn't a linked Parallel portfolio company or has no cached comms yet
+ * (the cache is filled by the cron / a refresh). Triggered on `setVascoLink`
+ * and by the backfill; org-agnostic (keyed by the VASCO link, not the org).
+ */
+export const enrichFromVasco = internalAction({
+  args: { companyId: v.id('companies') },
+  handler: async (ctx, { companyId }) => {
+    const target = await ctx.runQuery(
+      internal.companyEnrichment.getVascoEnrichmentTarget,
+      { companyId },
+    )
+    if (!target || target.comms.length === 0) return null
+
+    let text = ''
+    for (const c of target.comms) {
+      const block = [
+        c.publishDate ? `[${c.publishDate}]` : '',
+        c.title ?? '',
+        c.bodyText ?? '',
+        c.docNames.length ? `Documents : ${c.docNames.join(', ')}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n')
+      if (text.length + block.length > MAX_VASCO_PITCH_TEXT) break
+      text += `${block}\n\n`
+    }
+
+    const prompt = `OPÉRATION : ${target.name}\nSPV : ${target.issuerLabel ?? '—'}\nCOMMUNICATIONS :\n${text.trim()}`
+    const fields = await generatePitch(VASCO_PITCH_PROMPT, prompt)
+    if (!fields) return null
+
+    await ctx.runMutation(internal.companyEnrichment.applyVascoPitch, {
+      companyId,
+      oneLiner: fields.oneLiner,
+      summary: fields.summary,
+    })
+    return null
+  },
+})
+
+/**
+ * One-shot backfill (CLI): describe every linked Parallel entity from VASCO,
+ * across ALL orgs that have an active VASCO connection (Calte today, Albo once
+ * connected). Refreshes each org's cache first so the descriptions are built on
+ * fresh communications.
+ *   npx convex run --prod companyEnrichment:backfillVascoPitches '{}'
+ */
+export const backfillVascoPitches = internalAction({
+  args: {},
+  handler: async (ctx): Promise<{ orgs: number; companies: number }> => {
+    const conns = await ctx.runQuery(internal.vasco.getAllActiveConnections, {})
+    const orgIds = Array.from(new Set(conns.map((c) => c.orgId)))
+    let companies = 0
+    for (const orgId of orgIds) {
+      await ctx.runAction(internal.vasco.refreshVascoCacheForOrg, { orgId })
+      const ids = await ctx.runQuery(
+        internal.companyEnrichment.listLinkedParallelCompanies,
+        { orgId },
+      )
+      for (const companyId of ids) {
+        await ctx.runAction(internal.companyEnrichment.enrichFromVasco, {
+          companyId,
+        })
+        companies++
+      }
+    }
+    return { orgs: orgIds.length, companies }
   },
 })

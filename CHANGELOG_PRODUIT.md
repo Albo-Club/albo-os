@@ -23,6 +23,36 @@ bas de page.
 
 ---
 
+## v1.90.0 — 15/07/2026 à 17:39 — Fiches Parallel : la description de l'opération est générée depuis Parallel
+
+Les SPV Parallel n'avaient pas de description utile : le one-liner et le résumé
+sous l'en-tête se basent d'habitude sur le **site web** de la société — or un SPV
+n'en a pas (son domaine pointe la plateforme). Désormais, pour une entité
+**rattachée à son SPV Parallel**, Albo génère ces deux champs à partir des
+**communications Parallel** : nature de l'opération (promotion immobilière,
+club deal, dette, foncière, tech…), **géographie** et stade. On sait d'un coup
+d'œil, en arrivant sur la fiche, de quoi il s'agit.
+
+C'est généré **automatiquement au rattachement** d'une entité à son SPV, et un
+rattrapage couvre toutes les entités Parallel déjà rattachées. Ça **remplace** la
+description issue du domaine (inadaptée aux SPV). Valable pour **toutes les orgs**
+qui ont une connexion Parallel (Calte aujourd'hui, Albo dès qu'elle sera
+branchée).
+
+> **🔧 Notes techniques**
+>
+> - `companyEnrichment.ts` : 2ᵉ source de pitch « VASCO » à côté de la source
+>   « site web ». `enrichFromVasco` lit les communications en cache
+>   (`vascoCommunicationsCache`, filtré par `vascoClientSlug` + `vascoIssuerId`)
+>   + le nom du SPV → `generatePitch` (helper LLM factorisé, `getModel()`) →
+>   `applyVascoPitch` qui **écrase** `oneLiner` + `summary` (vs `applyEnrichment`,
+>   additif). Skip si non rattaché / pas de comms en cache.
+> - Déclencheurs org-agnostiques (pilotés par le lien VASCO, jamais l'org) :
+>   `setVascoLink` planifie `enrichFromVasco` ; backfill one-shot
+>   `backfillVascoPitches` (rafraîchit le cache par org puis décrit toutes les
+>   entités rattachées de chaque org ayant une connexion active). cf.
+>   MIGRATIONS.md.
+
 ## v1.89.1 — 15/07/2026 à 17:24 — Documentation produit complète
 
 Albo dispose désormais d'une **documentation produit** qui explique, page par
@@ -45,6 +75,8 @@ est disponible dans les documents du projet Linear « Albo OS ».
 >   `docs/produit/` correspondante dans la même PR) + entrée dans « Where
 >   things live ». Le dossier repo est la source de vérité, miroir Linear
 >   en lecture.
+
+## v1.89.0 — 15/07/2026 à 13:40 — Communications Parallel : chargement instantané (cache + rafraîchissement automatique)
 
 Ouvrir le rattachement à un SPV Parallel et afficher les communications d'une
 entité étaient **lents** : à chaque clic, Albo se reconnectait à Parallel et

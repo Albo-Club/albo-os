@@ -354,6 +354,15 @@ export const setVascoLink = mutation({
         ? { vascoClientSlug: clientSlug, vascoIssuerId: issuerId }
         : { vascoClientSlug: undefined, vascoIssuerId: undefined }
     await ctx.db.patch('companies', id, link)
+    // Newly linked to a Parallel SPV → (re)generate its operation pitch from the
+    // VASCO communications (fire-and-forget; overwrites the domain-based one).
+    if (clientSlug && issuerId) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.companyEnrichment.enrichFromVasco,
+        { companyId: id },
+      )
+    }
     return id
   },
 })
