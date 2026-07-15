@@ -1272,6 +1272,10 @@ export default defineSchema({
     derivedKey: v.optional(v.string()),
     overridden: v.boolean(),
     realizedTransactionId: v.optional(v.id('transactions')), // filled on matching
+    // Attio-synced deal entry with no `date_de_l_investissement`: the `date` is
+    // a placeholder (end of the creation month) and the UI prompts for a real
+    // one. Cleared when a date is set (Attio resync or manual edit).
+    dateMissing: v.optional(v.boolean()),
 
     // ── Reserved fields, NOT READ by current logic ────────────────────────
     // Present in the schema to avoid a future migration, but no

@@ -48,7 +48,7 @@
 
 import { ConvexError, v } from 'convex/values'
 import { internal } from './_generated/api'
-import { httpAction, internalMutation } from './_generated/server'
+import { httpAction, internalAction, internalMutation } from './_generated/server'
 import {
   INVESTED_STATUS_ID,
   TERM_SHEET_STATUS_ID,
@@ -215,7 +215,18 @@ async function fetchDealRecord(recordId: string): Promise<NormalizedDeal | null>
 
   const json = (await res.json()) as unknown
   const values = asRecord(asRecord(asRecord(json).data).values) as Values
+  return normalizeDealValues(recordId, values)
+}
 
+/**
+ * Attio `deals` record `values` → normalized payload. Shared by the webhook
+ * re-fetch and the backfill query so both feed `upsertFromDeal` identically.
+ * Returns null when the record has no active stage.
+ */
+function normalizeDealValues(
+  recordId: string,
+  values: Values,
+): NormalizedDeal | null {
   const stage = statusId(values, 'stage')
   if (!stage) {
     console.warn(`[attio] record=${recordId} has no active stage — skipped`)
@@ -515,12 +526,22 @@ async function resolveOrCreateTargetCompany(
   })
 }
 
+/** Last day of the current UTC month at 00:00 — placeholder date for a TS deal
+ * with no `date_de_l_investissement` yet (keeps it in the current month). */
+function endOfCurrentMonthMs(): number {
+  const now = new Date(Date.now())
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)
+}
+
 /**
- * The anticipated capital outflow for a pending deal — one stable entry per
- * deal (`derivedKey = deal:{dealId}`, category `deals`). Needs a firm date to
- * sit on the cash timeline; skipped (the deal still shows as pending) until
- * Attio provides one. While the entry is still pending it is refreshed from
- * Attio; a realized/cancelled one is never touched.
+ * The anticipated capital outflow for a deal — one stable entry per deal
+ * (`derivedKey = deal:{dealId}`, category `deals`). ALWAYS created (so a TS
+ * deal always shows in the forecast); when Attio has no
+ * `date_de_l_investissement` the date is a placeholder (end of the current
+ * month) and `dateMissing: true` flags it so the UI prompts for a real one.
+ * While still pending it is refreshed from Attio; a realized/cancelled one is
+ * never touched, and a date the user fixed by hand is only overwritten once
+ * Attio itself provides a real date.
  */
 async function upsertDealForecastEntry(
   ctx: MutationCtx,
@@ -528,13 +549,9 @@ async function upsertDealForecastEntry(
   orgId: Id<'organizations'>,
   args: NormalizedDeal,
 ): Promise<void> {
-  if (
-    args.investmentDate == null ||
-    args.valueCents == null ||
-    args.valueCents <= 0
-  ) {
+  if (args.valueCents == null || args.valueCents <= 0) {
     console.log(
-      `[attio] deal ${args.attioDealId}: no firm date/amount → no forecast entry yet`,
+      `[attio] deal ${args.attioDealId}: no positive value → no forecast entry`,
     )
     return
   }
@@ -547,16 +564,20 @@ async function upsertDealForecastEntry(
   if (existing) {
     if (existing.status === 'pending') {
       await ctx.db.patch('forecastEntries', existing._id, {
-        date: args.investmentDate,
         amountCents: args.valueCents,
         label,
+        // Only a real Attio date moves the date / clears the flag — never
+        // clobber a date the user fixed by hand with a fresh placeholder.
+        ...(args.investmentDate != null
+          ? { date: args.investmentDate, dateMissing: false }
+          : {}),
       })
     }
     return
   }
   await ctx.db.insert('forecastEntries', {
     orgId,
-    date: args.investmentDate,
+    date: args.investmentDate ?? endOfCurrentMonthMs(),
     amountCents: args.valueCents,
     direction: 'out',
     confidence: 'expected',
@@ -567,6 +588,7 @@ async function upsertDealForecastEntry(
     derivedKey,
     overridden: false,
     currency: 'EUR',
+    dateMissing: args.investmentDate == null,
   })
 }
 
@@ -587,3 +609,69 @@ async function confirmDealForecastEntry(
     await ctx.db.patch('forecastEntries', entry._id, { confidence: 'confirmed' })
   }
 }
+
+// ─── One-shot backfill (deals already at Term Sheet) ─────────────────────────
+
+/**
+ * Import the deals CURRENTLY at the Term Sheet stage in Attio — the webhook
+ * only catches future stage changes, so the ones sitting in Term Sheet at
+ * activation need a one-shot. Queries every deal, keeps the Term Sheet ones
+ * (by status id, same rule as the webhook), and runs each through the same
+ * `upsertFromDeal` path: creates the pending deal + forecast entry, idempotent
+ * on `attioDealId`, and NEVER touches Invested (the anti-duplicate rule lives
+ * in `decideSyncAction`, so even if a non-TS record slipped through it would
+ * be skipped). Re-runnable.
+ *
+ *   npx convex run --prod attioSync:backfillTermSheets
+ */
+export const backfillTermSheets = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    const apiKey = process.env.ATTIO_API_KEY
+    if (!apiKey) throw new ConvexError('missing_attio_api_key')
+
+    // Collect the Term Sheet deals (paginated query, filtered by status id).
+    const termSheetDeals: Array<NormalizedDeal> = []
+    const pageSize = 500
+    let offset = 0
+    for (;;) {
+      const res = await fetch(
+        `${ATTIO_API_BASE}/v2/objects/deals/records/query`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ limit: pageSize, offset }),
+        },
+      )
+      if (!res.ok) throw new ConvexError(`attio_query_failed:${res.status}`)
+      const data = asArray(asRecord((await res.json()) as unknown).data)
+      for (const rec of data) {
+        const recordId = asString(asRecord(asRecord(rec).id).record_id)
+        if (!recordId) continue
+        const deal = normalizeDealValues(recordId, asRecord(asRecord(rec).values))
+        if (deal && deal.stage === TERM_SHEET_STATUS_ID) termSheetDeals.push(deal)
+      }
+      if (data.length < pageSize) break
+      offset += pageSize
+    }
+
+    let created = 0
+    let updated = 0
+    let skipped = 0
+    for (const deal of termSheetDeals) {
+      const res = await ctx.runMutation(internal.attioSync.upsertFromDeal, deal)
+      if ('action' in res && res.action === 'termsheet_created') created += 1
+      else if ('action' in res) updated += 1
+      else skipped += 1
+    }
+
+    console.log(
+      `[attio] backfill term sheets: ${termSheetDeals.length} found — ` +
+        `created=${created} updated=${updated} skipped=${skipped}`,
+    )
+    return { termSheetDeals: termSheetDeals.length, created, updated, skipped }
+  },
+})

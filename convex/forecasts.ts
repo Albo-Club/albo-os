@@ -702,6 +702,7 @@ export const getDealForecast = query({
         direction: e.direction,
         confidence: e.confidence,
         derivedFromRule: e.ruleId != null,
+        dateMissing: e.dateMissing ?? false,
       }))
 
     const committedCents = deal.committedAmount ?? 0
@@ -988,6 +989,8 @@ export const updateEntry = mutation({
       // Patching `category: undefined` removes the field (clear).
       ...(rawCategory !== undefined ? { category: rawCategory ?? undefined } : {}),
       ...(rawDealId !== undefined ? { dealId: rawDealId ?? undefined } : {}),
+      // Setting a date clears the Attio-sync "date à préciser" flag.
+      ...(patch.date !== undefined ? { dateMissing: false } : {}),
       // A hand-edited derived entry becomes protected from regeneration.
       ...(entry.ruleId ? { overridden: true } : {}),
     })

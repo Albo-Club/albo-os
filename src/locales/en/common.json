@@ -3,6 +3,7 @@
   "appTitle": "albo — MVP starter",
   "loadingEllipsis": "Loading…",
   "notFound": "Page not found",
+  "dateMissing": "Date to set",
   "actions": {
     "save": "Save",
     "cancel": "Cancel",

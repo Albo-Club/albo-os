@@ -479,7 +479,7 @@ seedées (`convex run --prod seed:seedAll`). Le schéma doit être déployé (ch
 
 ## Sync Attio → deals (webhook live, `POST /attio/webhook`)
 
-Synchro **à partir de maintenant** (pas de reprise du passé). Prérequis :
+Synchro **à partir de maintenant** (+ backfill one-shot des TS déjà en cours, cf. AS7). Prérequis :
 `ATTIO_WEBHOOK_SECRET` posé en prod + webhook Attio `record.updated` sur
 l'objet `deals` → `/attio/webhook`. Montant = `value` (ticket engagé), org via
 `albo_or_calte`, instrument via `type_d_invest`. Détails : `KNOWN_ISSUES.md`
@@ -490,8 +490,10 @@ l'objet `deals` → `/attio/webhook`. Montant = `value` (ticket engagé), org vi
 | AS1 | Passer un deal en **📝 Term Sheet** dans Attio (date d'invest. renseignée) | Le deal apparaît dans Albo OS en statut **« Term sheet »** + 1 ligne de prévisionnel (sortie, `expected`, catégorie « deals ») rattachée au deal |
 | AS2 | Ce même deal passe en **Invested**                                  | Le deal bascule **actif** ; la ligne de prévisionnel passe en `confirmed` (jamais supprimée)                        |
 | AS3 | **Éditer** dans Attio un deal **déjà Invested** dans Albo OS        | **Aucun doublon** : la synchro ne crée jamais sur Invested (skip `invested_no_deal` si `attioDealId` inconnu, sinon no-op forward-only) |
-| AS4 | Term Sheet **sans** date d'investissement                           | Le deal apparaît en « Term sheet », **sans** ligne de prévisionnel ; renseigner la date dans Attio → l'échéance apparaît au prochain event |
+| AS4 | Term Sheet **sans** date d'investissement                           | Le deal apparaît en « TS » **et** une ligne de prévisionnel **taguée « date à préciser »** (posée fin de mois courant) ; renseigner la date (Attio ou Albo OS) → le tag saute et la date se cale |
 | AS5 | Rejouer le même webhook (idempotence)                               | Aucun deal ni ligne de prévisionnel en double (clés `attioDealId` / `derivedKey`)                                   |
+| AS6 | Badge **« TS »** (ambre) sur un deal en Term Sheet                  | Visible dans la liste des deals, sur la fiche, et dans l'onglet Participations (chip « TS » sur la société ayant un deal en TS) — distinct des deals investis |
+| AS7 | Backfill : `npx convex run --prod attioSync:backfillTermSheets`     | Importe les deals **actuellement** en Term Sheet (pas les Invested) → `{ termSheetDeals, created, updated, skipped }` ; re-run idempotent (`created: 0`) |
 
 ## Ingestion Powens (webhook → bankAccounts + transactions)
 

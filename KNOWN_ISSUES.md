@@ -1571,15 +1571,19 @@ le module Convex n'est qu'une coquille DB autour.
    written_off`). Un Invested ne « ressuscite » pas un deal sorti. Un instrument
    Attio absent (`unknown`) ne **dégrade** jamais un instrument connu au patch.
 
-4. **Ligne de prévisionnel : une seule par deal, datée.** Créée seulement si
-   `date_de_l_investissement` est présente (une sortie anticipée sans date ne
-   peut pas se placer sur la timeline de trésorerie) — sinon le deal reste
-   `pending` sans ligne, jusqu'à ce qu'un event ultérieur apporte la date.
+4. **Ligne de prévisionnel : une seule par deal, toujours créée.** Dès qu'un
+   deal passe en Term Sheet, une sortie anticipée est créée (montant = `value`
+   Attio, le **ticket engagé** — pas `montant_levee_6` = taille du tour, ni
+   `valorisation_8`). Sans `date_de_l_investissement`, la date est un
+   **placeholder** (fin du mois courant) et `forecastEntries.dateMissing: true`
+   la **flague** (badge « date à préciser » dans le prévisionnel et sur la fiche
+   deal). Le flag saute — et la vraie date se cale — dès qu'Attio en fournit une
+   (resync) ou que l'user édite la date (`forecasts.updateEntry`) ; un resync
+   Attio sans date ne réécrit jamais une date posée à la main.
    `derivedKey = deal:{dealId}` **stable et sans date** (survit au changement de
    date Term Sheet → Invested), `category: 'deals'` (même ligne que le virement
-   réel au pointage), montant = `value` Attio (le **ticket engagé**, pas
-   `montant_levee_6` = taille du tour, ni `valorisation_8`). Elle se réalise au
-   pointage (`realizedTransactionId`), jamais supprimée par la synchro.
+   réel au pointage). Elle se réalise au pointage (`realizedTransactionId`),
+   jamais supprimée par la synchro.
 
 5. **Écriture en mutation interne.** `upsertFromDeal` écrit via `ctx.db` (pas
    `deals.create`, qui exige `requireOrgMember` — le webhook n'a pas d'identité

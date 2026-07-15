@@ -23,6 +23,41 @@ bas de page.
 
 ---
 
+## v1.91.0 — 15/07/2026 à 17:51 — Deals en term sheet : toujours au prévisionnel, mieux repérés, et reprise des TS en cours
+
+Trois améliorations sur les deals qui arrivent d'Attio en **Term Sheet** :
+
+- **Toujours une ligne au prévisionnel.** Un deal en term sheet crée maintenant
+  systématiquement sa sortie anticipée — même sans date d'investissement
+  renseignée dans Attio. Dans ce cas elle est posée sur le mois en cours et
+  **taguée « date à préciser »** ; le tag disparaît dès que tu renseignes une
+  date (dans Attio ou directement dans Albo OS).
+- **Repérage « TS » partout.** Les deals en term sheet portent un badge **« TS »**
+  (ambre) dans la liste des deals, sur leur fiche, et dans l'onglet
+  Participations (une société qui a un deal en TS l'affiche sur sa ligne) — pour
+  distinguer d'un coup d'œil ce qui est **engagé mais pas encore investi**.
+- **Reprise des term sheets déjà en cours.** Les deals actuellement en term
+  sheet dans Attio (pas les investis, déjà présents) peuvent être importés en une
+  fois. À lancer une seule fois (voir notes techniques).
+
+> **🔧 Notes techniques**
+>
+> - `attioSync.upsertDealForecastEntry` : la ligne de prévisionnel est désormais
+>   **toujours** créée (montant = `value`). Sans `date_de_l_investissement` →
+>   date placeholder (fin du mois courant) + champ additif
+>   `forecastEntries.dateMissing: true`. Le flag saute quand Attio fournit une
+>   vraie date (resync) ou via `forecasts.updateEntry` (édition manuelle) ; un
+>   resync sans date ne réécrit jamais une date posée à la main.
+> - Badge « TS » : i18n `participations:status.pending` = « TS », tonalité
+>   `--warning` (ambre) sur la liste des deals, la fiche et la vue Participations
+>   (chip `hasPending` au niveau société). Badge « date à préciser »
+>   (`common:dateMissing`) sur les lignes concernées (section prévisionnel +
+>   section forecast de la fiche deal).
+> - Backfill : `attioSync.backfillTermSheets` (internalAction) — query paginée
+>   des deals, filtre stage Term Sheet par id, chacun dans `upsertFromDeal`
+>   (idempotent, ne crée jamais sur Invested). Lancer :
+>   `npx convex run --prod attioSync:backfillTermSheets`.
+
 ## v1.90.1 — 15/07/2026 à 17:40 — Pont Parallel → fiches deal : pré-remplissage des instruments SPV (simulation)
 
 Nouvel outil interne pour **réconcilier les positions Parallel (Vasco) avec les

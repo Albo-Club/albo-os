@@ -315,7 +315,14 @@ export function DealsList({
             <Field label={t('deal.received')}>{fmtEur(dl.received ?? 0)}</Field>
             <Field label={t('deal.tvpi')}>{fmtMultiple(tvpi)}</Field>
             <Field label={t('deal.status')}>
-              <Badge variant={statusVariant(dl.status)}>
+              <Badge
+                variant={statusVariant(dl.status)}
+                className={
+                  dl.status === 'pending'
+                    ? 'bg-warning text-warning-foreground'
+                    : undefined
+                }
+              >
                 {t(`status.${dl.status}`, { defaultValue: dl.status })}
               </Badge>
             </Field>
@@ -438,6 +445,8 @@ export function ParticipationsTable({
         flows: Array<{ amount: number; date: number }>
         // Group exit outcome for the badge: a write-off anywhere wins.
         writtenOff: boolean
+        // At least one deal of the group is a pending Term Sheet (not invested).
+        hasPending: boolean
       }
     >()
     for (const d of deals) {
@@ -459,6 +468,7 @@ export function ParticipationsTable({
         proceeds: 0,
         flows: [],
         writtenOff: false,
+        hasPending: false,
       }
       g.deals.push(d)
       if (d.org) g.orgs.add(d.org.name)
@@ -475,6 +485,7 @@ export function ParticipationsTable({
       // the union feeds the shared solver for the company IRR.
       if (d.flows) g.flows.push(...d.flows)
       if (d.status === 'written_off') g.writtenOff = true
+      if (d.status === 'pending') g.hasPending = true
       map.set(key, g)
     }
     return Array.from(map.entries()).map(([id, g]) => {
@@ -678,6 +689,7 @@ function CompanyRows({
     capital: number
     proceeds: number
     writtenOff: boolean
+    hasPending: boolean
   }
   showOrg: boolean
   settled: boolean
@@ -742,6 +754,11 @@ function CompanyRows({
             size="sm"
           />
           {group.name}
+          {group.hasPending && !settled && (
+            <Badge className="bg-warning text-warning-foreground">
+              {t('status.pending')}
+            </Badge>
+          )}
           {settled && <ExitBadge deal={exitDeal} transactions={exitTxs} />}
         </span>
       </TableCell>

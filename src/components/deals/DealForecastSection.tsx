@@ -74,6 +74,11 @@ export function DealForecastSection({ dealId }: { dealId: Id<'deals'> }) {
                   <TableCell>
                     <span className="flex flex-wrap items-center gap-1.5">
                       <span className="font-medium">{entry.label}</span>
+                      {entry.dateMissing && (
+                        <Badge className="bg-warning text-warning-foreground">
+                          {t('common:dateMissing')}
+                        </Badge>
+                      )}
                       {entry.derivedFromRule && (
                         <Badge variant="secondary">
                           {t('dealForecast.ruleBadge')}

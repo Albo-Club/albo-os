@@ -130,7 +130,7 @@
     "empty": "To be filled in"
   },
   "status": {
-    "pending": "Term sheet",
+    "pending": "TS",
     "active": "Active",
     "partially_exited": "Partial exit",
     "fully_exited": "Exited",
