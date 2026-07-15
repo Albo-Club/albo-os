@@ -1,28 +1,45 @@
 /**
- * Attio → Albo OS sync (stage-driven).
+ * Attio → Albo OS sync (stage-driven, forward in time only).
  *
  * Attio is the source of truth BEFORE investment (dealflow, term sheet).
  * When a deal's `stage` changes there, Attio fires a `record.updated`
  * webhook; we re-fetch the record (the payload diff is not reliable) and,
  * for the two stages we care about, hand a normalized payload to
  * `upsertFromDeal`:
- *   - 📝 Term Sheet (bb580481…) → deal « pending » + anticipated forecast
- *   - Invested      (b59066ed…) → deal « confirmed » (status active)
+ *   - 📝 Term Sheet (bb580481…) → deal `pending` (committed, not wired) +
+ *     an anticipated capital-outflow entry in the cash forecast.
+ *   - Invested      (b59066ed…) → the SAME deal (matched on `attioDealId`)
+ *     flips to `active`; its anticipated forecast entry is confirmed (never
+ *     deleted — it realizes when the real wire is pointed to it).
  * every other stage is ignored (200, no-op).
  *
- * Flow: `attioWebhook` (httpAction: HMAC check + re-fetch + stage filter)
- *   → `upsertFromDeal` (internalMutation).
+ * Anti-duplicate linchpin: we CREATE a deal only on Term Sheet, NEVER on
+ * Invested (enforced by `decideSyncAction` in ./lib/attioSync). Deals already
+ * invested in Albo OS (one-shot import #184, Airtable, manual) are therefore
+ * never re-created — an Invested event with no matching `attioDealId` is
+ * skipped. This is what lets the webhook run "from now on" without
+ * back-importing the existing portfolio.
  *
- * ⚠️ LOT 1 — BACKEND SKELETON ONLY. `upsertFromDeal` does NOT write to the
- * DB yet: it logs the normalized payload and returns. The real upsert
- * (deal + forecast, investor = group_root, idempotent on `attioDealId`) is
- * Lot 2.
+ * Attribution boundary (cf. CLAUDE.md): a `pending` deal is pre-investment, so
+ * Attio owns its fields and Term Sheet events refresh them. Once `active`
+ * (post-signature) Albo OS owns the data — Invested only advances the
+ * lifecycle and confirms the forecast, it never overwrites financials.
+ *
+ * Idempotence: deals keyed on `attioDealId` (index by_attio_deal_id),
+ * companies on `attioCompanyId` (by_attio_company_id), the forecast entry on a
+ * STABLE `derivedKey = deal:{dealId}` (one per deal — the date lives in `date`,
+ * so the key never orphans across the Term Sheet → Invested transition).
  *
  * Webhook security: HMAC-SHA256 over the RAW UTF-8 body, hex-encoded,
  * header `Attio-Signature`, secret `ATTIO_WEBHOOK_SECRET`. Same Web Crypto
  * approach as Powens (`crypto.subtle.verify`, the runtime has no
  * `timingSafeEqual`), but Attio = hex + raw body only (Powens = base64 +
  * `POST.path.date.body`).
+ *
+ * Retry policy (avoid Attio's retry storm): a CONFIG error (missing secret /
+ * API key) or a non-replayable data error answers 200 + logs — retrying
+ * won't help. Only a transient re-fetch failure (network / Attio 5xx)
+ * answers 503 so Attio retries.
  *
  * Env (set with `pnpm exec convex env set --prod`, never committed):
  *   - ATTIO_WEBHOOK_SECRET  — per-webhook signing secret (signature check)
@@ -32,14 +49,22 @@
 import { ConvexError, v } from 'convex/values'
 import { internal } from './_generated/api'
 import { httpAction, internalMutation } from './_generated/server'
+import {
+  INVESTED_STATUS_ID,
+  TERM_SHEET_STATUS_ID,
+  advancesStatus,
+  dealForecastKey,
+  decideSyncAction,
+  orgSlugFromOption,
+  resolveInstrumentKind,
+  shouldReplaceInstrument,
+} from './lib/attioSync'
+import type { MutationCtx } from './_generated/server'
+import type { Id } from './_generated/dataModel'
 
 // ─── Attio constants ─────────────────────────────────────────────────────────
 
 const ATTIO_API_BASE = 'https://api.attio.com'
-
-/** Stage status ids we act on (match on id, never the emoji label). */
-const TERM_SHEET_STATUS_ID = 'bb580481-f95e-42f7-a21e-ee974ac6a7cc'
-const INVESTED_STATUS_ID = 'b59066ed-7ae6-4893-949e-a5540abdaf13'
 
 const HANDLED_STAGES: ReadonlySet<string> = new Set([
   TERM_SHEET_STATUS_ID,
@@ -146,11 +171,27 @@ type NormalizedDeal = {
   valuation?: number
 }
 
+/** Marks a re-fetch failure Attio should retry (network / Attio 5xx). */
+class RetryableError extends Error {}
+
+/** ConvexError codes that mean « ops must fix config » → ack 200, no retry. */
+const CONFIG_ERROR_DATA: ReadonlySet<string> = new Set([
+  'missing_attio_webhook_secret',
+  'missing_attio_api_key',
+])
+function isConfigError(err: unknown): boolean {
+  return (
+    err instanceof ConvexError &&
+    typeof err.data === 'string' &&
+    CONFIG_ERROR_DATA.has(err.data)
+  )
+}
+
 /**
- * Re-fetch a `deals` record and normalize it. Returns null on any failure
- * (unknown record, non-deal record, transport error) → the event is skipped
- * (still 200). The re-fetch scopes to the deals object: a non-deal record id
- * 404s here, which is the desired no-op.
+ * Re-fetch a `deals` record and normalize it. The re-fetch scopes to the
+ * deals object: a non-deal / unknown record id 404s here → returns null
+ * (skip, non-replayable). A network failure or Attio 5xx throws
+ * `RetryableError` so the webhook answers 503 and Attio retries.
  */
 async function fetchDealRecord(recordId: string): Promise<NormalizedDeal | null> {
   const apiKey = process.env.ATTIO_API_KEY
@@ -159,8 +200,13 @@ async function fetchDealRecord(recordId: string): Promise<NormalizedDeal | null>
   const res = await fetch(
     `${ATTIO_API_BASE}/v2/objects/deals/records/${recordId}`,
     { headers: { Authorization: `Bearer ${apiKey}` } },
-  )
+  ).catch((e) => {
+    throw new RetryableError(`network: ${String(e)}`)
+  })
   if (!res.ok) {
+    if (res.status >= 500) {
+      throw new RetryableError(`attio_5xx:${res.status}`)
+    }
     console.warn(
       `[attio] re-fetch failed: record=${recordId} status=${res.status}`,
     )
@@ -244,19 +290,27 @@ async function verifySignature(
  * - Per event: re-fetches the deal record, filters to the handled stages,
  *   and calls `upsertFromDeal`. Ignored stages → no-op, still 200.
  * - Idempotency: Attio repeats `Idempotency-Key` across retries/redeliveries.
- *   We always answer 200 (except 401/400) and the re-fetch+upsert path is
- *   idempotent, so replays are safe. A persisted dedup store is Lot 2 (needs
- *   a table = a DB write, out of scope here).
+ *   The re-fetch + upsert path is idempotent (deals on `attioDealId`, the
+ *   forecast entry on `derivedKey`), so replays are safe with no dedup store.
+ * - Retry policy: a transient re-fetch failure → 503 (Attio retries); a config
+ *   error (missing secret / API key) → 200 (acked, no retry storm).
  */
 export const attioWebhook = httpAction(async (ctx, request) => {
   const rawBody = await request.text()
   const signature = request.headers.get('Attio-Signature')
   if (!signature) return new Response('Missing signature', { status: 400 })
 
-  const ok = await verifySignature(rawBody, signature)
-  if (!ok) return new Response('Invalid signature', { status: 401 })
-
-  const idempotencyKey = request.headers.get('Idempotency-Key')
+  let valid: boolean
+  try {
+    valid = await verifySignature(rawBody, signature)
+  } catch (err) {
+    if (isConfigError(err)) {
+      console.error('[attio] webhook secret missing — acking without processing')
+      return Response.json({ status: 'config_error' })
+    }
+    throw err
+  }
+  if (!valid) return new Response('Invalid signature', { status: 401 })
 
   let payload: unknown
   try {
@@ -265,6 +319,7 @@ export const attioWebhook = httpAction(async (ctx, request) => {
     return new Response('Bad JSON', { status: 400 })
   }
 
+  const idempotencyKey = request.headers.get('Idempotency-Key')
   const events = asArray(asRecord(payload).events)
   console.log(
     `[attio] webhook received: ${events.length} event(s), ` +
@@ -275,7 +330,20 @@ export const attioWebhook = httpAction(async (ctx, request) => {
     const recordId = asString(asRecord(asRecord(event).id).record_id)
     if (!recordId) continue
 
-    const deal = await fetchDealRecord(recordId)
+    let deal: NormalizedDeal | null
+    try {
+      deal = await fetchDealRecord(recordId)
+    } catch (err) {
+      if (err instanceof RetryableError) {
+        console.warn(`[attio] transient re-fetch failure → 503: ${String(err)}`)
+        return new Response('Upstream transient error', { status: 503 })
+      }
+      if (isConfigError(err)) {
+        console.error('[attio] API key missing — acking without processing')
+        return Response.json({ status: 'config_error' })
+      }
+      throw err
+    }
     if (!deal) continue
 
     if (!HANDLED_STAGES.has(deal.stage)) {
@@ -292,21 +360,14 @@ export const attioWebhook = httpAction(async (ctx, request) => {
   return Response.json({ status: 'received' })
 })
 
-// ─── Upsert mutation (LOT 1 SKELETON — no DB write) ──────────────────────────
+// ─── Upsert mutation (real write) ────────────────────────────────────────────
 
 /**
- * Normalized Attio deal → Albo OS. LOT 1: SKELETON ONLY — logs the payload
- * and returns, writes nothing. Lot 2 implements the real upsert:
- *   - resolve org from `orgOptionId` (🛩️ Calte → calte, 🌍 Albo → albo)
- *   - resolve/create target company via `targetCompanyAttioId`
- *   - investor = org's `group_root` (cf. migrations/attioAlboImport.ts)
- *   - map `instrumentRaw` → instrumentKind
- *   - upsert deal idempotently on `attioDealId` (index by_attio_deal_id),
- *     status `pending` (Term Sheet) / `active` (Invested)
- *   - anticipated forecast entry on Term Sheet
- *
- * No `requireOrgMember`: this is internal, the caller (webhook) is
- * authenticated by the HMAC signature.
+ * Normalized Attio deal → Albo OS. No `requireOrgMember`: this is internal,
+ * the caller (webhook) is authenticated by the HMAC signature. The org is
+ * resolved from the Attio `albo_or_calte` option, and every write is scoped
+ * to that org. The branch decision (create / refresh / confirm / skip) is the
+ * pure `decideSyncAction` (./lib/attioSync) — see it for the invariants.
  */
 export const upsertFromDeal = internalMutation({
   args: {
@@ -321,11 +382,208 @@ export const upsertFromDeal = internalMutation({
     roundSize: v.optional(v.number()),
     valuation: v.optional(v.number()),
   },
-  handler: (_ctx, args) => {
-    // LOT 1: skeleton — structured log, no DB write (not even a test insert).
-    // Sync handler on purpose (no await yet); Lot 2 makes it async on the
-    // first DB write.
-    console.log(`[attio] upsertFromDeal (skeleton, no write): ${JSON.stringify(args)}`)
-    return { skipped: true as const, reason: 'lot1_skeleton' }
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query('deals')
+      .withIndex('by_attio_deal_id', (q) => q.eq('attioDealId', args.attioDealId))
+      .unique()
+    const action = decideSyncAction(args.stage, existing ? existing.status : null)
+
+    if (action.kind === 'skip') {
+      console.log(
+        `[attio] ${args.attioDealId} stage=${args.stage}: skip (${action.reason})`,
+      )
+      return { skipped: true as const, reason: action.reason }
+    }
+
+    // ── Invested: patch-only. decideSyncAction returns 'invested' only when a
+    //    deal already exists → never a create, so existing invested deals in
+    //    Albo OS can't be duplicated. Post-signature: only advance the
+    //    lifecycle (forward-only) and confirm the anticipated forecast entry. ──
+    if (action.kind === 'invested') {
+      // Defensive: 'invested' is only returned with an existing deal.
+      if (!existing) return { skipped: true as const, reason: 'invested_no_deal' }
+      if (advancesStatus(existing.status, 'active')) {
+        await ctx.db.patch('deals', existing._id, { status: 'active' })
+      }
+      await confirmDealForecastEntry(ctx, existing._id)
+      return { dealId: existing._id, action: 'invested' as const }
+    }
+
+    // ── Term Sheet (create or refresh): pre-investment, Attio is the source. ──
+    const orgSlug = orgSlugFromOption(args.orgOptionId)
+    if (!orgSlug) {
+      console.warn(
+        `[attio] term sheet ${args.attioDealId}: unknown/absent org option ` +
+          `(${args.orgOptionId ?? 'none'}) → skip`,
+      )
+      return { skipped: true as const, reason: 'unknown_org' }
+    }
+    const org = await ctx.db
+      .query('organizations')
+      .withIndex('by_slug', (q) => q.eq('slug', orgSlug))
+      .unique()
+    if (!org) {
+      console.warn(
+        `[attio] term sheet ${args.attioDealId}: org '${orgSlug}' not found → skip`,
+      )
+      return { skipped: true as const, reason: 'org_not_found' }
+    }
+    const instrumentKind = resolveInstrumentKind(args.instrumentRaw)
+
+    if (action.kind === 'termsheet_refresh') {
+      // Defensive: 'termsheet_refresh' is only returned with an existing deal.
+      if (!existing) return { skipped: true as const, reason: 'termsheet_no_deal' }
+      await ctx.db.patch('deals', existing._id, {
+        ...(shouldReplaceInstrument(instrumentKind, existing.instrumentKind)
+          ? { instrumentKind }
+          : {}),
+        ...(args.name ? { name: args.name } : {}),
+        ...(args.valueCents != null ? { committedAmount: args.valueCents } : {}),
+        ...(args.investmentDate != null
+          ? { investmentDate: args.investmentDate }
+          : {}),
+        ...(args.roundSize != null ? { roundSize: args.roundSize } : {}),
+        ...(args.valuation != null ? { entryValuation: args.valuation } : {}),
+      })
+      await upsertDealForecastEntry(ctx, existing._id, org._id, args)
+      return { dealId: existing._id, action: 'termsheet_updated' as const }
+    }
+
+    // action.kind === 'termsheet_create'
+    const investor = await ctx.db
+      .query('companies')
+      .withIndex('by_org_kind', (q) =>
+        q.eq('orgId', org._id).eq('kind', 'group_root'),
+      )
+      .first()
+    if (!investor) {
+      console.warn(
+        `[attio] term sheet ${args.attioDealId}: no group_root for org ` +
+          `'${orgSlug}' → skip`,
+      )
+      return { skipped: true as const, reason: 'no_group_root' }
+    }
+    const targetCompanyId = await resolveOrCreateTargetCompany(ctx, org._id, args)
+    const dealId = await ctx.db.insert('deals', {
+      orgId: org._id,
+      investorCompanyId: investor._id,
+      targetCompanyId,
+      instrumentKind,
+      currency: 'EUR',
+      status: 'pending',
+      attioDealId: args.attioDealId,
+      ...(args.name ? { name: args.name } : {}),
+      ...(args.valueCents != null ? { committedAmount: args.valueCents } : {}),
+      ...(args.investmentDate != null
+        ? { investmentDate: args.investmentDate }
+        : {}),
+      ...(args.roundSize != null ? { roundSize: args.roundSize } : {}),
+      ...(args.valuation != null ? { entryValuation: args.valuation } : {}),
+    })
+    await upsertDealForecastEntry(ctx, dealId, org._id, args)
+    return { dealId, action: 'termsheet_created' as const }
   },
 })
+
+/**
+ * Portfolio company for the deal target: reuse the Attio-anchored one when it
+ * exists in this org, else create a stub named after the deal. The
+ * `attioCompanyId` anchor is only claimed when no company already holds it,
+ * to preserve its uniqueness.
+ */
+async function resolveOrCreateTargetCompany(
+  ctx: MutationCtx,
+  orgId: Id<'organizations'>,
+  args: NormalizedDeal,
+): Promise<Id<'companies'>> {
+  const attioCompanyId = args.targetCompanyAttioId
+  const anchored = attioCompanyId
+    ? await ctx.db
+        .query('companies')
+        .withIndex('by_attio_company_id', (q) =>
+          q.eq('attioCompanyId', attioCompanyId),
+        )
+        .unique()
+    : null
+  if (anchored && anchored.orgId === orgId) return anchored._id
+  return await ctx.db.insert('companies', {
+    orgId,
+    name: args.name?.trim() || 'Société (Attio)',
+    kind: 'portfolio',
+    ...(attioCompanyId && !anchored ? { attioCompanyId } : {}),
+  })
+}
+
+/**
+ * The anticipated capital outflow for a pending deal — one stable entry per
+ * deal (`derivedKey = deal:{dealId}`, category `deals`). Needs a firm date to
+ * sit on the cash timeline; skipped (the deal still shows as pending) until
+ * Attio provides one. While the entry is still pending it is refreshed from
+ * Attio; a realized/cancelled one is never touched.
+ */
+async function upsertDealForecastEntry(
+  ctx: MutationCtx,
+  dealId: Id<'deals'>,
+  orgId: Id<'organizations'>,
+  args: NormalizedDeal,
+): Promise<void> {
+  if (
+    args.investmentDate == null ||
+    args.valueCents == null ||
+    args.valueCents <= 0
+  ) {
+    console.log(
+      `[attio] deal ${args.attioDealId}: no firm date/amount → no forecast entry yet`,
+    )
+    return
+  }
+  const derivedKey = dealForecastKey(dealId)
+  const label = args.name ? `Investissement ${args.name}` : 'Investissement'
+  const existing = await ctx.db
+    .query('forecastEntries')
+    .withIndex('by_derivedKey', (q) => q.eq('derivedKey', derivedKey))
+    .unique()
+  if (existing) {
+    if (existing.status === 'pending') {
+      await ctx.db.patch('forecastEntries', existing._id, {
+        date: args.investmentDate,
+        amountCents: args.valueCents,
+        label,
+      })
+    }
+    return
+  }
+  await ctx.db.insert('forecastEntries', {
+    orgId,
+    date: args.investmentDate,
+    amountCents: args.valueCents,
+    direction: 'out',
+    confidence: 'expected',
+    status: 'pending',
+    label,
+    category: 'deals',
+    dealId,
+    derivedKey,
+    overridden: false,
+    currency: 'EUR',
+  })
+}
+
+/**
+ * On Invested: the anticipated entry becomes committed (`confidence:
+ * confirmed`). Never deleted — it realizes when the real wire is pointed to
+ * it. No-op if there is no entry or it is already realized/cancelled.
+ */
+async function confirmDealForecastEntry(
+  ctx: MutationCtx,
+  dealId: Id<'deals'>,
+): Promise<void> {
+  const entry = await ctx.db
+    .query('forecastEntries')
+    .withIndex('by_derivedKey', (q) => q.eq('derivedKey', dealForecastKey(dealId)))
+    .unique()
+  if (entry && entry.status === 'pending') {
+    await ctx.db.patch('forecastEntries', entry._id, { confidence: 'confirmed' })
+  }
+}

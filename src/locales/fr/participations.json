@@ -130,6 +130,7 @@
     "empty": "À renseigner"
   },
   "status": {
+    "pending": "Term sheet",
     "active": "Actif",
     "partially_exited": "Exit partiel",
     "fully_exited": "Exité",
@@ -173,7 +174,8 @@
     "dat": "Dépôt à terme",
     "crypto": "Crypto",
     "loan": "Prêt",
-    "capitalization_account": "Compte de capitalisation"
+    "capitalization_account": "Compte de capitalisation",
+    "unknown": "Non défini"
   },
   "field": {
     "closingDate": "Date de closing",

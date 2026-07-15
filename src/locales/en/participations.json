@@ -130,6 +130,7 @@
     "empty": "To be filled in"
   },
   "status": {
+    "pending": "Term sheet",
     "active": "Active",
     "partially_exited": "Partial exit",
     "fully_exited": "Exited",
@@ -173,7 +174,8 @@
     "dat": "Term deposit",
     "crypto": "Crypto",
     "loan": "Loan",
-    "capitalization_account": "Capitalization account"
+    "capitalization_account": "Capitalization account",
+    "unknown": "Not set"
   },
   "field": {
     "closingDate": "Closing date",
