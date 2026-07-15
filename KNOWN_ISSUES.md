@@ -2300,3 +2300,24 @@ dégradé assumé, échec actionnable dans le récap.
 pas téléchargés (le markdown rendu contient leurs liens signés — extraction
 dédiée à faire si le besoin réel se confirme) ; une page derrière un mur de
 login rend une coquille → échec normal.
+
+## Prompts « Claude Code Remote » (Routines) — non désactivables côté repo
+
+Les outils du serveur MCP **`Claude_Code_Remote`** (`create_trigger`,
+`update_trigger`, `delete_trigger`, `send_later` — utilisés par l'auto-watch
+de PR et les rappels planifiés) déclenchent, en session web, une fenêtre de
+validation **à chaque appel** : « Allow Claude to use delete trigger (Claude
+Code Remote)? » avec seulement **Deny / Allow once** (jamais « Allow
+always »).
+
+**Ne pas essayer de les auto-autoriser via `.claude/settings.json`.** Ajouter
+`mcp__Claude_Code_Remote__*` dans `permissions.allow` **ne les éteint pas** —
+testé empiriquement (juillet 2026) : le prompt réapparaît malgré la règle
+chargée au démarrage. Ces approbations sont gérées par la couche **Remote
+Control de claude.ai**, pas par les réglages du dépôt ; c'est un garde-fou
+volontaire de la plateforme (ces outils peuvent lancer des sessions
+récurrentes / planifiées — cf. « Routines », `code.claude.com/docs/en/routines`).
+
+Aucun fichier du repo ne les désactive. Seules mitigations : **ne pas
+appeler ces outils** (p. ex. ne pas armer de re-vérification `send_later`
+d'une PR), ou cliquer « Allow once » au cas par cas.
