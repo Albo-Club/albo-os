@@ -5,14 +5,14 @@
  * SPV, each holding the « Contrat d'émission de titres » + BS + coupon
  * attestations). Calte counterpart of migrations/alboInstrumentImport.ts.
  *
- * Scope = the obligations lot validated with the team: SPV 4, 5, 6, 7, 11, 13
- * (each has its emission contract in the Drive, single documented instrument).
- * Deliberately OUT of scope, pending a decision (see PR / CHANGELOG):
- *   - SPV 9  : OCA (convertible), not a plain bond → instrumentKind os→oc first.
- *   - SPV 18 : Vanves/Le Bozec operation cancelled + fully repaid 06/10/2025.
- *   - SPV 14 / 17 : emission contract absent from the Drive (terms only known
- *     from coupon attestations) → durée / remboursement not firm.
- *   - SPV 2  : contract missing (terms via BS + attestations, variable rate).
+ * Scope = the lot validated with the team: SPV 4, 5, 6, 7, 11, 13 (plain bonds)
+ * plus SPV 9 requalified os → oc (it is an OCA / convertible bond — team
+ * decision). Each has its emission contract in the Drive.
+ * Deliberately OUT of scope (team decision — handled elsewhere or by hand):
+ *   - SPV 18 : Vanves/Le Bozec operation cancelled + fully repaid 06/10/2025
+ *     (nothing disbursed) → the Calte deal is deleted by hand, not here.
+ *   - SPV 14 / 17 : emission contract absent from the Drive → handled by hand.
+ *   - SPV 2  : already exited → skipped.
  *   - SPV 8 / 16 : equity (ordinary shares), not bonds → `share` is correct.
  *
  * Conventions (same as convex/schema.ts): amounts in CENTS, rates in BASIS
@@ -46,6 +46,9 @@ type DealPatch = {
   expectedTarget: string
   /** Fields written only if currently undefined on the deal. */
   fields: Record<string, number | string>
+  /** Written unconditionally when the value differs (explicit requalification,
+   * e.g. instrumentKind os → oc). Idempotent by value. */
+  force?: Record<string, string>
 }
 
 // Amounts in CENTS, rates in BASIS POINTS — same conventions as the schema.
@@ -105,6 +108,20 @@ const PATCHES: Array<DealPatch> = [
       interestRate: 1100,
       couponPeriodicity: 'mensuel',
       repaymentModality: 'in_fine',
+    },
+  },
+  {
+    // Contrat d'émission (SPV 9). OBLIGATION CONVERTIBLE (OCA) → requalifiée
+    // os → oc (décision équipe). Cible STOA Groupe — 2 promotions Mérignac /
+    // Salleboeuf. Taux 12 %/an capitalisés, payés in fine. Les termes de
+    // conversion (ratio / décote / valo) ne figurent pas dans l'extraction →
+    // non importés. maturityDate omis (jouissance non datée). couponPeriodicity
+    // non écrit (intérêts capitalisés, pas de coupon périodique).
+    dealId: 'k57at71sp327r0g1b00w8eew4s87r04d',
+    expectedTarget: 'PARALLEL INVEST SPV9',
+    force: { instrumentKind: 'oc' },
+    fields: {
+      interestRate: 1200,
     },
   },
   {
@@ -182,6 +199,10 @@ async function resolvePatch(
       if (record[key] !== value)
         mismatch.push({ field: key, current: record[key], document: value })
     }
+  }
+  // Requalifications (force): written whenever the current value differs.
+  for (const [key, value] of Object.entries(spec.force ?? {})) {
+    if (record[key] !== value) toWrite[key] = value
   }
   return { deal, toWrite, alreadySet, mismatch }
 }
