@@ -31,6 +31,14 @@ describe('detectLinks — notion', () => {
     assert.ok(notion[0].includes('311990bc334980cc87d6cafd06d29960'))
   })
 
+  it('detects a link hidden behind anchor text (href only, invisible in plain text)', () => {
+    const html =
+      'Voici l’update Q2 2026 : <a href="https://app.notion.com/p/jointango/Tango-Investor-Update-311990bc334980cc87d6cafd06d29960?source=copy_link">lien</a>.'
+    const { notion } = detectLinks(html)
+    assert.equal(notion.length, 1)
+    assert.ok(notion[0].startsWith('https://app.notion.com/'))
+  })
+
   it('ignores notion.com marketing pages (no 32-hex page id)', () => {
     const { notion } = detectLinks('découvrez https://www.notion.com/pricing et https://notion.com/blog')
     assert.equal(notion.length, 0)
