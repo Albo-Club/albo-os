@@ -501,8 +501,9 @@ export const deleteConnection = internalMutation({
 
 /**
  * For every active VASCO connection of `orgId`, log in and return the accounts
- * and their investments. Org-member-guarded. Read-only — nothing is written to
- * the portfolio tables yet (the deal bridge + valuations land in a later step).
+ * and their investments. Org-member-guarded. Read-only — this action writes
+ * nothing; the instrument deal bridge is `backfillSpvInstruments` (CLI, below),
+ * and valuations land in a later step.
  */
 export const fetchParticipations = action({
   args: { orgId: v.id('organizations') },
@@ -1041,5 +1042,407 @@ export const downloadCommunicationDocument = action({
       }
     }
     throw new ConvexError(`vasco_download_failed: ${lastError ?? 'unknown'}`)
+  },
+})
+
+// ── Instrument bridge (Parallel positions → SPV deal fiche) ──────────────────
+//
+// Fills the SPV deal fiche's instrument block from the investor-side Parallel
+// positions (`pullPositions`). Conservative by design — see KNOWN_ISSUES.md
+// "VASCO API → instrument bridge":
+//   - a position is matched to a deal by the SPV NUMBER token ("SPVn") shared
+//     by the Parallel vehicle/security name and the target company name, never
+//     by free-text name (labels are opaque). No number on either side → the row
+//     is reported for manual mapping, never guessed;
+//   - it writes ONLY the three fields Parallel fills unambiguously and that the
+//     deal fiche actually displays: `paidAmount` (investedCents — cents, like
+//     us), `spvName` (vehicleName), `closingDate` (effectiveDate). Parallel's
+//     `securitiesNumber` / `priceBySecurity` / `capitalCallPercentage` have no
+//     display home for the equity/spv_share archetype and carry unconfirmed
+//     units, so they are REPORTED (`extraVascoData`), never written;
+//   - fill-empty-only: a populated field that disagrees with Parallel is
+//     surfaced as a discrepancy, never overwritten;
+//   - it never touches `instrumentKind` (most SPV deals are typed `os`/`share`;
+//     the os→spv_share requalification is a separate human decision — reported
+//     via `needsRequalification`).
+// `dryRun` defaults to true: nothing is written and the full proposal returns.
+
+/** SPV number token shared by Parallel vehicle/security names and the SPV
+ * target company names ("…SPV13…" → 13). null when absent (e.g. "SPV YOUSE") →
+ * the row is reported for manual mapping, never guessed. */
+function spvNumberOf(name: string | null | undefined): number | null {
+  if (!name) return null
+  const m = /\bspv\s*0*(\d+)\b/i.exec(name)
+  return m ? Number(m[1]) : null
+}
+
+type BridgeDeal = {
+  dealId: Id<'deals'>
+  targetName: string
+  instrumentKind: string
+  status: string
+  paidAmount: number | null
+  committedAmount: number | null
+  spvName: string | null
+  closingDate: number | null
+}
+
+/** The org's SPV deals (target named "PARALLEL INVEST SPVn"), with just the
+ * columns the bridge compares. Auth-less, keyed by slug — CLI internal only. */
+export const getSpvDealsForBridge = internalQuery({
+  args: { orgSlug: v.string() },
+  handler: async (ctx, { orgSlug }): Promise<{ deals: Array<BridgeDeal> }> => {
+    const org = await ctx.db
+      .query('organizations')
+      .withIndex('by_slug', (q) => q.eq('slug', orgSlug))
+      .unique()
+    if (!org) throw new ConvexError('org_not_found')
+    const deals = await ctx.db
+      .query('deals')
+      .withIndex('by_org', (q) => q.eq('orgId', org._id))
+      .collect()
+    const out: Array<BridgeDeal> = []
+    for (const deal of deals) {
+      const target = await ctx.db.get('companies', deal.targetCompanyId)
+      if (!target || !/parallel\s*invest\s*spv/i.test(target.name)) continue
+      out.push({
+        dealId: deal._id,
+        targetName: target.name,
+        instrumentKind: deal.instrumentKind,
+        status: deal.status,
+        paidAmount: deal.paidAmount ?? null,
+        committedAmount: deal.committedAmount ?? null,
+        spvName: deal.spvName ?? null,
+        closingDate: deal.closingDate ?? null,
+      })
+    }
+    return { deals: out }
+  },
+})
+
+/** Patch one deal with the bridge-allowed fields, recording them in
+ * `manuallyEditedFields` so the Airtable re-import (deals.upsertDeals) treats
+ * Parallel as authoritative and never clobbers them (same convention as
+ * deals.update). CLI internal only. */
+export const applyInstrumentBridgePatch = internalMutation({
+  args: {
+    dealId: v.id('deals'),
+    patch: v.object({
+      paidAmount: v.optional(v.number()),
+      spvName: v.optional(v.string()),
+      closingDate: v.optional(v.number()),
+    }),
+  },
+  handler: async (ctx, { dealId, patch }) => {
+    const deal = await ctx.db.get('deals', dealId)
+    if (!deal) throw new ConvexError('not_found')
+    const editedFields = new Set(deal.manuallyEditedFields ?? [])
+    for (const key of Object.keys(patch)) editedFields.add(key)
+    await ctx.db.patch('deals', dealId, {
+      ...patch,
+      manuallyEditedFields: [...editedFields],
+    })
+    return dealId
+  },
+})
+
+type ExtraVascoData = {
+  securityName: string | null
+  vehicleName: string | null
+  investedCents: number | null
+  currency: string | null
+  securitiesNumber: number | null
+  priceBySecurity: number | null
+  capitalCallPercentage: number | null
+  effectiveDate: string | null
+}
+
+type FieldFill = { field: string; to: number | string; note?: string }
+type FieldDiff = {
+  field: string
+  current: number | string
+  vasco: number | string
+  note?: string
+}
+type BridgeProposal = {
+  spvNo: number
+  dealId: Id<'deals'>
+  targetName: string
+  instrumentKind: string
+  needsRequalification: boolean
+  fills: Array<FieldFill>
+  discrepancies: Array<FieldDiff>
+  extraVascoData: ExtraVascoData
+}
+
+type BridgePosition = VascoInvestment & { clientSlug: string }
+
+/** Explicit result type — annotated on the action handler to break the
+ * self-reference inference cycle (the handler calls `internal.vasco.*` from
+ * inside this same module; see CLAUDE.md "TS inference cycle"). */
+type BridgeResult = {
+  orgSlug: string
+  dryRun: boolean
+  summary: {
+    positions: number
+    spvDeals: number
+    matched: number
+    wouldFill: number
+    applied: number
+    withDiscrepancies: number
+    needingRequalification: number
+    positionsWithoutDeal: number
+    dealsWithoutPosition: number
+    ambiguous: number
+    positionsNoNumber: number
+    dealsNoNumber: number
+  }
+  proposals: Array<BridgeProposal>
+  positionsWithoutDeal: Array<{
+    spvNo: number
+    positions: Array<ExtraVascoData>
+  }>
+  dealsWithoutPosition: Array<{
+    spvNo: number
+    dealId: Id<'deals'>
+    targetName: string
+    instrumentKind: string
+  }>
+  ambiguous: Array<{ spvNo: number; positions: number; deals: number }>
+  positionsNoNumber: Array<ExtraVascoData>
+  dealsNoNumber: Array<{ dealId: Id<'deals'>; targetName: string }>
+  pullErrors: Array<{ clientSlug: string; error: string }>
+}
+
+function shapeExtra(p: VascoInvestment): ExtraVascoData {
+  return {
+    securityName: p.securityName,
+    vehicleName: p.vehicleName,
+    investedCents: p.investedCents,
+    currency: p.currency,
+    securitiesNumber: p.securitiesNumber,
+    priceBySecurity: p.priceBySecurity,
+    capitalCallPercentage: p.capitalCallPercentage,
+    effectiveDate: p.effectiveDate,
+  }
+}
+
+/** Build the fill/discrepancy proposal for one clean 1:1 position↔deal pair. */
+function buildProposal(
+  spvNo: number,
+  deal: BridgeDeal,
+  pos: BridgePosition,
+): BridgeProposal {
+  const fills: Array<FieldFill> = []
+  const discrepancies: Array<FieldDiff> = []
+
+  // paidAmount ← investedCents (both cents). Fill if empty; else reconcile.
+  if (pos.investedCents != null) {
+    if (deal.paidAmount == null)
+      fills.push({ field: 'paidAmount', to: pos.investedCents })
+    else if (deal.paidAmount !== pos.investedCents)
+      discrepancies.push({
+        field: 'paidAmount',
+        current: deal.paidAmount,
+        vasco: pos.investedCents,
+      })
+  }
+
+  // spvName ← vehicleName. Fill if empty; else reconcile.
+  if (pos.vehicleName) {
+    if (!deal.spvName) fills.push({ field: 'spvName', to: pos.vehicleName })
+    else if (deal.spvName !== pos.vehicleName)
+      discrepancies.push({
+        field: 'spvName',
+        current: deal.spvName,
+        vasco: pos.vehicleName,
+      })
+  }
+
+  // closingDate ← effectiveDate (ISO → ms UTC). Fill if empty; else reconcile.
+  const eff = pos.effectiveDate ? Date.parse(pos.effectiveDate) : NaN
+  if (!Number.isNaN(eff)) {
+    if (deal.closingDate == null)
+      fills.push({
+        field: 'closingDate',
+        to: eff,
+        note: pos.effectiveDate ?? undefined,
+      })
+    else if (deal.closingDate !== eff)
+      discrepancies.push({
+        field: 'closingDate',
+        current: deal.closingDate,
+        vasco: eff,
+        note: pos.effectiveDate ?? undefined,
+      })
+  }
+
+  return {
+    spvNo,
+    dealId: deal.dealId,
+    targetName: deal.targetName,
+    instrumentKind: deal.instrumentKind,
+    needsRequalification: deal.instrumentKind !== 'spv_share',
+    fills,
+    discrepancies,
+    extraVascoData: shapeExtra(pos),
+  }
+}
+
+/**
+ * Reconcile Parallel positions against the org's SPV deals and (optionally)
+ * fill the empty instrument fields. Read side is org-agnostic (CLI, auth-less
+ * by slug), write side goes through `applyInstrumentBridgePatch`.
+ *   # dry-run (default) — writes nothing, returns the full proposal:
+ *   npx convex run --prod vasco:backfillSpvInstruments '{"orgSlug":"calte"}'
+ *   # apply the empty-field fills:
+ *   npx convex run --prod vasco:backfillSpvInstruments '{"orgSlug":"calte","dryRun":false}'
+ */
+export const backfillSpvInstruments = internalAction({
+  args: { orgSlug: v.string(), dryRun: v.optional(v.boolean()) },
+  handler: async (ctx, { orgSlug, dryRun = true }): Promise<BridgeResult> => {
+    // 1. Pull Parallel positions across the org's active connections.
+    const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
+      internal.vasco.getConnectionsByOrgSlug,
+      { orgSlug },
+    )
+    const positions: Array<BridgePosition> = []
+    const pullErrors: Array<{ clientSlug: string; error: string }> = []
+    for (const conn of conns) {
+      try {
+        const accounts = await pullPositions(conn)
+        for (const acc of accounts)
+          for (const inv of acc.investments)
+            positions.push({ ...inv, clientSlug: conn.clientSlug })
+      } catch (err) {
+        pullErrors.push({
+          clientSlug: conn.clientSlug,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+
+    // 2. Load the org's SPV deals.
+    const { deals }: { deals: Array<BridgeDeal> } = await ctx.runQuery(
+      internal.vasco.getSpvDealsForBridge,
+      { orgSlug },
+    )
+
+    // 3. Index both sides by SPV number; anything without a number is reported.
+    const posByNo = new Map<number, Array<BridgePosition>>()
+    const positionsNoNumber: Array<ExtraVascoData> = []
+    for (const p of positions) {
+      const no = spvNumberOf(p.vehicleName) ?? spvNumberOf(p.securityName)
+      if (no == null) {
+        positionsNoNumber.push(shapeExtra(p))
+        continue
+      }
+      const arr = posByNo.get(no) ?? []
+      arr.push(p)
+      posByNo.set(no, arr)
+    }
+    const dealsByNo = new Map<number, Array<BridgeDeal>>()
+    const dealsNoNumber: Array<{ dealId: Id<'deals'>; targetName: string }> = []
+    for (const d of deals) {
+      const no = spvNumberOf(d.targetName)
+      if (no == null) {
+        dealsNoNumber.push({ dealId: d.dealId, targetName: d.targetName })
+        continue
+      }
+      const arr = dealsByNo.get(no) ?? []
+      arr.push(d)
+      dealsByNo.set(no, arr)
+    }
+
+    // 4. Reconcile per SPV number.
+    const proposals: Array<BridgeProposal> = []
+    const ambiguous: Array<{ spvNo: number; positions: number; deals: number }> =
+      []
+    const positionsWithoutDeal: Array<{
+      spvNo: number
+      positions: Array<ExtraVascoData>
+    }> = []
+    const dealsWithoutPosition: Array<{
+      spvNo: number
+      dealId: Id<'deals'>
+      targetName: string
+      instrumentKind: string
+    }> = []
+    const allNos = new Set<number>([...posByNo.keys(), ...dealsByNo.keys()])
+    for (const no of [...allNos].sort((a, b) => a - b)) {
+      const ps = posByNo.get(no) ?? []
+      const ds = dealsByNo.get(no) ?? []
+      if (ps.length && !ds.length) {
+        positionsWithoutDeal.push({ spvNo: no, positions: ps.map(shapeExtra) })
+        continue
+      }
+      if (ds.length && !ps.length) {
+        for (const d of ds)
+          dealsWithoutPosition.push({
+            spvNo: no,
+            dealId: d.dealId,
+            targetName: d.targetName,
+            instrumentKind: d.instrumentKind,
+          })
+        continue
+      }
+      // Ambiguous (a follow-on deal, or an SPV holding several securities) →
+      // reported, never auto-written.
+      if (ps.length > 1 || ds.length > 1) {
+        ambiguous.push({ spvNo: no, positions: ps.length, deals: ds.length })
+        continue
+      }
+      proposals.push(buildProposal(no, ds[0], ps[0]))
+    }
+
+    // 5. Apply the empty-field fills unless dry-run.
+    let applied = 0
+    if (!dryRun) {
+      for (const prop of proposals) {
+        if (!prop.fills.length) continue
+        const patch: {
+          paidAmount?: number
+          spvName?: string
+          closingDate?: number
+        } = {}
+        for (const f of prop.fills) {
+          if (f.field === 'paidAmount') patch.paidAmount = f.to as number
+          else if (f.field === 'spvName') patch.spvName = f.to as string
+          else if (f.field === 'closingDate') patch.closingDate = f.to as number
+        }
+        await ctx.runMutation(internal.vasco.applyInstrumentBridgePatch, {
+          dealId: prop.dealId,
+          patch,
+        })
+        applied++
+      }
+    }
+
+    return {
+      orgSlug,
+      dryRun,
+      summary: {
+        positions: positions.length,
+        spvDeals: deals.length,
+        matched: proposals.length,
+        wouldFill: proposals.filter((p) => p.fills.length).length,
+        applied: dryRun ? 0 : applied,
+        withDiscrepancies: proposals.filter((p) => p.discrepancies.length).length,
+        needingRequalification: proposals.filter((p) => p.needsRequalification)
+          .length,
+        positionsWithoutDeal: positionsWithoutDeal.length,
+        dealsWithoutPosition: dealsWithoutPosition.length,
+        ambiguous: ambiguous.length,
+        positionsNoNumber: positionsNoNumber.length,
+        dealsNoNumber: dealsNoNumber.length,
+      },
+      proposals,
+      positionsWithoutDeal,
+      dealsWithoutPosition,
+      ambiguous,
+      positionsNoNumber,
+      dealsNoNumber,
+      pullErrors,
+    }
   },
 })

@@ -2222,6 +2222,51 @@ the hand edit only keeps `pnpm lint` (`tsc`) green in CI until then. Note
 `schema.ts` — only the function-reference file (`api.d.ts`) is static and needs
 the manual entry.
 
+### Instrument bridge (Parallel positions → SPV deal fiche) — `backfillSpvInstruments`
+
+The write-back counterpart of `pullPositions`: fills the SPV deal fiche's
+instrument block from the investor-side Parallel positions. CLI internal action,
+`dryRun: true` by default (simulate → returns the full proposal, writes nothing):
+
+    npx convex run --prod vasco:backfillSpvInstruments '{"orgSlug":"calte"}'                    # simulate
+    npx convex run --prod vasco:backfillSpvInstruments '{"orgSlug":"calte","dryRun":false}'     # apply
+
+Non-obvious constraints that shaped the conservative design:
+
+- **Only three fields are written.** A Parallel `Investment` carries
+  `investedCents`, `vehicleName`, `effectiveDate`, `securitiesNumber`,
+  `priceBySecurity`, `capitalCallPercentage`. Only `investedCents → paidAmount`
+  (both cents), `vehicleName → spvName` and `effectiveDate → closingDate` map to
+  a real `deals` column Parallel fills unambiguously — they are the `spv_share`
+  archetype's displayed fields (`INSTRUMENT_FIELDS`). `securitiesNumber` /
+  `priceBySecurity` have **no display home** for the equity/`spv_share` kinds
+  (they exist only for safe/bsa/scpi) and their units are unconfirmed, so they
+  are **reported** (`extraVascoData`), never written.
+- **Matching is by SPV number, never by name.** Parallel labels are opaque
+  ("SPVn"); the bridge extracts the number token (`spvNumberOf`) from both the
+  Parallel `vehicleName`/`securityName` and the target company name and matches
+  on it. No number on either side (e.g. "SPV YOUSE") → reported for manual
+  mapping, never guessed. A follow-on deal or an SPV holding several securities
+  → reported as `ambiguous`, never auto-written.
+- **Fill-empty-only.** A populated field that disagrees with Parallel is a
+  `discrepancy` in the report, never overwritten. Filled columns are recorded in
+  `manuallyEditedFields` (via `applyInstrumentBridgePatch`) so the Airtable
+  re-import treats Parallel as authoritative.
+- **`instrumentKind` is never touched.** Most Calte SPV deals are typed `os`
+  (bond) or `share`, not `spv_share` — an Airtable-import artifact. Under `os`
+  only `closingDate` even renders in the instrument block (paidAmount/spvName are
+  still written — they feed portfolio math + metadata — but show only once the
+  deal is `spv_share`). The `os → spv_share` requalification flips the
+  debt/equity archetype (dashboards, MOIC/IRR grouping), so it stays a **human
+  decision**, flagged per deal via `needsRequalification`.
+- **TS inference-cycle trap.** The action calls `internal.vasco.*` from inside
+  `vasco.ts`; without an explicit return type on the handler the self-reference
+  makes the whole `internal`/`api` type resolve to `any`, cascading dozens of
+  implicit-any errors across the **frontend** (every `useQuery`/`runQuery` result
+  turns `any`). Fix: annotate the handler `Promise<BridgeResult>` and the
+  intermediate `runQuery` results. Same family as the BA-trigger cycle in
+  CLAUDE.md's anti-patterns.
+
 ## Domaines corrompus en base (import Calte) → logos + enrichissement KO
 
 `companies.domain` doit être un **hostname nu** (`anaxago.com`) : il sert au

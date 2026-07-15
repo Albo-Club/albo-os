@@ -636,6 +636,19 @@ Nécessite une connexion VASCO active (org `calte`).
 | VC6 | Émetteur sans communication | État vide « Aucune communication pour ce deal » (pas d'erreur) |
 | VC7 | i18n EN/FR sur tout le bloc | Titres, boutons, états et toasts traduits (namespace `vasco`) |
 
+## Instruments SPV depuis Parallel (VASCO) → pré-remplissage des fiches deal
+
+Outil **CLI, prod uniquement**, `dryRun: true` par défaut. Réconcilie les
+positions Parallel avec les fiches deal SPV (target « PARALLEL INVEST SPVn »),
+apparie **par numéro de SPV**, et ne remplit que des champs vides. Nécessite une
+connexion VASCO active (org `calte`).
+
+| Ref | Scénario | Attendu |
+| --- | --- | --- |
+| VI1 | `convex run --prod vasco:backfillSpvInstruments '{"orgSlug":"calte"}'` (simulation) | Rapport JSON : `summary` (positions, deals appariés, à remplir, écarts, à requalifier, non-appariés), `proposals` par SPV, `positionsWithoutDeal` / `dealsWithoutPosition` / `ambiguous`. **Aucune** écriture (`applied: 0`) |
+| VI2 | Idem avec `"dryRun":false` | Remplit uniquement `paidAmount`/`spvName`/`closingDate` **vides** ; les divergences restent listées, jamais écrasées ; `instrumentKind` inchangé ; champs remplis marqués `manuallyEditedFields` (le ré-import Airtable ne les écrase pas) |
+| VI3 | Position Parallel sans n° SPV (ex. « SPV YOUSE ») ou SPV sans position | Reportée dans `positionsNoNumber` / `dealsWithoutPosition`, jamais appariée à l'aveugle |
+
 ## Pointage transaction → deal (mutations + backfill)
 
 Pointage manuel (MVP 1) : `matchTransaction` / `ignoreTransaction` /
