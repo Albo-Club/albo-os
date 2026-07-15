@@ -23,7 +23,34 @@ bas de page.
 
 ---
 
-## v1.91.1 — 15/07/2026 à 18:16 — Fiches Parallel : la description colle à l'opération, pas à son avancement
+## v1.91.2 — 15/07/2026 à 19:34 — Fiches SPV Parallel Calte : import des termes obligataires
+
+Les fiches des SPV Parallel de Calte n'avaient que le montant, le nom du SPV et
+la date — l'API Vasco ne donne pas les conditions de l'emprunt. Ces conditions
+(taux, périodicité des coupons, remboursement, principal) vivent dans les
+**contrats d'émission stockés dans le Drive**. On les récupère et on les remplit
+pour le lot documenté : **SPV 4, 5, 6, 7, 11 et 13** — chacun avec son taux, sa
+périodicité et sa modalité de remboursement, sourcés au contrat. Le remplissage
+ne touche que les champs vides et signale toute valeur qui divergerait de
+l'existant. Restent à trancher ensemble (hors de ce lot) : SPV 9 (obligation
+convertible), SPV 18 (opération Vanves annulée et remboursée), SPV 14 et 17
+(contrat absent du Drive), SPV 2 (taux variable), et SPV 8 / 16 (ce sont des
+actions, pas des obligations).
+
+> **🔧 Notes techniques**
+> Nouvelle migration one-shot `convex/migrations/calteInstrumentImport.ts`
+> (`dryRun` / `apply` / `verify`), pendant Calte de `alboInstrumentImport.ts` et
+> calquée dessus. Ancrage par `_id` prod + garde `expectedTarget` (nom de la
+> company cible) ; `fill-empty-only` sur `principalAmount` (cents),
+> `interestRate` (bps), `couponPeriodicity`, `repaymentModality` — `closingDate`
+> / `spvName` / `paidAmount` restent gérés par le bridge Vasco
+> (`vasco:backfillSpvInstruments`), `maturityDate` omis (durée contractuelle
+> N mois après une « date de jouissance » non datée). Le `dryRun` renvoie un
+> bloc `mismatches` (champ déjà rempli ≠ valeur du doc, jamais écrasé). Valeurs
+> extraites des contrats d'émission Parallel (Drive), recoupées avec les
+> positions Vasco. SPV 5 importé au taux contractuel de base (10,5 %) — un
+> avenant à 13 % existe côté attestations, à arbitrer.
+
 
 La description générée pour les SPV Parallel donnait l'**actualité** de
 l'opération (« première vente, remboursement partiel… ») au lieu de dire
