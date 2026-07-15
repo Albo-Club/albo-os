@@ -641,6 +641,19 @@ active (org `calte`).
 | VC8 | **Fraîcheur du cache.** Nouveau SPV / nouvelle communication côté Parallel | Apparaît après le prochain **cron (48 h)** **ou** un clic **« Rafraîchir »** — pas d'apparition instantanée (pas de webhook). Un échec de pull garde l'ancien cache (jamais vidé) |
 | VC9 | **Description via VASCO.** Entité Parallel rattachée à son SPV → en-tête de la fiche | `oneLiner` + résumé décrivent l'**opération** (nature : promotion / dette / foncière / tech…, **géographie**, stade), générés depuis les communications et **écrasant** la description issue du domaine. Auto au rattachement (`setVascoLink`) ; rattrapage global `convex run --prod companyEnrichment:backfillVascoPitches '{}'` (toutes orgs avec connexion VASCO). Skip si pas de comms en cache. **Prod only** (LLM + VASCO) |
 
+## Instruments SPV depuis Parallel (VASCO) → pré-remplissage des fiches deal
+
+Outil **CLI, prod uniquement**, `dryRun: true` par défaut. Réconcilie les
+positions Parallel avec les fiches deal SPV (target « PARALLEL INVEST SPVn »),
+apparie **par numéro de SPV**, et ne remplit que des champs vides. Nécessite une
+connexion VASCO active (org `calte`).
+
+| Ref | Scénario | Attendu |
+| --- | --- | --- |
+| VI1 | `convex run --prod vasco:backfillSpvInstruments '{"orgSlug":"calte"}'` (simulation) | Rapport JSON : `summary` (positions, deals appariés, à remplir, écarts, à requalifier, non-appariés), `proposals` par SPV, `positionsWithoutDeal` / `dealsWithoutPosition` / `ambiguous`. **Aucune** écriture (`applied: 0`) |
+| VI2 | Idem avec `"dryRun":false` | Remplit uniquement `paidAmount`/`spvName`/`closingDate` **vides** ; les divergences restent listées, jamais écrasées ; `instrumentKind` inchangé ; champs remplis marqués `manuallyEditedFields` (le ré-import Airtable ne les écrase pas) |
+| VI3 | Position Parallel sans n° SPV (ex. « SPV YOUSE ») ou SPV sans position | Reportée dans `positionsNoNumber` / `dealsWithoutPosition`, jamais appariée à l'aveugle |
+
 ## Pointage transaction → deal (mutations + backfill)
 
 Pointage manuel (MVP 1) : `matchTransaction` / `ignoreTransaction` /

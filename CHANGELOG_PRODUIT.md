@@ -23,6 +23,32 @@ bas de page.
 
 ---
 
+## v1.90.1 — 15/07/2026 à 17:40 — Pont Parallel → fiches deal : pré-remplissage des instruments SPV (simulation)
+
+Nouvel outil interne pour **réconcilier les positions Parallel (Vasco) avec les
+fiches deal des SPV** et compléter les détails d'instrument manquants — montant
+payé, nom du SPV, date de closing. Il tourne d'abord en **simulation** : il
+propose, SPV par SPV, ce qu'il écrirait, signale les écarts avec l'existant et
+les positions sans fiche (ou l'inverse), et **n'écrit rien** tant que le
+remplissage n'est pas lancé explicitement. Rien de visible dans l'app à ce
+stade ; c'est le socle avant de fiabiliser les fiches SPV.
+
+> **🔧 Notes techniques**
+> Ajout du pont instruments dans `convex/vasco.ts` (le pull Parallel existait
+> déjà — seul le write vers les deals manquait). `backfillSpvInstruments`
+> (internalAction, `convex run --prod`, `dryRun: true` par défaut) : pull des
+> positions via `pullPositions`, appariement position ↔ deal par **numéro de
+> SPV** (`spvNumberOf` — token « SPVn » commun au `vehicleName`/`securityName`
+> Parallel et au nom de la company cible), puis proposition **fill-empty-only**
+> de `paidAmount` (investedCents), `spvName` (vehicleName) et `closingDate`
+> (effectiveDate). `securitiesNumber`/`priceBySecurity`/`capitalCallPercentage`
+> n'ont pas de champ d'affichage pour l'archétype equity/spv_share → **reportés**
+> (`extraVascoData`), jamais écrits ; un champ rempli divergent devient une
+> discrepancy, jamais écrasé. `instrumentKind` non touché : la requalif
+> `os → spv_share` est signalée (`needsRequalification`) mais reste manuelle.
+> Écriture via `applyInstrumentBridgePatch` (marque `manuallyEditedFields`).
+> Piège de cycle d'inférence TS documenté dans `KNOWN_ISSUES.md`
+> « VASCO API → instrument bridge ».
 ## v1.90.0 — 15/07/2026 à 17:39 — Fiches Parallel : la description de l'opération est générée depuis Parallel
 
 Les SPV Parallel n'avaient pas de description utile : le one-liner et le résumé
