@@ -23,6 +23,25 @@ bas de page.
 
 ---
 
+## v1.91.1 — 15/07/2026 à 18:16 — Fiches Parallel : la description colle à l'opération, pas à son avancement
+
+La description générée pour les SPV Parallel donnait l'**actualité** de
+l'opération (« première vente, remboursement partiel… ») au lieu de dire
+**ce qu'est** l'opération. Corrigé : le one-liner et le résumé décrivent désormais
+l'**opération telle qu'elle a été présentée** (nature, actif/secteur, géographie,
+structure), **sans aucun élément d'avancement, de performance ou daté**. Pour
+regénérer les fiches déjà décrites, relancer le rattrapage.
+
+> **🔧 Notes techniques**
+>
+> - `companyEnrichment.ts` : `VASCO_PITCH_PROMPT` réécrit — description
+>   **intemporelle** de l'opération, interdiction explicite du statut /
+>   avancement / performance / daté. `getVascoEnrichmentTarget` trie les
+>   communications **oldest-first** (la 1ʳᵉ = la présentation du deal) pour que le
+>   contexte du prompt soit dominé par le pitch d'origine, pas les updates.
+> - Régénération : `convex run --prod companyEnrichment:backfillVascoPitches '{}'`
+>   (écrase les descriptions existantes).
+
 ## v1.91.0 — 15/07/2026 à 17:51 — Deals en term sheet : toujours au prévisionnel, mieux repérés, et reprise des TS en cours
 
 Trois améliorations sur les deals qui arrivent d'Attio en **Term Sheet** :
