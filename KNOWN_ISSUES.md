@@ -2216,6 +2216,33 @@ new is persisted — the result still lands in `companyIntelligence`).
   auto-trigger** on `companies.setVascoLink` and no cron; the button is the only
   new trigger.
 
+### Communications → entity pitch (one-liner + résumé)
+
+The default pitch enrichment (`companyEnrichment.enrich`) reads the company's
+**website** (the `domain` field) — useless for a Parallel SPV, whose domain
+points at the platform (SPVs are deliberately excluded from the domain backfill,
+cf. MIGRATIONS.md `parallel_spv`). So Parallel entities get their pitch from a
+second source: `enrichFromVasco` reads the entity's **cached communications**
+(`vascoCommunicationsCache`, by `vascoClientSlug` + `vascoIssuerId`) and asks the
+LLM to describe the operation (nature / geography / stage), then **overwrites**
+`oneLiner` + `summary` via `applyVascoPitch` (unlike the additive
+`applyEnrichment` — the VASCO description supersedes the domain-derived one).
+
+- **Triggers, org-agnostic (keyed by the VASCO link, not the org).**
+  `companies.setVascoLink` schedules `enrichFromVasco` on link; a one-shot
+  `backfillVascoPitches` covers existing linked entities across **every** org
+  with an active VASCO connection (Calte now, Albo once connected). No cron —
+  the pitch isn't re-generated on every cache refresh (so a later hand-edit
+  survives until a re-link or a re-run of the backfill).
+- **Depends on the cache.** `enrichFromVasco` reads cached comms and skips if the
+  issuer has none yet. The picker/dialog bootstrap fills the cache before a link
+  happens, so on-link enrichment has data; the backfill refreshes each org's
+  cache first.
+- **Shared LLM helper.** Both sources use `generatePitch(system, prompt)`
+  (structured output + free-text-JSON fallback) — only the system prompt and the
+  source text differ (`SYSTEM_PROMPT` + site text vs `VASCO_PITCH_PROMPT` +
+  communications).
+
 ### `convex codegen` can't run in the remote exec environment
 
 `convex codegen` requires an authenticated deployment (`CONVEX_DEPLOYMENT` +

@@ -639,6 +639,7 @@ active (org `calte`).
 | VC6 | Émetteur sans communication | État vide « Aucune communication pour ce deal » (pas d'erreur) |
 | VC7 | i18n EN/FR sur tout le bloc | Titres, boutons, états et toasts traduits (namespace `vasco`) |
 | VC8 | **Fraîcheur du cache.** Nouveau SPV / nouvelle communication côté Parallel | Apparaît après le prochain **cron (48 h)** **ou** un clic **« Rafraîchir »** — pas d'apparition instantanée (pas de webhook). Un échec de pull garde l'ancien cache (jamais vidé) |
+| VC9 | **Description via VASCO.** Entité Parallel rattachée à son SPV → en-tête de la fiche | `oneLiner` + résumé décrivent l'**opération** (nature : promotion / dette / foncière / tech…, **géographie**, stade), générés depuis les communications et **écrasant** la description issue du domaine. Auto au rattachement (`setVascoLink`) ; rattrapage global `convex run --prod companyEnrichment:backfillVascoPitches '{}'` (toutes orgs avec connexion VASCO). Skip si pas de comms en cache. **Prod only** (LLM + VASCO) |
 
 ## Pointage transaction → deal (mutations + backfill)
 
