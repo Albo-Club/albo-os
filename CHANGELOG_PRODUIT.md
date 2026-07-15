@@ -23,6 +23,24 @@ bas de page.
 
 ---
 
+## v1.88.1 — 15/07/2026 à 11:17 — Validations « tâches planifiées » : réglage sans effet retiré
+
+La mise à jour v1.83.3 annonçait la fin des demandes de validation à
+répétition quand l'assistant gère ses rappels planifiés. En pratique ça ne
+marchait pas : ces confirmations viennent de la **plateforme claude.ai**
+(la couche qui fait tourner les sessions), pas de l'application — et elles
+ne peuvent **pas** être désactivées depuis le dépôt. Le réglage sans effet
+a donc été retiré. Aucun impact sur l'outil ; pour éviter ces fenêtres, la
+seule voie reste de ne pas déclencher ces tâches planifiées.
+
+> **🔧 Notes techniques**
+> Retrait du bloc `permissions.allow` (`mcp__Claude_Code_Remote__*`) de
+> `.claude/settings.json` — inefficace : testé en direct, le prompt
+> réapparaît malgré la règle chargée au démarrage. Ces approbations (outils
+> Routines / Remote Control) ne transitent pas par le système de permissions
+> du repo, mais par la couche Remote Control de claude.ai. Piège documenté
+> dans `KNOWN_ISSUES.md` (« Prompts Claude Code Remote (Routines) »).
+
 ## v1.88.0 — 15/07/2026 à 10:49 — Synthèse IA : bouton « Relancer l'analyse » et prise en compte des communications Parallel
 
 La **synthèse IA** (« Cerveau ») de chaque fiche entité peut désormais être
