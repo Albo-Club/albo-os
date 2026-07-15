@@ -552,7 +552,8 @@ const SOURCE_DETAIL_LABELS: Record<string, string> = {
   parse_failed: 'fichier illisible',
   download_failed: 'téléchargement impossible',
   file_too_large: 'fichier > 20 Mo — non conservé',
-  notion_unreachable: 'page Notion privée — partage-la publiquement puis re-transfère',
+  notion_unreachable:
+    "page Notion inaccessible — vérifie qu'elle est partagée publiquement, puis « Retraiter » depuis la file",
   gdrive_unreachable: 'fichier Drive non partagé — active « accès par lien » ou joins le fichier',
   docsend_failed: 'conversion DocSend impossible — télécharge le PDF et re-transfère',
   small_image_skipped: 'petite image (logo) ignorée',
