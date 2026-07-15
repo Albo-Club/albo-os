@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.88.3 — 15/07/2026 à 17:40 — Pont Parallel → fiches deal : pré-remplissage des instruments SPV (simulation)
+## v1.90.1 — 15/07/2026 à 17:40 — Pont Parallel → fiches deal : pré-remplissage des instruments SPV (simulation)
 
 Nouvel outil interne pour **réconcilier les positions Parallel (Vasco) avec les
 fiches deal des SPV** et compléter les détails d'instrument manquants — montant
@@ -49,6 +49,96 @@ stade ; c'est le socle avant de fiabiliser les fiches SPV.
 > Écriture via `applyInstrumentBridgePatch` (marque `manuallyEditedFields`).
 > Piège de cycle d'inférence TS documenté dans `KNOWN_ISSUES.md`
 > « VASCO API → instrument bridge ».
+## v1.90.0 — 15/07/2026 à 17:39 — Fiches Parallel : la description de l'opération est générée depuis Parallel
+
+Les SPV Parallel n'avaient pas de description utile : le one-liner et le résumé
+sous l'en-tête se basent d'habitude sur le **site web** de la société — or un SPV
+n'en a pas (son domaine pointe la plateforme). Désormais, pour une entité
+**rattachée à son SPV Parallel**, Albo génère ces deux champs à partir des
+**communications Parallel** : nature de l'opération (promotion immobilière,
+club deal, dette, foncière, tech…), **géographie** et stade. On sait d'un coup
+d'œil, en arrivant sur la fiche, de quoi il s'agit.
+
+C'est généré **automatiquement au rattachement** d'une entité à son SPV, et un
+rattrapage couvre toutes les entités Parallel déjà rattachées. Ça **remplace** la
+description issue du domaine (inadaptée aux SPV). Valable pour **toutes les orgs**
+qui ont une connexion Parallel (Calte aujourd'hui, Albo dès qu'elle sera
+branchée).
+
+> **🔧 Notes techniques**
+>
+> - `companyEnrichment.ts` : 2ᵉ source de pitch « VASCO » à côté de la source
+>   « site web ». `enrichFromVasco` lit les communications en cache
+>   (`vascoCommunicationsCache`, filtré par `vascoClientSlug` + `vascoIssuerId`)
+>   + le nom du SPV → `generatePitch` (helper LLM factorisé, `getModel()`) →
+>   `applyVascoPitch` qui **écrase** `oneLiner` + `summary` (vs `applyEnrichment`,
+>   additif). Skip si non rattaché / pas de comms en cache.
+> - Déclencheurs org-agnostiques (pilotés par le lien VASCO, jamais l'org) :
+>   `setVascoLink` planifie `enrichFromVasco` ; backfill one-shot
+>   `backfillVascoPitches` (rafraîchit le cache par org puis décrit toutes les
+>   entités rattachées de chaque org ayant une connexion active). cf.
+>   MIGRATIONS.md.
+
+## v1.89.1 — 15/07/2026 à 17:24 — Documentation produit complète
+
+Albo dispose désormais d'une **documentation produit** qui explique, page par
+page, comment fonctionne chaque partie de l'outil — participations, deals,
+trésorerie, pointage, prévisionnel, passif, assistant IA, intégrations,
+comptes et organisations. Écrite pour quelqu'un qui n'a pas construit
+l'outil, en langage simple, elle décrit l'état courant de chaque
+fonctionnalité (là où ces Nouveautés racontent ce qui change au fil du
+temps). Elle sera tenue à jour à chaque évolution, et une copie de lecture
+est disponible dans les documents du projet Linear « Albo OS ».
+
+> **🔧 Notes techniques**
+>
+> - Nouveau dossier `docs/produit/` : 16 pages markdown (README sommaire +
+>   15 pages par module), gabarit commun « à quoi ça sert / comment ça
+>   marche / points d'attention / pages liées », rédigées depuis une
+>   exploration complète du code (routes, modules Convex, agent, MCP).
+> - `CLAUDE.md` : question 7 ajoutée à l'audit doc pré-PR (toute feature
+>   visible ajoutée/modifiée/retirée → mettre à jour la page
+>   `docs/produit/` correspondante dans la même PR) + entrée dans « Where
+>   things live ». Le dossier repo est la source de vérité, miroir Linear
+>   en lecture.
+
+## v1.89.0 — 15/07/2026 à 13:40 — Communications Parallel : chargement instantané (cache + rafraîchissement automatique)
+
+Ouvrir le rattachement à un SPV Parallel et afficher les communications d'une
+entité étaient **lents** : à chaque clic, Albo se reconnectait à Parallel et
+retéléchargeait tout. Désormais Albo garde une **copie locale** des
+communications Parallel : l'ouverture du sélecteur de SPV **et** l'affichage des
+communications sont **instantanés**. Cette copie est **rafraîchie automatiquement
+tous les 2 jours** en arrière-plan, et un bouton **« Rafraîchir »** permet de
+forcer une mise à jour immédiate (par exemple juste après un nouveau deal). La
+toute première ouverture reste un chargement en direct — le temps de remplir la
+copie — puis tout est instantané.
+
+À noter : Parallel n'envoie aucune notification quand une communication ou un SPV
+est ajouté, donc un nouvel élément apparaît au prochain rafraîchissement
+(automatique sous 2 jours, ou immédiat via le bouton).
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle table `vascoCommunicationsCache` (1 ligne par communication ;
+>   remplacement **atomique** par `(orgId, clientSlug)`). Métadonnées seulement —
+>   les octets des PDF restent téléchargés en direct
+>   (`downloadCommunicationDocument`).
+> - `vasco.ts` : lectures **réactives** `listCachedVascoIssuers` /
+>   `getCachedCommunications` (l'UI lit le cache → instantané) ; rafraîchissement
+>   `refreshVascoCacheForOrg` (pull complet → `replaceCommunicationsCache`,
+>   best-effort : un échec garde l'ancien cache) exposé via un cron
+>   `refreshAllVascoCaches` (`crons.ts`, toutes les 48 h) **et** une action
+>   publique `refreshVascoCacheNow` (org-guardée, bouton « Rafraîchir »).
+>   Suppression des actions live `listVascoIssuers` / `fetchCommunications` (+ le
+>   pull allégé de la v1.88.2), remplacées par le cache.
+> - Front `VascoCommunicationsSection` : picker + liste lisent les queries du
+>   cache ; amorçage (option 1) = un pull au 1er affichage si le cache est vide ;
+>   bouton « Rafraîchir » via le hook `useVascoRefresh`. i18n
+>   `vasco:communications.refreshError` (en+fr).
+> - Contexte : VASCO n'expose **pas** de webhook pour le persona investisseur
+>   (pull-only, vérifié sur la doc API) → cache + cron + refresh manuel est la
+>   seule voie « rapide ET frais ».
 
 ## v1.88.2 — 15/07/2026 à 11:59 — Rattachement Parallel : ciblé sur les bonnes entités et plus rapide à ouvrir
 

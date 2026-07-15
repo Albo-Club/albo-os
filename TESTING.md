@@ -620,21 +620,26 @@ complet + re-auth), Rejeter. Gabarits français dans
 
 ## Communications Parallel (VASCO) → section Report par entité
 
-Lecture **live** (actions, non réactif) ; scoping org + rattachement entité ↔
-émetteur **par id**. Le bloc apparaît sur toute entité **portfolio** (investie)
-ou déjà rattachée ; jamais sur les entités juridiques du groupe (`group_*`).
-Nécessite une connexion VASCO active (org `calte`).
+Communications **mises en cache** (`vascoCommunicationsCache`) et lues via des
+queries **réactives** (affichage instantané) ; rafraîchies par un **cron toutes
+les 48 h** + un bouton **« Rafraîchir »** (VASCO n'a pas de webhook investisseur,
+d'où le pull). Scoping org + rattachement entité ↔ émetteur **par id**. Le bloc
+apparaît sur les entités **portfolio Parallel** (nom/domaine/origine « Parallel »)
+ou déjà rattachées ; jamais sur les `group_*`. Nécessite une connexion VASCO
+active (org `calte`).
 
 | Ref | Scénario | Attendu |
 | --- | --- | --- |
 | VC1 | Fiche entité **portfolio Parallel** (nom/domaine/origine contient « Parallel »), non rattachée → onglet Reports | Encart pointillé « Rattachez cette entité à son deal Parallel… » + bouton « Rattacher à Parallel » |
 | VC1b | Fiche entité **portfolio non-Parallel** (boîte lambda) **ou** entité `group_*` → onglet Reports | **Aucun** bloc de rattachement — l'encart ne s'affiche que sur les entités Parallel ou déjà rattachées |
-| VC2 | « Rattacher à Parallel » → dialog | Liste des SPV (label + dernier titre) chargée live ; clic sur un SPV → toast, dialog fermé, entité rattachée |
-| VC3 | Entité rattachée → onglet Reports | Bloc « Communications Parallel » : communications datées (desc), titre, corps texte, PJ ; « Rafraîchir » recharge |
+| VC2 | « Rattacher à Parallel » → dialog | Liste des SPV (label + dernier titre) lue depuis le cache, **instantanée** si déjà rempli ; **1re fois** (cache vide) = un chargement live puis instantané ensuite. Clic sur un SPV → toast, dialog fermé, entité rattachée. Bouton « Rafraîchir » présent dans le dialog |
+| VC3 | Entité rattachée → onglet Reports | Bloc « Communications Parallel » lu depuis le cache (**instantané**) : communications datées (desc), titre, corps texte, PJ ; « Rafraîchir » re-pull Parallel et met le cache à jour → le bloc se réactualise seul |
 | VC4 | Communication avec PJ → « Télécharger » | Le document s'ouvre (proxy authentifié Convex) ; échec → toast, jamais de lien cassé |
 | VC5 | « Modifier le rattachement » → « Détacher » | Rattachement supprimé (toast) ; le bloc redevient le bouton « Rattacher » |
 | VC6 | Émetteur sans communication | État vide « Aucune communication pour ce deal » (pas d'erreur) |
 | VC7 | i18n EN/FR sur tout le bloc | Titres, boutons, états et toasts traduits (namespace `vasco`) |
+| VC8 | **Fraîcheur du cache.** Nouveau SPV / nouvelle communication côté Parallel | Apparaît après le prochain **cron (48 h)** **ou** un clic **« Rafraîchir »** — pas d'apparition instantanée (pas de webhook). Un échec de pull garde l'ancien cache (jamais vidé) |
+| VC9 | **Description via VASCO.** Entité Parallel rattachée à son SPV → en-tête de la fiche | `oneLiner` + résumé décrivent l'**opération** (nature : promotion / dette / foncière / tech…, **géographie**, stade), générés depuis les communications et **écrasant** la description issue du domaine. Auto au rattachement (`setVascoLink`) ; rattrapage global `convex run --prod companyEnrichment:backfillVascoPitches '{}'` (toutes orgs avec connexion VASCO). Skip si pas de comms en cache. **Prod only** (LLM + VASCO) |
 
 ## Instruments SPV depuis Parallel (VASCO) → pré-remplissage des fiches deal
 

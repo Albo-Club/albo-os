@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAction } from 'convex/react'
-import { useConvexMutation } from '@convex-dev/react-query'
+import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import {
@@ -146,8 +146,28 @@ function CommunicationCard({
   )
 }
 
-/** Live list of communications for a linked entity. Fetches on mount and on
- * demand (the underlying Convex function is an action, not reactive). */
+/** Shared "refresh now" trigger: pulls Parallel live and refreshes the org's
+ * cache; the reactive read queries then update on their own. */
+function useVascoRefresh(orgId: Doc<'companies'>['orgId']) {
+  const { t } = useTranslation('vasco')
+  const refreshNow = useAction(api.vasco.refreshVascoCacheNow)
+  const [refreshing, setRefreshing] = useState(false)
+  const doRefresh = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await refreshNow({ orgId })
+    } catch {
+      toast.error(t('communications.refreshError'))
+    } finally {
+      setRefreshing(false)
+    }
+  }, [refreshNow, orgId, t])
+  return { refreshing, doRefresh }
+}
+
+/** Communications for a linked entity — read from the local cache (reactive,
+ * instant). Kept fresh by a cron + the manual "refresh" button. On the first
+ * ever view (empty cache) it pulls once to bootstrap. */
 function CommunicationsList({
   company,
   onChangeLink,
@@ -156,26 +176,26 @@ function CommunicationsList({
   onChangeLink: () => void
 }) {
   const { t } = useTranslation('vasco')
-  const fetchComms = useAction(api.vasco.fetchCommunications)
   const clientSlug = company.vascoClientSlug ?? ''
   const issuerId = company.vascoIssuerId ?? ''
-  const [status, setStatus] = useState<'loading' | 'error' | 'ready'>('loading')
-  const [items, setItems] = useState<Array<VascoCommunication>>([])
+  const data = useConvexQuery(api.vasco.getCachedCommunications, {
+    orgId: company.orgId,
+    clientSlug,
+    issuerId,
+  })
+  const { refreshing, doRefresh } = useVascoRefresh(company.orgId)
+  const bootstrapped = useRef(false)
 
-  const load = useCallback(async () => {
-    setStatus('loading')
-    try {
-      const res = await fetchComms({ orgId: company.orgId, clientSlug, issuerId })
-      setItems(res.communications)
-      setStatus('ready')
-    } catch {
-      setStatus('error')
-    }
-  }, [fetchComms, company.orgId, clientSlug, issuerId])
-
+  // Bootstrap (option 1): if the cache has never been filled, pull once.
   useEffect(() => {
-    void load()
-  }, [load])
+    if (data && data.lastFetchedAt === null && !bootstrapped.current) {
+      bootstrapped.current = true
+      void doRefresh()
+    }
+  }, [data, doRefresh])
+
+  const items = data?.communications ?? []
+  const loading = data === undefined || (refreshing && items.length === 0)
 
   return (
     <section className="space-y-3">
@@ -187,11 +207,11 @@ function CommunicationsList({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => void load()}
-            disabled={status === 'loading'}
+            onClick={() => void doRefresh()}
+            disabled={refreshing}
           >
             <RefreshCw
-              className={status === 'loading' ? 'size-4 animate-spin' : 'size-4'}
+              className={refreshing ? 'size-4 animate-spin' : 'size-4'}
             />
             {t('communications.refresh')}
           </Button>
@@ -202,22 +222,17 @@ function CommunicationsList({
         </div>
       </div>
 
-      {status === 'loading' && (
+      {loading && (
         <div className="text-muted-foreground text-sm">
           {t('communications.loading')}
         </div>
       )}
-      {status === 'error' && (
-        <div className="text-destructive text-sm">
-          {t('communications.error')}
-        </div>
-      )}
-      {status === 'ready' && items.length === 0 && (
+      {!loading && items.length === 0 && (
         <div className="text-muted-foreground rounded-xl border border-dashed p-6 text-center text-sm">
           {t('communications.empty')}
         </div>
       )}
-      {status === 'ready' && items.length > 0 && (
+      {items.length > 0 && (
         <div className="space-y-2">
           {items.map((c) => (
             <CommunicationCard
@@ -242,30 +257,24 @@ function LinkParallelDialog({
   onClose: () => void
 }) {
   const { t } = useTranslation('vasco')
-  const listIssuers = useAction(api.vasco.listVascoIssuers)
   const setLink = useConvexMutation(api.companies.setVascoLink)
-  const [status, setStatus] = useState<'loading' | 'error' | 'ready'>('loading')
-  const [issuers, setIssuers] = useState<
-    Array<{
-      clientSlug: string
-      issuerId: string
-      issuerLabel: string | null
-      sampleTitle: string | null
-    }>
-  >([])
+  const data = useConvexQuery(api.vasco.listCachedVascoIssuers, {
+    orgId: company.orgId,
+  })
+  const { refreshing, doRefresh } = useVascoRefresh(company.orgId)
+  const bootstrapped = useRef(false)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
 
+  // Bootstrap (option 1): if the cache has never been filled, pull once.
   useEffect(() => {
-    void (async () => {
-      try {
-        const res = await listIssuers({ orgId: company.orgId })
-        setIssuers(res.issuers)
-        setStatus('ready')
-      } catch {
-        setStatus('error')
-      }
-    })()
-  }, [listIssuers, company.orgId])
+    if (data && data.lastFetchedAt === null && !bootstrapped.current) {
+      bootstrapped.current = true
+      void doRefresh()
+    }
+  }, [data, doRefresh])
+
+  const issuers = data?.issuers ?? []
+  const loading = data === undefined || (refreshing && issuers.length === 0)
 
   async function handlePick(clientSlug: string, issuerId: string) {
     setPendingKey(`${clientSlug}:${issuerId}`)
@@ -304,22 +313,17 @@ function LinkParallelDialog({
           <DialogDescription>{t('link.dialogDescription')}</DialogDescription>
         </DialogHeader>
 
-        {status === 'loading' && (
+        {loading && (
           <div className="text-muted-foreground text-sm">
             {t('link.loadingIssuers')}
           </div>
         )}
-        {status === 'error' && (
-          <div className="text-destructive text-sm">
-            {t('link.issuersError')}
-          </div>
-        )}
-        {status === 'ready' && issuers.length === 0 && (
+        {!loading && issuers.length === 0 && (
           <div className="text-muted-foreground text-sm">
             {t('link.noIssuers')}
           </div>
         )}
-        {status === 'ready' && issuers.length > 0 && (
+        {!loading && issuers.length > 0 && (
           <div className="space-y-1">
             {issuers.map((iss) => {
               const key = `${iss.clientSlug}:${iss.issuerId}`
@@ -354,8 +358,19 @@ function LinkParallelDialog({
           </div>
         )}
 
-        {currentKey && (
-          <DialogFooter>
+        <DialogFooter className="sm:justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void doRefresh()}
+            disabled={refreshing}
+          >
+            <RefreshCw
+              className={refreshing ? 'size-4 animate-spin' : 'size-4'}
+            />
+            {t('communications.refresh')}
+          </Button>
+          {currentKey && (
             <Button
               variant="outline"
               onClick={() => void handleUnlink()}
@@ -364,8 +379,8 @@ function LinkParallelDialog({
               <Unlink className="size-4" />
               {pendingKey === 'unlink' ? t('link.unlinking') : t('link.unlink')}
             </Button>
-          </DialogFooter>
-        )}
+          )}
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

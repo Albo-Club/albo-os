@@ -24,6 +24,7 @@ import {
   internalAction,
   internalMutation,
   internalQuery,
+  query,
 } from './_generated/server'
 import { internal } from './_generated/api'
 import { requireOrgMember } from './lib/auth'
@@ -95,7 +96,7 @@ async function vascoLogin(
 async function vascoGraphql<T>(
   clientSlug: string,
   token: string,
-  query: string,
+  gqlQuery: string,
   variables: Record<string, unknown> = {},
 ): Promise<T> {
   const res = await fetch(`${vascoBaseUrl(clientSlug)}/graphql/`, {
@@ -105,7 +106,7 @@ async function vascoGraphql<T>(
       Authorization: `Bearer ${token}`,
       'User-Agent': USER_AGENT,
     },
-    body: JSON.stringify({ query, variables }),
+    body: JSON.stringify({ query: gqlQuery, variables }),
   })
   const json = (await res.json()) as {
     data?: T
@@ -130,7 +131,7 @@ async function vascoGraphql<T>(
 async function vascoGraphqlRaw(
   clientSlug: string,
   token: string,
-  query: string,
+  gqlQuery: string,
   variables: Record<string, unknown> = {},
 ): Promise<{ httpStatus: number; body: unknown }> {
   const res = await fetch(`${vascoBaseUrl(clientSlug)}/graphql/`, {
@@ -140,7 +141,7 @@ async function vascoGraphqlRaw(
       Authorization: `Bearer ${token}`,
       'User-Agent': USER_AGENT,
     },
-    body: JSON.stringify({ query, variables }),
+    body: JSON.stringify({ query: gqlQuery, variables }),
   })
   const text = await res.text().catch(() => '')
   try {
@@ -191,21 +192,6 @@ const GET_COMMUNICATIONS = `query($accountId: ID, $userId: ID, $issuerId: ID) {
     publishDate
     issuer { id label }
     communicationDocuments { id document { id name createdAt contentType downloadUrl } }
-  }
-}`
-
-// Lightweight selection for the issuer picker: issuer + title + dates only, no
-// `htmlContent` (full bodies) and no `communicationDocuments` (per-doc arrays).
-// `listVascoIssuers` only needs distinct issuers + a sample title, so pulling
-// the heavy fields for every communication just to dedupe was the main cost of
-// opening the linker. cf. KNOWN_ISSUES.md "VASCO API".
-const GET_COMMUNICATIONS_LIGHT = `query($accountId: ID, $userId: ID, $issuerId: ID) {
-  GetCommunications(accountId: $accountId, userId: $userId, issuerId: $issuerId) {
-    id
-    title
-    period
-    publishDate
-    issuer { id label }
   }
 }`
 
@@ -803,51 +789,6 @@ async function pullCommunications(
     .map(shapeCommunication)
 }
 
-// Minimal shape returned by the light pull — just what the issuer picker needs.
-type VascoCommunicationLight = {
-  issuerId: string
-  issuerLabel: string | null
-  title: string | null
-  period: string | null
-  publishDate: string | null
-}
-
-type CommunicationLightNode = {
-  id: string
-  title?: string | null
-  period?: string | null
-  publishDate?: string | null
-  issuer?: { id: string; label?: string | null } | null
-}
-
-type GetCommunicationsLightResult = {
-  GetCommunications: Array<CommunicationLightNode | null> | null
-}
-
-/** Like `pullCommunications`, but with the light selection (no bodies/documents)
- * — for the issuer picker (`listVascoIssuers`), which only dedupes issuers and
- * shows a sample title. */
-async function pullCommunicationsLight(
-  creds: VascoCreds,
-): Promise<Array<VascoCommunicationLight>> {
-  const { token, userId } = await vascoLogin(creds)
-  const data = await vascoGraphql<GetCommunicationsLightResult>(
-    creds.clientSlug,
-    token,
-    GET_COMMUNICATIONS_LIGHT,
-    { userId },
-  )
-  return (data.GetCommunications ?? [])
-    .filter((c): c is CommunicationLightNode => c != null)
-    .map((node) => ({
-      issuerId: node.issuer?.id ?? '',
-      issuerLabel: node.issuer?.label ?? null,
-      title: node.title ?? null,
-      period: node.period ?? null,
-      publishDate: node.publishDate ?? null,
-    }))
-}
-
 /** Active connections of `orgId` matching `clientSlug`. Org-member-guarded via
  * the caller's identity (propagated from the calling action). */
 async function activeConnectionsForClient(
@@ -862,19 +803,167 @@ async function activeConnectionsForClient(
   return conns.filter((c) => c.clientSlug === clientSlug)
 }
 
-/**
- * Distinct VASCO issuers (Parallel SPVs) reachable for `orgId`, each annotated
- * with the most recent communication title so the entity↔issuer link is
- * pickable (labels alone are opaque "SPVn"). Org-member-guarded. On-demand
- * action (login + external call) — NOT reactive.
- */
-export const listVascoIssuers = action({
+// ── Communications cache (stored, cron-refreshed) ───────────────────────────
+//
+// VASCO has no webhook for the investor persona (pull-only), and reading live
+// on every UI open is slow (login + full GetCommunications). So we cache the
+// communications in `vascoCommunicationsCache` and refresh on a cron (+ a manual
+// button). The UI reads the cache via reactive queries (instant); freshness is
+// bounded by the cron cadence. cf. KNOWN_ISSUES.md "VASCO API".
+
+/** All active connections across every org — auth-less, for the cron. INTERNAL
+ * ONLY (rows carry credentials). */
+export const getAllActiveConnections = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const conns = await ctx.db.query('vascoConnections').collect()
+    return conns.filter((c) => c.active)
+  },
+})
+
+/** Atomically replace the cached communications of one (org, clientSlug): drop
+ * the stale rows, insert the freshly pulled set. One transaction, so a reader
+ * never sees a half-empty cache. */
+export const replaceCommunicationsCache = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    clientSlug: v.string(),
+    communications: v.array(
+      v.object({
+        communicationId: v.string(),
+        issuerId: v.string(),
+        issuerLabel: v.union(v.string(), v.null()),
+        title: v.union(v.string(), v.null()),
+        bodyText: v.union(v.string(), v.null()),
+        period: v.union(v.string(), v.null()),
+        publishDate: v.union(v.string(), v.null()),
+        documents: v.array(
+          v.object({
+            documentId: v.string(),
+            name: v.union(v.string(), v.null()),
+            contentType: v.union(v.string(), v.null()),
+            createdAt: v.union(v.string(), v.null()),
+          }),
+        ),
+      }),
+    ),
+  },
+  handler: async (ctx, { orgId, clientSlug, communications }) => {
+    const existing = await ctx.db
+      .query('vascoCommunicationsCache')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    for (const row of existing) {
+      if (row.clientSlug === clientSlug)
+        await ctx.db.delete('vascoCommunicationsCache', row._id)
+    }
+    const fetchedAt = Date.now()
+    for (const c of communications) {
+      await ctx.db.insert('vascoCommunicationsCache', {
+        orgId,
+        clientSlug,
+        issuerId: c.issuerId,
+        communicationId: c.communicationId,
+        issuerLabel: c.issuerLabel ?? undefined,
+        title: c.title ?? undefined,
+        bodyText: c.bodyText ?? undefined,
+        period: c.period ?? undefined,
+        publishDate: c.publishDate ?? undefined,
+        documents: c.documents.map((d) => ({
+          documentId: d.documentId,
+          name: d.name ?? undefined,
+          contentType: d.contentType ?? undefined,
+          createdAt: d.createdAt ?? undefined,
+        })),
+        fetchedAt,
+      })
+    }
+  },
+})
+
+/** Pull every active connection of `orgId` and refresh its cache. Best-effort
+ * per client: if all of a client's connections fail to log in, the existing
+ * cache is KEPT (not wiped). System-context safe (auth-less connection query),
+ * so it serves both the cron and the manual "refresh". */
+export const refreshVascoCacheForOrg = internalAction({
   args: { orgId: v.id('organizations') },
   handler: async (ctx, { orgId }) => {
     const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
-      internal.vasco.authorizeAndListConnections,
+      internal.vasco.getActiveConnectionsByOrgId,
       { orgId },
     )
+    // Group by client so a stale duplicate connection can't wipe a good cache.
+    const byClient = new Map<string, Array<Doc<'vascoConnections'>>>()
+    for (const conn of conns) {
+      const list = byClient.get(conn.clientSlug) ?? []
+      list.push(conn)
+      byClient.set(conn.clientSlug, list)
+    }
+    for (const [clientSlug, clientConns] of byClient) {
+      let communications: Array<VascoCommunication> | null = null
+      for (const conn of clientConns) {
+        try {
+          communications = await pullCommunications(conn)
+          break
+        } catch (err) {
+          console.warn(
+            `[vasco] cache refresh pull failed for ${conn.clientSlug}:`,
+            err instanceof Error ? err.message : String(err),
+          )
+        }
+      }
+      if (communications == null) continue // all failed → keep existing cache
+      await ctx.runMutation(internal.vasco.replaceCommunicationsCache, {
+        orgId,
+        clientSlug,
+        communications,
+      })
+    }
+  },
+})
+
+/** Cron entry point: refresh the cache of every org that has an active VASCO
+ * connection. */
+export const refreshAllVascoCaches = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
+      internal.vasco.getAllActiveConnections,
+      {},
+    )
+    const orgIds = Array.from(new Set(conns.map((c) => c.orgId)))
+    for (const orgId of orgIds) {
+      await ctx.runAction(internal.vasco.refreshVascoCacheForOrg, { orgId })
+    }
+  },
+})
+
+/** Manual "refresh now" — org-member-guarded. Pulls Parallel live and updates
+ * the cache; the reactive read queries then update on their own. */
+export const refreshVascoCacheNow = action({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }): Promise<{ refreshedAt: number }> => {
+    // Guard: throws unless the caller is a member of the org.
+    await ctx.runQuery(internal.vasco.authorizeAndListConnections, { orgId })
+    await ctx.runAction(internal.vasco.refreshVascoCacheForOrg, { orgId })
+    return { refreshedAt: Date.now() }
+  },
+})
+
+/**
+ * Distinct cached issuers (Parallel SPVs) for `orgId`, each annotated with its
+ * most recent communication title so the entity↔issuer link is pickable (labels
+ * alone are opaque "SPVn"). Reactive — reads the cache, no live call.
+ * `lastFetchedAt` is null when the cache has never been filled (bootstrap hint).
+ */
+export const listCachedVascoIssuers = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+    const rows = await ctx.db
+      .query('vascoCommunicationsCache')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
     const byKey = new Map<
       string,
       {
@@ -885,31 +974,23 @@ export const listVascoIssuers = action({
         latest: string
       }
     >()
-    const errors: Array<{ clientSlug: string; label: string; error: string }> =
-      []
-    for (const conn of conns) {
-      try {
-        const comms = await pullCommunicationsLight(conn)
-        for (const c of comms) {
-          if (!c.issuerId) continue
-          const key = `${conn.clientSlug}:${c.issuerId}`
-          const stamp = c.publishDate ?? c.period ?? ''
-          const existing = byKey.get(key)
-          if (!existing || stamp > existing.latest) {
-            byKey.set(key, {
-              clientSlug: conn.clientSlug,
-              issuerId: c.issuerId,
-              issuerLabel: c.issuerLabel,
-              sampleTitle: c.title,
-              latest: stamp,
-            })
-          }
-        }
-      } catch (err) {
-        errors.push({
-          clientSlug: conn.clientSlug,
-          label: conn.label,
-          error: err instanceof Error ? err.message : String(err),
+    let lastFetchedAt: number | null = null
+    for (const r of rows) {
+      lastFetchedAt =
+        lastFetchedAt == null
+          ? r.fetchedAt
+          : Math.max(lastFetchedAt, r.fetchedAt)
+      if (!r.issuerId) continue
+      const key = `${r.clientSlug}:${r.issuerId}`
+      const stamp = r.publishDate ?? r.period ?? ''
+      const existing = byKey.get(key)
+      if (!existing || stamp > existing.latest) {
+        byKey.set(key, {
+          clientSlug: r.clientSlug,
+          issuerId: r.issuerId,
+          issuerLabel: r.issuerLabel ?? null,
+          sampleTitle: r.title ?? null,
+          latest: stamp,
         })
       }
     }
@@ -921,50 +1002,61 @@ export const listVascoIssuers = action({
         issuerLabel: i.issuerLabel,
         sampleTitle: i.sampleTitle,
       }))
-    return { orgId, issuers, errors }
+    return { issuers, lastFetchedAt }
   },
 })
 
 /**
- * Communications for one entity's linked VASCO issuer, date-desc.
- * Org-member-guarded. On-demand action (login + external call) — NOT reactive.
+ * Cached communications for one entity's linked issuer, date-desc. Reactive.
+ * `lastFetchedAt` is the org-level cache stamp (null = never filled) so the UI
+ * can distinguish "issuer has no communications" from "cache not yet built".
  */
-export const fetchCommunications = action({
+export const getCachedCommunications = query({
   args: {
     orgId: v.id('organizations'),
     clientSlug: v.string(),
     issuerId: v.string(),
   },
   handler: async (ctx, { orgId, clientSlug, issuerId }) => {
-    const conns = await activeConnectionsForClient(ctx, orgId, clientSlug)
-    if (conns.length === 0) throw new ConvexError('vasco_no_connection')
-    // Try each matching connection until one logs in (tolerates a stale dup).
-    let lastError: string | null = null
-    for (const conn of conns) {
-      try {
-        const all = await pullCommunications(conn)
-        const communications = all
-          .filter((c) => c.issuerId === issuerId)
-          .sort((a, b) =>
-            (b.publishDate ?? '').localeCompare(a.publishDate ?? ''),
-          )
-        return { orgId, clientSlug, issuerId, communications }
-      } catch (err) {
-        lastError = err instanceof Error ? err.message : String(err)
-      }
-    }
-    throw new ConvexError(`vasco_fetch_failed: ${lastError ?? 'unknown'}`)
+    await requireOrgMember(ctx, orgId)
+    const rows = await ctx.db
+      .query('vascoCommunicationsCache')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    const lastFetchedAt = rows.reduce<number | null>(
+      (acc, r) => (acc == null ? r.fetchedAt : Math.max(acc, r.fetchedAt)),
+      null,
+    )
+    const communications: Array<VascoCommunication> = rows
+      .filter((r) => r.clientSlug === clientSlug && r.issuerId === issuerId)
+      .map((r) => ({
+        communicationId: r.communicationId,
+        issuerId: r.issuerId,
+        issuerLabel: r.issuerLabel ?? null,
+        title: r.title ?? null,
+        bodyText: r.bodyText ?? null,
+        period: r.period ?? null,
+        publishDate: r.publishDate ?? null,
+        documents: r.documents.map((d) => ({
+          documentId: d.documentId,
+          name: d.name ?? null,
+          contentType: d.contentType ?? null,
+          createdAt: d.createdAt ?? null,
+        })),
+      }))
+      .sort((a, b) => (b.publishDate ?? '').localeCompare(a.publishDate ?? ''))
+    return { communications, lastFetchedAt }
   },
 })
 
 /**
- * Same issuer-scoped read as `fetchCommunications`, but for the AI-synthesis
- * runner (`intelligence.runAnalysis`), which runs in system context (no user
- * identity → can't go through the org-member-guarded path). Resolves the org's
- * active connections for `clientSlug` via the auth-less internal query, logs
- * in, and returns the issuer's communications date-desc. Best-effort: returns
- * `[]` if no connection logs in, so the synthesis still runs on the
- * company/report context alone.
+ * Live issuer-scoped read for the AI-synthesis runner (`intelligence.runAnalysis`),
+ * which runs in system context (no user identity → can't go through the
+ * org-member-guarded path) and wants the freshest communications rather than the
+ * cache. Resolves the org's active connections for `clientSlug` via the
+ * auth-less internal query, logs in, and returns the issuer's communications
+ * date-desc. Best-effort: returns `[]` if no connection logs in, so the
+ * synthesis still runs on the company/report context alone.
  */
 export const pullCommunicationsForSynthesis = internalAction({
   args: {

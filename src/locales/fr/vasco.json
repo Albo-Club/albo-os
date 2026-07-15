@@ -4,6 +4,7 @@
     "refresh": "Rafraîchir",
     "loading": "Chargement des communications…",
     "error": "Impossible de charger les communications Parallel.",
+    "refreshError": "Impossible de rafraîchir depuis Parallel.",
     "empty": "Aucune communication pour ce deal pour l'instant.",
     "publishedOn": "Publié le {{date}}",
     "download": "Télécharger",

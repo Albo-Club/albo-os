@@ -2151,15 +2151,21 @@ SPV13"), dated (`publishDate`/`period`), with `title`, `htmlContent`, and
   lives in the `title` / position `securityName`. So an Albo OS entity is linked
   to its issuer **by id**, stored on `companies.vascoClientSlug` +
   `companies.vascoIssuerId` (set together via `companies.setVascoLink`; matched
-  by id, never by name). The entity's Report section then reads
-  `fetchCommunications({orgId, clientSlug, issuerId})`; the issuer picker is fed
-  by `listVascoIssuers` (distinct issuers + latest title as a human hint).
-- **Picker uses a light query.** `listVascoIssuers` only needs distinct issuers +
-  a sample title, so it pulls `GET_COMMUNICATIONS_LIGHT` (`pullCommunicationsLight`)
-  — issuer + title + dates, **no** `htmlContent` / `communicationDocuments`.
-  Pulling the full bodies for every communication just to dedupe issuers was the
-  main latency of opening the linker. `fetchCommunications` keeps the full query
-  (the list needs bodies + attachments).
+  by id, never by name). The entity's Report section reads the cache query
+  `getCachedCommunications({orgId, clientSlug, issuerId})`; the issuer picker is
+  fed by `listCachedVascoIssuers` (distinct issuers + latest title as a human
+  hint) — both reactive, both reading `vascoCommunicationsCache`.
+- **Cached, not live-on-open (the big perf lever).** Reading VASCO live on every
+  UI open is slow (login + full `GetCommunications`) and there is **no webhook**
+  for the investor persona to push updates (pull-only — verified against the API
+  docs). So communications are cached in `vascoCommunicationsCache` and refreshed
+  by (a) a cron every 48h (`refreshAllVascoCaches` → `refreshVascoCacheForOrg` →
+  `pullCommunications` → `replaceCommunicationsCache`, atomic replace per
+  `(orgId, clientSlug)`) and (b) a manual "refresh" button (`refreshVascoCacheNow`,
+  org-member-guarded). The UI reads the cache (instant, reactive). First-ever view
+  bootstraps by triggering one refresh. A failed pull KEEPS the existing cache
+  (never wiped). Only communication metadata is cached — the document BYTES are
+  still fetched live on demand.
 - **Which entities show the linker.** `VascoCommunicationsSection` renders only on
   `kind: 'portfolio'` entities that look like Parallel investments —
   `/parallel/i` over `name + domain + sponsor + group` — plus any already-linked
@@ -2176,9 +2182,10 @@ SPV13"), dated (`publishDate`/`period`), with `title`, `htmlContent`, and
 - **`htmlContent` is stripped to plain text** server-side (`stripHtml`) before it
   reaches the client: it's raw HTML from an external source and the in-app
   renderer drops HTML anyway. Full formatting stays in the attached PDF.
-- All three actions are org-member-guarded and **live-read only** (no valuation
-  or communication is persisted). They are actions (login + external calls), so
-  the UI fetches on mount + a Refresh button — not reactive.
+- **Positions stay live.** `fetchParticipations` (positions / valuations) is an
+  org-member-guarded live read, nothing persisted — actions (login + external
+  calls), fetched on mount + Refresh. Communications are the exception: cached
+  (above), so their UI is reactive and instant.
 - **Stale duplicate connection.** calte still has a second `parallel` connection
   row whose login 401s; the read actions iterate matching active connections and
   use the first that logs in, so it degrades gracefully. Delete it with
@@ -2208,6 +2215,33 @@ new is persisted — the result still lands in `companyIntelligence`).
   sets `processing` and schedules `runAnalysis`. **By design there is no
   auto-trigger** on `companies.setVascoLink` and no cron; the button is the only
   new trigger.
+
+### Communications → entity pitch (one-liner + résumé)
+
+The default pitch enrichment (`companyEnrichment.enrich`) reads the company's
+**website** (the `domain` field) — useless for a Parallel SPV, whose domain
+points at the platform (SPVs are deliberately excluded from the domain backfill,
+cf. MIGRATIONS.md `parallel_spv`). So Parallel entities get their pitch from a
+second source: `enrichFromVasco` reads the entity's **cached communications**
+(`vascoCommunicationsCache`, by `vascoClientSlug` + `vascoIssuerId`) and asks the
+LLM to describe the operation (nature / geography / stage), then **overwrites**
+`oneLiner` + `summary` via `applyVascoPitch` (unlike the additive
+`applyEnrichment` — the VASCO description supersedes the domain-derived one).
+
+- **Triggers, org-agnostic (keyed by the VASCO link, not the org).**
+  `companies.setVascoLink` schedules `enrichFromVasco` on link; a one-shot
+  `backfillVascoPitches` covers existing linked entities across **every** org
+  with an active VASCO connection (Calte now, Albo once connected). No cron —
+  the pitch isn't re-generated on every cache refresh (so a later hand-edit
+  survives until a re-link or a re-run of the backfill).
+- **Depends on the cache.** `enrichFromVasco` reads cached comms and skips if the
+  issuer has none yet. The picker/dialog bootstrap fills the cache before a link
+  happens, so on-link enrichment has data; the backfill refreshes each org's
+  cache first.
+- **Shared LLM helper.** Both sources use `generatePitch(system, prompt)`
+  (structured output + free-text-JSON fallback) — only the system prompt and the
+  source text differ (`SYSTEM_PROMPT` + site text vs `VASCO_PITCH_PROMPT` +
+  communications).
 
 ### `convex codegen` can't run in the remote exec environment
 
