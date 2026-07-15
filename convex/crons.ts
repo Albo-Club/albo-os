@@ -26,4 +26,15 @@ crons.daily(
   {},
 )
 
+// Refresh the VASCO/Parallel communications cache every 2 days. VASCO has no
+// webhook for the investor persona (pull-only), so the UI reads a local cache
+// and this keeps it fresh in the background; a manual "refresh" button covers
+// urgent needs. cf. KNOWN_ISSUES.md « VASCO API ».
+crons.interval(
+  'refresh vasco communications cache',
+  { hours: 48 },
+  internal.vasco.refreshAllVascoCaches,
+  {},
+)
+
 export default crons

@@ -326,6 +326,38 @@ export default defineSchema({
     .index('by_org', ['orgId'])
     .index('by_client_and_username', ['clientSlug', 'username']),
 
+  /**
+   * vascoCommunicationsCache — local copy of the investor communications pulled
+   * from VASCO/Parallel, so the UI reads them **instantly** (reactive Convex
+   * query) instead of a live login + full pull on every open. VASCO has no
+   * webhook for the investor persona (pull-only), so freshness is maintained by
+   * a cron (every 48h) plus a manual "refresh" button — cf. KNOWN_ISSUES.md
+   * "VASCO API". One row per communication; the set is replaced wholesale per
+   * (orgId, clientSlug) on each refresh. A cache, not a source of truth: the
+   * document BYTES are still fetched live (`downloadCommunicationDocument`),
+   * only metadata is stored here.
+   */
+  vascoCommunicationsCache: defineTable({
+    orgId: v.id('organizations'),
+    clientSlug: v.string(),
+    issuerId: v.string(),
+    communicationId: v.string(), // VASCO communication id
+    issuerLabel: v.optional(v.string()),
+    title: v.optional(v.string()),
+    bodyText: v.optional(v.string()), // plain text (HTML already stripped)
+    period: v.optional(v.string()),
+    publishDate: v.optional(v.string()),
+    documents: v.array(
+      v.object({
+        documentId: v.string(),
+        name: v.optional(v.string()),
+        contentType: v.optional(v.string()),
+        createdAt: v.optional(v.string()),
+      }),
+    ),
+    fetchedAt: v.number(), // when this row was last pulled
+  }).index('by_org', ['orgId']),
+
   // ─── Portfolio core ──────────────────────────────────────────────────────
 
   /**
