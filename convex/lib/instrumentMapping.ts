@@ -5,7 +5,7 @@ import type { InstrumentKind } from './instruments'
  * dashboard refonte. The front (deal fiche, forms) and reporting read these
  * constants. NEVER duplicate this mapping elsewhere.
  *
- * Each `instrumentKind` (the 20 values in ./instruments) belongs to exactly
+ * Each `instrumentKind` (every value in ./instruments) belongs to exactly
  * one archetype and has exactly one render mode:
  *   - 'fields'      → INSTRUMENT_FIELDS lists the ordered `deals` columns to show
  *   - 'custom'      → a bespoke panel renders the central block (lead_spv →
@@ -13,9 +13,9 @@ import type { InstrumentKind } from './instruments'
  *   - 'placeholder' → layout not designed yet; show a neutral "type non encore
  *                     configuré" block (cto only).
  *
- * 'unassigned' is the holding bucket for the placeholder kinds (only `cto`
- * remains, lacking a prod deal to model its layout from), so
- * INSTRUMENT_ARCHETYPE stays a total Record over the 20 real values.
+ * 'unassigned' is the holding bucket for the placeholder kinds (`cto`, lacking
+ * a prod deal to model its layout from, and the Attio-sync `unknown` fallback),
+ * so INSTRUMENT_ARCHETYPE stays a total Record over every InstrumentKind.
  */
 export type Archetype =
   | 'equity'
@@ -29,7 +29,7 @@ export type Archetype =
 
 export type RenderMode = 'fields' | 'custom' | 'placeholder'
 
-/** instrumentKind → archetype. Total Record (all 19 kinds). */
+/** instrumentKind → archetype. Total Record (every InstrumentKind). */
 export const INSTRUMENT_ARCHETYPE: Record<InstrumentKind, Archetype> = {
   // equity. safe config keeps only safe / bsa_air; bsa has its own config
   // (warrants), oc + convertible_note share the oc config (convertible bond) —
@@ -63,11 +63,13 @@ export const INSTRUMENT_ARCHETYPE: Record<InstrumentKind, Archetype> = {
   // placement field config)
   crypto: 'placement',
   capitalization_account: 'placement',
-  // parked — layout deferred, render placeholder (only cto, no prod deal yet)
+  // parked — layout deferred, render placeholder (cto has no prod deal yet;
+  // `unknown` is the Attio-sync fallback until the real instrument is set)
   cto: 'unassigned',
+  unknown: 'unassigned',
 }
 
-/** instrumentKind → render mode. Total Record (all 19 kinds). */
+/** instrumentKind → render mode. Total Record (every InstrumentKind). */
 export const INSTRUMENT_RENDER: Record<InstrumentKind, RenderMode> = {
   share: 'fields',
   bsa: 'fields',
@@ -89,6 +91,7 @@ export const INSTRUMENT_RENDER: Record<InstrumentKind, RenderMode> = {
   crypto: 'fields',
   capitalization_account: 'fields',
   cto: 'placeholder',
+  unknown: 'placeholder',
 }
 
 // Shared field configs — ordered `deals` column names (convex/schema.ts), in

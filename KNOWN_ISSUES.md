@@ -1544,6 +1544,59 @@ non-évidents :
    `EditCompanyDialog`. Si un domaine change côté Attio, il faut le ressaisir
    à la main.
 
+## Sync Attio → deals (webhook live, `convex/attioSync.ts` + `convex/lib/attioSync.ts`)
+
+Synchro **stage-driven** : le webhook Attio `record.updated` sur l'objet
+`deals` re-fetch le record et n'agit que sur deux stages (par id, jamais le
+label) : **📝 Term Sheet** et **Invested**. La logique de décision est **pure et
+testée** (`convex/lib/attioSync.ts:decideSyncAction`, `tests/attioSync.test.ts`) ;
+le module Convex n'est qu'une coquille DB autour.
+
+1. **Verrou anti-doublon — on ne crée un deal qu'au Term Sheet, jamais sur
+   Invested.** Un event Invested sans `attioDealId` correspondant est **skippé**
+   (`invested_no_deal`). C'est ce qui permet d'activer la synchro « à partir de
+   maintenant » sans réimporter le portefeuille déjà investi (import #184,
+   Airtable, saisie manuelle). **Conséquence** : un deal qui passe *directement*
+   en Invested sans jamais passer par Term Sheet ne sera **pas** créé
+   automatiquement — le faire transiter par Term Sheet, ou l'ajouter à la main.
+
+2. **Frontière d'attribution (cf. CLAUDE.md).** `pending` = pré-investissement,
+   **Attio est la source** → un event Term Sheet rafraîchit les champs du deal.
+   `active` (et au-delà) = post-signature, **Albo OS est la source** → l'event
+   Invested se contente d'avancer le statut et de confirmer le prévisionnel ;
+   il **n'écrase jamais** les montants/instrument.
+
+3. **Statut forward-only.** Un event ne fait jamais **régresser** le cycle de
+   vie (`STATUS_RANK` : `pending < active < partially_exited < fully_exited =
+   written_off`). Un Invested ne « ressuscite » pas un deal sorti. Un instrument
+   Attio absent (`unknown`) ne **dégrade** jamais un instrument connu au patch.
+
+4. **Ligne de prévisionnel : une seule par deal, datée.** Créée seulement si
+   `date_de_l_investissement` est présente (une sortie anticipée sans date ne
+   peut pas se placer sur la timeline de trésorerie) — sinon le deal reste
+   `pending` sans ligne, jusqu'à ce qu'un event ultérieur apporte la date.
+   `derivedKey = deal:{dealId}` **stable et sans date** (survit au changement de
+   date Term Sheet → Invested), `category: 'deals'` (même ligne que le virement
+   réel au pointage), montant = `value` Attio (le **ticket engagé**, pas
+   `montant_levee_6` = taille du tour, ni `valorisation_8`). Elle se réalise au
+   pointage (`realizedTransactionId`), jamais supprimée par la synchro.
+
+5. **Écriture en mutation interne.** `upsertFromDeal` écrit via `ctx.db` (pas
+   `deals.create`, qui exige `requireOrgMember` — le webhook n'a pas d'identité
+   auth, il est authentifié par la signature HMAC). Investisseur = `group_root`
+   de l'org résolue depuis `albo_or_calte`. Société cible résolue/créée sur
+   `attioCompanyId` (stub `portfolio` si absente, ancre réclamée seulement si
+   libre).
+
+6. **Robustesse webhook.** Re-fetch transitoire (réseau / 5xx Attio) → **503**
+   (Attio rejoue) ; erreur de config (secret/clé absente) → **200** (pas de
+   tempête de retries) ; signature invalide → 401, JSON malformé → 400.
+   Idempotent (clés `attioDealId` + `derivedKey`), pas de table de dédup.
+
+**Activation** : `pnpm exec convex env set ATTIO_WEBHOOK_SECRET <secret>` +
+créer le webhook Attio (`record.updated`, objet `deals`) → `/attio/webhook`.
+`ATTIO_API_KEY` est déjà posé (partagé avec la recherche de personnes Attio).
+
 ## Archétypes d'instruments (fiches deal — dashboard refonte)
 
 `convex/lib/instrumentMapping.ts` est la **source unique** qui mappe chaque

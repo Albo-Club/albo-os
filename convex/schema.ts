@@ -68,6 +68,9 @@ const companyKind = v.union(
 const instrumentKind = instrumentValidator
 
 const dealStatus = v.union(
+  // Attio Term Sheet: committed but not yet wired (anticipated). Set by the
+  // Attio sync (convex/attioSync.ts) and flipped to 'active' on Invested.
+  v.literal('pending'),
   v.literal('active'),
   v.literal('partially_exited'),
   v.literal('fully_exited'),

@@ -23,6 +23,7 @@ import type { DataModel, Doc, Id } from './_generated/dataModel'
 type Ctx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>
 
 const statusValidator = v.union(
+  v.literal('pending'), // Attio Term Sheet (committed, not yet wired)
   v.literal('active'),
   v.literal('partially_exited'),
   v.literal('fully_exited'),

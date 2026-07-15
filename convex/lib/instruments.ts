@@ -26,6 +26,7 @@ export const INSTRUMENTS = [
   'crypto',
   'loan', // loan (Airtable « Prêt »)
   'capitalization_account', // capitalization contract (Airtable « Compte de Capitalisation »)
+  'unknown', // Attio deal with no/unmapped type_d_invest — sync fallback, shows a neutral placeholder until the real type is set
 ] as const
 
 export type InstrumentKind = (typeof INSTRUMENTS)[number]

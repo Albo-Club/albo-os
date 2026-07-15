@@ -476,6 +476,22 @@ seedées (`convex run --prod seed:seedAll`). Le schéma doit être déployé (ch
 | A4  | Re-lancer `:run` (idempotence)                        | `…Inserted: 0`, `…Patched: 34/43` — aucun doublon   |
 | A5  | Échantillon `verify.sample`                           | Chaque `attioDealId` pointe sur la bonne `target`   |
 
+## Sync Attio → deals (webhook live, `POST /attio/webhook`)
+
+Synchro **à partir de maintenant** (pas de reprise du passé). Prérequis :
+`ATTIO_WEBHOOK_SECRET` posé en prod + webhook Attio `record.updated` sur
+l'objet `deals` → `/attio/webhook`. Montant = `value` (ticket engagé), org via
+`albo_or_calte`, instrument via `type_d_invest`. Détails : `KNOWN_ISSUES.md`
+« Sync Attio → deals ».
+
+| #   | Étape                                                               | Résultat attendu                                                                                                     |
+| --- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| AS1 | Passer un deal en **📝 Term Sheet** dans Attio (date d'invest. renseignée) | Le deal apparaît dans Albo OS en statut **« Term sheet »** + 1 ligne de prévisionnel (sortie, `expected`, catégorie « deals ») rattachée au deal |
+| AS2 | Ce même deal passe en **Invested**                                  | Le deal bascule **actif** ; la ligne de prévisionnel passe en `confirmed` (jamais supprimée)                        |
+| AS3 | **Éditer** dans Attio un deal **déjà Invested** dans Albo OS        | **Aucun doublon** : la synchro ne crée jamais sur Invested (skip `invested_no_deal` si `attioDealId` inconnu, sinon no-op forward-only) |
+| AS4 | Term Sheet **sans** date d'investissement                           | Le deal apparaît en « Term sheet », **sans** ligne de prévisionnel ; renseigner la date dans Attio → l'échéance apparaît au prochain event |
+| AS5 | Rejouer le même webhook (idempotence)                               | Aucun deal ni ligne de prévisionnel en double (clés `attioDealId` / `derivedKey`)                                   |
+
 ## Ingestion Powens (webhook → bankAccounts + transactions)
 
 Webhook `CONNECTION_SYNCED` → `/powens/webhook` (HMAC) → `ingestConnectionSync`.

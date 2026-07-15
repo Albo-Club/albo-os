@@ -23,6 +23,48 @@ bas de page.
 
 ---
 
+## v1.87.0 — 15/07/2026 à 10:42 — Vos deals en term sheet arrivent tout seuls depuis Attio
+
+Quand un deal passe en **Term Sheet** dans Attio (vous vous êtes engagé à
+verser les fonds), il apparaît maintenant **automatiquement dans vos deals**
+Albo OS, marqué **« Term sheet »** — visible, mais pas encore réalisé. Et une
+**sortie de trésorerie anticipée** est ajoutée à votre prévisionnel, à la date
+d'investissement prévue, pour mieux anticiper le décaissement.
+
+Quand le deal passe ensuite en **Invested**, il bascule en réalisé et la ligne
+du prévisionnel est confirmée (elle se soldera toute seule au pointage du vrai
+virement).
+
+Vos deals **déjà investis ne sont jamais réimportés** : la synchro ne crée un
+deal qu'au stade Term Sheet, donc aucun doublon avec ce qui est déjà dans
+Albo OS. À noter : la ligne de prévisionnel n'apparaît que si la **date
+d'investissement** est renseignée dans Attio (sinon le deal s'affiche quand
+même, sans échéance). Fonction à activer une fois côté configuration (voir
+notes techniques) — tant qu'elle ne l'est pas, rien ne change.
+
+> **🔧 Notes techniques**
+>
+> - Reprise du chantier « Lot 2 » (webhook Attio → deals), réécrit sur le
+>   modèle prévisionnel actuel (`forecastEntries` + rattachement deal). La
+>   PR #89, basée sur un `main` périmé, est remplacée.
+> - `convex/attioSync.ts` : `upsertFromDeal` réel (mutation interne, écrit via
+>   `ctx.db`, investisseur = `group_root` de l'org). La décision de branche est
+>   **pure** dans `convex/lib/attioSync.ts` (`decideSyncAction`), testée
+>   (`tests/attioSync.test.ts`). Term Sheet → deal `pending` + une
+>   `forecastEntries` (`direction: out`, `confidence: expected`, `category:
+>   deals`, `derivedKey: deal:{id}` **stable**, date = `date_de_l_investissement`,
+>   montant = `value` Attio) ; Invested → statut `active` (forward-only) +
+>   `confidence: confirmed`. **Jamais de création sur Invested** (verrou
+>   anti-doublon). Frontière d'attribution : `pending` = Attio source (refresh),
+>   `active` = Albo OS source (aucun écrasement).
+> - Schéma additif : `deals.status += 'pending'`, `INSTRUMENTS += 'unknown'`
+>   (fallback instrument absent/non mappé, archétype placeholder). i18n
+>   `participations:status.pending` (« Term sheet ») + `instrument.unknown`.
+> - Webhook durci : re-fetch transitoire (réseau / 5xx Attio) → 503 (retry) ;
+>   erreur de config (secret/clé absente) → 200 (pas de tempête de retries).
+> - Activation prod : `pnpm exec convex env set ATTIO_WEBHOOK_SECRET <secret>`
+>   + webhook Attio `record.updated` sur l'objet `deals` → `/attio/webhook`.
+
 ## v1.86.2 — 14/07/2026 à 12:20 — Reports par email : extraction Notion fiabilisée
 
 Correctif sur le circuit des reports : l'extraction des pages Notion
