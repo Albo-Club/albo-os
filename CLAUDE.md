@@ -70,10 +70,10 @@ one file. Surface non-obvious knowledge ; drift kills future you.
 
 ### Pre-PR doc audit (run it yourself, every PR, without being prompted)
 
-Before pushing the final commit, walk through these six questions. Questions
-1–4 and 6 only fire when relevant — if none do, write nothing there; the diff
-and commit message already document the _what_. Question 5 (changelog) fires on
-**every** PR, no exception.
+Before pushing the final commit, walk through these seven questions.
+Questions 1–4, 6 and 7 only fire when relevant — if none do, write nothing
+there; the diff and commit message already document the _what_. Question 5
+(changelog) fires on **every** PR, no exception.
 
 1. **Touched a route, page, env var, or workflow listed in `TESTING.md`** ?
    → update the matching row in the same PR.
@@ -116,6 +116,16 @@ and commit message already document the _what_. Question 5 (changelog) fires on
    **and** a short "Template sync" section in the PR description listing the
    candidate(s). Flag only — Benjamin/Clément port it into `albo-ouvre-boite`;
    the agent never opens the template PR itself (reverse of `UPGRADING.md`).
+7. **Added, changed, or removed a user-visible feature** (new page, new
+   action, changed workflow, retired capability) ? → update the matching
+   page in `docs/produit/` in the same PR (create it if the feature is a
+   new module, using the shared template: à quoi ça sert / comment ça
+   marche / points d'attention / pages liées). French, product language,
+   no file paths or function names — it documents the **current state**,
+   unlike the changelog which is the chronological journal. After the PR
+   ships, mirror the touched pages to the Linear project "Albo OS"
+   documents when Linear access is available; the repo folder is the
+   source of truth.
 
 ### Where things live (don't duplicate across files)
 
@@ -129,6 +139,10 @@ and commit message already document the _what_. Question 5 (changelog) fires on
 - `CHANGELOG_PRODUIT.md` — user-facing release notes in French, **one
   versioned entry per PR** (`vX.Y.Z` + date/heure de la PR), product
   language. Hand-written.
+- `docs/produit/` — SaaS-style feature documentation in French (current
+  state of each feature, one page per module, shared template). Source of
+  truth; mirrored to the Linear project "Albo OS" documents. Update via
+  question 7 above.
 - `MIGRATIONS.md` — index of one-shot prod data operations (seeds, imports,
   purges) pointing to the module-level runbooks, plus in-flight chantiers.
 - `TEMPLATE_SYNC.md` — backlog of Albo OS "core" improvements that are
