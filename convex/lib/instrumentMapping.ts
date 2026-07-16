@@ -187,6 +187,9 @@ const SPV_FIELDS = [
   'spvName',
   'spvOwnershipPct',
   'structuringFees',
+  // roundType describes the underlying company's funding round — same field as
+  // equity direct (EQUITY_FIELDS), placed just before the valuations.
+  'roundType',
   'preMoneyValuation',
   'postMoneyValuation',
 ]
