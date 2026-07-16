@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
+import { useAgo } from './BankConnectionsHealth'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { Badge } from '~/components/ui/badge'
 import { Skeleton } from '~/components/ui/skeleton'
@@ -13,6 +14,10 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+
+// Mirrors STALE_AFTER_MS in convex/powens.ts (Powens re-syncs ~24h; past
+// 48h without fresh data something is wrong).
+const STALE_AFTER_MS = 48 * 60 * 60 * 1000
 
 export type CashAccount = {
   _id: Id<'bankAccounts'>
@@ -69,6 +74,7 @@ function AccountsTable({
 }) {
   const { t } = useTranslation('cash')
   const { fmtEur, fmtDate } = useFormatters()
+  const ago = useAgo()
   const navigate = useNavigate()
 
   return (
@@ -109,9 +115,16 @@ function AccountsTable({
                     )}
                   </span>
                   {a.balanceAsOf != null && (
-                    <span className="text-muted-foreground text-xs">
+                    <span
+                      className={`text-xs ${
+                        a.isConnected &&
+                        Date.now() - a.balanceAsOf > STALE_AFTER_MS
+                          ? 'text-amber-700 dark:text-amber-400'
+                          : 'text-muted-foreground'
+                      }`}
+                    >
                       {a.isConnected
-                        ? t('asOf', { date: fmtDate(a.balanceAsOf) })
+                        ? t('syncedAgo', { ago: ago(a.balanceAsOf) })
                         : t('manualAsOf', { date: fmtDate(a.balanceAsOf) })}
                     </span>
                   )}

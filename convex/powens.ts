@@ -1001,7 +1001,14 @@ export const pollConnectionsHealth = internalAction({
 })
 
 /** Connections of an org with their derived health — feeds the Cash page
- * monitoring section. No secret in these rows. */
+ * monitoring section. No secret in these rows.
+ *
+ * Also surfaces the UNTRACKED case: an account is Powens-linked
+ * (`powensAccountId` set) but its connection has no `powensConnections` row —
+ * typically a connection made under an old, unmanaged Powens user (its
+ * webhooks are ignored, the managed user's poll can't see it), so nothing
+ * refreshes and nothing is monitored. Without this the account silently
+ * looks "connected" while being dead (the Qonto case). */
 export const listConnections = query({
   args: { orgId: v.id('organizations') },
   handler: async (ctx, { orgId }) => {
@@ -1010,16 +1017,25 @@ export const listConnections = query({
       .query('powensConnections')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
-    if (rows.length === 0) return []
     const now = Date.now()
     // Labels of the accounts fed by each connection (small org-scoped set).
     const accounts = await ctx.db
       .query('bankAccounts')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
-    return rows
+    type ConnectionListItem = {
+      key: string
+      powensConnectionId: string
+      connectorName: string | null
+      health: ConnectionHealth | 'untracked'
+      state: string | null
+      errorMessage: string | null
+      lastSuccessfulSyncAt: number | null
+      accountLabels: Array<string>
+    }
+    const tracked: Array<ConnectionListItem> = rows
       .map((r) => ({
-        _id: r._id,
+        key: r._id,
         powensConnectionId: r.powensConnectionId,
         connectorName: r.connectorName ?? null,
         health: connectionHealth(r, now),
@@ -1036,6 +1052,43 @@ export const listConnections = query({
       .sort((a, b) =>
         (a.connectorName ?? '').localeCompare(b.connectorName ?? ''),
       )
+
+    // Powens-linked accounts whose connection is not tracked, grouped by
+    // bank. `lastSuccessfulSyncAt` falls back to the freshest balance the
+    // dead connection ever delivered (best available signal).
+    const trackedIds = new Set(rows.map((r) => r.powensConnectionId))
+    const orphans = accounts.filter(
+      (a) =>
+        a.powensAccountId &&
+        !a.archivedAt &&
+        a.accountStatus !== 'closed' &&
+        (!a.powensConnectionId || !trackedIds.has(a.powensConnectionId)),
+    )
+    const byBank = new Map<string, Array<Doc<'bankAccounts'>>>()
+    for (const a of orphans) {
+      const key = normalizeName(a.bankName)
+      byBank.set(key, [...(byBank.get(key) ?? []), a])
+    }
+    const untracked: Array<ConnectionListItem> = Array.from(
+      byBank.entries(),
+    ).map(([key, group]) => ({
+      key: `untracked:${key}`,
+      powensConnectionId: group[0].powensConnectionId ?? '',
+      connectorName: group[0].bankName,
+      health: 'untracked',
+      state: null,
+      errorMessage: null,
+      lastSuccessfulSyncAt: group.reduce<number | null>(
+        (max, a) =>
+          a.balanceAsOf != null && (max == null || a.balanceAsOf > max)
+            ? a.balanceAsOf
+            : max,
+        null,
+      ),
+      accountLabels: group.map((a) => a.displayName ?? a.label),
+    }))
+
+    return [...tracked, ...untracked]
   },
 })
 

@@ -33,6 +33,10 @@ Deux origines :
   distingue les deux ; l'édition manuelle du solde est bloquée sur un compte
   connecté (la synchro l'écraserait).
 
+Chaque compte connecté affiche la **fraîcheur de sa dernière synchronisation**
+(« synchro il y a 3 h ») ; le texte passe en orange au-delà de 48 h sans
+donnée fraîche. Les comptes manuels affichent la date de saisie du solde.
+
 Trois états particuliers changent les calculs :
 
 - **Nanti** : fonds bloqués (nantissement, séquestre) — le compte reste
@@ -57,6 +61,11 @@ l'état de chaque connexion Powens :
 - 🔴 **À reconnecter** — la banque attend une action (nouveau mot de passe,
   authentification forte) : la synchro est bloquée tant que ce n'est pas
   fait.
+- 🟠 **Non suivie** — un compte est relié à une connexion que l'application
+  ne surveille pas (typiquement une connexion établie en dehors de l'app) :
+  rien ne se met plus à jour et aucune alerte ne peut partir. La ligne
+  indique la date des dernières données reçues ; le remède est de refaire
+  la connexion via « Connecter une banque ».
 
 Chaque ligne montre la date de dernière synchronisation réussie et les
 comptes alimentés. Quand une connexion se dégrade, les membres de

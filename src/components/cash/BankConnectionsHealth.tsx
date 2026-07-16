@@ -10,7 +10,11 @@ import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { Button } from '~/components/ui/button'
 
-type Health = 'connected' | 'stale' | 'action_required'
+/** `untracked` = a Powens-linked account whose connection has no tracking
+ * row (connection made under an unmanaged Powens user — nothing refreshes,
+ * nothing is monitored). Fix = a fresh « Connecter une banque », not a
+ * reconnect (there is no tracked connection to reconnect). */
+type Health = 'connected' | 'stale' | 'action_required' | 'untracked'
 
 /** Status pill — same visual family as the session pill in
  * active-sessions.tsx (palette classes with dark variants, no brand token). */
@@ -18,9 +22,12 @@ const HEALTH_PILL: Record<Health, string> = {
   connected: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
   stale: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
   action_required: 'bg-red-500/15 text-red-700 dark:text-red-400',
+  untracked: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
 }
 
-function useAgo() {
+/** Relative "il y a X min/h/j" formatter — shared with the per-account
+ * freshness badges (CashAccounts). */
+export function useAgo() {
   const { t } = useTranslation('cash')
   return (ms: number) => {
     const minutes = Math.max(1, Math.round((Date.now() - ms) / 60_000))
@@ -52,7 +59,9 @@ export function ConnectionsBanner({
 
   const worst: Health = degraded.some((c) => c.health === 'action_required')
     ? 'action_required'
-    : 'stale'
+    : degraded.some((c) => c.health === 'stale')
+      ? 'stale'
+      : 'untracked'
   const names = degraded
     .map((c) => c.connectorName ?? t('connections.unknownConnector'))
     .join(', ')
@@ -84,10 +93,11 @@ export function ConnectionsBanner({
 
 /**
  * Sync-health of the org's Powens bank connections: one row per connection
- * with a health pill (connected / late / reconnect needed), the last
- * successful sync, the accounts it feeds, and a "Reconnect" button opening
- * the Powens webview reconnect flow when the connection is degraded.
- * Renders nothing while loading or when the org has no tracked connection.
+ * with a health pill (connected / late / reconnect needed / untracked),
+ * the last successful sync, the accounts it feeds, and a "Reconnect" button
+ * opening the Powens webview reconnect flow when the connection is degraded
+ * (tracked ones only). Renders nothing while loading or when the org has no
+ * tracked connection nor untracked Powens-linked account.
  */
 export function BankConnectionsHealth({
   orgId,
@@ -124,7 +134,7 @@ export function BankConnectionsHealth({
       <div className="divide-y rounded-lg border">
         {connections.map((c) => (
           <div
-            key={c._id}
+            key={c.key}
             className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3"
           >
             <div className="flex min-w-0 flex-col gap-0.5">
@@ -140,21 +150,32 @@ export function BankConnectionsHealth({
               </span>
               <span className="text-muted-foreground text-xs">
                 {c.lastSuccessfulSyncAt != null
-                  ? t('connections.lastSync', {
-                      ago: ago(c.lastSuccessfulSyncAt),
-                    })
+                  ? t(
+                      c.health === 'untracked'
+                        ? 'connections.lastData'
+                        : 'connections.lastSync',
+                      { ago: ago(c.lastSuccessfulSyncAt) },
+                    )
                   : t('connections.neverSynced')}
                 {c.accountLabels.length > 0 && (
                   <> · {c.accountLabels.join(', ')}</>
                 )}
               </span>
+              {c.health === 'untracked' && (
+                <span className="text-muted-foreground text-xs">
+                  {t('connections.untrackedHint')}
+                </span>
+              )}
               {c.errorMessage && (
                 <span className="text-destructive text-xs">
                   {c.errorMessage}
                 </span>
               )}
             </div>
-            {c.health !== 'connected' && (
+            {/* No reconnect for an untracked connection: there is nothing to
+                reconnect under the managed Powens user — the fix is a fresh
+                « Connecter une banque ». */}
+            {c.health !== 'connected' && c.health !== 'untracked' && (
               <Button
                 size="sm"
                 variant={

@@ -41,7 +41,7 @@
     "empty": "No entry in this window.",
     "overdue": "Overdue"
   },
-  "asOf": "as of {{date}}",
+  "syncedAgo": "synced {{ago}}",
   "manualAsOf": "manual balance as of {{date}}",
   "notConnected": "not connected — enter the balance manually",
   "closedSection": "Closed accounts",
@@ -93,10 +93,13 @@
     "health": {
       "connected": "Connected",
       "stale": "Late",
-      "action_required": "Reconnect needed"
+      "action_required": "Reconnect needed",
+      "untracked": "Untracked"
     },
     "lastSync": "last sync {{ago}}",
+    "lastData": "last data {{ago}}",
     "neverSynced": "no known successful sync",
+    "untrackedHint": "Connection unknown to the monitoring (probably made outside the app): nothing refreshes or is monitored. Redo the connection via “Connect a bank”.",
     "reconnect": "Reconnect",
     "reconnecting": "Redirecting…",
     "reconnectFailed": "Couldn't start the reconnection. Please try again.",
@@ -105,6 +108,8 @@
       "stale_other": "{{count}} bank connections late on sync: {{names}}",
       "action_required_one": "Bank connection needs reconnecting: {{names}}",
       "action_required_other": "{{count}} bank connections need reconnecting: {{names}}",
+      "untracked_one": "Untracked bank connection: {{names}}",
+      "untracked_other": "{{count}} untracked bank connections: {{names}}",
       "manage": "Manage connections"
     },
     "ago": {
