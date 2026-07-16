@@ -496,7 +496,7 @@ export default defineSchema({
     committedAmount: v.optional(v.number()), // commitment (LP/SAFE/OS…)
     paidAmount: v.optional(v.number()), // actually disbursed to date
 
-    // Share-based (share, spv_share, secondary, SCI shares…)
+    // Share-based (share, spv_share, SCI shares…)
     sharesAcquired: v.optional(v.number()),
     pricePerShare: v.optional(v.number()), // cents
 

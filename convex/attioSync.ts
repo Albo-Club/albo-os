@@ -57,6 +57,7 @@ import {
   decideSyncAction,
   orgSlugFromOption,
   resolveInstrumentKind,
+  secondaryRoundFromInstrumentRaw,
   shouldReplaceInstrument,
 } from './lib/attioSync'
 import type { MutationCtx } from './_generated/server'
@@ -484,6 +485,10 @@ export const upsertFromDeal = internalMutation({
       currency: 'EUR',
       status: 'pending',
       attioDealId: args.attioDealId,
+      // 'Secondary Shares' → share deal with the secondary round preset.
+      ...(secondaryRoundFromInstrumentRaw(args.instrumentRaw)
+        ? { roundType: 'secondary' as const }
+        : {}),
       ...(args.name ? { name: args.name } : {}),
       ...(args.valueCents != null ? { committedAmount: args.valueCents } : {}),
       ...(args.investmentDate != null

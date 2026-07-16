@@ -123,7 +123,7 @@ const OPERATIONAL = new Set([
 // `sharesAcquired` only makes sense for "share-like" instruments.
 // For debt (os/oc/loan…) the Airtable "Nb d'action" is a nominal amount,
 // not a number of securities → we don't map it.
-const SHARE_LIKE = new Set(['share', 'spv_share', 'secondary', 'scpi'])
+const SHARE_LIKE = new Set(['share', 'spv_share', 'scpi'])
 
 const instrumentValidator = v.union(
   v.literal('share'),
@@ -137,7 +137,6 @@ const instrumentValidator = v.union(
   v.literal('royalty'),
   v.literal('fund_lp'),
   v.literal('spv_share'),
-  v.literal('secondary'),
   v.literal('real_estate_direct'),
   v.literal('scpi'),
   v.literal('cto'),

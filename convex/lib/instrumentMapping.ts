@@ -55,9 +55,8 @@ export const INSTRUMENT_ARCHETYPE: Record<InstrumentKind, Archetype> = {
   loan: 'debt',
   cca: 'debt',
   dat: 'debt',
-  // funds_lp (secondary reuses the fonds field config)
+  // funds_lp
   fund_lp: 'funds_lp',
-  secondary: 'funds_lp',
   // real_estate
   real_estate_direct: 'real_estate',
   scpi: 'real_estate',
@@ -89,7 +88,6 @@ export const INSTRUMENT_RENDER: Record<InstrumentKind, RenderMode> = {
   spv_share: 'fields',
   carry_vehicle: 'fields',
   lead_spv: 'custom',
-  secondary: 'fields',
   real_estate_direct: 'fields',
   scpi: 'fields',
   royalty: 'custom',
@@ -283,7 +281,6 @@ export const INSTRUMENT_FIELDS: Partial<Record<InstrumentKind, Array<string>>> =
     cca: CCA_FIELDS,
     dat: DAT_FIELDS,
     fund_lp: FONDS_FIELDS,
-    secondary: FONDS_FIELDS,
     spv_share: SPV_FIELDS,
     lead_spv: LEAD_SPV_FIELDS,
     carry_vehicle: CARRY_VEHICLE_FIELDS,
