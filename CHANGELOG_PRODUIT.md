@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.96.0 — 16/07/2026 à 15:48 — Trésorerie : surveillance des connexions bancaires
+## v1.98.0 — 16/07/2026 à 15:48 — Trésorerie : surveillance des connexions bancaires
 
 Les connexions bancaires (Powens) sont désormais **surveillées en continu**.
 Sur la page Trésorerie, une nouvelle section **« Connexions bancaires »**
@@ -67,6 +67,64 @@ sans refaire toute la connexion.
 > - UI : `src/components/cash/BankConnectionsHealth.tsx` (query
 >   `powens.listConnections`), section insérée sous les comptes sur
 >   `/app/$orgSlug/cash`.
+
+## v1.97.0 — 16/07/2026 à 15:19 — Deals : nouveau type d'instrument « Structure de carried »
+
+Un **nouveau type d'instrument** rejoint la liste des deals : **« Structure de
+carried »**. Il modélise une **participation (equity) qu'on détient dans un
+véhicule dédié au carried interest** — une « Manco » —, typiquement
+**OPRTRS & Co** : on détient des titres d'une structure qui, elle, reverse du
+carried.
+
+C'est un type **distinct de « Lead SPV (gestion) »** : ce dernier suit **nos
+revenus** quand c'est **nous** qui gérons un SPV (frais + carried), alors que
+« Structure de carried » suit une **participation qu'on détient** dans une
+telle structure.
+
+- Sélectionnable comme tout autre instrument, via **⋯ → Modifier** (dialogue
+  d'édition du deal).
+- Sur la fiche, il affiche : **date de closing**, **titres acquis**, **prix par
+  titre** et **carried** (le taux de carried de la structure).
+
+> **🔧 Notes techniques**
+>
+> - `carry_vehicle` ajouté à la liste source `INSTRUMENTS`
+>   (`convex/lib/instruments.ts`) → le validateur `instrumentValidator` du
+>   schéma se met à jour seul (source unique, pas de redéclaration).
+> - `convex/lib/instrumentMapping.ts` : archétype `equity`, rendu `fields`, et
+>   `CARRY_VEHICLE_FIELDS` = `closingDate` / `sharesAcquired` / `pricePerShare`
+>   / `carriedRate` (colonnes `deals` existantes → **aucun changement de
+>   schéma**). La détention % n'est volontairement pas un champ deal (calculée
+>   au niveau société).
+> - Ajouté au sélecteur de l'`EditDealDialog` (`INSTRUMENTS` dans
+>   `src/routes/app/$orgSlug/deals.$dealId.tsx`) et libellé i18n
+>   `instrument.carry_vehicle` (fr « Structure de carried » / en « Carried
+>   interest structure ») dans `participations.json` **et** `chat.json`.
+> - **Pas de migration** : « Oprtrs & Co » (org Albo) reste en `secondary`
+>   (importé du `type_d_invest = "Secondary Shares"` d'Attio) et sera
+>   rebasculé à la main dans l'app.
+
+## v1.96.0 — 16/07/2026 à 15:14 — Deals : le titre d'un deal renommé n'affiche plus le type
+
+Depuis la dernière mise à jour, le titre d'une fiche deal montrait **« Nom ·
+Type d'instrument »**. Quand vous renommez un deal, ce **« · Type »** collé
+derrière votre nom faisait doublon. Il **disparaît** : un deal que vous avez
+renommé s'affiche désormais avec **son nom seul**, partout (fiche, fil
+d'ariane, sélecteurs de pointage, recherche). Le type d'instrument reste bien
+visible dans les **informations** de la fiche et dans la **colonne dédiée** de
+la liste — et se modifie toujours via **⋯ → Modifier**. Un deal **sans nom
+personnalisé** continue, lui, d'afficher le type comme titre.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/participations/ParticipationsTable.tsx` : `useDealTitle`
+>   renvoie désormais `deal.name` seul quand un nom custom existe (fallback
+>   label instrument sinon). Suppression de l'option `withInstrument`, devenue
+>   sans objet.
+> - `src/components/app-shell/AppHeader.tsx` : `buildDealCrumbs` appelle
+>   `dealTitle(deal)` sans l'option retirée (signature allégée).
+> - `src/routes/app/$orgSlug/deals.$dealId.tsx` : commentaire du titre mis à
+>   jour. Ajuste le format « Nom · Type » introduit en v1.95.1.
 
 ## v1.95.1 — 16/07/2026 à 14:58 — Deals : sélecteur de type d'instrument retiré de la fiche
 

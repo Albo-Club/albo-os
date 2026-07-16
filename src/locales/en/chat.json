@@ -66,6 +66,7 @@
     "instrument": {
       "share": "Shares",
       "spv_share": "Equity via SPV",
+      "carry_vehicle": "Carried interest structure",
       "os": "Bond",
       "oc": "Convertible bond",
       "convertible_note": "Convertible note",

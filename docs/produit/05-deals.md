@@ -17,8 +17,10 @@ là où [Participations](04-participations.md) regroupe par société.
 - **Instrument** : le type d'investissement. Une vingtaine sont gérés —
   actions, BSA, BSA-AIR, SAFE, obligations convertibles ou simples, compte
   courant d'associé, royalties, engagement LP dans un fonds, parts de SPV,
-  lead SPV (fees + carried), secondaire, immobilier direct, SCPI, CTO, dépôt
-  à terme, crypto, prêt, compte de capitalisation. Chaque instrument a ses
+  lead SPV (fees + carried), structure de carried (participation dans un
+  véhicule dédié au carried, type OPRTRS & Co), secondaire, immobilier
+  direct, SCPI, CTO, dépôt à terme, crypto, prêt, compte de capitalisation.
+  Chaque instrument a ses
   champs propres (prix par action et valorisation d'entrée pour les actions,
   taux et maturité pour la dette, cap et discount pour un SAFE, etc.).
 - **Montants** : un deal a un **engagé** (ce qu'on s'est engagé à investir,
@@ -45,8 +47,8 @@ là où [Participations](04-participations.md) regroupe par société.
   cas (cf. « Montants » ci-dessus : décaissé réel si investi, engagé
   prévisionnel si en term sheet, ou les deux pour un fonds).
 - **Bloc instrument** : les champs propres au type d'instrument, éditables en
-  ligne. Le type s'affiche dans le titre de la fiche ; on le change via
-  ⋯ → « Modifier ».
+  ligne. Le type s'affiche dans ce bloc (et sert de titre à la fiche tant que
+  le deal n'a pas de nom personnalisé) ; on le change via ⋯ → « Modifier ».
 - **Panneau Royalties** (deals royalties) : capital investi, taux de
   royalties, plafond, multiples plancher/plafond, business plan initial
   trimestre par trimestre et réels — les écarts et le BP dégradé sont
