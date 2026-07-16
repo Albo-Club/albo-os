@@ -182,7 +182,7 @@
     "signedDate": "Signed date",
     "conversionDeadlineDate": "Conversion deadline",
     "maturityDate": "Maturity date",
-    "paidAmount": "Contractual amount",
+    "paidAmount": "Called capital",
     "committedAmount": "Committed amount",
     "roundSize": "Round size",
     "preMoneyValuation": "Pre-money valuation",

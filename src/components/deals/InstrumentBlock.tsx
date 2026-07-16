@@ -205,7 +205,10 @@ function Placeholder({ text }: { text: string }) {
 function LatentGain({ deal }: { deal: Doc<'deals'> }) {
   const { t } = useTranslation('participations')
   const { fmtEur } = useFormatters()
-  const gain = (deal.currentValue ?? 0) - (deal.paidAmount ?? 0)
+  // Cost basis = the invested amount (committedAmount). Fallback to the legacy
+  // paidAmount for older placements that only carried that field.
+  const gain =
+    (deal.currentValue ?? 0) - (deal.committedAmount ?? deal.paidAmount ?? 0)
   return (
     <div className="flex items-center justify-between rounded-lg border p-4">
       <span className="text-muted-foreground text-sm">

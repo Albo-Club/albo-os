@@ -98,7 +98,6 @@ export const INSTRUMENT_RENDER: Record<InstrumentKind, RenderMode> = {
 // the order of the target mapping. Several kinds point at the same layout.
 const EQUITY_FIELDS = [
   'closingDate',
-  'paidAmount',
   'roundSize',
   'roundType',
   'preMoneyValuation',
@@ -109,7 +108,6 @@ const EQUITY_FIELDS = [
 
 const SAFE_FIELDS = [
   'closingDate',
-  'paidAmount',
   'safeType',
   'valuationCap',
   'discount',
@@ -136,7 +134,6 @@ const BSA_FIELDS = [
 // the deal sheet shows pre/post tabs (same mechanism as safe).
 const OC_FIELDS = [
   'closingDate',
-  'paidAmount',
   'interestRate',
   'maturityDate',
   'conversionRatio',
@@ -187,7 +184,6 @@ const FONDS_FIELDS = [
 // spvOwnershipPct (not ownershipPct) holds the stake — kept as-is, no migration.
 const SPV_FIELDS = [
   'closingDate',
-  'paidAmount',
   'spvName',
   'spvOwnershipPct',
   'structuringFees',
@@ -223,7 +219,6 @@ const ROYALTY_FIELDS = [
 
 const SCPI_FIELDS = [
   'closingDate',
-  'paidAmount',
   'sharesAcquired',
   'pricePerShare',
   'distributionRate',
@@ -233,7 +228,6 @@ const SCPI_FIELDS = [
 
 const IMMO_FIELDS = [
   'closingDate',
-  'paidAmount',
   'acquisitionFees',
   'surfaceSqm',
   'location',
@@ -243,7 +237,6 @@ const IMMO_FIELDS = [
 
 const PLACEMENT_FIELDS = [
   'closingDate',
-  'paidAmount',
   'currentValue',
   'bankName',
 ]
