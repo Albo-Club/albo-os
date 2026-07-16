@@ -264,8 +264,8 @@ export function useDealTitle() {
 /**
  * Amount tiles to show for a deal, BEFORE the always-present "Reçu". Keeps the
  * commitment vs disbursed distinction only where it's meaningful:
- * - Fund (fund_lp / secondary): both « Engagé » (commitment) and
- *   « Décaissé (réel) » (called & paid), which genuinely differ.
+ * - Fund (fund_lp): both « Engagé » (commitment) and « Décaissé (réel) »
+ *   (called & paid), which genuinely differ.
  * - Direct deal in term sheet (pending): « Engagé prévisionnel » only — the
  *   disbursed is still 0, so we show the planned amount.
  * - Direct invested deal: « Décaissé (réel) » only — for a wired deal it equals
@@ -279,8 +279,7 @@ export function dealAmountTiles(deal: {
 }): Array<{ labelKey: string; cents: number }> {
   const committed = deal.committedAmount ?? 0
   const paid = deal.paidActual ?? 0
-  const isFund =
-    deal.instrumentKind === 'fund_lp' || deal.instrumentKind === 'secondary'
+  const isFund = deal.instrumentKind === 'fund_lp'
   if (isFund) {
     return [
       { labelKey: 'deal.committed', cents: committed },

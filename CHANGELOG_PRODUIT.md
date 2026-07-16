@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.98.0 — 16/07/2026 à 15:48 — Trésorerie : surveillance des connexions bancaires
+## v1.99.0 — 16/07/2026 à 15:48 — Trésorerie : surveillance des connexions bancaires
 
 Les connexions bancaires (Powens) sont désormais **surveillées en continu**.
 Sur la page Trésorerie, une nouvelle section **« Connexions bancaires »**
@@ -67,6 +67,32 @@ sans refaire toute la connexion.
 > - UI : `src/components/cash/BankConnectionsHealth.tsx` (query
 >   `powens.listConnections`), section insérée sous les comptes sur
 >   `/app/$orgSlug/cash`.
+## v1.98.0 — 16/07/2026 à 15:57 — Deals : « Secondaire » redevient un type de tour, retiré des instruments
+
+« Secondaire » n'est plus proposé comme **type d'instrument** à la création ou
+à l'édition d'un deal. Un achat sur le secondaire se saisit désormais comme un
+deal en **actions** dont le **tour** est « Secondaire » — là où cette
+information a du sens. Les deals importés depuis Attio en « Secondary Shares »
+arrivent maintenant en deal actions avec le tour « Secondaire » prérempli.
+Rien n'est perdu par ailleurs : un *fonds* secondaire reste un engagement dans
+un **fonds** de type « Secondaire ».
+
+> **🔧 Notes techniques**
+> - Retrait de `'secondary'` de `INSTRUMENTS` (`convex/lib/instruments.ts`) ;
+>   le round type `'secondary'` (dans `ROUND_TYPES`) est inchangé. Nettoyage
+>   des mappings d'archétype (`instrumentMapping.ts`), du picker d'édition
+>   (`deals.$dealId.tsx`), du regroupement front (`ParticipationsTable`), des
+>   labels i18n (`participations.json`, `chat.json`), de l'import Airtable
+>   legacy et d'un commentaire de schéma.
+> - Sync Attio (`convex/lib/attioSync.ts` + `convex/attioSync.ts`) :
+>   « Secondary Shares » → instrument `share`, avec `roundType: 'secondary'`
+>   posé **à la création uniquement** (helper pur
+>   `secondaryRoundFromInstrumentRaw`, testé) pour ne pas écraser une édition
+>   manuelle ultérieure.
+> - Aucune migration : le seul deal historiquement sur l'instrument `secondary`
+>   (Oprtrs & Co) a déjà été reclassé en `carry_vehicle` (cf. #231), donc plus
+>   aucun deal ne porte `'secondary'` → le resserrement du validateur se
+>   déploie sans opération prod.
 
 ## v1.97.0 — 16/07/2026 à 15:19 — Deals : nouveau type d'instrument « Structure de carried »
 

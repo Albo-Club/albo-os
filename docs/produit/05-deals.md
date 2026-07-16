@@ -18,7 +18,7 @@ là où [Participations](04-participations.md) regroupe par société.
   actions, BSA, BSA-AIR, SAFE, obligations convertibles ou simples, compte
   courant d'associé, royalties, engagement LP dans un fonds, parts de SPV,
   lead SPV (fees + carried), structure de carried (participation dans un
-  véhicule dédié au carried, type OPRTRS & Co), secondaire, immobilier
+  véhicule dédié au carried, type OPRTRS & Co), immobilier
   direct, SCPI, CTO, dépôt à terme, crypto, prêt, compte de capitalisation.
   Chaque instrument a ses
   champs propres (prix par action et valorisation d'entrée pour les actions,
@@ -35,7 +35,9 @@ là où [Participations](04-participations.md) regroupe par société.
   *passé en perte*.
 - **Dates** : signature (tri par défaut), closing, sortie.
 - **Titres et détention** : les deals en actions enregistrent le **nombre de
-  titres acquis** et le **prix par titre** (utile pour un secondaire). Le
+  titres acquis** et le **prix par titre**. Un achat sur le **secondaire**
+  n'est pas un instrument à part : c'est un deal en **actions** dont le
+  **tour** est « Secondaire ». Le
   **pourcentage de détention** ne se saisit
   pas sur le deal : il est **calculé au niveau de la société** (titres détenus
   rapportés au capital total), là où il a du sens — une société peut porter
