@@ -18,6 +18,7 @@ export const INSTRUMENTS = [
   'fund_lp', // LP commitment in a fund
   'spv_share', // shares of an SPV
   'lead_spv', // management revenue as lead of an SPV (fees + carried)
+  'carry_vehicle', // equity stake we HOLD in a carried-interest / management vehicle (e.g. OPRTRS & Co): the vehicle distributes carry — distinct from lead_spv (which models the fees + carried WE earn managing an SPV)
   'secondary',
   'real_estate_direct',
   'scpi',

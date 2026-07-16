@@ -43,6 +43,10 @@ export const INSTRUMENT_ARCHETYPE: Record<InstrumentKind, Archetype> = {
   // equity held indirectly through an SPV — the deal's target is the underlying
   // company (targetCompanyId), the SPV is just a holding method (spvName + fees).
   spv_share: 'equity',
+  // equity stake we HOLD in a carried-interest / management vehicle (Manco,
+  // e.g. OPRTRS & Co): the vehicle distributes carry. Not lead_spv — that's the
+  // management side (fees + carried WE earn).
+  carry_vehicle: 'equity',
   // management revenue as lead of an SPV (fees + carried) — not a placement:
   // the deal tracks what you earn managing the SPV, not an investment.
   lead_spv: 'management',
@@ -83,6 +87,7 @@ export const INSTRUMENT_RENDER: Record<InstrumentKind, RenderMode> = {
   dat: 'fields',
   fund_lp: 'fields',
   spv_share: 'fields',
+  carry_vehicle: 'fields',
   lead_spv: 'custom',
   secondary: 'fields',
   real_estate_direct: 'fields',
@@ -205,6 +210,19 @@ const LEAD_SPV_FIELDS = [
   'carriedRate',
 ]
 
+// Carry vehicle (Manco / carried-interest structure): an equity stake we HOLD
+// in a vehicle dedicated to carried interest (e.g. OPRTRS & Co). Equity params
+// only — no round/valuation (the vehicle isn't a fundraising target) — plus the
+// structure's carried rate. Ownership % is NOT a deal field (it's computed at
+// the company level). Distinct from lead_spv, which models the fees + carried
+// WE earn managing an SPV.
+const CARRY_VEHICLE_FIELDS = [
+  'closingDate',
+  'sharesAcquired',
+  'pricePerShare',
+  'carriedRate',
+]
+
 // Royalties: the three declarative parameters (level 1). Rendered by the
 // custom RoyaltiesPanel, but listed here so the shared edit dialog edits them
 // (render mode ≠ editable fields). The BP / actuals lists are NOT here — they
@@ -268,6 +286,7 @@ export const INSTRUMENT_FIELDS: Partial<Record<InstrumentKind, Array<string>>> =
     secondary: FONDS_FIELDS,
     spv_share: SPV_FIELDS,
     lead_spv: LEAD_SPV_FIELDS,
+    carry_vehicle: CARRY_VEHICLE_FIELDS,
     royalty: ROYALTY_FIELDS,
     scpi: SCPI_FIELDS,
     real_estate_direct: IMMO_FIELDS,
