@@ -298,12 +298,6 @@
   },
   "fiche": {
     "instrumentTitle": "Instrument details",
-    "typeLabel": "Instrument type",
-    "preview": {
-      "unsaved": "Preview — not saved",
-      "note": "Switching the type here only previews the layout — nothing is written to the database.",
-      "reset": "Back to saved type"
-    },
     "safe": {
       "pre": "Pre-conversion",
       "post": "Post-conversion"
