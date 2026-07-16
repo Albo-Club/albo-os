@@ -23,6 +23,55 @@ bas de page.
 
 ---
 
+## v1.100.0 — 16/07/2026 à 17:21 — Trésorerie : la page repensée en quatre onglets
+
+La page Trésorerie était devenue illisible : tout s'empilait sur un seul
+écran. Elle est désormais découpée en **quatre onglets**, du plus consulté
+au plus « réglage » :
+
+- **Vue d'ensemble** — l'essentiel en une hauteur d'écran : le solde
+  disponible, l'atterrissage fin de mois, et deux nouvelles tuiles **« 30
+  prochains jours »** et **« 90 prochains jours »** qui détaillent chacune
+  les entrées, les sorties et le net attendus. En dessous, la courbe de
+  solde passé → futur — avec, nouveauté, votre **seuil d'alerte tracé en
+  pointillés** sur la courbe quand l'alerte est active — puis les comptes
+  bancaires, désormais regroupés **par banque** (sous-total par banque,
+  entité titulaire sur chaque ligne) pour répondre d'un coup d'œil à « où
+  est le cash ? ».
+- **Prévisionnel** — le détail mois par mois : les échéances à venir
+  (retards en tête), les rapprochements suggérés, le reste à déployer sur
+  les deals signés, la grille par catégorie et par mois, et l'analyse
+  rétrospective des flux (l'ancien onglet Analyse, qui fusionne ici).
+- **Transactions** — inchangé : le registre complet et le pointage.
+- **Règles & échéances** — tout ce qui se configure, regroupé au même
+  endroit : règles récurrentes et suggestions, échéances ponctuelles, TVA,
+  alerte de seuil, et connexions bancaires.
+
+Deux **bannières d'alerte** apparaissent en tête de la Vue d'ensemble quand
+quelque chose réclame votre attention : une connexion bancaire en panne
+(avec le nom des banques et un raccourci pour la reconnecter), ou le seuil
+d'alerte de trésorerie franchi. Plus besoin d'attendre l'email.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/$orgSlug/cash.index.tsx` : passage de 3 à 4 onglets
+>   (`apercu`/`previsionnel`/`transactions`/`gestion`), l'ancien
+>   `?tab=analyse` redirige vers `previsionnel` via `validateSearch`.
+> - `ForecastOverview.tsx` allégé (KPIs + courbe + bannière de seuil) ; la
+>   grille catégories × mois et le pipeline engagé déménagent dans le
+>   nouveau `ForecastGridSection.tsx` (sélecteur d'horizon propre).
+> - `CashKpis.tsx` : tuiles composites 30/90 j (entrées/sorties/net) ;
+>   `forecasts.getUpcomingEntries` renvoie désormais les bruts
+>   `in30/out30/in90/out90` en plus des nets.
+> - `ForecastChart.tsx` : prop `thresholdCents` → `ReferenceLine`
+>   (`ifOverflow="extendDomain"`) ; seuil lu depuis `getCashAlert`.
+> - `CashAccounts.tsx` : regroupement par banque (clé insensible à la
+>   casse pour fusionner « PALATINE » importé et « Palatine » Powens),
+>   sous-totaux, colonne Entité ; `ConnectionsBanner` ajouté dans
+>   `BankConnectionsHealth.tsx`.
+> - Docs mises à jour : `TESTING.md` (CA2/CA9/AN1/FC1/FC12–FC25/M1),
+>   `docs/produit/07/08/09`, `KNOWN_ISSUES.md` (référence d'onglet).
+
 ## v1.99.0 — 16/07/2026 à 15:48 — Trésorerie : surveillance des connexions bancaires
 
 Les connexions bancaires (Powens) sont désormais **surveillées en continu**.

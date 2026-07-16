@@ -1451,7 +1451,7 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   forecast).
 - **La table front des échéances ne liste que les one-shot pures — limitation
   V1 assumée.** `forecasts.listEntries` (consommée par `ForecastEntriesSection`,
-  onglet Cash « Aperçu ») filtre `ruleId == null` : les occurrences générées
+  onglet Cash « Règles & échéances ») filtre `ruleId == null` : les occurrences générées
   par une règle n'y apparaissent jamais. Conséquence : une occurrence de règle
   passée en `overridden` (éditée à la main — aujourd'hui faisable uniquement
   via l'agent IA, `updateForecastEntry`) n'est visible **ni** dans cette table

@@ -3,10 +3,21 @@
 ## À quoi ça sert
 
 La page Trésorerie (`/app/<org>/cash`) centralise les comptes bancaires du
-véhicule et toutes les transactions. Trois onglets : **Aperçu** (soldes,
-prévisionnel, TVA, alertes), **Transactions** (le registre complet et le
-[pointage](08-pointage.md)) et **Analyse** (ventilation mensuelle par
-catégorie).
+véhicule et toutes les transactions. Quatre onglets, du plus consulté au
+plus « réglage » :
+
+- **Vue d'ensemble** — l'essentiel en un écran : les indicateurs clés
+  (solde disponible, atterrissage fin de mois, entrées/sorties/net des 30
+  et 90 prochains jours), la courbe de solde passé → futur (avec le seuil
+  d'alerte tracé dessus quand une alerte est active), et les comptes
+  regroupés **par banque** (sous-total par banque, entité titulaire sur
+  chaque ligne). Si une connexion bancaire est en panne ou si le seuil
+  d'alerte est franchi, une **bannière** le signale en tête de page.
+- **Prévisionnel** — le détail mois par mois : voir
+  [Prévisionnel](09-previsionnel.md).
+- **Transactions** — le registre complet et le [pointage](08-pointage.md).
+- **Règles & échéances** — tout ce qui se configure : règles récurrentes,
+  échéances ponctuelles, TVA, alerte de seuil, connexions bancaires.
 
 ## Comptes bancaires
 
@@ -37,8 +48,8 @@ solde manuel, nanti, clôturé.
 
 ### Surveillance des connexions
 
-La section « Connexions bancaires » (sous les comptes) affiche l'état de
-chaque connexion Powens :
+La section « Connexions bancaires » (onglet Règles & échéances) affiche
+l'état de chaque connexion Powens :
 
 - 🟢 **Connectée** — la synchronisation tourne normalement.
 - 🟠 **En retard** — aucune synchronisation réussie depuis plus de 48 h
@@ -56,7 +67,9 @@ chaque notification de Powens, et par un contrôle automatique toutes les
 
 Le bouton **« Reconnecter »** (sur une connexion dégradée) rouvre la fenêtre
 sécurisée de la banque en ne redemandant que l'information manquante, sans
-refaire toute la connexion.
+refaire toute la connexion. Dès qu'une connexion se dégrade, une bannière
+apparaît aussi en tête de la Vue d'ensemble avec le nom des banques
+concernées et un raccourci vers cette section.
 
 ## Transactions
 
@@ -81,10 +94,10 @@ pour éviter les doublons avec l'historique.
 
 ## Analyse
 
-L'onglet Analyse ventile les entrées et sorties par grande catégorie, mois
-par mois, sur 3, 6 ou 12 mois, avec la ligne nette. Les virements internes
-et les lignes ignorées sont exclus (comptés à part). Les catégories viennent
-du [pointage](08-pointage.md).
+La section Analyse (en bas de l'onglet Prévisionnel) ventile les entrées et
+sorties par grande catégorie, mois par mois, sur 3, 6 ou 12 mois, avec la
+ligne nette. Les virements internes et les lignes ignorées sont exclus
+(comptés à part). Les catégories viennent du [pointage](08-pointage.md).
 
 ## Points d'attention
 

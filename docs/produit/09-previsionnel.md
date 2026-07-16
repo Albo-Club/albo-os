@@ -5,8 +5,11 @@
 Le prévisionnel projette le solde de trésorerie du véhicule dans le temps, à
 partir de deux sources : les **règles récurrentes** (loyers, salaires,
 échéances de dette, abonnements) et les **écritures ponctuelles** (appels de
-fonds, distributions, impôts one-shot). Il vit dans l'onglet **Aperçu** de la
-[Trésorerie](07-tresorerie.md).
+fonds, distributions, impôts one-shot). Il est réparti sur trois onglets de
+la [Trésorerie](07-tresorerie.md) : la courbe et les indicateurs dans
+**Vue d'ensemble**, le détail (échéances à venir, rapprochements, grille
+mois par mois, analyse) dans **Prévisionnel**, et la gestion des règles,
+échéances ponctuelles, TVA et alertes dans **Règles & échéances**.
 
 ## Règles et écritures
 
@@ -32,9 +35,12 @@ conserve l'historique (réalisées, annulées, retouchées).
 
 ## La projection
 
-- **Courbe de solde projeté** sur 6, 12 ou 24 mois, avec deux scénarios :
-  *engagé seul* (les flux confirmés) et *avec planifié*.
-- **Grille catégories × mois** fusionnant réalisé, engagé et planifié, avec
+- **Courbe de solde projeté** sur 6, 12 ou 24 mois (Vue d'ensemble), avec
+  deux scénarios : *engagé seul* (les flux confirmés) et *avec planifié*.
+  Quand une alerte de seuil est active, le seuil apparaît en ligne
+  pointillée sur la courbe.
+- **Grille catégories × mois** (onglet Prévisionnel) fusionnant réalisé,
+  engagé et planifié, avec
   la ligne de solde. Le réalisé du mois **consomme** le prévu de la même
   catégorie, pour ne jamais compter deux fois le même flux. Les échéances en
   retard roulent sur le mois courant (toujours attendues, juste en retard).
@@ -62,13 +68,15 @@ foulée — deux gestes distincts.
 
 - **Alerte de trésorerie** : « me prévenir par email si le solde disponible
   ou un mois projeté (3 mois) passe sous X € ». Vérifiée chaque matin, avec
-  une pause de 7 jours après chaque alerte envoyée.
+  une pause de 7 jours après chaque alerte envoyée. Tant que le seuil est
+  franchi, une bannière rouge l'affiche aussi en tête de la Vue d'ensemble.
 - **Échéance TVA suggérée** : quand la TVA du dernier trimestre clos est à
   payer, Albo OS propose de créer l'échéance correspondante (sortie
   « impôts », due le 24 du mois suivant le trimestre). Jamais créée toute
   seule.
-- **Échéances à venir** : la liste des 90 prochains jours, retards en tête,
-  avec les nets à 30 et 90 jours dans le bandeau.
+- **Échéances à venir** : la liste des 90 prochains jours, retards en tête
+  (tête de l'onglet Prévisionnel), avec les entrées, sorties et net à 30 et
+  90 jours dans le bandeau de la Vue d'ensemble.
 
 ## Points d'attention
 

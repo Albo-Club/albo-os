@@ -4,8 +4,9 @@
   "title": "Cash",
   "tabs": {
     "apercu": "Overview",
+    "previsionnel": "Forecast",
     "transactions": "Transactions",
-    "analyse": "Analysis"
+    "gestion": "Rules & entries"
   },
   "analysis": {
     "title": "Inflows / outflows by category",
@@ -26,10 +27,14 @@
   "kpis": {
     "landing": "End-of-month landing",
     "landingCommitted": "committed only: {{amount}}",
-    "net30": "30-day net",
-    "net90": "90-day net",
-    "netHint": "upcoming entries, overdue included"
+    "window30": "Next 30 days",
+    "window90": "Next 90 days",
+    "inflows": "Inflows",
+    "outflows": "Outflows",
+    "net": "Net",
+    "flowsHint": "upcoming entries, overdue included"
   },
+  "accountsTitle": "Bank accounts",
   "upcoming": {
     "title": "Upcoming entries",
     "window": "{{count}}d",
@@ -95,6 +100,13 @@
     "reconnect": "Reconnect",
     "reconnecting": "Redirecting…",
     "reconnectFailed": "Couldn't start the reconnection. Please try again.",
+    "banner": {
+      "stale_one": "Bank connection late on sync: {{names}}",
+      "stale_other": "{{count}} bank connections late on sync: {{names}}",
+      "action_required_one": "Bank connection needs reconnecting: {{names}}",
+      "action_required_other": "{{count}} bank connections need reconnecting: {{names}}",
+      "manage": "Manage connections"
+    },
     "ago": {
       "minutes_one": "{{count}} min ago",
       "minutes_other": "{{count}} min ago",
@@ -107,6 +119,7 @@
   "col": {
     "account": "Account",
     "bank": "Bank",
+    "entity": "Entity",
     "kind": "Type",
     "balance": "Balance"
   },
@@ -154,6 +167,7 @@
   },
   "alert": {
     "title": "Threshold alert",
+    "breached": "Alert threshold breached: the available or projected balance drops under {{amount}} within the next 3 months.",
     "hint": "An email when the projected balance over the next 3 months (or the available balance) drops under the threshold. At most one alert per week.",
     "thresholdLabel": "Threshold (€)",
     "activeLabel": "Alert active",
@@ -162,6 +176,8 @@
   },
   "forecast": {
     "title": "Cash forecast",
+    "gridTitle": "Category × month detail",
+    "gridEmpty": "No forecast flow over the period. Add rules or entries in the Rules & entries tab.",
     "horizonMonths_one": "{{count}} month",
     "horizonMonths_other": "{{count}} months",
     "startingBalance": "Starting balance (available, EUR accounts): {{amount}}",

@@ -3,9 +3,10 @@
   "metaTitleDetail": "Compte — Albo OS",
   "title": "Trésorerie",
   "tabs": {
-    "apercu": "Aperçu",
+    "apercu": "Vue d'ensemble",
+    "previsionnel": "Prévisionnel",
     "transactions": "Transactions",
-    "analyse": "Analyse"
+    "gestion": "Règles & échéances"
   },
   "analysis": {
     "title": "Entrées / sorties par catégorie",
@@ -26,10 +27,14 @@
   "kpis": {
     "landing": "Atterrissage fin de mois",
     "landingCommitted": "engagé seul : {{amount}}",
-    "net30": "Net 30 jours",
-    "net90": "Net 90 jours",
-    "netHint": "échéances à venir, retards inclus"
+    "window30": "30 prochains jours",
+    "window90": "90 prochains jours",
+    "inflows": "Entrées",
+    "outflows": "Sorties",
+    "net": "Net",
+    "flowsHint": "échéances à venir, retards inclus"
   },
+  "accountsTitle": "Comptes bancaires",
   "upcoming": {
     "title": "Échéances à venir",
     "window": "{{count}} j",
@@ -95,6 +100,13 @@
     "reconnect": "Reconnecter",
     "reconnecting": "Redirection…",
     "reconnectFailed": "Impossible de démarrer la reconnexion. Réessayez.",
+    "banner": {
+      "stale_one": "Connexion bancaire en retard de synchronisation : {{names}}",
+      "stale_other": "{{count}} connexions bancaires en retard de synchronisation : {{names}}",
+      "action_required_one": "Connexion bancaire à reconnecter : {{names}}",
+      "action_required_other": "{{count}} connexions bancaires à reconnecter : {{names}}",
+      "manage": "Gérer les connexions"
+    },
     "ago": {
       "minutes_one": "il y a {{count}} min",
       "minutes_other": "il y a {{count}} min",
@@ -107,6 +119,7 @@
   "col": {
     "account": "Compte",
     "bank": "Banque",
+    "entity": "Entité",
     "kind": "Type",
     "balance": "Solde"
   },
@@ -154,6 +167,7 @@
   },
   "alert": {
     "title": "Alerte de seuil",
+    "breached": "Seuil d'alerte franchi : le solde disponible ou projeté passe sous {{amount}} dans les 3 prochains mois.",
     "hint": "Un email si le solde projeté des 3 prochains mois (ou le solde disponible) passe sous le seuil. Au plus une alerte par semaine.",
     "thresholdLabel": "Seuil (€)",
     "activeLabel": "Alerte active",
@@ -162,6 +176,8 @@
   },
   "forecast": {
     "title": "Prévisionnel de trésorerie",
+    "gridTitle": "Détail par catégorie et par mois",
+    "gridEmpty": "Aucun flux prévisionnel sur la période. Ajoute des règles ou des échéances dans l'onglet Règles & échéances.",
     "horizonMonths_one": "{{count}} mois",
     "horizonMonths_other": "{{count}} mois",
     "startingBalance": "Solde de départ (disponible, comptes EUR) : {{amount}}",
