@@ -229,9 +229,9 @@ Sections typées de la page deal (`/deals/$dealId`) et de la page société
 Bloc central piloté par `convex/lib/instrumentMapping.ts` (les 3 `Record` :
 archétype, mode de rendu, champs ordonnés). Les champs de la grille standard
 s'**éditent inline** (clic sur la valeur → `InlineField` → `deals.update`, cf.
-FD38) ; le sélecteur de type en en-tête ne fait que **prévisualiser** (édition
-inline désactivée pendant l'aperçu). Le dialog « Modifier » reste la voie pour
-nom, type d'instrument, entité cible et personnes (tests FD11+).
+FD38). Le type d'instrument s'affiche dans le titre de la fiche ; le dialog
+« Modifier » est la voie pour le changer, ainsi que le nom, l'entité cible et
+les personnes (tests FD11+).
 
 | #    | Étape                                                                                          | Résultat attendu                                                                                                                                                                                                              |
 | ---- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -242,7 +242,7 @@ nom, type d'instrument, entité cible et personnes (tests FD11+).
 | FD5  | Deal `cto`                                                                                     | Bloc central = placeholder neutre « Type d'instrument pas encore configuré »                                                                                                                                                  |
 | FD6  | Deal `safe` ou `bsa_air` **sans** données post                                                 | Toggle Pré/Post-conversion, défaut **Pré** : seuls closing/versé/type/cap/discount/échéance ; basculer **Post** ajoute valo à la conversion / titres / détention                                                              |
 | FD7  | Deal `safe` avec `conversionValuation` rempli                                                  | Le toggle démarre sur **Post** (déduit de la présence de données post)                                                                                                                                                        |
-| FD8  | Sélecteur de type en en-tête → choisir un autre type                                           | Le bloc central se recompose **à l'écran** ; bandeau **« Aperçu — non enregistré » bien visible** ; **aucune** mutation (vérifier Convex) ; « Revenir au type enregistré » restaure ; **au reload, retour au type réel en base** |
+| FD8  | En-tête de fiche : titre + absence de sélecteur de type                                        | Le titre affiche **« Nom · Type »** (ou le type seul si le deal n'a pas de nom personnalisé) ; **aucun** sélecteur de type sur la fiche ; changer le type passe **uniquement** par ⋯ → « Modifier » (cf. FD11, FD15)                |
 | FD9  | Overview + entité liée + placeholders                                                          | Strip Engagé / Versé / Reçu ; carte « Entité liée » → lien vers la fiche société (`targetCompanyId`) + investisseur (· via SPV si présent) ; blocs « Reporting & KPIs » et « Documents » en placeholder « à venir »            |
 | FD10 | i18n EN/FR                                                                                     | Libellés champs (`field.*`), enums (`enum.*`), archétypes (`archetype.*`) et fiche (`fiche.*`) traduits ; le bloc central **lit** `instrumentMapping.ts` (aucune liste de champs en dur dans le front)                          |
 | FD11 | « Modifier » sur un deal `os` → changer **Taux d'intérêt** (ex. 11 → 12), Enregistrer          | Le dialog liste les champs du type courant en plus de nom + type ; le taux est saisi en **%** ; après save, la valeur persiste (stockée en bps) ; un **point** apparaît à côté du champ sur la fiche (tooltip « modifié à la main »)                                              |

@@ -45,8 +45,8 @@ là où [Participations](04-participations.md) regroupe par société.
   cas (cf. « Montants » ci-dessus : décaissé réel si investi, engagé
   prévisionnel si en term sheet, ou les deux pour un fonds).
 - **Bloc instrument** : les champs propres au type d'instrument, éditables en
-  ligne. Changer le type dans le sélecteur **prévisualise** la nouvelle mise
-  en page sans rien enregistrer (bannière « non enregistré »).
+  ligne. Le type s'affiche dans le titre de la fiche ; on le change via
+  ⋯ → « Modifier ».
 - **Panneau Royalties** (deals royalties) : capital investi, taux de
   royalties, plafond, multiples plancher/plafond, business plan initial
   trimestre par trimestre et réels — les écarts et le BP dégradé sont

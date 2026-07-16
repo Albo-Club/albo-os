@@ -298,12 +298,6 @@
   },
   "fiche": {
     "instrumentTitle": "Détails de l'instrument",
-    "typeLabel": "Type d'instrument",
-    "preview": {
-      "unsaved": "Aperçu — non enregistré",
-      "note": "Changer le type ici ne fait que prévisualiser la mise en page — rien n'est écrit en base.",
-      "reset": "Revenir au type enregistré"
-    },
     "safe": {
       "pre": "Pré-conversion",
       "post": "Post-conversion"

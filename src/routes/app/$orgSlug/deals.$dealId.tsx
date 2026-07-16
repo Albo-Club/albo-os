@@ -3,7 +3,6 @@ import {
   ArrowRight,
   Check,
   ChevronsUpDown,
-  Eye,
   Info,
   LogOut,
   MoreHorizontal,
@@ -694,9 +693,6 @@ function DealDetail() {
   const [exitOpen, setExitOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  // Instrument-type preview: local-only, writes nothing (cf. Lot 3). null =
-  // showing the saved type; any other value previews a layout.
-  const [previewKind, setPreviewKind] = useState<InstrumentKind | null>(null)
   const removeDeal = useConvexMutation(api.deals.remove)
   const deal = useConvexQuery(api.deals.getById, {
     id: dealId as Id<'deals'>,
@@ -759,9 +755,6 @@ function DealDetail() {
     )
   }
 
-  // Previewed instrument type (local only) vs the one saved in DB.
-  const effectiveKind = previewKind ?? deal.instrumentKind
-  const unsaved = previewKind != null && previewKind !== deal.instrumentKind
   // Amount tile(s) shown at the top of the fiche, by status/instrument (helper
   // shared with the entity-sheet deal list). "Reçu" is added alongside.
   const amountTiles = dealAmountTiles({
@@ -784,9 +777,9 @@ function DealDetail() {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        {/* Name only: the instrument type sits in the selector below. */}
+        {/* Name + instrument type (e.g. "Qonto · Actions"). */}
         <h1 className="text-2xl font-semibold tracking-tight">
-          {dealTitle(deal, { withInstrument: false })}
+          {dealTitle(deal)}
         </h1>
         <Badge
           variant={statusVariant(deal.status)}
@@ -833,53 +826,6 @@ function DealDetail() {
         </DropdownMenu>
       </div>
 
-      {/* Instrument-type selector — previews the central block only. The
-          change is local and never written to DB (the write lands in Lot 3). */}
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground text-sm">
-            {t('fiche.typeLabel')}
-          </span>
-          <Select
-            value={effectiveKind}
-            onValueChange={(v) => setPreviewKind(v as InstrumentKind)}
-          >
-            <SelectTrigger className="w-[220px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {INSTRUMENTS.map((kind) => (
-                <SelectItem key={kind} value={kind}>
-                  {t(`instrument.${kind}`, { defaultValue: kind })}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        {unsaved && (
-          <div
-            role="status"
-            className="border-chart-4/50 bg-chart-4/10 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2"
-          >
-            <span className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
-              <Eye className="text-chart-4 size-4" />
-              {t('fiche.preview.unsaved')}
-            </span>
-            <span className="text-muted-foreground text-xs">
-              {t('fiche.preview.note')}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="ml-auto"
-              onClick={() => setPreviewKind(null)}
-            >
-              {t('fiche.preview.reset')}
-            </Button>
-          </div>
-        )}
-      </div>
-
       {/* Overview: amount tile(s) by status/instrument + received. */}
       <div
         className={cn(
@@ -897,23 +843,25 @@ function DealDetail() {
         <Stat label={t('deal.received')} value={fmtEur(received)} />
       </div>
 
-      {/* Central block: layout driven by the previewed instrument type. The
+      {/* Central block: layout driven by the saved instrument type. The
           custom panels (lead_spv) read `received` and open the edit dialog.
           For royalty, the notes are injected inside the panel (parameters →
           notes → realized → table); other instruments keep them below. */}
       <InstrumentBlock
         deal={deal}
-        instrumentKind={effectiveKind}
+        instrumentKind={deal.instrumentKind}
         received={received}
         transactions={txs}
         notesSlot={
-          effectiveKind === 'royalty' ? <NotesSection deal={deal} /> : undefined
+          deal.instrumentKind === 'royalty' ? (
+            <NotesSection deal={deal} />
+          ) : undefined
         }
         onEdit={() => setEditOpen(true)}
-        editable={!unsaved}
+        editable
       />
 
-      {effectiveKind !== 'royalty' && <NotesSection deal={deal} />}
+      {deal.instrumentKind !== 'royalty' && <NotesSection deal={deal} />}
 
       {deal.instrumentKind === 'fund_lp' && (
         <FundSection

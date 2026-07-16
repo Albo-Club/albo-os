@@ -23,6 +23,28 @@ bas de page.
 
 ---
 
+## v1.95.1 — 16/07/2026 à 14:58 — Deals : sélecteur de type d'instrument retiré de la fiche
+
+Sur une fiche deal, un sélecteur **« Type d'instrument »** trônait en tête de
+page. En réalité il ne faisait qu'un **aperçu** : changer le type dedans
+redessinait l'affichage sans **rien enregistrer** — trompeur au quotidien. Il
+est **retiré**. Le type d'instrument s'affiche désormais directement dans le
+**titre** de la fiche (« Nom · Type »), et se **change** comme les autres
+informations via **⋯ → Modifier**.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/$orgSlug/deals.$dealId.tsx` : suppression de l'état
+>   d'aperçu local (`previewKind` / `effectiveKind` / `unsaved`) et du bloc
+>   sélecteur. `InstrumentBlock` reçoit maintenant `deal.instrumentKind` et
+>   `editable` (toujours vrai — l'édition inline n'est plus désactivée pendant
+>   un aperçu). Titre passé de `dealTitle(deal, { withInstrument: false })` à
+>   `dealTitle(deal)` pour garder le type visible.
+> - Clés i18n orphelines retirées (`participations:fiche.typeLabel` et
+>   `fiche.preview.*`, EN + FR). Docs à jour : `docs/produit/05-deals.md` et
+>   `TESTING.md` (intro fiche deal + test FD8 réorienté). Le vrai changement de
+>   type reste dans `EditDealDialog` (inchangé).
+
 ## v1.95.0 — 16/07/2026 à 14:26 — Deals : type de tour aussi sur l'equity via SPV
 
 Le champ **« Tour »** (Pre-seed, Seed, Série A/B/C+, Bridge, Secondaire),
