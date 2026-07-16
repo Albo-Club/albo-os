@@ -23,6 +23,28 @@ bas de page.
 
 ---
 
+## v1.96.0 — 16/07/2026 à 15:14 — Deals : le titre d'un deal renommé n'affiche plus le type
+
+Depuis la dernière mise à jour, le titre d'une fiche deal montrait **« Nom ·
+Type d'instrument »**. Quand vous renommez un deal, ce **« · Type »** collé
+derrière votre nom faisait doublon. Il **disparaît** : un deal que vous avez
+renommé s'affiche désormais avec **son nom seul**, partout (fiche, fil
+d'ariane, sélecteurs de pointage, recherche). Le type d'instrument reste bien
+visible dans les **informations** de la fiche et dans la **colonne dédiée** de
+la liste — et se modifie toujours via **⋯ → Modifier**. Un deal **sans nom
+personnalisé** continue, lui, d'afficher le type comme titre.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/participations/ParticipationsTable.tsx` : `useDealTitle`
+>   renvoie désormais `deal.name` seul quand un nom custom existe (fallback
+>   label instrument sinon). Suppression de l'option `withInstrument`, devenue
+>   sans objet.
+> - `src/components/app-shell/AppHeader.tsx` : `buildDealCrumbs` appelle
+>   `dealTitle(deal)` sans l'option retirée (signature allégée).
+> - `src/routes/app/$orgSlug/deals.$dealId.tsx` : commentaire du titre mis à
+>   jour. Ajuste le format « Nom · Type » introduit en v1.95.1.
+
 ## v1.95.1 — 16/07/2026 à 14:58 — Deals : sélecteur de type d'instrument retiré de la fiche
 
 Sur une fiche deal, un sélecteur **« Type d'instrument »** trônait en tête de
