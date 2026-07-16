@@ -23,6 +23,31 @@ bas de page.
 
 ---
 
+## v1.94.0 — 16/07/2026 à 13:54 — Deals : montant unique et cohérent en tête de fiche
+
+Suite d'ALB-55 : en tête d'une fiche deal (et dans les colonnes de la ligne
+« Deals » d'une fiche entité), on voyait à la fois **« Engagé »** et
+**« Décaissé (réel) »** — identiques pour un deal direct, donc redondants.
+
+- Un deal **investi** n'affiche plus que le **« Décaissé (réel) »** (le montant
+  réellement viré, calculé depuis les transactions pointées) + « Reçu ».
+- Un deal encore en **term sheet** affiche le **« Engagé prévisionnel »** (le
+  montant du TS) — puisque rien n'a encore été décaissé.
+- Les **fonds** gardent bien les deux (« Engagé » = ce qu'on committe et
+  « Décaissé (réel) » = capital appelé & versé), car ils diffèrent réellement.
+
+> **🔧 Notes techniques**
+>
+> - Helper partagé `dealAmountTiles(deal)` dans
+>   `src/components/participations/ParticipationsTable.tsx` : renvoie les tuiles
+>   de montant selon `isFund` (`fund_lp`/`secondary`) et `status === 'pending'`.
+>   Réutilisé par la fiche deal (`deals.$dealId.tsx`, grille de `Stat`) et par
+>   `DealsList` (fiche entité). « Reçu » ajouté systématiquement.
+> - i18n `deal.committedForecast` (« Engagé prévisionnel » / « Forecast
+>   commitment »).
+> - Vue agrégée « tous les deals » (`DealsListView`) et export CSV **inchangés**
+>   (tableau à colonnes fixes).
+
 ## v1.93.0 — 16/07/2026 à 10:22 — Deals : un seul montant saisi, « Capital appelé » sur les fonds
 
 Suite d'ALB-55 : on clarifie les montants sur les fiches deal, qui prêtaient à

@@ -269,6 +269,38 @@ export function useDealTitle() {
 }
 
 /**
+ * Amount tiles to show for a deal, BEFORE the always-present "Reçu". Keeps the
+ * commitment vs disbursed distinction only where it's meaningful:
+ * - Fund (fund_lp / secondary): both « Engagé » (commitment) and
+ *   « Décaissé (réel) » (called & paid), which genuinely differ.
+ * - Direct deal in term sheet (pending): « Engagé prévisionnel » only — the
+ *   disbursed is still 0, so we show the planned amount.
+ * - Direct invested deal: « Décaissé (réel) » only — for a wired deal it equals
+ *   the commitment, so showing both is redundant.
+ */
+export function dealAmountTiles(deal: {
+  instrumentKind: string
+  status: string
+  committedAmount?: number | null
+  paidActual?: number | null
+}): Array<{ labelKey: string; cents: number }> {
+  const committed = deal.committedAmount ?? 0
+  const paid = deal.paidActual ?? 0
+  const isFund =
+    deal.instrumentKind === 'fund_lp' || deal.instrumentKind === 'secondary'
+  if (isFund) {
+    return [
+      { labelKey: 'deal.committed', cents: committed },
+      { labelKey: 'deal.paid', cents: paid },
+    ]
+  }
+  if (deal.status === 'pending') {
+    return [{ labelKey: 'deal.committedForecast', cents: committed }]
+  }
+  return [{ labelKey: 'deal.paid', cents: paid }]
+}
+
+/**
  * Detailed list of deals (one block per deal). Used by the participation
  * detail page (entity sheet) to list an entity's deals.
  */
@@ -308,10 +340,11 @@ export function DealsList({
                 </span>
               ) : null}
             </Field>
-            <Field label={t('deal.committed')}>
-              {fmtEur(dl.committedAmount)}
-            </Field>
-            <Field label={t('deal.paid')}>{fmtEur(dl.paidActual ?? 0)}</Field>
+            {dealAmountTiles(dl).map((tile) => (
+              <Field key={tile.labelKey} label={t(tile.labelKey)}>
+                {fmtEur(tile.cents)}
+              </Field>
+            ))}
             <Field label={t('deal.received')}>{fmtEur(dl.received ?? 0)}</Field>
             <Field label={t('deal.tvpi')}>{fmtMultiple(tvpi)}</Field>
             <Field label={t('deal.status')}>
