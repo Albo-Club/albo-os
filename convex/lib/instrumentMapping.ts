@@ -104,6 +104,7 @@ const EQUITY_FIELDS = [
   'preMoneyValuation',
   'postMoneyValuation',
   'sharesAcquired',
+  'pricePerShare',
 ]
 
 const SAFE_FIELDS = [

@@ -29,7 +29,8 @@ là où [Participations](04-participations.md) regroupe par société.
   *passé en perte*.
 - **Dates** : signature (tri par défaut), closing, sortie.
 - **Titres et détention** : les deals en actions enregistrent le **nombre de
-  titres acquis** lors du tour. Le **pourcentage de détention** ne se saisit
+  titres acquis** et le **prix par titre** (utile pour un secondaire). Le
+  **pourcentage de détention** ne se saisit
   pas sur le deal : il est **calculé au niveau de la société** (titres détenus
   rapportés au capital total), là où il a du sens — une société peut porter
   plusieurs deals.

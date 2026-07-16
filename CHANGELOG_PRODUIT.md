@@ -33,13 +33,17 @@ Plusieurs améliorations sur les deals, remontées à l'usage :
   plus besoin de compléter la fiche après coup.
 - **Titres acquis** : les deals en **actions** enregistrent le **nombre de
   titres** acquis lors du tour.
+- **Prix par titre** : les deals en actions peuvent aussi renseigner le
+  **prix par titre** — utile notamment pour un **secondaire** (rachat
+  d'actions existantes : titres × prix).
 - **Détention au niveau société** : le pourcentage de détention n'est plus
   saisi deal par deal. Il est **calculé au niveau de la société** (titres
   détenus rapportés au capital total), là où il a du sens — une société peut
   porter plusieurs deals.
 - **Date de closing sur les fonds** : elle s'affiche maintenant aussi sur les
   deals de type **fonds** (elle l'était déjà pour les actions, SAFE, OC…).
-- **Nouveau tour « Secondaire »** dans la liste des tours de table.
+- **Nouveau tour « Secondaire »** (rachat d'actions existantes) dans la liste
+  des tours de table.
 
 > **🔧 Notes techniques**
 >
@@ -47,9 +51,10 @@ Plusieurs améliorations sur les deals, remontées à l'usage :
 >   validator, le champ `roundType` du schéma et les options d'édition en
 >   dérivent (union élargie, rétro-compatible, **aucune migration**).
 > - `convex/lib/instrumentMapping.ts` : `EQUITY_FIELDS` +`sharesAcquired`
->   −`ownershipPct` ; `SAFE`/`BSA`/`OC` −`ownershipPct` ; `FONDS_FIELDS`
->   +`closingDate`. `spvOwnershipPct` (SPV) laissé intact. Le champ
->   `ownershipPct` reste au schéma (données préservées, juste plus affiché).
+>   +`pricePerShare` −`ownershipPct` ; `SAFE`/`BSA`/`OC` −`ownershipPct` ;
+>   `FONDS_FIELDS` +`closingDate`. `spvOwnershipPct` (SPV) laissé intact. Le
+>   champ `ownershipPct` reste au schéma (données préservées, juste plus
+>   affiché). `pricePerShare` était déjà câblé (format `eur`, i18n fr/en).
 > - `DealFieldInput` extrait dans `src/components/deals/DealFieldInput.tsx`
 >   (composant partagé édition + création). `CreateDealDialog`
 >   (`participations.$companyId.tsx`) rend `INSTRUMENT_FIELDS[instrument]`
