@@ -66,6 +66,7 @@
     "instrument": {
       "share": "Actions",
       "spv_share": "Equity via SPV",
+      "carry_vehicle": "Structure de carried",
       "os": "Obligation",
       "oc": "Obligation convertible",
       "convertible_note": "Note convertible",

@@ -17,8 +17,10 @@ là où [Participations](04-participations.md) regroupe par société.
 - **Instrument** : le type d'investissement. Une vingtaine sont gérés —
   actions, BSA, BSA-AIR, SAFE, obligations convertibles ou simples, compte
   courant d'associé, royalties, engagement LP dans un fonds, parts de SPV,
-  lead SPV (fees + carried), secondaire, immobilier direct, SCPI, CTO, dépôt
-  à terme, crypto, prêt, compte de capitalisation. Chaque instrument a ses
+  lead SPV (fees + carried), structure de carried (participation dans un
+  véhicule dédié au carried, type OPRTRS & Co), secondaire, immobilier
+  direct, SCPI, CTO, dépôt à terme, crypto, prêt, compte de capitalisation.
+  Chaque instrument a ses
   champs propres (prix par action et valorisation d'entrée pour les actions,
   taux et maturité pour la dette, cap et discount pour un SAFE, etc.).
 - **Montants** : un deal a un **engagé** (ce qu'on s'est engagé à investir,

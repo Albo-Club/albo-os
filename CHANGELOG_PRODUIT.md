@@ -23,6 +23,42 @@ bas de page.
 
 ---
 
+## v1.97.0 — 16/07/2026 à 15:19 — Deals : nouveau type d'instrument « Structure de carried »
+
+Un **nouveau type d'instrument** rejoint la liste des deals : **« Structure de
+carried »**. Il modélise une **participation (equity) qu'on détient dans un
+véhicule dédié au carried interest** — une « Manco » —, typiquement
+**OPRTRS & Co** : on détient des titres d'une structure qui, elle, reverse du
+carried.
+
+C'est un type **distinct de « Lead SPV (gestion) »** : ce dernier suit **nos
+revenus** quand c'est **nous** qui gérons un SPV (frais + carried), alors que
+« Structure de carried » suit une **participation qu'on détient** dans une
+telle structure.
+
+- Sélectionnable comme tout autre instrument, via **⋯ → Modifier** (dialogue
+  d'édition du deal).
+- Sur la fiche, il affiche : **date de closing**, **titres acquis**, **prix par
+  titre** et **carried** (le taux de carried de la structure).
+
+> **🔧 Notes techniques**
+>
+> - `carry_vehicle` ajouté à la liste source `INSTRUMENTS`
+>   (`convex/lib/instruments.ts`) → le validateur `instrumentValidator` du
+>   schéma se met à jour seul (source unique, pas de redéclaration).
+> - `convex/lib/instrumentMapping.ts` : archétype `equity`, rendu `fields`, et
+>   `CARRY_VEHICLE_FIELDS` = `closingDate` / `sharesAcquired` / `pricePerShare`
+>   / `carriedRate` (colonnes `deals` existantes → **aucun changement de
+>   schéma**). La détention % n'est volontairement pas un champ deal (calculée
+>   au niveau société).
+> - Ajouté au sélecteur de l'`EditDealDialog` (`INSTRUMENTS` dans
+>   `src/routes/app/$orgSlug/deals.$dealId.tsx`) et libellé i18n
+>   `instrument.carry_vehicle` (fr « Structure de carried » / en « Carried
+>   interest structure ») dans `participations.json` **et** `chat.json`.
+> - **Pas de migration** : « Oprtrs & Co » (org Albo) reste en `secondary`
+>   (importé du `type_d_invest = "Secondary Shares"` d'Attio) et sera
+>   rebasculé à la main dans l'app.
+
 ## v1.96.0 — 16/07/2026 à 15:14 — Deals : le titre d'un deal renommé n'affiche plus le type
 
 Depuis la dernière mise à jour, le titre d'une fiche deal montrait **« Nom ·

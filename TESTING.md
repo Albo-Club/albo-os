@@ -30,7 +30,7 @@ Pré-requis :
 
 > **Schéma & mapping d'instruments** (refonte fiches deal, `convex/schema.ts` +
 > `convex/lib/instrumentMapping.ts`). Validés par B1 : `INSTRUMENT_ARCHETYPE` et
-> `INSTRUMENT_RENDER` sont des `Record` totaux sur les 20 `instrumentKind` → un
+> `INSTRUMENT_RENDER` sont des `Record` totaux sur **tous** les `instrumentKind` → un
 > type oublié casse la compilation. Vérifier en plus, à la revue, que chaque
 > colonne listée dans `INSTRUMENT_FIELDS` existe bien sur la table `deals`.
 > Aucune surface UI à tester : les colonnes d'archétype sont dormantes tant que
@@ -275,6 +275,7 @@ les personnes (tests FD11+).
 | FD37 | **`royalty` — distinction « rien saisi » / « zéro » (colonnes Réel et BP initial).** Sur un trimestre, éditer une cellule **Réel** (puis idem **BP initial**) : (a) la **vider** entièrement et valider (Entrée/blur) ; (b) y saisir **« 0 »** et valider | (a) **Vider** → le point est **supprimé** (`actualPoints` / `bpPoints` filtré, sans réinsertion via `deals.update`) ; la cellule repasse à **« — »** ; si l'autre colonne du trimestre n'a plus de point non plus, la ligne sort de l'union. (b) Saisir **« 0 »** → un point à **valeur 0** est **conservé/créé** ; la cellule affiche **« 0 € »** (pas « — »). Un trimestre déjà à **0** (vrai zéro) reste **« 0 € »**, jamais transformé en tiret. Saisie **non vide non parsable** (ex. « abc ») → **aucun** changement (point conservé). **Échap** annule sans rien toucher |
 | FD38 | **Édition inline du bloc « Détails de l'instrument ».** Sur un deal `os` (grille standard), cliquer directement sur la valeur d'un champ **€** (ex. Principal), d'un champ **%** (Taux), d'une **date** (Échéance) et d'un **enum** (Périodicité du coupon) | Le champ passe en saisie **au clic** (input formaté au bon type : € avec groupage des milliers, % avec suffixe, `date`, ou **liste déroulante** enum ouverte). **Entrée** ou **blur** enregistre (`deals.update` à un seul champ, toast « enregistré », valeur reformatée) ; **Échap** annule. Le champ modifié devient **`manuallyEditedFields`** (point « modifié à la main », cf. FD14). Aucun passage par le menu « … » |
 | FD39 | **Inline désactivé en aperçu + champs calculés/non éditables.** (a) Changer le type via le sélecteur d'en-tête (bandeau « Aperçu — non enregistré ») puis cliquer un champ de la grille ; (b) sur un deal `crypto`, viser la **plus-value latente** et le strip **Engagé/Versé/Reçu** | (a) En **aperçu** d'un autre type, les champs de la grille **ne sont pas éditables** (affichage lecture seule) — l'édition inline ne revient qu'au type enregistré. (b) Plus-value latente et strip d'overview (dont **« Décaissé (réel) »**, calculé depuis les transactions) restent **non éditables**. Un champ **€ vidé** puis validé est un **no-op** (les colonnes deal ne se vident pas via la mutation) |
+| FD40 | **Deal `carry_vehicle` (« Structure de carried »).** Ouvrir/créer un deal `carry_vehicle` (ex. reclasser « Oprtrs & Co », org `albo`, depuis « Secondaire ») | Libellé d'instrument « Structure de carried » / « Carried interest structure » (EN/FR), **sélectionnable** via **⋯ → Modifier** (dialogue d'édition) ; badge archétype **« Capital »** (token chart-1, comme l'equity) — **pas** « Gestion » (distinct de `lead_spv`) ; bloc « Détails de l'instrument » = grille standard : **date de closing / titres acquis / prix par titre / carried (%)**, dans l'ordre du mapping ; champs vides → « — ». « Modifier » édite ces 4 champs (date / nombre / € / %) |
 
 ### Liste transversale des deals (`/app/$orgSlug/deals`, `/app/all/deals`)
 
@@ -816,7 +817,7 @@ signature → ms epoch.
 | CD2 | Org à **plusieurs** entités `group_*`                                                              | Aucun investisseur deviné ; sélection obligatoire ; bouton Créer désactivé tant qu'investisseur **et** instrument ne sont pas choisis            |
 | CD3 | Choisir investisseur + instrument (+ montant en € + date optionnels) → Créer                       | Toast succès ; le deal apparaît dans la liste de la fiche (réactif, sans reload) ; **on reste sur la fiche** ; montant stocké en cents           |
 | CD4 | Montant invalide (négatif ou non numérique)                                                        | Erreur inline sous le champ + bouton Créer désactivé                                                                                             |
-| CD5 | i18n EN/FR sur le dialog                                                                           | Libellés, placeholders, erreurs et toasts traduits ; les 20 instruments viennent de `convex/lib/instruments.ts` (libellés `instrument.*`)         |
+| CD5 | i18n EN/FR sur le dialog                                                                           | Libellés, placeholders, erreurs et toasts traduits ; les instruments viennent de `convex/lib/instruments.ts` (libellés `instrument.*`)         |
 
 ### Suppression de deal depuis la fiche deal (`/app/$orgSlug/deals/$dealId`)
 

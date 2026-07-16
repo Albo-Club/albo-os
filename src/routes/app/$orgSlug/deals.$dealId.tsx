@@ -133,6 +133,7 @@ const INSTRUMENTS = [
   'fund_lp',
   'spv_share',
   'lead_spv',
+  'carry_vehicle',
   'secondary',
   'real_estate_direct',
   'scpi',

@@ -1687,10 +1687,11 @@ ce mapping ailleurs. Décisions non-évidentes :
    `INSTRUMENTS` (≈ l.80-100, ordre d'affichage du dropdown) alors que la source
    unique est `convex/lib/instruments.ts`, déjà réimportée ailleurs
    (`participations.$companyId.tsx`, `ParticipationsTable.tsx`). Les deux listes
-   couvrent les 20 mêmes `instrumentKind` mais dans un **ordre différent** (penser
-   à y ajouter tout nouveau kind — `lead_spv` l'a été). Laissé tel quel (hors
-   périmètre, pas de fix adjacent) : le sélecteur de
-   prévisualisation ajouté réutilise la copie locale pour ne pas introniser deux
+   couvrent les mêmes `instrumentKind` (hors `unknown`, réservé à la sync) mais
+   dans un **ordre différent** (penser à y ajouter tout nouveau kind — `lead_spv`
+   puis `carry_vehicle` l'ont été). Laissé tel quel (hors
+   périmètre, pas de fix adjacent) : le dialogue d'édition
+   (`EditDealDialog`) réutilise la copie locale pour ne pas introniser deux
    sources dans le même fichier. **Risque** : un instrument ajouté dans
    `instruments.ts` n'apparaît pas dans ce dropdown tant que la copie locale n'est
    pas mise à jour (divergence silencieuse). **À faire (lot ultérieur)** :
