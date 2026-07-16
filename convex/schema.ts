@@ -271,6 +271,36 @@ export default defineSchema({
     .index('by_powens_user_id', ['powensUserId']),
 
   /**
+   * powensConnections — sync-health monitoring of each Powens bank
+   * connection (one row per connection). Fed by BOTH the CONNECTION_SYNCED
+   * webhook (push, immediate) and a 6h polling cron (pull, catches the
+   * silence when webhooks stop arriving). `state` mirrors the Powens
+   * connection state: null/absent = last sync OK; wrongpass, SCARequired,
+   * webauthRequired, actionNeeded, passwordExpired,
+   * additionalInformationNeeded = user must re-authenticate (webview
+   * reconnect). Health is DERIVED at read time (cf. connectionHealth in
+   * convex/powens.ts), never stored — except `notifiedHealth`, the
+   * anti-spam memory of the last emailed degraded health.
+   */
+  powensConnections: defineTable({
+    orgId: v.id('organizations'),
+    powensConnectionId: v.string(),
+    connectorName: v.optional(v.string()), // bank label, e.g. "Palatine"
+    state: v.optional(v.string()), // Powens state code; absent = OK
+    errorMessage: v.optional(v.string()), // institution hint, user-facing
+    lastSuccessfulSyncAt: v.optional(v.number()), // Powens `last_update`
+    nextTryAt: v.optional(v.number()), // Powens `next_try`
+    active: v.optional(v.boolean()), // Powens `active` (auto-sync on/off)
+    lastWebhookAt: v.optional(v.number()), // last CONNECTION_SYNCED received
+    lastPolledAt: v.optional(v.number()), // last successful cron poll
+    // Last degraded health emailed ('stale' | 'action_required') — cleared
+    // when the connection is healthy again, so the next incident re-alerts.
+    notifiedHealth: v.optional(v.string()),
+  })
+    .index('by_org', ['orgId'])
+    .index('by_powens_connection', ['powensConnectionId']),
+
+  /**
    * telegramAccounts — one row per app user bridging their Telegram account
    * to the AI agent (cf. convex/telegram.ts). Linked via a one-shot
    * `linkCode` (CLI runbook `telegram:createLinkCode` + `/start <code>`).

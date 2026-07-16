@@ -23,6 +23,51 @@ bas de page.
 
 ---
 
+## v1.96.0 — 16/07/2026 à 15:48 — Trésorerie : surveillance des connexions bancaires
+
+Les connexions bancaires (Powens) sont désormais **surveillées en continu**.
+Sur la page Trésorerie, une nouvelle section **« Connexions bancaires »**
+affiche pour chaque banque connectée : son état — 🟢 **Connectée**,
+🟠 **En retard** (aucune synchronisation réussie depuis plus de 48 h) ou
+🔴 **À reconnecter** (la banque attend une action de votre part : nouveau mot
+de passe, authentification forte…) — et la date de sa **dernière
+synchronisation**.
+
+Dès qu'une connexion se dégrade, vous recevez un **email d'alerte** (un seul
+par incident, pas de rappel tant que rien ne change). La panne la plus
+sournoise — la banque qui cesse silencieusement d'envoyer des données — est
+détectée automatiquement : l'application va elle-même vérifier l'état des
+connexions toutes les 6 heures, sans dépendre des notifications de Powens.
+
+Un bouton **« Reconnecter »** apparaît sur toute connexion dégradée : il ouvre
+le parcours bancaire en ne redemandant que ce qui manque (code, mot de passe),
+sans refaire toute la connexion.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle table `powensConnections` (une ligne par connexion Powens) :
+>   état, `lastSuccessfulSyncAt` (le `last_update` Powens), `lastWebhookAt`,
+>   `lastPolledAt`, `notifiedHealth` (anti-spam). Santé **dérivée** à la
+>   lecture (`connectionHealth` dans `convex/powens.ts`) : `action_required`
+>   si state ∈ {wrongpass, SCARequired, webauthRequired, actionNeeded,
+>   passwordExpired, additionalInformationNeeded}, `stale` si aucun signal
+>   depuis > 48 h, sinon `connected`.
+> - Double alimentation : le webhook `CONNECTION_SYNCED` upserte la ligne à
+>   chaque réception (y compris payload à 0 compte, cas typique d'une synchro
+>   en échec) ; cron `pollConnectionsHealth` toutes les 6 h
+>   (`GET /users/me/connections?expand=connector` avec le token permanent de
+>   chaque org) + `evaluateConnectionsHealth` qui ré-évalue la staleness même
+>   quand rien n'arrive. Une connexion absente du poll (supprimée côté
+>   Powens) est retirée du suivi.
+> - Alerte email aux membres de l'org sur transition vers un état dégradé
+>   (`powensConnectionAlertEmail` dans `convex/emailTemplates.ts`), un email
+>   par incident via `notifiedHealth`, remis à zéro au retour à la normale.
+> - Reconnexion : action `startReconnect` → webview Powens `/reconnect` avec
+>   `connection_id` (même posture sécurité que `startBankConnection`).
+> - UI : `src/components/cash/BankConnectionsHealth.tsx` (query
+>   `powens.listConnections`), section insérée sous les comptes sur
+>   `/app/$orgSlug/cash`.
+
 ## v1.95.1 — 16/07/2026 à 14:58 — Deals : sélecteur de type d'instrument retiré de la fiche
 
 Sur une fiche deal, un sélecteur **« Type d'instrument »** trônait en tête de

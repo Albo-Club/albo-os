@@ -34,6 +34,13 @@ transactions — sans jamais dupliquer ni écraser le pointage déjà fait (voir
 Chaque connexion bancaire est rattachée à la bonne organisation et à l'entité
 titulaire du compte.
 
+La santé de chaque connexion est **surveillée en continu** : état visible sur
+la page Trésorerie (connectée / en retard / à reconnecter), alerte email quand
+une connexion se dégrade, et bouton « Reconnecter » pour la rétablir sans
+refaire toute la connexion. Un contrôle automatique interroge Powens toutes
+les 6 heures, pour détecter aussi une connexion qui cesse silencieusement
+d'envoyer des données (voir [Trésorerie](07-tresorerie.md)).
+
 ## Connecteur Claude (serveur MCP)
 
 Albo OS expose ses données à des clients externes compatibles MCP —

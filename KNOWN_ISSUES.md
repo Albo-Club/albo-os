@@ -1043,6 +1043,48 @@ permanent par org, génère un code temporaire et renvoie l'URL du Webview.
   `/auth/init` quasi-simultanés sur une org sans token créeraient un user Powens
   orphelin côté Powens ; risque faible, bouton désactivé pendant l'appel).
 
+## Monitoring des connexions Powens (`convex/powens.ts`, table `powensConnections`)
+
+Santé des connexions bancaires : une ligne par connexion Powens, alimentée en
+**double flux** — le webhook `CONNECTION_SYNCED` (push) ET un cron de poll
+toutes les 6 h (`pollConnectionsHealth`). Points non évidents :
+
+- **Le webhook seul ne suffit PAS.** Le mode de panne principal est le
+  silence : connexion cassée côté banque → Powens n'envoie simplement plus de
+  webhook. C'est le poll (`GET /users/me/connections` avec le token permanent
+  de chaque org) qui rattrape ce cas — ne jamais retirer le cron en pensant
+  que le webhook couvre tout. Symétriquement, `evaluateConnectionsHealth`
+  tourne en fin de cron **même si tous les fetchs ont échoué** : la staleness
+  doit être détectée sans aucune donnée entrante.
+- **Le webhook est ingéré même à 0 compte.** Une synchro en ÉCHEC livre
+  typiquement un payload sans comptes mais avec le `state` d'erreur — c'est
+  précisément lui qu'on veut. Ne pas remettre le garde
+  `accounts.length > 0` d'avant sur l'appel à `ingestConnectionSync`.
+- **Santé dérivée, jamais stockée** (`connectionHealth`) : `action_required`
+  si `state` ∈ {wrongpass, SCARequired, webauthRequired, actionNeeded,
+  passwordExpired, additionalInformationNeeded} (re-auth webview
+  obligatoire) ; `stale` si aucun signal (max de `lastSuccessfulSyncAt` /
+  `lastWebhookAt` / `_creationTime`) depuis > 48 h (Powens re-synchronise
+  toutes les ~24 h) ; sinon `connected`. Les états transitoires
+  (websiteUnavailable, rateLimiting, bug…) ne déclenchent PAS d'alerte
+  directe — ils finissent en `stale` s'ils durent.
+- **Anti-spam : `notifiedHealth`** mémorise le dernier état dégradé alerté
+  par email ; remis à `undefined` au retour au vert. Un incident = un email,
+  une aggravation (`stale` → `action_required`) = un second. Pas de cooldown
+  temporel — c'est le changement d'état qui déclenche.
+- **Le poll est autoritaire sur l'existence** : une connexion absente de la
+  réponse (supprimée côté Powens) est retirée de `powensConnections` —
+  uniquement après un fetch réussi (une liste vide signifie vraiment « zéro
+  connexion », pas une erreur).
+- **Datetimes Powens sans timezone** (`YYYY-MM-DD HH:MM:SS`) : parsés en UTC
+  (`parsePowensDateTime`). Un décalage d'1–2 h est sans effet sur le seuil
+  de 48 h — ne pas sur-ingénierer.
+- **Reconnexion** : `startReconnect` → webview `/reconnect` avec
+  `connection_id` + code temporaire. Même flux de code que
+  `startBankConnection` ; Powens refuse un `connection_id` qui n'appartient
+  pas au user porteur du code (pas de contrôle d'appartenance à refaire côté
+  app au-delà du rôle admin).
+
 ## Pointage transaction → deal (`convex/transactions.ts`)
 
 Le pointage manuel rattache une transaction bancaire à un deal (MVP 1) et

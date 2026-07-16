@@ -9,6 +9,7 @@ import { ConvexError } from 'convex/values'
 import { api } from '../../../../convex/_generated/api'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
+import { BankConnectionsHealth } from '~/components/cash/BankConnectionsHealth'
 import { CashAccounts } from '~/components/cash/CashAccounts'
 import { CashAlertCard } from '~/components/cash/CashAlertCard'
 import { CategoryBreakdown } from '~/components/cash/CategoryBreakdown'
@@ -108,6 +109,7 @@ function Cash() {
           {org && <UpcomingEntriesSection orgId={org._id} />}
           {org && <ForecastMatchSuggestions orgId={org._id} />}
           <CashAccounts accounts={accounts} orgSlug={orgSlug} />
+          {org && <BankConnectionsHealth orgId={org._id} />}
           {org && <VatCard orgId={org._id} orgSlug={orgSlug} />}
           {org && <VatSuggestionCard orgId={org._id} />}
           {org && <CashAlertCard orgId={org._id} />}
