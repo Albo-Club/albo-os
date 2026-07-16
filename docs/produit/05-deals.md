@@ -21,9 +21,11 @@ là où [Participations](04-participations.md) regroupe par société.
   à terme, crypto, prêt, compte de capitalisation. Chaque instrument a ses
   champs propres (prix par action et valorisation d'entrée pour les actions,
   taux et maturité pour la dette, cap et discount pour un SAFE, etc.).
-- **Montants** : l'**engagé** (ce qu'on s'est engagé à investir) et le
-  **décaissé** (ce qui est réellement sorti — calculé depuis les
-  transactions bancaires pointées, jamais saisi à la main).
+- **Montants** : un seul montant saisi, le **montant engagé** (ce qu'on s'est
+  engagé à investir). Le **payé** (ce qui est réellement sorti) est calculé
+  depuis les transactions bancaires pointées, jamais saisi à la main. Les
+  **fonds** ont en plus un **capital appelé** saisi (le fonds appelle le capital
+  par tranches).
 - **Statut** : *engagé* (term sheet signée, pas encore câblé — créé
   automatiquement depuis Attio), *actif*, *sorti partiellement*, *sorti*,
   *passé en perte*.
@@ -37,7 +39,7 @@ là où [Participations](04-participations.md) regroupe par société.
 
 ## La fiche deal
 
-- **Trois stats** en tête : Engagé, Décaissé, Reçu.
+- **Trois stats** en tête : Engagé, Payé, Reçu.
 - **Bloc instrument** : les champs propres au type d'instrument, éditables en
   ligne. Changer le type dans le sélecteur **prévisualise** la nouvelle mise
   en page sans rien enregistrer (bannière « non enregistré »).

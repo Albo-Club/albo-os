@@ -23,6 +23,37 @@ bas de page.
 
 ---
 
+## v1.93.0 — 16/07/2026 à 10:22 — Deals : un seul montant saisi, « Capital appelé » sur les fonds
+
+Suite d'ALB-55 : on clarifie les montants sur les fiches deal, qui prêtaient à
+confusion (« Montant engagé » **et** « Montant contractuel »).
+
+- **Un seul montant saisi** sur les deals directs (actions, SAFE, obligations
+  convertibles, SPV, SCPI, immobilier, placements) : « **Montant engagé** ».
+  L'ancien « Montant contractuel » disparaît de ces fiches — il faisait doublon
+  avec la tuile « **Payé** », déjà calculée depuis les virements rapprochés.
+- Sur les **fonds**, on garde bien deux montants distincts : « Montant engagé »
+  (ce qu'on s'engage à investir) et l'ancien « Montant contractuel » **renommé
+  « Capital appelé »** (le capital appelé par le fonds), en plus de la tuile
+  « Payé ».
+- La **plus-value** d'un placement (crypto, compte de capitalisation) se calcule
+  désormais à partir du « Montant engagé ».
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/instrumentMapping.ts` : `paidAmount` retiré de
+>   `EQUITY`/`SAFE`/`OC`/`SPV`/`SCPI`/`IMMO`/`PLACEMENT_FIELDS` ; **conservé dans
+>   `FONDS_FIELDS`**. Se répercute d'un coup sur la grille de la fiche, l'édition
+>   inline et le formulaire de création (tous pilotés par `INSTRUMENT_FIELDS`).
+> - `src/components/deals/InstrumentBlock.tsx` : `LatentGain` (placements)
+>   calcule `currentValue − (committedAmount ?? paidAmount)` (base = montant
+>   investi, fallback legacy).
+> - i18n `field.paidAmount` renommé « Capital appelé » / « Called capital »
+>   (n'apparaît plus que sur les fonds) ; `field.committedAmount` inchangé.
+> - Champ `paidAmount` **conservé au schéma** (écrit par la sync VASCO/Parallel
+>   et les imports) — non affiché hors fonds, **aucune migration**. Le
+>   prévisionnel n'utilise pas ce champ (le payé dérive des transactions).
+
 ## v1.92.0 — 15/07/2026 à 20:03 — Deals : création plus complète, détention au niveau société, tour « Secondaire »
 
 Plusieurs améliorations sur les deals, remontées à l'usage :

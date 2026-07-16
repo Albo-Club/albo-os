@@ -182,7 +182,7 @@
     "signedDate": "Date de signature",
     "conversionDeadlineDate": "Échéance de conversion",
     "maturityDate": "Date d'échéance",
-    "paidAmount": "Montant contractuel",
+    "paidAmount": "Capital appelé",
     "committedAmount": "Montant engagé",
     "roundSize": "Taille du tour",
     "preMoneyValuation": "Valorisation pre-money",
