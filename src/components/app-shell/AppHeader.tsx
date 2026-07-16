@@ -87,10 +87,7 @@ function buildDealCrumbs(
   orgName: string,
   t: TFunction<['nav']>,
   deal: DealCrumbData | undefined,
-  dealTitle: (
-    deal: { name?: string | null; instrumentKind: string },
-    opts?: { withInstrument?: boolean },
-  ) => string,
+  dealTitle: (deal: { name?: string | null; instrumentKind: string }) => string,
 ): Array<Crumb> {
   const base = `/app/${orgSlug}`
   const companiesLabel = t('nav:appShell.breadcrumb.participations')
@@ -106,7 +103,7 @@ function buildDealCrumbs(
       href: `${base}/participations/${deal.target._id}`,
     })
   }
-  crumbs.push({ label: dealTitle(deal, { withInstrument: false }) })
+  crumbs.push({ label: dealTitle(deal) })
   return crumbs
 }
 

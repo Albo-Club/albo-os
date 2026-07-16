@@ -777,7 +777,7 @@ function DealDetail() {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        {/* Name + instrument type (e.g. "Qonto · Actions"). */}
+        {/* Custom deal name, or the instrument label when the deal is unnamed. */}
         <h1 className="text-2xl font-semibold tracking-tight">
           {dealTitle(deal)}
         </h1>

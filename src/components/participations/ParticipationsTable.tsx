@@ -247,24 +247,17 @@ export function useFormatters() {
 }
 
 /**
- * Display title of a deal: `custom name · instrument` if a name exists,
- * otherwise the (i18n) label of the instrument alone.
- * `withInstrument: false` shows only the name (e.g. the deal detail page,
- * where the instrument already sits in the info grid).
+ * Display title of a deal: the custom name alone when one is set, otherwise
+ * the (i18n) label of the instrument. A renamed deal shows only its name —
+ * the instrument type still lives in the deal's info grid and its own column.
  */
 export function useDealTitle() {
   const { t } = useTranslation('participations')
-  return (
-    deal: { name?: string | null; instrumentKind: string },
-    opts?: { withInstrument?: boolean },
-  ) => {
-    const instrument = t(`instrument.${deal.instrumentKind}`, {
+  return (deal: { name?: string | null; instrumentKind: string }) => {
+    if (deal.name) return deal.name
+    return t(`instrument.${deal.instrumentKind}`, {
       defaultValue: deal.instrumentKind,
     })
-    if (!deal.name) return instrument
-    return opts?.withInstrument === false
-      ? deal.name
-      : `${deal.name} · ${instrument}`
   }
 }
 
