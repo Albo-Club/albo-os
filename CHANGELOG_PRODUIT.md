@@ -23,7 +23,38 @@ bas de page.
 
 ---
 
-## v1.91.1 — 15/07/2026 à 18:16 — Fiches Parallel : la description colle à l'opération, pas à son avancement
+## v1.91.2 — 15/07/2026 à 19:34 — Fiches SPV Parallel Calte : import des termes obligataires
+
+Les fiches des SPV Parallel de Calte n'avaient que le montant, le nom du SPV et
+la date — l'API Vasco ne donne pas les conditions de l'emprunt. Ces conditions
+(taux, périodicité des coupons, remboursement, principal) vivent dans les
+**contrats d'émission stockés dans le Drive**. On les récupère et on les remplit
+pour le lot documenté : **SPV 4, 5, 6, 7, 11 et 13** — chacun avec son taux, sa
+périodicité et sa modalité de remboursement, sourcés au contrat. **SPV 9** est
+au passage requalifié en obligation **convertible** (c'en est une) avec son taux
+de 12 %. Le remplissage ne touche que les champs vides et signale toute valeur
+qui divergerait de l'existant. Hors de ce lot : SPV 18 (opération Vanves annulée
+et remboursée — la fiche est supprimée à la main), SPV 14 et 17 (contrat absent
+du Drive), SPV 2 (déjà sortie), et SPV 8 / 16 (ce sont des actions, pas des
+obligations).
+
+> **🔧 Notes techniques**
+> Nouvelle migration one-shot `convex/migrations/calteInstrumentImport.ts`
+> (`dryRun` / `apply` / `verify`), pendant Calte de `alboInstrumentImport.ts` et
+> calquée dessus. Ancrage par `_id` prod + garde `expectedTarget` (nom de la
+> company cible) ; `fill-empty-only` sur `principalAmount` (cents),
+> `interestRate` (bps), `couponPeriodicity`, `repaymentModality` — `closingDate`
+> / `spvName` / `paidAmount` restent gérés par le bridge Vasco
+> (`vasco:backfillSpvInstruments`), `maturityDate` omis (durée contractuelle
+> N mois après une « date de jouissance » non datée). Le `dryRun` renvoie un
+> bloc `mismatches` (champ déjà rempli ≠ valeur du doc, jamais écrasé). Valeurs
+> extraites des contrats d'émission Parallel (Drive), recoupées avec les
+> positions Vasco. SPV 5 importé au taux contractuel de base (10,5 %) — un
+> avenant à 13 % existe côté attestations, à arbitrer. SPV 9 requalifié `os` →
+> `oc` via un champ `force` (idempotent par valeur, comme la requalif Keenest de
+> `alboInstrumentImport`) + `interestRate` 12 % ; termes de conversion non
+> extraits, donc non importés.
+
 
 La description générée pour les SPV Parallel donnait l'**actualité** de
 l'opération (« première vente, remboursement partiel… ») au lieu de dire
