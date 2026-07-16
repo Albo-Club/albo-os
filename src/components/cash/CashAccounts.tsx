@@ -59,10 +59,13 @@ function AccountsTable({
   accounts,
   orgSlug,
   muted = false,
+  showBank = false,
 }: {
   accounts: Array<CashAccount>
   orgSlug: string
   muted?: boolean
+  /** Bank column instead of the entity one (closed section, mixed banks). */
+  showBank?: boolean
 }) {
   const { t } = useTranslation('cash')
   const { fmtEur, fmtDate } = useFormatters()
@@ -73,8 +76,9 @@ function AccountsTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>{t('col.bank')}</TableHead>
+            {showBank && <TableHead>{t('col.bank')}</TableHead>}
             <TableHead>{t('col.account')}</TableHead>
+            {!showBank && <TableHead>{t('col.entity')}</TableHead>}
             <TableHead className="text-right">{t('col.balance')}</TableHead>
           </TableRow>
         </TableHeader>
@@ -90,7 +94,9 @@ function AccountsTable({
                 })
               }
             >
-              <TableCell className="font-medium">{a.bankName}</TableCell>
+              {showBank && (
+                <TableCell className="font-medium">{a.bankName}</TableCell>
+              )}
               <TableCell>
                 <span className="flex flex-col gap-0.5">
                   <span className="flex flex-wrap items-center gap-1.5">
@@ -116,6 +122,11 @@ function AccountsTable({
                   )}
                 </span>
               </TableCell>
+              {!showBank && (
+                <TableCell className="text-muted-foreground">
+                  {a.owner?.name ?? '—'}
+                </TableCell>
+              )}
               <TableCell className="text-right tabular-nums">
                 {fmtEur(a.currentBalance) ?? t('noBalance')}
               </TableCell>
@@ -128,10 +139,11 @@ function AccountsTable({
 }
 
 /**
- * Bank accounts of the org, grouped by owning entity. The headline
- * available/total figures moved to the cockpit KPI band (CashKpis) — this
- * section keeps the tables only. Closed accounts are kept (their
- * transaction history still backs deals) in a separate muted section.
+ * Bank accounts of the org, grouped by bank ("where is the cash"), with the
+ * owning entity as a column and a per-bank subtotal in the group header.
+ * The headline available/total figures live in the cockpit KPI band
+ * (CashKpis) — this section keeps the tables only. Closed accounts are kept
+ * (their transaction history still backs deals) in a separate muted section.
  */
 export function CashAccounts({
   accounts,
@@ -141,6 +153,7 @@ export function CashAccounts({
   orgSlug: string
 }) {
   const { t } = useTranslation('cash')
+  const { fmtEur } = useFormatters()
 
   const { open, closed } = useMemo(() => {
     const all = accounts ?? []
@@ -151,17 +164,23 @@ export function CashAccounts({
   }, [accounts])
 
   const groups = useMemo(() => {
+    // Case-insensitive key: imported rows ("PALATINE") and Powens-created
+    // ones ("Palatine") must land in the same bank group.
     const map = new Map<
       string,
-      { name: string; accounts: Array<CashAccount> }
+      { name: string; accounts: Array<CashAccount>; totalCents: number }
     >()
     for (const a of open) {
-      const key = a.owner?._id ?? '—'
-      const g = map.get(key) ?? { name: a.owner?.name ?? '—', accounts: [] }
+      const key = a.bankName.trim().toLowerCase()
+      const g =
+        map.get(key) ?? { name: a.bankName.trim(), accounts: [], totalCents: 0 }
       g.accounts.push(a)
+      g.totalCents += a.currentBalance ?? 0
       map.set(key, g)
     }
-    return Array.from(map.entries()).map(([id, g]) => ({ id, ...g }))
+    return Array.from(map.entries())
+      .map(([id, g]) => ({ id, ...g }))
+      .sort((a, b) => b.totalCents - a.totalCents)
   }, [open])
 
   if (!accounts) {
@@ -185,7 +204,12 @@ export function CashAccounts({
     <div className="space-y-6">
       {groups.map((g) => (
         <section key={g.id} className="space-y-2">
-          <h2 className="text-sm font-semibold tracking-tight">{g.name}</h2>
+          <div className="flex items-baseline justify-between gap-4">
+            <h2 className="text-sm font-semibold tracking-tight">{g.name}</h2>
+            <span className="text-sm font-semibold tabular-nums">
+              {fmtEur(g.totalCents)}
+            </span>
+          </div>
           <AccountsTable accounts={g.accounts} orgSlug={orgSlug} />
         </section>
       ))}
@@ -195,7 +219,7 @@ export function CashAccounts({
           <h2 className="text-muted-foreground text-sm font-semibold tracking-tight">
             {t('closedSection')}
           </h2>
-          <AccountsTable accounts={closed} orgSlug={orgSlug} muted />
+          <AccountsTable accounts={closed} orgSlug={orgSlug} muted showBank />
         </section>
       )}
     </div>

@@ -22,6 +22,7 @@ export function ForecastChart({
   history,
   labels,
   fmtEur,
+  thresholdCents,
 }: {
   projection: Array<{
     monthKey: string
@@ -32,6 +33,8 @@ export function ForecastChart({
   history?: Array<{ monthKey: string; balanceCents: number }> | null
   labels: { real: string; committed: string; planned: string }
   fmtEur: (cents?: number | null) => string
+  /** Active alert threshold, drawn as a horizontal reference line. */
+  thresholdCents?: number | null
 }) {
   const [recharts, setRecharts] = useState<RechartsMod | null>(null)
 
@@ -136,6 +139,20 @@ export function ForecastChart({
           <Legend wrapperStyle={{ fontSize: 12 }} />
           {hasNegative && (
             <ReferenceLine y={0} stroke="var(--destructive)" strokeDasharray="4 4" />
+          )}
+          {thresholdCents != null && thresholdCents > 0 && (
+            <ReferenceLine
+              y={thresholdCents}
+              stroke="var(--chart-4)"
+              strokeDasharray="4 4"
+              ifOverflow="extendDomain"
+              label={{
+                value: fmtEur(thresholdCents),
+                position: 'insideBottomRight',
+                fontSize: 11,
+                fill: 'var(--muted-foreground)',
+              }}
+            />
           )}
           {history && history.length > 0 && (
             <Area

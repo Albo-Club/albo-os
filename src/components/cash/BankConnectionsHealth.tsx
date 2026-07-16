@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import { useConvexQuery } from '@convex-dev/react-query'
 import { useAction } from 'convex/react'
+import { TriangleAlert } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -27,6 +29,57 @@ function useAgo() {
     if (hours < 48) return t('connections.ago.hours', { count: hours })
     return t('connections.ago.days', { count: Math.round(hours / 24) })
   }
+}
+
+/**
+ * Action banner shown at the top of the « Vue d'ensemble » tab when at
+ * least one Powens connection is degraded: names the banks and links to
+ * the connections list of the « Règles & échéances » tab (where the
+ * reconnect flow lives). Renders nothing when everything is healthy.
+ */
+export function ConnectionsBanner({
+  orgId,
+  orgSlug,
+}: {
+  orgId: Id<'organizations'>
+  orgSlug: string
+}) {
+  const { t } = useTranslation('cash')
+  const connections = useConvexQuery(api.powens.listConnections, { orgId })
+
+  const degraded = (connections ?? []).filter((c) => c.health !== 'connected')
+  if (degraded.length === 0) return null
+
+  const worst: Health = degraded.some((c) => c.health === 'action_required')
+    ? 'action_required'
+    : 'stale'
+  const names = degraded
+    .map((c) => c.connectorName ?? t('connections.unknownConnector'))
+    .join(', ')
+  const tone =
+    worst === 'action_required'
+      ? 'border-destructive/40 bg-destructive/10 text-destructive'
+      : 'bg-amber-500/10 border-amber-500/40 text-amber-700 dark:text-amber-400'
+
+  return (
+    <div
+      className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border px-4 py-3 text-sm ${tone}`}
+    >
+      <span className="flex items-center gap-2">
+        <TriangleAlert className="size-4 shrink-0" />
+        {t(`connections.banner.${worst}`, { count: degraded.length, names })}
+      </span>
+      <Button asChild size="sm" variant="outline">
+        <Link
+          to="/app/$orgSlug/cash"
+          params={{ orgSlug }}
+          search={{ tab: 'gestion' }}
+        >
+          {t('connections.banner.manage')}
+        </Link>
+      </Button>
+    </div>
+  )
 }
 
 /**

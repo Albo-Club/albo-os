@@ -54,7 +54,7 @@ explicitement dans le chat).
 - Les montants sont toujours TTC ; on qualifie le **taux** (0 / 5,5 / 10 /
   20 %) sur les charges et produits, et le montant de TVA est déduit
   automatiquement.
-- La carte **TVA récupérable** (onglet Aperçu) montre la position cumulée :
+- La carte **TVA récupérable** (onglet Règles & échéances) montre la position cumulée :
   TVA déductible (sur les charges) moins TVA collectée (sur les produits),
   avec le nombre de lignes restant « à qualifier ».
 - L'historique n'est volontairement pas qualifié en masse : salaires,

@@ -829,8 +829,8 @@ const UPCOMING_KPI_WINDOW_DAYS = 30
  * Pending entries due within the next 90 days for the cockpit list —
  * OVERDUE ones included (same rollover stance as the grid: still expected,
  * just late), rule-derived occurrences included, EUR only, date ascending.
- * Ships the 30/90-day nets (in − out, overdue included) alongside so the
- * KPI band shares this single subscription.
+ * Ships the 30/90-day gross inflows/outflows and nets (overdue included)
+ * alongside so the KPI band shares this single subscription.
  */
 export const getUpcomingEntries = query({
   args: { orgId: v.id('organizations') },
@@ -849,15 +849,20 @@ export const getUpcomingEntries = query({
       )
       .collect()
 
-    let net30Cents = 0
-    let net90Cents = 0
+    let in30Cents = 0
+    let out30Cents = 0
+    let in90Cents = 0
+    let out90Cents = 0
     const entries = []
     for (const entry of rows) {
       if (entry.status !== 'pending' || entry.currency !== 'EUR') continue
-      const signed =
-        entry.direction === 'in' ? entry.amountCents : -entry.amountCents
-      net90Cents += signed
-      if (entry.date <= kpiEnd) net30Cents += signed
+      if (entry.direction === 'in') {
+        in90Cents += entry.amountCents
+        if (entry.date <= kpiEnd) in30Cents += entry.amountCents
+      } else {
+        out90Cents += entry.amountCents
+        if (entry.date <= kpiEnd) out30Cents += entry.amountCents
+      }
       entries.push({
         _id: entry._id,
         date: entry.date,
@@ -869,7 +874,15 @@ export const getUpcomingEntries = query({
         overdue: entry.date < now,
       })
     }
-    return { entries, net30Cents, net90Cents }
+    return {
+      entries,
+      in30Cents,
+      out30Cents,
+      net30Cents: in30Cents - out30Cents,
+      in90Cents,
+      out90Cents,
+      net90Cents: in90Cents - out90Cents,
+    }
   },
 })
 
