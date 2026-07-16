@@ -23,6 +23,29 @@ bas de page.
 
 ---
 
+## v1.95.0 — 16/07/2026 à 14:26 — Deals : type de tour aussi sur l'equity via SPV
+
+Le champ **« Tour »** (Pre-seed, Seed, Série A/B/C+, Bridge, Secondaire),
+jusqu'ici réservé aux deals en **actions en direct**, est désormais aussi
+disponible sur les deals en **equity via SPV** — c'est la même notion de tour de
+financement de la société cible, que l'investissement passe en direct ou via un
+véhicule intermédiaire.
+
+- Sur une fiche deal *parts de SPV*, le champ **« Tour »** s'affiche à côté des
+  valorisations et s'édite d'un clic (même liste de choix que pour un deal en
+  actions).
+
+> **🔧 Notes techniques**
+>
+> - `roundType` ajouté à `SPV_FIELDS` dans `convex/lib/instrumentMapping.ts`,
+>   placé avant `preMoneyValuation` pour miroiter `EQUITY_FIELDS`. L'affichage
+>   read-only (`InstrumentBlock`) et le dialog d'édition (`deals.$dealId.tsx`)
+>   sont tous deux pilotés par `INSTRUMENT_FIELDS`, donc ce seul ajout suffit.
+> - Aucun changement de schéma ni d'i18n : la colonne `deals.roundType`, le
+>   format `enum`, les valeurs `ROUND_TYPES` et les libellés
+>   `field.roundType` / `enum.roundType.*` (fr + en) existaient déjà pour
+>   l'equity direct `share` et sont réutilisés tels quels.
+
 ## v1.94.0 — 16/07/2026 à 13:54 — Deals : montant unique et cohérent en tête de fiche
 
 Suite d'ALB-55 : en tête d'une fiche deal (et dans les colonnes de la ligne
