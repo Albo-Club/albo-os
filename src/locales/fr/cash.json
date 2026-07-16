@@ -41,7 +41,7 @@
     "empty": "Aucune échéance sur cette fenêtre.",
     "overdue": "En retard"
   },
-  "asOf": "au {{date}}",
+  "syncedAgo": "synchro {{ago}}",
   "manualAsOf": "solde manuel au {{date}}",
   "notConnected": "non connecté — solde à saisir",
   "closedSection": "Comptes clôturés",
@@ -93,10 +93,13 @@
     "health": {
       "connected": "Connectée",
       "stale": "En retard",
-      "action_required": "À reconnecter"
+      "action_required": "À reconnecter",
+      "untracked": "Non suivie"
     },
     "lastSync": "dernière synchro {{ago}}",
+    "lastData": "dernières données {{ago}}",
     "neverSynced": "aucune synchro réussie connue",
+    "untrackedHint": "Connexion inconnue du suivi (probablement établie hors de l'app) : rien ne se met à jour ni n'est surveillé. Refaire la connexion via « Connecter une banque ».",
     "reconnect": "Reconnecter",
     "reconnecting": "Redirection…",
     "reconnectFailed": "Impossible de démarrer la reconnexion. Réessayez.",
@@ -105,6 +108,8 @@
       "stale_other": "{{count}} connexions bancaires en retard de synchronisation : {{names}}",
       "action_required_one": "Connexion bancaire à reconnecter : {{names}}",
       "action_required_other": "{{count}} connexions bancaires à reconnecter : {{names}}",
+      "untracked_one": "Connexion bancaire non suivie : {{names}}",
+      "untracked_other": "{{count}} connexions bancaires non suivies : {{names}}",
       "manage": "Gérer les connexions"
     },
     "ago": {

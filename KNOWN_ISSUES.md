@@ -1084,6 +1084,24 @@ toutes les 6 h (`pollConnectionsHealth`). Points non évidents :
   `startBankConnection` ; Powens refuse un `connection_id` qui n'appartient
   pas au user porteur du code (pas de contrôle d'appartenance à refaire côté
   app au-delà du rôle admin).
+- **État « Non suivie » (`untracked`) — le trou Qonto.** Un compte peut être
+  lié à Powens (`powensAccountId` posé) alors que sa connexion n'a AUCUNE
+  ligne `powensConnections` : connexion établie sous un **user Powens non
+  géré** (vieux user temporaire, autre projet) → ses webhooks sont ignorés
+  (`id_user` inconnu) et le poll du user géré ne la voit pas. Conséquence
+  silencieuse : plus aucune mise à jour de solde/transactions, zéro
+  surveillance, mais le compte paraît « connecté ». `listConnections`
+  détecte ces orphelins (linked + non archivé + non clôturé + connexion non
+  suivie) et les renvoie en `health: 'untracked'` (pastille « Non suivie »,
+  comptée dans la bannière). **Réparation opérateur** (cas Qonto) :
+  1. `convex run --prod powens:diagnoseQontoMatch` — état des candidats.
+  2. `convex run --prod powens:resetQontoPowensLink '{"bankAccountId":"…"}'`
+     — délie le record (sinon la nouvelle connexion finit en
+     `qonto_already_linked`).
+  3. « Connecter une banque » dans l'app (user Powens géré) → `linkQonto`
+     re-backfille et la connexion devient suivie. Pas de bouton
+     « Reconnecter » sur une ligne `untracked` : il n'y a rien à reconnecter
+     sous le user géré, il faut une connexion neuve.
 
 ## Pointage transaction → deal (`convex/transactions.ts`)
 

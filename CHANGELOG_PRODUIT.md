@@ -23,6 +23,42 @@ bas de page.
 
 ---
 
+## v1.101.0 — 16/07/2026 à 18:06 — Trésorerie : les connexions bancaires « fantômes » deviennent visibles
+
+Jusqu'ici, un compte bancaire pouvait sembler connecté alors que sa
+connexion était **morte en silence** : établie en dehors de l'application
+(c'est le cas de Qonto), elle n'était ni surveillée ni rafraîchie — sans
+qu'aucun écran ne le signale. C'est corrigé :
+
+- La section « Connexions bancaires » (onglet Règles & échéances) affiche
+  désormais un état 🟠 **« Non suivie »** pour ces connexions : quelle
+  banque, quels comptes concernés, la date des dernières données reçues, et
+  la marche à suivre (refaire la connexion via « Connecter une banque »).
+- La **bannière d'alerte** de la Vue d'ensemble les signale aussi, comme
+  pour une connexion en panne.
+- Chaque compte connecté affiche maintenant la **fraîcheur de sa dernière
+  synchronisation** (« synchro il y a 3 h ») dans la liste des comptes ; le
+  texte passe en **orange** au-delà de 48 h sans donnée fraîche — un compte
+  qui décroche se voit d'un coup d'œil, sans ouvrir le détail.
+
+> **🔧 Notes techniques**
+>
+> - `convex/powens.ts:listConnections` : détecte les comptes Powens-liés
+>   (`powensAccountId` posé, non archivés/clôturés) dont la
+>   `powensConnectionId` n'a pas de ligne `powensConnections`, groupés par
+>   banque et renvoyés en `health: 'untracked'` (`lastSuccessfulSyncAt` =
+>   max des `balanceAsOf`). Cause racine : connexion sous un user Powens
+>   non géré → webhooks ignorés + poll aveugle (cf. `KNOWN_ISSUES.md`
+>   « État Non suivie », avec le runbook `diagnoseQontoMatch` →
+>   `resetQontoPowensLink` → reconnexion in-app).
+> - `BankConnectionsHealth.tsx` : pastille « Non suivie » (ambre), hint
+>   dédié, pas de bouton Reconnecter sur une ligne untracked ; la bannière
+>   (`ConnectionsBanner`) hiérarchise action_required > stale > untracked.
+> - `CashAccounts.tsx` : sous-texte de fraîcheur relatif via `useAgo`
+>   (exporté de `BankConnectionsHealth`), ambre au-delà de 48 h
+>   (constante miroir de `STALE_AFTER_MS`) ; clé i18n `asOf` retirée
+>   (orpheline).
+
 ## v1.100.0 — 16/07/2026 à 17:21 — Trésorerie : la page repensée en quatre onglets
 
 La page Trésorerie était devenue illisible : tout s'empilait sur un seul
