@@ -244,7 +244,8 @@
       "serieA": "Série A",
       "serieB": "Série B",
       "serieC_plus": "Série C+",
-      "bridge": "Bridge"
+      "bridge": "Bridge",
+      "secondary": "Secondaire"
     },
     "safeType": {
       "safe": "SAFE",

@@ -48,6 +48,7 @@ export const ROUND_TYPES = [
   'serieB',
   'serieC_plus',
   'bridge',
+  'secondary',
 ] as const
 export const roundTypeValidator = literals(...ROUND_TYPES)
 

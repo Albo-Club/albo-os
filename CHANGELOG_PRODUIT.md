@@ -23,6 +23,52 @@ bas de page.
 
 ---
 
+## v1.92.0 — 15/07/2026 à 20:03 — Deals : création plus complète, détention au niveau société, tour « Secondaire »
+
+Plusieurs améliorations sur les deals, remontées à l'usage :
+
+- **Création plus complète** : le formulaire de création d'un deal propose
+  désormais **tous les champs de l'instrument** choisi (montant, dates dont le
+  closing, tour, valorisations, titres acquis…). Tout se saisit d'un coup —
+  plus besoin de compléter la fiche après coup.
+- **Titres acquis** : les deals en **actions** enregistrent le **nombre de
+  titres** acquis lors du tour.
+- **Prix par titre** : les deals en actions peuvent aussi renseigner le
+  **prix par titre** — utile notamment pour un **secondaire** (rachat
+  d'actions existantes : titres × prix).
+- **Détention au niveau société** : le pourcentage de détention n'est plus
+  saisi deal par deal. Il est **calculé au niveau de la société** (titres
+  détenus rapportés au capital total), là où il a du sens — une société peut
+  porter plusieurs deals.
+- **Date de closing sur les fonds** : elle s'affiche maintenant aussi sur les
+  deals de type **fonds** (elle l'était déjà pour les actions, SAFE, OC…).
+- **Nouveau tour « Secondaire »** (rachat d'actions existantes) dans la liste
+  des tours de table.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/instruments.ts` : `'secondary'` ajouté à `ROUND_TYPES` — le
+>   validator, le champ `roundType` du schéma et les options d'édition en
+>   dérivent (union élargie, rétro-compatible, **aucune migration**).
+> - `convex/lib/instrumentMapping.ts` : `EQUITY_FIELDS` +`sharesAcquired`
+>   +`pricePerShare` −`ownershipPct` ; `SAFE`/`BSA`/`OC` −`ownershipPct` ;
+>   `FONDS_FIELDS` +`closingDate`. `spvOwnershipPct` (SPV) laissé intact. Le
+>   champ `ownershipPct` reste au schéma (données préservées, juste plus
+>   affiché). `pricePerShare` était déjà câblé (format `eur`, i18n fr/en).
+> - `DealFieldInput` extrait dans `src/components/deals/DealFieldInput.tsx`
+>   (composant partagé édition + création). `CreateDealDialog`
+>   (`participations.$companyId.tsx`) rend `INSTRUMENT_FIELDS[instrument]`
+>   — hors `committedAmount`/`signedDate` gérés en champs cœur — parse via
+>   `parseField` et envoie le tout à `deals.create` (déjà tolérant via
+>   `...dealFields`). `DialogContent` passé en `max-h-[85vh] overflow-y-auto`.
+> - Détention société **inchangée** (Σ `sharesAcquired` / `totalShares` dans
+>   `participations.$companyId.tsx`), désormais alimentée par les titres saisis
+>   sur les deals actions.
+> - i18n `enum.roundType.secondary` (fr « Secondaire » / en « Secondary »).
+> - **Hors périmètre, décision différée** : la fusion « Montant engagé »
+>   (`committedAmount`) / « Montant contractuel » (`paidAmount`) n'est pas
+>   traitée ici — à trancher en réunion (cf. analyse dans la PR).
+
 ## v1.91.2 — 15/07/2026 à 19:34 — Fiches SPV Parallel Calte : import des termes obligataires
 
 Les fiches des SPV Parallel de Calte n'avaient que le montant, le nom du SPV et
@@ -55,6 +101,7 @@ obligations).
 > `alboInstrumentImport`) + `interestRate` 12 % ; termes de conversion non
 > extraits, donc non importés.
 
+## v1.91.1 — 15/07/2026 à 18:16 — Fiches Parallel : la description colle à l'opération, pas à son avancement
 
 La description générée pour les SPV Parallel donnait l'**actualité** de
 l'opération (« première vente, remboursement partiel… ») au lieu de dire

@@ -103,7 +103,8 @@ const EQUITY_FIELDS = [
   'roundType',
   'preMoneyValuation',
   'postMoneyValuation',
-  'ownershipPct',
+  'sharesAcquired',
+  'pricePerShare',
 ]
 
 const SAFE_FIELDS = [
@@ -115,7 +116,6 @@ const SAFE_FIELDS = [
   'conversionDeadlineDate',
   'conversionValuation',
   'sharesAcquired',
-  'ownershipPct',
 ]
 
 // BSA (warrants): own list. No conversionValuation marker → the deal sheet
@@ -129,7 +129,6 @@ const BSA_FIELDS = [
   'exerciseDeadlineDate',
   // post-exercise
   'sharesAcquired',
-  'ownershipPct',
 ]
 
 // OC (convertible bond): own list. Reuses interestRate + maturityDate (debt)
@@ -145,7 +144,6 @@ const OC_FIELDS = [
   // post-conversion
   'conversionValuation',
   'sharesAcquired',
-  'ownershipPct',
 ]
 
 const OS_FIELDS = [
@@ -175,6 +173,7 @@ const DAT_FIELDS = [
 
 const FONDS_FIELDS = [
   'signedDate',
+  'closingDate',
   'committedAmount',
   'paidAmount',
   'fundType',

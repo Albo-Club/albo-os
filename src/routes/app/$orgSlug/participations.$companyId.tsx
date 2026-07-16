@@ -18,6 +18,8 @@ import { ConvexError } from 'convex/values'
 import { api } from '../../../../convex/_generated/api'
 // Single source of truth for instrument kinds (cf. convex/lib/instruments.ts).
 import { INSTRUMENTS } from '../../../../convex/lib/instruments'
+// Instrument → editable fields mapping, shared with the deal edit dialog.
+import { INSTRUMENT_FIELDS } from '../../../../convex/lib/instrumentMapping'
 // Single source of truth for people roles (cf. convex/lib/people.ts).
 import { PERSON_ROLES } from '../../../../convex/lib/people'
 import type { Id } from '../../../../convex/_generated/dataModel'
@@ -62,7 +64,9 @@ import { InlineField } from '~/components/ui/inline-field'
 import { Input } from '~/components/ui/input'
 import { Textarea } from '~/components/ui/textarea'
 import { AmountInput } from '~/components/ui/amount-input'
-import { eurosToCents } from '~/lib/parse'
+import { eurosToCents, parseField } from '~/lib/parse'
+import { DealFieldInput } from '~/components/deals/DealFieldInput'
+import { FIELD_FORMAT } from '~/components/deals/InstrumentBlock'
 import { Label } from '~/components/ui/label'
 import {
   Popover,
@@ -556,6 +560,20 @@ function CreateDealDialog({
   const [amount, setAmount] = useState('') // euros (UI), converted to cents
   const [signed, setSigned] = useState('') // YYYY-MM-DD, converted to ms epoch
   const [pending, setPending] = useState(false)
+  // Instrument-specific fields collected at creation (parity with the edit
+  // dialog), minus the ones already captured by the dedicated controls below
+  // (committedAmount = "Montant engagé", signedDate). Same source of truth as
+  // the edit dialog: INSTRUMENT_FIELDS. Values are strings in the display unit,
+  // parsed to the storage unit on submit.
+  const [values, setValues] = useState<Record<string, string>>({})
+  const extraFields = useMemo(
+    () =>
+      (instrument
+        ? (INSTRUMENT_FIELDS[instrument as InstrumentKind] ?? [])
+        : []
+      ).filter((f) => f !== 'committedAmount' && f !== 'signedDate'),
+    [instrument],
+  )
 
   // Preselect the investor when the org has a single group entity; never
   // guess a default when several exist.
@@ -566,12 +584,29 @@ function CreateDealDialog({
   }, [groupEntities, investorId])
 
   const amountInvalid = amount.trim() !== '' && eurosToCents(amount) == null
+  // A non-empty extra field that fails to parse (letters in a € field, …)
+  // blocks the submit — no partial write.
+  const extrasValid = extraFields.every(
+    (f) => parseField(FIELD_FORMAT[f] ?? 'text', values[f] ?? '') !== null,
+  )
   const canSubmit =
-    investorId !== '' && instrument !== '' && !amountInvalid && !pending
+    investorId !== '' &&
+    instrument !== '' &&
+    !amountInvalid &&
+    extrasValid &&
+    !pending
 
   async function handleCreate() {
     setPending(true)
     try {
+      // Parse the instrument-specific fields to their storage unit; skip empty
+      // (undefined) and invalid (null — already blocked by canSubmit) values.
+      const extras: Record<string, unknown> = {}
+      for (const f of extraFields) {
+        const parsed = parseField(FIELD_FORMAT[f] ?? 'text', values[f] ?? '')
+        if (parsed === undefined || parsed === null) continue
+        extras[f] = parsed
+      }
       await createDeal({
         orgId,
         investorCompanyId: investorId as Id<'companies'>,
@@ -580,6 +615,7 @@ function CreateDealDialog({
         committedAmount:
           amount.trim() === '' ? undefined : (eurosToCents(amount) ?? undefined),
         signedDate: signed === '' ? undefined : new Date(signed).getTime(),
+        ...extras,
       })
       toast.success(t('participations:createDeal.created'))
       onClose()
@@ -605,7 +641,7 @@ function CreateDealDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t('participations:createDeal.title')}</DialogTitle>
           <DialogDescription>
@@ -640,7 +676,14 @@ function CreateDealDialog({
           </div>
           <div className="space-y-2">
             <Label>{t('participations:edit.instrumentLabel')}</Label>
-            <Select value={instrument} onValueChange={setInstrument}>
+            <Select
+              value={instrument}
+              onValueChange={(v) => {
+                setInstrument(v)
+                // Field set changes with the instrument → drop stale values.
+                setValues({})
+              }}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue
                   placeholder={t(
@@ -686,6 +729,19 @@ function CreateDealDialog({
               onChange={(e) => setSigned(e.target.value)}
             />
           </div>
+          {extraFields.length > 0 && (
+            <div className="space-y-4 border-t pt-4">
+              {extraFields.map((field) => (
+                <DealFieldInput
+                  key={field}
+                  field={field}
+                  format={FIELD_FORMAT[field] ?? 'text'}
+                  value={values[field] ?? ''}
+                  onChange={(v) => setValues((s) => ({ ...s, [field]: v }))}
+                />
+              ))}
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={pending}>
