@@ -26,6 +26,16 @@ crons.daily(
   {},
 )
 
+// Powens connection health: pull the connection states every 6h (belt &
+// braces with the CONNECTION_SYNCED webhook — the pull is the only feed that
+// still works when webhooks stop arriving) + staleness evaluation & alerts.
+crons.interval(
+  'poll powens connections health',
+  { hours: 6 },
+  internal.powens.pollConnectionsHealth,
+  {},
+)
+
 // Refresh the VASCO/Parallel communications cache every 2 days. VASCO has no
 // webhook for the investor persona (pull-only), so the UI reads a local cache
 // and this keeps it fresh in the background; a manual "refresh" button covers

@@ -633,6 +633,119 @@ export function cashAlertEmail({
   return { subject: c.subject, html, text: plainText(c.text) }
 }
 
+export function powensConnectionAlertEmail({
+  locale,
+  orgName,
+  connectorName,
+  health,
+  lastSyncAt,
+  errorMessage,
+  cashUrl,
+}: {
+  locale: EmailLocale
+  orgName: string
+  connectorName: string
+  health: 'stale' | 'action_required'
+  lastSyncAt: number | null
+  errorMessage: string | null
+  cashUrl: string
+}) {
+  const fmtDate = (ms: number) =>
+    new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'Europe/Paris',
+    }).format(new Date(ms))
+  const lastSync = lastSyncAt != null ? fmtDate(lastSyncAt) : null
+
+  const c = pick(locale, {
+    en: {
+      subject:
+        health === 'action_required'
+          ? `Bank connection — ${connectorName} needs to be reconnected (${orgName})`
+          : `Bank connection — ${connectorName} has not synced recently (${orgName})`,
+      heading:
+        health === 'action_required'
+          ? `${connectorName}: reconnection required`
+          : `${connectorName}: sync is late`,
+      intro:
+        health === 'action_required'
+          ? `The <strong>${connectorName}</strong> bank connection of <strong>${orgName}</strong> requires your action (new password, strong authentication…). Until you reconnect it, balances and transactions stop updating.`
+          : `The <strong>${connectorName}</strong> bank connection of <strong>${orgName}</strong> has not completed a successful sync for more than 48 hours. Balances and transactions may be out of date.`,
+      followup:
+        health === 'action_required'
+          ? `Open the Cash page and use the “Reconnect” button next to the connection.`
+          : `This often resolves on its own (bank site down, temporary block). If it persists, reconnect from the Cash page.`,
+      footer: `You receive this because bank connections are monitored for ${orgName}. One email per incident — no reminders until the state changes.`,
+      preheader: `${connectorName} (${orgName}) — bank sync issue.`,
+      cta: 'Open the Cash page',
+      text: [
+        health === 'action_required'
+          ? `The ${connectorName} bank connection of ${orgName} requires your action (new password, strong authentication…). Until you reconnect it, balances and transactions stop updating.`
+          : `The ${connectorName} bank connection of ${orgName} has not completed a successful sync for more than 48 hours. Balances and transactions may be out of date.`,
+        lastSync ? `Last successful sync: ${lastSync}.` : '',
+        errorMessage ? `Message from the institution: ${errorMessage}` : '',
+        `Open the Cash page: ${cashUrl}`,
+      ],
+    },
+    fr: {
+      subject:
+        health === 'action_required'
+          ? `Connexion bancaire — ${connectorName} à reconnecter (${orgName})`
+          : `Connexion bancaire — ${connectorName} sans synchro récente (${orgName})`,
+      heading:
+        health === 'action_required'
+          ? `${connectorName} : reconnexion nécessaire`
+          : `${connectorName} : synchronisation en retard`,
+      intro:
+        health === 'action_required'
+          ? `La connexion bancaire <strong>${connectorName}</strong> de <strong>${orgName}</strong> attend une action de votre part (nouveau mot de passe, authentification forte…). Tant qu'elle n'est pas reconnectée, les soldes et transactions ne se mettent plus à jour.`
+          : `La connexion bancaire <strong>${connectorName}</strong> de <strong>${orgName}</strong> n'a pas réussi de synchronisation depuis plus de 48 heures. Les soldes et transactions peuvent être obsolètes.`,
+      followup:
+        health === 'action_required'
+          ? `Ouvrez la page Trésorerie et utilisez le bouton « Reconnecter » à côté de la connexion.`
+          : `Cela se résout souvent tout seul (site de la banque indisponible, blocage temporaire). Si ça persiste, reconnectez depuis la page Trésorerie.`,
+      footer: `Vous recevez cet email car les connexions bancaires de ${orgName} sont surveillées. Un email par incident — pas de rappel tant que l'état ne change pas.`,
+      preheader: `${connectorName} (${orgName}) — problème de synchronisation bancaire.`,
+      cta: 'Ouvrir la Trésorerie',
+      text: [
+        health === 'action_required'
+          ? `La connexion bancaire ${connectorName} de ${orgName} attend une action de votre part (nouveau mot de passe, authentification forte…). Tant qu'elle n'est pas reconnectée, les soldes et transactions ne se mettent plus à jour.`
+          : `La connexion bancaire ${connectorName} de ${orgName} n'a pas réussi de synchronisation depuis plus de 48 heures. Les soldes et transactions peuvent être obsolètes.`,
+        lastSync ? `Dernière synchronisation réussie : ${lastSync}.` : '',
+        errorMessage ? `Message de l'établissement : ${errorMessage}` : '',
+        `Ouvrir la Trésorerie : ${cashUrl}`,
+      ],
+    },
+  })
+
+  const detailParagraphs = [
+    lastSync
+      ? pick(locale, {
+          en: `Last successful sync: <strong>${lastSync}</strong>.`,
+          fr: `Dernière synchronisation réussie : <strong>${lastSync}</strong>.`,
+        })
+      : '',
+    errorMessage
+      ? pick(locale, {
+          en: `Message from the institution: “${errorMessage}”`,
+          fr: `Message de l'établissement : « ${errorMessage} »`,
+        })
+      : '',
+  ].filter(Boolean)
+
+  const html = layout({
+    locale,
+    preheader: c.preheader,
+    heading: c.heading,
+    paragraphs: [c.intro, ...detailParagraphs, c.followup],
+    cta: { label: c.cta, url: cashUrl },
+    footer: c.footer,
+  })
+
+  return { subject: c.subject, html, text: plainText(c.text) }
+}
+
 export function reviewReasonLabel(reason: string): string {
   return REVIEW_REASON_LABELS[reason] ?? reason
 }

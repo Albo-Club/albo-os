@@ -82,6 +82,28 @@
       "powens_env_missing": "Bank connection isn't configured yet. Contact an admin."
     }
   },
+  "connections": {
+    "title": "Bank connections",
+    "unknownConnector": "Bank connection",
+    "health": {
+      "connected": "Connected",
+      "stale": "Late",
+      "action_required": "Reconnect needed"
+    },
+    "lastSync": "last sync {{ago}}",
+    "neverSynced": "no known successful sync",
+    "reconnect": "Reconnect",
+    "reconnecting": "Redirecting…",
+    "reconnectFailed": "Couldn't start the reconnection. Please try again.",
+    "ago": {
+      "minutes_one": "{{count}} min ago",
+      "minutes_other": "{{count}} min ago",
+      "hours_one": "{{count}} h ago",
+      "hours_other": "{{count}} h ago",
+      "days_one": "{{count}} day ago",
+      "days_other": "{{count}} days ago"
+    }
+  },
   "col": {
     "account": "Account",
     "bank": "Bank",

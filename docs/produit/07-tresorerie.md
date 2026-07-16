@@ -35,6 +35,29 @@ La page de détail d'un compte montre son historique de transactions
 (recherche, lien vers le deal rattaché) et permet d'éditer nom personnalisé,
 solde manuel, nanti, clôturé.
 
+### Surveillance des connexions
+
+La section « Connexions bancaires » (sous les comptes) affiche l'état de
+chaque connexion Powens :
+
+- 🟢 **Connectée** — la synchronisation tourne normalement.
+- 🟠 **En retard** — aucune synchronisation réussie depuis plus de 48 h
+  (banque indisponible, blocage temporaire… ou panne silencieuse).
+- 🔴 **À reconnecter** — la banque attend une action (nouveau mot de passe,
+  authentification forte) : la synchro est bloquée tant que ce n'est pas
+  fait.
+
+Chaque ligne montre la date de dernière synchronisation réussie et les
+comptes alimentés. Quand une connexion se dégrade, les membres de
+l'organisation reçoivent un **email d'alerte** (un par incident — pas de
+rappel tant que l'état ne change pas). L'état est vérifié en continu : à
+chaque notification de Powens, et par un contrôle automatique toutes les
+6 heures qui détecte aussi le cas où Powens cesse d'envoyer des données.
+
+Le bouton **« Reconnecter »** (sur une connexion dégradée) rouvre la fenêtre
+sécurisée de la banque en ne redemandant que l'information manquante, sans
+refaire toute la connexion.
+
 ## Transactions
 
 Une transaction = un flux bancaire réel : sens (entrée/sortie), montant,

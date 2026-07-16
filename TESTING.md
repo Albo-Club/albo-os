@@ -535,6 +535,25 @@ Prérequis : env vars `POWENS_CLIENT_ID/SECRET/DOMAIN/REDIRECT_URI` posées ;
 | E5  | Sécurité — inspecter la réponse réseau du clic (DevTools)              | Seul `{ webviewUrl }` revient ; **aucun** `authToken`/`client_secret` dans le payload ni dans les logs Convex                       |
 | E6  | Env var manquante (test : retirer `POWENS_DOMAIN`)                     | Toast « connexion bancaire pas configurée » (`powens_env_missing`) ; aucun appel Powens                                             |
 
+## Monitoring connexions Powens (santé + alertes + reconnexion)
+
+Santé des connexions dans `powensConnections` : double flux webhook
+`CONNECTION_SYNCED` (push) + cron `pollConnectionsHealth` toutes les 6 h
+(pull `GET /users/me/connections`), santé dérivée
+(connected / stale > 48 h / action_required), alerte email par incident,
+webview reconnect. Prérequis : au moins une banque connectée (cf. sections
+ci-dessus).
+
+| #   | Étape                                                                                    | Résultat attendu                                                                                                                                          |
+| --- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M1  | `/app/calte/cash` (Aperçu) après un webhook ou un poll                                    | Section « Connexions bancaires » sous les comptes : une ligne par connexion, pastille 🟢 « Connectée », « dernière synchro il y a X », comptes alimentés    |
+| M2  | `convex run --prod powens:pollConnectionsHealth '{}'`                                     | `{ polled: N, failed: 0 }` ; lignes `powensConnections` créées/rafraîchies (dashboard Convex), `lastPolledAt` posé                                          |
+| M3  | Simuler un retard : patcher `lastSuccessfulSyncAt`/`lastWebhookAt` à J-3 puis relancer M2 | Pastille 🟠 « En retard » ; **un** email « sans synchro récente » aux membres de l'org ; relance M2 → **pas** de second email (`notifiedHealth`)             |
+| M4  | Simuler une casse : patcher `state: "wrongpass"` sur une ligne puis relancer M2           | ⚠️ le poll réel écrase le state simulé — patcher puis appeler `powens:evaluateConnectionsHealth '{}'` : pastille 🔴 « À reconnecter » + email dédié          |
+| M5  | Bouton « Reconnecter » (connexion dégradée, en tant qu'admin)                             | Redirection `webview.powens.com/reconnect?…&connection_id=…` ; après le parcours, webhook → state effacé, pastille 🟢, `notifiedHealth` nettoyé              |
+| M6  | Webhook d'une synchro en échec (payload sans comptes)                                     | La ligne `powensConnections` est quand même mise à jour (state + `lastWebhookAt`) ; aucune tx écrite                                                        |
+| M7  | Supprimer une connexion côté Powens puis relancer M2                                      | La ligne disparaît de `powensConnections` (le poll est autoritaire) ; la section UI ne la montre plus                                                       |
+
 ## Ingestion reports (AgentMail → inboundEmails, briques 1-6)
 
 Webhook `message.received` → `/agentmail/webhook` (signature Svix) →

@@ -10,6 +10,12 @@
  *   → `ingestConnectionSync` (internalMutation: account resolution, per-account
  *   cutover, idempotent upsert by `powensTxId`).
  *
+ * Sync-health monitoring (`powensConnections`): the webhook (push) and a 6h
+ * polling cron (`pollConnectionsHealth`, pull) both refresh one row per
+ * connection; health is derived (connected / stale / action_required) and a
+ * degradation emails the org members once per incident. Reconnection goes
+ * through the webview reconnect flow (`startReconnect`).
+ *
  * Webhook security: HMAC-SHA256 signature (headers `BI-Signature` +
  * `BI-Signature-Date`) verified via Web Crypto (`crypto.subtle.verify`).
  * The Convex runtime does not expose Node's `crypto.timingSafeEqual`;
@@ -24,10 +30,14 @@ import { internal } from './_generated/api'
 import {
   action,
   httpAction,
+  internalAction,
   internalMutation,
   internalQuery,
+  query,
 } from './_generated/server'
-import { requireOrgRole } from './lib/auth'
+import { RESEND_FROM, resend } from './email'
+import { powensConnectionAlertEmail } from './emailTemplates'
+import { requireOrgMember, requireOrgRole } from './lib/auth'
 import { loadOrgRules, ruleFieldsFor } from './lib/categoryRules'
 import { buildSearchText } from './lib/searchText'
 import type { Doc, Id } from './_generated/dataModel'
@@ -80,6 +90,17 @@ function asIdStr(value: unknown): string | undefined {
   if (typeof value === 'number') return String(value)
   return undefined
 }
+/** Powens datetimes come as "YYYY-MM-DD HH:MM:SS" (no timezone marker) or
+ * ISO. Parsed as UTC — a ~1h offset is irrelevant for the 48h staleness
+ * threshold. */
+function parsePowensDateTime(value: unknown): number | undefined {
+  const s = asString(value)
+  if (!s) return undefined
+  const iso = s.includes('T') ? s : s.replace(' ', 'T')
+  const hasTz = iso.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(iso)
+  const ms = Date.parse(hasTz ? iso : `${iso}Z`)
+  return Number.isNaN(ms) ? undefined : ms
+}
 
 function normalizeName(s: string): string {
   return s
@@ -105,6 +126,82 @@ function matchConnector(normalizedConnector: string) {
 function mapAccountKind(type: string | undefined): string | undefined {
   if (!type) return undefined
   return ACCOUNT_KIND[type] ?? type
+}
+
+// ─── Connection sync-health (powensConnections) ──────────────────────────────
+
+/** Powens connection states that require the USER to re-authenticate via the
+ * webview reconnect flow. Everything else (websiteUnavailable, rateLimiting,
+ * bug…) is transient on the bank/Powens side and resolves on its own. */
+const ACTION_REQUIRED_STATES: ReadonlySet<string> = new Set([
+  'wrongpass',
+  'SCARequired',
+  'webauthRequired',
+  'actionNeeded',
+  'passwordExpired',
+  'additionalInformationNeeded',
+])
+
+/** Powens background-syncs every ~24h; past 48h without a successful sync
+ * (or any webhook) something is wrong. Single threshold for badge + email. */
+const STALE_AFTER_MS = 48 * 60 * 60 * 1000
+
+export type ConnectionHealth = 'connected' | 'stale' | 'action_required'
+
+/** Derived health of a connection row — never stored (except the anti-spam
+ * `notifiedHealth` memory). `_creationTime` is the grace floor so a row
+ * created seconds ago is not instantly "stale". */
+function connectionHealth(
+  row: Doc<'powensConnections'>,
+  now: number,
+): ConnectionHealth {
+  if (row.state && ACTION_REQUIRED_STATES.has(row.state)) {
+    return 'action_required'
+  }
+  const lastSeen = Math.max(
+    row.lastSuccessfulSyncAt ?? 0,
+    row.lastWebhookAt ?? 0,
+    row._creationTime,
+  )
+  return now - lastSeen > STALE_AFTER_MS ? 'stale' : 'connected'
+}
+
+/** Connection metadata normalized from a Powens Connection object (webhook
+ * payload or GET /users/me/connections). All fields optional: the payload is
+ * untyped JSON. */
+const connMetaFields = {
+  connectorName: v.optional(v.string()),
+  state: v.optional(v.string()),
+  errorMessage: v.optional(v.string()),
+  lastSuccessfulSyncAt: v.optional(v.number()),
+  nextTryAt: v.optional(v.number()),
+  active: v.optional(v.boolean()),
+}
+const connMetaValidator = v.object(connMetaFields)
+
+type ConnMeta = {
+  connectorName?: string
+  state?: string
+  errorMessage?: string
+  lastSuccessfulSyncAt?: number
+  nextTryAt?: number
+  active?: boolean
+}
+
+function normalizeConnectionMeta(
+  connection: Record<string, unknown>,
+  connectorName: string,
+): ConnMeta {
+  return {
+    connectorName: connectorName || undefined,
+    // `state` replaces the deprecated `error`; null/absent = last sync OK.
+    state: asString(connection.state) ?? asString(connection.error),
+    errorMessage: asString(connection.error_message),
+    lastSuccessfulSyncAt: parsePowensDateTime(connection.last_update),
+    nextTryAt: parsePowensDateTime(connection.next_try),
+    active:
+      typeof connection.active === 'boolean' ? connection.active : undefined,
+  }
 }
 
 // ─── Normalized shape (action → mutation boundary) ───────────────────────────
@@ -204,6 +301,7 @@ function normalizePayload(payload: unknown): {
   connectionId: string
   powensUserId: string | undefined
   accounts: Array<NormAccount>
+  connectionMeta: ConnMeta
 } {
   const root = asRecord(payload)
   // Tolerates a root-level payload OR one wrapped in `connection`.
@@ -222,7 +320,8 @@ function normalizePayload(payload: unknown): {
   const accounts = asArray(connection.accounts)
     .map((a) => normalizeAccount(a, connectorName))
     .filter((a): a is NormAccount => a !== null)
-  return { connectionId, powensUserId, accounts }
+  const connectionMeta = normalizeConnectionMeta(connection, connectorName)
+  return { connectionId, powensUserId, accounts, connectionMeta }
 }
 
 // ─── HMAC signature verification ─────────────────────────────────────────────
@@ -282,7 +381,10 @@ export const powensWebhook = httpAction(async (ctx, request) => {
   }
 
   const normalized = normalizePayload(payload)
-  if (normalized.accounts.length > 0) {
+  // Even with 0 accounts the webhook carries the connection state (a failed
+  // sync typically has no accounts) — always ingest to keep the health row
+  // fresh; the mutation itself filters unknown Powens users.
+  if (normalized.connectionId) {
     await ctx.runMutation(internal.powens.ingestConnectionSync, normalized)
   }
   return Response.json({ status: 'received' })
@@ -532,13 +634,129 @@ async function computeCutoff(
   return account._creationTime
 }
 
+// ─── Connection health: upsert + change-triggered email alert ─────────────────
+
+/** Emails every org member when a connection's health degrades. Anti-spam:
+ * one email per incident — `notifiedHealth` remembers the last degraded
+ * health emailed, and is cleared once the connection is healthy again. */
+async function maybeNotifyConnectionHealth(
+  ctx: MutationCtx,
+  row: Doc<'powensConnections'>,
+  now: number,
+): Promise<void> {
+  const health = connectionHealth(row, now)
+  if (health === 'connected') {
+    if (row.notifiedHealth) {
+      await ctx.db.patch('powensConnections', row._id, {
+        notifiedHealth: undefined,
+      })
+    }
+    return
+  }
+  if (row.notifiedHealth === health) return
+
+  const org = await ctx.db.get('organizations', row.orgId)
+  if (!org) return
+  const siteUrl = process.env.SITE_URL ?? ''
+  const members = await ctx.db
+    .query('organizationMembers')
+    .withIndex('by_org', (q) => q.eq('orgId', row.orgId))
+    .collect()
+  for (const member of members) {
+    const user = await ctx.db.get('users', member.userId)
+    if (!user?.email) continue
+    const { subject, html, text } = powensConnectionAlertEmail({
+      locale: user.preferredLanguage === 'fr' ? 'fr' : 'en',
+      orgName: org.name,
+      connectorName: row.connectorName ?? `connexion ${row.powensConnectionId}`,
+      health,
+      lastSyncAt: row.lastSuccessfulSyncAt ?? null,
+      errorMessage: row.errorMessage ?? null,
+      cashUrl: `${siteUrl}/app/${org.slug}/cash`,
+    })
+    await resend.sendEmail(ctx, {
+      from: RESEND_FROM,
+      to: user.email,
+      subject,
+      html,
+      text,
+    })
+  }
+  await ctx.db.patch('powensConnections', row._id, { notifiedHealth: health })
+  console.log(
+    `[powens] alerte santé connexion ${row.powensConnectionId} ` +
+      `(${row.connectorName ?? '?'}, org ${org.slug}): ${health} — ` +
+      `${members.length} membre(s) notifié(s)`,
+  )
+}
+
+/** Idempotent upsert of a connection's health row, then evaluates whether an
+ * alert email is due. `via` stamps the freshness of the matching feed. */
+async function upsertConnectionStatus(
+  ctx: MutationCtx,
+  orgId: Id<'organizations'>,
+  powensConnectionId: string,
+  meta: ConnMeta,
+  via: 'webhook' | 'poll',
+): Promise<void> {
+  const now = Date.now()
+  const existing = await ctx.db
+    .query('powensConnections')
+    .withIndex('by_powens_connection', (q) =>
+      q.eq('powensConnectionId', powensConnectionId),
+    )
+    .unique()
+
+  // Current-state facts are always overwritten (undefined = cleared, e.g. a
+  // sync back to OK clears `state`). `connectorName` and
+  // `lastSuccessfulSyncAt` only ever improve — never erased by a payload
+  // that omits them.
+  const fields = {
+    state: meta.state,
+    errorMessage: meta.errorMessage,
+    nextTryAt: meta.nextTryAt,
+    active: meta.active,
+    ...(meta.connectorName ? { connectorName: meta.connectorName } : {}),
+    ...(meta.lastSuccessfulSyncAt
+      ? { lastSuccessfulSyncAt: meta.lastSuccessfulSyncAt }
+      : {}),
+    ...(via === 'webhook' ? { lastWebhookAt: now } : { lastPolledAt: now }),
+  }
+
+  let rowId: Id<'powensConnections'>
+  if (existing) {
+    if (existing.orgId !== orgId) {
+      // Same global Powens connection id claimed by another org — never
+      // rebind silently.
+      console.warn(
+        `[powens] connexion ${powensConnectionId} déjà suivie pour une autre org — ignorée`,
+      )
+      return
+    }
+    await ctx.db.patch('powensConnections', existing._id, fields)
+    rowId = existing._id
+  } else {
+    rowId = await ctx.db.insert('powensConnections', {
+      orgId,
+      powensConnectionId,
+      ...fields,
+    })
+  }
+  const row = await ctx.db.get('powensConnections', rowId)
+  if (row) await maybeNotifyConnectionHealth(ctx, row, now)
+}
+
 export const ingestConnectionSync = internalMutation({
   args: {
     connectionId: v.string(),
     powensUserId: v.optional(v.string()),
     accounts: v.array(normAccountValidator),
+    connectionMeta: v.optional(connMetaValidator),
   },
-  handler: async (ctx, { connectionId, powensUserId, accounts }) => {
+  handler: async (
+    ctx,
+    { connectionId, powensUserId, accounts, connectionMeta },
+  ) => {
     const summary = { inserted: 0, patched: 0, skipped: 0 }
 
     // ── Filter by Powens user: only the users managed by Albo OS are
@@ -566,6 +784,16 @@ export const ingestConnectionSync = internalMutation({
     // The matched Powens user's org = source of truth for the write scope.
     const org = await ctx.db.get("organizations", powensUser.orgId)
     if (!org) throw new ConvexError('powens_user_org_not_found')
+
+    // Sync-health monitoring: refresh the connection row (state, last sync,
+    // webhook heartbeat) and alert on degradation — even with 0 accounts.
+    await upsertConnectionStatus(
+      ctx,
+      org._id,
+      connectionId,
+      connectionMeta ?? {},
+      'webhook',
+    )
 
     console.log(
       `[powens] webhook connection=${connectionId} (user ${powensUserId} → org ${org.slug}): ` +
@@ -656,6 +884,158 @@ export const ingestConnectionSync = internalMutation({
         `inserted=${summary.inserted}, patched=${summary.patched}, skipped=${summary.skipped}`,
     )
     return summary
+  },
+})
+
+// ─── Connection health: polling cron + org-facing query ──────────────────────
+
+/** Powens users of all orgs, with their token — INTERNAL only (secret), feeds
+ * the polling cron. */
+export const listPowensUsersForPoll = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query('powensUsers').collect()
+    return rows.map((r) => ({ orgId: r.orgId, authToken: r.authToken }))
+  },
+})
+
+/** Writes one poll round for an org: upserts every connection returned by
+ * Powens and deletes the org's rows that no longer exist on the Powens side
+ * (connection deleted) — the poll list is authoritative. Only called after a
+ * SUCCESSFUL fetch, so an empty array really means "no connections". */
+export const recordPolledConnections = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    connections: v.array(
+      v.object({ powensConnectionId: v.string(), ...connMetaFields }),
+    ),
+  },
+  handler: async (ctx, { orgId, connections }) => {
+    for (const { powensConnectionId, ...meta } of connections) {
+      await upsertConnectionStatus(ctx, orgId, powensConnectionId, meta, 'poll')
+    }
+    const known = new Set(connections.map((c) => c.powensConnectionId))
+    const rows = await ctx.db
+      .query('powensConnections')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    for (const row of rows) {
+      if (!known.has(row.powensConnectionId)) {
+        await ctx.db.delete('powensConnections', row._id)
+        console.warn(
+          `[powens] connexion ${row.powensConnectionId} ` +
+            `(${row.connectorName ?? '?'}) absente du poll — supprimée du suivi`,
+        )
+      }
+    }
+    return { upserted: connections.length }
+  },
+})
+
+/** Re-evaluates the health of EVERY tracked connection, with no incoming
+ * data. This is what catches the silence: webhooks stopped AND the poll
+ * failed (or brought nothing) — staleness still gets detected and alerted. */
+export const evaluateConnectionsHealth = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now()
+    const rows = await ctx.db.query('powensConnections').collect()
+    for (const row of rows) {
+      await maybeNotifyConnectionHealth(ctx, row, now)
+    }
+    return { evaluated: rows.length }
+  },
+})
+
+/** Cron (every 6h): pulls the connection list of each org's Powens user and
+ * refreshes the health rows. Belt & braces with the webhook — the pull is
+ * the only feed that still works when webhooks stop arriving. */
+export const pollConnectionsHealth = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    const domain = process.env.POWENS_DOMAIN
+    if (!domain) throw new ConvexError('powens_env_missing')
+    const base = `https://${domain}/2.0`
+    const users: Array<{ orgId: Id<'organizations'>; authToken: string }> =
+      await ctx.runQuery(internal.powens.listPowensUsersForPoll, {})
+
+    const summary = { polled: 0, failed: 0 }
+    for (const user of users) {
+      try {
+        const res = await fetch(
+          `${base}/users/me/connections?expand=connector`,
+          { headers: { Authorization: `Bearer ${user.authToken}` } },
+        )
+        if (!res.ok) throw new Error(`http_${res.status}`)
+        const json = asRecord(await res.json())
+        const connections = asArray(json.connections).flatMap((raw) => {
+          const c = asRecord(raw)
+          const id = asIdStr(c.id)
+          if (!id) return []
+          const connectorName = asString(asRecord(c.connector).name) ?? ''
+          return [
+            {
+              powensConnectionId: id,
+              ...normalizeConnectionMeta(c, connectorName),
+            },
+          ]
+        })
+        await ctx.runMutation(internal.powens.recordPolledConnections, {
+          orgId: user.orgId,
+          connections,
+        })
+        summary.polled += 1
+      } catch (err) {
+        summary.failed += 1
+        // No token in the message — orgId only.
+        console.error(
+          `[powens] poll connexions échoué (org ${user.orgId}): ` +
+            `${err instanceof Error ? err.message : String(err)}`,
+        )
+      }
+    }
+    // Staleness must be evaluated even when nothing new came in.
+    await ctx.runMutation(internal.powens.evaluateConnectionsHealth, {})
+    return summary
+  },
+})
+
+/** Connections of an org with their derived health — feeds the Cash page
+ * monitoring section. No secret in these rows. */
+export const listConnections = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+    const rows = await ctx.db
+      .query('powensConnections')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    if (rows.length === 0) return []
+    const now = Date.now()
+    // Labels of the accounts fed by each connection (small org-scoped set).
+    const accounts = await ctx.db
+      .query('bankAccounts')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    return rows
+      .map((r) => ({
+        _id: r._id,
+        powensConnectionId: r.powensConnectionId,
+        connectorName: r.connectorName ?? null,
+        health: connectionHealth(r, now),
+        state: r.state ?? null,
+        errorMessage: r.errorMessage ?? null,
+        lastSuccessfulSyncAt: r.lastSuccessfulSyncAt ?? null,
+        accountLabels: accounts
+          .filter(
+            (a) =>
+              a.powensConnectionId === r.powensConnectionId && !a.archivedAt,
+          )
+          .map((a) => a.displayName ?? a.label),
+      }))
+      .sort((a, b) =>
+        (a.connectorName ?? '').localeCompare(b.connectorName ?? ''),
+      )
   },
 })
 
@@ -1058,6 +1438,49 @@ export const startBankConnection = action({
     url.searchParams.set('client_id', clientId)
     url.searchParams.set('redirect_uri', redirectUri)
     url.searchParams.set('code', codeJson.code)
+    return { webviewUrl: url.toString() }
+  },
+})
+
+/** Webview URL of the RECONNECT flow for an existing connection: the user
+ * only re-enters what the bank asks for (new password, OTP, SCA) instead of
+ * redoing the whole connection. Same security posture as
+ * `startBankConnection`: the permanent token stays server-side, the front
+ * end only gets the URL with the temporary code. Powens scopes
+ * `connection_id` to the bearer of the code — a foreign id is refused. */
+export const startReconnect = action({
+  args: { orgId: v.id('organizations'), powensConnectionId: v.string() },
+  handler: async (
+    ctx,
+    { orgId, powensConnectionId },
+  ): Promise<{ webviewUrl: string }> => {
+    await ctx.runQuery(internal.powens.powensAuthProbe, { orgId })
+    const { clientId, domain, redirectUri } = powensEnv()
+    const base = `https://${domain}/2.0`
+
+    const existing = await ctx.runQuery(internal.powens.getOrgPowensToken, {
+      orgId,
+    })
+    if (!existing) throw new ConvexError('powens_no_user')
+
+    const codeUrl = new URL(`${base}/auth/token/code`)
+    const codeType = powensCodeType()
+    if (codeType) codeUrl.searchParams.set('type', codeType)
+    const codeRes = await fetch(codeUrl.toString(), {
+      headers: { Authorization: `Bearer ${existing.authToken}` },
+    })
+    if (!codeRes.ok) {
+      throw new ConvexError(`powens_code_failed:${codeRes.status}`)
+    }
+    const codeJson = (await codeRes.json()) as { code?: string }
+    if (!codeJson.code) throw new ConvexError('powens_code_malformed')
+
+    const url = new URL('https://webview.powens.com/reconnect')
+    url.searchParams.set('domain', domain)
+    url.searchParams.set('client_id', clientId)
+    url.searchParams.set('redirect_uri', redirectUri)
+    url.searchParams.set('code', codeJson.code)
+    url.searchParams.set('connection_id', powensConnectionId)
     return { webviewUrl: url.toString() }
   },
 })
