@@ -18,6 +18,7 @@ import {
   decideSyncAction,
   orgSlugFromOption,
   resolveInstrumentKind,
+  secondaryRoundFromInstrumentRaw,
   shouldReplaceInstrument,
 } from '../convex/lib/attioSync'
 
@@ -110,7 +111,7 @@ describe('resolveInstrumentKind — Attio type_d_invest → instrumentKind', () 
       ['BSA Air', 'bsa_air'],
       ['CCA', 'cca'],
       ['Royalties', 'royalty'],
-      ['Secondary Shares', 'secondary'],
+      ['Secondary Shares', 'share'],
       ['Convertible Note', 'convertible_note'],
       ['SPV SAFE', 'safe'],
       ['SPV Share', 'spv_share'],
@@ -123,6 +124,14 @@ describe('resolveInstrumentKind — Attio type_d_invest → instrumentKind', () 
   it('falls back to unknown for an absent or unmapped instrument (never guesses)', () => {
     assert.equal(resolveInstrumentKind(null), 'unknown')
     assert.equal(resolveInstrumentKind('Something new'), 'unknown')
+  })
+})
+
+describe('secondaryRoundFromInstrumentRaw — Secondary Shares presets a secondary round', () => {
+  it('returns the secondary round only for Secondary Shares', () => {
+    assert.equal(secondaryRoundFromInstrumentRaw('Secondary Shares'), 'secondary')
+    assert.equal(secondaryRoundFromInstrumentRaw('Share'), undefined)
+    assert.equal(secondaryRoundFromInstrumentRaw(null), undefined)
   })
 })
 

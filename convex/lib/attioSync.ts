@@ -30,7 +30,9 @@ const INSTRUMENT_MAP = new Map<string, InstrumentKind>([
   ['BSA Air', 'bsa_air'],
   ['CCA', 'cca'],
   ['Royalties', 'royalty'],
-  ['Secondary Shares', 'secondary'],
+  // A secondary is an equity deal: the `share` instrument carries the buy,
+  // the "secondary" nature lives on the round type (secondaryRoundFromInstrumentRaw).
+  ['Secondary Shares', 'share'],
   ['Convertible Note', 'convertible_note'],
   ['SPV SAFE', 'safe'],
   ['SPV Share', 'spv_share'],
@@ -39,6 +41,17 @@ const INSTRUMENT_MAP = new Map<string, InstrumentKind>([
 /** Absent / unmapped Attio instrument → 'unknown' (never guesses). */
 export function resolveInstrumentKind(title: string | null): InstrumentKind {
   return (title ? INSTRUMENT_MAP.get(title) : undefined) ?? 'unknown'
+}
+
+/**
+ * 'Secondary Shares' maps to the `share` instrument (see INSTRUMENT_MAP), with
+ * the secondary nature carried by the round type. Returns the round to preset,
+ * or undefined. Applied on create only — never overwrites a later manual edit.
+ */
+export function secondaryRoundFromInstrumentRaw(
+  title: string | null,
+): 'secondary' | undefined {
+  return title === 'Secondary Shares' ? 'secondary' : undefined
 }
 
 /**
