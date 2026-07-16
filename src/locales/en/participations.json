@@ -86,6 +86,7 @@
     "viaSpv": "via SPV",
     "target": "Company",
     "committed": "Committed",
+    "committedForecast": "Forecast commitment",
     "paid": "Disbursed (actual)",
     "received": "Received",
     "shares": "Shares acquired",

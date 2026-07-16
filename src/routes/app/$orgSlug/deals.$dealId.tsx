@@ -25,6 +25,7 @@ import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { directionBadgeClass, directionTone } from '~/lib/moneyTone'
 import {
+  dealAmountTiles,
   useDealTitle,
   useFormatters,
 } from '~/components/participations/ParticipationsTable'
@@ -761,6 +762,14 @@ function DealDetail() {
   // Previewed instrument type (local only) vs the one saved in DB.
   const effectiveKind = previewKind ?? deal.instrumentKind
   const unsaved = previewKind != null && previewKind !== deal.instrumentKind
+  // Amount tile(s) shown at the top of the fiche, by status/instrument (helper
+  // shared with the entity-sheet deal list). "Reçu" is added alongside.
+  const amountTiles = dealAmountTiles({
+    instrumentKind: deal.instrumentKind,
+    status: deal.status,
+    committedAmount: deal.committedAmount,
+    paidActual,
+  })
 
   return (
     <main className="flex-1 space-y-6 p-6">
@@ -871,10 +880,20 @@ function DealDetail() {
         )}
       </div>
 
-      {/* Overview: commitment + actuals (computed from the transactions). */}
-      <div className="grid grid-cols-3 gap-4">
-        <Stat label={t('deal.committed')} value={fmtEur(deal.committedAmount)} />
-        <Stat label={t('deal.paid')} value={fmtEur(paidActual)} />
+      {/* Overview: amount tile(s) by status/instrument + received. */}
+      <div
+        className={cn(
+          'grid gap-4',
+          amountTiles.length === 2 ? 'grid-cols-3' : 'grid-cols-2',
+        )}
+      >
+        {amountTiles.map((tile) => (
+          <Stat
+            key={tile.labelKey}
+            label={t(tile.labelKey)}
+            value={fmtEur(tile.cents)}
+          />
+        ))}
         <Stat label={t('deal.received')} value={fmtEur(received)} />
       </div>
 

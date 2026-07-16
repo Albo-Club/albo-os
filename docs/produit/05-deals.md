@@ -21,11 +21,13 @@ là où [Participations](04-participations.md) regroupe par société.
   à terme, crypto, prêt, compte de capitalisation. Chaque instrument a ses
   champs propres (prix par action et valorisation d'entrée pour les actions,
   taux et maturité pour la dette, cap et discount pour un SAFE, etc.).
-- **Montants** : un seul montant saisi, le **montant engagé** (ce qu'on s'est
-  engagé à investir). Le **payé** (ce qui est réellement sorti) est calculé
-  depuis les transactions bancaires pointées, jamais saisi à la main. Les
-  **fonds** ont en plus un **capital appelé** saisi (le fonds appelle le capital
-  par tranches).
+- **Montants** : un deal a un **engagé** (ce qu'on s'est engagé à investir,
+  saisi) et un **décaissé (réel)** (ce qui est réellement sorti, calculé depuis
+  les transactions bancaires pointées, jamais saisi). Pour un deal direct les
+  deux sont égaux une fois câblé, donc on n'en affiche qu'un : le **décaissé
+  (réel)** s'il est investi, l'**engagé prévisionnel** s'il est encore en term
+  sheet (rien n'est décaissé). Les **fonds** affichent les deux — engagé
+  (commit) vs **capital appelé** — car ils diffèrent réellement.
 - **Statut** : *engagé* (term sheet signée, pas encore câblé — créé
   automatiquement depuis Attio), *actif*, *sorti partiellement*, *sorti*,
   *passé en perte*.
@@ -39,7 +41,9 @@ là où [Participations](04-participations.md) regroupe par société.
 
 ## La fiche deal
 
-- **Trois stats** en tête : Engagé, Payé, Reçu.
+- **Montants en tête** : le montant du deal + « Reçu ». Le montant s'adapte au
+  cas (cf. « Montants » ci-dessus : décaissé réel si investi, engagé
+  prévisionnel si en term sheet, ou les deux pour un fonds).
 - **Bloc instrument** : les champs propres au type d'instrument, éditables en
   ligne. Changer le type dans le sélecteur **prévisualise** la nouvelle mise
   en page sans rien enregistrer (bannière « non enregistré »).

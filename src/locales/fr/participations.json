@@ -86,6 +86,7 @@
     "viaSpv": "via SPV",
     "target": "Société",
     "committed": "Engagé",
+    "committedForecast": "Engagé prévisionnel",
     "paid": "Décaissé (réel)",
     "received": "Reçu",
     "shares": "Titres acquis",
