@@ -23,6 +23,30 @@ bas de page.
 
 ---
 
+## v1.104.0 — 17/07/2026 à 17:34 — Prévisionnel : « Capital engagé non appelé » (fin des miettes)
+
+La carte « Reste à déployer (deals signés) » affichait aussi les **petits
+écarts de virement** — quelques euros de différence entre le montant engagé
+sur un deal et ce qui a réellement été viré (arrondis, frais bancaires).
+Ces miettes ne seront jamais « déployées » : ce ne sont pas des appels de
+fonds à venir.
+
+- La carte est **renommée « Capital engagé non appelé »** — son vrai sens :
+  le capital promis (fonds à appels progressifs, tranches à venir) qui
+  sortira un jour mais n'a pas de date.
+- Les écarts **inférieurs à 1 % du montant engagé** sont désormais ignorés,
+  sur la carte du Prévisionnel comme sur la ligne « Reste à déployer » des
+  fiches deal. Un vrai appel de fonds reste toujours affiché.
+
+> **🔧 Notes techniques**
+>
+> - `convex/forecasts.ts` : constante `PIPELINE_RESIDUAL_RATIO = 0.01`
+>   appliquée dans `getCommittedPipeline` (skip du deal) et
+>   `getDealForecast` (`remainingCents` forcé à 0) — les résidus concernés
+>   sur albo : Hectarea 86,88 €, Ouisub 10 €, Komeet 7,83 €.
+> - i18n `forecast.pipeline.title`/`hint` (fr/en) ; `TESTING.md` FC14 +
+>   FC27 ; `docs/produit/09-previsionnel.md`.
+
 ## v1.103.0 — 17/07/2026 à 10:15 — Prévisionnel : des suggestions de règles plus généreuses
 
 Le détecteur de flux récurrents (la carte « Règles suggérées ») était trop

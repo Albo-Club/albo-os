@@ -46,9 +46,12 @@ conserve l'historique (réalisées, annulées, retouchées).
   la ligne de solde. Le réalisé du mois **consomme** le prévu de la même
   catégorie, pour ne jamais compter deux fois le même flux. Les échéances en
   retard roulent sur le mois courant (toujours attendues, juste en retard).
-- **Pipeline engagé** : le capital restant à déployer sur les deals signés
-  (engagé moins versé). Ces obligations réelles mais **sans date** sont
-  affichées à côté de la courbe, jamais inventées dans des mois.
+- **Capital engagé non appelé** : le capital restant à déployer sur les
+  deals signés (engagé moins versé) — typiquement les fonds à appels
+  progressifs et les tranches à venir. Ces obligations réelles mais **sans
+  date** sont affichées à côté de la courbe, jamais inventées dans des
+  mois. Les petits écarts de virement (moins de 1 % de l'engagé : arrondis,
+  frais) ne sont pas des appels à venir et sont ignorés.
 - **Fiabilité** : chaque début de mois, une photo du solde projeté est prise
   automatiquement ; le mois suivant, elle est comparée au réel pour mesurer
   la fiabilité de la projection.

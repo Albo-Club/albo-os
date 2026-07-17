@@ -198,10 +198,10 @@
       "balance": "Projected balance"
     },
     "pipeline": {
-      "title": "Left to deploy (signed deals)",
+      "title": "Committed capital not yet called",
       "more_one": "+ {{count}} other deal",
       "more_other": "+ {{count}} other deals",
-      "hint": "Committed amounts with no call date — counted here, not in the curve. Create a one-off entry to schedule a capital call."
+      "hint": "Committed amounts with no call date — counted here, not in the curve. Create a one-off entry to schedule a capital call. Wire-transfer gaps (under 1% of the commitment) are ignored."
     },
     "suggestions": {
       "title": "Suggested reconciliations",
