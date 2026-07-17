@@ -1319,4 +1319,20 @@ export default defineSchema({
     .index('by_derivedKey', ['derivedKey'])
     .index('by_rule', ['ruleId'])
     .index('by_deal', ['dealId']),
+
+  /**
+   * todos — manual tasks of the « To do » tab (convex/todo.ts). Only the
+   * hand-written items live here: the automatic signals of that tab
+   * (transactions to reconcile, degraded bank connections, overdue forecast
+   * entries, silent portfolio companies) are DERIVED at read time from their
+   * own tables and never stored.
+   */
+  todos: defineTable({
+    orgId: v.id('organizations'),
+    title: v.string(),
+    status: v.union(v.literal('open'), v.literal('done')),
+    createdBy: v.id('users'),
+    createdAt: v.number(),
+    doneAt: v.optional(v.number()),
+  }).index('by_org', ['orgId']),
 })

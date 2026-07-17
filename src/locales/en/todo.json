@@ -1,0 +1,35 @@
+{
+  "metaTitle": "To do — Albo OS",
+  "title": "To do",
+  "subtitle": "Everything waiting for an action, in one place.",
+  "loading": "Loading…",
+  "tasks": {
+    "title": "Tasks",
+    "placeholder": "Add a task…",
+    "add": "Add",
+    "empty": "No tasks. Add one above.",
+    "delete": "Delete task",
+    "markDone": "Mark as done",
+    "failed": "Action failed"
+  },
+  "unmatched": {
+    "title": "Transactions to reconcile",
+    "count_one": "{{count}} transaction",
+    "count_other": "{{count}} transactions",
+    "empty": "Nothing to reconcile.",
+    "more_one": "+{{count}} more transaction",
+    "more_other": "+{{count}} more transactions",
+    "cta": "Reconcile"
+  },
+  "forecast": {
+    "title": "Overdue forecast entries",
+    "empty": "No overdue entries.",
+    "cta": "Open forecast"
+  },
+  "reports": {
+    "title": "Missing reportings",
+    "empty": "Every portfolio company has reported recently.",
+    "lastReport": "No report received since {{date}}",
+    "hint": "Portfolio companies that used to report but have been silent for 3+ months."
+  }
+}

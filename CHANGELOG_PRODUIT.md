@@ -23,6 +23,44 @@ bas de page.
 
 ---
 
+## v1.105.0 — 17/07/2026 à 17:45 — Nouvel onglet « À faire » : tout ce qui attend une action
+
+Un nouvel onglet **À faire** apparaît dans la barre latérale, juste sous le
+Tableau de bord. Il rassemble sur une seule page tout ce qui attend une
+action dans l'organisation — la page à ouvrir en début de journée :
+
+- **Connexions bancaires** : si une banque demande une reconnexion ou n'a
+  plus synchronisé, la bannière d'alerte de la Trésorerie s'affiche en haut.
+- **Tâches** : une liste de tâches manuelles partagée dans l'organisation —
+  on ajoute en une ligne, on coche quand c'est fait, on supprime au besoin.
+- **Transactions à pointer** : le compteur de la file de pointage, un aperçu
+  des dernières transactions en attente et un bouton direct vers l'onglet
+  Transactions.
+- **Échéances en retard** : les entrées du prévisionnel dont la date est
+  passée sans réalisation (même définition que le badge « En retard »).
+- **Reportings manquants** : les participations qui envoyaient des rapports
+  et sont silencieuses depuis plus de 3 mois, avec lien vers leur fiche.
+
+Tout sauf les tâches est automatique : un item disparaît de lui-même dès que
+l'action est faite. Un récap hebdomadaire par email est prévu dans un second
+temps.
+
+> **🔧 Notes techniques**
+>
+> - `convex/todo.ts` : query `getTodo` (compteur + aperçu des transactions
+>   `unmatched` via `by_org_matchStatus`, participations silencieuses —
+>   portfolio non archivées, cible d'un deal `active`/`partially_exited`,
+>   ≥ 1 `companyReports`, dernier reçu (`emailDate`) > 90 j — et tâches) +
+>   mutations `createTask`/`setTaskDone`/`removeTask`. Nouvelle table
+>   `todos` (orgId, title, status open/done, index `by_org`).
+> - Réutilisation côté client : `powens.listConnections` (via le composant
+>   `ConnectionsBanner` existant) et `forecasts.getUpcomingEntries` filtrée
+>   sur `overdue` — aucune logique dupliquée pour ces deux signaux.
+> - Front : `src/routes/app/$orgSlug/todo.tsx`, entrée nav (`nav.ts`,
+>   icône ListTodo) + breadcrumb (`AppHeader.tsx`), namespace i18n `todo`
+>   (en/fr). `convex/_generated/api.d.ts` resynchronisé à la main (codegen
+>   indisponible dans l'environnement).
+
 ## v1.104.0 — 17/07/2026 à 17:34 — Prévisionnel : « Capital engagé non appelé » (fin des miettes)
 
 La carte « Reste à déployer (deals signés) » affichait aussi les **petits

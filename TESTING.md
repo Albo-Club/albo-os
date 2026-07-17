@@ -207,6 +207,23 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | FC28 | Rapprocher (FC17) une échéance **rattachée à un deal** avec une transaction **non pointée** | Le toast de succès porte l'action « Pointer sur le deal » (10 s) ; cliquer → `matchTransaction`, la tx passe `matched` sur le deal (visible fiche deal) ; pas d'action si la tx est déjà pointée/allouée ou l'échéance sans deal |
 | FC29 | Digest « échéances en retard » : échéance `pending` EUR datée d'avant-hier, puis `convex run --prod forecasts:checkOverdueEntries '{}'` | Email bilingue à chaque membre de l'org : liste des échéances en retard (date, libellé, montant signé, max 8 lignes + « + N »), CTA → `/cash?tab=previsionnel` ; relancer immédiatement → **pas** de second email (rien de « nouvellement » en retard : la fenêtre = 1 jour) ; une échéance datée d'**hier** seulement n'est pas comptée (jour de grâce) ; réalisée/annulée → jamais dans le digest |
 
+## Niveau 3 — Onglet À faire (5 min)
+
+Route `/app/$orgSlug/todo` (`src/routes/app/$orgSlug/todo.tsx`), entrée
+« À faire » dans la sidebar (groupe Plateforme, sous le Tableau de bord).
+Agrégation lecture seule (`convex/todo.ts:getTodo` + réutilisation de
+`powens.listConnections` et `forecasts.getUpcomingEntries`) + tâches
+manuelles (table `todos`).
+
+| ID  | Étape                                                                                       | Attendu                                                                                                                                                                                                                             |
+| --- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TD1 | Ouvrir `/app/<org>/todo` sur une org « saine » (rien à pointer, pas de retard)               | Chaque bloc affiche son état vide en pointillé ; pas de bannière connexions ; breadcrumb « À faire »                                                                                                                                  |
+| TD2 | Org avec des transactions `unmatched`                                                        | Bloc « Transactions à pointer » : badge = compteur exact de la file, aperçu des 5 plus récentes (contrepartie/libellé, date · compte, montant signé), ligne « +N autres », bouton « Pointer » → `/cash?tab=transactions`               |
+| TD3 | Échéance prévisionnelle `pending` EUR datée d'hier                                           | Bloc « Échéances en retard » la liste (date en rouge, montant signé) — même définition que le badge « En retard » de l'onglet Prévisionnel (pas de jour de grâce, contrairement au digest email FC29) ; CTA → `/cash?tab=previsionnel` |
+| TD4 | Connexion bancaire dégradée (stale / action requise)                                         | La bannière de la Trésorerie apparaît en haut de page avec le bouton « Gérer » → `/cash?tab=gestion`                                                                                                                                  |
+| TD5 | Participation avec ≥ 1 `companyReports` dont le dernier reçu date de > 3 mois + un deal actif | Bloc « Reportings manquants » : ligne société (lien → fiche) + « Aucun report reçu depuis le {date} » ; une société sans aucun rapport ou sans deal actif/partially_exited n'apparaît **pas**                                          |
+| TD6 | Ajouter une tâche, la cocher, la décocher, la supprimer                                      | Ajout en tête de liste (badge compteur = tâches ouvertes) ; cochée → barrée, passe sous les ouvertes ; décochée → redevient ouverte ; suppression immédiate ; visible par l'autre membre de l'org (temps réel)                          |
+
 ## Niveau 3 — Vues par type de projet (10 min)
 
 Sections typées de la page deal (`/deals/$dealId`) et de la page société

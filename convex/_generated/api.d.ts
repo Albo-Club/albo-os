@@ -80,6 +80,7 @@ import type * as rateLimiters from "../rateLimiters.js";
 import type * as search from "../search.js";
 import type * as seed from "../seed.js";
 import type * as telegram from "../telegram.js";
+import type * as todo from "../todo.js";
 import type * as transactions from "../transactions.js";
 import type * as users from "../users.js";
 import type * as valuations from "../valuations.js";
@@ -164,6 +165,7 @@ declare const fullApi: ApiFromModules<{
   search: typeof search;
   seed: typeof seed;
   telegram: typeof telegram;
+  todo: typeof todo;
   transactions: typeof transactions;
   users: typeof users;
   valuations: typeof valuations;

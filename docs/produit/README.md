@@ -48,6 +48,7 @@ expliqué simplement dans un encadré « Sous le capot ».
 | [Compte et sécurité](13-compte-et-securite.md) | Connexion, profil, mot de passe, sessions |
 | [Organisations, membres et invitations](14-organisations-membres-invitations.md) | Rôles, réglages d'org, invitations, super-admin |
 | [Intégrations](15-integrations.md) | Attio, Powens, connecteur Claude (MCP), Parallel/VASCO, imports |
+| [À faire](16-a-faire.md) | Tâches manuelles et signaux à traiter (pointage, banques, échéances, reportings) |
 
 ## Comment cette doc vit
 

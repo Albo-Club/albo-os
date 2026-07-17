@@ -2,6 +2,7 @@ import {
   Handshake,
   Inbox,
   LayoutDashboard,
+  ListTodo,
   Mail,
   Megaphone,
   PieChart,
@@ -40,6 +41,11 @@ export function getNavGroups(): Array<NavGroup> {
           titleKey: 'items.dashboard',
           to: '/app/$orgSlug',
           icon: LayoutDashboard,
+        },
+        {
+          titleKey: 'items.todo',
+          to: '/app/$orgSlug/todo',
+          icon: ListTodo,
         },
         {
           titleKey: 'items.participations',
