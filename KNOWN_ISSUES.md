@@ -1169,6 +1169,21 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   (pré-`backfillSearchText`) reste invisible à la recherche. Pas de pagination
   serveur (`usePaginatedQuery` n'est utilisé que par le chat) : on garde le
   pattern `.take()` + `LocalPagination` partagé avec `PointageTable`.
+- **Puces de suggestion de la file (`getPointageSuggestions`) — précision
+  avant rappel, labels résolus côté client.** La query ne couvre que les
+  **30 tx `unmatched` les plus récentes** (= le haut de la file triée date
+  desc) : au-delà, pas de puce, le picker reste le chemin. Deux moteurs :
+  paires de virements internes (`lib/transferPairs.ts`, pur et testé —
+  montant **exact**, sens opposés, comptes **différents**, ≤ 4 j, chaque
+  jambe appariée au plus une fois au plus proche en date) ; sinon top-1 du
+  moteur historique partagé avec l'agent (`lib/suggest.ts:rankCandidates`),
+  retenu seulement si le libellé similaire a été vu **≥ 2 fois** parmi les
+  tx déjà pointées. La query renvoie `(kind, targetId)` SANS label : le
+  front résout depuis `deals.listOptions`/`liabilities.listOptions` déjà
+  chargés (zéro lecture de plus) — une cible absente des options (deal
+  archivé…) fait silencieusement disparaître la puce, c'est voulu. Cliquer
+  une puce passe par les **mêmes mutations** que le picker : aucune écriture
+  nouvelle, les invariants du pointage restent intacts.
 
 ## Catégories & règles apprenantes (`convex/lib/categories.ts`, `categoryRules`)
 

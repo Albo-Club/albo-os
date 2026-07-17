@@ -13,6 +13,8 @@ import {
   applyUnmatch,
 } from './lib/pointage'
 import { buildSearchText, normalizeSearch } from './lib/searchText'
+import { rankCandidates } from './lib/suggest'
+import { detectInternalTransferPairs } from './lib/transferPairs'
 import { vatCentsFromTtc, vatRateBpsValidator } from './lib/vat'
 
 import type { Doc, Id } from './_generated/dataModel'
@@ -348,6 +350,137 @@ export const countByStatus = query({
       )
       .collect()
     return rows.length
+  },
+})
+
+// ─── Suggestion-first inbox (unified picker, step 2) ─────────────────────────
+
+// Caps of the suggestion pass: the most recent unmatched rows (= the top of
+// the date-desc inbox), a few similar labels per row, a bounded decisions
+// scan. Rows beyond the cap simply show no chip — the picker is always there.
+const SUGGESTIONS_TX_MAX = 30
+const SUGGESTIONS_SIMILAR_PER_TX = 8
+const SUGGESTIONS_DECISIONS_SCAN = 200
+/** A history candidate must have its label seen at least twice among the
+ * already-matched transactions (precision over recall: a wrong one-click
+ * suggestion nags, a missing one is a non-event). */
+const SUGGESTIONS_MIN_SIMILAR = 2
+
+/**
+ * One-click suggestions for the pointage inbox: per recent unmatched
+ * transaction, either `internal_transfer` (two legs of the same wire —
+ * same amount, opposite directions, different accounts, ≤4 days apart,
+ * lib/transferPairs) or the top history-based target (same ranking engine
+ * as the agent's suggestMatches: similar already-matched labels + recent
+ * decisions, lib/suggest). Labels are resolved client-side from the picker
+ * options already loaded — no extra read here. Suggestion only: applying
+ * goes through the normal mutations.
+ */
+export const getPointageSuggestions = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+    const txs = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_matchStatus', (q) =>
+        q.eq('orgId', orgId).eq('matchStatus', 'unmatched'),
+      )
+      .order('desc')
+      .take(SUGGESTIONS_TX_MAX)
+
+    const transferIds = detectInternalTransferPairs(
+      txs.map((tx) => ({
+        id: tx._id,
+        bankAccountId: tx.bankAccountId,
+        direction: tx.direction,
+        amountCents: tx.amount,
+        dateMs: tx.transactionDate,
+      })),
+    )
+
+    // Secondary signal: recent `matched` decisions per deal (same scan as
+    // the agent tool).
+    const decisions = await ctx.db
+      .query('matchingDecisions')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .order('desc')
+      .take(SUGGESTIONS_DECISIONS_SCAN)
+    const decisionsCountByTarget: Record<string, number> = {}
+    for (const decision of decisions) {
+      if (decision.decision !== 'matched' || !decision.dealId) continue
+      decisionsCountByTarget[decision.dealId] =
+        (decisionsCountByTarget[decision.dealId] ?? 0) + 1
+    }
+
+    const committedByDeal = new Map<string, number | null>()
+    const suggestions: Array<{
+      transactionId: Id<'transactions'>
+      kind: 'internal_transfer' | 'deal' | 'equity' | 'intercompany_loan'
+      targetId: string | null
+    }> = []
+
+    for (const tx of txs) {
+      if (transferIds.has(tx._id)) {
+        suggestions.push({
+          transactionId: tx._id,
+          kind: 'internal_transfer',
+          targetId: null,
+        })
+        continue
+      }
+      const term = normalizeSearch(
+        `${tx.rawLabel} ${tx.counterparty ?? ''}`,
+      ).trim()
+      if (!term) continue
+      const similar = await ctx.db
+        .query('transactions')
+        .withSearchIndex('search_text', (q) =>
+          q
+            .search('searchText', term)
+            .eq('orgId', orgId)
+            .eq('matchStatus', 'matched'),
+        )
+        .take(SUGGESTIONS_SIMILAR_PER_TX)
+      const similarTargets = []
+      for (const s of similar) {
+        if (s._id === tx._id) continue
+        const kind = s.dealId
+          ? ('deal' as const)
+          : s.allocation && s.allocation.kind !== 'deal'
+            ? s.allocation.kind
+            : null
+        if (!kind) continue
+        const targetId = s.dealId ?? s.allocation?.targetId
+        if (!targetId) continue
+        let committed: number | null = null
+        if (kind === 'deal') {
+          if (!committedByDeal.has(targetId)) {
+            const deal = await ctx.db.get('deals', targetId as Id<'deals'>)
+            committedByDeal.set(targetId, deal?.committedAmount ?? null)
+          }
+          committed = committedByDeal.get(targetId) ?? null
+        }
+        similarTargets.push({
+          kind,
+          targetId,
+          targetLabel: null,
+          committedAmountCents: committed,
+        })
+      }
+      const top = rankCandidates({
+        txAmountCents: tx.amount,
+        similarTargets,
+        decisionsCountByTarget,
+      }).at(0)
+      if (top && top.evidence.similarMatchedCount >= SUGGESTIONS_MIN_SIMILAR) {
+        suggestions.push({
+          transactionId: tx._id,
+          kind: top.kind,
+          targetId: top.targetId,
+        })
+      }
+    }
+    return suggestions
   },
 })
 

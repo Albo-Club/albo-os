@@ -23,6 +23,44 @@ bas de page.
 
 ---
 
+## v1.109.0 — 17/07/2026 à 18:28 — Pointage : les suggestions en un clic
+
+Deuxième étape de la refonte du pointage : la file « À pointer » **propose
+avant de demander**. Les lignes que l'outil sait probablement classer
+portent désormais une **puce ✓ avec la cible proposée**, à côté du menu
+« Affecter à… » — un clic dessus applique (avec le même « Annuler » de
+5 secondes).
+
+Deux types de propositions :
+
+- **Virements internes détectés automatiquement** : deux mouvements de
+  même montant, en sens opposés, entre deux comptes de l'organisation, à
+  quelques jours d'écart — les deux jambes du virement reçoivent la puce
+  « Virement interne ». Plus besoin de reconnaître les paires à l'œil.
+- **Cibles apprises de l'historique** : quand des transactions au libellé
+  similaire ont déjà été pointées plusieurs fois vers le même deal ou la
+  même ligne de passif, la cible est proposée directement.
+
+L'outil ne classe jamais tout seul : sans clic de votre part, rien ne
+bouge. Les propositions sont volontairement prudentes — mieux vaut pas de
+puce qu'une puce fausse.
+
+> **🔧 Notes techniques**
+>
+> - `transactions.getPointageSuggestions` (query publique) : 30 tx
+>   `unmatched` les plus récentes ; paires de virements via le nouveau
+>   `convex/lib/transferPairs.ts` (pur, 4 tests — montant exact, sens
+>   opposés, comptes différents, ≤ 4 j, appariement glouton au plus
+>   proche) ; sinon top-1 de `lib/suggest.ts:rankCandidates` (moteur
+>   partagé avec l'agent), seuil ≥ 2 libellés similaires déjà pointés.
+> - Front : puce `✓ {label}` dans `RowActions` (`PointageTable.tsx`),
+>   résolution des labels depuis les `listOptions` déjà chargés, clic →
+>   `handleAssign` (mêmes mutations que le picker). Query active sur le
+>   filtre « À pointer » uniquement (`TransactionsLedger.tsx`).
+> - Docs : `TESTING.md` RU32, `docs/produit/08-pointage.md` § Les
+>   suggestions (+ point d'attention virement interne mis à jour),
+>   `KNOWN_ISSUES.md` § Pointage (caps et résolution client des puces).
+
 ## v1.108.0 — 17/07/2026 à 18:07 — Pointage : un seul geste, « Affecter à… »
 
 Le pointage d'une transaction demandait de choisir d'abord un **mode** —
