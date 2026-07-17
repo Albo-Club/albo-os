@@ -47,12 +47,22 @@ risqué en automatique).
 
 ## Les suggestions
 
-Pour une transaction en attente, l'outil propose jusqu'à trois cibles
-probables en s'appuyant sur l'historique : les transactions au libellé
-similaire déjà pointées (signal principal), les décisions récentes, et la
-proximité du montant avec l'engagement d'un deal. Ni l'outil ni l'assistant
-ne pointent jamais seuls : la décision reste humaine (ou approuvée
-explicitement dans le chat).
+Dans la file « À pointer », les lignes que l'outil sait probablement
+classer portent une **puce de suggestion** (✓ suivie de la cible) à côté
+du menu : un clic dessus applique. Deux sources :
+
+- les **virements internes détectés automatiquement** : deux mouvements de
+  même montant, en sens opposés, entre deux comptes de l'organisation, à
+  quelques jours d'écart — les deux jambes sont proposées en « Virement
+  interne » ;
+- l'**historique** : quand des transactions au libellé similaire ont déjà
+  été pointées plusieurs fois vers le même deal ou la même cible de
+  passif, cette cible est proposée.
+
+L'assistant IA s'appuie sur le même moteur (jusqu'à trois cibles
+probables, en conversation). Dans les deux cas, ni l'outil ni l'assistant
+ne pointent jamais seuls : la décision reste humaine — cliquer la puce,
+ou approuver explicitement dans le chat.
 
 ## La TVA
 
@@ -79,8 +89,9 @@ sort de la file, sans deal, et reste consultable par statut.
 
 - Une transaction allouée au **passif** ne peut pas être en même temps sur un
   deal (et inversement) : il faut la détacher d'abord.
-- « Virement interne » est une étiquette : les deux jambes d'un virement ne
-  sont pas encore appariées automatiquement.
+- « Virement interne » reste une étiquette posée ligne par ligne : la
+  détection de paires **suggère** les deux jambes mais ne les classe
+  jamais toute seule.
 
 ## Pages liées
 

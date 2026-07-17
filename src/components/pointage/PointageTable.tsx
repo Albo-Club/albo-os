@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, Check } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useConvexMutation } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
@@ -94,26 +94,44 @@ type RecentAction = {
   targetName?: string
 }
 
+/** A resolved one-click suggestion: apply `target`, shown as `label`. */
+type ResolvedSuggestion = { label: string; target: PointageTarget }
+
 /**
- * Single unified action: the « Affecter à… » picker. Selecting an entry
- * (deal, liability, charge/product category, tax/transfer/ignore) applies
- * immediately — the ~5 s « Annuler » banner covers mistakes.
+ * Single unified action: the « Affecter à… » picker, preceded by the
+ * one-click suggestion chip when the backend proposes one (✓ {label} —
+ * suggestion-first, the picker stays the manual path). Selecting either
+ * applies immediately — the ~5 s « Annuler » banner covers mistakes.
  */
 function RowActions({
   deals,
   liabilityOptions,
   direction,
+  suggestion,
   pending,
   onAssign,
 }: {
   deals: Array<DealOption> | undefined
   liabilityOptions: LiabilityOptionGroups | undefined
   direction: 'in' | 'out'
+  suggestion?: ResolvedSuggestion
   pending: boolean
   onAssign: (target: PointageTarget) => void
 }) {
   return (
     <div className="flex items-center justify-end gap-2">
+      {suggestion && (
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={pending}
+          className="max-w-48"
+          onClick={() => onAssign(suggestion.target)}
+        >
+          <Check className="size-4 shrink-0" />
+          <span className="truncate">{suggestion.label}</span>
+        </Button>
+      )}
       <TargetCombobox
         deals={deals}
         equityOptions={liabilityOptions?.equityOptions}
@@ -226,10 +244,18 @@ function MatchLink({
  * goes through the backend mutations. Rendering is paginated locally
  * (cf. `usePagination`).
  */
+/** One-click suggestion of the inbox (transactions.getPointageSuggestions). */
+export type PointageSuggestion = {
+  transactionId: Id<'transactions'>
+  kind: 'internal_transfer' | 'deal' | 'equity' | 'intercompany_loan'
+  targetId: string | null
+}
+
 export function PointageTable({
   transactions,
   deals,
   liabilityOptions,
+  suggestions,
   orgSlug,
   emptyMessage,
   pageResetKey,
@@ -239,6 +265,8 @@ export function PointageTable({
   deals: Array<DealOption> | undefined
   /** Liability targets (equity / C/C) of the org, built by the page. */
   liabilityOptions: LiabilityOptionGroups | undefined
+  /** One-click suggestions per unmatched row — absent = no chips. */
+  suggestions?: Array<PointageSuggestion>
   /** Org slug, to link a matched row to its deal / Passif. Absent = no link. */
   orgSlug?: string
   /** Alternative empty-state message (e.g. search with no results). */
@@ -275,6 +303,36 @@ export function PointageTable({
       ),
     [liabilityOptions],
   )
+
+  // Resolve the backend suggestions to a ready-to-apply target + label from
+  // the picker options already loaded (unresolvable → no chip, e.g. an
+  // archived deal absent from listOptions).
+  const suggestionByTx = useMemo(() => {
+    const map = new Map<Id<'transactions'>, ResolvedSuggestion>()
+    for (const s of suggestions ?? []) {
+      if (s.kind === 'internal_transfer') {
+        map.set(s.transactionId, {
+          label: t('actions.internal_transfer'),
+          target: { kind: 'status', status: 'internal_transfer' },
+        })
+      } else if (s.kind === 'deal' && s.targetId) {
+        const deal = dealsById.get(s.targetId)
+        if (!deal) continue
+        map.set(s.transactionId, {
+          label: deal.target?.name ?? deal.name ?? '—',
+          target: { kind: 'deal', deal },
+        })
+      } else if (s.targetId) {
+        const liability = liabilityByTarget.get(s.targetId)
+        if (!liability) continue
+        map.set(s.transactionId, {
+          label: liability.label,
+          target: { kind: 'liability', liability },
+        })
+      }
+    }
+    return map
+  }, [suggestions, dealsById, liabilityByTarget, t])
 
   const matchTransaction = useConvexMutation(api.transactions.matchTransaction)
   const allocateTransaction = useConvexMutation(
@@ -619,6 +677,7 @@ export function PointageTable({
           deals={deals}
           liabilityOptions={liabilityOptions}
           direction={tx.direction}
+          suggestion={suggestionByTx.get(tx._id)}
           pending={pending}
           onAssign={(target) => void handleAssign(tx, target)}
         />
@@ -630,6 +689,7 @@ export function PointageTable({
           deals={deals}
           liabilityOptions={liabilityOptions}
           direction={tx.direction}
+          suggestion={suggestionByTx.get(tx._id)}
           pending={pending}
           onAssign={(target) => void handleAssign(tx, target)}
         />

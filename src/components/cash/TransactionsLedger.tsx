@@ -106,6 +106,12 @@ export function TransactionsLedger({
     bankAccountId: accountId,
     search: searchArg,
   })
+  // One-click suggestion chips — inbox view only (the chips only render on
+  // unmatched rows anyway).
+  const suggestions = useConvexQuery(
+    api.transactions.getPointageSuggestions,
+    status === 'unmatched' ? { orgId } : 'skip',
+  )
 
   const liabilityOptions = useMemo<LiabilityOptionGroups | undefined>(() => {
     if (!liabilities) return undefined
@@ -188,6 +194,7 @@ export function TransactionsLedger({
         transactions={transactions}
         deals={deals}
         liabilityOptions={liabilityOptions}
+        suggestions={suggestions}
         orgSlug={orgSlug}
         emptyMessage={emptyMessage}
         statusColumn={status !== 'unmatched'}
