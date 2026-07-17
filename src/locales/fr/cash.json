@@ -198,10 +198,10 @@
       "balance": "Solde projeté"
     },
     "pipeline": {
-      "title": "Reste à déployer (deals signés)",
+      "title": "Capital engagé non appelé",
       "more_one": "+ {{count}} autre deal",
       "more_other": "+ {{count}} autres deals",
-      "hint": "Montants engagés sans date d'appel — comptés ici, pas dans la courbe. Crée une échéance ponctuelle pour dater un appel de fonds."
+      "hint": "Montants engagés sans date d'appel — comptés ici, pas dans la courbe. Crée une échéance ponctuelle pour dater un appel de fonds. Les écarts de virement (< 1 % de l'engagé) sont ignorés."
     },
     "suggestions": {
       "title": "Rapprochements suggérés",
