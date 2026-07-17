@@ -1,0 +1,35 @@
+{
+  "metaTitle": "À faire — Albo OS",
+  "title": "À faire",
+  "subtitle": "Tout ce qui attend une action, au même endroit.",
+  "loading": "Chargement…",
+  "tasks": {
+    "title": "Tâches",
+    "placeholder": "Ajouter une tâche…",
+    "add": "Ajouter",
+    "empty": "Aucune tâche. Ajoutez-en une ci-dessus.",
+    "delete": "Supprimer la tâche",
+    "markDone": "Marquer comme faite",
+    "failed": "Échec de l'action"
+  },
+  "unmatched": {
+    "title": "Transactions à pointer",
+    "count_one": "{{count}} transaction",
+    "count_other": "{{count}} transactions",
+    "empty": "Rien à pointer.",
+    "more_one": "+{{count}} autre transaction",
+    "more_other": "+{{count}} autres transactions",
+    "cta": "Pointer"
+  },
+  "forecast": {
+    "title": "Échéances en retard",
+    "empty": "Aucune échéance en retard.",
+    "cta": "Ouvrir le prévisionnel"
+  },
+  "reports": {
+    "title": "Reportings manquants",
+    "empty": "Toutes les participations ont reporté récemment.",
+    "lastReport": "Aucun report reçu depuis le {{date}}",
+    "hint": "Participations qui reportaient et sont silencieuses depuis plus de 3 mois."
+  }
+}

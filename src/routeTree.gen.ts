@@ -28,6 +28,7 @@ import { Route as AppOrgSlugIndexRouteImport } from './routes/app/$orgSlug/index
 import { Route as AppAllReportsRouteImport } from './routes/app/all/reports'
 import { Route as AppAllParticipationsRouteImport } from './routes/app/all/participations'
 import { Route as AppAllDealsRouteImport } from './routes/app/all/deals'
+import { Route as AppOrgSlugTodoRouteImport } from './routes/app/$orgSlug/todo'
 import { Route as AppOrgSlugChangelogRouteImport } from './routes/app/$orgSlug/changelog'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppOrgSlugSettingsRouteRouteImport } from './routes/app/$orgSlug/settings/route'
@@ -140,6 +141,11 @@ const AppAllDealsRoute = AppAllDealsRouteImport.update({
   path: '/deals',
   getParentRoute: () => AppAllRouteRoute,
 } as any)
+const AppOrgSlugTodoRoute = AppOrgSlugTodoRouteImport.update({
+  id: '/todo',
+  path: '/todo',
+  getParentRoute: () => AppOrgSlugRouteRoute,
+} as any)
 const AppOrgSlugChangelogRoute = AppOrgSlugChangelogRouteImport.update({
   id: '/changelog',
   path: '/changelog',
@@ -239,6 +245,7 @@ export interface FileRoutesByFullPath {
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/$orgSlug/changelog': typeof AppOrgSlugChangelogRoute
+  '/app/$orgSlug/todo': typeof AppOrgSlugTodoRoute
   '/app/all/deals': typeof AppAllDealsRoute
   '/app/all/participations': typeof AppAllParticipationsRoute
   '/app/all/reports': typeof AppAllReportsRoute
@@ -271,6 +278,7 @@ export interface FileRoutesByTo {
   '/app': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/$orgSlug/changelog': typeof AppOrgSlugChangelogRoute
+  '/app/$orgSlug/todo': typeof AppOrgSlugTodoRoute
   '/app/all/deals': typeof AppAllDealsRoute
   '/app/all/participations': typeof AppAllParticipationsRoute
   '/app/all/reports': typeof AppAllReportsRoute
@@ -308,6 +316,7 @@ export interface FileRoutesById {
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/$orgSlug/changelog': typeof AppOrgSlugChangelogRoute
+  '/app/$orgSlug/todo': typeof AppOrgSlugTodoRoute
   '/app/all/deals': typeof AppAllDealsRoute
   '/app/all/participations': typeof AppAllParticipationsRoute
   '/app/all/reports': typeof AppAllReportsRoute
@@ -346,6 +355,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/settings'
     | '/api/auth/$'
     | '/app/$orgSlug/changelog'
+    | '/app/$orgSlug/todo'
     | '/app/all/deals'
     | '/app/all/participations'
     | '/app/all/reports'
@@ -378,6 +388,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/api/auth/$'
     | '/app/$orgSlug/changelog'
+    | '/app/$orgSlug/todo'
     | '/app/all/deals'
     | '/app/all/participations'
     | '/app/all/reports'
@@ -414,6 +425,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/settings'
     | '/api/auth/$'
     | '/app/$orgSlug/changelog'
+    | '/app/$orgSlug/todo'
     | '/app/all/deals'
     | '/app/all/participations'
     | '/app/all/reports'
@@ -580,6 +592,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAllDealsRouteImport
       parentRoute: typeof AppAllRouteRoute
     }
+    '/app/$orgSlug/todo': {
+      id: '/app/$orgSlug/todo'
+      path: '/todo'
+      fullPath: '/app/$orgSlug/todo'
+      preLoaderRoute: typeof AppOrgSlugTodoRouteImport
+      parentRoute: typeof AppOrgSlugRouteRoute
+    }
     '/app/$orgSlug/changelog': {
       id: '/app/$orgSlug/changelog'
       path: '/changelog'
@@ -711,6 +730,7 @@ const AppOrgSlugSettingsRouteRouteWithChildren =
 interface AppOrgSlugRouteRouteChildren {
   AppOrgSlugSettingsRouteRoute: typeof AppOrgSlugSettingsRouteRouteWithChildren
   AppOrgSlugChangelogRoute: typeof AppOrgSlugChangelogRoute
+  AppOrgSlugTodoRoute: typeof AppOrgSlugTodoRoute
   AppOrgSlugIndexRoute: typeof AppOrgSlugIndexRoute
   AppOrgSlugCashAccountIdRoute: typeof AppOrgSlugCashAccountIdRoute
   AppOrgSlugDealsDealIdRoute: typeof AppOrgSlugDealsDealIdRoute
@@ -725,6 +745,7 @@ interface AppOrgSlugRouteRouteChildren {
 const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
   AppOrgSlugSettingsRouteRoute: AppOrgSlugSettingsRouteRouteWithChildren,
   AppOrgSlugChangelogRoute: AppOrgSlugChangelogRoute,
+  AppOrgSlugTodoRoute: AppOrgSlugTodoRoute,
   AppOrgSlugIndexRoute: AppOrgSlugIndexRoute,
   AppOrgSlugCashAccountIdRoute: AppOrgSlugCashAccountIdRoute,
   AppOrgSlugDealsDealIdRoute: AppOrgSlugDealsDealIdRoute,
