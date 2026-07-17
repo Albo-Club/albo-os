@@ -49,6 +49,7 @@ expliqué simplement dans un encadré « Sous le capot ».
 | [Organisations, membres et invitations](14-organisations-membres-invitations.md) | Rôles, réglages d'org, invitations, super-admin |
 | [Intégrations](15-integrations.md) | Attio, Powens, connecteur Claude (MCP), Parallel/VASCO, imports |
 | [À faire](16-a-faire.md) | Tâches manuelles et signaux à traiter (pointage, banques, échéances, reportings) |
+| [Reports par email](17-reports-par-email.md) | Le circuit complet des investor updates : forward, extraction, KPIs, récap |
 
 ## Comment cette doc vit
 

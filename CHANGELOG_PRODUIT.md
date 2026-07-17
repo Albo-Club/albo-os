@@ -23,6 +23,21 @@ bas de page.
 
 ---
 
+## v1.107.1 — 17/07/2026 à 18:10 — Documentation : le circuit des reports par email
+
+La documentation produit gagne une page dédiée au circuit des reports par
+email : ce que fait le transfert vers l'adresse dédiée, comment la
+participation est identifiée, comment chaque type de contenu est lu (PDF,
+Excel, image, Notion, Drive, DocSend), comment les KPIs sont extraits et
+rangés, et ce que dit le récapitulatif. Les pages Intégrations et Vue
+consolidée pointent désormais vers cette référence unique.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle page `docs/produit/17-reports-par-email.md` (gabarit standard : à quoi ça sert / comment ça marche / points d'attention / pages liées, encadré « Sous le capot »).
+> - `docs/produit/15-integrations.md` § « Ingestion des rapports par email » réduit à un pointeur (une seule source de vérité) ; liens croisés depuis `12-vue-consolidee.md` ; ligne ajoutée au sommaire `README.md`.
+> - Doc uniquement — aucun changement de code.
+
 ## v1.107.0 — 17/07/2026 à 17:50 — Prévisionnel : un seul tableau
 
 L'onglet Prévisionnel affichait **deux tableaux** qui se ressemblaient : la
