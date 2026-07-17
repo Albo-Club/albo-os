@@ -30,8 +30,6 @@
     "nothingToApply": "Aucune transaction en attente ne correspond à une règle"
   },
   "actions": {
-    "match": "Rattacher",
-    "discard": "Écarter",
     "ignore": "Ignorer",
     "charge": "Charge",
     "tax": "Impôt",
@@ -107,12 +105,17 @@
     "noResults": "Aucune transaction ne correspond à votre recherche."
   },
   "combobox": {
-    "placeholder": "Choisir une cible",
-    "search": "Rechercher une cible…",
-    "empty": "Aucune cible trouvée.",
+    "placeholder": "Affecter à…",
+    "search": "Rechercher un deal, une catégorie…",
+    "empty": "Aucun résultat.",
     "groupDeals": "Deals",
     "groupEquity": "Capitaux propres",
     "groupLoans": "Comptes courants",
+    "groupCharges": "Charges",
+    "groupProducts": "Produits",
+    "groupOther": "Autres",
+    "chargeUnqualified": "Charge — catégorie à qualifier",
+    "productUnqualified": "Produit — catégorie à qualifier",
     "emptyDeals": "Aucun deal pour cette organisation.",
     "emptyEquity": "Aucune position de capital pour cette organisation.",
     "emptyLoans": "Aucun compte courant pour cette organisation."

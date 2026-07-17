@@ -23,6 +23,48 @@ bas de page.
 
 ---
 
+## v1.108.0 — 17/07/2026 à 18:07 — Pointage : un seul geste, « Affecter à… »
+
+Le pointage d'une transaction demandait de choisir d'abord un **mode** —
+« Rattacher » (deal, passif) ou « Écarter » (charge, impôt, produit,
+virement interne, ignorer) — puis, pour une charge ou un produit, de
+préciser la catégorie dans un second temps. Ce choix de mode disparaît :
+
+- Chaque ligne se traite désormais avec **un seul menu « Affecter à… »**,
+  cherchable, qui regroupe tout : vos deals, le passif (capital, comptes
+  courants), les **catégories de charges et de produits en direct**
+  (salaires, honoraires, loyer… — la catégorie est posée dès le choix),
+  puis Impôt, Virement interne et Ignorer.
+- Choisir une entrée **applique immédiatement** — plus de bouton de
+  confirmation. La bannière « Annuler » (~5 s) reste là pour se raviser,
+  et « Détacher » permet toujours de revenir en arrière plus tard.
+- Le menu s'adapte au sens de la transaction : une **sortie** propose les
+  charges en premier, une **entrée** les produits.
+- Rien ne change sur le fond : TVA ajustable sur la ligne, actions
+  groupées, règles apprenantes et suggestions fonctionnent comme avant.
+
+C'est la première étape de la refonte du pointage ; la seconde apportera
+les **suggestions pré-remplies** validables en un clic.
+
+> **🔧 Notes techniques**
+>
+> - `TargetCombobox.tsx` réécrit en picker unifié : `PointageTarget`
+>   étendu (`category` charge/produit + `status` tax/transfer/ignored),
+>   groupes Charges/Produits (feuilles = slugs de `CHARGE_CATEGORIES`/
+>   `PRODUCT_CATEGORIES` + « à qualifier ») et « Autres », application
+>   au `onSelect` (plus d'état armé ni de bouton Rattacher).
+> - `PointageTable.tsx` : `RowActions` réduit au picker, dispatcher
+>   `handleAssign` → `handleMatch` (deal/passif) ou `handleDiscard`
+>   (étendu pour porter la catégorie) ; menu « Écarter » et
+>   `DropdownMenu` supprimés ; aucune mutation backend nouvelle
+>   (`categorizeAsCharge/Product` acceptaient déjà `category`).
+> - Invariants préservés (KNOWN_ISSUES « Pointage ») : routage
+>   deal→`matchTransaction` vs passif→`allocateTransaction`, règles
+>   apprises seulement sur charge/impôt/produit/virement unitaires.
+> - i18n : `combobox.*` enrichi, `actions.match`/`actions.discard`
+>   retirés (orphelins). `TESTING.md` RU3/RU4/RU8/RU17/RU17b/RU19 ;
+>   `docs/produit/08-pointage.md` § Le workflow.
+
 ## v1.107.1 — 17/07/2026 à 18:10 — Documentation : le circuit des reports par email
 
 La documentation produit gagne une page dédiée au circuit des reports par
