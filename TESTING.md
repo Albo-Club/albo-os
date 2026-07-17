@@ -662,6 +662,9 @@ complet + re-auth), Rejeter. Gabarits français dans
 | R28 | Action « Rattacher » sur une ligne « À traiter »                | Dialog → choix participation → traitement reprend (extraction si pas faite, sinon fiche) → « Traité » + récap  |
 | R29 | Action « Retraiter »                                            | Pipeline rejoué de zéro (re-auth incluse) ; utile après avoir rempli un domaine manquant                       |
 | R30 | Action « Rejeter »                                              | Ligne « Rejeté / Rejeté manuellement », aucun traitement ni email                                              |
+| R31 | Fiche participation → carte « KPIs suivis » → Modifier          | Dialog : liste du catalogue cochable ; fiche vide → les métriques déjà vues sont pré-cochées ; Enregistrer → badges à jour (clés hors catalogue impossibles) |
+| R32 | Report d'une boîte **avec** fiche KPI cible                     | Récap : section « KPIs cibles » ✅ valeur / ⚠️ « absent de ce report » pour **chaque** cible ; les extras sous « Autres métriques enregistrées » ; plus de ligne « Habituelles mais absentes » |
+| R33 | Report d'une boîte **sans** fiche KPI cible                     | Comportement inchangé (mémoire implicite + « Habituelles mais absentes de ce report »)                         |
 
 ## Communications Parallel (VASCO) → section Report par entité
 

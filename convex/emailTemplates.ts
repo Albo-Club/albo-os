@@ -518,6 +518,8 @@ export interface ReportRecapData {
   unrecognized: Array<string>
   suspicious: Array<RecapSuspicious>
   missingUsual: Array<string>
+  /** Fiche KPI cible checklist — replaces missingUsual when defined. */
+  targets?: Array<{ metricType: string; found: boolean; value?: number; unit?: string }>
 }
 
 const EUR_FMT = new Intl.NumberFormat('fr-FR', {
@@ -882,9 +884,17 @@ export function reportRecapSuccessHtml(d: ReportRecapData): string {
     return `${icon} ${esc(s.label)}${detail}`
   })
 
-  const metrics = d.metricsFound.map(
-    (m) => `${esc(m.metricType)} : <b>${formatMetricValue(m.value, m.unit)}</b>`,
+  const targets = (d.targets ?? []).map((t) =>
+    t.found && t.value !== undefined && t.unit !== undefined
+      ? `✅ ${esc(t.metricType)} : <b>${formatMetricValue(t.value, t.unit)}</b>`
+      : `⚠️ ${esc(t.metricType)} : absent de ce report`,
   )
+  // With a target checklist, the generic metrics list only carries the
+  // extras (targets are already itemized above).
+  const targetKeys = new Set((d.targets ?? []).map((t) => t.metricType))
+  const metrics = d.metricsFound
+    .filter((m) => !targetKeys.has(m.metricType))
+    .map((m) => `${esc(m.metricType)} : <b>${formatMetricValue(m.value, m.unit)}</b>`)
   const suspicious = d.suspicious.map(
     (s) =>
       `${esc(s.metricType)} : ${formatMetricValue(s.value, s.unit)} (précédent : ${formatMetricValue(
@@ -897,7 +907,8 @@ export function reportRecapSuccessHtml(d: ReportRecapData): string {
     `<p style="margin: 0 0 4px;">${companies}</p>`,
     `<p style="margin: 0; color: ${MUTED};">Rattachement confirmé par : ${esc(matchMethodLabel(d.matchMethod))}</p>`,
     listBlock('Sources', sources),
-    listBlock('Métriques enregistrées', metrics),
+    listBlock('KPIs cibles', targets),
+    listBlock(targets.length > 0 ? 'Autres métriques enregistrées' : 'Métriques enregistrées', metrics),
     listBlock('⚠️ Valeurs inhabituelles', suspicious),
     listBlock('Métriques non reconnues (conservées sur le report, hors séries)', d.unrecognized.map(esc)),
     listBlock('Habituelles mais absentes de ce report', d.missingUsual.map(esc)),

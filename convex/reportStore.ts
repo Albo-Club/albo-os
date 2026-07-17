@@ -22,7 +22,7 @@ import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { internalAction, internalMutation, internalQuery } from './_generated/server'
 import { getModel } from './agent'
-import { catalogPromptList, toCanonical } from './lib/metricCatalog'
+import { catalogPromptList, sanitizeKpiTargets, targetsPromptList, toCanonical } from './lib/metricCatalog'
 import { normalizePeriodDisplay, parsePeriod } from './lib/reportPeriod'
 import type { RawMetric } from './lib/metricCatalog'
 import type { Doc, Id } from './_generated/dataModel'
@@ -316,8 +316,17 @@ async function callModel(
   emailDateIso: string,
   companyName: string,
   known: Array<{ metricType: string; value: number; unit: string | null }>,
+  targets: Array<string>,
 ): Promise<Analysis> {
   const model = getModel()
+  const targetsBlock =
+    targets.length > 0
+      ? `
+KPIs CIBLES pour cette participation (grille de lecture — cherche chacun d'eux en priorité) :
+${targetsPromptList(targets)}
+Règle sur les KPIs cibles : UNE SEULE valeur par KPI cible — celle qui couvre la période principale du report (jamais un record mensuel ni une valeur intermédiaire : report trimestriel → la valeur du trimestre, pas celle du meilleur mois ; sauf métriques de stock comme la trésorerie ou l'effectif → valeur de fin de période).
+`
+      : ''
   const knownList =
     known.length > 0
       ? known.map((k) => `- ${k.metricType} = ${k.value}${k.unit ? ` ${k.unit}` : ''}`).join('\n')
@@ -328,7 +337,7 @@ OBJET : ${subject}
 
 CATALOGUE DE MÉTRIQUES (clés autorisées pour catalog_key) :
 ${catalogPromptList()}
-
+${targetsBlock}
 MÉTRIQUES DÉJÀ CONNUES pour cette participation (dernière valeur, conventions de stockage — pour rester cohérent d'un report à l'autre) :
 ${knownList}
 
@@ -384,6 +393,11 @@ export const run = internalAction({
       companyIds: matched.map((m) => m.companyId),
     })
 
+    // Fiche KPI cible: union across matched entities (usually identical).
+    const targets = sanitizeKpiTargets(
+      companies.flatMap((c) => c?.kpiTargets ?? []),
+    )
+
     let analysis: Analysis
     try {
       analysis = await callModel(
@@ -392,6 +406,7 @@ export const run = internalAction({
         new Date(row.receivedAt).toISOString().slice(0, 10),
         companyName,
         known,
+        targets,
       )
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
@@ -484,10 +499,22 @@ export const run = internalAction({
         unit: c.unit,
         previousValue: knownMap.get(c.metricType)?.value ?? 0,
       }))
-    const missingUsual = known
-      .map((k) => k.metricType)
-      .filter((k) => !canonicalKeys.has(k))
-      .slice(0, 6)
+    // With a fiche KPI cible, the explicit checklist replaces the implicit
+    // "usual but missing" memory signal.
+    const canonicalByKey = new Map(canonical.map((c) => [c.metricType, c]))
+    const targetChecklist = targets.map((key) => {
+      const found = canonicalByKey.get(key)
+      return found
+        ? { metricType: key, found: true, value: found.value, unit: found.unit }
+        : { metricType: key, found: false }
+    })
+    const missingUsual =
+      targets.length > 0
+        ? []
+        : known
+            .map((k) => k.metricType)
+            .filter((k) => !canonicalKeys.has(k))
+            .slice(0, 6)
 
     await ctx.scheduler.runAfter(0, internal.reportNotify.send, {
       inboundEmailId,
@@ -504,6 +531,7 @@ export const run = internalAction({
         suspicious,
         unrecognized,
         missingUsual,
+        targets: targetChecklist,
       },
     })
 

@@ -30,6 +30,18 @@ fondateurs, à la main ou — le plus souvent — via l'assistant IA qui extrait
 les chiffres d'un reporting. Chaque valeur garde sa source et sa date de
 saisie. L'historique se consulte sur la fiche société.
 
+### Fiche KPI cible (KPIs suivis)
+
+Chaque participation peut porter sa liste de **KPIs suivis**, choisis dans le
+catalogue de métriques (carte « KPIs suivis » en tête de la section KPIs de
+la fiche). Cette fiche sert de grille de lecture aux reports reçus par
+email : les KPIs cibles sont extraits en priorité (une seule valeur par KPI,
+celle qui couvre la période du report), et le récap email affiche une
+checklist — ✅ trouvé avec sa valeur, ⚠️ absent de ce report. Au premier
+paramétrage, les métriques déjà vues dans les reports passés sont
+pré-cochées ; il suffit de valider. Sans fiche définie, l'extraction
+retombe sur la mémoire implicite (les métriques déjà vues).
+
 ## Métriques calculées : comment lire les chiffres
 
 Toutes les métriques partent des **transactions bancaires pointées** sur les

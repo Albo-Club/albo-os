@@ -548,6 +548,14 @@
       "default": "Une erreur est survenue"
     }
   },
+  "kpiTargets": {
+    "title": "KPIs suivis (fiche cible)",
+    "subtitle": "Grille de lecture des reports : ces KPIs sont cherchés en priorité et vérifiés dans chaque récap.",
+    "empty": "Aucun KPI cible défini — le circuit retombe sur les métriques déjà vues.",
+    "dialogTitle": "KPIs suivis pour cette participation",
+    "dialogDescription": "Coche les KPIs à suivre en série. Le récap de chaque report indiquera ceux qui manquent.",
+    "saved": "Fiche KPI enregistrée"
+  },
   "reportings": {
     "title": "Reporting",
     "upload": "Ajouter un document",

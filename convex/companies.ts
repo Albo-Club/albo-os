@@ -3,6 +3,7 @@ import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { normalizeDomain } from './lib/domain'
+import { sanitizeKpiTargets } from './lib/metricCatalog'
 import { applyPitchToDomainGroup } from './lib/pitch'
 import { personValidator } from './lib/people'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
@@ -270,6 +271,8 @@ export const update = mutation({
       // Full replacement of the people list (founders/board/co-investors).
       // role is enforced by the validator; name is checked non-empty below.
       people: v.optional(v.array(personValidator)),
+      // Fiche KPI cible — full replacement; keys sanitized against the catalog.
+      kpiTargets: v.optional(v.array(v.string())),
     }),
   },
   handler: async (ctx, { id, patch }) => {
@@ -304,6 +307,10 @@ export const update = mutation({
     // Summary: trimmed; '' clears the field (mirror of domain behaviour).
     if (patch.summary !== undefined) {
       patch.summary = patch.summary.trim() || undefined
+    }
+    // KPI targets: keep only catalog keys, deduped, capped.
+    if (patch.kpiTargets !== undefined) {
+      patch.kpiTargets = sanitizeKpiTargets(patch.kpiTargets)
     }
     await ctx.db.patch("companies", id, patch)
     // Same-domain propagation: a pitch edit applies to every non-archived

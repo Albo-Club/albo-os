@@ -548,6 +548,14 @@
       "default": "Something went wrong"
     }
   },
+  "kpiTargets": {
+    "title": "Tracked KPIs (target sheet)",
+    "subtitle": "Report reading grid: these KPIs are extracted first and checked in every recap.",
+    "empty": "No target KPIs yet — the pipeline falls back to metrics already seen.",
+    "dialogTitle": "Tracked KPIs for this company",
+    "dialogDescription": "Check the KPIs to track as series. Each report recap will flag the missing ones.",
+    "saved": "KPI sheet saved"
+  },
   "reportings": {
     "title": "Reporting",
     "upload": "Add a document",
