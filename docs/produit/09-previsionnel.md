@@ -21,9 +21,11 @@ mois par mois, analyse) dans **Prévisionnel**, et la gestion des règles,
   niveau de confiance (confirmé / attendu / probable).
 - Chaque échéance a un statut : **en attente** (comptée dans la projection),
   **réalisée** (rattachée à une transaction réelle) ou **annulée**.
-- Albo OS **suggère des règles** en détectant les flux récurrents des 12
-  derniers mois non couverts ; la création reste un geste humain (dialogue
-  pré-rempli).
+- Albo OS **suggère des règles** en détectant les flux récurrents des 24
+  derniers mois non couverts : dès 2 occurrences pour un flux trimestriel
+  ou annuel (3 pour un mensuel/hebdo), montants variables acceptés — le
+  montant proposé est la médiane et la fourchette observée est affichée.
+  La création reste un geste humain (dialogue pré-rempli).
 
 ### Sous le capot : une génération qui respecte vos retouches
 

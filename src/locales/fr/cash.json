@@ -223,7 +223,7 @@
     },
     "suggestedRules": {
       "title": "Règles suggérées",
-      "hint": "Flux récurrents détectés dans les 12 derniers mois, sans règle correspondante. Créer une règle l'ajoute au prévisionnel ; ignorer est définitif.",
+      "hint": "Flux récurrents détectés dans les 24 derniers mois, sans règle correspondante (montant proposé = médiane, la fourchette est affichée). Créer une règle l'ajoute au prévisionnel ; ignorer est définitif.",
       "create": "Créer la règle",
       "ignore": "Ignorer",
       "occurrences_one": "{{count}} occurrence ({{min}} → {{max}})",

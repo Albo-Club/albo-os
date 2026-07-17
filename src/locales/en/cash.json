@@ -223,7 +223,7 @@
     },
     "suggestedRules": {
       "title": "Suggested rules",
-      "hint": "Recurring flows detected over the last 12 months with no matching rule. Creating a rule adds it to the forecast; ignoring is permanent.",
+      "hint": "Recurring flows detected over the last 24 months with no matching rule (suggested amount = median, the range is shown). Creating a rule adds it to the forecast; ignoring is permanent.",
       "create": "Create rule",
       "ignore": "Ignore",
       "occurrences_one": "{{count}} occurrence ({{min}} → {{max}})",

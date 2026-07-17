@@ -23,6 +23,44 @@ bas de page.
 
 ---
 
+## v1.103.0 — 17/07/2026 à 10:15 — Prévisionnel : des suggestions de règles plus généreuses
+
+Le détecteur de flux récurrents (la carte « Règles suggérées ») était trop
+timide : il exigeait des montants quasi identiques, trois occurrences
+minimum quelle que soit la fréquence, et ne regardait que 12 mois en
+arrière — beaucoup de vrais récurrents passaient sous le radar. Il est
+recalibré :
+
+- **Fenêtre élargie à 24 mois** d'historique : les flux **annuels**
+  (assurances, cotisations, taxes) deviennent détectables, et les
+  trimestriels ont plus de matière.
+- **2 occurrences suffisent** pour un flux trimestriel ou annuel — un seul
+  intervalle propre est déjà un bon signal. Les mensuels et hebdos gardent
+  le seuil de 3 (deux virements espacés d'un mois ne font pas un loyer).
+- **Montants variables acceptés** : une facture de rattrapage ou un
+  prélèvement fluctuant (énergie, intérêts) ne disqualifie plus le flux.
+  Il suffit que la majorité des montants soient proches de la médiane ; le
+  montant proposé est la médiane, et la fourchette observée (min → max)
+  reste affichée sur la carte pour juger avant de créer la règle.
+
+Rien ne change au principe : l'outil **suggère**, la création d'une règle
+reste toujours votre geste (dialogue pré-rempli), et « Ignorer » reste
+définitif.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/recurrenceDetection.ts` : `DETECTION_MIN_OCCURRENCES_LONG
+>   = 2` (trimestriel/annuel, appliqué après `detectFrequency`),
+>   stabilité des montants en règle **majoritaire** (`≥ 60 %` dans
+>   `±40 %` de la médiane, constantes `DETECTION_AMOUNT_MAJORITY` /
+>   `DETECTION_AMOUNT_TOLERANCE`) au lieu du gate tous-montants ±30 %.
+> - `convex/forecasts.ts` : `DETECTION_LOOKBACK_MONTHS` 12 → 24.
+> - Tests unitaires mis à jour + nouveaux cas (trimestriel/annuel à 2
+>   occurrences, outlier toléré, groupe majoritairement instable rejeté) —
+>   `tests/recurrenceDetection.test.ts`, 213 tests verts.
+> - Docs : `TESTING.md` FC21, `docs/produit/09-previsionnel.md`,
+>   `KNOWN_ISSUES.md` (calibrage documenté), hint i18n de la carte.
+
 ## v1.102.0 — 17/07/2026 à 09:45 — Trésorerie : alerte email sur les échéances en retard
 
 Une échéance attendue (loyer, appel de fonds, TVA…) qui dépasse sa date

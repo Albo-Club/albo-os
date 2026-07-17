@@ -1461,9 +1461,15 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   (`cancelled` garde la clé).
 - **La détection de récurrences ne crée JAMAIS de règle seule.**
   `forecasts.suggestRules` (moteur pur `lib/recurrenceDetection.ts`, testé)
-  propose des règles depuis l'historique 12 mois ; la création passe
+  propose des règles depuis l'historique **24 mois** ; la création passe
   toujours par le dialog prérempli (geste humain, `createRule` +
-  `expandRules` habituels). Le groupement réutilise la MÊME clé de pattern
+  `expandRules` habituels). Calibrage volontairement généreux (Benjamin
+  trouvait la V1 trop timide) : ≥ 3 occurrences en hebdo/mensuel mais
+  **≥ 2 en trimestriel/annuel** (un intervalle propre suffit), et montants
+  **majoritairement** stables (≥ 60 % dans ±40 % de la médiane) au lieu de
+  « tous dans ±30 % » — une facture de rattrapage ou un montant variable ne
+  tue plus le groupe, la médiane est proposée et la fourchette min→max
+  reste visible sur la carte. Le groupement réutilise la MÊME clé de pattern
   que les règles apprenantes de catégorie (`deriveCategoryPattern`) — si le
   pattern d'un libellé change, les deux mécanismes bougent ensemble.
   « Ignorer » écrit dans `dismissedRuleSuggestions` (org, pattern,

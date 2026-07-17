@@ -82,7 +82,7 @@ describe('detectRecurringFlows — suggestions de règles', () => {
     assert.deepEqual(s.lastDates, [utc(2026, 6, 5), utc(2026, 5, 5), utc(2026, 4, 5)])
   })
 
-  it('exige au moins 3 occurrences', () => {
+  it('exige au moins 3 occurrences pour un mensuel', () => {
     const out = detectRecurringFlows({
       transactions: monthlySeries(2),
       existingRules: [],
@@ -91,9 +91,50 @@ describe('detectRecurringFlows — suggestions de règles', () => {
     assert.deepEqual(out, [])
   })
 
-  it('rejette un groupe aux montants instables (> ±30 % de la médiane)', () => {
+  it('suggère un trimestriel et un annuel dès 2 occurrences', () => {
+    const quarterly = detectRecurringFlows({
+      transactions: [
+        tx({ transactionDate: utc(2026, 1, 15) }),
+        tx({ transactionDate: utc(2026, 4, 15) }),
+      ],
+      existingRules: [],
+      dismissed: [],
+    })
+    assert.equal(quarterly.length, 1)
+    assert.equal(quarterly[0].frequency, 'quarterly')
+    assert.equal(quarterly[0].occurrences, 2)
+
+    const yearly = detectRecurringFlows({
+      transactions: [
+        tx({ transactionDate: utc(2025, 3, 10) }),
+        tx({ transactionDate: utc(2026, 3, 10) }),
+      ],
+      existingRules: [],
+      dismissed: [],
+    })
+    assert.equal(yearly.length, 1)
+    assert.equal(yearly[0].frequency, 'yearly')
+  })
+
+  it('tolère une occurrence au montant hors norme (règle majoritaire ±40 %)', () => {
+    // 1 outlier out of 4: 3/4 = 75 % within tolerance → suggested, median kept.
     const txs = monthlySeries(4)
     txs[0] = { ...txs[0], amountCents: 500000 }
+    const out = detectRecurringFlows({
+      transactions: txs,
+      existingRules: [],
+      dismissed: [],
+    })
+    assert.equal(out.length, 1)
+    assert.equal(out[0].amountCents, 150000)
+    assert.equal(out[0].maxAmountCents, 500000)
+  })
+
+  it('rejette un groupe majoritairement instable (< 60 % des montants dans ±40 %)', () => {
+    // 2 outliers out of 4: 2/4 = 50 % within tolerance → rejected.
+    const txs = monthlySeries(4)
+    txs[0] = { ...txs[0], amountCents: 500000 }
+    txs[1] = { ...txs[1], amountCents: 700000 }
     const out = detectRecurringFlows({
       transactions: txs,
       existingRules: [],
