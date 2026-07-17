@@ -23,6 +23,39 @@ bas de page.
 
 ---
 
+## v1.102.0 — 17/07/2026 à 09:45 — Trésorerie : alerte email sur les échéances en retard
+
+Une échéance attendue (loyer, appel de fonds, TVA…) qui dépasse sa date
+sans être rapprochée d'une transaction réelle passait inaperçue : elle
+restait simplement listée « en retard » dans le prévisionnel, à charge d'y
+penser. Désormais, **un email récapitulatif** part automatiquement :
+
+- Déclenché quand une échéance attendue dépasse sa date de **plus d'un
+  jour** (le temps que la banque synchronise et que le rapprochement se
+  fasse normalement).
+- L'email liste **toutes** les échéances en retard — date, libellé,
+  montant — avec un lien direct vers l'onglet Prévisionnel pour les
+  traiter : rapprocher, re-dater, ou annuler.
+- Anti-harcèlement : un seul envoi quand de **nouvelles** échéances
+  passent en retard. Pas de rappel quotidien pour le même stock — le
+  prévisionnel reste l'écran de référence.
+
+C'est la troisième alerte automatique de la Trésorerie, avec l'alerte de
+seuil de solde et la surveillance des connexions bancaires.
+
+> **🔧 Notes techniques**
+>
+> - `convex/forecasts.ts:checkOverdueEntries` (internalMutation, cron
+>   quotidien 07:10 UTC dans `convex/crons.ts`) : en retard = `pending` +
+>   EUR + `date < now − OVERDUE_GRACE_MS` (1 jour) ; envoi seulement si une
+>   échéance a franchi la limite depuis le run précédent
+>   (`OVERDUE_NEW_WINDOW_MS` = cadence du cron — anti-spam **sans état**,
+>   cf. `KNOWN_ISSUES.md` « Cash flow forecast » : ne pas changer la
+>   fréquence du cron sans ajuster la fenêtre).
+> - `convex/emailTemplates.ts:overdueEntriesEmail` : template bilingue,
+>   max 8 lignes + « + N », CTA vers `/cash?tab=previsionnel`.
+> - Tests : `TESTING.md` FC29 ; doc produit `09-previsionnel.md` § Alertes.
+
 ## v1.101.0 — 16/07/2026 à 18:06 — Trésorerie : les connexions bancaires « fantômes » deviennent visibles
 
 Jusqu'ici, un compte bancaire pouvait sembler connecté alors que sa

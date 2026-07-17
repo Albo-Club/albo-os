@@ -26,6 +26,16 @@ crons.daily(
   {},
 )
 
+// Daily overdue-entries digest. MUST stay daily: the mutation's stateless
+// "newly overdue" window equals one day (cf. KNOWN_ISSUES « Cash flow
+// forecast »).
+crons.daily(
+  'check overdue forecast entries',
+  { hourUTC: 7, minuteUTC: 10 },
+  internal.forecasts.checkOverdueEntries,
+  {},
+)
+
 // Powens connection health: pull the connection states every 6h (belt &
 // braces with the CONNECTION_SYNCED webhook — the pull is the only feed that
 // still works when webhooks stop arriving) + staleness evaluation & alerts.

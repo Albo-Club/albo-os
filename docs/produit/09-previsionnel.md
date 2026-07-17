@@ -77,6 +77,11 @@ foulée — deux gestes distincts.
 - **Échéances à venir** : la liste des 90 prochains jours, retards en tête
   (tête de l'onglet Prévisionnel), avec les entrées, sorties et net à 30 et
   90 jours dans le bandeau de la Vue d'ensemble.
+- **Digest « échéances en retard »** : quand une échéance attendue dépasse
+  sa date de plus d'un jour sans être rapprochée, un email récapitule
+  toutes les échéances en retard (avec le lien vers le prévisionnel pour
+  les traiter). Un seul envoi quand de nouvelles échéances passent en
+  retard — pas de rappel quotidien pour le même stock.
 
 ## Points d'attention
 

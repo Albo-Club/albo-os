@@ -1437,6 +1437,20 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   `setCashAlert` efface `lastNotifiedAt` pour qu'un nouveau seuil puisse
   notifier immédiatement ; en contrepartie, re-sauvegarder sans rien
   changer ré-arme aussi l'alerte (accepté, 2 users).
+- **Digest « échéances en retard » : anti-spam SANS état, couplé à la
+  cadence quotidienne du cron.** `checkOverdueEntries` (quotidien
+  07:10 UTC) considère en retard une échéance `pending` EUR dépassée de
+  plus d'**un jour de grâce** (`OVERDUE_GRACE_MS` — la banque synchronise
+  en ~24 h et le rapprochement est un geste manuel), et n'envoie le digest
+  que si au moins une échéance a **franchi la limite depuis le run
+  précédent** (`OVERDUE_NEW_WINDOW_MS` = 1 jour). Aucun champ
+  `lastNotifiedAt` : c'est la fenêtre qui déduplique. Conséquences : (1)
+  **ne pas changer la fréquence du cron** sans ajuster la fenêtre — un cron
+  toutes les 6 h enverrait 4 digests pour la même échéance, un cron
+  hebdomadaire raterait les échéances des jours intermédiaires ; (2) un
+  run de cron raté = digest de ce jour-là perdu (pas de rattrapage) —
+  accepté, le stock complet repart dans le digest suivant dès qu'une
+  nouvelle échéance passe en retard.
 - **Échéance TVA suggérée : `derivedKey` "vat:{orgId}:{YYYY-Qn}", sans
   `ruleId`.** L'idempotence passe par la clé (créée une fois par trimestre,
   quelle que soit sa vie ensuite : réalisée, annulée, éditée — la
