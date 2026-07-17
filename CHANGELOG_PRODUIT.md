@@ -23,6 +23,31 @@ bas de page.
 
 ---
 
+## v1.107.0 — 17/07/2026 à 17:50 — Prévisionnel : un seul tableau
+
+L'onglet Prévisionnel affichait **deux tableaux** qui se ressemblaient : la
+grille « Détail par catégorie et par mois » (la projection, avec le réalisé
+des mois passés) et un tableau « Entrées / sorties par catégorie » purement
+rétrospectif. La redondance rendait la page chargée et la différence peu
+lisible.
+
+Le tableau rétrospectif est **retiré** : la grille suffit — ses colonnes
+des mois passés montrent déjà ce qui s'est réellement passé, catégorie par
+catégorie, et ses colonnes futures la projection, dans un seul et même
+tableau. Les anciens liens vers l'onglet « Analyse » continuent d'atterrir
+sur le Prévisionnel.
+
+> **🔧 Notes techniques**
+>
+> - Suppression de `src/components/cash/CategoryBreakdown.tsx` et de la
+>   query `convex/transactions.ts:getCategoryBreakdown` (plus aucun
+>   consommateur) ; import retiré de `cash.index.tsx`.
+> - i18n : bloc `cash:analysis` réduit à `inflows`/`outflows` (utilisés par
+>   la grille `ForecastGridSection`).
+> - Docs : `TESTING.md` (intro niveau 3, lignes AN1–AN3 retirées),
+>   `docs/produit/07-tresorerie.md` § Analyse rétrospective,
+>   `09-previsionnel.md`.
+
 ## v1.106.0 — 17/07/2026 à 17:50 — Fiche KPI cible par participation
 
 Chaque participation peut maintenant porter sa **fiche de KPIs suivis** :

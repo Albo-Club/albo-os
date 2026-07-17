@@ -1,7 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 import { internalMutation, mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
-import { effectiveCategory, isValidCategory } from './lib/categories'
+import { isValidCategory } from './lib/categories'
 import {
   loadOrgRules,
   ruleFieldsFor,
@@ -664,95 +664,6 @@ export const applyCategoryRules = mutation({
       applied += 1
     }
     return { applied }
-  },
-})
-
-/**
- * Monthly in/out breakdown by analysis bucket over the last `monthsBack`
- * months (current month included) — the « Analyse » tab of the Cash page.
- * Buckets derive from the pointage state (lib/categories.ts
- * effectiveCategory): deal matches, liability allocations, taxes, then the
- * stored charge/product categories; `unmatched` rows surface as their own
- * bucket so the analysis is honest about what is not qualified yet.
- * Internal transfers and explicitly ignored rows are excluded (not flows),
- * tallied separately for visibility.
- */
-export const getCategoryBreakdown = query({
-  args: {
-    orgId: v.id('organizations'),
-    monthsBack: v.number(),
-  },
-  handler: async (ctx, { orgId, monthsBack }) => {
-    await requireOrgMember(ctx, orgId)
-    if (!Number.isInteger(monthsBack) || monthsBack < 1 || monthsBack > 24) {
-      throw new ConvexError('invalid_horizon')
-    }
-
-    // Date.now() here defeats the query cache — same accepted trade-off as
-    // getForecastGrid (cf. KNOWN_ISSUES.md « Cash flow forecast »).
-    const now = new Date()
-    const windowStart = Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth() - (monthsBack - 1),
-      1,
-    )
-    const months: Array<string> = []
-    for (let i = monthsBack - 1; i >= 0; i--) {
-      months.push(
-        new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1))
-          .toISOString()
-          .slice(0, 7),
-      )
-    }
-
-    const txs = await ctx.db
-      .query('transactions')
-      .withIndex('by_org_date', (q) =>
-        q.eq('orgId', orgId).gte('transactionDate', windowStart),
-      )
-      .collect()
-
-    const buckets = new Map<
-      string,
-      {
-        direction: 'in' | 'out'
-        category: string
-        byMonth: Record<string, number>
-        totalCents: number
-      }
-    >()
-    let internalTransferCents = 0
-    let ignoredCents = 0
-
-    for (const tx of txs) {
-      const category = effectiveCategory(tx)
-      if (category === null) {
-        if ((tx.matchStatus ?? 'unmatched') === 'internal_transfer') {
-          internalTransferCents += tx.amount
-        } else {
-          ignoredCents += tx.amount
-        }
-        continue
-      }
-      const monthKey = new Date(tx.transactionDate).toISOString().slice(0, 7)
-      const key = `${tx.direction}:${category}`
-      const bucket = buckets.get(key) ?? {
-        direction: tx.direction,
-        category,
-        byMonth: {},
-        totalCents: 0,
-      }
-      bucket.byMonth[monthKey] = (bucket.byMonth[monthKey] ?? 0) + tx.amount
-      bucket.totalCents += tx.amount
-      buckets.set(key, bucket)
-    }
-
-    return {
-      months,
-      rows: [...buckets.values()].sort((a, b) => b.totalCents - a.totalCents),
-      internalTransferCents,
-      ignoredCents,
-    }
   },
 })
 
