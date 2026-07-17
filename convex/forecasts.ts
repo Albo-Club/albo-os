@@ -674,6 +674,11 @@ export const suggestForecastMatches = query({
 
 // ─── Deal-page forecast section ──────────────────────────────────────────────
 
+/** Residual below this share of the committed amount = wire-transfer crumb
+ * (rounding, fees), not an upcoming capital call — hidden from the pipeline
+ * card and the deal page. */
+const PIPELINE_RESIDUAL_RATIO = 0.01
+
 /**
  * The forecast side of a deal page: its pending linked entries (planned
  * flows — SCPI rents, coupons, capital calls…) plus the undated committed
@@ -715,11 +720,15 @@ export const getDealForecast = query({
       if (tx.direction === 'out') paidCents += tx.amount
     }
 
+    const remaining = Math.max(0, committedCents - paidCents)
     return {
       entries,
       committedCents,
       paidCents,
-      remainingCents: Math.max(0, committedCents - paidCents),
+      // Same crumb filter as getCommittedPipeline: a sub-1% residual is a
+      // wire gap, not a remainder to deploy.
+      remainingCents:
+        remaining < committedCents * PIPELINE_RESIDUAL_RATIO ? 0 : remaining,
     }
   },
 })
@@ -1150,6 +1159,9 @@ export async function computeForecastGridForOrg(
  * transactions — same derivation as the deal pages, never `paidAmount`).
  * This is the UNDATED committed layer of the forecast: real obligations
  * with no schedule — shown next to the curve, never invented into months.
+ * Wire-transfer crumbs (residual under PIPELINE_RESIDUAL_RATIO of the
+ * committed amount) are rounding/fee gaps, not upcoming capital calls —
+ * filtered out here and on the deal page (getDealForecast).
  */
 export const getCommittedPipeline = query({
   args: { orgId: v.id('organizations') },
@@ -1181,7 +1193,9 @@ export const getCommittedPipeline = query({
         if (tx.direction === 'out') paid += tx.amount
       }
       const remaining = committed - paid
-      if (remaining <= 0) continue
+      if (remaining <= 0 || remaining < committed * PIPELINE_RESIDUAL_RATIO) {
+        continue
+      }
       const target = await ctx.db.get('companies', deal.targetCompanyId)
       rows.push({
         dealId: deal._id,
