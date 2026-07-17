@@ -121,3 +121,28 @@ export function toCanonical(m: RawMetric): CanonicalMetric | null {
 export function catalogPromptList(): string {
   return METRIC_CATALOG.map((e) => `- ${e.key} (${e.unit}) : ${e.hint}`).join('\n')
 }
+
+const MAX_KPI_TARGETS = 15
+
+/**
+ * Per-company target KPI list (fiche KPI cible): dedupe, keep only catalog
+ * keys, cap the length. Order is preserved (it drives the recap checklist).
+ */
+export function sanitizeKpiTargets(keys: Array<string>): Array<string> {
+  const out: Array<string> = []
+  for (const key of keys) {
+    if (CATALOG_BY_KEY.has(key) && !out.includes(key)) out.push(key)
+    if (out.length >= MAX_KPI_TARGETS) break
+  }
+  return out
+}
+
+/** The target keys rendered for the extraction prompt (with their hints). */
+export function targetsPromptList(targets: Array<string>): string {
+  return targets
+    .map((key) => {
+      const e = CATALOG_BY_KEY.get(key)
+      return e ? `- ${e.key} (${e.unit}) : ${e.hint}` : `- ${key}`
+    })
+    .join('\n')
+}

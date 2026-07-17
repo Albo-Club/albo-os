@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { KpiTargetsCard } from '~/components/companies/KpiTargetsCard'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { Button } from '~/components/ui/button'
 import {
@@ -66,6 +67,11 @@ export function KpisSection({ companyId }: { companyId: Id<'companies'> }) {
       <h2 className="text-lg font-semibold tracking-tight">
         {t('participations:kpis.title')}
       </h2>
+
+      <KpiTargetsCard
+        companyId={companyId}
+        seenMetricKeys={[...new Set((kpis ?? []).map((k) => k.metricType))]}
+      />
 
       {!kpis ? (
         <div className="text-muted-foreground text-sm">

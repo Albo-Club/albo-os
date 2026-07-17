@@ -445,6 +445,11 @@ export default defineSchema({
     // Participations view (e.g. the SPVs of "Parallel"). Logical key — a group
     // "exists" as soon as one entity carries its value. Distinct from sponsor.
     group: v.optional(v.string()),
+    // Fiche KPI cible: metric-catalog keys tracked for this company. Drives
+    // the report-extraction grid and the recap checklist (✅/⚠️ per target).
+    // Absent/empty → fall back to the implicit memory (metrics already seen).
+    // Keys validated against the catalog in mutations (sanitizeKpiTargets).
+    kpiTargets: v.optional(v.array(v.string())),
     notes: v.optional(v.string()),
     // Founders / board / co-investors. Display-only list (Lot 5a backend; UI
     // in Lot 5b). Each entry is either Attio-linked (attioRecordId) or free.

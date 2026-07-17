@@ -9,7 +9,7 @@
 
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { METRIC_CATALOG, toCanonical } from '../convex/lib/metricCatalog'
+import { METRIC_CATALOG, sanitizeKpiTargets, toCanonical } from '../convex/lib/metricCatalog'
 
 describe('toCanonical', () => {
   it('converts EUR magnitudes to cents', () => {
@@ -77,5 +77,21 @@ describe('toCanonical', () => {
   it('has unique catalog keys', () => {
     const keys = METRIC_CATALOG.map((e) => e.key)
     assert.equal(new Set(keys).size, keys.length)
+  })
+})
+
+describe('sanitizeKpiTargets', () => {
+  it('keeps only catalog keys, deduped, order preserved', () => {
+    const out = sanitizeKpiTargets(['gmv', 'burn_rate', 'gmv', 'not_a_key', 'runway_months'])
+    assert.deepEqual(out, ['gmv', 'burn_rate', 'runway_months'])
+  })
+
+  it('caps the list length', () => {
+    const all = METRIC_CATALOG.map((e) => e.key)
+    assert.ok(sanitizeKpiTargets(all).length <= 15)
+  })
+
+  it('returns empty for garbage input', () => {
+    assert.deepEqual(sanitizeKpiTargets(['foo', 'bar']), [])
   })
 })

@@ -113,6 +113,17 @@ const successPayloadValidator = v.object({
   ),
   unrecognized: v.array(v.string()),
   missingUsual: v.array(v.string()),
+  // Fiche KPI cible checklist (present when the company defines targets).
+  targets: v.optional(
+    v.array(
+      v.object({
+        metricType: v.string(),
+        found: v.boolean(),
+        value: v.optional(v.number()),
+        unit: v.optional(v.string()),
+      }),
+    ),
+  ),
 })
 
 export const send = internalAction({
@@ -154,6 +165,7 @@ export const send = internalAction({
         suspicious,
         unrecognized: success.unrecognized,
         missingUsual: success.missingUsual,
+        targets: success.targets,
       })
       subject = `Albo OS — report rangé : ${success.reportPeriod}`
     } else if (kind === 'failure') {

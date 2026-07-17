@@ -23,6 +23,29 @@ bas de page.
 
 ---
 
+## v1.106.0 — 17/07/2026 à 17:50 — Fiche KPI cible par participation
+
+Chaque participation peut maintenant porter sa **fiche de KPIs suivis** :
+la liste des indicateurs (issus du catalogue) que vous voulez voir dans
+chaque report — par exemple GMV, burn, runway pour Tango. La fiche
+s'édite en deux clics sur la page de la participation (section KPIs), et
+si elle est vide au premier passage, les métriques déjà vues dans les
+reports passés sont pré-cochées : une validation suffit.
+
+Effet sur le circuit des reports : l'extraction cherche ces KPIs en
+priorité (une seule valeur par KPI, celle qui couvre la période — fini
+les doublons type « GMV du trimestre » + « GMV du mois record »), et le
+récap email affiche une **checklist nette** : ✅ trouvé avec sa valeur,
+⚠️ absent de ce report. Les récaps deviennent comparables d'un trimestre
+à l'autre. Sans fiche définie, rien ne change pour la boîte.
+
+> **🔧 Notes techniques**
+>
+> - Schéma : `companies.kpiTargets` (clés catalogue, validées par `sanitizeKpiTargets` dans `companies.update` — dédup + filtre + cap 15). Helpers `sanitizeKpiTargets`/`targetsPromptList` dans `convex/lib/metricCatalog.ts` (testés).
+> - `convex/reportStore.ts` : union des fiches des entités matchées → bloc « KPIs CIBLES » injecté dans le prompt d'extraction (règle : une valeur par cible, celle couvrant la période ; stocks = fin de période) ; checklist calculée en code et passée au récap. `missingUsual` désactivé quand une fiche existe.
+> - Récap (`convex/reportNotify.ts` + `convex/emailTemplates.ts`) : section « KPIs cibles » ✅/⚠️, les métriques hors fiche passent sous « Autres métriques enregistrées ».
+> - UI : `src/components/companies/KpiTargetsCard.tsx` (badges + dialog cochable, pré-cochage depuis les KPIs déjà vus), montée dans `KpisSection`. i18n `participations:kpiTargets` fr+en. TESTING R31–R33.
+
 ## v1.105.0 — 17/07/2026 à 17:45 — Nouvel onglet « À faire » : tout ce qui attend une action
 
 Un nouvel onglet **À faire** apparaît dans la barre latérale, juste sous le
