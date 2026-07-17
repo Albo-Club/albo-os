@@ -15,7 +15,6 @@ import {
 } from '~/components/cash/BankConnectionsHealth'
 import { CashAccounts } from '~/components/cash/CashAccounts'
 import { CashAlertCard } from '~/components/cash/CashAlertCard'
-import { CategoryBreakdown } from '~/components/cash/CategoryBreakdown'
 import {
   ForecastEntriesSection,
   ForecastRulesSection,
@@ -130,14 +129,13 @@ function Cash() {
           </section>
         </TabsContent>
         {/* Prévisionnel: the month-by-month detail — the "to handle" queue
-            (upcoming/overdue entries, suggested reconciliations), the
-            committed pipeline + category × month grid, and the
-            retrospective per-category analysis. */}
+            (upcoming/overdue entries, suggested reconciliations), then the
+            committed pipeline + category × month grid (whose past months
+            already carry the realized per-category view). */}
         <TabsContent value="previsionnel" className="space-y-6 pt-4">
           {org && <UpcomingEntriesSection orgId={org._id} />}
           {org && <ForecastMatchSuggestions orgId={org._id} />}
           {org && <ForecastGridSection orgId={org._id} />}
-          {org && <CategoryBreakdown orgId={org._id} />}
         </TabsContent>
         <TabsContent value="transactions" className="pt-4">
           {org && <TransactionsLedger orgId={org._id} orgSlug={orgSlug} />}

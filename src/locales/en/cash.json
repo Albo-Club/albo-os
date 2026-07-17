@@ -9,16 +9,8 @@
     "gestion": "Rules & entries"
   },
   "analysis": {
-    "title": "Inflows / outflows by category",
-    "window_one": "{{count}} month",
-    "window_other": "{{count}} months",
-    "empty": "No transactions over the period.",
-    "colCategory": "Category",
-    "colTotal": "Total",
     "inflows": "Inflows",
-    "outflows": "Outflows",
-    "net": "Net",
-    "excluded": "Out of scope: {{internal}} internal transfers, {{ignored}} ignored transactions."
+    "outflows": "Outflows"
   },
   "back": "← Cash",
   "notFound": "Account not found.",

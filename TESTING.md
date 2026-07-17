@@ -142,11 +142,14 @@ Toujours connecté en tant qu'Alice. Préparer un 2e navigateur pour Bob.
 Route `/app/$orgSlug/cash` (`src/routes/app/$orgSlug/cash.index.tsx`), quatre
 onglets pilotés par `?tab=` : **Vue d'ensemble** (bannières d'alerte, bandeau
 KPIs, courbe, comptes par banque), **Prévisionnel** (échéances à venir,
-rapprochements, reste à déployer, grille catégories × mois, analyse par
-catégorie cf. AN1–AN3), **Transactions** (registre complet, cf. RU1–RU31) et
-**Règles & échéances** (règles récurrentes, ponctuelles, TVA, alerte de
-seuil, connexions bancaires). Un ancien lien `?tab=analyse` atterrit sur
-`?tab=previsionnel`. Lecture seule côté Vue d'ensemble :
+rapprochements, capital engagé non appelé, grille catégories × mois — dont
+les colonnes passées portent le réalisé par catégorie), **Transactions**
+(registre complet, cf. RU1–RU31) et **Règles & échéances** (règles
+récurrentes, ponctuelles, TVA, alerte de seuil, connexions bancaires). Un
+ancien lien `?tab=analyse` atterrit sur `?tab=previsionnel` (le tableau
+rétrospectif « Entrées/sorties par catégorie » a été retiré — redondant
+avec les colonnes passées de la grille). Lecture seule côté Vue
+d'ensemble :
 pas d'ingestion encore (Powens en cible). Pour tester avec des données, insérer
 temporairement via le dashboard Convex 1–2 `bankAccounts` (`ownerCompanyId` =
 une entité `group_*` de l'org, `currentBalance` en cents) et quelques
@@ -167,9 +170,6 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | CA11 | Page compte → « Modifier » → cocher « Fonds nantis / bloqués »                                                                  | Badge « Nanti » sur la ligne (liste) et l'en-tête (page compte) ; le compte sort du « Solde disponible », de la courbe prévisionnelle (`getForecastGrid`) et du cash du dashboard, mais reste listé avec son solde                                                                                                                                                                                                        |
 | CA12 | Page compte → « Modifier » → cocher « Compte clôturé à la banque »                                                              | Badge « Clôturé » ; le compte descend dans la section grisée « Comptes clôturés » de la liste ; ses transactions et rattachements deals restent intacts (rien n'est supprimé)                                                                                                                                                                                                                                                |
 | CA13 | Compte **non connecté** à Powens (pas de `powensAccountId`) → « Modifier » → champ « Solde actuel (€) »                         | Champ visible uniquement sur les comptes non connectés (badge « Non connecté » en en-tête) ; saisir un montant (négatif accepté) → `updateAccountBalance`, `balanceAsOf` estampillé à maintenant, sous-texte « solde manuel au JJ/MM » dans la liste ; sur un compte connecté le champ est absent (Powens est la source de vérité, `ConvexError('account_connected')` si forcé par l'API)                                     |
-| AN1  | Section **Analyse** en bas de l'onglet Prévisionnel (`/cash?tab=previsionnel` ; l'ancien `?tab=analyse` y redirige), org avec transactions | Tableau catégories × mois (fenêtre 3/6/12 mois) : bloc **Entrées** puis **Sorties** (totaux par mois en tête de bloc, tons `positive`/`destructive`), ligne **Net** en pied ; les buckets dérivés du pointage (Deals, Capitaux propres, Comptes courants & intercos, Impôts & taxes) + les catégories charges/produits ; lignes « À pointer »/« À qualifier » en italique grisé                                              |
-| AN2  | Transactions `internal_transfer` ou `ignored` sur la période                                                                    | Exclues du tableau ; note de bas de page « Hors analyse : X € de virements internes, Y € de transactions ignorées »                                                                                                                                                                                                                                                                                                          |
-| AN3  | i18n EN/FR sur l'onglet Analyse                                                                                                 | Libellés traduits (`cash:analysis`, catégories dans `common:categories`)                                                                                                                                                                                                                                                                                                                                                     |
 
 ## Niveau 3 — Dashboard & prévisionnel de trésorerie (10 min)
 

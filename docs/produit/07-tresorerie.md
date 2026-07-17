@@ -101,12 +101,13 @@ de pointage déjà posé. Les comptes historiques importés d'Airtable ont une
 date de bascule : la synchro n'ingère que les transactions postérieures,
 pour éviter les doublons avec l'historique.
 
-## Analyse
+## Analyse rétrospective
 
-La section Analyse (en bas de l'onglet Prévisionnel) ventile les entrées et
-sorties par grande catégorie, mois par mois, sur 3, 6 ou 12 mois, avec la
-ligne nette. Les virements internes et les lignes ignorées sont exclus
-(comptés à part). Les catégories viennent du [pointage](08-pointage.md).
+L'analyse du réalisé par catégorie vit dans la grille du
+[Prévisionnel](09-previsionnel.md) : ses colonnes des mois passés montrent
+les entrées et sorties réellement constatées, catégorie par catégorie, dans
+le même tableau que la projection. Les catégories viennent du
+[pointage](08-pointage.md).
 
 ## Points d'attention
 

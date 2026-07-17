@@ -8,8 +8,9 @@ partir de deux sources : les **règles récurrentes** (loyers, salaires,
 fonds, distributions, impôts one-shot). Il est réparti sur trois onglets de
 la [Trésorerie](07-tresorerie.md) : la courbe et les indicateurs dans
 **Vue d'ensemble**, le détail (échéances à venir, rapprochements, grille
-mois par mois, analyse) dans **Prévisionnel**, et la gestion des règles,
-échéances ponctuelles, TVA et alertes dans **Règles & échéances**.
+mois par mois — réalisé passé et projection future dans le même tableau)
+dans **Prévisionnel**, et la gestion des règles, échéances ponctuelles,
+TVA et alertes dans **Règles & échéances**.
 
 ## Règles et écritures
 

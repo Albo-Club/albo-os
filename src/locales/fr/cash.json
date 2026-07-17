@@ -9,16 +9,8 @@
     "gestion": "Règles & échéances"
   },
   "analysis": {
-    "title": "Entrées / sorties par catégorie",
-    "window_one": "{{count}} mois",
-    "window_other": "{{count}} mois",
-    "empty": "Aucune transaction sur la période.",
-    "colCategory": "Catégorie",
-    "colTotal": "Total",
     "inflows": "Entrées",
-    "outflows": "Sorties",
-    "net": "Net",
-    "excluded": "Hors analyse : {{internal}} de virements internes, {{ignored}} de transactions ignorées."
+    "outflows": "Sorties"
   },
   "back": "← Trésorerie",
   "notFound": "Compte introuvable.",
