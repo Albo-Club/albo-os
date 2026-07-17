@@ -726,11 +726,12 @@ export const getDealForecast = query({
 
 // ─── Rule suggestions (recurrence detection) ─────────────────────────────────
 
-// History window scanned for recurring flows.
-const DETECTION_LOOKBACK_MONTHS = 12
+// History window scanned for recurring flows — 24 months so yearly flows
+// (2 occurrences minimum) become detectable.
+const DETECTION_LOOKBACK_MONTHS = 24
 
 /**
- * Recurring flows detected in the last 12 months of transactions that are
+ * Recurring flows detected in the last 24 months of transactions that are
  * not covered by an active rule nor dismissed — candidates for forecast
  * rules, biggest amounts first. Detection is pure and tested
  * (lib/recurrenceDetection.ts); it only SUGGESTS — creating the rule stays

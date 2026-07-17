@@ -54,17 +54,26 @@ export type RuleSuggestion = {
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-/** A group needs at least this many occurrences to be suggested. */
+/** Minimum occurrences for the short frequencies (weekly/monthly): two
+ * transactions ~30 days apart are not a rent yet. */
 export const DETECTION_MIN_OCCURRENCES = 3
-/** Every amount of the group must stay within ±30 % of the median. */
-export const DETECTION_AMOUNT_TOLERANCE = 0.3
+/** Long frequencies (quarterly/yearly) fire from 2 occurrences: a single
+ * clean ~91-day or ~365-day interval is already a strong signal, and
+ * waiting for a 3rd yearly occurrence would need 2+ years of history. */
+export const DETECTION_MIN_OCCURRENCES_LONG = 2
+/** Amount-stability window around the group median. */
+export const DETECTION_AMOUNT_TOLERANCE = 0.4
+/** Share of the group's amounts that must sit inside the tolerance window —
+ * a majority rule, so one exceptional occurrence (catch-up invoice,
+ * variable utility bill) no longer kills an otherwise clean group. The
+ * suggested amount stays the median; the min→max range is shown in the UI. */
+export const DETECTION_AMOUNT_MAJORITY = 0.6
 /** An active rule with the same frequency/direction and an amount within
  * ±15 % of the group median marks the group as already covered. */
 export const DETECTION_COVERED_TOLERANCE = 0.15
 
 // Interval → frequency mapping (median spacing in days, with tolerance).
-// Yearly stays listed for completeness but cannot fire on a 12-month
-// window (3 occurrences would need 2+ years of history).
+// Yearly needs the 24-month detection window (2 occurrences minimum).
 const FREQUENCY_STEPS = [
   { frequency: 'weekly', days: 7, tolerance: 2 },
   { frequency: 'monthly', days: 30.44, tolerance: 7 },
@@ -110,8 +119,10 @@ export function detectFrequency(
 
 /**
  * Detects recurring flows and suggests forecast rules, biggest amounts
- * first. Strict on amount stability (all within ±30 % of the median):
- * a false negative is a non-event, a false positive nags.
+ * first. Amount stability is a MAJORITY rule (60 % of amounts within ±40 %
+ * of the median) rather than an all-amounts gate — variable-amount
+ * recurrings (utilities, interest) are suggested with their median, and
+ * the human validates from the displayed min→max range.
  */
 export function detectRecurringFlows(params: {
   transactions: Array<DetectionTx>
@@ -137,24 +148,30 @@ export function detectRecurringFlows(params: {
   const suggestions: Array<RuleSuggestion> = []
   for (const [key, group] of groups) {
     if (dismissedKeys.has(key)) continue
-    if (group.length < DETECTION_MIN_OCCURRENCES) continue
+    if (group.length < DETECTION_MIN_OCCURRENCES_LONG) continue
     group.sort((a, b) => a.transactionDate - b.transactionDate)
 
-    // 2. Regular spacing.
+    // 2. Regular spacing — the minimum occurrences depend on the detected
+    // frequency (short ones need 3, long ones fire from 2).
     const frequency = detectFrequency(group.map((tx) => tx.transactionDate))
     if (!frequency) continue
+    const minOccurrences =
+      frequency === 'quarterly' || frequency === 'yearly'
+        ? DETECTION_MIN_OCCURRENCES_LONG
+        : DETECTION_MIN_OCCURRENCES
+    if (group.length < minOccurrences) continue
 
-    // 3. Stable amounts.
+    // 3. Majority-stable amounts around the median.
     const amounts = group.map((tx) => tx.amountCents).sort((a, b) => a - b)
     const amountCents = median(amounts)
     const minAmountCents = amounts[0]
     const maxAmountCents = amounts[amounts.length - 1]
-    if (
-      minAmountCents < amountCents * (1 - DETECTION_AMOUNT_TOLERANCE) ||
-      maxAmountCents > amountCents * (1 + DETECTION_AMOUNT_TOLERANCE)
-    ) {
-      continue
-    }
+    const withinTolerance = amounts.filter(
+      (cents) =>
+        cents >= amountCents * (1 - DETECTION_AMOUNT_TOLERANCE) &&
+        cents <= amountCents * (1 + DETECTION_AMOUNT_TOLERANCE),
+    ).length
+    if (withinTolerance / amounts.length < DETECTION_AMOUNT_MAJORITY) continue
 
     const direction = group[0].direction
     const pattern = key.slice(key.indexOf(':') + 1)
