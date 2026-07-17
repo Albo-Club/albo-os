@@ -31,7 +31,8 @@ pièces jointes. Pour les lignes que le rapprochement automatique n'a pas su
 traiter (« à revoir » ou rejetées), trois actions : **Assigner** à une
 société, **Retraiter**, **Rejeter**. Le contenu analysé alimente ensuite la
 fiche société ([Participations](04-participations.md) : rapports, synthèse
-IA, KPIs).
+IA, KPIs). Le circuit d'ingestion lui-même est décrit dans
+[Reports par email](17-reports-par-email.md).
 
 ## Points d'attention
 
@@ -42,4 +43,5 @@ IA, KPIs).
 ## Pages liées
 
 - [Participations](04-participations.md), [Deals](05-deals.md),
-  [Intégrations](15-integrations.md) (ingestion des rapports par email)
+  [Reports par email](17-reports-par-email.md),
+  [Intégrations](15-integrations.md)

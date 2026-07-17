@@ -70,11 +70,10 @@ téléchargement des documents et rafraîchissement à la demande.
 
 ## Ingestion des rapports par email
 
-Les investor updates reçus par email sont ingérés automatiquement : le
-contenu est extrait, rapproché de la bonne participation, analysé
-(highlights, métriques, période), et vient alimenter la fiche société et sa
-synthèse IA. Les cas ambigus atterrissent dans la boîte
-[Rapports entrants](12-vue-consolidee.md) pour assignation manuelle.
+Les investor updates transférés à l'adresse dédiée sont ingérés
+automatiquement et alimentent la fiche société et sa synthèse IA. Le
+circuit complet (forward, sécurité, sources lues, KPIs, récap) est décrit
+dans [Reports par email](17-reports-par-email.md).
 
 ## Imports historiques (ponctuels)
 
