@@ -30,8 +30,6 @@
     "nothingToApply": "No pending transaction matches a rule"
   },
   "actions": {
-    "match": "Match",
-    "discard": "Discard",
     "ignore": "Ignore",
     "charge": "Expense",
     "tax": "Tax",
@@ -107,12 +105,17 @@
     "noResults": "No transaction matches your search."
   },
   "combobox": {
-    "placeholder": "Select a target",
-    "search": "Search a target…",
-    "empty": "No target found.",
+    "placeholder": "Assign to…",
+    "search": "Search a deal, a category…",
+    "empty": "No result.",
     "groupDeals": "Deals",
     "groupEquity": "Equity",
     "groupLoans": "Current accounts",
+    "groupCharges": "Expenses",
+    "groupProducts": "Income",
+    "groupOther": "Other",
+    "chargeUnqualified": "Expense — category to qualify",
+    "productUnqualified": "Income — category to qualify",
     "emptyDeals": "No deal for this organization.",
     "emptyEquity": "No equity position for this organization.",
     "emptyLoans": "No current account for this organization."

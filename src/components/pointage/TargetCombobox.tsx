@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Check, ChevronsUpDown } from 'lucide-react'
+import { ChevronsUpDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { DealOption } from './DealCombobox'
 import type { LiabilityOption } from '~/lib/liabilityOptions'
-import { cn } from '~/lib/utils'
+import { CHARGE_CATEGORIES, PRODUCT_CATEGORIES } from '~/lib/categories'
 import { useDealTitle } from '~/components/participations/ParticipationsTable'
 import { Button } from '~/components/ui/button'
 import {
@@ -21,53 +21,56 @@ import {
   PopoverTrigger,
 } from '~/components/ui/popover'
 
-/** Selected pointage target: a deal OR a liability target. */
+/**
+ * Outcome of the unified « Affecter à… » picker: a deal, a liability
+ * target, a charge/product category (null = to qualify later), or a plain
+ * status (tax / internal transfer / ignored). One picker, one gesture —
+ * the backend routing stays the caller's job (match vs allocate vs
+ * categorize, cf. KNOWN_ISSUES « Pointage transaction → deal »).
+ */
 export type PointageTarget =
   | { kind: 'deal'; deal: DealOption }
   | { kind: 'liability'; liability: LiabilityOption }
+  | { kind: 'category'; status: 'charge' | 'product'; category: string | null }
+  | { kind: 'status'; status: 'tax' | 'internal_transfer' | 'ignored' }
 
 /**
- * Searchable combobox of pointage targets (Popover + Command): three groups
- * Deals / Capitaux propres / Comptes courants, each fed directly from its
- * source (`api.deals.list` / `getLiabilities` via `buildLiabilityOptions`)
- * — never a flattened list re-filtered by kind.
+ * Unified searchable pointage picker (Popover + Command): Deals /
+ * Capitaux propres / Comptes courants (fed from `listOptions`, never a
+ * flattened re-filtered list), then the charge and product categories as
+ * direct leaves, then Impôt / Virement interne / Ignorer. Selecting an
+ * entry APPLIES it immediately (the undo banner covers mistakes) — there
+ * is no armed selection nor confirm button anymore.
  *
- * The three groups are ALWAYS rendered: a group with no target shows an
- * explicit empty state ("missing" and "empty" must stay distinguishable —
- * see KNOWN_ISSUES.md « Passif »). Extends the `DealCombobox` pattern
- * (still used on its own for deal → deal reassignment).
+ * Every group is ALWAYS rendered ("missing" and "empty" must stay
+ * distinguishable — see KNOWN_ISSUES.md « Passif »); only the
+ * charge/product order adapts to the transaction direction (out: Charges
+ * first; in: Produits first).
  */
 export function TargetCombobox({
   deals,
   equityOptions,
   loanOptions,
-  value,
+  direction,
   onSelect,
   disabled,
 }: {
   deals: Array<DealOption> | undefined
   equityOptions: Array<LiabilityOption> | undefined
   loanOptions: Array<LiabilityOption> | undefined
-  value: PointageTarget | null
-  onSelect: (target: PointageTarget | null) => void
+  /** Transaction direction — orders the charge/product groups. */
+  direction: 'in' | 'out'
+  onSelect: (target: PointageTarget) => void
   disabled?: boolean
 }) {
-  const { t } = useTranslation('pointage')
+  const { t } = useTranslation(['pointage', 'common'])
   const [open, setOpen] = useState(false)
   const dealTitle = useDealTitle()
 
-  const valueId =
-    value == null
-      ? null
-      : value.kind === 'deal'
-        ? value.deal._id
-        : value.liability.targetId
-  const valueLabel =
-    value == null
-      ? null
-      : value.kind === 'deal'
-        ? (value.deal.target?.name ?? '—')
-        : value.liability.label
+  const pick = (target: PointageTarget) => {
+    onSelect(target)
+    setOpen(false)
+  }
 
   const liabilityGroups = [
     {
@@ -82,6 +85,41 @@ export function TargetCombobox({
       emptyLabel: t('pointage:combobox.emptyLoans'),
       options: loanOptions,
     },
+  ]
+
+  // Charge/product categories as direct leaves — the two-step
+  // « Écarter → Charge » then inline category is collapsed into one pick.
+  const categoryGroups: Array<{
+    key: 'charge' | 'product'
+    heading: string
+    unqualifiedLabel: string
+    categories: ReadonlyArray<string>
+  }> = [
+    {
+      key: 'charge',
+      heading: t('pointage:combobox.groupCharges'),
+      unqualifiedLabel: t('pointage:combobox.chargeUnqualified'),
+      categories: CHARGE_CATEGORIES,
+    },
+    {
+      key: 'product',
+      heading: t('pointage:combobox.groupProducts'),
+      unqualifiedLabel: t('pointage:combobox.productUnqualified'),
+      categories: PRODUCT_CATEGORIES,
+    },
+  ]
+  if (direction === 'in') categoryGroups.reverse()
+
+  const statusLeaves: Array<{
+    status: 'tax' | 'internal_transfer' | 'ignored'
+    label: string
+  }> = [
+    { status: 'tax', label: t('pointage:actions.tax') },
+    {
+      status: 'internal_transfer',
+      label: t('pointage:actions.internal_transfer'),
+    },
+    { status: 'ignored', label: t('pointage:actions.ignore') },
   ]
 
   const loading =
@@ -101,7 +139,7 @@ export function TargetCombobox({
           className="w-44 justify-between font-normal"
         >
           <span className="truncate">
-            {valueLabel ?? t('pointage:combobox.placeholder')}
+            {t('pointage:combobox.placeholder')}
           </span>
           <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
         </Button>
@@ -125,19 +163,8 @@ export function TargetCombobox({
                     // custom name and the instrument (like the Participations
                     // table).
                     value={`${deal.target?.name ?? ''} ${dealTitle(deal)} ${deal.investor?.name ?? ''} ${deal._id}`}
-                    onSelect={() => {
-                      onSelect(
-                        deal._id === valueId ? null : { kind: 'deal', deal },
-                      )
-                      setOpen(false)
-                    }}
+                    onSelect={() => pick({ kind: 'deal', deal })}
                   >
-                    <Check
-                      className={cn(
-                        'size-4',
-                        deal._id === valueId ? 'opacity-100' : 'opacity-0',
-                      )}
-                    />
                     <span className="flex min-w-0 flex-col">
                       <span className="truncate">
                         {deal.target?.name ?? '—'}
@@ -162,23 +189,10 @@ export function TargetCombobox({
                     <CommandItem
                       key={option.targetId}
                       value={`${option.label} ${option.sublabel} ${option.targetId}`}
-                      onSelect={() => {
-                        onSelect(
-                          option.targetId === valueId
-                            ? null
-                            : { kind: 'liability', liability: option },
-                        )
-                        setOpen(false)
-                      }}
+                      onSelect={() =>
+                        pick({ kind: 'liability', liability: option })
+                      }
                     >
-                      <Check
-                        className={cn(
-                          'size-4',
-                          option.targetId === valueId
-                            ? 'opacity-100'
-                            : 'opacity-0',
-                        )}
-                      />
                       <span className="flex min-w-0 flex-col">
                         <span className="truncate">{option.label}</span>
                         <span className="text-muted-foreground truncate text-xs">
@@ -190,6 +204,45 @@ export function TargetCombobox({
                 )}
               </CommandGroup>
             ))}
+            {categoryGroups.map((group) => (
+              <CommandGroup key={group.key} heading={group.heading}>
+                {group.categories.map((slug) => (
+                  <CommandItem
+                    key={slug}
+                    value={`${group.heading} ${t(`common:categories.${slug}`)} ${slug}`}
+                    onSelect={() =>
+                      pick({
+                        kind: 'category',
+                        status: group.key,
+                        category: slug,
+                      })
+                    }
+                  >
+                    {t(`common:categories.${slug}`)}
+                  </CommandItem>
+                ))}
+                <CommandItem
+                  value={`${group.heading} ${group.unqualifiedLabel}`}
+                  className="text-muted-foreground"
+                  onSelect={() =>
+                    pick({ kind: 'category', status: group.key, category: null })
+                  }
+                >
+                  {group.unqualifiedLabel}
+                </CommandItem>
+              </CommandGroup>
+            ))}
+            <CommandGroup heading={t('pointage:combobox.groupOther')}>
+              {statusLeaves.map((leaf) => (
+                <CommandItem
+                  key={leaf.status}
+                  value={`${leaf.label} ${leaf.status}`}
+                  onSelect={() => pick({ kind: 'status', status: leaf.status })}
+                >
+                  {leaf.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
           </CommandList>
         </Command>
       </PopoverContent>

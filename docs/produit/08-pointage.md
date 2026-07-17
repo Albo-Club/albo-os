@@ -15,15 +15,20 @@ Il se fait dans l'onglet **Transactions** de la [Trésorerie](07-tresorerie.md).
 
 1. Chaque nouvelle transaction arrive en statut **« À pointer »** (file
    d'attente avec compteur).
-2. Pour chaque ligne, trois familles d'actions :
-   - **Rapprocher** vers un deal ou une cible de passif (capital, compte
-     courant) via une liste groupée ;
-   - **Écarter** : Ignorer, Charge, Impôt, Produit ou Virement interne ;
-   - Sur une charge ou un produit : préciser la **catégorie** (salaires,
-     honoraires, loyer, frais bancaires…) et le **taux de TVA**.
-3. Une bannière « Annuler » (~5 secondes) permet de revenir sur un geste, et
+2. Chaque ligne se traite en **un seul geste** : le menu « **Affecter
+   à…** », une liste cherchable qui regroupe toutes les destinations
+   possibles — les **deals**, le **passif** (capital, comptes courants),
+   les **catégories de charges** (salaires, honoraires, loyer, frais
+   bancaires…), les **catégories de produits**, puis Impôt, Virement
+   interne et Ignorer. Choisir une entrée applique immédiatement ;
+   l'ordre des groupes s'adapte au sens de la transaction (une sortie
+   propose les charges d'abord, une entrée les produits).
+3. Sur une charge ou un produit, la **catégorie** est donc posée dès le
+   choix (ou « à qualifier » pour décider plus tard) ; le **taux de TVA**
+   s'ajuste ensuite directement sur la ligne.
+4. Une bannière « Annuler » (~5 secondes) permet de revenir sur un geste, et
    toute transaction peut être **détachée** plus tard pour repartir en file.
-4. **Actions groupées** : sélectionner plusieurs lignes et les classer
+5. **Actions groupées** : sélectionner plusieurs lignes et les classer
    d'un coup (charge, impôt, produit, virement interne).
 
 L'[assistant IA](11-assistant-ia.md) peut faire le pointage en conversation :

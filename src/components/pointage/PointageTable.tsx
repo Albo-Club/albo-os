@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpRight, ChevronDown } from 'lucide-react'
+import { ArrowUpRight } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useConvexMutation } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
@@ -42,12 +42,6 @@ import {
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '~/components/ui/dropdown-menu'
 import {
   Select,
   SelectContent,
@@ -100,64 +94,34 @@ type RecentAction = {
   targetName?: string
 }
 
-/** Target combobox (deal / liability) + Match + « Écarter » menu. */
+/**
+ * Single unified action: the « Affecter à… » picker. Selecting an entry
+ * (deal, liability, charge/product category, tax/transfer/ignore) applies
+ * immediately — the ~5 s « Annuler » banner covers mistakes.
+ */
 function RowActions({
   deals,
   liabilityOptions,
+  direction,
   pending,
-  onMatch,
-  onDiscard,
+  onAssign,
 }: {
   deals: Array<DealOption> | undefined
   liabilityOptions: LiabilityOptionGroups | undefined
+  direction: 'in' | 'out'
   pending: boolean
-  onMatch: (target: PointageTarget) => void
-  onDiscard: (kind: DiscardKind) => void
+  onAssign: (target: PointageTarget) => void
 }) {
-  const { t } = useTranslation('pointage')
-  const [target, setTarget] = useState<PointageTarget | null>(null)
   return (
     <div className="flex items-center justify-end gap-2">
       <TargetCombobox
         deals={deals}
         equityOptions={liabilityOptions?.equityOptions}
         loanOptions={liabilityOptions?.loanOptions}
-        value={target}
-        onSelect={setTarget}
+        direction={direction}
+        onSelect={onAssign}
         disabled={pending}
       />
-      <Button
-        size="sm"
-        disabled={!target || pending}
-        onClick={() => target && onMatch(target)}
-      >
-        {t('actions.match')}
-      </Button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button size="sm" variant="ghost" disabled={pending}>
-            {t('actions.discard')}
-            <ChevronDown className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => onDiscard('ignored')}>
-            {t('actions.ignore')}
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onDiscard('charge')}>
-            {t('actions.charge')}
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onDiscard('tax')}>
-            {t('actions.tax')}
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onDiscard('product')}>
-            {t('actions.product')}
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onDiscard('internal_transfer')}>
-            {t('actions.internal_transfer')}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
     </div>
   )
 }
@@ -339,11 +303,11 @@ export function PointageTable({
   const setVatRate = useConvexMutation(api.transactions.setVatRate)
   const setCategory = useConvexMutation(api.transactions.setCategory)
 
+  // Charge/product go through their dedicated calls (they carry category
+  // and, for charges, the default VAT rate) — this map covers the rest.
   const discardMutations = {
     ignored: ignoreTransaction,
-    charge: categorizeAsCharge,
     tax: categorizeAsTax,
-    product: categorizeAsProduct,
     internal_transfer: categorizeAsInternalTransfer,
   }
 
@@ -400,7 +364,10 @@ export function PointageTable({
     )
   }
 
-  async function handleMatch(tx: UnmatchedTx, target: PointageTarget) {
+  async function handleMatch(
+    tx: UnmatchedTx,
+    target: Extract<PointageTarget, { kind: 'deal' | 'liability' }>,
+  ) {
     setPendingId(tx._id)
     try {
       if (target.kind === 'deal') {
@@ -432,18 +399,29 @@ export function PointageTable({
     }
   }
 
-  async function handleDiscard(tx: UnmatchedTx, kind: DiscardKind) {
+  async function handleDiscard(
+    tx: UnmatchedTx,
+    kind: DiscardKind,
+    category?: string | null,
+  ) {
     setPendingId(tx._id)
     try {
-      // A charge starts with a default 20% VAT rate, adjustable later in
-      // the Charges tab (setVatRate).
+      // A charge starts with a default 20% VAT rate, adjustable later
+      // inline (setVatRate). The unified picker can carry the category
+      // directly (charge/product leaves) — undefined keeps « à qualifier ».
       const result =
         kind === 'charge'
           ? await categorizeAsCharge({
               transactionId: tx._id,
               vatRateBps: DEFAULT_VAT_RATE_BPS,
+              ...(category ? { category } : {}),
             })
-          : await discardMutations[kind]({ transactionId: tx._id })
+          : kind === 'product'
+            ? await categorizeAsProduct({
+                transactionId: tx._id,
+                ...(category ? { category } : {}),
+              })
+            : await discardMutations[kind]({ transactionId: tx._id })
       // The gesture was memorized as a learned rule — surface it once so
       // the automatic classification of future rows is never a surprise.
       if (result?.ruleCreated) toast(t('rules.created'))
@@ -454,6 +432,20 @@ export function PointageTable({
     } finally {
       setPendingId(null)
     }
+  }
+
+  // Single entry point of the unified « Affecter à… » picker: routes a
+  // picked target to the right backend gesture (deal match / liability
+  // allocation / categorization) — the guards and invariants stay
+  // server-side (cf. KNOWN_ISSUES « Pointage transaction → deal »).
+  async function handleAssign(tx: UnmatchedTx, target: PointageTarget) {
+    if (target.kind === 'deal' || target.kind === 'liability') {
+      return handleMatch(tx, target)
+    }
+    if (target.kind === 'category') {
+      return handleDiscard(tx, target.status, target.category)
+    }
+    return handleDiscard(tx, target.status)
   }
 
   // Ledger mode: return a matched/categorized row to « À pointer ». Routes
@@ -626,9 +618,9 @@ export function PointageTable({
         <RowActions
           deals={deals}
           liabilityOptions={liabilityOptions}
+          direction={tx.direction}
           pending={pending}
-          onMatch={(target) => void handleMatch(tx, target)}
-          onDiscard={(kind) => void handleDiscard(tx, kind)}
+          onAssign={(target) => void handleAssign(tx, target)}
         />
       )
     }
@@ -637,9 +629,9 @@ export function PointageTable({
         <RowActions
           deals={deals}
           liabilityOptions={liabilityOptions}
+          direction={tx.direction}
           pending={pending}
-          onMatch={(target) => void handleMatch(tx, target)}
-          onDiscard={(kind) => void handleDiscard(tx, kind)}
+          onAssign={(target) => void handleAssign(tx, target)}
         />
       )
     }
