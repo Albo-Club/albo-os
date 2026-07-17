@@ -633,6 +633,98 @@ export function cashAlertEmail({
   return { subject: c.subject, html, text: plainText(c.text) }
 }
 
+/** Max entry lines rendered in the overdue digest (the rest is "+N more"). */
+const OVERDUE_EMAIL_MAX_LINES = 8
+
+export function overdueEntriesEmail({
+  locale,
+  orgName,
+  entries,
+  forecastUrl,
+}: {
+  locale: EmailLocale
+  orgName: string
+  /** All overdue entries, date ascending (oldest first). */
+  entries: Array<{
+    date: number
+    label: string
+    direction: 'in' | 'out'
+    amountCents: number
+  }>
+  forecastUrl: string
+}) {
+  const eur = (cents: number) =>
+    new Intl.NumberFormat(locale === 'fr' ? 'fr-FR' : 'en-US', {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 0,
+    }).format(cents / 100)
+  const fmtDate = (ms: number) =>
+    new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-US', {
+      dateStyle: 'medium',
+      timeZone: 'Europe/Paris',
+    }).format(new Date(ms))
+
+  const line = (e: (typeof entries)[number]) =>
+    `${fmtDate(e.date)} — ${e.label} — ${e.direction === 'out' ? '−' : '+'}${eur(e.amountCents)}`
+  const shown = entries.slice(0, OVERDUE_EMAIL_MAX_LINES)
+  const hidden = entries.length - shown.length
+  const listHtml = shown
+    .map((e) => `• ${line(e)}`)
+    .join('<br>')
+    .concat(
+      hidden > 0
+        ? `<br><span style="color:${MUTED};">${pick(locale, {
+            en: `+ ${hidden} more`,
+            fr: `+ ${hidden} autre(s)`,
+          })}</span>`
+        : '',
+    )
+  const count = entries.length
+
+  const c = pick(locale, {
+    en: {
+      subject: `Overdue entries — ${count} expected ${count === 1 ? 'entry' : 'entries'} not reconciled (${orgName})`,
+      heading: `${count} overdue ${count === 1 ? 'entry' : 'entries'}`,
+      intro: `${count === 1 ? 'An expected entry' : `${count} expected entries`} of <strong>${orgName}</strong> ${count === 1 ? 'is' : 'are'} past due and not reconciled to a transaction yet:`,
+      followup: `Reconcile them from the Forecast tab (suggested matches are one click away), reschedule them, or cancel them if no longer expected — overdue entries keep weighing on the projected balance.`,
+      footer: `You receive this because forecast entries are monitored for ${orgName}. One digest when new entries become overdue — no daily reminders.`,
+      preheader: `${count} expected ${count === 1 ? 'entry' : 'entries'} past due, not reconciled.`,
+      cta: 'Open the forecast',
+      text: [
+        `${count} expected ${count === 1 ? 'entry' : 'entries'} of ${orgName} ${count === 1 ? 'is' : 'are'} past due and not reconciled yet:`,
+        entries.map((e) => `- ${line(e)}`).join('\n'),
+        `Open the forecast: ${forecastUrl}`,
+      ],
+    },
+    fr: {
+      subject: `Échéances en retard — ${count} échéance(s) attendue(s) non rapprochée(s) (${orgName})`,
+      heading: `${count} échéance(s) en retard`,
+      intro: `${count === 1 ? 'Une échéance attendue' : `${count} échéances attendues`} de <strong>${orgName}</strong> ${count === 1 ? 'est dépassée' : 'sont dépassées'} sans être rapprochée${count === 1 ? '' : 's'} d'une transaction :`,
+      followup: `Rapprochez-les depuis l'onglet Prévisionnel (les rapprochements suggérés sont à un clic), re-datez-les, ou annulez-les si elles ne sont plus attendues — une échéance en retard continue de peser sur le solde projeté.`,
+      footer: `Vous recevez cet email car les échéances prévisionnelles de ${orgName} sont surveillées. Un récapitulatif quand de nouvelles échéances passent en retard — pas de rappel quotidien.`,
+      preheader: `${count} échéance(s) attendue(s) dépassée(s), non rapprochée(s).`,
+      cta: 'Ouvrir le prévisionnel',
+      text: [
+        `${count} échéance(s) attendue(s) de ${orgName} dépassée(s) sans rapprochement :`,
+        entries.map((e) => `- ${line(e)}`).join('\n'),
+        `Ouvrir le prévisionnel : ${forecastUrl}`,
+      ],
+    },
+  })
+
+  const html = layout({
+    locale,
+    preheader: c.preheader,
+    heading: c.heading,
+    paragraphs: [c.intro, listHtml, c.followup, urlFallback(locale, forecastUrl)],
+    cta: { label: c.cta, url: forecastUrl },
+    footer: c.footer,
+  })
+
+  return { subject: c.subject, html, text: plainText(c.text) }
+}
+
 export function powensConnectionAlertEmail({
   locale,
   orgName,

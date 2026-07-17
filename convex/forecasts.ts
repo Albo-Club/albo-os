@@ -14,7 +14,7 @@
 import { ConvexError, v } from 'convex/values'
 import { internalMutation, mutation, query } from './_generated/server'
 import { RESEND_FROM, resend } from './email'
-import { cashAlertEmail } from './emailTemplates'
+import { cashAlertEmail, overdueEntriesEmail } from './emailTemplates'
 import { requireAppUser, requireOrgMember } from './lib/auth'
 import { isAvailableAccount } from './lib/bankAccounts'
 import { effectiveCategory, isValidForecastCategory } from './lib/categories'
@@ -1422,6 +1422,80 @@ export const checkCashAlerts = internalMutation({
       await ctx.db.patch('cashAlertSettings', setting._id, {
         lastNotifiedAt: now,
       })
+      notified += 1
+    }
+    return { notified }
+  },
+})
+
+// Overdue digest: one full day of grace before an entry counts as overdue
+// (bank syncs ~24h and reconciliation is a manual gesture — no point nagging
+// about yesterday's rent), and a "newly overdue" window equal to the DAILY
+// cron cadence: the digest fires only when at least one entry crossed the
+// grace boundary since the previous run. Stateless anti-spam — changing the
+// cron frequency breaks this window math (cf. KNOWN_ISSUES « Cash flow
+// forecast »).
+const OVERDUE_GRACE_MS = DAY_MS
+const OVERDUE_NEW_WINDOW_MS = DAY_MS
+
+/**
+ * Daily overdue-entries digest (cron, 07:10 UTC — convex/crons.ts, no auth
+ * like checkCashAlerts). Overdue = pending EUR entry past its date by more
+ * than the grace day. Emails every org member ONE digest listing all
+ * overdue entries, only when at least one is newly overdue — no daily
+ * reminder for the same stock.
+ */
+export const checkOverdueEntries = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now()
+    const siteUrl = process.env.SITE_URL ?? ''
+    const overdueBefore = now - OVERDUE_GRACE_MS
+    const orgs = await ctx.db.query('organizations').collect()
+
+    let notified = 0
+    for (const org of orgs) {
+      const rows = await ctx.db
+        .query('forecastEntries')
+        .withIndex('by_org_and_date', (q) =>
+          q.eq('orgId', org._id).lte('date', overdueBefore),
+        )
+        .collect()
+      const overdue = rows
+        .filter((e) => e.status === 'pending' && e.currency === 'EUR')
+        .sort((a, b) => a.date - b.date)
+      if (overdue.length === 0) continue
+      const hasNew = overdue.some(
+        (e) => e.date > overdueBefore - OVERDUE_NEW_WINDOW_MS,
+      )
+      if (!hasNew) continue
+
+      const members = await ctx.db
+        .query('organizationMembers')
+        .withIndex('by_org', (q) => q.eq('orgId', org._id))
+        .collect()
+      for (const member of members) {
+        const user = await ctx.db.get('users', member.userId)
+        if (!user?.email) continue
+        const { subject, html, text } = overdueEntriesEmail({
+          locale: user.preferredLanguage === 'fr' ? 'fr' : 'en',
+          orgName: org.name,
+          entries: overdue.map((e) => ({
+            date: e.date,
+            label: e.label,
+            direction: e.direction,
+            amountCents: e.amountCents,
+          })),
+          forecastUrl: `${siteUrl}/app/${org.slug}/cash?tab=previsionnel`,
+        })
+        await resend.sendEmail(ctx, {
+          from: RESEND_FROM,
+          to: user.email,
+          subject,
+          html,
+          text,
+        })
+      }
       notified += 1
     }
     return { notified }
