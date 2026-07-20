@@ -23,14 +23,21 @@ bas de page.
 
 ---
 
-## v1.109.1 — 20/07/2026 à 17:39 — Connexions externes : socle modulaire
+## v1.110.0 — 20/07/2026 à 17:39 — Connexions externes : socle modulaire + page Intégrations
 
-Chantier technique, sans changement visible : les connexions aux plateformes
-externes (banques via Powens, portails fonds via Parallel/VASCO, extraction
-Notion et DocSend) reposent désormais sur un socle commun — un registre des
-plateformes et une gestion unifiée des connexions — au lieu de branchements
-codés au cas par cas. Ajouter une nouvelle plateforme demain sera plus simple
-et plus sûr, sans rien changer au fonctionnement actuel.
+Les connexions aux plateformes externes (banques via Powens, portails fonds
+via Parallel/VASCO, extraction Notion et DocSend) reposent désormais sur un
+socle commun — un registre des plateformes et une gestion unifiée des
+connexions — au lieu de branchements codés au cas par cas. Ajouter une
+nouvelle plateforme demain sera plus simple et plus sûr.
+
+Et c'est désormais visible : une nouvelle page **Réglages → Intégrations**
+liste, pour chaque organisation, les plateformes branchées et disponibles
+avec leur état — connexions bancaires avec leur santé et leur dernière
+synchro, connexion Parallel, services d'extraction (Notion, DocSend)
+opérationnels ou non. Une vue d'état façon « intégrations » d'Attio ou
+Granola : les actions restent sur leurs pages (la reconnexion bancaire se
+fait toujours depuis la Trésorerie).
 
 > **🔧 Notes techniques**
 >
@@ -50,6 +57,11 @@ et plus sûr, sans rien changer au fonctionnement actuel.
 > - Migration one-shot idempotente `migrations/externalConnections:
 >   migrateVascoConnections` (à lancer juste après le deploy — cf.
 >   `MIGRATIONS.md`) ; table `vascoConnections` conservée déclarée-mais-inerte.
+> - Page `settings/integrations` : query publique sanitisée
+>   `connections.listIntegrations` (jamais de secret), pastilles d'état par
+>   type d'auth (santé Powens dérivée via `connectionHealth`, état credentials
+>   via `lastConnectedAt`/`lastError`, env keys pour Notion), onglet ajouté au
+>   layout Réglages, i18n `settings:integrations.*` (EN/FR).
 > - Tests `tests/connectors.test.ts` (intégrité du registre + validation des
 >   lignes).
 

@@ -17,7 +17,7 @@
  */
 
 import { ConvexError, v } from 'convex/values'
-import { internalMutation, internalQuery } from './_generated/server'
+import { internalMutation, internalQuery, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { CONNECTORS, getConnector, parseConnection } from './lib/connectors'
 import { connectionHealth } from './powens'
@@ -185,6 +185,92 @@ export const removeConnection = internalMutation({
   handler: async (ctx, { connectionId }) => {
     await ctx.db.delete('externalConnections', connectionId)
     return { deleted: connectionId }
+  },
+})
+
+// ── Org-facing integrations view ────────────────────────────────────────────
+
+type IntegrationConnection = {
+  label: string
+  state: string
+  lastConnectedAt: number | null
+}
+
+type IntegrationItem = {
+  platform: string
+  scope: string
+  auth: string
+  /** org-scoped connectors: one entry per connection row of the org. */
+  connections?: Array<IntegrationConnection>
+  /** global connectors: whether the capability is operational. */
+  configured?: boolean
+}
+
+/**
+ * Sanitized per-connector view feeding the Réglages → Intégrations page:
+ * every registered platform with the org's connections and their state.
+ * Org-member-guarded and dispatched per auth kind (like `status`), but NEVER
+ * returns `config`/`credentials` — labels, states and timestamps only.
+ */
+export const listIntegrations = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }): Promise<Array<IntegrationItem>> => {
+    await requireOrgMember(ctx, orgId)
+    const now = Date.now()
+    const out: Array<IntegrationItem> = []
+    for (const def of CONNECTORS) {
+      const item: IntegrationItem = {
+        platform: def.platform,
+        scope: def.scope,
+        auth: def.auth,
+      }
+      switch (def.auth) {
+        case 'credentials': {
+          const rows = await ctx.db
+            .query('externalConnections')
+            .withIndex('by_org_and_platform', (q) =>
+              q.eq('orgId', orgId).eq('platform', def.platform),
+            )
+            .collect()
+          item.connections = rows.map((r) => ({
+            label: r.label,
+            state: !r.active
+              ? 'inactive'
+              : r.lastError
+                ? 'error'
+                : r.lastConnectedAt
+                  ? 'connected'
+                  : 'pending',
+            lastConnectedAt: r.lastConnectedAt ?? null,
+          }))
+          break
+        }
+        case 'webview': {
+          const rows = await ctx.db
+            .query('powensConnections')
+            .withIndex('by_org', (q) => q.eq('orgId', orgId))
+            .collect()
+          item.connections = rows.map((r) => ({
+            label: r.connectorName ?? r.powensConnectionId,
+            state: connectionHealth(r, now),
+            lastConnectedAt: r.lastSuccessfulSyncAt ?? null,
+          }))
+          break
+        }
+        case 'env': {
+          item.configured = (def.envKeys ?? []).some((k) =>
+            Boolean(process.env[k]),
+          )
+          break
+        }
+        case 'none': {
+          item.configured = true
+          break
+        }
+      }
+      out.push(item)
+    }
+    return out
   },
 })
 

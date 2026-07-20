@@ -6,7 +6,8 @@
     "tabs": {
       "general": "General",
       "members": "Members",
-      "invitations": "Invitations"
+      "invitations": "Invitations",
+      "integrations": "Integrations"
     }
   },
   "general": {
@@ -73,6 +74,45 @@
       "not_a_member": "You are not a member of this organization",
       "rate_limited": "Too many invitations — slow down and try again later",
       "default": "Could not send invitation"
+    }
+  },
+  "integrations": {
+    "title": "Integrations",
+    "description": "External platforms this organization is connected to — what is installed, what is available, and its current state.",
+    "scope": {
+      "org": "Per organization",
+      "global": "Shared service"
+    },
+    "none": "Not connected",
+    "globalConfigured": "Operational",
+    "globalNotConfigured": "Not configured",
+    "state": {
+      "connected": "Connected",
+      "stale": "Late",
+      "action_required": "Reconnect needed",
+      "error": "Error",
+      "pending": "Never connected",
+      "inactive": "Inactive"
+    },
+    "lastSync": "Last sync {{ago}}",
+    "neverSynced": "No sync yet",
+    "platforms": {
+      "powens": {
+        "name": "Powens",
+        "description": "Bank aggregation: accounts and transactions synced automatically. Connections are managed from the Cash page (connect / reconnect)."
+      },
+      "vasco": {
+        "name": "Parallel / VASCO",
+        "description": "Investor portals of fund-admin platforms: positions, investor communications and documents pulled into the linked entities."
+      },
+      "notion": {
+        "name": "Notion",
+        "description": "Extraction of public Notion pages linked in investor updates received by email."
+      },
+      "docsend": {
+        "name": "DocSend",
+        "description": "Extraction of DocSend decks linked in investor updates received by email."
+      }
     }
   }
 }

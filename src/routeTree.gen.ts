@@ -40,6 +40,7 @@ import { Route as AppOrgSlugDealsIndexRouteImport } from './routes/app/$orgSlug/
 import { Route as AppOrgSlugCashIndexRouteImport } from './routes/app/$orgSlug/cash.index'
 import { Route as AppOrgSlugSettingsMembersRouteImport } from './routes/app/$orgSlug/settings/members'
 import { Route as AppOrgSlugSettingsInvitationsRouteImport } from './routes/app/$orgSlug/settings/invitations'
+import { Route as AppOrgSlugSettingsIntegrationsRouteImport } from './routes/app/$orgSlug/settings/integrations'
 import { Route as AppOrgSlugSettingsGeneralRouteImport } from './routes/app/$orgSlug/settings/general'
 import { Route as AppOrgSlugParticipationsCompanyIdRouteImport } from './routes/app/$orgSlug/participations.$companyId'
 import { Route as AppOrgSlugDealsDealIdRouteImport } from './routes/app/$orgSlug/deals.$dealId'
@@ -204,6 +205,12 @@ const AppOrgSlugSettingsInvitationsRoute =
     path: '/invitations',
     getParentRoute: () => AppOrgSlugSettingsRouteRoute,
   } as any)
+const AppOrgSlugSettingsIntegrationsRoute =
+  AppOrgSlugSettingsIntegrationsRouteImport.update({
+    id: '/integrations',
+    path: '/integrations',
+    getParentRoute: () => AppOrgSlugSettingsRouteRoute,
+  } as any)
 const AppOrgSlugSettingsGeneralRoute =
   AppOrgSlugSettingsGeneralRouteImport.update({
     id: '/general',
@@ -255,6 +262,7 @@ export interface FileRoutesByFullPath {
   '/app/$orgSlug/deals/$dealId': typeof AppOrgSlugDealsDealIdRoute
   '/app/$orgSlug/participations/$companyId': typeof AppOrgSlugParticipationsCompanyIdRoute
   '/app/$orgSlug/settings/general': typeof AppOrgSlugSettingsGeneralRoute
+  '/app/$orgSlug/settings/integrations': typeof AppOrgSlugSettingsIntegrationsRoute
   '/app/$orgSlug/settings/invitations': typeof AppOrgSlugSettingsInvitationsRoute
   '/app/$orgSlug/settings/members': typeof AppOrgSlugSettingsMembersRoute
   '/app/$orgSlug/cash/': typeof AppOrgSlugCashIndexRoute
@@ -288,6 +296,7 @@ export interface FileRoutesByTo {
   '/app/$orgSlug/deals/$dealId': typeof AppOrgSlugDealsDealIdRoute
   '/app/$orgSlug/participations/$companyId': typeof AppOrgSlugParticipationsCompanyIdRoute
   '/app/$orgSlug/settings/general': typeof AppOrgSlugSettingsGeneralRoute
+  '/app/$orgSlug/settings/integrations': typeof AppOrgSlugSettingsIntegrationsRoute
   '/app/$orgSlug/settings/invitations': typeof AppOrgSlugSettingsInvitationsRoute
   '/app/$orgSlug/settings/members': typeof AppOrgSlugSettingsMembersRoute
   '/app/$orgSlug/cash': typeof AppOrgSlugCashIndexRoute
@@ -326,6 +335,7 @@ export interface FileRoutesById {
   '/app/$orgSlug/deals/$dealId': typeof AppOrgSlugDealsDealIdRoute
   '/app/$orgSlug/participations/$companyId': typeof AppOrgSlugParticipationsCompanyIdRoute
   '/app/$orgSlug/settings/general': typeof AppOrgSlugSettingsGeneralRoute
+  '/app/$orgSlug/settings/integrations': typeof AppOrgSlugSettingsIntegrationsRoute
   '/app/$orgSlug/settings/invitations': typeof AppOrgSlugSettingsInvitationsRoute
   '/app/$orgSlug/settings/members': typeof AppOrgSlugSettingsMembersRoute
   '/app/$orgSlug/cash/': typeof AppOrgSlugCashIndexRoute
@@ -365,6 +375,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/deals/$dealId'
     | '/app/$orgSlug/participations/$companyId'
     | '/app/$orgSlug/settings/general'
+    | '/app/$orgSlug/settings/integrations'
     | '/app/$orgSlug/settings/invitations'
     | '/app/$orgSlug/settings/members'
     | '/app/$orgSlug/cash/'
@@ -398,6 +409,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/deals/$dealId'
     | '/app/$orgSlug/participations/$companyId'
     | '/app/$orgSlug/settings/general'
+    | '/app/$orgSlug/settings/integrations'
     | '/app/$orgSlug/settings/invitations'
     | '/app/$orgSlug/settings/members'
     | '/app/$orgSlug/cash'
@@ -435,6 +447,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/deals/$dealId'
     | '/app/$orgSlug/participations/$companyId'
     | '/app/$orgSlug/settings/general'
+    | '/app/$orgSlug/settings/integrations'
     | '/app/$orgSlug/settings/invitations'
     | '/app/$orgSlug/settings/members'
     | '/app/$orgSlug/cash/'
@@ -676,6 +689,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrgSlugSettingsInvitationsRouteImport
       parentRoute: typeof AppOrgSlugSettingsRouteRoute
     }
+    '/app/$orgSlug/settings/integrations': {
+      id: '/app/$orgSlug/settings/integrations'
+      path: '/integrations'
+      fullPath: '/app/$orgSlug/settings/integrations'
+      preLoaderRoute: typeof AppOrgSlugSettingsIntegrationsRouteImport
+      parentRoute: typeof AppOrgSlugSettingsRouteRoute
+    }
     '/app/$orgSlug/settings/general': {
       id: '/app/$orgSlug/settings/general'
       path: '/general'
@@ -709,6 +729,7 @@ declare module '@tanstack/react-router' {
 
 interface AppOrgSlugSettingsRouteRouteChildren {
   AppOrgSlugSettingsGeneralRoute: typeof AppOrgSlugSettingsGeneralRoute
+  AppOrgSlugSettingsIntegrationsRoute: typeof AppOrgSlugSettingsIntegrationsRoute
   AppOrgSlugSettingsInvitationsRoute: typeof AppOrgSlugSettingsInvitationsRoute
   AppOrgSlugSettingsMembersRoute: typeof AppOrgSlugSettingsMembersRoute
   AppOrgSlugSettingsIndexRoute: typeof AppOrgSlugSettingsIndexRoute
@@ -717,6 +738,7 @@ interface AppOrgSlugSettingsRouteRouteChildren {
 const AppOrgSlugSettingsRouteRouteChildren: AppOrgSlugSettingsRouteRouteChildren =
   {
     AppOrgSlugSettingsGeneralRoute: AppOrgSlugSettingsGeneralRoute,
+    AppOrgSlugSettingsIntegrationsRoute: AppOrgSlugSettingsIntegrationsRoute,
     AppOrgSlugSettingsInvitationsRoute: AppOrgSlugSettingsInvitationsRoute,
     AppOrgSlugSettingsMembersRoute: AppOrgSlugSettingsMembersRoute,
     AppOrgSlugSettingsIndexRoute: AppOrgSlugSettingsIndexRoute,
