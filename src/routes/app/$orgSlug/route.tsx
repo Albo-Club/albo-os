@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import { Outlet, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
@@ -7,10 +14,17 @@ import { api } from '../../../../convex/_generated/api'
 import { SidebarInset, SidebarProvider } from '~/components/ui/sidebar'
 import { AppSidebar } from '~/components/app-shell/AppSidebar'
 import { AppHeader } from '~/components/app-shell/AppHeader'
-import { AiPanel } from '~/components/ai/AiPanel'
 import { CommandPalette } from '~/components/search/CommandPalette'
 import { clearLastOrgCookie, writeLastOrgCookie } from '~/lib/lastOrg'
 import { cn } from '~/lib/utils'
+
+// Lazy: AiPanel drags the whole markdown/streaming stack (streamdown,
+// ai-elements — ~90 kB gzip) into the layout chunk when imported statically.
+// Loading it on demand keeps it off the critical path; the panel streams in
+// right after first paint.
+const AiPanel = lazy(() =>
+  import('~/components/ai/AiPanel').then((m) => ({ default: m.AiPanel })),
+)
 
 export const Route = createFileRoute('/app/$orgSlug')({
   component: OrgLayout,
@@ -160,14 +174,16 @@ function OrgLayout() {
           )}
         >
           {/* key: clean remount on org change (org-scoped thread state) */}
-          <AiPanel
-            key={org._id}
-            orgId={org._id}
-            open={aiOpen}
-            onClose={() => setAiPanelOpen(false)}
-            initialPrompt={askAiPrompt}
-            onPromptConsumed={() => setAskAiPrompt(null)}
-          />
+          <Suspense fallback={null}>
+            <AiPanel
+              key={org._id}
+              orgId={org._id}
+              open={aiOpen}
+              onClose={() => setAiPanelOpen(false)}
+              initialPrompt={askAiPrompt}
+              onPromptConsumed={() => setAskAiPrompt(null)}
+            />
+          </Suspense>
         </aside>
       )}
       {org && (

@@ -23,6 +23,34 @@ bas de page.
 
 ---
 
+## v1.110.1 — 20/07/2026 à 19:52 — Chargement de l'application plus rapide
+
+L'arrivée sur Albo OS (première visite de la journée, rafraîchissement de
+page) devient sensiblement plus rapide, sur deux fronts :
+
+- **Le serveur reste éveillé.** Avec deux utilisateurs, le serveur qui rend
+  les pages s'endormait entre vos visites et devait redémarrer à chaque
+  arrivée (1 à 3 secondes de latence à froid). Il est désormais maintenu
+  chaud en permanence par un signal automatique toutes les 5 minutes.
+- **Le panneau AI ne bloque plus l'affichage.** Son moteur d'affichage
+  (rendu des réponses, code, tableaux) se charge désormais en parallèle,
+  juste après la page, au lieu d'être téléchargé avant le premier affichage
+  de chaque écran.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau cron Convex `warm vercel ssr` (toutes les 5 min) →
+>   `convex/warmup.ts:pingSite`, un `fetch(SITE_URL)` qui garde la fonction
+>   SSR Vercel chaude (garde anti-localhost identique à `convex/auth.ts`).
+> - `AiPanel` passé en `React.lazy` + `Suspense` dans
+>   `src/routes/app/$orgSlug/route.tsx` : le chunk du layout org tombe de
+>   ~180 Ko (47 Ko gz) à ~12 Ko (3,3 Ko gz), le stack streamdown/ai-elements
+>   (~90 Ko gz) sort du chemin critique de toutes les pages de l'app.
+> - `convex/_generated/api.d.ts` : entrée `warmup` ajoutée à la main
+>   (l'environnement distant ne peut pas lancer la codegen — cf.
+>   `KNOWN_ISSUES.md` « Codegen Convex hors-ligne ») ; le prochain
+>   `convex dev`/`convex deploy` la régénère à l'identique.
+
 ## v1.110.0 — 20/07/2026 à 17:39 — Connexions externes : socle modulaire + page Intégrations
 
 Les connexions aux plateformes externes (banques via Powens, portails fonds

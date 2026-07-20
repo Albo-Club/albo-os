@@ -89,6 +89,7 @@ import type * as transactions from "../transactions.js";
 import type * as users from "../users.js";
 import type * as valuations from "../valuations.js";
 import type * as vasco from "../vasco.js";
+import type * as warmup from "../warmup.js";
 
 import type {
   ApiFromModules,
@@ -178,6 +179,7 @@ declare const fullApi: ApiFromModules<{
   users: typeof users;
   valuations: typeof valuations;
   vasco: typeof vasco;
+  warmup: typeof warmup;
 }>;
 
 /**

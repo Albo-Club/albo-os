@@ -57,4 +57,8 @@ crons.interval(
   {},
 )
 
+// Keep the Vercel SSR function warm (internal tool → near-zero traffic →
+// cold start on most arrivals otherwise). cf. convex/warmup.ts.
+crons.interval('warm vercel ssr', { minutes: 5 }, internal.warmup.pingSite, {})
+
 export default crons

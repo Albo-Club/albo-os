@@ -2528,3 +2528,25 @@ récurrentes / planifiées — cf. « Routines », `code.claude.com/docs/en/rout
 Aucun fichier du repo ne les désactive. Seules mitigations : **ne pas
 appeler ces outils** (p. ex. ne pas armer de re-vérification `send_later`
 d'une PR), ou cliquer « Allow once » au cas par cas.
+
+## Codegen Convex hors-ligne (env distant / CI)
+
+`convex/_generated/api.d.ts` est committé et n'est régénéré que par
+`npx convex dev` / `convex deploy` — qui exigent un deployment configuré.
+Dans un environnement distant sans `CONVEX_DEPLOYMENT` (agent cloud, CI),
+`npx convex codegen` refuse de tourner, et le fallback
+`CONVEX_AGENT_MODE=anonymous npx convex dev --once` échoue si le proxy
+bloque le téléchargement du binaire `convex-local-backend` depuis GitHub.
+
+Conséquence : **créer un nouveau fichier module dans `convex/`** y casse le
+typecheck (`Property 'x' does not exist on type …`), car `api.d.ts` mappe
+chaque module par nom. Deux issues :
+
+- **Ajouter l'export à un module existant** : aucune régénération nécessaire
+  (le mapping est `moduleName: typeof import`, les exports sont inférés).
+- **Nouveau fichier vraiment justifié** : ajouter à la main les deux lignes
+  mécaniques dans `api.d.ts` (`import type * as x from "../x.js";` +
+  `x: typeof x;`), à l'identique de ce que la codegen produira. C'est la
+  seule exception tolérée à la règle « ne jamais éditer `_generated/` » —
+  le prochain `convex dev`/`convex deploy` (le build prod regénère) valide
+  et écrase par le même contenu. Le signaler dans la PR.
