@@ -959,14 +959,18 @@ function ParticipationDetail() {
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-        {/* Optional 2-3 line summary — w-full wraps it onto its own row
-            under the name (the header container is flex-wrap). */}
-        {company?.summary && (
-          <p className="text-muted-foreground w-full max-w-3xl whitespace-pre-line text-sm">
-            {company.summary}
-          </p>
-        )}
       </div>
+
+      {/* Optional 2-3 line summary — its own row under the name, left-aligned.
+          Kept out of the header's flex row: as a flex item its max-w-3xl width
+          fits on the same line on wide screens, and the menu's ml-auto then
+          pushes it to the right. As a plain block it always sits under the
+          name. */}
+      {company?.summary && (
+        <p className="text-muted-foreground max-w-3xl whitespace-pre-line text-sm">
+          {company.summary}
+        </p>
+      )}
 
       {/* Identity block — nature "company". Sector / SIREN / domain edit
           inline (click the value); ownership, share count and the Attio link

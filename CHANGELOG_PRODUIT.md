@@ -23,6 +23,20 @@ bas de page.
 
 ---
 
+## v1.111.2 — 20/07/2026 à 19:55 — Fiche entité : description alignée sous le nom
+
+Sur la fiche d'une entreprise, le texte de description repasse toujours sous
+le nom de la société, aligné à gauche. Sur les grands écrans il se retrouvait
+décalé sur la droite, collé au menu d'actions — c'est corrigé.
+
+> **🔧 Notes techniques**
+> Le paragraphe `summary` de l'en-tête de `participations.$companyId.tsx`
+> était un enfant du conteneur flex (`flex flex-wrap items-center`) avec
+> `w-full max-w-3xl` : sur grand écran sa largeur plafonnée tenait sur la même
+> ligne que le nom, et le `ml-auto` du menu le poussait à droite. Il est sorti
+> de la rangée flex pour redevenir un bloc plein placé sous le nom (retrait de
+> `w-full`, `max-w-3xl` conservé pour la lisibilité).
+
 ## v1.111.1 — 20/07/2026 à 19:52 — Chargement de l'application plus rapide
 
 L'arrivée sur Albo OS (première visite de la journée, rafraîchissement de
