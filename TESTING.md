@@ -578,9 +578,11 @@ ci-dessus).
 
 ## Page Intégrations (Réglages → Intégrations)
 
-Vue par org des plateformes externes du registre (`convex/lib/connectors.ts`)
-avec leur état, servie par la query publique sanitisée
-`connections.listIntegrations` (jamais de secret dans la réponse).
+Tour de contrôle par org des plateformes externes du registre
+(`convex/lib/connectors.ts`) : groupes **Installées / Disponibles**, état par
+connexion, et **point d'entrée unique** connecter/déconnecter (admin). Servie
+par la query publique sanitisée `connections.listIntegrations` (jamais de
+secret dans la réponse) + mutations `createConnection`/`disconnectConnection`.
 
 | #   | Étape                                                              | Résultat attendu                                                                                                                                                                                                       |
 | --- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -589,6 +591,9 @@ avec leur état, servie par la query publique sanitisée
 | IG3 | VASCO (org avec connexion seedée)                                  | Sous-ligne par connexion (`label`) avec état (Connectée / En erreur / Jamais connectée / Inactive) dérivé de `lastConnectedAt`/`lastError` ; **aucun** identifiant/secret visible dans la réponse réseau                 |
 | IG4 | Org sans connexion sur une plateforme org-scopée                   | Pastille « Non connectée » sur la ligne plateforme                                                                                                                                                                     |
 | IG5 | Notion / DocSend (services partagés)                               | Pastille « Opérationnelle » (Notion seulement si `BROWSERLESS_TOKEN` ou `JINA_API_KEY` posée en env ; DocSend toujours) ou « Non configurée »                                                                            |
+| IG6 | Bouton « Connecter » (VASCO, admin) → formulaire → soumettre       | Dialog générique dont les champs viennent du registre (`label` + `clientSlug` + `username` + `password`) ; création via `connections.createConnection` (admin-gated, validé `parseConnection`) ; label déjà pris → toast « Une connexion porte déjà ce nom » ; membre non-admin → bouton absent |
+| IG7 | « Déconnecter » une connexion VASCO (admin)                        | Dialog de confirmation → `connections.disconnectConnection` supprime la ligne (identifiants oubliés) ; les données déjà importées (cache communications, deals) restent                                                  |
+| IG8 | « Connecter une banque » / « Reconnecter » (Powens, admin)         | Redirection webview Powens (`startBankConnection` / `startReconnect`, comme depuis la Trésorerie) ; « Reconnecter » visible seulement sur une connexion dégradée ; non-admin → boutons absents                            |
 
 ## Ingestion reports (AgentMail → inboundEmails, briques 1-6)
 
