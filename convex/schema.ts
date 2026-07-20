@@ -325,21 +325,45 @@ export default defineSchema({
     .index('by_link_code', ['linkCode']),
 
   /**
-   * vascoConnections — investor-side connections to VASCO (https://vasco.fund),
-   * the fund-admin platform backing vehicles like Parallel Invest
-   * (`parallel.vasco.fund`). Albo OS pulls the data that only lives on the
-   * platform (positions, valuations, documents/reportings, communications) —
-   * distinct from the email report pipeline.
+   * externalConnections — org-scoped connections to external platforms whose
+   * auth kind is `credentials` (cf. `convex/lib/connectors.ts`, the registry).
+   * Generic storage managed by the common core `convex/connections.ts`;
+   * `platform` is the registry key ('vasco', …), `config` holds the platform's
+   * non-secret settings (e.g. `clientSlug`), `credentials` its secrets. The
+   * shape of both records is validated against the registry declaration
+   * (`parseConnection`), never hand-checked per platform.
    *
-   * One row per (VASCO client × Albo OS org): `Parallel → Calte` and
-   * `Parallel → Albo` are two rows (same `clientSlug`, different `username` +
-   * `orgId`). Adding a vehicle = adding a row. Each connection feeds exactly
-   * one org, so the pulled data stays within that org's tenant boundary.
+   * One row per connection per org: e.g. `vasco/Parallel → Calte` and
+   * `vasco/Parallel → Albo` are two rows. Each connection feeds exactly one
+   * org, so pulled data stays within that org's tenant boundary.
    *
-   * INTERNAL: `username`/`password` are secrets at rest, never exposed to the
-   * front end. Read/written only by internalQuery/internalMutation
-   * (cf. convex/vasco.ts). Do NOT return a raw row from a public query — it
-   * would leak the credentials (same rule as `powensUsers`).
+   * INTERNAL: `credentials` is secret at rest, never exposed to the front
+   * end. Read/written only by internalQuery/internalMutation
+   * (cf. convex/connections.ts). Do NOT return a raw row from a public
+   * query — it would leak the credentials (same rule as `powensUsers`).
+   */
+  externalConnections: defineTable({
+    orgId: v.id('organizations'), // Albo OS org fed by this connection
+    platform: v.string(), // registry key — cf. convex/lib/connectors.ts
+    label: v.string(), // human label, e.g. "Parallel — Calte"
+    config: v.optional(v.record(v.string(), v.string())), // non-secret settings
+    credentials: v.optional(v.record(v.string(), v.string())), // secrets at rest
+    active: v.boolean(),
+    createdAt: v.number(),
+    createdBy: v.optional(v.id('users')),
+    lastConnectedAt: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+  })
+    .index('by_org', ['orgId'])
+    .index('by_org_and_platform', ['orgId', 'platform'])
+    .index('by_platform', ['platform']),
+
+  /**
+   * vascoConnections — LEGACY, declared but inert. Superseded by
+   * `externalConnections` (platform 'vasco') via the one-shot
+   * `migrations/externalConnections:migrateVascoConnections` — cf.
+   * `MIGRATIONS.md`. Kept declared until the purge-then-narrow cleanup
+   * (same convention as the legacy `forecasts` table). Read by nothing.
    */
   vascoConnections: defineTable({
     orgId: v.id('organizations'), // Albo OS org fed by this connection

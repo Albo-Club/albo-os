@@ -16,6 +16,12 @@
  * denied, and the monetary fields on `accountSecurityContracts` come back
  * masked (zeroed). The real invested amounts live on `Account.investments`,
  * read via  JWT `id` → GetUser(id).accounts → GetAccount(id).investments.
+ *
+ * Platform module on the connections core: the connection rows live in the
+ * generic `externalConnections` table (platform 'vasco'), managed by
+ * `convex/connections.ts` (seed/remove/list/markConnected) and declared in
+ * the registry `convex/lib/connectors.ts`. This module only holds the VASCO
+ * pull logic and adapts the generic rows via `vascoCreds`.
  */
 
 import { ConvexError, v } from 'convex/values'
@@ -28,17 +34,36 @@ import {
 } from './_generated/server'
 import { internal } from './_generated/api'
 import { requireOrgMember } from './lib/auth'
+import { getConnector, parseConnection } from './lib/connectors'
 import type { GenericActionCtx } from 'convex/server'
 import type { DataModel, Doc, Id } from './_generated/dataModel'
 
 type ActionCtx = GenericActionCtx<DataModel>
 
-// ── HTTP / GraphQL helpers ──────────────────────────────────────────────────
+// ── Connection adapter (generic row → typed VASCO creds) ────────────────────
 
-type VascoCreds = Pick<
-  Doc<'vascoConnections'>,
-  'clientSlug' | 'username' | 'password'
->
+type VascoConnection = Doc<'externalConnections'>
+
+type VascoCreds = { clientSlug: string; username: string; password: string }
+
+/** Validated VASCO view of a generic connection row — throws a machine code
+ * on a malformed row (missing clientSlug/username/password). */
+function vascoCreds(conn: VascoConnection): VascoCreds {
+  const { config, credentials } = parseConnection(getConnector('vasco'), conn)
+  return {
+    clientSlug: config.clientSlug,
+    username: credentials.username,
+    password: credentials.password,
+  }
+}
+
+/** Non-throwing clientSlug read, for filtering/grouping rows (a malformed row
+ * must not kill a listing — it fails later, loudly, at login time). */
+function connClientSlug(conn: VascoConnection): string | null {
+  return conn.config?.clientSlug ?? null
+}
+
+// ── HTTP / GraphQL helpers ──────────────────────────────────────────────────
 
 function vascoBaseUrl(clientSlug: string): string {
   return `https://api.${clientSlug}.vasco.fund`
@@ -304,39 +329,40 @@ type ConnectionResult = {
   error?: string
 }
 
-/** Log in and read each connection, recording the outcome. Shared by the two
- * read entry points (public action + CLI internal action). */
+/** Log in and read each connection, recording the outcome on the generic row
+ * (connections core). Shared by the two read entry points (public action +
+ * CLI internal action). */
 async function runConnections(
   ctx: ActionCtx,
-  conns: Array<Doc<'vascoConnections'>>,
+  conns: Array<VascoConnection>,
 ): Promise<Array<ConnectionResult>> {
   const results: Array<ConnectionResult> = []
   for (const conn of conns) {
     try {
-      const accounts = await pullPositions(conn)
+      const accounts = await pullPositions(vascoCreds(conn))
       const totalInvestedCents = accounts.reduce(
         (s, a) => s + a.totalInvestedCents,
         0,
       )
       results.push({
-        clientSlug: conn.clientSlug,
+        clientSlug: connClientSlug(conn) ?? '',
         label: conn.label,
         totalInvestedCents,
         accounts,
       })
-      await ctx.runMutation(internal.vasco.markConnected, {
+      await ctx.runMutation(internal.connections.markConnected, {
         connectionId: conn._id,
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       results.push({
-        clientSlug: conn.clientSlug,
+        clientSlug: connClientSlug(conn) ?? '',
         label: conn.label,
         totalInvestedCents: 0,
         accounts: [],
         error: message,
       })
-      await ctx.runMutation(internal.vasco.markConnected, {
+      await ctx.runMutation(internal.connections.markConnected, {
         connectionId: conn._id,
         error: message,
       })
@@ -345,141 +371,36 @@ async function runConnections(
   return results
 }
 
-// ── Connection registry (internal-only — rows carry credentials) ────────────
+// Connection rows live in `externalConnections` (platform 'vasco') and are
+// managed by the connections core — seeding/removal runbook in
+// `convex/connections.ts` (`connections:seedConnection` /
+// `connections:removeConnection`).
 
 /**
- * Authorize the caller and return the org's ACTIVE connections. Membership is
- * checked with the caller's identity, propagated from the calling action
- * (same pattern as powens.powensAuthProbe). Returns raw rows including
- * credentials — INTERNAL ONLY, never expose to a public query.
+ * Distinct client slugs of the org's ACTIVE VASCO connections (e.g.
+ * ["parallel", "teampact"]) — feeds the front-end gating of the
+ * communications block: an entity offers the linker when one of the org's
+ * connected portals is mentioned in its name/domain/origin fields.
+ * Org-member-guarded; returns ONLY the non-secret slugs, never a row.
  */
-export const authorizeAndListConnections = internalQuery({
+export const listConnectedClientSlugs = query({
   args: { orgId: v.id('organizations') },
-  handler: async (ctx, { orgId }) => {
+  handler: async (ctx, { orgId }): Promise<Array<string>> => {
     await requireOrgMember(ctx, orgId)
     const conns = await ctx.db
-      .query('vascoConnections')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .collect()
-    return conns.filter((c) => c.active)
-  },
-})
-
-/**
- * Like `authorizeAndListConnections` but resolved by org slug and WITHOUT an
- * auth check — for CLI-run internal actions (`convex run`), which have no user
- * identity. INTERNAL ONLY (never exposed publicly); rows carry credentials.
- */
-export const getConnectionsByOrgSlug = internalQuery({
-  args: { orgSlug: v.string() },
-  handler: async (ctx, { orgSlug }) => {
-    const org = await ctx.db
-      .query('organizations')
-      .withIndex('by_slug', (q) => q.eq('slug', orgSlug))
-      .unique()
-    if (!org) throw new ConvexError('org_not_found')
-    const conns = await ctx.db
-      .query('vascoConnections')
-      .withIndex('by_org', (q) => q.eq('orgId', org._id))
-      .collect()
-    return conns.filter((c) => c.active)
-  },
-})
-
-/**
- * Active connections of `orgId` — auth-less, keyed by orgId. Mirrors
- * `getConnectionsByOrgSlug` but for system-context callers that already hold an
- * orgId (e.g. `intelligence.runAnalysis`, which runs with no user identity, so
- * `requireOrgMember` can't apply). INTERNAL ONLY (never exposed publicly); rows
- * carry credentials.
- */
-export const getActiveConnectionsByOrgId = internalQuery({
-  args: { orgId: v.id('organizations') },
-  handler: async (ctx, { orgId }) => {
-    const conns = await ctx.db
-      .query('vascoConnections')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .collect()
-    return conns.filter((c) => c.active)
-  },
-})
-
-/** Record the outcome of a connection attempt (clears `lastError` on success). */
-export const markConnected = internalMutation({
-  args: {
-    connectionId: v.id('vascoConnections'),
-    error: v.optional(v.string()),
-  },
-  handler: async (ctx, { connectionId, error }) => {
-    await ctx.db.patch('vascoConnections', connectionId, {
-      lastConnectedAt: Date.now(),
-      lastError: error,
-    })
-  },
-})
-
-/**
- * Seed / upsert a connection. One-shot, run from the CLI, e.g.:
- *   npx convex run --prod vasco:seedConnection \
- *     '{"orgSlug":"calte","clientSlug":"parallel","label":"Parallel — Calte",
- *       "username":"<login>","password":"<password>"}'
- * Upsert key = (clientSlug, username). INTERNAL — carries credentials.
- */
-export const seedConnection = internalMutation({
-  args: {
-    orgSlug: v.string(),
-    clientSlug: v.string(),
-    label: v.string(),
-    username: v.string(),
-    // Provide exactly one: `password` (plain) or `passwordB64` (base64 — use
-    // this to avoid shell/paste mangling of special characters).
-    password: v.optional(v.string()),
-    passwordB64: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const password = args.passwordB64 ? atob(args.passwordB64) : args.password
-    if (!password) throw new ConvexError('password_required')
-    const org = await ctx.db
-      .query('organizations')
-      .withIndex('by_slug', (q) => q.eq('slug', args.orgSlug))
-      .unique()
-    if (!org) throw new ConvexError('org_not_found')
-    const existing = await ctx.db
-      .query('vascoConnections')
-      .withIndex('by_client_and_username', (q) =>
-        q.eq('clientSlug', args.clientSlug).eq('username', args.username),
+      .query('externalConnections')
+      .withIndex('by_org_and_platform', (q) =>
+        q.eq('orgId', orgId).eq('platform', 'vasco'),
       )
-      .unique()
-    if (existing) {
-      await ctx.db.patch('vascoConnections', existing._id, {
-        orgId: org._id,
-        label: args.label,
-        password,
-        active: true,
-      })
-      return existing._id
-    }
-    return ctx.db.insert('vascoConnections', {
-      orgId: org._id,
-      clientSlug: args.clientSlug,
-      label: args.label,
-      username: args.username,
-      password,
-      active: true,
-      createdAt: Date.now(),
-    })
-  },
-})
-
-/**
- * Delete a connection row (e.g. remove a mistakenly-seeded one). One-shot CLI:
- *   npx convex run --prod vasco:deleteConnection '{"connectionId":"<id>"}'
- */
-export const deleteConnection = internalMutation({
-  args: { connectionId: v.id('vascoConnections') },
-  handler: async (ctx, { connectionId }) => {
-    await ctx.db.delete('vascoConnections', connectionId)
-    return { deleted: connectionId }
+      .collect()
+    return [
+      ...new Set(
+        conns
+          .filter((c) => c.active)
+          .map((c) => connClientSlug(c))
+          .filter((s): s is string => Boolean(s)),
+      ),
+    ]
   },
 })
 
@@ -494,9 +415,9 @@ export const deleteConnection = internalMutation({
 export const fetchParticipations = action({
   args: { orgId: v.id('organizations') },
   handler: async (ctx, { orgId }) => {
-    const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
-      internal.vasco.authorizeAndListConnections,
-      { orgId },
+    const conns: Array<VascoConnection> = await ctx.runQuery(
+      internal.connections.authorizeAndListActive,
+      { orgId, platform: 'vasco' },
     )
     return { orgId, connections: await runConnections(ctx, conns) }
   },
@@ -511,9 +432,9 @@ export const fetchParticipations = action({
 export const verifyConnection = internalAction({
   args: { orgSlug: v.string() },
   handler: async (ctx, { orgSlug }) => {
-    const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
-      internal.vasco.getConnectionsByOrgSlug,
-      { orgSlug },
+    const conns: Array<VascoConnection> = await ctx.runQuery(
+      internal.connections.listActiveByOrgSlug,
+      { orgSlug, platform: 'vasco' },
     )
     return { orgSlug, connections: await runConnections(ctx, conns) }
   },
@@ -528,9 +449,9 @@ export const verifyConnection = internalAction({
 export const debugVascoLogin = internalAction({
   args: { orgSlug: v.string() },
   handler: async (ctx, { orgSlug }) => {
-    const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
-      internal.vasco.getConnectionsByOrgSlug,
-      { orgSlug },
+    const conns: Array<VascoConnection> = await ctx.runQuery(
+      internal.connections.listActiveByOrgSlug,
+      { orgSlug, platform: 'vasco' },
     )
     const egressIp = await fetch('https://api.ipify.org')
       .then((r) => r.text())
@@ -549,19 +470,23 @@ export const debugVascoLogin = internalAction({
       bodySnippet: string
     }> = []
     for (const conn of conns) {
-      const storedUsername = conn.username
-      const storedPasswordLen = conn.password.length
-      const storedPasswordSha12 = await sha256Hex12(conn.password)
+      // Raw reads (not the throwing adapter): a malformed row must still be
+      // diagnosable, that is the whole point of this probe.
+      const clientSlug = connClientSlug(conn) ?? ''
+      const storedUsername = conn.credentials?.username ?? ''
+      const storedPassword = conn.credentials?.password ?? ''
+      const storedPasswordLen = storedPassword.length
+      const storedPasswordSha12 = await sha256Hex12(storedPassword)
       try {
-        const res = await fetch(`${vascoBaseUrl(conn.clientSlug)}/auth/login`, {
+        const res = await fetch(`${vascoBaseUrl(clientSlug)}/auth/login`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'User-Agent': USER_AGENT,
           },
           body: JSON.stringify({
-            username: conn.username,
-            password: conn.password,
+            username: storedUsername,
+            password: storedPassword,
           }),
         })
         const body = await res.text().catch(() => '')
@@ -573,7 +498,7 @@ export const debugVascoLogin = internalAction({
         }
         results.push({
           label: conn.label,
-          clientSlug: conn.clientSlug,
+          clientSlug,
           storedUsername,
           storedPasswordLen,
           storedPasswordSha12,
@@ -586,7 +511,7 @@ export const debugVascoLogin = internalAction({
       } catch (err) {
         results.push({
           label: conn.label,
-          clientSlug: conn.clientSlug,
+          clientSlug,
           storedUsername,
           storedPasswordLen,
           storedPasswordSha12,
@@ -615,9 +540,9 @@ export const debugVascoLogin = internalAction({
 export const probeCommunications = internalAction({
   args: { orgSlug: v.string() },
   handler: async (ctx, { orgSlug }) => {
-    const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
-      internal.vasco.getConnectionsByOrgSlug,
-      { orgSlug },
+    const conns: Array<VascoConnection> = await ctx.runQuery(
+      internal.connections.listActiveByOrgSlug,
+      { orgSlug, platform: 'vasco' },
     )
     const connections: Array<{
       label: string
@@ -628,10 +553,12 @@ export const probeCommunications = internalAction({
       probes?: Array<{ scope: string; httpStatus: number; body: unknown }>
     }> = []
     for (const conn of conns) {
+      const clientSlug = connClientSlug(conn) ?? ''
       try {
-        const { token, userId } = await vascoLogin(conn)
+        const creds = vascoCreds(conn)
+        const { token, userId } = await vascoLogin(creds)
         const userData = await vascoGraphql<GetUserResult>(
-          conn.clientSlug,
+          creds.clientSlug,
           token,
           GET_USER,
           { id: userId },
@@ -649,15 +576,18 @@ export const probeCommunications = internalAction({
         // Candidate investor scopings: by user, then by each account id.
         probes.push({
           scope: `userId=${userId}`,
-          ...(await vascoGraphqlRaw(conn.clientSlug, token, GET_COMMUNICATIONS, {
-            userId,
-          })),
+          ...(await vascoGraphqlRaw(
+            creds.clientSlug,
+            token,
+            GET_COMMUNICATIONS,
+            { userId },
+          )),
         })
         for (const acc of accounts) {
           probes.push({
             scope: `accountId=${acc.id} (${acc.label ?? acc.type})`,
             ...(await vascoGraphqlRaw(
-              conn.clientSlug,
+              creds.clientSlug,
               token,
               GET_COMMUNICATIONS,
               { accountId: acc.id },
@@ -666,7 +596,7 @@ export const probeCommunications = internalAction({
         }
         connections.push({
           label: conn.label,
-          clientSlug: conn.clientSlug,
+          clientSlug,
           userId,
           accounts,
           probes,
@@ -674,7 +604,7 @@ export const probeCommunications = internalAction({
       } catch (err) {
         connections.push({
           label: conn.label,
-          clientSlug: conn.clientSlug,
+          clientSlug,
           error: err instanceof Error ? err.message : String(err),
         })
       }
@@ -795,12 +725,12 @@ async function activeConnectionsForClient(
   ctx: ActionCtx,
   orgId: Id<'organizations'>,
   clientSlug: string,
-): Promise<Array<Doc<'vascoConnections'>>> {
-  const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
-    internal.vasco.authorizeAndListConnections,
-    { orgId },
+): Promise<Array<VascoConnection>> {
+  const conns: Array<VascoConnection> = await ctx.runQuery(
+    internal.connections.authorizeAndListActive,
+    { orgId, platform: 'vasco' },
   )
-  return conns.filter((c) => c.clientSlug === clientSlug)
+  return conns.filter((c) => connClientSlug(c) === clientSlug)
 }
 
 // ── Communications cache (stored, cron-refreshed) ───────────────────────────
@@ -810,16 +740,6 @@ async function activeConnectionsForClient(
 // communications in `vascoCommunicationsCache` and refresh on a cron (+ a manual
 // button). The UI reads the cache via reactive queries (instant); freshness is
 // bounded by the cron cadence. cf. KNOWN_ISSUES.md "VASCO API".
-
-/** All active connections across every org — auth-less, for the cron. INTERNAL
- * ONLY (rows carry credentials). */
-export const getAllActiveConnections = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const conns = await ctx.db.query('vascoConnections').collect()
-    return conns.filter((c) => c.active)
-  },
-})
 
 /** Atomically replace the cached communications of one (org, clientSlug): drop
  * the stale rows, insert the freshly pulled set. One transaction, so a reader
@@ -888,26 +808,28 @@ export const replaceCommunicationsCache = internalMutation({
 export const refreshVascoCacheForOrg = internalAction({
   args: { orgId: v.id('organizations') },
   handler: async (ctx, { orgId }) => {
-    const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
-      internal.vasco.getActiveConnectionsByOrgId,
-      { orgId },
+    const conns: Array<VascoConnection> = await ctx.runQuery(
+      internal.connections.listActiveForOrg,
+      { orgId, platform: 'vasco' },
     )
     // Group by client so a stale duplicate connection can't wipe a good cache.
-    const byClient = new Map<string, Array<Doc<'vascoConnections'>>>()
+    const byClient = new Map<string, Array<VascoConnection>>()
     for (const conn of conns) {
-      const list = byClient.get(conn.clientSlug) ?? []
+      const clientSlug = connClientSlug(conn)
+      if (!clientSlug) continue // malformed row — fails loudly at login time
+      const list = byClient.get(clientSlug) ?? []
       list.push(conn)
-      byClient.set(conn.clientSlug, list)
+      byClient.set(clientSlug, list)
     }
     for (const [clientSlug, clientConns] of byClient) {
       let communications: Array<VascoCommunication> | null = null
       for (const conn of clientConns) {
         try {
-          communications = await pullCommunications(conn)
+          communications = await pullCommunications(vascoCreds(conn))
           break
         } catch (err) {
           console.warn(
-            `[vasco] cache refresh pull failed for ${conn.clientSlug}:`,
+            `[vasco] cache refresh pull failed for ${clientSlug}:`,
             err instanceof Error ? err.message : String(err),
           )
         }
@@ -927,9 +849,9 @@ export const refreshVascoCacheForOrg = internalAction({
 export const refreshAllVascoCaches = internalAction({
   args: {},
   handler: async (ctx) => {
-    const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
-      internal.vasco.getAllActiveConnections,
-      {},
+    const conns: Array<VascoConnection> = await ctx.runQuery(
+      internal.connections.listAllActive,
+      { platform: 'vasco' },
     )
     const orgIds = Array.from(new Set(conns.map((c) => c.orgId)))
     for (const orgId of orgIds) {
@@ -944,7 +866,10 @@ export const refreshVascoCacheNow = action({
   args: { orgId: v.id('organizations') },
   handler: async (ctx, { orgId }): Promise<{ refreshedAt: number }> => {
     // Guard: throws unless the caller is a member of the org.
-    await ctx.runQuery(internal.vasco.authorizeAndListConnections, { orgId })
+    await ctx.runQuery(internal.connections.authorizeAndListActive, {
+      orgId,
+      platform: 'vasco',
+    })
     await ctx.runAction(internal.vasco.refreshVascoCacheForOrg, { orgId })
     return { refreshedAt: Date.now() }
   },
@@ -1068,15 +993,15 @@ export const pullCommunicationsForSynthesis = internalAction({
     ctx,
     { orgId, clientSlug, issuerId },
   ): Promise<Array<VascoCommunication>> => {
-    const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
-      internal.vasco.getActiveConnectionsByOrgId,
-      { orgId },
+    const conns: Array<VascoConnection> = await ctx.runQuery(
+      internal.connections.listActiveForOrg,
+      { orgId, platform: 'vasco' },
     )
-    const matching = conns.filter((c) => c.clientSlug === clientSlug)
+    const matching = conns.filter((c) => connClientSlug(c) === clientSlug)
     // Try each matching connection until one logs in (tolerates a stale dup).
     for (const conn of matching) {
       try {
-        const all = await pullCommunications(conn)
+        const all = await pullCommunications(vascoCreds(conn))
         return all
           .filter((c) => c.issuerId === issuerId)
           .sort((a, b) =>
@@ -1084,7 +1009,7 @@ export const pullCommunicationsForSynthesis = internalAction({
           )
       } catch (err) {
         console.warn(
-          `[vasco] synthesis comms pull failed for ${conn.clientSlug}:`,
+          `[vasco] synthesis comms pull failed for ${clientSlug}:`,
           err instanceof Error ? err.message : String(err),
         )
       }
@@ -1112,9 +1037,10 @@ export const downloadCommunicationDocument = action({
     let lastError: string | null = null
     for (const conn of conns) {
       try {
-        const { token } = await vascoLogin(conn)
+        const creds = vascoCreds(conn)
+        const { token } = await vascoLogin(creds)
         const res = await fetch(
-          `${vascoBaseUrl(conn.clientSlug)}/documents/${documentId}/download`,
+          `${vascoBaseUrl(creds.clientSlug)}/documents/${documentId}/download`,
           { headers: { Authorization: `Bearer ${token}`, 'User-Agent': USER_AGENT } },
         )
         if (!res.ok) {
@@ -1394,21 +1320,22 @@ export const backfillSpvInstruments = internalAction({
   args: { orgSlug: v.string(), dryRun: v.optional(v.boolean()) },
   handler: async (ctx, { orgSlug, dryRun = true }): Promise<BridgeResult> => {
     // 1. Pull Parallel positions across the org's active connections.
-    const conns: Array<Doc<'vascoConnections'>> = await ctx.runQuery(
-      internal.vasco.getConnectionsByOrgSlug,
-      { orgSlug },
+    const conns: Array<VascoConnection> = await ctx.runQuery(
+      internal.connections.listActiveByOrgSlug,
+      { orgSlug, platform: 'vasco' },
     )
     const positions: Array<BridgePosition> = []
     const pullErrors: Array<{ clientSlug: string; error: string }> = []
     for (const conn of conns) {
+      const clientSlug = connClientSlug(conn) ?? ''
       try {
-        const accounts = await pullPositions(conn)
+        const accounts = await pullPositions(vascoCreds(conn))
         for (const acc of accounts)
           for (const inv of acc.investments)
-            positions.push({ ...inv, clientSlug: conn.clientSlug })
+            positions.push({ ...inv, clientSlug })
       } catch (err) {
         pullErrors.push({
-          clientSlug: conn.clientSlug,
+          clientSlug,
           error: err instanceof Error ? err.message : String(err),
         })
       }

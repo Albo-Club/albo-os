@@ -32,9 +32,20 @@ pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip
 | Description Parallel via VASCO (one-liner + résumé des SPV) toutes orgs | `convex/companyEnrichment.ts` → `companyEnrichment:backfillVascoPitches`                                    | Décrit **chaque entité Parallel rattachée** (portfolio + `vascoIssuerId`) à partir de ses communications VASCO en cache. **Écrase** `oneLiner`+`summary` (la description d'opération VASCO supplante celle du domaine, inadaptée aux SPV). Rafraîchit le cache par org d'abord. Org-agnostique (toute org avec une connexion VASCO active — Calte, Albo si branchée). Aussi déclenché **auto au rattachement** (`setVascoLink`). Non idempotent (régénère à chaque passage). Ancre : le lien `vascoClientSlug`+`vascoIssuerId`. |
 | Backfill Attio → deals (Term Sheet en cours)                         | `convex/attioSync.ts` → `attioSync:backfillTermSheets`                                                       | Importe les deals **actuellement** en Term Sheet dans Attio (le webhook ne prend que le futur). Query paginée, filtre stage TS par id, chacun dans `upsertFromDeal` (idempotent sur `attioDealId`, **ne crée jamais sur Invested** → pas de doublon avec le portefeuille déjà importé). Re-run sûr. Cf. `KNOWN_ISSUES.md` « Sync Attio → deals ». |
 
+| Bascule connexions VASCO → table générique `externalConnections`      | `convex/migrations/externalConnections.ts` → `migrateVascoConnections`                                       | Copie les lignes `vascoConnections` vers `externalConnections` (platform `vasco`). Additive, idempotente (skip si clientSlug+username déjà présents). ⚠️ **À lancer juste après le deploy** du socle connexions : tant qu'elle n'a pas tourné, le module VASCO ne voit aucune connexion. Runbook en tête du module. |
+
 Les ponts Attio (`attioCompanyId` / `attioDealId`) et l'ingestion Powens sont
 des flux **continus**, pas des migrations — cf. `KNOWN_ISSUES.md`
 (« Ingestion Powens ») et `CLAUDE.md` (frontière d'attribution Attio).
+
+## Chantier : retrait de la table legacy `vascoConnections`
+
+La table `vascoConnections` est inerte depuis la bascule vers le socle
+connexions (`externalConnections`, cf. l'opération ci-dessus — lue par rien).
+Retrait en deux temps, même règle « purger d'abord, resserrer ensuite » que
+`forecasts` : après avoir vérifié en prod que `migrateVascoConnections` a bien
+tourné (et un `connections:status` sain), purger les lignes puis retirer la
+table du `convex/schema.ts` dans une PR de suivi.
 
 ## Chantier : retrait de la table legacy `forecasts`
 

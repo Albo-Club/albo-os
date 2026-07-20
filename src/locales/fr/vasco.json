@@ -1,10 +1,10 @@
 {
   "communications": {
-    "title": "Communications Parallel",
+    "title": "Communications investisseurs",
     "refresh": "Rafraîchir",
     "loading": "Chargement des communications…",
-    "error": "Impossible de charger les communications Parallel.",
-    "refreshError": "Impossible de rafraîchir depuis Parallel.",
+    "error": "Impossible de charger les communications.",
+    "refreshError": "Impossible de rafraîchir depuis le portail.",
     "empty": "Aucune communication pour ce deal pour l'instant.",
     "publishedOn": "Publié le {{date}}",
     "download": "Télécharger",
@@ -13,19 +13,19 @@
     "documents_other": "{{count}} documents"
   },
   "link": {
-    "cta": "Rattacher à Parallel",
-    "prompt": "Rattachez cette entité à son deal Parallel pour voir ses communications.",
+    "cta": "Rattacher au portail investisseur",
+    "prompt": "Rattachez cette entité à son deal sur le portail investisseur (Parallel, …) pour voir ses communications.",
     "linkedTo": "Rattaché à {{label}}",
     "change": "Modifier le rattachement",
     "unlink": "Détacher",
     "unlinking": "Détachement…",
-    "dialogTitle": "Rattacher cette entité à un deal Parallel",
-    "dialogDescription": "Choisissez le SPV Parallel correspondant à cette entité. Ses communications apparaîtront alors ici.",
-    "loadingIssuers": "Chargement des deals Parallel…",
-    "issuersError": "Impossible de charger les deals Parallel.",
-    "noIssuers": "Aucun deal Parallel disponible pour cette organisation.",
+    "dialogTitle": "Rattacher cette entité à un deal du portail",
+    "dialogDescription": "Choisissez le véhicule correspondant à cette entité. Ses communications apparaîtront alors ici.",
+    "loadingIssuers": "Chargement des deals du portail…",
+    "issuersError": "Impossible de charger les deals du portail.",
+    "noIssuers": "Aucun deal disponible pour cette organisation.",
     "current": "Actuellement rattaché à {{label}}",
-    "saved": "Entité rattachée à Parallel.",
+    "saved": "Entité rattachée au portail.",
     "unlinked": "Rattachement supprimé.",
     "saveError": "Échec de l'enregistrement du rattachement."
   }

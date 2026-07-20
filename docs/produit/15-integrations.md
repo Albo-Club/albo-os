@@ -1,5 +1,22 @@
 # Intégrations
 
+## La page Intégrations (Réglages)
+
+Chaque organisation dispose d'une vue **Réglages → Intégrations** qui liste
+les plateformes externes gérées par Albo OS — ce qui est branché, ce qui est
+disponible, et dans quel état :
+
+- les plateformes **par organisation** (banques via Powens, portails fonds
+  type Parallel) affichent chaque connexion avec sa pastille d'état
+  (connectée / en retard / à reconnecter / en erreur) et sa dernière
+  synchronisation ;
+- les **services partagés** (extraction Notion, DocSend) indiquent simplement
+  s'ils sont opérationnels.
+
+C'est une vue d'état : les actions restent sur leurs pages respectives (la
+connexion/reconnexion bancaire se fait depuis la Trésorerie). Toute nouvelle
+plateforme branchée à l'avenir apparaîtra automatiquement dans cette liste.
+
 ## Attio (CRM dealflow)
 
 **La frontière** : Attio est la source de vérité *avant* l'investissement

@@ -576,6 +576,20 @@ ci-dessus).
 | M7  | Supprimer une connexion côté Powens puis relancer M2                                      | La ligne disparaît de `powensConnections` (le poll est autoritaire) ; la section UI ne la montre plus                                                       |
 | M8  | Compte lié à Powens (`powensAccountId` posé) dont la connexion n'a pas de ligne `powensConnections` (ex. connexion sous un vieux user Powens non géré — cas Qonto) | Ligne « Non suivie » (pastille ambre) dans la section Connexions : nom = banque, « dernières données il y a X » (max des `balanceAsOf`), comptes concernés, hint « refaire la connexion via Connecter une banque », **pas** de bouton Reconnecter ; comptée dans la bannière de la Vue d'ensemble (« Connexion bancaire non suivie : X ») ; réparation : cf. `KNOWN_ISSUES.md` « État Non suivie » |
 
+## Page Intégrations (Réglages → Intégrations)
+
+Vue par org des plateformes externes du registre (`convex/lib/connectors.ts`)
+avec leur état, servie par la query publique sanitisée
+`connections.listIntegrations` (jamais de secret dans la réponse).
+
+| #   | Étape                                                              | Résultat attendu                                                                                                                                                                                                       |
+| --- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IG1 | `/app/calte/settings/integrations` (membre de l'org)               | Une ligne par plateforme du registre (Powens, Parallel/VASCO, Notion, DocSend) : nom + badge de portée (« Par organisation » / « Service partagé ») + description ; i18n FR/EN                                          |
+| IG2 | Powens (org avec banques connectées)                               | Une sous-ligne par connexion bancaire avec pastille de santé (🟢 Connectée / 🟠 En retard / 🔴 À reconnecter — même dérivation que la page Trésorerie) et « dernière synchro il y a X »                                     |
+| IG3 | VASCO (org avec connexion seedée)                                  | Sous-ligne par connexion (`label`) avec état (Connectée / En erreur / Jamais connectée / Inactive) dérivé de `lastConnectedAt`/`lastError` ; **aucun** identifiant/secret visible dans la réponse réseau                 |
+| IG4 | Org sans connexion sur une plateforme org-scopée                   | Pastille « Non connectée » sur la ligne plateforme                                                                                                                                                                     |
+| IG5 | Notion / DocSend (services partagés)                               | Pastille « Opérationnelle » (Notion seulement si `BROWSERLESS_TOKEN` ou `JINA_API_KEY` posée en env ; DocSend toujours) ou « Non configurée »                                                                            |
+
 ## Ingestion reports (AgentMail → inboundEmails, briques 1-6)
 
 Webhook `message.received` → `/agentmail/webhook` (signature Svix) →
@@ -672,9 +686,11 @@ Communications **mises en cache** (`vascoCommunicationsCache`) et lues via des
 queries **réactives** (affichage instantané) ; rafraîchies par un **cron toutes
 les 48 h** + un bouton **« Rafraîchir »** (VASCO n'a pas de webhook investisseur,
 d'où le pull). Scoping org + rattachement entité ↔ émetteur **par id**. Le bloc
-apparaît sur les entités **portfolio Parallel** (nom/domaine/origine « Parallel »)
-ou déjà rattachées ; jamais sur les `group_*`. Nécessite une connexion VASCO
-active (org `calte`).
+apparaît sur les entités **portfolio** dont le nom/domaine/origine mentionne un
+**portail VASCO connecté de l'org** (slugs actifs via
+`vasco.listConnectedClientSlugs` — « parallel » aujourd'hui, tout nouveau
+portail seedé élargit la détection sans code) ou déjà rattachées ; jamais sur
+les `group_*`. Nécessite une connexion VASCO active (org `calte`).
 
 | Ref | Scénario | Attendu |
 | --- | --- | --- |

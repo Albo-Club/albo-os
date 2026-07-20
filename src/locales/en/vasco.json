@@ -1,10 +1,10 @@
 {
   "communications": {
-    "title": "Parallel communications",
+    "title": "Investor communications",
     "refresh": "Refresh",
     "loading": "Loading communications…",
-    "error": "Couldn't load Parallel communications.",
-    "refreshError": "Couldn't refresh from Parallel.",
+    "error": "Couldn't load the communications.",
+    "refreshError": "Couldn't refresh from the portal.",
     "empty": "No communication for this deal yet.",
     "publishedOn": "Published {{date}}",
     "download": "Download",
@@ -13,19 +13,19 @@
     "documents_other": "{{count}} documents"
   },
   "link": {
-    "cta": "Link to Parallel",
-    "prompt": "Link this entity to its Parallel deal to see its communications.",
+    "cta": "Link to the investor portal",
+    "prompt": "Link this entity to its deal on the investor portal (Parallel, …) to see its communications.",
     "linkedTo": "Linked to {{label}}",
     "change": "Change link",
     "unlink": "Unlink",
     "unlinking": "Unlinking…",
-    "dialogTitle": "Link this entity to a Parallel deal",
-    "dialogDescription": "Pick the Parallel SPV that matches this entity. Its communications will then show up here.",
-    "loadingIssuers": "Loading Parallel deals…",
-    "issuersError": "Couldn't load Parallel deals.",
-    "noIssuers": "No Parallel deal available for this organisation.",
+    "dialogTitle": "Link this entity to a portal deal",
+    "dialogDescription": "Pick the vehicle that matches this entity. Its communications will then show up here.",
+    "loadingIssuers": "Loading portal deals…",
+    "issuersError": "Couldn't load the portal deals.",
+    "noIssuers": "No deal available for this organisation.",
     "current": "Currently linked to {{label}}",
-    "saved": "Entity linked to Parallel.",
+    "saved": "Entity linked to the portal.",
     "unlinked": "Link removed.",
     "saveError": "Couldn't save the link."
   }

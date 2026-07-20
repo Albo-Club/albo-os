@@ -23,6 +23,58 @@ bas de page.
 
 ---
 
+## v1.110.0 — 20/07/2026 à 17:39 — Connexions externes : socle modulaire + page Intégrations
+
+Les connexions aux plateformes externes (banques via Powens, portails fonds
+via Parallel/VASCO, extraction Notion et DocSend) reposent désormais sur un
+socle commun — un registre des plateformes et une gestion unifiée des
+connexions — au lieu de branchements codés au cas par cas. Ajouter une
+nouvelle plateforme demain sera plus simple et plus sûr.
+
+Et c'est désormais visible : une nouvelle page **Réglages → Intégrations**
+liste, pour chaque organisation, les plateformes branchées et disponibles
+avec leur état — connexions bancaires avec leur santé et leur dernière
+synchro, connexion Parallel, services d'extraction (Notion, DocSend)
+opérationnels ou non. Une vue d'état façon « intégrations » d'Attio ou
+Granola : les actions restent sur leurs pages (la reconnexion bancaire se
+fait toujours depuis la Trésorerie).
+
+Dans la foulée, le bloc « Communications investisseurs » des fiches
+participations n'est plus réservé à Parallel : il se propose désormais sur
+toute entité liée à un portail investisseur **connecté** de l'organisation.
+Brancher demain un nouveau portail (par exemple Teampact, également géré via
+VASCO) suffira à faire apparaître ses communications — sans développement.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau registre `convex/lib/connectors.ts` (powens/vasco/notion/docsend :
+>   portée, mode d'auth, clés requises) + noyau commun `convex/connections.ts`
+>   (table générique `externalConnections`, seed/remove/list/markConnected,
+>   diagnostic `connections:status` dispatché par type d'auth, jamais par
+>   plateforme).
+> - `convex/vasco.ts` devient le module de référence : la logique GraphQL est
+>   inchangée mais lit ses connexions via le noyau (adaptateur `vascoCreds` +
+>   `parseConnection`). Les fonctions maison (`vasco:seedConnection`,
+>   `deleteConnection`, `getConnectionsByOrgSlug`…) sont remplacées par les
+>   génériques `connections:*`.
+> - `downloadDocSend` extrait de `reportExtract.ts` vers `convex/lib/docsend.ts`
+>   (1 module = 1 plateforme) ; `powens.ts` expose `connectionHealth` pour le
+>   statut du registre.
+> - Migration one-shot idempotente `migrations/externalConnections:
+>   migrateVascoConnections` (à lancer juste après le deploy — cf.
+>   `MIGRATIONS.md`) ; table `vascoConnections` conservée déclarée-mais-inerte.
+> - Page `settings/integrations` : query publique sanitisée
+>   `connections.listIntegrations` (jamais de secret), pastilles d'état par
+>   type d'auth (santé Powens dérivée via `connectionHealth`, état credentials
+>   via `lastConnectedAt`/`lastError`, env keys pour Notion), onglet ajouté au
+>   layout Réglages, i18n `settings:integrations.*` (EN/FR).
+> - Détection du bloc Communications généralisée : `VascoCommunicationsSection`
+>   matche les slugs des portails connectés (`vasco.listConnectedClientSlugs`,
+>   query publique sans secret) au lieu du `/parallel/i` codé en dur ; libellés
+>   `vasco:*` neutralisés (plus de « Parallel » en dur).
+> - Tests `tests/connectors.test.ts` (intégrité du registre + validation des
+>   lignes).
+
 ## v1.109.0 — 17/07/2026 à 18:28 — Pointage : les suggestions en un clic
 
 Deuxième étape de la refonte du pointage : la file « À pointer » **propose

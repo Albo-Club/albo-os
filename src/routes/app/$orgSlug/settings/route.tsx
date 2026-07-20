@@ -30,6 +30,7 @@ function SettingsLayout() {
       | '/app/$orgSlug/settings/general'
       | '/app/$orgSlug/settings/members'
       | '/app/$orgSlug/settings/invitations'
+      | '/app/$orgSlug/settings/integrations'
     label: string
     adminOnly?: boolean
   }> = [
@@ -39,6 +40,10 @@ function SettingsLayout() {
       to: '/app/$orgSlug/settings/invitations',
       label: t('settings:layout.tabs.invitations'),
       adminOnly: true,
+    },
+    {
+      to: '/app/$orgSlug/settings/integrations',
+      label: t('settings:layout.tabs.integrations'),
     },
   ]
 

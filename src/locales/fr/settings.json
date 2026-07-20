@@ -6,7 +6,8 @@
     "tabs": {
       "general": "Général",
       "members": "Membres",
-      "invitations": "Invitations"
+      "invitations": "Invitations",
+      "integrations": "Intégrations"
     }
   },
   "general": {
@@ -73,6 +74,45 @@
       "not_a_member": "Vous n'êtes pas membre de cette organisation",
       "rate_limited": "Trop d'invitations — ralentissez et réessayez plus tard",
       "default": "Échec de l'envoi de l'invitation"
+    }
+  },
+  "integrations": {
+    "title": "Intégrations",
+    "description": "Les plateformes externes reliées à cette organisation — ce qui est installé, ce qui est disponible, et dans quel état.",
+    "scope": {
+      "org": "Par organisation",
+      "global": "Service partagé"
+    },
+    "none": "Non connectée",
+    "globalConfigured": "Opérationnelle",
+    "globalNotConfigured": "Non configurée",
+    "state": {
+      "connected": "Connectée",
+      "stale": "En retard",
+      "action_required": "À reconnecter",
+      "error": "En erreur",
+      "pending": "Jamais connectée",
+      "inactive": "Inactive"
+    },
+    "lastSync": "Dernière synchro {{ago}}",
+    "neverSynced": "Aucune synchro pour l'instant",
+    "platforms": {
+      "powens": {
+        "name": "Powens",
+        "description": "Agrégation bancaire : comptes et transactions synchronisés automatiquement. Les connexions se gèrent depuis la page Trésorerie (connexion / reconnexion)."
+      },
+      "vasco": {
+        "name": "Parallel / VASCO",
+        "description": "Portails investisseurs des plateformes de fund admin : positions, communications investisseurs et documents remontés sur les entités liées."
+      },
+      "notion": {
+        "name": "Notion",
+        "description": "Extraction des pages Notion publiques liées dans les investor updates reçus par email."
+      },
+      "docsend": {
+        "name": "DocSend",
+        "description": "Extraction des decks DocSend liés dans les investor updates reçus par email."
+      }
     }
   }
 }
