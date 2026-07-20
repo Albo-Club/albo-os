@@ -2272,12 +2272,18 @@ SPV13"), dated (`publishDate`/`period`), with `title`, `htmlContent`, and
   (never wiped). Only communication metadata is cached — the document BYTES are
   still fetched live on demand.
 - **Which entities show the linker.** `VascoCommunicationsSection` renders only on
-  `kind: 'portfolio'` entities that look like Parallel investments —
-  `/parallel/i` over `name + domain + sponsor + group` — plus any already-linked
-  entity. The union is deliberate: the live `domain` isn't reliably filled on
-  SPVs (often empty or the parent platform), so keying on it alone would hide the
-  block on real Parallel entities (the v1.86.1 regression); the name
+  `kind: 'portfolio'` entities that look like an investment made through one of
+  the org's **connected VASCO portals** — the active client slugs (from
+  `vasco.listConnectedClientSlugs`, e.g. "parallel", "teampact") matched over
+  `name + domain + sponsor + group` — plus any already-linked entity. No
+  hardcoded platform: connecting a new portal automatically widens the
+  detection. The field union is deliberate: the live `domain` isn't reliably
+  filled on SPVs (often empty or the parent platform), so keying on it alone
+  would hide the block on real entities (the v1.86.1 regression); the name
   ("PARALLEL INVEST …") backstops it. `group_*` legal entities never show it.
+  An entity whose fields don't mention the portal at all still gets the block
+  once linked (manual link from any state is done via the picker on a
+  detected entity, or by setting `companies.setVascoLink`).
 - **Download = server proxy, mandatory.** `document.downloadUrl` is an
   **authenticated** endpoint (`api.<client>.vasco.fund/documents/<id>/download`),
   not a public signed URL → a browser `<a href>` fails.

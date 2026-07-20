@@ -39,6 +39,12 @@ opérationnels ou non. Une vue d'état façon « intégrations » d'Attio ou
 Granola : les actions restent sur leurs pages (la reconnexion bancaire se
 fait toujours depuis la Trésorerie).
 
+Dans la foulée, le bloc « Communications investisseurs » des fiches
+participations n'est plus réservé à Parallel : il se propose désormais sur
+toute entité liée à un portail investisseur **connecté** de l'organisation.
+Brancher demain un nouveau portail (par exemple Teampact, également géré via
+VASCO) suffira à faire apparaître ses communications — sans développement.
+
 > **🔧 Notes techniques**
 >
 > - Nouveau registre `convex/lib/connectors.ts` (powens/vasco/notion/docsend :
@@ -62,6 +68,10 @@ fait toujours depuis la Trésorerie).
 >   type d'auth (santé Powens dérivée via `connectionHealth`, état credentials
 >   via `lastConnectedAt`/`lastError`, env keys pour Notion), onglet ajouté au
 >   layout Réglages, i18n `settings:integrations.*` (EN/FR).
+> - Détection du bloc Communications généralisée : `VascoCommunicationsSection`
+>   matche les slugs des portails connectés (`vasco.listConnectedClientSlugs`,
+>   query publique sans secret) au lieu du `/parallel/i` codé en dur ; libellés
+>   `vasco:*` neutralisés (plus de « Parallel » en dur).
 > - Tests `tests/connectors.test.ts` (intégrité du registre + validation des
 >   lignes).
 

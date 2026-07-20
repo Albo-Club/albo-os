@@ -387,13 +387,14 @@ function LinkParallelDialog({
 }
 
 /**
- * Parallel communications for an entity, in its Report section. Shown only on
- * portfolio entities that look like Parallel investments — "parallel" in the
- * name (the SPVs are all "PARALLEL INVEST …"), the domain, or an origin field
- * (`sponsor`/`group`) — plus any entity already linked. Off on the org's legal
- * entities (group_*) and on the many non-Parallel portfolio lines, so the
- * linker isn't noise. All data is read live (on-demand actions); nothing is
- * stored.
+ * VASCO investor communications for an entity, in its Report section. Shown
+ * only on portfolio entities that look like an investment made through one of
+ * the org's CONNECTED VASCO portals — a connected client slug ("parallel",
+ * "teampact", …) appears in the name (Parallel SPVs are all
+ * "PARALLEL INVEST …"), the domain, or an origin field (`sponsor`/`group`) —
+ * plus any entity already linked. Off on the org's legal entities (group_*)
+ * and on unrelated portfolio lines, so the linker isn't noise. All data is
+ * read live (on-demand actions); nothing is stored.
  */
 export function VascoCommunicationsSection({
   company,
@@ -404,16 +405,20 @@ export function VascoCommunicationsSection({
   const [linkOpen, setLinkOpen] = useState(false)
   const isLinked = Boolean(company.vascoClientSlug && company.vascoIssuerId)
 
-  // Detect a Parallel investment across every field that may carry the marker
-  // (name OR domain OR sponsor/group) so none slip through, whatever the data
-  // state — the live domain isn't always filled on SPVs. Portfolio-only; the
-  // org's legal entities (group_*) never show the linker.
-  const looksParallel =
+  // Detect an investment made through a connected portal across every field
+  // that may carry the marker (name OR domain OR sponsor/group) so none slip
+  // through, whatever the data state — the live domain isn't always filled on
+  // SPVs. Driven by the org's active connections (no hardcoded platform);
+  // portfolio-only, the org's legal entities (group_*) never show the linker.
+  const connectedSlugs = useConvexQuery(api.vasco.listConnectedClientSlugs, {
+    orgId: company.orgId,
+  })
+  const haystack =
+    `${company.name} ${company.domain ?? ''} ${company.sponsor ?? ''} ${company.group ?? ''}`.toLowerCase()
+  const looksConnected =
     company.kind === 'portfolio' &&
-    /parallel/i.test(
-      `${company.name} ${company.domain ?? ''} ${company.sponsor ?? ''} ${company.group ?? ''}`,
-    )
-  if (!isLinked && !looksParallel) return null
+    (connectedSlugs ?? []).some((slug) => haystack.includes(slug.toLowerCase()))
+  if (!isLinked && !looksConnected) return null
 
   return (
     <div className="space-y-3">

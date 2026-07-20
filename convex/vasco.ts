@@ -376,6 +376,34 @@ async function runConnections(
 // `convex/connections.ts` (`connections:seedConnection` /
 // `connections:removeConnection`).
 
+/**
+ * Distinct client slugs of the org's ACTIVE VASCO connections (e.g.
+ * ["parallel", "teampact"]) — feeds the front-end gating of the
+ * communications block: an entity offers the linker when one of the org's
+ * connected portals is mentioned in its name/domain/origin fields.
+ * Org-member-guarded; returns ONLY the non-secret slugs, never a row.
+ */
+export const listConnectedClientSlugs = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }): Promise<Array<string>> => {
+    await requireOrgMember(ctx, orgId)
+    const conns = await ctx.db
+      .query('externalConnections')
+      .withIndex('by_org_and_platform', (q) =>
+        q.eq('orgId', orgId).eq('platform', 'vasco'),
+      )
+      .collect()
+    return [
+      ...new Set(
+        conns
+          .filter((c) => c.active)
+          .map((c) => connClientSlug(c))
+          .filter((s): s is string => Boolean(s)),
+      ),
+    ]
+  },
+})
+
 // ── Read actions ────────────────────────────────────────────────────────────
 
 /**
