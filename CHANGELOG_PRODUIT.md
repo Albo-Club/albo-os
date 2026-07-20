@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.110.1 — 20/07/2026 à 19:52 — Chargement de l'application plus rapide
+## v1.111.1 — 20/07/2026 à 19:52 — Chargement de l'application plus rapide
 
 L'arrivée sur Albo OS (première visite de la journée, rafraîchissement de
 page) devient sensiblement plus rapide, sur deux fronts :
@@ -50,6 +50,39 @@ page) devient sensiblement plus rapide, sur deux fronts :
 >   (l'environnement distant ne peut pas lancer la codegen — cf.
 >   `KNOWN_ISSUES.md` « Codegen Convex hors-ligne ») ; le prochain
 >   `convex dev`/`convex deploy` la régénère à l'identique.
+## v1.111.0 — 20/07/2026 à 19:41 — Intégrations : la tour de contrôle
+
+La page **Réglages → Intégrations** devient le point d'entrée unique des
+outils externes, sur le modèle des intégrations d'Attio ou Granola :
+
+- les plateformes sont désormais présentées en deux groupes — **Installées**
+  (au moins une connexion, ou service opérationnel) et **Disponibles**
+  (prêtes à brancher) ;
+- **connecter se fait depuis la page** : « Connecter une banque » ouvre la
+  fenêtre sécurisée Powens, et les portails investisseurs (Parallel,
+  Teampact…) se branchent via un petit formulaire — nom, portail,
+  identifiants — sans plus passer par la ligne de commande ;
+- **déconnecter aussi** : chaque connexion à identifiants peut être retirée
+  (avec confirmation) — les identifiants sont oubliés, les données déjà
+  importées restent ; une connexion bancaire dégradée propose son bouton
+  « Reconnecter » directement ici ;
+- réservé aux **admins** de l'organisation ; les identifiants saisis partent
+  côté serveur et ne redescendent jamais dans le navigateur.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelles mutations publiques admin-gated `connections.createConnection`
+>   (validée contre le registre via `parseConnection`, refus des doublons de
+>   label — l'écrasement volontaire reste au CLI `connections:seedConnection`)
+>   et `connections.disconnectConnection` (delete, oubli des credentials).
+> - `connections.listIntegrations` enrichie : `id` par connexion
+>   (`externalConnections._id` ou `powensConnectionId`) + `configKeys`/
+>   `credentialKeys` du registre — le **formulaire de connexion est générique**,
+>   ses champs sont pilotés par la déclaration de la plateforme
+>   (`settings:integrations.fields.<key>`).
+> - `settings/integrations.tsx` réécrite : groupes Installées/Disponibles,
+>   webview Powens (`startBankConnection`/`startReconnect`) branchée depuis la
+>   page, dialogs connect/disconnect (max-h 85vh), i18n EN/FR.
 
 ## v1.110.0 — 20/07/2026 à 17:39 — Connexions externes : socle modulaire + page Intégrations
 

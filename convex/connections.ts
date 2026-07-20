@@ -17,8 +17,13 @@
  */
 
 import { ConvexError, v } from 'convex/values'
-import { internalMutation, internalQuery, query } from './_generated/server'
-import { requireOrgMember } from './lib/auth'
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from './_generated/server'
+import { requireOrgMember, requireOrgRole } from './lib/auth'
 import { CONNECTORS, getConnector, parseConnection } from './lib/connectors'
 import { connectionHealth } from './powens'
 import type { Doc } from './_generated/dataModel'
@@ -188,9 +193,12 @@ export const removeConnection = internalMutation({
   },
 })
 
-// ── Org-facing integrations view ────────────────────────────────────────────
+// ── Org-facing integrations view + connect/disconnect ───────────────────────
 
 type IntegrationConnection = {
+  /** `externalConnections` id (credentials) or the platform-side connection
+   * id (webview) — what the connect/disconnect/reconnect actions take. */
+  id: string
   label: string
   state: string
   lastConnectedAt: number | null
@@ -200,11 +208,77 @@ type IntegrationItem = {
   platform: string
   scope: string
   auth: string
+  /** auth 'credentials': the registry-declared keys, driving the generic
+   * in-app connect form (labels resolved via i18n on the client). */
+  configKeys?: Array<string>
+  credentialKeys?: Array<string>
   /** org-scoped connectors: one entry per connection row of the org. */
   connections?: Array<IntegrationConnection>
   /** global connectors: whether the capability is operational. */
   configured?: boolean
 }
+
+/**
+ * Connect a credentials platform from the app (the Intégrations control
+ * tower). Admin-gated — connecting an external platform is a sensitive
+ * action. The row is validated against the registry declaration; the
+ * credentials go straight to the internal table and are NEVER returned by
+ * any public query. Duplicate label in the org+platform → error (no silent
+ * credential overwrite from the UI; overwrite is a deliberate CLI
+ * `connections:seedConnection`).
+ */
+export const createConnection = mutation({
+  args: {
+    orgId: v.id('organizations'),
+    platform: v.string(),
+    label: v.string(),
+    config: v.optional(v.record(v.string(), v.string())),
+    credentials: v.optional(v.record(v.string(), v.string())),
+  },
+  handler: async (ctx, args) => {
+    const def = getConnector(args.platform)
+    parseConnection(def, { config: args.config, credentials: args.credentials })
+    const { user } = await requireOrgRole(ctx, args.orgId, 'admin')
+    const label = args.label.trim()
+    if (!label) throw new ConvexError('label_required')
+    const siblings = await ctx.db
+      .query('externalConnections')
+      .withIndex('by_org_and_platform', (q) =>
+        q.eq('orgId', args.orgId).eq('platform', args.platform),
+      )
+      .collect()
+    if (siblings.some((c) => c.label === label)) {
+      throw new ConvexError('label_taken')
+    }
+    return ctx.db.insert('externalConnections', {
+      orgId: args.orgId,
+      platform: args.platform,
+      label,
+      config: args.config,
+      credentials: args.credentials,
+      active: true,
+      createdAt: Date.now(),
+      createdBy: user._id,
+    })
+  },
+})
+
+/**
+ * Disconnect (delete) a credentials connection from the app. Admin-gated on
+ * the row's org; deleting forgets the stored credentials. Webview platforms
+ * (Powens) are NOT disconnectable here — their lifecycle lives on the
+ * platform side.
+ */
+export const disconnectConnection = mutation({
+  args: { connectionId: v.id('externalConnections') },
+  handler: async (ctx, { connectionId }) => {
+    const row = await ctx.db.get('externalConnections', connectionId)
+    if (!row) throw new ConvexError('not_found')
+    await requireOrgRole(ctx, row.orgId, 'admin')
+    await ctx.db.delete('externalConnections', connectionId)
+    return { deleted: connectionId }
+  },
+})
 
 /**
  * Sanitized per-connector view feeding the Réglages → Intégrations page:
@@ -226,6 +300,8 @@ export const listIntegrations = query({
       }
       switch (def.auth) {
         case 'credentials': {
+          item.configKeys = [...(def.configKeys ?? [])]
+          item.credentialKeys = [...(def.credentialKeys ?? [])]
           const rows = await ctx.db
             .query('externalConnections')
             .withIndex('by_org_and_platform', (q) =>
@@ -233,6 +309,7 @@ export const listIntegrations = query({
             )
             .collect()
           item.connections = rows.map((r) => ({
+            id: r._id,
             label: r.label,
             state: !r.active
               ? 'inactive'
@@ -251,6 +328,7 @@ export const listIntegrations = query({
             .withIndex('by_org', (q) => q.eq('orgId', orgId))
             .collect()
           item.connections = rows.map((r) => ({
+            id: r.powensConnectionId,
             label: r.connectorName ?? r.powensConnectionId,
             state: connectionHealth(r, now),
             lastConnectedAt: r.lastSuccessfulSyncAt ?? null,

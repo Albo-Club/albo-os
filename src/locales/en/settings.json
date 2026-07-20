@@ -99,7 +99,7 @@
     "platforms": {
       "powens": {
         "name": "Powens",
-        "description": "Bank aggregation: accounts and transactions synced automatically. Connections are managed from the Cash page (connect / reconnect)."
+        "description": "Bank aggregation: accounts and transactions synced automatically. The bank connection happens in the secure Powens window."
       },
       "vasco": {
         "name": "Parallel / VASCO",
@@ -113,6 +113,43 @@
         "name": "DocSend",
         "description": "Extraction of DocSend decks linked in investor updates received by email."
       }
+    },
+    "groups": {
+      "installed": "Installed",
+      "installedEmpty": "No platform connected yet.",
+      "available": "Available",
+      "availableDescription": "Platforms ready to be connected to this organization.",
+      "availableEmpty": "Everything is already connected."
+    },
+    "actions": {
+      "connect": "Connect",
+      "connectBank": "Connect a bank",
+      "disconnect": "Disconnect",
+      "reconnect": "Reconnect",
+      "reconnecting": "Redirecting…"
+    },
+    "dialog": {
+      "title": "Connect {{name}}",
+      "description": "Credentials are stored server-side and never sent back to the browser."
+    },
+    "fields": {
+      "label": "Connection name",
+      "labelPlaceholder": "e.g. Parallel — Calte",
+      "clientSlug": "Portal (client identifier, e.g. parallel)",
+      "username": "Login",
+      "password": "Password"
+    },
+    "confirm": {
+      "title": "Disconnect “{{label}}”?",
+      "description": "The stored credentials will be deleted. Already-imported data stays in place."
+    },
+    "toasts": {
+      "connected": "Connection saved.",
+      "connectError": "Couldn't save the connection.",
+      "labelTaken": "A connection with this name already exists.",
+      "disconnected": "Connection removed.",
+      "disconnectError": "Couldn't disconnect.",
+      "bankRedirectError": "Couldn't open the bank connection flow."
     }
   }
 }

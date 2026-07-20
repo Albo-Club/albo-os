@@ -1,21 +1,32 @@
 # Intégrations
 
-## La page Intégrations (Réglages)
+## La page Intégrations (Réglages) — la tour de contrôle
 
-Chaque organisation dispose d'une vue **Réglages → Intégrations** qui liste
-les plateformes externes gérées par Albo OS — ce qui est branché, ce qui est
-disponible, et dans quel état :
+Chaque organisation dispose d'une vue **Réglages → Intégrations**, le point
+d'entrée unique des outils externes, présentés en deux groupes : **Installées**
+(au moins une connexion, ou service opérationnel) et **Disponibles** (prêtes à
+brancher).
 
-- les plateformes **par organisation** (banques via Powens, portails fonds
-  type Parallel) affichent chaque connexion avec sa pastille d'état
-  (connectée / en retard / à reconnecter / en erreur) et sa dernière
-  synchronisation ;
-- les **services partagés** (extraction Notion, DocSend) indiquent simplement
+- Les plateformes **par organisation** (banques via Powens, portails fonds
+  type Parallel ou Teampact) affichent chaque connexion avec sa pastille
+  d'état (connectée / en retard / à reconnecter / en erreur) et sa dernière
+  synchronisation.
+- Les **services partagés** (extraction Notion, DocSend) indiquent simplement
   s'ils sont opérationnels.
 
-C'est une vue d'état : les actions restent sur leurs pages respectives (la
-connexion/reconnexion bancaire se fait depuis la Trésorerie). Toute nouvelle
-plateforme branchée à l'avenir apparaîtra automatiquement dans cette liste.
+**Connecter et déconnecter se font depuis la page** (admins uniquement) :
+
+- « Connecter une banque » ouvre la fenêtre sécurisée Powens (identifiants
+  bancaires jamais saisis dans Albo OS) ; une connexion dégradée propose son
+  bouton « Reconnecter » ici aussi (comme sur la Trésorerie) ;
+- un portail investisseur se branche via un petit formulaire (nom, portail,
+  identifiants) — les identifiants sont stockés côté serveur et ne
+  redescendent jamais dans le navigateur ;
+- « Déconnecter » (avec confirmation) oublie les identifiants ; les données
+  déjà importées restent en place.
+
+Toute nouvelle plateforme déclarée au registre apparaîtra automatiquement
+dans cette liste, formulaire de connexion compris.
 
 ## Attio (CRM dealflow)
 

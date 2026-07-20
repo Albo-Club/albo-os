@@ -99,7 +99,7 @@
     "platforms": {
       "powens": {
         "name": "Powens",
-        "description": "Agrégation bancaire : comptes et transactions synchronisés automatiquement. Les connexions se gèrent depuis la page Trésorerie (connexion / reconnexion)."
+        "description": "Agrégation bancaire : comptes et transactions synchronisés automatiquement. La connexion à la banque se fait dans la fenêtre sécurisée Powens."
       },
       "vasco": {
         "name": "Parallel / VASCO",
@@ -113,6 +113,43 @@
         "name": "DocSend",
         "description": "Extraction des decks DocSend liés dans les investor updates reçus par email."
       }
+    },
+    "groups": {
+      "installed": "Installées",
+      "installedEmpty": "Aucune plateforme connectée pour l'instant.",
+      "available": "Disponibles",
+      "availableDescription": "Plateformes prêtes à être branchées sur cette organisation.",
+      "availableEmpty": "Tout est déjà connecté."
+    },
+    "actions": {
+      "connect": "Connecter",
+      "connectBank": "Connecter une banque",
+      "disconnect": "Déconnecter",
+      "reconnect": "Reconnecter",
+      "reconnecting": "Redirection…"
+    },
+    "dialog": {
+      "title": "Connecter {{name}}",
+      "description": "Les identifiants sont stockés côté serveur et ne sont jamais renvoyés au navigateur."
+    },
+    "fields": {
+      "label": "Nom de la connexion",
+      "labelPlaceholder": "ex. Parallel — Calte",
+      "clientSlug": "Portail (identifiant du client, ex. parallel)",
+      "username": "Identifiant de connexion",
+      "password": "Mot de passe"
+    },
+    "confirm": {
+      "title": "Déconnecter « {{label}} » ?",
+      "description": "Les identifiants enregistrés seront supprimés. Les données déjà importées restent en place."
+    },
+    "toasts": {
+      "connected": "Connexion enregistrée.",
+      "connectError": "Impossible d'enregistrer la connexion.",
+      "labelTaken": "Une connexion porte déjà ce nom.",
+      "disconnected": "Connexion supprimée.",
+      "disconnectError": "Échec de la déconnexion.",
+      "bankRedirectError": "Impossible d'ouvrir la connexion bancaire."
     }
   }
 }
