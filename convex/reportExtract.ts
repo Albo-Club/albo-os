@@ -20,6 +20,7 @@ import { internal } from './_generated/api'
 import { internalAction, internalMutation } from './_generated/server'
 import { downloadAttachment } from './agentmail'
 import { csvToText, excelToText } from './lib/excel'
+import { downloadDocSend } from './lib/docsend'
 import { fetchNotionText } from './lib/notion'
 import { ocrImage, ocrPdf } from './lib/ocr'
 import { detectLinks, htmlToText, resolveTrackingUrl } from './lib/reportLinks'
@@ -148,20 +149,6 @@ async function downloadGDrive(
         kind = 'excel'
     }
     return { buf, kind, contentType }
-  } catch {
-    return null
-  }
-}
-
-async function downloadDocSend(url: string, email: string): Promise<ArrayBuffer | null> {
-  try {
-    const res = await fetch('https://docsend2pdf.com/api/convert', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, email }),
-    })
-    if (!res.ok) return null
-    return await res.arrayBuffer()
   } catch {
     return null
   }

@@ -23,6 +23,36 @@ bas de page.
 
 ---
 
+## v1.109.1 — 20/07/2026 à 17:39 — Connexions externes : socle modulaire
+
+Chantier technique, sans changement visible : les connexions aux plateformes
+externes (banques via Powens, portails fonds via Parallel/VASCO, extraction
+Notion et DocSend) reposent désormais sur un socle commun — un registre des
+plateformes et une gestion unifiée des connexions — au lieu de branchements
+codés au cas par cas. Ajouter une nouvelle plateforme demain sera plus simple
+et plus sûr, sans rien changer au fonctionnement actuel.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau registre `convex/lib/connectors.ts` (powens/vasco/notion/docsend :
+>   portée, mode d'auth, clés requises) + noyau commun `convex/connections.ts`
+>   (table générique `externalConnections`, seed/remove/list/markConnected,
+>   diagnostic `connections:status` dispatché par type d'auth, jamais par
+>   plateforme).
+> - `convex/vasco.ts` devient le module de référence : la logique GraphQL est
+>   inchangée mais lit ses connexions via le noyau (adaptateur `vascoCreds` +
+>   `parseConnection`). Les fonctions maison (`vasco:seedConnection`,
+>   `deleteConnection`, `getConnectionsByOrgSlug`…) sont remplacées par les
+>   génériques `connections:*`.
+> - `downloadDocSend` extrait de `reportExtract.ts` vers `convex/lib/docsend.ts`
+>   (1 module = 1 plateforme) ; `powens.ts` expose `connectionHealth` pour le
+>   statut du registre.
+> - Migration one-shot idempotente `migrations/externalConnections:
+>   migrateVascoConnections` (à lancer juste après le deploy — cf.
+>   `MIGRATIONS.md`) ; table `vascoConnections` conservée déclarée-mais-inerte.
+> - Tests `tests/connectors.test.ts` (intégrité du registre + validation des
+>   lignes).
+
 ## v1.109.0 — 17/07/2026 à 18:28 — Pointage : les suggestions en un clic
 
 Deuxième étape de la refonte du pointage : la file « À pointer » **propose

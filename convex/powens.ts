@@ -150,8 +150,9 @@ export type ConnectionHealth = 'connected' | 'stale' | 'action_required'
 
 /** Derived health of a connection row — never stored (except the anti-spam
  * `notifiedHealth` memory). `_creationTime` is the grace floor so a row
- * created seconds ago is not instantly "stale". */
-function connectionHealth(
+ * created seconds ago is not instantly "stale". Exported for the registry-wide
+ * `connections:status` diagnostic. */
+export function connectionHealth(
   row: Doc<'powensConnections'>,
   now: number,
 ): ConnectionHealth {

@@ -411,7 +411,9 @@ export const enrichFromVasco = internalAction({
 export const backfillVascoPitches = internalAction({
   args: {},
   handler: async (ctx): Promise<{ orgs: number; companies: number }> => {
-    const conns = await ctx.runQuery(internal.vasco.getAllActiveConnections, {})
+    const conns = await ctx.runQuery(internal.connections.listAllActive, {
+      platform: 'vasco',
+    })
     const orgIds = Array.from(new Set(conns.map((c) => c.orgId)))
     let companies = 0
     for (const orgId of orgIds) {

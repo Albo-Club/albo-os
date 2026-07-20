@@ -2190,9 +2190,14 @@ data that only lives on the platform (positions, valuations, documents) — a
   VASCO client, e.g. `parallel`.
 - Auth = `POST /auth/login {username,password}` → `{ token }` (JWT, short-lived,
   re-login on 401). **No machine-to-machine API key** — a login is stored per
-  connection, in the internal-only `vascoConnections` table (one row per
-  `clientSlug × orgId`), never returned to the client (same rule as
-  `powensUsers`).
+  connection in the generic internal-only `externalConnections` table
+  (platform `vasco`, `config.clientSlug` + `credentials.username/password`,
+  one row per client × org), managed by the connections core
+  (`convex/connections.ts` + registry `convex/lib/connectors.ts`), never
+  returned to the client (same rule as `powensUsers`). The legacy
+  `vascoConnections` table is declared-but-inert after the one-shot
+  `migrations/externalConnections:migrateVascoConnections` (cf.
+  `MIGRATIONS.md`).
 
 ### The investor-scoping trap (this cost the reverse-engineering)
 
@@ -2289,7 +2294,7 @@ SPV13"), dated (`publishDate`/`period`), with `title`, `htmlContent`, and
 - **Stale duplicate connection.** calte still has a second `parallel` connection
   row whose login 401s; the read actions iterate matching active connections and
   use the first that logs in, so it degrades gracefully. Delete it with
-  `vasco:deleteConnection` when convenient.
+  `connections:removeConnection` when convenient.
 
 ### Communications → AI synthesis (« Cerveau », étape 2c)
 
@@ -2300,10 +2305,11 @@ new is persisted — the result still lands in `companyIntelligence`).
 - **System-context read path.** `runAnalysis` is a scheduled internalAction with
   **no user identity**, so it can't use the org-member-guarded
   `fetchCommunications`. It calls `vasco.pullCommunicationsForSynthesis` (an
-  internalAction) which resolves connections via `vasco.getActiveConnectionsByOrgId`
+  internalAction) which resolves connections via `connections.listActiveForOrg`
   — an **auth-less** internalQuery keyed by orgId (sibling of
-  `getConnectionsByOrgSlug`, do **not** reuse `authorizeAndListConnections`,
-  which guards). Best-effort: it returns `[]` on any VASCO failure so the
+  `connections.listActiveByOrgSlug`, do **not** reuse
+  `connections.authorizeAndListActive`, which guards). Best-effort: it returns
+  `[]` on any VASCO failure so the
   synthesis still runs on the company/report context alone. The `no_data` guard
   is evaluated on (context **OR** comms), so a bare Parallel entity with only
   communications is still analyzed.

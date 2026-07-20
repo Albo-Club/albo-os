@@ -473,6 +473,13 @@ export const remove = mutation({
   has no built-in height cap, so tall content overflows the viewport with no
   way to reach the lower fields or the footer actions. Pattern already in
   `deals.$dealId.tsx`, `RoyaltiesPanel.tsx`, `CompanyReportsSection.tsx`.
+- ❌ Une nouvelle connexion à une plateforme externe avec sa table et son CRUD
+  dédiés. Déclarer la plateforme dans le registre `convex/lib/connectors.ts`
+  et passer par le noyau commun `convex/connections.ts` (table générique
+  `externalConnections`, seed/remove/list/markConnected, statut dispatché par
+  type d'auth). Le module de la plateforme ne contient que sa logique métier
+  (pull/push) et adapte les lignes via `parseConnection` — cf. `convex/vasco.ts`
+  comme module de référence.
 - ❌ Anchor `#section` for nav between major sections.
 - ❌ Unrequested dark/light toggle.
 - ❌ `tailwind.config.js` (Tailwind v4 is CSS-first).
