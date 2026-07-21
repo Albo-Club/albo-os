@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowDownLeft, ArrowUpRight, ChevronRight } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, ChevronRight, FileText, Paperclip } from 'lucide-react'
 import { useConvexQuery } from '@convex-dev/react-query'
 
 import { api } from '../../../convex/_generated/api'
@@ -21,6 +21,7 @@ type EmailRow = {
   fromName: string | null
   sentAt: number
   direction: 'incoming' | 'outgoing'
+  attachmentCount: number
 }
 
 /** Localised relative age, e.g. "il y a 13 j" / "13 days ago". */
@@ -77,6 +78,12 @@ function EmailCard({ email, onOpen }: { email: EmailRow; onOpen: () => void }) {
         </p>
       </div>
 
+      {email.attachmentCount > 0 && (
+        <Paperclip
+          className="text-muted-foreground size-4 shrink-0"
+          aria-label={t('emails.attachments')}
+        />
+      )}
       <ChevronRight className="text-muted-foreground size-4 shrink-0" />
     </div>
   )
@@ -131,6 +138,33 @@ function EmailDetailDialog({
                 })}
               </p>
             </div>
+
+            {detail.attachments.length > 0 && (
+              <div>
+                <h4 className="mb-1 font-semibold">{t('emails.attachments')}</h4>
+                <div className="space-y-1">
+                  {detail.attachments.map((att, i) =>
+                    att.url ? (
+                      <a
+                        key={i}
+                        href={att.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="hover:bg-accent/40 flex items-center gap-2 rounded-md border p-2 text-sm transition-colors"
+                      >
+                        <FileText className="text-muted-foreground size-4 shrink-0" />
+                        <span className="truncate">{att.filename}</span>
+                        {att.size != null && (
+                          <span className="text-muted-foreground ml-auto shrink-0 text-xs tabular-nums">
+                            {Math.max(1, Math.round(att.size / 1024))} Ko
+                          </span>
+                        )}
+                      </a>
+                    ) : null,
+                  )}
+                </div>
+              </div>
+            )}
 
             {detail.bodyText && (
               <div className="text-foreground/90 max-h-96 overflow-y-auto rounded-md border p-3 text-sm whitespace-pre-wrap">

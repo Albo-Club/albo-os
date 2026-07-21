@@ -600,9 +600,11 @@ secret dans la réponse) + mutations `createConnection`/`disconnectConnection`.
 
 ## Connecteur Gmail (OAuth → timeline emails par participation)
 
-Boîtes Gmail connectées en OAuth direct (`convex/gmail.ts`), sync
+Boîtes Gmail connectées en OAuth direct (`convex/gmail.ts`), **une
+connexion par org** (même boîte dans 2 orgs = 2 connexions), sync
 incrémentale par cron 10 min (`gmail.syncAll`, curseur `historyId`), mails
-matchés par domaine → onglet **Emails** de la fiche participation.
+matchés par domaine dans l'org de la boîte → onglet **Emails** de la fiche
+participation, pièces jointes stockées.
 Prérequis : env vars `GOOGLE_OAUTH_CLIENT_ID`/`GOOGLE_OAUTH_CLIENT_SECRET`
 posées (client OAuth **dédié** au scope `gmail.readonly` — pas celui du
 sign-in) ; redirect URI `${CONVEX_SITE_URL}/gmail/oauth/callback` déclarée
@@ -615,7 +617,9 @@ sur le client Google. Cf. `KNOWN_ISSUES.md` « Connecteur Gmail ».
 | GM3 | Envoyer un mail de test depuis/vers une adresse au domaine d'une participation | Après le cron (≤ 10 min, ou « Synchroniser ») : le mail apparaît dans l'onglet **Emails** de la fiche, direction correcte (reçu/envoyé), clic → dialog avec corps texte                |
 | GM4 | Mail sans rapport avec le portfolio (newsletter, interne)                      | **Aucune** ligne `companyEmails` créée (vérifier au dashboard) — seuls les mails matchés sont stockés                                                                                 |
 | GM5 | Même mail visible par 2 boîtes connectées                                      | **Une seule** entrée dans la timeline ; le dialog liste les 2 boîtes (`via …`)                                                                                                        |
-| GM6 | Participation présente dans les 2 orgs avec le même domaine                    | Le mail apparaît sur la fiche des **deux** orgs (fan-out `companyEmailLinks`)                                                                                                         |
+| GM6 | Boîte connectée dans Albo seulement, société au même domaine existant aussi dans Calte | Le mail apparaît **uniquement** côté Albo ; côté Calte : rien tant que la boîte n'y est pas aussi connectée (étanchéité par org) ; connectée dans les 2 orgs → il apparaît des deux côtés, PJ stockées une seule fois |
+| GM6b | Mail matché avec un PDF en pièce jointe                                       | Trombone sur la ligne de la timeline ; dialog → section « Pièces jointes » avec téléchargement ; liens `<a href>` du corps préservés sous la forme « libellé (url) »                  |
+| GM6c | Ligne `gmailAccounts` sans `orgId` (legacy pré-séparation)                    | Supprimée automatiquement au passage suivant du cron `syncAll` ; reconnecter la boîte depuis la bonne org                                                                             |
 | GM7 | Boîte en mode test Google après 7 jours (ou révocation manuelle du grant)      | Au cron suivant : pastille 🔴 « À reconnecter » (`reauth_required`) ; « Reconnecter » relance l'OAuth et **conserve** le curseur de sync                                               |
 | GM8 | « Déconnecter » une boîte                                                      | Ligne `gmailAccounts` supprimée + révocation du token côté Google (best-effort) ; la timeline déjà importée **reste**                                                                 |
 | GM9 | Env vars Google absentes → clic « Connecter une boîte Gmail »                  | Toast dédié « Gmail n'est pas encore configuré… » (`gmail_env_missing`) — jamais le message bancaire Powens ; aucun appel Google                                                      |

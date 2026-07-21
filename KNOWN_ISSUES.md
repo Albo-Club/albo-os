@@ -2636,19 +2636,36 @@ incrémental `historyId` par boîte, cron de polling 10 min, dédup par
   une semaine. `history.list` → 404 → on ré-ancre le curseur au présent
   (`lastError: history_cursor_expired`) et **le trou n'est pas comblé** —
   c'est le rôle du backfill d'historique (étape à venir, pas encore livré).
-- **Texte seul, pas de pièces jointes** : `companyEmails.bodyText` = texte
-  nettoyé borné à 50 k caractères (text/plain prioritaire, sinon HTML
-  converti). Les reports avec PDF continuent de passer par le forward
-  AgentMail (`docs/produit/17-reports-par-email.md`), qui sait extraire les
-  fichiers. Les deux canaux coexistent sans conflit (tables distinctes).
-- **Matching = domaine uniquement** : participants (From/To/Cc) dont le
-  domaine == `companies.domain` (kind `portfolio`, non archivée). Freemail
-  exclus, domaines des boîtes connectées exclus (une boîte sur le domaine
-  d'une participation inonderait sa timeline de trafic interne), mails
-  100 % internes à la boîte ignorés. Les contacts n'ont **pas** d'email en
-  base (`companies.people` : décision « reachable via Attio ») → pas de
-  matching par adresse individuelle à ce stade.
-- **Multi-org fan-out sans `orgId` sur le message** : même famille que
-  `inboundEmails` — le message est cross-org, le lien à l'org vit sur
-  `companyEmailLinks`. Les gardes d'accès passent par l'org de la company
-  (`listByCompany`) ou l'intersection des memberships (`getById`).
+- **Stockage complet depuis le 21/07/2026 au soir** : `bodyText` = texte
+  nettoyé borné à 50 k caractères avec les URLs des `<a href>` préservées
+  (« libellé (url) » — nécessaire aux liens DocSend/Notion pour l'étape 2),
+  et les **pièces jointes sont téléchargées dans le storage Convex**
+  (`companyEmails.attachments`, ≤ 20 Mo chacune, cap 10/message, images
+  inline < 100 Ko ignorées comme signatures). Le téléchargement n'a lieu
+  qu'après un `matchProbe` read-only positif — un mail non matché ne
+  déclenche ni écriture ni download. `gmailMessageId` + boîte source sont
+  conservés comme filet de re-fetch. L'extraction de reports (OCR,
+  métriques) reste à brancher (étape 2) ; le forward AgentMail
+  (`docs/produit/17-reports-par-email.md`) reste le canal d'analyse.
+- **Matching = domaine uniquement, RESTREINT à l'org de la boîte** : les
+  boîtes sont org-scopées depuis le 21/07/2026 au soir (une connexion
+  faite depuis Albo n'alimente qu'Albo ; même boîte dans 2 orgs = 2 lignes
+  `gmailAccounts`, upsert par (org, email)). Participants (From/To/Cc)
+  dont le domaine == `companies.domain` (kind `portfolio`, non archivée)
+  de **l'org de la boîte** uniquement. Freemail exclus, domaines des
+  boîtes connectées de l'org exclus, mails 100 % internes ignorés. Les
+  contacts n'ont **pas** d'email en base (`companies.people` : décision
+  « reachable via Attio ») → pas de matching par adresse individuelle.
+- **Ligne legacy pré-séparation** : le modèle initial (boîtes globales) a
+  brièvement vécu en prod avec une boîte connectée, zéro donnée.
+  `gmailAccounts.orgId`/`gmailOAuthStates.orgId` sont donc **optional au
+  schéma** ; toute ligne sans `orgId` est purgée automatiquement par le
+  cron `syncAll` (et un state sans org est traité comme expiré). À
+  resserrer en required une fois la prod propre (widen-migrate-narrow).
+- **Message dédupliqué sans `orgId`, lien org-scopé** : le message reste
+  dédupliqué par `Message-ID` toutes boîtes confondues (une seule copie
+  des PJ) ; l'appartenance à une org vit sur `companyEmailLinks`, créés
+  uniquement par le matching org-scopé. Les gardes d'accès passent par
+  l'org de la company (`listByCompany`) ou l'intersection des memberships
+  (`getById`) — un membre d'une seule org ne voit jamais les liens de
+  l'autre.

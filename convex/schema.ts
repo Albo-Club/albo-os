@@ -325,20 +325,26 @@ export default defineSchema({
     .index('by_link_code', ['linkCode']),
 
   /**
-   * gmailAccounts — one row per Gmail mailbox connected for the portfolio
-   * email timeline (cf. convex/gmail.ts, OAuth flow modeled on Twenty CRM's
-   * messaging sync). Mailboxes are app-wide, not org-scoped: matched emails
-   * fan out to companies across every org (same family as `inboundEmails`).
+   * gmailAccounts — one row per Gmail mailbox connected FOR ONE ORG (cf.
+   * convex/gmail.ts, OAuth flow modeled on Twenty CRM's messaging sync).
+   * Mailboxes are org-scoped: a connection made from an org only feeds that
+   * org's participations; the same personal mailbox serving two vehicles is
+   * TWO rows (one OAuth grant each) — strict tenant separation, like Powens.
+   * `orgId` is optional ONLY to let the pre-separation legacy rows (global
+   * mailboxes, shipped 21/07/2026, zero synced data) pass schema validation:
+   * the sync cron deletes any row without `orgId`; narrow to required once
+   * prod is clean (widen-migrate-narrow).
    * `historyId` is the Gmail incremental-sync cursor (users.history.list);
    * it only advances after a successful sync and is reset from the profile
    * when Google reports it expired.
    * INTERNAL: `refreshToken` is secret at rest — rows are read/written only
-   * by internal functions; the public `listAccounts` view is sanitized
-   * (same rule as `powensUsers`).
+   * by internal functions; public views are sanitized (same rule as
+   * `powensUsers`).
    */
   gmailAccounts: defineTable({
+    orgId: v.optional(v.id('organizations')), // org fed by this mailbox
     userId: v.id('users'), // who connected the mailbox
-    email: v.string(), // mailbox address, lowercase — upsert key
+    email: v.string(), // mailbox address, lowercase — upsert key with orgId
     refreshToken: v.string(), // OAuth refresh token — secret
     historyId: v.optional(v.string()), // incremental sync cursor
     status: v.union(
@@ -350,15 +356,19 @@ export default defineSchema({
     lastSyncAt: v.optional(v.number()),
     createdAt: v.number(),
   })
-    .index('by_email', ['email'])
+    .index('by_org', ['orgId'])
+    .index('by_org_and_email', ['orgId', 'email'])
     .index('by_user', ['userId']),
 
   /**
    * gmailOAuthStates — short-lived anti-CSRF `state` tokens of the Gmail
    * OAuth flow (created by `gmail.startConnect`, consumed once by the
-   * /gmail/oauth/callback HTTP route, expired after 15 min).
+   * /gmail/oauth/callback HTTP route, expired after 15 min). `orgId` is the
+   * org the connection is being made for (optional for the same legacy
+   * reason as `gmailAccounts`; a state without it is treated as expired).
    */
   gmailOAuthStates: defineTable({
+    orgId: v.optional(v.id('organizations')),
     userId: v.id('users'),
     state: v.string(),
     returnTo: v.string(), // in-app path to land back on after the callback
@@ -1036,11 +1046,16 @@ export default defineSchema({
    * boxes = 1 row, `accountEmails` lists the boxes that saw it). Only
    * messages matched to ≥1 portfolio company are stored — unmatched mail
    * never enters the database. No `orgId` here: the org link lives on
-   * `companyEmailLinks` (multi-org fan-out, same family as `inboundEmails`).
-   * Body is CLEANED TEXT only (no HTML, no attachments), bounded.
+   * `companyEmailLinks` (each link created by the matching of an org-scoped
+   * mailbox — reads are always guarded through the link's org).
+   * The message is stored IN FULL for later re-processing (étape 2 —
+   * report extraction): cleaned text with `<a href>` URLs preserved,
+   * attachments downloaded into Convex storage, and the Gmail reference
+   * (`gmailMessageId` + source mailbox) as a re-fetch safety net.
    */
   companyEmails: defineTable({
     headerMessageId: v.string(), // RFC Message-ID — dedup key
+    gmailMessageId: v.optional(v.string()), // Gmail id of the first sighting
     gmailThreadId: v.optional(v.string()), // thread of the first sighting
     subject: v.string(),
     snippet: v.optional(v.string()),
@@ -1052,6 +1067,18 @@ export default defineSchema({
     sentAt: v.number(), // ms epoch (Gmail internalDate)
     direction: v.union(v.literal('incoming'), v.literal('outgoing')),
     accountEmails: v.array(v.string()), // connected mailboxes that saw it
+    // Downloaded attachments (matched messages only, ≤ 20 MB each, inline
+    // signature images skipped). Bounded: a mail carries a handful of files.
+    attachments: v.optional(
+      v.array(
+        v.object({
+          filename: v.string(),
+          contentType: v.optional(v.string()),
+          size: v.optional(v.number()),
+          storageId: v.id('_storage'),
+        }),
+      ),
+    ),
   }).index('by_header_message_id', ['headerMessageId']),
 
   /**

@@ -3,22 +3,28 @@
  *
  * Direct Google OAuth (no aggregator), modeled on Twenty CRM's messaging
  * sync (github.com/twentyhq/twenty, modules/messaging):
- * - one `gmailAccounts` row per connected mailbox, `historyId` as the
- *   incremental sync cursor (users.history.list), reset on expiry;
- * - a ~10 min polling cron (no Pub/Sub push — internal tool, 5 mailboxes);
+ * - one `gmailAccounts` row per mailbox PER ORG (strict tenant separation:
+ *   a connection made from an org only feeds that org; the same personal
+ *   mailbox serving two vehicles = two rows, one OAuth grant each);
+ * - `historyId` as the incremental sync cursor (users.history.list), reset
+ *   on expiry; ~10 min polling cron (no Pub/Sub push — internal tool);
  * - messages deduplicated across mailboxes by the RFC `Message-ID` header;
  * - DETERMINISTIC matching: a message is linked to every active portfolio
- *   company whose `domain` appears among the participants' email domains
- *   (freemail + connected-mailbox domains excluded, fully-internal mail
- *   skipped). No LLM. Only matched messages are stored.
+ *   company OF THE MAILBOX'S ORG whose `domain` appears among the
+ *   participants' email domains (freemail + connected-mailbox domains
+ *   excluded, fully-internal mail skipped). No LLM. Only matched messages
+ *   are stored.
+ * - matched messages are stored IN FULL for later re-processing (étape 2 —
+ *   report extraction): cleaned text with link URLs preserved, attachments
+ *   downloaded to Convex storage, Gmail reference kept as a re-fetch net.
  *
  * Report extraction is NOT wired here (étape 2): the AgentMail pipeline
- * keeps handling forwarded reports (and attachments, which Gmail sync does
- * not store).
+ * keeps handling forwarded reports for now.
  *
  * Security: `refreshToken` is secret at rest — every account listing here is
- * internal; the public `listAccounts` is sanitized (same rule as
- * `powensUsers`). OAuth `state` rows are one-shot and expire after 15 min.
+ * internal; public views are sanitized (same rule as `powensUsers`). OAuth
+ * `state` rows are one-shot and expire after 15 min. Connect/disconnect are
+ * admin-gated on the org, like the other org connectors.
  */
 
 import { ConvexError, v } from 'convex/values'
@@ -31,12 +37,14 @@ import {
   query,
 } from './_generated/server'
 import { internal } from './_generated/api'
-import { requireAppUser, requireOrgMember } from './lib/auth'
-import type { ActionCtx } from './_generated/server'
+import { requireAppUser, requireOrgMember, requireOrgRole } from './lib/auth'
+import type { ActionCtx, MutationCtx, QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 
 const OAUTH_STATE_TTL_MS = 15 * 60 * 1000
 const MAX_BODY_CHARS = 50_000
+const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024 // app-wide upload cap
+const MAX_ATTACHMENTS_PER_MESSAGE = 10
 const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly'
 
 // Freemail domains never identify a participation (same spirit as the
@@ -68,14 +76,16 @@ function gmailEnv() {
 // ── OAuth flow ──────────────────────────────────────────────────────────────
 
 /**
- * Build the Google authorize URL for the caller and store the one-shot
- * anti-CSRF `state`. The front end redirects the browser to the returned URL;
- * Google calls back on /gmail/oauth/callback (convex/http.ts).
+ * Build the Google authorize URL for one org and store the one-shot
+ * anti-CSRF `state`. Admin-gated on the org (connecting a mailbox is a
+ * sensitive action, same rule as the other connectors). The front end
+ * redirects the browser to the returned URL; Google calls back on
+ * /gmail/oauth/callback (convex/http.ts).
  */
 export const startConnect = mutation({
-  args: { returnTo: v.string() },
-  handler: async (ctx, { returnTo }) => {
-    const user = await requireAppUser(ctx)
+  args: { orgId: v.id('organizations'), returnTo: v.string() },
+  handler: async (ctx, { orgId, returnTo }) => {
+    const { user } = await requireOrgRole(ctx, orgId, 'admin')
     // Only an in-app path may be used as the post-callback landing target.
     if (!returnTo.startsWith('/')) throw new ConvexError('invalid_return_to')
     const { clientId, redirectUri } = gmailEnv()
@@ -84,6 +94,7 @@ export const startConnect = mutation({
     crypto.getRandomValues(bytes)
     const state = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
     await ctx.db.insert('gmailOAuthStates', {
+      orgId,
       userId: user._id,
       state,
       returnTo,
@@ -103,7 +114,8 @@ export const startConnect = mutation({
   },
 })
 
-/** Consume (validate + delete) an OAuth state token. One-shot by design. */
+/** Consume (validate + delete) an OAuth state token. One-shot by design; a
+ * legacy state without orgId is treated as expired. */
 export const consumeOAuthState = internalMutation({
   args: { state: v.string() },
   handler: async (ctx, { state }) => {
@@ -113,16 +125,20 @@ export const consumeOAuthState = internalMutation({
       .unique()
     if (!row) return null
     await ctx.db.delete('gmailOAuthStates', row._id)
-    if (Date.now() - row.createdAt > OAUTH_STATE_TTL_MS) return null
-    return { userId: row.userId, returnTo: row.returnTo }
+    if (!row.orgId || Date.now() - row.createdAt > OAUTH_STATE_TTL_MS) {
+      return null
+    }
+    return { orgId: row.orgId, userId: row.userId, returnTo: row.returnTo }
   },
 })
 
-/** Upsert a connected mailbox after a successful token exchange. On a
+/** Upsert a connected mailbox after a successful token exchange. Upsert key
+ * = (org, email): the same mailbox in another org is a separate row. On a
  * reconnect the existing sync cursor is KEPT (a stale cursor is handled by
  * the expiry fallback in the sync), so no window of mail is silently lost. */
 export const saveAccount = internalMutation({
   args: {
+    orgId: v.id('organizations'),
     userId: v.id('users'),
     email: v.string(),
     refreshToken: v.string(),
@@ -132,7 +148,9 @@ export const saveAccount = internalMutation({
     const email = args.email.toLowerCase()
     const existing = await ctx.db
       .query('gmailAccounts')
-      .withIndex('by_email', (q) => q.eq('email', email))
+      .withIndex('by_org_and_email', (q) =>
+        q.eq('orgId', args.orgId).eq('email', email),
+      )
       .unique()
     if (existing) {
       await ctx.db.patch('gmailAccounts', existing._id, {
@@ -144,6 +162,7 @@ export const saveAccount = internalMutation({
       return existing._id
     }
     return ctx.db.insert('gmailAccounts', {
+      orgId: args.orgId,
       userId: args.userId,
       email,
       refreshToken: args.refreshToken,
@@ -156,9 +175,9 @@ export const saveAccount = internalMutation({
 
 /**
  * GET /gmail/oauth/callback — Google redirects here with `code` + `state`.
- * Exchanges the code, resolves the mailbox address, stores the account and
- * bounces the browser back into the app. Secrets never appear in the
- * redirect URL or in error messages.
+ * Exchanges the code, resolves the mailbox address, stores the account for
+ * the state's org and bounces the browser back into the app. Secrets never
+ * appear in the redirect URL or in error messages.
  */
 export const gmailOauthCallback = httpAction(async (ctx, req) => {
   const url = new URL(req.url)
@@ -167,12 +186,11 @@ export const gmailOauthCallback = httpAction(async (ctx, req) => {
   const stateRow = state
     ? await ctx.runMutation(internal.gmail.consumeOAuthState, { state })
     : null
-  const fallback = `${siteUrl}/app`
   const landing = (outcome: 'connected' | 'error') => {
     const path = stateRow?.returnTo ?? '/app'
     return Response.redirect(`${siteUrl}${path}?gmail=${outcome}`, 302)
   }
-  if (!stateRow) return Response.redirect(`${fallback}?gmail=error`, 302)
+  if (!stateRow) return Response.redirect(`${siteUrl}/app?gmail=error`, 302)
 
   const code = url.searchParams.get('code')
   if (!code || url.searchParams.get('error')) return landing('error')
@@ -209,6 +227,7 @@ export const gmailOauthCallback = httpAction(async (ctx, req) => {
     if (!profile.emailAddress || !profile.historyId) return landing('error')
 
     await ctx.runMutation(internal.gmail.saveAccount, {
+      orgId: stateRow.orgId,
       userId: stateRow.userId,
       email: profile.emailAddress,
       refreshToken: tokens.refresh_token,
@@ -221,27 +240,6 @@ export const gmailOauthCallback = httpAction(async (ctx, req) => {
 })
 
 // ── Account lifecycle ───────────────────────────────────────────────────────
-
-/** Sanitized mailbox list for the Intégrations page — never the token. */
-export const listAccounts = query({
-  args: {},
-  handler: async (ctx) => {
-    await requireAppUser(ctx)
-    const rows = await ctx.db.query('gmailAccounts').take(50)
-    return rows.map((r) => ({
-      _id: r._id,
-      email: r.email,
-      status: r.status,
-      lastError: r.lastError ?? null,
-      lastSyncAt: r.lastSyncAt ?? null,
-    }))
-  },
-})
-
-export const getAccountInternal = internalQuery({
-  args: { accountId: v.id('gmailAccounts') },
-  handler: async (ctx, { accountId }) => ctx.db.get('gmailAccounts', accountId),
-})
 
 export const listAccountsInternal = internalQuery({
   args: {},
@@ -278,14 +276,20 @@ export const patchAccountInternal = internalMutation({
   },
 })
 
-/** Disconnect a mailbox: best-effort token revocation on Google's side, then
- * forget the account row. Already-imported timeline emails stay. */
+/** Disconnect a mailbox from its org: best-effort token revocation on
+ * Google's side, then forget the account row. Admin-gated on the row's org.
+ * Already-imported timeline emails stay. */
 export const disconnect = mutation({
   args: { accountId: v.id('gmailAccounts') },
   handler: async (ctx, { accountId }) => {
-    await requireAppUser(ctx)
     const account = await ctx.db.get('gmailAccounts', accountId)
     if (!account) throw new ConvexError('not_found')
+    if (account.orgId) {
+      await requireOrgRole(ctx, account.orgId, 'admin')
+    } else {
+      // Legacy pre-separation row: any app user may clean it up.
+      await requireAppUser(ctx)
+    }
     await ctx.db.delete('gmailAccounts', accountId)
     // Revocation needs fetch → schedule it after the transaction commits.
     await ctx.scheduler.runAfter(0, internal.gmail.revokeToken, {
@@ -312,7 +316,8 @@ export const revokeToken = internalAction({
 type GmailHeader = { name?: string; value?: string }
 type GmailPart = {
   mimeType?: string
-  body?: { data?: string }
+  filename?: string
+  body?: { data?: string; attachmentId?: string; size?: number }
   parts?: Array<GmailPart>
 }
 type GmailMessage = {
@@ -324,11 +329,17 @@ type GmailMessage = {
   payload?: GmailPart & { headers?: Array<GmailHeader> }
 }
 
-function decodeBase64Url(data: string): string {
+function base64UrlToBytes(data: string): Uint8Array<ArrayBuffer> {
   const b64 = data.replace(/-/g, '+').replace(/_/g, '/')
   const bin = atob(b64)
-  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0))
-  return new TextDecoder('utf-8').decode(bytes)
+  // Backed by a plain ArrayBuffer so the result is a valid BlobPart.
+  const bytes = new Uint8Array(new ArrayBuffer(bin.length))
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return bytes
+}
+
+function decodeBase64Url(data: string): string {
+  return new TextDecoder('utf-8').decode(base64UrlToBytes(data))
 }
 
 /** Depth-first lookup of the first body part of a given MIME type. */
@@ -342,10 +353,20 @@ function findPart(part: GmailPart | undefined, mimeType: string): string | null 
   return null
 }
 
-/** Minimal HTML → text fallback when a message has no text/plain part. */
+/** Minimal HTML → text fallback when a message has no text/plain part.
+ * `<a href>` URLs are PRESERVED next to their label — losing them would
+ * strand every "view the report" DocSend/Notion link (étape 2 needs them). */
 function htmlToText(html: string): string {
   return html
     .replace(/<(style|script)[\s\S]*?<\/\1>/gi, ' ')
+    .replace(
+      /<a\s[^>]*href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi,
+      (_m, href: string, label: string) => {
+        const text = label.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+        // Skip the parenthesized URL when the label already IS the URL.
+        return text && text !== href ? `${text} (${href})` : href
+      },
+    )
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|div|tr|li|h[1-6])>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
@@ -390,6 +411,37 @@ function parseFromName(raw: string | null): string | null {
   return name && !name.includes('@') ? name : null
 }
 
+type AttachmentPart = {
+  filename: string
+  mimeType?: string
+  attachmentId: string
+  size?: number
+}
+
+/** Collect the real attachment parts of a message. Inline signature images
+ * (small image/* parts) are noise, not documents — skipped. */
+function collectAttachmentParts(
+  part: GmailPart | undefined,
+  out: Array<AttachmentPart>,
+) {
+  if (!part) return
+  if (part.filename && part.body?.attachmentId) {
+    const size = part.body.size
+    const isSmallImage =
+      (part.mimeType ?? '').startsWith('image/') && (size ?? 0) < 100_000
+    const tooBig = (size ?? 0) > MAX_ATTACHMENT_BYTES
+    if (!isSmallImage && !tooBig) {
+      out.push({
+        filename: part.filename,
+        mimeType: part.mimeType,
+        attachmentId: part.body.attachmentId,
+        size,
+      })
+    }
+  }
+  for (const child of part.parts ?? []) collectAttachmentParts(child, out)
+}
+
 async function refreshAccessToken(refreshToken: string): Promise<
   { ok: true; accessToken: string } | { ok: false; reauth: boolean; detail: string }
 > {
@@ -421,7 +473,10 @@ async function refreshAccessToken(refreshToken: string): Promise<
   return { ok: true, accessToken: json.access_token }
 }
 
-/** Poll every connected mailbox — cron entry point (cf. convex/crons.ts). */
+/** Poll every connected mailbox — cron entry point (cf. convex/crons.ts).
+ * Legacy pre-separation rows (no orgId) are purged here: they were shipped
+ * global with zero synced data; their mailboxes must be reconnected from an
+ * org (cf. KNOWN_ISSUES « Connecteur Gmail »). */
 export const syncAll = internalAction({
   args: {},
   handler: async (ctx) => {
@@ -430,8 +485,14 @@ export const syncAll = internalAction({
       {},
     )
     for (const account of accounts) {
+      if (!account.orgId) {
+        await ctx.runMutation(internal.gmail.deleteAccountInternal, {
+          accountId: account._id,
+        })
+        continue
+      }
       try {
-        await syncAccount(ctx, account)
+        await syncAccount(ctx, account, account.orgId)
       } catch (err) {
         await ctx.runMutation(internal.gmail.patchAccountInternal, {
           accountId: account._id,
@@ -443,15 +504,17 @@ export const syncAll = internalAction({
   },
 })
 
-type SyncCtx = ActionCtx
-
 async function gmailGet(accessToken: string, path: string): Promise<Response> {
   return fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
 }
 
-async function syncAccount(ctx: SyncCtx, account: Doc<'gmailAccounts'>) {
+async function syncAccount(
+  ctx: ActionCtx,
+  account: Doc<'gmailAccounts'>,
+  orgId: Id<'organizations'>,
+) {
   const token = await refreshAccessToken(account.refreshToken)
   if (!token.ok) {
     await ctx.runMutation(internal.gmail.patchAccountInternal, {
@@ -463,7 +526,7 @@ async function syncAccount(ctx: SyncCtx, account: Doc<'gmailAccounts'>) {
   }
   const { accessToken } = token
 
-  // No cursor (legacy row) → anchor at "now" and start from the next run.
+  // No cursor (defensive) → anchor at "now" and start from the next run.
   if (!account.historyId) {
     const profileRes = await gmailGet(accessToken, 'profile')
     if (!profileRes.ok) throw new Error(`profile_failed:${profileRes.status}`)
@@ -535,19 +598,73 @@ async function syncAccount(ctx: SyncCtx, account: Doc<'gmailAccounts'>) {
     if (!headerMessageId) continue
     const fromEmail = parseAddresses(header(message, 'From'))[0]
     if (!fromEmail) continue
+    const toEmails = parseAddresses(header(message, 'To'))
+    const ccEmails = parseAddresses(header(message, 'Cc'))
 
+    // Phase 1 — cheap match probe: no write, no attachment download for the
+    // ~95% of mail that concerns no participation of this org.
+    const probe: { matched: boolean; alreadyStored: boolean } =
+      await ctx.runQuery(internal.gmail.matchProbe, {
+        orgId,
+        accountEmail: account.email,
+        participantEmails: [fromEmail, ...toEmails, ...ccEmails],
+        headerMessageId,
+      })
+    if (!probe.matched) continue
+
+    // Phase 2 — download attachments into Convex storage (first sighting
+    // only: another mailbox already stored them otherwise).
+    let attachments:
+      | Array<{
+          filename: string
+          contentType?: string
+          size?: number
+          storageId: Id<'_storage'>
+        }>
+      | undefined
+    if (!probe.alreadyStored) {
+      const parts: Array<AttachmentPart> = []
+      collectAttachmentParts(message.payload, parts)
+      const stored = []
+      for (const part of parts.slice(0, MAX_ATTACHMENTS_PER_MESSAGE)) {
+        const attRes = await gmailGet(
+          accessToken,
+          `messages/${id}/attachments/${part.attachmentId}`,
+        )
+        if (!attRes.ok) continue
+        const att = (await attRes.json()) as { data?: string }
+        if (!att.data) continue
+        const bytes = base64UrlToBytes(att.data)
+        if (bytes.byteLength > MAX_ATTACHMENT_BYTES) continue
+        const storageId = await ctx.storage.store(
+          new Blob([bytes], { type: part.mimeType ?? 'application/octet-stream' }),
+        )
+        stored.push({
+          filename: part.filename,
+          contentType: part.mimeType,
+          size: bytes.byteLength,
+          storageId,
+        })
+      }
+      if (stored.length > 0) attachments = stored
+    }
+
+    // Phase 3 — transactional store (matching re-checked inside).
     await ctx.runMutation(internal.gmail.storeMessage, {
+      orgId,
       accountEmail: account.email,
       headerMessageId,
+      gmailMessageId: id,
       gmailThreadId: message.threadId,
       subject: header(message, 'Subject') ?? '',
       snippet: message.snippet,
       bodyText: extractBodyText(message) ?? undefined,
       fromEmail,
       fromName: parseFromName(header(message, 'From')) ?? undefined,
-      toEmails: parseAddresses(header(message, 'To')),
-      ccEmails: parseAddresses(header(message, 'Cc')),
+      toEmails,
+      ccEmails,
       sentAt: Number(message.internalDate ?? Date.now()),
+      attachments,
     })
   }
 
@@ -567,14 +684,95 @@ function domainOf(email: string): string | null {
 }
 
 /**
- * Match one parsed message against the portfolio and store it if it matches.
+ * Deterministic matching of a message against ONE org's portfolio: the
+ * candidate domains are the participants' domains minus freemail minus the
+ * org's connected-mailbox domains; fully-internal mail (all participants on
+ * the mailbox's own domain) never matches. Shared by the read probe and the
+ * transactional store.
+ */
+async function findMatches(
+  ctx: QueryCtx | MutationCtx,
+  orgId: Id<'organizations'>,
+  accountEmail: string,
+  participantEmails: Array<string>,
+): Promise<Array<{ companyId: Id<'companies'>; orgId: Id<'organizations'> }>> {
+  const accountDomain = domainOf(accountEmail)
+  const participantDomains = [
+    ...new Set(
+      participantEmails
+        .map((p) => domainOf(p))
+        .filter((d): d is string => d !== null),
+    ),
+  ]
+  if (participantDomains.every((d) => d === accountDomain)) return []
+
+  const accounts = await ctx.db
+    .query('gmailAccounts')
+    .withIndex('by_org', (q) => q.eq('orgId', orgId))
+    .take(50)
+  const mailboxDomains = new Set(
+    accounts
+      .map((a) => domainOf(a.email))
+      .filter((d): d is string => d !== null),
+  )
+  const candidateDomains = participantDomains.filter(
+    (d) => !FREEMAIL_DOMAINS.has(d) && !mailboxDomains.has(d),
+  )
+  if (candidateDomains.length === 0) return []
+
+  const matches: Array<{ companyId: Id<'companies'>; orgId: Id<'organizations'> }> = []
+  for (const domain of candidateDomains) {
+    const companies = await ctx.db
+      .query('companies')
+      .withIndex('by_org_domain', (q) => q.eq('orgId', orgId).eq('domain', domain))
+      .collect()
+    for (const company of companies) {
+      if (company.kind !== 'portfolio' || company.archivedAt) continue
+      matches.push({ companyId: company._id, orgId })
+    }
+  }
+  return matches
+}
+
+/** Read-only pre-check used by the sync action before downloading anything:
+ * does the message match this org, and is it already stored (dedup)? */
+export const matchProbe = internalQuery({
+  args: {
+    orgId: v.id('organizations'),
+    accountEmail: v.string(),
+    participantEmails: v.array(v.string()),
+    headerMessageId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const matches = await findMatches(
+      ctx,
+      args.orgId,
+      args.accountEmail,
+      args.participantEmails,
+    )
+    if (matches.length === 0) return { matched: false, alreadyStored: false }
+    const existing = await ctx.db
+      .query('companyEmails')
+      .withIndex('by_header_message_id', (q) =>
+        q.eq('headerMessageId', args.headerMessageId),
+      )
+      .unique()
+    return { matched: true, alreadyStored: existing !== null }
+  },
+})
+
+/**
+ * Match one parsed message against the account org's portfolio and store it.
  * Transactional and idempotent: dedup by `headerMessageId`, a replay only
- * merges the mailbox into `accountEmails` / adds missing links.
+ * merges the mailbox into `accountEmails` / adds missing links; attachments
+ * are attached on first insert only (the probe prevents double downloads).
  */
 export const storeMessage = internalMutation({
   args: {
+    orgId: v.id('organizations'),
     accountEmail: v.string(),
     headerMessageId: v.string(),
+    gmailMessageId: v.string(),
     gmailThreadId: v.optional(v.string()),
     subject: v.string(),
     snippet: v.optional(v.string()),
@@ -584,56 +782,24 @@ export const storeMessage = internalMutation({
     toEmails: v.array(v.string()),
     ccEmails: v.array(v.string()),
     sentAt: v.number(),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          filename: v.string(),
+          contentType: v.optional(v.string()),
+          size: v.optional(v.number()),
+          storageId: v.id('_storage'),
+        }),
+      ),
+    ),
   },
   handler: async (ctx, args) => {
-    const participants = [
-      ...new Set([args.fromEmail, ...args.toEmails, ...args.ccEmails]),
-    ]
-    const accountDomain = domainOf(args.accountEmail)
-    const participantDomains = [
-      ...new Set(
-        participants
-          .map((p) => domainOf(p))
-          .filter((d): d is string => d !== null),
-      ),
-    ]
-
-    // Fully-internal mail (all participants on the mailbox's own domain)
-    // never belongs to the portfolio timeline (Twenty's rule).
-    if (participantDomains.every((d) => d === accountDomain)) return null
-
-    // Candidate domains: participants minus freemail minus every connected
-    // mailbox's own domain (a mailbox domain matching a portfolio company
-    // would flood the timeline with that company's internal traffic).
-    const accounts = await ctx.db.query('gmailAccounts').take(50)
-    const mailboxDomains = new Set(
-      accounts
-        .map((a) => domainOf(a.email))
-        .filter((d): d is string => d !== null),
+    const matches = await findMatches(
+      ctx,
+      args.orgId,
+      args.accountEmail,
+      [args.fromEmail, ...args.toEmails, ...args.ccEmails],
     )
-    const candidateDomains = participantDomains.filter(
-      (d) => !FREEMAIL_DOMAINS.has(d) && !mailboxDomains.has(d),
-    )
-    if (candidateDomains.length === 0) return null
-
-    // Portfolio lookup across every org (multi-org fan-out, like the report
-    // pipeline: the same participation may exist in several orgs).
-    const orgs = await ctx.db.query('organizations').collect()
-    const matches: Array<{ companyId: Id<'companies'>; orgId: Id<'organizations'> }> = []
-    for (const org of orgs) {
-      for (const domain of candidateDomains) {
-        const companies = await ctx.db
-          .query('companies')
-          .withIndex('by_org_domain', (q) =>
-            q.eq('orgId', org._id).eq('domain', domain),
-          )
-          .collect()
-        for (const company of companies) {
-          if (company.kind !== 'portfolio' || company.archivedAt) continue
-          matches.push({ companyId: company._id, orgId: org._id })
-        }
-      }
-    }
     if (matches.length === 0) return null
 
     const direction =
@@ -652,14 +818,22 @@ export const storeMessage = internalMutation({
     let emailId: Id<'companyEmails'>
     if (existing) {
       emailId = existing._id
+      const patch: Partial<Doc<'companyEmails'>> = {}
       if (!existing.accountEmails.includes(args.accountEmail)) {
-        await ctx.db.patch('companyEmails', existing._id, {
-          accountEmails: [...existing.accountEmails, args.accountEmail],
-        })
+        patch.accountEmails = [...existing.accountEmails, args.accountEmail]
+      }
+      // Defensive: attach late-arriving attachments if the first sighting
+      // stored none (e.g. its download failed).
+      if (!existing.attachments?.length && args.attachments?.length) {
+        patch.attachments = args.attachments
+      }
+      if (Object.keys(patch).length > 0) {
+        await ctx.db.patch('companyEmails', existing._id, patch)
       }
     } else {
       emailId = await ctx.db.insert('companyEmails', {
         headerMessageId: args.headerMessageId,
+        gmailMessageId: args.gmailMessageId,
         gmailThreadId: args.gmailThreadId,
         subject: args.subject,
         snippet: args.snippet,
@@ -671,6 +845,7 @@ export const storeMessage = internalMutation({
         sentAt: args.sentAt,
         direction,
         accountEmails: [args.accountEmail],
+        attachments: args.attachments,
       })
     }
 
@@ -721,14 +896,16 @@ export const listByCompany = query({
         fromName: email.fromName ?? null,
         sentAt: email.sentAt,
         direction: email.direction,
+        attachmentCount: email.attachments?.length ?? 0,
       })
     }
     return out
   },
 })
 
-/** Full content of one timeline email (detail dialog). Authorized when the
- * caller is a member of at least one org the email is linked to. */
+/** Full content of one timeline email (detail dialog), attachments resolved
+ * to signed download URLs. Authorized when the caller is a member of at
+ * least one org the email is linked to. */
 export const getById = query({
   args: { emailId: v.id('companyEmails') },
   handler: async (ctx, { emailId }) => {
@@ -749,6 +926,16 @@ export const getById = query({
       throw new ConvexError('forbidden')
     }
 
+    const attachments = []
+    for (const att of email.attachments ?? []) {
+      attachments.push({
+        filename: att.filename,
+        contentType: att.contentType ?? null,
+        size: att.size ?? null,
+        url: await ctx.storage.getUrl(att.storageId),
+      })
+    }
+
     return {
       _id: email._id,
       subject: email.subject,
@@ -760,6 +947,7 @@ export const getById = query({
       sentAt: email.sentAt,
       direction: email.direction,
       accountEmails: email.accountEmails,
+      attachments,
     }
   },
 })
