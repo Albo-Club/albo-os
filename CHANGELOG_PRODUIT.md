@@ -23,6 +23,25 @@ bas de page.
 
 ---
 
+## v1.111.3 — 21/07/2026 à 09:55 — Convex à jour, et désormais mis à jour tout seul
+
+Le moteur de données de l'app (Convex) passe à sa dernière version, et un
+robot vérifie désormais chaque lundi matin si une nouvelle version est
+sortie : si oui, il prépare tout seul une proposition de mise à jour, déjà
+testée, qu'il ne reste qu'à valider. Aucun changement visible dans l'app.
+
+> **🔧 Notes techniques**
+>
+> - `convex` 1.38.0 → 1.42.3 (`pnpm add convex@latest`) ; `pnpm lint`,
+>   `pnpm test:unit` (228) et `pnpm build` verts.
+> - Nouveau workflow `.github/workflows/update-convex.yml` (lundi 06:30 UTC,
+>   calqué sur `sync-skills.yml`) : `scripts/update-convex.mjs` bumpe convex,
+>   génère l'entrée de changelog, puis le workflow relance lint/tests/build
+>   **avant** d'ouvrir la PR `chore/update-convex` (la CI ne se déclenche pas
+>   sur les PRs créées avec `GITHUB_TOKEN`).
+> - Au passage : `renovate.json` existe mais l'app GitHub Renovate n'a jamais
+>   été installée sur le repo — voir la PR pour l'alternative.
+
 ## v1.111.2 — 20/07/2026 à 19:55 — Fiche entité : description alignée sous le nom
 
 Sur la fiche d'une entreprise, le texte de description repasse toujours sous

@@ -1,0 +1,58 @@
+name: Update Convex
+
+on:
+  schedule:
+    # Mondays at 06:30 UTC (right after sync-skills at 06:00).
+    - cron: '30 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - id: update
+        run: node scripts/update-convex.mjs
+      # Validate BEFORE opening the PR — PRs created with GITHUB_TOKEN don't
+      # trigger the CI workflow, so the same checks run here instead. A red
+      # run on this workflow = the new Convex version breaks something.
+      - if: steps.update.outputs.updated == 'true'
+        run: pnpm lint
+      - if: steps.update.outputs.updated == 'true'
+        run: pnpm test:unit
+      - if: steps.update.outputs.updated == 'true'
+        run: pnpm build
+      - name: Open PR
+        if: steps.update.outputs.updated == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/update-convex
+          base: main
+          commit-message: 'chore: bump convex to ${{ steps.update.outputs.after }}'
+          title: 'chore: bump convex ${{ steps.update.outputs.before }} → ${{ steps.update.outputs.after }}'
+          body: |
+            Automated `pnpm add convex@latest` run
+            (`.github/workflows/update-convex.yml`).
+
+            `convex` ${{ steps.update.outputs.before }} → ${{ steps.update.outputs.after }},
+            changelog entry included. `pnpm lint`, `pnpm test:unit` and
+            `pnpm build` all passed in the workflow run before this PR was
+            opened (the CI workflow does not trigger on PRs created with
+            `GITHUB_TOKEN`).
+
+            Skim the [Convex release notes](https://news.convex.dev/tag/releases/)
+            before merging.
+          labels: dependencies
+          delete-branch: true
