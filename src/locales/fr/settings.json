@@ -83,7 +83,6 @@
       "org": "Par organisation",
       "global": "Service partagé"
     },
-    "none": "Non connectée",
     "globalConfigured": "Opérationnelle",
     "globalNotConfigured": "Non configurée",
     "state": {
@@ -95,7 +94,7 @@
       "inactive": "Inactive"
     },
     "lastSync": "Dernière synchro {{ago}}",
-    "neverSynced": "Aucune synchro pour l'instant",
+    "neverSynced": "Jamais synchronisée",
     "platforms": {
       "powens": {
         "name": "Powens",
@@ -126,7 +125,8 @@
       "connectBank": "Connecter une banque",
       "disconnect": "Déconnecter",
       "reconnect": "Reconnecter",
-      "reconnecting": "Redirection…"
+      "reconnecting": "Redirection…",
+      "add": "Ajouter"
     },
     "dialog": {
       "title": "Connecter {{name}}",
