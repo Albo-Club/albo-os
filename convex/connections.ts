@@ -213,6 +213,10 @@ type IntegrationConnection = {
   /** Last failure message (sanitized platform-side, no secret) — lets the
    * UI say WHY a connection is red instead of a bare dot. */
   lastError: string | null
+  /** auth 'credentials': the row's NON-SECRET settings (registry
+   * `configKeys`, e.g. VASCO's clientSlug) — prefills the edit form.
+   * Credentials never travel this way (write-only). */
+  config?: Record<string, string>
 }
 
 type IntegrationItem = {
@@ -307,6 +311,49 @@ export const createConnection = mutation({
 })
 
 /**
+ * Fix a credentials connection in place (the « Modifier » button of the
+ * Intégrations page): replace its label/config/credentials without losing the
+ * row. Admin-gated on the row's org; validated against the registry like
+ * `createConnection`. Clears `lastError` (the stored failure belonged to the
+ * previous credentials) — the caller re-syncs right after to stamp a fresh
+ * outcome. Credentials are write-only: the form never sees the stored ones.
+ */
+export const updateConnection = mutation({
+  args: {
+    connectionId: v.id('externalConnections'),
+    label: v.string(),
+    config: v.optional(v.record(v.string(), v.string())),
+    credentials: v.optional(v.record(v.string(), v.string())),
+  },
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get('externalConnections', args.connectionId)
+    if (!row) throw new ConvexError('not_found')
+    const def = getConnector(row.platform)
+    parseConnection(def, { config: args.config, credentials: args.credentials })
+    await requireOrgRole(ctx, row.orgId, 'admin')
+    const label = args.label.trim()
+    if (!label) throw new ConvexError('label_required')
+    const siblings = await ctx.db
+      .query('externalConnections')
+      .withIndex('by_org_and_platform', (q) =>
+        q.eq('orgId', row.orgId).eq('platform', row.platform),
+      )
+      .collect()
+    if (siblings.some((c) => c._id !== row._id && c.label === label)) {
+      throw new ConvexError('label_taken')
+    }
+    await ctx.db.patch('externalConnections', args.connectionId, {
+      label,
+      config: args.config,
+      credentials: args.credentials,
+      active: true,
+      lastError: undefined,
+    })
+    return args.connectionId
+  },
+})
+
+/**
  * Disconnect (delete) a credentials connection from the app. Admin-gated on
  * the row's org; deleting forgets the stored credentials. Webview platforms
  * (Powens) are NOT disconnectable here — their lifecycle lives on the
@@ -365,6 +412,7 @@ export const listIntegrations = query({
                   : 'pending',
             lastConnectedAt: r.lastConnectedAt ?? null,
             lastError: r.lastError ?? null,
+            config: r.config ?? {},
           }))
           break
         }

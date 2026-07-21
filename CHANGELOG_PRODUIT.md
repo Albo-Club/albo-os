@@ -23,6 +23,32 @@ bas de page.
 
 ---
 
+## v1.114.0 — 21/07/2026 à 12:45 — Intégrations : corriger une connexion en un clic
+
+Quand une connexion à un portail investisseur (Parallel / VASCO) est en
+erreur, plus besoin de la supprimer puis la recréer : un bouton **Modifier**
+(crayon) ouvre le formulaire pré-rempli (nom, portail), il suffit de
+ressaisir les identifiants et d'enregistrer. Une synchronisation est
+relancée aussitôt pour vérifier que la connexion refonctionne — la pastille
+passe au vert dans la foulée (ou affiche la nouvelle erreur, le cas
+échéant). Les identifiants déjà enregistrés ne redescendent jamais dans le
+navigateur : ils se remplacent, ils ne se consultent pas.
+
+> **🔧 Notes techniques**
+>
+> - `convex/connections.ts` : mutation `updateConnection` (admin-gated sur
+>   l'org de la ligne, validée `parseConnection`, unicité du label hors
+>   soi-même, `lastError` purgé, `active: true` reposé) ;
+>   `listIntegrations` expose désormais `config` (non-secret, registre
+>   `configKeys`) pour pré-remplir le formulaire — jamais `credentials`.
+> - `settings/integrations.tsx` : bouton crayon par connexion credentials
+>   (admin) ; `ConnectDialog` gagne un mode édition (`existing` +
+>   `onSaved`) qui appelle `updateConnection` puis déclenche `syncNow`
+>   (plateformes `manualSync`) pour retamponner l'état réactivement.
+> - i18n FR/EN (`settings:integrations` : `actions.edit`,
+>   `dialog.editTitle/editDescription`, `toasts.updated`) ; TESTING.md
+>   (IG10) et doc produit Intégrations à jour.
+
 ## v1.113.0 — 21/07/2026 à 12:38 — Liste Entreprises : le one-liner s'élargit sur grand écran
 
 Dans la liste Entreprises, la colonne **One-liner** ne reste plus coincée à
@@ -43,7 +69,6 @@ colonnes pendant que le one-liner était rogné.
 > - Aucune autre colonne touchée — le tableau reste en `table-layout: auto`,
 >   le one-liner absorbe simplement l'espace horizontal restant via son
 >   plafond élargi.
-
 ## v1.112.1 — 21/07/2026 à 12:20 — Intégrations : état de connexion honnête et erreurs visibles
 
 Fin des signaux contradictoires sur les connexions aux portails

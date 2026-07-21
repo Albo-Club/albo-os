@@ -128,11 +128,14 @@
       "reconnect": "Reconnecter",
       "reconnecting": "Redirection…",
       "add": "Ajouter",
-      "sync": "Synchroniser"
+      "sync": "Synchroniser",
+      "edit": "Modifier la connexion"
     },
     "dialog": {
       "title": "Connecter {{name}}",
-      "description": "Les identifiants sont stockés côté serveur et ne sont jamais renvoyés au navigateur."
+      "description": "Les identifiants sont stockés côté serveur et ne sont jamais renvoyés au navigateur.",
+      "editTitle": "Modifier la connexion {{name}}",
+      "editDescription": "Corrigez les informations puis enregistrez : les identifiants saisis remplacent les précédents, et une synchronisation est relancée aussitôt pour vérifier la connexion."
     },
     "fields": {
       "label": "Nom de la connexion",
@@ -147,6 +150,7 @@
     },
     "toasts": {
       "connected": "Connexion enregistrée.",
+      "updated": "Connexion mise à jour.",
       "connectError": "Impossible d'enregistrer la connexion.",
       "labelTaken": "Une connexion porte déjà ce nom.",
       "disconnected": "Connexion supprimée.",

@@ -25,6 +25,10 @@ brancher).
 - un portail investisseur se branche via un petit formulaire (nom, portail,
   identifiants) — les identifiants sont stockés côté serveur et ne
   redescendent jamais dans le navigateur ;
+- une connexion de portail se **corrige sur place** (bouton crayon) : le même
+  formulaire s'ouvre pré-rempli (nom, portail), les identifiants sont à
+  ressaisir, et une synchronisation est relancée aussitôt pour vérifier que
+  la connexion refonctionne — inutile de déconnecter puis reconnecter ;
 - « Déconnecter » (avec confirmation) oublie les identifiants ; les données
   déjà importées restent en place.
 
