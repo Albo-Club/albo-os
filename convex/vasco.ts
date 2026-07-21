@@ -826,11 +826,21 @@ export const refreshVascoCacheForOrg = internalAction({
       for (const conn of clientConns) {
         try {
           communications = await pullCommunications(vascoCreds(conn))
+          // Stamp the outcome on the attempted row so the Intégrations page
+          // (dot + last sync) reflects this refresh reactively.
+          await ctx.runMutation(internal.connections.markConnected, {
+            connectionId: conn._id,
+          })
           break
         } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          await ctx.runMutation(internal.connections.markConnected, {
+            connectionId: conn._id,
+            error: message,
+          })
           console.warn(
             `[vasco] cache refresh pull failed for ${clientSlug}:`,
-            err instanceof Error ? err.message : String(err),
+            message,
           )
         }
       }

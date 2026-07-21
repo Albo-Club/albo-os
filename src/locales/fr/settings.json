@@ -126,7 +126,8 @@
       "disconnect": "Déconnecter",
       "reconnect": "Reconnecter",
       "reconnecting": "Redirection…",
-      "add": "Ajouter"
+      "add": "Ajouter",
+      "sync": "Synchroniser"
     },
     "dialog": {
       "title": "Connecter {{name}}",
@@ -149,7 +150,9 @@
       "labelTaken": "Une connexion porte déjà ce nom.",
       "disconnected": "Connexion supprimée.",
       "disconnectError": "Échec de la déconnexion.",
-      "bankRedirectError": "Impossible d'ouvrir la connexion bancaire."
+      "bankRedirectError": "Impossible d'ouvrir la connexion bancaire.",
+      "synced": "Synchronisation terminée.",
+      "syncError": "Échec de la synchronisation."
     },
     "fieldHelp": {
       "vasco": {

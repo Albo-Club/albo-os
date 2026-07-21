@@ -39,6 +39,11 @@ Deux améliorations de lisibilité sur la page Réglages → Intégrations :
   « Connecter » n'est mis en avant que tant qu'aucune connexion n'existe
   (ensuite, un discret « Ajouter ») ; la déconnexion devient une icône
   sobre en bout de ligne.
+- **Synchroniser à la demande** : les plateformes qui s'y prêtent (portails
+  investisseurs — les banques, elles, poussent leurs données toutes seules)
+  gagnent un bouton de synchronisation manuelle ; la pastille et la
+  « dernière synchro » de chaque connexion se mettent à jour en direct,
+  succès comme échec.
 
 > **🔧 Notes techniques**
 >
@@ -55,6 +60,12 @@ Deux améliorations de lisibilité sur la page Réglages → Intégrations :
 >   connect `outline` → `ghost` « Ajouter » dès qu'une connexion existe ;
 >   déconnexion en `icon-sm` ghost ; clé i18n `integrations.none` retirée
 >   (redondante avec le groupe « Disponibles »).
+> - Sync manuelle : flag `manualSync` au registre (`lib/connectors.ts`,
+>   vasco seul), action `connections.syncNow` (org-member-guarded, dispatch
+>   par plateforme → `vasco.refreshVascoCacheForOrg`), qui tamponne
+>   désormais `markConnected` (succès/erreur) sur chaque connexion tentée —
+>   la page se met à jour réactivement. Bouton `RefreshCw` sur la ligne
+>   plateforme.
 
 ## v1.111.5 — 21/07/2026 à 10:52 — Connexion instantanée au chargement
 

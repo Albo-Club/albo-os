@@ -126,7 +126,8 @@
       "disconnect": "Disconnect",
       "reconnect": "Reconnect",
       "reconnecting": "Redirecting…",
-      "add": "Add"
+      "add": "Add",
+      "sync": "Sync now"
     },
     "dialog": {
       "title": "Connect {{name}}",
@@ -149,7 +150,9 @@
       "labelTaken": "A connection with this name already exists.",
       "disconnected": "Connection removed.",
       "disconnectError": "Couldn't disconnect.",
-      "bankRedirectError": "Couldn't open the bank connection flow."
+      "bankRedirectError": "Couldn't open the bank connection flow.",
+      "synced": "Sync complete.",
+      "syncError": "Sync failed."
     },
     "fieldHelp": {
       "vasco": {

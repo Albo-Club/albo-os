@@ -594,6 +594,7 @@ secret dans la réponse) + mutations `createConnection`/`disconnectConnection`.
 | IG6 | Bouton « Connecter » (VASCO, admin) → formulaire → soumettre       | Dialog générique dont les champs viennent du registre (`label` + `clientSlug` + `username` + `password`) ; création via `connections.createConnection` (admin-gated, validé `parseConnection`) ; label déjà pris → toast « Une connexion porte déjà ce nom » ; membre non-admin → bouton absent |
 | IG7 | « Déconnecter » une connexion VASCO (admin)                        | Dialog de confirmation → `connections.disconnectConnection` supprime la ligne (identifiants oubliés) ; les données déjà importées (cache communications, deals) restent                                                  |
 | IG8 | « Connecter une banque » / « Reconnecter » (Powens, admin)         | Redirection webview Powens (`startBankConnection` / `startReconnect`, comme depuis la Trésorerie) ; « Reconnecter » visible seulement sur une connexion dégradée ; non-admin → boutons absents                            |
+| IG9 | Bouton « Synchroniser » (icône refresh, ligne VASCO, tout membre)  | `connections.syncNow` → pull live + cache rafraîchi ; pastille + « dernière synchro » de chaque connexion tentée mises à jour réactivement (`markConnected`, succès **et** échec) ; absent sur Powens/Notion/DocSend (pas de `manualSync` au registre) |
 
 ## Ingestion reports (AgentMail → inboundEmails, briques 1-6)
 

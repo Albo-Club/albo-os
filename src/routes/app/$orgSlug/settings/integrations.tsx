@@ -5,7 +5,7 @@ import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useAction } from 'convex/react'
 import { ConvexError } from 'convex/values'
 import { toast } from 'sonner'
-import { Link2, Loader2, Unlink } from 'lucide-react'
+import { Link2, Loader2, RefreshCw, Unlink } from 'lucide-react'
 
 import { api } from '../../../../../convex/_generated/api'
 import type { Id } from '../../../../../convex/_generated/dataModel'
@@ -196,6 +196,21 @@ function PlatformRow({
   const startReconnect = useAction(api.powens.startReconnect)
   const [redirecting, setRedirecting] = useState<string | null>(null)
 
+  const syncNow = useAction(api.connections.syncNow)
+  const [syncing, setSyncing] = useState(false)
+
+  async function handleSync() {
+    setSyncing(true)
+    try {
+      await syncNow({ orgId, platform: item.platform })
+      toast.success(t('settings:integrations.toasts.synced'))
+    } catch {
+      toast.error(t('settings:integrations.toasts.syncError'))
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   async function openWebview(kind: 'connect' | 'reconnect', id?: string) {
     setRedirecting(id ?? 'new')
     try {
@@ -245,6 +260,20 @@ function PlatformRow({
           </span>
         </span>
         <span className="flex items-center gap-2">
+          {/* On-demand pull (registry `manualSync`) — member-level, read-only. */}
+          {item.manualSync && hasConnections && (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className="text-muted-foreground"
+              aria-label={t('settings:integrations.actions.sync')}
+              title={t('settings:integrations.actions.sync')}
+              disabled={syncing}
+              onClick={() => void handleSync()}
+            >
+              <RefreshCw className={`size-4 ${syncing ? 'animate-spin' : ''}`} />
+            </Button>
+          )}
           {canManage && item.auth === 'webview' && (
             <Button
               size="sm"

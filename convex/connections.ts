@@ -18,11 +18,13 @@
 
 import { ConvexError, v } from 'convex/values'
 import {
+  action,
   internalMutation,
   internalQuery,
   mutation,
   query,
 } from './_generated/server'
+import { internal } from './_generated/api'
 import { requireOrgMember, requireOrgRole } from './lib/auth'
 import { CONNECTORS, getConnector, parseConnection } from './lib/connectors'
 import { connectionHealth } from './powens'
@@ -208,6 +210,8 @@ type IntegrationItem = {
   platform: string
   scope: string
   auth: string
+  /** The platform supports the on-demand `syncNow` pull. */
+  manualSync?: boolean
   /** auth 'credentials': the registry-declared keys, driving the generic
    * in-app connect form (labels resolved via i18n on the client). */
   configKeys?: Array<string>
@@ -217,6 +221,34 @@ type IntegrationItem = {
   /** global connectors: whether the capability is operational. */
   configured?: boolean
 }
+
+/**
+ * On-demand pull for a platform that declares `manualSync` in the registry
+ * (e.g. VASCO — Powens is push-based, nothing to trigger). Org-member-guarded;
+ * each platform module stamps the per-connection outcome
+ * (`lastConnectedAt`/`lastError`), so the Intégrations page updates
+ * reactively. A syncable platform = registry flag + one dispatch case below.
+ */
+export const syncNow = action({
+  args: { orgId: v.id('organizations'), platform: v.string() },
+  handler: async (ctx, { orgId, platform }): Promise<{ syncedAt: number }> => {
+    const def = getConnector(platform)
+    if (!def.manualSync) throw new ConvexError('sync_not_supported')
+    // Guard: throws unless the caller is a member of the org.
+    await ctx.runQuery(internal.connections.authorizeAndListActive, {
+      orgId,
+      platform,
+    })
+    switch (platform) {
+      case 'vasco':
+        await ctx.runAction(internal.vasco.refreshVascoCacheForOrg, { orgId })
+        break
+      default:
+        throw new ConvexError('sync_not_supported')
+    }
+    return { syncedAt: Date.now() }
+  },
+})
 
 /**
  * Connect a credentials platform from the app (the Intégrations control
@@ -297,6 +329,7 @@ export const listIntegrations = query({
         platform: def.platform,
         scope: def.scope,
         auth: def.auth,
+        manualSync: def.manualSync,
       }
       switch (def.auth) {
         case 'credentials': {
