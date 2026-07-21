@@ -71,9 +71,18 @@ export function EntityIntegrationsDialog({
         ) : (
           <div className="divide-y rounded-lg border">
             {linkable.map((item) => {
-              const connected = (item.connections ?? []).some(
-                (c) => c.state !== 'inactive',
-              )
+              const states = (item.connections ?? []).map((c) => c.state)
+              const hasActive = states.some((s) => s !== 'inactive')
+              // Honest platform dot: green only when a connection actually
+              // works — a failing connection must read red here too, not
+              // green (the picker it opens would find nothing).
+              const dotClass = states.includes('connected')
+                ? 'bg-emerald-500'
+                : states.some((s) => s === 'error' || s === 'action_required')
+                  ? 'bg-red-500'
+                  : hasActive
+                    ? 'bg-amber-500'
+                    : 'bg-muted-foreground/40'
               // Today the only entity-linkable platform is VASCO; a future
               // one plugs its own picker here.
               const isLinked =
@@ -86,9 +95,7 @@ export function EntityIntegrationsDialog({
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     <span
-                      className={`inline-block size-2 shrink-0 rounded-full ${
-                        connected ? 'bg-emerald-500' : 'bg-muted-foreground/40'
-                      }`}
+                      className={`inline-block size-2 shrink-0 rounded-full ${dotClass}`}
                     />
                     <span className="text-sm font-medium">
                       {t(`participations:integrations.platforms.${item.platform}`)}
@@ -99,7 +106,7 @@ export function EntityIntegrationsDialog({
                       </span>
                     )}
                   </span>
-                  {connected ? (
+                  {hasActive ? (
                     <Button
                       size="sm"
                       variant="outline"

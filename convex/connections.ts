@@ -106,18 +106,24 @@ export const listAllActive = internalQuery({
 
 // ── Lifecycle ───────────────────────────────────────────────────────────────
 
-/** Record the outcome of a connection attempt (clears `lastError` on
- * success). Called by platform modules after each login/pull. */
+/** Record the outcome of a connection attempt. Success stamps
+ * `lastConnectedAt` and clears `lastError`; failure records `lastError`
+ * ONLY, so `lastConnectedAt` always means "last SUCCESSFUL sync" — a
+ * failing connection must never display a fresh "last sync" next to its
+ * red state dot. Called by platform modules after each login/pull. */
 export const markConnected = internalMutation({
   args: {
     connectionId: v.id('externalConnections'),
     error: v.optional(v.string()),
   },
   handler: async (ctx, { connectionId, error }) => {
-    await ctx.db.patch('externalConnections', connectionId, {
-      lastConnectedAt: Date.now(),
-      lastError: error,
-    })
+    await ctx.db.patch(
+      'externalConnections',
+      connectionId,
+      error === undefined
+        ? { lastConnectedAt: Date.now(), lastError: undefined }
+        : { lastError: error },
+    )
   },
 })
 
@@ -204,6 +210,9 @@ type IntegrationConnection = {
   label: string
   state: string
   lastConnectedAt: number | null
+  /** Last failure message (sanitized platform-side, no secret) — lets the
+   * UI say WHY a connection is red instead of a bare dot. */
+  lastError: string | null
 }
 
 type IntegrationItem = {
@@ -355,6 +364,7 @@ export const listIntegrations = query({
                   ? 'connected'
                   : 'pending',
             lastConnectedAt: r.lastConnectedAt ?? null,
+            lastError: r.lastError ?? null,
           }))
           break
         }
@@ -368,6 +378,7 @@ export const listIntegrations = query({
             label: r.connectorName ?? r.powensConnectionId,
             state: connectionHealth(r, now),
             lastConnectedAt: r.lastSuccessfulSyncAt ?? null,
+            lastError: r.errorMessage ?? null,
           }))
           break
         }

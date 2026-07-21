@@ -22,6 +22,7 @@
     "loadingIssuers": "Chargement des deals du portail…",
     "issuersError": "Impossible de charger les deals du portail.",
     "noIssuers": "Aucun deal disponible pour cette organisation.",
+    "connectionError": "La connexion au portail est en erreur : impossible de récupérer les deals. Vérifiez-la dans Réglages → Intégrations (le détail de l'erreur y est affiché), puis relancez la synchronisation.",
     "current": "Actuellement rattaché à {{label}}",
     "saved": "Entité rattachée au portail.",
     "unlinked": "Rattachement supprimé.",

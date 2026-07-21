@@ -23,6 +23,40 @@ bas de page.
 
 ---
 
+## v1.112.1 — 21/07/2026 à 12:20 — Intégrations : état de connexion honnête et erreurs visibles
+
+Fin des signaux contradictoires sur les connexions aux portails
+investisseurs (Parallel / VASCO) :
+
+- la « dernière synchro » affichée est désormais celle de la dernière
+  synchronisation **réussie** — une connexion en erreur ne peut plus
+  afficher pastille rouge et « dernière synchro il y a 5 secondes » en
+  même temps ;
+- une connexion en erreur affiche **le message d'erreur** sous sa ligne
+  dans Réglages → Intégrations, pour voir immédiatement ce qui bloque
+  (identifiants refusés, portail injoignable…) ;
+- sur la fiche entité, le dialog « Rattacher à une intégration » montre
+  l'état réel de la plateforme (pastille rouge si la connexion est en
+  erreur, plus jamais verte à tort) ;
+- quand la connexion est en erreur, le sélecteur de deals du portail
+  l'explique clairement au lieu d'un « Aucun deal disponible » muet.
+
+> **🔧 Notes techniques**
+>
+> - `convex/connections.ts` : `markConnected` ne tamponne plus
+>   `lastConnectedAt` sur un échec (seul `lastError` est posé) —
+>   `lastConnectedAt` signifie désormais « dernier succès » ;
+>   `listIntegrations` expose `lastError` (sanitisé, jamais de secret)
+>   pour les connexions credentials et webview.
+> - `settings/integrations.tsx` : message `lastError` affiché sous une
+>   connexion en erreur.
+> - `EntityIntegrationsDialog.tsx` : pastille agrégée honnête
+>   (verte seulement si une connexion est `connected`, rouge si
+>   erreur, ambre sinon).
+> - `VascoCommunicationsSection.tsx` (`VascoLinkDialog`) : lit l'état de
+>   connexion via `listIntegrations` et affiche `link.connectionError`
+>   quand la connexion échoue et que le cache d'émetteurs est vide.
+
 ## v1.112.0 — 21/07/2026 à 11:53 — Rattacher une intégration depuis la fiche entité
 
 Le rattachement d'une participation à un portail investisseur (Parallel /

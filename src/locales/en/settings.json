@@ -95,6 +95,7 @@
     },
     "lastSync": "Last sync {{ago}}",
     "neverSynced": "Never synced",
+    "lastError": "Error: {{message}}",
     "platforms": {
       "powens": {
         "name": "Powens",

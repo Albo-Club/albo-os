@@ -263,6 +263,17 @@ export function VascoLinkDialog({
   const data = useConvexQuery(api.vasco.listCachedVascoIssuers, {
     orgId: company.orgId,
   })
+  // Connection state, to tell "no issuer on the portal" apart from "the
+  // connection is failing" when the cache comes back empty.
+  const integrations = useConvexQuery(api.connections.listIntegrations, {
+    orgId: company.orgId,
+  })
+  const vascoConnections =
+    integrations?.find((i) => i.platform === 'vasco')?.connections ?? []
+  const connectionFailing =
+    vascoConnections.length > 0 &&
+    !vascoConnections.some((c) => c.state === 'connected') &&
+    vascoConnections.some((c) => c.state === 'error')
   const { refreshing, doRefresh } = useVascoRefresh(company.orgId)
   const bootstrapped = useRef(false)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
@@ -321,8 +332,16 @@ export function VascoLinkDialog({
           </div>
         )}
         {!loading && issuers.length === 0 && (
-          <div className="text-muted-foreground text-sm">
-            {t('link.noIssuers')}
+          <div
+            className={
+              connectionFailing
+                ? 'text-destructive text-sm'
+                : 'text-muted-foreground text-sm'
+            }
+          >
+            {connectionFailing
+              ? t('link.connectionError')
+              : t('link.noIssuers')}
           </div>
         )}
         {!loading && issuers.length > 0 && (
