@@ -5,7 +5,7 @@ import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useAction } from 'convex/react'
 import { ConvexError } from 'convex/values'
 import { toast } from 'sonner'
-import { Link2, Loader2, RefreshCw, Unlink } from 'lucide-react'
+import { Link2, Loader2, Pencil, RefreshCw, Unlink } from 'lucide-react'
 
 import { api } from '../../../../../convex/_generated/api'
 import type { Id } from '../../../../../convex/_generated/dataModel'
@@ -187,6 +187,11 @@ function PlatformRow({
   const { t } = useTranslation(['settings', 'common'])
   const ago = useAgo()
   const [connectOpen, setConnectOpen] = useState(false)
+  const [editing, setEditing] = useState<{
+    id: string
+    label: string
+    config: Record<string, string>
+  } | null>(null)
   const [disconnecting, setDisconnecting] = useState<{
     id: string
     label: string
@@ -339,16 +344,36 @@ function PlatformRow({
                   </Button>
                 )}
               {canManage && item.auth === 'credentials' && (
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  className="text-muted-foreground"
-                  aria-label={t('settings:integrations.actions.disconnect')}
-                  title={t('settings:integrations.actions.disconnect')}
-                  onClick={() => setDisconnecting({ id: c.id, label: c.label })}
-                >
-                  <Unlink className="size-4" />
-                </Button>
+                <>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    className="text-muted-foreground"
+                    aria-label={t('settings:integrations.actions.edit')}
+                    title={t('settings:integrations.actions.edit')}
+                    onClick={() =>
+                      setEditing({
+                        id: c.id,
+                        label: c.label,
+                        config: c.config ?? {},
+                      })
+                    }
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    className="text-muted-foreground"
+                    aria-label={t('settings:integrations.actions.disconnect')}
+                    title={t('settings:integrations.actions.disconnect')}
+                    onClick={() =>
+                      setDisconnecting({ id: c.id, label: c.label })
+                    }
+                  >
+                    <Unlink className="size-4" />
+                  </Button>
+                </>
               )}
             </span>
           </div>
@@ -367,6 +392,15 @@ function PlatformRow({
           onClose={() => setConnectOpen(false)}
         />
       )}
+      {editing && (
+        <ConnectDialog
+          item={item}
+          orgId={orgId}
+          existing={editing}
+          onClose={() => setEditing(null)}
+          onSaved={item.manualSync ? () => void handleSync() : undefined}
+        />
+      )}
       {disconnecting && (
         <DisconnectDialog
           connection={disconnecting}
@@ -382,20 +416,30 @@ function PlatformRow({
  * THE REGISTRY declaration (configKeys + credentialKeys) — a new platform
  * gets its form without any UI change (field labels resolve from
  * `settings:integrations.fields.<key>`, falling back to the raw key).
+ * With `existing`, the same form EDITS a connection in place (label + config
+ * prefilled, credentials re-entered — they are write-only) and `onSaved`
+ * fires after the update (used to re-sync immediately).
  */
 function ConnectDialog({
   item,
   orgId,
+  existing,
   onClose,
+  onSaved,
 }: {
   item: Integration
   orgId: Id<'organizations'>
+  existing?: { id: string; label: string; config: Record<string, string> }
   onClose: () => void
+  onSaved?: () => void
 }) {
   const { t, i18n } = useTranslation(['settings', 'common'])
   const create = useConvexMutation(api.connections.createConnection)
-  const [label, setLabel] = useState('')
-  const [values, setValues] = useState<Record<string, string>>({})
+  const update = useConvexMutation(api.connections.updateConnection)
+  const [label, setLabel] = useState(existing?.label ?? '')
+  const [values, setValues] = useState<Record<string, string>>(
+    existing ? { ...existing.config } : {},
+  )
   const [saving, setSaving] = useState(false)
 
   const configKeys = item.configKeys ?? []
@@ -422,18 +466,31 @@ function ConnectDialog({
   async function handleSubmit() {
     setSaving(true)
     try {
-      await create({
-        orgId,
-        platform: item.platform,
-        label: label.trim(),
-        config: Object.fromEntries(
-          configKeys.map((k) => [k, values[k].trim()]),
-        ),
-        credentials: Object.fromEntries(
-          credentialKeys.map((k) => [k, values[k]]),
-        ),
-      })
-      toast.success(t('settings:integrations.toasts.connected'))
+      const config = Object.fromEntries(
+        configKeys.map((k) => [k, values[k].trim()]),
+      )
+      const credentials = Object.fromEntries(
+        credentialKeys.map((k) => [k, values[k]]),
+      )
+      if (existing) {
+        await update({
+          connectionId: existing.id as Id<'externalConnections'>,
+          label: label.trim(),
+          config,
+          credentials,
+        })
+        toast.success(t('settings:integrations.toasts.updated'))
+      } else {
+        await create({
+          orgId,
+          platform: item.platform,
+          label: label.trim(),
+          config,
+          credentials,
+        })
+        toast.success(t('settings:integrations.toasts.connected'))
+      }
+      onSaved?.()
       onClose()
     } catch (err) {
       const code = err instanceof ConvexError ? (err.data as string) : ''
@@ -451,12 +508,23 @@ function ConnectDialog({
       <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {t('settings:integrations.dialog.title', {
-              name: t(`settings:integrations.platforms.${item.platform}.name`),
-            })}
+            {t(
+              existing
+                ? 'settings:integrations.dialog.editTitle'
+                : 'settings:integrations.dialog.title',
+              {
+                name: t(
+                  `settings:integrations.platforms.${item.platform}.name`,
+                ),
+              },
+            )}
           </DialogTitle>
           <DialogDescription>
-            {t('settings:integrations.dialog.description')}
+            {t(
+              existing
+                ? 'settings:integrations.dialog.editDescription'
+                : 'settings:integrations.dialog.description',
+            )}
           </DialogDescription>
         </DialogHeader>
         <FieldGroup>
@@ -503,7 +571,9 @@ function ConnectDialog({
             disabled={!complete || saving}
           >
             {saving && <Loader2 className="size-4 animate-spin" />}
-            {t('settings:integrations.actions.connect')}
+            {existing
+              ? t('common:actions.save')
+              : t('settings:integrations.actions.connect')}
           </Button>
         </DialogFooter>
       </DialogContent>

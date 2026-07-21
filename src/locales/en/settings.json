@@ -128,11 +128,14 @@
       "reconnect": "Reconnect",
       "reconnecting": "Redirecting…",
       "add": "Add",
-      "sync": "Sync now"
+      "sync": "Sync now",
+      "edit": "Edit connection"
     },
     "dialog": {
       "title": "Connect {{name}}",
-      "description": "Credentials are stored server-side and never sent back to the browser."
+      "description": "Credentials are stored server-side and never sent back to the browser.",
+      "editTitle": "Edit the {{name}} connection",
+      "editDescription": "Fix the details and save: the credentials you enter replace the previous ones, and a sync runs right away to verify the connection."
     },
     "fields": {
       "label": "Connection name",
@@ -147,6 +150,7 @@
     },
     "toasts": {
       "connected": "Connection saved.",
+      "updated": "Connection updated.",
       "connectError": "Couldn't save the connection.",
       "labelTaken": "A connection with this name already exists.",
       "disconnected": "Connection removed.",
