@@ -2259,7 +2259,26 @@ SPV13"), dated (`publishDate`/`period`), with `title`, `htmlContent`, and
   by id, never by name). The entity's Report section reads the cache query
   `getCachedCommunications({orgId, clientSlug, issuerId})`; the issuer picker is
   fed by `listCachedVascoIssuers` (distinct issuers + latest title as a human
-  hint) — both reactive, both reading `vascoCommunicationsCache`.
+  hint) — reactive, reading `vascoCommunicationsCache` **unioned with**
+  `vascoPortfolioIssuers` (next bullet), so a held-but-silent SPV is pickable too.
+- **Two issuer sources (comms + holdings), reconciled by `Company.id`.** An SPV
+  only emits its first communication around closing, so a held-but-silent SPV
+  (e.g. freshly closed) used to be unlinkable — absent from a picker fed by
+  communications alone. Second source: the account's **holdings**, via
+  `GetAccount.accountSecurityContracts → security → company { id label }`
+  (`GET_PORTFOLIO_ISSUERS` / `pullPortfolioIssuers`), cached in
+  `vascoPortfolioIssuers` (atomic replace per `(orgId, clientSlug)`, same
+  discipline as the comms cache; pulled best-effort inside
+  `refreshVascoCacheForOrg`, isolated so a failure never wipes/blocks the comms
+  cache). **Why the ids reconcile:** `Security.company` and `Communication.issuer`
+  are both the GraphQL type `Company`, so `company.id === issuer.id` for the same
+  SPV — a link made from a holdings-only issuer stores the very id future
+  communications will carry, so they surface in the Report section with nothing
+  to redo. ⚠️ `TransactionSecurity.issuerCompany` is a DIFFERENT type
+  (`IssuerCompany`) — do NOT key on it, its id may not match. Confirm live with
+  `vasco:probePortfolioIssuers` (`inBothCount` = ids reconcile; `portfolioOnly` =
+  the newly-linkable silent SPVs). Best-effort: a field the investor persona
+  can't read comes back null (nulled + warning, not a top-level error) → skipped.
 - **Cached, not live-on-open (the big perf lever).** Reading VASCO live on every
   UI open is slow (login + full `GetCommunications`) and there is **no webhook**
   for the investor persona to push updates (pull-only — verified against the API
