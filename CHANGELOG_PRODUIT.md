@@ -23,6 +23,34 @@ bas de page.
 
 ---
 
+## v1.117.2 — 21/07/2026 à 18:17 — Parallel : correction du chemin de lecture du portefeuille (rattachement des SPV détenus)
+
+La détection des SPV détenus — celle qui permet de les rattacher **avant** leur
+première communication — lisait une source que Parallel **masque** au compte
+investisseur : elle ne remontait donc rien. Elle s'appuie désormais sur la vue
+**portefeuille** du compte, bien lisible par notre connexion. Un SPV détenu
+doit maintenant apparaître dans la liste de rattachement après une
+synchronisation.
+
+> **🔧 Notes techniques**
+>
+> - `pullPortfolioIssuers` (`convex/vasco.ts`) lit désormais
+>   `Account.portfolio.active` (`ActiveParticipation.issuerId` / `issuerName`),
+>   des scalaires directs, au lieu de
+>   `accountSecurityContracts.security.company` — ce dernier revient
+>   **vide/masqué** pour la persona investisseur (vérifié en prod :
+>   `probePortfolioIssuers` → `portfolioCount: 0`, sans erreur), comme
+>   `GetSecurities`.
+> - `issuerId` = l'id Company de l'émetteur, **même id** que
+>   `Communication.issuer.id` → la réconciliation (remontée des communications
+>   futures) reste garantie. Normalisation scalaire-ou-liste
+>   (`firstNonEmptyString` ; la doc rend ces champs `[String]`).
+>   ⚠️ `TransactionSecurity.issuerCompany` (type `IssuerCompany`) volontairement
+>   écarté : son id peut différer.
+> - Nouvelle sonde `vasco:probePortfolioParticipations` : dump brut de
+>   `portfolio.active` + ids des communications, pour confirmer en prod la
+>   lisibilité du chemin et la réconciliation des id avant de s'y fier.
+
 ## v1.117.1 — 21/07/2026 à 17:55 — Gmail : message d'erreur clair quand la connexion n'est pas encore configurée
 
 Cliquer « Connecter une boîte Gmail » avant la configuration des identifiants
