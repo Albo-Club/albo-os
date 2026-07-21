@@ -3,12 +3,10 @@ import {
   Inbox,
   LayoutDashboard,
   ListTodo,
-  Mail,
   Megaphone,
   PieChart,
   Scale,
   Settings,
-  Users,
   Wallet,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -73,18 +71,6 @@ export function getNavGroups(): Array<NavGroup> {
       labelKey: 'groups.workspace',
       secondary: true,
       items: [
-        {
-          titleKey: 'items.members',
-          to: '/app/$orgSlug/settings/members',
-          icon: Users,
-          adminOnly: true,
-        },
-        {
-          titleKey: 'items.invitations',
-          to: '/app/$orgSlug/settings/invitations',
-          icon: Mail,
-          adminOnly: true,
-        },
         {
           titleKey: 'items.settings',
           to: '/app/$orgSlug/settings',
