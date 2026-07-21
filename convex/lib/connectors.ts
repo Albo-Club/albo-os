@@ -36,6 +36,10 @@ export interface ConnectorDefinition {
   credentialKeys?: ReadonlyArray<string>
   /** auth `env`: the connector is available when ANY of these env vars is set. */
   envKeys?: ReadonlyArray<string>
+  /** The platform supports an on-demand pull, dispatched by
+   * `connections.syncNow` (a syncable platform adds its case there). Off for
+   * push-based platforms (webhooks) and passive capabilities. */
+  manualSync?: boolean
   /** Dev-facing pointer to the module implementing the platform logic. */
   module: string
   description: string
@@ -60,6 +64,7 @@ export const CONNECTORS: ReadonlyArray<ConnectorDefinition> = [
     auth: 'credentials',
     configKeys: ['clientSlug'],
     credentialKeys: ['username', 'password'],
+    manualSync: true,
     module: 'convex/vasco.ts',
     description:
       'Investor-side pull (positions, communications, documents) from ' +

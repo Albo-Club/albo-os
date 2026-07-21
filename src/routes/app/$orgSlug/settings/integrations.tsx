@@ -5,7 +5,7 @@ import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useAction } from 'convex/react'
 import { ConvexError } from 'convex/values'
 import { toast } from 'sonner'
-import { Link2, Loader2, Unlink } from 'lucide-react'
+import { Link2, Loader2, RefreshCw, Unlink } from 'lucide-react'
 
 import { api } from '../../../../../convex/_generated/api'
 import type { Id } from '../../../../../convex/_generated/dataModel'
@@ -27,21 +27,39 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
-import { Field, FieldGroup, FieldLabel } from '~/components/ui/field'
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from '~/components/ui/field'
 
 export const Route = createFileRoute('/app/$orgSlug/settings/integrations')({
   component: IntegrationsSettings,
 })
 
-/** Status pill — same visual family as the connection pills on the Cash page
- * (palette classes with dark variants, no brand token). */
-const STATE_PILL: Record<string, string> = {
-  connected: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-  stale: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
-  action_required: 'bg-red-500/15 text-red-700 dark:text-red-400',
-  error: 'bg-red-500/15 text-red-700 dark:text-red-400',
-  pending: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
-  inactive: 'bg-muted text-muted-foreground',
+/** Status dot (Attio-style): the color alone carries the state — green OK,
+ * amber degraded, red broken, gray inactive. The text label lives in the
+ * dot's tooltip (`title`), never inline. */
+const STATE_DOT: Record<string, string> = {
+  connected: 'bg-emerald-500',
+  stale: 'bg-amber-500',
+  action_required: 'bg-red-500',
+  error: 'bg-red-500',
+  pending: 'bg-amber-500',
+  inactive: 'bg-muted-foreground/40',
+}
+
+function StateDot({ state, label }: { state: string; label: string }) {
+  return (
+    <span
+      title={label}
+      aria-label={label}
+      className={`inline-block size-2 shrink-0 rounded-full ${
+        STATE_DOT[state] ?? STATE_DOT.inactive
+      }`}
+    />
+  )
 }
 
 type Integration = (typeof api.connections.listIntegrations)['_returnType'][number]
@@ -178,6 +196,21 @@ function PlatformRow({
   const startReconnect = useAction(api.powens.startReconnect)
   const [redirecting, setRedirecting] = useState<string | null>(null)
 
+  const syncNow = useAction(api.connections.syncNow)
+  const [syncing, setSyncing] = useState(false)
+
+  async function handleSync() {
+    setSyncing(true)
+    try {
+      await syncNow({ orgId, platform: item.platform })
+      toast.success(t('settings:integrations.toasts.synced'))
+    } catch {
+      toast.error(t('settings:integrations.toasts.syncError'))
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   async function openWebview(kind: 'connect' | 'reconnect', id?: string) {
     setRedirecting(id ?? 'new')
     try {
@@ -192,6 +225,18 @@ function PlatformRow({
     }
   }
 
+  const connections = item.connections ?? []
+  const hasConnections = connections.length > 0
+  // Prominent "Connecter" only while nothing is connected; once a connection
+  // exists the entry point shrinks to a discreet "Ajouter" (multi-portal /
+  // multi-bank stays possible without shouting).
+  const connectVariant = hasConnections ? 'ghost' : 'outline'
+  const connectLabel = hasConnections
+    ? t('settings:integrations.actions.add')
+    : item.auth === 'webview'
+      ? t('settings:integrations.actions.connectBank')
+      : t('settings:integrations.actions.connect')
+
   return (
     <div className="space-y-2 px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
@@ -199,36 +244,41 @@ function PlatformRow({
           <span className="text-sm font-medium">
             {t(`settings:integrations.platforms.${item.platform}.name`)}
           </span>
+          {/* Global connectors: the dot alone says operational or not. */}
+          {item.configured !== undefined && (
+            <StateDot
+              state={item.configured ? 'connected' : 'inactive'}
+              label={
+                item.configured
+                  ? t('settings:integrations.globalConfigured')
+                  : t('settings:integrations.globalNotConfigured')
+              }
+            />
+          )}
           <span className="text-muted-foreground rounded-full border px-2 py-0.5 text-xs">
             {t(`settings:integrations.scope.${item.scope}`)}
           </span>
         </span>
         <span className="flex items-center gap-2">
-          {/* Global connectors carry one org-independent state pill. */}
-          {item.configured !== undefined && (
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                item.configured ? STATE_PILL.connected : STATE_PILL.inactive
-              }`}
+          {/* On-demand pull (registry `manualSync`) — member-level, read-only. */}
+          {item.manualSync && hasConnections && (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className="text-muted-foreground"
+              aria-label={t('settings:integrations.actions.sync')}
+              title={t('settings:integrations.actions.sync')}
+              disabled={syncing}
+              onClick={() => void handleSync()}
             >
-              {item.configured
-                ? t('settings:integrations.globalConfigured')
-                : t('settings:integrations.globalNotConfigured')}
-            </span>
+              <RefreshCw className={`size-4 ${syncing ? 'animate-spin' : ''}`} />
+            </Button>
           )}
-          {item.connections !== undefined &&
-            item.connections.length === 0 && (
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATE_PILL.inactive}`}
-              >
-                {t('settings:integrations.none')}
-              </span>
-            )}
-          {/* The single entry point: connect from here, per auth kind. */}
           {canManage && item.auth === 'webview' && (
             <Button
               size="sm"
-              variant="outline"
+              variant={connectVariant}
+              className={hasConnections ? 'text-muted-foreground' : undefined}
               disabled={redirecting !== null}
               onClick={() => void openWebview('connect')}
             >
@@ -237,67 +287,72 @@ function PlatformRow({
               ) : (
                 <Link2 className="size-4" />
               )}
-              {t('settings:integrations.actions.connectBank')}
+              {connectLabel}
             </Button>
           )}
           {canManage && item.auth === 'credentials' && (
             <Button
               size="sm"
-              variant="outline"
+              variant={connectVariant}
+              className={hasConnections ? 'text-muted-foreground' : undefined}
               onClick={() => setConnectOpen(true)}
             >
               <Link2 className="size-4" />
-              {t('settings:integrations.actions.connect')}
+              {connectLabel}
             </Button>
           )}
         </span>
       </div>
-      <p className="text-muted-foreground text-xs">
+      <p className="text-muted-foreground/80 text-xs">
         {t(`settings:integrations.platforms.${item.platform}.description`)}
       </p>
-      {(item.connections ?? []).map((c) => (
+      {connections.map((c) => (
         <div
           key={c.id}
-          className="flex flex-wrap items-center gap-2 text-sm"
+          className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1"
         >
-          <span>{c.label}</span>
-          <span
-            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-              STATE_PILL[c.state] ?? STATE_PILL.inactive
-            }`}
-          >
-            {t(`settings:integrations.state.${c.state}`)}
+          <span className="flex min-w-0 items-center gap-2 text-sm">
+            <StateDot
+              state={c.state}
+              label={t(`settings:integrations.state.${c.state}`)}
+            />
+            <span className="truncate">{c.label}</span>
           </span>
-          <span className="text-muted-foreground text-xs">
-            {c.lastConnectedAt != null
-              ? t('settings:integrations.lastSync', {
-                  ago: ago(c.lastConnectedAt),
-                })
-              : t('settings:integrations.neverSynced')}
+          <span className="flex items-center gap-1">
+            <span className="text-muted-foreground text-xs tabular-nums">
+              {c.lastConnectedAt != null
+                ? t('settings:integrations.lastSync', {
+                    ago: ago(c.lastConnectedAt),
+                  })
+                : t('settings:integrations.neverSynced')}
+            </span>
+            {canManage &&
+              item.auth === 'webview' &&
+              c.state !== 'connected' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={redirecting !== null}
+                  onClick={() => void openWebview('reconnect', c.id)}
+                >
+                  {redirecting === c.id
+                    ? t('settings:integrations.actions.reconnecting')
+                    : t('settings:integrations.actions.reconnect')}
+                </Button>
+              )}
+            {canManage && item.auth === 'credentials' && (
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className="text-muted-foreground"
+                aria-label={t('settings:integrations.actions.disconnect')}
+                title={t('settings:integrations.actions.disconnect')}
+                onClick={() => setDisconnecting({ id: c.id, label: c.label })}
+              >
+                <Unlink className="size-4" />
+              </Button>
+            )}
           </span>
-          {canManage && item.auth === 'webview' && c.state !== 'connected' && (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={redirecting !== null}
-              onClick={() => void openWebview('reconnect', c.id)}
-            >
-              {redirecting === c.id
-                ? t('settings:integrations.actions.reconnecting')
-                : t('settings:integrations.actions.reconnect')}
-            </Button>
-          )}
-          {canManage && item.auth === 'credentials' && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-muted-foreground"
-              onClick={() => setDisconnecting({ id: c.id, label: c.label })}
-            >
-              <Unlink className="size-4" />
-              {t('settings:integrations.actions.disconnect')}
-            </Button>
-          )}
         </div>
       ))}
 
@@ -348,6 +403,16 @@ function ConnectDialog({
   const fieldLabel = (key: string) => {
     const i18nKey = `settings:integrations.fields.${key}`
     return i18n.exists(i18nKey) ? t(i18nKey) : key
+  }
+  // Per-platform helper text and placeholder, resolved from i18n so a new
+  // platform documents its own fields without touching this generic form.
+  const fieldHelp = (key: string) => {
+    const i18nKey = `settings:integrations.fieldHelp.${item.platform}.${key}`
+    return i18n.exists(i18nKey) ? t(i18nKey) : null
+  }
+  const fieldPlaceholder = (key: string) => {
+    const i18nKey = `settings:integrations.fieldPlaceholders.${item.platform}.${key}`
+    return i18n.exists(i18nKey) ? t(i18nKey) : undefined
   }
 
   async function handleSubmit() {
@@ -417,7 +482,11 @@ function ConnectDialog({
                 onChange={(e) =>
                   setValues((v) => ({ ...v, [key]: e.target.value }))
                 }
+                placeholder={fieldPlaceholder(key)}
               />
+              {fieldHelp(key) && (
+                <FieldDescription>{fieldHelp(key)}</FieldDescription>
+              )}
             </Field>
           ))}
         </FieldGroup>

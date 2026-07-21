@@ -23,6 +23,50 @@ bas de page.
 
 ---
 
+## v1.111.6 — 21/07/2026 à 11:03 — Intégrations : formulaire et liste plus clairs
+
+Deux améliorations de lisibilité sur la page Réglages → Intégrations :
+
+- **Le formulaire « Connecter » explique chaque champ** : « Portail » montre
+  un exemple et précise où trouver l'identifiant (le début de l'adresse web
+  du portail — « parallel » pour parallel.vasco.fund), et les champs
+  identifiant / mot de passe indiquent qu'il s'agit de vos accès à ce
+  portail.
+- **La liste respire, façon Attio** : l'état d'une connexion est porté par
+  une simple pastille de couleur (verte / orange / rouge, libellé au
+  survol) au lieu d'un badge texte ; la dernière synchro est alignée à
+  droite, distincte de la description de la plateforme ; le bouton
+  « Connecter » n'est mis en avant que tant qu'aucune connexion n'existe
+  (ensuite, un discret « Ajouter ») ; la déconnexion devient une icône
+  sobre en bout de ligne.
+- **Synchroniser à la demande** : les plateformes qui s'y prêtent (portails
+  investisseurs — les banques, elles, poussent leurs données toutes seules)
+  gagnent un bouton de synchronisation manuelle ; la pastille et la
+  « dernière synchro » de chaque connexion se mettent à jour en direct,
+  succès comme échec.
+
+> **🔧 Notes techniques**
+>
+> - `ConnectDialog` (`settings/integrations.tsx`) : aide et placeholder par
+>   champ résolus depuis l'i18n **par plateforme**
+>   (`settings:integrations.fieldHelp.<platform>.<key>` /
+>   `fieldPlaceholders.<platform>.<key>`, rendu `FieldDescription`) — le
+>   formulaire reste générique, une nouvelle plateforme documente ses champs
+>   en ajoutant ses clés i18n. Libellé `fields.clientSlug` simplifié en
+>   « Portail ».
+> - `PlatformRow` : `STATE_PILL` remplacé par `StateDot` (pastille `size-2`,
+>   libellé en `title`/`aria-label`) ; ligne de connexion en
+>   `justify-between` (synchro `text-xs tabular-nums` à droite) ; bouton
+>   connect `outline` → `ghost` « Ajouter » dès qu'une connexion existe ;
+>   déconnexion en `icon-sm` ghost ; clé i18n `integrations.none` retirée
+>   (redondante avec le groupe « Disponibles »).
+> - Sync manuelle : flag `manualSync` au registre (`lib/connectors.ts`,
+>   vasco seul), action `connections.syncNow` (org-member-guarded, dispatch
+>   par plateforme → `vasco.refreshVascoCacheForOrg`), qui tamponne
+>   désormais `markConnected` (succès/erreur) sur chaque connexion tentée —
+>   la page se met à jour réactivement. Bouton `RefreshCw` sur la ligne
+>   plateforme.
+
 ## v1.111.5 — 21/07/2026 à 10:52 — Connexion instantanée au chargement
 
 Suite du chantier vitesse : au chargement d'une page (arrivée, rafraîchissement),
