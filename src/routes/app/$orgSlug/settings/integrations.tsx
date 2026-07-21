@@ -307,52 +307,56 @@ function PlatformRow({
         {t(`settings:integrations.platforms.${item.platform}.description`)}
       </p>
       {connections.map((c) => (
-        <div
-          key={c.id}
-          className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1"
-        >
-          <span className="flex min-w-0 items-center gap-2 text-sm">
-            <StateDot
-              state={c.state}
-              label={t(`settings:integrations.state.${c.state}`)}
-            />
-            <span className="truncate">{c.label}</span>
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="text-muted-foreground text-xs tabular-nums">
-              {c.lastConnectedAt != null
-                ? t('settings:integrations.lastSync', {
-                    ago: ago(c.lastConnectedAt),
-                  })
-                : t('settings:integrations.neverSynced')}
+        <div key={c.id} className="space-y-0.5">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+            <span className="flex min-w-0 items-center gap-2 text-sm">
+              <StateDot
+                state={c.state}
+                label={t(`settings:integrations.state.${c.state}`)}
+              />
+              <span className="truncate">{c.label}</span>
             </span>
-            {canManage &&
-              item.auth === 'webview' &&
-              c.state !== 'connected' && (
+            <span className="flex items-center gap-1">
+              <span className="text-muted-foreground text-xs tabular-nums">
+                {c.lastConnectedAt != null
+                  ? t('settings:integrations.lastSync', {
+                      ago: ago(c.lastConnectedAt),
+                    })
+                  : t('settings:integrations.neverSynced')}
+              </span>
+              {canManage &&
+                item.auth === 'webview' &&
+                c.state !== 'connected' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={redirecting !== null}
+                    onClick={() => void openWebview('reconnect', c.id)}
+                  >
+                    {redirecting === c.id
+                      ? t('settings:integrations.actions.reconnecting')
+                      : t('settings:integrations.actions.reconnect')}
+                  </Button>
+                )}
+              {canManage && item.auth === 'credentials' && (
                 <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={redirecting !== null}
-                  onClick={() => void openWebview('reconnect', c.id)}
+                  size="icon-sm"
+                  variant="ghost"
+                  className="text-muted-foreground"
+                  aria-label={t('settings:integrations.actions.disconnect')}
+                  title={t('settings:integrations.actions.disconnect')}
+                  onClick={() => setDisconnecting({ id: c.id, label: c.label })}
                 >
-                  {redirecting === c.id
-                    ? t('settings:integrations.actions.reconnecting')
-                    : t('settings:integrations.actions.reconnect')}
+                  <Unlink className="size-4" />
                 </Button>
               )}
-            {canManage && item.auth === 'credentials' && (
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                className="text-muted-foreground"
-                aria-label={t('settings:integrations.actions.disconnect')}
-                title={t('settings:integrations.actions.disconnect')}
-                onClick={() => setDisconnecting({ id: c.id, label: c.label })}
-              >
-                <Unlink className="size-4" />
-              </Button>
-            )}
-          </span>
+            </span>
+          </div>
+          {c.lastError && (
+            <p className="text-destructive line-clamp-2 pl-4 text-xs">
+              {t('settings:integrations.lastError', { message: c.lastError })}
+            </p>
+          )}
         </div>
       ))}
 

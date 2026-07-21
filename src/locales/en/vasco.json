@@ -22,6 +22,7 @@
     "loadingIssuers": "Loading portal deals…",
     "issuersError": "Couldn't load the portal deals.",
     "noIssuers": "No deal available for this organisation.",
+    "connectionError": "The portal connection is failing: the deals can't be fetched. Check it in Settings → Integrations (the error detail is shown there), then run a sync again.",
     "current": "Currently linked to {{label}}",
     "saved": "Entity linked to the portal.",
     "unlinked": "Link removed.",

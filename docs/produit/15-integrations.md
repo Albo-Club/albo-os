@@ -10,7 +10,10 @@ brancher).
 - Les plateformes **par organisation** (banques via Powens, portails fonds
   type Parallel ou Teampact) affichent chaque connexion avec sa pastille
   d'état (connectée / en retard / à reconnecter / en erreur) et sa dernière
-  synchronisation.
+  synchronisation **réussie** (une connexion en erreur garde la date de son
+  dernier succès — ou « Jamais synchronisée »). Une connexion en erreur
+  affiche aussi le message d'erreur sous sa ligne, pour comprendre d'un coup
+  d'œil ce qui bloque (identifiants refusés, portail injoignable…).
 - Les **services partagés** (extraction Notion, DocSend) indiquent simplement
   s'ils sont opérationnels.
 
@@ -95,8 +98,10 @@ Pour les participations souscrites via un portail investisseur (Parallel,
 Teampact…), la fiche société se rattache à l'émetteur correspondant depuis
 son menu **⋯ → « Rattacher à une intégration »** — disponible sur toute
 entité du portefeuille, quel que soit son nom. Le dialog montre les
-plateformes rattachables et leur état de connexion, puis propose la liste
-des émetteurs à choisir. Une fois rattachée, les **communications
+plateformes rattachables et leur état de connexion réel (pastille rouge si
+la connexion est en erreur), puis propose la liste des émetteurs à choisir ;
+si la connexion est en erreur et qu'aucun deal ne peut être récupéré, le
+sélecteur l'explique et renvoie vers Réglages → Intégrations. Une fois rattachée, les **communications
 investisseurs** (annonces, documents) remontent dans l'onglet Rapports de la
 fiche, avec téléchargement des documents et rafraîchissement à la demande ;
 une fiche non rattachée n'affiche rien.
