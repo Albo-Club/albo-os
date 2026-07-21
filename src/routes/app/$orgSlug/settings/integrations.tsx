@@ -234,8 +234,17 @@ function PlatformRow({
           ? await startBank({ orgId })
           : await startReconnect({ orgId, powensConnectionId: id! })
       window.location.href = webviewUrl
-    } catch {
-      toast.error(t('settings:integrations.toasts.bankRedirectError'))
+    } catch (err) {
+      // Name the actual cause — the generic bank message on a Gmail row
+      // reads as a different feature failing.
+      const code = err instanceof ConvexError ? (err.data as string) : ''
+      toast.error(
+        item.platform === 'gmail'
+          ? code === 'gmail_env_missing'
+            ? t('settings:integrations.toasts.gmailNotConfigured')
+            : t('settings:integrations.toasts.gmailRedirectError')
+          : t('settings:integrations.toasts.bankRedirectError'),
+      )
       setRedirecting(null)
     }
   }

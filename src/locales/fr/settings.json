@@ -162,7 +162,9 @@
       "disconnectError": "Échec de la déconnexion.",
       "bankRedirectError": "Impossible d'ouvrir la connexion bancaire.",
       "synced": "Synchronisation terminée.",
-      "syncError": "Échec de la synchronisation."
+      "syncError": "Échec de la synchronisation.",
+      "gmailNotConfigured": "Gmail n'est pas encore configuré : identifiants Google manquants côté serveur (GOOGLE_OAUTH_CLIENT_ID/SECRET).",
+      "gmailRedirectError": "Impossible d'ouvrir la connexion Gmail."
     },
     "fieldHelp": {
       "vasco": {
