@@ -646,12 +646,12 @@
     "received": "Reçu",
     "receivedVia": "via {{mailbox}}",
     "attachments": "Pièces jointes",
-    "all": {
+    "page": {
       "metaTitle": "Emails — Albo OS",
       "title": "Emails",
-      "subtitleLoading": "Tous les emails rattachés à vos participations, toutes organisations confondues.",
-      "subtitle": "Tous les emails rattachés à vos participations, toutes organisations confondues — {{count}} stockés.",
-      "empty": "Aucun email pour l'instant. Les emails apparaissent ici dès qu'une boîte Gmail connectée reçoit ou envoie un message lié à une participation.",
+      "subtitleLoading": "Tous les emails rattachés aux participations de cette organisation.",
+      "subtitle": "Tous les emails rattachés aux participations de cette organisation — {{count}} stockés.",
+      "empty": "Aucun email pour l'instant. Les emails apparaissent ici dès qu'une boîte Gmail connectée à cette organisation reçoit ou envoie un message lié à une participation.",
       "col": {
         "date": "Date",
         "subject": "Objet",

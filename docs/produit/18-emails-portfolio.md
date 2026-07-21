@@ -50,11 +50,12 @@ téléchargeables.
 
 ### 4. Suivre tout ce qui est capté
 
-Dans la vue « Toutes les organisations », la page **Emails** (menu de
-gauche, à côté de Rapports) liste tous les emails rattachés, toutes
-organisations et toutes boîtes confondues — avec les sociétés cliquables
-vers leur fiche. C'est le poste de contrôle : on y vérifie d'un coup d'œil
-que la capture tourne et ce qui est entré récemment.
+Dans chaque organisation, la page **Emails** (menu de gauche, entre Deals
+et Trésorerie) liste tous les emails rattachés aux participations de cette
+organisation, toutes boîtes confondues — avec les sociétés cliquables vers
+leur fiche. C'est le poste de contrôle : on y vérifie d'un coup d'œil que
+la capture tourne et ce qui est entré récemment. Albo et Calte ont chacun
+leur page, étanches l'une à l'autre.
 
 ## Points d'attention
 
@@ -82,8 +83,7 @@ que la capture tourne et ce qui est entré récemment.
 
 ## Pages liées
 
-- [Vue consolidée](12-vue-consolidee.md) (la page Emails cross-org),
-  [Participations](04-participations.md) (la fiche et ses onglets),
+- [Participations](04-participations.md) (la fiche et ses onglets),
   [Reports par email](17-reports-par-email.md) (le circuit d'analyse des
   investor updates), [Intégrations](15-integrations.md) (connexion et état
   des boîtes)

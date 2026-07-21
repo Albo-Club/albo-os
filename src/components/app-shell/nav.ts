@@ -57,6 +57,11 @@ export function getNavGroups(): Array<NavGroup> {
           icon: Handshake,
         },
         {
+          titleKey: 'items.emails',
+          to: '/app/$orgSlug/emails',
+          icon: Mail,
+        },
+        {
           titleKey: 'items.cash',
           to: '/app/$orgSlug/cash',
           icon: Wallet,
@@ -107,11 +112,6 @@ export function getAllNavGroups(): Array<NavGroup> {
           titleKey: 'items.reports',
           to: '/app/all/reports',
           icon: Inbox,
-        },
-        {
-          titleKey: 'items.emails',
-          to: '/app/all/emails',
-          icon: Mail,
         },
       ],
     },

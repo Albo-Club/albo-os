@@ -20,13 +20,13 @@ import {
   TableRow,
 } from '~/components/ui/table'
 
-export const Route = createFileRoute('/app/all/emails')({
-  component: AllEmails,
+export const Route = createFileRoute('/app/$orgSlug/emails')({
+  component: OrgEmails,
   head: () => ({
     meta: [
       {
         title: getI18n(getLocale()).getFixedT(null, 'participations')(
-          'emails.all.metaTitle',
+          'emails.page.metaTitle',
         ),
       },
     ],
@@ -34,25 +34,31 @@ export const Route = createFileRoute('/app/all/emails')({
 })
 
 /**
- * Consolidated email feed: every stored email across the caller's orgs,
- * most recent first. Read-only — the timeline is managed by the Gmail sync
- * (cf. the per-participation Emails tab for the entity-level view).
+ * Org-scoped email feed: every stored email linked to this workspace's
+ * participations, most recent first. Read-only — the timeline is managed
+ * by the Gmail sync (cf. the per-participation Emails tab for the
+ * entity-level view).
  */
-function AllEmails() {
+function OrgEmails() {
   const { t, i18n } = useTranslation('participations')
-  const rows = useConvexQuery(api.gmail.listAll, {})
+  const { orgSlug } = Route.useParams()
+  const org = useConvexQuery(api.organizations.bySlug, { slug: orgSlug })
+  const rows = useConvexQuery(
+    api.gmail.listByOrg,
+    org ? { orgId: org._id } : 'skip',
+  )
   const [openId, setOpenId] = useState<Id<'companyEmails'> | null>(null)
 
   return (
     <main className="flex-1 space-y-6 p-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
-          {t('emails.all.title')}
+          {t('emails.page.title')}
         </h1>
         <p className="text-muted-foreground text-sm">
           {rows === undefined
-            ? t('emails.all.subtitleLoading')
-            : t('emails.all.subtitle', { count: rows.length })}
+            ? t('emails.page.subtitleLoading')
+            : t('emails.page.subtitle', { count: rows.length })}
         </p>
       </div>
 
@@ -63,16 +69,18 @@ function AllEmails() {
           <Skeleton className="h-8 w-full" />
         </div>
       ) : rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t('emails.all.empty')}</p>
+        <p className="text-muted-foreground text-sm">
+          {t('emails.page.empty')}
+        </p>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{t('emails.all.col.date')}</TableHead>
-              <TableHead>{t('emails.all.col.subject')}</TableHead>
-              <TableHead>{t('emails.all.col.from')}</TableHead>
-              <TableHead>{t('emails.all.col.companies')}</TableHead>
-              <TableHead>{t('emails.all.col.mailboxes')}</TableHead>
+              <TableHead>{t('emails.page.col.date')}</TableHead>
+              <TableHead>{t('emails.page.col.subject')}</TableHead>
+              <TableHead>{t('emails.page.col.from')}</TableHead>
+              <TableHead>{t('emails.page.col.companies')}</TableHead>
+              <TableHead>{t('emails.page.col.mailboxes')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -120,17 +128,10 @@ function AllEmails() {
                   <TableCell>
                     <span className="flex flex-wrap gap-1">
                       {row.companies.map((c) => (
-                        <Badge
-                          key={`${c.orgSlug}-${c.companyId}`}
-                          variant="secondary"
-                          asChild
-                        >
+                        <Badge key={c.companyId} variant="secondary" asChild>
                           <Link
                             to="/app/$orgSlug/participations/$companyId"
-                            params={{
-                              orgSlug: c.orgSlug,
-                              companyId: c.companyId,
-                            }}
+                            params={{ orgSlug, companyId: c.companyId }}
                             onClick={(e) => e.stopPropagation()}
                           >
                             {c.name}

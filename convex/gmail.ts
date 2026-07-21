@@ -904,48 +904,50 @@ export const listByCompany = query({
 })
 
 /**
- * Consolidated feed for /app/all/emails: the most recent stored emails
- * visible to the caller (an email is visible when ≥1 of its links belongs
- * to an org the caller is a member of — links of other orgs are filtered
- * out). Bounded to the last 100 captures; read-only union, same spirit as
- * the cross-org aggregate view.
+ * Per-org feed for the /app/$orgSlug/emails page: the most recent emails
+ * linked to THIS org's participations (last ~100 captures). An email
+ * linked to several companies of the org appears once, with every company
+ * listed. Strictly org-scoped — the other orgs' links never surface here.
  */
-export const listAll = query({
-  args: {},
-  handler: async (ctx) => {
-    const user = await requireAppUser(ctx)
-    const memberships = await ctx.db
-      .query('organizationMembers')
-      .withIndex('by_user', (q) => q.eq('userId', user._id))
-      .collect()
-    const memberOrgIds = new Set(memberships.map((m) => m.orgId))
+export const listByOrg = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
 
-    const emails = await ctx.db.query('companyEmails').order('desc').take(100)
-    const orgSlugCache = new Map<Id<'organizations'>, string>()
+    // Over-fetch links (an email can carry one link per matched company of
+    // the org) then dedupe by email, newest first.
+    const links = await ctx.db
+      .query('companyEmailLinks')
+      .withIndex('by_org_and_sentAt', (q) => q.eq('orgId', orgId))
+      .order('desc')
+      .take(300)
+
+    const byEmail = new Map<
+      Id<'companyEmails'>,
+      Array<Id<'companies'>>
+    >()
+    for (const link of links) {
+      const list = byEmail.get(link.emailId) ?? []
+      list.push(link.companyId)
+      byEmail.set(link.emailId, list)
+    }
+
+    const companyNameCache = new Map<Id<'companies'>, string>()
     const out = []
-    for (const email of emails) {
-      const links = await ctx.db
-        .query('companyEmailLinks')
-        .withIndex('by_email', (q) => q.eq('emailId', email._id))
-        .collect()
-      const visible = links.filter((l) => memberOrgIds.has(l.orgId))
-      if (visible.length === 0) continue
+    for (const [emailId, companyIds] of byEmail) {
+      if (out.length >= 100) break
+      const email = await ctx.db.get('companyEmails', emailId)
+      if (!email) continue
 
       const companies = []
-      for (const link of visible) {
-        const company = await ctx.db.get('companies', link.companyId)
-        if (!company) continue
-        let slug = orgSlugCache.get(link.orgId)
-        if (slug === undefined) {
-          const org = await ctx.db.get('organizations', link.orgId)
-          slug = org?.slug ?? ''
-          orgSlugCache.set(link.orgId, slug)
+      for (const companyId of companyIds) {
+        let name = companyNameCache.get(companyId)
+        if (name === undefined) {
+          const company = await ctx.db.get('companies', companyId)
+          name = company?.name ?? ''
+          companyNameCache.set(companyId, name)
         }
-        companies.push({
-          companyId: link.companyId,
-          name: company.name,
-          orgSlug: slug,
-        })
+        if (name) companies.push({ companyId, name })
       }
 
       out.push({
