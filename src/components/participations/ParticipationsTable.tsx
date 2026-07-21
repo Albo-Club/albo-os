@@ -69,7 +69,7 @@ function OneLinerCell({
     return (
       <span
         ref={measureRef}
-        className="block max-w-72 truncate text-muted-foreground"
+        className="block max-w-72 truncate text-muted-foreground lg:max-w-sm xl:max-w-md 2xl:max-w-lg"
       >
         {text}
       </span>
@@ -85,7 +85,7 @@ function OneLinerCell({
           aria-label={expandLabel}
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
-          className="block max-w-72 cursor-pointer truncate text-left text-muted-foreground underline decoration-dotted decoration-muted-foreground/40 underline-offset-4 transition-colors hover:text-foreground"
+          className="block max-w-72 cursor-pointer truncate text-left text-muted-foreground underline decoration-dotted decoration-muted-foreground/40 underline-offset-4 transition-colors hover:text-foreground lg:max-w-sm xl:max-w-md 2xl:max-w-lg"
         >
           {text}
         </button>
