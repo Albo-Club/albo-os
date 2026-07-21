@@ -2261,24 +2261,34 @@ SPV13"), dated (`publishDate`/`period`), with `title`, `htmlContent`, and
   fed by `listCachedVascoIssuers` (distinct issuers + latest title as a human
   hint) — reactive, reading `vascoCommunicationsCache` **unioned with**
   `vascoPortfolioIssuers` (next bullet), so a held-but-silent SPV is pickable too.
-- **Two issuer sources (comms + holdings), reconciled by `Company.id`.** An SPV
-  only emits its first communication around closing, so a held-but-silent SPV
-  (e.g. freshly closed) used to be unlinkable — absent from a picker fed by
+- **Two issuer sources (comms + holdings), reconciled by the issuer Company id.**
+  An SPV only emits its first communication around closing, so a held-but-silent
+  SPV (e.g. freshly closed) used to be unlinkable — absent from a picker fed by
   communications alone. Second source: the account's **holdings**, via
-  `GetAccount.accountSecurityContracts → security → company { id label }`
-  (`GET_PORTFOLIO_ISSUERS` / `pullPortfolioIssuers`), cached in
+  `GetAccount.portfolio.active → { issuerId, issuerName }` (`ActiveParticipation`)
+  — `GET_PORTFOLIO_ISSUERS` / `pullPortfolioIssuers`, cached in
   `vascoPortfolioIssuers` (atomic replace per `(orgId, clientSlug)`, same
   discipline as the comms cache; pulled best-effort inside
   `refreshVascoCacheForOrg`, isolated so a failure never wipes/blocks the comms
-  cache). **Why the ids reconcile:** `Security.company` and `Communication.issuer`
-  are both the GraphQL type `Company`, so `company.id === issuer.id` for the same
-  SPV — a link made from a holdings-only issuer stores the very id future
-  communications will carry, so they surface in the Report section with nothing
-  to redo. ⚠️ `TransactionSecurity.issuerCompany` is a DIFFERENT type
-  (`IssuerCompany`) — do NOT key on it, its id may not match. Confirm live with
-  `vasco:probePortfolioIssuers` (`inBothCount` = ids reconcile; `portfolioOnly` =
-  the newly-linkable silent SPVs). Best-effort: a field the investor persona
-  can't read comes back null (nulled + warning, not a top-level error) → skipped.
+  cache). **Why the ids reconcile:** `ActiveParticipation.issuerId` is the
+  issuer's Company id — the same id `Communication.issuer.id` carries — so a link
+  made from a holdings-only issuer stores the very id future communications will
+  carry, and they surface in the Report section with nothing to redo.
+  ⚠️ **Two traps, both verified in prod:** (1) `accountSecurityContracts.security`
+  and `security.company` are **masked/empty for the investor persona** (like
+  `GetSecurities`) — the first cut used that path and `pullPortfolioIssuers`
+  returned **0** (`vasco:probePortfolioIssuers` → `portfolioCount: 0`, no error);
+  the direct `portfolio.active` scalars are readable where the nested
+  `Security`/`Company` objects are not. (2) `TransactionSecurity.issuerCompany`
+  is a DIFFERENT type (`IssuerCompany`, `id: [ID]!`, a "public representation") —
+  do NOT key on it, its id may not match the Company id. `issuerId`/`issuerName`
+  come back scalar-or-single-element-list (doc renders them `[String]`) →
+  normalize (`firstNonEmptyString`). Confirm live with
+  `vasco:probePortfolioParticipations` (raw dump: is `portfolio.active` readable?
+  does `issuerId` match a communication issuer id?) and `vasco:probePortfolioIssuers`
+  (`inBothCount` = ids reconcile; `portfolioOnly` = the newly-linkable silent
+  SPVs). Best-effort throughout: a field the persona can't read comes back null
+  (nulled + warning, not a top-level error) → skipped.
 - **Cached, not live-on-open (the big perf lever).** Reading VASCO live on every
   UI open is slow (login + full `GetCommunications`) and there is **no webhook**
   for the investor persona to push updates (pull-only — verified against the API

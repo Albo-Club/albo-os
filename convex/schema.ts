@@ -465,21 +465,23 @@ export default defineSchema({
 
   /**
    * vascoPortfolioIssuers — the SPVs (issuers) the org actually HOLDS on
-   * VASCO/Parallel, derived from the account's security contracts, independent
-   * of any communication. Lets a held SPV be linked even before it has emitted
-   * a single communication (e.g. a freshly closed SPV). `issuerId` is the
-   * VASCO `Company.id` — the **same** id space as `Communication.issuer.id`
-   * (both fields are `Company!`), so a link made from here catches that
-   * issuer's future communications. Same cache discipline as
-   * `vascoCommunicationsCache`: reactive read, replaced wholesale per
-   * (orgId, clientSlug) on each refresh. cf. KNOWN_ISSUES.md "VASCO API".
+   * VASCO/Parallel, derived from `Account.portfolio.active`
+   * (`ActiveParticipation.issuerId`), independent of any communication. Lets a
+   * held SPV be linked even before it has emitted a single communication (e.g.
+   * a freshly closed SPV). `issuerId` is the issuer's Company id — the **same**
+   * id space as `Communication.issuer.id` — so a link made from here catches
+   * that issuer's future communications. (The direct `portfolio.active` scalars
+   * are used because `accountSecurityContracts.security.company` is masked to
+   * the investor persona — cf. KNOWN_ISSUES.md "VASCO API".) Same cache
+   * discipline as `vascoCommunicationsCache`: reactive read, replaced wholesale
+   * per (orgId, clientSlug) on each refresh.
    */
   vascoPortfolioIssuers: defineTable({
     orgId: v.id('organizations'),
     clientSlug: v.string(),
-    issuerId: v.string(), // VASCO Company.id (== Communication.issuer.id)
+    issuerId: v.string(), // issuer Company id (== Communication.issuer.id)
     issuerLabel: v.optional(v.string()),
-    securityName: v.optional(v.string()), // human hint (labels are opaque "SPVn")
+    securityName: v.optional(v.string()), // reserved (unused with portfolio.active)
     fetchedAt: v.number(),
   }).index('by_org', ['orgId']),
 

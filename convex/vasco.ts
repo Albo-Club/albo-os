@@ -221,16 +221,18 @@ const GET_COMMUNICATIONS = `query($accountId: ID, $userId: ID, $issuerId: ID) {
 }`
 
 // Portfolio issuers (the SPVs the account HOLDS), independent of communications.
-// `security.company` is a `Company` — the SAME type as `Communication.issuer` —
-// so `company.id` reconciles with the `issuerId` stored on an entity link. Kept
-// minimal: no monetary field (masked for the investor persona anyway), only the
-// issuer identity we need to make a held-but-silent SPV pickable.
+// Read from `Account.portfolio.active`: `ActiveParticipation.issuerId` /
+// `issuerName` are DIRECT scalars, unlike `accountSecurityContracts.security`
+// which the investor persona can't read (it comes back empty/masked, like
+// `GetSecurities` — verified in prod via `probePortfolioParticipations`).
+// `issuerId` is the issuer's Company id, the same id space as
+// `Communication.issuer.id`, so a link made from here reconciles with that
+// issuer's future communications.
 const GET_PORTFOLIO_ISSUERS = `query($id: ID!) {
   GetAccount(id: $id) {
     id
-    accountSecurityContracts {
-      id
-      security { id name company { id label } }
+    portfolio {
+      active { issuerId issuerName }
     }
   }
 }`
@@ -603,7 +605,7 @@ export const probeCommunications = internalAction({
 /**
  * Diagnostic (CLI): confirm the portfolio path is readable by the investor
  * persona AND that its issuer id RECONCILES with the communications id. Per
- * connection: pulls the held issuers (`accountSecurityContracts.security.company.id`)
+ * connection: pulls the held issuers (`Account.portfolio.active.issuerId`)
  * and the communications issuers (`Communication.issuer.id`), then reports the
  * overlap. Both are `Company.id`, so an SPV present in both sources MUST share
  * the id → it lands in `inBothCount` (never double-counted); if the ids did NOT
@@ -787,29 +789,42 @@ export type VascoPortfolioIssuer = {
   securityName: string | null
 }
 
-type PortfolioContractNode = {
-  id: string
-  security?: {
-    id: string
-    name?: string | null
-    company?: { id: string; label?: string | null } | null
-  } | null
+// `issuerId` / `issuerName` may come back as a scalar or a single-element list
+// depending on the field (the doc renders them `[String]`), so normalize both.
+type ActiveParticipationNode = {
+  issuerId?: string | Array<string | null> | null
+  issuerName?: string | Array<string | null> | null
 }
 
 type GetPortfolioIssuersResult = {
   GetAccount: {
     id: string
-    accountSecurityContracts?: Array<PortfolioContractNode | null> | null
+    portfolio?: {
+      active?: Array<ActiveParticipationNode | null> | null
+    } | null
   } | null
 }
 
-/** Log in and return the DISTINCT issuers (Company) the user holds a security
- * contract with — across every account. No communication required, so a held
- * SPV that has never communicated (e.g. a freshly closed one) is still
- * returned. Keyed by `company.id`, the exact same id as `Communication.issuer.id`
- * (both are `Company`), so a link made from here catches that issuer's future
- * communications. Best-effort by design: a field the investor persona can't read
- * comes back null (nulled + warning, not a top-level error), so it is skipped. */
+/** Normalize a VASCO field that may be a scalar or a (single-element) list to
+ * one non-empty string, else null. */
+function firstNonEmptyString(
+  value: string | Array<string | null> | null | undefined,
+): string | null {
+  if (value == null) return null
+  if (Array.isArray(value)) {
+    const s = value.find((x) => typeof x === 'string' && x.length > 0)
+    return s ?? null
+  }
+  return value.length > 0 ? value : null
+}
+
+/** Log in and return the DISTINCT issuers the user holds — across every account
+ * — from `Account.portfolio.active` (`ActiveParticipation.issuerId`). No
+ * communication required, so a held SPV that has never communicated (e.g. a
+ * freshly closed one) is still returned. `issuerId` is the issuer's Company id,
+ * the same id as `Communication.issuer.id`, so a link made from here catches
+ * that issuer's future communications. Best-effort by design: a field the
+ * investor persona can't read comes back null → skipped, never guessed. */
 async function pullPortfolioIssuers(
   creds: VascoCreds,
 ): Promise<Array<VascoPortfolioIssuer>> {
@@ -829,21 +844,109 @@ async function pullPortfolioIssuers(
       GET_PORTFOLIO_ISSUERS,
       { id: acc.id },
     )
-    const contracts = accData.GetAccount?.accountSecurityContracts ?? []
-    for (const c of contracts) {
-      const company = c?.security?.company
-      if (!company?.id) continue // denied/masked field → null → skip, never guess
-      if (!byIssuer.has(company.id)) {
-        byIssuer.set(company.id, {
-          issuerId: company.id,
-          issuerLabel: company.label ?? null,
-          securityName: c?.security?.name ?? null,
+    const active = accData.GetAccount?.portfolio?.active ?? []
+    for (const p of active) {
+      const issuerId = firstNonEmptyString(p?.issuerId)
+      if (!issuerId) continue // masked/absent → skip, never guess
+      if (!byIssuer.has(issuerId)) {
+        byIssuer.set(issuerId, {
+          issuerId,
+          issuerLabel: firstNonEmptyString(p?.issuerName),
+          securityName: null,
         })
       }
     }
   }
   return [...byIssuer.values()]
 }
+
+/**
+ * Diagnostic (CLI): raw dump of the investor-readable holdings path
+ * `Account.portfolio.active` (issuerId/issuerName) per account, plus the
+ * communications issuer ids, to (a) confirm the persona can read it and (b)
+ * check `ActiveParticipation.issuerId` reconciles with `Communication.issuer.id`.
+ * Uses the RAW GraphQL call so masking (nulled fields + `extensions.warnings`)
+ * stays visible. Non-throwing.
+ *   npx convex run --prod vasco:probePortfolioParticipations '{"orgSlug":"albo"}'
+ */
+export const probePortfolioParticipations = internalAction({
+  args: { orgSlug: v.string() },
+  handler: async (ctx, { orgSlug }) => {
+    const conns: Array<VascoConnection> = await ctx.runQuery(
+      internal.connections.listActiveByOrgSlug,
+      { orgSlug, platform: 'vasco' },
+    )
+    const connections: Array<{
+      label: string
+      clientSlug: string
+      error?: string
+      communicationIssuers?: Array<{ id: string; label: string | null }>
+      accounts?: Array<{
+        accountId: string
+        accountLabel: string | null
+        httpStatus: number
+        body: unknown
+      }>
+    }> = []
+    for (const conn of conns) {
+      const clientSlug = connClientSlug(conn) ?? ''
+      try {
+        const creds = vascoCreds(conn)
+        const { token, userId } = await vascoLogin(creds)
+        const userData = await vascoGraphql<GetUserResult>(
+          creds.clientSlug,
+          token,
+          GET_USER,
+          { id: userId },
+        )
+        const accounts = userData.GetUser?.accounts ?? []
+        let communicationIssuers: Array<{ id: string; label: string | null }> =
+          []
+        try {
+          const comms = await pullCommunications(creds)
+          const m = new Map<string, string | null>()
+          for (const c of comms) if (c.issuerId) m.set(c.issuerId, c.issuerLabel)
+          communicationIssuers = [...m].map(([id, label]) => ({ id, label }))
+        } catch {
+          // Communications optional here — the portfolio dump is the point.
+        }
+        const accountDumps: Array<{
+          accountId: string
+          accountLabel: string | null
+          httpStatus: number
+          body: unknown
+        }> = []
+        for (const acc of accounts) {
+          const raw = await vascoGraphqlRaw(
+            creds.clientSlug,
+            token,
+            GET_PORTFOLIO_ISSUERS,
+            { id: acc.id },
+          )
+          accountDumps.push({
+            accountId: acc.id,
+            accountLabel: acc.label ?? null,
+            httpStatus: raw.httpStatus,
+            body: raw.body,
+          })
+        }
+        connections.push({
+          label: conn.label,
+          clientSlug,
+          communicationIssuers,
+          accounts: accountDumps,
+        })
+      } catch (err) {
+        connections.push({
+          label: conn.label,
+          clientSlug,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+    return { orgSlug, connections }
+  },
+})
 
 /** Active connections of `orgId` matching `clientSlug`. Org-member-guarded via
  * the caller's identity (propagated from the calling action). */
