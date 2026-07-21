@@ -2550,3 +2550,44 @@ chaque module par nom. Deux issues :
   seule exception tolérée à la règle « ne jamais éditer `_generated/` » —
   le prochain `convex dev`/`convex deploy` (le build prod regénère) valide
   et écrase par le même contenu. Le signaler dans la PR.
+
+## Préchargement de session SSR (initialToken)
+
+Le chargement initial passait par une cascade séquentielle côté client :
+hydratation → `get-session` (Better Auth) → `convex/token` → auth du
+WebSocket Convex → queries. Depuis v1.111.5, le serveur lit le cookie de
+session sur la requête document et transmet le JWT Convex à la page
+(pattern officiel `@convex-dev/better-auth` pour TanStack Start) :
+
+- `src/lib/auth-server.ts` : `convexBetterAuthReactStart` partagé entre le
+  proxy `/api/auth/$` et le `getAuth` server function de `__root.tsx`.
+- `beforeLoad` racine : récupère le token côté serveur, le retourne dans le
+  contexte, et authentifie `convexQueryClient.serverHttpClient` (utile le
+  jour où des loaders préchargeront des queries Convex en SSR).
+- `ConvexBetterAuthProvider` vit dans `__root.tsx` (pas dans un `Wrap` de
+  `router.tsx`) : c'est le seul endroit qui peut lire `context.token` pour
+  le prop `initialToken`.
+
+Pièges si on retouche cette zone :
+
+- **Ne pas retirer la garde `typeof window !== 'undefined'`** du
+  `beforeLoad` racine. Le contexte retourné par `beforeLoad` est
+  **déshydraté** par le serveur et réhydraté tel quel (`__beforeLoadContext`
+  dans `@tanstack/router-core`) : au premier mount client le token est déjà
+  là, sans re-exécution. Mais `beforeLoad` re-tourne à **chaque navigation
+  SPA** — sans la garde, chaque navigation paierait un aller-retour serveur
+  bloquant (et, derrière, un hop serveur → Convex).
+- `initialToken` n'est consommé **qu'au tout premier mount** du provider
+  (flag module + `useState` initial dans `@convex-dev/better-auth/react`) :
+  le `token: null` renvoyé par les navigations client est sans effet.
+- Le JWT (15 min) transite dans le HTML déshydraté de la réponse document —
+  même classe d'exposition que le flux client normal (`authClient.convex.token()`
+  le remet à JS de toute façon), réponse servie uniquement au porteur du
+  cookie de session.
+- Visiteur anonyme : `getToken` fait quand même un hop serveur → Convex qui
+  revient vide (~100 ms sur la requête document des pages publiques).
+  Optimisable via l'option `jwtCache` (cookie `albo-os.convex_jwt` déjà posé
+  par le plugin) si ça devient gênant.
+- `useAuthState` (`src/lib/auth-state.ts`) reste la source de vérité des
+  guards — le préchargement ne fait qu'accélérer `useConvexAuth()`, il ne
+  court-circuite pas la logique anti-flash.

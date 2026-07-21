@@ -23,6 +23,28 @@ bas de page.
 
 ---
 
+## v1.111.5 — 21/07/2026 à 10:52 — Connexion instantanée au chargement
+
+Suite du chantier vitesse : au chargement d'une page (arrivée, rafraîchissement),
+l'application sait désormais **immédiatement** que vous êtes connecté. Le
+serveur lit votre session dès la première requête et la transmet à la page,
+au lieu de laisser le navigateur la redécouvrir en plusieurs allers-retours
+successifs. Résultat : l'écran « loading » intermédiaire dure nettement moins
+longtemps avant l'affichage de vos données.
+
+> **🔧 Notes techniques**
+>
+> - Préchargement de session SSR (pattern officiel `@convex-dev/better-auth`) :
+>   `getToken` serveur dans `src/lib/auth-server.ts` (partagé avec le proxy
+>   `/api/auth`), `beforeLoad` racine qui lit le cookie et passe le JWT Convex
+>   au client via le contexte déshydraté, `ConvexBetterAuthProvider` déplacé de
+>   `router.tsx` vers `__root.tsx` pour recevoir `initialToken`.
+> - La cascade séquentielle get-session → token → WebSocket devient
+>   parallèle : le WebSocket Convex s'authentifie dès l'hydratation.
+> - Garde `typeof window` dans `beforeLoad` : le contexte SSR est réhydraté
+>   tel quel, les navigations SPA ne paient aucun aller-retour serveur —
+>   cf. `KNOWN_ISSUES.md` « Préchargement de session SSR ».
+> - `useAuthState` (garde anti-flash) volontairement intouché.
 ## v1.111.4 — 21/07/2026 à 10:25 — Convex à jour, et les dépendances mises à jour toutes seules
 
 Le moteur de données de l'app (Convex) passe à sa dernière version. Et un
