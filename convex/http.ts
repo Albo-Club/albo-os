@@ -9,6 +9,7 @@ import {
   mcpOptions,
   protectedResourceMetadata,
 } from './mcp/server'
+import { gmailOauthCallback } from './gmail'
 import { powensWebhook } from './powens'
 import { telegramWebhook } from './telegram'
 
@@ -46,6 +47,15 @@ http.route({
   path: '/telegram/webhook',
   method: 'POST',
   handler: telegramWebhook,
+})
+
+// Gmail OAuth callback — Google redirects the browser here after consent.
+// Anti-CSRF via the one-shot `state` token; secrets stay server-side.
+// Cf. convex/gmail.ts.
+http.route({
+  path: '/gmail/oauth/callback',
+  method: 'GET',
+  handler: gmailOauthCallback,
 })
 
 // AgentMail webhook (message.received) — Svix signature verified in the

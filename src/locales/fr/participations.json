@@ -590,7 +590,8 @@
   },
   "tabs": {
     "documents": "Documents",
-    "reports": "Reports"
+    "reports": "Reports",
+    "emails": "Emails"
   },
   "reports": {
     "title": "Reports investisseur",
@@ -633,6 +634,17 @@
       "received": "Reçu le {{date}}",
       "viewDocs": "Voir les docs"
     }
+  },
+  "emails": {
+    "title": "Emails liés",
+    "empty": "Aucun email lié à cette participation pour l'instant. Connectez une boîte Gmail dans Réglages → Intégrations.",
+    "noSubject": "(sans objet)",
+    "from": "De :",
+    "to": "À :",
+    "cc": "Cc :",
+    "sent": "Envoyé",
+    "received": "Reçu",
+    "receivedVia": "via {{mailbox}}"
   },
   "intelligence": {
     "status": {

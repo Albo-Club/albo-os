@@ -23,6 +23,53 @@ bas de page.
 
 ---
 
+## v1.117.0 — 21/07/2026 à 17:02 — Emails du portfolio : boîtes Gmail connectées, timeline par participation
+
+Vos boîtes Gmail se connectent maintenant directement à Albo OS (Réglages →
+Intégrations → Gmail), sans passer par un service tiers. Toutes les 10
+minutes, les nouveaux emails — reçus **et** envoyés — sont relevés, et chaque
+email dont un participant appartient au domaine d'une société du portefeuille
+apparaît sur la fiche de la participation, dans un nouvel onglet **Emails** :
+liste chronologique, clic pour lire le message complet. Un même email vu par
+plusieurs boîtes n'apparaît qu'une fois, en précisant par quelles boîtes il
+est passé.
+
+Côté confidentialité : **seuls les emails liés à une participation sont
+conservés**. Le reste de vos boîtes (mails internes, personnels, newsletters)
+n'entre jamais dans Albo OS. Les pièces jointes ne sont pas récupérées par ce
+canal — pour un report avec un PDF, l'adresse de transfert des reports reste
+la bonne voie.
+
+À venir dans de prochaines livraisons : le branchement des emails « report »
+sur le circuit d'analyse existant (KPIs, synthèse), puis l'import de
+l'historique complet de chaque boîte.
+
+> **🔧 Notes techniques**
+>
+> - Connecteur Gmail en OAuth Google direct, architecture inspirée du module
+>   messaging de Twenty CRM : `convex/gmail.ts` (flow OAuth : mutation
+>   `startConnect` + route HTTP `GET /gmail/oauth/callback` dans
+>   `convex/http.ts` ; états anti-CSRF one-shot `gmailOAuthStates`).
+> - Tables : `gmailAccounts` (une ligne par boîte, refresh token secret,
+>   curseur incrémental `historyId`), `companyEmails` (un message dédupliqué
+>   par `Message-ID`, texte nettoyé borné, sans pièces jointes) +
+>   `companyEmailLinks` (jointure email ↔ société, fan-out multi-org).
+> - Sync par cron 10 min (`crons.ts` → `gmail.syncAll`) via
+>   `users.history.list` ; curseur expiré → ré-ancrage au présent (le trou
+>   sera comblé par le backfill, étape à venir). `invalid_grant` → statut
+>   « à reconnecter ».
+> - Matching **déterministe** (pas de LLM) : domaine des participants ==
+>   `companies.domain` (kind `portfolio`, non archivée), freemail et domaines
+>   des boîtes connectées exclus, mails 100 % internes ignorés.
+> - Registre : entrée `gmail` (auth `webview`, scope global) dans
+>   `convex/lib/connectors.ts` ; dispatch webview par plateforme dans
+>   `connections.listIntegrations`/`status`/`syncNow`. Front : onglet Emails
+>   (`CompanyEmailsSection.tsx`) sur `participations.$companyId.tsx`,
+>   connexion/déconnexion sur la page Intégrations.
+> - Env : `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` (client
+>   OAuth dédié au scope `gmail.readonly` — distinct du client de sign-in
+>   `GOOGLE_CLIENT_ID`). Cf. `KNOWN_ISSUES.md` « Connecteur Gmail ».
+
 ## v1.116.0 — 21/07/2026 à 16:59 — Parallel : rattacher un SPV détenu même sans communication
 
 Jusqu'ici, la liste de rattachement d'une entité à un deal Parallel ne

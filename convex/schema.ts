@@ -325,6 +325,47 @@ export default defineSchema({
     .index('by_link_code', ['linkCode']),
 
   /**
+   * gmailAccounts — one row per Gmail mailbox connected for the portfolio
+   * email timeline (cf. convex/gmail.ts, OAuth flow modeled on Twenty CRM's
+   * messaging sync). Mailboxes are app-wide, not org-scoped: matched emails
+   * fan out to companies across every org (same family as `inboundEmails`).
+   * `historyId` is the Gmail incremental-sync cursor (users.history.list);
+   * it only advances after a successful sync and is reset from the profile
+   * when Google reports it expired.
+   * INTERNAL: `refreshToken` is secret at rest — rows are read/written only
+   * by internal functions; the public `listAccounts` view is sanitized
+   * (same rule as `powensUsers`).
+   */
+  gmailAccounts: defineTable({
+    userId: v.id('users'), // who connected the mailbox
+    email: v.string(), // mailbox address, lowercase — upsert key
+    refreshToken: v.string(), // OAuth refresh token — secret
+    historyId: v.optional(v.string()), // incremental sync cursor
+    status: v.union(
+      v.literal('connected'),
+      v.literal('reauth_required'),
+      v.literal('error'),
+    ),
+    lastError: v.optional(v.string()),
+    lastSyncAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index('by_email', ['email'])
+    .index('by_user', ['userId']),
+
+  /**
+   * gmailOAuthStates — short-lived anti-CSRF `state` tokens of the Gmail
+   * OAuth flow (created by `gmail.startConnect`, consumed once by the
+   * /gmail/oauth/callback HTTP route, expired after 15 min).
+   */
+  gmailOAuthStates: defineTable({
+    userId: v.id('users'),
+    state: v.string(),
+    returnTo: v.string(), // in-app path to land back on after the callback
+    createdAt: v.number(),
+  }).index('by_state', ['state']),
+
+  /**
    * externalConnections — org-scoped connections to external platforms whose
    * auth kind is `credentials` (cf. `convex/lib/connectors.ts`, the registry).
    * Generic storage managed by the common core `convex/connections.ts`;
@@ -987,6 +1028,45 @@ export default defineSchema({
   })
     .index('by_message_id', ['agentmailMessageId'])
     .index('by_status', ['status']),
+
+  /**
+   * companyEmails — the portfolio email timeline (cf. convex/gmail.ts).
+   * One row per MESSAGE, deduplicated across mailboxes by the RFC
+   * `Message-ID` header (Twenty CRM's design: a mail seen by N connected
+   * boxes = 1 row, `accountEmails` lists the boxes that saw it). Only
+   * messages matched to ≥1 portfolio company are stored — unmatched mail
+   * never enters the database. No `orgId` here: the org link lives on
+   * `companyEmailLinks` (multi-org fan-out, same family as `inboundEmails`).
+   * Body is CLEANED TEXT only (no HTML, no attachments), bounded.
+   */
+  companyEmails: defineTable({
+    headerMessageId: v.string(), // RFC Message-ID — dedup key
+    gmailThreadId: v.optional(v.string()), // thread of the first sighting
+    subject: v.string(),
+    snippet: v.optional(v.string()),
+    bodyText: v.optional(v.string()),
+    fromEmail: v.string(),
+    fromName: v.optional(v.string()),
+    toEmails: v.array(v.string()),
+    ccEmails: v.array(v.string()),
+    sentAt: v.number(), // ms epoch (Gmail internalDate)
+    direction: v.union(v.literal('incoming'), v.literal('outgoing')),
+    accountEmails: v.array(v.string()), // connected mailboxes that saw it
+  }).index('by_header_message_id', ['headerMessageId']),
+
+  /**
+   * companyEmailLinks — join table email ↔ matched company (one row per
+   * company per email; `sentAt` denormalized for the per-company timeline
+   * ordering). Access control happens through the company's org.
+   */
+  companyEmailLinks: defineTable({
+    companyId: v.id('companies'),
+    orgId: v.id('organizations'),
+    emailId: v.id('companyEmails'),
+    sentAt: v.number(),
+  })
+    .index('by_company_and_sentAt', ['companyId', 'sentAt'])
+    .index('by_email', ['emailId']),
 
   // ─── Liabilities (equity + shareholder current accounts) ──────────────────
 

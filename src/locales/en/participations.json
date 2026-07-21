@@ -590,7 +590,8 @@
   },
   "tabs": {
     "documents": "Documents",
-    "reports": "Reports"
+    "reports": "Reports",
+    "emails": "Emails"
   },
   "reports": {
     "title": "Investor reports",
@@ -633,6 +634,17 @@
       "received": "Received {{date}}",
       "viewDocs": "View documents"
     }
+  },
+  "emails": {
+    "title": "Linked emails",
+    "empty": "No email linked to this participation yet. Connect a Gmail mailbox in Settings → Integrations.",
+    "noSubject": "(no subject)",
+    "from": "From:",
+    "to": "To:",
+    "cc": "Cc:",
+    "sent": "Sent",
+    "received": "Received",
+    "receivedVia": "via {{mailbox}}"
   },
   "intelligence": {
     "status": {

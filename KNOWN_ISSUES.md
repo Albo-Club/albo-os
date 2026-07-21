@@ -2609,3 +2609,46 @@ Pièges si on retouche cette zone :
 - `useAuthState` (`src/lib/auth-state.ts`) reste la source de vérité des
   guards — le préchargement ne fait qu'accélérer `useConvexAuth()`, il ne
   court-circuite pas la logique anti-flash.
+
+## Connecteur Gmail — timeline emails du portfolio (`convex/gmail.ts`)
+
+OAuth Google **direct** (pas d'agrégateur), architecture reprise du module
+messaging de Twenty CRM (`twentyhq/twenty`, `modules/messaging`) : curseur
+incrémental `historyId` par boîte, cron de polling 10 min, dédup par
+`Message-ID`, matching déterministe par domaine. Pièges à connaître :
+
+- **Client OAuth dédié, séparé du sign-in.** Le scope `gmail.readonly` est
+  un scope *restreint* Google : le porter sur le client de sign-in
+  (`GOOGLE_CLIENT_ID`) soumettrait TOUTE l'app au processus de validation.
+  D'où `GOOGLE_OAUTH_CLIENT_ID`/`GOOGLE_OAUTH_CLIENT_SECRET` — un client
+  OAuth distinct dans le même projet GCP, redirect URI
+  `${CONVEX_SITE_URL}/gmail/oauth/callback`.
+- **App en mode « test » (publishing status Testing)** : les refresh tokens
+  des comptes hors Workspace interne **expirent tous les 7 jours** →
+  `invalid_grant` au refresh → statut `reauth_required` sur la ligne
+  `gmailAccounts`, pastille « À reconnecter » sur la page Intégrations, et
+  reconnexion en 2 clics (le curseur de sync est conservé). Lever la limite
+  = publier l'app et passer la validation Google (scope restreint → audit
+  CASA payant, annuel). Les boîtes du Workspace propriétaire du projet GCP
+  peuvent éviter ça via une app « Internal » — mais elle ne couvre ni les
+  @gmail.com perso ni les Workspaces tiers (boîte morning).
+- **Curseur `historyId` périmé** : Gmail ne garde l'historique qu'environ
+  une semaine. `history.list` → 404 → on ré-ancre le curseur au présent
+  (`lastError: history_cursor_expired`) et **le trou n'est pas comblé** —
+  c'est le rôle du backfill d'historique (étape à venir, pas encore livré).
+- **Texte seul, pas de pièces jointes** : `companyEmails.bodyText` = texte
+  nettoyé borné à 50 k caractères (text/plain prioritaire, sinon HTML
+  converti). Les reports avec PDF continuent de passer par le forward
+  AgentMail (`docs/produit/17-reports-par-email.md`), qui sait extraire les
+  fichiers. Les deux canaux coexistent sans conflit (tables distinctes).
+- **Matching = domaine uniquement** : participants (From/To/Cc) dont le
+  domaine == `companies.domain` (kind `portfolio`, non archivée). Freemail
+  exclus, domaines des boîtes connectées exclus (une boîte sur le domaine
+  d'une participation inonderait sa timeline de trafic interne), mails
+  100 % internes à la boîte ignorés. Les contacts n'ont **pas** d'email en
+  base (`companies.people` : décision « reachable via Attio ») → pas de
+  matching par adresse individuelle à ce stade.
+- **Multi-org fan-out sans `orgId` sur le message** : même famille que
+  `inboundEmails` — le message est cross-org, le lien à l'org vit sur
+  `companyEmailLinks`. Les gardes d'accès passent par l'org de la company
+  (`listByCompany`) ou l'intersection des memberships (`getById`).

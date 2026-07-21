@@ -97,6 +97,10 @@
     "neverSynced": "Never synced",
     "lastError": "Error: {{message}}",
     "platforms": {
+      "gmail": {
+        "name": "Gmail",
+        "description": "Portfolio email timeline: connected Gmail mailboxes are polled every 10 minutes and every email linked to a participation (company domain among the participants) shows up on its page, Emails tab. Only linked emails are stored."
+      },
       "powens": {
         "name": "Powens",
         "description": "Bank aggregation: accounts and transactions synced automatically. The bank connection happens in the secure Powens window."
@@ -129,7 +133,8 @@
       "reconnecting": "Redirecting…",
       "add": "Add",
       "sync": "Sync now",
-      "edit": "Edit connection"
+      "edit": "Edit connection",
+      "connectGmail": "Connect a Gmail mailbox"
     },
     "dialog": {
       "title": "Connect {{name}}",

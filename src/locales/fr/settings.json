@@ -97,6 +97,10 @@
     "neverSynced": "Jamais synchronisée",
     "lastError": "Erreur : {{message}}",
     "platforms": {
+      "gmail": {
+        "name": "Gmail",
+        "description": "Timeline email du portfolio : les boîtes Gmail connectées sont relevées toutes les 10 minutes et chaque email lié à une participation (domaine de la société parmi les participants) apparaît sur sa fiche, onglet Emails. Seuls les emails liés sont conservés."
+      },
       "powens": {
         "name": "Powens",
         "description": "Agrégation bancaire : comptes et transactions synchronisés automatiquement. La connexion à la banque se fait dans la fenêtre sécurisée Powens."
@@ -129,7 +133,8 @@
       "reconnecting": "Redirection…",
       "add": "Ajouter",
       "sync": "Synchroniser",
-      "edit": "Modifier la connexion"
+      "edit": "Modifier la connexion",
+      "connectGmail": "Connecter une boîte Gmail"
     },
     "dialog": {
       "title": "Connecter {{name}}",
