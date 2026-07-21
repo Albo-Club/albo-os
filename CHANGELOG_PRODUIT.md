@@ -23,24 +23,28 @@ bas de page.
 
 ---
 
-## v1.111.3 — 21/07/2026 à 09:55 — Convex à jour, et désormais mis à jour tout seul
+## v1.111.3 — 21/07/2026 à 09:55 — Convex à jour, et les dépendances mises à jour toutes seules
 
-Le moteur de données de l'app (Convex) passe à sa dernière version, et un
-robot vérifie désormais chaque lundi matin si une nouvelle version est
-sortie : si oui, il prépare tout seul une proposition de mise à jour, déjà
-testée, qu'il ne reste qu'à valider. Aucun changement visible dans l'app.
+Le moteur de données de l'app (Convex) passe à sa dernière version. Et un
+robot vérifie désormais chaque lundi matin si des briques logicielles de
+l'app ont une nouvelle version : si oui, il prépare tout seul une
+proposition de mise à jour, déjà testée, qu'il ne reste qu'à valider.
+Aucun changement visible dans l'app.
 
 > **🔧 Notes techniques**
 >
 > - `convex` 1.38.0 → 1.42.3 (`pnpm add convex@latest`) ; `pnpm lint`,
 >   `pnpm test:unit` (228) et `pnpm build` verts.
-> - Nouveau workflow `.github/workflows/update-convex.yml` (lundi 06:30 UTC,
->   calqué sur `sync-skills.yml`) : `scripts/update-convex.mjs` bumpe convex,
->   génère l'entrée de changelog, puis le workflow relance lint/tests/build
->   **avant** d'ouvrir la PR `chore/update-convex` (la CI ne se déclenche pas
->   sur les PRs créées avec `GITHUB_TOKEN`).
-> - Au passage : `renovate.json` existe mais l'app GitHub Renovate n'a jamais
->   été installée sur le repo — voir la PR pour l'alternative.
+> - Nouveau workflow `.github/workflows/update-deps.yml` (lundi 06:30 UTC,
+>   calqué sur `sync-skills.yml`) : `scripts/update-deps.mjs` fait un
+>   `pnpm update` (dans les plages semver — jamais de saut de majeure),
+>   génère l'entrée de changelog listant les paquets bumpés, puis le
+>   workflow relance lint/tests/build **avant** d'ouvrir la PR
+>   `chore/update-deps` (la CI ne se déclenche pas sur les PRs créées avec
+>   `GITHUB_TOKEN`).
+> - Contexte : `renovate.json` existe mais l'app Renovate n'a jamais exécuté
+>   un seul job sur ce repo (0 PR, 0 issue, 0 branche `renovate/*`) — ce
+>   workflow maison la remplace.
 
 ## v1.111.2 — 20/07/2026 à 19:55 — Fiche entité : description alignée sous le nom
 
