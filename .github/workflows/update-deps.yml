@@ -1,0 +1,55 @@
+name: Update dependencies
+
+on:
+  schedule:
+    # Mondays at 06:30 UTC (right after sync-skills at 06:00).
+    - cron: '30 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - id: update
+        run: node scripts/update-deps.mjs
+      # Validate BEFORE opening the PR — PRs created with GITHUB_TOKEN don't
+      # trigger the CI workflow, so the same checks run here instead. A red
+      # run on this workflow = an updated dependency breaks something.
+      - if: steps.update.outputs.updated == 'true'
+        run: pnpm lint
+      - if: steps.update.outputs.updated == 'true'
+        run: pnpm test:unit
+      - if: steps.update.outputs.updated == 'true'
+        run: pnpm build
+      - name: Open PR
+        if: steps.update.outputs.updated == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/update-deps
+          base: main
+          commit-message: 'chore: weekly dependency updates (${{ steps.update.outputs.count }} direct)'
+          title: 'chore: weekly dependency updates (${{ steps.update.outputs.count }} direct)'
+          body: |
+            Automated `pnpm update` run (`.github/workflows/update-deps.yml`):
+            all dependencies bumped within their declared semver ranges — never
+            a major jump. The updated packages are listed in the
+            `CHANGELOG_PRODUIT.md` entry included in this PR.
+
+            `pnpm lint`, `pnpm test:unit` and `pnpm build` all passed in the
+            workflow run before this PR was opened (the CI workflow does not
+            trigger on PRs created with `GITHUB_TOKEN`).
+          labels: dependencies
+          delete-branch: true
