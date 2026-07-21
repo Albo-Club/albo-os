@@ -35,7 +35,8 @@
     "passif": "Passif",
     "settings": "Paramètres",
     "changelog": "Nouveautés",
-    "reports": "Reports entrants"
+    "reports": "Reports entrants",
+    "emails": "Emails"
   },
   "navUser": {
     "switchOrg": "Changer d'organisation"

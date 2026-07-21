@@ -27,6 +27,7 @@ import { Route as AppAllIndexRouteImport } from './routes/app/all/index'
 import { Route as AppOrgSlugIndexRouteImport } from './routes/app/$orgSlug/index'
 import { Route as AppAllReportsRouteImport } from './routes/app/all/reports'
 import { Route as AppAllParticipationsRouteImport } from './routes/app/all/participations'
+import { Route as AppAllEmailsRouteImport } from './routes/app/all/emails'
 import { Route as AppAllDealsRouteImport } from './routes/app/all/deals'
 import { Route as AppOrgSlugTodoRouteImport } from './routes/app/$orgSlug/todo'
 import { Route as AppOrgSlugChangelogRouteImport } from './routes/app/$orgSlug/changelog'
@@ -135,6 +136,11 @@ const AppAllReportsRoute = AppAllReportsRouteImport.update({
 const AppAllParticipationsRoute = AppAllParticipationsRouteImport.update({
   id: '/participations',
   path: '/participations',
+  getParentRoute: () => AppAllRouteRoute,
+} as any)
+const AppAllEmailsRoute = AppAllEmailsRouteImport.update({
+  id: '/emails',
+  path: '/emails',
   getParentRoute: () => AppAllRouteRoute,
 } as any)
 const AppAllDealsRoute = AppAllDealsRouteImport.update({
@@ -254,6 +260,7 @@ export interface FileRoutesByFullPath {
   '/app/$orgSlug/changelog': typeof AppOrgSlugChangelogRoute
   '/app/$orgSlug/todo': typeof AppOrgSlugTodoRoute
   '/app/all/deals': typeof AppAllDealsRoute
+  '/app/all/emails': typeof AppAllEmailsRoute
   '/app/all/participations': typeof AppAllParticipationsRoute
   '/app/all/reports': typeof AppAllReportsRoute
   '/app/$orgSlug/': typeof AppOrgSlugIndexRoute
@@ -288,6 +295,7 @@ export interface FileRoutesByTo {
   '/app/$orgSlug/changelog': typeof AppOrgSlugChangelogRoute
   '/app/$orgSlug/todo': typeof AppOrgSlugTodoRoute
   '/app/all/deals': typeof AppAllDealsRoute
+  '/app/all/emails': typeof AppAllEmailsRoute
   '/app/all/participations': typeof AppAllParticipationsRoute
   '/app/all/reports': typeof AppAllReportsRoute
   '/app/$orgSlug': typeof AppOrgSlugIndexRoute
@@ -327,6 +335,7 @@ export interface FileRoutesById {
   '/app/$orgSlug/changelog': typeof AppOrgSlugChangelogRoute
   '/app/$orgSlug/todo': typeof AppOrgSlugTodoRoute
   '/app/all/deals': typeof AppAllDealsRoute
+  '/app/all/emails': typeof AppAllEmailsRoute
   '/app/all/participations': typeof AppAllParticipationsRoute
   '/app/all/reports': typeof AppAllReportsRoute
   '/app/$orgSlug/': typeof AppOrgSlugIndexRoute
@@ -367,6 +376,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/changelog'
     | '/app/$orgSlug/todo'
     | '/app/all/deals'
+    | '/app/all/emails'
     | '/app/all/participations'
     | '/app/all/reports'
     | '/app/$orgSlug/'
@@ -401,6 +411,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/changelog'
     | '/app/$orgSlug/todo'
     | '/app/all/deals'
+    | '/app/all/emails'
     | '/app/all/participations'
     | '/app/all/reports'
     | '/app/$orgSlug'
@@ -439,6 +450,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/changelog'
     | '/app/$orgSlug/todo'
     | '/app/all/deals'
+    | '/app/all/emails'
     | '/app/all/participations'
     | '/app/all/reports'
     | '/app/$orgSlug/'
@@ -596,6 +608,13 @@ declare module '@tanstack/react-router' {
       path: '/participations'
       fullPath: '/app/all/participations'
       preLoaderRoute: typeof AppAllParticipationsRouteImport
+      parentRoute: typeof AppAllRouteRoute
+    }
+    '/app/all/emails': {
+      id: '/app/all/emails'
+      path: '/emails'
+      fullPath: '/app/all/emails'
+      preLoaderRoute: typeof AppAllEmailsRouteImport
       parentRoute: typeof AppAllRouteRoute
     }
     '/app/all/deals': {
@@ -786,6 +805,7 @@ const AppOrgSlugRouteRouteWithChildren = AppOrgSlugRouteRoute._addFileChildren(
 
 interface AppAllRouteRouteChildren {
   AppAllDealsRoute: typeof AppAllDealsRoute
+  AppAllEmailsRoute: typeof AppAllEmailsRoute
   AppAllParticipationsRoute: typeof AppAllParticipationsRoute
   AppAllReportsRoute: typeof AppAllReportsRoute
   AppAllIndexRoute: typeof AppAllIndexRoute
@@ -793,6 +813,7 @@ interface AppAllRouteRouteChildren {
 
 const AppAllRouteRouteChildren: AppAllRouteRouteChildren = {
   AppAllDealsRoute: AppAllDealsRoute,
+  AppAllEmailsRoute: AppAllEmailsRoute,
   AppAllParticipationsRoute: AppAllParticipationsRoute,
   AppAllReportsRoute: AppAllReportsRoute,
   AppAllIndexRoute: AppAllIndexRoute,

@@ -89,7 +89,9 @@ function EmailCard({ email, onOpen }: { email: EmailRow; onOpen: () => void }) {
   )
 }
 
-function EmailDetailDialog({
+/** Shared by the participation tab and the consolidated /app/all/emails
+ * page — the read authorization lives in the `gmail.getById` query. */
+export function EmailDetailDialog({
   openId,
   onClose,
 }: {

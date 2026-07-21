@@ -35,7 +35,8 @@
     "passif": "Liabilities",
     "settings": "Settings",
     "changelog": "What's new",
-    "reports": "Inbound reports"
+    "reports": "Inbound reports",
+    "emails": "Emails"
   },
   "navUser": {
     "switchOrg": "Switch organization"

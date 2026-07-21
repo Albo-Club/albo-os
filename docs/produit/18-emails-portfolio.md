@@ -45,7 +45,16 @@ la liste, téléchargement dans le dialog).
 
 Sur la fiche d'une participation, l'onglet **Emails** liste les échanges du
 plus récent au plus ancien : sens (reçu/envoyé), objet, expéditeur, extrait
-et date. Un clic ouvre le message complet (texte).
+et date. Un clic ouvre le message complet, avec ses pièces jointes
+téléchargeables.
+
+### 4. Suivre tout ce qui est capté
+
+Dans la vue « Toutes les organisations », la page **Emails** (menu de
+gauche, à côté de Rapports) liste tous les emails rattachés, toutes
+organisations et toutes boîtes confondues — avec les sociétés cliquables
+vers leur fiche. C'est le poste de contrôle : on y vérifie d'un coup d'œil
+que la capture tourne et ce qui est entré récemment.
 
 ## Points d'attention
 
@@ -73,7 +82,8 @@ et date. Un clic ouvre le message complet (texte).
 
 ## Pages liées
 
-- [Participations](04-participations.md) (la fiche et ses onglets),
+- [Vue consolidée](12-vue-consolidee.md) (la page Emails cross-org),
+  [Participations](04-participations.md) (la fiche et ses onglets),
   [Reports par email](17-reports-par-email.md) (le circuit d'analyse des
   investor updates), [Intégrations](15-integrations.md) (connexion et état
   des boîtes)

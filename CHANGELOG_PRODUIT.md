@@ -23,6 +23,29 @@ bas de page.
 
 ---
 
+## v1.119.0 — 21/07/2026 à 20:52 — Vue consolidée : page « Emails », le suivi de tout ce qui est capté
+
+Nouvelle entrée **Emails** dans le menu de la vue « Toutes les
+organisations », à côté de Rapports : la liste de **tous les emails
+rattachés à vos participations**, toutes organisations et toutes boîtes
+confondues, du plus récent au plus ancien. Pour chaque email : date, sens
+(reçu/envoyé), objet (avec trombone s'il a des pièces jointes),
+expéditeur, **société(s) rattachée(s)** — cliquables vers la fiche — et la
+boîte qui l'a capté. Un clic ouvre le message complet, comme sur les
+fiches. C'est l'endroit où vérifier d'un coup d'œil que la capture
+fonctionne et ce qui est entré récemment.
+
+> **🔧 Notes techniques**
+>
+> - Query `gmail.listAll` : union lecture seule cross-org (bornée aux 100
+>   dernières captures), filtrée par les memberships de l'appelant — un
+>   email dont aucun lien n'appartient à une org de l'utilisateur est
+>   invisible, et seuls les liens de ses orgs sont montrés.
+> - Route `src/routes/app/all/emails.tsx` (pattern de `reports.tsx`),
+>   dialog de détail réutilisé (`EmailDetailDialog` exporté de
+>   `CompanyEmailsSection`), entrée nav `getAllNavGroups` (icône Mail),
+>   i18n fr/en (`participations:emails.all.*`, `nav:items.emails`).
+
 ## v1.118.0 — 21/07/2026 à 18:32 — Emails du portfolio : boîtes par organisation et pièces jointes conservées
 
 Deux renforcements du connecteur Gmail livré aujourd'hui, avant sa première

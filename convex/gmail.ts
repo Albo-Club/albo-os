@@ -903,6 +903,67 @@ export const listByCompany = query({
   },
 })
 
+/**
+ * Consolidated feed for /app/all/emails: the most recent stored emails
+ * visible to the caller (an email is visible when ≥1 of its links belongs
+ * to an org the caller is a member of — links of other orgs are filtered
+ * out). Bounded to the last 100 captures; read-only union, same spirit as
+ * the cross-org aggregate view.
+ */
+export const listAll = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireAppUser(ctx)
+    const memberships = await ctx.db
+      .query('organizationMembers')
+      .withIndex('by_user', (q) => q.eq('userId', user._id))
+      .collect()
+    const memberOrgIds = new Set(memberships.map((m) => m.orgId))
+
+    const emails = await ctx.db.query('companyEmails').order('desc').take(100)
+    const orgSlugCache = new Map<Id<'organizations'>, string>()
+    const out = []
+    for (const email of emails) {
+      const links = await ctx.db
+        .query('companyEmailLinks')
+        .withIndex('by_email', (q) => q.eq('emailId', email._id))
+        .collect()
+      const visible = links.filter((l) => memberOrgIds.has(l.orgId))
+      if (visible.length === 0) continue
+
+      const companies = []
+      for (const link of visible) {
+        const company = await ctx.db.get('companies', link.companyId)
+        if (!company) continue
+        let slug = orgSlugCache.get(link.orgId)
+        if (slug === undefined) {
+          const org = await ctx.db.get('organizations', link.orgId)
+          slug = org?.slug ?? ''
+          orgSlugCache.set(link.orgId, slug)
+        }
+        companies.push({
+          companyId: link.companyId,
+          name: company.name,
+          orgSlug: slug,
+        })
+      }
+
+      out.push({
+        _id: email._id,
+        subject: email.subject,
+        fromEmail: email.fromEmail,
+        fromName: email.fromName ?? null,
+        sentAt: email.sentAt,
+        direction: email.direction,
+        attachmentCount: email.attachments?.length ?? 0,
+        accountEmails: email.accountEmails,
+        companies,
+      })
+    }
+    return out
+  },
+})
+
 /** Full content of one timeline email (detail dialog), attachments resolved
  * to signed download URLs. Authorized when the caller is a member of at
  * least one org the email is linked to. */
