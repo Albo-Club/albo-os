@@ -23,6 +23,27 @@ bas de page.
 
 ---
 
+## v1.113.0 — 21/07/2026 à 12:38 — Liste Entreprises : le one-liner s'élargit sur grand écran
+
+Dans la liste Entreprises, la colonne **One-liner** ne reste plus coincée à
+une largeur fixe : sur les écrans larges, elle s'élargit par paliers pour
+afficher davantage du pitch. Le texte complet reste accessible au survol tant
+qu'il dépasse encore la place disponible. Fini les grands blancs entre les
+colonnes pendant que le one-liner était rogné.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/participations/ParticipationsTable.tsx` (`OneLinerCell`) :
+>   le plafond `max-w-72` (288 px) devient responsive — `lg:max-w-sm`
+>   (384 px), `xl:max-w-md` (448 px), `2xl:max-w-lg` (512 px) — appliqué à la
+>   fois sur le `<span>` simple et sur le `<button>` tronqué.
+> - La mesure existante (`ResizeObserver` comparant `scrollWidth > clientWidth`)
+>   se recalcule au resize et bascule seule entre texte simple et
+>   bouton-popover : le popover ne subsiste que tant que le texte est tronqué.
+> - Aucune autre colonne touchée — le tableau reste en `table-layout: auto`,
+>   le one-liner absorbe simplement l'espace horizontal restant via son
+>   plafond élargi.
+
 ## v1.112.1 — 21/07/2026 à 12:20 — Intégrations : état de connexion honnête et erreurs visibles
 
 Fin des signaux contradictoires sur les connexions aux portails
