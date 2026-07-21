@@ -1,11 +1,6 @@
 import '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
-import { convexBetterAuthReactStart } from '@convex-dev/better-auth/react-start'
-
-const ba = convexBetterAuthReactStart({
-  convexUrl: import.meta.env.VITE_CONVEX_URL,
-  convexSiteUrl: import.meta.env.VITE_CONVEX_SITE_URL,
-})
+import { handler } from '~/lib/auth-server'
 
 // The Convex Better Auth adapter calls `fetch(upstream, { body: req.body,
 // duplex: 'half' })` to proxy the request. On Vercel's Node runtime, that
@@ -29,7 +24,7 @@ export const Route = createFileRoute('/api/auth/$')({
       ANY: async ({ request }) => {
         try {
           const buffered = await bufferRequestBody(request)
-          return await ba.handler(buffered)
+          return await handler(buffered)
         } catch (err) {
           // Log fields on separate lines: Vercel's UI truncates a single
           // long line, which hid the actual cause during the first round.

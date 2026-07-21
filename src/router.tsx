@@ -2,9 +2,7 @@ import { createRouter } from '@tanstack/react-router'
 import { QueryClient } from '@tanstack/react-query'
 import { routerWithQueryClient } from '@tanstack/react-router-with-query'
 import { ConvexQueryClient } from '@convex-dev/react-query'
-import { ConvexBetterAuthProvider } from '@convex-dev/better-auth/react'
 import { routeTree } from './routeTree.gen'
-import { authClient } from '~/lib/auth-client'
 import { initSentry } from '~/lib/sentry'
 
 // Client-only singletons. getRouter() is called during SSR AND on every
@@ -57,23 +55,18 @@ export function getRouter() {
   }
   const { convexQueryClient, queryClient } = getOrCreateClients(CONVEX_URL)
 
+  // ConvexBetterAuthProvider lives in __root.tsx (not a Wrap here): it needs
+  // the SSR-preloaded token from the root route's beforeLoad context
+  // (`initialToken`), which a router-level Wrap cannot read.
   const router = routerWithQueryClient(
     createRouter({
       routeTree,
       defaultPreload: 'intent',
-      context: { queryClient },
+      context: { queryClient, convexQueryClient },
       scrollRestoration: true,
       defaultPreloadStaleTime: 0, // Let React Query handle all caching
       defaultErrorComponent: (err) => <p>{err.error.stack}</p>,
       defaultNotFoundComponent: () => <p>not found</p>,
-      Wrap: ({ children }) => (
-        <ConvexBetterAuthProvider
-          client={convexQueryClient.convexClient}
-          authClient={authClient}
-        >
-          {children}
-        </ConvexBetterAuthProvider>
-      ),
     }),
     queryClient,
   )
