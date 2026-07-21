@@ -135,7 +135,7 @@
     "fields": {
       "label": "Connection name",
       "labelPlaceholder": "e.g. Parallel — Calte",
-      "clientSlug": "Portal (client identifier, e.g. parallel)",
+      "clientSlug": "Portal",
       "username": "Login",
       "password": "Password"
     },
@@ -150,6 +150,19 @@
       "disconnected": "Connection removed.",
       "disconnectError": "Couldn't disconnect.",
       "bankRedirectError": "Couldn't open the bank connection flow."
+    },
+    "fieldHelp": {
+      "vasco": {
+        "clientSlug": "The first part of the investor portal's web address: ‹portal›.vasco.fund. E.g. \"parallel\" if you sign in at parallel.vasco.fund, \"teampact\" for teampact.vasco.fund.",
+        "username": "The email you use to sign in to this portal.",
+        "password": "The password of your access to this portal."
+      }
+    },
+    "fieldPlaceholders": {
+      "vasco": {
+        "clientSlug": "parallel",
+        "username": "name@alboteam.com"
+      }
     }
   }
 }

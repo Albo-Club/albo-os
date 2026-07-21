@@ -27,7 +27,12 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
-import { Field, FieldGroup, FieldLabel } from '~/components/ui/field'
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from '~/components/ui/field'
 
 export const Route = createFileRoute('/app/$orgSlug/settings/integrations')({
   component: IntegrationsSettings,
@@ -349,6 +354,16 @@ function ConnectDialog({
     const i18nKey = `settings:integrations.fields.${key}`
     return i18n.exists(i18nKey) ? t(i18nKey) : key
   }
+  // Per-platform helper text and placeholder, resolved from i18n so a new
+  // platform documents its own fields without touching this generic form.
+  const fieldHelp = (key: string) => {
+    const i18nKey = `settings:integrations.fieldHelp.${item.platform}.${key}`
+    return i18n.exists(i18nKey) ? t(i18nKey) : null
+  }
+  const fieldPlaceholder = (key: string) => {
+    const i18nKey = `settings:integrations.fieldPlaceholders.${item.platform}.${key}`
+    return i18n.exists(i18nKey) ? t(i18nKey) : undefined
+  }
 
   async function handleSubmit() {
     setSaving(true)
@@ -417,7 +432,11 @@ function ConnectDialog({
                 onChange={(e) =>
                   setValues((v) => ({ ...v, [key]: e.target.value }))
                 }
+                placeholder={fieldPlaceholder(key)}
               />
+              {fieldHelp(key) && (
+                <FieldDescription>{fieldHelp(key)}</FieldDescription>
+              )}
             </Field>
           ))}
         </FieldGroup>

@@ -23,6 +23,24 @@ bas de page.
 
 ---
 
+## v1.111.6 — 21/07/2026 à 11:03 — Intégrations : formulaire de connexion plus clair
+
+Le formulaire « Connecter » d'un portail investisseur (Réglages →
+Intégrations) explique désormais chaque champ : le champ « Portail » montre
+un exemple et précise où trouver l'identifiant (c'est le début de l'adresse
+web du portail — « parallel » pour parallel.vasco.fund), et les champs
+identifiant / mot de passe indiquent qu'il s'agit de vos accès à ce portail.
+
+> **🔧 Notes techniques**
+>
+> - `ConnectDialog` (`settings/integrations.tsx`) : aide et placeholder par
+>   champ résolus depuis l'i18n **par plateforme**
+>   (`settings:integrations.fieldHelp.<platform>.<key>` /
+>   `fieldPlaceholders.<platform>.<key>`, rendu `FieldDescription`) — le
+>   formulaire reste générique, une nouvelle plateforme documente ses champs
+>   en ajoutant ses clés i18n.
+> - Libellé `fields.clientSlug` simplifié en « Portail » (EN « Portal »).
+
 ## v1.111.5 — 21/07/2026 à 10:52 — Connexion instantanée au chargement
 
 Suite du chantier vitesse : au chargement d'une page (arrivée, rafraîchissement),
