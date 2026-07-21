@@ -57,6 +57,16 @@ crons.interval(
   {},
 )
 
+// Poll the connected Gmail mailboxes for new messages (portfolio email
+// timeline). Incremental via the per-account historyId cursor — same cadence
+// family as Twenty CRM's 5-min messaging cron, relaxed for an internal tool.
+crons.interval(
+  'sync gmail mailboxes',
+  { minutes: 10 },
+  internal.gmail.syncAll,
+  {},
+)
+
 // Keep the Vercel SSR function warm (internal tool → near-zero traffic →
 // cold start on most arrivals otherwise). cf. convex/warmup.ts.
 crons.interval('warm vercel ssr', { minutes: 5 }, internal.warmup.pingSite, {})

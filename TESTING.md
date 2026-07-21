@@ -587,7 +587,7 @@ secret dans la réponse) + mutations `createConnection`/`disconnectConnection`.
 
 | #   | Étape                                                              | Résultat attendu                                                                                                                                                                                                       |
 | --- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| IG1 | `/app/calte/settings/integrations` (membre de l'org)               | Une ligne par plateforme du registre (Powens, Parallel/VASCO, Notion, DocSend) : nom + badge de portée (« Par organisation » / « Service partagé ») + description ; i18n FR/EN                                          |
+| IG1 | `/app/calte/settings/integrations` (membre de l'org)               | Une ligne par plateforme du registre (Powens, Gmail, Parallel/VASCO, Notion, DocSend) : nom + badge de portée (« Par organisation » / « Service partagé ») + description ; i18n FR/EN                                   |
 | IG2 | Powens (org avec banques connectées)                               | Une sous-ligne par connexion bancaire avec **point de couleur** (🟢/🟠/🔴 — même dérivation que la page Trésorerie, libellé au survol) et « dernière synchro il y a X » alignée à droite                                    |
 | IG3 | VASCO (org avec connexion)                                         | Sous-ligne par connexion (`label`) avec point de couleur (état dérivé de `lastConnectedAt`/`lastError`, libellé au survol) ; connexion en erreur → le message `lastError` s'affiche sous la ligne ; **aucun** identifiant/secret visible dans la réponse réseau |
 | IG4 | Org sans connexion sur une plateforme org-scopée                   | La plateforme apparaît dans « Disponibles » avec le bouton Connecter mis en avant ; dès qu'une connexion existe, le bouton devient un discret « Ajouter »                                                               |
@@ -597,6 +597,27 @@ secret dans la réponse) + mutations `createConnection`/`disconnectConnection`.
 | IG8 | « Connecter une banque » / « Reconnecter » (Powens, admin)         | Redirection webview Powens (`startBankConnection` / `startReconnect`, comme depuis la Trésorerie) ; « Reconnecter » visible seulement sur une connexion dégradée ; non-admin → boutons absents                            |
 | IG9 | Bouton « Synchroniser » (icône refresh, ligne VASCO, tout membre)  | `connections.syncNow` → pull live + cache rafraîchi ; mise à jour réactive par connexion tentée (`markConnected`) : succès → pastille verte + « dernière synchro » retamponnée ; échec → pastille rouge + message d'erreur, « dernière synchro » **inchangée** (elle signifie dernier **succès**, jamais dernière tentative) ; absent sur Powens/Notion/DocSend (pas de `manualSync` au registre) |
 | IG10 | Bouton « Modifier la connexion » (crayon, ligne VASCO, admin)     | Dialog pré-rempli (nom + portail ; identifiants à **ressaisir** — jamais renvoyés au navigateur) → `connections.updateConnection` (admin-gated, validé `parseConnection`, `lastError` purgé, ligne réactivée) puis **synchro immédiate** (`syncNow`) pour vérifier ; nom déjà pris par une autre connexion → toast « Une connexion porte déjà ce nom » ; membre non-admin → bouton absent |
+
+## Connecteur Gmail (OAuth → timeline emails par participation)
+
+Boîtes Gmail connectées en OAuth direct (`convex/gmail.ts`), sync
+incrémentale par cron 10 min (`gmail.syncAll`, curseur `historyId`), mails
+matchés par domaine → onglet **Emails** de la fiche participation.
+Prérequis : env vars `GOOGLE_OAUTH_CLIENT_ID`/`GOOGLE_OAUTH_CLIENT_SECRET`
+posées (client OAuth **dédié** au scope `gmail.readonly` — pas celui du
+sign-in) ; redirect URI `${CONVEX_SITE_URL}/gmail/oauth/callback` déclarée
+sur le client Google. Cf. `KNOWN_ISSUES.md` « Connecteur Gmail ».
+
+| #   | Étape                                                                          | Résultat attendu                                                                                                                                                                     |
+| --- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GM1 | Intégrations → Gmail → « Connecter une boîte Gmail »                           | Redirection `accounts.google.com` (consent `gmail.readonly`) ; au retour, sous-ligne avec l'adresse de la boîte, pastille 🟢, atterrissage sur la page d'origine (`?gmail=connected`)  |
+| GM2 | Réponse réseau de `gmail.startConnect` + ligne `gmailAccounts` (dashboard)     | Seul `{ authorizeUrl }` transite ; le refresh token n'apparaît dans **aucune** query publique (`listAccounts` sanitisée) ; état OAuth one-shot consommé (table `gmailOAuthStates` vide) |
+| GM3 | Envoyer un mail de test depuis/vers une adresse au domaine d'une participation | Après le cron (≤ 10 min, ou « Synchroniser ») : le mail apparaît dans l'onglet **Emails** de la fiche, direction correcte (reçu/envoyé), clic → dialog avec corps texte                |
+| GM4 | Mail sans rapport avec le portfolio (newsletter, interne)                      | **Aucune** ligne `companyEmails` créée (vérifier au dashboard) — seuls les mails matchés sont stockés                                                                                 |
+| GM5 | Même mail visible par 2 boîtes connectées                                      | **Une seule** entrée dans la timeline ; le dialog liste les 2 boîtes (`via …`)                                                                                                        |
+| GM6 | Participation présente dans les 2 orgs avec le même domaine                    | Le mail apparaît sur la fiche des **deux** orgs (fan-out `companyEmailLinks`)                                                                                                         |
+| GM7 | Boîte en mode test Google après 7 jours (ou révocation manuelle du grant)      | Au cron suivant : pastille 🔴 « À reconnecter » (`reauth_required`) ; « Reconnecter » relance l'OAuth et **conserve** le curseur de sync                                               |
+| GM8 | « Déconnecter » une boîte                                                      | Ligne `gmailAccounts` supprimée + révocation du token côté Google (best-effort) ; la timeline déjà importée **reste**                                                                 |
 
 ## Ingestion reports (AgentMail → inboundEmails, briques 1-6)
 

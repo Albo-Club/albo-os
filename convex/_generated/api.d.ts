@@ -36,6 +36,7 @@ import type * as email from "../email.js";
 import type * as emailTemplates from "../emailTemplates.js";
 import type * as files from "../files.js";
 import type * as forecasts from "../forecasts.js";
+import type * as gmail from "../gmail.js";
 import type * as http from "../http.js";
 import type * as invitations from "../invitations.js";
 import type * as kpis from "../kpis.js";
@@ -126,6 +127,7 @@ declare const fullApi: ApiFromModules<{
   emailTemplates: typeof emailTemplates;
   files: typeof files;
   forecasts: typeof forecasts;
+  gmail: typeof gmail;
   http: typeof http;
   invitations: typeof invitations;
   kpis: typeof kpis;

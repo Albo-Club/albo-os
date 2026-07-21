@@ -39,6 +39,7 @@ import {
   PeopleList,
 } from '~/components/companies/EntityFiche'
 import { ReportingsSection } from '~/components/companies/ReportingsSection'
+import { CompanyEmailsSection } from '~/components/companies/CompanyEmailsSection'
 import { CompanyReportsSection } from '~/components/companies/CompanyReportsSection'
 import { VascoCommunicationsSection } from '~/components/vasco/VascoCommunicationsSection'
 import { CompanyAiSynthesisBlock } from '~/components/companies/CompanyAiSynthesisBlock'
@@ -1086,6 +1087,7 @@ function ParticipationDetail() {
           <Tabs defaultValue="reports">
             <TabsList variant="line">
               <TabsTrigger value="reports">{t('tabs.reports')}</TabsTrigger>
+              <TabsTrigger value="emails">{t('tabs.emails')}</TabsTrigger>
               <TabsTrigger value="documents">
                 {t('tabs.documents')}
               </TabsTrigger>
@@ -1095,6 +1097,9 @@ function ParticipationDetail() {
                 <VascoCommunicationsSection company={company} />
                 <CompanyReportsSection companyId={company._id} />
               </div>
+            </TabsContent>
+            <TabsContent value="emails" className="pt-4">
+              <CompanyEmailsSection companyId={company._id} />
             </TabsContent>
             <TabsContent value="documents" className="pt-4">
               <ReportingsSection companyId={company._id} />

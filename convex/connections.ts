@@ -258,6 +258,9 @@ export const syncNow = action({
       case 'vasco':
         await ctx.runAction(internal.vasco.refreshVascoCacheForOrg, { orgId })
         break
+      case 'gmail':
+        await ctx.runAction(internal.gmail.syncAll, {})
+        break
       default:
         throw new ConvexError('sync_not_supported')
     }
@@ -417,6 +420,24 @@ export const listIntegrations = query({
           break
         }
         case 'webview': {
+          // Webview platforms own their storage → dispatch per platform.
+          if (def.platform === 'gmail') {
+            // Global scope: the same mailboxes feed every org.
+            const rows = await ctx.db.query('gmailAccounts').take(50)
+            item.connections = rows.map((r) => ({
+              id: r._id,
+              label: r.email,
+              state:
+                r.status === 'connected'
+                  ? 'connected'
+                  : r.status === 'reauth_required'
+                    ? 'action_required'
+                    : 'error',
+              lastConnectedAt: r.lastSyncAt ?? null,
+              lastError: r.lastError ?? null,
+            }))
+            break
+          }
           const rows = await ctx.db
             .query('powensConnections')
             .withIndex('by_org', (q) => q.eq('orgId', orgId))
@@ -509,8 +530,18 @@ export const status = internalQuery({
           break
         }
         case 'webview': {
-          // Webview platforms own their storage; today that is Powens only,
-          // whose health rows live in `powensConnections`.
+          // Webview platforms own their storage → dispatch per platform.
+          if (def.platform === 'gmail') {
+            const rows = await ctx.db.query('gmailAccounts').take(50)
+            base.connections = rows.map((r) => ({
+              orgSlug: 'global',
+              label: r.email,
+              health: r.status,
+              lastConnectedAt: r.lastSyncAt ?? null,
+              lastError: r.lastError ?? null,
+            }))
+            break
+          }
           const rows: Array<Doc<'powensConnections'>> = await ctx.db
             .query('powensConnections')
             .collect()

@@ -50,6 +50,7 @@ expliqué simplement dans un encadré « Sous le capot ».
 | [Intégrations](15-integrations.md) | Attio, Powens, connecteur Claude (MCP), Parallel/VASCO, imports |
 | [À faire](16-a-faire.md) | Tâches manuelles et signaux à traiter (pointage, banques, échéances, reportings) |
 | [Reports par email](17-reports-par-email.md) | Le circuit complet des investor updates : forward, extraction, KPIs, récap |
+| [Emails du portfolio](18-emails-portfolio.md) | Boîtes Gmail connectées, timeline des échanges par participation |
 
 ## Comment cette doc vit
 
