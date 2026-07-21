@@ -105,10 +105,15 @@ entité du portefeuille, quel que soit son nom. Le dialog montre les
 plateformes rattachables et leur état de connexion réel (pastille rouge si
 la connexion est en erreur), puis propose la liste des émetteurs à choisir ;
 si la connexion est en erreur et qu'aucun deal ne peut être récupéré, le
-sélecteur l'explique et renvoie vers Réglages → Intégrations. Une fois rattachée, les **communications
-investisseurs** (annonces, documents) remontent dans l'onglet Rapports de la
-fiche, avec téléchargement des documents et rafraîchissement à la demande ;
-une fiche non rattachée n'affiche rien.
+sélecteur l'explique et renvoie vers Réglages → Intégrations. La liste propose
+aussi bien les SPV ayant **déjà publié une communication** que ceux simplement
+**détenus** dans le portefeuille Parallel : un SPV tout juste closé, encore sans
+communication, est donc rattachable immédiatement (il apparaît après la
+prochaine synchro ou un clic sur « Rafraîchir »). Une fois rattachée, les
+**communications investisseurs** (annonces, documents) remontent dans l'onglet
+Rapports de la fiche — y compris si le rattachement a été fait avant la première
+communication —, avec téléchargement des documents et rafraîchissement à la
+demande ; une fiche non rattachée n'affiche rien.
 
 ## Ingestion des rapports par email
 

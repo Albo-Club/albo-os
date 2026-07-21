@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.116.0 — 21/07/2026 à 16:57 — Emails du portfolio : boîtes Gmail connectées, timeline par participation
+## v1.117.0 — 21/07/2026 à 17:02 — Emails du portfolio : boîtes Gmail connectées, timeline par participation
 
 Vos boîtes Gmail se connectent maintenant directement à Albo OS (Réglages →
 Intégrations → Gmail), sans passer par un service tiers. Toutes les 10
@@ -69,6 +69,47 @@ l'historique complet de chaque boîte.
 > - Env : `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` (client
 >   OAuth dédié au scope `gmail.readonly` — distinct du client de sign-in
 >   `GOOGLE_CLIENT_ID`). Cf. `KNOWN_ISSUES.md` « Connecteur Gmail ».
+
+## v1.116.0 — 21/07/2026 à 16:59 — Parallel : rattacher un SPV détenu même sans communication
+
+Jusqu'ici, la liste de rattachement d'une entité à un deal Parallel ne
+proposait que les SPV ayant **déjà publié une communication** (reporting,
+coupon, avis…). Un SPV que vous détenez mais qui n'a encore rien communiqué
+— par exemple une opération tout juste closée — restait introuvable dans la
+liste, impossible à rattacher.
+
+Désormais, la liste s'appuie **aussi sur votre portefeuille Parallel** : tout
+SPV que vous détenez apparaît et peut être rattaché, sans attendre sa première
+communication. Et le rattachement pointe sur le bon émetteur, donc dès qu'une
+communication arrive, elle remonte automatiquement dans l'onglet Rapports de
+l'entité — rien à refaire.
+
+Après la prochaine synchronisation (ou un clic sur **« Rafraîchir »**), les
+SPV manquants apparaissent dans la liste.
+
+> **🔧 Notes techniques**
+>
+> - Le sélecteur d'émetteurs (`vasco.listCachedVascoIssuers`) est désormais
+>   alimenté par **deux sources unies** : les communications
+>   (`vascoCommunicationsCache`) **et** le portefeuille détenu
+>   (`vascoPortfolioIssuers`, nouvelle table). Union dédupliquée sur
+>   `clientSlug:issuerId`.
+> - Nouveau chemin API VASCO, indépendant des communications :
+>   `GetAccount.accountSecurityContracts → security → company { id label }`
+>   (`GET_PORTFOLIO_ISSUERS` + `pullPortfolioIssuers` dans `convex/vasco.ts`).
+>   `Security.company` et `Communication.issuer` sont tous deux le type
+>   `Company`, donc `company.id === issuer.id` : l'id stocké via le
+>   portefeuille réconcilie avec les futures communications (c'est ce qui
+>   garantit la remontée). Best-effort : un champ non lisible par la persona
+>   investisseur revient `null` → ignoré, jamais deviné.
+> - Pull branché sur `refreshVascoCacheForOrg` (cron 48 h + bouton
+>   « Rafraîchir »), isolé du pull communications (un échec n'affecte ni ne
+>   vide l'autre cache). Remplacement atomique par `(orgId, clientSlug)` via
+>   `replacePortfolioIssuersCache`.
+> - Sonde de vérification prod `vasco:probePortfolioIssuers` : confirme la
+>   lisibilité du chemin et la réconciliation des id (les SPV présents dans les
+>   deux sources tombent dans `inBothCount` ; les détenus-sans-comm dans
+>   `portfolioOnly`). Front inchangé (même forme de retour).
 
 ## v1.115.1 — 21/07/2026 à 13:15 — Barre latérale : Membres et Invitations retirés du menu (doublon avec Paramètres)
 

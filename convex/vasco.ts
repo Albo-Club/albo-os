@@ -220,6 +220,21 @@ const GET_COMMUNICATIONS = `query($accountId: ID, $userId: ID, $issuerId: ID) {
   }
 }`
 
+// Portfolio issuers (the SPVs the account HOLDS), independent of communications.
+// `security.company` is a `Company` — the SAME type as `Communication.issuer` —
+// so `company.id` reconciles with the `issuerId` stored on an entity link. Kept
+// minimal: no monetary field (masked for the investor persona anyway), only the
+// issuer identity we need to make a held-but-silent SPV pickable.
+const GET_PORTFOLIO_ISSUERS = `query($id: ID!) {
+  GetAccount(id: $id) {
+    id
+    accountSecurityContracts {
+      id
+      security { id name company { id label } }
+    }
+  }
+}`
+
 type GetUserResult = {
   GetUser: {
     id: string
@@ -585,6 +600,79 @@ export const probeCommunications = internalAction({
   },
 })
 
+/**
+ * Diagnostic (CLI): confirm the portfolio path is readable by the investor
+ * persona AND that its issuer id RECONCILES with the communications id. Per
+ * connection: pulls the held issuers (`accountSecurityContracts.security.company.id`)
+ * and the communications issuers (`Communication.issuer.id`), then reports the
+ * overlap. Both are `Company.id`, so an SPV present in both sources MUST share
+ * the id → it lands in `inBothCount` (never double-counted); if the ids did NOT
+ * reconcile, that SPV would instead show up in `portfolioOnly`. `portfolioOnly`
+ * is precisely what this feature unlocks: held SPVs with no communication yet
+ * (e.g. a freshly closed SPV), now linkable. Non-throwing.
+ *   npx convex run --prod vasco:probePortfolioIssuers '{"orgSlug":"albo"}'
+ */
+export const probePortfolioIssuers = internalAction({
+  args: { orgSlug: v.string() },
+  handler: async (ctx, { orgSlug }) => {
+    const conns: Array<VascoConnection> = await ctx.runQuery(
+      internal.connections.listActiveByOrgSlug,
+      { orgSlug, platform: 'vasco' },
+    )
+    const connections: Array<{
+      label: string
+      clientSlug: string
+      error?: string
+      portfolioCount?: number
+      communicationIssuerCount?: number
+      inBothCount?: number
+      portfolioOnly?: Array<{
+        issuerId: string
+        label: string | null
+        security: string | null
+      }>
+    }> = []
+    for (const conn of conns) {
+      const clientSlug = connClientSlug(conn) ?? ''
+      try {
+        const creds = vascoCreds(conn)
+        const portfolio = await pullPortfolioIssuers(creds)
+        let commIssuerIds = new Set<string>()
+        try {
+          const comms = await pullCommunications(creds)
+          commIssuerIds = new Set(
+            comms.map((c) => c.issuerId).filter((id) => id !== ''),
+          )
+        } catch {
+          // Communications unreachable here — still report the portfolio side.
+        }
+        connections.push({
+          label: conn.label,
+          clientSlug,
+          portfolioCount: portfolio.length,
+          communicationIssuerCount: commIssuerIds.size,
+          inBothCount: portfolio.filter((p) => commIssuerIds.has(p.issuerId))
+            .length,
+          portfolioOnly: portfolio
+            .filter((p) => !commIssuerIds.has(p.issuerId))
+            .map((p) => ({
+              issuerId: p.issuerId,
+              label: p.issuerLabel,
+              security: p.securityName,
+            })),
+        })
+      } catch (err) {
+        connections.push({
+          label: conn.label,
+          clientSlug,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+    return { orgSlug, connections }
+  },
+})
+
 // ── Communications (per-issuer investor updates) ────────────────────────────
 
 export type VascoCommunicationDoc = {
@@ -691,6 +779,72 @@ async function pullCommunications(
     .map(shapeCommunication)
 }
 
+// ── Portfolio issuers (held SPVs, communication-independent) ─────────────────
+
+export type VascoPortfolioIssuer = {
+  issuerId: string // VASCO Company.id (== Communication.issuer.id)
+  issuerLabel: string | null
+  securityName: string | null
+}
+
+type PortfolioContractNode = {
+  id: string
+  security?: {
+    id: string
+    name?: string | null
+    company?: { id: string; label?: string | null } | null
+  } | null
+}
+
+type GetPortfolioIssuersResult = {
+  GetAccount: {
+    id: string
+    accountSecurityContracts?: Array<PortfolioContractNode | null> | null
+  } | null
+}
+
+/** Log in and return the DISTINCT issuers (Company) the user holds a security
+ * contract with — across every account. No communication required, so a held
+ * SPV that has never communicated (e.g. a freshly closed one) is still
+ * returned. Keyed by `company.id`, the exact same id as `Communication.issuer.id`
+ * (both are `Company`), so a link made from here catches that issuer's future
+ * communications. Best-effort by design: a field the investor persona can't read
+ * comes back null (nulled + warning, not a top-level error), so it is skipped. */
+async function pullPortfolioIssuers(
+  creds: VascoCreds,
+): Promise<Array<VascoPortfolioIssuer>> {
+  const { token, userId } = await vascoLogin(creds)
+  const userData = await vascoGraphql<GetUserResult>(
+    creds.clientSlug,
+    token,
+    GET_USER,
+    { id: userId },
+  )
+  const accounts = userData.GetUser?.accounts ?? []
+  const byIssuer = new Map<string, VascoPortfolioIssuer>()
+  for (const acc of accounts) {
+    const accData = await vascoGraphql<GetPortfolioIssuersResult>(
+      creds.clientSlug,
+      token,
+      GET_PORTFOLIO_ISSUERS,
+      { id: acc.id },
+    )
+    const contracts = accData.GetAccount?.accountSecurityContracts ?? []
+    for (const c of contracts) {
+      const company = c?.security?.company
+      if (!company?.id) continue // denied/masked field → null → skip, never guess
+      if (!byIssuer.has(company.id)) {
+        byIssuer.set(company.id, {
+          issuerId: company.id,
+          issuerLabel: company.label ?? null,
+          securityName: c?.security?.name ?? null,
+        })
+      }
+    }
+  }
+  return [...byIssuer.values()]
+}
+
 /** Active connections of `orgId` matching `clientSlug`. Org-member-guarded via
  * the caller's identity (propagated from the calling action). */
 async function activeConnectionsForClient(
@@ -773,6 +927,44 @@ export const replaceCommunicationsCache = internalMutation({
   },
 })
 
+/** Atomically replace the cached portfolio issuers of one (org, clientSlug):
+ * drop the stale rows, insert the freshly pulled set. Same discipline as
+ * `replaceCommunicationsCache` (one transaction, no half-empty read). */
+export const replacePortfolioIssuersCache = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    clientSlug: v.string(),
+    issuers: v.array(
+      v.object({
+        issuerId: v.string(),
+        issuerLabel: v.union(v.string(), v.null()),
+        securityName: v.union(v.string(), v.null()),
+      }),
+    ),
+  },
+  handler: async (ctx, { orgId, clientSlug, issuers }) => {
+    const existing = await ctx.db
+      .query('vascoPortfolioIssuers')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    for (const row of existing) {
+      if (row.clientSlug === clientSlug)
+        await ctx.db.delete('vascoPortfolioIssuers', row._id)
+    }
+    const fetchedAt = Date.now()
+    for (const iss of issuers) {
+      await ctx.db.insert('vascoPortfolioIssuers', {
+        orgId,
+        clientSlug,
+        issuerId: iss.issuerId,
+        issuerLabel: iss.issuerLabel ?? undefined,
+        securityName: iss.securityName ?? undefined,
+        fetchedAt,
+      })
+    }
+  },
+})
+
 /** Pull every active connection of `orgId` and refresh its cache. Best-effort
  * per client: if all of a client's connections fail to log in, the existing
  * cache is KEPT (not wiped). System-context safe (auth-less connection query),
@@ -816,12 +1008,36 @@ export const refreshVascoCacheForOrg = internalAction({
           )
         }
       }
-      if (communications == null) continue // all failed → keep existing cache
-      await ctx.runMutation(internal.vasco.replaceCommunicationsCache, {
-        orgId,
-        clientSlug,
-        communications,
-      })
+      if (communications != null) {
+        await ctx.runMutation(internal.vasco.replaceCommunicationsCache, {
+          orgId,
+          clientSlug,
+          communications,
+        })
+      } // else all failed → keep existing communications cache
+
+      // Portfolio issuers (best-effort, isolated from the communications path):
+      // a held SPV without any communication yet still becomes linkable. A
+      // failure here never wipes or blocks the communications cache.
+      let portfolioIssuers: Array<VascoPortfolioIssuer> | null = null
+      for (const conn of clientConns) {
+        try {
+          portfolioIssuers = await pullPortfolioIssuers(vascoCreds(conn))
+          break
+        } catch (err) {
+          console.warn(
+            `[vasco] portfolio issuers pull failed for ${clientSlug}:`,
+            err instanceof Error ? err.message : String(err),
+          )
+        }
+      }
+      if (portfolioIssuers != null) {
+        await ctx.runMutation(internal.vasco.replacePortfolioIssuersCache, {
+          orgId,
+          clientSlug,
+          issuers: portfolioIssuers,
+        })
+      } // else keep existing portfolio-issuers cache
     }
   },
 })
@@ -898,6 +1114,33 @@ export const listCachedVascoIssuers = query({
           issuerLabel: r.issuerLabel ?? null,
           sampleTitle: r.title ?? null,
           latest: stamp,
+        })
+      }
+    }
+    // Union with portfolio-held issuers (SPVs held but with no communication
+    // yet — e.g. a freshly closed SPV). Keyed on the same `clientSlug:issuerId`
+    // (Company.id) as the communications above, so a held SPV that later
+    // communicates merges into one entry, and a link made now catches those
+    // future communications. Additive only: an issuer already seen via a
+    // communication keeps its richer title.
+    const portfolioRows = await ctx.db
+      .query('vascoPortfolioIssuers')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    for (const p of portfolioRows) {
+      lastFetchedAt =
+        lastFetchedAt == null
+          ? p.fetchedAt
+          : Math.max(lastFetchedAt, p.fetchedAt)
+      if (!p.issuerId) continue
+      const key = `${p.clientSlug}:${p.issuerId}`
+      if (!byKey.has(key)) {
+        byKey.set(key, {
+          clientSlug: p.clientSlug,
+          issuerId: p.issuerId,
+          issuerLabel: p.issuerLabel ?? null,
+          sampleTitle: p.securityName ?? null,
+          latest: '',
         })
       }
     }
