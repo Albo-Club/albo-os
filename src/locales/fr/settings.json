@@ -99,7 +99,7 @@
     "platforms": {
       "gmail": {
         "name": "Gmail",
-        "description": "Timeline email du portfolio : les boîtes Gmail connectées sont relevées toutes les 10 minutes et chaque email lié à une participation (domaine de la société parmi les participants) apparaît sur sa fiche, onglet Emails. Seuls les emails liés sont conservés."
+        "description": "Timeline email du portfolio : chaque boîte Gmail est connectée pour cette organisation et relevée toutes les 10 minutes. Un email lié à une participation (domaine de la société parmi les participants) apparaît sur sa fiche, onglet Emails, avec ses pièces jointes. Seuls les emails liés sont conservés ; la même boîte peut être connectée dans une autre organisation séparément."
       },
       "powens": {
         "name": "Powens",

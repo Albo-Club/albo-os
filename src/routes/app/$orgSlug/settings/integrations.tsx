@@ -221,9 +221,10 @@ function PlatformRow({
     setRedirecting(id ?? 'new')
     try {
       // Gmail: connect and reconnect are the same Google OAuth round-trip
-      // (the callback upserts the mailbox row and keeps its sync cursor).
+      // (the callback upserts the org's mailbox row and keeps its cursor).
       if (item.platform === 'gmail') {
         const { authorizeUrl } = await startGmail({
+          orgId,
           returnTo: window.location.pathname,
         })
         window.location.href = authorizeUrl

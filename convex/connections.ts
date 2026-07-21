@@ -422,8 +422,10 @@ export const listIntegrations = query({
         case 'webview': {
           // Webview platforms own their storage → dispatch per platform.
           if (def.platform === 'gmail') {
-            // Global scope: the same mailboxes feed every org.
-            const rows = await ctx.db.query('gmailAccounts').take(50)
+            const rows = await ctx.db
+              .query('gmailAccounts')
+              .withIndex('by_org', (q) => q.eq('orgId', orgId))
+              .take(50)
             item.connections = rows.map((r) => ({
               id: r._id,
               label: r.email,
@@ -534,7 +536,11 @@ export const status = internalQuery({
           if (def.platform === 'gmail') {
             const rows = await ctx.db.query('gmailAccounts').take(50)
             base.connections = rows.map((r) => ({
-              orgSlug: 'global',
+              // A row without orgId is a pre-separation legacy mailbox,
+              // pending purge by the sync cron.
+              orgSlug: r.orgId
+                ? (orgSlug.get(r.orgId) ?? String(r.orgId))
+                : 'legacy',
               label: r.email,
               health: r.status,
               lastConnectedAt: r.lastSyncAt ?? null,

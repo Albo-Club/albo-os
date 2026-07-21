@@ -65,14 +65,15 @@ export const CONNECTORS: ReadonlyArray<ConnectorDefinition> = [
   {
     platform: 'gmail',
     label: 'Gmail (portfolio email timeline)',
-    scope: 'global',
+    scope: 'org',
     auth: 'webview',
     manualSync: true,
     module: 'convex/gmail.ts',
     description:
-      'Mailboxes connected via Google OAuth; refresh token + historyId ' +
-      'cursor in `gmailAccounts`, matched emails in `companyEmails` ' +
-      '(10-min polling cron, deterministic domain matching).',
+      'Org-scoped mailboxes connected via Google OAuth (one row per org × ' +
+      'mailbox); refresh token + historyId cursor in `gmailAccounts`, ' +
+      'matched emails + stored attachments in `companyEmails` (10-min ' +
+      'polling cron, deterministic domain matching within the org).',
   },
   {
     platform: 'vasco',

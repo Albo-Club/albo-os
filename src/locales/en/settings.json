@@ -99,7 +99,7 @@
     "platforms": {
       "gmail": {
         "name": "Gmail",
-        "description": "Portfolio email timeline: connected Gmail mailboxes are polled every 10 minutes and every email linked to a participation (company domain among the participants) shows up on its page, Emails tab. Only linked emails are stored."
+        "description": "Portfolio email timeline: each Gmail mailbox is connected for this organization and polled every 10 minutes. An email linked to a participation (company domain among the participants) shows up on its page, Emails tab, with its attachments. Only linked emails are stored; the same mailbox can be connected in another organization separately."
       },
       "powens": {
         "name": "Powens",

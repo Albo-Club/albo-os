@@ -23,6 +23,47 @@ bas de page.
 
 ---
 
+## v1.118.0 — 21/07/2026 à 18:32 — Emails du portfolio : boîtes par organisation et pièces jointes conservées
+
+Deux renforcements du connecteur Gmail livré aujourd'hui, avant sa première
+vraie utilisation :
+
+**Chaque boîte appartient désormais à une organisation.** Une boîte
+connectée depuis Albo n'alimente que les participations d'Albo ; pour
+qu'elle serve aussi Calte, on la connecte une seconde fois depuis Calte
+(deux autorisations indépendantes). L'étanchéité entre les véhicules est
+totale : un email ne peut jamais se retrouver dans une organisation qui ne
+suit pas la société concernée, et perdre l'accès à un véhicule ne laisse
+aucune donnée derrière soi. La boîte connectée avant ce changement (aucune
+donnée relevée) est retirée automatiquement — il suffit de la reconnecter
+depuis la bonne organisation.
+
+**Les emails sont conservés en entier.** Pour chaque email rattaché à une
+participation : les pièces jointes (PDF, Excel…) sont téléchargées et
+stockées dans Albo OS — visibles et téléchargeables dans le détail de
+l'email (trombone dans la liste) — et les liens cliquables du message
+(DocSend, Notion…) sont préservés dans le texte. Tout est donc en place
+pour extraire plus tard les données des reports reçus par email, même des
+mois après, sans dépendre de Gmail.
+
+> **🔧 Notes techniques**
+>
+> - `gmailAccounts.orgId` (+ `gmailOAuthStates.orgId`) : upsert par
+>   (org, email), `startConnect`/`disconnect` admin-gated sur l'org,
+>   matching restreint aux sociétés de l'org de la boîte (`findMatches`
+>   partagé query/mutation). `orgId` laissé optional au schéma pour la
+>   ligne legacy pré-séparation ; purge auto dans `syncAll` ; à resserrer
+>   ensuite (widen-migrate-narrow).
+> - Pièces jointes : probe de match read-only (`matchProbe`) avant tout
+>   téléchargement (rien pour les mails non matchés ni déjà stockés), puis
+>   `messages.attachments.get` → `ctx.storage.store` (≤ 20 Mo, cap 10,
+>   images inline < 100 Ko ignorées) → `companyEmails.attachments`.
+> - `htmlToText` préserve les URLs des `<a href>` (« libellé (url) ») ;
+>   `gmailMessageId` stocké comme référence de re-fetch.
+> - Front : PJ téléchargeables dans le dialog (`CompanyEmailsSection`),
+>   trombone sur les lignes, `startConnect({orgId})`, Intégrations par org
+>   (badge « Par organisation »).
+
 ## v1.117.2 — 21/07/2026 à 18:17 — Parallel : correction du chemin de lecture du portefeuille (rattachement des SPV détenus)
 
 La détection des SPV détenus — celle qui permet de les rattacher **avant** leur

@@ -18,20 +18,28 @@ la timeline CRM du portefeuille, sur le modèle des CRM modernes
 Réglages → Intégrations → **Gmail** → « Connecter une boîte Gmail ». La
 connexion se fait sur l'écran officiel de Google (autorisation en lecture
 seule) ; aucun mot de passe ne transite par Albo OS. Chaque boîte connectée
-apparaît avec sa pastille d'état et sa dernière relève. On peut connecter
-plusieurs boîtes (perso, alboteam, morning…) — le service est partagé :
-les mêmes boîtes alimentent toutes les organisations.
+apparaît avec sa pastille d'état et sa dernière relève.
+
+**Une boîte est connectée pour une organisation précise** : connectée
+depuis Albo, elle n'alimente que les participations d'Albo. Pour que la
+même boîte serve aussi Calte, on la connecte une seconde fois depuis Calte
+(deux autorisations indépendantes). L'étanchéité entre les véhicules est
+totale.
 
 ### 2. Relève et rangement automatiques
 
 Toutes les 10 minutes, les nouveaux emails de chaque boîte sont relevés.
 Un email est rattaché à une participation quand un de ses participants
 (expéditeur ou destinataires) porte le **domaine de la société** (celui de
-la fiche). Le rattachement est mécanique et prévisible — pas d'IA, donc pas
-de faux positifs surprenants. Si la même société existe dans plusieurs
-organisations, l'email apparaît sur chacune de ses fiches. Un même email vu
-par plusieurs boîtes n'est rangé qu'**une fois** (le détail indique par
-quelles boîtes il est passé).
+la fiche) — parmi les sociétés de l'organisation de la boîte uniquement.
+Le rattachement est mécanique et prévisible — pas d'IA, donc pas de faux
+positifs surprenants. Un même email vu par plusieurs boîtes n'est rangé
+qu'**une fois** (le détail indique par quelles boîtes il est passé).
+
+L'email est conservé **en entier** : le texte du message avec ses liens
+cliquables, et ses **pièces jointes** (PDF, Excel…), téléchargées et
+stockées dans Albo OS — visibles dans le détail de l'email (trombone dans
+la liste, téléchargement dans le dialog).
 
 ### 3. Lire la timeline
 
@@ -48,10 +56,12 @@ et date. Un clic ouvre le message complet (texte).
   « domaine » renseigné ne peut pas recevoir d'emails ; un email dont aucun
   participant n'écrit depuis le domaine de la société (ex. un avocat qui
   écrit sans copie de la boîte) n'est pas rattaché.
-- **Pas de pièces jointes** par ce canal : la timeline conserve le texte.
-  Pour un report avec PDF, le
-  [forward à l'adresse reports](17-reports-par-email.md) reste la bonne
-  voie — les deux circuits coexistent.
+- **Les pièces jointes sont conservées** (jusqu'à 20 Mo par fichier), mais
+  leur contenu n'est **pas encore analysé** automatiquement : l'extraction
+  des chiffres d'un report (KPIs, synthèse) reste pour l'instant du ressort
+  du [forward à l'adresse reports](17-reports-par-email.md) — les deux
+  circuits coexistent, et le branchement de l'analyse sur les emails
+  stockés est une évolution prévue.
 - **Reconnexion périodique** : tant que l'application Google est en mode
   test, les boîtes hors alboteam demandent une reconnexion (2 clics)
   environ chaque semaine — la pastille passe « À reconnecter » sur la page

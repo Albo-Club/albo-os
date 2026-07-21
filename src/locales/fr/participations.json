@@ -644,7 +644,8 @@
     "cc": "Cc :",
     "sent": "Envoyé",
     "received": "Reçu",
-    "receivedVia": "via {{mailbox}}"
+    "receivedVia": "via {{mailbox}}",
+    "attachments": "Pièces jointes"
   },
   "intelligence": {
     "status": {
