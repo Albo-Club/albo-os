@@ -618,6 +618,7 @@ sur le client Google. Cf. `KNOWN_ISSUES.md` « Connecteur Gmail ».
 | GM6 | Participation présente dans les 2 orgs avec le même domaine                    | Le mail apparaît sur la fiche des **deux** orgs (fan-out `companyEmailLinks`)                                                                                                         |
 | GM7 | Boîte en mode test Google après 7 jours (ou révocation manuelle du grant)      | Au cron suivant : pastille 🔴 « À reconnecter » (`reauth_required`) ; « Reconnecter » relance l'OAuth et **conserve** le curseur de sync                                               |
 | GM8 | « Déconnecter » une boîte                                                      | Ligne `gmailAccounts` supprimée + révocation du token côté Google (best-effort) ; la timeline déjà importée **reste**                                                                 |
+| GM9 | Env vars Google absentes → clic « Connecter une boîte Gmail »                  | Toast dédié « Gmail n'est pas encore configuré… » (`gmail_env_missing`) — jamais le message bancaire Powens ; aucun appel Google                                                      |
 
 ## Ingestion reports (AgentMail → inboundEmails, briques 1-6)
 

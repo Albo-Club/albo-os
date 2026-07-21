@@ -162,7 +162,9 @@
       "disconnectError": "Couldn't disconnect.",
       "bankRedirectError": "Couldn't open the bank connection flow.",
       "synced": "Sync complete.",
-      "syncError": "Sync failed."
+      "syncError": "Sync failed.",
+      "gmailNotConfigured": "Gmail is not configured yet: Google credentials missing server-side (GOOGLE_OAUTH_CLIENT_ID/SECRET).",
+      "gmailRedirectError": "Could not open the Gmail connection."
     },
     "fieldHelp": {
       "vasco": {

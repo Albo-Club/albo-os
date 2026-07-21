@@ -23,6 +23,20 @@ bas de page.
 
 ---
 
+## v1.117.1 — 21/07/2026 à 17:55 — Gmail : message d'erreur clair quand la connexion n'est pas encore configurée
+
+Cliquer « Connecter une boîte Gmail » avant la configuration des identifiants
+Google affichait par erreur le message de la connexion bancaire. Le bouton
+explique désormais la vraie cause : Gmail n'est pas encore configuré côté
+serveur (ou, le cas échéant, une erreur Gmail spécifique).
+
+> **🔧 Notes techniques**
+>
+> - `settings/integrations.tsx` : le catch d'`openWebview` distingue la
+>   plateforme et le code `ConvexError` (`gmail_env_missing` → toast dédié) ;
+>   nouvelles clés i18n `toasts.gmailNotConfigured`/`gmailRedirectError`
+>   (fr/en). Ligne GM9 ajoutée à `TESTING.md`.
+
 ## v1.117.0 — 21/07/2026 à 17:02 — Emails du portfolio : boîtes Gmail connectées, timeline par participation
 
 Vos boîtes Gmail se connectent maintenant directement à Albo OS (Réglages →
