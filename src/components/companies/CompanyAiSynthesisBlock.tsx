@@ -16,8 +16,9 @@ import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { directionBadgeClass } from '~/lib/moneyTone'
-import { scoreVerdict, verdictSquareClass } from '~/lib/reportScore'
+import { scoreVerdict } from '~/lib/reportScore'
 import { cn } from '~/lib/utils'
+import { ScoreRing } from '~/components/companies/ScoreRing'
 import { Button } from '~/components/ui/button'
 
 // Shape of companyIntelligence.aiAnalysis (Cerveau 3).
@@ -123,16 +124,7 @@ export function CompanyAiSynthesisBlock({
 
       {/* Hero line: score square + verdict + one-line TL;DR. */}
       <div className="flex items-start gap-4">
-        {score !== null && verdict && (
-          <div
-            className={cn(
-              'flex size-13 shrink-0 items-center justify-center rounded-lg border text-2xl font-semibold',
-              verdictSquareClass(verdict),
-            )}
-          >
-            {score}
-          </div>
-        )}
+        {score !== null && <ScoreRing score={score} size="lg" />}
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-baseline gap-x-2">
             <span className="font-medium">

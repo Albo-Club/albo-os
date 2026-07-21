@@ -10,9 +10,10 @@ sociétés, leurs rapports et leurs documents.
 ## La liste
 
 - **Tableau des participations actives** : logo et nom, pitch (une ligne),
-  secteur, **score IA de santé** (carré coloré de 1 à 10, issu de la synthèse
-  IA), nombre de deals, montant investi, montant reçu, **TVPI**. Tri par
-  colonne, pagination, clic vers la fiche.
+  secteur, **score IA de santé** (pastille en anneau de 1 à 10, jauge remplie
+  selon la note et colorée selon le verdict, issue de la synthèse IA), nombre
+  de deals, montant investi, montant reçu, **TVPI**. Tri par colonne (dont le
+  score IA), pagination, clic vers la fiche.
 - **Recherche et filtres** : recherche plein texte (société, deal,
   instrument, investisseur, secteur) et filtres multi-sélection par
   instrument, statut et secteur. Export CSV de l'ensemble.

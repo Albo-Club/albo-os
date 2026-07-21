@@ -13,9 +13,9 @@ import type { ReactNode } from 'react'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import type { MoicTransaction } from '~/lib/dealMetrics'
 import { cn } from '~/lib/utils'
-import { scoreVerdict, verdictSquareClass } from '~/lib/reportScore'
 import { xirr } from '~/lib/xirr'
 import { CompanyLogo } from '~/components/CompanyLogo'
+import { ScoreRing } from '~/components/companies/ScoreRing'
 import { ExitBadge } from '~/components/deals/ExitBadge'
 import { Badge } from '~/components/ui/badge'
 import {
@@ -384,7 +384,7 @@ export function DealsList({
  * feeds each instance an already-filtered `deals` set (the active table and the
  * settled section share one toolbar).
  */
-type SortKey = 'name' | 'deals' | 'paid' | 'received' | 'tvpi'
+type SortKey = 'name' | 'aiScore' | 'deals' | 'paid' | 'received' | 'tvpi'
 
 /** Clickable header of a sortable column (asc ⇄ desc). */
 export function SortableHead({
@@ -535,7 +535,7 @@ export function ParticipationsTable({
   }, [deals, orgSlug])
 
   // Column sort (client-side, low volumes). null = server order
-  // (signedDate desc). Missing TVPIs go to the end of the list.
+  // (signedDate desc). Missing TVPIs / AI scores sink to the end (desc).
   const [sort, setSort] = useState<{
     key: SortKey
     dir: 'asc' | 'desc'
@@ -553,9 +553,11 @@ export function ParticipationsTable({
         ? g.name
         : sort.key === 'tvpi'
           ? (g.tvpi ?? Number.NEGATIVE_INFINITY)
-          : sort.key === 'deals'
-            ? g.deals.length
-            : g[sort.key]
+          : sort.key === 'aiScore'
+            ? (g.aiScore ?? Number.NEGATIVE_INFINITY)
+            : sort.key === 'deals'
+              ? g.deals.length
+              : g[sort.key]
     const sign = sort.dir === 'asc' ? 1 : -1
     return [...groups].sort((a, b) => {
       const va = value(a)
@@ -608,7 +610,13 @@ export function ParticipationsTable({
               {showOrg && <TableHead>{t('col.org')}</TableHead>}
               <TableHead>{t('col.oneLiner')}</TableHead>
               <TableHead>{t('col.sector')}</TableHead>
-              <TableHead>{t('col.aiScore')}</TableHead>
+              <SortableHead
+                label={t('col.aiScore')}
+                active={sort?.key === 'aiScore'}
+                dir={sort?.dir ?? 'desc'}
+                onClick={() => toggleSort('aiScore')}
+                sortable={!settled}
+              />
               <SortableHead
                 label={t('col.deals')}
                 active={sort?.key === 'deals'}
@@ -808,15 +816,7 @@ function CompanyRows({
       </TableCell>
       <TableCell>
         {group.aiScore != null ? (
-          // Same idiom as the entity sheet's synthesis hero (reportScore).
-          <span
-            className={cn(
-              'inline-flex size-6 items-center justify-center rounded-md border text-xs font-semibold',
-              verdictSquareClass(scoreVerdict(group.aiScore)),
-            )}
-          >
-            {group.aiScore}
-          </span>
+          <ScoreRing score={group.aiScore} />
         ) : (
           <span className="text-muted-foreground">—</span>
         )}
