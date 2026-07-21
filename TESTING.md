@@ -692,11 +692,12 @@ Communications **mises en cache** (`vascoCommunicationsCache`) et lues via des
 queries **réactives** (affichage instantané) ; rafraîchies par un **cron toutes
 les 48 h** + un bouton **« Rafraîchir »** (VASCO n'a pas de webhook investisseur,
 d'où le pull). Scoping org + rattachement entité ↔ émetteur **par id**. Le bloc
-apparaît sur les entités **portfolio** dont le nom/domaine/origine mentionne un
-**portail VASCO connecté de l'org** (slugs actifs via
-`vasco.listConnectedClientSlugs` — « parallel » aujourd'hui, tout nouveau
-portail seedé élargit la détection sans code) ou déjà rattachées ; jamais sur
-les `group_*`. Nécessite une connexion VASCO active (org `calte`).
+Reports n'apparaît que sur les entités **déjà rattachées** ; le rattachement se
+fait depuis le menu **⋯ → « Rattacher à une intégration »** de la fiche
+(toute entité portfolio, quel que soit son nom — dialog listant les
+plateformes `entityLink` du registre avec leur état de connexion, puis le
+sélecteur d'émetteurs) ; jamais sur les `group_*`. Nécessite une connexion
+VASCO active (org `calte`).
 
 | Ref | Scénario | Attendu |
 | --- | --- | --- |

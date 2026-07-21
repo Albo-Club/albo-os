@@ -13,8 +13,6 @@
     "documents_other": "{{count}} documents"
   },
   "link": {
-    "cta": "Link to the investor portal",
-    "prompt": "Link this entity to its deal on the investor portal (Parallel, …) to see its communications.",
     "linkedTo": "Linked to {{label}}",
     "change": "Change link",
     "unlink": "Unlink",

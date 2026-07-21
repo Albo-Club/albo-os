@@ -212,6 +212,8 @@ type IntegrationItem = {
   auth: string
   /** The platform supports the on-demand `syncNow` pull. */
   manualSync?: boolean
+  /** Portfolio entities can be linked to an object of this platform. */
+  entityLink?: boolean
   /** auth 'credentials': the registry-declared keys, driving the generic
    * in-app connect form (labels resolved via i18n on the client). */
   configKeys?: Array<string>
@@ -330,6 +332,7 @@ export const listIntegrations = query({
         scope: def.scope,
         auth: def.auth,
         manualSync: def.manualSync,
+        entityLink: def.entityLink,
       }
       switch (def.auth) {
         case 'credentials': {

@@ -40,6 +40,11 @@ export interface ConnectorDefinition {
    * `connections.syncNow` (a syncable platform adds its case there). Off for
    * push-based platforms (webhooks) and passive capabilities. */
   manualSync?: boolean
+  /** Portfolio entities can be linked to an object of this platform (e.g. a
+   * VASCO issuer) from the entity page's « Intégrations » dialog. Off for
+   * platforms whose data attaches elsewhere (Powens → bank accounts) and for
+   * global capabilities. */
+  entityLink?: boolean
   /** Dev-facing pointer to the module implementing the platform logic. */
   module: string
   description: string
@@ -65,6 +70,7 @@ export const CONNECTORS: ReadonlyArray<ConnectorDefinition> = [
     configKeys: ['clientSlug'],
     credentialKeys: ['username', 'password'],
     manualSync: true,
+    entityLink: true,
     module: 'convex/vasco.ts',
     description:
       'Investor-side pull (positions, communications, documents) from ' +

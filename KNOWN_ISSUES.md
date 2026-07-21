@@ -2271,19 +2271,18 @@ SPV13"), dated (`publishDate`/`period`), with `title`, `htmlContent`, and
   bootstraps by triggering one refresh. A failed pull KEEPS the existing cache
   (never wiped). Only communication metadata is cached — the document BYTES are
   still fetched live on demand.
-- **Which entities show the linker.** `VascoCommunicationsSection` renders only on
-  `kind: 'portfolio'` entities that look like an investment made through one of
-  the org's **connected VASCO portals** — the active client slugs (from
-  `vasco.listConnectedClientSlugs`, e.g. "parallel", "teampact") matched over
-  `name + domain + sponsor + group` — plus any already-linked entity. No
-  hardcoded platform: connecting a new portal automatically widens the
-  detection. The field union is deliberate: the live `domain` isn't reliably
-  filled on SPVs (often empty or the parent platform), so keying on it alone
-  would hide the block on real entities (the v1.86.1 regression); the name
-  ("PARALLEL INVEST …") backstops it. `group_*` legal entities never show it.
-  An entity whose fields don't mention the portal at all still gets the block
-  once linked (manual link from any state is done via the picker on a
-  detected entity, or by setting `companies.setVascoLink`).
+- **Which entities show the communications block / how linking works.**
+  `VascoCommunicationsSection` renders ONLY on entities **already linked** to
+  an issuer (`vascoClientSlug` + `vascoIssuerId`) — unlinked entities carry
+  zero VASCO noise in their Report tab. Linking lives in the entity page's
+  menu ⋯ → « Rattacher à une intégration » (`EntityIntegrationsDialog`),
+  available on EVERY `kind: 'portfolio'` entity whatever its name: it lists
+  the registry platforms with `entityLink: true`, shows the org's connection
+  state (via `connections.listIntegrations`), and opens the platform's picker
+  (`VascoLinkDialog` → `listCachedVascoIssuers`). The historical name-based
+  heuristic (`/parallel/i`, then connected-slug matching) is GONE — it made
+  differently-named entities impossible to link from the UI. `group_*` legal
+  entities never show the menu entry.
 - **Download = server proxy, mandatory.** `document.downloadUrl` is an
   **authenticated** endpoint (`api.<client>.vasco.fund/documents/<id>/download`),
   not a public signed URL → a browser `<a href>` fails.

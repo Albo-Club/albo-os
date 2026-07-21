@@ -248,8 +248,10 @@ function CommunicationsList({
   )
 }
 
-/** Pick a Parallel issuer (SPV) to link this entity to, or unlink it. */
-function LinkParallelDialog({
+/** Pick a VASCO issuer (e.g. a Parallel SPV) to link this entity to, or
+ * unlink it. Opened from the entity page's « Intégrations » dialog (menu ⋯)
+ * and from the linked communications list ("change link"). */
+export function VascoLinkDialog({
   company,
   onClose,
 }: {
@@ -388,59 +390,28 @@ function LinkParallelDialog({
 
 /**
  * VASCO investor communications for an entity, in its Report section. Shown
- * only on portfolio entities that look like an investment made through one of
- * the org's CONNECTED VASCO portals — a connected client slug ("parallel",
- * "teampact", …) appears in the name (Parallel SPVs are all
- * "PARALLEL INVEST …"), the domain, or an origin field (`sponsor`/`group`) —
- * plus any entity already linked. Off on the org's legal entities (group_*)
- * and on unrelated portfolio lines, so the linker isn't noise. All data is
- * read live (on-demand actions); nothing is stored.
+ * ONLY on entities already linked to an issuer — linking (and unlinking)
+ * lives in the entity page's « Intégrations » dialog (menu ⋯), so unlinked
+ * entities carry zero VASCO noise here. All data is read from the reactive
+ * cache; nothing is stored by this component.
  */
 export function VascoCommunicationsSection({
   company,
 }: {
   company: Doc<'companies'>
 }) {
-  const { t } = useTranslation('vasco')
   const [linkOpen, setLinkOpen] = useState(false)
   const isLinked = Boolean(company.vascoClientSlug && company.vascoIssuerId)
-
-  // Detect an investment made through a connected portal across every field
-  // that may carry the marker (name OR domain OR sponsor/group) so none slip
-  // through, whatever the data state — the live domain isn't always filled on
-  // SPVs. Driven by the org's active connections (no hardcoded platform);
-  // portfolio-only, the org's legal entities (group_*) never show the linker.
-  const connectedSlugs = useConvexQuery(api.vasco.listConnectedClientSlugs, {
-    orgId: company.orgId,
-  })
-  const haystack =
-    `${company.name} ${company.domain ?? ''} ${company.sponsor ?? ''} ${company.group ?? ''}`.toLowerCase()
-  const looksConnected =
-    company.kind === 'portfolio' &&
-    (connectedSlugs ?? []).some((slug) => haystack.includes(slug.toLowerCase()))
-  if (!isLinked && !looksConnected) return null
+  if (!isLinked) return null
 
   return (
     <div className="space-y-3">
-      {isLinked ? (
-        <CommunicationsList
-          company={company}
-          onChangeLink={() => setLinkOpen(true)}
-        />
-      ) : (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed p-3">
-          <span className="text-muted-foreground text-sm">
-            {t('link.prompt')}
-          </span>
-          <Button variant="outline" size="sm" onClick={() => setLinkOpen(true)}>
-            <Link2 className="size-4" />
-            {t('link.cta')}
-          </Button>
-        </div>
-      )}
-
+      <CommunicationsList
+        company={company}
+        onChangeLink={() => setLinkOpen(true)}
+      />
       {linkOpen && (
-        <LinkParallelDialog company={company} onClose={() => setLinkOpen(false)} />
+        <VascoLinkDialog company={company} onClose={() => setLinkOpen(false)} />
       )}
     </div>
   )

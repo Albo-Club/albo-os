@@ -23,6 +23,38 @@ bas de page.
 
 ---
 
+## v1.112.0 — 21/07/2026 à 11:53 — Rattacher une intégration depuis la fiche entité
+
+Le rattachement d'une participation à un portail investisseur (Parallel /
+VASCO) se fait désormais depuis le menu **⋯** de sa fiche : « Rattacher à
+une intégration ». Le dialog montre les plateformes rattachables avec leur
+état de connexion — si la plateforme est connectée, on choisit l'émetteur
+dans la liste ; sinon, un lien renvoie vers Réglages → Intégrations.
+
+Deux effets concrets :
+
+- **toute entité du portefeuille peut être rattachée**, quel que soit son
+  nom — jusqu'ici, le rattachement n'était proposé que sur les entités dont
+  le nom évoquait le portail, ce qui rendait certaines participations
+  impossibles à relier ;
+- **l'onglet Rapports est plus propre** : le bandeau « Connecter VASCO »
+  disparaît ; les communications investisseurs ne s'affichent que sur les
+  fiches réellement rattachées.
+
+> **🔧 Notes techniques**
+>
+> - Flag `entityLink` au registre (`lib/connectors.ts`, vasco seul), exposé
+>   par `connections.listIntegrations`.
+> - Nouveau `EntityIntegrationsDialog` (`src/components/companies/`) : liste
+>   des plateformes `entityLink` avec état de connexion, bascule vers le
+>   picker `VascoLinkDialog` (ex-`LinkParallelDialog`, exporté).
+> - Entrée « Rattacher à une intégration » dans le menu ⋯ de
+>   `participations.$companyId.tsx` (entités `portfolio` uniquement).
+> - `VascoCommunicationsSection` simplifiée : rendu uniquement si rattachée ;
+>   heuristique par slugs connectés + CTA retirés, query
+>   `vasco.listConnectedClientSlugs` supprimée (orpheline), clés i18n
+>   `vasco:link.prompt`/`cta` retirées.
+
 ## v1.111.6 — 21/07/2026 à 11:03 — Intégrations : formulaire et liste plus clairs
 
 Deux améliorations de lisibilité sur la page Réglages → Intégrations :

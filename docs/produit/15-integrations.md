@@ -91,10 +91,15 @@ peut écrire (avec approbation).
 
 ## Parallel / VASCO (communications SPV)
 
-Pour les SPV souscrits via Parallel, la fiche société peut être liée à
-l'émetteur correspondant : les **communications investisseurs** (annonces,
-documents) remontent alors dans l'onglet Rapports de la fiche, avec
-téléchargement des documents et rafraîchissement à la demande.
+Pour les participations souscrites via un portail investisseur (Parallel,
+Teampact…), la fiche société se rattache à l'émetteur correspondant depuis
+son menu **⋯ → « Rattacher à une intégration »** — disponible sur toute
+entité du portefeuille, quel que soit son nom. Le dialog montre les
+plateformes rattachables et leur état de connexion, puis propose la liste
+des émetteurs à choisir. Une fois rattachée, les **communications
+investisseurs** (annonces, documents) remontent dans l'onglet Rapports de la
+fiche, avec téléchargement des documents et rafraîchissement à la demande ;
+une fiche non rattachée n'affiche rien.
 
 ## Ingestion des rapports par email
 
