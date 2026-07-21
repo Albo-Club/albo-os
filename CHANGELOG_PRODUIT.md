@@ -23,6 +23,39 @@ bas de page.
 
 ---
 
+## v1.115.0 — 21/07/2026 à 12:55 — Score IA : pastille en anneau et tri sur la table Entreprises
+
+Le score IA de santé est plus lisible et plus actionnable sur la page
+Entreprises :
+
+- il s'affiche désormais en **pastille « anneau »** — une jauge circulaire
+  dont l'arc se remplit selon la note sur 10, colorée en vert / orange /
+  rouge selon le verdict — à la place de l'ancien carré ;
+- la colonne **se trie** : un clic sur l'en-tête classe les sociétés par
+  note (les meilleures d'abord, un second clic inverse) ; les sociétés sans
+  synthèse passent en fin de liste ;
+- la **même pastille** est reprise sur la fiche entité, pour garder la
+  lecture cohérente entre la liste et le détail.
+
+Les seuils de couleur restent inchangés (vert ≥ 7, orange 5-6, rouge ≤ 4),
+donc la couleur reste alignée avec le texte de verdict de la fiche.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau composant partagé `ScoreRing` (`src/components/companies/ScoreRing.tsx`) :
+>   jauge SVG (arc = `score/10`, `-rotate-90` pour démarrer en haut), couleur
+>   dérivée de `scoreVerdict` (seuils inchangés), tokens `positive` / `warning`
+>   / `destructive`, deux tailles `sm` (table) et `lg` (hero fiche). Source
+>   unique → cohérence table ↔ fiche garantie.
+> - `ParticipationsTable.tsx` : la colonne « Score IA » passe sur `ScoreRing` et
+>   devient triable (`SortKey` étendu à `'aiScore'`, tri client-side, notes
+>   absentes → `NEGATIVE_INFINITY` donc en fin de liste en desc ; en-tête via
+>   `SortableHead`, non triable sur la table « Soldées »).
+> - `CompanyAiSynthesisBlock.tsx` : le carré du hero de synthèse est remplacé
+>   par `ScoreRing size="lg"`.
+> - `reportScore.ts` : `verdictSquareClass` / `VERDICT_SQUARE` retirés (devenus
+>   orphelins) ; `scoreVerdict` conservé (couleur de l'anneau + texte de verdict).
+
 ## v1.114.0 — 21/07/2026 à 12:45 — Intégrations : corriger une connexion en un clic
 
 Quand une connexion à un portail investisseur (Parallel / VASCO) est en
