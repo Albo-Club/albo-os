@@ -23,6 +23,24 @@ bas de page.
 
 ---
 
+## v1.115.1 — 21/07/2026 à 13:15 — Barre latérale : Membres et Invitations retirés du menu (doublon avec Paramètres)
+
+« Membres » et « Invitations » n'apparaissent plus dans le menu de gauche :
+ces deux entrées faisaient **doublon** avec les onglets du même nom déjà
+présents dans **Paramètres**. On les retrouve désormais à un seul endroit — la
+page **Paramètres** — ce qui allège le bas du menu, qui ne garde que Paramètres
+et Nouveautés.
+
+> **🔧 Notes techniques**
+> Retrait des deux `NavLeaf` (`items.members`, `items.invitations`) du groupe
+> secondaire `groups.workspace` dans `getNavGroups()`
+> (`src/components/app-shell/nav.ts`) ; imports d'icônes `Users`/`Mail` devenus
+> inutiles supprimés. Clés i18n orphelines `items.members`/`items.invitations`
+> retirées de `src/locales/{fr,en}/nav.json` (les clés `appShell.breadcrumb.*`
+> restent, utilisées par le fil d'Ariane). Aucune perte d'accès : les onglets
+> Membres/Invitations vivent dans `/app/$orgSlug/settings`. TESTING.md (SH1)
+> mis à jour.
+
 ## v1.115.0 — 21/07/2026 à 12:55 — Score IA : pastille en anneau et tri sur la table Entreprises
 
 Le score IA de santé est plus lisible et plus actionnable sur la page
