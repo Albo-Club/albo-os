@@ -961,13 +961,12 @@ function ParticipationDetail() {
         )}
       </div>
 
-      {/* Optional 2-3 line summary — its own row under the name, left-aligned.
-          Kept out of the header's flex row: as a flex item its max-w-3xl width
-          fits on the same line on wide screens, and the menu's ml-auto then
-          pushes it to the right. As a plain block it always sits under the
-          name. */}
+      {/* Optional 2-3 line summary — full-width bordered card under the header,
+          styled like the Identity block below (rounded-lg border p-4) so the
+          description reads as a deliberate block filling the page width rather
+          than a narrow column of text hugging the left. */}
       {company?.summary && (
-        <p className="text-muted-foreground max-w-3xl whitespace-pre-line text-sm">
+        <p className="text-muted-foreground whitespace-pre-line rounded-lg border p-4 text-sm">
           {company.summary}
         </p>
       )}

@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.111.3 — 21/07/2026 à 09:55 — Convex à jour, et les dépendances mises à jour toutes seules
+## v1.111.4 — 21/07/2026 à 10:25 — Convex à jour, et les dépendances mises à jour toutes seules
 
 Le moteur de données de l'app (Convex) passe à sa dernière version. Et un
 robot vérifie désormais chaque lundi matin si des briques logicielles de
@@ -45,6 +45,20 @@ Aucun changement visible dans l'app.
 > - Contexte : `renovate.json` existe mais l'app Renovate n'a jamais exécuté
 >   un seul job sur ce repo (0 PR, 0 issue, 0 branche `renovate/*`) — ce
 >   workflow maison la remplace.
+
+## v1.111.3 — 21/07/2026 à 10:04 — Fiche entité : description en bloc pleine largeur
+
+Sur la fiche d'une entreprise, la description passe désormais dans un bloc
+encadré qui occupe toute la largeur, dans le même style que le bloc
+« Identité » juste en dessous. Fini la colonne de texte étroite calée à gauche
+avec du vide à droite : la présentation est plus nette et cohérente avec le
+reste de la fiche.
+
+> **🔧 Notes techniques**
+> Le paragraphe `summary` de l'en-tête de `participations.$companyId.tsx`
+> reçoit le style du bloc Identité (`rounded-lg border p-4`) et perd son
+> plafond de largeur (`max-w-3xl` retiré) : il s'étend sur toute la largeur du
+> contenu au lieu d'être limité à 768 px.
 
 ## v1.111.2 — 20/07/2026 à 19:55 — Fiche entité : description alignée sous le nom
 
