@@ -671,5 +671,17 @@
       "probable": "Probable"
     },
     "hint": "Forecast entries linked to this deal (managed from the Cash page). The realized layer is the Transactions section below."
+  },
+  "integrations": {
+    "menuItem": "Link to an integration",
+    "dialogTitle": "Entity integrations",
+    "dialogDescription": "Link this entity to the connected external platforms to pull their data (communications, documents) into its page.",
+    "platforms": {
+      "vasco": "Parallel / VASCO"
+    },
+    "linked": "Linked",
+    "link": "Link",
+    "changeLink": "Change link",
+    "notConnected": "Not connected — set up in Settings → Integrations"
   }
 }

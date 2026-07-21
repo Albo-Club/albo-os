@@ -42,6 +42,7 @@ import { ReportingsSection } from '~/components/companies/ReportingsSection'
 import { CompanyReportsSection } from '~/components/companies/CompanyReportsSection'
 import { VascoCommunicationsSection } from '~/components/vasco/VascoCommunicationsSection'
 import { CompanyAiSynthesisBlock } from '~/components/companies/CompanyAiSynthesisBlock'
+import { EntityIntegrationsDialog } from '~/components/companies/EntityIntegrationsDialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { Button } from '~/components/ui/button'
 import {
@@ -762,6 +763,7 @@ function ParticipationDetail() {
   const navigate = useNavigate()
   const [editOpen, setEditOpen] = useState(false)
   const [createDealOpen, setCreateDealOpen] = useState(false)
+  const [integrationsOpen, setIntegrationsOpen] = useState(false)
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [archiving, setArchiving] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -941,6 +943,14 @@ function ParticipationDetail() {
                   {t('createDeal.button')}
                 </DropdownMenuItem>
               )}
+              {/* Link to an external platform object (e.g. a VASCO issuer) —
+                  works on any portfolio entity, whatever its name. */}
+              {company.kind === 'portfolio' && (
+                <DropdownMenuItem onSelect={() => setIntegrationsOpen(true)}>
+                  <Link2 className="size-4" />
+                  {t('integrations.menuItem')}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 variant="destructive"
@@ -1106,6 +1116,14 @@ function ParticipationDetail() {
           company={company}
           orgId={org._id}
           onClose={() => setCreateDealOpen(false)}
+        />
+      )}
+
+      {company && integrationsOpen && (
+        <EntityIntegrationsDialog
+          company={company}
+          orgSlug={orgSlug}
+          onClose={() => setIntegrationsOpen(false)}
         />
       )}
 

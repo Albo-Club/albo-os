@@ -13,8 +13,6 @@
     "documents_other": "{{count}} documents"
   },
   "link": {
-    "cta": "Rattacher au portail investisseur",
-    "prompt": "Rattachez cette entité à son deal sur le portail investisseur (Parallel, …) pour voir ses communications.",
     "linkedTo": "Rattaché à {{label}}",
     "change": "Modifier le rattachement",
     "unlink": "Détacher",

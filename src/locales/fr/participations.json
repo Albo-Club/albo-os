@@ -671,5 +671,17 @@
       "probable": "Probable"
     },
     "hint": "Échéances prévisionnelles rattachées à ce deal (gérées depuis la page Trésorerie). Le réalisé est la section Transactions ci-dessous."
+  },
+  "integrations": {
+    "menuItem": "Rattacher à une intégration",
+    "dialogTitle": "Intégrations de l'entité",
+    "dialogDescription": "Rattachez cette entité aux plateformes externes connectées pour faire remonter leurs données (communications, documents) sur sa fiche.",
+    "platforms": {
+      "vasco": "Parallel / VASCO"
+    },
+    "linked": "Rattachée",
+    "link": "Rattacher",
+    "changeLink": "Modifier le rattachement",
+    "notConnected": "Non connectée — brancher dans Réglages → Intégrations"
   }
 }
