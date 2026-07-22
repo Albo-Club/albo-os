@@ -23,6 +23,23 @@ bas de page.
 
 ---
 
+## v1.119.1 — 22/07/2026 à 11:39 — Gmail : documentation du mode test Google (utilisateurs test, reconnexion à 7 jours)
+
+Clarification de la documentation après le passage de l'application Google
+en « Externe / Test » (nécessaire pour connecter les boîtes hors alboteam) :
+ajouter une nouvelle boîte demande d'abord de déclarer l'adresse comme
+« utilisateur test » dans la console Google, et toutes les autorisations
+expirent au bout de 7 jours (2 clics pour reconnecter) tant que la
+validation Google n'est pas passée.
+
+> **🔧 Notes techniques**
+>
+> - Doc uniquement : `docs/produit/18-emails-portfolio.md` (points
+>   d'attention : procédure d'ajout en deux endroits, expiration 7 jours
+>   généralisée) et `KNOWN_ISSUES.md` § « Connecteur Gmail » (bascule
+>   Internal → External/Testing, liste d'utilisateurs test, blocage du
+>   mode production sans validation CASA).
+
 ## v1.119.0 — 21/07/2026 à 20:52 — Page « Emails » : le suivi des mails captés, par organisation
 
 Nouvelle entrée **Emails** dans le menu de gauche de chaque organisation

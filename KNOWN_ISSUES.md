@@ -2633,15 +2633,22 @@ incrémental `historyId` par boîte, cron de polling 10 min, dédup par
   D'où `GOOGLE_OAUTH_CLIENT_ID`/`GOOGLE_OAUTH_CLIENT_SECRET` — un client
   OAuth distinct dans le même projet GCP, redirect URI
   `${CONVEX_SITE_URL}/gmail/oauth/callback`.
-- **App en mode « test » (publishing status Testing)** : les refresh tokens
-  des comptes hors Workspace interne **expirent tous les 7 jours** →
-  `invalid_grant` au refresh → statut `reauth_required` sur la ligne
-  `gmailAccounts`, pastille « À reconnecter » sur la page Intégrations, et
-  reconnexion en 2 clics (le curseur de sync est conservé). Lever la limite
-  = publier l'app et passer la validation Google (scope restreint → audit
-  CASA payant, annuel). Les boîtes du Workspace propriétaire du projet GCP
-  peuvent éviter ça via une app « Internal » — mais elle ne couvre ni les
-  @gmail.com perso ni les Workspaces tiers (boîte morning).
+- **App « External / Testing » depuis le 22/07/2026** (bascule depuis
+  « Internal », qui bloquait les @gmail.com perso avec « Erreur 403 :
+  org_internal ») : deux conséquences à connaître.
+  (1) **Liste d'utilisateurs test obligatoire** : toute adresse — alboteam
+  comprise — doit être déclarée dans Google Auth Platform → Audience →
+  Test users AVANT de pouvoir se connecter, sinon « Accès bloqué ».
+  Ajouter une boîte = console Google d'abord, Albo OS ensuite (documenté
+  dans `docs/produit/18-emails-portfolio.md`).
+  (2) **Refresh tokens expirés tous les 7 jours pour TOUS les comptes** →
+  `invalid_grant` au refresh → statut `reauth_required`, pastille « À
+  reconnecter », reconnexion en 2 clics (curseur de sync conservé ;
+  au-delà d'~1 semaine sans reconnexion, Gmail ne garde plus l'historique
+  → trou jusqu'au backfill). Lever ces deux limites = validation Google
+  (scope restreint → brand verification + audit CASA payant, annuel,
+  plusieurs semaines). « En production » sans validation est BLOQUÉ par
+  Google pour un scope restreint — ce n'est pas un raccourci possible.
 - **Curseur `historyId` périmé** : Gmail ne garde l'historique qu'environ
   une semaine. `history.list` → 404 → on ré-ancre le curseur au présent
   (`lastError: history_cursor_expired`) et **le trou n'est pas comblé** —

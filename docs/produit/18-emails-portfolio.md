@@ -72,10 +72,21 @@ leur page, étanches l'une à l'autre.
   du [forward à l'adresse reports](17-reports-par-email.md) — les deux
   circuits coexistent, et le branchement de l'analyse sur les emails
   stockés est une évolution prévue.
-- **Reconnexion périodique** : tant que l'application Google est en mode
-  test, les boîtes hors alboteam demandent une reconnexion (2 clics)
-  environ chaque semaine — la pastille passe « À reconnecter » sur la page
-  Intégrations, sans perte de mails déjà rangés.
+- **Ajouter une nouvelle boîte se fait en DEUX endroits.** Avant de
+  cliquer « Connecter » dans Albo OS, l'adresse doit être déclarée
+  **utilisateur test** dans la console Google de l'application (Google
+  Auth Platform → Audience → Utilisateurs test, sur le projet Google
+  Cloud d'Albo OS) — sinon Google refuse la connexion avec « Accès
+  bloqué ». Cette règle vaut pour **toutes** les adresses, alboteam
+  comprises, tant que l'application est en mode test. C'est l'étape
+  facile à oublier.
+- **Reconnexion tous les ~7 jours, pour toutes les boîtes** : tant que
+  l'application Google est en mode test (non validée par Google), chaque
+  autorisation expire au bout de 7 jours — la pastille passe « À
+  reconnecter » sur la page Intégrations, et 2 clics la réarment. Aucun
+  mail n'est perdu si on reconnecte dans la semaine. La validation Google
+  (audit annuel payant, plusieurs semaines) supprimera cette contrainte
+  ainsi que la liste d'utilisateurs test.
 - **Historique** : la relève ne couvre que les emails reçus **depuis** la
   connexion de la boîte. L'import de l'historique complet est une évolution
   prévue, comme le branchement des emails « report » sur le circuit
