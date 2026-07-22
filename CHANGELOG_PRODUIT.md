@@ -23,6 +23,26 @@ bas de page.
 
 ---
 
+## v1.120.0 — 22/07/2026 à 12:06 — Gmail : email d'alerte quand une boîte doit être reconnectée
+
+Plus besoin de surveiller la page Intégrations : quand l'autorisation d'une
+boîte Gmail expire (la limite hebdomadaire du mode test Google) ou est
+révoquée, **un email est envoyé automatiquement** à la personne qui a
+connecté la boîte, avec le lien direct vers la page Intégrations — la
+reconnexion prend une vingtaine de secondes. Un seul email par incident,
+pas de rappels.
+
+> **🔧 Notes techniques**
+>
+> - `gmail.notifyReauthRequired` (internalMutation) : déclenchée par
+>   `syncAll` au passage `reauth_required` (`invalid_grant` au refresh) ;
+>   destinataire = `gmailAccounts.userId`, template bilingue
+>   `gmailReauthAlertEmail` (`convex/emailTemplates.ts`), envoi via
+>   `@convex-dev/resend`.
+> - Garde anti-spam `gmailAccounts.reauthNotifiedAt` (même convention que
+>   `powensConnections.notifiedHealth`), effacée au reconnect
+>   (`saveAccount`) → un incident = un email.
+
 ## v1.119.1 — 22/07/2026 à 11:39 — Gmail : documentation du mode test Google (utilisateurs test, reconnexion à 7 jours)
 
 Clarification de la documentation après le passage de l'application Google

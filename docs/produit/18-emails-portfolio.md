@@ -83,10 +83,13 @@ leur page, étanches l'une à l'autre.
 - **Reconnexion tous les ~7 jours, pour toutes les boîtes** : tant que
   l'application Google est en mode test (non validée par Google), chaque
   autorisation expire au bout de 7 jours — la pastille passe « À
-  reconnecter » sur la page Intégrations, et 2 clics la réarment. Aucun
-  mail n'est perdu si on reconnecte dans la semaine. La validation Google
-  (audit annuel payant, plusieurs semaines) supprimera cette contrainte
-  ainsi que la liste d'utilisateurs test.
+  reconnecter » sur la page Intégrations, et 2 clics la réarment (~20
+  secondes, pas de mot de passe à retaper). **Un email d'alerte est envoyé
+  automatiquement** à la personne qui a connecté la boîte dès que la
+  reconnexion est nécessaire, avec le lien direct — un seul email par
+  incident. Aucun mail n'est perdu si on reconnecte dans la semaine. La
+  validation Google (audit annuel payant, plusieurs semaines) supprimerait
+  cette contrainte ainsi que la liste d'utilisateurs test.
 - **Historique** : la relève ne couvre que les emails reçus **depuis** la
   connexion de la boîte. L'import de l'historique complet est une évolution
   prévue, comme le branchement des emails « report » sur le circuit

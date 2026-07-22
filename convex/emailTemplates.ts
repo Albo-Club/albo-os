@@ -840,6 +840,91 @@ export function powensConnectionAlertEmail({
   return { subject: c.subject, html, text: plainText(c.text) }
 }
 
+/**
+ * Gmail mailbox reauthorization alert — sent to the user who connected the
+ * mailbox when its OAuth grant expires (7-day testing-mode limit) or is
+ * revoked. One email per incident (guard: `gmailAccounts.reauthNotifiedAt`).
+ */
+export function gmailReauthAlertEmail({
+  locale,
+  orgName,
+  mailbox,
+  integrationsUrl,
+}: {
+  locale: EmailLocale
+  orgName: string
+  mailbox: string
+  integrationsUrl: string
+}) {
+  const c = pick(locale, {
+    en: {
+      subject: `Gmail — ${mailbox} needs to be reconnected (${orgName})`,
+      heading: `${mailbox}: reconnection required`,
+      intro:
+        `The Gmail mailbox <strong>${mailbox}</strong> connected to ` +
+        `<strong>${orgName}</strong> is no longer authorized (Google expires ` +
+        `each authorization after 7 days while the app is in testing mode). ` +
+        `Until you reconnect it, its emails stop being collected.`,
+      followup:
+        `Open the Integrations page and use the “Reconnect” button next to ` +
+        `the mailbox — about 20 seconds, no password to retype. Emails ` +
+        `received in the meantime are caught up as long as you reconnect ` +
+        `within a week.`,
+      footer:
+        `You receive this because you connected this mailbox for ${orgName}. ` +
+        `One email per incident — no reminders until the state changes.`,
+      preheader: `${mailbox} (${orgName}) — Gmail authorization expired.`,
+      cta: 'Open Integrations',
+      text: [
+        `The Gmail mailbox ${mailbox} connected to ${orgName} is no longer ` +
+          `authorized (Google expires each authorization after 7 days while ` +
+          `the app is in testing mode). Until you reconnect it, its emails ` +
+          `stop being collected.`,
+        `Reconnect from the Integrations page (about 20 seconds): ${integrationsUrl}`,
+      ],
+    },
+    fr: {
+      subject: `Gmail — ${mailbox} à reconnecter (${orgName})`,
+      heading: `${mailbox} : reconnexion nécessaire`,
+      intro:
+        `La boîte Gmail <strong>${mailbox}</strong> connectée à ` +
+        `<strong>${orgName}</strong> n'est plus autorisée (Google fait ` +
+        `expirer chaque autorisation au bout de 7 jours tant que ` +
+        `l'application est en mode test). Tant qu'elle n'est pas ` +
+        `reconnectée, ses emails ne sont plus relevés.`,
+      followup:
+        `Ouvrez la page Intégrations et utilisez le bouton « Reconnecter » ` +
+        `à côté de la boîte — environ 20 secondes, pas de mot de passe à ` +
+        `retaper. Les emails arrivés entre-temps sont rattrapés si vous ` +
+        `reconnectez dans la semaine.`,
+      footer:
+        `Vous recevez cet email car vous avez connecté cette boîte pour ` +
+        `${orgName}. Un email par incident — pas de rappel tant que l'état ` +
+        `ne change pas.`,
+      preheader: `${mailbox} (${orgName}) — autorisation Gmail expirée.`,
+      cta: 'Ouvrir les Intégrations',
+      text: [
+        `La boîte Gmail ${mailbox} connectée à ${orgName} n'est plus ` +
+          `autorisée (Google fait expirer chaque autorisation au bout de ` +
+          `7 jours tant que l'application est en mode test). Tant qu'elle ` +
+          `n'est pas reconnectée, ses emails ne sont plus relevés.`,
+        `Reconnecter depuis la page Intégrations (environ 20 secondes) : ${integrationsUrl}`,
+      ],
+    },
+  })
+
+  const html = layout({
+    locale,
+    preheader: c.preheader,
+    heading: c.heading,
+    paragraphs: [c.intro, c.followup],
+    cta: { label: c.cta, url: integrationsUrl },
+    footer: c.footer,
+  })
+
+  return { subject: c.subject, html, text: plainText(c.text) }
+}
+
 export function reviewReasonLabel(reason: string): string {
   return REVIEW_REASON_LABELS[reason] ?? reason
 }
