@@ -45,7 +45,17 @@ la liste, téléchargement dans le dialog).
 
 Sur la fiche d'une participation, l'onglet **Emails** liste les échanges du
 plus récent au plus ancien : sens (reçu/envoyé), objet, expéditeur, extrait
-et date. Un clic ouvre le message complet (texte).
+et date. Un clic ouvre le message complet, avec ses pièces jointes
+téléchargeables.
+
+### 4. Suivre tout ce qui est capté
+
+Dans chaque organisation, la page **Emails** (menu de gauche, entre Deals
+et Trésorerie) liste tous les emails rattachés aux participations de cette
+organisation, toutes boîtes confondues — avec les sociétés cliquables vers
+leur fiche. C'est le poste de contrôle : on y vérifie d'un coup d'œil que
+la capture tourne et ce qui est entré récemment. Albo et Calte ont chacun
+leur page, étanches l'une à l'autre.
 
 ## Points d'attention
 

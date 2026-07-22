@@ -645,7 +645,21 @@
     "sent": "Envoyé",
     "received": "Reçu",
     "receivedVia": "via {{mailbox}}",
-    "attachments": "Pièces jointes"
+    "attachments": "Pièces jointes",
+    "page": {
+      "metaTitle": "Emails — Albo OS",
+      "title": "Emails",
+      "subtitleLoading": "Tous les emails rattachés aux participations de cette organisation.",
+      "subtitle": "Tous les emails rattachés aux participations de cette organisation — {{count}} stockés.",
+      "empty": "Aucun email pour l'instant. Les emails apparaissent ici dès qu'une boîte Gmail connectée à cette organisation reçoit ou envoie un message lié à une participation.",
+      "col": {
+        "date": "Date",
+        "subject": "Objet",
+        "from": "Expéditeur",
+        "companies": "Sociétés",
+        "mailboxes": "Boîte"
+      }
+    }
   },
   "intelligence": {
     "status": {

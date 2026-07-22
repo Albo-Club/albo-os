@@ -903,6 +903,69 @@ export const listByCompany = query({
   },
 })
 
+/**
+ * Per-org feed for the /app/$orgSlug/emails page: the most recent emails
+ * linked to THIS org's participations (last ~100 captures). An email
+ * linked to several companies of the org appears once, with every company
+ * listed. Strictly org-scoped — the other orgs' links never surface here.
+ */
+export const listByOrg = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+
+    // Over-fetch links (an email can carry one link per matched company of
+    // the org) then dedupe by email, newest first.
+    const links = await ctx.db
+      .query('companyEmailLinks')
+      .withIndex('by_org_and_sentAt', (q) => q.eq('orgId', orgId))
+      .order('desc')
+      .take(300)
+
+    const byEmail = new Map<
+      Id<'companyEmails'>,
+      Array<Id<'companies'>>
+    >()
+    for (const link of links) {
+      const list = byEmail.get(link.emailId) ?? []
+      list.push(link.companyId)
+      byEmail.set(link.emailId, list)
+    }
+
+    const companyNameCache = new Map<Id<'companies'>, string>()
+    const out = []
+    for (const [emailId, companyIds] of byEmail) {
+      if (out.length >= 100) break
+      const email = await ctx.db.get('companyEmails', emailId)
+      if (!email) continue
+
+      const companies = []
+      for (const companyId of companyIds) {
+        let name = companyNameCache.get(companyId)
+        if (name === undefined) {
+          const company = await ctx.db.get('companies', companyId)
+          name = company?.name ?? ''
+          companyNameCache.set(companyId, name)
+        }
+        if (name) companies.push({ companyId, name })
+      }
+
+      out.push({
+        _id: email._id,
+        subject: email.subject,
+        fromEmail: email.fromEmail,
+        fromName: email.fromName ?? null,
+        sentAt: email.sentAt,
+        direction: email.direction,
+        attachmentCount: email.attachments?.length ?? 0,
+        accountEmails: email.accountEmails,
+        companies,
+      })
+    }
+    return out
+  },
+})
+
 /** Full content of one timeline email (detail dialog), attachments resolved
  * to signed download URLs. Authorized when the caller is a member of at
  * least one org the email is linked to. */

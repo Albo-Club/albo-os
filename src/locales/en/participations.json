@@ -645,7 +645,21 @@
     "sent": "Sent",
     "received": "Received",
     "receivedVia": "via {{mailbox}}",
-    "attachments": "Attachments"
+    "attachments": "Attachments",
+    "page": {
+      "metaTitle": "Emails — Albo OS",
+      "title": "Emails",
+      "subtitleLoading": "Every email linked to this organization's participations.",
+      "subtitle": "Every email linked to this organization's participations — {{count}} stored.",
+      "empty": "No email yet. Emails show up here as soon as a Gmail mailbox connected to this organization sends or receives a message linked to a participation.",
+      "col": {
+        "date": "Date",
+        "subject": "Subject",
+        "from": "From",
+        "companies": "Companies",
+        "mailboxes": "Mailbox"
+      }
+    }
   },
   "intelligence": {
     "status": {

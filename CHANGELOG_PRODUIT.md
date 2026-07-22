@@ -23,6 +23,29 @@ bas de page.
 
 ---
 
+## v1.119.0 — 21/07/2026 à 20:52 — Page « Emails » : le suivi des mails captés, par organisation
+
+Nouvelle entrée **Emails** dans le menu de gauche de chaque organisation
+(entre Deals et Trésorerie) : la liste de **tous les emails rattachés aux
+participations de cette organisation**, toutes boîtes confondues, du plus
+récent au plus ancien. Pour chaque email : date, sens (reçu/envoyé), objet
+(avec trombone s'il a des pièces jointes), expéditeur, **société(s)
+rattachée(s)** — cliquables vers la fiche — et la boîte qui l'a capté. Un
+clic ouvre le message complet, comme sur les fiches. C'est l'endroit où
+vérifier d'un coup d'œil que la capture fonctionne — Albo et Calte ont
+chacun leur page, étanches l'une à l'autre.
+
+> **🔧 Notes techniques**
+>
+> - Query `gmail.listByOrg` : liens `companyEmailLinks` par le nouvel index
+>   `by_org_and_sentAt` (desc, dédupliqués par email, borné ~100), gardée
+>   `requireOrgMember` — strictement org-scopée, cohérente avec le modèle
+>   de boîtes par organisation.
+> - Route `src/routes/app/$orgSlug/emails.tsx` (pattern de la page
+>   Rapports), dialog de détail réutilisé (`EmailDetailDialog` exporté de
+>   `CompanyEmailsSection`), entrée nav `getNavGroups` (icône Mail), i18n
+>   fr/en (`participations:emails.page.*`, `nav:items.emails`).
+
 ## v1.118.0 — 21/07/2026 à 18:32 — Emails du portfolio : boîtes par organisation et pièces jointes conservées
 
 Deux renforcements du connecteur Gmail livré aujourd'hui, avant sa première

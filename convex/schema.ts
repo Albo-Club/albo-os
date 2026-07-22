@@ -1095,6 +1095,7 @@ export default defineSchema({
     sentAt: v.number(),
   })
     .index('by_company_and_sentAt', ['companyId', 'sentAt'])
+    .index('by_org_and_sentAt', ['orgId', 'sentAt'])
     .index('by_email', ['emailId']),
 
   // ─── Liabilities (equity + shareholder current accounts) ──────────────────
