@@ -5,12 +5,24 @@
   "loading": "Loading…",
   "tasks": {
     "title": "Tasks",
-    "placeholder": "Add a task…",
+    "new": "New task",
+    "placeholder": "Task title…",
     "add": "Add",
-    "empty": "No tasks. Add one above.",
+    "cancel": "Cancel",
+    "company": "Company",
+    "noCompany": "No company",
+    "assignee": "Assignee",
+    "noAssignee": "No one",
+    "dueDate": "Due date",
+    "empty": "No tasks. Create one with “New task” (or press T).",
     "delete": "Delete task",
-    "markDone": "Mark as done",
-    "failed": "Action failed"
+    "cycleStatus": "Change status",
+    "failed": "Action failed",
+    "groups": {
+      "open": "Todo",
+      "in_progress": "In progress",
+      "done": "Done"
+    }
   },
   "unmatched": {
     "title": "Transactions to reconcile",

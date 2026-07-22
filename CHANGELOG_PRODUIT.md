@@ -23,6 +23,39 @@ bas de page.
 
 ---
 
+## v1.121.0 — 22/07/2026 à 19:54 — Tâches : statuts, société liée, assignation et échéances
+
+La liste de tâches de l'onglet **À faire** passe d'une simple check-list à
+un vrai suivi, inspiré des outils de gestion de portefeuille :
+
+- **Trois statuts** au lieu de deux : à faire, **en cours** (anneau orange)
+  et fait (coche verte, titre barré). Un clic sur l'indicateur fait passer
+  la tâche au statut suivant.
+- Les tâches sont **groupées par statut** avec un compteur par groupe, et
+  triées par échéance dans chaque groupe.
+- Chaque tâche peut porter une **société du portefeuille** (badge cliquable
+  vers sa fiche), une **personne assignée** et une **date d'échéance**
+  (affichée en rouge quand elle est dépassée).
+- Nouveau bouton **« Nouvelle tâche »** — ou la touche **T** depuis la page —
+  qui ouvre un petit formulaire de création ; Échap le referme.
+- Les tâches faites restent visibles **30 jours**, puis sortent de la liste
+  (elles ne sont pas supprimées).
+
+> **🔧 Notes techniques**
+>
+> - Schéma `todos` étendu : statut `in_progress`, champs optionnels
+>   `dueDate`, `assigneeUserId`, `companyId` (rétro-compatible, pas de
+>   migration).
+> - `convex/todo.ts` : `createTask` valide l'assignee (membre de l'org) et
+>   la société (même org) ; `setTaskDone` remplacée par `setTaskStatus`
+>   (3 états) ; `getTodo` enrichit chaque tâche (nom société/assignee),
+>   masque les faites > 30 jours (`DONE_VISIBLE_MS`) et trie par échéance
+>   puis création.
+> - `src/routes/app/$orgSlug/todo.tsx` : groupes À faire / En cours / Fait,
+>   indicateur tri-state cliquable (tokens `--warning`/`--positive`),
+>   composer repliable (Input + Selects société/membre + date), raccourci
+>   clavier T (ignoré dans les champs), suppression au survol.
+
 ## v1.120.0 — 22/07/2026 à 12:06 — Gmail : email d'alerte quand une boîte doit être reconnectée
 
 Plus besoin de surveiller la page Intégrations : quand l'autorisation d'une
