@@ -37,6 +37,8 @@ import {
   query,
 } from './_generated/server'
 import { internal } from './_generated/api'
+import { RESEND_FROM, resend } from './email'
+import { gmailReauthAlertEmail } from './emailTemplates'
 import { requireAppUser, requireOrgMember, requireOrgRole } from './lib/auth'
 import type { ActionCtx, MutationCtx, QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
@@ -157,6 +159,8 @@ export const saveAccount = internalMutation({
         refreshToken: args.refreshToken,
         status: 'connected',
         lastError: undefined,
+        // Reconnect closes the incident → the next expiry re-alerts.
+        reauthNotifiedAt: undefined,
         historyId: existing.historyId ?? args.initialHistoryId,
       })
       return existing._id
@@ -295,6 +299,45 @@ export const disconnect = mutation({
     await ctx.scheduler.runAfter(0, internal.gmail.revokeToken, {
       refreshToken: account.refreshToken,
     })
+  },
+})
+
+/**
+ * Alert email when a mailbox needs reauthorization (7-day testing-mode
+ * expiry or revoked grant). Targeted: sent to the user who connected the
+ * mailbox, once per incident (`reauthNotifiedAt`, cleared on reconnect) —
+ * same convention as the Powens connection-health alerts.
+ */
+export const notifyReauthRequired = internalMutation({
+  args: { accountId: v.id('gmailAccounts') },
+  handler: async (ctx, { accountId }) => {
+    const account = await ctx.db.get('gmailAccounts', accountId)
+    if (!account || account.status !== 'reauth_required') return
+    if (account.reauthNotifiedAt || !account.orgId) return
+    const org = await ctx.db.get('organizations', account.orgId)
+    const user = await ctx.db.get('users', account.userId)
+    if (!org || !user?.email) return
+
+    const siteUrl = process.env.SITE_URL ?? ''
+    const { subject, html, text } = gmailReauthAlertEmail({
+      locale: user.preferredLanguage === 'fr' ? 'fr' : 'en',
+      orgName: org.name,
+      mailbox: account.email,
+      integrationsUrl: `${siteUrl}/app/${org.slug}/settings/integrations`,
+    })
+    await resend.sendEmail(ctx, {
+      from: RESEND_FROM,
+      to: user.email,
+      subject,
+      html,
+      text,
+    })
+    await ctx.db.patch('gmailAccounts', accountId, {
+      reauthNotifiedAt: Date.now(),
+    })
+    console.log(
+      `[gmail] reauth alert for ${account.email} (org ${org.slug}) → ${user.email}`,
+    )
   },
 })
 
@@ -522,6 +565,11 @@ async function syncAccount(
       status: token.reauth ? 'reauth_required' : 'error',
       lastError: token.detail,
     })
+    if (token.reauth) {
+      await ctx.runMutation(internal.gmail.notifyReauthRequired, {
+        accountId: account._id,
+      })
+    }
     return
   }
   const { accessToken } = token

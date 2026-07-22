@@ -23,6 +23,43 @@ bas de page.
 
 ---
 
+## v1.120.0 — 22/07/2026 à 12:06 — Gmail : email d'alerte quand une boîte doit être reconnectée
+
+Plus besoin de surveiller la page Intégrations : quand l'autorisation d'une
+boîte Gmail expire (la limite hebdomadaire du mode test Google) ou est
+révoquée, **un email est envoyé automatiquement** à la personne qui a
+connecté la boîte, avec le lien direct vers la page Intégrations — la
+reconnexion prend une vingtaine de secondes. Un seul email par incident,
+pas de rappels.
+
+> **🔧 Notes techniques**
+>
+> - `gmail.notifyReauthRequired` (internalMutation) : déclenchée par
+>   `syncAll` au passage `reauth_required` (`invalid_grant` au refresh) ;
+>   destinataire = `gmailAccounts.userId`, template bilingue
+>   `gmailReauthAlertEmail` (`convex/emailTemplates.ts`), envoi via
+>   `@convex-dev/resend`.
+> - Garde anti-spam `gmailAccounts.reauthNotifiedAt` (même convention que
+>   `powensConnections.notifiedHealth`), effacée au reconnect
+>   (`saveAccount`) → un incident = un email.
+
+## v1.119.1 — 22/07/2026 à 11:39 — Gmail : documentation du mode test Google (utilisateurs test, reconnexion à 7 jours)
+
+Clarification de la documentation après le passage de l'application Google
+en « Externe / Test » (nécessaire pour connecter les boîtes hors alboteam) :
+ajouter une nouvelle boîte demande d'abord de déclarer l'adresse comme
+« utilisateur test » dans la console Google, et toutes les autorisations
+expirent au bout de 7 jours (2 clics pour reconnecter) tant que la
+validation Google n'est pas passée.
+
+> **🔧 Notes techniques**
+>
+> - Doc uniquement : `docs/produit/18-emails-portfolio.md` (points
+>   d'attention : procédure d'ajout en deux endroits, expiration 7 jours
+>   généralisée) et `KNOWN_ISSUES.md` § « Connecteur Gmail » (bascule
+>   Internal → External/Testing, liste d'utilisateurs test, blocage du
+>   mode production sans validation CASA).
+
 ## v1.119.0 — 21/07/2026 à 20:52 — Page « Emails » : le suivi des mails captés, par organisation
 
 Nouvelle entrée **Emails** dans le menu de gauche de chaque organisation

@@ -354,6 +354,10 @@ export default defineSchema({
     ),
     lastError: v.optional(v.string()),
     lastSyncAt: v.optional(v.number()),
+    // Anti-spam guard of the reauth alert email: set when the alert for the
+    // current incident went out, cleared on reconnect (cf. Powens
+    // `notifiedHealth`, same convention).
+    reauthNotifiedAt: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index('by_org', ['orgId'])
