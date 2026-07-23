@@ -137,11 +137,6 @@
     "fully_exited": "Exited",
     "written_off": "Written off"
   },
-  "exitBadge": {
-    "win": "Exit win",
-    "lost": "Exit lost",
-    "exited": "Exited"
-  },
   "exit": {
     "action": "Mark as exited",
     "manage": "Manage exit",

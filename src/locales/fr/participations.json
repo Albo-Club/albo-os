@@ -137,11 +137,6 @@
     "fully_exited": "Exité",
     "written_off": "Déprécié"
   },
-  "exitBadge": {
-    "win": "Exit gagnant",
-    "lost": "Exit perdant",
-    "exited": "Sorti"
-  },
   "exit": {
     "action": "Marquer comme sorti",
     "manage": "Gérer la sortie",
