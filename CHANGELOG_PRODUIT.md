@@ -23,6 +23,30 @@ bas de page.
 
 ---
 
+## v1.126.0 — 23/07/2026 à 15:43 — Sortie partielle : le gain déjà réalisé s'affiche
+
+Un deal en **sortie partielle** garde son statut « Exit partiel » et reste
+dans les participations actives — c'est normal, on détient encore une partie.
+Mais désormais, dès que le montant déjà reçu dépasse le capital déployé, sa
+fiche affiche un badge **« Exit gagnant »** : le gain réalisé ne passe plus
+inaperçu. Rien ne s'affiche tant que la position n'est pas dans le vert, et
+**jamais** de badge « perdant » sur une sortie partielle — le deal n'étant pas
+soldé, le reste de la position peut encore remonter.
+
+> **🔧 Notes techniques**
+>
+> - `ExitBadge` (`src/components/deals/ExitBadge.tsx`) : la garde de rendu
+>   inclut désormais `partially_exited`, en logique « win-only » — le badge
+>   n'est rendu que si `dealMoic` renvoie `isWin === true` (MOIC ≥ 1) ; un
+>   MOIC < 1 ou nul (deal non soldé) ne rend rien, jamais « lost » ni le
+>   neutre « Sorti ». `fully_exited` / `written_off` inchangés.
+> - Surface : la **fiche deal** (`deals.$dealId.tsx`, déjà branchée sur
+>   `ExitBadge` avec les vraies transactions → MOIC exact, dé-TVA royalties
+>   incluse). Volontairement **pas** ajouté aux listes (`DealsListView`
+>   n'affiche aucun badge win/lost, et la table par société n'agrège pas un
+>   partiel au niveau société). Aucune nouvelle clé i18n (réutilise
+>   `participations:exitBadge.win`), aucun changement de schéma.
+
 ## v1.125.0 — 23/07/2026 à 15:22 — Le titre reste figé en haut des fiches entité et deal
 
 Sur une **fiche entreprise** ou une **fiche deal**, le titre (le nom, son
@@ -224,7 +248,6 @@ un vrai suivi, inspiré des outils de gestion de portefeuille :
 >   indicateur tri-state cliquable (tokens `--warning`/`--positive`),
 >   composer repliable (Input + Selects société/membre + date), raccourci
 >   clavier T (ignoré dans les champs), suppression au survol.
-
 ## v1.120.0 — 22/07/2026 à 12:06 — Gmail : email d'alerte quand une boîte doit être reconnectée
 
 Plus besoin de surveiller la page Intégrations : quand l'autorisation d'une

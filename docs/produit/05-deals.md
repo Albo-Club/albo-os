@@ -76,6 +76,14 @@ Le dialogue « Gérer la sortie » pose le statut (sortie totale, partielle,
 perte), la date et le produit de cession. Une sortie est **réversible** : on
 peut l'annuler et le deal redevient actif.
 
+Une fois sorti, le deal porte un **badge gagné/perdu** déduit du multiple
+réalisé (MOIC, calculé depuis les transactions pointées) : au-dessus de 1
+c'est un **exit gagnant**, en dessous un **exit perdant** — une perte actée
+est toujours « perdant ». Pour une **sortie partielle**, le deal reste actif
+(on détient encore une partie) : seul un gain déjà réalisé est signalé (badge
+« Exit gagnant » quand le reçu dépasse déjà le capital déployé), jamais
+« perdant », puisque la position n'est pas soldée.
+
 ## Points d'attention
 
 - **Supprimer un deal est refusé** tant que des transactions lui sont
