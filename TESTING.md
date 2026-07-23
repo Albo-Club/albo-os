@@ -512,13 +512,14 @@ l'objet `deals` → `/attio/webhook`. Montant = `value` (ticket engagé), org vi
 
 | #   | Étape                                                               | Résultat attendu                                                                                                     |
 | --- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| AS1 | Passer un deal en **📝 Term Sheet** dans Attio (date d'invest. renseignée) | Le deal apparaît dans Albo OS en statut **« Term sheet »** + 1 ligne de prévisionnel (sortie, `expected`, catégorie « deals ») rattachée au deal |
+| AS1 | Passer un deal en **📝 Term Sheet** dans Attio (date d'invest. renseignée) | Le deal apparaît dans Albo OS en statut **« Term sheet »** + 1 ligne de prévisionnel (sortie, `expected`, catégorie « deals ») rattachée au deal ; la société cible est créée avec le **nom + domaine de la company Attio associée** (pas le nom du deal) |
 | AS2 | Ce même deal passe en **Invested**                                  | Le deal bascule **actif** ; la ligne de prévisionnel passe en `confirmed` (jamais supprimée)                        |
 | AS3 | **Éditer** dans Attio un deal **déjà Invested** dans Albo OS        | **Aucun doublon** : la synchro ne crée jamais sur Invested (skip `invested_no_deal` si `attioDealId` inconnu, sinon no-op forward-only) |
 | AS4 | Term Sheet **sans** date d'investissement                           | Le deal apparaît en « TS » **et** une ligne de prévisionnel **taguée « date à préciser »** (posée fin de mois courant) ; renseigner la date (Attio ou Albo OS) → le tag saute et la date se cale |
 | AS5 | Rejouer le même webhook (idempotence)                               | Aucun deal ni ligne de prévisionnel en double (clés `attioDealId` / `derivedKey`)                                   |
 | AS6 | Badge **« TS »** (ambre) sur un deal en Term Sheet                  | Visible dans la liste des deals, sur la fiche, et dans l'onglet Participations (chip « TS » sur la société ayant un deal en TS) — distinct des deals investis |
 | AS7 | Backfill : `npx convex run --prod attioSync:backfillTermSheets`     | Importe les deals **actuellement** en Term Sheet (pas les Invested) → `{ termSheetDeals, created, updated, skipped }` ; re-run idempotent (`created: 0`) |
+| AS8 | Deal TS dont la société s'était créée en **stub** (nommée d'après le deal) : éditer le deal dans Attio (re-déclenche le webhook) | La société reprend le **nom + domaine** de la company Attio ; une société **renommée à la main** n'est jamais écrasée (seul un domaine vide se remplit) |
 
 ## Ingestion Powens (webhook → bankAccounts + transactions)
 
