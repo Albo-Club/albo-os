@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
-import { ArrowDownLeft, ArrowUpRight, Paperclip } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, Paperclip, Sparkles } from 'lucide-react'
 
 import { api } from '../../../../convex/_generated/api'
 import type { Id } from '../../../../convex/_generated/dataModel'
@@ -128,13 +128,24 @@ function OrgEmails() {
                   <TableCell>
                     <span className="flex flex-wrap gap-1">
                       {row.companies.map((c) => (
-                        <Badge key={c.companyId} variant="secondary" asChild>
+                        <Badge
+                          key={c.companyId}
+                          variant="secondary"
+                          title={c.viaLlm ? t('emails.aiMatched') : undefined}
+                          asChild
+                        >
                           <Link
                             to="/app/$orgSlug/participations/$companyId"
                             params={{ orgSlug, companyId: c.companyId }}
                             onClick={(e) => e.stopPropagation()}
                           >
                             {c.name}
+                            {c.viaLlm && (
+                              <Sparkles
+                                className="size-3"
+                                aria-label={t('emails.aiMatched')}
+                              />
+                            )}
                           </Link>
                         </Badge>
                       ))}

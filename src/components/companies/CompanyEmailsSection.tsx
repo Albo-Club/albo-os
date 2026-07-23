@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowDownLeft, ArrowUpRight, ChevronRight, FileScan, FileText, Loader2, Paperclip } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, ChevronRight, FileScan, FileText, Loader2, Paperclip, Sparkles } from 'lucide-react'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { toast } from 'sonner'
 
@@ -25,6 +25,7 @@ type EmailRow = {
   sentAt: number
   direction: 'incoming' | 'outgoing'
   attachmentCount: number
+  viaLlm: boolean
 }
 
 /** Localised relative age, e.g. "il y a 13 j" / "13 days ago". */
@@ -69,8 +70,16 @@ function EmailCard({ email, onOpen }: { email: EmailRow; onOpen: () => void }) {
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="truncate font-medium">
-          {email.subject || t('emails.noSubject')}
+        <div className="flex items-center gap-1.5">
+          <span className="truncate font-medium">
+            {email.subject || t('emails.noSubject')}
+          </span>
+          {email.viaLlm && (
+            <Sparkles
+              className="text-muted-foreground size-3.5 shrink-0"
+              aria-label={t('emails.aiMatched')}
+            />
+          )}
         </div>
         <p className="text-muted-foreground truncate text-sm">
           {email.fromName ?? email.fromEmail}

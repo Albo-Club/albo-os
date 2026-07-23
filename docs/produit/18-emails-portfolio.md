@@ -29,12 +29,27 @@ totale.
 ### 2. Relève et rangement automatiques
 
 Toutes les 10 minutes, les nouveaux emails de chaque boîte sont relevés.
-Un email est rattaché à une participation quand un de ses participants
-(expéditeur ou destinataires) porte le **domaine de la société** (celui de
-la fiche) — parmi les sociétés de l'organisation de la boîte uniquement.
-Le rattachement est mécanique et prévisible — pas d'IA, donc pas de faux
-positifs surprenants. Un même email vu par plusieurs boîtes n'est rangé
-qu'**une fois** (le détail indique par quelles boîtes il est passé).
+Le rattachement à une participation (parmi les sociétés de l'organisation
+de la boîte uniquement) se fait en cascade, du signal le plus sûr au plus
+fin :
+
+1. **Domaine des participants** : l'expéditeur ou un destinataire porte le
+   domaine de la société (celui de la fiche).
+2. **Domaine dans le corps du message** : une adresse au domaine de la
+   société apparaît dans le texte — le cas typique du mail transféré ou
+   d'un tiers (fonds, avocat, plateforme) qui cite la société.
+3. **Nom de la société dans le message** : le nom exact apparaît dans
+   l'objet ou le corps (les noms de plateformes courantes — LinkedIn,
+   Notion… — sont exclus pour éviter les faux positifs de signatures).
+4. **Analyse par l'IA en cas de doute** : un email qu'aucune règle n'a
+   rattaché est analysé pour détecter une participation concernée
+   **directement ou indirectement** (reporting transféré par un fonds,
+   variante d'écriture du nom…). Seul un rattachement **sans ambiguïté**
+   est retenu ; il est marqué d'une étincelle ✨ dans la timeline pour
+   rester identifiable (et auditable). Dans le doute, l'IA ne fait rien.
+
+Un même email vu par plusieurs boîtes n'est rangé qu'**une fois** (le
+détail indique par quelles boîtes il est passé).
 
 L'email est conservé **en entier** : le texte du message avec ses liens
 cliquables, et ses **pièces jointes** (PDF, Excel…), téléchargées et
@@ -62,10 +77,10 @@ leur page, étanches l'une à l'autre.
 - **Seuls les emails liés au portefeuille sont conservés.** Les mails
   internes, personnels ou sans rapport ne sont **jamais** stockés dans
   Albo OS — le filtre s'applique avant tout enregistrement.
-- **Le domaine de la fiche est la clé.** Une participation sans champ
-  « domaine » renseigné ne peut pas recevoir d'emails ; un email dont aucun
-  participant n'écrit depuis le domaine de la société (ex. un avocat qui
-  écrit sans copie de la boîte) n'est pas rattaché.
+- **Le domaine de la fiche reste la clé la plus fiable.** Une participation
+  sans champ « domaine » renseigné ne peut être rattachée que par son nom
+  (règle 3) ou par l'IA (règle 4) — renseigner le domaine reste le meilleur
+  moyen de ne rien rater.
 - **L'extraction d'un report est manuelle, à la demande.** Dans le détail
   d'un email capté, le bouton **« Extraire le report »** envoie l'email
   dans le [circuit d'analyse des reports](17-reports-par-email.md) (texte,

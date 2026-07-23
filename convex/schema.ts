@@ -1097,6 +1097,10 @@ export default defineSchema({
     orgId: v.id('organizations'),
     emailId: v.id('companyEmails'),
     sentAt: v.number(),
+    // How the link was found: 'participant_domain' | 'body_domain' |
+    // 'name_mention' | 'llm_direct' | 'llm_indirect'. Absent on links
+    // created before the matching cascade shipped.
+    matchMethod: v.optional(v.string()),
   })
     .index('by_company_and_sentAt', ['companyId', 'sentAt'])
     .index('by_org_and_sentAt', ['orgId', 'sentAt'])
