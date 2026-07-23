@@ -66,12 +66,14 @@ leur page, étanches l'une à l'autre.
   « domaine » renseigné ne peut pas recevoir d'emails ; un email dont aucun
   participant n'écrit depuis le domaine de la société (ex. un avocat qui
   écrit sans copie de la boîte) n'est pas rattaché.
-- **Les pièces jointes sont conservées** (jusqu'à 20 Mo par fichier), mais
-  leur contenu n'est **pas encore analysé** automatiquement : l'extraction
-  des chiffres d'un report (KPIs, synthèse) reste pour l'instant du ressort
-  du [forward à l'adresse reports](17-reports-par-email.md) — les deux
-  circuits coexistent, et le branchement de l'analyse sur les emails
-  stockés est une évolution prévue.
+- **L'extraction d'un report est manuelle, à la demande.** Dans le détail
+  d'un email capté, le bouton **« Extraire le report »** envoie l'email
+  dans le [circuit d'analyse des reports](17-reports-par-email.md) (texte,
+  PDF et Excel joints, liens DocSend/Notion → KPIs, fiche report, synthèse,
+  récap par email). Rien ne part sans ce clic ; un email déjà extrait
+  affiche « Déjà extrait ». Si le même report arrive aussi par le forward,
+  la fiche de la période est mise à jour, jamais dupliquée. Le forward
+  reste utile pour les reports qui n'arrivent pas dans une boîte connectée.
 - **Ajouter une nouvelle boîte se fait en DEUX endroits.** Avant de
   cliquer « Connecter » dans Albo OS, l'adresse doit être déclarée
   **utilisateur test** dans la console Google de l'application (Google

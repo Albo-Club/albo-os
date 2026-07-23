@@ -659,7 +659,11 @@
         "companies": "Companies",
         "mailboxes": "Mailbox"
       }
-    }
+    },
+    "extractReport": "Extract report",
+    "alreadyExtracted": "Already extracted",
+    "extractStarted": "Extraction started — the report will show up in the Reports tab of the company page (recap email when done).",
+    "extractError": "Could not start the extraction."
   },
   "intelligence": {
     "status": {

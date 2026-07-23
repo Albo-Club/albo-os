@@ -2679,6 +2679,15 @@ incrémental `historyId` par boîte, cron de polling 10 min, dédup par
   schéma** ; toute ligne sans `orgId` est purgée automatiquement par le
   cron `syncAll` (et un state sans org est traité comme expiré). À
   resserrer en required une fois la prod propre (widen-migrate-narrow).
+- **Pont vers le pipeline reports (`processAsReport`)** : une ligne
+  `inboundEmails` à provenance synthétique (`agentmailInboxId: 'gmail'`,
+  `agentmailMessageId: 'gmail:<companyEmailId>'`) — l'index
+  `by_message_id` sert de garde une-extraction-par-email, la brique 3
+  (identification LLM) est sautée (`matchedCompanies` = les liens du
+  mail), et `reportExtract.run` lit toute pièce jointe portant un
+  `storageId` depuis le storage Convex (jamais d'appel AgentMail pour ces
+  lignes). Ne JAMAIS déclencher automatiquement : règle produit =
+  extraction sur clic uniquement.
 - **Message dédupliqué sans `orgId`, lien org-scopé** : le message reste
   dédupliqué par `Message-ID` toutes boîtes confondues (une seule copie
   des PJ) ; l'appartenance à une org vit sur `companyEmailLinks`, créés

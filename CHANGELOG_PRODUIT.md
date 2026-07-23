@@ -23,6 +23,33 @@ bas de page.
 
 ---
 
+## v1.122.0 — 22/07/2026 à 12:21 — Emails : bouton « Extraire le report » (validation manuelle)
+
+Depuis le détail d'un email capté (fiche participation ou page Emails), un
+bouton **« Extraire le report »** envoie l'email dans le circuit d'analyse
+des reports — le même que le transfert d'emails : lecture du texte, des PDF
+et Excel joints, des liens DocSend/Notion, extraction des KPIs, fiche
+report sur l'onglet Rapports, synthèse IA et récap par email. **Rien n'est
+extrait automatiquement** : chaque extraction part d'un clic, et un email
+déjà extrait affiche « Déjà extrait » (pas de double traitement). Si le
+même report arrive aussi par le transfert, la fiche de la période est mise
+à jour, jamais dupliquée.
+
+> **🔧 Notes techniques**
+>
+> - `gmail.processAsReport` (mutation, membre d'une org liée requis) : crée
+>   la ligne `inboundEmails` avec provenance synthétique
+>   (`agentmailMessageId = gmail:<emailId>`, dedup naturel par
+>   `by_message_id`), `matchedCompanies` = les liens du mail (brique 3
+>   d'identification LLM sautée), `senderUserId` = le déclencheur, puis
+>   schedule `reportExtract.run` directement.
+> - `reportExtract.run` : raccourci storage — une pièce jointe portant déjà
+>   un `storageId` (mail capté Gmail) est lue depuis le storage Convex,
+>   jamais retéléchargée d'AgentMail ni re-stockée. Circuit forward
+>   inchangé.
+> - Dialog email : bouton avec états (spinner / « Déjà extrait » réactif
+>   via `getById.processedAsReport`), i18n fr/en.
+
 ## v1.121.0 — 22/07/2026 à 19:54 — Tâches : statuts, société liée, assignation et échéances
 
 La liste de tâches de l'onglet **À faire** passe d'une simple check-list à
