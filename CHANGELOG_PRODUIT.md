@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.121.1 — 23/07/2026 à 11:10 — Emails : corps de message qui débordait à l'ouverture
+## v1.122.1 — 23/07/2026 à 11:10 — Emails : corps de message qui débordait à l'ouverture
 
 À l'ouverture d'un email contenant de très longs liens (par exemple des URL
 de téléchargement de pièces jointes sans espaces), le corps du message
@@ -37,6 +37,33 @@ coupées proprement pour tenir dans la fenêtre.
 >   `EmailDetailDialog`. Le `whitespace-pre-wrap` seul ne coupait pas les
 >   tokens sans espaces (longues URL), d'où le débordement horizontal du
 >   modal.
+
+## v1.122.0 — 22/07/2026 à 12:21 — Emails : bouton « Extraire le report » (validation manuelle)
+
+Depuis le détail d'un email capté (fiche participation ou page Emails), un
+bouton **« Extraire le report »** envoie l'email dans le circuit d'analyse
+des reports — le même que le transfert d'emails : lecture du texte, des PDF
+et Excel joints, des liens DocSend/Notion, extraction des KPIs, fiche
+report sur l'onglet Rapports, synthèse IA et récap par email. **Rien n'est
+extrait automatiquement** : chaque extraction part d'un clic, et un email
+déjà extrait affiche « Déjà extrait » (pas de double traitement). Si le
+même report arrive aussi par le transfert, la fiche de la période est mise
+à jour, jamais dupliquée.
+
+> **🔧 Notes techniques**
+>
+> - `gmail.processAsReport` (mutation, membre d'une org liée requis) : crée
+>   la ligne `inboundEmails` avec provenance synthétique
+>   (`agentmailMessageId = gmail:<emailId>`, dedup naturel par
+>   `by_message_id`), `matchedCompanies` = les liens du mail (brique 3
+>   d'identification LLM sautée), `senderUserId` = le déclencheur, puis
+>   schedule `reportExtract.run` directement.
+> - `reportExtract.run` : raccourci storage — une pièce jointe portant déjà
+>   un `storageId` (mail capté Gmail) est lue depuis le storage Convex,
+>   jamais retéléchargée d'AgentMail ni re-stockée. Circuit forward
+>   inchangé.
+> - Dialog email : bouton avec états (spinner / « Déjà extrait » réactif
+>   via `getById.processedAsReport`), i18n fr/en.
 
 ## v1.121.0 — 22/07/2026 à 19:54 — Tâches : statuts, société liée, assignation et échéances
 

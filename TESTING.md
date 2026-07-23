@@ -625,6 +625,7 @@ sur le client Google. Cf. `KNOWN_ISSUES.md` « Connecteur Gmail ».
 | GM8 | « Déconnecter » une boîte                                                      | Ligne `gmailAccounts` supprimée + révocation du token côté Google (best-effort) ; la timeline déjà importée **reste**                                                                 |
 | GM9 | Env vars Google absentes → clic « Connecter une boîte Gmail »                  | Toast dédié « Gmail n'est pas encore configuré… » (`gmail_env_missing`) — jamais le message bancaire Powens ; aucun appel Google                                                      |
 | GM10 | `/app/calte/emails` (et `/app/albo/emails`)                                   | Table des emails captés de **cette org** (100 derniers) : date, sens, objet (+trombone), expéditeur, badges sociétés cliquables → fiche, boîte source ; clic ligne → dialog détail ; un email capté dans l'autre org n'apparaît **pas** (étanchéité par workspace)      |
+| GM11 | Dialog d'un email avec PDF → bouton « Extraire le report »                     | Ligne `inboundEmails` `gmail:<emailId>` créée (`matchedCompanies` = liens du mail, pas d'appel LLM d'identification) → extraction (PDF lu **depuis le storage**, pas d'appel AgentMail) → fiche report + métriques sur l'onglet Rapports + récap email ; second clic / réouverture → bouton « Déjà extrait » désactivé ; email sans contenu exploitable → `needs_review` (`no_content`), pas de fiche |
 
 ## Ingestion reports (AgentMail → inboundEmails, briques 1-6)
 

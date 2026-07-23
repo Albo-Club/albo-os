@@ -916,6 +916,86 @@ export const storeMessage = internalMutation({
   },
 })
 
+// ── Manual report extraction (étape 2) ──────────────────────────────────────
+
+/**
+ * Feed one captured email into the existing report pipeline — MANUAL only,
+ * never automatic (Benjamin's rule: nothing is extracted without his click).
+ * The email's company links stand in for the LLM identification stage
+ * (brick 3 is skipped: the match is already deterministic), and the caller
+ * is the authenticated sender. The row is bridged with a synthetic
+ * provenance (`agentmailMessageId = gmail:<emailId>`), which the pipeline's
+ * by_message_id dedup turns into a natural one-extraction-per-email guard.
+ * Downstream dedup on (company, reportPeriod) then guarantees a single
+ * report card per period even if the same update also arrived via the
+ * AgentMail forward channel.
+ */
+export const processAsReport = mutation({
+  args: { emailId: v.id('companyEmails') },
+  handler: async (ctx, { emailId }) => {
+    const user = await requireAppUser(ctx)
+    const email = await ctx.db.get('companyEmails', emailId)
+    if (!email) throw new ConvexError('not_found')
+
+    const links = await ctx.db
+      .query('companyEmailLinks')
+      .withIndex('by_email', (q) => q.eq('emailId', emailId))
+      .collect()
+    const memberships = await ctx.db
+      .query('organizationMembers')
+      .withIndex('by_user', (q) => q.eq('userId', user._id))
+      .collect()
+    const memberOrgIds = new Set(memberships.map((m) => m.orgId))
+    if (!links.some((l) => memberOrgIds.has(l.orgId))) {
+      throw new ConvexError('forbidden')
+    }
+
+    const syntheticMessageId = `gmail:${emailId}`
+    const existing = await ctx.db
+      .query('inboundEmails')
+      .withIndex('by_message_id', (q) =>
+        q.eq('agentmailMessageId', syntheticMessageId),
+      )
+      .first()
+    if (existing) {
+      return { inboundEmailId: existing._id, alreadyProcessed: true }
+    }
+
+    const inboundEmailId = await ctx.db.insert('inboundEmails', {
+      agentmailInboxId: 'gmail',
+      agentmailMessageId: syntheticMessageId,
+      fromEmail: email.fromEmail,
+      toEmails: email.toEmails,
+      ccEmails: email.ccEmails,
+      subject: email.subject,
+      receivedAt: email.sentAt,
+      bodyText: email.bodyText,
+      // Attachments are already in Convex storage — the extract stage reads
+      // them from there (storageId shortcut) instead of AgentMail.
+      attachments: (email.attachments ?? []).map((a, i) => ({
+        attachmentId: `${syntheticMessageId}:${i}`,
+        filename: a.filename,
+        contentType: a.contentType,
+        size: a.size,
+        storageId: a.storageId,
+      })),
+      status: 'received',
+      senderUserId: user._id,
+      matchedCompanies: links.map((l) => ({
+        companyId: l.companyId,
+        orgId: l.orgId,
+      })),
+      matchMethod: 'gmail_manual',
+    })
+
+    // Straight to content extraction (brick 4) — identification is done.
+    await ctx.scheduler.runAfter(0, internal.reportExtract.run, {
+      inboundEmailId,
+    })
+    return { inboundEmailId, alreadyProcessed: false }
+  },
+})
+
 // ── Timeline reads (org-guarded) ────────────────────────────────────────────
 
 /** A company's email timeline, most recent first (light fields). */
@@ -1047,8 +1127,17 @@ export const getById = query({
       })
     }
 
+    // Already fed into the report pipeline? Drives the extract button state.
+    const processed = await ctx.db
+      .query('inboundEmails')
+      .withIndex('by_message_id', (q) =>
+        q.eq('agentmailMessageId', `gmail:${emailId}`),
+      )
+      .first()
+
     return {
       _id: email._id,
+      processedAsReport: processed !== null,
       subject: email.subject,
       bodyText: email.bodyText ?? null,
       fromEmail: email.fromEmail,
