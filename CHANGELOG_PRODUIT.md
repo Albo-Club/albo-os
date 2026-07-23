@@ -23,6 +23,26 @@ bas de page.
 
 ---
 
+## v1.124.2 — 23/07/2026 à 14:45 — Emails : plus aucun scroll horizontal dans la fenêtre du mail
+
+Verrouillage complet de la fenêtre d'email : les blocs internes (en-tête,
+corps du message) ne peuvent plus créer de barre de défilement horizontale.
+Tout respecte la largeur de la fenêtre et revient à la ligne ; seul le
+défilement vertical reste possible. Ça règle les cas — surtout les mails au
+titre très long — où il fallait « glisser vers la gauche » pour voir la suite.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/CompanyEmailsSection.tsx`, `EmailDetailDialog` :
+>   sur le `DialogContent`, ajout de `overflow-x-hidden` (un conteneur en
+>   `overflow-y-auto` voit son `overflow-x` calculé en `auto` par le
+>   navigateur → autorise un scroll horizontal ; on le force à `hidden`) et
+>   de `[&>*]:min-w-0` (les enfants d'une grille ont `min-width: auto` et
+>   peuvent élargir la piste au-delà du plafond ; on les laisse rétrécir pour
+>   forcer le retour à la ligne). Même `overflow-x-hidden` ajouté sur la boîte
+>   de scroll du corps du message. Complète le plafond `sm:max-w-2xl!` de
+>   v1.124.1.
+
 ## v1.124.1 — 23/07/2026 à 14:29 — Emails : la fenêtre du mail qui débordait de l'écran
 
 La vraie cause des débordements de la fenêtre d'email : la fenêtre elle-même
