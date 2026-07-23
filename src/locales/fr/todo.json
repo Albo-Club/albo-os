@@ -5,12 +5,24 @@
   "loading": "Chargement…",
   "tasks": {
     "title": "Tâches",
-    "placeholder": "Ajouter une tâche…",
+    "new": "Nouvelle tâche",
+    "placeholder": "Titre de la tâche…",
     "add": "Ajouter",
-    "empty": "Aucune tâche. Ajoutez-en une ci-dessus.",
+    "cancel": "Annuler",
+    "company": "Société",
+    "noCompany": "Aucune société",
+    "assignee": "Assignée à",
+    "noAssignee": "Personne",
+    "dueDate": "Échéance",
+    "empty": "Aucune tâche. Créez-en une avec « Nouvelle tâche » (ou la touche T).",
     "delete": "Supprimer la tâche",
-    "markDone": "Marquer comme faite",
-    "failed": "Échec de l'action"
+    "cycleStatus": "Changer le statut",
+    "failed": "Échec de l'action",
+    "groups": {
+      "open": "À faire",
+      "in_progress": "En cours",
+      "done": "Fait"
+    }
   },
   "unmatched": {
     "title": "Transactions à pointer",

@@ -15,10 +15,15 @@ La page empile cinq blocs :
    Trésorerie : si une banque demande une reconnexion ou n'a pas synchronisé
    depuis trop longtemps, elle apparaît en haut avec un bouton vers l'écran
    de gestion. Rien ne s'affiche quand tout est sain.
-2. **Tâches** — une liste de tâches manuelles propre à l'organisation :
-   on ajoute une tâche en une ligne, on la coche quand c'est fait, on la
-   supprime quand elle n'a plus lieu d'être. Les tâches faites restent
-   visibles barrées, en bas de liste.
+2. **Tâches** — les tâches manuelles de l'organisation, groupées par
+   statut : **À faire**, **En cours** (anneau orange) et **Fait** (coche
+   verte, titre barré). Un clic sur l'indicateur rond fait passer la tâche
+   au statut suivant. Le bouton « Nouvelle tâche » (ou la touche **T**)
+   ouvre le formulaire de création : titre, et en option une société du
+   portefeuille (badge cliquable vers sa fiche), une personne assignée et
+   une date d'échéance (en rouge quand elle est dépassée). Chaque groupe
+   est trié par échéance ; les tâches faites restent visibles 30 jours
+   puis sortent de la liste sans être supprimées.
 3. **Transactions à pointer** — le compteur de la file de
    [pointage](08-pointage.md), avec un aperçu des dernières transactions en
    attente et un bouton qui ouvre directement l'onglet Transactions de la
