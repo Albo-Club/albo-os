@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.121.0 — 23/07/2026 à 11:32 — Centimes : les montants réels affichés au centime là où ça compte
+## v1.123.0 — 23/07/2026 à 11:32 — Centimes : les montants réels affichés au centime là où ça compte
 
 Fini les montants arrondis à l'euro sur les écrans où le centime compte. Les
 montants **réels** — transactions bancaires, soldes de comptes, pointage,
@@ -54,6 +54,81 @@ n'existe pas sur une valo).
 > - Prévisionnel/suggestions, valos, plus-value latente, engagement, dashboard
 >   et e-mails : inchangés (arrondi euro). Règle documentée dans `CLAUDE.md`
 >   § Gestion des arrondis (centimes).
+
+## v1.122.1 — 23/07/2026 à 11:10 — Emails : corps de message qui débordait à l'ouverture
+
+À l'ouverture d'un email contenant de très longs liens (par exemple des URL
+de téléchargement de pièces jointes sans espaces), le corps du message
+débordait sur le côté et s'affichait mal. Les longues chaînes sont désormais
+coupées proprement pour tenir dans la fenêtre.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/CompanyEmailsSection.tsx` : ajout de
+>   `break-words` sur le conteneur du corps (`detail.bodyText`) du
+>   `EmailDetailDialog`. Le `whitespace-pre-wrap` seul ne coupait pas les
+>   tokens sans espaces (longues URL), d'où le débordement horizontal du
+>   modal.
+
+## v1.122.0 — 22/07/2026 à 12:21 — Emails : bouton « Extraire le report » (validation manuelle)
+
+Depuis le détail d'un email capté (fiche participation ou page Emails), un
+bouton **« Extraire le report »** envoie l'email dans le circuit d'analyse
+des reports — le même que le transfert d'emails : lecture du texte, des PDF
+et Excel joints, des liens DocSend/Notion, extraction des KPIs, fiche
+report sur l'onglet Rapports, synthèse IA et récap par email. **Rien n'est
+extrait automatiquement** : chaque extraction part d'un clic, et un email
+déjà extrait affiche « Déjà extrait » (pas de double traitement). Si le
+même report arrive aussi par le transfert, la fiche de la période est mise
+à jour, jamais dupliquée.
+
+> **🔧 Notes techniques**
+>
+> - `gmail.processAsReport` (mutation, membre d'une org liée requis) : crée
+>   la ligne `inboundEmails` avec provenance synthétique
+>   (`agentmailMessageId = gmail:<emailId>`, dedup naturel par
+>   `by_message_id`), `matchedCompanies` = les liens du mail (brique 3
+>   d'identification LLM sautée), `senderUserId` = le déclencheur, puis
+>   schedule `reportExtract.run` directement.
+> - `reportExtract.run` : raccourci storage — une pièce jointe portant déjà
+>   un `storageId` (mail capté Gmail) est lue depuis le storage Convex,
+>   jamais retéléchargée d'AgentMail ni re-stockée. Circuit forward
+>   inchangé.
+> - Dialog email : bouton avec états (spinner / « Déjà extrait » réactif
+>   via `getById.processedAsReport`), i18n fr/en.
+
+## v1.121.0 — 22/07/2026 à 19:54 — Tâches : statuts, société liée, assignation et échéances
+
+La liste de tâches de l'onglet **À faire** passe d'une simple check-list à
+un vrai suivi, inspiré des outils de gestion de portefeuille :
+
+- **Trois statuts** au lieu de deux : à faire, **en cours** (anneau orange)
+  et fait (coche verte, titre barré). Un clic sur l'indicateur fait passer
+  la tâche au statut suivant.
+- Les tâches sont **groupées par statut** avec un compteur par groupe, et
+  triées par échéance dans chaque groupe.
+- Chaque tâche peut porter une **société du portefeuille** (badge cliquable
+  vers sa fiche), une **personne assignée** et une **date d'échéance**
+  (affichée en rouge quand elle est dépassée).
+- Nouveau bouton **« Nouvelle tâche »** — ou la touche **T** depuis la page —
+  qui ouvre un petit formulaire de création ; Échap le referme.
+- Les tâches faites restent visibles **30 jours**, puis sortent de la liste
+  (elles ne sont pas supprimées).
+
+> **🔧 Notes techniques**
+>
+> - Schéma `todos` étendu : statut `in_progress`, champs optionnels
+>   `dueDate`, `assigneeUserId`, `companyId` (rétro-compatible, pas de
+>   migration).
+> - `convex/todo.ts` : `createTask` valide l'assignee (membre de l'org) et
+>   la société (même org) ; `setTaskDone` remplacée par `setTaskStatus`
+>   (3 états) ; `getTodo` enrichit chaque tâche (nom société/assignee),
+>   masque les faites > 30 jours (`DONE_VISIBLE_MS`) et trie par échéance
+>   puis création.
+> - `src/routes/app/$orgSlug/todo.tsx` : groupes À faire / En cours / Fait,
+>   indicateur tri-state cliquable (tokens `--warning`/`--positive`),
+>   composer repliable (Input + Selects société/membre + date), raccourci
+>   clavier T (ignoré dans les champs), suppression au survol.
 
 ## v1.120.0 — 22/07/2026 à 12:06 — Gmail : email d'alerte quand une boîte doit être reconnectée
 

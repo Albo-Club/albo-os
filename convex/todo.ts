@@ -8,6 +8,9 @@ import type { Doc, Id } from './_generated/dataModel'
  * the Cash → Transactions tab). */
 const UNMATCHED_PREVIEW = 5
 
+/** Done tasks stay visible this long, then drop from the list (kept in DB). */
+const DONE_VISIBLE_MS = 30 * 24 * 60 * 60 * 1000
+
 /** A portfolio company is « silent » past 3 months without a received report.
  * Measured on the RECEPTION date (email date), not the covered period: a
  * quarterly reporter would otherwise look stale right after reporting. */
@@ -104,17 +107,34 @@ export const getTodo = query({
     missingReports.sort((a, b) => a.lastReportAt - b.lastReportAt)
 
     // ── Manual tasks ──────────────────────────────────────────────────────
-    const tasks = await ctx.db
+    // Done tasks older than DONE_VISIBLE_MS are hidden (not deleted). Within
+    // a status group the UI keeps this order: due date first, then newest.
+    const allTasks = await ctx.db
       .query('todos')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
-    tasks.sort((a, b) =>
-      a.status === b.status
-        ? b.createdAt - a.createdAt
-        : a.status === 'open'
-          ? -1
-          : 1,
+    const tasks = allTasks.filter(
+      (task) =>
+        task.status !== 'done' ||
+        now - (task.doneAt ?? task.createdAt) <= DONE_VISIBLE_MS,
     )
+    tasks.sort((a, b) => {
+      const dueA = a.dueDate ?? Number.POSITIVE_INFINITY
+      const dueB = b.dueDate ?? Number.POSITIVE_INFINITY
+      return dueA !== dueB ? dueA - dueB : b.createdAt - a.createdAt
+    })
+    const assigneeNames = new Map<Id<'users'>, string>()
+    const companyNames = new Map<Id<'companies'>, string>()
+    for (const task of tasks) {
+      if (task.assigneeUserId && !assigneeNames.has(task.assigneeUserId)) {
+        const u = await ctx.db.get('users', task.assigneeUserId)
+        assigneeNames.set(task.assigneeUserId, u?.name ?? u?.email ?? '?')
+      }
+      if (task.companyId && !companyNames.has(task.companyId)) {
+        const c = await ctx.db.get('companies', task.companyId)
+        if (c) companyNames.set(task.companyId, c.name)
+      }
+    }
 
     return {
       unmatchedCount: unmatched.length,
@@ -126,36 +146,83 @@ export const getTodo = query({
         status: task.status,
         createdAt: task.createdAt,
         doneAt: task.doneAt ?? null,
+        dueDate: task.dueDate ?? null,
+        assignee: task.assigneeUserId
+          ? {
+              userId: task.assigneeUserId,
+              name: assigneeNames.get(task.assigneeUserId) ?? '?',
+            }
+          : null,
+        company:
+          task.companyId && companyNames.has(task.companyId)
+            ? {
+                _id: task.companyId,
+                name: companyNames.get(task.companyId) as string,
+              }
+            : null,
       })),
     }
   },
 })
 
 export const createTask = mutation({
-  args: { orgId: v.id('organizations'), title: v.string() },
-  handler: async (ctx, { orgId, title }) => {
+  args: {
+    orgId: v.id('organizations'),
+    title: v.string(),
+    dueDate: v.optional(v.number()),
+    assigneeUserId: v.optional(v.id('users')),
+    companyId: v.optional(v.id('companies')),
+  },
+  handler: async (
+    ctx,
+    { orgId, title, dueDate, assigneeUserId, companyId },
+  ) => {
     const { user } = await requireOrgMember(ctx, orgId)
     const trimmed = title.trim()
     if (!trimmed) throw new ConvexError('invalid_title')
+    if (assigneeUserId) {
+      const membership = await ctx.db
+        .query('organizationMembers')
+        .withIndex('by_org_and_user', (q) =>
+          q.eq('orgId', orgId).eq('userId', assigneeUserId),
+        )
+        .unique()
+      if (!membership) throw new ConvexError('assignee_not_member')
+    }
+    if (companyId) {
+      const company = await ctx.db.get('companies', companyId)
+      if (!company || company.orgId !== orgId)
+        throw new ConvexError('company_not_in_org')
+    }
     return ctx.db.insert('todos', {
       orgId,
       title: trimmed,
       status: 'open',
       createdBy: user._id,
       createdAt: Date.now(),
+      dueDate,
+      assigneeUserId,
+      companyId,
     })
   },
 })
 
-export const setTaskDone = mutation({
-  args: { taskId: v.id('todos'), done: v.boolean() },
-  handler: async (ctx, { taskId, done }) => {
+export const setTaskStatus = mutation({
+  args: {
+    taskId: v.id('todos'),
+    status: v.union(
+      v.literal('open'),
+      v.literal('in_progress'),
+      v.literal('done'),
+    ),
+  },
+  handler: async (ctx, { taskId, status }) => {
     const task = await ctx.db.get('todos', taskId)
     if (!task) throw new ConvexError('not_found')
     await requireOrgMember(ctx, task.orgId)
     await ctx.db.patch('todos', taskId, {
-      status: done ? 'done' : 'open',
-      doneAt: done ? Date.now() : undefined,
+      status,
+      doneAt: status === 'done' ? Date.now() : undefined,
     })
   },
 })

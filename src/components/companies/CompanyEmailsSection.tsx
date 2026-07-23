@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowDownLeft, ArrowUpRight, ChevronRight, FileText, Paperclip } from 'lucide-react'
-import { useConvexQuery } from '@convex-dev/react-query'
+import { ArrowDownLeft, ArrowUpRight, ChevronRight, FileScan, FileText, Loader2, Paperclip } from 'lucide-react'
+import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
+import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
+import { Button } from '~/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
@@ -104,6 +107,24 @@ export function EmailDetailDialog({
     api.gmail.getById,
     openId ? { emailId: openId } : 'skip',
   )
+  const extract = useConvexMutation(api.gmail.processAsReport)
+  const [extracting, setExtracting] = useState(false)
+
+  // Manual-only report extraction (Benjamin's rule): nothing runs without
+  // this click. getById is reactive, so the button flips to "already
+  // extracted" on its own once the pipeline entry exists.
+  async function handleExtract() {
+    if (!detail) return
+    setExtracting(true)
+    try {
+      await extract({ emailId: detail._id })
+      toast.success(t('emails.extractStarted'))
+    } catch {
+      toast.error(t('emails.extractError'))
+    } finally {
+      setExtracting(false)
+    }
+  }
 
   return (
     <Dialog open={openId !== null} onOpenChange={(open) => !open && onClose()}>
@@ -169,11 +190,30 @@ export function EmailDetailDialog({
             )}
 
             {detail.bodyText && (
-              <div className="text-foreground/90 max-h-96 overflow-y-auto rounded-md border p-3 text-sm whitespace-pre-wrap">
+              <div className="text-foreground/90 max-h-96 overflow-y-auto rounded-md border p-3 text-sm break-words whitespace-pre-wrap">
                 {detail.bodyText}
               </div>
             )}
           </div>
+        )}
+
+        {detail && (
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={detail.processedAsReport || extracting}
+              onClick={() => void handleExtract()}
+            >
+              {extracting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <FileScan className="size-4" />
+              )}
+              {detail.processedAsReport
+                ? t('emails.alreadyExtracted')
+                : t('emails.extractReport')}
+            </Button>
+          </DialogFooter>
         )}
       </DialogContent>
     </Dialog>

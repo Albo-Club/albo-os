@@ -659,7 +659,11 @@
         "companies": "Sociétés",
         "mailboxes": "Boîte"
       }
-    }
+    },
+    "extractReport": "Extraire le report",
+    "alreadyExtracted": "Déjà extrait",
+    "extractStarted": "Extraction lancée — le report apparaîtra dans l'onglet Rapports de la fiche (récap par email à la fin).",
+    "extractError": "Impossible de lancer l'extraction."
   },
   "intelligence": {
     "status": {

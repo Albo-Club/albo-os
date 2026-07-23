@@ -182,10 +182,18 @@ export const run = internalAction({
       outcomes.push({ kind: 'body', label: 'email', state: 'extracted', chars: bodyText.length })
     }
 
-    // 2. Attachments — every file ends in exactly one state.
+    // 2. Attachments — every file ends in exactly one state. A file already
+    //    in Convex storage (Gmail-captured email, cf. gmail.processAsReport)
+    //    is read from there — never fetched from AgentMail, never re-stored.
     for (const att of row.attachments) {
       const label = att.filename
-      const buf = await downloadAttachment(row.agentmailInboxId, row.agentmailMessageId, att.attachmentId)
+      let buf: ArrayBuffer | null
+      if (att.storageId) {
+        const blob = await ctx.storage.get(att.storageId)
+        buf = blob ? await blob.arrayBuffer() : null
+      } else {
+        buf = await downloadAttachment(row.agentmailInboxId, row.agentmailMessageId, att.attachmentId)
+      }
       if (!buf) {
         outcomes.push({ kind: 'other', label, state: 'failed', detail: 'download_failed' })
         continue
@@ -194,9 +202,11 @@ export const run = internalAction({
         outcomes.push({ kind: 'other', label, state: 'failed', detail: 'file_too_large' })
         continue
       }
-      const storageId = await ctx.storage.store(
-        new Blob([buf], { type: att.contentType ?? 'application/octet-stream' }),
-      )
+      const storageId =
+        att.storageId ??
+        (await ctx.storage.store(
+          new Blob([buf], { type: att.contentType ?? 'application/octet-stream' }),
+        ))
       attachmentStorageIds.push({ attachmentId: att.attachmentId, storageId })
 
       const e = ext(att.filename)

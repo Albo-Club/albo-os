@@ -1493,9 +1493,16 @@ export default defineSchema({
   todos: defineTable({
     orgId: v.id('organizations'),
     title: v.string(),
-    status: v.union(v.literal('open'), v.literal('done')),
+    status: v.union(
+      v.literal('open'),
+      v.literal('in_progress'),
+      v.literal('done'),
+    ),
     createdBy: v.id('users'),
     createdAt: v.number(),
     doneAt: v.optional(v.number()),
+    dueDate: v.optional(v.number()),
+    assigneeUserId: v.optional(v.id('users')),
+    companyId: v.optional(v.id('companies')),
   }).index('by_org', ['orgId']),
 })
