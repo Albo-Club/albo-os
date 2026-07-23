@@ -26,7 +26,8 @@ export function VatCard({
     new Intl.NumberFormat(i18n.language, {
       style: 'currency',
       currency: 'EUR',
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(cents / 100)
 
   return (

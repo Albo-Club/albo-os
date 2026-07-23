@@ -34,7 +34,9 @@ export function PlanVsActualSection({
     | undefined
 }) {
   const { t } = useTranslation('participations')
-  const { fmtEur, fmtDate } = useFormatters()
+  // Chart keeps the rounded fmtEur (cent-level ticks would be unreadable); the
+  // comparison table below shows fmtEurCents so the gap ties out to the cent.
+  const { fmtEur, fmtEurCents, fmtDate } = useFormatters()
   const projections = useConvexQuery(api.projections.listByDeal, { dealId })
 
   const hasLines =
@@ -102,15 +104,15 @@ export function PlanVsActualSection({
                   <TableRow key={row.period}>
                     <TableCell>{fmtDate(row.period)}</TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {fmtEur(row.initialCents)}
+                      {fmtEurCents(row.initialCents)}
                     </TableCell>
                     {hasRevised && (
                       <TableCell className="text-right tabular-nums">
-                        {fmtEur(row.revisedCents)}
+                        {fmtEurCents(row.revisedCents)}
                       </TableCell>
                     )}
                     <TableCell className="text-right tabular-nums">
-                      {fmtEur(row.actualCents)}
+                      {fmtEurCents(row.actualCents)}
                     </TableCell>
                     <TableCell
                       className={cn(
@@ -122,7 +124,7 @@ export function PlanVsActualSection({
                             : 'text-muted-foreground',
                       )}
                     >
-                      {fmtEur(row.gapCumCents)}
+                      {fmtEurCents(row.gapCumCents)}
                     </TableCell>
                   </TableRow>
                 ))}

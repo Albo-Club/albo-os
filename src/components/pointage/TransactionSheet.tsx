@@ -61,7 +61,8 @@ export function useFormatters() {
     return new Intl.NumberFormat(lang, {
       style: 'currency',
       currency: 'EUR',
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
       signDisplay: 'always',
     }).format(signed / 100)
   }

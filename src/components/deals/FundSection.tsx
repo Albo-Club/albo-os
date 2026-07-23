@@ -31,7 +31,7 @@ export function FundSection({
   distributedCents: number | undefined
 }) {
   const { t, i18n } = useTranslation('participations')
-  const { fmtEur, fmtDate } = useFormatters()
+  const { fmtEur, fmtEurCents, fmtDate } = useFormatters()
   const valuations = useConvexQuery(api.valuations.list, { dealId })
 
   const lastFairValue = valuations?.at(0)?.fairValue ?? null
@@ -54,8 +54,8 @@ export function FundSection({
 
   const cards: Array<{ label: string; value: string }> = [
     { label: t('fund.committed'), value: fmtEur(committedAmount) },
-    { label: t('fund.called'), value: fmtEur(called) },
-    { label: t('fund.distributed'), value: fmtEur(distributed) },
+    { label: t('fund.called'), value: fmtEurCents(called) },
+    { label: t('fund.distributed'), value: fmtEurCents(distributed) },
     { label: t('fund.dpi'), value: fmtMultiple(dpi) },
     { label: t('fund.tvpi'), value: fmtMultiple(tvpi) },
   ]
