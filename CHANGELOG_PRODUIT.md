@@ -23,6 +23,29 @@ bas de page.
 
 ---
 
+## v1.124.0 — 23/07/2026 à 14:14 — Prévisionnel : ajouter une échéance directement depuis un deal
+
+Vous pouvez maintenant créer une **prévision ponctuelle** (un coupon attendu,
+un loyer, un appel de fonds programmé…) directement depuis la fiche d'un deal,
+sans repasser par la Trésorerie. Un bouton **« Ajouter une prévision »** dans
+la section Prévisionnel du deal ouvre le formulaire, l'échéance est
+automatiquement rattachée au deal et remonte aussitôt dans le prévisionnel de
+trésorerie.
+
+> **🔧 Notes techniques**
+> - Aucune évolution backend ni de schéma : `forecastEntries.dealId` et la
+>   mutation `createManualEntry` (avec `dealId`) existaient déjà.
+> - `EntryDialog` (`src/components/cash/ForecastSection.tsx`) est désormais
+>   exporté et accepte une prop optionnelle `lockedDealId` : quand elle est
+>   fournie, le sélecteur de deal est masqué et l'échéance est liée à ce deal.
+> - `DealForecastSection` (`src/components/deals/DealForecastSection.tsx`) reçoit
+>   `orgId`, affiche un bouton « Ajouter une prévision » (visible même quand la
+>   section est vide, avec un état vide dédié) et monte `EntryDialog` en mode
+>   verrouillé.
+> - Fiche deal (`deals.$dealId.tsx`) : passe `orgId={deal.orgId}`. Le `hint` de
+>   la section, qui renvoyait à la page Trésorerie pour la gestion, a été
+>   corrigé. Clés i18n `dealForecast.add` / `dealForecast.empty` (en + fr).
+
 ## v1.123.0 — 23/07/2026 à 11:32 — Centimes : les montants réels affichés au centime là où ça compte
 
 Fini les montants arrondis à l'euro sur les écrans où le centime compte. Les

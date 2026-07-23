@@ -883,7 +883,7 @@ function DealDetail() {
 
       {/* Planned + committed layers (linked forecast entries); the
           realized layer is the Transactions section below. */}
-      <DealForecastSection dealId={deal._id} />
+      <DealForecastSection dealId={deal._id} orgId={deal.orgId} />
 
       <Transactions deal={deal} />
 

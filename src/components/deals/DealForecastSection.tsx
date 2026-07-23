@@ -1,11 +1,15 @@
+import { useState } from 'react'
+import { Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useConvexQuery } from '@convex-dev/react-query'
 
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { EntryDialog } from '~/components/cash/ForecastSection'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { directionTone } from '~/lib/moneyTone'
 import { Badge } from '~/components/ui/badge'
+import { Button } from '~/components/ui/button'
 import {
   Table,
   TableBody,
@@ -25,27 +29,44 @@ const CONFIDENCE_VARIANT = {
 /**
  * Forecast side of a deal page: the pending forecast entries linked to the
  * deal (planned flows — SCPI rents, coupons, scheduled capital calls…) and
- * the undated committed remainder. Hidden when the deal has neither. The
- * realized layer is the existing Transactions section below.
+ * the undated committed remainder. One-off forecast entries can be added
+ * straight from here (bound to this deal). The realized layer is the
+ * existing Transactions section below.
  */
-export function DealForecastSection({ dealId }: { dealId: Id<'deals'> }) {
+export function DealForecastSection({
+  dealId,
+  orgId,
+}: {
+  dealId: Id<'deals'>
+  orgId: Id<'organizations'>
+}) {
   const { t } = useTranslation('participations')
   const { fmtEur, fmtDate } = useFormatters()
+  const [creating, setCreating] = useState(false)
   const forecast = useConvexQuery(api.forecasts.getDealForecast, { dealId })
 
-  if (
-    !forecast ||
-    (forecast.entries.length === 0 && forecast.remainingCents <= 0)
-  ) {
-    return null
-  }
+  const isEmpty =
+    !!forecast &&
+    forecast.entries.length === 0 &&
+    forecast.remainingCents <= 0
 
   return (
     <section className="space-y-3">
-      <h2 className="text-lg font-semibold tracking-tight">
-        {t('dealForecast.title')}
-      </h2>
-      {forecast.remainingCents > 0 && (
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 className="text-lg font-semibold tracking-tight">
+          {t('dealForecast.title')}
+        </h2>
+        <Button variant="outline" size="sm" onClick={() => setCreating(true)}>
+          <Plus className="size-4" />
+          {t('dealForecast.add')}
+        </Button>
+      </div>
+      {isEmpty && (
+        <p className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
+          {t('dealForecast.empty')}
+        </p>
+      )}
+      {forecast && forecast.remainingCents > 0 && (
         <p className="text-muted-foreground text-sm">
           {t('dealForecast.committed', {
             remaining: fmtEur(forecast.remainingCents),
@@ -54,7 +75,7 @@ export function DealForecastSection({ dealId }: { dealId: Id<'deals'> }) {
           })}
         </p>
       )}
-      {forecast.entries.length > 0 && (
+      {forecast && forecast.entries.length > 0 && (
         <div className="rounded-lg border">
           <Table>
             <TableHeader>
@@ -106,6 +127,14 @@ export function DealForecastSection({ dealId }: { dealId: Id<'deals'> }) {
       <p className="text-muted-foreground text-xs">
         {t('dealForecast.hint')}
       </p>
+      {creating && (
+        <EntryDialog
+          orgId={orgId}
+          entry={null}
+          lockedDealId={dealId}
+          onClose={() => setCreating(false)}
+        />
+      )}
     </section>
   )
 }

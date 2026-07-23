@@ -688,6 +688,8 @@
   },
   "dealForecast": {
     "title": "Forecast",
+    "add": "Add a forecast",
+    "empty": "No forecast linked to this deal yet.",
     "committed": "Still to deploy: {{remaining}} (committed {{committed}} − paid {{paid}}) — no call date, counted apart from the curve.",
     "col": {
       "date": "Date",
@@ -701,7 +703,7 @@
       "expected": "Expected",
       "probable": "Probable"
     },
-    "hint": "Forecast entries linked to this deal (managed from the Cash page). The realized layer is the Transactions section below."
+    "hint": "Forecast entries linked to this deal. The realized layer is the Transactions section below."
   },
   "integrations": {
     "menuItem": "Link to an integration",
