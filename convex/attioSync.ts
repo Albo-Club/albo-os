@@ -3,9 +3,10 @@
  *
  * Attio is the source of truth BEFORE investment (dealflow, term sheet).
  * When a deal's `stage` changes there, Attio fires a `record.updated`
- * webhook; we re-fetch the record (the payload diff is not reliable) and,
- * for the two stages we care about, hand a normalized payload to
- * `upsertFromDeal`:
+ * webhook; we re-fetch the record (the payload diff is not reliable), fetch
+ * the associated company's identity (name + domain — the deal payload only
+ * carries the reference), and, for the two stages we care about, hand a
+ * normalized payload to `upsertFromDeal`:
  *   - 📝 Term Sheet (bb580481…) → deal `pending` (committed, not wired) +
  *     an anticipated capital-outflow entry in the cash forecast.
  *   - Invested      (b59066ed…) → the SAME deal (matched on `attioDealId`)
@@ -50,9 +51,11 @@ import { ConvexError, v } from 'convex/values'
 import { internal } from './_generated/api'
 import { httpAction, internalAction, internalMutation } from './_generated/server'
 import {
+  ATTIO_STUB_COMPANY_NAME,
   INVESTED_STATUS_ID,
   TERM_SHEET_STATUS_ID,
   advancesStatus,
+  companyIdentityPatch,
   dealForecastKey,
   decideSyncAction,
   orgSlugFromOption,
@@ -61,7 +64,7 @@ import {
   shouldReplaceInstrument,
 } from './lib/attioSync'
 import type { MutationCtx } from './_generated/server'
-import type { Id } from './_generated/dataModel'
+import type { Doc, Id } from './_generated/dataModel'
 
 // ─── Attio constants ─────────────────────────────────────────────────────────
 
@@ -170,6 +173,11 @@ type NormalizedDeal = {
   name: string | null
   roundSize?: number
   valuation?: number
+  // Identity of the associated Attio company (separate re-fetch — the deal
+  // payload only carries the reference). Absent when the fetch failed 4xx or
+  // the deal has no associated company: the target falls back to a stub.
+  targetCompanyName?: string
+  targetCompanyDomain?: string
 }
 
 /** Marks a re-fetch failure Attio should retry (network / Attio 5xx). */
@@ -216,7 +224,53 @@ async function fetchDealRecord(recordId: string): Promise<NormalizedDeal | null>
 
   const json = (await res.json()) as unknown
   const values = asRecord(asRecord(asRecord(json).data).values) as Values
-  return normalizeDealValues(recordId, values)
+  const deal = normalizeDealValues(recordId, values)
+  if (deal && HANDLED_STAGES.has(deal.stage) && deal.targetCompanyAttioId) {
+    return { ...deal, ...(await fetchCompanyIdentity(deal.targetCompanyAttioId)) }
+  }
+  return deal
+}
+
+/**
+ * Fetch the associated company's identity (name + first domain). The deal
+ * payload only carries the company reference, so without this re-fetch the
+ * sync would create the target company as a stub named after the DEAL (e.g.
+ * "Invest Startup Studio" instead of "You.Switch"). Same retry semantics as
+ * the deal re-fetch: network / Attio 5xx throw `RetryableError`; a 4xx logs
+ * and returns nothing (the deal still syncs, target falls back to a stub).
+ */
+async function fetchCompanyIdentity(
+  recordId: string,
+): Promise<Pick<NormalizedDeal, 'targetCompanyName' | 'targetCompanyDomain'>> {
+  const apiKey = process.env.ATTIO_API_KEY
+  if (!apiKey) throw new ConvexError('missing_attio_api_key')
+
+  const res = await fetch(
+    `${ATTIO_API_BASE}/v2/objects/companies/records/${recordId}`,
+    { headers: { Authorization: `Bearer ${apiKey}` } },
+  ).catch((e) => {
+    throw new RetryableError(`network: ${String(e)}`)
+  })
+  if (!res.ok) {
+    if (res.status >= 500) {
+      throw new RetryableError(`attio_5xx:${res.status}`)
+    }
+    console.warn(
+      `[attio] company re-fetch failed: record=${recordId} status=${res.status}`,
+    )
+    return {}
+  }
+
+  const json = (await res.json()) as unknown
+  const values = asRecord(asRecord(asRecord(json).data).values) as Values
+  const name = textValue(values, 'name')?.trim()
+  // `domains` entries carry the domain in a `domain` property (not `value`).
+  const domainEntry = activeEntry(values.domains)
+  const domain = domainEntry ? asString(domainEntry.domain)?.trim() : undefined
+  return {
+    ...(name ? { targetCompanyName: name } : {}),
+    ...(domain ? { targetCompanyDomain: domain } : {}),
+  }
 }
 
 /**
@@ -393,6 +447,8 @@ export const upsertFromDeal = internalMutation({
     name: v.union(v.string(), v.null()),
     roundSize: v.optional(v.number()),
     valuation: v.optional(v.number()),
+    targetCompanyName: v.optional(v.string()),
+    targetCompanyDomain: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -458,6 +514,7 @@ export const upsertFromDeal = internalMutation({
         ...(args.roundSize != null ? { roundSize: args.roundSize } : {}),
         ...(args.valuation != null ? { entryValuation: args.valuation } : {}),
       })
+      await repairStubTargetCompany(ctx, existing, args)
       await upsertDealForecastEntry(ctx, existing._id, org._id, args)
       return { dealId: existing._id, action: 'termsheet_updated' as const }
     }
@@ -504,9 +561,11 @@ export const upsertFromDeal = internalMutation({
 
 /**
  * Portfolio company for the deal target: reuse the Attio-anchored one when it
- * exists in this org, else create a stub named after the deal. The
- * `attioCompanyId` anchor is only claimed when no company already holds it,
- * to preserve its uniqueness.
+ * exists in this org, else create it with the Attio company identity (name +
+ * domain). Falls back to a stub named after the deal when the identity fetch
+ * failed — repaired later by `repairStubTargetCompany` on the next refresh.
+ * The `attioCompanyId` anchor is only claimed when no company already holds
+ * it, to preserve its uniqueness.
  */
 async function resolveOrCreateTargetCompany(
   ctx: MutationCtx,
@@ -525,10 +584,40 @@ async function resolveOrCreateTargetCompany(
   if (anchored && anchored.orgId === orgId) return anchored._id
   return await ctx.db.insert('companies', {
     orgId,
-    name: args.name?.trim() || 'Société (Attio)',
+    name:
+      args.targetCompanyName?.trim() ||
+      args.name?.trim() ||
+      ATTIO_STUB_COMPANY_NAME,
     kind: 'portfolio',
+    ...(args.targetCompanyDomain ? { domain: args.targetCompanyDomain } : {}),
     ...(attioCompanyId && !anchored ? { attioCompanyId } : {}),
   })
+}
+
+/**
+ * Term Sheet refresh: give a sync-created stub company its real Attio
+ * identity (deals synced before the company fetch existed, or a transient
+ * company re-fetch failure at create time). Only touches the company anchored
+ * to THIS deal's Attio company, and only renames stubs — a user-chosen name
+ * is never overwritten (see `companyIdentityPatch`).
+ */
+async function repairStubTargetCompany(
+  ctx: MutationCtx,
+  deal: Doc<'deals'>,
+  args: NormalizedDeal,
+): Promise<void> {
+  if (!args.targetCompanyAttioId) return
+  const company = await ctx.db.get('companies', deal.targetCompanyId)
+  if (!company || company.attioCompanyId !== args.targetCompanyAttioId) return
+  const patch = companyIdentityPatch({
+    companyName: args.targetCompanyName ?? null,
+    companyDomain: args.targetCompanyDomain ?? null,
+    current: { name: company.name, domain: company.domain },
+    stubNames: [deal.name, args.name],
+  })
+  if (patch) {
+    await ctx.db.patch('companies', company._id, patch)
+  }
 }
 
 /** Last day of the current UTC month at 00:00 — placeholder date for a TS deal
@@ -667,7 +756,15 @@ export const backfillTermSheets = internalAction({
     let updated = 0
     let skipped = 0
     for (const deal of termSheetDeals) {
-      const res = await ctx.runMutation(internal.attioSync.upsertFromDeal, deal)
+      // Same company-identity enrichment as the webhook path (the query
+      // payload only carries the company reference).
+      const identity = deal.targetCompanyAttioId
+        ? await fetchCompanyIdentity(deal.targetCompanyAttioId)
+        : {}
+      const res = await ctx.runMutation(internal.attioSync.upsertFromDeal, {
+        ...deal,
+        ...identity,
+      })
       if ('action' in res && res.action === 'termsheet_created') created += 1
       else if ('action' in res) updated += 1
       else skipped += 1

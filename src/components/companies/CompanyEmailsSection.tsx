@@ -137,9 +137,22 @@ export function EmailDetailDialog({
 
   return (
     <Dialog open={openId !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+      {/* Width containment, three layers so the box never overflows sideways
+          — only vertical scroll is allowed:
+          1. `sm:max-w-2xl!` (suffix important): shadcn's DialogContent ships a
+             base `max-w-[calc(100%-2rem)]` that outranks a plain `sm:max-w-2xl`
+             in the CSS cascade (cf. KNOWN_ISSUES "tailwind-merge v3 / Tailwind
+             v4"), so without `!` the box is never capped at 2xl.
+          2. `overflow-x-hidden`: a container with only `overflow-y-auto` gets
+             its `overflow-x` computed to `auto` by the browser, which lets any
+             wide child open a horizontal scrollbar. Pinning it to `hidden`
+             keeps scrolling strictly vertical.
+          3. `[&>*]:min-w-0`: grid items default to `min-width: auto`, so a wide
+             child (the long one-line subject) could push the track past the
+             cap. Letting them shrink to 0 forces the content to wrap instead. */}
+      <DialogContent className="max-h-[85vh] overflow-x-hidden overflow-y-auto sm:max-w-2xl! [&>*]:min-w-0">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="pr-8 break-words">
             {detail ? detail.subject || t('emails.noSubject') : t('loading')}
           </DialogTitle>
         </DialogHeader>
@@ -199,7 +212,7 @@ export function EmailDetailDialog({
             )}
 
             {detail.bodyText && (
-              <div className="text-foreground/90 max-h-96 overflow-y-auto rounded-md border p-3 text-sm break-words whitespace-pre-wrap">
+              <div className="text-foreground/90 max-h-96 overflow-x-hidden overflow-y-auto rounded-md border p-3 text-sm break-words whitespace-pre-wrap">
                 {detail.bodyText}
               </div>
             )}

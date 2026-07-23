@@ -32,7 +32,11 @@ là où [Participations](04-participations.md) regroupe par société.
   (commit) vs **capital appelé** — car ils diffèrent réellement.
 - **Statut** : *engagé* (term sheet signée, pas encore câblé — créé
   automatiquement depuis Attio), *actif*, *sorti partiellement*, *sorti*,
-  *passé en perte*.
+  *passé en perte*. La **couleur** du statut ne sert qu'à la sortie : vert =
+  sortie gagnante, rouge = perte, gris = neutre (actif ou sortie sans
+  plus-value) ; *engagé* est en ambre. Une **sortie partielle** vire au vert
+  dès qu'elle est déjà dans le vert, jamais au rouge (la position n'est pas
+  soldée). Un deal actif se suit par ses reports, pas par une couleur.
 - **Dates** : signature (tri par défaut), closing, sortie.
 - **Titres et détention** : les deals en actions enregistrent le **nombre de
   titres acquis** et le **prix par titre**. Un achat sur le **secondaire**
@@ -61,7 +65,10 @@ là où [Participations](04-participations.md) regroupe par société.
   l'[assistant IA](11-assistant-ia.md) (coller le BP suffit), pas par un
   formulaire.
 - **Prévisionnel du deal** : les échéances prévisionnelles liées (loyers
-  SCPI, coupons, appels programmés) et le reste engagé à déployer.
+  SCPI, coupons, appels programmés) et le reste engagé à déployer. Le
+  bouton **« Ajouter une prévision »** crée une échéance ponctuelle
+  directement rattachée à ce deal, sans passer par la Trésorerie ; elle
+  remonte aussitôt ici et dans le prévisionnel de trésorerie.
 - **Transactions** : les mouvements bancaires rattachés au deal. Un clic
   ouvre le détail avec possibilité de **réaffecter** la transaction à un
   autre deal.
@@ -72,6 +79,14 @@ là où [Participations](04-participations.md) regroupe par société.
 Le dialogue « Gérer la sortie » pose le statut (sortie totale, partielle,
 perte), la date et le produit de cession. Une sortie est **réversible** : on
 peut l'annuler et le deal redevient actif.
+
+Une fois sorti, la **couleur du statut** dit comment ça s'est passé, déduite du
+multiple réalisé (MOIC, calculé depuis les transactions pointées) : **vert**
+au-dessus de 1 (exit gagnant), **rouge** en dessous (exit perdant) — une perte
+actée (« Déprécié ») est toujours rouge. Pour une **sortie partielle**, le deal
+reste actif (on détient encore une partie) : seul un gain déjà réalisé est
+signalé (statut « Exit partiel » en **vert** quand le reçu dépasse déjà le
+capital déployé), jamais en rouge, puisque la position n'est pas soldée.
 
 ## Points d'attention
 

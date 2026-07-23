@@ -18,7 +18,8 @@ sociétés, leurs rapports et leurs documents.
   instrument, investisseur, secteur) et filtres multi-sélection par
   instrument, statut et secteur. Export CSV de l'ensemble.
 - **Section « Soldées »** : les sociétés dont les deals sont sortis ou passés
-  en perte, avec badge gagné/perdu et colonnes **MOIC** et **TRI** annualisé.
+  en perte, avec un **badge de statut coloré** (vert = sortie gagnante, rouge =
+  perte, gris = sortie sans plus-value) et colonnes **MOIC** et **TRI** annualisé.
 - **Section « Sans deal »** : les entités du portefeuille pas encore
   rattachées à un deal.
 - **Section « Archivées »** : les entités archivées, restaurables en un clic.

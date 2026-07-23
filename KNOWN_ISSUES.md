@@ -1684,8 +1684,14 @@ le module Convex n'est qu'une coquille DB autour.
    `deals.create`, qui exige `requireOrgMember` — le webhook n'a pas d'identité
    auth, il est authentifié par la signature HMAC). Investisseur = `group_root`
    de l'org résolue depuis `albo_or_calte`. Société cible résolue/créée sur
-   `attioCompanyId` (stub `portfolio` si absente, ancre réclamée seulement si
-   libre).
+   `attioCompanyId` (ancre réclamée seulement si libre). ⚠️ Le payload deal ne
+   porte que la **référence** de la company → la synchro re-fetch la fiche
+   company Attio (`fetchCompanyIdentity` : nom + premier domaine) pour créer la
+   société avec son vrai nom. Si ce fetch échoue (4xx), fallback stub nommé
+   d'après le deal ; un refresh Term Sheet ultérieur **répare le stub**
+   (`repairStubTargetCompany` + `companyIdentityPatch`, pur/testé) — il ne
+   renomme que les stubs (nom = nom du deal ou placeholder), jamais un nom
+   posé par l'utilisateur, et ne remplit le domaine que s'il est vide.
 
 6. **Robustesse webhook.** Re-fetch transitoire (réseau / 5xx Attio) → **503**
    (Attio rejoue) ; erreur de config (secret/clé absente) → **200** (pas de

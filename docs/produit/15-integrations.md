@@ -44,7 +44,9 @@ n'écrit jamais dans Attio.
 **La synchro automatique** fonctionne au changement de stage dans Attio :
 
 - **Term Sheet** → un deal *engagé* (pending) est créé dans Albo OS, avec la
-  sortie de cash anticipée dans le prévisionnel ;
+  sortie de cash anticipée dans le prévisionnel ; si la société n'existe pas
+  encore dans Albo OS, elle est créée automatiquement avec le nom et le
+  domaine de la fiche société Attio ;
 - **Invested** → le même deal passe *actif* et l'échéance prévisionnelle est
   confirmée (elle se réalisera quand le vrai virement sera pointé).
 

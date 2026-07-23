@@ -10,13 +10,11 @@ import {
 } from '../../../convex/lib/metrics'
 import type { ReactNode } from 'react'
 
-import type { Doc } from '../../../convex/_generated/dataModel'
-import type { MoicTransaction } from '~/lib/dealMetrics'
 import { cn } from '~/lib/utils'
+import { dealStatusBadge } from '~/lib/dealStatusBadge'
 import { xirr } from '~/lib/xirr'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { ScoreRing } from '~/components/companies/ScoreRing'
-import { ExitBadge } from '~/components/deals/ExitBadge'
 import { Badge } from '~/components/ui/badge'
 import {
   Table,
@@ -181,12 +179,6 @@ const stickyCellClass =
   'sticky left-0 z-10 bg-background transition-colors ' +
   'group-hover:bg-[color-mix(in_oklab,var(--muted)_50%,var(--background))]'
 
-function statusVariant(s: string): 'default' | 'secondary' | 'destructive' {
-  if (s === 'written_off') return 'destructive'
-  if (s === 'active') return 'default'
-  return 'secondary'
-}
-
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5">
@@ -330,6 +322,7 @@ export function DealsList({
           proceeds: dl.received ?? 0,
           residual: residualCents(dl),
         })
+        const statusBadge = dealStatusBadge(dl.status, dl.moic)
         const body = (
           <>
             <Field label={t('deal.name')}>{dl.name ?? '—'}</Field>
@@ -357,14 +350,7 @@ export function DealsList({
             </Field>
             <Field label={t('deal.tvpi')}>{fmtMultiple(tvpi)}</Field>
             <Field label={t('deal.status')}>
-              <Badge
-                variant={statusVariant(dl.status)}
-                className={
-                  dl.status === 'pending'
-                    ? 'bg-warning text-warning-foreground'
-                    : undefined
-                }
-              >
+              <Badge variant={statusBadge.variant} className={statusBadge.className}>
                 {t(`status.${dl.status}`, { defaultValue: dl.status })}
               </Badge>
             </Field>
@@ -449,8 +435,8 @@ export function ParticipationsTable({
   showOrg?: boolean
   orgSlug?: string
   // Settled variant (fully_exited / written_off): swaps TVPI for a MOIC + an
-  // annualized TRI column, adds an ExitBadge per row and drops sorting. Used by
-  // the always-open section below the active table.
+  // annualized TRI column, adds a colour-coded exit badge per row and drops
+  // sorting. Used by the always-open section below the active table.
   settled?: boolean
   // True when the parent search/filters are active — drives the empty message
   // (no results vs. empty scope).
@@ -749,20 +735,11 @@ function CompanyRows({
 }) {
   const { t } = useTranslation('participations')
   const navigate = useNavigate()
-  // Settled rows carry a win/lost badge + a MOIC column. The badge reuses
-  // ExitBadge, which only reads `status` + `instrumentKind`: feed it a
-  // synthetic deal whose proceeds are already net of VAT (a non-royalty
-  // instrument so dealMoic doesn't de-VAT a second time) and the group's
-  // aggregated capital/proceeds. A write-off anywhere in the group forces
-  // "lost".
-  const exitDeal = {
-    status: group.writtenOff ? 'written_off' : 'fully_exited',
-    instrumentKind: 'share',
-  } as unknown as Doc<'deals'>
-  const exitTxs: Array<MoicTransaction> = [
-    { direction: 'out', amount: group.capital },
-    { direction: 'in', amount: group.proceeds },
-  ]
+  // Settled rows carry a single status badge whose colour is the exit outcome
+  // (green win / red loss / neutral). A write-off anywhere in the group forces
+  // "written_off" (always red); otherwise the group's aggregated MOIC decides.
+  const settledStatus = group.writtenOff ? 'written_off' : 'fully_exited'
+  const settledBadge = dealStatusBadge(settledStatus, group.moic)
   // Whole-row click opens the entity sheet (its deals are listed there).
   // Guarded by `slug`: the per-org view passes orgSlug, the aggregated view
   // derives it from each deal's org; without a slug the row isn't clickable
@@ -809,7 +786,14 @@ function CompanyRows({
               {t('status.pending')}
             </Badge>
           )}
-          {settled && <ExitBadge deal={exitDeal} transactions={exitTxs} />}
+          {settled && (
+            <Badge
+              variant={settledBadge.variant}
+              className={settledBadge.className}
+            >
+              {t(`status.${settledStatus}`)}
+            </Badge>
+          )}
         </span>
       </TableCell>
       {showOrg && (

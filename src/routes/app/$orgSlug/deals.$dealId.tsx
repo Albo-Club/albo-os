@@ -23,6 +23,8 @@ import type { TxDetails } from '~/components/pointage/TransactionSheet'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { directionBadgeClass, directionTone } from '~/lib/moneyTone'
+import { dealMoic } from '~/lib/dealMetrics'
+import { dealStatusBadge } from '~/lib/dealStatusBadge'
 import {
   dealAmountTiles,
   useDealTitle,
@@ -33,7 +35,6 @@ import {
   PaginationFooter,
   usePagination,
 } from '~/components/data-table/LocalPagination'
-import { ExitBadge } from '~/components/deals/ExitBadge'
 import { ExitDealDialog } from '~/components/deals/ExitDealDialog'
 import { DealForecastSection } from '~/components/deals/DealForecastSection'
 import { FundSection } from '~/components/deals/FundSection'
@@ -142,12 +143,6 @@ const INSTRUMENTS = [
   'loan',
   'capitalization_account',
 ] as const satisfies ReadonlyArray<InstrumentKind>
-
-function statusVariant(s: string): 'default' | 'secondary' | 'destructive' {
-  if (s === 'written_off') return 'destructive'
-  if (s === 'active') return 'default'
-  return 'secondary'
-}
 
 function NotFound() {
   const { t } = useTranslation('participations')
@@ -763,6 +758,9 @@ function DealDetail() {
     committedAmount: deal.committedAmount,
     paidActual,
   })
+  // Single status badge: colour = the exit outcome (green win / red loss /
+  // neutral), derived from the deal's realized cash flows.
+  const statusBadge = dealStatusBadge(deal.status, dealMoic(deal, txs).moic)
 
   return (
     <main className="flex-1 space-y-6 p-6">
@@ -776,22 +774,20 @@ function DealDetail() {
         </Link>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Sticky so the title stays pinned while scrolling; full-bleed bg +
+          border mask the content passing underneath (scroll container is the
+          layout's Outlet). */}
+      <div className="bg-background sticky top-0 z-10 -mx-6 flex flex-wrap items-center gap-3 border-b px-6 py-3">
         {/* Custom deal name, or the instrument label when the deal is unnamed. */}
         <h1 className="text-2xl font-semibold tracking-tight">
           {dealTitle(deal)}
         </h1>
         <Badge
-          variant={statusVariant(deal.status)}
-          className={
-            deal.status === 'pending'
-              ? 'ms-1.5 bg-warning text-warning-foreground'
-              : 'ms-1.5'
-          }
+          variant={statusBadge.variant}
+          className={cn('ms-1.5', statusBadge.className)}
         >
           {t(`status.${deal.status}`, { defaultValue: deal.status })}
         </Badge>
-        <ExitBadge deal={deal} transactions={txs} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -883,7 +879,7 @@ function DealDetail() {
 
       {/* Planned + committed layers (linked forecast entries); the
           realized layer is the Transactions section below. */}
-      <DealForecastSection dealId={deal._id} />
+      <DealForecastSection dealId={deal._id} orgId={deal.orgId} />
 
       <Transactions deal={deal} />
 

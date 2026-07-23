@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.124.0 — 23/07/2026 à 17:15 — Emails : rattachement plus malin, avec l'IA en filet
+## v1.128.0 — 23/07/2026 à 17:15 — Emails : rattachement plus malin, avec l'IA en filet
 
 Jusqu'ici, un email n'était rangé sur la fiche d'une participation que si
 l'expéditeur ou un destinataire portait le domaine de la société. Beaucoup
@@ -58,6 +58,181 @@ l'extraction de report reste sur votre clic.
 > - Piège documenté (`KNOWN_ISSUES.md` « Connecteur Gmail ») : un échec de
 >   l'appel LLM saute le message sans retry (curseur consommé) — rattrapé
 >   par le futur backfill d'historique.
+
+## v1.127.0 — 23/07/2026 à 17:07 — Statut des deals : la couleur ne sert plus qu'aux sorties
+
+Les badges de statut d'un deal étaient devenus confus : plusieurs couleurs se
+chevauchaient et un deal sorti pouvait porter deux badges qui répétaient la
+même info (deux rouges sur une perte, deux gris sur une sortie à plat).
+
+Désormais **un seul badge par deal**, et la couleur ne parle que quand elle
+veut dire quelque chose :
+
+- **gris** — rien à signaler : un deal actif, ou une sortie sans plus-value
+  (un deal actif se suit avec ses reports, pas avec une couleur) ;
+- **ambre** — term sheet signée, pas encore câblée ;
+- **vert** — sortie gagnante, y compris une **sortie partielle déjà dans le
+  vert** (le gain réalisé reste signalé, jamais une perte tant que la position
+  n'est pas soldée) ;
+- **rouge** — sortie en perte ou dépréciation.
+
+Plus de double badge, et la même règle s'applique partout : liste des deals,
+vue consolidée, fiche société et fiche deal.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle source unique `dealStatusBadge(status, moic)`
+>   (`src/lib/dealStatusBadge.ts`) → `{ variant, className }`. Couleur d'un exit
+>   depuis le MOIC réalisé (`DealRow.moic` côté serveur, ou `dealMoic(deal, txs)`
+>   sur la fiche) : `pending` → ambre, `fully_exited` ≥ 1 → vert / < 1 → rouge /
+>   MOIC nul → neutre, `written_off` → rouge, `partially_exited` ≥ 1 → vert
+>   (win-only, jamais rouge — reprend la logique de la v1.126.0), sinon neutre.
+> - Remplace les 3 copies de `statusVariant` + l'override `pending` inline + le
+>   composant `ExitBadge` (supprimé, sa logique win-only repliée dans le helper)
+>   dans `DealsListView` (liste par-org **et** `/app/all`), `ParticipationsTable`
+>   (`DealsList` + section soldés) et `deals.$dealId`. Un seul `<Badge>` par deal.
+> - Clés i18n `participations.exitBadge.*` retirées (FR + EN) ; les libellés
+>   réutilisent `status.*`.
+
+## v1.126.1 — 23/07/2026 à 16:39 — Sync Attio : la société arrive avec son vrai nom
+
+Quand un deal passait en Term Sheet dans Attio, la société créée dans Albo OS
+prenait le **nom du deal** (ex. « Invest Startup Studio ») au lieu du nom de
+la société (« You.Switch »). Corrigé : la synchro va maintenant chercher la
+fiche société dans Attio et crée la société avec son **vrai nom et son
+domaine**. Les sociétés déjà arrivées en « coquille » se réparent toutes
+seules à la prochaine modification du deal dans Attio — un nom corrigé à la
+main n'est jamais écrasé.
+
+> **🔧 Notes techniques**
+>
+> - `convex/attioSync.ts` : nouveau `fetchCompanyIdentity` (re-fetch de la
+>   company Attio associée — nom + premier domaine — le payload deal ne porte
+>   que la référence), branché sur le webhook ET le backfill ;
+>   `resolveOrCreateTargetCompany` crée la société avec cette identité,
+>   `repairStubTargetCompany` répare les stubs au refresh Term Sheet.
+> - `convex/lib/attioSync.ts` : décision pure `companyIdentityPatch`
+>   (rename stub-only, domaine rempli seulement si vide) + constante
+>   `ATTIO_STUB_COMPANY_NAME` — testée dans `tests/attioSync.test.ts`.
+
+## v1.126.0 — 23/07/2026 à 15:43 — Sortie partielle : le gain déjà réalisé s'affiche
+
+Un deal en **sortie partielle** garde son statut « Exit partiel » et reste
+dans les participations actives — c'est normal, on détient encore une partie.
+Mais désormais, dès que le montant déjà reçu dépasse le capital déployé, sa
+fiche affiche un badge **« Exit gagnant »** : le gain réalisé ne passe plus
+inaperçu. Rien ne s'affiche tant que la position n'est pas dans le vert, et
+**jamais** de badge « perdant » sur une sortie partielle — le deal n'étant pas
+soldé, le reste de la position peut encore remonter.
+
+> **🔧 Notes techniques**
+>
+> - `ExitBadge` (`src/components/deals/ExitBadge.tsx`) : la garde de rendu
+>   inclut désormais `partially_exited`, en logique « win-only » — le badge
+>   n'est rendu que si `dealMoic` renvoie `isWin === true` (MOIC ≥ 1) ; un
+>   MOIC < 1 ou nul (deal non soldé) ne rend rien, jamais « lost » ni le
+>   neutre « Sorti ». `fully_exited` / `written_off` inchangés.
+> - Surface : la **fiche deal** (`deals.$dealId.tsx`, déjà branchée sur
+>   `ExitBadge` avec les vraies transactions → MOIC exact, dé-TVA royalties
+>   incluse). Volontairement **pas** ajouté aux listes (`DealsListView`
+>   n'affiche aucun badge win/lost, et la table par société n'agrège pas un
+>   partiel au niveau société). Aucune nouvelle clé i18n (réutilise
+>   `participations:exitBadge.win`), aucun changement de schéma.
+
+## v1.125.0 — 23/07/2026 à 15:22 — Le titre reste figé en haut des fiches entité et deal
+
+Sur une **fiche entreprise** ou une **fiche deal**, le titre (le nom, son
+statut et le menu d'actions « … ») reste désormais **collé en haut de la
+page** quand vous faites défiler vers le bas. Plus besoin de remonter tout en
+haut pour savoir où vous êtes ou pour rouvrir le menu d'actions : le repère
+reste toujours visible.
+
+> **🔧 Notes techniques**
+> - Barre de titre rendue `sticky top-0` dans `participations.$companyId.tsx`
+>   et `deals.$dealId.tsx` — le conteneur de scroll est le `div.overflow-y-auto`
+>   qui enveloppe l'`Outlet` (`app/$orgSlug/route.tsx`), donc pas de JS.
+> - Full-bleed via `-mx-6 px-6` (le `main` est en `p-6`) + `bg-background`
+>   `border-b` `z-10` pour masquer proprement le contenu qui passe dessous.
+
+## v1.124.2 — 23/07/2026 à 14:45 — Emails : plus aucun scroll horizontal dans la fenêtre du mail
+
+Verrouillage complet de la fenêtre d'email : les blocs internes (en-tête,
+corps du message) ne peuvent plus créer de barre de défilement horizontale.
+Tout respecte la largeur de la fenêtre et revient à la ligne ; seul le
+défilement vertical reste possible. Ça règle les cas — surtout les mails au
+titre très long — où il fallait « glisser vers la gauche » pour voir la suite.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/CompanyEmailsSection.tsx`, `EmailDetailDialog` :
+>   sur le `DialogContent`, ajout de `overflow-x-hidden` (un conteneur en
+>   `overflow-y-auto` voit son `overflow-x` calculé en `auto` par le
+>   navigateur → autorise un scroll horizontal ; on le force à `hidden`) et
+>   de `[&>*]:min-w-0` (les enfants d'une grille ont `min-width: auto` et
+>   peuvent élargir la piste au-delà du plafond ; on les laisse rétrécir pour
+>   forcer le retour à la ligne). Même `overflow-x-hidden` ajouté sur la boîte
+>   de scroll du corps du message. Complète le plafond `sm:max-w-2xl!` de
+>   v1.124.1.
+
+## v1.124.1 — 23/07/2026 à 14:29 — Emails : la fenêtre du mail qui débordait de l'écran
+
+La vraie cause des débordements de la fenêtre d'email : la fenêtre elle-même
+n'était pas limitée en largeur et s'étirait à la taille de son contenu le plus
+large (un sujet très long sur une seule ligne), au point de sortir de l'écran.
+Elle est désormais correctement plafonnée et centrée, et tout le mail tient
+dans le cadre. (Les deux correctifs précédents ne traitaient que le contenu à
+l'intérieur du cadre, pas la taille du cadre — d'où l'impression que « rien ne
+se passait ».)
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/CompanyEmailsSection.tsx` : `DialogContent` du
+>   `EmailDetailDialog` passé de `sm:max-w-2xl` à `sm:max-w-2xl!` (important
+>   suffixe). Le `DialogContent` shadcn embarque un `max-w-[calc(100%-2rem)]`
+>   de base qui l'emportait dans la cascade CSS sur un `sm:max-w-2xl` nu (cf.
+>   `KNOWN_ISSUES.md` « tailwind-merge v3 / Tailwind v4 »), donc la boîte
+>   n'était jamais plafonnée à 2xl et s'étalait à la largeur de son plus large
+>   enfant. Seule modale du projet à contenir un enfant aussi large (le sujet
+>   d'un mail sur une ligne), d'où le fait qu'elle seule exposait le bug.
+
+## v1.124.0 — 23/07/2026 à 14:14 — Prévisionnel : ajouter une échéance directement depuis un deal
+
+Vous pouvez maintenant créer une **prévision ponctuelle** (un coupon attendu,
+un loyer, un appel de fonds programmé…) directement depuis la fiche d'un deal,
+sans repasser par la Trésorerie. Un bouton **« Ajouter une prévision »** dans
+la section Prévisionnel du deal ouvre le formulaire, l'échéance est
+automatiquement rattachée au deal et remonte aussitôt dans le prévisionnel de
+trésorerie.
+
+> **🔧 Notes techniques**
+> - Aucune évolution backend ni de schéma : `forecastEntries.dealId` et la
+>   mutation `createManualEntry` (avec `dealId`) existaient déjà.
+> - `EntryDialog` (`src/components/cash/ForecastSection.tsx`) est désormais
+>   exporté et accepte une prop optionnelle `lockedDealId` : quand elle est
+>   fournie, le sélecteur de deal est masqué et l'échéance est liée à ce deal.
+> - `DealForecastSection` (`src/components/deals/DealForecastSection.tsx`) reçoit
+>   `orgId`, affiche un bouton « Ajouter une prévision » (visible même quand la
+>   section est vide, avec un état vide dédié) et monte `EntryDialog` en mode
+>   verrouillé.
+> - Fiche deal (`deals.$dealId.tsx`) : passe `orgId={deal.orgId}`. Le `hint` de
+>   la section, qui renvoyait à la page Trésorerie pour la gestion, a été
+>   corrigé. Clés i18n `dealForecast.add` / `dealForecast.empty` (en + fr).
+
+## v1.123.1 — 23/07/2026 à 11:47 — Emails : titre trop long qui débordait de la fenêtre
+
+Suite du correctif précédent : quand le sujet d'un email était très long
+(par exemple une invitation d'agenda avec la date et l'adresse dans le
+titre), le titre débordait sur le côté et passait sous la croix de
+fermeture. Le titre revient désormais à la ligne et laisse la place au
+bouton de fermeture.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/CompanyEmailsSection.tsx` : ajout de `pr-8`
+>   (marge réservée au bouton close de la `DialogContent`) et `break-words`
+>   sur le `DialogTitle` du `EmailDetailDialog`. Sans marge à droite, un
+>   sujet long passait sous la croix ; `break-words` couvre les sujets
+>   contenant une longue chaîne sans espace (adresse email, URL).
 
 ## v1.123.0 — 23/07/2026 à 11:32 — Centimes : les montants réels affichés au centime là où ça compte
 
@@ -165,7 +340,6 @@ un vrai suivi, inspiré des outils de gestion de portefeuille :
 >   indicateur tri-state cliquable (tokens `--warning`/`--positive`),
 >   composer repliable (Input + Selects société/membre + date), raccourci
 >   clavier T (ignoré dans les champs), suppression au survol.
-
 ## v1.120.0 — 22/07/2026 à 12:06 — Gmail : email d'alerte quand une boîte doit être reconnectée
 
 Plus besoin de surveiller la page Intégrations : quand l'autorisation d'une
