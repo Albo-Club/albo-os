@@ -190,7 +190,7 @@ export function EmailDetailDialog({
             )}
 
             {detail.bodyText && (
-              <div className="text-foreground/90 max-h-96 overflow-y-auto rounded-md border p-3 text-sm whitespace-pre-wrap">
+              <div className="text-foreground/90 max-h-96 overflow-y-auto rounded-md border p-3 text-sm break-words whitespace-pre-wrap">
                 {detail.bodyText}
               </div>
             )}
