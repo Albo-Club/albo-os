@@ -130,7 +130,7 @@ export function EmailDetailDialog({
     <Dialog open={openId !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="pr-8 break-words">
             {detail ? detail.subject || t('emails.noSubject') : t('loading')}
           </DialogTitle>
         </DialogHeader>
