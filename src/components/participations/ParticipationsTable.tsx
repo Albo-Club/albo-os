@@ -208,6 +208,19 @@ export function useFormatters() {
           currency: 'EUR',
           maximumFractionDigits: 0,
         }).format(cents / 100)
+  // Cent-precise form for real cash amounts and comparison tables surfaced on
+  // the deal sheet (paid/received, royalties, plan-vs-actual): these must tie
+  // to the bank to the cent, unlike the rounded fmtEur used across the
+  // portfolio/valuation views. See CLAUDE.md § Gestion des arrondis (centimes).
+  const fmtEurCents = (cents?: number | null) =>
+    cents == null
+      ? '—'
+      : new Intl.NumberFormat(lang, {
+          style: 'currency',
+          currency: 'EUR',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(cents / 100)
   // Compact form for dense KPI tiles (e.g. "54,0 M€", "19,2 k€"); the exact
   // amount is surfaced via a title tooltip on the value.
   const fmtEurCompact = (cents?: number | null) =>
@@ -243,7 +256,7 @@ export function useFormatters() {
           style: 'percent',
           maximumFractionDigits: 1,
         }).format(ratio)
-  return { fmtEur, fmtEurCompact, fmtDate, fmtMultiple, fmtPercent }
+  return { fmtEur, fmtEurCents, fmtEurCompact, fmtDate, fmtMultiple, fmtPercent }
 }
 
 /**
@@ -276,20 +289,22 @@ export function dealAmountTiles(deal: {
   status: string
   committedAmount?: number | null
   paidActual?: number | null
-}): Array<{ labelKey: string; cents: number }> {
+}): Array<{ labelKey: string; cents: number; precise?: boolean }> {
   const committed = deal.committedAmount ?? 0
   const paid = deal.paidActual ?? 0
   const isFund = deal.instrumentKind === 'fund_lp'
+  // `precise`: paid is the sum of matched bank transactions → show to the cent
+  // so the tile ties to the cash. Committed is an engagement → stays rounded.
   if (isFund) {
     return [
       { labelKey: 'deal.committed', cents: committed },
-      { labelKey: 'deal.paid', cents: paid },
+      { labelKey: 'deal.paid', cents: paid, precise: true },
     ]
   }
   if (deal.status === 'pending') {
     return [{ labelKey: 'deal.committedForecast', cents: committed }]
   }
-  return [{ labelKey: 'deal.paid', cents: paid }]
+  return [{ labelKey: 'deal.paid', cents: paid, precise: true }]
 }
 
 /**
@@ -304,7 +319,7 @@ export function DealsList({
   orgSlug?: string
 }) {
   const { t } = useTranslation('participations')
-  const { fmtEur, fmtDate, fmtMultiple } = useFormatters()
+  const { fmtEur, fmtEurCents, fmtDate, fmtMultiple } = useFormatters()
   const cellClass =
     'grid grid-cols-2 gap-x-6 gap-y-1 px-6 py-3 text-sm sm:grid-cols-5'
   return (
@@ -334,10 +349,12 @@ export function DealsList({
             </Field>
             {dealAmountTiles(dl).map((tile) => (
               <Field key={tile.labelKey} label={t(tile.labelKey)}>
-                {fmtEur(tile.cents)}
+                {tile.precise ? fmtEurCents(tile.cents) : fmtEur(tile.cents)}
               </Field>
             ))}
-            <Field label={t('deal.received')}>{fmtEur(dl.received ?? 0)}</Field>
+            <Field label={t('deal.received')}>
+              {fmtEurCents(dl.received ?? 0)}
+            </Field>
             <Field label={t('deal.tvpi')}>{fmtMultiple(tvpi)}</Field>
             <Field label={t('deal.status')}>
               <Badge

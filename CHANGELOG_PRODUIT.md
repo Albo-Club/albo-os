@@ -23,6 +23,38 @@ bas de page.
 
 ---
 
+## v1.121.0 — 23/07/2026 à 11:32 — Centimes : les montants réels affichés au centime là où ça compte
+
+Fini les montants arrondis à l'euro sur les écrans où le centime compte. Les
+montants **réels** — transactions bancaires, soldes de comptes, pointage,
+comptes courants, TVA et le suivi des royalties — s'affichent désormais **au
+centime** (ex. `1 234,56 €` au lieu de `1 235 €`). Sur la fiche d'un deal, le
+montant réellement versé, le reçu, la table des transactions et la comparaison
+plan vs réel passent aussi au centime, pour que tout se recoupe avec le relevé
+bancaire. Les montants d'**estimation et de pilotage** — valorisations, KPIs,
+engagements, prévisionnel, tableau de bord — restent arrondis à l'euro : à ce
+niveau les centimes seraient du bruit (et suggéreraient une précision qui
+n'existe pas sur une valo).
+
+> **🔧 Notes techniques**
+>
+> - Changement d'affichage uniquement : les montants sont déjà stockés en
+>   centimes (entiers), rien ne bouge en base ni dans les calculs.
+> - Nouveau formateur `fmtEurCents` (2 décimales) dans `useFormatters()`
+>   (`src/components/participations/ParticipationsTable.tsx`), à côté du
+>   `fmtEur` arrondi conservé pour le portfolio.
+> - Couche cash passée à 2 décimales : `TransactionSheet.tsx` (`fmtSigned`),
+>   `cash.$accountId.tsx`, `PassifTables.tsx`, `VatCard.tsx`,
+>   `CashAccounts.tsx`.
+> - Fiche deal : table des transactions + tuiles « versé »/« reçu » (flag
+>   `precise` sur `dealAmountTiles`), `RoyaltiesPanel.tsx` (panneau entier),
+>   `LeadSpvPanel.tsx` (collecté), `FundSection.tsx` (appelé/distribué), table
+>   de `PlanVsActualSection.tsx` → `fmtEurCents`. Le graphe plan-vs-réel garde
+>   son axe arrondi (des ticks au centime seraient illisibles).
+> - Prévisionnel/suggestions, valos, plus-value latente, engagement, dashboard
+>   et e-mails : inchangés (arrondi euro). Règle documentée dans `CLAUDE.md`
+>   § Gestion des arrondis (centimes).
+
 ## v1.120.0 — 22/07/2026 à 12:06 — Gmail : email d'alerte quand une boîte doit être reconnectée
 
 Plus besoin de surveiller la page Intégrations : quand l'autorisation d'une

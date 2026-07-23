@@ -86,13 +86,15 @@ function usePassifFormatters() {
     new Intl.NumberFormat(lang, {
       style: 'currency',
       currency: 'EUR',
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(cents / 100)
   const fmtBalance = (cents: number) =>
     new Intl.NumberFormat(lang, {
       style: 'currency',
       currency: 'EUR',
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
       signDisplay: 'exceptZero',
     }).format(cents / 100)
   return { fmtEur, fmtBalance }

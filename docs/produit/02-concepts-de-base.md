@@ -38,6 +38,11 @@ Quelques conventions traversent toute l'application :
 
 - **Montants** : stockés en centimes d'euro, toujours en nombres entiers.
   L'affichage fait la conversion — vous ne manipulez jamais les centimes.
+  Ils sont affichés **au centime** là où le montant est réel et doit se
+  recouper avec la banque (transactions, soldes, pointage, comptes courants,
+  TVA, royalties, versé/reçu d'un deal), et **arrondis à l'euro** là où c'est
+  une estimation ou du pilotage (valorisations, KPIs, engagement, prévisionnel,
+  tableau de bord).
 - **Taux** : stockés en points de base (1100 = 11 %). Même principe :
   l'affichage montre des pourcentages.
 - **Devise** : l'euro partout par défaut. Les soldes et le prévisionnel

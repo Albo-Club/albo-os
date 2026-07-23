@@ -279,7 +279,8 @@ function AccountDetail() {
       : new Intl.NumberFormat(lang, {
           style: 'currency',
           currency: 'EUR',
-          maximumFractionDigits: 0,
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
         }).format(cents / 100)
   const fmtDate = (ms: number) =>
     new Date(ms).toLocaleDateString(lang, {
@@ -292,7 +293,8 @@ function AccountDetail() {
     return new Intl.NumberFormat(lang, {
       style: 'currency',
       currency: 'EUR',
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
       signDisplay: 'always',
     }).format(signed / 100)
   }

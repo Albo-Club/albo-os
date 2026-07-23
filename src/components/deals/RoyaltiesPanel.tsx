@@ -72,7 +72,7 @@ function EditableCa({
   onDelete: () => void
   className?: string
 }) {
-  const { fmtEur } = useFormatters()
+  const { fmtEurCents } = useFormatters()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   // The amount-field hook must run on every render, not only while editing —
@@ -131,7 +131,7 @@ function EditableCa({
       )}
       onClick={begin}
     >
-      {value == null ? '—' : fmtEur(value)}
+      {value == null ? '—' : fmtEurCents(value)}
     </TableCell>
   )
 }
@@ -161,7 +161,7 @@ export function RoyaltiesPanel({
 }) {
   const { t, i18n } = useTranslation('participations')
   const lang = i18n.language
-  const { fmtEur, fmtDate, fmtMultiple } = useFormatters()
+  const { fmtEurCents, fmtDate, fmtMultiple } = useFormatters()
   const updateDeal = useConvexMutation(api.deals.update)
 
   const [importOpen, setImportOpen] = useState(false)
@@ -207,10 +207,10 @@ export function RoyaltiesPanel({
       ? '—'
       : amount == null
         ? fmtMultiple(mult)
-        : `${fmtMultiple(mult)} — ${fmtEur(amount)}`
+        : `${fmtMultiple(mult)} — ${fmtEurCents(amount)}`
 
   const params = [
-    { key: 'capitalInvested', value: fmtEur(deal.capitalInvested) },
+    { key: 'capitalInvested', value: fmtEurCents(deal.capitalInvested) },
     { key: 'depreciationRate', value: fmtPct(deal.depreciationRate) },
     { key: 'royaltyRate', value: fmtPct(deal.royaltyRate) },
     { key: 'investmentDate', value: fmtDate(deal.investmentDate) },
@@ -352,7 +352,7 @@ export function RoyaltiesPanel({
     className?: string,
   ) => (
     <TableCell key={key} className={cn('text-right tabular-nums', className)}>
-      {value == null ? '—' : fmtEur(value)}
+      {value == null ? '—' : fmtEurCents(value)}
     </TableCell>
   )
 
@@ -416,7 +416,7 @@ export function RoyaltiesPanel({
               )}
               style={{ left: `${cursorPct}%` }}
             >
-              {fmtEur(realizedCumul)}{' '}
+              {fmtEurCents(realizedCumul)}{' '}
               <span className="text-muted-foreground text-xs font-normal">
                 {t('fiche.royalty.htTag')}
               </span>
@@ -478,7 +478,7 @@ export function RoyaltiesPanel({
                   {t('field.floorMultiple')}
                 </span>
                 <span>
-                  {fmtEur(floorAmount)} ·{' '}
+                  {fmtEurCents(floorAmount)} ·{' '}
                   {fmtMultiple(deal.floorMultiple ?? null)}
                 </span>
               </span>
@@ -487,7 +487,7 @@ export function RoyaltiesPanel({
                   {t('field.capMultiple')}
                 </span>
                 <span>
-                  {fmtEur(capAmount)} · {fmtMultiple(deal.capMultiple ?? null)}
+                  {fmtEurCents(capAmount)} · {fmtMultiple(deal.capMultiple ?? null)}
                 </span>
               </span>
             </div>
@@ -497,11 +497,11 @@ export function RoyaltiesPanel({
           <p className="text-sm">
             {realizedCumul < floorAmount
               ? t('fiche.royalty.stateBeforeFloor', {
-                  amount: fmtEur(floorAmount - realizedCumul),
+                  amount: fmtEurCents(floorAmount - realizedCumul),
                 })
               : realizedCumul < capAmount
                 ? t('fiche.royalty.stateBeforeCap', {
-                    amount: fmtEur(capAmount - realizedCumul),
+                    amount: fmtEurCents(capAmount - realizedCumul),
                   })
                 : t('fiche.royalty.stateCapReached')}
           </p>
@@ -692,7 +692,7 @@ export function RoyaltiesPanel({
                   >
                     {r.gapAbs == null
                       ? '—'
-                      : `${r.gapAbs > 0 ? '+' : ''}${fmtEur(r.gapAbs)}`}
+                      : `${r.gapAbs > 0 ? '+' : ''}${fmtEurCents(r.gapAbs)}`}
                   </TableCell>
                 ))}
                 <TableCell
@@ -702,7 +702,7 @@ export function RoyaltiesPanel({
                   )}
                 >
                   {totals.gapAbs > 0 ? '+' : ''}
-                  {fmtEur(totals.gapAbs)}
+                  {fmtEurCents(totals.gapAbs)}
                 </TableCell>
               </TableRow>
               <TableRow>
@@ -754,7 +754,7 @@ function ImportBpDialog({
   onConfirm: (rows: Array<BpPoint>) => void
 }) {
   const { t } = useTranslation(['participations', 'common'])
-  const { fmtEur } = useFormatters()
+  const { fmtEurCents } = useFormatters()
   const [text, setText] = useState('')
 
   const preview = useMemo(() => parseBpPaste(text), [text])
@@ -795,9 +795,9 @@ function ImportBpDialog({
                   <p className="text-muted-foreground tabular-nums">
                     {t('participations:fiche.royalty.importRange', {
                       fromQuarter: first.quarter,
-                      fromValue: fmtEur(first.plannedRevenue),
+                      fromValue: fmtEurCents(first.plannedRevenue),
                       toQuarter: last.quarter,
-                      toValue: fmtEur(last.plannedRevenue),
+                      toValue: fmtEurCents(last.plannedRevenue),
                     })}
                   </p>
                   {skipped > 0 && (

@@ -474,7 +474,7 @@ function ReattachActions({
 
 function Transactions({ deal }: { deal: CurrentDeal }) {
   const { t } = useTranslation('participations')
-  const { fmtEur, fmtDate } = useFormatters()
+  const { fmtEurCents, fmtDate } = useFormatters()
   const reportError = useReportError()
   const txs = useConvexQuery(api.transactions.listByDeal, { dealId: deal._id })
 
@@ -553,7 +553,7 @@ function Transactions({ deal }: { deal: CurrentDeal }) {
                   <TableCell
                     className={`text-right tabular-nums ${directionTone(tx.direction)}`}
                   >
-                    {fmtEur(tx.amount)}
+                    {fmtEurCents(tx.amount)}
                   </TableCell>
                   <TableCell>{tx.rawLabel}</TableCell>
                   <TableCell>{tx.counterparty ?? '—'}</TableCell>
@@ -710,7 +710,7 @@ function DealDetail() {
     (sum, tx) => (tx.direction === 'in' ? sum + tx.amount : sum),
     0,
   )
-  const { fmtEur } = useFormatters()
+  const { fmtEur, fmtEurCents } = useFormatters()
   const dealTitle = useDealTitle()
 
   // Reconciled transactions block deletion (invariant: matched ⟺ dealId,
@@ -837,10 +837,10 @@ function DealDetail() {
           <Stat
             key={tile.labelKey}
             label={t(tile.labelKey)}
-            value={fmtEur(tile.cents)}
+            value={tile.precise ? fmtEurCents(tile.cents) : fmtEur(tile.cents)}
           />
         ))}
-        <Stat label={t('deal.received')} value={fmtEur(received)} />
+        <Stat label={t('deal.received')} value={fmtEurCents(received)} />
       </div>
 
       {/* Central block: layout driven by the saved instrument type. The

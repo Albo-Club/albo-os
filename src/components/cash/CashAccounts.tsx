@@ -47,7 +47,8 @@ function useFormatters() {
       : new Intl.NumberFormat(lang, {
           style: 'currency',
           currency: 'EUR',
-          maximumFractionDigits: 0,
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
         }).format(cents / 100)
   const fmtDate = (ms?: number | null) =>
     ms == null
