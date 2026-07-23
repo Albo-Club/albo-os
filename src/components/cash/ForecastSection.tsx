@@ -589,13 +589,17 @@ const STATUS_VARIANT = {
   cancelled: 'outline',
 } as const
 
-function EntryDialog({
+export function EntryDialog({
   orgId,
   entry,
+  lockedDealId,
   onClose,
 }: {
   orgId: Id<'organizations'>
   entry: Entry | null // null = create
+  // When set (create-from-deal), the entry is bound to this deal and the
+  // deal picker is hidden.
+  lockedDealId?: Id<'deals'>
   onClose: () => void
 }) {
   const { t } = useTranslation(['cash', 'common'])
@@ -606,7 +610,7 @@ function EntryDialog({
   // rule dialog — same query + args).
   const deals = useConvexQuery(api.deals.listOptions, { orgId })
   const [dealId, setDealId] = useState<Id<'deals'> | null>(
-    entry?.dealId ?? null,
+    entry?.dealId ?? lockedDealId ?? null,
   )
   const [label, setLabel] = useState(entry?.label ?? '')
   const [amount, setAmount] = useState(
@@ -780,17 +784,19 @@ function EntryDialog({
               onChange={setCategory}
             />
           </div>
-          <div className="space-y-2">
-            <Label>{t('cash:forecast.dealLabel')}</Label>
-            <DealCombobox
-              deals={deals}
-              value={deals?.find((d) => d._id === dealId) ?? null}
-              onSelect={(deal) => setDealId(deal?._id ?? null)}
-            />
-            <p className="text-muted-foreground text-xs">
-              {t('cash:forecast.dealHint')}
-            </p>
-          </div>
+          {!lockedDealId && (
+            <div className="space-y-2">
+              <Label>{t('cash:forecast.dealLabel')}</Label>
+              <DealCombobox
+                deals={deals}
+                value={deals?.find((d) => d._id === dealId) ?? null}
+                onSelect={(deal) => setDealId(deal?._id ?? null)}
+              />
+              <p className="text-muted-foreground text-xs">
+                {t('cash:forecast.dealHint')}
+              </p>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={pending}>

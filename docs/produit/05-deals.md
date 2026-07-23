@@ -61,7 +61,10 @@ là où [Participations](04-participations.md) regroupe par société.
   l'[assistant IA](11-assistant-ia.md) (coller le BP suffit), pas par un
   formulaire.
 - **Prévisionnel du deal** : les échéances prévisionnelles liées (loyers
-  SCPI, coupons, appels programmés) et le reste engagé à déployer.
+  SCPI, coupons, appels programmés) et le reste engagé à déployer. Le
+  bouton **« Ajouter une prévision »** crée une échéance ponctuelle
+  directement rattachée à ce deal, sans passer par la Trésorerie ; elle
+  remonte aussitôt ici et dans le prévisionnel de trésorerie.
 - **Transactions** : les mouvements bancaires rattachés au deal. Un clic
   ouvre le détail avec possibilité de **réaffecter** la transaction à un
   autre deal.
