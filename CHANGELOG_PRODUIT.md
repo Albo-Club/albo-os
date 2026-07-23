@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.125.0 — 23/07/2026 à 14:38 — Le titre reste figé en haut des fiches entité et deal
+## v1.125.0 — 23/07/2026 à 15:22 — Le titre reste figé en haut des fiches entité et deal
 
 Sur une **fiche entreprise** ou une **fiche deal**, le titre (le nom, son
 statut et le menu d'actions « … ») reste désormais **collé en haut de la
@@ -37,6 +37,47 @@ reste toujours visible.
 >   qui enveloppe l'`Outlet` (`app/$orgSlug/route.tsx`), donc pas de JS.
 > - Full-bleed via `-mx-6 px-6` (le `main` est en `p-6`) + `bg-background`
 >   `border-b` `z-10` pour masquer proprement le contenu qui passe dessous.
+
+## v1.124.2 — 23/07/2026 à 14:45 — Emails : plus aucun scroll horizontal dans la fenêtre du mail
+
+Verrouillage complet de la fenêtre d'email : les blocs internes (en-tête,
+corps du message) ne peuvent plus créer de barre de défilement horizontale.
+Tout respecte la largeur de la fenêtre et revient à la ligne ; seul le
+défilement vertical reste possible. Ça règle les cas — surtout les mails au
+titre très long — où il fallait « glisser vers la gauche » pour voir la suite.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/CompanyEmailsSection.tsx`, `EmailDetailDialog` :
+>   sur le `DialogContent`, ajout de `overflow-x-hidden` (un conteneur en
+>   `overflow-y-auto` voit son `overflow-x` calculé en `auto` par le
+>   navigateur → autorise un scroll horizontal ; on le force à `hidden`) et
+>   de `[&>*]:min-w-0` (les enfants d'une grille ont `min-width: auto` et
+>   peuvent élargir la piste au-delà du plafond ; on les laisse rétrécir pour
+>   forcer le retour à la ligne). Même `overflow-x-hidden` ajouté sur la boîte
+>   de scroll du corps du message. Complète le plafond `sm:max-w-2xl!` de
+>   v1.124.1.
+
+## v1.124.1 — 23/07/2026 à 14:29 — Emails : la fenêtre du mail qui débordait de l'écran
+
+La vraie cause des débordements de la fenêtre d'email : la fenêtre elle-même
+n'était pas limitée en largeur et s'étirait à la taille de son contenu le plus
+large (un sujet très long sur une seule ligne), au point de sortir de l'écran.
+Elle est désormais correctement plafonnée et centrée, et tout le mail tient
+dans le cadre. (Les deux correctifs précédents ne traitaient que le contenu à
+l'intérieur du cadre, pas la taille du cadre — d'où l'impression que « rien ne
+se passait ».)
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/CompanyEmailsSection.tsx` : `DialogContent` du
+>   `EmailDetailDialog` passé de `sm:max-w-2xl` à `sm:max-w-2xl!` (important
+>   suffixe). Le `DialogContent` shadcn embarque un `max-w-[calc(100%-2rem)]`
+>   de base qui l'emportait dans la cascade CSS sur un `sm:max-w-2xl` nu (cf.
+>   `KNOWN_ISSUES.md` « tailwind-merge v3 / Tailwind v4 »), donc la boîte
+>   n'était jamais plafonnée à 2xl et s'étalait à la largeur de son plus large
+>   enfant. Seule modale du projet à contenir un enfant aussi large (le sujet
+>   d'un mail sur une ligne), d'où le fait qu'elle seule exposait le bug.
 
 ## v1.124.0 — 23/07/2026 à 14:14 — Prévisionnel : ajouter une échéance directement depuis un deal
 
