@@ -646,6 +646,7 @@
     "received": "Reçu",
     "receivedVia": "via {{mailbox}}",
     "attachments": "Pièces jointes",
+    "aiMatched": "Rattaché par l'IA",
     "page": {
       "metaTitle": "Emails — Albo OS",
       "title": "Emails",

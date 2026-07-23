@@ -604,8 +604,10 @@ secret dans la réponse) + mutations `createConnection`/`disconnectConnection`.
 Boîtes Gmail connectées en OAuth direct (`convex/gmail.ts`), **une
 connexion par org** (même boîte dans 2 orgs = 2 connexions), sync
 incrémentale par cron 10 min (`gmail.syncAll`, curseur `historyId`), mails
-matchés par domaine dans l'org de la boîte → onglet **Emails** de la fiche
-participation, pièces jointes stockées.
+matchés dans l'org de la boîte par cascade — domaine des participants,
+domaine cité dans le corps, nom de la société en mot entier, puis fallback
+LLM (confiance high uniquement, lien flaggé ✨) → onglet **Emails** de la
+fiche participation, pièces jointes stockées.
 Prérequis : env vars `GOOGLE_OAUTH_CLIENT_ID`/`GOOGLE_OAUTH_CLIENT_SECRET`
 posées (client OAuth **dédié** au scope `gmail.readonly` — pas celui du
 sign-in) ; redirect URI `${CONVEX_SITE_URL}/gmail/oauth/callback` déclarée
@@ -616,7 +618,9 @@ sur le client Google. Cf. `KNOWN_ISSUES.md` « Connecteur Gmail ».
 | GM1 | Intégrations → Gmail → « Connecter une boîte Gmail »                           | Redirection `accounts.google.com` (consent `gmail.readonly`) ; au retour, sous-ligne avec l'adresse de la boîte, pastille 🟢, atterrissage sur la page d'origine (`?gmail=connected`)  |
 | GM2 | Réponse réseau de `gmail.startConnect` + ligne `gmailAccounts` (dashboard)     | Seul `{ authorizeUrl }` transite ; le refresh token n'apparaît dans **aucune** query publique (`listAccounts` sanitisée) ; état OAuth one-shot consommé (table `gmailOAuthStates` vide) |
 | GM3 | Envoyer un mail de test depuis/vers une adresse au domaine d'une participation | Après le cron (≤ 10 min, ou « Synchroniser ») : le mail apparaît dans l'onglet **Emails** de la fiche, direction correcte (reçu/envoyé), clic → dialog avec corps texte                |
-| GM4 | Mail sans rapport avec le portfolio (newsletter, interne)                      | **Aucune** ligne `companyEmails` créée (vérifier au dashboard) — seuls les mails matchés sont stockés                                                                                 |
+| GM3b | Mail transféré (ou envoyé par un tiers) qui cite une adresse `@domaine-participation` ou le nom exact de la société dans l'objet/corps, sans participant à ce domaine | Matché quand même (cascade `body_domain` / `name_mention`, visible sur `companyEmailLinks.matchMethod`) ; pas d'étincelle ✨ (réservée aux liens LLM)                                  |
+| GM3c | Mail concernant une participation sans domaine ni nom exact dans le texte (ex. reporting transféré par un fonds) | Rattaché par le fallback LLM si sans ambiguïté (`matchMethod: llm_direct`/`llm_indirect`) : étincelle ✨ sur la ligne (page org : sur le badge société ; onglet fiche : à côté de l'objet, tooltip « Rattaché par l'IA ») ; si le LLM doute (confidence low) → rien de stocké |
+| GM4 | Mail sans rapport avec le portfolio (newsletter, interne)                      | **Aucune** ligne `companyEmails` créée (vérifier au dashboard) — le mail passe par le fallback LLM (log `[gmail]` si erreur) mais seuls les mails matchés sont stockés                 |
 | GM5 | Même mail visible par 2 boîtes connectées                                      | **Une seule** entrée dans la timeline ; le dialog liste les 2 boîtes (`via …`)                                                                                                        |
 | GM6 | Boîte connectée dans Albo seulement, société au même domaine existant aussi dans Calte | Le mail apparaît **uniquement** côté Albo ; côté Calte : rien tant que la boîte n'y est pas aussi connectée (étanchéité par org) ; connectée dans les 2 orgs → il apparaît des deux côtés, PJ stockées une seule fois |
 | GM6b | Mail matché avec un PDF en pièce jointe                                       | Trombone sur la ligne de la timeline ; dialog → section « Pièces jointes » avec téléchargement ; liens `<a href>` du corps préservés sous la forme « libellé (url) »                  |

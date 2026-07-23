@@ -2625,7 +2625,8 @@ Pièges si on retouche cette zone :
 OAuth Google **direct** (pas d'agrégateur), architecture reprise du module
 messaging de Twenty CRM (`twentyhq/twenty`, `modules/messaging`) : curseur
 incrémental `historyId` par boîte, cron de polling 10 min, dédup par
-`Message-ID`, matching déterministe par domaine. Pièges à connaître :
+`Message-ID`, matching en cascade (règles déterministes puis fallback LLM).
+Pièges à connaître :
 
 - **Client OAuth dédié, séparé du sign-in.** Le scope `gmail.readonly` est
   un scope *restreint* Google : le porter sur le client de sign-in
@@ -2664,15 +2665,33 @@ incrémental `historyId` par boîte, cron de polling 10 min, dédup par
   conservés comme filet de re-fetch. L'extraction de reports (OCR,
   métriques) reste à brancher (étape 2) ; le forward AgentMail
   (`docs/produit/17-reports-par-email.md`) reste le canal d'analyse.
-- **Matching = domaine uniquement, RESTREINT à l'org de la boîte** : les
+- **Matching en cascade, RESTREINT à l'org de la boîte** : les
   boîtes sont org-scopées depuis le 21/07/2026 au soir (une connexion
   faite depuis Albo n'alimente qu'Albo ; même boîte dans 2 orgs = 2 lignes
-  `gmailAccounts`, upsert par (org, email)). Participants (From/To/Cc)
-  dont le domaine == `companies.domain` (kind `portfolio`, non archivée)
-  de **l'org de la boîte** uniquement. Freemail exclus, domaines des
-  boîtes connectées de l'org exclus, mails 100 % internes ignorés. Les
+  `gmailAccounts`, upsert par (org, email)). Cascade (lignée Albo App,
+  `findMatches` partagé probe/store, méthode tracée sur
+  `companyEmailLinks.matchMethod`) : (1) domaines des participants
+  From/To/Cc == `companies.domain` (kind `portfolio`, non archivée) de
+  **l'org de la boîte** uniquement ; (2) domaines des adresses citées dans
+  le corps (blocs de transfert, signatures) ; (3) nom de la société en
+  mot entier dans objet+corps (emails/URLs strippés, ≥ 3 caractères,
+  blocklist plateformes — helpers partagés avec `reportIdentify` dans
+  `convex/lib/emailIdentify.ts`) ; (4) fallback LLM (`identifyByLlm`,
+  même `getModel()` que le reste) pour les mails non matchés par les
+  règles : rattachement direct/indirect, **confiance high uniquement**,
+  ids hallucinés filtrés, picks re-validés dans la mutation →
+  `matchMethod: llm_direct|llm_indirect`, étincelle ✨ dans l'UI.
+  Freemail exclus, domaines des boîtes connectées de l'org exclus. Les
   contacts n'ont **pas** d'email en base (`companies.people` : décision
   « reachable via Attio ») → pas de matching par adresse individuelle.
+- **Échec du fallback LLM = mail perdu pour la timeline** : le curseur
+  `historyId` consomme le message même si l'appel LLM échoue (erreur
+  modèle, JSON imparsable) — il n'y a pas de retry, le mail est loggé
+  (`[gmail] LLM identification failed`) et sauté. Enjeu timeline
+  uniquement (aucune action automatique) ; le backfill d'historique à
+  venir rattrapera ces cas. Un mail interne (100 % domaines des boîtes)
+  n'est plus ignoré d'office : il peut matcher via le corps (transfert
+  interne d'un report) — c'est voulu.
 - **Ligne legacy pré-séparation** : le modèle initial (boîtes globales) a
   brièvement vécu en prod avec une boîte connectée, zéro donnée.
   `gmailAccounts.orgId`/`gmailOAuthStates.orgId` sont donc **optional au

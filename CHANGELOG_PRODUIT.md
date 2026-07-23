@@ -23,6 +23,42 @@ bas de page.
 
 ---
 
+## v1.124.0 — 23/07/2026 à 17:15 — Emails : rattachement plus malin, avec l'IA en filet
+
+Jusqu'ici, un email n'était rangé sur la fiche d'une participation que si
+l'expéditeur ou un destinataire portait le domaine de la société. Beaucoup
+de vrais échanges passaient au travers : un report transféré, un fonds qui
+transmet le reporting d'une de vos lignes, un avocat qui parle du deal…
+
+Le rattachement se fait désormais **en cascade**, du signal le plus sûr au
+plus fin : domaine des participants, puis domaine cité dans le corps du
+message (cas du transfert), puis nom exact de la société dans l'objet ou le
+corps — et, pour les emails qu'aucune règle ne rattache, une **analyse par
+l'IA** détecte les participations concernées directement ou indirectement.
+L'IA ne rattache que quand c'est sans ambiguïté, et ces liens sont marqués
+d'une étincelle ✨ dans la timeline pour rester identifiables. Rien d'autre
+ne change : seuls les emails liés au portefeuille sont conservés, et
+l'extraction de report reste sur votre clic.
+
+> **🔧 Notes techniques**
+>
+> - `convex/gmail.ts` : `findMatches` réécrit en cascade déterministe
+>   (`participant_domain` → `body_domain` → `name_mention`) + fallback
+>   `identifyByLlm` (generateObject via `getModel()`, fallback
+>   generateText, confiance high uniquement, picks re-validés dans
+>   `storeMessage`) ; méthode tracée sur `companyEmailLinks.matchMethod`
+>   (nouveau champ optionnel au schéma). Suppression du skip « mail 100 %
+>   interne » (un transfert interne peut matcher via le corps).
+> - Helpers partagés extraits dans `convex/lib/emailIdentify.ts`
+>   (`nameAppearsInText`, `extractEmailAddresses`, `extractJson`,
+>   blocklist plateformes) — `reportIdentify.ts` les consomme désormais.
+> - UI : flag `viaLlm` exposé par `gmail.listByOrg`/`listByCompany`,
+>   étincelle `Sparkles` sur `/app/$orgSlug/emails` et l'onglet Emails de
+>   la fiche (i18n `emails.aiMatched`).
+> - Piège documenté (`KNOWN_ISSUES.md` « Connecteur Gmail ») : un échec de
+>   l'appel LLM saute le message sans retry (curseur consommé) — rattrapé
+>   par le futur backfill d'historique.
+
 ## v1.123.0 — 23/07/2026 à 11:32 — Centimes : les montants réels affichés au centime là où ça compte
 
 Fini les montants arrondis à l'euro sur les écrans où le centime compte. Les
