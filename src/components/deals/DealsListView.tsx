@@ -12,6 +12,7 @@ import {
   residualCents,
   useFormatters,
 } from '~/components/participations/ParticipationsTable'
+import { dealStatusBadge } from '~/lib/dealStatusBadge'
 import { FacetFilter } from '~/components/participations/FacetFilter'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { Badge } from '~/components/ui/badge'
@@ -64,12 +65,6 @@ function dealTvpi(d: DealRow): number | null {
     proceeds: d.received ?? 0,
     residual: residualCents(d),
   })
-}
-
-function statusVariant(s: string): 'default' | 'secondary' | 'destructive' {
-  if (s === 'written_off') return 'destructive'
-  if (s === 'active') return 'default'
-  return 'secondary'
 }
 
 type SortKey = 'company' | 'paid' | 'received' | 'tvpi' | 'signed'
@@ -544,6 +539,7 @@ function DealRowCells({
   const { t } = useTranslation('participations')
   const navigate = useNavigate()
   const tvpi = dealTvpi(deal)
+  const statusBadge = dealStatusBadge(deal.status, deal.moic)
   // Whole-row click opens the deal sheet. Guarded by `slug` (per-org passes
   // orgSlug; aggregated derives it from the deal's org) — without it the row
   // isn't clickable.
@@ -641,7 +637,7 @@ function DealRowCells({
       </TableCell>
       {settled && (
         <TableCell>
-          <Badge variant={statusVariant(deal.status)}>
+          <Badge variant={statusBadge.variant} className={statusBadge.className}>
             {t(`status.${deal.status}`, { defaultValue: deal.status })}
           </Badge>
         </TableCell>

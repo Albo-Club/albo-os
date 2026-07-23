@@ -23,6 +23,41 @@ bas de page.
 
 ---
 
+## v1.127.0 — 23/07/2026 à 17:07 — Statut des deals : la couleur ne sert plus qu'aux sorties
+
+Les badges de statut d'un deal étaient devenus confus : plusieurs couleurs se
+chevauchaient et un deal sorti pouvait porter deux badges qui répétaient la
+même info (deux rouges sur une perte, deux gris sur une sortie à plat).
+
+Désormais **un seul badge par deal**, et la couleur ne parle que quand elle
+veut dire quelque chose :
+
+- **gris** — rien à signaler : un deal actif, ou une sortie sans plus-value
+  (un deal actif se suit avec ses reports, pas avec une couleur) ;
+- **ambre** — term sheet signée, pas encore câblée ;
+- **vert** — sortie gagnante, y compris une **sortie partielle déjà dans le
+  vert** (le gain réalisé reste signalé, jamais une perte tant que la position
+  n'est pas soldée) ;
+- **rouge** — sortie en perte ou dépréciation.
+
+Plus de double badge, et la même règle s'applique partout : liste des deals,
+vue consolidée, fiche société et fiche deal.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle source unique `dealStatusBadge(status, moic)`
+>   (`src/lib/dealStatusBadge.ts`) → `{ variant, className }`. Couleur d'un exit
+>   depuis le MOIC réalisé (`DealRow.moic` côté serveur, ou `dealMoic(deal, txs)`
+>   sur la fiche) : `pending` → ambre, `fully_exited` ≥ 1 → vert / < 1 → rouge /
+>   MOIC nul → neutre, `written_off` → rouge, `partially_exited` ≥ 1 → vert
+>   (win-only, jamais rouge — reprend la logique de la v1.126.0), sinon neutre.
+> - Remplace les 3 copies de `statusVariant` + l'override `pending` inline + le
+>   composant `ExitBadge` (supprimé, sa logique win-only repliée dans le helper)
+>   dans `DealsListView` (liste par-org **et** `/app/all`), `ParticipationsTable`
+>   (`DealsList` + section soldés) et `deals.$dealId`. Un seul `<Badge>` par deal.
+> - Clés i18n `participations.exitBadge.*` retirées (FR + EN) ; les libellés
+>   réutilisent `status.*`.
+
 ## v1.126.1 — 23/07/2026 à 16:39 — Sync Attio : la société arrive avec son vrai nom
 
 Quand un deal passait en Term Sheet dans Attio, la société créée dans Albo OS

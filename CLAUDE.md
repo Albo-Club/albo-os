@@ -488,6 +488,13 @@ export const remove = mutation({
   raw unformatted string, so the euro parsers (`eurosToCents`, `parseEuros`,
   `parseAmountToCents`) work unchanged. Percentages, share counts and years
   keep the native numeric input.
+- ❌ Recolouring a deal's status/exit badge by hand (a hardcoded `Badge`
+  variant, or a second exit badge next to the status one). A deal's status
+  colour has **one source**: `dealStatusBadge(status, moic)`
+  (`src/lib/dealStatusBadge.ts`) — neutral grey by default, amber for
+  `pending`, green/red for a winning/losing exit (from the realized MOIC), red
+  for `written_off`. One badge per deal; the colour carries only the exit (an
+  active deal is tracked through its reports, not a colour).
 - ❌ A `DialogContent` whose content can grow tall (long lists, repeatable
   rows, many fields) without `max-h-[85vh] overflow-y-auto`. shadcn's dialog
   has no built-in height cap, so tall content overflows the viewport with no
