@@ -776,7 +776,10 @@ function DealDetail() {
         </Link>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Sticky so the title stays pinned while scrolling; full-bleed bg +
+          border mask the content passing underneath (scroll container is the
+          layout's Outlet). */}
+      <div className="bg-background sticky top-0 z-10 -mx-6 flex flex-wrap items-center gap-3 border-b px-6 py-3">
         {/* Custom deal name, or the instrument label when the deal is unnamed. */}
         <h1 className="text-2xl font-semibold tracking-tight">
           {dealTitle(deal)}

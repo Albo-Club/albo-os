@@ -905,8 +905,10 @@ function ParticipationDetail() {
   return (
     <main className="flex-1 space-y-6 p-6">
       <BackLink orgSlug={orgSlug} />
-      {/* Header: name + nature + ownership + (kept) edit actions. */}
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Header: name + nature + ownership + (kept) edit actions. Sticky so the
+          title stays pinned while scrolling; full-bleed bg + border mask the
+          content passing underneath (scroll container is the layout's Outlet). */}
+      <div className="bg-background sticky top-0 z-10 -mx-6 flex flex-wrap items-center gap-3 border-b px-6 py-3">
         <CompanyLogo
           domain={company?.domain}
           companyName={company?.name}

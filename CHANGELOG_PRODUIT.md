@@ -23,6 +23,21 @@ bas de page.
 
 ---
 
+## v1.125.0 — 23/07/2026 à 15:22 — Le titre reste figé en haut des fiches entité et deal
+
+Sur une **fiche entreprise** ou une **fiche deal**, le titre (le nom, son
+statut et le menu d'actions « … ») reste désormais **collé en haut de la
+page** quand vous faites défiler vers le bas. Plus besoin de remonter tout en
+haut pour savoir où vous êtes ou pour rouvrir le menu d'actions : le repère
+reste toujours visible.
+
+> **🔧 Notes techniques**
+> - Barre de titre rendue `sticky top-0` dans `participations.$companyId.tsx`
+>   et `deals.$dealId.tsx` — le conteneur de scroll est le `div.overflow-y-auto`
+>   qui enveloppe l'`Outlet` (`app/$orgSlug/route.tsx`), donc pas de JS.
+> - Full-bleed via `-mx-6 px-6` (le `main` est en `p-6`) + `bg-background`
+>   `border-b` `z-10` pour masquer proprement le contenu qui passe dessous.
+
 ## v1.124.2 — 23/07/2026 à 14:45 — Emails : plus aucun scroll horizontal dans la fenêtre du mail
 
 Verrouillage complet de la fenêtre d'email : les blocs internes (en-tête,
