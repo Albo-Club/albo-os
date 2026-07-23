@@ -66,6 +66,42 @@ export function shouldReplaceInstrument(
   return incoming !== 'unknown' && incoming !== current
 }
 
+/** Placeholder name for a sync-created target company with no Attio identity. */
+export const ATTIO_STUB_COMPANY_NAME = 'Société (Attio)'
+
+/**
+ * Identity patch for the deal's target company on a Term Sheet refresh, or
+ * null when nothing should change. Renames ONLY sync-created stubs — a stub
+ * is a company still named after the deal (or the generic placeholder), i.e.
+ * the name the create path gave it when the Attio company identity was
+ * unavailable. Any other name is user data and is never overwritten. The
+ * domain is only ever filled when missing, never replaced.
+ */
+export function companyIdentityPatch(opts: {
+  companyName: string | null
+  companyDomain: string | null
+  current: { name: string; domain?: string | null }
+  /** Deal names the stub may carry (DB name, incoming Attio deal name). */
+  stubNames: ReadonlyArray<string | null | undefined>
+}): { name?: string; domain?: string } | null {
+  const patch: { name?: string; domain?: string } = {}
+
+  const incomingName = opts.companyName?.trim()
+  const isStub =
+    opts.current.name === ATTIO_STUB_COMPANY_NAME ||
+    opts.stubNames.some((n) => n != null && n.trim() === opts.current.name)
+  if (incomingName && incomingName !== opts.current.name && isStub) {
+    patch.name = incomingName
+  }
+
+  const incomingDomain = opts.companyDomain?.trim()
+  if (incomingDomain && !opts.current.domain) {
+    patch.domain = incomingDomain
+  }
+
+  return Object.keys(patch).length > 0 ? patch : null
+}
+
 export type DealStatus =
   | 'pending'
   | 'active'

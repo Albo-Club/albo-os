@@ -23,6 +23,27 @@ bas de page.
 
 ---
 
+## v1.126.1 — 23/07/2026 à 16:39 — Sync Attio : la société arrive avec son vrai nom
+
+Quand un deal passait en Term Sheet dans Attio, la société créée dans Albo OS
+prenait le **nom du deal** (ex. « Invest Startup Studio ») au lieu du nom de
+la société (« You.Switch »). Corrigé : la synchro va maintenant chercher la
+fiche société dans Attio et crée la société avec son **vrai nom et son
+domaine**. Les sociétés déjà arrivées en « coquille » se réparent toutes
+seules à la prochaine modification du deal dans Attio — un nom corrigé à la
+main n'est jamais écrasé.
+
+> **🔧 Notes techniques**
+>
+> - `convex/attioSync.ts` : nouveau `fetchCompanyIdentity` (re-fetch de la
+>   company Attio associée — nom + premier domaine — le payload deal ne porte
+>   que la référence), branché sur le webhook ET le backfill ;
+>   `resolveOrCreateTargetCompany` crée la société avec cette identité,
+>   `repairStubTargetCompany` répare les stubs au refresh Term Sheet.
+> - `convex/lib/attioSync.ts` : décision pure `companyIdentityPatch`
+>   (rename stub-only, domaine rempli seulement si vide) + constante
+>   `ATTIO_STUB_COMPANY_NAME` — testée dans `tests/attioSync.test.ts`.
+
 ## v1.126.0 — 23/07/2026 à 15:43 — Sortie partielle : le gain déjà réalisé s'affiche
 
 Un deal en **sortie partielle** garde son statut « Exit partiel » et reste

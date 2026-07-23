@@ -11,9 +11,11 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import {
+  ATTIO_STUB_COMPANY_NAME,
   INVESTED_STATUS_ID,
   TERM_SHEET_STATUS_ID,
   advancesStatus,
+  companyIdentityPatch,
   dealForecastKey,
   decideSyncAction,
   orgSlugFromOption,
@@ -161,6 +163,98 @@ describe('orgSlugFromOption — Attio albo_or_calte option → org slug', () => 
   it('is undefined for an absent or unknown option (deal is then skipped)', () => {
     assert.equal(orgSlugFromOption(null), undefined)
     assert.equal(orgSlugFromOption('unknown-option-id'), undefined)
+  })
+})
+
+describe('companyIdentityPatch — stub-only rename + domain fill', () => {
+  it('renames a stub still named after the deal to the Attio company name', () => {
+    assert.deepEqual(
+      companyIdentityPatch({
+        companyName: 'You.Switch',
+        companyDomain: null,
+        current: { name: 'Invest Startup Studio' },
+        stubNames: ['Invest Startup Studio', 'Invest Startup Studio'],
+      }),
+      { name: 'You.Switch' },
+    )
+  })
+
+  it('renames the generic placeholder stub', () => {
+    assert.deepEqual(
+      companyIdentityPatch({
+        companyName: 'You.Switch',
+        companyDomain: null,
+        current: { name: ATTIO_STUB_COMPANY_NAME },
+        stubNames: [null, 'Invest Startup Studio'],
+      }),
+      { name: 'You.Switch' },
+    )
+  })
+
+  it('never renames a company the user named', () => {
+    assert.equal(
+      companyIdentityPatch({
+        companyName: 'You.Switch',
+        companyDomain: null,
+        current: { name: 'Uswitch (renommée à la main)' },
+        stubNames: ['Invest Startup Studio', 'Invest Startup Studio'],
+      }),
+      null,
+    )
+  })
+
+  it('is a no-op when the incoming name is absent or already applied', () => {
+    assert.equal(
+      companyIdentityPatch({
+        companyName: null,
+        companyDomain: null,
+        current: { name: 'Invest Startup Studio' },
+        stubNames: ['Invest Startup Studio'],
+      }),
+      null,
+    )
+    assert.equal(
+      companyIdentityPatch({
+        companyName: 'You.Switch',
+        companyDomain: null,
+        current: { name: 'You.Switch' },
+        stubNames: ['Invest Startup Studio'],
+      }),
+      null,
+    )
+  })
+
+  it('fills a missing domain (even on a user-named company), never replaces one', () => {
+    assert.deepEqual(
+      companyIdentityPatch({
+        companyName: null,
+        companyDomain: 'youswitch.co',
+        current: { name: 'Uswitch (renommée à la main)' },
+        stubNames: ['Invest Startup Studio'],
+      }),
+      { domain: 'youswitch.co' },
+    )
+    assert.equal(
+      companyIdentityPatch({
+        companyName: null,
+        companyDomain: 'youswitch.co',
+        current: { name: 'You.Switch', domain: 'youswitch.fr' },
+        stubNames: [],
+      }),
+      null,
+    )
+  })
+
+  it('renames and fills the domain in one patch', () => {
+    assert.deepEqual(
+      companyIdentityPatch({
+        companyName: 'You.Switch',
+        companyDomain: 'youswitch.co',
+        current: { name: 'Invest Startup Studio' },
+        stubNames: ['Invest Startup Studio'],
+      }),
+      { name: 'You.Switch', domain: 'youswitch.co' },
+    )
   })
 })
 
