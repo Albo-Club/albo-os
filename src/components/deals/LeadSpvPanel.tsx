@@ -29,7 +29,7 @@ export function LeadSpvPanel({
   onEdit?: () => void
 }) {
   const { t, i18n } = useTranslation('participations')
-  const { fmtEur } = useFormatters()
+  const { fmtEurCents } = useFormatters()
 
   const fmtPct = (bps: number | undefined) =>
     bps == null
@@ -40,7 +40,7 @@ export function LeadSpvPanel({
         }).format(bps / 10000)
 
   const params = [
-    { key: 'amountRaised', value: fmtEur(deal.amountRaised) },
+    { key: 'amountRaised', value: fmtEurCents(deal.amountRaised) },
     { key: 'managementFeeRate', value: fmtPct(deal.managementFeeRate) },
     { key: 'hurdleRate', value: fmtPct(deal.hurdleRate) },
     { key: 'carriedRate', value: fmtPct(deal.carriedRate) },
@@ -55,7 +55,7 @@ export function LeadSpvPanel({
             {t('fiche.leadSpv.collected')}
           </div>
           <div className="text-positive text-2xl font-semibold tabular-nums">
-            {fmtEur(received ?? 0)}
+            {fmtEurCents(received ?? 0)}
           </div>
         </div>
         <p className="text-muted-foreground max-w-[16rem] text-right text-xs">

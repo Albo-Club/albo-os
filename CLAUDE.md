@@ -213,6 +213,26 @@ seulement) :
 - **Multi-tenant strict** : aucune query/mutation ne lit/écrit sans avoir
   passé `requireOrgMember(ctx, orgId)`. Pas d'exception.
 
+**Gestion des arrondis (centimes)** : les montants sont **toujours** stockés
+au centime (entier) et calculés au centime — l'arrondi est **exclusivement**
+une décision d'affichage. La précision dépend de la nature du montant, pas de
+l'écran :
+
+- **Montant réel** (issu ou rapproché d'un mouvement bancaire) → affiché **au
+  centime** (2 décimales). Concerne : transactions, pointage, soldes de comptes
+  (`CashAccounts`), passif/comptes courants, TVA, versé/reçu réels sur la fiche
+  deal, royalties, tables de comparaison plan vs réel. Formateur `fmtEurCents`
+  de `useFormatters()` (`ParticipationsTable.tsx`), ou `minimumFractionDigits:
+  2` sur les formateurs locaux de la couche cash.
+- **Montant estimé / engagé / de pilotage** (pas un mouvement) → **arrondi à
+  l'euro** (`fmtEur`, `maximumFractionDigits: 0`). Concerne : valorisations,
+  plus-value latente, KPIs, TVPI/TRI/DPI, engagement (`committed`),
+  prévisionnel et suggestions, tableau de bord, axes de graphe, e-mails. Y
+  mettre des centimes suggérerait une précision qui n'existe pas.
+
+Règle mnémo : « l'actuel au centime, l'estimé arrondi ». Ne jamais rebasculer
+la couche cash sur l'euro entier, ni ajouter des centimes au portfolio.
+
 **État du schéma** : `companies`, `companyRelations`, `deals`, `valuations`,
 `kpiSnapshots` (cœur portfolio). `bankAccounts` + `transactions` sont
 alimentées (Powens/import) ; le pointage transaction → deal vit dans
