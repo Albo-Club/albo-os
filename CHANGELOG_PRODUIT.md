@@ -46,6 +46,22 @@ trésorerie.
 >   la section, qui renvoyait à la page Trésorerie pour la gestion, a été
 >   corrigé. Clés i18n `dealForecast.add` / `dealForecast.empty` (en + fr).
 
+## v1.123.1 — 23/07/2026 à 11:47 — Emails : titre trop long qui débordait de la fenêtre
+
+Suite du correctif précédent : quand le sujet d'un email était très long
+(par exemple une invitation d'agenda avec la date et l'adresse dans le
+titre), le titre débordait sur le côté et passait sous la croix de
+fermeture. Le titre revient désormais à la ligne et laisse la place au
+bouton de fermeture.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/CompanyEmailsSection.tsx` : ajout de `pr-8`
+>   (marge réservée au bouton close de la `DialogContent`) et `break-words`
+>   sur le `DialogTitle` du `EmailDetailDialog`. Sans marge à droite, un
+>   sujet long passait sous la croix ; `break-words` couvre les sujets
+>   contenant une longue chaîne sans espace (adresse email, URL).
+
 ## v1.123.0 — 23/07/2026 à 11:32 — Centimes : les montants réels affichés au centime là où ça compte
 
 Fini les montants arrondis à l'euro sur les écrans où le centime compte. Les
