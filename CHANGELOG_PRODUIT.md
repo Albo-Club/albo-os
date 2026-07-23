@@ -23,6 +23,21 @@ bas de page.
 
 ---
 
+## v1.121.1 — 23/07/2026 à 11:10 — Emails : corps de message qui débordait à l'ouverture
+
+À l'ouverture d'un email contenant de très longs liens (par exemple des URL
+de téléchargement de pièces jointes sans espaces), le corps du message
+débordait sur le côté et s'affichait mal. Les longues chaînes sont désormais
+coupées proprement pour tenir dans la fenêtre.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/CompanyEmailsSection.tsx` : ajout de
+>   `break-words` sur le conteneur du corps (`detail.bodyText`) du
+>   `EmailDetailDialog`. Le `whitespace-pre-wrap` seul ne coupait pas les
+>   tokens sans espaces (longues URL), d'où le débordement horizontal du
+>   modal.
+
 ## v1.121.0 — 22/07/2026 à 19:54 — Tâches : statuts, société liée, assignation et échéances
 
 La liste de tâches de l'onglet **À faire** passe d'une simple check-list à
