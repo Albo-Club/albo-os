@@ -23,6 +23,27 @@ bas de page.
 
 ---
 
+## v1.124.1 — 23/07/2026 à 14:29 — Emails : la fenêtre du mail qui débordait de l'écran
+
+La vraie cause des débordements de la fenêtre d'email : la fenêtre elle-même
+n'était pas limitée en largeur et s'étirait à la taille de son contenu le plus
+large (un sujet très long sur une seule ligne), au point de sortir de l'écran.
+Elle est désormais correctement plafonnée et centrée, et tout le mail tient
+dans le cadre. (Les deux correctifs précédents ne traitaient que le contenu à
+l'intérieur du cadre, pas la taille du cadre — d'où l'impression que « rien ne
+se passait ».)
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/CompanyEmailsSection.tsx` : `DialogContent` du
+>   `EmailDetailDialog` passé de `sm:max-w-2xl` à `sm:max-w-2xl!` (important
+>   suffixe). Le `DialogContent` shadcn embarque un `max-w-[calc(100%-2rem)]`
+>   de base qui l'emportait dans la cascade CSS sur un `sm:max-w-2xl` nu (cf.
+>   `KNOWN_ISSUES.md` « tailwind-merge v3 / Tailwind v4 »), donc la boîte
+>   n'était jamais plafonnée à 2xl et s'étalait à la largeur de son plus large
+>   enfant. Seule modale du projet à contenir un enfant aussi large (le sujet
+>   d'un mail sur une ligne), d'où le fait qu'elle seule exposait le bug.
+
 ## v1.124.0 — 23/07/2026 à 14:14 — Prévisionnel : ajouter une échéance directement depuis un deal
 
 Vous pouvez maintenant créer une **prévision ponctuelle** (un coupon attendu,

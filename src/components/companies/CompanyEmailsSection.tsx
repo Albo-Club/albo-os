@@ -128,7 +128,12 @@ export function EmailDetailDialog({
 
   return (
     <Dialog open={openId !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+      {/* `sm:max-w-2xl!` (suffix important): the shadcn DialogContent ships a
+          base `max-w-[calc(100%-2rem)]` that outranks a plain `sm:max-w-2xl`
+          in the CSS cascade (cf. KNOWN_ISSUES "tailwind-merge v3 / Tailwind
+          v4"), so without `!` the box is never capped at 2xl and stretches to
+          its widest child — here the long one-line email subject. */}
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl!">
         <DialogHeader>
           <DialogTitle className="pr-8 break-words">
             {detail ? detail.subject || t('emails.noSubject') : t('loading')}
