@@ -171,6 +171,25 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 | CA12 | Page compte → « Modifier » → cocher « Compte clôturé à la banque »                                                              | Badge « Clôturé » ; le compte descend dans la section grisée « Comptes clôturés » de la liste ; ses transactions et rattachements deals restent intacts (rien n'est supprimé)                                                                                                                                                                                                                                                |
 | CA13 | Compte **non connecté** à Powens (pas de `powensAccountId`) → « Modifier » → champ « Solde actuel (€) »                         | Champ visible uniquement sur les comptes non connectés (badge « Non connecté » en en-tête) ; saisir un montant (négatif accepté) → `updateAccountBalance`, `balanceAsOf` estampillé à maintenant, sous-texte « solde manuel au JJ/MM » dans la liste ; sur un compte connecté le champ est absent (Powens est la source de vérité, `ConvexError('account_connected')` si forcé par l'API)                                     |
 
+## Niveau 3 — Vue Placements (5 min)
+
+Route `/app/$orgSlug/placements`
+(`src/routes/app/$orgSlug/placements.index.tsx`) : la trésorerie placée suivie
+« façon Finary » — les deals dont l'instrument est `crypto`,
+`capitalization_account`, `dat` ou `cto` (périmètre
+`TREASURY_PLACEMENT_KINDS`, `convex/lib/instrumentMapping.ts`). Ces deals sont
+**exclus** de la liste Entreprises (`/participations`) ; la vue consolidée
+`/app/all` reste inchangée.
+
+| #   | Étape                                                                                      | Résultat attendu                                                                                                                                                                                                                                                             |
+| --- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PL1 | Ouvrir `/app/<org>/placements` (entrée sidebar « Placements » sous Trésorerie)             | 4 tuiles (Solde total, Versé net, Plus-value latente avec %, Rendement annualisé) + une ligne par placement : nom + banque, type, ouvert le, versé, retiré, solde, plus-value (€ + %), rendement ann. Montants au **centime** (soldes de comptes), tri par solde décroissant |
+| PL2 | Vérifier `/app/<org>/participations` dans la même org                                      | Aucun deal placement dans la table (ni dans l'export CSV) ; les sociétés des placements n'apparaissent **pas** dans « Sans deal » ; les compteurs/TVPI de la liste ignorent les placements                                                                                    |
+| PL3 | Clic sur le **solde** d'une ligne → saisir un montant → Entrée                             | Sauvegarde inline (`deals.update`, patch `currentValue`) + toast « Solde mis à jour » ; tuiles et plus-value recalculées ; une ligne `valuations` (`mark_to_market`, source `balance_update`) est créée — visible dans l'historique de valorisations du deal                  |
+| PL4 | Ligne sans solde renseigné                                                                  | Solde « — » (cliquable pour le saisir) ; plus-value et rendement « — » ; la ligne ne compte ni dans la plus-value ni dans le rendement globaux (pas de fausse perte à −100 %)                                                                                                 |
+| PL5 | Clic n'importe où ailleurs sur la ligne (ou Tab → Entrée)                                   | Navigue vers la fiche deal `/deals/$dealId` ; le clic sur le solde ne navigue pas                                                                                                                                                                                             |
+| PL6 | i18n EN/FR                                                                                  | Namespace `placements` : titre d'onglet, tuiles, colonnes, toasts traduits (« Placements » FR / « Investments » EN, nav + breadcrumb)                                                                                                                                        |
+
 ## Niveau 3 — Dashboard & prévisionnel de trésorerie (10 min)
 
 | #   | Étape                                                                 | Résultat attendu                                                                                                                                                                                                                                                               |

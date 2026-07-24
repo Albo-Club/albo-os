@@ -473,6 +473,24 @@ export const update = mutation({
         : {}),
       manuallyEditedFields: [...editedFields],
     })
+    // Placement balance history: every currentValue update (Placements page,
+    // deal sheet or edit dialog — they all land here) also logs a valuation
+    // row, so the balance builds a dated series over time. Skip 0 (the
+    // valuations module contract requires fairValue > 0).
+    if (
+      patch.currentValue != null &&
+      patch.currentValue > 0 &&
+      patch.currentValue !== deal.currentValue
+    ) {
+      await ctx.db.insert('valuations', {
+        orgId: deal.orgId,
+        dealId: id,
+        asOf: Date.now(),
+        fairValue: patch.currentValue,
+        valuationMethod: 'mark_to_market',
+        source: 'balance_update',
+      })
+    }
     return id
   },
 })

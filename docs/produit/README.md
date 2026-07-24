@@ -35,6 +35,7 @@ expliqué simplement dans un encadré « Sous le capot ».
 | Page | Contenu |
 | --- | --- |
 | [Trésorerie](07-tresorerie.md) | Comptes bancaires, transactions, analyse mensuelle |
+| [Placements](19-placements.md) | Trésorerie placée : crypto, comptes de capitalisation, dépôts à terme — solde et rendement |
 | [Pointage](08-pointage.md) | Rapprochement des transactions, catégorisation, TVA |
 | [Prévisionnel](09-previsionnel.md) | Règles récurrentes, solde projeté, rapprochement au réalisé, alertes |
 | [Passif](10-passif.md) | Capitaux propres, comptes courants inter-entités |

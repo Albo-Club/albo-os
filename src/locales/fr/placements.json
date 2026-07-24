@@ -1,0 +1,32 @@
+{
+  "metaTitle": "Placements — Albo OS",
+  "title": "Placements",
+  "subtitle": "La trésorerie placée — crypto, comptes de capitalisation, dépôts à terme, comptes-titres. Le solde se met à jour ici, la performance se calcule toute seule.",
+  "tiles": {
+    "balance": "Solde total",
+    "invested": "Versé net",
+    "investedHint": "Versé − retiré",
+    "gain": "Plus-value latente",
+    "yield": "Rendement annualisé",
+    "yieldHint": "XIRR des flux pointés + soldes actuels"
+  },
+  "col": {
+    "name": "Placement",
+    "type": "Type",
+    "opened": "Ouvert le",
+    "paid": "Versé",
+    "withdrawn": "Retiré",
+    "balance": "Solde",
+    "gain": "Plus-value",
+    "yield": "Rendement ann."
+  },
+  "balanceEditAria": "Modifier le solde de {{name}}",
+  "rowOpenAria": "Ouvrir le deal {{name}}",
+  "edit": {
+    "saved": "Solde mis à jour",
+    "errors": {
+      "default": "Impossible de mettre à jour le solde."
+    }
+  },
+  "empty": "Aucun placement. Les deals crypto, comptes de capitalisation, dépôts à terme et comptes-titres apparaîtront ici."
+}

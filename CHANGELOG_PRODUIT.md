@@ -23,6 +23,48 @@ bas de page.
 
 ---
 
+## v1.129.0 — 24/07/2026 à 12:45 — Placements : la trésorerie placée a sa propre page
+
+La crypto, les comptes de capitalisation, les dépôts à terme et les
+comptes-titres ne se suivent pas comme des participations : pas de tour de
+table ni de TVPI, juste un **solde** et **combien ça rapporte**. Ils ont
+désormais leur page dédiée, « Placements », dans la barre latérale sous
+Trésorerie — et sortent de la liste Entreprises (les fonds, eux, y restent).
+
+Sur cette page, façon Finary : quatre tuiles (solde total, versé net,
+plus-value latente, rendement annualisé) et une ligne par placement avec son
+versé, son retiré, son solde et sa performance. Le solde se met à jour d'un
+clic directement dans le tableau ; chaque mise à jour est datée et conservée,
+ce qui prépare une future courbe d'évolution. Le rendement annualisé est
+calculé sur les flux réellement pointés en banque plus le solde actuel.
+
+> **🔧 Notes techniques**
+>
+> - Périmètre défini par `TREASURY_PLACEMENT_KINDS` (`crypto`,
+>   `capitalization_account`, `dat`, `cto`) + helper `isTreasuryPlacement`
+>   dans `convex/lib/instrumentMapping.ts` — distinct de l'archétype
+>   `placement`, qui ne pilote que le layout de la fiche deal.
+> - Nouvelle route `src/routes/app/$orgSlug/placements.index.tsx` +
+>   `src/components/placements/PlacementsView.tsx` : tuiles `KpiCard`,
+>   table avec solde éditable inline (pattern `EditableCa`), XIRR par ligne
+>   et global via `xirr(flows + solde terminal)`. Montants au centime
+>   (`fmtEurCents`). Les lignes sans solde sont exclues de la plus-value et
+>   du rendement globaux.
+> - `deals.update` (`convex/deals.ts`) : tout patch de `currentValue`
+>   (> 0, changé) insère aussi une ligne `valuations`
+>   (`mark_to_market`, source `balance_update`) — historique daté du solde,
+>   quel que soit le point d'entrée (page Placements, fiche, dialogue).
+>   Effet de bord assumé : la NAV/TVPI du dashboard comptera ces placements
+>   à leur valeur marquée (aujourd'hui ils comptent au coût, faute de
+>   valorisation).
+> - `/app/$orgSlug/participations` filtre `isTreasuryPlacement` avant
+>   `ParticipationsView` (facettes, export CSV et section « Soldées »
+>   suivent) ; la liste **non filtrée** continue d'alimenter « Sans deal ».
+>   `/app/all` inchangé (pas encore de vue placements cross-org).
+> - Nav + breadcrumb (`nav.ts`, `AppHeader.tsx`), namespace i18n
+>   `placements` (fr/en), doc produit `docs/produit/19-placements.md`,
+>   TESTING.md section « Vue Placements » (PL1-PL6).
+
 ## v1.128.0 — 23/07/2026 à 17:15 — Emails : rattachement plus malin, avec l'IA en filet
 
 Jusqu'ici, un email n'était rangé sur la fiche d'une participation que si

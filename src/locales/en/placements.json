@@ -1,0 +1,32 @@
+{
+  "metaTitle": "Investments — Albo OS",
+  "title": "Investments",
+  "subtitle": "Invested treasury — crypto, capitalization accounts, term deposits, brokerage accounts. Update the balance here, the performance follows.",
+  "tiles": {
+    "balance": "Total balance",
+    "invested": "Net paid in",
+    "investedHint": "Paid in − withdrawn",
+    "gain": "Unrealized gain",
+    "yield": "Annualized return",
+    "yieldHint": "XIRR of matched flows + current balances"
+  },
+  "col": {
+    "name": "Investment",
+    "type": "Type",
+    "opened": "Opened",
+    "paid": "Paid in",
+    "withdrawn": "Withdrawn",
+    "balance": "Balance",
+    "gain": "Gain",
+    "yield": "Ann. return"
+  },
+  "balanceEditAria": "Edit the balance of {{name}}",
+  "rowOpenAria": "Open deal {{name}}",
+  "edit": {
+    "saved": "Balance updated",
+    "errors": {
+      "default": "Could not update the balance."
+    }
+  },
+  "empty": "No investments yet. Crypto, capitalization accounts, term deposits and brokerage accounts will show up here."
+}
