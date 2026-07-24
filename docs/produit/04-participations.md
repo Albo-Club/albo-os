@@ -7,6 +7,11 @@ portefeuille **par société** : une ligne = une société, quel que soit le
 nombre de deals réalisés dessus. C'est le point d'entrée vers les fiches
 sociétés, leurs rapports et leurs documents.
 
+Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
+à terme, comptes-titres) n'apparaissent pas ici : leur suivi est différent
+(un solde et un rendement, pas une participation) et vit sur la page
+[Placements](19-placements.md). Les fonds, eux, restent bien dans la liste.
+
 ## La liste
 
 - **Tableau des participations actives** : logo et nom, pitch (une ligne),

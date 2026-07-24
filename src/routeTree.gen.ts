@@ -35,6 +35,7 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppOrgSlugSettingsRouteRouteImport } from './routes/app/$orgSlug/settings/route'
 import { Route as AppOrgSlugSettingsIndexRouteImport } from './routes/app/$orgSlug/settings/index'
 import { Route as AppOrgSlugPointageIndexRouteImport } from './routes/app/$orgSlug/pointage.index'
+import { Route as AppOrgSlugPlacementsIndexRouteImport } from './routes/app/$orgSlug/placements.index'
 import { Route as AppOrgSlugPassifIndexRouteImport } from './routes/app/$orgSlug/passif.index'
 import { Route as AppOrgSlugParticipationsIndexRouteImport } from './routes/app/$orgSlug/participations.index'
 import { Route as AppOrgSlugDealsIndexRouteImport } from './routes/app/$orgSlug/deals.index'
@@ -178,6 +179,12 @@ const AppOrgSlugPointageIndexRoute = AppOrgSlugPointageIndexRouteImport.update({
   path: '/pointage/',
   getParentRoute: () => AppOrgSlugRouteRoute,
 } as any)
+const AppOrgSlugPlacementsIndexRoute =
+  AppOrgSlugPlacementsIndexRouteImport.update({
+    id: '/placements/',
+    path: '/placements/',
+    getParentRoute: () => AppOrgSlugRouteRoute,
+  } as any)
 const AppOrgSlugPassifIndexRoute = AppOrgSlugPassifIndexRouteImport.update({
   id: '/passif/',
   path: '/passif/',
@@ -276,6 +283,7 @@ export interface FileRoutesByFullPath {
   '/app/$orgSlug/deals/': typeof AppOrgSlugDealsIndexRoute
   '/app/$orgSlug/participations/': typeof AppOrgSlugParticipationsIndexRoute
   '/app/$orgSlug/passif/': typeof AppOrgSlugPassifIndexRoute
+  '/app/$orgSlug/placements/': typeof AppOrgSlugPlacementsIndexRoute
   '/app/$orgSlug/pointage/': typeof AppOrgSlugPointageIndexRoute
   '/app/$orgSlug/settings/': typeof AppOrgSlugSettingsIndexRoute
 }
@@ -311,6 +319,7 @@ export interface FileRoutesByTo {
   '/app/$orgSlug/deals': typeof AppOrgSlugDealsIndexRoute
   '/app/$orgSlug/participations': typeof AppOrgSlugParticipationsIndexRoute
   '/app/$orgSlug/passif': typeof AppOrgSlugPassifIndexRoute
+  '/app/$orgSlug/placements': typeof AppOrgSlugPlacementsIndexRoute
   '/app/$orgSlug/pointage': typeof AppOrgSlugPointageIndexRoute
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsIndexRoute
 }
@@ -351,6 +360,7 @@ export interface FileRoutesById {
   '/app/$orgSlug/deals/': typeof AppOrgSlugDealsIndexRoute
   '/app/$orgSlug/participations/': typeof AppOrgSlugParticipationsIndexRoute
   '/app/$orgSlug/passif/': typeof AppOrgSlugPassifIndexRoute
+  '/app/$orgSlug/placements/': typeof AppOrgSlugPlacementsIndexRoute
   '/app/$orgSlug/pointage/': typeof AppOrgSlugPointageIndexRoute
   '/app/$orgSlug/settings/': typeof AppOrgSlugSettingsIndexRoute
 }
@@ -392,6 +402,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/deals/'
     | '/app/$orgSlug/participations/'
     | '/app/$orgSlug/passif/'
+    | '/app/$orgSlug/placements/'
     | '/app/$orgSlug/pointage/'
     | '/app/$orgSlug/settings/'
   fileRoutesByTo: FileRoutesByTo
@@ -427,6 +438,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/deals'
     | '/app/$orgSlug/participations'
     | '/app/$orgSlug/passif'
+    | '/app/$orgSlug/placements'
     | '/app/$orgSlug/pointage'
     | '/app/$orgSlug/settings'
   id:
@@ -466,6 +478,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/deals/'
     | '/app/$orgSlug/participations/'
     | '/app/$orgSlug/passif/'
+    | '/app/$orgSlug/placements/'
     | '/app/$orgSlug/pointage/'
     | '/app/$orgSlug/settings/'
   fileRoutesById: FileRoutesById
@@ -666,6 +679,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrgSlugPointageIndexRouteImport
       parentRoute: typeof AppOrgSlugRouteRoute
     }
+    '/app/$orgSlug/placements/': {
+      id: '/app/$orgSlug/placements/'
+      path: '/placements'
+      fullPath: '/app/$orgSlug/placements/'
+      preLoaderRoute: typeof AppOrgSlugPlacementsIndexRouteImport
+      parentRoute: typeof AppOrgSlugRouteRoute
+    }
     '/app/$orgSlug/passif/': {
       id: '/app/$orgSlug/passif/'
       path: '/passif'
@@ -781,6 +801,7 @@ interface AppOrgSlugRouteRouteChildren {
   AppOrgSlugDealsIndexRoute: typeof AppOrgSlugDealsIndexRoute
   AppOrgSlugParticipationsIndexRoute: typeof AppOrgSlugParticipationsIndexRoute
   AppOrgSlugPassifIndexRoute: typeof AppOrgSlugPassifIndexRoute
+  AppOrgSlugPlacementsIndexRoute: typeof AppOrgSlugPlacementsIndexRoute
   AppOrgSlugPointageIndexRoute: typeof AppOrgSlugPointageIndexRoute
 }
 
@@ -798,6 +819,7 @@ const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
   AppOrgSlugDealsIndexRoute: AppOrgSlugDealsIndexRoute,
   AppOrgSlugParticipationsIndexRoute: AppOrgSlugParticipationsIndexRoute,
   AppOrgSlugPassifIndexRoute: AppOrgSlugPassifIndexRoute,
+  AppOrgSlugPlacementsIndexRoute: AppOrgSlugPlacementsIndexRoute,
   AppOrgSlugPointageIndexRoute: AppOrgSlugPointageIndexRoute,
 }
 

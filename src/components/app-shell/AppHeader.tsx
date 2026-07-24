@@ -36,6 +36,7 @@ const CRUMB_SEGMENTS = [
   'participations',
   'deals',
   'cash',
+  'placements',
   'pointage',
   'todo',
   'passif',

@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { ConvexError } from 'convex/values'
 
 import { api } from '../../../../convex/_generated/api'
+import { isTreasuryPlacement } from '../../../../convex/lib/instrumentMapping'
 import type { Id } from '../../../../convex/_generated/dataModel'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
@@ -334,10 +335,18 @@ function Participations() {
     api.deals.list,
     org ? { orgId: org._id } : 'skip',
   )
+  // Treasury placements (crypto, capitalization accounts, term deposits…) live
+  // on the dedicated Placements page — the list, its facets and its CSV export
+  // only cover participations. The UNFILTERED set keeps feeding
+  // WithoutDealSection below, so a placement's company never shows as orphan.
+  const participations = useMemo(
+    () => deals?.filter((d) => !isTreasuryPlacement(d.instrumentKind)),
+    [deals],
+  )
   // Filled by the table; lets the header menu trigger the export of the full
   // deal set (active + settled).
   const exportRef = useRef<(() => void) | null>(null)
-  const hasDeals = Boolean(deals && deals.length > 0)
+  const hasDeals = Boolean(participations && participations.length > 0)
 
   return (
     <main className="flex-1 space-y-6 p-6">
@@ -370,7 +379,11 @@ function Participations() {
           </DropdownMenu>
         )}
       </div>
-      <ParticipationsView deals={deals} orgSlug={orgSlug} exportRef={exportRef} />
+      <ParticipationsView
+        deals={participations}
+        orgSlug={orgSlug}
+        exportRef={exportRef}
+      />
 
       {org && (
         <WithoutDealSection orgId={org._id} orgSlug={orgSlug} deals={deals} />

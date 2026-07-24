@@ -19,6 +19,7 @@ import enOrg from '~/locales/en/org.json'
 import enSettings from '~/locales/en/settings.json'
 import enChat from '~/locales/en/chat.json'
 import enCash from '~/locales/en/cash.json'
+import enPlacements from '~/locales/en/placements.json'
 import enPointage from '~/locales/en/pointage.json'
 import enPassif from '~/locales/en/passif.json'
 import enReports from '~/locales/en/reports.json'
@@ -39,6 +40,7 @@ import frOrg from '~/locales/fr/org.json'
 import frSettings from '~/locales/fr/settings.json'
 import frChat from '~/locales/fr/chat.json'
 import frCash from '~/locales/fr/cash.json'
+import frPlacements from '~/locales/fr/placements.json'
 import frPointage from '~/locales/fr/pointage.json'
 import frPassif from '~/locales/fr/passif.json'
 import frReports from '~/locales/fr/reports.json'
@@ -60,6 +62,7 @@ export const NAMESPACES = [
   'settings',
   'chat',
   'cash',
+  'placements',
   'pointage',
   'passif',
   'reports',
@@ -85,6 +88,7 @@ export const resources = {
     settings: enSettings,
     chat: enChat,
     cash: enCash,
+    placements: enPlacements,
     pointage: enPointage,
     passif: enPassif,
     reports: enReports,
@@ -106,6 +110,7 @@ export const resources = {
     settings: frSettings,
     chat: frChat,
     cash: frCash,
+    placements: frPlacements,
     pointage: frPointage,
     passif: frPassif,
     reports: frReports,

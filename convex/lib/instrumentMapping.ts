@@ -29,6 +29,28 @@ export type Archetype =
 
 export type RenderMode = 'fields' | 'custom' | 'placeholder'
 
+/**
+ * Treasury placements — the deals tracked as an ACCOUNT (a balance you update
+ * and an annualized yield), not as a participation: they live on the dedicated
+ * Placements page and are excluded from the Participations list. Scope rule
+ * (fixed with ALB-82): crypto, capitalization accounts, term deposits (dat)
+ * and brokerage accounts (cto). Distinct from the 'placement' ARCHETYPE, which
+ * only drives the deal-sheet field layout (dat keeps its debt fields, cto its
+ * placeholder).
+ */
+export const TREASURY_PLACEMENT_KINDS: ReadonlySet<InstrumentKind> = new Set([
+  'crypto',
+  'capitalization_account',
+  'dat',
+  'cto',
+])
+
+/** Whether a deal belongs to the Placements page (loose string overload for
+ * front rows typed `instrumentKind: string`). */
+export function isTreasuryPlacement(kind: string): boolean {
+  return TREASURY_PLACEMENT_KINDS.has(kind as InstrumentKind)
+}
+
 /** instrumentKind → archetype. Total Record (every InstrumentKind). */
 export const INSTRUMENT_ARCHETYPE: Record<InstrumentKind, Archetype> = {
   // equity. safe config keeps only safe / bsa_air; bsa has its own config

@@ -1,6 +1,7 @@
 import {
   Handshake,
   Inbox,
+  Landmark,
   LayoutDashboard,
   ListTodo,
   Mail,
@@ -65,6 +66,11 @@ export function getNavGroups(): Array<NavGroup> {
           titleKey: 'items.cash',
           to: '/app/$orgSlug/cash',
           icon: Wallet,
+        },
+        {
+          titleKey: 'items.placements',
+          to: '/app/$orgSlug/placements',
+          icon: Landmark,
         },
         {
           titleKey: 'items.passif',
