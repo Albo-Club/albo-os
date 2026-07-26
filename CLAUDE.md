@@ -295,8 +295,8 @@ fichiers annexes dans un tableau `references` optionnel, aux chemins relatifs
 au répertoire du `SKILL.md` — identiques upstream et en local, pour que les
 liens Markdown relatifs continuent de résoudre. Ces références entrent dans le
 `computedHash`, donc la détection de dérive les couvre. **Tout nouveau fichier
-annexe doit y être déclaré** : un fichier vendorisé à la main est invisible de
-`sync:skills` comme de `--check`, et pourrit en silence.
+annexe doit y être déclaré** : un fichier vendorisé à la main n'est vu ni par
+`sync:skills`, ni par `--check`, ni par `--verify`, et pourrit en silence.
 
 Un chemin de `references` ne peut viser qu'un **descendant** du répertoire du
 `SKILL.md` — jamais `../`, qui écrirait hors de `.agents/skills/<nom>/`. Pour
@@ -305,27 +305,35 @@ lock. Le pourquoi est dans `KNOWN_ISSUES.md` § « Skills vendorisées : liens
 inter-familles » ; la section suivante explique pourquoi `MAX_IN_FLIGHT` ne doit
 pas bouger quand la liste s'allonge.
 
-`--check` répond à « est-ce que l'upstream a bougé ? », pas à « est-ce que mon
-arbre local est intact ? » : il compare le tip upstream au lock et vérifie
-seulement que les fichiers vendorisés *existent*. Les éditions locales de
-`.agents/skills/` sont l'affaire de git, pas du script. Corollaire : quand on
-ajoute des `references` à une skill déjà vendorisée, le hash du lock peut déjà
-correspondre à l'upstream et `sync:skills` ne réécrit rien — il faut
-`node scripts/sync-skills.mjs --force` pour remplacer les copies locales.
+**Deux questions distinctes, deux modes — ne pas les confondre.** `--verify`
+répond à « est-ce que mon arbre local est intact ? » (re-hash local, hors-ligne,
+déterministe) ; `--check` répond à « est-ce que l'upstream a bougé ? » (réseau,
+la réponse change sans que personne ne touche au repo). C'est `--verify` qui
+garde la CI ; la dérive upstream remonte par le hook `SessionStart` et le cron
+hebdo. Cf. `KNOWN_ISSUES.md` § « `--check` ne voit pas l'état du disque ».
 
 - `pnpm run sync:skills` — vendorise chaque skill au `pinnedRef` déclaré
-  (reproductible, pas de réseau surprise ; idempotent).
+  (reproductible, pas de réseau surprise ; idempotent). **Auto-réparateur** :
+  réécrit tout fichier qui ne correspond plus au `computedHash`, donc répare un
+  arbre corrompu ou périmé sans `--force`.
+- `pnpm run sync:skills:verify` — re-hash les fichiers vendorisés et compare au
+  lock ; exit 2 si l'arbre a divergé. Aucun réseau — c'est le garde-fou CI.
 - `pnpm run sync:skills:check` — compare le `trackingRef` tip au contenu
   vendorisé ; exit 2 si dérive (upstream a bougé depuis le dernier bump).
 - `pnpm run sync:skills:update` — avance le `pinnedRef` au SHA courant du
   `trackingRef`, re-vendorise, écrit le lock. C'est le bump délibéré — à
   faire après avoir relu le diff.
 
-Règle : `--check` détecte, `--update` bumpe. Ne jamais `--update` sans avoir
-relu ce que la nouvelle version change.
+Règle : `--verify` protège, `--check` détecte, `--update` bumpe. Ne jamais
+`--update` sans avoir relu ce que la nouvelle version change.
 
-**Si le check CI `skills-drift` est rouge (avant de merger)** : ne jamais le
-contourner ni `--update` à l'aveugle. Dérouler :
+**Si le job CI `skills-verify` est rouge** : l'arbre vendorisé ne correspond
+plus au lock — quelqu'un a édité `.agents/skills/` à la main, ou un fichier
+manque. `pnpm run sync:skills` répare, puis relire le `git diff` : si le
+contenu revient à ce que dit le lock, l'édition locale était l'erreur.
+
+**Si `pnpm run sync:skills:check` signale une dérive (upstream a bougé)** : ne
+jamais `--update` à l'aveugle. Dérouler :
 
 1. **Expliquer l'erreur** : lancer `pnpm run sync:skills:check`, nommer la/les
    skill(s) en dérive et ce que ça signifie (le `trackingRef` upstream a bougé
@@ -338,7 +346,7 @@ contourner ni `--update` à l'aveugle. Dérouler :
    (`CLAUDE.md` / `KNOWN_ISSUES.md`) ne devient faux. ⚠️ Une maj de skill est
    une surface de prompt-injection : lire, pas rubber-stamper.
 4. **Proposer de merger** : présenter le résumé puis demander l'accord avant de
-   commit/push. Une fois mergé, `skills-drift` repasse au vert.
+   commit/push. Une fois mergé, `sync:skills:check` repasse au vert.
 
 | Skill                                      | Domaine                                | Source upstream                       | Officiel ?     |
 | ------------------------------------------ | -------------------------------------- | ------------------------------------- | -------------- |

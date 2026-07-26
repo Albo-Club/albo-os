@@ -23,6 +23,40 @@ bas de page.
 
 ---
 
+## v1.129.2 — 26/07/2026 à 15:00 — Documentation des agents : contrôle d'intégrité
+
+Changement interne, sans effet visible dans l'application. La documentation
+technique lue par les agents IA est désormais vérifiée à chaque modification du
+code : si un fichier a été altéré ou est resté périmé, l'intégration continue
+le signale et une seule commande le répare.
+
+> **🔧 Notes techniques**
+>
+> Suite de la v1.129.1. En portant les PR du template, on a découvert que
+> `scripts/sync-skills.mjs` ne vérifiait **jamais** l'état du disque : `--check`
+> comme le mode par défaut comparaient le hash du lock à l'**upstream**, et
+> `isVendored()` ne testait que l'*existence* des fichiers. Un fichier vendorisé
+> édité à la main, tronqué ou périmé était invisible des deux côtés — démontré
+> en ajoutant une ligne dans un `SKILL.md` : `--check` restait vert, exit 0.
+> C'est la cause racine des trois fichiers `references/` Convex périmés
+> (`migrations-component.md` avait 54 lignes de retard).
+>
+> - Nouveau mode `--verify` (`pnpm run sync:skills:verify`) : `hashLocal()`
+>   reproduit `fetchSkillAt()` contre l'arbre de travail (même ordre de
+>   fichiers, même cadrage) et compare à `computedHash`. Aucun réseau.
+> - Le mode par défaut devient **auto-réparateur** : `runSync` réécrit dès que
+>   le local diverge du lock, donc `pnpm run sync:skills` répare un arbre
+>   corrompu sans `--force`.
+> - CI : le job `skills-drift` (réseau, 62 requêtes par PR, pouvait rougir sur
+>   un hoquet GitHub) est remplacé par `skills-verify` (hors-ligne,
+>   déterministe). La dérive upstream reste couverte par le hook `SessionStart`
+>   et le cron hebdo.
+> - Vérifs : 3 types de corruption détectés (SKILL.md modifié, référence
+>   modifiée, fichier supprimé) → exit 2 ; réparation par `sync:skills` seul,
+>   arbre restauré à l'identique (0 diff) ; idempotence et `--check` inchangés ;
+>   lint + typecheck + build verts.
+> - Ajouté au backlog `TEMPLATE_SYNC.md` : le template porte le même bug.
+
 ## v1.129.1 — 26/07/2026 à 14:32 — Documentation des agents : arborescence TanStack officielle
 
 Changement interne, sans effet visible dans l'application : la documentation

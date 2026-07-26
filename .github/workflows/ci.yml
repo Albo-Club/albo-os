@@ -26,15 +26,19 @@ jobs:
       - run: pnpm test:unit
       - run: pnpm build
 
-  skills-drift:
+  skills-verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # exit 2 si une skill upstream a dérivé de skills-lock.json
-      - run: node scripts/sync-skills.mjs --check
+      # exit 2 si .agents/skills ne correspond plus à skills-lock.json.
+      # Hors-ligne et déterministe : contrairement à --check, ce job ne peut
+      # pas rougir à cause d'un hoquet de raw.githubusercontent.com. La dérive
+      # upstream, elle, est couverte par le hook SessionStart et le cron
+      # hebdo (workflow « Sync skills ») — cf. KNOWN_ISSUES.md.
+      - run: node scripts/sync-skills.mjs --verify
 
   changelog:
     # Changelog entry mandatory on every PR (CLAUDE.md § Pre-PR doc audit, q.5).
