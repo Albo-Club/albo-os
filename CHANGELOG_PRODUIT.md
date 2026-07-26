@@ -23,6 +23,61 @@ bas de page.
 
 ---
 
+## v1.129.5 — 26/07/2026 à 23:40 — Sécurité : reprise de compte par email périmé, et emails neutralisés
+
+Changements internes, sans effet visible dans l'application.
+
+Changer l'adresse email de son compte met désormais le compte à jour
+**partout** : jusqu'ici l'ancienne adresse restait attachée en base, et
+quelqu'un qui aurait récupéré cette adresse abandonnée pour créer un compte
+aurait hérité de l'accès, des organisations et des droits de son précédent
+propriétaire.
+
+Les emails envoyés par l'application (invitation, alerte de trésorerie,
+échéances en retard, connexion bancaire, boîte Gmail à reconnecter…)
+affichent maintenant les noms et libellés de façon neutralisée : un nom
+d'organisation ou un libellé d'échéance contenant du code ne peut plus
+modifier l'apparence de l'email reçu par quelqu'un d'autre.
+
+> **🔧 Notes techniques**
+>
+> Report des correctifs de sécurité du template amont, ce fork étant antérieur
+> au fix. La troisième faille du lot (open redirect sur `?redirect=`) était
+> déjà couverte par la v1.129.3 — voir la note de fusion en fin d'entrée.
+>
+> - **Reprise de compte via email périmé (critique).** `user.changeEmail` est
+>   activé et `provisionAppUser` (`convex/lib/auth.ts`) retombe sur un lookup
+>   `by_email` quand `betterAuthId` ne matche pas — mais rien ne resynchronisait
+>   `users.email` après un changement côté Better Auth. Ajout de
+>   `databaseHooks.user.update.after` dans `createAuth` (`convex/auth.ts`), qui
+>   appelle la nouvelle `internal.users.syncFromBetterAuth` : elle retrouve la
+>   ligne **par `betterAuthId`** (clé stable, jamais par email) et recopie
+>   `email` / `name`. Idempotente, et sans write quand rien n'a changé — la
+>   ligne `users` est chaude. Scénario d'attaque et règle anti-récidive dans
+>   `KNOWN_ISSUES.md` § « Reprise de compte via email périmé ».
+> - **Injection HTML dans les emails (moyen).** Le helper `esc()` de
+>   `convex/emailTemplates.ts` (échappe `& < > " '`, existait déjà pour les
+>   récaps de reports) est remonté en haut du fichier, étendu aux guillemets et
+>   apostrophes, et appliqué aux valeurs utilisateur de la branche HTML des huit
+>   templates transactionnels : `invitationEmail`,
+>   `changeEmailVerificationEmail`, `deleteAccountVerificationEmail`,
+>   `passwordChangedEmail`, `cashAlertEmail`, `overdueEntriesEmail` (dont les
+>   libellés d'échéance), `powensConnectionAlertEmail` (dont l'`errorMessage`
+>   relayé par la banque) et `gmailReauthAlertEmail`. Sujets et branches texte
+>   inchangés ; les URLs sont construites côté serveur, donc laissées telles
+>   quelles (liens intacts).
+>
+> **Fusion avec la v1.129.3 (open redirect).** Cette branche portait aussi un
+> correctif pour la 3ᵉ faille, développé en parallèle : il a été **abandonné au
+> rebase** au profit de `internalRedirectSearch`. Motif : notre garde était une
+> regex `/^\/(?![/\\])/`, et le parseur d'URL supprime tab/LF/CR **avant** de
+> résoudre — `/<TAB>/evil.com` passait donc le test puis résolvait vers
+> `https://evil.com` (vérifié). La résolution contre une origine sonde de
+> `src/lib/safe-redirect.ts` n'a pas ce trou, et couvre aussi `/register`.
+>
+> Un anti-pattern ajouté dans `CLAUDE.md` (échappement des emails) ; ligne L2
+> de `TESTING.md` mise à jour.
+
 ## v1.129.4 — 26/07/2026 à 23:12 — Documentation des agents : mise à jour TanStack
 
 Changement interne, sans effet visible dans l'application. La documentation
@@ -86,7 +141,6 @@ sur votre tableau de bord.
 > - Docs : section « Return-URL `?redirect=` » dans `KNOWN_ISSUES.md`,
 >   anti-pattern dans `CLAUDE.md`, ligne A4 de `TESTING.md` corrigée (le garde
 >   `/app` n'ajoute aucun paramètre de retour) et nouvelle ligne S8.
-
 ## v1.129.2 — 26/07/2026 à 15:00 — Documentation des agents : contrôle d'intégrité
 
 Changement interne, sans effet visible dans l'application. La documentation

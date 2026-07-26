@@ -221,6 +221,22 @@ export const createAuth = (ctx: GenericCtx<DataModel>) =>
             return undefined
           },
         },
+        update: {
+          // Mirror every BA user update onto the Convex `users` row. Mandatory
+          // because `user.changeEmail` is enabled AND `provisionAppUser` falls
+          // back to an email lookup: without this, a changed email leaves the
+          // row on the OLD address, and whoever re-registers that abandoned
+          // address gets re-pointed onto the victim's row (orgs, ownership,
+          // superAdmin). The sync keys on `betterAuthId`, never on email.
+          after: async (user) => {
+            const mutCtx = requireRunMutationCtx(ctx)
+            await mutCtx.runMutation(internal.users.syncFromBetterAuth, {
+              betterAuthId: user.id,
+              email: user.email,
+              name: user.name,
+            })
+          },
+        },
       },
     },
     user: {

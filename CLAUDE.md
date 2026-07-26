@@ -527,6 +527,14 @@ export const remove = mutation({
   (`convex/lib/userPrefs.ts`). Same family: a mutation fired from a
   `useEffect` that depends on a Convex query observing the written data
   (cross-tab infinite loop). See `KNOWN_ISSUES.md` "Hot `users` row".
+- ❌ Interpolating a user-controlled value (name, org name, email address,
+  free-text label, message relayed by a third party) into the **HTML**
+  branch of a `convex/emailTemplates.ts` template without `esc()`. The
+  `heading` / `intro` / `followup` / `preheader` / `footer` fields land in
+  the markup verbatim, so an unescaped `<` injects arbitrary HTML into an
+  email read by someone else. Local convention: prefix escaped values with
+  `h…` (`hOrg`, `hMailbox`). The `subject` and the `text` branch take the
+  raw value — escaping there would render literal `&amp;`.
 - ❌ Surfacing Better Auth errors via `error.message` (or worse, a regex
   on it) in any new client code. Always classify through
   `classifyAuthError()` + `formatAuthError(code, ctx)` from

@@ -117,6 +117,40 @@ export const localeForEmail = internalQuery({
 })
 
 /**
+ * Internal — called from Better Auth's `user.update.after` hook to mirror a BA
+ * user update onto our `users` row. Security-critical for `changeEmail`:
+ * `provisionAppUser` falls back to an email lookup when `betterAuthId` misses,
+ * so a row left on a stale address would be handed to whoever re-registers
+ * that address (orgs, ownership, superAdmin). The row is found by
+ * `betterAuthId` — the stable key — never by email. Idempotent, and a no-op
+ * write-wise when nothing changed (the `users` row is hot: every query reads
+ * the caller's row, so a needless patch invalidates all open subscriptions —
+ * see KNOWN_ISSUES.md § "Hot `users` row").
+ */
+export const syncFromBetterAuth = internalMutation({
+  args: {
+    betterAuthId: v.string(),
+    email: v.string(),
+    name: v.optional(v.string()),
+  },
+  handler: async (ctx, { betterAuthId, email, name }) => {
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_betterAuthId', (q) => q.eq('betterAuthId', betterAuthId))
+      .unique()
+    if (!user) return null
+
+    const patch: { email?: string; name?: string } = {}
+    if (user.email !== email) patch.email = email
+    if (name !== undefined && user.name !== name) patch.name = name
+    if (Object.keys(patch).length === 0) return null
+
+    await ctx.db.patch('users', user._id, patch)
+    return null
+  },
+})
+
+/**
  * Internal — called from Better Auth's `beforeDelete` hook to cascade-delete
  * all Convex-side data for a user being removed. Idempotent.
  */

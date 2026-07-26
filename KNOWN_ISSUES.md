@@ -48,6 +48,35 @@ all three :
    bypassing the `/register` flow and leaving password-less accounts
    that later 500 on `signIn.email`.
 
+5. **Toute mutation d'identité côté BA doit se répercuter sur la ligne
+   `users`.** `databaseHooks.user.update.after` (dans `createAuth`) appelle
+   `internal.users.syncFromBetterAuth`, qui retrouve la ligne **par
+   `betterAuthId`** et recopie `email` / `name`. Ne jamais retrouver la ligne
+   par email dans ce hook : c'est précisément l'adresse qui vient de changer.
+
+### Reprise de compte via email périmé
+
+Le fallback email de `provisionAppUser` (règle 3) et `user.changeEmail`
+(activé dans `convex/auth.ts`) sont **couplés**. Sans le hook de la règle 5 :
+
+1. La victime change son email de `old@x.com` vers `new@x.com`. BA met à jour
+   son user ; la ligne Convex, elle, reste sur `old@x.com`.
+2. L'attaquant reprend `old@x.com` (domaine expiré, adresse recyclée chez le
+   fournisseur, alias libéré) et s'inscrit avec.
+3. Son nouveau BA user n'a pas de ligne `users`. `provisionAppUser` tombe dans
+   le fallback email, trouve la ligne périmée de la victime, et **repointe son
+   `betterAuthId` dessus** — l'attaquant hérite des orgs, du rôle owner et du
+   flag `superAdmin`.
+
+Le hook ferme la fenêtre en gardant `users.email` aligné : après le
+changement, plus aucune ligne ne porte `old@x.com`, donc le fallback ne matche
+plus rien et l'attaquant obtient une ligne neuve, vide.
+
+La mutation ne patche que si une valeur a réellement changé — la ligne `users`
+est chaude (cf. § « Hot `users` row »), un write inutile invaliderait toutes
+les souscriptions ouvertes. À noter : `update.after` se déclenche aussi sur les
+updates sans rapport (`emailVerified`, changement de nom), d'où le garde.
+
 ### Security coupling
 
 Conditions (1) and (2) are coupled. If you enable account linking but
