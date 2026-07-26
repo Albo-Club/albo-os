@@ -513,15 +513,48 @@ rafraîchis ni drift-checkés. Ce ne sont pas des instructions lues par un agent
 TanStack a fait passer le check de ~30 à **62 fichiers**. Au-delà d'environ 30
 handshakes TLS en parallèle, `raw.githubusercontent.com` cesse de répondre,
 undici brûle ses 10 s de connect timeout et le script meurt sur
-`TypeError: fetch failed`. Ça casse deux choses à la fois : le hook
-`SessionStart` de `.claude/settings.json` a un budget de 10 s, et le job CI
-`skills-drift` passe au rouge sans raison réelle.
+`TypeError: fetch failed`. Ça casse le hook `SessionStart` de
+`.claude/settings.json`, qui a un budget de 10 s — et ça rougissait le job CI
+`skills-drift`, avant que la CI ne bascule sur `--verify` (hors-ligne, section
+suivante).
 
 Corrigé dans `scripts/sync-skills.mjs` par un sémaphore à 8 slots autour de
 `fetch` (`MAX_IN_FLIGHT`). Contre-intuitivement le check est devenu **plus
 rapide** qu'avant (~0,8 s mesuré ici), parce que ≤ 8 sockets sont réutilisées au
 lieu de se marcher dessus. Si on ajoute beaucoup de skills, augmenter librement
 leur nombre — **ne pas** augmenter `MAX_IN_FLIGHT`.
+
+## `--check` ne voit pas l'état du disque — d'où `--verify`
+
+`--check` et le mode par défaut comparaient tous deux **le hash du lock à
+l'upstream**, jamais **le lock au disque** : `isVendored()` ne testait que
+l'*existence* des fichiers. Conséquence, un fichier vendorisé édité à la main,
+tronqué ou simplement périmé était invisible des deux côtés. Démontré en
+ajoutant une ligne de garbage dans un `SKILL.md` : `--check` restait vert,
+exit 0.
+
+Ce n'est pas théorique — c'est la cause racine des trois fichiers `references/`
+Convex périmés découverts en portant les PR #50/#51 du template, dont
+`migrations-component.md` avec 54 lignes de retard. Rien ne pouvait sonner.
+
+Deux modes, deux questions, à ne pas confondre :
+
+| Mode | Question | Réseau | Où |
+| --- | --- | --- | --- |
+| `--verify` | « mon arbre est-il intact ? » | non | **CI, chaque PR** (job `skills-verify`) |
+| `--check` | « l'upstream a-t-il bougé ? » | oui | hook `SessionStart` + cron hebdo |
+
+La CI ne fait plus que le check local : il est déterministe, instantané et ne
+peut pas rougir à cause d'un hoquet de `raw.githubusercontent.com` sur une PR
+qui n'a rien à voir. La dérive upstream n'est pas un défaut de la PR en cours —
+elle est traitée par le hook de session (elle remonte au moment où quelqu'un
+code, le seul moment où des skills fraîches comptent) et par le cron hebdo qui
+ouvre une PR de bump.
+
+Le mode par défaut est aussi devenu **auto-réparateur** : il réécrit un fichier
+qui ne correspond plus au `computedHash`, donc un `pnpm run sync:skills` répare
+un arbre corrompu. `--force` n'est plus nécessaire pour ça (il reste utile pour
+tout re-télécharger sans condition).
 
 ## Streamdown (panneau AI) — `@source` Tailwind v4, plugins retirés, labels tool
 
