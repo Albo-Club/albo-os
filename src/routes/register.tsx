@@ -10,6 +10,7 @@ import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { classifyAuthError, formatAuthError } from '~/lib/auth-errors'
 import { useRedirectWhenAuthenticated } from '~/lib/auth-state'
+import { internalRedirectSearch } from '~/lib/safe-redirect'
 import { isPasswordPwned } from '~/lib/hibp'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
@@ -29,7 +30,9 @@ import {
 import { CardContent, CardFooter } from '~/components/ui/card'
 
 const searchSchema = z.object({
-  redirect: z.string().optional(),
+  // Constrained to an internal path: it feeds the invite hand-off and the
+  // Better Auth `callbackURL`s below (see ~/lib/safe-redirect).
+  redirect: internalRedirectSearch,
 })
 
 export const Route = createFileRoute('/register')({

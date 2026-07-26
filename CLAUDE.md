@@ -535,6 +535,15 @@ export const remove = mutation({
   leaks enumeration. Raw `error.message` is also locale-fragile and may
   change between BA versions. The classifier collapses safe equivalence
   classes and centralises the user-facing copy.
+- ❌ A return-URL search param (`redirect`, `next`, `returnTo`, `from`…)
+  typed as a bare `z.string()`, or validated by a hand-rolled regex. It
+  reaches a navigation, so it is an open redirect:
+  `?redirect=https://evil.com` ships the visitor off-site right after they
+  authenticated. Use `internalRedirectSearch` from
+  `src/lib/safe-redirect.ts`. A regex such as "starts with `/` but not
+  `//`" is bypassable — the URL parser strips tab/LF/CR, so
+  `/<TAB>/evil.com` becomes `//evil.com` after passing the check. See
+  `KNOWN_ISSUES.md` "Return-URL `?redirect=`".
 - ❌ A raw `<input type="number">` for an editable **euro amount**. Use
   `AmountInput` (or the `useAmountField(value, onChange)` hook for an
   `InputGroupInput`/inline cell) from `src/components/ui/amount-input.tsx`:

@@ -245,6 +245,52 @@ across non-auth routes that pre-date Phase 0/1 and want a separate
 cleanup PR. The new Phase 1 files (`hibp.ts`, `auth-errors.ts`,
 `password-input.tsx`, `password-strength.tsx`) lint clean.
 
+## Return-URL `?redirect=` : pourquoi un regex est FAUX
+
+`/login` et `/register` acceptent un `?redirect=` qui finit dans
+`window.location.replace()` après une authentification réussie. Tant que la
+valeur n'était qu'un `z.string().optional()`, `/login?redirect=https://evil.com`
+expédiait la victime hors du site **au moment précis où elle venait de prouver
+qu'elle faisait confiance à la page**. Better Auth ne couvrait pas ce chemin :
+son `trustedOrigins` valide `callbackURL` / `redirectTo`, or `signIn.email` n'en
+reçoit aucun ici — c'est notre code qui navigue.
+
+Le correctif vit dans `src/lib/safe-redirect.ts` (`isInternalPath` +
+`internalRedirectSearch`), appliqué au champ Zod des deux routes.
+
+**Le piège.** Le prédicat qui vient naturellement — « commence par `/` mais pas
+`//` » — est contournable :
+
+```js
+const isInternalPath = (v) => /^\/(?![/\\])/.test(v) // ← BYPASSABLE
+```
+
+Il laisse passer `/<TAB>/evil.com`. Par la spec WHATWG URL, les navigateurs
+**suppriment** tab/LF/CR en parsant : la chaîne devient `//evil.com`,
+protocol-relative, hors site — _après_ avoir passé un contrôle qui lisait les
+octets bruts. À reproduire soi-même :
+
+```sh
+node -e "console.log(new URL('/\t/evil.com','https://x.com').origin)"
+# → https://evil.com
+```
+
+D'où la validation par **résolution contre une origine bidon** : on délègue la
+normalisation au parseur que la navigation utilisera de toute façon.
+
+```ts
+value.startsWith('/') && new URL(value, PROBE_ORIGIN).origin === PROBE_ORIGIN
+```
+
+Le `startsWith('/')` reste nécessaire (un `app` nu résout sur l'origine bidon
+sans être un chemin absolu interne). Le champ Zod finit par `.catch(undefined)`
+et non un throw : une valeur hostile retombe sur « pas de redirect » et la page
+s'affiche normalement — un écran d'erreur signalerait la tentative à
+l'attaquant.
+
+Couvert par `tests/safeRedirect.test.ts` (24 vecteurs). Tout nouveau paramètre
+de retour (`next`, `returnTo`, `from`…) doit passer par le même helper.
+
 ## Production deploy is wired into the Vercel build
 
 `vercel.json` runs `npx convex deploy --cmd 'pnpm build'`, so every
