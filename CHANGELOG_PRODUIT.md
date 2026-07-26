@@ -23,6 +23,36 @@ bas de page.
 
 ---
 
+## v1.129.4 — 26/07/2026 à 23:12 — Documentation des agents : mise à jour TanStack
+
+Changement interne, sans effet visible dans l'application. La documentation
+technique que les agents IA lisent avant d'écrire du code a été mise à jour
+depuis sa source officielle.
+
+> **🔧 Notes techniques**
+>
+> `pnpm run sync:skills:update` — 5 skills TanStack passent de `fc83c03` à
+> `179d9b9` (+ `ai-elements`, dont seul le `pinnedRef` bouge, contenu
+> identique). Diff relu avant merge, comme l'exige `CLAUDE.md` (une maj de
+> skill est une surface de prompt-injection).
+>
+> - **Forme** : le frontmatter regroupe `type`/`library`/`library_version`
+>   sous une clé `metadata:`, et les `name:` perdent leur préfixe de chemin
+>   (`router-core/data-loading` → `data-loading`). Sans effet sur notre
+>   vendorisation : le script s'appuie sur les clés du lock, pas sur le
+>   frontmatter. Les liens inter-familles upstream sont inchangés, la règle de
+>   traduction de `KNOWN_ISSUES.md` reste valide.
+> - **Fond** : nouvel anti-pattern « ne pas faire un `fetch('/api/...')`
+>   relatif depuis un loader SSR » (passer par un server function) ;
+>   « typecheck ≠ contrat runtime » ; mutations cache-cohérentes avec
+>   `router.invalidate({ sync: true })` ; et un nouveau CRITICAL côté auth :
+>   la page atteinte par un visiteur anonyme ne doit rien divulguer, et
+>   « le redirect ne doit contenir qu'une URL de retour relative
+>   assainie » — exactement ce que la v1.129.3 vient de mettre en place.
+> - Aucun override projet (`CLAUDE.md`, `KNOWN_ISSUES.md`) ne devient faux ;
+>   aucun `fetch('/api/...')` relatif dans nos loaders. `--verify` et
+>   `--check` verts après bump.
+
 ## v1.129.3 — 26/07/2026 à 23:02 — Connexion : les liens de retour piégés sont neutralisés
 
 Correctif de sécurité, sans changement visible à l'usage. Un lien de connexion
