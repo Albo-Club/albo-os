@@ -23,6 +23,40 @@ bas de page.
 
 ---
 
+## v1.129.3 — 26/07/2026 à 23:02 — Connexion : les liens de retour piégés sont neutralisés
+
+Correctif de sécurité, sans changement visible à l'usage. Un lien de connexion
+forgé pouvait, jusqu'ici, vous envoyer vers un site extérieur juste après une
+authentification réussie — un classique du phishing : le domaine affiché et la
+page de connexion sont les vrais, seule la destination finale est celle de
+l'attaquant. La destination de retour est désormais contrainte aux pages de
+l'application ; toute autre valeur est ignorée et vous atterrissez normalement
+sur votre tableau de bord.
+
+> **🔧 Notes techniques**
+>
+> Portage du correctif template `albo-ouvre-boite` (commit `c3ec25d`, PR #54).
+>
+> - Le `?redirect=` de `/login` et `/register` était typé `z.string().optional()`
+>   puis passé à `window.location.replace()` (`src/routes/login.tsx`). Better
+>   Auth ne couvrait pas ce chemin : `trustedOrigins` ne valide que
+>   `callbackURL`/`redirectTo`, et `signIn.email` n'en reçoit aucun ici.
+> - Nouveau helper partagé `src/lib/safe-redirect.ts` : `isInternalPath()` et le
+>   champ Zod `internalRedirectSearch`, appliqué au `validateSearch` des deux
+>   routes. Les `callbackURL` en aval (magic link, vérification email, Google)
+>   héritent donc d'une valeur déjà assainie.
+> - **Pas de regex** : la validation résout la valeur contre une origine bidon et
+>   exige que le résultat y reste (`new URL(v, PROBE).origin === PROBE` +
+>   `v.startsWith('/')`). Un regex « commence par `/` mais pas `//` » laisse
+>   passer `/<TAB>/evil.com`, que le parseur d'URL réduit ensuite à
+>   `//evil.com`. Le champ finit par `.catch(undefined)` (et non un throw) pour
+>   ne pas signaler la tentative à l'attaquant.
+> - `tests/safeRedirect.test.ts` : 24 vecteurs (18 hostiles neutralisés, 6
+>   chemins internes préservés à l'identique), exécutés par `pnpm test:unit`.
+> - Docs : section « Return-URL `?redirect=` » dans `KNOWN_ISSUES.md`,
+>   anti-pattern dans `CLAUDE.md`, ligne A4 de `TESTING.md` corrigée (le garde
+>   `/app` n'ajoute aucun paramètre de retour) et nouvelle ligne S8.
+
 ## v1.129.2 — 26/07/2026 à 15:00 — Documentation des agents : contrôle d'intégrité
 
 Changement interne, sans effet visible dans l'application. La documentation
