@@ -471,6 +471,58 @@ diff de contenu du SKILL.md avant de committer (obligation CLAUDE.md), et ne
 bumper que le(s) skill(s) réellement dérivé(s) — laisser les autres `pinnedRef`
 en place est sans risque (pas de drift de contenu = check vert).
 
+## Skills vendorisées : liens inter-familles, et pourquoi `..` est interdit dans `references`
+
+Les repos upstream shippent de plus en plus des *arbres* de skills
+(`TanStack/router` : `packages/<pkg>/skills/<skill>/[<sous>/]SKILL.md`). On
+vendorise **à plat**, une clé de lock par famille : `.agents/skills/<nom>/`.
+Deux conséquences :
+
+- **Les liens frères à l'intérieur d'une famille résolvent, ceux qui en sortent
+  non.** Une sous-skill vendorisée en `reference` garde sa position relative à
+  son parent, donc `./middleware/SKILL.md` et `../server-functions/SKILL.md`
+  marchent. Mais upstream lie aussi *entre packages*
+  (`../../../../router-core/skills/router-core/auth-and-guards/SKILL.md`), et ce
+  préfixe n'existe pas en local — **18 liens** pendouillent aujourd'hui (audit :
+  43 liens résolvent, 0 cassé à l'intérieur d'une famille). On ne les réécrit
+  **pas** à la vendorisation : `computedHash` porte sur les octets récupérés, donc
+  patcher les liens à l'écriture ferait diverger l'arbre du hash pour toujours et
+  chaque `--check` ressemblerait à une dérive. La table de traduction vit dans
+  `CLAUDE.md` § Skills.
+- **Une entrée `references` ne doit jamais commencer par `..`.** Ça a l'air de
+  marcher — `raw.githubusercontent.com` normalise le chemin et renvoie 200 —
+  mais `vendor()` résout la même chaîne contre `.agents/skills/<nom>/` et écrit
+  **hors** du répertoire de la skill. C'est pour ça que
+  `compositions/router-query`, pourtant *frère* de `react-router` upstream, est
+  sa propre entrée de lock (`tanstack-router-query`) plutôt qu'une référence en
+  `../`.
+
+Règle : une entrée de lock par répertoire upstream où l'on veut enraciner un
+arbre ; `references` ne vise que des descendants de ce répertoire.
+
+**Reste hors périmètre** : 11 fichiers non-Markdown vendorisés à la main
+(`convex-*/agents/openai.yaml`, `convex-*/assets/icon.svg`,
+`frontend-design/LICENSE.txt`) ne sont dans aucun `references`, donc ni
+rafraîchis ni drift-checkés. Ce ne sont pas des instructions lues par un agent
+— les déclarer ferait diverger nos hashes de ceux du template pour zéro gain.
+
+## `sync:skills --check` a besoin d'un plafond de fetchs simultanés
+
+`runCheck` part en parallèle sur toutes les skills d'un coup, et chaque skill avec des
+`references` multiplie son propre nombre de fichiers. Vendoriser l'arbre
+TanStack a fait passer le check de ~30 à **62 fichiers**. Au-delà d'environ 30
+handshakes TLS en parallèle, `raw.githubusercontent.com` cesse de répondre,
+undici brûle ses 10 s de connect timeout et le script meurt sur
+`TypeError: fetch failed`. Ça casse deux choses à la fois : le hook
+`SessionStart` de `.claude/settings.json` a un budget de 10 s, et le job CI
+`skills-drift` passe au rouge sans raison réelle.
+
+Corrigé dans `scripts/sync-skills.mjs` par un sémaphore à 8 slots autour de
+`fetch` (`MAX_IN_FLIGHT`). Contre-intuitivement le check est devenu **plus
+rapide** qu'avant (~0,8 s mesuré ici), parce que ≤ 8 sockets sont réutilisées au
+lieu de se marcher dessus. Si on ajoute beaucoup de skills, augmenter librement
+leur nombre — **ne pas** augmenter `MAX_IN_FLIGHT`.
+
 ## Streamdown (panneau AI) — `@source` Tailwind v4, plugins retirés, labels tool
 
 Le markdown du chat AI est rendu par `streamdown` (via `MessageResponse`

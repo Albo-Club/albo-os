@@ -5,11 +5,16 @@ import convexPlugin from '@convex-dev/eslint-plugin'
 export default defineConfig([
   ...tanstackConfig,
   ...convexPlugin.configs.recommended,
+  // `.agents/skills` holds upstream skill content vendored verbatim, including
+  // illustrative .tsx examples that live outside any tsconfig project — linting
+  // them only produces parser errors. Kept in sync with `.prettierignore`.
   globalIgnores([
     'convex/_generated',
     '.output',
     '.nitro',
     'prettier.config.js',
+    '.agents/skills',
+    '.claude/skills',
   ]),
   {
     // shadcn/ui generated files — never hand-edited (see CLAUDE.md), so

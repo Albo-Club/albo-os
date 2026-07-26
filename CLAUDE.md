@@ -290,6 +290,29 @@ surveillée), `pinnedRef` (SHA immuable vendorisé), hash SHA-256).
 Sync hebdo via GitHub Action (`.github/workflows/sync-skills.yml`, lundi
 06:00 UTC) + manuel :
 
+Les skills qui éclatent leur contenu hors du `SKILL.md` déclarent leurs
+fichiers annexes dans un tableau `references` optionnel, aux chemins relatifs
+au répertoire du `SKILL.md` — identiques upstream et en local, pour que les
+liens Markdown relatifs continuent de résoudre. Ces références entrent dans le
+`computedHash`, donc la détection de dérive les couvre. **Tout nouveau fichier
+annexe doit y être déclaré** : un fichier vendorisé à la main est invisible de
+`sync:skills` comme de `--check`, et pourrit en silence.
+
+Un chemin de `references` ne peut viser qu'un **descendant** du répertoire du
+`SKILL.md` — jamais `../`, qui écrirait hors de `.agents/skills/<nom>/`. Pour
+enraciner un arbre ailleurs upstream, ajouter une **seconde entrée** dans le
+lock. Le pourquoi est dans `KNOWN_ISSUES.md` § « Skills vendorisées : liens
+inter-familles » ; la section suivante explique pourquoi `MAX_IN_FLIGHT` ne doit
+pas bouger quand la liste s'allonge.
+
+`--check` répond à « est-ce que l'upstream a bougé ? », pas à « est-ce que mon
+arbre local est intact ? » : il compare le tip upstream au lock et vérifie
+seulement que les fichiers vendorisés *existent*. Les éditions locales de
+`.agents/skills/` sont l'affaire de git, pas du script. Corollaire : quand on
+ajoute des `references` à une skill déjà vendorisée, le hash du lock peut déjà
+correspondre à l'upstream et `sync:skills` ne réécrit rien — il faut
+`node scripts/sync-skills.mjs --force` pour remplacer les copies locales.
+
 - `pnpm run sync:skills` — vendorise chaque skill au `pinnedRef` déclaré
   (reproductible, pas de réseau surprise ; idempotent).
 - `pnpm run sync:skills:check` — compare le `trackingRef` tip au contenu
@@ -331,7 +354,11 @@ contourner ni `--update` à l'aveugle. Dérouler :
 | `two-factor-authentication-best-practices` | 2FA / TOTP / backup codes              | `better-auth/skills`                  | ✅ officiel    |
 | `organization-best-practices`              | Plugin `organization()` BA             | `better-auth/skills`                  | ✅ officiel ⚠️ |
 | `create-auth`                              | Scaffolding auth BA                    | `better-auth/skills`                  | ✅ officiel    |
-| `tanstack-start-best-practices`            | SSR, server functions, middleware      | `TanStack/router` (monorepo officiel) | ✅ officiel    |
+| `tanstack-start-core`                      | **Porte d'entrée Start** + server functions, middleware, auth serveur, modèle d'exécution, server routes, déploiement | `TanStack/router` (monorepo officiel) | ✅ officiel    |
+| `tanstack-react-start`                     | Bindings React de Start + server components | `TanStack/router` (monorepo officiel) | ✅ officiel    |
+| `tanstack-router-core`                     | **Porte d'entrée Router** + data loading, guards, SSR, 404/erreurs, search/path params, navigation, code splitting, type safety | `TanStack/router` (monorepo officiel) | ✅ officiel    |
+| `tanstack-react-router`                    | Hooks/composants React du router       | `TanStack/router` (monorepo officiel) | ✅ officiel    |
+| `tanstack-router-query`                    | Intégration Router ↔ TanStack Query    | `TanStack/router` (monorepo officiel) | ✅ officiel    |
 | `ai-elements`                              | Composants chat AI (panneau AiPanel)   | `vercel/ai-elements`                  | ✅ officiel    |
 
 **⚠️ `organization-best-practices`** : skill officielle BA, mais le plugin
@@ -339,11 +366,30 @@ contourner ni `--update` à l'aveugle. Dérouler :
 Lis-la pour comprendre les concepts ; n'applique pas le code BA tel quel —
 nos orgs/membres vivent dans le schéma Convex maison.
 
-**TanStack Start (`TanStack/router`)** : source officielle depuis juin 2026
-(`packages/react-start/skills/react-start/SKILL.md`). La skill est versionnée
-avec les releases de `@tanstack/react-start` dans le monorepo. En cas de doute
-sur un changement de comportement, fallback sur le MCP `context7`
-(`mcp__…__query-docs`) pour `/tanstack/start`.
+**TanStack (`TanStack/router`)** : source officielle, versionnée avec les
+releases de `@tanstack/react-start` / `@tanstack/react-router` dans le monorepo
+(`packages/*/skills/*/SKILL.md`). En cas de doute sur un changement de
+comportement, fallback sur le MCP `context7` (`mcp__…__query-docs`) pour
+`/tanstack/start`.
+
+**Commencer par `tanstack-start-core` ou `tanstack-router-core`.** Ces deux-là
+sont des *routeurs* : chacun ouvre sur un tableau de sous-skills + un arbre de
+décision, et le contenu réel vit dans les répertoires descendants atteints
+depuis là (`tanstack-start-core/server-functions/SKILL.md`,
+`tanstack-router-core/data-loading/SKILL.md`, …). Les sous-skills sont
+vendorisées comme `references`, donc leurs liens frères résolvent en local —
+mais Claude Code n'enregistre que les 5 skills de premier niveau : une
+sous-skill se lit *via le tableau de son parent*, jamais depuis la liste des
+skills.
+
+Les liens upstream qui sortent d'une skill (`../../../<pkg>/skills/<skill>/…`)
+**pendouillent par construction** : on vendorise à plat
+(`.agents/skills/<nom>/`) là où upstream imbrique sous `packages/<pkg>/skills/`.
+Traduire avec `<skill>[/<sous>]` → `tanstack-<skill>[/<sous>]` (donc
+`start-client-core/skills/start-core/middleware` →
+`tanstack-start-core/middleware`) ; le seul cas irrégulier est
+`react-router/skills/compositions/router-query` → `tanstack-router-query`. Voir
+`KNOWN_ISSUES.md` § « Skills vendorisées : liens inter-familles ».
 
 **shadcn/ui** : pas de skill agent à ce jour. Les conventions vivent dans
 `components.json` (alias `@/components`, neutral theme, radius 0.5rem, tokens

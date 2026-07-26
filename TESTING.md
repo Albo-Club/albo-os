@@ -25,7 +25,7 @@ Pré-requis :
 | B3  | Build           | `pnpm build`             | Bundle écrit dans `.output/`                                                                                                                 |
 | B4  | Smoke E2E       | `pnpm test:smoke`        | Tous les scénarios passent                                                                                                                   |
 | B5  | Cookies prod    | `pnpm test:cookies`      | `albo-os.session_token` a Secure+HttpOnly+SameSite=Lax+Max-Age≈604800                                                                        |
-| B6  | Skills à jour   | `pnpm sync:skills:check` | `0 skills drifted`                                                                                                                           |
+| B6  | Skills à jour   | `pnpm sync:skills:check` | `Skills up to date with upstream.` (exit 0) — couvre les `SKILL.md` **et** leurs `references`                                                 |
 | B7  | Tests unitaires | `pnpm test:unit`         | 70 tests verts (logique pure : récurrence/solde forecast + historique cash, ranking suggestions, instructions agent, passif, séries BP, CSV) |
 
 > **Schéma & mapping d'instruments** (refonte fiches deal, `convex/schema.ts` +
