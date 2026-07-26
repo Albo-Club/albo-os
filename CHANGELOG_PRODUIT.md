@@ -23,6 +23,40 @@ bas de page.
 
 ---
 
+## v1.129.1 — 26/07/2026 à 14:32 — Documentation des agents : arborescence TanStack officielle
+
+Changement interne, sans effet visible dans l'application : la documentation
+technique que les agents IA lisent avant d'écrire du code a été remise à jour
+depuis les sources officielles.
+
+> **🔧 Notes techniques**
+>
+> Port ciblé des PR #50 et #51 du template `albo-ouvre-boite`, sans passer par
+> `pnpm run upgrade-template` (le template a divergé de dix PR, dont plusieurs
+> portées depuis Albo OS — un merge complet aurait été du bruit conflictuel pour
+> zéro gain). Aucun code applicatif touché.
+>
+> - `scripts/sync-skills.mjs` accepte désormais un tableau `references` par
+>   skill (fichiers annexes vendorisés et intégrés au `computedHash`, donc
+>   couverts par la détection de dérive) et plafonne les fetchs simultanés à 8
+>   (`MAX_IN_FLIGHT`) — au-delà de ~30 handshakes TLS parallèles
+>   `raw.githubusercontent.com` cesse de répondre et fait sauter le budget 10 s
+>   du hook `SessionStart`.
+> - `tanstack-start-best-practices` (un `SKILL.md` routeur aux 2 liens cassés +
+>   13 `rules/*.md` orphelins issus d'un repo communautaire, jamais rafraîchis)
+>   est remplacé par les **5 familles officielles** de `TanStack/router@fc83c03`
+>   — 34 fichiers : server functions, middleware, SSR, data loading, guards,
+>   search/path params, type safety, Router ↔ Query. Couverture des 13 règles
+>   supprimées vérifiée thème par thème avant suppression.
+> - Skills Convex bumpées `7a6fcc6` → `ec1e6ba` avec leurs `references` : trois
+>   fichiers étaient réellement périmés, dont `migrations-component.md` avec 54
+>   lignes de retard.
+> - `eslint.config.mjs` ignore `.agents/skills` et `.claude/skills` (les
+>   exemples `.tsx` vendorisés vivent hors de tout projet tsconfig).
+> - Vérifs : `sync:skills` idempotent, `--force` reproductible, `--check` vert
+>   en ~0,8 s sur 62 fichiers, audit de liens 43 résolus / 0 cassé dans une
+>   famille, `pnpm lint` et `pnpm build` verts.
+
 ## v1.129.0 — 24/07/2026 à 12:45 — Placements : la trésorerie placée a sa propre page
 
 La crypto, les comptes de capitalisation, les dépôts à terme et les
