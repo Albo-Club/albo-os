@@ -89,6 +89,22 @@ function plainText(parts: Array<string>): string {
   return parts.filter(Boolean).join('\n\n')
 }
 
+/**
+ * Escape a user-controlled value before it lands in an HTML branch. Every
+ * template interpolates names, org names, addresses and free-text labels into
+ * markup, so an unescaped `<` would let a user inject arbitrary HTML into an
+ * email read by someone else. Applies to the HTML branch only — the plain-text
+ * branch and the subject line take the raw value.
+ */
+function esc(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 function pick<T>(locale: EmailLocale, copy: Record<EmailLocale, T>): T {
   return copy[locale] ?? copy.en
 }
@@ -110,14 +126,16 @@ export function invitationEmail({
   orgName: string
   acceptUrl: string
 }) {
+  const hInviter = esc(inviterName)
+  const hOrg = esc(orgName)
   const c = pick(locale, {
     en: {
       subject: `You're invited to ${orgName} on ${APP_NAME}`,
-      heading: `Join ${orgName}`,
-      intro: `<strong>${inviterName}</strong> invited you to join <strong>${orgName}</strong>.`,
+      heading: `Join ${hOrg}`,
+      intro: `<strong>${hInviter}</strong> invited you to join <strong>${hOrg}</strong>.`,
       followup: `Click the button below to accept. This link expires in 7 days.`,
       footer: `If you didn't expect this invitation, you can safely ignore this email.`,
-      preheader: `${inviterName} invited you to join ${orgName}.`,
+      preheader: `${hInviter} invited you to join ${hOrg}.`,
       cta: 'Accept invitation',
       text: [
         `${inviterName} invited you to join ${orgName} on ${APP_NAME}.`,
@@ -129,11 +147,11 @@ export function invitationEmail({
     },
     fr: {
       subject: `Vous êtes invité à rejoindre ${orgName} sur ${APP_NAME}`,
-      heading: `Rejoindre ${orgName}`,
-      intro: `<strong>${inviterName}</strong> vous a invité à rejoindre <strong>${orgName}</strong>.`,
+      heading: `Rejoindre ${hOrg}`,
+      intro: `<strong>${hInviter}</strong> vous a invité à rejoindre <strong>${hOrg}</strong>.`,
       followup: `Cliquez sur le bouton ci-dessous pour accepter. Ce lien expire dans 7 jours.`,
       footer: `Si vous n'attendiez pas cette invitation, vous pouvez ignorer cet e-mail.`,
-      preheader: `${inviterName} vous a invité à rejoindre ${orgName}.`,
+      preheader: `${hInviter} vous a invité à rejoindre ${hOrg}.`,
       cta: 'Accepter l’invitation',
       text: [
         `${inviterName} vous a invité à rejoindre ${orgName} sur ${APP_NAME}.`,
@@ -169,14 +187,15 @@ export function changeEmailVerificationEmail({
   // Sent to the CURRENT address. Acts as approval gate: a hijacked session
   // can request the change, but only the legitimate owner of the current
   // inbox can authorize it.
+  const hNewEmail = esc(newEmail)
   const c = pick(locale, {
     en: {
       subject: `Approve email change on ${APP_NAME}`,
       heading: `Approve email change`,
-      intro: `Someone requested to change your ${APP_NAME} account email to <strong>${newEmail}</strong>.`,
+      intro: `Someone requested to change your ${APP_NAME} account email to <strong>${hNewEmail}</strong>.`,
       followup: `If this was you, click below to approve. <strong>If not, ignore this email</strong> — your current address stays unchanged and the request is dropped.`,
       footer: `Your account email is updated only after you approve here.`,
-      preheader: `Approve change to ${newEmail}.`,
+      preheader: `Approve change to ${hNewEmail}.`,
       cta: 'Approve email change',
       text: [
         `Approve email change on ${APP_NAME}.`,
@@ -189,10 +208,10 @@ export function changeEmailVerificationEmail({
     fr: {
       subject: `Approuver le changement d'e-mail sur ${APP_NAME}`,
       heading: `Approuver le changement d'e-mail`,
-      intro: `Quelqu'un a demandé à changer l'e-mail de votre compte ${APP_NAME} pour <strong>${newEmail}</strong>.`,
+      intro: `Quelqu'un a demandé à changer l'e-mail de votre compte ${APP_NAME} pour <strong>${hNewEmail}</strong>.`,
       followup: `Si c'était vous, cliquez ci-dessous pour approuver. <strong>Sinon, ignorez cet e-mail</strong> — votre adresse actuelle reste inchangée et la demande est annulée.`,
       footer: `L'e-mail de votre compte n'est mis à jour qu'après votre approbation ici.`,
-      preheader: `Approuver le changement vers ${newEmail}.`,
+      preheader: `Approuver le changement vers ${hNewEmail}.`,
       cta: 'Approuver le changement',
       text: [
         `Approuver le changement d'e-mail sur ${APP_NAME}.`,
@@ -225,12 +244,13 @@ export function deleteAccountVerificationEmail({
   url: string
   name?: string | null
 }) {
+  const hName = name ? esc(name) : null
   const c = pick(locale, {
     en: {
       subject: `Confirm account deletion on ${APP_NAME}`,
       heading: `Confirm account deletion`,
-      intro: name
-        ? `${name}, you asked to delete your ${APP_NAME} account.`
+      intro: hName
+        ? `${hName}, you asked to delete your ${APP_NAME} account.`
         : `You asked to delete your ${APP_NAME} account.`,
       followup: `This will permanently remove your profile, your organization memberships, and your access. <strong>This cannot be undone.</strong>`,
       footer: `If you didn't request this, ignore this email and nothing happens.`,
@@ -249,8 +269,8 @@ export function deleteAccountVerificationEmail({
     fr: {
       subject: `Confirmer la suppression du compte sur ${APP_NAME}`,
       heading: `Confirmer la suppression du compte`,
-      intro: name
-        ? `${name}, vous avez demandé à supprimer votre compte ${APP_NAME}.`
+      intro: hName
+        ? `${hName}, vous avez demandé à supprimer votre compte ${APP_NAME}.`
         : `Vous avez demandé à supprimer votre compte ${APP_NAME}.`,
       followup: `Cela supprimera définitivement votre profil, vos adhésions aux organisations et votre accès. <strong>Cette action est irréversible.</strong>`,
       footer: `Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail et rien ne se passera.`,
@@ -390,14 +410,15 @@ export function passwordChangedEmail({
   resetUrl: string
 }) {
   // Post-event notification — fired AFTER the password is already changed.
+  const hEmail = esc(email)
   const c = pick(locale, {
     en: {
       subject: `Your ${APP_NAME} password was changed`,
       heading: `Password changed`,
-      intro: `The password for <strong>${email}</strong> was just changed on ${APP_NAME}.`,
+      intro: `The password for <strong>${hEmail}</strong> was just changed on ${APP_NAME}.`,
       followup: `If you made this change, no action is needed. <strong>If you didn't, your account may be compromised</strong> — reset your password now and review your active sessions.`,
       footer: `For your safety, all other sessions were signed out automatically.`,
-      preheader: `Password changed for ${email}.`,
+      preheader: `Password changed for ${hEmail}.`,
       cta: 'Reset password',
       text: [
         `Your ${APP_NAME} password was just changed.`,
@@ -408,10 +429,10 @@ export function passwordChangedEmail({
     fr: {
       subject: `Votre mot de passe ${APP_NAME} a été modifié`,
       heading: `Mot de passe modifié`,
-      intro: `Le mot de passe de <strong>${email}</strong> vient d'être modifié sur ${APP_NAME}.`,
+      intro: `Le mot de passe de <strong>${hEmail}</strong> vient d'être modifié sur ${APP_NAME}.`,
       followup: `Si vous êtes à l'origine de ce changement, aucune action n'est requise. <strong>Sinon, votre compte est peut-être compromis</strong> — réinitialisez votre mot de passe maintenant et vérifiez vos sessions actives.`,
       footer: `Pour votre sécurité, toutes les autres sessions ont été déconnectées automatiquement.`,
-      preheader: `Mot de passe modifié pour ${email}.`,
+      preheader: `Mot de passe modifié pour ${hEmail}.`,
       cta: 'Réinitialiser le mot de passe',
       text: [
         `Votre mot de passe ${APP_NAME} vient d'être modifié.`,
@@ -591,14 +612,15 @@ export function cashAlertEmail({
       currency: 'EUR',
       maximumFractionDigits: 0,
     }).format(cents / 100)
+  const hOrg = esc(orgName)
 
   const c = pick(locale, {
     en: {
       subject: `Cash alert — ${orgName} projected below ${eur(thresholdCents)}`,
       heading: `Cash below your threshold`,
-      intro: `The projected cash balance of <strong>${orgName}</strong> drops to <strong>${eur(minProjectedCents)}</strong> within the next 3 months — below your ${eur(thresholdCents)} alert threshold.`,
+      intro: `The projected cash balance of <strong>${hOrg}</strong> drops to <strong>${eur(minProjectedCents)}</strong> within the next 3 months — below your ${eur(thresholdCents)} alert threshold.`,
       followup: `The projection includes committed and planned entries (overdue ones included). Review the forecast to see which month dips and what drives it.`,
-      footer: `You receive this because a cash threshold alert is active for ${orgName}. Adjust or disable it on the Cash page. No more than one alert per week.`,
+      footer: `You receive this because a cash threshold alert is active for ${hOrg}. Adjust or disable it on the Cash page. No more than one alert per week.`,
       preheader: `Projected balance ${eur(minProjectedCents)} — under your ${eur(thresholdCents)} threshold.`,
       cta: 'Open the cash forecast',
       text: [
@@ -610,9 +632,9 @@ export function cashAlertEmail({
     fr: {
       subject: `Alerte trésorerie — ${orgName} projetée sous ${eur(thresholdCents)}`,
       heading: `Trésorerie sous votre seuil`,
-      intro: `Le solde projeté de <strong>${orgName}</strong> descend à <strong>${eur(minProjectedCents)}</strong> dans les 3 prochains mois — sous votre seuil d'alerte de ${eur(thresholdCents)}.`,
+      intro: `Le solde projeté de <strong>${hOrg}</strong> descend à <strong>${eur(minProjectedCents)}</strong> dans les 3 prochains mois — sous votre seuil d'alerte de ${eur(thresholdCents)}.`,
       followup: `La projection inclut l'engagé et le prévu (retards compris). Ouvrez le prévisionnel pour voir quel mois creuse et ce qui l'explique.`,
-      footer: `Vous recevez cet email car une alerte de seuil est active pour ${orgName}. Ajustez-la ou désactivez-la sur la page Trésorerie. Au plus une alerte par semaine.`,
+      footer: `Vous recevez cet email car une alerte de seuil est active pour ${hOrg}. Ajustez-la ou désactivez-la sur la page Trésorerie. Au plus une alerte par semaine.`,
       preheader: `Solde projeté ${eur(minProjectedCents)} — sous votre seuil de ${eur(thresholdCents)}.`,
       cta: 'Ouvrir le prévisionnel',
       text: [
@@ -667,12 +689,15 @@ export function overdueEntriesEmail({
       timeZone: 'Europe/Paris',
     }).format(new Date(ms))
 
-  const line = (e: (typeof entries)[number]) =>
-    `${fmtDate(e.date)} — ${e.label} — ${e.direction === 'out' ? '−' : '+'}${eur(e.amountCents)}`
+  // `label` is passed in so each caller picks its own escaping: raw for the
+  // plain-text branch, `esc()`-ed for the HTML one.
+  const line = (e: (typeof entries)[number], label: string) =>
+    `${fmtDate(e.date)} — ${label} — ${e.direction === 'out' ? '−' : '+'}${eur(e.amountCents)}`
+  const hOrg = esc(orgName)
   const shown = entries.slice(0, OVERDUE_EMAIL_MAX_LINES)
   const hidden = entries.length - shown.length
   const listHtml = shown
-    .map((e) => `• ${line(e)}`)
+    .map((e) => `• ${line(e, esc(e.label))}`)
     .join('<br>')
     .concat(
       hidden > 0
@@ -688,28 +713,28 @@ export function overdueEntriesEmail({
     en: {
       subject: `Overdue entries — ${count} expected ${count === 1 ? 'entry' : 'entries'} not reconciled (${orgName})`,
       heading: `${count} overdue ${count === 1 ? 'entry' : 'entries'}`,
-      intro: `${count === 1 ? 'An expected entry' : `${count} expected entries`} of <strong>${orgName}</strong> ${count === 1 ? 'is' : 'are'} past due and not reconciled to a transaction yet:`,
+      intro: `${count === 1 ? 'An expected entry' : `${count} expected entries`} of <strong>${hOrg}</strong> ${count === 1 ? 'is' : 'are'} past due and not reconciled to a transaction yet:`,
       followup: `Reconcile them from the Forecast tab (suggested matches are one click away), reschedule them, or cancel them if no longer expected — overdue entries keep weighing on the projected balance.`,
-      footer: `You receive this because forecast entries are monitored for ${orgName}. One digest when new entries become overdue — no daily reminders.`,
+      footer: `You receive this because forecast entries are monitored for ${hOrg}. One digest when new entries become overdue — no daily reminders.`,
       preheader: `${count} expected ${count === 1 ? 'entry' : 'entries'} past due, not reconciled.`,
       cta: 'Open the forecast',
       text: [
         `${count} expected ${count === 1 ? 'entry' : 'entries'} of ${orgName} ${count === 1 ? 'is' : 'are'} past due and not reconciled yet:`,
-        entries.map((e) => `- ${line(e)}`).join('\n'),
+        entries.map((e) => `- ${line(e, e.label)}`).join('\n'),
         `Open the forecast: ${forecastUrl}`,
       ],
     },
     fr: {
       subject: `Échéances en retard — ${count} échéance(s) attendue(s) non rapprochée(s) (${orgName})`,
       heading: `${count} échéance(s) en retard`,
-      intro: `${count === 1 ? 'Une échéance attendue' : `${count} échéances attendues`} de <strong>${orgName}</strong> ${count === 1 ? 'est dépassée' : 'sont dépassées'} sans être rapprochée${count === 1 ? '' : 's'} d'une transaction :`,
+      intro: `${count === 1 ? 'Une échéance attendue' : `${count} échéances attendues`} de <strong>${hOrg}</strong> ${count === 1 ? 'est dépassée' : 'sont dépassées'} sans être rapprochée${count === 1 ? '' : 's'} d'une transaction :`,
       followup: `Rapprochez-les depuis l'onglet Prévisionnel (les rapprochements suggérés sont à un clic), re-datez-les, ou annulez-les si elles ne sont plus attendues — une échéance en retard continue de peser sur le solde projeté.`,
-      footer: `Vous recevez cet email car les échéances prévisionnelles de ${orgName} sont surveillées. Un récapitulatif quand de nouvelles échéances passent en retard — pas de rappel quotidien.`,
+      footer: `Vous recevez cet email car les échéances prévisionnelles de ${hOrg} sont surveillées. Un récapitulatif quand de nouvelles échéances passent en retard — pas de rappel quotidien.`,
       preheader: `${count} échéance(s) attendue(s) dépassée(s), non rapprochée(s).`,
       cta: 'Ouvrir le prévisionnel',
       text: [
         `${count} échéance(s) attendue(s) de ${orgName} dépassée(s) sans rapprochement :`,
-        entries.map((e) => `- ${line(e)}`).join('\n'),
+        entries.map((e) => `- ${line(e, e.label)}`).join('\n'),
         `Ouvrir le prévisionnel : ${forecastUrl}`,
       ],
     },
@@ -751,6 +776,11 @@ export function powensConnectionAlertEmail({
       timeZone: 'Europe/Paris',
     }).format(new Date(ms))
   const lastSync = lastSyncAt != null ? fmtDate(lastSyncAt) : null
+  const hOrg = esc(orgName)
+  const hConnector = esc(connectorName)
+  // `errorMessage` is relayed verbatim from the banking institution — the one
+  // value here we don't author ourselves.
+  const hError = errorMessage ? esc(errorMessage) : null
 
   const c = pick(locale, {
     en: {
@@ -760,18 +790,18 @@ export function powensConnectionAlertEmail({
           : `Bank connection — ${connectorName} has not synced recently (${orgName})`,
       heading:
         health === 'action_required'
-          ? `${connectorName}: reconnection required`
-          : `${connectorName}: sync is late`,
+          ? `${hConnector}: reconnection required`
+          : `${hConnector}: sync is late`,
       intro:
         health === 'action_required'
-          ? `The <strong>${connectorName}</strong> bank connection of <strong>${orgName}</strong> requires your action (new password, strong authentication…). Until you reconnect it, balances and transactions stop updating.`
-          : `The <strong>${connectorName}</strong> bank connection of <strong>${orgName}</strong> has not completed a successful sync for more than 48 hours. Balances and transactions may be out of date.`,
+          ? `The <strong>${hConnector}</strong> bank connection of <strong>${hOrg}</strong> requires your action (new password, strong authentication…). Until you reconnect it, balances and transactions stop updating.`
+          : `The <strong>${hConnector}</strong> bank connection of <strong>${hOrg}</strong> has not completed a successful sync for more than 48 hours. Balances and transactions may be out of date.`,
       followup:
         health === 'action_required'
           ? `Open the Cash page and use the “Reconnect” button next to the connection.`
           : `This often resolves on its own (bank site down, temporary block). If it persists, reconnect from the Cash page.`,
-      footer: `You receive this because bank connections are monitored for ${orgName}. One email per incident — no reminders until the state changes.`,
-      preheader: `${connectorName} (${orgName}) — bank sync issue.`,
+      footer: `You receive this because bank connections are monitored for ${hOrg}. One email per incident — no reminders until the state changes.`,
+      preheader: `${hConnector} (${hOrg}) — bank sync issue.`,
       cta: 'Open the Cash page',
       text: [
         health === 'action_required'
@@ -789,18 +819,18 @@ export function powensConnectionAlertEmail({
           : `Connexion bancaire — ${connectorName} sans synchro récente (${orgName})`,
       heading:
         health === 'action_required'
-          ? `${connectorName} : reconnexion nécessaire`
-          : `${connectorName} : synchronisation en retard`,
+          ? `${hConnector} : reconnexion nécessaire`
+          : `${hConnector} : synchronisation en retard`,
       intro:
         health === 'action_required'
-          ? `La connexion bancaire <strong>${connectorName}</strong> de <strong>${orgName}</strong> attend une action de votre part (nouveau mot de passe, authentification forte…). Tant qu'elle n'est pas reconnectée, les soldes et transactions ne se mettent plus à jour.`
-          : `La connexion bancaire <strong>${connectorName}</strong> de <strong>${orgName}</strong> n'a pas réussi de synchronisation depuis plus de 48 heures. Les soldes et transactions peuvent être obsolètes.`,
+          ? `La connexion bancaire <strong>${hConnector}</strong> de <strong>${hOrg}</strong> attend une action de votre part (nouveau mot de passe, authentification forte…). Tant qu'elle n'est pas reconnectée, les soldes et transactions ne se mettent plus à jour.`
+          : `La connexion bancaire <strong>${hConnector}</strong> de <strong>${hOrg}</strong> n'a pas réussi de synchronisation depuis plus de 48 heures. Les soldes et transactions peuvent être obsolètes.`,
       followup:
         health === 'action_required'
           ? `Ouvrez la page Trésorerie et utilisez le bouton « Reconnecter » à côté de la connexion.`
           : `Cela se résout souvent tout seul (site de la banque indisponible, blocage temporaire). Si ça persiste, reconnectez depuis la page Trésorerie.`,
-      footer: `Vous recevez cet email car les connexions bancaires de ${orgName} sont surveillées. Un email par incident — pas de rappel tant que l'état ne change pas.`,
-      preheader: `${connectorName} (${orgName}) — problème de synchronisation bancaire.`,
+      footer: `Vous recevez cet email car les connexions bancaires de ${hOrg} sont surveillées. Un email par incident — pas de rappel tant que l'état ne change pas.`,
+      preheader: `${hConnector} (${hOrg}) — problème de synchronisation bancaire.`,
       cta: 'Ouvrir la Trésorerie',
       text: [
         health === 'action_required'
@@ -820,10 +850,10 @@ export function powensConnectionAlertEmail({
           fr: `Dernière synchronisation réussie : <strong>${lastSync}</strong>.`,
         })
       : '',
-    errorMessage
+    hError
       ? pick(locale, {
-          en: `Message from the institution: “${errorMessage}”`,
-          fr: `Message de l'établissement : « ${errorMessage} »`,
+          en: `Message from the institution: “${hError}”`,
+          fr: `Message de l'établissement : « ${hError} »`,
         })
       : '',
   ].filter(Boolean)
@@ -856,13 +886,15 @@ export function gmailReauthAlertEmail({
   mailbox: string
   integrationsUrl: string
 }) {
+  const hOrg = esc(orgName)
+  const hMailbox = esc(mailbox)
   const c = pick(locale, {
     en: {
       subject: `Gmail — ${mailbox} needs to be reconnected (${orgName})`,
-      heading: `${mailbox}: reconnection required`,
+      heading: `${hMailbox}: reconnection required`,
       intro:
-        `The Gmail mailbox <strong>${mailbox}</strong> connected to ` +
-        `<strong>${orgName}</strong> is no longer authorized (Google expires ` +
+        `The Gmail mailbox <strong>${hMailbox}</strong> connected to ` +
+        `<strong>${hOrg}</strong> is no longer authorized (Google expires ` +
         `each authorization after 7 days while the app is in testing mode). ` +
         `Until you reconnect it, its emails stop being collected.`,
       followup:
@@ -871,9 +903,9 @@ export function gmailReauthAlertEmail({
         `received in the meantime are caught up as long as you reconnect ` +
         `within a week.`,
       footer:
-        `You receive this because you connected this mailbox for ${orgName}. ` +
+        `You receive this because you connected this mailbox for ${hOrg}. ` +
         `One email per incident — no reminders until the state changes.`,
-      preheader: `${mailbox} (${orgName}) — Gmail authorization expired.`,
+      preheader: `${hMailbox} (${hOrg}) — Gmail authorization expired.`,
       cta: 'Open Integrations',
       text: [
         `The Gmail mailbox ${mailbox} connected to ${orgName} is no longer ` +
@@ -885,10 +917,10 @@ export function gmailReauthAlertEmail({
     },
     fr: {
       subject: `Gmail — ${mailbox} à reconnecter (${orgName})`,
-      heading: `${mailbox} : reconnexion nécessaire`,
+      heading: `${hMailbox} : reconnexion nécessaire`,
       intro:
-        `La boîte Gmail <strong>${mailbox}</strong> connectée à ` +
-        `<strong>${orgName}</strong> n'est plus autorisée (Google fait ` +
+        `La boîte Gmail <strong>${hMailbox}</strong> connectée à ` +
+        `<strong>${hOrg}</strong> n'est plus autorisée (Google fait ` +
         `expirer chaque autorisation au bout de 7 jours tant que ` +
         `l'application est en mode test). Tant qu'elle n'est pas ` +
         `reconnectée, ses emails ne sont plus relevés.`,
@@ -899,9 +931,9 @@ export function gmailReauthAlertEmail({
         `reconnectez dans la semaine.`,
       footer:
         `Vous recevez cet email car vous avez connecté cette boîte pour ` +
-        `${orgName}. Un email par incident — pas de rappel tant que l'état ` +
+        `${hOrg}. Un email par incident — pas de rappel tant que l'état ` +
         `ne change pas.`,
-      preheader: `${mailbox} (${orgName}) — autorisation Gmail expirée.`,
+      preheader: `${hMailbox} (${hOrg}) — autorisation Gmail expirée.`,
       cta: 'Ouvrir les Intégrations',
       text: [
         `La boîte Gmail ${mailbox} connectée à ${orgName} n'est plus ` +
@@ -933,10 +965,6 @@ const STATE_ICONS: Record<string, string> = {
   extracted: '✅',
   stored: '📦',
   failed: '⚠️',
-}
-
-function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 function recapShell(title: string, blocks: Array<string>): string {

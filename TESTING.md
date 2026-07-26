@@ -433,7 +433,7 @@ sans snapshot (`convex export --prod`) au préalable.
 | #   | Étape                           | Résultat attendu                                            |
 | --- | ------------------------------- | ----------------------------------------------------------- |
 | L1  | `/app/me` → change email        | Email de vérif envoyé à l'ancienne adresse                  |
-| L2  | Clic lien de vérif              | Email mis à jour, sessions toujours valides                 |
+| L2  | Clic lien de vérif              | Email mis à jour **des deux côtés** (BA **et** ligne `users` Convex — vérifier dans le dashboard), sessions toujours valides |
 | L3  | `/app/me` → delete account      | Email de confirmation envoyé                                |
 | L4  | Clic lien dans email delete     | User Convex purgé, memberships supprimées, BA user supprimé |
 | L5  | Le user supprimé tente `/login` | Auth échoue                                                 |
