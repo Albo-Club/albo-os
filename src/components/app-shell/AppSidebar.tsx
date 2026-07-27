@@ -3,10 +3,8 @@ import { useTranslation } from 'react-i18next'
 
 import { OrgSwitcher } from './OrgSwitcher'
 import { NavUser } from './NavUser'
-import { ThemePicker } from './ThemePicker'
 import { getNavGroups } from './nav'
 import type { NavGroup } from './nav'
-import { LanguageSwitcher } from '~/components/i18n/LanguageSwitcher'
 import { Badge } from '~/components/ui/badge'
 import {
   Sidebar,
@@ -148,14 +146,6 @@ export function AppSidebar({
         })}
       </SidebarContent>
       <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <ThemePicker />
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <LanguageSwitcher variant="sidebar" />
-          </SidebarMenuItem>
-        </SidebarMenu>
         <NavUser
           name={me.name}
           email={me.email}

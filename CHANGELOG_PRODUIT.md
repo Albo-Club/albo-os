@@ -23,6 +23,35 @@ bas de page.
 
 ---
 
+## v1.132.0 — 27/07/2026 à 18:35 — Thème et langue passent dans Mon compte
+
+Le pied de la barre latérale ne porte plus les réglages d'affichage : il ne
+reste que le menu utilisateur.
+
+- **Un bloc « Apparence »** apparaît dans **Mon compte**, onglet Profil,
+  sous les informations personnelles : le thème de couleur et la langue de
+  l'interface s'y règlent, avec le même effet immédiat qu'avant.
+- **Rien d'autre ne change** : le thème reste mémorisé sur l'appareil, la
+  langue reste rattachée au compte et continue de servir pour les emails.
+  Le bouton clair/sombre reste, lui, dans le bandeau du haut.
+
+> **🔧 Notes techniques**
+>
+> - `AppSidebar.tsx` : `SidebarFooter` réduit à `NavUser` (suppression des
+>   deux `SidebarMenuItem` + imports orphelins).
+> - `ThemePicker.tsx` : déclencheur `SidebarMenuButton` → `Button` ghost
+>   (pastille + nom du thème courant), `DropdownMenuContent` repassé en
+>   `align="end"` sans `side="right"`.
+> - `LanguageSwitcher.tsx` : la branche `variant="sidebar"` devenue morte
+>   est supprimée, la prop `variant` disparaît — seul le bouton ghost
+>   `FR`/`EN` subsiste.
+> - `routes/app/me.tsx` : nouvelle `Card` « Apparence » en fin d'onglet
+>   Profil, libellés réutilisés (`nav:theme.label`, `common:language.label`)
+>   pour éviter de dupliquer les chaînes ; ajout de `account:appearance.*`
+>   (fr + en).
+> - Docs : `TESTING.md` I4/SH7 et `docs/produit/02` + `13` pointent vers le
+>   nouvel emplacement.
+
 ## v1.131.0 — 27/07/2026 à 18:08 — Le portefeuille se pilote depuis la liste des entreprises
 
 Grande passe d'ergonomie issue du point produit du jour : l'application se
