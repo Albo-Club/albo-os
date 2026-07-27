@@ -9,7 +9,11 @@ import type { RefObject } from 'react'
 
 import type { FacetOption } from './FacetFilter'
 import type { CompanyRow, DealRow } from './ParticipationsTable'
-import { dealStatusLabelKey } from '~/lib/dealStatusBadge'
+import {
+  dealStatusLabelKey,
+  participationBucketBand,
+} from '~/lib/dealStatusBadge'
+import { cn } from '~/lib/utils'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
@@ -53,11 +57,11 @@ export function ParticipationsView({
   const term = normalizeSearch(useDebouncedValue(search))
 
   // Faceted filters (multi-select), applied at the row (company) level
-  // alongside the search, before the split into active / settled.
+  // alongside the search, before the split into the status tables. No status
+  // facet: the per-status tables below play that role.
   const [instrumentFilter, setInstrumentFilter] = useState<Set<string>>(
     new Set(),
   )
-  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set())
   const [sectorFilter, setSectorFilter] = useState<Set<string>>(new Set())
   const toggle =
     (setter: React.Dispatch<React.SetStateAction<Set<string>>>) =>
@@ -68,11 +72,9 @@ export function ParticipationsView({
         else next.add(value)
         return next
       })
-  const hasFilters =
-    instrumentFilter.size > 0 || statusFilter.size > 0 || sectorFilter.size > 0
+  const hasFilters = instrumentFilter.size > 0 || sectorFilter.size > 0
   const resetFilters = () => {
     setInstrumentFilter(new Set())
-    setStatusFilter(new Set())
     setSectorFilter(new Set())
   }
 
@@ -80,7 +82,6 @@ export function ParticipationsView({
   // options never vanish mid-selection), localized and sorted by label.
   const facets = useMemo(() => {
     const instruments = new Map<string, string>()
-    const statuses = new Map<string, string>()
     const sectors = new Map<string, string>()
     for (const r of rows ?? []) {
       for (const kind of r.instrumentKinds) {
@@ -88,9 +89,6 @@ export function ParticipationsView({
           kind,
           t(`instrument.${kind}`, { defaultValue: kind }),
         )
-      }
-      for (const status of r.statuses) {
-        statuses.set(status, t(`status.${status}`, { defaultValue: status }))
       }
       if (r.sector) {
         sectors.set(
@@ -105,7 +103,6 @@ export function ParticipationsView({
       )
     return {
       instruments: toOptions(instruments),
-      statuses: toOptions(statuses),
       sectors: toOptions(sectors),
     }
   }, [rows, t])
@@ -134,28 +131,30 @@ export function ParticipationsView({
       )
         return false
       if (
-        statusFilter.size > 0 &&
-        !r.statuses.some((status) => statusFilter.has(status))
-      )
-        return false
-      if (
         sectorFilter.size > 0 &&
         !(r.sector != null && sectorFilter.has(r.sector))
       )
         return false
       return true
     })
-  }, [rows, term, t, instrumentFilter, statusFilter, sectorFilter, hasFilters])
+  }, [rows, term, t, instrumentFilter, sectorFilter, hasFilters])
 
-  const { active, settled } = useMemo(() => {
-    if (!filtered) return { active: undefined, settled: undefined }
-    const activeRows: Array<CompanyRow> = []
-    const settledRows: Array<CompanyRow> = []
+  // One bucket per status table. Exit outcome mirrors the badge rule at the
+  // company-bucket level: a write-off or a realized MOIC < 1 is a loss; an
+  // unknown MOIC is never a loss.
+  const buckets = useMemo(() => {
+    if (!filtered) return null
+    const pending: Array<CompanyRow> = []
+    const active: Array<CompanyRow> = []
+    const exitWin: Array<CompanyRow> = []
+    const exitLoss: Array<CompanyRow> = []
     for (const r of filtered) {
-      if (r.settled) settledRows.push(r)
-      else activeRows.push(r)
+      if (r.pending) pending.push(r)
+      else if (!r.settled) active.push(r)
+      else if (r.writtenOff || (r.moic != null && r.moic < 1)) exitLoss.push(r)
+      else exitWin.push(r)
     }
-    return { active: activeRows, settled: settledRows }
+    return { pending, active, exitWin, exitLoss }
   }, [filtered])
 
   // CSV export, flat (one deal per row). Always covers the full, unsplit deal
@@ -253,14 +252,6 @@ export function ParticipationsView({
               onToggle={toggle(setInstrumentFilter)}
             />
           )}
-          {facets.statuses.length >= 2 && (
-            <FacetFilter
-              label={t('filters.status')}
-              options={facets.statuses}
-              selected={statusFilter}
-              onToggle={toggle(setStatusFilter)}
-            />
-          )}
           {facets.sectors.length >= 2 && (
             <FacetFilter
               label={t('filters.sector')}
@@ -294,27 +285,61 @@ export function ParticipationsView({
         </div>
       )}
 
-      <ParticipationsTable
-        rows={active}
-        showOrg={showOrg}
-        orgSlug={orgSlug}
-        isFiltered={isFiltered}
-      />
-
-      {settled && settled.length > 0 && (
-        <section className="space-y-3">
-          <h3 className="text-muted-foreground text-sm font-medium">
-            {t('settled.sectionTitle', { count: settled.length })}
-          </h3>
-          <ParticipationsTable
-            rows={settled}
-            showOrg={showOrg}
-            orgSlug={orgSlug}
-            settled
-            isFiltered={isFiltered}
-          />
-        </section>
+      {!buckets ? (
+        // Initial load: a single skeleton table (its body shows the loading row).
+        <ParticipationsTable
+          rows={undefined}
+          showOrg={showOrg}
+          orgSlug={orgSlug}
+        />
+      ) : SECTIONS.every(({ key }) => buckets[key].length === 0) ? (
+        <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
+          {isFiltered ? t('search.noResults') : t('empty')}
+        </div>
+      ) : (
+        SECTIONS.map(({ key, bucket, variant }) => {
+          const bucketRows = buckets[key]
+          // An empty status table is not rendered at all (e.g. no TS in
+          // progress → no "pending" table).
+          if (bucketRows.length === 0) return null
+          const { band, dot } = participationBucketBand(bucket)
+          return (
+            <section key={key} className="space-y-3">
+              <div
+                className={cn(
+                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium',
+                  band,
+                )}
+              >
+                <span aria-hidden className={cn('size-2 rounded-full', dot)} />
+                {t(`sections.${key}`)}
+                <span className="text-muted-foreground">
+                  ({bucketRows.length})
+                </span>
+              </div>
+              <ParticipationsTable
+                rows={bucketRows}
+                showOrg={showOrg}
+                orgSlug={orgSlug}
+                variant={variant}
+                isFiltered={isFiltered}
+              />
+            </section>
+          )
+        })
       )}
     </div>
   )
 }
+
+/**
+ * The four status tables, in display order: pending Term Sheets first (they
+ * need attention), then open positions, then the realized outcomes. Band
+ * colours come from `participationBucketBand` — the shared status palette.
+ */
+const SECTIONS = [
+  { key: 'pending', bucket: 'pending', variant: 'pending' },
+  { key: 'active', bucket: 'active', variant: 'active' },
+  { key: 'exitWin', bucket: 'exit_win', variant: 'settled' },
+  { key: 'exitLoss', bucket: 'exit_loss', variant: 'settled' },
+] as const

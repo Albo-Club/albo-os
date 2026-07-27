@@ -317,6 +317,7 @@ type ParticipationDealSource = {
   status: string
   instrumentKind: string
   name: string | null
+  committedAmount: number | null
   signedDate: number | null
   targetCompanyId: Id<'companies'>
   target: { name: string; sector: string | null; domain: string | null } | null
@@ -343,6 +344,7 @@ export async function participationSource(
     status: deal.status,
     instrumentKind: deal.instrumentKind,
     name: deal.name ?? null,
+    committedAmount: deal.committedAmount ?? null,
     signedDate: deal.signedDate ?? null,
     targetCompanyId: deal.targetCompanyId,
     target: target && {
@@ -362,8 +364,9 @@ export async function participationSource(
 
 /**
  * Server-side projection for the participations list: ONE row per company and
- * per bucket (active vs settled — fully_exited / written_off deals split into
- * their own row, mirroring the client-side split of the two tables). Each row
+ * per bucket (pending TS vs active vs settled — mirroring the client-side
+ * split into one table per status; a company holding e.g. a TS deal AND
+ * active deals yields two rows, so each table's sums stay exact). Each row
  * carries only what the table displays (name/domain/sector/AI score + the
  * pre-aggregated sums and ratios) plus the per-deal facet values (instrument
  * kinds, statuses, deal/investor names) so the client search & filters keep
@@ -372,10 +375,11 @@ export async function participationSource(
  * Ratios follow the tables: TVPI on active rows (gross received, residual =
  * last valuation falling back to cost), MOIC (de-VAT'd proceeds) + exact XIRR
  * on the flow union for settled rows — IRR is not additive, so it is solved
- * here on the union, never derived from per-deal rates.
+ * here on the union, never derived from per-deal rates. Pending rows carry
+ * the summed commitment instead (nothing is wired yet).
  *
- * Default order: rows with a pending Term Sheet first (they need attention),
- * then most recent deal first.
+ * Default order: most recent deal first (the pending TS rows live in their
+ * own table, always rendered on top).
  */
 export function buildParticipationRows(deals: Array<ParticipationDealSource>) {
   type Group = {
@@ -385,26 +389,28 @@ export function buildParticipationRows(deals: Array<ParticipationDealSource>) {
     sector: string | null
     aiScore: number | null
     org: { name: string; slug: string } | null
+    pending: boolean
     settled: boolean
     dealCount: number
+    committed: number
     paid: number
     received: number
     residual: number
     capital: number
     proceeds: number
     flows: Array<{ amount: number; date: number }>
-    hasPending: boolean
     writtenOff: boolean
     lastSigned: number
     instrumentKinds: Set<string>
-    statuses: Set<string>
     dealNames: Array<string>
     investorNames: Set<string>
   }
   const map = new Map<string, Group>()
   for (const d of deals) {
+    const pending = d.status === 'pending'
     const settled = d.status === 'fully_exited' || d.status === 'written_off'
-    const key = `${d.targetCompanyId}:${settled ? 'settled' : 'active'}`
+    const bucket = pending ? 'pending' : settled ? 'settled' : 'active'
+    const key = `${d.targetCompanyId}:${bucket}`
     const g = map.get(key) ?? {
       companyId: d.targetCompanyId,
       name: d.target?.name ?? '—',
@@ -412,23 +418,24 @@ export function buildParticipationRows(deals: Array<ParticipationDealSource>) {
       sector: d.target?.sector ?? null,
       aiScore: d.aiScore,
       org: d.org,
+      pending,
       settled,
       dealCount: 0,
+      committed: 0,
       paid: 0,
       received: 0,
       residual: 0,
       capital: 0,
       proceeds: 0,
       flows: [],
-      hasPending: false,
       writtenOff: false,
       lastSigned: 0,
       instrumentKinds: new Set<string>(),
-      statuses: new Set<string>(),
       dealNames: [],
       investorNames: new Set<string>(),
     }
     g.dealCount += 1
+    g.committed += d.committedAmount ?? 0
     g.paid += d.paidActual
     g.received += d.received
     g.residual += residualValueCents({
@@ -442,21 +449,15 @@ export function buildParticipationRows(deals: Array<ParticipationDealSource>) {
     g.capital += d.paidActual
     g.proceeds += proceedsFromReceived(d.received, d.instrumentKind)
     g.flows.push(...d.flows)
-    if (d.status === 'pending') g.hasPending = true
     if (d.status === 'written_off') g.writtenOff = true
     g.lastSigned = Math.max(g.lastSigned, d.signedDate ?? 0)
     g.instrumentKinds.add(d.instrumentKind)
-    g.statuses.add(d.status)
     if (d.name) g.dealNames.push(d.name)
     if (d.investorName) g.investorNames.add(d.investorName)
     map.set(key, g)
   }
   return Array.from(map.values())
-    .sort(
-      (a, b) =>
-        (b.hasPending ? 1 : 0) - (a.hasPending ? 1 : 0) ||
-        b.lastSigned - a.lastSigned,
-    )
+    .sort((a, b) => b.lastSigned - a.lastSigned)
     .map((g) => ({
       companyId: g.companyId,
       name: g.name,
@@ -464,26 +465,28 @@ export function buildParticipationRows(deals: Array<ParticipationDealSource>) {
       sector: g.sector,
       aiScore: g.aiScore,
       org: g.org,
+      pending: g.pending,
       settled: g.settled,
       dealCount: g.dealCount,
+      committed: g.committed,
       invested: g.paid,
       received: g.received,
       // TVPI keeps the GROSS received (not de-VAT'd), unlike the MOIC.
-      tvpi: g.settled
-        ? null
-        : tvpiRatio({
-            capital: g.paid,
-            proceeds: g.received,
-            residual: g.residual,
-          }),
+      // Pending rows have no ratio at all: nothing is wired yet.
+      tvpi:
+        g.settled || g.pending
+          ? null
+          : tvpiRatio({
+              capital: g.paid,
+              proceeds: g.received,
+              residual: g.residual,
+            }),
       moic: g.settled
         ? moicRatio({ capital: g.capital, proceeds: g.proceeds })
         : null,
       tri: g.settled ? xirr(g.flows) : null,
-      hasPending: g.hasPending,
       writtenOff: g.writtenOff,
       instrumentKinds: [...g.instrumentKinds],
-      statuses: [...g.statuses],
       dealNames: g.dealNames,
       investorNames: [...g.investorNames],
     }))

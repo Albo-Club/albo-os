@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next'
 import { residualValueCents } from '../../../convex/lib/metrics'
 
 import { cn } from '~/lib/utils'
-import { dealStatusAccent } from '~/lib/dealStatusBadge'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { ScoreRing } from '~/components/companies/ScoreRing'
 import { Badge } from '~/components/ui/badge'
@@ -215,8 +214,8 @@ export function dealAmountTiles(deal: {
  * One pre-aggregated company row (per active/settled bucket), as served by
  * `deals.listParticipations` (per-org) and `aggregate.listParticipations`
  * (cross-org, with `org` set). All the sums/ratios are computed server-side;
- * the facet arrays (instrument kinds, statuses, deal & investor names) only
- * feed the toolbar's search + filters in `ParticipationsView`.
+ * the facet arrays (instrument kinds, deal & investor names) only feed the
+ * toolbar's search + filters in `ParticipationsView`.
  */
 export type CompanyRow = {
   companyId: string
@@ -226,9 +225,13 @@ export type CompanyRow = {
   /** Cerveau 3 health score (1-10), null while no synthesis exists. */
   aiScore: number | null
   org: { name: string; slug: string } | null
-  /** True for the fully_exited / written_off bucket (settled table). */
+  /** True for the pending Term-Sheet bucket (its own table on top). */
+  pending: boolean
+  /** True for the fully_exited / written_off bucket (exit tables). */
   settled: boolean
   dealCount: number
+  /** Engagé (cents): summed commitments — the pending table's amount. */
+  committed: number
   /** Versé (cents): sum of the matched outgoing transactions. */
   invested: number
   /** Reçu (cents): sum of the matched incoming transactions. */
@@ -239,10 +242,8 @@ export type CompanyRow = {
   moic: number | null
   /** Settled rows only: exact XIRR on the union of the deals' dated flows. */
   tri: number | null
-  hasPending: boolean
   writtenOff: boolean
   instrumentKinds: Array<string>
-  statuses: Array<string>
   dealNames: Array<string>
   investorNames: Array<string>
 }
@@ -297,23 +298,25 @@ export function ParticipationsTable({
   rows,
   showOrg = false,
   orgSlug,
-  settled = false,
+  variant = 'active',
   isFiltered = false,
 }: {
   // Already filtered by the parent toolbar (search + facets).
   rows: Array<CompanyRow> | undefined
   showOrg?: boolean
   orgSlug?: string
-  // Settled variant (fully_exited / written_off): swaps TVPI for a MOIC + an
-  // annualized TRI column and drops sorting. Used by the always-open section
-  // below the active table.
-  settled?: boolean
+  // One table per status bucket: 'pending' swaps the money columns for a
+  // single summed commitment (nothing wired yet), 'settled' swaps TVPI for
+  // MOIC + annualized TRI; both drop sorting (short lists).
+  variant?: 'pending' | 'active' | 'settled'
   // True when the parent search/filters are active — drives the empty message
   // (no results vs. empty scope).
   isFiltered?: boolean
 }) {
   const { t } = useTranslation('participations')
   const { fmtEur, fmtMultiple, fmtPercent } = useFormatters()
+  const pending = variant === 'pending'
+  const settled = variant === 'settled'
 
   // Column sort (client-side, low volumes). null = server order (rows with a
   // pending Term Sheet first, then most recent deal first). Missing TVPIs /
@@ -357,20 +360,23 @@ export function ParticipationsTable({
   const totals = useMemo(() => {
     if (!rows) return null
     let dealCount = 0
+    let committed = 0
     let invested = 0
     let received = 0
     for (const r of rows) {
       dealCount += r.dealCount
+      committed += r.committed
       invested += r.invested
       received += r.received
     }
-    return { dealCount, invested, received }
+    return { dealCount, committed, invested, received }
   }, [rows])
 
   // Base 8 (company, AI score, deals, invested, received, sector, chevron +
   // TVPI) + the optional org column, plus one more in the settled variant
-  // (MOIC + TRI replace TVPI).
-  const colSpan = 8 + (showOrg ? 1 : 0) + (settled ? 1 : 0)
+  // (MOIC + TRI replace TVPI); the pending variant collapses the three money
+  // columns into a single summed commitment.
+  const colSpan = (pending ? 6 : 8) + (showOrg ? 1 : 0) + (settled ? 1 : 0)
 
   if (rows && rows.length === 0) {
     return (
@@ -393,7 +399,7 @@ export function ParticipationsTable({
                 active={sort?.key === 'name'}
                 dir={sort?.dir ?? 'asc'}
                 onClick={() => toggleSort('name')}
-                sortable={!settled}
+                sortable={variant === 'active'}
                 className={headCornerClass}
               />
               {showOrg && (
@@ -404,7 +410,7 @@ export function ParticipationsTable({
                 active={sort?.key === 'aiScore'}
                 dir={sort?.dir ?? 'desc'}
                 onClick={() => toggleSort('aiScore')}
-                sortable={!settled}
+                sortable={variant === 'active'}
                 className={headCellClass}
               />
               <SortableHead
@@ -413,32 +419,39 @@ export function ParticipationsTable({
                 dir={sort?.dir ?? 'desc'}
                 onClick={() => toggleSort('deals')}
                 className={cn(headCellClass, 'text-right')}
-                sortable={!settled}
+                sortable={variant === 'active'}
               />
-              <SortableHead
-                label={t('col.invested')}
-                active={sort?.key === 'invested'}
-                dir={sort?.dir ?? 'desc'}
-                onClick={() => toggleSort('invested')}
-                className={cn(headCellClass, 'text-right')}
-                sortable={!settled}
-              />
-              <SortableHead
-                label={t('col.received')}
-                active={sort?.key === 'received'}
-                dir={sort?.dir ?? 'desc'}
-                onClick={() => toggleSort('received')}
-                className={cn(headCellClass, 'text-right')}
-                sortable={!settled}
-              />
-              {!settled && (
+              {pending ? (
+                <TableHead className={cn(headCellClass, 'text-right')}>
+                  {t('col.committed')}
+                </TableHead>
+              ) : (
+                <>
+                  <SortableHead
+                    label={t('col.invested')}
+                    active={sort?.key === 'invested'}
+                    dir={sort?.dir ?? 'desc'}
+                    onClick={() => toggleSort('invested')}
+                    className={cn(headCellClass, 'text-right')}
+                    sortable={variant === 'active'}
+                  />
+                  <SortableHead
+                    label={t('col.received')}
+                    active={sort?.key === 'received'}
+                    dir={sort?.dir ?? 'desc'}
+                    onClick={() => toggleSort('received')}
+                    className={cn(headCellClass, 'text-right')}
+                    sortable={variant === 'active'}
+                  />
+                </>
+              )}
+              {variant === 'active' && (
                 <SortableHead
                   label={t('col.tvpi')}
                   active={sort?.key === 'tvpi'}
                   dir={sort?.dir ?? 'desc'}
                   onClick={() => toggleSort('tvpi')}
                   className={cn(headCellClass, 'text-right')}
-                  sortable={!settled}
                 />
               )}
               {settled && (
@@ -469,11 +482,11 @@ export function ParticipationsTable({
             ) : (
               sortedRows.map((r) => (
                 <CompanyTableRow
-                  key={`${r.companyId}:${r.settled}`}
+                  key={r.companyId}
                   row={r}
                   showOrg={showOrg}
                   orgSlug={orgSlug}
-                  settled={settled}
+                  variant={variant}
                   fmtEur={fmtEur}
                   fmtMultiple={fmtMultiple}
                   fmtPercent={fmtPercent}
@@ -494,19 +507,29 @@ export function ParticipationsTable({
                 >
                   {t('dealsCount', { count: totals.dealCount })}
                 </TableCell>
-                <TableCell
-                  className={cn(footCellClass, 'text-right tabular-nums')}
-                >
-                  {fmtEur(totals.invested)}
-                </TableCell>
-                <TableCell
-                  className={cn(footCellClass, 'text-right tabular-nums')}
-                >
-                  {fmtEur(totals.received)}
-                </TableCell>
-                {/* No sum for ratio columns (TVPI, or MOIC + TRI). */}
-                <TableCell className={footCellClass} />
-                {settled && <TableCell className={footCellClass} />}
+                {pending ? (
+                  <TableCell
+                    className={cn(footCellClass, 'text-right tabular-nums')}
+                  >
+                    {fmtEur(totals.committed)}
+                  </TableCell>
+                ) : (
+                  <>
+                    <TableCell
+                      className={cn(footCellClass, 'text-right tabular-nums')}
+                    >
+                      {fmtEur(totals.invested)}
+                    </TableCell>
+                    <TableCell
+                      className={cn(footCellClass, 'text-right tabular-nums')}
+                    >
+                      {fmtEur(totals.received)}
+                    </TableCell>
+                    {/* No sum for ratio columns (TVPI, or MOIC + TRI). */}
+                    <TableCell className={footCellClass} />
+                    {settled && <TableCell className={footCellClass} />}
+                  </>
+                )}
                 <TableCell className={footCellClass} />
                 <TableCell className={cn(footCellClass, 'w-8')} />
               </TableRow>
@@ -522,7 +545,7 @@ function CompanyTableRow({
   row,
   showOrg,
   orgSlug,
-  settled,
+  variant,
   fmtEur,
   fmtMultiple,
   fmtPercent,
@@ -530,24 +553,13 @@ function CompanyTableRow({
   row: CompanyRow
   showOrg: boolean
   orgSlug?: string
-  settled: boolean
+  variant: 'pending' | 'active' | 'settled'
   fmtEur: (c?: number | null) => string
   fmtMultiple: (ratio: number | null) => string
   fmtPercent: (ratio: number | null) => string
 }) {
   const { t } = useTranslation('participations')
   const navigate = useNavigate()
-  // Row status feeding the left accent bar — the SINGLE colour source is
-  // dealStatusAccent: amber = pending TS, blue = open position, green/red =
-  // exit win/loss (a write-off anywhere in the group forces the loss red).
-  const rowStatus = row.settled
-    ? row.writtenOff
-      ? 'written_off'
-      : 'fully_exited'
-    : row.hasPending
-      ? 'pending'
-      : 'active'
-  const accent = dealStatusAccent(rowStatus, row.moic)
   // Whole-row click opens the entity sheet (its deals are listed there).
   // Guarded by `slug`: the per-org view passes orgSlug, the aggregated view
   // reads it from the row's org; without a slug the row isn't clickable.
@@ -579,12 +591,6 @@ function CompanyTableRow({
       }
     >
       <TableCell className={cn('font-medium', stickyCellClass)}>
-        {/* Accent bar in the row's left margin (sticky cells are positioned,
-            so the absolute span anchors to this cell). */}
-        <span
-          aria-hidden
-          className={cn('absolute inset-y-0 left-0 w-1', accent)}
-        />
         <span className="flex items-center gap-3">
           <CompanyLogo
             domain={row.domain}
@@ -610,17 +616,25 @@ function CompanyTableRow({
       <TableCell className="text-right tabular-nums">
         {t('dealsCount', { count: row.dealCount })}
       </TableCell>
-      <TableCell className="text-right tabular-nums">
-        {fmtEur(row.invested)}
-      </TableCell>
-      <TableCell
-        className={`text-right tabular-nums${
-          isNeutralAmount(row.received) ? ' text-muted-foreground' : ''
-        }`}
-      >
-        {fmtEur(row.received)}
-      </TableCell>
-      {!settled && (
+      {variant === 'pending' ? (
+        <TableCell className="text-right tabular-nums">
+          {fmtEur(row.committed)}
+        </TableCell>
+      ) : (
+        <>
+          <TableCell className="text-right tabular-nums">
+            {fmtEur(row.invested)}
+          </TableCell>
+          <TableCell
+            className={`text-right tabular-nums${
+              isNeutralAmount(row.received) ? ' text-muted-foreground' : ''
+            }`}
+          >
+            {fmtEur(row.received)}
+          </TableCell>
+        </>
+      )}
+      {variant === 'active' && (
         <TableCell
           className={`text-right tabular-nums${
             isNeutralTvpi(row.tvpi) ? ' text-muted-foreground' : ''
@@ -629,7 +643,7 @@ function CompanyTableRow({
           {fmtMultiple(row.tvpi)}
         </TableCell>
       )}
-      {settled && (
+      {variant === 'settled' && (
         <>
           <TableCell className="text-right tabular-nums">
             {fmtMultiple(row.moic)}

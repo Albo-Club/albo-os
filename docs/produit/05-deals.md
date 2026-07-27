@@ -37,12 +37,11 @@ toutes organisations confondues.
   automatiquement depuis Attio), *actif*, *sorti partiellement*, **Exit
   win** / **Exit loss** (sortie gagnante ou perdante, selon le multiple
   réalisé). La **couleur** du statut ne sert qu'à la sortie : vert = Exit
-  win, rouge = Exit loss, gris = neutre (actif ou sortie sans plus-value) ;
-  *engagé* est en ambre. Une **sortie partielle** vire au vert dès qu'elle
-  est déjà dans le vert, jamais au rouge (la position n'est pas soldée). Un
-  deal actif se suit par ses reports, pas par une couleur. Dans la liste
-  des participations, cette couleur s'affiche en liseré dans la marge de la
-  ligne.
+  win, rouge = Exit loss ; *engagé* est en ambre et un deal **actif** est
+  en **bleu** (position ouverte) — la même palette que les bandeaux de la
+  liste des participations. Une **sortie partielle** vire au vert dès
+  qu'elle est déjà dans le vert, jamais au rouge (la position n'est pas
+  soldée).
 - **Dates** : signature (tri par défaut), closing, sortie.
 - **Titres et détention** : les deals en actions enregistrent le **nombre de
   titres acquis** et le **prix par titre**. Un achat sur le **secondaire**
@@ -88,8 +87,8 @@ peut l'annuler et le deal redevient actif.
 
 Une fois sorti, la **couleur du statut** dit comment ça s'est passé, déduite du
 multiple réalisé (MOIC, calculé depuis les transactions pointées) : **vert**
-au-dessus de 1 (exit gagnant), **rouge** en dessous (exit perdant) — une perte
-actée (« Déprécié ») est toujours rouge. Pour une **sortie partielle**, le deal
+au-dessus de 1 (« Exit win »), **rouge** en dessous (« Exit loss ») — une perte
+actée est toujours un « Exit loss » rouge. Pour une **sortie partielle**, le deal
 reste actif (on détient encore une partie) : seul un gain déjà réalisé est
 signalé (statut « Exit partiel » en **vert** quand le reçu dépasse déjà le
 capital déployé), jamais en rouge, puisque la position n'est pas soldée.

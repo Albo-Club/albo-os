@@ -14,28 +14,26 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
 
 ## La liste
 
-- **Tableau des participations actives**, réduit à l'essentiel : logo et
-  nom, **score IA de santé** (1 à 10, issu de la synthèse IA), nombre de
-  deals, montant investi, montant reçu, **TVPI**, et le secteur en badge en
-  dernière colonne. Tri par colonne, clic vers la fiche ; plus de pagination —
-  toute la liste s'affiche et défile sous l'en-tête et les totaux, qui
-  restent visibles.
-- **Liseré de statut** dans la marge gauche de chaque ligne : **orange** =
-  deal en cours (term sheet), **bleu** = participation active, **vert** =
-  Exit win, **rouge** = Exit loss. Les lignes avec un deal en cours
-  remontent en haut de la liste — elles demandent une action.
-- **Ligne de totaux** en pied de tableau : nombre de deals, montant investi
-  et montant reçu, sommés sur **toute la liste** et recalculés en
-  direct quand un filtre ou une recherche est actif. C'est la façon de
-  répondre à « combien a-t-on investi en immobilier actif ? » sans quitter
-  la liste.
+- **Un tableau par statut**, empilés dans l'ordre de lecture, chacun coiffé
+  d'un **bandeau teinté** (pastille + titre + compteur) : **En cours (term
+  sheet)** en ambre tout en haut, **Actives** en bleu, **Exit win** en
+  vert, **Exit loss** en rouge. Un tableau vide ne s'affiche pas — pas de
+  term sheet en cours, pas de tableau ambre.
+- **Colonnes réduites à l'essentiel** : logo et nom, **score IA de santé**
+  (1 à 10), nombre de deals, montant investi, montant reçu, **TVPI**, et le
+  secteur en badge en dernière colonne. Le tableau des term sheets affiche
+  l'**engagé prévisionnel** à la place (rien n'est encore décaissé) ; les
+  deux tableaux d'exits remplacent le TVPI par **MOIC** et **TRI**
+  annualisé. Tri par colonne sur les Actives, clic vers la fiche ; pas de
+  pagination — chaque tableau défile sous son en-tête et ses totaux.
+- **Ligne de totaux par tableau** : nombre de deals et montants, sommés sur
+  la section entière et recalculés en direct quand un filtre ou une
+  recherche est actif. La somme des exits gagnants et celle des pertes se
+  lisent directement au pied de leurs tableaux.
 - **Recherche et filtres** : recherche plein texte (société, deal,
   instrument, investisseur, secteur) et filtres multi-sélection par
-  instrument, statut et secteur. Export CSV de l'ensemble (généré à la
-  demande).
-- **Section « Exits »** : les sociétés dont les deals sont sortis ou passés
-  en perte — libellés **« Exit win »** (sortie gagnante) et **« Exit
-  loss »** (perte), avec colonnes **MOIC** et **TRI** annualisé.
+  instrument et secteur — le filtre statut a disparu, les tableaux par
+  statut jouent ce rôle. Export CSV de l'ensemble (généré à la demande).
 - **Section « Sans deal »** : les entités du portefeuille pas encore
   rattachées à un deal.
 - **Section « Archivées »** : les entités archivées, restaurables en un clic.
@@ -57,8 +55,9 @@ La colonne principale, dans l'ordre de lecture :
   est régénérée automatiquement à chaque rapport ingéré, et peut être
   relancée à la main.
 - **Deals de la société** : un tableau au même style que la liste des
-  participations (statut avec liseré coloré, date de signature, investi,
-  reçu, TVPI), chaque **ligne cliquable** vers la
+  participations (badge de statut coloré — ambre term sheet, bleu actif,
+  vert Exit win, rouge Exit loss —, date de signature, investi, reçu,
+  TVPI), les term sheets en premier, chaque **ligne cliquable** vers la
   [fiche deal](05-deals.md) — c'est le seul chemin d'accès aux deals. Un
   deal se crée depuis cette fiche (menu ⋯) ; le formulaire propose
   d'emblée **tous les champs de l'instrument** choisi (montant, dates dont
