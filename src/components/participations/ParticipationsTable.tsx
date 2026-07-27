@@ -99,6 +99,32 @@ const stickyCellClass =
 const footCornerClass = 'sticky bottom-0 left-0 z-30 border-t bg-muted'
 const footCellClass = 'sticky bottom-0 z-20 border-t bg-muted'
 
+/**
+ * Shared column grid for the stacked tables of the participations page (one
+ * table per status bucket). Every variant renders the SAME columns in the same
+ * order — a variant that has nothing for a slot renders an empty cell rather
+ * than dropping the column — and `table-fixed` + this colgroup pin the widths,
+ * so the tables line up with each other instead of each sizing itself from its
+ * own content.
+ *
+ * The company column carries no width: it absorbs whatever is left. Below
+ * `fixed widths + COMPANY_MIN_WIDTH` the table scrolls horizontally, which the
+ * frozen first column already handles.
+ */
+const COL_WIDTHS = {
+  org: 104,
+  aiScore: 96,
+  deals: 80,
+  /** Engagé / Montant investi / Reçu. */
+  amount: 144,
+  /** TVPI or MOIC, then TRI. */
+  ratio: 80,
+  /** Fits the longest sector badge ("Marketplace / E-commerce"). */
+  sector: 192,
+  chevron: 40,
+} as const
+const COMPANY_MIN_WIDTH = 256
+
 /** Localized €/date/multiple/percent formatters, shared by the components below. */
 export function useFormatters() {
   const { i18n } = useTranslation('participations')
@@ -372,11 +398,17 @@ export function ParticipationsTable({
     return { dealCount, committed, invested, received }
   }, [rows])
 
-  // Base 8 (company, AI score, deals, invested, received, sector, chevron +
-  // TVPI) + the optional org column, plus one more in the settled variant
-  // (MOIC + TRI replace TVPI); the pending variant collapses the three money
-  // columns into a single summed commitment.
-  const colSpan = (pending ? 6 : 8) + (showOrg ? 1 : 0) + (settled ? 1 : 0)
+  // Same 9 columns in every variant (company, AI score, deals, 2 amounts,
+  // 2 ratios, sector, chevron — see COL_WIDTHS), plus the optional org one.
+  const colSpan = 9 + (showOrg ? 1 : 0)
+  const fixedWidth =
+    (showOrg ? COL_WIDTHS.org : 0) +
+    COL_WIDTHS.aiScore +
+    COL_WIDTHS.deals +
+    2 * COL_WIDTHS.amount +
+    2 * COL_WIDTHS.ratio +
+    COL_WIDTHS.sector +
+    COL_WIDTHS.chevron
 
   if (rows && rows.length === 0) {
     return (
@@ -391,7 +423,23 @@ export function ParticipationsTable({
       {/* The bounded height turns the (shadcn) table container into the
           vertical scroll box the sticky header/totals cells latch onto. */}
       <div className="rounded-lg border [&>div]:max-h-[70vh]">
-        <Table className="[&_td]:py-3">
+        <Table
+          className="table-fixed [&_td]:py-3"
+          style={{ minWidth: fixedWidth + COMPANY_MIN_WIDTH }}
+        >
+          <colgroup>
+            {/* Company: no width — takes the leftover space. */}
+            <col />
+            {showOrg && <col style={{ width: COL_WIDTHS.org }} />}
+            <col style={{ width: COL_WIDTHS.aiScore }} />
+            <col style={{ width: COL_WIDTHS.deals }} />
+            <col style={{ width: COL_WIDTHS.amount }} />
+            <col style={{ width: COL_WIDTHS.amount }} />
+            <col style={{ width: COL_WIDTHS.ratio }} />
+            <col style={{ width: COL_WIDTHS.ratio }} />
+            <col style={{ width: COL_WIDTHS.sector }} />
+            <col style={{ width: COL_WIDTHS.chevron }} />
+          </colgroup>
           <TableHeader>
             <TableRow>
               <SortableHead
@@ -421,31 +469,39 @@ export function ParticipationsTable({
                 className={cn(headCellClass, 'text-right')}
                 sortable={variant === 'active'}
               />
+              {/* First amount slot: the summed commitment for the pending
+                  bucket, the disbursed amount everywhere else. */}
               {pending ? (
                 <TableHead className={cn(headCellClass, 'text-right')}>
                   {t('col.committed')}
                 </TableHead>
               ) : (
-                <>
-                  <SortableHead
-                    label={t('col.invested')}
-                    active={sort?.key === 'invested'}
-                    dir={sort?.dir ?? 'desc'}
-                    onClick={() => toggleSort('invested')}
-                    className={cn(headCellClass, 'text-right')}
-                    sortable={variant === 'active'}
-                  />
-                  <SortableHead
-                    label={t('col.received')}
-                    active={sort?.key === 'received'}
-                    dir={sort?.dir ?? 'desc'}
-                    onClick={() => toggleSort('received')}
-                    className={cn(headCellClass, 'text-right')}
-                    sortable={variant === 'active'}
-                  />
-                </>
+                <SortableHead
+                  label={t('col.invested')}
+                  active={sort?.key === 'invested'}
+                  dir={sort?.dir ?? 'desc'}
+                  onClick={() => toggleSort('invested')}
+                  className={cn(headCellClass, 'text-right')}
+                  sortable={variant === 'active'}
+                />
               )}
-              {variant === 'active' && (
+              {/* Second amount slot: nothing has been received yet on a
+                  pending term sheet — the column stays reserved but empty. */}
+              {pending ? (
+                <TableHead className={headCellClass} />
+              ) : (
+                <SortableHead
+                  label={t('col.received')}
+                  active={sort?.key === 'received'}
+                  dir={sort?.dir ?? 'desc'}
+                  onClick={() => toggleSort('received')}
+                  className={cn(headCellClass, 'text-right')}
+                  sortable={variant === 'active'}
+                />
+              )}
+              {/* First ratio slot: TVPI while active, realized MOIC once
+                  settled, empty while pending. */}
+              {variant === 'active' ? (
                 <SortableHead
                   label={t('col.tvpi')}
                   active={sort?.key === 'tvpi'}
@@ -453,20 +509,24 @@ export function ParticipationsTable({
                   onClick={() => toggleSort('tvpi')}
                   className={cn(headCellClass, 'text-right')}
                 />
+              ) : settled ? (
+                <TableHead className={cn(headCellClass, 'text-right')}>
+                  {t('col.moic')}
+                </TableHead>
+              ) : (
+                <TableHead className={headCellClass} />
               )}
-              {settled && (
-                <>
-                  <TableHead className={cn(headCellClass, 'text-right')}>
-                    {t('col.moic')}
-                  </TableHead>
-                  <TableHead className={cn(headCellClass, 'text-right')}>
-                    {t('col.tri')}
-                  </TableHead>
-                </>
+              {/* Second ratio slot: the annualized TRI, settled bucket only. */}
+              {settled ? (
+                <TableHead className={cn(headCellClass, 'text-right')}>
+                  {t('col.tri')}
+                </TableHead>
+              ) : (
+                <TableHead className={headCellClass} />
               )}
               <TableHead className={headCellClass}>{t('col.sector')}</TableHead>
               {/* Trailing column for the per-row hover chevron. */}
-              <TableHead className={cn(headCellClass, 'w-8')} />
+              <TableHead className={headCellClass} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -507,31 +567,25 @@ export function ParticipationsTable({
                 >
                   {t('dealsCount', { count: totals.dealCount })}
                 </TableCell>
+                <TableCell
+                  className={cn(footCellClass, 'text-right tabular-nums')}
+                >
+                  {fmtEur(pending ? totals.committed : totals.invested)}
+                </TableCell>
                 {pending ? (
+                  <TableCell className={footCellClass} />
+                ) : (
                   <TableCell
                     className={cn(footCellClass, 'text-right tabular-nums')}
                   >
-                    {fmtEur(totals.committed)}
+                    {fmtEur(totals.received)}
                   </TableCell>
-                ) : (
-                  <>
-                    <TableCell
-                      className={cn(footCellClass, 'text-right tabular-nums')}
-                    >
-                      {fmtEur(totals.invested)}
-                    </TableCell>
-                    <TableCell
-                      className={cn(footCellClass, 'text-right tabular-nums')}
-                    >
-                      {fmtEur(totals.received)}
-                    </TableCell>
-                    {/* No sum for ratio columns (TVPI, or MOIC + TRI). */}
-                    <TableCell className={footCellClass} />
-                    {settled && <TableCell className={footCellClass} />}
-                  </>
                 )}
+                {/* No sum for the ratio columns (TVPI, or MOIC + TRI). */}
                 <TableCell className={footCellClass} />
-                <TableCell className={cn(footCellClass, 'w-8')} />
+                <TableCell className={footCellClass} />
+                <TableCell className={footCellClass} />
+                <TableCell className={footCellClass} />
               </TableRow>
             </TableFooter>
           )}
@@ -591,14 +645,16 @@ function CompanyTableRow({
       }
     >
       <TableCell className={cn('font-medium', stickyCellClass)}>
-        <span className="flex items-center gap-3">
+        <span className="flex min-w-0 items-center gap-3">
           <CompanyLogo
             domain={row.domain}
             companyName={row.name}
             size="md"
             className="size-9"
           />
-          {row.name}
+          {/* The column grid is fixed now, so a long name has to ellipsize
+              instead of pushing the table wider. */}
+          <span className="truncate">{row.name}</span>
         </span>
       </TableCell>
       {showOrg && (
@@ -616,25 +672,24 @@ function CompanyTableRow({
       <TableCell className="text-right tabular-nums">
         {t('dealsCount', { count: row.dealCount })}
       </TableCell>
+      {/* The column grid is shared by all three variants (see COL_WIDTHS):
+          the slots a variant has nothing for stay empty rather than shifting
+          the columns to their left. */}
+      <TableCell className="text-right tabular-nums">
+        {fmtEur(variant === 'pending' ? row.committed : row.invested)}
+      </TableCell>
       {variant === 'pending' ? (
-        <TableCell className="text-right tabular-nums">
-          {fmtEur(row.committed)}
-        </TableCell>
+        <TableCell />
       ) : (
-        <>
-          <TableCell className="text-right tabular-nums">
-            {fmtEur(row.invested)}
-          </TableCell>
-          <TableCell
-            className={`text-right tabular-nums${
-              isNeutralAmount(row.received) ? ' text-muted-foreground' : ''
-            }`}
-          >
-            {fmtEur(row.received)}
-          </TableCell>
-        </>
+        <TableCell
+          className={`text-right tabular-nums${
+            isNeutralAmount(row.received) ? ' text-muted-foreground' : ''
+          }`}
+        >
+          {fmtEur(row.received)}
+        </TableCell>
       )}
-      {variant === 'active' && (
+      {variant === 'active' ? (
         <TableCell
           className={`text-right tabular-nums${
             isNeutralTvpi(row.tvpi) ? ' text-muted-foreground' : ''
@@ -642,16 +697,19 @@ function CompanyTableRow({
         >
           {fmtMultiple(row.tvpi)}
         </TableCell>
+      ) : variant === 'settled' ? (
+        <TableCell className="text-right tabular-nums">
+          {fmtMultiple(row.moic)}
+        </TableCell>
+      ) : (
+        <TableCell />
       )}
-      {variant === 'settled' && (
-        <>
-          <TableCell className="text-right tabular-nums">
-            {fmtMultiple(row.moic)}
-          </TableCell>
-          <TableCell className="text-right tabular-nums">
-            {fmtPercent(row.tri)}
-          </TableCell>
-        </>
+      {variant === 'settled' ? (
+        <TableCell className="text-right tabular-nums">
+          {fmtPercent(row.tri)}
+        </TableCell>
+      ) : (
+        <TableCell />
       )}
       <TableCell>
         {row.sector ? (
@@ -662,7 +720,7 @@ function CompanyTableRow({
           <span className="text-muted-foreground">—</span>
         )}
       </TableCell>
-      <TableCell className="w-8 text-right">
+      <TableCell className="text-right">
         {openDetail && (
           <ArrowRight
             aria-hidden
