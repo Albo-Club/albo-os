@@ -23,6 +23,27 @@ bas de page.
 
 ---
 
+## v1.129.6 — 27/07/2026 à 09:20 — Fenêtre de rapprochement : le texte ne déborde plus
+
+Dans le prévisionnel, la fenêtre « Les montants diffèrent » (celle qui
+propose de clore avec l'écart ou de conserver le reliquat) débordait de son
+cadre : les boutons, trop larges pour tenir sur une seule ligne, poussaient
+tout le contenu au-delà des bords de la fenêtre. Les boutons passent
+désormais à la ligne quand la place manque, et le texte reste dans le cadre.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/cash/ForecastMatchSuggestions.tsx` : `sm:flex-wrap` sur
+>   le `DialogFooter` de la boîte de décision de rapprochement.
+> - Cause : `DialogContent` est un `grid`, et les `Button` sont
+>   `whitespace-nowrap shrink-0` — la largeur min-content du footer (3
+>   boutons + gaps) dépassait `sm:max-w-md`, ce qui élargissait la colonne
+>   de grille au-delà du `max-width` et faisait déborder tout le contenu.
+>   Autoriser le wrap ramène le min-content à la largeur du bouton le plus
+>   large.
+
+---
+
 ## v1.129.5 — 26/07/2026 à 23:40 — Sécurité : reprise de compte par email périmé, et emails neutralisés
 
 Changements internes, sans effet visible dans l'application.

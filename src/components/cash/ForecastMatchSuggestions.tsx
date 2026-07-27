@@ -232,7 +232,7 @@ export function ForecastMatchSuggestions({
               )}
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="sm:flex-wrap">
             <Button
               variant="outline"
               disabled={pending}
