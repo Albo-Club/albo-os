@@ -27,7 +27,6 @@
   "allSubtitle": "Toutes tes organisations réunies — lecture seule. L'édition se fait dans une organisation.",
   "openDetail": "Ouvrir la fiche",
   "rowOpenAria": "Ouvrir la fiche de {{name}}",
-  "oneLinerExpand": "Voir le one-liner complet",
   "back": "← Entreprises",
   "notFound": "Société introuvable.",
   "info": {
@@ -59,7 +58,6 @@
   "col": {
     "company": "Société",
     "org": "Org",
-    "oneLiner": "One-liner",
     "sector": "Secteur",
     "aiScore": "Score IA",
     "deals": "Deals",
@@ -135,7 +133,9 @@
     "active": "Actif",
     "partially_exited": "Exit partiel",
     "fully_exited": "Exité",
-    "written_off": "Déprécié"
+    "written_off": "Exit loss",
+    "exit_win": "Exit win",
+    "exit_loss": "Exit loss"
   },
   "exit": {
     "action": "Marquer comme sorti",
@@ -483,8 +483,8 @@
     "sectionTitle_other": "{{count}} entités sans deal"
   },
   "settled": {
-    "sectionTitle_one": "Participation soldée ({{count}})",
-    "sectionTitle_other": "Participations soldées ({{count}})"
+    "sectionTitle_one": "Exit ({{count}})",
+    "sectionTitle_other": "Exits ({{count}})"
   },
   "empty": "Aucune entreprise pour ce scope — crée des deals via le chat IA, ou ajoute-les à la main.",
   "search": {
@@ -493,6 +493,7 @@
   },
   "dealsCount_one": "{{count}} deal",
   "dealsCount_other": "{{count}} deals",
+  "totalsRow": "Total",
   "loading": "Chargement…",
   "plan": {
     "title": "Business plan vs réalisé",
@@ -677,6 +678,7 @@
   },
   "export": {
     "button": "Exporter CSV",
+    "error": "L'export a échoué. Réessayez.",
     "col": {
       "deal": "Nom du deal",
       "lastValuation": "Dernière valorisation"
