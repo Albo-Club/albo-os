@@ -24,7 +24,7 @@ import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { directionBadgeClass, directionTone } from '~/lib/moneyTone'
 import { dealMoic } from '~/lib/dealMetrics'
-import { dealStatusBadge } from '~/lib/dealStatusBadge'
+import { dealStatusBadge, dealStatusLabelKey } from '~/lib/dealStatusBadge'
 import {
   dealAmountTiles,
   useDealTitle,
@@ -758,9 +758,10 @@ function DealDetail() {
     committedAmount: deal.committedAmount,
     paidActual,
   })
-  // Single status badge: colour = the exit outcome (green win / red loss /
-  // neutral), derived from the deal's realized cash flows.
-  const statusBadge = dealStatusBadge(deal.status, dealMoic(deal, txs).moic)
+  // Single status badge: colour AND label ("Exit win" / "Exit loss") = the
+  // exit outcome, derived from the deal's realized cash flows.
+  const statusMoic = dealMoic(deal, txs).moic
+  const statusBadge = dealStatusBadge(deal.status, statusMoic)
 
   return (
     <main className="flex-1 space-y-6 p-6">
@@ -786,7 +787,9 @@ function DealDetail() {
           variant={statusBadge.variant}
           className={cn('ms-1.5', statusBadge.className)}
         >
-          {t(`status.${deal.status}`, { defaultValue: deal.status })}
+          {t(`status.${dealStatusLabelKey(deal.status, statusMoic)}`, {
+            defaultValue: deal.status,
+          })}
         </Badge>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

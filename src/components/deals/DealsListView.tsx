@@ -12,7 +12,7 @@ import {
   residualCents,
   useFormatters,
 } from '~/components/participations/ParticipationsTable'
-import { dealStatusBadge } from '~/lib/dealStatusBadge'
+import { dealStatusBadge, dealStatusLabelKey } from '~/lib/dealStatusBadge'
 import { FacetFilter } from '~/components/participations/FacetFilter'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { Badge } from '~/components/ui/badge'
@@ -235,7 +235,9 @@ export function DealsListView({
           defaultValue: d.instrumentKind,
         }),
         d.investor?.name ?? '',
-        t(`participations:status.${d.status}`, { defaultValue: d.status }),
+        t(`participations:status.${dealStatusLabelKey(d.status, d.moic)}`, {
+          defaultValue: d.status,
+        }),
         euros(d.committedAmount),
         euros(d.paidActual ?? 0),
         euros(d.received ?? 0),
@@ -638,7 +640,9 @@ function DealRowCells({
       {settled && (
         <TableCell>
           <Badge variant={statusBadge.variant} className={statusBadge.className}>
-            {t(`status.${deal.status}`, { defaultValue: deal.status })}
+            {t(`status.${dealStatusLabelKey(deal.status, deal.moic)}`, {
+              defaultValue: deal.status,
+            })}
           </Badge>
         </TableCell>
       )}

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
+import { useConvex } from 'convex/react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { ConvexError } from 'convex/values'
@@ -246,17 +247,12 @@ function ArchivedSection({
 function WithoutDealSection({
   orgId,
   orgSlug,
-  deals,
+  referencedCompanyIds,
 }: {
   orgId: Id<'organizations'>
   orgSlug: string
-  deals:
-    | Array<{
-        targetCompanyId: Id<'companies'>
-        investorCompanyId: Id<'companies'>
-        viaSpvCompanyId?: Id<'companies'>
-      }>
-    | undefined
+  /** Company ids referenced by any deal (from deals.listParticipations). */
+  referencedCompanyIds: Array<string> | undefined
 }) {
   const { t } = useTranslation('participations')
   const [open, setOpen] = useState(false)
@@ -269,15 +265,10 @@ function WithoutDealSection({
   // is referenced by no deal. Matched strictly by ID. Both queries must have
   // resolved before we can tell an entity is truly orphan.
   const withoutDeal = useMemo(() => {
-    if (!companies || !deals) return undefined
-    const referenced = new Set<string>()
-    for (const d of deals) {
-      referenced.add(d.targetCompanyId)
-      referenced.add(d.investorCompanyId)
-      if (d.viaSpvCompanyId) referenced.add(d.viaSpvCompanyId)
-    }
+    if (!companies || !referencedCompanyIds) return undefined
+    const referenced = new Set(referencedCompanyIds)
     return companies.filter((c) => !referenced.has(c._id))
-  }, [companies, deals])
+  }, [companies, referencedCompanyIds])
 
   // No orphan entity: render nothing (the normal case — keeps the page clean).
   if (!withoutDeal || withoutDeal.length === 0) return null
@@ -330,14 +321,20 @@ function Participations() {
   const { orgSlug } = Route.useParams()
   const [createOpen, setCreateOpen] = useState(false)
   const org = useConvexQuery(api.organizations.bySlug, { slug: orgSlug })
-  const deals = useConvexQuery(
-    api.deals.list,
+  // Server-side projection: pre-aggregated company rows (one per company and
+  // per active/settled bucket) — the full deal docs never reach this page.
+  const participations = useConvexQuery(
+    api.deals.listParticipations,
     org ? { orgId: org._id } : 'skip',
   )
+  // One-shot fetch of the full per-deal set, only when the CSV export runs.
+  const convex = useConvex()
   // Filled by the table; lets the header menu trigger the export of the full
   // deal set (active + settled).
   const exportRef = useRef<(() => void) | null>(null)
-  const hasDeals = Boolean(deals && deals.length > 0)
+  const hasDeals = Boolean(
+    participations && participations.rows.length > 0,
+  )
 
   return (
     <main className="flex-1 space-y-6 p-6">
@@ -370,10 +367,21 @@ function Participations() {
           </DropdownMenu>
         )}
       </div>
-      <ParticipationsView deals={deals} orgSlug={orgSlug} exportRef={exportRef} />
+      <ParticipationsView
+        rows={participations?.rows}
+        orgSlug={orgSlug}
+        exportRef={exportRef}
+        loadExportDeals={
+          org ? () => convex.query(api.deals.list, { orgId: org._id }) : undefined
+        }
+      />
 
       {org && (
-        <WithoutDealSection orgId={org._id} orgSlug={orgSlug} deals={deals} />
+        <WithoutDealSection
+          orgId={org._id}
+          orgSlug={orgSlug}
+          referencedCompanyIds={participations?.referencedCompanyIds}
+        />
       )}
 
       {org && <ArchivedSection orgId={org._id} orgSlug={orgSlug} />}

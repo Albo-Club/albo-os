@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useConvexQuery } from '@convex-dev/react-query'
+import { useConvex } from 'convex/react'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '../../../../convex/_generated/api'
@@ -23,7 +24,10 @@ export const Route = createFileRoute('/app/all/participations')({
 
 function AllParticipations() {
   const { t } = useTranslation('participations')
-  const deals = useConvexQuery(api.aggregate.listDeals, {})
+  // Server-side projection: pre-aggregated company rows across all my orgs.
+  const rows = useConvexQuery(api.aggregate.listParticipations, {})
+  // One-shot fetch of the full per-deal set, only when the CSV export runs.
+  const convex = useConvex()
 
   return (
     <main className="flex-1 space-y-6 p-6">
@@ -33,7 +37,11 @@ function AllParticipations() {
         </h1>
         <p className="text-muted-foreground text-sm">{t('allSubtitle')}</p>
       </div>
-      <ParticipationsView deals={deals} showOrg />
+      <ParticipationsView
+        rows={rows}
+        showOrg
+        loadExportDeals={() => convex.query(api.aggregate.listDeals, {})}
+      />
     </main>
   )
 }
