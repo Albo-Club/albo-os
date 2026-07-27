@@ -64,6 +64,18 @@ probables, en conversation). Dans les deux cas, ni l'outil ni l'assistant
 ne pointent jamais seuls : la décision reste humaine — cliquer la puce,
 ou approuver explicitement dans le chat.
 
+## Le rapprochement des échéances prévues
+
+En tête de l'onglet **Transactions**, une carte « Rapprochements suggérés »
+rapproche l'autre bout de la chaîne : les échéances du
+[prévisionnel](09-previsionnel.md) dues ou en retard qui ressemblent à une
+transaction récente (même sens, dates et montants proches, libellé). C'est
+aussi un pointage — la transaction dit ce qui s'est réellement passé, la
+carte confirme que l'échéance attendue est bien celle-là. Un clic si les
+montants collent, sinon un dialogue pour clore avec l'écart ou garder le
+reliquat. Le détail du mécanisme est décrit dans le
+[prévisionnel](09-previsionnel.md).
+
 ## La TVA
 
 - Les montants sont toujours TTC ; on qualifie le **taux** (0 / 5,5 / 10 /
