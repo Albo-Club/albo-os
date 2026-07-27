@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.132.0 — 27/07/2026 à 18:35 — Thème et langue passent dans Mon compte
+## v1.133.0 — 27/07/2026 à 18:47 — Thème et langue passent dans Mon compte
 
 Le pied de la barre latérale ne porte plus les réglages d'affichage : il ne
 reste que le menu utilisateur.
@@ -51,6 +51,27 @@ reste que le menu utilisateur.
 >   (fr + en).
 > - Docs : `TESTING.md` I4/SH7 et `docs/produit/02` + `13` pointent vers le
 >   nouvel emplacement.
+
+## v1.132.0 — 27/07/2026 à 18:29 — La liste des entreprises ne pagine plus
+
+Dans la foulée de la refonte de la liste : la pagination disparaît. Toutes
+les participations s'affichent d'un seul tenant — comme dans un tableur —
+et défilent sous l'en-tête et la ligne de totaux, qui restent visibles.
+Plus besoin d'aller chercher une société « en page 4 » : on fait défiler,
+on filtre ou on cherche. Le passage des lignes en version allégée (mise à
+jour précédente) rend l'affichage complet instantané.
+
+> **🔧 Notes techniques**
+>
+> - `ParticipationsTable.tsx` : suppression de `usePagination` /
+>   `PaginationFooter` / découpage `PAGE_SIZE` — rendu direct de
+>   `sortedRows` dans le conteneur borné (`max-h-[70vh]`) qui portait déjà
+>   l'en-tête et les totaux sticky.
+> - Orphelins retirés : prop `resetKey` et `filterKey` de
+>   `ParticipationsView.tsx`. `LocalPagination.tsx` reste utilisé par les
+>   autres listes (deals agrégés…).
+> - TESTING.md (SH19/SH20, section deals per-org retirée) et
+>   `docs/produit/04-participations.md` mis à jour.
 
 ## v1.131.0 — 27/07/2026 à 18:08 — Le portefeuille se pilote depuis la liste des entreprises
 

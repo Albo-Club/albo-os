@@ -17,13 +17,15 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
 - **Tableau des participations actives**, réduit à l'essentiel : logo et
   nom, **score IA de santé** (1 à 10, issu de la synthèse IA), nombre de
   deals, montant investi, montant reçu, **TVPI**, et le secteur en badge en
-  dernière colonne. Tri par colonne, pagination, clic vers la fiche.
+  dernière colonne. Tri par colonne, clic vers la fiche ; plus de pagination —
+  toute la liste s'affiche et défile sous l'en-tête et les totaux, qui
+  restent visibles.
 - **Liseré de statut** dans la marge gauche de chaque ligne : **orange** =
   deal en cours (term sheet), **bleu** = participation active, **vert** =
   Exit win, **rouge** = Exit loss. Les lignes avec un deal en cours
   remontent en haut de la liste — elles demandent une action.
 - **Ligne de totaux** en pied de tableau : nombre de deals, montant investi
-  et montant reçu, sommés sur **l'ensemble des pages** et recalculés en
+  et montant reçu, sommés sur **toute la liste** et recalculés en
   direct quand un filtre ou une recherche est actif. C'est la façon de
   répondre à « combien a-t-on investi en immobilier actif ? » sans quitter
   la liste.
