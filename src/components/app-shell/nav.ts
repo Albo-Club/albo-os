@@ -1,7 +1,6 @@
 import {
   Handshake,
   Inbox,
-  LayoutDashboard,
   ListTodo,
   Megaphone,
   PieChart,
@@ -12,7 +11,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 
 export type NavLeaf = {
-  /** i18n key under the `nav` namespace, e.g. `items.dashboard`. */
+  /** i18n key under the `nav` namespace, e.g. `items.participations`. */
   titleKey: string
   to: string
   icon?: LucideIcon
@@ -35,11 +34,6 @@ export function getNavGroups(): Array<NavGroup> {
     {
       labelKey: 'groups.platform',
       items: [
-        {
-          titleKey: 'items.dashboard',
-          to: '/app/$orgSlug',
-          icon: LayoutDashboard,
-        },
         {
           titleKey: 'items.todo',
           to: '/app/$orgSlug/todo',

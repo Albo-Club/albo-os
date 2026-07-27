@@ -10,7 +10,6 @@ import enAuth from '~/locales/en/auth.json'
 import enErrors from '~/locales/en/errors.json'
 import enValidation from '~/locales/en/validation.json'
 import enNav from '~/locales/en/nav.json'
-import enDashboard from '~/locales/en/dashboard.json'
 import enParticipations from '~/locales/en/participations.json'
 import enDeals from '~/locales/en/deals.json'
 import enSearch from '~/locales/en/search.json'
@@ -30,7 +29,6 @@ import frAuth from '~/locales/fr/auth.json'
 import frErrors from '~/locales/fr/errors.json'
 import frValidation from '~/locales/fr/validation.json'
 import frNav from '~/locales/fr/nav.json'
-import frDashboard from '~/locales/fr/dashboard.json'
 import frParticipations from '~/locales/fr/participations.json'
 import frDeals from '~/locales/fr/deals.json'
 import frSearch from '~/locales/fr/search.json'
@@ -51,7 +49,6 @@ export const NAMESPACES = [
   'errors',
   'validation',
   'nav',
-  'dashboard',
   'participations',
   'deals',
   'search',
@@ -76,7 +73,6 @@ export const resources = {
     errors: enErrors,
     validation: enValidation,
     nav: enNav,
-    dashboard: enDashboard,
     participations: enParticipations,
     deals: enDeals,
     search: enSearch,
@@ -97,7 +93,6 @@ export const resources = {
     errors: frErrors,
     validation: frValidation,
     nav: frNav,
-    dashboard: frDashboard,
     participations: frParticipations,
     deals: frDeals,
     search: frSearch,
