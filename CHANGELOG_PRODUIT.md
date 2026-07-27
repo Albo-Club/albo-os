@@ -23,6 +23,69 @@ bas de page.
 
 ---
 
+## v1.131.0 — 27/07/2026 à 18:08 — Le portefeuille se pilote depuis la liste des entreprises
+
+Grande passe d'ergonomie issue du point produit du jour : l'application se
+recentre sur la liste des entreprises et leurs fiches.
+
+- **Liste des entreprises épurée** : les colonnes se limitent à l'essentiel
+  — société (logo agrandi, lignes plus lisibles), score IA, nombre de
+  deals, montant investi, reçu, TVPI, et le secteur en badge en bout de
+  ligne. Le pitch d'une ligne disparaît du tableau.
+- **Le statut se lit d'un coup d'œil** : un liseré coloré dans la marge de
+  chaque ligne — orange pour un deal en cours (term sheet), bleu pour une
+  participation active, vert pour une sortie gagnante, rouge pour une
+  perte. Les participations soldées s'appellent désormais **« Exit win »**
+  et **« Exit loss »**, et les deals en cours remontent en haut de la
+  liste.
+- **Des totaux comme dans un tableur** : une ligne de totaux fixée en bas
+  du tableau somme le nombre de deals, l'investi et le reçu — sur toutes
+  les pages, et recalculée à la volée quand on filtre ou qu'on cherche.
+  « Combien a-t-on investi en immobilier actif ? » se lit désormais
+  directement dans la liste, qui remplace l'ancien tableau de bord.
+- **Fiche entreprise réorganisée** : la santé de la boîte (synthèse IA)
+  arrive tout en haut, suivie d'un vrai tableau des deals — chaque ligne
+  est cliquable vers la fiche du deal. L'identité, le résumé et les
+  personnes (fondateurs, board, co-investisseurs) se rangent dans un
+  panneau latéral à droite.
+- **Navigation simplifiée** : les deals s'ouvrent uniquement depuis la
+  fiche de leur entreprise (l'entrée « Deals » du menu disparaît, comme le
+  fil d'Ariane du haut de page) ; l'accueil d'une organisation mène
+  directement à la liste des entreprises.
+- **Les emails du portfolio se retirent** : la timeline d'emails par
+  participation et le raccordement Gmail n'étaient pas au niveau ; la
+  fonctionnalité est retirée entièrement pour être repensée à froid. Les
+  reports par email (investor updates transférés) continuent, eux, de
+  fonctionner normalement.
+- **Listes plus rapides** : la liste des entreprises ne charge plus que ce
+  qu'elle affiche, au lieu de l'intégralité des données de chaque deal.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle query de projection `deals.listParticipations` (+ sœur
+>   `aggregate.listParticipations`) : agrégats par société calculés côté
+>   serveur (`buildParticipationRows`, XIRR sur l'union des flux), les
+>   documents deals complets ne transitent plus ; export CSV en fetch
+>   one-shot au clic. Filtre `isTreasuryPlacement` conservé côté serveur.
+> - `ParticipationsTable.tsx` refondu : liseré via `dealStatusAccent()`
+>   (nouveau token `--info` dans `brand.css`), libellés via
+>   `dealStatusLabelKey()` (source unique `dealStatusBadge.ts`), en-tête
+>   sticky + ligne de totaux sticky (sticky par cellule, conteneur borné —
+>   cf. KNOWN_ISSUES « Colonne figée »).
+> - Fiche société (`participations.$companyId.tsx`) : layout deux colonnes
+>   (`lg:flex-row`), nouveau `CompanyDealsTable.tsx` (lignes cliquables,
+>   conventions de montants de `dealAmountTiles`), `DealsList` supprimé.
+> - Suppressions : feature emails (`convex/gmail.ts`, route `/emails`,
+>   `CompanyEmailsSection`, cron, callback OAuth — tables `gmail*` /
+>   `companyEmail*` déclarées inertes, pipeline reports AgentMail intact),
+>   dashboard UI (redirect `/app/$orgSlug` → participations,
+>   `convex/dashboard.ts` conservé pour le MCP), entrée nav Deals + route
+>   `deals.index.tsx`, breadcrumb (`AppHeader.tsx` réécrit).
+> - Docs : TESTING.md (SH/FE/M4 réécrits, section Gmail supprimée),
+>   KNOWN_ISSUES.md (section tables Gmail inertes, note sticky),
+>   TEMPLATE_SYNC.md (token `--info`), docs/produit (pages 03 et 18
+>   supprimées, 02/04/05 réécrites).
+
 ## v1.130.1 — 27/07/2026 à 09:40 — Fenêtre de rapprochement : le texte ne déborde plus
 
 La fenêtre « Les montants diffèrent » (celle qui propose de clore avec

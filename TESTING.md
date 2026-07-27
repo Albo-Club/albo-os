@@ -937,15 +937,19 @@ suppression est désactivé quand `listByDeal(dealId).length > 0`.
 
 ## Fiche société (lecture seule)
 
-Squelette commun des fiches (en-tête → bloc d'identité → Reporting/KPIs →
-Documents) pour la fiche société (`/participations/$companyId`, nature
-« Entreprise »). Briques read-only dans `src/components/companies/EntityFiche.tsx` ;
-les actions d'édition existantes restent (seul le bloc d'identité est en lecture
-seule). Champs manquants & lien Attio : `KNOWN_ISSUES.md` « Fiche entité ».
+Fiche société (`/participations/$companyId`, nature « Entreprise ») en deux
+colonnes : colonne principale (synthèse IA en tête → table des deals →
+onglets Rapports/Documents) + **panneau d'identité à droite** (identité,
+résumé, fondateurs/board/co-investisseurs) qui passe **sous** le contenu en
+dessous de `lg`. Briques read-only dans
+`src/components/companies/EntityFiche.tsx` ; les actions d'édition
+existantes restent. Champs manquants & lien Attio : `KNOWN_ISSUES.md`
+« Fiche entité ».
 
 | #   | Étape                                                              | Résultat attendu                                                                                                                                                                                                              |
 | --- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| FE1 | Fiche société `/participations/$companyId`                        | En-tête : nom + badge « Entreprise » + détention (si calculable) + boutons Éditer/Nouveau deal ; bloc Identité (Secteur, SIREN, Domaine, Détention, Fiche Attio) ; sections Fondateur(s)/Board/Co-investisseurs (personnes groupées par rôle ; « À renseigner » si la section est vide) ; Deals ; KPIs ; Documents |
+| FE1 | Fiche société `/participations/$companyId`                        | En-tête (sticky) : logo + nom + badge « Entreprise » + détention (si calculable) + menu ⋯ (Éditer/Nouveau deal/…). Colonne principale : **synthèse IA en premier**, puis table des **Deals** (colonnes Deal / Statut / Signé / Investi / Reçu / TVPI, **ligne entière cliquable** → fiche deal, Entrée au clavier, chevron au survol), puis onglets Rapports/Documents. **Panneau latéral droit** (`lg:` et plus ; empilé dessous en mobile) : Identité (Secteur/SIREN/Domaine éditables en ligne, Détention, Actions consolidées, Fiche Attio), résumé, Fondateur(s)/Board/Co-investisseurs (« À renseigner » si vide) |
+| FE1b | Table des deals de la fiche | Montants conformes aux conventions : investi = décaissé réel au centime (fonds : engagé arrondi + appelé au centime ; term sheet : engagé prévisionnel arrondi), reçu au centime ; statut en libellé « Exit win »/« Exit loss » selon le MOIC ; liseré de statut 4px dans la marge de la ligne (mêmes couleurs que la liste, cf. SH19) |
 | FE2 | Lien Attio sur la fiche société                                   | Avec `VITE_ATTIO_WORKSPACE_URL` posée → lien « Ouvrir dans Attio » (nouvel onglet, `{base}/company/{attioCompanyId}`) ; sans → mention grisée « Lié à Attio » (jamais d'URL devinée) ; « — » si pas d'`attioCompanyId`         |
 | FE3 | i18n EN/FR                                                        | `nature.company`, `identity.*`, `personRole.*`, `edit.people*`, « À renseigner » — tous traduits (namespace `participations`)                                                                                                  |
 | FE4 | Édition des personnes via **« Modifier la société »** → bloc « Personnes » | « Ajouter une personne » crée une ligne (select rôle + nom) ; saisir nom + rôle → Enregistrer → la personne apparaît aussitôt dans la bonne section de la fiche ; « Retirer » puis Enregistrer → elle disparaît ; **nom vide** → bouton Enregistrer **désactivé** (miroir backend `invalid_person_name`) ; la **liste complète** part dans `companies.update` (`patch.people`, remplacement total, pas de nouvelle mutation) |

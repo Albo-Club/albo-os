@@ -42,29 +42,42 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
 
 ## La fiche société
 
-En-tête : logo, nom, nature, % de détention global. Puis :
+En-tête : logo, nom, nature, % de détention global. En dessous, la page se
+lit en deux colonnes : le contenu principal à gauche, la **fiche d'identité
+en panneau latéral à droite** (sur mobile, le panneau passe sous le
+contenu).
 
-- **Identité** : secteur, SIREN, domaine — éditables en ligne (clic sur la
-  valeur) — plus le nombre d'actions consolidé et un lien « Ouvrir dans
-  Attio » quand la société est liée au CRM.
-- **Personnes** : trois colonnes — fondateurs, board, co-investisseurs — avec
-  lien vers la fiche Attio quand la personne y est rattachée. L'édition passe
-  par le dialogue Éditer, qui propose une recherche dans les personnes Attio.
-- **Deals de la société** : blocs détaillés cliquables vers chaque
-  [fiche deal](05-deals.md). Un deal se crée depuis cette fiche (menu ⋯) ; le
-  formulaire propose d'emblée **tous les champs de l'instrument** choisi
-  (montant, dates dont le closing, tour, valorisations, titres acquis…) pour
-  tout renseigner en une fois.
-- **Synthèse IA** : score de santé, résumé exécutif, alerte critique
-  éventuelle, points forts / points de vigilance, trois KPIs avec tendance.
-  Elle est régénérée automatiquement à chaque rapport ingéré, et peut être
+La colonne principale, dans l'ordre de lecture :
+
+- **Synthèse IA en premier** : score de santé, résumé exécutif, alerte
+  critique éventuelle, points forts / points de vigilance, trois KPIs avec
+  tendance — la santé de la boîte est la première chose qu'on voit. Elle
+  est régénérée automatiquement à chaque rapport ingéré, et peut être
   relancée à la main.
+- **Deals de la société** : un tableau au même style que la liste des
+  participations (statut avec liseré coloré, date de signature, investi,
+  reçu, TVPI), chaque **ligne cliquable** vers la
+  [fiche deal](05-deals.md) — c'est le seul chemin d'accès aux deals. Un
+  deal se crée depuis cette fiche (menu ⋯) ; le formulaire propose
+  d'emblée **tous les champs de l'instrument** choisi (montant, dates dont
+  le closing, tour, valorisations, titres acquis…) pour tout renseigner en
+  une fois.
 - **Onglet Rapports** : les communications investisseurs — celles ingérées
   automatiquement par email (investor updates analysés : highlights,
   métriques, contenu) et celles remontées depuis Parallel/VASCO pour les SPV
   (voir [Intégrations](15-integrations.md)).
 - **Onglet Documents** : upload manuel (reporting, BP, légal, autre — 20 Mo
   max, avec période couverte), téléchargement, suppression.
+
+Le panneau d'identité, à droite :
+
+- **Identité** : secteur, SIREN, domaine — éditables en ligne (clic sur la
+  valeur) — plus le % de détention, le nombre d'actions consolidé et un
+  lien « Ouvrir dans Attio » quand la société est liée au CRM, suivi du
+  résumé de la société.
+- **Personnes** : fondateurs, board, co-investisseurs — avec lien vers la
+  fiche Attio quand la personne y est rattachée. L'édition passe par le
+  dialogue Éditer, qui propose une recherche dans les personnes Attio.
 
 ### Sous le capot : l'enrichissement automatique
 
