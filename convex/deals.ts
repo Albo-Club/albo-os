@@ -11,10 +11,13 @@ import {
   instrumentValidator as sharedInstrumentValidator,
   termDurationValidator,
 } from './lib/instruments'
+import { isTreasuryPlacement } from './lib/instrumentMapping'
 import {
   moic as moicRatio,
   proceedsFromReceived,
   realizedCashflows,
+  residualValueCents,
+  tvpi as tvpiRatio,
 } from './lib/metrics'
 import { xirr } from './lib/xirr'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
@@ -302,6 +305,237 @@ export const list = query({
         }
       }),
     )
+  },
+})
+
+/**
+ * One deal reduced to the inputs of the participations rows. Built by
+ * `participationSource` (per-org and aggregated queries feed the same
+ * builder); `org` is only set by the aggregated view.
+ */
+type ParticipationDealSource = {
+  status: string
+  instrumentKind: string
+  name: string | null
+  signedDate: number | null
+  targetCompanyId: Id<'companies'>
+  target: { name: string; sector: string | null; domain: string | null } | null
+  investorName: string | null
+  aiScore: number | null
+  paidActual: number
+  received: number
+  lastValuationCents: number | null
+  flows: Array<{ amount: number; date: number }>
+  org: { name: string; slug: string } | null
+}
+
+/** Builds one ParticipationDealSource (reads the deal's txs + last valuation). */
+export async function participationSource(
+  ctx: Ctx,
+  deal: Doc<'deals'>,
+  companiesById: Map<Id<'companies'>, Doc<'companies'>>,
+  aiScores: Map<Id<'companies'>, number>,
+  org: { name: string; slug: string } | null,
+): Promise<ParticipationDealSource> {
+  const target = companiesById.get(deal.targetCompanyId) ?? null
+  const metrics = await dealRealizedMetrics(ctx, deal)
+  return {
+    status: deal.status,
+    instrumentKind: deal.instrumentKind,
+    name: deal.name ?? null,
+    signedDate: deal.signedDate ?? null,
+    targetCompanyId: deal.targetCompanyId,
+    target: target && {
+      name: target.name,
+      sector: target.sector ?? null,
+      domain: target.domain ?? null,
+    },
+    investorName: companiesById.get(deal.investorCompanyId)?.name ?? null,
+    aiScore: aiScores.get(deal.targetCompanyId) ?? null,
+    paidActual: metrics.paidActual,
+    received: metrics.received,
+    lastValuationCents: await lastValuationCents(ctx, deal._id),
+    flows: metrics.flows,
+    org,
+  }
+}
+
+/**
+ * Server-side projection for the participations list: ONE row per company and
+ * per bucket (active vs settled — fully_exited / written_off deals split into
+ * their own row, mirroring the client-side split of the two tables). Each row
+ * carries only what the table displays (name/domain/sector/AI score + the
+ * pre-aggregated sums and ratios) plus the per-deal facet values (instrument
+ * kinds, statuses, deal/investor names) so the client search & filters keep
+ * working — the full deal docs and dated flows never reach the client.
+ *
+ * Ratios follow the tables: TVPI on active rows (gross received, residual =
+ * last valuation falling back to cost), MOIC (de-VAT'd proceeds) + exact XIRR
+ * on the flow union for settled rows — IRR is not additive, so it is solved
+ * here on the union, never derived from per-deal rates.
+ *
+ * Default order: rows with a pending Term Sheet first (they need attention),
+ * then most recent deal first.
+ */
+export function buildParticipationRows(deals: Array<ParticipationDealSource>) {
+  type Group = {
+    companyId: Id<'companies'>
+    name: string
+    domain: string | null
+    sector: string | null
+    aiScore: number | null
+    org: { name: string; slug: string } | null
+    settled: boolean
+    dealCount: number
+    paid: number
+    received: number
+    residual: number
+    capital: number
+    proceeds: number
+    flows: Array<{ amount: number; date: number }>
+    hasPending: boolean
+    writtenOff: boolean
+    lastSigned: number
+    instrumentKinds: Set<string>
+    statuses: Set<string>
+    dealNames: Array<string>
+    investorNames: Set<string>
+  }
+  const map = new Map<string, Group>()
+  for (const d of deals) {
+    const settled = d.status === 'fully_exited' || d.status === 'written_off'
+    const key = `${d.targetCompanyId}:${settled ? 'settled' : 'active'}`
+    const g = map.get(key) ?? {
+      companyId: d.targetCompanyId,
+      name: d.target?.name ?? '—',
+      domain: d.target?.domain ?? null,
+      sector: d.target?.sector ?? null,
+      aiScore: d.aiScore,
+      org: d.org,
+      settled,
+      dealCount: 0,
+      paid: 0,
+      received: 0,
+      residual: 0,
+      capital: 0,
+      proceeds: 0,
+      flows: [],
+      hasPending: false,
+      writtenOff: false,
+      lastSigned: 0,
+      instrumentKinds: new Set<string>(),
+      statuses: new Set<string>(),
+      dealNames: [],
+      investorNames: new Set<string>(),
+    }
+    g.dealCount += 1
+    g.paid += d.paidActual
+    g.received += d.received
+    g.residual += residualValueCents({
+      status: d.status,
+      lastValuationCents: d.lastValuationCents,
+      paidActual: d.paidActual,
+    })
+    // MOIC capital/proceeds accumulated per-deal so each deal's own VAT
+    // convention applies (royalty proceeds are net of VAT). De-VATing only
+    // ever lowers the multiple, so a mixed group is never overvalued.
+    g.capital += d.paidActual
+    g.proceeds += proceedsFromReceived(d.received, d.instrumentKind)
+    g.flows.push(...d.flows)
+    if (d.status === 'pending') g.hasPending = true
+    if (d.status === 'written_off') g.writtenOff = true
+    g.lastSigned = Math.max(g.lastSigned, d.signedDate ?? 0)
+    g.instrumentKinds.add(d.instrumentKind)
+    g.statuses.add(d.status)
+    if (d.name) g.dealNames.push(d.name)
+    if (d.investorName) g.investorNames.add(d.investorName)
+    map.set(key, g)
+  }
+  return Array.from(map.values())
+    .sort(
+      (a, b) =>
+        (b.hasPending ? 1 : 0) - (a.hasPending ? 1 : 0) ||
+        b.lastSigned - a.lastSigned,
+    )
+    .map((g) => ({
+      companyId: g.companyId,
+      name: g.name,
+      domain: g.domain,
+      sector: g.sector,
+      aiScore: g.aiScore,
+      org: g.org,
+      settled: g.settled,
+      dealCount: g.dealCount,
+      invested: g.paid,
+      received: g.received,
+      // TVPI keeps the GROSS received (not de-VAT'd), unlike the MOIC.
+      tvpi: g.settled
+        ? null
+        : tvpiRatio({
+            capital: g.paid,
+            proceeds: g.received,
+            residual: g.residual,
+          }),
+      moic: g.settled
+        ? moicRatio({ capital: g.capital, proceeds: g.proceeds })
+        : null,
+      tri: g.settled ? xirr(g.flows) : null,
+      hasPending: g.hasPending,
+      writtenOff: g.writtenOff,
+      instrumentKinds: [...g.instrumentKinds],
+      statuses: [...g.statuses],
+      dealNames: g.dealNames,
+      investorNames: [...g.investorNames],
+    }))
+}
+
+export type ParticipationRow = ReturnType<typeof buildParticipationRows>[number]
+
+/**
+ * Per-org participations rows (see `buildParticipationRows`), plus the set of
+ * company ids referenced by any deal (target / investor / via-SPV) so the
+ * "entities without a deal" section works without shipping the deals.
+ */
+export const listParticipations = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+
+    const deals = await ctx.db
+      .query('deals')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+
+    // One indexed read of the org's companies (names/sector/domain) instead
+    // of per-deal gets; one read of the AI scores.
+    const companies = await ctx.db
+      .query('companies')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    const companiesById = new Map(companies.map((c) => [c._id, c]))
+    const aiScores = await aiScoresByCompany(ctx, orgId)
+
+    // Treasury placements (crypto, capitalization accounts, term deposits…)
+    // live on the dedicated Placements page — the participations rows only
+    // cover participations. `referencedCompanyIds` below stays computed on
+    // the UNFILTERED set, so a placement's company never shows as orphan.
+    const sources = await Promise.all(
+      deals
+        .filter((d) => !isTreasuryPlacement(d.instrumentKind))
+        .map((d) => participationSource(ctx, d, companiesById, aiScores, null)),
+    )
+
+    const referenced = new Set<Id<'companies'>>()
+    for (const d of deals) {
+      referenced.add(d.targetCompanyId)
+      referenced.add(d.investorCompanyId)
+      if (d.viaSpvCompanyId) referenced.add(d.viaSpvCompanyId)
+    }
+
+    return {
+      rows: buildParticipationRows(sources),
+      referencedCompanyIds: [...referenced],
+    }
   },
 })
 

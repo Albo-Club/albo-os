@@ -27,7 +27,6 @@
   "allSubtitle": "All your organizations combined — read-only. Edit within an organization.",
   "openDetail": "Open details",
   "rowOpenAria": "Open {{name}}'s details",
-  "oneLinerExpand": "Show full one-liner",
   "back": "← Investments",
   "notFound": "Company not found.",
   "info": {
@@ -59,7 +58,6 @@
   "col": {
     "company": "Company",
     "org": "Org",
-    "oneLiner": "One-liner",
     "sector": "Sector",
     "aiScore": "AI score",
     "deals": "Deals",
@@ -135,7 +133,9 @@
     "active": "Active",
     "partially_exited": "Partial exit",
     "fully_exited": "Exited",
-    "written_off": "Written off"
+    "written_off": "Exit loss",
+    "exit_win": "Exit win",
+    "exit_loss": "Exit loss"
   },
   "exit": {
     "action": "Mark as exited",
@@ -483,8 +483,8 @@
     "sectionTitle_other": "{{count}} entities without a deal"
   },
   "settled": {
-    "sectionTitle_one": "Settled participation ({{count}})",
-    "sectionTitle_other": "Settled participations ({{count}})"
+    "sectionTitle_one": "Exit ({{count}})",
+    "sectionTitle_other": "Exits ({{count}})"
   },
   "empty": "No companies in this scope — create deals via the AI chat, or add them manually.",
   "search": {
@@ -493,6 +493,7 @@
   },
   "dealsCount_one": "{{count}} deal",
   "dealsCount_other": "{{count}} deals",
+  "totalsRow": "Total",
   "loading": "Loading…",
   "plan": {
     "title": "Business plan vs actuals",
@@ -645,6 +646,7 @@
   },
   "export": {
     "button": "Export CSV",
+    "error": "Export failed. Please try again.",
     "col": {
       "deal": "Deal name",
       "lastValuation": "Last valuation"
