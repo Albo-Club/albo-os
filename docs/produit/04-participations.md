@@ -44,7 +44,7 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
 
 ## La fiche société
 
-En-tête : logo, nom, nature, % de détention global. En dessous, la page se
+En-tête : logo, nom, % de détention global. En dessous, la page se
 lit en deux colonnes : le contenu principal à gauche, la **fiche d'identité
 en panneau latéral à droite** (sur mobile, le panneau passe sous le
 contenu).

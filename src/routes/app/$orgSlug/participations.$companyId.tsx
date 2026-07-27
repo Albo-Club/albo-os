@@ -33,7 +33,6 @@ import { CompanyDealsTable } from '~/components/companies/CompanyDealsTable'
 import { SectorCombobox } from '~/components/companies/SectorCombobox'
 import {
   AttioCompanyLink,
-  EntityNatureBadge,
   IdentityField,
   IdentitySection,
   PeopleList,
@@ -916,7 +915,6 @@ function ParticipationDetail() {
         <h1 className="text-2xl font-semibold tracking-tight">
           {company ? company.name : t('loading')}
         </h1>
-        {company && <EntityNatureBadge nature="company" className="ms-1.5" />}
         {ownership && (
           <span className="text-muted-foreground text-sm">
             {t('info.ownership')} {ownership}
