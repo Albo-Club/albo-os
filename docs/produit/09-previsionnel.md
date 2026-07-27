@@ -7,10 +7,12 @@ partir de deux sources : les **règles récurrentes** (loyers, salaires,
 échéances de dette, abonnements) et les **écritures ponctuelles** (appels de
 fonds, distributions, impôts one-shot). Il est réparti sur trois onglets de
 la [Trésorerie](07-tresorerie.md) : la courbe et les indicateurs dans
-**Vue d'ensemble**, le détail (échéances à venir, rapprochements, grille
-mois par mois — réalisé passé et projection future dans le même tableau)
-dans **Prévisionnel**, et la gestion des règles, échéances ponctuelles,
-TVA et alertes dans **Règles & échéances**.
+**Vue d'ensemble**, le détail (échéances à venir, grille mois par mois —
+réalisé passé et projection future dans le même tableau) dans
+**Prévisionnel**, et la gestion des règles, échéances ponctuelles, TVA et
+alertes dans **Règles & échéances**. Le rapprochement d'une échéance avec
+une transaction réelle, lui, est un geste de [pointage](08-pointage.md) et
+se fait dans l'onglet **Transactions**.
 
 ## Règles et écritures
 
@@ -60,6 +62,10 @@ conserve l'historique (réalisées, annulées, retouchées).
   nantis, en euros).
 
 ## Le rapprochement au réalisé
+
+Il se fait dans l'onglet **Transactions**, au-dessus du registre : pointer
+une échéance sur une transaction est de la même nature que pointer une
+transaction sur un deal.
 
 Quand une transaction réelle correspond à une échéance attendue, Albo OS le
 **suggère** (fenêtres de date, montant et libellé) : rapprochement en un clic

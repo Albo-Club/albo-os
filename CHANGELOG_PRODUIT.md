@@ -23,13 +23,14 @@ bas de page.
 
 ---
 
-## v1.129.6 — 27/07/2026 à 09:20 — Fenêtre de rapprochement : le texte ne déborde plus
+## v1.130.1 — 27/07/2026 à 09:40 — Fenêtre de rapprochement : le texte ne déborde plus
 
-Dans le prévisionnel, la fenêtre « Les montants diffèrent » (celle qui
-propose de clore avec l'écart ou de conserver le reliquat) débordait de son
-cadre : les boutons, trop larges pour tenir sur une seule ligne, poussaient
-tout le contenu au-delà des bords de la fenêtre. Les boutons passent
-désormais à la ligne quand la place manque, et le texte reste dans le cadre.
+La fenêtre « Les montants diffèrent » (celle qui propose de clore avec
+l'écart ou de conserver le reliquat, depuis les rapprochements suggérés)
+débordait de son cadre : les boutons, trop larges pour tenir sur une seule
+ligne, poussaient tout le contenu au-delà des bords de la fenêtre. Les
+boutons passent désormais à la ligne quand la place manque, et le texte
+reste dans le cadre.
 
 > **🔧 Notes techniques**
 >
@@ -43,6 +44,41 @@ désormais à la ligne quand la place manque, et le texte reste dans le cadre.
 >   large.
 
 ---
+
+## v1.130.0 — 27/07/2026 à 09:20 — Les rapprochements suggérés passent dans Transactions
+
+La carte « Rapprochements suggérés » — celle qui repère qu'une échéance
+attendue ressemble à une transaction récente — quitte l'onglet
+**Prévisionnel** pour s'installer en tête de l'onglet **Transactions**,
+au-dessus du registre.
+
+C'est le même geste que le reste du pointage : confirmer qu'un mouvement
+bancaire réel correspond à ce qu'on attendait. Tout se traite donc au même
+endroit — les transactions à affecter à un deal, au passif ou à une
+catégorie, et les échéances du prévisionnel à rapprocher.
+
+La carte reste visible quel que soit le filtre de statut affiché, et son
+fonctionnement ne change pas (un clic quand les montants sont égaux,
+sinon le choix entre clore avec l'écart ou garder le reliquat).
+L'onglet Prévisionnel garde les échéances à venir et la grille mois par
+mois.
+
+> **🔧 Notes techniques**
+>
+> - Déplacement pur côté route : `<ForecastMatchSuggestions>` passe du
+>   `TabsContent` `previsionnel` au `TabsContent` `transactions` de
+>   `src/routes/app/$orgSlug/cash.index.tsx`, rendu au-dessus de
+>   `<TransactionsLedger>` (le tab passe en `space-y-6`).
+> - Rendu inconditionnel du filtre de statut du registre : les transactions
+>   candidates de `suggestForecastMatches` ne sont pas nécessairement
+>   `unmatched` (seules les transactions déjà consommées par une échéance,
+>   `ignored` et les virements internes sont exclues côté serveur) — gater
+>   sur le filtre « À pointer » aurait masqué des suggestions valides.
+> - Aucun changement backend : `forecasts.suggestForecastMatches`,
+>   `forecasts.markEntryRealized` et `transactions.matchTransaction`
+>   inchangés.
+> - Docs : ligne FC16 de `TESTING.md` (emplacement), FC20 (renvoi),
+>   `docs/produit/09-previsionnel.md` et `docs/produit/08-pointage.md`.
 
 ## v1.129.5 — 26/07/2026 à 23:40 — Sécurité : reprise de compte par email périmé, et emails neutralisés
 

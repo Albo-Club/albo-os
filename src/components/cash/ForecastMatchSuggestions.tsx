@@ -43,10 +43,11 @@ type Suggestion = {
 }
 
 /**
- * Suggested forecast-entry ↔ transaction reconciliations (Cash « Aperçu »
- * tab). Hidden when there is nothing to suggest. Equal amounts reconcile in
- * one click; a differing amount opens the explicit decision dialog: close
- * with the gap (default) or keep the remainder as a new pending entry
+ * Suggested forecast-entry ↔ transaction reconciliations (Cash
+ * « Transactions » tab). Hidden when there is nothing to suggest. Equal
+ * amounts reconcile in one click; a differing amount opens the explicit
+ * decision dialog: close with the gap (default) or keep the remainder as a
+ * new pending entry
  * (partial payment — only offered when the transaction pays LESS than
  * forecast).
  */
