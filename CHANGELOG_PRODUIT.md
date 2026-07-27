@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.137.3 — 27/07/2026 à 23:03 — Une colonne Secteur plus compacte
+## v1.138.1 — 27/07/2026 à 23:03 — Une colonne Secteur plus compacte
 
 Sur la liste Entreprises, la colonne **Secteur** était calibrée sur le
 libellé le plus long (« Marketplace / E-commerce ») : elle réservait cette
@@ -51,6 +51,42 @@ Exit win, Exit loss) est inchangé.
 >   libellés) et seuils de scroll horizontal de SH19b ramenés à ~1040 px
 >   (~1144 px en vue agrégée).
 
+---
+
+## v1.138.0 — 27/07/2026 à 22:54 — L'en-tête de la liste Entreprises reste en haut
+
+Sur la liste Entreprises, le bandeau de tête — **titre**, menu `⋯` et la
+barre **recherche / Instrument / Secteur** — reste maintenant figé en haut
+de l'écran quand on descend dans la liste. Avant, il fallait remonter tout
+en haut de la page pour lancer une recherche ou poser un filtre : sur un
+portefeuille qui empile quatre tableaux (term sheets, actifs, exit win,
+exit loss), ça faisait beaucoup d'allers-retours. Les actions de tri du
+portefeuille restent désormais à portée de clic depuis n'importe où dans
+la liste.
+
+Même comportement en vue **Toutes les organisations**, où le bandeau figé
+emporte le titre et son sous-titre.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/participations/ParticipationsView.tsx` : le titre et la
+>   barre d'outils sont réunis dans un seul conteneur
+>   `sticky top-0 -mx-6 px-6 border-b bg-background` — même motif que
+>   l'en-tête de la fiche société (`participations.$companyId.tsx`). Le
+>   conteneur de scroll est celui du layout org (`app/$orgSlug/route.tsx`).
+> - Le titre arrive par une nouvelle prop `header?: ReactNode` plutôt que de
+>   rester dans la route : deux éléments `sticky` empilés auraient exigé un
+>   offset `top` codé en dur (et différent entre les deux pages, la vue
+>   agrégée ayant un sous-titre).
+> - `z-40` sur le bandeau, au-dessus des cellules d'en-tête figées des
+>   tableaux (`z-30`), sinon celles-ci repassent par-dessus au scroll.
+> - Routes adaptées : `app/$orgSlug/participations.index.tsx` (titre + menu
+>   `⋯`) et `app/all/participations.tsx` (titre + sous-titre).
+> - Docs : ligne SH21 ajoutée à `TESTING.md`, `docs/produit/04-participations.md`
+>   complété.
+
+---
+
 ## v1.137.2 — 27/07/2026 à 22:50 — Les noms de sociétés ne sont plus coupés
 
 Sur la liste Entreprises, un nom de société trop long pour sa colonne
@@ -70,6 +106,9 @@ et la colonne Société garde sa largeur.
 >   `title` pour l'infobulle. Point F3 de la revue UI, oublié dans la
 >   fournée #298.
 > - `TESTING.md` SH19b recalé (deux lignes + tooltip au lieu de « … »).
+
+---
+
 ## v1.137.1 — 27/07/2026 à 22:38 — Une seule icône pour les Entreprises
 
 Dans le menu de gauche, « Entreprises » s'affichait avec un camembert
@@ -134,6 +173,9 @@ filtres en cours (sans filtre, tout est exporté comme avant).
 >   XLSX via `write-excel-file` 4.1.1 (import dynamique
 >   `write-excel-file/browser`, cellules numériques typées) ; menus mis à
 >   jour dans `participations.index.tsx` (deux entrées CSV/Excel).
+
+---
+
 ## v1.136.0 — 27/07/2026 à 22:15 — Le score IA reste visible au scroll
 
 Sur la liste Entreprises, le **score IA** reste maintenant figé à l'écran

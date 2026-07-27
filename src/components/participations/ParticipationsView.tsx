@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { tvpi as tvpiRatio } from '../../../convex/lib/metrics'
 import { ParticipationsTable, residualCents } from './ParticipationsTable'
 import { FacetFilter } from './FacetFilter'
-import type { RefObject } from 'react'
+import type { ReactNode, RefObject } from 'react'
 
 import type { FacetOption } from './FacetFilter'
 import type { CompanyRow, DealRow } from './ParticipationsTable'
@@ -47,6 +47,7 @@ export function ParticipationsView({
   orgSlug,
   exportRef,
   loadExportDeals,
+  header,
 }: {
   rows: Array<CompanyRow> | undefined
   showOrg?: boolean
@@ -54,6 +55,12 @@ export function ParticipationsView({
   exportRef?: RefObject<((format: 'csv' | 'xlsx') => void) | null>
   /** One-shot fetch of the full per-deal set feeding the export. */
   loadExportDeals?: () => Promise<Array<DealRow>>
+  /**
+   * Page title row, rendered inside the sticky bar right above the toolbar.
+   * Passed in (rather than left in the route) so title and toolbar pin as ONE
+   * block — two stacked sticky elements would need a hardcoded top offset.
+   */
+  header?: ReactNode
 }) {
   const { t } = useTranslation('participations')
 
@@ -300,59 +307,69 @@ export function ParticipationsView({
 
   return (
     <div className="space-y-6">
-      {showToolbar && (
-        <div className="flex flex-wrap items-center gap-2">
-          <Input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('search.placeholder')}
-            className="max-w-xs"
-          />
-          {facets.instruments.length >= 2 && (
-            <FacetFilter
-              label={t('filters.instrument')}
-              options={facets.instruments}
-              selected={instrumentFilter}
-              onToggle={toggle(setInstrumentFilter)}
-            />
-          )}
-          {facets.sectors.length >= 2 && (
-            <FacetFilter
-              label={t('filters.sector')}
-              options={facets.sectors}
-              selected={sectorFilter}
-              onToggle={toggle(setSectorFilter)}
-            />
-          )}
-          {hasFilters && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={resetFilters}
-              className="text-muted-foreground"
-            >
-              {t('filters.reset')}
-              <X className="size-4" />
-            </Button>
-          )}
-          {!exportRef && loadExportDeals && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="ml-auto">
-                  <Download className="size-4" />
-                  {t('export.button')}
+      {/* Title + toolbar pinned to the top of the layout's scroll container.
+          Full-bleed bg + border mask the rows passing underneath; z-40 keeps
+          it above the tables' own sticky header cells (z-30). */}
+      {(header || showToolbar) && (
+        <div className="bg-background sticky top-0 z-40 -mx-6 space-y-3 border-b px-6 py-3">
+          {header}
+          {showToolbar && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t('search.placeholder')}
+                className="max-w-xs"
+              />
+              {facets.instruments.length >= 2 && (
+                <FacetFilter
+                  label={t('filters.instrument')}
+                  options={facets.instruments}
+                  selected={instrumentFilter}
+                  onToggle={toggle(setInstrumentFilter)}
+                />
+              )}
+              {facets.sectors.length >= 2 && (
+                <FacetFilter
+                  label={t('filters.sector')}
+                  options={facets.sectors}
+                  selected={sectorFilter}
+                  onToggle={toggle(setSectorFilter)}
+                />
+              )}
+              {hasFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetFilters}
+                  className="text-muted-foreground"
+                >
+                  {t('filters.reset')}
+                  <X className="size-4" />
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => void handleExport('csv')}>
-                  {t('export.csv')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void handleExport('xlsx')}>
-                  {t('export.xlsx')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              )}
+              {!exportRef && loadExportDeals && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="ml-auto">
+                      <Download className="size-4" />
+                      {t('export.button')}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => void handleExport('csv')}>
+                      {t('export.csv')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => void handleExport('xlsx')}
+                    >
+                      {t('export.xlsx')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           )}
         </div>
       )}
