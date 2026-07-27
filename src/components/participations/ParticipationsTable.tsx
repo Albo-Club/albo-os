@@ -113,19 +113,26 @@ const footCellClass = 'sticky bottom-0 z-20 border-t bg-muted'
  * The company column carries no width: it absorbs whatever is left. Below
  * `fixed widths + COMPANY_MIN_WIDTH` the table scrolls horizontally, which the
  * frozen first column already handles.
+ *
+ * Each width is sized against the widest real content of its slot — header
+ * label (plus the sort icon where the active variant sorts) or cell — measured
+ * with the FALLBACK font of the brand stack, not Inter: Inter is narrower, so
+ * a column that fits without it fits with it. Cells are `whitespace-nowrap`
+ * with no overflow clamp, so a column that is one pixel short does not
+ * ellipsize, it spills into its neighbour.
  */
 const COL_WIDTHS = {
   org: 104,
   aiScore: 96,
   deals: 80,
-  /** Engagé / Montant investi / Reçu. */
-  amount: 144,
+  /** Engagé / Montant investi / Reçu — driven by the "Montant investi" header. */
+  amount: 152,
   /** TVPI or MOIC, then TRI. */
   ratio: 80,
-  /** Fits the longest sector badge ("Marketplace / E-commerce"). */
-  sector: 192,
+  /** Driven by the longest sector badge, "Marketplace / E-commerce" (195px). */
+  sector: 208,
 } as const
-const COMPANY_MIN_WIDTH = 256
+const COMPANY_MIN_WIDTH = 240
 
 /** Localized €/date/multiple/percent formatters, shared by the components below. */
 export function useFormatters() {
@@ -433,12 +440,12 @@ export function ParticipationsTable({
             <col />
             {showOrg && <col style={{ width: COL_WIDTHS.org }} />}
             <col style={{ width: COL_WIDTHS.aiScore }} />
+            <col style={{ width: COL_WIDTHS.sector }} />
             <col style={{ width: COL_WIDTHS.deals }} />
             <col style={{ width: COL_WIDTHS.amount }} />
             <col style={{ width: COL_WIDTHS.amount }} />
             <col style={{ width: COL_WIDTHS.ratio }} />
             <col style={{ width: COL_WIDTHS.ratio }} />
-            <col style={{ width: COL_WIDTHS.sector }} />
           </colgroup>
           <TableHeader>
             <TableRow>
@@ -461,6 +468,7 @@ export function ParticipationsTable({
                 sortable={variant === 'active'}
                 className={headCellClass}
               />
+              <TableHead className={headCellClass}>{t('col.sector')}</TableHead>
               <SortableHead
                 label={t('col.deals')}
                 active={sort?.key === 'deals'}
@@ -524,7 +532,6 @@ export function ParticipationsTable({
               ) : (
                 <TableHead className={headCellClass} />
               )}
-              <TableHead className={headCellClass}>{t('col.sector')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -559,6 +566,8 @@ export function ParticipationsTable({
                   {t('totalsRow')}
                 </TableCell>
                 {showOrg && <TableCell className={footCellClass} />}
+                {/* AI score + sector: nothing to sum. */}
+                <TableCell className={footCellClass} />
                 <TableCell className={footCellClass} />
                 <TableCell
                   className={cn(footCellClass, 'text-right tabular-nums')}
@@ -580,7 +589,6 @@ export function ParticipationsTable({
                   </TableCell>
                 )}
                 {/* No sum for the ratio columns (TVPI, or MOIC + TRI). */}
-                <TableCell className={footCellClass} />
                 <TableCell className={footCellClass} />
                 <TableCell className={footCellClass} />
               </TableRow>
@@ -666,6 +674,15 @@ function CompanyTableRow({
           <span className="text-muted-foreground">—</span>
         )}
       </TableCell>
+      <TableCell>
+        {row.sector ? (
+          <Badge variant="outline">
+            {t(`sectors.${row.sector}`, { defaultValue: row.sector })}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </TableCell>
       <TableCell className="text-right tabular-nums">
         {t('dealsCount', { count: row.dealCount })}
       </TableCell>
@@ -708,15 +725,6 @@ function CompanyTableRow({
       ) : (
         <TableCell />
       )}
-      <TableCell>
-        {row.sector ? (
-          <Badge variant="outline">
-            {t(`sectors.${row.sector}`, { defaultValue: row.sector })}
-          </Badge>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        )}
-      </TableCell>
     </TableRow>
   )
 }

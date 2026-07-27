@@ -73,6 +73,41 @@ filtres en cours (sans filtre, tout est exporté comme avant).
 >   XLSX via `write-excel-file` 4.1.1 (import dynamique
 >   `write-excel-file/browser`, cellules numériques typées) ; menus mis à
 >   jour dans `participations.index.tsx` (deux entrées CSV/Excel).
+## v1.135.4 — 27/07/2026 à 21:45 — Le secteur remonte avant les chiffres
+
+Sur la liste Entreprises, la colonne **Secteur** passe juste après le score
+IA, avant les colonnes de chiffres. Depuis que les quatre tableaux
+partagent la même grille, ceux qui n'ont pas toutes les colonnes (les term
+sheets surtout, sans Reçu ni multiple) ouvraient un **trou blanc au milieu
+du tableau**, entre les montants et le secteur. Les emplacements vides sont
+maintenant en **bout de ligne**, où l'œil ne les lit plus comme un trou.
+
+Au passage, les colonnes regroupent ce qui va ensemble : ce qui décrit la
+boîte (société, score, secteur) d'abord, ce qui la mesure (deals, montants,
+multiples) ensuite.
+
+Le badge de secteur le plus long débordait de trois pixels sur la colonne
+voisine : sa colonne a été élargie.
+
+> **🔧 Notes techniques**
+>
+> - `ParticipationsTable.tsx` : la colonne Secteur passe de l'avant-dernière
+>   position à la 3ᵉ (après Score IA), dans le `<colgroup>`, l'en-tête, le
+>   corps et le pied. Aucun contenu de cellule ne change.
+> - `COL_WIDTHS.sector` 192 → 208 px : « Marketplace / E-commerce » mesure
+>   195 px, il débordait donc — sans ellipse, les cellules étant
+>   `whitespace-nowrap` sans clamp. `COL_WIDTHS.amount` 144 → 152 px (1 px
+>   de marge seulement sur l'en-tête « Montant investi »).
+>   `COMPANY_MIN_WIDTH` 256 → 240 px pour compenser : le seuil de scroll
+>   horizontal ne bouge quasiment pas (~1128 px, ~1232 px en vue agrégée).
+> - Largeurs re-mesurées dans Chromium **sans clamp** sur la sonde : le
+>   `max-width:100%` de la vérification précédente écrasait `scrollWidth` et
+>   masquait justement ce type de débordement. Chaque colonne garde ≥ 4 px
+>   de marge, mesurée avec la police de **repli** de la stack (Inter est
+>   plus étroite, donc c'est le pire cas).
+> - TESTING.md (SH19/SH19b) et `docs/produit/04-participations.md` alignés.
+
+---
 
 ## v1.135.3 — 27/07/2026 à 20:24 — Colonnes alignées sur la liste Entreprises
 
