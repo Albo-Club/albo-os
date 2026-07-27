@@ -21,18 +21,21 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
   term sheet en cours, pas de tableau ambre. Le compteur du bandeau compte
   les **deals** (pas les lignes) : même nombre que la ligne de totaux du
   tableau — tout se raisonne en deals.
-- **Colonnes réduites à l'essentiel** : logo et nom, **score IA de santé**
-  (1 à 10), nombre de deals, montant investi, montant reçu, **TVPI**, et le
-  secteur en badge en dernière colonne. Le tableau des term sheets affiche
-  l'**engagé prévisionnel** à la place (rien n'est encore décaissé) ; les
-  deux tableaux d'exits remplacent le TVPI par **MOIC** et **TRI**
-  annualisé. Tri par colonne sur les Actifs, clic vers la fiche ; pas de
-  pagination — chaque tableau défile sous son en-tête et ses totaux.
+- **Colonnes réduites à l'essentiel**, dans cet ordre : ce qui décrit la
+  boîte — logo et nom, **score IA de santé** (1 à 10), secteur en badge —
+  puis ce qui la mesure : nombre de deals, montant investi, montant reçu,
+  **TVPI**. Le tableau des term sheets affiche l'**engagé prévisionnel** à
+  la place des montants (rien n'est encore décaissé) ; les deux tableaux
+  d'exits remplacent le TVPI par **MOIC** et **TRI** annualisé. Tri par
+  colonne sur les Actifs, clic vers la fiche ; pas de pagination — chaque
+  tableau défile sous son en-tête et ses totaux.
 - **Colonnes alignées d'un tableau à l'autre** : les quatre tableaux
   partagent la même grille, donc chaque colonne tombe au même endroit et
   la page se lit d'un seul coup d'œil vertical. Un tableau qui n'a pas une
-  colonne laisse sa place vide plutôt que de décaler les suivantes — c'est
-  pourquoi le tableau des term sheets a des colonnes blanches à droite.
+  colonne laisse sa place vide plutôt que de décaler les suivantes ; comme
+  les chiffres sont en fin de ligne, ces emplacements vides se retrouvent
+  au bout — le tableau des term sheets s'arrête après l'engagé, sans trou
+  au milieu.
 - **Ligne de totaux par tableau** : nombre de deals et montants, sommés sur
   la section entière et recalculés en direct quand un filtre ou une
   recherche est actif. La somme des exits gagnants et celle des pertes se
