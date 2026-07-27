@@ -794,6 +794,21 @@ Implémentation de référence : `stickyHeadClass` / `stickyCellClass` dans
 `src/components/participations/ParticipationsTable.tsx`. À réutiliser tel quel
 pour figer une colonne d'une autre table (vue Deals…).
 
+**Figer plusieurs colonnes** (Société + Score IA sur la liste Entreprises) :
+`left-0` ne marche que pour la première — les suivantes ont besoin de leur
+**décalage `left` explicite**, égal à la somme des largeurs des colonnes
+figées à leur gauche (`frozenCompany` / `frozenScore` dans le même fichier).
+Deux conséquences :
+
+- La colonne **flexible** (celle sans largeur, qui absorbe la place restante)
+  doit être la première : au moment où le scroll horizontal se déclenche, la
+  table est pile à son `min-width`, donc cette colonne est pile à son minimum
+  — c'est ce qui rend l'offset des suivantes constant et calculable. Au-delà
+  de cette largeur rien ne défile, donc les offsets ne jouent jamais.
+- Les colonnes figées doivent être **contiguës et en tête** de la table : une
+  colonne intercalée qu'on ne veut pas figer doit être déplacée à droite (la
+  colonne Org de la vue agrégée est passée après Score IA pour cette raison).
+
 **En-tête / pied figés au scroll vertical** (même table) : `sticky` sur
 `<thead>`/`<tfoot>` est peu fiable (Safari) — poser le sticky **cellule par
 cellule** (`sticky top-0` sur chaque `th`, `sticky bottom-0` sur chaque

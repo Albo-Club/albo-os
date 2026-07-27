@@ -23,6 +23,41 @@ bas de page.
 
 ---
 
+## v1.136.0 — 27/07/2026 à 22:15 — Le score IA reste visible au scroll
+
+Sur la liste Entreprises, le **score IA** reste maintenant figé à l'écran
+avec le nom de la société quand on fait défiler le tableau vers la droite.
+Avant, seule la colonne Société tenait bon : dès qu'on allait chercher le
+TVPI ou le TRI, la note disparaissait et on ne pouvait plus croiser
+« qu'est-ce que ça vaut » avec « comment ça va ». Les deux repères de
+lecture d'une ligne restent désormais sous les yeux en permanence, sur les
+quatre tableaux (term sheets, actifs, exit win, exit loss).
+
+En vue **Toutes les organisations**, la colonne **Org** passe juste après le
+score IA : elle serait sinon coincée entre les deux colonnes figées et
+mangerait de la place à l'écran sans raison.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/participations/ParticipationsTable.tsx` : le figeage
+>   passe d'une à deux colonnes. Les classes `headCornerClass` /
+>   `footCornerClass` / `stickyCellClass` perdent leur `left-0` en dur, le
+>   décalage vient de deux objets de style `frozenCompany` (0) et
+>   `frozenScore` (`COMPANY_MIN_WIDTH`).
+> - L'offset de la 2ᵉ colonne figée est constant par construction : le
+>   scroll horizontal ne se déclenche qu'une fois la table à son
+>   `min-width` (`fixedWidth + COMPANY_MIN_WIDTH`), où la colonne Société —
+>   la seule flexible — est pile à son minimum.
+> - La colonne Org (`showOrg`) est déplacée après le score IA dans le
+>   `colgroup`, l'en-tête, la ligne et le pied de totaux, pour que les deux
+>   colonnes figées restent les deux premières.
+> - `SortableHead` accepte une prop `style` (elle porte le `left` de la
+>   colonne figée).
+> - Docs : ligne SH19 de `TESTING.md` mise à jour, et section « Colonne
+>   figée » de `KNOWN_ISSUES.md` complétée sur le cas multi-colonnes.
+
+---
+
 ## v1.135.4 — 27/07/2026 à 21:45 — Le secteur remonte avant les chiffres
 
 Sur la liste Entreprises, la colonne **Secteur** passe juste après le score

@@ -3,6 +3,7 @@ import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { residualValueCents } from '../../../convex/lib/metrics'
+import type { CSSProperties } from 'react'
 
 import { cn } from '~/lib/utils'
 import { CompanyLogo } from '~/components/CompanyLogo'
@@ -78,11 +79,12 @@ const isNeutralTvpi = (ratio: number | null) =>
   ratio != null && Math.round(ratio * 100) === 100
 
 /**
- * Frozen first column (company) for the horizontal scroll: sticky + an OPAQUE
- * background, otherwise the cells sliding underneath show through. The row
- * hover tint (`hover:bg-muted/50` on the <tr>) is translucent, so it can't be
- * inherited either — the cell composites the same color over the page
- * background via color-mix, driven by the row's `group` hover.
+ * Frozen first columns (company + AI score) for the horizontal scroll: sticky +
+ * an OPAQUE background, otherwise the cells sliding underneath show through.
+ * The row hover tint (`hover:bg-muted/50` on the <tr>) is translucent, so it
+ * can't be inherited either — the cell composites the same color over the page
+ * background via color-mix, driven by the row's `group` hover. Each frozen
+ * column carries its own `left` offset (see `frozenCompany` / `frozenScore`).
  *
  * The header row is ALSO frozen on vertical scroll (the table body scrolls
  * inside a bounded container — see the `[&>div]:max-h-*` wrapper), and the
@@ -94,12 +96,12 @@ const isNeutralTvpi = (ratio: number | null) =>
 // Header cells carry the same opaque `bg-muted` as the totals row below: it is
 // what makes the column titles read as a band of their own rather than as one
 // more participation row.
-const headCornerClass = 'sticky top-0 left-0 z-30 border-b bg-muted'
+const headCornerClass = 'sticky top-0 z-30 border-b bg-muted'
 const headCellClass = 'sticky top-0 z-20 border-b bg-muted'
 const stickyCellClass =
-  'sticky left-0 z-10 bg-background transition-colors ' +
+  'sticky z-10 bg-background transition-colors ' +
   'group-hover:bg-[color-mix(in_oklab,var(--muted)_50%,var(--background))]'
-const footCornerClass = 'sticky bottom-0 left-0 z-30 border-t bg-muted'
+const footCornerClass = 'sticky bottom-0 z-30 border-t bg-muted'
 const footCellClass = 'sticky bottom-0 z-20 border-t bg-muted'
 
 /**
@@ -134,6 +136,20 @@ const COL_WIDTHS = {
   chevron: 40,
 } as const
 const COMPANY_MIN_WIDTH = 240
+
+/**
+ * Horizontal offsets of the two frozen columns. Company sits at 0, the AI score
+ * column right where it ends — which is exactly COMPANY_MIN_WIDTH: the table
+ * only scrolls sideways once squeezed down to `fixedWidth + COMPANY_MIN_WIDTH`,
+ * and there the company column (the only flexible one) is at its minimum. Above
+ * that width nothing scrolls, so the offsets never come into play.
+ *
+ * This is also why the org badge column sits AFTER the AI score one: the two
+ * frozen columns have to be the first two, and freezing the org badge along
+ * with them would eat the horizontal room for nothing.
+ */
+const frozenCompany = { left: 0 }
+const frozenScore = { left: COMPANY_MIN_WIDTH }
 
 /** Localized €/date/multiple/percent formatters, shared by the components below. */
 export function useFormatters() {
@@ -304,6 +320,7 @@ export function SortableHead({
   dir,
   onClick,
   className,
+  style,
   sortable = true,
 }: {
   label: string
@@ -311,13 +328,20 @@ export function SortableHead({
   dir: 'asc' | 'desc'
   onClick: () => void
   className?: string
+  // Carries the `left` offset of a frozen column (see frozenCompany below).
+  style?: CSSProperties
   // When false, render a plain (inert) header — the settled table has no sort.
   sortable?: boolean
 }) {
-  if (!sortable) return <TableHead className={className}>{label}</TableHead>
+  if (!sortable)
+    return (
+      <TableHead className={className} style={style}>
+        {label}
+      </TableHead>
+    )
   const Icon = active ? (dir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown
   return (
-    <TableHead className={className}>
+    <TableHead className={className} style={style}>
       <button
         type="button"
         onClick={onClick}
@@ -440,8 +464,8 @@ export function ParticipationsTable({
           <colgroup>
             {/* Company: no width — takes the leftover space. */}
             <col />
-            {showOrg && <col style={{ width: COL_WIDTHS.org }} />}
             <col style={{ width: COL_WIDTHS.aiScore }} />
+            {showOrg && <col style={{ width: COL_WIDTHS.org }} />}
             <col style={{ width: COL_WIDTHS.sector }} />
             <col style={{ width: COL_WIDTHS.deals }} />
             <col style={{ width: COL_WIDTHS.amount }} />
@@ -459,18 +483,20 @@ export function ParticipationsTable({
                 onClick={() => toggleSort('name')}
                 sortable={variant === 'active'}
                 className={headCornerClass}
+                style={frozenCompany}
               />
-              {showOrg && (
-                <TableHead className={headCellClass}>{t('col.org')}</TableHead>
-              )}
               <SortableHead
                 label={t('col.aiScore')}
                 active={sort?.key === 'aiScore'}
                 dir={sort?.dir ?? 'desc'}
                 onClick={() => toggleSort('aiScore')}
                 sortable={variant === 'active'}
-                className={headCellClass}
+                className={headCornerClass}
+                style={frozenScore}
               />
+              {showOrg && (
+                <TableHead className={headCellClass}>{t('col.org')}</TableHead>
+              )}
               <TableHead className={headCellClass}>{t('col.sector')}</TableHead>
               <SortableHead
                 label={t('col.deals')}
@@ -567,12 +593,12 @@ export function ParticipationsTable({
           {totals && (
             <TableFooter>
               <TableRow className="hover:bg-transparent">
-                <TableCell className={footCornerClass}>
+                <TableCell className={footCornerClass} style={frozenCompany}>
                   {t('totalsRow')}
                 </TableCell>
+                {/* AI score + org + sector: nothing to sum. */}
+                <TableCell className={footCornerClass} style={frozenScore} />
                 {showOrg && <TableCell className={footCellClass} />}
-                {/* AI score + sector: nothing to sum. */}
-                <TableCell className={footCellClass} />
                 <TableCell className={footCellClass} />
                 <TableCell
                   className={cn(footCellClass, 'text-right tabular-nums')}
@@ -655,7 +681,10 @@ function CompanyTableRow({
           : undefined
       }
     >
-      <TableCell className={cn('font-medium', stickyCellClass)}>
+      <TableCell
+        className={cn('font-medium', stickyCellClass)}
+        style={frozenCompany}
+      >
         <span className="flex min-w-0 items-center gap-3">
           <CompanyLogo
             domain={row.domain}
@@ -668,18 +697,18 @@ function CompanyTableRow({
           <span className="truncate">{row.name}</span>
         </span>
       </TableCell>
-      {showOrg && (
-        <TableCell>
-          {row.org ? <Badge variant="outline">{row.org.name}</Badge> : '—'}
-        </TableCell>
-      )}
-      <TableCell>
+      <TableCell className={stickyCellClass} style={frozenScore}>
         {row.aiScore != null ? (
           <ScoreRing score={row.aiScore} />
         ) : (
           <span className="text-muted-foreground">—</span>
         )}
       </TableCell>
+      {showOrg && (
+        <TableCell>
+          {row.org ? <Badge variant="outline">{row.org.name}</Badge> : '—'}
+        </TableCell>
+      )}
       <TableCell>
         {row.sector ? (
           <Badge variant="outline">
