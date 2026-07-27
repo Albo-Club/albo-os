@@ -45,11 +45,6 @@ export function getNavGroups(): Array<NavGroup> {
           icon: PieChart,
         },
         {
-          titleKey: 'items.deals',
-          to: '/app/$orgSlug/deals',
-          icon: Handshake,
-        },
-        {
           titleKey: 'items.cash',
           to: '/app/$orgSlug/cash',
           icon: Wallet,

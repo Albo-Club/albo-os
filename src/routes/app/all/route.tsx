@@ -39,7 +39,7 @@ function AllOrgsLayout() {
         }}
       />
       <SidebarInset className="overflow-hidden">
-        <AppHeader orgSlug="all" orgName={t('orgSwitcher.allOrganizations')} />
+        <AppHeader />
         <div className="min-h-0 flex-1 overflow-y-auto">
           <Outlet />
         </div>

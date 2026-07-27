@@ -151,8 +151,6 @@ function OrgLayout() {
       />
       <SidebarInset className="overflow-hidden">
         <AppHeader
-          orgSlug={orgSlug}
-          orgName={member.name}
           aiPanelOpen={aiOpen}
           onToggleAiPanel={() => setAiPanelOpen(!aiOpen)}
           onOpenSearch={() => setPaletteOpen(true)}
