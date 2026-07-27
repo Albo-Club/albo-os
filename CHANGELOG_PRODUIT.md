@@ -23,6 +23,24 @@ bas de page.
 
 ---
 
+## v1.135.2 — 27/07/2026 à 20:07 — La ligne de titres des tableaux se détache
+
+Dans les tableaux de participations, la ligne des titres de colonnes
+(« Société », « Score IA », « Montant investi »…) avait le même fond blanc
+que les lignes de sociétés en dessous : rien ne la démarquait, et l'œil ne
+voyait plus où commençait la liste. Elle prend désormais le **même fond
+gris que la ligne de totaux** en bas du tableau. La liste est encadrée par
+ses deux lignes de repère, et chaque participation se distingue mieux.
+
+> **🔧 Notes techniques**
+>
+> - `ParticipationsTable.tsx` : `headCornerClass` / `headCellClass` passent
+>   de `bg-background` à `bg-muted`, en miroir de `footCornerClass` /
+>   `footCellClass`. Fond opaque conservé (obligatoire : les cellules sont
+>   `sticky` et les colonnes défilent dessous).
+> - Aucun changement de structure ni de layout — les trois variantes du
+>   tableau (actif / en cours / sorties) en héritent d'office.
+
 ## v1.135.1 — 27/07/2026 à 19:37 — « Actifs », et des compteurs en deals
 
 Le tableau des participations actives s'appelle désormais **« Actifs »**
