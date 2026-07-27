@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import {
-  ArrowRight,
   Check,
   ChevronsUpDown,
   Info,
@@ -46,7 +45,6 @@ import { DealFieldInput } from '~/components/deals/DealFieldInput'
 import { PlanVsActualSection } from '~/components/deals/PlanVsActualSection'
 import { parseField, rawToInput } from '~/lib/parse'
 import { cn } from '~/lib/utils'
-import { CompanyLogo } from '~/components/CompanyLogo'
 import { DealCombobox } from '~/components/pointage/DealCombobox'
 import {
   TransactionSheet,
@@ -54,7 +52,6 @@ import {
 } from '~/components/pointage/TransactionSheet'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
-import { Card, CardContent } from '~/components/ui/card'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -885,72 +882,6 @@ function DealDetail() {
       <DealForecastSection dealId={deal._id} orgId={deal.orgId} />
 
       <Transactions deal={deal} />
-
-      {/* Linked entity: card to the target company sheet. */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold tracking-tight">
-          {t('fiche.entity.title')}
-        </h2>
-        <Card>
-          {deal.target ? (
-            <Link
-              to="/app/$orgSlug/participations/$companyId"
-              params={{ orgSlug, companyId: deal.target._id }}
-              className="group block"
-              aria-label={deal.target.name}
-            >
-              <CardContent className="flex items-center gap-4">
-                <CompanyLogo
-                  domain={deal.target.domain}
-                  companyName={deal.target.name}
-                  size="lg"
-                />
-                <div className="flex-1 space-y-1">
-                  <span className="font-medium underline-offset-4 group-hover:underline">
-                    {deal.target.name}
-                  </span>
-                  <div className="text-muted-foreground text-xs">
-                    {t('deal.investor')}: {deal.investor?.name ?? '—'}
-                    {deal.spv ? (
-                      <>
-                        {' '}
-                        · {t('deal.viaSpv')} {deal.spv.name}
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-                <ArrowRight className="text-muted-foreground group-hover:text-foreground size-4" />
-              </CardContent>
-            </Link>
-          ) : (
-            <CardContent className="flex items-center gap-4">
-              <CompanyLogo size="lg" />
-              <div className="flex-1 space-y-1">
-                <span className="text-muted-foreground text-sm">—</span>
-                <div className="text-muted-foreground text-xs">
-                  {t('deal.investor')}: {deal.investor?.name ?? '—'}
-                  {deal.spv ? (
-                    <>
-                      {' '}
-                      · {t('deal.viaSpv')} {deal.spv.name}
-                    </>
-                  ) : null}
-                </div>
-              </div>
-            </CardContent>
-          )}
-        </Card>
-      </section>
-
-      {/* Reporting / KPIs — reserved (deal-scoped reporting lands later). */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold tracking-tight">
-          {t('fiche.reporting.title')}
-        </h2>
-        <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-          {t('fiche.reporting.body')}
-        </div>
-      </section>
 
       {/* Documents — reserved (deal-scoped documents land later). */}
       <section className="space-y-3">

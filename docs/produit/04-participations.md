@@ -43,7 +43,9 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
 - **Recherche et filtres** : recherche plein texte (société, deal,
   instrument, investisseur, secteur) et filtres multi-sélection par
   instrument et secteur — le filtre statut a disparu, les tableaux par
-  statut jouent ce rôle. Export CSV de l'ensemble (généré à la demande).
+  statut jouent ce rôle. Export **CSV ou Excel (.xlsx)**, généré à la
+  demande ; il respecte la recherche et les filtres actifs (sans filtre,
+  tout l'ensemble est exporté).
 - **Section « Sans deal »** : les entités du portefeuille pas encore
   rattachées à un deal.
 - **Section « Archivées »** : les entités archivées, restaurables en un clic.
@@ -61,7 +63,9 @@ La colonne principale, dans l'ordre de lecture :
 
 - **Synthèse IA en premier** : score de santé, résumé exécutif, alerte
   critique éventuelle, points forts / points de vigilance, trois KPIs avec
-  tendance — la santé de la boîte est la première chose qu'on voit. Elle
+  tendance — chiffres, variations et lignes de contexte alignés d'une
+  tuile à l'autre, contexte lisible sur deux lignes — la santé de la
+  boîte est la première chose qu'on voit. Elle
   est régénérée automatiquement à chaque rapport ingéré, et peut être
   relancée à la main.
 - **Deals de la société** : un tableau au même style que la liste des
@@ -83,10 +87,11 @@ La colonne principale, dans l'ordre de lecture :
 
 Le panneau d'identité, à droite :
 
-- **Identité** : secteur, SIREN, domaine — éditables en ligne (clic sur la
-  valeur) — plus le % de détention, le nombre d'actions consolidé et un
-  lien « Ouvrir dans Attio » quand la société est liée au CRM, suivi du
-  résumé de la société.
+- **Identité** : secteur, SIREN (affiché par groupes de trois chiffres),
+  domaine — éditables en ligne (clic sur la valeur) — plus le % de
+  détention, le nombre d'actions consolidé, un lien « Ouvrir dans Attio »
+  quand la société est liée au CRM, et le **résumé** de la société,
+  intégré à la fiche avec son propre libellé et le texte justifié.
 - **Personnes** : fondateurs, board, co-investisseurs — avec lien vers la
   fiche Attio quand la personne y est rattachée. L'édition passe par le
   dialogue Éditer, qui propose une recherche dans les personnes Attio.

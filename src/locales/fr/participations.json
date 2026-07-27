@@ -124,6 +124,7 @@
     "founders": "Fondateur(s)",
     "board": "Membres du board",
     "coInvestors": "Co-investisseurs",
+    "summary": "Résumé",
     "empty": "À renseigner"
   },
   "status": {
@@ -279,16 +280,6 @@
       "autre": "Autre"
     }
   },
-  "archetype": {
-    "equity": "Capital",
-    "debt": "Dette",
-    "funds_lp": "Fonds (LP)",
-    "real_estate": "Immobilier",
-    "royalties": "Royalties",
-    "management": "Gestion",
-    "placement": "Placement",
-    "unassigned": "Non classé"
-  },
   "fiche": {
     "instrumentTitle": "Détails de l'instrument",
     "safe": {
@@ -343,13 +334,6 @@
     },
     "cto": {
       "placeholder": "Type d'instrument pas encore configuré."
-    },
-    "entity": {
-      "title": "Entité liée"
-    },
-    "reporting": {
-      "title": "Reporting & KPIs",
-      "body": "À venir — le reporting et les KPIs de ce deal s'afficheront ici."
     },
     "documents": {
       "title": "Documents",
@@ -640,6 +624,8 @@
   },
   "export": {
     "button": "Exporter CSV",
+    "csv": "Exporter en CSV",
+    "xlsx": "Exporter en Excel",
     "error": "L'export a échoué. Réessayez.",
     "col": {
       "deal": "Nom du deal",

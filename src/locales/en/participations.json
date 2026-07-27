@@ -124,6 +124,7 @@
     "founders": "Founder(s)",
     "board": "Board members",
     "coInvestors": "Co-investors",
+    "summary": "Summary",
     "empty": "To be filled in"
   },
   "status": {
@@ -279,16 +280,6 @@
       "autre": "Other"
     }
   },
-  "archetype": {
-    "equity": "Equity",
-    "debt": "Debt",
-    "funds_lp": "Fund (LP)",
-    "real_estate": "Real estate",
-    "royalties": "Royalties",
-    "management": "Management",
-    "placement": "Treasury",
-    "unassigned": "Unassigned"
-  },
   "fiche": {
     "instrumentTitle": "Instrument details",
     "safe": {
@@ -343,13 +334,6 @@
     },
     "cto": {
       "placeholder": "This instrument type isn't configured yet."
-    },
-    "entity": {
-      "title": "Linked entity"
-    },
-    "reporting": {
-      "title": "Reporting & KPIs",
-      "body": "Coming soon — reporting and KPIs for this deal will appear here."
     },
     "documents": {
       "title": "Documents",
@@ -640,6 +624,8 @@
   },
   "export": {
     "button": "Export CSV",
+    "csv": "Export as CSV",
+    "xlsx": "Export as Excel",
     "error": "Export failed. Please try again.",
     "col": {
       "deal": "Deal name",
