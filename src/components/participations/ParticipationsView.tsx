@@ -228,14 +228,6 @@ export function ParticipationsView({
   })
 
   const isFiltered = Boolean(term) || hasFilters
-  // Pagination reset key shared by both tables: reset to page 1 on any
-  // search / filter change.
-  const filterKey = [
-    term,
-    [...instrumentFilter].sort().join(','),
-    [...statusFilter].sort().join(','),
-    [...sectorFilter].sort().join(','),
-  ].join('|')
 
   // Toolbar shown as soon as there are rows — including when the current
   // search matches nothing (otherwise it can't be cleared). A facet is only
@@ -307,7 +299,6 @@ export function ParticipationsView({
         showOrg={showOrg}
         orgSlug={orgSlug}
         isFiltered={isFiltered}
-        resetKey={filterKey}
       />
 
       {settled && settled.length > 0 && (
@@ -321,7 +312,6 @@ export function ParticipationsView({
             orgSlug={orgSlug}
             settled
             isFiltered={isFiltered}
-            resetKey={filterKey}
           />
         </section>
       )}
