@@ -91,8 +91,11 @@ const isNeutralTvpi = (ratio: number | null) =>
  * travel with them. z layers: corner cells (left + top/bottom) > header /
  * footer cells > frozen body column.
  */
-const headCornerClass = 'sticky top-0 left-0 z-30 border-b bg-background'
-const headCellClass = 'sticky top-0 z-20 border-b bg-background'
+// Header cells carry the same opaque `bg-muted` as the totals row below: it is
+// what makes the column titles read as a band of their own rather than as one
+// more participation row.
+const headCornerClass = 'sticky top-0 left-0 z-30 border-b bg-muted'
+const headCellClass = 'sticky top-0 z-20 border-b bg-muted'
 const stickyCellClass =
   'sticky left-0 z-10 bg-background transition-colors ' +
   'group-hover:bg-[color-mix(in_oklab,var(--muted)_50%,var(--background))]'
