@@ -199,7 +199,6 @@ function PlatformRow({
 
   const startBank = useAction(api.powens.startBankConnection)
   const startReconnect = useAction(api.powens.startReconnect)
-  const startGmail = useConvexMutation(api.gmail.startConnect)
   const [redirecting, setRedirecting] = useState<string | null>(null)
 
   const syncNow = useAction(api.connections.syncNow)
@@ -220,32 +219,13 @@ function PlatformRow({
   async function openWebview(kind: 'connect' | 'reconnect', id?: string) {
     setRedirecting(id ?? 'new')
     try {
-      // Gmail: connect and reconnect are the same Google OAuth round-trip
-      // (the callback upserts the org's mailbox row and keeps its cursor).
-      if (item.platform === 'gmail') {
-        const { authorizeUrl } = await startGmail({
-          orgId,
-          returnTo: window.location.pathname,
-        })
-        window.location.href = authorizeUrl
-        return
-      }
       const { webviewUrl } =
         kind === 'connect'
           ? await startBank({ orgId })
           : await startReconnect({ orgId, powensConnectionId: id! })
       window.location.href = webviewUrl
-    } catch (err) {
-      // Name the actual cause — the generic bank message on a Gmail row
-      // reads as a different feature failing.
-      const code = err instanceof ConvexError ? (err.data as string) : ''
-      toast.error(
-        item.platform === 'gmail'
-          ? code === 'gmail_env_missing'
-            ? t('settings:integrations.toasts.gmailNotConfigured')
-            : t('settings:integrations.toasts.gmailRedirectError')
-          : t('settings:integrations.toasts.bankRedirectError'),
-      )
+    } catch {
+      toast.error(t('settings:integrations.toasts.bankRedirectError'))
       setRedirecting(null)
     }
   }
@@ -258,11 +238,9 @@ function PlatformRow({
   const connectVariant = hasConnections ? 'ghost' : 'outline'
   const connectLabel = hasConnections
     ? t('settings:integrations.actions.add')
-    : item.platform === 'gmail'
-      ? t('settings:integrations.actions.connectGmail')
-      : item.auth === 'webview'
-        ? t('settings:integrations.actions.connectBank')
-        : t('settings:integrations.actions.connect')
+    : item.auth === 'webview'
+      ? t('settings:integrations.actions.connectBank')
+      : t('settings:integrations.actions.connect')
 
   return (
     <div className="space-y-2 px-4 py-3">
@@ -365,18 +343,6 @@ function PlatformRow({
                       : t('settings:integrations.actions.reconnect')}
                   </Button>
                 )}
-              {canManage && item.platform === 'gmail' && (
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  className="text-muted-foreground"
-                  aria-label={t('settings:integrations.actions.disconnect')}
-                  title={t('settings:integrations.actions.disconnect')}
-                  onClick={() => setDisconnecting({ id: c.id, label: c.label })}
-                >
-                  <Unlink className="size-4" />
-                </Button>
-              )}
               {canManage && item.auth === 'credentials' && (
                 <>
                   <Button
@@ -438,7 +404,6 @@ function PlatformRow({
       {disconnecting && (
         <DisconnectDialog
           connection={disconnecting}
-          platform={item.platform}
           onClose={() => setDisconnecting(null)}
         />
       )}
@@ -620,30 +585,21 @@ function ConnectDialog({
  * stays). Confirmation dialog, admin-only. */
 function DisconnectDialog({
   connection,
-  platform,
   onClose,
 }: {
   connection: { id: string; label: string }
-  platform: string
   onClose: () => void
 }) {
   const { t } = useTranslation(['settings', 'common'])
   const disconnect = useConvexMutation(api.connections.disconnectConnection)
-  const disconnectGmail = useConvexMutation(api.gmail.disconnect)
   const [pending, setPending] = useState(false)
 
   async function handleConfirm() {
     setPending(true)
     try {
-      if (platform === 'gmail') {
-        await disconnectGmail({
-          accountId: connection.id as Id<'gmailAccounts'>,
-        })
-      } else {
-        await disconnect({
-          connectionId: connection.id as Id<'externalConnections'>,
-        })
-      }
+      await disconnect({
+        connectionId: connection.id as Id<'externalConnections'>,
+      })
       toast.success(t('settings:integrations.toasts.disconnected'))
       onClose()
     } catch {

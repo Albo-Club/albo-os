@@ -97,10 +97,6 @@
     "neverSynced": "Jamais synchronisée",
     "lastError": "Erreur : {{message}}",
     "platforms": {
-      "gmail": {
-        "name": "Gmail",
-        "description": "Timeline email du portfolio : chaque boîte Gmail est connectée pour cette organisation et relevée toutes les 10 minutes. Un email lié à une participation (domaine de la société parmi les participants) apparaît sur sa fiche, onglet Emails, avec ses pièces jointes. Seuls les emails liés sont conservés ; la même boîte peut être connectée dans une autre organisation séparément."
-      },
       "powens": {
         "name": "Powens",
         "description": "Agrégation bancaire : comptes et transactions synchronisés automatiquement. La connexion à la banque se fait dans la fenêtre sécurisée Powens."
@@ -133,8 +129,7 @@
       "reconnecting": "Redirection…",
       "add": "Ajouter",
       "sync": "Synchroniser",
-      "edit": "Modifier la connexion",
-      "connectGmail": "Connecter une boîte Gmail"
+      "edit": "Modifier la connexion"
     },
     "dialog": {
       "title": "Connecter {{name}}",
@@ -162,9 +157,7 @@
       "disconnectError": "Échec de la déconnexion.",
       "bankRedirectError": "Impossible d'ouvrir la connexion bancaire.",
       "synced": "Synchronisation terminée.",
-      "syncError": "Échec de la synchronisation.",
-      "gmailNotConfigured": "Gmail n'est pas encore configuré : identifiants Google manquants côté serveur (GOOGLE_OAUTH_CLIENT_ID/SECRET).",
-      "gmailRedirectError": "Impossible d'ouvrir la connexion Gmail."
+      "syncError": "Échec de la synchronisation."
     },
     "fieldHelp": {
       "vasco": {

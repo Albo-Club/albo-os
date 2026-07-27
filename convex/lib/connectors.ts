@@ -63,19 +63,6 @@ export const CONNECTORS: ReadonlyArray<ConnectorDefinition> = [
       '(webhook + 6h polling cron).',
   },
   {
-    platform: 'gmail',
-    label: 'Gmail (portfolio email timeline)',
-    scope: 'org',
-    auth: 'webview',
-    manualSync: true,
-    module: 'convex/gmail.ts',
-    description:
-      'Org-scoped mailboxes connected via Google OAuth (one row per org × ' +
-      'mailbox); refresh token + historyId cursor in `gmailAccounts`, ' +
-      'matched emails + stored attachments in `companyEmails` (10-min ' +
-      'polling cron, deterministic domain matching within the org).',
-  },
-  {
     platform: 'vasco',
     label: 'VASCO (fund-admin portals, e.g. Parallel)',
     scope: 'org',

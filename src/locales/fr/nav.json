@@ -3,22 +3,7 @@
     "ai": "IA",
     "aiShortcut": "Afficher/masquer le panneau IA (⌘J / Ctrl+J)",
     "search": "Rechercher",
-    "searchShortcut": "Rechercher (⌘K / Ctrl+K)",
-    "breadcrumb": {
-      "participations": "Entreprises",
-      "deals": "Deals",
-      "cash": "Trésorerie",
-      "placements": "Placements",
-      "pointage": "Pointage",
-      "todo": "À faire",
-      "passif": "Passif",
-      "settings": "Paramètres",
-      "members": "Membres",
-      "invitations": "Invitations",
-      "general": "Général",
-      "changelog": "Nouveautés",
-      "reports": "Reports entrants"
-    }
+    "searchShortcut": "Rechercher (⌘K / Ctrl+K)"
   },
   "comingSoon": "Bientôt disponible",
   "soon": "Bientôt",
@@ -27,7 +12,6 @@
     "workspace": "Espace de travail"
   },
   "items": {
-    "dashboard": "Tableau de bord",
     "participations": "Entreprises",
     "deals": "Deals",
     "cash": "Trésorerie",
@@ -37,8 +21,7 @@
     "passif": "Passif",
     "settings": "Paramètres",
     "changelog": "Nouveautés",
-    "reports": "Reports entrants",
-    "emails": "Emails"
+    "reports": "Reports entrants"
   },
   "navUser": {
     "switchOrg": "Changer d'organisation"
