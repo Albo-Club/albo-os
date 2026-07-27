@@ -681,8 +681,6 @@
     "pending": "In progress (term sheet)",
     "active": "Active",
     "exitWin": "Exit win",
-    "exitLoss": "Exit loss",
-    "count_one": "{{count}} company",
-    "count_other": "{{count}} companies"
+    "exitLoss": "Exit loss"
   }
 }

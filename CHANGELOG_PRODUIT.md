@@ -23,22 +23,20 @@ bas de page.
 
 ---
 
-## v1.135.1 — 27/07/2026 à 19:37 — « Actifs », et des compteurs sans ambiguïté
+## v1.135.1 — 27/07/2026 à 19:37 — « Actifs », et des compteurs en deals
 
 Le tableau des participations actives s'appelle désormais **« Actifs »**
-(et non « Actives »), et le compteur de chaque bandeau précise son unité :
-**« Actifs (44 sociétés) »**. Il compte les sociétés (les lignes du
-tableau), tandis que la ligne de totaux en bas compte les **deals** — une
-société pouvant porter plusieurs deals, les deux nombres diffèrent
-normalement (44 sociétés / 48 deals n'est pas une erreur).
+(et non « Actives »), et le compteur de chaque bandeau compte maintenant
+les **deals** — la même unité et le même nombre que la ligne de totaux du
+tableau (« Actifs (48 deals) »). Il comptait les lignes (sociétés), d'où
+un « 44 » en haut face à un « 48 deals » en bas qui semblait incohérent.
 
 > **🔧 Notes techniques**
 >
-> - `sections.active` renommé (fr) + nouvelles clés plurielles
->   `sections.count_one/_other` (fr « société(s) », en « company/ies »)
->   rendues dans le bandeau (`ParticipationsView.tsx`).
-> - TESTING.md (SH19/SH20) et `docs/produit/04-participations.md`
->   précisent l'unité des deux compteurs.
+> - Bandeau (`ParticipationsView.tsx`) : compteur = somme des `dealCount`
+>   des lignes du bucket, rendu via la clé existante `dealsCount` ;
+>   `sections.active` renommé « Actifs » (fr).
+> - TESTING.md (SH19/SH20) et `docs/produit/04-participations.md` alignés.
 
 ## v1.135.0 — 27/07/2026 à 19:21 — Un tableau par statut dans la liste des entreprises
 
