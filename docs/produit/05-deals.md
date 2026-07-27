@@ -3,9 +3,12 @@
 ## À quoi ça sert
 
 Un **deal** = un investissement précis : un instrument souscrit à un instant
-donné. Un réinvestissement (follow-on) est un nouveau deal. La section Deals
-(`/app/<org>/deals`) montre le portefeuille **à plat** — une ligne par deal —
-là où [Participations](04-participations.md) regroupe par société.
+donné. Un réinvestissement (follow-on) est un nouveau deal. Un deal s'ouvre
+**depuis la fiche de sa société** ([Participations](04-participations.md)) —
+il n'y a plus de liste de deals dédiée dans une organisation, la logique de
+lecture passant toujours par l'entreprise. La [vue
+consolidée](12-vue-consolidee.md) garde, elle, sa liste de deals à plat
+toutes organisations confondues.
 
 ## Anatomie d'un deal
 
@@ -31,12 +34,15 @@ là où [Participations](04-participations.md) regroupe par société.
   sheet (rien n'est décaissé). Les **fonds** affichent les deux — engagé
   (commit) vs **capital appelé** — car ils diffèrent réellement.
 - **Statut** : *engagé* (term sheet signée, pas encore câblé — créé
-  automatiquement depuis Attio), *actif*, *sorti partiellement*, *sorti*,
-  *passé en perte*. La **couleur** du statut ne sert qu'à la sortie : vert =
-  sortie gagnante, rouge = perte, gris = neutre (actif ou sortie sans
-  plus-value) ; *engagé* est en ambre. Une **sortie partielle** vire au vert
-  dès qu'elle est déjà dans le vert, jamais au rouge (la position n'est pas
-  soldée). Un deal actif se suit par ses reports, pas par une couleur.
+  automatiquement depuis Attio), *actif*, *sorti partiellement*, **Exit
+  win** / **Exit loss** (sortie gagnante ou perdante, selon le multiple
+  réalisé). La **couleur** du statut ne sert qu'à la sortie : vert = Exit
+  win, rouge = Exit loss, gris = neutre (actif ou sortie sans plus-value) ;
+  *engagé* est en ambre. Une **sortie partielle** vire au vert dès qu'elle
+  est déjà dans le vert, jamais au rouge (la position n'est pas soldée). Un
+  deal actif se suit par ses reports, pas par une couleur. Dans la liste
+  des participations, cette couleur s'affiche en liseré dans la marge de la
+  ligne.
 - **Dates** : signature (tri par défaut), closing, sortie.
 - **Titres et détention** : les deals en actions enregistrent le **nombre de
   titres acquis** et le **prix par titre**. Un achat sur le **secondaire**

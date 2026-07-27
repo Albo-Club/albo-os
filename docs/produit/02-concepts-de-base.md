@@ -41,8 +41,8 @@ Quelques conventions traversent toute l'application :
   Ils sont affichés **au centime** là où le montant est réel et doit se
   recouper avec la banque (transactions, soldes, pointage, comptes courants,
   TVA, royalties, versé/reçu d'un deal), et **arrondis à l'euro** là où c'est
-  une estimation ou du pilotage (valorisations, KPIs, engagement, prévisionnel,
-  tableau de bord).
+  une estimation ou du pilotage (valorisations, KPIs, engagement,
+  prévisionnel).
 - **Taux** : stockés en points de base (1100 = 11 %). Même principe :
   l'affichage montre des pourcentages.
 - **Devise** : l'euro partout par défaut. Les soldes et le prévisionnel
@@ -55,15 +55,15 @@ Quelques conventions traversent toute l'application :
 
 - **Barre latérale gauche** (repliable, ⌘B) : le sélecteur d'organisation en
   haut (avec l'entrée « Toutes les organisations »), puis les sections
-  Tableau de bord, Participations, Deals, Trésorerie, Passif, et l'espace de
-  travail (Membres, Invitations, Paramètres, Nouveautés). En pied : thème,
-  langue (français/anglais), menu utilisateur.
+  À faire, Participations, Trésorerie, Placements, Passif, et l'espace de
+  travail (Paramètres, Nouveautés). En pied : thème, langue
+  (français/anglais), menu utilisateur. Les deals s'ouvrent depuis la fiche
+  d'une participation — ils n'ont plus d'entrée dédiée dans le menu.
 - **Palette de commandes** (⌘K) : recherche globale dans l'organisation —
   deals, sociétés, transactions — avec navigation directe vers la fiche, et
   l'action « Demander à l'IA » qui transmet la requête à l'assistant.
 - **Assistant IA** (⌘J) : panneau latéral droit persistant, décrit dans
   [Assistant IA](11-assistant-ia.md).
-- **Fil d'Ariane** dans l'en-tête : organisation › section › entité.
 
 ## Pages liées
 

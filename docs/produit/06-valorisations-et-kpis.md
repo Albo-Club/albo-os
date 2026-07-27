@@ -71,5 +71,4 @@ deals (voir [Pointage](08-pointage.md)) :
 
 ## Pages liées
 
-- [Deals](05-deals.md), [Pointage](08-pointage.md),
-  [Tableau de bord](03-tableau-de-bord.md)
+- [Deals](05-deals.md), [Pointage](08-pointage.md)

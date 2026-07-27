@@ -14,17 +14,26 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
 
 ## La liste
 
-- **Tableau des participations actives** : logo et nom, pitch (une ligne),
-  secteur, **score IA de santé** (pastille en anneau de 1 à 10, jauge remplie
-  selon la note et colorée selon le verdict, issue de la synthèse IA), nombre
-  de deals, montant investi, montant reçu, **TVPI**. Tri par colonne (dont le
-  score IA), pagination, clic vers la fiche.
+- **Tableau des participations actives**, réduit à l'essentiel : logo et
+  nom, **score IA de santé** (1 à 10, issu de la synthèse IA), nombre de
+  deals, montant investi, montant reçu, **TVPI**, et le secteur en badge en
+  dernière colonne. Tri par colonne, pagination, clic vers la fiche.
+- **Liseré de statut** dans la marge gauche de chaque ligne : **orange** =
+  deal en cours (term sheet), **bleu** = participation active, **vert** =
+  Exit win, **rouge** = Exit loss. Les lignes avec un deal en cours
+  remontent en haut de la liste — elles demandent une action.
+- **Ligne de totaux** en pied de tableau : nombre de deals, montant investi
+  et montant reçu, sommés sur **l'ensemble des pages** et recalculés en
+  direct quand un filtre ou une recherche est actif. C'est la façon de
+  répondre à « combien a-t-on investi en immobilier actif ? » sans quitter
+  la liste.
 - **Recherche et filtres** : recherche plein texte (société, deal,
   instrument, investisseur, secteur) et filtres multi-sélection par
-  instrument, statut et secteur. Export CSV de l'ensemble.
-- **Section « Soldées »** : les sociétés dont les deals sont sortis ou passés
-  en perte, avec un **badge de statut coloré** (vert = sortie gagnante, rouge =
-  perte, gris = sortie sans plus-value) et colonnes **MOIC** et **TRI** annualisé.
+  instrument, statut et secteur. Export CSV de l'ensemble (généré à la
+  demande).
+- **Section « Exits »** : les sociétés dont les deals sont sortis ou passés
+  en perte — libellés **« Exit win »** (sortie gagnante) et **« Exit
+  loss »** (perte), avec colonnes **MOIC** et **TRI** annualisé.
 - **Section « Sans deal »** : les entités du portefeuille pas encore
   rattachées à un deal.
 - **Section « Archivées »** : les entités archivées, restaurables en un clic.
