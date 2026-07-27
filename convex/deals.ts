@@ -745,6 +745,16 @@ export const remove = mutation({
       .withIndex('by_deal', (q) => q.eq('dealId', id))
       .first()
     if (linked) throw new ConvexError('deal_has_transactions')
+    // Deal documents are owned by the deal (they don't show anywhere else),
+    // so they go with it — files included, or the storage leaks.
+    const docs = await ctx.db
+      .query('documents')
+      .withIndex('by_deal', (q) => q.eq('dealId', id))
+      .collect()
+    for (const doc of docs) {
+      await ctx.storage.delete(doc.storageId)
+      await ctx.db.delete('documents', doc._id)
+    }
     await ctx.db.delete("deals", id)
     return { deletedId: id }
   },

@@ -678,7 +678,11 @@ export const listCompanyDocumentsInternal = internalQuery({
       .order('desc')
       .take(50)
 
-    return rows.map((doc) => ({
+    // Deal documents belong to their deal sheet, not to the company (same
+    // rule as documents:listByCompany).
+    const visible = rows.filter((doc) => doc.dealId === undefined)
+
+    return visible.map((doc) => ({
       _id: doc._id,
       title: doc.title,
       kind: doc.kind,
@@ -756,8 +760,10 @@ const listCompanyDocuments = createTool({
     'List document metadata (investor updates, business plans, legal docs) ' +
     'attached to a company of the current org. Returns title, kind ' +
     '(reporting/bp/legal/other), period (ms epoch), contentType, size, ' +
-    'source and uploadedAt. Does NOT return download URLs — to download, ' +
-    'use the app UI. Use listCompanies to resolve the companyId first.',
+    'source and uploadedAt. Documents filed on a specific deal (term sheet, ' +
+    'pacte…) are NOT included — they live on their deal sheet. Does NOT ' +
+    'return download URLs — to download, use the app UI. Use listCompanies ' +
+    'to resolve the companyId first.',
   inputSchema: z.object({
     companyId: z.string().describe('Id of the company'),
   }),

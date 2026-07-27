@@ -820,18 +820,33 @@ export default defineSchema({
    * portfolio): investor updates, BP, legal. File stored in native Convex
    * storage (20 MB cap). `source: 'email'` reserved for inbound
    * ingestion (V2) — V1 = manual upload.
+   *
+   * A row with `dealId` set is a DEAL document (term sheet, pacte,
+   * subscription form…): it belongs to that single deal and is deliberately
+   * hidden from the company's Documents tab — cf. `documents:listByCompany`.
+   * `companyId` stays filled (the deal's target) so the org scoping and the
+   * `by_company` index keep working for both kinds.
    */
   documents: defineTable({
     orgId: v.id('organizations'),
     companyId: v.id('companies'),
+    dealId: v.optional(v.id('deals')),
     title: v.string(),
+    // Company kinds first, then the deal-specific ones. One widened union
+    // rather than two columns: which subset is offered is a UI concern.
     kind: v.union(
       v.literal('reporting'),
       v.literal('bp'),
       v.literal('legal'),
       v.literal('other'),
+      v.literal('term_sheet'),
+      v.literal('pacte'),
+      v.literal('subscription'),
+      v.literal('attestation'),
     ),
-    period: v.optional(v.number()), // covered period (ms epoch)
+    // Company docs: covered period (month). Deal docs: the document's own
+    // date (signature…). Same storage, the label differs per surface.
+    period: v.optional(v.number()), // ms epoch
     storageId: v.id('_storage'),
     contentType: v.optional(v.string()),
     size: v.optional(v.number()),
@@ -849,6 +864,7 @@ export default defineSchema({
     inline: v.optional(v.boolean()),
   })
     .index('by_company', ['companyId', 'uploadedAt'])
+    .index('by_deal', ['dealId', 'uploadedAt'])
     .index('by_org', ['orgId'])
     .index('by_report', ['reportId']),
 
@@ -890,10 +906,7 @@ export default defineSchema({
       ),
     ),
     reportAbout: v.optional(
-      v.union(
-        v.literal('company_self'),
-        v.literal('fund_portfolio_company'),
-      ),
+      v.union(v.literal('company_self'), v.literal('fund_portfolio_company')),
     ),
     metrics: v.optional(v.any()), // flat canonical map { key: converted number }
     // Full as-written metric snapshot (label, value, seen unit, catalog key) —
@@ -1015,7 +1028,11 @@ export default defineSchema({
         v.object({
           kind: v.string(), // 'body' | 'pdf' | 'excel' | 'image' | 'notion' | 'gdrive' | 'docsend' | 'other'
           label: v.string(), // filename or URL
-          state: v.union(v.literal('extracted'), v.literal('stored'), v.literal('failed')),
+          state: v.union(
+            v.literal('extracted'),
+            v.literal('stored'),
+            v.literal('failed'),
+          ),
           detail: v.optional(v.string()),
           chars: v.optional(v.number()),
         }),

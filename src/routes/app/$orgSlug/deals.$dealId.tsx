@@ -36,6 +36,7 @@ import {
 } from '~/components/data-table/LocalPagination'
 import { ExitDealDialog } from '~/components/deals/ExitDealDialog'
 import { DealForecastSection } from '~/components/deals/DealForecastSection'
+import { DealDocumentsSection } from '~/components/deals/DealDocumentsSection'
 import { FundSection } from '~/components/deals/FundSection'
 import {
   FIELD_FORMAT,
@@ -883,15 +884,9 @@ function DealDetail() {
 
       <Transactions deal={deal} />
 
-      {/* Documents — reserved (deal-scoped documents land later). */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold tracking-tight">
-          {t('fiche.documents.title')}
-        </h2>
-        <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-          {t('fiche.documents.body')}
-        </div>
-      </section>
+      {/* Documents filed on this deal only (term sheet, pacte…) — the
+          company's own documents live on its fiche. */}
+      <DealDocumentsSection dealId={deal._id} companyId={deal.target?._id} />
 
       {editOpen && (
         <EditDealDialog deal={deal} onClose={() => setEditOpen(false)} />
