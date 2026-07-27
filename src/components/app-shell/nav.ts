@@ -1,10 +1,10 @@
 import {
+  Building2,
   Handshake,
   Inbox,
   Landmark,
   ListTodo,
   Megaphone,
-  PieChart,
   Scale,
   Settings,
   Wallet,
@@ -43,7 +43,7 @@ export function getNavGroups(): Array<NavGroup> {
         {
           titleKey: 'items.participations',
           to: '/app/$orgSlug/participations',
-          icon: PieChart,
+          icon: Building2,
         },
         {
           titleKey: 'items.cash',
@@ -90,7 +90,7 @@ export function getAllNavGroups(): Array<NavGroup> {
         {
           titleKey: 'items.participations',
           to: '/app/all/participations',
-          icon: PieChart,
+          icon: Building2,
         },
         {
           titleKey: 'items.deals',
