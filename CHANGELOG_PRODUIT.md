@@ -23,6 +23,53 @@ bas de page.
 
 ---
 
+## v1.139.0 — 27/07/2026 à 23:02 — Les documents d'un deal se rangent sur le deal
+
+La fiche deal a enfin son bloc **Documents**, juste sous les Transactions —
+là où il n'y avait qu'un encart « à venir ». On y dépose la term sheet, le
+pacte ou les statuts, le bulletin de souscription, une attestation ou un
+KBIS, et tout le reste sous « Autre ».
+
+Chaque document se dépose en un clic (**20 Mo maximum**) : on lui donne un
+titre, un type et, si c'est utile, sa **date** — la date de signature par
+exemple, mais elle reste facultative. Le tableau liste ensuite titre, type,
+date, taille et date d'ajout ; chaque ligne se télécharge ou se supprime,
+avec une confirmation avant l'effacement définitif.
+
+Le rangement est volontairement étanche : un document déposé sur un deal
+**n'apparaît que là**, jamais dans l'onglet Documents de la société — qui
+reste réservé à ce qui concerne l'entreprise elle-même (reportings,
+business plan, juridique). L'assistant applique la même règle quand on lui
+demande les documents d'une société. Conséquence à garder en tête :
+**supprimer un deal supprime aussi ses documents**, fichiers compris.
+
+> **🔧 Notes techniques**
+>
+> - Pas de nouvelle table : la table `documents` existante gagne un
+>   `dealId: v.optional(v.id('deals'))` + index `by_deal`, et son union
+>   `kind` s'élargit de `term_sheet` / `pacte` / `subscription` /
+>   `attestation` (les types société restent). Champ optionnel additif →
+>   **aucune migration**. `companyId` reste rempli (la cible du deal), donc
+>   le scoping org et `by_company` continuent de marcher pour les deux
+>   familles ; `period` sert de « date du document » côté deal.
+> - `convex/documents.ts` : nouvelle query `listByDeal` ; `create` accepte
+>   un `dealId` optionnel et vérifie que le deal existe, est dans la même
+>   org et cible bien la société sous laquelle le doc est classé.
+>   `listByCompany` **filtre les lignes portant un `dealId`** — c'est ce
+>   filtre qui rend le cloisonnement effectif (même filtre dans
+>   `convex/agentTools.ts:listCompanyDocumentsInternal` pour l'assistant).
+> - `convex/deals.ts:remove` : suppression en cascade des documents du deal
+>   **et** de leurs fichiers (`ctx.storage.delete`), sinon lignes orphelines
+>   + storage qui fuit. Le refus sur transactions rapprochées est inchangé.
+> - Front : `src/components/deals/DealDocumentsSection.tsx` (calqué sur
+>   `ReportingsSection`), branché dans
+>   `src/routes/app/$orgSlug/deals.$dealId.tsx` à la place du placeholder,
+>   après les Transactions. i18n : bloc `participations:dealDocuments.*`
+>   (fr + en), clés `fiche.documents.*` obsolètes retirées.
+> - `TESTING.md` : FD9 recalé (le bloc n'est plus un placeholder) + FD41
+>   (upload / 20 Mo / download / suppression) et FD42 (cloisonnement
+>   société ↔ deal, cascade à la suppression) ; note sur TP6.
+>   `docs/produit/05-deals.md` et `04-participations.md` mis à jour.
 ## v1.138.1 — 27/07/2026 à 23:03 — Une colonne Secteur plus compacte
 
 Sur la liste Entreprises, la colonne **Secteur** était calibrée sur le

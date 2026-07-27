@@ -334,10 +334,6 @@
     },
     "cto": {
       "placeholder": "Type d'instrument pas encore configuré."
-    },
-    "documents": {
-      "title": "Documents",
-      "body": "À venir — les documents rattachés à ce deal s'afficheront ici."
     }
   },
   "edit": {
@@ -555,6 +551,39 @@
       "reporting": "Reporting",
       "bp": "Business plan",
       "legal": "Juridique",
+      "other": "Autre"
+    },
+    "errors": {
+      "too_large": "Le fichier dépasse 20 Mo",
+      "default": "Une erreur est survenue"
+    }
+  },
+  "dealDocuments": {
+    "title": "Documents",
+    "upload": "Ajouter un doc",
+    "uploading": "Envoi…",
+    "empty": "Aucun document. Term sheet, pacte, bulletin de souscription… tout ce qui concerne ce deal précisément.",
+    "added": "Document ajouté",
+    "deleted": "Document supprimé",
+    "deleteConfirmTitle": "Supprimer ce document ?",
+    "deleteConfirmBody": "Le fichier sera définitivement supprimé.",
+    "download": "Télécharger",
+    "dialogTitle": "Nouveau document",
+    "titleLabel": "Titre",
+    "kindLabel": "Type",
+    "dateLabel": "Date du document (optionnel)",
+    "col": {
+      "title": "Titre",
+      "kind": "Type",
+      "date": "Date",
+      "size": "Taille",
+      "added": "Ajouté"
+    },
+    "kind": {
+      "term_sheet": "Term sheet",
+      "pacte": "Pacte / statuts",
+      "subscription": "Bulletin de souscription",
+      "attestation": "Attestation / KBIS",
       "other": "Autre"
     },
     "errors": {

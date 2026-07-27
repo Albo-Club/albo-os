@@ -78,6 +78,15 @@ toutes organisations confondues.
 - **Transactions** : les mouvements bancaires rattachés au deal. Un clic
   ouvre le détail avec possibilité de **réaffecter** la transaction à un
   autre deal.
+- **Documents** : les pièces propres à **ce deal** — term sheet, pacte ou
+  statuts, bulletin de souscription, attestation ou KBIS, et « autre » pour
+  le reste. À distinguer des documents de la **société**, qui vivent sur sa
+  fiche (reportings, business plan, juridique) : un document déposé ici
+  n'apparaît **que** sur le deal, jamais dans l'onglet Documents de la
+  société. On dépose un fichier (**20 Mo maximum**) en lui donnant un titre,
+  un type et, si utile, la **date du document** (signature par exemple) —
+  cette date est facultative. Chaque ligne se **télécharge** ou se
+  **supprime** (avec confirmation).
 - **Notes** : texte libre.
 
 ## Gérer une sortie
@@ -98,6 +107,8 @@ capital déployé), jamais en rouge, puisque la position n'est pas soldée.
 
 - **Supprimer un deal est refusé** tant que des transactions lui sont
   rattachées — il faut les détacher d'abord (aucune transaction orpheline).
+- **Supprimer un deal supprime aussi ses documents**, fichiers compris.
+  Ils n'existent nulle part ailleurs : à récupérer avant, si besoin.
 - Les métriques affichées (Versé, Reçu, MOIC, TRI) sont **toujours
   recalculées** depuis les transactions pointées — le pointage est donc la
   condition pour que les chiffres soient justes. Voir

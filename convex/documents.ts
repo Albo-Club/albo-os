@@ -15,11 +15,17 @@ import type { MutationCtx } from './_generated/server'
 
 const MAX_BYTES = 20 * 1024 * 1024 // project storage cap (cf. files.ts)
 
+// Company kinds + deal-specific ones (term sheet, pacte…). The surface picks
+// which subset it offers; the schema accepts both.
 const kindValidator = v.union(
   v.literal('reporting'),
   v.literal('bp'),
   v.literal('legal'),
   v.literal('other'),
+  v.literal('term_sheet'),
+  v.literal('pacte'),
+  v.literal('subscription'),
+  v.literal('attestation'),
 )
 
 async function validateUpload(
@@ -49,8 +55,11 @@ export const listByCompany = query({
       .order('desc')
       .take(200)
 
-    // Hide inline email images (cid:) — they're analysis artefacts, not docs.
-    const visible = rows.filter((doc) => doc.inline !== true)
+    // Hide inline email images (cid:) — they're analysis artefacts, not docs —
+    // and deal documents, which live on their deal sheet only.
+    const visible = rows.filter(
+      (doc) => doc.inline !== true && doc.dealId === undefined,
+    )
 
     return await Promise.all(
       visible.map(async (doc) => ({
@@ -71,9 +80,40 @@ export const listByCompany = query({
   },
 })
 
+/** A deal's documents, most recent first, with download URL. */
+export const listByDeal = query({
+  args: { dealId: v.id('deals') },
+  handler: async (ctx, { dealId }) => {
+    const deal = await ctx.db.get('deals', dealId)
+    if (!deal) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, deal.orgId)
+
+    const rows = await ctx.db
+      .query('documents')
+      .withIndex('by_deal', (q) => q.eq('dealId', dealId))
+      .order('desc')
+      .take(200)
+
+    return await Promise.all(
+      rows.map(async (doc) => ({
+        _id: doc._id,
+        title: doc.title,
+        kind: doc.kind,
+        period: doc.period ?? null,
+        contentType: doc.contentType ?? null,
+        size: doc.size ?? null,
+        uploadedAt: doc.uploadedAt,
+        url: await ctx.storage.getUrl(doc.storageId),
+      })),
+    )
+  },
+})
+
 export const create = mutation({
   args: {
     companyId: v.id('companies'),
+    // Set to attach the document to a single deal instead of the company.
+    dealId: v.optional(v.id('deals')),
     title: v.string(),
     kind: kindValidator,
     period: v.optional(v.number()),
@@ -84,6 +124,20 @@ export const create = mutation({
     if (!company) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, company.orgId)
 
+    // A deal document must belong to the same org AND target the company it
+    // is filed under, otherwise the row would be reachable from the wrong
+    // fiche.
+    if (args.dealId) {
+      const deal = await ctx.db.get('deals', args.dealId)
+      if (
+        !deal ||
+        deal.orgId !== company.orgId ||
+        deal.targetCompanyId !== args.companyId
+      ) {
+        throw new ConvexError('not_found')
+      }
+    }
+
     const title = args.title.trim()
     if (!title) throw new ConvexError('invalid_title')
     const { contentType, size } = await validateUpload(ctx, args.storageId)
@@ -91,6 +145,7 @@ export const create = mutation({
     return await ctx.db.insert('documents', {
       orgId: company.orgId,
       companyId: args.companyId,
+      dealId: args.dealId,
       title,
       kind: args.kind,
       period: args.period,

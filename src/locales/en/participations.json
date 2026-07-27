@@ -334,10 +334,6 @@
     },
     "cto": {
       "placeholder": "This instrument type isn't configured yet."
-    },
-    "documents": {
-      "title": "Documents",
-      "body": "Coming soon — documents attached to this deal will appear here."
     }
   },
   "edit": {
@@ -555,6 +551,39 @@
       "reporting": "Reporting",
       "bp": "Business plan",
       "legal": "Legal",
+      "other": "Other"
+    },
+    "errors": {
+      "too_large": "File is larger than 20 MB",
+      "default": "Something went wrong"
+    }
+  },
+  "dealDocuments": {
+    "title": "Documents",
+    "upload": "Add a doc",
+    "uploading": "Uploading…",
+    "empty": "No document yet. Term sheet, shareholders' agreement, subscription form… anything specific to this deal.",
+    "added": "Document added",
+    "deleted": "Document deleted",
+    "deleteConfirmTitle": "Delete this document?",
+    "deleteConfirmBody": "The file will be permanently deleted.",
+    "download": "Download",
+    "dialogTitle": "New document",
+    "titleLabel": "Title",
+    "kindLabel": "Type",
+    "dateLabel": "Document date (optional)",
+    "col": {
+      "title": "Title",
+      "kind": "Type",
+      "date": "Date",
+      "size": "Size",
+      "added": "Added"
+    },
+    "kind": {
+      "term_sheet": "Term sheet",
+      "pacte": "Shareholders' agreement",
+      "subscription": "Subscription form",
+      "attestation": "Certificate / registry extract",
       "other": "Other"
     },
     "errors": {
