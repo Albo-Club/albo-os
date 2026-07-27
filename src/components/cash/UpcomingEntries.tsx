@@ -32,7 +32,8 @@ const CONFIDENCE_VARIANT = {
  * Cockpit list of upcoming pending entries (30/90-day toggle), overdue ones
  * first with a badge — rule-derived occurrences INCLUDED, contrary to the
  * hand-managed one-shot table lower on the page. Read-only: editing stays
- * on the rules / one-off surfaces, reconciliation on the suggestions card.
+ * on the rules / one-off surfaces, reconciliation on the suggestions card
+ * (Transactions tab).
  */
 export function UpcomingEntriesSection({
   orgId,

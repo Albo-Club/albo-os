@@ -129,15 +129,19 @@ function Cash() {
           </section>
         </TabsContent>
         {/* Prévisionnel: the month-by-month detail — the "to handle" queue
-            (upcoming/overdue entries, suggested reconciliations), then the
-            committed pipeline + category × month grid (whose past months
-            already carry the realized per-category view). */}
+            (upcoming/overdue entries), then the committed pipeline + category ×
+            month grid (whose past months already carry the realized
+            per-category view). Reconciling an entry against a transaction is a
+            pointage gesture and lives in the Transactions tab. */}
         <TabsContent value="previsionnel" className="space-y-6 pt-4">
           {org && <UpcomingEntriesSection orgId={org._id} />}
-          {org && <ForecastMatchSuggestions orgId={org._id} />}
           {org && <ForecastGridSection orgId={org._id} />}
         </TabsContent>
-        <TabsContent value="transactions" className="pt-4">
+        {/* Transactions: the pointage surface. Suggested forecast-entry
+            reconciliations sit above the ledger, whatever the active filter —
+            the suggestion is about the entry, not the transaction's status. */}
+        <TabsContent value="transactions" className="space-y-6 pt-4">
+          {org && <ForecastMatchSuggestions orgId={org._id} />}
           {org && <TransactionsLedger orgId={org._id} orgSlug={orgSlug} />}
         </TabsContent>
         {/* Règles & échéances: everything one configures — recurring rules
