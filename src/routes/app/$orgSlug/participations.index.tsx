@@ -339,46 +339,52 @@ function Participations() {
 
   return (
     <main className="flex-1 space-y-6 p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
-        {org && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                aria-label={t('common:actions.menu')}
-              >
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => setCreateOpen(true)}>
-                <Plus className="size-4" />
-                {t('create.button')}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!hasDeals}
-                onSelect={() => exportRef.current?.('csv')}
-              >
-                <Download className="size-4" />
-                {t('export.csv')}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!hasDeals}
-                onSelect={() => exportRef.current?.('xlsx')}
-              >
-                <Download className="size-4" />
-                {t('export.xlsx')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </div>
       <ParticipationsView
         rows={participations?.rows}
         orgSlug={orgSlug}
         exportRef={exportRef}
+        // Rendered inside the view's sticky bar, so title + menu + filters
+        // stay pinned together while the list scrolls.
+        header={
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {t('title')}
+            </h1>
+            {org && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    aria-label={t('common:actions.menu')}
+                  >
+                    <MoreHorizontal className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => setCreateOpen(true)}>
+                    <Plus className="size-4" />
+                    {t('create.button')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={!hasDeals}
+                    onSelect={() => exportRef.current?.('csv')}
+                  >
+                    <Download className="size-4" />
+                    {t('export.csv')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={!hasDeals}
+                    onSelect={() => exportRef.current?.('xlsx')}
+                  >
+                    <Download className="size-4" />
+                    {t('export.xlsx')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        }
         loadExportDeals={
           org
             ? async () => {
