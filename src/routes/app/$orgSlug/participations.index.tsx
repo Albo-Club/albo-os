@@ -328,11 +328,11 @@ function Participations() {
     api.deals.listParticipations,
     org ? { orgId: org._id } : 'skip',
   )
-  // One-shot fetch of the full per-deal set, only when the CSV export runs.
+  // One-shot fetch of the full per-deal set, only when an export runs.
   const convex = useConvex()
-  // Filled by the table; lets the header menu trigger the export of the full
-  // deal set (active + settled).
-  const exportRef = useRef<(() => void) | null>(null)
+  // Filled by the table; lets the header menu trigger the per-deal export
+  // (CSV or Excel) under the view's current filters.
+  const exportRef = useRef<((format: 'csv' | 'xlsx') => void) | null>(null)
   const hasDeals = Boolean(
     participations && participations.rows.length > 0,
   )
@@ -368,10 +368,17 @@ function Participations() {
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={!hasDeals}
-                    onSelect={() => exportRef.current?.()}
+                    onSelect={() => exportRef.current?.('csv')}
                   >
                     <Download className="size-4" />
-                    {t('export.button')}
+                    {t('export.csv')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={!hasDeals}
+                    onSelect={() => exportRef.current?.('xlsx')}
+                  >
+                    <Download className="size-4" />
+                    {t('export.xlsx')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -385,7 +392,7 @@ function Participations() {
                   orgId: org._id,
                 })
                 // Treasury placements live on the dedicated Placements page —
-                // the CSV export only covers participations.
+                // the export only covers participations.
                 return deals.filter(
                   (d) => !isTreasuryPlacement(d.instrumentKind),
                 )

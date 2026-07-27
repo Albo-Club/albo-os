@@ -26,7 +26,7 @@ function AllParticipations() {
   const { t } = useTranslation('participations')
   // Server-side projection: pre-aggregated company rows across all my orgs.
   const rows = useConvexQuery(api.aggregate.listParticipations, {})
-  // One-shot fetch of the full per-deal set, only when the CSV export runs.
+  // One-shot fetch of the full per-deal set, only when an export runs.
   const convex = useConvex()
 
   return (

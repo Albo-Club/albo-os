@@ -20,7 +20,6 @@ import { LeadSpvPanel } from '~/components/deals/LeadSpvPanel'
 import { RoyaltiesPanel } from '~/components/deals/RoyaltiesPanel'
 import { signTone } from '~/lib/moneyTone'
 import { cn } from '~/lib/utils'
-import { Badge } from '~/components/ui/badge'
 import { InlineField } from '~/components/ui/inline-field'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 
@@ -28,8 +27,8 @@ import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
  * Read-only central block of the deal sheet, driven by
  * convex/lib/instrumentMapping.ts (single source of truth). The block reads
  * INSTRUMENT_RENDER to pick a render mode, INSTRUMENT_FIELDS for the ordered
- * columns to show, and INSTRUMENT_ARCHETYPE for the colored badge. It NEVER
- * duplicates the instrument→fields mapping.
+ * columns to show, and INSTRUMENT_ARCHETYPE to drive the field layout. It
+ * NEVER duplicates the instrument→fields mapping.
  *
  * Fields in the standard grid edit inline when `editable` (click a value →
  * InlineField → one-field `deals.update`); the block stays read-only while the
@@ -130,20 +129,6 @@ export const FORMAT_UNIT: Partial<Record<FieldFormat, string>> = {
  * from the mapping order — no hardcoded field list here).
  */
 const SAFE_SPLIT_FIELD = 'conversionValuation'
-
-/** Archetype → tinted badge classes (brand tokens, never raw colors). */
-const ARCHETYPE_BADGE: Record<Archetype, string> = {
-  equity: 'border-chart-1/40 bg-chart-1/10 text-chart-1',
-  debt: 'border-chart-2/40 bg-chart-2/10 text-chart-2',
-  funds_lp: 'border-chart-3/40 bg-chart-3/10 text-chart-3',
-  real_estate: 'border-chart-4/40 bg-chart-4/10 text-chart-4',
-  royalties: 'border-chart-5/40 bg-chart-5/10 text-chart-5',
-  // management revenue (fees + carried) reuses the income-green token —
-  // it's income, like placement, so the same positive family fits.
-  management: 'border-positive/40 bg-positive/10 text-positive',
-  placement: 'border-positive/40 bg-positive/10 text-positive',
-  unassigned: 'text-muted-foreground',
-}
 
 /**
  * Minimal shape a custom panel needs from a deal's transactions: the dated,
@@ -363,14 +348,9 @@ export function InstrumentBlock({
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-lg font-semibold tracking-tight">
-          {t('fiche.instrumentTitle')}
-        </h2>
-        <Badge variant="outline" className={cn(ARCHETYPE_BADGE[archetype])}>
-          {t(`archetype.${archetype}`)}
-        </Badge>
-      </div>
+      <h2 className="text-lg font-semibold tracking-tight">
+        {t('fiche.instrumentTitle')}
+      </h2>
 
       {render === 'custom' ? (
         (() => {

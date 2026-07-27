@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.137.0 — 27/07/2026 à 22:28 — L'en-tête de la liste Entreprises reste en haut
+## v1.138.0 — 27/07/2026 à 22:50 — L'en-tête de la liste Entreprises reste en haut
 
 Sur la liste Entreprises, le bandeau de tête — **titre**, menu `⋯` et la
 barre **recherche / Instrument / Secteur** — reste maintenant figé en haut
@@ -54,6 +54,73 @@ emporte le titre et son sous-titre.
 >   `⋯`) et `app/all/participations.tsx` (titre + sous-titre).
 > - Docs : ligne SH21 ajoutée à `TESTING.md`, `docs/produit/04-participations.md`
 >   complété.
+
+---
+
+## v1.137.1 — 27/07/2026 à 22:38 — Une seule icône pour les Entreprises
+
+Dans le menu de gauche, « Entreprises » s'affichait avec un camembert
+alors que la recherche rapide (⌘K) proposait les sociétés avec une icône
+d'immeuble. C'est désormais la même icône d'immeuble des deux côtés.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/app-shell/nav.ts` : l'entrée `items.participations`
+>   passe de `PieChart` à `Building2`, dans `getNavGroups()` (vue par-org)
+>   comme dans `getAllNavGroups()` (vue agrégée `/app/all`), pour rester
+>   cohérente avec le groupe « Entreprises » de `CommandPalette.tsx`.
+> - `PieChart` n'était plus utilisé ailleurs : import retiré.
+
+## v1.137.0 — 27/07/2026 à 22:32 — Fiches plus lisibles et export Excel
+
+Une fournée de retouches issues de la revue de l'app, pour rendre les
+fiches plus lisibles et les listes plus propres.
+
+**Fiche société.** La box Identité gagne en lisibilité : les libellés
+(Secteur, SIREN, Domaine…) passent en petites majuscules discrètes et les
+valeurs ressortent davantage. Le **résumé** de la société n'est plus un
+texte posé sous la box : il est intégré à la fiche d'identité avec son
+propre libellé, en texte justifié. Le **SIREN** s'affiche désormais par
+groupes de trois chiffres (552 178 639), comme partout ailleurs. Dans la
+**Synthèse IA**, les trois tuiles KPI s'alignent enfin : chiffres,
+variations et lignes de contexte tombent sur les mêmes lignes d'une tuile
+à l'autre, et la ligne de contexte s'écrit sur deux lignes au lieu d'être
+systématiquement coupée par « … ».
+
+**Fiche deal.** La grosse carte « Entité liée » au milieu de la fiche
+disparaît (le lien de retour vers la société, en haut de fiche, fait déjà
+le travail), ainsi que la section « Reporting & KPIs » qui n'affichait
+rien. La vignette de famille d'instrument (« Capital », « Dette »…) est
+retirée : elle n'apportait rien de plus que le type déjà affiché.
+
+**Liste Entreprises.** La petite flèche qui apparaissait au survol en bout
+de ligne est retirée — le grisé de la ligne suffit. L'**export** propose
+désormais **CSV et Excel (.xlsx)**, et il respecte la recherche et les
+filtres en cours (sans filtre, tout est exporté comme avant).
+
+> **🔧 Notes techniques**
+>
+> - Fiche deal : sections « Entité liée » et « Reporting » supprimées de
+>   `deals.$dealId.tsx` ; badge archétype et `ARCHETYPE_BADGE` retirés de
+>   `InstrumentBlock.tsx` (le mapping `INSTRUMENT_ARCHETYPE` reste, il
+>   pilote le layout). Clés i18n `archetype.*`, `fiche.entity.*`,
+>   `fiche.reporting.*` purgées.
+> - Identité : hiérarchie libellé/valeur unifiée dans `IdentityField`
+>   (`EntityFiche.tsx`) et `InlineField` (`ui/inline-field.tsx`) — libellé
+>   `text-[11px] uppercase tracking-wide`, valeur `font-medium` ; résumé
+>   déplacé dans la section Identité (`participations.$companyId.tsx`).
+> - SIREN : nouveau helper pur `formatSiren` (`src/lib/siren.ts` +
+>   `tests/siren.test.ts`), appliqué à l'affichage seulement (l'édition
+>   garde la valeur brute).
+> - Synthèse IA : `KpiTile` passe en subgrid (`grid-rows-subgrid
+>   row-span-4`, placeholders pour tendance/contexte absents) pour aligner
+>   les rangées entre tuiles ; contexte en `line-clamp-2` + tooltip.
+> - Liste : colonne chevron retirée de `ParticipationsTable.tsx` (colgroup
+>   et `colSpan` recalés). Export : `handleExport(format)` dans
+>   `ParticipationsView.tsx`, filtre par `companyId` des lignes visibles,
+>   XLSX via `write-excel-file` 4.1.1 (import dynamique
+>   `write-excel-file/browser`, cellules numériques typées) ; menus mis à
+>   jour dans `participations.index.tsx` (deux entrées CSV/Excel).
 
 ---
 

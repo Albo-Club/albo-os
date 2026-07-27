@@ -15,6 +15,12 @@ import {
 } from '~/lib/dealStatusBadge'
 import { cn } from '~/lib/utils'
 import { Button } from '~/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu'
 import { Input } from '~/components/ui/input'
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
 import { downloadCsv, toCsv } from '~/lib/csv'
@@ -31,8 +37,9 @@ import { normalizeSearch } from '~/lib/searchText'
  * filters run here on the lightweight rows and apply to BOTH tables at once
  * (a row matches an instrument/status facet when ANY of its deals carries the
  * value — the row's sums always cover the whole company bucket). Export
- * covers the full per-deal set, fetched one-shot via `loadExportDeals`,
- * regardless of the filters.
+ * (CSV or Excel) fetches the per-deal set one-shot via `loadExportDeals`,
+ * then keeps only the deals of the companies that survive the current
+ * search + filters.
  */
 export function ParticipationsView({
   rows,
@@ -45,8 +52,8 @@ export function ParticipationsView({
   rows: Array<CompanyRow> | undefined
   showOrg?: boolean
   orgSlug?: string
-  exportRef?: RefObject<(() => void) | null>
-  /** One-shot fetch of the full per-deal set feeding the CSV export. */
+  exportRef?: RefObject<((format: 'csv' | 'xlsx') => void) | null>
+  /** One-shot fetch of the full per-deal set feeding the export. */
   loadExportDeals?: () => Promise<Array<DealRow>>
   /**
    * Page title row, rendered inside the sticky bar right above the toolbar.
@@ -164,11 +171,13 @@ export function ParticipationsView({
     return { pending, active, exitWin, exitLoss }
   }, [filtered])
 
-  // CSV export, flat (one deal per row). Always covers the full, unsplit deal
-  // set (active + settled), independent of the current search / filters. The
+  // Flat export (one deal per row), CSV or Excel. Follows the current search
+  // + filters: only the deals of the companies whose rows survive them are
+  // exported (the filters match at the company level, so BOTH status buckets
+  // of a visible company are covered — same predicate as the tables). The
   // per-deal data is NOT subscribed by this view anymore (the tables run on
   // the aggregated rows), so it's fetched one-shot on demand.
-  async function handleExport() {
+  async function handleExport(format: 'csv' | 'xlsx') {
     if (!loadExportDeals) return
     let deals: Array<DealRow>
     try {
@@ -176,6 +185,10 @@ export function ParticipationsView({
     } catch {
       toast.error(t('export.error'))
       return
+    }
+    if (filtered && (term || hasFilters)) {
+      const visible = new Set(filtered.map((r) => r.companyId))
+      deals = deals.filter((d) => visible.has(d.targetCompanyId))
     }
     const headers = [
       t('col.company'),
@@ -192,39 +205,91 @@ export function ParticipationsView({
       t('col.tri'),
       t('deal.signed'),
     ]
-    const euros = (cents?: number | null) =>
-      cents == null ? null : (cents / 100).toFixed(2)
-    const csvRows = deals.map((d) => {
-      const tvpi = tvpiRatio({
+    // One intermediate record per deal so CSV and Excel serialize the SAME
+    // values, each format only picking its own rendering.
+    const exportRows = deals.map((d) => ({
+      company: d.target?.name ?? '',
+      deal: d.name ?? '',
+      instrument: t(`instrument.${d.instrumentKind}`, {
+        defaultValue: d.instrumentKind,
+      }),
+      investor: d.investor?.name ?? '',
+      status: t(`status.${dealStatusLabelKey(d.status, d.moic)}`, {
+        defaultValue: d.status,
+      }),
+      committedCents: d.committedAmount ?? null,
+      paidCents: d.paidActual ?? 0,
+      receivedCents: d.received ?? 0,
+      valuationCents: d.lastValuationCents ?? null,
+      tvpi: tvpiRatio({
         capital: d.paidActual ?? 0,
         proceeds: d.received ?? 0,
         residual: residualCents(d),
-      })
-      return [
-        d.target?.name ?? '',
-        d.name ?? '',
-        t(`instrument.${d.instrumentKind}`, {
-          defaultValue: d.instrumentKind,
-        }),
-        d.investor?.name ?? '',
-        t(`status.${dealStatusLabelKey(d.status, d.moic)}`, {
-          defaultValue: d.status,
-        }),
-        euros(d.committedAmount),
-        euros(d.paidActual ?? 0),
-        euros(d.received ?? 0),
-        euros(d.lastValuationCents),
-        tvpi == null ? null : tvpi.toFixed(2),
-        // Realized MOIC + exact XIRR straight from the authoritative server
-        // fields (no client recompute). TRI is a raw decimal ratio (unitless,
-        // like TVPI/MOIC); null when undefined (e.g. total loss, no proceeds).
-        d.moic == null ? null : d.moic.toFixed(2),
-        d.irr == null ? null : d.irr.toFixed(4),
-        d.signedDate ? new Date(d.signedDate).toISOString().slice(0, 10) : null,
-      ]
-    })
+      }),
+      // Realized MOIC + exact XIRR straight from the authoritative server
+      // fields (no client recompute). TRI is a raw decimal ratio (unitless,
+      // like TVPI/MOIC); null when undefined (e.g. total loss, no proceeds).
+      moic: d.moic ?? null,
+      irr: d.irr ?? null,
+      signed: d.signedDate
+        ? new Date(d.signedDate).toISOString().slice(0, 10)
+        : null,
+    }))
     const day = new Date().toISOString().slice(0, 10)
-    downloadCsv(`participations-${day}.csv`, toCsv(headers, csvRows))
+    if (format === 'csv') {
+      const euros = (cents: number | null) =>
+        cents == null ? null : (cents / 100).toFixed(2)
+      const csvRows = exportRows.map((r) => [
+        r.company,
+        r.deal,
+        r.instrument,
+        r.investor,
+        r.status,
+        euros(r.committedCents),
+        euros(r.paidCents),
+        euros(r.receivedCents),
+        euros(r.valuationCents),
+        r.tvpi == null ? null : r.tvpi.toFixed(2),
+        r.moic == null ? null : r.moic.toFixed(2),
+        r.irr == null ? null : r.irr.toFixed(4),
+        r.signed,
+      ])
+      downloadCsv(`participations-${day}.csv`, toCsv(headers, csvRows))
+      return
+    }
+    // Excel: same columns/rows, but the numeric cells stay numbers (euros
+    // with a 2-decimal format). Dynamic import so the xlsx writer stays out
+    // of the main bundle (v4 moved the browser entry to a subpath export).
+    try {
+      const { default: writeXlsxFile } = await import(
+        'write-excel-file/browser'
+      )
+      const eur = (cents: number | null) =>
+        cents == null ? null : { value: cents / 100, format: '0.00' }
+      const num = (ratio: number | null, numFormat: string) =>
+        ratio == null ? null : { value: ratio, format: numFormat }
+      const data = [
+        headers,
+        ...exportRows.map((r) => [
+          r.company,
+          r.deal,
+          r.instrument,
+          r.investor,
+          r.status,
+          eur(r.committedCents),
+          eur(r.paidCents),
+          eur(r.receivedCents),
+          eur(r.valuationCents),
+          num(r.tvpi, '0.00'),
+          num(r.moic, '0.00'),
+          num(r.irr, '0.0000'),
+          r.signed,
+        ]),
+      ]
+      await writeXlsxFile(data).toFile(`participations-${day}.xlsx`)
+    } catch {
+      toast.error(t('export.error'))
+    }
   }
 
   // Expose the export handler to a parent (header menu) when asked. No deps:
@@ -285,15 +350,24 @@ export function ParticipationsView({
                 </Button>
               )}
               {!exportRef && loadExportDeals && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void handleExport()}
-                  className="ml-auto"
-                >
-                  <Download className="size-4" />
-                  {t('export.button')}
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="ml-auto">
+                      <Download className="size-4" />
+                      {t('export.button')}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => void handleExport('csv')}>
+                      {t('export.csv')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => void handleExport('xlsx')}
+                    >
+                      {t('export.xlsx')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
           )}
