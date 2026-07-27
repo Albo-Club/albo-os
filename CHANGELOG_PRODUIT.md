@@ -23,6 +23,36 @@ bas de page.
 
 ---
 
+## v1.138.1 — 27/07/2026 à 23:03 — Une colonne Secteur plus compacte
+
+Sur la liste Entreprises, la colonne **Secteur** était calibrée sur le
+libellé le plus long (« Marketplace / E-commerce ») : elle réservait cette
+largeur sur **toutes** les lignes, y compris celles où le badge affiche
+« Fintech ». Elle est maintenant **plus étroite d'environ 50 px**, au
+profit des colonnes de chiffres à sa droite, et les **quatre libellés les
+plus longs passent sur deux lignes dans le badge** au lieu d'imposer leur
+largeur à la colonne entière. Tous les autres secteurs restent sur une
+ligne, et l'alignement des colonnes entre les tableaux (En cours, Actifs,
+Exit win, Exit loss) est inchangé.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/participations/ParticipationsTable.tsx` :
+>   `COL_WIDTHS.sector` passe de 208 à 160 px — volontairement en dessous
+>   de la largeur du badge le plus long, la grille de colonnes partagée
+>   (`table-fixed` + colgroup) restant la référence commune aux trois
+>   variantes.
+> - Le badge secteur reçoit `whitespace-normal text-center` pour
+>   neutraliser le `whitespace-nowrap` par défaut du composant `Badge` et
+>   retomber sur deux lignes. Seuls les 4 libellés > ~17 caractères
+>   (marketplace, fund, industry, consumer) sont concernés, en FR comme en
+>   EN.
+> - `TESTING.md` : SH19c recalé (deux lignes attendues sur les longs
+>   libellés) et seuils de scroll horizontal de SH19b ramenés à ~1040 px
+>   (~1144 px en vue agrégée).
+
+---
+
 ## v1.138.0 — 27/07/2026 à 22:54 — L'en-tête de la liste Entreprises reste en haut
 
 Sur la liste Entreprises, le bandeau de tête — **titre**, menu `⋯` et la
