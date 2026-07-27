@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { residualValueCents } from '../../../convex/lib/metrics'
@@ -124,7 +124,6 @@ const COL_WIDTHS = {
   ratio: 80,
   /** Fits the longest sector badge ("Marketplace / E-commerce"). */
   sector: 192,
-  chevron: 40,
 } as const
 const COMPANY_MIN_WIDTH = 256
 
@@ -401,17 +400,16 @@ export function ParticipationsTable({
     return { dealCount, committed, invested, received }
   }, [rows])
 
-  // Same 9 columns in every variant (company, AI score, deals, 2 amounts,
-  // 2 ratios, sector, chevron — see COL_WIDTHS), plus the optional org one.
-  const colSpan = 9 + (showOrg ? 1 : 0)
+  // Same 8 columns in every variant (company, AI score, deals, 2 amounts,
+  // 2 ratios, sector — see COL_WIDTHS), plus the optional org one.
+  const colSpan = 8 + (showOrg ? 1 : 0)
   const fixedWidth =
     (showOrg ? COL_WIDTHS.org : 0) +
     COL_WIDTHS.aiScore +
     COL_WIDTHS.deals +
     2 * COL_WIDTHS.amount +
     2 * COL_WIDTHS.ratio +
-    COL_WIDTHS.sector +
-    COL_WIDTHS.chevron
+    COL_WIDTHS.sector
 
   if (rows && rows.length === 0) {
     return (
@@ -441,7 +439,6 @@ export function ParticipationsTable({
             <col style={{ width: COL_WIDTHS.ratio }} />
             <col style={{ width: COL_WIDTHS.ratio }} />
             <col style={{ width: COL_WIDTHS.sector }} />
-            <col style={{ width: COL_WIDTHS.chevron }} />
           </colgroup>
           <TableHeader>
             <TableRow>
@@ -528,8 +525,6 @@ export function ParticipationsTable({
                 <TableHead className={headCellClass} />
               )}
               <TableHead className={headCellClass}>{t('col.sector')}</TableHead>
-              {/* Trailing column for the per-row hover chevron. */}
-              <TableHead className={headCellClass} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -585,7 +580,6 @@ export function ParticipationsTable({
                   </TableCell>
                 )}
                 {/* No sum for the ratio columns (TVPI, or MOIC + TRI). */}
-                <TableCell className={footCellClass} />
                 <TableCell className={footCellClass} />
                 <TableCell className={footCellClass} />
                 <TableCell className={footCellClass} />
@@ -721,14 +715,6 @@ function CompanyTableRow({
           </Badge>
         ) : (
           <span className="text-muted-foreground">—</span>
-        )}
-      </TableCell>
-      <TableCell className="text-right">
-        {openDetail && (
-          <ArrowRight
-            aria-hidden
-            className="text-muted-foreground inline size-4 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-          />
         )}
       </TableCell>
     </TableRow>

@@ -180,7 +180,9 @@ export function InlineField({
 
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-muted-foreground text-xs">{label}</span>
+      <span className="text-muted-foreground text-[11px] tracking-wide uppercase">
+        {label}
+      </span>
       {editing ? (
         editor
       ) : (
@@ -190,7 +192,7 @@ export function InlineField({
           onClick={begin}
           aria-label={ariaLabel}
           className={cn(
-            'focus-visible:ring-ring -mx-1 rounded px-1 text-left text-sm focus-visible:ring-2 focus-visible:outline-none',
+            'focus-visible:ring-ring -mx-1 rounded px-1 text-left text-sm font-medium focus-visible:ring-2 focus-visible:outline-none',
             disabled ? 'cursor-default' : 'hover:bg-muted/50 cursor-pointer',
           )}
         >

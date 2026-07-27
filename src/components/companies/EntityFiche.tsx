@@ -21,8 +21,12 @@ export function IdentityField({
 }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="text-sm">{value == null || value === '' ? '—' : value}</span>
+      <span className="text-muted-foreground text-[11px] tracking-wide uppercase">
+        {label}
+      </span>
+      <span className="text-sm font-medium">
+        {value == null || value === '' ? '—' : value}
+      </span>
     </div>
   )
 }

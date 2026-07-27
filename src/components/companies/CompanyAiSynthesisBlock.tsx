@@ -288,7 +288,13 @@ function KpiTile({ insight }: { insight: Insight }) {
         ? directionBadgeClass(false)
         : 'border-border bg-muted text-muted-foreground'
   return (
-    <div className="flex flex-col rounded-lg border p-3">
+    // Subgrid tile: the four rows (label / value / trend / context) come from
+    // the parent grid, so they stay aligned across the three tiles even when a
+    // value wraps. gap-y-0 cancels the inherited row gap — vertical spacing
+    // stays on the per-row margins, as before. All four rows always render
+    // (empty placeholders when trend/context are missing) so every tile spans
+    // the same tracks; on mobile each tile simply spans its own four rows.
+    <div className="grid grid-rows-subgrid row-span-4 gap-y-0 rounded-lg border p-3">
       <span className="text-muted-foreground truncate text-xs tracking-wide uppercase">
         {insight.label}
       </span>
@@ -308,10 +314,15 @@ function KpiTile({ insight }: { insight: Insight }) {
           </span>
         )}
       </div>
-      {insight.context && (
-        <span className="text-muted-foreground mt-1 truncate text-xs" title={insight.context}>
+      {insight.context ? (
+        <span
+          className="text-muted-foreground mt-1 line-clamp-2 text-xs"
+          title={insight.context}
+        >
           {insight.context}
         </span>
+      ) : (
+        <span aria-hidden="true" />
       )}
     </div>
   )

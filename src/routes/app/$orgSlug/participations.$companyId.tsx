@@ -28,6 +28,7 @@ import type { PersonRole } from '../../../../convex/lib/people'
 import { attioPersonUrl } from '~/lib/attio'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
+import { formatSiren } from '~/lib/siren'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { CompanyDealsTable } from '~/components/companies/CompanyDealsTable'
 import { SectorCombobox } from '~/components/companies/SectorCombobox'
@@ -1055,7 +1056,7 @@ function ParticipationDetail() {
                 label={t('info.siren')}
                 format="text"
                 rawValue={company?.siren}
-                display={company?.siren ?? ''}
+                display={formatSiren(company?.siren)}
                 ariaLabel={t('edit.inlineLabel', { field: t('info.siren') })}
                 disabled={!company}
                 onCommit={(v) => saveCompany({ siren: String(v) })}
@@ -1086,14 +1087,19 @@ function ParticipationDetail() {
                 }
               />
             </div>
+            {/* Optional 2-3 line summary, laid out as a labelled field below
+                the grid (paragraph text, so no font-medium). */}
+            {company?.summary && (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-muted-foreground text-[11px] tracking-wide uppercase">
+                  {t('identity.summary')}
+                </span>
+                <p className="text-sm text-justify whitespace-pre-line">
+                  {company.summary}
+                </p>
+              </div>
+            )}
           </IdentitySection>
-
-          {/* Optional 2-3 line summary. */}
-          {company?.summary && (
-            <p className="text-muted-foreground whitespace-pre-line text-sm">
-              {company.summary}
-            </p>
-          )}
 
           {/* People — founders / board / co-investors, fed from company.people.
               Empty sections render the discreet "to be filled in" state. */}
