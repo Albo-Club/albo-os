@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, Palette } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
-import { SidebarMenuButton } from '~/components/ui/sidebar'
+import { Button } from '~/components/ui/button'
 
 const THEMES = [
   { id: 'neutral', swatch: 'oklch(0.205 0 0)' },
@@ -55,16 +55,15 @@ export function ThemePicker() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <SidebarMenuButton tooltip={t('theme.colorTheme')}>
-          <Palette />
-          <span>{t('theme.label')}</span>
+        <Button variant="ghost" size="sm" className="gap-2">
           <span
-            className="ml-auto inline-block size-3 rounded-full border"
+            className="inline-block size-3 rounded-full border"
             style={{ background: current.swatch }}
           />
-        </SidebarMenuButton>
+          <span>{t(`theme.${current.id}`)}</span>
+        </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="right" align="end" className="min-w-44">
+      <DropdownMenuContent align="end" className="min-w-44">
         <DropdownMenuLabel className="text-muted-foreground text-xs">
           {t('theme.colorTheme')}
         </DropdownMenuLabel>

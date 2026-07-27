@@ -50,6 +50,8 @@ import {
 } from '~/components/ui/tabs'
 import { ActiveSessions } from '~/components/auth/active-sessions'
 import { LinkedAccounts } from '~/components/auth/linked-accounts'
+import { ThemePicker } from '~/components/app-shell/ThemePicker'
+import { LanguageSwitcher } from '~/components/i18n/LanguageSwitcher'
 
 export const Route = createFileRoute('/app/me')({
   component: ProfilePage,
@@ -63,7 +65,13 @@ export const Route = createFileRoute('/app/me')({
 })
 
 function ProfilePage() {
-  const { t } = useTranslation(['account', 'validation', 'errors', 'common'])
+  const { t } = useTranslation([
+    'account',
+    'validation',
+    'errors',
+    'common',
+    'nav',
+  ])
   const te = (k: string) => t(`errors:${k}`)
   const profileSchema = useMemo(
     () =>
@@ -406,6 +414,25 @@ function ProfilePage() {
             </FieldGroup>
           </CardContent>
         </form>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('account:appearance.title')}</CardTitle>
+          <CardDescription>
+            {t('account:appearance.description')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-sm">{t('nav:theme.label')}</span>
+            <ThemePicker />
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-sm">{t('common:language.label')}</span>
+            <LanguageSwitcher />
+          </div>
+        </CardContent>
       </Card>
 
         </TabsContent>
