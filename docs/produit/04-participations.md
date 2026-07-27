@@ -28,6 +28,11 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
   deux tableaux d'exits remplacent le TVPI par **MOIC** et **TRI**
   annualisé. Tri par colonne sur les Actifs, clic vers la fiche ; pas de
   pagination — chaque tableau défile sous son en-tête et ses totaux.
+- **Colonnes alignées d'un tableau à l'autre** : les quatre tableaux
+  partagent la même grille, donc chaque colonne tombe au même endroit et
+  la page se lit d'un seul coup d'œil vertical. Un tableau qui n'a pas une
+  colonne laisse sa place vide plutôt que de décaler les suivantes — c'est
+  pourquoi le tableau des term sheets a des colonnes blanches à droite.
 - **Ligne de totaux par tableau** : nombre de deals et montants, sommés sur
   la section entière et recalculés en direct quand un filtre ou une
   recherche est actif. La somme des exits gagnants et celle des pertes se

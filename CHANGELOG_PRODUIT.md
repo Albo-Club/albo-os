@@ -23,6 +23,45 @@ bas de page.
 
 ---
 
+## v1.135.3 — 27/07/2026 à 20:24 — Colonnes alignées sur la liste Entreprises
+
+Sur la liste Entreprises, les quatre tableaux (En cours, Actifs, Exit win,
+Exit loss) partagent désormais **la même grille de colonnes**. Chaque
+colonne tombe exactement au même endroit d'un tableau à l'autre : le
+« Montant investi » des Actifs est pile au-dessus de celui des Exit win,
+« Secteur » et la flèche de fin de ligne sont alignés partout. Avant,
+chaque tableau calculait ses largeurs à partir de son propre contenu, d'où
+des colonnes en escalier d'une section à l'autre.
+
+Un tableau qui n'a pas une colonne **laisse sa place vide** au lieu de
+décaler les suivantes — le tableau des term sheets a donc des colonnes
+blanches à droite, et celui des Actifs laisse vide l'emplacement du TRI.
+Seule la colonne « Société » s'étire avec la fenêtre ; un nom trop long se
+coupe avec « … » plutôt que d'élargir la colonne.
+
+> **🔧 Notes techniques**
+>
+> - `ParticipationsTable.tsx` : passage en `table-fixed` + `<colgroup>`
+>   partagé, largeurs déclarées dans `COL_WIDTHS` (org, aiScore, deals,
+>   amount ×2, ratio ×2, sector, chevron) ; la colonne Société n'a pas de
+>   largeur et absorbe le reste, avec un `minWidth` = somme des largeurs
+>   fixes + `COMPANY_MIN_WIDTH` en dessous duquel la table scrolle
+>   horizontalement (colonne figée déjà en place).
+> - Les trois variantes (`pending` / `active` / `settled`) rendent
+>   maintenant **le même nombre de cellules** dans le même ordre : les
+>   emplacements sans contenu sont des `TableHead` / `TableCell` vides au
+>   lieu d'être omis (en-tête, corps et pied). `colSpan` devient constant
+>   (9 + org).
+> - Nom de société en `truncate` (+ `min-w-0` sur le flex parent) : en
+>   largeur fixe, il ne peut plus pousser la colonne.
+> - Alignement et absence de débordement vérifiés dans Chromium sur les
+>   trois variantes (positions x identiques, aucune cellule ne dépasse sa
+>   largeur, en-tête le plus long et badge secteur le plus long inclus).
+> - TESTING.md : SH19 ajusté + nouveau cas **SH19b** (alignement
+>   inter-tableaux) ; `docs/produit/04-participations.md` mis à jour.
+
+---
+
 ## v1.135.2 — 27/07/2026 à 20:07 — La ligne de titres des tableaux se détache
 
 Dans les tableaux de participations, la ligne des titres de colonnes
@@ -40,6 +79,8 @@ ses deux lignes de repère, et chaque participation se distingue mieux.
 >   `sticky` et les colonnes défilent dessous).
 > - Aucun changement de structure ni de layout — les trois variantes du
 >   tableau (actif / en cours / sorties) en héritent d'office.
+
+---
 
 ## v1.135.1 — 27/07/2026 à 19:37 — « Actifs », et des compteurs en deals
 
