@@ -43,7 +43,9 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
 - **Recherche et filtres** : recherche plein texte (société, deal,
   instrument, investisseur, secteur) et filtres multi-sélection par
   instrument et secteur — le filtre statut a disparu, les tableaux par
-  statut jouent ce rôle. Export CSV de l'ensemble (généré à la demande).
+  statut jouent ce rôle. Le bandeau de tête (titre, menu ⋯, recherche et
+  filtres) reste figé en haut de l'écran quand on descend dans la liste.
+  Export CSV de l'ensemble (généré à la demande).
 - **Section « Sans deal »** : les entités du portefeuille pas encore
   rattachées à un deal.
 - **Section « Archivées »** : les entités archivées, restaurables en un clic.

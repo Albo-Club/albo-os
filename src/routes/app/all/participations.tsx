@@ -31,16 +31,20 @@ function AllParticipations() {
 
   return (
     <main className="flex-1 space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {t('title')}
-        </h1>
-        <p className="text-muted-foreground text-sm">{t('allSubtitle')}</p>
-      </div>
       <ParticipationsView
         rows={rows}
         showOrg
         loadExportDeals={() => convex.query(api.aggregate.listDeals, {})}
+        // Rendered inside the view's sticky bar, so title + filters stay
+        // pinned together while the list scrolls.
+        header={
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {t('title')}
+            </h1>
+            <p className="text-muted-foreground text-sm">{t('allSubtitle')}</p>
+          </div>
+        }
       />
     </main>
   )
