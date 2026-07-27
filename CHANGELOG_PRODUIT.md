@@ -23,6 +23,26 @@ bas de page.
 
 ---
 
+## v1.138.0 — 27/07/2026 à 22:50 — Les noms de sociétés ne sont plus coupés
+
+Sur la liste Entreprises, un nom de société trop long pour sa colonne
+**passe maintenant sur deux lignes** au lieu d'être coupé avec « … » dès la
+première — « La Vie de Quartier - Bdv… » redevient lisible en entier. Au
+survol, une infobulle affiche toujours le nom complet, et un nom qui
+dépasserait même deux lignes se coupe proprement à la fin de la seconde.
+Rien d'autre ne bouge : les colonnes restent alignées entre les tableaux
+et la colonne Société garde sa largeur.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/participations/ParticipationsTable.tsx` : le nom dans
+>   la cellule Société passe de `truncate` à
+>   `line-clamp-2 whitespace-normal break-words` (le `whitespace-nowrap`
+>   par défaut des cellules shadcn est neutralisé au niveau du span) +
+>   `title` pour l'infobulle. Point F3 de la revue UI, oublié dans la
+>   fournée #298.
+> - `TESTING.md` SH19b recalé (deux lignes + tooltip au lieu de « … »).
+
 ## v1.137.0 — 27/07/2026 à 22:32 — Fiches plus lisibles et export Excel
 
 Une fournée de retouches issues de la revue de l'app, pour rendre les

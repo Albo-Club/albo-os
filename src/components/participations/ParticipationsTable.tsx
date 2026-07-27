@@ -686,9 +686,14 @@ function CompanyTableRow({
             size="md"
             className="size-9"
           />
-          {/* The column grid is fixed now, so a long name has to ellipsize
-              instead of pushing the table wider. */}
-          <span className="truncate">{row.name}</span>
+          {/* The column grid is fixed, so a long name wraps to two lines
+              (then ellipsizes) instead of pushing the table wider. */}
+          <span
+            className="line-clamp-2 whitespace-normal break-words"
+            title={row.name}
+          >
+            {row.name}
+          </span>
         </span>
       </TableCell>
       <TableCell className={stickyCellClass} style={frozenScore}>
