@@ -313,8 +313,10 @@ export function ParticipationsView({
               >
                 <span aria-hidden className={cn('size-2 rounded-full', dot)} />
                 {t(`sections.${key}`)}
+                {/* Count in COMPANIES (table rows) — the totals row at the
+                    bottom counts DEALS, so the unit must be explicit. */}
                 <span className="text-muted-foreground">
-                  ({bucketRows.length})
+                  ({t('sections.count', { count: bucketRows.length })})
                 </span>
               </div>
               <ParticipationsTable

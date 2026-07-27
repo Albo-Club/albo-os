@@ -23,6 +23,23 @@ bas de page.
 
 ---
 
+## v1.135.1 — 27/07/2026 à 19:37 — « Actifs », et des compteurs sans ambiguïté
+
+Le tableau des participations actives s'appelle désormais **« Actifs »**
+(et non « Actives »), et le compteur de chaque bandeau précise son unité :
+**« Actifs (44 sociétés) »**. Il compte les sociétés (les lignes du
+tableau), tandis que la ligne de totaux en bas compte les **deals** — une
+société pouvant porter plusieurs deals, les deux nombres diffèrent
+normalement (44 sociétés / 48 deals n'est pas une erreur).
+
+> **🔧 Notes techniques**
+>
+> - `sections.active` renommé (fr) + nouvelles clés plurielles
+>   `sections.count_one/_other` (fr « société(s) », en « company/ies »)
+>   rendues dans le bandeau (`ParticipationsView.tsx`).
+> - TESTING.md (SH19/SH20) et `docs/produit/04-participations.md`
+>   précisent l'unité des deux compteurs.
+
 ## v1.135.0 — 27/07/2026 à 19:21 — Un tableau par statut dans la liste des entreprises
 
 Le liseré coloré dans la marge des lignes n'était pas assez lisible : il

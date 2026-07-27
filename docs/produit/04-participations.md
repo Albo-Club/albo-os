@@ -16,15 +16,17 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
 
 - **Un tableau par statut**, empilés dans l'ordre de lecture, chacun coiffé
   d'un **bandeau teinté** (pastille + titre + compteur) : **En cours (term
-  sheet)** en ambre tout en haut, **Actives** en bleu, **Exit win** en
+  sheet)** en ambre tout en haut, **Actifs** en bleu, **Exit win** en
   vert, **Exit loss** en rouge. Un tableau vide ne s'affiche pas — pas de
-  term sheet en cours, pas de tableau ambre.
+  term sheet en cours, pas de tableau ambre. Le compteur du bandeau est en
+  **sociétés** ; la ligne de totaux compte les **deals** — une société
+  pouvant porter plusieurs deals, les deux nombres diffèrent normalement.
 - **Colonnes réduites à l'essentiel** : logo et nom, **score IA de santé**
   (1 à 10), nombre de deals, montant investi, montant reçu, **TVPI**, et le
   secteur en badge en dernière colonne. Le tableau des term sheets affiche
   l'**engagé prévisionnel** à la place (rien n'est encore décaissé) ; les
   deux tableaux d'exits remplacent le TVPI par **MOIC** et **TRI**
-  annualisé. Tri par colonne sur les Actives, clic vers la fiche ; pas de
+  annualisé. Tri par colonne sur les Actifs, clic vers la fiche ; pas de
   pagination — chaque tableau défile sous son en-tête et ses totaux.
 - **Ligne de totaux par tableau** : nombre de deals et montants, sommés sur
   la section entière et recalculés en direct quand un filtre ou une
