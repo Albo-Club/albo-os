@@ -1,19 +1,11 @@
 import { useMemo, useState } from 'react'
 import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown } from 'lucide-react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import {
-  residualValueCents,
-  tvpi as tvpiRatio,
-} from '../../../convex/lib/metrics'
-import type { ReactNode } from 'react'
+import { residualValueCents } from '../../../convex/lib/metrics'
 
 import { cn } from '~/lib/utils'
-import {
-  dealStatusAccent,
-  dealStatusBadge,
-  dealStatusLabelKey,
-} from '~/lib/dealStatusBadge'
+import { dealStatusAccent } from '~/lib/dealStatusBadge'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { ScoreRing } from '~/components/companies/ScoreRing'
 import { Badge } from '~/components/ui/badge'
@@ -112,15 +104,6 @@ const stickyCellClass =
   'group-hover:bg-[color-mix(in_oklab,var(--muted)_50%,var(--background))]'
 const footCornerClass = 'sticky bottom-0 left-0 z-30 border-t bg-muted'
 const footCellClass = 'sticky bottom-0 z-20 border-t bg-muted'
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span>{children}</span>
-    </div>
-  )
-}
 
 /** Localized €/date/multiple/percent formatters, shared by the components below. */
 export function useFormatters() {
@@ -231,85 +214,6 @@ export function dealAmountTiles(deal: {
     return [{ labelKey: 'deal.committedForecast', cents: committed }]
   }
   return [{ labelKey: 'deal.paid', cents: paid, precise: true }]
-}
-
-/**
- * Detailed list of deals (one block per deal). Used by the participation
- * detail page (entity sheet) to list an entity's deals.
- */
-export function DealsList({
-  deals,
-  orgSlug,
-}: {
-  deals: Array<DealRow>
-  orgSlug?: string
-}) {
-  const { t } = useTranslation('participations')
-  const { fmtEur, fmtEurCents, fmtDate, fmtMultiple } = useFormatters()
-  const cellClass =
-    'grid grid-cols-2 gap-x-6 gap-y-1 px-6 py-3 text-sm sm:grid-cols-5'
-  return (
-    <div className="divide-y">
-      {deals.map((dl) => {
-        const tvpi = tvpiRatio({
-          capital: dl.paidActual ?? 0,
-          proceeds: dl.received ?? 0,
-          residual: residualCents(dl),
-        })
-        const statusBadge = dealStatusBadge(dl.status, dl.moic)
-        const body = (
-          <>
-            <Field label={t('deal.name')}>{dl.name ?? '—'}</Field>
-            <Field label={t('deal.instrument')}>
-              {t(`instrument.${dl.instrumentKind}`, {
-                defaultValue: dl.instrumentKind,
-              })}
-            </Field>
-            <Field label={t('deal.investor')}>
-              {dl.investor?.name ?? '—'}
-              {dl.spv ? (
-                <span className="text-muted-foreground">
-                  {' '}
-                  · {t('deal.viaSpv')} {dl.spv.name}
-                </span>
-              ) : null}
-            </Field>
-            {dealAmountTiles(dl).map((tile) => (
-              <Field key={tile.labelKey} label={t(tile.labelKey)}>
-                {tile.precise ? fmtEurCents(tile.cents) : fmtEur(tile.cents)}
-              </Field>
-            ))}
-            <Field label={t('deal.received')}>
-              {fmtEurCents(dl.received ?? 0)}
-            </Field>
-            <Field label={t('deal.tvpi')}>{fmtMultiple(tvpi)}</Field>
-            <Field label={t('deal.status')}>
-              <Badge variant={statusBadge.variant} className={statusBadge.className}>
-                {t(`status.${dealStatusLabelKey(dl.status, dl.moic)}`, {
-                  defaultValue: dl.status,
-                })}
-              </Badge>
-            </Field>
-            <Field label={t('deal.signed')}>{fmtDate(dl.signedDate)}</Field>
-          </>
-        )
-        return orgSlug ? (
-          <Link
-            key={dl._id}
-            to="/app/$orgSlug/deals/$dealId"
-            params={{ orgSlug, dealId: dl._id }}
-            className={`${cellClass} hover:bg-accent/60 transition-colors`}
-          >
-            {body}
-          </Link>
-        ) : (
-          <div key={dl._id} className={cellClass}>
-            {body}
-          </div>
-        )
-      })}
-    </div>
-  )
 }
 
 /**

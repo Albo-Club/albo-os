@@ -57,6 +57,7 @@
   },
   "col": {
     "company": "Société",
+    "deal": "Deal",
     "org": "Org",
     "sector": "Secteur",
     "aiScore": "Score IA",

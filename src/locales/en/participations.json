@@ -57,6 +57,7 @@
   },
   "col": {
     "company": "Company",
+    "deal": "Deal",
     "org": "Org",
     "sector": "Sector",
     "aiScore": "AI score",
