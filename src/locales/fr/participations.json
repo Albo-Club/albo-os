@@ -585,8 +585,7 @@
   },
   "tabs": {
     "documents": "Documents",
-    "reports": "Reports",
-    "emails": "Emails"
+    "reports": "Reports"
   },
   "reports": {
     "title": "Reports investisseur",
@@ -629,37 +628,6 @@
       "received": "Reçu le {{date}}",
       "viewDocs": "Voir les docs"
     }
-  },
-  "emails": {
-    "title": "Emails liés",
-    "empty": "Aucun email lié à cette participation pour l'instant. Connectez une boîte Gmail dans Réglages → Intégrations.",
-    "noSubject": "(sans objet)",
-    "from": "De :",
-    "to": "À :",
-    "cc": "Cc :",
-    "sent": "Envoyé",
-    "received": "Reçu",
-    "receivedVia": "via {{mailbox}}",
-    "attachments": "Pièces jointes",
-    "aiMatched": "Rattaché par l'IA",
-    "page": {
-      "metaTitle": "Emails — Albo OS",
-      "title": "Emails",
-      "subtitleLoading": "Tous les emails rattachés aux participations de cette organisation.",
-      "subtitle": "Tous les emails rattachés aux participations de cette organisation — {{count}} stockés.",
-      "empty": "Aucun email pour l'instant. Les emails apparaissent ici dès qu'une boîte Gmail connectée à cette organisation reçoit ou envoie un message lié à une participation.",
-      "col": {
-        "date": "Date",
-        "subject": "Objet",
-        "from": "Expéditeur",
-        "companies": "Sociétés",
-        "mailboxes": "Boîte"
-      }
-    },
-    "extractReport": "Extraire le report",
-    "alreadyExtracted": "Déjà extrait",
-    "extractStarted": "Extraction lancée — le report apparaîtra dans l'onglet Rapports de la fiche (récap par email à la fin).",
-    "extractError": "Impossible de lancer l'extraction."
   },
   "intelligence": {
     "status": {

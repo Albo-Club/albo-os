@@ -3,7 +3,6 @@ import {
   Inbox,
   LayoutDashboard,
   ListTodo,
-  Mail,
   Megaphone,
   PieChart,
   Scale,
@@ -55,11 +54,6 @@ export function getNavGroups(): Array<NavGroup> {
           titleKey: 'items.deals',
           to: '/app/$orgSlug/deals',
           icon: Handshake,
-        },
-        {
-          titleKey: 'items.emails',
-          to: '/app/$orgSlug/emails',
-          icon: Mail,
         },
         {
           titleKey: 'items.cash',
