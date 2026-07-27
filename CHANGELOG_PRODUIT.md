@@ -23,6 +23,20 @@ bas de page.
 
 ---
 
+## v1.137.1 — 27/07/2026 à 22:38 — Une seule icône pour les Entreprises
+
+Dans le menu de gauche, « Entreprises » s'affichait avec un camembert
+alors que la recherche rapide (⌘K) proposait les sociétés avec une icône
+d'immeuble. C'est désormais la même icône d'immeuble des deux côtés.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/app-shell/nav.ts` : l'entrée `items.participations`
+>   passe de `PieChart` à `Building2`, dans `getNavGroups()` (vue par-org)
+>   comme dans `getAllNavGroups()` (vue agrégée `/app/all`), pour rester
+>   cohérente avec le groupe « Entreprises » de `CommandPalette.tsx`.
+> - `PieChart` n'était plus utilisé ailleurs : import retiré.
+
 ## v1.137.0 — 27/07/2026 à 22:32 — Fiches plus lisibles et export Excel
 
 Une fournée de retouches issues de la revue de l'app, pour rendre les
