@@ -18,11 +18,6 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
-import {
-  PAGE_SIZE,
-  PaginationFooter,
-  usePagination,
-} from '~/components/data-table/LocalPagination'
 
 /** Minimal shape of an enriched deal, shared by per-org and aggregated views. */
 export type DealRow = {
@@ -304,7 +299,6 @@ export function ParticipationsTable({
   orgSlug,
   settled = false,
   isFiltered = false,
-  resetKey = '',
 }: {
   // Already filtered by the parent toolbar (search + facets).
   rows: Array<CompanyRow> | undefined
@@ -317,8 +311,6 @@ export function ParticipationsTable({
   // True when the parent search/filters are active — drives the empty message
   // (no results vs. empty scope).
   isFiltered?: boolean
-  // Snaps pagination back to page 1 when the upstream search/filters change.
-  resetKey?: string
 }) {
   const { t } = useTranslation('participations')
   const { fmtEur, fmtMultiple, fmtPercent } = useFormatters()
@@ -359,17 +351,9 @@ export function ParticipationsTable({
     })
   }, [rows, sort])
 
-  // Local pagination (by company, after sort); snaps back to page 1 whenever
-  // the upstream search/filters (resetKey) or the sort changes.
-  const { page, pageCount, setPage } = usePagination(
-    sortedRows?.length ?? 0,
-    `${resetKey}:${sort ? `${sort.key}:${sort.dir}` : ''}`,
-  )
-  const pagedRows = sortedRows?.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
-
   // Airtable-style totals, pinned at the bottom: summed over the WHOLE
-  // filtered set (every page of the pagination), not just the visible page.
-  // Only the countable columns are summed — never the TVPI/MOIC/TRI ratios.
+  // filtered set. Only the countable columns are summed — never the
+  // TVPI/MOIC/TRI ratios.
   const totals = useMemo(() => {
     if (!rows) return null
     let dealCount = 0
@@ -473,7 +457,7 @@ export function ParticipationsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {!pagedRows ? (
+            {!sortedRows ? (
               <TableRow>
                 <TableCell
                   colSpan={colSpan}
@@ -483,7 +467,7 @@ export function ParticipationsTable({
                 </TableCell>
               </TableRow>
             ) : (
-              pagedRows.map((r) => (
+              sortedRows.map((r) => (
                 <CompanyTableRow
                   key={`${r.companyId}:${r.settled}`}
                   row={r}
@@ -530,11 +514,6 @@ export function ParticipationsTable({
           )}
         </Table>
       </div>
-      <PaginationFooter
-        page={page}
-        pageCount={pageCount}
-        onPageChange={setPage}
-      />
     </div>
   )
 }
