@@ -16,6 +16,7 @@ import {
   dealStatusLabelKey,
 } from '~/lib/dealStatusBadge'
 import { Badge } from '~/components/ui/badge'
+import { cn } from '~/lib/utils'
 import {
   Table,
   TableBody,
@@ -24,15 +25,26 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
-import { cn } from '~/lib/utils'
 
 /**
  * Deals of ONE company, styled like the participations list (same row height,
- * 4px status accent bar in the left margin, whole-row click). One row = one
- * deal, clicking it opens the deal sheet. Feeds on the enriched `deals.list`
- * result the company page already loads — no extra query. Lists are short
- * (a handful of deals per company), so no sticky header / sort / pagination.
+ * whole-row click). The status reads on the 4px accent bar in the row's left
+ * margin (`dealStatusAccent` — amber TS, blue open, green/red exits); the
+ * badge itself stays signal-only (a neutral active deal is tracked through
+ * its reports). One row = one deal, clicking it opens the deal sheet. Feeds
+ * on the enriched `deals.list` result the company page already loads — no
+ * extra query. Lists are short (a handful of deals per company), so no
+ * sticky header / sort / pagination — only a fixed order: pending Term
+ * Sheets first (they need attention), then open positions, exits last.
  */
+const STATUS_ORDER: Record<string, number> = {
+  pending: 0,
+  active: 1,
+  partially_exited: 1,
+  fully_exited: 2,
+  written_off: 2,
+}
+
 export function CompanyDealsTable({
   deals,
   orgSlug,
@@ -41,6 +53,11 @@ export function CompanyDealsTable({
   orgSlug: string
 }) {
   const { t } = useTranslation('participations')
+  const ordered = [...deals].sort(
+    (a, b) =>
+      (STATUS_ORDER[a.status] ?? 1) - (STATUS_ORDER[b.status] ?? 1) ||
+      (b.signedDate ?? 0) - (a.signedDate ?? 0),
+  )
   return (
     <div className="rounded-lg border">
       <Table className="[&_td]:py-3">
@@ -57,7 +74,7 @@ export function CompanyDealsTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {deals.map((deal) => (
+          {ordered.map((deal) => (
             <CompanyDealRow key={deal._id} deal={deal} orgSlug={orgSlug} />
           ))}
         </TableBody>

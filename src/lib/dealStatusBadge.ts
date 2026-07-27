@@ -51,10 +51,10 @@ export function dealStatusBadge(
 }
 
 /**
- * Accent-bar colour for a participations row (the thin vertical bar in the
- * left margin of the table rows — it replaces the row badges). Same decision
- * tree as the badge, plus a blue "open position" state: unlike the badge, the
- * bar is a position marker on every row, not a signal-only overlay.
+ * Accent-bar colour for a deal row (the thin vertical bar in the left margin
+ * of the company sheet's deals table). Same decision tree as the badge, plus
+ * a blue "open position" state: unlike the badge, the bar is a position
+ * marker on every row, not a signal-only overlay.
  *   - pending (TS)               → amber (in progress, needs attention)
  *   - active / partially_exited  → blue  (position open)
  *   - fully_exited, moic ≥ 1     → green (exit win)
@@ -75,6 +75,31 @@ export function dealStatusAccent(
     return moic >= 1 ? 'bg-positive' : 'bg-destructive'
   }
   return 'bg-info'
+}
+
+/** Status buckets the participations list splits into (one table each). */
+export type ParticipationBucket = 'pending' | 'active' | 'exit_win' | 'exit_loss'
+
+/**
+ * Tinted section band above each participations table (it replaces the
+ * per-row accent bar): a softly tinted background + a solid status dot, on
+ * the same amber/blue/green/red palette as the badges. Colours live here
+ * only — never hardcode them at a call site.
+ */
+export function participationBucketBand(bucket: ParticipationBucket): {
+  band: string
+  dot: string
+} {
+  switch (bucket) {
+    case 'pending':
+      return { band: 'bg-warning/10', dot: 'bg-warning' }
+    case 'active':
+      return { band: 'bg-info/10', dot: 'bg-info' }
+    case 'exit_win':
+      return { band: 'bg-positive/10', dot: 'bg-positive' }
+    case 'exit_loss':
+      return { band: 'bg-destructive/10', dot: 'bg-destructive' }
+  }
 }
 
 /**

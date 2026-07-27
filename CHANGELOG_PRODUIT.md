@@ -23,6 +23,51 @@ bas de page.
 
 ---
 
+## v1.135.0 — 27/07/2026 à 19:21 — Un tableau par statut dans la liste des entreprises
+
+Le liseré coloré dans la marge des lignes n'était pas assez lisible : il
+disparaît, remplacé par un découpage de la liste en **un tableau par
+statut**, chacun coiffé d'un bandeau teinté (pastille, titre, compteur) :
+
+- **En cours (term sheet)** en ambre, tout en haut — et affiché uniquement
+  s'il y a des term sheets en cours. Ses colonnes montrent l'**engagé
+  prévisionnel** (rien n'est encore décaissé).
+- **Actives** en bleu : toutes les entreprises avec des deals actifs.
+- **Exit win** en vert et **Exit loss** en rouge, chacun avec MOIC et TRI.
+
+Chaque tableau garde sa **ligne de totaux** : la somme des exits gagnants
+et celle des pertes se lisent maintenant directement. La recherche et les
+filtres restent uniques en haut et s'appliquent à tous les tableaux ; le
+filtre « statut » disparaît, devenu redondant. Une société avec un term
+sheet **et** des deals actifs apparaît dans les deux tableaux, avec des
+sommes exactes de chaque côté.
+
+Sur la **fiche société**, le tableau des deals garde son **liseré coloré**
+dans la marge (ambre = term sheet, bleu = actif, vert = Exit win, rouge =
+Exit loss) — c'est lui qui distingue les statuts d'un coup d'œil — et les
+term sheets remontent en tête du tableau. Les badges de statut, eux, ne
+changent pas : un deal actif reste gris neutre, la couleur n'apparaît que
+quand elle signale quelque chose.
+
+> **🔧 Notes techniques**
+>
+> - `buildParticipationRows` (`convex/deals.ts`) : bucket `pending` dédié
+>   (clé société × pending/active/settled) + somme `committed` par ligne ;
+>   champs `hasPending`/`statuses` retirés de la projection (le tri
+>   pending-first et la facette statut n'existent plus).
+> - `ParticipationsView.tsx` : découpage en 4 sections (`SECTIONS`),
+>   bandeaux via `participationBucketBand()` (nouveau, dans
+>   `dealStatusBadge.ts` — source unique des couleurs, remplace
+>   `dealStatusAccent` supprimé) ; répartition win/loss au niveau du
+>   groupe (write-off ou MOIC < 1 → loss, MOIC inconnu jamais loss).
+> - `ParticipationsTable.tsx` : prop `variant` (`pending`/`active`/
+>   `settled`) — colonne Engagé et totaux dédiés pour les TS, liseré
+>   retiré des lignes.
+> - `dealStatusBadge()` inchangé (actif = gris neutre, signal-only) ;
+>   `dealStatusAccent` reste la source du liseré, désormais propre à
+>   `CompanyDealsTable.tsx`, qui trie TS → ouvertes → exits.
+> - Docs : TESTING.md (SH17–SH20, FE1b), docs/produit 04 + 05.
+
 ## v1.134.0 — 27/07/2026 à 18:55 — Le badge « Entreprise » disparaît de la fiche société
 
 L'en-tête de la fiche société ne porte plus la pastille bleue

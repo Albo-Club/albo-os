@@ -480,10 +480,6 @@
     "sectionTitle_one": "{{count}} entité sans deal",
     "sectionTitle_other": "{{count}} entités sans deal"
   },
-  "settled": {
-    "sectionTitle_one": "Exit ({{count}})",
-    "sectionTitle_other": "Exits ({{count}})"
-  },
   "empty": "Aucune entreprise pour ce scope — crée des deals via le chat IA, ou ajoute-les à la main.",
   "search": {
     "placeholder": "Rechercher par société, instrument, secteur…",
@@ -680,5 +676,11 @@
     "link": "Rattacher",
     "changeLink": "Modifier le rattachement",
     "notConnected": "Non connectée — brancher dans Réglages → Intégrations"
+  },
+  "sections": {
+    "pending": "En cours (term sheet)",
+    "active": "Actives",
+    "exitWin": "Exit win",
+    "exitLoss": "Exit loss"
   }
 }
