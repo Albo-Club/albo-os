@@ -27,7 +27,6 @@
   "allSubtitle": "Toutes tes organisations réunies — lecture seule. L'édition se fait dans une organisation.",
   "openDetail": "Ouvrir la fiche",
   "rowOpenAria": "Ouvrir la fiche de {{name}}",
-  "oneLinerExpand": "Voir le one-liner complet",
   "back": "← Entreprises",
   "notFound": "Société introuvable.",
   "info": {
@@ -58,8 +57,8 @@
   },
   "col": {
     "company": "Société",
+    "deal": "Deal",
     "org": "Org",
-    "oneLiner": "One-liner",
     "sector": "Secteur",
     "aiScore": "Score IA",
     "deals": "Deals",
@@ -135,7 +134,9 @@
     "active": "Actif",
     "partially_exited": "Exit partiel",
     "fully_exited": "Exité",
-    "written_off": "Déprécié"
+    "written_off": "Exit loss",
+    "exit_win": "Exit win",
+    "exit_loss": "Exit loss"
   },
   "exit": {
     "action": "Marquer comme sorti",
@@ -483,8 +484,8 @@
     "sectionTitle_other": "{{count}} entités sans deal"
   },
   "settled": {
-    "sectionTitle_one": "Participation soldée ({{count}})",
-    "sectionTitle_other": "Participations soldées ({{count}})"
+    "sectionTitle_one": "Exit ({{count}})",
+    "sectionTitle_other": "Exits ({{count}})"
   },
   "empty": "Aucune entreprise pour ce scope — crée des deals via le chat IA, ou ajoute-les à la main.",
   "search": {
@@ -493,6 +494,7 @@
   },
   "dealsCount_one": "{{count}} deal",
   "dealsCount_other": "{{count}} deals",
+  "totalsRow": "Total",
   "loading": "Chargement…",
   "plan": {
     "title": "Business plan vs réalisé",
@@ -585,8 +587,7 @@
   },
   "tabs": {
     "documents": "Documents",
-    "reports": "Reports",
-    "emails": "Emails"
+    "reports": "Reports"
   },
   "reports": {
     "title": "Reports investisseur",
@@ -630,37 +631,6 @@
       "viewDocs": "Voir les docs"
     }
   },
-  "emails": {
-    "title": "Emails liés",
-    "empty": "Aucun email lié à cette participation pour l'instant. Connectez une boîte Gmail dans Réglages → Intégrations.",
-    "noSubject": "(sans objet)",
-    "from": "De :",
-    "to": "À :",
-    "cc": "Cc :",
-    "sent": "Envoyé",
-    "received": "Reçu",
-    "receivedVia": "via {{mailbox}}",
-    "attachments": "Pièces jointes",
-    "aiMatched": "Rattaché par l'IA",
-    "page": {
-      "metaTitle": "Emails — Albo OS",
-      "title": "Emails",
-      "subtitleLoading": "Tous les emails rattachés aux participations de cette organisation.",
-      "subtitle": "Tous les emails rattachés aux participations de cette organisation — {{count}} stockés.",
-      "empty": "Aucun email pour l'instant. Les emails apparaissent ici dès qu'une boîte Gmail connectée à cette organisation reçoit ou envoie un message lié à une participation.",
-      "col": {
-        "date": "Date",
-        "subject": "Objet",
-        "from": "Expéditeur",
-        "companies": "Sociétés",
-        "mailboxes": "Boîte"
-      }
-    },
-    "extractReport": "Extraire le report",
-    "alreadyExtracted": "Déjà extrait",
-    "extractStarted": "Extraction lancée — le report apparaîtra dans l'onglet Rapports de la fiche (récap par email à la fin).",
-    "extractError": "Impossible de lancer l'extraction."
-  },
   "intelligence": {
     "status": {
       "processing": "Analyse en cours…",
@@ -677,6 +647,7 @@
   },
   "export": {
     "button": "Exporter CSV",
+    "error": "L'export a échoué. Réessayez.",
     "col": {
       "deal": "Nom du deal",
       "lastValuation": "Dernière valorisation"

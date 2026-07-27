@@ -18,6 +18,7 @@
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-positive: var(--positive);
+  --color-info: var(--info);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -75,6 +76,9 @@
   /* Monetary semantics: cash inflows / positive balances (green
      counterpart of --destructive for outflows). Value = emerald-600. */
   --positive: oklch(0.596 0.145 163.225);
+  /* Informative "open position" state (participations accent bar: active).
+     Blue sibling of --warning / --positive / --destructive. Value = sky-600. */
+  --info: oklch(0.588 0.158 241.966);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -115,6 +119,8 @@
   --warning-foreground: oklch(0.216 0 0);
   /* emerald-500 — brighter for contrast on a dark background. */
   --positive: oklch(0.696 0.17 162.48);
+  /* sky-500 — brighter for contrast on a dark background. */
+  --info: oklch(0.685 0.169 237.323);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);

@@ -97,10 +97,6 @@
     "neverSynced": "Never synced",
     "lastError": "Error: {{message}}",
     "platforms": {
-      "gmail": {
-        "name": "Gmail",
-        "description": "Portfolio email timeline: each Gmail mailbox is connected for this organization and polled every 10 minutes. An email linked to a participation (company domain among the participants) shows up on its page, Emails tab, with its attachments. Only linked emails are stored; the same mailbox can be connected in another organization separately."
-      },
       "powens": {
         "name": "Powens",
         "description": "Bank aggregation: accounts and transactions synced automatically. The bank connection happens in the secure Powens window."
@@ -133,8 +129,7 @@
       "reconnecting": "Redirecting…",
       "add": "Add",
       "sync": "Sync now",
-      "edit": "Edit connection",
-      "connectGmail": "Connect a Gmail mailbox"
+      "edit": "Edit connection"
     },
     "dialog": {
       "title": "Connect {{name}}",
@@ -162,9 +157,7 @@
       "disconnectError": "Couldn't disconnect.",
       "bankRedirectError": "Couldn't open the bank connection flow.",
       "synced": "Sync complete.",
-      "syncError": "Sync failed.",
-      "gmailNotConfigured": "Gmail is not configured yet: Google credentials missing server-side (GOOGLE_OAUTH_CLIENT_ID/SECRET).",
-      "gmailRedirectError": "Could not open the Gmail connection."
+      "syncError": "Sync failed."
     },
     "fieldHelp": {
       "vasco": {

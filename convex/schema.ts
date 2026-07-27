@@ -325,21 +325,12 @@ export default defineSchema({
     .index('by_link_code', ['linkCode']),
 
   /**
-   * gmailAccounts — one row per Gmail mailbox connected FOR ONE ORG (cf.
-   * convex/gmail.ts, OAuth flow modeled on Twenty CRM's messaging sync).
-   * Mailboxes are org-scoped: a connection made from an org only feeds that
-   * org's participations; the same personal mailbox serving two vehicles is
-   * TWO rows (one OAuth grant each) — strict tenant separation, like Powens.
-   * `orgId` is optional ONLY to let the pre-separation legacy rows (global
-   * mailboxes, shipped 21/07/2026, zero synced data) pass schema validation:
-   * the sync cron deletes any row without `orgId`; narrow to required once
-   * prod is clean (widen-migrate-narrow).
-   * `historyId` is the Gmail incremental-sync cursor (users.history.list);
-   * it only advances after a successful sync and is reset from the profile
-   * when Google reports it expired.
-   * INTERNAL: `refreshToken` is secret at rest — rows are read/written only
-   * by internal functions; public views are sanitized (same rule as
-   * `powensUsers`).
+   * gmailAccounts — LEGACY, declared but inert. Belonged to the retired
+   * emails feature (Gmail-synced portfolio email timeline); the whole
+   * browsing/sync surface was removed to be rethought later. Kept declared
+   * with its data until the purge-then-narrow cleanup (same convention as
+   * the legacy `forecasts` table). Read by nothing.
+   * `refreshToken` remains secret at rest — never expose rows publicly.
    */
   gmailAccounts: defineTable({
     orgId: v.optional(v.id('organizations')), // org fed by this mailbox
@@ -365,11 +356,9 @@ export default defineSchema({
     .index('by_user', ['userId']),
 
   /**
-   * gmailOAuthStates — short-lived anti-CSRF `state` tokens of the Gmail
-   * OAuth flow (created by `gmail.startConnect`, consumed once by the
-   * /gmail/oauth/callback HTTP route, expired after 15 min). `orgId` is the
-   * org the connection is being made for (optional for the same legacy
-   * reason as `gmailAccounts`; a state without it is treated as expired).
+   * gmailOAuthStates — LEGACY, declared but inert (retired emails feature,
+   * same convention as `gmailAccounts`). Short-lived anti-CSRF tokens of the
+   * removed Gmail OAuth flow. Read by nothing.
    */
   gmailOAuthStates: defineTable({
     orgId: v.optional(v.id('organizations')),
@@ -1046,18 +1035,12 @@ export default defineSchema({
     .index('by_status', ['status']),
 
   /**
-   * companyEmails — the portfolio email timeline (cf. convex/gmail.ts).
-   * One row per MESSAGE, deduplicated across mailboxes by the RFC
-   * `Message-ID` header (Twenty CRM's design: a mail seen by N connected
-   * boxes = 1 row, `accountEmails` lists the boxes that saw it). Only
-   * messages matched to ≥1 portfolio company are stored — unmatched mail
-   * never enters the database. No `orgId` here: the org link lives on
-   * `companyEmailLinks` (each link created by the matching of an org-scoped
-   * mailbox — reads are always guarded through the link's org).
-   * The message is stored IN FULL for later re-processing (étape 2 —
-   * report extraction): cleaned text with `<a href>` URLs preserved,
-   * attachments downloaded into Convex storage, and the Gmail reference
-   * (`gmailMessageId` + source mailbox) as a re-fetch safety net.
+   * companyEmails — LEGACY, declared but inert (retired emails feature).
+   * Was the portfolio email timeline: one row per message, deduplicated
+   * across mailboxes by the RFC `Message-ID` header, stored in full with
+   * attachments in Convex storage. Kept declared with its data until the
+   * purge-then-narrow cleanup (same convention as the legacy `forecasts`
+   * table). Read by nothing.
    */
   companyEmails: defineTable({
     headerMessageId: v.string(), // RFC Message-ID — dedup key
@@ -1088,9 +1071,9 @@ export default defineSchema({
   }).index('by_header_message_id', ['headerMessageId']),
 
   /**
-   * companyEmailLinks — join table email ↔ matched company (one row per
-   * company per email; `sentAt` denormalized for the per-company timeline
-   * ordering). Access control happens through the company's org.
+   * companyEmailLinks — LEGACY, declared but inert (retired emails feature,
+   * same convention as `companyEmails`). Join table email ↔ matched company.
+   * Read by nothing.
    */
   companyEmailLinks: defineTable({
     companyId: v.id('companies'),

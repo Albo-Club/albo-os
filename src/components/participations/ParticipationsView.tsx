@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Download, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { tvpi as tvpiRatio } from '../../../convex/lib/metrics'
 import { ParticipationsTable, residualCents } from './ParticipationsTable'
 import { FacetFilter } from './FacetFilter'
 import type { RefObject } from 'react'
 
 import type { FacetOption } from './FacetFilter'
-import type { DealRow } from './ParticipationsTable'
+import type { CompanyRow, DealRow } from './ParticipationsTable'
+import { dealStatusLabelKey } from '~/lib/dealStatusBadge'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
@@ -15,36 +17,43 @@ import { downloadCsv, toCsv } from '~/lib/csv'
 import { normalizeSearch } from '~/lib/searchText'
 
 /**
- * Stacks two participation tables sharing ONE toolbar: the active deals on top
- * and an always-open section for settled deals (fully_exited / written_off)
- * below. The split on `status` is the only partitioning rule —
- * `partially_exited` stays with the active deals.
+ * Stacks two participation tables sharing ONE toolbar: the companies with
+ * active deals on top and an always-open section for the settled bucket
+ * (fully_exited / written_off) below. The split is made server-side
+ * (`CompanyRow.settled`) — `partially_exited` stays with the active rows.
  *
- * Search + facet filters live here and apply to BOTH tables at once; the
- * settled table drops TVPI and adds a MOIC + annualized TRI column. Export
- * covers the full, unsplit set (active + settled) regardless of the filters.
+ * The rows arrive pre-aggregated from the server projection
+ * (deals.listParticipations / aggregate.listParticipations); search + facet
+ * filters run here on the lightweight rows and apply to BOTH tables at once
+ * (a row matches an instrument/status facet when ANY of its deals carries the
+ * value — the row's sums always cover the whole company bucket). Export
+ * covers the full per-deal set, fetched one-shot via `loadExportDeals`,
+ * regardless of the filters.
  */
 export function ParticipationsView({
-  deals,
+  rows,
   showOrg = false,
   orgSlug,
   exportRef,
+  loadExportDeals,
 }: {
-  deals: Array<DealRow> | undefined
+  rows: Array<CompanyRow> | undefined
   showOrg?: boolean
   orgSlug?: string
   exportRef?: RefObject<(() => void) | null>
+  /** One-shot fetch of the full per-deal set feeding the CSV export. */
+  loadExportDeals?: () => Promise<Array<DealRow>>
 }) {
   const { t } = useTranslation('participations')
 
-  // Client-side search (low volumes): company name, custom deal name,
-  // instrument (raw key + translated label), investor, sector —
+  // Client-side search (low volumes): company name, custom deal names,
+  // instrument (raw key + translated label), investors, sector —
   // case/accent insensitive.
   const [search, setSearch] = useState('')
   const term = normalizeSearch(useDebouncedValue(search))
 
-  // Faceted filters (multi-select), applied at the deal level alongside the
-  // search, before the split into active / settled.
+  // Faceted filters (multi-select), applied at the row (company) level
+  // alongside the search, before the split into active / settled.
   const [instrumentFilter, setInstrumentFilter] = useState<Set<string>>(
     new Set(),
   )
@@ -67,25 +76,26 @@ export function ParticipationsView({
     setSectorFilter(new Set())
   }
 
-  // Facet options derived from the full deal set (not the filtered one, so
+  // Facet options derived from the full row set (not the filtered one, so
   // options never vanish mid-selection), localized and sorted by label.
   const facets = useMemo(() => {
     const instruments = new Map<string, string>()
     const statuses = new Map<string, string>()
     const sectors = new Map<string, string>()
-    for (const d of deals ?? []) {
-      instruments.set(
-        d.instrumentKind,
-        t(`instrument.${d.instrumentKind}`, { defaultValue: d.instrumentKind }),
-      )
-      statuses.set(
-        d.status,
-        t(`status.${d.status}`, { defaultValue: d.status }),
-      )
-      if (d.target?.sector) {
+    for (const r of rows ?? []) {
+      for (const kind of r.instrumentKinds) {
+        instruments.set(
+          kind,
+          t(`instrument.${kind}`, { defaultValue: kind }),
+        )
+      }
+      for (const status of r.statuses) {
+        statuses.set(status, t(`status.${status}`, { defaultValue: status }))
+      }
+      if (r.sector) {
         sectors.set(
-          d.target.sector,
-          t(`sectors.${d.target.sector}`, { defaultValue: d.target.sector }),
+          r.sector,
+          t(`sectors.${r.sector}`, { defaultValue: r.sector }),
         )
       }
     }
@@ -98,59 +108,69 @@ export function ParticipationsView({
       statuses: toOptions(statuses),
       sectors: toOptions(sectors),
     }
-  }, [deals, t])
+  }, [rows, t])
 
   const filtered = useMemo(() => {
-    if (!deals) return deals
-    if (!term && !hasFilters) return deals
-    return deals.filter((d) => {
+    if (!rows) return rows
+    if (!term && !hasFilters) return rows
+    return rows.filter((r) => {
       const matchesSearch =
         !term ||
         [
-          d.target?.name,
-          d.name,
-          d.target?.sector,
-          d.target?.sector &&
-            t(`sectors.${d.target.sector}`, {
-              defaultValue: d.target.sector,
-            }),
-          d.investor?.name,
-          d.instrumentKind,
-          t(`instrument.${d.instrumentKind}`, {
-            defaultValue: d.instrumentKind,
-          }),
+          r.name,
+          ...r.dealNames,
+          r.sector,
+          r.sector && t(`sectors.${r.sector}`, { defaultValue: r.sector }),
+          ...r.investorNames,
+          ...r.instrumentKinds,
+          ...r.instrumentKinds.map((kind) =>
+            t(`instrument.${kind}`, { defaultValue: kind }),
+          ),
         ].some((s) => s && normalizeSearch(s).includes(term))
       if (!matchesSearch) return false
-      if (instrumentFilter.size > 0 && !instrumentFilter.has(d.instrumentKind))
+      if (
+        instrumentFilter.size > 0 &&
+        !r.instrumentKinds.some((kind) => instrumentFilter.has(kind))
+      )
         return false
-      if (statusFilter.size > 0 && !statusFilter.has(d.status)) return false
+      if (
+        statusFilter.size > 0 &&
+        !r.statuses.some((status) => statusFilter.has(status))
+      )
+        return false
       if (
         sectorFilter.size > 0 &&
-        !(d.target?.sector != null && sectorFilter.has(d.target.sector))
+        !(r.sector != null && sectorFilter.has(r.sector))
       )
         return false
       return true
     })
-  }, [deals, term, t, instrumentFilter, statusFilter, sectorFilter, hasFilters])
+  }, [rows, term, t, instrumentFilter, statusFilter, sectorFilter, hasFilters])
 
   const { active, settled } = useMemo(() => {
     if (!filtered) return { active: undefined, settled: undefined }
-    const activeDeals: Array<DealRow> = []
-    const settledDeals: Array<DealRow> = []
-    for (const d of filtered) {
-      if (d.status === 'fully_exited' || d.status === 'written_off') {
-        settledDeals.push(d)
-      } else {
-        activeDeals.push(d)
-      }
+    const activeRows: Array<CompanyRow> = []
+    const settledRows: Array<CompanyRow> = []
+    for (const r of filtered) {
+      if (r.settled) settledRows.push(r)
+      else activeRows.push(r)
     }
-    return { active: activeDeals, settled: settledDeals }
+    return { active: activeRows, settled: settledRows }
   }, [filtered])
 
   // CSV export, flat (one deal per row). Always covers the full, unsplit deal
-  // set (active + settled), independent of the current search / filters.
-  function handleExport() {
-    if (!deals) return
+  // set (active + settled), independent of the current search / filters. The
+  // per-deal data is NOT subscribed by this view anymore (the tables run on
+  // the aggregated rows), so it's fetched one-shot on demand.
+  async function handleExport() {
+    if (!loadExportDeals) return
+    let deals: Array<DealRow>
+    try {
+      deals = await loadExportDeals()
+    } catch {
+      toast.error(t('export.error'))
+      return
+    }
     const headers = [
       t('col.company'),
       t('export.col.deal'),
@@ -168,7 +188,7 @@ export function ParticipationsView({
     ]
     const euros = (cents?: number | null) =>
       cents == null ? null : (cents / 100).toFixed(2)
-    const rows = deals.map((d) => {
+    const csvRows = deals.map((d) => {
       const tvpi = tvpiRatio({
         capital: d.paidActual ?? 0,
         proceeds: d.received ?? 0,
@@ -181,7 +201,9 @@ export function ParticipationsView({
           defaultValue: d.instrumentKind,
         }),
         d.investor?.name ?? '',
-        t(`status.${d.status}`, { defaultValue: d.status }),
+        t(`status.${dealStatusLabelKey(d.status, d.moic)}`, {
+          defaultValue: d.status,
+        }),
         euros(d.committedAmount),
         euros(d.paidActual ?? 0),
         euros(d.received ?? 0),
@@ -196,7 +218,7 @@ export function ParticipationsView({
       ]
     })
     const day = new Date().toISOString().slice(0, 10)
-    downloadCsv(`participations-${day}.csv`, toCsv(headers, rows))
+    downloadCsv(`participations-${day}.csv`, toCsv(headers, csvRows))
   }
 
   // Expose the export handler to a parent (header menu) when asked. No deps:
@@ -215,10 +237,10 @@ export function ParticipationsView({
     [...sectorFilter].sort().join(','),
   ].join('|')
 
-  // Toolbar shown as soon as there are deals — including when the current
+  // Toolbar shown as soon as there are rows — including when the current
   // search matches nothing (otherwise it can't be cleared). A facet is only
   // worth showing when it can actually partition the data (≥2 distinct values).
-  const showToolbar = deals && deals.length > 0
+  const showToolbar = rows && rows.length > 0
 
   return (
     <div className="space-y-6">
@@ -266,11 +288,11 @@ export function ParticipationsView({
               <X className="size-4" />
             </Button>
           )}
-          {!exportRef && (
+          {!exportRef && loadExportDeals && (
             <Button
               variant="outline"
               size="sm"
-              onClick={handleExport}
+              onClick={() => void handleExport()}
               className="ml-auto"
             >
               <Download className="size-4" />
@@ -281,7 +303,7 @@ export function ParticipationsView({
       )}
 
       <ParticipationsTable
-        deals={active}
+        rows={active}
         showOrg={showOrg}
         orgSlug={orgSlug}
         isFiltered={isFiltered}
@@ -294,7 +316,7 @@ export function ParticipationsView({
             {t('settled.sectionTitle', { count: settled.length })}
           </h3>
           <ParticipationsTable
-            deals={settled}
+            rows={settled}
             showOrg={showOrg}
             orgSlug={orgSlug}
             settled
