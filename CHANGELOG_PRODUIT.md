@@ -23,6 +23,27 @@ bas de page.
 
 ---
 
+## v1.134.0 — 27/07/2026 à 18:55 — Le badge « Entreprise » disparaît de la fiche société
+
+L'en-tête de la fiche société ne porte plus la pastille bleue
+« Entreprise » à côté du nom : elle ne disait rien qu'on ne sache déjà en
+arrivant sur la page.
+
+- **L'en-tête se lit plus vite** : logo, nom, puis le % de détention et le
+  menu d'actions. Rien d'autre ne bouge.
+
+> **🔧 Notes techniques**
+>
+> - `participations.$companyId.tsx` : suppression du `EntityNatureBadge`
+>   dans l'en-tête sticky + import orphelin.
+> - `EntityFiche.tsx` : le composant `EntityNatureBadge` et le type
+>   `EntityNature` n'ayant plus d'appelant sont retirés, avec l'import
+>   `Badge` devenu inutile.
+> - i18n : clés `participations:nature.*` supprimées (fr + en).
+> - Docs : `TESTING.md` FE1 + intro « Fiche société » et
+>   `docs/produit/04-participations.md` ne mentionnent plus la nature dans
+>   l'en-tête.
+
 ## v1.133.0 — 27/07/2026 à 18:47 — Thème et langue passent dans Mon compte
 
 Le pied de la barre latérale ne porte plus les réglages d'affichage : il ne

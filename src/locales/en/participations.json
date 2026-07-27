@@ -116,9 +116,6 @@
     "board": "Board",
     "coinvestor": "Co-investor"
   },
-  "nature": {
-    "company": "Company"
-  },
   "identity": {
     "title": "Identity",
     "attio": "Attio record",
