@@ -42,11 +42,12 @@ filtre « statut » disparaît, devenu redondant. Une société avec un term
 sheet **et** des deals actifs apparaît dans les deux tableaux, avec des
 sommes exactes de chaque côté.
 
-Sur la **fiche société**, même ménage : plus de liseré dans la marge du
-tableau des deals — le statut se lit sur le **badge coloré** (ambre = term
-sheet, **bleu = actif**, vert = Exit win, rouge = Exit loss), et les term
-sheets remontent en tête du tableau. Le badge bleu « position ouverte »
-s'applique partout, fiche deal comprise.
+Sur la **fiche société**, le tableau des deals garde son **liseré coloré**
+dans la marge (ambre = term sheet, bleu = actif, vert = Exit win, rouge =
+Exit loss) — c'est lui qui distingue les statuts d'un coup d'œil — et les
+term sheets remontent en tête du tableau. Les badges de statut, eux, ne
+changent pas : un deal actif reste gris neutre, la couleur n'apparaît que
+quand elle signale quelque chose.
 
 > **🔧 Notes techniques**
 >
@@ -62,9 +63,9 @@ s'applique partout, fiche deal comprise.
 > - `ParticipationsTable.tsx` : prop `variant` (`pending`/`active`/
 >   `settled`) — colonne Engagé et totaux dédiés pour les TS, liseré
 >   retiré des lignes.
-> - `dealStatusBadge()` : un deal actif porte désormais la teinte **info**
->   (bleu) au lieu du gris neutre ; `CompanyDealsTable.tsx` trie TS →
->   ouvertes → exits et perd son liseré.
+> - `dealStatusBadge()` inchangé (actif = gris neutre, signal-only) ;
+>   `dealStatusAccent` reste la source du liseré, désormais propre à
+>   `CompanyDealsTable.tsx`, qui trie TS → ouvertes → exits.
 > - Docs : TESTING.md (SH17–SH20, FE1b), docs/produit 04 + 05.
 
 ## v1.134.0 — 27/07/2026 à 18:55 — Le badge « Entreprise » disparaît de la fiche société

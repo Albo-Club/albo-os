@@ -55,9 +55,10 @@ La colonne principale, dans l'ordre de lecture :
   est régénérée automatiquement à chaque rapport ingéré, et peut être
   relancée à la main.
 - **Deals de la société** : un tableau au même style que la liste des
-  participations (badge de statut coloré — ambre term sheet, bleu actif,
-  vert Exit win, rouge Exit loss —, date de signature, investi, reçu,
-  TVPI), les term sheets en premier, chaque **ligne cliquable** vers la
+  participations (liseré de statut dans la marge de chaque ligne — ambre
+  term sheet, bleu actif, vert Exit win, rouge Exit loss —, date de
+  signature, investi, reçu, TVPI), les term sheets en premier, chaque
+  **ligne cliquable** vers la
   [fiche deal](05-deals.md) — c'est le seul chemin d'accès aux deals. Un
   deal se crée depuis cette fiche (menu ⋯) ; le formulaire propose
   d'emblée **tous les champs de l'instrument** choisi (montant, dates dont

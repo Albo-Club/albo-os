@@ -10,10 +10,9 @@
  *   - written_off               → red     (loss booked, whatever the moic)
  *   - partially_exited, moic ≥ 1 → green  (realized gain on a still-open
  *                                          position; win-only — a MOIC < 1 is
- *                                          not a loss yet, so it stays blue)
- *   - active / other            → blue    (open position — the status palette
- *                                          amber/blue/green/red is shared with
- *                                          the participations section bands)
+ *                                          not a loss yet, so it stays neutral)
+ *   - active / other            → neutral (no signal — active deals are tracked
+ *                                          through their reports, not a colour)
  *
  * `moic` is the realized multiple — `DealRow.moic` (server-side) in the lists,
  * or `dealMoic(deal, txs).moic` on the deal sheet. Null/undefined ⇒ not
@@ -29,7 +28,6 @@ export type DealBadgeVisual = {
 const WIN = 'border-positive/40 bg-positive/10 text-positive'
 const LOST = 'border-destructive/40 bg-destructive/10 text-destructive'
 const PENDING = 'bg-warning text-warning-foreground'
-const OPEN = 'border-info/40 bg-info/10 text-info'
 
 export function dealStatusBadge(
   status: string,
@@ -48,8 +46,35 @@ export function dealStatusBadge(
   if (status === 'partially_exited' && moic != null && moic >= 1) {
     return { variant: 'outline', className: WIN }
   }
-  // active, and partial exits not yet in the green: blue open-position tint.
-  return { variant: 'outline', className: OPEN }
+  // active, and partial exits not yet in the green: neutral.
+  return { variant: 'secondary' }
+}
+
+/**
+ * Accent-bar colour for a deal row (the thin vertical bar in the left margin
+ * of the company sheet's deals table). Same decision tree as the badge, plus
+ * a blue "open position" state: unlike the badge, the bar is a position
+ * marker on every row, not a signal-only overlay.
+ *   - pending (TS)               → amber (in progress, needs attention)
+ *   - active / partially_exited  → blue  (position open)
+ *   - fully_exited, moic ≥ 1     → green (exit win)
+ *   - fully_exited, moic < 1     → red   (exit loss)
+ *   - written_off                → red
+ * Returns a background utility on the shared tokens — never hardcode these
+ * colours at a call site.
+ */
+export function dealStatusAccent(
+  status: string,
+  moic?: number | null,
+): string {
+  if (status === 'pending') return 'bg-warning'
+  if (status === 'written_off') return 'bg-destructive'
+  if (status === 'fully_exited') {
+    // Unknown outcome (no capital deployed): neutral, never a loss.
+    if (moic == null) return 'bg-muted-foreground/40'
+    return moic >= 1 ? 'bg-positive' : 'bg-destructive'
+  }
+  return 'bg-info'
 }
 
 /** Status buckets the participations list splits into (one table each). */
