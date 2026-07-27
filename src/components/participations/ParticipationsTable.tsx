@@ -131,8 +131,12 @@ const COL_WIDTHS = {
   amount: 152,
   /** TVPI or MOIC, then TRI. */
   ratio: 80,
-  /** Driven by the longest sector badge, "Marketplace / E-commerce" (195px). */
-  sector: 208,
+  /**
+   * Narrower than the longest sector badge on purpose: the four longest labels
+   * ("Marketplace / E-commerce" and friends) wrap onto two lines inside the
+   * badge rather than holding 48px hostage for every row.
+   */
+  sector: 160,
 } as const
 const COMPANY_MIN_WIDTH = 240
 
@@ -710,7 +714,9 @@ function CompanyTableRow({
       )}
       <TableCell>
         {row.sector ? (
-          <Badge variant="outline">
+          // The badge is nowrap by default: long sector labels have to wrap
+          // inside it to fit the narrowed column (see COL_WIDTHS.sector).
+          <Badge variant="outline" className="whitespace-normal text-center">
             {t(`sectors.${row.sector}`, { defaultValue: row.sector })}
           </Badge>
         ) : (
