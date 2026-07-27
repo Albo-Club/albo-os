@@ -23,6 +23,21 @@ bas de page.
 
 ---
 
+## v1.135.1 — 27/07/2026 à 19:37 — « Actifs », et des compteurs en deals
+
+Le tableau des participations actives s'appelle désormais **« Actifs »**
+(et non « Actives »), et le compteur de chaque bandeau compte maintenant
+les **deals** — la même unité et le même nombre que la ligne de totaux du
+tableau (« Actifs (48 deals) »). Il comptait les lignes (sociétés), d'où
+un « 44 » en haut face à un « 48 deals » en bas qui semblait incohérent.
+
+> **🔧 Notes techniques**
+>
+> - Bandeau (`ParticipationsView.tsx`) : compteur = somme des `dealCount`
+>   des lignes du bucket, rendu via la clé existante `dealsCount` ;
+>   `sections.active` renommé « Actifs » (fr).
+> - TESTING.md (SH19/SH20) et `docs/produit/04-participations.md` alignés.
+
 ## v1.135.0 — 27/07/2026 à 19:21 — Un tableau par statut dans la liste des entreprises
 
 Le liseré coloré dans la marge des lignes n'était pas assez lisible : il
