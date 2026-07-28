@@ -23,6 +23,34 @@ bas de page.
 
 ---
 
+## v1.139.1 — 27/07/2026 à 23:25 — Les badges de secteur tiennent tous sur une ligne
+
+Dans la liste Entreprises, le secteur « Marketplace / E-commerce » était le
+seul libellé trop long pour sa colonne : sa pastille passait sur deux lignes
+et dépassait en hauteur toutes les autres, ce qui donnait une colonne
+irrégulière. Le libellé devient simplement **« Marketplace »** et tous les
+badges de secteur s'alignent désormais sur une seule ligne, à la même
+hauteur.
+
+> **🔧 Notes techniques**
+>
+> - `src/locales/{fr,en}/participations.json` : clé `sectors.marketplace`
+>   raccourcie en « Marketplace » (le seul libellé qui débordait — mesuré à
+>   143 px pour ~126 px de texte disponible dans le badge, police de
+>   fallback Arial/Liberation Sans 12 px ; les trois suivants —
+>   « Fonds / Private equity » 116 px, « Consumer / Marques » 112 px,
+>   « Industrie / DeepTech » 111 px — tenaient déjà).
+> - `ParticipationsTable.tsx` : le badge de secteur perd
+>   `whitespace-normal text-center` et revient au `whitespace-nowrap` natif
+>   du composant `Badge`. Largeur de colonne `COL_WIDTHS.sector` inchangée
+>   (160 px) ; son commentaire, qui annonçait à tort quatre libellés sur
+>   deux lignes, est corrigé.
+> - `TESTING.md` SH19c mis à jour : le scénario pointe désormais
+>   « Fonds / Private equity » (nouveau libellé le plus long) et attend des
+>   badges tous sur une ligne.
+
+---
+
 ## v1.139.0 — 27/07/2026 à 23:02 — Les documents d'un deal se rangent sur le deal
 
 La fiche deal a enfin son bloc **Documents**, juste sous les Transactions —
