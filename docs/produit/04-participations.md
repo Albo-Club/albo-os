@@ -94,16 +94,24 @@ La colonne principale, dans l'ordre de lecture :
   investissement (term sheet, pacte, bulletin de souscription…) ne se
   rangent pas ici mais sur la [fiche du deal concerné](05-deals.md).
 
-Le panneau d'identité, à droite :
+Le panneau d'identité, à droite. Il se présente comme une carte, au même
+style que la synthèse IA, et chaque section y est introduite par une petite
+pastille carrée portant son icône :
 
 - **Identité** : secteur, SIREN (affiché par groupes de trois chiffres),
   domaine — éditables en ligne (clic sur la valeur) — plus le % de
-  détention, le nombre d'actions consolidé, un lien « Ouvrir dans Attio »
-  quand la société est liée au CRM, et le **résumé** de la société,
-  intégré à la fiche avec son propre libellé et le texte justifié.
-- **Personnes** : fondateurs, board, co-investisseurs — avec lien vers la
-  fiche Attio quand la personne y est rattachée. L'édition passe par le
-  dialogue Éditer, qui propose une recherche dans les personnes Attio.
+  détention, le nombre d'actions consolidé et un lien « Ouvrir dans Attio »
+  quand la société est liée au CRM. Les champs se lisent en lignes —
+  libellé à gauche, valeur à droite, séparés par un filet fin — de sorte
+  que même les libellés longs tiennent sur une seule ligne dans la
+  largeur du panneau.
+- **Résumé** : le résumé de la société, dans sa propre section, aligné à
+  gauche.
+- **Personnes** : fondateurs, board, co-investisseurs — chacun en pastille
+  avec ses initiales, et un compteur sur la section quand la liste n'est
+  pas vide ; lien vers la fiche Attio quand la personne y est rattachée.
+  L'édition passe par le dialogue Éditer, qui propose une recherche dans
+  les personnes Attio.
 
 ### La lecture des documents
 
