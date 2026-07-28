@@ -547,6 +547,11 @@
       "size": "Size",
       "date": "Added"
     },
+    "group": {
+      "reporting": "Reporting & tracking",
+      "legal": "Legal",
+      "other": "Other"
+    },
     "kind": {
       "reporting": "Reporting",
       "bp": "Business plan",

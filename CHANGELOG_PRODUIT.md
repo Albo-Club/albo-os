@@ -23,6 +23,37 @@ bas de page.
 
 ---
 
+## v1.140.0 — 28/07/2026 à 14:57 — Les documents d'une société se rangent en juridique et en reporting
+
+Sur la fiche d'une société, l'onglet **Documents** mélangeait deux familles
+qui n'ont rien à voir : ce que la boîte nous envoie (reportings, business
+plans) et ce qui engage l'entité (statuts, pactes, KBIS…). Ils sont
+maintenant séparés en blocs repliables — **Reporting & suivi**, **Juridique
+& légal**, et **Autres** — chacun avec son nombre de documents dans le
+titre. Tout est déplié à l'ouverture : on replie ce qu'on ne veut pas voir,
+rien n'est masqué par surprise. Un bloc sans document ne s'affiche pas.
+
+Rien ne change à l'ajout d'un document (les types proposés sont les mêmes),
+ni sur la fiche d'un deal, où la question ne se pose pas : on n'y trouve que
+des documents liés à l'investissement.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/ReportingsSection.tsx` : le tableau plat est
+>   remplacé par une liste de groupes `Collapsible` (`ui/collapsible`),
+>   pilotés par une constante `GROUPS` (`reporting` = `reporting` + `bp`,
+>   `legal` = `legal`, `other` = tout le reste, y compris les kinds deal que
+>   le schéma accepte aussi). Le rendu d'un groupe est extrait dans un
+>   composant local `DocumentGroup` (ouvert par défaut) ; un groupe vide
+>   n'est pas rendu, l'état vide global est inchangé.
+> - `src/locales/{fr,en}/participations.json` : nouvelles clés
+>   `reportings.group.{reporting,legal,other}`.
+> - Aucun changement de modèle ni de migration : les quatre `kind` existent
+>   déjà en base, seul le regroupement d'affichage est nouveau.
+> - `DealDocumentsSection` n'est pas touché.
+
+---
+
 ## v1.139.2 — 28/07/2026 à 09:35 — Les onglets Reports / Documents adoptent le style du reste de l'app
 
 Sur la fiche d'une participation, les onglets **Reports** et **Documents**
