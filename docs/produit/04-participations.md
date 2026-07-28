@@ -89,7 +89,8 @@ La colonne principale, dans l'ordre de lecture :
   sont rangés en blocs dépliables — « Reporting & suivi » (reportings et
   business plans), « Juridique & légal » (statuts, pactes, KBIS…) et
   « Autres » — dépliés par défaut, chaque titre portant son nombre de
-  documents ; un bloc vide n'apparaît pas. Les documents propres à un
+  documents ; un bloc vide n'apparaît pas. Chaque document affiche l'état
+  de sa **lecture** (voir ci-dessous). Les documents propres à un
   investissement (term sheet, pacte, bulletin de souscription…) ne se
   rangent pas ici mais sur la [fiche du deal concerné](05-deals.md).
 
@@ -103,6 +104,32 @@ Le panneau d'identité, à droite :
 - **Personnes** : fondateurs, board, co-investisseurs — avec lien vers la
   fiche Attio quand la personne y est rattachée. L'édition passe par le
   dialogue Éditer, qui propose une recherche dans les personnes Attio.
+
+### La lecture des documents
+
+Tout document qui entre — qu'il soit déposé à la main ici ou arrivé par un
+[report transféré par email](17-reports-par-email.md) — est **lu
+automatiquement** : PDF et images par OCR, Excel et CSV cellule par cellule.
+La colonne « Lecture » dit où il en est :
+
+| Ce que tu vois | Ce que ça veut dire |
+| --- | --- |
+| « Lecture en cours… » | Le document vient d'arriver, la lecture tourne |
+| « 12 400 car. » | Lu — clique pour relire le texte extrait |
+| ⚠️ avec une cause | La lecture a échoué (fichier illisible, protégé…) — le bouton ↻ relance |
+| « Petite image ignorée », « Format non lu » | Rien à lire, c'est normal (logo, format non géré) |
+| « Analyser » | Document déposé avant cette fonctionnalité — le bouton lance sa lecture |
+
+Le texte extrait s'ouvre en un clic : c'est ce qui permet de **vérifier ce
+que la machine a réellement lu** avant de faire confiance aux métriques
+qu'elle en a tirées. Un texte très court sur un document épais est le signe
+d'un scan de mauvaise qualité.
+
+> Un document très long est tronqué à 900 000 caractères (~350 pages) ; la
+> fenêtre le dit explicitement.
+
+Les documents rangés sur une [fiche deal](05-deals.md) suivent exactement le
+même circuit et affichent la même colonne.
 
 ### Sous le capot : l'enrichissement automatique
 

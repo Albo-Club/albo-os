@@ -7,6 +7,10 @@ import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+import {
+  ExtractedTextDialog,
+  OcrStatus,
+} from '~/components/documents/DocumentReading'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { Button } from '~/components/ui/button'
 import {
@@ -81,6 +85,7 @@ export function DealDocumentsSection({
   const [docDate, setDocDate] = useState('') // "YYYY-MM-DD"
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<Id<'documents'> | null>(null)
+  const [textDocId, setTextDocId] = useState<Id<'documents'> | null>(null)
 
   function handlePick(file: File) {
     if (file.size > MAX_BYTES) {
@@ -208,6 +213,9 @@ export function DealDocumentsSection({
                 <TableHead>
                   {t('participations:dealDocuments.col.added')}
                 </TableHead>
+                <TableHead>
+                  {t('participations:documentReading.column')}
+                </TableHead>
                 <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
@@ -225,6 +233,15 @@ export function DealDocumentsSection({
                   </TableCell>
                   <TableCell>{formatSize(doc.size)}</TableCell>
                   <TableCell>{fmtDate(doc.uploadedAt)}</TableCell>
+                  <TableCell>
+                    <OcrStatus
+                      documentId={doc._id}
+                      state={doc.ocrState}
+                      detail={doc.ocrDetail}
+                      chars={doc.ocrChars}
+                      onOpen={() => setTextDocId(doc._id)}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
                       {doc.url && (
@@ -358,6 +375,11 @@ export function DealDocumentsSection({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ExtractedTextDialog
+        documentId={textDocId}
+        title={docs?.find((d) => d._id === textDocId)?.title ?? ''}
+        onClose={() => setTextDocId(null)}
+      />
     </section>
   )
 }

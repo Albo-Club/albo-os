@@ -8,6 +8,10 @@ import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { FunctionReturnType } from 'convex/server'
 import type { Id } from '../../../convex/_generated/dataModel'
+import {
+  ExtractedTextDialog,
+  OcrStatus,
+} from '~/components/documents/DocumentReading'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { Button } from '~/components/ui/button'
 import {
@@ -70,10 +74,12 @@ function DocumentGroup({
   label,
   docs,
   onDelete,
+  onOpenText,
 }: {
   label: string
   docs: Array<CompanyDoc>
   onDelete: (id: Id<'documents'>) => void
+  onOpenText: (id: Id<'documents'>) => void
 }) {
   const { t } = useTranslation(['participations', 'common'])
   const { fmtDate } = useFormatters()
@@ -103,6 +109,7 @@ function DocumentGroup({
               <TableHead>{t('participations:reportings.col.period')}</TableHead>
               <TableHead>{t('participations:reportings.col.size')}</TableHead>
               <TableHead>{t('participations:reportings.col.date')}</TableHead>
+              <TableHead>{t('participations:documentReading.column')}</TableHead>
               <TableHead className="w-20" />
             </TableRow>
           </TableHeader>
@@ -116,6 +123,15 @@ function DocumentGroup({
                 <TableCell>{doc.period ? fmtDate(doc.period) : '—'}</TableCell>
                 <TableCell>{formatSize(doc.size)}</TableCell>
                 <TableCell>{fmtDate(doc.uploadedAt)}</TableCell>
+                <TableCell>
+                  <OcrStatus
+                    documentId={doc._id}
+                    state={doc.ocrState}
+                    detail={doc.ocrDetail}
+                    chars={doc.ocrChars}
+                    onOpen={() => onOpenText(doc._id)}
+                  />
+                </TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-1">
                     {doc.url && (
@@ -169,6 +185,8 @@ export function ReportingsSection({
   const generateUploadUrl = useConvexMutation(api.files.generateUploadUrl)
   const createDocument = useConvexMutation(api.documents.create)
   const removeDocument = useConvexMutation(api.documents.remove)
+
+  const [textDocId, setTextDocId] = useState<Id<'documents'> | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
@@ -293,6 +311,7 @@ export function ReportingsSection({
                 label={t(`participations:reportings.group.${group.id}`)}
                 docs={rows}
                 onDelete={setDeleteId}
+                onOpenText={setTextDocId}
               />
             )
           })}
@@ -395,6 +414,12 @@ export function ReportingsSection({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ExtractedTextDialog
+        documentId={textDocId}
+        title={docs?.find((d) => d._id === textDocId)?.title ?? ''}
+        onClose={() => setTextDocId(null)}
+      />
     </section>
   )
 }
