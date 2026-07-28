@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AlignLeft,
   Archive,
+  Handshake,
+  IdCard,
   Link2,
   Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
   Trash2,
+  User,
+  Users,
 } from 'lucide-react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
@@ -1020,14 +1025,20 @@ function ParticipationDetail() {
         </div>
 
         {/* Identity side panel ("fiche d'identité"): identity fields, summary
-            and people, stacked in one calm card. */}
-        <aside className="w-full shrink-0 space-y-6 rounded-lg border p-4 lg:w-80">
+            and people, stacked in one calm card. Each section is introduced by
+            a small squared icon chip; the data itself carries no box — label
+            left, value right, hairline between rows. */}
+        <aside className="bg-card w-full shrink-0 space-y-5 rounded-xl border p-4 lg:w-80">
           {/* Identity — sector / SIREN / domain edit inline (click the value);
               ownership, share count and the Attio link are computed/derived
               and stay read-only. */}
-          <IdentitySection title={t('identity.title')}>
-            <div className="grid grid-cols-2 gap-4">
+          <IdentitySection
+            title={t('identity.title')}
+            icon={<IdCard className="size-3.5" />}
+          >
+            <div className="flex flex-col">
               <InlineField
+                layout="row"
                 label={t('info.sector')}
                 format="text"
                 rawValue={company?.sector}
@@ -1053,6 +1064,7 @@ function ParticipationDetail() {
                 }
               />
               <InlineField
+                layout="row"
                 label={t('info.siren')}
                 format="text"
                 rawValue={company?.siren}
@@ -1063,6 +1075,7 @@ function ParticipationDetail() {
                 onClear={() => saveCompany({ siren: '' })}
               />
               <InlineField
+                layout="row"
                 label={t('info.domain')}
                 format="text"
                 rawValue={company?.domain}
@@ -1087,29 +1100,43 @@ function ParticipationDetail() {
                 }
               />
             </div>
-            {/* Optional 2-3 line summary, laid out as a labelled field below
-                the grid (paragraph text, so no font-medium). */}
-            {company?.summary && (
-              <div className="flex flex-col gap-0.5">
-                <span className="text-muted-foreground text-[11px] tracking-wide uppercase">
-                  {t('identity.summary')}
-                </span>
-                <p className="text-sm text-justify whitespace-pre-line">
-                  {company.summary}
-                </p>
-              </div>
-            )}
           </IdentitySection>
+
+          {/* Optional 2-3 line summary, promoted to its own section. Left
+              aligned on purpose: justifying a paragraph in a 320px column digs
+              white rivers between the words. */}
+          {company?.summary && (
+            <IdentitySection
+              title={t('identity.summary')}
+              icon={<AlignLeft className="size-3.5" />}
+            >
+              <p className="text-[13px] leading-relaxed whitespace-pre-line">
+                {company.summary}
+              </p>
+            </IdentitySection>
+          )}
 
           {/* People — founders / board / co-investors, fed from company.people.
               Empty sections render the discreet "to be filled in" state. */}
-          <IdentitySection title={t('identity.founders')}>
+          <IdentitySection
+            title={t('identity.founders')}
+            icon={<User className="size-3.5" />}
+            count={peopleByRole.founder.length}
+          >
             <PeopleList people={peopleByRole.founder} />
           </IdentitySection>
-          <IdentitySection title={t('identity.board')}>
+          <IdentitySection
+            title={t('identity.board')}
+            icon={<Users className="size-3.5" />}
+            count={peopleByRole.board.length}
+          >
             <PeopleList people={peopleByRole.board} />
           </IdentitySection>
-          <IdentitySection title={t('identity.coInvestors')}>
+          <IdentitySection
+            title={t('identity.coInvestors')}
+            icon={<Handshake className="size-3.5" />}
+            count={peopleByRole.coinvestor.length}
+          >
             <PeopleList people={peopleByRole.coinvestor} />
           </IdentitySection>
         </aside>

@@ -23,6 +23,51 @@ bas de page.
 
 ---
 
+## v1.142.0 — 28/07/2026 à 18:18 — La fiche d'identité d'une société est enfin lisible
+
+Le panneau d'identité, à droite de la fiche société, empilait quatre blocs de
+même poids dans un cadre blanc : rien n'accrochait l'œil, et trois détails le
+rendaient franchement désagréable à lire. Les libellés longs — « Nb d'actions
+consolidé », « Détention globale (%) » — passaient à la ligne et cassaient
+l'alignement des valeurs entre les deux colonnes. Le résumé de la société
+était justifié, ce qui creusait de larges blancs entre les mots dans une
+colonne aussi étroite. Et rien ne distinguait une section d'une autre.
+
+Le panneau reprend désormais le style de la synthèse IA : une carte, et
+chaque section introduite par une petite pastille carrée avec son icône.
+Les champs se lisent en lignes — libellé à gauche, valeur à droite, un filet
+fin entre chaque — si bien qu'aucun libellé ne passe plus à la ligne et que
+les chiffres s'alignent enfin verticalement. Le résumé devient une section à
+part entière, aligné à gauche. Fondateurs, board et co-investisseurs
+s'affichent en pastilles avec leurs initiales, chaque section portant son
+compteur.
+
+Rien ne change côté saisie : secteur, SIREN et domaine s'éditent toujours
+d'un clic sur la valeur, et les champs vides gardent leur tiret.
+
+> **🔧 Notes techniques**
+>
+> - `EntityFiche.tsx` : `IdentityField` passe d'une pile libellé/valeur à une
+>   ligne `flex justify-between` avec `border-b` + `last:border-b-0` — c'est
+>   ce qui règle le retour à la ligne des libellés longs dans les 320 px du
+>   panneau. `IdentitySection` accepte deux props optionnelles, `icon`
+>   (pastille carrée 22 px) et `count` (badge), toutes deux opt-in pour que la
+>   section « Deals » de la colonne principale reste inchangée. `PeopleList`
+>   rend des pastilles arrondies avec initiales (helper local
+>   `personInitials`) ; les branches LinkedIn/mail, toujours inertes, sont
+>   conservées telles quelles.
+> - `src/components/ui/inline-field.tsx` : nouvelle prop
+>   `layout: 'stacked' | 'row'`, défaut `stacked` — la fiche deal
+>   (`InstrumentBlock.tsx`) n'est donc pas touchée. Le bouton de repos est
+>   extrait dans une variable partagée par les deux layouts, l'édition est
+>   identique dans les deux cas.
+> - `participations.$companyId.tsx` : l'`aside` passe en
+>   `bg-card rounded-xl` (parité visuelle avec `CompanyAiSynthesisBlock`), la
+>   grille `grid-cols-2` devient une pile de lignes, et le résumé sort du bloc
+>   Identité pour devenir sa propre `IdentitySection` — sans `text-justify`.
+>   Icônes lucide : `IdCard`, `AlignLeft`, `User`, `Users`, `Handshake`.
+> - Aucune nouvelle clé i18n : les libellés existants sont réutilisés tels
+>   quels, y compris `identity.summary` promu en titre de section.
 ## v1.141.0 — 28/07/2026 à 18:07 — Documents : voir ce que la machine a lu
 
 Jusqu'ici, savoir si un document avait bien été déchiffré supposait de
