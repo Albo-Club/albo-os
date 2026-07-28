@@ -23,6 +23,25 @@ bas de page.
 
 ---
 
+## v1.139.2 — 28/07/2026 à 09:35 — Les onglets Reports / Documents adoptent le style du reste de l'app
+
+Sur la fiche d'une participation, les onglets **Reports** et **Documents**
+étaient les seuls de l'app à s'afficher en texte souligné. Ils prennent
+désormais la même forme que partout ailleurs — notamment la barre de la
+page Cash (Vue d'ensemble / Prévisionnel / Transactions / Règles &
+échéances) : des pastilles dans un bandeau gris, l'onglet actif en blanc.
+Rien ne change dans le contenu des deux onglets.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/$orgSlug/participations.$companyId.tsx` : la `TabsList`
+>   de la zone reporting passe de `variant="line"` au variant par défaut
+>   (pastilles), identique à `cash.index.tsx`.
+> - C'était le seul usage de `variant="line"` du repo ; le variant reste
+>   défini dans `src/components/ui/tabs.tsx` et disponible si besoin.
+
+---
+
 ## v1.139.1 — 27/07/2026 à 23:25 — Les badges de secteur tiennent tous sur une ligne
 
 Dans la liste Entreprises, le secteur « Marketplace / E-commerce » était le
