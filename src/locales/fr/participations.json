@@ -547,6 +547,11 @@
       "size": "Taille",
       "date": "Ajouté"
     },
+    "group": {
+      "reporting": "Reporting & suivi",
+      "legal": "Juridique & légal",
+      "other": "Autres"
+    },
     "kind": {
       "reporting": "Reporting",
       "bp": "Business plan",
