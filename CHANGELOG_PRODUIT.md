@@ -23,6 +23,33 @@ bas de page.
 
 ---
 
+## v1.142.1 — 28/07/2026 à 18:29 — Correctif : le déploiement de la lecture des documents
+
+La mise en ligne de la lecture automatique des documents a échoué au
+déploiement : un ancien champ, que plus aucun code n'utilise mais que
+certains documents portent encore en base, avait été retiré. La base a
+refusé la mise à jour, et rien n'est parti en production.
+
+Le champ est remis en place — aucun changement visible côté produit, la
+fonctionnalité de lecture part maintenant normalement. Le nettoyage de ces
+anciennes données est planifié à part, en récupérant leur texte plutôt qu'en
+le jetant : ces documents s'afficheront comme déjà lus, sans repasser à
+l'OCR.
+
+> **🔧 Notes techniques**
+>
+> - `documents.extractedText` a été retiré du schéma en v1.141.0 sur la foi
+>   d'un grep (aucune écriture dans le repo, aucune lecture). Des lignes de
+>   prod le portent quand même — écrit hors du repo, avant `documentTexts`.
+>   `convex deploy` a rejeté le push : « Object contains extra field
+>   `extractedText` that is not in the validator ».
+> - Le champ est restauré (`v.optional(v.string())`), commenté comme legacy.
+>   Aucun autre changement : la lecture des documents est inchangée.
+> - Leçon consignée dans `KNOWN_ISSUES.md` : un grep dit qu'aucun code
+>   **actuel** n'écrit un champ, pas qu'aucune **donnée** ne le porte.
+> - Chantier de retrait (reprise du texte vers `documentTexts` + purge, puis
+>   resserrage du schéma) documenté dans `MIGRATIONS.md`.
+
 ## v1.142.0 — 28/07/2026 à 18:18 — La fiche d'identité d'une société est enfin lisible
 
 Le panneau d'identité, à droite de la fiche société, empilait quatre blocs de

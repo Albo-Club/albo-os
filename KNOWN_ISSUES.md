@@ -39,6 +39,20 @@ Donc : un nouveau chemin d'ingestion de fichiers doit écrire son texte via
 `documentsExtract:saveStorageText` (clé blob) et poser l'état sur sa ligne
 `documents` — jamais l'inverse.
 
+### Le champ legacy `documents.extractedText`
+
+Le champ existe encore au schéma. Il est écrit par **rien** dans ce repo et lu
+par **rien** — mais des lignes de prod le portent (le texte y a été mis
+hors du repo, avant `documentTexts`). Le retirer **casse `convex deploy`** :
+la validation de schéma refuse les lignes existantes (« Object contains extra
+field `extractedText` that is not in the validator »), et le build Vercel de
+prod échoue après le push des fonctions. Vérifié à la dure sur la PR #307.
+
+Un `grep` du code ne suffit donc pas à conclure qu'un champ est mort : il dit
+qu'aucun code **actuel** ne l'écrit, pas qu'aucune **donnée** ne le porte.
+Avant de retirer un champ, regarder la prod. Le chantier de retrait
+(reprise du texte puis purge) est dans `MIGRATIONS.md`.
+
 ### Le corollaire qui mord
 
 `documents:remove` supprime le blob **et** sa ligne `documentTexts`. Sur un
