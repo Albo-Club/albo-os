@@ -36,6 +36,11 @@ import {
  *
  * For a bespoke editor (e.g. the creatable sector combobox) pass `renderEditor`:
  * it fully owns the commit and calls `done()` to leave edit mode.
+ *
+ * `layout` picks the resting shape: `stacked` (default, label above the value —
+ * what the deal fiche uses) or `row` (label left, value right, hairline below),
+ * which is what the company identity panel needs to keep long labels on one
+ * line in a narrow column. Editing behaves identically in both.
  */
 export function InlineField({
   label,
@@ -51,6 +56,7 @@ export function InlineField({
   onClear,
   renderEditor,
   disabled,
+  layout = 'stacked',
 }: {
   label: string
   format: FieldFormat
@@ -65,6 +71,7 @@ export function InlineField({
   onClear?: () => void | Promise<void>
   renderEditor?: (api: { done: () => void }) => ReactNode
   disabled?: boolean
+  layout?: 'stacked' | 'row'
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -178,27 +185,37 @@ export function InlineField({
     }
   }
 
+  const trigger = (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={begin}
+      aria-label={ariaLabel}
+      className={cn(
+        'focus-visible:ring-ring -mx-1 rounded px-1 text-sm font-medium focus-visible:ring-2 focus-visible:outline-none',
+        layout === 'row' ? 'min-w-0 text-right' : 'text-left',
+        disabled ? 'cursor-default' : 'hover:bg-muted/50 cursor-pointer',
+      )}
+    >
+      {display === '' ? '—' : display}
+    </button>
+  )
+
+  if (layout === 'row') {
+    return (
+      <div className="flex items-baseline justify-between gap-3 border-b py-1.5 last:border-b-0">
+        <span className="text-muted-foreground shrink-0 text-xs">{label}</span>
+        {editing ? <div className="min-w-0 flex-1">{editor}</div> : trigger}
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-muted-foreground text-[11px] tracking-wide uppercase">
         {label}
       </span>
-      {editing ? (
-        editor
-      ) : (
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={begin}
-          aria-label={ariaLabel}
-          className={cn(
-            'focus-visible:ring-ring -mx-1 rounded px-1 text-left text-sm font-medium focus-visible:ring-2 focus-visible:outline-none',
-            disabled ? 'cursor-default' : 'hover:bg-muted/50 cursor-pointer',
-          )}
-        >
-          {display === '' ? '—' : display}
-        </button>
-      )}
+      {editing ? editor : trigger}
     </div>
   )
 }
