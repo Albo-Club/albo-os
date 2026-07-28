@@ -11,6 +11,7 @@
 import type * as admin from "../admin.js";
 import type * as agent from "../agent.js";
 import type * as agentTools from "../agentTools.js";
+import type * as agentToolsDocuments from "../agentToolsDocuments.js";
 import type * as agentToolsForecasts from "../agentToolsForecasts.js";
 import type * as agentToolsIntelligence from "../agentToolsIntelligence.js";
 import type * as agentToolsLiabilities from "../agentToolsLiabilities.js";
@@ -115,6 +116,7 @@ import type * as transactions from "../transactions.js";
 import type * as users from "../users.js";
 import type * as valuations from "../valuations.js";
 import type * as vasco from "../vasco.js";
+import type * as vectorize from "../vectorize.js";
 import type * as warmup from "../warmup.js";
 
 import type {
@@ -127,6 +129,7 @@ declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   agent: typeof agent;
   agentTools: typeof agentTools;
+  agentToolsDocuments: typeof agentToolsDocuments;
   agentToolsForecasts: typeof agentToolsForecasts;
   agentToolsIntelligence: typeof agentToolsIntelligence;
   agentToolsLiabilities: typeof agentToolsLiabilities;
@@ -231,6 +234,7 @@ declare const fullApi: ApiFromModules<{
   users: typeof users;
   valuations: typeof valuations;
   vasco: typeof vasco;
+  vectorize: typeof vectorize;
   warmup: typeof warmup;
 }>;
 
@@ -264,5 +268,6 @@ export declare const components: {
   betterAuth: import("@convex-dev/better-auth/_generated/component.js").ComponentApi<"betterAuth">;
   resend: import("@convex-dev/resend/_generated/component.js").ComponentApi<"resend">;
   agent: import("@convex-dev/agent/_generated/component.js").ComponentApi<"agent">;
+  rag: import("@convex-dev/rag/_generated/component.js").ComponentApi<"rag">;
   rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
 };

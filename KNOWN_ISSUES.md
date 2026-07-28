@@ -2887,3 +2887,48 @@ dans l'historique git si besoin de s'en inspirer.
   conservé dans `reportExtract.run`.
 - Les emails transactionnels (magic link, invitations, alertes) n'ont
   jamais fait partie de la feature et sont intacts.
+
+## Vectorisation documents & reports — RAG par org (`convex/vectorize.ts`)
+
+Recherche sémantique sur le contenu des documents et des reports via le
+composant `@convex-dev/rag`, exposée à l'assistant par l'outil
+`searchDocuments` (`convex/agentToolsDocuments.ts` → `vectorize:searchInternal`).
+Embeddings `qwen/qwen3-embedding-8b` via OpenRouter (même clé/facturation que
+le chat), dimension 4096 — **le max du vector index Convex**, ne pas prendre
+un modèle au-dessus.
+
+- **Un namespace RAG = une org** (`namespace = orgId`) : l'isolation
+  multi-tenant est structurelle côté index, mais le namespace **isole sans
+  autoriser** — toute surface de recherche re-vérifie l'appartenance
+  (`assertMemberInternal`) avant `rag.search`, même discipline que les
+  autres outils d'agent.
+- **Ce qui est indexé** (du texte, jamais les octets du fichier) : les
+  `documents` en `source: 'upload'` via le texte de leur blob dans
+  `documentTexts`, et les `companyReports` via leur `rawContent`.
+  **Aucune extraction ici** : elle appartient à `documentsExtract.ts`, qui
+  schedule `vectorize:indexDocument` en fin de run (les deux chemins :
+  adoption d'un texte existant et extraction fraîche) — donc une
+  re-extraction (`documents:reextract`) ré-indexe d'office. Les `documents`
+  issus d'email ne sont **pas** indexés individuellement : leur texte est
+  déjà dans l'entrée du report (l'indexer aussi créerait des doublons de
+  résultats).
+- **Clés d'entrée** `doc:<documentId>` / `report:<reportId>` : ré-ajouter la
+  même clé **remplace** l'entrée (ingestion idempotente, backfill re-runnable,
+  re-import d'une période de report aligné sur la dedup de `storeForCompany`).
+  Suppression d'un document → `removeEntry` schedulé (no-op si jamais
+  indexé), depuis `documents:remove` **et** le cascade de `deals:remove` —
+  tout nouveau chemin de suppression de `documents` doit faire pareil.
+- **Changer de modèle d'embedding est une bascule atomique** : un namespace
+  RAG est identifié par (namespace, modelId, dimension, filterNames). Changer
+  `EMBEDDING_MODEL`/`EMBEDDING_DIMENSION` fait pointer recherche ET ingestion
+  vers un namespace **neuf et vide** — la recherche ne tombe jamais sur des
+  vecteurs de l'ancien modèle (incompatibles par construction), mais elle ne
+  voit **plus rien** tant que `vectorize:backfillAll` n'a pas re-vectorisé le
+  corpus. Séquence : changer la constante → deploy → backfill immédiat.
+  Le modèle est épinglé (pas d'alias `latest`) pour qu'aucune release
+  upstream ne déclenche cette bascule silencieusement.
+- Le cron/les webhooks n'interviennent pas : l'ingestion au fil de l'eau est
+  schedulée en fin d'extraction (`documentsExtract.run`) et de pipeline
+  report (`reportStore:storeForCompany`), jamais bloquante pour l'upload ni
+  le pipeline. Le backfill envoie d'abord à l'extraction les documents
+  uploadés **jamais lus** (sans `ocrState`) — l'indexation suit toute seule.
