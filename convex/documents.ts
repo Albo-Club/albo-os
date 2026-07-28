@@ -7,6 +7,7 @@
  */
 
 import { ConvexError, v } from 'convex/values'
+import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 
@@ -142,7 +143,7 @@ export const create = mutation({
     if (!title) throw new ConvexError('invalid_title')
     const { contentType, size } = await validateUpload(ctx, args.storageId)
 
-    return await ctx.db.insert('documents', {
+    const documentId = await ctx.db.insert('documents', {
       orgId: company.orgId,
       companyId: args.companyId,
       dealId: args.dealId,
@@ -156,6 +157,13 @@ export const create = mutation({
       uploadedBy: user._id,
       uploadedAt: Date.now(),
     })
+
+    // Semantic index (OCR + embeddings) — async, never blocks the upload.
+    await ctx.scheduler.runAfter(0, internal.vectorize.indexDocument, {
+      documentId,
+    })
+
+    return documentId
   },
 })
 
@@ -167,6 +175,11 @@ export const remove = mutation({
     await requireOrgMember(ctx, doc.orgId)
     await ctx.storage.delete(doc.storageId)
     await ctx.db.delete('documents', documentId)
+    // Drop the semantic-index entry (no-op if the doc was never indexed).
+    await ctx.scheduler.runAfter(0, internal.vectorize.removeEntry, {
+      orgId: doc.orgId,
+      key: `doc:${documentId}`,
+    })
     return null
   },
 })

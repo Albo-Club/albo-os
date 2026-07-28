@@ -23,6 +23,54 @@ bas de page.
 
 ---
 
+## v1.140.0 — 28/07/2026 à 20:13 — L'assistant sait lire vos documents et reports
+
+L'assistant ne se contente plus de lister vos documents : il peut désormais
+**chercher dans leur contenu**. Posez la question en langage naturel —
+« que dit le pacte de Sezame sur la clause de liquidité ? », « quelles
+boîtes du portefeuille ont parlé de difficultés de recrutement ? » — et il
+retrouve les passages pertinents dans les pactes, term sheets, BP, documents
+juridiques et reportings de l'organisation, ainsi que dans les reports
+investisseurs reçus par email, puis répond en citant ses sources.
+
+La recherche se fait **par le sens**, pas par mots-clés : une question sur
+les « problèmes de trésorerie » retrouve un passage qui parle de « runway
+réduit à 4 mois ». Elle fonctionne en français comme en anglais, et reste
+strictement cloisonnée par organisation.
+
+Concrètement, chaque document déposé dans l'app est désormais lu (les PDF et
+images passent par la même reconnaissance de texte que les reports email),
+puis indexé automatiquement — rien à faire de votre côté. Les documents et
+reports déjà présents seront indexés en une passe à l'activation.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau composant `@convex-dev/rag` (`convex/convex.config.ts`) —
+>   embeddings `qwen/qwen3-embedding-8b` via OpenRouter (même clé que le
+>   chat), dimension 4096, **un namespace par org**, clés idempotentes
+>   `doc:<id>` / `report:<id>`.
+> - `convex/vectorize.ts` : instance RAG + extraction texte des uploads
+>   (OCR Mistral PDF/images, excel/csv, `text/*`) persistée sur
+>   `documents.extractedText`, indexation `indexDocument`/`indexReport`,
+>   suppression `removeEntry`, recherche `searchInternal` (re-check
+>   membership), backfill `backfillAll`/`backfillOrg` (cf. `MIGRATIONS.md`).
+> - Ingestion schedulée depuis `documents:create` / `documents:remove` /
+>   `reportStore:storeForCompany` (jamais bloquante). Les documents issus
+>   d'email ne sont pas indexés individuellement (déjà couverts par
+>   l'entrée du report).
+> - Nouvel outil d'agent `searchDocuments`
+>   (`convex/agentToolsDocuments.ts`, lecture seule) branché dans
+>   `convex/agent.ts` + consigne dans `convex/lib/instructions.ts`.
+> - `convex/_generated/api.d.ts` édité à la main (lignes mécaniques
+>   `rag` + nouveaux modules — convention KNOWN_ISSUES « Codegen Convex
+>   hors-ligne ») ; le prochain `convex deploy` régénère à l'identique.
+> - Docs : section `KNOWN_ISSUES.md` « Vectorisation documents & reports »
+>   (bascule de modèle = namespace neuf + backfill), ligne `MIGRATIONS.md`,
+>   scénario `TESTING.md` C35, page produit assistant, ligne
+>   `TEMPLATE_SYNC.md`.
+
+---
+
 ## v1.139.1 — 27/07/2026 à 23:25 — Les badges de secteur tiennent tous sur une ligne
 
 Dans la liste Entreprises, le secteur « Marketplace / E-commerce » était le

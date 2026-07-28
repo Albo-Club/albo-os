@@ -2828,3 +2828,41 @@ dans l'historique git si besoin de s'en inspirer.
   conservé dans `reportExtract.run`.
 - Les emails transactionnels (magic link, invitations, alertes) n'ont
   jamais fait partie de la feature et sont intacts.
+
+## Vectorisation documents & reports — RAG par org (`convex/vectorize.ts`)
+
+Recherche sémantique sur le contenu des documents et des reports via le
+composant `@convex-dev/rag`, exposée à l'assistant par l'outil
+`searchDocuments` (`convex/agentToolsDocuments.ts` → `vectorize:searchInternal`).
+Embeddings `qwen/qwen3-embedding-8b` via OpenRouter (même clé/facturation que
+le chat), dimension 4096 — **le max du vector index Convex**, ne pas prendre
+un modèle au-dessus.
+
+- **Un namespace RAG = une org** (`namespace = orgId`) : l'isolation
+  multi-tenant est structurelle côté index, mais le namespace **isole sans
+  autoriser** — toute surface de recherche re-vérifie l'appartenance
+  (`assertMemberInternal`) avant `rag.search`, même discipline que les
+  autres outils d'agent.
+- **Ce qui est indexé** (du texte, jamais les octets du fichier) : les
+  `documents` en `source: 'upload'` (extraction ici : OCR Mistral
+  PDF/images, `excelToText`/`csvToText`, passthrough `text/*` — persistée
+  sur `extractedText`) et les `companyReports` via leur `rawContent`. Les
+  `documents` issus d'email ne sont **pas** indexés individuellement :
+  leur texte est déjà dans l'entrée du report (l'indexer aussi créerait des
+  doublons de résultats).
+- **Clés d'entrée** `doc:<documentId>` / `report:<reportId>` : ré-ajouter la
+  même clé **remplace** l'entrée (ingestion idempotente, backfill re-runnable,
+  re-import d'une période de report aligné sur la dedup de `storeForCompany`).
+  Suppression d'un document → `removeEntry` schedulé (no-op si jamais indexé).
+- **Changer de modèle d'embedding est une bascule atomique** : un namespace
+  RAG est identifié par (namespace, modelId, dimension, filterNames). Changer
+  `EMBEDDING_MODEL`/`EMBEDDING_DIMENSION` fait pointer recherche ET ingestion
+  vers un namespace **neuf et vide** — la recherche ne tombe jamais sur des
+  vecteurs de l'ancien modèle (incompatibles par construction), mais elle ne
+  voit **plus rien** tant que `vectorize:backfillAll` n'a pas re-vectorisé le
+  corpus. Séquence : changer la constante → deploy → backfill immédiat.
+  Le modèle est épinglé (pas d'alias `latest`) pour qu'aucune release
+  upstream ne déclenche cette bascule silencieusement.
+- Le cron/les webhooks n'interviennent pas : l'ingestion au fil de l'eau est
+  schedulée depuis les mutations (`documents:create`, `reportStore:storeForCompany`),
+  jamais bloquante pour l'upload ni le pipeline.
