@@ -3,6 +3,44 @@
 Pinned versions, workarounds, and rough edges. Update this file as upstream
 fixes land so renovate (which respects `pnpm.overrides`) can be unblocked.
 
+## Panneau latéral figé : `position: sticky` + `bottom` ne marche PAS
+
+**Le piège** : pour un panneau plus haut que l'écran qu'on veut voir défiler
+puis se figer une fois arrivé en bas, le réflexe est `position: sticky` +
+`bottom: 0`. **Ça ne fige rien** — le panneau sort de l'écran par le haut
+comme s'il n'y avait pas de sticky du tout.
+
+Vérifié au navigateur (Chromium, scrollport de 700 px, panneau de 1100 px) :
+
+| Offset | Comportement |
+| --- | --- |
+| `bottom: 24px` seul | aucun figement, le panneau part par le haut |
+| `top: 24px` seul | figé en haut — le bas du panneau reste **inatteignable** |
+| `top` **et** `bottom` | identique à `top` seul (la contrainte haute gagne) |
+
+**Pourquoi** : un offset `bottom` ne retient pas une boîte qui remonte, il
+*tire vers le haut* une boîte dont la position naturelle est sous la ligne de
+flottaison (cas du pied de page collant). Il n'a donc aucun effet sur un
+panneau qui commence en haut de page.
+
+**La solution** : un `top` **négatif** égal au débordement du panneau,
+c'est-à-dire `-(hauteurPanneau - hauteurScrollport) - gap`. Le panneau défile
+avec la page jusqu'à ce que son bas arrive à `gap` px du bas du scrollport,
+puis se fige. Comme la valeur dépend de la hauteur rendue, elle se calcule en
+JS : `src/hooks/useStickyBottom.ts` (ResizeObserver sur le panneau **et** sur
+le scrollport). Quand le panneau tient dans l'écran, le hook retombe sur un
+`top` positif — sinon il serait figé trop bas, avec un blanc au-dessus.
+
+**Deuxième piège, spécifique à l'app** : le scroll n'est pas celui de la
+fenêtre. Le shell est `h-svh overflow-hidden` et le défilement vit dans
+`<div class="min-h-0 flex-1 overflow-y-auto">` (`src/routes/app/$orgSlug/route.tsx`).
+Tout calcul basé sur `window.innerHeight` ou `100vh` est donc faux — d'où la
+remontée d'ancêtres `scrollParent()` dans le hook plutôt qu'une constante.
+
+Enfin, le parent flex doit rester en `items-start` : en `stretch` (défaut), le
+panneau est étiré à la hauteur de la colonne principale et il n'a plus aucune
+marge pour coller.
+
 ## Texte extrait d'un document : pourquoi une table à part, clé sur le blob
 
 ### Le piège

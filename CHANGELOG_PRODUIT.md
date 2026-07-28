@@ -23,6 +23,39 @@ bas de page.
 
 ---
 
+## v1.144.0 — 28/07/2026 à 20:56 — La fiche d'identité reste sous les yeux
+
+Sur une fiche société, le panneau d'identité disparaissait par le haut dès
+qu'on descendait dans la page : pour comparer une information d'identité avec
+un rapport ou un deal plus bas, il fallait remonter.
+
+Le panneau défile maintenant normalement tant qu'il reste quelque chose à
+découvrir dessous, puis **se fige** une fois qu'on est arrivé à son bas. La
+colonne du milieu continue de défiler dessous, et le panneau reste visible en
+entier. Sur une fiche courte, qui tient déjà dans l'écran, il se fige
+directement en haut. Sur mobile et petits écrans, où le panneau passe sous le
+contenu, rien ne change.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau hook `src/hooks/useStickyBottom.ts` + `lg:sticky` sur l'`aside` de
+>   `participations.$companyId.tsx`, avec un `top` inline calculé.
+> - `position: sticky` + `bottom` **ne fige pas** un panneau plus haut que
+>   l'écran : un offset `bottom` ne retient pas une boîte qui remonte, il tire
+>   vers le haut une boîte située sous la ligne de flottaison. Mesuré au
+>   navigateur avant d'écrire le code. La solution est un `top` **négatif**
+>   valant `-(hauteurPanneau - hauteurScrollport) - gap` ; le panneau défile
+>   puis se fige quand son bas atteint le bas du scrollport.
+> - Le calcul dépend de la hauteur rendue → `ResizeObserver` sur le panneau et
+>   sur le scrollport (la hauteur bouge quand le résumé/les personnes se
+>   chargent, ou quand le panneau IA s'ouvre).
+> - Le scroll de l'app n'est pas celui de la fenêtre (shell `h-svh
+>   overflow-hidden`, défilement dans un `div overflow-y-auto`), d'où la
+>   remontée d'ancêtres `scrollParent()` au lieu de `window.innerHeight`.
+> - Panneau plus court que l'écran → repli sur un `top` positif, sinon il
+>   serait figé en bas avec un blanc au-dessus.
+> - Détail complet du piège dans `KNOWN_ISSUES.md`.
+
 ## v1.143.0 — 28/07/2026 à 20:19 — L'assistant sait chercher dans vos documents et reports
 
 La lecture automatique des documents (arrivée avec la v1.142.0) trouve son
