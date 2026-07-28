@@ -1,14 +1,20 @@
 import { useRef, useState } from 'react'
-import { Download, Plus, Trash2 } from 'lucide-react'
+import { ChevronRight, Download, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { ConvexError } from 'convex/values'
 import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
+import type { FunctionReturnType } from 'convex/server'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { Button } from '~/components/ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '~/components/ui/collapsible'
 import {
   Dialog,
   DialogContent,
@@ -38,16 +44,120 @@ const MAX_BYTES = 20 * 1024 * 1024
 const KINDS = ['reporting', 'bp', 'legal', 'other'] as const
 type DocKind = (typeof KINDS)[number]
 
+/**
+ * Display groups of the Documents tab. A company mixes two very different
+ * families — what the company sends us (reportings, BP) and what binds the
+ * entity (statuts, pactes, KBIS) — so they get their own foldable block.
+ * Anything else (including the deal kinds the schema also accepts) falls
+ * back to "other"; an empty group is not rendered.
+ */
+const GROUPS = [
+  { id: 'reporting', kinds: ['reporting', 'bp'] },
+  { id: 'legal', kinds: ['legal'] },
+  { id: 'other', kinds: null },
+] as const
+
 function formatSize(bytes: number | null): string {
   if (bytes == null) return '—'
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+type CompanyDoc = FunctionReturnType<typeof api.documents.listByCompany>[number]
+
+/** One foldable group: header (chevron + label + count) over its own table. */
+function DocumentGroup({
+  label,
+  docs,
+  onDelete,
+}: {
+  label: string
+  docs: Array<CompanyDoc>
+  onDelete: (id: Id<'documents'>) => void
+}) {
+  const { t } = useTranslation(['participations', 'common'])
+  const { fmtDate } = useFormatters()
+  const [open, setOpen] = useState(true)
+
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="rounded-lg border"
+    >
+      <CollapsibleTrigger className="hover:bg-muted/50 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium">
+        <ChevronRight
+          className={`text-muted-foreground size-4 transition-transform ${open ? 'rotate-90' : ''}`}
+        />
+        {label}
+        <span className="text-muted-foreground font-normal">
+          ({docs.length})
+        </span>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('participations:reportings.col.title')}</TableHead>
+              <TableHead>{t('participations:reportings.col.kind')}</TableHead>
+              <TableHead>{t('participations:reportings.col.period')}</TableHead>
+              <TableHead>{t('participations:reportings.col.size')}</TableHead>
+              <TableHead>{t('participations:reportings.col.date')}</TableHead>
+              <TableHead className="w-20" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {docs.map((doc) => (
+              <TableRow key={doc._id}>
+                <TableCell className="font-medium">{doc.title}</TableCell>
+                <TableCell>
+                  {t(`participations:reportings.kind.${doc.kind}`)}
+                </TableCell>
+                <TableCell>{doc.period ? fmtDate(doc.period) : '—'}</TableCell>
+                <TableCell>{formatSize(doc.size)}</TableCell>
+                <TableCell>{fmtDate(doc.uploadedAt)}</TableCell>
+                <TableCell>
+                  <div className="flex justify-end gap-1">
+                    {doc.url && (
+                      <Button
+                        asChild
+                        size="icon"
+                        variant="ghost"
+                        className="size-7"
+                        aria-label={t('participations:reportings.download')}
+                        title={t('participations:reportings.download')}
+                      >
+                        <a href={doc.url} target="_blank" rel="noreferrer">
+                          <Download className="size-4" />
+                        </a>
+                      </Button>
+                    )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="text-destructive size-7"
+                      onClick={() => onDelete(doc._id)}
+                      aria-label={t('common:actions.delete')}
+                      title={t('common:actions.delete')}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
 /**
  * Reportings & documents of a company: manual upload (Convex storage,
- * 20 MB cap) + list with download/delete. KPI extraction from a reporting
- * goes through the assistant (createKpiSnapshot), not this component.
+ * 20 MB cap) + list with download/delete, split into foldable groups
+ * (cf. GROUPS). KPI extraction from a reporting goes through the assistant
+ * (createKpiSnapshot), not this component.
  */
 export function ReportingsSection({
   companyId,
@@ -55,7 +165,6 @@ export function ReportingsSection({
   companyId: Id<'companies'>
 }) {
   const { t } = useTranslation(['participations', 'common'])
-  const { fmtDate } = useFormatters()
   const docs = useConvexQuery(api.documents.listByCompany, { companyId })
   const generateUploadUrl = useConvexMutation(api.files.generateUploadUrl)
   const createDocument = useConvexMutation(api.documents.create)
@@ -166,62 +275,27 @@ export function ReportingsSection({
           {t('participations:reportings.empty')}
         </div>
       ) : (
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('participations:reportings.col.title')}</TableHead>
-                <TableHead>{t('participations:reportings.col.kind')}</TableHead>
-                <TableHead>{t('participations:reportings.col.period')}</TableHead>
-                <TableHead>{t('participations:reportings.col.size')}</TableHead>
-                <TableHead>{t('participations:reportings.col.date')}</TableHead>
-                <TableHead className="w-20" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {docs.map((doc) => (
-                <TableRow key={doc._id}>
-                  <TableCell className="font-medium">{doc.title}</TableCell>
-                  <TableCell>
-                    {t(`participations:reportings.kind.${doc.kind}`)}
-                  </TableCell>
-                  <TableCell>
-                    {doc.period ? fmtDate(doc.period) : '—'}
-                  </TableCell>
-                  <TableCell>{formatSize(doc.size)}</TableCell>
-                  <TableCell>{fmtDate(doc.uploadedAt)}</TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-1">
-                      {doc.url && (
-                        <Button
-                          asChild
-                          size="icon"
-                          variant="ghost"
-                          className="size-7"
-                          aria-label={t('participations:reportings.download')}
-                          title={t('participations:reportings.download')}
-                        >
-                          <a href={doc.url} target="_blank" rel="noreferrer">
-                            <Download className="size-4" />
-                          </a>
-                        </Button>
-                      )}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-destructive size-7"
-                        onClick={() => setDeleteId(doc._id)}
-                        aria-label={t('common:actions.delete')}
-                        title={t('common:actions.delete')}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="space-y-3">
+          {GROUPS.map((group) => {
+            const rows = docs.filter((doc) =>
+              group.kinds
+                ? (group.kinds as ReadonlyArray<string>).includes(doc.kind)
+                : !GROUPS.some((g) =>
+                    (g.kinds as ReadonlyArray<string> | null)?.includes(
+                      doc.kind,
+                    ),
+                  ),
+            )
+            if (rows.length === 0) return null
+            return (
+              <DocumentGroup
+                key={group.id}
+                label={t(`participations:reportings.group.${group.id}`)}
+                docs={rows}
+                onDelete={setDeleteId}
+              />
+            )
+          })}
         </div>
       )}
 
@@ -285,7 +359,10 @@ export function ReportingsSection({
             >
               {t('common:actions.cancel')}
             </Button>
-            <Button onClick={() => void handleSave()} disabled={saving || !title.trim()}>
+            <Button
+              onClick={() => void handleSave()}
+              disabled={saving || !title.trim()}
+            >
               {saving
                 ? t('participations:reportings.uploading')
                 : t('common:actions.save')}

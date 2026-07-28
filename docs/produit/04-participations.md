@@ -86,9 +86,12 @@ La colonne principale, dans l'ordre de lecture :
   (voir [Intégrations](15-integrations.md)).
 - **Onglet Documents** : upload manuel (reporting, BP, légal, autre — 20 Mo
   max, avec période couverte), téléchargement, suppression. Les documents
-  propres à un investissement (term sheet, pacte, bulletin de
-  souscription…) ne se rangent pas ici mais sur la [fiche du deal
-  concerné](05-deals.md).
+  sont rangés en blocs dépliables — « Reporting & suivi » (reportings et
+  business plans), « Juridique & légal » (statuts, pactes, KBIS…) et
+  « Autres » — dépliés par défaut, chaque titre portant son nombre de
+  documents ; un bloc vide n'apparaît pas. Les documents propres à un
+  investissement (term sheet, pacte, bulletin de souscription…) ne se
+  rangent pas ici mais sur la [fiche du deal concerné](05-deals.md).
 
 Le panneau d'identité, à droite :
 
