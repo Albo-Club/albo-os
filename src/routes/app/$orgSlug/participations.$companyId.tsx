@@ -1004,7 +1004,7 @@ function ParticipationDetail() {
           {company && (
             <section>
               <Tabs defaultValue="reports">
-                <TabsList variant="line">
+                <TabsList>
                   <TabsTrigger value="reports">{t('tabs.reports')}</TabsTrigger>
                   <TabsTrigger value="documents">
                     {t('tabs.documents')}

@@ -50,6 +50,11 @@ marquée ⚠️ dans le récap avec la cause et le geste correctif (ex. « page
 Notion inaccessible — vérifie qu'elle est partagée publiquement »), et
 « Retraiter » relance tout le circuit après correction.
 
+Le verdict de lecture de chaque pièce jointe reste consultable **après
+coup** : il est repris sur l'onglet Documents de la fiche société, avec le
+texte lu ([Participations](04-participations.md)). Le récap dit ce qui
+s'est passé sur le moment, la fiche dit ce qui est en base.
+
 ### 4. Extraction des KPIs
 
 L'IA lit le contenu et propose les métriques ; le rangement est fait par du

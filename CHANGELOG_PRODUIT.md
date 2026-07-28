@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.140.0 — 28/07/2026 à 18:15 — La fiche d'identité d'une société est enfin lisible
+## v1.142.0 — 28/07/2026 à 18:18 — La fiche d'identité d'une société est enfin lisible
 
 Le panneau d'identité, à droite de la fiche société, empilait quatre blocs de
 même poids dans un cadre blanc : rien n'accrochait l'œil, et trois détails le
@@ -68,6 +68,115 @@ d'un clic sur la valeur, et les champs vides gardent leur tiret.
 >   Icônes lucide : `IdCard`, `AlignLeft`, `User`, `Users`, `Handshake`.
 > - Aucune nouvelle clé i18n : les libellés existants sont réutilisés tels
 >   quels, y compris `identity.summary` promu en titre de section.
+## v1.141.0 — 28/07/2026 à 18:07 — Documents : voir ce que la machine a lu
+
+Jusqu'ici, savoir si un document avait bien été déchiffré supposait de
+retrouver le récap reçu dans le fil du mail — et pour un fichier déposé à la
+main, la question n'avait même pas de réponse : il n'était pas lu du tout.
+
+Deux changements, sur l'onglet Documents des fiches société **et** sur le
+bloc Documents des fiches deal :
+
+- **Tout document déposé à la main est désormais lu automatiquement**, comme
+  ceux qui arrivent par un report transféré : PDF et images par OCR, Excel et
+  CSV cellule par cellule.
+- **Une colonne « Lecture »** dit, document par document, où ça en est :
+  lecture en cours, lu (avec le volume de texte obtenu), échec avec sa cause,
+  ou « rien à lire » pour un logo ou un format non géré.
+
+Le volume de texte est cliquable : il ouvre **le texte réellement extrait**.
+C'est le geste qui permet de vérifier ce que la machine a lu avant de faire
+confiance aux métriques qu'elle en a tirées — quelques centaines de
+caractères sur un PDF de trente pages, c'est un scan illisible, pas un
+reporting vide.
+
+Le circuit est le même des deux côtés : un term sheet déposé sur un deal est
+lu exactement comme un investor update reçu par mail.
+
+Pour un document en échec, ou déposé avant cette mise à jour, un bouton
+relance la lecture à la demande. Les causes d'échec sont formulées exactement
+comme dans le récap email, pour que les deux surfaces ne racontent jamais
+deux histoires différentes.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle table `documentTexts` : **une ligne par blob de storage**, pas
+>   par document. Le texte reste hors de `documents` parce que Convex lit la
+>   ligne entière — `documents:listByCompany` charge 200 lignes à chaque
+>   affichage. Clé sur `storageId` → le fan-out multi-org du pipeline report
+>   partage une seule extraction. Détail complet dans `KNOWN_ISSUES.md`.
+> - `documents` gagne `ocrState` / `ocrDetail` / `ocrChars` (petits, lus avec
+>   la liste) ; le champ mort `extractedText` (déclaré, jamais écrit) est
+>   retiré. `ocrDetail` réutilise le **vocabulaire de codes** de
+>   `inboundEmails.sources[].detail`.
+> - `convex/documentsExtract.ts` : action interne planifiée par
+>   `documents:create`, même routeur « monde clos » que `reportExtract`
+>   réduit à un fichier. Elle adopte le texte déjà présent pour un blob au
+>   lieu de relancer un OCR — c'est ce qui évite de payer Mistral deux fois
+>   sur les pièces jointes des reports.
+> - `convex/lib/fileText.ts` : seuils de classification et budget de texte
+>   (`MAX_DOCUMENT_CHARS` = 900 000, ~350 pages) partagés par les deux
+>   chemins d'extraction, pour qu'ils ne dérivent pas.
+> - `reportExtract` persiste désormais le texte **par pièce jointe** (en plus
+>   du texte combiné) ; `reportStore` recopie l'état du routeur sur chaque
+>   ligne `documents` créée.
+> - Front : `src/components/documents/DocumentReading.tsx` (`OcrStatus` +
+>   `ExtractedTextDialog`) partagé par `ReportingsSection` et
+>   `DealDocumentsSection` ; requête `documents:getExtractedText` chargée
+>   uniquement à l'ouverture (`'skip'` sinon), mutation `documents:reextract`.
+>   Clés i18n sous `participations:documentReading.*`.
+> - `deals:remove` supprimait le blob d'un document de deal sans passer par
+>   `documents:remove` : sa ligne `documentTexts` serait restée orpheline.
+>   Helper `convex/lib/documentTexts.ts` appelé aux deux endroits.
+## v1.140.0 — 28/07/2026 à 14:57 — Les documents d'une société se rangent en juridique et en reporting
+
+Sur la fiche d'une société, l'onglet **Documents** mélangeait deux familles
+qui n'ont rien à voir : ce que la boîte nous envoie (reportings, business
+plans) et ce qui engage l'entité (statuts, pactes, KBIS…). Ils sont
+maintenant séparés en blocs repliables — **Reporting & suivi**, **Juridique
+& légal**, et **Autres** — chacun avec son nombre de documents dans le
+titre. Tout est déplié à l'ouverture : on replie ce qu'on ne veut pas voir,
+rien n'est masqué par surprise. Un bloc sans document ne s'affiche pas.
+
+Rien ne change à l'ajout d'un document (les types proposés sont les mêmes),
+ni sur la fiche d'un deal, où la question ne se pose pas : on n'y trouve que
+des documents liés à l'investissement.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/ReportingsSection.tsx` : le tableau plat est
+>   remplacé par une liste de groupes `Collapsible` (`ui/collapsible`),
+>   pilotés par une constante `GROUPS` (`reporting` = `reporting` + `bp`,
+>   `legal` = `legal`, `other` = tout le reste, y compris les kinds deal que
+>   le schéma accepte aussi). Le rendu d'un groupe est extrait dans un
+>   composant local `DocumentGroup` (ouvert par défaut) ; un groupe vide
+>   n'est pas rendu, l'état vide global est inchangé.
+> - `src/locales/{fr,en}/participations.json` : nouvelles clés
+>   `reportings.group.{reporting,legal,other}`.
+> - Aucun changement de modèle ni de migration : les quatre `kind` existent
+>   déjà en base, seul le regroupement d'affichage est nouveau.
+> - `DealDocumentsSection` n'est pas touché.
+
+---
+
+## v1.139.2 — 28/07/2026 à 09:35 — Les onglets Reports / Documents adoptent le style du reste de l'app
+
+Sur la fiche d'une participation, les onglets **Reports** et **Documents**
+étaient les seuls de l'app à s'afficher en texte souligné. Ils prennent
+désormais la même forme que partout ailleurs — notamment la barre de la
+page Cash (Vue d'ensemble / Prévisionnel / Transactions / Règles &
+échéances) : des pastilles dans un bandeau gris, l'onglet actif en blanc.
+Rien ne change dans le contenu des deux onglets.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/$orgSlug/participations.$companyId.tsx` : la `TabsList`
+>   de la zone reporting passe de `variant="line"` au variant par défaut
+>   (pastilles), identique à `cash.index.tsx`.
+> - C'était le seul usage de `variant="line"` du repo ; le variant reste
+>   défini dans `src/components/ui/tabs.tsx` et disponible si besoin.
+
+---
 
 ## v1.139.1 — 27/07/2026 à 23:25 — Les badges de secteur tiennent tous sur une ligne
 

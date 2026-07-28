@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import { deleteStorageText } from './lib/documentTexts'
 import {
   couponPeriodicityValidator,
   fundTypeValidator,
@@ -752,6 +753,7 @@ export const remove = mutation({
       .withIndex('by_deal', (q) => q.eq('dealId', id))
       .collect()
     for (const doc of docs) {
+      await deleteStorageText(ctx, doc.storageId)
       await ctx.storage.delete(doc.storageId)
       await ctx.db.delete('documents', doc._id)
     }

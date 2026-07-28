@@ -3,6 +3,51 @@
 Pinned versions, workarounds, and rough edges. Update this file as upstream
 fixes land so renovate (which respects `pnpm.overrides`) can be unblocked.
 
+## Texte extrait d'un document : pourquoi une table à part, clé sur le blob
+
+### Le piège
+
+Le réflexe est de coller le texte OCRisé dans un champ `documents.extractedText`
+(le champ existait d'ailleurs, déclaré et jamais écrit). Deux raisons de ne
+pas le faire, et la seconde est la vraie :
+
+1. **La ligne Convex est plafonnée à 1 Mo**, tous champs confondus (cf.
+   `convex/_generated/ai/guidelines.md`). Un pacte de 350 pages en français
+   (~900 000 caractères, ~1,05 octet/caractère en UTF-8) sature la ligne à
+   lui seul.
+2. **Convex lit toujours la ligne entière.** `documents:listByCompany` charge
+   jusqu'à 200 lignes à chaque ouverture de l'onglet Documents. Avec le texte
+   sur la ligne, c'est des dizaines de Mo relus à chaque affichage, pour
+   afficher un titre et une taille.
+
+### Le pattern retenu
+
+Table `documentTexts`, **une ligne par blob de storage** (`storageId`), pas
+par document :
+
+- la liste ne lit que l'état (`ocrState` / `ocrDetail` / `ocrChars`, petits
+  champs restés sur `documents`), le texte n'est lu que par
+  `documents:getExtractedText` quand l'utilisateur l'ouvre ;
+- le **fan-out multi-org** du pipeline report crée N lignes `documents`
+  autour d'**un seul** blob : la clé sur `storageId` fait que l'extraction
+  est partagée, écrite une fois, jamais recalculée par entité ;
+- corollaire utile : `documentsExtract:run` commence par regarder si le blob
+  a déjà un texte. C'est ce qui évite de **payer Mistral deux fois** pour une
+  pièce jointe déjà lue par `reportExtract` (brique 4).
+
+Donc : un nouveau chemin d'ingestion de fichiers doit écrire son texte via
+`documentsExtract:saveStorageText` (clé blob) et poser l'état sur sa ligne
+`documents` — jamais l'inverse.
+
+### Le corollaire qui mord
+
+`documents:remove` supprime le blob **et** sa ligne `documentTexts`. Sur un
+document issu du fan-out, ça vaut aussi pour les lignes sœurs des autres
+entités, qui perdent le fichier — comportement **préexistant** (la
+suppression du blob était déjà inconditionnelle), simplement étendu au
+texte pour rester cohérent. À traiter le jour où le fan-out multi-org
+devient courant.
+
 ## Account linking & verified email (anti-doublon)
 
 ### What went wrong (the trap)
