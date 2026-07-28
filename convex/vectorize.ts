@@ -5,19 +5,20 @@
  * isolation at the index level; every search surface must STILL check org
  * membership (the namespace isolates, auth authorizes).
  *
- * What gets indexed (all text, never file bytes):
- * - `documents` rows with `source: 'upload'` (manual uploads) — text produced
- *   here by the shared extraction helpers (Mistral OCR for PDF/images,
- *   excel/csv parsing, plain text passthrough), persisted on
- *   `documents.extractedText`, then embedded. Entry key `doc:<documentId>`.
+ * What gets indexed (always text, never file bytes — extraction is NOT done
+ * here, it belongs to `documentsExtract.ts` which writes `documentTexts`):
+ * - `documents` rows with `source: 'upload'` — their blob's `documentTexts`
+ *   text, indexed when `documentsExtract.run` completes (it schedules
+ *   `indexDocument`). Entry key `doc:<documentId>`.
  * - `companyReports` — the pipeline's combined `rawContent` (email body +
- *   attachments + links), already extracted upstream. Entry key
- *   `report:<reportId>`. Email-ingested `documents` rows are NOT indexed
- *   individually: their text is already inside the report entry.
+ *   attachments + links), indexed from `reportStore.storeForCompany`.
+ *   Entry key `report:<reportId>`. Email-ingested `documents` rows are NOT
+ *   indexed individually: their text is already inside the report entry.
  *
  * Keys make ingestion idempotent: re-adding the same key replaces the entry
- * (safe backfill re-runs). Embeddings: qwen/qwen3-embedding-8b via OpenRouter
- * (same billing account as the agent chat model, EU-hosted provider).
+ * (safe backfill re-runs, re-extraction re-indexes). Embeddings:
+ * qwen/qwen3-embedding-8b via OpenRouter (same billing account as the agent
+ * chat model, EU-hosted provider).
  */
 
 import { RAG } from '@convex-dev/rag'
@@ -27,12 +28,9 @@ import { v } from 'convex/values'
 import { components, internal } from './_generated/api'
 import {
   internalAction,
-  internalMutation,
   internalQuery,
 } from './_generated/server'
 import { readMembership } from './lib/agentScope'
-import { csvToText, excelToText } from './lib/excel'
-import { ocrImage, ocrPdf } from './lib/ocr'
 
 import type { ActionCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
@@ -42,12 +40,6 @@ import type { Doc, Id } from './_generated/dataModel'
 // full backfill re-run (embeddings from different models are incompatible).
 const EMBEDDING_MODEL = 'qwen/qwen3-embedding-8b'
 const EMBEDDING_DIMENSION = 4096 // Qwen3 native; Convex vector index max
-
-// Same combined-text budget as the report pipeline (1MB doc cap headroom).
-const MAX_INDEX_CHARS = 150_000
-
-const EXCEL_EXTS = new Set(['xlsx', 'xls', 'xlsm'])
-const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif'])
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -64,56 +56,6 @@ export const rag = new RAG<Filters>(components.rag, {
   filterNames: ['companyId', 'kind'],
 })
 
-// ─── Text extraction (shared with upload + backfill paths) ───────────────────
-
-function ext(filename: string): string {
-  const parts = filename.toLowerCase().split('.')
-  return parts.length > 1 ? parts[parts.length - 1] : ''
-}
-
-/**
- * Produce text for a stored file: Mistral OCR for PDF/images, parser for
- * Excel/CSV, passthrough for plain text. Returns '' when the format has no
- * extractable text (the caller records the skip) — extraction never throws.
- */
-async function extractFileText(
-  buf: ArrayBuffer,
-  title: string,
-  contentType: string | undefined,
-): Promise<string> {
-  const e = ext(title)
-  if (contentType === 'application/pdf' || e === 'pdf') {
-    return await ocrPdf(buf)
-  }
-  if (contentType?.startsWith('image/') || IMAGE_EXTS.has(e)) {
-    return await ocrImage(buf, contentType ?? 'image/png')
-  }
-  if (EXCEL_EXTS.has(e)) {
-    try {
-      return excelToText(buf, title)
-    } catch {
-      return ''
-    }
-  }
-  if (e === 'csv' || contentType === 'text/csv') {
-    try {
-      return csvToText(buf, title)
-    } catch {
-      return ''
-    }
-  }
-  if (contentType?.startsWith('text/') || e === 'txt' || e === 'md') {
-    return new TextDecoder().decode(buf)
-  }
-  return ''
-}
-
-function cap(text: string): string {
-  return text.length > MAX_INDEX_CHARS
-    ? `${text.slice(0, MAX_INDEX_CHARS)}\n[...tronqué]`
-    : text
-}
-
 // ─── Internal data access ────────────────────────────────────────────────────
 
 export const getDocumentForIndex = internalQuery({
@@ -122,7 +64,15 @@ export const getDocumentForIndex = internalQuery({
     const doc = await ctx.db.get('documents', documentId)
     if (!doc) return null
     const company = await ctx.db.get('companies', doc.companyId)
-    return { doc, companyName: company?.name ?? '' }
+    const textRow = await ctx.db
+      .query('documentTexts')
+      .withIndex('by_storage', (q) => q.eq('storageId', doc.storageId))
+      .first()
+    return {
+      doc,
+      companyName: company?.name ?? '',
+      text: textRow?.text ?? null,
+    }
   },
 })
 
@@ -133,27 +83,6 @@ export const getReportForIndex = internalQuery({
     if (!report) return null
     const company = await ctx.db.get('companies', report.companyId)
     return { report, companyName: company?.name ?? '' }
-  },
-})
-
-export const setExtractedText = internalMutation({
-  args: {
-    documentId: v.id('documents'),
-    extractedText: v.string(),
-  },
-  handler: async (ctx, { documentId, extractedText }) => {
-    // The row may have been deleted while OCR was running.
-    const doc = await ctx.db.get('documents', documentId)
-    if (doc) await ctx.db.patch('documents', documentId, { extractedText })
-    return null
-  },
-})
-
-export const getCompanyName = internalQuery({
-  args: { companyId: v.id('companies') },
-  handler: async (ctx, { companyId }) => {
-    const company = await ctx.db.get('companies', companyId)
-    return company?.name ?? ''
   },
 })
 
@@ -170,31 +99,19 @@ export const assertMemberInternal = internalQuery({
 
 // ─── Indexing implementations (shared by live ingestion + backfill) ──────────
 
+function indexableDocument(doc: Doc<'documents'>): boolean {
+  // Email-ingested rows are covered by their report entry; inline images are
+  // analysis artefacts.
+  return doc.source === 'upload' && doc.inline !== true
+}
+
 async function indexDocumentImpl(
   ctx: ActionCtx,
   doc: Doc<'documents'>,
   companyName: string,
+  text: string | null,
 ): Promise<'indexed' | 'skipped'> {
-  // Email-ingested rows are covered by their report entry; inline images are
-  // analysis artefacts.
-  if (doc.source !== 'upload' || doc.inline === true) return 'skipped'
-
-  let text = doc.extractedText
-  if (!text) {
-    const blob = await ctx.storage.get(doc.storageId)
-    if (!blob) return 'skipped'
-    text = await extractFileText(
-      await blob.arrayBuffer(),
-      doc.title,
-      doc.contentType,
-    )
-    if (!text) return 'skipped'
-    text = cap(text)
-    await ctx.runMutation(internal.vectorize.setExtractedText, {
-      documentId: doc._id,
-      extractedText: text,
-    })
-  }
+  if (!indexableDocument(doc) || !text) return 'skipped'
 
   // Header line so company / kind / title are searchable content too.
   const header = `Document "${doc.title}" (${doc.kind}) — ${companyName}`
@@ -202,7 +119,7 @@ async function indexDocumentImpl(
     namespace: doc.orgId,
     key: `doc:${doc._id}`,
     title: doc.title,
-    text: cap(`${header}\n\n${text}`),
+    text: `${header}\n\n${text}`,
     filterValues: [
       { name: 'companyId', value: doc.companyId },
       { name: 'kind', value: doc.kind },
@@ -223,7 +140,7 @@ async function indexReportImpl(
     namespace: report.orgId,
     key: `report:${report._id}`,
     title,
-    text: cap(`${header}\n\n${report.rawContent}`),
+    text: `${header}\n\n${report.rawContent}`,
     filterValues: [
       { name: 'companyId', value: report.companyId },
       { name: 'kind', value: 'report' },
@@ -241,7 +158,12 @@ export const indexDocument = internalAction({
       documentId,
     })
     if (!found) return null
-    const state = await indexDocumentImpl(ctx, found.doc, found.companyName)
+    const state = await indexDocumentImpl(
+      ctx,
+      found.doc,
+      found.companyName,
+      found.text,
+    )
     console.log(`[vectorize] document ${documentId}: ${state}`)
     return null
   },
@@ -302,10 +224,10 @@ export const searchInternal = internalAction({
       chunkContext: { before: 1, after: 1 },
     })
 
-    const titleByEntry = new Map(entries.map((e) => [e.entryId, e]))
+    const entryById = new Map(entries.map((e) => [e.entryId, e]))
     return {
       results: results.map((r) => {
-        const entry = titleByEntry.get(r.entryId)
+        const entry = entryById.get(r.entryId)
         return {
           source: entry?.title ?? 'unknown',
           sourceKey: entry?.key ?? null,
@@ -321,7 +243,7 @@ export const searchInternal = internalAction({
 
 const BACKFILL_BATCH = 2000
 
-export const listDocumentsForBackfill = internalQuery({
+export const listDocumentIdsForBackfill = internalQuery({
   args: { orgId: v.id('organizations') },
   handler: async (ctx, { orgId }) => {
     const rows = await ctx.db
@@ -333,11 +255,11 @@ export const listDocumentsForBackfill = internalQuery({
         `[vectorize] backfill hit the ${BACKFILL_BATCH} documents cap for org ${orgId} — rows beyond the cap were NOT indexed`,
       )
     }
-    return rows
+    return rows.map((r) => r._id)
   },
 })
 
-export const listReportsForBackfill = internalQuery({
+export const listReportIdsForBackfill = internalQuery({
   args: { orgId: v.id('organizations') },
   handler: async (ctx, { orgId }) => {
     const rows = await ctx.db
@@ -349,7 +271,7 @@ export const listReportsForBackfill = internalQuery({
         `[vectorize] backfill hit the ${BACKFILL_BATCH} reports cap for org ${orgId} — rows beyond the cap were NOT indexed`,
       )
     }
-    return rows
+    return rows.map((r) => r._id)
   },
 })
 
@@ -365,43 +287,53 @@ async function backfillOrgImpl(
   ctx: ActionCtx,
   orgId: Id<'organizations'>,
 ): Promise<string> {
-  const companyNames = new Map<Id<'companies'>, string>()
-  const nameOf = async (companyId: Id<'companies'>): Promise<string> => {
-    const cached = companyNames.get(companyId)
-    if (cached !== undefined) return cached
-    const found: string = await ctx.runQuery(
-      internal.vectorize.getCompanyName,
-      { companyId },
-    )
-    companyNames.set(companyId, found)
-    return found
-  }
-
   let indexed = 0
   let skipped = 0
-  const docs = await ctx.runQuery(internal.vectorize.listDocumentsForBackfill, {
-    orgId,
-  })
-  for (const doc of docs) {
-    const state = await indexDocumentImpl(ctx, doc, await nameOf(doc.companyId))
-    if (state === 'indexed') indexed++
-    else skipped++
-  }
+  let queued = 0
 
-  const reports = await ctx.runQuery(internal.vectorize.listReportsForBackfill, {
-    orgId,
-  })
-  for (const report of reports) {
-    const state = await indexReportImpl(
+  const docIds = await ctx.runQuery(
+    internal.vectorize.listDocumentIdsForBackfill,
+    { orgId },
+  )
+  for (const documentId of docIds) {
+    const found = await ctx.runQuery(internal.vectorize.getDocumentForIndex, {
+      documentId,
+    })
+    if (!found) continue
+    if (indexableDocument(found.doc) && !found.text && !found.doc.ocrState) {
+      // Uploaded before extraction existed: run the reading now — its end
+      // schedules indexDocument, so the entry lands once the OCR is done.
+      await ctx.scheduler.runAfter(0, internal.documentsExtract.run, {
+        documentId,
+      })
+      queued++
+      continue
+    }
+    const state = await indexDocumentImpl(
       ctx,
-      report,
-      await nameOf(report.companyId),
+      found.doc,
+      found.companyName,
+      found.text,
     )
     if (state === 'indexed') indexed++
     else skipped++
   }
 
-  const summary = `[vectorize] backfill org ${orgId}: ${indexed} indexed, ${skipped} skipped`
+  const reportIds = await ctx.runQuery(
+    internal.vectorize.listReportIdsForBackfill,
+    { orgId },
+  )
+  for (const reportId of reportIds) {
+    const found = await ctx.runQuery(internal.vectorize.getReportForIndex, {
+      reportId,
+    })
+    if (!found) continue
+    const state = await indexReportImpl(ctx, found.report, found.companyName)
+    if (state === 'indexed') indexed++
+    else skipped++
+  }
+
+  const summary = `[vectorize] backfill org ${orgId}: ${indexed} indexed, ${skipped} skipped, ${queued} queued for extraction`
   console.log(summary)
   return summary
 }

@@ -222,9 +222,14 @@ export const storeForCompany = internalMutation({
       reportId = await ctx.db.insert('companyReports', reportFields)
     }
 
-    // Files → documents rows (one per entity, same storage blob).
+    // Files → documents rows (one per entity, same storage blob). The
+    // content router already read each file (brick 4): its outcome becomes
+    // the document's reading state, so the front and the recap email always
+    // tell the same story. The text itself is already stored, keyed by the
+    // shared blob (`documentTexts`) — no second OCR here.
     for (const att of email.attachments) {
       if (!att.storageId) continue
+      const outcome = email.sources?.find((s) => s.label === att.filename)
       await ctx.db.insert('documents', {
         orgId: args.orgId,
         companyId: args.companyId,
@@ -238,6 +243,18 @@ export const storeForCompany = internalMutation({
         uploadedAt: Date.now(),
         reportId,
         inline: att.inline,
+        ...(outcome
+          ? {
+              ocrState:
+                outcome.state === 'extracted'
+                  ? ('extracted' as const)
+                  : outcome.state === 'failed'
+                    ? ('failed' as const)
+                    : ('skipped' as const),
+              ocrDetail: outcome.detail,
+              ocrChars: outcome.chars,
+            }
+          : {}),
       })
     }
 

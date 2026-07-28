@@ -3,6 +3,65 @@
 Pinned versions, workarounds, and rough edges. Update this file as upstream
 fixes land so renovate (which respects `pnpm.overrides`) can be unblocked.
 
+## Texte extrait d'un document : pourquoi une table à part, clé sur le blob
+
+### Le piège
+
+Le réflexe est de coller le texte OCRisé dans un champ `documents.extractedText`
+(le champ existait d'ailleurs, déclaré et jamais écrit). Deux raisons de ne
+pas le faire, et la seconde est la vraie :
+
+1. **La ligne Convex est plafonnée à 1 Mo**, tous champs confondus (cf.
+   `convex/_generated/ai/guidelines.md`). Un pacte de 350 pages en français
+   (~900 000 caractères, ~1,05 octet/caractère en UTF-8) sature la ligne à
+   lui seul.
+2. **Convex lit toujours la ligne entière.** `documents:listByCompany` charge
+   jusqu'à 200 lignes à chaque ouverture de l'onglet Documents. Avec le texte
+   sur la ligne, c'est des dizaines de Mo relus à chaque affichage, pour
+   afficher un titre et une taille.
+
+### Le pattern retenu
+
+Table `documentTexts`, **une ligne par blob de storage** (`storageId`), pas
+par document :
+
+- la liste ne lit que l'état (`ocrState` / `ocrDetail` / `ocrChars`, petits
+  champs restés sur `documents`), le texte n'est lu que par
+  `documents:getExtractedText` quand l'utilisateur l'ouvre ;
+- le **fan-out multi-org** du pipeline report crée N lignes `documents`
+  autour d'**un seul** blob : la clé sur `storageId` fait que l'extraction
+  est partagée, écrite une fois, jamais recalculée par entité ;
+- corollaire utile : `documentsExtract:run` commence par regarder si le blob
+  a déjà un texte. C'est ce qui évite de **payer Mistral deux fois** pour une
+  pièce jointe déjà lue par `reportExtract` (brique 4).
+
+Donc : un nouveau chemin d'ingestion de fichiers doit écrire son texte via
+`documentsExtract:saveStorageText` (clé blob) et poser l'état sur sa ligne
+`documents` — jamais l'inverse.
+
+### Le champ legacy `documents.extractedText`
+
+Le champ existe encore au schéma. Il est écrit par **rien** dans ce repo et lu
+par **rien** — mais des lignes de prod le portent (le texte y a été mis
+hors du repo, avant `documentTexts`). Le retirer **casse `convex deploy`** :
+la validation de schéma refuse les lignes existantes (« Object contains extra
+field `extractedText` that is not in the validator »), et le build Vercel de
+prod échoue après le push des fonctions. Vérifié à la dure sur la PR #307.
+
+Un `grep` du code ne suffit donc pas à conclure qu'un champ est mort : il dit
+qu'aucun code **actuel** ne l'écrit, pas qu'aucune **donnée** ne le porte.
+Avant de retirer un champ, regarder la prod. Le chantier de retrait
+(reprise du texte puis purge) est dans `MIGRATIONS.md`.
+
+### Le corollaire qui mord
+
+`documents:remove` supprime le blob **et** sa ligne `documentTexts`. Sur un
+document issu du fan-out, ça vaut aussi pour les lignes sœurs des autres
+entités, qui perdent le fichier — comportement **préexistant** (la
+suppression du blob était déjà inconditionnelle), simplement étendu au
+texte pour rester cohérent. À traiter le jour où le fan-out multi-org
+devient courant.
+
 ## Account linking & verified email (anti-doublon)
 
 ### What went wrong (the trap)
@@ -2844,16 +2903,21 @@ un modèle au-dessus.
   (`assertMemberInternal`) avant `rag.search`, même discipline que les
   autres outils d'agent.
 - **Ce qui est indexé** (du texte, jamais les octets du fichier) : les
-  `documents` en `source: 'upload'` (extraction ici : OCR Mistral
-  PDF/images, `excelToText`/`csvToText`, passthrough `text/*` — persistée
-  sur `extractedText`) et les `companyReports` via leur `rawContent`. Les
-  `documents` issus d'email ne sont **pas** indexés individuellement :
-  leur texte est déjà dans l'entrée du report (l'indexer aussi créerait des
-  doublons de résultats).
+  `documents` en `source: 'upload'` via le texte de leur blob dans
+  `documentTexts`, et les `companyReports` via leur `rawContent`.
+  **Aucune extraction ici** : elle appartient à `documentsExtract.ts`, qui
+  schedule `vectorize:indexDocument` en fin de run (les deux chemins :
+  adoption d'un texte existant et extraction fraîche) — donc une
+  re-extraction (`documents:reextract`) ré-indexe d'office. Les `documents`
+  issus d'email ne sont **pas** indexés individuellement : leur texte est
+  déjà dans l'entrée du report (l'indexer aussi créerait des doublons de
+  résultats).
 - **Clés d'entrée** `doc:<documentId>` / `report:<reportId>` : ré-ajouter la
   même clé **remplace** l'entrée (ingestion idempotente, backfill re-runnable,
   re-import d'une période de report aligné sur la dedup de `storeForCompany`).
-  Suppression d'un document → `removeEntry` schedulé (no-op si jamais indexé).
+  Suppression d'un document → `removeEntry` schedulé (no-op si jamais
+  indexé), depuis `documents:remove` **et** le cascade de `deals:remove` —
+  tout nouveau chemin de suppression de `documents` doit faire pareil.
 - **Changer de modèle d'embedding est une bascule atomique** : un namespace
   RAG est identifié par (namespace, modelId, dimension, filterNames). Changer
   `EMBEDDING_MODEL`/`EMBEDDING_DIMENSION` fait pointer recherche ET ingestion
@@ -2864,5 +2928,7 @@ un modèle au-dessus.
   Le modèle est épinglé (pas d'alias `latest`) pour qu'aucune release
   upstream ne déclenche cette bascule silencieusement.
 - Le cron/les webhooks n'interviennent pas : l'ingestion au fil de l'eau est
-  schedulée depuis les mutations (`documents:create`, `reportStore:storeForCompany`),
-  jamais bloquante pour l'upload ni le pipeline.
+  schedulée en fin d'extraction (`documentsExtract.run`) et de pipeline
+  report (`reportStore:storeForCompany`), jamais bloquante pour l'upload ni
+  le pipeline. Le backfill envoie d'abord à l'extraction les documents
+  uploadés **jamais lus** (sans `ocrState`) — l'indexation suit toute seule.

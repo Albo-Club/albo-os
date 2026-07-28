@@ -2,14 +2,21 @@
  * Documents & reportings attached to a company (investor updates, BP,
  * legal). Files live in native Convex storage — upload via
  * `files:generateUploadUrl` (existing), then `documents:create` with the
- * storageId. V1 = manual upload; email ingestion (`source: 'email'`)
- * will come in V2.
+ * storageId. Two ways in: manual upload here, and the report pipeline
+ * (`source: 'email'`, rows created by `reportStore.ts`). A row hangs off a
+ * company, or off one of its deals when `dealId` is set — the two lists are
+ * disjoint (`listByCompany` excludes deal documents).
+ *
+ * Both carry the same reading state (`ocrState`) so the front can tell,
+ * per document, whether its text was read — the extracted text itself is
+ * fetched on demand via `getExtractedText`, never with the list.
  */
 
 import { ConvexError, v } from 'convex/values'
 import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import { deleteStorageText } from './lib/documentTexts'
 
 import type { Id } from './_generated/dataModel'
 import type { MutationCtx } from './_generated/server'
@@ -75,6 +82,10 @@ export const listByCompany = query({
         // Links an email-ingested attachment to its report (companyReports),
         // so the Reports timeline can surface a report's source docs.
         reportId: doc.reportId ?? null,
+        // Reading state — never the text itself (cf. `documentTexts`).
+        ocrState: doc.ocrState ?? null,
+        ocrDetail: doc.ocrDetail ?? null,
+        ocrChars: doc.ocrChars ?? null,
         url: await ctx.storage.getUrl(doc.storageId),
       })),
     )
@@ -104,9 +115,30 @@ export const listByDeal = query({
         contentType: doc.contentType ?? null,
         size: doc.size ?? null,
         uploadedAt: doc.uploadedAt,
+        // Same reading state as a company document — one pipeline, one story.
+        ocrState: doc.ocrState ?? null,
+        ocrDetail: doc.ocrDetail ?? null,
+        ocrChars: doc.ocrChars ?? null,
         url: await ctx.storage.getUrl(doc.storageId),
       })),
     )
+  },
+})
+
+/** The extracted text of a document — loaded only when the user opens it. */
+export const getExtractedText = query({
+  args: { documentId: v.id('documents') },
+  handler: async (ctx, { documentId }) => {
+    const doc = await ctx.db.get('documents', documentId)
+    if (!doc) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, doc.orgId)
+
+    const row = await ctx.db
+      .query('documentTexts')
+      .withIndex('by_storage', (q) => q.eq('storageId', doc.storageId))
+      .first()
+    if (!row) return null
+    return { text: row.text, truncated: row.truncated }
   },
 })
 
@@ -156,14 +188,38 @@ export const create = mutation({
       source: 'upload',
       uploadedBy: user._id,
       uploadedAt: Date.now(),
+      ocrState: 'pending',
     })
-
-    // Semantic index (OCR + embeddings) — async, never blocks the upload.
-    await ctx.scheduler.runAfter(0, internal.vectorize.indexDocument, {
-      documentId,
-    })
-
+    await ctx.scheduler.runAfter(0, internal.documentsExtract.run, { documentId })
     return documentId
+  },
+})
+
+/**
+ * Re-run the reading of a document. Covers a transient OCR failure and the
+ * documents stored before extraction existed (no state at all).
+ */
+export const reextract = mutation({
+  args: { documentId: v.id('documents') },
+  handler: async (ctx, { documentId }) => {
+    const doc = await ctx.db.get('documents', documentId)
+    if (!doc) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, doc.orgId)
+
+    // Drop the cached text first, otherwise the run would adopt it and skip.
+    const existing = await ctx.db
+      .query('documentTexts')
+      .withIndex('by_storage', (q) => q.eq('storageId', doc.storageId))
+      .first()
+    if (existing) await ctx.db.delete('documentTexts', existing._id)
+
+    await ctx.db.patch('documents', documentId, {
+      ocrState: 'pending',
+      ocrDetail: undefined,
+      ocrChars: undefined,
+    })
+    await ctx.scheduler.runAfter(0, internal.documentsExtract.run, { documentId })
+    return null
   },
 })
 
@@ -173,6 +229,8 @@ export const remove = mutation({
     const doc = await ctx.db.get('documents', documentId)
     if (!doc) throw new ConvexError('not_found')
     await requireOrgMember(ctx, doc.orgId)
+    // The text is keyed by the blob, and the blob goes with the document.
+    await deleteStorageText(ctx, doc.storageId)
     await ctx.storage.delete(doc.storageId)
     await ctx.db.delete('documents', documentId)
     // Drop the semantic-index entry (no-op if the doc was never indexed).

@@ -86,7 +86,9 @@ toutes organisations confondues.
   société. On dépose un fichier (**20 Mo maximum**) en lui donnant un titre,
   un type et, si utile, la **date du document** (signature par exemple) —
   cette date est facultative. Chaque ligne se **télécharge** ou se
-  **supprime** (avec confirmation).
+  **supprime** (avec confirmation), et affiche l'état de sa **lecture**
+  automatique — même colonne et mêmes règles que côté société, détaillées
+  dans [Participations](04-participations.md).
 - **Notes** : texte libre.
 
 ## Gérer une sortie

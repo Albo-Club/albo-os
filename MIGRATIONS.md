@@ -33,11 +33,37 @@ pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip
 | Backfill Attio → deals (Term Sheet en cours)                         | `convex/attioSync.ts` → `attioSync:backfillTermSheets`                                                       | Importe les deals **actuellement** en Term Sheet dans Attio (le webhook ne prend que le futur). Query paginée, filtre stage TS par id, chacun dans `upsertFromDeal` (idempotent sur `attioDealId`, **ne crée jamais sur Invested** → pas de doublon avec le portefeuille déjà importé). Re-run sûr. Cf. `KNOWN_ISSUES.md` « Sync Attio → deals ». |
 
 | Bascule connexions VASCO → table générique `externalConnections`      | `convex/migrations/externalConnections.ts` → `migrateVascoConnections`                                       | Copie les lignes `vascoConnections` vers `externalConnections` (platform `vasco`). Additive, idempotente (skip si clientSlug+username déjà présents). ⚠️ **À lancer juste après le deploy** du socle connexions : tant qu'elle n'a pas tourné, le module VASCO ne voit aucune connexion. Runbook en tête du module. |
-| Backfill vectorisation documents & reports (toutes orgs)              | `convex/vectorize.ts` → `vectorize:backfillAll` (`'{}'`) ou `vectorize:backfillOrg` par org                  | Indexe dans le composant RAG le texte des `documents` uploadés (OCR Mistral au passage si `extractedText` absent, persisté) et le `rawContent` des `companyReports`. Idempotent par clé (`doc:<id>` / `report:<id>` — re-run = remplacement, re-embedding refacturé mais négligeable). Non destructif. ⚠️ **À lancer une fois après le deploy** du chantier vectorisation : sans lui, `searchDocuments` ne voit que les contenus ingérés après coup. Cap 2000 lignes/table/org (log si atteint). Cf. `KNOWN_ISSUES.md` « Vectorisation documents & reports ». |
+| Backfill vectorisation documents & reports (toutes orgs)              | `convex/vectorize.ts` → `vectorize:backfillAll` (`'{}'`) ou `vectorize:backfillOrg` par org                  | Indexe dans le composant RAG le texte `documentTexts` des `documents` uploadés et le `rawContent` des `companyReports`. Les documents uploadés **jamais lus** (sans `ocrState`) sont d'abord envoyés à `documentsExtract.run`, qui schedule l'indexation en fin de lecture (`queued` dans le résumé). Idempotent par clé (`doc:<id>` / `report:<id>` — re-run = remplacement, re-embedding refacturé mais négligeable). Non destructif. ⚠️ **À lancer une fois après le deploy** du chantier vectorisation : sans lui, `searchDocuments` ne voit que les contenus ingérés après coup. Cap 2000 lignes/table/org (log si atteint). Cf. `KNOWN_ISSUES.md` « Vectorisation documents & reports ». |
 
 Les ponts Attio (`attioCompanyId` / `attioDealId`) et l'ingestion Powens sont
 des flux **continus**, pas des migrations — cf. `KNOWN_ISSUES.md`
 (« Ingestion Powens ») et `CLAUDE.md` (frontière d'attribution Attio).
+
+## Chantier : retrait du champ legacy `documents.extractedText`
+
+Le champ n'est **écrit par aucun code de ce repo** (aucun commit ne l'alimente)
+et n'est **lu par rien** depuis que le texte extrait vit dans `documentTexts`
+(cf. `KNOWN_ISSUES.md` « Texte extrait d'un document »). Mais des lignes de
+prod le portent — le texte y a été mis hors du repo, avant `documentTexts`.
+
+Le retirer du schéma **casse `convex deploy`** : la validation refuse les
+lignes existantes (« Object contains extra field `extractedText` that is not
+in the validator »). C'est arrivé une fois, sur le déploiement de la PR #307 —
+le champ a dû être remis. Règle « purger d'abord, resserrer ensuite » :
+
+1. **Reprise + purge (à exécuter en prod)** — ne pas jeter le texte : il évite
+   de repasser ces documents à l'OCR (Mistral est facturé à la page). La
+   migration doit, pour chaque ligne portant `extractedText` : écrire une ligne
+   `documentTexts` pour son `storageId` (si absente), poser
+   `ocrState: 'extracted'` + `ocrChars`, puis effacer le champ.
+
+   ```bash
+   pnpm exec convex export --prod --path ./albo-backup.zip
+   pnpm exec convex run --prod <migration>
+   ```
+
+2. **Resserrage** : une fois la prod à zéro ligne portant le champ, retirer
+   `extractedText` du `documents` de `convex/schema.ts` dans une PR de suivi.
 
 ## Chantier : retrait de la table legacy `vascoConnections`
 

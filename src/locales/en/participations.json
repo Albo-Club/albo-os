@@ -547,6 +547,11 @@
       "size": "Size",
       "date": "Added"
     },
+    "group": {
+      "reporting": "Reporting & tracking",
+      "legal": "Legal",
+      "other": "Other"
+    },
     "kind": {
       "reporting": "Reporting",
       "bp": "Business plan",
@@ -697,5 +702,29 @@
     "active": "Active",
     "exitWin": "Exit win",
     "exitLoss": "Exit loss"
+  },
+  "documentReading": {
+    "chars": "{{chars}} chars",
+    "open": "View extracted text",
+    "dialogTitle": "Extracted text",
+    "noText": "No text was extracted from this document.",
+    "truncated": "Text truncated at 900,000 characters (~350 pages).",
+    "pending": "Reading…",
+    "failed": "Could not be read",
+    "skipped": "Not analysed",
+    "retry": "Run the reading again",
+    "analyse": "Analyse",
+    "restarted": "Reading restarted",
+    "detail": {
+      "ocr_failed": "Could not be read",
+      "parse_failed": "Unreadable file",
+      "download_failed": "File not found",
+      "file_too_large": "File too large",
+      "small_image_skipped": "Small image skipped",
+      "empty_workbook": "Empty workbook",
+      "unsupported_format": "Format not read"
+    },
+    "column": "Reading",
+    "retryError": "Could not restart the reading"
   }
 }

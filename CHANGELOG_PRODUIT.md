@@ -23,13 +23,14 @@ bas de page.
 
 ---
 
-## v1.140.0 — 28/07/2026 à 20:13 — L'assistant sait lire vos documents et reports
+## v1.143.0 — 28/07/2026 à 20:19 — L'assistant sait chercher dans vos documents et reports
 
-L'assistant ne se contente plus de lister vos documents : il peut désormais
-**chercher dans leur contenu**. Posez la question en langage naturel —
-« que dit le pacte de Sezame sur la clause de liquidité ? », « quelles
-boîtes du portefeuille ont parlé de difficultés de recrutement ? » — et il
-retrouve les passages pertinents dans les pactes, term sheets, BP, documents
+La lecture automatique des documents (arrivée avec la v1.142.0) trouve son
+prolongement : l'assistant peut désormais **chercher dans le contenu** de
+tout ce qui a été lu. Posez la question en langage naturel — « que dit le
+pacte de Sezame sur la clause de liquidité ? », « quelles boîtes du
+portefeuille ont parlé de difficultés de recrutement ? » — et il retrouve
+les passages pertinents dans les pactes, term sheets, BP, documents
 juridiques et reportings de l'organisation, ainsi que dans les reports
 investisseurs reçus par email, puis répond en citant ses sources.
 
@@ -38,26 +39,29 @@ les « problèmes de trésorerie » retrouve un passage qui parle de « runway
 réduit à 4 mois ». Elle fonctionne en français comme en anglais, et reste
 strictement cloisonnée par organisation.
 
-Concrètement, chaque document déposé dans l'app est désormais lu (les PDF et
-images passent par la même reconnaissance de texte que les reports email),
-puis indexé automatiquement — rien à faire de votre côté. Les documents et
-reports déjà présents seront indexés en une passe à l'activation.
+Chaque document dont la lecture aboutit est indexé automatiquement — rien à
+faire de votre côté. Les documents et reports déjà présents seront indexés
+en une passe à l'activation (les anciens documents jamais lus passeront
+d'abord par la lecture automatique).
 
 > **🔧 Notes techniques**
 >
 > - Nouveau composant `@convex-dev/rag` (`convex/convex.config.ts`) —
 >   embeddings `qwen/qwen3-embedding-8b` via OpenRouter (même clé que le
->   chat), dimension 4096, **un namespace par org**, clés idempotentes
->   `doc:<id>` / `report:<id>`.
-> - `convex/vectorize.ts` : instance RAG + extraction texte des uploads
->   (OCR Mistral PDF/images, excel/csv, `text/*`) persistée sur
->   `documents.extractedText`, indexation `indexDocument`/`indexReport`,
->   suppression `removeEntry`, recherche `searchInternal` (re-check
->   membership), backfill `backfillAll`/`backfillOrg` (cf. `MIGRATIONS.md`).
-> - Ingestion schedulée depuis `documents:create` / `documents:remove` /
->   `reportStore:storeForCompany` (jamais bloquante). Les documents issus
->   d'email ne sont pas indexés individuellement (déjà couverts par
->   l'entrée du report).
+>   chat, provider hébergé UE), dimension 4096, **un namespace par org**,
+>   clés idempotentes `doc:<id>` / `report:<id>`.
+> - `convex/vectorize.ts` : instance RAG, indexation
+>   `indexDocument`/`indexReport` (texte lu depuis `documentTexts` — zéro
+>   OCR en propre, l'extraction reste à `documentsExtract.ts` qui schedule
+>   l'indexation en fin de run), suppression `removeEntry` (schedulée par
+>   `documents:remove` et le cascade `deals:remove`), recherche
+>   `searchInternal` (re-check membership), backfill
+>   `backfillAll`/`backfillOrg` (cf. `MIGRATIONS.md` — les documents
+>   uploadés sans état de lecture sont d'abord envoyés à l'extraction).
+> - Reports : indexation schedulée en fin de `reportStore:storeForCompany`
+>   (le re-import d'une période remplace l'entrée, aligné sur la dedup).
+>   Les documents issus d'email ne sont pas indexés individuellement (déjà
+>   couverts par l'entrée du report).
 > - Nouvel outil d'agent `searchDocuments`
 >   (`convex/agentToolsDocuments.ts`, lecture seule) branché dans
 >   `convex/agent.ts` + consigne dans `convex/lib/instructions.ts`.
@@ -68,6 +72,188 @@ reports déjà présents seront indexés en une passe à l'activation.
 >   (bascule de modèle = namespace neuf + backfill), ligne `MIGRATIONS.md`,
 >   scénario `TESTING.md` C35, page produit assistant, ligne
 >   `TEMPLATE_SYNC.md`.
+
+---
+
+## v1.142.1 — 28/07/2026 à 18:29 — Correctif : le déploiement de la lecture des documents
+
+La mise en ligne de la lecture automatique des documents a échoué au
+déploiement : un ancien champ, que plus aucun code n'utilise mais que
+certains documents portent encore en base, avait été retiré. La base a
+refusé la mise à jour, et rien n'est parti en production.
+
+Le champ est remis en place — aucun changement visible côté produit, la
+fonctionnalité de lecture part maintenant normalement. Le nettoyage de ces
+anciennes données est planifié à part, en récupérant leur texte plutôt qu'en
+le jetant : ces documents s'afficheront comme déjà lus, sans repasser à
+l'OCR.
+
+> **🔧 Notes techniques**
+>
+> - `documents.extractedText` a été retiré du schéma en v1.141.0 sur la foi
+>   d'un grep (aucune écriture dans le repo, aucune lecture). Des lignes de
+>   prod le portent quand même — écrit hors du repo, avant `documentTexts`.
+>   `convex deploy` a rejeté le push : « Object contains extra field
+>   `extractedText` that is not in the validator ».
+> - Le champ est restauré (`v.optional(v.string())`), commenté comme legacy.
+>   Aucun autre changement : la lecture des documents est inchangée.
+> - Leçon consignée dans `KNOWN_ISSUES.md` : un grep dit qu'aucun code
+>   **actuel** n'écrit un champ, pas qu'aucune **donnée** ne le porte.
+> - Chantier de retrait (reprise du texte vers `documentTexts` + purge, puis
+>   resserrage du schéma) documenté dans `MIGRATIONS.md`.
+
+## v1.142.0 — 28/07/2026 à 18:18 — La fiche d'identité d'une société est enfin lisible
+
+Le panneau d'identité, à droite de la fiche société, empilait quatre blocs de
+même poids dans un cadre blanc : rien n'accrochait l'œil, et trois détails le
+rendaient franchement désagréable à lire. Les libellés longs — « Nb d'actions
+consolidé », « Détention globale (%) » — passaient à la ligne et cassaient
+l'alignement des valeurs entre les deux colonnes. Le résumé de la société
+était justifié, ce qui creusait de larges blancs entre les mots dans une
+colonne aussi étroite. Et rien ne distinguait une section d'une autre.
+
+Le panneau reprend désormais le style de la synthèse IA : une carte, et
+chaque section introduite par une petite pastille carrée avec son icône.
+Les champs se lisent en lignes — libellé à gauche, valeur à droite, un filet
+fin entre chaque — si bien qu'aucun libellé ne passe plus à la ligne et que
+les chiffres s'alignent enfin verticalement. Le résumé devient une section à
+part entière, aligné à gauche. Fondateurs, board et co-investisseurs
+s'affichent en pastilles avec leurs initiales, chaque section portant son
+compteur.
+
+Rien ne change côté saisie : secteur, SIREN et domaine s'éditent toujours
+d'un clic sur la valeur, et les champs vides gardent leur tiret.
+
+> **🔧 Notes techniques**
+>
+> - `EntityFiche.tsx` : `IdentityField` passe d'une pile libellé/valeur à une
+>   ligne `flex justify-between` avec `border-b` + `last:border-b-0` — c'est
+>   ce qui règle le retour à la ligne des libellés longs dans les 320 px du
+>   panneau. `IdentitySection` accepte deux props optionnelles, `icon`
+>   (pastille carrée 22 px) et `count` (badge), toutes deux opt-in pour que la
+>   section « Deals » de la colonne principale reste inchangée. `PeopleList`
+>   rend des pastilles arrondies avec initiales (helper local
+>   `personInitials`) ; les branches LinkedIn/mail, toujours inertes, sont
+>   conservées telles quelles.
+> - `src/components/ui/inline-field.tsx` : nouvelle prop
+>   `layout: 'stacked' | 'row'`, défaut `stacked` — la fiche deal
+>   (`InstrumentBlock.tsx`) n'est donc pas touchée. Le bouton de repos est
+>   extrait dans une variable partagée par les deux layouts, l'édition est
+>   identique dans les deux cas.
+> - `participations.$companyId.tsx` : l'`aside` passe en
+>   `bg-card rounded-xl` (parité visuelle avec `CompanyAiSynthesisBlock`), la
+>   grille `grid-cols-2` devient une pile de lignes, et le résumé sort du bloc
+>   Identité pour devenir sa propre `IdentitySection` — sans `text-justify`.
+>   Icônes lucide : `IdCard`, `AlignLeft`, `User`, `Users`, `Handshake`.
+> - Aucune nouvelle clé i18n : les libellés existants sont réutilisés tels
+>   quels, y compris `identity.summary` promu en titre de section.
+## v1.141.0 — 28/07/2026 à 18:07 — Documents : voir ce que la machine a lu
+
+Jusqu'ici, savoir si un document avait bien été déchiffré supposait de
+retrouver le récap reçu dans le fil du mail — et pour un fichier déposé à la
+main, la question n'avait même pas de réponse : il n'était pas lu du tout.
+
+Deux changements, sur l'onglet Documents des fiches société **et** sur le
+bloc Documents des fiches deal :
+
+- **Tout document déposé à la main est désormais lu automatiquement**, comme
+  ceux qui arrivent par un report transféré : PDF et images par OCR, Excel et
+  CSV cellule par cellule.
+- **Une colonne « Lecture »** dit, document par document, où ça en est :
+  lecture en cours, lu (avec le volume de texte obtenu), échec avec sa cause,
+  ou « rien à lire » pour un logo ou un format non géré.
+
+Le volume de texte est cliquable : il ouvre **le texte réellement extrait**.
+C'est le geste qui permet de vérifier ce que la machine a lu avant de faire
+confiance aux métriques qu'elle en a tirées — quelques centaines de
+caractères sur un PDF de trente pages, c'est un scan illisible, pas un
+reporting vide.
+
+Le circuit est le même des deux côtés : un term sheet déposé sur un deal est
+lu exactement comme un investor update reçu par mail.
+
+Pour un document en échec, ou déposé avant cette mise à jour, un bouton
+relance la lecture à la demande. Les causes d'échec sont formulées exactement
+comme dans le récap email, pour que les deux surfaces ne racontent jamais
+deux histoires différentes.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle table `documentTexts` : **une ligne par blob de storage**, pas
+>   par document. Le texte reste hors de `documents` parce que Convex lit la
+>   ligne entière — `documents:listByCompany` charge 200 lignes à chaque
+>   affichage. Clé sur `storageId` → le fan-out multi-org du pipeline report
+>   partage une seule extraction. Détail complet dans `KNOWN_ISSUES.md`.
+> - `documents` gagne `ocrState` / `ocrDetail` / `ocrChars` (petits, lus avec
+>   la liste) ; le champ mort `extractedText` (déclaré, jamais écrit) est
+>   retiré. `ocrDetail` réutilise le **vocabulaire de codes** de
+>   `inboundEmails.sources[].detail`.
+> - `convex/documentsExtract.ts` : action interne planifiée par
+>   `documents:create`, même routeur « monde clos » que `reportExtract`
+>   réduit à un fichier. Elle adopte le texte déjà présent pour un blob au
+>   lieu de relancer un OCR — c'est ce qui évite de payer Mistral deux fois
+>   sur les pièces jointes des reports.
+> - `convex/lib/fileText.ts` : seuils de classification et budget de texte
+>   (`MAX_DOCUMENT_CHARS` = 900 000, ~350 pages) partagés par les deux
+>   chemins d'extraction, pour qu'ils ne dérivent pas.
+> - `reportExtract` persiste désormais le texte **par pièce jointe** (en plus
+>   du texte combiné) ; `reportStore` recopie l'état du routeur sur chaque
+>   ligne `documents` créée.
+> - Front : `src/components/documents/DocumentReading.tsx` (`OcrStatus` +
+>   `ExtractedTextDialog`) partagé par `ReportingsSection` et
+>   `DealDocumentsSection` ; requête `documents:getExtractedText` chargée
+>   uniquement à l'ouverture (`'skip'` sinon), mutation `documents:reextract`.
+>   Clés i18n sous `participations:documentReading.*`.
+> - `deals:remove` supprimait le blob d'un document de deal sans passer par
+>   `documents:remove` : sa ligne `documentTexts` serait restée orpheline.
+>   Helper `convex/lib/documentTexts.ts` appelé aux deux endroits.
+## v1.140.0 — 28/07/2026 à 14:57 — Les documents d'une société se rangent en juridique et en reporting
+
+Sur la fiche d'une société, l'onglet **Documents** mélangeait deux familles
+qui n'ont rien à voir : ce que la boîte nous envoie (reportings, business
+plans) et ce qui engage l'entité (statuts, pactes, KBIS…). Ils sont
+maintenant séparés en blocs repliables — **Reporting & suivi**, **Juridique
+& légal**, et **Autres** — chacun avec son nombre de documents dans le
+titre. Tout est déplié à l'ouverture : on replie ce qu'on ne veut pas voir,
+rien n'est masqué par surprise. Un bloc sans document ne s'affiche pas.
+
+Rien ne change à l'ajout d'un document (les types proposés sont les mêmes),
+ni sur la fiche d'un deal, où la question ne se pose pas : on n'y trouve que
+des documents liés à l'investissement.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/ReportingsSection.tsx` : le tableau plat est
+>   remplacé par une liste de groupes `Collapsible` (`ui/collapsible`),
+>   pilotés par une constante `GROUPS` (`reporting` = `reporting` + `bp`,
+>   `legal` = `legal`, `other` = tout le reste, y compris les kinds deal que
+>   le schéma accepte aussi). Le rendu d'un groupe est extrait dans un
+>   composant local `DocumentGroup` (ouvert par défaut) ; un groupe vide
+>   n'est pas rendu, l'état vide global est inchangé.
+> - `src/locales/{fr,en}/participations.json` : nouvelles clés
+>   `reportings.group.{reporting,legal,other}`.
+> - Aucun changement de modèle ni de migration : les quatre `kind` existent
+>   déjà en base, seul le regroupement d'affichage est nouveau.
+> - `DealDocumentsSection` n'est pas touché.
+
+---
+
+## v1.139.2 — 28/07/2026 à 09:35 — Les onglets Reports / Documents adoptent le style du reste de l'app
+
+Sur la fiche d'une participation, les onglets **Reports** et **Documents**
+étaient les seuls de l'app à s'afficher en texte souligné. Ils prennent
+désormais la même forme que partout ailleurs — notamment la barre de la
+page Cash (Vue d'ensemble / Prévisionnel / Transactions / Règles &
+échéances) : des pastilles dans un bandeau gris, l'onglet actif en blanc.
+Rien ne change dans le contenu des deux onglets.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/$orgSlug/participations.$companyId.tsx` : la `TabsList`
+>   de la zone reporting passe de `variant="line"` au variant par défaut
+>   (pastilles), identique à `cash.index.tsx`.
+> - C'était le seul usage de `variant="line"` du repo ; le variant reste
+>   défini dans `src/components/ui/tabs.tsx` et disponible si besoin.
 
 ---
 
