@@ -66,6 +66,10 @@
     "invalidName": "Invalid name",
     "couldNotSave": "Could not save"
   },
+  "appearance": {
+    "title": "Appearance",
+    "description": "Colour theme and interface language, specific to your account."
+  },
   "email": {
     "title": "Email",
     "description": "We'll send a confirmation link to your current address.",

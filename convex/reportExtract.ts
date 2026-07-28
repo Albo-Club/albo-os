@@ -171,7 +171,7 @@ export const run = internalAction({
     }
 
     // 2. Attachments — every file ends in exactly one state. A file already
-    //    in Convex storage (Gmail-captured email, cf. gmail.processAsReport)
+    //    in Convex storage (rows bridged from the retired Gmail timeline)
     //    is read from there — never fetched from AgentMail, never re-stored.
     for (const att of row.attachments) {
       const label = att.filename

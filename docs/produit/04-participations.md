@@ -14,17 +14,40 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
 
 ## La liste
 
-- **Tableau des participations actives** : logo et nom, pitch (une ligne),
-  secteur, **score IA de santé** (pastille en anneau de 1 à 10, jauge remplie
-  selon la note et colorée selon le verdict, issue de la synthèse IA), nombre
-  de deals, montant investi, montant reçu, **TVPI**. Tri par colonne (dont le
-  score IA), pagination, clic vers la fiche.
+- **Un tableau par statut**, empilés dans l'ordre de lecture, chacun coiffé
+  d'un **bandeau teinté** (pastille + titre + compteur) : **En cours (term
+  sheet)** en ambre tout en haut, **Actifs** en bleu, **Exit win** en
+  vert, **Exit loss** en rouge. Un tableau vide ne s'affiche pas — pas de
+  term sheet en cours, pas de tableau ambre. Le compteur du bandeau compte
+  les **deals** (pas les lignes) : même nombre que la ligne de totaux du
+  tableau — tout se raisonne en deals.
+- **Colonnes réduites à l'essentiel**, dans cet ordre : ce qui décrit la
+  boîte — logo et nom, **score IA de santé** (1 à 10), secteur en badge —
+  puis ce qui la mesure : nombre de deals, montant investi, montant reçu,
+  **TVPI**. Le tableau des term sheets affiche l'**engagé prévisionnel** à
+  la place des montants (rien n'est encore décaissé) ; les deux tableaux
+  d'exits remplacent le TVPI par **MOIC** et **TRI** annualisé. Tri par
+  colonne sur les Actifs, clic vers la fiche ; pas de pagination — chaque
+  tableau défile sous son en-tête et ses totaux.
+- **Colonnes alignées d'un tableau à l'autre** : les quatre tableaux
+  partagent la même grille, donc chaque colonne tombe au même endroit et
+  la page se lit d'un seul coup d'œil vertical. Un tableau qui n'a pas une
+  colonne laisse sa place vide plutôt que de décaler les suivantes ; comme
+  les chiffres sont en fin de ligne, ces emplacements vides se retrouvent
+  au bout — le tableau des term sheets s'arrête après l'engagé, sans trou
+  au milieu.
+- **Ligne de totaux par tableau** : nombre de deals et montants, sommés sur
+  la section entière et recalculés en direct quand un filtre ou une
+  recherche est actif. La somme des exits gagnants et celle des pertes se
+  lisent directement au pied de leurs tableaux.
 - **Recherche et filtres** : recherche plein texte (société, deal,
   instrument, investisseur, secteur) et filtres multi-sélection par
-  instrument, statut et secteur. Export CSV de l'ensemble.
-- **Section « Soldées »** : les sociétés dont les deals sont sortis ou passés
-  en perte, avec un **badge de statut coloré** (vert = sortie gagnante, rouge =
-  perte, gris = sortie sans plus-value) et colonnes **MOIC** et **TRI** annualisé.
+  instrument et secteur — le filtre statut a disparu, les tableaux par
+  statut jouent ce rôle. Le bandeau de tête (titre, menu ⋯, recherche et
+  filtres) reste figé en haut de l'écran quand on descend dans la liste.
+  Export **CSV ou Excel (.xlsx)**, généré à la demande ; il respecte la
+  recherche et les filtres actifs (sans filtre, tout l'ensemble est
+  exporté).
 - **Section « Sans deal »** : les entités du portefeuille pas encore
   rattachées à un deal.
 - **Section « Archivées »** : les entités archivées, restaurables en un clic.
@@ -33,30 +56,50 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
 
 ## La fiche société
 
-En-tête : logo, nom, nature, % de détention global. Puis :
+En-tête : logo, nom, % de détention global. En dessous, la page se
+lit en deux colonnes : le contenu principal à gauche, la **fiche d'identité
+en panneau latéral à droite** (sur mobile, le panneau passe sous le
+contenu).
 
-- **Identité** : secteur, SIREN, domaine — éditables en ligne (clic sur la
-  valeur) — plus le nombre d'actions consolidé et un lien « Ouvrir dans
-  Attio » quand la société est liée au CRM.
-- **Personnes** : trois colonnes — fondateurs, board, co-investisseurs — avec
-  lien vers la fiche Attio quand la personne y est rattachée. L'édition passe
-  par le dialogue Éditer, qui propose une recherche dans les personnes Attio.
-- **Deals de la société** : blocs détaillés cliquables vers chaque
-  [fiche deal](05-deals.md). Un deal se crée depuis cette fiche (menu ⋯) ; le
-  formulaire propose d'emblée **tous les champs de l'instrument** choisi
-  (montant, dates dont le closing, tour, valorisations, titres acquis…) pour
-  tout renseigner en une fois.
-- **Synthèse IA** : score de santé, résumé exécutif, alerte critique
-  éventuelle, points forts / points de vigilance, trois KPIs avec tendance.
-  Elle est régénérée automatiquement à chaque rapport ingéré, et peut être
+La colonne principale, dans l'ordre de lecture :
+
+- **Synthèse IA en premier** : score de santé, résumé exécutif, alerte
+  critique éventuelle, points forts / points de vigilance, trois KPIs avec
+  tendance — chiffres, variations et lignes de contexte alignés d'une
+  tuile à l'autre, contexte lisible sur deux lignes — la santé de la
+  boîte est la première chose qu'on voit. Elle
+  est régénérée automatiquement à chaque rapport ingéré, et peut être
   relancée à la main.
+- **Deals de la société** : un tableau au même style que la liste des
+  participations (liseré de statut dans la marge de chaque ligne — ambre
+  term sheet, bleu actif, vert Exit win, rouge Exit loss —, date de
+  signature, investi, reçu, TVPI), les term sheets en premier, chaque
+  **ligne cliquable** vers la
+  [fiche deal](05-deals.md) — c'est le seul chemin d'accès aux deals. Un
+  deal se crée depuis cette fiche (menu ⋯) ; le formulaire propose
+  d'emblée **tous les champs de l'instrument** choisi (montant, dates dont
+  le closing, tour, valorisations, titres acquis…) pour tout renseigner en
+  une fois.
 - **Onglet Rapports** : les communications investisseurs — celles ingérées
   automatiquement par email (investor updates analysés : highlights,
   métriques, contenu) et celles remontées depuis Parallel/VASCO pour les SPV
   (voir [Intégrations](15-integrations.md)).
 - **Onglet Documents** : upload manuel (reporting, BP, légal, autre — 20 Mo
   max, avec période couverte), téléchargement, suppression. Chaque document
-  affiche l'état de sa **lecture** (voir ci-dessous).
+  affiche l'état de sa **lecture** (voir ci-dessous). Les documents propres
+  à un investissement (term sheet, pacte, bulletin de souscription…) ne se
+  rangent pas ici mais sur la [fiche du deal concerné](05-deals.md).
+
+Le panneau d'identité, à droite :
+
+- **Identité** : secteur, SIREN (affiché par groupes de trois chiffres),
+  domaine — éditables en ligne (clic sur la valeur) — plus le % de
+  détention, le nombre d'actions consolidé, un lien « Ouvrir dans Attio »
+  quand la société est liée au CRM, et le **résumé** de la société,
+  intégré à la fiche avec son propre libellé et le texte justifié.
+- **Personnes** : fondateurs, board, co-investisseurs — avec lien vers la
+  fiche Attio quand la personne y est rattachée. L'édition passe par le
+  dialogue Éditer, qui propose une recherche dans les personnes Attio.
 
 ### La lecture des documents
 
@@ -80,6 +123,9 @@ d'un scan de mauvaise qualité.
 
 > Un document très long est tronqué à 900 000 caractères (~350 pages) ; la
 > fenêtre le dit explicitement.
+
+Les documents rangés sur une [fiche deal](05-deals.md) suivent exactement le
+même circuit et affichent la même colonne.
 
 ### Sous le capot : l'enrichissement automatique
 

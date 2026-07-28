@@ -27,7 +27,6 @@
   "allSubtitle": "All your organizations combined — read-only. Edit within an organization.",
   "openDetail": "Open details",
   "rowOpenAria": "Open {{name}}'s details",
-  "oneLinerExpand": "Show full one-liner",
   "back": "← Investments",
   "notFound": "Company not found.",
   "info": {
@@ -46,7 +45,7 @@
     "agrifood": "AgriFood",
     "mobility": "Mobility",
     "industry": "Industry / DeepTech",
-    "marketplace": "Marketplace / E-commerce",
+    "marketplace": "Marketplace",
     "consumer": "Consumer / Brands",
     "media": "Media",
     "realestate": "Real estate",
@@ -58,8 +57,8 @@
   },
   "col": {
     "company": "Company",
+    "deal": "Deal",
     "org": "Org",
-    "oneLiner": "One-liner",
     "sector": "Sector",
     "aiScore": "AI score",
     "deals": "Deals",
@@ -117,9 +116,6 @@
     "board": "Board",
     "coinvestor": "Co-investor"
   },
-  "nature": {
-    "company": "Company"
-  },
   "identity": {
     "title": "Identity",
     "attio": "Attio record",
@@ -128,6 +124,7 @@
     "founders": "Founder(s)",
     "board": "Board members",
     "coInvestors": "Co-investors",
+    "summary": "Summary",
     "empty": "To be filled in"
   },
   "status": {
@@ -135,7 +132,9 @@
     "active": "Active",
     "partially_exited": "Partial exit",
     "fully_exited": "Exited",
-    "written_off": "Written off"
+    "written_off": "Exit loss",
+    "exit_win": "Exit win",
+    "exit_loss": "Exit loss"
   },
   "exit": {
     "action": "Mark as exited",
@@ -281,16 +280,6 @@
       "autre": "Other"
     }
   },
-  "archetype": {
-    "equity": "Equity",
-    "debt": "Debt",
-    "funds_lp": "Fund (LP)",
-    "real_estate": "Real estate",
-    "royalties": "Royalties",
-    "management": "Management",
-    "placement": "Treasury",
-    "unassigned": "Unassigned"
-  },
   "fiche": {
     "instrumentTitle": "Instrument details",
     "safe": {
@@ -345,17 +334,6 @@
     },
     "cto": {
       "placeholder": "This instrument type isn't configured yet."
-    },
-    "entity": {
-      "title": "Linked entity"
-    },
-    "reporting": {
-      "title": "Reporting & KPIs",
-      "body": "Coming soon — reporting and KPIs for this deal will appear here."
-    },
-    "documents": {
-      "title": "Documents",
-      "body": "Coming soon — documents attached to this deal will appear here."
     }
   },
   "edit": {
@@ -482,10 +460,6 @@
     "sectionTitle_one": "{{count}} entity without a deal",
     "sectionTitle_other": "{{count}} entities without a deal"
   },
-  "settled": {
-    "sectionTitle_one": "Settled participation ({{count}})",
-    "sectionTitle_other": "Settled participations ({{count}})"
-  },
   "empty": "No companies in this scope — create deals via the AI chat, or add them manually.",
   "search": {
     "placeholder": "Search by company, instrument, sector…",
@@ -493,6 +467,7 @@
   },
   "dealsCount_one": "{{count}} deal",
   "dealsCount_other": "{{count}} deals",
+  "totalsRow": "Total",
   "loading": "Loading…",
   "plan": {
     "title": "Business plan vs actuals",
@@ -570,8 +545,7 @@
       "kind": "Type",
       "period": "Period",
       "size": "Size",
-      "date": "Added",
-      "reading": "Reading"
+      "date": "Added"
     },
     "kind": {
       "reporting": "Reporting",
@@ -582,34 +556,44 @@
     "errors": {
       "too_large": "File is larger than 20 MB",
       "default": "Something went wrong"
+    }
+  },
+  "dealDocuments": {
+    "title": "Documents",
+    "upload": "Add a doc",
+    "uploading": "Uploading…",
+    "empty": "No document yet. Term sheet, shareholders' agreement, subscription form… anything specific to this deal.",
+    "added": "Document added",
+    "deleted": "Document deleted",
+    "deleteConfirmTitle": "Delete this document?",
+    "deleteConfirmBody": "The file will be permanently deleted.",
+    "download": "Download",
+    "dialogTitle": "New document",
+    "titleLabel": "Title",
+    "kindLabel": "Type",
+    "dateLabel": "Document date (optional)",
+    "col": {
+      "title": "Title",
+      "kind": "Type",
+      "date": "Date",
+      "size": "Size",
+      "added": "Added"
     },
-    "ocr": {
-      "chars": "{{chars}} chars",
-      "open": "View extracted text",
-      "dialogTitle": "Extracted text",
-      "noText": "No text was extracted from this document.",
-      "truncated": "Text truncated at 900,000 characters (~350 pages).",
-      "pending": "Reading…",
-      "failed": "Could not be read",
-      "skipped": "Not analysed",
-      "retry": "Run the reading again",
-      "analyse": "Analyse",
-      "restarted": "Reading restarted",
-      "detail": {
-        "ocr_failed": "Could not be read",
-        "parse_failed": "Unreadable file",
-        "download_failed": "File not found",
-        "file_too_large": "File too large",
-        "small_image_skipped": "Small image skipped",
-        "empty_workbook": "Empty workbook",
-        "unsupported_format": "Format not read"
-      }
+    "kind": {
+      "term_sheet": "Term sheet",
+      "pacte": "Shareholders' agreement",
+      "subscription": "Subscription form",
+      "attestation": "Certificate / registry extract",
+      "other": "Other"
+    },
+    "errors": {
+      "too_large": "File is larger than 20 MB",
+      "default": "Something went wrong"
     }
   },
   "tabs": {
     "documents": "Documents",
-    "reports": "Reports",
-    "emails": "Emails"
+    "reports": "Reports"
   },
   "reports": {
     "title": "Investor reports",
@@ -653,37 +637,6 @@
       "viewDocs": "View documents"
     }
   },
-  "emails": {
-    "title": "Linked emails",
-    "empty": "No email linked to this participation yet. Connect a Gmail mailbox in Settings → Integrations.",
-    "noSubject": "(no subject)",
-    "from": "From:",
-    "to": "To:",
-    "cc": "Cc:",
-    "sent": "Sent",
-    "received": "Received",
-    "receivedVia": "via {{mailbox}}",
-    "attachments": "Attachments",
-    "aiMatched": "Matched by AI",
-    "page": {
-      "metaTitle": "Emails — Albo OS",
-      "title": "Emails",
-      "subtitleLoading": "Every email linked to this organization's participations.",
-      "subtitle": "Every email linked to this organization's participations — {{count}} stored.",
-      "empty": "No email yet. Emails show up here as soon as a Gmail mailbox connected to this organization sends or receives a message linked to a participation.",
-      "col": {
-        "date": "Date",
-        "subject": "Subject",
-        "from": "From",
-        "companies": "Companies",
-        "mailboxes": "Mailbox"
-      }
-    },
-    "extractReport": "Extract report",
-    "alreadyExtracted": "Already extracted",
-    "extractStarted": "Extraction started — the report will show up in the Reports tab of the company page (recap email when done).",
-    "extractError": "Could not start the extraction."
-  },
   "intelligence": {
     "status": {
       "processing": "Analysis in progress…",
@@ -700,6 +653,9 @@
   },
   "export": {
     "button": "Export CSV",
+    "csv": "Export as CSV",
+    "xlsx": "Export as Excel",
+    "error": "Export failed. Please try again.",
     "col": {
       "deal": "Deal name",
       "lastValuation": "Last valuation"
@@ -735,5 +691,35 @@
     "link": "Link",
     "changeLink": "Change link",
     "notConnected": "Not connected — set up in Settings → Integrations"
+  },
+  "sections": {
+    "pending": "In progress (term sheet)",
+    "active": "Active",
+    "exitWin": "Exit win",
+    "exitLoss": "Exit loss"
+  },
+  "documentReading": {
+    "chars": "{{chars}} chars",
+    "open": "View extracted text",
+    "dialogTitle": "Extracted text",
+    "noText": "No text was extracted from this document.",
+    "truncated": "Text truncated at 900,000 characters (~350 pages).",
+    "pending": "Reading…",
+    "failed": "Could not be read",
+    "skipped": "Not analysed",
+    "retry": "Run the reading again",
+    "analyse": "Analyse",
+    "restarted": "Reading restarted",
+    "detail": {
+      "ocr_failed": "Could not be read",
+      "parse_failed": "Unreadable file",
+      "download_failed": "File not found",
+      "file_too_large": "File too large",
+      "small_image_skipped": "Small image skipped",
+      "empty_workbook": "Empty workbook",
+      "unsupported_format": "Format not read"
+    },
+    "column": "Reading",
+    "retryError": "Could not restart the reading"
   }
 }

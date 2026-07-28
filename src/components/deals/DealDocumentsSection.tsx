@@ -39,8 +39,17 @@ import {
 } from '~/components/ui/table'
 
 const MAX_BYTES = 20 * 1024 * 1024
-const KINDS = ['reporting', 'bp', 'legal', 'other'] as const
-type DocKind = (typeof KINDS)[number]
+
+/** Deal-specific kinds — the company's own set (reporting / BP / legal) lives
+ * on the company fiche and isn't offered here. */
+const KINDS = [
+  'term_sheet',
+  'pacte',
+  'subscription',
+  'attestation',
+  'other',
+] as const
+type DealDocKind = (typeof KINDS)[number]
 
 function formatSize(bytes: number | null): string {
   if (bytes == null) return '—'
@@ -49,75 +58,87 @@ function formatSize(bytes: number | null): string {
 }
 
 /**
- * Reportings & documents of a company: manual upload (Convex storage,
- * 20 MB cap) + list with download/delete. KPI extraction from a reporting
- * goes through the assistant (createKpiSnapshot), not this component.
+ * Documents attached to a single deal (term sheet, pacte, subscription form):
+ * manual upload to Convex storage (20 MB cap) + list with download/delete.
+ * Mirrors the company's `ReportingsSection`, with the deal kinds and a plain
+ * document date instead of a covered period. These rows carry `dealId`, which
+ * is what keeps them off the company's Documents tab.
  */
-export function ReportingsSection({
+export function DealDocumentsSection({
+  dealId,
   companyId,
 }: {
-  companyId: Id<'companies'>
+  dealId: Id<'deals'>
+  companyId: Id<'companies'> | undefined
 }) {
   const { t } = useTranslation(['participations', 'common'])
   const { fmtDate } = useFormatters()
-  const docs = useConvexQuery(api.documents.listByCompany, { companyId })
+  const docs = useConvexQuery(api.documents.listByDeal, { dealId })
   const generateUploadUrl = useConvexMutation(api.files.generateUploadUrl)
   const createDocument = useConvexMutation(api.documents.create)
   const removeDocument = useConvexMutation(api.documents.remove)
 
-  const [textDocId, setTextDocId] = useState<Id<'documents'> | null>(null)
-
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
-  const [kind, setKind] = useState<DocKind>('reporting')
-  const [periodMonth, setPeriodMonth] = useState('') // "YYYY-MM"
+  const [kind, setKind] = useState<DealDocKind>('term_sheet')
+  const [docDate, setDocDate] = useState('') // "YYYY-MM-DD"
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<Id<'documents'> | null>(null)
+  const [textDocId, setTextDocId] = useState<Id<'documents'> | null>(null)
 
   function handlePick(file: File) {
     if (file.size > MAX_BYTES) {
-      toast.error(t('participations:reportings.errors.too_large'))
+      toast.error(t('participations:dealDocuments.errors.too_large'))
       return
     }
     setPendingFile(file)
     setTitle(file.name.replace(/\.[^.]+$/, ''))
-    setKind('reporting')
-    setPeriodMonth('')
+    setKind('term_sheet')
+    setDocDate('')
   }
 
   async function handleSave() {
-    if (!pendingFile || !title.trim()) return
+    if (!pendingFile || !title.trim() || !companyId) return
     setSaving(true)
     try {
       const url = await generateUploadUrl({})
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': pendingFile.type || 'application/octet-stream' },
+        headers: {
+          'Content-Type': pendingFile.type || 'application/octet-stream',
+        },
         body: pendingFile,
       })
       if (!res.ok) {
-        toast.error(t('participations:reportings.errors.default'))
+        toast.error(t('participations:dealDocuments.errors.default'))
         return
       }
       const { storageId } = (await res.json()) as { storageId: Id<'_storage'> }
-      // "YYYY-MM" → first of the month, UTC.
-      const period = periodMonth
+      // "YYYY-MM-DD" → midnight UTC (dates are stored as ms epoch, UTC).
+      const period = docDate
         ? Date.UTC(
-            Number(periodMonth.slice(0, 4)),
-            Number(periodMonth.slice(5, 7)) - 1,
-            1,
+            Number(docDate.slice(0, 4)),
+            Number(docDate.slice(5, 7)) - 1,
+            Number(docDate.slice(8, 10)),
           )
         : undefined
-      await createDocument({ companyId, title, kind, period, storageId })
-      toast.success(t('participations:reportings.added'))
+      await createDocument({
+        companyId,
+        dealId,
+        title,
+        kind,
+        period,
+        storageId,
+      })
+      toast.success(t('participations:dealDocuments.added'))
       setPendingFile(null)
     } catch (err) {
       const code = err instanceof ConvexError ? (err.data as string) : ''
       toast.error(
         code === 'too_large'
-          ? t('participations:reportings.errors.too_large')
-          : t('participations:reportings.errors.default'),
+          ? t('participations:dealDocuments.errors.too_large')
+          : t('participations:dealDocuments.errors.default'),
       )
     } finally {
       setSaving(false)
@@ -128,9 +149,9 @@ export function ReportingsSection({
     if (!deleteId) return
     try {
       await removeDocument({ documentId: deleteId })
-      toast.success(t('participations:reportings.deleted'))
+      toast.success(t('participations:dealDocuments.deleted'))
     } catch {
-      toast.error(t('participations:reportings.errors.default'))
+      toast.error(t('participations:dealDocuments.errors.default'))
     } finally {
       setDeleteId(null)
     }
@@ -140,15 +161,16 @@ export function ReportingsSection({
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-lg font-semibold tracking-tight">
-          {t('participations:reportings.title')}
+          {t('participations:dealDocuments.title')}
         </h2>
         <Button
           variant="outline"
           size="sm"
           onClick={() => fileInputRef.current?.click()}
+          disabled={!companyId}
         >
           <Plus className="size-4" />
-          {t('participations:reportings.upload')}
+          {t('participations:dealDocuments.upload')}
         </Button>
       </div>
 
@@ -169,18 +191,28 @@ export function ReportingsSection({
         </div>
       ) : docs.length === 0 ? (
         <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-          {t('participations:reportings.empty')}
+          {t('participations:dealDocuments.empty')}
         </div>
       ) : (
         <div className="rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t('participations:reportings.col.title')}</TableHead>
-                <TableHead>{t('participations:reportings.col.kind')}</TableHead>
-                <TableHead>{t('participations:reportings.col.period')}</TableHead>
-                <TableHead>{t('participations:reportings.col.size')}</TableHead>
-                <TableHead>{t('participations:reportings.col.date')}</TableHead>
+                <TableHead>
+                  {t('participations:dealDocuments.col.title')}
+                </TableHead>
+                <TableHead>
+                  {t('participations:dealDocuments.col.kind')}
+                </TableHead>
+                <TableHead>
+                  {t('participations:dealDocuments.col.date')}
+                </TableHead>
+                <TableHead>
+                  {t('participations:dealDocuments.col.size')}
+                </TableHead>
+                <TableHead>
+                  {t('participations:dealDocuments.col.added')}
+                </TableHead>
                 <TableHead>
                   {t('participations:documentReading.column')}
                 </TableHead>
@@ -192,7 +224,9 @@ export function ReportingsSection({
                 <TableRow key={doc._id}>
                   <TableCell className="font-medium">{doc.title}</TableCell>
                   <TableCell>
-                    {t(`participations:reportings.kind.${doc.kind}`)}
+                    {t(`participations:dealDocuments.kind.${doc.kind}`, {
+                      defaultValue: doc.kind,
+                    })}
                   </TableCell>
                   <TableCell>
                     {doc.period ? fmtDate(doc.period) : '—'}
@@ -216,8 +250,10 @@ export function ReportingsSection({
                           size="icon"
                           variant="ghost"
                           className="size-7"
-                          aria-label={t('participations:reportings.download')}
-                          title={t('participations:reportings.download')}
+                          aria-label={t(
+                            'participations:dealDocuments.download',
+                          )}
+                          title={t('participations:dealDocuments.download')}
                         >
                           <a href={doc.url} target="_blank" rel="noreferrer">
                             <Download className="size-4" />
@@ -251,25 +287,25 @@ export function ReportingsSection({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {t('participations:reportings.dialogTitle')}
+              {t('participations:dealDocuments.dialogTitle')}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="doc-title">
-                {t('participations:reportings.titleLabel')}
+              <Label htmlFor="deal-doc-title">
+                {t('participations:dealDocuments.titleLabel')}
               </Label>
               <Input
-                id="doc-title"
+                id="deal-doc-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label>{t('participations:reportings.kindLabel')}</Label>
+              <Label>{t('participations:dealDocuments.kindLabel')}</Label>
               <Select
                 value={kind}
-                onValueChange={(value) => setKind(value as DocKind)}
+                onValueChange={(value) => setKind(value as DealDocKind)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -277,21 +313,21 @@ export function ReportingsSection({
                 <SelectContent>
                   {KINDS.map((k) => (
                     <SelectItem key={k} value={k}>
-                      {t(`participations:reportings.kind.${k}`)}
+                      {t(`participations:dealDocuments.kind.${k}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="doc-period">
-                {t('participations:reportings.periodLabel')}
+              <Label htmlFor="deal-doc-date">
+                {t('participations:dealDocuments.dateLabel')}
               </Label>
               <Input
-                id="doc-period"
-                type="month"
-                value={periodMonth}
-                onChange={(e) => setPeriodMonth(e.target.value)}
+                id="deal-doc-date"
+                type="date"
+                value={docDate}
+                onChange={(e) => setDocDate(e.target.value)}
               />
             </div>
           </div>
@@ -303,9 +339,12 @@ export function ReportingsSection({
             >
               {t('common:actions.cancel')}
             </Button>
-            <Button onClick={() => void handleSave()} disabled={saving || !title.trim()}>
+            <Button
+              onClick={() => void handleSave()}
+              disabled={saving || !title.trim()}
+            >
               {saving
-                ? t('participations:reportings.uploading')
+                ? t('participations:dealDocuments.uploading')
                 : t('common:actions.save')}
             </Button>
           </DialogFooter>
@@ -320,11 +359,11 @@ export function ReportingsSection({
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>
-              {t('participations:reportings.deleteConfirmTitle')}
+              {t('participations:dealDocuments.deleteConfirmTitle')}
             </DialogTitle>
           </DialogHeader>
           <p className="text-muted-foreground text-sm">
-            {t('participations:reportings.deleteConfirmBody')}
+            {t('participations:dealDocuments.deleteConfirmBody')}
           </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteId(null)}>
@@ -336,7 +375,6 @@ export function ReportingsSection({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       <ExtractedTextDialog
         documentId={textDocId}
         title={docs?.find((d) => d._id === textDocId)?.title ?? ''}

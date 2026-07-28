@@ -27,7 +27,6 @@
   "allSubtitle": "Toutes tes organisations réunies — lecture seule. L'édition se fait dans une organisation.",
   "openDetail": "Ouvrir la fiche",
   "rowOpenAria": "Ouvrir la fiche de {{name}}",
-  "oneLinerExpand": "Voir le one-liner complet",
   "back": "← Entreprises",
   "notFound": "Société introuvable.",
   "info": {
@@ -46,7 +45,7 @@
     "agrifood": "AgriFood",
     "mobility": "Mobilité",
     "industry": "Industrie / DeepTech",
-    "marketplace": "Marketplace / E-commerce",
+    "marketplace": "Marketplace",
     "consumer": "Consumer / Marques",
     "media": "Média",
     "realestate": "Immobilier",
@@ -58,8 +57,8 @@
   },
   "col": {
     "company": "Société",
+    "deal": "Deal",
     "org": "Org",
-    "oneLiner": "One-liner",
     "sector": "Secteur",
     "aiScore": "Score IA",
     "deals": "Deals",
@@ -117,9 +116,6 @@
     "board": "Board",
     "coinvestor": "Co-investisseur"
   },
-  "nature": {
-    "company": "Entreprise"
-  },
   "identity": {
     "title": "Identité",
     "attio": "Fiche Attio",
@@ -128,6 +124,7 @@
     "founders": "Fondateur(s)",
     "board": "Membres du board",
     "coInvestors": "Co-investisseurs",
+    "summary": "Résumé",
     "empty": "À renseigner"
   },
   "status": {
@@ -135,7 +132,9 @@
     "active": "Actif",
     "partially_exited": "Exit partiel",
     "fully_exited": "Exité",
-    "written_off": "Déprécié"
+    "written_off": "Exit loss",
+    "exit_win": "Exit win",
+    "exit_loss": "Exit loss"
   },
   "exit": {
     "action": "Marquer comme sorti",
@@ -281,16 +280,6 @@
       "autre": "Autre"
     }
   },
-  "archetype": {
-    "equity": "Capital",
-    "debt": "Dette",
-    "funds_lp": "Fonds (LP)",
-    "real_estate": "Immobilier",
-    "royalties": "Royalties",
-    "management": "Gestion",
-    "placement": "Placement",
-    "unassigned": "Non classé"
-  },
   "fiche": {
     "instrumentTitle": "Détails de l'instrument",
     "safe": {
@@ -345,17 +334,6 @@
     },
     "cto": {
       "placeholder": "Type d'instrument pas encore configuré."
-    },
-    "entity": {
-      "title": "Entité liée"
-    },
-    "reporting": {
-      "title": "Reporting & KPIs",
-      "body": "À venir — le reporting et les KPIs de ce deal s'afficheront ici."
-    },
-    "documents": {
-      "title": "Documents",
-      "body": "À venir — les documents rattachés à ce deal s'afficheront ici."
     }
   },
   "edit": {
@@ -482,10 +460,6 @@
     "sectionTitle_one": "{{count}} entité sans deal",
     "sectionTitle_other": "{{count}} entités sans deal"
   },
-  "settled": {
-    "sectionTitle_one": "Participation soldée ({{count}})",
-    "sectionTitle_other": "Participations soldées ({{count}})"
-  },
   "empty": "Aucune entreprise pour ce scope — crée des deals via le chat IA, ou ajoute-les à la main.",
   "search": {
     "placeholder": "Rechercher par société, instrument, secteur…",
@@ -493,6 +467,7 @@
   },
   "dealsCount_one": "{{count}} deal",
   "dealsCount_other": "{{count}} deals",
+  "totalsRow": "Total",
   "loading": "Chargement…",
   "plan": {
     "title": "Business plan vs réalisé",
@@ -570,8 +545,7 @@
       "kind": "Type",
       "period": "Période",
       "size": "Taille",
-      "date": "Ajouté",
-      "reading": "Lecture"
+      "date": "Ajouté"
     },
     "kind": {
       "reporting": "Reporting",
@@ -582,34 +556,44 @@
     "errors": {
       "too_large": "Le fichier dépasse 20 Mo",
       "default": "Une erreur est survenue"
+    }
+  },
+  "dealDocuments": {
+    "title": "Documents",
+    "upload": "Ajouter un doc",
+    "uploading": "Envoi…",
+    "empty": "Aucun document. Term sheet, pacte, bulletin de souscription… tout ce qui concerne ce deal précisément.",
+    "added": "Document ajouté",
+    "deleted": "Document supprimé",
+    "deleteConfirmTitle": "Supprimer ce document ?",
+    "deleteConfirmBody": "Le fichier sera définitivement supprimé.",
+    "download": "Télécharger",
+    "dialogTitle": "Nouveau document",
+    "titleLabel": "Titre",
+    "kindLabel": "Type",
+    "dateLabel": "Date du document (optionnel)",
+    "col": {
+      "title": "Titre",
+      "kind": "Type",
+      "date": "Date",
+      "size": "Taille",
+      "added": "Ajouté"
     },
-    "ocr": {
-      "chars": "{{chars}} car.",
-      "open": "Voir le texte lu",
-      "dialogTitle": "Texte lu",
-      "noText": "Aucun texte n'a été extrait de ce document.",
-      "truncated": "Texte tronqué à 900 000 caractères (~350 pages).",
-      "pending": "Lecture en cours…",
-      "failed": "Lecture impossible",
-      "skipped": "Non analysé",
-      "retry": "Relancer la lecture",
-      "analyse": "Analyser",
-      "restarted": "Lecture relancée",
-      "detail": {
-        "ocr_failed": "Lecture impossible",
-        "parse_failed": "Fichier illisible",
-        "download_failed": "Fichier introuvable",
-        "file_too_large": "Fichier trop volumineux",
-        "small_image_skipped": "Petite image ignorée",
-        "empty_workbook": "Classeur vide",
-        "unsupported_format": "Format non lu"
-      }
+    "kind": {
+      "term_sheet": "Term sheet",
+      "pacte": "Pacte / statuts",
+      "subscription": "Bulletin de souscription",
+      "attestation": "Attestation / KBIS",
+      "other": "Autre"
+    },
+    "errors": {
+      "too_large": "Le fichier dépasse 20 Mo",
+      "default": "Une erreur est survenue"
     }
   },
   "tabs": {
     "documents": "Documents",
-    "reports": "Reports",
-    "emails": "Emails"
+    "reports": "Reports"
   },
   "reports": {
     "title": "Reports investisseur",
@@ -653,37 +637,6 @@
       "viewDocs": "Voir les docs"
     }
   },
-  "emails": {
-    "title": "Emails liés",
-    "empty": "Aucun email lié à cette participation pour l'instant. Connectez une boîte Gmail dans Réglages → Intégrations.",
-    "noSubject": "(sans objet)",
-    "from": "De :",
-    "to": "À :",
-    "cc": "Cc :",
-    "sent": "Envoyé",
-    "received": "Reçu",
-    "receivedVia": "via {{mailbox}}",
-    "attachments": "Pièces jointes",
-    "aiMatched": "Rattaché par l'IA",
-    "page": {
-      "metaTitle": "Emails — Albo OS",
-      "title": "Emails",
-      "subtitleLoading": "Tous les emails rattachés aux participations de cette organisation.",
-      "subtitle": "Tous les emails rattachés aux participations de cette organisation — {{count}} stockés.",
-      "empty": "Aucun email pour l'instant. Les emails apparaissent ici dès qu'une boîte Gmail connectée à cette organisation reçoit ou envoie un message lié à une participation.",
-      "col": {
-        "date": "Date",
-        "subject": "Objet",
-        "from": "Expéditeur",
-        "companies": "Sociétés",
-        "mailboxes": "Boîte"
-      }
-    },
-    "extractReport": "Extraire le report",
-    "alreadyExtracted": "Déjà extrait",
-    "extractStarted": "Extraction lancée — le report apparaîtra dans l'onglet Rapports de la fiche (récap par email à la fin).",
-    "extractError": "Impossible de lancer l'extraction."
-  },
   "intelligence": {
     "status": {
       "processing": "Analyse en cours…",
@@ -700,6 +653,9 @@
   },
   "export": {
     "button": "Exporter CSV",
+    "csv": "Exporter en CSV",
+    "xlsx": "Exporter en Excel",
+    "error": "L'export a échoué. Réessayez.",
     "col": {
       "deal": "Nom du deal",
       "lastValuation": "Dernière valorisation"
@@ -735,5 +691,35 @@
     "link": "Rattacher",
     "changeLink": "Modifier le rattachement",
     "notConnected": "Non connectée — brancher dans Réglages → Intégrations"
+  },
+  "sections": {
+    "pending": "En cours (term sheet)",
+    "active": "Actifs",
+    "exitWin": "Exit win",
+    "exitLoss": "Exit loss"
+  },
+  "documentReading": {
+    "chars": "{{chars}} car.",
+    "open": "Voir le texte lu",
+    "dialogTitle": "Texte lu",
+    "noText": "Aucun texte n'a été extrait de ce document.",
+    "truncated": "Texte tronqué à 900 000 caractères (~350 pages).",
+    "pending": "Lecture en cours…",
+    "failed": "Lecture impossible",
+    "skipped": "Non analysé",
+    "retry": "Relancer la lecture",
+    "analyse": "Analyser",
+    "restarted": "Lecture relancée",
+    "detail": {
+      "ocr_failed": "Lecture impossible",
+      "parse_failed": "Fichier illisible",
+      "download_failed": "Fichier introuvable",
+      "file_too_large": "Fichier trop volumineux",
+      "small_image_skipped": "Petite image ignorée",
+      "empty_workbook": "Classeur vide",
+      "unsupported_format": "Format non lu"
+    },
+    "column": "Lecture",
+    "retryError": "Impossible de relancer la lecture"
   }
 }

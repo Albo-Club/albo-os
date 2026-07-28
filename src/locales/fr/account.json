@@ -66,6 +66,10 @@
     "invalidName": "Nom invalide",
     "couldNotSave": "Échec de l'enregistrement"
   },
+  "appearance": {
+    "title": "Apparence",
+    "description": "Thème de couleur et langue de l'interface, propres à votre compte."
+  },
   "email": {
     "title": "E-mail",
     "description": "Nous enverrons un lien de confirmation à votre adresse actuelle.",

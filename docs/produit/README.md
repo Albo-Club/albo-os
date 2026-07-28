@@ -25,7 +25,6 @@ expliqué simplement dans un encadré « Sous le capot ».
 
 | Page | Contenu |
 | --- | --- |
-| [Tableau de bord](03-tableau-de-bord.md) | NAV, TVPI, capital déployé, activité récente |
 | [Participations](04-participations.md) | Sociétés du portefeuille, fiches, synthèse IA, rapports |
 | [Deals](05-deals.md) | Investissements, instruments, sorties, royalties, business plans |
 | [Valorisations, KPIs et métriques](06-valorisations-et-kpis.md) | Juste valeur, snapshots KPI, MOIC / TVPI / TRI |
@@ -51,7 +50,6 @@ expliqué simplement dans un encadré « Sous le capot ».
 | [Intégrations](15-integrations.md) | Attio, Powens, connecteur Claude (MCP), Parallel/VASCO, imports |
 | [À faire](16-a-faire.md) | Tâches manuelles et signaux à traiter (pointage, banques, échéances, reportings) |
 | [Reports par email](17-reports-par-email.md) | Le circuit complet des investor updates : forward, extraction, KPIs, récap |
-| [Emails du portfolio](18-emails-portfolio.md) | Boîtes Gmail connectées, timeline des échanges par participation |
 
 ## Comment cette doc vit
 

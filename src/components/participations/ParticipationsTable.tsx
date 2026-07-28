@@ -1,18 +1,11 @@
-import { useCallback, useMemo, useState } from 'react'
-import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown } from 'lucide-react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { useMemo, useState } from 'react'
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
+import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import {
-  moic as moicRatio,
-  proceedsFromReceived,
-  residualValueCents,
-  tvpi as tvpiRatio,
-} from '../../../convex/lib/metrics'
-import type { ReactNode } from 'react'
+import { residualValueCents } from '../../../convex/lib/metrics'
+import type { CSSProperties } from 'react'
 
 import { cn } from '~/lib/utils'
-import { dealStatusBadge } from '~/lib/dealStatusBadge'
-import { xirr } from '~/lib/xirr'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { ScoreRing } from '~/components/companies/ScoreRing'
 import { Badge } from '~/components/ui/badge'
@@ -20,84 +13,11 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '~/components/ui/popover'
-import {
-  PAGE_SIZE,
-  PaginationFooter,
-  usePagination,
-} from '~/components/data-table/LocalPagination'
-
-/**
- * One-liner cell: truncated to the column width, and — only when the text is
- * actually clipped — it becomes a click target that reveals the full pitch in
- * a popover. Short one-liners stay plain text so a row click still opens the
- * company sheet; the click that expands is stopped from bubbling so it never
- * navigates.
- */
-function OneLinerCell({
-  text,
-  expandLabel,
-}: {
-  text?: string | null
-  expandLabel: string
-}) {
-  const [truncated, setTruncated] = useState(false)
-  // Stable callback ref: measures on mount, on resize, and again when the
-  // element swaps between the plain-span and button branches below.
-  const measureRef = useCallback((el: HTMLElement | null) => {
-    if (!el) return
-    const measure = () => setTruncated(el.scrollWidth > el.clientWidth)
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-
-  if (!text) return <span className="text-muted-foreground">—</span>
-
-  if (!truncated) {
-    return (
-      <span
-        ref={measureRef}
-        className="block max-w-72 truncate text-muted-foreground lg:max-w-sm xl:max-w-md 2xl:max-w-lg"
-      >
-        {text}
-      </span>
-    )
-  }
-
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button
-          ref={measureRef}
-          type="button"
-          aria-label={expandLabel}
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          className="block max-w-72 cursor-pointer truncate text-left text-muted-foreground underline decoration-dotted decoration-muted-foreground/40 underline-offset-4 transition-colors hover:text-foreground lg:max-w-sm xl:max-w-md 2xl:max-w-lg"
-        >
-          {text}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        onClick={(e) => e.stopPropagation()}
-        className="w-auto max-w-xs p-3 text-sm leading-snug text-foreground"
-      >
-        {text}
-      </PopoverContent>
-    </Popover>
-  )
-}
 
 /** Minimal shape of an enriched deal, shared by per-org and aggregated views. */
 export type DealRow = {
@@ -109,10 +29,6 @@ export type DealRow = {
     _id: string
     name: string
     sector?: string | null
-    /** One-line pitch (companies.oneLiner), hand-filled. */
-    oneLiner?: string | null
-    /** Cerveau 3 health score (1-10), null while no synthesis exists. */
-    aiScore?: number | null
     domain?: string | null
   } | null
   investor: { name: string } | null
@@ -130,11 +46,6 @@ export type DealRow = {
   moic?: number | null
   /** Exact per-deal annualized XIRR (decimal), server-side; null if undefined. */
   irr?: number | null
-  /**
-   * Signed, de-VAT'd dated flows (server-side). Concatenated across a company's
-   * deals to solve the company-level IRR on the union — IRR isn't additive.
-   */
-  flows?: Array<{ amount: number; date: number }>
   signedDate?: number | null
   /** Exit date (ms), set on fully_exited / written_off deals. */
   exitedDate?: number | null
@@ -168,25 +79,81 @@ const isNeutralTvpi = (ratio: number | null) =>
   ratio != null && Math.round(ratio * 100) === 100
 
 /**
- * Frozen first column (company) for the horizontal scroll: sticky + an OPAQUE
- * background, otherwise the cells sliding underneath show through. The row
- * hover tint (`hover:bg-muted/50` on the <tr>) is translucent, so it can't be
- * inherited either — the cell composites the same color over the page
- * background via color-mix, driven by the row's `group` hover.
+ * Frozen first columns (company + AI score) for the horizontal scroll: sticky +
+ * an OPAQUE background, otherwise the cells sliding underneath show through.
+ * The row hover tint (`hover:bg-muted/50` on the <tr>) is translucent, so it
+ * can't be inherited either — the cell composites the same color over the page
+ * background via color-mix, driven by the row's `group` hover. Each frozen
+ * column carries its own `left` offset (see `frozenCompany` / `frozenScore`).
+ *
+ * The header row is ALSO frozen on vertical scroll (the table body scrolls
+ * inside a bounded container — see the `[&>div]:max-h-*` wrapper), and the
+ * totals row is pinned at the bottom. Sticky is applied per-cell (not on
+ * thead/tfoot: unreliable cross-browser), with borders on the cells so they
+ * travel with them. z layers: corner cells (left + top/bottom) > header /
+ * footer cells > frozen body column.
  */
-const stickyHeadClass = 'sticky left-0 z-10 bg-background'
+// Header cells carry the same opaque `bg-muted` as the totals row below: it is
+// what makes the column titles read as a band of their own rather than as one
+// more participation row.
+const headCornerClass = 'sticky top-0 z-30 border-b bg-muted'
+const headCellClass = 'sticky top-0 z-20 border-b bg-muted'
 const stickyCellClass =
-  'sticky left-0 z-10 bg-background transition-colors ' +
+  'sticky z-10 bg-background transition-colors ' +
   'group-hover:bg-[color-mix(in_oklab,var(--muted)_50%,var(--background))]'
+const footCornerClass = 'sticky bottom-0 z-30 border-t bg-muted'
+const footCellClass = 'sticky bottom-0 z-20 border-t bg-muted'
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span>{children}</span>
-    </div>
-  )
-}
+/**
+ * Shared column grid for the stacked tables of the participations page (one
+ * table per status bucket). Every variant renders the SAME columns in the same
+ * order — a variant that has nothing for a slot renders an empty cell rather
+ * than dropping the column — and `table-fixed` + this colgroup pin the widths,
+ * so the tables line up with each other instead of each sizing itself from its
+ * own content.
+ *
+ * The company column carries no width: it absorbs whatever is left. Below
+ * `fixed widths + COMPANY_MIN_WIDTH` the table scrolls horizontally, which the
+ * frozen first column already handles.
+ *
+ * Each width is sized against the widest real content of its slot — header
+ * label (plus the sort icon where the active variant sorts) or cell — measured
+ * with the FALLBACK font of the brand stack, not Inter: Inter is narrower, so
+ * a column that fits without it fits with it. Cells are `whitespace-nowrap`
+ * with no overflow clamp, so a column that is one pixel short does not
+ * ellipsize, it spills into its neighbour.
+ */
+const COL_WIDTHS = {
+  org: 104,
+  aiScore: 96,
+  deals: 80,
+  /** Engagé / Montant investi / Reçu — driven by the "Montant investi" header. */
+  amount: 152,
+  /** TVPI or MOIC, then TRI. */
+  ratio: 80,
+  /**
+   * Holds the widest predefined sector label (see src/lib/sectors.ts) on a
+   * single line inside its badge: "Fonds / Private equity" measures ~116px of
+   * the ~126px a badge leaves here. A free-typed sector longer than that
+   * spills into the next column like any other cell.
+   */
+  sector: 160,
+} as const
+const COMPANY_MIN_WIDTH = 240
+
+/**
+ * Horizontal offsets of the two frozen columns. Company sits at 0, the AI score
+ * column right where it ends — which is exactly COMPANY_MIN_WIDTH: the table
+ * only scrolls sideways once squeezed down to `fixedWidth + COMPANY_MIN_WIDTH`,
+ * and there the company column (the only flexible one) is at its minimum. Above
+ * that width nothing scrolls, so the offsets never come into play.
+ *
+ * This is also why the org badge column sits AFTER the AI score one: the two
+ * frozen columns have to be the first two, and freezing the org badge along
+ * with them would eat the horizontal room for nothing.
+ */
+const frozenCompany = { left: 0 }
+const frozenScore = { left: COMPANY_MIN_WIDTH }
 
 /** Localized €/date/multiple/percent formatters, shared by the components below. */
 export function useFormatters() {
@@ -300,94 +267,55 @@ export function dealAmountTiles(deal: {
 }
 
 /**
- * Detailed list of deals (one block per deal). Used by the participation
- * detail page (entity sheet) to list an entity's deals.
+ * One pre-aggregated company row (per active/settled bucket), as served by
+ * `deals.listParticipations` (per-org) and `aggregate.listParticipations`
+ * (cross-org, with `org` set). All the sums/ratios are computed server-side;
+ * the facet arrays (instrument kinds, deal & investor names) only feed the
+ * toolbar's search + filters in `ParticipationsView`.
  */
-export function DealsList({
-  deals,
-  orgSlug,
-}: {
-  deals: Array<DealRow>
-  orgSlug?: string
-}) {
-  const { t } = useTranslation('participations')
-  const { fmtEur, fmtEurCents, fmtDate, fmtMultiple } = useFormatters()
-  const cellClass =
-    'grid grid-cols-2 gap-x-6 gap-y-1 px-6 py-3 text-sm sm:grid-cols-5'
-  return (
-    <div className="divide-y">
-      {deals.map((dl) => {
-        const tvpi = tvpiRatio({
-          capital: dl.paidActual ?? 0,
-          proceeds: dl.received ?? 0,
-          residual: residualCents(dl),
-        })
-        const statusBadge = dealStatusBadge(dl.status, dl.moic)
-        const body = (
-          <>
-            <Field label={t('deal.name')}>{dl.name ?? '—'}</Field>
-            <Field label={t('deal.instrument')}>
-              {t(`instrument.${dl.instrumentKind}`, {
-                defaultValue: dl.instrumentKind,
-              })}
-            </Field>
-            <Field label={t('deal.investor')}>
-              {dl.investor?.name ?? '—'}
-              {dl.spv ? (
-                <span className="text-muted-foreground">
-                  {' '}
-                  · {t('deal.viaSpv')} {dl.spv.name}
-                </span>
-              ) : null}
-            </Field>
-            {dealAmountTiles(dl).map((tile) => (
-              <Field key={tile.labelKey} label={t(tile.labelKey)}>
-                {tile.precise ? fmtEurCents(tile.cents) : fmtEur(tile.cents)}
-              </Field>
-            ))}
-            <Field label={t('deal.received')}>
-              {fmtEurCents(dl.received ?? 0)}
-            </Field>
-            <Field label={t('deal.tvpi')}>{fmtMultiple(tvpi)}</Field>
-            <Field label={t('deal.status')}>
-              <Badge variant={statusBadge.variant} className={statusBadge.className}>
-                {t(`status.${dl.status}`, { defaultValue: dl.status })}
-              </Badge>
-            </Field>
-            <Field label={t('deal.signed')}>{fmtDate(dl.signedDate)}</Field>
-          </>
-        )
-        return orgSlug ? (
-          <Link
-            key={dl._id}
-            to="/app/$orgSlug/deals/$dealId"
-            params={{ orgSlug, dealId: dl._id }}
-            className={`${cellClass} hover:bg-accent/60 transition-colors`}
-          >
-            {body}
-          </Link>
-        ) : (
-          <div key={dl._id} className={cellClass}>
-            {body}
-          </div>
-        )
-      })}
-    </div>
-  )
+export type CompanyRow = {
+  companyId: string
+  name: string
+  domain: string | null
+  sector: string | null
+  /** Cerveau 3 health score (1-10), null while no synthesis exists. */
+  aiScore: number | null
+  org: { name: string; slug: string } | null
+  /** True for the pending Term-Sheet bucket (its own table on top). */
+  pending: boolean
+  /** True for the fully_exited / written_off bucket (exit tables). */
+  settled: boolean
+  dealCount: number
+  /** Engagé (cents): summed commitments — the pending table's amount. */
+  committed: number
+  /** Versé (cents): sum of the matched outgoing transactions. */
+  invested: number
+  /** Reçu (cents): sum of the matched incoming transactions. */
+  received: number
+  /** Active rows only. */
+  tvpi: number | null
+  /** Settled rows only (realized, de-VAT'd proceeds). */
+  moic: number | null
+  /** Settled rows only: exact XIRR on the union of the deals' dated flows. */
+  tri: number | null
+  writtenOff: boolean
+  instrumentKinds: Array<string>
+  dealNames: Array<string>
+  investorNames: Array<string>
 }
 
 /**
- * Participations table grouped BY COMPANY (one row = one company; clicking a
- * row opens its detail sheet, where the deals are listed). `showOrg` adds an
- * org badge column (cross-org aggregated view). `orgSlug` (per-org view)
- * targets the detail link; in the aggregated view the slug is derived from
- * each deal's org.
+ * Participations table grouped BY COMPANY (one row = one pre-aggregated
+ * company bucket from the server projection; clicking a row opens its detail
+ * sheet, where the deals are listed). `showOrg` adds an org badge column
+ * (cross-org aggregated view). `orgSlug` (per-org view) targets the detail
+ * link; in the aggregated view the slug comes from each row's org.
  *
  * The search + facet filters live in the parent `ParticipationsView`, which
- * feeds each instance an already-filtered `deals` set (the active table and the
+ * feeds each instance an already-filtered `rows` set (the active table and the
  * settled section share one toolbar).
  */
-type SortKey = 'name' | 'aiScore' | 'deals' | 'paid' | 'received' | 'tvpi'
+type SortKey = 'name' | 'aiScore' | 'deals' | 'invested' | 'received' | 'tvpi'
 
 /** Clickable header of a sortable column (asc ⇄ desc). */
 export function SortableHead({
@@ -396,6 +324,7 @@ export function SortableHead({
   dir,
   onClick,
   className,
+  style,
   sortable = true,
 }: {
   label: string
@@ -403,13 +332,20 @@ export function SortableHead({
   dir: 'asc' | 'desc'
   onClick: () => void
   className?: string
+  // Carries the `left` offset of a frozen column (see frozenCompany below).
+  style?: CSSProperties
   // When false, render a plain (inert) header — the settled table has no sort.
   sortable?: boolean
 }) {
-  if (!sortable) return <TableHead className={className}>{label}</TableHead>
+  if (!sortable)
+    return (
+      <TableHead className={className} style={style}>
+        {label}
+      </TableHead>
+    )
   const Icon = active ? (dir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown
   return (
-    <TableHead className={className}>
+    <TableHead className={className} style={style}>
       <button
         type="button"
         onClick={onClick}
@@ -423,122 +359,32 @@ export function SortableHead({
 }
 
 export function ParticipationsTable({
-  deals,
+  rows,
   showOrg = false,
   orgSlug,
-  settled = false,
+  variant = 'active',
   isFiltered = false,
-  resetKey = '',
 }: {
   // Already filtered by the parent toolbar (search + facets).
-  deals: Array<DealRow> | undefined
+  rows: Array<CompanyRow> | undefined
   showOrg?: boolean
   orgSlug?: string
-  // Settled variant (fully_exited / written_off): swaps TVPI for a MOIC + an
-  // annualized TRI column, adds a colour-coded exit badge per row and drops
-  // sorting. Used by the always-open section below the active table.
-  settled?: boolean
+  // One table per status bucket: 'pending' swaps the money columns for a
+  // single summed commitment (nothing wired yet), 'settled' swaps TVPI for
+  // MOIC + annualized TRI; both drop sorting (short lists).
+  variant?: 'pending' | 'active' | 'settled'
   // True when the parent search/filters are active — drives the empty message
   // (no results vs. empty scope).
   isFiltered?: boolean
-  // Snaps pagination back to page 1 when the upstream search/filters change.
-  resetKey?: string
 }) {
   const { t } = useTranslation('participations')
   const { fmtEur, fmtMultiple, fmtPercent } = useFormatters()
+  const pending = variant === 'pending'
+  const settled = variant === 'settled'
 
-  const groups = useMemo(() => {
-    if (!deals) return undefined
-    const map = new Map<
-      string,
-      {
-        name: string
-        domain: string | undefined
-        oneLiner: string | undefined
-        sector: string | undefined
-        // Defensive: only a numeric score is kept (aiAnalysis is untyped).
-        aiScore: number | undefined
-        orgs: Set<string>
-        slug: string | undefined
-        deals: Array<DealRow>
-        paid: number
-        received: number
-        residual: number
-        // Settled-only MOIC inputs (capital deployed, proceeds net of VAT).
-        capital: number
-        proceeds: number
-        // Union of the deals' signed, de-VAT'd dated flows — solved by `xirr`
-        // for the EXACT company TRI. IRR is not additive, so it must run on the
-        // union, never be derived from per-deal rates.
-        flows: Array<{ amount: number; date: number }>
-        // Group exit outcome for the badge: a write-off anywhere wins.
-        writtenOff: boolean
-        // At least one deal of the group is a pending Term Sheet (not invested).
-        hasPending: boolean
-      }
-    >()
-    for (const d of deals) {
-      const key = d.target?._id ?? d.targetCompanyId
-      const g = map.get(key) ?? {
-        name: d.target?.name ?? '—',
-        domain: d.target?.domain ?? undefined,
-        oneLiner: d.target?.oneLiner ?? undefined,
-        sector: d.target?.sector ?? undefined,
-        aiScore:
-          typeof d.target?.aiScore === 'number' ? d.target.aiScore : undefined,
-        orgs: new Set<string>(),
-        slug: orgSlug ?? d.org?.slug,
-        deals: [],
-        paid: 0,
-        received: 0,
-        residual: 0,
-        capital: 0,
-        proceeds: 0,
-        flows: [],
-        writtenOff: false,
-        hasPending: false,
-      }
-      g.deals.push(d)
-      if (d.org) g.orgs.add(d.org.name)
-      g.paid += d.paidActual ?? 0
-      g.received += d.received ?? 0
-      g.residual += residualCents(d)
-      // MOIC capital/proceeds, accumulated per-deal so each deal's own VAT
-      // convention applies (royalty proceeds are net of VAT — mirrors
-      // dealMoic in ~/lib/dealMetrics). De-VATing only ever lowers the
-      // multiple, so a mixed group is never overvalued (no false Exit win).
-      g.capital += d.paidActual ?? 0
-      g.proceeds += proceedsFromReceived(d.received ?? 0, d.instrumentKind)
-      // Server-side flows already carry the sign + per-deal VAT convention;
-      // the union feeds the shared solver for the company IRR.
-      if (d.flows) g.flows.push(...d.flows)
-      if (d.status === 'written_off') g.writtenOff = true
-      if (d.status === 'pending') g.hasPending = true
-      map.set(key, g)
-    }
-    return Array.from(map.entries()).map(([id, g]) => {
-      const moic = moicRatio({ capital: g.capital, proceeds: g.proceeds })
-      // EXACT company TRI: annualized XIRR on the union of the company's dated
-      // flows (the shared, server-consistent solver). Null — shown "—" — when
-      // undefined, e.g. a total loss with no proceeds (no sign change).
-      const tri = xirr(g.flows)
-      return {
-        id,
-        ...g,
-        // TVPI keeps the GROSS received (not de-VAT'd), unlike the MOIC.
-        tvpi: tvpiRatio({
-          capital: g.paid,
-          proceeds: g.received,
-          residual: g.residual,
-        }),
-        moic,
-        tri,
-      }
-    })
-  }, [deals, orgSlug])
-
-  // Column sort (client-side, low volumes). null = server order
-  // (signedDate desc). Missing TVPIs / AI scores sink to the end (desc).
+  // Column sort (client-side, low volumes). null = server order (rows with a
+  // pending Term Sheet first, then most recent deal first). Missing TVPIs /
+  // AI scores sink to the end (desc).
   const [sort, setSort] = useState<{
     key: SortKey
     dir: 'asc' | 'desc'
@@ -549,20 +395,20 @@ export function ParticipationsTable({
         ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
         : { key, dir: key === 'name' ? 'asc' : 'desc' },
     )
-  const sortedGroups = useMemo(() => {
-    if (!groups || !sort) return groups
-    const value = (g: NonNullable<typeof groups>[number]) =>
+  const sortedRows = useMemo(() => {
+    if (!rows || !sort) return rows
+    const value = (r: CompanyRow) =>
       sort.key === 'name'
-        ? g.name
+        ? r.name
         : sort.key === 'tvpi'
-          ? (g.tvpi ?? Number.NEGATIVE_INFINITY)
+          ? (r.tvpi ?? Number.NEGATIVE_INFINITY)
           : sort.key === 'aiScore'
-            ? (g.aiScore ?? Number.NEGATIVE_INFINITY)
+            ? (r.aiScore ?? Number.NEGATIVE_INFINITY)
             : sort.key === 'deals'
-              ? g.deals.length
-              : g[sort.key]
+              ? r.dealCount
+              : r[sort.key]
     const sign = sort.dir === 'asc' ? 1 : -1
-    return [...groups].sort((a, b) => {
+    return [...rows].sort((a, b) => {
       const va = value(a)
       const vb = value(b)
       if (typeof va === 'string' && typeof vb === 'string') {
@@ -570,25 +416,38 @@ export function ParticipationsTable({
       }
       return sign * (Number(va) - Number(vb))
     })
-  }, [groups, sort])
+  }, [rows, sort])
 
-  // Local pagination (by company, after sort); snaps back to page 1 whenever
-  // the upstream search/filters (resetKey) or the sort changes.
-  const { page, pageCount, setPage } = usePagination(
-    sortedGroups?.length ?? 0,
-    `${resetKey}:${sort ? `${sort.key}:${sort.dir}` : ''}`,
-  )
-  const pagedGroups = sortedGroups?.slice(
-    page * PAGE_SIZE,
-    (page + 1) * PAGE_SIZE,
-  )
+  // Airtable-style totals, pinned at the bottom: summed over the WHOLE
+  // filtered set. Only the countable columns are summed — never the
+  // TVPI/MOIC/TRI ratios.
+  const totals = useMemo(() => {
+    if (!rows) return null
+    let dealCount = 0
+    let committed = 0
+    let invested = 0
+    let received = 0
+    for (const r of rows) {
+      dealCount += r.dealCount
+      committed += r.committed
+      invested += r.invested
+      received += r.received
+    }
+    return { dealCount, committed, invested, received }
+  }, [rows])
 
-  // Base 8 (company, one-liner, sector, AI score, deals, invested, received,
-  // chevron) + the optional org column, plus TVPI (active) or MOIC + TRI
-  // (settled).
-  const colSpan = 8 + (showOrg ? 1 : 0) + (settled ? 2 : 1)
+  // Same 8 columns in every variant (company, AI score, deals, 2 amounts,
+  // 2 ratios, sector — see COL_WIDTHS), plus the optional org one.
+  const colSpan = 8 + (showOrg ? 1 : 0)
+  const fixedWidth =
+    (showOrg ? COL_WIDTHS.org : 0) +
+    COL_WIDTHS.aiScore +
+    COL_WIDTHS.deals +
+    2 * COL_WIDTHS.amount +
+    2 * COL_WIDTHS.ratio +
+    COL_WIDTHS.sector
 
-  if (groups && groups.length === 0) {
+  if (rows && rows.length === 0) {
     return (
       <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
         {isFiltered ? t('search.noResults') : t('empty')}
@@ -598,8 +457,25 @@ export function ParticipationsTable({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border">
-        <Table>
+      {/* The bounded height turns the (shadcn) table container into the
+          vertical scroll box the sticky header/totals cells latch onto. */}
+      <div className="rounded-lg border [&>div]:max-h-[70vh]">
+        <Table
+          className="table-fixed [&_td]:py-3"
+          style={{ minWidth: fixedWidth + COMPANY_MIN_WIDTH }}
+        >
+          <colgroup>
+            {/* Company: no width — takes the leftover space. */}
+            <col />
+            <col style={{ width: COL_WIDTHS.aiScore }} />
+            {showOrg && <col style={{ width: COL_WIDTHS.org }} />}
+            <col style={{ width: COL_WIDTHS.sector }} />
+            <col style={{ width: COL_WIDTHS.deals }} />
+            <col style={{ width: COL_WIDTHS.amount }} />
+            <col style={{ width: COL_WIDTHS.amount }} />
+            <col style={{ width: COL_WIDTHS.ratio }} />
+            <col style={{ width: COL_WIDTHS.ratio }} />
+          </colgroup>
           <TableHeader>
             <TableRow>
               <SortableHead
@@ -607,65 +483,90 @@ export function ParticipationsTable({
                 active={sort?.key === 'name'}
                 dir={sort?.dir ?? 'asc'}
                 onClick={() => toggleSort('name')}
-                sortable={!settled}
-                className={stickyHeadClass}
+                sortable={variant === 'active'}
+                className={headCornerClass}
+                style={frozenCompany}
               />
-              {showOrg && <TableHead>{t('col.org')}</TableHead>}
-              <TableHead>{t('col.oneLiner')}</TableHead>
-              <TableHead>{t('col.sector')}</TableHead>
               <SortableHead
                 label={t('col.aiScore')}
                 active={sort?.key === 'aiScore'}
                 dir={sort?.dir ?? 'desc'}
                 onClick={() => toggleSort('aiScore')}
-                sortable={!settled}
+                sortable={variant === 'active'}
+                className={headCornerClass}
+                style={frozenScore}
               />
+              {showOrg && (
+                <TableHead className={headCellClass}>{t('col.org')}</TableHead>
+              )}
+              <TableHead className={headCellClass}>{t('col.sector')}</TableHead>
               <SortableHead
                 label={t('col.deals')}
                 active={sort?.key === 'deals'}
                 dir={sort?.dir ?? 'desc'}
                 onClick={() => toggleSort('deals')}
-                className="text-right"
-                sortable={!settled}
+                className={cn(headCellClass, 'text-right')}
+                sortable={variant === 'active'}
               />
-              <SortableHead
-                label={t('col.invested')}
-                active={sort?.key === 'paid'}
-                dir={sort?.dir ?? 'desc'}
-                onClick={() => toggleSort('paid')}
-                className="text-right"
-                sortable={!settled}
-              />
-              <SortableHead
-                label={t('col.received')}
-                active={sort?.key === 'received'}
-                dir={sort?.dir ?? 'desc'}
-                onClick={() => toggleSort('received')}
-                className="text-right"
-                sortable={!settled}
-              />
-              {!settled && (
+              {/* First amount slot: the summed commitment for the pending
+                  bucket, the disbursed amount everywhere else. */}
+              {pending ? (
+                <TableHead className={cn(headCellClass, 'text-right')}>
+                  {t('col.committed')}
+                </TableHead>
+              ) : (
+                <SortableHead
+                  label={t('col.invested')}
+                  active={sort?.key === 'invested'}
+                  dir={sort?.dir ?? 'desc'}
+                  onClick={() => toggleSort('invested')}
+                  className={cn(headCellClass, 'text-right')}
+                  sortable={variant === 'active'}
+                />
+              )}
+              {/* Second amount slot: nothing has been received yet on a
+                  pending term sheet — the column stays reserved but empty. */}
+              {pending ? (
+                <TableHead className={headCellClass} />
+              ) : (
+                <SortableHead
+                  label={t('col.received')}
+                  active={sort?.key === 'received'}
+                  dir={sort?.dir ?? 'desc'}
+                  onClick={() => toggleSort('received')}
+                  className={cn(headCellClass, 'text-right')}
+                  sortable={variant === 'active'}
+                />
+              )}
+              {/* First ratio slot: TVPI while active, realized MOIC once
+                  settled, empty while pending. */}
+              {variant === 'active' ? (
                 <SortableHead
                   label={t('col.tvpi')}
                   active={sort?.key === 'tvpi'}
                   dir={sort?.dir ?? 'desc'}
                   onClick={() => toggleSort('tvpi')}
-                  className="text-right"
-                  sortable={!settled}
+                  className={cn(headCellClass, 'text-right')}
                 />
+              ) : settled ? (
+                <TableHead className={cn(headCellClass, 'text-right')}>
+                  {t('col.moic')}
+                </TableHead>
+              ) : (
+                <TableHead className={headCellClass} />
               )}
-              {settled && (
-                <>
-                  <TableHead className="text-right">{t('col.moic')}</TableHead>
-                  <TableHead className="text-right">{t('col.tri')}</TableHead>
-                </>
+              {/* Second ratio slot: the annualized TRI, settled bucket only. */}
+              {settled ? (
+                <TableHead className={cn(headCellClass, 'text-right')}>
+                  {t('col.tri')}
+                </TableHead>
+              ) : (
+                <TableHead className={headCellClass} />
               )}
-              {/* Trailing column for the per-row hover chevron. */}
-              <TableHead className="w-8" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {!pagedGroups ? (
+            {!sortedRows ? (
               <TableRow>
                 <TableCell
                   colSpan={colSpan}
@@ -675,12 +576,13 @@ export function ParticipationsTable({
                 </TableCell>
               </TableRow>
             ) : (
-              pagedGroups.map((g) => (
-                <CompanyRows
-                  key={g.id}
-                  group={g}
+              sortedRows.map((r) => (
+                <CompanyTableRow
+                  key={r.companyId}
+                  row={r}
                   showOrg={showOrg}
-                  settled={settled}
+                  orgSlug={orgSlug}
+                  variant={variant}
                   fmtEur={fmtEur}
                   fmtMultiple={fmtMultiple}
                   fmtPercent={fmtPercent}
@@ -688,68 +590,75 @@ export function ParticipationsTable({
               ))
             )}
           </TableBody>
+          {totals && (
+            <TableFooter>
+              <TableRow className="hover:bg-transparent">
+                <TableCell className={footCornerClass} style={frozenCompany}>
+                  {t('totalsRow')}
+                </TableCell>
+                {/* AI score + org + sector: nothing to sum. */}
+                <TableCell className={footCornerClass} style={frozenScore} />
+                {showOrg && <TableCell className={footCellClass} />}
+                <TableCell className={footCellClass} />
+                <TableCell
+                  className={cn(footCellClass, 'text-right tabular-nums')}
+                >
+                  {t('dealsCount', { count: totals.dealCount })}
+                </TableCell>
+                <TableCell
+                  className={cn(footCellClass, 'text-right tabular-nums')}
+                >
+                  {fmtEur(pending ? totals.committed : totals.invested)}
+                </TableCell>
+                {pending ? (
+                  <TableCell className={footCellClass} />
+                ) : (
+                  <TableCell
+                    className={cn(footCellClass, 'text-right tabular-nums')}
+                  >
+                    {fmtEur(totals.received)}
+                  </TableCell>
+                )}
+                {/* No sum for the ratio columns (TVPI, or MOIC + TRI). */}
+                <TableCell className={footCellClass} />
+                <TableCell className={footCellClass} />
+              </TableRow>
+            </TableFooter>
+          )}
         </Table>
       </div>
-      <PaginationFooter
-        page={page}
-        pageCount={pageCount}
-        onPageChange={setPage}
-      />
     </div>
   )
 }
 
-function CompanyRows({
-  group,
+function CompanyTableRow({
+  row,
   showOrg,
-  settled,
+  orgSlug,
+  variant,
   fmtEur,
   fmtMultiple,
   fmtPercent,
 }: {
-  group: {
-    id: string
-    name: string
-    domain: string | undefined
-    oneLiner: string | undefined
-    sector: string | undefined
-    aiScore: number | undefined
-    orgs: Set<string>
-    slug: string | undefined
-    deals: Array<DealRow>
-    paid: number
-    received: number
-    tvpi: number | null
-    moic: number | null
-    tri: number | null
-    capital: number
-    proceeds: number
-    writtenOff: boolean
-    hasPending: boolean
-  }
+  row: CompanyRow
   showOrg: boolean
-  settled: boolean
+  orgSlug?: string
+  variant: 'pending' | 'active' | 'settled'
   fmtEur: (c?: number | null) => string
   fmtMultiple: (ratio: number | null) => string
   fmtPercent: (ratio: number | null) => string
 }) {
   const { t } = useTranslation('participations')
   const navigate = useNavigate()
-  // Settled rows carry a single status badge whose colour is the exit outcome
-  // (green win / red loss / neutral). A write-off anywhere in the group forces
-  // "written_off" (always red); otherwise the group's aggregated MOIC decides.
-  const settledStatus = group.writtenOff ? 'written_off' : 'fully_exited'
-  const settledBadge = dealStatusBadge(settledStatus, group.moic)
   // Whole-row click opens the entity sheet (its deals are listed there).
   // Guarded by `slug`: the per-org view passes orgSlug, the aggregated view
-  // derives it from each deal's org; without a slug the row isn't clickable
-  // (mirrors the "Open details" button's own render guard).
-  const slug = group.slug
+  // reads it from the row's org; without a slug the row isn't clickable.
+  const slug = orgSlug ?? row.org?.slug
   const openDetail = slug
     ? () =>
         navigate({
           to: '/app/$orgSlug/participations/$companyId',
-          params: { orgSlug: slug, companyId: group.id },
+          params: { orgSlug: slug, companyId: row.companyId },
         })
     : undefined
   return (
@@ -762,9 +671,7 @@ function CompanyRows({
       // and Enter-activated only when there's a destination.
       tabIndex={openDetail ? 0 : undefined}
       role={openDetail ? 'link' : undefined}
-      aria-label={
-        openDetail ? t('rowOpenAria', { name: group.name }) : undefined
-      }
+      aria-label={openDetail ? t('rowOpenAria', { name: row.name }) : undefined}
       onKeyDown={
         openDetail
           ? (e) => {
@@ -773,95 +680,90 @@ function CompanyRows({
           : undefined
       }
     >
-      <TableCell className={cn('font-medium', stickyCellClass)}>
-        <span className="flex items-center gap-2">
+      <TableCell
+        className={cn('font-medium', stickyCellClass)}
+        style={frozenCompany}
+      >
+        <span className="flex min-w-0 items-center gap-3">
           <CompanyLogo
-            domain={group.domain}
-            companyName={group.name}
-            size="sm"
+            domain={row.domain}
+            companyName={row.name}
+            size="md"
+            className="size-9"
           />
-          {group.name}
-          {group.hasPending && !settled && (
-            <Badge className="bg-warning text-warning-foreground">
-              {t('status.pending')}
-            </Badge>
-          )}
-          {settled && (
-            <Badge
-              variant={settledBadge.variant}
-              className={settledBadge.className}
-            >
-              {t(`status.${settledStatus}`)}
-            </Badge>
-          )}
+          {/* The column grid is fixed, so a long name wraps to two lines
+              (then ellipsizes) instead of pushing the table wider. */}
+          <span
+            className="line-clamp-2 whitespace-normal break-words"
+            title={row.name}
+          >
+            {row.name}
+          </span>
         </span>
+      </TableCell>
+      <TableCell className={stickyCellClass} style={frozenScore}>
+        {row.aiScore != null ? (
+          <ScoreRing score={row.aiScore} />
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
       </TableCell>
       {showOrg && (
         <TableCell>
-          <span className="flex flex-wrap gap-1">
-            {Array.from(group.orgs).map((o) => (
-              <Badge key={o} variant="outline">
-                {o}
-              </Badge>
-            ))}
-          </span>
+          {row.org ? <Badge variant="outline">{row.org.name}</Badge> : '—'}
         </TableCell>
       )}
       <TableCell>
-        <OneLinerCell text={group.oneLiner} expandLabel={t('oneLinerExpand')} />
-      </TableCell>
-      <TableCell>
-        {group.sector
-          ? t(`sectors.${group.sector}`, { defaultValue: group.sector })
-          : '—'}
-      </TableCell>
-      <TableCell>
-        {group.aiScore != null ? (
-          <ScoreRing score={group.aiScore} />
+        {row.sector ? (
+          <Badge variant="outline">
+            {t(`sectors.${row.sector}`, { defaultValue: row.sector })}
+          </Badge>
         ) : (
           <span className="text-muted-foreground">—</span>
         )}
       </TableCell>
       <TableCell className="text-right tabular-nums">
-        {t('dealsCount', { count: group.deals.length })}
+        {t('dealsCount', { count: row.dealCount })}
       </TableCell>
+      {/* The column grid is shared by all three variants (see COL_WIDTHS):
+          the slots a variant has nothing for stay empty rather than shifting
+          the columns to their left. */}
       <TableCell className="text-right tabular-nums">
-        {fmtEur(group.paid)}
+        {fmtEur(variant === 'pending' ? row.committed : row.invested)}
       </TableCell>
-      <TableCell
-        className={`text-right tabular-nums${
-          isNeutralAmount(group.received) ? ' text-muted-foreground' : ''
-        }`}
-      >
-        {fmtEur(group.received)}
-      </TableCell>
-      {!settled && (
+      {variant === 'pending' ? (
+        <TableCell />
+      ) : (
         <TableCell
           className={`text-right tabular-nums${
-            isNeutralTvpi(group.tvpi) ? ' text-muted-foreground' : ''
+            isNeutralAmount(row.received) ? ' text-muted-foreground' : ''
           }`}
         >
-          {fmtMultiple(group.tvpi)}
+          {fmtEur(row.received)}
         </TableCell>
       )}
-      {settled && (
-        <>
-          <TableCell className="text-right tabular-nums">
-            {fmtMultiple(group.moic)}
-          </TableCell>
-          <TableCell className="text-right tabular-nums">
-            {fmtPercent(group.tri)}
-          </TableCell>
-        </>
+      {variant === 'active' ? (
+        <TableCell
+          className={`text-right tabular-nums${
+            isNeutralTvpi(row.tvpi) ? ' text-muted-foreground' : ''
+          }`}
+        >
+          {fmtMultiple(row.tvpi)}
+        </TableCell>
+      ) : variant === 'settled' ? (
+        <TableCell className="text-right tabular-nums">
+          {fmtMultiple(row.moic)}
+        </TableCell>
+      ) : (
+        <TableCell />
       )}
-      <TableCell className="w-8 text-right">
-        {openDetail && (
-          <ArrowRight
-            aria-hidden
-            className="text-muted-foreground inline size-4 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-          />
-        )}
-      </TableCell>
+      {variant === 'settled' ? (
+        <TableCell className="text-right tabular-nums">
+          {fmtPercent(row.tri)}
+        </TableCell>
+      ) : (
+        <TableCell />
+      )}
     </TableRow>
   )
 }

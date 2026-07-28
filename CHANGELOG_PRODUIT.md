@@ -23,13 +23,14 @@ bas de page.
 
 ---
 
-## v1.131.0 — 28/07/2026 à 14:59 — Documents : voir ce que la machine a lu
+## v1.140.0 — 28/07/2026 à 16:10 — Documents : voir ce que la machine a lu
 
 Jusqu'ici, savoir si un document avait bien été déchiffré supposait de
 retrouver le récap reçu dans le fil du mail — et pour un fichier déposé à la
 main, la question n'avait même pas de réponse : il n'était pas lu du tout.
 
-Deux changements, sur l'onglet Documents de chaque fiche société :
+Deux changements, sur l'onglet Documents des fiches société **et** sur le
+bloc Documents des fiches deal :
 
 - **Tout document déposé à la main est désormais lu automatiquement**, comme
   ceux qui arrivent par un report transféré : PDF et images par OCR, Excel et
@@ -43,6 +44,9 @@ C'est le geste qui permet de vérifier ce que la machine a lu avant de faire
 confiance aux métriques qu'elle en a tirées — quelques centaines de
 caractères sur un PDF de trente pages, c'est un scan illisible, pas un
 reporting vide.
+
+Le circuit est le même des deux côtés : un term sheet déposé sur un deal est
+lu exactement comme un investor update reçu par mail.
 
 Pour un document en échec, ou déposé avant cette mise à jour, un bouton
 relance la lecture à la demande. Les causes d'échec sont formulées exactement
@@ -71,9 +75,584 @@ deux histoires différentes.
 > - `reportExtract` persiste désormais le texte **par pièce jointe** (en plus
 >   du texte combiné) ; `reportStore` recopie l'état du routeur sur chaque
 >   ligne `documents` créée.
-> - Front : composant `OcrStatus` + fenêtre du texte extrait dans
->   `ReportingsSection.tsx`, requête `documents:getExtractedText` chargée
+> - Front : `src/components/documents/DocumentReading.tsx` (`OcrStatus` +
+>   `ExtractedTextDialog`) partagé par `ReportingsSection` et
+>   `DealDocumentsSection` ; requête `documents:getExtractedText` chargée
 >   uniquement à l'ouverture (`'skip'` sinon), mutation `documents:reextract`.
+>   Clés i18n sous `participations:documentReading.*`.
+> - `deals:remove` supprimait le blob d'un document de deal sans passer par
+>   `documents:remove` : sa ligne `documentTexts` serait restée orpheline.
+>   Helper `convex/lib/documentTexts.ts` appelé aux deux endroits.
+## v1.139.2 — 28/07/2026 à 09:35 — Les onglets Reports / Documents adoptent le style du reste de l'app
+
+Sur la fiche d'une participation, les onglets **Reports** et **Documents**
+étaient les seuls de l'app à s'afficher en texte souligné. Ils prennent
+désormais la même forme que partout ailleurs — notamment la barre de la
+page Cash (Vue d'ensemble / Prévisionnel / Transactions / Règles &
+échéances) : des pastilles dans un bandeau gris, l'onglet actif en blanc.
+Rien ne change dans le contenu des deux onglets.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/$orgSlug/participations.$companyId.tsx` : la `TabsList`
+>   de la zone reporting passe de `variant="line"` au variant par défaut
+>   (pastilles), identique à `cash.index.tsx`.
+> - C'était le seul usage de `variant="line"` du repo ; le variant reste
+>   défini dans `src/components/ui/tabs.tsx` et disponible si besoin.
+
+---
+
+## v1.139.1 — 27/07/2026 à 23:25 — Les badges de secteur tiennent tous sur une ligne
+
+Dans la liste Entreprises, le secteur « Marketplace / E-commerce » était le
+seul libellé trop long pour sa colonne : sa pastille passait sur deux lignes
+et dépassait en hauteur toutes les autres, ce qui donnait une colonne
+irrégulière. Le libellé devient simplement **« Marketplace »** et tous les
+badges de secteur s'alignent désormais sur une seule ligne, à la même
+hauteur.
+
+> **🔧 Notes techniques**
+>
+> - `src/locales/{fr,en}/participations.json` : clé `sectors.marketplace`
+>   raccourcie en « Marketplace » (le seul libellé qui débordait — mesuré à
+>   143 px pour ~126 px de texte disponible dans le badge, police de
+>   fallback Arial/Liberation Sans 12 px ; les trois suivants —
+>   « Fonds / Private equity » 116 px, « Consumer / Marques » 112 px,
+>   « Industrie / DeepTech » 111 px — tenaient déjà).
+> - `ParticipationsTable.tsx` : le badge de secteur perd
+>   `whitespace-normal text-center` et revient au `whitespace-nowrap` natif
+>   du composant `Badge`. Largeur de colonne `COL_WIDTHS.sector` inchangée
+>   (160 px) ; son commentaire, qui annonçait à tort quatre libellés sur
+>   deux lignes, est corrigé.
+> - `TESTING.md` SH19c mis à jour : le scénario pointe désormais
+>   « Fonds / Private equity » (nouveau libellé le plus long) et attend des
+>   badges tous sur une ligne.
+
+---
+
+## v1.139.0 — 27/07/2026 à 23:02 — Les documents d'un deal se rangent sur le deal
+
+La fiche deal a enfin son bloc **Documents**, juste sous les Transactions —
+là où il n'y avait qu'un encart « à venir ». On y dépose la term sheet, le
+pacte ou les statuts, le bulletin de souscription, une attestation ou un
+KBIS, et tout le reste sous « Autre ».
+
+Chaque document se dépose en un clic (**20 Mo maximum**) : on lui donne un
+titre, un type et, si c'est utile, sa **date** — la date de signature par
+exemple, mais elle reste facultative. Le tableau liste ensuite titre, type,
+date, taille et date d'ajout ; chaque ligne se télécharge ou se supprime,
+avec une confirmation avant l'effacement définitif.
+
+Le rangement est volontairement étanche : un document déposé sur un deal
+**n'apparaît que là**, jamais dans l'onglet Documents de la société — qui
+reste réservé à ce qui concerne l'entreprise elle-même (reportings,
+business plan, juridique). L'assistant applique la même règle quand on lui
+demande les documents d'une société. Conséquence à garder en tête :
+**supprimer un deal supprime aussi ses documents**, fichiers compris.
+
+> **🔧 Notes techniques**
+>
+> - Pas de nouvelle table : la table `documents` existante gagne un
+>   `dealId: v.optional(v.id('deals'))` + index `by_deal`, et son union
+>   `kind` s'élargit de `term_sheet` / `pacte` / `subscription` /
+>   `attestation` (les types société restent). Champ optionnel additif →
+>   **aucune migration**. `companyId` reste rempli (la cible du deal), donc
+>   le scoping org et `by_company` continuent de marcher pour les deux
+>   familles ; `period` sert de « date du document » côté deal.
+> - `convex/documents.ts` : nouvelle query `listByDeal` ; `create` accepte
+>   un `dealId` optionnel et vérifie que le deal existe, est dans la même
+>   org et cible bien la société sous laquelle le doc est classé.
+>   `listByCompany` **filtre les lignes portant un `dealId`** — c'est ce
+>   filtre qui rend le cloisonnement effectif (même filtre dans
+>   `convex/agentTools.ts:listCompanyDocumentsInternal` pour l'assistant).
+> - `convex/deals.ts:remove` : suppression en cascade des documents du deal
+>   **et** de leurs fichiers (`ctx.storage.delete`), sinon lignes orphelines
+>   + storage qui fuit. Le refus sur transactions rapprochées est inchangé.
+> - Front : `src/components/deals/DealDocumentsSection.tsx` (calqué sur
+>   `ReportingsSection`), branché dans
+>   `src/routes/app/$orgSlug/deals.$dealId.tsx` à la place du placeholder,
+>   après les Transactions. i18n : bloc `participations:dealDocuments.*`
+>   (fr + en), clés `fiche.documents.*` obsolètes retirées.
+> - `TESTING.md` : FD9 recalé (le bloc n'est plus un placeholder) + FD41
+>   (upload / 20 Mo / download / suppression) et FD42 (cloisonnement
+>   société ↔ deal, cascade à la suppression) ; note sur TP6.
+>   `docs/produit/05-deals.md` et `04-participations.md` mis à jour.
+## v1.138.1 — 27/07/2026 à 23:03 — Une colonne Secteur plus compacte
+
+Sur la liste Entreprises, la colonne **Secteur** était calibrée sur le
+libellé le plus long (« Marketplace / E-commerce ») : elle réservait cette
+largeur sur **toutes** les lignes, y compris celles où le badge affiche
+« Fintech ». Elle est maintenant **plus étroite d'environ 50 px**, au
+profit des colonnes de chiffres à sa droite, et les **quatre libellés les
+plus longs passent sur deux lignes dans le badge** au lieu d'imposer leur
+largeur à la colonne entière. Tous les autres secteurs restent sur une
+ligne, et l'alignement des colonnes entre les tableaux (En cours, Actifs,
+Exit win, Exit loss) est inchangé.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/participations/ParticipationsTable.tsx` :
+>   `COL_WIDTHS.sector` passe de 208 à 160 px — volontairement en dessous
+>   de la largeur du badge le plus long, la grille de colonnes partagée
+>   (`table-fixed` + colgroup) restant la référence commune aux trois
+>   variantes.
+> - Le badge secteur reçoit `whitespace-normal text-center` pour
+>   neutraliser le `whitespace-nowrap` par défaut du composant `Badge` et
+>   retomber sur deux lignes. Seuls les 4 libellés > ~17 caractères
+>   (marketplace, fund, industry, consumer) sont concernés, en FR comme en
+>   EN.
+> - `TESTING.md` : SH19c recalé (deux lignes attendues sur les longs
+>   libellés) et seuils de scroll horizontal de SH19b ramenés à ~1040 px
+>   (~1144 px en vue agrégée).
+
+---
+
+## v1.138.0 — 27/07/2026 à 22:54 — L'en-tête de la liste Entreprises reste en haut
+
+Sur la liste Entreprises, le bandeau de tête — **titre**, menu `⋯` et la
+barre **recherche / Instrument / Secteur** — reste maintenant figé en haut
+de l'écran quand on descend dans la liste. Avant, il fallait remonter tout
+en haut de la page pour lancer une recherche ou poser un filtre : sur un
+portefeuille qui empile quatre tableaux (term sheets, actifs, exit win,
+exit loss), ça faisait beaucoup d'allers-retours. Les actions de tri du
+portefeuille restent désormais à portée de clic depuis n'importe où dans
+la liste.
+
+Même comportement en vue **Toutes les organisations**, où le bandeau figé
+emporte le titre et son sous-titre.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/participations/ParticipationsView.tsx` : le titre et la
+>   barre d'outils sont réunis dans un seul conteneur
+>   `sticky top-0 -mx-6 px-6 border-b bg-background` — même motif que
+>   l'en-tête de la fiche société (`participations.$companyId.tsx`). Le
+>   conteneur de scroll est celui du layout org (`app/$orgSlug/route.tsx`).
+> - Le titre arrive par une nouvelle prop `header?: ReactNode` plutôt que de
+>   rester dans la route : deux éléments `sticky` empilés auraient exigé un
+>   offset `top` codé en dur (et différent entre les deux pages, la vue
+>   agrégée ayant un sous-titre).
+> - `z-40` sur le bandeau, au-dessus des cellules d'en-tête figées des
+>   tableaux (`z-30`), sinon celles-ci repassent par-dessus au scroll.
+> - Routes adaptées : `app/$orgSlug/participations.index.tsx` (titre + menu
+>   `⋯`) et `app/all/participations.tsx` (titre + sous-titre).
+> - Docs : ligne SH21 ajoutée à `TESTING.md`, `docs/produit/04-participations.md`
+>   complété.
+
+---
+
+## v1.137.2 — 27/07/2026 à 22:50 — Les noms de sociétés ne sont plus coupés
+
+Sur la liste Entreprises, un nom de société trop long pour sa colonne
+**passe maintenant sur deux lignes** au lieu d'être coupé avec « … » dès la
+première — « La Vie de Quartier - Bdv… » redevient lisible en entier. Au
+survol, une infobulle affiche toujours le nom complet, et un nom qui
+dépasserait même deux lignes se coupe proprement à la fin de la seconde.
+Rien d'autre ne bouge : les colonnes restent alignées entre les tableaux
+et la colonne Société garde sa largeur.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/participations/ParticipationsTable.tsx` : le nom dans
+>   la cellule Société passe de `truncate` à
+>   `line-clamp-2 whitespace-normal break-words` (le `whitespace-nowrap`
+>   par défaut des cellules shadcn est neutralisé au niveau du span) +
+>   `title` pour l'infobulle. Point F3 de la revue UI, oublié dans la
+>   fournée #298.
+> - `TESTING.md` SH19b recalé (deux lignes + tooltip au lieu de « … »).
+
+---
+
+## v1.137.1 — 27/07/2026 à 22:38 — Une seule icône pour les Entreprises
+
+Dans le menu de gauche, « Entreprises » s'affichait avec un camembert
+alors que la recherche rapide (⌘K) proposait les sociétés avec une icône
+d'immeuble. C'est désormais la même icône d'immeuble des deux côtés.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/app-shell/nav.ts` : l'entrée `items.participations`
+>   passe de `PieChart` à `Building2`, dans `getNavGroups()` (vue par-org)
+>   comme dans `getAllNavGroups()` (vue agrégée `/app/all`), pour rester
+>   cohérente avec le groupe « Entreprises » de `CommandPalette.tsx`.
+> - `PieChart` n'était plus utilisé ailleurs : import retiré.
+
+## v1.137.0 — 27/07/2026 à 22:32 — Fiches plus lisibles et export Excel
+
+Une fournée de retouches issues de la revue de l'app, pour rendre les
+fiches plus lisibles et les listes plus propres.
+
+**Fiche société.** La box Identité gagne en lisibilité : les libellés
+(Secteur, SIREN, Domaine…) passent en petites majuscules discrètes et les
+valeurs ressortent davantage. Le **résumé** de la société n'est plus un
+texte posé sous la box : il est intégré à la fiche d'identité avec son
+propre libellé, en texte justifié. Le **SIREN** s'affiche désormais par
+groupes de trois chiffres (552 178 639), comme partout ailleurs. Dans la
+**Synthèse IA**, les trois tuiles KPI s'alignent enfin : chiffres,
+variations et lignes de contexte tombent sur les mêmes lignes d'une tuile
+à l'autre, et la ligne de contexte s'écrit sur deux lignes au lieu d'être
+systématiquement coupée par « … ».
+
+**Fiche deal.** La grosse carte « Entité liée » au milieu de la fiche
+disparaît (le lien de retour vers la société, en haut de fiche, fait déjà
+le travail), ainsi que la section « Reporting & KPIs » qui n'affichait
+rien. La vignette de famille d'instrument (« Capital », « Dette »…) est
+retirée : elle n'apportait rien de plus que le type déjà affiché.
+
+**Liste Entreprises.** La petite flèche qui apparaissait au survol en bout
+de ligne est retirée — le grisé de la ligne suffit. L'**export** propose
+désormais **CSV et Excel (.xlsx)**, et il respecte la recherche et les
+filtres en cours (sans filtre, tout est exporté comme avant).
+
+> **🔧 Notes techniques**
+>
+> - Fiche deal : sections « Entité liée » et « Reporting » supprimées de
+>   `deals.$dealId.tsx` ; badge archétype et `ARCHETYPE_BADGE` retirés de
+>   `InstrumentBlock.tsx` (le mapping `INSTRUMENT_ARCHETYPE` reste, il
+>   pilote le layout). Clés i18n `archetype.*`, `fiche.entity.*`,
+>   `fiche.reporting.*` purgées.
+> - Identité : hiérarchie libellé/valeur unifiée dans `IdentityField`
+>   (`EntityFiche.tsx`) et `InlineField` (`ui/inline-field.tsx`) — libellé
+>   `text-[11px] uppercase tracking-wide`, valeur `font-medium` ; résumé
+>   déplacé dans la section Identité (`participations.$companyId.tsx`).
+> - SIREN : nouveau helper pur `formatSiren` (`src/lib/siren.ts` +
+>   `tests/siren.test.ts`), appliqué à l'affichage seulement (l'édition
+>   garde la valeur brute).
+> - Synthèse IA : `KpiTile` passe en subgrid (`grid-rows-subgrid
+>   row-span-4`, placeholders pour tendance/contexte absents) pour aligner
+>   les rangées entre tuiles ; contexte en `line-clamp-2` + tooltip.
+> - Liste : colonne chevron retirée de `ParticipationsTable.tsx` (colgroup
+>   et `colSpan` recalés). Export : `handleExport(format)` dans
+>   `ParticipationsView.tsx`, filtre par `companyId` des lignes visibles,
+>   XLSX via `write-excel-file` 4.1.1 (import dynamique
+>   `write-excel-file/browser`, cellules numériques typées) ; menus mis à
+>   jour dans `participations.index.tsx` (deux entrées CSV/Excel).
+
+---
+
+## v1.136.0 — 27/07/2026 à 22:15 — Le score IA reste visible au scroll
+
+Sur la liste Entreprises, le **score IA** reste maintenant figé à l'écran
+avec le nom de la société quand on fait défiler le tableau vers la droite.
+Avant, seule la colonne Société tenait bon : dès qu'on allait chercher le
+TVPI ou le TRI, la note disparaissait et on ne pouvait plus croiser
+« qu'est-ce que ça vaut » avec « comment ça va ». Les deux repères de
+lecture d'une ligne restent désormais sous les yeux en permanence, sur les
+quatre tableaux (term sheets, actifs, exit win, exit loss).
+
+En vue **Toutes les organisations**, la colonne **Org** passe juste après le
+score IA : elle serait sinon coincée entre les deux colonnes figées et
+mangerait de la place à l'écran sans raison.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/participations/ParticipationsTable.tsx` : le figeage
+>   passe d'une à deux colonnes. Les classes `headCornerClass` /
+>   `footCornerClass` / `stickyCellClass` perdent leur `left-0` en dur, le
+>   décalage vient de deux objets de style `frozenCompany` (0) et
+>   `frozenScore` (`COMPANY_MIN_WIDTH`).
+> - L'offset de la 2ᵉ colonne figée est constant par construction : le
+>   scroll horizontal ne se déclenche qu'une fois la table à son
+>   `min-width` (`fixedWidth + COMPANY_MIN_WIDTH`), où la colonne Société —
+>   la seule flexible — est pile à son minimum.
+> - La colonne Org (`showOrg`) est déplacée après le score IA dans le
+>   `colgroup`, l'en-tête, la ligne et le pied de totaux, pour que les deux
+>   colonnes figées restent les deux premières.
+> - `SortableHead` accepte une prop `style` (elle porte le `left` de la
+>   colonne figée).
+> - Docs : ligne SH19 de `TESTING.md` mise à jour, et section « Colonne
+>   figée » de `KNOWN_ISSUES.md` complétée sur le cas multi-colonnes.
+
+---
+
+## v1.135.4 — 27/07/2026 à 21:45 — Le secteur remonte avant les chiffres
+
+Sur la liste Entreprises, la colonne **Secteur** passe juste après le score
+IA, avant les colonnes de chiffres. Depuis que les quatre tableaux
+partagent la même grille, ceux qui n'ont pas toutes les colonnes (les term
+sheets surtout, sans Reçu ni multiple) ouvraient un **trou blanc au milieu
+du tableau**, entre les montants et le secteur. Les emplacements vides sont
+maintenant en **bout de ligne**, où l'œil ne les lit plus comme un trou.
+
+Au passage, les colonnes regroupent ce qui va ensemble : ce qui décrit la
+boîte (société, score, secteur) d'abord, ce qui la mesure (deals, montants,
+multiples) ensuite.
+
+Le badge de secteur le plus long débordait de trois pixels sur la colonne
+voisine : sa colonne a été élargie.
+
+> **🔧 Notes techniques**
+>
+> - `ParticipationsTable.tsx` : la colonne Secteur passe de l'avant-dernière
+>   position à la 3ᵉ (après Score IA), dans le `<colgroup>`, l'en-tête, le
+>   corps et le pied. Aucun contenu de cellule ne change.
+> - `COL_WIDTHS.sector` 192 → 208 px : « Marketplace / E-commerce » mesure
+>   195 px, il débordait donc — sans ellipse, les cellules étant
+>   `whitespace-nowrap` sans clamp. `COL_WIDTHS.amount` 144 → 152 px (1 px
+>   de marge seulement sur l'en-tête « Montant investi »).
+>   `COMPANY_MIN_WIDTH` 256 → 240 px pour compenser : le seuil de scroll
+>   horizontal ne bouge quasiment pas (~1128 px, ~1232 px en vue agrégée).
+> - Largeurs re-mesurées dans Chromium **sans clamp** sur la sonde : le
+>   `max-width:100%` de la vérification précédente écrasait `scrollWidth` et
+>   masquait justement ce type de débordement. Chaque colonne garde ≥ 4 px
+>   de marge, mesurée avec la police de **repli** de la stack (Inter est
+>   plus étroite, donc c'est le pire cas).
+> - TESTING.md (SH19/SH19b) et `docs/produit/04-participations.md` alignés.
+
+---
+
+## v1.135.3 — 27/07/2026 à 20:24 — Colonnes alignées sur la liste Entreprises
+
+Sur la liste Entreprises, les quatre tableaux (En cours, Actifs, Exit win,
+Exit loss) partagent désormais **la même grille de colonnes**. Chaque
+colonne tombe exactement au même endroit d'un tableau à l'autre : le
+« Montant investi » des Actifs est pile au-dessus de celui des Exit win,
+« Secteur » et la flèche de fin de ligne sont alignés partout. Avant,
+chaque tableau calculait ses largeurs à partir de son propre contenu, d'où
+des colonnes en escalier d'une section à l'autre.
+
+Un tableau qui n'a pas une colonne **laisse sa place vide** au lieu de
+décaler les suivantes — le tableau des term sheets a donc des colonnes
+blanches à droite, et celui des Actifs laisse vide l'emplacement du TRI.
+Seule la colonne « Société » s'étire avec la fenêtre ; un nom trop long se
+coupe avec « … » plutôt que d'élargir la colonne.
+
+> **🔧 Notes techniques**
+>
+> - `ParticipationsTable.tsx` : passage en `table-fixed` + `<colgroup>`
+>   partagé, largeurs déclarées dans `COL_WIDTHS` (org, aiScore, deals,
+>   amount ×2, ratio ×2, sector, chevron) ; la colonne Société n'a pas de
+>   largeur et absorbe le reste, avec un `minWidth` = somme des largeurs
+>   fixes + `COMPANY_MIN_WIDTH` en dessous duquel la table scrolle
+>   horizontalement (colonne figée déjà en place).
+> - Les trois variantes (`pending` / `active` / `settled`) rendent
+>   maintenant **le même nombre de cellules** dans le même ordre : les
+>   emplacements sans contenu sont des `TableHead` / `TableCell` vides au
+>   lieu d'être omis (en-tête, corps et pied). `colSpan` devient constant
+>   (9 + org).
+> - Nom de société en `truncate` (+ `min-w-0` sur le flex parent) : en
+>   largeur fixe, il ne peut plus pousser la colonne.
+> - Alignement et absence de débordement vérifiés dans Chromium sur les
+>   trois variantes (positions x identiques, aucune cellule ne dépasse sa
+>   largeur, en-tête le plus long et badge secteur le plus long inclus).
+> - TESTING.md : SH19 ajusté + nouveau cas **SH19b** (alignement
+>   inter-tableaux) ; `docs/produit/04-participations.md` mis à jour.
+
+---
+
+## v1.135.2 — 27/07/2026 à 20:07 — La ligne de titres des tableaux se détache
+
+Dans les tableaux de participations, la ligne des titres de colonnes
+(« Société », « Score IA », « Montant investi »…) avait le même fond blanc
+que les lignes de sociétés en dessous : rien ne la démarquait, et l'œil ne
+voyait plus où commençait la liste. Elle prend désormais le **même fond
+gris que la ligne de totaux** en bas du tableau. La liste est encadrée par
+ses deux lignes de repère, et chaque participation se distingue mieux.
+
+> **🔧 Notes techniques**
+>
+> - `ParticipationsTable.tsx` : `headCornerClass` / `headCellClass` passent
+>   de `bg-background` à `bg-muted`, en miroir de `footCornerClass` /
+>   `footCellClass`. Fond opaque conservé (obligatoire : les cellules sont
+>   `sticky` et les colonnes défilent dessous).
+> - Aucun changement de structure ni de layout — les trois variantes du
+>   tableau (actif / en cours / sorties) en héritent d'office.
+
+---
+
+## v1.135.1 — 27/07/2026 à 19:37 — « Actifs », et des compteurs en deals
+
+Le tableau des participations actives s'appelle désormais **« Actifs »**
+(et non « Actives »), et le compteur de chaque bandeau compte maintenant
+les **deals** — la même unité et le même nombre que la ligne de totaux du
+tableau (« Actifs (48 deals) »). Il comptait les lignes (sociétés), d'où
+un « 44 » en haut face à un « 48 deals » en bas qui semblait incohérent.
+
+> **🔧 Notes techniques**
+>
+> - Bandeau (`ParticipationsView.tsx`) : compteur = somme des `dealCount`
+>   des lignes du bucket, rendu via la clé existante `dealsCount` ;
+>   `sections.active` renommé « Actifs » (fr).
+> - TESTING.md (SH19/SH20) et `docs/produit/04-participations.md` alignés.
+
+## v1.135.0 — 27/07/2026 à 19:21 — Un tableau par statut dans la liste des entreprises
+
+Le liseré coloré dans la marge des lignes n'était pas assez lisible : il
+disparaît, remplacé par un découpage de la liste en **un tableau par
+statut**, chacun coiffé d'un bandeau teinté (pastille, titre, compteur) :
+
+- **En cours (term sheet)** en ambre, tout en haut — et affiché uniquement
+  s'il y a des term sheets en cours. Ses colonnes montrent l'**engagé
+  prévisionnel** (rien n'est encore décaissé).
+- **Actives** en bleu : toutes les entreprises avec des deals actifs.
+- **Exit win** en vert et **Exit loss** en rouge, chacun avec MOIC et TRI.
+
+Chaque tableau garde sa **ligne de totaux** : la somme des exits gagnants
+et celle des pertes se lisent maintenant directement. La recherche et les
+filtres restent uniques en haut et s'appliquent à tous les tableaux ; le
+filtre « statut » disparaît, devenu redondant. Une société avec un term
+sheet **et** des deals actifs apparaît dans les deux tableaux, avec des
+sommes exactes de chaque côté.
+
+Sur la **fiche société**, le tableau des deals garde son **liseré coloré**
+dans la marge (ambre = term sheet, bleu = actif, vert = Exit win, rouge =
+Exit loss) — c'est lui qui distingue les statuts d'un coup d'œil — et les
+term sheets remontent en tête du tableau. Les badges de statut, eux, ne
+changent pas : un deal actif reste gris neutre, la couleur n'apparaît que
+quand elle signale quelque chose.
+
+> **🔧 Notes techniques**
+>
+> - `buildParticipationRows` (`convex/deals.ts`) : bucket `pending` dédié
+>   (clé société × pending/active/settled) + somme `committed` par ligne ;
+>   champs `hasPending`/`statuses` retirés de la projection (le tri
+>   pending-first et la facette statut n'existent plus).
+> - `ParticipationsView.tsx` : découpage en 4 sections (`SECTIONS`),
+>   bandeaux via `participationBucketBand()` (nouveau, dans
+>   `dealStatusBadge.ts` — source unique des couleurs, remplace
+>   `dealStatusAccent` supprimé) ; répartition win/loss au niveau du
+>   groupe (write-off ou MOIC < 1 → loss, MOIC inconnu jamais loss).
+> - `ParticipationsTable.tsx` : prop `variant` (`pending`/`active`/
+>   `settled`) — colonne Engagé et totaux dédiés pour les TS, liseré
+>   retiré des lignes.
+> - `dealStatusBadge()` inchangé (actif = gris neutre, signal-only) ;
+>   `dealStatusAccent` reste la source du liseré, désormais propre à
+>   `CompanyDealsTable.tsx`, qui trie TS → ouvertes → exits.
+> - Docs : TESTING.md (SH17–SH20, FE1b), docs/produit 04 + 05.
+
+## v1.134.0 — 27/07/2026 à 18:55 — Le badge « Entreprise » disparaît de la fiche société
+
+L'en-tête de la fiche société ne porte plus la pastille bleue
+« Entreprise » à côté du nom : elle ne disait rien qu'on ne sache déjà en
+arrivant sur la page.
+
+- **L'en-tête se lit plus vite** : logo, nom, puis le % de détention et le
+  menu d'actions. Rien d'autre ne bouge.
+
+> **🔧 Notes techniques**
+>
+> - `participations.$companyId.tsx` : suppression du `EntityNatureBadge`
+>   dans l'en-tête sticky + import orphelin.
+> - `EntityFiche.tsx` : le composant `EntityNatureBadge` et le type
+>   `EntityNature` n'ayant plus d'appelant sont retirés, avec l'import
+>   `Badge` devenu inutile.
+> - i18n : clés `participations:nature.*` supprimées (fr + en).
+> - Docs : `TESTING.md` FE1 + intro « Fiche société » et
+>   `docs/produit/04-participations.md` ne mentionnent plus la nature dans
+>   l'en-tête.
+
+## v1.133.0 — 27/07/2026 à 18:47 — Thème et langue passent dans Mon compte
+
+Le pied de la barre latérale ne porte plus les réglages d'affichage : il ne
+reste que le menu utilisateur.
+
+- **Un bloc « Apparence »** apparaît dans **Mon compte**, onglet Profil,
+  sous les informations personnelles : le thème de couleur et la langue de
+  l'interface s'y règlent, avec le même effet immédiat qu'avant.
+- **Rien d'autre ne change** : le thème reste mémorisé sur l'appareil, la
+  langue reste rattachée au compte et continue de servir pour les emails.
+  Le bouton clair/sombre reste, lui, dans le bandeau du haut.
+
+> **🔧 Notes techniques**
+>
+> - `AppSidebar.tsx` : `SidebarFooter` réduit à `NavUser` (suppression des
+>   deux `SidebarMenuItem` + imports orphelins).
+> - `ThemePicker.tsx` : déclencheur `SidebarMenuButton` → `Button` ghost
+>   (pastille + nom du thème courant), `DropdownMenuContent` repassé en
+>   `align="end"` sans `side="right"`.
+> - `LanguageSwitcher.tsx` : la branche `variant="sidebar"` devenue morte
+>   est supprimée, la prop `variant` disparaît — seul le bouton ghost
+>   `FR`/`EN` subsiste.
+> - `routes/app/me.tsx` : nouvelle `Card` « Apparence » en fin d'onglet
+>   Profil, libellés réutilisés (`nav:theme.label`, `common:language.label`)
+>   pour éviter de dupliquer les chaînes ; ajout de `account:appearance.*`
+>   (fr + en).
+> - Docs : `TESTING.md` I4/SH7 et `docs/produit/02` + `13` pointent vers le
+>   nouvel emplacement.
+
+## v1.132.0 — 27/07/2026 à 18:29 — La liste des entreprises ne pagine plus
+
+Dans la foulée de la refonte de la liste : la pagination disparaît. Toutes
+les participations s'affichent d'un seul tenant — comme dans un tableur —
+et défilent sous l'en-tête et la ligne de totaux, qui restent visibles.
+Plus besoin d'aller chercher une société « en page 4 » : on fait défiler,
+on filtre ou on cherche. Le passage des lignes en version allégée (mise à
+jour précédente) rend l'affichage complet instantané.
+
+> **🔧 Notes techniques**
+>
+> - `ParticipationsTable.tsx` : suppression de `usePagination` /
+>   `PaginationFooter` / découpage `PAGE_SIZE` — rendu direct de
+>   `sortedRows` dans le conteneur borné (`max-h-[70vh]`) qui portait déjà
+>   l'en-tête et les totaux sticky.
+> - Orphelins retirés : prop `resetKey` et `filterKey` de
+>   `ParticipationsView.tsx`. `LocalPagination.tsx` reste utilisé par les
+>   autres listes (deals agrégés…).
+> - TESTING.md (SH19/SH20, section deals per-org retirée) et
+>   `docs/produit/04-participations.md` mis à jour.
+
+## v1.131.0 — 27/07/2026 à 18:08 — Le portefeuille se pilote depuis la liste des entreprises
+
+Grande passe d'ergonomie issue du point produit du jour : l'application se
+recentre sur la liste des entreprises et leurs fiches.
+
+- **Liste des entreprises épurée** : les colonnes se limitent à l'essentiel
+  — société (logo agrandi, lignes plus lisibles), score IA, nombre de
+  deals, montant investi, reçu, TVPI, et le secteur en badge en bout de
+  ligne. Le pitch d'une ligne disparaît du tableau.
+- **Le statut se lit d'un coup d'œil** : un liseré coloré dans la marge de
+  chaque ligne — orange pour un deal en cours (term sheet), bleu pour une
+  participation active, vert pour une sortie gagnante, rouge pour une
+  perte. Les participations soldées s'appellent désormais **« Exit win »**
+  et **« Exit loss »**, et les deals en cours remontent en haut de la
+  liste.
+- **Des totaux comme dans un tableur** : une ligne de totaux fixée en bas
+  du tableau somme le nombre de deals, l'investi et le reçu — sur toutes
+  les pages, et recalculée à la volée quand on filtre ou qu'on cherche.
+  « Combien a-t-on investi en immobilier actif ? » se lit désormais
+  directement dans la liste, qui remplace l'ancien tableau de bord.
+- **Fiche entreprise réorganisée** : la santé de la boîte (synthèse IA)
+  arrive tout en haut, suivie d'un vrai tableau des deals — chaque ligne
+  est cliquable vers la fiche du deal. L'identité, le résumé et les
+  personnes (fondateurs, board, co-investisseurs) se rangent dans un
+  panneau latéral à droite.
+- **Navigation simplifiée** : les deals s'ouvrent uniquement depuis la
+  fiche de leur entreprise (l'entrée « Deals » du menu disparaît, comme le
+  fil d'Ariane du haut de page) ; l'accueil d'une organisation mène
+  directement à la liste des entreprises.
+- **Les emails du portfolio se retirent** : la timeline d'emails par
+  participation et le raccordement Gmail n'étaient pas au niveau ; la
+  fonctionnalité est retirée entièrement pour être repensée à froid. Les
+  reports par email (investor updates transférés) continuent, eux, de
+  fonctionner normalement.
+- **Listes plus rapides** : la liste des entreprises ne charge plus que ce
+  qu'elle affiche, au lieu de l'intégralité des données de chaque deal.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle query de projection `deals.listParticipations` (+ sœur
+>   `aggregate.listParticipations`) : agrégats par société calculés côté
+>   serveur (`buildParticipationRows`, XIRR sur l'union des flux), les
+>   documents deals complets ne transitent plus ; export CSV en fetch
+>   one-shot au clic. Filtre `isTreasuryPlacement` conservé côté serveur.
+> - `ParticipationsTable.tsx` refondu : liseré via `dealStatusAccent()`
+>   (nouveau token `--info` dans `brand.css`), libellés via
+>   `dealStatusLabelKey()` (source unique `dealStatusBadge.ts`), en-tête
+>   sticky + ligne de totaux sticky (sticky par cellule, conteneur borné —
+>   cf. KNOWN_ISSUES « Colonne figée »).
+> - Fiche société (`participations.$companyId.tsx`) : layout deux colonnes
+>   (`lg:flex-row`), nouveau `CompanyDealsTable.tsx` (lignes cliquables,
+>   conventions de montants de `dealAmountTiles`), `DealsList` supprimé.
+> - Suppressions : feature emails (`convex/gmail.ts`, route `/emails`,
+>   `CompanyEmailsSection`, cron, callback OAuth — tables `gmail*` /
+>   `companyEmail*` déclarées inertes, pipeline reports AgentMail intact),
+>   dashboard UI (redirect `/app/$orgSlug` → participations,
+>   `convex/dashboard.ts` conservé pour le MCP), entrée nav Deals + route
+>   `deals.index.tsx`, breadcrumb (`AppHeader.tsx` réécrit).
+> - Docs : TESTING.md (SH/FE/M4 réécrits, section Gmail supprimée),
+>   KNOWN_ISSUES.md (section tables Gmail inertes, note sticky),
+>   TEMPLATE_SYNC.md (token `--info`), docs/produit (pages 03 et 18
+>   supprimées, 02/04/05 réécrites).
 
 ## v1.130.1 — 27/07/2026 à 09:40 — Fenêtre de rapprochement : le texte ne déborde plus
 

@@ -839,6 +839,29 @@ Implémentation de référence : `stickyHeadClass` / `stickyCellClass` dans
 `src/components/participations/ParticipationsTable.tsx`. À réutiliser tel quel
 pour figer une colonne d'une autre table (vue Deals…).
 
+**Figer plusieurs colonnes** (Société + Score IA sur la liste Entreprises) :
+`left-0` ne marche que pour la première — les suivantes ont besoin de leur
+**décalage `left` explicite**, égal à la somme des largeurs des colonnes
+figées à leur gauche (`frozenCompany` / `frozenScore` dans le même fichier).
+Deux conséquences :
+
+- La colonne **flexible** (celle sans largeur, qui absorbe la place restante)
+  doit être la première : au moment où le scroll horizontal se déclenche, la
+  table est pile à son `min-width`, donc cette colonne est pile à son minimum
+  — c'est ce qui rend l'offset des suivantes constant et calculable. Au-delà
+  de cette largeur rien ne défile, donc les offsets ne jouent jamais.
+- Les colonnes figées doivent être **contiguës et en tête** de la table : une
+  colonne intercalée qu'on ne veut pas figer doit être déplacée à droite (la
+  colonne Org de la vue agrégée est passée après Score IA pour cette raison).
+
+**En-tête / pied figés au scroll vertical** (même table) : `sticky` sur
+`<thead>`/`<tfoot>` est peu fiable (Safari) — poser le sticky **cellule par
+cellule** (`sticky top-0` sur chaque `th`, `sticky bottom-0` sur chaque
+cellule du pied de totaux) et **borner la hauteur du conteneur** de
+`ui/table.tsx` (`[&>div]:max-h-[70vh]`) pour créer le contexte de scroll.
+La cellule de coin (colonne figée × en-tête figé) cumule les deux axes et
+prend un `z-30`.
+
 ## Vercel framework preset traps TanStack Start
 
 Vercel's auto-detection lands on **Vite** the moment it sees `vite.config.ts`,
@@ -2831,97 +2854,22 @@ Pièges si on retouche cette zone :
   guards — le préchargement ne fait qu'accélérer `useConvexAuth()`, il ne
   court-circuite pas la logique anti-flash.
 
-## Connecteur Gmail — timeline emails du portfolio (`convex/gmail.ts`)
+## Tables Gmail inertes (`gmailAccounts`, `gmailOAuthStates`, `companyEmails`, `companyEmailLinks`)
 
-OAuth Google **direct** (pas d'agrégateur), architecture reprise du module
-messaging de Twenty CRM (`twentyhq/twenty`, `modules/messaging`) : curseur
-incrémental `historyId` par boîte, cron de polling 10 min, dédup par
-`Message-ID`, matching en cascade (règles déterministes puis fallback LLM).
-Pièges à connaître :
+La feature « emails du portfolio » (connecteur Gmail OAuth, timeline
+d'emails par participation, page `/emails`) a été **entièrement retirée**
+(UI + backend `convex/gmail.ts`) — décision produit : à repenser à froid
+plutôt que de laisser traîner une version non satisfaisante. Le code reste
+dans l'historique git si besoin de s'en inspirer.
 
-- **Client OAuth dédié, séparé du sign-in.** Le scope `gmail.readonly` est
-  un scope *restreint* Google : le porter sur le client de sign-in
-  (`GOOGLE_CLIENT_ID`) soumettrait TOUTE l'app au processus de validation.
-  D'où `GOOGLE_OAUTH_CLIENT_ID`/`GOOGLE_OAUTH_CLIENT_SECRET` — un client
-  OAuth distinct dans le même projet GCP, redirect URI
-  `${CONVEX_SITE_URL}/gmail/oauth/callback`.
-- **App « External / Testing » depuis le 22/07/2026** (bascule depuis
-  « Internal », qui bloquait les @gmail.com perso avec « Erreur 403 :
-  org_internal ») : deux conséquences à connaître.
-  (1) **Liste d'utilisateurs test obligatoire** : toute adresse — alboteam
-  comprise — doit être déclarée dans Google Auth Platform → Audience →
-  Test users AVANT de pouvoir se connecter, sinon « Accès bloqué ».
-  Ajouter une boîte = console Google d'abord, Albo OS ensuite (documenté
-  dans `docs/produit/18-emails-portfolio.md`).
-  (2) **Refresh tokens expirés tous les 7 jours pour TOUS les comptes** →
-  `invalid_grant` au refresh → statut `reauth_required`, pastille « À
-  reconnecter », reconnexion en 2 clics (curseur de sync conservé ;
-  au-delà d'~1 semaine sans reconnexion, Gmail ne garde plus l'historique
-  → trou jusqu'au backfill). Lever ces deux limites = validation Google
-  (scope restreint → brand verification + audit CASA payant, annuel,
-  plusieurs semaines). « En production » sans validation est BLOQUÉ par
-  Google pour un scope restreint — ce n'est pas un raccourci possible.
-- **Curseur `historyId` périmé** : Gmail ne garde l'historique qu'environ
-  une semaine. `history.list` → 404 → on ré-ancre le curseur au présent
-  (`lastError: history_cursor_expired`) et **le trou n'est pas comblé** —
-  c'est le rôle du backfill d'historique (étape à venir, pas encore livré).
-- **Stockage complet depuis le 21/07/2026 au soir** : `bodyText` = texte
-  nettoyé borné à 50 k caractères avec les URLs des `<a href>` préservées
-  (« libellé (url) » — nécessaire aux liens DocSend/Notion pour l'étape 2),
-  et les **pièces jointes sont téléchargées dans le storage Convex**
-  (`companyEmails.attachments`, ≤ 20 Mo chacune, cap 10/message, images
-  inline < 100 Ko ignorées comme signatures). Le téléchargement n'a lieu
-  qu'après un `matchProbe` read-only positif — un mail non matché ne
-  déclenche ni écriture ni download. `gmailMessageId` + boîte source sont
-  conservés comme filet de re-fetch. L'extraction de reports (OCR,
-  métriques) reste à brancher (étape 2) ; le forward AgentMail
-  (`docs/produit/17-reports-par-email.md`) reste le canal d'analyse.
-- **Matching en cascade, RESTREINT à l'org de la boîte** : les
-  boîtes sont org-scopées depuis le 21/07/2026 au soir (une connexion
-  faite depuis Albo n'alimente qu'Albo ; même boîte dans 2 orgs = 2 lignes
-  `gmailAccounts`, upsert par (org, email)). Cascade (lignée Albo App,
-  `findMatches` partagé probe/store, méthode tracée sur
-  `companyEmailLinks.matchMethod`) : (1) domaines des participants
-  From/To/Cc == `companies.domain` (kind `portfolio`, non archivée) de
-  **l'org de la boîte** uniquement ; (2) domaines des adresses citées dans
-  le corps (blocs de transfert, signatures) ; (3) nom de la société en
-  mot entier dans objet+corps (emails/URLs strippés, ≥ 3 caractères,
-  blocklist plateformes — helpers partagés avec `reportIdentify` dans
-  `convex/lib/emailIdentify.ts`) ; (4) fallback LLM (`identifyByLlm`,
-  même `getModel()` que le reste) pour les mails non matchés par les
-  règles : rattachement direct/indirect, **confiance high uniquement**,
-  ids hallucinés filtrés, picks re-validés dans la mutation →
-  `matchMethod: llm_direct|llm_indirect`, étincelle ✨ dans l'UI.
-  Freemail exclus, domaines des boîtes connectées de l'org exclus. Les
-  contacts n'ont **pas** d'email en base (`companies.people` : décision
-  « reachable via Attio ») → pas de matching par adresse individuelle.
-- **Échec du fallback LLM = mail perdu pour la timeline** : le curseur
-  `historyId` consomme le message même si l'appel LLM échoue (erreur
-  modèle, JSON imparsable) — il n'y a pas de retry, le mail est loggé
-  (`[gmail] LLM identification failed`) et sauté. Enjeu timeline
-  uniquement (aucune action automatique) ; le backfill d'historique à
-  venir rattrapera ces cas. Un mail interne (100 % domaines des boîtes)
-  n'est plus ignoré d'office : il peut matcher via le corps (transfert
-  interne d'un report) — c'est voulu.
-- **Ligne legacy pré-séparation** : le modèle initial (boîtes globales) a
-  brièvement vécu en prod avec une boîte connectée, zéro donnée.
-  `gmailAccounts.orgId`/`gmailOAuthStates.orgId` sont donc **optional au
-  schéma** ; toute ligne sans `orgId` est purgée automatiquement par le
-  cron `syncAll` (et un state sans org est traité comme expiré). À
-  resserrer en required une fois la prod propre (widen-migrate-narrow).
-- **Pont vers le pipeline reports (`processAsReport`)** : une ligne
-  `inboundEmails` à provenance synthétique (`agentmailInboxId: 'gmail'`,
-  `agentmailMessageId: 'gmail:<companyEmailId>'`) — l'index
-  `by_message_id` sert de garde une-extraction-par-email, la brique 3
-  (identification LLM) est sautée (`matchedCompanies` = les liens du
-  mail), et `reportExtract.run` lit toute pièce jointe portant un
-  `storageId` depuis le storage Convex (jamais d'appel AgentMail pour ces
-  lignes). Ne JAMAIS déclencher automatiquement : règle produit =
-  extraction sur clic uniquement.
-- **Message dédupliqué sans `orgId`, lien org-scopé** : le message reste
-  dédupliqué par `Message-ID` toutes boîtes confondues (une seule copie
-  des PJ) ; l'appartenance à une org vit sur `companyEmailLinks`, créés
-  uniquement par le matching org-scopé. Les gardes d'accès passent par
-  l'org de la company (`listByCompany`) ou l'intersection des memberships
-  (`getById`) — un membre d'une seule org ne voit jamais les liens de
-  l'autre.
+- Les 4 tables ci-dessus restent **déclarées mais inertes** au schéma
+  (même stance que la table legacy `forecasts`) : aucune purge de la
+  donnée prod n'a été faite. Les retirer = purger d'abord, puis resserrer
+  (widen-migrate-narrow).
+- Le pipeline **reports** (AgentMail → `inboundEmails`) est indépendant et
+  reste actif : seules les lignes `inboundEmails` historiques à provenance
+  synthétique `gmail:<id>` (ancien pont « Extraire le report ») lisent
+  encore leurs PJ depuis le storage Convex via `storageId` — chemin
+  conservé dans `reportExtract.run`.
+- Les emails transactionnels (magic link, invitations, alertes) n'ont
+  jamais fait partie de la feature et sont intacts.

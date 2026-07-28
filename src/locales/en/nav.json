@@ -3,22 +3,7 @@
     "ai": "AI",
     "aiShortcut": "Toggle AI panel (⌘J / Ctrl+J)",
     "search": "Search",
-    "searchShortcut": "Search (⌘K / Ctrl+K)",
-    "breadcrumb": {
-      "participations": "Companies",
-      "deals": "Deals",
-      "cash": "Cash",
-      "placements": "Investments",
-      "pointage": "Reconciliation",
-      "todo": "To do",
-      "passif": "Liabilities",
-      "settings": "Settings",
-      "members": "Members",
-      "invitations": "Invitations",
-      "general": "General",
-      "changelog": "What's new",
-      "reports": "Inbound reports"
-    }
+    "searchShortcut": "Search (⌘K / Ctrl+K)"
   },
   "comingSoon": "Coming soon",
   "soon": "Soon",
@@ -27,7 +12,6 @@
     "workspace": "Workspace"
   },
   "items": {
-    "dashboard": "Dashboard",
     "participations": "Companies",
     "deals": "Deals",
     "cash": "Cash",
@@ -37,8 +21,7 @@
     "passif": "Liabilities",
     "settings": "Settings",
     "changelog": "What's new",
-    "reports": "Inbound reports",
-    "emails": "Emails"
+    "reports": "Inbound reports"
   },
   "navUser": {
     "switchOrg": "Switch organization"

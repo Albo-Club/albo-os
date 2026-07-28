@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 
 import { attioCompanyUrl } from '~/lib/attio'
-import { Badge } from '~/components/ui/badge'
 
 /**
  * Shared, read-only building blocks for the entity fiche skeleton (header →
@@ -11,25 +10,6 @@ import { Badge } from '~/components/ui/badge'
  * These primitives stay display-only: the editable Identity fields (sector /
  * SIREN / domain) are rendered inline by `InlineField` in the route, not here.
  */
-
-export type EntityNature = 'company'
-
-/** Nature badge shown in the header. `className` lets the header own the
- * spacing (e.g. a bit of separation from the title). */
-export function EntityNatureBadge({
-  nature,
-  className,
-}: {
-  nature: EntityNature
-  className?: string
-}) {
-  const { t } = useTranslation('participations')
-  return (
-    <Badge variant="default" className={className}>
-      {t(`nature.${nature}`)}
-    </Badge>
-  )
-}
 
 /** One labelled identity field; shows an em dash when the value is empty. */
 export function IdentityField({
@@ -41,8 +21,12 @@ export function IdentityField({
 }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="text-sm">{value == null || value === '' ? '—' : value}</span>
+      <span className="text-muted-foreground text-[11px] tracking-wide uppercase">
+        {label}
+      </span>
+      <span className="text-sm font-medium">
+        {value == null || value === '' ? '—' : value}
+      </span>
     </div>
   )
 }
