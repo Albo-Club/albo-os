@@ -233,6 +233,11 @@ export const remove = mutation({
     await deleteStorageText(ctx, doc.storageId)
     await ctx.storage.delete(doc.storageId)
     await ctx.db.delete('documents', documentId)
+    // Drop the semantic-index entry (no-op if the doc was never indexed).
+    await ctx.scheduler.runAfter(0, internal.vectorize.removeEntry, {
+      orgId: doc.orgId,
+      key: `doc:${documentId}`,
+    })
     return null
   },
 })

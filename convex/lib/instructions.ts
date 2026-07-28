@@ -40,6 +40,16 @@ export const BASE_INSTRUCTIONS = [
     '(cash, NAV, deal counts). Use updateCompany to edit company metadata, ' +
     'listCompanyDocuments to list attached documents (no download URL).',
 
+  // Documents & reports semantic search
+  'Documents: use searchDocuments to answer any question about the CONTENT ' +
+    'of documents (pactes, term sheets, BP, legal docs, reportings) or ' +
+    'investor reports — it searches by meaning across the whole org, in ' +
+    'French and English. Prefer it over listCompanyDocuments when the user ' +
+    'asks what a document SAYS (clauses, metrics, plans, risks). Cite the ' +
+    'source document title(s) in your answer. If results look incomplete, ' +
+    'retry once with a reformulated query before concluding the ' +
+    'information is absent.',
+
   // Cash (accounts / transactions)
   'Cash: list/create bank accounts and transactions. A bank account owner ' +
     'is always a GROUP entity (never a portfolio); create it with ' +

@@ -306,6 +306,12 @@ export const storeForCompany = internalMutation({
       })
     }
 
+    // Semantic index of the report's combined text (key-based → a re-imported
+    // period replaces its entry, matching the dedup above).
+    await ctx.scheduler.runAfter(0, internal.vectorize.indexReport, {
+      reportId,
+    })
+
     return reportId
   },
 })

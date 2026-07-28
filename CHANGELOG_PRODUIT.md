@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.143.0 — 28/07/2026 à 19:50 — La fiche d'identité reste sous les yeux
+## v1.144.0 — 28/07/2026 à 20:56 — La fiche d'identité reste sous les yeux
 
 Sur une fiche société, le panneau d'identité disparaissait par le haut dès
 qu'on descendait dans la page : pour comparer une information d'identité avec
@@ -55,6 +55,58 @@ contenu, rien ne change.
 > - Panneau plus court que l'écran → repli sur un `top` positif, sinon il
 >   serait figé en bas avec un blanc au-dessus.
 > - Détail complet du piège dans `KNOWN_ISSUES.md`.
+
+## v1.143.0 — 28/07/2026 à 20:19 — L'assistant sait chercher dans vos documents et reports
+
+La lecture automatique des documents (arrivée avec la v1.142.0) trouve son
+prolongement : l'assistant peut désormais **chercher dans le contenu** de
+tout ce qui a été lu. Posez la question en langage naturel — « que dit le
+pacte de Sezame sur la clause de liquidité ? », « quelles boîtes du
+portefeuille ont parlé de difficultés de recrutement ? » — et il retrouve
+les passages pertinents dans les pactes, term sheets, BP, documents
+juridiques et reportings de l'organisation, ainsi que dans les reports
+investisseurs reçus par email, puis répond en citant ses sources.
+
+La recherche se fait **par le sens**, pas par mots-clés : une question sur
+les « problèmes de trésorerie » retrouve un passage qui parle de « runway
+réduit à 4 mois ». Elle fonctionne en français comme en anglais, et reste
+strictement cloisonnée par organisation.
+
+Chaque document dont la lecture aboutit est indexé automatiquement — rien à
+faire de votre côté. Les documents et reports déjà présents seront indexés
+en une passe à l'activation (les anciens documents jamais lus passeront
+d'abord par la lecture automatique).
+
+> **🔧 Notes techniques**
+>
+> - Nouveau composant `@convex-dev/rag` (`convex/convex.config.ts`) —
+>   embeddings `qwen/qwen3-embedding-8b` via OpenRouter (même clé que le
+>   chat, provider hébergé UE), dimension 4096, **un namespace par org**,
+>   clés idempotentes `doc:<id>` / `report:<id>`.
+> - `convex/vectorize.ts` : instance RAG, indexation
+>   `indexDocument`/`indexReport` (texte lu depuis `documentTexts` — zéro
+>   OCR en propre, l'extraction reste à `documentsExtract.ts` qui schedule
+>   l'indexation en fin de run), suppression `removeEntry` (schedulée par
+>   `documents:remove` et le cascade `deals:remove`), recherche
+>   `searchInternal` (re-check membership), backfill
+>   `backfillAll`/`backfillOrg` (cf. `MIGRATIONS.md` — les documents
+>   uploadés sans état de lecture sont d'abord envoyés à l'extraction).
+> - Reports : indexation schedulée en fin de `reportStore:storeForCompany`
+>   (le re-import d'une période remplace l'entrée, aligné sur la dedup).
+>   Les documents issus d'email ne sont pas indexés individuellement (déjà
+>   couverts par l'entrée du report).
+> - Nouvel outil d'agent `searchDocuments`
+>   (`convex/agentToolsDocuments.ts`, lecture seule) branché dans
+>   `convex/agent.ts` + consigne dans `convex/lib/instructions.ts`.
+> - `convex/_generated/api.d.ts` édité à la main (lignes mécaniques
+>   `rag` + nouveaux modules — convention KNOWN_ISSUES « Codegen Convex
+>   hors-ligne ») ; le prochain `convex deploy` régénère à l'identique.
+> - Docs : section `KNOWN_ISSUES.md` « Vectorisation documents & reports »
+>   (bascule de modèle = namespace neuf + backfill), ligne `MIGRATIONS.md`,
+>   scénario `TESTING.md` C35, page produit assistant, ligne
+>   `TEMPLATE_SYNC.md`.
+
+---
 
 ## v1.142.1 — 28/07/2026 à 18:29 — Correctif : le déploiement de la lecture des documents
 

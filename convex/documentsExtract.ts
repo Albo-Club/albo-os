@@ -125,6 +125,10 @@ export const run = internalAction({
         ocrState: 'extracted',
         ocrChars: target.existingChars,
       })
+      // Text available → semantic index (skips non-upload rows itself).
+      await ctx.scheduler.runAfter(0, internal.vectorize.indexDocument, {
+        documentId,
+      })
       return null
     }
 
@@ -198,6 +202,10 @@ export const run = internalAction({
         documentId,
         ocrState: 'extracted',
         ocrChars: bounded.text.length,
+      })
+      // Fresh text → semantic index (skips non-upload rows itself).
+      await ctx.scheduler.runAfter(0, internal.vectorize.indexDocument, {
+        documentId,
       })
     } else {
       await ctx.runMutation(internal.documentsExtract.setState, {

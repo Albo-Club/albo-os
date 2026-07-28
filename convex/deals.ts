@@ -1,4 +1,5 @@
 import { ConvexError, v } from 'convex/values'
+import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { deleteStorageText } from './lib/documentTexts'
@@ -756,6 +757,11 @@ export const remove = mutation({
       await deleteStorageText(ctx, doc.storageId)
       await ctx.storage.delete(doc.storageId)
       await ctx.db.delete('documents', doc._id)
+      // Drop the semantic-index entry (no-op if never indexed).
+      await ctx.scheduler.runAfter(0, internal.vectorize.removeEntry, {
+        orgId: doc.orgId,
+        key: `doc:${doc._id}`,
+      })
     }
     await ctx.db.delete("deals", id)
     return { deletedId: id }
