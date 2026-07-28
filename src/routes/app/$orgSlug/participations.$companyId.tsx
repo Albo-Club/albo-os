@@ -87,6 +87,7 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
+import { useStickyBottom } from '~/hooks/useStickyBottom'
 
 export const Route = createFileRoute('/app/$orgSlug/participations/$companyId')({
   component: ParticipationDetail,
@@ -773,6 +774,8 @@ function ParticipationDetail() {
   const [archiving, setArchiving] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // Identity panel: scrolls with the page, then freezes once its bottom shows.
+  const { ref: asideRef, top: asideTop } = useStickyBottom()
   const archiveCompany = useConvexMutation(api.companies.archive)
   const removeCompany = useConvexMutation(api.companies.remove)
   const updateCompany = useConvexMutation(api.companies.update)
@@ -1027,8 +1030,16 @@ function ParticipationDetail() {
         {/* Identity side panel ("fiche d'identité"): identity fields, summary
             and people, stacked in one calm card. Each section is introduced by
             a small squared icon chip; the data itself carries no box — label
-            left, value right, hairline between rows. */}
-        <aside className="bg-card w-full shrink-0 space-y-5 rounded-xl border p-4 lg:w-80">
+            left, value right, hairline between rows.
+
+            From lg up the panel is sticky: it scrolls with the page until its
+            bottom edge is reached, then freezes while the main column keeps
+            scrolling (see useStickyBottom for why the offset is computed). */}
+        <aside
+          ref={asideRef}
+          style={{ top: asideTop }}
+          className="bg-card w-full shrink-0 space-y-5 rounded-xl border p-4 lg:sticky lg:w-80"
+        >
           {/* Identity — sector / SIREN / domain edit inline (click the value);
               ownership, share count and the Attio link are computed/derived
               and stay read-only. */}

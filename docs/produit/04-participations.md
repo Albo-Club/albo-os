@@ -96,7 +96,11 @@ La colonne principale, dans l'ordre de lecture :
 
 Le panneau d'identité, à droite. Il se présente comme une carte, au même
 style que la synthèse IA, et chaque section y est introduite par une petite
-pastille carrée portant son icône :
+pastille carrée portant son icône. Il **suit la lecture** : il défile avec la
+page tant qu'il reste quelque chose à y découvrir, puis se fige une fois
+qu'on est arrivé à son bas, pendant que la colonne principale continue de
+défiler — l'identité de la société reste donc sous les yeux quand on lit ses
+rapports ou ses deals.
 
 - **Identité** : secteur, SIREN (affiché par groupes de trois chiffres),
   domaine — éditables en ligne (clic sur la valeur) — plus le % de
