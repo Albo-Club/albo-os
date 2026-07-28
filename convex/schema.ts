@@ -879,6 +879,12 @@ export default defineSchema({
     ),
     ocrDetail: v.optional(v.string()),
     ocrChars: v.optional(v.number()),
+    // LEGACY — read by nothing, written by nothing in this repo, but prod rows
+    // carry it (the text was put there out-of-band, before `documentTexts`
+    // existed). Removing it fails `convex deploy` on schema validation:
+    // "Object contains extra field `extractedText` that is not in the
+    // validator". Purge the data first, then drop the field — cf. MIGRATIONS.md.
+    extractedText: v.optional(v.string()),
   })
     .index('by_company', ['companyId', 'uploadedAt'])
     .index('by_deal', ['dealId', 'uploadedAt'])
