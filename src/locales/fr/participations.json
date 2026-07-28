@@ -570,7 +570,8 @@
       "kind": "Type",
       "period": "Période",
       "size": "Taille",
-      "date": "Ajouté"
+      "date": "Ajouté",
+      "reading": "Lecture"
     },
     "kind": {
       "reporting": "Reporting",
@@ -581,6 +582,28 @@
     "errors": {
       "too_large": "Le fichier dépasse 20 Mo",
       "default": "Une erreur est survenue"
+    },
+    "ocr": {
+      "chars": "{{chars}} car.",
+      "open": "Voir le texte lu",
+      "dialogTitle": "Texte lu",
+      "noText": "Aucun texte n'a été extrait de ce document.",
+      "truncated": "Texte tronqué à 900 000 caractères (~350 pages).",
+      "pending": "Lecture en cours…",
+      "failed": "Lecture impossible",
+      "skipped": "Non analysé",
+      "retry": "Relancer la lecture",
+      "analyse": "Analyser",
+      "restarted": "Lecture relancée",
+      "detail": {
+        "ocr_failed": "Lecture impossible",
+        "parse_failed": "Fichier illisible",
+        "download_failed": "Fichier introuvable",
+        "file_too_large": "Fichier trop volumineux",
+        "small_image_skipped": "Petite image ignorée",
+        "empty_workbook": "Classeur vide",
+        "unsupported_format": "Format non lu"
+      }
     }
   },
   "tabs": {

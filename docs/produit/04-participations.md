@@ -55,7 +55,31 @@ En-tête : logo, nom, nature, % de détention global. Puis :
   métriques, contenu) et celles remontées depuis Parallel/VASCO pour les SPV
   (voir [Intégrations](15-integrations.md)).
 - **Onglet Documents** : upload manuel (reporting, BP, légal, autre — 20 Mo
-  max, avec période couverte), téléchargement, suppression.
+  max, avec période couverte), téléchargement, suppression. Chaque document
+  affiche l'état de sa **lecture** (voir ci-dessous).
+
+### La lecture des documents
+
+Tout document qui entre — qu'il soit déposé à la main ici ou arrivé par un
+[report transféré par email](17-reports-par-email.md) — est **lu
+automatiquement** : PDF et images par OCR, Excel et CSV cellule par cellule.
+La colonne « Lecture » dit où il en est :
+
+| Ce que tu vois | Ce que ça veut dire |
+| --- | --- |
+| « Lecture en cours… » | Le document vient d'arriver, la lecture tourne |
+| « 12 400 car. » | Lu — clique pour relire le texte extrait |
+| ⚠️ avec une cause | La lecture a échoué (fichier illisible, protégé…) — le bouton ↻ relance |
+| « Petite image ignorée », « Format non lu » | Rien à lire, c'est normal (logo, format non géré) |
+| « Analyser » | Document déposé avant cette fonctionnalité — le bouton lance sa lecture |
+
+Le texte extrait s'ouvre en un clic : c'est ce qui permet de **vérifier ce
+que la machine a réellement lu** avant de faire confiance aux métriques
+qu'elle en a tirées. Un texte très court sur un document épais est le signe
+d'un scan de mauvaise qualité.
+
+> Un document très long est tronqué à 900 000 caractères (~350 pages) ; la
+> fenêtre le dit explicitement.
 
 ### Sous le capot : l'enrichissement automatique
 

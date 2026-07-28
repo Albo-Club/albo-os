@@ -1,5 +1,13 @@
 import { useRef, useState } from 'react'
-import { Download, Plus, Trash2 } from 'lucide-react'
+import {
+  AlertTriangle,
+  Download,
+  Loader2,
+  Plus,
+  RefreshCw,
+  ScanText,
+  Trash2,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { ConvexError } from 'convex/values'
@@ -45,6 +53,98 @@ function formatSize(bytes: number | null): string {
 }
 
 /**
+ * Reading state of one document, from the same vocabulary as the report
+ * recap email (`inboundEmails.sources[].detail`) so both surfaces name a
+ * failure the same way. Rows predating extraction have no state at all —
+ * they get the "analyse" action rather than a misleading verdict.
+ */
+function OcrStatus({
+  state,
+  detail,
+  chars,
+  onOpen,
+  onRetry,
+}: {
+  state: 'pending' | 'extracted' | 'skipped' | 'failed' | null
+  detail: string | null
+  chars: number | null
+  onOpen: () => void
+  onRetry: () => void
+}) {
+  const { t, i18n } = useTranslation('participations')
+  const detailLabel = detail
+    ? t(`reportings.ocr.detail.${detail}`, { defaultValue: detail })
+    : null
+
+  if (state === 'extracted') {
+    return (
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 px-2 font-normal"
+        onClick={onOpen}
+        title={t('reportings.ocr.open')}
+      >
+        <ScanText className="size-3.5" />
+        {t('reportings.ocr.chars', {
+          chars: (chars ?? 0).toLocaleString(i18n.language),
+        })}
+      </Button>
+    )
+  }
+
+  if (state === 'pending') {
+    return (
+      <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+        <Loader2 className="size-3.5 animate-spin" />
+        {t('reportings.ocr.pending')}
+      </span>
+    )
+  }
+
+  if (state === 'failed') {
+    return (
+      <span className="flex items-center gap-1">
+        <span className="text-destructive flex items-center gap-1.5 text-xs">
+          <AlertTriangle className="size-3.5" />
+          {detailLabel ?? t('reportings.ocr.failed')}
+        </span>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7"
+          onClick={onRetry}
+          aria-label={t('reportings.ocr.retry')}
+          title={t('reportings.ocr.retry')}
+        >
+          <RefreshCw className="size-3.5" />
+        </Button>
+      </span>
+    )
+  }
+
+  if (state === 'skipped') {
+    return (
+      <span className="text-muted-foreground text-xs">
+        {detailLabel ?? t('reportings.ocr.skipped')}
+      </span>
+    )
+  }
+
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      className="text-muted-foreground h-7 px-2 font-normal"
+      onClick={onRetry}
+    >
+      <ScanText className="size-3.5" />
+      {t('reportings.ocr.analyse')}
+    </Button>
+  )
+}
+
+/**
  * Reportings & documents of a company: manual upload (Convex storage,
  * 20 MB cap) + list with download/delete. KPI extraction from a reporting
  * goes through the assistant (createKpiSnapshot), not this component.
@@ -60,6 +160,13 @@ export function ReportingsSection({
   const generateUploadUrl = useConvexMutation(api.files.generateUploadUrl)
   const createDocument = useConvexMutation(api.documents.create)
   const removeDocument = useConvexMutation(api.documents.remove)
+  const reextractDocument = useConvexMutation(api.documents.reextract)
+
+  const [textDocId, setTextDocId] = useState<Id<'documents'> | null>(null)
+  const extracted = useConvexQuery(
+    api.documents.getExtractedText,
+    textDocId ? { documentId: textDocId } : 'skip',
+  )
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
@@ -115,6 +222,15 @@ export function ReportingsSection({
       )
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleReextract(documentId: Id<'documents'>) {
+    try {
+      await reextractDocument({ documentId })
+      toast.success(t('participations:reportings.ocr.restarted'))
+    } catch {
+      toast.error(t('participations:reportings.errors.default'))
     }
   }
 
@@ -175,6 +291,9 @@ export function ReportingsSection({
                 <TableHead>{t('participations:reportings.col.period')}</TableHead>
                 <TableHead>{t('participations:reportings.col.size')}</TableHead>
                 <TableHead>{t('participations:reportings.col.date')}</TableHead>
+                <TableHead>
+                  {t('participations:reportings.col.reading')}
+                </TableHead>
                 <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
@@ -190,6 +309,15 @@ export function ReportingsSection({
                   </TableCell>
                   <TableCell>{formatSize(doc.size)}</TableCell>
                   <TableCell>{fmtDate(doc.uploadedAt)}</TableCell>
+                  <TableCell>
+                    <OcrStatus
+                      state={doc.ocrState}
+                      detail={doc.ocrDetail}
+                      chars={doc.ocrChars}
+                      onOpen={() => setTextDocId(doc._id)}
+                      onRetry={() => void handleReextract(doc._id)}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
                       {doc.url && (
@@ -316,6 +444,41 @@ export function ReportingsSection({
               {t('common:actions.delete')}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Extracted text — loaded only here, never with the documents list */}
+      <Dialog
+        open={textDocId !== null}
+        onOpenChange={(open) => !open && setTextDocId(null)}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {docs?.find((d) => d._id === textDocId)?.title ??
+                t('participations:reportings.ocr.dialogTitle')}
+            </DialogTitle>
+          </DialogHeader>
+          {extracted === undefined ? (
+            <p className="text-muted-foreground text-sm">
+              {t('participations:loading')}
+            </p>
+          ) : extracted === null ? (
+            <p className="text-muted-foreground text-sm">
+              {t('participations:reportings.ocr.noText')}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {extracted.truncated && (
+                <p className="text-muted-foreground text-xs">
+                  {t('participations:reportings.ocr.truncated')}
+                </p>
+              )}
+              <pre className="bg-muted rounded-md p-3 text-xs break-words whitespace-pre-wrap">
+                {extracted.text}
+              </pre>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </section>

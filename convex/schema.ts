@@ -851,17 +851,51 @@ export default defineSchema({
     uploadedAt: v.number(),
     // ── Email ingestion (AgentMail report pipeline) ───────────────────────
     // Set when the file arrives as an email attachment. `reportId` links the
-    // file to its `companyReports` row; `extractedText` holds the OCR/parsed
-    // text (deferred — null until OCR is wired); `inline` flags inline images
-    // (cid:) which are hidden from the Docs tab. All optional → manual uploads
+    // file to its `companyReports` row; `inline` flags inline images (cid:)
+    // which are hidden from the Docs tab. All optional → manual uploads
     // leave them unset.
     reportId: v.optional(v.id('companyReports')),
-    extractedText: v.optional(v.string()),
     inline: v.optional(v.boolean()),
+    // ── Text extraction (Mistral OCR / parsers) ───────────────────────────
+    // Reading state of the file, surfaced per document in the front:
+    // 'pending' = queued, 'extracted' = text obtained, 'skipped' = nothing to
+    // read (logo-sized image, unsupported format), 'failed' = tried and
+    // failed. `ocrDetail` is a machine code from the SAME vocabulary as
+    // `inboundEmails.sources[].detail` ('ocr_failed', 'small_image_skipped',
+    // …) so the front and the recap email speak the same language. The text
+    // itself lives in `documentTexts` — see that table for why. Undefined on
+    // rows predating the feature (displayed as "not analysed").
+    ocrState: v.optional(
+      v.union(
+        v.literal('pending'),
+        v.literal('extracted'),
+        v.literal('skipped'),
+        v.literal('failed'),
+      ),
+    ),
+    ocrDetail: v.optional(v.string()),
+    ocrChars: v.optional(v.number()),
   })
     .index('by_company', ['companyId', 'uploadedAt'])
     .index('by_org', ['orgId'])
     .index('by_report', ['reportId']),
+
+  /**
+   * documentTexts — the extracted text of a stored file. ONE row per storage
+   * blob, NOT per document: the report fan-out creates one `documents` row
+   * per matched entity around a single shared blob, and the extracted text
+   * is a property of the file, not of the row pointing at it.
+   *
+   * Kept out of `documents` on purpose: Convex reads whole rows, so a
+   * ~900k-char field there would be re-read for every row on every Documents
+   * tab open. Here it is only read when the user opens the text.
+   * `truncated` marks a file whose text hit MAX_DOCUMENT_CHARS.
+   */
+  documentTexts: defineTable({
+    storageId: v.id('_storage'),
+    text: v.string(),
+    truncated: v.boolean(),
+  }).index('by_storage', ['storageId']),
 
   /**
    * companyReports — investor updates ingested by email (AgentMail report

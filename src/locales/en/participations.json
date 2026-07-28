@@ -570,7 +570,8 @@
       "kind": "Type",
       "period": "Period",
       "size": "Size",
-      "date": "Added"
+      "date": "Added",
+      "reading": "Reading"
     },
     "kind": {
       "reporting": "Reporting",
@@ -581,6 +582,28 @@
     "errors": {
       "too_large": "File is larger than 20 MB",
       "default": "Something went wrong"
+    },
+    "ocr": {
+      "chars": "{{chars}} chars",
+      "open": "View extracted text",
+      "dialogTitle": "Extracted text",
+      "noText": "No text was extracted from this document.",
+      "truncated": "Text truncated at 900,000 characters (~350 pages).",
+      "pending": "Reading…",
+      "failed": "Could not be read",
+      "skipped": "Not analysed",
+      "retry": "Run the reading again",
+      "analyse": "Analyse",
+      "restarted": "Reading restarted",
+      "detail": {
+        "ocr_failed": "Could not be read",
+        "parse_failed": "Unreadable file",
+        "download_failed": "File not found",
+        "file_too_large": "File too large",
+        "small_image_skipped": "Small image skipped",
+        "empty_workbook": "Empty workbook",
+        "unsupported_format": "Format not read"
+      }
     }
   },
   "tabs": {

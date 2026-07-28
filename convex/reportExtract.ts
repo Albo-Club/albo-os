@@ -21,18 +21,15 @@ import { internalAction, internalMutation } from './_generated/server'
 import { downloadAttachment } from './agentmail'
 import { csvToText, excelToText } from './lib/excel'
 import { downloadDocSend } from './lib/docsend'
+import { EXCEL_EXTS, MIN_OCR_IMAGE_BYTES, boundText, ext, isImage } from './lib/fileText'
 import { fetchNotionText } from './lib/notion'
 import { ocrImage, ocrPdf } from './lib/ocr'
 import { detectLinks, htmlToText, resolveTrackingUrl } from './lib/reportLinks'
 import type { Id } from './_generated/dataModel'
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024 // Convex storage cap
-const MIN_OCR_IMAGE_BYTES = 15_000 // below this, images are logos/signatures
 const MAX_EXTRACTED_CHARS = 150_000 // combined text budget (1MB doc cap)
 const MAX_LINKS_PER_KIND = 3
-
-const EXCEL_EXTS = new Set(['xlsx', 'xls', 'xlsm'])
-const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif'])
 
 interface SourceOutcome {
   kind: string
@@ -40,15 +37,6 @@ interface SourceOutcome {
   state: 'extracted' | 'stored' | 'failed'
   detail?: string
   chars?: number
-}
-
-function ext(filename: string): string {
-  const parts = filename.toLowerCase().split('.')
-  return parts.length > 1 ? parts[parts.length - 1] : ''
-}
-
-function isImage(filename: string, contentType?: string): boolean {
-  return IMAGE_EXTS.has(ext(filename)) || Boolean(contentType?.startsWith('image/'))
 }
 
 // ─── Claim + persist ─────────────────────────────────────────────────────────
@@ -209,10 +197,14 @@ export const run = internalAction({
         ))
       attachmentStorageIds.push({ attachmentId: att.attachmentId, storageId })
 
+      // Kept per attachment (on top of the combined text) so the `documents`
+      // row created later for this file can show what was read from it.
+      let fileText = ''
       const e = ext(att.filename)
       if (e === 'pdf' || att.contentType === 'application/pdf') {
         const text = await ocrPdf(buf)
         if (text) {
+          fileText = text
           addText(`PDF ${label}`, text)
           outcomes.push({ kind: 'pdf', label, state: 'extracted', chars: text.length })
         } else {
@@ -222,6 +214,7 @@ export const run = internalAction({
         try {
           const text = excelToText(buf, att.filename)
           if (text) {
+            fileText = text
             addText(`EXCEL ${label}`, text)
             outcomes.push({ kind: 'excel', label, state: 'extracted', chars: text.length })
           } else {
@@ -233,6 +226,7 @@ export const run = internalAction({
         }
       } else if (e === 'csv') {
         const text = csvToText(buf, att.filename)
+        fileText = text
         addText(`CSV ${label}`, text)
         outcomes.push({ kind: 'excel', label, state: 'extracted', chars: text.length })
       } else if (isImage(att.filename, att.contentType)) {
@@ -242,6 +236,7 @@ export const run = internalAction({
         } else {
           const text = await ocrImage(buf, att.contentType ?? 'image/png')
           if (text) {
+            fileText = text
             addText(`IMAGE ${label}`, text)
             outcomes.push({ kind: 'image', label, state: 'extracted', chars: text.length })
           } else {
@@ -251,6 +246,15 @@ export const run = internalAction({
       } else {
         // Catch-all: unknown formats are stored, never an error.
         outcomes.push({ kind: 'other', label, state: 'stored' })
+      }
+
+      if (fileText) {
+        const bounded = boundText(fileText)
+        await ctx.runMutation(internal.documentsExtract.saveStorageText, {
+          storageId,
+          text: bounded.text,
+          truncated: bounded.truncated,
+        })
       }
     }
 
