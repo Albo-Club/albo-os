@@ -584,6 +584,7 @@ La connexion des banques se fait par l'opérateur via le Powens Webview.
 | P13 | Diagnostic — `convex run --prod powens:diagnoseOrgAccountLinks '{"orgSlug":"calte"}'` | Lecture seule : par compte, IBAN / ids Powens / `airtableId` / nb de tx / 1ʳᵉ et dernière tx ; par connexion, santé + nombre de comptes desservis |
 | P14 | Rattrapage après reconnexion : couper une connexion (mot de passe changé côté banque) jusqu'à l'état dégradé, laisser passer des mouvements, puis « Reconnecter » | Au retour à l'état sain, log `rattrapage planifié` puis `rattrapage <compte> depuis <date>` ; les transactions de la coupure apparaissent dans le registre, aucune antérieure au cutover du compte |
 | P15 | Rattrapage manuel — `convex run --prod powens:backfillConnection '{"orgId":"…","powensConnectionId":"…"}'` | Retourne `{ accounts, fetched, inserted }` ; **rejouer** : `inserted: 0` (dédup `by_powens_id`), et le pointage déjà posé sur les tx rattrapées est intact |
+| P16 | Trou constaté après coup — même commande avec `"minDate":"AAAA-MM-JJ"` antérieur au trou | Log `depuis <minDate> (date imposée)` sur chaque compte de la connexion ; les tx du trou sont insérées, aucune antérieure au cutover du compte. `minDate` mal formé → `invalid_min_date`, aucun appel réseau |
 
 ## Émission Powens (bouton « Connecter une banque » → Webview)
 

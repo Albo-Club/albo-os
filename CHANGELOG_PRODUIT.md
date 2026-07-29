@@ -23,6 +23,38 @@ bas de page.
 
 ---
 
+## v1.147.1 — 29/07/2026 à 20:05 — Réparer un trou de synchro repéré après coup
+
+Le rattrapage livré en v1.147.0 repart de la dernière transaction connue sur
+le compte, ce qui couvre le cas normal : au moment où une connexion est
+rétablie, ce repère précède encore la période manquante. Mais si le trou
+n'est repéré que plus tard, une fois que de nouvelles transactions sont
+arrivées, le repère a dépassé la zone à combler — et le rattrapage
+l'enjambe.
+
+Il est désormais possible d'imposer une **date de départ** au rattrapage,
+pour aller rechercher une période précise indépendamment de ce repère. Le
+cas d'usage : un trou découvert des semaines après la reconnexion. La
+protection contre les doublons avec l'historique importé reste en place, une
+date imposée ne peut pas remonter au-delà.
+
+Opération technique lancée à la main — aucun changement dans l'application.
+
+> **🔧 Notes techniques**
+>
+> - `convex/powens.ts:backfillConnection` : argument optionnel `minDate`
+>   (`YYYY-MM-DD`, validé, sinon `invalid_min_date`). Il remplace le point de
+>   reprise pour tous les comptes de la connexion, y compris ceux sans
+>   aucune transaction (rien d'où reprendre autrement) ; `computeCutoff`
+>   reste le plancher dur. Le log par compte signale « (date imposée) ».
+> - Pourquoi : le point de reprise ne vaut qu'à l'instant de la reconnexion
+>   (cf. `KNOWN_ISSUES.md` « Rattrapage après reconnexion »). Sur le trou
+>   Qonto 02/06 → 22/07, découvert le 29/07 alors que la reconnexion datait
+>   du 23/07, le point de reprise était déjà au 28/07.
+> - Test `TESTING.md` P16.
+
+---
+
 ## v1.147.0 — 29/07/2026 à 16:56 — Une reconnexion bancaire rattrape les transactions manquées
 
 Jusqu'ici, une connexion bancaire coupée puis rétablie repartait **de la date
