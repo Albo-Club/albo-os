@@ -580,6 +580,8 @@ La connexion des banques se fait par l'opérateur via le Powens Webview.
 | P9  | Signature falsifiée                                                                 | `401`, rien écrit (cf. S5)                                                                                                           |
 | P10 | Nettoyage Qonto — `convex run --prod powens:listQontoTestTransactions`              | Liste les tx `source='manual'` sans `airtableId` ; si vide → ne rien supprimer                                                       |
 | P11 | `convex export --prod --path …` puis `powens:deleteTransactionsByIds '{"ids":[…]}'` | Supprime **uniquement** les ids validés (garde-fou : manual + sans airtableId + compte Qonto) ; retourne `{ deleted, skipped }`      |
+| P12 | **Reconnexion d'une banque déjà connectée** (via « Reconnecter » ou via « Connecter une banque ») | Aucun nouveau `bankAccounts` : chaque compte livré est rapproché de l'existant (IBAN, sinon banque + libellé, sinon compte unique) et son lien est repris (`powensAccountId` + `powensConnectionId` re-tamponnés, IBAN backfillé) ; historique et pointage intacts |
+| P13 | Diagnostic — `convex run --prod powens:diagnoseOrgAccountLinks '{"orgSlug":"calte"}'` | Lecture seule : par compte, IBAN / ids Powens / `airtableId` / nb de tx / 1ʳᵉ et dernière tx ; par connexion, santé + nombre de comptes desservis |
 
 ## Émission Powens (bouton « Connecter une banque » → Webview)
 
@@ -602,8 +604,8 @@ Prérequis : env vars `POWENS_CLIENT_ID/SECRET/DOMAIN/REDIRECT_URI` posées ;
 Santé des connexions dans `powensConnections` : double flux webhook
 `CONNECTION_SYNCED` (push) + cron `pollConnectionsHealth` toutes les 6 h
 (pull `GET /users/me/connections`), santé dérivée
-(connected / stale > 48 h / action_required), alerte email par incident,
-webview reconnect. Prérequis : au moins une banque connectée (cf. sections
+(connected / stale > 48 h / action_required, + obsolete quand la connexion ne
+dessert aucun compte), alerte email par incident, webview reconnect. Prérequis : au moins une banque connectée (cf. sections
 ci-dessus).
 
 | #   | Étape                                                                                    | Résultat attendu                                                                                                                                          |
@@ -616,6 +618,8 @@ ci-dessus).
 | M6  | Webhook d'une synchro en échec (payload sans comptes)                                     | La ligne `powensConnections` est quand même mise à jour (state + `lastWebhookAt`) ; aucune tx écrite                                                        |
 | M7  | Supprimer une connexion côté Powens puis relancer M2                                      | La ligne disparaît de `powensConnections` (le poll est autoritaire) ; la section UI ne la montre plus                                                       |
 | M8  | Compte lié à Powens (`powensAccountId` posé) dont la connexion n'a pas de ligne `powensConnections` (ex. connexion sous un vieux user Powens non géré — cas Qonto) | Ligne « Non suivie » (pastille ambre) dans la section Connexions : nom = banque, « dernières données il y a X » (max des `balanceAsOf`), comptes concernés, hint « refaire la connexion via Connecter une banque », **pas** de bouton Reconnecter ; comptée dans la bannière de la Vue d'ensemble (« Connexion bancaire non suivie : X ») ; réparation : cf. `KNOWN_ISSUES.md` « État Non suivie » |
+| M9  | Connexion dégradée ne desservant **aucun** compte (ex. tentative de connexion jamais synchronisée) | Pastille grise « Obsolète » + hint « rien à reconnecter », **pas** de bouton Reconnecter ; **hors** bannière Vue d'ensemble et **aucun** email (relancer `powens:evaluateConnectionsHealth '{}'` pour le vérifier) ; page Intégrations : point gris « Inactive », sans bouton Reconnecter |
+| M10 | Bouton « Supprimer » sur une ligne Obsolète (admin) → confirmer | La connexion est supprimée **chez Powens** puis la ligne `powensConnections` disparaît ; toast de succès ; le poll (M2) ne la fait pas revenir. En tant que member : `insufficient_role`. Sur une connexion desservant encore un compte : `connection_in_use` (jamais proposé par l'UI) |
 
 ## Page Intégrations (Réglages → Intégrations)
 

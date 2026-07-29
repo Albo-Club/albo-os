@@ -39,6 +39,11 @@ import { RESEND_FROM, resend } from './email'
 import { powensConnectionAlertEmail } from './emailTemplates'
 import { requireOrgMember, requireOrgRole } from './lib/auth'
 import { loadOrgRules, ruleFieldsFor } from './lib/categoryRules'
+import {
+  matchExistingAccount,
+  normalizeName,
+  squashName,
+} from './lib/powensAccounts'
 import { buildSearchText } from './lib/searchText'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
@@ -100,22 +105,6 @@ function parsePowensDateTime(value: unknown): number | undefined {
   const hasTz = iso.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(iso)
   const ms = Date.parse(hasTz ? iso : `${iso}Z`)
   return Number.isNaN(ms) ? undefined : ms
-}
-
-function normalizeName(s: string): string {
-  return s
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim()
-}
-function normalizeIban(s: string): string {
-  return s.replace(/\s+/g, '').toUpperCase()
-}
-/** Like `normalizeName` but also collapses internal whitespace — to compare
- * multi-word labels ("Neuflize OBC - Compte à terme"). */
-function squashName(s: string): string {
-  return normalizeName(s).replace(/\s+/g, ' ')
 }
 
 function matchConnector(normalizedConnector: string) {
@@ -489,69 +478,44 @@ async function qontoTestTxRows(
   return out
 }
 
-/** Matches a Powens Qonto account to the existing record (imported from
- * Airtable). Match by IBAN if the record has one, otherwise by uniqueness of
- * `bankName='Qonto'` (the Airtable import does not store the IBAN), with IBAN
- * backfill.
- *
- * Separate cases (do not confuse):
- * - 0 eligible candidates = calte's Qonto record(s) are ALREADY linked to
- *   another `powensAccountId` (redundant re-sync webhook from another Powens
- *   connection/user). We keep the first match as the source of truth →
- *   `qonto_already_linked` warning + this account is ignored (return null,
- *   no error).
- * - ≥2 candidates = real ambiguity → `qonto_match_ambiguous` (hard stop). */
-async function linkQonto(
+/** Binds a payload account to an existing record: the same real account, seen
+ * under new Powens ids (reconnection) or not yet linked at all (record
+ * imported from Airtable). Backfills the IBAN, re-stamps the connection. */
+async function takeOverAccount(
   ctx: MutationCtx,
+  accountId: Id<'bankAccounts'>,
   acc: NormAccount,
   connectionId: string,
-): Promise<Doc<'bankAccounts'> | null> {
-  const qontoAccounts = await qontoAccountsOfCalte(ctx)
-  const candidates = eligibleQontoCandidates(qontoAccounts)
-  if (candidates.length === 0) {
-    const linkedIds = qontoAccounts
-      .filter((a) => a.powensAccountId)
-      .map((a) => a.powensAccountId)
-      .join(', ')
-    console.warn(
-      `[powens] qonto_already_linked: compte payload acct ${acc.powensAccountId} ` +
-        `ignoré — record(s) Qonto déjà lié(s) à acct ${linkedIds || '(aucun)'}`,
-    )
-    return null
-  }
-  if (candidates.length > 1) throw new ConvexError('qonto_match_ambiguous')
-  const qonto = candidates[0]
-  if (
-    qonto.iban &&
-    acc.iban &&
-    normalizeIban(qonto.iban) !== normalizeIban(acc.iban)
-  ) {
-    throw new ConvexError('qonto_iban_mismatch')
-  }
-  await ctx.db.patch("bankAccounts", qonto._id, {
+): Promise<Doc<'bankAccounts'>> {
+  const existing = await ctx.db.get('bankAccounts', accountId)
+  if (!existing) throw new ConvexError('account_vanished')
+  await ctx.db.patch('bankAccounts', accountId, {
     powensConnectionId: connectionId,
     powensAccountId: acc.powensAccountId,
-    iban: qonto.iban ?? acc.iban,
+    iban: existing.iban ?? acc.iban,
     ...balancePatch(acc),
   })
-  const refreshed = await ctx.db.get("bankAccounts", qonto._id)
+  const refreshed = await ctx.db.get('bankAccounts', accountId)
   if (!refreshed) throw new ConvexError('account_vanished')
   return refreshed
 }
 
 /** Resolves the target `bankAccounts` row for a payload account. Returns
- * `null` if the account must be ignored (`qonto_already_linked` case, cf.
- * linkQonto).
+ * `null` if the account must be ignored.
  *
  * `org` = the org of the matched Powens user (source of truth for "who owns
  * this connection"): it is what scopes the write. The connector→entity
  * mapping only picks the owning entity and must agree with this org
- * (otherwise a visible error, no silent write). */
+ * (otherwise a visible error, no silent write).
+ *
+ * `siblings` = every account of the same payload, needed to tell a lone
+ * account of a bank from one of several (cf. `matchExistingAccount`). */
 async function resolveAccount(
   ctx: MutationCtx,
   connectionId: string,
   acc: NormAccount,
   org: Doc<'organizations'>,
+  siblings: ReadonlyArray<NormAccount>,
 ): Promise<Doc<'bankAccounts'> | null> {
   // 1. Already linked by powensAccountId → reuse it (balance update).
   const linked = await ctx.db
@@ -569,24 +533,78 @@ async function resolveAccount(
       )
       return null
     }
-    await ctx.db.patch("bankAccounts", linked._id, balancePatch(acc))
-    const refreshed = await ctx.db.get("bankAccounts", linked._id)
+    // The connection is re-stamped: the same account can be delivered by a
+    // NEW connection (reconnect). Leaving the old id would keep the account
+    // attached to a dead connection, which then alerts forever.
+    await ctx.db.patch('bankAccounts', linked._id, {
+      powensConnectionId: connectionId,
+      iban: linked.iban ?? acc.iban,
+      ...balancePatch(acc),
+    })
+    const refreshed = await ctx.db.get('bankAccounts', linked._id)
     if (!refreshed) throw new ConvexError('account_vanished')
     return refreshed
   }
 
   const connector = normalizeName(acc.connectorName)
+  const mapping = matchConnector(connector)
+  const bankName = mapping?.bankName ?? acc.connectorName
 
-  // 2. Existing Qonto match (the record lives in the calte org).
-  if (connector.includes('qonto')) {
-    if (org.slug !== 'calte') {
-      throw new ConvexError(`connector_org_mismatch:qonto:${org.slug}`)
-    }
-    return linkQonto(ctx, acc, connectionId)
+  // 2. Same real account already recorded, under other ids (reconnection) or
+  // not yet linked (record imported from Airtable) → take over the link
+  // instead of creating a second row for the same bank.
+  const orgAccounts = await ctx.db
+    .query('bankAccounts')
+    .withIndex('by_org', (q) => q.eq('orgId', org._id))
+    .collect()
+  const match = matchExistingAccount(
+    orgAccounts.map((a) => ({
+      id: a._id,
+      bankName: a.bankName,
+      label: a.label,
+      displayName: a.displayName,
+      iban: a.iban,
+      powensAccountId: a.powensAccountId,
+      archivedAt: a.archivedAt,
+    })),
+    {
+      bankName,
+      accountName: acc.accountName,
+      iban: acc.iban,
+      soleAccountOfBank:
+        siblings.filter((s) => normalizeName(s.connectorName) === connector)
+          .length === 1,
+    },
+  )
+  if (match?.kind === 'ambiguous') {
+    // Several plausible records: writing would either duplicate or bind the
+    // wrong account. Hard stop, the webhook is retried by Powens.
+    throw new ConvexError(
+      `account_match_ambiguous:${acc.powensAccountId}:${match.ids.join(',')}`,
+    )
+  }
+  if (match) {
+    const target = match.id as Id<'bankAccounts'>
+    console.log(
+      `[powens] compte acct ${acc.powensAccountId} ("${acc.accountName ?? '?'}") ` +
+        `rapproché par ${match.kind} du compte existant ${target} — ` +
+        `lien repris, aucun doublon créé`,
+    )
+    return takeOverAccount(ctx, target, acc, connectionId)
   }
 
-  // 3. New account via the connector → entity mapping, scoped to the user's org.
-  const mapping = matchConnector(connector)
+  // 3. Qonto is never created here: its record comes from the Airtable
+  // import. No match = it is already linked to another Powens id (redundant
+  // re-sync from another connection/user) → ignored, no error.
+  if (connector.includes('qonto')) {
+    console.warn(
+      `[powens] qonto_already_linked: compte payload acct ${acc.powensAccountId} ` +
+        `ignoré — aucun record Qonto libre dans l'org ${org.slug}`,
+    )
+    return null
+  }
+
+  // 4. New account via the connector → entity mapping, scoped to the user's org.
   if (!mapping) {
     throw new ConvexError(`unmapped_powens_account:${acc.connectorName}`)
   }
@@ -637,6 +655,21 @@ async function computeCutoff(
 
 // ─── Connection health: upsert + change-triggered email alert ─────────────────
 
+/** Accounts of the org currently fed by a connection (archived excluded) —
+ * a connection feeding none is a leftover, not an incident. */
+async function connectionAccounts(
+  ctx: QueryCtx,
+  row: Doc<'powensConnections'>,
+): Promise<Array<Doc<'bankAccounts'>>> {
+  const accounts = await ctx.db
+    .query('bankAccounts')
+    .withIndex('by_org', (q) => q.eq('orgId', row.orgId))
+    .collect()
+  return accounts.filter(
+    (a) => !a.archivedAt && a.powensConnectionId === row.powensConnectionId,
+  )
+}
+
 /** Emails every org member when a connection's health degrades. Anti-spam:
  * one email per incident — `notifiedHealth` remembers the last degraded
  * health emailed, and is cleared once the connection is healthy again. */
@@ -646,6 +679,15 @@ async function maybeNotifyConnectionHealth(
   now: number,
 ): Promise<void> {
   const health = connectionHealth(row, now)
+  // Obsolete connection (feeds no account — typically a failed connection
+  // attempt left aside by a reconnection): degraded forever, but there is
+  // nothing to repair. Never alert on it; the UI offers to delete it.
+  if (
+    health !== 'connected' &&
+    (await connectionAccounts(ctx, row)).length === 0
+  ) {
+    return
+  }
   if (health === 'connected') {
     if (row.notifiedHealth) {
       await ctx.db.patch('powensConnections', row._id, {
@@ -804,7 +846,13 @@ export const ingestConnectionSync = internalMutation({
     // (never on a patch — redelivery must not overwrite the matching state).
     const categoryRules = await loadOrgRules(ctx, org._id)
     for (const acc of accounts) {
-      const account = await resolveAccount(ctx, connectionId, acc, org)
+      const account = await resolveAccount(
+        ctx,
+        connectionId,
+        acc,
+        org,
+        accounts,
+      )
       if (!account) {
         // Account ignored (qonto_already_linked) — its txs are not ingested.
         summary.skipped += acc.transactions.length
@@ -1028,28 +1076,38 @@ export const listConnections = query({
       key: string
       powensConnectionId: string
       connectorName: string | null
-      health: ConnectionHealth | 'untracked'
+      health: ConnectionHealth | 'untracked' | 'obsolete'
       state: string | null
       errorMessage: string | null
       lastSuccessfulSyncAt: number | null
       accountLabels: Array<string>
     }
     const tracked: Array<ConnectionListItem> = rows
-      .map((r) => ({
-        key: r._id,
-        powensConnectionId: r.powensConnectionId,
-        connectorName: r.connectorName ?? null,
-        health: connectionHealth(r, now),
-        state: r.state ?? null,
-        errorMessage: r.errorMessage ?? null,
-        lastSuccessfulSyncAt: r.lastSuccessfulSyncAt ?? null,
-        accountLabels: accounts
+      .map((r) => {
+        const health = connectionHealth(r, now)
+        const accountLabels = accounts
           .filter(
             (a) =>
               a.powensConnectionId === r.powensConnectionId && !a.archivedAt,
           )
-          .map((a) => a.displayName ?? a.label),
-      }))
+          .map((a) => a.displayName ?? a.label)
+        return {
+          key: r._id,
+          powensConnectionId: r.powensConnectionId,
+          connectorName: r.connectorName ?? null,
+          // Degraded but feeding no account = leftover of a failed connection
+          // attempt (or of accounts taken over by another connection).
+          // Nothing to reconnect — it is offered for deletion instead.
+          health:
+            health !== 'connected' && accountLabels.length === 0
+              ? ('obsolete' as const)
+              : health,
+          state: r.state ?? null,
+          errorMessage: r.errorMessage ?? null,
+          lastSuccessfulSyncAt: r.lastSuccessfulSyncAt ?? null,
+          accountLabels,
+        }
+      })
       .sort((a, b) =>
         (a.connectorName ?? '').localeCompare(b.connectorName ?? ''),
       )
@@ -1163,6 +1221,74 @@ export const diagnoseBankAccountsForCleanup = internalQuery({
     )
     rows.sort((x, y) => y.txCount - x.txCount)
     return rows
+  },
+})
+
+/** Read-only: link state of every bank account of an org, plus its tracked
+ * connections. This is what tells a real second account at the bank from a
+ * duplicate born of a reconnection (compare the IBANs), and which row holds
+ * the history (`txCount`, `airtableId`). Writes nothing.
+ *
+ *   pnpm exec convex run --prod powens:diagnoseOrgAccountLinks '{"orgSlug":"calte"}'
+ */
+export const diagnoseOrgAccountLinks = internalQuery({
+  args: { orgSlug: v.string() },
+  handler: async (ctx, { orgSlug }) => {
+    const org = await orgBySlug(ctx, orgSlug)
+    const accounts = await ctx.db
+      .query('bankAccounts')
+      .withIndex('by_org', (q) => q.eq('orgId', org._id))
+      .collect()
+    const rows = await Promise.all(
+      accounts.map(async (a) => {
+        const txs = await ctx.db
+          .query('transactions')
+          .withIndex('by_account_date', (q) => q.eq('bankAccountId', a._id))
+          .collect()
+        const dates = txs.map((t) => t.transactionDate).sort((x, y) => x - y)
+        const iso = (ms: number | undefined) =>
+          ms == null ? null : new Date(ms).toISOString().slice(0, 10)
+        return {
+          _id: a._id,
+          bankName: a.bankName,
+          label: a.label,
+          displayName: a.displayName ?? null,
+          iban: a.iban ?? null,
+          accountKind: a.accountKind ?? null,
+          airtableId: a.airtableId ?? null,
+          powensAccountId: a.powensAccountId ?? null,
+          powensConnectionId: a.powensConnectionId ?? null,
+          accountStatus: a.accountStatus ?? null,
+          archivedAt: a.archivedAt ?? null,
+          createdAt: iso(a._creationTime),
+          txCount: txs.length,
+          firstTx: iso(dates[0]),
+          lastTx: iso(dates[dates.length - 1]),
+        }
+      }),
+    )
+    rows.sort((x, y) => x.bankName.localeCompare(y.bankName))
+    const now = Date.now()
+    const connections = await ctx.db
+      .query('powensConnections')
+      .withIndex('by_org', (q) => q.eq('orgId', org._id))
+      .collect()
+    return {
+      accounts: rows,
+      connections: connections.map((c) => ({
+        powensConnectionId: c.powensConnectionId,
+        connectorName: c.connectorName ?? null,
+        health: connectionHealth(c, now),
+        state: c.state ?? null,
+        lastSuccessfulSyncAt:
+          c.lastSuccessfulSyncAt == null
+            ? null
+            : new Date(c.lastSuccessfulSyncAt).toISOString(),
+        accountCount: accounts.filter(
+          (a) => !a.archivedAt && a.powensConnectionId === c.powensConnectionId,
+        ).length,
+      })),
+    }
   },
 })
 
@@ -1536,6 +1662,87 @@ export const startReconnect = action({
     url.searchParams.set('code', codeJson.code)
     url.searchParams.set('connection_id', powensConnectionId)
     return { webviewUrl: url.toString() }
+  },
+})
+
+/** Guard for `deleteConnection`: the connection must belong to the org AND
+ * feed no account. Deleting one that still feeds accounts would leave them
+ * unmonitored — that case is a reconnect, not a deletion. */
+export const assertConnectionDeletable = internalQuery({
+  args: { orgId: v.id('organizations'), powensConnectionId: v.string() },
+  handler: async (ctx, { orgId, powensConnectionId }) => {
+    const row = await ctx.db
+      .query('powensConnections')
+      .withIndex('by_powens_connection', (q) =>
+        q.eq('powensConnectionId', powensConnectionId),
+      )
+      .unique()
+    if (!row || row.orgId !== orgId) {
+      throw new ConvexError('connection_not_found')
+    }
+    const fed = await connectionAccounts(ctx, row)
+    if (fed.length > 0) throw new ConvexError('connection_in_use')
+    return { ok: true as const }
+  },
+})
+
+/** Drops the tracking row of a connection deleted on the Powens side. */
+export const removeConnectionRow = internalMutation({
+  args: { orgId: v.id('organizations'), powensConnectionId: v.string() },
+  handler: async (ctx, { orgId, powensConnectionId }) => {
+    const row = await ctx.db
+      .query('powensConnections')
+      .withIndex('by_powens_connection', (q) =>
+        q.eq('powensConnectionId', powensConnectionId),
+      )
+      .unique()
+    if (!row || row.orgId !== orgId) return { deleted: false }
+    await ctx.db.delete('powensConnections', row._id)
+    return { deleted: true }
+  },
+})
+
+/** Deletes an obsolete connection for good — on the Powens side first, then
+ * its tracking row. Typical case: a failed connection attempt left behind by
+ * a reconnection, which stays degraded forever with nothing to repair.
+ *
+ * Same posture as the other Powens actions: admin role, token server-side,
+ * only the HTTP status surfaces in errors. A 404 on the Powens side (already
+ * gone) still drops our row — the goal is that it stops existing. */
+export const deleteConnection = action({
+  args: { orgId: v.id('organizations'), powensConnectionId: v.string() },
+  handler: async (
+    ctx,
+    { orgId, powensConnectionId },
+  ): Promise<{ deleted: true }> => {
+    await ctx.runQuery(internal.powens.powensAuthProbe, { orgId })
+    await ctx.runQuery(internal.powens.assertConnectionDeletable, {
+      orgId,
+      powensConnectionId,
+    })
+    const user = await ctx.runQuery(internal.powens.getOrgPowensToken, {
+      orgId,
+    })
+    if (!user) throw new ConvexError('powens_no_user')
+    const { domain } = powensEnv()
+    const res = await fetch(
+      `https://${domain}/2.0/users/me/connections/${powensConnectionId}`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${user.authToken}` },
+      },
+    )
+    if (!res.ok && res.status !== 404) {
+      throw new ConvexError(`powens_delete_failed:${res.status}`)
+    }
+    await ctx.runMutation(internal.powens.removeConnectionRow, {
+      orgId,
+      powensConnectionId,
+    })
+    console.log(
+      `[powens] connexion ${powensConnectionId} supprimée (org ${orgId})`,
+    )
+    return { deleted: true }
   },
 })
 

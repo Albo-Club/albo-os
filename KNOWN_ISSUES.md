@@ -1256,19 +1256,47 @@ id_user inconnu (X)` + réponse 200, **rien n'est écrit**. Conséquence :
   `Uint8Array` génériques sont `ArrayBufferLike` → rejetés par tsc, union
   `SharedArrayBuffer`). Construire via `new Uint8Array(len)` / `new
 Uint8Array(enc.encode(s))` produit bien de l'`ArrayBuffer`-backed.
-- **Le record Qonto importé d'Airtable n'a pas d'IBAN.** `upsertBankAccounts`
-  (`airtableImport.ts`) ne stocke pas l'IBAN → le « match par IBAN » littéral
-  ne suffit pas. `linkQonto` rapproche le Qonto existant par **unicité du
-  `bankName='Qonto'`** dans calte (sans `powensAccountId`), exige l'égalité
-  d'IBAN seulement si le record en a déjà un, puis **backfille** l'IBAN Powens.
-  Deux cas de non-match, traités différemment :
-  - **0 candidat** (Qonto déjà lié à un autre `powensAccountId` — webhook
-    re-sync redondant d'une autre connexion/user Powens) → warning
-    `qonto_already_linked` dans les logs + compte **ignoré** (webhook répond
-    200, rien n'est cassé). Le premier match reste la source de vérité, pas de
-    re-lien automatique.
-  - **≥2 candidats** (vraie ambiguïté) → **arrêt dur** `qonto_match_ambiguous`,
-    aucune écriture — jamais de doublon.
+- **Une reconnexion redistribue de NOUVEAUX ids de compte.** C'est le piège
+  central : reconnecter une banque (et surtout repasser par « Connecter une
+  banque » plutôt que par « Reconnecter ») crée une nouvelle connexion Powens
+  dont les comptes portent de nouveaux `powensAccountId`. Résoudre par le seul
+  `powensAccountId` rate donc systématiquement → l'ingestion **créait un
+  second compte** pour la même banque, l'ancien restait figé sur son lien mort
+  et alertait à vie. D'où `matchExistingAccount`
+  (`convex/lib/powensAccounts.ts`, pure et testée) tentée AVANT toute
+  création, par ordre de force du signal :
+  1. **IBAN** — seul signal assez fort pour reprendre un compte **déjà lié** à
+     un ancien id (même IBAN = même compte).
+  2. **Même banque + même libellé** (ou `displayName`), parmi les records
+     **non liés** — rattrape les comptes livrés sans IBAN (nantissement,
+     titres).
+  3. **Compte unique d'une banque à record unique** — la connexion ne livre
+     qu'un compte pour cette banque et l'org n'a qu'un record libre.
+     C'est le cas Qonto (record importé d'Airtable, sans IBAN, dont le libellé
+     ne correspond jamais à celui de la banque) ; `linkQonto` a disparu au
+     profit de cette règle générique.
+
+  Les règles 2 et 3 ne volent **jamais** un record déjà lié et écartent tout
+  candidat dont l'IBAN contredit le payload. Une **égalité** sur la règle 1 ou
+  2 renvoie `ambiguous` → **arrêt dur** `account_match_ambiguous`, aucune
+  écriture (Powens re-livrera le webhook). Un match repose le lien sur le
+  record existant (`powensAccountId`, `powensConnectionId`, backfill IBAN,
+  solde) — jamais de doublon.
+- **La branche « déjà lié » re-tamponne `powensConnectionId`.** Un compte
+  peut garder son id Powens tout en étant désormais livré par une AUTRE
+  connexion. Sans ce re-tamponnage il resterait rattaché à une connexion
+  morte, qui alerterait indéfiniment. Ne pas la retirer.
+- **Qonto n'est jamais créé** (pas d'entrée dans `CONNECTOR_OWNER`) : son
+  record vient de l'import Airtable. Aucun match = tous les records Qonto sont
+  déjà liés à un autre id (re-sync redondant d'une autre connexion/user) →
+  warning `qonto_already_linked` + compte **ignoré** (webhook 200, rien de
+  cassé). Le premier lien reste la source de vérité.
+- **Limite connue** : un record importé d'Airtable **sans IBAN et au libellé
+  différent** de celui de la banque (l'ancien `PALATINE` de calte face à
+  « COMPTE COURANT GG21 CALTE ») n'est PAS rapprochable quand la banque livre
+  plusieurs comptes — la règle 3 ne s'applique pas. Il faut fusionner les deux
+  lignes une fois à la main (cf. `MIGRATIONS.md`) ; l'IBAN backfillé à la
+  fusion rend les reconnexions suivantes automatiques.
 - **Cutover sans champ au schéma.** Aucune date de connexion n'est stockée.
   Borne par compte dans `computeCutoff` : compte neuf → `_creationTime` (champ
   Convex natif ≈ date de connexion, l'historique antérieur du 1ᵉʳ lot est
@@ -1348,6 +1376,22 @@ toutes les 6 h (`pollConnectionsHealth`). Points non évidents :
   toutes les ~24 h) ; sinon `connected`. Les états transitoires
   (websiteUnavailable, rateLimiting, bug…) ne déclenchent PAS d'alerte
   directe — ils finissent en `stale` s'ils durent.
+- **État « Obsolète » — une connexion sans compte n'est pas un incident.**
+  Une connexion dégradée qui ne dessert **aucun compte actif** est un
+  reliquat : tentative de connexion jamais synchronisée, ou comptes repris par
+  une connexion plus récente. Elle est dégradée pour toujours et il n'y a rien
+  à réparer → `maybeNotifyConnectionHealth` **n'envoie rien**,
+  `listConnections` la renvoie en `health: 'obsolete'` (pastille grise, hors
+  bannière) et la page Intégrations la montre `inactive` (sans bouton
+  « Reconnecter »). C'est ce qui permet à l'alerte de s'éteindre seule après
+  une reconnexion réussie. Le poll la ré-insère tant qu'elle existe côté
+  Powens — la faire taire ne suffit donc pas à la faire disparaître, d'où le
+  bouton ci-dessous.
+- **Suppression définitive** : `powens.deleteConnection` (action, rôle admin)
+  garde `connection_in_use` si la connexion dessert encore un compte, appelle
+  `DELETE /users/me/connections/{id}` puis supprime la ligne de suivi. Un 404
+  côté Powens (déjà partie) supprime quand même la ligne — le but est qu'elle
+  cesse d'exister. Jamais de suppression de compte ni de transaction.
 - **Anti-spam : `notifiedHealth`** mémorise le dernier état dégradé alerté
   par email ; remis à `undefined` au retour au vert. Un incident = un email,
   une aggravation (`stale` → `action_required`) = un second. Pas de cooldown
@@ -1374,6 +1418,10 @@ toutes les 6 h (`pollConnectionsHealth`). Points non évidents :
   détecte ces orphelins (linked + non archivé + non clôturé + connexion non
   suivie) et les renvoie en `health: 'untracked'` (pastille « Non suivie »,
   comptée dans la bannière). **Réparation opérateur** (cas Qonto) :
+  0. `convex run --prod powens:diagnoseOrgAccountLinks '{"orgSlug":"calte"}'`
+     — vue d'ensemble (IBAN, ids Powens, nb de tx par compte, connexions et
+     nombre de comptes desservis). C'est lui qui distingue un vrai second
+     compte d'un doublon de reconnexion.
   1. `convex run --prod powens:diagnoseQontoMatch` — état des candidats.
   2. `convex run --prod powens:resetQontoPowensLink '{"bankAccountId":"…"}'`
      — délie le record (sinon la nouvelle connexion finit en
