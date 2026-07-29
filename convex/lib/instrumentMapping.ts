@@ -51,6 +51,46 @@ export function isTreasuryPlacement(kind: string): boolean {
   return TREASURY_PLACEMENT_KINDS.has(kind as InstrumentKind)
 }
 
+/**
+ * Liquidity buckets of the Placements page, most liquid first. A placement's
+ * bucket defaults from its instrument kind (DEFAULT_PLACEMENT_LIQUIDITY
+ * below); the optional per-deal `deals.liquidity` override lets the user
+ * reclassify a single placement.
+ */
+export type PlacementLiquidity = 'liquid' | 'semi_liquid' | 'illiquid'
+
+export const PLACEMENT_LIQUIDITIES: ReadonlyArray<PlacementLiquidity> = [
+  'liquid',
+  'semi_liquid',
+  'illiquid',
+]
+
+/** Default liquidity per treasury-placement kind (TREASURY_PLACEMENT_KINDS). */
+const DEFAULT_PLACEMENT_LIQUIDITY: Record<string, PlacementLiquidity> = {
+  cto: 'liquid',
+  crypto: 'liquid',
+  dat: 'semi_liquid',
+  capitalization_account: 'illiquid',
+}
+
+/**
+ * Resolves a placement's liquidity bucket: the per-deal override wins when it
+ * is a valid bucket, otherwise the default for the instrument kind, with
+ * 'semi_liquid' as a safe fallback for unknown kinds.
+ */
+export function placementLiquidity(
+  kind: string,
+  override?: string | null,
+): PlacementLiquidity {
+  if (
+    override &&
+    (PLACEMENT_LIQUIDITIES as ReadonlyArray<string>).includes(override)
+  ) {
+    return override as PlacementLiquidity
+  }
+  return DEFAULT_PLACEMENT_LIQUIDITY[kind] ?? 'semi_liquid'
+}
+
 /** instrumentKind → archetype. Total Record (every InstrumentKind). */
 export const INSTRUMENT_ARCHETYPE: Record<InstrumentKind, Archetype> = {
   // equity. safe config keeps only safe / bsa_air; bsa has its own config

@@ -85,11 +85,16 @@ export function AppSidebar({
 
     const isParam = item.to.includes('$orgSlug')
     const href = isParam ? item.to.replace('$orgSlug', currentSlug) : item.to
+    // Exact-or-prefix match against a resolved path (`$orgSlug` substituted).
+    const matchesPath = (path: string) =>
+      location.pathname === path || location.pathname.startsWith(path + '/')
     const isActive =
       item.to === '/app/$orgSlug'
         ? location.pathname === href
-        : location.pathname === href ||
-          location.pathname.startsWith(href + '/')
+        : matchesPath(href) ||
+          (item.alsoActiveOn ?? []).some((prefix) =>
+            matchesPath(prefix.replace('$orgSlug', currentSlug)),
+          )
     return (
       <SidebarMenuItem key={item.titleKey}>
         <SidebarMenuButton

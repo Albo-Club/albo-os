@@ -1,5 +1,6 @@
 {
   "metaTitle": "Placements — Albo OS",
+  "metaTitleDetail": "Placement — Albo OS",
   "title": "Placements",
   "subtitle": "La trésorerie placée — crypto, comptes de capitalisation, dépôts à terme, comptes-titres. Le solde se met à jour ici, la performance se calcule toute seule.",
   "tiles": {
@@ -9,6 +10,23 @@
     "gain": "Plus-value latente",
     "yield": "Rendement annualisé",
     "yieldHint": "XIRR des flux pointés + soldes actuels"
+  },
+  "sections": {
+    "liquid": "Liquide",
+    "semi_liquid": "Semi-liquide",
+    "illiquid": "Non liquide"
+  },
+  "placementsCount_one": "{{count}} placement",
+  "placementsCount_other": "{{count}} placements",
+  "liquidity": {
+    "label": "Liquidité",
+    "liquid": "Liquide",
+    "semi_liquid": "Semi-liquide",
+    "illiquid": "Non liquide",
+    "saved": "Liquidité mise à jour",
+    "errors": {
+      "default": "Impossible de mettre à jour la liquidité."
+    }
   },
   "col": {
     "name": "Placement",
@@ -21,11 +39,29 @@
     "yield": "Rendement ann."
   },
   "balanceEditAria": "Modifier le solde de {{name}}",
-  "rowOpenAria": "Ouvrir le deal {{name}}",
+  "rowOpenAria": "Ouvrir le placement {{name}}",
   "edit": {
     "saved": "Solde mis à jour",
     "errors": {
       "default": "Impossible de mettre à jour le solde."
+    }
+  },
+  "fiche": {
+    "back": "← Placements",
+    "notFound": "Placement introuvable.",
+    "notPlacement": "Ce deal n'est pas un placement — ouvre sa fiche deal complète.",
+    "openDeal": "Ouvrir la fiche deal",
+    "history": {
+      "title": "Historique du solde",
+      "empty": "Aucun historique — mets à jour le solde pour créer le premier point.",
+      "col": {
+        "date": "Date",
+        "value": "Valeur"
+      }
+    },
+    "tx": {
+      "title": "Transactions pointées",
+      "empty": "Aucune transaction pointée sur ce placement."
     }
   },
   "empty": "Aucun placement. Les deals crypto, comptes de capitalisation, dépôts à terme et comptes-titres apparaîtront ici."

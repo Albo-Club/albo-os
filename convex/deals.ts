@@ -6,6 +6,7 @@ import { deleteStorageText } from './lib/documentTexts'
 import {
   couponPeriodicityValidator,
   fundTypeValidator,
+  placementLiquidityValidator,
   propertyTypeValidator,
   repaymentModalityValidator,
   roundTypeValidator,
@@ -114,6 +115,8 @@ const dealFields = {
   propertyType: v.optional(propertyTypeValidator),
   rentReceived: v.optional(v.number()), // cents
   currentValue: v.optional(v.number()), // cents
+  // Placement liquidity override; default derived from instrumentKind.
+  liquidity: v.optional(placementLiquidityValidator),
 
   // BSA (warrants) — own config, split from safe
   grantDate: v.optional(v.number()), // ms

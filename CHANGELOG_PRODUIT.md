@@ -23,6 +23,49 @@ bas de page.
 
 ---
 
+## v1.148.0 — 29/07/2026 à 20:30 — Sidebar resserrée : Investissements réunit Entreprises et Placements
+
+La barre latérale passe à quatre entrées : **À faire, Investissements,
+Trésorerie, Passif**. Entreprises et Placements ne disparaissent pas — ce
+sont désormais les deux **sous-onglets** de la nouvelle section
+Investissements, qui s'ouvre sur Entreprises. Deux façons de suivre ses
+investissements, un seul endroit : les participations d'un côté, la
+trésorerie placée de l'autre, et on bascule de l'une à l'autre en un clic.
+
+La page Placements se structure par **liquidité** : trois sections —
+Liquide, Semi-liquide, Non liquide — sur le modèle des tableaux par statut
+de la liste Entreprises. Le classement se déduit du type de placement
+(compte-titres et crypto en liquide, dépôt à terme en semi-liquide, compte
+de capitalisation en non liquide) et se corrige placement par placement :
+un DAT à 5 ans peut passer en non liquide.
+
+Un placement s'ouvre maintenant sur sa **fiche placement**, volontairement
+légère — un placement est un compte, pas une participation : l'essentiel du
+compte en tuiles, la liquidité modifiable, l'**historique du solde** (chaque
+mise à jour crée un point daté) et les transactions pointées. Le contenu de
+l'enveloppe (les titres d'un compte-titres, les supports d'un contrat de
+capitalisation) viendra avec la connexion Powens Wealth.
+
+> **🔧 Notes techniques**
+>
+> - Sidebar : `nav.ts` remplace les entrées Entreprises + Placements par une
+>   entrée `items.investments` → `/participations`, avec `alsoActiveOn:
+>   ['/app/$orgSlug/placements']` honoré par `AppSidebar.tsx` ; sous-onglets
+>   partagés `src/components/investments/InvestmentsTabs.tsx` (Links stylés
+>   TabsTrigger) rendus dans les headers des deux pages.
+> - Liquidité : champ optionnel `deals.liquidity`
+>   (`liquid`/`semi_liquid`/`illiquid`, validator partagé
+>   `convex/lib/instruments.ts`), défaut par type + override via
+>   `placementLiquidity()` (`convex/lib/instrumentMapping.ts`) ;
+>   `PlacementsView.tsx` regroupe en trois sections à bandeaux
+>   (vert/ambre/gris, miroir de `participationBucketBand`).
+> - Fiche placement : nouvelle route `placements.$dealId.tsx` (getById +
+>   `transactions.listByDeal` + `valuations.list`, XIRR client identique à la
+>   liste) ; la ligne de la liste navigue vers cette fiche au lieu de la
+>   fiche deal.
+> - `pnpm typecheck`, `lint`, `build` verts ; smoke tests non lancés (dev
+>   server requis).
+
 ## v1.147.1 — 29/07/2026 à 20:05 — Réparer un trou de synchro repéré après coup
 
 Le rattrapage livré en v1.147.0 repart de la dernière transaction connue sur

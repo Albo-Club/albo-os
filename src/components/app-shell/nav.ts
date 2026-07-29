@@ -1,8 +1,8 @@
 import {
   Building2,
+  ChartCandlestick,
   Handshake,
   Inbox,
-  Landmark,
   ListTodo,
   Megaphone,
   Scale,
@@ -15,6 +15,8 @@ export type NavLeaf = {
   /** i18n key under the `nav` namespace, e.g. `items.participations`. */
   titleKey: string
   to: string
+  /** Extra path prefixes that keep this item highlighted. */
+  alsoActiveOn?: Array<string>
   icon?: LucideIcon
   adminOnly?: boolean
   /** When true, render a `common:demo` badge. */
@@ -41,19 +43,15 @@ export function getNavGroups(): Array<NavGroup> {
           icon: ListTodo,
         },
         {
-          titleKey: 'items.participations',
+          titleKey: 'items.investments',
           to: '/app/$orgSlug/participations',
-          icon: Building2,
+          alsoActiveOn: ['/app/$orgSlug/placements'],
+          icon: ChartCandlestick,
         },
         {
           titleKey: 'items.cash',
           to: '/app/$orgSlug/cash',
           icon: Wallet,
-        },
-        {
-          titleKey: 'items.placements',
-          to: '/app/$orgSlug/placements',
-          icon: Landmark,
         },
         {
           titleKey: 'items.passif',
