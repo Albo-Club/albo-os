@@ -29,6 +29,7 @@
   "dependencies": {
     "@convex-dev/agent": "^0.6.3",
     "@convex-dev/better-auth": "^0.12.2",
+    "@convex-dev/rag": "^0.7.5",
     "@convex-dev/rate-limiter": "^0.3.2",
     "@convex-dev/react-query": "^0.1.0",
     "@convex-dev/resend": "^0.2.3",
@@ -72,6 +73,7 @@
     "streamdown": "^2.5.0",
     "tailwind-merge": "^3.6.0",
     "use-stick-to-bottom": "^1.1.6",
+    "write-excel-file": "^4.1.1",
     "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },

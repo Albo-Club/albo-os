@@ -142,7 +142,8 @@ export const getInternal = internalQuery({
     if (!report || report.orgId !== orgId) throw new ConvexError('not_found')
 
     // No rawContent/cleanedHtml here: they run up to 150k chars and would
-    // swamp the context. Semantic retrieval over them is a separate chantier.
+    // swamp the context. That text is already indexed — read it through
+    // `searchDocuments` (convex/vectorize.ts).
     return {
       _id: report._id,
       companyId: report.companyId,

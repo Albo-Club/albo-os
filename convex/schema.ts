@@ -325,21 +325,12 @@ export default defineSchema({
     .index('by_link_code', ['linkCode']),
 
   /**
-   * gmailAccounts — one row per Gmail mailbox connected FOR ONE ORG (cf.
-   * convex/gmail.ts, OAuth flow modeled on Twenty CRM's messaging sync).
-   * Mailboxes are org-scoped: a connection made from an org only feeds that
-   * org's participations; the same personal mailbox serving two vehicles is
-   * TWO rows (one OAuth grant each) — strict tenant separation, like Powens.
-   * `orgId` is optional ONLY to let the pre-separation legacy rows (global
-   * mailboxes, shipped 21/07/2026, zero synced data) pass schema validation:
-   * the sync cron deletes any row without `orgId`; narrow to required once
-   * prod is clean (widen-migrate-narrow).
-   * `historyId` is the Gmail incremental-sync cursor (users.history.list);
-   * it only advances after a successful sync and is reset from the profile
-   * when Google reports it expired.
-   * INTERNAL: `refreshToken` is secret at rest — rows are read/written only
-   * by internal functions; public views are sanitized (same rule as
-   * `powensUsers`).
+   * gmailAccounts — LEGACY, declared but inert. Belonged to the retired
+   * emails feature (Gmail-synced portfolio email timeline); the whole
+   * browsing/sync surface was removed to be rethought later. Kept declared
+   * with its data until the purge-then-narrow cleanup (same convention as
+   * the legacy `forecasts` table). Read by nothing.
+   * `refreshToken` remains secret at rest — never expose rows publicly.
    */
   gmailAccounts: defineTable({
     orgId: v.optional(v.id('organizations')), // org fed by this mailbox
@@ -365,11 +356,9 @@ export default defineSchema({
     .index('by_user', ['userId']),
 
   /**
-   * gmailOAuthStates — short-lived anti-CSRF `state` tokens of the Gmail
-   * OAuth flow (created by `gmail.startConnect`, consumed once by the
-   * /gmail/oauth/callback HTTP route, expired after 15 min). `orgId` is the
-   * org the connection is being made for (optional for the same legacy
-   * reason as `gmailAccounts`; a state without it is treated as expired).
+   * gmailOAuthStates — LEGACY, declared but inert (retired emails feature,
+   * same convention as `gmailAccounts`). Short-lived anti-CSRF tokens of the
+   * removed Gmail OAuth flow. Read by nothing.
    */
   gmailOAuthStates: defineTable({
     orgId: v.optional(v.id('organizations')),
@@ -831,18 +820,33 @@ export default defineSchema({
    * portfolio): investor updates, BP, legal. File stored in native Convex
    * storage (20 MB cap). `source: 'email'` reserved for inbound
    * ingestion (V2) — V1 = manual upload.
+   *
+   * A row with `dealId` set is a DEAL document (term sheet, pacte,
+   * subscription form…): it belongs to that single deal and is deliberately
+   * hidden from the company's Documents tab — cf. `documents:listByCompany`.
+   * `companyId` stays filled (the deal's target) so the org scoping and the
+   * `by_company` index keep working for both kinds.
    */
   documents: defineTable({
     orgId: v.id('organizations'),
     companyId: v.id('companies'),
+    dealId: v.optional(v.id('deals')),
     title: v.string(),
+    // Company kinds first, then the deal-specific ones. One widened union
+    // rather than two columns: which subset is offered is a UI concern.
     kind: v.union(
       v.literal('reporting'),
       v.literal('bp'),
       v.literal('legal'),
       v.literal('other'),
+      v.literal('term_sheet'),
+      v.literal('pacte'),
+      v.literal('subscription'),
+      v.literal('attestation'),
     ),
-    period: v.optional(v.number()), // covered period (ms epoch)
+    // Company docs: covered period (month). Deal docs: the document's own
+    // date (signature…). Same storage, the label differs per surface.
+    period: v.optional(v.number()), // ms epoch
     storageId: v.id('_storage'),
     contentType: v.optional(v.string()),
     size: v.optional(v.number()),
@@ -851,17 +855,58 @@ export default defineSchema({
     uploadedAt: v.number(),
     // ── Email ingestion (AgentMail report pipeline) ───────────────────────
     // Set when the file arrives as an email attachment. `reportId` links the
-    // file to its `companyReports` row; `extractedText` holds the OCR/parsed
-    // text (deferred — null until OCR is wired); `inline` flags inline images
-    // (cid:) which are hidden from the Docs tab. All optional → manual uploads
+    // file to its `companyReports` row; `inline` flags inline images (cid:)
+    // which are hidden from the Docs tab. All optional → manual uploads
     // leave them unset.
     reportId: v.optional(v.id('companyReports')),
-    extractedText: v.optional(v.string()),
     inline: v.optional(v.boolean()),
+    // ── Text extraction (Mistral OCR / parsers) ───────────────────────────
+    // Reading state of the file, surfaced per document in the front:
+    // 'pending' = queued, 'extracted' = text obtained, 'skipped' = nothing to
+    // read (logo-sized image, unsupported format), 'failed' = tried and
+    // failed. `ocrDetail` is a machine code from the SAME vocabulary as
+    // `inboundEmails.sources[].detail` ('ocr_failed', 'small_image_skipped',
+    // …) so the front and the recap email speak the same language. The text
+    // itself lives in `documentTexts` — see that table for why. Undefined on
+    // rows predating the feature (displayed as "not analysed").
+    ocrState: v.optional(
+      v.union(
+        v.literal('pending'),
+        v.literal('extracted'),
+        v.literal('skipped'),
+        v.literal('failed'),
+      ),
+    ),
+    ocrDetail: v.optional(v.string()),
+    ocrChars: v.optional(v.number()),
+    // LEGACY — read by nothing, written by nothing in this repo, but prod rows
+    // carry it (the text was put there out-of-band, before `documentTexts`
+    // existed). Removing it fails `convex deploy` on schema validation:
+    // "Object contains extra field `extractedText` that is not in the
+    // validator". Purge the data first, then drop the field — cf. MIGRATIONS.md.
+    extractedText: v.optional(v.string()),
   })
     .index('by_company', ['companyId', 'uploadedAt'])
+    .index('by_deal', ['dealId', 'uploadedAt'])
     .index('by_org', ['orgId'])
     .index('by_report', ['reportId']),
+
+  /**
+   * documentTexts — the extracted text of a stored file. ONE row per storage
+   * blob, NOT per document: the report fan-out creates one `documents` row
+   * per matched entity around a single shared blob, and the extracted text
+   * is a property of the file, not of the row pointing at it.
+   *
+   * Kept out of `documents` on purpose: Convex reads whole rows, so a
+   * ~900k-char field there would be re-read for every row on every Documents
+   * tab open. Here it is only read when the user opens the text.
+   * `truncated` marks a file whose text hit MAX_DOCUMENT_CHARS.
+   */
+  documentTexts: defineTable({
+    storageId: v.id('_storage'),
+    text: v.string(),
+    truncated: v.boolean(),
+  }).index('by_storage', ['storageId']),
 
   /**
    * companyReports — investor updates ingested by email (AgentMail report
@@ -901,10 +946,7 @@ export default defineSchema({
       ),
     ),
     reportAbout: v.optional(
-      v.union(
-        v.literal('company_self'),
-        v.literal('fund_portfolio_company'),
-      ),
+      v.union(v.literal('company_self'), v.literal('fund_portfolio_company')),
     ),
     metrics: v.optional(v.any()), // flat canonical map { key: converted number }
     // Full as-written metric snapshot (label, value, seen unit, catalog key) —
@@ -1026,7 +1068,11 @@ export default defineSchema({
         v.object({
           kind: v.string(), // 'body' | 'pdf' | 'excel' | 'image' | 'notion' | 'gdrive' | 'docsend' | 'other'
           label: v.string(), // filename or URL
-          state: v.union(v.literal('extracted'), v.literal('stored'), v.literal('failed')),
+          state: v.union(
+            v.literal('extracted'),
+            v.literal('stored'),
+            v.literal('failed'),
+          ),
           detail: v.optional(v.string()),
           chars: v.optional(v.number()),
         }),
@@ -1046,18 +1092,12 @@ export default defineSchema({
     .index('by_status', ['status']),
 
   /**
-   * companyEmails — the portfolio email timeline (cf. convex/gmail.ts).
-   * One row per MESSAGE, deduplicated across mailboxes by the RFC
-   * `Message-ID` header (Twenty CRM's design: a mail seen by N connected
-   * boxes = 1 row, `accountEmails` lists the boxes that saw it). Only
-   * messages matched to ≥1 portfolio company are stored — unmatched mail
-   * never enters the database. No `orgId` here: the org link lives on
-   * `companyEmailLinks` (each link created by the matching of an org-scoped
-   * mailbox — reads are always guarded through the link's org).
-   * The message is stored IN FULL for later re-processing (étape 2 —
-   * report extraction): cleaned text with `<a href>` URLs preserved,
-   * attachments downloaded into Convex storage, and the Gmail reference
-   * (`gmailMessageId` + source mailbox) as a re-fetch safety net.
+   * companyEmails — LEGACY, declared but inert (retired emails feature).
+   * Was the portfolio email timeline: one row per message, deduplicated
+   * across mailboxes by the RFC `Message-ID` header, stored in full with
+   * attachments in Convex storage. Kept declared with its data until the
+   * purge-then-narrow cleanup (same convention as the legacy `forecasts`
+   * table). Read by nothing.
    */
   companyEmails: defineTable({
     headerMessageId: v.string(), // RFC Message-ID — dedup key
@@ -1088,9 +1128,9 @@ export default defineSchema({
   }).index('by_header_message_id', ['headerMessageId']),
 
   /**
-   * companyEmailLinks — join table email ↔ matched company (one row per
-   * company per email; `sentAt` denormalized for the per-company timeline
-   * ordering). Access control happens through the company's org.
+   * companyEmailLinks — LEGACY, declared but inert (retired emails feature,
+   * same convention as `companyEmails`). Join table email ↔ matched company.
+   * Read by nothing.
    */
   companyEmailLinks: defineTable({
     companyId: v.id('companies'),

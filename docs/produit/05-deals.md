@@ -3,9 +3,12 @@
 ## À quoi ça sert
 
 Un **deal** = un investissement précis : un instrument souscrit à un instant
-donné. Un réinvestissement (follow-on) est un nouveau deal. La section Deals
-(`/app/<org>/deals`) montre le portefeuille **à plat** — une ligne par deal —
-là où [Participations](04-participations.md) regroupe par société.
+donné. Un réinvestissement (follow-on) est un nouveau deal. Un deal s'ouvre
+**depuis la fiche de sa société** ([Participations](04-participations.md)) —
+il n'y a plus de liste de deals dédiée dans une organisation, la logique de
+lecture passant toujours par l'entreprise. La [vue
+consolidée](12-vue-consolidee.md) garde, elle, sa liste de deals à plat
+toutes organisations confondues.
 
 ## Anatomie d'un deal
 
@@ -31,12 +34,15 @@ là où [Participations](04-participations.md) regroupe par société.
   sheet (rien n'est décaissé). Les **fonds** affichent les deux — engagé
   (commit) vs **capital appelé** — car ils diffèrent réellement.
 - **Statut** : *engagé* (term sheet signée, pas encore câblé — créé
-  automatiquement depuis Attio), *actif*, *sorti partiellement*, *sorti*,
-  *passé en perte*. La **couleur** du statut ne sert qu'à la sortie : vert =
-  sortie gagnante, rouge = perte, gris = neutre (actif ou sortie sans
-  plus-value) ; *engagé* est en ambre. Une **sortie partielle** vire au vert
-  dès qu'elle est déjà dans le vert, jamais au rouge (la position n'est pas
-  soldée). Un deal actif se suit par ses reports, pas par une couleur.
+  automatiquement depuis Attio), *actif*, *sorti partiellement*, **Exit
+  win** / **Exit loss** (sortie gagnante ou perdante, selon le multiple
+  réalisé). La **couleur** du statut ne sert qu'à la sortie : vert = Exit
+  win, rouge = Exit loss, gris = neutre (actif ou sortie sans plus-value) ;
+  *engagé* est en ambre. Une **sortie partielle** vire au vert dès qu'elle
+  est déjà dans le vert, jamais au rouge (la position n'est pas soldée).
+  Un deal actif se suit par ses reports, pas par une couleur — le bleu
+  « position ouverte » n'apparaît que sur les repères de la liste
+  (bandeaux) et de la fiche société (liseré).
 - **Dates** : signature (tri par défaut), closing, sortie.
 - **Titres et détention** : les deals en actions enregistrent le **nombre de
   titres acquis** et le **prix par titre**. Un achat sur le **secondaire**
@@ -72,6 +78,17 @@ là où [Participations](04-participations.md) regroupe par société.
 - **Transactions** : les mouvements bancaires rattachés au deal. Un clic
   ouvre le détail avec possibilité de **réaffecter** la transaction à un
   autre deal.
+- **Documents** : les pièces propres à **ce deal** — term sheet, pacte ou
+  statuts, bulletin de souscription, attestation ou KBIS, et « autre » pour
+  le reste. À distinguer des documents de la **société**, qui vivent sur sa
+  fiche (reportings, business plan, juridique) : un document déposé ici
+  n'apparaît **que** sur le deal, jamais dans l'onglet Documents de la
+  société. On dépose un fichier (**20 Mo maximum**) en lui donnant un titre,
+  un type et, si utile, la **date du document** (signature par exemple) —
+  cette date est facultative. Chaque ligne se **télécharge** ou se
+  **supprime** (avec confirmation), et affiche l'état de sa **lecture**
+  automatique — même colonne et mêmes règles que côté société, détaillées
+  dans [Participations](04-participations.md).
 - **Notes** : texte libre.
 
 ## Gérer une sortie
@@ -82,8 +99,8 @@ peut l'annuler et le deal redevient actif.
 
 Une fois sorti, la **couleur du statut** dit comment ça s'est passé, déduite du
 multiple réalisé (MOIC, calculé depuis les transactions pointées) : **vert**
-au-dessus de 1 (exit gagnant), **rouge** en dessous (exit perdant) — une perte
-actée (« Déprécié ») est toujours rouge. Pour une **sortie partielle**, le deal
+au-dessus de 1 (« Exit win »), **rouge** en dessous (« Exit loss ») — une perte
+actée est toujours un « Exit loss » rouge. Pour une **sortie partielle**, le deal
 reste actif (on détient encore une partie) : seul un gain déjà réalisé est
 signalé (statut « Exit partiel » en **vert** quand le reçu dépasse déjà le
 capital déployé), jamais en rouge, puisque la position n'est pas soldée.
@@ -92,6 +109,8 @@ capital déployé), jamais en rouge, puisque la position n'est pas soldée.
 
 - **Supprimer un deal est refusé** tant que des transactions lui sont
   rattachées — il faut les détacher d'abord (aucune transaction orpheline).
+- **Supprimer un deal supprime aussi ses documents**, fichiers compris.
+  Ils n'existent nulle part ailleurs : à récupérer avant, si besoin.
 - Les métriques affichées (Versé, Reçu, MOIC, TRI) sont **toujours
   recalculées** depuis les transactions pointées — le pointage est donc la
   condition pour que les chiffres soient justes. Voir

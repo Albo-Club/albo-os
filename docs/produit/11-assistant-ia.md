@@ -51,6 +51,11 @@ Une cinquantaine d'outils, par domaine :
   comptes courants.
 - **Prévisionnel** : règles, échéances, solde projeté, réalisation d'une
   échéance, écritures ponctuelles.
+- **Contenu des documents et reports** : recherche par le sens (pas par
+  mots-clés) dans tous les documents de l'organisation (pactes, term
+  sheets, BP, reportings…) et dans les reports reçus par email — « que dit
+  le pacte de X sur la liquidité ? », « quelles boîtes ont parlé de
+  recrutement ? ». L'assistant cite les documents sources dans sa réponse.
 
 ## Les approbations : Confirmer / Refuser
 

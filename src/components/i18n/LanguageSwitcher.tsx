@@ -7,7 +7,6 @@ import { api } from '../../../convex/_generated/api'
 import type {Locale} from '~/lib/locale';
 import { LOCALES,  writeLocaleCookie } from '~/lib/locale'
 import { Button } from '~/components/ui/button'
-import { SidebarMenuButton } from '~/components/ui/sidebar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,11 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
 
-export function LanguageSwitcher({
-  variant = 'default',
-}: {
-  variant?: 'default' | 'sidebar'
-}) {
+export function LanguageSwitcher() {
   const { t, i18n } = useTranslation('common')
   const { isAuthenticated } = useConvexAuth()
   const setPreferredLanguage = useConvexMutation(api.users.setPreferredLanguage)
@@ -37,20 +32,10 @@ export function LanguageSwitcher({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        {variant === 'sidebar' ? (
-          <SidebarMenuButton tooltip={t('language.label')}>
-            <Languages />
-            <span>{t('language.label')}</span>
-            <span className="text-muted-foreground ml-auto text-xs uppercase">
-              {current}
-            </span>
-          </SidebarMenuButton>
-        ) : (
-          <Button variant="ghost" size="sm" className="gap-1.5">
-            <Languages className="size-4" />
-            <span className="uppercase">{current}</span>
-          </Button>
-        )}
+        <Button variant="ghost" size="sm" className="gap-1.5">
+          <Languages className="size-4" />
+          <span className="uppercase">{current}</span>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-36">
         {LOCALES.map((locale) => (

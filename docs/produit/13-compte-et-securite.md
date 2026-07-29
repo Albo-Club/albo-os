@@ -37,8 +37,9 @@ Trois onglets :
 
 ## Langue et thème
 
-Le choix de langue (**français / anglais**) et de thème (clair/sombre) se
-fait dans la barre latérale. La langue choisie est mémorisée et sert aussi
+Le choix de langue (**français / anglais**) et du thème de couleur se fait
+dans **Mon compte → Profil → Apparence** ; le mode clair/sombre reste sur
+l'icône du bandeau du haut. La langue choisie est mémorisée et sert aussi
 pour les emails transactionnels (invitations, vérifications).
 
 ## Points d'attention

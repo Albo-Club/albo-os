@@ -3,6 +3,103 @@
 Pinned versions, workarounds, and rough edges. Update this file as upstream
 fixes land so renovate (which respects `pnpm.overrides`) can be unblocked.
 
+## Panneau latéral figé : `position: sticky` + `bottom` ne marche PAS
+
+**Le piège** : pour un panneau plus haut que l'écran qu'on veut voir défiler
+puis se figer une fois arrivé en bas, le réflexe est `position: sticky` +
+`bottom: 0`. **Ça ne fige rien** — le panneau sort de l'écran par le haut
+comme s'il n'y avait pas de sticky du tout.
+
+Vérifié au navigateur (Chromium, scrollport de 700 px, panneau de 1100 px) :
+
+| Offset | Comportement |
+| --- | --- |
+| `bottom: 24px` seul | aucun figement, le panneau part par le haut |
+| `top: 24px` seul | figé en haut — le bas du panneau reste **inatteignable** |
+| `top` **et** `bottom` | identique à `top` seul (la contrainte haute gagne) |
+
+**Pourquoi** : un offset `bottom` ne retient pas une boîte qui remonte, il
+*tire vers le haut* une boîte dont la position naturelle est sous la ligne de
+flottaison (cas du pied de page collant). Il n'a donc aucun effet sur un
+panneau qui commence en haut de page.
+
+**La solution** : un `top` **négatif** égal au débordement du panneau,
+c'est-à-dire `-(hauteurPanneau - hauteurScrollport) - gap`. Le panneau défile
+avec la page jusqu'à ce que son bas arrive à `gap` px du bas du scrollport,
+puis se fige. Comme la valeur dépend de la hauteur rendue, elle se calcule en
+JS : `src/hooks/useStickyBottom.ts` (ResizeObserver sur le panneau **et** sur
+le scrollport). Quand le panneau tient dans l'écran, le hook retombe sur un
+`top` positif — sinon il serait figé trop bas, avec un blanc au-dessus.
+
+**Deuxième piège, spécifique à l'app** : le scroll n'est pas celui de la
+fenêtre. Le shell est `h-svh overflow-hidden` et le défilement vit dans
+`<div class="min-h-0 flex-1 overflow-y-auto">` (`src/routes/app/$orgSlug/route.tsx`).
+Tout calcul basé sur `window.innerHeight` ou `100vh` est donc faux — d'où la
+remontée d'ancêtres `scrollParent()` dans le hook plutôt qu'une constante.
+
+Enfin, le parent flex doit rester en `items-start` : en `stretch` (défaut), le
+panneau est étiré à la hauteur de la colonne principale et il n'a plus aucune
+marge pour coller.
+
+## Texte extrait d'un document : pourquoi une table à part, clé sur le blob
+
+### Le piège
+
+Le réflexe est de coller le texte OCRisé dans un champ `documents.extractedText`
+(le champ existait d'ailleurs, déclaré et jamais écrit). Deux raisons de ne
+pas le faire, et la seconde est la vraie :
+
+1. **La ligne Convex est plafonnée à 1 Mo**, tous champs confondus (cf.
+   `convex/_generated/ai/guidelines.md`). Un pacte de 350 pages en français
+   (~900 000 caractères, ~1,05 octet/caractère en UTF-8) sature la ligne à
+   lui seul.
+2. **Convex lit toujours la ligne entière.** `documents:listByCompany` charge
+   jusqu'à 200 lignes à chaque ouverture de l'onglet Documents. Avec le texte
+   sur la ligne, c'est des dizaines de Mo relus à chaque affichage, pour
+   afficher un titre et une taille.
+
+### Le pattern retenu
+
+Table `documentTexts`, **une ligne par blob de storage** (`storageId`), pas
+par document :
+
+- la liste ne lit que l'état (`ocrState` / `ocrDetail` / `ocrChars`, petits
+  champs restés sur `documents`), le texte n'est lu que par
+  `documents:getExtractedText` quand l'utilisateur l'ouvre ;
+- le **fan-out multi-org** du pipeline report crée N lignes `documents`
+  autour d'**un seul** blob : la clé sur `storageId` fait que l'extraction
+  est partagée, écrite une fois, jamais recalculée par entité ;
+- corollaire utile : `documentsExtract:run` commence par regarder si le blob
+  a déjà un texte. C'est ce qui évite de **payer Mistral deux fois** pour une
+  pièce jointe déjà lue par `reportExtract` (brique 4).
+
+Donc : un nouveau chemin d'ingestion de fichiers doit écrire son texte via
+`documentsExtract:saveStorageText` (clé blob) et poser l'état sur sa ligne
+`documents` — jamais l'inverse.
+
+### Le champ legacy `documents.extractedText`
+
+Le champ existe encore au schéma. Il est écrit par **rien** dans ce repo et lu
+par **rien** — mais des lignes de prod le portent (le texte y a été mis
+hors du repo, avant `documentTexts`). Le retirer **casse `convex deploy`** :
+la validation de schéma refuse les lignes existantes (« Object contains extra
+field `extractedText` that is not in the validator »), et le build Vercel de
+prod échoue après le push des fonctions. Vérifié à la dure sur la PR #307.
+
+Un `grep` du code ne suffit donc pas à conclure qu'un champ est mort : il dit
+qu'aucun code **actuel** ne l'écrit, pas qu'aucune **donnée** ne le porte.
+Avant de retirer un champ, regarder la prod. Le chantier de retrait
+(reprise du texte puis purge) est dans `MIGRATIONS.md`.
+
+### Le corollaire qui mord
+
+`documents:remove` supprime le blob **et** sa ligne `documentTexts`. Sur un
+document issu du fan-out, ça vaut aussi pour les lignes sœurs des autres
+entités, qui perdent le fichier — comportement **préexistant** (la
+suppression du blob était déjà inconditionnelle), simplement étendu au
+texte pour rester cohérent. À traiter le jour où le fan-out multi-org
+devient courant.
+
 ## Account linking & verified email (anti-doublon)
 
 ### What went wrong (the trap)
@@ -793,6 +890,29 @@ pièges en cascade :
 Implémentation de référence : `stickyHeadClass` / `stickyCellClass` dans
 `src/components/participations/ParticipationsTable.tsx`. À réutiliser tel quel
 pour figer une colonne d'une autre table (vue Deals…).
+
+**Figer plusieurs colonnes** (Société + Score IA sur la liste Entreprises) :
+`left-0` ne marche que pour la première — les suivantes ont besoin de leur
+**décalage `left` explicite**, égal à la somme des largeurs des colonnes
+figées à leur gauche (`frozenCompany` / `frozenScore` dans le même fichier).
+Deux conséquences :
+
+- La colonne **flexible** (celle sans largeur, qui absorbe la place restante)
+  doit être la première : au moment où le scroll horizontal se déclenche, la
+  table est pile à son `min-width`, donc cette colonne est pile à son minimum
+  — c'est ce qui rend l'offset des suivantes constant et calculable. Au-delà
+  de cette largeur rien ne défile, donc les offsets ne jouent jamais.
+- Les colonnes figées doivent être **contiguës et en tête** de la table : une
+  colonne intercalée qu'on ne veut pas figer doit être déplacée à droite (la
+  colonne Org de la vue agrégée est passée après Score IA pour cette raison).
+
+**En-tête / pied figés au scroll vertical** (même table) : `sticky` sur
+`<thead>`/`<tfoot>` est peu fiable (Safari) — poser le sticky **cellule par
+cellule** (`sticky top-0` sur chaque `th`, `sticky bottom-0` sur chaque
+cellule du pied de totaux) et **borner la hauteur du conteneur** de
+`ui/table.tsx` (`[&>div]:max-h-[70vh]`) pour créer le contexte de scroll.
+La cellule de coin (colonne figée × en-tête figé) cumule les deux axes et
+prend un `z-30`.
 
 ## Vercel framework preset traps TanStack Start
 
@@ -2786,100 +2906,75 @@ Pièges si on retouche cette zone :
   guards — le préchargement ne fait qu'accélérer `useConvexAuth()`, il ne
   court-circuite pas la logique anti-flash.
 
-## Connecteur Gmail — timeline emails du portfolio (`convex/gmail.ts`)
+## Tables Gmail inertes (`gmailAccounts`, `gmailOAuthStates`, `companyEmails`, `companyEmailLinks`)
 
-OAuth Google **direct** (pas d'agrégateur), architecture reprise du module
-messaging de Twenty CRM (`twentyhq/twenty`, `modules/messaging`) : curseur
-incrémental `historyId` par boîte, cron de polling 10 min, dédup par
-`Message-ID`, matching en cascade (règles déterministes puis fallback LLM).
-Pièges à connaître :
+La feature « emails du portfolio » (connecteur Gmail OAuth, timeline
+d'emails par participation, page `/emails`) a été **entièrement retirée**
+(UI + backend `convex/gmail.ts`) — décision produit : à repenser à froid
+plutôt que de laisser traîner une version non satisfaisante. Le code reste
+dans l'historique git si besoin de s'en inspirer.
 
-- **Client OAuth dédié, séparé du sign-in.** Le scope `gmail.readonly` est
-  un scope *restreint* Google : le porter sur le client de sign-in
-  (`GOOGLE_CLIENT_ID`) soumettrait TOUTE l'app au processus de validation.
-  D'où `GOOGLE_OAUTH_CLIENT_ID`/`GOOGLE_OAUTH_CLIENT_SECRET` — un client
-  OAuth distinct dans le même projet GCP, redirect URI
-  `${CONVEX_SITE_URL}/gmail/oauth/callback`.
-- **App « External / Testing » depuis le 22/07/2026** (bascule depuis
-  « Internal », qui bloquait les @gmail.com perso avec « Erreur 403 :
-  org_internal ») : deux conséquences à connaître.
-  (1) **Liste d'utilisateurs test obligatoire** : toute adresse — alboteam
-  comprise — doit être déclarée dans Google Auth Platform → Audience →
-  Test users AVANT de pouvoir se connecter, sinon « Accès bloqué ».
-  Ajouter une boîte = console Google d'abord, Albo OS ensuite (documenté
-  dans `docs/produit/18-emails-portfolio.md`).
-  (2) **Refresh tokens expirés tous les 7 jours pour TOUS les comptes** →
-  `invalid_grant` au refresh → statut `reauth_required`, pastille « À
-  reconnecter », reconnexion en 2 clics (curseur de sync conservé ;
-  au-delà d'~1 semaine sans reconnexion, Gmail ne garde plus l'historique
-  → trou jusqu'au backfill). Lever ces deux limites = validation Google
-  (scope restreint → brand verification + audit CASA payant, annuel,
-  plusieurs semaines). « En production » sans validation est BLOQUÉ par
-  Google pour un scope restreint — ce n'est pas un raccourci possible.
-- **Curseur `historyId` périmé** : Gmail ne garde l'historique qu'environ
-  une semaine. `history.list` → 404 → on ré-ancre le curseur au présent
-  (`lastError: history_cursor_expired`) et **le trou n'est pas comblé** —
-  c'est le rôle du backfill d'historique (étape à venir, pas encore livré).
-- **Stockage complet depuis le 21/07/2026 au soir** : `bodyText` = texte
-  nettoyé borné à 50 k caractères avec les URLs des `<a href>` préservées
-  (« libellé (url) » — nécessaire aux liens DocSend/Notion pour l'étape 2),
-  et les **pièces jointes sont téléchargées dans le storage Convex**
-  (`companyEmails.attachments`, ≤ 20 Mo chacune, cap 10/message, images
-  inline < 100 Ko ignorées comme signatures). Le téléchargement n'a lieu
-  qu'après un `matchProbe` read-only positif — un mail non matché ne
-  déclenche ni écriture ni download. `gmailMessageId` + boîte source sont
-  conservés comme filet de re-fetch. L'extraction de reports (OCR,
-  métriques) reste à brancher (étape 2) ; le forward AgentMail
-  (`docs/produit/17-reports-par-email.md`) reste le canal d'analyse.
-- **Matching en cascade, RESTREINT à l'org de la boîte** : les
-  boîtes sont org-scopées depuis le 21/07/2026 au soir (une connexion
-  faite depuis Albo n'alimente qu'Albo ; même boîte dans 2 orgs = 2 lignes
-  `gmailAccounts`, upsert par (org, email)). Cascade (lignée Albo App,
-  `findMatches` partagé probe/store, méthode tracée sur
-  `companyEmailLinks.matchMethod`) : (1) domaines des participants
-  From/To/Cc == `companies.domain` (kind `portfolio`, non archivée) de
-  **l'org de la boîte** uniquement ; (2) domaines des adresses citées dans
-  le corps (blocs de transfert, signatures) ; (3) nom de la société en
-  mot entier dans objet+corps (emails/URLs strippés, ≥ 3 caractères,
-  blocklist plateformes — helpers partagés avec `reportIdentify` dans
-  `convex/lib/emailIdentify.ts`) ; (4) fallback LLM (`identifyByLlm`,
-  même `getModel()` que le reste) pour les mails non matchés par les
-  règles : rattachement direct/indirect, **confiance high uniquement**,
-  ids hallucinés filtrés, picks re-validés dans la mutation →
-  `matchMethod: llm_direct|llm_indirect`, étincelle ✨ dans l'UI.
-  Freemail exclus, domaines des boîtes connectées de l'org exclus. Les
-  contacts n'ont **pas** d'email en base (`companies.people` : décision
-  « reachable via Attio ») → pas de matching par adresse individuelle.
-- **Échec du fallback LLM = mail perdu pour la timeline** : le curseur
-  `historyId` consomme le message même si l'appel LLM échoue (erreur
-  modèle, JSON imparsable) — il n'y a pas de retry, le mail est loggé
-  (`[gmail] LLM identification failed`) et sauté. Enjeu timeline
-  uniquement (aucune action automatique) ; le backfill d'historique à
-  venir rattrapera ces cas. Un mail interne (100 % domaines des boîtes)
-  n'est plus ignoré d'office : il peut matcher via le corps (transfert
-  interne d'un report) — c'est voulu.
-- **Ligne legacy pré-séparation** : le modèle initial (boîtes globales) a
-  brièvement vécu en prod avec une boîte connectée, zéro donnée.
-  `gmailAccounts.orgId`/`gmailOAuthStates.orgId` sont donc **optional au
-  schéma** ; toute ligne sans `orgId` est purgée automatiquement par le
-  cron `syncAll` (et un state sans org est traité comme expiré). À
-  resserrer en required une fois la prod propre (widen-migrate-narrow).
-- **Pont vers le pipeline reports (`processAsReport`)** : une ligne
-  `inboundEmails` à provenance synthétique (`agentmailInboxId: 'gmail'`,
-  `agentmailMessageId: 'gmail:<companyEmailId>'`) — l'index
-  `by_message_id` sert de garde une-extraction-par-email, la brique 3
-  (identification LLM) est sautée (`matchedCompanies` = les liens du
-  mail), et `reportExtract.run` lit toute pièce jointe portant un
-  `storageId` depuis le storage Convex (jamais d'appel AgentMail pour ces
-  lignes). Ne JAMAIS déclencher automatiquement : règle produit =
-  extraction sur clic uniquement.
-- **Message dédupliqué sans `orgId`, lien org-scopé** : le message reste
-  dédupliqué par `Message-ID` toutes boîtes confondues (une seule copie
-  des PJ) ; l'appartenance à une org vit sur `companyEmailLinks`, créés
-  uniquement par le matching org-scopé. Les gardes d'accès passent par
-  l'org de la company (`listByCompany`) ou l'intersection des memberships
-  (`getById`) — un membre d'une seule org ne voit jamais les liens de
-  l'autre.
+- Les 4 tables ci-dessus restent **déclarées mais inertes** au schéma
+  (même stance que la table legacy `forecasts`) : aucune purge de la
+  donnée prod n'a été faite. Les retirer = purger d'abord, puis resserrer
+  (widen-migrate-narrow).
+- Le pipeline **reports** (AgentMail → `inboundEmails`) est indépendant et
+  reste actif : seules les lignes `inboundEmails` historiques à provenance
+  synthétique `gmail:<id>` (ancien pont « Extraire le report ») lisent
+  encore leurs PJ depuis le storage Convex via `storageId` — chemin
+  conservé dans `reportExtract.run`.
+- Les emails transactionnels (magic link, invitations, alertes) n'ont
+  jamais fait partie de la feature et sont intacts.
+
+## Vectorisation documents & reports — RAG par org (`convex/vectorize.ts`)
+
+Recherche sémantique sur le contenu des documents et des reports via le
+composant `@convex-dev/rag`, exposée à l'assistant par l'outil
+`searchDocuments` (`convex/agentToolsDocuments.ts` → `vectorize:searchInternal`).
+Embeddings `qwen/qwen3-embedding-8b` via OpenRouter (même clé/facturation que
+le chat), dimension 4096 — **le max du vector index Convex**, ne pas prendre
+un modèle au-dessus. Routage **épinglé sur le provider `nebius`** (Nebius
+Token Factory, NL) avec `allow_fallbacks: false` — décision souveraineté : le
+texte des documents ne doit transiter que par cet hébergeur UE. Conséquence
+assumée : une panne Nebius fait échouer l'indexation (schedulée → relançable)
+et la recherche, au lieu de basculer vers un host US ; ne ré-élargir le
+routage qu'en connaissance de cause.
+
+- **Un namespace RAG = une org** (`namespace = orgId`) : l'isolation
+  multi-tenant est structurelle côté index, mais le namespace **isole sans
+  autoriser** — toute surface de recherche re-vérifie l'appartenance
+  (`assertMemberInternal`) avant `rag.search`, même discipline que les
+  autres outils d'agent.
+- **Ce qui est indexé** (du texte, jamais les octets du fichier) : les
+  `documents` en `source: 'upload'` via le texte de leur blob dans
+  `documentTexts`, et les `companyReports` via leur `rawContent`.
+  **Aucune extraction ici** : elle appartient à `documentsExtract.ts`, qui
+  schedule `vectorize:indexDocument` en fin de run (les deux chemins :
+  adoption d'un texte existant et extraction fraîche) — donc une
+  re-extraction (`documents:reextract`) ré-indexe d'office. Les `documents`
+  issus d'email ne sont **pas** indexés individuellement : leur texte est
+  déjà dans l'entrée du report (l'indexer aussi créerait des doublons de
+  résultats).
+- **Clés d'entrée** `doc:<documentId>` / `report:<reportId>` : ré-ajouter la
+  même clé **remplace** l'entrée (ingestion idempotente, backfill re-runnable,
+  re-import d'une période de report aligné sur la dedup de `storeForCompany`).
+  Suppression d'un document → `removeEntry` schedulé (no-op si jamais
+  indexé), depuis `documents:remove` **et** le cascade de `deals:remove` —
+  tout nouveau chemin de suppression de `documents` doit faire pareil.
+- **Changer de modèle d'embedding est une bascule atomique** : un namespace
+  RAG est identifié par (namespace, modelId, dimension, filterNames). Changer
+  `EMBEDDING_MODEL`/`EMBEDDING_DIMENSION` fait pointer recherche ET ingestion
+  vers un namespace **neuf et vide** — la recherche ne tombe jamais sur des
+  vecteurs de l'ancien modèle (incompatibles par construction), mais elle ne
+  voit **plus rien** tant que `vectorize:backfillAll` n'a pas re-vectorisé le
+  corpus. Séquence : changer la constante → deploy → backfill immédiat.
+  Le modèle est épinglé (pas d'alias `latest`) pour qu'aucune release
+  upstream ne déclenche cette bascule silencieusement.
+- Le cron/les webhooks n'interviennent pas : l'ingestion au fil de l'eau est
+  schedulée en fin d'extraction (`documentsExtract.run`) et de pipeline
+  report (`reportStore:storeForCompany`), jamais bloquante pour l'upload ni
+  le pipeline. Le backfill envoie d'abord à l'extraction les documents
+  uploadés **jamais lus** (sans `ocrState`) — l'indexation suit toute seule.
 
 ## `companyReports.metrics` — des nombres nus, unité stockée ailleurs
 
@@ -2906,3 +3001,21 @@ Corollaire : `metrics` ne contient **que** des clés du catalogue. Tout ce
 que le LLM d'extraction a vu sans savoir le rattacher reste dans
 `rawMetrics` (snapshot d'audit, non servi aux outils). Une métrique absente
 n'est pas un zéro.
+
+## Outils reports vs `searchDocuments` — deux portes, deux usages
+
+Depuis la vectorisation (§ ci-dessus), deux familles d'outils lisent la
+matière des reportings, et le modèle doit choisir la bonne :
+
+- `listCompanyReports` / `getCompanyReport` (`convex/agentToolsReports.ts`)
+  servent le **structuré** d'un report identifié : headline, points clés,
+  métriques canoniques avec leur unité. Déterministe, scopé à une société,
+  c'est la source pour un chiffre ou un résumé de période.
+- `searchDocuments` (`convex/agentToolsDocuments.ts`) sert des **extraits
+  par le sens** sur tout le corpus de l'org. C'est la source pour « qu'est-ce
+  qui est dit sur X », jamais pour un chiffre exact.
+
+`getCompanyReport` ne renvoie **volontairement pas** `rawContent`
+(jusqu'à 150k caractères) : le texte intégral est déjà indexé et se lit par
+`searchDocuments`. Ne pas rajouter ce champ « pour dépanner » — ce serait
+dupliquer le corpus dans la fenêtre de contexte.

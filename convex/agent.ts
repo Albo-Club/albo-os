@@ -3,6 +3,7 @@ import { Agent, stepCountIs } from '@convex-dev/agent'
 
 import { components } from './_generated/api'
 import { dealTools } from './agentTools'
+import { documentTools } from './agentToolsDocuments'
 import { forecastTools } from './agentToolsForecasts'
 import { liabilityTools } from './agentToolsLiabilities'
 import { pointageTools } from './agentToolsPointage'
@@ -39,6 +40,7 @@ export const chatAgent = new Agent(components.agent, {
     ...valuationTools,
     ...projectionTools,
     ...reportTools,
+    ...documentTools,
   },
   // Transaction-matching (pointage) flows are multi-step (list → suggest →
   // confirm → match): 12 steps instead of 8.

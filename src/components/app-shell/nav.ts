@@ -1,12 +1,10 @@
 import {
+  Building2,
   Handshake,
   Inbox,
   Landmark,
-  LayoutDashboard,
   ListTodo,
-  Mail,
   Megaphone,
-  PieChart,
   Scale,
   Settings,
   Wallet,
@@ -14,7 +12,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 
 export type NavLeaf = {
-  /** i18n key under the `nav` namespace, e.g. `items.dashboard`. */
+  /** i18n key under the `nav` namespace, e.g. `items.participations`. */
   titleKey: string
   to: string
   icon?: LucideIcon
@@ -38,11 +36,6 @@ export function getNavGroups(): Array<NavGroup> {
       labelKey: 'groups.platform',
       items: [
         {
-          titleKey: 'items.dashboard',
-          to: '/app/$orgSlug',
-          icon: LayoutDashboard,
-        },
-        {
           titleKey: 'items.todo',
           to: '/app/$orgSlug/todo',
           icon: ListTodo,
@@ -50,17 +43,7 @@ export function getNavGroups(): Array<NavGroup> {
         {
           titleKey: 'items.participations',
           to: '/app/$orgSlug/participations',
-          icon: PieChart,
-        },
-        {
-          titleKey: 'items.deals',
-          to: '/app/$orgSlug/deals',
-          icon: Handshake,
-        },
-        {
-          titleKey: 'items.emails',
-          to: '/app/$orgSlug/emails',
-          icon: Mail,
+          icon: Building2,
         },
         {
           titleKey: 'items.cash',
@@ -107,7 +90,7 @@ export function getAllNavGroups(): Array<NavGroup> {
         {
           titleKey: 'items.participations',
           to: '/app/all/participations',
-          icon: PieChart,
+          icon: Building2,
         },
         {
           titleKey: 'items.deals',

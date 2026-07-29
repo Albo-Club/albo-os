@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import {
-  ArrowRight,
   Check,
   ChevronsUpDown,
   Info,
@@ -24,7 +23,7 @@ import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { directionBadgeClass, directionTone } from '~/lib/moneyTone'
 import { dealMoic } from '~/lib/dealMetrics'
-import { dealStatusBadge } from '~/lib/dealStatusBadge'
+import { dealStatusBadge, dealStatusLabelKey } from '~/lib/dealStatusBadge'
 import {
   dealAmountTiles,
   useDealTitle,
@@ -37,6 +36,7 @@ import {
 } from '~/components/data-table/LocalPagination'
 import { ExitDealDialog } from '~/components/deals/ExitDealDialog'
 import { DealForecastSection } from '~/components/deals/DealForecastSection'
+import { DealDocumentsSection } from '~/components/deals/DealDocumentsSection'
 import { FundSection } from '~/components/deals/FundSection'
 import {
   FIELD_FORMAT,
@@ -46,7 +46,6 @@ import { DealFieldInput } from '~/components/deals/DealFieldInput'
 import { PlanVsActualSection } from '~/components/deals/PlanVsActualSection'
 import { parseField, rawToInput } from '~/lib/parse'
 import { cn } from '~/lib/utils'
-import { CompanyLogo } from '~/components/CompanyLogo'
 import { DealCombobox } from '~/components/pointage/DealCombobox'
 import {
   TransactionSheet,
@@ -54,7 +53,6 @@ import {
 } from '~/components/pointage/TransactionSheet'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
-import { Card, CardContent } from '~/components/ui/card'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -758,9 +756,10 @@ function DealDetail() {
     committedAmount: deal.committedAmount,
     paidActual,
   })
-  // Single status badge: colour = the exit outcome (green win / red loss /
-  // neutral), derived from the deal's realized cash flows.
-  const statusBadge = dealStatusBadge(deal.status, dealMoic(deal, txs).moic)
+  // Single status badge: colour AND label ("Exit win" / "Exit loss") = the
+  // exit outcome, derived from the deal's realized cash flows.
+  const statusMoic = dealMoic(deal, txs).moic
+  const statusBadge = dealStatusBadge(deal.status, statusMoic)
 
   return (
     <main className="flex-1 space-y-6 p-6">
@@ -786,7 +785,9 @@ function DealDetail() {
           variant={statusBadge.variant}
           className={cn('ms-1.5', statusBadge.className)}
         >
-          {t(`status.${deal.status}`, { defaultValue: deal.status })}
+          {t(`status.${dealStatusLabelKey(deal.status, statusMoic)}`, {
+            defaultValue: deal.status,
+          })}
         </Badge>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -883,81 +884,9 @@ function DealDetail() {
 
       <Transactions deal={deal} />
 
-      {/* Linked entity: card to the target company sheet. */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold tracking-tight">
-          {t('fiche.entity.title')}
-        </h2>
-        <Card>
-          {deal.target ? (
-            <Link
-              to="/app/$orgSlug/participations/$companyId"
-              params={{ orgSlug, companyId: deal.target._id }}
-              className="group block"
-              aria-label={deal.target.name}
-            >
-              <CardContent className="flex items-center gap-4">
-                <CompanyLogo
-                  domain={deal.target.domain}
-                  companyName={deal.target.name}
-                  size="lg"
-                />
-                <div className="flex-1 space-y-1">
-                  <span className="font-medium underline-offset-4 group-hover:underline">
-                    {deal.target.name}
-                  </span>
-                  <div className="text-muted-foreground text-xs">
-                    {t('deal.investor')}: {deal.investor?.name ?? '—'}
-                    {deal.spv ? (
-                      <>
-                        {' '}
-                        · {t('deal.viaSpv')} {deal.spv.name}
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-                <ArrowRight className="text-muted-foreground group-hover:text-foreground size-4" />
-              </CardContent>
-            </Link>
-          ) : (
-            <CardContent className="flex items-center gap-4">
-              <CompanyLogo size="lg" />
-              <div className="flex-1 space-y-1">
-                <span className="text-muted-foreground text-sm">—</span>
-                <div className="text-muted-foreground text-xs">
-                  {t('deal.investor')}: {deal.investor?.name ?? '—'}
-                  {deal.spv ? (
-                    <>
-                      {' '}
-                      · {t('deal.viaSpv')} {deal.spv.name}
-                    </>
-                  ) : null}
-                </div>
-              </div>
-            </CardContent>
-          )}
-        </Card>
-      </section>
-
-      {/* Reporting / KPIs — reserved (deal-scoped reporting lands later). */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold tracking-tight">
-          {t('fiche.reporting.title')}
-        </h2>
-        <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-          {t('fiche.reporting.body')}
-        </div>
-      </section>
-
-      {/* Documents — reserved (deal-scoped documents land later). */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold tracking-tight">
-          {t('fiche.documents.title')}
-        </h2>
-        <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-          {t('fiche.documents.body')}
-        </div>
-      </section>
+      {/* Documents filed on this deal only (term sheet, pacte…) — the
+          company's own documents live on its fiche. */}
+      <DealDocumentsSection dealId={deal._id} companyId={deal.target?._id} />
 
       {editOpen && (
         <EditDealDialog deal={deal} onClose={() => setEditOpen(false)} />

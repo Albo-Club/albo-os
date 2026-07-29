@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AlignLeft,
   Archive,
+  Handshake,
+  IdCard,
   Link2,
   Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
   Trash2,
+  User,
+  Users,
 } from 'lucide-react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
@@ -28,18 +33,17 @@ import type { PersonRole } from '../../../../convex/lib/people'
 import { attioPersonUrl } from '~/lib/attio'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
-import { DealsList } from '~/components/participations/ParticipationsTable'
+import { formatSiren } from '~/lib/siren'
 import { CompanyLogo } from '~/components/CompanyLogo'
+import { CompanyDealsTable } from '~/components/companies/CompanyDealsTable'
 import { SectorCombobox } from '~/components/companies/SectorCombobox'
 import {
   AttioCompanyLink,
-  EntityNatureBadge,
   IdentityField,
   IdentitySection,
   PeopleList,
 } from '~/components/companies/EntityFiche'
 import { ReportingsSection } from '~/components/companies/ReportingsSection'
-import { CompanyEmailsSection } from '~/components/companies/CompanyEmailsSection'
 import { CompanyReportsSection } from '~/components/companies/CompanyReportsSection'
 import { VascoCommunicationsSection } from '~/components/vasco/VascoCommunicationsSection'
 import { CompanyAiSynthesisBlock } from '~/components/companies/CompanyAiSynthesisBlock'
@@ -83,6 +87,7 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
+import { useStickyBottom } from '~/hooks/useStickyBottom'
 
 export const Route = createFileRoute('/app/$orgSlug/participations/$companyId')({
   component: ParticipationDetail,
@@ -769,6 +774,8 @@ function ParticipationDetail() {
   const [archiving, setArchiving] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // Identity panel: scrolls with the page, then freezes once its bottom shows.
+  const { ref: asideRef, top: asideTop } = useStickyBottom()
   const archiveCompany = useConvexMutation(api.companies.archive)
   const removeCompany = useConvexMutation(api.companies.remove)
   const updateCompany = useConvexMutation(api.companies.update)
@@ -917,7 +924,6 @@ function ParticipationDetail() {
         <h1 className="text-2xl font-semibold tracking-tight">
           {company ? company.name : t('loading')}
         </h1>
-        {company && <EntityNatureBadge nature="company" className="ms-1.5" />}
         {ownership && (
           <span className="text-muted-foreground text-sm">
             {t('info.ownership')} {ownership}
@@ -974,141 +980,178 @@ function ParticipationDetail() {
         )}
       </div>
 
-      {/* Optional 2-3 line summary — full-width bordered card under the header,
-          styled like the Identity block below (rounded-lg border p-4) so the
-          description reads as a deliberate block filling the page width rather
-          than a narrow column of text hugging the left. */}
-      {company?.summary && (
-        <p className="text-muted-foreground whitespace-pre-line rounded-lg border p-4 text-sm">
-          {company.summary}
-        </p>
-      )}
+      {/* Two-column layout under the header: the main column (health synthesis
+          → deals → reporting tabs) plus the identity side panel on the right.
+          Below lg the panel stacks AFTER the main content. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="min-w-0 flex-1 space-y-6">
+          {/* Company health synthesis first — the "santé de la boîte" is the
+              first thing to see on the page. */}
+          {company && <CompanyAiSynthesisBlock companyId={company._id} />}
 
-      {/* Identity block — nature "company". Sector / SIREN / domain edit
-          inline (click the value); ownership, share count and the Attio link
-          are computed/derived and stay read-only. */}
-      <IdentitySection title={t('identity.title')}>
-        <div className="grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-4">
-          <InlineField
-            label={t('info.sector')}
-            format="text"
-            rawValue={company?.sector}
-            display={
-              company?.sector
-                ? t(`sectors.${company.sector}`, {
-                    defaultValue: company.sector,
-                  })
-                : ''
-            }
-            ariaLabel={t('edit.inlineLabel', { field: t('info.sector') })}
-            disabled={!company}
-            renderEditor={({ done }) =>
-              company ? (
-                <SectorCombobox
-                  value={company.sector ?? ''}
-                  defaultOpen
-                  onOpenChange={(o) => !o && done()}
-                  onChange={(v) => void saveCompany({ sector: v })}
-                  extraSectors={company.sector ? [company.sector] : []}
-                />
-              ) : null
-            }
-          />
-          <InlineField
-            label={t('info.siren')}
-            format="text"
-            rawValue={company?.siren}
-            display={company?.siren ?? ''}
-            ariaLabel={t('edit.inlineLabel', { field: t('info.siren') })}
-            disabled={!company}
-            onCommit={(v) => saveCompany({ siren: String(v) })}
-            onClear={() => saveCompany({ siren: '' })}
-          />
-          <InlineField
-            label={t('info.domain')}
-            format="text"
-            rawValue={company?.domain}
-            display={company?.domain ?? ''}
-            ariaLabel={t('edit.inlineLabel', { field: t('info.domain') })}
-            disabled={!company}
-            onCommit={(v) => saveCompany({ domain: String(v) })}
-            onClear={() => saveCompany({ domain: '' })}
-          />
-          <IdentityField
-            label={t('info.ownershipGlobal')}
-            value={ownership}
-          />
-          <IdentityField
-            label={t('info.sharesConsolidated')}
-            value={sharesConsolidated}
-          />
-          <IdentityField
-            label={t('identity.attio')}
-            value={
-              <AttioCompanyLink attioCompanyId={company?.attioCompanyId} />
-            }
-          />
-        </div>
-      </IdentitySection>
-
-      {/* People — founders / board / co-investors, fed from company.people.
-          Empty sections render the discreet "to be filled in" state. */}
-      <div className="grid gap-6 sm:grid-cols-3">
-        <IdentitySection title={t('identity.founders')}>
-          <PeopleList people={peopleByRole.founder} />
-        </IdentitySection>
-        <IdentitySection title={t('identity.board')}>
-          <PeopleList people={peopleByRole.board} />
-        </IdentitySection>
-        <IdentitySection title={t('identity.coInvestors')}>
-          <PeopleList people={peopleByRole.coinvestor} />
-        </IdentitySection>
-      </div>
-
-      <IdentitySection title={t('col.deals')}>
-        {!deals ? (
-          <div className="text-muted-foreground text-sm">{t('loading')}</div>
-        ) : deals.length === 0 ? (
-          <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
-            {t('empty')}
-          </div>
-        ) : (
-          <div className="rounded-lg border">
-            <DealsList deals={deals} orgSlug={orgSlug} />
-          </div>
-        )}
-      </IdentitySection>
-
-      {/* Full-width AI synthesis block (company-level Cerveau 3), above the
-          reporting tabs and outside them. */}
-      {company && <CompanyAiSynthesisBlock companyId={company._id} />}
-
-      {/* Reporting zone: email-ingested report history + manual documents. */}
-      {company && (
-        <section>
-          <Tabs defaultValue="reports">
-            <TabsList variant="line">
-              <TabsTrigger value="reports">{t('tabs.reports')}</TabsTrigger>
-              <TabsTrigger value="emails">{t('tabs.emails')}</TabsTrigger>
-              <TabsTrigger value="documents">
-                {t('tabs.documents')}
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="reports" className="pt-4">
-              <div className="space-y-6">
-                <VascoCommunicationsSection company={company} />
-                <CompanyReportsSection companyId={company._id} />
+          <IdentitySection title={t('col.deals')}>
+            {!deals ? (
+              <div className="text-muted-foreground text-sm">
+                {t('loading')}
               </div>
-            </TabsContent>
-            <TabsContent value="emails" className="pt-4">
-              <CompanyEmailsSection companyId={company._id} />
-            </TabsContent>
-            <TabsContent value="documents" className="pt-4">
-              <ReportingsSection companyId={company._id} />
-            </TabsContent>
-          </Tabs>
-        </section>
-      )}
+            ) : deals.length === 0 ? (
+              <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
+                {t('empty')}
+              </div>
+            ) : (
+              <CompanyDealsTable deals={deals} orgSlug={orgSlug} />
+            )}
+          </IdentitySection>
+
+          {/* Reporting zone: email-ingested report history + manual documents. */}
+          {company && (
+            <section>
+              <Tabs defaultValue="reports">
+                <TabsList>
+                  <TabsTrigger value="reports">{t('tabs.reports')}</TabsTrigger>
+                  <TabsTrigger value="documents">
+                    {t('tabs.documents')}
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="reports" className="pt-4">
+                  <div className="space-y-6">
+                    <VascoCommunicationsSection company={company} />
+                    <CompanyReportsSection companyId={company._id} />
+                  </div>
+                </TabsContent>
+                <TabsContent value="documents" className="pt-4">
+                  <ReportingsSection companyId={company._id} />
+                </TabsContent>
+              </Tabs>
+            </section>
+          )}
+        </div>
+
+        {/* Identity side panel ("fiche d'identité"): identity fields, summary
+            and people, stacked in one calm card. Each section is introduced by
+            a small squared icon chip; the data itself carries no box — label
+            left, value right, hairline between rows.
+
+            From lg up the panel is sticky: it scrolls with the page until its
+            bottom edge is reached, then freezes while the main column keeps
+            scrolling (see useStickyBottom for why the offset is computed). */}
+        <aside
+          ref={asideRef}
+          style={{ top: asideTop }}
+          className="bg-card w-full shrink-0 space-y-5 rounded-xl border p-4 lg:sticky lg:w-80"
+        >
+          {/* Identity — sector / SIREN / domain edit inline (click the value);
+              ownership, share count and the Attio link are computed/derived
+              and stay read-only. */}
+          <IdentitySection
+            title={t('identity.title')}
+            icon={<IdCard className="size-3.5" />}
+          >
+            <div className="flex flex-col">
+              <InlineField
+                layout="row"
+                label={t('info.sector')}
+                format="text"
+                rawValue={company?.sector}
+                display={
+                  company?.sector
+                    ? t(`sectors.${company.sector}`, {
+                        defaultValue: company.sector,
+                      })
+                    : ''
+                }
+                ariaLabel={t('edit.inlineLabel', { field: t('info.sector') })}
+                disabled={!company}
+                renderEditor={({ done }) =>
+                  company ? (
+                    <SectorCombobox
+                      value={company.sector ?? ''}
+                      defaultOpen
+                      onOpenChange={(o) => !o && done()}
+                      onChange={(v) => void saveCompany({ sector: v })}
+                      extraSectors={company.sector ? [company.sector] : []}
+                    />
+                  ) : null
+                }
+              />
+              <InlineField
+                layout="row"
+                label={t('info.siren')}
+                format="text"
+                rawValue={company?.siren}
+                display={formatSiren(company?.siren)}
+                ariaLabel={t('edit.inlineLabel', { field: t('info.siren') })}
+                disabled={!company}
+                onCommit={(v) => saveCompany({ siren: String(v) })}
+                onClear={() => saveCompany({ siren: '' })}
+              />
+              <InlineField
+                layout="row"
+                label={t('info.domain')}
+                format="text"
+                rawValue={company?.domain}
+                display={company?.domain ?? ''}
+                ariaLabel={t('edit.inlineLabel', { field: t('info.domain') })}
+                disabled={!company}
+                onCommit={(v) => saveCompany({ domain: String(v) })}
+                onClear={() => saveCompany({ domain: '' })}
+              />
+              <IdentityField
+                label={t('info.ownershipGlobal')}
+                value={ownership}
+              />
+              <IdentityField
+                label={t('info.sharesConsolidated')}
+                value={sharesConsolidated}
+              />
+              <IdentityField
+                label={t('identity.attio')}
+                value={
+                  <AttioCompanyLink attioCompanyId={company?.attioCompanyId} />
+                }
+              />
+            </div>
+          </IdentitySection>
+
+          {/* Optional 2-3 line summary, promoted to its own section. Left
+              aligned on purpose: justifying a paragraph in a 320px column digs
+              white rivers between the words. */}
+          {company?.summary && (
+            <IdentitySection
+              title={t('identity.summary')}
+              icon={<AlignLeft className="size-3.5" />}
+            >
+              <p className="text-[13px] leading-relaxed whitespace-pre-line">
+                {company.summary}
+              </p>
+            </IdentitySection>
+          )}
+
+          {/* People — founders / board / co-investors, fed from company.people.
+              Empty sections render the discreet "to be filled in" state. */}
+          <IdentitySection
+            title={t('identity.founders')}
+            icon={<User className="size-3.5" />}
+            count={peopleByRole.founder.length}
+          >
+            <PeopleList people={peopleByRole.founder} />
+          </IdentitySection>
+          <IdentitySection
+            title={t('identity.board')}
+            icon={<Users className="size-3.5" />}
+            count={peopleByRole.board.length}
+          >
+            <PeopleList people={peopleByRole.board} />
+          </IdentitySection>
+          <IdentitySection
+            title={t('identity.coInvestors')}
+            icon={<Handshake className="size-3.5" />}
+            count={peopleByRole.coinvestor.length}
+          >
+            <PeopleList people={peopleByRole.coinvestor} />
+          </IdentitySection>
+        </aside>
+      </div>
 
       {company && editOpen && org && (
         <EditCompanyDialog

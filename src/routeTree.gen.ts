@@ -29,7 +29,6 @@ import { Route as AppAllReportsRouteImport } from './routes/app/all/reports'
 import { Route as AppAllParticipationsRouteImport } from './routes/app/all/participations'
 import { Route as AppAllDealsRouteImport } from './routes/app/all/deals'
 import { Route as AppOrgSlugTodoRouteImport } from './routes/app/$orgSlug/todo'
-import { Route as AppOrgSlugEmailsRouteImport } from './routes/app/$orgSlug/emails'
 import { Route as AppOrgSlugChangelogRouteImport } from './routes/app/$orgSlug/changelog'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppOrgSlugSettingsRouteRouteImport } from './routes/app/$orgSlug/settings/route'
@@ -38,7 +37,6 @@ import { Route as AppOrgSlugPointageIndexRouteImport } from './routes/app/$orgSl
 import { Route as AppOrgSlugPlacementsIndexRouteImport } from './routes/app/$orgSlug/placements.index'
 import { Route as AppOrgSlugPassifIndexRouteImport } from './routes/app/$orgSlug/passif.index'
 import { Route as AppOrgSlugParticipationsIndexRouteImport } from './routes/app/$orgSlug/participations.index'
-import { Route as AppOrgSlugDealsIndexRouteImport } from './routes/app/$orgSlug/deals.index'
 import { Route as AppOrgSlugCashIndexRouteImport } from './routes/app/$orgSlug/cash.index'
 import { Route as AppOrgSlugSettingsMembersRouteImport } from './routes/app/$orgSlug/settings/members'
 import { Route as AppOrgSlugSettingsInvitationsRouteImport } from './routes/app/$orgSlug/settings/invitations'
@@ -149,11 +147,6 @@ const AppOrgSlugTodoRoute = AppOrgSlugTodoRouteImport.update({
   path: '/todo',
   getParentRoute: () => AppOrgSlugRouteRoute,
 } as any)
-const AppOrgSlugEmailsRoute = AppOrgSlugEmailsRouteImport.update({
-  id: '/emails',
-  path: '/emails',
-  getParentRoute: () => AppOrgSlugRouteRoute,
-} as any)
 const AppOrgSlugChangelogRoute = AppOrgSlugChangelogRouteImport.update({
   id: '/changelog',
   path: '/changelog',
@@ -196,11 +189,6 @@ const AppOrgSlugParticipationsIndexRoute =
     path: '/participations/',
     getParentRoute: () => AppOrgSlugRouteRoute,
   } as any)
-const AppOrgSlugDealsIndexRoute = AppOrgSlugDealsIndexRouteImport.update({
-  id: '/deals/',
-  path: '/deals/',
-  getParentRoute: () => AppOrgSlugRouteRoute,
-} as any)
 const AppOrgSlugCashIndexRoute = AppOrgSlugCashIndexRouteImport.update({
   id: '/cash/',
   path: '/cash/',
@@ -265,7 +253,6 @@ export interface FileRoutesByFullPath {
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/$orgSlug/changelog': typeof AppOrgSlugChangelogRoute
-  '/app/$orgSlug/emails': typeof AppOrgSlugEmailsRoute
   '/app/$orgSlug/todo': typeof AppOrgSlugTodoRoute
   '/app/all/deals': typeof AppAllDealsRoute
   '/app/all/participations': typeof AppAllParticipationsRoute
@@ -280,7 +267,6 @@ export interface FileRoutesByFullPath {
   '/app/$orgSlug/settings/invitations': typeof AppOrgSlugSettingsInvitationsRoute
   '/app/$orgSlug/settings/members': typeof AppOrgSlugSettingsMembersRoute
   '/app/$orgSlug/cash/': typeof AppOrgSlugCashIndexRoute
-  '/app/$orgSlug/deals/': typeof AppOrgSlugDealsIndexRoute
   '/app/$orgSlug/participations/': typeof AppOrgSlugParticipationsIndexRoute
   '/app/$orgSlug/passif/': typeof AppOrgSlugPassifIndexRoute
   '/app/$orgSlug/placements/': typeof AppOrgSlugPlacementsIndexRoute
@@ -301,7 +287,6 @@ export interface FileRoutesByTo {
   '/app': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/$orgSlug/changelog': typeof AppOrgSlugChangelogRoute
-  '/app/$orgSlug/emails': typeof AppOrgSlugEmailsRoute
   '/app/$orgSlug/todo': typeof AppOrgSlugTodoRoute
   '/app/all/deals': typeof AppAllDealsRoute
   '/app/all/participations': typeof AppAllParticipationsRoute
@@ -316,7 +301,6 @@ export interface FileRoutesByTo {
   '/app/$orgSlug/settings/invitations': typeof AppOrgSlugSettingsInvitationsRoute
   '/app/$orgSlug/settings/members': typeof AppOrgSlugSettingsMembersRoute
   '/app/$orgSlug/cash': typeof AppOrgSlugCashIndexRoute
-  '/app/$orgSlug/deals': typeof AppOrgSlugDealsIndexRoute
   '/app/$orgSlug/participations': typeof AppOrgSlugParticipationsIndexRoute
   '/app/$orgSlug/passif': typeof AppOrgSlugPassifIndexRoute
   '/app/$orgSlug/placements': typeof AppOrgSlugPlacementsIndexRoute
@@ -342,7 +326,6 @@ export interface FileRoutesById {
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/$orgSlug/changelog': typeof AppOrgSlugChangelogRoute
-  '/app/$orgSlug/emails': typeof AppOrgSlugEmailsRoute
   '/app/$orgSlug/todo': typeof AppOrgSlugTodoRoute
   '/app/all/deals': typeof AppAllDealsRoute
   '/app/all/participations': typeof AppAllParticipationsRoute
@@ -357,7 +340,6 @@ export interface FileRoutesById {
   '/app/$orgSlug/settings/invitations': typeof AppOrgSlugSettingsInvitationsRoute
   '/app/$orgSlug/settings/members': typeof AppOrgSlugSettingsMembersRoute
   '/app/$orgSlug/cash/': typeof AppOrgSlugCashIndexRoute
-  '/app/$orgSlug/deals/': typeof AppOrgSlugDealsIndexRoute
   '/app/$orgSlug/participations/': typeof AppOrgSlugParticipationsIndexRoute
   '/app/$orgSlug/passif/': typeof AppOrgSlugPassifIndexRoute
   '/app/$orgSlug/placements/': typeof AppOrgSlugPlacementsIndexRoute
@@ -384,7 +366,6 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/settings'
     | '/api/auth/$'
     | '/app/$orgSlug/changelog'
-    | '/app/$orgSlug/emails'
     | '/app/$orgSlug/todo'
     | '/app/all/deals'
     | '/app/all/participations'
@@ -399,7 +380,6 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/settings/invitations'
     | '/app/$orgSlug/settings/members'
     | '/app/$orgSlug/cash/'
-    | '/app/$orgSlug/deals/'
     | '/app/$orgSlug/participations/'
     | '/app/$orgSlug/passif/'
     | '/app/$orgSlug/placements/'
@@ -420,7 +400,6 @@ export interface FileRouteTypes {
     | '/app'
     | '/api/auth/$'
     | '/app/$orgSlug/changelog'
-    | '/app/$orgSlug/emails'
     | '/app/$orgSlug/todo'
     | '/app/all/deals'
     | '/app/all/participations'
@@ -435,7 +414,6 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/settings/invitations'
     | '/app/$orgSlug/settings/members'
     | '/app/$orgSlug/cash'
-    | '/app/$orgSlug/deals'
     | '/app/$orgSlug/participations'
     | '/app/$orgSlug/passif'
     | '/app/$orgSlug/placements'
@@ -460,7 +438,6 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/settings'
     | '/api/auth/$'
     | '/app/$orgSlug/changelog'
-    | '/app/$orgSlug/emails'
     | '/app/$orgSlug/todo'
     | '/app/all/deals'
     | '/app/all/participations'
@@ -475,7 +452,6 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/settings/invitations'
     | '/app/$orgSlug/settings/members'
     | '/app/$orgSlug/cash/'
-    | '/app/$orgSlug/deals/'
     | '/app/$orgSlug/participations/'
     | '/app/$orgSlug/passif/'
     | '/app/$orgSlug/placements/'
@@ -637,13 +613,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrgSlugTodoRouteImport
       parentRoute: typeof AppOrgSlugRouteRoute
     }
-    '/app/$orgSlug/emails': {
-      id: '/app/$orgSlug/emails'
-      path: '/emails'
-      fullPath: '/app/$orgSlug/emails'
-      preLoaderRoute: typeof AppOrgSlugEmailsRouteImport
-      parentRoute: typeof AppOrgSlugRouteRoute
-    }
     '/app/$orgSlug/changelog': {
       id: '/app/$orgSlug/changelog'
       path: '/changelog'
@@ -698,13 +667,6 @@ declare module '@tanstack/react-router' {
       path: '/participations'
       fullPath: '/app/$orgSlug/participations/'
       preLoaderRoute: typeof AppOrgSlugParticipationsIndexRouteImport
-      parentRoute: typeof AppOrgSlugRouteRoute
-    }
-    '/app/$orgSlug/deals/': {
-      id: '/app/$orgSlug/deals/'
-      path: '/deals'
-      fullPath: '/app/$orgSlug/deals/'
-      preLoaderRoute: typeof AppOrgSlugDealsIndexRouteImport
       parentRoute: typeof AppOrgSlugRouteRoute
     }
     '/app/$orgSlug/cash/': {
@@ -791,14 +753,12 @@ const AppOrgSlugSettingsRouteRouteWithChildren =
 interface AppOrgSlugRouteRouteChildren {
   AppOrgSlugSettingsRouteRoute: typeof AppOrgSlugSettingsRouteRouteWithChildren
   AppOrgSlugChangelogRoute: typeof AppOrgSlugChangelogRoute
-  AppOrgSlugEmailsRoute: typeof AppOrgSlugEmailsRoute
   AppOrgSlugTodoRoute: typeof AppOrgSlugTodoRoute
   AppOrgSlugIndexRoute: typeof AppOrgSlugIndexRoute
   AppOrgSlugCashAccountIdRoute: typeof AppOrgSlugCashAccountIdRoute
   AppOrgSlugDealsDealIdRoute: typeof AppOrgSlugDealsDealIdRoute
   AppOrgSlugParticipationsCompanyIdRoute: typeof AppOrgSlugParticipationsCompanyIdRoute
   AppOrgSlugCashIndexRoute: typeof AppOrgSlugCashIndexRoute
-  AppOrgSlugDealsIndexRoute: typeof AppOrgSlugDealsIndexRoute
   AppOrgSlugParticipationsIndexRoute: typeof AppOrgSlugParticipationsIndexRoute
   AppOrgSlugPassifIndexRoute: typeof AppOrgSlugPassifIndexRoute
   AppOrgSlugPlacementsIndexRoute: typeof AppOrgSlugPlacementsIndexRoute
@@ -808,7 +768,6 @@ interface AppOrgSlugRouteRouteChildren {
 const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
   AppOrgSlugSettingsRouteRoute: AppOrgSlugSettingsRouteRouteWithChildren,
   AppOrgSlugChangelogRoute: AppOrgSlugChangelogRoute,
-  AppOrgSlugEmailsRoute: AppOrgSlugEmailsRoute,
   AppOrgSlugTodoRoute: AppOrgSlugTodoRoute,
   AppOrgSlugIndexRoute: AppOrgSlugIndexRoute,
   AppOrgSlugCashAccountIdRoute: AppOrgSlugCashAccountIdRoute,
@@ -816,7 +775,6 @@ const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
   AppOrgSlugParticipationsCompanyIdRoute:
     AppOrgSlugParticipationsCompanyIdRoute,
   AppOrgSlugCashIndexRoute: AppOrgSlugCashIndexRoute,
-  AppOrgSlugDealsIndexRoute: AppOrgSlugDealsIndexRoute,
   AppOrgSlugParticipationsIndexRoute: AppOrgSlugParticipationsIndexRoute,
   AppOrgSlugPassifIndexRoute: AppOrgSlugPassifIndexRoute,
   AppOrgSlugPlacementsIndexRoute: AppOrgSlugPlacementsIndexRoute,

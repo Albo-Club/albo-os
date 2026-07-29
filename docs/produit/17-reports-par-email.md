@@ -50,6 +50,11 @@ marquée ⚠️ dans le récap avec la cause et le geste correctif (ex. « page
 Notion inaccessible — vérifie qu'elle est partagée publiquement »), et
 « Retraiter » relance tout le circuit après correction.
 
+Le verdict de lecture de chaque pièce jointe reste consultable **après
+coup** : il est repris sur l'onglet Documents de la fiche société, avec le
+texte lu ([Participations](04-participations.md)). Le récap dit ce qui
+s'est passé sur le moment, la fiche dit ce qui est en base.
+
 ### 4. Extraction des KPIs
 
 L'IA lit le contenu et propose les métriques ; le rangement est fait par du
@@ -95,11 +100,13 @@ Rapports entrants (Assigner / Retraiter / Rejeter).
   une série, elle doit entrer au catalogue (évolution à demander).
 - **Budget vs réalisé** : seules les valeurs réalisées alimentent les
   séries ; les chiffres de budget/prévisionnel restent sur le report.
-- **L'assistant IA les lit** : une fois le report rangé, l'assistant peut
-  le restituer (points clés, métriques) et donner la synthèse d'une
-  société, dans l'app comme depuis claude.ai. Il lit l'analyse produite par
-  le pipeline, pas le texte intégral du mail — pour une question très
-  précise sur une phrase du reporting, ouvrir le report dans la fiche.
+- **L'assistant IA les lit, de deux façons** : il restitue l'analyse rangée
+  par le pipeline (points clés, métriques, synthèse de la société) pour une
+  question factuelle — « quel CA en mars ? » ; et il fouille le texte
+  intégral par le sens pour une question ouverte — « qu'est-ce qu'ils
+  disent du recrutement ? ». Il choisit tout seul. Vaut dans l'app comme
+  depuis claude.ai, à ceci près que la recherche dans le texte reste
+  in-app.
 
 ## Pages liées
 

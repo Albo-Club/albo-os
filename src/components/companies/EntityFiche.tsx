@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 
 import { attioCompanyUrl } from '~/lib/attio'
-import { Badge } from '~/components/ui/badge'
 
 /**
  * Shared, read-only building blocks for the entity fiche skeleton (header →
@@ -12,26 +11,13 @@ import { Badge } from '~/components/ui/badge'
  * SIREN / domain) are rendered inline by `InlineField` in the route, not here.
  */
 
-export type EntityNature = 'company'
-
-/** Nature badge shown in the header. `className` lets the header own the
- * spacing (e.g. a bit of separation from the title). */
-export function EntityNatureBadge({
-  nature,
-  className,
-}: {
-  nature: EntityNature
-  className?: string
-}) {
-  const { t } = useTranslation('participations')
-  return (
-    <Badge variant="default" className={className}>
-      {t(`nature.${nature}`)}
-    </Badge>
-  )
-}
-
-/** One labelled identity field; shows an em dash when the value is empty. */
+/**
+ * One labelled identity field, laid out as a row: label left, value right,
+ * separated from the next field by a hairline. The row form is what keeps long
+ * labels ("Nb d'actions consolidé") on a single line in the 320px side panel —
+ * the previous two-column grid wrapped them and broke the value alignment.
+ * Shows an em dash when the value is empty.
+ */
 export function IdentityField({
   label,
   value,
@@ -40,28 +26,49 @@ export function IdentityField({
   value: ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="text-sm">{value == null || value === '' ? '—' : value}</span>
+    <div className="flex items-baseline justify-between gap-3 border-b py-1.5 last:border-b-0">
+      <span className="text-muted-foreground shrink-0 text-xs">{label}</span>
+      <span className="min-w-0 text-right text-sm font-medium tabular-nums">
+        {value == null || value === '' ? '—' : value}
+      </span>
     </div>
   )
 }
 
-/** Titled section wrapper used across the skeleton, with an optional action. */
+/**
+ * Titled section wrapper used across the skeleton, with an optional action.
+ * `icon` renders a small squared chip before the title and `count` a discreet
+ * badge after it — both opt-in, so the plain sections (e.g. the deals table in
+ * the main column) keep their bare title.
+ */
 export function IdentitySection({
   title,
+  icon,
+  count,
   action,
   children,
 }: {
   title: string
+  icon?: ReactNode
+  count?: number
   action?: ReactNode
   children: ReactNode
 }) {
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        {icon && (
+          <span className="bg-muted text-muted-foreground flex size-[22px] shrink-0 items-center justify-center rounded-md border">
+            {icon}
+          </span>
+        )}
         <h2 className="text-sm font-medium">{title}</h2>
-        {action}
+        {count != null && count > 0 && (
+          <span className="bg-muted text-muted-foreground rounded-full border px-1.5 text-[10px] font-semibold tabular-nums">
+            {count}
+          </span>
+        )}
+        {action && <span className="ml-auto">{action}</span>}
       </div>
       {children}
     </section>
@@ -121,9 +128,18 @@ export function PeopleList({ people }: { people: Array<Person> }) {
     )
   }
   return (
-    <ul className="space-y-1.5">
+    <ul className="flex flex-wrap gap-1.5">
       {people.map((p) => (
-        <li key={p.name} className="flex items-center gap-2 text-sm">
+        <li
+          key={p.name}
+          className="bg-muted flex items-center gap-1.5 rounded-full border py-0.5 pr-2.5 pl-1 text-[13px]"
+        >
+          <span
+            aria-hidden="true"
+            className="bg-background text-muted-foreground flex size-[18px] shrink-0 items-center justify-center rounded-full border text-[9px] font-bold"
+          >
+            {personInitials(p.name)}
+          </span>
           {p.attioUrl ? (
             <a
               href={p.attioUrl}
@@ -161,4 +177,13 @@ export function PeopleList({ people }: { people: Array<Person> }) {
       ))}
     </ul>
   )
+}
+
+/** First letter of the first and last words of a name ("Marc Perrin" → "MP"). */
+function personInitials(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return '?'
+  const first = words[0][0]
+  const last = words.length > 1 ? words[words.length - 1][0] : ''
+  return (first + last).toUpperCase()
 }

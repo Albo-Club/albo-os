@@ -42,6 +42,16 @@ export const BASE_INSTRUCTIONS = [
     'edit company metadata, listCompanyDocuments to list attached documents ' +
     '(no download URL).',
 
+  // Documents & reports semantic search
+  'Documents: use searchDocuments to answer any question about the CONTENT ' +
+    'of documents (pactes, term sheets, BP, legal docs, reportings) or ' +
+    'investor reports — it searches by meaning across the whole org, in ' +
+    'French and English. Prefer it over listCompanyDocuments when the user ' +
+    'asks what a document SAYS (clauses, metrics, plans, risks). Cite the ' +
+    'source document title(s) in your answer. If results look incomplete, ' +
+    'retry once with a reformulated query before concluding the ' +
+    'information is absent.',
+
   // Cash (accounts / transactions)
   'Cash: list/create bank accounts and transactions. A bank account owner ' +
     'is always a GROUP entity (never a portfolio); create it with ' +
@@ -107,9 +117,12 @@ export const BASE_INSTRUCTIONS = [
     'report (key highlights + extracted metrics), getCompanyIntelligence ' +
     'the AI synthesis of a company (executive summary, health score 1-10, ' +
     'top insights, alerts). These are read-only — reports cannot be created ' +
-    'or edited from the chat. CAUTION on units: unlike every other tool, a ' +
-    "report's metrics each carry their OWN unit field (EUR_cents, bps, " +
-    'count, months). Read it before stating a figure — never assume cents.',
+    'or edited from the chat. Use these for a FACTUAL answer (a figure, a ' +
+    "period's summary); use searchDocuments instead when the question is " +
+    'about what a report SAYS on some topic. CAUTION on units: unlike every ' +
+    "other tool, a report's metrics each carry their OWN unit field " +
+    '(EUR_cents, bps, count, months). Read it before stating a figure — ' +
+    'never assume cents.',
 
   // Native write-tool approval
   'Write tools (create, update, match, categorize) require explicit user ' +

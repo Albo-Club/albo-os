@@ -7,7 +7,13 @@
  */
 
 import { query } from './_generated/server'
-import { aiScoresByCompany, dealRealizedMetrics, lastValuationCents } from './deals'
+import {
+  aiScoresByCompany,
+  buildParticipationRows,
+  dealRealizedMetrics,
+  lastValuationCents,
+  participationSource,
+} from './deals'
 import { requireAppUser } from './lib/auth'
 import type { GenericQueryCtx } from 'convex/server'
 import type { DataModel, Doc } from './_generated/dataModel'
@@ -89,5 +95,46 @@ export const listDeals = query({
     return perOrg
       .flat()
       .sort((a, b) => (b.signedDate ?? 0) - (a.signedDate ?? 0))
+  },
+})
+
+/**
+ * Aggregated participations rows across all my orgs — the same server-side
+ * projection as `deals.listParticipations` (see `buildParticipationRows`),
+ * each row tagged with its org. Read-only, like the rest of this module.
+ */
+export const listParticipations = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireAppUser(ctx)
+    const memberships = await ctx.db
+      .query('organizationMembers')
+      .withIndex('by_user', (q) => q.eq('userId', user._id))
+      .collect()
+
+    const perOrg = await Promise.all(
+      memberships.map(async (m) => {
+        const org = await ctx.db.get("organizations", m.orgId)
+        if (!org) return []
+        const tag = { name: org.name, slug: org.slug }
+        const deals = await ctx.db
+          .query('deals')
+          .withIndex('by_org', (q) => q.eq('orgId', m.orgId))
+          .collect()
+        const companies = await ctx.db
+          .query('companies')
+          .withIndex('by_org', (q) => q.eq('orgId', m.orgId))
+          .collect()
+        const companiesById = new Map(companies.map((c) => [c._id, c]))
+        const aiScores = await aiScoresByCompany(ctx, m.orgId)
+        return Promise.all(
+          deals.map((d) =>
+            participationSource(ctx, d, companiesById, aiScores, tag),
+          ),
+        )
+      }),
+    )
+
+    return buildParticipationRows(perOrg.flat())
   },
 })
