@@ -57,6 +57,8 @@ expliqué simplement dans un encadré « Sous le capot ».
   Toute PR qui ajoute, modifie ou retire une fonctionnalité visible met à jour
   la page correspondante **dans la même PR** (règle dans `CLAUDE.md`,
   audit doc pré-PR).
-- **Miroir Linear** : les pages sont recopiées dans les documents du projet
-  Linear « Albo OS » pour lecture confortable. En cas d'écart, ce dossier
-  fait foi.
+- **Miroir Linear** : les pages sont recopiées **automatiquement** dans les
+  documents du projet Linear « Albo OS » à chaque merge sur `main` qui touche
+  ce dossier (workflow « Sync Linear docs »). Rien à faire à la main. En cas
+  d'écart, ce dossier fait foi — une modification faite directement dans
+  Linear sera écrasée au prochain merge.

@@ -122,10 +122,14 @@ there; the diff and commit message already document the _what_. Question 5
    new module, using the shared template: à quoi ça sert / comment ça
    marche / points d'attention / pages liées). French, product language,
    no file paths or function names — it documents the **current state**,
-   unlike the changelog which is the chronological journal. After the PR
-   ships, mirror the touched pages to the Linear project "Albo OS"
-   documents when Linear access is available; the repo folder is the
-   source of truth.
+   unlike the changelog which is the chronological journal. The repo folder
+   is the source of truth; the Linear project "Albo OS" is mirrored
+   **automatically** on merge (workflow « Sync Linear docs ») — never copy
+   pages into Linear by hand. **Creating or deleting a page is the one
+   manual step**: a new page needs its Linear document created and its
+   `id`/`url` added to `DOCS` in `scripts/sync-linear-docs.mjs` (a deleted
+   one needs its entry removed), otherwise the sync fails on `main` with
+   exit 2.
 
 ### Where things live (don't duplicate across files)
 

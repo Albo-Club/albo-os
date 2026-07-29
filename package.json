@@ -24,7 +24,8 @@
     "test:smoke": "node scripts/e2e-smoke.mjs",
     "test:cookies": "bash scripts/test-cookies.sh",
     "test:unit": "node --import tsx --test \"tests/**/*.test.ts\"",
-    "sync:skills:update": "node scripts/sync-skills.mjs --update"
+    "sync:skills:update": "node scripts/sync-skills.mjs --update",
+    "sync:linear-docs": "node scripts/sync-linear-docs.mjs"
   },
   "dependencies": {
     "@convex-dev/agent": "^0.6.3",

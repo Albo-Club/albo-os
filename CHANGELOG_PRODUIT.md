@@ -23,6 +23,49 @@ bas de page.
 
 ---
 
+## v1.148.1 — 29/07/2026 à 21:45 — La doc produit se recopie toute seule dans Linear
+
+La documentation produit lisible dans Linear se met désormais à jour
+**automatiquement** : dès qu'une mise à jour touchant la doc part en
+production, les pages concernées sont recopiées dans le projet Linear
+« Albo OS » dans la foulée. Plus de recopie à la main, donc plus de
+décalage entre ce que fait l'outil et ce que raconte la doc — le retard
+constaté aujourd'hui (une douzaine de jours, une vingtaine d'évolutions)
+ne peut plus se reproduire.
+
+Les liens entre pages pointent maintenant vers les documents Linear
+correspondants : on navigue dans la doc depuis Linear comme dans le repo.
+Rappel utile : le dossier du repo reste la référence, une retouche faite
+directement dans Linear sera écrasée à la prochaine mise à jour.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `scripts/sync-linear-docs.mjs` : pousse `docs/produit/*.md` dans
+>   les documents Linear via `documentUpdate` (GraphQL). Retire le H1,
+>   préfixe la bannière « Miroir en lecture », et réécrit les liens
+>   relatifs inter-pages vers les URLs Linear (un lien hors dossier perd sa
+>   cible et garde son texte). Modes : liste de chemins, `--all`,
+>   `--dry-run` (hors-ligne, sans clé).
+> - Nouveau workflow `.github/workflows/sync-linear-docs.yml` : sur push
+>   `main` touchant `docs/produit/**`, calcule les pages modifiées via
+>   `git diff` contre `github.event.before` (repli `HEAD^` si le SHA est
+>   nul ou dangling) et les pousse. `workflow_dispatch` repousse tout.
+>   Secret `LINEAR_API_KEY`. Pas de `pnpm install` — le script n'utilise que
+>   des builtins Node + `fetch`.
+> - La map `DOCS` (fichier → id/url du document Linear) est vérifiée dans
+>   les deux sens à chaque run : page sans document ou document sans page →
+>   exit 2. C'est le garde-fou contre une page ajoutée qui n'atteindrait
+>   jamais Linear.
+> - La sync suit le `git diff`, **pas** une comparaison de contenu : Linear
+>   normalise le markdown à l'écriture (`-` → `*`, `| --- |` → `| -- |`),
+>   donc le stocké n'égale jamais l'envoyé — cf. `KNOWN_ISSUES.md`
+>   « Miroir Linear de `docs/produit/` ».
+> - `CLAUDE.md` q.7 : la consigne « mirror after the PR ships » (jamais
+>   applicable — la session de l'agent se termine à l'ouverture de la PR)
+>   est remplacée par le fait automatique + le seul geste manuel restant
+>   (créer/retirer le document Linear et son entrée `DOCS`).
+> - `TESTING.md` B8 et `docs/produit/README.md` mis à jour.
+
 ## v1.148.0 — 29/07/2026 à 20:30 — Sidebar resserrée : Investissements réunit Entreprises et Placements
 
 La barre latérale passe à quatre entrées : **À faire, Investissements,

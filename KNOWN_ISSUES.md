@@ -3121,3 +3121,33 @@ matière des reportings, et le modèle doit choisir la bonne :
 (jusqu'à 150k caractères) : le texte intégral est déjà indexé et se lit par
 `searchDocuments`. Ne pas rajouter ce champ « pour dépanner » — ce serait
 dupliquer le corpus dans la fenêtre de contexte.
+
+## Miroir Linear de `docs/produit/` — pourquoi la sync suit le `git diff`
+
+`scripts/sync-linear-docs.mjs` pousse une page **parce qu'elle a changé dans
+le commit**, jamais parce que son contenu diffère de ce que Linear stocke. La
+distinction est contre-intuitive et coûte une demi-journée à qui essaie
+« d'optimiser » en comparant les contenus.
+
+Linear **normalise le markdown à l'écriture**. On envoie `- item`, on relit
+`* item` ; on envoie `| --- |`, on relit `| -- |`. Le contenu stocké n'est
+donc jamais égal à ce qu'on a envoyé, même juste après l'avoir envoyé. Un
+`if (stored !== desired) update()` renverrait les 18 pages à chaque exécution
+— ce qui bouscule `updatedAt` sur tout le dossier et détruit précisément le
+signal qui sert à repérer une dérive (c'est en lisant les `updatedAt` qu'on a
+vu que le miroir avait 12 jours de retard).
+
+Deux conséquences à ne pas défaire :
+
+- pas de « skip if unchanged » basé sur le contenu (il faudrait réimplémenter
+  le normaliseur de Linear, qui n'est pas documenté et peut bouger) ;
+- une retouche faite **directement dans Linear** n'est pas détectée et sera
+  écrasée au prochain merge touchant la page. C'est voulu : le repo fait foi.
+  `workflow_dispatch` (ou `pnpm sync:linear-docs --all`) force un réalignement
+  complet quand un run a échoué.
+
+La map `DOCS` du script est volontairement vérifiée dans les deux sens à
+chaque run : une page sans document Linear, ou un document sans page,
+sort en exit 2. Une page ajoutée sans son entrée ne partirait jamais dans
+Linear — un échec silencieux exactement de la nature de celui que ce
+script corrige.
