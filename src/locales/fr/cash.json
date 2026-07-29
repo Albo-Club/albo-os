@@ -86,12 +86,21 @@
       "connected": "Connectée",
       "stale": "En retard",
       "action_required": "À reconnecter",
-      "untracked": "Non suivie"
+      "untracked": "Non suivie",
+      "obsolete": "Obsolète"
     },
     "lastSync": "dernière synchro {{ago}}",
     "lastData": "dernières données {{ago}}",
     "neverSynced": "aucune synchro réussie connue",
     "untrackedHint": "Connexion inconnue du suivi (probablement établie hors de l'app) : rien ne se met à jour ni n'est surveillé. Refaire la connexion via « Connecter une banque ».",
+    "obsoleteHint": "Connexion sans aucun compte : reliquat d'une tentative de connexion abandonnée. Rien à reconnecter — vous pouvez la supprimer.",
+    "delete": "Supprimer",
+    "deleted": "Connexion supprimée.",
+    "deleteFailed": "Impossible de supprimer la connexion. Réessayez.",
+    "deleteConfirm": {
+      "title": "Supprimer la connexion {{name}} ?",
+      "description": "Elle sera supprimée chez Powens et disparaîtra de la liste. Aucun compte ni aucune transaction n'est touché."
+    },
     "reconnect": "Reconnecter",
     "reconnecting": "Redirection…",
     "reconnectFailed": "Impossible de démarrer la reconnexion. Réessayez.",

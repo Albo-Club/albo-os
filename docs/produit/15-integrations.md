@@ -71,12 +71,25 @@ transactions — sans jamais dupliquer ni écraser le pointage déjà fait (voir
 Chaque connexion bancaire est rattachée à la bonne organisation et à l'entité
 titulaire du compte.
 
+Chaque compte livré par une synchronisation est d'abord **rapproché des
+comptes déjà connus** — par IBAN, sinon par banque et libellé identiques,
+sinon parce que la banque n'a qu'un seul compte de votre côté. Reconnecter une
+banque reprend donc la ligne existante, avec son historique et son pointage :
+pas de banque en double. Quand deux comptes se ressemblent trop pour trancher,
+rien n'est écrit — mieux vaut ne rien faire que se tromper de compte.
+
 La santé de chaque connexion est **surveillée en continu** : état visible sur
 la page Trésorerie (connectée / en retard / à reconnecter), alerte email quand
 une connexion se dégrade, et bouton « Reconnecter » pour la rétablir sans
 refaire toute la connexion. Un contrôle automatique interroge Powens toutes
 les 6 heures, pour détecter aussi une connexion qui cesse silencieusement
 d'envoyer des données (voir [Trésorerie](07-tresorerie.md)).
+
+Une connexion qui ne dessert **aucun compte** — typiquement le reliquat d'une
+tentative de connexion abandonnée — n'est pas une panne : elle passe en
+« Obsolète », sans email ni bannière, et un bouton **Supprimer** la retire
+définitivement (côté Powens comme dans l'app). Les comptes et les
+transactions ne sont jamais touchés.
 
 ## Connecteur Claude (serveur MCP)
 

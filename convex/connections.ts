@@ -421,13 +421,28 @@ export const listIntegrations = query({
             .query('powensConnections')
             .withIndex('by_org', (q) => q.eq('orgId', orgId))
             .collect()
-          item.connections = rows.map((r) => ({
-            id: r.powensConnectionId,
-            label: r.connectorName ?? r.powensConnectionId,
-            state: connectionHealth(r, now),
-            lastConnectedAt: r.lastSuccessfulSyncAt ?? null,
-            lastError: r.errorMessage ?? null,
-          }))
+          const bankAccounts = await ctx.db
+            .query('bankAccounts')
+            .withIndex('by_org', (q) => q.eq('orgId', orgId))
+            .collect()
+          item.connections = rows.map((r) => {
+            const health = connectionHealth(r, now)
+            // A degraded connection feeding no account is a leftover, not an
+            // incident: shown as inactive (no reconnect prompt). The delete
+            // affordance lives on the Cash page — cf. convex/powens.ts.
+            const feedsAccount = bankAccounts.some(
+              (a) =>
+                !a.archivedAt && a.powensConnectionId === r.powensConnectionId,
+            )
+            return {
+              id: r.powensConnectionId,
+              label: r.connectorName ?? r.powensConnectionId,
+              state:
+                health !== 'connected' && !feedsAccount ? 'inactive' : health,
+              lastConnectedAt: r.lastSuccessfulSyncAt ?? null,
+              lastError: r.errorMessage ?? null,
+            }
+          })
           break
         }
         case 'env': {

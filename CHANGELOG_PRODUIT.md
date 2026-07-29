@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.146.0 — 29/07/2026 à 16:51 — Une reconnexion bancaire rattrape les transactions manquées
+## v1.147.0 — 29/07/2026 à 16:56 — Une reconnexion bancaire rattrape les transactions manquées
 
 Jusqu'ici, une connexion bancaire coupée puis rétablie repartait **de la date
 de reconnexion** : tout ce qui s'était passé entre-temps sur le compte ne
@@ -69,12 +69,60 @@ transaction synchronisée.
 >   (filtre cutover + dédup `powensTxId` + `ruleFieldsFor` à l'insert),
 >   appelée par le webhook **et** par `ingestBackfilledTransactions` — les
 >   deux chemins ne peuvent plus diverger.
-> - `resolveAccount` rafraîchit désormais `powensConnectionId` sur un compte
->   déjà lié : une reconnexion peut déplacer le compte sous un nouvel id de
->   connexion, sinon il devient invisible à tout ce qui scope par connexion.
+> - S'appuie sur le re-tamponnage de `powensConnectionId` livré en v1.146.0 :
+>   sans lui, un compte repris par une nouvelle connexion serait invisible au
+>   rattrapage, qui scope par connexion.
 > - Pas de plafond de profondeur : il recréerait le bug sur une panne longue
 >   (cf. `KNOWN_ISSUES.md` « Rattrapage après reconnexion »). Tests
->   `TESTING.md` P12/P13 ; doc produit `07-tresorerie.md`.
+>   `TESTING.md` P14/P15 ; doc produit `07-tresorerie.md`.
+
+---
+
+## v1.146.0 — 29/07/2026 à 16:37 — Reconnecter une banque ne crée plus de doublon
+
+Jusqu'ici, reconnecter une banque pouvait faire apparaître une **deuxième
+fois la même banque** dans la trésorerie : la reconnexion attribue de
+nouveaux identifiants aux mêmes comptes, et l'application les prenait pour
+des comptes inconnus. L'ancienne ligne cessait de se mettre à jour tout en
+continuant d'alerter, sans moyen de faire taire l'alerte.
+
+Désormais, à chaque synchronisation, un compte qui arrive est d'abord
+**rapproché des comptes déjà connus** — par IBAN, sinon par banque et
+libellé identiques, sinon parce que la banque n'a qu'un seul compte de votre
+côté. S'il est reconnu, le lien est simplement repris : même ligne, même
+historique, même pointage. Aucun doublon.
+
+Deuxième changement, sur les alertes : une connexion qui ne dessert **aucun
+compte** — typiquement le reliquat d'une tentative de connexion abandonnée —
+n'est plus considérée comme une panne. Elle n'envoie plus d'e-mail, ne
+déclenche plus la bannière, s'affiche en gris « Obsolète », et un bouton
+**Supprimer** permet de la retirer définitivement (côté banque comme dans
+l'app). Vos comptes et vos transactions ne sont pas touchés.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle règle d'identité pure et testée dans `convex/lib/powensAccounts.ts`
+>   (`matchExistingAccount`, 12 tests dans `tests/powensAccounts.test.ts`) :
+>   IBAN → banque + libellé → compte unique d'une banque à compte unique.
+>   Les règles faibles ne volent jamais un compte déjà lié et refusent tout
+>   candidat dont l'IBAN contredit le payload ; égalité = `ambiguous`, arrêt
+>   dur sans écriture.
+> - `resolveAccount` (`convex/powens.ts`) tente ce rapprochement avant de
+>   créer un compte ; `linkQonto` disparaît, le cas Qonto devient la règle 3.
+>   La branche « déjà lié » re-tamponne désormais `powensConnectionId` : un
+>   compte repris par une nouvelle connexion ne reste plus attaché à la
+>   morte.
+> - Santé : une connexion dégradée ne desservant aucun compte actif passe en
+>   `obsolete` dans `listConnections` (et `inactive` côté page Intégrations),
+>   sort de la bannière et de `maybeNotifyConnectionHealth`. Action
+>   `powens.deleteConnection` (rôle admin, garde `connection_in_use`,
+>   `DELETE /users/me/connections/{id}` puis suppression de la ligne de
+>   suivi ; 404 côté Powens = ligne supprimée quand même).
+> - Diagnostic opérateur `powens:diagnoseOrgAccountLinks` (lecture seule) :
+>   IBAN, ids Powens, nb de transactions et bornes de dates par compte, pour
+>   distinguer un vrai second compte d'un doublon avant toute fusion.
+
+---
 
 ## v1.145.0 — 29/07/2026 à 16:18 — L'assistant lit les reportings et la fiche société
 

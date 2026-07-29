@@ -9,12 +9,35 @@ import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { Button } from '~/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
 
 /** `untracked` = a Powens-linked account whose connection has no tracking
  * row (connection made under an unmanaged Powens user — nothing refreshes,
  * nothing is monitored). Fix = a fresh « Connecter une banque », not a
- * reconnect (there is no tracked connection to reconnect). */
-type Health = 'connected' | 'stale' | 'action_required' | 'untracked'
+ * reconnect (there is no tracked connection to reconnect).
+ *
+ * `obsolete` = a degraded connection feeding no account (leftover of a failed
+ * connection attempt, or accounts taken over by another connection). Nothing
+ * to repair and nothing to alert on: it is offered for deletion. */
+type Health =
+  | 'connected'
+  | 'stale'
+  | 'action_required'
+  | 'untracked'
+  | 'obsolete'
+
+/** Health states worth an alert — `obsolete` is deliberately out (no incident
+ * behind it), which is what makes the banner disappear on its own. */
+function isDegraded(health: Health): boolean {
+  return health !== 'connected' && health !== 'obsolete'
+}
 
 /** Status pill — same visual family as the session pill in
  * active-sessions.tsx (palette classes with dark variants, no brand token). */
@@ -23,6 +46,7 @@ const HEALTH_PILL: Record<Health, string> = {
   stale: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
   action_required: 'bg-red-500/15 text-red-700 dark:text-red-400',
   untracked: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  obsolete: 'bg-muted text-muted-foreground',
 }
 
 /** Relative "il y a X min/h/j" formatter — shared with the per-account
@@ -54,7 +78,7 @@ export function ConnectionsBanner({
   const { t } = useTranslation('cash')
   const connections = useConvexQuery(api.powens.listConnections, { orgId })
 
-  const degraded = (connections ?? []).filter((c) => c.health !== 'connected')
+  const degraded = (connections ?? []).filter((c) => isDegraded(c.health))
   if (degraded.length === 0) return null
 
   const worst: Health = degraded.some((c) => c.health === 'action_required')
@@ -93,10 +117,11 @@ export function ConnectionsBanner({
 
 /**
  * Sync-health of the org's Powens bank connections: one row per connection
- * with a health pill (connected / late / reconnect needed / untracked),
- * the last successful sync, the accounts it feeds, and a "Reconnect" button
- * opening the Powens webview reconnect flow when the connection is degraded
- * (tracked ones only). Renders nothing while loading or when the org has no
+ * with a health pill (connected / late / reconnect needed / untracked /
+ * obsolete), the last successful sync, the accounts it feeds, and a
+ * "Reconnect" button opening the Powens webview reconnect flow when the
+ * connection is degraded (tracked ones only) — replaced by "Delete" on an
+ * obsolete one. Renders nothing while loading or when the org has no
  * tracked connection nor untracked Powens-linked account.
  */
 export function BankConnectionsHealth({
@@ -109,6 +134,9 @@ export function BankConnectionsHealth({
   const connections = useConvexQuery(api.powens.listConnections, { orgId })
   const startReconnect = useAction(api.powens.startReconnect)
   const [reconnectingId, setReconnectingId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(
+    null,
+  )
 
   if (!connections || connections.length === 0) return null
 
@@ -166,6 +194,11 @@ export function BankConnectionsHealth({
                   {t('connections.untrackedHint')}
                 </span>
               )}
+              {c.health === 'obsolete' && (
+                <span className="text-muted-foreground text-xs">
+                  {t('connections.obsoleteHint')}
+                </span>
+              )}
               {c.errorMessage && (
                 <span className="text-destructive text-xs">
                   {c.errorMessage}
@@ -175,12 +208,10 @@ export function BankConnectionsHealth({
             {/* No reconnect for an untracked connection: there is nothing to
                 reconnect under the managed Powens user — the fix is a fresh
                 « Connecter une banque ». */}
-            {c.health !== 'connected' && c.health !== 'untracked' && (
+            {isDegraded(c.health) && c.health !== 'untracked' && (
               <Button
                 size="sm"
-                variant={
-                  c.health === 'action_required' ? 'default' : 'outline'
-                }
+                variant={c.health === 'action_required' ? 'default' : 'outline'}
                 disabled={reconnectingId !== null}
                 onClick={() => handleReconnect(c.powensConnectionId)}
               >
@@ -189,9 +220,88 @@ export function BankConnectionsHealth({
                   : t('connections.reconnect')}
               </Button>
             )}
+            {c.health === 'obsolete' && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-muted-foreground"
+                onClick={() =>
+                  setDeleting({
+                    id: c.powensConnectionId,
+                    name: c.connectorName ?? t('connections.unknownConnector'),
+                  })
+                }
+              >
+                {t('connections.delete')}
+              </Button>
+            )}
           </div>
         ))}
       </div>
+      {deleting && (
+        <DeleteConnectionDialog
+          orgId={orgId}
+          connection={deleting}
+          onClose={() => setDeleting(null)}
+        />
+      )}
     </section>
+  )
+}
+
+/** Confirms deleting an obsolete connection — it disappears from Powens as
+ * well, so it can never come back through the polling cron. */
+function DeleteConnectionDialog({
+  orgId,
+  connection,
+  onClose,
+}: {
+  orgId: Id<'organizations'>
+  connection: { id: string; name: string }
+  onClose: () => void
+}) {
+  const { t } = useTranslation(['cash', 'common'])
+  const deleteConnection = useAction(api.powens.deleteConnection)
+  const [pending, setPending] = useState(false)
+
+  async function handleConfirm() {
+    setPending(true)
+    try {
+      await deleteConnection({ orgId, powensConnectionId: connection.id })
+      toast.success(t('cash:connections.deleted'))
+      onClose()
+    } catch {
+      toast.error(t('cash:connections.deleteFailed'))
+      setPending(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {t('cash:connections.deleteConfirm.title', {
+              name: connection.name,
+            })}
+          </DialogTitle>
+          <DialogDescription>
+            {t('cash:connections.deleteConfirm.description')}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={pending}>
+            {t('common:actions.cancel')}
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => void handleConfirm()}
+            disabled={pending}
+          >
+            {t('cash:connections.delete')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
