@@ -23,6 +23,25 @@ bas de page.
 
 ---
 
+## v1.144.1 — 29/07/2026 à 10:01 — La vectorisation reste hébergée en Europe
+
+La recherche dans les documents s'appuyait sur le routage automatique
+d'OpenRouter, qui pouvait diriger les calculs vers différents hébergeurs
+selon la charge. Le traitement est désormais **épinglé sur Nebius Token
+Factory**, hébergé aux Pays-Bas : le texte de vos documents ne transite plus
+que par cet hébergeur européen, à prix identique.
+
+> **🔧 Notes techniques**
+>
+> - `convex/vectorize.ts` : routage OpenRouter épinglé sur le provider
+>   `nebius` (`provider: { order: ['nebius'], allow_fallbacks: false }`)
+>   dans `openrouter.textEmbeddingModel(...)`. Pas de fallback : une panne
+>   Nebius fait échouer l'indexation (schedulée, relançable) et la
+>   recherche plutôt que d'envoyer le texte ailleurs — choix documenté
+>   dans `KNOWN_ISSUES.md` § « Vectorisation documents & reports ».
+
+---
+
 ## v1.144.0 — 28/07/2026 à 20:56 — La fiche d'identité reste sous les yeux
 
 Sur une fiche société, le panneau d'identité disparaissait par le haut dès
