@@ -86,12 +86,21 @@
       "connected": "Connected",
       "stale": "Late",
       "action_required": "Reconnect needed",
-      "untracked": "Untracked"
+      "untracked": "Untracked",
+      "obsolete": "Obsolete"
     },
     "lastSync": "last sync {{ago}}",
     "lastData": "last data {{ago}}",
     "neverSynced": "no known successful sync",
     "untrackedHint": "Connection unknown to the monitoring (probably made outside the app): nothing refreshes or is monitored. Redo the connection via “Connect a bank”.",
+    "obsoleteHint": "Connection with no account: leftover of an abandoned connection attempt. Nothing to reconnect — you can delete it.",
+    "delete": "Delete",
+    "deleted": "Connection deleted.",
+    "deleteFailed": "Couldn't delete the connection. Please try again.",
+    "deleteConfirm": {
+      "title": "Delete the {{name}} connection?",
+      "description": "It will be deleted on the Powens side and disappear from the list. No account and no transaction is touched."
+    },
     "reconnect": "Reconnect",
     "reconnecting": "Redirecting…",
     "reconnectFailed": "Couldn't start the reconnection. Please try again.",

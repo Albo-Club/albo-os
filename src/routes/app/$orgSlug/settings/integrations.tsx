@@ -331,7 +331,8 @@ function PlatformRow({
               </span>
               {canManage &&
                 item.auth === 'webview' &&
-                c.state !== 'connected' && (
+                c.state !== 'connected' &&
+                c.state !== 'inactive' && (
                   <Button
                     size="sm"
                     variant="outline"
