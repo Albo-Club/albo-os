@@ -1,6 +1,7 @@
 {
-  "metaTitle": "Investments — Albo OS",
-  "title": "Investments",
+  "metaTitle": "Placements — Albo OS",
+  "metaTitleDetail": "Placement — Albo OS",
+  "title": "Placements",
   "subtitle": "Invested treasury — crypto, capitalization accounts, term deposits, brokerage accounts. Update the balance here, the performance follows.",
   "tiles": {
     "balance": "Total balance",
@@ -10,8 +11,25 @@
     "yield": "Annualized return",
     "yieldHint": "XIRR of matched flows + current balances"
   },
+  "sections": {
+    "liquid": "Liquid",
+    "semi_liquid": "Semi-liquid",
+    "illiquid": "Illiquid"
+  },
+  "placementsCount_one": "{{count}} placement",
+  "placementsCount_other": "{{count}} placements",
+  "liquidity": {
+    "label": "Liquidity",
+    "liquid": "Liquid",
+    "semi_liquid": "Semi-liquid",
+    "illiquid": "Illiquid",
+    "saved": "Liquidity updated",
+    "errors": {
+      "default": "Could not update the liquidity."
+    }
+  },
   "col": {
-    "name": "Investment",
+    "name": "Placement",
     "type": "Type",
     "opened": "Opened",
     "paid": "Paid in",
@@ -21,12 +39,30 @@
     "yield": "Ann. return"
   },
   "balanceEditAria": "Edit the balance of {{name}}",
-  "rowOpenAria": "Open deal {{name}}",
+  "rowOpenAria": "Open placement {{name}}",
   "edit": {
     "saved": "Balance updated",
     "errors": {
       "default": "Could not update the balance."
     }
   },
-  "empty": "No investments yet. Crypto, capitalization accounts, term deposits and brokerage accounts will show up here."
+  "fiche": {
+    "back": "← Placements",
+    "notFound": "Placement not found.",
+    "notPlacement": "This deal is not a placement — open its full deal sheet.",
+    "openDeal": "Open the deal sheet",
+    "history": {
+      "title": "Balance history",
+      "empty": "No history yet — update the balance to create the first point.",
+      "col": {
+        "date": "Date",
+        "value": "Value"
+      }
+    },
+    "tx": {
+      "title": "Matched transactions",
+      "empty": "No transaction matched to this placement."
+    }
+  },
+  "empty": "No placements yet. Crypto, capitalization accounts, term deposits and brokerage accounts will show up here."
 }

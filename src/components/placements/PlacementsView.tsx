@@ -6,6 +6,11 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
+import {
+  PLACEMENT_LIQUIDITIES,
+  placementLiquidity,
+} from '../../../convex/lib/instrumentMapping'
+import type { PlacementLiquidity } from '../../../convex/lib/instrumentMapping'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { cn } from '~/lib/utils'
 import { signTone } from '~/lib/moneyTone'
@@ -38,6 +43,8 @@ export type PlacementRow = {
   paidActual?: number | null
   received?: number | null
   flows?: Array<{ amount: number; date: number }>
+  /** Per-deal liquidity override — default derived from instrumentKind. */
+  liquidity?: string | null
 }
 
 /**
@@ -144,12 +151,28 @@ function EditableBalance({
   )
 }
 
+/** Section band tint per liquidity bucket (mirrors participationBucketBand). */
+function liquidityBand(bucket: PlacementLiquidity): {
+  band: string
+  dot: string
+} {
+  switch (bucket) {
+    case 'liquid':
+      return { band: 'bg-positive/10', dot: 'bg-positive' }
+    case 'semi_liquid':
+      return { band: 'bg-warning/10', dot: 'bg-warning' }
+    case 'illiquid':
+      return { band: 'bg-muted', dot: 'bg-muted-foreground' }
+  }
+}
+
 /**
  * Treasury placements, tracked like accounts (Finary-style): summary tiles
  * (total balance, net paid in, unrealized gain, annualized return) above one
- * row per placement with its declared balance editable in place. Real cash
- * amounts and account balances → cent precision (see CLAUDE.md § arrondis);
- * only the return ratios are percentages.
+ * table per liquidity bucket (liquid / semi-liquid / illiquid — default by
+ * instrument kind, per-deal override) with each declared balance editable in
+ * place. Real cash amounts and account balances → cent precision (see
+ * CLAUDE.md § arrondis); only the return ratios are percentages.
  */
 export function PlacementsView({
   deals,
@@ -159,8 +182,7 @@ export function PlacementsView({
   orgSlug: string
 }) {
   const { t } = useTranslation(['placements', 'participations'])
-  const navigate = useNavigate()
-  const { fmtEurCents, fmtDate, fmtPercent } = useFormatters()
+  const { fmtEurCents, fmtPercent } = useFormatters()
 
   const computed = useMemo(() => {
     if (!deals) return undefined
@@ -197,11 +219,20 @@ export function PlacementsView({
       gainPct: hasGain && paid > 0 ? gain / paid : null,
       annualized: xirr(flows),
     }
-    return { rows, totals }
+    // One bucket per liquidity, in PLACEMENT_LIQUIDITIES display order.
+    const buckets = new Map<PlacementLiquidity, typeof rows>(
+      PLACEMENT_LIQUIDITIES.map((key) => [key, []]),
+    )
+    for (const row of rows) {
+      buckets
+        .get(placementLiquidity(row.deal.instrumentKind, row.deal.liquidity))
+        ?.push(row)
+    }
+    return { rows, totals, buckets }
   }, [deals])
 
   if (!computed) return null
-  const { rows, totals } = computed
+  const { rows, totals, buckets } = computed
 
   if (rows.length === 0) {
     return (
@@ -243,108 +274,149 @@ export function PlacementsView({
         />
       </div>
 
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('placements:col.name')}</TableHead>
-              <TableHead>{t('placements:col.type')}</TableHead>
-              <TableHead>{t('placements:col.opened')}</TableHead>
-              <TableHead className="text-right">
-                {t('placements:col.paid')}
-              </TableHead>
-              <TableHead className="text-right">
-                {t('placements:col.withdrawn')}
-              </TableHead>
-              <TableHead className="text-right">
-                {t('placements:col.balance')}
-              </TableHead>
-              <TableHead className="text-right">
-                {t('placements:col.gain')}
-              </TableHead>
-              <TableHead className="text-right">
-                {t('placements:col.yield')}
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map(({ deal, m }) => {
-              const name = deal.target?.name ?? deal.name ?? '—'
-              const openDeal = () =>
-                navigate({
-                  to: '/app/$orgSlug/deals/$dealId',
-                  params: { orgSlug, dealId: deal._id },
-                })
-              return (
-                <TableRow
-                  key={deal._id}
-                  className="cursor-pointer"
-                  onClick={openDeal}
-                  tabIndex={0}
-                  role="link"
-                  aria-label={t('placements:rowOpenAria', { name })}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') openDeal()
-                  }}
-                >
-                  <TableCell className="font-medium">
-                    <span className="flex items-center gap-2">
-                      <CompanyLogo
-                        domain={deal.target?.domain}
-                        companyName={name}
-                        size="sm"
-                      />
-                      <span className="flex flex-col">
-                        {name}
-                        {deal.bankName && (
-                          <span className="text-muted-foreground text-xs font-normal">
-                            {deal.bankName}
-                          </span>
-                        )}
-                      </span>
+      {PLACEMENT_LIQUIDITIES.map((key) => {
+        const bucketRows = buckets.get(key) ?? []
+        // An empty liquidity bucket is not rendered at all.
+        if (bucketRows.length === 0) return null
+        const { band, dot } = liquidityBand(key)
+        return (
+          <section key={key} className="space-y-3">
+            <div
+              className={cn(
+                'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium',
+                band,
+              )}
+            >
+              <span aria-hidden className={cn('size-2 rounded-full', dot)} />
+              {t(`placements:sections.${key}`)}
+              <span className="text-muted-foreground">
+                ({t('placements:placementsCount', { count: bucketRows.length })})
+              </span>
+            </div>
+            <PlacementsTable rows={bucketRows} orgSlug={orgSlug} />
+          </section>
+        )
+      })}
+    </div>
+  )
+}
+
+/** One liquidity bucket's table — same columns for every bucket. */
+function PlacementsTable({
+  rows,
+  orgSlug,
+}: {
+  rows: Array<{ deal: PlacementRow; m: ReturnType<typeof accountMetrics> }>
+  orgSlug: string
+}) {
+  const { t } = useTranslation(['placements', 'participations'])
+  const navigate = useNavigate()
+  const { fmtEurCents, fmtDate, fmtPercent } = useFormatters()
+
+  return (
+    <div className="rounded-lg border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t('placements:col.name')}</TableHead>
+            <TableHead>{t('placements:col.type')}</TableHead>
+            <TableHead>{t('placements:col.opened')}</TableHead>
+            <TableHead className="text-right">
+              {t('placements:col.paid')}
+            </TableHead>
+            <TableHead className="text-right">
+              {t('placements:col.withdrawn')}
+            </TableHead>
+            <TableHead className="text-right">
+              {t('placements:col.balance')}
+            </TableHead>
+            <TableHead className="text-right">
+              {t('placements:col.gain')}
+            </TableHead>
+            <TableHead className="text-right">
+              {t('placements:col.yield')}
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map(({ deal, m }) => {
+            const name = deal.target?.name ?? deal.name ?? '—'
+            // A placement opens its light placement sheet (balance history,
+            // matched flows), not the full deal sheet.
+            const openPlacement = () =>
+              navigate({
+                to: '/app/$orgSlug/placements/$dealId',
+                params: { orgSlug, dealId: deal._id },
+              })
+            return (
+              <TableRow
+                key={deal._id}
+                className="cursor-pointer"
+                onClick={openPlacement}
+                tabIndex={0}
+                role="link"
+                aria-label={t('placements:rowOpenAria', { name })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') openPlacement()
+                }}
+              >
+                <TableCell className="font-medium">
+                  <span className="flex items-center gap-2">
+                    <CompanyLogo
+                      domain={deal.target?.domain}
+                      companyName={name}
+                      size="sm"
+                    />
+                    <span className="flex flex-col">
+                      {name}
+                      {deal.bankName && (
+                        <span className="text-muted-foreground text-xs font-normal">
+                          {deal.bankName}
+                        </span>
+                      )}
                     </span>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {t(`participations:instrument.${deal.instrumentKind}`, {
-                      defaultValue: deal.instrumentKind,
-                    })}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {fmtDate(deal.closingDate)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {fmtEurCents(m.paid)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {m.withdrawn === 0 ? '—' : fmtEurCents(m.withdrawn)}
-                  </TableCell>
-                  <EditableBalance
-                    deal={deal}
-                    ariaLabel={t('placements:balanceEditAria', { name })}
-                  />
-                  <TableCell
-                    className={cn(
-                      'text-right tabular-nums',
-                      m.gain != null && signTone(m.gain),
-                    )}
-                  >
-                    {m.gain == null
-                      ? '—'
-                      : `${m.gain > 0 ? '+' : ''}${fmtEurCents(m.gain)}${
-                          m.gainPct == null
-                            ? ''
-                            : ` (${m.gainPct > 0 ? '+' : ''}${fmtPercent(m.gainPct)})`
-                        }`}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {fmtPercent(m.annualized)}
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
-      </div>
+                  </span>
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {t(`participations:instrument.${deal.instrumentKind}`, {
+                    defaultValue: deal.instrumentKind,
+                  })}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {fmtDate(deal.closingDate)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {fmtEurCents(m.paid)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {m.withdrawn === 0 ? '—' : fmtEurCents(m.withdrawn)}
+                </TableCell>
+                <EditableBalance
+                  deal={deal}
+                  ariaLabel={t('placements:balanceEditAria', { name })}
+                />
+                <TableCell
+                  className={cn(
+                    'text-right tabular-nums',
+                    m.gain != null && signTone(m.gain),
+                  )}
+                >
+                  {m.gain == null
+                    ? '—'
+                    : `${m.gain > 0 ? '+' : ''}${fmtEurCents(m.gain)}${
+                        m.gainPct == null
+                          ? ''
+                          : ` (${m.gainPct > 0 ? '+' : ''}${fmtPercent(m.gainPct)})`
+                      }`}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {fmtPercent(m.annualized)}
+                </TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+      </Table>
     </div>
   )
 }

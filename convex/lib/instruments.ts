@@ -1,4 +1,5 @@
 import { literals } from 'convex-helpers/validators'
+import { PLACEMENT_LIQUIDITIES } from './instrumentMapping'
 
 /**
  * Single source of truth for instrument kinds (deal.instrumentKind).
@@ -91,6 +92,10 @@ export const PROPERTY_TYPES = [
   'autre',
 ] as const
 export const propertyTypeValidator = literals(...PROPERTY_TYPES)
+
+// Placement liquidity buckets — values live in ./instrumentMapping.ts
+// (PLACEMENT_LIQUIDITIES, next to the default-by-kind mapping).
+export const placementLiquidityValidator = literals(...PLACEMENT_LIQUIDITIES)
 
 /** Field name → value array, for the enum-rendered editable fields. */
 export const ENUM_FIELD_VALUES: Record<string, ReadonlyArray<string>> = {

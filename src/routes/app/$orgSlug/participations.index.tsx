@@ -21,6 +21,7 @@ import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { cn } from '~/lib/utils'
 import { ParticipationsView } from '~/components/participations/ParticipationsView'
+import { InvestmentsTabs } from '~/components/investments/InvestmentsTabs'
 import { Button } from '~/components/ui/button'
 import {
   DropdownMenu,
@@ -318,7 +319,7 @@ function WithoutDealSection({
 }
 
 function Participations() {
-  const { t } = useTranslation(['participations', 'common'])
+  const { t } = useTranslation(['participations', 'common', 'nav'])
   const { orgSlug } = Route.useParams()
   const [createOpen, setCreateOpen] = useState(false)
   const org = useConvexQuery(api.organizations.bySlug, { slug: orgSlug })
@@ -346,43 +347,46 @@ function Participations() {
         // Rendered inside the view's sticky bar, so title + menu + filters
         // stay pinned together while the list scrolls.
         header={
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {t('title')}
-            </h1>
-            {org && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    aria-label={t('common:actions.menu')}
-                  >
-                    <MoreHorizontal className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => setCreateOpen(true)}>
-                    <Plus className="size-4" />
-                    {t('create.button')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={!hasDeals}
-                    onSelect={() => exportRef.current?.('csv')}
-                  >
-                    <Download className="size-4" />
-                    {t('export.csv')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={!hasDeals}
-                    onSelect={() => exportRef.current?.('xlsx')}
-                  >
-                    <Download className="size-4" />
-                    {t('export.xlsx')}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h1 className="text-2xl font-semibold tracking-tight">
+                {t('nav:items.investments')}
+              </h1>
+              {org && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label={t('common:actions.menu')}
+                    >
+                      <MoreHorizontal className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => setCreateOpen(true)}>
+                      <Plus className="size-4" />
+                      {t('create.button')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={!hasDeals}
+                      onSelect={() => exportRef.current?.('csv')}
+                    >
+                      <Download className="size-4" />
+                      {t('export.csv')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={!hasDeals}
+                      onSelect={() => exportRef.current?.('xlsx')}
+                    >
+                      <Download className="size-4" />
+                      {t('export.xlsx')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+            <InvestmentsTabs orgSlug={orgSlug} active="entreprises" />
           </div>
         }
         loadExportDeals={

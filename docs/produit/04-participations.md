@@ -2,7 +2,8 @@
 
 ## À quoi ça sert
 
-La section Participations (`/app/<org>/participations`) est la vue du
+La liste Entreprises (`/app/<org>/participations`, premier sous-onglet de
+la section **Investissements** de la barre latérale) est la vue du
 portefeuille **par société** : une ligne = une société, quel que soit le
 nombre de deals réalisés dessus. C'est le point d'entrée vers les fiches
 sociétés, leurs rapports et leurs documents.

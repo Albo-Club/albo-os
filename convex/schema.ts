@@ -23,6 +23,7 @@ import {
   couponPeriodicityValidator,
   fundTypeValidator,
   instrumentValidator,
+  placementLiquidityValidator,
   propertyTypeValidator,
   repaymentModalityValidator,
   roundTypeValidator,
@@ -88,6 +89,7 @@ const repaymentModality = repaymentModalityValidator
 const termDuration = termDurationValidator
 const fundType = fundTypeValidator
 const propertyType = propertyTypeValidator
+const placementLiquidity = placementLiquidityValidator
 
 const txDirection = v.union(v.literal('in'), v.literal('out'))
 
@@ -742,6 +744,8 @@ export default defineSchema({
 
     // Placement (crypto / capitalization_account)
     currentValue: v.optional(v.number()), // cents — current value of a placement
+    // Placement liquidity override; default derived from instrumentKind.
+    liquidity: v.optional(placementLiquidity),
 
     // Field names edited by hand on the deal sheet. The Airtable re-import
     // (convex/airtableImport.ts:upsertDeals) skips these columns so manual
