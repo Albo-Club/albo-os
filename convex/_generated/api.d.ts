@@ -43,6 +43,7 @@ import type * as forecasts from "../forecasts.js";
 import type * as gmail from "../gmail.js";
 import type * as http from "../http.js";
 import type * as intelligence from "../intelligence.js";
+import type * as investments from "../investments.js";
 import type * as invitations from "../invitations.js";
 import type * as kpis from "../kpis.js";
 import type * as liabilities from "../liabilities.js";
@@ -162,6 +163,7 @@ declare const fullApi: ApiFromModules<{
   gmail: typeof gmail;
   http: typeof http;
   intelligence: typeof intelligence;
+  investments: typeof investments;
   invitations: typeof invitations;
   kpis: typeof kpis;
   liabilities: typeof liabilities;

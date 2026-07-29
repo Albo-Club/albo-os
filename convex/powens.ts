@@ -1792,7 +1792,7 @@ export const savePowensUser = internalMutation({
   },
 })
 
-function powensEnv() {
+export function powensEnv() {
   const clientId = process.env.POWENS_CLIENT_ID
   const clientSecret = process.env.POWENS_CLIENT_SECRET
   const domain = process.env.POWENS_DOMAIN

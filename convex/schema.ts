@@ -746,6 +746,9 @@ export default defineSchema({
     currentValue: v.optional(v.number()), // cents — current value of a placement
     // Placement liquidity override; default derived from instrumentKind.
     liquidity: v.optional(placementLiquidity),
+    // The bank account backing a treasury placement — envelope link for
+    // Powens Wealth positions (cf. investmentPositions).
+    bankAccountId: v.optional(v.id('bankAccounts')),
 
     // Field names edited by hand on the deal sheet. The Airtable re-import
     // (convex/airtableImport.ts:upsertDeals) skips these columns so manual
@@ -1235,6 +1238,29 @@ export default defineSchema({
     .index('by_owner', ['orgId', 'ownerCompanyId'])
     .index('by_powens_account', ['powensAccountId'])
     .index('by_airtable_id', ['airtableId']),
+
+  /**
+   * investmentPositions — mirrors of Powens Wealth investments: the
+   * securities held inside a compte-titres / contrat de capitalisation /
+   * crypto account (`bankAccounts` row resolved via `powensAccountId`).
+   * Rows are replaced wholesale per account at each sync (convex/
+   * investments.ts) — no uniqueness constraint needed.
+   */
+  investmentPositions: defineTable({
+    orgId: v.id('organizations'),
+    bankAccountId: v.id('bankAccounts'),
+    powensInvestmentId: v.string(),
+    label: v.string(),
+    isinCode: v.optional(v.string()),
+    quantity: v.optional(v.number()), // units, float
+    unitValue: v.optional(v.number()), // cents
+    valuation: v.optional(v.number()), // cents
+    diff: v.optional(v.number()), // cents, +/- vs cost
+    valuationDate: v.optional(v.number()), // ms epoch (vdate)
+    syncedAt: v.number(),
+  })
+    .index('by_org', ['orgId'])
+    .index('by_account', ['bankAccountId']),
 
   /**
    * transactions — realized bank flow. `dealId` nullable because some

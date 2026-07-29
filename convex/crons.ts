@@ -46,6 +46,15 @@ crons.interval(
   {},
 )
 
+// Daily Powens Wealth positions sync (harmless no-op while the Wealth
+// product isn't enabled on the domain).
+crons.daily(
+  'sync investment positions',
+  { hourUTC: 6, minuteUTC: 30 },
+  internal.investments.syncAll,
+  {},
+)
+
 // Refresh the VASCO/Parallel communications cache every 2 days. VASCO has no
 // webhook for the investor persona (pull-only), so the UI reads a local cache
 // and this keeps it fresh in the background; a manual "refresh" button covers
