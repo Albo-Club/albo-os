@@ -10,6 +10,11 @@
  *   → `ingestConnectionSync` (internalMutation: account resolution, per-account
  *   cutover, idempotent upsert by `powensTxId`).
  *
+ * Second ingestion path, in pull: `backfillConnection` catches up on what a
+ * broken connection missed (the webhook only ever pushes the current sync) —
+ * scheduled when a connection goes back to healthy. Both paths write through
+ * `writeAccountTransactions`.
+ *
  * Sync-health monitoring (`powensConnections`): the webhook (push) and a 6h
  * polling cron (`pollConnectionsHealth`, pull) both refresh one row per
  * connection; health is derived (connected / stale / action_required) and a
@@ -569,7 +574,15 @@ async function resolveAccount(
       )
       return null
     }
-    await ctx.db.patch("bankAccounts", linked._id, balancePatch(acc))
+    // A reconnection can move the account under a NEW connection id: keep the
+    // link fresh, otherwise the account is invisible to everything that scopes
+    // by connection (health display, catch-up).
+    await ctx.db.patch("bankAccounts", linked._id, {
+      ...balancePatch(acc),
+      ...(linked.powensConnectionId === connectionId
+        ? {}
+        : { powensConnectionId: connectionId }),
+    })
     const refreshed = await ctx.db.get("bankAccounts", linked._id)
     if (!refreshed) throw new ConvexError('account_vanished')
     return refreshed
@@ -633,6 +646,84 @@ async function computeCutoff(
     if (t.airtableId) return t.transactionDate
   }
   return account._creationTime
+}
+
+// ─── Transaction write (shared by the webhook and the catch-up) ──────────────
+
+type WriteCounters = {
+  received: number
+  ingested: number
+  filteredCutover: number
+  filteredDeleted: number
+  alreadyExisting: number
+}
+
+/** Idempotent write of normalized transactions onto ONE account: cutover
+ * filter, dedup by `powensTxId` (patch if known, insert otherwise) and
+ * learned-rule classification on insert.
+ *
+ * Shared by the two ingestion paths — the `CONNECTION_SYNCED` webhook (push)
+ * and `backfillConnection` (pull, after a reconnection) — so they can never
+ * drift apart on the filtering or the dedup. */
+async function writeAccountTransactions(
+  ctx: MutationCtx,
+  account: Doc<'bankAccounts'>,
+  transactions: ReadonlyArray<NormTx>,
+  cutoff: number,
+  categoryRules: Array<Doc<'categoryRules'>>,
+): Promise<WriteCounters> {
+  const counters: WriteCounters = {
+    received: 0,
+    ingested: 0,
+    filteredCutover: 0,
+    filteredDeleted: 0,
+    alreadyExisting: 0,
+  }
+  for (const tx of transactions) {
+    counters.received += 1
+    if (tx.deleted || tx.dateMs <= cutoff) {
+      if (tx.deleted) {
+        counters.filteredDeleted += 1
+      } else {
+        counters.filteredCutover += 1
+      }
+      continue
+    }
+    const existing = await ctx.db
+      .query('transactions')
+      .withIndex('by_powens_id', (q) => q.eq('powensTxId', tx.powensTxId))
+      .first()
+    const direction: 'in' | 'out' = tx.valueUnits < 0 ? 'out' : 'in'
+    const fields = {
+      orgId: account.orgId,
+      bankAccountId: account._id,
+      direction,
+      amount: Math.round(Math.abs(tx.valueUnits) * 100),
+      transactionDate: tx.dateMs,
+      rawLabel: tx.wording,
+      counterparty: tx.counterparty,
+      searchText: buildSearchText(tx.wording, tx.counterparty),
+      source: 'powens' as const,
+      powensTxId: tx.powensTxId,
+    }
+    if (existing) {
+      // Redelivery (webhook) or overlap (catch-up): do not overwrite the
+      // matching state (matchStatus / dealId / reconciled) already on the row.
+      await ctx.db.patch("transactions", existing._id, fields)
+      counters.alreadyExisting += 1
+    } else {
+      // A matching learned rule classifies the new row at insert
+      // (charge/tax/product/internal transfer + category + VAT).
+      const ruleFields = ruleFieldsFor(categoryRules, fields.searchText)
+      await ctx.db.insert('transactions', {
+        ...fields,
+        ...(ruleFields ?? { matchStatus: 'unmatched' as const }),
+        reconciled: false,
+      })
+      counters.ingested += 1
+    }
+  }
+  return counters
 }
 
 // ─── Connection health: upsert + change-triggered email alert ─────────────────
@@ -707,6 +798,8 @@ async function upsertConnectionStatus(
       q.eq('powensConnectionId', powensConnectionId),
     )
     .unique()
+  // Health BEFORE this refresh — the catch-up below keys off the transition.
+  const previousHealth = existing ? connectionHealth(existing, now) : null
 
   // Current-state facts are always overwritten (undefined = cleared, e.g. a
   // sync back to OK clears `state`). `connectorName` and
@@ -744,7 +837,23 @@ async function upsertConnectionStatus(
     })
   }
   const row = await ctx.db.get('powensConnections', rowId)
-  if (row) await maybeNotifyConnectionHealth(ctx, row, now)
+  if (!row) return
+  await maybeNotifyConnectionHealth(ctx, row, now)
+
+  // A connection coming back to life (reconnection after a breakdown, or a
+  // brand-new connection row) is THE moment to catch up on the gap: the
+  // webhook only carries what Powens synced now, never what was missed while
+  // the connection was down. Scheduled — it hits the Powens REST API.
+  if (connectionHealth(row, now) === 'connected' && previousHealth !== 'connected') {
+    await ctx.scheduler.runAfter(0, internal.powens.backfillConnection, {
+      orgId,
+      powensConnectionId,
+    })
+    console.log(
+      `[powens] connexion ${powensConnectionId} de nouveau saine ` +
+        `(avant: ${previousHealth ?? 'inconnue'}) — rattrapage planifié`,
+    )
+  }
 }
 
 export const ingestConnectionSync = internalMutation({
@@ -816,68 +925,23 @@ export const ingestConnectionSync = internalMutation({
         cutoff === account._creationTime
           ? '_creationTime'
           : 'dernière tx Airtable'
-      // Per-account counters (feed the log; the global summary is unchanged).
-      let received = 0
-      let ingested = 0
-      let filteredCutover = 0
-      let filteredDeleted = 0
-      let alreadyExisting = 0
-      for (const tx of acc.transactions) {
-        received += 1
-        if (tx.deleted || tx.dateMs <= cutoff) {
-          if (tx.deleted) {
-            filteredDeleted += 1
-          } else {
-            filteredCutover += 1
-          }
-          summary.skipped += 1
-          continue
-        }
-        const existing = await ctx.db
-          .query('transactions')
-          .withIndex('by_powens_id', (q) =>
-            q.eq('powensTxId', tx.powensTxId),
-          )
-          .first()
-        const direction: 'in' | 'out' = tx.valueUnits < 0 ? 'out' : 'in'
-        const fields = {
-          orgId: account.orgId,
-          bankAccountId: account._id,
-          direction,
-          amount: Math.round(Math.abs(tx.valueUnits) * 100),
-          transactionDate: tx.dateMs,
-          rawLabel: tx.wording,
-          counterparty: tx.counterparty,
-          searchText: buildSearchText(tx.wording, tx.counterparty),
-          source: 'powens' as const,
-          powensTxId: tx.powensTxId,
-        }
-        if (existing) {
-          // Webhook redelivery: do not overwrite the matching state
-          // (matchStatus / dealId / reconciled) already set on the row.
-          await ctx.db.patch("transactions", existing._id, fields)
-          alreadyExisting += 1
-          summary.patched += 1
-        } else {
-          // A matching learned rule classifies the new row at insert
-          // (charge/tax/product/internal transfer + category + VAT).
-          const ruleFields = ruleFieldsFor(categoryRules, fields.searchText)
-          await ctx.db.insert('transactions', {
-            ...fields,
-            ...(ruleFields ?? { matchStatus: 'unmatched' as const }),
-            reconciled: false,
-          })
-          ingested += 1
-          summary.inserted += 1
-        }
-      }
+      const counters = await writeAccountTransactions(
+        ctx,
+        account,
+        acc.transactions,
+        cutoff,
+        categoryRules,
+      )
+      summary.inserted += counters.ingested
+      summary.patched += counters.alreadyExisting
+      summary.skipped += counters.filteredCutover + counters.filteredDeleted
       console.log(
         `[powens] ${account.bankName} / connecteur "${acc.connectorName}" ` +
-          `(acct ${acc.powensAccountId}): reçu ${received} tx, ` +
+          `(acct ${acc.powensAccountId}): reçu ${counters.received} tx, ` +
           `cutover=${new Date(cutoff).toISOString().slice(0, 10)} (${cutoffSource}), ` +
-          `ingéré ${ingested}, filtré ${filteredCutover} (cutover)` +
-          `${filteredDeleted > 0 ? ` + ${filteredDeleted} (deleted)` : ''}, ` +
-          `${alreadyExisting} déjà existante(s) (idempotence)`,
+          `ingéré ${counters.ingested}, filtré ${counters.filteredCutover} (cutover)` +
+          `${counters.filteredDeleted > 0 ? ` + ${counters.filteredDeleted} (deleted)` : ''}, ` +
+          `${counters.alreadyExisting} déjà existante(s) (idempotence)`,
       )
     }
     console.log(
@@ -1090,6 +1154,180 @@ export const listConnections = query({
     }))
 
     return [...tracked, ...untracked]
+  },
+})
+
+// ─── Catch-up after a reconnection (Powens REST pull) ────────────────────────
+
+/** Overlap applied to the catch-up window: we re-ask Powens starting a few
+ * days BEFORE our last known transaction, because a movement can land with a
+ * date earlier than one already received (deferred settlement). Free — the
+ * overlap is deduped by `powensTxId`. */
+const BACKFILL_OVERLAP_MS = 7 * 24 * 60 * 60 * 1000
+
+/** Pages walked at most per account. Stop against an endless pagination loop;
+ * at 1000 transactions per page it is far above any real gap. */
+const BACKFILL_MAX_PAGES = 20
+
+/** Accounts fed by a connection, each with the date of the LAST transaction we
+ * hold — the resume point of the catch-up. `lastTransactionAt: null` (account
+ * with no movement yet) means there is nothing to resume FROM: its history
+ * starts at its own cutover, so the catch-up skips it. */
+export const listAccountsForBackfill = internalQuery({
+  args: { orgId: v.id('organizations'), powensConnectionId: v.string() },
+  handler: async (ctx, { orgId, powensConnectionId }) => {
+    const accounts = await ctx.db
+      .query('bankAccounts')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    const rows: Array<{
+      bankAccountId: Id<'bankAccounts'>
+      powensAccountId: string
+      label: string
+      lastTransactionAt: number | null
+    }> = []
+    for (const a of accounts) {
+      if (a.powensConnectionId !== powensConnectionId) continue
+      if (!a.powensAccountId || a.archivedAt) continue
+      const last = await ctx.db
+        .query('transactions')
+        .withIndex('by_account_date', (q) => q.eq('bankAccountId', a._id))
+        .order('desc')
+        .first()
+      rows.push({
+        bankAccountId: a._id,
+        powensAccountId: a.powensAccountId,
+        label: a.displayName ?? a.label,
+        lastTransactionAt: last?.transactionDate ?? null,
+      })
+    }
+    return rows
+  },
+})
+
+/** Writes one page of caught-up transactions onto an account, through the
+ * SAME path as the webhook (`writeAccountTransactions`): cutover filter,
+ * dedup by `powensTxId`, learned rules on insert. Nothing is overwritten. */
+export const ingestBackfilledTransactions = internalMutation({
+  args: {
+    bankAccountId: v.id('bankAccounts'),
+    transactions: v.array(normTxValidator),
+  },
+  handler: async (ctx, { bankAccountId, transactions }) => {
+    const account = await ctx.db.get("bankAccounts", bankAccountId)
+    if (!account) throw new ConvexError('account_not_found')
+    const cutoff = await computeCutoff(ctx, account)
+    const categoryRules = await loadOrgRules(ctx, account.orgId)
+    return writeAccountTransactions(
+      ctx,
+      account,
+      transactions,
+      cutoff,
+      categoryRules,
+    )
+  },
+})
+
+/** Catches up on the transactions missed while a connection was down.
+ *
+ * The webhook only pushes what Powens synced at that moment: when a
+ * connection breaks and is reconnected days or weeks later, the movements
+ * that happened in between are in Powens' store but were never pushed to us.
+ * This pulls them explicitly, per account, from `GET /users/me/accounts/{id}/
+ * transactions?min_date=…` — `min_date` being the date of the last
+ * transaction we hold (minus `BACKFILL_OVERLAP_MS`).
+ *
+ * Scheduled automatically when a connection goes back to `connected`
+ * (cf. `upsertConnectionStatus`). Also runnable by the operator to repair an
+ * old gap:
+ *   pnpm exec convex run --prod powens:backfillConnection \
+ *     '{"orgId":"…","powensConnectionId":"…"}'
+ *
+ * Bounds, in order: the last transaction held (resume point), the account
+ * cutover (`computeCutoff`, hard floor) and what Powens itself holds — no
+ * arbitrary depth limit, otherwise a long breakdown would silently lose its
+ * oldest weeks. A per-account failure is logged and does not stop the others. */
+export const backfillConnection = internalAction({
+  args: { orgId: v.id('organizations'), powensConnectionId: v.string() },
+  handler: async (
+    ctx,
+    { orgId, powensConnectionId },
+  ): Promise<{ accounts: number; fetched: number; inserted: number }> => {
+    const domain = process.env.POWENS_DOMAIN
+    if (!domain) throw new ConvexError('powens_env_missing')
+    const summary = { accounts: 0, fetched: 0, inserted: 0 }
+
+    const powensUser = await ctx.runQuery(internal.powens.getOrgPowensToken, {
+      orgId,
+    })
+    if (!powensUser) {
+      console.warn(
+        `[powens] rattrapage impossible pour la connexion ${powensConnectionId}: ` +
+          `aucun user Powens géré pour cette org`,
+      )
+      return summary
+    }
+    const accounts = await ctx.runQuery(
+      internal.powens.listAccountsForBackfill,
+      { orgId, powensConnectionId },
+    )
+
+    for (const account of accounts) {
+      if (account.lastTransactionAt == null) continue
+      const since = new Date(account.lastTransactionAt - BACKFILL_OVERLAP_MS)
+        .toISOString()
+        .slice(0, 10)
+      let next: string | null =
+        `https://${domain}/2.0/users/me/accounts/${account.powensAccountId}` +
+        `/transactions?limit=1000&min_date=${since}`
+      let fetched = 0
+      let inserted = 0
+      let pages = 0
+      try {
+        while (next && pages < BACKFILL_MAX_PAGES) {
+          const res = await fetch(next, {
+            headers: { Authorization: `Bearer ${powensUser.authToken}` },
+          })
+          if (!res.ok) throw new Error(`http_${res.status}`)
+          const json = asRecord(await res.json())
+          const txs = asArray(json.transactions)
+            .map(normalizeTx)
+            .filter((t): t is NormTx => t !== null)
+          fetched += txs.length
+          if (txs.length > 0) {
+            const counters: WriteCounters = await ctx.runMutation(
+              internal.powens.ingestBackfilledTransactions,
+              { bankAccountId: account.bankAccountId, transactions: txs },
+            )
+            inserted += counters.ingested
+          }
+          // Powens paginates with opaque absolute links — followed as is.
+          next = asString(asRecord(asRecord(json._links).next).href) ?? null
+          pages += 1
+        }
+        summary.accounts += 1
+        summary.fetched += fetched
+        summary.inserted += inserted
+        console.log(
+          `[powens] rattrapage ${account.label} (acct ${account.powensAccountId}) ` +
+            `depuis ${since}: ${fetched} tx reçue(s) sur ${pages} page(s), ` +
+            `${inserted} nouvelle(s)`,
+        )
+      } catch (err) {
+        // No token in the message — account label only.
+        console.error(
+          `[powens] rattrapage échoué pour ${account.label} ` +
+            `(acct ${account.powensAccountId}): ` +
+            `${err instanceof Error ? err.message : String(err)}`,
+        )
+      }
+    }
+    console.log(
+      `[powens] rattrapage connexion ${powensConnectionId} terminé: ` +
+        `${summary.accounts} compte(s), ${summary.fetched} tx reçue(s), ` +
+        `${summary.inserted} nouvelle(s)`,
+    )
+    return summary
   },
 })
 

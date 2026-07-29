@@ -580,6 +580,8 @@ La connexion des banques se fait par l'opérateur via le Powens Webview.
 | P9  | Signature falsifiée                                                                 | `401`, rien écrit (cf. S5)                                                                                                           |
 | P10 | Nettoyage Qonto — `convex run --prod powens:listQontoTestTransactions`              | Liste les tx `source='manual'` sans `airtableId` ; si vide → ne rien supprimer                                                       |
 | P11 | `convex export --prod --path …` puis `powens:deleteTransactionsByIds '{"ids":[…]}'` | Supprime **uniquement** les ids validés (garde-fou : manual + sans airtableId + compte Qonto) ; retourne `{ deleted, skipped }`      |
+| P12 | Rattrapage après reconnexion : couper une connexion (mot de passe changé côté banque) jusqu'à l'état dégradé, laisser passer des mouvements, puis « Reconnecter » | Au retour à l'état sain, log `rattrapage planifié` puis `rattrapage <compte> depuis <date>` ; les transactions de la coupure apparaissent dans le registre, aucune antérieure au cutover du compte |
+| P13 | Rattrapage manuel — `convex run --prod powens:backfillConnection '{"orgId":"…","powensConnectionId":"…"}'` | Retourne `{ accounts, fetched, inserted }` ; **rejouer** : `inserted: 0` (dédup `by_powens_id`), et le pointage déjà posé sur les tx rattrapées est intact |
 
 ## Émission Powens (bouton « Connecter une banque » → Webview)
 

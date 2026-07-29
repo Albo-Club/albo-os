@@ -80,6 +80,16 @@ refaire toute la connexion. Dès qu'une connexion se dégrade, une bannière
 apparaît aussi en tête de la Vue d'ensemble avec le nom des banques
 concernées et un raccourci vers cette section.
 
+**Rattrapage automatique du trou.** Quand une connexion revient à la normale,
+l'application va chercher d'elle-même les mouvements survenus pendant la
+coupure : elle repart de la dernière transaction qu'elle détient sur chaque
+compte et redemande à la banque tout ce qui s'est passé depuis. Une coupure
+non traitée pendant plusieurs semaines n'est donc plus une perte de données —
+la reconnexion suffit à combler le trou. Aucune limite d'ancienneté n'est
+appliquée : la seule borne est ce que la banque conserve encore de son côté.
+Le rattrapage repasse par le même chemin que la synchro courante, donc il ne
+crée pas de doublon et n'écrase aucun pointage déjà fait.
+
 ## Transactions
 
 Une transaction = un flux bancaire réel : sens (entrée/sortie), montant,
