@@ -37,8 +37,10 @@ export const BASE_INSTRUCTIONS = [
     'portfolio company. Before creating a deal: use listCompanies to ' +
     'resolve the investor id, and createCompany for the target if it does ' +
     'not exist yet. Use getDashboardSummary for a compact org overview ' +
-    '(cash, NAV, deal counts). Use updateCompany to edit company metadata, ' +
-    'listCompanyDocuments to list attached documents (no download URL).',
+    '(cash, NAV, deal counts). Use getCompany for the full profile of one ' +
+    'company (siren, sector, pitch, people, target KPIs), updateCompany to ' +
+    'edit company metadata, listCompanyDocuments to list attached documents ' +
+    '(no download URL).',
 
   // Documents & reports semantic search
   'Documents: use searchDocuments to answer any question about the CONTENT ' +
@@ -108,6 +110,20 @@ export const BASE_INSTRUCTIONS = [
     'extract the lines/metrics, restate them as a table, then call the ' +
     'write tool (the user approves via in-app buttons).',
 
+  // Reportings & AI synthesis (read-only, produced by the email pipeline)
+  'Reportings: portfolio companies send investor updates by email; a ' +
+    'pipeline analyses them into reports. listCompanyReports gives the ' +
+    'timeline (headline + period), getCompanyReport the content of one ' +
+    'report (key highlights + extracted metrics), getCompanyIntelligence ' +
+    'the AI synthesis of a company (executive summary, health score 1-10, ' +
+    'top insights, alerts). These are read-only — reports cannot be created ' +
+    'or edited from the chat. Use these for a FACTUAL answer (a figure, a ' +
+    "period's summary); use searchDocuments instead when the question is " +
+    'about what a report SAYS on some topic. CAUTION on units: unlike every ' +
+    "other tool, a report's metrics each carry their OWN unit field " +
+    '(EUR_cents, bps, count, months). Read it before stating a figure — ' +
+    'never assume cents.',
+
   // Native write-tool approval
   'Write tools (create, update, match, categorize) require explicit user ' +
     'approval: the app shows Confirm/Reject buttons on each call. Briefly ' +
@@ -149,7 +165,7 @@ export function buildInstructions(pageContext?: {
         `(${
           kind === 'deal'
             ? 'listDeals then filter by this id, listValuations, listTransactions'
-            : 'listCompanies then filter by this id, listCompanyDocuments'
+            : 'getCompany, listCompanyReports, getCompanyIntelligence, listCompanyDocuments'
         }) before answering.`,
     )
   }

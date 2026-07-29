@@ -100,6 +100,13 @@ Rapports entrants (Assigner / Retraiter / Rejeter).
   une série, elle doit entrer au catalogue (évolution à demander).
 - **Budget vs réalisé** : seules les valeurs réalisées alimentent les
   séries ; les chiffres de budget/prévisionnel restent sur le report.
+- **L'assistant IA les lit, de deux façons** : il restitue l'analyse rangée
+  par le pipeline (points clés, métriques, synthèse de la société) pour une
+  question factuelle — « quel CA en mars ? » ; et il fouille le texte
+  intégral par le sens pour une question ouverte — « qu'est-ce qu'ils
+  disent du recrutement ? ». Il choisit tout seul. Vaut dans l'app comme
+  depuis claude.ai, à ceci près que la recherche dans le texte reste
+  in-app.
 
 ## Pages liées
 

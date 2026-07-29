@@ -117,6 +117,26 @@ export function toCanonical(m: RawMetric): CanonicalMetric | null {
   }
 }
 
+/**
+ * Storage unit of a catalog key, or null when the key is off-catalog. Readers
+ * of a report's flat `metrics` map (bare numbers) need it to know that 8600000
+ * on `revenue` is 86 000 €, not 8.6 M€.
+ */
+export function storageUnitFor(key: string): CanonicalMetric['unit'] | null {
+  const entry = CATALOG_BY_KEY.get(key)
+  if (!entry) return null
+  switch (entry.unit) {
+    case 'eur':
+      return 'EUR_cents'
+    case 'percent':
+      return 'bps'
+    case 'count':
+      return 'count'
+    case 'months':
+      return 'months'
+  }
+}
+
 /** Catalog rendered for the extraction prompt. */
 export function catalogPromptList(): string {
   return METRIC_CATALOG.map((e) => `- ${e.key} (${e.unit}) : ${e.hint}`).join('\n')

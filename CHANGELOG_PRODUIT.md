@@ -23,6 +23,58 @@ bas de page.
 
 ---
 
+## v1.145.0 — 29/07/2026 à 16:18 — L'assistant lit les reportings et la fiche société
+
+L'assistant sait désormais chercher dans le **contenu** de vos documents et
+reports (v1.143.0), mais il ne voyait toujours pas le travail d'analyse fait
+par le pipeline : les points clés d'un reporting, ses métriques rangées, et
+la synthèse IA d'une société. C'est corrigé.
+
+Il accède maintenant à la liste des reportings d'une participation, au
+détail de chacun (points clés + métriques extraites) et à la synthèse d'une
+société — score de santé, forces, points de vigilance, alertes. En lecture
+seule : les reportings continuent d'arriver par transfert d'email.
+
+La différence avec la recherche par le sens : pour « que dit le reporting
+sur le recrutement ? », l'assistant fouille le texte ; pour « quel était le
+CA de mars ? », il lit la métrique rangée, exacte. Il choisit tout seul.
+
+Dans la foulée, il connaît aussi la **fiche complète d'une société** :
+secteur, pitch, identité légale, personnes, KPIs suivis. Avant, il ne
+voyait qu'un nom — il pouvait citer une participation sans savoir ce
+qu'elle fait.
+
+Ces nouveautés valent dans l'app (panneau ⌘J) **et** depuis claude.ai via
+le connecteur, qui passe de 18 à 22 outils de consultation. Si vous
+utilisez le connecteur, déconnectez-le et reconnectez-le une fois pour que
+les nouveaux outils apparaissent.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau fichier de domaine `convex/agentToolsReports.ts` : trois outils
+>   de lecture (`listCompanyReports`, `getCompanyReport`,
+>   `getCompanyIntelligence`), branchés sur `chatAgent` dans
+>   `convex/agent.ts` et miroités dans `convex/mcp/registry.ts` (le MCP
+>   n'expose pas `searchDocuments`, qui reste in-app).
+> - Internals scopés `actorUserId` (pattern `readMembership`) :
+>   `companyReports.listInternal` / `getInternal` et
+>   `intelligence.getByCompanyInternal`.
+> - `getInternal` ne sert **pas** `rawContent` : ce texte est déjà indexé
+>   par la vectorisation (v1.143.0) et se lit via `searchDocuments`. Les
+>   deux portes sont documentées dans `KNOWN_ISSUES.md` § « Outils reports
+>   vs searchDocuments ».
+> - Piège traité : `companyReports.metrics` est une map de nombres nus dont
+>   l'unité vit dans `METRIC_CATALOG`. Nouveau helper pur `storageUnitFor`
+>   (`convex/lib/metricCatalog.ts`, testé sur les 35 clés) ; `getInternal`
+>   renvoie `{key, value, unit}` par métrique, sans quoi le modèle lit
+>   86 k€ comme 8,6 M€. Documenté dans `KNOWN_ISSUES.md`.
+> - Côté portfolio : `listCompaniesInternal` s'enrichit (secteur, domaine,
+>   pitch, groupe, sponsor), nouvel outil `getCompany` pour le détail, et
+>   `listCompanyDocuments` expose `reportId` pour chaîner un fichier vers
+>   son reporting. Pas d'URL de storage exposée — décision assumée.
+
+---
+
 ## v1.144.1 — 29/07/2026 à 10:01 — La vectorisation reste hébergée en Europe
 
 La recherche dans les documents s'appuyait sur le routage automatique

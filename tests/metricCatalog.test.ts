@@ -9,7 +9,12 @@
 
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { METRIC_CATALOG, sanitizeKpiTargets, toCanonical } from '../convex/lib/metricCatalog'
+import {
+  METRIC_CATALOG,
+  sanitizeKpiTargets,
+  storageUnitFor,
+  toCanonical,
+} from '../convex/lib/metricCatalog'
 
 describe('toCanonical', () => {
   it('converts EUR magnitudes to cents', () => {
@@ -77,6 +82,39 @@ describe('toCanonical', () => {
   it('has unique catalog keys', () => {
     const keys = METRIC_CATALOG.map((e) => e.key)
     assert.equal(new Set(keys).size, keys.length)
+  })
+})
+
+describe('storageUnitFor', () => {
+  it('maps each catalog unit to its storage unit', () => {
+    assert.equal(storageUnitFor('revenue'), 'EUR_cents')
+    assert.equal(storageUnitFor('ebitda_margin_pct'), 'bps')
+    assert.equal(storageUnitFor('headcount'), 'count')
+    assert.equal(storageUnitFor('runway_months'), 'months')
+  })
+
+  it('returns null off-catalog', () => {
+    assert.equal(storageUnitFor('parking_occupancy'), null)
+    assert.equal(storageUnitFor(''), null)
+  })
+
+  it('agrees with toCanonical on every catalog key', () => {
+    for (const entry of METRIC_CATALOG) {
+      const seen =
+        entry.unit === 'eur'
+          ? 'EUR'
+          : entry.unit === 'percent'
+            ? 'percent'
+            : entry.unit
+      const canonical = toCanonical({
+        catalog_key: entry.key,
+        raw_label: entry.key,
+        value: 1,
+        unit: seen,
+        period: null,
+      })
+      assert.equal(storageUnitFor(entry.key), canonical?.unit)
+    }
   })
 })
 

@@ -17,6 +17,7 @@ import type * as agentToolsIntelligence from "../agentToolsIntelligence.js";
 import type * as agentToolsLiabilities from "../agentToolsLiabilities.js";
 import type * as agentToolsPointage from "../agentToolsPointage.js";
 import type * as agentToolsProjections from "../agentToolsProjections.js";
+import type * as agentToolsReports from "../agentToolsReports.js";
 import type * as agentToolsValuations from "../agentToolsValuations.js";
 import type * as agentmail from "../agentmail.js";
 import type * as aggregate from "../aggregate.js";
@@ -135,6 +136,7 @@ declare const fullApi: ApiFromModules<{
   agentToolsLiabilities: typeof agentToolsLiabilities;
   agentToolsPointage: typeof agentToolsPointage;
   agentToolsProjections: typeof agentToolsProjections;
+  agentToolsReports: typeof agentToolsReports;
   agentToolsValuations: typeof agentToolsValuations;
   agentmail: typeof agentmail;
   aggregate: typeof aggregate;

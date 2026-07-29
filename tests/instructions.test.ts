@@ -59,5 +59,7 @@ describe('buildInstructions', () => {
     })
     assert.ok(out.includes('viewing the company with id "company_456"'))
     assert.ok(out.includes('listCompanyDocuments'))
+    assert.ok(out.includes('listCompanyReports'))
+    assert.ok(out.includes('getCompanyIntelligence'))
   })
 })
