@@ -85,9 +85,10 @@ principalement **claude.ai** — pour interroger le portefeuille sans ouvrir
 l'app (« quelle est ma position de trésorerie ? », « liste mes deals
 actifs »).
 
-- **Strictement en lecture seule** : ~18 outils de consultation (deals,
-  sociétés, comptes, transactions, prévisionnel, passif, valorisations,
-  KPIs, TVA…), aucune écriture.
+- **Strictement en lecture seule** : ~22 outils de consultation (deals,
+  fiches sociétés, reportings des participations et synthèse IA, comptes,
+  transactions, prévisionnel, passif, valorisations, KPIs, TVA…), aucune
+  écriture.
 - **Sécurisé par OAuth** : la connexion passe par la page de connexion
   habituelle d'Albo OS, et chaque utilisateur ne voit que les organisations
   dont il est membre.

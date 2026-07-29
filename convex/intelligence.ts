@@ -22,6 +22,7 @@ import {
 import { getModel } from './agent'
 import { intelligenceTools } from './agentToolsIntelligence'
 import { INTELLIGENCE_SYSTEM_PROMPT } from './lib/reportPrompts'
+import { readMembership } from './lib/agentScope'
 import { requireOrgMember } from './lib/auth'
 import type { Id } from './_generated/dataModel'
 import type { VascoCommunication } from './vasco'
@@ -207,6 +208,35 @@ export const getByCompany = query({
       aiAnalysis: intel.aiAnalysis ?? null,
       aiAnalysisStatus: intel.aiAnalysisStatus ?? null,
       aiAnalysisUpdatedAt: intel.aiAnalysisUpdatedAt ?? null,
+    }
+  },
+})
+
+// ─── Agent variants (re-check membership via actorUserId) ────────────────────
+
+export const getByCompanyInternal = internalQuery({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    companyId: v.id('companies'),
+  },
+  handler: async (ctx, { orgId, actorUserId, companyId }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const company = await ctx.db.get('companies', companyId)
+    if (!company || company.orgId !== orgId) throw new ConvexError('not_found')
+
+    const intel = await ctx.db
+      .query('companyIntelligence')
+      .withIndex('by_company', (q) => q.eq('companyId', companyId))
+      .unique()
+    if (!intel) return null
+
+    return {
+      aiAnalysis: intel.aiAnalysis ?? null,
+      aiAnalysisStatus: intel.aiAnalysisStatus ?? null,
+      aiAnalysisUpdatedAt: intel.aiAnalysisUpdatedAt ?? null,
+      // Chains into getCompanyReport for the report behind the synthesis.
+      latestReportId: intel.latestReportId ?? null,
     }
   },
 })

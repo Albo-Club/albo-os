@@ -690,7 +690,7 @@ Les outils d'écriture de l'agent portent `needsApproval: true`
 
 ## Serveur MCP distant (connector claude.ai) — OAuth via plugin BA `mcp`
 
-Le serveur MCP (`convex/mcp/`) expose ~18 outils **lecture seule** aux
+Le serveur MCP (`convex/mcp/`) expose ~22 outils **lecture seule** aux
 clients MCP externes. Architecture : resource server = httpAction `/mcp`
 (JSON-RPC Streamable HTTP **stateless**, fait main — le SDK
 `@modelcontextprotocol/sdk` est Node-only et les httpActions tournent dans
@@ -739,7 +739,7 @@ Pièges et décisions :
    re-déclare les schémas en zod v4. Si les args d'un internal changent,
    tenir les deux en phase.
 8. **claude.ai ne charge qu'un sous-ensemble des outils par conversation**
-   (sélection dynamique côté Anthropic, ~5 sur 18 observés). Conséquence :
+   (sélection dynamique côté Anthropic, ~5 sur 22 observés). Conséquence :
    `listOrgs` peut être absent et le modèle devine des slugs erronés.
    Mitigation en place : à `initialize`/`tools/list` (authentifiés), les
    orgs du caller sont injectées en `enum` sur le paramètre `org` de chaque
@@ -2880,3 +2880,29 @@ Pièges à connaître :
   l'org de la company (`listByCompany`) ou l'intersection des memberships
   (`getById`) — un membre d'une seule org ne voit jamais les liens de
   l'autre.
+
+## `companyReports.metrics` — des nombres nus, unité stockée ailleurs
+
+`companyReports.metrics` est un `Record<string, number>` : `{ revenue:
+8600000, ebitda_margin_pct: 1100, headcount: 23 }`. **L'unité de chaque
+clé ne vit pas dans la donnée** mais dans `METRIC_CATALOG`
+(`convex/lib/metricCatalog.ts`) : `eur` → centimes, `percent` → points de
+base, `count` et `months` bruts. Un lecteur qui affiche la valeur telle
+quelle annonce 8,6 M€ là où le report disait 86 k€ — erreur d'un facteur
+100, silencieuse, et d'autant plus traître que les clés cohabitent dans le
+même dictionnaire (le `1100` d'à côté, lui, est bien 11 %).
+
+Le front s'en tire en affichant la valeur brute en `font-mono` sans
+prétendre à une unité (`CompanyReportsSection.tsx`) — c'est un choix
+d'affichage, pas une solution.
+
+**Règle** : tout nouveau consommateur de `metrics` joint l'unité via
+`storageUnitFor(key)` avant de formater ou de raisonner. C'est ce que fait
+`describeMetrics` dans `convex/companyReports.ts:getInternal`, qui sert
+aux outils IA/MCP un tableau `{ key, value, unit }` plutôt que la map nue —
+sans quoi le modèle invente l'unité (et se trompe).
+
+Corollaire : `metrics` ne contient **que** des clés du catalogue. Tout ce
+que le LLM d'extraction a vu sans savoir le rattacher reste dans
+`rawMetrics` (snapshot d'audit, non servi aux outils). Une métrique absente
+n'est pas un zéro.

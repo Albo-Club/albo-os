@@ -48,7 +48,54 @@ export const listCompaniesInternal = internalQuery({
       .collect()
     return rows
       .filter((c) => !c.archivedAt)
-      .map((c) => ({ _id: c._id, name: c.name, kind: c.kind }))
+      .map((c) => ({
+        _id: c._id,
+        name: c.name,
+        kind: c.kind,
+        // Enough to tell the companies apart without a second call; the long
+        // fields (summary, notes, people) live on getCompanyInternal.
+        sector: c.sector ?? null,
+        domain: c.domain ?? null,
+        oneLiner: c.oneLiner ?? null,
+        group: c.group ?? null,
+        sponsor: c.sponsor ?? null,
+      }))
+  },
+})
+
+export const getCompanyInternal = internalQuery({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    companyId: v.id('companies'),
+  },
+  handler: async (ctx, { orgId, actorUserId, companyId }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const c = await ctx.db.get('companies', companyId)
+    if (!c || c.orgId !== orgId) throw new ConvexError('not_found')
+
+    return {
+      _id: c._id,
+      name: c.name,
+      legalName: c.legalName ?? null,
+      kind: c.kind,
+      siren: c.siren ?? null,
+      registrationNumber: c.registrationNumber ?? null,
+      countryCode: c.countryCode ?? null,
+      domain: c.domain ?? null,
+      sector: c.sector ?? null,
+      oneLiner: c.oneLiner ?? null,
+      summary: c.summary ?? null,
+      legalForm: c.legalForm ?? null,
+      incorporationDate: c.incorporationDate ?? null,
+      totalShares: c.totalShares ?? null,
+      sponsor: c.sponsor ?? null,
+      group: c.group ?? null,
+      kpiTargets: c.kpiTargets ?? [],
+      notes: c.notes ?? null,
+      people: c.people ?? [],
+      archivedAt: c.archivedAt ?? null,
+    }
   },
 })
 
@@ -352,6 +399,26 @@ const listCompanies = createTool({
     return await ctx.runQuery(internal.agentTools.listCompaniesInternal, {
       orgId,
       actorUserId: userId,
+    })
+  },
+})
+
+const getCompany = createTool({
+  description:
+    'Full profile of one company: legal identity (siren, legal form, ' +
+    'country), sector, pitch (oneLiner) and summary, share count, sponsor ' +
+    'and portfolio group, target KPI keys, free notes and people ' +
+    '(founders, board, co-investors). Use listCompanies first if you do not ' +
+    'know the company id.',
+  inputSchema: z.object({
+    companyId: z.string(),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runQuery(internal.agentTools.getCompanyInternal, {
+      orgId,
+      actorUserId: userId,
+      companyId: input.companyId as Id<'companies'>,
     })
   },
 })
@@ -687,6 +754,9 @@ export const listCompanyDocumentsInternal = internalQuery({
       size: doc.size ?? null,
       source: doc.source,
       uploadedAt: doc.uploadedAt,
+      // Set when the file arrived as a report attachment: chains into
+      // getCompanyReport for the analysed content.
+      reportId: doc.reportId ?? null,
     }))
   },
 })
@@ -836,6 +906,7 @@ const renameBankAccount = createTool({
 
 export const dealTools = {
   listCompanies,
+  getCompany,
   listDeals,
   createCompany,
   createDeal,

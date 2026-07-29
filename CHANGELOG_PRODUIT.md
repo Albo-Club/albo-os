@@ -23,6 +23,51 @@ bas de page.
 
 ---
 
+## v1.131.0 — 29/07/2026 à 15:50 — L'assistant IA lit enfin les reportings
+
+Jusqu'ici l'assistant voyait les KPIs chiffrés d'une participation, mais
+pas les comptes rendus dont ils sortent : impossible de lui demander « que
+disait le dernier reporting de X ? ». C'est corrigé. Il accède désormais
+aux reportings reçus par email (points clés et métriques extraites) et à la
+synthèse IA d'une société — score de santé, forces, points de vigilance,
+alertes. En lecture seule : les reportings continuent d'arriver par
+transfert d'email, l'assistant ne peut ni en créer ni en modifier.
+
+Dans la foulée, il connaît aussi la **fiche complète d'une société** :
+secteur, pitch, identité légale, personnes, KPIs suivis. Avant, il ne
+voyait qu'un nom — il pouvait citer une participation sans savoir ce
+qu'elle fait.
+
+Ces nouveautés valent dans l'app (panneau ⌘J) **et** depuis claude.ai via
+le connecteur, qui passe de 18 à 22 outils de consultation. Si vous
+utilisez le connecteur, déconnectez-le et reconnectez-le une fois pour que
+les nouveaux outils apparaissent.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau fichier de domaine `convex/agentToolsReports.ts` : trois outils
+>   de lecture (`listCompanyReports`, `getCompanyReport`,
+>   `getCompanyIntelligence`), branchés sur `chatAgent` dans
+>   `convex/agent.ts` et miroités dans `convex/mcp/registry.ts`.
+> - Internals scopés `actorUserId` (pattern `readMembership`) :
+>   `companyReports.listInternal` / `getInternal` et
+>   `intelligence.getByCompanyInternal`. `getInternal` ne sert **pas**
+>   `rawContent`/`cleanedHtml` (jusqu'à 150k caractères) — la recherche
+>   sémantique sur ce contenu est un chantier séparé.
+> - Piège traité : `companyReports.metrics` est une map de nombres nus dont
+>   l'unité vit dans `METRIC_CATALOG`. Nouveau helper pur `storageUnitFor`
+>   (`convex/lib/metricCatalog.ts`, testé) ; `getInternal` renvoie
+>   `{key, value, unit}` par métrique, sans quoi le modèle lit 86 k€ comme
+>   8,6 M€. Documenté dans `KNOWN_ISSUES.md`.
+> - Côté portfolio : `listCompaniesInternal` s'enrichit (secteur, domaine,
+>   pitch, groupe, sponsor), nouvel outil `getCompany` pour le détail, et
+>   `listCompanyDocuments` expose `reportId` pour chaîner un fichier vers
+>   son reporting. Pas d'URL de storage exposée — décision assumée.
+> - `convex/lib/instructions.ts` : bloc « Reportings » dans le prompt
+>   système, avec l'avertissement sur les unités par métrique.
+
+---
+
 ## v1.130.1 — 27/07/2026 à 09:40 — Fenêtre de rapprochement : le texte ne déborde plus
 
 La fenêtre « Les montants diffèrent » (celle qui propose de clore avec

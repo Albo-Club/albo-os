@@ -95,6 +95,11 @@ Rapports entrants (Assigner / Retraiter / Rejeter).
   une série, elle doit entrer au catalogue (évolution à demander).
 - **Budget vs réalisé** : seules les valeurs réalisées alimentent les
   séries ; les chiffres de budget/prévisionnel restent sur le report.
+- **L'assistant IA les lit** : une fois le report rangé, l'assistant peut
+  le restituer (points clés, métriques) et donner la synthèse d'une
+  société, dans l'app comme depuis claude.ai. Il lit l'analyse produite par
+  le pipeline, pas le texte intégral du mail — pour une question très
+  précise sur une phrase du reporting, ouvrir le report dans la fiche.
 
 ## Pages liées
 

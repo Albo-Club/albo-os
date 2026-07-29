@@ -7,6 +7,7 @@ import { forecastTools } from './agentToolsForecasts'
 import { liabilityTools } from './agentToolsLiabilities'
 import { pointageTools } from './agentToolsPointage'
 import { projectionTools } from './agentToolsProjections'
+import { reportTools } from './agentToolsReports'
 import { valuationTools } from './agentToolsValuations'
 import { AGENT_MODEL, BASE_INSTRUCTIONS } from './lib/instructions'
 
@@ -37,6 +38,7 @@ export const chatAgent = new Agent(components.agent, {
     ...forecastTools,
     ...valuationTools,
     ...projectionTools,
+    ...reportTools,
   },
   // Transaction-matching (pointage) flows are multi-step (list → suggest →
   // confirm → match): 12 steps instead of 8.

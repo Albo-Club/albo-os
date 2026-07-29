@@ -103,6 +103,21 @@ export const mcpTools: Array<McpTool> = [
       }),
   }),
   defineTool({
+    name: 'getCompany',
+    description:
+      'Full profile of one company: legal identity (siren, legal form, ' +
+      'country), sector, pitch and summary, share count, sponsor and ' +
+      'portfolio group, target KPI keys, notes and people. Use listCompanies ' +
+      'first if you do not know the company id.',
+    schema: { org: orgSlug, companyId: z.string() },
+    run: async (ctx, actorUserId, { org, companyId }) =>
+      await ctx.runQuery(internal.agentTools.getCompanyInternal, {
+        orgId: await orgIdFor(ctx, actorUserId, org),
+        actorUserId,
+        companyId: companyId as Id<'companies'>,
+      }),
+  }),
+  defineTool({
     name: 'listDeals',
     description:
       'List investments (deals) in an org with investor, target, instrument ' +
@@ -158,6 +173,54 @@ export const mcpTools: Array<McpTool> = [
     schema: { org: orgSlug, companyId: z.string() },
     run: async (ctx, actorUserId, { org, companyId }) =>
       await ctx.runQuery(internal.agentTools.listCompanyDocumentsInternal, {
+        orgId: await orgIdFor(ctx, actorUserId, org),
+        actorUserId,
+        companyId: companyId as Id<'companies'>,
+      }),
+  }),
+  defineTool({
+    name: 'listCompanyReports',
+    description:
+      'List the investor reports of a portfolio company (updates received by ' +
+      'email and analysed by the pipeline), most recent period first. ' +
+      'Returns the headline and period of each report, not its content — ' +
+      'call getCompanyReport for that. Use listCompanies first if you do not ' +
+      'know the company id.',
+    schema: { org: orgSlug, companyId: z.string(), limit: limitArg },
+    run: async (ctx, actorUserId, { org, companyId, limit }) =>
+      await ctx.runQuery(internal.companyReports.listInternal, {
+        orgId: await orgIdFor(ctx, actorUserId, org),
+        actorUserId,
+        companyId: companyId as Id<'companies'>,
+        limit,
+      }),
+  }),
+  defineTool({
+    name: 'getCompanyReport',
+    description:
+      'Content of one investor report: headline, key highlights and the ' +
+      'extracted metrics. Each metric carries its OWN unit — EUR_cents ' +
+      '(divide by 100 for euros), bps (divide by 100 for percent), count or ' +
+      'months — so read the unit field before stating a figure. Use ' +
+      'listCompanyReports first to get a report id.',
+    schema: { org: orgSlug, reportId: z.string() },
+    run: async (ctx, actorUserId, { org, reportId }) =>
+      await ctx.runQuery(internal.companyReports.getInternal, {
+        orgId: await orgIdFor(ctx, actorUserId, org),
+        actorUserId,
+        reportId: reportId as Id<'companyReports'>,
+      }),
+  }),
+  defineTool({
+    name: 'getCompanyIntelligence',
+    description:
+      'The AI synthesis of a portfolio company, computed from its reports: ' +
+      'executive summary, health score (1-10 with good/bad points), top ' +
+      'insights and alerts. Returns null when no synthesis exists yet. ' +
+      'latestReportId points at the report it was last refreshed from.',
+    schema: { org: orgSlug, companyId: z.string() },
+    run: async (ctx, actorUserId, { org, companyId }) =>
+      await ctx.runQuery(internal.intelligence.getByCompanyInternal, {
         orgId: await orgIdFor(ctx, actorUserId, org),
         actorUserId,
         companyId: companyId as Id<'companies'>,
