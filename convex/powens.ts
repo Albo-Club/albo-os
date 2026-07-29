@@ -1289,23 +1289,36 @@ export const ingestBackfilledTransactions = internalMutation({
  * transaction we hold (minus `BACKFILL_OVERLAP_MS`).
  *
  * Scheduled automatically when a connection goes back to `connected`
- * (cf. `upsertConnectionStatus`). Also runnable by the operator to repair an
- * old gap:
- *   pnpm exec convex run --prod powens:backfillConnection \
- *     '{"orgId":"…","powensConnectionId":"…"}'
+ * (cf. `upsertConnectionStatus`), which is the case the resume point is made
+ * for: at that instant the last transaction held still predates the gap.
  *
- * Bounds, in order: the last transaction held (resume point), the account
- * cutover (`computeCutoff`, hard floor) and what Powens itself holds — no
- * arbitrary depth limit, otherwise a long breakdown would silently lose its
- * oldest weeks. A per-account failure is logged and does not stop the others. */
+ * `minDate` (YYYY-MM-DD, operator only) overrides that resume point for every
+ * account of the connection. It is what repairs a gap noticed AFTER the
+ * reconnection: once fresh transactions have landed, the resume point sits
+ * past the gap and would step right over it.
+ *   pnpm exec convex run --prod powens:backfillConnection \
+ *     '{"orgId":"…","powensConnectionId":"…","minDate":"2026-06-01"}'
+ *
+ * Bounds, in order: the start date (resume point or `minDate`), the account
+ * cutover (`computeCutoff`, hard floor — a `minDate` cannot reach behind it)
+ * and what Powens itself holds — no arbitrary depth limit, otherwise a long
+ * breakdown would silently lose its oldest weeks. A per-account failure is
+ * logged and does not stop the others. */
 export const backfillConnection = internalAction({
-  args: { orgId: v.id('organizations'), powensConnectionId: v.string() },
+  args: {
+    orgId: v.id('organizations'),
+    powensConnectionId: v.string(),
+    minDate: v.optional(v.string()),
+  },
   handler: async (
     ctx,
-    { orgId, powensConnectionId },
+    { orgId, powensConnectionId, minDate },
   ): Promise<{ accounts: number; fetched: number; inserted: number }> => {
     const domain = process.env.POWENS_DOMAIN
     if (!domain) throw new ConvexError('powens_env_missing')
+    if (minDate && !/^\d{4}-\d{2}-\d{2}$/.test(minDate)) {
+      throw new ConvexError('invalid_min_date')
+    }
     const summary = { accounts: 0, fetched: 0, inserted: 0 }
 
     const powensUser = await ctx.runQuery(internal.powens.getOrgPowensToken, {
@@ -1324,10 +1337,17 @@ export const backfillConnection = internalAction({
     )
 
     for (const account of accounts) {
-      if (account.lastTransactionAt == null) continue
-      const since = new Date(account.lastTransactionAt - BACKFILL_OVERLAP_MS)
-        .toISOString()
-        .slice(0, 10)
+      // Explicit start date wins over the resume point — including on an
+      // account with no transaction at all, where there is nothing to resume
+      // from. The account cutover still filters what may be written.
+      const since =
+        minDate ??
+        (account.lastTransactionAt == null
+          ? null
+          : new Date(account.lastTransactionAt - BACKFILL_OVERLAP_MS)
+              .toISOString()
+              .slice(0, 10))
+      if (!since) continue
       let next: string | null =
         `https://${domain}/2.0/users/me/accounts/${account.powensAccountId}` +
         `/transactions?limit=1000&min_date=${since}`
@@ -1361,7 +1381,8 @@ export const backfillConnection = internalAction({
         summary.inserted += inserted
         console.log(
           `[powens] rattrapage ${account.label} (acct ${account.powensAccountId}) ` +
-            `depuis ${since}: ${fetched} tx reçue(s) sur ${pages} page(s), ` +
+            `depuis ${since}${minDate ? ' (date imposée)' : ''}: ` +
+            `${fetched} tx reçue(s) sur ${pages} page(s), ` +
             `${inserted} nouvelle(s)`,
         )
       } catch (err) {

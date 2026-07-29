@@ -1339,6 +1339,14 @@ permanent de l'org.
   `by_account_date`, `.order('desc').first()`), moins `BACKFILL_OVERLAP_MS`
   (7 j) : un mouvement peut arriver daté **avant** une transaction déjà reçue
   (règlement différé). Le recouvrement est gratuit — dédup par `powensTxId`.
+- **Le point de reprise ne répare PAS un trou constaté après coup.** Il vaut au
+  moment de la reconnexion : la dernière tx détenue précède encore le trou. Dès
+  que des transactions fraîches sont arrivées, le point de reprise passe
+  **derrière** le trou et le rattrapage l'enjambe. C'est le cas du trou Qonto,
+  découvert le 29/07 alors que la reconnexion datait du 23/07 : le point de
+  reprise était au 28/07. D'où l'argument **`minDate`** (`YYYY-MM-DD`, usage
+  opérateur), qui force la date de départ sur tous les comptes de la connexion.
+  Le cutover reste le plancher dur — un `minDate` ne peut pas remonter derrière.
 - **Pas de plafond d'ancienneté, volontairement.** Un plafond (« 120 j max »)
   recréerait le bug : une panne plus longue perdrait silencieusement ses
   semaines les plus anciennes. Les bornes réelles sont le point de reprise, le
