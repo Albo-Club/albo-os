@@ -66,6 +66,45 @@ capitalisation) viendra avec la connexion Powens Wealth.
 > - `pnpm typecheck`, `lint`, `build` verts ; smoke tests non lancés (dev
 >   server requis).
 
+## v1.147.2 — 29/07/2026 à 20:35 — Une seule ligne Palatine, connectée
+
+Les mouvements Palatine vivaient dans **deux lignes** : l'ancienne, venue de
+l'import Airtable (88 mouvements de 2020 au 20/02/2026, plus jamais mise à
+jour), et celle créée par la connexion bancaire en juin. Même compte à la
+banque, deux lignes chez nous.
+
+L'opération de fusion les réunit : l'ancienne ligne — celle qui porte
+l'historique et vos pointages — récupère les mouvements récents, l'IBAN et la
+connexion, puis la ligne en double disparaît. Il reste **un seul compte
+courant Palatine, connecté**, avec l'historique complet depuis 2020.
+
+Deux précisions : le second compte courant Palatine (peu actif) et les
+comptes de nantissement sont de vrais comptes distincts chez la banque — ils
+ne sont pas touchés. Et il subsiste un trou du 21/02 au 08/06 sur ce compte,
+antérieur à la connexion : c'est exactement ce que le rattrapage à date
+imposée (v1.147.1) sait aller rechercher, une fois la fusion faite.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/mergePalatineAccount.ts` (`dryRun` / `apply` /
+>   `verify`), ancrée sur les `_id` prod lus via
+>   `powens:diagnoseOrgAccountLinks`. Sens de fusion : la ligne **importée**
+>   survit (elle porte `airtableId`, les transactions et les
+>   `matchingDecisions`) et reprend le lien Powens de la ligne acct 35, qui
+>   est ensuite supprimée.
+> - Sont repointés vers la ligne conservée : `transactions.bankAccountId`,
+>   `matchingDecisions.txBankAccountId` (log append-only dont le snapshot ne
+>   doit pas pendouiller) et `forecasts.bankAccountId` (table legacy).
+>   `bankName` est aligné sur « Palatine » pour que la page Cash cesse
+>   d'afficher deux groupes ; `label` n'est pas touché (règle du schéma).
+> - Gardes : org calte, même entité titulaire, banque Palatine des deux
+>   côtés, survivante importée et non liée, fusionnée liée à Powens et non
+>   importée. Idempotente (no-op une fois la ligne fusionnée supprimée).
+> - Effet de bord voulu : la survivante gardant son `airtableId`, la borne
+>   d'ingestion (`computeCutoff`) repart de sa dernière transaction Airtable
+>   (20/02/2026). Le trou 21/02 → 08/06 se comble donc ensuite via
+>   `powens:backfillConnection` avec `minDate: "2026-02-21"` — au-dessus du
+>   plancher, et sans doublon (idempotence par `powensTxId`).
 ## v1.147.1 — 29/07/2026 à 20:05 — Réparer un trou de synchro repéré après coup
 
 Le rattrapage livré en v1.147.0 repart de la dernière transaction connue sur

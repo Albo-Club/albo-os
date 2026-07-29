@@ -1295,8 +1295,9 @@ Uint8Array(enc.encode(s))` produit bien de l'`ArrayBuffer`-backed.
   différent** de celui de la banque (l'ancien `PALATINE` de calte face à
   « COMPTE COURANT GG21 CALTE ») n'est PAS rapprochable quand la banque livre
   plusieurs comptes — la règle 3 ne s'applique pas. Il faut fusionner les deux
-  lignes une fois à la main (cf. `MIGRATIONS.md`) ; l'IBAN backfillé à la
-  fusion rend les reconnexions suivantes automatiques.
+  lignes une fois à la main (`migrations/mergePalatineAccount`, cf.
+  `MIGRATIONS.md`) ; l'IBAN repris à la fusion rend les reconnexions
+  suivantes automatiques.
 - **Cutover sans champ au schéma.** Aucune date de connexion n'est stockée.
   Borne par compte dans `computeCutoff` : compte neuf → `_creationTime` (champ
   Convex natif ≈ date de connexion, l'historique antérieur du 1ᵉʳ lot est
