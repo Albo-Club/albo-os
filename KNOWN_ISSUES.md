@@ -1314,6 +1314,51 @@ Uint8Array(enc.encode(s))` produit bien de l'`ArrayBuffer`-backed.
   dans `_generated/api.d.ts` qu'après codegen. L'entrée `powens` y a été ajoutée
   pour passer le `typecheck` local ; `convex deploy` la régénère à l'identique.
 
+### Rattrapage après reconnexion (`backfillConnection`)
+
+**Le webhook ne rattrape rien.** `CONNECTION_SYNCED` ne pousse que ce que
+Powens a synchronisé à cet instant. Une connexion cassée puis reconnectée deux
+semaines plus tard reprend le flux à la date de reconnexion : les mouvements
+de l'intervalle ne sont **jamais** repoussés, et aucun `powensTxId` ne les
+réclame. C'est ce qui a créé le trou Qonto du 02/06 au 22/07/2026 (~7 semaines,
+dont 2 380 000 € de virements entrants recoupés depuis Palatine). D'où un
+second chemin d'ingestion, en **pull** : `backfillConnection` (internalAction)
+appelle `GET /users/me/accounts/{id}/transactions?min_date=…` avec le token
+permanent de l'org.
+
+- **Déclencheur = la transition, pas l'état.** Dans `upsertConnectionStatus`,
+  la santé est calculée **avant** le patch (`previousHealth`) puis après ; le
+  rattrapage est planifié seulement sur `≠ connected → connected` (ligne
+  absente incluse = nouvelle connexion). Se déclencher sur l'état « sain »
+  relancerait un pull à chaque webhook.
+- **`ctx.scheduler.runAfter(0, …)`** et pas un appel direct : c'est une action
+  (réseau), et le report post-commit garantit que les `bankAccounts` de la
+  connexion sont déjà reliées quand elle s'exécute (le webhook appelle
+  `upsertConnectionStatus` **avant** de résoudre les comptes).
+- **Point de reprise = dernière tx détenue**, par compte (index
+  `by_account_date`, `.order('desc').first()`), moins `BACKFILL_OVERLAP_MS`
+  (7 j) : un mouvement peut arriver daté **avant** une transaction déjà reçue
+  (règlement différé). Le recouvrement est gratuit — dédup par `powensTxId`.
+- **Pas de plafond d'ancienneté, volontairement.** Un plafond (« 120 j max »)
+  recréerait le bug : une panne plus longue perdrait silencieusement ses
+  semaines les plus anciennes. Les bornes réelles sont le point de reprise, le
+  cutover du compte (`computeCutoff`, plancher dur) et ce que Powens détient.
+- **Compte sans aucune transaction → ignoré** (`lastTransactionAt: null`) :
+  il n'y a rien d'où reprendre, son historique démarre à son propre cutover.
+  Sinon une première connexion réimporterait tout le passé du compte.
+- **Écriture mutualisée** : `writeAccountTransactions` est le SEUL endroit qui
+  écrit une tx Powens (filtre cutover + dédup + règles apprises à l'insert) —
+  webhook et rattrapage l'appellent tous les deux, ils ne peuvent pas diverger.
+- **Pagination Powens = liens opaques.** `limit` est obligatoire (max 1000) et
+  la suite se lit dans `_links.next.href` (URL **absolue**, à suivre telle
+  quelle — pas de `offset` à reconstruire). Garde-fou `BACKFILL_MAX_PAGES`.
+- **Un échec par compte n'arrête pas les autres** (try/catch dans la boucle) ;
+  le message de log ne contient jamais le token, seulement le libellé du compte.
+- **Ce que le rattrapage ne peut PAS faire** : récupérer ce que Powens n'a
+  jamais lui-même récupéré (connexion établie sous un user Powens non géré,
+  fenêtre d'historique de la banque dépassée). Dans ce cas, le seul recours
+  reste l'import CSV de la banque (cf. `importMemoCsvTransactions`).
+
 ## Émission Powens — connexion bancaire depuis l'app (`convex/powens.ts`)
 
 Côté émission du flux Powens : un bouton « Connecter une banque » (page Cash)

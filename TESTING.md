@@ -582,6 +582,8 @@ La connexion des banques se fait par l'opérateur via le Powens Webview.
 | P11 | `convex export --prod --path …` puis `powens:deleteTransactionsByIds '{"ids":[…]}'` | Supprime **uniquement** les ids validés (garde-fou : manual + sans airtableId + compte Qonto) ; retourne `{ deleted, skipped }`      |
 | P12 | **Reconnexion d'une banque déjà connectée** (via « Reconnecter » ou via « Connecter une banque ») | Aucun nouveau `bankAccounts` : chaque compte livré est rapproché de l'existant (IBAN, sinon banque + libellé, sinon compte unique) et son lien est repris (`powensAccountId` + `powensConnectionId` re-tamponnés, IBAN backfillé) ; historique et pointage intacts |
 | P13 | Diagnostic — `convex run --prod powens:diagnoseOrgAccountLinks '{"orgSlug":"calte"}'` | Lecture seule : par compte, IBAN / ids Powens / `airtableId` / nb de tx / 1ʳᵉ et dernière tx ; par connexion, santé + nombre de comptes desservis |
+| P14 | Rattrapage après reconnexion : couper une connexion (mot de passe changé côté banque) jusqu'à l'état dégradé, laisser passer des mouvements, puis « Reconnecter » | Au retour à l'état sain, log `rattrapage planifié` puis `rattrapage <compte> depuis <date>` ; les transactions de la coupure apparaissent dans le registre, aucune antérieure au cutover du compte |
+| P15 | Rattrapage manuel — `convex run --prod powens:backfillConnection '{"orgId":"…","powensConnectionId":"…"}'` | Retourne `{ accounts, fetched, inserted }` ; **rejouer** : `inserted: 0` (dédup `by_powens_id`), et le pointage déjà posé sur les tx rattrapées est intact |
 
 ## Émission Powens (bouton « Connecter une banque » → Webview)
 

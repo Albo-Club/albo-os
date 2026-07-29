@@ -23,6 +23,61 @@ bas de page.
 
 ---
 
+## v1.147.0 — 29/07/2026 à 16:56 — Une reconnexion bancaire rattrape les transactions manquées
+
+Jusqu'ici, une connexion bancaire coupée puis rétablie repartait **de la date
+de reconnexion** : tout ce qui s'était passé entre-temps sur le compte ne
+remontait jamais dans Albo OS. Une coupure repérée tardivement se traduisait
+donc par un trou définitif dans la trésorerie — et c'est exactement ce qui est
+arrivé au compte Qonto, resté muet du 2 juin au 22 juillet 2026, avec près de
+2,4 M€ de virements entrants absents du registre.
+
+Désormais, dès qu'une connexion redevient saine, l'application **va chercher
+elle-même ce qu'elle a manqué** : elle repart de la dernière transaction
+connue sur chaque compte et redemande à la banque tout ce qui s'est produit
+depuis. Concrètement, il suffit de reconnecter la banque — le trou se comble
+tout seul dans la foulée, sans manipulation.
+
+Trois garanties :
+
+- **Aucune limite d'ancienneté** : une coupure de plusieurs mois est rattrapée
+  entièrement, tant que la banque conserve l'historique de son côté.
+- **Aucun doublon** : une transaction déjà présente est reconnue et mise à
+  jour, jamais recréée.
+- **Aucun pointage perdu** : le rapprochement déjà fait sur une transaction
+  n'est jamais écrasé par le rattrapage.
+
+Les mouvements récupérés entrent normalement dans la file de pointage et
+suivent les règles de catégorisation apprises, comme n'importe quelle
+transaction synchronisée.
+
+> **🔧 Notes techniques**
+>
+> - `convex/powens.ts:backfillConnection` (internalAction) : pull REST
+>   `GET /users/me/accounts/{id}/transactions?min_date=…` avec le token
+>   permanent de l'org. Point de reprise = dernière tx détenue par compte
+>   (`listAccountsForBackfill`, index `by_account_date`) moins
+>   `BACKFILL_OVERLAP_MS` (7 j, règlements différés). Pagination via les
+>   liens opaques `_links.next.href` (garde-fou `BACKFILL_MAX_PAGES`),
+>   try/catch par compte, aucun token dans les logs.
+> - Déclenchement dans `upsertConnectionStatus` : santé calculée **avant**
+>   le patch, planification (`ctx.scheduler.runAfter(0, …)`) sur la seule
+>   transition `≠ connected → connected` (ligne absente incluse). Le report
+>   post-commit garantit que les comptes de la connexion sont déjà reliés.
+> - Chemin d'écriture mutualisé : la boucle d'insertion de
+>   `ingestConnectionSync` est extraite en `writeAccountTransactions`
+>   (filtre cutover + dédup `powensTxId` + `ruleFieldsFor` à l'insert),
+>   appelée par le webhook **et** par `ingestBackfilledTransactions` — les
+>   deux chemins ne peuvent plus diverger.
+> - S'appuie sur le re-tamponnage de `powensConnectionId` livré en v1.146.0 :
+>   sans lui, un compte repris par une nouvelle connexion serait invisible au
+>   rattrapage, qui scope par connexion.
+> - Pas de plafond de profondeur : il recréerait le bug sur une panne longue
+>   (cf. `KNOWN_ISSUES.md` « Rattrapage après reconnexion »). Tests
+>   `TESTING.md` P14/P15 ; doc produit `07-tresorerie.md`.
+
+---
+
 ## v1.146.0 — 29/07/2026 à 16:37 — Reconnecter une banque ne crée plus de doublon
 
 Jusqu'ici, reconnecter une banque pouvait faire apparaître une **deuxième
