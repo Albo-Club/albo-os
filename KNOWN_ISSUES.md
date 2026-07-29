@@ -3121,3 +3121,32 @@ matière des reportings, et le modèle doit choisir la bonne :
 (jusqu'à 150k caractères) : le texte intégral est déjà indexé et se lit par
 `searchDocuments`. Ne pas rajouter ce champ « pour dépanner » — ce serait
 dupliquer le corpus dans la fenêtre de contexte.
+
+## Positions Powens Wealth (« Contenu de l'enveloppe » des placements)
+
+Les positions des comptes d'investissement (titres d'un CTO, supports d'un
+contrat de capitalisation) viennent du produit Powens **Wealth & Loans** —
+un produit **distinct** de l'agrégation bancaire déjà branchée, qui doit
+être **activé par l'Account Manager Powens sur le domaine** (pas un flag
+self-service). Tant qu'il ne l'est pas, `GET /users/me/investments` répond
+403/404 : le code le traite comme un état normal (`ConvexError
+'powens_wealth_unavailable'` sur le refresh manuel, cron silencieux), et la
+fiche placement affiche simplement « aucune position ». Si l'enveloppe
+reste vide alors qu'un compte est bien lié : vérifier l'activation du
+produit AVANT de déboguer le code.
+
+Décisions de design à connaître avant de toucher `convex/investments.ts` :
+
+- **Remplacement en bloc par compte** : chaque sync efface puis réinsère les
+  lignes `investmentPositions` du compte présent dans le payload — pas
+  d'upsert ligne à ligne, pas de contrainte d'unicité à maintenir. Un compte
+  absent du payload garde ses dernières positions (photo du dernier sync).
+- **Résolution par `powensAccountId`** : un investissement est rattaché via
+  `id_account` → `bankAccounts.by_powens_account`, scopé org. Les comptes
+  non résolus sont comptés (`skipped`) et ignorés — même famille de pièges
+  que « Ingestion Powens » ci-dessus (une reconnexion change les ids).
+- **Lien deal ↔ compte explicite** : `deals.bankAccountId` (optionnel,
+  posé depuis la fiche placement). Pas de rattachement heuristique par
+  transactions — un compte peut porter plusieurs deals et vice-versa.
+- Montants stockés en **cents** (arrondi de floats EUR Powens),
+  `quantity` reste un float (nombre de parts).
