@@ -51,7 +51,13 @@ type Filters = {
 }
 
 export const rag = new RAG<Filters>(components.rag, {
-  textEmbeddingModel: openrouter.textEmbeddingModel(EMBEDDING_MODEL),
+  textEmbeddingModel: openrouter.textEmbeddingModel(EMBEDDING_MODEL, {
+    // Pin the EU-hosted provider (Nebius Token Factory, NL) instead of
+    // OpenRouter's load balancing: document text must not transit through
+    // other hosts. No fallback on purpose — indexing is scheduled (a retry
+    // re-runs it) and a search outage is acceptable; widen only knowingly.
+    provider: { order: ['nebius'], allow_fallbacks: false },
+  }),
   embeddingDimension: EMBEDDING_DIMENSION,
   filterNames: ['companyId', 'kind'],
 })

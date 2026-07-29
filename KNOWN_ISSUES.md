@@ -2933,7 +2933,12 @@ composant `@convex-dev/rag`, exposée à l'assistant par l'outil
 `searchDocuments` (`convex/agentToolsDocuments.ts` → `vectorize:searchInternal`).
 Embeddings `qwen/qwen3-embedding-8b` via OpenRouter (même clé/facturation que
 le chat), dimension 4096 — **le max du vector index Convex**, ne pas prendre
-un modèle au-dessus.
+un modèle au-dessus. Routage **épinglé sur le provider `nebius`** (Nebius
+Token Factory, NL) avec `allow_fallbacks: false` — décision souveraineté : le
+texte des documents ne doit transiter que par cet hébergeur UE. Conséquence
+assumée : une panne Nebius fait échouer l'indexation (schedulée → relançable)
+et la recherche, au lieu de basculer vers un host US ; ne ré-élargir le
+routage qu'en connaissance de cause.
 
 - **Un namespace RAG = une org** (`namespace = orgId`) : l'isolation
   multi-tenant est structurelle côté index, mais le namespace **isole sans
