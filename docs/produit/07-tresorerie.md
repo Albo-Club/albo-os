@@ -6,18 +6,35 @@ La page Trésorerie (`/app/<org>/cash`) centralise les comptes bancaires du
 véhicule et toutes les transactions. Quatre onglets, du plus consulté au
 plus « réglage » :
 
-- **Vue d'ensemble** — l'essentiel en un écran : les indicateurs clés
-  (solde disponible, atterrissage fin de mois, entrées/sorties/net des 30
-  et 90 prochains jours), la courbe de solde passé → futur (avec le seuil
-  d'alerte tracé dessus quand une alerte est active), et les comptes
-  regroupés **par banque** (sous-total par banque, entité titulaire sur
-  chaque ligne). Si une connexion bancaire est en panne ou si le seuil
-  d'alerte est franchi, une **bannière** le signale en tête de page.
+- **Vue d'ensemble** — l'essentiel en un écran, dans cet ordre : le **cash
+  disponible** (le total, puis le solde de chaque compte, une ligne par
+  compte), les **entrées/sorties/net des 30 et 90 prochains jours** côte à
+  côte, la **courbe de solde** passé → futur, et enfin les comptes qui ne
+  sont **pas** du cash disponible (nantis, clôturés). Si une connexion
+  bancaire est en panne ou si le seuil d'alerte est franchi, une **bannière**
+  le signale en tête de page.
 - **Prévisionnel** — le détail mois par mois : voir
   [Prévisionnel](09-previsionnel.md).
 - **Transactions** — le registre complet et le [pointage](08-pointage.md).
 - **Règles & échéances** — tout ce qui se configure : règles récurrentes,
   échéances ponctuelles, TVA, alerte de seuil, connexions bancaires.
+
+## La courbe de solde
+
+La Vue d'ensemble trace **une seule trajectoire** : le solde du compte, mois
+par mois. En trait plein le passé (le solde réellement constaté), en
+pointillé le futur (le solde projeté en tenant compte de **tout** le
+prévisionnel — confirmé, attendu et probable). C'est donc la trajectoire à
+laquelle s'attendre, pas un scénario prudent : ce qui est probable pèse
+dessus comme le reste.
+
+La courbe est **verte tant que le solde est positif et rouge dès qu'il passe
+sous zéro** — le moment du basculement se lit d'un coup d'œil. L'horizon se
+choisit à 6, 12 ou 24 mois.
+
+Un sous-titre rappelle le solde de départ et, dès qu'un mois est écoulé, la
+**fiabilité** de la projection : ce qui avait été projeté pour le mois
+dernier, ce qui a été réellement constaté, et l'écart.
 
 ## Comptes bancaires
 
@@ -39,12 +56,16 @@ donnée fraîche. Les comptes manuels affichent la date de saisie du solde.
 
 Trois états particuliers changent les calculs :
 
-- **Nanti** : fonds bloqués (nantissement, séquestre) — le compte reste
-  visible mais son solde est **exclu du disponible** et du prévisionnel.
+- **Nanti** : fonds bloqués (nantissement, séquestre) — le solde est
+  **exclu du disponible** et du prévisionnel. Le compte quitte la liste du
+  cash disponible pour la section « Hors trésorerie disponible », en bas de
+  la Vue d'ensemble.
 - **Clôturé** : compte fermé en banque, conservé pour son historique, solde
-  ignoré.
+  ignoré — également listé dans cette section.
 - Le « **solde disponible** » affiché partout = comptes actifs, non nantis,
-  en euros.
+  en euros. Un compte d'épargne ou un support monétaire mobilisable à vue
+  (type compte booster) compte comme du disponible dès lors qu'il est saisi
+  comme un compte bancaire actif non nanti.
 
 La page de détail d'un compte montre son historique de transactions
 (recherche, lien vers le deal rattaché) et permet d'éditer nom personnalisé,
@@ -98,8 +119,8 @@ par import (historique Airtable, CSV Mémo Bank) ou à la main (souvent via
 l'assistant IA).
 
 - **Registre complet** (onglet Transactions) : toutes les transactions, tous
-  statuts, filtrables par statut, compte et recherche plein texte
-  (insensible aux accents). Plafonné aux 1 000 plus récentes à l'écran.
+  statuts, filtrables par type, compte et recherche plein texte (insensible
+  aux accents). Plafonné aux 1 000 plus récentes à l'écran.
 - Chaque nouvelle transaction entre dans la **file de pointage** — voir
   [Pointage](08-pointage.md).
 

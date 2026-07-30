@@ -52,7 +52,7 @@ async function orgAccountsById(
 export const listByDeal = query({
   args: { dealId: v.id('deals') },
   handler: async (ctx, { dealId }) => {
-    const deal = await ctx.db.get("deals", dealId)
+    const deal = await ctx.db.get('deals', dealId)
     if (!deal) throw new ConvexError('not_found')
     await requireOrgMember(ctx, deal.orgId)
 
@@ -65,7 +65,7 @@ export const listByDeal = query({
 
     return await Promise.all(
       rows.map(async (tx) => {
-        const account = await ctx.db.get("bankAccounts", tx.bankAccountId)
+        const account = await ctx.db.get('bankAccounts', tx.bankAccountId)
         return {
           _id: tx._id,
           direction: tx.direction,
@@ -216,11 +216,15 @@ export const listByStatus = query({
 
 /**
  * Complete transactions ledger (Pennylane-style): an org's transactions across
- * ALL accounts and statuses, optionally narrowed by `status`, `bankAccountId`
- * and `search`, sorted by descending date and enriched with the bank account.
- * Drives the Transactions tab of the Cash section — a matched row stays visible
- * (with its `matchStatus`), unlike `listUnmatched`. Rows without `matchStatus`
- * (pre-backfill) surface as 'unmatched'.
+ * ALL accounts and statuses, optionally narrowed by `status` OR `matchedKind`,
+ * plus `bankAccountId` and `search`, sorted by descending date and enriched
+ * with the bank account. Drives the Transactions tab of the Cash section — a
+ * matched row stays visible (with its `matchStatus`), unlike `listUnmatched`.
+ * Rows without `matchStatus` (pre-backfill) surface as 'unmatched'.
+ *
+ * `status` and `matchedKind` are mutually exclusive: the UI exposes ONE filter,
+ * and every `matchedKind` row is 'matched' by construction (`matchedKind`
+ * splits that status by nature of the attachment: a deal vs a liability).
  *
  * Bounded to the LEDGER_LIMIT most recent rows per filter.
  */
@@ -238,11 +242,25 @@ export const listLedger = query({
         v.literal('internal_transfer'),
       ),
     ),
+    /** 'deal' = investment flows, 'liability' = equity + C/C / loan moves. */
+    matchedKind: v.optional(v.union(v.literal('deal'), v.literal('liability'))),
     bankAccountId: v.optional(v.id('bankAccounts')),
     search: v.optional(v.string()),
   },
-  handler: async (ctx, { orgId, status, bankAccountId, search }) => {
+  handler: async (
+    ctx,
+    { orgId, status, matchedKind, bankAccountId, search },
+  ) => {
     await requireOrgMember(ctx, orgId)
+
+    const allocationKinds: ReadonlyArray<
+      'deal' | 'equity' | 'intercompany_loan'
+    > | null =
+      matchedKind === 'deal'
+        ? ['deal']
+        : matchedKind === 'liability'
+          ? ['equity', 'intercompany_loan']
+          : null
 
     // The org's accounts, read once — also gates the by-account branch below
     // (that index is not org-scoped, so we must verify ownership ourselves).
@@ -257,18 +275,41 @@ export const listLedger = query({
     // otherwise (and for the no-search status branch) we narrow the account in
     // JS after the bounded read.
     let filterAccountInJs = false
+    // Same trade-off for `matchedKind`: allocation.kind is not a filter field
+    // of the search index, so it is applied in JS on the bounded result.
+    let filterKindInJs = false
 
     if (term) {
+      // A `matchedKind` filter implies matchStatus 'matched' — narrowing on it
+      // keeps the index doing as much of the work as it can.
+      const searchStatus = status ?? (allocationKinds ? 'matched' : undefined)
       rows = await ctx.db
         .query('transactions')
         .withSearchIndex('search_text', (q) => {
           let s = q.search('searchText', term).eq('orgId', orgId)
-          if (status) s = s.eq('matchStatus', status)
-          if (status && bankAccountId) s = s.eq('bankAccountId', bankAccountId)
+          if (searchStatus) s = s.eq('matchStatus', searchStatus)
+          if (searchStatus && bankAccountId)
+            s = s.eq('bankAccountId', bankAccountId)
           return s
         })
         .take(LEDGER_LIMIT)
-      if (bankAccountId && !status) filterAccountInJs = true
+      if (bankAccountId && !searchStatus) filterAccountInJs = true
+      if (allocationKinds) filterKindInJs = true
+    } else if (allocationKinds) {
+      // One bounded read per kind (an index range covers a single value).
+      const perKind = await Promise.all(
+        allocationKinds.map((kind) =>
+          ctx.db
+            .query('transactions')
+            .withIndex('by_org_allocation_kind', (q) =>
+              q.eq('orgId', orgId).eq('allocation.kind', kind),
+            )
+            .order('desc')
+            .take(LEDGER_LIMIT),
+        ),
+      )
+      rows = perKind.flat()
+      if (bankAccountId) filterAccountInJs = true
     } else if (status) {
       rows = await ctx.db
         .query('transactions')
@@ -281,7 +322,9 @@ export const listLedger = query({
       // "Tout" scoped to one account — naturally newest-first.
       rows = await ctx.db
         .query('transactions')
-        .withIndex('by_account_date', (q) => q.eq('bankAccountId', bankAccountId))
+        .withIndex('by_account_date', (q) =>
+          q.eq('bankAccountId', bankAccountId),
+        )
         .order('desc')
         .take(LEDGER_LIMIT)
     } else {
@@ -295,6 +338,11 @@ export const listLedger = query({
 
     if (filterAccountInJs) {
       rows = rows.filter((tx) => tx.bankAccountId === bankAccountId)
+    }
+    if (filterKindInJs && allocationKinds) {
+      rows = rows.filter((tx) =>
+        allocationKinds.some((kind) => kind === tx.allocation?.kind),
+      )
     }
 
     rows.sort((a, b) => b.transactionDate - a.transactionDate)
@@ -697,7 +745,14 @@ export const bulkCategorize = mutation({
         if (!tx) throw new ConvexError('not_found')
         const { user } = await requireOrgMember(ctx, tx.orgId)
 
-        await applyCategorization(ctx, tx, status, user._id, 'manual', vatRateBps)
+        await applyCategorization(
+          ctx,
+          tx,
+          status,
+          user._id,
+          'manual',
+          vatRateBps,
+        )
         succeeded.push(transactionId)
       } catch (err) {
         failed.push({

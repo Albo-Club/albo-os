@@ -1346,6 +1346,10 @@ export default defineSchema({
     // Liability balance derivation: transactions of ONE org allocated to a
     // given target (nested path supported by Convex).
     .index('by_org_allocation_target', ['orgId', 'allocation.targetId'])
+    // Ledger filters by nature of the attachment ("mes investissements", "mes
+    // mouvements de compte courant") — `matchStatus` alone cannot tell them
+    // apart, they all sit under 'matched'.
+    .index('by_org_allocation_kind', ['orgId', 'allocation.kind'])
     .index('by_airtable_id', ['airtableId'])
     .searchIndex('search_text', {
       searchField: 'searchText',

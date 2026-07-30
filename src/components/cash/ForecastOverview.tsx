@@ -26,22 +26,23 @@ const HISTORY_MONTHS = 6
 const ALERT_LOOKAHEAD_MONTHS = 3
 
 /**
- * Cockpit of the Cash « Vue d'ensemble » tab: the KPI band (available
- * balance, end-of-month landing, 30/90-day flows), then the projected-
- * balance curve (two scenarios: committed-only / with planned) with the
- * alert threshold drawn on it, plus an in-app banner when the threshold is
- * breached. The category × month grid and the committed pipeline moved to
- * the « Prévisionnel » tab (ForecastGridSection).
+ * Cockpit of the Cash « Vue d'ensemble » tab: the KPI band (where the
+ * available cash sits, 30/90-day flows), then the single projected-balance
+ * curve, plus an in-app banner when the alert threshold is breached. The
+ * category × month grid and the committed pipeline moved to the
+ * « Prévisionnel » tab (ForecastGridSection).
  */
 export function ForecastOverview({
   orgId,
+  orgSlug,
   accounts,
 }: {
   orgId: Id<'organizations'>
+  orgSlug: string
   accounts: Array<CashAccount> | undefined
 }) {
   const { t, i18n } = useTranslation(['cash', 'common'])
-  const { fmtEur } = useFormatters()
+  const { fmtEur, fmtEurCents } = useFormatters()
   const [horizon, setHorizon] = useState<(typeof HORIZONS)[number]>(12)
 
   const grid = useConvexQuery(api.forecasts.getForecastGrid, {
@@ -57,19 +58,19 @@ export function ForecastOverview({
   })
   const alert = useConvexQuery(api.forecasts.getCashAlert, { orgId })
 
-  // Headline balances (moved here from CashAccounts): available = active,
-  // non-pledged accounts — the phase-0 perimeter, all currencies.
-  const { availableCents, blockedCents } = useMemo(() => {
-    if (!accounts) return { availableCents: null, blockedCents: 0 }
-    const available = accounts
-      .filter((a) => a.accountStatus === 'active' && !a.pledged)
-      .reduce((sum, a) => sum + (a.currentBalance ?? 0), 0)
-    const total = accounts.reduce((sum, a) => sum + (a.currentBalance ?? 0), 0)
-    return { availableCents: available, blockedCents: total - available }
-  }, [accounts])
-
-  // End-of-month landing = the current month's projection point.
-  const landing = grid?.projection[0] ?? null
+  // Available cash = active, non-pledged accounts — the phase-0 perimeter,
+  // all currencies. Pledged and closed accounts are listed apart, at the
+  // bottom of the tab (UnavailableAccountsSection).
+  const availableAccounts = useMemo(
+    () => accounts?.filter((a) => a.accountStatus === 'active' && !a.pledged),
+    [accounts],
+  )
+  const availableCents = useMemo(
+    () =>
+      availableAccounts?.reduce((sum, a) => sum + (a.currentBalance ?? 0), 0) ??
+      null,
+    [availableAccounts],
+  )
 
   const thresholdCents =
     alert?.active && alert.thresholdCents > 0 ? alert.thresholdCents : null
@@ -97,10 +98,9 @@ export function ForecastOverview({
         </div>
       )}
       <CashKpis
+        accounts={availableAccounts}
         availableCents={availableCents}
-        blockedCents={blockedCents}
-        landingPlannedCents={landing?.plannedBalanceCents ?? null}
-        landingCommittedCents={landing?.committedBalanceCents ?? null}
+        orgSlug={orgSlug}
         flows30={
           upcoming
             ? {
@@ -120,6 +120,7 @@ export function ForecastOverview({
             : null
         }
         fmtEur={fmtEur}
+        fmtEurCents={fmtEurCents}
       />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-lg font-semibold tracking-tight">
@@ -171,11 +172,9 @@ export function ForecastOverview({
             history={grid.history}
             labels={{
               real: t('cash:forecast.chartReal'),
-              committed: t('cash:forecast.chartCommitted'),
-              planned: t('cash:forecast.chartPlanned'),
+              projected: t('cash:forecast.chartProjected'),
             }}
             fmtEur={fmtEur}
-            thresholdCents={thresholdCents}
           />
         </>
       )}

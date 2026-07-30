@@ -19,38 +19,47 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
 
-/** Ledger status filter — 'all' = the whole ledger (« Tout »). */
+/**
+ * The ledger's single filter. 'all' = the whole ledger; 'unmatched' is the
+ * inbox (surfaced by its own button, not by the type menu); 'deal' and
+ * 'liability' split the 'matched' status by nature of the attachment, so a
+ * generic « Pointé » entry would be redundant with the two of them.
+ */
 type LedgerFilter =
   | 'all'
   | 'unmatched'
-  | 'matched'
   | 'charge'
   | 'tax'
   | 'product'
   | 'internal_transfer'
+  | 'deal'
+  | 'liability'
+  | 'ignored'
 
-const FILTERS: Array<LedgerFilter> = [
+/** Entries of the « Type » menu, in reading order. */
+const TYPE_FILTERS: ReadonlyArray<LedgerFilter> = [
   'all',
-  'unmatched',
-  'matched',
   'charge',
   'tax',
   'product',
   'internal_transfer',
+  'deal',
+  'liability',
+  'ignored',
 ]
 
 const ALL_ACCOUNTS = 'all'
 
 /**
  * Pennylane-style complete ledger (Transactions tab of the Cash section): all
- * the org's transactions across accounts, filterable by status / account /
- * search. « À pointer » is the default filter (inbox) and keeps its counter;
- * matched/categorized rows stay visible with their status badge + an inline
- * detach/VAT action (PointageTable `statusColumn` mode). Reconciliation reuses
- * the same row actions as the historical pointage queue.
+ * the org's transactions across accounts, narrowed by ONE filter — the
+ * « À pointer » button (the inbox, with its counter, the default landing) or
+ * the « Type » menu — plus account and search. Matched/categorized rows stay
+ * visible with their status badge + an inline detach/VAT action (PointageTable
+ * `statusColumn` mode). Reconciliation reuses the same row actions as the
+ * historical pointage queue.
  */
 export function TransactionsLedger({
   orgId,
@@ -60,7 +69,7 @@ export function TransactionsLedger({
   orgSlug: string
 }) {
   const { t } = useTranslation(['pointage', 'passif'])
-  const [status, setStatus] = useState<LedgerFilter>('unmatched')
+  const [filter, setFilter] = useState<LedgerFilter>('unmatched')
   const [accountId, setAccountId] = useState<Id<'bankAccounts'> | undefined>(
     undefined,
   )
@@ -100,17 +109,19 @@ export function TransactionsLedger({
   const deals = useConvexQuery(api.deals.listOptions, { orgId })
   const liabilities = useConvexQuery(api.liabilities.listOptions, { orgId })
 
+  const byAttachment = filter === 'deal' || filter === 'liability'
   const liveTransactions = useConvexQuery(api.transactions.listLedger, {
     orgId,
-    status: status === 'all' ? undefined : status,
+    status: filter === 'all' || byAttachment ? undefined : filter,
+    matchedKind: byAttachment ? filter : undefined,
     bankAccountId: accountId,
     search: searchArg,
   })
-  // One-click suggestion chips — inbox view only (the chips only render on
-  // unmatched rows anyway).
+  // One-click suggestions — inbox view only (they only render on unmatched
+  // rows anyway).
   const suggestions = useConvexQuery(
     api.transactions.getPointageSuggestions,
-    status === 'unmatched' ? { orgId } : 'skip',
+    filter === 'unmatched' ? { orgId } : 'skip',
   )
 
   const liabilityOptions = useMemo<LiabilityOptionGroups | undefined>(() => {
@@ -130,25 +141,49 @@ export function TransactionsLedger({
 
   const emptyMessage = searchArg
     ? t('search.noResults')
-    : status === 'unmatched'
+    : filter === 'unmatched'
       ? undefined // → PointageTable's inbox empty message (t('empty'))
       : t('viewEmpty')
 
   return (
     <div className="space-y-4">
-      <Tabs value={status} onValueChange={(v) => setStatus(v as LedgerFilter)}>
-        <TabsList>
-          {FILTERS.map((f) => (
-            <TabsTrigger key={f} value={f} className="gap-1.5">
-              {t(`view.${f}`)}
-              {f === 'unmatched' && unmatchedCount ? (
-                <Badge variant="secondary">{unmatchedCount}</Badge>
-              ) : null}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
       <div className="flex flex-wrap items-center gap-3">
+        {/* The inbox as a toggle: pressing it filters, pressing it again goes
+            back to the whole ledger. It is not a « Type », hence its own
+            control next to the menu. */}
+        <Button
+          variant={filter === 'unmatched' ? 'secondary' : 'outline'}
+          aria-pressed={filter === 'unmatched'}
+          className={
+            filter === 'unmatched' ? 'ring-ring/40 gap-1.5 ring-2' : 'gap-1.5'
+          }
+          onClick={() =>
+            setFilter(filter === 'unmatched' ? 'all' : 'unmatched')
+          }
+        >
+          {t('view.unmatched')}
+          {unmatchedCount ? (
+            <Badge variant="secondary">{unmatchedCount}</Badge>
+          ) : null}
+        </Button>
+        <Select
+          value={TYPE_FILTERS.includes(filter) ? filter : 'all'}
+          onValueChange={(v) => setFilter(v as LedgerFilter)}
+        >
+          <SelectTrigger className="w-60">
+            <span className="text-muted-foreground mr-1">
+              {t('filter.type')}
+            </span>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {TYPE_FILTERS.map((f) => (
+              <SelectItem key={f} value={f}>
+                {t(`view.${f}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select
           value={accountId ?? ALL_ACCOUNTS}
           onValueChange={(v) =>
@@ -178,7 +213,7 @@ export function TransactionsLedger({
           placeholder={t('search.placeholder')}
           className="max-w-sm"
         />
-        {status === 'unmatched' && (
+        {filter === 'unmatched' && (
           <Button
             variant="outline"
             size="sm"
@@ -197,8 +232,8 @@ export function TransactionsLedger({
         suggestions={suggestions}
         orgSlug={orgSlug}
         emptyMessage={emptyMessage}
-        statusColumn={status !== 'unmatched'}
-        pageResetKey={`${status}:${accountId ?? ''}:${searchArg ?? ''}`}
+        statusColumn={filter !== 'unmatched'}
+        pageResetKey={`${filter}:${accountId ?? ''}:${searchArg ?? ''}`}
       />
     </div>
   )
