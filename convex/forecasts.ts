@@ -676,14 +676,15 @@ export const suggestForecastMatches = query({
 
 /** Residual below this share of the committed amount = wire-transfer crumb
  * (rounding, fees), not an upcoming capital call — hidden from the pipeline
- * card and the deal page. */
+ * card. */
 const PIPELINE_RESIDUAL_RATIO = 0.01
 
 /**
  * The forecast side of a deal page: its pending linked entries (planned
- * flows — SCPI rents, coupons, capital calls…) plus the undated committed
- * remainder (committedAmount − realized "Versé", same derivation as
- * getCommittedPipeline). Realized transactions already live on the page.
+ * flows — SCPI rents, coupons, capital calls…). Realized transactions
+ * already live on the page. The undated committed remainder is NOT served
+ * here: it only makes sense next to the curve it is set apart from, which
+ * lives on the cash page (getCommittedPipeline).
  */
 export const getDealForecast = query({
   args: { dealId: v.id('deals') },
@@ -710,26 +711,7 @@ export const getDealForecast = query({
         dateMissing: e.dateMissing ?? false,
       }))
 
-    const committedCents = deal.committedAmount ?? 0
-    let paidCents = 0
-    const dealTxs = await ctx.db
-      .query('transactions')
-      .withIndex('by_deal', (q) => q.eq('dealId', dealId))
-      .collect()
-    for (const tx of dealTxs) {
-      if (tx.direction === 'out') paidCents += tx.amount
-    }
-
-    const remaining = Math.max(0, committedCents - paidCents)
-    return {
-      entries,
-      committedCents,
-      paidCents,
-      // Same crumb filter as getCommittedPipeline: a sub-1% residual is a
-      // wire gap, not a remainder to deploy.
-      remainingCents:
-        remaining < committedCents * PIPELINE_RESIDUAL_RATIO ? 0 : remaining,
-    }
+    return { entries }
   },
 })
 
@@ -1161,7 +1143,7 @@ export async function computeForecastGridForOrg(
  * with no schedule — shown next to the curve, never invented into months.
  * Wire-transfer crumbs (residual under PIPELINE_RESIDUAL_RATIO of the
  * committed amount) are rounding/fee gaps, not upcoming capital calls —
- * filtered out here and on the deal page (getDealForecast).
+ * filtered out here.
  */
 export const getCommittedPipeline = query({
   args: { orgId: v.id('organizations') },

@@ -79,7 +79,9 @@ visible pendant qu'on fait défiler la page.
   l'[assistant IA](11-assistant-ia.md) (coller le BP suffit), pas par un
   formulaire.
 - **Prévisionnel du deal** : les échéances prévisionnelles liées (loyers
-  SCPI, coupons, appels programmés) et le reste engagé à déployer. Le
+  SCPI, coupons, appels programmés). Le capital engagé restant à déployer
+  se lit dans la [Trésorerie](09-previsionnel.md), carte « Capital engagé
+  non appelé », où la courbe dont il est mis à part est sous les yeux. Le
   bouton **« Ajouter une prévision »** crée une échéance ponctuelle
   directement rattachée à ce deal, sans passer par la Trésorerie ; elle
   remonte aussitôt ici et dans le prévisionnel de trésorerie.
