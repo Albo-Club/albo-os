@@ -23,6 +23,24 @@ bas de page.
 
 ---
 
+## v1.154.1 — 30/07/2026 à 16:09 — Étude du double affichage sur la page Participations
+
+Quand une société a des deals dans deux états différents (par exemple un
+deal en cours et un deal sorti, comme Rewatt), elle apparaît dans deux
+tableaux de la page Participations. Ce comportement, acté comme « bancal
+mais assumé », fait l'objet d'une note de décision qui compare trois pistes
+d'évolution — rien ne change dans l'app à ce stade.
+
+> **🔧 Notes techniques**
+>
+> - Note d'options ajoutée dans `docs/decisions/participations-doublon-entreprise.md` :
+>   constat (la projection `buildParticipationRows` de `convex/deals.ts` groupe
+>   par entreprise × famille de statut, d'où jusqu'à 3 lignes par société),
+>   trois options (statu quo lisible « N deals sur M », ligne unique à statut
+>   dominant, toggle vue entreprise/deal) et recommandation (option 1 court
+>   terme, option 2 en cible).
+> - Aucun code applicatif modifié.
+
 ## v1.154.0 — 30/07/2026 à 14:35 — Déposer un report soi-même depuis la fiche société
 
 Jusqu'ici, un report n'entrait que par mail : on transférait l'update à
