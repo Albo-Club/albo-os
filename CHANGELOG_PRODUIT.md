@@ -23,6 +23,30 @@ bas de page.
 
 ---
 
+## v1.155.1 — 30/07/2026 à 16:40 — Plan de test de la fiche deal remis d'équerre
+
+Rien ne change dans l'application : deux étapes du plan de test interne
+décrivaient un écran qui n'existe plus (un bandeau de montants qui n'apparaît
+plus tel quel, et un sélecteur de type d'instrument retiré de l'en-tête depuis
+longtemps). Elles décrivent maintenant ce que l'écran fait vraiment.
+
+> **🔧 Notes techniques**
+>
+> - `TESTING.md` FD9 : le « strip Engagé / Versé / Reçu » ne correspondait plus
+>   à `dealAmountTiles` — une seule tuile de montant dans le cas courant
+>   (« Décaissé (réel) »), « Engagé prévisionnel » si `status === 'pending'`,
+>   deux tuiles pour `fund_lp` seulement, « Reçu » toujours à côté. La ligne
+>   portait aussi encore « Documents juste sous les Transactions » (le bloc est
+>   en bas de la colonne centrale depuis v1.155.0).
+> - `TESTING.md` FD39 : suppression du scénario (a) « aperçu via le sélecteur
+>   de type d'en-tête » — ce sélecteur n'existe plus (cf. FD8), le changement de
+>   type passe par ⋯ → « Modifier ». La ligne ne garde que les champs calculés
+>   non éditables et le no-op du champ € vidé.
+> - À noter, **non corrigé** : le drapeau `editable` d'`InstrumentDetails`
+>   (`src/components/deals/InstrumentBlock.tsx`) n'a plus de site d'appel à
+>   `false` depuis le retrait de ce mode aperçu — sa branche lecture seule
+>   (`IdentityField`) est du code mort.
+
 ## v1.155.0 — 30/07/2026 à 16:30 — La fiche deal adopte la structure de la fiche société
 
 La fiche d'un deal s'ouvrait comme une longue colonne : les caractéristiques
