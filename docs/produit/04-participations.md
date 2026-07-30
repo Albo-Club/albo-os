@@ -136,6 +136,38 @@ Enregistrer. Le menu ⋯ ne garde que ce qui n'est pas un champ de la fiche :
 **renommer** la société, créer un deal, lier une plateforme externe,
 archiver, supprimer.
 
+### Les secteurs
+
+Le secteur répond à une seule question : **à quel marché la société
+vend-elle ?** Quatorze valeurs, pas une de plus — SaaS / Logiciel, Fintech,
+Santé / Biotech, Silver economy, AgriFood, Consumer / Retail, Marketplace,
+Industrie / Circulaire, DeepTech, Immobilier, Fonds / Véhicules, Mobilité,
+EdTech, Autre.
+
+Trois principes tiennent la liste, et évitent qu'elle regonfle :
+
+- **Le marché, jamais le véhicule.** SPV, fonds, studio, structure de
+  carried : c'est déjà l'instrument du deal qui le dit. Les participations
+  sans marché propre — un fonds, un studio — se rangent toutes dans
+  « Fonds / Véhicules », plutôt qu'une étiquette par véhicule.
+- **La verticale l'emporte sur le modèle**, quand elle existe dans la liste :
+  un logiciel vendu aux radiologues est en Santé, un logiciel vendu aux
+  agriculteurs en AgriFood. « SaaS / Logiciel » ne garde que le logiciel B2B
+  sans verticale dominante, et « DeepTech » les ruptures scientifiques
+  qu'aucun marché de la liste ne couvre. Seule exception assumée : une
+  marketplace reste une marketplace.
+- **Pas de lecture transversale.** Le climat a été essayé comme secteur puis
+  retiré : avec une thèse d'impact, les trois quarts du portefeuille peuvent
+  le revendiquer — il n'y a donc rien à trier, et la case attirait tout ce
+  qui passait (un logiciel, une opération immobilière, deux fonds). Chaque
+  société est revenue à son marché réel.
+
+Le champ reste **libre à la saisie** : on peut taper un secteur qui n'est pas
+dans la liste, et il réapparaîtra ensuite dans le sélecteur. Mais c'est un
+signal, pas une pratique — si une valeur libre s'installe, c'est qu'il
+manque une case, et elle se tranche pour tout le portefeuille. L'assistant
+IA, lui, ne peut plus en inventer : il choisit dans la liste ou laisse vide.
+
 ### La lecture des documents
 
 Tout document qui entre — qu'il soit déposé à la main ici ou arrivé par un

@@ -4,34 +4,20 @@
   "title": "Cash",
   "tabs": {
     "apercu": "Overview",
-    "previsionnel": "Forecast",
-    "transactions": "Transactions",
-    "gestion": "Rules & entries"
-  },
-  "analysis": {
-    "inflows": "Inflows",
-    "outflows": "Outflows"
+    "gestion": "Settings"
   },
   "back": "← Cash",
   "notFound": "Account not found.",
-  "availableBalance": "Available balance",
   "kpis": {
-    "window30": "Next 30 days",
-    "window90": "Next 90 days",
+    "availableToday": "Available today",
+    "activeAccounts_one": "{{count}} active account",
+    "activeAccounts_other": "{{count}} active accounts",
+    "projected30": "Projected balance at 30d",
+    "projected90": "Projected balance at 90d",
     "inflows": "Inflows",
     "outflows": "Outflows",
     "net": "Net",
     "flowsHint": "upcoming entries, overdue included"
-  },
-  "unavailable": {
-    "title": "Not available cash",
-    "hint": "excluded from the available balance"
-  },
-  "upcoming": {
-    "title": "Upcoming entries",
-    "window": "{{count}}d",
-    "empty": "No entry in this window.",
-    "overdue": "Overdue"
   },
   "syncedAgo": "synced {{ago}}",
   "manualAsOf": "manual balance as of {{date}}",
@@ -180,8 +166,6 @@
   },
   "forecast": {
     "title": "Cash forecast",
-    "gridTitle": "Category × month detail",
-    "gridEmpty": "No forecast flow over the period. Add rules or entries in the Rules & entries tab.",
     "horizonMonths_one": "{{count}} month",
     "horizonMonths_other": "{{count}} months",
     "startingBalance": "Starting balance (available, EUR accounts): {{amount}}",
@@ -189,12 +173,6 @@
     "dealLabel": "Deal (optional)",
     "dealHint": "Links this flow to a deal (SCPI rents, coupons, distributions…) — it will show on the deal page.",
     "chartProjected": "Projected",
-    "grid": {
-      "colCategory": "Category",
-      "upcoming": "+ {{amount}} to come",
-      "plannedShare": "incl. {{amount}} planned",
-      "balance": "Projected balance"
-    },
     "pipeline": {
       "title": "Committed capital not yet called",
       "more_one": "+ {{count}} other deal",
@@ -319,5 +297,13 @@
       }
     },
     "chartReal": "Actual balance"
+  },
+  "unavailable": {
+    "hint": "out of the available balance"
+  },
+  "accounts": {
+    "title": "Accounts",
+    "nonLiquid": "Non-liquid: {{amount}} in placements",
+    "nonLiquidCta": "See placements"
   }
 }

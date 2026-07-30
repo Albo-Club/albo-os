@@ -3,21 +3,26 @@
 ## À quoi ça sert
 
 La page Trésorerie (`/app/<org>/cash`) centralise les comptes bancaires du
-véhicule et toutes les transactions. Quatre onglets, du plus consulté au
-plus « réglage » :
+véhicule et toutes les transactions. Deux onglets :
 
-- **Vue d'ensemble** — l'essentiel en un écran, dans cet ordre : le **cash
-  disponible** (le total, puis le solde de chaque compte, une ligne par
-  compte), les **entrées/sorties/net des 30 et 90 prochains jours** côte à
-  côte, la **courbe de solde** passé → futur, et enfin les comptes qui ne
-  sont **pas** du cash disponible (nantis, clôturés). Si une connexion
-  bancaire est en panne ou si le seuil d'alerte est franchi, une **bannière**
-  le signale en tête de page.
-- **Prévisionnel** — le détail mois par mois : voir
-  [Prévisionnel](09-previsionnel.md).
-- **Transactions** — le registre complet et le [pointage](08-pointage.md).
-- **Règles & échéances** — tout ce qui se configure : règles récurrentes,
-  échéances ponctuelles, TVA, alerte de seuil, connexions bancaires.
+- **Vue d'ensemble** — tout le quotidien en un seul écran, dans cet ordre :
+  le **solde disponible aujourd'hui** puis les **soldes projetés à 30 et
+  90 jours** (chacun détaillé en une petite somme entrées + sorties = net),
+  la **courbe de solde** passé → futur, les **comptes** (avec le logo de
+  leur banque, les nantis et clôturés listés en dessous, atténués), et
+  enfin le **registre unique** : les échéances prévisionnelles à venir
+  au-dessus du séparateur « Aujourd'hui », toutes les transactions réelles
+  en dessous. Si une connexion bancaire est en panne ou si le seuil
+  d'alerte est franchi, une **bannière** le signale en tête de page.
+- **Gestion** — tout ce qui se configure : règles récurrentes, échéances
+  ponctuelles, capital engagé non appelé, TVA, alerte de seuil, connexions
+  bancaires.
+
+Le chiffre qui compte est le **solde projeté**, pas la somme brute des
+entrées/sorties : c'est lui qui ouvre la page. Le cash **non liquide**
+(contrats de capitalisation…) est hors du disponible ; une ligne sous les
+comptes en rappelle le total et renvoie vers les
+[Placements](19-placements.md).
 
 ## La courbe de solde
 
@@ -57,11 +62,10 @@ donnée fraîche. Les comptes manuels affichent la date de saisie du solde.
 Trois états particuliers changent les calculs :
 
 - **Nanti** : fonds bloqués (nantissement, séquestre) — le solde est
-  **exclu du disponible** et du prévisionnel. Le compte quitte la liste du
-  cash disponible pour la section « Hors trésorerie disponible », en bas de
-  la Vue d'ensemble.
+  **exclu du disponible** et du prévisionnel. Le compte reste dans la liste
+  des comptes, en bas et atténué, avec la mention « hors solde disponible ».
 - **Clôturé** : compte fermé en banque, conservé pour son historique, solde
-  ignoré — également listé dans cette section.
+  ignoré — listé de la même façon, en dernier.
 - Le « **solde disponible** » affiché partout = comptes actifs, non nantis,
   en euros. Un compte d'épargne ou un support monétaire mobilisable à vue
   (type compte booster) compte comme du disponible dès lors qu'il est saisi
@@ -73,7 +77,7 @@ solde manuel, nanti, clôturé.
 
 ### Surveillance des connexions
 
-La section « Connexions bancaires » (onglet Règles & échéances) affiche
+La section « Connexions bancaires » (onglet Gestion) affiche
 l'état de chaque connexion Powens :
 
 - 🟢 **Connectée** — la synchronisation tourne normalement.
@@ -118,10 +122,18 @@ date, libellé, contrepartie, compte. Elles arrivent par la synchro Powens,
 par import (historique Airtable, CSV Mémo Bank) ou à la main (souvent via
 l'assistant IA).
 
-- **Registre complet** (onglet Transactions) : toutes les transactions, tous
-  statuts, filtrables par type, compte et recherche plein texte (insensible
-  aux accents). Plafonné aux 1 000 plus récentes à l'écran.
-- Chaque nouvelle transaction entre dans la **file de pointage** — voir
+- **Registre unique** (bas de la Vue d'ensemble) : les échéances
+  prévisionnelles à venir au-dessus du séparateur « Aujourd'hui » (en bleu ;
+  en ambre quand elles sont en retard), toutes les transactions réelles en
+  dessous, du plus récent au plus ancien. Filtres : recherche plein texte
+  (insensible aux accents), **montant** (min/max), **statut** (dont
+  « À pointer » et « Prévisionnel ») et **compte** — la même grammaire de
+  filtres que la liste des participations. Plafonné aux 1 000 transactions
+  les plus récentes à l'écran.
+- Chaque nouvelle transaction entre dans la **file de pointage** — statut
+  « À pointer », en ambre pour se repérer d'un coup d'œil. Le poste de
+  travail quotidien est la page [À faire](16-a-faire.md), qui ouvre le
+  registre déjà filtré ; le geste lui-même est décrit dans
   [Pointage](08-pointage.md).
 
 ### Sous le capot : une synchro qui ne casse jamais le pointage
@@ -131,14 +143,6 @@ jamais dupliquée, et une re-livraison de la banque **n'écrase jamais** l'état
 de pointage déjà posé. Les comptes historiques importés d'Airtable ont une
 date de bascule : la synchro n'ingère que les transactions postérieures,
 pour éviter les doublons avec l'historique.
-
-## Analyse rétrospective
-
-L'analyse du réalisé par catégorie vit dans la grille du
-[Prévisionnel](09-previsionnel.md) : ses colonnes des mois passés montrent
-les entrées et sorties réellement constatées, catégorie par catégorie, dans
-le même tableau que la projection. Les catégories viennent du
-[pointage](08-pointage.md).
 
 ## Points d'attention
 

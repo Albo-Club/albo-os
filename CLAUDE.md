@@ -573,6 +573,15 @@ export const remove = mutation({
   (`dealBucket` / `participationBucketBand`), so a deal reads the same on the
   deal sheet, the deals list and the company sheet. One badge per deal, and no
   second status marker beside it (no accent bar, no duplicate exit badge).
+- ❌ Adding a `companies.sector` value that describes the **vehicle** (SPV,
+  fund, studio, carried structure) or a transversal **lens** (climate,
+  impact), or writing a free-typed sector from code. The canonical list is
+  `convex/lib/sectors.ts` — 14 slugs, one axis: the market the company sells
+  to. The vehicle is already carried by the deal's `instrumentKind`, and a
+  lens that three quarters of the portfolio can claim sorts nothing (that is
+  exactly how `climate` had to be retired). A missing bucket is arbitrated in
+  that file, with its assignment rules; agent tools take the enum, never a
+  free string.
 - ❌ A `DialogContent` whose content can grow tall (long lists, repeatable
   rows, many fields) without `max-h-[85vh] overflow-y-auto`. shadcn's dialog
   has no built-in height cap, so tall content overflows the viewport with no

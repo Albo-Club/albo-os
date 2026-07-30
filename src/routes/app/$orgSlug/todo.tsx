@@ -406,7 +406,7 @@ function Todo() {
               <Link
                 to="/app/$orgSlug/cash"
                 params={{ orgSlug }}
-                search={{ tab: 'transactions' }}
+                search={{ filter: 'unmatched' }}
               >
                 {t('unmatched.cta')}
               </Link>
@@ -461,7 +461,7 @@ function Todo() {
               <Link
                 to="/app/$orgSlug/cash"
                 params={{ orgSlug }}
-                search={{ tab: 'previsionnel' }}
+                search={{ filter: 'unmatched' }}
               >
                 {t('forecast.cta')}
               </Link>

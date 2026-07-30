@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.156.0 — 30/07/2026 à 17:06 — La fiche société s'édite au clic, comme la fiche deal
+## v1.158.0 — 30/07/2026 à 17:29 — La fiche société s'édite au clic, comme la fiche deal
 
 La fiche deal s'édite déjà entièrement au clic : on clique une valeur du
 panneau de droite, on écrit, c'est enregistré. La fiche société, elle,
@@ -87,6 +87,147 @@ archiver, supprimer.
 > - Docs : `TESTING.md` (TP11, TP11b, nouveau TP11d, FD17),
 >   `docs/produit/04-participations.md`, `docs/produit/05-deals.md`,
 >   `KNOWN_ISSUES.md` (§ personnes), `TEMPLATE_SYNC.md` (ligne `InlineField`).
+## v1.157.0 — 30/07/2026 à 17:05 — Trésorerie : une seule vue d'ensemble, le solde projeté en premier
+
+La page Trésorerie passe de quatre onglets à **deux** : tout le quotidien
+tient maintenant dans la **Vue d'ensemble**, et l'onglet **Gestion** garde ce
+qui se configure une fois par mois (règles récurrentes, échéances
+ponctuelles, capital engagé non appelé, TVA, seuil d'alerte, connexions
+bancaires).
+
+En tête de page, le chiffre qui compte : le **solde projeté**. Trois tuiles
+sur une ligne — le disponible aujourd'hui (au centime), puis le solde
+projeté à **30 jours** et à **90 jours**, chacun détaillé en une petite
+somme : entrées, sorties, et le net souligné. La courbe de solde reste
+juste en dessous, suivie des **comptes avec le logo de leur banque** pour
+les reconnaître d'un coup d'œil — les comptes nantis ou clôturés restent
+listés, atténués, hors du disponible. Une ligne discrète rappelle le cash
+**non liquide** (contrats de capitalisation…) et renvoie vers les
+Placements.
+
+En bas de page, **un seul registre** : les échéances prévues au-dessus du
+séparateur « Aujourd'hui », toutes les transactions réelles en dessous. Une
+échéance en retard descend à sa date, en ambre. Plus de bouton « À
+pointer » : c'est une valeur du filtre **Statut** (avec son compteur), aux
+côtés de la recherche, d'un nouveau filtre **Montant** (min/max) et du
+compte — la même grammaire de filtres que les participations. Le statut
+« À pointer » s'affiche désormais en **ambre**, ici comme dans le panneau
+de détail d'une transaction (qui montrait… rien : le statut disparaissait
+au clic, c'est corrigé). Le pointage quotidien, lui, se lance depuis
+l'onglet **À faire**, qui ouvre ce registre déjà filtré.
+
+Le tableau prévisionnel « catégories × mois » est retiré — la projection
+continue de tourner exactement pareil sous la courbe.
+
+> **🔧 Notes techniques**
+>
+> - `cash.index.tsx` : 2 onglets (`apercu`/`gestion`), `?filter=` pré-filtre
+>   le registre ; `?tab=previsionnel|transactions|analyse` retombent sur la
+>   Vue d'ensemble. `ForecastGridSection.tsx` et `UpcomingEntries.tsx`
+>   supprimés (backend `getForecastGrid` conservé pour la courbe) ; la carte
+>   pipeline extraite dans `CommittedPipelineCard.tsx` (onglet Gestion).
+> - `CashKpis.tsx` : 3 tuiles — dispo (centimes) + projetés 30/90 j
+>   (`available + netCents` de `getUpcomingEntries`, arrondi euro) avec somme
+>   entrées/sorties/net sur 3 lignes.
+> - `CashAccounts.tsx` : carte Comptes unifiée (dispo + nantis/clôturés
+>   atténués) avec logos via `lib/bankDomains.ts` → `CompanyLogo` (logo.dev) ;
+>   ligne non-liquide = somme des placements `placementLiquidity() !== 'liquid'`.
+> - `TransactionsLedger.tsx` + `PointageTable.tsx` : lignes prévisionnelles
+>   (`getUpcomingEntries`) fusionnées au registre avec séparateur
+>   « Aujourd'hui », badges Prévu (info) / En retard (warning), montants
+>   prévisionnels arrondis à l'euro ; filtre Statut (menu unique, compteur
+>   inline) + filtre Montant client-side (`AmountInput` min/max) ; badge
+>   `unmatched` en warning (4.4).
+> - Bug 4.5 : `TransactionSheet` affiche le statut et lit la ligne **live**
+>   (plus le snapshot du clic). CTAs To do / VatCard / email
+>   `overdueEntriesEmail` → `/cash?filter=unmatched`.
+
+## v1.156.0 — 30/07/2026 à 16:57 — Une liste de secteurs qui veut enfin dire quelque chose
+
+La liste des secteurs avait dérivé : des étiquettes créées une par une au fil
+des deals, des doublons de casse, et surtout des cases qui ne décrivaient pas
+un marché — un studio, une structure de carried, un fonds. Résultat : filtrer
+par secteur ne renseignait plus sur l'exposition réelle du portefeuille.
+
+Elle est ramenée à **quatorze valeurs**, chacune avec une définition : SaaS /
+Logiciel, Fintech, Santé / Biotech, Silver economy, AgriFood, Consumer /
+Retail, Marketplace, Industrie / Circulaire, DeepTech, Immobilier, Fonds /
+Véhicules, Mobilité, EdTech, Autre.
+
+Ce qui change concrètement :
+
+- **Le secteur dit le marché, plus le véhicule.** SPV, fonds, studio, carried :
+  l'instrument du deal le disait déjà. Les participations sans marché propre se
+  rangent désormais toutes dans « Fonds / Véhicules ».
+- **« Climat » disparaît.** Avec une thèse d'impact, les trois quarts du
+  portefeuille pouvaient le revendiquer : la case ne triait rien et attirait
+  tout — elle contenait un logiciel, une opération immobilière et deux fonds.
+  Chaque société est revenue à son marché réel.
+- **Deux nouveaux secteurs** : **Silver economy**, qui sort l'accompagnement du
+  grand âge de la santé (ce ne sont ni les mêmes clients ni les mêmes
+  financeurs), et **DeepTech**, pour les ruptures scientifiques qu'aucun marché
+  de la liste ne couvre.
+- **« Services » disparaît aussi** : c'était le fourre-tout où tombait ce qu'on
+  ne savait pas ranger.
+- **Plus aucune valeur libre héritée.** Les étiquettes créées à la volée
+  (Agritech, Retail, Mobility, Circular Economy, Start-up Studio…) sont
+  ramenées sur la liste. Vingt participations changent de secteur.
+
+Le champ reste **saisissable librement** : si une case manque, on peut toujours
+taper un secteur. L'assistant IA, lui, ne peut plus en inventer — il choisit
+dans la liste ou laisse vide, ce qui était la principale source de dérive.
+
+> **🔧 Notes techniques**
+>
+> - Liste canonique déplacée de `src/lib/sectors.ts` vers `convex/lib/sectors.ts`
+>   (même pattern que `lib/instruments.ts`) : front, outils d'agent et migration
+>   partagent la même source. Le doc-comment porte les 4 règles d'affectation —
+>   marché ≠ véhicule, la verticale bat le modèle, `marketplace` en exception
+>   assumée, aucune lecture transversale — plus le budget de largeur des
+>   libellés (la colonne Secteur de `ParticipationsTable` est dimensionnée sur
+>   le libellé le plus long, désormais « Industrie / Circulaire »).
+> - `SECTOR_SLUGS` : 16 → 14. Ajouts `silver` / `deeptech` ; retraits `climate`,
+>   `services`, `media`, `crypto`. Libellés FR/EN mis à jour (`industry`
+>   « Industrie / DeepTech » → « Industrie / Circulaire », `fund` → « Fonds /
+>   Véhicules », `consumer` → « Consumer / Retail »). `companies.sector` reste
+>   `v.string()` au schéma — le combobox créable est inchangé.
+> - `agentTools` : `createCompany` / `updateCompany` passent de
+>   `z.string().optional()` à `z.enum(SECTOR_SLUGS).optional()` (const partagé
+>   `sectorInput`). C'est le verrou : les valeurs one-off type « Carried Interest
+>   Structure » venaient de là.
+> - Migration `convex/migrations/normalizeSectors.ts` (`dryRun` / `apply` /
+>   `report`) : 18 décisions par entité ancrées `_id` prod + garde nom (une même
+>   valeur d'origine peut partir sur deux cibles — `services` → `industry` pour
+>   Reekom, `silver` pour Tango/Auxicare), puis alias par valeur pour le reste,
+>   archivées et org Calte incluses. Idempotente, non destructive : une valeur
+>   sans lecture unique est remontée dans `needsManualReview` plutôt que réécrite
+>   en `other`. À lancer juste après le deploy.
+> - Doc : `TESTING.md` SH19c (libellé le plus long) + nouvelle ligne SH22,
+>   `MIGRATIONS.md`, `docs/produit/04-participations.md` § « Les secteurs »,
+>   anti-pattern `CLAUDE.md`.
+## v1.155.1 — 30/07/2026 à 16:40 — Plan de test de la fiche deal remis d'équerre
+
+Rien ne change dans l'application : deux étapes du plan de test interne
+décrivaient un écran qui n'existe plus (un bandeau de montants qui n'apparaît
+plus tel quel, et un sélecteur de type d'instrument retiré de l'en-tête depuis
+longtemps). Elles décrivent maintenant ce que l'écran fait vraiment.
+
+> **🔧 Notes techniques**
+>
+> - `TESTING.md` FD9 : le « strip Engagé / Versé / Reçu » ne correspondait plus
+>   à `dealAmountTiles` — une seule tuile de montant dans le cas courant
+>   (« Décaissé (réel) »), « Engagé prévisionnel » si `status === 'pending'`,
+>   deux tuiles pour `fund_lp` seulement, « Reçu » toujours à côté. La ligne
+>   portait aussi encore « Documents juste sous les Transactions » (le bloc est
+>   en bas de la colonne centrale depuis v1.155.0).
+> - `TESTING.md` FD39 : suppression du scénario (a) « aperçu via le sélecteur
+>   de type d'en-tête » — ce sélecteur n'existe plus (cf. FD8), le changement de
+>   type passe par ⋯ → « Modifier ». La ligne ne garde que les champs calculés
+>   non éditables et le no-op du champ € vidé.
+> - À noter, **non corrigé** : le drapeau `editable` d'`InstrumentDetails`
+>   (`src/components/deals/InstrumentBlock.tsx`) n'a plus de site d'appel à
+>   `false` depuis le retrait de ce mode aperçu — sa branche lecture seule
+>   (`IdentityField`) est du code mort.
 
 ## v1.155.0 — 30/07/2026 à 16:30 — La fiche deal adopte la structure de la fiche société
 

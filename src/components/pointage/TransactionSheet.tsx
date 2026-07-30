@@ -104,12 +104,16 @@ export function TransactionSheet({
   onOpenChange,
   footer,
   match,
+  status,
 }: {
   tx: TxDetails | null
   onOpenChange: (open: boolean) => void
   footer?: ReactNode
   /** Linked deal / liability entity (resolved + linked by the caller). */
   match?: ReactNode
+  /** Matching-status badge — rendered by the caller so the sheet mirrors the
+   * table's status column (it used to vanish when opening a row). */
+  status?: ReactNode
 }) {
   const { t } = useTranslation('pointage')
   const { fmtDate, fmtSigned } = useFormatters()
@@ -139,6 +143,7 @@ export function TransactionSheet({
                 value={t(`direction.${tx.direction}`)}
               />
               <Info label={t('detail.account')} value={accountLabel(tx)} />
+              {status && <Info label={t('col.status')} value={status} />}
               {match && <Info label={t('detail.matchedTo')} value={match} />}
             </div>
             <SheetFooter>{footer}</SheetFooter>

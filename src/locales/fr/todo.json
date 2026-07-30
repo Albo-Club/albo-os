@@ -36,7 +36,7 @@
   "forecast": {
     "title": "Échéances en retard",
     "empty": "Aucune échéance en retard.",
-    "cta": "Ouvrir le prévisionnel"
+    "cta": "Ouvrir le registre"
   },
   "reports": {
     "title": "Reportings manquants",
