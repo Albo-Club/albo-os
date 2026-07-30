@@ -66,7 +66,7 @@ export type UnmatchedTx = TxDetails
  * « Aujourd'hui » divider, overdue ones inline with the past transactions.
  */
 export type PlannedEntry = {
-  _id: string
+  _id: Id<'forecastEntries'>
   date: number
   label: string
   amountCents: number
@@ -426,6 +426,8 @@ export function PointageTable({
   }, [suggestions, dealsById, liabilityByTarget, t])
 
   const matchTransaction = useConvexMutation(api.transactions.matchTransaction)
+  const markEntryRealized = useConvexMutation(api.forecasts.markEntryRealized)
+  const cancelForecastEntry = useConvexMutation(api.forecasts.cancelEntry)
   const allocateTransaction = useConvexMutation(
     api.liabilities.allocateTransaction,
   )
@@ -472,6 +474,10 @@ export function PointageTable({
     Set<Id<'transactions'>>
   >(() => new Set())
   const [confirmStatus, setConfirmStatus] = useState<BulkStatus | null>(null)
+  // Planned row awaiting the « Annuler l'échéance » confirmation.
+  const [cancelEntryTarget, setCancelEntryTarget] =
+    useState<PlannedEntry | null>(null)
+  const [cancelEntryPending, setCancelEntryPending] = useState(false)
   const timeoutsRef = useRef(
     new Map<Id<'transactions'>, ReturnType<typeof setTimeout>>(),
   )
@@ -517,6 +523,21 @@ export function PointageTable({
     )
   }
 
+  // Second gesture offered by the post-match toast: realize the deal's
+  // pending forecast entry against the just-matched transaction (mode
+  // `close` — the planned/actual gap stays readable, cf. forecasts.ts).
+  async function realizePendingEntry(
+    entryId: Id<'forecastEntries'>,
+    transactionId: Id<'transactions'>,
+  ) {
+    try {
+      await markEntryRealized({ entryId, transactionId, mode: 'close' })
+      toast.success(t('pendingEntry.realized'))
+    } catch (err) {
+      reportError(err)
+    }
+  }
+
   async function handleMatch(
     tx: UnmatchedTx,
     target: Extract<PointageTarget, { kind: 'deal' | 'liability' }>,
@@ -524,7 +545,7 @@ export function PointageTable({
     setPendingId(tx._id)
     try {
       if (target.kind === 'deal') {
-        await matchTransaction({
+        const result = await matchTransaction({
           transactionId: tx._id,
           dealId: target.deal._id,
         })
@@ -535,6 +556,25 @@ export function PointageTable({
             kind: 'matched',
             targetName: target.deal.target?.name ?? '—',
           })
+        // Deal with a pending planned entry → offer to realize it right away
+        // (reverse of the suggestions card's « Pointer sur le deal » toast).
+        const entry = result.pendingEntry
+        if (entry) {
+          toast(
+            t('pendingEntry.toast', {
+              label: entry.label,
+              date: fmtDate(entry.date),
+              amount: fmtSignedRounded(entry.amountCents, entry.direction),
+            }),
+            {
+              action: {
+                label: t('pendingEntry.realize'),
+                onClick: () => void realizePendingEntry(entry._id, tx._id),
+              },
+              duration: 10000,
+            },
+          )
+        }
       } else {
         await allocateTransaction({
           transactionId: tx._id,
@@ -656,6 +696,22 @@ export function PointageTable({
       reportError(err)
     } finally {
       setPendingId(null)
+    }
+  }
+
+  // Cancels a planned entry (rule-derived occurrences included) straight
+  // from the register — the row leaves via getUpcomingEntries reactivity.
+  async function handleCancelEntry() {
+    if (!cancelEntryTarget) return
+    setCancelEntryPending(true)
+    try {
+      await cancelForecastEntry({ entryId: cancelEntryTarget._id })
+      toast.success(t('register.entryCancelled'))
+      setCancelEntryTarget(null)
+    } catch (err) {
+      reportError(err)
+    } finally {
+      setCancelEntryPending(false)
     }
   }
 
@@ -969,7 +1025,17 @@ export function PointageTable({
                             </Badge>
                           </TableCell>
                         )}
-                        <TableCell />
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-muted-foreground"
+                            disabled={cancelEntryPending}
+                            onClick={() => setCancelEntryTarget(entry)}
+                          >
+                            {t('register.cancelEntry')}
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     </Fragment>
                   )
@@ -1130,6 +1196,41 @@ export function PointageTable({
               onClick={() => {
                 if (confirmStatus) void handleBulkCategorize(confirmStatus)
               }}
+            >
+              {t('bulk.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={cancelEntryTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setCancelEntryTarget(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('register.cancelEntryTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cancelEntryTarget &&
+                t('register.cancelEntryBody', {
+                  label: cancelEntryTarget.label,
+                  date: fmtDate(cancelEntryTarget.date),
+                  amount: fmtSignedRounded(
+                    cancelEntryTarget.amountCents,
+                    cancelEntryTarget.direction,
+                  ),
+                })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelEntryPending}>
+              {t('bulk.cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={cancelEntryPending}
+              onClick={() => void handleCancelEntry()}
             >
               {t('bulk.confirm')}
             </AlertDialogAction>

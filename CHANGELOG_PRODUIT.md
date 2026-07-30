@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.161.1 — 30/07/2026 à 18:45 — La fiche deal ne parle plus d'une courbe qu'elle n'affiche pas
+## v1.162.1 — 30/07/2026 à 18:45 — La fiche deal ne parle plus d'une courbe qu'elle n'affiche pas
 
 La section Prévisionnel d'une fiche deal affichait une ligne « Reste à
 déployer : X (engagé Y − versé Z) — sans date d'appel, compté à part de la
@@ -63,6 +63,43 @@ calcul de la carte, ce qui n'entre pas dans ce nettoyage.
 > - `TESTING.md` : FC27 réécrit (plus de ligne à vérifier), FC14 ne
 >   mentionne plus la fiche deal ; `docs/produit/05-deals.md` renvoie vers
 >   la Trésorerie pour le reste à déployer.
+> - Ce merge retire aussi trois marqueurs de conflit (`<<<<<<<`,
+>   `=======`, `>>>>>>>`) commités par erreur dans ce fichier sur `main`
+>   (PR #338) : ils s'affichaient tels quels dans la page Nouveautés. Les
+>   deux entrées encadrées (v1.162.0 et v1.161.0) sont conservées telles
+>   quelles.
+
+## v1.162.0 — 30/07/2026 à 18:40 — Pointer un deal rattrape son échéance prévue, et les échéances s'annulent depuis le registre
+
+Deux angles morts du rapprochement prévisionnel ↔ réel disparaissent :
+
+- **Pointer une transaction sur un deal propose de réaliser son échéance
+  prévue.** Jusqu'ici, si la suggestion de rapprochement n'était pas passée
+  (virement trop tardif, montant trop différent), on pointait la transaction
+  sur le deal… et l'échéance prévisionnelle restait « En retard » dans le
+  registre, sans moyen simple de la solder. Le pointage propose désormais
+  aussitôt, dans la notification de succès, de **réaliser l'échéance
+  attendue** du deal — même éloignée en date ou en montant : le lien au deal
+  suffit.
+- **Annuler une échéance directement depuis le registre.** Chaque ligne
+  prévisionnelle du registre porte une action « Annuler l'échéance » avec
+  confirmation — y compris les occurrences générées par une règle
+  récurrente, qui jusqu'ici ne pouvaient être annulées que via l'assistant
+  IA. L'échéance annulée sort du registre et du solde projeté.
+
+> **🔧 Notes techniques**
+>
+> - `transactions.matchTransaction` retourne désormais `pendingEntry`
+>   (l'échéance `pending` du deal la plus proche en date — même sens, EUR,
+>   sans fenêtre date/montant) ; `PointageTable.handleMatch` affiche un
+>   toast avec action « Réaliser l'échéance » →
+>   `forecasts.markEntryRealized` (mode `close`, l'écart reste lisible).
+> - Lignes prévisionnelles de `PointageTable` : bouton « Annuler
+>   l'échéance » + AlertDialog → `forecasts.cancelEntry` (mutation
+>   existante, jusqu'ici réservée aux ponctuelles de l'onglet Gestion).
+> - Test de régression ajouté (`convex/regression.pointage.test.ts` :
+>   retour `pendingEntry`, plus proche en date, même sens) ; docs produit
+>   08/09, `TESTING.md` (FC20, FC30, B11) et `KNOWN_ISSUES.md` mis à jour.
 
 ## v1.161.0 — 30/07/2026 à 18:35 — La TVA quitte l'écran, les comptes nantis rejoignent les placements
 
