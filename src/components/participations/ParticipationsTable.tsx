@@ -132,8 +132,8 @@ const COL_WIDTHS = {
   /** TVPI or MOIC, then TRI. */
   ratio: 80,
   /**
-   * Holds the widest predefined sector label (see src/lib/sectors.ts) on a
-   * single line inside its badge: "Fonds / Private equity" measures ~116px of
+   * Holds the widest predefined sector label (see convex/lib/sectors.ts) on a
+   * single line inside its badge: "Industrie / Circulaire" measures ~116px of
    * the ~126px a badge leaves here. A free-typed sector longer than that
    * spills into the next column like any other cell.
    */
