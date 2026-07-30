@@ -27,8 +27,9 @@ Pré-requis :
 | B5  | Cookies prod    | `pnpm test:cookies`      | `albo-os.session_token` a Secure+HttpOnly+SameSite=Lax+Max-Age≈604800                                                                        |
 | B6  | Skills intègres | `pnpm sync:skills:verify` | `Vendored skills match skills-lock.json.` (exit 0) — hors-ligne, couvre les `SKILL.md` **et** leurs `references` ; c'est le job CI `skills-verify` |
 | B6b | Skills à jour   | `pnpm sync:skills:check` | `Skills up to date with upstream.` (exit 0) — réseau ; une dérive n'est pas bloquante (cron hebdo + hook `SessionStart`)                       |
-| B7  | Tests unitaires | `pnpm test:unit`         | 70 tests verts (logique pure : récurrence/solde forecast + historique cash, ranking suggestions, instructions agent, passif, séries BP, CSV) |
+| B7  | Tests unitaires | `pnpm test:unit`         | 257 tests verts (logique pure : récurrence/solde forecast + historique cash, ranking suggestions, instructions agent, passif, séries BP, CSV) |
 | B8  | Miroir Linear   | `pnpm sync:linear-docs --all --dry-run` | `18 page(s) mirrored to Linear.` (exit 0) — hors-ligne, sans clé : valide que `docs/produit/` et la map `DOCS` de `scripts/sync-linear-docs.mjs` se correspondent (exit 2 sinon) et imprime le markdown qui partirait. La vraie poussée se fait au merge (workflow « Sync Linear docs », secret GitHub `LINEAR_API_KEY`) |
+| B9  | Régression Convex | `pnpm test:convex`     | 35 tests verts (vitest + convex-test, backend en mémoire — aucun réseau, aucun déploiement) : isolation multi-tenant + rejet non-authentifié, rôles admin/member, invariants deals (unicité SIREN, investisseur `group_*`, idempotence upsert Attio), pointage (état matched/unmatched + `matchingDecisions` append-only), forecast (`expandRules` idempotent, grille, `markEntryRealized`), passif (soldes C/C dérivés des transactions), vue agrégée cross-org |
 
 > **Schéma & mapping d'instruments** (refonte fiches deal, `convex/schema.ts` +
 > `convex/lib/instrumentMapping.ts`). Validés par B1 : `INSTRUMENT_ARCHETYPE` et

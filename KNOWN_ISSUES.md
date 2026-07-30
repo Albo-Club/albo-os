@@ -1062,6 +1062,41 @@ If the lib renders content outside the React tree (e.g. into its own DOM
 node), Tailwind theme switching won't reach that container — fall back to
 inline styles with explicit values there.
 
+## Suite de régression Convex (`pnpm test:convex`) — 3 pièges du harness
+
+La suite (`convex/regression.*.test.ts` + harness `convex/regression.setup.ts`)
+tourne sur `convex-test` : backend en mémoire, aucun réseau, aucun déploiement.
+Trois choses non évidentes qui coûteraient cher à redécouvrir :
+
+1. **Les tests vivent dans `convex/` sans être déployés.** Le CLI Convex
+   ignore tout module dont le *basename* contient **plus d'un point**
+   (cf. `entryPoints()` dans le bundle CLI : « Skipping … that contains
+   multiple dots »). `regression.tenancy.test.ts` comme `regression.setup.ts`
+   sont donc invisibles pour `convex dev`/`deploy` — c'est la raison du
+   préfixe `regression.` sur le fichier de setup aussi. Ne PAS créer de
+   helper `setupTests.ts` (un seul point → il partirait en prod et casserait
+   le deploy sur l'import vitest).
+2. **Auth réelle, pas de mock : composant Better Auth + claims précises.**
+   `requireAppUser` passe par `authComponent.safeGetAuthUser`, qui lit
+   `identity.sessionId` et `identity.subject` puis résout `session` et `user`
+   dans les tables **du composant**. Le harness enregistre le composant via
+   l'entrée officielle `@convex-dev/better-auth/test` (`register(t)`), seed
+   `user` + `session` par `components.betterAuth.adapter.create`, puis
+   authentifie avec `t.withIdentity({ subject: <baUserId>, sessionId:
+   <sessionId> })`. Un identity sans `sessionId` = utilisateur silencieusement
+   anonyme (les tests « rejette un non-membre » passeraient pour de mauvaises
+   raisons).
+3. **`import.meta.glob` sous vitest = inline deps obligatoires.**
+   `convex-test` et `@convex-dev/better-auth/test` utilisent
+   `import.meta.glob` (construct Vite) ; servis depuis `node_modules` sans
+   transformation, ils explosent. D'où `server.deps.inline: ['convex-test',
+   '@convex-dev/better-auth']` dans `vitest.config.ts` — et `SITE_URL` y est
+   injecté car `convex/auth.ts` le lit au chargement du module (importé par
+   `lib/auth.ts`, donc par quasi toutes les fonctions testées).
+
+Le critère d'efficacité de la suite a été vérifié : commenter le
+`requireOrgMember` de `deals.list` fait rougir 2 tests (isolation lecture).
+
 ## Convex dev typecheck
 
 `pnpm exec convex dev` runs its own typecheck (`--typecheck=enable`). If

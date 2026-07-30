@@ -23,6 +23,38 @@ bas de page.
 
 ---
 
+## v1.149.2 — 30/07/2026 à 10:15 — Des tests de régression gardent les fondations
+
+Mise à jour purement technique : une suite de tests automatiques vérifie
+désormais, à chaque modification du code, que les protections fondamentales
+de l'application tiennent toujours — l'étanchéité entre les véhicules
+d'investissement (un membre d'une organisation ne peut jamais voir ni
+modifier les données d'une autre), les rôles, les règles de création des
+deals, le pointage des transactions, le prévisionnel de trésorerie, le
+passif et la vue agrégée. Si une future évolution casse silencieusement
+l'une de ces garanties, la mise en production est bloquée automatiquement.
+
+> **🔧 Notes techniques**
+>
+> - Suite de régression `convex-test` + vitest (`pnpm test:convex`, branchée
+>   dans le job CI `check`) : 35 tests dans `convex/regression.*.test.ts`,
+>   backend Convex en mémoire, zéro réseau, zéro déploiement.
+> - Harness partagé `convex/regression.setup.ts` : enregistre le composant
+>   Better Auth via `@convex-dev/better-auth/test`, seed `user`/`session`
+>   du composant + ligne `users` applicative, identité
+>   `withIdentity({ subject, sessionId })` — le vrai `requireAppUser` /
+>   `requireOrgMember` s'exécute, aucun mock.
+> - Couverture : multi-tenant (`not_a_member`, accès anonyme), rôles
+>   (`insufficient_role`, `owner_only`), deals (`siren_already_used`,
+>   `assertInvestorIsGroupEntity`, idempotence `attioSync.upsertFromDeal`),
+>   pointage (`applyMatchToDeal`/`applyUnmatch` + `matchingDecisions`
+>   append-only), forecasts (`expandRules` idempotent, `getForecastGrid`,
+>   `markEntryRealized` close/keepRemainder), passif
+>   (`getLiabilities` : soldes C/C dérivés, allocations), `aggregate.listDeals`.
+> - Les fichiers vivent dans `convex/` sans être déployés : le CLI Convex
+>   ignore tout module dont le nom contient plus d'un point (cf.
+>   `KNOWN_ISSUES.md`). Aucun code métier modifié.
+
 ## v1.149.1 — 29/07/2026 à 21:45 — La doc produit se recopie toute seule dans Linear
 
 La documentation produit lisible dans Linear se met désormais à jour
