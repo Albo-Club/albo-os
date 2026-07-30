@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.160.0 — 30/07/2026 à 18:21 — La TVA quitte l'écran, les comptes nantis rejoignent les placements
+## v1.161.0 — 30/07/2026 à 18:35 — La TVA quitte l'écran, les comptes nantis rejoignent les placements
 
 Deux nettoyages qui vont dans le même sens : ne garder à l'écran que ce qui
 sert au pilotage.
@@ -71,6 +71,56 @@ de l'historique.
 >   ajouté à la seule tuile « solde total ».
 > - `tests/vat.test.ts` perd le test de miroir front (le module n'existe
 >   plus), garde la dérivation Convex.
+## v1.160.0 — 30/07/2026 à 18:25 — Rattacher une société à sa fiche Attio, depuis sa fiche
+
+Les sociétés qui arrivent par la synchronisation Attio sont déjà rattachées à
+leur fiche CRM. Celles créées à la main dans Albo, non — et rien ne permettait
+de le faire : la ligne « Fiche Attio » du panneau d'identité affichait le lien
+quand il existait, un tiret sinon, sans jamais rien proposer.
+
+Elle devient **la dernière ligne éditable du panneau**, dans le même geste que
+les autres :
+
+- Pas de lien ? Un clic ouvre une **recherche dans Attio**. On tape deux
+  lettres, on choisit dans la liste — chaque suggestion affiche le nom et, si
+  Attio le connaît, le **domaine**, ce qui permet de départager les homonymes.
+- Un lien existe ? La ligne affiche « Ouvrir dans Attio » et une **croix pour
+  détacher**.
+
+On ne peut pas saisir une référence à la main, uniquement en choisir une :
+c'est ce lien qui indique à la synchronisation où ranger les prochains deals,
+une valeur inventée les enverrait en silence sur la mauvaise société. Pour la
+même raison, une fiche Attio ne peut être rattachée qu'à **une seule** société,
+toutes organisations confondues — sinon la synchronisation se bloque.
+
+> **🔧 Notes techniques**
+>
+> - `convex/attio.ts` : action `searchCompanies`, miroir de `searchPeople` sur
+>   l'objet `companies` d'Attio (même garde d'appartenance via
+>   `internal.attio.requireMember`, mêmes dégradations douces `config` /
+>   `upstream`, clé jamais loguée). Helpers `companyName` / `companyDomain` sur
+>   les attributs historisés ; le domaine remonte pour départager les homonymes
+>   dans le picker.
+> - `convex/companies.ts` : `update` accepte `attioCompanyId` (`''` → colonne
+>   retirée, comme `domain`). ⚠️ `assertAttioCompanyIdFree` est **global, pas
+>   par org** : `by_attio_company_id` est un index global lu en `.unique()` par
+>   `attioSync.ts:resolveOrCreateTargetCompany`, donc un doublon d'ancrage —
+>   même inter-org — ferait throw la synchro. Nouveau code d'erreur
+>   `attio_company_already_used`.
+> - `src/components/companies/AttioCompanyField.tsx` (nouveau) : la ligne du
+>   panneau, posée comme un `IdentityField` (elle ne peut pas en être un : sa
+>   valeur au repos est un lien + une croix). Picker `AttioCompanySearch` —
+>   recherche débouncée, popover de résultats, `preventDefault` sur `mousedown`
+>   pour que le blur n'annule pas avant le clic. Aucun chemin de saisie libre.
+> - `AttioCompanyLink` retiré de `EntityFiche.tsx` (orphelin après ce
+>   changement) ; `edit.personSearching` / `edit.personSearchError` renommées
+>   `edit.attioSearching` / `edit.attioSearchError` — leur texte était déjà
+>   générique et sert maintenant aux deux pickers.
+> - Tests : trois cas ajoutés à `convex/regression.deals.test.ts` (ancrage déjà
+>   pris refusé, refus **inter-org**, détachement qui libère l'ancrage).
+> - Docs : `TESTING.md` (TP11 corrigé, nouveau TP11e),
+>   `docs/produit/04-participations.md`, `KNOWN_ISSUES.md` (§ fiche société,
+>   points 5 et 6).
 
 ## v1.159.0 — 30/07/2026 à 17:35 — La fiche société s'édite au clic, comme la fiche deal
 

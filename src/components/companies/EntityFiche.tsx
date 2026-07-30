@@ -1,14 +1,11 @@
-import { ArrowUpRight } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
-
-import { attioCompanyUrl } from '~/lib/attio'
 
 /**
  * Shared building blocks for the fiche skeleton (header → identity panel →
  * reporting/KPIs → documents), used by both the company and the deal fiche.
  * These primitives stay display-only: an editable field is an `InlineField`
- * (or, for the people sections, `PeopleEditor`) dropped inside them.
+ * — or, for the sections that need their own control, `PeopleEditor` and
+ * `AttioCompanyField` — dropped inside them.
  */
 
 /**
@@ -72,35 +69,5 @@ export function IdentitySection({
       </div>
       {children}
     </section>
-  )
-}
-
-/** "Open in Attio" link when a workspace base is configured; otherwise a muted
- * marker (the bridge id alone can't build a reliable web URL). */
-export function AttioCompanyLink({
-  attioCompanyId,
-}: {
-  attioCompanyId?: string | null
-}) {
-  const { t } = useTranslation('participations')
-  if (!attioCompanyId) return <>—</>
-  const url = attioCompanyUrl(attioCompanyId)
-  if (!url) {
-    return (
-      <span className="text-muted-foreground text-xs" title={attioCompanyId}>
-        {t('identity.attioLinked')}
-      </span>
-    )
-  }
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      className="inline-flex items-center gap-1 underline-offset-4 hover:underline"
-    >
-      {t('identity.attioOpen')}
-      <ArrowUpRight className="size-3.5" />
-    </a>
   )
 }
