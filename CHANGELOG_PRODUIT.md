@@ -23,6 +23,70 @@ bas de page.
 
 ---
 
+## v1.155.0 — 30/07/2026 à 16:39 — Une liste de secteurs qui veut enfin dire quelque chose
+
+La liste des secteurs avait dérivé : des étiquettes créées une par une au fil
+des deals, des doublons de casse, et surtout des cases qui ne décrivaient pas
+un marché — un studio, une structure de carried, un fonds. Résultat : filtrer
+par secteur ne renseignait plus sur l'exposition réelle du portefeuille.
+
+Elle est ramenée à **quatorze valeurs**, chacune avec une définition : SaaS /
+Logiciel, Fintech, Santé / Biotech, Silver economy, AgriFood, Consumer /
+Retail, Marketplace, Industrie / Circulaire, DeepTech, Immobilier, Fonds /
+Véhicules, Mobilité, EdTech, Autre.
+
+Ce qui change concrètement :
+
+- **Le secteur dit le marché, plus le véhicule.** SPV, fonds, studio, carried :
+  l'instrument du deal le disait déjà. Les participations sans marché propre se
+  rangent désormais toutes dans « Fonds / Véhicules ».
+- **« Climat » disparaît.** Avec une thèse d'impact, les trois quarts du
+  portefeuille pouvaient le revendiquer : la case ne triait rien et attirait
+  tout — elle contenait un logiciel, une opération immobilière et deux fonds.
+  Chaque société est revenue à son marché réel.
+- **Deux nouveaux secteurs** : **Silver economy**, qui sort l'accompagnement du
+  grand âge de la santé (ce ne sont ni les mêmes clients ni les mêmes
+  financeurs), et **DeepTech**, pour les ruptures scientifiques qu'aucun marché
+  de la liste ne couvre.
+- **« Services » disparaît aussi** : c'était le fourre-tout où tombait ce qu'on
+  ne savait pas ranger.
+- **Plus aucune valeur libre héritée.** Les étiquettes créées à la volée
+  (Agritech, Retail, Mobility, Circular Economy, Start-up Studio…) sont
+  ramenées sur la liste. Vingt participations changent de secteur.
+
+Le champ reste **saisissable librement** : si une case manque, on peut toujours
+taper un secteur. L'assistant IA, lui, ne peut plus en inventer — il choisit
+dans la liste ou laisse vide, ce qui était la principale source de dérive.
+
+> **🔧 Notes techniques**
+>
+> - Liste canonique déplacée de `src/lib/sectors.ts` vers `convex/lib/sectors.ts`
+>   (même pattern que `lib/instruments.ts`) : front, outils d'agent et migration
+>   partagent la même source. Le doc-comment porte les 4 règles d'affectation —
+>   marché ≠ véhicule, la verticale bat le modèle, `marketplace` en exception
+>   assumée, aucune lecture transversale — plus le budget de largeur des
+>   libellés (la colonne Secteur de `ParticipationsTable` est dimensionnée sur
+>   le libellé le plus long, désormais « Industrie / Circulaire »).
+> - `SECTOR_SLUGS` : 16 → 14. Ajouts `silver` / `deeptech` ; retraits `climate`,
+>   `services`, `media`, `crypto`. Libellés FR/EN mis à jour (`industry`
+>   « Industrie / DeepTech » → « Industrie / Circulaire », `fund` → « Fonds /
+>   Véhicules », `consumer` → « Consumer / Retail »). `companies.sector` reste
+>   `v.string()` au schéma — le combobox créable est inchangé.
+> - `agentTools` : `createCompany` / `updateCompany` passent de
+>   `z.string().optional()` à `z.enum(SECTOR_SLUGS).optional()` (const partagé
+>   `sectorInput`). C'est le verrou : les valeurs one-off type « Carried Interest
+>   Structure » venaient de là.
+> - Migration `convex/migrations/normalizeSectors.ts` (`dryRun` / `apply` /
+>   `report`) : 18 décisions par entité ancrées `_id` prod + garde nom (une même
+>   valeur d'origine peut partir sur deux cibles — `services` → `industry` pour
+>   Reekom, `silver` pour Tango/Auxicare), puis alias par valeur pour le reste,
+>   archivées et org Calte incluses. Idempotente, non destructive : une valeur
+>   sans lecture unique est remontée dans `needsManualReview` plutôt que réécrite
+>   en `other`. À lancer juste après le deploy.
+> - Doc : `TESTING.md` SH19c (libellé le plus long) + nouvelle ligne SH22,
+>   `MIGRATIONS.md`, `docs/produit/04-participations.md` § « Les secteurs »,
+>   anti-pattern `CLAUDE.md`.
+
 ## v1.154.0 — 30/07/2026 à 14:35 — Déposer un report soi-même depuis la fiche société
 
 Jusqu'ici, un report n'entrait que par mail : on transférait l'update à
