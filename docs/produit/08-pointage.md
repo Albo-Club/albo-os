@@ -88,6 +88,11 @@ montants collent, sinon un dialogue pour clore avec l'écart ou garder le
 reliquat. Le détail du mécanisme est décrit dans le
 [prévisionnel](09-previsionnel.md).
 
+Le pont marche dans les deux sens : pointer une transaction sur un deal qui
+attend encore une échéance prévue propose aussitôt de la réaliser, et une
+échéance devenue sans objet s'annule directement depuis sa ligne du
+registre.
+
 ## La TVA, mise de côté
 
 Qualifier le taux de TVA ligne à ligne sur les charges ne servait pas au
