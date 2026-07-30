@@ -1297,7 +1297,10 @@ export const ingestBackfilledTransactions = internalMutation({
  * reconnection: once fresh transactions have landed, the resume point sits
  * past the gap and would step right over it.
  *   pnpm exec convex run --prod powens:backfillConnection \
- *     '{"orgId":"…","powensConnectionId":"…","minDate":"2026-06-01"}'
+ *     '{"orgSlug":"calte","powensConnectionId":"…","minDate":"2026-06-01"}'
+ *
+ * `orgSlug` and `orgId` are interchangeable — the scheduled call passes the
+ * id it already holds, the operator passes the slug.
  *
  * Bounds, in order: the start date (resume point or `minDate`), the account
  * cutover (`computeCutoff`, hard floor — a `minDate` cannot reach behind it)
@@ -1306,19 +1309,28 @@ export const ingestBackfilledTransactions = internalMutation({
  * logged and does not stop the others. */
 export const backfillConnection = internalAction({
   args: {
-    orgId: v.id('organizations'),
+    // Exactly one of the two: `orgId` for the scheduled call, `orgSlug` for
+    // the operator — every other CLI runbook takes a slug.
+    orgId: v.optional(v.id('organizations')),
+    orgSlug: v.optional(v.string()),
     powensConnectionId: v.string(),
     minDate: v.optional(v.string()),
   },
   handler: async (
     ctx,
-    { orgId, powensConnectionId, minDate },
+    { orgId: orgIdArg, orgSlug, powensConnectionId, minDate },
   ): Promise<{ accounts: number; fetched: number; inserted: number }> => {
     const domain = process.env.POWENS_DOMAIN
     if (!domain) throw new ConvexError('powens_env_missing')
     if (minDate && !/^\d{4}-\d{2}-\d{2}$/.test(minDate)) {
       throw new ConvexError('invalid_min_date')
     }
+    const orgId =
+      orgIdArg ??
+      (orgSlug
+        ? await ctx.runQuery(internal.powens.orgIdBySlug, { slug: orgSlug })
+        : null)
+    if (!orgId) throw new ConvexError('org_id_or_slug_required')
     const summary = { accounts: 0, fetched: 0, inserted: 0 }
 
     const powensUser = await ctx.runQuery(internal.powens.getOrgPowensToken, {
@@ -1753,6 +1765,13 @@ export const powensAuthProbe = internalQuery({
     await requireOrgRole(ctx, orgId, 'admin')
     return { ok: true as const }
   },
+})
+
+/** Org id from its slug — lets the CLI runbooks pass `"calte"` rather than the
+ * internal id (an action has no `ctx.db`). Throws `org_not_found:<slug>`. */
+export const orgIdBySlug = internalQuery({
+  args: { slug: v.string() },
+  handler: async (ctx, { slug }) => (await orgBySlug(ctx, slug))._id,
 })
 
 /** An org's permanent Powens token (or null). INTERNAL — never expose to the

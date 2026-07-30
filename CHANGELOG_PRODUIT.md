@@ -23,6 +23,37 @@ bas de page.
 
 ---
 
+## v1.150.2 — 30/07/2026 à 10:28 — Ménage : organisations parasites et commande de rattrapage
+
+Deux corvées d'entretien, invisibles dans l'app au quotidien.
+
+La liste des organisations contenait **deux espaces créés par des comptes
+inconnus** en juin. Ils ne voyaient rien de CALTE ni d'Albo Club — chaque
+organisation est étanche — mais ils polluaient la liste. Un outil permet
+maintenant de les inspecter (qui en est membre, ce qu'ils contiennent) puis de
+les supprimer, avec deux garde-fous : impossible de supprimer CALTE ou Albo
+Club, impossible de supprimer un espace qui contient encore des données.
+
+Et la commande de rattrapage des transactions accepte désormais le nom court
+d'une organisation (« calte ») au lieu de son identifiant technique, comme
+toutes les autres commandes d'administration.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/purgeStrayOrgs.ts` : `inspect` (internalQuery, lecture
+>   seule) rend les membres avec leur compte user (email, date, autres orgs) et
+>   le compte de lignes de chaque table scopée org ; `apply` (internalMutation)
+>   supprime invitations + membres + org + logo. Gardes : `PROTECTED_SLUGS`
+>   (`calte`, `albo`) et `org_not_empty:<slug>:<table=n>`. Les tables filles
+>   (`valuations`, `kpiSnapshots`, `transactions`…) sont couvertes
+>   transitivement par leur parent. Les comptes users ne sont PAS supprimés —
+>   décision séparée côté Better Auth (`users:cascadeDelete`).
+> - `powens:backfillConnection` : `orgId` et `orgSlug` désormais tous deux
+>   optionnels au validateur, garde `org_id_or_slug_required` dans le handler,
+>   résolution par la nouvelle `powens:orgIdBySlug`. L'appel schedulé depuis
+>   `upsertConnectionStatus` passe toujours l'id.
+
+---
 ## v1.150.1 — 30/07/2026 à 10:20 — Un détecteur de code mort, lançable à la demande
 
 Mise à jour purement technique : un détecteur de code inutilisé (fichiers,

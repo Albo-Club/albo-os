@@ -1348,6 +1348,10 @@ permanent de l'org.
   reprise était au 28/07. D'où l'argument **`minDate`** (`YYYY-MM-DD`, usage
   opérateur), qui force la date de départ sur tous les comptes de la connexion.
   Le cutover reste le plancher dur — un `minDate` ne peut pas remonter derrière.
+- **`orgSlug` ou `orgId`, au choix** : l'appel schedulé passe l'id qu'il a déjà
+  en main, l'opérateur passe `"calte"` (via `orgIdBySlug`) comme dans tous les
+  autres runbooks CLI. Aucun des deux → `org_id_or_slug_required` ; les deux
+  arguments sont optionnels au validateur, la garde est dans le handler.
 - **Pas de plafond d'ancienneté, volontairement.** Un plafond (« 120 j max »)
   recréerait le bug : une panne plus longue perdrait silencieusement ses
   semaines les plus anciennes. Les bornes réelles sont le point de reprise, le
