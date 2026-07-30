@@ -1011,8 +1011,19 @@ export default defineSchema({
    * Dedup: `agentmailMessageId`, enforced in `reportInbox.ingest` (Convex has
    * no unique constraints). Body snapshots are truncated (1MB doc cap) —
    * later pipeline stages re-fetch the full body from AgentMail when needed.
+   *
+   * A row can also be born from a MANUAL upload (`origin: 'upload'`, created
+   * by `reportInbox.createFromUpload` from the company sheet): same table so
+   * the whole pipeline downstream of identification runs unchanged. Those
+   * rows carry no real AgentMail message — never call AgentMail with their
+   * ids (cf. the guard in `reportNotify.send`).
    */
   inboundEmails: defineTable({
+    // Absent = email (the historical case). 'upload' = manual upload from the
+    // front: the AgentMail ids below are placeholders, the company is already
+    // matched, and the pipeline starts at extraction (brick 4).
+    origin: v.optional(v.union(v.literal('email'), v.literal('upload'))),
+
     // AgentMail provenance
     agentmailInboxId: v.string(),
     agentmailMessageId: v.string(), // dedup key

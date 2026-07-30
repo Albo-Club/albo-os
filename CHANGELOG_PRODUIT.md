@@ -23,6 +23,52 @@ bas de page.
 
 ---
 
+## v1.154.0 — 30/07/2026 à 14:35 — Déposer un report soi-même depuis la fiche société
+
+Jusqu'ici, un report n'entrait que par mail : on transférait l'update à
+l'adresse dédiée et le circuit faisait le reste. Tous les reports ne
+passent pas par là — un PDF récupéré sur un espace investisseur, un deck
+remis en main propre, un export sorti d'un outil restaient dehors.
+
+L'onglet **Rapports** d'une fiche société porte maintenant un bouton
+**« Ajouter un report »**. On dépose un ou plusieurs fichiers (PDF, Excel,
+image — 20 Mo par fichier), on ajoute une note de contexte si c'est utile,
+et on lance l'analyse. **C'est exactement le même traitement qu'un mail
+transféré** : lecture du contenu (OCR compris), extraction de la période,
+des points clés et des métriques, alimentation des séries de KPIs,
+rangement sur la fiche et relance de la synthèse IA. Le report est rangé
+dans chaque organisation où la société existe, comme pour un mail.
+
+Le temps de l'analyse — quelques dizaines de secondes selon le poids du
+fichier — une ligne « analyse en cours… » s'affiche sous le titre de
+l'onglet, et le report apparaît tout seul quand c'est prêt. Pas de récap
+par mail pour un dépôt manuel : le résultat est sous vos yeux. Si l'analyse
+échoue, la ligne le dit avec la raison, et le dépôt reste rattrapable
+depuis la boîte Rapports entrants, comme n'importe quel mail.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle mutation `reportInbox.createFromUpload` : crée une ligne
+>   `inboundEmails` marquée `origin: 'upload'` (nouveau champ optionnel du
+>   schéma, absent = email) avec `matchedCompanies` déjà rempli, puis
+>   enchaîne sur `reportExtract.run`. La brique 3 (identification LLM) est
+>   sautée — la société est choisie par l'utilisateur ; le fan-out
+>   multi-org réutilise la règle domaine/nom exact, extraite de
+>   `assignCompany` dans le helper `sameParticipation`.
+> - Briques 4 et 5 inchangées : `reportExtract` sait déjà lire une pièce
+>   jointe présente en storage. `reportStore.storeForCompany` bascule le
+>   report et ses `documents` sur `source: 'upload'` et laisse les ids
+>   AgentMail vides quand `origin === 'upload'`.
+> - `reportNotify.send` sort tôt sur une ligne d'origine `upload` : ses ids
+>   AgentMail sont des placeholders, il n'y a pas de fil où répondre.
+> - Front : `CompanyReportsSection` porte l'en-tête + le bouton (visible
+>   aussi sur l'état vide), le dialog d'upload (`files.generateUploadUrl`
+>   puis la mutation) et la ligne d'avancement alimentée par
+>   `reportInbox.listUploadsInProgress` (scan des 50 lignes les plus
+>   récentes — `matchedCompanies` est un tableau, non indexable).
+> - Régression multi-tenant ajoutée : un membre de l'org A ne peut pas
+>   déposer de report sur une participation de l'org B.
+
 ## v1.153.0 — 30/07/2026 à 12:36 — Trésorerie : le cash d'abord, une seule courbe, des filtres
 
 La Vue d'ensemble de la Trésorerie répond maintenant aux questions dans

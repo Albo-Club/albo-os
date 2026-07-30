@@ -10,6 +10,11 @@ les KPIs, ranger le report sur la fiche société et répondre dans le fil
 avec un récapitulatif. À l'usage : transférer le mail, lire le récap,
 c'est tout.
 
+Un report qui n'est pas arrivé par mail (PDF récupéré sur un espace
+investisseur, deck envoyé en main propre, export d'un outil) se dépose
+directement depuis la fiche société — il suit le même circuit à partir de
+la lecture du contenu. Voir « Ajouter un report à la main » plus bas.
+
 ## Comment ça marche
 
 ### 1. Transférer le mail
@@ -88,11 +93,34 @@ Rapports entrants (Assigner / Retraiter / Rejeter).
 > et « Retraiter » rejoue le circuit de zéro. L'adresse est hébergée chez
 > AgentMail, qui notifie Albo OS à chaque email et envoie les récaps.
 
+## Ajouter un report à la main
+
+Sur la fiche d'une participation, onglet **Rapports**, le bouton
+**« Ajouter un report »** ouvre une fenêtre où déposer un ou plusieurs
+fichiers (PDF, Excel, image — 20 Mo par fichier) et, si utile, une note de
+contexte. « Analyser » lance le même circuit qu'un mail transféré, à partir
+de l'étape 3 : les étapes 1 et 2 n'ont pas lieu d'être puisque tu as choisi
+la société toi-même.
+
+Le temps de l'analyse, une ligne « analyse en cours… » s'affiche sous le
+titre de l'onglet ; quand elle disparaît, le report est là, avec sa
+période, ses points clés et ses métriques, et les fichiers déposés se
+retrouvent dans l'onglet Documents. Comme pour un mail, le report est rangé
+dans **chaque organisation** où la société existe, et la synthèse IA est
+relancée.
+
+Deux différences avec le mail : **aucun récapitulatif n'est envoyé** (tu es
+devant l'écran, le résultat est sous tes yeux), et si l'analyse échoue, la
+ligne passe en « analyse échouée » — le dépôt reste rattrapable depuis la
+boîte [Rapports entrants](12-vue-consolidee.md), comme un mail.
+
 ## Points d'attention
 
 - **Tout passe par un forward d'un membre** : un email envoyé directement
   par une participation à l'adresse dédiée part en quarantaine. C'est
-  voulu (sécurité + contrôle de ce qui entre).
+  voulu (sécurité + contrôle de ce qui entre). Le dépôt manuel depuis la
+  fiche société est l'autre porte d'entrée, réservée aux membres de
+  l'organisation de la société.
 - **Liens Notion** : la page doit être partagée publiquement. Une page
   privée échoue proprement (source ⚠️, reste du mail traité).
 - **Métriques hors catalogue** : visibles dans le récap sous « non

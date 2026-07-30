@@ -3155,6 +3155,29 @@ routage qu'en connaissance de cause.
   le pipeline. Le backfill envoie d'abord à l'extraction les documents
   uploadés **jamais lus** (sans `ocrState`) — l'indexation suit toute seule.
 
+## `inboundEmails` contient des lignes qui ne sont PAS des emails
+
+Le dépôt manuel d'un report depuis la fiche société
+(`reportInbox.createFromUpload`) réutilise tout le pipeline d'ingestion :
+il insère une ligne `inboundEmails` avec `origin: 'upload'`, la
+participation déjà matchée, et enchaîne directement sur
+`reportExtract.run`. C'est ce qui évite de dupliquer les briques 4 et 5
+(routeur de contenu, fiche + métriques, fan-out, `kpiSnapshots`,
+synthèse) pour un second point d'entrée.
+
+Le prix à payer : **les champs AgentMail de ces lignes sont des
+placeholders** (`agentmailInboxId: 'manual-upload'`,
+`agentmailMessageId: 'upload:<storageId>'`). Tout code qui les passe à
+l'API AgentMail échoue — c'est la raison de la sortie anticipée en tête de
+`reportNotify.send` (`if (row.origin === 'upload') return`). Un nouveau
+chemin sortant (relance, notification, réponse) doit refaire ce test ; se
+fier au fait que `senderUserId` est rempli ne suffit pas, il l'est aussi
+pour un upload.
+
+Corollaire côté lecture : `origin` est **optionnel** (absent = email, les
+lignes d'avant la fonctionnalité n'ont rien). Tester `=== 'upload'`, jamais
+`!== 'email'`.
+
 ## `companyReports.metrics` — des nombres nus, unité stockée ailleurs
 
 `companyReports.metrics` est un `Record<string, number>` : `{ revenue:

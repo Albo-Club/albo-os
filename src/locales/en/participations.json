@@ -595,7 +595,7 @@
   },
   "reports": {
     "title": "Investor reports",
-    "empty": "No report received by email yet.",
+    "empty": "No report yet.",
     "untitled": "Untitled report",
     "metrics": "Metrics",
     "content": "Content",
@@ -633,6 +633,25 @@
       "current": "Up to date",
       "received": "Received {{date}}",
       "viewDocs": "View documents"
+    },
+    "add": {
+      "action": "Add a report",
+      "dialogTitle": "Add a report",
+      "description": "The file is analysed like a report received by email: period, key highlights and metrics are extracted automatically.",
+      "pick": "Choose files",
+      "noteLabel": "Note (optional)",
+      "notePlaceholder": "Context for the analysis: covering message, clarifications…",
+      "submit": "Analyse",
+      "uploading": "Uploading…",
+      "queued": "Report sent — analysis in progress.",
+      "errors": {
+        "too_large": "File too large (20 MB maximum).",
+        "default": "Upload failed. Try again."
+      },
+      "progress": {
+        "running": "· analysis in progress…",
+        "failed": "· analysis failed ({{reason}})"
+      }
     }
   },
   "intelligence": {

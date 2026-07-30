@@ -142,6 +142,14 @@ export const send = internalAction({
     const row = await ctx.runQuery(internal.reportIdentify.getRow, { inboundEmailId })
     if (!row) return null
 
+    // Manual upload: no AgentMail thread to reply to (the ids are
+    // placeholders), and the user is in front of the company sheet, which
+    // shows the outcome. No recap mail.
+    if (row.origin === 'upload') {
+      console.log(`[reportNotify] ${kind} recap skipped for manual upload ${inboundEmailId}`)
+      return null
+    }
+
     const queueUrl = `${siteUrl()}/app/all/reports`
     const senderIsMember: boolean = await ctx.runQuery(internal.reportNotify.isMemberEmail, {
       email: row.fromEmail,
