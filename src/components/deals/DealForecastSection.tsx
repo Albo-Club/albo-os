@@ -28,10 +28,12 @@ const CONFIDENCE_VARIANT = {
 
 /**
  * Forecast side of a deal page: the pending forecast entries linked to the
- * deal (planned flows — SCPI rents, coupons, scheduled capital calls…) and
- * the undated committed remainder. One-off forecast entries can be added
- * straight from here (bound to this deal). The realized layer is the
- * existing Transactions section below.
+ * deal (planned flows — SCPI rents, coupons, scheduled capital calls…).
+ * One-off forecast entries can be added straight from here (bound to this
+ * deal). The realized layer is the existing Transactions section below.
+ * The undated committed remainder lives on the cash page only (card
+ * « Capital engagé non appelé »), where the curve it is set apart from is
+ * actually on screen — here it referred to a chart this page doesn't have.
  */
 export function DealForecastSection({
   dealId,
@@ -45,10 +47,7 @@ export function DealForecastSection({
   const [creating, setCreating] = useState(false)
   const forecast = useConvexQuery(api.forecasts.getDealForecast, { dealId })
 
-  const isEmpty =
-    !!forecast &&
-    forecast.entries.length === 0 &&
-    forecast.remainingCents <= 0
+  const isEmpty = !!forecast && forecast.entries.length === 0
 
   return (
     <section className="space-y-3">
@@ -64,15 +63,6 @@ export function DealForecastSection({
       {isEmpty && (
         <p className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
           {t('dealForecast.empty')}
-        </p>
-      )}
-      {forecast && forecast.remainingCents > 0 && (
-        <p className="text-muted-foreground text-sm">
-          {t('dealForecast.committed', {
-            remaining: fmtEur(forecast.remainingCents),
-            committed: fmtEur(forecast.committedCents),
-            paid: fmtEur(forecast.paidCents),
-          })}
         </p>
       )}
       {forecast && forecast.entries.length > 0 && (

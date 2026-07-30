@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.163.0 — 30/07/2026 à 18:41 — Une petite roue qui tourne partout où ça charge
+## v1.163.0 — 30/07/2026 à 18:54 — Une petite roue qui tourne partout où ça charge
 
 Jusqu'ici, quand l'app attendait quelque chose, elle affichait un simple
 « Chargement… » figé. Rien ne distinguait un écran qui travaille d'un écran
@@ -71,6 +71,52 @@ document, synthèse IA, synchronisation bancaire, panneau IA) sont inchangés.
 >   un passage dédié.
 
 ---
+
+## v1.162.1 — 30/07/2026 à 18:45 — La fiche deal ne parle plus d'une courbe qu'elle n'affiche pas
+
+La section Prévisionnel d'une fiche deal affichait une ligne « Reste à
+déployer : X (engagé Y − versé Z) — sans date d'appel, compté à part de la
+courbe ». Elle est retirée.
+
+La phrase était écrite du point de vue de la Trésorerie, où le capital
+engagé non appelé est posé juste à côté de la courbe de prévisionnel : la
+mise à part se comprend d'un coup d'œil. Sur une fiche deal, il n'y a
+aucune courbe — la référence pointait dans le vide. Pire, dès qu'un appel
+de fonds était daté dans le prévisionnel, la ligne annonçait « sans date
+d'appel » juste au-dessus de l'échéance datée qui la contredisait.
+
+Le montant reste-t-il lisible ? Oui, à son seul endroit cohérent : la carte
+**« Capital engagé non appelé »** de la Trésorerie (onglet Gestion), qui le
+totalise sur tous les deals et le détaille deal par deal.
+
+À noter, sans changement à ce stade : un engagement non versé mais déjà
+daté dans le prévisionnel est compté deux fois au niveau de l'organisation
+— une fois dans la courbe au mois de l'appel, une fois dans la carte du
+capital engagé non appelé. Corriger cela suppose de changer la règle de
+calcul de la carte, ce qui n'entre pas dans ce nettoyage.
+
+> **🔧 Notes techniques**
+>
+> - `DealForecastSection.tsx` : suppression du paragraphe
+>   `dealForecast.committed` ; `isEmpty` ne dépend plus que de
+>   `entries.length` (sans quoi un deal sans échéance mais avec un reste
+>   engagé n'affichait plus ni état vide ni table).
+> - `convex/forecasts.ts` — `getDealForecast` ne renvoie plus que
+>   `entries` : `committedCents` / `paidCents` / `remainingCents` étaient
+>   devenus orphelins, ainsi que le scan des transactions du deal (une
+>   lecture de moins par ouverture de fiche). `getCommittedPipeline` est
+>   inchangé et reste le seul porteur de la règle, filtre miettes
+>   `PIPELINE_RESIDUAL_RATIO` compris.
+> - Clés `dealForecast.committed` retirées de `fr` et `en`
+>   (`participations`).
+> - `TESTING.md` : FC27 réécrit (plus de ligne à vérifier), FC14 ne
+>   mentionne plus la fiche deal ; `docs/produit/05-deals.md` renvoie vers
+>   la Trésorerie pour le reste à déployer.
+> - Ce merge retire aussi trois marqueurs de conflit (`<<<<<<<`,
+>   `=======`, `>>>>>>>`) commités par erreur dans ce fichier sur `main`
+>   (PR #338) : ils s'affichaient tels quels dans la page Nouveautés. Les
+>   deux entrées encadrées (v1.162.0 et v1.161.0) sont conservées telles
+>   quelles.
 
 ## v1.162.0 — 30/07/2026 à 18:40 — Pointer un deal rattrape son échéance prévue, et les échéances s'annulent depuis le registre
 
@@ -768,6 +814,7 @@ toutes les autres commandes d'administration.
 >   `upsertConnectionStatus` passe toujours l'id.
 
 ---
+
 ## v1.150.1 — 30/07/2026 à 10:20 — Un détecteur de code mort, lançable à la demande
 
 Mise à jour purement technique : un détecteur de code inutilisé (fichiers,
