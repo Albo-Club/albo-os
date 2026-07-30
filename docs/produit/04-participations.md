@@ -113,11 +113,21 @@ rapports ou ses deals.
 
 - **Identité** : secteur, SIREN (affiché par groupes de trois chiffres),
   domaine — éditables en ligne (clic sur la valeur) — plus le % de
-  détention, le nombre d'actions consolidé et un lien « Ouvrir dans Attio »
-  quand la société est liée au CRM. Les champs se lisent en lignes —
-  libellé à gauche, valeur à droite, séparés par un filet fin — de sorte
-  que même les libellés longs tiennent sur une seule ligne dans la
-  largeur du panneau.
+  détention et le nombre d'actions consolidé, qui sont calculés et donc en
+  lecture seule. Les champs se lisent en lignes — libellé à gauche, valeur
+  à droite, séparés par un filet fin — de sorte que même les libellés longs
+  tiennent sur une seule ligne dans la largeur du panneau.
+- **Fiche Attio** : la dernière ligne du bloc Identité rattache la société à
+  sa fiche dans le CRM. Quand le lien existe, elle affiche « Ouvrir dans
+  Attio » et une croix pour détacher ; sinon, un clic ouvre une **recherche
+  dans Attio** — on tape deux lettres et on **choisit** dans la liste (nom
+  et domaine, pour départager les homonymes). On ne peut pas saisir une
+  référence à la main : ce lien est ce sur quoi la synchronisation des deals
+  s'appuie, une valeur inventée enverrait les prochains deals sur la
+  mauvaise société. Une même fiche Attio ne peut être rattachée qu'à **une
+  seule** société, toutes organisations confondues. C'est utile surtout pour
+  les sociétés créées à la main dans Albo : celles qui arrivent par la
+  synchronisation sont déjà rattachées.
 - **Résumé** : le résumé de la société, dans sa propre section, aligné à
   gauche et **éditable au clic** — on clique le texte, on écrit, on clique
   ailleurs et c'est enregistré (Échap annule).

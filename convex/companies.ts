@@ -43,6 +43,31 @@ async function assertSirenFree(
   if (clash && clash._id !== selfId) throw new ConvexError('siren_already_used')
 }
 
+/**
+ * Rejects an Attio company record already anchored to another company.
+ *
+ * Deliberately GLOBAL, not org-scoped like the SIREN above:
+ * `by_attio_company_id` is a global index and the deal sync reads it with
+ * `.unique()` (`resolveOrCreateTargetCompany`, convex/attioSync.ts), so a
+ * second company claiming the same anchor — in this org or any other — makes
+ * the sync throw at its next run. One Attio company ⟷ one Albo company.
+ */
+async function assertAttioCompanyIdFree(
+  ctx: Ctx,
+  attioCompanyId: string,
+  selfId: Id<'companies'>,
+) {
+  const clash = await ctx.db
+    .query('companies')
+    .withIndex('by_attio_company_id', (q) =>
+      q.eq('attioCompanyId', attioCompanyId),
+    )
+    .first()
+  if (clash && clash._id !== selfId) {
+    throw new ConvexError('attio_company_already_used')
+  }
+}
+
 export const list = query({
   args: {
     orgId: v.id('organizations'),
@@ -268,6 +293,9 @@ export const update = mutation({
       totalShares: v.optional(v.number()),
       summary: v.optional(v.string()),
       notes: v.optional(v.string()),
+      // Attio bridge, set by hand from the identity panel ('' unlinks). The
+      // sync writes it too, hence the global uniqueness check below.
+      attioCompanyId: v.optional(v.string()),
       // Full replacement of the people list (founders/board/co-investors).
       // role is enforced by the validator; name is checked non-empty below.
       people: v.optional(v.array(personValidator)),
@@ -303,6 +331,14 @@ export const update = mutation({
     if (patch.domain !== undefined) {
       const trimmed = patch.domain.trim()
       patch.domain = trimmed ? (normalizeDomain(trimmed) ?? trimmed) : undefined
+    }
+    // Attio anchor: trimmed; '' unlinks (mirror of domain). Uniqueness is
+    // global — see assertAttioCompanyIdFree.
+    if (patch.attioCompanyId !== undefined) {
+      patch.attioCompanyId = patch.attioCompanyId.trim() || undefined
+    }
+    if (patch.attioCompanyId) {
+      await assertAttioCompanyIdFree(ctx, patch.attioCompanyId, id)
     }
     // Summary: trimmed; '' clears the field (mirror of domain behaviour).
     if (patch.summary !== undefined) {

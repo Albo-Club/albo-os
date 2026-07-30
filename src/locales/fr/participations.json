@@ -118,6 +118,8 @@
     "attio": "Fiche Attio",
     "attioOpen": "Ouvrir dans Attio",
     "attioLinked": "Lié à Attio",
+    "attioLink": "Rechercher dans Attio…",
+    "attioUnlink": "Détacher la fiche Attio",
     "founders": "Fondateur(s)",
     "board": "Membres du board",
     "coInvestors": "Co-investisseurs",
@@ -356,15 +358,17 @@
     "nameRequired": "Le nom est obligatoire.",
     "peopleRemove": "Retirer",
     "peopleNamePlaceholder": "Nom de la personne",
-    "personSearching": "Recherche Attio…",
+    "attioSearching": "Recherche Attio…",
     "personSearchNoResults": "Aucune personne trouvée dans Attio",
-    "personSearchError": "Recherche Attio indisponible",
+    "companySearchNoResults": "Aucune société trouvée dans Attio",
+    "attioSearchError": "Recherche Attio indisponible",
     "attioBadge": "Attio",
     "saved": "Modifications enregistrées",
     "inlineLabel": "Modifier {{field}}",
     "errors": {
       "invalid_siren": "Le SIREN doit contenir exactement 9 chiffres.",
       "siren_already_used": "Ce SIREN est déjà utilisé par une autre société.",
+      "attio_company_already_used": "Cette fiche Attio est déjà rattachée à une autre société.",
       "invalid_person_name": "Le nom d'une personne est vide.",
       "default": "Impossible d'enregistrer les modifications. Réessayez."
     }
