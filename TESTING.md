@@ -29,7 +29,7 @@ Pré-requis :
 | B6b | Skills à jour   | `pnpm sync:skills:check` | `Skills up to date with upstream.` (exit 0) — réseau ; une dérive n'est pas bloquante (cron hebdo + hook `SessionStart`)                       |
 | B7  | Tests unitaires | `pnpm test:unit`         | 70 tests verts (logique pure : récurrence/solde forecast + historique cash, ranking suggestions, instructions agent, passif, séries BP, CSV) |
 | B8  | Miroir Linear   | `pnpm sync:linear-docs --all --dry-run` | `18 page(s) mirrored to Linear.` (exit 0) — hors-ligne, sans clé : valide que `docs/produit/` et la map `DOCS` de `scripts/sync-linear-docs.mjs` se correspondent (exit 2 sinon) et imprime le markdown qui partirait. La vraie poussée se fait au merge (workflow « Sync Linear docs », secret GitHub `LINEAR_API_KEY`) |
-| B9  | Code mort       | `pnpm deadcode`          | Exit 0, aucun résultat (knip) — tant que les candidats de l'audit initial ne sont pas purgés, le job CI `deadcode` est **non-bloquant** (`continue-on-error`) et cette étape liste les candidats connus                       |
+| B9  | Code mort       | `pnpm deadcode`          | Exit 0, aucun résultat (knip) — audit **manuel** (volontairement hors CI) ; tant que les candidats de l'audit initial (PR #323) ne sont pas purgés, cette étape les liste et sort en exit 1. Brancher un job CI bloquant une fois le rapport vide                       |
 
 > **Schéma & mapping d'instruments** (refonte fiches deal, `convex/schema.ts` +
 > `convex/lib/instrumentMapping.ts`). Validés par B1 : `INSTRUMENT_ARCHETYPE` et

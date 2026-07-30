@@ -23,13 +23,13 @@ bas de page.
 
 ---
 
-## v1.149.2 — 30/07/2026 à 10:00 — Le code mort est désormais détecté automatiquement
+## v1.149.2 — 30/07/2026 à 10:00 — Un détecteur de code mort, lançable à la demande
 
 Mise à jour purement technique : un détecteur de code inutilisé (fichiers,
-briques et dépendances que plus rien ne référence) tourne maintenant à
-chaque proposition de modification. Un premier audit a dressé la liste des
-candidats au nettoyage — rien n'est supprimé à ce stade, la purge sera
-validée séparément.
+briques et dépendances que plus rien ne référence) est désormais disponible
+en une commande. Un premier audit a dressé la liste des candidats au
+nettoyage — rien n'est supprimé à ce stade, la purge sera validée
+séparément.
 
 > **🔧 Notes techniques**
 >
@@ -42,9 +42,9 @@ validée séparément.
 >   `src/components/ui/` (shadcn, audité à part). `tailwindcss` /
 >   `tw-animate-css` en `ignoreDependencies` (imports CSS non suivis par
 >   knip).
-> - Script `pnpm deadcode` + job CI `deadcode` dans `ci.yml`,
->   **non-bloquant** (`continue-on-error: true`) tant que les candidats de
->   l'audit initial ne sont pas purgés — à passer bloquant ensuite.
+> - Script `pnpm deadcode`, **hors CI volontairement** : une croix rouge
+>   permanente sur chaque PR (le repo n'est pas encore propre) coûte plus
+>   qu'elle n'apporte. Brancher un job bloquant une fois la purge faite.
 > - Rapport d'audit complet (candidats classés sûr / douteux) dans la
 >   description de la PR. Aucune suppression dans cette PR.
 > - `TESTING.md` B9 et `TEMPLATE_SYNC.md` (candidat template) mis à jour.

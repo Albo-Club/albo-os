@@ -26,25 +26,6 @@ jobs:
       - run: pnpm test:unit
       - run: pnpm build
 
-  deadcode:
-    # Dead-code detection (knip) : fichiers, exports et dépendances que rien
-    # ne référence. Non-bloquant tant que les candidats du rapport d'audit
-    # (PR knip) n'ont pas été purgés — passer continue-on-error à false une
-    # fois le rapport vide.
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm deadcode
-
   skills-verify:
     runs-on: ubuntu-latest
     steps:
