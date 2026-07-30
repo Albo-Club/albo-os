@@ -119,12 +119,22 @@ rapports ou ses deals.
   que même les libellés longs tiennent sur une seule ligne dans la
   largeur du panneau.
 - **Résumé** : le résumé de la société, dans sa propre section, aligné à
-  gauche.
+  gauche et **éditable au clic** — on clique le texte, on écrit, on clique
+  ailleurs et c'est enregistré (Échap annule).
 - **Personnes** : fondateurs, board, co-investisseurs — chacun en pastille
   avec ses initiales, et un compteur sur la section quand la liste n'est
-  pas vide ; lien vers la fiche Attio quand la personne y est rattachée.
-  L'édition passe par le dialogue Éditer, qui propose une recherche dans
-  les personnes Attio.
+  pas vide ; une flèche mène à la fiche Attio quand la personne y est
+  rattachée. Tout se fait **sur place** : la pastille **« + Ajouter »**
+  ouvre un champ de saisie, un clic sur un nom le corrige, la croix retire
+  la personne. La saisie propose au fil de la frappe les **personnes
+  d'Attio** : choisir une suggestion rattache la personne au CRM, taper un
+  nom libre la laisse non rattachée (et corriger un nom à la main détache
+  la fiche Attio).
+
+Toute la fiche s'édite ainsi, au clic sur la valeur, sans fenêtre ni bouton
+Enregistrer. Le menu ⋯ ne garde que ce qui n'est pas un champ de la fiche :
+**renommer** la société, créer un deal, lier une plateforme externe,
+archiver, supprimer.
 
 ### Les secteurs
 

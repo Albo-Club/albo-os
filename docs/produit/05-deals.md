@@ -99,7 +99,8 @@ visible pendant qu'on fait défiler la page.
   par type, et l'état de sa **lecture** automatique — mêmes règles que côté
   société, détaillées dans [Participations](04-participations.md).
 - **Notes** : texte libre, sous les détails de l'instrument dans le panneau de
-  droite.
+  droite, **éditables au clic** comme les autres lignes du panneau : on clique
+  le texte, on écrit, on clique ailleurs — c'est enregistré. Échap annule.
 
 ## Gérer une sortie
 

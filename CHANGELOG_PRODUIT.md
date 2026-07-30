@@ -23,6 +23,70 @@ bas de page.
 
 ---
 
+## v1.159.0 — 30/07/2026 à 17:35 — La fiche société s'édite au clic, comme la fiche deal
+
+La fiche deal s'édite déjà entièrement au clic : on clique une valeur du
+panneau de droite, on écrit, c'est enregistré. La fiche société, elle,
+gardait deux gestes différents — le secteur, le SIREN et le domaine
+s'éditaient au clic, mais le **résumé** et les **personnes** obligeaient
+encore à ouvrir le dialogue « Modifier », qui prend tout l'écran sur mobile.
+
+Les deux fiches se manipulent désormais **de la même façon**, partout dans le
+panneau latéral :
+
+- **Résumé** : un clic sur le texte (ou sur « Ajouter un résumé de la
+  société… » quand il n'y en a pas) ouvre la saisie ; on clique ailleurs et
+  c'est enregistré. Échap annule.
+- **Personnes** : fondateurs, board et co-investisseurs se gèrent sur place.
+  La pastille **« + Ajouter »** ouvre un champ de saisie, un clic sur un nom
+  le corrige, la croix retire la personne. La saisie propose toujours les
+  **personnes d'Attio** au fil de la frappe : choisir une suggestion rattache
+  la personne au CRM, taper un nom libre la laisse non rattachée.
+- **Notes d'un deal** : même geste que les lignes juste au-dessus — plus de
+  crayon, plus de boutons Enregistrer / Annuler.
+
+Le menu ⋯ de la fiche société ne garde que ce qui n'est pas un champ de la
+fiche : **renommer** la société, créer un deal, lier une plateforme externe,
+archiver, supprimer.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/ui/inline-field.tsx` : `InlineField` gagne un `layout`
+>   `block` (pas de libellé, valeur pleine largeur — la section porte déjà son
+>   titre), le format `multiline` (textarea, blur commit, Échap annule, Entrée
+>   = retour à la ligne) et une prop `placeholder` qui remplace le tiret cadratin
+>   sur un champ vide. `FieldFormat` (`src/lib/parse.ts`) accueille
+>   `'multiline'` — même parse/sérialisation que `'text'`.
+> - `src/components/companies/PeopleEditor.tsx` (nouveau) : les trois sections
+>   de personnes, ajout / renommage / retrait en place. Chaque ligne porte son
+>   **index dans le tableau stocké** (les sections sont un regroupement
+>   d'affichage par rôle), `companies.update` recevant toujours la **liste
+>   complète**. `PersonInput` (partagé ajout + renommage) reprend la recherche
+>   Attio de l'ancien `PersonRow` ; les boutons de suggestion font
+>   `preventDefault` sur `mousedown` pour que le blur ne valide pas le nom tapé
+>   avant que le clic n'atterrisse. Renommer à la main **détache**
+>   `attioRecordId`, comme avant.
+> - `src/routes/app/$orgSlug/participations.$companyId.tsx` : `EditCompanyDialog`
+>   (~230 lignes) et `PersonRow` (~170) remplacés par `RenameCompanyDialog`
+>   (le nom seul — il vit dans l'en-tête, pas dans le panneau) ; résumé en
+>   `InlineField` `block`/`multiline` dans une section **toujours affichée** ;
+>   `peopleByRole` remplacé par `<PeopleEditor>`. Le menu ⋯ passe à
+>   `common:actions.rename`.
+> - `src/routes/app/$orgSlug/deals.$dealId.tsx` : `NotesSection` passe au même
+>   `InlineField` (l'état local `editing`/`pending` et les boutons disparaissent).
+> - `src/components/companies/EntityFiche.tsx` : `PeopleList`, `Person` et
+>   `personInitials` déménagent dans `PeopleEditor` ; les branches JSX
+>   `linkedin`/`email` jamais alimentées ne sont pas reconduites (cf.
+>   `KNOWN_ISSUES.md` § personnes).
+> - i18n : `identity.summaryPlaceholder`, `identity.addPerson`,
+>   `common:actions.rename` ajoutées (fr + en) ; `edit.domainLabel`,
+>   `edit.domainPlaceholder`, `edit.sectorLabel`, `edit.summaryLabel`,
+>   `edit.summaryPlaceholder`, `edit.peopleLabel`, `edit.peopleAdd`,
+>   `edit.peopleNameRequired`, `edit.personLinkedToAttio`, `notes.empty` et
+>   `identity.empty` retirées.
+> - Docs : `TESTING.md` (TP11, TP11b, nouveau TP11d, FD17),
+>   `docs/produit/04-participations.md`, `docs/produit/05-deals.md`,
+>   `KNOWN_ISSUES.md` (§ personnes), `TEMPLATE_SYNC.md` (ligne `InlineField`).
 ## v1.158.0 — 30/07/2026 à 17:11 — Créer un placement depuis la page Placements
 
 Jusqu'ici, un placement (contrat de capitalisation, dépôt à terme,

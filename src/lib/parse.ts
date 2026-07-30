@@ -65,6 +65,10 @@ export function bpsToPctInput(bps: number): string {
  * how a stored value is rendered and parsed back — cents→€, bps→%, ms→date,
  * enum literal, plain number/decimal/year, or free text. Shared by the
  * read-only panels (InstrumentBlock), the edit dialog and the inline editor.
+ *
+ * 'multiline' is free text too (same parse/serialise as 'text'); it only tells
+ * the inline editor to open a textarea instead of a single-line input — deal
+ * notes, company summary.
  */
 export type FieldFormat =
   | 'eur'
@@ -75,6 +79,7 @@ export type FieldFormat =
   | 'decimal'
   | 'year'
   | 'text'
+  | 'multiline'
 
 /**
  * Input string → stored value. `undefined` = empty (the caller decides: leave
