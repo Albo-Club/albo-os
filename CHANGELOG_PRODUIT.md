@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.149.2 — 30/07/2026 à 10:15 — Des tests de régression gardent les fondations
+## v1.150.1 — 30/07/2026 à 10:15 — Des tests de régression gardent les fondations
 
 Mise à jour purement technique : une suite de tests automatiques vérifie
 désormais, à chaque modification du code, que les protections fondamentales
@@ -54,6 +54,31 @@ l'une de ces garanties, la mise en production est bloquée automatiquement.
 > - Les fichiers vivent dans `convex/` sans être déployés : le CLI Convex
 >   ignore tout module dont le nom contient plus d'un point (cf.
 >   `KNOWN_ISSUES.md`). Aucun code métier modifié.
+
+## v1.150.0 — 30/07/2026 à 10:05 — L'app est surveillée tous les matins
+
+Chaque matin à 7h, une vérification automatique s'assure que l'application
+en production répond correctement : pages publiques accessibles, connexion
+opérationnelle, protections de sécurité en place. Si quelque chose casse,
+une alerte est créée automatiquement sur GitHub avec le détail de ce qui ne
+répond plus — plus besoin de découvrir une panne en tombant dessus par
+hasard. Tant que le problème n'est pas résolu, les échecs suivants
+s'ajoutent à la même alerte au lieu d'en créer de nouvelles.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau workflow `.github/workflows/prod-smoke.yml` : cron quotidien
+>   05:00 UTC (7h Paris en été) + `workflow_dispatch`, qui rejoue le smoke
+>   existant `scripts/e2e-smoke.mjs --url $PROD_URL` contre la prod
+>   (21 checks non authentifiés : pages publiques, headers de sécurité,
+>   santé du proxy Better Auth, forme du HTML SSR). Aucun changement du
+>   script ni du code applicatif.
+> - L'URL de prod vient de la **variable de repo** GitHub `PROD_URL`
+>   (Settings → Secrets and variables → Actions → Variables) — pas de
+>   secret ni d'URL en dur ; échec explicite si elle manque.
+> - En échec, `actions/github-script` ouvre une issue labellisée
+>   `prod-smoke` avec la sortie du smoke (ANSI strippé) ; si une issue
+>   `prod-smoke` est déjà ouverte, il la commente au lieu d'en rouvrir une.
 
 ## v1.149.1 — 29/07/2026 à 21:45 — La doc produit se recopie toute seule dans Linear
 
