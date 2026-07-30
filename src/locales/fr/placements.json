@@ -92,5 +92,28 @@
     "syncedOn": "Synchronisé le {{date}}",
     "empty": "Aucune position remontée pour l'instant — vérifie que le produit Powens Wealth est actif et que le compte est synchronisé."
   },
-  "empty": "Aucun placement. Les deals crypto, comptes de capitalisation, dépôts à terme et comptes-titres apparaîtront ici."
+  "empty": "Aucun placement. Les deals crypto, comptes de capitalisation, dépôts à terme et comptes-titres apparaîtront ici.",
+  "create": {
+    "button": "Nouveau placement",
+    "title": "Nouveau placement",
+    "description": "Un compte de trésorerie placée : contrat de capitalisation, compte à terme, compte-titres, crypto. Le support peut être une nouvelle entreprise, créée dans la foulée.",
+    "investorLabel": "Entité détentrice",
+    "investorPlaceholder": "Choisir une entité du groupe",
+    "supportLabel": "Support",
+    "supportNew": "+ Nouvelle entreprise",
+    "supportNamePlaceholder": "ex. Generali Patrimoine",
+    "supportNameAria": "Nom de la nouvelle entreprise",
+    "typeLabel": "Type de placement",
+    "typePlaceholder": "Choisir un type",
+    "bankLabel": "Banque / plateforme (optionnel)",
+    "bankPlaceholder": "ex. Palatine, Kraken…",
+    "openedLabel": "Date d'ouverture (optionnel)",
+    "balanceLabel": "Solde actuel (€, optionnel)",
+    "balanceInvalid": "Montant invalide",
+    "submit": "Créer le placement",
+    "created": "Placement créé",
+    "errors": {
+      "default": "Impossible de créer le placement. Réessayez."
+    }
+  }
 }

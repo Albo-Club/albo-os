@@ -1,14 +1,17 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
+import { Plus } from 'lucide-react'
 
 import { api } from '../../../../convex/_generated/api'
 import { isTreasuryPlacement } from '../../../../convex/lib/instrumentMapping'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
+import { CreatePlacementDialog } from '~/components/placements/CreatePlacementDialog'
 import { PlacementsView } from '~/components/placements/PlacementsView'
 import { InvestmentsTabs } from '~/components/investments/InvestmentsTabs'
+import { Button } from '~/components/ui/button'
 
 export const Route = createFileRoute('/app/$orgSlug/placements/')({
   component: Placements,
@@ -35,6 +38,7 @@ function Placements() {
     api.deals.list,
     org ? { orgId: org._id } : 'skip',
   )
+  const [creating, setCreating] = useState(false)
   const placements = useMemo(
     () => deals?.filter((d) => isTreasuryPlacement(d.instrumentKind)),
     [deals],
@@ -43,13 +47,26 @@ function Placements() {
   return (
     <main className="flex-1 space-y-6 p-6">
       <div className="space-y-3">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {t('nav:items.investments')}
-        </h1>
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {t('nav:items.investments')}
+          </h1>
+          <Button onClick={() => setCreating(true)} disabled={!org}>
+            <Plus className="size-4" />
+            {t('create.button')}
+          </Button>
+        </div>
         <InvestmentsTabs orgSlug={orgSlug} active="placements" />
         <p className="text-muted-foreground text-sm">{t('subtitle')}</p>
       </div>
       <PlacementsView deals={placements} orgSlug={orgSlug} />
+      {creating && org && (
+        <CreatePlacementDialog
+          orgId={org._id}
+          orgSlug={orgSlug}
+          onClose={() => setCreating(false)}
+        />
+      )}
     </main>
   )
 }

@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.158.0 — 30/07/2026 à 17:29 — La fiche société s'édite au clic, comme la fiche deal
+## v1.159.0 — 30/07/2026 à 17:35 — La fiche société s'édite au clic, comme la fiche deal
 
 La fiche deal s'édite déjà entièrement au clic : on clique une valeur du
 panneau de droite, on écrit, c'est enregistré. La fiche société, elle,
@@ -87,6 +87,33 @@ archiver, supprimer.
 > - Docs : `TESTING.md` (TP11, TP11b, nouveau TP11d, FD17),
 >   `docs/produit/04-participations.md`, `docs/produit/05-deals.md`,
 >   `KNOWN_ISSUES.md` (§ personnes), `TEMPLATE_SYNC.md` (ligne `InlineField`).
+## v1.158.0 — 30/07/2026 à 17:11 — Créer un placement depuis la page Placements
+
+Jusqu'ici, un placement (contrat de capitalisation, dépôt à terme,
+compte-titres, crypto) ne pouvait naître que depuis la fiche d'une
+entreprise déjà existante — il fallait d'abord créer l'entreprise dans la
+liste Entreprises, puis ouvrir sa fiche, puis créer le deal.
+
+La page **Placements** porte maintenant un bouton **« Nouveau placement »** :
+un seul formulaire pour choisir l'entité détentrice, le support — une
+entreprise existante **ou une nouvelle, créée dans la foulée** en tapant
+simplement son nom —, le type de placement, et en option la
+banque/plateforme, la date d'ouverture et le solde actuel. La création
+ouvre directement la fiche du placement, rangé dans sa section de
+liquidité (corrigeable sur la fiche, comme avant).
+
+> **🔧 Notes techniques**
+>
+> - `CreatePlacementDialog.tsx` (nouveau) : Select entité `group_*`
+>   (pré-sélection si unique), Select support avec sentinelle
+>   « + Nouvelle entreprise » → `companies.create` (kind `portfolio`, nom
+>   seul) puis `deals.create` (types `TREASURY_PLACEMENT_KINDS`,
+>   `currentValue`/`bankName`/`closingDate` optionnels) ; navigation vers
+>   `/placements/$dealId`.
+> - `placements.index.tsx` : bouton « Nouveau placement » en tête de page.
+> - Deux mutations séquentielles assumées (une société orpheline sans deal
+>   est inoffensive si la seconde échoue) ; clés i18n `placements:create.*`.
+
 ## v1.157.0 — 30/07/2026 à 17:05 — Trésorerie : une seule vue d'ensemble, le solde projeté en premier
 
 La page Trésorerie passe de quatre onglets à **deux** : tout le quotidien
