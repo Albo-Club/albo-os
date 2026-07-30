@@ -1,16 +1,15 @@
 import { useRef, useState } from 'react'
-import { Download, Plus, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { ConvexError } from 'convex/values'
 import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
+import type { FunctionArgs, FunctionReturnType } from 'convex/server'
 import type { Id } from '../../../convex/_generated/dataModel'
-import {
-  ExtractedTextDialog,
-  OcrStatus,
-} from '~/components/documents/DocumentReading'
+import { DocumentAttachment } from '~/components/documents/DocumentAttachment'
+import { ExtractedTextDialog } from '~/components/documents/DocumentReading'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { Button } from '~/components/ui/button'
 import {
@@ -29,19 +28,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '~/components/ui/table'
 
 const MAX_BYTES = 20 * 1024 * 1024
 
 /** Deal-specific kinds — the company's own set (reporting / BP / legal) lives
- * on the company fiche and isn't offered here. */
+ * on the company fiche and isn't offered here. A row can carry another one
+ * (the schema's union is wider), so the state is typed with the mutation's
+ * own kind. */
 const KINDS = [
   'term_sheet',
   'pacte',
@@ -49,7 +42,7 @@ const KINDS = [
   'attestation',
   'other',
 ] as const
-type DealDocKind = (typeof KINDS)[number]
+type DealDocKind = FunctionArgs<typeof api.documents.create>['kind']
 
 function formatSize(bytes: number | null): string {
   if (bytes == null) return '—'
@@ -57,12 +50,20 @@ function formatSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+/** ms epoch → "YYYY-MM-DD", the value shape of an `<input type="date">`. */
+function toDateInput(period: number): string {
+  return new Date(period).toISOString().slice(0, 10)
+}
+
+type DealDoc = FunctionReturnType<typeof api.documents.listByDeal>[number]
+
 /**
  * Documents attached to a single deal (term sheet, pacte, subscription form):
- * manual upload to Convex storage (20 MB cap) + list with download/delete.
- * Mirrors the company's `ReportingsSection`, with the deal kinds and a plain
- * document date instead of a covered period. These rows carry `dealId`, which
- * is what keeps them off the company's Documents tab.
+ * manual upload to Convex storage (20 MB cap) + list of attachment cards with
+ * open / edit / delete, filterable by kind. Mirrors the company's
+ * `ReportingsSection`, with the deal kinds and a plain document date instead
+ * of a covered period. These rows carry `dealId`, which is what keeps them off
+ * the company's Documents tab.
  */
 export function DealDocumentsSection({
   dealId,
@@ -76,16 +77,41 @@ export function DealDocumentsSection({
   const docs = useConvexQuery(api.documents.listByDeal, { dealId })
   const generateUploadUrl = useConvexMutation(api.files.generateUploadUrl)
   const createDocument = useConvexMutation(api.documents.create)
+  const updateDocument = useConvexMutation(api.documents.update)
   const removeDocument = useConvexMutation(api.documents.remove)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [kindFilter, setKindFilter] = useState<string>('all')
+  // Exactly one of the two is set while the metadata dialog is open: a picked
+  // file (creation) or the id of the document being edited.
   const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [editingId, setEditingId] = useState<Id<'documents'> | null>(null)
   const [title, setTitle] = useState('')
-  const [kind, setKind] = useState<DealDocKind>('term_sheet')
+  const [kind, setKind] = useState<string>('term_sheet')
   const [docDate, setDocDate] = useState('') // "YYYY-MM-DD"
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<Id<'documents'> | null>(null)
   const [textDocId, setTextDocId] = useState<Id<'documents'> | null>(null)
+
+  const kindLabel = (value: string) =>
+    t(`participations:dealDocuments.kind.${value}`, { defaultValue: value })
+
+  // Only the kinds actually present are offered — the filter mirrors the list.
+  const rank = (value: string) => {
+    const index = (KINDS as ReadonlyArray<string>).indexOf(value)
+    return index === -1 ? KINDS.length : index
+  }
+  const presentKinds: Array<string> = docs
+    ? [...new Set(docs.map((doc) => doc.kind))].sort(
+        (a, b) => rank(a) - rank(b),
+      )
+    : []
+  // Deleting the last document of the filtered kind falls back to "all"
+  // rather than leaving the list stuck on an empty filter.
+  const activeFilter = presentKinds.includes(kindFilter) ? kindFilter : 'all'
+  const visible = docs?.filter(
+    (doc) => activeFilter === 'all' || doc.kind === activeFilter,
+  )
 
   function handlePick(file: File) {
     if (file.size > MAX_BYTES) {
@@ -98,10 +124,45 @@ export function DealDocumentsSection({
     setDocDate('')
   }
 
+  function handleEdit(doc: DealDoc) {
+    setEditingId(doc._id)
+    setTitle(doc.title)
+    setKind(doc.kind)
+    setDocDate(doc.period ? toDateInput(doc.period) : '')
+  }
+
+  function closeForm() {
+    setPendingFile(null)
+    setEditingId(null)
+  }
+
   async function handleSave() {
-    if (!pendingFile || !title.trim() || !companyId) return
+    if (!title.trim()) return
     setSaving(true)
     try {
+      // "YYYY-MM-DD" → midnight UTC (dates are stored as ms epoch, UTC).
+      // Emptied: the date is cleared.
+      const period = docDate
+        ? Date.UTC(
+            Number(docDate.slice(0, 4)),
+            Number(docDate.slice(5, 7)) - 1,
+            Number(docDate.slice(8, 10)),
+          )
+        : undefined
+
+      if (editingId) {
+        await updateDocument({
+          documentId: editingId,
+          title,
+          kind: kind as DealDocKind,
+          period,
+        })
+        toast.success(t('participations:dealDocuments.updated'))
+        closeForm()
+        return
+      }
+
+      if (!pendingFile || !companyId) return
       const url = await generateUploadUrl({})
       const res = await fetch(url, {
         method: 'POST',
@@ -115,24 +176,16 @@ export function DealDocumentsSection({
         return
       }
       const { storageId } = (await res.json()) as { storageId: Id<'_storage'> }
-      // "YYYY-MM-DD" → midnight UTC (dates are stored as ms epoch, UTC).
-      const period = docDate
-        ? Date.UTC(
-            Number(docDate.slice(0, 4)),
-            Number(docDate.slice(5, 7)) - 1,
-            Number(docDate.slice(8, 10)),
-          )
-        : undefined
       await createDocument({
         companyId,
         dealId,
         title,
-        kind,
+        kind: kind as DealDocKind,
         period,
         storageId,
       })
       toast.success(t('participations:dealDocuments.added'))
-      setPendingFile(null)
+      closeForm()
     } catch (err) {
       const code = err instanceof ConvexError ? (err.data as string) : ''
       toast.error(
@@ -160,9 +213,29 @@ export function DealDocumentsSection({
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold tracking-tight">
-          {t('participations:dealDocuments.title')}
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold tracking-tight">
+            {t('participations:dealDocuments.title')}
+          </h2>
+          <Select value={activeFilter} onValueChange={setKindFilter}>
+            <SelectTrigger size="sm" className="gap-1.5">
+              <span className="text-muted-foreground">
+                {t('participations:dealDocuments.filter.label')}
+              </span>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
+                {t('participations:dealDocuments.filter.all')}
+              </SelectItem>
+              {presentKinds.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {kindLabel(value)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <Button
           variant="outline"
           size="sm"
@@ -185,109 +258,48 @@ export function DealDocumentsSection({
         }}
       />
 
-      {!docs ? (
+      {!visible ? (
         <div className="text-muted-foreground text-sm">
           {t('participations:loading')}
         </div>
-      ) : docs.length === 0 ? (
+      ) : visible.length === 0 ? (
         <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
           {t('participations:dealDocuments.empty')}
         </div>
       ) : (
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>
-                  {t('participations:dealDocuments.col.title')}
-                </TableHead>
-                <TableHead>
-                  {t('participations:dealDocuments.col.kind')}
-                </TableHead>
-                <TableHead>
-                  {t('participations:dealDocuments.col.date')}
-                </TableHead>
-                <TableHead>
-                  {t('participations:dealDocuments.col.size')}
-                </TableHead>
-                <TableHead>
-                  {t('participations:dealDocuments.col.added')}
-                </TableHead>
-                <TableHead>
-                  {t('participations:documentReading.column')}
-                </TableHead>
-                <TableHead className="w-20" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {docs.map((doc) => (
-                <TableRow key={doc._id}>
-                  <TableCell className="font-medium">{doc.title}</TableCell>
-                  <TableCell>
-                    {t(`participations:dealDocuments.kind.${doc.kind}`, {
-                      defaultValue: doc.kind,
-                    })}
-                  </TableCell>
-                  <TableCell>
-                    {doc.period ? fmtDate(doc.period) : '—'}
-                  </TableCell>
-                  <TableCell>{formatSize(doc.size)}</TableCell>
-                  <TableCell>{fmtDate(doc.uploadedAt)}</TableCell>
-                  <TableCell>
-                    <OcrStatus
-                      documentId={doc._id}
-                      state={doc.ocrState}
-                      detail={doc.ocrDetail}
-                      chars={doc.ocrChars}
-                      onOpen={() => setTextDocId(doc._id)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-1">
-                      {doc.url && (
-                        <Button
-                          asChild
-                          size="icon"
-                          variant="ghost"
-                          className="size-7"
-                          aria-label={t(
-                            'participations:dealDocuments.download',
-                          )}
-                          title={t('participations:dealDocuments.download')}
-                        >
-                          <a href={doc.url} target="_blank" rel="noreferrer">
-                            <Download className="size-4" />
-                          </a>
-                        </Button>
-                      )}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-destructive size-7"
-                        onClick={() => setDeleteId(doc._id)}
-                        aria-label={t('common:actions.delete')}
-                        title={t('common:actions.delete')}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="space-y-2">
+          {visible.map((doc) => (
+            <DocumentAttachment
+              key={doc._id}
+              doc={doc}
+              kindLabel={kindLabel(doc.kind)}
+              description={[
+                doc.period
+                  ? fmtDate(doc.period)
+                  : t('participations:dealDocuments.addedOn', {
+                      date: fmtDate(doc.uploadedAt),
+                    }),
+                formatSize(doc.size),
+              ].join(' · ')}
+              onEdit={() => handleEdit(doc)}
+              onDelete={() => setDeleteId(doc._id)}
+              onOpenText={() => setTextDocId(doc._id)}
+            />
+          ))}
         </div>
       )}
 
-      {/* Metadata dialog shown after the file is picked */}
+      {/* Metadata dialog: after a file is picked, or on the edit pencil */}
       <Dialog
-        open={pendingFile !== null}
-        onOpenChange={(open) => !open && setPendingFile(null)}
+        open={pendingFile !== null || editingId !== null}
+        onOpenChange={(open) => !open && closeForm()}
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {t('participations:dealDocuments.dialogTitle')}
+              {editingId
+                ? t('participations:dealDocuments.editDialogTitle')
+                : t('participations:dealDocuments.dialogTitle')}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -303,17 +315,14 @@ export function DealDocumentsSection({
             </div>
             <div className="space-y-2">
               <Label>{t('participations:dealDocuments.kindLabel')}</Label>
-              <Select
-                value={kind}
-                onValueChange={(value) => setKind(value as DealDocKind)}
-              >
+              <Select value={kind} onValueChange={setKind}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {KINDS.map((k) => (
                     <SelectItem key={k} value={k}>
-                      {t(`participations:dealDocuments.kind.${k}`)}
+                      {kindLabel(k)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -332,11 +341,7 @@ export function DealDocumentsSection({
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setPendingFile(null)}
-              disabled={saving}
-            >
+            <Button variant="outline" onClick={closeForm} disabled={saving}>
               {t('common:actions.cancel')}
             </Button>
             <Button

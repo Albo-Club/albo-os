@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.152.0 — 30/07/2026 à 12:28 — Trésorerie : le cash d'abord, une seule courbe, des filtres
+## v1.153.0 — 30/07/2026 à 12:36 — Trésorerie : le cash d'abord, une seule courbe, des filtres
 
 La Vue d'ensemble de la Trésorerie répond maintenant aux questions dans
 l'ordre où on se les pose.
@@ -102,6 +102,59 @@ mot « Proposition », la cible en clair et en entier, puis « Valider » ou
 >   `chartCommitted`, `chartPlanned`, `view.matched` retirés.
 > - `TESTING.md` : CA1, CA2, CA11, FC1, FC19, RU23, RU24, RU32 réécrits,
 >   RU33/RU34 ajoutés (filtres par nature de rattachement, bouton toggle).
+
+## v1.152.0 — 30/07/2026 à 12:26 — Les documents deviennent des pièces jointes, et se renomment
+
+L'onglet **Documents** d'une société ne ressemble plus à un tableau. Chaque
+document s'y présente comme une **pièce jointe** : une petite box qui porte
+l'icône de son format, son titre, le badge de son type et, en dessous, sa
+période et son poids. Elles s'empilent de la plus récente à la plus ancienne.
+Le mot « Reporting » qui coiffait la liste a disparu — il n'y a pas que des
+reportings ici, et l'onglet le dit déjà.
+
+Trois conséquences au quotidien :
+
+- **Un clic sur la box ouvre le document.** Plus besoin de viser une petite
+  icône de téléchargement.
+- **Un crayon permet de corriger** le titre, le type et la période d'un
+  document déjà déposé — un nom de fichier illisible se réécrit en deux
+  secondes, sans supprimer puis re-téléverser. L'assistant retrouve
+  immédiatement le document sous son nouveau nom.
+- **Un filtre par type**, en haut de la liste, ne propose que les types
+  réellement présents.
+
+Le bloc **Documents** d'une fiche deal (term sheet, pacte, bulletin de
+souscription…) adopte exactement la même présentation, avec ses propres types
+et la date du document. Rien ne bouge côté fichiers : ceux déjà déposés
+restent en place, avec leur lecture automatique déjà faite.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle primitive `src/components/ui/attachment.tsx` (composant
+>   `attachment` du registry shadcn, variante Radix — deps `radix-ui` +
+>   `button`, déjà présentes). Une seule déviation, commentée dans le
+>   fichier : `AttachmentAction` par défaut en `icon-sm`, notre `button.tsx`
+>   ne déclarant pas la taille `icon-xs` d'upstream.
+> - `src/components/documents/DocumentAttachment.tsx` : la carte partagée par
+>   les deux surfaces — `AttachmentTrigger asChild` sur un `<a target=_blank>`
+>   (toute la box ouvre le fichier), actions au-dessus (`z-20`) portant
+>   `OcrStatus`, le crayon et la corbeille ; icône déduite du `contentType`
+>   (image / tableur / doc), vignette rouge quand la lecture a échoué.
+> - `ReportingsSection.tsx` : suppression du `h2`, des groupes pliables
+>   (`GROUPS`/`Collapsible`) et du tableau ; ajout du filtre `Select` (types
+>   réellement présents uniquement) et de la liste de cartes. La modale de
+>   métadonnées est mutualisée création/édition (`pendingFile` xor
+>   `editingId`). Idem `DealDocumentsSection.tsx`, qui garde son titre (hors
+>   onglet) et sa date de document.
+> - Backend : mutation `documents.update` (titre trimé non vide, `kind`,
+>   `period` — vidée, elle est supprimée par le `patch`). Un changement de
+>   titre **ou** de type replanifie `vectorize.indexDocument` : le titre et le
+>   type nourrissent l'index sémantique (ligne d'en-tête + `filterValues`),
+>   sinon l'assistant continuerait à chercher sous l'ancien nom.
+> - i18n : clés `filter.*`, `editDialogTitle`, `updated`, `addedOn` +
+>   namespace `documentAttachment` (fr/en) ; retrait des clés devenues
+>   orphelines (`reportings.col.*`, `reportings.group.*`,
+>   `dealDocuments.col.*`, `documentReading.column`, les deux `download`).
 
 ## v1.151.0 — 30/07/2026 à 11:30 — Le statut d'un deal se lit à la même couleur partout
 
