@@ -1693,31 +1693,40 @@ manuel = une règle mémorisée, rejouée sur les transactions suivantes.
 ## TVA récupérable (`convex/lib/vat.ts`, `transactions:getVatPosition`)
 
 Suivi minimal de la TVA pour fiabiliser les charges réelles et la position de
-TVA récupérable (carte sur la page Trésorerie). Pas un module de déclaration.
+TVA récupérable. Pas un module de déclaration.
+
+> ⚠️ **La TVA n'a plus aucune surface front** (retirée en v1.160.0 : elle
+> n'apportait rien au quotidien). Sont partis le sélecteur de taux sur les
+> lignes charge/produit du registre, la carte « TVA récupérable » et la carte
+> « Échéance TVA estimée », plus le miroir `src/lib/vat.ts`. Le **backend est
+> intact et reste la référence** ci-dessous : champ au schéma, `setVatRate`,
+> `getVatPosition`, `suggestVatEntry`/`createVatEntry`, outils agent/MCP — les
+> taux déjà saisis sont conservés, l'agent sait encore répondre sur la
+> position TVA, et re-brancher une UI est une PR d'affichage. **Sans rapport
+> avec la TVA des deals** : la dé-TVA ÷1,2 des royalties est portée par
+> l'instrument dans `convex/lib/metrics.ts`, elle ne lit jamais `vatRateBps`.
 
 - **Les montants de transaction sont toujours TTC.** Le taux de TVA
   (`vatRateBps` : 0 / 550 / 1000 / 2000) est stocké sur la transaction ; le
   montant de TVA est **toujours dérivé, jamais stocké** :
   `vatCents = round(amount × taux / (10000 + taux))`. La dérivation vit dans
-  `convex/lib/vat.ts`, miroir front `src/lib/vat.ts` (même convention que
-  `searchText.ts`) — garder les deux identiques (testé par
-  `tests/vat.test.ts`).
+  `convex/lib/vat.ts` (testée par `tests/vat.test.ts`).
 - **Invariant : `vatRateBps` n'existe que sur `charge` / `product`.** Tout
   pointage qui fait quitter ces statuts (match deal, allocation passif,
   unmatch, re-catégorisation en ignored/tax/internal_transfer) l'efface —
   enforced dans `convex/lib/pointage.ts`, ne pas contourner.
 - **L'historique n'est pas backfillé, exprès.** Une charge sans taux est
   « à qualifier » (un /1,2 global serait faux : salaires, assurances, frais
-  bancaires sont exonérés). La qualification se fait ligne à ligne dans les
-  onglets Charges/Produits du pointage (`setVatRate`, accepte `null` pour
-  revenir à « à qualifier »), ou via l'outil agent `categorizeTransaction`.
-  Le défaut 20 % ne s'applique qu'aux **nouvelles** catégorisations en charge
-  depuis l'UI (`DEFAULT_VAT_RATE_BPS`, côté front exprès — backend neutre).
+  bancaires sont exonérés). Depuis le retrait du front, la qualification ne
+  passe plus que par l'outil agent `categorizeTransaction` ou `setVatRate`
+  appelée à la main — l'UI n'écrit plus de taux du tout (le défaut 20 % des
+  catégorisations en charge est parti avec le sélecteur : écrire un taux que
+  personne ne peut plus relire ni corriger serait pire que pas de taux).
 - **`getVatPosition` est signée par le sens** : une charge `in` (avoir
   fournisseur) se déduit de la TVA déductible, un produit `out` de la TVA
   collectée. Les règlements/remboursements de TVA avec l'État restent en
-  statut `tax` et ne sont **pas nettés** contre la position en V1 — la carte
-  montre la position cumulée, pas le solde restant à récupérer après
+  statut `tax` et ne sont **pas nettés** contre la position en V1 — elle
+  donne la position cumulée, pas le solde restant à récupérer après
   déclarations.
 
 ## Passif — `equityPositions` / `intercompanyLoans` / soldes dérivés (`convex/liabilities.ts`)

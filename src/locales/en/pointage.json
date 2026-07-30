@@ -10,14 +10,9 @@
     "date": "Date",
     "label": "Label",
     "amount": "Amount",
-    "vat": "VAT",
     "account": "Account",
     "status": "Status",
     "actions": "Actions"
-  },
-  "vat": {
-    "toQualify": "To qualify",
-    "amount": "incl. {{amount}} VAT"
   },
   "category": {
     "toQualify": "To qualify"

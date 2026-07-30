@@ -1,7 +1,8 @@
 /**
- * Pure tests for the VAT derivation (convex/lib/vat.ts, mirrored in
- * src/lib/vat.ts): VAT-inclusive amounts in cents, rates in basis points,
- * VAT never stored.
+ * Pure tests for the VAT derivation (convex/lib/vat.ts): VAT-inclusive
+ * amounts in cents, rates in basis points, VAT never stored. The front
+ * mirror is gone with the VAT classification UI — the backend derivation
+ * stays (transactions keep their stored rate, agent tools still read it).
  *
  * Run with Node's native test runner via tsx (no dependency):
  *   pnpm test:unit
@@ -9,11 +10,7 @@
 
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { VAT_RATES_BPS, vatCentsFromTtc } from '../convex/lib/vat'
-import {
-  VAT_RATES_BPS as FRONT_RATES,
-  vatCentsFromTtc as frontVatCentsFromTtc,
-} from '../src/lib/vat'
+import { vatCentsFromTtc } from '../convex/lib/vat'
 
 describe('vatCentsFromTtc', () => {
   it('20 % : 120 € TTC → 20 € de TVA', () => {
@@ -34,17 +31,5 @@ describe('vatCentsFromTtc', () => {
 
   it('arrondi au cent le plus proche (100 € TTC à 20 % → 16,67 €)', () => {
     assert.equal(vatCentsFromTtc(10000, 2000), 1667)
-  })
-
-  it('le miroir front reste identique au module Convex', () => {
-    assert.deepEqual([...FRONT_RATES], [...VAT_RATES_BPS])
-    for (const amount of [0, 1, 9999, 10000, 123456]) {
-      for (const rate of VAT_RATES_BPS) {
-        assert.equal(
-          frontVatCentsFromTtc(amount, rate),
-          vatCentsFromTtc(amount, rate),
-        )
-      }
-    }
   })
 })

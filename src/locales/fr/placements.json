@@ -9,12 +9,14 @@
     "investedHint": "Versé − retiré",
     "gain": "Plus-value latente",
     "yield": "Rendement annualisé",
-    "yieldHint": "XIRR des flux pointés + soldes actuels"
+    "yieldHint": "XIRR des flux pointés + soldes actuels",
+    "balancePledgedHint": "dont {{amount}} de comptes nantis"
   },
   "sections": {
     "liquid": "Liquide",
     "semi_liquid": "Semi-liquide",
-    "illiquid": "Non liquide"
+    "illiquid": "Non liquide",
+    "pledged": "Comptes nantis"
   },
   "placementsCount_one": "{{count}} placement",
   "placementsCount_other": "{{count}} placements",
@@ -36,7 +38,8 @@
     "withdrawn": "Retiré",
     "balance": "Solde",
     "gain": "Plus-value",
-    "yield": "Rendement ann."
+    "yield": "Rendement ann.",
+    "holder": "Entité"
   },
   "balanceEditAria": "Modifier le solde de {{name}}",
   "rowOpenAria": "Ouvrir le placement {{name}}",
@@ -115,5 +118,6 @@
     "errors": {
       "default": "Impossible de créer le placement. Réessayez."
     }
-  }
+  },
+  "pledgedHint": "Fonds bloqués (nantissement, séquestre) : hors de la trésorerie disponible. Le solde se met à jour sur la fiche du compte."
 }
