@@ -25,6 +25,7 @@ import { normalizeDomain } from './lib/domain'
 import { buildSearchText } from './lib/searchText'
 import { INSTRUMENTS, instrumentValidator } from './lib/instruments'
 import { residualValueCents } from './lib/metrics'
+import { SECTOR_SLUGS } from './lib/sectors'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx } from './_generated/server'
 
@@ -440,6 +441,18 @@ const listDeals = createTool({
   },
 })
 
+/**
+ * Sector restricted to the canonical list (cf. lib/sectors.ts). An enum, not a
+ * free string: left open, the agent coins one-off values ("Start-up Studio",
+ * "Carried Interest Structure") and the taxonomy drifts one deal at a time. A
+ * missing bucket is arbitrated in lib/sectors.ts, never created here. The UI
+ * picker stays creatable for humans — this is the machine-facing gate.
+ */
+const sectorInput = z
+  .enum(SECTOR_SLUGS)
+  .optional()
+  .describe('Sector, from the canonical list only')
+
 const createCompany = createTool({
   description:
     'Create a PORTFOLIO company (an invested startup/fund/asset). Never use ' +
@@ -448,7 +461,7 @@ const createCompany = createTool({
   needsApproval: true,
   inputSchema: z.object({
     name: z.string().min(1).describe('Company name, e.g. "Sezame"'),
-    sector: z.string().optional(),
+    sector: sectorInput,
     domain: z.string().optional().describe('Website domain, e.g. sezame.io'),
   }),
   execute: async (ctx, input): Promise<unknown> => {
@@ -863,7 +876,7 @@ const updateCompany = createTool({
     companyId: z.string().describe('Company id (from listCompanies)'),
     name: z.string().min(1).optional(),
     legalName: z.string().optional(),
-    sector: z.string().optional(),
+    sector: sectorInput,
     domain: z.string().optional().describe('Website domain, e.g. acme.io'),
     countryCode: z.string().length(2).optional().describe('ISO-2 country code'),
     notes: z.string().optional(),

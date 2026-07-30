@@ -10,7 +10,7 @@ import {
 } from '../../../convex/lib/instrumentMapping'
 import { ENUM_FIELD_VALUES } from '../../../convex/lib/instruments'
 import { api } from '../../../convex/_generated/api'
-import type { ComponentType, ReactNode } from 'react'
+import type { ComponentType } from 'react'
 import type { Archetype } from '../../../convex/lib/instrumentMapping'
 import type { InstrumentKind } from '../../../convex/lib/instruments'
 import type { Doc } from '../../../convex/_generated/dataModel'
@@ -20,20 +20,26 @@ import { LeadSpvPanel } from '~/components/deals/LeadSpvPanel'
 import { RoyaltiesPanel } from '~/components/deals/RoyaltiesPanel'
 import { signTone } from '~/lib/moneyTone'
 import { cn } from '~/lib/utils'
+import { IdentityField } from '~/components/companies/EntityFiche'
 import { InlineField } from '~/components/ui/inline-field'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 
 /**
- * Read-only central block of the deal sheet, driven by
- * convex/lib/instrumentMapping.ts (single source of truth). The block reads
- * INSTRUMENT_RENDER to pick a render mode, INSTRUMENT_FIELDS for the ordered
- * columns to show, and INSTRUMENT_ARCHETYPE to drive the field layout. It
- * NEVER duplicates the instrument→fields mapping.
+ * The two instrument-driven surfaces of the deal sheet, both driven by
+ * convex/lib/instrumentMapping.ts (single source of truth):
  *
- * Fields in the standard grid edit inline when `editable` (click a value →
- * InlineField → one-field `deals.update`); the block stays read-only while the
- * parent previews a different instrument type. The instrument-type selector
- * itself only previews a layout (cf. deals.$dealId.tsx).
+ *   - `InstrumentDetails` — the stored parameters of the instrument, shown as
+ *     rows in the sheet's side panel. Reads INSTRUMENT_FIELDS for the ordered
+ *     columns and INSTRUMENT_ARCHETYPE for the extras. Every instrument has
+ *     one, whatever its render mode.
+ *   - `InstrumentPanel` — the bespoke body of a `render: 'custom'` instrument
+ *     (royalty projection table, lead-SPV collected tile), in the main column.
+ *     Nothing for the other kinds: their parameters ARE the side panel.
+ *
+ * Neither duplicates the instrument→fields mapping.
+ *
+ * Fields edit inline when `editable` (click a value → InlineField → one-field
+ * `deals.update`).
  */
 
 /**
@@ -142,18 +148,15 @@ export type PanelTransaction = {
 }
 
 /**
- * Props every custom panel receives. `received` (inbound transactions sum),
- * `transactions` (the dated flows, for realized indicators) and `onEdit`
- * (opens the shared deal edit dialog) are threaded from the page. `notesSlot`
- * lets the page inject the deal notes inside the panel (royalty ordering:
- * parameters → notes → realized → table).
+ * Props every custom panel receives. `received` (inbound transactions sum) and
+ * `transactions` (the dated flows, for realized indicators) are threaded from
+ * the page. The instrument's stored parameters are NOT a panel's job — they
+ * live in `InstrumentDetails`, in the side panel.
  */
 export type CustomPanelProps = {
   deal: Doc<'deals'>
   received?: number
   transactions?: Array<PanelTransaction>
-  notesSlot?: ReactNode
-  onEdit?: () => void
 }
 
 /**
@@ -167,15 +170,6 @@ const CUSTOM_PANELS: Partial<
 > = {
   lead_spv: LeadSpvPanel,
   royalty: RoyaltiesPanel,
-}
-
-function FieldRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="text-sm">{value}</span>
-    </div>
-  )
 }
 
 function Placeholder({ text }: { text: string }) {
@@ -255,18 +249,26 @@ function FieldsView({
         </Tabs>
       )}
 
-      <div className="grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-3">
+      {/* Rows, not a grid: the side panel is 320px wide, so label left / value
+          right with a hairline between is what keeps long labels on one line
+          (same shape as the company identity panel). */}
+      <div className="flex flex-col">
         {visible.map((field) => {
           const label = t(`field.${field}`, { defaultValue: field })
           if (!editable) {
             return (
-              <FieldRow key={field} label={label} value={formatField(field)} />
+              <IdentityField
+                key={field}
+                label={label}
+                value={formatField(field)}
+              />
             )
           }
           const format = FIELD_FORMAT[field] ?? 'text'
           return (
             <InlineField
               key={field}
+              layout="row"
               label={label}
               format={format}
               rawValue={(deal as Record<string, unknown>)[field]}
@@ -293,23 +295,15 @@ function FieldsView({
   )
 }
 
-export function InstrumentBlock({
+export function InstrumentDetails({
   deal,
   instrumentKind,
-  received,
-  transactions,
-  notesSlot,
-  onEdit,
   editable,
 }: {
   deal: Doc<'deals'>
   instrumentKind: InstrumentKind
-  received?: number
-  transactions?: Array<PanelTransaction>
-  notesSlot?: ReactNode
-  onEdit?: () => void
-  // Inline-edit the standard field grid. Off while previewing a different
-  // instrument type (the shown fields wouldn't match the saved type).
+  // Inline-edit the fields. Off while previewing a different instrument type
+  // (the shown fields wouldn't match the saved type).
   editable?: boolean
 }) {
   const { t, i18n } = useTranslation('participations')
@@ -343,43 +337,44 @@ export function InstrumentBlock({
     }
   }
 
-  const archetype = INSTRUMENT_ARCHETYPE[instrumentKind]
-  const render = INSTRUMENT_RENDER[instrumentKind]
+  // 'placeholder' kinds (cto, unknown) carry no field config at all — the
+  // neutral block stands in until their layout is modelled. Every other kind,
+  // custom-rendered or not, has parameters to show here.
+  if (INSTRUMENT_RENDER[instrumentKind] === 'placeholder') {
+    return <Placeholder text={t('fiche.cto.placeholder')} />
+  }
 
   return (
-    <section className="space-y-3">
-      <h2 className="text-lg font-semibold tracking-tight">
-        {t('fiche.instrumentTitle')}
-      </h2>
-
-      {render === 'custom' ? (
-        (() => {
-          const Panel = CUSTOM_PANELS[instrumentKind]
-          return Panel ? (
-            <Panel
-              deal={deal}
-              received={received}
-              transactions={transactions}
-              notesSlot={notesSlot}
-              onEdit={onEdit}
-            />
-          ) : (
-            // render='custom' but no panel registered yet — neutral fallback
-            // (none today: lead_spv + royalty both have panels).
-            <Placeholder text={t('fiche.cto.placeholder')} />
-          )
-        })()
-      ) : render === 'placeholder' ? (
-        <Placeholder text={t('fiche.cto.placeholder')} />
-      ) : (
-        <FieldsView
-          deal={deal}
-          instrumentKind={instrumentKind}
-          archetype={archetype}
-          formatField={formatField}
-          editable={editable}
-        />
-      )}
-    </section>
+    <FieldsView
+      deal={deal}
+      instrumentKind={instrumentKind}
+      archetype={INSTRUMENT_ARCHETYPE[instrumentKind]}
+      formatField={formatField}
+      editable={editable}
+    />
   )
+}
+
+/**
+ * Bespoke body of a `render: 'custom'` instrument, in the sheet's main column
+ * (royalty projection table, lead-SPV collected tile). Renders nothing for the
+ * other kinds: their content is entirely the side panel's field rows.
+ */
+export function InstrumentPanel({
+  deal,
+  instrumentKind,
+  received,
+  transactions,
+}: {
+  deal: Doc<'deals'>
+  instrumentKind: InstrumentKind
+  received?: number
+  transactions?: Array<PanelTransaction>
+}) {
+  if (INSTRUMENT_RENDER[instrumentKind] !== 'custom') return null
+  // render='custom' but no panel registered yet — nothing to show (none today:
+  // lead_spv + royalty both have panels).
+  const Panel = CUSTOM_PANELS[instrumentKind]
+  if (!Panel) return null
+  return <Panel deal={deal} received={received} transactions={transactions} />
 }

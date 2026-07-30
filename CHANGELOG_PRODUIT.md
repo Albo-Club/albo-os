@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.155.0 — 30/07/2026 à 16:55 — Trésorerie : une seule vue d'ensemble, le solde projeté en premier
+## v1.157.0 — 30/07/2026 à 17:05 — Trésorerie : une seule vue d'ensemble, le solde projeté en premier
 
 La page Trésorerie passe de quatre onglets à **deux** : tout le quotidien
 tient maintenant dans la **Vue d'ensemble**, et l'onglet **Gestion** garde ce
@@ -77,6 +77,141 @@ continue de tourner exactement pareil sous la courbe.
 > - Bug 4.5 : `TransactionSheet` affiche le statut et lit la ligne **live**
 >   (plus le snapshot du clic). CTAs To do / VatCard / email
 >   `overdueEntriesEmail` → `/cash?filter=unmatched`.
+
+## v1.156.0 — 30/07/2026 à 16:57 — Une liste de secteurs qui veut enfin dire quelque chose
+
+La liste des secteurs avait dérivé : des étiquettes créées une par une au fil
+des deals, des doublons de casse, et surtout des cases qui ne décrivaient pas
+un marché — un studio, une structure de carried, un fonds. Résultat : filtrer
+par secteur ne renseignait plus sur l'exposition réelle du portefeuille.
+
+Elle est ramenée à **quatorze valeurs**, chacune avec une définition : SaaS /
+Logiciel, Fintech, Santé / Biotech, Silver economy, AgriFood, Consumer /
+Retail, Marketplace, Industrie / Circulaire, DeepTech, Immobilier, Fonds /
+Véhicules, Mobilité, EdTech, Autre.
+
+Ce qui change concrètement :
+
+- **Le secteur dit le marché, plus le véhicule.** SPV, fonds, studio, carried :
+  l'instrument du deal le disait déjà. Les participations sans marché propre se
+  rangent désormais toutes dans « Fonds / Véhicules ».
+- **« Climat » disparaît.** Avec une thèse d'impact, les trois quarts du
+  portefeuille pouvaient le revendiquer : la case ne triait rien et attirait
+  tout — elle contenait un logiciel, une opération immobilière et deux fonds.
+  Chaque société est revenue à son marché réel.
+- **Deux nouveaux secteurs** : **Silver economy**, qui sort l'accompagnement du
+  grand âge de la santé (ce ne sont ni les mêmes clients ni les mêmes
+  financeurs), et **DeepTech**, pour les ruptures scientifiques qu'aucun marché
+  de la liste ne couvre.
+- **« Services » disparaît aussi** : c'était le fourre-tout où tombait ce qu'on
+  ne savait pas ranger.
+- **Plus aucune valeur libre héritée.** Les étiquettes créées à la volée
+  (Agritech, Retail, Mobility, Circular Economy, Start-up Studio…) sont
+  ramenées sur la liste. Vingt participations changent de secteur.
+
+Le champ reste **saisissable librement** : si une case manque, on peut toujours
+taper un secteur. L'assistant IA, lui, ne peut plus en inventer — il choisit
+dans la liste ou laisse vide, ce qui était la principale source de dérive.
+
+> **🔧 Notes techniques**
+>
+> - Liste canonique déplacée de `src/lib/sectors.ts` vers `convex/lib/sectors.ts`
+>   (même pattern que `lib/instruments.ts`) : front, outils d'agent et migration
+>   partagent la même source. Le doc-comment porte les 4 règles d'affectation —
+>   marché ≠ véhicule, la verticale bat le modèle, `marketplace` en exception
+>   assumée, aucune lecture transversale — plus le budget de largeur des
+>   libellés (la colonne Secteur de `ParticipationsTable` est dimensionnée sur
+>   le libellé le plus long, désormais « Industrie / Circulaire »).
+> - `SECTOR_SLUGS` : 16 → 14. Ajouts `silver` / `deeptech` ; retraits `climate`,
+>   `services`, `media`, `crypto`. Libellés FR/EN mis à jour (`industry`
+>   « Industrie / DeepTech » → « Industrie / Circulaire », `fund` → « Fonds /
+>   Véhicules », `consumer` → « Consumer / Retail »). `companies.sector` reste
+>   `v.string()` au schéma — le combobox créable est inchangé.
+> - `agentTools` : `createCompany` / `updateCompany` passent de
+>   `z.string().optional()` à `z.enum(SECTOR_SLUGS).optional()` (const partagé
+>   `sectorInput`). C'est le verrou : les valeurs one-off type « Carried Interest
+>   Structure » venaient de là.
+> - Migration `convex/migrations/normalizeSectors.ts` (`dryRun` / `apply` /
+>   `report`) : 18 décisions par entité ancrées `_id` prod + garde nom (une même
+>   valeur d'origine peut partir sur deux cibles — `services` → `industry` pour
+>   Reekom, `silver` pour Tango/Auxicare), puis alias par valeur pour le reste,
+>   archivées et org Calte incluses. Idempotente, non destructive : une valeur
+>   sans lecture unique est remontée dans `needsManualReview` plutôt que réécrite
+>   en `other`. À lancer juste après le deploy.
+> - Doc : `TESTING.md` SH19c (libellé le plus long) + nouvelle ligne SH22,
+>   `MIGRATIONS.md`, `docs/produit/04-participations.md` § « Les secteurs »,
+>   anti-pattern `CLAUDE.md`.
+## v1.155.1 — 30/07/2026 à 16:40 — Plan de test de la fiche deal remis d'équerre
+
+Rien ne change dans l'application : deux étapes du plan de test interne
+décrivaient un écran qui n'existe plus (un bandeau de montants qui n'apparaît
+plus tel quel, et un sélecteur de type d'instrument retiré de l'en-tête depuis
+longtemps). Elles décrivent maintenant ce que l'écran fait vraiment.
+
+> **🔧 Notes techniques**
+>
+> - `TESTING.md` FD9 : le « strip Engagé / Versé / Reçu » ne correspondait plus
+>   à `dealAmountTiles` — une seule tuile de montant dans le cas courant
+>   (« Décaissé (réel) »), « Engagé prévisionnel » si `status === 'pending'`,
+>   deux tuiles pour `fund_lp` seulement, « Reçu » toujours à côté. La ligne
+>   portait aussi encore « Documents juste sous les Transactions » (le bloc est
+>   en bas de la colonne centrale depuis v1.155.0).
+> - `TESTING.md` FD39 : suppression du scénario (a) « aperçu via le sélecteur
+>   de type d'en-tête » — ce sélecteur n'existe plus (cf. FD8), le changement de
+>   type passe par ⋯ → « Modifier ». La ligne ne garde que les champs calculés
+>   non éditables et le no-op du champ € vidé.
+> - À noter, **non corrigé** : le drapeau `editable` d'`InstrumentDetails`
+>   (`src/components/deals/InstrumentBlock.tsx`) n'a plus de site d'appel à
+>   `false` depuis le retrait de ce mode aperçu — sa branche lecture seule
+>   (`IdentityField`) est du code mort.
+
+## v1.155.0 — 30/07/2026 à 16:30 — La fiche deal adopte la structure de la fiche société
+
+La fiche d'un deal s'ouvrait comme une longue colonne : les caractéristiques
+de l'instrument en haut, puis tout le reste à la suite. Il fallait remonter en
+haut de page à chaque fois qu'on voulait revérifier un taux ou une date
+pendant qu'on regardait les transactions.
+
+Elle est maintenant bâtie **comme la fiche d'une société** : un **panneau à
+droite** rassemble les **détails de l'instrument** — montants, taux, dates,
+multiples, une caractéristique par ligne — et les **notes** du deal. Ce
+panneau **reste visible pendant qu'on fait défiler** la page, exactement comme
+la fiche d'identité d'une société. Chaque valeur s'y **édite au clic**, sans
+passer par le dialogue « Modifier ».
+
+La colonne centrale est consacrée à la vie du deal : le suivi propre à
+l'instrument quand il en a un (les royalties perçues et leur suivi
+trimestriel, le perçu à date d'un SPV en gestion), puis les **transactions**,
+le prévisionnel, le business plan vs réalisé et les documents.
+
+Conséquence sur les deals **royalties** et **SPV en gestion** : leurs
+paramètres ne sont plus répétés dans le panneau du milieu, ils sont à droite
+avec ceux de tous les autres instruments. Pour les royalties, les montants en
+euros du plancher et du plafond restent affichés sur la barre de progression.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/$orgSlug/deals.$dealId.tsx` : passage en deux colonnes
+>   (`flex-col lg:flex-row` + `aside` 320 px avec `useStickyBottom`), même
+>   squelette que `participations.$companyId.tsx`. Ordre de la colonne
+>   centrale : `InstrumentPanel` → `Transactions` → `DealForecastSection` →
+>   `FundSection` / `PlanVsActualSection` → `DealDocumentsSection`.
+>   `NotesSection` rendue dans un `IdentitySection` (icône + titre + crayon en
+>   action) et déplacée dans l'`aside`.
+> - `src/components/deals/InstrumentBlock.tsx` : `InstrumentBlock` éclaté en
+>   `InstrumentDetails` (les champs `INSTRUMENT_FIELDS` en rangées
+>   `InlineField layout="row"`, pour **tous** les kinds, `Placeholder` pour
+>   les kinds `render: 'placeholder'`) et `InstrumentPanel` (le corps des
+>   kinds `render: 'custom'`, `null` sinon). `CustomPanelProps` perd
+>   `notesSlot` et `onEdit`.
+> - `RoyaltiesPanel` / `LeadSpvPanel` : suppression de leur carte
+>   « Paramètres » (doublon du panneau latéral) et du bouton « Modifier »
+>   local ; le `notesSlot` du royalty disparaît. Clés i18n
+>   `fiche.royalty.paramsTitle|edit` et `fiche.leadSpv.paramsTitle|edit`
+>   retirées (fr + en) ; `dealForecast.hint` corrigée (« Transactions
+>   ci-dessus »).
+> - Docs : `TESTING.md` (intro de la section fiche deal, FD4/FD22/FD24/FD35,
+>   FD41, nouveau FD44) et `docs/produit/05-deals.md`.
 
 ## v1.154.0 — 30/07/2026 à 14:35 — Déposer un report soi-même depuis la fiche société
 
