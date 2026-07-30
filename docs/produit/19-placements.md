@@ -46,10 +46,21 @@ la **liquidité modifiable**, les quatre tuiles du compte, l'**historique du
 solde** (chaque mise à jour crée un point daté) et les **transactions
 pointées** sur le placement.
 
-Le **contenu de l'enveloppe** (les titres d'un compte-titres, les supports
-d'un contrat de capitalisation) n'est pas encore affiché : il arrivera avec
-la connexion Powens Wealth, qui remonte les positions (ISIN, quantité,
-valorisation) des comptes d'investissement.
+### Le contenu de l'enveloppe
+
+La fiche affiche aussi les **positions** du compte (les titres d'un
+compte-titres, les supports d'un contrat de capitalisation, les lignes
+crypto), remontées par la connexion bancaire (Powens Wealth) : support et
+code ISIN, quantité, valeur unitaire, valorisation, plus ou moins-value,
+avec le total du compte. Pour l'activer : **lier le placement à son compte
+bancaire** depuis la fiche (liste déroulante des comptes de
+l'organisation). Les positions se mettent à jour automatiquement chaque
+matin ; « Actualiser » force la mise à jour.
+
+Point d'attention : ce flux dépend du produit **Powens Wealth**, à activer
+auprès de Powens (distinct de l'agrégation bancaire déjà branchée). Tant
+qu'il n'est pas actif, la section affiche « aucune position » sans rien
+casser.
 
 ### Sous le capot : l'historique des soldes
 

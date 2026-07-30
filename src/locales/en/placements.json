@@ -64,5 +64,33 @@
       "empty": "No transaction matched to this placement."
     }
   },
+  "envelope": {
+    "title": "Envelope contents",
+    "linkExplain": "Link this placement to its bank account to pull up the positions inside the envelope (securities, funds, crypto…).",
+    "selectPlaceholder": "Pick an account…",
+    "linked": "Account linked",
+    "unlink": "Unlink",
+    "unlinked": "Account unlinked",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing…",
+    "refreshed_one": "{{count}} position synced",
+    "refreshed_other": "{{count}} positions synced",
+    "errors": {
+      "wealthUnavailable": "Powens Wealth product not enabled — ask Powens to activate it.",
+      "noUser": "No Powens connection for this organization.",
+      "refresh": "Could not refresh the positions.",
+      "link": "Could not update the linked account."
+    },
+    "col": {
+      "support": "Asset",
+      "quantity": "Quantity",
+      "unitValue": "Unit value",
+      "valuation": "Valuation",
+      "gain": "Gain / loss"
+    },
+    "total": "Total",
+    "syncedOn": "Synced on {{date}}",
+    "empty": "No position came up yet — make sure the Powens Wealth product is active and the account is synced."
+  },
   "empty": "No placements yet. Crypto, capitalization accounts, term deposits and brokerage accounts will show up here."
 }

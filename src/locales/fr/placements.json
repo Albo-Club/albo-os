@@ -64,5 +64,33 @@
       "empty": "Aucune transaction pointée sur ce placement."
     }
   },
+  "envelope": {
+    "title": "Contenu de l'enveloppe",
+    "linkExplain": "Relie ce placement à son compte bancaire pour faire remonter les positions de l'enveloppe (titres, fonds, crypto…).",
+    "selectPlaceholder": "Choisir un compte…",
+    "linked": "Compte relié",
+    "unlink": "Délier",
+    "unlinked": "Compte délié",
+    "refresh": "Actualiser",
+    "refreshing": "Actualisation…",
+    "refreshed_one": "{{count}} position synchronisée",
+    "refreshed_other": "{{count}} positions synchronisées",
+    "errors": {
+      "wealthUnavailable": "Produit Powens Wealth non activé — à activer auprès de Powens.",
+      "noUser": "Aucune connexion Powens pour cette organisation.",
+      "refresh": "Impossible d'actualiser les positions.",
+      "link": "Impossible de mettre à jour le compte relié."
+    },
+    "col": {
+      "support": "Support",
+      "quantity": "Quantité",
+      "unitValue": "Valeur unitaire",
+      "valuation": "Valorisation",
+      "gain": "+/- value"
+    },
+    "total": "Total",
+    "syncedOn": "Synchronisé le {{date}}",
+    "empty": "Aucune position remontée pour l'instant — vérifie que le produit Powens Wealth est actif et que le compte est synchronisé."
+  },
   "empty": "Aucun placement. Les deals crypto, comptes de capitalisation, dépôts à terme et comptes-titres apparaîtront ici."
 }

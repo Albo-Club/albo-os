@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.148.1 — 29/07/2026 à 21:45 — La doc produit se recopie toute seule dans Linear
+## v1.149.1 — 29/07/2026 à 21:45 — La doc produit se recopie toute seule dans Linear
 
 La documentation produit lisible dans Linear se met désormais à jour
 **automatiquement** : dès qu'une mise à jour touchant la doc part en
@@ -65,6 +65,42 @@ directement dans Linear sera écrasée à la prochaine mise à jour.
 >   est remplacée par le fait automatique + le seul geste manuel restant
 >   (créer/retirer le document Linear et son entrée `DOCS`).
 > - `TESTING.md` B8 et `docs/produit/README.md` mis à jour.
+
+## v1.149.0 — 29/07/2026 à 20:55 — Le contenu de l'enveloppe arrive sur la fiche placement
+
+La fiche d'un placement gagne une section **« Contenu de l'enveloppe »** :
+les titres d'un compte-titres, les supports d'un contrat de capitalisation,
+les lignes crypto — remontés automatiquement depuis la connexion bancaire
+(Powens Wealth). Pour chaque ligne : le support (et son code ISIN), la
+quantité, la valeur unitaire, la valorisation et la plus ou moins-value,
+avec le total du compte en pied de tableau.
+
+Le geste d'installation est simple : sur la fiche du placement, **lier le
+placement à son compte bancaire** (une liste déroulante des comptes de
+l'organisation). Une fois lié, les positions se rafraîchissent toutes
+seules chaque matin, et un bouton « Actualiser » force la mise à jour à la
+demande. On peut délier à tout moment.
+
+⚠️ Ce flux repose sur le produit **Powens Wealth**, distinct de
+l'agrégation bancaire déjà en place : il doit être activé auprès de Powens
+(Account Manager). Tant qu'il ne l'est pas, la section affiche simplement
+« aucune position » — rien ne casse.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle table `investmentPositions` (miroir des investissements Powens,
+>   remplacement en bloc par compte à chaque sync) + `deals.bankAccountId`
+>   optionnel (lien enveloppe, éditable/effaçable via `deals.update`).
+> - `convex/investments.ts` : `listByAccount` (query org-scopée),
+>   `refresh` (action « Actualiser », erreurs typées
+>   `powens_wealth_unavailable` / `powens_no_user`), `syncOrg`/`syncAll`
+>   (internal) sur `GET /2.0/users/me/investments`, résolution
+>   `id_account` → `bankAccounts.by_powens_account`. Cron quotidien 06:30
+>   UTC (no-op tant que le produit Wealth n'est pas activé).
+> - Fiche placement (`placements.$dealId.tsx`) : section enveloppe (liaison
+>   compte, tableau des positions, total, dernier sync, états vides).
+> - Piège d'activation + décisions de design documentés dans
+>   `KNOWN_ISSUES.md` § « Positions Powens Wealth ».
 
 ## v1.148.0 — 29/07/2026 à 20:30 — Sidebar resserrée : Investissements réunit Entreprises et Placements
 
