@@ -137,24 +137,6 @@
     "in": "Inflow",
     "out": "Outflow"
   },
-  "vat": {
-    "title": "Recoverable VAT",
-    "breakdown": "Deductible VAT (expenses) {{deductible}} − collected VAT (income) {{collected}}",
-    "unqualified_one": "{{count}} transaction to qualify in reconciliation",
-    "unqualified_other": "{{count}} transactions to qualify in reconciliation"
-  },
-  "vatSuggestion": {
-    "quarter": "Q{{quarter}} {{year}}",
-    "title": "Estimated VAT entry — {{quarter}}",
-    "body": "{{amount}} of VAT owed for the closed quarter (collected {{collected}} − deductible {{deductible}}).",
-    "unqualified_one": "{{count}} transaction of the quarter still to qualify — the amount may move.",
-    "unqualified_other": "{{count}} transactions of the quarter still to qualify — the amount may move.",
-    "create": "Create the entry (due {{date}})",
-    "entryLabel": "VAT {{quarter}}",
-    "created": "VAT entry created",
-    "alreadyExists": "This quarter's entry already exists",
-    "error": "Something went wrong"
-  },
   "alert": {
     "title": "Threshold alert",
     "breached": "Alert threshold breached: the available or projected balance drops under {{amount}} within the next 3 months.",

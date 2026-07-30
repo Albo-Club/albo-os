@@ -11,7 +11,9 @@ import {
   placementLiquidity,
 } from '../../../convex/lib/instrumentMapping'
 import type { PlacementLiquidity } from '../../../convex/lib/instrumentMapping'
+import type { CashAccount } from '~/components/cash/CashAccounts'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { bankDomain } from '~/lib/bankDomains'
 import { cn } from '~/lib/utils'
 import { signTone } from '~/lib/moneyTone'
 import { xirr } from '~/lib/xirr'
@@ -177,12 +179,27 @@ function liquidityBand(bucket: PlacementLiquidity): {
 export function PlacementsView({
   deals,
   orgSlug,
+  pledgedAccounts,
 }: {
   deals: Array<PlacementRow> | undefined
   orgSlug: string
+  /**
+   * Pledged bank accounts (blocked money — long-term, so they belong here
+   * rather than in the treasury). Already filtered by the caller
+   * (`isPledgedPlacement`). Read-only: their balance feeds the total-balance
+   * tile only, never the paid-in / gain / return ones, which are meaningless
+   * for an account with no deal behind it.
+   */
+  pledgedAccounts?: Array<CashAccount>
 }) {
   const { t } = useTranslation(['placements', 'participations'])
   const { fmtEurCents, fmtPercent } = useFormatters()
+
+  const pledged = pledgedAccounts ?? []
+  const pledgedCents = pledged.reduce(
+    (sum, a) => sum + (a.currentBalance ?? 0),
+    0,
+  )
 
   const computed = useMemo(() => {
     if (!deals) return undefined
@@ -234,7 +251,7 @@ export function PlacementsView({
   if (!computed) return null
   const { rows, totals, buckets } = computed
 
-  if (rows.length === 0) {
+  if (rows.length === 0 && pledged.length === 0) {
     return (
       <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
         {t('placements:empty')}
@@ -247,7 +264,14 @@ export function PlacementsView({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           label={t('placements:tiles.balance')}
-          value={fmtEurCents(totals.balance)}
+          value={fmtEurCents(totals.balance + pledgedCents)}
+          hint={
+            pledgedCents > 0
+              ? t('placements:tiles.balancePledgedHint', {
+                  amount: fmtEurCents(pledgedCents),
+                })
+              : undefined
+          }
           icon={PiggyBank}
         />
         <KpiCard
@@ -297,7 +321,98 @@ export function PlacementsView({
           </section>
         )
       })}
+
+      {pledged.length > 0 && (
+        <PledgedAccountsSection accounts={pledged} orgSlug={orgSlug} />
+      )}
     </div>
+  )
+}
+
+/**
+ * Pledged bank accounts (nantissement, escrow): blocked money, so it reads as
+ * a long-term placement rather than treasury — the Cash page no longer lists
+ * them. Read-only here (the account keeps its own detail page for balance and
+ * transactions); no paid-in / gain / return columns, an account has no deal
+ * behind it to derive them from.
+ */
+function PledgedAccountsSection({
+  accounts,
+  orgSlug,
+}: {
+  accounts: Array<CashAccount>
+  orgSlug: string
+}) {
+  const { t } = useTranslation('placements')
+  const navigate = useNavigate()
+  const { fmtEurCents } = useFormatters()
+
+  const sorted = [...accounts].sort(
+    (a, b) => (b.currentBalance ?? 0) - (a.currentBalance ?? 0),
+  )
+
+  return (
+    <section className="space-y-3">
+      <div className="bg-muted/60 flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium">
+        <span aria-hidden className="bg-muted-foreground size-2 rounded-full" />
+        {t('sections.pledged')}
+        <span className="text-muted-foreground">
+          ({t('placementsCount', { count: sorted.length })})
+        </span>
+      </div>
+      <p className="text-muted-foreground text-sm">{t('pledgedHint')}</p>
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('col.name')}</TableHead>
+              <TableHead>{t('col.holder')}</TableHead>
+              <TableHead className="text-right">{t('col.balance')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sorted.map((account) => (
+              <TableRow
+                key={account._id}
+                className="cursor-pointer"
+                onClick={() =>
+                  navigate({
+                    to: '/app/$orgSlug/cash/$accountId',
+                    params: { orgSlug, accountId: account._id },
+                  })
+                }
+              >
+                <TableCell>
+                  <span className="flex items-center gap-2">
+                    <CompanyLogo
+                      domain={bankDomain(account.bankName)}
+                      companyName={account.bankName}
+                      size="sm"
+                    />
+                    <span className="flex flex-col">
+                      <span className="font-medium">
+                        {account.displayName ?? account.label}
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        {account.bankName}
+                      </span>
+                    </span>
+                  </span>
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {account.owner?.name ?? '—'}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {account.currentBalance == null
+                    ? '—'
+                    : fmtEurCents(account.currentBalance)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </section>
   )
 }
 

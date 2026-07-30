@@ -45,6 +45,20 @@ du cash disponible tout de suite, pas un placement.
   annualisé est le taux de rendement interne (XIRR) de ces flux datés plus
   le solde actuel.
 
+### Les comptes nantis
+
+Les comptes bancaires **nantis** (nantissement de titres, d'espèces, séquestre)
+apparaissent en bas de la page, dans une section à part. Ce sont des fonds
+bloqués : ils ne sont plus de la trésorerie disponible, et se lisent donc
+comme du long terme. La section les liste en lecture seule (banque, nom,
+entité titulaire, solde) ; un clic ouvre la fiche du compte, où le solde
+s'édite comme n'importe quel compte bancaire.
+
+Leur solde entre dans la tuile **Solde total** (le sous-texte rappelle la part
+nantie) mais **jamais** dans le versé net, la plus-value ou le rendement :
+derrière un compte nanti il n'y a pas de deal, donc pas de versements à
+comparer.
+
 ## La fiche placement
 
 Un placement s'ouvre sur une **fiche légère** (pas la fiche deal complète

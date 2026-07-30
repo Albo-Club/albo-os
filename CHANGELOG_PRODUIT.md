@@ -23,6 +23,54 @@ bas de page.
 
 ---
 
+## v1.161.0 — 30/07/2026 à 18:35 — La TVA quitte l'écran, les comptes nantis rejoignent les placements
+
+Deux nettoyages qui vont dans le même sens : ne garder à l'écran que ce qui
+sert au pilotage.
+
+**La TVA sort de l'interface.** Qualifier un taux de TVA ligne à ligne sur
+les charges ne servait pas au quotidien — c'est un travail de comptable, fait
+ailleurs. Le sélecteur de taux sur les lignes de charges et de produits, la
+carte « TVA récupérable » et l'échéance de TVA suggérée disparaissent donc.
+Une ligne de charge se qualifie maintenant par sa **catégorie**, et rien
+d'autre. Les taux déjà saisis restent en base et l'assistant IA sait toujours
+répondre sur la position de TVA : c'est un retrait d'écran, pas une
+suppression.
+
+À ne pas confondre avec la **TVA des deals**, qui elle ne bouge pas : les
+royalties encaissées restent converties en hors taxes pour que leur multiple
+et leur rendement soient justes. C'est bien la distinction qu'on voulait
+garder.
+
+**Les comptes nantis basculent dans les Placements.** Un nantissement de
+titres ou d'espèces, c'est de l'argent bloqué — donc du long terme, pas de la
+trésorerie. Ces comptes quittent la page Trésorerie et apparaissent en bas de
+la page Placements, dans une section « Comptes nantis » : banque, nom, entité
+titulaire, solde. Leur total s'ajoute au solde des placements (le sous-texte
+rappelle la part nantie) mais reste hors du versé, de la plus-value et du
+rendement — il n'y a pas de deal derrière un compte. Côté Trésorerie, leur
+montant est rappelé dans la ligne « Non liquide » sous les comptes. Les
+comptes **clôturés**, eux, ne bougent pas : ils restent en Trésorerie, c'est
+de l'historique.
+
+> **🔧 Notes techniques**
+>
+> - Retrait TVA front : `VatRateSelect` (dans `PointageTable.tsx`),
+>   `VatCard.tsx`, `VatSuggestionCard.tsx` et le miroir `src/lib/vat.ts`
+>   supprimés ; plus d'envoi de `DEFAULT_VAT_RATE_BPS` sur
+>   `categorizeAsCharge`/`bulkCategorize` (écrire un taux non relisible serait
+>   pire que pas de taux). Backend intact : schéma, `setVatRate`,
+>   `getVatPosition`, `suggestVatEntry`/`createVatEntry`, outils agent/MCP.
+>   La dé-TVA des royalties vit dans `convex/lib/metrics.ts` (par
+>   `instrumentKind`), elle ne lit jamais `vatRateBps` — zéro impact.
+> - Comptes nantis : prédicat partagé `isPledgedPlacement`
+>   (`CashAccounts.tsx`, nanti ET non clôturé) consommé par la carte Comptes,
+>   par le total « non liquide » de `ForecastOverview` et par
+>   `placements.index.tsx` ; nouvelle section `PledgedAccountsSection` dans
+>   `PlacementsView.tsx` (lecture seule, ligne → `/cash/$accountId`), solde
+>   ajouté à la seule tuile « solde total ».
+> - `tests/vat.test.ts` perd le test de miroir front (le module n'existe
+>   plus), garde la dérivation Convex.
 ## v1.160.0 — 30/07/2026 à 18:25 — Rattacher une société à sa fiche Attio, depuis sa fiche
 
 Les sociétés qui arrivent par la synchronisation Attio sont déjà rattachées à
