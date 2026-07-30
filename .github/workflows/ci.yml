@@ -24,6 +24,10 @@ jobs:
       # lint = tsc + eslint ; toujours avant build (piège .output/, cf. KNOWN_ISSUES)
       - run: pnpm lint
       - run: pnpm test:unit
+      # Convex regression suite (convex-test, in-memory backend — no network,
+      # no deployment). Guards the multi-tenant / pointage / forecast / passif
+      # invariants (cf. TESTING.md niveau 1).
+      - run: pnpm test:convex
       - run: pnpm build
 
   skills-verify:
