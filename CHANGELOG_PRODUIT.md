@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.150.1 — 30/07/2026 à 10:15 — Des tests de régression gardent les fondations
+## v1.150.3 — 30/07/2026 à 10:19 — Des tests de régression gardent les fondations
 
 Mise à jour purement technique : une suite de tests automatiques vérifie
 désormais, à chaque modification du code, que les protections fondamentales
@@ -54,6 +54,62 @@ l'une de ces garanties, la mise en production est bloquée automatiquement.
 > - Les fichiers vivent dans `convex/` sans être déployés : le CLI Convex
 >   ignore tout module dont le nom contient plus d'un point (cf.
 >   `KNOWN_ISSUES.md`). Aucun code métier modifié.
+## v1.150.2 — 30/07/2026 à 10:28 — Ménage : organisations parasites et commande de rattrapage
+
+Deux corvées d'entretien, invisibles dans l'app au quotidien.
+
+La liste des organisations contenait **deux espaces créés par des comptes
+inconnus** en juin. Ils ne voyaient rien de CALTE ni d'Albo Club — chaque
+organisation est étanche — mais ils polluaient la liste. Un outil permet
+maintenant de les inspecter (qui en est membre, ce qu'ils contiennent) puis de
+les supprimer, avec deux garde-fous : impossible de supprimer CALTE ou Albo
+Club, impossible de supprimer un espace qui contient encore des données.
+
+Et la commande de rattrapage des transactions accepte désormais le nom court
+d'une organisation (« calte ») au lieu de son identifiant technique, comme
+toutes les autres commandes d'administration.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/purgeStrayOrgs.ts` : `inspect` (internalQuery, lecture
+>   seule) rend les membres avec leur compte user (email, date, autres orgs) et
+>   le compte de lignes de chaque table scopée org ; `apply` (internalMutation)
+>   supprime invitations + membres + org + logo. Gardes : `PROTECTED_SLUGS`
+>   (`calte`, `albo`) et `org_not_empty:<slug>:<table=n>`. Les tables filles
+>   (`valuations`, `kpiSnapshots`, `transactions`…) sont couvertes
+>   transitivement par leur parent. Les comptes users ne sont PAS supprimés —
+>   décision séparée côté Better Auth (`users:cascadeDelete`).
+> - `powens:backfillConnection` : `orgId` et `orgSlug` désormais tous deux
+>   optionnels au validateur, garde `org_id_or_slug_required` dans le handler,
+>   résolution par la nouvelle `powens:orgIdBySlug`. L'appel schedulé depuis
+>   `upsertConnectionStatus` passe toujours l'id.
+
+---
+## v1.150.1 — 30/07/2026 à 10:20 — Un détecteur de code mort, lançable à la demande
+
+Mise à jour purement technique : un détecteur de code inutilisé (fichiers,
+briques et dépendances que plus rien ne référence) est désormais disponible
+en une commande. Un premier audit a dressé la liste des candidats au
+nettoyage — rien n'est supprimé à ce stade, la purge sera validée
+séparément.
+
+> **🔧 Notes techniques**
+>
+> - `knip` (v6) installé en devDependency, configuré via `knip.jsonc` :
+>   entrées pour les routes TanStack Start (`src/routes/**`, référencées via
+>   `routeTree.gen.ts`), les fonctions Convex (`convex/*.ts` +
+>   `convex/migrations/*`, référencées via les proxys générés
+>   `api.*`/`internal.*`), les scripts et les tests. Ignorés :
+>   `convex/_generated/`, le vendoré (`src/components/ai-elements/`) et
+>   `src/components/ui/` (shadcn, audité à part). `tailwindcss` /
+>   `tw-animate-css` en `ignoreDependencies` (imports CSS non suivis par
+>   knip).
+> - Script `pnpm deadcode`, **hors CI volontairement** : une croix rouge
+>   permanente sur chaque PR (le repo n'est pas encore propre) coûte plus
+>   qu'elle n'apporte. Brancher un job bloquant une fois la purge faite.
+> - Rapport d'audit complet (candidats classés sûr / douteux) dans la
+>   description de la PR. Aucune suppression dans cette PR.
+> - `TESTING.md` B10 et `TEMPLATE_SYNC.md` (candidat template) mis à jour.
 
 ## v1.150.0 — 30/07/2026 à 10:05 — L'app est surveillée tous les matins
 
