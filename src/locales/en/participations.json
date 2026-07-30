@@ -108,7 +108,6 @@
     "tvpi": "TVPI"
   },
   "notes": {
-    "empty": "No notes yet.",
     "placeholder": "Add notes about this deal…"
   },
   "personRole": {
@@ -125,7 +124,8 @@
     "board": "Board members",
     "coInvestors": "Co-investors",
     "summary": "Summary",
-    "empty": "To be filled in"
+    "summaryPlaceholder": "Add a summary about the company…",
+    "addPerson": "Add"
   },
   "status": {
     "pending": "TS",
@@ -336,8 +336,8 @@
     "dealTitle": "Edit deal",
     "dealDescription": "Rename the deal, change its instrument type, and edit its field values.",
     "selectPlaceholder": "Select…",
-    "companyTitle": "Edit company",
-    "companyDescription": "Rename the company and edit its sector, SIREN, domain and summary.",
+    "companyTitle": "Rename company",
+    "companyDescription": "Rename the company. Everything else on its sheet is edited by clicking the field.",
     "nameLabel": "Name",
     "dealNamePlaceholder": "Custom name (optional)",
     "dealNameHint": "Leave empty to use the instrument as title.",
@@ -351,25 +351,16 @@
     "sirenLabel": "SIREN",
     "sirenPlaceholder": "9 digits",
     "sirenInvalid": "The SIREN must be exactly 9 digits.",
-    "domainLabel": "Domain",
-    "domainPlaceholder": "example.com",
-    "sectorLabel": "Sector",
     "sectorPlaceholder": "Select or type a sector…",
     "sectorSearch": "Search or create…",
     "sectorCreate": "Create \"{{value}}\"",
     "sectorEmpty": "Type to create a sector",
-    "summaryLabel": "Summary",
-    "summaryPlaceholder": "Two to three lines about the company — shown under its page title.",
     "nameRequired": "Name is required.",
-    "peopleLabel": "People",
-    "peopleAdd": "Add a person",
     "peopleRemove": "Remove",
     "peopleNamePlaceholder": "Person's name",
-    "peopleNameRequired": "Name is required.",
     "personSearching": "Searching Attio…",
     "personSearchNoResults": "No matching person in Attio",
     "personSearchError": "Attio search unavailable",
-    "personLinkedToAttio": "Linked to Attio",
     "attioBadge": "Attio",
     "saved": "Changes saved",
     "inlineLabel": "Edit {{field}}",

@@ -108,7 +108,6 @@
     "tvpi": "TVPI"
   },
   "notes": {
-    "empty": "Aucune note pour le moment.",
     "placeholder": "Ajouter des notes sur ce deal…"
   },
   "personRole": {
@@ -125,7 +124,8 @@
     "board": "Membres du board",
     "coInvestors": "Co-investisseurs",
     "summary": "Résumé",
-    "empty": "À renseigner"
+    "summaryPlaceholder": "Ajouter un résumé de la société…",
+    "addPerson": "Ajouter"
   },
   "status": {
     "pending": "TS",
@@ -336,8 +336,8 @@
     "dealTitle": "Modifier le deal",
     "dealDescription": "Renommer le deal, changer son type d'instrument et modifier les valeurs de ses champs.",
     "selectPlaceholder": "Sélectionner…",
-    "companyTitle": "Modifier la société",
-    "companyDescription": "Renommer la société et modifier son secteur, son SIREN, son domaine et son résumé.",
+    "companyTitle": "Renommer la société",
+    "companyDescription": "Renommer la société. Le reste de sa fiche s'édite directement au clic sur le champ.",
     "nameLabel": "Nom",
     "dealNamePlaceholder": "Nom personnalisé (optionnel)",
     "dealNameHint": "Laisser vide pour utiliser l'instrument comme titre.",
@@ -351,25 +351,16 @@
     "sirenLabel": "SIREN",
     "sirenPlaceholder": "9 chiffres",
     "sirenInvalid": "Le SIREN doit contenir exactement 9 chiffres.",
-    "domainLabel": "Domaine",
-    "domainPlaceholder": "exemple.com",
-    "sectorLabel": "Secteur",
     "sectorPlaceholder": "Choisir ou saisir un secteur…",
     "sectorSearch": "Rechercher ou créer…",
     "sectorCreate": "Créer « {{value}} »",
     "sectorEmpty": "Saisissez pour créer un secteur",
-    "summaryLabel": "Résumé",
-    "summaryPlaceholder": "Deux à trois lignes sur la société — affiché sous le titre de sa fiche.",
     "nameRequired": "Le nom est obligatoire.",
-    "peopleLabel": "Personnes",
-    "peopleAdd": "Ajouter une personne",
     "peopleRemove": "Retirer",
     "peopleNamePlaceholder": "Nom de la personne",
-    "peopleNameRequired": "Le nom est obligatoire.",
     "personSearching": "Recherche Attio…",
     "personSearchNoResults": "Aucune personne trouvée dans Attio",
     "personSearchError": "Recherche Attio indisponible",
-    "personLinkedToAttio": "Lié à Attio",
     "attioBadge": "Attio",
     "saved": "Modifications enregistrées",
     "inlineLabel": "Modifier {{field}}",

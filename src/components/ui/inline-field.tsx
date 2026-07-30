@@ -5,6 +5,7 @@ import type { FieldFormat } from '~/lib/parse'
 import { parseField, rawToInput } from '~/lib/parse'
 import { cn } from '~/lib/utils'
 import { Input } from '~/components/ui/input'
+import { Textarea } from '~/components/ui/textarea'
 import { useAmountField } from '~/components/ui/amount-input'
 import {
   InputGroup,
@@ -37,10 +38,16 @@ import {
  * For a bespoke editor (e.g. the creatable sector combobox) pass `renderEditor`:
  * it fully owns the commit and calls `done()` to leave edit mode.
  *
- * `layout` picks the resting shape: `stacked` (default, label above the value —
- * what the deal fiche uses) or `row` (label left, value right, hairline below),
- * which is what the company identity panel needs to keep long labels on one
- * line in a narrow column. Editing behaves identically in both.
+ * `layout` picks the resting shape: `stacked` (default, label above the value),
+ * `row` (label left, value right, hairline below) — what the fiche side panels
+ * use to keep long labels on one line in a narrow column — or `block` (no label
+ * at all, the value spans the full width), for a free-text paragraph whose
+ * label is already carried by the enclosing `IdentitySection`. Editing behaves
+ * identically in all three.
+ *
+ * `format: 'multiline'` opens a textarea instead of an input: Enter inserts a
+ * newline, blur commits, Escape cancels. Pair it with `layout="block"` and a
+ * `placeholder` — deal notes, company summary.
  */
 export function InlineField({
   label,
@@ -52,6 +59,7 @@ export function InlineField({
   renderEnumLabel,
   selectPlaceholder,
   ariaLabel,
+  placeholder,
   onCommit,
   onClear,
   renderEditor,
@@ -67,11 +75,14 @@ export function InlineField({
   renderEnumLabel?: (opt: string) => string
   selectPlaceholder?: string
   ariaLabel?: string
+  /** Muted prompt shown in place of the em dash when the field is empty, and
+   * as the textarea placeholder while editing a multiline field. */
+  placeholder?: string
   onCommit?: (parsed: number | string) => void | Promise<void>
   onClear?: () => void | Promise<void>
   renderEditor?: (api: { done: () => void }) => ReactNode
   disabled?: boolean
-  layout?: 'stacked' | 'row'
+  layout?: 'stacked' | 'row' | 'block'
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -130,6 +141,25 @@ export function InlineField({
           </SelectContent>
         </Select>
       )
+    } else if (format === 'multiline') {
+      // Enter belongs to the text here, so only blur commits (Escape cancels).
+      editor = (
+        <Textarea
+          autoFocus
+          rows={4}
+          value={draft}
+          placeholder={placeholder}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault()
+              setEditing(false)
+            }
+          }}
+          className="text-[13px]"
+        />
+      )
     } else {
       const isNumeric =
         format === 'eur' ||
@@ -185,6 +215,7 @@ export function InlineField({
     }
   }
 
+  const empty = display === ''
   const trigger = (
     <button
       type="button"
@@ -192,14 +223,25 @@ export function InlineField({
       onClick={begin}
       aria-label={ariaLabel}
       className={cn(
-        'focus-visible:ring-ring -mx-1 rounded px-1 text-sm font-medium focus-visible:ring-2 focus-visible:outline-none',
-        layout === 'row' ? 'min-w-0 text-right' : 'text-left',
+        'focus-visible:ring-ring -mx-1 rounded px-1 focus-visible:ring-2 focus-visible:outline-none',
+        layout === 'block'
+          ? 'w-full text-left text-[13px] leading-relaxed whitespace-pre-wrap'
+          : cn(
+              'text-sm font-medium',
+              layout === 'row' ? 'min-w-0 text-right' : 'text-left',
+            ),
+        empty && placeholder && 'text-muted-foreground italic',
         disabled ? 'cursor-default' : 'hover:bg-muted/50 cursor-pointer',
       )}
     >
-      {display === '' ? '—' : display}
+      {empty ? (placeholder ?? '—') : display}
     </button>
   )
+
+  // The section header already carries the label — the value takes the width.
+  if (layout === 'block') {
+    return editing ? <>{editor}</> : trigger
+  }
 
   if (layout === 'row') {
     return (
