@@ -1693,31 +1693,40 @@ manuel = une règle mémorisée, rejouée sur les transactions suivantes.
 ## TVA récupérable (`convex/lib/vat.ts`, `transactions:getVatPosition`)
 
 Suivi minimal de la TVA pour fiabiliser les charges réelles et la position de
-TVA récupérable (carte sur la page Trésorerie). Pas un module de déclaration.
+TVA récupérable. Pas un module de déclaration.
+
+> ⚠️ **La TVA n'a plus aucune surface front** (retirée en v1.161.0 : elle
+> n'apportait rien au quotidien). Sont partis le sélecteur de taux sur les
+> lignes charge/produit du registre, la carte « TVA récupérable » et la carte
+> « Échéance TVA estimée », plus le miroir `src/lib/vat.ts`. Le **backend est
+> intact et reste la référence** ci-dessous : champ au schéma, `setVatRate`,
+> `getVatPosition`, `suggestVatEntry`/`createVatEntry`, outils agent/MCP — les
+> taux déjà saisis sont conservés, l'agent sait encore répondre sur la
+> position TVA, et re-brancher une UI est une PR d'affichage. **Sans rapport
+> avec la TVA des deals** : la dé-TVA ÷1,2 des royalties est portée par
+> l'instrument dans `convex/lib/metrics.ts`, elle ne lit jamais `vatRateBps`.
 
 - **Les montants de transaction sont toujours TTC.** Le taux de TVA
   (`vatRateBps` : 0 / 550 / 1000 / 2000) est stocké sur la transaction ; le
   montant de TVA est **toujours dérivé, jamais stocké** :
   `vatCents = round(amount × taux / (10000 + taux))`. La dérivation vit dans
-  `convex/lib/vat.ts`, miroir front `src/lib/vat.ts` (même convention que
-  `searchText.ts`) — garder les deux identiques (testé par
-  `tests/vat.test.ts`).
+  `convex/lib/vat.ts` (testée par `tests/vat.test.ts`).
 - **Invariant : `vatRateBps` n'existe que sur `charge` / `product`.** Tout
   pointage qui fait quitter ces statuts (match deal, allocation passif,
   unmatch, re-catégorisation en ignored/tax/internal_transfer) l'efface —
   enforced dans `convex/lib/pointage.ts`, ne pas contourner.
 - **L'historique n'est pas backfillé, exprès.** Une charge sans taux est
   « à qualifier » (un /1,2 global serait faux : salaires, assurances, frais
-  bancaires sont exonérés). La qualification se fait ligne à ligne dans les
-  onglets Charges/Produits du pointage (`setVatRate`, accepte `null` pour
-  revenir à « à qualifier »), ou via l'outil agent `categorizeTransaction`.
-  Le défaut 20 % ne s'applique qu'aux **nouvelles** catégorisations en charge
-  depuis l'UI (`DEFAULT_VAT_RATE_BPS`, côté front exprès — backend neutre).
+  bancaires sont exonérés). Depuis le retrait du front, la qualification ne
+  passe plus que par l'outil agent `categorizeTransaction` ou `setVatRate`
+  appelée à la main — l'UI n'écrit plus de taux du tout (le défaut 20 % des
+  catégorisations en charge est parti avec le sélecteur : écrire un taux que
+  personne ne peut plus relire ni corriger serait pire que pas de taux).
 - **`getVatPosition` est signée par le sens** : une charge `in` (avoir
   fournisseur) se déduit de la TVA déductible, un produit `out` de la TVA
   collectée. Les règlements/remboursements de TVA avec l'État restent en
-  statut `tax` et ne sont **pas nettés** contre la position en V1 — la carte
-  montre la position cumulée, pas le solde restant à récupérer après
+  statut `tax` et ne sont **pas nettés** contre la position en V1 — elle
+  donne la position cumulée, pas le solde restant à récupérer après
   déclarations.
 
 ## Passif — `equityPositions` / `intercompanyLoans` / soldes dérivés (`convex/liabilities.ts`)
@@ -1860,7 +1869,12 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   `convex/lib/entryMatching.ts` (fenêtres sens/date/montant + score
   montant/date/libellé, testé par `tests/entryMatching.test.ts`) ; une
   transaction déjà portée par un `realizedTransactionId` n'est jamais
-  re-suggérée.
+  re-suggérée. Le pont **inverse** vit dans `transactions.ts:matchTransaction` :
+  son retour porte `pendingEntry` (l'échéance `pending` du deal la plus
+  proche en date, même sens, EUR, **sans** fenêtre date/montant — le lien
+  deal est le signal), que le front propose de réaliser via
+  `markEntryRealized` (mode `close`). matchTransaction ne fait que LIRE les
+  entries — la réalisation reste un geste forecasts.ts.
 - **Tests purs hors de `convex/`.** La logique (récurrence UTC, clamping fin
   de mois, protection, agrégation mensuelle) vit dans
   `convex/lib/recurrence.ts` (zéro import Node/Convex) et est testée par
@@ -1974,10 +1988,14 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   via l'agent IA, `updateForecastEntry`) n'est visible **ni** dans cette table
   (filtre `ruleId == null`), **ni** dans la table des règles (qui liste les
   règles, pas leurs occurrences) — seulement dans la courbe/grille
-  `getForecastGrid`. Non corrigé délibérément : la surface humaine se limite
-  aux règles récurrentes + aux ponctuelles pures ; l'override d'une occurrence
-  dérivée reste un geste agent. À revoir si l'édition d'occurrence dérivée
-  passe un jour en front.
+  `getForecastGrid` et comme ligne prévisionnelle du registre
+  (`getUpcomingEntries`, ≤ 90 j). Non corrigé délibérément : la surface
+  humaine se limite aux règles récurrentes + aux ponctuelles pures ;
+  l'**édition**/override d'une occurrence dérivée reste un geste agent. En
+  revanche l'**annulation** est possible en front pour toute échéance
+  `pending` (occurrences comprises) : action « Annuler l'échéance » des
+  lignes prévisionnelles du registre (`PointageTable` → `cancelEntry`). À
+  revoir si l'édition d'occurrence dérivée passe un jour en front.
 
 ## Split chapeaux Attio → SPV, org albo (`convex/migrations/splitAlboSponsorSpvs.ts`)
 
@@ -2369,16 +2387,32 @@ Pièges non-évidents :
    d'URL potentiellement faux. C'est une base d'URL **publique**, pas un secret
    (l'anti-pattern « pas de `VITE_` sur un secret » ne s'applique pas).
 
-5. **Identité éditable inline (secteur / SIREN / domaine) ; le reste en lecture
-   seule.** Ces trois champs s'éditent **au clic** via `InlineField`
-   (`src/components/ui/inline-field.tsx`) câblé sur `companies.update` — plus de
-   détour par le dialog « Modifier » pour eux (le dialog reste la voie pour nom
-   + personnes). Les champs **calculés/dérivés** — détention globale, nb
-   d'actions consolidé, lien Attio — **restent en lecture seule** (rendus par
-   `IdentityField`). Vider SIREN/domaine puis valider les **efface** (`''`,
-   normalisé côté mutation) ; le **secteur** réutilise `SectorCombobox` (props
-   additives `defaultOpen` + `onOpenChange` pour l'ouvrir/fermer en inline). Le
-   détail du composant partagé : section « Édition inline des fiches ».
+5. **Tout le panneau d'identité s'édite inline ; seuls les calculés restent en
+   lecture seule.** Secteur / SIREN / domaine / résumé s'éditent **au clic** via
+   `InlineField` (`src/components/ui/inline-field.tsx`) câblé sur
+   `companies.update` ; les personnes via `PeopleEditor` et la fiche Attio via
+   `AttioCompanyField`. Seul le **nom** passe encore par un dialog (il vit dans
+   l'en-tête figé, pas dans le panneau). Les champs **calculés** — détention
+   globale, nb d'actions consolidé — restent en lecture seule (`IdentityField`).
+   Vider SIREN/domaine/résumé puis valider les **efface** (`''`, normalisé côté
+   mutation) ; le **secteur** réutilise `SectorCombobox` (props additives
+   `defaultOpen` + `onOpenChange` pour l'ouvrir/fermer en inline). Le détail du
+   composant partagé : section « Édition inline des fiches ».
+
+6. **L'ancrage `attioCompanyId` se pose à la main, et son unicité est
+   GLOBALE — pas par org.** La ligne « Fiche Attio » du panneau
+   (`AttioCompanyField`) permet de rattacher une société créée à la main à sa
+   fiche CRM : `companies.update` accepte désormais `attioCompanyId` (`''`
+   détache). ⚠️ Le piège : par analogie avec le SIREN on écrirait un contrôle
+   **par org**, ce qui serait faux. `by_attio_company_id` est un index
+   **global** et `convex/attioSync.ts:resolveOrCreateTargetCompany` le lit en
+   **`.unique()`** — deux sociétés portant le même ancrage, même dans deux orgs
+   différentes, font **throw la synchro** au prochain événement Attio. D'où
+   `assertAttioCompanyIdFree` (global, `ConvexError('attio_company_already_used')`),
+   couvert par `convex/regression.deals.test.ts`. Corollaire côté UI : l'ancrage
+   ne se **saisit** jamais, il se **choisit** dans les résultats de
+   `attio.searchCompanies` — un id inventé enverrait les prochains deals sur la
+   mauvaise société, en silence.
 
 ## Édition manuelle deals & `manuallyEditedFields`
 

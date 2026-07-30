@@ -26,8 +26,6 @@ import {
   LEDGER_FILTERS,
   TransactionsLedger,
 } from '~/components/cash/TransactionsLedger'
-import { VatCard } from '~/components/cash/VatCard'
-import { VatSuggestionCard } from '~/components/cash/VatSuggestionCard'
 import { Button } from '~/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 
@@ -135,13 +133,11 @@ function Cash() {
         </TabsContent>
         {/* Gestion — everything one configures monthly: recurring rules
             (+ suggestions), one-off entries, the undated committed pipeline,
-            VAT, threshold alert, bank connections health. */}
+            threshold alert, bank connections health. */}
         <TabsContent value="gestion" className="space-y-6 pt-4">
           {org && <ForecastRulesSection orgId={org._id} />}
           {org && <ForecastEntriesSection orgId={org._id} />}
           {org && <CommittedPipelineCard orgId={org._id} />}
-          {org && <VatCard orgId={org._id} orgSlug={orgSlug} />}
-          {org && <VatSuggestionCard orgId={org._id} />}
           {org && <CashAlertCard orgId={org._id} />}
           {org && <BankConnectionsHealth orgId={org._id} />}
         </TabsContent>

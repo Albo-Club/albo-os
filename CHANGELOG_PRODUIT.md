@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.160.0 — 30/07/2026 à 18:38 — Une petite roue qui tourne partout où ça charge
+## v1.163.0 — 30/07/2026 à 18:41 — Une petite roue qui tourne partout où ça charge
 
 Jusqu'ici, quand l'app attendait quelque chose, elle affichait un simple
 « Chargement… » figé. Rien ne distinguait un écran qui travaille d'un écran
@@ -33,7 +33,7 @@ attente, toujours au même endroit et toujours avec la même allure :
 - **Les pages et les tableaux qui se remplissent** : accueil, fiche deal,
   fiche société, fiche placement, to-do, administration, participations,
   deals, pointage, passif, documents, reportings, KPIs, trésorerie
-  (prévisionnel, TVA, fiche compte), plan vs réel, fonds.
+  (prévisionnel, fiche compte), plan vs réel, fonds.
 - **Les fichiers qu'on envoie** : documents d'un deal, reportings et reports
   d'une société, logo. Le bouton garde son libellé « Téléversement… » et
   gagne la roue à côté — on voit que l'envoi est en cours, pas bloqué.
@@ -71,6 +71,137 @@ document, synthèse IA, synchronisation bancaire, panneau IA) sont inchangés.
 >   un passage dédié.
 
 ---
+
+## v1.162.0 — 30/07/2026 à 18:40 — Pointer un deal rattrape son échéance prévue, et les échéances s'annulent depuis le registre
+
+Deux angles morts du rapprochement prévisionnel ↔ réel disparaissent :
+
+- **Pointer une transaction sur un deal propose de réaliser son échéance
+  prévue.** Jusqu'ici, si la suggestion de rapprochement n'était pas passée
+  (virement trop tardif, montant trop différent), on pointait la transaction
+  sur le deal… et l'échéance prévisionnelle restait « En retard » dans le
+  registre, sans moyen simple de la solder. Le pointage propose désormais
+  aussitôt, dans la notification de succès, de **réaliser l'échéance
+  attendue** du deal — même éloignée en date ou en montant : le lien au deal
+  suffit.
+- **Annuler une échéance directement depuis le registre.** Chaque ligne
+  prévisionnelle du registre porte une action « Annuler l'échéance » avec
+  confirmation — y compris les occurrences générées par une règle
+  récurrente, qui jusqu'ici ne pouvaient être annulées que via l'assistant
+  IA. L'échéance annulée sort du registre et du solde projeté.
+
+> **🔧 Notes techniques**
+>
+> - `transactions.matchTransaction` retourne désormais `pendingEntry`
+>   (l'échéance `pending` du deal la plus proche en date — même sens, EUR,
+>   sans fenêtre date/montant) ; `PointageTable.handleMatch` affiche un
+>   toast avec action « Réaliser l'échéance » →
+>   `forecasts.markEntryRealized` (mode `close`, l'écart reste lisible).
+> - Lignes prévisionnelles de `PointageTable` : bouton « Annuler
+>   l'échéance » + AlertDialog → `forecasts.cancelEntry` (mutation
+>   existante, jusqu'ici réservée aux ponctuelles de l'onglet Gestion).
+> - Test de régression ajouté (`convex/regression.pointage.test.ts` :
+>   retour `pendingEntry`, plus proche en date, même sens) ; docs produit
+>   08/09, `TESTING.md` (FC20, FC30, B11) et `KNOWN_ISSUES.md` mis à jour.
+
+## v1.161.0 — 30/07/2026 à 18:35 — La TVA quitte l'écran, les comptes nantis rejoignent les placements
+
+Deux nettoyages qui vont dans le même sens : ne garder à l'écran que ce qui
+sert au pilotage.
+
+**La TVA sort de l'interface.** Qualifier un taux de TVA ligne à ligne sur
+les charges ne servait pas au quotidien — c'est un travail de comptable, fait
+ailleurs. Le sélecteur de taux sur les lignes de charges et de produits, la
+carte « TVA récupérable » et l'échéance de TVA suggérée disparaissent donc.
+Une ligne de charge se qualifie maintenant par sa **catégorie**, et rien
+d'autre. Les taux déjà saisis restent en base et l'assistant IA sait toujours
+répondre sur la position de TVA : c'est un retrait d'écran, pas une
+suppression.
+
+À ne pas confondre avec la **TVA des deals**, qui elle ne bouge pas : les
+royalties encaissées restent converties en hors taxes pour que leur multiple
+et leur rendement soient justes. C'est bien la distinction qu'on voulait
+garder.
+
+**Les comptes nantis basculent dans les Placements.** Un nantissement de
+titres ou d'espèces, c'est de l'argent bloqué — donc du long terme, pas de la
+trésorerie. Ces comptes quittent la page Trésorerie et apparaissent en bas de
+la page Placements, dans une section « Comptes nantis » : banque, nom, entité
+titulaire, solde. Leur total s'ajoute au solde des placements (le sous-texte
+rappelle la part nantie) mais reste hors du versé, de la plus-value et du
+rendement — il n'y a pas de deal derrière un compte. Côté Trésorerie, leur
+montant est rappelé dans la ligne « Non liquide » sous les comptes. Les
+comptes **clôturés**, eux, ne bougent pas : ils restent en Trésorerie, c'est
+de l'historique.
+
+> **🔧 Notes techniques**
+>
+> - Retrait TVA front : `VatRateSelect` (dans `PointageTable.tsx`),
+>   `VatCard.tsx`, `VatSuggestionCard.tsx` et le miroir `src/lib/vat.ts`
+>   supprimés ; plus d'envoi de `DEFAULT_VAT_RATE_BPS` sur
+>   `categorizeAsCharge`/`bulkCategorize` (écrire un taux non relisible serait
+>   pire que pas de taux). Backend intact : schéma, `setVatRate`,
+>   `getVatPosition`, `suggestVatEntry`/`createVatEntry`, outils agent/MCP.
+>   La dé-TVA des royalties vit dans `convex/lib/metrics.ts` (par
+>   `instrumentKind`), elle ne lit jamais `vatRateBps` — zéro impact.
+> - Comptes nantis : prédicat partagé `isPledgedPlacement`
+>   (`CashAccounts.tsx`, nanti ET non clôturé) consommé par la carte Comptes,
+>   par le total « non liquide » de `ForecastOverview` et par
+>   `placements.index.tsx` ; nouvelle section `PledgedAccountsSection` dans
+>   `PlacementsView.tsx` (lecture seule, ligne → `/cash/$accountId`), solde
+>   ajouté à la seule tuile « solde total ».
+> - `tests/vat.test.ts` perd le test de miroir front (le module n'existe
+>   plus), garde la dérivation Convex.
+## v1.160.0 — 30/07/2026 à 18:25 — Rattacher une société à sa fiche Attio, depuis sa fiche
+
+Les sociétés qui arrivent par la synchronisation Attio sont déjà rattachées à
+leur fiche CRM. Celles créées à la main dans Albo, non — et rien ne permettait
+de le faire : la ligne « Fiche Attio » du panneau d'identité affichait le lien
+quand il existait, un tiret sinon, sans jamais rien proposer.
+
+Elle devient **la dernière ligne éditable du panneau**, dans le même geste que
+les autres :
+
+- Pas de lien ? Un clic ouvre une **recherche dans Attio**. On tape deux
+  lettres, on choisit dans la liste — chaque suggestion affiche le nom et, si
+  Attio le connaît, le **domaine**, ce qui permet de départager les homonymes.
+- Un lien existe ? La ligne affiche « Ouvrir dans Attio » et une **croix pour
+  détacher**.
+
+On ne peut pas saisir une référence à la main, uniquement en choisir une :
+c'est ce lien qui indique à la synchronisation où ranger les prochains deals,
+une valeur inventée les enverrait en silence sur la mauvaise société. Pour la
+même raison, une fiche Attio ne peut être rattachée qu'à **une seule** société,
+toutes organisations confondues — sinon la synchronisation se bloque.
+
+> **🔧 Notes techniques**
+>
+> - `convex/attio.ts` : action `searchCompanies`, miroir de `searchPeople` sur
+>   l'objet `companies` d'Attio (même garde d'appartenance via
+>   `internal.attio.requireMember`, mêmes dégradations douces `config` /
+>   `upstream`, clé jamais loguée). Helpers `companyName` / `companyDomain` sur
+>   les attributs historisés ; le domaine remonte pour départager les homonymes
+>   dans le picker.
+> - `convex/companies.ts` : `update` accepte `attioCompanyId` (`''` → colonne
+>   retirée, comme `domain`). ⚠️ `assertAttioCompanyIdFree` est **global, pas
+>   par org** : `by_attio_company_id` est un index global lu en `.unique()` par
+>   `attioSync.ts:resolveOrCreateTargetCompany`, donc un doublon d'ancrage —
+>   même inter-org — ferait throw la synchro. Nouveau code d'erreur
+>   `attio_company_already_used`.
+> - `src/components/companies/AttioCompanyField.tsx` (nouveau) : la ligne du
+>   panneau, posée comme un `IdentityField` (elle ne peut pas en être un : sa
+>   valeur au repos est un lien + une croix). Picker `AttioCompanySearch` —
+>   recherche débouncée, popover de résultats, `preventDefault` sur `mousedown`
+>   pour que le blur n'annule pas avant le clic. Aucun chemin de saisie libre.
+> - `AttioCompanyLink` retiré de `EntityFiche.tsx` (orphelin après ce
+>   changement) ; `edit.personSearching` / `edit.personSearchError` renommées
+>   `edit.attioSearching` / `edit.attioSearchError` — leur texte était déjà
+>   générique et sert maintenant aux deux pickers.
+> - Tests : trois cas ajoutés à `convex/regression.deals.test.ts` (ancrage déjà
+>   pris refusé, refus **inter-org**, détachement qui libère l'ancrage).
+> - Docs : `TESTING.md` (TP11 corrigé, nouveau TP11e),
+>   `docs/produit/04-participations.md`, `KNOWN_ISSUES.md` (§ fiche société,
+>   points 5 et 6).
 
 ## v1.159.0 — 30/07/2026 à 17:35 — La fiche société s'édite au clic, comme la fiche deal
 

@@ -552,7 +552,11 @@ export const getPointageSuggestions = query({
 // those patches here.
 
 /**
- * Attaches a transaction to a deal in the same org.
+ * Attaches a transaction to a deal in the same org. Returns the deal's
+ * closest pending forecast entry (same direction, EUR) so the UI can offer
+ * to realize it right after pointing — the reverse of
+ * forecasts.suggestForecastMatches' `pointToDealId` (two distinct gestures;
+ * realizing stays forecasts.ts's job, via markEntryRealized).
  */
 export const matchTransaction = mutation({
   args: { transactionId: v.id('transactions'), dealId: v.id('deals') },
@@ -562,7 +566,37 @@ export const matchTransaction = mutation({
     const { user } = await requireOrgMember(ctx, tx.orgId)
 
     await applyMatchToDeal(ctx, tx, dealId, user._id, 'manual')
-    return null
+
+    // No matching windows here: the deal link IS the signal (a capital call
+    // paid 3 weeks late must still surface). Closest pending entry by date.
+    const entries = await ctx.db
+      .query('forecastEntries')
+      .withIndex('by_deal', (q) => q.eq('dealId', dealId))
+      .collect()
+    let best: Doc<'forecastEntries'> | null = null
+    for (const entry of entries) {
+      if (entry.status !== 'pending') continue
+      if (entry.direction !== tx.direction) continue
+      if (entry.currency !== 'EUR') continue
+      if (
+        best === null ||
+        Math.abs(entry.date - tx.transactionDate) <
+          Math.abs(best.date - tx.transactionDate)
+      ) {
+        best = entry
+      }
+    }
+    return {
+      pendingEntry: best
+        ? {
+            _id: best._id,
+            label: best.label,
+            date: best.date,
+            amountCents: best.amountCents,
+            direction: best.direction,
+          }
+        : null,
+    }
   },
 })
 

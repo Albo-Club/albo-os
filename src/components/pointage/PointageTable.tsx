@@ -27,7 +27,6 @@ import {
   usePagination,
 } from '~/components/data-table/LocalPagination'
 import { CHARGE_CATEGORIES, PRODUCT_CATEGORIES } from '~/lib/categories'
-import { DEFAULT_VAT_RATE_BPS, VAT_RATES_BPS, vatCentsFromTtc } from '~/lib/vat'
 import { directionTone } from '~/lib/moneyTone'
 import {
   AlertDialog,
@@ -68,7 +67,7 @@ export type UnmatchedTx = TxDetails
  * « Aujourd'hui » divider, overdue ones inline with the past transactions.
  */
 export type PlannedEntry = {
-  _id: string
+  _id: Id<'forecastEntries'>
   date: number
   label: string
   amountCents: number
@@ -428,6 +427,8 @@ export function PointageTable({
   }, [suggestions, dealsById, liabilityByTarget, t])
 
   const matchTransaction = useConvexMutation(api.transactions.matchTransaction)
+  const markEntryRealized = useConvexMutation(api.forecasts.markEntryRealized)
+  const cancelForecastEntry = useConvexMutation(api.forecasts.cancelEntry)
   const allocateTransaction = useConvexMutation(
     api.liabilities.allocateTransaction,
   )
@@ -451,7 +452,6 @@ export function PointageTable({
     api.transactions.unmatchTransaction,
   )
   const bulkCategorize = useConvexMutation(api.transactions.bulkCategorize)
-  const setVatRate = useConvexMutation(api.transactions.setVatRate)
   const setCategory = useConvexMutation(api.transactions.setCategory)
 
   // Charge/product go through their dedicated calls (they carry category
@@ -475,6 +475,10 @@ export function PointageTable({
     Set<Id<'transactions'>>
   >(() => new Set())
   const [confirmStatus, setConfirmStatus] = useState<BulkStatus | null>(null)
+  // Planned row awaiting the « Annuler l'échéance » confirmation.
+  const [cancelEntryTarget, setCancelEntryTarget] =
+    useState<PlannedEntry | null>(null)
+  const [cancelEntryPending, setCancelEntryPending] = useState(false)
   const timeoutsRef = useRef(
     new Map<Id<'transactions'>, ReturnType<typeof setTimeout>>(),
   )
@@ -520,6 +524,21 @@ export function PointageTable({
     )
   }
 
+  // Second gesture offered by the post-match toast: realize the deal's
+  // pending forecast entry against the just-matched transaction (mode
+  // `close` — the planned/actual gap stays readable, cf. forecasts.ts).
+  async function realizePendingEntry(
+    entryId: Id<'forecastEntries'>,
+    transactionId: Id<'transactions'>,
+  ) {
+    try {
+      await markEntryRealized({ entryId, transactionId, mode: 'close' })
+      toast.success(t('pendingEntry.realized'))
+    } catch (err) {
+      reportError(err)
+    }
+  }
+
   async function handleMatch(
     tx: UnmatchedTx,
     target: Extract<PointageTarget, { kind: 'deal' | 'liability' }>,
@@ -527,7 +546,7 @@ export function PointageTable({
     setPendingId(tx._id)
     try {
       if (target.kind === 'deal') {
-        await matchTransaction({
+        const result = await matchTransaction({
           transactionId: tx._id,
           dealId: target.deal._id,
         })
@@ -538,6 +557,25 @@ export function PointageTable({
             kind: 'matched',
             targetName: target.deal.target?.name ?? '—',
           })
+        // Deal with a pending planned entry → offer to realize it right away
+        // (reverse of the suggestions card's « Pointer sur le deal » toast).
+        const entry = result.pendingEntry
+        if (entry) {
+          toast(
+            t('pendingEntry.toast', {
+              label: entry.label,
+              date: fmtDate(entry.date),
+              amount: fmtSignedRounded(entry.amountCents, entry.direction),
+            }),
+            {
+              action: {
+                label: t('pendingEntry.realize'),
+                onClick: () => void realizePendingEntry(entry._id, tx._id),
+              },
+              duration: 10000,
+            },
+          )
+        }
       } else {
         await allocateTransaction({
           transactionId: tx._id,
@@ -566,14 +604,12 @@ export function PointageTable({
   ) {
     setPendingId(tx._id)
     try {
-      // A charge starts with a default 20% VAT rate, adjustable later
-      // inline (setVatRate). The unified picker can carry the category
-      // directly (charge/product leaves) — undefined keeps « à qualifier ».
+      // The unified picker can carry the category directly (charge/product
+      // leaves) — undefined keeps « à qualifier ».
       const result =
         kind === 'charge'
           ? await categorizeAsCharge({
               transactionId: tx._id,
-              vatRateBps: DEFAULT_VAT_RATE_BPS,
               ...(category ? { category } : {}),
             })
           : kind === 'product'
@@ -629,21 +665,6 @@ export function PointageTable({
     }
   }
 
-  // Ledger mode: qualify a charge/product VAT rate inline (feeds the VAT card).
-  async function handleVatRate(tx: UnmatchedTx, vatRateBps: number | null) {
-    setPendingId(tx._id)
-    try {
-      await setVatRate({
-        transactionId: tx._id,
-        vatRateBps: vatRateBps as 0 | 550 | 1000 | 2000 | null,
-      })
-    } catch (err) {
-      reportError(err)
-    } finally {
-      setPendingId(null)
-    }
-  }
-
   // Ledger mode: qualify a charge/product broad category inline. Setting a
   // category memorizes a learned rule (surfaced once via toast).
   async function handleCategory(tx: UnmatchedTx, category: string | null) {
@@ -679,6 +700,22 @@ export function PointageTable({
     }
   }
 
+  // Cancels a planned entry (rule-derived occurrences included) straight
+  // from the register — the row leaves via getUpcomingEntries reactivity.
+  async function handleCancelEntry() {
+    if (!cancelEntryTarget) return
+    setCancelEntryPending(true)
+    try {
+      await cancelForecastEntry({ entryId: cancelEntryTarget._id })
+      toast.success(t('register.entryCancelled'))
+      setCancelEntryTarget(null)
+    } catch (err) {
+      reportError(err)
+    } finally {
+      setCancelEntryPending(false)
+    }
+  }
+
   function toggleSelected(txId: Id<'transactions'>) {
     setSelectedIds((prev) => {
       const next = new Set(prev)
@@ -709,7 +746,6 @@ export function PointageTable({
       const result = await bulkCategorize({
         transactionIds: ids,
         status,
-        vatRateBps: status === 'charge' ? DEFAULT_VAT_RATE_BPS : undefined,
       })
       setSelectedIds(new Set())
       if (result.succeeded.length > 0) {
@@ -836,11 +872,6 @@ export function PointageTable({
             status={status}
             pending={pending}
             onChange={(category) => void handleCategory(tx, category)}
-          />
-          <VatRateSelect
-            tx={tx}
-            pending={pending}
-            onChange={(vatRateBps) => void handleVatRate(tx, vatRateBps)}
           />
           {detach}
         </div>
@@ -995,7 +1026,17 @@ export function PointageTable({
                             </Badge>
                           </TableCell>
                         )}
-                        <TableCell />
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-muted-foreground"
+                            disabled={cancelEntryPending}
+                            onClick={() => setCancelEntryTarget(entry)}
+                          >
+                            {t('register.cancelEntry')}
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     </Fragment>
                   )
@@ -1162,6 +1203,41 @@ export function PointageTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog
+        open={cancelEntryTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setCancelEntryTarget(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('register.cancelEntryTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cancelEntryTarget &&
+                t('register.cancelEntryBody', {
+                  label: cancelEntryTarget.label,
+                  date: fmtDate(cancelEntryTarget.date),
+                  amount: fmtSignedRounded(
+                    cancelEntryTarget.amountCents,
+                    cancelEntryTarget.direction,
+                  ),
+                })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelEntryPending}>
+              {t('bulk.cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={cancelEntryPending}
+              onClick={() => void handleCancelEntry()}
+            >
+              {t('bulk.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
@@ -1207,61 +1283,3 @@ function CategorySelect({
   )
 }
 
-/**
- * VAT rate selector for a charge/product row (« À qualifier » /
- * 0% / 5.5% / 10% / 20%) → `setVatRate`. The VAT amount derived from the
- * tax-inclusive total shows below the selector once a rate is set.
- */
-function VatRateSelect({
-  tx,
-  pending,
-  onChange,
-}: {
-  tx: UnmatchedTx
-  pending: boolean
-  onChange: (vatRateBps: number | null) => void
-}) {
-  const { t, i18n } = useTranslation('pointage')
-  const fmtRate = (bps: number) =>
-    new Intl.NumberFormat(i18n.language, {
-      style: 'percent',
-      maximumFractionDigits: 1,
-    }).format(bps / 10000)
-  const fmtEur = (cents: number) =>
-    new Intl.NumberFormat(i18n.language, {
-      style: 'currency',
-      currency: 'EUR',
-      maximumFractionDigits: 2,
-    }).format(cents / 100)
-
-  return (
-    <div className="flex flex-col items-start gap-0.5">
-      <Select
-        value={tx.vatRateBps != null ? String(tx.vatRateBps) : 'unset'}
-        disabled={pending}
-        onValueChange={(value) =>
-          onChange(value === 'unset' ? null : Number(value))
-        }
-      >
-        <SelectTrigger size="sm" className="w-32">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="unset">{t('vat.toQualify')}</SelectItem>
-          {VAT_RATES_BPS.map((bps) => (
-            <SelectItem key={bps} value={String(bps)}>
-              {fmtRate(bps)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {tx.vatRateBps != null && tx.vatRateBps > 0 && (
-        <span className="text-muted-foreground text-xs tabular-nums">
-          {t('vat.amount', {
-            amount: fmtEur(vatCentsFromTtc(tx.amount, tx.vatRateBps)),
-          })}
-        </span>
-      )}
-    </div>
-  )
-}

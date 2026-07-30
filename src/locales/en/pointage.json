@@ -10,14 +10,9 @@
     "date": "Date",
     "label": "Label",
     "amount": "Amount",
-    "vat": "VAT",
     "account": "Account",
     "status": "Status",
     "actions": "Actions"
-  },
-  "vat": {
-    "toQualify": "To qualify",
-    "amount": "incl. {{amount}} VAT"
   },
   "category": {
     "toQualify": "To qualify"
@@ -162,6 +157,15 @@
     "today": "Today — {{date}}",
     "planned": "Planned",
     "overdue": "Overdue",
-    "fromRule": "recurring rule"
+    "fromRule": "recurring rule",
+    "cancelEntry": "Cancel entry",
+    "cancelEntryTitle": "Cancel this planned entry?",
+    "cancelEntryBody": "“{{label}}” due {{date}} ({{amount}}) will no longer count toward the projected balance.",
+    "entryCancelled": "Planned entry cancelled"
+  },
+  "pendingEntry": {
+    "toast": "This deal has a pending planned entry: “{{label}}” due {{date}} ({{amount}}).",
+    "realize": "Realize the entry",
+    "realized": "Planned entry realized — removed from the forecast."
   }
 }
