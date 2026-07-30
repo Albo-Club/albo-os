@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+import { LoadingLine } from '~/components/ui/spinner'
 
 /**
  * "Business plan vs actual" section of a deal. Always mounted (the query
@@ -59,7 +60,7 @@ export function PlanVsActualSection({
       </h2>
 
       {!projections ? (
-        <div className="text-muted-foreground text-sm">{t('loading')}</div>
+        <LoadingLine>{t('loading')}</LoadingLine>
       ) : rows.length === 0 ? (
         <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
           <p>{t('plan.empty')}</p>

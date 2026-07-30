@@ -40,6 +40,7 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+import { LoadingLine } from '~/components/ui/spinner'
 
 // Post-save expansion covers the largest displayable horizon.
 const EXPAND_MONTHS = 24
@@ -454,7 +455,7 @@ export function ForecastRulesSection({
         }}
       />
       {!rules ? (
-        <div className="text-muted-foreground text-sm">{t('cash:loading')}</div>
+        <LoadingLine>{t('cash:loading')}</LoadingLine>
       ) : rules.length === 0 ? (
         <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
           {t('cash:forecast.rules.empty')}
@@ -859,7 +860,7 @@ export function ForecastEntriesSection({
         </Button>
       </div>
       {!entries ? (
-        <div className="text-muted-foreground text-sm">{t('cash:loading')}</div>
+        <LoadingLine>{t('cash:loading')}</LoadingLine>
       ) : entries.length === 0 ? (
         <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
           {t('cash:forecast.entries.empty')}

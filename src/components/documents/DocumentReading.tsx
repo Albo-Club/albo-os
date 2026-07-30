@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
+import { LoadingLine } from '~/components/ui/spinner'
 
 /**
  * Reading state of a document, shared by the company Documents tab and the
@@ -148,7 +149,7 @@ export function ExtractedTextDialog({
           <DialogTitle>{title || t('documentReading.dialogTitle')}</DialogTitle>
         </DialogHeader>
         {extracted === undefined ? (
-          <p className="text-muted-foreground text-sm">{t('loading')}</p>
+          <LoadingLine>{t('loading')}</LoadingLine>
         ) : extracted === null ? (
           <p className="text-muted-foreground text-sm">
             {t('documentReading.noText')}

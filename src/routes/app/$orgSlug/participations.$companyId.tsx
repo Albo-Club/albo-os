@@ -63,6 +63,7 @@ import { eurosToCents, parseField } from '~/lib/parse'
 import { DealFieldInput } from '~/components/deals/DealFieldInput'
 import { FIELD_FORMAT } from '~/components/deals/InstrumentBlock'
 import { Label } from '~/components/ui/label'
+import { LoadingLine } from '~/components/ui/spinner'
 import {
   Select,
   SelectContent,
@@ -549,7 +550,7 @@ function ParticipationDetail() {
           size="lg"
         />
         <h1 className="text-2xl font-semibold tracking-tight">
-          {company ? company.name : t('loading')}
+          {company ? company.name : <LoadingLine>{t('loading')}</LoadingLine>}
         </h1>
         {ownership && (
           <span className="text-muted-foreground text-sm">
@@ -618,9 +619,7 @@ function ParticipationDetail() {
 
           <IdentitySection title={t('col.deals')}>
             {!deals ? (
-              <div className="text-muted-foreground text-sm">
-                {t('loading')}
-              </div>
+              <LoadingLine>{t('loading')}</LoadingLine>
             ) : deals.length === 0 ? (
               <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
                 {t('empty')}

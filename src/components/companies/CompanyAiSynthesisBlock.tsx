@@ -20,6 +20,7 @@ import { scoreVerdict } from '~/lib/reportScore'
 import { cn } from '~/lib/utils'
 import { ScoreRing } from '~/components/companies/ScoreRing'
 import { Button } from '~/components/ui/button'
+import { LoadingLine } from '~/components/ui/spinner'
 
 // Shape of companyIntelligence.aiAnalysis (Cerveau 3).
 interface Insight {
@@ -69,7 +70,7 @@ export function CompanyAiSynthesisBlock({
   const intel = useConvexQuery(api.intelligence.getByCompany, { companyId })
 
   if (intel === undefined) {
-    return <div className="text-muted-foreground text-sm">{t('loading')}</div>
+    return <LoadingLine>{t('loading')}</LoadingLine>
   }
 
   const status = intel?.aiAnalysisStatus ?? null

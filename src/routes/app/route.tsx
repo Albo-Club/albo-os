@@ -4,6 +4,7 @@ import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../../convex/_generated/api'
 import { useAuthState } from '~/lib/auth-state'
+import { LoadingLine } from '~/components/ui/spinner'
 
 export const Route = createFileRoute('/app')({
   component: AppLayout,
@@ -37,7 +38,7 @@ function AppLayout() {
   if (isLoading || !isAuthenticated || !me || me.kind !== 'ready') {
     return (
       <main className="flex min-h-svh items-center justify-center">
-        <p className="text-muted-foreground text-sm">{t('loading')}</p>
+        <LoadingLine>{t('loading')}</LoadingLine>
       </main>
     )
   }

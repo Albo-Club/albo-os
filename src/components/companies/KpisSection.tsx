@@ -24,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+import { LoadingLine } from '~/components/ui/spinner'
 
 /**
  * KPIs of a company (kpiSnapshots), most recent first. AI-first entry:
@@ -74,9 +75,7 @@ export function KpisSection({ companyId }: { companyId: Id<'companies'> }) {
       />
 
       {!kpis ? (
-        <div className="text-muted-foreground text-sm">
-          {t('participations:loading')}
-        </div>
+        <LoadingLine>{t('participations:loading')}</LoadingLine>
       ) : kpis.length === 0 ? (
         <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
           <p>{t('participations:kpis.empty')}</p>

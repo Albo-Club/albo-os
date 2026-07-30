@@ -23,6 +23,55 @@ bas de page.
 
 ---
 
+## v1.163.0 — 30/07/2026 à 18:54 — Une petite roue qui tourne partout où ça charge
+
+Jusqu'ici, quand l'app attendait quelque chose, elle affichait un simple
+« Chargement… » figé. Rien ne distinguait un écran qui travaille d'un écran
+qui a planté. Une **petite roue qui tourne** accompagne désormais chaque
+attente, toujours au même endroit et toujours avec la même allure :
+
+- **Les pages et les tableaux qui se remplissent** : accueil, fiche deal,
+  fiche société, fiche placement, to-do, administration, participations,
+  deals, pointage, passif, documents, reportings, KPIs, trésorerie
+  (prévisionnel, fiche compte), plan vs réel, fonds.
+- **Les fichiers qu'on envoie** : documents d'un deal, reportings et reports
+  d'une société, logo. Le bouton garde son libellé « Téléversement… » et
+  gagne la roue à côté — on voit que l'envoi est en cours, pas bloqué.
+- **Les analyses en arrière-plan** : un reporting reçu par e-mail ou déposé à
+  la main passe par une extraction automatique. Tant qu'elle tourne, le
+  statut « en cours de traitement » porte la roue, dans la boîte de réception
+  des reportings comme sur la fiche société.
+
+Rien ne change dans les données ni dans les gestes : c'est uniquement de la
+lisibilité. Les endroits qui avaient déjà leur indicateur (lecture d'un
+document, synthèse IA, synchronisation bancaire, panneau IA) sont inchangés.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/ui/spinner.tsx` : ajout de `LoadingLine` à côté du
+>   `Spinner` existant — un `<span>` `inline-flex` qui pose la roue
+>   (`size-3.5`) devant son libellé, en `text-muted-foreground text-sm`.
+>   Inline pour se centrer dans un parent flex comme dans une `TableCell`
+>   en `text-center`, sans s'étirer.
+> - Famille « chargement de données » : les ~25 `<div|p className="…text-sm">
+>   {t('loading')}</…>` disséminés dans les routes et les composants sont
+>   remplacés par `<LoadingLine>{t('loading')}</LoadingLine>`. Aucune clé i18n
+>   nouvelle, aucune condition de rendu touchée.
+> - Famille « upload » : `<Spinner />` conditionné à l'état `saving` dans les
+>   boutons de `DealDocumentsSection`, `ReportingsSection` et
+>   `CompanyReportsSection` ; dans `ImageUpload`, la zone de dépôt empile la
+>   roue au-dessus du libellé.
+> - Famille « analyse » : `reports.tsx` ajoute la roue dans le `Badge` quand
+>   `row.status === 'processing'` ; `UploadProgressLine`
+>   (`CompanyReportsSection`) passe en `flex` pour porter la roue tant que le
+>   statut n'est pas `needs_review`.
+> - Écarté volontairement : pas de skeletons, pas de barre de progression en
+>   pourcentage. Sur les grandes tables (participations, pointage,
+>   prévisionnel) un skeleton resterait plus lisible qu'une roue — piste pour
+>   un passage dédié.
+
+---
+
 ## v1.162.1 — 30/07/2026 à 18:45 — La fiche deal ne parle plus d'une courbe qu'elle n'affiche pas
 
 La section Prévisionnel d'une fiche deal affichait une ligne « Reste à
@@ -765,6 +814,7 @@ toutes les autres commandes d'administration.
 >   `upsertConnectionStatus` passe toujours l'id.
 
 ---
+
 ## v1.150.1 — 30/07/2026 à 10:20 — Un détecteur de code mort, lançable à la demande
 
 Mise à jour purement technique : un détecteur de code inutilisé (fichiers,

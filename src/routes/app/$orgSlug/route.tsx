@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next'
 
 import { api } from '../../../../convex/_generated/api'
 import { SidebarInset, SidebarProvider } from '~/components/ui/sidebar'
+import { LoadingLine } from '~/components/ui/spinner'
 import { AppSidebar } from '~/components/app-shell/AppSidebar'
 import { AppHeader } from '~/components/app-shell/AppHeader'
 import { CommandPalette } from '~/components/search/CommandPalette'
@@ -123,7 +124,7 @@ function OrgLayout() {
   if (!me || me.kind !== 'ready') {
     return (
       <main className="flex min-h-svh items-center justify-center">
-        <p className="text-muted-foreground text-sm">{t('loading')}</p>
+        <LoadingLine>{t('loading')}</LoadingLine>
       </main>
     )
   }

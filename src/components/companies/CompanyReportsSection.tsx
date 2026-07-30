@@ -25,6 +25,7 @@ import {
 } from '~/components/ui/dropdown-menu'
 import { Label } from '~/components/ui/label'
 import { Textarea } from '~/components/ui/textarea'
+import { LoadingLine, Spinner } from '~/components/ui/spinner'
 
 type ReportDoc = { _id: Id<'documents'>; title: string; url: string | null }
 
@@ -241,9 +242,7 @@ function ReportDetailDialog({
         </DialogHeader>
 
         {!detail ? (
-          <div className="text-muted-foreground text-sm">
-            {t('loading')}
-          </div>
+          <LoadingLine>{t('loading')}</LoadingLine>
         ) : (
           <div className="space-y-4 text-sm">
             {detail.headline && <p className="font-medium">{detail.headline}</p>}
@@ -427,6 +426,7 @@ function AddReportDialog({
             onClick={() => void handleSubmit()}
             disabled={saving || files.length === 0}
           >
+            {saving && <Spinner />}
             {saving
               ? t('participations:reports.add.uploading')
               : t('participations:reports.add.submit')}
@@ -451,15 +451,18 @@ function UploadProgressLine({
   const failed = status === 'needs_review'
 
   return (
-    <div className="text-muted-foreground rounded-lg border border-dashed p-3 text-sm">
-      <span className="text-foreground font-medium">{subject}</span>{' '}
-      {failed
-        ? t('participations:reports.add.progress.failed', {
-            reason: t(`reports:reasons.${statusReason ?? 'unknown'}`, {
-              defaultValue: statusReason ?? '',
-            }),
-          })
-        : t('participations:reports.add.progress.running')}
+    <div className="text-muted-foreground flex items-start gap-2 rounded-lg border border-dashed p-3 text-sm">
+      {!failed && <Spinner className="mt-0.5 size-3.5 shrink-0" />}
+      <span>
+        <span className="text-foreground font-medium">{subject}</span>{' '}
+        {failed
+          ? t('participations:reports.add.progress.failed', {
+              reason: t(`reports:reasons.${statusReason ?? 'unknown'}`, {
+                defaultValue: statusReason ?? '',
+              }),
+            })
+          : t('participations:reports.add.progress.running')}
+      </span>
     </div>
   )
 }
@@ -507,7 +510,7 @@ export function CompanyReportsSection({
       ))}
 
       {!reports ? (
-        <div className="text-muted-foreground text-sm">{t('loading')}</div>
+        <LoadingLine>{t('loading')}</LoadingLine>
       ) : reports.length === 0 ? (
         <div className="text-muted-foreground rounded-xl border border-dashed p-8 text-center text-sm">
           {t('reports.empty')}

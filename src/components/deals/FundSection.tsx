@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+import { LoadingLine } from '~/components/ui/spinner'
 
 /**
  * "Fund" section of a fund_lp deal: committed / called / distributed + DPI,
@@ -79,7 +80,7 @@ export function FundSection({
 
       <h3 className="text-sm font-semibold">{t('fund.valuations')}</h3>
       {!valuations ? (
-        <div className="text-muted-foreground text-sm">{t('loading')}</div>
+        <LoadingLine>{t('loading')}</LoadingLine>
       ) : valuations.length === 0 ? (
         <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
           {t('fund.valEmpty')}

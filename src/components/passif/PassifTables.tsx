@@ -32,6 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+import { LoadingLine } from '~/components/ui/spinner'
 
 // ─── Minimal shapes (returns of `liabilities:getLiabilities`) ───────────────
 
@@ -309,7 +310,7 @@ export function EquityTable({
                 colSpan={5}
                 className="text-muted-foreground text-center"
               >
-                {t('loading')}
+                <LoadingLine>{t('loading')}</LoadingLine>
               </TableCell>
             </TableRow>
           ) : (
@@ -421,7 +422,7 @@ export function LoansTable({
                 colSpan={4}
                 className="text-muted-foreground text-center"
               >
-                {t('loading')}
+                <LoadingLine>{t('loading')}</LoadingLine>
               </TableCell>
             </TableRow>
           ) : (

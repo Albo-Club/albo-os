@@ -22,6 +22,7 @@ import {
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import { LoadingLine } from '~/components/ui/spinner'
 import {
   Table,
   TableBody,
@@ -305,9 +306,11 @@ function AccountDetail() {
       <div className="space-y-1">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">
-            {account
-              ? `${account.bankName} · ${account.displayName ?? account.label}`
-              : t('loading')}
+            {account ? (
+              `${account.bankName} · ${account.displayName ?? account.label}`
+            ) : (
+              <LoadingLine>{t('loading')}</LoadingLine>
+            )}
           </h1>
           {account?.pledged && (
             <Badge variant="outline">{t('badges.pledged')}</Badge>

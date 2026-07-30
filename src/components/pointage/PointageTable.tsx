@@ -56,6 +56,7 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+import { LoadingLine } from '~/components/ui/spinner'
 
 /** Minimal shape of an unmatched transaction (return of `listUnmatched`). */
 export type UnmatchedTx = TxDetails
@@ -959,7 +960,7 @@ export function PointageTable({
                   colSpan={statusColumn ? 7 : 6}
                   className="text-muted-foreground text-center"
                 >
-                  {t('loading')}
+                  <LoadingLine>{t('loading')}</LoadingLine>
                 </TableCell>
               </TableRow>
             ) : (

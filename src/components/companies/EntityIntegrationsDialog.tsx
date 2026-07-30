@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
+import { LoadingLine } from '~/components/ui/spinner'
 
 /**
  * « Intégrations » dialog of an entity page (menu ⋯): one row per registry
@@ -65,9 +66,7 @@ export function EntityIntegrationsDialog({
           </DialogDescription>
         </DialogHeader>
         {integrations === undefined ? (
-          <p className="text-muted-foreground text-sm">
-            {t('participations:loading')}
-          </p>
+          <LoadingLine>{t('participations:loading')}</LoadingLine>
         ) : (
           <div className="divide-y rounded-lg border">
             {linkable.map((item) => {
