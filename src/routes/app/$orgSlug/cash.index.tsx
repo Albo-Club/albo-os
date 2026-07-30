@@ -7,48 +7,46 @@ import { toast } from 'sonner'
 import { ConvexError } from 'convex/values'
 
 import { api } from '../../../../convex/_generated/api'
+import type { LedgerFilter } from '~/components/cash/TransactionsLedger'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import {
   BankConnectionsHealth,
   ConnectionsBanner,
 } from '~/components/cash/BankConnectionsHealth'
-import { UnavailableAccountsSection } from '~/components/cash/CashAccounts'
 import { CashAlertCard } from '~/components/cash/CashAlertCard'
+import { CommittedPipelineCard } from '~/components/cash/CommittedPipelineCard'
 import {
   ForecastEntriesSection,
   ForecastRulesSection,
 } from '~/components/cash/ForecastSection'
-import { ForecastGridSection } from '~/components/cash/ForecastGridSection'
 import { ForecastMatchSuggestions } from '~/components/cash/ForecastMatchSuggestions'
 import { ForecastOverview } from '~/components/cash/ForecastOverview'
-import { TransactionsLedger } from '~/components/cash/TransactionsLedger'
-import { UpcomingEntriesSection } from '~/components/cash/UpcomingEntries'
+import {
+  LEDGER_FILTERS,
+  TransactionsLedger,
+} from '~/components/cash/TransactionsLedger'
 import { VatCard } from '~/components/cash/VatCard'
 import { VatSuggestionCard } from '~/components/cash/VatSuggestionCard'
 import { Button } from '~/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 
-type CashTab = 'apercu' | 'previsionnel' | 'transactions' | 'gestion'
-
-const NON_DEFAULT_TABS: ReadonlyArray<CashTab> = [
-  'previsionnel',
-  'transactions',
-  'gestion',
-]
+type CashTab = 'apercu' | 'gestion'
 
 export const Route = createFileRoute('/app/$orgSlug/cash/')({
   component: Cash,
-  // `?tab=` keeps the active tab linkable (and is the landing of the /pointage
-  // redirect). Optional so existing `<Link to="/cash">` callers need not pass
-  // it; absent / unknown = overview, and the URL stays clean on the overview.
-  validateSearch: (search: Record<string, unknown>): { tab?: CashTab } => {
-    // Legacy bookmark: the old Analysis tab now lives in Prévisionnel.
-    if (search.tab === 'analyse') return { tab: 'previsionnel' }
-    return NON_DEFAULT_TABS.includes(search.tab as CashTab)
-      ? { tab: search.tab as CashTab }
-      : {}
-  },
+  // `?tab=gestion` keeps the settings tab linkable; `?filter=` preselects the
+  // register's status filter (To do CTAs, overdue-entries email). Legacy
+  // bookmarks: the old Prévisionnel / Transactions / Analyse tabs merged into
+  // the overview, so their `?tab=` values fall back to it.
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { tab?: CashTab; filter?: LedgerFilter } => ({
+    ...(search.tab === 'gestion' ? { tab: 'gestion' as const } : {}),
+    ...(LEDGER_FILTERS.includes(search.filter as LedgerFilter)
+      ? { filter: search.filter as LedgerFilter }
+      : {}),
+  }),
   head: () => ({
     meta: [
       {
@@ -61,7 +59,7 @@ export const Route = createFileRoute('/app/$orgSlug/cash/')({
 function Cash() {
   const { t } = useTranslation('cash')
   const { orgSlug } = Route.useParams()
-  const { tab = 'apercu' } = Route.useSearch()
+  const { tab = 'apercu', filter } = Route.useSearch()
   const navigate = useNavigate()
   const org = useConvexQuery(api.organizations.bySlug, { slug: orgSlug })
   const accounts = useConvexQuery(
@@ -98,27 +96,22 @@ function Cash() {
           navigate({
             to: '/app/$orgSlug/cash',
             params: { orgSlug },
-            search: NON_DEFAULT_TABS.includes(value as CashTab)
-              ? { tab: value as CashTab }
-              : {},
+            search: value === 'gestion' ? { tab: 'gestion' } : {},
             replace: true,
           })
         }
       >
         <TabsList>
           <TabsTrigger value="apercu">{t('tabs.apercu')}</TabsTrigger>
-          <TabsTrigger value="previsionnel">
-            {t('tabs.previsionnel')}
-          </TabsTrigger>
-          <TabsTrigger value="transactions">
-            {t('tabs.transactions')}
-          </TabsTrigger>
           <TabsTrigger value="gestion">{t('tabs.gestion')}</TabsTrigger>
         </TabsList>
-        {/* Vue d'ensemble: the essentials only — degraded-connection banner,
-            KPI band (where the available cash sits) + balance curve, then the
-            accounts that are NOT available cash (pledged, closed). Everything
-            else lives in the other tabs. */}
+        {/* Vue d'ensemble — the whole daily surface in one scroll: the
+            degraded-connection banner, the projected-balance KPIs + curve,
+            the accounts card, then the single register (planned entries +
+            transactions) behind its filter bar. The suggested forecast-entry
+            reconciliations sit above the register, whatever the active
+            filter — the suggestion is about the entry, not the transaction's
+            status. */}
         <TabsContent value="apercu" className="space-y-6 pt-4">
           {org && <ConnectionsBanner orgId={org._id} orgSlug={orgSlug} />}
           {org && (
@@ -128,30 +121,25 @@ function Cash() {
               accounts={accounts}
             />
           )}
-          <UnavailableAccountsSection accounts={accounts} orgSlug={orgSlug} />
-        </TabsContent>
-        {/* Prévisionnel: the month-by-month detail — the "to handle" queue
-            (upcoming/overdue entries), then the committed pipeline + category ×
-            month grid (whose past months already carry the realized
-            per-category view). Reconciling an entry against a transaction is a
-            pointage gesture and lives in the Transactions tab. */}
-        <TabsContent value="previsionnel" className="space-y-6 pt-4">
-          {org && <UpcomingEntriesSection orgId={org._id} />}
-          {org && <ForecastGridSection orgId={org._id} />}
-        </TabsContent>
-        {/* Transactions: the pointage surface. Suggested forecast-entry
-            reconciliations sit above the ledger, whatever the active filter —
-            the suggestion is about the entry, not the transaction's status. */}
-        <TabsContent value="transactions" className="space-y-6 pt-4">
           {org && <ForecastMatchSuggestions orgId={org._id} />}
-          {org && <TransactionsLedger orgId={org._id} orgSlug={orgSlug} />}
+          {/* Remount on ?filter= change so a To do CTA lands pre-filtered
+              even when the page is already open. */}
+          {org && (
+            <TransactionsLedger
+              key={filter ?? 'all'}
+              orgId={org._id}
+              orgSlug={orgSlug}
+              initialFilter={filter}
+            />
+          )}
         </TabsContent>
-        {/* Règles & échéances: everything one configures — recurring rules
-            (+ suggestions), one-off entries, VAT, threshold alert, bank
-            connections health. */}
+        {/* Gestion — everything one configures monthly: recurring rules
+            (+ suggestions), one-off entries, the undated committed pipeline,
+            VAT, threshold alert, bank connections health. */}
         <TabsContent value="gestion" className="space-y-6 pt-4">
           {org && <ForecastRulesSection orgId={org._id} />}
           {org && <ForecastEntriesSection orgId={org._id} />}
+          {org && <CommittedPipelineCard orgId={org._id} />}
           {org && <VatCard orgId={org._id} orgSlug={orgSlug} />}
           {org && <VatSuggestionCard orgId={org._id} />}
           {org && <CashAlertCard orgId={org._id} />}

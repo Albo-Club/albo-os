@@ -4,34 +4,20 @@
   "title": "Trésorerie",
   "tabs": {
     "apercu": "Vue d'ensemble",
-    "previsionnel": "Prévisionnel",
-    "transactions": "Transactions",
-    "gestion": "Règles & échéances"
-  },
-  "analysis": {
-    "inflows": "Entrées",
-    "outflows": "Sorties"
+    "gestion": "Gestion"
   },
   "back": "← Trésorerie",
   "notFound": "Compte introuvable.",
-  "availableBalance": "Solde disponible",
   "kpis": {
-    "window30": "30 prochains jours",
-    "window90": "90 prochains jours",
+    "availableToday": "Disponible aujourd'hui",
+    "activeAccounts_one": "{{count}} compte actif",
+    "activeAccounts_other": "{{count}} comptes actifs",
+    "projected30": "Solde projeté à 30 j",
+    "projected90": "Solde projeté à 90 j",
     "inflows": "Entrées",
     "outflows": "Sorties",
     "net": "Net",
     "flowsHint": "échéances à venir, retards inclus"
-  },
-  "unavailable": {
-    "title": "Hors trésorerie disponible",
-    "hint": "exclu du solde disponible"
-  },
-  "upcoming": {
-    "title": "Échéances à venir",
-    "window": "{{count}} j",
-    "empty": "Aucune échéance sur cette fenêtre.",
-    "overdue": "En retard"
   },
   "syncedAgo": "synchro {{ago}}",
   "manualAsOf": "solde manuel au {{date}}",
@@ -180,8 +166,6 @@
   },
   "forecast": {
     "title": "Prévisionnel de trésorerie",
-    "gridTitle": "Détail par catégorie et par mois",
-    "gridEmpty": "Aucun flux prévisionnel sur la période. Ajoute des règles ou des échéances dans l'onglet Règles & échéances.",
     "horizonMonths_one": "{{count}} mois",
     "horizonMonths_other": "{{count}} mois",
     "startingBalance": "Solde de départ (disponible, comptes EUR) : {{amount}}",
@@ -189,12 +173,6 @@
     "dealLabel": "Deal (optionnel)",
     "dealHint": "Rattache ce flux à un deal (loyers SCPI, coupons, distributions…) — il apparaîtra sur la fiche du deal.",
     "chartProjected": "Projeté",
-    "grid": {
-      "colCategory": "Catégorie",
-      "upcoming": "+ {{amount}} à venir",
-      "plannedShare": "dont {{amount}} prévu",
-      "balance": "Solde projeté"
-    },
     "pipeline": {
       "title": "Capital engagé non appelé",
       "more_one": "+ {{count}} autre deal",
@@ -319,5 +297,13 @@
       }
     },
     "chartReal": "Solde réel"
+  },
+  "unavailable": {
+    "hint": "hors solde disponible"
+  },
+  "accounts": {
+    "title": "Comptes",
+    "nonLiquid": "Non liquide : {{amount}} en placements",
+    "nonLiquidCta": "Voir les placements"
   }
 }

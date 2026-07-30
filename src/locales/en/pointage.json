@@ -81,6 +81,7 @@
   "view": {
     "all": "All",
     "unmatched": "To match",
+    "planned": "Forecast",
     "charge": "Expenses",
     "tax": "Taxes",
     "product": "Income",
@@ -101,7 +102,11 @@
   },
   "filter": {
     "allAccounts": "All accounts",
-    "type": "Type:"
+    "status": "Status:",
+    "amount": "Amount",
+    "amountMin": "Min amount (€)",
+    "amountMax": "Max amount (€)",
+    "amountClear": "Clear filter"
   },
   "suggestion": {
     "label": "Suggestion",
@@ -152,5 +157,11 @@
     "loan_wrong_org": "This transaction belongs to neither organization of the current account.",
     "already_matched_to_deal": "This transaction is already matched to a deal. Unmatch it first.",
     "allocated_to_liability": "This transaction is allocated to a liability (equity or current account). Detach it from the Liabilities page first."
+  },
+  "register": {
+    "today": "Today — {{date}}",
+    "planned": "Planned",
+    "overdue": "Overdue",
+    "fromRule": "recurring rule"
   }
 }

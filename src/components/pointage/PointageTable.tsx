@@ -61,8 +61,33 @@ import {
 /** Minimal shape of an unmatched transaction (return of `listUnmatched`). */
 export type UnmatchedTx = TxDetails
 
+/**
+ * Pending forecast entry rendered as a read-only row of the register
+ * (subset of forecasts.getUpcomingEntries). Future entries sit above the
+ * « Aujourd'hui » divider, overdue ones inline with the past transactions.
+ */
+export type PlannedEntry = {
+  _id: string
+  date: number
+  label: string
+  amountCents: number
+  direction: 'in' | 'out'
+  derivedFromRule: boolean
+  overdue: boolean
+}
+
+/** One row of the register: a real transaction or a planned entry. */
+type MergedRow =
+  | { kind: 'tx'; date: number; tx: UnmatchedTx; recent?: RecentAction }
+  | { kind: 'entry'; date: number; entry: PlannedEntry }
+
 /** Display duration of the « Annuler » banner after a match/discard. */
 const UNDO_DELAY_MS = 5000
+
+// Status tints — same outline + token-overlay grammar as dealStatusBadge's
+// BUCKET_TINT: amber = still to handle (4.4), blue = planned entry.
+const UNMATCHED_TINT = 'border-warning/40 bg-warning/10 text-warning'
+const PLANNED_TINT = 'border-info/40 bg-info/10 text-info'
 
 /** « Écarté » fates: ignored, charge, tax, product or internal transfer. */
 type DiscardKind =
@@ -96,6 +121,26 @@ type RecentAction = {
 
 /** A resolved one-click suggestion: apply `target`, shown as `label`. */
 type ResolvedSuggestion = { label: string; target: PointageTarget }
+
+/**
+ * Status badge of a transaction row — « À pointer » in amber (the daily
+ * signal of what is left to handle), every settled status in neutral grey.
+ * Shared by the status column and the detail sheet.
+ */
+function TxStatusBadge({
+  status,
+}: {
+  status: NonNullable<UnmatchedTx['matchStatus']>
+}) {
+  const { t } = useTranslation('pointage')
+  return status === 'unmatched' ? (
+    <Badge variant="outline" className={UNMATCHED_TINT}>
+      {t('status.unmatched')}
+    </Badge>
+  ) : (
+    <Badge variant="secondary">{t(`status.${status}`)}</Badge>
+  )
+}
 
 /**
  * Single unified action of an unmatched row: the « Affecter à… » picker.
@@ -284,6 +329,7 @@ export type PointageSuggestion = {
 
 export function PointageTable({
   transactions,
+  plannedEntries,
   deals,
   liabilityOptions,
   suggestions,
@@ -293,6 +339,12 @@ export function PointageTable({
   statusColumn = false,
 }: {
   transactions: Array<UnmatchedTx> | undefined
+  /**
+   * Pending forecast entries merged into the register as read-only rows,
+   * sorted with the transactions by date (future ones above the
+   * « Aujourd'hui » divider). `undefined` while loading; absent = none.
+   */
+  plannedEntries?: Array<PlannedEntry>
   deals: Array<DealOption> | undefined
   /** Liability targets (equity / C/C) of the org, built by the page. */
   liabilityOptions: LiabilityOptionGroups | undefined
@@ -314,9 +366,18 @@ export function PointageTable({
    */
   statusColumn?: boolean
 }) {
-  const { t } = useTranslation('pointage')
+  const { t, i18n } = useTranslation('pointage')
   const { fmtDate, fmtSigned } = useFormatters()
   const reportError = useReportError()
+
+  // Planned amounts are forecast figures → rounded to the euro (CLAUDE.md
+  // § « Gestion des arrondis »), unlike the cent-precise real transactions.
+  const fmtSignedRounded = (cents: number, direction: 'in' | 'out') =>
+    `${direction === 'out' ? '−' : '+'}${new Intl.NumberFormat(i18n.language, {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 0,
+    }).format(cents / 100)}`
 
   // Resolve a matched row's `allocation.targetId` → display label + link, from
   // the picker options already loaded for the comboboxes (no extra read).
@@ -670,23 +731,35 @@ export function PointageTable({
     }
   }
 
-  // Displayed rows = `unmatched` transactions (query) + recently
-  // matched/discarded rows (local state, while the « Annuler » banner shows).
+  // Displayed rows = planned forecast entries + transactions (query) +
+  // recently matched/discarded rows (local state, while the « Annuler »
+  // banner shows), all sorted newest-first on one date axis so the future
+  // entries naturally sit on top.
   const rows = useMemo(() => {
-    if (!transactions) return undefined
+    if (!transactions || plannedEntries === undefined) return undefined
     const recentById = new Map(recent.map((r) => [r.tx._id, r]))
-    const merged = transactions.map((tx) => ({
+    const merged: Array<MergedRow> = transactions.map((tx) => ({
+      kind: 'tx',
+      date: tx.transactionDate,
       tx,
       recent: recentById.get(tx._id),
     }))
     for (const r of recent) {
       if (!transactions.some((tx) => tx._id === r.tx._id)) {
-        merged.push({ tx: r.tx, recent: r })
+        merged.push({
+          kind: 'tx',
+          date: r.tx.transactionDate,
+          tx: r.tx,
+          recent: r,
+        })
       }
     }
-    merged.sort((a, b) => b.tx.transactionDate - a.tx.transactionDate)
+    for (const entry of plannedEntries) {
+      merged.push({ kind: 'entry', date: entry.date, entry })
+    }
+    merged.sort((a, b) => b.date - a.date)
     return merged
-  }, [transactions, recent])
+  }, [transactions, plannedEntries, recent])
 
   const { page, pageCount, setPage } = usePagination(
     rows?.length ?? 0,
@@ -694,8 +767,19 @@ export function PointageTable({
   )
   const pagedRows = rows?.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
-  const sheetRecent = sheetTx
-    ? recent.find((r) => r.tx._id === sheetTx._id)
+  // « Aujourd'hui » divider: global index of the first row at or before now —
+  // rendered only when at least one future (planned) row sits above it.
+  const now = Date.now()
+  const firstPastIndex = rows?.findIndex((row) => row.date <= now) ?? -1
+  const dividerIndex = firstPastIndex > 0 ? firstPastIndex : null
+
+  // The sheet reads the LIVE row (reactivity), not the click-time snapshot —
+  // otherwise its status/actions freeze while the table updates underneath.
+  const sheetLive = sheetTx
+    ? (transactions?.find((tx) => tx._id === sheetTx._id) ?? sheetTx)
+    : null
+  const sheetRecent = sheetLive
+    ? recent.find((r) => r.tx._id === sheetLive._id)
     : undefined
 
   // Per-row (and sheet-footer) actions. Inbox mode (no status column) keeps
@@ -848,7 +932,74 @@ export function PointageTable({
                 </TableCell>
               </TableRow>
             ) : (
-              pagedRows.map(({ tx, recent: recentAction }) => {
+              pagedRows.map((row, indexInPage) => {
+                // « Aujourd'hui » divider ahead of the first at-or-before-now
+                // row, when future planned rows sit above it in the full list.
+                const divider = dividerIndex != null &&
+                  page * PAGE_SIZE + indexInPage === dividerIndex && (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell
+                        colSpan={statusColumn ? 7 : 6}
+                        className="bg-muted/40 text-muted-foreground py-1.5 text-xs font-medium tracking-wide uppercase"
+                      >
+                        {t('register.today', { date: fmtDate(now) })}
+                      </TableCell>
+                    </TableRow>
+                  )
+                if (row.kind === 'entry') {
+                  const { entry } = row
+                  return (
+                    <Fragment key={entry._id}>
+                      {divider}
+                      <TableRow
+                        className={
+                          entry.overdue ? 'bg-warning/5' : 'bg-info/5'
+                        }
+                      >
+                        <TableCell className="w-10" />
+                        <TableCell className="whitespace-nowrap tabular-nums">
+                          {fmtDate(entry.date)}
+                        </TableCell>
+                        <TableCell>
+                          <span className="block max-w-md truncate">
+                            {entry.label}
+                          </span>
+                          {entry.derivedFromRule && (
+                            <span className="text-muted-foreground block text-xs">
+                              {t('register.fromRule')}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell
+                          className={`text-right tabular-nums ${directionTone(entry.direction)}`}
+                        >
+                          {fmtSignedRounded(entry.amountCents, entry.direction)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          —
+                        </TableCell>
+                        {statusColumn && (
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={
+                                entry.overdue ? UNMATCHED_TINT : PLANNED_TINT
+                              }
+                            >
+                              {t(
+                                entry.overdue
+                                  ? 'register.overdue'
+                                  : 'register.planned',
+                              )}
+                            </Badge>
+                          </TableCell>
+                        )}
+                        <TableCell />
+                      </TableRow>
+                    </Fragment>
+                  )
+                }
+                const { tx, recent: recentAction } = row
                 // A proposal only makes sense on a row still to reconcile,
                 // that was not just acted upon and whose band was not refused.
                 const suggestion =
@@ -859,6 +1010,7 @@ export function PointageTable({
                     : undefined
                 return (
                   <Fragment key={tx._id}>
+                    {divider}
                     <TableRow
                       className={`cursor-pointer ${recentAction ? 'bg-muted/40' : ''} ${suggestion ? 'border-b-0' : ''}`}
                       onClick={() => setSheetTx(tx)}
@@ -901,9 +1053,9 @@ export function PointageTable({
                       {statusColumn && (
                         <TableCell>
                           <div className="flex flex-col items-start gap-1">
-                            <Badge variant="secondary">
-                              {t(`status.${tx.matchStatus ?? 'unmatched'}`)}
-                            </Badge>
+                            <TxStatusBadge
+                              status={tx.matchStatus ?? 'unmatched'}
+                            />
                             {tx.allocation && (
                               <MatchLink
                                 allocation={tx.allocation}
@@ -955,15 +1107,20 @@ export function PointageTable({
       />
 
       <TransactionSheet
-        tx={sheetTx}
+        tx={sheetLive}
         onOpenChange={(open) => {
           if (!open) setSheetTx(null)
         }}
-        footer={sheetTx && actionsFor(sheetTx, sheetRecent)}
+        status={
+          sheetLive ? (
+            <TxStatusBadge status={sheetLive.matchStatus ?? 'unmatched'} />
+          ) : undefined
+        }
+        footer={sheetLive && actionsFor(sheetLive, sheetRecent)}
         match={
-          sheetTx?.allocation ? (
+          sheetLive?.allocation ? (
             <MatchLink
-              allocation={sheetTx.allocation}
+              allocation={sheetLive.allocation}
               dealsById={dealsById}
               liabilityByTarget={liabilityByTarget}
               orgSlug={orgSlug}

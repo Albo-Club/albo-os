@@ -23,6 +23,61 @@ bas de page.
 
 ---
 
+## v1.157.0 — 30/07/2026 à 17:05 — Trésorerie : une seule vue d'ensemble, le solde projeté en premier
+
+La page Trésorerie passe de quatre onglets à **deux** : tout le quotidien
+tient maintenant dans la **Vue d'ensemble**, et l'onglet **Gestion** garde ce
+qui se configure une fois par mois (règles récurrentes, échéances
+ponctuelles, capital engagé non appelé, TVA, seuil d'alerte, connexions
+bancaires).
+
+En tête de page, le chiffre qui compte : le **solde projeté**. Trois tuiles
+sur une ligne — le disponible aujourd'hui (au centime), puis le solde
+projeté à **30 jours** et à **90 jours**, chacun détaillé en une petite
+somme : entrées, sorties, et le net souligné. La courbe de solde reste
+juste en dessous, suivie des **comptes avec le logo de leur banque** pour
+les reconnaître d'un coup d'œil — les comptes nantis ou clôturés restent
+listés, atténués, hors du disponible. Une ligne discrète rappelle le cash
+**non liquide** (contrats de capitalisation…) et renvoie vers les
+Placements.
+
+En bas de page, **un seul registre** : les échéances prévues au-dessus du
+séparateur « Aujourd'hui », toutes les transactions réelles en dessous. Une
+échéance en retard descend à sa date, en ambre. Plus de bouton « À
+pointer » : c'est une valeur du filtre **Statut** (avec son compteur), aux
+côtés de la recherche, d'un nouveau filtre **Montant** (min/max) et du
+compte — la même grammaire de filtres que les participations. Le statut
+« À pointer » s'affiche désormais en **ambre**, ici comme dans le panneau
+de détail d'une transaction (qui montrait… rien : le statut disparaissait
+au clic, c'est corrigé). Le pointage quotidien, lui, se lance depuis
+l'onglet **À faire**, qui ouvre ce registre déjà filtré.
+
+Le tableau prévisionnel « catégories × mois » est retiré — la projection
+continue de tourner exactement pareil sous la courbe.
+
+> **🔧 Notes techniques**
+>
+> - `cash.index.tsx` : 2 onglets (`apercu`/`gestion`), `?filter=` pré-filtre
+>   le registre ; `?tab=previsionnel|transactions|analyse` retombent sur la
+>   Vue d'ensemble. `ForecastGridSection.tsx` et `UpcomingEntries.tsx`
+>   supprimés (backend `getForecastGrid` conservé pour la courbe) ; la carte
+>   pipeline extraite dans `CommittedPipelineCard.tsx` (onglet Gestion).
+> - `CashKpis.tsx` : 3 tuiles — dispo (centimes) + projetés 30/90 j
+>   (`available + netCents` de `getUpcomingEntries`, arrondi euro) avec somme
+>   entrées/sorties/net sur 3 lignes.
+> - `CashAccounts.tsx` : carte Comptes unifiée (dispo + nantis/clôturés
+>   atténués) avec logos via `lib/bankDomains.ts` → `CompanyLogo` (logo.dev) ;
+>   ligne non-liquide = somme des placements `placementLiquidity() !== 'liquid'`.
+> - `TransactionsLedger.tsx` + `PointageTable.tsx` : lignes prévisionnelles
+>   (`getUpcomingEntries`) fusionnées au registre avec séparateur
+>   « Aujourd'hui », badges Prévu (info) / En retard (warning), montants
+>   prévisionnels arrondis à l'euro ; filtre Statut (menu unique, compteur
+>   inline) + filtre Montant client-side (`AmountInput` min/max) ; badge
+>   `unmatched` en warning (4.4).
+> - Bug 4.5 : `TransactionSheet` affiche le statut et lit la ligne **live**
+>   (plus le snapshot du clic). CTAs To do / VatCard / email
+>   `overdueEntriesEmail` → `/cash?filter=unmatched`.
+
 ## v1.156.0 — 30/07/2026 à 16:57 — Une liste de secteurs qui veut enfin dire quelque chose
 
 La liste des secteurs avait dérivé : des étiquettes créées une par une au fil

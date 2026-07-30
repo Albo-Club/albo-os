@@ -1,18 +1,13 @@
 import { useMemo } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import { useAgo } from './BankConnectionsHealth'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { bankDomain } from '~/lib/bankDomains'
+import { CompanyLogo } from '~/components/CompanyLogo'
 import { Badge } from '~/components/ui/badge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '~/components/ui/table'
+import { Skeleton } from '~/components/ui/skeleton'
 
 // Mirrors STALE_AFTER_MS in convex/powens.ts (Powens re-syncs ~24h; past
 // 48h without fresh data something is wrong).
@@ -63,8 +58,7 @@ function useFormatters() {
 /**
  * Balance freshness of one account, as a small muted line: sync recency for
  * a connected account (amber past STALE_AFTER_MS — the balance can no longer
- * be trusted), manual entry date otherwise. Shared by the available-cash
- * list of the KPI band and the unavailable-accounts table below it.
+ * be trusted), manual entry date otherwise. Shared by the accounts card rows.
  */
 export function AccountFreshness({ account }: { account: CashAccount }) {
   const { t } = useTranslation('cash')
@@ -92,109 +86,138 @@ export function AccountFreshness({ account }: { account: CashAccount }) {
   )
 }
 
-function AccountsTable({
-  accounts,
+/** One account row of the card — bank logo, names, freshness, balance. */
+function AccountRow({
+  account,
   orgSlug,
+  dim,
 }: {
-  accounts: Array<CashAccount>
+  account: CashAccount
   orgSlug: string
+  dim: boolean
 }) {
   const { t } = useTranslation('cash')
   const { fmtEur } = useFormatters()
-  const navigate = useNavigate()
 
   return (
-    <div className="rounded-lg border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('col.bank')}</TableHead>
-            <TableHead>{t('col.account')}</TableHead>
-            <TableHead className="text-right">{t('col.balance')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {accounts.map((a) => (
-            <TableRow
-              key={a._id}
-              className="text-muted-foreground cursor-pointer"
-              onClick={() =>
-                navigate({
-                  to: '/app/$orgSlug/cash/$accountId',
-                  params: { orgSlug, accountId: a._id },
-                })
-              }
-            >
-              <TableCell className="font-medium">{a.bankName}</TableCell>
-              <TableCell>
-                <span className="flex flex-col gap-0.5">
-                  <span className="flex flex-wrap items-center gap-1.5">
-                    {a.displayName ?? a.label}
-                    {a.pledged && (
-                      <Badge variant="outline">{t('badges.pledged')}</Badge>
-                    )}
-                    {a.accountStatus === 'closed' && (
-                      <Badge variant="secondary">{t('badges.closed')}</Badge>
-                    )}
-                  </span>
-                  <AccountFreshness account={a} />
-                </span>
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {fmtEur(a.currentBalance) ?? t('noBalance')}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <Link
+      to="/app/$orgSlug/cash/$accountId"
+      params={{ orgSlug, accountId: account._id }}
+      className={`hover:bg-muted/50 flex items-center gap-3 px-4 py-2.5 text-sm ${
+        dim ? 'text-muted-foreground bg-muted/30' : ''
+      }`}
+    >
+      <CompanyLogo
+        domain={bankDomain(account.bankName)}
+        companyName={account.bankName}
+        size="md"
+      />
+      <span className="flex min-w-0 flex-col">
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span className="truncate font-medium">
+            {account.displayName ?? account.label}
+          </span>
+          {account.pledged && (
+            <Badge variant="outline">{t('badges.pledged')}</Badge>
+          )}
+          {account.accountStatus === 'closed' && (
+            <Badge variant="secondary">{t('badges.closed')}</Badge>
+          )}
+        </span>
+        <span className="text-muted-foreground truncate text-xs">
+          {account.owner
+            ? `${account.bankName} · ${account.owner.name}`
+            : account.bankName}
+        </span>
+      </span>
+      <span className="ml-auto flex shrink-0 flex-col items-end">
+        <span className="font-medium tabular-nums">
+          {fmtEur(account.currentBalance) ?? t('noBalance')}
+        </span>
+        {dim ? (
+          <span className="text-muted-foreground text-xs">
+            {t('unavailable.hint')}
+          </span>
+        ) : (
+          <AccountFreshness account={account} />
+        )}
+      </span>
+    </Link>
   )
 }
 
 /**
- * Bottom of the Cash « Vue d'ensemble » tab: the accounts that are NOT part
- * of the available cash — pledged/blocked funds and accounts closed at the
- * bank (kept because their transaction history still backs deals). The
- * available accounts themselves are listed in the KPI band at the top of the
- * tab (CashKpis), so nothing is repeated here. Renders nothing when the org
- * has no such account.
+ * The accounts card of the Cash overview: available accounts first (each row
+ * linking to its detail), then the pledged/closed ones, dimmed with their
+ * badge — one card so where the money sits reads in one glance. A footer line
+ * sums the NON-LIQUID placements (capitalization accounts, term deposits…)
+ * managed on the Placements page, so sleeping cash stays visible without
+ * polluting the available balance.
  */
-export function UnavailableAccountsSection({
+export function CashAccountsCard({
   accounts,
   orgSlug,
+  nonLiquidCents,
 }: {
   accounts: Array<CashAccount> | undefined
   orgSlug: string
+  /** Sum of non-liquid placements (cents) — `null` while loading. */
+  nonLiquidCents: number | null
 }) {
   const { t } = useTranslation('cash')
+  const { fmtEur } = useFormatters()
 
-  // Pledged first (real money, just not spendable), closed last.
-  const rows = useMemo(
-    () =>
-      (accounts ?? [])
-        .filter((a) => a.pledged || a.accountStatus === 'closed')
-        .sort(
-          (a, b) =>
-            Number(a.accountStatus === 'closed') -
-              Number(b.accountStatus === 'closed') ||
-            (b.currentBalance ?? 0) - (a.currentBalance ?? 0),
-        ),
-    [accounts],
-  )
-
-  if (rows.length === 0) return null
+  // Available first, then pledged (real money, just not spendable), closed
+  // last — each bucket biggest balance first.
+  const rows = useMemo(() => {
+    if (!accounts) return undefined
+    const rank = (a: CashAccount) =>
+      a.accountStatus === 'closed' ? 2 : a.pledged ? 1 : 0
+    return [...accounts].sort(
+      (a, b) =>
+        rank(a) - rank(b) || (b.currentBalance ?? 0) - (a.currentBalance ?? 0),
+    )
+  }, [accounts])
 
   return (
     <section className="space-y-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-semibold tracking-tight">
-          {t('unavailable.title')}
-        </h2>
-        <span className="text-muted-foreground text-sm">
-          {t('unavailable.hint')}
-        </span>
-      </div>
-      <AccountsTable accounts={rows} orgSlug={orgSlug} />
+      <h2 className="text-lg font-semibold tracking-tight">
+        {t('accounts.title')}
+      </h2>
+      {!rows ? (
+        <Skeleton className="h-24 w-full" />
+      ) : rows.length === 0 ? (
+        <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
+          {t('accountsEmpty')}
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border">
+          <div className="divide-y">
+            {rows.map((account) => (
+              <AccountRow
+                key={account._id}
+                account={account}
+                orgSlug={orgSlug}
+                dim={account.pledged || account.accountStatus === 'closed'}
+              />
+            ))}
+          </div>
+          {nonLiquidCents != null && nonLiquidCents > 0 && (
+            <div className="bg-muted/30 text-muted-foreground flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2.5 text-sm">
+              <span>
+                {t('accounts.nonLiquid', { amount: fmtEur(nonLiquidCents) })}
+              </span>
+              <Link
+                to="/app/$orgSlug/placements"
+                params={{ orgSlug }}
+                className="text-foreground font-medium hover:underline"
+              >
+                {t('accounts.nonLiquidCta')} →
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
     </section>
   )
 }

@@ -36,7 +36,7 @@
   "forecast": {
     "title": "Overdue forecast entries",
     "empty": "No overdue entries.",
-    "cta": "Open forecast"
+    "cta": "Open the register"
   },
   "reports": {
     "title": "Missing reportings",

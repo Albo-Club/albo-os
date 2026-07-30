@@ -26,11 +26,12 @@ La page empile cinq blocs :
    puis sortent de la liste sans être supprimées.
 3. **Transactions à pointer** — le compteur de la file de
    [pointage](08-pointage.md), avec un aperçu des dernières transactions en
-   attente et un bouton qui ouvre directement l'onglet Transactions de la
-   Trésorerie.
+   attente et un bouton qui ouvre le registre de la Trésorerie déjà filtré
+   sur « À pointer ».
 4. **Échéances en retard** — les entrées du [prévisionnel](09-previsionnel.md)
    dont la date est passée sans qu'elles soient réalisées ni annulées (même
-   définition que le badge « En retard » de l'onglet Prévisionnel).
+   définition que le badge « En retard » du registre) ; le bouton ouvre le
+   même registre filtré.
 5. **Reportings manquants** — les participations qui envoyaient des rapports
    et n'en ont plus envoyé **depuis plus de 3 mois**. Chaque ligne renvoie
    vers la fiche de la société.

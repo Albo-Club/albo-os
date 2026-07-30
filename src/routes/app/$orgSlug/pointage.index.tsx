@@ -8,7 +8,7 @@ export const Route = createFileRoute('/app/$orgSlug/pointage/')({
     throw redirect({
       to: '/app/$orgSlug/cash',
       params: { orgSlug: params.orgSlug },
-      search: { tab: 'transactions' },
+      search: { filter: 'unmatched' },
     })
   },
 })
