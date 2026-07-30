@@ -23,6 +23,7 @@ import { CompanyLogo } from '~/components/CompanyLogo'
 import { KpiCard } from '~/components/placements/KpiCard'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { Button } from '~/components/ui/button'
+import { LoadingLine } from '~/components/ui/spinner'
 import {
   Select,
   SelectContent,
@@ -147,9 +148,7 @@ function PlacementDetail() {
   if (deal === undefined) {
     return (
       <main className="flex-1 p-6">
-        <p className="text-muted-foreground text-sm">
-          {t('participations:loading')}
-        </p>
+        <LoadingLine>{t('participations:loading')}</LoadingLine>
       </main>
     )
   }

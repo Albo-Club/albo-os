@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { LoadingLine, Spinner } from '~/components/ui/spinner'
 
 const MAX_BYTES = 20 * 1024 * 1024
 /** The kinds this surface offers. A row can carry another one (the schema's
@@ -242,9 +243,7 @@ export function ReportingsSection({
       />
 
       {!visible ? (
-        <div className="text-muted-foreground text-sm">
-          {t('participations:loading')}
-        </div>
+        <LoadingLine>{t('participations:loading')}</LoadingLine>
       ) : visible.length === 0 ? (
         <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
           {t('participations:reportings.empty')}
@@ -331,6 +330,7 @@ export function ReportingsSection({
               onClick={() => void handleSave()}
               disabled={saving || !title.trim()}
             >
+              {saving && <Spinner />}
               {saving
                 ? t('participations:reportings.uploading')
                 : t('common:actions.save')}

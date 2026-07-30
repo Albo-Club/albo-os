@@ -26,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+import { LoadingLine } from '~/components/ui/spinner'
 import {
   PAGE_SIZE,
   PaginationFooter,
@@ -492,7 +493,7 @@ function DealsTable({
                   colSpan={colSpan}
                   className="text-muted-foreground text-center"
                 >
-                  {t('loading')}
+                  <LoadingLine>{t('loading')}</LoadingLine>
                 </TableCell>
               </TableRow>
             ) : (

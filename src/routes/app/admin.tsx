@@ -20,6 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from '~/components/ui/card'
+import { LoadingLine } from '~/components/ui/spinner'
 
 export const Route = createFileRoute('/app/admin')({
   component: AdminPage,
@@ -59,7 +60,7 @@ function AdminPage() {
   if (!me || me.kind !== 'ready') {
     return (
       <main className="flex min-h-svh items-center justify-center">
-        <p className="text-muted-foreground text-sm">{t('loading')}</p>
+        <LoadingLine>{t('loading')}</LoadingLine>
       </main>
     )
   }
@@ -123,7 +124,7 @@ function AdminPage() {
         </CardHeader>
         <CardContent>
           {!orgs ? (
-            <p className="text-muted-foreground text-sm">{t('loading')}</p>
+            <LoadingLine>{t('loading')}</LoadingLine>
           ) : orgs.length === 0 ? (
             <p className="text-muted-foreground text-sm">
               {t('admin.orgs.empty')}
@@ -159,7 +160,7 @@ function AdminPage() {
         </CardHeader>
         <CardContent>
           {!users ? (
-            <p className="text-muted-foreground text-sm">{t('loading')}</p>
+            <LoadingLine>{t('loading')}</LoadingLine>
           ) : users.length === 0 ? (
             <p className="text-muted-foreground text-sm">
               {t('admin.users.empty')}

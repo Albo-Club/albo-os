@@ -18,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+import { LoadingLine } from '~/components/ui/spinner'
 
 /** Minimal shape of an enriched deal, shared by per-org and aggregated views. */
 export type DealRow = {
@@ -572,7 +573,7 @@ export function ParticipationsTable({
                   colSpan={colSpan}
                   className="text-muted-foreground text-center"
                 >
-                  {t('loading')}
+                  <LoadingLine>{t('loading')}</LoadingLine>
                 </TableCell>
               </TableRow>
             ) : (

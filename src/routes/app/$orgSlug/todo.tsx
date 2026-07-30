@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { LoadingLine } from '~/components/ui/spinner'
 
 export const Route = createFileRoute('/app/$orgSlug/todo')({
   component: Todo,
@@ -206,7 +207,7 @@ function Todo() {
     return (
       <main className="flex-1 space-y-6 p-6">
         <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
-        <div className="text-muted-foreground text-sm">{t('loading')}</div>
+        <LoadingLine>{t('loading')}</LoadingLine>
       </main>
     )
   }

@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import { Button } from '~/components/ui/button'
+import { Spinner } from '~/components/ui/spinner'
 import { cn } from '~/lib/utils'
 
 const MAX_BYTES = 20 * 1024 * 1024
@@ -111,7 +112,10 @@ export function ImageUpload({
         aria-label={resolvedLabel}
       >
         {uploading ? (
-          t('imageUpload.uploading')
+          <span className="flex flex-col items-center gap-1">
+            <Spinner className="size-4" />
+            {t('imageUpload.uploading')}
+          </span>
         ) : currentUrl ? (
           <img
             src={currentUrl}

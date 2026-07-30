@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
+import { LoadingLine } from '~/components/ui/spinner'
 
 /**
  * "Recoverable VAT" card on the Cash page: deductible VAT (qualified
@@ -39,7 +40,7 @@ export function VatCard({
       </CardHeader>
       <CardContent>
         {!position ? (
-          <div className="text-muted-foreground text-sm">{t('loading')}</div>
+          <LoadingLine>{t('loading')}</LoadingLine>
         ) : (
           <div className="space-y-1">
             <div className="text-2xl font-semibold tabular-nums">

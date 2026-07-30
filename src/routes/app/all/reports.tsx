@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { Skeleton } from '~/components/ui/skeleton'
+import { Spinner } from '~/components/ui/spinner'
 import {
   Table,
   TableBody,
@@ -183,6 +184,9 @@ function InboundReports() {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Badge variant={STATUS_VARIANT[row.status]}>
+                        {row.status === 'processing' && (
+                          <Spinner className="size-3" />
+                        )}
                         {t(`status.${row.status}`)}
                       </Badge>
                       {row.statusReason ? (

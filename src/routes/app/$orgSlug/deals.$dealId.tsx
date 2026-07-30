@@ -83,6 +83,7 @@ import {
 import { Input } from '~/components/ui/input'
 import { InlineField } from '~/components/ui/inline-field'
 import { Label } from '~/components/ui/label'
+import { LoadingLine } from '~/components/ui/spinner'
 import {
   Popover,
   PopoverContent,
@@ -511,7 +512,7 @@ function Transactions({ deal }: { deal: CurrentDeal }) {
     <section className="space-y-3">
       <h2 className="text-lg font-semibold tracking-tight">{t('tx.title')}</h2>
       {!txs ? (
-        <div className="text-muted-foreground text-sm">{t('loading')}</div>
+        <LoadingLine>{t('loading')}</LoadingLine>
       ) : txs.length === 0 ? (
         <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
           {t('tx.empty')}
@@ -695,7 +696,7 @@ function DealDetail() {
   if (!deal) {
     return (
       <main className="flex-1 space-y-4 p-6">
-        <div className="text-muted-foreground text-sm">{t('loading')}</div>
+        <LoadingLine>{t('loading')}</LoadingLine>
       </main>
     )
   }
