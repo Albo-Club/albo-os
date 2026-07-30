@@ -23,6 +23,54 @@ bas de page.
 
 ---
 
+## v1.155.0 — 30/07/2026 à 16:30 — La fiche deal adopte la structure de la fiche société
+
+La fiche d'un deal s'ouvrait comme une longue colonne : les caractéristiques
+de l'instrument en haut, puis tout le reste à la suite. Il fallait remonter en
+haut de page à chaque fois qu'on voulait revérifier un taux ou une date
+pendant qu'on regardait les transactions.
+
+Elle est maintenant bâtie **comme la fiche d'une société** : un **panneau à
+droite** rassemble les **détails de l'instrument** — montants, taux, dates,
+multiples, une caractéristique par ligne — et les **notes** du deal. Ce
+panneau **reste visible pendant qu'on fait défiler** la page, exactement comme
+la fiche d'identité d'une société. Chaque valeur s'y **édite au clic**, sans
+passer par le dialogue « Modifier ».
+
+La colonne centrale est consacrée à la vie du deal : le suivi propre à
+l'instrument quand il en a un (les royalties perçues et leur suivi
+trimestriel, le perçu à date d'un SPV en gestion), puis les **transactions**,
+le prévisionnel, le business plan vs réalisé et les documents.
+
+Conséquence sur les deals **royalties** et **SPV en gestion** : leurs
+paramètres ne sont plus répétés dans le panneau du milieu, ils sont à droite
+avec ceux de tous les autres instruments. Pour les royalties, les montants en
+euros du plancher et du plafond restent affichés sur la barre de progression.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/$orgSlug/deals.$dealId.tsx` : passage en deux colonnes
+>   (`flex-col lg:flex-row` + `aside` 320 px avec `useStickyBottom`), même
+>   squelette que `participations.$companyId.tsx`. Ordre de la colonne
+>   centrale : `InstrumentPanel` → `Transactions` → `DealForecastSection` →
+>   `FundSection` / `PlanVsActualSection` → `DealDocumentsSection`.
+>   `NotesSection` rendue dans un `IdentitySection` (icône + titre + crayon en
+>   action) et déplacée dans l'`aside`.
+> - `src/components/deals/InstrumentBlock.tsx` : `InstrumentBlock` éclaté en
+>   `InstrumentDetails` (les champs `INSTRUMENT_FIELDS` en rangées
+>   `InlineField layout="row"`, pour **tous** les kinds, `Placeholder` pour
+>   les kinds `render: 'placeholder'`) et `InstrumentPanel` (le corps des
+>   kinds `render: 'custom'`, `null` sinon). `CustomPanelProps` perd
+>   `notesSlot` et `onEdit`.
+> - `RoyaltiesPanel` / `LeadSpvPanel` : suppression de leur carte
+>   « Paramètres » (doublon du panneau latéral) et du bouton « Modifier »
+>   local ; le `notesSlot` du royalty disparaît. Clés i18n
+>   `fiche.royalty.paramsTitle|edit` et `fiche.leadSpv.paramsTitle|edit`
+>   retirées (fr + en) ; `dealForecast.hint` corrigée (« Transactions
+>   ci-dessus »).
+> - Docs : `TESTING.md` (intro de la section fiche deal, FD4/FD22/FD24/FD35,
+>   FD41, nouveau FD44) et `docs/produit/05-deals.md`.
+
 ## v1.154.0 — 30/07/2026 à 14:35 — Déposer un report soi-même depuis la fiche société
 
 Jusqu'ici, un report n'entrait que par mail : on transférait l'update à

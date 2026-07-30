@@ -56,16 +56,23 @@ toutes organisations confondues.
 
 ## La fiche deal
 
+La fiche est bâtie comme celle d'une société : une colonne principale au
+centre pour la vie du deal, et un **panneau latéral à droite** qui reste
+visible pendant qu'on fait défiler la page.
+
 - **Montants en tête** : le montant du deal + « Reçu ». Le montant s'adapte au
   cas (cf. « Montants » ci-dessus : décaissé réel si investi, engagé
   prévisionnel si en term sheet, ou les deux pour un fonds).
-- **Bloc instrument** : les champs propres au type d'instrument, éditables en
-  ligne. Le type s'affiche dans ce bloc (et sert de titre à la fiche tant que
-  le deal n'a pas de nom personnalisé) ; on le change via ⋯ → « Modifier ».
-- **Panneau Royalties** (deals royalties) : capital investi, taux de
-  royalties, plafond, multiples plancher/plafond, business plan initial
-  trimestre par trimestre et réels — les écarts et le BP dégradé sont
-  calculés à l'affichage.
+- **Détails de l'instrument** (panneau de droite) : les caractéristiques
+  propres au type d'instrument — montants, taux, dates, multiples — une par
+  ligne, **éditables au clic** sur la valeur. Le type lui-même sert de titre à
+  la fiche tant que le deal n'a pas de nom personnalisé ; on le change via
+  ⋯ → « Modifier ».
+- **Panneau Royalties** (deals royalties) : les royalties perçues face au
+  plancher et au plafond, puis le business plan initial trimestre par
+  trimestre et les réels — les écarts et le BP dégradé sont calculés à
+  l'affichage. Les paramètres (capital investi, taux, multiples, dates) sont
+  dans le panneau de droite, comme pour tout autre instrument.
 - **Section Fonds** (engagements LP) : appels et distributions.
 - **Business plan vs réalisé** : graphique et tableau comparant le BP initial
   (figé au closing), le BP révisé et le réel. La saisie du BP se fait via
@@ -91,7 +98,8 @@ toutes organisations confondues.
   corriger titre / type / date, une corbeille (avec confirmation), un filtre
   par type, et l'état de sa **lecture** automatique — mêmes règles que côté
   société, détaillées dans [Participations](04-participations.md).
-- **Notes** : texte libre.
+- **Notes** : texte libre, sous les détails de l'instrument dans le panneau de
+  droite.
 
 ## Gérer une sortie
 

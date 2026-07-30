@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import {
+  AlignLeft,
   Check,
   ChevronsUpDown,
   Info,
   LogOut,
   MoreHorizontal,
   Pencil,
+  SlidersHorizontal,
   Trash2,
 } from 'lucide-react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
@@ -40,8 +42,10 @@ import { DealDocumentsSection } from '~/components/deals/DealDocumentsSection'
 import { FundSection } from '~/components/deals/FundSection'
 import {
   FIELD_FORMAT,
-  InstrumentBlock,
+  InstrumentDetails,
+  InstrumentPanel,
 } from '~/components/deals/InstrumentBlock'
+import { IdentitySection } from '~/components/companies/EntityFiche'
 import { DealFieldInput } from '~/components/deals/DealFieldInput'
 import { PlanVsActualSection } from '~/components/deals/PlanVsActualSection'
 import { parseField, rawToInput } from '~/lib/parse'
@@ -99,6 +103,7 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+import { useStickyBottom } from '~/hooks/useStickyBottom'
 
 export const Route = createFileRoute('/app/$orgSlug/deals/$dealId')({
   component: DealDetail,
@@ -624,10 +629,11 @@ function NotesSection({ deal }: { deal: Doc<'deals'> }) {
   }
 
   return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-1.5">
-        <span className="text-muted-foreground text-xs">{t('deal.notes')}</span>
-        {!editing && (
+    <IdentitySection
+      title={t('deal.notes')}
+      icon={<AlignLeft className="size-3.5" />}
+      action={
+        !editing && (
           <Button
             variant="ghost"
             size="icon-sm"
@@ -637,8 +643,9 @@ function NotesSection({ deal }: { deal: Doc<'deals'> }) {
           >
             <Pencil className="size-3.5" />
           </Button>
-        )}
-      </div>
+        )
+      }
+    >
       {editing ? (
         <div className="space-y-2">
           <Textarea
@@ -668,13 +675,15 @@ function NotesSection({ deal }: { deal: Doc<'deals'> }) {
           </div>
         </div>
       ) : deal.notes ? (
-        <p className="text-sm whitespace-pre-wrap">{deal.notes}</p>
+        <p className="text-[13px] leading-relaxed whitespace-pre-wrap">
+          {deal.notes}
+        </p>
       ) : (
         <p className="text-muted-foreground text-sm italic">
           {t('participations:notes.empty')}
         </p>
       )}
-    </div>
+    </IdentitySection>
   )
 }
 
@@ -686,6 +695,8 @@ function DealDetail() {
   const [exitOpen, setExitOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // Instrument panel: scrolls with the page, then freezes once its bottom shows.
+  const { ref: asideRef, top: asideTop } = useStickyBottom()
   const removeDeal = useConvexMutation(api.deals.remove)
   const deal = useConvexQuery(api.deals.getById, {
     id: dealId as Id<'deals'>,
@@ -840,53 +851,73 @@ function DealDetail() {
         <Stat label={t('deal.received')} value={fmtEurCents(received)} />
       </div>
 
-      {/* Central block: layout driven by the saved instrument type. The
-          custom panels (lead_spv) read `received` and open the edit dialog.
-          For royalty, the notes are injected inside the panel (parameters →
-          notes → realized → table); other instruments keep them below. */}
-      <InstrumentBlock
-        deal={deal}
-        instrumentKind={deal.instrumentKind}
-        received={received}
-        transactions={txs}
-        notesSlot={
-          deal.instrumentKind === 'royalty' ? (
-            <NotesSection deal={deal} />
-          ) : undefined
-        }
-        onEdit={() => setEditOpen(true)}
-        editable
-      />
+      {/* Two-column layout, same skeleton as the company fiche: the main
+          column carries the deal's activity (transactions first), the side
+          panel the instrument's stored parameters. Below lg the panel stacks
+          AFTER the main content. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="min-w-0 flex-1 space-y-6">
+          {/* Bespoke body of a custom-rendered instrument (royalty projection
+              table, lead-SPV collected tile). Nothing for the other kinds. */}
+          <InstrumentPanel
+            deal={deal}
+            instrumentKind={deal.instrumentKind}
+            received={received}
+            transactions={txs}
+          />
 
-      {deal.instrumentKind !== 'royalty' && <NotesSection deal={deal} />}
+          <Transactions deal={deal} />
 
-      {deal.instrumentKind === 'fund_lp' && (
-        <FundSection
-          dealId={deal._id}
-          committedAmount={deal.committedAmount}
-          calledCents={paidActual}
-          distributedCents={received}
-        />
-      )}
+          {/* Planned + committed layers (linked forecast entries); the
+              realized layer is the Transactions section above. */}
+          <DealForecastSection dealId={deal._id} orgId={deal.orgId} />
 
-      {/* Royalties use the RoyaltiesPanel table instead of this section. */}
-      {deal.instrumentKind !== 'royalty' && (
-        <PlanVsActualSection
-          dealId={deal._id}
-          instrumentKind={deal.instrumentKind}
-          txs={txs}
-        />
-      )}
+          {deal.instrumentKind === 'fund_lp' && (
+            <FundSection
+              dealId={deal._id}
+              committedAmount={deal.committedAmount}
+              calledCents={paidActual}
+              distributedCents={received}
+            />
+          )}
 
-      {/* Planned + committed layers (linked forecast entries); the
-          realized layer is the Transactions section below. */}
-      <DealForecastSection dealId={deal._id} orgId={deal.orgId} />
+          {/* Royalties use the RoyaltiesPanel table instead of this section. */}
+          {deal.instrumentKind !== 'royalty' && (
+            <PlanVsActualSection
+              dealId={deal._id}
+              instrumentKind={deal.instrumentKind}
+              txs={txs}
+            />
+          )}
 
-      <Transactions deal={deal} />
+          {/* Documents filed on this deal only (term sheet, pacte…) — the
+              company's own documents live on its fiche. */}
+          <DealDocumentsSection dealId={deal._id} companyId={deal.target?._id} />
+        </div>
 
-      {/* Documents filed on this deal only (term sheet, pacte…) — the
-          company's own documents live on its fiche. */}
-      <DealDocumentsSection dealId={deal._id} companyId={deal.target?._id} />
+        {/* Instrument side panel, mirror of the company fiche's identity panel:
+            the stored parameters as rows (each editable inline) plus the deal
+            notes. Sticky from lg up — it scrolls with the page until its bottom
+            edge shows, then freezes (see useStickyBottom). */}
+        <aside
+          ref={asideRef}
+          style={{ top: asideTop }}
+          className="bg-card w-full shrink-0 space-y-5 rounded-xl border p-4 lg:sticky lg:w-80"
+        >
+          <IdentitySection
+            title={t('participations:fiche.instrumentTitle')}
+            icon={<SlidersHorizontal className="size-3.5" />}
+          >
+            <InstrumentDetails
+              deal={deal}
+              instrumentKind={deal.instrumentKind}
+              editable
+            />
+          </IdentitySection>
+
+          <NotesSection deal={deal} />
+        </aside>
+      </div>
 
       {editOpen && (
         <EditDealDialog deal={deal} onClose={() => setEditOpen(false)} />
