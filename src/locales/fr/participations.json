@@ -671,7 +671,6 @@
     "title": "Prévisionnel",
     "add": "Ajouter une prévision",
     "empty": "Aucune prévision rattachée à ce deal.",
-    "committed": "Reste à déployer : {{remaining}} (engagé {{committed}} − versé {{paid}}) — sans date d'appel, compté à part de la courbe.",
     "col": {
       "date": "Date",
       "label": "Libellé",
