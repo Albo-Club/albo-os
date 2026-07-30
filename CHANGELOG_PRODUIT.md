@@ -23,6 +23,32 @@ bas de page.
 
 ---
 
+## v1.150.1 — 30/07/2026 à 10:20 — Un détecteur de code mort, lançable à la demande
+
+Mise à jour purement technique : un détecteur de code inutilisé (fichiers,
+briques et dépendances que plus rien ne référence) est désormais disponible
+en une commande. Un premier audit a dressé la liste des candidats au
+nettoyage — rien n'est supprimé à ce stade, la purge sera validée
+séparément.
+
+> **🔧 Notes techniques**
+>
+> - `knip` (v6) installé en devDependency, configuré via `knip.jsonc` :
+>   entrées pour les routes TanStack Start (`src/routes/**`, référencées via
+>   `routeTree.gen.ts`), les fonctions Convex (`convex/*.ts` +
+>   `convex/migrations/*`, référencées via les proxys générés
+>   `api.*`/`internal.*`), les scripts et les tests. Ignorés :
+>   `convex/_generated/`, le vendoré (`src/components/ai-elements/`) et
+>   `src/components/ui/` (shadcn, audité à part). `tailwindcss` /
+>   `tw-animate-css` en `ignoreDependencies` (imports CSS non suivis par
+>   knip).
+> - Script `pnpm deadcode`, **hors CI volontairement** : une croix rouge
+>   permanente sur chaque PR (le repo n'est pas encore propre) coûte plus
+>   qu'elle n'apporte. Brancher un job bloquant une fois la purge faite.
+> - Rapport d'audit complet (candidats classés sûr / douteux) dans la
+>   description de la PR. Aucune suppression dans cette PR.
+> - `TESTING.md` B10 et `TEMPLATE_SYNC.md` (candidat template) mis à jour.
+
 ## v1.150.0 — 30/07/2026 à 10:05 — L'app est surveillée tous les matins
 
 Chaque matin à 7h, une vérification automatique s'assure que l'application
