@@ -9,17 +9,19 @@ un **deal** (un versement d'investissement, un retour), une ligne de
 C'est le geste qui rend tous les chiffres justes : performance des deals,
 soldes de comptes courants, analyse par catégorie, TVA.
 
-Il se fait dans l'onglet **Transactions** de la [Trésorerie](07-tresorerie.md).
+Il se fait dans le **registre** de la [Trésorerie](07-tresorerie.md) (bas de
+la Vue d'ensemble) ; le point d'entrée quotidien est la page
+[À faire](16-a-faire.md), qui ouvre ce registre déjà filtré sur la file.
 
 ## Le workflow
 
-1. Chaque nouvelle transaction arrive en statut **« À pointer »**. Ce n'est
-   pas une page à part : c'est un **filtre du registre**, qu'on active avec
-   le bouton « À pointer » (il porte le compteur de la file et est actif par
-   défaut). Le menu **« Type »** à côté sert à retrouver le reste : charges,
-   impôts, produits, virements internes, investissements, comptes courants &
-   emprunts, ignorées. Les deux ne se cumulent pas — on regarde la file, ou
-   un type.
+1. Chaque nouvelle transaction arrive en statut **« À pointer »**, affiché
+   en **ambre** pour repérer d'un coup d'œil ce qui reste à traiter. Ce
+   n'est pas une page à part : c'est une valeur du filtre **« Statut »** du
+   registre (avec le compteur de la file), qui montre aussi les échéances
+   prévisionnelles **en retard**. Le même menu sert à retrouver le reste :
+   prévisionnel, charges, impôts, produits, virements internes,
+   investissements, comptes courants & emprunts, ignorées.
 2. Chaque ligne se traite en **un seul geste** : le menu « **Affecter
    à…** », une liste cherchable qui regroupe toutes les destinations
    possibles — les **deals**, le **passif** (capital, comptes courants),
@@ -31,8 +33,8 @@ Il se fait dans l'onglet **Transactions** de la [Trésorerie](07-tresorerie.md).
 3. Sur une charge ou un produit, la **catégorie** est donc posée dès le
    choix (ou « à qualifier » pour décider plus tard) ; le **taux de TVA**
    s'ajuste ensuite directement sur la ligne.
-4. Une bannière « Annuler » (~5 secondes) permet de revenir sur un geste, et
-   toute transaction peut être **détachée** plus tard pour repartir en file.
+4. Une ligne pointée reste visible avec son nouveau statut, et toute
+   transaction peut être **détachée** plus tard pour repartir en file.
 5. **Actions groupées** : sélectionner plusieurs lignes et les classer
    d'un coup (charge, impôt, produit, virement interne).
 
@@ -76,7 +78,7 @@ explicitement dans le chat.
 
 ## Le rapprochement des échéances prévues
 
-En tête de l'onglet **Transactions**, une carte « Rapprochements suggérés »
+Au-dessus du registre, une carte « Rapprochements suggérés »
 rapproche l'autre bout de la chaîne : les échéances du
 [prévisionnel](09-previsionnel.md) dues ou en retard qui ressemblent à une
 transaction récente (même sens, dates et montants proches, libellé). C'est
@@ -91,7 +93,7 @@ reliquat. Le détail du mécanisme est décrit dans le
 - Les montants sont toujours TTC ; on qualifie le **taux** (0 / 5,5 / 10 /
   20 %) sur les charges et produits, et le montant de TVA est déduit
   automatiquement.
-- La carte **TVA récupérable** (onglet Règles & échéances) montre la position cumulée :
+- La carte **TVA récupérable** (onglet Gestion) montre la position cumulée :
   TVA déductible (sur les charges) moins TVA collectée (sur les produits),
   avec le nombre de lignes restant « à qualifier ».
 - L'historique n'est volontairement pas qualifié en masse : salaires,

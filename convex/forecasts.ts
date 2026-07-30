@@ -1501,7 +1501,7 @@ export const checkOverdueEntries = internalMutation({
             direction: e.direction,
             amountCents: e.amountCents,
           })),
-          forecastUrl: `${siteUrl}/app/${org.slug}/cash?tab=previsionnel`,
+          forecastUrl: `${siteUrl}/app/${org.slug}/cash?filter=unmatched`,
         })
         await resend.sendEmail(ctx, {
           from: RESEND_FROM,

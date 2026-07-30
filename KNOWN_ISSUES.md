@@ -1619,15 +1619,20 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   idempotent, n'écrit rien dans `matchingDecisions`). Tout nouveau code qui
   écrit `dealId` doit écrire `allocation` dans le même patch.
 - **Registre Transactions (`listLedger`) — plafond 1000, plus récent
-  d'abord.** L'onglet Transactions de la page Trésorerie (qui absorbe la file
-  de pointage : « À pointer » = filtre `unmatched`) lit `listLedger`, borné aux
+  d'abord.** Le registre de la Vue d'ensemble Trésorerie (qui absorbe la file
+  de pointage : « À pointer » = filtre `unmatched`, et fusionne les échéances
+  prévisionnelles via `getUpcomingEntries`) lit `listLedger`, borné aux
   **1000 transactions les plus récentes** par filtre actif (`LEDGER_LIMIT`).
   Au-delà, la queue la plus ancienne est masquée — le browse exhaustif (capé
   200) reste sur `/cash/$accountId`. Comme `listUnmatched`, le registre passe
   par l'index `search_text` en mode recherche : une ligne sans `searchText`
   (pré-`backfillSearchText`) reste invisible à la recherche. Pas de pagination
   serveur (`usePaginatedQuery` n'est utilisé que par le chat) : on garde le
-  pattern `.take()` + `LocalPagination` partagé avec `PointageTable`.
+  pattern `.take()` + `LocalPagination` partagé avec `PointageTable`. Le
+  filtre **montant** (min/max) s'applique côté client sur ces lignes déjà
+  chargées : sur une org > 1000 tx il ne « repêche » donc pas la queue
+  masquée. Les lignes prévisionnelles n'ont pas de compte bancaire : un
+  filtre compte actif les masque.
 - **Puces de suggestion de la file (`getPointageSuggestions`) — précision
   avant rappel, labels résolus côté client.** La query ne couvre que les
   **30 tx `unmatched` les plus récentes** (= le haut de la file triée date
@@ -1963,7 +1968,7 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   forecast).
 - **La table front des échéances ne liste que les one-shot pures — limitation
   V1 assumée.** `forecasts.listEntries` (consommée par `ForecastEntriesSection`,
-  onglet Cash « Règles & échéances ») filtre `ruleId == null` : les occurrences générées
+  onglet Cash « Gestion ») filtre `ruleId == null` : les occurrences générées
   par une règle n'y apparaissent jamais. Conséquence : une occurrence de règle
   passée en `overridden` (éditée à la main — aujourd'hui faisable uniquement
   via l'agent IA, `updateForecastEntry`) n'est visible **ni** dans cette table

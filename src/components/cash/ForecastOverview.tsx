@@ -4,6 +4,11 @@ import { useTranslation } from 'react-i18next'
 import { TriangleAlert } from 'lucide-react'
 
 import { api } from '../../../convex/_generated/api'
+import {
+  isTreasuryPlacement,
+  placementLiquidity,
+} from '../../../convex/lib/instrumentMapping'
+import { CashAccountsCard } from './CashAccounts'
 import { CashKpis } from './CashKpis'
 import { ForecastChart } from './ForecastChart'
 import type { CashAccount } from './CashAccounts'
@@ -26,11 +31,11 @@ const HISTORY_MONTHS = 6
 const ALERT_LOOKAHEAD_MONTHS = 3
 
 /**
- * Cockpit of the Cash « Vue d'ensemble » tab: the KPI band (where the
- * available cash sits, 30/90-day flows), then the single projected-balance
- * curve, plus an in-app banner when the alert threshold is breached. The
- * category × month grid and the committed pipeline moved to the
- * « Prévisionnel » tab (ForecastGridSection).
+ * Cockpit of the Cash overview: the KPI line (available today + projected
+ * balance at 30/90 days, each with its inflow/outflow/net sum), the single
+ * projected-balance curve, then the accounts card (bank logos, pledged and
+ * closed accounts dimmed, non-liquid placements summed in a footer line) —
+ * plus an in-app banner when the alert threshold is breached.
  */
 export function ForecastOverview({
   orgId,
@@ -50,17 +55,19 @@ export function ForecastOverview({
     historyMonths: HISTORY_MONTHS,
     horizonMonths: horizon,
   })
-  // Shared subscription with UpcomingEntriesSection (same query + args).
+  // Shared subscription with the register's planned rows (same query + args).
   const upcoming = useConvexQuery(api.forecasts.getUpcomingEntries, { orgId })
   // Null until a 1st-of-month snapshot exists for the previous month.
   const reliability = useConvexQuery(api.forecasts.getForecastReliability, {
     orgId,
   })
   const alert = useConvexQuery(api.forecasts.getCashAlert, { orgId })
+  // Non-liquid placements summed in the accounts card's footer line.
+  const deals = useConvexQuery(api.deals.list, { orgId })
 
   // Available cash = active, non-pledged accounts — the phase-0 perimeter,
-  // all currencies. Pledged and closed accounts are listed apart, at the
-  // bottom of the tab (UnavailableAccountsSection).
+  // all currencies. Pledged and closed accounts stay listed (dimmed) at the
+  // bottom of the accounts card.
   const availableAccounts = useMemo(
     () => accounts?.filter((a) => a.accountStatus === 'active' && !a.pledged),
     [accounts],
@@ -71,6 +78,19 @@ export function ForecastOverview({
       null,
     [availableAccounts],
   )
+
+  // Placements that are NOT liquid (capitalization accounts, term deposits…):
+  // out of the available treasury, surfaced as one line → Placements page.
+  const nonLiquidCents = useMemo(() => {
+    if (!deals) return null
+    return deals
+      .filter(
+        (d) =>
+          isTreasuryPlacement(d.instrumentKind) &&
+          placementLiquidity(d.instrumentKind, d.liquidity) !== 'liquid',
+      )
+      .reduce((sum, d) => sum + (d.currentValue ?? 0), 0)
+  }, [deals])
 
   const thresholdCents =
     alert?.active && alert.thresholdCents > 0 ? alert.thresholdCents : null
@@ -98,9 +118,8 @@ export function ForecastOverview({
         </div>
       )}
       <CashKpis
-        accounts={availableAccounts}
         availableCents={availableCents}
-        orgSlug={orgSlug}
+        accountsCount={availableAccounts?.length}
         flows30={
           upcoming
             ? {
@@ -178,6 +197,12 @@ export function ForecastOverview({
           />
         </>
       )}
+
+      <CashAccountsCard
+        accounts={accounts}
+        orgSlug={orgSlug}
+        nonLiquidCents={nonLiquidCents}
+      />
     </section>
   )
 }

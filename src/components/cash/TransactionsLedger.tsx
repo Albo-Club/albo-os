@@ -7,11 +7,20 @@ import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { LiabilityOptionGroups } from '~/lib/liabilityOptions'
+import type { PlannedEntry } from '~/components/pointage/PointageTable'
 import { buildLiabilityOptions } from '~/lib/liabilityOptions'
+import { eurosToCents } from '~/lib/parse'
+import { normalizeSearch } from '~/lib/searchText'
 import { PointageTable } from '~/components/pointage/PointageTable'
-import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
+import { AmountInput } from '~/components/ui/amount-input'
 import { Input } from '~/components/ui/input'
+import { Label } from '~/components/ui/label'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '~/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -22,14 +31,16 @@ import {
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
 
 /**
- * The ledger's single filter. 'all' = the whole ledger; 'unmatched' is the
- * inbox (surfaced by its own button, not by the type menu); 'deal' and
- * 'liability' split the 'matched' status by nature of the attachment, so a
- * generic « Pointé » entry would be redundant with the two of them.
+ * The register's single « Statut » filter. 'all' = the whole register
+ * (planned entries + every transaction); 'unmatched' = everything left to
+ * handle (unmatched transactions AND overdue planned entries); 'planned' =
+ * the forecast entries alone; 'deal' and 'liability' split the 'matched'
+ * status by nature of the attachment.
  */
-type LedgerFilter =
+export type LedgerFilter =
   | 'all'
   | 'unmatched'
+  | 'planned'
   | 'charge'
   | 'tax'
   | 'product'
@@ -38,9 +49,12 @@ type LedgerFilter =
   | 'liability'
   | 'ignored'
 
-/** Entries of the « Type » menu, in reading order. */
-const TYPE_FILTERS: ReadonlyArray<LedgerFilter> = [
+/** Entries of the « Statut » menu, in reading order — also the values the
+ * route accepts as `?filter=` (To do CTAs, bookmarks). */
+export const LEDGER_FILTERS: ReadonlyArray<LedgerFilter> = [
   'all',
+  'unmatched',
+  'planned',
   'charge',
   'tax',
   'product',
@@ -53,23 +67,27 @@ const TYPE_FILTERS: ReadonlyArray<LedgerFilter> = [
 const ALL_ACCOUNTS = 'all'
 
 /**
- * Pennylane-style complete ledger (Transactions tab of the Cash section): all
- * the org's transactions across accounts, narrowed by ONE filter — the
- * « À pointer » button (the inbox, with its counter, the default landing) or
- * the « Type » menu — plus account and search. Matched/categorized rows stay
- * visible with their status badge + an inline detach/VAT action (PointageTable
- * `statusColumn` mode). Reconciliation reuses the same row actions as the
- * historical pointage queue.
+ * The single register of the Cash overview: planned forecast entries (future
+ * ones on top, overdue ones inline) merged with every real transaction,
+ * newest first, behind one filter bar — search, amount range, status,
+ * account (same filter grammar as the participations list). No standalone
+ * « À pointer » button: the daily reconciliation queue lives in the To do
+ * page, which links here with `?filter=unmatched`. Matched/categorized rows
+ * stay visible with their status badge + inline detach/VAT actions
+ * (PointageTable).
  */
 export function TransactionsLedger({
   orgId,
   orgSlug,
+  initialFilter,
 }: {
   orgId: Id<'organizations'>
   orgSlug: string
+  /** Filter preselected by the route's `?filter=` (To do CTAs). */
+  initialFilter?: LedgerFilter
 }) {
   const { t } = useTranslation(['pointage', 'passif'])
-  const [filter, setFilter] = useState<LedgerFilter>('unmatched')
+  const [filter, setFilter] = useState<LedgerFilter>(initialFilter ?? 'all')
   const [accountId, setAccountId] = useState<Id<'bankAccounts'> | undefined>(
     undefined,
   )
@@ -100,6 +118,16 @@ export function TransactionsLedger({
   const [search, setSearch] = useState('')
   const searchArg = useDebouncedValue(search).trim() || undefined
 
+  // Amount range, applied client-side on the loaded rows (the register is
+  // bounded to the newest LEDGER_LIMIT transactions anyway — see
+  // KNOWN_ISSUES « Registre Transactions »). Raw euro strings; invalid or
+  // empty input = no bound.
+  const [minAmount, setMinAmount] = useState('')
+  const [maxAmount, setMaxAmount] = useState('')
+  const minCents = minAmount.trim() === '' ? null : eurosToCents(minAmount)
+  const maxCents = maxAmount.trim() === '' ? null : eurosToCents(maxAmount)
+  const amountActive = minCents != null || maxCents != null
+
   const accounts = useConvexQuery(api.cash.listAccounts, { orgId })
   const unmatchedCount = useConvexQuery(api.transactions.countByStatus, {
     orgId,
@@ -110,15 +138,27 @@ export function TransactionsLedger({
   const liabilities = useConvexQuery(api.liabilities.listOptions, { orgId })
 
   const byAttachment = filter === 'deal' || filter === 'liability'
-  const liveTransactions = useConvexQuery(api.transactions.listLedger, {
-    orgId,
-    status: filter === 'all' || byAttachment ? undefined : filter,
-    matchedKind: byAttachment ? filter : undefined,
-    bankAccountId: accountId,
-    search: searchArg,
-  })
-  // One-click suggestions — inbox view only (they only render on unmatched
-  // rows anyway).
+  const liveTransactions = useConvexQuery(
+    api.transactions.listLedger,
+    filter === 'planned'
+      ? 'skip'
+      : {
+          orgId,
+          status:
+            filter === 'all' || byAttachment
+              ? undefined
+              : (filter),
+          matchedKind: byAttachment ? filter : undefined,
+          bankAccountId: accountId,
+          search: searchArg,
+        },
+  )
+  // Planned forecast entries (pending, next 90 days + overdue) — shared
+  // subscription with ForecastOverview. They carry no bank account, so an
+  // account filter hides them.
+  const upcoming = useConvexQuery(api.forecasts.getUpcomingEntries, { orgId })
+  // One-click suggestions — reconciliation view only (they only render on
+  // unmatched rows anyway).
   const suggestions = useConvexQuery(
     api.transactions.getPointageSuggestions,
     filter === 'unmatched' ? { orgId } : 'skip',
@@ -137,7 +177,34 @@ export function TransactionsLedger({
   // Keep the last list displayed while a new filter/search reloads (no flash).
   const lastRef = useRef(liveTransactions)
   if (liveTransactions !== undefined) lastRef.current = liveTransactions
-  const transactions = liveTransactions ?? lastRef.current
+  const loadedTransactions =
+    filter === 'planned' ? [] : (liveTransactions ?? lastRef.current)
+  const transactions = useMemo(() => {
+    if (!loadedTransactions || (minCents == null && maxCents == null)) {
+      return loadedTransactions
+    }
+    return loadedTransactions.filter(
+      (tx) =>
+        (minCents == null || tx.amount >= minCents) &&
+        (maxCents == null || tx.amount <= maxCents),
+    )
+  }, [loadedTransactions, minCents, maxCents])
+
+  const showPlanned =
+    (filter === 'all' || filter === 'planned' || filter === 'unmatched') &&
+    accountId === undefined
+  const plannedEntries = useMemo<Array<PlannedEntry> | undefined>(() => {
+    if (!showPlanned) return []
+    if (!upcoming) return undefined
+    const term = searchArg ? normalizeSearch(searchArg) : ''
+    return upcoming.entries.filter((entry) => {
+      if (filter === 'unmatched' && !entry.overdue) return false
+      if (term && !normalizeSearch(entry.label).includes(term)) return false
+      if (minCents != null && entry.amountCents < minCents) return false
+      if (maxCents != null && entry.amountCents > maxCents) return false
+      return true
+    })
+  }, [showPlanned, upcoming, searchArg, filter, minCents, maxCents])
 
   const emptyMessage = searchArg
     ? t('search.noResults')
@@ -145,41 +212,86 @@ export function TransactionsLedger({
       ? undefined // → PointageTable's inbox empty message (t('empty'))
       : t('viewEmpty')
 
+  const amountLabel = amountActive
+    ? [
+        minCents != null ? `≥ ${minAmount} €` : null,
+        maxCents != null ? `≤ ${maxAmount} €` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : null
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        {/* The inbox as a toggle: pressing it filters, pressing it again goes
-            back to the whole ledger. It is not a « Type », hence its own
-            control next to the menu. */}
-        <Button
-          variant={filter === 'unmatched' ? 'secondary' : 'outline'}
-          aria-pressed={filter === 'unmatched'}
-          className={
-            filter === 'unmatched' ? 'ring-ring/40 gap-1.5 ring-2' : 'gap-1.5'
-          }
-          onClick={() =>
-            setFilter(filter === 'unmatched' ? 'all' : 'unmatched')
-          }
-        >
-          {t('view.unmatched')}
-          {unmatchedCount ? (
-            <Badge variant="secondary">{unmatchedCount}</Badge>
-          ) : null}
-        </Button>
+        <Input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t('search.placeholder')}
+          className="max-w-sm"
+        />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant={amountActive ? 'secondary' : 'outline'}>
+              {t('filter.amount')}
+              {amountLabel && (
+                <span className="text-muted-foreground font-normal">
+                  {amountLabel}
+                </span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 space-y-3" align="start">
+            <div className="space-y-1.5">
+              <Label htmlFor="ledger-amount-min">{t('filter.amountMin')}</Label>
+              <AmountInput
+                id="ledger-amount-min"
+                value={minAmount}
+                onChange={setMinAmount}
+                placeholder="0"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ledger-amount-max">{t('filter.amountMax')}</Label>
+              <AmountInput
+                id="ledger-amount-max"
+                value={maxAmount}
+                onChange={setMaxAmount}
+                placeholder="100 000"
+              />
+            </div>
+            {amountActive && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setMinAmount('')
+                  setMaxAmount('')
+                }}
+              >
+                {t('filter.amountClear')}
+              </Button>
+            )}
+          </PopoverContent>
+        </Popover>
         <Select
-          value={TYPE_FILTERS.includes(filter) ? filter : 'all'}
+          value={filter}
           onValueChange={(v) => setFilter(v as LedgerFilter)}
         >
-          <SelectTrigger className="w-60">
+          <SelectTrigger className="w-64">
             <span className="text-muted-foreground mr-1">
-              {t('filter.type')}
+              {t('filter.status')}
             </span>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {TYPE_FILTERS.map((f) => (
+            {LEDGER_FILTERS.map((f) => (
               <SelectItem key={f} value={f}>
                 {t(`view.${f}`)}
+                {f === 'unmatched' && unmatchedCount
+                  ? ` (${unmatchedCount})`
+                  : ''}
               </SelectItem>
             ))}
           </SelectContent>
@@ -206,13 +318,6 @@ export function TransactionsLedger({
             ))}
           </SelectContent>
         </Select>
-        <Input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t('search.placeholder')}
-          className="max-w-sm"
-        />
         {filter === 'unmatched' && (
           <Button
             variant="outline"
@@ -227,13 +332,14 @@ export function TransactionsLedger({
       </div>
       <PointageTable
         transactions={transactions}
+        plannedEntries={plannedEntries}
         deals={deals}
         liabilityOptions={liabilityOptions}
         suggestions={suggestions}
         orgSlug={orgSlug}
         emptyMessage={emptyMessage}
-        statusColumn={filter !== 'unmatched'}
-        pageResetKey={`${filter}:${accountId ?? ''}:${searchArg ?? ''}`}
+        statusColumn
+        pageResetKey={`${filter}:${accountId ?? ''}:${searchArg ?? ''}:${minCents ?? ''}:${maxCents ?? ''}`}
       />
     </div>
   )

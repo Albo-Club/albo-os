@@ -56,7 +56,7 @@ export function VatCard({
                 <Link
                   to="/app/$orgSlug/cash"
                   params={{ orgSlug }}
-                  search={{ tab: 'transactions' }}
+                  search={{ filter: 'unmatched' }}
                   className="hover:text-foreground underline underline-offset-4"
                 >
                   {t('vat.unqualified', {
