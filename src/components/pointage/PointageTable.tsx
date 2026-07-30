@@ -27,7 +27,6 @@ import {
   usePagination,
 } from '~/components/data-table/LocalPagination'
 import { CHARGE_CATEGORIES, PRODUCT_CATEGORIES } from '~/lib/categories'
-import { DEFAULT_VAT_RATE_BPS, VAT_RATES_BPS, vatCentsFromTtc } from '~/lib/vat'
 import { directionTone } from '~/lib/moneyTone'
 import {
   AlertDialog,
@@ -452,7 +451,6 @@ export function PointageTable({
     api.transactions.unmatchTransaction,
   )
   const bulkCategorize = useConvexMutation(api.transactions.bulkCategorize)
-  const setVatRate = useConvexMutation(api.transactions.setVatRate)
   const setCategory = useConvexMutation(api.transactions.setCategory)
 
   // Charge/product go through their dedicated calls (they carry category
@@ -605,14 +603,12 @@ export function PointageTable({
   ) {
     setPendingId(tx._id)
     try {
-      // A charge starts with a default 20% VAT rate, adjustable later
-      // inline (setVatRate). The unified picker can carry the category
-      // directly (charge/product leaves) — undefined keeps « à qualifier ».
+      // The unified picker can carry the category directly (charge/product
+      // leaves) — undefined keeps « à qualifier ».
       const result =
         kind === 'charge'
           ? await categorizeAsCharge({
               transactionId: tx._id,
-              vatRateBps: DEFAULT_VAT_RATE_BPS,
               ...(category ? { category } : {}),
             })
           : kind === 'product'
@@ -661,21 +657,6 @@ export function PointageTable({
       } else {
         await unmatchTransaction({ transactionId: tx._id })
       }
-    } catch (err) {
-      reportError(err)
-    } finally {
-      setPendingId(null)
-    }
-  }
-
-  // Ledger mode: qualify a charge/product VAT rate inline (feeds the VAT card).
-  async function handleVatRate(tx: UnmatchedTx, vatRateBps: number | null) {
-    setPendingId(tx._id)
-    try {
-      await setVatRate({
-        transactionId: tx._id,
-        vatRateBps: vatRateBps as 0 | 550 | 1000 | 2000 | null,
-      })
     } catch (err) {
       reportError(err)
     } finally {
@@ -764,7 +745,6 @@ export function PointageTable({
       const result = await bulkCategorize({
         transactionIds: ids,
         status,
-        vatRateBps: status === 'charge' ? DEFAULT_VAT_RATE_BPS : undefined,
       })
       setSelectedIds(new Set())
       if (result.succeeded.length > 0) {
@@ -891,11 +871,6 @@ export function PointageTable({
             status={status}
             pending={pending}
             onChange={(category) => void handleCategory(tx, category)}
-          />
-          <VatRateSelect
-            tx={tx}
-            pending={pending}
-            onChange={(vatRateBps) => void handleVatRate(tx, vatRateBps)}
           />
           {detach}
         </div>
@@ -1307,61 +1282,3 @@ function CategorySelect({
   )
 }
 
-/**
- * VAT rate selector for a charge/product row (« À qualifier » /
- * 0% / 5.5% / 10% / 20%) → `setVatRate`. The VAT amount derived from the
- * tax-inclusive total shows below the selector once a rate is set.
- */
-function VatRateSelect({
-  tx,
-  pending,
-  onChange,
-}: {
-  tx: UnmatchedTx
-  pending: boolean
-  onChange: (vatRateBps: number | null) => void
-}) {
-  const { t, i18n } = useTranslation('pointage')
-  const fmtRate = (bps: number) =>
-    new Intl.NumberFormat(i18n.language, {
-      style: 'percent',
-      maximumFractionDigits: 1,
-    }).format(bps / 10000)
-  const fmtEur = (cents: number) =>
-    new Intl.NumberFormat(i18n.language, {
-      style: 'currency',
-      currency: 'EUR',
-      maximumFractionDigits: 2,
-    }).format(cents / 100)
-
-  return (
-    <div className="flex flex-col items-start gap-0.5">
-      <Select
-        value={tx.vatRateBps != null ? String(tx.vatRateBps) : 'unset'}
-        disabled={pending}
-        onValueChange={(value) =>
-          onChange(value === 'unset' ? null : Number(value))
-        }
-      >
-        <SelectTrigger size="sm" className="w-32">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="unset">{t('vat.toQualify')}</SelectItem>
-          {VAT_RATES_BPS.map((bps) => (
-            <SelectItem key={bps} value={String(bps)}>
-              {fmtRate(bps)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {tx.vatRateBps != null && tx.vatRateBps > 0 && (
-        <span className="text-muted-foreground text-xs tabular-nums">
-          {t('vat.amount', {
-            amount: fmtEur(vatCentsFromTtc(tx.amount, tx.vatRateBps)),
-          })}
-        </span>
-      )}
-    </div>
-  )
-}

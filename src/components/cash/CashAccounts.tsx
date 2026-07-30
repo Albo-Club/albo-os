@@ -32,6 +32,17 @@ export type CashAccount = {
   owner: { _id: Id<'companies'>; name: string; kind: string } | null
 }
 
+/**
+ * A pledged account (nantissement, escrow) holds blocked money: that is a
+ * long-term placement, not treasury — it leaves the Cash accounts card for
+ * the Placements page. A pledged account CLOSED at the bank is history, so it
+ * stays with the other closed accounts. Single source of truth for the split,
+ * shared by the Cash overview and the Placements page.
+ */
+export function isPledgedPlacement(account: CashAccount): boolean {
+  return account.pledged && account.accountStatus !== 'closed'
+}
+
 function useFormatters() {
   const { i18n } = useTranslation('cash')
   const lang = i18n.language
@@ -167,16 +178,18 @@ export function CashAccountsCard({
   const { t } = useTranslation('cash')
   const { fmtEur } = useFormatters()
 
-  // Available first, then pledged (real money, just not spendable), closed
-  // last — each bucket biggest balance first.
+  // Available first, closed last (each bucket biggest balance first). Pledged
+  // accounts are not treasury at all — they live on the Placements page.
   const rows = useMemo(() => {
     if (!accounts) return undefined
-    const rank = (a: CashAccount) =>
-      a.accountStatus === 'closed' ? 2 : a.pledged ? 1 : 0
-    return [...accounts].sort(
-      (a, b) =>
-        rank(a) - rank(b) || (b.currentBalance ?? 0) - (a.currentBalance ?? 0),
-    )
+    return accounts
+      .filter((a) => !isPledgedPlacement(a))
+      .sort(
+        (a, b) =>
+          Number(a.accountStatus === 'closed') -
+            Number(b.accountStatus === 'closed') ||
+          (b.currentBalance ?? 0) - (a.currentBalance ?? 0),
+      )
   }, [accounts])
 
   return (

@@ -8,7 +8,7 @@ import {
   isTreasuryPlacement,
   placementLiquidity,
 } from '../../../convex/lib/instrumentMapping'
-import { CashAccountsCard } from './CashAccounts'
+import { CashAccountsCard, isPledgedPlacement } from './CashAccounts'
 import { CashKpis } from './CashKpis'
 import { ForecastChart } from './ForecastChart'
 import type { CashAccount } from './CashAccounts'
@@ -79,18 +79,24 @@ export function ForecastOverview({
     [availableAccounts],
   )
 
-  // Placements that are NOT liquid (capitalization accounts, term deposits…):
-  // out of the available treasury, surfaced as one line → Placements page.
+  // Everything that is NOT available treasury and lives on the Placements
+  // page: non-liquid placements (capitalization accounts, term deposits…)
+  // plus the pledged accounts (blocked money — long-term by nature).
+  // Surfaced as one line pointing there.
   const nonLiquidCents = useMemo(() => {
-    if (!deals) return null
-    return deals
+    if (!deals || !accounts) return null
+    const placements = deals
       .filter(
         (d) =>
           isTreasuryPlacement(d.instrumentKind) &&
           placementLiquidity(d.instrumentKind, d.liquidity) !== 'liquid',
       )
       .reduce((sum, d) => sum + (d.currentValue ?? 0), 0)
-  }, [deals])
+    const pledged = accounts
+      .filter(isPledgedPlacement)
+      .reduce((sum, a) => sum + (a.currentBalance ?? 0), 0)
+    return placements + pledged
+  }, [deals, accounts])
 
   const thresholdCents =
     alert?.active && alert.thresholdCents > 0 ? alert.thresholdCents : null

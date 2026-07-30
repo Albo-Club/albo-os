@@ -9,7 +9,7 @@ fonds, distributions, impôts one-shot). Il vit dans la
 [Trésorerie](07-tresorerie.md) : les soldes projetés à 30/90 jours, la
 courbe et les échéances (dans le registre unique, au-dessus du séparateur
 « Aujourd'hui ») sur la **Vue d'ensemble**, la gestion des règles, échéances
-ponctuelles, TVA et alertes dans l'onglet **Gestion**. Le rapprochement
+ponctuelles et alertes dans l'onglet **Gestion**. Le rapprochement
 d'une échéance avec une transaction réelle, lui, est un geste de
 [pointage](08-pointage.md) et se fait au-dessus du registre.
 
@@ -83,16 +83,12 @@ même en dehors des fenêtres de date et de montant des suggestions, le lien
 au deal suffit. Une échéance ne reste donc pas « en retard » simplement
 parce que le pointage a été fait avant le rapprochement.
 
-## Alertes et TVA
+## Alertes
 
 - **Alerte de trésorerie** : « me prévenir par email si le solde disponible
   ou un mois projeté (3 mois) passe sous X € ». Vérifiée chaque matin, avec
   une pause de 7 jours après chaque alerte envoyée. Tant que le seuil est
   franchi, une bannière rouge l'affiche aussi en tête de la Vue d'ensemble.
-- **Échéance TVA suggérée** : quand la TVA du dernier trimestre clos est à
-  payer, Albo OS propose de créer l'échéance correspondante (sortie
-  « impôts », due le 24 du mois suivant le trimestre). Jamais créée toute
-  seule.
 - **Échéances à venir** : les 90 prochains jours vivent dans le registre,
   au-dessus du séparateur « Aujourd'hui » (statut « Prévu » en bleu) ; une
   échéance en retard descend à sa date avec un statut « En retard » en

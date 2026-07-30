@@ -9,19 +9,19 @@ véhicule et toutes les transactions. Deux onglets :
   le **solde disponible aujourd'hui** puis les **soldes projetés à 30 et
   90 jours** (chacun détaillé en une petite somme entrées + sorties = net),
   la **courbe de solde** passé → futur, les **comptes** (avec le logo de
-  leur banque, les nantis et clôturés listés en dessous, atténués), et
+  leur banque, les comptes clôturés listés en dessous, atténués), et
   enfin le **registre unique** : les échéances prévisionnelles à venir
   au-dessus du séparateur « Aujourd'hui », toutes les transactions réelles
   en dessous. Si une connexion bancaire est en panne ou si le seuil
   d'alerte est franchi, une **bannière** le signale en tête de page.
 - **Gestion** — tout ce qui se configure : règles récurrentes, échéances
-  ponctuelles, capital engagé non appelé, TVA, alerte de seuil, connexions
+  ponctuelles, capital engagé non appelé, alerte de seuil, connexions
   bancaires.
 
 Le chiffre qui compte est le **solde projeté**, pas la somme brute des
 entrées/sorties : c'est lui qui ouvre la page. Le cash **non liquide**
-(contrats de capitalisation…) est hors du disponible ; une ligne sous les
-comptes en rappelle le total et renvoie vers les
+(contrats de capitalisation, comptes nantis…) est hors du disponible ; une
+ligne sous les comptes en rappelle le total et renvoie vers les
 [Placements](19-placements.md).
 
 ## La courbe de solde
@@ -62,8 +62,12 @@ donnée fraîche. Les comptes manuels affichent la date de saisie du solde.
 Trois états particuliers changent les calculs :
 
 - **Nanti** : fonds bloqués (nantissement, séquestre) — le solde est
-  **exclu du disponible** et du prévisionnel. Le compte reste dans la liste
-  des comptes, en bas et atténué, avec la mention « hors solde disponible ».
+  **exclu du disponible** et du prévisionnel. Le compte quitte carrément la
+  page Trésorerie : de l'argent bloqué est de l'argent long terme, il vit
+  donc avec les [Placements](19-placements.md), en section « Comptes
+  nantis ». Son solde est rappelé sous les comptes, dans la ligne
+  « Non liquide ». (Un compte à la fois nanti et clôturé reste ici : c'est
+  de l'historique.)
 - **Clôturé** : compte fermé en banque, conservé pour son historique, solde
   ignoré — listé de la même façon, en dernier.
 - Le « **solde disponible** » affiché partout = comptes actifs, non nantis,

@@ -8,6 +8,7 @@ import { api } from '../../../../convex/_generated/api'
 import { isTreasuryPlacement } from '../../../../convex/lib/instrumentMapping'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
+import { isPledgedPlacement } from '~/components/cash/CashAccounts'
 import { CreatePlacementDialog } from '~/components/placements/CreatePlacementDialog'
 import { PlacementsView } from '~/components/placements/PlacementsView'
 import { InvestmentsTabs } from '~/components/investments/InvestmentsTabs'
@@ -38,10 +39,20 @@ function Placements() {
     api.deals.list,
     org ? { orgId: org._id } : 'skip',
   )
+  const accounts = useConvexQuery(
+    api.cash.listAccounts,
+    org ? { orgId: org._id } : 'skip',
+  )
   const [creating, setCreating] = useState(false)
   const placements = useMemo(
     () => deals?.filter((d) => isTreasuryPlacement(d.instrumentKind)),
     [deals],
+  )
+  // Pledged accounts are blocked money — treasury lists them no more, they
+  // read as long-term placements (shared predicate with the Cash page).
+  const pledgedAccounts = useMemo(
+    () => accounts?.filter(isPledgedPlacement),
+    [accounts],
   )
 
   return (
@@ -59,7 +70,11 @@ function Placements() {
         <InvestmentsTabs orgSlug={orgSlug} active="placements" />
         <p className="text-muted-foreground text-sm">{t('subtitle')}</p>
       </div>
-      <PlacementsView deals={placements} orgSlug={orgSlug} />
+      <PlacementsView
+        deals={placements}
+        orgSlug={orgSlug}
+        pledgedAccounts={pledgedAccounts}
+      />
       {creating && org && (
         <CreatePlacementDialog
           orgId={org._id}

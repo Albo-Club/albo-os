@@ -7,7 +7,7 @@ un **deal** (un versement d'investissement, un retour), une ligne de
 **passif** (apport en capital, mouvement de compte courant), ou une
 **catégorie** de gestion courante (charge, impôt, produit, virement interne).
 C'est le geste qui rend tous les chiffres justes : performance des deals,
-soldes de comptes courants, analyse par catégorie, TVA.
+soldes de comptes courants, analyse par catégorie.
 
 Il se fait dans le **registre** de la [Trésorerie](07-tresorerie.md) (bas de
 la Vue d'ensemble) ; le point d'entrée quotidien est la page
@@ -31,8 +31,8 @@ la Vue d'ensemble) ; le point d'entrée quotidien est la page
    l'ordre des groupes s'adapte au sens de la transaction (une sortie
    propose les charges d'abord, une entrée les produits).
 3. Sur une charge ou un produit, la **catégorie** est donc posée dès le
-   choix (ou « à qualifier » pour décider plus tard) ; le **taux de TVA**
-   s'ajuste ensuite directement sur la ligne.
+   choix (ou « à qualifier » pour décider plus tard) ; elle s'ajuste ensuite
+   directement sur la ligne.
 4. Une ligne pointée reste visible avec son nouveau statut, et toute
    transaction peut être **détachée** plus tard pour repartir en file.
 5. **Actions groupées** : sélectionner plusieurs lignes et les classer
@@ -45,7 +45,7 @@ passe par une approbation Confirmer/Refuser.
 ## Les règles apprenantes
 
 Quand vous catégorisez une transaction à la main (charge, impôt, produit,
-virement interne — avec éventuellement catégorie et taux de TVA), Albo OS
+virement interne — avec éventuellement une catégorie), Albo OS
 **mémorise une règle** sur le libellé/la contrepartie. Cette règle est
 rejouée automatiquement sur les nouvelles transactions qui arrivent, et à la
 demande avec le bouton « Appliquer les règles ». Deux gestes ne sont jamais
@@ -93,17 +93,21 @@ attend encore une échéance prévue propose aussitôt de la réaliser, et une
 échéance devenue sans objet s'annule directement depuis sa ligne du
 registre.
 
-## La TVA
+## La TVA, mise de côté
 
-- Les montants sont toujours TTC ; on qualifie le **taux** (0 / 5,5 / 10 /
-  20 %) sur les charges et produits, et le montant de TVA est déduit
-  automatiquement.
-- La carte **TVA récupérable** (onglet Gestion) montre la position cumulée :
-  TVA déductible (sur les charges) moins TVA collectée (sur les produits),
-  avec le nombre de lignes restant « à qualifier ».
-- L'historique n'est volontairement pas qualifié en masse : salaires,
-  assurances ou frais bancaires sont exonérés, un taux global serait faux.
-  On qualifie ligne à ligne.
+Qualifier le taux de TVA ligne à ligne sur les charges ne servait pas au
+pilotage : c'est un travail de comptable, fait ailleurs. Toute la TVA a donc
+été **retirée de l'interface** — plus de taux à choisir sur une ligne, plus
+de carte « TVA récupérable », plus d'échéance de TVA suggérée.
+
+Rien n'est perdu pour autant : les taux déjà saisis restent en base,
+l'assistant IA sait toujours répondre sur la position de TVA, et la remettre
+à l'écran ne demanderait qu'un travail d'affichage.
+
+À ne pas confondre avec la **TVA des deals**, qui elle reste : les royalties
+encaissées sont converties en hors taxes pour que leur multiple et leur
+rendement soient justes. C'est porté par le type d'instrument, sans aucun
+lien avec la qualification des charges.
 
 ### Sous le capot : ce que le pointage enregistre
 

@@ -9,12 +9,14 @@
     "investedHint": "Paid in − withdrawn",
     "gain": "Unrealized gain",
     "yield": "Annualized return",
-    "yieldHint": "XIRR of matched flows + current balances"
+    "yieldHint": "XIRR of matched flows + current balances",
+    "balancePledgedHint": "including {{amount}} of pledged accounts"
   },
   "sections": {
     "liquid": "Liquid",
     "semi_liquid": "Semi-liquid",
-    "illiquid": "Illiquid"
+    "illiquid": "Illiquid",
+    "pledged": "Pledged accounts"
   },
   "placementsCount_one": "{{count}} placement",
   "placementsCount_other": "{{count}} placements",
@@ -36,7 +38,8 @@
     "withdrawn": "Withdrawn",
     "balance": "Balance",
     "gain": "Gain",
-    "yield": "Ann. return"
+    "yield": "Ann. return",
+    "holder": "Entity"
   },
   "balanceEditAria": "Edit the balance of {{name}}",
   "rowOpenAria": "Open placement {{name}}",
@@ -115,5 +118,6 @@
     "errors": {
       "default": "Could not create the placement. Please retry."
     }
-  }
+  },
+  "pledgedHint": "Blocked funds (pledge, escrow): out of the available treasury. The balance is updated on the account page."
 }
