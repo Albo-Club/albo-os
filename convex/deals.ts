@@ -117,6 +117,9 @@ const dealFields = {
   currentValue: v.optional(v.number()), // cents
   // Placement liquidity override; default derived from instrumentKind.
   liquidity: v.optional(placementLiquidityValidator),
+  // The bank account backing a treasury placement — envelope link for
+  // Powens Wealth positions.
+  bankAccountId: v.optional(v.id('bankAccounts')),
 
   // BSA (warrants) — own config, split from safe
   grantDate: v.optional(v.number()), // ms
@@ -666,6 +669,8 @@ export const update = mutation({
       // of an exit — Convex can't transmit `undefined` from the client).
       exitedDate: v.optional(v.union(v.null(), v.number())),
       exitProceeds: v.optional(v.union(v.null(), v.number())),
+      // Same pattern: explicit null detaches the placement's bank account.
+      bankAccountId: v.optional(v.union(v.null(), v.id('bankAccounts'))),
     }),
   },
   handler: async (ctx, { id, patch }) => {
@@ -691,6 +696,13 @@ export const update = mutation({
     if (patch.viaSpvCompanyId) {
       await assertSameOrg(ctx, deal.orgId, patch.viaSpvCompanyId, 'spv_wrong_org')
     }
+    // Backing bank account (treasury placement): must exist in the deal's org.
+    if (patch.bankAccountId) {
+      const account = await ctx.db.get("bankAccounts", patch.bankAccountId)
+      if (!account || account.orgId !== deal.orgId) {
+        throw new ConvexError('account_wrong_org')
+      }
+    }
     // Name: trimmed; '' = clears it (display falls back to derived title).
     if (patch.name !== undefined) {
       const trimmed = patch.name.trim()
@@ -706,12 +718,15 @@ export const update = mutation({
     // (cancelling an exit). `null ?? undefined` → undefined, which tells
     // db.patch to drop the column; absent keys are left untouched (so editing
     // an unrelated field never wipes a recorded exit).
-    const { exitedDate, exitProceeds, ...rest } = patch
+    const { exitedDate, exitProceeds, bankAccountId, ...rest } = patch
     await ctx.db.patch("deals", id, {
       ...rest,
       ...('exitedDate' in patch ? { exitedDate: exitedDate ?? undefined } : {}),
       ...('exitProceeds' in patch
         ? { exitProceeds: exitProceeds ?? undefined }
+        : {}),
+      ...('bankAccountId' in patch
+        ? { bankAccountId: bankAccountId ?? undefined }
         : {}),
       manuallyEditedFields: [...editedFields],
     })
