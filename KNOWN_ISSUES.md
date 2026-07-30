@@ -2378,16 +2378,32 @@ Pièges non-évidents :
    d'URL potentiellement faux. C'est une base d'URL **publique**, pas un secret
    (l'anti-pattern « pas de `VITE_` sur un secret » ne s'applique pas).
 
-5. **Identité éditable inline (secteur / SIREN / domaine) ; le reste en lecture
-   seule.** Ces trois champs s'éditent **au clic** via `InlineField`
-   (`src/components/ui/inline-field.tsx`) câblé sur `companies.update` — plus de
-   détour par le dialog « Modifier » pour eux (le dialog reste la voie pour nom
-   + personnes). Les champs **calculés/dérivés** — détention globale, nb
-   d'actions consolidé, lien Attio — **restent en lecture seule** (rendus par
-   `IdentityField`). Vider SIREN/domaine puis valider les **efface** (`''`,
-   normalisé côté mutation) ; le **secteur** réutilise `SectorCombobox` (props
-   additives `defaultOpen` + `onOpenChange` pour l'ouvrir/fermer en inline). Le
-   détail du composant partagé : section « Édition inline des fiches ».
+5. **Tout le panneau d'identité s'édite inline ; seuls les calculés restent en
+   lecture seule.** Secteur / SIREN / domaine / résumé s'éditent **au clic** via
+   `InlineField` (`src/components/ui/inline-field.tsx`) câblé sur
+   `companies.update` ; les personnes via `PeopleEditor` et la fiche Attio via
+   `AttioCompanyField`. Seul le **nom** passe encore par un dialog (il vit dans
+   l'en-tête figé, pas dans le panneau). Les champs **calculés** — détention
+   globale, nb d'actions consolidé — restent en lecture seule (`IdentityField`).
+   Vider SIREN/domaine/résumé puis valider les **efface** (`''`, normalisé côté
+   mutation) ; le **secteur** réutilise `SectorCombobox` (props additives
+   `defaultOpen` + `onOpenChange` pour l'ouvrir/fermer en inline). Le détail du
+   composant partagé : section « Édition inline des fiches ».
+
+6. **L'ancrage `attioCompanyId` se pose à la main, et son unicité est
+   GLOBALE — pas par org.** La ligne « Fiche Attio » du panneau
+   (`AttioCompanyField`) permet de rattacher une société créée à la main à sa
+   fiche CRM : `companies.update` accepte désormais `attioCompanyId` (`''`
+   détache). ⚠️ Le piège : par analogie avec le SIREN on écrirait un contrôle
+   **par org**, ce qui serait faux. `by_attio_company_id` est un index
+   **global** et `convex/attioSync.ts:resolveOrCreateTargetCompany` le lit en
+   **`.unique()`** — deux sociétés portant le même ancrage, même dans deux orgs
+   différentes, font **throw la synchro** au prochain événement Attio. D'où
+   `assertAttioCompanyIdFree` (global, `ConvexError('attio_company_already_used')`),
+   couvert par `convex/regression.deals.test.ts`. Corollaire côté UI : l'ancrage
+   ne se **saisit** jamais, il se **choisit** dans les résultats de
+   `attio.searchCompanies` — un id inventé enverrait les prochains deals sur la
+   mauvaise société, en silence.
 
 ## Édition manuelle deals & `manuallyEditedFields`
 

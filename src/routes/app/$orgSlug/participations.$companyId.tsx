@@ -29,10 +29,10 @@ import { CompanyLogo } from '~/components/CompanyLogo'
 import { CompanyDealsTable } from '~/components/companies/CompanyDealsTable'
 import { SectorCombobox } from '~/components/companies/SectorCombobox'
 import {
-  AttioCompanyLink,
   IdentityField,
   IdentitySection,
 } from '~/components/companies/EntityFiche'
+import { AttioCompanyField } from '~/components/companies/AttioCompanyField'
 import { PeopleEditor } from '~/components/companies/PeopleEditor'
 import { ReportingsSection } from '~/components/companies/ReportingsSection'
 import { CompanyReportsSection } from '~/components/companies/CompanyReportsSection'
@@ -731,12 +731,9 @@ function ParticipationDetail() {
                 label={t('info.sharesConsolidated')}
                 value={sharesConsolidated}
               />
-              <IdentityField
-                label={t('identity.attio')}
-                value={
-                  <AttioCompanyLink attioCompanyId={company?.attioCompanyId} />
-                }
-              />
+              {company && org && (
+                <AttioCompanyField company={company} orgId={org._id} />
+              )}
             </div>
           </IdentitySection>
 
