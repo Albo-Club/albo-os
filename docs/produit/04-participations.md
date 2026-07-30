@@ -86,14 +86,18 @@ La colonne principale, dans l'ordre de lecture :
   métriques, contenu) et celles remontées depuis Parallel/VASCO pour les SPV
   (voir [Intégrations](15-integrations.md)).
 - **Onglet Documents** : upload manuel (reporting, BP, légal, autre — 20 Mo
-  max, avec période couverte), téléchargement, suppression. Les documents
-  sont rangés en blocs dépliables — « Reporting & suivi » (reportings et
-  business plans), « Juridique & légal » (statuts, pactes, KBIS…) et
-  « Autres » — dépliés par défaut, chaque titre portant son nombre de
-  documents ; un bloc vide n'apparaît pas. Chaque document affiche l'état
-  de sa **lecture** (voir ci-dessous). Les documents propres à un
-  investissement (term sheet, pacte, bulletin de souscription…) ne se
-  rangent pas ici mais sur la [fiche du deal concerné](05-deals.md).
+  max, avec période couverte). Chaque document se présente comme une
+  **pièce jointe** : une petite box qui porte l'icône de son format, son
+  titre, le badge de son type et, en dessous, sa période et son poids. Elles
+  s'empilent de la plus récente à la plus ancienne — pas de tableau ici, la
+  liste ne sert pas à comparer des chiffres mais à retrouver un fichier. Un
+  **clic sur la box ouvre le document**. À droite, l'état de sa **lecture**
+  (voir ci-dessous), un **crayon** pour corriger le titre, le type ou la
+  période, et une corbeille (avec confirmation). Un **filtre par type**, en
+  haut à gauche, ne propose que les types réellement présents. Les documents
+  propres à un investissement (term sheet, pacte, bulletin de
+  souscription…) ne se rangent pas ici mais sur la [fiche du deal
+  concerné](05-deals.md).
 
 Le panneau d'identité, à droite. Il se présente comme une carte, au même
 style que la synthèse IA, et chaque section y est introduite par une petite
@@ -123,7 +127,7 @@ rapports ou ses deals.
 Tout document qui entre — qu'il soit déposé à la main ici ou arrivé par un
 [report transféré par email](17-reports-par-email.md) — est **lu
 automatiquement** : PDF et images par OCR, Excel et CSV cellule par cellule.
-La colonne « Lecture » dit où il en est :
+L'état affiché dans les actions de sa box dit où il en est :
 
 | Ce que tu vois | Ce que ça veut dire |
 | --- | --- |

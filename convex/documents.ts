@@ -190,8 +190,50 @@ export const create = mutation({
       uploadedAt: Date.now(),
       ocrState: 'pending',
     })
-    await ctx.scheduler.runAfter(0, internal.documentsExtract.run, { documentId })
+    await ctx.scheduler.runAfter(0, internal.documentsExtract.run, {
+      documentId,
+    })
     return documentId
+  },
+})
+
+/**
+ * Edit a document's metadata (title, kind, covered period / document date).
+ * The file itself is immutable — replacing it means deleting and re-adding,
+ * since the reading and the semantic index are keyed by the blob.
+ *
+ * An emptied period clears the field (`patch` with `undefined` removes it).
+ * Title and kind both feed the semantic index (header line + filter value),
+ * so a change to either re-indexes the document — otherwise the assistant
+ * would keep finding it under its former name.
+ */
+export const update = mutation({
+  args: {
+    documentId: v.id('documents'),
+    title: v.string(),
+    kind: kindValidator,
+    period: v.optional(v.number()),
+  },
+  handler: async (ctx, { documentId, title, kind, period }) => {
+    const doc = await ctx.db.get('documents', documentId)
+    if (!doc) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, doc.orgId)
+
+    const trimmed = title.trim()
+    if (!trimmed) throw new ConvexError('invalid_title')
+
+    await ctx.db.patch('documents', documentId, {
+      title: trimmed,
+      kind,
+      period,
+    })
+
+    if (trimmed !== doc.title || kind !== doc.kind) {
+      await ctx.scheduler.runAfter(0, internal.vectorize.indexDocument, {
+        documentId,
+      })
+    }
+    return null
   },
 })
 
@@ -218,7 +260,9 @@ export const reextract = mutation({
       ocrDetail: undefined,
       ocrChars: undefined,
     })
-    await ctx.scheduler.runAfter(0, internal.documentsExtract.run, { documentId })
+    await ctx.scheduler.runAfter(0, internal.documentsExtract.run, {
+      documentId,
+    })
     return null
   },
 })

@@ -535,23 +535,10 @@
     "deleted": "Document deleted",
     "deleteConfirmTitle": "Delete this document?",
     "deleteConfirmBody": "The file will be permanently deleted.",
-    "download": "Download",
     "dialogTitle": "New document",
     "titleLabel": "Title",
     "kindLabel": "Type",
     "periodLabel": "Covered period (optional)",
-    "col": {
-      "title": "Title",
-      "kind": "Type",
-      "period": "Period",
-      "size": "Size",
-      "date": "Added"
-    },
-    "group": {
-      "reporting": "Reporting & tracking",
-      "legal": "Legal",
-      "other": "Other"
-    },
     "kind": {
       "reporting": "Reporting",
       "bp": "Business plan",
@@ -561,6 +548,13 @@
     "errors": {
       "too_large": "File is larger than 20 MB",
       "default": "Something went wrong"
+    },
+    "updated": "Document updated",
+    "editDialogTitle": "Edit document",
+    "addedOn": "Added on {{date}}",
+    "filter": {
+      "label": "Type:",
+      "all": "all"
     }
   },
   "dealDocuments": {
@@ -572,18 +566,10 @@
     "deleted": "Document deleted",
     "deleteConfirmTitle": "Delete this document?",
     "deleteConfirmBody": "The file will be permanently deleted.",
-    "download": "Download",
     "dialogTitle": "New document",
     "titleLabel": "Title",
     "kindLabel": "Type",
     "dateLabel": "Document date (optional)",
-    "col": {
-      "title": "Title",
-      "kind": "Type",
-      "date": "Date",
-      "size": "Size",
-      "added": "Added"
-    },
     "kind": {
       "term_sheet": "Term sheet",
       "pacte": "Shareholders' agreement",
@@ -594,6 +580,13 @@
     "errors": {
       "too_large": "File is larger than 20 MB",
       "default": "Something went wrong"
+    },
+    "updated": "Document updated",
+    "editDialogTitle": "Edit document",
+    "addedOn": "Added on {{date}}",
+    "filter": {
+      "label": "Type:",
+      "all": "all"
     }
   },
   "tabs": {
@@ -724,7 +717,10 @@
       "empty_workbook": "Empty workbook",
       "unsupported_format": "Format not read"
     },
-    "column": "Reading",
     "retryError": "Could not restart the reading"
+  },
+  "documentAttachment": {
+    "open": "Open \"{{title}}\"",
+    "edit": "Edit"
   }
 }

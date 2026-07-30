@@ -86,10 +86,11 @@ toutes organisations confondues.
   n'apparaît **que** sur le deal, jamais dans l'onglet Documents de la
   société. On dépose un fichier (**20 Mo maximum**) en lui donnant un titre,
   un type et, si utile, la **date du document** (signature par exemple) —
-  cette date est facultative. Chaque ligne se **télécharge** ou se
-  **supprime** (avec confirmation), et affiche l'état de sa **lecture**
-  automatique — même colonne et mêmes règles que côté société, détaillées
-  dans [Participations](04-participations.md).
+  cette date est facultative. Présentation identique à celle de la société :
+  une box par document, un **clic pour l'ouvrir**, un **crayon** pour
+  corriger titre / type / date, une corbeille (avec confirmation), un filtre
+  par type, et l'état de sa **lecture** automatique — mêmes règles que côté
+  société, détaillées dans [Participations](04-participations.md).
 - **Notes** : texte libre.
 
 ## Gérer une sortie
