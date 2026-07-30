@@ -18,6 +18,13 @@ du cash disponible tout de suite, pas un placement.
 
 ## Comment ça marche
 
+- **Créer un placement** : le bouton « Nouveau placement » en tête de page
+  ouvre un formulaire — entité détentrice, support (une entreprise
+  existante **ou une nouvelle, créée dans la foulée** en tapant son nom),
+  type (contrat de capitalisation, dépôt à terme, compte-titres, crypto),
+  et en option la banque/plateforme, la date d'ouverture et le solde
+  actuel. La création débouche directement sur la fiche du placement ; la
+  liquidité prend le défaut de son type, corrigeable sur la fiche.
 - **Quatre tuiles de synthèse** : solde total, versé net (versements moins
   retraits), plus-value latente (en euros et en %), rendement annualisé.
 - **Un tableau par liquidité**, empilés dans l'ordre : **Liquide** (bandeau

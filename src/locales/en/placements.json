@@ -92,5 +92,28 @@
     "syncedOn": "Synced on {{date}}",
     "empty": "No position came up yet — make sure the Powens Wealth product is active and the account is synced."
   },
-  "empty": "No placements yet. Crypto, capitalization accounts, term deposits and brokerage accounts will show up here."
+  "empty": "No placements yet. Crypto, capitalization accounts, term deposits and brokerage accounts will show up here.",
+  "create": {
+    "button": "New placement",
+    "title": "New placement",
+    "description": "A placed-treasury account: capitalization contract, term deposit, brokerage account, crypto. The support can be a new company, created in the same step.",
+    "investorLabel": "Holding entity",
+    "investorPlaceholder": "Pick a group entity",
+    "supportLabel": "Support",
+    "supportNew": "+ New company",
+    "supportNamePlaceholder": "e.g. Generali Patrimoine",
+    "supportNameAria": "New company name",
+    "typeLabel": "Placement type",
+    "typePlaceholder": "Pick a type",
+    "bankLabel": "Bank / platform (optional)",
+    "bankPlaceholder": "e.g. Palatine, Kraken…",
+    "openedLabel": "Opening date (optional)",
+    "balanceLabel": "Current balance (€, optional)",
+    "balanceInvalid": "Invalid amount",
+    "submit": "Create placement",
+    "created": "Placement created",
+    "errors": {
+      "default": "Could not create the placement. Please retry."
+    }
+  }
 }
