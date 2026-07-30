@@ -23,6 +23,32 @@ bas de page.
 
 ---
 
+## v1.149.2 — 30/07/2026 à 10:00 — Le code mort est désormais détecté automatiquement
+
+Mise à jour purement technique : un détecteur de code inutilisé (fichiers,
+briques et dépendances que plus rien ne référence) tourne maintenant à
+chaque proposition de modification. Un premier audit a dressé la liste des
+candidats au nettoyage — rien n'est supprimé à ce stade, la purge sera
+validée séparément.
+
+> **🔧 Notes techniques**
+>
+> - `knip` (v6) installé en devDependency, configuré via `knip.jsonc` :
+>   entrées pour les routes TanStack Start (`src/routes/**`, référencées via
+>   `routeTree.gen.ts`), les fonctions Convex (`convex/*.ts` +
+>   `convex/migrations/*`, référencées via les proxys générés
+>   `api.*`/`internal.*`), les scripts et les tests. Ignorés :
+>   `convex/_generated/`, le vendoré (`src/components/ai-elements/`) et
+>   `src/components/ui/` (shadcn, audité à part). `tailwindcss` /
+>   `tw-animate-css` en `ignoreDependencies` (imports CSS non suivis par
+>   knip).
+> - Script `pnpm deadcode` + job CI `deadcode` dans `ci.yml`,
+>   **non-bloquant** (`continue-on-error: true`) tant que les candidats de
+>   l'audit initial ne sont pas purgés — à passer bloquant ensuite.
+> - Rapport d'audit complet (candidats classés sûr / douteux) dans la
+>   description de la PR. Aucune suppression dans cette PR.
+> - `TESTING.md` B9 et `TEMPLATE_SYNC.md` (candidat template) mis à jour.
+
 ## v1.149.1 — 29/07/2026 à 21:45 — La doc produit se recopie toute seule dans Linear
 
 La documentation produit lisible dans Linear se met désormais à jour

@@ -24,6 +24,7 @@
     "test:smoke": "node scripts/e2e-smoke.mjs",
     "test:cookies": "bash scripts/test-cookies.sh",
     "test:unit": "node --import tsx --test \"tests/**/*.test.ts\"",
+    "deadcode": "knip",
     "sync:skills:update": "node scripts/sync-skills.mjs --update",
     "sync:linear-docs": "node scripts/sync-linear-docs.mjs"
   },
@@ -89,6 +90,7 @@
     "@vitejs/plugin-react": "^5.2.0",
     "concurrently": "^9.1.2",
     "eslint": "^10.3.0",
+    "knip": "^6.29.0",
     "prettier": "^3.8.3",
     "tailwindcss": "^4.2.2",
     "tsx": "^4.19.2",
