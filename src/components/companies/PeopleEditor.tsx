@@ -344,11 +344,11 @@ function PersonInput({
         {loading ? (
           <div className="text-muted-foreground flex items-center gap-2 px-2 py-1.5 text-sm">
             <Loader2 className="size-4 animate-spin" />
-            {t('edit.personSearching')}
+            {t('edit.attioSearching')}
           </div>
         ) : error ? (
           <div className="text-muted-foreground px-2 py-1.5 text-sm">
-            {t('edit.personSearchError')}
+            {t('edit.attioSearchError')}
           </div>
         ) : results.length === 0 ? (
           <div className="text-muted-foreground px-2 py-1.5 text-sm">

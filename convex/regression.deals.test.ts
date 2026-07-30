@@ -6,7 +6,10 @@
  *   `by_org_siren` — Convex has no schema-level unique constraint).
  * - Attio bridge uniqueness (`attioDealId` / `attioCompanyId`) is enforced by
  *   the sync upsert (keyed lookups on `by_attio_deal_id` /
- *   `by_attio_company_id`): re-running the same event never duplicates.
+ *   `by_attio_company_id`): re-running the same event never duplicates. The
+ *   company anchor is also settable by hand from the identity panel, where
+ *   `companies.update` guards it GLOBALLY — the sync reads that index with
+ *   `.unique()`, so a duplicate anchor would break it at the next run.
  * - A deal's investor is always a `group_*` entity of the org, never a
  *   portfolio company (`assertInvestorIsGroupEntity`).
  */
@@ -230,10 +233,86 @@ describe('Attio bridge: attioDealId / attioCompanyId idempotence', () => {
       deals: await ctx.db.query('deals').collect(),
       companies: await ctx.db.query('companies').collect(),
     }))
-    expect(deals.filter((d) => d.attioDealId === 'attio-deal-1')).toHaveLength(1)
+    expect(deals.filter((d) => d.attioDealId === 'attio-deal-1')).toHaveLength(
+      1,
+    )
     expect(
       companies.filter((c) => c.attioCompanyId === 'attio-company-1'),
     ).toHaveLength(1)
+  })
+
+  test('claiming an Attio company already anchored elsewhere is refused', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'albo@test.dev')
+    const org = await createOrg(t, 'albo', [
+      { userId: user.userId, role: 'owner' },
+    ])
+    // The sync anchors 'attio-company-1' to the deal's target company.
+    await t.mutation(internal.attioSync.upsertFromDeal, termSheetEvent)
+
+    const other = await createPortfolioCompany(t, org.orgId, 'Homonyme')
+    await expectConvexError(
+      user.as.mutation(api.companies.update, {
+        id: other,
+        patch: { attioCompanyId: 'attio-company-1' },
+      }),
+      'attio_company_already_used',
+    )
+  })
+
+  test('the anchor uniqueness is global: another org cannot claim it either', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'albo@test.dev')
+    await createOrg(t, 'albo', [{ userId: user.userId, role: 'owner' }])
+    const orgB = await createOrg(t, 'org-b', [
+      { userId: user.userId, role: 'owner' },
+    ])
+    await t.mutation(internal.attioSync.upsertFromDeal, termSheetEvent)
+
+    // Unlike the SIREN (per-org index), the Attio anchor is one workspace-wide
+    // record: a second org claiming it would make the sync's .unique() throw.
+    const inB = await createPortfolioCompany(t, orgB.orgId, 'Même boîte')
+    await expectConvexError(
+      user.as.mutation(api.companies.update, {
+        id: inB,
+        patch: { attioCompanyId: 'attio-company-1' },
+      }),
+      'attio_company_already_used',
+    )
+  })
+
+  test('unlinking frees the anchor for another company', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'albo@test.dev')
+    const org = await createOrg(t, 'albo', [
+      { userId: user.userId, role: 'owner' },
+    ])
+    await t.mutation(internal.attioSync.upsertFromDeal, termSheetEvent)
+    const anchoredId = await t.run(async (ctx) => {
+      const rows = await ctx.db.query('companies').collect()
+      const anchored = rows.find((c) => c.attioCompanyId === 'attio-company-1')
+      if (!anchored) throw new Error('the sync did not anchor the company')
+      return anchored._id
+    })
+
+    // '' unlinks (the mutation drops the column), so the id is claimable again.
+    await user.as.mutation(api.companies.update, {
+      id: anchoredId,
+      patch: { attioCompanyId: '' },
+    })
+    const other = await createPortfolioCompany(t, org.orgId, 'La vraie')
+    await user.as.mutation(api.companies.update, {
+      id: other,
+      patch: { attioCompanyId: 'attio-company-1' },
+    })
+
+    const anchored = await t.run(async (ctx) =>
+      (await ctx.db.query('companies').collect()).filter(
+        (c) => c.attioCompanyId === 'attio-company-1',
+      ),
+    )
+    expect(anchored).toHaveLength(1)
+    expect(anchored[0]._id).toBe(other)
   })
 
   test('a second deal on the same Attio company reuses the anchored company', async () => {
