@@ -1,0 +1,52 @@
+name: Sync Linear docs
+
+# Mirrors docs/produit/*.md into the Linear project "Albo OS" on merge.
+# Runs at the one moment the old manual rule could not: after the PR ships,
+# when the agent that wrote it is long gone (CLAUDE.md § Pre-PR doc audit, q.7).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/produit/**'
+  # Manual run mirrors every page — recovery after a failed run or a hand-edit
+  # in Linear.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # git diff needs the history to reach the pre-push commit.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # No pnpm install: the script only uses Node builtins and fetch.
+      - name: Mirror pages into Linear
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            node scripts/sync-linear-docs.mjs --all
+            exit 0
+          fi
+          # `before` is all-zeros on a branch's first push and dangling after a
+          # force-push — fall back to the parent commit rather than guessing.
+          if ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            BEFORE="HEAD^"
+          fi
+          mapfile -t changed < <(git diff --name-only "$BEFORE" HEAD -- docs/produit)
+          if [ "${#changed[@]}" -eq 0 ]; then
+            echo "No docs/produit change in this push."
+            exit 0
+          fi
+          node scripts/sync-linear-docs.mjs "${changed[@]}"
