@@ -23,6 +23,86 @@ bas de page.
 
 ---
 
+## v1.153.0 — 30/07/2026 à 12:36 — Trésorerie : le cash d'abord, une seule courbe, des filtres
+
+La Vue d'ensemble de la Trésorerie répond maintenant aux questions dans
+l'ordre où on se les pose.
+
+**Où est le cash.** L'indicateur « Solde disponible » ne se contente plus
+d'afficher un total : il liste chaque compte avec son solde, au centime, et
+le total au-dessus. Compte courant, compte booster, tout ce qui est
+mobilisable apparaît là — plus besoin de descendre en bas de page pour voir
+la répartition, le tableau des comptes par banque a disparu. Les comptes
+**non disponibles** (nantis, clôturés) sont regroupés en bas de page, dans
+une section « Hors trésorerie disponible » qui dit clairement qu'ils sont
+exclus du total. Chaque ligne reste cliquable vers le détail du compte.
+
+**Ce qui tombe.** Les deux blocs « 30 prochains jours » et « 90 prochains
+jours » sont désormais côte à côte, sur une seule ligne. Le bloc
+« Atterrissage fin de mois » a été retiré : il redisait, moins clairement, ce
+que la courbe montre déjà.
+
+**La trajectoire.** Il n'y a plus qu'une seule courbe au lieu de deux
+scénarios qu'on confondait (« projeté engagé » / « projeté avec prévu ») : le
+solde du compte, trait plein sur le passé, pointillé sur le futur, en tenant
+compte de tout le prévisionnel. Et surtout : elle est **verte tant que le
+solde est positif, rouge dès qu'il passe sous zéro**. Le moment où ça bascule
+se voit immédiatement. La ligne du seuil d'alerte a été retirée du graphe (le
+bandeau d'alerte et son réglage, eux, ne changent pas).
+
+**Les transactions se filtrent.** La rangée de sept onglets (Tout, À pointer,
+Pointé, Charges, Impôts, Produits, Virements internes) est remplacée par un
+bouton « À pointer » — la file, avec son compteur — et un menu « Type » qui
+couvre tout le reste, avec deux entrées nouvelles : **Investissements** (les
+transactions rattachées à un deal) et **Comptes courants & emprunts** (celles
+allouées au passif). « Je veux voir toutes mes charges » se fait en un choix.
+
+**Les propositions de pointage se lisent enfin.** Le petit bouton gris tronqué
+(« ✓ La V… ») est remplacé par un bandeau sous la transaction concernée : le
+mot « Proposition », la cible en clair et en entier, puis « Valider » ou
+« Refuser ». On comprend qu'il y a quelque chose à décider, et on sait quoi.
+
+> **🔧 Notes techniques**
+>
+> - `CashKpis` : la tuile « Solde disponible » devient une carte pleine
+>   largeur listant les comptes actifs non nantis (lien `/cash/$accountId`
+>   par ligne, solde via `fmtEurCents`, fraîcheur de synchro via le nouveau
+>   composant exporté `AccountFreshness`) ; tuile « Atterrissage » supprimée ;
+>   les deux tuiles de flux passent en `grid-cols-2` inconditionnel.
+> - `CashAccounts.tsx` : `CashAccounts` (groupement par banque) devient
+>   `UnavailableAccountsSection` — table unique des comptes nantis/clôturés,
+>   rendue seulement s'il y en a. Le regroupement par banque et la colonne
+>   Entité disparaissent avec elle.
+> - `ForecastChart` : une seule série projetée (`plannedBalanceCents`), la
+>   série « engagé » et la `ReferenceLine` du seuil sont retirées. Couleur par
+>   signe via un `linearGradient` à deux arrêts confondus, dont l'offset est
+>   calculé sur l'étendue **de chaque série** (`zeroOffset`) — le piège des
+>   unités `objectBoundingBox` est documenté dans `KNOWN_ISSUES.md` « Courbe
+>   de solde bicolore » (contraintes : `type="monotone"` et `baseValue={0}`).
+> - `listLedger` (`convex/transactions.ts`) : nouvel argument `matchedKind`
+>   ('deal' | 'liability'), exclusif de `status`, servi par le nouvel index
+>   `by_org_allocation_kind` (`['orgId', 'allocation.kind']`). Avec un terme
+>   de recherche, le filtre s'applique en JS après l'index de recherche (dont
+>   les `filterFields` n'incluent pas `allocation.kind`).
+> - `TransactionsLedger` : `TabsList` remplacé par un bouton toggle
+>   « À pointer » (compteur `countByStatus`) + un `Select` « Type » ; un seul
+>   état `filter` en dessous, donc aucune combinaison contradictoire possible.
+>   L'entrée « Pointé » disparaît (redondante avec Investissements + Comptes
+>   courants & emprunts).
+> - `PointageTable` : la puce de suggestion sort de `RowActions` et devient
+>   `SuggestionBand`, rendue dans une `TableRow` supplémentaire (`colSpan`,
+>   `Fragment` par transaction, ligne du dessus en `border-b-0`). « Refuser »
+>   alimente un `Set` d'ids en state local — les suggestions étant recalculées
+>   à chaque lecture, un refus persistant demanderait une table dédiée (hors
+>   périmètre).
+> - i18n : `cash.unavailable.*`, `forecast.chartProjected`,
+>   `pointage.suggestion.*`, `pointage.filter.type`,
+>   `pointage.view.{deal,liability,ignored}` ajoutés en fr/en ; `totalHint`,
+>   `kpis.landing*`, `accountsTitle`, `closedSection`, `col.entity`,
+>   `chartCommitted`, `chartPlanned`, `view.matched` retirés.
+> - `TESTING.md` : CA1, CA2, CA11, FC1, FC19, RU23, RU24, RU32 réécrits,
+>   RU33/RU34 ajoutés (filtres par nature de rattachement, bouton toggle).
+
 ## v1.152.0 — 30/07/2026 à 12:26 — Les documents deviennent des pièces jointes, et se renomment
 
 L'onglet **Documents** d'une société ne ressemble plus à un tableau. Chaque

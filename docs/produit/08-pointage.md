@@ -13,8 +13,13 @@ Il se fait dans l'onglet **Transactions** de la [Trésorerie](07-tresorerie.md).
 
 ## Le workflow
 
-1. Chaque nouvelle transaction arrive en statut **« À pointer »** (file
-   d'attente avec compteur).
+1. Chaque nouvelle transaction arrive en statut **« À pointer »**. Ce n'est
+   pas une page à part : c'est un **filtre du registre**, qu'on active avec
+   le bouton « À pointer » (il porte le compteur de la file et est actif par
+   défaut). Le menu **« Type »** à côté sert à retrouver le reste : charges,
+   impôts, produits, virements internes, investissements, comptes courants &
+   emprunts, ignorées. Les deux ne se cumulent pas — on regarde la file, ou
+   un type.
 2. Chaque ligne se traite en **un seul geste** : le menu « **Affecter
    à…** », une liste cherchable qui regroupe toutes les destinations
    possibles — les **deals**, le **passif** (capital, comptes courants),
@@ -47,9 +52,10 @@ risqué en automatique).
 
 ## Les suggestions
 
-Dans la file « À pointer », les lignes que l'outil sait probablement
-classer portent une **puce de suggestion** (✓ suivie de la cible) à côté
-du menu : un clic dessus applique. Deux sources :
+Dans la file « À pointer », les lignes que l'outil sait probablement classer
+portent un **bandeau « Proposition »** juste en dessous : la cible proposée
+en clair (nom complet, jamais tronqué), un bouton « Valider » qui applique, et
+« Refuser » qui écarte la proposition. Deux sources :
 
 - les **virements internes détectés automatiquement** : deux mouvements de
   même montant, en sens opposés, entre deux comptes de l'organisation, à
@@ -59,10 +65,14 @@ du menu : un clic dessus applique. Deux sources :
   été pointées plusieurs fois vers le même deal ou la même cible de
   passif, cette cible est proposée.
 
-L'assistant IA s'appuie sur le même moteur (jusqu'à trois cibles
-probables, en conversation). Dans les deux cas, ni l'outil ni l'assistant
-ne pointent jamais seuls : la décision reste humaine — cliquer la puce,
-ou approuver explicitement dans le chat.
+« Refuser » ne fait que masquer le bandeau : rien n'est mémorisé, donc la
+proposition peut revenir au prochain chargement de la page tant que la
+transaction n'est pas pointée.
+
+L'assistant IA s'appuie sur le même moteur (jusqu'à trois cibles probables, en
+conversation). Dans les deux cas, ni l'outil ni l'assistant ne pointent jamais
+seuls : la décision reste humaine — valider le bandeau, ou approuver
+explicitement dans le chat.
 
 ## Le rapprochement des échéances prévues
 
@@ -104,6 +114,9 @@ sort de la file, sans deal, et reste consultable par statut.
 - « Virement interne » reste une étiquette posée ligne par ligne : la
   détection de paires **suggère** les deux jambes mais ne les classe
   jamais toute seule.
+- Les types « investissements » et « comptes courants & emprunts » sont deux
+  vues du même statut « pointé » : la première montre ce qui est rattaché à
+  un deal, la seconde ce qui est alloué au [passif](10-passif.md).
 
 ## Pages liées
 

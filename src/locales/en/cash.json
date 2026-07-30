@@ -15,10 +15,7 @@
   "back": "← Cash",
   "notFound": "Account not found.",
   "availableBalance": "Available balance",
-  "totalHint": "incl. {{amount}} pledged or closed",
   "kpis": {
-    "landing": "End-of-month landing",
-    "landingCommitted": "committed only: {{amount}}",
     "window30": "Next 30 days",
     "window90": "Next 90 days",
     "inflows": "Inflows",
@@ -26,7 +23,10 @@
     "net": "Net",
     "flowsHint": "upcoming entries, overdue included"
   },
-  "accountsTitle": "Bank accounts",
+  "unavailable": {
+    "title": "Not available cash",
+    "hint": "excluded from the available balance"
+  },
   "upcoming": {
     "title": "Upcoming entries",
     "window": "{{count}}d",
@@ -36,7 +36,6 @@
   "syncedAgo": "synced {{ago}}",
   "manualAsOf": "manual balance as of {{date}}",
   "notConnected": "not connected — enter the balance manually",
-  "closedSection": "Closed accounts",
   "badges": {
     "pledged": "Pledged",
     "closed": "Closed",
@@ -125,7 +124,6 @@
   "col": {
     "account": "Account",
     "bank": "Bank",
-    "entity": "Entity",
     "kind": "Type",
     "balance": "Balance"
   },
@@ -190,8 +188,7 @@
     "reliability": "Reliability: end of {{month}}, projected {{projected}} (as of the 1st) · actual {{actual}} · gap {{delta}}",
     "dealLabel": "Deal (optional)",
     "dealHint": "Links this flow to a deal (SCPI rents, coupons, distributions…) — it will show on the deal page.",
-    "chartCommitted": "Projected (committed)",
-    "chartPlanned": "Projected (with planned)",
+    "chartProjected": "Projected",
     "grid": {
       "colCategory": "Category",
       "upcoming": "+ {{amount}} to come",

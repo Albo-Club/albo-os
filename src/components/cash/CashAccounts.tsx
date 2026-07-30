@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next'
 import { useAgo } from './BankConnectionsHealth'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { Badge } from '~/components/ui/badge'
-import { Skeleton } from '~/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -61,21 +60,47 @@ function useFormatters() {
   return { fmtEur, fmtDate }
 }
 
+/**
+ * Balance freshness of one account, as a small muted line: sync recency for
+ * a connected account (amber past STALE_AFTER_MS — the balance can no longer
+ * be trusted), manual entry date otherwise. Shared by the available-cash
+ * list of the KPI band and the unavailable-accounts table below it.
+ */
+export function AccountFreshness({ account }: { account: CashAccount }) {
+  const { t } = useTranslation('cash')
+  const { fmtDate } = useFormatters()
+  const ago = useAgo()
+
+  if (account.balanceAsOf == null) {
+    if (account.isConnected) return null
+    return (
+      <span className="text-muted-foreground text-xs">{t('notConnected')}</span>
+    )
+  }
+  const stale =
+    account.isConnected && Date.now() - account.balanceAsOf > STALE_AFTER_MS
+  return (
+    <span
+      className={`text-xs ${
+        stale ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'
+      }`}
+    >
+      {account.isConnected
+        ? t('syncedAgo', { ago: ago(account.balanceAsOf) })
+        : t('manualAsOf', { date: fmtDate(account.balanceAsOf) })}
+    </span>
+  )
+}
+
 function AccountsTable({
   accounts,
   orgSlug,
-  muted = false,
-  showBank = false,
 }: {
   accounts: Array<CashAccount>
   orgSlug: string
-  muted?: boolean
-  /** Bank column instead of the entity one (closed section, mixed banks). */
-  showBank?: boolean
 }) {
   const { t } = useTranslation('cash')
-  const { fmtEur, fmtDate } = useFormatters()
-  const ago = useAgo()
+  const { fmtEur } = useFormatters()
   const navigate = useNavigate()
 
   return (
@@ -83,9 +108,8 @@ function AccountsTable({
       <Table>
         <TableHeader>
           <TableRow>
-            {showBank && <TableHead>{t('col.bank')}</TableHead>}
+            <TableHead>{t('col.bank')}</TableHead>
             <TableHead>{t('col.account')}</TableHead>
-            {!showBank && <TableHead>{t('col.entity')}</TableHead>}
             <TableHead className="text-right">{t('col.balance')}</TableHead>
           </TableRow>
         </TableHeader>
@@ -93,7 +117,7 @@ function AccountsTable({
           {accounts.map((a) => (
             <TableRow
               key={a._id}
-              className={`cursor-pointer ${muted ? 'text-muted-foreground' : ''}`}
+              className="text-muted-foreground cursor-pointer"
               onClick={() =>
                 navigate({
                   to: '/app/$orgSlug/cash/$accountId',
@@ -101,9 +125,7 @@ function AccountsTable({
                 })
               }
             >
-              {showBank && (
-                <TableCell className="font-medium">{a.bankName}</TableCell>
-              )}
+              <TableCell className="font-medium">{a.bankName}</TableCell>
               <TableCell>
                 <span className="flex flex-col gap-0.5">
                   <span className="flex flex-wrap items-center gap-1.5">
@@ -115,32 +137,9 @@ function AccountsTable({
                       <Badge variant="secondary">{t('badges.closed')}</Badge>
                     )}
                   </span>
-                  {a.balanceAsOf != null && (
-                    <span
-                      className={`text-xs ${
-                        a.isConnected &&
-                        Date.now() - a.balanceAsOf > STALE_AFTER_MS
-                          ? 'text-amber-700 dark:text-amber-400'
-                          : 'text-muted-foreground'
-                      }`}
-                    >
-                      {a.isConnected
-                        ? t('syncedAgo', { ago: ago(a.balanceAsOf) })
-                        : t('manualAsOf', { date: fmtDate(a.balanceAsOf) })}
-                    </span>
-                  )}
-                  {a.balanceAsOf == null && !a.isConnected && (
-                    <span className="text-muted-foreground text-xs">
-                      {t('notConnected')}
-                    </span>
-                  )}
+                  <AccountFreshness account={a} />
                 </span>
               </TableCell>
-              {!showBank && (
-                <TableCell className="text-muted-foreground">
-                  {a.owner?.name ?? '—'}
-                </TableCell>
-              )}
               <TableCell className="text-right tabular-nums">
                 {fmtEur(a.currentBalance) ?? t('noBalance')}
               </TableCell>
@@ -153,13 +152,14 @@ function AccountsTable({
 }
 
 /**
- * Bank accounts of the org, grouped by bank ("where is the cash"), with the
- * owning entity as a column and a per-bank subtotal in the group header.
- * The headline available/total figures live in the cockpit KPI band
- * (CashKpis) — this section keeps the tables only. Closed accounts are kept
- * (their transaction history still backs deals) in a separate muted section.
+ * Bottom of the Cash « Vue d'ensemble » tab: the accounts that are NOT part
+ * of the available cash — pledged/blocked funds and accounts closed at the
+ * bank (kept because their transaction history still backs deals). The
+ * available accounts themselves are listed in the KPI band at the top of the
+ * tab (CashKpis), so nothing is repeated here. Renders nothing when the org
+ * has no such account.
  */
-export function CashAccounts({
+export function UnavailableAccountsSection({
   accounts,
   orgSlug,
 }: {
@@ -167,75 +167,34 @@ export function CashAccounts({
   orgSlug: string
 }) {
   const { t } = useTranslation('cash')
-  const { fmtEur } = useFormatters()
 
-  const { open, closed } = useMemo(() => {
-    const all = accounts ?? []
-    return {
-      open: all.filter((a) => a.accountStatus === 'active'),
-      closed: all.filter((a) => a.accountStatus === 'closed'),
-    }
-  }, [accounts])
+  // Pledged first (real money, just not spendable), closed last.
+  const rows = useMemo(
+    () =>
+      (accounts ?? [])
+        .filter((a) => a.pledged || a.accountStatus === 'closed')
+        .sort(
+          (a, b) =>
+            Number(a.accountStatus === 'closed') -
+              Number(b.accountStatus === 'closed') ||
+            (b.currentBalance ?? 0) - (a.currentBalance ?? 0),
+        ),
+    [accounts],
+  )
 
-  const groups = useMemo(() => {
-    // Case-insensitive key: imported rows ("PALATINE") and Powens-created
-    // ones ("Palatine") must land in the same bank group.
-    const map = new Map<
-      string,
-      { name: string; accounts: Array<CashAccount>; totalCents: number }
-    >()
-    for (const a of open) {
-      const key = a.bankName.trim().toLowerCase()
-      const g =
-        map.get(key) ?? { name: a.bankName.trim(), accounts: [], totalCents: 0 }
-      g.accounts.push(a)
-      g.totalCents += a.currentBalance ?? 0
-      map.set(key, g)
-    }
-    return Array.from(map.entries())
-      .map(([id, g]) => ({ id, ...g }))
-      .sort((a, b) => b.totalCents - a.totalCents)
-  }, [open])
-
-  if (!accounts) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-24 w-full max-w-xs" />
-        <Skeleton className="h-40 w-full" />
-      </div>
-    )
-  }
-
-  if (accounts.length === 0) {
-    return (
-      <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
-        {t('accountsEmpty')}
-      </div>
-    )
-  }
+  if (rows.length === 0) return null
 
   return (
-    <div className="space-y-6">
-      {groups.map((g) => (
-        <section key={g.id} className="space-y-2">
-          <div className="flex items-baseline justify-between gap-4">
-            <h2 className="text-sm font-semibold tracking-tight">{g.name}</h2>
-            <span className="text-sm font-semibold tabular-nums">
-              {fmtEur(g.totalCents)}
-            </span>
-          </div>
-          <AccountsTable accounts={g.accounts} orgSlug={orgSlug} />
-        </section>
-      ))}
-
-      {closed.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="text-muted-foreground text-sm font-semibold tracking-tight">
-            {t('closedSection')}
-          </h2>
-          <AccountsTable accounts={closed} orgSlug={orgSlug} muted showBank />
-        </section>
-      )}
-    </div>
+    <section className="space-y-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-lg font-semibold tracking-tight">
+          {t('unavailable.title')}
+        </h2>
+        <span className="text-muted-foreground text-sm">
+          {t('unavailable.hint')}
+        </span>
+      </div>
+      <AccountsTable accounts={rows} orgSlug={orgSlug} />
+    </section>
   )
 }

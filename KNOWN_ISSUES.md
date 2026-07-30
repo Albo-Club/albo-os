@@ -1062,6 +1062,44 @@ If the lib renders content outside the React tree (e.g. into its own DOM
 node), Tailwind theme switching won't reach that container — fall back to
 inline styles with explicit values there.
 
+## Courbe de solde bicolore (vert au-dessus de zéro, rouge en dessous)
+
+Recharts ne sait pas colorer une série par signe : une `Area`/`Line` prend UN
+`stroke`. La seule voie propre est un `<linearGradient>` vertical avec **deux
+arrêts au même offset** (rupture franche) — le piège est de calculer cet
+offset.
+
+Un gradient SVG utilise par défaut `gradientUnits="objectBoundingBox"` :
+`y=0` et `y=1` sont le haut et le bas de la **boîte englobante du path
+peint**, PAS de la zone de tracé du graphe. Calculer l'offset depuis le
+domaine de l'axe Y place donc la bascule au mauvais endroit dès que la courbe
+ne touche pas les bords du graphe. Et passer en `userSpaceOnUse` obligerait à
+connaître la hauteur en pixels de la zone de tracé, que recharts n'expose pas
+de façon déclarative.
+
+**Solution retenue** (`src/components/cash/ForecastChart.tsx`, fonction
+`zeroOffset`) : calculer l'offset sur l'étendue **de la série elle-même**,
+`max / (max − min)` de ses valeurs. La boîte englobante du path EST cette
+étendue — l'offset tombe donc pile sur le zéro, sans maths en pixels ni
+domaine figé sur l'axe.
+
+Trois conditions à respecter si on touche ce fichier :
+
+- **Un gradient par série** (le réel et le projeté n'ont pas la même étendue,
+  donc pas le même offset).
+- **`type="monotone"`** : l'interpolation monotone ne dépasse jamais les
+  extrêmes des points, donc la boîte englobante reste égale à l'étendue des
+  données. Un `type="natural"` (spline qui overshoote) décalerait la bascule
+  de quelques pixels.
+- **`baseValue={0}`** sur l'`Area` : le remplissage est alors borné par la
+  ligne de zéro et son path couvre la même étendue verticale que le tracé,
+  donc le même offset marche pour le `fill`. Sans lui, l'aire descend jusqu'au
+  bas du graphe et le dégradé du remplissage se décale.
+
+Série entièrement positive ou entièrement négative : `zeroOffset` renvoie 1 ou
+0, les deux arrêts se confondent et le dégradé devient monochrome — pas de cas
+particulier à écrire.
+
 ## Suite de régression Convex (`pnpm test:convex`) — 3 pièges du harness
 
 La suite (`convex/regression.*.test.ts` + harness `convex/regression.setup.ts`)

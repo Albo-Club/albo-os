@@ -1,5 +1,8 @@
+import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
+import { AccountFreshness } from './CashAccounts'
+import type { CashAccount } from './CashAccounts'
 import { directionTone, signTone } from '~/lib/moneyTone'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Skeleton } from '~/components/ui/skeleton'
@@ -12,34 +15,34 @@ export type FlowWindow = {
 }
 
 /**
- * Cockpit KPI band (Cash « Vue d'ensemble » tab, above the curve):
- * available balance, end-of-month landing, then one composite tile per
- * horizon (30/90 days) showing inflows, outflows and net. Purely
- * presentational — the data comes from ForecastOverview (accounts + grid +
- * upcoming entries). `null` values render as skeletons while loading.
+ * Cockpit KPI band (Cash « Vue d'ensemble » tab, above the curve): where the
+ * available cash sits (total + one line per account, each linking to its
+ * detail), then the 30- and 90-day windows side by side. Purely
+ * presentational — the data comes from ForecastOverview (accounts + upcoming
+ * entries). `null` values render as skeletons while loading.
  *
- * Scope note: the available balance keeps the phase-0 account perimeter
- * (all currencies), while landing/flows are EUR (forecast grid) — coherent
- * today where every account is EUR, kept as-is rather than unified.
+ * Rounding follows CLAUDE.md § « Gestion des arrondis » : account balances
+ * are real amounts (cent-precise), the flow windows are forecast figures
+ * (rounded to the euro).
  */
 export function CashKpis({
+  accounts,
   availableCents,
-  blockedCents,
-  landingPlannedCents,
-  landingCommittedCents,
+  orgSlug,
   flows30,
   flows90,
   fmtEur,
+  fmtEurCents,
 }: {
+  /** Available accounts (active, non-pledged) — `undefined` while loading. */
+  accounts: Array<CashAccount> | undefined
+  /** Sum of the accounts above; `null` while loading. */
   availableCents: number | null
-  /** total − available; 0 hides the hint. */
-  blockedCents: number
-  landingPlannedCents: number | null
-  /** Committed-only landing, shown as subtext when scenarios diverge. */
-  landingCommittedCents: number | null
+  orgSlug: string
   flows30: FlowWindow | null
   flows90: FlowWindow | null
   fmtEur: (cents?: number | null) => string
+  fmtEurCents: (cents?: number | null) => string
 }) {
   const { t } = useTranslation('cash')
 
@@ -59,9 +62,7 @@ export function CashKpis({
         ) : (
           <>
             <div className="flex items-baseline justify-between gap-2 text-sm tabular-nums">
-              <span className="text-muted-foreground">
-                {t('kpis.inflows')}
-              </span>
+              <span className="text-muted-foreground">{t('kpis.inflows')}</span>
               <span className={directionTone('in')}>
                 +{fmtEur(flows.inCents)}
               </span>
@@ -87,66 +88,62 @@ export function CashKpis({
     </Card>
   )
 
-  const simpleTiles: Array<{
-    key: string
-    title: string
-    value: number | null
-    render: (cents: number) => { text: string; tone: string }
-    hint?: string
-  }> = [
-    {
-      key: 'available',
-      title: t('availableBalance'),
-      value: availableCents,
-      render: (cents) => ({ text: fmtEur(cents), tone: '' }),
-      hint:
-        blockedCents > 0
-          ? t('totalHint', { amount: fmtEur(blockedCents) })
-          : undefined,
-    },
-    {
-      key: 'landing',
-      title: t('kpis.landing'),
-      value: landingPlannedCents,
-      render: (cents) => ({
-        text: fmtEur(cents),
-        tone: cents < 0 ? 'text-destructive' : '',
-      }),
-      hint:
-        landingCommittedCents != null &&
-        landingCommittedCents !== landingPlannedCents
-          ? t('kpis.landingCommitted', { amount: fmtEur(landingCommittedCents) })
-          : undefined,
-    },
-  ]
-
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {simpleTiles.map((tile) => (
-        <Card key={tile.key}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-sm font-medium">
-              {tile.title}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1">
-            {tile.value == null ? (
-              <Skeleton className="h-8 w-32" />
-            ) : (
-              <p
-                className={`text-2xl font-semibold tabular-nums ${tile.render(tile.value).tone}`}
-              >
-                {tile.render(tile.value).text}
-              </p>
-            )}
-            {tile.hint && (
-              <p className="text-muted-foreground text-xs">{tile.hint}</p>
-            )}
-          </CardContent>
-        </Card>
-      ))}
-      {flowTile('flows30', t('kpis.window30'), flows30)}
-      {flowTile('flows90', t('kpis.window90'), flows90)}
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-muted-foreground text-sm font-medium">
+            {t('availableBalance')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {availableCents == null ? (
+            <Skeleton className="h-8 w-40" />
+          ) : (
+            <p className="text-2xl font-semibold tabular-nums">
+              {fmtEurCents(availableCents)}
+            </p>
+          )}
+          {accounts && accounts.length === 0 && (
+            <p className="text-muted-foreground text-sm">
+              {t('accountsEmpty')}
+            </p>
+          )}
+          {accounts && accounts.length > 0 && (
+            <div className="divide-y border-t">
+              {accounts.map((a) => (
+                <Link
+                  key={a._id}
+                  to="/app/$orgSlug/cash/$accountId"
+                  params={{ orgSlug, accountId: a._id }}
+                  className="hover:bg-muted/50 -mx-2 flex items-center justify-between gap-3 px-2 py-2 text-sm"
+                >
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate font-medium">
+                      {a.displayName ?? a.label}
+                    </span>
+                    <span className="text-muted-foreground truncate text-xs">
+                      {a.owner ? `${a.bankName} · ${a.owner.name}` : a.bankName}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 flex-col items-end">
+                    <span className="font-medium tabular-nums">
+                      {a.currentBalance == null
+                        ? t('noBalance')
+                        : fmtEurCents(a.currentBalance)}
+                    </span>
+                    <AccountFreshness account={a} />
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      <div className="grid grid-cols-2 gap-4">
+        {flowTile('flows30', t('kpis.window30'), flows30)}
+        {flowTile('flows90', t('kpis.window90'), flows90)}
+      </div>
     </div>
   )
 }

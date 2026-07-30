@@ -81,11 +81,13 @@
   "view": {
     "all": "All",
     "unmatched": "To match",
-    "matched": "Matched",
     "charge": "Expenses",
     "tax": "Taxes",
     "product": "Income",
-    "internal_transfer": "Internal transfers"
+    "internal_transfer": "Internal transfers",
+    "deal": "Investments",
+    "liability": "Shareholder accounts & loans",
+    "ignored": "Ignored"
   },
   "viewEmpty": "No transactions in this category.",
   "status": {
@@ -98,7 +100,15 @@
     "internal_transfer": "Internal transfer"
   },
   "filter": {
-    "allAccounts": "All accounts"
+    "allAccounts": "All accounts",
+    "type": "Type:"
+  },
+  "suggestion": {
+    "label": "Suggestion",
+    "attachTo": "attach to",
+    "classifyAs": "classify as",
+    "validate": "Confirm",
+    "dismiss": "Dismiss"
   },
   "search": {
     "placeholder": "Search a transaction…",

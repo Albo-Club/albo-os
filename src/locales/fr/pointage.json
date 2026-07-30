@@ -79,13 +79,15 @@
     "failed_other": "{{count}} transactions n'ont pas pu être classées."
   },
   "view": {
-    "all": "Tout",
+    "all": "Tous",
     "unmatched": "À pointer",
-    "matched": "Pointé",
     "charge": "Charges",
     "tax": "Impôts",
     "product": "Produits",
-    "internal_transfer": "Virements internes"
+    "internal_transfer": "Virements internes",
+    "deal": "Investissements",
+    "liability": "Comptes courants & emprunts",
+    "ignored": "Ignorées"
   },
   "viewEmpty": "Aucune transaction dans cette catégorie.",
   "status": {
@@ -98,7 +100,15 @@
     "internal_transfer": "Virement interne"
   },
   "filter": {
-    "allAccounts": "Tous les comptes"
+    "allAccounts": "Tous les comptes",
+    "type": "Type :"
+  },
+  "suggestion": {
+    "label": "Proposition",
+    "attachTo": "rattacher à",
+    "classifyAs": "classer en",
+    "validate": "Valider",
+    "dismiss": "Refuser"
   },
   "search": {
     "placeholder": "Rechercher une transaction…",

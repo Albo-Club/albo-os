@@ -13,7 +13,7 @@ import {
   BankConnectionsHealth,
   ConnectionsBanner,
 } from '~/components/cash/BankConnectionsHealth'
-import { CashAccounts } from '~/components/cash/CashAccounts'
+import { UnavailableAccountsSection } from '~/components/cash/CashAccounts'
 import { CashAlertCard } from '~/components/cash/CashAlertCard'
 import {
   ForecastEntriesSection,
@@ -116,17 +116,19 @@ function Cash() {
           <TabsTrigger value="gestion">{t('tabs.gestion')}</TabsTrigger>
         </TabsList>
         {/* Vue d'ensemble: the essentials only — degraded-connection banner,
-            KPI band + projected-balance curve, and where the cash sits
-            (accounts by bank). Everything else lives in the other tabs. */}
+            KPI band (where the available cash sits) + balance curve, then the
+            accounts that are NOT available cash (pledged, closed). Everything
+            else lives in the other tabs. */}
         <TabsContent value="apercu" className="space-y-6 pt-4">
           {org && <ConnectionsBanner orgId={org._id} orgSlug={orgSlug} />}
-          {org && <ForecastOverview orgId={org._id} accounts={accounts} />}
-          <section className="space-y-4">
-            <h2 className="text-lg font-semibold tracking-tight">
-              {t('accountsTitle')}
-            </h2>
-            <CashAccounts accounts={accounts} orgSlug={orgSlug} />
-          </section>
+          {org && (
+            <ForecastOverview
+              orgId={org._id}
+              orgSlug={orgSlug}
+              accounts={accounts}
+            />
+          )}
+          <UnavailableAccountsSection accounts={accounts} orgSlug={orgSlug} />
         </TabsContent>
         {/* Prévisionnel: the month-by-month detail — the "to handle" queue
             (upcoming/overdue entries), then the committed pipeline + category ×

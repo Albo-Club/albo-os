@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUpRight, Check } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useConvexMutation } from '@convex-dev/react-query'
@@ -98,40 +98,26 @@ type RecentAction = {
 type ResolvedSuggestion = { label: string; target: PointageTarget }
 
 /**
- * Single unified action: the « Affecter à… » picker, preceded by the
- * one-click suggestion chip when the backend proposes one (✓ {label} —
- * suggestion-first, the picker stays the manual path). Selecting either
- * applies immediately — the ~5 s « Annuler » banner covers mistakes.
+ * Single unified action of an unmatched row: the « Affecter à… » picker.
+ * Selecting an entry applies immediately — the ~5 s « Annuler » banner covers
+ * mistakes. When the backend proposes a target, it is offered separately, in
+ * the SuggestionBand below the row (a proposal to accept, not an action).
  */
 function RowActions({
   deals,
   liabilityOptions,
   direction,
-  suggestion,
   pending,
   onAssign,
 }: {
   deals: Array<DealOption> | undefined
   liabilityOptions: LiabilityOptionGroups | undefined
   direction: 'in' | 'out'
-  suggestion?: ResolvedSuggestion
   pending: boolean
   onAssign: (target: PointageTarget) => void
 }) {
   return (
     <div className="flex items-center justify-end gap-2">
-      {suggestion && (
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={pending}
-          className="max-w-48"
-          onClick={() => onAssign(suggestion.target)}
-        >
-          <Check className="size-4 shrink-0" />
-          <span className="truncate">{suggestion.label}</span>
-        </Button>
-      )}
       <TargetCombobox
         deals={deals}
         equityOptions={liabilityOptions?.equityOptions}
@@ -140,6 +126,48 @@ function RowActions({
         onSelect={onAssign}
         disabled={pending}
       />
+    </div>
+  )
+}
+
+/**
+ * The backend's proposal for one unmatched transaction, as a full-width band
+ * under its row: it reads as something to accept or reject, and the target's
+ * name stays legible however long it is. « Valider » applies the same
+ * assignment as the picker; « Refuser » only hides the band (suggestions are
+ * recomputed on every read, nothing is stored server-side — so a refusal
+ * lasts as long as the page stays open).
+ */
+function SuggestionBand({
+  suggestion,
+  pending,
+  onValidate,
+  onDismiss,
+}: {
+  suggestion: ResolvedSuggestion
+  pending: boolean
+  onValidate: () => void
+  onDismiss: () => void
+}) {
+  const { t } = useTranslation('pointage')
+  return (
+    <div className="bg-info/10 border-info/30 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border px-3 py-2">
+      <span className="text-xs font-semibold tracking-wide uppercase">
+        {t('suggestion.label')}
+      </span>
+      <span className="flex-1 text-sm">
+        {suggestion.target.kind === 'status'
+          ? t('suggestion.classifyAs')
+          : t('suggestion.attachTo')}{' '}
+        <span className="font-medium">{suggestion.label}</span>
+      </span>
+      <Button size="sm" disabled={pending} onClick={onValidate}>
+        <Check className="size-4 shrink-0" />
+        {t('suggestion.validate')}
+      </Button>
+      <Button size="sm" variant="ghost" disabled={pending} onClick={onDismiss}>
+        {t('suggestion.dismiss')}
+      </Button>
     </div>
   )
 }
@@ -186,7 +214,10 @@ function MatchLink({
   liabilityByTarget,
   orgSlug,
 }: {
-  allocation: { kind: 'deal' | 'equity' | 'intercompany_loan'; targetId: string }
+  allocation: {
+    kind: 'deal' | 'equity' | 'intercompany_loan'
+    targetId: string
+  }
   dealsById: Map<string, DealOption>
   liabilityByTarget: Map<string, LiabilityOption>
   orgSlug?: string
@@ -376,6 +407,11 @@ export function PointageTable({
     () => new Set(),
   )
   const [bulkPending, setBulkPending] = useState(false)
+  // Suggestions refused this session (nothing is persisted server-side — cf.
+  // SuggestionBand): the band stays hidden until the page is reloaded.
+  const [refusedSuggestions, setRefusedSuggestions] = useState<
+    Set<Id<'transactions'>>
+  >(() => new Set())
   const [confirmStatus, setConfirmStatus] = useState<BulkStatus | null>(null)
   const timeoutsRef = useRef(
     new Map<Id<'transactions'>, ReturnType<typeof setTimeout>>(),
@@ -447,7 +483,11 @@ export function PointageTable({
           targetId: target.liability.targetId,
         })
         if (!statusColumn)
-          addRecent({ tx, kind: 'allocated', targetName: target.liability.label })
+          addRecent({
+            tx,
+            kind: 'allocated',
+            targetName: target.liability.label,
+          })
       }
       setSheetTx((cur) => (cur?._id === tx._id ? null : cur))
     } catch (err) {
@@ -677,7 +717,6 @@ export function PointageTable({
           deals={deals}
           liabilityOptions={liabilityOptions}
           direction={tx.direction}
-          suggestion={suggestionByTx.get(tx._id)}
           pending={pending}
           onAssign={(target) => void handleAssign(tx, target)}
         />
@@ -689,7 +728,6 @@ export function PointageTable({
           deals={deals}
           liabilityOptions={liabilityOptions}
           direction={tx.direction}
-          suggestion={suggestionByTx.get(tx._id)}
           pending={pending}
           onAssign={(target) => void handleAssign(tx, target)}
         />
@@ -810,69 +848,101 @@ export function PointageTable({
                 </TableCell>
               </TableRow>
             ) : (
-              pagedRows.map(({ tx, recent: recentAction }) => (
-                <TableRow
-                  key={tx._id}
-                  className={`cursor-pointer ${recentAction ? 'bg-muted/40' : ''}`}
-                  onClick={() => setSheetTx(tx)}
-                >
-                  <TableCell
-                    className="w-10"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {!recentAction &&
-                      (tx.matchStatus ?? 'unmatched') === 'unmatched' && (
-                        <Checkbox
-                          checked={selectedIds.has(tx._id)}
-                          onCheckedChange={() => toggleSelected(tx._id)}
-                          disabled={bulkPending}
-                          aria-label={t('bulk.select')}
-                        />
-                      )}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap tabular-nums">
-                    {fmtDate(tx.transactionDate)}
-                  </TableCell>
-                  <TableCell>
-                    <span className="block max-w-md truncate">
-                      {tx.rawLabel}
-                    </span>
-                    {tx.counterparty && (
-                      <span className="text-muted-foreground block max-w-md truncate text-xs">
-                        {tx.counterparty}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell
-                    className={`text-right tabular-nums ${directionTone(tx.direction)}`}
-                  >
-                    {fmtSigned(tx.amount, tx.direction)}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {accountLabel(tx)}
-                  </TableCell>
-                  {statusColumn && (
-                    <TableCell>
-                      <div className="flex flex-col items-start gap-1">
-                        <Badge variant="secondary">
-                          {t(`status.${tx.matchStatus ?? 'unmatched'}`)}
-                        </Badge>
-                        {tx.allocation && (
-                          <MatchLink
-                            allocation={tx.allocation}
-                            dealsById={dealsById}
-                            liabilityByTarget={liabilityByTarget}
-                            orgSlug={orgSlug}
-                          />
+              pagedRows.map(({ tx, recent: recentAction }) => {
+                // A proposal only makes sense on a row still to reconcile,
+                // that was not just acted upon and whose band was not refused.
+                const suggestion =
+                  !recentAction &&
+                  (tx.matchStatus ?? 'unmatched') === 'unmatched' &&
+                  !refusedSuggestions.has(tx._id)
+                    ? suggestionByTx.get(tx._id)
+                    : undefined
+                return (
+                  <Fragment key={tx._id}>
+                    <TableRow
+                      className={`cursor-pointer ${recentAction ? 'bg-muted/40' : ''} ${suggestion ? 'border-b-0' : ''}`}
+                      onClick={() => setSheetTx(tx)}
+                    >
+                      <TableCell
+                        className="w-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {!recentAction &&
+                          (tx.matchStatus ?? 'unmatched') === 'unmatched' && (
+                            <Checkbox
+                              checked={selectedIds.has(tx._id)}
+                              onCheckedChange={() => toggleSelected(tx._id)}
+                              disabled={bulkPending}
+                              aria-label={t('bulk.select')}
+                            />
+                          )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap tabular-nums">
+                        {fmtDate(tx.transactionDate)}
+                      </TableCell>
+                      <TableCell>
+                        <span className="block max-w-md truncate">
+                          {tx.rawLabel}
+                        </span>
+                        {tx.counterparty && (
+                          <span className="text-muted-foreground block max-w-md truncate text-xs">
+                            {tx.counterparty}
+                          </span>
                         )}
-                      </div>
-                    </TableCell>
-                  )}
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    {actionsFor(tx, recentAction)}
-                  </TableCell>
-                </TableRow>
-              ))
+                      </TableCell>
+                      <TableCell
+                        className={`text-right tabular-nums ${directionTone(tx.direction)}`}
+                      >
+                        {fmtSigned(tx.amount, tx.direction)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {accountLabel(tx)}
+                      </TableCell>
+                      {statusColumn && (
+                        <TableCell>
+                          <div className="flex flex-col items-start gap-1">
+                            <Badge variant="secondary">
+                              {t(`status.${tx.matchStatus ?? 'unmatched'}`)}
+                            </Badge>
+                            {tx.allocation && (
+                              <MatchLink
+                                allocation={tx.allocation}
+                                dealsById={dealsById}
+                                liabilityByTarget={liabilityByTarget}
+                                orgSlug={orgSlug}
+                              />
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        {actionsFor(tx, recentAction)}
+                      </TableCell>
+                    </TableRow>
+                    {suggestion && (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell
+                          colSpan={statusColumn ? 7 : 6}
+                          className="pt-0 pb-3"
+                        >
+                          <SuggestionBand
+                            suggestion={suggestion}
+                            pending={pendingId === tx._id}
+                            onValidate={() =>
+                              void handleAssign(tx, suggestion.target)
+                            }
+                            onDismiss={() =>
+                              setRefusedSuggestions((prev) =>
+                                new Set(prev).add(tx._id),
+                              )
+                            }
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                )
+              })
             )}
           </TableBody>
         </Table>
@@ -966,7 +1036,9 @@ function CategorySelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="unset">{t('pointage:category.toQualify')}</SelectItem>
+        <SelectItem value="unset">
+          {t('pointage:category.toQualify')}
+        </SelectItem>
         {options.map((slug) => (
           <SelectItem key={slug} value={slug}>
             {t(`common:categories.${slug}`)}

@@ -15,10 +15,7 @@
   "back": "← Trésorerie",
   "notFound": "Compte introuvable.",
   "availableBalance": "Solde disponible",
-  "totalHint": "dont {{amount}} bloqués ou clôturés",
   "kpis": {
-    "landing": "Atterrissage fin de mois",
-    "landingCommitted": "engagé seul : {{amount}}",
     "window30": "30 prochains jours",
     "window90": "90 prochains jours",
     "inflows": "Entrées",
@@ -26,7 +23,10 @@
     "net": "Net",
     "flowsHint": "échéances à venir, retards inclus"
   },
-  "accountsTitle": "Comptes bancaires",
+  "unavailable": {
+    "title": "Hors trésorerie disponible",
+    "hint": "exclu du solde disponible"
+  },
   "upcoming": {
     "title": "Échéances à venir",
     "window": "{{count}} j",
@@ -36,7 +36,6 @@
   "syncedAgo": "synchro {{ago}}",
   "manualAsOf": "solde manuel au {{date}}",
   "notConnected": "non connecté — solde à saisir",
-  "closedSection": "Comptes clôturés",
   "badges": {
     "pledged": "Nanti",
     "closed": "Clôturé",
@@ -125,7 +124,6 @@
   "col": {
     "account": "Compte",
     "bank": "Banque",
-    "entity": "Entité",
     "kind": "Type",
     "balance": "Solde"
   },
@@ -190,8 +188,7 @@
     "reliability": "Fiabilité : fin {{month}}, projeté {{projected}} (au 1er du mois) · réalisé {{actual}} · écart {{delta}}",
     "dealLabel": "Deal (optionnel)",
     "dealHint": "Rattache ce flux à un deal (loyers SCPI, coupons, distributions…) — il apparaîtra sur la fiche du deal.",
-    "chartCommitted": "Projeté (engagé)",
-    "chartPlanned": "Projeté (avec prévu)",
+    "chartProjected": "Projeté",
     "grid": {
       "colCategory": "Catégorie",
       "upcoming": "+ {{amount}} à venir",
