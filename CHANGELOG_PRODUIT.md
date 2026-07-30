@@ -23,6 +23,49 @@ bas de page.
 
 ---
 
+## v1.151.0 — 30/07/2026 à 11:30 — Le statut d'un deal se lit à la même couleur partout
+
+Sur la fiche société, le tableau des deals affichait deux repères de statut à
+la fois : un petit liseré coloré dans la marge de chaque ligne, et un badge.
+Le liseré n'existait nulle part ailleurs dans l'application, et sa couleur ne
+disait pas la même chose que celle du badge — il disparaît.
+
+Reste **un seul badge**, désormais coloré comme les bandeaux de la liste des
+participations : **ambre** pour un term sheet en cours, **bleu** pour une
+position ouverte (deal actif), **vert** pour un Exit win, **rouge** pour un
+Exit loss. En teinte claire, lisible d'un coup d'œil, ce qui aide surtout
+quand une société porte plusieurs deals à des stades différents.
+
+Cette même palette s'applique maintenant partout où le statut d'un deal
+s'affiche — fiche deal et liste des deals comprises : un deal actif y était
+gris neutre, il est bleu comme ailleurs. Seul cas encore gris : une sortie
+dont le multiple n'est pas calculable (aucun capital décaissé), qui n'est ni
+une victoire ni une perte.
+
+> **🔧 Notes techniques**
+>
+> - `src/lib/dealStatusBadge.ts` : nouvelle fonction `dealBucket(status, moic)`
+>   qui range un deal dans l'un des quatre buckets `ParticipationBucket`
+>   (`pending` / `active` / `exit_win` / `exit_loss`, `null` si le MOIC d'une
+>   sortie n'est pas calculable) — même arbre de décision que le découpage
+>   par société de `ParticipationsView`. `dealStatusBadge()` en dérive
+>   directement sa teinte via la table `BUCKET_TINT` (`border-X/40 bg-X/10
+>   text-X` sur les tokens `warning` / `info` / `positive` / `destructive`),
+>   donc plus de règle « signal-only » : l'actif passe de `secondary` neutre à
+>   bleu, et le TS d'un ambre plein à un ambre teinté.
+> - `dealStatusAccent()` supprimée : elle n'avait qu'un appelant, le liseré de
+>   `CompanyDealsTable.tsx`, retiré ici (avec la cellule `relative` et
+>   l'import `cn` devenus inutiles).
+> - Signature de `dealStatusBadge()` inchangée → les autres appelants
+>   (`deals.$dealId.tsx`, `DealsListView.tsx`) héritent de la nouvelle palette
+>   sans modification. Les libellés restent servis par `dealStatusLabelKey()`
+>   et les clés i18n `participations:status.*` existantes.
+> - Docs mises à jour : `TESTING.md` (SH17, FE1b), `docs/produit/04` et `05`,
+>   et la puce anti-pattern de `CLAUDE.md` qui décrivait l'ancienne règle
+>   « la couleur ne porte que l'exit ».
+
+---
+
 ## v1.150.3 — 30/07/2026 à 10:19 — Des tests de régression gardent les fondations
 
 Mise à jour purement technique : une suite de tests automatiques vérifie
