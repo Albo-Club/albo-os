@@ -566,10 +566,13 @@ export const remove = mutation({
 - ❌ Recolouring a deal's status/exit badge by hand (a hardcoded `Badge`
   variant, or a second exit badge next to the status one). A deal's status
   colour has **one source**: `dealStatusBadge(status, moic)`
-  (`src/lib/dealStatusBadge.ts`) — neutral grey by default, amber for
-  `pending`, green/red for a winning/losing exit (from the realized MOIC), red
-  for `written_off`. One badge per deal; the colour carries only the exit (an
-  active deal is tracked through its reports, not a colour).
+  (`src/lib/dealStatusBadge.ts`) — amber for `pending`, blue for an open
+  position, green/red for a winning/losing exit (from the realized MOIC), red
+  for `written_off`, neutral grey only when the outcome isn't computable. It
+  runs on the same four-bucket palette as the participations list bands
+  (`dealBucket` / `participationBucketBand`), so a deal reads the same on the
+  deal sheet, the deals list and the company sheet. One badge per deal, and no
+  second status marker beside it (no accent bar, no duplicate exit badge).
 - ❌ A `DialogContent` whose content can grow tall (long lists, repeatable
   rows, many fields) without `max-h-[85vh] overflow-y-auto`. shadcn's dialog
   has no built-in height cap, so tall content overflows the viewport with no
