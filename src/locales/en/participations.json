@@ -288,8 +288,6 @@
       "latentGain": "Latent gain/loss"
     },
     "royalty": {
-      "paramsTitle": "Parameters",
-      "edit": "Edit",
       "tableTitle": "Quarterly tracking",
       "importBp": "Import BP",
       "addQuarter": "Add a quarter",
@@ -326,9 +324,7 @@
     },
     "leadSpv": {
       "collected": "Collected to date",
-      "collectedHint": "Gross sum of inbound transactions linked to this deal (fees + carried, not split).",
-      "paramsTitle": "Management parameters",
-      "edit": "Edit"
+      "collectedHint": "Gross sum of inbound transactions linked to this deal (fees + carried, not split)."
     },
     "cto": {
       "placeholder": "This instrument type isn't configured yet."
@@ -693,7 +689,7 @@
       "expected": "Expected",
       "probable": "Probable"
     },
-    "hint": "Forecast entries linked to this deal. The realized layer is the Transactions section below."
+    "hint": "Forecast entries linked to this deal. The realized layer is the Transactions section above."
   },
   "integrations": {
     "menuItem": "Link to an integration",

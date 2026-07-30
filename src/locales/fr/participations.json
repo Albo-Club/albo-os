@@ -288,8 +288,6 @@
       "latentGain": "Plus-value latente"
     },
     "royalty": {
-      "paramsTitle": "Paramètres",
-      "edit": "Modifier",
       "tableTitle": "Suivi trimestriel",
       "importBp": "Importer le BP",
       "addQuarter": "Ajouter un trimestre",
@@ -326,9 +324,7 @@
     },
     "leadSpv": {
       "collected": "Perçu à date",
-      "collectedHint": "Somme brute des flux entrants rattachés à ce deal (frais + carried, non ventilés).",
-      "paramsTitle": "Paramètres de gestion",
-      "edit": "Modifier"
+      "collectedHint": "Somme brute des flux entrants rattachés à ce deal (frais + carried, non ventilés)."
     },
     "cto": {
       "placeholder": "Type d'instrument pas encore configuré."
@@ -693,7 +689,7 @@
       "expected": "Prévu",
       "probable": "Probable"
     },
-    "hint": "Échéances prévisionnelles rattachées à ce deal. Le réalisé est la section Transactions ci-dessous."
+    "hint": "Échéances prévisionnelles rattachées à ce deal. Le réalisé est la section Transactions ci-dessus."
   },
   "integrations": {
     "menuItem": "Rattacher à une intégration",
