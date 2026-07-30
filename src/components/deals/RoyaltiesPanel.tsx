@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ClipboardPaste, Pencil, Plus } from 'lucide-react'
+import { ClipboardPaste, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConvexMutation } from '@convex-dev/react-query'
 
 import { api } from '../../../convex/_generated/api'
-import type { ReactNode } from 'react'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import type { BpPoint } from '~/lib/royalties'
 import type { PanelTransaction } from '~/components/deals/InstrumentBlock'
@@ -140,40 +139,28 @@ function EditableCa({
  * Custom central block for a `royalty` deal (e.g. La Vie de Quartier): a
  * royalties investment indexed on a shop's revenue. 1 deal = 1 underlying.
  *
- * Three declarative parameters (capital, depreciation, royalty rate) are
- * stored as scalars and edited through the shared deal dialog (`onEdit`, like
- * LeadSpvPanel). Two lists — the initial BP (pasted once) and the actuals (one
- * point per quarter) — are stored on the deal and edited via a dedicated UI
- * here that patches `deals.update`. Everything else (degraded BP, royalties,
- * gaps, cumulative totals) is derived at display, nothing is stored.
+ * The declarative parameters (capital, depreciation, royalty rate, floor/cap
+ * multiples, dates) live in the sheet's side panel (`InstrumentDetails`) like
+ * every other instrument's. Two lists — the initial BP (pasted once) and the
+ * actuals (one point per quarter) — are stored on the deal and edited via a
+ * dedicated UI here that patches `deals.update`. Everything else (degraded BP,
+ * royalties, gaps, cumulative totals) is derived at display, nothing is stored.
  */
 export function RoyaltiesPanel({
   deal,
   transactions,
-  notesSlot,
-  onEdit,
 }: {
   deal: Doc<'deals'>
   received?: number
   transactions?: Array<PanelTransaction>
-  notesSlot?: ReactNode
-  onEdit?: () => void
 }) {
   const { t, i18n } = useTranslation('participations')
   const lang = i18n.language
-  const { fmtEurCents, fmtDate, fmtMultiple } = useFormatters()
+  const { fmtEurCents, fmtMultiple } = useFormatters()
   const updateDeal = useConvexMutation(api.deals.update)
 
   const [importOpen, setImportOpen] = useState(false)
   const [quarterOpen, setQuarterOpen] = useState(false)
-
-  const fmtPct = (bps: number | undefined) =>
-    bps == null
-      ? '—'
-      : new Intl.NumberFormat(lang, {
-          style: 'percent',
-          maximumFractionDigits: 2,
-        }).format(bps / 10000)
 
   const fmtPctSigned = (ratio: number) =>
     new Intl.NumberFormat(lang, {
@@ -201,30 +188,6 @@ export function RoyaltiesPanel({
     deal.capMultiple != null && capital != null
       ? Math.round(deal.capMultiple * capital)
       : undefined
-
-  const fmtMultipleAmount = (mult?: number, amount?: number) =>
-    mult == null
-      ? '—'
-      : amount == null
-        ? fmtMultiple(mult)
-        : `${fmtMultiple(mult)} — ${fmtEurCents(amount)}`
-
-  const params = [
-    { key: 'capitalInvested', value: fmtEurCents(deal.capitalInvested) },
-    { key: 'depreciationRate', value: fmtPct(deal.depreciationRate) },
-    { key: 'royaltyRate', value: fmtPct(deal.royaltyRate) },
-    { key: 'investmentDate', value: fmtDate(deal.investmentDate) },
-    { key: 'royaltyStartDate', value: fmtDate(deal.royaltyStartDate) },
-    {
-      key: 'floorMultiple',
-      value: fmtMultipleAmount(deal.floorMultiple, floorAmount),
-    },
-    {
-      key: 'capMultiple',
-      value: fmtMultipleAmount(deal.capMultiple, capAmount),
-    },
-    { key: 'endDate', value: fmtDate(deal.endDate) },
-  ]
 
   const { rows, totals } = useMemo(
     () =>
@@ -358,35 +321,6 @@ export function RoyaltiesPanel({
 
   return (
     <div className="space-y-4">
-      {/* Declarative parameters (stored), edited via the shared dialog. */}
-      <div className="rounded-lg border">
-        <div className="flex items-center justify-between border-b px-4 py-2.5">
-          <span className="text-sm font-medium">
-            {t('fiche.royalty.paramsTitle')}
-          </span>
-          {onEdit && (
-            <Button variant="ghost" size="sm" className="h-7" onClick={onEdit}>
-              <Pencil className="size-3.5" />
-              {t('fiche.royalty.edit')}
-            </Button>
-          )}
-        </div>
-        <div className="grid grid-cols-3 gap-4 p-4">
-          {params.map((p) => (
-            <div key={p.key} className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground text-xs">
-                {t(`field.${p.key}`, { defaultValue: p.key })}
-              </span>
-              <span className="text-sm tabular-nums">{p.value}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Deal notes (injected by the page) sit between the parameters and the
-          realized indicators on the royalty fiche. */}
-      {notesSlot}
-
       {/* Realized performance — built from the incoming transactions de-VAT'd to
           HT, NOT from the projection table. Only shown once floor/cap multiples
           and capital are entered. */}
