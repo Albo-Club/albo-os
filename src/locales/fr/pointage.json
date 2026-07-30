@@ -162,6 +162,15 @@
     "today": "Aujourd'hui — {{date}}",
     "planned": "Prévu",
     "overdue": "En retard",
-    "fromRule": "règle récurrente"
+    "fromRule": "règle récurrente",
+    "cancelEntry": "Annuler l'échéance",
+    "cancelEntryTitle": "Annuler cette échéance ?",
+    "cancelEntryBody": "« {{label}} » du {{date}} ({{amount}}) ne comptera plus dans le solde projeté.",
+    "entryCancelled": "Échéance annulée"
+  },
+  "pendingEntry": {
+    "toast": "Ce deal a une échéance prévue en attente : « {{label}} » du {{date}} ({{amount}}).",
+    "realize": "Réaliser l'échéance",
+    "realized": "Échéance réalisée — elle sort du prévisionnel."
   }
 }

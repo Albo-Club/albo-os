@@ -1860,7 +1860,12 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   `convex/lib/entryMatching.ts` (fenêtres sens/date/montant + score
   montant/date/libellé, testé par `tests/entryMatching.test.ts`) ; une
   transaction déjà portée par un `realizedTransactionId` n'est jamais
-  re-suggérée.
+  re-suggérée. Le pont **inverse** vit dans `transactions.ts:matchTransaction` :
+  son retour porte `pendingEntry` (l'échéance `pending` du deal la plus
+  proche en date, même sens, EUR, **sans** fenêtre date/montant — le lien
+  deal est le signal), que le front propose de réaliser via
+  `markEntryRealized` (mode `close`). matchTransaction ne fait que LIRE les
+  entries — la réalisation reste un geste forecasts.ts.
 - **Tests purs hors de `convex/`.** La logique (récurrence UTC, clamping fin
   de mois, protection, agrégation mensuelle) vit dans
   `convex/lib/recurrence.ts` (zéro import Node/Convex) et est testée par
@@ -1974,10 +1979,14 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   via l'agent IA, `updateForecastEntry`) n'est visible **ni** dans cette table
   (filtre `ruleId == null`), **ni** dans la table des règles (qui liste les
   règles, pas leurs occurrences) — seulement dans la courbe/grille
-  `getForecastGrid`. Non corrigé délibérément : la surface humaine se limite
-  aux règles récurrentes + aux ponctuelles pures ; l'override d'une occurrence
-  dérivée reste un geste agent. À revoir si l'édition d'occurrence dérivée
-  passe un jour en front.
+  `getForecastGrid` et comme ligne prévisionnelle du registre
+  (`getUpcomingEntries`, ≤ 90 j). Non corrigé délibérément : la surface
+  humaine se limite aux règles récurrentes + aux ponctuelles pures ;
+  l'**édition**/override d'une occurrence dérivée reste un geste agent. En
+  revanche l'**annulation** est possible en front pour toute échéance
+  `pending` (occurrences comprises) : action « Annuler l'échéance » des
+  lignes prévisionnelles du registre (`PointageTable` → `cancelEntry`). À
+  revoir si l'édition d'occurrence dérivée passe un jour en front.
 
 ## Split chapeaux Attio → SPV, org albo (`convex/migrations/splitAlboSponsorSpvs.ts`)
 

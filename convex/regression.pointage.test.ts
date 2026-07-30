@@ -48,10 +48,12 @@ describe('pointage: match / unmatch', () => {
   test('matching sets the full matched state and leaves the queue', async () => {
     const { t, user, org, dealId, txId } = await pointageSetup()
 
-    await user.as.mutation(api.transactions.matchTransaction, {
+    const result = await user.as.mutation(api.transactions.matchTransaction, {
       transactionId: txId,
       dealId,
     })
+    // No pending forecast entry linked to the deal → nothing to follow up.
+    expect(result).toEqual({ pendingEntry: null })
 
     const tx = await t.run(async (ctx) => ctx.db.get('transactions', txId))
     expect(tx).toMatchObject({
@@ -121,6 +123,47 @@ describe('pointage: match / unmatch', () => {
       }),
       'deal_wrong_org',
     )
+  })
+})
+
+describe('pointage: deal-linked forecast entry follow-up', () => {
+  test('matching returns the closest pending entry of the deal (same direction)', async () => {
+    const { user, org, dealId, txId } = await pointageSetup()
+    const now = Date.now()
+    const DAY = 24 * 60 * 60 * 1000
+
+    // Same direction, 20 days away — outside suggestForecastMatches' ±10d
+    // window on purpose: the deal link alone must surface it.
+    const farEntry = await user.as.mutation(api.forecasts.createManualEntry, {
+      orgId: org.orgId,
+      date: now - 20 * DAY,
+      amountCents: 10_000_000,
+      direction: 'out',
+      confidence: 'expected',
+      label: 'Appel de fonds T3',
+      dealId,
+    })
+    // Closer by date but wrong direction — never suggested.
+    await user.as.mutation(api.forecasts.createManualEntry, {
+      orgId: org.orgId,
+      date: now - 1 * DAY,
+      amountCents: 5_000_000,
+      direction: 'in',
+      confidence: 'expected',
+      label: 'Distribution',
+      dealId,
+    })
+
+    const result = await user.as.mutation(api.transactions.matchTransaction, {
+      transactionId: txId,
+      dealId,
+    })
+    expect(result.pendingEntry).toMatchObject({
+      _id: farEntry,
+      label: 'Appel de fonds T3',
+      amountCents: 10_000_000,
+      direction: 'out',
+    })
   })
 })
 

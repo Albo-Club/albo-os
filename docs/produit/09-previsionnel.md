@@ -77,6 +77,12 @@ l'échéance est liée à un deal et la transaction pas encore pointée, la
 suggestion propose aussi de pointer la transaction sur le deal dans la
 foulée — deux gestes distincts.
 
+Le pont existe aussi dans l'autre sens : pointer une transaction sur un
+deal qui attend encore une échéance propose aussitôt de la réaliser —
+même en dehors des fenêtres de date et de montant des suggestions, le lien
+au deal suffit. Une échéance ne reste donc pas « en retard » simplement
+parce que le pointage a été fait avant le rapprochement.
+
 ## Alertes et TVA
 
 - **Alerte de trésorerie** : « me prévenir par email si le solde disponible
@@ -90,7 +96,10 @@ foulée — deux gestes distincts.
 - **Échéances à venir** : les 90 prochains jours vivent dans le registre,
   au-dessus du séparateur « Aujourd'hui » (statut « Prévu » en bleu) ; une
   échéance en retard descend à sa date avec un statut « En retard » en
-  ambre, et fait partie du filtre « À pointer ».
+  ambre, et fait partie du filtre « À pointer ». Une échéance devenue sans
+  objet s'**annule** directement depuis sa ligne du registre (occurrences
+  de règles récurrentes comprises), avec confirmation : elle sort du solde
+  projeté.
 - **Digest « échéances en retard »** : quand une échéance attendue dépasse
   sa date de plus d'un jour sans être rapprochée, un email récapitule
   toutes les échéances en retard (avec le lien vers le registre filtré
