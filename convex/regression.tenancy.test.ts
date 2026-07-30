@@ -172,6 +172,23 @@ describe('multi-tenant: writes', () => {
       'not_a_member',
     )
   })
+
+  test('a member of org A cannot upload a report on an org B participation', async () => {
+    const { t, alice, orgB } = await twoOrgsSetup()
+    const targetB = await createPortfolioCompany(t, orgB.orgId, 'Target B')
+    const storageId = await t.run(async (ctx) =>
+      ctx.storage.store(new Blob(['report'], { type: 'text/plain' })),
+    )
+
+    await expectConvexError(
+      alice.as.mutation(api.reportInbox.createFromUpload, {
+        companyId: targetB,
+        storageIds: [storageId],
+        filenames: ['report.txt'],
+      }),
+      'not_a_member',
+    )
+  })
 })
 
 describe('unauthenticated access', () => {

@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, FileText } from 'lucide-react'
-import { useConvexQuery } from '@convex-dev/react-query'
+import { ChevronRight, FileText, Plus } from 'lucide-react'
+import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
+import { ConvexError } from 'convex/values'
+import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
@@ -11,6 +13,7 @@ import { Button } from '~/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
@@ -20,6 +23,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
+import { Label } from '~/components/ui/label'
+import { Textarea } from '~/components/ui/textarea'
 
 type ReportDoc = { _id: Id<'documents'>; title: string; url: string | null }
 
@@ -47,7 +52,6 @@ function ReportHistory({
   companyId: Id<'companies'>
   reports: Array<ReportRow>
 }) {
-  const { t } = useTranslation('participations')
   const [openId, setOpenId] = useState<Id<'companyReports'> | null>(null)
   const docs = useConvexQuery(api.documents.listByCompany, { companyId })
 
@@ -64,11 +68,7 @@ function ReportHistory({
   }, [docs])
 
   return (
-    <section className="space-y-3">
-      <h2 className="text-lg font-semibold tracking-tight">
-        {t('reports.history.title')}
-      </h2>
-
+    <>
       <div className="space-y-2">
         {reports.map((r, i) => (
           <ReportCard
@@ -85,7 +85,7 @@ function ReportHistory({
         openId={openId}
         onClose={() => setOpenId(null)}
       />
-    </section>
+    </>
   )
 }
 
@@ -285,13 +285,193 @@ function ReportDetailDialog({
   )
 }
 
+// ─── Manual upload ───────────────────────────────────────────────────────────
+
+const MAX_BYTES = 20 * 1024 * 1024 // project storage cap (cf. convex/files.ts)
+
+/**
+ * Adds a report by hand: the picked file(s) go to Convex storage, then
+ * `reportInbox.createFromUpload` pushes them through the SAME pipeline as an
+ * emailed report (extraction → analysis → report + metrics). Nothing appears
+ * instantly — the progress line below the header tracks the run.
+ */
+function AddReportDialog({
+  companyId,
+  open,
+  onClose,
+}: {
+  companyId: Id<'companies'>
+  open: boolean
+  onClose: () => void
+}) {
+  const { t } = useTranslation(['participations', 'common'])
+  const generateUploadUrl = useConvexMutation(api.files.generateUploadUrl)
+  const createFromUpload = useConvexMutation(api.reportInbox.createFromUpload)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [files, setFiles] = useState<Array<File>>([])
+  const [note, setNote] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  function close() {
+    setFiles([])
+    setNote('')
+    onClose()
+  }
+
+  async function handleSubmit() {
+    if (files.length === 0) return
+    setSaving(true)
+    try {
+      const storageIds: Array<Id<'_storage'>> = []
+      for (const file of files) {
+        const url = await generateUploadUrl({})
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          body: file,
+        })
+        if (!res.ok) {
+          toast.error(t('participations:reports.add.errors.default'))
+          return
+        }
+        const { storageId } = (await res.json()) as { storageId: Id<'_storage'> }
+        storageIds.push(storageId)
+      }
+      await createFromUpload({
+        companyId,
+        storageIds,
+        filenames: files.map((f) => f.name),
+        note: note.trim() || undefined,
+      })
+      toast.success(t('participations:reports.add.queued'))
+      close()
+    } catch (err) {
+      const code = err instanceof ConvexError ? (err.data as string) : ''
+      toast.error(
+        code === 'too_large'
+          ? t('participations:reports.add.errors.too_large')
+          : t('participations:reports.add.errors.default'),
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && close()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t('participations:reports.add.dialogTitle')}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <p className="text-muted-foreground text-sm">
+            {t('participations:reports.add.description')}
+          </p>
+
+          <div className="space-y-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Plus className="size-4" />
+              {t('participations:reports.add.pick')}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const picked = [...(e.target.files ?? [])]
+                e.target.value = ''
+                if (picked.some((f) => f.size > MAX_BYTES)) {
+                  toast.error(t('participations:reports.add.errors.too_large'))
+                  return
+                }
+                setFiles((prev) => [...prev, ...picked])
+              }}
+            />
+            {files.length > 0 && (
+              <ul className="text-muted-foreground space-y-1 text-sm">
+                {files.map((f) => (
+                  <li key={f.name} className="truncate">
+                    {f.name}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="report-note">
+              {t('participations:reports.add.noteLabel')}
+            </Label>
+            <Textarea
+              id="report-note"
+              rows={3}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={t('participations:reports.add.notePlaceholder')}
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={close} disabled={saving}>
+            {t('common:actions.cancel')}
+          </Button>
+          <Button
+            onClick={() => void handleSubmit()}
+            disabled={saving || files.length === 0}
+          >
+            {saving
+              ? t('participations:reports.add.uploading')
+              : t('participations:reports.add.submit')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** One manual upload still in the pipeline, or stuck in the review queue. */
+function UploadProgressLine({
+  subject,
+  status,
+  statusReason,
+}: {
+  subject: string
+  status: string
+  statusReason: string | null
+}) {
+  const { t } = useTranslation(['participations', 'reports'])
+  const failed = status === 'needs_review'
+
+  return (
+    <div className="text-muted-foreground rounded-lg border border-dashed p-3 text-sm">
+      <span className="text-foreground font-medium">{subject}</span>{' '}
+      {failed
+        ? t('participations:reports.add.progress.failed', {
+            reason: t(`reports:reasons.${statusReason ?? 'unknown'}`, {
+              defaultValue: statusReason ?? '',
+            }),
+          })
+        : t('participations:reports.add.progress.running')}
+    </div>
+  )
+}
+
 // ─── Root ────────────────────────────────────────────────────────────────────
 
 /**
- * Reports tab: a clickable history of email-ingested investor reports.
- * Read-only; the report pipeline does the writing. The company-level AI
- * synthesis now lives in its own full-width block above the tabs
- * (CompanyAiSynthesisBlock).
+ * Reports tab: a clickable history of investor reports, plus the button that
+ * adds one by hand. Reports themselves are always written by the pipeline —
+ * from an email, or from a manual upload (AddReportDialog).
+ * The company-level AI synthesis lives in its own full-width block above the
+ * tabs (CompanyAiSynthesisBlock).
  */
 export function CompanyReportsSection({
   companyId,
@@ -300,22 +480,47 @@ export function CompanyReportsSection({
 }) {
   const { t } = useTranslation('participations')
   const reports = useConvexQuery(api.companyReports.listByCompany, { companyId })
+  const pending = useConvexQuery(api.reportInbox.listUploadsInProgress, {
+    companyId,
+  })
+  const [addOpen, setAddOpen] = useState(false)
 
-  if (!reports) {
-    return (
-      <div className="text-muted-foreground text-sm">
-        {t('loading')}
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="text-lg font-semibold tracking-tight">
+          {t('reports.history.title')}
+        </h2>
+        <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
+          <Plus className="size-4" />
+          {t('reports.add.action')}
+        </Button>
       </div>
-    )
-  }
 
-  if (reports.length === 0) {
-    return (
-      <div className="text-muted-foreground rounded-xl border border-dashed p-8 text-center text-sm">
-        {t('reports.empty')}
-      </div>
-    )
-  }
+      {pending?.map((row) => (
+        <UploadProgressLine
+          key={row._id}
+          subject={row.subject}
+          status={row.status}
+          statusReason={row.statusReason}
+        />
+      ))}
 
-  return <ReportHistory companyId={companyId} reports={reports} />
+      {!reports ? (
+        <div className="text-muted-foreground text-sm">{t('loading')}</div>
+      ) : reports.length === 0 ? (
+        <div className="text-muted-foreground rounded-xl border border-dashed p-8 text-center text-sm">
+          {t('reports.empty')}
+        </div>
+      ) : (
+        <ReportHistory companyId={companyId} reports={reports} />
+      )}
+
+      <AddReportDialog
+        companyId={companyId}
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+      />
+    </section>
+  )
 }

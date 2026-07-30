@@ -84,7 +84,11 @@ La colonne principale, dans l'ordre de lecture :
 - **Onglet Rapports** : les communications investisseurs — celles ingérées
   automatiquement par email (investor updates analysés : highlights,
   métriques, contenu) et celles remontées depuis Parallel/VASCO pour les SPV
-  (voir [Intégrations](15-integrations.md)).
+  (voir [Intégrations](15-integrations.md)). Le bouton **« Ajouter un
+  report »**, en haut à droite de l'onglet, permet de déposer soi-même un
+  report qui n'est pas arrivé par mail : il suit exactement le même
+  traitement (voir
+  [Reports par email](17-reports-par-email.md)).
 - **Onglet Documents** : upload manuel (reporting, BP, légal, autre — 20 Mo
   max, avec période couverte). Chaque document se présente comme une
   **pièce jointe** : une petite box qui porte l'icône de son format, son

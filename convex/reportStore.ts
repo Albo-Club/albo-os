@@ -172,12 +172,16 @@ export const storeForCompany = internalMutation({
     const email = await ctx.db.get('inboundEmails', args.inboundEmailId)
     if (!email) throw new Error('inbound email not found')
 
+    // A manual upload (`origin: 'upload'`) carries no real AgentMail message:
+    // its provenance is the upload, and the placeholder ids stay out.
+    const isUpload = email.origin === 'upload'
+
     const reportFields = {
       orgId: args.orgId,
       companyId: args.companyId,
-      source: 'email' as const,
-      agentmailInboxId: email.agentmailInboxId,
-      agentmailMessageId: email.agentmailMessageId,
+      source: isUpload ? ('upload' as const) : ('email' as const),
+      agentmailInboxId: isUpload ? undefined : email.agentmailInboxId,
+      agentmailMessageId: isUpload ? undefined : email.agentmailMessageId,
       agentmailThreadId: email.agentmailThreadId,
       fromEmail: email.realSenderEmail ?? email.fromEmail,
       subject: email.subject,
@@ -239,7 +243,7 @@ export const storeForCompany = internalMutation({
         storageId: att.storageId,
         contentType: att.contentType,
         size: att.size,
-        source: 'email',
+        source: isUpload ? 'upload' : 'email',
         uploadedAt: Date.now(),
         reportId,
         inline: att.inline,

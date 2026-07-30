@@ -595,7 +595,7 @@
   },
   "reports": {
     "title": "Reports investisseur",
-    "empty": "Aucun report reçu par email pour l'instant.",
+    "empty": "Aucun report pour l'instant.",
     "untitled": "Report sans titre",
     "metrics": "Métriques",
     "content": "Contenu",
@@ -633,6 +633,25 @@
       "current": "À jour",
       "received": "Reçu le {{date}}",
       "viewDocs": "Voir les docs"
+    },
+    "add": {
+      "action": "Ajouter un report",
+      "dialogTitle": "Ajouter un report",
+      "description": "Le fichier est analysé comme un report reçu par email : période, points clés et métriques sont extraits automatiquement.",
+      "pick": "Choisir des fichiers",
+      "noteLabel": "Note (optionnel)",
+      "notePlaceholder": "Contexte utile à l'analyse : message d'accompagnement, précisions…",
+      "submit": "Analyser",
+      "uploading": "Envoi…",
+      "queued": "Report envoyé — l'analyse est en cours.",
+      "errors": {
+        "too_large": "Fichier trop lourd (20 Mo maximum).",
+        "default": "L'envoi a échoué. Réessaie."
+      },
+      "progress": {
+        "running": "· analyse en cours…",
+        "failed": "· analyse échouée ({{reason}})"
+      }
     }
   },
   "intelligence": {

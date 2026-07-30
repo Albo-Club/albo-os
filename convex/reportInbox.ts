@@ -15,8 +15,8 @@ import { internal } from './_generated/api'
 import { internalAction, internalMutation, mutation, query } from './_generated/server'
 import { fetchBody, getMessage } from './agentmail'
 import { requireAppUser, requireOrgMember } from './lib/auth'
-import type { QueryCtx } from './_generated/server'
-import type { Id } from './_generated/dataModel'
+import type { MutationCtx, QueryCtx } from './_generated/server'
+import type { Doc, Id } from './_generated/dataModel'
 
 // Keep stored body snapshots well under the 1MB Convex document cap. Later
 // pipeline stages re-fetch the full body from AgentMail when they need it.
@@ -315,6 +315,36 @@ export const listAssignTargets = query({
 })
 
 /**
+ * Every entity representing the same participation as `company`: same domain
+ * or exact same name, across all orgs — the fan-out rule of automatic
+ * identification (convex/reportIdentify.ts).
+ */
+async function sameParticipation(
+  ctx: MutationCtx,
+  company: Doc<'companies'>,
+): Promise<Array<{ companyId: Id<'companies'>; orgId: Id<'organizations'> }>> {
+  const domain = company.domain?.toLowerCase() ?? null
+  const nameLc = company.name.toLowerCase()
+  const matched: Array<{ companyId: Id<'companies'>; orgId: Id<'organizations'> }> = []
+  const orgs = await ctx.db.query('organizations').collect()
+  for (const org of orgs) {
+    const companies = await ctx.db
+      .query('companies')
+      .withIndex('by_org_kind', (q) => q.eq('orgId', org._id).eq('kind', 'portfolio'))
+      .collect()
+    for (const c of companies) {
+      if (c.archivedAt) continue
+      const same =
+        c._id === company._id ||
+        (domain !== null && (c.domain ?? '').toLowerCase() === domain) ||
+        c.name.toLowerCase() === nameLc
+      if (same) matched.push({ companyId: c._id, orgId: c.orgId })
+    }
+  }
+  return matched
+}
+
+/**
  * Manually attach a reviewed email to a participation, then resume the
  * pipeline where it stopped (extraction if not done, else storage). The
  * match fans out to every entity sharing the chosen company's domain or
@@ -333,24 +363,7 @@ export const assignCompany = mutation({
     if (!company || company.kind !== 'portfolio') throw new ConvexError('not_found')
     await requireOrgMember(ctx, company.orgId)
 
-    const domain = company.domain?.toLowerCase() ?? null
-    const nameLc = company.name.toLowerCase()
-    const matched: Array<{ companyId: Id<'companies'>; orgId: Id<'organizations'> }> = []
-    const orgs = await ctx.db.query('organizations').collect()
-    for (const org of orgs) {
-      const companies = await ctx.db
-        .query('companies')
-        .withIndex('by_org_kind', (q) => q.eq('orgId', org._id).eq('kind', 'portfolio'))
-        .collect()
-      for (const c of companies) {
-        if (c.archivedAt) continue
-        const same =
-          c._id === companyId ||
-          (domain !== null && (c.domain ?? '').toLowerCase() === domain) ||
-          c.name.toLowerCase() === nameLc
-        if (same) matched.push({ companyId: c._id, orgId: c.orgId })
-      }
-    }
+    const matched = await sameParticipation(ctx, company)
 
     await ctx.db.patch('inboundEmails', inboundEmailId, {
       status: 'received',
@@ -419,5 +432,115 @@ export const reject = mutation({
       statusReason: 'manual_reject',
     })
     return null
+  },
+})
+
+// ─── Manual upload (company sheet) ───────────────────────────────────────────
+
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024 // project storage cap (cf. files.ts)
+/** Recent rows scanned for the company sheet's in-progress banner. */
+const UPLOAD_SCAN = 50
+
+/**
+ * Add a report by hand from a company sheet: the uploaded file(s) enter the
+ * SAME pipeline as an emailed report, starting at content extraction. The
+ * participation is chosen by the user, so identification (brick 3) is skipped
+ * — the match is preset here, with the usual multi-org fan-out.
+ *
+ * The row is not an email: `origin: 'upload'` marks it, the AgentMail ids are
+ * placeholders, and no recap mail goes out (cf. `reportNotify.send`).
+ */
+export const createFromUpload = mutation({
+  args: {
+    companyId: v.id('companies'),
+    storageIds: v.array(v.id('_storage')),
+    filenames: v.array(v.string()),
+    note: v.optional(v.string()),
+  },
+  handler: async (
+    ctx,
+    { companyId, storageIds, filenames, note },
+  ): Promise<Id<'inboundEmails'>> => {
+    const user = await requireAppUser(ctx)
+    if (storageIds.length === 0 || storageIds.length !== filenames.length) {
+      throw new ConvexError('invalid_args')
+    }
+    const company = await ctx.db.get('companies', companyId)
+    if (!company || company.kind !== 'portfolio') throw new ConvexError('not_found')
+    await requireOrgMember(ctx, company.orgId)
+
+    // Content type and size come from the stored blob, never from the client.
+    const attachments = []
+    for (const [i, storageId] of storageIds.entries()) {
+      const meta = await ctx.db.system.get('_storage', storageId)
+      if (!meta) throw new ConvexError('not_found')
+      if (meta.size > MAX_UPLOAD_BYTES) {
+        await ctx.storage.delete(storageId)
+        throw new ConvexError('too_large')
+      }
+      attachments.push({
+        // The storage id is unique per upload — a fine attachment key here.
+        attachmentId: storageId,
+        filename: filenames[i],
+        contentType: meta.contentType ?? undefined,
+        size: meta.size,
+        storageId,
+      })
+    }
+
+    const matched = await sameParticipation(ctx, company)
+    const trimmedNote = note?.trim()
+
+    const id = await ctx.db.insert('inboundEmails', {
+      origin: 'upload',
+      agentmailInboxId: 'manual-upload',
+      agentmailMessageId: `upload:${storageIds[0]}`,
+      fromEmail: user.email,
+      toEmails: [],
+      ccEmails: [],
+      subject: filenames.join(', '),
+      receivedAt: Date.now(),
+      bodyText: trimmedNote || undefined,
+      attachments,
+      status: 'received',
+      senderUserId: user._id,
+      matchedCompanies: matched,
+      matchMethod: 'manual_upload',
+    })
+
+    await ctx.scheduler.runAfter(0, internal.reportExtract.run, { inboundEmailId: id })
+    return id
+  },
+})
+
+/**
+ * Manual uploads of this company still in the pipeline (or stuck in review),
+ * for the progress line on its Reports tab. Scans the most recent rows rather
+ * than an index: `matchedCompanies` is an array, and manual uploads are rare
+ * and short-lived — an older failure stays visible in the review queue.
+ */
+export const listUploadsInProgress = query({
+  args: { companyId: v.id('companies') },
+  handler: async (ctx, { companyId }) => {
+    const company = await ctx.db.get('companies', companyId)
+    if (!company) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, company.orgId)
+
+    const rows = await ctx.db.query('inboundEmails').order('desc').take(UPLOAD_SCAN)
+    return rows
+      .filter(
+        (r) =>
+          r.origin === 'upload' &&
+          r.status !== 'processed' &&
+          r.status !== 'rejected' &&
+          (r.matchedCompanies ?? []).some((m) => m.companyId === companyId),
+      )
+      .map((r) => ({
+        _id: r._id,
+        subject: r.subject,
+        status: r.status,
+        statusReason: r.statusReason ?? null,
+        receivedAt: r.receivedAt,
+      }))
   },
 })
