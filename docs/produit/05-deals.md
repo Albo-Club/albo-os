@@ -36,13 +36,14 @@ toutes organisations confondues.
 - **Statut** : *engagé* (term sheet signée, pas encore câblé — créé
   automatiquement depuis Attio), *actif*, *sorti partiellement*, **Exit
   win** / **Exit loss** (sortie gagnante ou perdante, selon le multiple
-  réalisé). La **couleur** du statut ne sert qu'à la sortie : vert = Exit
-  win, rouge = Exit loss, gris = neutre (actif ou sortie sans plus-value) ;
-  *engagé* est en ambre. Une **sortie partielle** vire au vert dès qu'elle
-  est déjà dans le vert, jamais au rouge (la position n'est pas soldée).
-  Un deal actif se suit par ses reports, pas par une couleur — le bleu
-  « position ouverte » n'apparaît que sur les repères de la liste
-  (bandeaux) et de la fiche société (liseré).
+  réalisé). Le statut se lit sur un **seul badge**, en teinte claire, avec la
+  même **couleur** partout (fiche deal, liste des deals, fiche société) que
+  les bandeaux de la liste des participations : ambre = *engagé*, bleu =
+  position ouverte (actif), vert = Exit win, rouge = Exit loss. Une **sortie
+  partielle** vire au vert dès qu'elle est déjà dans le vert, jamais au rouge
+  (la position n'est pas soldée) : sinon elle reste bleue. Seule exception,
+  le **gris** : une sortie dont le multiple n'est pas calculable (aucun
+  capital décaissé) n'est ni une victoire ni une perte.
 - **Dates** : signature (tri par défaut), closing, sortie.
 - **Titres et détention** : les deals en actions enregistrent le **nombre de
   titres acquis** et le **prix par titre**. Un achat sur le **secondaire**

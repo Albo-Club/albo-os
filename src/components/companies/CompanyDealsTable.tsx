@@ -10,13 +10,8 @@ import {
   useDealTitle,
   useFormatters,
 } from '~/components/participations/ParticipationsTable'
-import {
-  dealStatusAccent,
-  dealStatusBadge,
-  dealStatusLabelKey,
-} from '~/lib/dealStatusBadge'
+import { dealStatusBadge, dealStatusLabelKey } from '~/lib/dealStatusBadge'
 import { Badge } from '~/components/ui/badge'
-import { cn } from '~/lib/utils'
 import {
   Table,
   TableBody,
@@ -28,10 +23,9 @@ import {
 
 /**
  * Deals of ONE company, styled like the participations list (same row height,
- * whole-row click). The status reads on the 4px accent bar in the row's left
- * margin (`dealStatusAccent` — amber TS, blue open, green/red exits); the
- * badge itself stays signal-only (a neutral active deal is tracked through
- * its reports). One row = one deal, clicking it opens the deal sheet. Feeds
+ * whole-row click). The status reads on a single badge, coloured by
+ * `dealStatusBadge` on the participations palette (amber TS, blue open,
+ * green/red exits). One row = one deal, clicking it opens the deal sheet. Feeds
  * on the enriched `deals.list` result the company page already loads — no
  * extra query. Lists are short (a handful of deals per company), so no
  * sticky header / sort / pagination — only a fixed order: pending Term
@@ -118,7 +112,6 @@ function CompanyDealRow({
     residual: residualCents(deal),
   })
   const statusBadge = dealStatusBadge(deal.status, deal.moic)
-  const accent = dealStatusAccent(deal.status, deal.moic)
   // Same tiles as the deal sheet: committed + paid for funds, forecast
   // commitment for a pending TS, paid (cent-precise) otherwise.
   const tiles = dealAmountTiles(deal)
@@ -141,12 +134,7 @@ function CompanyDealRow({
         if (e.key === 'Enter') open()
       }}
     >
-      {/* Accent bar in the row's left margin (relative cell anchors it). */}
-      <TableCell className="relative font-medium">
-        <span
-          aria-hidden
-          className={cn('absolute inset-y-0 left-0 w-1', accent)}
-        />
+      <TableCell className="font-medium">
         <span className="flex flex-col">
           <span>{title}</span>
           {secondaryParts.length > 0 && (
