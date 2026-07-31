@@ -3154,9 +3154,47 @@ le chat), dimension 4096 — **le max du vector index Convex**, ne pas prendre
 un modèle au-dessus. Routage **épinglé sur le provider `nebius`** (Nebius
 Token Factory, NL) avec `allow_fallbacks: false` — décision souveraineté : le
 texte des documents ne doit transiter que par cet hébergeur UE. Conséquence
-assumée : une panne Nebius fait échouer l'indexation (schedulée → relançable)
-et la recherche, au lieu de basculer vers un host US ; ne ré-élargir le
-routage qu'en connaissance de cause.
+assumée : une saturation/panne Nebius fait échouer l'indexation (retries
+espacés puis email, cf. ci-dessous) et la recherche, au lieu de basculer vers
+un host US ; ne ré-élargir le routage qu'en connaissance de cause.
+
+**⚠️ Le quota Nebius est partagé, pas à nous.** On passe par la clé
+OpenRouter, qui appelle Nebius avec **ses** identifiants : le plafond de
+tokens du modèle est mutualisé entre tous les clients OpenRouter qui routent
+vers ce provider. Un `429 "You exceeded your tokens quota"` peut donc tomber
+**sans rapport avec notre volume** (vécu le 31/07/2026 : trafic mondial du
+modèle ×2 en dix jours, backfill bloqué à froid). Inutile de « demander plus
+de quota » chez Nebius (on n'a pas de compte) ; si ça devient chronique, la
+sortie propre est une clé Nebius en direct (même DC néerlandais, quota à
+nous).
+
+**Trace & échecs — même mécanique que `ocrState`, une couche plus bas.**
+Chaque soumission finit par écrire `vectorState` + `vectorDetail` sur sa
+ligne (`documents` **et** `companyReports`) : `indexed`, `skipped` (verdict
+normal : doc email couvert par son report, image inline, pas de texte),
+`failed`, `pending` pendant la file/les retries. Jamais d'échec silencieux :
+
+- **Au fil de l'eau** : échec transitoire → 3 tentatives espacées
+  (+1 min, +5 min — `MAX_INDEX_ATTEMPTS`/`RETRY_DELAYS_MS`) ; après la
+  dernière, **email aux membres de l'org** (`vectorizeFailureEmail`) et état
+  `failed` avec le bouton de relance dans l'UI (`documents:reindex`, jumeau
+  de `reextract` — il garde le texte extrait, seule l'entrée d'index est
+  reconstruite). Un échec permanent (4xx ≠ 408/429) saute les retries.
+- **`vectorDetail` nomme la couche fautive** (`convex/lib/vectorizeErrors.ts:
+  classifyIndexError`, testé dans `tests/vectorizeErrors.test.ts`) :
+  `provider_http_<status>` (le provider a répondu une erreur — `_429` =
+  quota partagé saturé), `provider_unreachable` (jamais atteint),
+  `provider_bad_response` (200 inexploitable), `index_write_failed` (notre
+  écriture après embedding). Le classifieur déplie `AI_RetryError.lastError`
+  et les `cause` imbriquées — ne pas matcher `err.message`.
+- **Le backfill est séquentiel et reprenable** : une ligne à la fois, saute
+  ce qui est déjà `indexed`/`skipped` (re-run gratuit), s'arrête proprement
+  au premier échec transitoire (quota) avec un résumé « STOPPED … run again
+  later to resume » — relancer plus tard reprend où c'était. Pas d'email ici
+  (opération manuelle, le résumé EST le feedback). Pas de cron de rattrapage
+  **par choix** (un seul moteur, celui de la trace OCR) : un échec est
+  visible, notifié, relançable — pas re-tenté en boucle par un second
+  mécanisme.
 
 - **Un namespace RAG = une org** (`namespace = orgId`) : l'isolation
   multi-tenant est structurelle côté index, mais le namespace **isole sans

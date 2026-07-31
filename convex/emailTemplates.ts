@@ -870,6 +870,71 @@ export function powensConnectionAlertEmail({
   return { subject: c.subject, html, text: plainText(c.text) }
 }
 
+export function vectorizeFailureEmail({
+  locale,
+  orgName,
+  itemLabel,
+  detail,
+  targetUrl,
+}: {
+  locale: EmailLocale
+  orgName: string
+  itemLabel: string
+  /** Machine code from vectorize.ts `classifyIndexError` — shown verbatim. */
+  detail: string
+  targetUrl: string
+}) {
+  const hOrg = esc(orgName)
+  const hItem = esc(itemLabel)
+  const hDetail = esc(detail)
+
+  const c = pick(locale, {
+    en: {
+      subject: `Document indexing failed — ${itemLabel} (${orgName})`,
+      heading: `“${hItem}” could not be indexed`,
+      intro: `The document <strong>${hItem}</strong> (${hOrg}) could not be added to the assistant's search index, despite several spaced attempts. Until it is indexed, the assistant cannot search its content.`,
+      followup: `The file itself is safe and untouched. Open the sheet and use the retry button next to the document — if the provider was saturated, a later retry usually goes through.`,
+      footer: `You receive this because document indexing is monitored for ${hOrg}. One email per failed document.`,
+      preheader: `“${hItem}” is not searchable by the assistant.`,
+      cta: 'Open the sheet',
+      text: [
+        `The document "${itemLabel}" (${orgName}) could not be added to the assistant's search index, despite several spaced attempts.`,
+        `Error code: ${detail}`,
+        `The file itself is safe and untouched. Open the sheet and use the retry button next to the document: ${targetUrl}`,
+      ],
+    },
+    fr: {
+      subject: `Indexation en échec — ${itemLabel} (${orgName})`,
+      heading: `« ${hItem} » n'a pas pu être indexé`,
+      intro: `Le document <strong>${hItem}</strong> (${hOrg}) n'a pas pu être ajouté à l'index de recherche de l'assistant, malgré plusieurs tentatives espacées. Tant qu'il n'est pas indexé, l'assistant ne peut pas chercher dans son contenu.`,
+      followup: `Le fichier lui-même est intact. Ouvrez la fiche et utilisez le bouton de relance à côté du document — si le fournisseur était saturé, une relance plus tard passe en général.`,
+      footer: `Vous recevez cet email car l'indexation des documents de ${hOrg} est surveillée. Un email par document en échec.`,
+      preheader: `« ${hItem} » n'est pas cherchable par l'assistant.`,
+      cta: 'Ouvrir la fiche',
+      text: [
+        `Le document « ${itemLabel} » (${orgName}) n'a pas pu être ajouté à l'index de recherche de l'assistant, malgré plusieurs tentatives espacées.`,
+        `Code d'erreur : ${detail}`,
+        `Le fichier lui-même est intact. Ouvrez la fiche et utilisez le bouton de relance à côté du document : ${targetUrl}`,
+      ],
+    },
+  })
+
+  const detailParagraph = pick(locale, {
+    en: `Error code: <code>${hDetail}</code>`,
+    fr: `Code d'erreur : <code>${hDetail}</code>`,
+  })
+
+  const html = layout({
+    locale,
+    preheader: c.preheader,
+    heading: c.heading,
+    paragraphs: [c.intro, detailParagraph, c.followup],
+    cta: { label: c.cta, url: targetUrl },
+    footer: c.footer,
+  })
+
+  return { subject: c.subject, html, text: plainText(c.text) }
+}
 
 export function reviewReasonLabel(reason: string): string {
   return REVIEW_REASON_LABELS[reason] ?? reason

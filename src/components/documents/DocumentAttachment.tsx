@@ -2,8 +2,14 @@ import { FileSpreadsheet, FileText, Image, Pencil, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { Id } from '../../../convex/_generated/dataModel'
-import type { OcrState } from '~/components/documents/DocumentReading'
-import { OcrStatus } from '~/components/documents/DocumentReading'
+import type {
+  OcrState,
+  VectorState,
+} from '~/components/documents/DocumentReading'
+import {
+  OcrStatus,
+  VectorStatus,
+} from '~/components/documents/DocumentReading'
 import {
   Attachment,
   AttachmentAction,
@@ -36,6 +42,8 @@ export type DocumentCard = {
   ocrState: OcrState
   ocrDetail: string | null
   ocrChars: number | null
+  vectorState: VectorState
+  vectorDetail: string | null
   url: string | null
 }
 
@@ -107,6 +115,11 @@ export function DocumentAttachment({
           detail={doc.ocrDetail}
           chars={doc.ocrChars}
           onOpen={onOpenText}
+        />
+        <VectorStatus
+          documentId={doc._id}
+          state={doc.vectorState}
+          detail={doc.vectorDetail}
         />
         <AttachmentAction
           onClick={onEdit}

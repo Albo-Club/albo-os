@@ -735,6 +735,26 @@
     },
     "retryError": "Impossible de relancer la lecture"
   },
+  "vectorization": {
+    "indexed": "Cherchable par l'assistant",
+    "pending": "Indexation pour la recherche…",
+    "failed": "Indexation en échec",
+    "skipped": "Non indexé",
+    "index": "Indexer pour la recherche de l'assistant",
+    "retry": "Relancer l'indexation",
+    "restarted": "Indexation relancée",
+    "retryError": "Impossible de relancer l'indexation",
+    "detail": {
+      "covered_by_report": "Couvert par son report",
+      "inline_image": "Image intégrée — non indexée",
+      "no_text": "Aucun texte à indexer",
+      "no_content": "Aucun contenu à indexer",
+      "provider_unreachable": "Service d'indexation injoignable",
+      "provider_bad_response": "Réponse invalide du service d'indexation",
+      "index_write_failed": "Échec à l'enregistrement de l'index",
+      "provider_http_429": "Service d'indexation saturé — réessayer plus tard"
+    }
+  },
   "documentAttachment": {
     "open": "Ouvrir « {{title}} »",
     "edit": "Modifier"
