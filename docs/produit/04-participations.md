@@ -22,6 +22,13 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
   term sheet en cours, pas de tableau ambre. Le compteur du bandeau compte
   les **deals** (pas les lignes) : même nombre que la ligne de totaux du
   tableau — tout se raisonne en deals.
+- **Une société peut apparaître dans plusieurs tableaux** quand ses deals
+  n'ont pas tous le même statut (ex. un deal sorti et un nouveau ticket en
+  cours) : chaque tableau garde ainsi des sommes exactes. Pour que ça ne se
+  lise pas comme un doublon, ces lignes portent un **sous-titre sous le nom**
+  — « 1 deal sur 2 · 1 sorti » côté positions ouvertes, « 1 deal sur 2 ·
+  toujours en portefeuille » côté exits — avec une pastille de la couleur du
+  tableau où vit le reste de la société. Les autres lignes ne changent pas.
 - **Colonnes réduites à l'essentiel**, dans cet ordre : ce qui décrit la
   boîte — logo et nom, **score IA de santé** (1 à 10), secteur en badge —
   puis ce qui la mesure : nombre de deals, montant investi, montant reçu,

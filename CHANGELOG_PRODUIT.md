@@ -23,6 +23,31 @@ bas de page.
 
 ---
 
+## v1.164.0 — 31/07/2026 à 14:16 — Fini le faux doublon dans la liste des participations
+
+Quand une société a des deals dans des états différents — par exemple un
+deal sorti et un nouveau ticket en cours, comme Rewatt — elle apparaît dans
+deux tableaux de la liste, et ça pouvait se lire comme un doublon. Ces
+lignes portent maintenant un sous-titre sous le nom de la société : « 1
+deal sur 2 · 1 sorti » côté positions ouvertes, « 1 deal sur 2 · toujours
+en portefeuille » côté exits, avec une pastille de la couleur du tableau où
+vit le reste de la société. Rien ne change sur les autres lignes ni dans
+les chiffres : chaque tableau garde ses sommes exactes.
+
+> **🔧 Notes techniques**
+>
+> - Calcul **100 % client** dans `ParticipationsView.tsx` : la vue possède
+>   déjà toutes les lignes d'une société, un helper `rowBucket` (même arbre
+>   de décision que `dealBucket`) classe chaque ligne, et les sociétés
+>   présentes dans ≥ 2 tableaux reçoivent un `crossRef` (total de deals +
+>   autres tableaux), calculé sur l'ensemble **non filtré** pour que la
+>   mention ne clignote pas avec les facettes. Aucun changement serveur.
+> - Rendu dans `ParticipationsTable.tsx` (cellule société, colonne gelée) :
+>   sous-titre « N deals sur M » + pastille par autre tableau via
+>   `participationBucketBand` — la palette de statut existante. Nouvelles
+>   clés i18n `crossRef.*` (fr/en). Doc produit et TESTING.md (SH19) mis à
+>   jour.
+
 ## v1.163.0 — 30/07/2026 à 18:54 — Une petite roue qui tourne partout où ça charge
 
 Jusqu'ici, quand l'app attendait quelque chose, elle affichait un simple
