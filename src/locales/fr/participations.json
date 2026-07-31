@@ -456,15 +456,7 @@
   },
   "dealsCount_one": "{{count}} deal",
   "dealsCount_other": "{{count}} deals",
-  "crossRef": {
-    "count_one": "{{count}} deal sur {{total}}",
-    "count_other": "{{count}} deals sur {{total}}",
-    "exited_one": "{{count}} sorti",
-    "exited_other": "{{count}} sortis",
-    "pendingTs_one": "{{count}} TS en cours",
-    "pendingTs_other": "{{count}} TS en cours",
-    "stillActive": "toujours en portefeuille"
-  },
+  "dealsOfTotal": "{{n}} sur {{total}}",
   "totalsRow": "Total",
   "loading": "Chargement…",
   "plan": {

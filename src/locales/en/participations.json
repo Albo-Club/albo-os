@@ -456,15 +456,7 @@
   },
   "dealsCount_one": "{{count}} deal",
   "dealsCount_other": "{{count}} deals",
-  "crossRef": {
-    "count_one": "{{count}} of {{total}} deals",
-    "count_other": "{{count}} of {{total}} deals",
-    "exited_one": "{{count}} exited",
-    "exited_other": "{{count}} exited",
-    "pendingTs_one": "{{count}} pending TS",
-    "pendingTs_other": "{{count}} pending TS",
-    "stillActive": "still in portfolio"
-  },
+  "dealsOfTotal": "{{n}} of {{total}}",
   "totalsRow": "Total",
   "loading": "Loading…",
   "plan": {
