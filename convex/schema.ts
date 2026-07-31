@@ -886,6 +886,23 @@ export default defineSchema({
     ),
     ocrDetail: v.optional(v.string()),
     ocrChars: v.optional(v.number()),
+    // ── Semantic indexing (vectorize.ts) ──────────────────────────────────
+    // Same trace mechanic as `ocrState`, one pipeline layer further down:
+    // 'pending' = queued or retrying, 'indexed' = searchable, 'skipped' =
+    // nothing to index (email rows live in their report's entry, inline
+    // images, no extracted text), 'failed' = indexing failed after retries
+    // (org members get an email — never a silent failure). `vectorDetail`
+    // is a machine code naming the failing layer (cf. vectorize.ts
+    // `classifyIndexError`). Undefined on rows never submitted for indexing.
+    vectorState: v.optional(
+      v.union(
+        v.literal('pending'),
+        v.literal('indexed'),
+        v.literal('skipped'),
+        v.literal('failed'),
+      ),
+    ),
+    vectorDetail: v.optional(v.string()),
     // LEGACY — read by nothing, written by nothing in this repo, but prod rows
     // carry it (the text was put there out-of-band, before `documentTexts`
     // existed). Removing it fails `convex deploy` on schema validation:
@@ -973,6 +990,18 @@ export default defineSchema({
     error: v.optional(v.string()),
     pipelineVersion: v.optional(v.string()),
     processedAt: v.optional(v.number()),
+    // Semantic indexing of `rawContent` — same trace as documents.vectorState
+    // (cf. that field's comment; reports have no per-row UI, the backfill
+    // retries their failures).
+    vectorState: v.optional(
+      v.union(
+        v.literal('pending'),
+        v.literal('indexed'),
+        v.literal('skipped'),
+        v.literal('failed'),
+      ),
+    ),
+    vectorDetail: v.optional(v.string()),
   })
     .index('by_company', ['companyId', 'periodSortDate'])
     .index('by_org', ['orgId'])

@@ -23,6 +23,48 @@ bas de page.
 
 ---
 
+## v1.166.0 — 31/07/2026 à 16:26 — L'indexation des documents se voit, se relance, et prévient quand elle échoue
+
+L'assistant cherche dans le contenu des documents grâce à une indexation qui
+tourne en coulisses. Jusqu'ici, quand elle échouait — typiquement quand le
+service d'indexation européen était saturé, comme ce matin — ça ne se voyait
+nulle part : le document restait simplement introuvable pour l'assistant.
+
+C'est terminé. Chaque document affiche désormais, à côté de son état de
+lecture, un **état d'indexation** : indexé, en cours, échec (avec un bouton
+de relance), ou rien à indexer. En cas d'échec passager, l'indexation
+**réessaie toute seule** plusieurs fois, à quelques minutes d'intervalle ;
+si elle n'y arrive toujours pas, vous recevez un **email** avec le document
+concerné et le lien pour relancer en un clic. Un document ne disparaît plus
+jamais des radars en silence.
+
+Le rattrapage de l'historique profite du même filet : il reprend là où il
+s'était arrêté au lieu de tout refaire, et s'interrompt proprement si le
+service sature — on le relance plus tard, il continue.
+
+> **🔧 Notes techniques**
+>
+> - `vectorState`/`vectorDetail` sur `documents` et `companyReports`
+>   (`convex/schema.ts`), même mécanique de trace que `ocrState`.
+> - `convex/vectorize.ts` : chaque `indexDocument`/`indexReport` écrit son
+>   verdict ; échec transitoire → 3 tentatives espacées (+1 min, +5 min)
+>   puis email aux membres (`vectorizeFailureEmail`,
+>   `convex/emailTemplates.ts`) — jamais d'échec silencieux.
+> - Classification de la couche fautive dans
+>   `convex/lib/vectorizeErrors.ts:classifyIndexError` (testée dans
+>   `tests/vectorizeErrors.test.ts`) : `provider_http_<status>` /
+>   `provider_unreachable` / `provider_bad_response` /
+>   `index_write_failed`.
+> - Backfill séquentiel et **reprenable** : saute `indexed`/`skipped`,
+>   s'arrête proprement sur quota (résumé `STOPPED`), re-run = reprise.
+>   Pas de cron de rattrapage — un seul moteur, celui de la trace OCR.
+> - UI : `VectorStatus` (jumeau d'`OcrStatus`,
+>   `src/components/documents/DocumentReading.tsx`), branché dans
+>   `DocumentAttachment` ; relance via `documents:reindex`.
+> - Contexte : le 429 Nebius du 31/07 venait du quota mutualisé
+>   OpenRouter→Nebius (trafic mondial du modèle ×2), pas de notre volume —
+>   cf. `KNOWN_ISSUES.md` § « Vectorisation ».
+
 ## v1.165.0 — 31/07/2026 à 16:10 — « 1 sur 2 » dans la colonne Deals
 
 La mention qui signale qu'une société apparaît dans plusieurs tableaux

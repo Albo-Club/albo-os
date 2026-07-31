@@ -86,6 +86,9 @@ export const listByCompany = query({
         ocrState: doc.ocrState ?? null,
         ocrDetail: doc.ocrDetail ?? null,
         ocrChars: doc.ocrChars ?? null,
+        // Semantic-index state (vectorize.ts) — same trace, one layer down.
+        vectorState: doc.vectorState ?? null,
+        vectorDetail: doc.vectorDetail ?? null,
         url: await ctx.storage.getUrl(doc.storageId),
       })),
     )
@@ -119,6 +122,8 @@ export const listByDeal = query({
         ocrState: doc.ocrState ?? null,
         ocrDetail: doc.ocrDetail ?? null,
         ocrChars: doc.ocrChars ?? null,
+        vectorState: doc.vectorState ?? null,
+        vectorDetail: doc.vectorDetail ?? null,
         url: await ctx.storage.getUrl(doc.storageId),
       })),
     )
@@ -259,8 +264,35 @@ export const reextract = mutation({
       ocrState: 'pending',
       ocrDetail: undefined,
       ocrChars: undefined,
+      // The run re-schedules the semantic indexing once the text is back.
+      vectorState: 'pending',
+      vectorDetail: undefined,
     })
     await ctx.scheduler.runAfter(0, internal.documentsExtract.run, {
+      documentId,
+    })
+    return null
+  },
+})
+
+/**
+ * Re-run the semantic indexing of a document — the vectorization twin of
+ * `reextract`. Covers a 'failed' indexing (provider saturated at the time)
+ * and the documents stored before indexing existed (no state at all). Keeps
+ * the extracted text as-is: only the index entry is rebuilt.
+ */
+export const reindex = mutation({
+  args: { documentId: v.id('documents') },
+  handler: async (ctx, { documentId }) => {
+    const doc = await ctx.db.get('documents', documentId)
+    if (!doc) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, doc.orgId)
+
+    await ctx.db.patch('documents', documentId, {
+      vectorState: 'pending',
+      vectorDetail: undefined,
+    })
+    await ctx.scheduler.runAfter(0, internal.vectorize.indexDocument, {
       documentId,
     })
     return null

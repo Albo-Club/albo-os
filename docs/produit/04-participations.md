@@ -207,6 +207,24 @@ d'un scan de mauvaise qualité.
 > Un document très long est tronqué à 900 000 caractères (~350 pages) ; la
 > fenêtre le dit explicitement.
 
+Une fois lu, le document est aussi **indexé pour la recherche de
+[l'assistant](11-assistant-ia.md)** — c'est ce qui lui permet de répondre à
+« que dit le pacte de X sur… ». Une seconde icône, à côté de l'état de
+lecture, dit où en est cette indexation :
+
+| Ce que tu vois | Ce que ça veut dire |
+| --- | --- |
+| 🔍✓ | Indexé — l'assistant peut chercher dans son contenu |
+| Roue qui tourne | Indexation en cours (elle réessaie toute seule en cas de saturation passagère) |
+| ⚠️ avec un bouton ↻ | L'indexation a échoué malgré plusieurs tentatives — un **email** t'a prévenu, le bouton relance |
+| 🔍✗ | Rien à indexer, c'est normal (pas de texte, ou contenu déjà couvert par son report) |
+| 🔍 cliquable | Document d'avant cette fonctionnalité — le bouton lance son indexation |
+
+Un échec d'indexation n'est **jamais silencieux** : après la dernière
+tentative, les membres de l'organisation reçoivent un email avec le document
+concerné et le bouton de relance à portée de clic. Le fichier lui-même n'est
+jamais affecté.
+
 Les documents rangés sur une [fiche deal](05-deals.md) suivent exactement le
 même circuit et affichent la même colonne.
 

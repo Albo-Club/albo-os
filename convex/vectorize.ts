@@ -19,6 +19,27 @@
  * (safe backfill re-runs, re-extraction re-indexes). Embeddings:
  * qwen/qwen3-embedding-8b via OpenRouter (same billing account as the agent
  * chat model, EU-hosted provider).
+ *
+ * ── Trace & failure handling (same mechanic as `ocrState`, one layer down) ──
+ * Every submission ends by recording `vectorState` + `vectorDetail` on its
+ * row ('indexed' | 'skipped' | 'failed', 'pending' while queued/retrying) —
+ * an indexing is never silently lost. Transient failures retry
+ * MAX_INDEX_ATTEMPTS times with spaced delays; after the last one the org
+ * members get an email (`vectorizeFailureEmail`) and the UI offers a manual
+ * relaunch (`documents.reindex`), like the OCR's `reextract`.
+ *
+ * `vectorDetail` names the failing pipeline layer (`classifyIndexError`):
+ *   - our data:    'no_text' / 'no_content' / 'covered_by_report' /
+ *                  'inline_image' (skips, not errors)
+ *   - request out: 'provider_unreachable' (never reached the provider)
+ *   - provider:    'provider_http_<status>' (HTTP error, e.g. _429 = the
+ *                  provider's shared token quota is saturated)
+ *   - response:    'provider_bad_response' (answered, unusable payload)
+ *   - our code:    'index_write_failed' (embeddings OK, Convex write failed)
+ *
+ * Sequencing: one document per action run (batch of 1); within a run the RAG
+ * component caps each embedding HTTP call at 100 chunks (~50 pages of text),
+ * so no single provider call ever carries a whole large corpus.
  */
 
 import { RAG } from '@convex-dev/rag'
@@ -28,9 +49,13 @@ import { v } from 'convex/values'
 import { components, internal } from './_generated/api'
 import {
   internalAction,
+  internalMutation,
   internalQuery,
 } from './_generated/server'
 import { readMembership } from './lib/agentScope'
+import { classifyIndexError } from './lib/vectorizeErrors'
+import { RESEND_FROM, resend } from './email'
+import { vectorizeFailureEmail } from './emailTemplates'
 
 import type { ActionCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
@@ -54,13 +79,21 @@ export const rag = new RAG<Filters>(components.rag, {
   textEmbeddingModel: openrouter.textEmbeddingModel(EMBEDDING_MODEL, {
     // Pin the EU-hosted provider (Nebius Token Factory, NL) instead of
     // OpenRouter's load balancing: document text must not transit through
-    // other hosts. No fallback on purpose — indexing is scheduled (a retry
-    // re-runs it) and a search outage is acceptable; widen only knowingly.
+    // other hosts. No fallback on purpose — a saturated provider surfaces as
+    // a retried-then-notified failure (cf. header) rather than a silent
+    // reroute; widen only knowingly.
     provider: { order: ['nebius'], allow_fallbacks: false },
   }),
   embeddingDimension: EMBEDDING_DIMENSION,
   filterNames: ['companyId', 'kind'],
 })
+
+// ─── Failure handling ────────────────────────────────────────────────────────
+// Which layer broke → `classifyIndexError` (convex/lib/vectorizeErrors.ts).
+
+/** Retry cadence: attempt 1 → +1 min → attempt 2 → +5 min → attempt 3. */
+const MAX_INDEX_ATTEMPTS = 3
+const RETRY_DELAYS_MS = [60_000, 300_000]
 
 // ─── Internal data access ────────────────────────────────────────────────────
 
@@ -103,22 +136,117 @@ export const assertMemberInternal = internalQuery({
   },
 })
 
+// ─── State trace (mirrors documentsExtract.setState) ─────────────────────────
+
+const vectorStateValidator = v.union(
+  v.literal('pending'),
+  v.literal('indexed'),
+  v.literal('skipped'),
+  v.literal('failed'),
+)
+
+export const setDocumentState = internalMutation({
+  args: {
+    documentId: v.id('documents'),
+    vectorState: vectorStateValidator,
+    vectorDetail: v.optional(v.string()),
+  },
+  handler: async (ctx, { documentId, vectorState, vectorDetail }) => {
+    const doc = await ctx.db.get('documents', documentId)
+    if (!doc) return null
+    await ctx.db.patch('documents', documentId, { vectorState, vectorDetail })
+    return null
+  },
+})
+
+export const setReportState = internalMutation({
+  args: {
+    reportId: v.id('companyReports'),
+    vectorState: vectorStateValidator,
+    vectorDetail: v.optional(v.string()),
+  },
+  handler: async (ctx, { reportId, vectorState, vectorDetail }) => {
+    const report = await ctx.db.get('companyReports', reportId)
+    if (!report) return null
+    await ctx.db.patch('companyReports', reportId, {
+      vectorState,
+      vectorDetail,
+    })
+    return null
+  },
+})
+
+/**
+ * Email the org members after the LAST failed attempt — an indexing failure
+ * must never be silent. Mutation (not action) so the resend enqueue commits
+ * atomically; recipients mirror the cash alerts (every org member).
+ */
+export const notifyIndexFailure = internalMutation({
+  args: {
+    orgId: v.id('organizations'),
+    companyId: v.id('companies'),
+    dealId: v.optional(v.id('deals')),
+    itemLabel: v.string(),
+    detail: v.string(),
+  },
+  handler: async (ctx, { orgId, companyId, dealId, itemLabel, detail }) => {
+    const org = await ctx.db.get('organizations', orgId)
+    if (!org) return null
+    const siteUrl = process.env.SITE_URL ?? ''
+    const targetUrl = dealId
+      ? `${siteUrl}/app/${org.slug}/deals/${dealId}`
+      : `${siteUrl}/app/${org.slug}/participations/${companyId}`
+
+    const members = await ctx.db
+      .query('organizationMembers')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    for (const member of members) {
+      const user = await ctx.db.get('users', member.userId)
+      if (!user?.email) continue
+      const { subject, html, text } = vectorizeFailureEmail({
+        locale: user.preferredLanguage === 'fr' ? 'fr' : 'en',
+        orgName: org.name,
+        itemLabel,
+        detail,
+        targetUrl,
+      })
+      await resend.sendEmail(ctx, {
+        from: RESEND_FROM,
+        to: user.email,
+        subject,
+        html,
+        text,
+      })
+    }
+    return null
+  },
+})
+
 // ─── Indexing implementations (shared by live ingestion + backfill) ──────────
 
-function indexableDocument(doc: Doc<'documents'>): boolean {
+/**
+ * Skip verdict for a document — a machine code when there is nothing to
+ * index (NOT an error), null when the document should be indexed.
+ */
+function documentSkipReason(
+  doc: Doc<'documents'>,
+  text: string | null,
+): string | null {
   // Email-ingested rows are covered by their report entry; inline images are
   // analysis artefacts.
-  return doc.source === 'upload' && doc.inline !== true
+  if (doc.source !== 'upload') return 'covered_by_report'
+  if (doc.inline === true) return 'inline_image'
+  if (!text) return 'no_text'
+  return null
 }
 
 async function indexDocumentImpl(
   ctx: ActionCtx,
   doc: Doc<'documents'>,
   companyName: string,
-  text: string | null,
-): Promise<'indexed' | 'skipped'> {
-  if (!indexableDocument(doc) || !text) return 'skipped'
-
+  text: string,
+): Promise<void> {
   // Header line so company / kind / title are searchable content too.
   const header = `Document "${doc.title}" (${doc.kind}) — ${companyName}`
   await rag.add(ctx, {
@@ -131,59 +259,162 @@ async function indexDocumentImpl(
       { name: 'kind', value: doc.kind },
     ],
   })
-  return 'indexed'
 }
 
 async function indexReportImpl(
   ctx: ActionCtx,
   report: Doc<'companyReports'>,
   companyName: string,
-): Promise<'indexed' | 'skipped'> {
-  if (!report.rawContent) return 'skipped'
+): Promise<void> {
   const title = report.title ?? report.subject ?? 'Report'
   const header = `Report ${companyName} — ${report.reportPeriod ?? ''} — ${title}`
   await rag.add(ctx, {
     namespace: report.orgId,
     key: `report:${report._id}`,
     title,
-    text: `${header}\n\n${report.rawContent}`,
+    text: `${header}\n\n${report.rawContent ?? ''}`,
     filterValues: [
       { name: 'companyId', value: report.companyId },
       { name: 'kind', value: 'report' },
     ],
   })
-  return 'indexed'
 }
 
 // ─── Live ingestion entry points ─────────────────────────────────────────────
 
 export const indexDocument = internalAction({
-  args: { documentId: v.id('documents') },
-  handler: async (ctx, { documentId }) => {
+  args: {
+    documentId: v.id('documents'),
+    // Retry counter — absent on the first submission (schedulers don't pass
+    // it), carried by the self-rescheduled retries.
+    attempt: v.optional(v.number()),
+  },
+  handler: async (ctx, { documentId, attempt }) => {
     const found = await ctx.runQuery(internal.vectorize.getDocumentForIndex, {
       documentId,
     })
     if (!found) return null
-    const state = await indexDocumentImpl(
-      ctx,
-      found.doc,
-      found.companyName,
-      found.text,
-    )
-    console.log(`[vectorize] document ${documentId}: ${state}`)
+    const n = attempt ?? 1
+
+    const skip = documentSkipReason(found.doc, found.text)
+    if (skip) {
+      await ctx.runMutation(internal.vectorize.setDocumentState, {
+        documentId,
+        vectorState: 'skipped',
+        vectorDetail: skip,
+      })
+      console.log(`[vectorize] document ${documentId}: skipped (${skip})`)
+      return null
+    }
+
+    try {
+      await indexDocumentImpl(ctx, found.doc, found.companyName, found.text!)
+      await ctx.runMutation(internal.vectorize.setDocumentState, {
+        documentId,
+        vectorState: 'indexed',
+      })
+      console.log(`[vectorize] document ${documentId}: indexed`)
+    } catch (err) {
+      const failure = classifyIndexError(err)
+      if (failure.transient && n < MAX_INDEX_ATTEMPTS) {
+        const delay = RETRY_DELAYS_MS[n - 1]
+        console.warn(
+          `[vectorize] document ${documentId} attempt ${n}/${MAX_INDEX_ATTEMPTS} failed (${failure.detail}) — retrying in ${delay / 1000}s`,
+        )
+        await ctx.runMutation(internal.vectorize.setDocumentState, {
+          documentId,
+          vectorState: 'pending',
+          vectorDetail: failure.detail,
+        })
+        await ctx.scheduler.runAfter(delay, internal.vectorize.indexDocument, {
+          documentId,
+          attempt: n + 1,
+        })
+        return null
+      }
+      console.error(
+        `[vectorize] document ${documentId} FAILED after ${n} attempt(s) (${failure.detail})`,
+      )
+      await ctx.runMutation(internal.vectorize.setDocumentState, {
+        documentId,
+        vectorState: 'failed',
+        vectorDetail: failure.detail,
+      })
+      await ctx.runMutation(internal.vectorize.notifyIndexFailure, {
+        orgId: found.doc.orgId,
+        companyId: found.doc.companyId,
+        dealId: found.doc.dealId,
+        itemLabel: found.doc.title,
+        detail: failure.detail,
+      })
+    }
     return null
   },
 })
 
 export const indexReport = internalAction({
-  args: { reportId: v.id('companyReports') },
-  handler: async (ctx, { reportId }) => {
+  args: {
+    reportId: v.id('companyReports'),
+    attempt: v.optional(v.number()),
+  },
+  handler: async (ctx, { reportId, attempt }) => {
     const found = await ctx.runQuery(internal.vectorize.getReportForIndex, {
       reportId,
     })
     if (!found) return null
-    const state = await indexReportImpl(ctx, found.report, found.companyName)
-    console.log(`[vectorize] report ${reportId}: ${state}`)
+    const n = attempt ?? 1
+
+    if (!found.report.rawContent) {
+      await ctx.runMutation(internal.vectorize.setReportState, {
+        reportId,
+        vectorState: 'skipped',
+        vectorDetail: 'no_content',
+      })
+      console.log(`[vectorize] report ${reportId}: skipped (no_content)`)
+      return null
+    }
+
+    try {
+      await indexReportImpl(ctx, found.report, found.companyName)
+      await ctx.runMutation(internal.vectorize.setReportState, {
+        reportId,
+        vectorState: 'indexed',
+      })
+      console.log(`[vectorize] report ${reportId}: indexed`)
+    } catch (err) {
+      const failure = classifyIndexError(err)
+      if (failure.transient && n < MAX_INDEX_ATTEMPTS) {
+        const delay = RETRY_DELAYS_MS[n - 1]
+        console.warn(
+          `[vectorize] report ${reportId} attempt ${n}/${MAX_INDEX_ATTEMPTS} failed (${failure.detail}) — retrying in ${delay / 1000}s`,
+        )
+        await ctx.runMutation(internal.vectorize.setReportState, {
+          reportId,
+          vectorState: 'pending',
+          vectorDetail: failure.detail,
+        })
+        await ctx.scheduler.runAfter(delay, internal.vectorize.indexReport, {
+          reportId,
+          attempt: n + 1,
+        })
+        return null
+      }
+      console.error(
+        `[vectorize] report ${reportId} FAILED after ${n} attempt(s) (${failure.detail})`,
+      )
+      await ctx.runMutation(internal.vectorize.setReportState, {
+        reportId,
+        vectorState: 'failed',
+        vectorDetail: failure.detail,
+      })
+      await ctx.runMutation(internal.vectorize.notifyIndexFailure, {
+        orgId: found.report.orgId,
+        companyId: found.report.companyId,
+        itemLabel:
+          found.report.title ?? found.report.subject ?? 'Report',
+        detail: failure.detail,
+      })
+    }
     return null
   },
 })
@@ -245,7 +476,15 @@ export const searchInternal = internalAction({
   },
 })
 
-// ─── Backfill (one-shot, idempotent — cf. MIGRATIONS.md) ─────────────────────
+// ─── Backfill (manual one-shot, resumable — cf. MIGRATIONS.md) ───────────────
+//
+// Strictly sequential (one row at a time, never a burst) and RESUMABLE: rows
+// already 'indexed' or 'skipped' are passed over, so a re-run only works on
+// what is left ('failed', 'pending', never-submitted). A transient provider
+// failure (saturated quota, network) marks the current row 'failed' and stops
+// the whole run — re-run later to resume where it stopped. A permanent
+// failure marks the row and moves on. No failure emails here: this is a
+// manual operation, the returned summary IS the feedback.
 
 const BACKFILL_BATCH = 2000
 
@@ -289,13 +528,26 @@ export const listOrgIds = internalQuery({
   },
 })
 
+interface BackfillTally {
+  indexed: number
+  skipped: number
+  failed: number
+  queued: number
+  /** Set when a transient provider failure stopped the run early. */
+  stoppedOn: string | null
+}
+
 async function backfillOrgImpl(
   ctx: ActionCtx,
   orgId: Id<'organizations'>,
 ): Promise<string> {
-  let indexed = 0
-  let skipped = 0
-  let queued = 0
+  const tally: BackfillTally = {
+    indexed: 0,
+    skipped: 0,
+    failed: 0,
+    queued: 0,
+    stoppedOn: null,
+  }
 
   const docIds = await ctx.runQuery(
     internal.vectorize.listDocumentIdsForBackfill,
@@ -306,40 +558,117 @@ async function backfillOrgImpl(
       documentId,
     })
     if (!found) continue
-    if (indexableDocument(found.doc) && !found.text && !found.doc.ocrState) {
+    // Resumability: done rows cost nothing on a re-run.
+    const state = found.doc.vectorState
+    if (state === 'indexed' || state === 'skipped') continue
+
+    if (
+      found.doc.source === 'upload' &&
+      found.doc.inline !== true &&
+      !found.text &&
+      !found.doc.ocrState
+    ) {
       // Uploaded before extraction existed: run the reading now — its end
       // schedules indexDocument, so the entry lands once the OCR is done.
       await ctx.scheduler.runAfter(0, internal.documentsExtract.run, {
         documentId,
       })
-      queued++
+      tally.queued++
       continue
     }
-    const state = await indexDocumentImpl(
-      ctx,
-      found.doc,
-      found.companyName,
-      found.text,
+
+    const skip = documentSkipReason(found.doc, found.text)
+    if (skip) {
+      await ctx.runMutation(internal.vectorize.setDocumentState, {
+        documentId,
+        vectorState: 'skipped',
+        vectorDetail: skip,
+      })
+      tally.skipped++
+      continue
+    }
+
+    try {
+      await indexDocumentImpl(ctx, found.doc, found.companyName, found.text!)
+      await ctx.runMutation(internal.vectorize.setDocumentState, {
+        documentId,
+        vectorState: 'indexed',
+      })
+      tally.indexed++
+    } catch (err) {
+      const failure = classifyIndexError(err)
+      await ctx.runMutation(internal.vectorize.setDocumentState, {
+        documentId,
+        vectorState: 'failed',
+        vectorDetail: failure.detail,
+      })
+      tally.failed++
+      console.error(
+        `[vectorize] backfill document ${documentId} failed (${failure.detail})`,
+      )
+      if (failure.transient) {
+        tally.stoppedOn = failure.detail
+        break
+      }
+    }
+  }
+
+  if (!tally.stoppedOn) {
+    const reportIds = await ctx.runQuery(
+      internal.vectorize.listReportIdsForBackfill,
+      { orgId },
     )
-    if (state === 'indexed') indexed++
-    else skipped++
+    for (const reportId of reportIds) {
+      const found = await ctx.runQuery(internal.vectorize.getReportForIndex, {
+        reportId,
+      })
+      if (!found) continue
+      const state = found.report.vectorState
+      if (state === 'indexed' || state === 'skipped') continue
+
+      if (!found.report.rawContent) {
+        await ctx.runMutation(internal.vectorize.setReportState, {
+          reportId,
+          vectorState: 'skipped',
+          vectorDetail: 'no_content',
+        })
+        tally.skipped++
+        continue
+      }
+
+      try {
+        await indexReportImpl(ctx, found.report, found.companyName)
+        await ctx.runMutation(internal.vectorize.setReportState, {
+          reportId,
+          vectorState: 'indexed',
+        })
+        tally.indexed++
+      } catch (err) {
+        const failure = classifyIndexError(err)
+        await ctx.runMutation(internal.vectorize.setReportState, {
+          reportId,
+          vectorState: 'failed',
+          vectorDetail: failure.detail,
+        })
+        tally.failed++
+        console.error(
+          `[vectorize] backfill report ${reportId} failed (${failure.detail})`,
+        )
+        if (failure.transient) {
+          tally.stoppedOn = failure.detail
+          break
+        }
+      }
+    }
   }
 
-  const reportIds = await ctx.runQuery(
-    internal.vectorize.listReportIdsForBackfill,
-    { orgId },
-  )
-  for (const reportId of reportIds) {
-    const found = await ctx.runQuery(internal.vectorize.getReportForIndex, {
-      reportId,
-    })
-    if (!found) continue
-    const state = await indexReportImpl(ctx, found.report, found.companyName)
-    if (state === 'indexed') indexed++
-    else skipped++
-  }
-
-  const summary = `[vectorize] backfill org ${orgId}: ${indexed} indexed, ${skipped} skipped, ${queued} queued for extraction`
+  const summary =
+    `[vectorize] backfill org ${orgId}: ${tally.indexed} indexed, ` +
+    `${tally.skipped} skipped, ${tally.failed} failed, ` +
+    `${tally.queued} queued for extraction` +
+    (tally.stoppedOn
+      ? ` — STOPPED on transient failure (${tally.stoppedOn}), run again later to resume`
+      : '')
   console.log(summary)
   return summary
 }
@@ -357,7 +686,11 @@ export const backfillAll = internalAction({
     const orgIds = await ctx.runQuery(internal.vectorize.listOrgIds, {})
     const summaries: Array<string> = []
     for (const orgId of orgIds) {
-      summaries.push(await backfillOrgImpl(ctx, orgId))
+      const summary = await backfillOrgImpl(ctx, orgId)
+      summaries.push(summary)
+      // The quota is shared across orgs — if one org hit it, the next would
+      // too. Stop the whole run; a later re-run resumes everywhere.
+      if (summary.includes('STOPPED')) break
     }
     return summaries
   },

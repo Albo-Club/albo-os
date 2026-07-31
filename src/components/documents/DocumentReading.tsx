@@ -1,4 +1,12 @@
-import { AlertTriangle, Loader2, RefreshCw, ScanText } from 'lucide-react'
+import {
+  AlertTriangle,
+  Loader2,
+  RefreshCw,
+  ScanText,
+  Search,
+  SearchCheck,
+  SearchX,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { toast } from 'sonner'
@@ -119,6 +127,117 @@ export function OcrStatus({
     >
       <ScanText className="size-3.5" />
       {t('documentReading.analyse')}
+    </Button>
+  )
+}
+
+/**
+ * Semantic-index state of a document — the vectorization twin of `OcrStatus`,
+ * same surfaces, one pipeline layer further down (documents.vectorState).
+ * Failed indexings offer the same manual relaunch gesture as a failed OCR.
+ */
+
+export type VectorState = 'pending' | 'indexed' | 'skipped' | 'failed' | null
+
+export function VectorStatus({
+  documentId,
+  state,
+  detail,
+}: {
+  documentId: Id<'documents'>
+  state: VectorState
+  detail: string | null
+}) {
+  const { t } = useTranslation('participations')
+  const reindex = useConvexMutation(api.documents.reindex)
+
+  // Machine codes from vectorize.ts `classifyIndexError` — an unknown one
+  // falls back to the raw code rather than an empty tooltip.
+  const detailLabel = detail
+    ? t(`vectorization.detail.${detail}`, { defaultValue: detail })
+    : null
+
+  async function handleRetry() {
+    try {
+      await reindex({ documentId })
+      toast.success(t('vectorization.restarted'))
+    } catch {
+      toast.error(t('vectorization.retryError'))
+    }
+  }
+
+  if (state === 'indexed') {
+    return (
+      <span
+        className="text-muted-foreground flex size-7 items-center justify-center"
+        title={t('vectorization.indexed')}
+        aria-label={t('vectorization.indexed')}
+      >
+        <SearchCheck className="size-3.5" />
+      </span>
+    )
+  }
+
+  if (state === 'pending') {
+    return (
+      <span
+        className="text-muted-foreground flex size-7 items-center justify-center"
+        title={t('vectorization.pending')}
+        aria-label={t('vectorization.pending')}
+      >
+        <Loader2 className="size-3.5 animate-spin" />
+      </span>
+    )
+  }
+
+  if (state === 'failed') {
+    return (
+      <span className="flex items-center">
+        <span
+          className="text-destructive flex size-7 items-center justify-center"
+          title={detailLabel ?? t('vectorization.failed')}
+          aria-label={detailLabel ?? t('vectorization.failed')}
+        >
+          <AlertTriangle className="size-3.5" />
+        </span>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7"
+          onClick={() => void handleRetry()}
+          aria-label={t('vectorization.retry')}
+          title={t('vectorization.retry')}
+        >
+          <RefreshCw className="size-3.5" />
+        </Button>
+      </span>
+    )
+  }
+
+  if (state === 'skipped') {
+    return (
+      <span
+        className="text-muted-foreground/60 flex size-7 items-center justify-center"
+        title={detailLabel ?? t('vectorization.skipped')}
+        aria-label={detailLabel ?? t('vectorization.skipped')}
+      >
+        <SearchX className="size-3.5" />
+      </span>
+    )
+  }
+
+  // No state at all: stored before semantic indexing existed. Offer the
+  // indexing rather than a verdict we never computed.
+  return (
+    <Button
+      size="icon"
+      variant="ghost"
+      className="text-muted-foreground size-7"
+      onClick={() => void handleRetry()}
+      aria-label={t('vectorization.index')}
+      title={t('vectorization.index')}
+    >
+      <Search className="size-3.5" />
     </Button>
   )
 }

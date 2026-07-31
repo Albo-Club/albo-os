@@ -727,6 +727,26 @@
     },
     "retryError": "Could not restart the reading"
   },
+  "vectorization": {
+    "indexed": "Searchable by the assistant",
+    "pending": "Indexing for assistant search…",
+    "failed": "Indexing failed",
+    "skipped": "Not indexed",
+    "index": "Index for assistant search",
+    "retry": "Run the indexing again",
+    "restarted": "Indexing restarted",
+    "retryError": "Could not restart the indexing",
+    "detail": {
+      "covered_by_report": "Covered by its report",
+      "inline_image": "Inline image — not indexed",
+      "no_text": "No text to index",
+      "no_content": "No content to index",
+      "provider_unreachable": "Indexing service unreachable",
+      "provider_bad_response": "Invalid response from the indexing service",
+      "index_write_failed": "Indexing failed while saving",
+      "provider_http_429": "Indexing service saturated — retry later"
+    }
+  },
   "documentAttachment": {
     "open": "Open \"{{title}}\"",
     "edit": "Edit"
