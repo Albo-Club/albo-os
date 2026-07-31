@@ -9,6 +9,7 @@ import type { ReactNode, RefObject } from 'react'
 
 import type { FacetOption } from './FacetFilter'
 import type { CompanyRow, DealRow } from './ParticipationsTable'
+import type { ParticipationBucket } from '~/lib/dealStatusBadge'
 import {
   dealStatusLabelKey,
   participationBucketBand,
@@ -155,21 +156,43 @@ export function ParticipationsView({
 
   // One bucket per status table. Exit outcome mirrors the badge rule at the
   // company-bucket level: a write-off or a realized MOIC < 1 is a loss; an
-  // unknown MOIC is never a loss.
+  // unknown MOIC is never a loss. Rows of a company split across several
+  // tables get a `crossRef` (rendered as a sub-line under the name), computed
+  // on the FULL row set — a facet can hide one of the company's rows, but the
+  // "N deals sur M" mention must not flicker with the filters.
   const buckets = useMemo(() => {
     if (!filtered) return null
+    const byCompany = new Map<
+      string,
+      Array<{ bucket: ParticipationBucket; dealCount: number }>
+    >()
+    for (const r of rows ?? []) {
+      const list = byCompany.get(r.companyId) ?? []
+      list.push({ bucket: rowBucket(r), dealCount: r.dealCount })
+      byCompany.set(r.companyId, list)
+    }
+    const decorate = (r: CompanyRow): CompanyRow => {
+      const entries = byCompany.get(r.companyId)
+      if (!entries || entries.length < 2) return r
+      const own = rowBucket(r)
+      return {
+        ...r,
+        crossRef: {
+          total: entries.reduce((n, e) => n + e.dealCount, 0),
+          others: entries
+            .filter((e) => e.bucket !== own)
+            .sort((a, b) => BUCKET_ORDER[a.bucket] - BUCKET_ORDER[b.bucket]),
+        },
+      }
+    }
     const pending: Array<CompanyRow> = []
     const active: Array<CompanyRow> = []
     const exitWin: Array<CompanyRow> = []
     const exitLoss: Array<CompanyRow> = []
-    for (const r of filtered) {
-      if (r.pending) pending.push(r)
-      else if (!r.settled) active.push(r)
-      else if (r.writtenOff || (r.moic != null && r.moic < 1)) exitLoss.push(r)
-      else exitWin.push(r)
-    }
+    const target = { pending, active, exit_win: exitWin, exit_loss: exitLoss }
+    for (const r of filtered) target[rowBucket(r)].push(decorate(r))
     return { pending, active, exitWin, exitLoss }
-  }, [filtered])
+  }, [filtered, rows])
 
   // Flat export (one deal per row), CSV or Excel. Follows the current search
   // + filters: only the deals of the companies whose rows survive them are
@@ -425,6 +448,27 @@ export function ParticipationsView({
       )}
     </div>
   )
+}
+
+/**
+ * Which status table a row lands in — the same decision tree as the badge
+ * rule (`dealBucket`) at the company-bucket level: a write-off or a realized
+ * MOIC < 1 is a loss; an unknown MOIC is never a loss.
+ */
+function rowBucket(r: CompanyRow): ParticipationBucket {
+  if (r.pending) return 'pending'
+  if (!r.settled) return 'active'
+  return r.writtenOff || (r.moic != null && r.moic < 1)
+    ? 'exit_loss'
+    : 'exit_win'
+}
+
+/** Display order of a crossRef's "other tables" mentions (SECTIONS order). */
+const BUCKET_ORDER: Record<ParticipationBucket, number> = {
+  pending: 0,
+  active: 1,
+  exit_win: 2,
+  exit_loss: 3,
 }
 
 /**
