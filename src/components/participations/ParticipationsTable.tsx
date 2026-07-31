@@ -5,8 +5,6 @@ import { useTranslation } from 'react-i18next'
 import { residualValueCents } from '../../../convex/lib/metrics'
 import type { CSSProperties } from 'react'
 
-import type { ParticipationBucket } from '~/lib/dealStatusBadge'
-import { participationBucketBand } from '~/lib/dealStatusBadge'
 import { cn } from '~/lib/utils'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { ScoreRing } from '~/components/companies/ScoreRing'
@@ -306,16 +304,12 @@ export type CompanyRow = {
   dealNames: Array<string>
   investorNames: Array<string>
   /**
-   * Set by `ParticipationsView` when the company has rows in OTHER status
-   * tables too (deal statuses spanning several buckets, e.g. one deal exited
-   * and one still open): total deals across ALL the company's rows + where
-   * the other rows live. Renders as a sub-line under the company name so the
-   * split never reads as a duplicate.
+   * Total deals of the company across ALL the status tables — set by
+   * `ParticipationsView` only when they don't all sit in this row (deals
+   * spanning several statuses, e.g. one exited and one still open). The Deals
+   * column then reads "1 sur 2", so the split never looks like a duplicate.
    */
-  crossRef?: {
-    total: number
-    others: Array<{ bucket: ParticipationBucket; dealCount: number }>
-  }
+  companyDealTotal?: number
 }
 
 /**
@@ -705,48 +699,13 @@ function CompanyTableRow({
             size="md"
             className="size-9"
           />
-          <span className="min-w-0">
-            {/* The column grid is fixed, so a long name wraps to two lines
-                (then ellipsizes) instead of pushing the table wider. */}
-            <span
-              className="line-clamp-2 whitespace-normal break-words"
-              title={row.name}
-            >
-              {row.name}
-            </span>
-            {/* Sub-line shown ONLY when the company also has rows in other
-                status tables: "1 deal sur 2 · ● 1 sorti". Each dot takes the
-                colour of the table where the rest of the company lives. */}
-            {row.crossRef && (
-              <span className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-normal">
-                <span className="whitespace-nowrap">
-                  {t('crossRef.count', {
-                    count: row.dealCount,
-                    total: row.crossRef.total,
-                  })}
-                </span>
-                {row.crossRef.others.map((other) => (
-                  <span
-                    key={other.bucket}
-                    className="flex items-center gap-1.5 whitespace-nowrap"
-                  >
-                    <span aria-hidden>·</span>
-                    <span
-                      aria-hidden
-                      className={cn(
-                        'size-1.5 rounded-full',
-                        participationBucketBand(other.bucket).dot,
-                      )}
-                    />
-                    {other.bucket === 'active'
-                      ? t('crossRef.stillActive')
-                      : other.bucket === 'pending'
-                        ? t('crossRef.pendingTs', { count: other.dealCount })
-                        : t('crossRef.exited', { count: other.dealCount })}
-                  </span>
-                ))}
-              </span>
-            )}
+          {/* The column grid is fixed, so a long name wraps to two lines
+              (then ellipsizes) instead of pushing the table wider. */}
+          <span
+            className="line-clamp-2 whitespace-normal break-words"
+            title={row.name}
+          >
+            {row.name}
           </span>
         </span>
       </TableCell>
@@ -772,7 +731,15 @@ function CompanyTableRow({
         )}
       </TableCell>
       <TableCell className="text-right tabular-nums">
-        {t('dealsCount', { count: row.dealCount })}
+        {/* "1 sur 2" when the company's other deals live in another status
+            table (this row then covers only part of them) — otherwise the
+            plain count. */}
+        {row.companyDealTotal != null
+          ? t('dealsOfTotal', {
+              n: row.dealCount,
+              total: row.companyDealTotal,
+            })
+          : t('dealsCount', { count: row.dealCount })}
       </TableCell>
       {/* The column grid is shared by all three variants (see COL_WIDTHS):
           the slots a variant has nothing for stay empty rather than shifting

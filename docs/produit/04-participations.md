@@ -25,10 +25,9 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
 - **Une société peut apparaître dans plusieurs tableaux** quand ses deals
   n'ont pas tous le même statut (ex. un deal sorti et un nouveau ticket en
   cours) : chaque tableau garde ainsi des sommes exactes. Pour que ça ne se
-  lise pas comme un doublon, ces lignes portent un **sous-titre sous le nom**
-  — « 1 deal sur 2 · 1 sorti » côté positions ouvertes, « 1 deal sur 2 ·
-  toujours en portefeuille » côté exits — avec une pastille de la couleur du
-  tableau où vit le reste de la société. Les autres lignes ne changent pas.
+  lise pas comme un doublon, la colonne **Deals** de ces lignes affiche
+  « 1 sur 2 » au lieu de « 1 deal » : la ligne ne couvre qu'une partie des
+  deals faits sur cette société. Les autres lignes ne changent pas.
 - **Colonnes réduites à l'essentiel**, dans cet ordre : ce qui décrit la
   boîte — logo et nom, **score IA de santé** (1 à 10), secteur en badge —
   puis ce qui la mesure : nombre de deals, montant investi, montant reçu,

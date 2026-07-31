@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.165.0 — 31/07/2026 à 16:23 — L'indexation des documents se voit, se relance, et prévient quand elle échoue
+## v1.166.0 — 31/07/2026 à 16:26 — L'indexation des documents se voit, se relance, et prévient quand elle échoue
 
 L'assistant cherche dans le contenu des documents grâce à une indexation qui
 tourne en coulisses. Jusqu'ici, quand elle échouait — typiquement quand le
@@ -64,6 +64,27 @@ service sature — on le relance plus tard, il continue.
 > - Contexte : le 429 Nebius du 31/07 venait du quota mutualisé
 >   OpenRouter→Nebius (trafic mondial du modèle ×2), pas de notre volume —
 >   cf. `KNOWN_ISSUES.md` § « Vectorisation ».
+
+## v1.165.0 — 31/07/2026 à 16:10 — « 1 sur 2 » dans la colonne Deals
+
+La mention qui signale qu'une société apparaît dans plusieurs tableaux
+passe **sous le nom de la société à la colonne Deals** : une ligne qui ne
+couvre qu'une partie des deals faits sur la boîte affiche simplement
+« 1 sur 2 » au lieu de « 1 deal ». Plus de sous-titre ni de pastille sous
+le nom — l'information est là où on compte les deals, et elle dit
+l'essentiel : ce n'est pas un doublon, c'est un deal parmi deux.
+
+> **🔧 Notes techniques**
+>
+> - `ParticipationsView.tsx` : le `crossRef` (total + autres tableaux) se
+>   simplifie en un seul champ `companyDealTotal`, posé uniquement quand la
+>   ligne ne porte pas tous les deals de la société ; toujours sommé sur
+>   l'ensemble non filtré. Le helper `rowBucket` et `BUCKET_ORDER`,
+>   devenus inutiles, sont retirés (retour à la boucle de répartition
+>   d'origine).
+> - `ParticipationsTable.tsx` : la cellule société revient à son état
+>   d'avant, la colonne Deals rend `dealsOfTotal` (« {{n}} sur {{total}} »)
+>   quand `companyDealTotal` est présent. Clés `crossRef.*` supprimées.
 
 ## v1.164.0 — 31/07/2026 à 14:16 — Fini le faux doublon dans la liste des participations
 
