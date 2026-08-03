@@ -142,13 +142,17 @@ rapports ou ses deals.
   ailleurs et c'est enregistré (Échap annule).
 - **Personnes** : fondateurs, board, co-investisseurs — chacun en pastille
   avec ses initiales, et un compteur sur la section quand la liste n'est
-  pas vide ; une flèche mène à la fiche Attio quand la personne y est
-  rattachée. Tout se fait **sur place** : la pastille **« + Ajouter »**
-  ouvre un champ de saisie, un clic sur un nom le corrige, la croix retire
-  la personne. La saisie propose au fil de la frappe les **personnes
-  d'Attio** : choisir une suggestion rattache la personne au CRM, taper un
-  nom libre la laisse non rattachée (et corriger un nom à la main détache
-  la fiche Attio).
+  pas vide ; une flèche mène à la fiche Attio quand l'entrée y est
+  rattachée. La pastille elle-même **n'est pas cliquable** : seules la
+  flèche (vers Attio) et la croix (retirer) réagissent, pour qu'on sache
+  toujours ce que fait un clic. Corriger un nom se fait donc en retirant
+  la pastille et en en ajoutant une nouvelle. La pastille
+  **« + Ajouter »** ouvre un champ de saisie qui propose au fil de la
+  frappe les résultats d'Attio, **personnes et sociétés** — un
+  co-investisseur est le plus souvent un fonds. Une petite icône distingue
+  les deux (silhouette pour une personne, immeuble pour une société), et
+  la flèche mène ensuite à la bonne fiche du CRM. Choisir une suggestion
+  rattache l'entrée à Attio ; taper un nom libre la laisse non rattachée.
 
 Toute la fiche s'édite ainsi, au clic sur la valeur, sans fenêtre ni bouton
 Enregistrer. Le menu ⋯ ne garde que ce qui n'est pas un champ de la fiche :
