@@ -593,89 +593,53 @@ const REVIEW_REASON_LABELS: Record<string, string> = {
   spam: 'marqué comme spam',
 }
 
-export function cashAlertEmail({
-  locale,
-  orgName,
-  thresholdCents,
-  minProjectedCents,
-  cashUrl,
-}: {
-  locale: EmailLocale
-  orgName: string
-  thresholdCents: number
-  minProjectedCents: number
-  cashUrl: string
-}) {
-  const eur = (cents: number) =>
-    new Intl.NumberFormat(locale === 'fr' ? 'fr-FR' : 'en-US', {
-      style: 'currency',
-      currency: 'EUR',
-      maximumFractionDigits: 0,
-    }).format(cents / 100)
-  const hOrg = esc(orgName)
-
-  const c = pick(locale, {
-    en: {
-      subject: `Cash alert — ${orgName} projected below ${eur(thresholdCents)}`,
-      heading: `Cash below your threshold`,
-      intro: `The projected cash balance of <strong>${hOrg}</strong> drops to <strong>${eur(minProjectedCents)}</strong> within the next 3 months — below your ${eur(thresholdCents)} alert threshold.`,
-      followup: `The projection includes committed and planned entries (overdue ones included). Review the forecast to see which month dips and what drives it.`,
-      footer: `You receive this because a cash threshold alert is active for ${hOrg}. Adjust or disable it on the Cash page. No more than one alert per week.`,
-      preheader: `Projected balance ${eur(minProjectedCents)} — under your ${eur(thresholdCents)} threshold.`,
-      cta: 'Open the cash forecast',
-      text: [
-        `The projected cash balance of ${orgName} drops to ${eur(minProjectedCents)} within the next 3 months — below your ${eur(thresholdCents)} alert threshold.`,
-        `Review the forecast: ${cashUrl}`,
-        `You receive this because a cash threshold alert is active for ${orgName}. No more than one alert per week.`,
-      ],
-    },
-    fr: {
-      subject: `Alerte trésorerie — ${orgName} projetée sous ${eur(thresholdCents)}`,
-      heading: `Trésorerie sous votre seuil`,
-      intro: `Le solde projeté de <strong>${hOrg}</strong> descend à <strong>${eur(minProjectedCents)}</strong> dans les 3 prochains mois — sous votre seuil d'alerte de ${eur(thresholdCents)}.`,
-      followup: `La projection inclut l'engagé et le prévu (retards compris). Ouvrez le prévisionnel pour voir quel mois creuse et ce qui l'explique.`,
-      footer: `Vous recevez cet email car une alerte de seuil est active pour ${hOrg}. Ajustez-la ou désactivez-la sur la page Trésorerie. Au plus une alerte par semaine.`,
-      preheader: `Solde projeté ${eur(minProjectedCents)} — sous votre seuil de ${eur(thresholdCents)}.`,
-      cta: 'Ouvrir le prévisionnel',
-      text: [
-        `Le solde projeté de ${orgName} descend à ${eur(minProjectedCents)} dans les 3 prochains mois — sous votre seuil d'alerte de ${eur(thresholdCents)}.`,
-        `Ouvrir le prévisionnel : ${cashUrl}`,
-        `Vous recevez cet email car une alerte de seuil est active pour ${orgName}. Au plus une alerte par semaine.`,
-      ],
-    },
-  })
-
-  const html = layout({
-    locale,
-    preheader: c.preheader,
-    heading: c.heading,
-    paragraphs: [c.intro, c.followup, urlFallback(locale, cashUrl)],
-    cta: { label: c.cta, url: cashUrl },
-    footer: c.footer,
-  })
-
-  return { subject: c.subject, html, text: plainText(c.text) }
-}
-
-/** Max entry lines rendered in the overdue digest (the rest is "+N more"). */
+/** Max entry lines rendered per org in the overdue block (rest is "+N more"). */
 const OVERDUE_EMAIL_MAX_LINES = 8
 
-export function overdueEntriesEmail({
+export type DigestOverdueEntry = {
+  date: number
+  label: string
+  direction: 'in' | 'out'
+  amountCents: number
+}
+
+/**
+ * One org's worth of the weekly digest. Both blocks are optional: a section
+ * is only built when the org has something to say AND the recipient still
+ * subscribes to that alert, so a reader who muted overdue entries gets the
+ * very same mail minus that block.
+ */
+export type DigestSection = {
+  orgName: string
+  cash: {
+    thresholdCents: number
+    minProjectedCents: number
+    cashUrl: string
+  } | null
+  overdue: {
+    /** All overdue entries, date ascending (oldest first). */
+    entries: Array<DigestOverdueEntry>
+    forecastUrl: string
+  } | null
+  /**
+   * Reports filed on this org's companies over the past week. Null when
+   * there were none, or when the reader muted the block — an org with
+   * nothing to say drops out of the digest entirely.
+   */
+  reports: { count: number } | null
+}
+
+/**
+ * The Monday digest: one mail per member, one section per org, sent by
+ * `forecasts.sendWeeklyDigest`. Callers must pass at least one section
+ * carrying at least one block — an empty digest is never sent.
+ */
+export function weeklyDigestEmail({
   locale,
-  orgName,
-  entries,
-  forecastUrl,
+  sections,
 }: {
   locale: EmailLocale
-  orgName: string
-  /** All overdue entries, date ascending (oldest first). */
-  entries: Array<{
-    date: number
-    label: string
-    direction: 'in' | 'out'
-    amountCents: number
-  }>
-  forecastUrl: string
+  sections: Array<DigestSection>
 }) {
   const eur = (cents: number) =>
     new Intl.NumberFormat(locale === 'fr' ? 'fr-FR' : 'en-US', {
@@ -689,67 +653,141 @@ export function overdueEntriesEmail({
       timeZone: 'Europe/Paris',
     }).format(new Date(ms))
 
-  // `label` is passed in so each caller picks its own escaping: raw for the
-  // plain-text branch, `esc()`-ed for the HTML one.
-  const line = (e: (typeof entries)[number], label: string) =>
+  // `label` is passed in so each branch picks its own escaping: raw for the
+  // plain-text one, `esc()`-ed for the HTML one.
+  const line = (e: DigestOverdueEntry, label: string) =>
     `${fmtDate(e.date)} — ${label} — ${e.direction === 'out' ? '−' : '+'}${eur(e.amountCents)}`
-  const hOrg = esc(orgName)
-  const shown = entries.slice(0, OVERDUE_EMAIL_MAX_LINES)
-  const hidden = entries.length - shown.length
-  const listHtml = shown
-    .map((e) => `• ${line(e, esc(e.label))}`)
-    .join('<br>')
-    .concat(
-      hidden > 0
-        ? `<br><span style="color:${MUTED};">${pick(locale, {
-            en: `+ ${hidden} more`,
-            fr: `+ ${hidden} autre(s)`,
-          })}</span>`
-        : '',
-    )
-  const count = entries.length
 
   const c = pick(locale, {
     en: {
-      subject: `Overdue entries — ${count} expected ${count === 1 ? 'entry' : 'entries'} not reconciled (${orgName})`,
-      heading: `${count} overdue ${count === 1 ? 'entry' : 'entries'}`,
-      intro: `${count === 1 ? 'An expected entry' : `${count} expected entries`} of <strong>${hOrg}</strong> ${count === 1 ? 'is' : 'are'} past due and not reconciled to a transaction yet:`,
-      followup: `Reconcile them from the Forecast tab (suggested matches are one click away), reschedule them, or cancel them if no longer expected — overdue entries keep weighing on the projected balance.`,
-      footer: `You receive this because forecast entries are monitored for ${hOrg}. One digest when new entries become overdue — no daily reminders.`,
-      preheader: `${count} expected ${count === 1 ? 'entry' : 'entries'} past due, not reconciled.`,
-      cta: 'Open the forecast',
-      text: [
-        `${count} expected ${count === 1 ? 'entry' : 'entries'} of ${orgName} ${count === 1 ? 'is' : 'are'} past due and not reconciled yet:`,
-        entries.map((e) => `- ${line(e, e.label)}`).join('\n'),
-        `Open the forecast: ${forecastUrl}`,
-      ],
+      heading: 'Your weekly digest',
+      cashLine: (s: NonNullable<DigestSection['cash']>) =>
+        `Projected cash drops to <strong>${eur(s.minProjectedCents)}</strong> within the next 3 months — below your ${eur(s.thresholdCents)} threshold.`,
+      cashText: (s: NonNullable<DigestSection['cash']>) =>
+        `Projected cash drops to ${eur(s.minProjectedCents)} within the next 3 months — below your ${eur(s.thresholdCents)} threshold.`,
+      cashCta: 'Open the cash forecast',
+      overdueLine: (n: number) =>
+        `${n} expected ${n === 1 ? 'entry is' : 'entries are'} past due and not reconciled yet:`,
+      overdueCta: 'Open the forecast',
+      more: (n: number) => `+ ${n} more`,
+      cashSubject: (n: number) =>
+        `${n} cash ${n === 1 ? 'threshold' : 'thresholds'} breached`,
+      overdueSubject: (n: number) =>
+        `${n} overdue ${n === 1 ? 'entry' : 'entries'}`,
+      reportsLine: (n: number) =>
+        `<strong>${n}</strong> ${n === 1 ? 'report' : 'reports'} filed this week.`,
+      reportsText: (n: number) =>
+        `${n} ${n === 1 ? 'report' : 'reports'} filed this week.`,
+      reportsSubject: (n: number) =>
+        `${n} ${n === 1 ? 'report' : 'reports'} filed`,
+      subjectPrefix: 'Weekly digest',
+      footer: `You receive this every Monday for the organisations you belong to. Choose which alerts reach you in Settings → Members.`,
     },
     fr: {
-      subject: `Échéances en retard — ${count} échéance(s) attendue(s) non rapprochée(s) (${orgName})`,
-      heading: `${count} échéance(s) en retard`,
-      intro: `${count === 1 ? 'Une échéance attendue' : `${count} échéances attendues`} de <strong>${hOrg}</strong> ${count === 1 ? 'est dépassée' : 'sont dépassées'} sans être rapprochée${count === 1 ? '' : 's'} d'une transaction :`,
-      followup: `Rapprochez-les depuis l'onglet Prévisionnel (les rapprochements suggérés sont à un clic), re-datez-les, ou annulez-les si elles ne sont plus attendues — une échéance en retard continue de peser sur le solde projeté.`,
-      footer: `Vous recevez cet email car les échéances prévisionnelles de ${hOrg} sont surveillées. Un récapitulatif quand de nouvelles échéances passent en retard — pas de rappel quotidien.`,
-      preheader: `${count} échéance(s) attendue(s) dépassée(s), non rapprochée(s).`,
-      cta: 'Ouvrir le prévisionnel',
-      text: [
-        `${count} échéance(s) attendue(s) de ${orgName} dépassée(s) sans rapprochement :`,
-        entries.map((e) => `- ${line(e, e.label)}`).join('\n'),
-        `Ouvrir le prévisionnel : ${forecastUrl}`,
-      ],
+      heading: 'Votre point hebdo',
+      cashLine: (s: NonNullable<DigestSection['cash']>) =>
+        `Le solde projeté descend à <strong>${eur(s.minProjectedCents)}</strong> dans les 3 prochains mois — sous votre seuil de ${eur(s.thresholdCents)}.`,
+      cashText: (s: NonNullable<DigestSection['cash']>) =>
+        `Le solde projeté descend à ${eur(s.minProjectedCents)} dans les 3 prochains mois — sous votre seuil de ${eur(s.thresholdCents)}.`,
+      cashCta: 'Ouvrir le prévisionnel',
+      overdueLine: (n: number) =>
+        `${n} échéance(s) attendue(s) dépassée(s), non rapprochée(s) :`,
+      overdueCta: 'Ouvrir le prévisionnel',
+      more: (n: number) => `+ ${n} autre(s)`,
+      cashSubject: (n: number) => `${n} seuil(s) de trésorerie franchi(s)`,
+      overdueSubject: (n: number) => `${n} échéance(s) en retard`,
+      reportsLine: (n: number) =>
+        `<strong>${n}</strong> report${n === 1 ? '' : 's'} rangé${n === 1 ? '' : 's'} cette semaine.`,
+      reportsText: (n: number) =>
+        `${n} report${n === 1 ? '' : 's'} rangé${n === 1 ? '' : 's'} cette semaine.`,
+      reportsSubject: (n: number) =>
+        `${n} report${n === 1 ? '' : 's'} rangé${n === 1 ? '' : 's'}`,
+      subjectPrefix: 'Point hebdo',
+      footer: `Vous recevez ce mail chaque lundi pour les organisations dont vous êtes membre. Choisissez les alertes qui vous parviennent dans Réglages → Membres.`,
     },
+  })
+
+  const cashCount = sections.filter((s) => s.cash).length
+  const overdueCount = sections.reduce(
+    (sum, s) => sum + (s.overdue?.entries.length ?? 0),
+    0,
+  )
+  // Summed across orgs on purpose: the subject is a headline, not a ledger.
+  // A company held by two orgs files one report in each, so this total can
+  // exceed the number of emails forwarded (cf. KNOWN_ISSUES).
+  const reportsCount = sections.reduce(
+    (sum, s) => sum + (s.reports?.count ?? 0),
+    0,
+  )
+  const summary = [
+    cashCount > 0 ? c.cashSubject(cashCount) : null,
+    overdueCount > 0 ? c.overdueSubject(overdueCount) : null,
+    reportsCount > 0 ? c.reportsSubject(reportsCount) : null,
+  ]
+    .filter(Boolean)
+    .join(', ')
+
+  const paragraphs = sections.map((s) => {
+    const blocks = [
+      `<p style="margin:0 0 8px; font-weight:600; font-size:16px;">${esc(s.orgName)}</p>`,
+    ]
+    if (s.cash) {
+      blocks.push(
+        `<p style="margin:0 0 12px;">${c.cashLine(s.cash)}<br>` +
+          `<a href="${s.cash.cashUrl}" style="color:${BRAND};">${c.cashCta}</a></p>`,
+      )
+    }
+    if (s.reports) {
+      blocks.push(
+        `<p style="margin:0 0 12px;">${c.reportsLine(s.reports.count)}</p>`,
+      )
+    }
+    if (s.overdue) {
+      const shown = s.overdue.entries.slice(0, OVERDUE_EMAIL_MAX_LINES)
+      const hidden = s.overdue.entries.length - shown.length
+      const list = shown
+        .map((e) => `• ${line(e, esc(e.label))}`)
+        .join('<br>')
+        .concat(
+          hidden > 0
+            ? `<br><span style="color:${MUTED};">${c.more(hidden)}</span>`
+            : '',
+        )
+      blocks.push(
+        `<p style="margin:0 0 12px;">${c.overdueLine(s.overdue.entries.length)}<br>` +
+          `${list}<br><a href="${s.overdue.forecastUrl}" style="color:${BRAND};">${c.overdueCta}</a></p>`,
+      )
+    }
+    return blocks.join('')
+  })
+
+  const text = sections.flatMap((s) => {
+    const parts = [s.orgName.toUpperCase()]
+    if (s.cash) parts.push(`${c.cashText(s.cash)}\n${s.cash.cashUrl}`)
+    if (s.reports) parts.push(c.reportsText(s.reports.count))
+    if (s.overdue) {
+      parts.push(
+        `${c.overdueLine(s.overdue.entries.length)}\n` +
+          s.overdue.entries.map((e) => `- ${line(e, e.label)}`).join('\n') +
+          `\n${s.overdue.forecastUrl}`,
+      )
+    }
+    return parts
   })
 
   const html = layout({
     locale,
-    preheader: c.preheader,
+    preheader: summary,
     heading: c.heading,
-    paragraphs: [c.intro, listHtml, c.followup, urlFallback(locale, forecastUrl)],
-    cta: { label: c.cta, url: forecastUrl },
+    paragraphs,
     footer: c.footer,
   })
 
-  return { subject: c.subject, html, text: plainText(c.text) }
+  return {
+    subject: `${c.subjectPrefix} — ${summary}`,
+    html,
+    text: plainText(text),
+  }
 }
 
 export function powensConnectionAlertEmail({
@@ -1007,7 +1045,23 @@ export function reportRecapSuccessHtml(d: ReportRecapData): string {
   ])
 }
 
-/** Failure recap — replied in the thread (member senders only). */
+/**
+ * Receipt for a member who forwards reports without handling the queue.
+ * Deliberately takes NO argument: it must read exactly the same whether the
+ * report was filed or fell over, so that a forwarder never has to wonder why
+ * this one looks different. Everything it claims is true in both cases — the
+ * mail is stored and replayable from the review queue either way — and it
+ * promises nothing about a human, which would be a lie the day nobody
+ * subscribes to report problems.
+ */
+export function reportReceiptHtml(): string {
+  return recapShell('📬 Report bien reçu', [
+    `<p style="margin: 0;">Merci — ton email est bien arrivé, avec ses pièces jointes, et son contenu est conservé.</p>`,
+    `<p style="margin: 12px 0 0; color: ${MUTED};">Il suit son cours dans Albo OS. Tu n'as rien d'autre à faire.</p>`,
+  ])
+}
+
+/** Failure recap — replied in the thread (queue handlers only). */
 export function reportRecapFailureHtml(reason: string, queueUrl: string): string {
   return recapShell(`⚠️ Report non traité — ${esc(reviewReasonLabel(reason))}`, [
     `<p style="margin: 0; color: ${MUTED};">L'email est conservé dans la file « Reports entrants ». Tu peux le rattacher à une participation ou le retraiter depuis Albo OS.</p>`,

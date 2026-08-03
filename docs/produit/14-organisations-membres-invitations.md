@@ -29,9 +29,48 @@ Trois onglets dans Paramètres :
 
 - **Général** : nom (admin/owner), slug (lecture seule), logo.
 - **Membres** : la liste avec rôle ; changement de rôle et retrait via un
-  menu par membre (dans le respect des règles ci-dessus).
+  menu par membre (dans le respect des règles ci-dessus). Plus bas, la
+  carte **Alertes par email** (voir ci-dessous).
 - **Invitations** (admin/owner) : envoyer une invitation (email + rôle) et
   révoquer celles en attente.
+
+## Qui reçoit quels emails
+
+Sous la liste des membres, un tableau croise **les personnes** et **les six
+emails récurrents** que l'application envoie :
+
+| Alerte | Ce qui la déclenche |
+| --- | --- |
+| Seuil de trésorerie | Le solde projeté des 3 prochains mois passe sous le seuil de l'organisation. Arrive dans le point hebdo du lundi. |
+| Échéances en retard | Des échéances attendues sont dépassées et toujours non rapprochées. Arrive dans le point hebdo du lundi. |
+| Connexion bancaire | Une connexion bancaire tombe en panne ou cesse de se synchroniser. Envoyé sur le moment. |
+| Échec d'indexation | Un document n'a pas pu être indexé pour la recherche de l'assistant IA. Envoyé sur le moment. |
+| Reports de la semaine | Le nombre de reports rangés sur les participations. Arrive dans le point hebdo du lundi. |
+| Problèmes de reports | Les emails de la file Rapports entrants : quarantaine, échec de traitement, suite donnée à un mail assigné à la main. Envoyé sur le moment. Cette case décide **aussi** de ce que tu reçois pour les reports que tu transfères toi-même (voir plus bas). |
+
+Trois choses à savoir :
+
+- **Tout est activé par défaut**, y compris pour un nouveau membre. C'est
+  un désabonnement, pas un abonnement.
+- **Les réglages suivent la personne, pas l'organisation.** Décocher une
+  case ici la décoche partout ; l'écran le rappelle. On ne peut pas
+  recevoir les alertes de Calte et couper celles d'Albo.
+- Un admin règle la ligne de tout le monde ; chacun règle la sienne.
+
+Ce que ce tableau **ne coupe pas** : les emails qui répondent à un geste
+qu'on vient de faire — invitation, lien de connexion, et la réponse au
+transfert d'un report. Ces derniers arrivent toujours, mais leur contenu
+dépend de la case « Problèmes de reports » :
+
+- **Case décochée** → tu reçois **« Report bien reçu »**, le même message
+  que le report se soit rangé ou non.
+- **Case cochée** → tu reçois le récapitulatif détaillé quand c'est rangé,
+  et le message actionnable (cause + lien vers la file) quand ça coince.
+
+C'est ce qui permet de confier à quelqu'un le seul rôle de **transférer
+des reports** : il reçoit toujours le même accusé, sans jamais voir une
+erreur, qui part à ceux qui gèrent la file. Voir
+[Reports par email](17-reports-par-email.md).
 
 ## Le workflow d'invitation
 

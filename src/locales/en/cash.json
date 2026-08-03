@@ -140,7 +140,7 @@
   "alert": {
     "title": "Threshold alert",
     "breached": "Alert threshold breached: the available or projected balance drops under {{amount}} within the next 3 months.",
-    "hint": "An email when the projected balance over the next 3 months (or the available balance) drops under the threshold. At most one alert per week.",
+    "hint": "An email when the projected balance over the next 3 months (or the available balance) drops under the threshold. Carried by the Monday digest, sent to the members who want it (Settings → Members).",
     "thresholdLabel": "Threshold (€)",
     "activeLabel": "Alert active",
     "saved": "Alert saved",

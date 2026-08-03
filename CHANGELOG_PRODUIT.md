@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.166.2 — 03/08/2026 à 15:24 — Un fichier Excel est enfin lu en entier, tous ses onglets compris
+## v1.170.1 — 03/08/2026 à 15:28 — Un fichier Excel est enfin lu en entier, tous ses onglets compris
 
 Jusqu'ici, un classeur Excel un peu fourni ne livrait qu'une partie de son
 contenu : le premier onglet était lu, et **tout ce qui suivait disparaissait
@@ -71,6 +71,197 @@ travailler sur les gros classeurs.
 > - `tests/excel.test.ts` : test de régression ALB-114 (classeur 3 onglets à
 >   premier onglet dense → les 3 rendus), vérifié rouge sur l'ancien code.
 
+---
+
+## v1.170.0 — 03/08/2026 à 12:48 — Le point du lundi compte les reports de la semaine
+
+Le mail du lundi matin gagne une ligne par organisation : **le nombre de
+reports rangés dans la semaine écoulée**. De quoi voir d'un coup d'œil que le
+circuit tourne, sans recevoir un mail à chaque report qui arrive.
+
+Comme les autres blocs, il se coupe depuis **Réglages → Membres**, case
+« Reports de la semaine ». Et comme les autres, il suffit à lui seul à
+déclencher le mail : une semaine sans alerte de trésorerie ni échéance en
+retard mais avec trois reports rangés vous enverra quand même le point hebdo.
+Qui coupe les trois cases ne reçoit toujours rien.
+
+Une précision de lecture : une société détenue par Calte **et** Albo range son
+report dans chacune. Un seul mail transféré compte donc 1 dans les deux
+sections. Chaque ligne est juste dans son organisation, mais les deux ne
+s'additionnent pas.
+
+> **🔧 Notes techniques**
+>
+> - Sixième drapeau `notifyWeeklyReports` sur `userPrefs` (opt-out, comme les
+>   cinq autres) + sixième colonne dans la matrice. **Tout nouveau bloc du
+>   digest doit avoir le sien** : sans ça il ré-arme le mail du lundi chez
+>   quelqu'un qui avait tout coupé — c'est la règle que `sectionsFor` fait
+>   respecter, tests à l'appui.
+> - Comptage dans `sendWeeklyDigest` : lecture de `companyReports` par l'index
+>   `by_org` en `order('desc')`, arrêt dès qu'une ligne sort de la fenêtre —
+>   seules les lignes de la semaine sont touchées. `DIGEST_WINDOW_MS` vaut une
+>   période de cron ; déplacer le cron sans le suivre créerait un trou ou un
+>   recouvrement.
+> - Le compteur reflète ce qui est **en base**, pas ce qui a été envoyé : un
+>   mail en quarantaine ou en échec n'y figure pas tant qu'il n'a pas été
+>   repris depuis la file.
+
+---
+
+## v1.169.0 — 03/08/2026 à 11:51 — Transférer un report sans jamais recevoir d'erreur
+
+Depuis la mise à jour précédente, on peut confier à quelqu'un le seul rôle de
+transférer les investor updates à l'adresse dédiée, sans lui envoyer les
+problèmes du circuit. Il restait un défaut : quand le report se rangeait bien
+cette personne recevait un récapitulatif, et quand ça coinçait elle ne recevait
+**rien**. Un accusé de réception qui n'arrive qu'une fois sur deux inquiète
+plus qu'il ne rassure.
+
+Désormais, **toute personne qui transfère reçoit une réponse dans son fil**, à
+chaque fois. Ce qu'elle contient dépend de son rôle :
+
+- **Elle ne gère pas la file** (case « Problèmes de reports » décochée) → elle
+  reçoit « **Report bien reçu** », exactement le même message que le report se
+  soit rangé ou non. Aucun verdict, aucun lien, rien à faire.
+- **Elle gère la file** → elle reçoit le vrai contenu : le récapitulatif
+  détaillé quand c'est rangé, et le message actionnable — la cause et le lien
+  vers la boîte Rapports entrants — quand ça coince.
+
+Les autres personnes qui gèrent la file sont prévenues **uniquement en cas de
+problème**, par un email séparé. Un report qui se range correctement ne
+déclenche aucune notification pour qui ne l'a pas transféré : pas de bruit pour
+une chaîne qui marche.
+
+Un trou est bouché au passage : un mail d'un membre classé en spam partait en
+quarantaine sans que son expéditeur en sache rien. Il reçoit maintenant la même
+réponse que dans tous les autres cas.
+
+> **🔧 Notes techniques**
+>
+> - **Décision isolée** dans `convex/lib/reportRouting.ts:routeRecap`, épinglée
+>   par `tests/reportRouting.test.ts` (6 cas : succès/échec/quarantaine ×
+>   transféreur abonné, non abonné, non membre). Deux axes indépendants — le
+>   **canal** suit le geste (réponse en fil pour le transféreur membre, mail
+>   neuf sinon), le **contenu** suit le rôle (abonné `reportIssues` →
+>   actionnable, sinon accusé neutre).
+> - **`emailTemplates.ts:reportReceiptHtml()` ne prend aucun argument**, à
+>   dessein : lui en passer un (cause, société, un simple ✅/⚠️) suffirait à
+>   révéler l'issue et casserait la garantie. Le texte ne promet rien sur un
+>   humain — ce serait faux si plus personne n'est abonné.
+> - `reportNotify.send` lit `listRecipients` **avant** de router : la liste
+>   sert à la fois de destinataires et de test « l'expéditeur gère-t-il la
+>   file ? », et le transféreur en est retiré pour ne pas être notifié deux
+>   fois. Une seule prise de `notifiedAt` couvre les deux envois.
+> - Un `success` ne déclenche plus aucun envoi vers un tiers
+>   (`alertOthers: false`).
+
+---
+
+## v1.168.0 — 03/08/2026 à 11:37 — Déposer plusieurs documents en une fois
+
+Ajouter des documents se faisait un par un : choisir le fichier, remplir le
+titre, le type, la date, enregistrer — puis tout recommencer pour le
+suivant. Avec les cinq pièces d'une assemblée générale ou le lot de
+documents d'un closing, la corvée était réelle.
+
+La fenêtre de sélection accepte désormais **plusieurs fichiers d'un coup**,
+sur l'onglet Documents d'une société comme sur le bloc Documents d'une fiche
+deal. La modale liste alors **un titre par fichier**, pré-rempli par le nom
+du fichier et modifiable ligne par ligne, pendant que le **type** et la
+**période** (ou la date, côté deal) se choisissent **une seule fois** et
+s'appliquent à tout le lot — c'est presque toujours ce qu'on veut quand on
+dépose des pièces qui vont ensemble. Un seul fichier sélectionné : l'écran
+est exactement celui d'avant.
+
+Deux garde-fous inchangés : la limite de **20 Mo par fichier** reste, et si
+un fichier trop lourd se glisse dans la sélection, le lot entier est refusé
+avant tout envoi plutôt que d'en perdre un en silence. Chaque document part
+ensuite en lecture automatique comme aujourd'hui.
+
+> **🔧 Notes techniques**
+>
+> - `ReportingsSection.tsx` et `DealDocumentsSection.tsx` : l'état
+>   `pendingFile: File | null` devient `pendingFiles: Array<File>` avec un
+>   tableau `titles` parallèle, qui porte aussi le titre unique en mode
+>   édition — un seul chemin de code pour les deux cas. `<input multiple>`,
+>   et `handlePick` reçoit désormais le tableau complet.
+> - `handleSave` boucle en série sur les fichiers (upload
+>   `files:generateUploadUrl` puis `documents:create` par fichier). Un échec
+>   interrompt le lot : les documents déjà créés restent, la liste étant
+>   réactive. Aucun changement backend — `documents:create` prend toujours
+>   un `storageId` à la fois.
+> - Même idiome que `AddReportDialog` (`CompanyReportsSection.tsx`), y
+>   compris le rejet du lot entier si un fichier dépasse `MAX_BYTES`.
+> - Les deux `DialogContent` passent en `max-h-[85vh] overflow-y-auto`
+>   (règle CLAUDE.md sur les modales à contenu extensible).
+> - i18n : `dialogTitle`, `added` et `titleLabel` passent au pluriel
+>   (`_one` / `_other`) dans les namespaces `reportings.*` et
+>   `dealDocuments.*`, EN et FR.
+
+---
+
+## v1.167.0 — 03/08/2026 à 10:42 — Vous choisissez qui reçoit quels emails, et les alertes du matin deviennent un point hebdo
+
+Jusqu'ici, les emails de l'application partaient à tout le monde, sans
+réglage possible : une alerte de trésorerie le matin, un digest d'échéances
+en retard un autre matin, et deux notifications séparées quand une connexion
+bancaire tombait ou qu'un document ne s'indexait pas.
+
+**Deux changements.** D'abord, les alertes de trésorerie et les échéances en
+retard ne partent plus au fil de l'eau : elles se retrouvent dans un **seul
+email, le lundi matin**, avec une section par organisation. Vous voyez d'un
+coup ce qui cloche partout, au lieu de recevoir des mails isolés en semaine.
+S'il n'y a rien à signaler, il n'y a pas d'email.
+
+Ensuite, **Réglages → Membres** accueille un tableau « Alertes par email »
+qui croise les personnes et les cinq alertes que l'application envoie : seuil
+de trésorerie, échéances en retard, connexion bancaire, échec d'indexation,
+problèmes de reports. Chacun coche ce qu'il veut recevoir ; un admin règle la
+ligne de tout le monde. Tout est activé par défaut, y compris pour un nouveau
+membre — c'est un désabonnement, pas un abonnement. Attention, ces réglages
+suivent la **personne** et pas l'organisation : les décocher ici les décoche
+partout.
+
+**Un cas concret que ça débloque** : confier à quelqu'un le seul rôle de
+transférer les reports reçus à l'adresse dédiée. Il continue de recevoir
+l'accusé de réception de chaque report qu'il transfère — ça, ça ne se coupe
+pas, c'est la réponse à son geste — mais les erreurs du circuit (report non
+traité, email en quarantaine) ne lui reviennent plus dans son fil : elles
+partent à ceux qui gèrent la file. Il suffit de décocher « Problèmes de
+reports » sur sa ligne.
+
+> **🔧 Notes techniques**
+>
+> - **Modèle.** Cinq drapeaux `notify*` optionnels sur `userPrefs`, stockés
+>   en **opt-out** (absent = abonné) : aucune migration, et un nouveau membre
+>   est abonné d'office. Volontairement hors de la ligne `users`, que
+>   `requireAppUser` lit dans chaque query. `convex/lib/notificationPrefs.ts`
+>   expose `wantsAlert` / `readAlertPrefs` / `setAlertPref` — tout nouvel
+>   envoi récurrent doit passer par là.
+> - **Digest.** `forecasts.checkCashAlerts` et `checkOverdueEntries`
+>   fusionnent en `forecasts.sendWeeklyDigest` (cron `weekly` lundi 07:00
+>   UTC). Deux passes : les constats par org, puis un mail par membre filtré
+>   via `sectionsFor` (`convex/lib/weeklyDigest.ts`, cœur pur épinglé par
+>   `tests/weeklyDigest.test.ts`). Le **cooldown 7 j** et la fenêtre
+>   « nouvellement en retard » de 24 h sont **retirés** — la cadence hebdo
+>   fait l'anti-spam, chaque run est une photo. `lastNotifiedAt` reste écrit
+>   comme trace, sans rôle de barrière. `cashAlertEmail` + `overdueEntriesEmail`
+>   → `weeklyDigestEmail` (sections optionnelles, fr/en).
+> - **Alertes immédiates.** `powens:maybeNotifyConnectionHealth` et
+>   `vectorize:notifyIndexFailure` sautent les membres désabonnés ;
+>   `notifiedHealth` continue d'être marqué même si personne n'a reçu le mail
+>   (état d'incident, pas compteur d'envois).
+> - **Reports.** `reportNotify.send` ne répond plus dans le fil que pour un
+>   `success` : `failure`, `quarantine` et les suites de lignes assignées à la
+>   main partent en mail neuf, `listRecipients` filtrant sur `reportIssues`.
+>   C'est ce qui permet un transféreur sans accès aux erreurs.
+> - **Front.** `organizations.listAlertPrefs` / `setMemberAlertPref`
+>   (auto-édition sans rôle, édition d'autrui en `admin`, appartenance à l'org
+>   re-vérifiée côté serveur) et `src/components/settings/AlertPrefsCard.tsx`
+>   sous la liste des membres. i18n `settings:alerts.*` fr/en.
+
+---
+
 ## v1.166.1 — 03/08/2026 à 10:39 — Un report envoyé depuis une adresse perso se range enfin tout seul
 
 Quand un fondateur envoie son investor update depuis son adresse
@@ -116,6 +307,8 @@ perso arrivent à bon port sans intervention.
 >   d'échec — c'est ce qui a rendu les 3 « erreur technique pendant
 >   l'analyse » indiagnosticables côté utilisateur. Le pattern à reprendre
 >   existe déjà dans `convex/vectorize.ts`.
+
+---
 
 ## v1.166.0 — 31/07/2026 à 16:26 — L'indexation des documents se voit, se relance, et prévient quand elle échoue
 

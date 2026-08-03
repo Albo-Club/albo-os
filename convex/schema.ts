@@ -218,9 +218,23 @@ export default defineSchema({
   // every query reads the caller's `users` row (requireAppUser), so writes
   // there invalidate ALL open subscriptions. See KNOWN_ISSUES.md
   // § "Hot `users` row".
+  /**
+   * userPrefs — per-user mutable state, deliberately OUT of the `users` row
+   * (cf. KNOWN_ISSUES « Hot `users` row »). The `notify*` flags are email
+   * alert opt-OUTS: absent means subscribed, so adding one needs no
+   * backfill and a new member is subscribed by default. They are GLOBAL
+   * (they apply to every org the user belongs to), even though the editing
+   * surface lives inside an org's settings.
+   */
   userPrefs: defineTable({
     userId: v.id('users'),
     lastOrgSlug: v.optional(v.string()),
+    notifyCashThreshold: v.optional(v.boolean()),
+    notifyOverdueEntries: v.optional(v.boolean()),
+    notifyBankConnection: v.optional(v.boolean()),
+    notifyIndexFailure: v.optional(v.boolean()),
+    notifyReportIssues: v.optional(v.boolean()),
+    notifyWeeklyReports: v.optional(v.boolean()),
   }).index('by_user', ['userId']),
 
   organizations: defineTable({
@@ -1457,8 +1471,10 @@ export default defineSchema({
   /**
    * cashAlertSettings — one optional row per org: threshold alert on the
    * projected balance (90-day planned scenario) and on the available
-   * balance. Evaluated daily by cron (forecasts.checkCashAlerts) with a
-   * 7-day cooldown (`lastNotifiedAt`); members are notified by email.
+   * balance. Evaluated weekly by cron (forecasts.sendWeeklyDigest), which
+   * emails the members subscribed to that alert. `lastNotifiedAt` records
+   * the last breach reported — the weekly cadence IS the anti-spam, so it
+   * no longer gates anything.
    */
   cashAlertSettings: defineTable({
     orgId: v.id('organizations'),

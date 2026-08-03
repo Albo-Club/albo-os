@@ -23,8 +23,9 @@ function parseThresholdEuros(raw: string): number | null {
 /**
  * Threshold-alert setting of the org (Cash « Aperçu », secondary zone):
  * "email me when the projected balance over the next 3 months drops under
- * X €". Evaluated daily by cron with a 7-day cooldown; saving clears the
- * cooldown so a new threshold can fire immediately.
+ * X €". Evaluated by the Monday digest cron (forecasts.sendWeeklyDigest),
+ * which carries it to the members who did not mute that alert. The in-app
+ * banner below uses the same rule, live and for everyone.
  */
 export function CashAlertCard({ orgId }: { orgId: Id<'organizations'> }) {
   const { t } = useTranslation(['cash', 'common'])

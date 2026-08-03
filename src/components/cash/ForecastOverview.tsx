@@ -26,7 +26,7 @@ import { Skeleton } from '~/components/ui/skeleton'
 const HORIZONS = [6, 12, 24] as const
 // Depth of the actual history shown ahead of the projection.
 const HISTORY_MONTHS = 6
-// The threshold banner mirrors checkCashAlerts: available balance or any
+// The threshold banner mirrors sendWeeklyDigest: available balance or any
 // projected month (with-planned scenario) over the next 3 months.
 const ALERT_LOOKAHEAD_MONTHS = 3
 
