@@ -1948,6 +1948,20 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   (`OVERDUE_GRACE_MS`) : la banque synchronise en ~24 h et le
   rapprochement est un geste manuel, donc pas de rappel sur le loyer
   d'hier. C'est le seul délai qui subsiste dans le digest.
+- **Compteur de reports du point hebdo : additionnable dans une org, pas
+  entre orgs.** Le bloc compte les `companyReports` créés dans les 7 jours
+  via l'index `by_org`, en lisant du plus récent au plus ancien et en
+  s'arrêtant au seuil (seules les lignes de la semaine sont touchées). Le
+  piège est le **fan-out multi-org** : une société détenue par Calte *et*
+  Albo range un report dans chacune, donc un seul mail transféré compte 1
+  dans les deux sections. Chaque ligne est juste dans son org ; le total du
+  sujet, lui, peut dépasser le nombre de mails réellement transférés — c'est
+  assumé, un sujet est une accroche, pas un registre. Ne pas « corriger »
+  en dédupliquant sur `agentmailMessageId` : ça casserait la lecture
+  par-org, qui est celle qui compte. Enfin, `DIGEST_WINDOW_MS` vaut une
+  période de cron : déplacer le cron sans le suivre créerait un trou ou un
+  recouvrement dans le comptage — c'est le seul endroit où les deux sont
+  couplés.
 - **Qui reçoit quoi : opt-out par personne, global, dans `userPrefs`.**
   Les cinq drapeaux `notify*` (`convex/lib/notificationPrefs.ts`) sont des
   **opt-out** — absent = abonné. D'où : aucun backfill à la création d'un
@@ -1959,7 +1973,9 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   aussi côté org B. Accepté à 3 users ; à revoir si le périmètre s'élargit.
   Tout nouvel envoi d'email récurrent doit passer par `wantsAlert` /
   `readAlertPrefs` — sinon il devient le seul mail qu'on ne peut pas
-  couper.
+  couper. Même règle pour tout **nouveau bloc du point hebdo** : il lui
+  faut son propre drapeau, sinon il ré-arme le mail du lundi chez quelqu'un
+  qui avait tout coupé.
 - **Échéance TVA suggérée : `derivedKey` "vat:{orgId}:{YYYY-Qn}", sans
   `ruleId`.** L'idempotence passe par la clé (créée une fois par trimestre,
   quelle que soit sa vie ensuite : réalisée, annulée, éditée — la
@@ -3271,32 +3287,54 @@ Corollaire côté lecture : `origin` est **optionnel** (absent = email, les
 lignes d'avant la fonctionnalité n'ont rien). Tester `=== 'upload'`, jamais
 `!== 'email'`.
 
-## Reports par email : le récap OK répond dans le fil, les problèmes non
+## Reports par email : le canal suit le geste, le contenu suit le rôle
 
-`reportNotify.send` route selon **le type de nouvelle**, pas selon
-l'expéditeur seul :
+Le routage des récaps (`convex/lib/reportRouting.ts:routeRecap`, appliqué
+par `reportNotify.send`) croise **deux axes indépendants**. Les confondre
+est l'erreur naturelle, et c'est ce qui casse la promesse faite au
+transféreur :
 
-- `success` + expéditeur membre → **réponse dans le fil du forward**. C'est
-  un accusé de réception : il part à qui a transféré, sans réglage possible.
-- tout le reste (`failure`, `quarantine`, et le `success` d'une ligne
-  assignée à la main depuis la file) → **mail neuf** aux membres qui n'ont
-  pas coupé `reportIssues` (`convex/lib/notificationPrefs.ts`).
+- **Le canal** dépend du geste : un membre qui a transféré reçoit la
+  réponse **dans son propre fil** ; tous les autres reçoivent un **mail
+  neuf**.
+- **Le contenu** dépend du rôle : qui gère la file (abonné `reportIssues`)
+  reçoit la version actionnable — récap détaillé sur succès, cause + lien
+  vers la file sur échec ; qui ne fait que transférer reçoit un **accusé de
+  réception identique au caractère près, succès comme échec**.
 
-La raison est fonctionnelle : quelqu'un peut être là **uniquement pour
-transférer** des reports sans jamais devoir gérer la file. Lui répondre
-« report non traité » dans son fil lui adresse un problème qu'il ne
-traitera pas. D'où la règle : un échec quitte le fil.
+Ce dernier point est le cœur du dispositif, et il est **contre-intuitif** :
+`reportReceiptHtml()` ne prend délibérément **aucun argument**. Lui en
+passer un — la cause, le nom de la société, un simple ✅/⚠️ — suffirait à
+révéler le résultat, et le transféreur se remettrait à surveiller un
+diagnostic qu'il ne traitera pas. Si un jour la fonction gagne un
+paramètre, la garantie tombe.
 
-Deux conséquences à ne pas redécouvrir à la main :
+Le corollaire symétrique : un **succès ne notifie jamais un tiers**
+(`alertOthers: false`). Une chaîne qui marche ne produit aucun mail pour
+qui ne l'a pas déclenchée. Ajouter une notification de succès aux
+gestionnaires ferait un mail par report entrant.
 
-- **Ne pas rétablir la réponse en fil sur `failure`** en croyant réparer un
-  oubli — c'est le comportement voulu, et ce qui protège le transféreur.
-- **Un nouveau membre est abonné d'office** (opt-out). Ajouter quelqu'un qui
-  ne doit voir que ses accusés de réception demande de décocher
-  « Problèmes de reports » sur sa ligne, Réglages → Membres.
+Trois pièges à ne pas redécouvrir :
+
+- **Ne pas « réparer » l'accusé neutre** en y ajoutant l'issue : c'est le
+  comportement voulu, pas un oubli.
+- **Ne pas promettre d'humain dans l'accusé** (« l'équipe a été prévenue ») :
+  ce serait faux le jour où personne n'est abonné à `reportIssues`. Le
+  texte ne dit que ce qui est vrai dans tous les cas — le mail est
+  conservé et rejouable depuis la file.
+- **Un nouveau membre est abonné d'office** (opt-out). Ajouter quelqu'un
+  qui ne doit voir que ses accusés demande de décocher « Problèmes de
+  reports » sur sa ligne, Réglages → Membres.
 
 Le garde-fou anti-énumération reste par-dessus tout ça : **jamais** de
 réponse à un expéditeur non membre, quoi qu'il arrive.
+
+Limite connue et assumée : si **personne** n'est abonné à `reportIssues`,
+un échec ne notifie plus personne pendant que le transféreur, lui, reçoit
+son « bien reçu ». Rien n'est perdu — la ligne reste dans la file
+`/app/all/reports` — mais plus aucun mail ne le signale. Pas de garde-fou
+en base (on ne bloque pas le désabonnement du dernier abonné) : à 3 users
+la file est regardée.
 
 ## `companyReports.metrics` — des nombres nus, unité stockée ailleurs
 

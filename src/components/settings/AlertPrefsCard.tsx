@@ -29,6 +29,7 @@ const KINDS = [
   'bankConnection',
   'indexFailure',
   'reportIssues',
+  'weeklyReports',
 ] as const
 
 type Kind = (typeof KINDS)[number]

@@ -248,7 +248,8 @@ la fiche deal complète.
 | FC27 | Fiche deal `/deals/$dealId` avec ≥ 1 échéance pending rattachée | Section « Prévisionnel » entre Plan vs réalisé et Transactions : table des échéances rattachées (date, libellé + badge « Règle », confiance, montant signé). **Aucune ligne « Reste à déployer »** — le reste engagé ne vit que dans la carte FC14, seul endroit où la courbe dont il est mis à part est à l'écran ; sans échéance rattachée, la section affiche l'état vide |
 | FC28 | Rapprocher (FC17) une échéance **rattachée à un deal** avec une transaction **non pointée** | Le toast de succès porte l'action « Pointer sur le deal » (10 s) ; cliquer → `matchTransaction`, la tx passe `matched` sur le deal (visible fiche deal) ; pas d'action si la tx est déjà pointée/allouée ou l'échéance sans deal |
 | FC29 | **Point hebdo** : org sous son seuil d'alerte **et** ≥ 1 échéance `pending` EUR datée d'avant-hier, puis `convex run --prod forecasts:sendWeeklyDigest '{}'` | **Un seul** email bilingue par membre (cron lundi 07:00 UTC), une section par org : bloc trésorerie (solde projeté vs seuil + lien) et/ou bloc échéances (date, libellé, montant signé, max 8 lignes + « + N », lien `/cash?filter=unmatched`) ; objet résumant les deux (« Point hebdo — 1 seuil(s)…, 3 échéance(s)… ») ; une échéance datée d'**hier** seulement n'est pas comptée (jour de grâce) ; réalisée/annulée → jamais dedans ; relancer immédiatement renvoie le **même** mail (photo, pas de cooldown ni de fenêtre — c'est voulu) ; rien à signaler nulle part → `{ notified: 0 }`, aucun envoi |
-| FC30 | **Filtrage du point hebdo** : décocher « Échéances en retard » pour un membre (Réglages → Membres), relancer `forecasts:sendWeeklyDigest '{}'` | Ce membre reçoit le même mail **sans** le bloc échéances ; les autres le reçoivent entier. Décocher aussi « Seuil de trésorerie » → il ne reçoit **plus rien** (aucune section = aucun mail), les autres sont inchangés. Les réglages sont **globaux** : vérifier qu'ils s'appliquent aussi à l'autre org |
+| FC30 | **Filtrage du point hebdo** : décocher « Échéances en retard » pour un membre (Réglages → Membres), relancer `forecasts:sendWeeklyDigest '{}'` | Ce membre reçoit le même mail **sans** le bloc échéances ; les autres le reçoivent entier. Décocher aussi « Seuil de trésorerie » et « Reports de la semaine » → il ne reçoit **plus rien** (aucune section = aucun mail), les autres sont inchangés. Les réglages sont **globaux** : vérifier qu'ils s'appliquent aussi à l'autre org |
+| FC31 | **Bloc « reports rangés »** : ranger ≥ 1 report dans la semaine (R25 ou dépôt manuel), org **sans** franchissement de seuil ni échéance en retard, puis `forecasts:sendWeeklyDigest '{}'` | Le mail part quand même, avec la seule ligne « N reports rangés cette semaine » (le bloc suffit à déclencher le point hebdo) ; objet « Point hebdo — N report(s) rangé(s) ». Une société présente dans **les 2 orgs** compte 1 dans **chaque** section (fan-out voulu, cf. `KNOWN_ISSUES.md`). Un report rangé il y a plus de 7 jours n'est pas compté ; un mail en quarantaine ou en échec **non plus** (seul ce qui est en base compte) |
 | FC30 | Pointer une transaction (registre ou file « À pointer ») sur un deal ayant ≥ 1 échéance `pending` liée (même sens, EUR) | Toast « échéance en attente » avec action « Réaliser l'échéance » (10 s) : clic → l'échéance passe `realized` rattachée à la transaction (mode `close`, l'écart de montant reste lisible) ; l'échéance proposée est la **plus proche en date**, sans fenêtre de date/montant (le lien deal suffit — inverse de FC28) ; aucun toast si le deal n'a pas d'échéance `pending` du même sens |
 
 ## Niveau 3 — Onglet À faire (5 min)
@@ -720,12 +721,13 @@ les séries). Page de suivi : `/app/all/reports`. Prérequis :
 `<CONVEX_SITE_URL>/agentmail/webhook` configurée dans la console AgentMail ;
 **domaines remplis sur les `companies` portfolio**. Boucle fermée par la
 brique 6 : **récaps 100 % AgentMail** (`reportNotify.send`, idempotent via
-`notifiedAt`) — seul le **succès** part en **réponse dans le fil du forward**
-(routing anti-énumération : l'expéditeur est re-vérifié membre AU MOMENT de
-l'envoi ; non-membre → jamais de réponse). Échecs, quarantaines et suites de
-lignes assignées à la main quittent le fil : mail **neuf** aux membres qui
-n'ont pas coupé « Problèmes de reports » (Réglages → Membres) — on peut donc
-transférer des reports sans jamais recevoir les erreurs ; récap
+`notifiedAt`). Routage dans `lib/reportRouting.ts:routeRecap` — **canal selon
+le geste** (le membre qui a transféré est répondu dans son fil, les autres
+reçoivent un mail neuf), **contenu selon le rôle** (abonné « Problèmes de
+reports » → récap détaillé sur succès / cause + lien sur échec ; non-abonné →
+accusé « Report bien reçu » **identique succès comme échec**). Un succès ne
+notifie jamais un tiers. Anti-énumération : l'expéditeur est re-vérifié membre
+AU MOMENT de l'envoi, non-membre → jamais de réponse ; récap
 succès = participations (liens fiches) + méthode de match + sources
 ✅/📦/⚠️ + métriques enregistrées / **non reconnues** / **valeurs
 inhabituelles** (×8 vs dernière valeur connue) / **habituelles absentes** ;
@@ -774,9 +776,12 @@ part (garde dans `reportNotify.send`), le report et ses documents portent
 | R22 | Métriques standard (CA, EBITDA, cash, effectif)                 | `kpiSnapshots` alimentés en conventions (cents, bps), visibles sur la fiche ; « 1,2 M€ » stocké 120000000 cents |
 | R23 | Métrique inconnue du catalogue (ex. taux d'occupation)          | Absente des `kpiSnapshots` ; présente dans le snapshot brut du report (`rawMetrics`) — jamais de pollution des séries |
 | R24 | Rejouer `reportStore.run` sur le même mail (idempotence)        | Aucun doublon de `kpiSnapshots` (clé company+métrique+période+report) ni de report                             |
-| R25 | Forward complet réussi                                          | Récap **en réponse dans le fil** du forward : participations (liens fiches), période, sources, métriques, non-reconnues/inhabituelles/absentes ; un seul récap même si rejoué (`notifiedAt`) |
-| R26 | Forward d'un membre qui échoue (participation introuvable)      | Réponse dans le fil « Report non traité » + lien vers la file ; jamais de mail à un tiers                      |
-| R27 | Email d'un inconnu (quarantaine)                                | Mail **neuf** aux membres (« Email en quarantaine ») ; **aucune** réponse dans le fil de l'inconnu             |
+| R25 | Forward réussi par un membre **abonné** « Problèmes de reports » | Récap détaillé **en réponse dans le fil** du forward : participations (liens fiches), période, sources, métriques, non-reconnues/inhabituelles/absentes ; un seul récap même si rejoué (`notifiedAt`) ; **aucun mail** aux autres membres (un succès ne notifie jamais un tiers) |
+| R25b | Forward réussi par un membre **non abonné** (le transféreur type) | Réponse dans son fil « **Report bien reçu** » — pas le récap détaillé, aucun nom de société, aucun lien ; toujours aucun mail aux autres |
+| R26 | Forward d'un membre **abonné** qui échoue (participation introuvable) | Réponse **dans son fil** « Report non traité » + cause + lien vers la file ; les **autres** abonnés reçoivent la même alerte en mail neuf ; lui ne la reçoit **pas** deux fois |
+| R26b | Forward d'un membre **non abonné** qui échoue                  | Il reçoit « Report bien reçu » — **identique au caractère près** à celui de R25b (comparer les deux mails : aucun mot ne doit différer) ; les abonnés reçoivent l'alerte « Report non traité » en mail neuf |
+| R27 | Email d'un inconnu (quarantaine)                                | Mail **neuf** aux abonnés « Problèmes de reports » (« Email en quarantaine ») ; **aucune** réponse dans le fil de l'inconnu |
+| R27b | Mail d'un **membre** flaggé `spam` (quarantaine, expéditeur connu) | Le membre reçoit la réponse correspondant à son rôle (accusé « bien reçu » s'il n'est pas abonné) ; les abonnés reçoivent la quarantaine en mail neuf |
 | R28 | Action « Rattacher » sur une ligne « À traiter »                | Dialog → choix participation → traitement reprend (extraction si pas faite, sinon fiche) → « Traité » + récap  |
 | R29 | Action « Retraiter »                                            | Pipeline rejoué de zéro (re-auth incluse) ; utile après avoir rempli un domaine manquant                       |
 | R30 | Action « Rejeter »                                              | Ligne « Rejeté / Rejeté manuellement », aucun traitement ni email                                              |

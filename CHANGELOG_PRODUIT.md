@@ -23,6 +23,90 @@ bas de page.
 
 ---
 
+## v1.170.0 — 03/08/2026 à 12:48 — Le point du lundi compte les reports de la semaine
+
+Le mail du lundi matin gagne une ligne par organisation : **le nombre de
+reports rangés dans la semaine écoulée**. De quoi voir d'un coup d'œil que le
+circuit tourne, sans recevoir un mail à chaque report qui arrive.
+
+Comme les autres blocs, il se coupe depuis **Réglages → Membres**, case
+« Reports de la semaine ». Et comme les autres, il suffit à lui seul à
+déclencher le mail : une semaine sans alerte de trésorerie ni échéance en
+retard mais avec trois reports rangés vous enverra quand même le point hebdo.
+Qui coupe les trois cases ne reçoit toujours rien.
+
+Une précision de lecture : une société détenue par Calte **et** Albo range son
+report dans chacune. Un seul mail transféré compte donc 1 dans les deux
+sections. Chaque ligne est juste dans son organisation, mais les deux ne
+s'additionnent pas.
+
+> **🔧 Notes techniques**
+>
+> - Sixième drapeau `notifyWeeklyReports` sur `userPrefs` (opt-out, comme les
+>   cinq autres) + sixième colonne dans la matrice. **Tout nouveau bloc du
+>   digest doit avoir le sien** : sans ça il ré-arme le mail du lundi chez
+>   quelqu'un qui avait tout coupé — c'est la règle que `sectionsFor` fait
+>   respecter, tests à l'appui.
+> - Comptage dans `sendWeeklyDigest` : lecture de `companyReports` par l'index
+>   `by_org` en `order('desc')`, arrêt dès qu'une ligne sort de la fenêtre —
+>   seules les lignes de la semaine sont touchées. `DIGEST_WINDOW_MS` vaut une
+>   période de cron ; déplacer le cron sans le suivre créerait un trou ou un
+>   recouvrement.
+> - Le compteur reflète ce qui est **en base**, pas ce qui a été envoyé : un
+>   mail en quarantaine ou en échec n'y figure pas tant qu'il n'a pas été
+>   repris depuis la file.
+
+---
+
+## v1.169.0 — 03/08/2026 à 11:51 — Transférer un report sans jamais recevoir d'erreur
+
+Depuis la mise à jour précédente, on peut confier à quelqu'un le seul rôle de
+transférer les investor updates à l'adresse dédiée, sans lui envoyer les
+problèmes du circuit. Il restait un défaut : quand le report se rangeait bien
+cette personne recevait un récapitulatif, et quand ça coinçait elle ne recevait
+**rien**. Un accusé de réception qui n'arrive qu'une fois sur deux inquiète
+plus qu'il ne rassure.
+
+Désormais, **toute personne qui transfère reçoit une réponse dans son fil**, à
+chaque fois. Ce qu'elle contient dépend de son rôle :
+
+- **Elle ne gère pas la file** (case « Problèmes de reports » décochée) → elle
+  reçoit « **Report bien reçu** », exactement le même message que le report se
+  soit rangé ou non. Aucun verdict, aucun lien, rien à faire.
+- **Elle gère la file** → elle reçoit le vrai contenu : le récapitulatif
+  détaillé quand c'est rangé, et le message actionnable — la cause et le lien
+  vers la boîte Rapports entrants — quand ça coince.
+
+Les autres personnes qui gèrent la file sont prévenues **uniquement en cas de
+problème**, par un email séparé. Un report qui se range correctement ne
+déclenche aucune notification pour qui ne l'a pas transféré : pas de bruit pour
+une chaîne qui marche.
+
+Un trou est bouché au passage : un mail d'un membre classé en spam partait en
+quarantaine sans que son expéditeur en sache rien. Il reçoit maintenant la même
+réponse que dans tous les autres cas.
+
+> **🔧 Notes techniques**
+>
+> - **Décision isolée** dans `convex/lib/reportRouting.ts:routeRecap`, épinglée
+>   par `tests/reportRouting.test.ts` (6 cas : succès/échec/quarantaine ×
+>   transféreur abonné, non abonné, non membre). Deux axes indépendants — le
+>   **canal** suit le geste (réponse en fil pour le transféreur membre, mail
+>   neuf sinon), le **contenu** suit le rôle (abonné `reportIssues` →
+>   actionnable, sinon accusé neutre).
+> - **`emailTemplates.ts:reportReceiptHtml()` ne prend aucun argument**, à
+>   dessein : lui en passer un (cause, société, un simple ✅/⚠️) suffirait à
+>   révéler l'issue et casserait la garantie. Le texte ne promet rien sur un
+>   humain — ce serait faux si plus personne n'est abonné.
+> - `reportNotify.send` lit `listRecipients` **avant** de router : la liste
+>   sert à la fois de destinataires et de test « l'expéditeur gère-t-il la
+>   file ? », et le transféreur en est retiré pour ne pas être notifié deux
+>   fois. Une seule prise de `notifiedAt` couvre les deux envois.
+> - Un `success` ne déclenche plus aucun envoi vers un tiers
+>   (`alertOthers: false`).
+
+---
+
 ## v1.168.0 — 03/08/2026 à 11:37 — Déposer plusieurs documents en une fois
 
 Ajouter des documents se faisait un par un : choisir le fichier, remplir le

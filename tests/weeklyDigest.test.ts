@@ -30,8 +30,19 @@ const OVERDUE: NonNullable<OrgFinding['overdue']> = {
   forecastUrl: 'https://app.test/app/calte/cash?filter=unmatched',
 }
 
-const BOTH: OrgFinding = { orgName: 'Calte', cash: CASH, overdue: OVERDUE }
-const ALL_ON = { cashThreshold: true, overdueEntries: true }
+const REPORTS: NonNullable<OrgFinding['reports']> = { count: 4 }
+
+const BOTH: OrgFinding = {
+  orgName: 'Calte',
+  cash: CASH,
+  overdue: OVERDUE,
+  reports: null,
+}
+const ALL_ON = {
+  cashThreshold: true,
+  overdueEntries: true,
+  weeklyReports: true,
+}
 
 describe('sectionsFor', () => {
   it('keeps both blocks when the member subscribes to everything', () => {
@@ -43,7 +54,7 @@ describe('sectionsFor', () => {
 
   it('drops the muted block but keeps the org and the other one', () => {
     const [section] = sectionsFor([BOTH], {
-      cashThreshold: true,
+      ...ALL_ON,
       overdueEntries: false,
     })
     assert.deepEqual(section.cash, CASH)
@@ -52,27 +63,39 @@ describe('sectionsFor', () => {
 
   it('drops the org entirely when every one of its blocks is muted', () => {
     assert.deepEqual(
-      sectionsFor([{ orgName: 'Calte', cash: CASH, overdue: null }], {
-        cashThreshold: false,
-        overdueEntries: true,
-      }),
+      sectionsFor(
+        [{ orgName: 'Calte', cash: CASH, overdue: null, reports: null }],
+        { ...ALL_ON, cashThreshold: false },
+      ),
       [],
     )
   })
 
-  it('returns nothing when the member muted both alerts — no mail at all', () => {
+  it('returns nothing when the member muted every block — no mail at all', () => {
     assert.deepEqual(
-      sectionsFor([BOTH, { orgName: 'Albo', cash: CASH, overdue: OVERDUE }], {
-        cashThreshold: false,
-        overdueEntries: false,
-      }),
+      sectionsFor(
+        [
+          BOTH,
+          {
+            orgName: 'Albo',
+            cash: CASH,
+            overdue: OVERDUE,
+            reports: REPORTS,
+          },
+        ],
+        {
+          cashThreshold: false,
+          overdueEntries: false,
+          weeklyReports: false,
+        },
+      ),
       [],
     )
   })
 
   it('carries one section per org, in the order they were found', () => {
     const sections = sectionsFor(
-      [BOTH, { orgName: 'Albo', cash: null, overdue: OVERDUE }],
+      [BOTH, { orgName: 'Albo', cash: null, overdue: OVERDUE, reports: null }],
       ALL_ON,
     )
     assert.deepEqual(
@@ -84,5 +107,40 @@ describe('sectionsFor', () => {
 
   it('sends nothing when no org has anything to report', () => {
     assert.deepEqual(sectionsFor([], ALL_ON), [])
+  })
+})
+
+describe('sectionsFor — the weekly report count', () => {
+  const ONLY_REPORTS: OrgFinding = {
+    orgName: 'Calte',
+    cash: null,
+    overdue: null,
+    reports: REPORTS,
+  }
+
+  it('carries the count when the member subscribes to it', () => {
+    const [section] = sectionsFor([ONLY_REPORTS], ALL_ON)
+    assert.deepEqual(section.reports, REPORTS)
+  })
+
+  it('is enough on its own to send the digest', () => {
+    assert.equal(sectionsFor([ONLY_REPORTS], ALL_ON).length, 1)
+  })
+
+  it('never re-arms the Monday mail for someone who muted it', () => {
+    assert.deepEqual(
+      sectionsFor([ONLY_REPORTS], { ...ALL_ON, weeklyReports: false }),
+      [],
+    )
+  })
+
+  it('drops out without taking the other blocks with it', () => {
+    const [section] = sectionsFor([{ ...BOTH, reports: REPORTS }], {
+      ...ALL_ON,
+      weeklyReports: false,
+    })
+    assert.equal(section.reports, null)
+    assert.deepEqual(section.cash, CASH)
+    assert.deepEqual(section.overdue, OVERDUE)
   })
 })

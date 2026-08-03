@@ -5,10 +5,12 @@ import type { DataModel, Doc, Id } from '../_generated/dataModel'
 type Ctx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>
 
 /**
- * The email alerts a member can opt out of. Everything else the app sends is
- * transactional (invitation, magic link, report recap answered in the
- * forwarder's own thread) and is NOT configurable — it is the direct answer
- * to a gesture its recipient just made.
+ * The recurring emails a member can opt out of — alerts, plus the weekly
+ * report count, which is a stat rather than an alert but travels in the same
+ * Monday mail and deserves the same off switch. Everything else the app sends
+ * is transactional (invitation, magic link, the answer to a forwarded report)
+ * and is NOT configurable — it is the direct reply to a gesture its recipient
+ * just made.
  */
 export const NOTIFICATION_KINDS = [
   'cashThreshold',
@@ -16,6 +18,7 @@ export const NOTIFICATION_KINDS = [
   'bankConnection',
   'indexFailure',
   'reportIssues',
+  'weeklyReports',
 ] as const
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number]
@@ -31,6 +34,7 @@ const PREF_FIELD = {
   bankConnection: 'notifyBankConnection',
   indexFailure: 'notifyIndexFailure',
   reportIssues: 'notifyReportIssues',
+  weeklyReports: 'notifyWeeklyReports',
 } as const satisfies Record<NotificationKind, keyof Doc<'userPrefs'>>
 
 async function prefsOf(ctx: Ctx, userId: Id<'users'>) {

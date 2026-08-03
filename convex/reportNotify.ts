@@ -2,16 +2,15 @@
  * Brick 6 — recap notifications, 100% via AgentMail (design decision:
  * no Resend in this pipeline).
  *
- * Routing rule (anti-enumeration, hard-coded):
- * - The sender is re-checked as a member AT SEND TIME. Member → the SUCCESS
- *   recap is a REPLY in the forward's own thread (lands in their mailbox, in
- *   context). Not a member → NEVER reply.
- * - Everything else (failures, quarantine notices, rows manually assigned
- *   from quarantine) is a FRESH email to the members who subscribe to report
- *   problems — someone can forward reports without ever being handed the
- *   pipeline's errors.
- * - Idempotent: `notifiedAt` is claimed transactionally before sending —
- *   scheduler retries never double-send.
+ * Routing rule: the decision lives in `lib/reportRouting.ts:routeRecap`
+ * (channel follows the gesture, content follows the role — see there). The
+ * sender is re-checked as a member AT SEND TIME, and a non-member is NEVER
+ * replied to, so the address cannot be probed.
+ *
+ * Idempotent: `notifiedAt` is claimed transactionally before sending, so
+ * scheduler retries never double-send. One claim covers BOTH sends of a
+ * problem (the forwarder's thread reply and the fresh mail to the other
+ * handlers) — they happen in the same action run.
  */
 
 import { v } from 'convex/values'
@@ -22,9 +21,11 @@ import {
   reportQuarantineHtml,
   reportRecapFailureHtml,
   reportRecapSuccessHtml,
+  reportReceiptHtml,
   reviewReasonLabel,
 } from './emailTemplates'
 import { wantsAlert } from './lib/notificationPrefs'
+import { routeRecap } from './lib/reportRouting'
 import type { RecapMetric, RecapSuspicious } from './emailTemplates'
 
 function siteUrl(): string {
@@ -45,12 +46,14 @@ export const claimNotify = internalMutation({
 })
 
 /**
- * Members who still want the report pipeline's problem mails. Every FRESH
- * notice of this pipeline is a problem report — a quarantined email, a
- * forward that could not be processed, or the outcome of a row someone
- * assigned by hand from the queue — so they all share one opt-out. The
- * in-thread recap answering a member's own forward is never gated: it is
- * the receipt of a gesture they just made.
+ * Members who still want the report pipeline's problem mails — a quarantined
+ * email, a forward that could not be processed, or the outcome of a row
+ * someone assigned by hand from the queue. They share one opt-out.
+ *
+ * This list does double duty in `send`: it is both the recipient list AND
+ * the test for "does the sender handle the queue?", which is what decides
+ * between the actionable mail and the neutral receipt. The receipt itself is
+ * never gated — it answers a gesture its reader just made.
  */
 export const listRecipients = internalQuery({
   args: {},
@@ -196,24 +199,31 @@ export const send = internalAction({
       subject = 'Albo OS — email en quarantaine'
     }
 
-    // Anti-enumeration routing: in-thread reply ONLY for member senders, and
-    // ONLY to congratulate. A failure is a problem for whoever fixes the
-    // queue, not for whoever pressed "forward" — so it leaves the thread and
-    // goes to the members who subscribe to report problems.
-    if (kind === 'success' && senderIsMember) {
-      await replyToMessage(row.agentmailInboxId, row.agentmailMessageId, html)
-    } else {
-      const recipients: Array<string> = await ctx.runQuery(
-        internal.reportNotify.listRecipients,
-        {},
-      )
-      if (recipients.length > 0) {
-        await sendMessage(row.agentmailInboxId, recipients, subject, html)
+    const recipients: Array<string> = await ctx.runQuery(
+      internal.reportNotify.listRecipients,
+      {},
+    )
+    // `fromEmail` is lowercased at normalization and `users.email` is
+    // lowercase (Better Auth), so a plain match is enough here.
+    const senderHandlesIssues =
+      senderIsMember && recipients.includes(row.fromEmail)
+    const route = routeRecap({ kind, senderIsMember, senderHandlesIssues })
+
+    if (route.reply) {
+      const body = route.reply === 'receipt' ? reportReceiptHtml() : html
+      await replyToMessage(row.agentmailInboxId, row.agentmailMessageId, body)
+    }
+    if (route.alertOthers) {
+      // The forwarder, when they handle the queue, already got it in-thread.
+      const others = recipients.filter((email) => email !== row.fromEmail)
+      if (others.length > 0) {
+        await sendMessage(row.agentmailInboxId, others, subject, html)
       }
     }
 
     console.log(
-      `[reportNotify] ${kind} recap sent for ${row.agentmailMessageId} (in-thread=${kind === 'success' && senderIsMember})`,
+      `[reportNotify] ${kind} recap for ${row.agentmailMessageId} ` +
+        `(reply=${route.reply ?? 'none'}, alertOthers=${route.alertOthers})`,
     )
     return null
   },

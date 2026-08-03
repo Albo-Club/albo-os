@@ -234,6 +234,7 @@ export default defineSchema({
     notifyBankConnection: v.optional(v.boolean()),
     notifyIndexFailure: v.optional(v.boolean()),
     notifyReportIssues: v.optional(v.boolean()),
+    notifyWeeklyReports: v.optional(v.boolean()),
   }).index('by_user', ['userId']),
 
   organizations: defineTable({

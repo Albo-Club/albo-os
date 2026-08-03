@@ -36,8 +36,8 @@ Trois onglets dans Paramètres :
 
 ## Qui reçoit quels emails
 
-Sous la liste des membres, un tableau croise **les personnes** et **les
-cinq alertes** que l'application envoie :
+Sous la liste des membres, un tableau croise **les personnes** et **les six
+emails récurrents** que l'application envoie :
 
 | Alerte | Ce qui la déclenche |
 | --- | --- |
@@ -45,7 +45,8 @@ cinq alertes** que l'application envoie :
 | Échéances en retard | Des échéances attendues sont dépassées et toujours non rapprochées. Arrive dans le point hebdo du lundi. |
 | Connexion bancaire | Une connexion bancaire tombe en panne ou cesse de se synchroniser. Envoyé sur le moment. |
 | Échec d'indexation | Un document n'a pas pu être indexé pour la recherche de l'assistant IA. Envoyé sur le moment. |
-| Problèmes de reports | Les emails de la file Rapports entrants : quarantaine, échec de traitement, suite donnée à un mail assigné à la main. Envoyé sur le moment. |
+| Reports de la semaine | Le nombre de reports rangés sur les participations. Arrive dans le point hebdo du lundi. |
+| Problèmes de reports | Les emails de la file Rapports entrants : quarantaine, échec de traitement, suite donnée à un mail assigné à la main. Envoyé sur le moment. Cette case décide **aussi** de ce que tu reçois pour les reports que tu transfères toi-même (voir plus bas). |
 
 Trois choses à savoir :
 
@@ -57,11 +58,19 @@ Trois choses à savoir :
 - Un admin règle la ligne de tout le monde ; chacun règle la sienne.
 
 Ce que ce tableau **ne coupe pas** : les emails qui répondent à un geste
-qu'on vient de faire — invitation, lien de connexion, et l'accusé de
-réception d'un report qu'on a soi-même transféré. Ce dernier point permet
-de confier à quelqu'un le seul rôle de **transférer des reports** : il
-reçoit ses accusés de réception, et jamais les erreurs, qui partent à ceux
-qui gèrent la file. Voir [Reports par email](17-reports-par-email.md).
+qu'on vient de faire — invitation, lien de connexion, et la réponse au
+transfert d'un report. Ces derniers arrivent toujours, mais leur contenu
+dépend de la case « Problèmes de reports » :
+
+- **Case décochée** → tu reçois **« Report bien reçu »**, le même message
+  que le report se soit rangé ou non.
+- **Case cochée** → tu reçois le récapitulatif détaillé quand c'est rangé,
+  et le message actionnable (cause + lien vers la file) quand ça coince.
+
+C'est ce qui permet de confier à quelqu'un le seul rôle de **transférer
+des reports** : il reçoit toujours le même accusé, sans jamais voir une
+erreur, qui part à ceux qui gèrent la file. Voir
+[Reports par email](17-reports-par-email.md).
 
 ## Le workflow d'invitation
 

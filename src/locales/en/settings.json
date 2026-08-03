@@ -196,7 +196,11 @@
       },
       "reportIssues": {
         "label": "Report problems",
-        "help": "Mails from the incoming reports queue: quarantine, processing failure, outcome of a manually assigned mail. The receipt for a report filed successfully always goes to whoever forwarded it, whatever this setting says."
+        "help": "Mails from the incoming reports queue: quarantine, processing failure, outcome of a manually assigned mail. Also decides what you get for the reports you forward yourself: ticked, the detailed recap or the failure cause; unticked, a plain \"well received\" — the same message either way."
+      },
+      "weeklyReports": {
+        "label": "Weekly reports",
+        "help": "How many reports were filed on your companies, carried by the Monday digest. A report for a company held by two organisations counts in each. Turned off, the line leaves the mail — and if it was the only thing to say that week, no mail is sent at all."
       }
     }
   }
