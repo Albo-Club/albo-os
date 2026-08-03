@@ -32,10 +32,12 @@ import { useDebouncedValue } from '~/hooks/useDebouncedValue'
  * The three people sections of the company identity panel (founders / board /
  * co-investors), edited in place: the ✕ drops a chip, the "+" chip adds one.
  *
- * A chip is deliberately NOT clickable. It used to double as a rename button
- * while also carrying the Attio arrow, so a click on it was ambiguous — open
- * the CRM, or edit the name? Fixing a name means dropping the chip and adding
- * a new one, which is also the only way to re-point its Attio link.
+ * A chip carries exactly ONE gesture: opening its Attio record, on the whole
+ * chip when it is linked (nothing at all when it isn't). It used to double as
+ * a rename button while also carrying the Attio arrow, so a click on it was
+ * ambiguous — open the CRM, or edit the name? Renaming is gone: fixing a name
+ * means dropping the chip and adding a new one, which is also the only way to
+ * re-point its Attio link.
  *
  * `companies.update` takes the people list as a FULL replacement, so every
  * edit rewrites the whole array; `people` order is the storage order, which is
@@ -141,7 +143,7 @@ export function PeopleEditor({
   )
 }
 
-/** One person: initials, name (inert), Attio link, remove. */
+/** One person: initials + name (the Attio link when there is one), remove. */
 function PersonChip({
   person,
   onRemove,
@@ -159,25 +161,41 @@ function PersonChip({
       : attioPersonUrl(person.attioRecordId)
     : null
 
+  const avatar = (
+    <span
+      aria-hidden="true"
+      className="bg-background text-muted-foreground flex size-[18px] shrink-0 items-center justify-center rounded-full border text-[9px] font-bold"
+    >
+      {personInitials(person.name)}
+    </span>
+  )
+
   return (
-    <span className="bg-muted flex items-center gap-1.5 rounded-full border py-0.5 pr-1.5 pl-1 text-[13px]">
-      <span
-        aria-hidden="true"
-        className="bg-background text-muted-foreground flex size-[18px] shrink-0 items-center justify-center rounded-full border text-[9px] font-bold"
-      >
-        {personInitials(person.name)}
-      </span>
-      <span>{person.name}</span>
-      {url && (
+    // The whole chip opens Attio when the entry is linked — a 14px arrow is a
+    // needlessly small target, and the chip has no competing gesture since it
+    // stopped renaming. The ✕ stays OUTSIDE the anchor: a <button> can't nest
+    // in an <a>, and removing must not be one misclick away from the CRM.
+    <span className="bg-muted has-[a:hover]:bg-accent flex items-center gap-1.5 rounded-full border py-0.5 pr-1.5 pl-1 text-[13px] transition-colors">
+      {url ? (
         <a
           href={url}
           target="_blank"
           rel="noreferrer"
-          aria-label={t('identity.attioOpen')}
-          className="text-muted-foreground hover:text-foreground"
+          title={t('identity.attioOpen')}
+          className="flex min-w-0 items-center gap-1.5"
         >
-          <ArrowUpRight className="size-3.5" />
+          {avatar}
+          <span className="truncate">{person.name}</span>
+          <ArrowUpRight
+            aria-hidden="true"
+            className="text-muted-foreground size-3.5 shrink-0"
+          />
         </a>
+      ) : (
+        <>
+          {avatar}
+          <span className="truncate">{person.name}</span>
+        </>
       )}
       <button
         type="button"
