@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.169.0 — 03/08/2026 à 12:48 — Le point du lundi compte les reports de la semaine
+## v1.170.0 — 03/08/2026 à 12:48 — Le point du lundi compte les reports de la semaine
 
 Le mail du lundi matin gagne une ligne par organisation : **le nombre de
 reports rangés dans la semaine écoulée**. De quoi voir d'un coup d'œil que le
@@ -58,7 +58,7 @@ s'additionnent pas.
 
 ---
 
-## v1.168.0 — 03/08/2026 à 11:51 — Transférer un report sans jamais recevoir d'erreur
+## v1.169.0 — 03/08/2026 à 11:51 — Transférer un report sans jamais recevoir d'erreur
 
 Depuis la mise à jour précédente, on peut confier à quelqu'un le seul rôle de
 transférer les investor updates à l'adresse dédiée, sans lui envoyer les
@@ -104,6 +104,49 @@ réponse que dans tous les autres cas.
 >   fois. Une seule prise de `notifiedAt` couvre les deux envois.
 > - Un `success` ne déclenche plus aucun envoi vers un tiers
 >   (`alertOthers: false`).
+
+---
+
+## v1.168.0 — 03/08/2026 à 11:37 — Déposer plusieurs documents en une fois
+
+Ajouter des documents se faisait un par un : choisir le fichier, remplir le
+titre, le type, la date, enregistrer — puis tout recommencer pour le
+suivant. Avec les cinq pièces d'une assemblée générale ou le lot de
+documents d'un closing, la corvée était réelle.
+
+La fenêtre de sélection accepte désormais **plusieurs fichiers d'un coup**,
+sur l'onglet Documents d'une société comme sur le bloc Documents d'une fiche
+deal. La modale liste alors **un titre par fichier**, pré-rempli par le nom
+du fichier et modifiable ligne par ligne, pendant que le **type** et la
+**période** (ou la date, côté deal) se choisissent **une seule fois** et
+s'appliquent à tout le lot — c'est presque toujours ce qu'on veut quand on
+dépose des pièces qui vont ensemble. Un seul fichier sélectionné : l'écran
+est exactement celui d'avant.
+
+Deux garde-fous inchangés : la limite de **20 Mo par fichier** reste, et si
+un fichier trop lourd se glisse dans la sélection, le lot entier est refusé
+avant tout envoi plutôt que d'en perdre un en silence. Chaque document part
+ensuite en lecture automatique comme aujourd'hui.
+
+> **🔧 Notes techniques**
+>
+> - `ReportingsSection.tsx` et `DealDocumentsSection.tsx` : l'état
+>   `pendingFile: File | null` devient `pendingFiles: Array<File>` avec un
+>   tableau `titles` parallèle, qui porte aussi le titre unique en mode
+>   édition — un seul chemin de code pour les deux cas. `<input multiple>`,
+>   et `handlePick` reçoit désormais le tableau complet.
+> - `handleSave` boucle en série sur les fichiers (upload
+>   `files:generateUploadUrl` puis `documents:create` par fichier). Un échec
+>   interrompt le lot : les documents déjà créés restent, la liste étant
+>   réactive. Aucun changement backend — `documents:create` prend toujours
+>   un `storageId` à la fois.
+> - Même idiome que `AddReportDialog` (`CompanyReportsSection.tsx`), y
+>   compris le rejet du lot entier si un fichier dépasse `MAX_BYTES`.
+> - Les deux `DialogContent` passent en `max-h-[85vh] overflow-y-auto`
+>   (règle CLAUDE.md sur les modales à contenu extensible).
+> - i18n : `dialogTitle`, `added` et `titleLabel` passent au pluriel
+>   (`_one` / `_other`) dans les namespaces `reportings.*` et
+>   `dealDocuments.*`, EN et FR.
 
 ---
 

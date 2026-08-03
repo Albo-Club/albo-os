@@ -96,7 +96,10 @@ La colonne principale, dans l'ordre de lecture :
   traitement (voir
   [Reports par email](17-reports-par-email.md)).
 - **Onglet Documents** : upload manuel (reporting, BP, légal, autre — 20 Mo
-  max, avec période couverte). Chaque document se présente comme une
+  max, avec période couverte). On peut **sélectionner plusieurs fichiers
+  d'un coup** : chacun garde son titre, pré-rempli par le nom du fichier et
+  modifiable, tandis que le type et la période choisis s'appliquent à tout
+  le lot. Chaque document se présente comme une
   **pièce jointe** : une petite box qui porte l'icône de son format, son
   titre, le badge de son type et, en dessous, sa période et son poids. Elles
   s'empilent de la plus récente à la plus ancienne — pas de tableau ici, la
