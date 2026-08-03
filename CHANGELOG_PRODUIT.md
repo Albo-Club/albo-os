@@ -23,6 +23,33 @@ bas de page.
 
 ---
 
+## v1.171.1 — 03/08/2026 à 17:36 — Toute la pastille ouvre la fiche Attio, pas seulement la flèche
+
+Sur une fiche société, les pastilles de personnes rattachées à Attio ne
+s'ouvraient que par leur petite flèche ↗ — une cible de quelques pixels qu'il
+fallait viser. Maintenant que la pastille ne sert plus à rien d'autre (le nom
+ne s'édite plus au clic), **elle est cliquable en entier** : un clic n'importe
+où dessus ouvre la fiche du CRM, et son fond réagit au survol pour le dire.
+
+Une pastille non rattachée à Attio reste inerte, comme avant. La croix, elle,
+n'a pas bougé : elle est en dehors du lien, la survoler ne colore pas la
+pastille, et la cliquer retire l'entrée sans ouvrir quoi que ce soit.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/PeopleEditor.tsx` : `PersonChip` enveloppe
+>   initiales + nom + flèche dans le `<a>` quand `url` existe, au lieu de
+>   n'y mettre que l'icône. Le `<button>` de retrait reste **hors** de
+>   l'ancre — un bouton ne peut pas s'imbriquer dans un lien, et le retrait
+>   ne doit pas être à un clic de travers du CRM.
+> - Retour visuel via `has-[a:hover]:bg-accent` sur le conteneur (même
+>   variante `:has()` que `src/components/ui/attachment.tsx`), donc le survol
+>   de la croix ne colore pas la pastille.
+> - L'`aria-label` « Ouvrir dans Attio » qui portait l'ancienne ancre laissait
+>   place à un lien sans nom lisible ; il devient un `title`, le nom de la
+>   personne redevenant le libellé accessible du lien, et la flèche passe en
+>   `aria-hidden`.
+
 ## v1.171.0 — 03/08/2026 à 16:46 — Les co-investisseurs se cherchent aussi dans les sociétés d'Attio
 
 Dans le bloc Identité d'une fiche société, les pastilles de personnes
