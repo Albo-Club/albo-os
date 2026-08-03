@@ -3438,3 +3438,68 @@ Décisions de design à connaître avant de toucher `convex/investments.ts` :
   transactions — un compte peut porter plusieurs deals et vice-versa.
 - Montants stockés en **cents** (arrondi de floats EUR Powens),
   `quantity` reste un float (nombre de parts).
+
+## Budget de texte : un cap global mange les onglets suivants (`convex/lib/excel.ts`)
+
+Un classeur Excel est dumpé onglet par onglet, et la boucle a **toujours**
+parcouru `wb.SheetNames` en entier. Pourtant, jusqu'à ALB-114, un classeur
+multi-onglets ne rendait que son premier onglet. Le piège n'est pas dans la
+boucle, il est **après** : le plafond de taille était appliqué au texte
+concaténé (`text.slice(0, MAX_CHARS)`), avec un `MAX_CHARS` de 40 000. Un
+onglet de P&L dense (600 lignes × 15 colonnes ≈ 90k caractères) consommait
+donc tout le budget à lui seul, et la coupe tombait avant que les onglets
+suivants soient écrits. Symptôme côté produit : « l'OCR ne prend que le
+premier onglet » — alors qu'ils avaient tous été lus, puis jetés.
+
+**La règle à retenir** : un budget de caractères réparti *après*
+concaténation n'est pas un plafond, c'est un ordre de priorité déguisé — le
+premier élément sert, les suivants disparaissent. Dès qu'une sortie agrège
+plusieurs sources (onglets, pièces jointes, sections), le budget doit être
+**alloué avant** le rendu, source par source.
+
+Ce que fait le code aujourd'hui :
+
+- Budget = celui du document (`MAX_DOCUMENT_CHARS`), plus de constante locale
+  — un second plafond 22× plus bas que le vrai n'avait aucune justification.
+- Répartition **max-min fair** (`fairShares`) : chaque onglet reçoit une part
+  égale, ceux qui en utilisent moins libèrent le reste pour les gros. Un
+  classeur « un énorme onglet + cinq petits » dépense donc presque tout sur le
+  gros, au lieu de le brider à budget/6.
+- En-tête et marqueur de coupe **payés d'avance** (`MARKER_RESERVE`) : un
+  onglet non vide apparaît toujours, avec son nombre de lignes **réel** (pas
+  le nombre rendu). C'est ce qui rend le problème visible si jamais il revient.
+- Plus de `MAX_ROWS_PER_SHEET` : la coupe est pilotée par le budget, jamais
+  par un nombre de lignes arbitraire (un export de transactions ou un FEC
+  dépasse 300 lignes sans être anormal).
+- Toute coupe est écrite dans le texte (`[...N lignes tronquées]`), en plus du
+  flag `truncated` de la ligne `documentTexts` que l'UI affiche déjà.
+
+⚠️ `csvToText` partageait ces constantes et coupait donc à 300 lignes : il est
+passé sur le même mécanisme. Ne pas réintroduire de plafond local ici.
+
+## Trois plafonds de texte, trois raisons différentes — ne pas les confondre
+
+Le pipeline empile trois bornes qui portent des noms proches et qu'on est
+tenté d'aligner. Elles ne se négocient pas de la même façon :
+
+| Constante | Valeur | Ce qui la contraint |
+| --- | --- | --- |
+| `MAX_DOCUMENT_CHARS` (`lib/fileText.ts`) | 900k | **Convex** : 1 Mo par document, tous champs confondus. Non négociable |
+| `MAX_EXTRACTED_CHARS` (`reportExtract.ts`) | 300k | **Le modèle** : ce texte part entier dans `callModel` |
+| `BODY_SNAPSHOT_MAX` (`reportInbox.ts`) | 100k | Corps d'email brut, partage la ligne avec `rawContent` |
+
+Deux erreurs classiques :
+
+1. **Croire que 900k est un réglage de confort.** C'est la limite dure de la
+   plateforme, et le dépassement ne tronque pas : l'écriture **échoue**. Le
+   document part en `ocrState: 'failed'` et on n'a plus rien du tout au lieu
+   d'avoir beaucoup. `boundText()` est un pare-chocs, pas une restriction.
+2. **Monter `MAX_EXTRACTED_CHARS` jusqu'à 900k** « puisque la ligne Convex
+   tient ». Ce n'est pas Convex qui borne ici mais la **fenêtre de contexte**
+   du modèle, elle-même pilotée par `OPENROUTER_MODEL` (`lib/instructions.ts`)
+   — donc modifiable sans toucher au code. À ~3,7 caractères par token en
+   français, 300k ≈ 80k tokens : confortable sous les 128k qui sont le
+   dénominateur commun des modèles susceptibles d'être configurés. Au-delà,
+   l'appel ne tronque pas, il **plante**, et le report part en `needs_review`.
+   Toute hausse se raisonne contre cette fenêtre, jamais contre la taille de
+   la ligne Convex (qui, elle, a de la marge : ~420 Ko sur 1 Mo).

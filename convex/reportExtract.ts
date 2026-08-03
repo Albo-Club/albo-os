@@ -28,7 +28,17 @@ import { detectLinks, htmlToText, resolveTrackingUrl } from './lib/reportLinks'
 import type { Id } from './_generated/dataModel'
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024 // Convex storage cap
-const MAX_EXTRACTED_CHARS = 150_000 // combined text budget (1MB doc cap)
+/**
+ * Combined text budget of one report (body + attachments + links). What binds
+ * here is the MODEL, not Convex: this text is sent whole to `callModel`
+ * (`reportStore.ts`) for metric extraction. At ~3.7 chars per token in French,
+ * 300k ≈ 80k tokens, which leaves room for the prompt and the JSON answer
+ * inside the 128k-token window common to the models that can land in
+ * `OPENROUTER_MODEL`. Raise it only against that window — the Convex side has
+ * margin to spare (this field plus `cleanedHtml`, itself capped at 100k, keeps
+ * the row near 420 KB of the 1 MB limit).
+ */
+const MAX_EXTRACTED_CHARS = 300_000
 const MAX_LINKS_PER_KIND = 3
 
 interface SourceOutcome {
