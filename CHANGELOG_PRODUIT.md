@@ -23,6 +23,68 @@ bas de page.
 
 ---
 
+## v1.167.0 — 03/08/2026 à 10:42 — Vous choisissez qui reçoit quels emails, et les alertes du matin deviennent un point hebdo
+
+Jusqu'ici, les emails de l'application partaient à tout le monde, sans
+réglage possible : une alerte de trésorerie le matin, un digest d'échéances
+en retard un autre matin, et deux notifications séparées quand une connexion
+bancaire tombait ou qu'un document ne s'indexait pas.
+
+**Deux changements.** D'abord, les alertes de trésorerie et les échéances en
+retard ne partent plus au fil de l'eau : elles se retrouvent dans un **seul
+email, le lundi matin**, avec une section par organisation. Vous voyez d'un
+coup ce qui cloche partout, au lieu de recevoir des mails isolés en semaine.
+S'il n'y a rien à signaler, il n'y a pas d'email.
+
+Ensuite, **Réglages → Membres** accueille un tableau « Alertes par email »
+qui croise les personnes et les cinq alertes que l'application envoie : seuil
+de trésorerie, échéances en retard, connexion bancaire, échec d'indexation,
+problèmes de reports. Chacun coche ce qu'il veut recevoir ; un admin règle la
+ligne de tout le monde. Tout est activé par défaut, y compris pour un nouveau
+membre — c'est un désabonnement, pas un abonnement. Attention, ces réglages
+suivent la **personne** et pas l'organisation : les décocher ici les décoche
+partout.
+
+**Un cas concret que ça débloque** : confier à quelqu'un le seul rôle de
+transférer les reports reçus à l'adresse dédiée. Il continue de recevoir
+l'accusé de réception de chaque report qu'il transfère — ça, ça ne se coupe
+pas, c'est la réponse à son geste — mais les erreurs du circuit (report non
+traité, email en quarantaine) ne lui reviennent plus dans son fil : elles
+partent à ceux qui gèrent la file. Il suffit de décocher « Problèmes de
+reports » sur sa ligne.
+
+> **🔧 Notes techniques**
+>
+> - **Modèle.** Cinq drapeaux `notify*` optionnels sur `userPrefs`, stockés
+>   en **opt-out** (absent = abonné) : aucune migration, et un nouveau membre
+>   est abonné d'office. Volontairement hors de la ligne `users`, que
+>   `requireAppUser` lit dans chaque query. `convex/lib/notificationPrefs.ts`
+>   expose `wantsAlert` / `readAlertPrefs` / `setAlertPref` — tout nouvel
+>   envoi récurrent doit passer par là.
+> - **Digest.** `forecasts.checkCashAlerts` et `checkOverdueEntries`
+>   fusionnent en `forecasts.sendWeeklyDigest` (cron `weekly` lundi 07:00
+>   UTC). Deux passes : les constats par org, puis un mail par membre filtré
+>   via `sectionsFor` (`convex/lib/weeklyDigest.ts`, cœur pur épinglé par
+>   `tests/weeklyDigest.test.ts`). Le **cooldown 7 j** et la fenêtre
+>   « nouvellement en retard » de 24 h sont **retirés** — la cadence hebdo
+>   fait l'anti-spam, chaque run est une photo. `lastNotifiedAt` reste écrit
+>   comme trace, sans rôle de barrière. `cashAlertEmail` + `overdueEntriesEmail`
+>   → `weeklyDigestEmail` (sections optionnelles, fr/en).
+> - **Alertes immédiates.** `powens:maybeNotifyConnectionHealth` et
+>   `vectorize:notifyIndexFailure` sautent les membres désabonnés ;
+>   `notifiedHealth` continue d'être marqué même si personne n'a reçu le mail
+>   (état d'incident, pas compteur d'envois).
+> - **Reports.** `reportNotify.send` ne répond plus dans le fil que pour un
+>   `success` : `failure`, `quarantine` et les suites de lignes assignées à la
+>   main partent en mail neuf, `listRecipients` filtrant sur `reportIssues`.
+>   C'est ce qui permet un transféreur sans accès aux erreurs.
+> - **Front.** `organizations.listAlertPrefs` / `setMemberAlertPref`
+>   (auto-édition sans rôle, édition d'autrui en `admin`, appartenance à l'org
+>   re-vérifiée côté serveur) et `src/components/settings/AlertPrefsCard.tsx`
+>   sous la liste des membres. i18n `settings:alerts.*` fr/en.
+
+---
+
 ## v1.166.0 — 31/07/2026 à 16:26 — L'indexation des documents se voit, se relance, et prévient quand elle échoue
 
 L'assistant cherche dans le contenu des documents grâce à une indexation qui

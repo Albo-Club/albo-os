@@ -172,5 +172,32 @@
         "username": "name@alboteam.com"
       }
     }
+  },
+  "alerts": {
+    "title": "Email alerts",
+    "description": "Who receives what. These settings belong to each person and apply to every organisation they are a member of, not just this one. An admin edits everyone’s row; everyone edits their own.",
+    "member": "Member",
+    "kinds": {
+      "cashThreshold": {
+        "label": "Cash threshold",
+        "help": "The projected balance over the next 3 months drops below the organisation’s alert threshold. Part of the Monday digest."
+      },
+      "overdueEntries": {
+        "label": "Overdue entries",
+        "help": "Forecast entries past due and still not reconciled. Part of the Monday digest."
+      },
+      "bankConnection": {
+        "label": "Bank connection",
+        "help": "A bank connection breaks or stops syncing. Sent right away, once per breakdown."
+      },
+      "indexFailure": {
+        "label": "Indexing failure",
+        "help": "A document could not be indexed for the AI assistant’s search. Sent right away."
+      },
+      "reportIssues": {
+        "label": "Report problems",
+        "help": "Mails from the incoming reports queue: quarantine, processing failure, outcome of a manually assigned mail. The receipt for a report filed successfully always goes to whoever forwarded it, whatever this setting says."
+      }
+    }
   }
 }

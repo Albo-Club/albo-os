@@ -14,7 +14,7 @@
 import { ConvexError, v } from 'convex/values'
 import { internalMutation, mutation, query } from './_generated/server'
 import { RESEND_FROM, resend } from './email'
-import { cashAlertEmail, overdueEntriesEmail } from './emailTemplates'
+import { weeklyDigestEmail } from './emailTemplates'
 import { requireAppUser, requireOrgMember } from './lib/auth'
 import { isAvailableAccount } from './lib/bankAccounts'
 import { effectiveCategory, isValidForecastCategory } from './lib/categories'
@@ -22,6 +22,7 @@ import {
   MATCH_DATE_WINDOW_DAYS,
   suggestEntryMatches as pairEntryMatches,
 } from './lib/entryMatching'
+import { readAlertPrefs } from './lib/notificationPrefs'
 import { detectRecurringFlows } from './lib/recurrenceDetection'
 import {
   addMonthsUtc,
@@ -34,8 +35,10 @@ import {
   ruleDerivedKey,
 } from './lib/recurrence'
 import { buildSearchText } from './lib/searchText'
+import { sectionsFor } from './lib/weeklyDigest'
 import { computeVatPositionForOrg } from './transactions'
 import type { GridTx, HistoryTx } from './lib/recurrence'
+import type { OrgFinding } from './lib/weeklyDigest'
 import type { DataModel, Doc, Id } from './_generated/dataModel'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
 
@@ -1197,10 +1200,9 @@ export const getCommittedPipeline = query({
 
 // ─── Monthly snapshots, threshold alerts, VAT suggestion (phase 4b) ──────────
 
-// Snapshot horizon and alert evaluation window / cooldown.
+// Snapshot horizon and alert evaluation window.
 const SNAPSHOT_HORIZON_MONTHS = 12
 const ALERT_HORIZON_MONTHS = 3
-const ALERT_COOLDOWN_MS = 7 * DAY_MS
 
 /**
  * Monthly photo of every org's projection (cron, 1st of month 05:00 UTC —
@@ -1358,91 +1360,27 @@ export const setCashAlert = mutation({
   },
 })
 
-/**
- * Daily threshold-alert evaluation (cron, 07:00 UTC — convex/crons.ts, no
- * auth like captureSnapshots). Breach = the available balance or any
- * projected month over the next 3 months (planned scenario) under the
- * threshold → email to every org member, then 7-day cooldown.
- */
-export const checkCashAlerts = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const now = Date.now()
-    const siteUrl = process.env.SITE_URL ?? ''
-    const settings = await ctx.db.query('cashAlertSettings').collect()
-
-    let notified = 0
-    for (const setting of settings) {
-      if (!setting.active) continue
-      if (
-        setting.lastNotifiedAt !== undefined &&
-        now - setting.lastNotifiedAt < ALERT_COOLDOWN_MS
-      ) {
-        continue
-      }
-      const grid = await computeForecastGridForOrg(
-        ctx,
-        setting.orgId,
-        0,
-        ALERT_HORIZON_MONTHS,
-      )
-      const minProjectedCents = Math.min(
-        grid.startingBalanceCents,
-        ...grid.projection.map((point) => point.plannedBalanceCents),
-      )
-      if (minProjectedCents >= setting.thresholdCents) continue
-
-      const org = await ctx.db.get('organizations', setting.orgId)
-      if (!org) continue
-      const members = await ctx.db
-        .query('organizationMembers')
-        .withIndex('by_org', (q) => q.eq('orgId', setting.orgId))
-        .collect()
-      for (const member of members) {
-        const user = await ctx.db.get('users', member.userId)
-        if (!user?.email) continue
-        const { subject, html, text } = cashAlertEmail({
-          locale: user.preferredLanguage === 'fr' ? 'fr' : 'en',
-          orgName: org.name,
-          thresholdCents: setting.thresholdCents,
-          minProjectedCents,
-          cashUrl: `${siteUrl}/app/${org.slug}/cash`,
-        })
-        await resend.sendEmail(ctx, {
-          from: RESEND_FROM,
-          to: user.email,
-          subject,
-          html,
-          text,
-        })
-      }
-      await ctx.db.patch('cashAlertSettings', setting._id, {
-        lastNotifiedAt: now,
-      })
-      notified += 1
-    }
-    return { notified }
-  },
-})
-
-// Overdue digest: one full day of grace before an entry counts as overdue
-// (bank syncs ~24h and reconciliation is a manual gesture — no point nagging
-// about yesterday's rent), and a "newly overdue" window equal to the DAILY
-// cron cadence: the digest fires only when at least one entry crossed the
-// grace boundary since the previous run. Stateless anti-spam — changing the
-// cron frequency breaks this window math (cf. KNOWN_ISSUES « Cash flow
-// forecast »).
+// One full day of grace before an entry counts as overdue: banks sync ~24h
+// and reconciliation is a manual gesture, so there is no point nagging about
+// yesterday's rent.
 const OVERDUE_GRACE_MS = DAY_MS
-const OVERDUE_NEW_WINDOW_MS = DAY_MS
 
 /**
- * Daily overdue-entries digest (cron, 07:10 UTC — convex/crons.ts, no auth
- * like checkCashAlerts). Overdue = pending EUR entry past its date by more
- * than the grace day. Emails every org member ONE digest listing all
- * overdue entries, only when at least one is newly overdue — no daily
- * reminder for the same stock.
+ * The Monday digest (cron, 07:00 UTC — convex/crons.ts, no auth like
+ * captureSnapshots). Replaces the two former daily alert crons: cash
+ * threshold breaches and overdue forecast entries now travel together, one
+ * mail per member, one section per org they belong to.
+ *
+ * The weekly cadence IS the anti-spam — hence no cooldown and no "newly
+ * overdue" window any more: each run is a fresh photo of what is off today.
+ * `cashAlertSettings.lastNotifiedAt` is still stamped, purely as a trace of
+ * the last breach reported.
+ *
+ * Each block is filtered per recipient (convex/lib/notificationPrefs.ts): a
+ * member who muted overdue entries gets the same mail minus that block, and
+ * a member who muted both gets no mail at all.
  */
-export const checkOverdueEntries = internalMutation({
+export const sendWeeklyDigest = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now()
@@ -1450,49 +1388,103 @@ export const checkOverdueEntries = internalMutation({
     const overdueBefore = now - OVERDUE_GRACE_MS
     const orgs = await ctx.db.query('organizations').collect()
 
-    let notified = 0
+    // Pass 1 — what is off, per org (computed once, read by every member).
+    const findings = new Map<Id<'organizations'>, OrgFinding>()
+
     for (const org of orgs) {
+      const setting = await ctx.db
+        .query('cashAlertSettings')
+        .withIndex('by_org', (q) => q.eq('orgId', org._id))
+        .unique()
+
+      let cash: OrgFinding['cash'] = null
+      if (setting?.active) {
+        const grid = await computeForecastGridForOrg(
+          ctx,
+          org._id,
+          0,
+          ALERT_HORIZON_MONTHS,
+        )
+        const minProjectedCents = Math.min(
+          grid.startingBalanceCents,
+          ...grid.projection.map((point) => point.plannedBalanceCents),
+        )
+        if (minProjectedCents < setting.thresholdCents) {
+          cash = {
+            thresholdCents: setting.thresholdCents,
+            minProjectedCents,
+            cashUrl: `${siteUrl}/app/${org.slug}/cash`,
+          }
+          await ctx.db.patch('cashAlertSettings', setting._id, {
+            lastNotifiedAt: now,
+          })
+        }
+      }
+
       const rows = await ctx.db
         .query('forecastEntries')
         .withIndex('by_org_and_date', (q) =>
           q.eq('orgId', org._id).lte('date', overdueBefore),
         )
         .collect()
-      const overdue = rows
+      const entries = rows
         .filter((e) => e.status === 'pending' && e.currency === 'EUR')
         .sort((a, b) => a.date - b.date)
-      if (overdue.length === 0) continue
-      const hasNew = overdue.some(
-        (e) => e.date > overdueBefore - OVERDUE_NEW_WINDOW_MS,
-      )
-      if (!hasNew) continue
+        .map((e) => ({
+          date: e.date,
+          label: e.label,
+          direction: e.direction,
+          amountCents: e.amountCents,
+        }))
 
+      if (!cash && entries.length === 0) continue
+      findings.set(org._id, {
+        orgName: org.name,
+        cash,
+        overdue:
+          entries.length > 0
+            ? {
+                entries,
+                forecastUrl: `${siteUrl}/app/${org.slug}/cash?filter=unmatched`,
+              }
+            : null,
+      })
+    }
+
+    if (findings.size === 0) return { notified: 0 }
+
+    // Pass 2 — gather each member's orgs, then keep only the blocks they
+    // subscribe to (`sectionsFor`, the testable core of the routing).
+    const findingsByUser = new Map<Id<'users'>, Array<OrgFinding>>()
+    for (const [orgId, finding] of findings) {
       const members = await ctx.db
         .query('organizationMembers')
-        .withIndex('by_org', (q) => q.eq('orgId', org._id))
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
         .collect()
       for (const member of members) {
-        const user = await ctx.db.get('users', member.userId)
-        if (!user?.email) continue
-        const { subject, html, text } = overdueEntriesEmail({
-          locale: user.preferredLanguage === 'fr' ? 'fr' : 'en',
-          orgName: org.name,
-          entries: overdue.map((e) => ({
-            date: e.date,
-            label: e.label,
-            direction: e.direction,
-            amountCents: e.amountCents,
-          })),
-          forecastUrl: `${siteUrl}/app/${org.slug}/cash?filter=unmatched`,
-        })
-        await resend.sendEmail(ctx, {
-          from: RESEND_FROM,
-          to: user.email,
-          subject,
-          html,
-          text,
-        })
+        const list = findingsByUser.get(member.userId) ?? []
+        list.push(finding)
+        findingsByUser.set(member.userId, list)
       }
+    }
+
+    let notified = 0
+    for (const [userId, list] of findingsByUser) {
+      const sections = sectionsFor(list, await readAlertPrefs(ctx, userId))
+      if (sections.length === 0) continue
+      const user = await ctx.db.get('users', userId)
+      if (!user?.email) continue
+      const { subject, html, text } = weeklyDigestEmail({
+        locale: user.preferredLanguage === 'fr' ? 'fr' : 'en',
+        sections,
+      })
+      await resend.sendEmail(ctx, {
+        from: RESEND_FROM,
+        to: user.email,
+        subject,
+        html,
+        text,
+      })
       notified += 1
     }
     return { notified }

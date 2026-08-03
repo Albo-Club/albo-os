@@ -25,8 +25,9 @@
  * row ('indexed' | 'skipped' | 'failed', 'pending' while queued/retrying) —
  * an indexing is never silently lost. Transient failures retry
  * MAX_INDEX_ATTEMPTS times with spaced delays; after the last one the org
- * members get an email (`vectorizeFailureEmail`) and the UI offers a manual
- * relaunch (`documents.reindex`), like the OCR's `reextract`.
+ * members subscribed to that alert get an email (`vectorizeFailureEmail`) and
+ * the UI offers a manual relaunch (`documents.reindex`), like the OCR's
+ * `reextract`.
  *
  * `vectorDetail` names the failing pipeline layer (`classifyIndexError`):
  *   - our data:    'no_text' / 'no_content' / 'covered_by_report' /
@@ -53,6 +54,7 @@ import {
   internalQuery,
 } from './_generated/server'
 import { readMembership } from './lib/agentScope'
+import { wantsAlert } from './lib/notificationPrefs'
 import { classifyIndexError } from './lib/vectorizeErrors'
 import { RESEND_FROM, resend } from './email'
 import { vectorizeFailureEmail } from './emailTemplates'
@@ -179,7 +181,8 @@ export const setReportState = internalMutation({
 /**
  * Email the org members after the LAST failed attempt — an indexing failure
  * must never be silent. Mutation (not action) so the resend enqueue commits
- * atomically; recipients mirror the cash alerts (every org member).
+ * atomically; recipients are the org members who did not mute this alert
+ * (convex/lib/notificationPrefs.ts).
  */
 export const notifyIndexFailure = internalMutation({
   args: {
@@ -204,6 +207,7 @@ export const notifyIndexFailure = internalMutation({
     for (const member of members) {
       const user = await ctx.db.get('users', member.userId)
       if (!user?.email) continue
+      if (!(await wantsAlert(ctx, member.userId, 'indexFailure'))) continue
       const { subject, html, text } = vectorizeFailureEmail({
         locale: user.preferredLanguage === 'fr' ? 'fr' : 'en',
         orgName: org.name,

@@ -18,21 +18,14 @@ crons.monthly(
   {},
 )
 
-// Daily cash threshold alerts (7-day cooldown handled in the mutation).
-crons.daily(
-  'check cash alerts',
-  { hourUTC: 7, minuteUTC: 0 },
-  internal.forecasts.checkCashAlerts,
-  {},
-)
-
-// Daily overdue-entries digest. MUST stay daily: the mutation's stateless
-// "newly overdue" window equals one day (cf. KNOWN_ISSUES « Cash flow
-// forecast »).
-crons.daily(
-  'check overdue forecast entries',
-  { hourUTC: 7, minuteUTC: 10 },
-  internal.forecasts.checkOverdueEntries,
+// Weekly digest: cash threshold breaches + overdue forecast entries, one
+// mail per member (Monday 07:00 UTC = 09:00 Paris in summer, 08:00 in
+// winter). The weekly cadence IS the anti-spam — there is no cooldown left
+// in the mutation, so moving this cron only changes when the photo is taken.
+crons.weekly(
+  'send weekly digest',
+  { dayOfWeek: 'monday', hourUTC: 7, minuteUTC: 0 },
+  internal.forecasts.sendWeeklyDigest,
   {},
 )
 

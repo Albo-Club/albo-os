@@ -172,5 +172,32 @@
         "username": "prenom@alboteam.com"
       }
     }
+  },
+  "alerts": {
+    "title": "Alertes par email",
+    "description": "Qui reçoit quoi. Ces réglages sont propres à chaque personne et s'appliquent à toutes les organisations dont elle est membre, pas seulement celle-ci. Un admin règle la ligne de tout le monde ; chacun règle la sienne.",
+    "member": "Membre",
+    "kinds": {
+      "cashThreshold": {
+        "label": "Seuil de trésorerie",
+        "help": "Le solde projeté des 3 prochains mois passe sous le seuil d'alerte de l'organisation. Inclus dans le point hebdo du lundi matin."
+      },
+      "overdueEntries": {
+        "label": "Échéances en retard",
+        "help": "Les échéances prévisionnelles dépassées et toujours non rapprochées. Inclus dans le point hebdo du lundi matin."
+      },
+      "bankConnection": {
+        "label": "Connexion bancaire",
+        "help": "Une connexion bancaire tombe en panne ou cesse de se synchroniser. Envoyé sur le moment, une seule fois par panne."
+      },
+      "indexFailure": {
+        "label": "Échec d’indexation",
+        "help": "Un document n'a pas pu être indexé pour la recherche de l'assistant IA. Envoyé sur le moment."
+      },
+      "reportIssues": {
+        "label": "Problèmes de reports",
+        "help": "Les emails de la file Rapports entrants : quarantaine, échec de traitement, suite donnée à un mail assigné à la main. L'accusé de réception d'un report bien rangé part toujours à la personne qui l'a transféré, quel que soit ce réglage."
+      }
+    }
   }
 }
