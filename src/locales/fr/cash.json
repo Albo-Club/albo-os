@@ -140,7 +140,7 @@
   "alert": {
     "title": "Alerte de seuil",
     "breached": "Seuil d'alerte franchi : le solde disponible ou projeté passe sous {{amount}} dans les 3 prochains mois.",
-    "hint": "Un email si le solde projeté des 3 prochains mois (ou le solde disponible) passe sous le seuil. Au plus une alerte par semaine.",
+    "hint": "Un email si le solde projeté des 3 prochains mois (ou le solde disponible) passe sous le seuil. Repris dans le point hebdo du lundi, envoyé aux membres qui le souhaitent (Réglages → Membres).",
     "thresholdLabel": "Seuil (€)",
     "activeLabel": "Alerte active",
     "saved": "Alerte enregistrée",

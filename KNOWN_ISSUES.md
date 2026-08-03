@@ -1526,7 +1526,11 @@ toutes les 6 h (`pollConnectionsHealth`). Points non évidents :
 - **Anti-spam : `notifiedHealth`** mémorise le dernier état dégradé alerté
   par email ; remis à `undefined` au retour au vert. Un incident = un email,
   une aggravation (`stale` → `action_required`) = un second. Pas de cooldown
-  temporel — c'est le changement d'état qui déclenche.
+  temporel — c'est le changement d'état qui déclenche. `notifiedHealth` est
+  marqué **même si personne n'a reçu l'email** (tous les membres ont coupé
+  l'alerte) : c'est un état d'incident, pas un compteur d'envois — sinon le
+  jour où quelqu'un se réabonne, tous les incidents passés lui tombent
+  dessus.
 - **Le poll est autoritaire sur l'existence** : une connexion absente de la
   réponse (supprimée côté Powens) est retirée de `powensConnections` —
   uniquement après un fetch réussi (une liste vide signifie vraiment « zéro
@@ -1918,7 +1922,7 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   la consommation par cellule n'est qu'un anti-double-comptage d'affichage.
 - **Crons (`convex/crons.ts`) = fonctions internal SANS auth — exception,
   pas un précédent.** `captureSnapshots` (mensuel, 1er 05:00 UTC) et
-  `checkCashAlerts` (quotidien 07:00 UTC) itèrent toutes les orgs sans
+  `sendWeeklyDigest` (lundi 07:00 UTC) itèrent toutes les orgs sans
   `requireOrgMember`, comme les backfills. La règle multi-tenant reste
   absolue pour toute fonction **publique**. Un cron raté se rejoue à la
   main (`convex run forecasts:captureSnapshots '{}' --prod`) — idempotent
@@ -1926,24 +1930,36 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   affichée compare le snapshot du mois M-1 (pris le 1er de M-1, scénario
   avec prévu) au solde réel de fin M-1 — rien ne s'affiche tant que le
   premier snapshot n'existe pas.
-- **Alerte de seuil : cooldown 7 jours, remis à zéro à chaque save.**
-  `setCashAlert` efface `lastNotifiedAt` pour qu'un nouveau seuil puisse
-  notifier immédiatement ; en contrepartie, re-sauvegarder sans rien
-  changer ré-arme aussi l'alerte (accepté, 2 users).
-- **Digest « échéances en retard » : anti-spam SANS état, couplé à la
-  cadence quotidienne du cron.** `checkOverdueEntries` (quotidien
-  07:10 UTC) considère en retard une échéance `pending` EUR dépassée de
-  plus d'**un jour de grâce** (`OVERDUE_GRACE_MS` — la banque synchronise
-  en ~24 h et le rapprochement est un geste manuel), et n'envoie le digest
-  que si au moins une échéance a **franchi la limite depuis le run
-  précédent** (`OVERDUE_NEW_WINDOW_MS` = 1 jour). Aucun champ
-  `lastNotifiedAt` : c'est la fenêtre qui déduplique. Conséquences : (1)
-  **ne pas changer la fréquence du cron** sans ajuster la fenêtre — un cron
-  toutes les 6 h enverrait 4 digests pour la même échéance, un cron
-  hebdomadaire raterait les échéances des jours intermédiaires ; (2) un
-  run de cron raté = digest de ce jour-là perdu (pas de rattrapage) —
-  accepté, le stock complet repart dans le digest suivant dès qu'une
-  nouvelle échéance passe en retard.
+- **Point hebdo : la cadence EST l'anti-spam — plus aucun état de
+  déduplication.** `sendWeeklyDigest` (lundi 07:00 UTC) fusionne les deux
+  anciens crons quotidiens (`checkCashAlerts`, `checkOverdueEntries`) en un
+  seul mail par membre, une section par org. Chaque run est une **photo**
+  de ce qui cloche aujourd'hui : ni cooldown de 7 jours sur l'alerte de
+  seuil, ni fenêtre « nouvellement en retard » de 24 h sur les échéances.
+  Ces deux mécanismes ont été retirés, pas déplacés — les réintroduire
+  ferait taire le digest la semaine suivante. Conséquences : (1) déplacer
+  le cron ne change que **l'instant de la photo**, plus rien d'autre (le
+  couplage fréquence ↔ fenêtre a disparu) ; (2) un run raté = un lundi
+  sans mail, le stock complet repart le lundi suivant ; (3)
+  `cashAlertSettings.lastNotifiedAt` est encore écrit, mais ne **barre
+  plus rien** — c'est une trace du dernier franchissement signalé, et
+  `setCashAlert` l'efface toujours à chaque save.
+- **Une échéance n'est « en retard » qu'après un jour de grâce**
+  (`OVERDUE_GRACE_MS`) : la banque synchronise en ~24 h et le
+  rapprochement est un geste manuel, donc pas de rappel sur le loyer
+  d'hier. C'est le seul délai qui subsiste dans le digest.
+- **Qui reçoit quoi : opt-out par personne, global, dans `userPrefs`.**
+  Les cinq drapeaux `notify*` (`convex/lib/notificationPrefs.ts`) sont des
+  **opt-out** — absent = abonné. D'où : aucun backfill à la création d'un
+  drapeau, et un nouveau membre est abonné d'office. Ils vivent dans
+  `userPrefs` et non sur la ligne `users` (cf. § « Hot `users` row »), et
+  s'appliquent à **toutes** les orgs de la personne, même si l'écran de
+  réglage est celui d'une org (Réglages → Membres). Corollaire à assumer :
+  un admin de l'org A qui décoche une case pour quelqu'un le désabonne
+  aussi côté org B. Accepté à 3 users ; à revoir si le périmètre s'élargit.
+  Tout nouvel envoi d'email récurrent doit passer par `wantsAlert` /
+  `readAlertPrefs` — sinon il devient le seul mail qu'on ne peut pas
+  couper.
 - **Échéance TVA suggérée : `derivedKey` "vat:{orgId}:{YYYY-Qn}", sans
   `ruleId`.** L'idempotence passe par la clé (créée une fois par trimestre,
   quelle que soit sa vie ensuite : réalisée, annulée, éditée — la
@@ -3254,6 +3270,33 @@ pour un upload.
 Corollaire côté lecture : `origin` est **optionnel** (absent = email, les
 lignes d'avant la fonctionnalité n'ont rien). Tester `=== 'upload'`, jamais
 `!== 'email'`.
+
+## Reports par email : le récap OK répond dans le fil, les problèmes non
+
+`reportNotify.send` route selon **le type de nouvelle**, pas selon
+l'expéditeur seul :
+
+- `success` + expéditeur membre → **réponse dans le fil du forward**. C'est
+  un accusé de réception : il part à qui a transféré, sans réglage possible.
+- tout le reste (`failure`, `quarantine`, et le `success` d'une ligne
+  assignée à la main depuis la file) → **mail neuf** aux membres qui n'ont
+  pas coupé `reportIssues` (`convex/lib/notificationPrefs.ts`).
+
+La raison est fonctionnelle : quelqu'un peut être là **uniquement pour
+transférer** des reports sans jamais devoir gérer la file. Lui répondre
+« report non traité » dans son fil lui adresse un problème qu'il ne
+traitera pas. D'où la règle : un échec quitte le fil.
+
+Deux conséquences à ne pas redécouvrir à la main :
+
+- **Ne pas rétablir la réponse en fil sur `failure`** en croyant réparer un
+  oubli — c'est le comportement voulu, et ce qui protège le transféreur.
+- **Un nouveau membre est abonné d'office** (opt-out). Ajouter quelqu'un qui
+  ne doit voir que ses accusés de réception demande de décocher
+  « Problèmes de reports » sur sa ligne, Réglages → Membres.
+
+Le garde-fou anti-énumération reste par-dessus tout ça : **jamais** de
+réponse à un expéditeur non membre, quoi qu'il arrive.
 
 ## `companyReports.metrics` — des nombres nus, unité stockée ailleurs
 

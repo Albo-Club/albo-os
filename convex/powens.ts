@@ -44,6 +44,7 @@ import { RESEND_FROM, resend } from './email'
 import { powensConnectionAlertEmail } from './emailTemplates'
 import { requireOrgMember, requireOrgRole } from './lib/auth'
 import { loadOrgRules, ruleFieldsFor } from './lib/categoryRules'
+import { wantsAlert } from './lib/notificationPrefs'
 import {
   matchExistingAccount,
   normalizeName,
@@ -789,9 +790,12 @@ async function maybeNotifyConnectionHealth(
     .query('organizationMembers')
     .withIndex('by_org', (q) => q.eq('orgId', row.orgId))
     .collect()
+  let sent = 0
   for (const member of members) {
     const user = await ctx.db.get('users', member.userId)
     if (!user?.email) continue
+    if (!(await wantsAlert(ctx, member.userId, 'bankConnection'))) continue
+    sent += 1
     const { subject, html, text } = powensConnectionAlertEmail({
       locale: user.preferredLanguage === 'fr' ? 'fr' : 'en',
       orgName: org.name,
@@ -813,7 +817,7 @@ async function maybeNotifyConnectionHealth(
   console.log(
     `[powens] alerte santé connexion ${row.powensConnectionId} ` +
       `(${row.connectorName ?? '?'}, org ${org.slug}): ${health} — ` +
-      `${members.length} membre(s) notifié(s)`,
+      `${sent} membre(s) notifié(s)`,
   )
 }
 

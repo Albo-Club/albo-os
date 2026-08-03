@@ -98,8 +98,11 @@ l'état de chaque connexion Powens :
 
 Chaque ligne montre la date de dernière synchronisation réussie et les
 comptes alimentés. Quand une connexion se dégrade, les membres de
-l'organisation reçoivent un **email d'alerte** (un par incident — pas de
-rappel tant que l'état ne change pas). L'état est vérifié en continu : à
+l'organisation qui le souhaitent reçoivent un **email d'alerte** (un par
+incident — pas de rappel tant que l'état ne change pas ; qui le reçoit se
+règle dans
+[Réglages → Membres](14-organisations-membres-invitations.md)).
+L'état est vérifié en continu : à
 chaque notification de Powens, et par un contrôle automatique toutes les
 6 heures qui détecte aussi le cas où Powens cesse d'envoyer des données.
 

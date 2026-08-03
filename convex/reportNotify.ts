@@ -3,10 +3,13 @@
  * no Resend in this pipeline).
  *
  * Routing rule (anti-enumeration, hard-coded):
- * - The sender is re-checked as a member AT SEND TIME. Member → the recap
- *   is a REPLY in the forward's own thread (lands in their mailbox, in
- *   context). Not a member → NEVER reply; a FRESH email goes to all members
- *   (quarantine notices, or rows manually assigned from quarantine).
+ * - The sender is re-checked as a member AT SEND TIME. Member → the SUCCESS
+ *   recap is a REPLY in the forward's own thread (lands in their mailbox, in
+ *   context). Not a member → NEVER reply.
+ * - Everything else (failures, quarantine notices, rows manually assigned
+ *   from quarantine) is a FRESH email to the members who subscribe to report
+ *   problems — someone can forward reports without ever being handed the
+ *   pipeline's errors.
  * - Idempotent: `notifiedAt` is claimed transactionally before sending —
  *   scheduler retries never double-send.
  */
@@ -21,6 +24,7 @@ import {
   reportRecapSuccessHtml,
   reviewReasonLabel,
 } from './emailTemplates'
+import { wantsAlert } from './lib/notificationPrefs'
 import type { RecapMetric, RecapSuspicious } from './emailTemplates'
 
 function siteUrl(): string {
@@ -40,7 +44,14 @@ export const claimNotify = internalMutation({
   },
 })
 
-/** All member emails (recipients of fresh notices). */
+/**
+ * Members who still want the report pipeline's problem mails. Every FRESH
+ * notice of this pipeline is a problem report — a quarantined email, a
+ * forward that could not be processed, or the outcome of a row someone
+ * assigned by hand from the queue — so they all share one opt-out. The
+ * in-thread recap answering a member's own forward is never gated: it is
+ * the receipt of a gesture they just made.
+ */
 export const listRecipients = internalQuery({
   args: {},
   handler: async (ctx): Promise<Array<string>> => {
@@ -48,6 +59,7 @@ export const listRecipients = internalQuery({
     const userIds = [...new Set(memberships.map((m) => m.userId))]
     const emails: Array<string> = []
     for (const userId of userIds) {
+      if (!(await wantsAlert(ctx, userId, 'reportIssues'))) continue
       const user = await ctx.db.get('users', userId)
       if (user?.email) emails.push(user.email)
     }
@@ -184,8 +196,11 @@ export const send = internalAction({
       subject = 'Albo OS — email en quarantaine'
     }
 
-    // Anti-enumeration routing: in-thread reply ONLY for member senders.
-    if (kind !== 'quarantine' && senderIsMember) {
+    // Anti-enumeration routing: in-thread reply ONLY for member senders, and
+    // ONLY to congratulate. A failure is a problem for whoever fixes the
+    // queue, not for whoever pressed "forward" — so it leaves the thread and
+    // goes to the members who subscribe to report problems.
+    if (kind === 'success' && senderIsMember) {
       await replyToMessage(row.agentmailInboxId, row.agentmailMessageId, html)
     } else {
       const recipients: Array<string> = await ctx.runQuery(
@@ -198,7 +213,7 @@ export const send = internalAction({
     }
 
     console.log(
-      `[reportNotify] ${kind} recap sent for ${row.agentmailMessageId} (in-thread=${kind !== 'quarantine' && senderIsMember})`,
+      `[reportNotify] ${kind} recap sent for ${row.agentmailMessageId} (in-thread=${kind === 'success' && senderIsMember})`,
     )
     return null
   },

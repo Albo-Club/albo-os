@@ -7,6 +7,7 @@ import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 
 import { api } from '../../../../../convex/_generated/api'
 import type { Id } from '../../../../../convex/_generated/dataModel'
+import { AlertPrefsCard } from '~/components/settings/AlertPrefsCard'
 import { Button } from '~/components/ui/button'
 import {
   Card,
@@ -101,139 +102,150 @@ function MembersSettings() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('settings:members.title')}</CardTitle>
-        <CardDescription>
-          {t('settings:members.description', {
-            org: org?.name ?? t('settings:members.fallbackOrg'),
-          })}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {!members ? (
-          <p className="text-muted-foreground text-sm">
-            {t('settings:members.loading')}
-          </p>
-        ) : members.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            {t('settings:members.empty')}
-          </p>
-        ) : (
-          <ul className="divide-border divide-y text-sm">
-            {members.map((m) => {
-              const isSelf = m.userId === myUserId
-              const targetRole = m.role
-              const canEditThis =
-                canManage &&
-                !isSelf &&
-                (targetRole !== 'owner' || myRole === 'owner')
-              return (
-                <li
-                  key={m._id}
-                  className="flex items-center justify-between gap-3 py-3"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    {m.avatarUrl ? (
-                      <img
-                        src={m.avatarUrl}
-                        alt=""
-                        className="h-8 w-8 rounded-full object-cover"
-                      />
-                    ) : (
-                      <span className="bg-muted text-muted-foreground flex h-8 w-8 items-center justify-center rounded-full text-xs">
-                        {(m.name ?? m.email).slice(0, 2).toUpperCase()}
-                      </span>
-                    )}
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">
-                        {m.name ?? m.email}
-                        {isSelf && (
-                          <span className="text-muted-foreground ml-2 text-xs">
-                            {t('settings:members.you')}
-                          </span>
-                        )}
-                      </p>
-                      {m.name && (
-                        <p className="text-muted-foreground truncate text-xs">
-                          {m.email}
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('settings:members.title')}</CardTitle>
+          <CardDescription>
+            {t('settings:members.description', {
+              org: org?.name ?? t('settings:members.fallbackOrg'),
+            })}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!members ? (
+            <p className="text-muted-foreground text-sm">
+              {t('settings:members.loading')}
+            </p>
+          ) : members.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              {t('settings:members.empty')}
+            </p>
+          ) : (
+            <ul className="divide-border divide-y text-sm">
+              {members.map((m) => {
+                const isSelf = m.userId === myUserId
+                const targetRole = m.role
+                const canEditThis =
+                  canManage &&
+                  !isSelf &&
+                  (targetRole !== 'owner' || myRole === 'owner')
+                return (
+                  <li
+                    key={m._id}
+                    className="flex items-center justify-between gap-3 py-3"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      {m.avatarUrl ? (
+                        <img
+                          src={m.avatarUrl}
+                          alt=""
+                          className="h-8 w-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="bg-muted text-muted-foreground flex h-8 w-8 items-center justify-center rounded-full text-xs">
+                          {(m.name ?? m.email).slice(0, 2).toUpperCase()}
+                        </span>
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">
+                          {m.name ?? m.email}
+                          {isSelf && (
+                            <span className="text-muted-foreground ml-2 text-xs">
+                              {t('settings:members.you')}
+                            </span>
+                          )}
                         </p>
+                        {m.name && (
+                          <p className="text-muted-foreground truncate text-xs">
+                            {m.email}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground text-xs">
+                        {t(`common:roles.${targetRole}`)}
+                      </span>
+                      {canEditThis && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline">
+                              …
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {(['owner', 'admin', 'member'] as Array<Role>)
+                              .filter((r) => r !== targetRole)
+                              .filter(
+                                (r) => r !== 'owner' || myRole === 'owner',
+                              )
+                              .map((r) => (
+                                <DropdownMenuItem
+                                  key={r}
+                                  onSelect={() => handleChangeRole(m._id, r)}
+                                >
+                                  {t('settings:members.makeRole', {
+                                    role: t(`common:roles.${r}`).toLowerCase(),
+                                  })}
+                                </DropdownMenuItem>
+                              ))}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onSelect={() =>
+                                setConfirmRemove({
+                                  memberId: m._id,
+                                  label: m.name ?? m.email,
+                                })
+                              }
+                            >
+                              {t('settings:members.removeFromOrg')}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground text-xs">
-                      {t(`common:roles.${targetRole}`)}
-                    </span>
-                    {canEditThis && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button size="sm" variant="outline">
-                            …
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {(['owner', 'admin', 'member'] as Array<Role>)
-                            .filter((r) => r !== targetRole)
-                            .filter((r) => r !== 'owner' || myRole === 'owner')
-                            .map((r) => (
-                              <DropdownMenuItem
-                                key={r}
-                                onSelect={() => handleChangeRole(m._id, r)}
-                              >
-                                {t('settings:members.makeRole', {
-                                  role: t(`common:roles.${r}`).toLowerCase(),
-                                })}
-                              </DropdownMenuItem>
-                            ))}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onSelect={() =>
-                              setConfirmRemove({
-                                memberId: m._id,
-                                label: m.name ?? m.email,
-                              })
-                            }
-                          >
-                            {t('settings:members.removeFromOrg')}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </CardContent>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </CardContent>
 
-      <Dialog
-        open={!!confirmRemove}
-        onOpenChange={(open) => !open && setConfirmRemove(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('settings:members.removeTitle')}</DialogTitle>
-            <DialogDescription>
-              <Trans
-                t={t}
-                i18nKey="settings:members.removeDescription"
-                values={{ label: confirmRemove?.label }}
-              />
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmRemove(null)}>
-              {t('common:actions.cancel')}
-            </Button>
-            <Button variant="destructive" onClick={handleRemove}>
-              {t('common:actions.remove')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </Card>
+        <Dialog
+          open={!!confirmRemove}
+          onOpenChange={(open) => !open && setConfirmRemove(null)}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('settings:members.removeTitle')}</DialogTitle>
+              <DialogDescription>
+                <Trans
+                  t={t}
+                  i18nKey="settings:members.removeDescription"
+                  values={{ label: confirmRemove?.label }}
+                />
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConfirmRemove(null)}>
+                {t('common:actions.cancel')}
+              </Button>
+              <Button variant="destructive" onClick={handleRemove}>
+                {t('common:actions.remove')}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </Card>
+
+      <AlertPrefsCard
+        orgId={org?._id}
+        members={members}
+        myUserId={myUserId}
+        canManage={canManage}
+      />
+    </div>
   )
 }
