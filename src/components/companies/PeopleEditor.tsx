@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ArrowUpRight,
+  Building2,
   Handshake,
   Loader2,
   Plus,
@@ -19,8 +20,8 @@ import { api } from '../../../convex/_generated/api'
 import { PERSON_ROLES } from '../../../convex/lib/people'
 import type { LucideIcon } from 'lucide-react'
 import type { Id } from '../../../convex/_generated/dataModel'
-import type { PersonRole } from '../../../convex/lib/people'
-import { attioPersonUrl } from '~/lib/attio'
+import type { AttioRecordType, PersonRole } from '../../../convex/lib/people'
+import { attioCompanyUrl, attioPersonUrl } from '~/lib/attio'
 import { IdentitySection } from '~/components/companies/EntityFiche'
 import { Badge } from '~/components/ui/badge'
 import { Input } from '~/components/ui/input'
@@ -29,16 +30,29 @@ import { useDebouncedValue } from '~/hooks/useDebouncedValue'
 
 /**
  * The three people sections of the company identity panel (founders / board /
- * co-investors), edited in place: click a name to rename it, the ✕ to drop it,
- * the "+" chip to add one. Same gesture as the panel's other fields — no
- * dialog, no save button (cf. `InlineField`).
+ * co-investors), edited in place: the ✕ drops a chip, the "+" chip adds one.
+ *
+ * A chip carries exactly ONE gesture: opening its Attio record, on the whole
+ * chip when it is linked (nothing at all when it isn't). It used to double as
+ * a rename button while also carrying the Attio arrow, so a click on it was
+ * ambiguous — open the CRM, or edit the name? Renaming is gone: fixing a name
+ * means dropping the chip and adding a new one, which is also the only way to
+ * re-point its Attio link.
  *
  * `companies.update` takes the people list as a FULL replacement, so every
  * edit rewrites the whole array; `people` order is the storage order, which is
  * why each row carries its index in it.
  */
 
-type Person = { role: PersonRole; name: string; attioRecordId?: string }
+type Person = {
+  role: PersonRole
+  name: string
+  attioRecordId?: string
+  attioRecordType?: AttioRecordType
+}
+
+/** An Attio record picked from the search, before it lands on a `Person`. */
+type AttioLink = { recordId: string; type: AttioRecordType }
 
 const ROLE_ICON: Record<PersonRole, LucideIcon> = {
   founder: User,
@@ -98,22 +112,6 @@ export function PeopleEditor({
                 <PersonChip
                   key={p.index}
                   person={p}
-                  orgId={orgId}
-                  // A hand-typed name breaks the Attio link (the record id no
-                  // longer describes the person) — same rule as before.
-                  onRename={(name, attioRecordId) =>
-                    void save(
-                      people.map((q, i) =>
-                        i === p.index
-                          ? {
-                              role,
-                              name,
-                              ...(attioRecordId ? { attioRecordId } : {}),
-                            }
-                          : q,
-                      ),
-                    )
-                  }
                   onRemove={() =>
                     void save(people.filter((_, i) => i !== p.index))
                   }
@@ -121,10 +119,19 @@ export function PeopleEditor({
               ))}
               <AddPerson
                 orgId={orgId}
-                onAdd={(name, attioRecordId) =>
+                onAdd={(name, attio) =>
                   void save([
                     ...people,
-                    { role, name, ...(attioRecordId ? { attioRecordId } : {}) },
+                    {
+                      role,
+                      name,
+                      ...(attio
+                        ? {
+                            attioRecordId: attio.recordId,
+                            attioRecordType: attio.type,
+                          }
+                        : {}),
+                    },
                   ])
                 }
               />
@@ -136,63 +143,59 @@ export function PeopleEditor({
   )
 }
 
-/** One person: initials, name (click to rename), Attio link, remove. */
+/** One person: initials + name (the Attio link when there is one), remove. */
 function PersonChip({
   person,
-  orgId,
-  onRename,
   onRemove,
 }: {
   person: Person
-  orgId: Id<'organizations'>
-  onRename: (name: string, attioRecordId?: string) => void
   onRemove: () => void
 }) {
   const { t } = useTranslation('participations')
-  const [editing, setEditing] = useState(false)
 
-  if (editing) {
-    return (
-      <PersonInput
-        orgId={orgId}
-        initial={person.name}
-        onSubmit={(name, attioRecordId) => {
-          setEditing(false)
-          onRename(name, attioRecordId)
-        }}
-        onCancel={() => setEditing(false)}
-      />
-    )
-  }
+  // The record type decides the deep link: a co-investor fund lives in Attio's
+  // `companies` object, so a /person/… URL would 404. Absent = person.
+  const url = person.attioRecordId
+    ? person.attioRecordType === 'company'
+      ? attioCompanyUrl(person.attioRecordId)
+      : attioPersonUrl(person.attioRecordId)
+    : null
 
-  const url = person.attioRecordId ? attioPersonUrl(person.attioRecordId) : null
+  const avatar = (
+    <span
+      aria-hidden="true"
+      className="bg-background text-muted-foreground flex size-[18px] shrink-0 items-center justify-center rounded-full border text-[9px] font-bold"
+    >
+      {personInitials(person.name)}
+    </span>
+  )
 
   return (
-    <span className="bg-muted flex items-center gap-1.5 rounded-full border py-0.5 pr-1.5 pl-1 text-[13px]">
-      <span
-        aria-hidden="true"
-        className="bg-background text-muted-foreground flex size-[18px] shrink-0 items-center justify-center rounded-full border text-[9px] font-bold"
-      >
-        {personInitials(person.name)}
-      </span>
-      <button
-        type="button"
-        onClick={() => setEditing(true)}
-        aria-label={t('edit.inlineLabel', { field: person.name })}
-        className="cursor-pointer underline-offset-4 hover:underline"
-      >
-        {person.name}
-      </button>
-      {url && (
+    // The whole chip opens Attio when the entry is linked — a 14px arrow is a
+    // needlessly small target, and the chip has no competing gesture since it
+    // stopped renaming. The ✕ stays OUTSIDE the anchor: a <button> can't nest
+    // in an <a>, and removing must not be one misclick away from the CRM.
+    <span className="bg-muted has-[a:hover]:bg-accent flex items-center gap-1.5 rounded-full border py-0.5 pr-1.5 pl-1 text-[13px] transition-colors">
+      {url ? (
         <a
           href={url}
           target="_blank"
           rel="noreferrer"
-          aria-label={t('identity.attioOpen')}
-          className="text-muted-foreground hover:text-foreground"
+          title={t('identity.attioOpen')}
+          className="flex min-w-0 items-center gap-1.5"
         >
-          <ArrowUpRight className="size-3.5" />
+          {avatar}
+          <span className="truncate">{person.name}</span>
+          <ArrowUpRight
+            aria-hidden="true"
+            className="text-muted-foreground size-3.5 shrink-0"
+          />
         </a>
+      ) : (
+        <>
+          {avatar}
+          <span className="truncate">{person.name}</span>
+        </>
       )}
       <button
         type="button"
@@ -212,7 +215,7 @@ function AddPerson({
   onAdd,
 }: {
   orgId: Id<'organizations'>
-  onAdd: (name: string, attioRecordId?: string) => void
+  onAdd: (name: string, attio?: AttioLink) => void
 }) {
   const { t } = useTranslation('participations')
   const [adding, setAdding] = useState(false)
@@ -221,9 +224,9 @@ function AddPerson({
     return (
       <PersonInput
         orgId={orgId}
-        onSubmit={(name, attioRecordId) => {
+        onSubmit={(name, attio) => {
           setAdding(false)
-          onAdd(name, attioRecordId)
+          onAdd(name, attio)
         }}
         onCancel={() => setAdding(false)}
       />
@@ -243,40 +246,40 @@ function AddPerson({
 }
 
 /**
- * Name input shared by add and rename, with the Attio people search as an aid
- * (Lot 5c): typing debounces a backend search, picking a suggestion submits
- * name + attioRecordId, Enter or blur submits the typed name unlinked, Escape
- * cancels. The search only assists — manual entry keeps working when Attio is
- * down or unconfigured (the action degrades to an empty list + an error flag).
+ * Name input backing "+ Ajouter", with the Attio search as an aid (Lot 5c):
+ * typing debounces a backend search, picking a suggestion submits name + Attio
+ * link, Enter or blur submits the typed name unlinked, Escape cancels. The
+ * search only assists — manual entry keeps working when Attio is down or
+ * unconfigured (the actions degrade to an empty list + an error flag).
+ *
+ * Both Attio objects are searched: a founder is a `people` record, but a
+ * co-investor is usually a fund, i.e. a `companies` one. Results carry their
+ * type so the two never get confused — visually here, and in the stored link.
  */
 function PersonInput({
   orgId,
-  initial = '',
   onSubmit,
   onCancel,
 }: {
   orgId: Id<'organizations'>
-  initial?: string
-  onSubmit: (name: string, attioRecordId?: string) => void
+  onSubmit: (name: string, attio?: AttioLink) => void
   onCancel: () => void
 }) {
   const { t } = useTranslation('participations')
   const searchPeople = useAction(api.attio.searchPeople)
-  const [value, setValue] = useState(initial)
+  const searchCompanies = useAction(api.attio.searchCompanies)
+  const [value, setValue] = useState('')
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
-  const [results, setResults] = useState<
-    Array<{ name: string; attioRecordId: string }>
-  >([])
+  const [results, setResults] = useState<Array<{ name: string } & AttioLink>>(
+    [],
+  )
   const debounced = useDebouncedValue(value, 300)
-  // The name we opened on is never searched: renaming must not pop the
-  // suggestion list on a name that is already settled.
-  const skipRef = useRef(initial)
 
   useEffect(() => {
     const q = debounced.trim()
-    if (q.length < 2 || q === skipRef.current) {
+    if (q.length < 2) {
       setResults([])
       setError(false)
       setLoading(false)
@@ -287,11 +290,27 @@ function PersonInput({
     setLoading(true)
     setError(false)
     setOpen(true)
-    searchPeople({ orgId, query: q })
-      .then((res) => {
+    Promise.all([
+      searchPeople({ orgId, query: q }),
+      searchCompanies({ orgId, query: q }),
+    ])
+      .then(([people, companies]) => {
         if (cancelled) return
-        setResults(res.results)
-        setError(res.error != null)
+        setResults([
+          ...people.results.map((r) => ({
+            name: r.name,
+            recordId: r.attioRecordId,
+            type: 'person' as const,
+          })),
+          ...companies.results.map((r) => ({
+            name: r.name,
+            recordId: r.attioRecordId,
+            type: 'company' as const,
+          })),
+        ])
+        // Only a double failure is worth reporting: one object still answering
+        // gives usable suggestions.
+        setError(people.error != null && companies.error != null)
         setLoading(false)
       })
       .catch(() => {
@@ -303,12 +322,12 @@ function PersonInput({
     return () => {
       cancelled = true
     }
-  }, [debounced, orgId, searchPeople])
+  }, [debounced, orgId, searchPeople, searchCompanies])
 
-  // Typed by hand: submit unlinked. Unchanged or emptied: nothing to write.
+  // Typed by hand: submit unlinked. Emptied: nothing to write.
   function submitTyped() {
     const name = value.trim()
-    if (name === '' || name === initial) {
+    if (name === '') {
       onCancel()
       return
     }
@@ -352,27 +371,40 @@ function PersonInput({
           </div>
         ) : results.length === 0 ? (
           <div className="text-muted-foreground px-2 py-1.5 text-sm">
-            {t('edit.personSearchNoResults')}
+            {t('edit.attioSearchNoResults')}
           </div>
         ) : (
           <ul>
-            {results.map((s) => (
-              <li key={s.attioRecordId}>
-                <button
-                  type="button"
-                  // Keep the focus on the input: the blur would otherwise
-                  // submit the typed name before this click lands.
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => onSubmit(s.name, s.attioRecordId)}
-                  className="hover:bg-accent hover:text-accent-foreground flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm"
-                >
-                  <span className="truncate">{s.name}</span>
-                  <Badge variant="secondary" className="shrink-0">
-                    {t('edit.attioBadge')}
-                  </Badge>
-                </button>
-              </li>
-            ))}
+            {results.map((s) => {
+              const TypeIcon = s.type === 'company' ? Building2 : User
+              return (
+                <li key={`${s.type}:${s.recordId}`}>
+                  <button
+                    type="button"
+                    // Keep the focus on the input: the blur would otherwise
+                    // submit the typed name before this click lands.
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => onSubmit(s.name, s)}
+                    className="hover:bg-accent hover:text-accent-foreground flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm"
+                  >
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <TypeIcon
+                        className="text-muted-foreground size-3.5 shrink-0"
+                        aria-label={t(
+                          s.type === 'company'
+                            ? 'edit.attioTypeCompany'
+                            : 'edit.attioTypePerson',
+                        )}
+                      />
+                      <span className="truncate">{s.name}</span>
+                    </span>
+                    <Badge variant="secondary" className="shrink-0">
+                      {t('edit.attioBadge')}
+                    </Badge>
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         )}
       </PopoverContent>

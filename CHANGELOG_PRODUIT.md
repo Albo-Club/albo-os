@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.171.0 — 03/08/2026 à 18:05 — Les rapports et les documents d'une société vivent enfin au même endroit
+## v1.172.0 — 03/08/2026 à 18:10 — Les rapports et les documents d'une société vivent enfin au même endroit
 
 Une fiche société avait deux onglets, et il fallait choisir le bon **avant**
 de savoir ce qu'on tenait. Un reporting déposé dans « Documents » restait un
@@ -90,6 +90,85 @@ société, il remonte désormais aussi ceux rattachés à ses deals.
 >   `reportings` sont supprimés, `dealDocuments` reste à la fiche deal).
 
 ---
+## v1.171.1 — 03/08/2026 à 17:36 — Toute la pastille ouvre la fiche Attio, pas seulement la flèche
+
+Sur une fiche société, les pastilles de personnes rattachées à Attio ne
+s'ouvraient que par leur petite flèche ↗ — une cible de quelques pixels qu'il
+fallait viser. Maintenant que la pastille ne sert plus à rien d'autre (le nom
+ne s'édite plus au clic), **elle est cliquable en entier** : un clic n'importe
+où dessus ouvre la fiche du CRM, et son fond réagit au survol pour le dire.
+
+Une pastille non rattachée à Attio reste inerte, comme avant. La croix, elle,
+n'a pas bougé : elle est en dehors du lien, la survoler ne colore pas la
+pastille, et la cliquer retire l'entrée sans ouvrir quoi que ce soit.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/PeopleEditor.tsx` : `PersonChip` enveloppe
+>   initiales + nom + flèche dans le `<a>` quand `url` existe, au lieu de
+>   n'y mettre que l'icône. Le `<button>` de retrait reste **hors** de
+>   l'ancre — un bouton ne peut pas s'imbriquer dans un lien, et le retrait
+>   ne doit pas être à un clic de travers du CRM.
+> - Retour visuel via `has-[a:hover]:bg-accent` sur le conteneur (même
+>   variante `:has()` que `src/components/ui/attachment.tsx`), donc le survol
+>   de la croix ne colore pas la pastille.
+> - L'`aria-label` « Ouvrir dans Attio » qui portait l'ancienne ancre laissait
+>   place à un lien sans nom lisible ; il devient un `title`, le nom de la
+>   personne redevenant le libellé accessible du lien, et la flèche passe en
+>   `aria-hidden`.
+
+## v1.171.0 — 03/08/2026 à 16:46 — Les co-investisseurs se cherchent aussi dans les sociétés d'Attio
+
+Dans le bloc Identité d'une fiche société, les pastilles de personnes
+(fondateurs, board, co-investisseurs) posaient une question à chaque clic :
+est-ce que ça ouvre la fiche Attio, ou est-ce que ça modifie le nom ? Les deux
+gestes vivaient au même endroit, sans rien pour les distinguer.
+
+La pastille **n'est plus cliquable**. Seules deux choses réagissent, et elles
+sont explicites : la flèche ↗, qui ouvre la fiche dans Attio, et la croix, qui
+retire l'entrée. Corriger un nom se fait désormais en retirant la pastille et
+en en ajoutant une nouvelle — c'est aussi la seule façon de la rattacher à une
+autre fiche du CRM, ce qui évite les liens qui ne décrivent plus la bonne
+personne.
+
+La recherche Attio de ce champ, elle, ne regardait que les **personnes**. Un
+co-investisseur étant le plus souvent un fonds, il fallait taper son nom à la
+main et renoncer au lien vers le CRM. Elle interroge maintenant **personnes et
+sociétés** en même temps, et chaque suggestion porte une petite icône pour
+qu'on ne les confonde pas : une silhouette pour une personne, un immeuble pour
+une société. La flèche de la pastille mène ensuite à la bonne fiche — celle
+d'un contact ou celle d'un fonds, selon le cas.
+
+Si l'un des deux annuaires ne répond pas, l'autre continue de proposer ses
+résultats ; la recherche n'est déclarée indisponible que lorsque les deux sont
+muets, et la saisie libre reste toujours possible.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/PeopleEditor.tsx` : `PersonChip` perd son état
+>   `editing` et le bouton de renommage inline — le nom redevient du texte, la
+>   pastille n'expose plus que le lien Attio et le retrait. `PersonInput`
+>   n'est donc plus utilisé que par `AddPerson` : ses props `initial` et le
+>   `skipRef` associé (qui évitaient de relancer une recherche sur le nom
+>   d'origine) tombent avec lui.
+> - `PersonInput` appelle désormais `api.attio.searchPeople` **et**
+>   `api.attio.searchCompanies` en parallèle (`Promise.all`) et fusionne les
+>   deux listes ; l'erreur n'est affichée que si les deux actions remontent un
+>   `error`. Aucun changement côté Convex : `searchCompanies` existait déjà
+>   pour la ligne « Fiche Attio ».
+> - `convex/lib/people.ts` : `personValidator` gagne un
+>   `attioRecordType: 'person' | 'company'` optionnel (+ `ATTIO_RECORD_TYPES`
+>   / `attioRecordTypeValidator`). Absent = personne, donc les entrées
+>   existantes restent valides sans migration. `PersonChip` s'en sert pour
+>   choisir entre `attioPersonUrl` et `attioCompanyUrl` — sans ça, un fonds
+>   pointerait vers une URL `/person/…` inexistante.
+> - La ligne « Fiche Attio » du bloc Identité (`AttioCompanyField`) reste
+>   **volontairement** en recherche sociétés seule : c'est l'ancre sur
+>   laquelle la synchro des deals se résout.
+> - i18n : `edit.personSearchNoResults` remplacé par
+>   `edit.attioSearchNoResults` (la liste n'est plus mono-objet), ajout de
+>   `edit.attioTypePerson` / `edit.attioTypeCompany` pour les icônes, et
+>   `edit.peopleNamePlaceholder` passe à « Nom ou société ».
 
 ## v1.170.1 — 03/08/2026 à 15:28 — Un fichier Excel est enfin lu en entier, tous ses onglets compris
 
