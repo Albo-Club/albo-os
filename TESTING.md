@@ -720,12 +720,13 @@ les séries). Page de suivi : `/app/all/reports`. Prérequis :
 `<CONVEX_SITE_URL>/agentmail/webhook` configurée dans la console AgentMail ;
 **domaines remplis sur les `companies` portfolio**. Boucle fermée par la
 brique 6 : **récaps 100 % AgentMail** (`reportNotify.send`, idempotent via
-`notifiedAt`) — seul le **succès** part en **réponse dans le fil du forward**
-(routing anti-énumération : l'expéditeur est re-vérifié membre AU MOMENT de
-l'envoi ; non-membre → jamais de réponse). Échecs, quarantaines et suites de
-lignes assignées à la main quittent le fil : mail **neuf** aux membres qui
-n'ont pas coupé « Problèmes de reports » (Réglages → Membres) — on peut donc
-transférer des reports sans jamais recevoir les erreurs ; récap
+`notifiedAt`). Routage dans `lib/reportRouting.ts:routeRecap` — **canal selon
+le geste** (le membre qui a transféré est répondu dans son fil, les autres
+reçoivent un mail neuf), **contenu selon le rôle** (abonné « Problèmes de
+reports » → récap détaillé sur succès / cause + lien sur échec ; non-abonné →
+accusé « Report bien reçu » **identique succès comme échec**). Un succès ne
+notifie jamais un tiers. Anti-énumération : l'expéditeur est re-vérifié membre
+AU MOMENT de l'envoi, non-membre → jamais de réponse ; récap
 succès = participations (liens fiches) + méthode de match + sources
 ✅/📦/⚠️ + métriques enregistrées / **non reconnues** / **valeurs
 inhabituelles** (×8 vs dernière valeur connue) / **habituelles absentes** ;
@@ -774,9 +775,12 @@ part (garde dans `reportNotify.send`), le report et ses documents portent
 | R22 | Métriques standard (CA, EBITDA, cash, effectif)                 | `kpiSnapshots` alimentés en conventions (cents, bps), visibles sur la fiche ; « 1,2 M€ » stocké 120000000 cents |
 | R23 | Métrique inconnue du catalogue (ex. taux d'occupation)          | Absente des `kpiSnapshots` ; présente dans le snapshot brut du report (`rawMetrics`) — jamais de pollution des séries |
 | R24 | Rejouer `reportStore.run` sur le même mail (idempotence)        | Aucun doublon de `kpiSnapshots` (clé company+métrique+période+report) ni de report                             |
-| R25 | Forward complet réussi                                          | Récap **en réponse dans le fil** du forward : participations (liens fiches), période, sources, métriques, non-reconnues/inhabituelles/absentes ; un seul récap même si rejoué (`notifiedAt`) |
-| R26 | Forward d'un membre qui échoue (participation introuvable)      | Réponse dans le fil « Report non traité » + lien vers la file ; jamais de mail à un tiers                      |
-| R27 | Email d'un inconnu (quarantaine)                                | Mail **neuf** aux membres (« Email en quarantaine ») ; **aucune** réponse dans le fil de l'inconnu             |
+| R25 | Forward réussi par un membre **abonné** « Problèmes de reports » | Récap détaillé **en réponse dans le fil** du forward : participations (liens fiches), période, sources, métriques, non-reconnues/inhabituelles/absentes ; un seul récap même si rejoué (`notifiedAt`) ; **aucun mail** aux autres membres (un succès ne notifie jamais un tiers) |
+| R25b | Forward réussi par un membre **non abonné** (le transféreur type) | Réponse dans son fil « **Report bien reçu** » — pas le récap détaillé, aucun nom de société, aucun lien ; toujours aucun mail aux autres |
+| R26 | Forward d'un membre **abonné** qui échoue (participation introuvable) | Réponse **dans son fil** « Report non traité » + cause + lien vers la file ; les **autres** abonnés reçoivent la même alerte en mail neuf ; lui ne la reçoit **pas** deux fois |
+| R26b | Forward d'un membre **non abonné** qui échoue                  | Il reçoit « Report bien reçu » — **identique au caractère près** à celui de R25b (comparer les deux mails : aucun mot ne doit différer) ; les abonnés reçoivent l'alerte « Report non traité » en mail neuf |
+| R27 | Email d'un inconnu (quarantaine)                                | Mail **neuf** aux abonnés « Problèmes de reports » (« Email en quarantaine ») ; **aucune** réponse dans le fil de l'inconnu |
+| R27b | Mail d'un **membre** flaggé `spam` (quarantaine, expéditeur connu) | Le membre reçoit la réponse correspondant à son rôle (accusé « bien reçu » s'il n'est pas abonné) ; les abonnés reçoivent la quarantaine en mail neuf |
 | R28 | Action « Rattacher » sur une ligne « À traiter »                | Dialog → choix participation → traitement reprend (extraction si pas faite, sinon fiche) → « Traité » + récap  |
 | R29 | Action « Retraiter »                                            | Pipeline rejoué de zéro (re-auth incluse) ; utile après avoir rempli un domaine manquant                       |
 | R30 | Action « Rejeter »                                              | Ligne « Rejeté / Rejeté manuellement », aucun traitement ni email                                              |

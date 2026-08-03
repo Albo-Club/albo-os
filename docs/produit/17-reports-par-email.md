@@ -83,25 +83,32 @@ mail — ou le même report pour la même période — ne crée **jamais de
 doublon** : la fiche est mise à jour. La synthèse IA de la société est
 relancée à chaque report ingéré.
 
-### 6. Le récapitulatif dans le fil
+### 6. La réponse dans le fil
 
-Quand le report est rangé, la réponse arrive dans le fil du forward :
-société identifiée (avec le mode de rattachement), période, sources lues
-✅/⚠️, KPIs cibles trouvés ou absents, autres métriques enregistrées,
-valeurs inhabituelles à vérifier. C'est l'accusé de réception de celui qui
-a transféré : il part toujours, il ne se règle pas.
+Toute personne qui transfère reçoit une réponse dans son propre fil. Ce
+qu'elle contient dépend de son rôle, réglé dans
+[Réglages → Membres](14-organisations-membres-invitations.md) :
 
-**Les problèmes, eux, ne reviennent pas dans le fil.** Un report que le
-circuit n'a pas su traiter, un email parti en quarantaine, la suite donnée
-à un mail assigné à la main : tout ça part en email séparé aux personnes
-qui ont coché « Problèmes de reports » dans
-[Réglages → Membres](14-organisations-membres-invitations.md). L'email dit
-**quoi corriger** et renvoie vers la boîte Rapports entrants (Assigner /
-Retraiter / Rejeter).
+- **Tu ne gères pas la file** (case « Problèmes de reports » décochée) → tu
+  reçois **« Report bien reçu »**, exactement le même message que le report
+  se soit rangé ou non. Pas de verdict, pas de lien, rien à faire. C'est
+  volontaire : on ne demande pas à quelqu'un dont le rôle s'arrête au
+  transfert de lire un diagnostic qu'il ne traitera pas.
+- **Tu gères la file** (case cochée) → tu reçois le vrai contenu : le
+  **récapitulatif détaillé** quand c'est rangé (société identifiée et mode
+  de rattachement, période, sources lues ✅/⚠️, KPIs cibles trouvés ou
+  absents, autres métriques enregistrées, valeurs inhabituelles à
+  vérifier), et le message **actionnable** quand ça coince (la cause + le
+  lien vers la boîte Rapports entrants).
+
+Les autres personnes qui gèrent la file sont prévenues **uniquement quand
+il y a un problème**, par un email séparé. Un report qui se range
+correctement ne génère aucune notification pour qui ne l'a pas transféré :
+pas de bruit pour une chaîne qui marche.
 
 C'est ce qui permet de confier le transfert des reports à quelqu'un sans
-lui envoyer les erreurs : il reçoit ses accusés de réception, et les
-problèmes atterrissent chez ceux qui tiennent la file.
+jamais lui envoyer les erreurs — il reçoit toujours le même accusé de
+réception, et les problèmes atterrissent chez ceux qui tiennent la file.
 
 > **Sous le capot** — L'email est enregistré intégralement dès son
 > arrivée, avant tout traitement : si une étape échoue, rien n'est perdu

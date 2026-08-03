@@ -196,7 +196,7 @@
       },
       "reportIssues": {
         "label": "Problèmes de reports",
-        "help": "Les emails de la file Rapports entrants : quarantaine, échec de traitement, suite donnée à un mail assigné à la main. L'accusé de réception d'un report bien rangé part toujours à la personne qui l'a transféré, quel que soit ce réglage."
+        "help": "Les emails de la file Rapports entrants : quarantaine, échec de traitement, suite donnée à un mail assigné à la main. Décide aussi de ce que tu reçois pour les reports que tu transfères toi-même : coché, tu as le récapitulatif détaillé ou la cause de l'échec ; décoché, tu reçois « Report bien reçu », le même message dans les deux cas."
       }
     }
   }
