@@ -23,6 +23,59 @@ bas de page.
 
 ---
 
+## v1.171.0 — 03/08/2026 à 16:46 — Les co-investisseurs se cherchent aussi dans les sociétés d'Attio
+
+Dans le bloc Identité d'une fiche société, les pastilles de personnes
+(fondateurs, board, co-investisseurs) posaient une question à chaque clic :
+est-ce que ça ouvre la fiche Attio, ou est-ce que ça modifie le nom ? Les deux
+gestes vivaient au même endroit, sans rien pour les distinguer.
+
+La pastille **n'est plus cliquable**. Seules deux choses réagissent, et elles
+sont explicites : la flèche ↗, qui ouvre la fiche dans Attio, et la croix, qui
+retire l'entrée. Corriger un nom se fait désormais en retirant la pastille et
+en en ajoutant une nouvelle — c'est aussi la seule façon de la rattacher à une
+autre fiche du CRM, ce qui évite les liens qui ne décrivent plus la bonne
+personne.
+
+La recherche Attio de ce champ, elle, ne regardait que les **personnes**. Un
+co-investisseur étant le plus souvent un fonds, il fallait taper son nom à la
+main et renoncer au lien vers le CRM. Elle interroge maintenant **personnes et
+sociétés** en même temps, et chaque suggestion porte une petite icône pour
+qu'on ne les confonde pas : une silhouette pour une personne, un immeuble pour
+une société. La flèche de la pastille mène ensuite à la bonne fiche — celle
+d'un contact ou celle d'un fonds, selon le cas.
+
+Si l'un des deux annuaires ne répond pas, l'autre continue de proposer ses
+résultats ; la recherche n'est déclarée indisponible que lorsque les deux sont
+muets, et la saisie libre reste toujours possible.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/PeopleEditor.tsx` : `PersonChip` perd son état
+>   `editing` et le bouton de renommage inline — le nom redevient du texte, la
+>   pastille n'expose plus que le lien Attio et le retrait. `PersonInput`
+>   n'est donc plus utilisé que par `AddPerson` : ses props `initial` et le
+>   `skipRef` associé (qui évitaient de relancer une recherche sur le nom
+>   d'origine) tombent avec lui.
+> - `PersonInput` appelle désormais `api.attio.searchPeople` **et**
+>   `api.attio.searchCompanies` en parallèle (`Promise.all`) et fusionne les
+>   deux listes ; l'erreur n'est affichée que si les deux actions remontent un
+>   `error`. Aucun changement côté Convex : `searchCompanies` existait déjà
+>   pour la ligne « Fiche Attio ».
+> - `convex/lib/people.ts` : `personValidator` gagne un
+>   `attioRecordType: 'person' | 'company'` optionnel (+ `ATTIO_RECORD_TYPES`
+>   / `attioRecordTypeValidator`). Absent = personne, donc les entrées
+>   existantes restent valides sans migration. `PersonChip` s'en sert pour
+>   choisir entre `attioPersonUrl` et `attioCompanyUrl` — sans ça, un fonds
+>   pointerait vers une URL `/person/…` inexistante.
+> - La ligne « Fiche Attio » du bloc Identité (`AttioCompanyField`) reste
+>   **volontairement** en recherche sociétés seule : c'est l'ancre sur
+>   laquelle la synchro des deals se résout.
+> - i18n : `edit.personSearchNoResults` remplacé par
+>   `edit.attioSearchNoResults` (la liste n'est plus mono-objet), ajout de
+>   `edit.attioTypePerson` / `edit.attioTypeCompany` pour les icônes, et
+>   `edit.peopleNamePlaceholder` passe à « Nom ou société ».
+
 ## v1.170.1 — 03/08/2026 à 15:28 — Un fichier Excel est enfin lu en entier, tous ses onglets compris
 
 Jusqu'ici, un classeur Excel un peu fourni ne livrait qu'une partie de son
