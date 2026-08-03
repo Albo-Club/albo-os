@@ -7,6 +7,11 @@ import {
   requireOrgRole,
   safeAppUser,
 } from './lib/auth'
+import {
+  notificationKindValidator,
+  readAlertPrefs,
+  setAlertPref,
+} from './lib/notificationPrefs'
 import { setLastOrgSlug } from './lib/userPrefs'
 import { resolveAvatarUrl, resolveLogoUrl } from './lib/storage'
 import type { DataModel, Id } from './_generated/dataModel'
@@ -34,6 +39,61 @@ export const listMembers = query({
         }
       }),
     )
+  },
+})
+
+/**
+ * Alert prefs of every member of `orgId`, joined on `userId` by the settings
+ * matrix. The flags are GLOBAL (one `userPrefs` row per user, applying to
+ * every org they belong to); they are only surfaced through an org because
+ * that is where the member list the user recognises lives.
+ */
+export const listAlertPrefs = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+    const members = await ctx.db
+      .query('organizationMembers')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    return Promise.all(
+      members.map(async (m) => ({
+        userId: m.userId,
+        prefs: await readAlertPrefs(ctx, m.userId),
+      })),
+    )
+  },
+})
+
+/**
+ * Toggle one alert for one member. Anyone edits their own line; editing
+ * someone else's needs admin. The target must be a member of `orgId` — the
+ * flags being global, this membership check is what stops an admin from
+ * reaching into a user they share no org with.
+ */
+export const setMemberAlertPref = mutation({
+  args: {
+    orgId: v.id('organizations'),
+    userId: v.id('users'),
+    kind: notificationKindValidator,
+    enabled: v.boolean(),
+  },
+  handler: async (ctx, { orgId, userId, kind, enabled }) => {
+    const me = await requireAppUser(ctx)
+    if (userId === me._id) {
+      await requireOrgMember(ctx, orgId)
+    } else {
+      await requireOrgRole(ctx, orgId, 'admin')
+      const target = await ctx.db
+        .query('organizationMembers')
+        .withIndex('by_org_and_user', (q) =>
+          q.eq('orgId', orgId).eq('userId', userId),
+        )
+        .unique()
+      if (!target) throw new ConvexError('not_found')
+    }
+    await setAlertPref(ctx, userId, kind, enabled)
+    return null
   },
 })
 

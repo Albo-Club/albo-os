@@ -86,9 +86,11 @@ parce que le pointage a été fait avant le rapprochement.
 ## Alertes
 
 - **Alerte de trésorerie** : « me prévenir par email si le solde disponible
-  ou un mois projeté (3 mois) passe sous X € ». Vérifiée chaque matin, avec
-  une pause de 7 jours après chaque alerte envoyée. Tant que le seuil est
-  franchi, une bannière rouge l'affiche aussi en tête de la Vue d'ensemble.
+  ou un mois projeté (3 mois) passe sous X € ». Le seuil se règle par
+  organisation ; le franchissement est signalé dans le **point hebdo du
+  lundi matin** (voir plus bas). Tant que le seuil est franchi, une
+  bannière rouge l'affiche aussi en tête de la Vue d'ensemble — celle-là
+  est immédiate et visible de tous.
 - **Échéances à venir** : les 90 prochains jours vivent dans le registre,
   au-dessus du séparateur « Aujourd'hui » (statut « Prévu » en bleu) ; une
   échéance en retard descend à sa date avec un statut « En retard » en
@@ -96,11 +98,14 @@ parce que le pointage a été fait avant le rapprochement.
   objet s'**annule** directement depuis sa ligne du registre (occurrences
   de règles récurrentes comprises), avec confirmation : elle sort du solde
   projeté.
-- **Digest « échéances en retard »** : quand une échéance attendue dépasse
-  sa date de plus d'un jour sans être rapprochée, un email récapitule
-  toutes les échéances en retard (avec le lien vers le registre filtré
-  pour les traiter). Un seul envoi quand de nouvelles échéances passent en
-  retard — pas de rappel quotidien pour le même stock.
+- **Le point hebdo du lundi matin** : un seul email, une section par
+  organisation, qui rassemble les seuils de trésorerie franchis et les
+  échéances en retard (celles dépassées de plus d'un jour sans avoir été
+  rapprochées), avec les liens pour aller les traiter. Rien à signaler =
+  pas d'email. Chacun choisit les deux morceaux qu'il veut y voir depuis
+  **Réglages → Membres** ; qui coupe les deux ne reçoit plus le point
+  hebdo du tout. Voir
+  [Organisations, membres et invitations](14-organisations-membres-invitations.md).
 
 ## Points d'attention
 

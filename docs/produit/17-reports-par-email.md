@@ -85,11 +85,23 @@ relancée à chaque report ingéré.
 
 ### 6. Le récapitulatif dans le fil
 
-La réponse arrive dans le fil du forward : société identifiée (avec le
-mode de rattachement), période, sources lues ✅/⚠️, KPIs cibles trouvés ou
-absents, autres métriques enregistrées, valeurs inhabituelles à vérifier.
-En cas d'échec, le récap dit **quoi corriger** et renvoie vers la boîte
-Rapports entrants (Assigner / Retraiter / Rejeter).
+Quand le report est rangé, la réponse arrive dans le fil du forward :
+société identifiée (avec le mode de rattachement), période, sources lues
+✅/⚠️, KPIs cibles trouvés ou absents, autres métriques enregistrées,
+valeurs inhabituelles à vérifier. C'est l'accusé de réception de celui qui
+a transféré : il part toujours, il ne se règle pas.
+
+**Les problèmes, eux, ne reviennent pas dans le fil.** Un report que le
+circuit n'a pas su traiter, un email parti en quarantaine, la suite donnée
+à un mail assigné à la main : tout ça part en email séparé aux personnes
+qui ont coché « Problèmes de reports » dans
+[Réglages → Membres](14-organisations-membres-invitations.md). L'email dit
+**quoi corriger** et renvoie vers la boîte Rapports entrants (Assigner /
+Retraiter / Rejeter).
+
+C'est ce qui permet de confier le transfert des reports à quelqu'un sans
+lui envoyer les erreurs : il reçoit ses accusés de réception, et les
+problèmes atterrissent chez ceux qui tiennent la file.
 
 > **Sous le capot** — L'email est enregistré intégralement dès son
 > arrivée, avant tout traitement : si une étape échoue, rien n'est perdu
@@ -123,7 +135,10 @@ boîte [Rapports entrants](12-vue-consolidee.md), comme un mail.
   par une participation à l'adresse dédiée part en quarantaine. C'est
   voulu (sécurité + contrôle de ce qui entre). Le dépôt manuel depuis la
   fiche société est l'autre porte d'entrée, réservée aux membres de
-  l'organisation de la société.
+  l'organisation de la société. Pour qu'une nouvelle personne puisse
+  transférer, il faut donc **l'ajouter comme membre** — et penser à
+  décocher « Problèmes de reports » sur sa ligne si elle ne doit pas gérer
+  la file (tout est activé par défaut).
 - **Liens Notion** : la page doit être partagée publiquement. Une page
   privée échoue proprement (source ⚠️, reste du mail traité).
 - **Métriques hors catalogue** : visibles dans le récap sous « non
