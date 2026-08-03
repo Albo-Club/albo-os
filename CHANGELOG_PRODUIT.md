@@ -85,6 +85,54 @@ reports » sur sa ligne.
 
 ---
 
+## v1.166.1 — 03/08/2026 à 10:39 — Un report envoyé depuis une adresse perso se range enfin tout seul
+
+Quand un fondateur envoie son investor update depuis son adresse
+personnelle (gmail…) plutôt que depuis celle de sa société, le circuit
+n'avait plus le domaine pour reconnaître la participation. Il lui restait
+pourtant une preuve solide — le nom de la société écrit noir sur blanc dans
+le message — mais l'IA, à qui on demande de ne jamais deviner, se déclarait
+hésitante, et cette hésitation suffisait à tout bloquer : le report partait
+dans « Reports entrants » avec « participation introuvable », à ranger à la
+main.
+
+Désormais l'hésitation de l'IA n'a plus le dernier mot sur une preuve
+vérifiée. Si le mail ne nomme **qu'une seule** participation, le report est
+rangé directement. S'il en nomme plusieurs, le doute est réel et le mail
+continue de passer par la file pour arbitrage manuel — et un mail qui ne
+nomme aucune participation connue n'est toujours jamais rangé au hasard.
+
+Concrètement : les updates des fondateurs qui écrivent depuis leur adresse
+perso arrivent à bon port sans intervention.
+
+> **🔧 Notes techniques**
+>
+> - `convex/reportIdentify.ts` : la condition de sortie en `no_match`
+>   mêlait deux choses, l'absence de corroboration déterministe et le
+>   `confidence === 'low'` du modèle. Le second terme annulait le premier
+>   même quand il était satisfait.
+> - Décision extraite en fonctions pures dans `convex/lib/emailIdentify.ts` :
+>   `namedIdentities()` (participations nommées dans le mail, sur **toute**
+>   la liste de candidats, clé d'identité domaine sinon nom — même règle que
+>   le check d'ambiguïté) et `acceptIdentification()` (pas de corroboration →
+>   review ; `low` ne veto que si `namedCount > 1`).
+> - `tests/emailIdentify.test.ts` (nouveau) couvre les cas : gmail + un seul
+>   nom → match, gmail + plusieurs noms + `low` → review, corroboration par
+>   domaine seule → match, aucune corroboration → review.
+> - Rejoué sur le mail réel qui a déclenché le bug (Sant Roch) : sur les 323
+>   participations des deux orgs, une seule est nommée dans le message → le
+>   pick `low` est accepté.
+> - Le log de non-match porte désormais `named=N` en plus de `picks`/
+>   `confidence`, pour diagnostiquer sans accès à la base.
+> - Non traité ici, à suivre : le pipeline report n'a **aucun retry** sur ses
+>   appels LLM (un échec transitoire = cul-de-sac + un mail), et le champ
+>   `inboundEmails.error` n'est remonté ni dans la file ni dans le mail
+>   d'échec — c'est ce qui a rendu les 3 « erreur technique pendant
+>   l'analyse » indiagnosticables côté utilisateur. Le pattern à reprendre
+>   existe déjà dans `convex/vectorize.ts`.
+
+---
+
 ## v1.166.0 — 31/07/2026 à 16:26 — L'indexation des documents se voit, se relance, et prévient quand elle échoue
 
 L'assistant cherche dans le contenu des documents grâce à une indexation qui

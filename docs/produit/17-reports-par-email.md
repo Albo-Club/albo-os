@@ -30,10 +30,13 @@ vous êtes prévenus par un email séparé.
 Le circuit reconnaît la société concernée en croisant le **domaine de
 l'expéditeur d'origine** (celui du forward, ex. `lea@tango.fr`) et le **nom
 de la société** dans le message. Une suggestion de l'IA n'est jamais
-acceptée sans une de ces preuves vérifiables. Si la société existe dans
+acceptée sans une de ces preuves vérifiables. Beaucoup de fondateurs
+écrivent depuis une adresse personnelle (gmail…) : le domaine ne dit alors
+rien, et c'est le nom de la société écrit dans le message qui fait foi —
+tant qu'une seule participation y est nommée. Si la société existe dans
 plusieurs organisations (Calte **et** Albo), le report est rangé dans
-chacune. En cas de doute (aucune correspondance, ou plusieurs possibles),
-le mail atterrit dans la boîte
+chacune. En cas de doute (aucune correspondance, ou plusieurs sociétés
+possibles), le mail atterrit dans la boîte
 [Rapports entrants](12-vue-consolidee.md) pour assignation manuelle.
 
 ### 3. Lecture du contenu — toutes les sources
