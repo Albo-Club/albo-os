@@ -54,7 +54,8 @@ pas le faire, et la seconde est la vraie :
    (~900 000 caractères, ~1,05 octet/caractère en UTF-8) sature la ligne à
    lui seul.
 2. **Convex lit toujours la ligne entière.** `documents:listByCompany` charge
-   jusqu'à 200 lignes à chaque ouverture de l'onglet Documents. Avec le texte
+   jusqu'à 200 lignes à chaque ouverture de la liste « Documents & rapports »
+   d'une fiche société. Avec le texte
    sur la ligne, c'est des dizaines de Mo relus à chaque affichage, pour
    afficher un titre et une taille.
 

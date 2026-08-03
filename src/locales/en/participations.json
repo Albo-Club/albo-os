@@ -516,40 +516,6 @@
     "dialogDescription": "Check the KPIs to track as series. Each report recap will flag the missing ones.",
     "saved": "KPI sheet saved"
   },
-  "reportings": {
-    "title": "Reporting",
-    "upload": "Add a document",
-    "uploading": "Uploading…",
-    "empty": "No document yet. Investor updates, BPs and legal docs live here.",
-    "added_one": "Document added",
-    "added_other": "{{count}} documents added",
-    "deleted": "Document deleted",
-    "deleteConfirmTitle": "Delete this document?",
-    "deleteConfirmBody": "The file will be permanently deleted.",
-    "dialogTitle_one": "New document",
-    "dialogTitle_other": "{{count}} new documents",
-    "titleLabel_one": "Title",
-    "titleLabel_other": "Titles",
-    "kindLabel": "Type",
-    "periodLabel": "Covered period (optional)",
-    "kind": {
-      "reporting": "Reporting",
-      "bp": "Business plan",
-      "legal": "Legal",
-      "other": "Other"
-    },
-    "errors": {
-      "too_large": "File is larger than 20 MB",
-      "default": "Something went wrong"
-    },
-    "updated": "Document updated",
-    "editDialogTitle": "Edit document",
-    "addedOn": "Added on {{date}}",
-    "filter": {
-      "label": "Type:",
-      "all": "all"
-    }
-  },
   "dealDocuments": {
     "title": "Documents",
     "upload": "Add a doc",
@@ -584,10 +550,6 @@
       "label": "Type:",
       "all": "all"
     }
-  },
-  "tabs": {
-    "documents": "Documents",
-    "reports": "Reports"
   },
   "reports": {
     "title": "Investor reports",
@@ -631,19 +593,6 @@
       "viewDocs": "View documents"
     },
     "add": {
-      "action": "Add a report",
-      "dialogTitle": "Add a report",
-      "description": "The file is analysed like a report received by email: period, key highlights and metrics are extracted automatically.",
-      "pick": "Choose files",
-      "noteLabel": "Note (optional)",
-      "notePlaceholder": "Context for the analysis: covering message, clarifications…",
-      "submit": "Analyse",
-      "uploading": "Uploading…",
-      "queued": "Report sent — analysis in progress.",
-      "errors": {
-        "too_large": "File too large (20 MB maximum).",
-        "default": "Upload failed. Try again."
-      },
       "progress": {
         "running": "· analysis in progress…",
         "failed": "· analysis failed ({{reason}})"
@@ -756,5 +705,70 @@
   "documentAttachment": {
     "open": "Open \"{{title}}\"",
     "edit": "Edit"
+  },
+  "timeline": {
+    "title": "Documents & reports",
+    "empty": "Nothing yet. Reports, communications and uploaded documents will show up here, most recent first.",
+    "addedOn": "Added on {{date}}",
+    "uploading": "Uploading…",
+    "queued": "Report sent — the analysis is running.",
+    "added_one": "Document added",
+    "added_other": "{{count}} documents added",
+    "updated": "Document updated",
+    "deleted": "Document deleted",
+    "editTitle": "Edit document",
+    "deleteConfirmTitle": "Delete this document?",
+    "deleteConfirmBody": "The file will be permanently deleted.",
+    "refreshVasco": "Refresh VASCO",
+    "files_one": "1 file",
+    "files_other": "{{count}} files",
+    "openReport": "Open report “{{title}}”",
+    "openCommunication": "Open communication “{{title}}”",
+    "dealBadge": "Deal · {{deal}}",
+    "dealLabel": "Attach to a deal (optional)",
+    "dealNone": "None — entity document",
+    "kindLabel": "Type",
+    "titleLabel_one": "Title",
+    "titleLabel_other": "Titles",
+    "periodLabel": "Covered period (optional)",
+    "dateLabel": "Document date (optional)",
+    "badge": {
+      "report": "Report",
+      "vasco": "VASCO"
+    },
+    "group": {
+      "communications": "Communications",
+      "documents": "Documents",
+      "company": "Company documents",
+      "deal": "Deal documents"
+    },
+    "kind": {
+      "reporting": "Reporting",
+      "bp": "Business plan",
+      "legal": "Legal",
+      "other": "Other",
+      "term_sheet": "Term sheet",
+      "pacte": "Shareholders' agreement",
+      "subscription": "Subscription form",
+      "attestation": "Certificate / registry extract"
+    },
+    "filter": {
+      "label": "Type:",
+      "all": "all"
+    },
+    "add": {
+      "action": "Add",
+      "title": "Add a document",
+      "pick": "Choose files",
+      "analysisHint": "A reporting is analysed automatically: period, key points and metrics are extracted, and the company synthesis is refreshed. Title and period come from the analysis.",
+      "noteLabel": "Note (optional)",
+      "notePlaceholder": "Context for the analysis: covering message, clarifications…",
+      "submit": "Add",
+      "submitAnalyse": "Analyse and add"
+    },
+    "errors": {
+      "too_large": "File is larger than 20 MB",
+      "default": "Something went wrong"
+    }
   }
 }

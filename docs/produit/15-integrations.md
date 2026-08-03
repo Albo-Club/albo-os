@@ -126,10 +126,14 @@ aussi bien les SPV ayant **déjà publié une communication** que ceux simplemen
 **détenus** dans le portefeuille Parallel : un SPV tout juste closé, encore sans
 communication, est donc rattachable immédiatement (il apparaît après la
 prochaine synchro ou un clic sur « Rafraîchir »). Une fois rattachée, les
-**communications investisseurs** (annonces, documents) remontent dans l'onglet
-Rapports de la fiche — y compris si le rattachement a été fait avant la première
-communication —, avec téléchargement des documents et rafraîchissement à la
-demande ; une fiche non rattachée n'affiche rien.
+**communications investisseurs** (annonces, documents) remontent dans la liste
+« Documents & rapports » de la fiche — y compris si le rattachement a été fait
+avant la première communication. Chacune s'y présente comme un rapport : une
+bulle à sa date de publication, qu'un clic déplie sur le message complet et ses
+pièces jointes, téléchargeables une par une depuis le portail. Un bouton
+**« Rafraîchir VASCO »** apparaît en haut de la liste sur les fiches rattachées
+uniquement ; une fiche non rattachée n'affiche rien. Le rattachement (et le
+détachement) se gèrent au même endroit qu'au départ : **⋯ → Intégrations**.
 
 ## Ingestion des rapports par email
 

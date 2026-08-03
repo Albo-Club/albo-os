@@ -59,9 +59,10 @@ Notion inaccessible — vérifie qu'elle est partagée publiquement »), et
 « Retraiter » relance tout le circuit après correction.
 
 Le verdict de lecture de chaque pièce jointe reste consultable **après
-coup** : il est repris sur l'onglet Documents de la fiche société, avec le
-texte lu ([Participations](04-participations.md)). Le récap dit ce qui
-s'est passé sur le moment, la fiche dit ce qui est en base.
+coup** : il est repris sur la fiche société, sous le rapport auquel la pièce
+jointe appartient, avec le texte lu ([Participations](04-participations.md)).
+Le récap dit ce qui s'est passé sur le moment, la fiche dit ce qui est en
+base.
 
 ### 4. Extraction des KPIs
 
@@ -77,8 +78,9 @@ celle qui couvre la période du report) et le récap dit lesquels manquent.
 
 ### 5. Rangement
 
-Le report est attaché à la fiche de la société (onglet Rapports) : titre,
-période, points clés, documents, métriques. Renvoyer deux fois le même
+Le report est attaché à la fiche de la société, dans la liste « Documents &
+rapports », à la date de la période qu'il couvre : titre, période, points
+clés, documents, métriques. Renvoyer deux fois le même
 mail — ou le même report pour la même période — ne crée **jamais de
 doublon** : la fiche est mise à jour. La synthèse IA de la société est
 relancée à chaque report ingéré.
@@ -119,17 +121,22 @@ réception, et les problèmes atterrissent chez ceux qui tiennent la file.
 
 ## Ajouter un report à la main
 
-Sur la fiche d'une participation, onglet **Rapports**, le bouton
-**« Ajouter un report »** ouvre une fenêtre où déposer un ou plusieurs
-fichiers (PDF, Excel, image — 20 Mo par fichier) et, si utile, une note de
-contexte. « Analyser » lance le même circuit qu'un mail transféré, à partir
-de l'étape 3 : les étapes 1 et 2 n'ont pas lieu d'être puisque tu as choisi
-la société toi-même.
+Sur la fiche d'une participation, le bouton **« Ajouter »** ouvre une
+fenêtre où choisir un ou plusieurs fichiers (PDF, Excel, image — 20 Mo par
+fichier). C'est le **type** qui décide de la suite : choisir **Reporting**
+lance le même circuit qu'un mail transféré, à partir de l'étape 3 — les
+étapes 1 et 2 n'ont pas lieu d'être puisque tu as choisi la société
+toi-même. Le bouton porte alors « Analyser et ajouter », et une note de
+contexte peut être jointe ; ni titre ni période ne sont demandés, c'est
+l'analyse qui les donne. Tout autre type (BP, juridique, pacte…) est un
+simple dépôt, sans analyse.
 
-Le temps de l'analyse, une ligne « analyse en cours… » s'affiche sous le
-titre de l'onglet ; quand elle disparaît, le report est là, avec sa
-période, ses points clés et ses métriques, et les fichiers déposés se
-retrouvent dans l'onglet Documents. Comme pour un mail, le report est rangé
+L'option n'existe que sur une **participation** : une entité du groupe n'a
+pas de reporting investisseur à analyser.
+
+Le temps de l'analyse, une ligne « analyse en cours… » s'affiche en haut de
+la liste ; quand elle disparaît, le report est là, avec sa période, ses
+points clés et ses métriques, et les fichiers déposés sont repliés dedans. Comme pour un mail, le report est rangé
 dans **chaque organisation** où la société existe, et la synthèse IA est
 relancée.
 
@@ -166,6 +173,7 @@ boîte [Rapports entrants](12-vue-consolidee.md), comme un mail.
 ## Pages liées
 
 - [Vue consolidée](12-vue-consolidee.md) (boîte Rapports entrants),
-  [Participations](04-participations.md) (onglet Rapports des fiches),
+  [Participations](04-participations.md) (liste « Documents & rapports » des
+  fiches),
   [Valorisations, KPIs et métriques](06-valorisations-et-kpis.md)
   (catalogue, fiche KPI cible), [Intégrations](15-integrations.md)

@@ -34,12 +34,9 @@ import {
 } from '~/components/companies/EntityFiche'
 import { AttioCompanyField } from '~/components/companies/AttioCompanyField'
 import { PeopleEditor } from '~/components/companies/PeopleEditor'
-import { ReportingsSection } from '~/components/companies/ReportingsSection'
-import { CompanyReportsSection } from '~/components/companies/CompanyReportsSection'
-import { VascoCommunicationsSection } from '~/components/vasco/VascoCommunicationsSection'
+import { CompanyTimelineSection } from '~/components/companies/CompanyTimelineSection'
 import { CompanyAiSynthesisBlock } from '~/components/companies/CompanyAiSynthesisBlock'
 import { EntityIntegrationsDialog } from '~/components/companies/EntityIntegrationsDialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { Button } from '~/components/ui/button'
 import {
   DropdownMenu,
@@ -629,27 +626,14 @@ function ParticipationDetail() {
             )}
           </IdentitySection>
 
-          {/* Reporting zone: email-ingested report history + manual documents. */}
+          {/* One timeline: reports, VASCO communications and documents (deal
+              documents included), sorted by date. */}
           {company && (
-            <section>
-              <Tabs defaultValue="reports">
-                <TabsList>
-                  <TabsTrigger value="reports">{t('tabs.reports')}</TabsTrigger>
-                  <TabsTrigger value="documents">
-                    {t('tabs.documents')}
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="reports" className="pt-4">
-                  <div className="space-y-6">
-                    <VascoCommunicationsSection company={company} />
-                    <CompanyReportsSection companyId={company._id} />
-                  </div>
-                </TabsContent>
-                <TabsContent value="documents" className="pt-4">
-                  <ReportingsSection companyId={company._id} />
-                </TabsContent>
-              </Tabs>
-            </section>
+            <CompanyTimelineSection
+              company={company}
+              orgSlug={orgSlug}
+              deals={deals ?? []}
+            />
           )}
         </div>
 

@@ -23,6 +23,74 @@ bas de page.
 
 ---
 
+## v1.171.0 — 03/08/2026 à 18:05 — Les rapports et les documents d'une société vivent enfin au même endroit
+
+Une fiche société avait deux onglets, et il fallait choisir le bon **avant**
+de savoir ce qu'on tenait. Un reporting déposé dans « Documents » restait un
+PDF muet : pas de période, pas de KPIs, pas de synthèse relancée — rien qui
+dise que c'était un rapport. Et un pacte, lui, n'existait que sur la fiche du
+deal, alors qu'il engage la société entière.
+
+Les deux onglets n'en font plus qu'un : **« Documents & rapports »**, une
+seule liste chronologique, du plus récent au plus ancien.
+
+- **Tout y est** : les rapports investisseurs analysés, les communications
+  Parallel/VASCO, et les documents déposés — **y compris ceux rattachés à un
+  deal**, qui portent le badge du deal concerné et renvoient vers sa fiche. Un
+  seul fichier stocké, deux endroits pour le retrouver.
+- **La date classe la ligne** : la période couverte quand elle existe (un
+  reporting de janvier se range en janvier, même déposé en mars), la date de
+  dépôt sinon — et la ligne dit toujours laquelle des deux elle affiche.
+- **Un seul bouton « Ajouter »**, et c'est le type choisi qui décide : un
+  **Reporting** part dans le circuit d'analyse (le bouton devient « Analyser
+  et ajouter » et l'encart le dit avant le clic), le reste est un simple
+  dépôt. On peut aussi rattacher le document à un deal au passage.
+- **Le filtre** retrouve un pacte au milieu de quarante rapports : il ne
+  propose que ce qui existe sur la fiche, groupé en communications
+  (rapports, VASCO) et documents.
+- **Les communications VASCO** ne s'affichent plus dépliées en entier les unes
+  sous les autres : chacune devient une bulle, comme un rapport, qu'un clic
+  ouvre sur le message complet et ses pièces jointes. Le bouton « Rafraîchir
+  VASCO » est en haut de la liste ; le rattachement à un émetteur se gère au
+  seul endroit qui le faisait déjà, le menu ⋯ → Intégrations.
+- **Fin d'un doublon** : les pièces jointes d'un rapport étaient listées deux
+  fois (sous le rapport et dans l'onglet Documents). Elles ne vivent plus que
+  sous leur rapport.
+
+L'assistant IA suit la même règle : quand on lui demande les documents d'une
+société, il remonte désormais aussi ceux rattachés à ses deals.
+
+> **🔧 Notes techniques**
+>
+> - Fusion de `CompanyReportsSection` + `ReportingsSection` (supprimés) dans
+>   `src/components/companies/CompanyTimelineSection.tsx` : une liste d'entrées
+>   typées (`report` / `vasco` / `doc`) triée sur un `sortDate` unique
+>   (`periodSortDate ?? processedAt ?? emailDate` pour un report,
+>   `publishDate` parsé pour VASCO, `period ?? uploadedAt` pour un document).
+>   Les documents portant un `reportId` sont exclus des entrées et repliés dans
+>   la bulle de leur report. Les onglets (`ui/tabs`) disparaissent de
+>   `participations.$companyId.tsx`.
+> - `documents:listByCompany` ne filtre plus `dealId === undefined` et renvoie
+>   le `deal` (id, nom, instrument) de chaque ligne, résolu par un `db.get` par
+>   deal **distinct**. `listByDeal` et la fiche deal sont inchangés — le
+>   `dealId` est une étiquette, pas une seconde copie.
+>   `agentTools:listCompanyDocumentsInternal` suit la même règle et expose
+>   `dealId` (description de l'outil mise à jour).
+> - Une seule fenêtre d'ajout : `kind === 'reporting'` (et
+>   `company.kind === 'portfolio'`) route vers `reportInbox.createFromUpload`
+>   (pipeline complet, pas de titre/période demandés), sinon `documents.create`
+>   avec `dealId` facultatif. L'input de date est un `month` pour les types
+>   société, un `date` pour les types deal.
+> - `VascoCommunicationsSection.tsx` renommé `VascoCommunications.tsx` : la
+>   liste dépliée est remplacée par un hook `useVascoCommunications` (cache
+>   réactif + bootstrap au 1er affichage) et un `VascoCommunicationDialog` ; le
+>   rendu des bulles vit dans la timeline. `VascoLinkDialog` inchangé.
+> - `DocumentAttachment` prend un `extraBadge` optionnel (le badge deal) ; i18n
+>   regroupée sous `participations:timeline.*` (les blocs `tabs` et
+>   `reportings` sont supprimés, `dealDocuments` reste à la fiche deal).
+
+---
+
 ## v1.170.1 — 03/08/2026 à 15:28 — Un fichier Excel est enfin lu en entier, tous ses onglets compris
 
 Jusqu'ici, un classeur Excel un peu fourni ne livrait qu'une partie de son

@@ -516,40 +516,6 @@
     "dialogDescription": "Coche les KPIs à suivre en série. Le récap de chaque report indiquera ceux qui manquent.",
     "saved": "Fiche KPI enregistrée"
   },
-  "reportings": {
-    "title": "Reporting",
-    "upload": "Ajouter un document",
-    "uploading": "Envoi…",
-    "empty": "Aucun document. Les investor updates, BP et docs juridiques vivent ici.",
-    "added_one": "Document ajouté",
-    "added_other": "{{count}} documents ajoutés",
-    "deleted": "Document supprimé",
-    "deleteConfirmTitle": "Supprimer ce document ?",
-    "deleteConfirmBody": "Le fichier sera définitivement supprimé.",
-    "dialogTitle_one": "Nouveau document",
-    "dialogTitle_other": "{{count}} nouveaux documents",
-    "titleLabel_one": "Titre",
-    "titleLabel_other": "Titres",
-    "kindLabel": "Type",
-    "periodLabel": "Période couverte (optionnel)",
-    "kind": {
-      "reporting": "Reporting",
-      "bp": "Business plan",
-      "legal": "Juridique",
-      "other": "Autre"
-    },
-    "errors": {
-      "too_large": "Le fichier dépasse 20 Mo",
-      "default": "Une erreur est survenue"
-    },
-    "updated": "Document modifié",
-    "editDialogTitle": "Modifier le document",
-    "addedOn": "Ajouté le {{date}}",
-    "filter": {
-      "label": "Type :",
-      "all": "tous"
-    }
-  },
   "dealDocuments": {
     "title": "Documents",
     "upload": "Ajouter un doc",
@@ -584,10 +550,6 @@
       "label": "Type :",
       "all": "tous"
     }
-  },
-  "tabs": {
-    "documents": "Documents",
-    "reports": "Reports"
   },
   "reports": {
     "title": "Reports investisseur",
@@ -631,19 +593,6 @@
       "viewDocs": "Voir les docs"
     },
     "add": {
-      "action": "Ajouter un report",
-      "dialogTitle": "Ajouter un report",
-      "description": "Le fichier est analysé comme un report reçu par email : période, points clés et métriques sont extraits automatiquement.",
-      "pick": "Choisir des fichiers",
-      "noteLabel": "Note (optionnel)",
-      "notePlaceholder": "Contexte utile à l'analyse : message d'accompagnement, précisions…",
-      "submit": "Analyser",
-      "uploading": "Envoi…",
-      "queued": "Report envoyé — l'analyse est en cours.",
-      "errors": {
-        "too_large": "Fichier trop lourd (20 Mo maximum).",
-        "default": "L'envoi a échoué. Réessaie."
-      },
       "progress": {
         "running": "· analyse en cours…",
         "failed": "· analyse échouée ({{reason}})"
@@ -756,5 +705,70 @@
   "documentAttachment": {
     "open": "Ouvrir « {{title}} »",
     "edit": "Modifier"
+  },
+  "timeline": {
+    "title": "Documents & rapports",
+    "empty": "Rien pour l'instant. Les rapports reçus, les communications et les documents déposés apparaîtront ici, du plus récent au plus ancien.",
+    "addedOn": "Ajouté le {{date}}",
+    "uploading": "Envoi…",
+    "queued": "Report envoyé — l'analyse est en cours.",
+    "added_one": "Document ajouté",
+    "added_other": "{{count}} documents ajoutés",
+    "updated": "Document modifié",
+    "deleted": "Document supprimé",
+    "editTitle": "Modifier le document",
+    "deleteConfirmTitle": "Supprimer ce document ?",
+    "deleteConfirmBody": "Le fichier sera définitivement supprimé.",
+    "refreshVasco": "Rafraîchir VASCO",
+    "files_one": "1 fichier",
+    "files_other": "{{count}} fichiers",
+    "openReport": "Ouvrir le rapport « {{title}} »",
+    "openCommunication": "Ouvrir la communication « {{title}} »",
+    "dealBadge": "Deal · {{deal}}",
+    "dealLabel": "Rattacher à un deal (optionnel)",
+    "dealNone": "Aucun — document de l'entité",
+    "kindLabel": "Type",
+    "titleLabel_one": "Titre",
+    "titleLabel_other": "Titres",
+    "periodLabel": "Période couverte (optionnel)",
+    "dateLabel": "Date du document (optionnel)",
+    "badge": {
+      "report": "Rapport",
+      "vasco": "VASCO"
+    },
+    "group": {
+      "communications": "Communications",
+      "documents": "Documents",
+      "company": "Documents société",
+      "deal": "Documents de deal"
+    },
+    "kind": {
+      "reporting": "Reporting",
+      "bp": "Business plan",
+      "legal": "Juridique",
+      "other": "Autre",
+      "term_sheet": "Term sheet",
+      "pacte": "Pacte / statuts",
+      "subscription": "Bulletin de souscription",
+      "attestation": "Attestation / KBIS"
+    },
+    "filter": {
+      "label": "Type :",
+      "all": "tous"
+    },
+    "add": {
+      "action": "Ajouter",
+      "title": "Ajouter un document",
+      "pick": "Choisir des fichiers",
+      "analysisHint": "Un reporting est analysé automatiquement : période, points clés et métriques sont extraits, et la synthèse de la société est relancée. Titre et période sont donnés par l'analyse.",
+      "noteLabel": "Note (optionnel)",
+      "notePlaceholder": "Contexte utile à l'analyse : message d'accompagnement, précisions…",
+      "submit": "Ajouter",
+      "submitAnalyse": "Analyser et ajouter"
+    },
+    "errors": {
+      "too_large": "Le fichier dépasse 20 Mo",
+      "default": "Une erreur est survenue"
+    }
   }
 }

@@ -2,19 +2,19 @@
   "communications": {
     "title": "Investor communications",
     "refresh": "Refresh",
-    "loading": "Loading communications…",
     "error": "Couldn't load the communications.",
     "refreshError": "Couldn't refresh from the portal.",
-    "empty": "No communication for this deal yet.",
     "publishedOn": "Published {{date}}",
     "download": "Download",
     "downloadError": "Document download failed.",
     "documents_one": "{{count}} document",
-    "documents_other": "{{count}} documents"
+    "documents_other": "{{count}} documents",
+    "untitled": "Untitled communication",
+    "attachments": "Attachments",
+    "attachmentsHint": "Attachments are downloaded from the VASCO portal on demand: they are not stored in Albo OS."
   },
   "link": {
     "linkedTo": "Linked to {{label}}",
-    "change": "Change link",
     "unlink": "Unlink",
     "unlinking": "Unlinking…",
     "dialogTitle": "Link this entity to a portal deal",

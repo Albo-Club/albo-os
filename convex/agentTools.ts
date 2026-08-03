@@ -758,11 +758,10 @@ export const listCompanyDocumentsInternal = internalQuery({
       .order('desc')
       .take(50)
 
-    // Deal documents belong to their deal sheet, not to the company (same
-    // rule as documents:listByCompany).
-    const visible = rows.filter((doc) => doc.dealId === undefined)
-
-    return visible.map((doc) => ({
+    // Deal documents belong to the entity too — a pacte binds the company, not
+    // just the deal that produced it. Same rule as documents:listByCompany, so
+    // the assistant and the fiche answer the same question the same way.
+    return rows.map((doc) => ({
       _id: doc._id,
       title: doc.title,
       kind: doc.kind,
@@ -771,6 +770,8 @@ export const listCompanyDocumentsInternal = internalQuery({
       size: doc.size ?? null,
       source: doc.source,
       uploadedAt: doc.uploadedAt,
+      // Set on a document filed under one of the company's deals.
+      dealId: doc.dealId ?? null,
       // Set when the file arrived as a report attachment: chains into
       // getCompanyReport for the analysed content.
       reportId: doc.reportId ?? null,
@@ -842,9 +843,10 @@ const listCompanyDocuments = createTool({
   description:
     'List document metadata (investor updates, business plans, legal docs) ' +
     'attached to a company of the current org. Returns title, kind ' +
-    '(reporting/bp/legal/other), period (ms epoch), contentType, size, ' +
-    'source and uploadedAt. Documents filed on a specific deal (term sheet, ' +
-    'pacte…) are NOT included — they live on their deal sheet. Does NOT ' +
+    '(reporting/bp/legal/other/term_sheet/pacte/subscription/attestation), ' +
+    'period (ms epoch), contentType, size, source, uploadedAt and dealId. ' +
+    'Documents filed on one of the company deals (term sheet, pacte…) ARE ' +
+    'included, with their dealId set — they bind the entity too. Does NOT ' +
     'return download URLs — to download, use the app UI. Use listCompanies ' +
     'to resolve the companyId first.',
   inputSchema: z.object({

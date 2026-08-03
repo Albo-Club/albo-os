@@ -843,10 +843,12 @@ export default defineSchema({
    * ingestion (V2) — V1 = manual upload.
    *
    * A row with `dealId` set is a DEAL document (term sheet, pacte,
-   * subscription form…): it belongs to that single deal and is deliberately
-   * hidden from the company's Documents tab — cf. `documents:listByCompany`.
-   * `companyId` stays filled (the deal's target) so the org scoping and the
-   * `by_company` index keep working for both kinds.
+   * subscription form…). It shows on BOTH surfaces: the deal sheet lists its
+   * own (`by_deal`), and the company timeline lists everything filed under the
+   * entity, deal documents included — a pacte binds the legal entity, so
+   * hiding it from the entity would be the trap. One row, two views: `dealId`
+   * is a label, never a second copy. `companyId` stays filled (the deal's
+   * target) so the org scoping and the `by_company` index work for both kinds.
    */
   documents: defineTable({
     orgId: v.id('organizations'),
