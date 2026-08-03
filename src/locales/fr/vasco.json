@@ -2,19 +2,19 @@
   "communications": {
     "title": "Communications investisseurs",
     "refresh": "Rafraîchir",
-    "loading": "Chargement des communications…",
     "error": "Impossible de charger les communications.",
     "refreshError": "Impossible de rafraîchir depuis le portail.",
-    "empty": "Aucune communication pour ce deal pour l'instant.",
     "publishedOn": "Publié le {{date}}",
     "download": "Télécharger",
     "downloadError": "Échec du téléchargement du document.",
     "documents_one": "{{count}} document",
-    "documents_other": "{{count}} documents"
+    "documents_other": "{{count}} documents",
+    "untitled": "Communication sans titre",
+    "attachments": "Pièces jointes",
+    "attachmentsHint": "Les pièces jointes sont téléchargées depuis le portail VASCO à la demande : elles ne sont pas stockées dans Albo OS."
   },
   "link": {
     "linkedTo": "Rattaché à {{label}}",
-    "change": "Modifier le rattachement",
     "unlink": "Détacher",
     "unlinking": "Détachement…",
     "dialogTitle": "Rattacher cette entité à un deal du portail",

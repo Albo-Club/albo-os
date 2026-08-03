@@ -6,7 +6,7 @@ import { Link2, Unlink } from 'lucide-react'
 
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
-import { VascoLinkDialog } from '~/components/vasco/VascoCommunicationsSection'
+import { VascoLinkDialog } from '~/components/vasco/VascoCommunications'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,

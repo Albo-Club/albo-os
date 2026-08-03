@@ -87,30 +87,44 @@ La colonne principale, dans l'ordre de lecture :
   d'emblée **tous les champs de l'instrument** choisi (montant, dates dont
   le closing, tour, valorisations, titres acquis…) pour tout renseigner en
   une fois.
-- **Onglet Rapports** : les communications investisseurs — celles ingérées
-  automatiquement par email (investor updates analysés : highlights,
-  métriques, contenu) et celles remontées depuis Parallel/VASCO pour les SPV
-  (voir [Intégrations](15-integrations.md)). Le bouton **« Ajouter un
-  report »**, en haut à droite de l'onglet, permet de déposer soi-même un
-  report qui n'est pas arrivé par mail : il suit exactement le même
-  traitement (voir
-  [Reports par email](17-reports-par-email.md)).
-- **Onglet Documents** : upload manuel (reporting, BP, légal, autre — 20 Mo
-  max, avec période couverte). On peut **sélectionner plusieurs fichiers
-  d'un coup** : chacun garde son titre, pré-rempli par le nom du fichier et
-  modifiable, tandis que le type et la période choisis s'appliquent à tout
-  le lot. Chaque document se présente comme une
-  **pièce jointe** : une petite box qui porte l'icône de son format, son
-  titre, le badge de son type et, en dessous, sa période et son poids. Elles
-  s'empilent de la plus récente à la plus ancienne — pas de tableau ici, la
-  liste ne sert pas à comparer des chiffres mais à retrouver un fichier. Un
-  **clic sur la box ouvre le document**. À droite, l'état de sa **lecture**
-  (voir ci-dessous), un **crayon** pour corriger le titre, le type ou la
-  période, et une corbeille (avec confirmation). Un **filtre par type**, en
-  haut à gauche, ne propose que les types réellement présents. Les documents
-  propres à un investissement (term sheet, pacte, bulletin de
-  souscription…) ne se rangent pas ici mais sur la [fiche du deal
-  concerné](05-deals.md).
+- **Documents & rapports** : une **seule liste chronologique**, du plus
+  récent au plus ancien, où se mélangent tout ce qui concerne la société —
+  les rapports investisseurs analysés (reçus par mail ou déposés à la main),
+  les communications Parallel/VASCO des SPV (voir
+  [Intégrations](15-integrations.md)) et les documents déposés (reporting,
+  BP, juridique, autre) **y compris ceux rattachés à un deal** (term sheet,
+  pacte, bulletin de souscription, attestation). Un pacte engage l'entité
+  autant que le deal qui l'a produit : il est donc visible ici, avec le badge
+  du deal concerné qui renvoie vers sa [fiche](05-deals.md) — un seul
+  fichier, deux endroits où le retrouver, jamais deux copies.
+  - **Ce qui classe une ligne, c'est sa date** : la période couverte quand
+    elle existe (un reporting de janvier se range en janvier même s'il est
+    déposé en mars), la date de dépôt sinon — et la ligne dit toujours
+    laquelle des deux elle affiche.
+  - **Rapports et communications** se présentent en bulles : titre, résumé
+    d'une ligne, date, et le nombre de fichiers joints. Un clic ouvre le
+    détail (points clés, métriques, contenu intégral ; corps et pièces
+    jointes pour une communication VASCO). Les fichiers d'un rapport sont
+    **repliés dedans** — ils ne prennent pas de ligne à part.
+  - **Documents** : chacun se présente comme une **pièce jointe** — une
+    petite box qui porte l'icône de son format, son titre, le badge de son
+    type et, en dessous, sa date et son poids. Un **clic sur la box ouvre le
+    document**. À droite, l'état de sa **lecture** (voir ci-dessous), un
+    **crayon** pour corriger le titre, le type ou la date, et une corbeille
+    (avec confirmation).
+  - **Un filtre par type**, en haut, ne propose que ce qui est réellement
+    présent sur la fiche, groupé en communications (rapports, VASCO) et
+    documents. C'est lui qui sort un pacte au milieu de quarante rapports.
+- **Le bouton « Ajouter »** ouvre une seule fenêtre, et c'est le **type
+  choisi qui décide du traitement** : un **Reporting** part dans le circuit
+  d'analyse (période, points clés, métriques, synthèse relancée — voir
+  [Reports par email](17-reports-par-email.md)) et le bouton devient
+  « Analyser et ajouter » ; tout autre type est simplement déposé et lu pour
+  la recherche. On peut **sélectionner plusieurs fichiers d'un coup** :
+  chacun garde son titre, pré-rempli par le nom du fichier et modifiable,
+  tandis que le type et la date choisis s'appliquent à tout le lot. Un
+  document peut être rattaché à un **deal** au passage (facultatif) — sans
+  rattachement, il reste au niveau de l'entité. 20 Mo par fichier.
 
 Le panneau d'identité, à droite. Il se présente comme une carte, au même
 style que la synthèse IA, et chaque section y est introduite par une petite

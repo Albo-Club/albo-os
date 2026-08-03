@@ -4,8 +4,9 @@
  * `files:generateUploadUrl` (existing), then `documents:create` with the
  * storageId. Two ways in: manual upload here, and the report pipeline
  * (`source: 'email'`, rows created by `reportStore.ts`). A row hangs off a
- * company, or off one of its deals when `dealId` is set — the two lists are
- * disjoint (`listByCompany` excludes deal documents).
+ * company, and additionally off one of its deals when `dealId` is set — the
+ * company list is the superset (`listByCompany` returns deal documents too,
+ * carrying their deal, so a pacte is reachable from the entity that signed it).
  *
  * Both carry the same reading state (`ocrState`) so the front can tell,
  * per document, whether its text was read — the extracted text itself is
@@ -49,7 +50,12 @@ async function validateUpload(
   return { contentType: meta.contentType ?? undefined, size: meta.size }
 }
 
-/** A company's documents, most recent first, with download URL. */
+/**
+ * A company's documents, most recent first, with download URL. Deal documents
+ * are included: they belong to the legal entity as much as to the deal (a
+ * pacte binds the company), and each carries its `deal` so the timeline can
+ * label it and link back to the deal sheet.
+ */
 export const listByCompany = query({
   args: { companyId: v.id('companies') },
   handler: async (ctx, { companyId }) => {
@@ -63,10 +69,18 @@ export const listByCompany = query({
       .order('desc')
       .take(200)
 
-    // Hide inline email images (cid:) — they're analysis artefacts, not docs —
-    // and deal documents, which live on their deal sheet only.
-    const visible = rows.filter(
-      (doc) => doc.inline !== true && doc.dealId === undefined,
+    // Hide inline email images (cid:) — they're analysis artefacts, not docs.
+    const visible = rows.filter((doc) => doc.inline !== true)
+
+    // One read per DISTINCT deal, not per row: a deal usually carries several
+    // documents, and the label is the same for all of them.
+    const dealIds = [
+      ...new Set(visible.flatMap((doc) => (doc.dealId ? [doc.dealId] : []))),
+    ]
+    const dealsById = new Map(
+      (await Promise.all(dealIds.map((id) => ctx.db.get('deals', id))))
+        .filter((deal) => deal !== null)
+        .map((deal) => [deal._id, deal]),
     )
 
     return await Promise.all(
@@ -79,6 +93,19 @@ export const listByCompany = query({
         size: doc.size ?? null,
         source: doc.source,
         uploadedAt: doc.uploadedAt,
+        // The deal this document is filed under, when there is one — the
+        // timeline badges it and links to the deal sheet. `name` is the deal's
+        // custom name; the front falls back to the instrument label.
+        deal: (() => {
+          const deal = doc.dealId ? dealsById.get(doc.dealId) : undefined
+          return deal
+            ? {
+                _id: deal._id,
+                name: deal.name ?? null,
+                instrumentKind: deal.instrumentKind,
+              }
+            : null
+        })(),
         // Links an email-ingested attachment to its report (companyReports),
         // so the Reports timeline can surface a report's source docs.
         reportId: doc.reportId ?? null,

@@ -1,6 +1,7 @@
 import { FileSpreadsheet, FileText, Image, Pencil, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import type { ReactNode } from 'react'
 import type { Id } from '../../../convex/_generated/dataModel'
 import type {
   OcrState,
@@ -62,6 +63,7 @@ function FileGlyph({ contentType }: { contentType: string | null }) {
 export function DocumentAttachment({
   doc,
   kindLabel,
+  extraBadge,
   description,
   onEdit,
   onDelete,
@@ -69,6 +71,9 @@ export function DocumentAttachment({
 }: {
   doc: DocumentCard
   kindLabel: string
+  /** Rendered right after the kind badge — the company timeline puts the
+   *  document's deal there; the deal sheet has nothing to add. */
+  extraBadge?: ReactNode
   description: string
   onEdit: () => void
   onDelete: () => void
@@ -105,6 +110,7 @@ export function DocumentAttachment({
           <Badge variant="outline" className="shrink-0 font-normal">
             {kindLabel}
           </Badge>
+          {extraBadge}
         </div>
         <AttachmentDescription>{description}</AttachmentDescription>
       </AttachmentContent>

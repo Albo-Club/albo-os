@@ -3,14 +3,7 @@ import { useAction } from 'convex/react'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import {
-  Download,
-  FileText,
-  Link2,
-  Loader2,
-  RefreshCw,
-  Unlink,
-} from 'lucide-react'
+import { Download, Loader2, RefreshCw, Unlink } from 'lucide-react'
 
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
@@ -28,7 +21,7 @@ import {
 
 /** ISO datetime string → localized date (communications carry ISO strings, not
  * ms epochs, so we can't reuse the cents/ms formatters). */
-function useIsoDate() {
+export function useIsoDate() {
   const { i18n } = useTranslation()
   return (iso: string | null) => {
     if (!iso) return '—'
@@ -94,61 +87,83 @@ function DocumentButton({
   )
 }
 
-function CommunicationCard({
+/**
+ * One communication in full, opened from its bubble in the company timeline.
+ * Same shape as a report's detail dialog — only the content differs: the body
+ * as published, and the attachments, which are downloaded live from the portal
+ * (nothing is stored on our side, so there is no reading state to show).
+ */
+export function VascoCommunicationDialog({
   communication,
   orgId,
   clientSlug,
+  onClose,
 }: {
-  communication: VascoCommunication
+  communication: VascoCommunication | null
   orgId: Doc<'companies'>['orgId']
   clientSlug: string
+  onClose: () => void
 }) {
   const { t } = useTranslation('vasco')
   const fmtIso = useIsoDate()
 
   return (
-    <div className="space-y-2 rounded-lg border p-3">
-      <div className="flex items-start gap-3">
-        <div className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg">
-          <FileText className="size-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-medium">
-            {communication.title ?? t('communications.title')}
-          </p>
-          <p className="text-muted-foreground text-xs">
+    <Dialog
+      open={communication !== null}
+      onOpenChange={(open) => !open && onClose()}
+    >
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>
+            {communication?.title ?? t('communications.untitled')}
+          </DialogTitle>
+          <DialogDescription>
             {t('communications.publishedOn', {
-              date: fmtIso(communication.publishDate ?? communication.period),
+              date: fmtIso(
+                communication?.publishDate ?? communication?.period ?? null,
+              ),
             })}
-          </p>
-        </div>
-      </div>
+          </DialogDescription>
+        </DialogHeader>
 
-      {communication.bodyText && (
-        <p className="text-muted-foreground max-h-48 overflow-y-auto text-sm whitespace-pre-wrap">
-          {communication.bodyText}
-        </p>
-      )}
+        {communication && (
+          <div className="space-y-4 text-sm">
+            {communication.bodyText && (
+              <p className="text-muted-foreground whitespace-pre-wrap">
+                {communication.bodyText}
+              </p>
+            )}
 
-      {communication.documents.length > 0 && (
-        <div className="flex flex-wrap gap-2 pt-1">
-          {communication.documents.map((doc) => (
-            <DocumentButton
-              key={doc.documentId}
-              orgId={orgId}
-              clientSlug={clientSlug}
-              doc={doc}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+            {communication.documents.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-semibold">
+                  {t('communications.attachments')}
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {communication.documents.map((doc) => (
+                    <DocumentButton
+                      key={doc.documentId}
+                      orgId={orgId}
+                      clientSlug={clientSlug}
+                      doc={doc}
+                    />
+                  ))}
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  {t('communications.attachmentsHint')}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
 
 /** Shared "refresh now" trigger: pulls Parallel live and refreshes the org's
  * cache; the reactive read queries then update on their own. */
-function useVascoRefresh(orgId: Doc<'companies'>['orgId']) {
+export function useVascoRefresh(orgId: Doc<'companies'>['orgId']) {
   const { t } = useTranslation('vasco')
   const refreshNow = useAction(api.vasco.refreshVascoCacheNow)
   const [refreshing, setRefreshing] = useState(false)
@@ -165,24 +180,21 @@ function useVascoRefresh(orgId: Doc<'companies'>['orgId']) {
   return { refreshing, doRefresh }
 }
 
-/** Communications for a linked entity — read from the local cache (reactive,
- * instant). Kept fresh by a cron + the manual "refresh" button. On the first
- * ever view (empty cache) it pulls once to bootstrap. */
-function CommunicationsList({
-  company,
-  onChangeLink,
-}: {
-  company: Doc<'companies'>
-  onChangeLink: () => void
-}) {
-  const { t } = useTranslation('vasco')
+/**
+ * Communications of a linked entity, for the company timeline — read from the
+ * local cache (reactive, instant), kept fresh by a cron and by the "refresh"
+ * button the timeline renders. On the first ever view (empty cache) it pulls
+ * once to bootstrap. Returns nothing for an unlinked entity, which is what
+ * keeps VASCO invisible on the rest of the portfolio.
+ */
+export function useVascoCommunications(company: Doc<'companies'>) {
   const clientSlug = company.vascoClientSlug ?? ''
   const issuerId = company.vascoIssuerId ?? ''
-  const data = useConvexQuery(api.vasco.getCachedCommunications, {
-    orgId: company.orgId,
-    clientSlug,
-    issuerId,
-  })
+  const linked = Boolean(clientSlug && issuerId)
+  const data = useConvexQuery(
+    api.vasco.getCachedCommunications,
+    linked ? { orgId: company.orgId, clientSlug, issuerId } : 'skip',
+  )
   const { refreshing, doRefresh } = useVascoRefresh(company.orgId)
   const bootstrapped = useRef(false)
 
@@ -194,63 +206,19 @@ function CommunicationsList({
     }
   }, [data, doRefresh])
 
-  const items = data?.communications ?? []
-  const loading = data === undefined || (refreshing && items.length === 0)
-
-  return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold tracking-tight">
-          {t('communications.title')}
-        </h3>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => void doRefresh()}
-            disabled={refreshing}
-          >
-            <RefreshCw
-              className={refreshing ? 'size-4 animate-spin' : 'size-4'}
-            />
-            {t('communications.refresh')}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onChangeLink}>
-            <Link2 className="size-4" />
-            {t('link.change')}
-          </Button>
-        </div>
-      </div>
-
-      {loading && (
-        <div className="text-muted-foreground text-sm">
-          {t('communications.loading')}
-        </div>
-      )}
-      {!loading && items.length === 0 && (
-        <div className="text-muted-foreground rounded-xl border border-dashed p-6 text-center text-sm">
-          {t('communications.empty')}
-        </div>
-      )}
-      {items.length > 0 && (
-        <div className="space-y-2">
-          {items.map((c) => (
-            <CommunicationCard
-              key={c.communicationId}
-              communication={c}
-              orgId={company.orgId}
-              clientSlug={clientSlug}
-            />
-          ))}
-        </div>
-      )}
-    </section>
-  )
+  return {
+    linked,
+    clientSlug,
+    communications: data?.communications ?? [],
+    loading: linked && data === undefined,
+    refreshing,
+    doRefresh,
+  }
 }
 
 /** Pick a VASCO issuer (e.g. a Parallel SPV) to link this entity to, or
- * unlink it. Opened from the entity page's « Intégrations » dialog (menu ⋯)
- * and from the linked communications list ("change link"). */
+ * unlink it. Opened from the entity page's « Intégrations » dialog (menu ⋯) —
+ * the only place where the link is made or broken. */
 export function VascoLinkDialog({
   company,
   onClose,
@@ -407,31 +375,3 @@ export function VascoLinkDialog({
   )
 }
 
-/**
- * VASCO investor communications for an entity, in its Report section. Shown
- * ONLY on entities already linked to an issuer — linking (and unlinking)
- * lives in the entity page's « Intégrations » dialog (menu ⋯), so unlinked
- * entities carry zero VASCO noise here. All data is read from the reactive
- * cache; nothing is stored by this component.
- */
-export function VascoCommunicationsSection({
-  company,
-}: {
-  company: Doc<'companies'>
-}) {
-  const [linkOpen, setLinkOpen] = useState(false)
-  const isLinked = Boolean(company.vascoClientSlug && company.vascoIssuerId)
-  if (!isLinked) return null
-
-  return (
-    <div className="space-y-3">
-      <CommunicationsList
-        company={company}
-        onChangeLink={() => setLinkOpen(true)}
-      />
-      {linkOpen && (
-        <VascoLinkDialog company={company} onClose={() => setLinkOpen(false)} />
-      )}
-    </div>
-  )
-}

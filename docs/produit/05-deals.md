@@ -90,10 +90,11 @@ visible pendant qu'on fait défiler la page.
   autre deal.
 - **Documents** : les pièces propres à **ce deal** — term sheet, pacte ou
   statuts, bulletin de souscription, attestation ou KBIS, et « autre » pour
-  le reste. À distinguer des documents de la **société**, qui vivent sur sa
-  fiche (reportings, business plan, juridique) : un document déposé ici
-  n'apparaît **que** sur le deal, jamais dans l'onglet Documents de la
-  société. On dépose un fichier (**20 Mo maximum**) en lui donnant un titre,
+  le reste. Cette liste ne montre que les documents **de ce deal**, mais ils
+  apparaissent aussi dans la liste « Documents & rapports » de la
+  [société](04-participations.md), avec le badge du deal : un pacte engage
+  l'entité autant que le deal qui l'a produit, et il n'y a jamais qu'un seul
+  fichier stocké. On dépose un fichier (**20 Mo maximum**) en lui donnant un titre,
   un type et, si utile, la **date du document** (signature par exemple) —
   cette date est facultative. **Plusieurs fichiers peuvent être déposés en
   une fois** : chacun garde son titre, le type et la date s'appliquant à
