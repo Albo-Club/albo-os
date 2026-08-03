@@ -197,6 +197,10 @@
       "reportIssues": {
         "label": "Problèmes de reports",
         "help": "Les emails de la file Rapports entrants : quarantaine, échec de traitement, suite donnée à un mail assigné à la main. Décide aussi de ce que tu reçois pour les reports que tu transfères toi-même : coché, tu as le récapitulatif détaillé ou la cause de l'échec ; décoché, tu reçois « Report bien reçu », le même message dans les deux cas."
+      },
+      "weeklyReports": {
+        "label": "Reports de la semaine",
+        "help": "Le nombre de reports rangés sur tes participations, repris dans le point hebdo du lundi. Un report d'une société détenue par deux organisations compte dans chacune. Coupé, cette ligne disparaît du mail — et si c'est la seule chose à dire cette semaine-là, tu ne reçois pas de mail du tout."
       }
     }
   }

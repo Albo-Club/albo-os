@@ -23,6 +23,41 @@ bas de page.
 
 ---
 
+## v1.169.0 — 03/08/2026 à 12:48 — Le point du lundi compte les reports de la semaine
+
+Le mail du lundi matin gagne une ligne par organisation : **le nombre de
+reports rangés dans la semaine écoulée**. De quoi voir d'un coup d'œil que le
+circuit tourne, sans recevoir un mail à chaque report qui arrive.
+
+Comme les autres blocs, il se coupe depuis **Réglages → Membres**, case
+« Reports de la semaine ». Et comme les autres, il suffit à lui seul à
+déclencher le mail : une semaine sans alerte de trésorerie ni échéance en
+retard mais avec trois reports rangés vous enverra quand même le point hebdo.
+Qui coupe les trois cases ne reçoit toujours rien.
+
+Une précision de lecture : une société détenue par Calte **et** Albo range son
+report dans chacune. Un seul mail transféré compte donc 1 dans les deux
+sections. Chaque ligne est juste dans son organisation, mais les deux ne
+s'additionnent pas.
+
+> **🔧 Notes techniques**
+>
+> - Sixième drapeau `notifyWeeklyReports` sur `userPrefs` (opt-out, comme les
+>   cinq autres) + sixième colonne dans la matrice. **Tout nouveau bloc du
+>   digest doit avoir le sien** : sans ça il ré-arme le mail du lundi chez
+>   quelqu'un qui avait tout coupé — c'est la règle que `sectionsFor` fait
+>   respecter, tests à l'appui.
+> - Comptage dans `sendWeeklyDigest` : lecture de `companyReports` par l'index
+>   `by_org` en `order('desc')`, arrêt dès qu'une ligne sort de la fenêtre —
+>   seules les lignes de la semaine sont touchées. `DIGEST_WINDOW_MS` vaut une
+>   période de cron ; déplacer le cron sans le suivre créerait un trou ou un
+>   recouvrement.
+> - Le compteur reflète ce qui est **en base**, pas ce qui a été envoyé : un
+>   mail en quarantaine ou en échec n'y figure pas tant qu'il n'a pas été
+>   repris depuis la file.
+
+---
+
 ## v1.168.0 — 03/08/2026 à 11:51 — Transférer un report sans jamais recevoir d'erreur
 
 Depuis la mise à jour précédente, on peut confier à quelqu'un le seul rôle de

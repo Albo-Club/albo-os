@@ -1365,6 +1365,11 @@ export const setCashAlert = mutation({
 // yesterday's rent.
 const OVERDUE_GRACE_MS = DAY_MS
 
+// Lookback of the "reports filed" count — one cron period, so consecutive
+// digests neither overlap nor leave a gap. Move the cron and this must move
+// with it (it is the only place where the two are coupled).
+const DIGEST_WINDOW_MS = 7 * DAY_MS
+
 /**
  * The Monday digest (cron, 07:00 UTC — convex/crons.ts, no auth like
  * captureSnapshots). Replaces the two former daily alert crons: cash
@@ -1437,7 +1442,20 @@ export const sendWeeklyDigest = internalMutation({
           amountCents: e.amountCents,
         }))
 
-      if (!cash && entries.length === 0) continue
+      // Reports filed on this org's companies since last Monday. The index
+      // is ordered by creation time within an org, so reading newest-first
+      // and stopping at the cutoff touches only the week's rows.
+      const filedSince = now - DIGEST_WINDOW_MS
+      let reportsCount = 0
+      for await (const report of ctx.db
+        .query('companyReports')
+        .withIndex('by_org', (q) => q.eq('orgId', org._id))
+        .order('desc')) {
+        if (report._creationTime < filedSince) break
+        reportsCount += 1
+      }
+
+      if (!cash && entries.length === 0 && reportsCount === 0) continue
       findings.set(org._id, {
         orgName: org.name,
         cash,
@@ -1448,6 +1466,7 @@ export const sendWeeklyDigest = internalMutation({
                 forecastUrl: `${siteUrl}/app/${org.slug}/cash?filter=unmatched`,
               }
             : null,
+        reports: reportsCount > 0 ? { count: reportsCount } : null,
       })
     }
 

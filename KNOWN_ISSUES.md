@@ -1948,6 +1948,20 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   (`OVERDUE_GRACE_MS`) : la banque synchronise en ~24 h et le
   rapprochement est un geste manuel, donc pas de rappel sur le loyer
   d'hier. C'est le seul délai qui subsiste dans le digest.
+- **Compteur de reports du point hebdo : additionnable dans une org, pas
+  entre orgs.** Le bloc compte les `companyReports` créés dans les 7 jours
+  via l'index `by_org`, en lisant du plus récent au plus ancien et en
+  s'arrêtant au seuil (seules les lignes de la semaine sont touchées). Le
+  piège est le **fan-out multi-org** : une société détenue par Calte *et*
+  Albo range un report dans chacune, donc un seul mail transféré compte 1
+  dans les deux sections. Chaque ligne est juste dans son org ; le total du
+  sujet, lui, peut dépasser le nombre de mails réellement transférés — c'est
+  assumé, un sujet est une accroche, pas un registre. Ne pas « corriger »
+  en dédupliquant sur `agentmailMessageId` : ça casserait la lecture
+  par-org, qui est celle qui compte. Enfin, `DIGEST_WINDOW_MS` vaut une
+  période de cron : déplacer le cron sans le suivre créerait un trou ou un
+  recouvrement dans le comptage — c'est le seul endroit où les deux sont
+  couplés.
 - **Qui reçoit quoi : opt-out par personne, global, dans `userPrefs`.**
   Les cinq drapeaux `notify*` (`convex/lib/notificationPrefs.ts`) sont des
   **opt-out** — absent = abonné. D'où : aucun backfill à la création d'un
@@ -1959,7 +1973,9 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   aussi côté org B. Accepté à 3 users ; à revoir si le périmètre s'élargit.
   Tout nouvel envoi d'email récurrent doit passer par `wantsAlert` /
   `readAlertPrefs` — sinon il devient le seul mail qu'on ne peut pas
-  couper.
+  couper. Même règle pour tout **nouveau bloc du point hebdo** : il lui
+  faut son propre drapeau, sinon il ré-arme le mail du lundi chez quelqu'un
+  qui avait tout coupé.
 - **Échéance TVA suggérée : `derivedKey` "vat:{orgId}:{YYYY-Qn}", sans
   `ruleId`.** L'idempotence passe par la clé (créée une fois par trimestre,
   quelle que soit sa vie ensuite : réalisée, annulée, éditée — la

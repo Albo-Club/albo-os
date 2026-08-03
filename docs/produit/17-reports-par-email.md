@@ -104,7 +104,9 @@ qu'elle contient dépend de son rôle, réglé dans
 Les autres personnes qui gèrent la file sont prévenues **uniquement quand
 il y a un problème**, par un email séparé. Un report qui se range
 correctement ne génère aucune notification pour qui ne l'a pas transféré :
-pas de bruit pour une chaîne qui marche.
+pas de bruit pour une chaîne qui marche. Le volume, lui, se lit dans le
+**point hebdo du lundi**, qui compte les reports rangés dans la semaine
+(voir [Prévisionnel](09-previsionnel.md)).
 
 C'est ce qui permet de confier le transfert des reports à quelqu'un sans
 jamais lui envoyer les erreurs — il reçoit toujours le même accusé de

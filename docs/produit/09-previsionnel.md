@@ -99,13 +99,15 @@ parce que le pointage a été fait avant le rapprochement.
   de règles récurrentes comprises), avec confirmation : elle sort du solde
   projeté.
 - **Le point hebdo du lundi matin** : un seul email, une section par
-  organisation, qui rassemble les seuils de trésorerie franchis et les
+  organisation, qui rassemble les seuils de trésorerie franchis, les
   échéances en retard (celles dépassées de plus d'un jour sans avoir été
-  rapprochées), avec les liens pour aller les traiter. Rien à signaler =
-  pas d'email. Chacun choisit les deux morceaux qu'il veut y voir depuis
-  **Réglages → Membres** ; qui coupe les deux ne reçoit plus le point
+  rapprochées) et le **nombre de reports rangés dans la semaine**, avec les
+  liens pour aller traiter ce qui doit l'être. Rien à signaler = pas
+  d'email. Chacun choisit les trois morceaux qu'il veut y voir depuis
+  **Réglages → Membres** ; qui coupe les trois ne reçoit plus le point
   hebdo du tout. Voir
-  [Organisations, membres et invitations](14-organisations-membres-invitations.md).
+  [Organisations, membres et invitations](14-organisations-membres-invitations.md)
+  et [Reports par email](17-reports-par-email.md).
 
 ## Points d'attention
 

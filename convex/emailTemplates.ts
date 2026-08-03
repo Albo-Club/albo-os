@@ -621,6 +621,12 @@ export type DigestSection = {
     entries: Array<DigestOverdueEntry>
     forecastUrl: string
   } | null
+  /**
+   * Reports filed on this org's companies over the past week. Null when
+   * there were none, or when the reader muted the block — an org with
+   * nothing to say drops out of the digest entirely.
+   */
+  reports: { count: number } | null
 }
 
 /**
@@ -668,6 +674,12 @@ export function weeklyDigestEmail({
         `${n} cash ${n === 1 ? 'threshold' : 'thresholds'} breached`,
       overdueSubject: (n: number) =>
         `${n} overdue ${n === 1 ? 'entry' : 'entries'}`,
+      reportsLine: (n: number) =>
+        `<strong>${n}</strong> ${n === 1 ? 'report' : 'reports'} filed this week.`,
+      reportsText: (n: number) =>
+        `${n} ${n === 1 ? 'report' : 'reports'} filed this week.`,
+      reportsSubject: (n: number) =>
+        `${n} ${n === 1 ? 'report' : 'reports'} filed`,
       subjectPrefix: 'Weekly digest',
       footer: `You receive this every Monday for the organisations you belong to. Choose which alerts reach you in Settings → Members.`,
     },
@@ -684,6 +696,12 @@ export function weeklyDigestEmail({
       more: (n: number) => `+ ${n} autre(s)`,
       cashSubject: (n: number) => `${n} seuil(s) de trésorerie franchi(s)`,
       overdueSubject: (n: number) => `${n} échéance(s) en retard`,
+      reportsLine: (n: number) =>
+        `<strong>${n}</strong> report${n === 1 ? '' : 's'} rangé${n === 1 ? '' : 's'} cette semaine.`,
+      reportsText: (n: number) =>
+        `${n} report${n === 1 ? '' : 's'} rangé${n === 1 ? '' : 's'} cette semaine.`,
+      reportsSubject: (n: number) =>
+        `${n} report${n === 1 ? '' : 's'} rangé${n === 1 ? '' : 's'}`,
       subjectPrefix: 'Point hebdo',
       footer: `Vous recevez ce mail chaque lundi pour les organisations dont vous êtes membre. Choisissez les alertes qui vous parviennent dans Réglages → Membres.`,
     },
@@ -694,9 +712,17 @@ export function weeklyDigestEmail({
     (sum, s) => sum + (s.overdue?.entries.length ?? 0),
     0,
   )
+  // Summed across orgs on purpose: the subject is a headline, not a ledger.
+  // A company held by two orgs files one report in each, so this total can
+  // exceed the number of emails forwarded (cf. KNOWN_ISSUES).
+  const reportsCount = sections.reduce(
+    (sum, s) => sum + (s.reports?.count ?? 0),
+    0,
+  )
   const summary = [
     cashCount > 0 ? c.cashSubject(cashCount) : null,
     overdueCount > 0 ? c.overdueSubject(overdueCount) : null,
+    reportsCount > 0 ? c.reportsSubject(reportsCount) : null,
   ]
     .filter(Boolean)
     .join(', ')
@@ -709,6 +735,11 @@ export function weeklyDigestEmail({
       blocks.push(
         `<p style="margin:0 0 12px;">${c.cashLine(s.cash)}<br>` +
           `<a href="${s.cash.cashUrl}" style="color:${BRAND};">${c.cashCta}</a></p>`,
+      )
+    }
+    if (s.reports) {
+      blocks.push(
+        `<p style="margin:0 0 12px;">${c.reportsLine(s.reports.count)}</p>`,
       )
     }
     if (s.overdue) {
@@ -733,6 +764,7 @@ export function weeklyDigestEmail({
   const text = sections.flatMap((s) => {
     const parts = [s.orgName.toUpperCase()]
     if (s.cash) parts.push(`${c.cashText(s.cash)}\n${s.cash.cashUrl}`)
+    if (s.reports) parts.push(c.reportsText(s.reports.count))
     if (s.overdue) {
       parts.push(
         `${c.overdueLine(s.overdue.entries.length)}\n` +
