@@ -23,6 +23,49 @@ bas de page.
 
 ---
 
+## v1.168.0 — 03/08/2026 à 11:37 — Déposer plusieurs documents en une fois
+
+Ajouter des documents se faisait un par un : choisir le fichier, remplir le
+titre, le type, la date, enregistrer — puis tout recommencer pour le
+suivant. Avec les cinq pièces d'une assemblée générale ou le lot de
+documents d'un closing, la corvée était réelle.
+
+La fenêtre de sélection accepte désormais **plusieurs fichiers d'un coup**,
+sur l'onglet Documents d'une société comme sur le bloc Documents d'une fiche
+deal. La modale liste alors **un titre par fichier**, pré-rempli par le nom
+du fichier et modifiable ligne par ligne, pendant que le **type** et la
+**période** (ou la date, côté deal) se choisissent **une seule fois** et
+s'appliquent à tout le lot — c'est presque toujours ce qu'on veut quand on
+dépose des pièces qui vont ensemble. Un seul fichier sélectionné : l'écran
+est exactement celui d'avant.
+
+Deux garde-fous inchangés : la limite de **20 Mo par fichier** reste, et si
+un fichier trop lourd se glisse dans la sélection, le lot entier est refusé
+avant tout envoi plutôt que d'en perdre un en silence. Chaque document part
+ensuite en lecture automatique comme aujourd'hui.
+
+> **🔧 Notes techniques**
+>
+> - `ReportingsSection.tsx` et `DealDocumentsSection.tsx` : l'état
+>   `pendingFile: File | null` devient `pendingFiles: Array<File>` avec un
+>   tableau `titles` parallèle, qui porte aussi le titre unique en mode
+>   édition — un seul chemin de code pour les deux cas. `<input multiple>`,
+>   et `handlePick` reçoit désormais le tableau complet.
+> - `handleSave` boucle en série sur les fichiers (upload
+>   `files:generateUploadUrl` puis `documents:create` par fichier). Un échec
+>   interrompt le lot : les documents déjà créés restent, la liste étant
+>   réactive. Aucun changement backend — `documents:create` prend toujours
+>   un `storageId` à la fois.
+> - Même idiome que `AddReportDialog` (`CompanyReportsSection.tsx`), y
+>   compris le rejet du lot entier si un fichier dépasse `MAX_BYTES`.
+> - Les deux `DialogContent` passent en `max-h-[85vh] overflow-y-auto`
+>   (règle CLAUDE.md sur les modales à contenu extensible).
+> - i18n : `dialogTitle`, `added` et `titleLabel` passent au pluriel
+>   (`_one` / `_other`) dans les namespaces `reportings.*` et
+>   `dealDocuments.*`, EN et FR.
+
+---
+
 ## v1.167.0 — 03/08/2026 à 10:42 — Vous choisissez qui reçoit quels emails, et les alertes du matin deviennent un point hebdo
 
 Jusqu'ici, les emails de l'application partaient à tout le monde, sans

@@ -83,11 +83,13 @@ export function DealDocumentsSection({
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [kindFilter, setKindFilter] = useState<string>('all')
-  // Exactly one of the two is set while the metadata dialog is open: a picked
-  // file (creation) or the id of the document being edited.
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  // Exactly one of the two is set while the metadata dialog is open: the
+  // picked files (creation, one or many) or the id of the document being
+  // edited. `titles` is parallel to `pendingFiles`, and holds the single
+  // title when editing — one code path for both.
+  const [pendingFiles, setPendingFiles] = useState<Array<File>>([])
   const [editingId, setEditingId] = useState<Id<'documents'> | null>(null)
-  const [title, setTitle] = useState('')
+  const [titles, setTitles] = useState<Array<string>>([])
   const [kind, setKind] = useState<string>('term_sheet')
   const [docDate, setDocDate] = useState('') // "YYYY-MM-DD"
   const [saving, setSaving] = useState(false)
@@ -114,31 +116,33 @@ export function DealDocumentsSection({
     (doc) => activeFilter === 'all' || doc.kind === activeFilter,
   )
 
-  function handlePick(file: File) {
-    if (file.size > MAX_BYTES) {
+  /** Whole selection or nothing: an oversized file in the batch rejects the
+   * pick, so the user re-picks knowingly rather than silently losing one. */
+  function handlePick(files: Array<File>) {
+    if (files.some((file) => file.size > MAX_BYTES)) {
       toast.error(t('participations:dealDocuments.errors.too_large'))
       return
     }
-    setPendingFile(file)
-    setTitle(file.name.replace(/\.[^.]+$/, ''))
+    setPendingFiles(files)
+    setTitles(files.map((file) => file.name.replace(/\.[^.]+$/, '')))
     setKind('term_sheet')
     setDocDate('')
   }
 
   function handleEdit(doc: DealDoc) {
     setEditingId(doc._id)
-    setTitle(doc.title)
+    setTitles([doc.title])
     setKind(doc.kind)
     setDocDate(doc.period ? toDateInput(doc.period) : '')
   }
 
   function closeForm() {
-    setPendingFile(null)
+    setPendingFiles([])
     setEditingId(null)
   }
 
   async function handleSave() {
-    if (!title.trim()) return
+    if (titles.some((value) => !value.trim())) return
     setSaving(true)
     try {
       // "YYYY-MM-DD" → midnight UTC (dates are stored as ms epoch, UTC).
@@ -154,7 +158,7 @@ export function DealDocumentsSection({
       if (editingId) {
         await updateDocument({
           documentId: editingId,
-          title,
+          title: titles[0],
           kind: kind as DealDocKind,
           period,
         })
@@ -163,29 +167,38 @@ export function DealDocumentsSection({
         return
       }
 
-      if (!pendingFile || !companyId) return
-      const url = await generateUploadUrl({})
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': pendingFile.type || 'application/octet-stream',
-        },
-        body: pendingFile,
-      })
-      if (!res.ok) {
-        toast.error(t('participations:dealDocuments.errors.default'))
-        return
+      if (pendingFiles.length === 0 || !companyId) return
+      // One upload + one create per file, in series. A failure stops the
+      // batch: the documents already created stay (the list refreshes on
+      // its own), the rest never left the browser.
+      for (const [index, file] of pendingFiles.entries()) {
+        const url = await generateUploadUrl({})
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': file.type || 'application/octet-stream',
+          },
+          body: file,
+        })
+        if (!res.ok) {
+          toast.error(t('participations:dealDocuments.errors.default'))
+          return
+        }
+        const { storageId } = (await res.json()) as {
+          storageId: Id<'_storage'>
+        }
+        await createDocument({
+          companyId,
+          dealId,
+          title: titles[index],
+          kind: kind as DealDocKind,
+          period,
+          storageId,
+        })
       }
-      const { storageId } = (await res.json()) as { storageId: Id<'_storage'> }
-      await createDocument({
-        companyId,
-        dealId,
-        title,
-        kind: kind as DealDocKind,
-        period,
-        storageId,
-      })
-      toast.success(t('participations:dealDocuments.added'))
+      toast.success(
+        t('participations:dealDocuments.added', { count: pendingFiles.length }),
+      )
       closeForm()
     } catch (err) {
       const code = err instanceof ConvexError ? (err.data as string) : ''
@@ -251,11 +264,12 @@ export function DealDocumentsSection({
       <input
         ref={fileInputRef}
         type="file"
+        multiple
         className="hidden"
         onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (file) handlePick(file)
+          const picked = [...(e.target.files ?? [])]
           e.target.value = ''
+          if (picked.length > 0) handlePick(picked)
         }}
       />
 
@@ -290,27 +304,48 @@ export function DealDocumentsSection({
 
       {/* Metadata dialog: after a file is picked, or on the edit pencil */}
       <Dialog
-        open={pendingFile !== null || editingId !== null}
+        open={pendingFiles.length > 0 || editingId !== null}
         onOpenChange={(open) => !open && closeForm()}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
               {editingId
                 ? t('participations:dealDocuments.editDialogTitle')
-                : t('participations:dealDocuments.dialogTitle')}
+                : t('participations:dealDocuments.dialogTitle', {
+                    count: pendingFiles.length,
+                  })}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="deal-doc-title">
-                {t('participations:dealDocuments.titleLabel')}
+                {t('participations:dealDocuments.titleLabel', {
+                  count: titles.length,
+                })}
               </Label>
-              <Input
-                id="deal-doc-title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
+              {titles.map((value, index) => (
+                <div key={index} className="space-y-1">
+                  {/* The file name only earns its place when several titles
+                      are stacked and one input no longer says which is which. */}
+                  {pendingFiles.length > 1 && (
+                    <p className="text-muted-foreground truncate text-xs">
+                      {pendingFiles[index].name}
+                    </p>
+                  )}
+                  <Input
+                    id={index === 0 ? 'deal-doc-title' : undefined}
+                    value={value}
+                    onChange={(e) =>
+                      setTitles((prev) =>
+                        prev.map((prevTitle, i) =>
+                          i === index ? e.target.value : prevTitle,
+                        ),
+                      )
+                    }
+                  />
+                </div>
+              ))}
             </div>
             <div className="space-y-2">
               <Label>{t('participations:dealDocuments.kindLabel')}</Label>
@@ -345,7 +380,7 @@ export function DealDocumentsSection({
             </Button>
             <Button
               onClick={() => void handleSave()}
-              disabled={saving || !title.trim()}
+              disabled={saving || titles.some((value) => !value.trim())}
             >
               {saving && <Spinner />}
               {saving
