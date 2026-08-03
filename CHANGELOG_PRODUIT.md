@@ -23,6 +23,54 @@ bas de page.
 
 ---
 
+## v1.166.2 — 03/08/2026 à 15:24 — Un fichier Excel est enfin lu en entier, tous ses onglets compris
+
+Jusqu'ici, un classeur Excel un peu fourni ne livrait qu'une partie de son
+contenu : le premier onglet était lu, et **tout ce qui suivait disparaissait
+en silence**. Un reporting avec un onglet P&L dense suivi d'onglets KPIs et
+Trésorerie ne rendait que le P&L — le reste n'existait tout simplement pas,
+ni dans le texte extrait, ni pour l'assistant, ni pour l'extraction
+automatique des métriques.
+
+La cause : une limite de taille appliquée à l'ensemble du classeur **après**
+sa lecture. Le premier onglet la consommait entièrement, et la coupe tombait
+avant que les autres soient écrits.
+
+Désormais, la place disponible est **partagée entre les onglets** : chacun
+apparaît toujours, avec son nom et son nombre de lignes réel, et les onglets
+qui ont besoin de peu laissent la place à ceux qui ont besoin de beaucoup. Un
+classeur qui dépasse malgré tout la taille maximale voit la coupe tomber sur
+l'onglet volumineux, jamais sur les petits, et le texte le dit noir sur blanc
+(« … lignes tronquées ») plutôt que de faire disparaître les données sans
+prévenir. Même chose pour les CSV, qui n'étaient lus que sur leurs 300
+premières lignes.
+
+Au passage, les reportings reçus par email peuvent porter **deux fois plus de
+contenu** avant d'être résumés, ce qui laisse à l'analyse automatique de quoi
+travailler sur les gros classeurs.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/excel.ts` : suppression du cap plat `MAX_CHARS = 40_000` et du
+>   cap dur `MAX_ROWS_PER_SHEET = 300`, appliqués après concaténation des
+>   onglets — c'est ce qui faisait disparaître les onglets suivants. Le budget
+>   est désormais celui du document (`MAX_DOCUMENT_CHARS`, 900k) et il est
+>   réparti en max-min fair entre onglets (`fairShares`) : les onglets sous
+>   leur quote-part libèrent le reliquat pour les gros.
+> - En-têtes et marqueurs de coupe sont payés d'avance sur le budget, donc un
+>   onglet non vide est **toujours** présent dans la sortie, avec son nombre de
+>   lignes réel — un classeur ne peut plus paraître avoir moins d'onglets
+>   qu'il n'en a. Toute coupe est explicite (`[...N lignes tronquées]`).
+> - `csvToText` passe sur le même mécanisme (il partageait les constantes
+>   supprimées) : plus de coupe à 300 lignes.
+> - `convex/reportExtract.ts` : `MAX_EXTRACTED_CHARS` 150k → 300k. Ce qui
+>   borne ici, c'est la fenêtre de contexte du modèle (`callModel` dans
+>   `reportStore.ts` reçoit ce texte entier), pas Convex — 300k ≈ 80k tokens,
+>   confortable sous une fenêtre de 128k, alors que la ligne `companyReports`
+>   reste à ~420 Ko de la limite d'1 Mo.
+> - `tests/excel.test.ts` : test de régression ALB-114 (classeur 3 onglets à
+>   premier onglet dense → les 3 rendus), vérifié rouge sur l'ancien code.
+
 ## v1.166.1 — 03/08/2026 à 10:39 — Un report envoyé depuis une adresse perso se range enfin tout seul
 
 Quand un fondateur envoie son investor update depuis son adresse

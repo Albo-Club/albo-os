@@ -189,7 +189,9 @@ IA, lui, ne peut plus en inventer : il choisit dans la liste ou laisse vide.
 Tout document qui entre — qu'il soit déposé à la main ici ou arrivé par un
 [report transféré par email](17-reports-par-email.md) — est **lu
 automatiquement** : PDF et images par OCR, Excel et CSV cellule par cellule.
-L'état affiché dans les actions de sa box dit où il en est :
+Un classeur Excel est lu **sur tous ses onglets**, chacun repris avec son nom
+et son nombre de lignes. L'état affiché dans les actions de sa box dit où il
+en est :
 
 | Ce que tu vois | Ce que ça veut dire |
 | --- | --- |
@@ -205,7 +207,9 @@ qu'elle en a tirées. Un texte très court sur un document épais est le signe
 d'un scan de mauvaise qualité.
 
 > Un document très long est tronqué à 900 000 caractères (~350 pages) ; la
-> fenêtre le dit explicitement.
+> fenêtre le dit explicitement. Sur un classeur, la place est partagée entre
+> les onglets — la coupe tombe sur celui qui déborde, jamais sur les autres,
+> et le texte indique combien de lignes ont été laissées de côté.
 
 Une fois lu, le document est aussi **indexé pour la recherche de
 [l'assistant](11-assistant-ia.md)** — c'est ce qui lui permet de répondre à
