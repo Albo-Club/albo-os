@@ -684,8 +684,12 @@ un appel LLM voit l'email + le portefeuille des 2 orgs, propose l'auteur réel
 du forward et les entités candidates ; la proposition est **corroborée en
 dur** (domaine de l'auteur réel = domaine de la boîte, ou nom présent dans
 objet/corps — jamais la parole du modèle seule), puis **démultipliée** sur
-toutes les entités de même domaine/nom (multi-orgs). Introuvable / ambigu /
-erreur LLM → `needs_review` (`no_match` / `ambiguous` / `identify_error`).
+toutes les entités de même domaine/nom (multi-orgs). La confiance déclarée
+par le modèle (`low`) n'envoie en review que si **plusieurs** participations
+sont nommées dans le mail : un fondateur qui transfère depuis une adresse
+perso (gmail) rend la corroboration par domaine impossible, et le nom écrit
+dans le message suffit alors. Introuvable / ambigu / erreur LLM →
+`needs_review` (`no_match` / `ambiguous` / `identify_error`).
 Après le match : **extraction de contenu** (`reportExtract.run`) — routeur
 en monde fermé : chaque PJ et chaque lien finit dans exactement un de 3
 états (`extracted` / `stored` / `failed` + code), une source qui échoue ne

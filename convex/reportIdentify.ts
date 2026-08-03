@@ -25,7 +25,12 @@ import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { internalAction, internalMutation, internalQuery } from './_generated/server'
 import { getModel } from './agent'
-import { extractJson, nameAppearsInText } from './lib/emailIdentify'
+import {
+  acceptIdentification,
+  extractJson,
+  nameAppearsInText,
+  namedIdentities,
+} from './lib/emailIdentify'
 import type { Id } from './_generated/dataModel'
 
 const MAX_BODY = 15_000
@@ -290,9 +295,18 @@ export const run = internalAction({
       }
     }
 
-    if (corroborated.length === 0 || ident.confidence === 'low') {
+    // The model's confidence only arbitrates when the mail names SEVERAL
+    // participations; a single named one is unambiguous evidence on its own.
+    const named = namedIdentities(candidates, row.subject, body)
+    const accepted = acceptIdentification({
+      corroboratedCount: corroborated.length,
+      namedCount: named.size,
+      confidence: ident.confidence,
+    })
+
+    if (!accepted) {
       console.log(
-        `[reportIdentify] no corroborated match for ${row.agentmailMessageId} (picks=${ident.company_ids.length}, confidence=${ident.confidence}): ${ident.reason}`,
+        `[reportIdentify] no corroborated match for ${row.agentmailMessageId} (picks=${ident.company_ids.length}, confidence=${ident.confidence}, named=${named.size}): ${ident.reason}`,
       )
       await ctx.runMutation(internal.reportIdentify.setReview, {
         inboundEmailId,
