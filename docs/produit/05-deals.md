@@ -43,7 +43,9 @@ toutes organisations confondues.
   partielle** vire au vert dès qu'elle est déjà dans le vert, jamais au rouge
   (la position n'est pas soldée) : sinon elle reste bleue. Seule exception,
   le **gris** : une sortie dont le multiple n'est pas calculable (aucun
-  capital décaissé) n'est ni une victoire ni une perte.
+  capital décaissé) n'est ni une victoire ni une perte. Un deal *engagé*
+  **passe tout seul en actif** dès qu'un décaissement lui est pointé
+  (cf. [Pointage](08-pointage.md)).
 - **Dates** : signature (tri par défaut), closing, sortie.
 - **Titres et détention** : les deals en actions enregistrent le **nombre de
   titres acquis** et le **prix par titre**. Un achat sur le **secondaire**
