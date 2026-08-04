@@ -23,6 +23,55 @@ bas de page.
 
 ---
 
+## v1.173.0 — 04/08/2026 à 16:48 — Un deal en term sheet passe en actif dès que l'argent part
+
+Jusqu'ici, un deal créé en **term sheet** y restait bloqué. On pouvait pointer
+le virement, voir le décaissé apparaître sur sa fiche — le deal continuait
+d'être compté parmi les engagements à venir, et rien dans l'application ne
+permettait de le passer en actif : il fallait repasser par Attio.
+
+C'est réglé : **pointer une sortie sur un deal en term sheet le fait passer en
+actif**. L'argent est parti, la position existe, elle sort de la liste des
+term sheets — dans la fiche, dans la liste des deals et dans les
+participations, sans rien avoir à faire de plus.
+
+Un seul versement suffit : inutile d'attendre que l'engagement soit couvert,
+un fonds étant bel et bien actif dès son premier appel de capital.
+
+Deux précisions :
+
+- la bascule ne va que dans ce sens — détacher la transaction ensuite ne
+  ramène pas le deal en term sheet, et un deal déjà sorti n'est jamais
+  ramené en actif ;
+- seules les **sorties** déclenchent le passage : pointer un retour ou une
+  distribution laisse le deal en term sheet.
+
+Passer le deal au stage « Invested » dans Attio continue bien sûr de
+fonctionner : les deux chemins mènent au même statut. En revanche les deals
+pointés **avant** cette mise à jour ne sont pas rattrapés — détacher puis
+repointer leur virement les fait basculer.
+
+> **🔧 Notes techniques**
+>
+> - La règle vit dans `applyMatchToDeal` (`convex/lib/pointage.ts`), le cœur
+>   partagé du pointage : elle couvre donc d'un coup la mutation manuelle
+>   `transactions.matchTransaction` et l'outil de pointage de l'agent
+>   (`agentToolsPointage.ts`), sans les toucher.
+> - Condition volontairement minimale : `deal.status === 'pending'` **et**
+>   `tx.direction === 'out'` → `patch('deals', dealId, { status: 'active' })`.
+>   Pas de seuil « décaissé ≥ engagé », qui laisserait un `fund_lp` appelé à
+>   30 % en term sheet.
+> - Forward-only, aligné sur `advancesStatus` du chemin Attio « Invested »
+>   (`convex/attioSync.ts`) : les autres statuts sont intouchés et
+>   `applyUnmatch` ne rétrograde pas (un deal `active` sans transaction est un
+>   cas légitime — import Airtable, webhook Attio).
+> - Couverture : 4 tests dans `convex/regression.pointage.test.ts` (sortie
+>   partielle → `active`, dépointage non rétrogradant, entrée sans effet,
+>   deal `fully_exited` inchangé). Rien d'autre n'a bougé : ni schéma, ni UI,
+>   ni migration.
+
+---
+
 ## v1.172.0 — 03/08/2026 à 18:10 — Les rapports et les documents d'une société vivent enfin au même endroit
 
 Une fiche société avait deux onglets, et il fallait choisir le bon **avant**

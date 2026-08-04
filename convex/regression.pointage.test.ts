@@ -8,6 +8,8 @@
  * - Every human decision appends a row to `matchingDecisions` — the log is
  *   append-only: an unmatch adds a row, it never rewrites the previous one.
  * - Cross-org matching is refused (`deal_wrong_org`).
+ * - A `pending` deal flips to `active` on the first pointed outflow
+ *   (forward-only, never reverted by an unmatch).
  */
 import { describe, expect, test } from 'vitest'
 import { api } from './_generated/api'
@@ -41,7 +43,7 @@ async function pointageSetup() {
     amount: 10_000_000,
     rawLabel: 'VIR TARGET',
   })
-  return { t, user, org, dealId, txId }
+  return { t, user, org, dealId, txId, accountId }
 }
 
 describe('pointage: match / unmatch', () => {
@@ -164,6 +166,87 @@ describe('pointage: deal-linked forecast entry follow-up', () => {
       amountCents: 10_000_000,
       direction: 'out',
     })
+  })
+})
+
+describe('pointage: a pointed outflow activates a Term Sheet deal', () => {
+  /** Deal in the given status + a transaction in the given direction. */
+  async function activationSetup(
+    status: 'pending' | 'fully_exited',
+    direction: 'in' | 'out',
+  ) {
+    const { t, user, org, accountId } = await pointageSetup()
+    const target = await createPortfolioCompany(t, org.orgId, 'Term sheet')
+    const dealId = await user.as.mutation(api.deals.create, {
+      orgId: org.orgId,
+      investorCompanyId: org.rootCompanyId,
+      targetCompanyId: target,
+      instrumentKind: 'fund_lp',
+      committedAmount: 15_000_000,
+      status,
+    })
+    const txId = await createTransaction(t, org.orgId, accountId, {
+      direction,
+      amount: 5_000_000,
+      rawLabel: 'VIR APPEL DE FONDS',
+    })
+    return { t, user, dealId, txId }
+  }
+
+  test('a partial outflow is enough — the deal leaves the Term Sheet bucket', async () => {
+    const { t, user, dealId, txId } = await activationSetup('pending', 'out')
+
+    await user.as.mutation(api.transactions.matchTransaction, {
+      transactionId: txId,
+      dealId,
+    })
+
+    const deal = await t.run(async (ctx) => ctx.db.get('deals', dealId))
+    // 50 000 € called out of 150 000 € committed: a fund is live from its
+    // first capital call, the commitment does not have to be covered.
+    expect(deal?.status).toBe('active')
+  })
+
+  test('unmatching never demotes the deal back to pending', async () => {
+    const { t, user, dealId, txId } = await activationSetup('pending', 'out')
+
+    await user.as.mutation(api.transactions.matchTransaction, {
+      transactionId: txId,
+      dealId,
+    })
+    await user.as.mutation(api.transactions.unmatchTransaction, {
+      transactionId: txId,
+    })
+
+    const deal = await t.run(async (ctx) => ctx.db.get('deals', dealId))
+    expect(deal?.status).toBe('active')
+  })
+
+  test('an incoming transaction leaves the deal in Term Sheet', async () => {
+    const { t, user, dealId, txId } = await activationSetup('pending', 'in')
+
+    await user.as.mutation(api.transactions.matchTransaction, {
+      transactionId: txId,
+      dealId,
+    })
+
+    const deal = await t.run(async (ctx) => ctx.db.get('deals', dealId))
+    expect(deal?.status).toBe('pending')
+  })
+
+  test('a settled deal keeps its status (forward-only)', async () => {
+    const { t, user, dealId, txId } = await activationSetup(
+      'fully_exited',
+      'out',
+    )
+
+    await user.as.mutation(api.transactions.matchTransaction, {
+      transactionId: txId,
+      dealId,
+    })
+
+    const deal = await t.run(async (ctx) => ctx.db.get('deals', dealId))
+    expect(deal?.status).toBe('fully_exited')
   })
 })
 
