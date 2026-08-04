@@ -76,6 +76,25 @@ conversation). Dans les deux cas, ni l'outil ni l'assistant ne pointent jamais
 seuls : la décision reste humaine — valider le bandeau, ou approuver
 explicitement dans le chat.
 
+## Un deal en term sheet devient actif au premier versement
+
+Pointer une **sortie** sur un deal encore _engagé_ (term sheet) le fait
+**passer en actif** dans la foulée : l'argent est parti, la position existe,
+elle n'a plus rien à faire dans les term sheets. Un seul versement suffit —
+inutile d'attendre que l'engagement soit couvert, un fonds étant bel et bien
+actif dès son premier appel de capital.
+
+Deux limites à connaître :
+
+- la bascule ne va **que dans ce sens** : détacher la transaction ensuite ne
+  ramène pas le deal en term sheet, et un deal déjà sorti n'est jamais
+  ramené en actif ;
+- elle ne se déclenche que sur une **sortie** : pointer une entrée (un
+  retour, une distribution) laisse le deal en term sheet.
+
+Le geste équivalent côté Attio — passer le deal au stage « Invested » —
+continue de fonctionner : les deux chemins mènent au même statut.
+
 ## Le rapprochement des échéances prévues
 
 Au-dessus du registre, une carte « Rapprochements suggérés »
