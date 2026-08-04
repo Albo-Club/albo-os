@@ -45,10 +45,15 @@ reconnectée, échéance réalisée, rapport reçu).
 - Le bloc « Reportings manquants » ne surveille que les participations qui
   portent encore un deal en cours : une position entièrement sortie, ou une
   société archivée, n'y apparaît pas. Le délai est mesuré sur la **date de
-  réception** du dernier rapport, pas sur la période couverte — sinon une
-  société qui reporte au trimestre paraîtrait en retard le lendemain de son
-  envoi.
-- Une société qui **n'a jamais** envoyé de rapport est comptée depuis le
+  réception** de la dernière nouvelle, pas sur la période couverte — sinon
+  une société qui reporte au trimestre paraîtrait en retard le lendemain de
+  son envoi.
+- Une **communication publiée sur le portail** de l'émetteur (les SPV
+  Parallel et consorts) compte exactement comme un rapport reçu par email :
+  ces sociétés n'envoient jamais de mail, elles publient. Encore faut-il que
+  l'entité soit **reliée à son émetteur** dans ses Intégrations — sans ce
+  lien, ses publications restent invisibles et l'alerte se déclenche à tort.
+- Une société qui **n'a jamais** donné de nouvelles est comptée depuis le
   **versement des fonds** (le premier décaissement pointé en banque, à
   défaut la date de signature du deal) : des fonds versés il y a deux
   semaines ne doivent encore rien.

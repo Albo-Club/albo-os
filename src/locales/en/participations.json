@@ -777,7 +777,9 @@
     "title": "Stale data",
     "lastReport_one": "Last report received {{count}} month ago",
     "lastReport_other": "Last report received {{count}} months ago",
-    "never": "No report since the funds were wired on {{date}}",
+    "lastComm_one": "Last communication {{count}} month ago",
+    "lastComm_other": "Last communication {{count}} months ago",
+    "never": "No news since the funds were wired on {{date}}",
     "coverage": "Covered through {{date}}"
   }
 }

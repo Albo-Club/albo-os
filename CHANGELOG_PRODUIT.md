@@ -23,6 +23,55 @@ bas de page.
 
 ---
 
+## v1.174.1 — 04/08/2026 à 19:09 — L'alerte « boîte silencieuse » écoute enfin les SPV
+
+L'alerte lancée ce matin criait au silence sur des sociétés qui parlaient
+pourtant très récemment : tous les SPV Parallel de CALTE portaient une
+pastille ambre alors que leurs communications dataient de quelques
+semaines.
+
+La cause tient en une phrase : l'alerte ne lisait que les rapports reçus
+**par email**. Or un SPV n'envoie jamais de mail — il **publie** sur le
+portail de son émetteur, et ces communications s'affichent déjà dans la
+fiche société. L'alerte regardait la seule boîte aux lettres, là où ces
+sociétés-là ne passent jamais.
+
+Désormais les deux canaux comptent à égalité : un rapport reçu par email
+et une communication publiée sur le portail remettent le compteur à zéro
+de la même façon. Le survol de la pastille précise **par quel canal** la
+dernière nouvelle est arrivée — « Dernier report reçu il y a 5 mois » ou
+« Dernière communication il y a 5 mois » — pour savoir où aller chercher.
+
+Un point à connaître : une entité ne bénéficie de ce rattrapage que si
+elle est **reliée à son émetteur** dans ses Intégrations. Un SPV non relié
+reste vu comme muet, puisque rien ne permet de savoir où il publie.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/reportFreshness.ts` : `listSilentCompanies` lit une seconde
+>   source, `vascoCommunicationsCache`, en plus de `companyReports`. La map
+>   `${vascoClientSlug}:${vascoIssuerId}` → `companyId` est construite depuis
+>   les `companies` déjà chargées ; le cache n'est lu que si au moins une
+>   entité porte un lien (pas d'abonnement Convex inutile sur une org sans
+>   connexion portail).
+> - `publishDate` est une chaîne ISO du portail : une date absente ou
+>   illisible est **écartée** plutôt que repliée sur `fetchedAt`, qui vaut
+>   toujours « aujourd'hui » et éteindrait l'alerte pour de mauvaises
+>   raisons.
+> - `SilentCompany.lastReportAt` devient `lastNewsAt`, plus `lastNewsSource`
+>   (`'report' | 'vasco'`) : le tooltip doit nommer le canal, sinon il envoie
+>   chercher un email qui n'existe pas. Les trois consommateurs suivent
+>   (`ParticipationsTable`, `todo.tsx`, outil agent `listSilentCompanies`).
+> - `convex/regression.reportFreshness.test.ts` : 4 tests de plus (10 au
+>   total) — communication récente vs vieille, entité non reliée qui ne lit
+>   rien du cache de l'org, communication sans date, et canal de la dernière
+>   nouvelle.
+> - Limite assumée : si la connexion au portail casse, les communications
+>   cessent d'être rafraîchies et l'alerte finit par se déclencher à tort.
+>   Non traité ici.
+
+---
+
 ## v1.174.0 — 04/08/2026 à 16:54 — Les boîtes qui ne donnent plus de nouvelles se signalent toutes seules
 
 Une participation qui cesse de reporter ne fait pas de bruit : c'est
