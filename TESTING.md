@@ -1153,7 +1153,7 @@ cf. `KNOWN_ISSUES.md` « Serveur MCP distant »). Pour M2-M5, poser
 | --- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | M1  | `POST <convex-site-url>/mcp` sans header `Authorization` (curl)                                        | 401 + header `WWW-Authenticate` pointant `/.well-known/oauth-protected-resource`                                  |
 | M2  | `initialize` avec `Authorization: Bearer $MCP_DEV_TOKEN`                                               | 200, `result.protocolVersion`, `capabilities.tools`, `instructions` (conventions cents/bps)                       |
-| M3  | `tools/list`                                                                                            | 22 outils avec `description` + `inputSchema` ; le param `org` porte un `enum` = slugs des orgs du user            |
+| M3  | `tools/list`                                                                                            | 26 outils avec `description` + `inputSchema` ; le param `org` porte un `enum` = slugs des orgs du user ; les 22 outils de lecture portent `annotations.readOnlyHint: true`, les 4 outils d'écriture `false` |
 | M4  | `tools/call listOrgs` puis `listDeals {org:"<slug>"}`                                                  | Orgs du user `MCP_DEV_EMAIL`, puis deals scopés à l'org                                                           |
 | M5  | `tools/call listDeals` avec un slug d'org dont l'user n'est **pas** membre                             | Résultat `isError` (`agent_tools_forbidden` / `org_not_found`), aucune donnée ne fuite                            |
 | M6  | GET `<site-url>/.well-known/oauth-authorization-server`                                                | 200 JSON, `issuer` = domaine app, endpoints sous `/api/auth/mcp/*`                                                |
@@ -1163,6 +1163,19 @@ cf. `KNOWN_ISSUES.md` « Serveur MCP distant »). Pour M2-M5, poser
 | M10 | Spammer ~25 `tools/call` d'affilée                                                                     | Résultat `isError` `rate_limited` (bucket `mcpToolCall`, 60/min/user)                                             |
 | M11 | `tools/call listCompanyReports {org, companyId}` sur une participation qui a des reportings, puis `getCompanyReport` sur un id rendu | Timeline (headline + période), puis contenu : `keyHighlights` + `metrics` sous forme de liste `{key, value, unit}` — jamais de `rawContent` |
 | M12 | `tools/call getCompanyReport` avec un `reportId` d'une org dont l'user n'est **pas** membre             | `isError` `not_found`, aucun contenu ne fuite                                                                     |
+| M13 | `tools/call createCompany {org, name:"Zzz Test", sector:"saas", domain:"zzz-test.example"}`             | Société `portfolio` créée ; réponse `{_id, name, url, possibleDuplicates: []}`, l'`url` ouvre bien sa fiche       |
+| M14 | Rejouer M13 à l'identique, puis une 3ᵉ fois avec `name:"Zzz Test SAS"` et sans `domain`                | Création à chaque fois (jamais bloquée), mais `possibleDuplicates` non vide : `reason:"domain"` en M14, `reason:"name"` en M14bis (suffixe juridique replié) |
+| M15 | `createCompany` avec un `siren` déjà porté par une autre société de l'org                               | `isError` `siren_already_used`, **aucune** société créée (seule écriture réellement bloquante)                    |
+| M16 | `createDeal {org, investorCompanyId:<entité group_*>, targetCompanyId:<M13>, instrumentKind:"bsa_air", committedAmount:5000000, valuationCap:800000000, signedDateISO:"2026-03-12"}` | Deal créé ; fiche deal affiche 50 000 € engagés, cap 8 M€, signé le 12/03/2026 ; `url` pointe `/deals/<id>`       |
+| M17 | `createDeal` en passant une **participation** comme `investorCompanyId`                                 | `isError` `investor_must_be_group_entity`, aucun deal créé                                                        |
+| M18 | Rejouer M16 à l'identique                                                                              | Deal créé quand même (un follow-on est légitime) + `possibleDuplicates` listant le deal de M16                    |
+| M19 | `updateDeal {org, dealId:<M16>, status:"fully_exited", exitedDateISO:"2026-07-01", exitProceeds:9000000}` | Deal passé en sorti sur la fiche, MOIC réalisé calculé ; les champs non transmis (cap, date de signature) inchangés |
+| M20 | `createDeal` avec `instrumentKind:"dat"`                                                               | `url` pointe `/placements/<id>` et non `/deals/<id>` (routage placement de trésorerie)                            |
+| M21 | Depuis claude.ai, demander une création (« crée la société … »)                                        | Claude demande confirmation avant l'appel (annotation `readOnlyHint: false`) et restitue le lien de la fiche      |
+| M22 | `updateCompany {org, companyId, siren:""}`                                                             | SIREN vidé sur la fiche, aucun autre champ modifié                                                                |
+
+> Nettoyage : archiver/supprimer dans l'app les sociétés et deals « Zzz Test »
+> créés par M13-M20 — ce sont de vraies écritures en base.
 
 ## En cas d'échec
 

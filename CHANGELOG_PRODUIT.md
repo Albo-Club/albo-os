@@ -23,6 +23,62 @@ bas de page.
 
 ---
 
+## v1.173.0 — 04/08/2026 à 19:21 — Créer une société ou un deal depuis Claude, sans ouvrir l'app
+
+Le connecteur Claude savait lire le portefeuille, rien de plus. Pour entrer
+une nouvelle boîte ou une nouvelle participation, il fallait revenir dans
+l'app — soit remplir le formulaire à la main, soit passer par l'assistant du
+panneau latéral. Deux allers-retours pour une information qu'on venait déjà
+de dicter.
+
+Le connecteur sait maintenant **écrire**. Vous donnez l'info en vrac, en une
+phrase, et c'est Claude qui range dans les bonnes cases.
+
+- **Quatre gestes possibles** : créer une société du portefeuille, créer un
+  deal, compléter une société existante, compléter un deal existant. Le reste
+  du connecteur ne change pas.
+- **Vous validez avant, toujours** : le connecteur annonce désormais quels
+  outils modifient les données, et Claude demande votre accord avant chaque
+  écriture. Rien ne part sans un clic de votre part.
+- **Un lien pour vérifier** : chaque création renvoie l'adresse de la fiche
+  dans l'app. Un clic et vous êtes dessus pour relire ou corriger.
+- **Il prévient au lieu de bloquer** : si une société ressemble à une fiche
+  déjà en base — même site, même nom à la forme juridique près — la fiche est
+  quand même créée, mais Claude vous signale les doublons possibles avec leurs
+  liens. Même chose pour un deal entre le même investisseur et la même cible :
+  c'est parfois un vrai second tour, à vous de juger. Seule exception, le
+  SIREN : un numéro déjà utilisé par une autre société est refusé net.
+- **Une limite assumée** : les paramètres de contrat de royalties (plan
+  d'affaires trimestriel, plancher et plafond de multiple) restent modifiables
+  uniquement dans l'app, sur leur écran dédié.
+
+> **🔧 Notes techniques**
+>
+> - Registre MCP (`convex/mcp/registry.ts`) : quatre outils d'écriture
+>   `createCompany` / `updateCompany` / `createDeal` / `updateDeal`, montants
+>   en cents, taux en bps, dates en ISO `YYYY-MM-DD` converties par
+>   `optionalISODate`. Schéma financier factorisé dans `dealValueSchema` +
+>   `dealValueArgs`. Les énums viennent des sources de vérité existantes
+>   (`lib/sectors.ts`, `lib/instruments.ts`), jamais redéclarées.
+> - `defineTool` prend un flag `write` et calcule `annotations`
+>   (`readOnlyHint`), émises dans `tools/list` (`convex/mcp/server.ts`) : c'est
+>   le signal MCP standard qui fait demander confirmation au client, puisque le
+>   `needsApproval` du chat in-app n'a pas d'équivalent hors app.
+> - Pas de mutation dupliquée : les internes existants de `convex/agentTools.ts`
+>   (`createCompanyInternal`, `createDealInternal`, `update*Internal`) sont
+>   élargis en champs **optionnels**. Les schémas zod des outils du chat sont
+>   inchangés — ils n'envoient simplement jamais les nouveaux champs. Effet de
+>   bord additif assumé : ces internes renvoient maintenant aussi `similar`,
+>   que l'agent in-app voit également.
+> - Détection de quasi-doublons dans `convex/lib/duplicates.ts`
+>   (`normalizeCompanyName` : accents, ponctuation et suffixe juridique repliés ;
+>   `findSimilarCompanies` sur domaine/nom, `findSimilarDeals` sur
+>   investisseur+cible). Jamais bloquant, sauf `assertSirenFree` — invariant
+>   déjà en place, exporté depuis `convex/companies.ts` pour éviter une seconde
+>   implémentation. Tests purs dans `tests/duplicates.test.ts`.
+> - Liens profonds construits depuis `SITE_URL`, avec routage
+>   `placements/` vs `deals/` via `isTreasuryPlacement`.
+
 ## v1.172.0 — 03/08/2026 à 18:10 — Les rapports et les documents d'une société vivent enfin au même endroit
 
 Une fiche société avait deux onglets, et il fallait choisir le bon **avant**

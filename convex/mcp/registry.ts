@@ -1,10 +1,18 @@
 /**
- * Read-only tool registry for the MCP server (convex/mcp/server.ts).
+ * Tool registry for the MCP server (convex/mcp/server.ts).
  *
- * Each tool is a thin wrapper over the same internal queries the AI agent
- * tools use (convex/agentTools*.ts) — membership is re-verified inside every
- * internal via `readMembership`, the registry only resolves the org slug and
- * forwards `{orgId, actorUserId}`.
+ * Each tool is a thin wrapper over the same internals the AI agent tools use
+ * (convex/agentTools*.ts) — membership is re-verified inside every internal
+ * via `readMembership`, the registry only resolves the org slug and forwards
+ * `{orgId, actorUserId}`.
+ *
+ * Most tools read. The four write tools at the bottom (createCompany,
+ * updateCompany, createDeal, updateDeal) exist so an external client can fill
+ * an entity from a free-form sentence without going through the in-app chat.
+ * They write STRAIGHT to the DB: the chat agent's `needsApproval` round-trip
+ * has no equivalent here, so the human checkpoint is the MCP client's own
+ * confirmation — which is why every tool carries `annotations.readOnlyHint`.
+ * Lookalike rows are reported back, never blocked (convex/lib/duplicates.ts).
  *
  * Schemas are declared here in zod v4 (the agent tools use `zod/v3` inline
  * schemas, which `z.toJSONSchema()` cannot consume). Keep the two in sync
@@ -15,13 +23,27 @@ import { ConvexError } from 'convex/values'
 import { z } from 'zod'
 
 import { internal } from '../_generated/api'
+import { isTreasuryPlacement } from '../lib/instrumentMapping'
+import { FUND_TYPES, INSTRUMENTS, ROUND_TYPES } from '../lib/instruments'
+import { SECTOR_SLUGS } from '../lib/sectors'
 import type { ActionCtx } from '../_generated/server'
 import type { Id } from '../_generated/dataModel'
+
+/**
+ * MCP tool annotations (spec 2025-06-18). `readOnlyHint` is what tells a
+ * client the call mutates state, so it can ask the user before running it.
+ */
+export type McpToolAnnotations = {
+  readOnlyHint: boolean
+  destructiveHint?: boolean
+  idempotentHint?: boolean
+}
 
 export type McpTool = {
   name: string
   description: string
   inputSchema: z.ZodObject<z.ZodRawShape>
+  annotations: McpToolAnnotations
   /** Runs the tool. `args` are already validated against `inputSchema`. */
   run: (
     ctx: ActionCtx,
@@ -35,6 +57,8 @@ function defineTool<TShape extends z.ZodRawShape>(def: {
   name: string
   description: string
   schema: TShape
+  /** Set on the tools that mutate the DB — drives the annotations below. */
+  write?: true
   run: (
     ctx: ActionCtx,
     actorUserId: Id<'users'>,
@@ -46,6 +70,10 @@ function defineTool<TShape extends z.ZodRawShape>(def: {
     name: def.name,
     description: def.description,
     inputSchema,
+    // Writes only create or patch — nothing here ever deletes a row.
+    annotations: def.write
+      ? { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
+      : { readOnlyHint: true },
     run: (ctx, actorUserId, args) =>
       def.run(ctx, actorUserId, args as z.infer<z.ZodObject<TShape>>),
   }
@@ -75,7 +103,104 @@ function parseISODate(value: string): number {
   return ms
 }
 
+/** `undefined` stays `undefined` — an omitted field must not be patched. */
+function optionalISODate(value: string | undefined): number | undefined {
+  return value === undefined ? undefined : parseISODate(value)
+}
+
 const limitArg = z.number().int().min(1).max(50).optional()
+
+// ─── Write helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Deep link to a row in the app, so the user can check and correct what was
+ * just written. Null when SITE_URL is unset (local/dev) — the write itself
+ * still succeeds.
+ */
+function appUrl(slug: string, path: string): string | null {
+  const base = process.env.SITE_URL
+  return base ? `${base.replace(/\/+$/, '')}/app/${slug}/${path}` : null
+}
+
+function companyUrl(slug: string, companyId: string): string | null {
+  return appUrl(slug, `participations/${companyId}`)
+}
+
+/** Treasury placements live on their own page, not the deal sheet. */
+function dealUrl(
+  slug: string,
+  dealId: string,
+  instrumentKind: string,
+): string | null {
+  const page = isTreasuryPlacement(instrumentKind) ? 'placements' : 'deals'
+  return appUrl(slug, `${page}/${dealId}`)
+}
+
+const centsArg = (what: string) =>
+  z.number().int().optional().describe(`${what} — CENTS EUR (50 000 € → 5000000)`)
+
+const bpsArg = (what: string) =>
+  z.number().int().optional().describe(`${what} — BASIS POINTS (11 % → 1100)`)
+
+const isoDateArg = (what: string) =>
+  z.string().optional().describe(`${what} — ISO date "YYYY-MM-DD"`)
+
+/** Financial/lifecycle fields shared by createDeal and updateDeal. */
+const dealValueSchema = {
+  name: z
+    .string()
+    .optional()
+    .describe('Custom deal label; omit to let the app derive it'),
+  committedAmount: centsArg('Amount committed'),
+  paidAmount: centsArg('Amount actually paid in'),
+  sharesAcquired: z.number().optional().describe('Number of shares acquired'),
+  pricePerShare: centsArg('Price per share'),
+  roundType: z.enum(ROUND_TYPES).optional(),
+  roundSize: centsArg('Total size of the round'),
+  preMoneyValuation: centsArg('Pre-money valuation'),
+  postMoneyValuation: centsArg('Post-money valuation'),
+  entryValuation: centsArg('Valuation at entry'),
+  ownershipPct: bpsArg('Ownership stake acquired'),
+  valuationCap: centsArg('Valuation cap (SAFE / BSA AIR / convertible)'),
+  discount: bpsArg('Conversion discount'),
+  interestRate: bpsArg('Interest rate'),
+  principalAmount: centsArg('Principal (bond, loan, current account)'),
+  maturityDateISO: isoDateArg('Maturity date'),
+  signedDateISO: isoDateArg('Signature date'),
+  closingDateISO: isoDateArg('Closing date'),
+  exitedDateISO: isoDateArg('Exit date'),
+  exitProceeds: centsArg('Proceeds received on exit'),
+  fundType: z.enum(FUND_TYPES).optional().describe('Fund LP commitments only'),
+  vintageYear: z.number().int().optional().describe('Fund LP commitments only'),
+  managementCompany: z
+    .string()
+    .optional()
+    .describe('Fund LP commitments only — the management company'),
+  notes: z.string().optional(),
+}
+
+/** Maps the ISO date args of `dealValueSchema` onto the internal's ms epochs. */
+function dealValueArgs(args: {
+  maturityDateISO?: string
+  signedDateISO?: string
+  closingDateISO?: string
+  exitedDateISO?: string
+}) {
+  const {
+    maturityDateISO,
+    signedDateISO,
+    closingDateISO,
+    exitedDateISO,
+    ...rest
+  } = args
+  return {
+    ...rest,
+    maturityDate: optionalISODate(maturityDateISO),
+    signedDate: optionalISODate(signedDateISO),
+    closingDate: optionalISODate(closingDateISO),
+    exitedDate: optionalISODate(exitedDateISO),
+  }
+}
 
 export const mcpTools: Array<McpTool> = [
   defineTool({
@@ -429,5 +554,198 @@ export const mcpTools: Array<McpTool> = [
         actorUserId,
         dealId: dealId as Id<'deals'>,
       }),
+  }),
+
+  // ─── Write tools ──────────────────────────────────────────────────────────
+
+  defineTool({
+    name: 'createCompany',
+    description:
+      'Create a PORTFOLIO company (an invested target) in an org. Group ' +
+      'entities of the vehicle (kind "group_*") are not created here — they ' +
+      'are set up in the app. Fill every field you can infer from what the ' +
+      'user told you; omit the rest rather than guessing. Amounts of shares ' +
+      'are counts, not money. Returns the new company, a link to its page in ' +
+      'the app, and `possibleDuplicates`: companies of the org that share the ' +
+      'domain or the name — the creation is NOT blocked, report them to the ' +
+      'user so they can decide to merge or rename. A SIREN already used by ' +
+      'another company of the org is refused (error "siren_already_used").',
+    schema: {
+      org: orgSlug,
+      name: z.string().min(1).describe('Commercial name, e.g. "Sezame"'),
+      sector: z
+        .enum(SECTOR_SLUGS)
+        .optional()
+        .describe('The market the company SELLS TO, never its legal vehicle'),
+      domain: z.string().optional().describe('Website, e.g. "sezame.fr"'),
+      countryCode: z.string().optional().describe('ISO-2, e.g. "FR"'),
+      legalName: z.string().optional().describe('e.g. "Sezame SAS"'),
+      siren: z.string().optional().describe('9 digits, French companies only'),
+      legalForm: z.string().optional().describe('e.g. "SAS"'),
+      totalShares: z.number().optional().describe('Total share count'),
+      notes: z.string().optional(),
+    },
+    write: true,
+    run: async (ctx, actorUserId, { org, ...fields }) => {
+      const orgId = await orgIdFor(ctx, actorUserId, org)
+      const created = await ctx.runMutation(
+        internal.agentTools.createCompanyInternal,
+        { orgId, actorUserId, ...fields },
+      )
+      return {
+        _id: created._id,
+        name: created.name,
+        url: companyUrl(org, created._id),
+        possibleDuplicates: created.similar.map((match) => ({
+          ...match,
+          url: companyUrl(org, match._id),
+        })),
+      }
+    },
+  }),
+  defineTool({
+    name: 'updateCompany',
+    description:
+      'Complete or correct a company of an org. Only pass the fields to ' +
+      'change — anything omitted is left untouched. Use listCompanies or ' +
+      'getCompany first to get the id and to see what is already filled. ' +
+      'Passing an empty string as `siren` clears it.',
+    schema: {
+      org: orgSlug,
+      companyId: z.string(),
+      name: z.string().min(1).optional(),
+      sector: z
+        .enum(SECTOR_SLUGS)
+        .optional()
+        .describe('The market the company SELLS TO, never its legal vehicle'),
+      domain: z.string().optional(),
+      countryCode: z.string().optional().describe('ISO-2, e.g. "FR"'),
+      legalName: z.string().optional(),
+      siren: z.string().optional().describe('9 digits, or "" to clear'),
+      legalForm: z.string().optional(),
+      totalShares: z.number().optional(),
+      notes: z.string().optional(),
+    },
+    write: true,
+    run: async (ctx, actorUserId, { org, companyId, ...patch }) => {
+      const orgId = await orgIdFor(ctx, actorUserId, org)
+      const updated = await ctx.runMutation(
+        internal.agentTools.updateCompanyInternal,
+        { orgId, actorUserId, companyId: companyId as Id<'companies'>, ...patch },
+      )
+      return { _id: updated._id, url: companyUrl(org, updated._id) }
+    },
+  }),
+  defineTool({
+    name: 'createDeal',
+    description:
+      'Record an investment (deal) in an org. The investor MUST be a group ' +
+      'entity of the vehicle (kind "group_*", e.g. Albo Club or CALTE) and ' +
+      'the target a portfolio company — use listCompanies to resolve both ' +
+      'ids, and createCompany first when the target does not exist yet. ' +
+      'Amounts in CENTS EUR, rates in BASIS POINTS, dates as ISO ' +
+      '"YYYY-MM-DD". Fill every field you can infer; omit the rest rather ' +
+      'than guessing. Returns the deal, a link to its page in the app, and ' +
+      '`possibleDuplicates`: existing deals between the same investor and ' +
+      'the same target. That is a WARNING, not an error — a follow-on round ' +
+      'is a legitimate second deal — so report them and let the user judge.',
+    schema: {
+      org: orgSlug,
+      investorCompanyId: z
+        .string()
+        .describe('Group entity of the org doing the investing'),
+      targetCompanyId: z.string().describe('The company invested in'),
+      instrumentKind: z.enum(INSTRUMENTS),
+      viaSpvCompanyId: z
+        .string()
+        .optional()
+        .describe('SPV the investment goes through, when there is one'),
+      status: z
+        .enum([
+          'pending',
+          'active',
+          'partially_exited',
+          'fully_exited',
+          'written_off',
+        ])
+        .optional()
+        .describe('Defaults to "active"; "pending" = signed but not wired'),
+      ...dealValueSchema,
+    },
+    write: true,
+    run: async (
+      ctx,
+      actorUserId,
+      { org, investorCompanyId, targetCompanyId, viaSpvCompanyId, ...fields },
+    ) => {
+      const orgId = await orgIdFor(ctx, actorUserId, org)
+      const { instrumentKind, status, ...values } = fields
+      const created = await ctx.runMutation(
+        internal.agentTools.createDealInternal,
+        {
+          orgId,
+          actorUserId,
+          investorCompanyId: investorCompanyId as Id<'companies'>,
+          targetCompanyId: targetCompanyId as Id<'companies'>,
+          viaSpvCompanyId: viaSpvCompanyId as Id<'companies'> | undefined,
+          instrumentKind,
+          status,
+          ...dealValueArgs(values),
+        },
+      )
+      return {
+        _id: created._id,
+        url: dealUrl(org, created._id, instrumentKind),
+        possibleDuplicates: created.similar.map((match) => ({
+          ...match,
+          url: dealUrl(org, match._id, match.instrumentKind),
+        })),
+      }
+    },
+  }),
+  defineTool({
+    name: 'updateDeal',
+    description:
+      'Complete or correct a deal of an org. Only pass the fields to change ' +
+      '— anything omitted is left untouched. Use listDeals first to get the ' +
+      'id. Amounts in CENTS EUR, rates in BASIS POINTS, dates as ISO ' +
+      '"YYYY-MM-DD". To record an exit, set status plus exitedDateISO and ' +
+      'exitProceeds.',
+    schema: {
+      org: orgSlug,
+      dealId: z.string(),
+      instrumentKind: z.enum(INSTRUMENTS).optional(),
+      viaSpvCompanyId: z.string().optional(),
+      status: z
+        .enum([
+          'active',
+          'partially_exited',
+          'fully_exited',
+          'written_off',
+        ])
+        .optional(),
+      ...dealValueSchema,
+    },
+    write: true,
+    run: async (ctx, actorUserId, { org, dealId, viaSpvCompanyId, ...fields }) => {
+      const orgId = await orgIdFor(ctx, actorUserId, org)
+      const { instrumentKind, status, ...values } = fields
+      const updated = await ctx.runMutation(
+        internal.agentTools.updateDealInternal,
+        {
+          orgId,
+          actorUserId,
+          dealId: dealId as Id<'deals'>,
+          viaSpvCompanyId: viaSpvCompanyId as Id<'companies'> | undefined,
+          instrumentKind,
+          status,
+          ...dealValueArgs(values),
+        },
+      )
+      return {
+        _id: updated._id,
+        url: dealUrl(org, updated._id, updated.instrumentKind),
+      }
+    },
   }),
 ]
