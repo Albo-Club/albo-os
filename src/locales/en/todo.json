@@ -40,8 +40,10 @@
   },
   "reports": {
     "title": "Missing reportings",
-    "empty": "Every portfolio company has reported recently.",
+    "empty": "Every participation reported recently.",
     "lastReport": "No report received since {{date}}",
-    "hint": "Portfolio companies that used to report but have been silent for 3+ months."
+    "neverReported": "No report since the funds were wired on {{date}}",
+    "hint_one": "Participations with no report received for over {{count}} month (threshold set in Settings → General).",
+    "hint_other": "Participations with no report received for over {{count}} months (threshold set in Settings → General)."
   }
 }

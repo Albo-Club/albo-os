@@ -36,8 +36,10 @@ Une cinquantaine d'outils, par domaine :
   une société, consulter le résumé du véhicule, lister les documents.
 - **Reportings** : lire les comptes rendus reçus des participations
   (points clés, métriques extraites) et la synthèse IA d'une société — score
-  de santé, insights, alertes. En lecture seule : les reportings arrivent par
-  email, ils ne se créent pas depuis le chat.
+  de santé, insights, alertes, et lister les **boîtes silencieuses** (celles
+  qui n'ont plus reporté depuis le délai fixé par l'organisation). En lecture
+  seule : les reportings arrivent par email, ils ne se créent pas depuis le
+  chat.
 - **Valorisations et KPIs** : consulter l'historique, enregistrer une
   valorisation ou un KPI depuis un reporting.
 - **Business plans** : lire et remplacer les lignes d'un BP (version

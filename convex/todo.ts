@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import { listSilentCompanies } from './lib/reportFreshness'
 
 import type { Doc, Id } from './_generated/dataModel'
 
@@ -10,11 +11,6 @@ const UNMATCHED_PREVIEW = 5
 
 /** Done tasks stay visible this long, then drop from the list (kept in DB). */
 const DONE_VISIBLE_MS = 30 * 24 * 60 * 60 * 1000
-
-/** A portfolio company is « silent » past 3 months without a received report.
- * Measured on the RECEPTION date (email date), not the covered period: a
- * quarterly reporter would otherwise look stale right after reporting. */
-const REPORT_SILENCE_MS = 90 * 24 * 60 * 60 * 1000
 
 /**
  * Aggregated feed of the « To do » tab. Only the signals with no existing
@@ -61,50 +57,9 @@ export const getTodo = query({
       })
 
     // ── Silent portfolio companies ────────────────────────────────────────
-    // Scope: non-archived portfolio companies target of at least one live
-    // deal (an exited position would nag forever) that have reported at
-    // least once (a company that never emails reports is not a to-do).
-    const liveTargets = new Set<Id<'companies'>>()
-    for (const status of ['active', 'partially_exited'] as const) {
-      const deals = await ctx.db
-        .query('deals')
-        .withIndex('by_org_status', (q) =>
-          q.eq('orgId', orgId).eq('status', status),
-        )
-        .collect()
-      for (const deal of deals) liveTargets.add(deal.targetCompanyId)
-    }
-    const portfolio = await ctx.db
-      .query('companies')
-      .withIndex('by_org_kind', (q) =>
-        q.eq('orgId', orgId).eq('kind', 'portfolio'),
-      )
-      .collect()
-    const missingReports: Array<{
-      companyId: Id<'companies'>
-      companyName: string
-      lastReportAt: number
-    }> = []
-    for (const company of portfolio) {
-      if (company.archivedAt || !liveTargets.has(company._id)) continue
-      const reports = await ctx.db
-        .query('companyReports')
-        .withIndex('by_company', (q) => q.eq('companyId', company._id))
-        .collect()
-      if (reports.length === 0) continue
-      const lastReportAt = reports.reduce(
-        (max, r) => Math.max(max, r.emailDate ?? r._creationTime),
-        0,
-      )
-      if (now - lastReportAt > REPORT_SILENCE_MS) {
-        missingReports.push({
-          companyId: company._id,
-          companyName: company.name,
-          lastReportAt,
-        })
-      }
-    }
-    missingReports.sort((a, b) => a.lastReportAt - b.lastReportAt)
+    // Same detection as the badge on the participations list — one source
+    // (lib/reportFreshness.ts), so the two surfaces never disagree.
+    const missingReports = await listSilentCompanies(ctx, orgId, now)
 
     // ── Manual tasks ──────────────────────────────────────────────────────
     // Done tasks older than DONE_VISIBLE_MS are hidden (not deleted). Within

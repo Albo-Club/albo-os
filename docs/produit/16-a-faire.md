@@ -32,9 +32,9 @@ La page empile cinq blocs :
    dont la date est passée sans qu'elles soient réalisées ni annulées (même
    définition que le badge « En retard » du registre) ; le bouton ouvre le
    même registre filtré.
-5. **Reportings manquants** — les participations qui envoyaient des rapports
-   et n'en ont plus envoyé **depuis plus de 3 mois**. Chaque ligne renvoie
-   vers la fiche de la société.
+5. **Reportings manquants** — les participations dont aucun rapport n'est
+   arrivé depuis plus de **4 mois** (délai réglable par organisation dans
+   Réglages → Général). Chaque ligne renvoie vers la fiche de la société.
 
 Tous les blocs sauf les tâches sont **automatiques** : un item disparaît de
 lui-même dès que l'action est faite (transaction pointée, banque
@@ -43,10 +43,17 @@ reconnectée, échéance réalisée, rapport reçu).
 ## Points d'attention
 
 - Le bloc « Reportings manquants » ne surveille que les participations qui
-  ont **déjà envoyé au moins un rapport** et qui portent encore un deal en
-  cours : une société qui n'a jamais reporté, ou une position entièrement
-  sortie, n'y apparaît pas. Le délai est mesuré sur la **date de réception**
-  du dernier rapport, pas sur la période couverte.
+  portent encore un deal en cours : une position entièrement sortie, ou une
+  société archivée, n'y apparaît pas. Le délai est mesuré sur la **date de
+  réception** du dernier rapport, pas sur la période couverte — sinon une
+  société qui reporte au trimestre paraîtrait en retard le lendemain de son
+  envoi.
+- Une société qui **n'a jamais** envoyé de rapport est comptée depuis le
+  **versement des fonds** (le premier décaissement pointé en banque, à
+  défaut la date de signature du deal) : des fonds versés il y a deux
+  semaines ne doivent encore rien.
+- Le même signal apparaît dans la liste des participations, sous forme de
+  pastille d'alerte à côté du nom de la société.
 - Les tâches manuelles sont partagées entre les membres de l'organisation
   (pas de tâches privées).
 - Un récapitulatif hebdomadaire par email (tâches en attente + rapports

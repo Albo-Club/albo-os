@@ -15,6 +15,7 @@ import {
   termDurationValidator,
 } from './lib/instruments'
 import { isTreasuryPlacement } from './lib/instrumentMapping'
+import { listSilentCompanies, withReportAlerts } from './lib/reportFreshness'
 import {
   moic as moicRatio,
   proceedsFromReceived,
@@ -543,8 +544,10 @@ export const listParticipations = query({
       if (d.viaSpvCompanyId) referenced.add(d.viaSpvCompanyId)
     }
 
+    const silent = await listSilentCompanies(ctx, orgId, Date.now())
+
     return {
-      rows: buildParticipationRows(sources),
+      rows: withReportAlerts(buildParticipationRows(sources), silent),
       referencedCompanyIds: [...referenced],
     }
   },

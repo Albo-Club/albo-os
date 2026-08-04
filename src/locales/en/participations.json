@@ -772,5 +772,12 @@
       "too_large": "File is larger than 20 MB",
       "default": "Something went wrong"
     }
+  },
+  "silence": {
+    "title": "Stale data",
+    "lastReport_one": "Last report received {{count}} month ago",
+    "lastReport_other": "Last report received {{count}} months ago",
+    "never": "No report since the funds were wired on {{date}}",
+    "coverage": "Covered through {{date}}"
   }
 }

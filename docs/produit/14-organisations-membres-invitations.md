@@ -27,7 +27,9 @@ member ou admin (jamais owner directement).
 
 Trois onglets dans Paramètres :
 
-- **Général** : nom (admin/owner), slug (lecture seule), logo.
+- **Général** : nom (admin/owner), slug (lecture seule), logo, et le délai
+  d'alerte reporting — le nombre de mois sans rapport reçu au-delà duquel une
+  participation est signalée comme silencieuse (4 mois par défaut).
 - **Membres** : la liste avec rôle ; changement de rôle et retrait via un
   menu par membre (dans le respect des règles ci-dessus). Plus bas, la
   carte **Alertes par email** (voir ci-dessous).

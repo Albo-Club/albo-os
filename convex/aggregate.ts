@@ -15,6 +15,7 @@ import {
   participationSource,
 } from './deals'
 import { requireAppUser } from './lib/auth'
+import { listSilentCompanies, withReportAlerts } from './lib/reportFreshness'
 import type { GenericQueryCtx } from 'convex/server'
 import type { DataModel, Doc } from './_generated/dataModel'
 
@@ -135,6 +136,13 @@ export const listParticipations = query({
       }),
     )
 
-    return buildParticipationRows(perOrg.flat())
+    const now = Date.now()
+    const silent = (
+      await Promise.all(
+        memberships.map((m) => listSilentCompanies(ctx, m.orgId, now)),
+      )
+    ).flat()
+
+    return withReportAlerts(buildParticipationRows(perOrg.flat()), silent)
   },
 })
