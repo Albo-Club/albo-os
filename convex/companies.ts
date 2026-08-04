@@ -22,7 +22,7 @@ const kindValidator = v.union(
 
 /** Normalizes a typed SIREN: strips spaces. '' = clears the field.
  * Throws 'invalid_siren' if non-empty and ≠ 9 digits. */
-function normalizeSiren(raw: string): string | undefined {
+export function normalizeSiren(raw: string): string | undefined {
   const cleaned = raw.replace(/\s/g, '')
   if (cleaned === '') return undefined
   if (!/^\d{9}$/.test(cleaned)) throw new ConvexError('invalid_siren')
@@ -30,7 +30,7 @@ function normalizeSiren(raw: string): string | undefined {
 }
 
 /** Rejects a SIREN already used by another company of the org. */
-async function assertSirenFree(
+export async function assertSirenFree(
   ctx: Ctx,
   orgId: Id<'organizations'>,
   siren: string,

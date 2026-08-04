@@ -788,8 +788,8 @@ Les outils d'écriture de l'agent portent `needsApproval: true`
 
 ## Serveur MCP distant (connector claude.ai) — OAuth via plugin BA `mcp`
 
-Le serveur MCP (`convex/mcp/`) expose ~22 outils **lecture seule** aux
-clients MCP externes. Architecture : resource server = httpAction `/mcp`
+Le serveur MCP (`convex/mcp/`) expose 26 outils aux clients MCP externes :
+22 en lecture, 4 en écriture (cf. point 6). Architecture : resource server = httpAction `/mcp`
 (JSON-RPC Streamable HTTP **stateless**, fait main — le SDK
 `@modelcontextprotocol/sdk` est Node-only et les httpActions tournent dans
 le runtime V8 Convex, sans `"use node"`) ; authorization server = plugin
@@ -809,7 +809,10 @@ Pièges et décisions :
    install du composant avec schéma régénéré ; (c) mini-AS maison.
 2. **Pas de binding d'audience RFC 8707** : les tokens BA sont opaques et
    le paramètre `resource` n'est pas validé. Accepté pour un outil interne
-   à 2 users — à revoir si le serveur expose un jour des écritures.
+   à 2 users. Depuis l'ouverture des écritures (point 6), un token volé
+   n'est plus seulement une fuite de lecture — la limite de dégât reste
+   qu'aucun outil MCP ne supprime, et que tout écrit est visible et
+   corrigeable dans l'app.
 3. **Reprise du flow OAuth après login.** Le plugin redirige les
    non-authentifiés vers `/login?<query OAuth>` et pose un cookie signé
    `oidc_login_prompt` (after-hook de reprise). On ne dépend **pas** de ce
@@ -828,16 +831,38 @@ Pièges et décisions :
 5. **`MCP_DEV_TOKEN` / `MCP_DEV_EMAIL`** (env Convex) : bypass OAuth pour
    curl et MCP Inspector. Les deux doivent être posés pour être actifs —
    ne jamais les laisser en prod hors session de test.
-6. **Écritures interdites par principe (v1).** MCP n'a pas d'équivalent de
-   `needsApproval` : une écriture exposée en MCP reposerait sur la
-   confirmation du client (Claude), pas sur nos boutons in-app. Si un jour
-   on en ajoute, décision explicite + section dédiée ici.
+6. **Écritures : où vit la validation humaine.** Le serveur expose 4 outils
+   d'écriture (`createCompany`, `updateCompany`, `createDeal`, `updateDeal`)
+   pour saisir une entité depuis une phrase dictée, hors app. MCP n'a
+   **pas** d'équivalent de `needsApproval` : le flag du chat in-app arrête
+   la génération et attend un clic sur nos boutons, mécanique qui n'existe
+   pas hors du panneau. Le point de contrôle est donc l'annotation MCP
+   `readOnlyHint: false` (spec 2025-06-18), émise dans `tools/list` et
+   calculée depuis le flag `write` de `defineTool` — c'est elle qui fait
+   demander confirmation au client. **Tout nouvel outil MCP qui écrit DOIT
+   porter `write: true`** ; sans lui il s'annonce en lecture seule et
+   s'exécute sans confirmation. Conséquences assumées :
+   - **Aucun blocage sur doublon**, seulement des avertissements
+     (`possibleDuplicates`, `convex/lib/duplicates.ts`). Sans écran de
+     revue, bloquer une création sur une heuristique de nom coûterait plus
+     cher que la corriger. Seule exception : `assertSirenFree`, invariant
+     de données déjà appliqué partout ailleurs — le chemin MCP ne doit pas
+     ouvrir de porte dérobée autour.
+   - **Pas de mutation dupliquée** : les internes de `convex/agentTools.ts`
+     sont élargis en champs optionnels plutôt que recopiés côté MCP, pour
+     garder une seule implémentation des garde-fous
+     (`assertInvestorIsGroupEntity`, `assertSameOrg`, normalisation domaine
+     et SIREN). Corollaire : élargir un interne modifie aussi ce que voit
+     l'agent in-app — les valeurs de retour sont additives (`similar`), les
+     schémas zod du chat restent inchangés.
+   - **Suppressions hors périmètre.** Aucun outil MCP ne supprime, et cette
+     limite est ce qui rend l'écriture directe acceptable.
 7. **Registre de schémas séparé.** Les outils agent sont en `zod/v3`
    (inline), incompatibles `z.toJSONSchema()` → `convex/mcp/registry.ts`
    re-déclare les schémas en zod v4. Si les args d'un internal changent,
    tenir les deux en phase.
 8. **claude.ai ne charge qu'un sous-ensemble des outils par conversation**
-   (sélection dynamique côté Anthropic, ~5 sur 22 observés). Conséquence :
+   (sélection dynamique côté Anthropic, ~5 sur 26 observés). Conséquence :
    `listOrgs` peut être absent et le modèle devine des slugs erronés.
    Mitigation en place : à `initialize`/`tools/list` (authentifiés), les
    orgs du caller sont injectées en `enum` sur le paramètre `org` de chaque

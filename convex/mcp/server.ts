@@ -34,11 +34,14 @@ import type { McpTool } from './registry'
 const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26']
 
 const SERVER_INSTRUCTIONS =
-  'Read-only access to Albo OS portfolio data (family office CALTE + Albo ' +
-  'Club). Monetary amounts are integers in EUR CENTS (100000 = 1 000 €). ' +
-  'Rates are in BASIS POINTS (1100 = 11%). Dates are ISO strings or ms ' +
-  'epoch. One investment vehicle = one organization: pass the `org` slug ' +
-  'to every tool.'
+  'Access to Albo OS portfolio data (family office CALTE + Albo Club). ' +
+  'Monetary amounts are integers in EUR CENTS (100000 = 1 000 €). Rates are ' +
+  'in BASIS POINTS (1100 = 11%). Dates are ISO strings or ms epoch. One ' +
+  'investment vehicle = one organization: pass the `org` slug to every tool. ' +
+  'Most tools read. The four write tools (createCompany, updateCompany, ' +
+  'createDeal, updateDeal) commit immediately — confirm with the user before ' +
+  'calling one, and report back the `url` and any `possibleDuplicates` the ' +
+  'call returns.'
 
 // Permissive CORS so browser-based clients (MCP Inspector) can connect; the
 // endpoint is bearer-only, no ambient cookie auth, so this is safe.
@@ -267,6 +270,10 @@ export const mcpEndpoint = httpAction(async (ctx, request) => {
             name: tool.name,
             description: tool.description,
             inputSchema: orgAwareSchema(tool, orgs),
+            // readOnlyHint: false is the signal that makes a client ask the
+            // user before running the call — that is where the human
+            // checkpoint lives for the write tools.
+            annotations: tool.annotations,
           })),
         }),
       )
