@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { api } from '../../../../convex/_generated/api'
+import { DEFAULT_SILENCE_MONTHS } from '../../../../convex/lib/reportFreshness'
 import type { Id } from '../../../../convex/_generated/dataModel'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
@@ -519,14 +520,22 @@ function Todo() {
                     {row.companyName}
                   </Link>
                   <span className="text-muted-foreground text-xs">
-                    {t('reports.lastReport', {
-                      date: fmtDate(row.lastReportAt),
-                    })}
+                    {row.lastNewsAt !== null
+                      ? t('reports.lastReport', {
+                          date: fmtDate(row.lastNewsAt),
+                        })
+                      : t('reports.neverReported', {
+                          date: fmtDate(row.sinceAt),
+                        })}
                   </span>
                 </div>
               ))}
             </div>
-            <p className="text-muted-foreground text-xs">{t('reports.hint')}</p>
+            <p className="text-muted-foreground text-xs">
+              {t('reports.hint', {
+                count: org?.reportSilenceMonths ?? DEFAULT_SILENCE_MONTHS,
+              })}
+            </p>
           </>
         )}
       </TodoSection>

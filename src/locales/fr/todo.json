@@ -40,8 +40,10 @@
   },
   "reports": {
     "title": "Reportings manquants",
-    "empty": "Toutes les participations ont reporté récemment.",
-    "lastReport": "Aucun report reçu depuis le {{date}}",
-    "hint": "Participations qui reportaient et sont silencieuses depuis plus de 3 mois."
+    "empty": "Toutes les participations ont donné des nouvelles récemment.",
+    "lastReport": "Aucune nouvelle depuis le {{date}}",
+    "neverReported": "Aucune nouvelle depuis le versement des fonds du {{date}}",
+    "hint_one": "Participations sans report ni communication depuis plus de {{count}} mois (seuil réglable dans Réglages → Général).",
+    "hint_other": "Participations sans report ni communication depuis plus de {{count}} mois (seuil réglable dans Réglages → Général)."
   }
 }

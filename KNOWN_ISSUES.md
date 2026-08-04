@@ -1632,6 +1632,21 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   (one-shot idempotent, `'{}'` = toutes les orgs, cf. `TESTING.md`). L'import
   CSV Mémo Bank a inséré sans `matchStatus` jusqu'au fix de juin 2026 — les
   lignes albo importées avant nécessitent ce backfill.
+- **Pointer une sortie fait basculer un deal en term sheet vers `active`.**
+  `applyMatchToDeal` (`convex/lib/pointage.ts`) patche le deal en
+  `status: 'active'` quand il est `pending` **et** que la transaction est
+  `direction: 'out'`. La **première** sortie suffit : un fonds est actif dès
+  son premier appel de capital, bien avant que les appels couvrent
+  l'engagement — un seuil « décaissé ≥ engagé » laisserait ces deals en term
+  sheet à tort. La règle vit dans le cœur partagé, donc elle couvre aussi le
+  pointage fait par l'agent (`agentToolsPointage.ts`). Bascule **en avant
+  uniquement**, comme le chemin Attio « Invested » : aucun autre statut n'est
+  touché, et `applyUnmatch` ne rétrograde pas (un deal `active` peut
+  légitimement n'avoir aucune transaction — import Airtable, webhook Attio, où
+  rétrograder serait une régression). Conséquence assumée : **aucun geste UI
+  ne ramène un deal en `pending`** — une activation par erreur se répare en
+  base (`convex run --prod`). Les deals déjà pointés avant cette règle ne sont
+  pas rattrapés : dépointer/repointer la transaction les fait basculer.
 - **`matchingDecisions` est append-only.** Une ligne par action de pointage
   (y compris le dé-pointage, signal négatif pour l'agent). Jamais de patch ni
   de delete. Le backfill n'y écrit **rien** (pas une décision humaine — ne pas

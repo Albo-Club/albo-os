@@ -244,6 +244,9 @@ export default defineSchema({
     logoStorageId: v.optional(v.id('_storage')),
     createdBy: v.id('users'),
     createdAt: v.number(),
+    // Months without a received report past which a participation is flagged
+    // as silent (unset = DEFAULT_SILENCE_MONTHS, cf. lib/reportFreshness.ts).
+    reportSilenceMonths: v.optional(v.number()),
   }).index('by_slug', ['slug']),
 
   organizationMembers: defineTable({

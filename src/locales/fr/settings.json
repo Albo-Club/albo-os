@@ -26,7 +26,9 @@
       "insufficient_role": "Réservé aux admins ou propriétaires",
       "invalid_name": "Nom invalide",
       "default": "Échec de l'enregistrement"
-    }
+    },
+    "reportSilence": "Alerte reporting (mois)",
+    "reportSilenceHint": "Nombre de mois sans report reçu au-delà duquel une participation est signalée comme silencieuse, dans la liste des participations et l'onglet À faire. Les boîtes qui n'ont jamais reporté sont comptées depuis le versement des fonds."
   },
   "members": {
     "title": "Membres",

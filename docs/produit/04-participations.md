@@ -36,6 +36,19 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
   d'exits remplacent le TVPI par **MOIC** et **TRI** annualisé. Tri par
   colonne sur les Actifs, clic vers la fiche ; pas de pagination — chaque
   tableau défile sous son en-tête et ses totaux.
+- **Alerte « boîte silencieuse »** : une pastille d'alerte ambre s'affiche à
+  côté du nom d'une société dont aucune nouvelle n'est arrivée depuis plus de
+  **4 mois** (délai réglable par organisation dans Réglages → Général). Deux
+  canaux comptent à égalité : les **rapports reçus par email** et les
+  **communications publiées sur le portail de l'émetteur** (les SPV Parallel
+  et consorts, cf. [Intégrations](15-integrations.md)) — un SPV ne rédige
+  rien, il publie, et l'alerte doit lire là où il parle. Le survol donne le
+  détail : par quel canal la dernière nouvelle est arrivée, depuis quand, et
+  jusqu'à quelle période elle couvrait — un rapport reçu en mars peut ne
+  couvrir que janvier. Une société qui n'a jamais donné de nouvelles est
+  comptée depuis le versement des fonds. Les term sheets en cours et les positions sorties
+  ne portent jamais cette pastille. Le même signal alimente le bloc
+  « Reportings manquants » de la page [À faire](16-a-faire.md).
 - **Colonnes alignées d'un tableau à l'autre** : les quatre tableaux
   partagent la même grille, donc chaque colonne tombe au même endroit et
   la page se lit d'un seul coup d'œil vertical. Un tableau qui n'a pas une

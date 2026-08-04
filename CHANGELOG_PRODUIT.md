@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.173.0 — 04/08/2026 à 19:21 — Créer une société ou un deal depuis Claude, sans ouvrir l'app
+## v1.175.0 — 04/08/2026 à 19:21 — Créer une société ou un deal depuis Claude, sans ouvrir l'app
 
 Le connecteur Claude savait lire le portefeuille, rien de plus. Pour entrer
 une nouvelle boîte ou une nouvelle participation, il fallait revenir dans
@@ -78,6 +78,160 @@ phrase, et c'est Claude qui range dans les bonnes cases.
 >   implémentation. Tests purs dans `tests/duplicates.test.ts`.
 > - Liens profonds construits depuis `SITE_URL`, avec routage
 >   `placements/` vs `deals/` via `isTreasuryPlacement`.
+
+---
+
+## v1.174.1 — 04/08/2026 à 19:09 — L'alerte « boîte silencieuse » écoute enfin les SPV
+
+L'alerte lancée ce matin criait au silence sur des sociétés qui parlaient
+pourtant très récemment : tous les SPV Parallel de CALTE portaient une
+pastille ambre alors que leurs communications dataient de quelques
+semaines.
+
+La cause tient en une phrase : l'alerte ne lisait que les rapports reçus
+**par email**. Or un SPV n'envoie jamais de mail — il **publie** sur le
+portail de son émetteur, et ces communications s'affichent déjà dans la
+fiche société. L'alerte regardait la seule boîte aux lettres, là où ces
+sociétés-là ne passent jamais.
+
+Désormais les deux canaux comptent à égalité : un rapport reçu par email
+et une communication publiée sur le portail remettent le compteur à zéro
+de la même façon. Le survol de la pastille précise **par quel canal** la
+dernière nouvelle est arrivée — « Dernier report reçu il y a 5 mois » ou
+« Dernière communication il y a 5 mois » — pour savoir où aller chercher.
+
+Un point à connaître : une entité ne bénéficie de ce rattrapage que si
+elle est **reliée à son émetteur** dans ses Intégrations. Un SPV non relié
+reste vu comme muet, puisque rien ne permet de savoir où il publie.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/reportFreshness.ts` : `listSilentCompanies` lit une seconde
+>   source, `vascoCommunicationsCache`, en plus de `companyReports`. La map
+>   `${vascoClientSlug}:${vascoIssuerId}` → `companyId` est construite depuis
+>   les `companies` déjà chargées ; le cache n'est lu que si au moins une
+>   entité porte un lien (pas d'abonnement Convex inutile sur une org sans
+>   connexion portail).
+> - `publishDate` est une chaîne ISO du portail : une date absente ou
+>   illisible est **écartée** plutôt que repliée sur `fetchedAt`, qui vaut
+>   toujours « aujourd'hui » et éteindrait l'alerte pour de mauvaises
+>   raisons.
+> - `SilentCompany.lastReportAt` devient `lastNewsAt`, plus `lastNewsSource`
+>   (`'report' | 'vasco'`) : le tooltip doit nommer le canal, sinon il envoie
+>   chercher un email qui n'existe pas. Les trois consommateurs suivent
+>   (`ParticipationsTable`, `todo.tsx`, outil agent `listSilentCompanies`).
+> - `convex/regression.reportFreshness.test.ts` : 4 tests de plus (10 au
+>   total) — communication récente vs vieille, entité non reliée qui ne lit
+>   rien du cache de l'org, communication sans date, et canal de la dernière
+>   nouvelle.
+> - Limite assumée : si la connexion au portail casse, les communications
+>   cessent d'être rafraîchies et l'alerte finit par se déclencher à tort.
+>   Non traité ici.
+
+---
+
+## v1.174.0 — 04/08/2026 à 16:54 — Les boîtes qui ne donnent plus de nouvelles se signalent toutes seules
+
+Une participation qui cesse de reporter ne fait pas de bruit : c'est
+justement le problème. Il fallait ouvrir l'onglet **À faire** pour s'en
+apercevoir, et le délai y était figé à trois mois pour tout le monde.
+
+- **Une pastille d'alerte dans la liste des participations**, à côté du nom
+  de la société. Au survol : depuis quand le dernier rapport est arrivé, et
+  **jusqu'à quelle période il couvrait** — un rapport reçu en mars peut ne
+  couvrir que janvier, et les deux dates ne disent pas la même chose.
+- **Le délai se règle par organisation** (Réglages → Général), à **4 mois**
+  par défaut. Le changer déplace le signal partout à la fois : la liste des
+  participations, l'onglet À faire et l'assistant disent toujours la même
+  chose.
+- **Les boîtes qui n'ont jamais reporté comptent aussi**, mais à partir du
+  **versement des fonds** : des fonds virés il y a deux semaines ne doivent
+  encore rien. Jusqu'ici elles étaient simplement invisibles.
+- **L'assistant sait répondre** à « quelles boîtes ne nous ont pas reporté
+  depuis longtemps ? », dans le chat comme sur Telegram.
+
+Le délai est toujours mesuré sur la **date de réception** d'un rapport, pas
+sur la période qu'il couvre : sinon une société qui reporte au trimestre
+paraîtrait en retard le lendemain de son envoi. Les term sheets en cours et
+les positions entièrement sorties ne sont jamais signalés.
+
+> **🔧 Notes techniques**
+>
+> - Détection centralisée dans `convex/lib/reportFreshness.ts`
+>   (`listSilentCompanies`) : un seul scan indexé `by_org` des
+>   `companyReports` pour le dernier `emailDate` et le dernier
+>   `periodSortDate` par société ; les transactions ne sont lues que pour les
+>   sociétés sans aucun rapport (`firstOutflowAt` sur l'index `by_deal`,
+>   repli sur `signedDate`). Scope : `companies.kind = 'portfolio'` non
+>   archivées, cibles d'un deal `active` / `partially_exited`.
+> - Seuil porté par `organizations.reportSilenceMonths` (optionnel, défaut
+>   `DEFAULT_SILENCE_MONTHS = 4`, bornes 1-24 validées dans
+>   `organizations.updateGeneral` et dans le schéma Zod du formulaire).
+> - Un producteur, trois consommateurs : `deals.listParticipations` et
+>   `aggregate.listParticipations` taguent leurs lignes via
+>   `withReportAlerts` (jamais sur les buckets `pending` / `settled`),
+>   `todo.getTodo` remplace sa boucle à N requêtes par le helper, et
+>   `companyReports.silentInternal` sert l'outil agent `listSilentCompanies`
+>   (lecture seule, `readMembership` sur la scope key du thread).
+> - Front : `SilenceBadge` local à `ParticipationsTable.tsx` (tooltip shadcn,
+>   le `TooltipProvider` vient du `SidebarProvider` du layout), champ
+>   « Alerte reporting » dans `settings/general.tsx`, i18n sous
+>   `participations:silence.*`, `todo:reports.*` et
+>   `settings:general.reportSilence*`.
+> - Invariants pinnés dans `convex/regression.reportFreshness.test.ts`
+>   (réception vs période couverte, décaissement pointé prioritaire sur la
+>   signature, seuil par org, exclusion des sorties et des archivées).
+
+---
+
+## v1.173.0 — 04/08/2026 à 16:48 — Un deal en term sheet passe en actif dès que l'argent part
+
+Jusqu'ici, un deal créé en **term sheet** y restait bloqué. On pouvait pointer
+le virement, voir le décaissé apparaître sur sa fiche — le deal continuait
+d'être compté parmi les engagements à venir, et rien dans l'application ne
+permettait de le passer en actif : il fallait repasser par Attio.
+
+C'est réglé : **pointer une sortie sur un deal en term sheet le fait passer en
+actif**. L'argent est parti, la position existe, elle sort de la liste des
+term sheets — dans la fiche, dans la liste des deals et dans les
+participations, sans rien avoir à faire de plus.
+
+Un seul versement suffit : inutile d'attendre que l'engagement soit couvert,
+un fonds étant bel et bien actif dès son premier appel de capital.
+
+Deux précisions :
+
+- la bascule ne va que dans ce sens — détacher la transaction ensuite ne
+  ramène pas le deal en term sheet, et un deal déjà sorti n'est jamais
+  ramené en actif ;
+- seules les **sorties** déclenchent le passage : pointer un retour ou une
+  distribution laisse le deal en term sheet.
+
+Passer le deal au stage « Invested » dans Attio continue bien sûr de
+fonctionner : les deux chemins mènent au même statut. En revanche les deals
+pointés **avant** cette mise à jour ne sont pas rattrapés — détacher puis
+repointer leur virement les fait basculer.
+
+> **🔧 Notes techniques**
+>
+> - La règle vit dans `applyMatchToDeal` (`convex/lib/pointage.ts`), le cœur
+>   partagé du pointage : elle couvre donc d'un coup la mutation manuelle
+>   `transactions.matchTransaction` et l'outil de pointage de l'agent
+>   (`agentToolsPointage.ts`), sans les toucher.
+> - Condition volontairement minimale : `deal.status === 'pending'` **et**
+>   `tx.direction === 'out'` → `patch('deals', dealId, { status: 'active' })`.
+>   Pas de seuil « décaissé ≥ engagé », qui laisserait un `fund_lp` appelé à
+>   30 % en term sheet.
+> - Forward-only, aligné sur `advancesStatus` du chemin Attio « Invested »
+>   (`convex/attioSync.ts`) : les autres statuts sont intouchés et
+>   `applyUnmatch` ne rétrograde pas (un deal `active` sans transaction est un
+>   cas légitime — import Airtable, webhook Attio).
+> - Couverture : 4 tests dans `convex/regression.pointage.test.ts` (sortie
+>   partielle → `active`, dépointage non rétrogradant, entrée sans effet,
+>   deal `fully_exited` inchangé). Rien d'autre n'a bougé : ni schéma, ni UI,
+>   ni migration.
+
+---
 
 ## v1.172.0 — 03/08/2026 à 18:10 — Les rapports et les documents d'une société vivent enfin au même endroit
 

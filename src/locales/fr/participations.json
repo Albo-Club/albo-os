@@ -772,5 +772,14 @@
       "too_large": "Le fichier dépasse 20 Mo",
       "default": "Une erreur est survenue"
     }
+  },
+  "silence": {
+    "title": "Données obsolètes",
+    "lastReport_one": "Dernier report reçu il y a {{count}} mois",
+    "lastReport_other": "Dernier report reçu il y a {{count}} mois",
+    "lastComm_one": "Dernière communication il y a {{count}} mois",
+    "lastComm_other": "Dernière communication il y a {{count}} mois",
+    "never": "Aucune nouvelle depuis le versement des fonds du {{date}}",
+    "coverage": "Couverture jusqu'au {{date}}"
   }
 }

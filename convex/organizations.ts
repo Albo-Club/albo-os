@@ -12,6 +12,7 @@ import {
   readAlertPrefs,
   setAlertPref,
 } from './lib/notificationPrefs'
+import { MAX_SILENCE_MONTHS, MIN_SILENCE_MONTHS } from './lib/reportFreshness'
 import { setLastOrgSlug } from './lib/userPrefs'
 import { resolveAvatarUrl, resolveLogoUrl } from './lib/storage'
 import type { DataModel, Id } from './_generated/dataModel'
@@ -235,12 +236,24 @@ export const updateGeneral = mutation({
   args: {
     orgId: v.id('organizations'),
     name: v.string(),
+    reportSilenceMonths: v.optional(v.number()),
   },
-  handler: async (ctx, { orgId, name }) => {
+  handler: async (ctx, { orgId, name, reportSilenceMonths }) => {
     await requireOrgRole(ctx, orgId, 'admin')
     const trimmedName = name.trim()
     if (!trimmedName) throw new ConvexError('invalid_name')
-    await ctx.db.patch('organizations', orgId, { name: trimmedName })
+    if (
+      reportSilenceMonths !== undefined &&
+      (!Number.isInteger(reportSilenceMonths) ||
+        reportSilenceMonths < MIN_SILENCE_MONTHS ||
+        reportSilenceMonths > MAX_SILENCE_MONTHS)
+    ) {
+      throw new ConvexError('invalid_report_silence_months')
+    }
+    await ctx.db.patch('organizations', orgId, {
+      name: trimmedName,
+      ...(reportSilenceMonths !== undefined ? { reportSilenceMonths } : {}),
+    })
     return null
   },
 })
