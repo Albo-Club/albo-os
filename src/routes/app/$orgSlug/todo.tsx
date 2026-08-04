@@ -520,9 +520,9 @@ function Todo() {
                     {row.companyName}
                   </Link>
                   <span className="text-muted-foreground text-xs">
-                    {row.lastReportAt !== null
+                    {row.lastNewsAt !== null
                       ? t('reports.lastReport', {
-                          date: fmtDate(row.lastReportAt),
+                          date: fmtDate(row.lastNewsAt),
                         })
                       : t('reports.neverReported', {
                           date: fmtDate(row.sinceAt),

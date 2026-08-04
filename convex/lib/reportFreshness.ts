@@ -1,9 +1,16 @@
 /**
- * « Silent company » detection — a portfolio company that stopped sending
- * investor reports, or never started.
+ * « Silent company » detection — a portfolio company that stopped giving news,
+ * or never started.
+ *
+ * Two channels count as news, because an entity has two ways of reaching us:
+ * the investor reports ingested by email (`companyReports`) and the investor
+ * communications published on a fund-admin portal (`vascoCommunicationsCache`,
+ * e.g. the Parallel SPVs). An SPV never emails anything — it publishes on the
+ * portal — so reading the reports alone flagged every linked SPV as silent
+ * while its communications were days old.
  *
  * Threshold: `organizations.reportSilenceMonths` (4 months by default),
- * measured on the RECEPTION date of the last report, never on the period it
+ * measured on the RECEPTION date of the last news, never on the period it
  * covers — a quarterly reporter would otherwise look silent the day after
  * reporting.
  *
@@ -29,14 +36,20 @@ export const DEFAULT_SILENCE_MONTHS = 4
 export const MIN_SILENCE_MONTHS = 1
 export const MAX_SILENCE_MONTHS = 24
 
+/** Channel the last news came through — the tooltip names it, so the reader
+ * knows where to go looking. */
+export type NewsSource = 'report' | 'vasco'
+
 export type SilentCompany = {
   companyId: Id<'companies'>
   companyName: string
-  /** Reception date of the last report, null when the company never reported. */
-  lastReportAt: number | null
+  /** Reception date of the last news, null when the company never gave any. */
+  lastNewsAt: number | null
+  /** Channel of that last news, null when there never was any. */
+  lastNewsSource: NewsSource | null
   /** Most recent period covered by a report, null when unknown. */
   coverageUntil: number | null
-  /** What the silence is counted from: last report, else first disbursement. */
+  /** What the silence is counted from: last news, else first disbursement. */
   sinceAt: number
 }
 
@@ -66,8 +79,9 @@ async function firstOutflowAt(
 
 /**
  * The org's silent companies, longest silence first. One indexed scan of the
- * org's reports; the transactions are only read for companies that never
- * reported (the sole case where the disbursement date is needed).
+ * org's reports and one of its portal communications; the transactions are
+ * only read for companies that never gave news (the sole case where the
+ * disbursement date is needed).
  */
 export async function listSilentCompanies(
   ctx: Ctx,
@@ -130,18 +144,64 @@ export async function listSilentCompanies(
     )
     .collect()
 
+  // Last portal communication per company, for the entities linked to their
+  // issuer. Publishing IS the reception here — there is no mail to wait for.
+  // The cache is only read when at least one entity is linked, so an org
+  // without a portal connection keeps its previous set of subscriptions.
+  const byIssuer = new Map<string, Id<'companies'>>()
+  for (const company of companies) {
+    if (company.vascoClientSlug && company.vascoIssuerId) {
+      byIssuer.set(
+        `${company.vascoClientSlug}:${company.vascoIssuerId}`,
+        company._id,
+      )
+    }
+  }
+  const lastComm = new Map<Id<'companies'>, number>()
+  if (byIssuer.size > 0) {
+    const comms = await ctx.db
+      .query('vascoCommunicationsCache')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    for (const comm of comms) {
+      const companyId = byIssuer.get(`${comm.clientSlug}:${comm.issuerId}`)
+      if (companyId === undefined) continue
+      // `publishDate` is an ISO string from the portal — an unparseable or
+      // missing one is no proof of life, so it is dropped rather than
+      // defaulted to the row's fetch date (which would be today, always).
+      const publishedAt = comm.publishDate ? Date.parse(comm.publishDate) : NaN
+      if (Number.isNaN(publishedAt)) continue
+      const known = lastComm.get(companyId)
+      if (known === undefined || publishedAt > known) {
+        lastComm.set(companyId, publishedAt)
+      }
+    }
+  }
+
   const silent: Array<SilentCompany> = []
   for (const company of companies) {
     if (company.archivedAt) continue
     const deals = dealsByCompany.get(company._id)
     if (!deals) continue
 
-    const lastReportAt = lastReport.get(company._id) ?? null
+    // The most recent news wins, whichever channel carried it.
+    const reportedAt = lastReport.get(company._id) ?? null
+    const communicatedAt = lastComm.get(company._id) ?? null
+    let lastNewsAt: number | null = null
+    let lastNewsSource: NewsSource | null = null
+    if (reportedAt !== null || communicatedAt !== null) {
+      const commWins =
+        communicatedAt !== null &&
+        (reportedAt === null || communicatedAt > reportedAt)
+      lastNewsAt = commWins ? communicatedAt : reportedAt
+      lastNewsSource = commWins ? 'vasco' : 'report'
+    }
+
     let sinceAt: number
-    if (lastReportAt !== null) {
-      sinceAt = lastReportAt
+    if (lastNewsAt !== null) {
+      sinceAt = lastNewsAt
     } else {
-      // Never reported: count from the first disbursement.
+      // Never gave news: count from the first disbursement.
       let firstPaid: number | null = null
       for (const dealId of deals) {
         const paidAt = await firstOutflowAt(ctx, dealId)
@@ -156,7 +216,8 @@ export async function listSilentCompanies(
     silent.push({
       companyId: company._id,
       companyName: company.name,
-      lastReportAt,
+      lastNewsAt,
+      lastNewsSource,
       coverageUntil: coverage.get(company._id) ?? null,
       sinceAt,
     })

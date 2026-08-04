@@ -6,7 +6,9 @@
  * agent tool), so the invariants are pinned here once:
  * - silence is measured on the RECEPTION date of the last report, never on
  *   the period it covers;
- * - a company that never reported is measured from its first disbursement —
+ * - a portal communication counts as news exactly like an emailed report —
+ *   an SPV publishes, it does not write;
+ * - a company that never gave news is measured from its first disbursement —
  *   funds wired last week owe nothing yet;
  * - the threshold follows the org's `reportSilenceMonths`;
  * - an exited or archived position never nags.
@@ -67,6 +69,39 @@ async function createReport(
       status: 'completed',
       emailDate: opts.emailDate,
       periodSortDate: opts.periodSortDate,
+    })
+  })
+}
+
+/** Link an entity to its fund-admin portal issuer (the « Intégrations » gesture). */
+async function linkVascoIssuer(
+  t: Harness,
+  companyId: Id<'companies'>,
+  issuerId: string,
+): Promise<void> {
+  await t.run(async (ctx) => {
+    await ctx.db.patch('companies', companyId, {
+      vascoClientSlug: 'parallel',
+      vascoIssuerId: issuerId,
+    })
+  })
+}
+
+async function createCommunication(
+  t: Harness,
+  orgId: Id<'organizations'>,
+  issuerId: string,
+  publishDate: string | undefined,
+): Promise<void> {
+  await t.run(async (ctx) => {
+    await ctx.db.insert('vascoCommunicationsCache', {
+      orgId,
+      clientSlug: 'parallel',
+      issuerId,
+      communicationId: `comm-${issuerId}-${publishDate ?? 'undated'}`,
+      publishDate,
+      documents: [],
+      fetchedAt: Date.now(),
     })
   })
 }
@@ -202,6 +237,110 @@ describe('report freshness: silent companies', () => {
       reportSilenceMonths: 6,
     })
     expect(await silentNames(user, org.orgId)).toEqual([])
+  })
+
+  test('a recent portal communication counts as news (the SPV case)', async () => {
+    const { t, user, org } = await orgSetup()
+    const now = Date.now()
+    // Two SPVs wired a year ago, neither has ever emailed a report: only the
+    // publication rhythm on the portal tells them apart.
+    const talking = await createPortfolioCompany(t, org.orgId, 'SPV talking')
+    const mute = await createPortfolioCompany(t, org.orgId, 'SPV mute')
+    for (const companyId of [talking, mute]) {
+      await createDeal(
+        t,
+        org.orgId,
+        org.rootCompanyId,
+        companyId,
+        'active',
+        now - 12 * MONTH,
+      )
+    }
+    await linkVascoIssuer(t, talking, 'issuer-talking')
+    await linkVascoIssuer(t, mute, 'issuer-mute')
+    await createCommunication(
+      t,
+      org.orgId,
+      'issuer-talking',
+      new Date(now - 1 * MONTH).toISOString(),
+    )
+    await createCommunication(
+      t,
+      org.orgId,
+      'issuer-mute',
+      new Date(now - 7 * MONTH).toISOString(),
+    )
+
+    expect(await silentNames(user, org.orgId)).toEqual(['SPV mute'])
+  })
+
+  test('matches the issuer by id — an unlinked entity reads nothing', async () => {
+    const { t, user, org } = await orgSetup()
+    const now = Date.now()
+    const company = await createPortfolioCompany(t, org.orgId, 'SPV unlinked')
+    await createDeal(
+      t,
+      org.orgId,
+      org.rootCompanyId,
+      company,
+      'active',
+      now - 12 * MONTH,
+    )
+    // The communication is cached for the org, but no entity claims the issuer.
+    await createCommunication(
+      t,
+      org.orgId,
+      'issuer-nobody',
+      new Date(now - 1 * MONTH).toISOString(),
+    )
+
+    expect(await silentNames(user, org.orgId)).toEqual(['SPV unlinked'])
+  })
+
+  test('an undated communication is no proof of life', async () => {
+    const { t, user, org } = await orgSetup()
+    const now = Date.now()
+    const company = await createPortfolioCompany(t, org.orgId, 'SPV undated')
+    await createDeal(
+      t,
+      org.orgId,
+      org.rootCompanyId,
+      company,
+      'active',
+      now - 12 * MONTH,
+    )
+    await linkVascoIssuer(t, company, 'issuer-undated')
+    await createCommunication(t, org.orgId, 'issuer-undated', undefined)
+
+    expect(await silentNames(user, org.orgId)).toEqual(['SPV undated'])
+  })
+
+  test('names the channel the last news came through', async () => {
+    const { t, user, org } = await orgSetup()
+    const now = Date.now()
+    const company = await createPortfolioCompany(t, org.orgId, 'Both channels')
+    await createDeal(
+      t,
+      org.orgId,
+      org.rootCompanyId,
+      company,
+      'active',
+      now - 24 * MONTH,
+    )
+    await linkVascoIssuer(t, company, 'issuer-both')
+    // Both channels went quiet, the portal being the last one to speak.
+    await createReport(t, org.orgId, company, { emailDate: now - 10 * MONTH })
+    await createCommunication(
+      t,
+      org.orgId,
+      'issuer-both',
+      new Date(now - 6 * MONTH).toISOString(),
+    )
+
+    const todo = await user.as.query(api.todo.getTodo, { orgId: org.orgId })
+    expect(todo.missingReports).toHaveLength(1)
+    expect(todo.missingReports[0].lastNewsSource).toBe('vasco')
+    expect(todo.missingReports[0].lastNewsAt).toBeCloseTo(now - 6 * MONTH, -4)
   })
 
   test('ignores exited and archived positions', async () => {

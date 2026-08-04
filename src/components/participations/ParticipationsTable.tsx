@@ -321,11 +321,13 @@ export type CompanyRow = {
    * settled buckets, and on companies that report on time.
    */
   reportAlert?: {
-    /** Reception date of the last report, null when it never reported. */
-    lastReportAt: number | null
+    /** Reception date of the last news, null when it never gave any. */
+    lastNewsAt: number | null
+    /** Channel that carried it: an emailed report, or a portal communication. */
+    lastNewsSource: 'report' | 'vasco' | null
     /** Most recent period covered by a report, null when unknown. */
     coverageUntil: number | null
-    /** What the silence runs from: last report, else first disbursement. */
+    /** What the silence runs from: last news, else first disbursement. */
     sinceAt: number
   } | null
 }
@@ -662,10 +664,11 @@ const monthsSince = (from: number) =>
   Math.floor((Date.now() - from) / (30 * 24 * 60 * 60 * 1000))
 
 /**
- * Amber warning on a participation that stopped reporting. The tooltip
- * separates the two dates that matter: when the last report LANDED, and how
+ * Amber warning on a participation that stopped giving news. The tooltip
+ * separates the two dates that matter: when the last news LANDED, and how
  * far its content actually covers — a report received in March can still
- * only cover January.
+ * only cover January. It also names the channel, so the reader knows whether
+ * to look in the mailbox or on the issuer's portal.
  */
 function SilenceBadge({
   alert,
@@ -675,9 +678,14 @@ function SilenceBadge({
   const { t } = useTranslation('participations')
   const { fmtDate } = useFormatters()
   const since =
-    alert.lastReportAt !== null
-      ? t('silence.lastReport', { count: monthsSince(alert.lastReportAt) })
-      : t('silence.never', { date: fmtDate(alert.sinceAt) })
+    alert.lastNewsAt === null
+      ? t('silence.never', { date: fmtDate(alert.sinceAt) })
+      : t(
+          alert.lastNewsSource === 'vasco'
+            ? 'silence.lastComm'
+            : 'silence.lastReport',
+          { count: monthsSince(alert.lastNewsAt) },
+        )
 
   return (
     <Tooltip>

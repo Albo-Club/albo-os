@@ -40,10 +40,10 @@
   },
   "reports": {
     "title": "Missing reportings",
-    "empty": "Every participation reported recently.",
-    "lastReport": "No report received since {{date}}",
-    "neverReported": "No report since the funds were wired on {{date}}",
-    "hint_one": "Participations with no report received for over {{count}} month (threshold set in Settings → General).",
-    "hint_other": "Participations with no report received for over {{count}} months (threshold set in Settings → General)."
+    "empty": "Every participation gave news recently.",
+    "lastReport": "No news since {{date}}",
+    "neverReported": "No news since the funds were wired on {{date}}",
+    "hint_one": "Participations with no report or communication for over {{count}} month (threshold set in Settings → General).",
+    "hint_other": "Participations with no report or communication for over {{count}} months (threshold set in Settings → General)."
   }
 }
