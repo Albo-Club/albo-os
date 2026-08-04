@@ -76,8 +76,28 @@ const getCompanyIntelligence = createTool({
   },
 })
 
+const listSilentCompanies = createTool({
+  description:
+    'List the portfolio companies that have gone silent: no investor report ' +
+    'received for longer than the organisation threshold (4 months by ' +
+    'default). Only covers companies held through a live deal. Returns the ' +
+    'date of the last report received (null when the company never ' +
+    'reported — the silence is then counted from the first disbursement), ' +
+    'the most recent period covered, and the date the silence runs from, ' +
+    'longest silence first.',
+  inputSchema: z.object({}),
+  execute: async (ctx): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runQuery(internal.companyReports.silentInternal, {
+      orgId,
+      actorUserId: userId,
+    })
+  },
+})
+
 export const reportTools = {
   listCompanyReports,
   getCompanyReport,
   getCompanyIntelligence,
+  listSilentCompanies,
 }

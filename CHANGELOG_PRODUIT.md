@@ -23,6 +23,60 @@ bas de page.
 
 ---
 
+## v1.174.0 — 04/08/2026 à 16:54 — Les boîtes qui ne donnent plus de nouvelles se signalent toutes seules
+
+Une participation qui cesse de reporter ne fait pas de bruit : c'est
+justement le problème. Il fallait ouvrir l'onglet **À faire** pour s'en
+apercevoir, et le délai y était figé à trois mois pour tout le monde.
+
+- **Une pastille d'alerte dans la liste des participations**, à côté du nom
+  de la société. Au survol : depuis quand le dernier rapport est arrivé, et
+  **jusqu'à quelle période il couvrait** — un rapport reçu en mars peut ne
+  couvrir que janvier, et les deux dates ne disent pas la même chose.
+- **Le délai se règle par organisation** (Réglages → Général), à **4 mois**
+  par défaut. Le changer déplace le signal partout à la fois : la liste des
+  participations, l'onglet À faire et l'assistant disent toujours la même
+  chose.
+- **Les boîtes qui n'ont jamais reporté comptent aussi**, mais à partir du
+  **versement des fonds** : des fonds virés il y a deux semaines ne doivent
+  encore rien. Jusqu'ici elles étaient simplement invisibles.
+- **L'assistant sait répondre** à « quelles boîtes ne nous ont pas reporté
+  depuis longtemps ? », dans le chat comme sur Telegram.
+
+Le délai est toujours mesuré sur la **date de réception** d'un rapport, pas
+sur la période qu'il couvre : sinon une société qui reporte au trimestre
+paraîtrait en retard le lendemain de son envoi. Les term sheets en cours et
+les positions entièrement sorties ne sont jamais signalés.
+
+> **🔧 Notes techniques**
+>
+> - Détection centralisée dans `convex/lib/reportFreshness.ts`
+>   (`listSilentCompanies`) : un seul scan indexé `by_org` des
+>   `companyReports` pour le dernier `emailDate` et le dernier
+>   `periodSortDate` par société ; les transactions ne sont lues que pour les
+>   sociétés sans aucun rapport (`firstOutflowAt` sur l'index `by_deal`,
+>   repli sur `signedDate`). Scope : `companies.kind = 'portfolio'` non
+>   archivées, cibles d'un deal `active` / `partially_exited`.
+> - Seuil porté par `organizations.reportSilenceMonths` (optionnel, défaut
+>   `DEFAULT_SILENCE_MONTHS = 4`, bornes 1-24 validées dans
+>   `organizations.updateGeneral` et dans le schéma Zod du formulaire).
+> - Un producteur, trois consommateurs : `deals.listParticipations` et
+>   `aggregate.listParticipations` taguent leurs lignes via
+>   `withReportAlerts` (jamais sur les buckets `pending` / `settled`),
+>   `todo.getTodo` remplace sa boucle à N requêtes par le helper, et
+>   `companyReports.silentInternal` sert l'outil agent `listSilentCompanies`
+>   (lecture seule, `readMembership` sur la scope key du thread).
+> - Front : `SilenceBadge` local à `ParticipationsTable.tsx` (tooltip shadcn,
+>   le `TooltipProvider` vient du `SidebarProvider` du layout), champ
+>   « Alerte reporting » dans `settings/general.tsx`, i18n sous
+>   `participations:silence.*`, `todo:reports.*` et
+>   `settings:general.reportSilence*`.
+> - Invariants pinnés dans `convex/regression.reportFreshness.test.ts`
+>   (réception vs période couverte, décaissement pointé prioritaire sur la
+>   signature, seuil par org, exclusion des sorties et des archivées).
+
+---
+
 ## v1.173.0 — 04/08/2026 à 16:48 — Un deal en term sheet passe en actif dès que l'argent part
 
 Jusqu'ici, un deal créé en **term sheet** y restait bloqué. On pouvait pointer

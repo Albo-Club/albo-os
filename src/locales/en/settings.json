@@ -26,7 +26,9 @@
       "insufficient_role": "Admins or owners only",
       "invalid_name": "Invalid name",
       "default": "Could not save"
-    }
+    },
+    "reportSilence": "Reporting alert (months)",
+    "reportSilenceHint": "Months without a received report past which a participation is flagged as silent, in the participations list and the To do tab. Companies that never reported are counted from the day the funds were wired."
   },
   "members": {
     "title": "Members",

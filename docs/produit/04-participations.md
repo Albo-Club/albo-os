@@ -36,6 +36,15 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
   d'exits remplacent le TVPI par **MOIC** et **TRI** annualisé. Tri par
   colonne sur les Actifs, clic vers la fiche ; pas de pagination — chaque
   tableau défile sous son en-tête et ses totaux.
+- **Alerte « boîte silencieuse »** : une pastille d'alerte ambre s'affiche à
+  côté du nom d'une société dont aucun rapport n'est arrivé depuis plus de
+  **4 mois** (délai réglable par organisation dans Réglages → Général). Le
+  survol donne le détail : depuis quand le dernier rapport est arrivé, et
+  jusqu'à quelle période il couvrait — un rapport reçu en mars peut ne
+  couvrir que janvier. Une société qui n'a jamais reporté est comptée depuis
+  le versement des fonds. Les term sheets en cours et les positions sorties
+  ne portent jamais cette pastille. Le même signal alimente le bloc
+  « Reportings manquants » de la page [À faire](16-a-faire.md).
 - **Colonnes alignées d'un tableau à l'autre** : les quatre tableaux
   partagent la même grille, donc chaque colonne tombe au même endroit et
   la page se lit d'un seul coup d'œil vertical. Un tableau qui n'a pas une
