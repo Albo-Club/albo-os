@@ -23,6 +23,33 @@ bas de page.
 
 ---
 
+## v1.180.2 — 05/08/2026 à 19:27 — Les fondateurs et co-investisseurs liés à Attio se voient enfin comme des liens
+
+Sur la fiche d'une participation, les puces des sections Fondateur(s),
+Membres du board et Co-investisseurs ouvrent la fiche Attio correspondante
+quand elles sont reliées au CRM. Mais rien ne le disait vraiment : la puce
+changeait juste de fond au survol, exactement comme n'importe quel élément
+neutre, et la petite flèche en bout de puce se remarquait à peine. On ne
+savait pas où l'on pouvait cliquer.
+
+Le nom se **souligne** désormais au survol des puces reliées à Attio,
+comme partout ailleurs dans l'app. Les puces sans lien, elles, ne bougent
+pas — la différence entre « ça ouvre le CRM » et « c'est juste un nom »
+se lit maintenant d'un coup d'œil.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/PeopleEditor.tsx` (`PersonChip`) : ajout de
+>   `group` sur l'ancre Attio et de `underline-offset-2 group-hover:underline`
+>   sur le `span` du nom. Le soulignement porte sur le seul nom, pas sur
+>   l'avatar ni sur la flèche `ArrowUpRight` — ils vivent dans les gaps du
+>   flex.
+> - Aligne les puces sur la convention déjà en place pour le champ Attio de
+>   la fiche société (`AttioCompanyField.tsx`, `underline-offset-4
+>   hover:underline`).
+> - Le fond `has-[a:hover]:bg-accent` de la puce est conservé : les deux
+>   signaux se cumulent. La branche non liée (`url === null`) est inchangée.
+
 ## v1.180.1 — 05/08/2026 à 18:13 — Les courriers sans période ne bloquent plus le circuit des reports
 
 Un courrier de liquidation transféré sur Wheelee revenait indéfiniment en
