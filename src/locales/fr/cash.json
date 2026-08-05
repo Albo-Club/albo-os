@@ -161,35 +161,6 @@
       "more_other": "+ {{count}} autres deals",
       "hint": "Montants engagés sans date d'appel — comptés ici, pas dans la courbe. Crée une échéance ponctuelle pour dater un appel de fonds. Les écarts de virement (< 1 % de l'engagé) sont ignorés."
     },
-    "suggestions": {
-      "title": "Rapprochements suggérés",
-      "hint": "Échéances dues ou en retard proches d'une transaction récente (montant, date, libellé).",
-      "ruleBadge": "Règle",
-      "match": "Rapprocher",
-      "delta": "écart {{amount}}",
-      "dialogTitle": "Les montants diffèrent",
-      "dialogBody": "L'échéance prévoit {{expected}}, la transaction fait {{actual}}.",
-      "closeWithGap": "Clore avec l'écart",
-      "closeWithGapHint": "Clore avec l'écart : l'échéance est réalisée telle quelle, l'écart reste lisible sur la ligne.",
-      "keepRemainder": "Conserver le reliquat ({{amount}})",
-      "keepRemainderHint": "Conserver le reliquat : paiement partiel — le solde reste attendu comme nouvelle échéance ponctuelle.",
-      "matched": "Échéance rapprochée",
-      "remainderKept": "Échéance rapprochée — reliquat de {{amount}} conservé",
-      "error": "Une erreur est survenue",
-      "pointAction": "Pointer sur le deal",
-      "pointed": "Transaction pointée sur le deal"
-    },
-    "suggestedRules": {
-      "title": "Règles suggérées",
-      "hint": "Flux récurrents détectés dans les 24 derniers mois, sans règle correspondante (montant proposé = médiane, la fourchette est affichée). Créer une règle l'ajoute au prévisionnel ; ignorer est définitif.",
-      "create": "Créer la règle",
-      "ignore": "Ignorer",
-      "occurrences_one": "{{count}} occurrence ({{min}} → {{max}})",
-      "occurrences_other": "{{count}} occurrences ({{min}} → {{max}})",
-      "lastSeen": "vu le {{date}}",
-      "dismissed": "Suggestion ignorée",
-      "error": "Une erreur est survenue"
-    },
     "rules": {
       "title": "Règles récurrentes",
       "add": "Ajouter une règle",
@@ -276,6 +247,22 @@
         "invalid_amount": "Montant invalide",
         "invalid_date": "Date invalide",
         "default": "Une erreur est survenue"
+      },
+      "realize": {
+        "action": "Marquer réalisée",
+        "title": "Marquer l'échéance comme réalisée",
+        "subtitle": "« {{label}} » du {{date}} ({{amount}}). Choisis la transaction bancaire qui la réalise.",
+        "searchPlaceholder": "Rechercher une transaction (libellé, contrepartie…)",
+        "noTransaction": "Aucune transaction ne correspond à cette recherche.",
+        "remainderHint": "La transaction est inférieure au montant attendu : il reste {{amount}}.",
+        "keepRemainder": "Garder le reste attendu",
+        "confirm": "Marquer réalisée",
+        "done": "Échéance réalisée — elle sort du prévisionnel.",
+        "errors": {
+          "transaction_wrong_org": "Cette transaction n'appartient pas à la même organisation.",
+          "not_pending": "Cette échéance n'est plus à venir.",
+          "no_remainder": "La transaction couvre déjà le montant attendu : il n'y a pas de reste."
+        }
       }
     },
     "chartReal": "Solde réel"

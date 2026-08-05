@@ -389,7 +389,11 @@ export const mcpTools: Array<McpTool> = [
       direction: z.enum(['in', 'out']).optional(),
       limit: limitArg,
     },
-    run: async (ctx, actorUserId, { org, search, matchStatus, direction, limit }) =>
+    run: async (
+      ctx,
+      actorUserId,
+      { org, search, matchStatus, direction, limit },
+    ) =>
       await ctx.runQuery(
         internal.agentToolsPointage.searchTransactionsInternal,
         {
@@ -401,25 +405,6 @@ export const mcpTools: Array<McpTool> = [
           limit,
         },
       ),
-  }),
-  defineTool({
-    name: 'suggestMatches',
-    description:
-      'Suggest reconciliation candidates (deal, category…) for unmatched ' +
-      'transactions, based on past decisions and similarity. Target a single ' +
-      'transaction with transactionId, or the most recent unmatched ones.',
-    schema: {
-      org: orgSlug,
-      transactionId: z.string().optional(),
-      limit: z.number().int().min(1).max(10).optional(),
-    },
-    run: async (ctx, actorUserId, { org, transactionId, limit }) =>
-      await ctx.runQuery(internal.agentToolsPointage.suggestMatchesInternal, {
-        orgId: await orgIdFor(ctx, actorUserId, org),
-        actorUserId,
-        transactionId: transactionId as Id<'transactions'> | undefined,
-        limit,
-      }),
   }),
   defineTool({
     name: 'getVatPosition',
@@ -473,11 +458,16 @@ export const mcpTools: Array<McpTool> = [
       status: z.enum(['pending', 'realized', 'cancelled']).optional(),
       limit: limitArg,
     },
-    run: async (ctx, actorUserId, { org, dateFromISO, dateToISO, status, limit }) =>
+    run: async (
+      ctx,
+      actorUserId,
+      { org, dateFromISO, dateToISO, status, limit },
+    ) =>
       await ctx.runQuery(internal.agentToolsForecasts.listEntriesInternal, {
         orgId: await orgIdFor(ctx, actorUserId, org),
         actorUserId,
-        dateFrom: dateFromISO !== undefined ? parseISODate(dateFromISO) : undefined,
+        dateFrom:
+          dateFromISO !== undefined ? parseISODate(dateFromISO) : undefined,
         dateTo: dateToISO !== undefined ? parseISODate(dateToISO) : undefined,
         status,
         limit,

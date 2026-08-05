@@ -65,18 +65,16 @@ export const BASE_INSTRUCTIONS = [
 
   // Pointage (reconciliation)
   'Reconciliation (pointage): listUnmatchedTransactions shows the queue of ' +
-    'transactions to reconcile. Use suggestMatches to propose likely ' +
-    'targets (deal, equity position or intercompany loan) based on past ' +
-    'matches — present the candidates with their evidence. If exactly one ' +
-    'candidate clearly stands out, call the matching tool directly — the ' +
-    'user confirms via the in-app approval buttons; if several are plausible, ' +
-    'ask the user to choose first. Never guess when suggestMatches returns no ' +
-    'candidates. VAT: "charge"/"product" transactions carry an optional ' +
+    'transactions to reconcile. NEVER propose, rank or guess a reconciliation ' +
+    'target: the user names the transaction AND the target, you only carry ' +
+    'out the gesture (they confirm via the in-app approval buttons). If the ' +
+    'target is not explicit, ask — do not infer it from labels, amounts or ' +
+    'past matches. VAT: "charge"/"product" transactions carry an optional ' +
     'vatRateBps (amounts are TTC; the deductible/collected VAT is derived). ' +
     'When categorizing a charge, suggest 2000 (20%) unless the expense is ' +
     'VAT-exempt (salaries, insurance, bank fees → 0). Use ' +
     'bulkCategorizeTransactions to classify multiple transactions in one ' +
-    'approval. Use getVatPosition for the org\'s VAT balance (deductible vs ' +
+    "approval. Use getVatPosition for the org's VAT balance (deductible vs " +
     'collected, amounts in cents signed by direction).',
 
   // Liabilities (passif)

@@ -167,10 +167,7 @@ export function TransactionsLedger({
       ? 'skip'
       : {
           orgId,
-          status:
-            filter === 'all' || byAttachment
-              ? undefined
-              : (filter),
+          status: filter === 'all' || byAttachment ? undefined : filter,
           matchedKind: byAttachment ? filter : undefined,
           bankAccountId: accountId,
           search: searchArg,
@@ -180,13 +177,6 @@ export function TransactionsLedger({
   // subscription with ForecastOverview. They carry no bank account, so an
   // account filter hides them.
   const upcoming = useConvexQuery(api.forecasts.getUpcomingEntries, { orgId })
-  // One-click suggestions — reconciliation view only (they only render on
-  // unmatched rows anyway).
-  const suggestions = useConvexQuery(
-    api.transactions.getPointageSuggestions,
-    filter === 'unmatched' ? { orgId } : 'skip',
-  )
-
   const liabilityOptions = useMemo<LiabilityOptionGroups | undefined>(() => {
     if (!liabilities) return undefined
     return buildLiabilityOptions(liabilities, {
@@ -372,7 +362,6 @@ export function TransactionsLedger({
         plannedEntries={plannedEntries}
         deals={deals}
         liabilityOptions={liabilityOptions}
-        suggestions={suggestions}
         orgSlug={orgSlug}
         emptyMessage={emptyMessage}
         statusColumn

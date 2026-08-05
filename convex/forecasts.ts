@@ -18,12 +18,7 @@ import { weeklyDigestEmail } from './emailTemplates'
 import { requireAppUser, requireOrgMember } from './lib/auth'
 import { isAvailableAccount } from './lib/bankAccounts'
 import { effectiveCategory, isValidForecastCategory } from './lib/categories'
-import {
-  MATCH_DATE_WINDOW_DAYS,
-  suggestEntryMatches as pairEntryMatches,
-} from './lib/entryMatching'
 import { readAlertPrefs } from './lib/notificationPrefs'
-import { detectRecurringFlows } from './lib/recurrenceDetection'
 import {
   addMonthsUtc,
   buildForecastGrid,
@@ -34,7 +29,6 @@ import {
   previousQuarter,
   ruleDerivedKey,
 } from './lib/recurrence'
-import { buildSearchText } from './lib/searchText'
 import { sectionsFor } from './lib/weeklyDigest'
 import { computeVatPositionForOrg } from './transactions'
 import type { GridTx, HistoryTx } from './lib/recurrence'
@@ -441,10 +435,10 @@ async function computeCashHistoryForOrgs(
     const txs = await ctx.db
       .query('transactions')
       .withIndex('by_org_date', (q) =>
-        q.eq('orgId', oid).gte('transactionDate', windowStart).lte(
-          'transactionDate',
-          now,
-        ),
+        q
+          .eq('orgId', oid)
+          .gte('transactionDate', windowStart)
+          .lte('transactionDate', now),
       )
       .collect()
     for (const tx of txs) {
@@ -552,128 +546,7 @@ export const markEntryRealized = mutation({
   },
 })
 
-// How far back a pending entry (overdue) is still offered for matching, and
-// how many suggestions the UI card shows at most.
-const SUGGEST_ENTRY_LOOKBACK_DAYS = 90
-const SUGGEST_ENTRY_MAX = 20
 const DAY_MS = 24 * 60 * 60 * 1000
-
-/**
- * Suggested entry ↔ transaction reconciliations for the org: due or
- * overdue pending EUR entries (rule-derived occurrences INCLUDED — rents
- * are the main use case) paired with recent transactions on EUR accounts.
- * The pairing itself is pure and tested (lib/entryMatching.ts): direction +
- * date window + amount window, scored by amount/date/label, one transaction
- * suggested at most once. Transactions already attached to a realized entry
- * and `ignored` / `internal_transfer` rows are excluded.
- */
-export const suggestForecastMatches = query({
-  args: { orgId: v.id('organizations') },
-  handler: async (ctx, { orgId }) => {
-    await requireOrgMember(ctx, orgId)
-    const now = Date.now()
-    const entriesFrom = now - SUGGEST_ENTRY_LOOKBACK_DAYS * DAY_MS
-    const entriesTo = now + MATCH_DATE_WINDOW_DAYS * DAY_MS
-
-    // One org-wide read: the matchable window AND the set of transactions
-    // already consumed by a realized entry (whatever their date).
-    const allEntries = await ctx.db
-      .query('forecastEntries')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .collect()
-    const usedTxIds = new Set(
-      allEntries
-        .map((e) => e.realizedTransactionId)
-        .filter((id): id is Id<'transactions'> => id != null),
-    )
-    const matchable = allEntries.filter(
-      (e) =>
-        e.status === 'pending' &&
-        e.currency === 'EUR' &&
-        e.date >= entriesFrom &&
-        e.date <= entriesTo,
-    )
-    if (matchable.length === 0) return []
-
-    const accounts = await ctx.db
-      .query('bankAccounts')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .collect()
-    const eurAccountIds = new Set(
-      accounts.filter((a) => a.currency === 'EUR').map((a) => a._id),
-    )
-
-    const txs = await ctx.db
-      .query('transactions')
-      .withIndex('by_org_date', (q) =>
-        q
-          .eq('orgId', orgId)
-          .gte('transactionDate', entriesFrom - MATCH_DATE_WINDOW_DAYS * DAY_MS)
-          .lte('transactionDate', now),
-      )
-      .collect()
-    const candidates = txs.filter(
-      (tx) =>
-        eurAccountIds.has(tx.bankAccountId) &&
-        !usedTxIds.has(tx._id) &&
-        tx.matchStatus !== 'ignored' &&
-        tx.matchStatus !== 'internal_transfer',
-    )
-
-    const pairs = pairEntryMatches({
-      entries: matchable.map((e) => ({
-        id: e._id,
-        date: e.date,
-        amountCents: e.amountCents,
-        direction: e.direction,
-        label: e.label,
-      })),
-      transactions: candidates.map((tx) => ({
-        id: tx._id,
-        transactionDate: tx.transactionDate,
-        amountCents: tx.amount,
-        direction: tx.direction,
-        searchText:
-          tx.searchText ?? buildSearchText(tx.rawLabel, tx.counterparty),
-      })),
-    })
-
-    const entryById = new Map(matchable.map((e) => [e._id as string, e]))
-    const txById = new Map(candidates.map((tx) => [tx._id as string, tx]))
-    return pairs.slice(0, SUGGEST_ENTRY_MAX).flatMap((pair) => {
-      const entry = entryById.get(pair.entryId)
-      const tx = txById.get(pair.transactionId)
-      if (!entry || !tx) return []
-      return [
-        {
-          entry: {
-            _id: entry._id,
-            date: entry.date,
-            label: entry.label,
-            amountCents: entry.amountCents,
-            direction: entry.direction,
-            confidence: entry.confidence,
-            derivedFromRule: entry.ruleId != null,
-          },
-          transaction: {
-            _id: tx._id,
-            transactionDate: tx.transactionDate,
-            rawLabel: tx.rawLabel,
-            counterparty: tx.counterparty ?? null,
-            amountCents: tx.amount,
-          },
-          // Deal-linked entry + still-unpointed transaction → the UI offers
-          // to match the transaction onto the deal right after reconciling
-          // (two distinct gestures; matching stays transactions.ts's job).
-          pointToDealId:
-            entry.dealId != null && tx.dealId == null && tx.allocation == null
-              ? entry.dealId
-              : null,
-        },
-      ]
-    })
-  },
-})
 
 // ─── Deal-page forecast section ──────────────────────────────────────────────
 
@@ -715,102 +588,6 @@ export const getDealForecast = query({
       }))
 
     return { entries }
-  },
-})
-
-// ─── Rule suggestions (recurrence detection) ─────────────────────────────────
-
-// History window scanned for recurring flows — 24 months so yearly flows
-// (2 occurrences minimum) become detectable.
-const DETECTION_LOOKBACK_MONTHS = 24
-
-/**
- * Recurring flows detected in the last 24 months of transactions that are
- * not covered by an active rule nor dismissed — candidates for forecast
- * rules, biggest amounts first. Detection is pure and tested
- * (lib/recurrenceDetection.ts); it only SUGGESTS — creating the rule stays
- * a human gesture through the prefilled rule dialog (createRule).
- */
-export const suggestRules = query({
-  args: { orgId: v.id('organizations') },
-  handler: async (ctx, { orgId }) => {
-    await requireOrgMember(ctx, orgId)
-    const now = Date.now()
-    const windowStart = addMonthsUtc(now, -DETECTION_LOOKBACK_MONTHS)
-
-    // EUR accounts only — rule amounts are EUR cents.
-    const accounts = await ctx.db
-      .query('bankAccounts')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .collect()
-    const eurAccountIds = new Set(
-      accounts.filter((a) => a.currency === 'EUR').map((a) => a._id),
-    )
-
-    const txs = await ctx.db
-      .query('transactions')
-      .withIndex('by_org_date', (q) =>
-        q
-          .eq('orgId', orgId)
-          .gte('transactionDate', windowStart)
-          .lte('transactionDate', now),
-      )
-      .collect()
-
-    const rules = await ctx.db
-      .query('forecastRules')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .collect()
-    const dismissed = await ctx.db
-      .query('dismissedRuleSuggestions')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .collect()
-
-    return detectRecurringFlows({
-      transactions: txs
-        .filter((tx) => eurAccountIds.has(tx.bankAccountId))
-        .map((tx) => ({
-          transactionDate: tx.transactionDate,
-          amountCents: tx.amount,
-          direction: tx.direction,
-          rawLabel: tx.rawLabel,
-          counterparty: tx.counterparty ?? null,
-          category: effectiveCategory(tx),
-        })),
-      existingRules: rules.map((rule) => ({
-        direction: rule.direction,
-        frequency: rule.frequency,
-        amountCents: rule.amountCents,
-        active: rule.active,
-      })),
-      dismissed: dismissed.map((d) => ({
-        pattern: d.pattern,
-        direction: d.direction,
-      })),
-    })
-  },
-})
-
-/**
- * "Ignorer" on a suggested rule: remembers the (pattern, direction) so the
- * suggestion never comes back. No edit/delete surface in V1 (Convex
- * dashboard, like categoryRules).
- */
-export const dismissRuleSuggestion = mutation({
-  args: {
-    orgId: v.id('organizations'),
-    pattern: v.string(),
-    direction: directionValidator,
-  },
-  handler: async (ctx, { orgId, pattern, direction }) => {
-    const { user } = await requireOrgMember(ctx, orgId)
-    await ctx.db.insert('dismissedRuleSuggestions', {
-      orgId,
-      pattern,
-      direction,
-      createdBy: user._id,
-    })
-    return null
   },
 })
 
@@ -995,7 +772,9 @@ export const updateEntry = mutation({
     await ctx.db.patch('forecastEntries', entry._id, {
       ...rest,
       // Patching `category: undefined` removes the field (clear).
-      ...(rawCategory !== undefined ? { category: rawCategory ?? undefined } : {}),
+      ...(rawCategory !== undefined
+        ? { category: rawCategory ?? undefined }
+        : {}),
       ...(rawDealId !== undefined ? { dealId: rawDealId ?? undefined } : {}),
       // Setting a date clears the Attio-sync "date à préciser" flag.
       ...(patch.date !== undefined ? { dateMissing: false } : {}),

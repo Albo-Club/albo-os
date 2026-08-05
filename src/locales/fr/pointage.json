@@ -104,13 +104,6 @@
     "amountClear": "Effacer le filtre",
     "reset": "Réinitialiser"
   },
-  "suggestion": {
-    "label": "Proposition",
-    "attachTo": "rattacher à",
-    "classifyAs": "classer en",
-    "validate": "Valider",
-    "dismiss": "Refuser"
-  },
   "search": {
     "placeholder": "Rechercher une transaction…",
     "noResults": "Aucune transaction ne correspond à votre recherche."
@@ -163,10 +156,5 @@
     "cancelEntryTitle": "Annuler cette échéance ?",
     "cancelEntryBody": "« {{label}} » du {{date}} ({{amount}}) ne comptera plus dans le solde projeté.",
     "entryCancelled": "Échéance annulée"
-  },
-  "pendingEntry": {
-    "toast": "Ce deal a une échéance prévue en attente : « {{label}} » du {{date}} ({{amount}}).",
-    "realize": "Réaliser l'échéance",
-    "realized": "Échéance réalisée — elle sort du prévisionnel."
   }
 }

@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { Ban, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Ban, Check, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { ConvexError } from 'convex/values'
 import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
-import { SuggestedRulesCard } from './SuggestedRules'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import { DealCombobox } from '~/components/pointage/DealCombobox'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
@@ -48,17 +47,6 @@ const FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'yearly'] as const
 type Frequency = (typeof FREQUENCIES)[number]
 
 type Rule = Doc<'forecastRules'>
-
-/** Prefill for a fresh rule (suggested-rules card) — create mode only. */
-export type RulePrefill = {
-  label: string
-  amountCents: number
-  direction: 'in' | 'out'
-  category: string | null
-  frequency: Frequency
-  anchorDay: number
-  startDate: number
-}
 
 function msToDateInput(ms: number | undefined): string {
   return ms == null ? '' : new Date(ms).toISOString().slice(0, 10)
@@ -114,14 +102,11 @@ function ForecastCategorySelect({
 function RuleDialog({
   orgId,
   rule,
-  prefill,
   onClose,
   onSaved,
 }: {
   orgId: Id<'organizations'>
   rule: Rule | null // null = create
-  /** Initial values in create mode (suggested rule) — ignored when editing. */
-  prefill?: RulePrefill | null
   onClose: () => void
   onSaved: () => Promise<void>
 }) {
@@ -129,12 +114,10 @@ function RuleDialog({
   const createRule = useConvexMutation(api.forecasts.createRule)
   const updateRule = useConvexMutation(api.forecasts.updateRule)
 
-  const initial = rule ?? prefill ?? null
+  const initial = rule
   // Org deals for the optional deal link (lightweight names-only query).
   const deals = useConvexQuery(api.deals.listOptions, { orgId })
-  const [dealId, setDealId] = useState<Id<'deals'> | null>(
-    rule?.dealId ?? null,
-  )
+  const [dealId, setDealId] = useState<Id<'deals'> | null>(rule?.dealId ?? null)
   const [label, setLabel] = useState(initial?.label ?? '')
   const [amount, setAmount] = useState(
     initial ? String(initial.amountCents / 100) : '',
@@ -210,7 +193,11 @@ function RuleDialog({
       onClose()
     } catch (err) {
       const code = err instanceof ConvexError ? (err.data as string) : ''
-      const known = ['invalid_amount', 'invalid_anchor_day', 'invalid_date_range']
+      const known = [
+        'invalid_amount',
+        'invalid_anchor_day',
+        'invalid_date_range',
+      ]
       toast.error(
         t(
           known.includes(code)
@@ -384,7 +371,10 @@ function RuleDialog({
           <Button variant="outline" onClick={onClose} disabled={pending}>
             {t('common:actions.cancel')}
           </Button>
-          <Button onClick={() => void handleSave()} disabled={pending || invalid}>
+          <Button
+            onClick={() => void handleSave()}
+            disabled={pending || invalid}
+          >
             {t('common:actions.save')}
           </Button>
         </DialogFooter>
@@ -406,8 +396,6 @@ export function ForecastRulesSection({
   const { t } = useTranslation(['cash', 'common'])
   const { fmtEur, fmtDate } = useFormatters()
   const [dialogRule, setDialogRule] = useState<Rule | null | 'create'>(null)
-  // Prefill of the create dialog when opened from a suggested rule.
-  const [dialogPrefill, setDialogPrefill] = useState<RulePrefill | null>(null)
   const [deleteRuleId, setDeleteRuleId] = useState<Id<'forecastRules'> | null>(
     null,
   )
@@ -447,13 +435,6 @@ export function ForecastRulesSection({
           {t('cash:forecast.rules.add')}
         </Button>
       </div>
-      <SuggestedRulesCard
-        orgId={orgId}
-        onCreate={(prefill) => {
-          setDialogPrefill(prefill)
-          setDialogRule('create')
-        }}
-      />
       {!rules ? (
         <LoadingLine>{t('cash:loading')}</LoadingLine>
       ) : rules.length === 0 ? (
@@ -537,11 +518,7 @@ export function ForecastRulesSection({
         <RuleDialog
           orgId={orgId}
           rule={dialogRule === 'create' ? null : dialogRule}
-          prefill={dialogPrefill}
-          onClose={() => {
-            setDialogRule(null)
-            setDialogPrefill(null)
-          }}
+          onClose={() => setDialogRule(null)}
           onSaved={refreshEntries}
         />
       )}
@@ -803,8 +780,167 @@ export function EntryDialog({
           <Button variant="outline" onClick={onClose} disabled={pending}>
             {t('common:actions.cancel')}
           </Button>
-          <Button onClick={() => void handleSave()} disabled={pending || invalid}>
+          <Button
+            onClick={() => void handleSave()}
+            disabled={pending || invalid}
+          >
             {t('common:actions.save')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/**
+ * Attaches a pending entry to a real transaction ("marquer réalisée").
+ *
+ * The transaction list is DELIBERATELY unranked: anti-chronological order
+ * plus a free-text search, no scoring, no preselection. Picking the right
+ * transaction is the user's call — the app never proposes one.
+ *
+ * When the picked transaction is smaller than the expected amount, the two
+ * outcomes are made explicit: close with the gap, or keep the balance
+ * expected as a new pending entry (`keepRemainder`).
+ */
+function RealizeEntryDialog({
+  orgId,
+  entry,
+  onClose,
+}: {
+  orgId: Id<'organizations'>
+  entry: Entry
+  onClose: () => void
+}) {
+  const { t } = useTranslation(['cash', 'common'])
+  const { fmtEur, fmtEurCents, fmtDate } = useFormatters()
+  const [search, setSearch] = useState('')
+  const [selectedId, setSelectedId] = useState<Id<'transactions'> | null>(null)
+  const [pending, setPending] = useState(false)
+  const markEntryRealized = useConvexMutation(api.forecasts.markEntryRealized)
+
+  const transactions = useConvexQuery(api.transactions.listLedger, {
+    orgId,
+    search: search.trim() || undefined,
+  })
+  const selected = transactions?.find((tx) => tx._id === selectedId) ?? null
+  const remainderCents = selected ? entry.amountCents - selected.amount : 0
+
+  async function handleRealize(mode: 'close' | 'keepRemainder') {
+    if (!selected) return
+    setPending(true)
+    try {
+      await markEntryRealized({
+        entryId: entry._id,
+        transactionId: selected._id,
+        mode,
+      })
+      toast.success(t('cash:forecast.entries.realize.done'))
+      onClose()
+    } catch (err) {
+      const code = err instanceof ConvexError ? (err.data as string) : ''
+      const known = ['transaction_wrong_org', 'not_pending', 'no_remainder']
+      toast.error(
+        t(
+          known.includes(code)
+            ? `cash:forecast.entries.realize.errors.${code}`
+            : 'cash:forecast.entries.errors.default',
+        ),
+      )
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{t('cash:forecast.entries.realize.title')}</DialogTitle>
+        </DialogHeader>
+
+        <p className="text-muted-foreground text-sm">
+          {t('cash:forecast.entries.realize.subtitle', {
+            label: entry.label,
+            date: fmtDate(entry.date),
+            amount: fmtEur(entry.amountCents),
+          })}
+        </p>
+
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t('cash:forecast.entries.realize.searchPlaceholder')}
+        />
+
+        {!transactions ? (
+          <LoadingLine>{t('cash:loading')}</LoadingLine>
+        ) : transactions.length === 0 ? (
+          <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
+            {t('cash:forecast.entries.realize.noTransaction')}
+          </div>
+        ) : (
+          <div className="max-h-72 overflow-y-auto rounded-lg border">
+            <Table>
+              <TableBody>
+                {transactions.map((tx) => (
+                  <TableRow
+                    key={tx._id}
+                    className={`cursor-pointer ${
+                      tx._id === selectedId ? 'bg-muted' : ''
+                    }`}
+                    onClick={() => setSelectedId(tx._id)}
+                  >
+                    <TableCell className="whitespace-nowrap">
+                      {fmtDate(tx.transactionDate)}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {tx.rawLabel}
+                      {tx.counterparty && (
+                        <span className="text-muted-foreground block max-w-md truncate text-xs">
+                          {tx.counterparty}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell
+                      className={`text-right tabular-nums whitespace-nowrap ${directionTone(tx.direction)}`}
+                    >
+                      {tx.direction === 'out' ? '−' : '+'}
+                      {fmtEurCents(tx.amount)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {selected && remainderCents > 0 && (
+          <p className="text-muted-foreground text-sm">
+            {t('cash:forecast.entries.realize.remainderHint', {
+              amount: fmtEurCents(remainderCents),
+            })}
+          </p>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={pending}>
+            {t('common:actions.cancel')}
+          </Button>
+          {selected && remainderCents > 0 && (
+            <Button
+              variant="outline"
+              disabled={pending}
+              onClick={() => void handleRealize('keepRemainder')}
+            >
+              {t('cash:forecast.entries.realize.keepRemainder')}
+            </Button>
+          )}
+          <Button
+            disabled={pending || !selected}
+            onClick={() => void handleRealize('close')}
+          >
+            {t('cash:forecast.entries.realize.confirm')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -827,6 +963,7 @@ export function ForecastEntriesSection({
   const { t } = useTranslation(['cash', 'common'])
   const { fmtEur, fmtDate } = useFormatters()
   const [dialogEntry, setDialogEntry] = useState<Entry | null | 'create'>(null)
+  const [realizeEntry, setRealizeEntry] = useState<Entry | null>(null)
   const [cancelId, setCancelId] = useState<Id<'forecastEntries'> | null>(null)
 
   const entries = useConvexQuery(api.forecasts.listEntries, { orgId })
@@ -933,6 +1070,18 @@ export function ForecastEntriesSection({
                             size="icon"
                             variant="ghost"
                             className="size-7"
+                            onClick={() => setRealizeEntry(entry)}
+                            aria-label={t(
+                              'cash:forecast.entries.realize.action',
+                            )}
+                            title={t('cash:forecast.entries.realize.action')}
+                          >
+                            <Check className="size-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="size-7"
                             onClick={() => setDialogEntry(entry)}
                             aria-label={t('common:actions.edit')}
                             title={t('common:actions.edit')}
@@ -965,6 +1114,14 @@ export function ForecastEntriesSection({
           orgId={orgId}
           entry={dialogEntry === 'create' ? null : dialogEntry}
           onClose={() => setDialogEntry(null)}
+        />
+      )}
+
+      {realizeEntry && (
+        <RealizeEntryDialog
+          orgId={orgId}
+          entry={realizeEntry}
+          onClose={() => setRealizeEntry(null)}
         />
       )}
 

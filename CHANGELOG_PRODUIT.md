@@ -23,6 +23,70 @@ bas de page.
 
 ---
 
+## v1.179.0 — 05/08/2026 à 13:56 — Le pointage ne propose plus rien (et c'est voulu)
+
+Albo OS affichait des propositions de rapprochement un peu partout : un
+bandeau « Proposition » sous les lignes à pointer, une carte
+« Rapprochements suggérés », des « règles suggérées », et une proposition de
+solder l'échéance prévue juste après un pointage. **Tout cela est retiré.**
+
+La raison est simple : le système se trompait sans le dire. Il rattachait
+des transactions au mauvais deal, confondait un deal avec une échéance
+prévue, et rien à l'écran ne signalait que la proposition était fausse. Une
+proposition juste fait gagner cinq secondes ; une proposition fausse
+acceptée de confiance coûte beaucoup plus cher à retrouver.
+
+Le pointage redevient donc entièrement manuel : vous ouvrez la file, vous
+choisissez la destination avec le menu « Affecter à… », comme avant. Rien
+d'autre ne change — la classification (charge, impôt, produit, virement
+interne), les actions groupées, le détachement et l'historique sont
+intacts. L'assistant IA sait toujours pointer, mais il ne devine plus la
+cible : vous la lui nommez, il l'applique après approbation.
+
+Nouveau au passage : une échéance prévue se marque **« réalisée » depuis sa
+ligne**, dans « Échéances ponctuelles ». Vous y choisissez vous-même la
+transaction correspondante — la liste est triée de la plus récente à la
+plus ancienne, avec une recherche libre. Si la transaction paye moins que
+prévu, vous choisissez de clore avec l'écart ou de garder le reste attendu.
+
+C'est volontairement une étape en arrière, le temps de rassembler assez de
+cas réels pour reconstruire un rapprochement automatique digne de
+confiance. Chaque pointage fait à la main aujourd'hui alimente cette
+matière : l'historique des décisions est conservé intact.
+
+> **🔧 Notes techniques**
+>
+> - **Backend supprimé** : `transactions.getPointageSuggestions`,
+>   `forecasts.suggestForecastMatches`, `forecasts.suggestRules` /
+>   `dismissRuleSuggestion`, `agentToolsPointage.suggestMatchesInternal` +
+>   l'outil agent `suggestMatches` et son entrée MCP, ainsi que les moteurs
+>   purs `lib/suggest.ts`, `lib/entryMatching.ts`, `lib/transferPairs.ts`
+>   et `lib/recurrenceDetection.ts` (avec leurs tests).
+> - `transactions.matchTransaction` ne lit plus les `forecastEntries` : son
+>   retour `pendingEntry` (qui alimentait le toast « Réaliser l'échéance »)
+>   est supprimé, la mutation renvoie `null`. Le cœur `applyMatchToDeal`
+>   est inchangé.
+> - `lib/instructions.ts` : la consigne « utilise `suggestMatches` » est
+>   remplacée par une interdiction explicite de proposer ou deviner une
+>   cible — sans ça l'agent aurait cherché un outil disparu et inventé.
+> - **Front supprimé** : `SuggestionBand` + état `refusedSuggestions` dans
+>   `PointageTable.tsx`, `ForecastMatchSuggestions.tsx`,
+>   `SuggestedRules.tsx` (et le `RulePrefill` devenu mort), le renderer
+>   `suggestMatches` du panneau AI, clés i18n associées (fr + en).
+> - **Ajout** : `RealizeEntryDialog` dans `ForecastSection.tsx` — sélecteur
+>   de transaction via `transactions.listLedger` (date desc + recherche
+>   libre), **aucun classement ni présélection**, modes `close` /
+>   `keepRemainder` conservés. C'était le seul chemin manuel manquant :
+>   les deux appelants de `markEntryRealized` vivaient dans les surfaces
+>   supprimées.
+> - **Schéma inchangé, aucune migration.** `matchStatus`, `allocation` et
+>   surtout `matchingDecisions` (append-only) sont intacts. La table
+>   `dismissedRuleSuggestions` devient inerte mais reste déclarée.
+> - Garde-fou ajouté en anti-pattern dans `CLAUDE.md` + section refondue
+>   dans `KNOWN_ISSUES.md` « Pointage transaction → deal ».
+
+---
+
 ## v1.178.0 — 05/08/2026 à 12:15 — Les filtres restent en place quand vous changez de page
 
 Vous filtriez la liste des investissements sur un instrument, vous ouvriez

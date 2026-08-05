@@ -8,25 +8,17 @@
  *
  * Shapes are the ones built by the internalQuery functions in convex/:
  * agentTools.ts (listDeals), agentToolsPointage.ts (searchTransactions,
- * listUnmatchedTransactions, suggestMatches), agentToolsForecasts.ts
+ * listUnmatchedTransactions), agentToolsForecasts.ts
  * (getForecastBalance), agentToolsLiabilities.ts (listLiabilities),
  * valuations.ts (listValuations). Amounts in cents EUR, rates in bps, dates
  * in ms epoch or ISO depending on the tool — see each renderer.
  */
 
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from '@tanstack/react-router'
-import { useConvexMutation } from '@convex-dev/react-query'
-import { ConvexError } from 'convex/values'
-import { Check } from 'lucide-react'
-import { toast } from 'sonner'
 
-import { api } from '../../../convex/_generated/api'
 import type { ComponentType } from 'react'
-import type { Id } from '../../../convex/_generated/dataModel'
 import { Badge } from '~/components/ui/badge'
-import { Button } from '~/components/ui/button'
 import { directionTone, signTone } from '~/lib/moneyTone'
 
 // ─── Local formatting helpers (cents → €, ms/ISO → date, bps → %) ───────────
@@ -72,16 +64,6 @@ function num(v: unknown): number | null {
 function useOrgSlug(): string | undefined {
   const params = useParams({ strict: false })
   return (params as { orgSlug?: string }).orgSlug
-}
-
-/** Extracts a readable Convex error code (same pattern as AiPanel). */
-function errorCode(err: unknown): string {
-  const data = err instanceof ConvexError ? err.data : null
-  if (typeof data === 'string') return data
-  if (data && typeof data === 'object' && 'code' in data) {
-    return (data as { code: string }).code
-  }
-  return ''
 }
 
 // ─── Presentation primitives (dense, ~24rem-wide panel) ─────────────────────
@@ -326,199 +308,6 @@ function UnmatchedTransactionsRenderer({ output }: { output: unknown }) {
   )
 }
 
-// ═══ 4. suggestMatches ═══════════════════════════════════════════════════════
-// Shape (agentToolsPointage.suggestMatchesInternal): Array<{ transactionId,
-// dateISO, direction, amountCents, rawLabel, candidates: Array<{ kind,
-// targetId, targetLabel, evidence: { similarMatchedCount, decisionsCount,
-// amountDeltaCents }, score }> }>.
-// Direct action (no model approval): per-candidate "Pointer" button via the
-// PUBLIC mutations api.transactions.matchTransaction (deal target) /
-// api.liabilities.allocateTransaction (liability target).
-
-/** Candidate "Pointer" button: direct user action. */
-function PointButton({
-  txId,
-  candidate,
-  done,
-  disabled,
-  onDone,
-}: {
-  txId: string
-  candidate: {
-    kind: string
-    targetId: string
-    targetLabel: string | null
-  }
-  done: boolean
-  disabled: boolean
-  onDone: () => void
-}) {
-  const { t } = useTranslation('chat')
-  const [busy, setBusy] = useState(false)
-  const matchToDeal = useConvexMutation(api.transactions.matchTransaction)
-  const allocate = useConvexMutation(api.liabilities.allocateTransaction)
-
-  async function handleClick() {
-    setBusy(true)
-    try {
-      if (candidate.kind === 'deal') {
-        await matchToDeal({
-          transactionId: txId as Id<'transactions'>,
-          dealId: candidate.targetId as Id<'deals'>,
-        })
-      } else if (
-        candidate.kind === 'equity' ||
-        candidate.kind === 'intercompany_loan'
-      ) {
-        await allocate({
-          transactionId: txId as Id<'transactions'>,
-          kind: candidate.kind,
-          targetId: candidate.targetId,
-        })
-      } else {
-        return
-      }
-      toast.success(t('renderers.suggest.pointed'))
-      onDone()
-    } catch (err) {
-      const code = errorCode(err)
-      toast.error(
-        code
-          ? t(`renderers.errors.${code}`, {
-              defaultValue: t('renderers.errors.default'),
-            })
-          : t('renderers.errors.default'),
-      )
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  if (done) {
-    return (
-      <span className="text-positive inline-flex items-center gap-1 text-xs">
-        <Check className="size-3.5" />
-        {t('renderers.suggest.pointedShort')}
-      </span>
-    )
-  }
-  return (
-    <Button
-      size="sm"
-      variant="outline"
-      className="h-7 text-xs"
-      disabled={disabled || busy}
-      onClick={() => void handleClick()}
-    >
-      {t('renderers.suggest.point')}
-    </Button>
-  )
-}
-
-function SuggestMatchesRenderer({ output }: { output: unknown }) {
-  const { t } = useTranslation('chat')
-  const { eur, dateISO } = useFmt()
-  // Local "matched" state per transaction (freezes the group on success).
-  const [pointed, setPointed] = useState<Record<string, string>>({})
-  const groups = asArray(output)
-  if (!groups || groups.length === 0) return null
-
-  return (
-    <div className="space-y-2">
-      {groups.map((g, i) => {
-        const txId = str(g.transactionId)
-        if (!txId) return null
-        const direction = str(g.direction)
-        const amount = num(g.amountCents)
-        const signed = direction === 'out' && amount != null ? -amount : amount
-        const candidates = asArray(g.candidates) ?? []
-        const pointedTarget = pointed[txId]
-
-        return (
-          <div key={i} className="space-y-1.5 rounded-md border p-2">
-            {/* Analyzed transaction info. */}
-            <div className="flex items-baseline justify-between gap-2 text-xs">
-              <span className="min-w-0 flex-1 truncate font-medium">
-                {str(g.rawLabel) ?? '—'}
-              </span>
-              <span
-                className={`shrink-0 tabular-nums ${
-                  direction === 'in' || direction === 'out'
-                    ? directionTone(direction)
-                    : ''
-                }`}
-              >
-                {eur(signed)}
-              </span>
-            </div>
-            <div className="text-muted-foreground text-[11px]">
-              {dateISO(str(g.dateISO))}
-            </div>
-
-            {candidates.length === 0 ? (
-              <div className="text-muted-foreground text-xs italic">
-                {t('renderers.suggest.noCandidate')}
-              </div>
-            ) : (
-              <ul className="space-y-1">
-                {candidates.map((c, j) => {
-                  const kind = str(c.kind) ?? ''
-                  const targetId = str(c.targetId) ?? ''
-                  const score = num(c.score)
-                  const isDone = pointedTarget === targetId
-                  // The group freezes as soon as one candidate is matched.
-                  const groupDone = Boolean(pointedTarget)
-                  return (
-                    <li
-                      key={j}
-                      className="bg-muted/30 flex items-center justify-between gap-2 rounded px-2 py-1.5"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <Badge
-                            variant="outline"
-                            className="shrink-0 text-[10px]"
-                          >
-                            {t(`renderers.suggest.kind.${kind}`, {
-                              defaultValue: kind,
-                            })}
-                          </Badge>
-                          <span className="truncate text-xs">
-                            {str(c.targetLabel) ??
-                              t('renderers.suggest.unknownTarget')}
-                          </span>
-                        </div>
-                        {score != null && (
-                          <span className="text-muted-foreground text-[10px]">
-                            {t('renderers.suggest.score', { score })}
-                          </span>
-                        )}
-                      </div>
-                      <PointButton
-                        txId={txId}
-                        candidate={{
-                          kind,
-                          targetId,
-                          targetLabel: str(c.targetLabel),
-                        }}
-                        done={isDone}
-                        disabled={groupDone}
-                        onDone={() =>
-                          setPointed((prev) => ({ ...prev, [txId]: targetId }))
-                        }
-                      />
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 // ═══ 5. getForecastBalance ═══════════════════════════════════════════════════
 // Shape (agentToolsForecasts.getForecastBalanceInternal, consumption
 // semantics of forecasts.computeForecastGridForOrg): { startingBalanceCents,
@@ -716,7 +505,6 @@ const toolRenderers: Record<string, ComponentType<{ output: unknown }>> = {
   listDeals: DealsRenderer,
   searchTransactions: SearchTransactionsRenderer,
   listUnmatchedTransactions: UnmatchedTransactionsRenderer,
-  suggestMatches: SuggestMatchesRenderer,
   getForecastBalance: ForecastBalanceRenderer,
   listLiabilities: LiabilitiesRenderer,
   listValuations: ValuationsRenderer,

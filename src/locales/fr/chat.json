@@ -98,19 +98,6 @@
       "vat": "TVA",
       "partial": "Total partiel"
     },
-    "suggest": {
-      "point": "Pointer",
-      "pointed": "Transaction pointée",
-      "pointedShort": "Pointé",
-      "noCandidate": "Aucune suggestion",
-      "unknownTarget": "Cible inconnue",
-      "score": "Score {{score}}",
-      "kind": {
-        "deal": "Deal",
-        "equity": "Capital",
-        "intercompany_loan": "Compte courant"
-      }
-    },
     "forecast": {
       "starting": "Solde de départ",
       "month": "Mois",

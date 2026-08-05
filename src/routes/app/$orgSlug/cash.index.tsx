@@ -20,7 +20,6 @@ import {
   ForecastEntriesSection,
   ForecastRulesSection,
 } from '~/components/cash/ForecastSection'
-import { ForecastMatchSuggestions } from '~/components/cash/ForecastMatchSuggestions'
 import { ForecastOverview } from '~/components/cash/ForecastOverview'
 import {
   LEDGER_FILTERS,
@@ -119,7 +118,6 @@ function Cash() {
               accounts={accounts}
             />
           )}
-          {org && <ForecastMatchSuggestions orgId={org._id} />}
           {/* Remount on ?filter= change so a To do CTA lands pre-filtered
               even when the page is already open. */}
           {org && (
