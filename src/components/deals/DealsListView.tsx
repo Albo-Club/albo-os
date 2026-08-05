@@ -33,6 +33,10 @@ import {
   usePagination,
 } from '~/components/data-table/LocalPagination'
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
+import {
+  toggleValue,
+  usePersistentFilters,
+} from '~/hooks/usePersistentFilters'
 import { downloadCsv, toCsv } from '~/lib/csv'
 import { normalizeSearch } from '~/lib/searchText'
 import { cn } from '~/lib/utils'
@@ -96,30 +100,40 @@ export function DealsListView({
 }) {
   const { t } = useTranslation(['deals', 'participations'])
 
-  const [search, setSearch] = useState('')
+  // Search + facets survive navigation (per tab, per org — see
+  // `usePersistentFilters`).
+  const [filters, setFilters, resetFilters] = usePersistentFilters(
+    `deals:${orgSlug ?? 'all'}`,
+    {
+      search: '',
+      instruments: [] as Array<string>,
+      statuses: [] as Array<string>,
+      sectors: [] as Array<string>,
+    },
+  )
+
+  const search = filters.search
   const term = normalizeSearch(useDebouncedValue(search))
 
-  const [instrumentFilter, setInstrumentFilter] = useState<Set<string>>(
-    new Set(),
+  const instrumentFilter = useMemo(
+    () => new Set(filters.instruments),
+    [filters.instruments],
   )
-  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set())
-  const [sectorFilter, setSectorFilter] = useState<Set<string>>(new Set())
+  const statusFilter = useMemo(
+    () => new Set(filters.statuses),
+    [filters.statuses],
+  )
+  const sectorFilter = useMemo(
+    () => new Set(filters.sectors),
+    [filters.sectors],
+  )
   const toggle =
-    (setter: React.Dispatch<React.SetStateAction<Set<string>>>) =>
-    (value: string) =>
-      setter((prev) => {
-        const next = new Set(prev)
-        if (next.has(value)) next.delete(value)
-        else next.add(value)
-        return next
-      })
+    (field: 'instruments' | 'statuses' | 'sectors') => (value: string) =>
+      setFilters({ [field]: toggleValue(filters[field], value) })
   const hasFilters =
-    instrumentFilter.size > 0 || statusFilter.size > 0 || sectorFilter.size > 0
-  const resetFilters = () => {
-    setInstrumentFilter(new Set())
-    setStatusFilter(new Set())
-    setSectorFilter(new Set())
-  }
+    filters.instruments.length > 0 ||
+    filters.statuses.length > 0 ||
+    filters.sectors.length > 0
 
   // Facet options derived from the full deal set (options never vanish
   // mid-selection), localized and sorted by label.
@@ -275,7 +289,7 @@ export function DealsListView({
           <Input
             type="search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => setFilters({ search: e.target.value })}
             placeholder={t('deals:search.placeholder')}
             className="max-w-xs"
           />
@@ -284,7 +298,7 @@ export function DealsListView({
               label={t('participations:filters.instrument')}
               options={facets.instruments}
               selected={instrumentFilter}
-              onToggle={toggle(setInstrumentFilter)}
+              onToggle={toggle('instruments')}
             />
           )}
           {facets.statuses.length >= 2 && (
@@ -292,7 +306,7 @@ export function DealsListView({
               label={t('participations:filters.status')}
               options={facets.statuses}
               selected={statusFilter}
-              onToggle={toggle(setStatusFilter)}
+              onToggle={toggle('statuses')}
             />
           )}
           {facets.sectors.length >= 2 && (
@@ -300,10 +314,12 @@ export function DealsListView({
               label={t('participations:filters.sector')}
               options={facets.sectors}
               selected={sectorFilter}
-              onToggle={toggle(setSectorFilter)}
+              onToggle={toggle('sectors')}
             />
           )}
-          {hasFilters && (
+          {/* Undebounced `search` so the button appears on the first
+              keystroke; it clears the search too. */}
+          {(Boolean(search) || hasFilters) && (
             <Button
               variant="ghost"
               size="sm"

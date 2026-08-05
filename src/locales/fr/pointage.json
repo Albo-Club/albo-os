@@ -101,7 +101,8 @@
     "amount": "Montant",
     "amountMin": "Montant min (€)",
     "amountMax": "Montant max (€)",
-    "amountClear": "Effacer le filtre"
+    "amountClear": "Effacer le filtre",
+    "reset": "Réinitialiser"
   },
   "suggestion": {
     "label": "Proposition",

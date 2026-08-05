@@ -101,7 +101,8 @@
     "amount": "Amount",
     "amountMin": "Min amount (€)",
     "amountMax": "Max amount (€)",
-    "amountClear": "Clear filter"
+    "amountClear": "Clear filter",
+    "reset": "Reset"
   },
   "suggestion": {
     "label": "Suggestion",

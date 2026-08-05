@@ -135,8 +135,13 @@ l'assistant IA).
   dessous, du plus récent au plus ancien. Filtres : recherche plein texte
   (insensible aux accents), **montant** (min/max), **statut** (dont
   « À pointer » et « Prévisionnel ») et **compte** — la même grammaire de
-  filtres que la liste des participations. Plafonné aux 1 000 transactions
-  les plus récentes à l'écran.
+  filtres que la liste des participations — et, comme elle, les filtres
+  **restent en place** quand on quitte la page et qu'on y revient (jusqu'à
+  la fermeture de l'onglet du navigateur), avec un bouton
+  **« Réinitialiser »** pour tout effacer. Un lien qui pré-filtre le
+  registre (les CTA de la page À faire, les emails) reste prioritaire sur
+  le dernier filtre utilisé. Plafonné aux 1 000 transactions les plus
+  récentes à l'écran.
 - Chaque nouvelle transaction entre dans la **file de pointage** — statut
   « À pointer », en ambre pour se repérer d'un coup d'œil. Le poste de
   travail quotidien est la page [À faire](16-a-faire.md), qui ouvre le

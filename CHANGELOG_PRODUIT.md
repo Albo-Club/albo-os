@@ -23,6 +23,64 @@ bas de page.
 
 ---
 
+## v1.178.0 — 05/08/2026 à 12:15 — Les filtres restent en place quand vous changez de page
+
+Vous filtriez la liste des investissements sur un instrument, vous ouvriez
+une fiche pour vérifier un chiffre, vous reveniez : la liste était revenue
+à zéro. Même chose sur le registre de trésorerie. Un filtre ne survivait
+pas à une navigation, ce qui obligeait à le reposer à chaque aller-retour.
+
+C'est fini. La recherche et les filtres sont désormais **mémorisés** :
+
+- **Liste Entreprises** (par organisation et vue consolidée) : recherche,
+  instrument, secteur.
+- **Deals consolidés** : recherche, instrument, statut, secteur.
+- **Registre de trésorerie** : recherche, montant min/max, statut et compte.
+
+Vous partez sur une fiche, sur une autre page, vous rechargez même l'écran :
+en revenant, la liste est exactement dans l'état où vous l'aviez laissée.
+La mémoire est propre à **l'onglet du navigateur** — un nouvel onglet repart
+sans filtre, et fermer l'onglet oublie tout. Chaque liste a la sienne : une
+organisation n'impose pas ses filtres à une autre, ni à la vue consolidée.
+
+Pour tout effacer d'un coup, le bouton **« Réinitialiser »** est à droite des
+filtres. Il existait déjà sur les listes d'investissements mais n'apparaissait
+que si une facette était cochée : il se déclenche maintenant dès qu'une
+**recherche** est en cours, et il efface recherche et filtres ensemble. Le
+registre de trésorerie, qui n'en avait pas, l'a désormais aussi.
+
+Un détail conservé : les liens qui ouvrent le registre déjà filtré (les
+boutons « Pointer » de la page À faire, les emails de rappel) restent
+prioritaires sur le dernier filtre mémorisé — ils vous emmènent bien là où
+ils le promettent.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau hook `src/hooks/usePersistentFilters.ts` : état de filtres
+>   miroité dans `sessionStorage` sous une clé passée par la vue
+>   (`participations:<slug|all>`, `deals:<slug|all>`, `cash-ledger:<slug>`).
+>   API `[filters, patch, reset]` + helper `toggleValue` pour les facettes
+>   multi-select ; valeurs JSON-sérialisables (tableaux, pas de `Set`).
+> - Restauration dans un `useEffect` **après** le premier render (pas dans
+>   l'état initial) : le serveur rend sans storage, lire pendant le render
+>   casserait l'hydratation — même pattern que `ThemePicker`. L'état porte
+>   la clé pour laquelle il a été restauré, ce qui empêche l'effet
+>   d'écriture de persister les valeurs par défaut par-dessus l'entrée
+>   sauvegardée (au montage comme au changement d'org).
+> - `ParticipationsView` et `DealsListView` : les `useState<Set<string>>`
+>   deviennent des tableaux persistés, re-dérivés en `Set` via `useMemo`
+>   (`FacetFilter` est inchangé). La condition d'affichage du bouton
+>   « Réinitialiser » passe de `hasFilters` à `search || hasFilters`, sur
+>   la valeur **non débouncée** pour réagir dès la première frappe.
+> - `TransactionsLedger` : statut, compte, recherche et bornes de montant
+>   passent dans le hook (`accountId: ''` = tous les comptes) ; un effet
+>   déclaré après le hook réapplique `initialFilter` (`?filter=`) par-dessus
+>   la valeur restaurée, et un bouton « Réinitialiser » (clé
+>   `pointage:filter.reset`, EN/FR) a été ajouté à la barre.
+> - Docs : `TESTING.md` SH23 (listes) et CA14 (registre),
+>   `docs/produit/04-participations.md` et `07-tresorerie.md`, plus une
+>   ligne `TEMPLATE_SYNC.md` (le hook est du core générique).
+
 ## v1.177.1 — 05/08/2026 à 11:47 — Les tableurs sortent de la recherche de l'assistant
 
 Un budget Excel ajouté sur une fiche société refusait obstinément d'être
