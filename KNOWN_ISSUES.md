@@ -3109,6 +3109,24 @@ la dérive :
 - **Existant** : `migrations/unifyDomainPitches` fige rétroactivement (canonique
   = résumé le plus long, cf. `pickCanonicalPitch`).
 
+**Exception : les véhicules d'investissement** (`lib/pitch.ts:isVehicleEntity`).
+Un SPV de plateforme porte le domaine de son **sponsor** (les 15 SPV Parallel de
+Calte sont tous sur `parallel-invest.com`) alors que chacun est une **opération
+distincte** — la règle ci-dessus y produit des résumés faux. Vécu (05/08/2026) :
+à sa création, `PARALLEL INVEST SPV24` a hérité mot pour mot du résumé de
+`SPV11` (voisin au résumé le plus long), fiche comprise « logé via le SPV
+Parallel Invest SPV11 » ; et `Parallel Invest SPV 23` portait la plaquette du
+site Parallel. Un véhicule est donc exclu **des trois côtés** : pas
+d'enrichissement depuis le domaine (`enrich` s'arrête net), pas d'héritage du
+pitch d'un voisin, pas de propagation de son propre résumé au groupe (sinon une
+saisie à la main sur un SPV écrase les 14 autres). Sa description vient des
+communications VASCO (`enrichFromVasco`, cf. plus haut) ou de la saisie manuelle.
+Marqueurs, l'un des trois suffit : `sponsor`, `vascoIssuerId`, ou un jeton
+« SPVn » dans le nom (les lignes SPV de Calte n'ont pas de `sponsor` — c'est ce
+jeton qui les rattrape ; même jeton que le pont instruments,
+`vasco.ts:spvNumberOf`). Rattrapage des deux fiches polluées :
+`migrations/fixSpvPitches`.
+
 Portée **par org** (multi-tenant) : on ne propage jamais une édition Albo vers
 Calte, même si un domaine était partagé entre les deux. Le `oneLiner` n'a pas
 d'éditeur inline aujourd'hui (édité via génération/unif) ; s'il en gagne un,

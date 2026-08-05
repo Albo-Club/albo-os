@@ -15,6 +15,31 @@ type Ctx = GenericMutationCtx<DataModel>
 type Pitch = { oneLiner?: string; summary?: string }
 
 /**
+ * An investment vehicle (a platform SPV: Parallel, Sezame…) carries its
+ * SPONSOR's domain while being a distinct operation, so the same-domain rule
+ * does NOT apply to it: it never inherits a sibling's pitch, never propagates
+ * its own, and never derives one from the platform's website. Its description
+ * comes from the VASCO investor communications
+ * (`companyEnrichment.enrichFromVasco`) or is written by hand.
+ *
+ * Any of three markers: an explicit `sponsor`, a VASCO issuer link, or an
+ * "SPVn" token in the name — same token as the Parallel instrument bridge
+ * (cf. `convex/vasco.ts:spvNumberOf`), needed because the Calte SPV rows carry
+ * no sponsor.
+ */
+export function isVehicleEntity(c: {
+  name: string
+  sponsor?: string
+  vascoIssuerId?: string
+}): boolean {
+  return (
+    Boolean(c.sponsor) ||
+    Boolean(c.vascoIssuerId) ||
+    /\bspv\s*0*\d+\b/i.test(c.name)
+  )
+}
+
+/**
  * The canonical pitch of a group = the pair (oneLiner, summary) of the entity
  * with the LONGEST summary (proxy for most complete). Returns null when no
  * entity in the group has a summary.
@@ -56,6 +81,8 @@ export async function applyPitchToDomainGroup(
   for (const c of companies) {
     if (c.archivedAt != null) continue
     if (c.domain !== domain) continue
+    // A vehicle sharing the sponsor's domain keeps its own operation pitch.
+    if (isVehicleEntity(c)) continue
     const patch: Pitch = {}
     if ('oneLiner' in fields && (mode === 'overwrite' || c.oneLiner === undefined))
       patch.oneLiner = fields.oneLiner
