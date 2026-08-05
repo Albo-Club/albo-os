@@ -15,6 +15,7 @@ import { internal } from './_generated/api'
 import { internalAction, internalMutation, mutation, query } from './_generated/server'
 import { fetchBody, getMessage } from './agentmail'
 import { requireAppUser, requireOrgMember } from './lib/auth'
+import { identityKey, sharedDomains } from './lib/emailIdentify'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 
@@ -315,17 +316,22 @@ export const listAssignTargets = query({
 })
 
 /**
- * Every entity representing the same participation as `company`: same domain
- * or exact same name, across all orgs — the fan-out rule of automatic
- * identification (convex/reportIdentify.ts).
+ * Every entity representing the same participation as `company`, across all
+ * orgs — same identity key as automatic identification
+ * (convex/lib/emailIdentify.ts): the domain when it carries a single
+ * participation, else the name. A sponsor domain shared by several vehicles
+ * (Sezame Immo 2 / 6) therefore fans out to the chosen vehicle only.
  */
 async function sameParticipation(
   ctx: MutationCtx,
   company: Doc<'companies'>,
 ): Promise<Array<{ companyId: Id<'companies'>; orgId: Id<'organizations'> }>> {
-  const domain = company.domain?.toLowerCase() ?? null
-  const nameLc = company.name.toLowerCase()
-  const matched: Array<{ companyId: Id<'companies'>; orgId: Id<'organizations'> }> = []
+  const all: Array<{
+    companyId: Id<'companies'>
+    orgId: Id<'organizations'>
+    name: string
+    domain: string | null
+  }> = []
   const orgs = await ctx.db.query('organizations').collect()
   for (const org of orgs) {
     const companies = await ctx.db
@@ -333,22 +339,31 @@ async function sameParticipation(
       .withIndex('by_org_kind', (q) => q.eq('orgId', org._id).eq('kind', 'portfolio'))
       .collect()
     for (const c of companies) {
-      if (c.archivedAt) continue
-      const same =
-        c._id === company._id ||
-        (domain !== null && (c.domain ?? '').toLowerCase() === domain) ||
-        c.name.toLowerCase() === nameLc
-      if (same) matched.push({ companyId: c._id, orgId: c.orgId })
+      // The chosen company is kept even when archived — it is an explicit pick.
+      if (c.archivedAt && c._id !== company._id) continue
+      all.push({
+        companyId: c._id,
+        orgId: c.orgId,
+        name: c.name,
+        domain: c.domain?.toLowerCase() ?? null,
+      })
     }
   }
-  return matched
+  const shared = sharedDomains(all)
+  const key = identityKey(
+    { name: company.name, domain: company.domain?.toLowerCase() ?? null },
+    shared,
+  )
+  return all
+    .filter((c) => identityKey(c, shared) === key)
+    .map(({ companyId, orgId }) => ({ companyId, orgId }))
 }
 
 /**
  * Manually attach a reviewed email to a participation, then resume the
  * pipeline where it stopped (extraction if not done, else storage). The
- * match fans out to every entity sharing the chosen company's domain or
- * exact name — the same rule as automatic identification.
+ * match fans out to every entity representing the chosen participation — the
+ * same identity rule as automatic identification.
  */
 export const assignCompany = mutation({
   args: { inboundEmailId: v.id('inboundEmails'), companyId: v.id('companies') },

@@ -3328,6 +3328,47 @@ Corollaire côté lecture : `origin` est **optionnel** (absent = email, les
 lignes d'avant la fonctionnalité n'ont rien). Tester `=== 'upload'`, jamais
 `!== 'email'`.
 
+## Un domaine n'identifie une participation que s'il n'en porte qu'une
+
+Le rattachement d'un report croise deux preuves : le domaine de l'auteur et
+le nom de la société écrit dans le mail. Le piège (ALB-110) : un **sponsor**
+héberge tous ses véhicules sur un seul domaine — `hellosezame.com` porte
+Sezame Immo 1/2/6, `parallel-invest.com` une vingtaine de SPV, idem
+`anaxago.com`, `rewatt.fr`, `wearevirgil.com`, `laviedequartier.fr`… Le
+domaine prouve alors **qui écrit**, jamais **de quel véhicule il parle**.
+
+La règle est portée par une seule notion, `identityKey`
+(`convex/lib/emailIdentify.ts`) : **le domaine identifie quand il ne porte
+qu'une participation, sinon c'est le nom normalisé**. `sharedDomains`
+calcule la liste des domaines disqualifiés sur l'ensemble des candidats
+(toutes orgs confondues). Trois conséquences, toutes dans le même fichier :
+
+- **Corroboration** (`resolveOnSharedDomains`) : sur un domaine partagé, les
+  candidats corroborés **par le nom** l'emportent ; si aucun ne l'est, la
+  sélection est remplacée par **tout le domaine** — ce qui produit ≥ 2 clés
+  d'identité, donc `ambiguous`, donc la file `/app/all/reports`. Le but est
+  qu'un pick LLM corroboré par le seul domaine ne soit **jamais** entériné :
+  c'est exactement comme ça qu'un report Sezame atterrissait sur le mauvais
+  véhicule.
+- **Ambiguïté et fan-out** (`reportIdentify.run`) : les deux se calculent sur
+  `identityKey`, plus sur `domain ?? name`. Le fan-out multi-org continue de
+  marcher — deux entités d'une même boîte partagent leur clé (domaine propre,
+  ou nom identique quand le domaine est celui d'un sponsor).
+- **Rattachement manuel** (`reportInbox.sameParticipation`, utilisé par
+  `assignCompany` et `createFromUpload`) : même helper, sinon choisir Sezame
+  Immo 6 à la main ré-arrosait Immo 2.
+
+Deux limites assumées :
+
+- Le seul discriminant accepté est le **nom complet** de l'entité
+  (`nameAppearsInText`, mot entier). Un mail qui ne dit que « SPV 6 »
+  n'accroche pas → file d'attente. Choix délibéré : pas de faux rattachement
+  silencieux, au prix de lignes à traiter à la main.
+- Deux entités d'une **même boîte** nommées différemment sur un domaine de
+  sponsor ne fanent plus ensemble (aujourd'hui `Oprtrs & Co` côté Albo vs
+  `OPRTRS CLUB` côté Calte, et le doublon `goodtechlab.io`). Le correctif est
+  dans la **donnée** — aligner les deux noms — pas dans le code.
+
 ## Reports par email : le canal suit le geste, le contenu suit le rôle
 
 Le routage des récaps (`convex/lib/reportRouting.ts:routeRecap`, appliqué

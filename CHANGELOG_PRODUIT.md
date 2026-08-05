@@ -23,6 +23,55 @@ bas de page.
 
 ---
 
+## v1.175.1 — 05/08/2026 à 11:57 — Un report de sponsor ne contamine plus les véhicules voisins
+
+Un report Sezame se rangeait à la fois sur Sezame Immo 2 et Sezame Immo 6.
+La raison : tous les véhicules d'un sponsor partagent le même site web, et
+c'est ce site qui servait à reconnaître la participation. Le même défaut
+guettait Parallel, Anaxago, Rewatt, Virgil ou La Vie de Quartier — partout
+où plusieurs lignes du portefeuille vivent sous un seul domaine.
+
+- **Le site ne suffit plus quand plusieurs lignes le partagent.** Il dit qui
+  écrit, pas de quel véhicule il parle. Sur ces domaines, il faut désormais
+  que le véhicule soit **nommé dans le message** pour que le report se range
+  tout seul.
+- **Le doute part dans la file, plus dans une fiche au hasard.** Si le
+  message ne nomme aucun véhicule, le mail atterrit dans Rapports entrants
+  avec la mention « plusieurs participations possibles » — vous le rattachez
+  en un clic, à la bonne ligne.
+- **Le rattachement à la main ne déborde plus non plus.** Choisir un
+  véhicule n'attache le report qu'à celui-là, alors qu'il arrosait avant
+  tous ses voisins de domaine. Idem pour un dépôt de fichier depuis une
+  fiche société.
+- **Ce qui ne change pas** : une même boîte détenue par Calte **et** Albo
+  reçoit toujours son report des deux côtés.
+
+Les reports déjà rangés au mauvais endroit avant ce correctif restent à
+corriger à la main.
+
+> **🔧 Notes techniques**
+>
+> - Une seule notion porte la règle : `identityKey` dans
+>   `convex/lib/emailIdentify.ts` — le domaine identifie une participation
+>   s'il n'en porte qu'une (`sharedDomains` calcule les domaines disqualifiés
+>   sur tous les candidats, toutes orgs), sinon c'est le nom normalisé.
+> - `reportIdentify.run` : nouvelle étape `resolveOnSharedDomains` entre la
+>   corroboration et la décision — sur un domaine partagé, les candidats
+>   corroborés par le **nom** l'emportent ; si aucun ne l'est, tout le domaine
+>   revient dans la sélection, ce qui produit ≥ 2 clés d'identité et donc
+>   `ambiguous`. Le test d'ambiguïté et le fan-out se calculent maintenant sur
+>   `identityKey` (le fan-out se réduit à un filtre sur la clé acceptée).
+> - `reportInbox.sameParticipation` (rattachement manuel + upload) passe par
+>   le même helper, sinon la correction manuelle ré-arrosait les voisins.
+> - Tests : `tests/emailIdentify.test.ts` (helpers purs) et
+>   `convex/regression.reportIdentify.test.ts` (fan-out du rattachement
+>   manuel, cas Sezame / Waro multi-org / SPV détenu par deux orgs).
+> - Limite assumée : le seul discriminant accepté est le nom complet de
+>   l'entité. Deux entités d'une même boîte nommées différemment sur un
+>   domaine de sponsor (`Oprtrs & Co` vs `OPRTRS CLUB`) ne fanent plus
+>   ensemble — à corriger dans la donnée, pas dans le code (cf.
+>   `KNOWN_ISSUES.md`).
+
 ## v1.175.0 — 04/08/2026 à 19:21 — Créer une société ou un deal depuis Claude, sans ouvrir l'app
 
 Le connecteur Claude savait lire le portefeuille, rien de plus. Pour entrer
