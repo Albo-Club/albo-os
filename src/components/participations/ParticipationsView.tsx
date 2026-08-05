@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Download, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -23,6 +23,10 @@ import {
 } from '~/components/ui/dropdown-menu'
 import { Input } from '~/components/ui/input'
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
+import {
+  toggleValue,
+  usePersistentFilters,
+} from '~/hooks/usePersistentFilters'
 import { downloadCsv, toCsv } from '~/lib/csv'
 import { normalizeSearch } from '~/lib/searchText'
 
@@ -64,33 +68,38 @@ export function ParticipationsView({
 }) {
   const { t } = useTranslation('participations')
 
+  // Search + facets survive navigation (per tab, per org — see
+  // `usePersistentFilters`): leaving the list and coming back keeps them.
+  const [filters, setFilters, resetFilters] = usePersistentFilters(
+    `participations:${orgSlug ?? 'all'}`,
+    {
+      search: '',
+      instruments: [] as Array<string>,
+      sectors: [] as Array<string>,
+    },
+  )
+
   // Client-side search (low volumes): company name, custom deal names,
   // instrument (raw key + translated label), investors, sector —
   // case/accent insensitive.
-  const [search, setSearch] = useState('')
+  const search = filters.search
   const term = normalizeSearch(useDebouncedValue(search))
 
   // Faceted filters (multi-select), applied at the row (company) level
   // alongside the search, before the split into the status tables. No status
   // facet: the per-status tables below play that role.
-  const [instrumentFilter, setInstrumentFilter] = useState<Set<string>>(
-    new Set(),
+  const instrumentFilter = useMemo(
+    () => new Set(filters.instruments),
+    [filters.instruments],
   )
-  const [sectorFilter, setSectorFilter] = useState<Set<string>>(new Set())
-  const toggle =
-    (setter: React.Dispatch<React.SetStateAction<Set<string>>>) =>
-    (value: string) =>
-      setter((prev) => {
-        const next = new Set(prev)
-        if (next.has(value)) next.delete(value)
-        else next.add(value)
-        return next
-      })
-  const hasFilters = instrumentFilter.size > 0 || sectorFilter.size > 0
-  const resetFilters = () => {
-    setInstrumentFilter(new Set())
-    setSectorFilter(new Set())
-  }
+  const sectorFilter = useMemo(
+    () => new Set(filters.sectors),
+    [filters.sectors],
+  )
+  const toggle = (field: 'instruments' | 'sectors') => (value: string) =>
+    setFilters({ [field]: toggleValue(filters[field], value) })
+  const hasFilters =
+    filters.instruments.length > 0 || filters.sectors.length > 0
 
   // Facet options derived from the full row set (not the filtered one, so
   // options never vanish mid-selection), localized and sorted by label.
@@ -334,7 +343,7 @@ export function ParticipationsView({
               <Input
                 type="search"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => setFilters({ search: e.target.value })}
                 placeholder={t('search.placeholder')}
                 className="max-w-xs"
               />
@@ -343,7 +352,7 @@ export function ParticipationsView({
                   label={t('filters.instrument')}
                   options={facets.instruments}
                   selected={instrumentFilter}
-                  onToggle={toggle(setInstrumentFilter)}
+                  onToggle={toggle('instruments')}
                 />
               )}
               {facets.sectors.length >= 2 && (
@@ -351,10 +360,12 @@ export function ParticipationsView({
                   label={t('filters.sector')}
                   options={facets.sectors}
                   selected={sectorFilter}
-                  onToggle={toggle(setSectorFilter)}
+                  onToggle={toggle('sectors')}
                 />
               )}
-              {hasFilters && (
+              {/* Undebounced `search` so the button appears on the first
+                  keystroke; it clears the search too. */}
+              {(Boolean(search) || hasFilters) && (
                 <Button
                   variant="ghost"
                   size="sm"

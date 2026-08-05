@@ -101,14 +101,8 @@
     "amount": "Amount",
     "amountMin": "Min amount (€)",
     "amountMax": "Max amount (€)",
-    "amountClear": "Clear filter"
-  },
-  "suggestion": {
-    "label": "Suggestion",
-    "attachTo": "attach to",
-    "classifyAs": "classify as",
-    "validate": "Confirm",
-    "dismiss": "Dismiss"
+    "amountClear": "Clear filter",
+    "reset": "Reset"
   },
   "search": {
     "placeholder": "Search a transaction…",
@@ -162,10 +156,5 @@
     "cancelEntryTitle": "Cancel this planned entry?",
     "cancelEntryBody": "“{{label}}” due {{date}} ({{amount}}) will no longer count toward the projected balance.",
     "entryCancelled": "Planned entry cancelled"
-  },
-  "pendingEntry": {
-    "toast": "This deal has a pending planned entry: “{{label}}” due {{date}} ({{amount}}).",
-    "realize": "Realize the entry",
-    "realized": "Planned entry realized — removed from the forecast."
   }
 }

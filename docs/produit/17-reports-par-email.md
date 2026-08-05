@@ -47,6 +47,18 @@ que le véhicule soit **nommé dans le message** (« Sezame Immo 6 ») ; sans
 main, plutôt que d'être rangé au hasard chez un véhicule voisin. Un
 rattachement manuel ne touche lui aussi que le véhicule choisi.
 
+**Quand la même boîte porte deux noms** (`Oprtrs & Co` côté Albo, `OPRTRS
+CLUB` côté Calte) : rien ne permet de deviner qu'il s'agit d'une seule
+participation — vu de l'outil, ces deux lignes se ressemblent autant que
+Sezame Immo 2 et Immo 6, qui sont bien deux véhicules. Le rattachement est
+donc **manuel et assisté** : au moment de choisir, les fiches qui partagent
+le site web dans une **autre organisation** sont proposées en cases à
+cocher (la plus proche en tête), jamais cochées d'avance. Et un report déjà
+rangé garde un bouton « **Rattacher aussi** » pour en ajouter une plus
+tard — la nouvelle s'ajoute, les précédentes ne bougent pas. La file
+signale le cas d'elle-même : un repère « + Calte ? » apparaît quand une
+organisation a une fiche sur le domaine du report sans rien avoir reçu.
+
 ### 3. Lecture du contenu — toutes les sources
 
 Chaque élément du mail est lu, selon son type :

@@ -25,19 +25,13 @@ import {
   applyMatchToDeal,
   applyUnmatch,
 } from './lib/pointage'
-import { rankCandidates } from './lib/suggest'
 import { normalizeSearch } from './lib/searchText'
 import { vatCentsFromTtc, vatRateBpsValidator } from './lib/vat'
 import type { Doc, Id } from './_generated/dataModel'
 import type { QueryCtx } from './_generated/server'
-import type { SimilarTarget } from './lib/suggest'
 
 const LIST_LIMIT_MAX = 50
 const LIST_LIMIT_DEFAULT = 25
-const SUGGEST_TX_MAX = 10
-const SUGGEST_TX_DEFAULT = 5
-const SIMILAR_PER_TX = 8
-const DECISIONS_SCAN = 200
 // Scan bound for searchTransactions (totals are computed over this set),
 // aligned with SEARCH_LIMIT of the public queries (convex/transactions.ts).
 const SEARCH_SCAN = 200
@@ -67,7 +61,10 @@ export const listUnmatchedInternal = internalQuery({
   },
   handler: async (ctx, { orgId, actorUserId, search, limit }) => {
     await readMembership(ctx, orgId, actorUserId)
-    const take = Math.min(Math.max(limit ?? LIST_LIMIT_DEFAULT, 1), LIST_LIMIT_MAX)
+    const take = Math.min(
+      Math.max(limit ?? LIST_LIMIT_DEFAULT, 1),
+      LIST_LIMIT_MAX,
+    )
 
     const term = search ? normalizeSearch(search) : ''
     const rows = term
@@ -249,7 +246,10 @@ export const allocateToLiabilityInternal = internalMutation({
     kind: v.union(v.literal('equity'), v.literal('intercompany_loan')),
     targetId: v.string(),
   },
-  handler: async (ctx, { orgId, actorUserId, transactionId, kind, targetId }) => {
+  handler: async (
+    ctx,
+    { orgId, actorUserId, transactionId, kind, targetId },
+  ) => {
     await readMembership(ctx, orgId, actorUserId)
     const tx = await getOrgTransaction(ctx, orgId, transactionId)
     await applyAllocateToLiability(ctx, tx, kind, targetId)
@@ -309,159 +309,6 @@ export const unpointInternal = internalMutation({
   },
 })
 
-/**
- * Human-readable label of a pointage target (for the suggestions).
- * Cached by the caller via `labelCache`.
- */
-async function resolveTargetLabel(
-  ctx: QueryCtx,
-  kind: 'deal' | 'equity' | 'intercompany_loan',
-  targetId: string,
-  labelCache: Map<string, { label: string | null; committed: number | null }>,
-): Promise<{ label: string | null; committed: number | null }> {
-  const key = `${kind}:${targetId}`
-  const cached = labelCache.get(key)
-  if (cached) return cached
-
-  let resolved: { label: string | null; committed: number | null } = {
-    label: null,
-    committed: null,
-  }
-  if (kind === 'deal') {
-    const dealId = ctx.db.normalizeId('deals', targetId)
-    const deal = dealId ? await ctx.db.get('deals', dealId) : null
-    if (deal) {
-      const target = await ctx.db.get('companies', deal.targetCompanyId)
-      resolved = {
-        label:
-          deal.name ??
-          (target ? `${target.name} · ${deal.instrumentKind}` : null),
-        committed: deal.committedAmount ?? null,
-      }
-    }
-  } else if (kind === 'equity') {
-    const positionId = ctx.db.normalizeId('equityPositions', targetId)
-    const position = positionId
-      ? await ctx.db.get('equityPositions', positionId)
-      : null
-    if (position) resolved = { label: position.type, committed: null }
-  } else {
-    const loanId = ctx.db.normalizeId('intercompanyLoans', targetId)
-    const loan = loanId ? await ctx.db.get('intercompanyLoans', loanId) : null
-    if (loan) {
-      const [from, to] = await Promise.all([
-        ctx.db.get('organizations', loan.fromOrgId),
-        ctx.db.get('organizations', loan.toOrgId),
-      ])
-      resolved = {
-        label: `${from?.name ?? '?'} → ${to?.name ?? '?'}`,
-        committed: null,
-      }
-    }
-  }
-  labelCache.set(key, resolved)
-  return resolved
-}
-
-export const suggestMatchesInternal = internalQuery({
-  args: {
-    orgId: v.id('organizations'),
-    actorUserId: v.id('users'),
-    transactionId: v.optional(v.id('transactions')),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, { orgId, actorUserId, transactionId, limit }) => {
-    await readMembership(ctx, orgId, actorUserId)
-
-    // Transactions to process: a single one (id provided) or the N most
-    // recent from the queue.
-    const targets = transactionId
-      ? [await getOrgTransaction(ctx, orgId, transactionId)]
-      : await ctx.db
-          .query('transactions')
-          .withIndex('by_org_matchStatus', (q) =>
-            q.eq('orgId', orgId).eq('matchStatus', 'unmatched'),
-          )
-          .order('desc')
-          .take(Math.min(Math.max(limit ?? SUGGEST_TX_DEFAULT, 1), SUGGEST_TX_MAX))
-
-    // Secondary signal: recent `matched` decisions per deal.
-    const decisions = await ctx.db
-      .query('matchingDecisions')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .order('desc')
-      .take(DECISIONS_SCAN)
-    const decisionsCountByTarget: Record<string, number> = {}
-    for (const decision of decisions) {
-      if (decision.decision !== 'matched' || !decision.dealId) continue
-      decisionsCountByTarget[decision.dealId] =
-        (decisionsCountByTarget[decision.dealId] ?? 0) + 1
-    }
-
-    const labelCache = new Map<
-      string,
-      { label: string | null; committed: number | null }
-    >()
-
-    return await Promise.all(
-      targets.map(async (tx) => {
-        const term = normalizeSearch(
-          `${tx.rawLabel} ${tx.counterparty ?? ''}`,
-        ).trim()
-        const similar = term
-          ? await ctx.db
-              .query('transactions')
-              .withSearchIndex('search_text', (q) =>
-                q
-                  .search('searchText', term)
-                  .eq('orgId', orgId)
-                  .eq('matchStatus', 'matched'),
-              )
-              .take(SIMILAR_PER_TX)
-          : []
-
-        const similarTargets: Array<SimilarTarget> = []
-        for (const s of similar) {
-          if (s._id === tx._id) continue
-          const kind = s.dealId
-            ? ('deal' as const)
-            : s.allocation && s.allocation.kind !== 'deal'
-              ? s.allocation.kind
-              : null
-          if (!kind) continue
-          const targetId = s.dealId ?? s.allocation?.targetId
-          if (!targetId) continue
-          const { label, committed } = await resolveTargetLabel(
-            ctx,
-            kind,
-            targetId,
-            labelCache,
-          )
-          similarTargets.push({
-            kind,
-            targetId,
-            targetLabel: label,
-            committedAmountCents: committed,
-          })
-        }
-
-        return {
-          transactionId: tx._id,
-          dateISO: toISODate(tx.transactionDate),
-          direction: tx.direction,
-          amountCents: tx.amount,
-          rawLabel: tx.rawLabel,
-          candidates: rankCandidates({
-            txAmountCents: tx.amount,
-            similarTargets,
-            decisionsCountByTarget,
-          }),
-        }
-      }),
-    )
-  },
-})
-
 // ─── Tools exposed to the agent ─────────────────────────────────────────────
 
 const listUnmatchedTransactions = createTool({
@@ -476,12 +323,15 @@ const listUnmatchedTransactions = createTool({
   }),
   execute: async (ctx, input): Promise<unknown> => {
     const { orgId, userId } = parseScope(ctx.userId)
-    return await ctx.runQuery(internal.agentToolsPointage.listUnmatchedInternal, {
-      orgId,
-      actorUserId: userId,
-      search: input.search,
-      limit: input.limit,
-    })
+    return await ctx.runQuery(
+      internal.agentToolsPointage.listUnmatchedInternal,
+      {
+        orgId,
+        actorUserId: userId,
+        search: input.search,
+        limit: input.limit,
+      },
+    )
   },
 })
 
@@ -528,42 +378,12 @@ const searchTransactions = createTool({
   },
 })
 
-const suggestMatches = createTool({
-  description:
-    'Suggest likely reconciliation targets (deal, equity position or ' +
-    'intercompany loan) for unmatched transactions, based on previously ' +
-    'matched transactions with similar labels and past matching decisions. ' +
-    'Pass transactionId to analyse one transaction, or omit it to analyse ' +
-    'the most recent unmatched ones (default 5, max 10). Present the ' +
-    'candidates to the user and WAIT for their confirmation before calling ' +
-    'matchTransactionToDeal / allocateTransactionToLiability. An empty ' +
-    'candidates list means no signal — do not guess.',
-  inputSchema: z.object({
-    transactionId: z.string().optional(),
-    limit: z.number().int().min(1).max(10).optional(),
-  }),
-  execute: async (ctx, input): Promise<unknown> => {
-    const { orgId, userId } = parseScope(ctx.userId)
-    return await ctx.runQuery(
-      internal.agentToolsPointage.suggestMatchesInternal,
-      {
-        orgId,
-        actorUserId: userId,
-        transactionId: input.transactionId
-          ? (input.transactionId as Id<'transactions'>)
-          : undefined,
-        limit: input.limit,
-      },
-    )
-  },
-})
-
 const matchTransactionToDeal = createTool({
   description:
     'Reconcile a transaction with a deal of the current org. Call once the ' +
-    'exact transaction + deal pair is identified (e.g. via suggestMatches); ' +
-    'the user approves via in-app buttons. Fails if the transaction is ' +
-    'allocated to a liability (unpoint it first).',
+    'user has named the exact transaction + deal pair; they approve via ' +
+    'in-app buttons. Fails if the transaction is allocated to a liability ' +
+    '(unpoint it first).',
   needsApproval: true,
   inputSchema: z.object({
     transactionId: z.string(),
@@ -623,7 +443,13 @@ const categorizeTransaction = createTool({
   needsApproval: true,
   inputSchema: z.object({
     transactionId: z.string(),
-    status: z.enum(['ignored', 'charge', 'tax', 'product', 'internal_transfer']),
+    status: z.enum([
+      'ignored',
+      'charge',
+      'tax',
+      'product',
+      'internal_transfer',
+    ]),
     vatRateBps: z
       .union([z.literal(0), z.literal(550), z.literal(1000), z.literal(2000)])
       .optional()
@@ -631,13 +457,16 @@ const categorizeTransaction = createTool({
   }),
   execute: async (ctx, input): Promise<unknown> => {
     const { orgId, userId } = parseScope(ctx.userId)
-    return await ctx.runMutation(internal.agentToolsPointage.categorizeInternal, {
-      orgId,
-      actorUserId: userId,
-      transactionId: input.transactionId as Id<'transactions'>,
-      status: input.status,
-      vatRateBps: input.vatRateBps,
-    })
+    return await ctx.runMutation(
+      internal.agentToolsPointage.categorizeInternal,
+      {
+        orgId,
+        actorUserId: userId,
+        transactionId: input.transactionId as Id<'transactions'>,
+        status: input.status,
+        vatRateBps: input.vatRateBps,
+      },
+    )
   },
 })
 
@@ -816,7 +645,6 @@ const bulkCategorizeTransactions = createTool({
 export const pointageTools = {
   listUnmatchedTransactions,
   searchTransactions,
-  suggestMatches,
   matchTransactionToDeal,
   allocateTransactionToLiability,
   categorizeTransaction,

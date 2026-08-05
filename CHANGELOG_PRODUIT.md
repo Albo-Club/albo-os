@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.177.3 — 05/08/2026 à 18:08 — Les courriers sans période ne bloquent plus le circuit des reports
+## v1.180.1 — 05/08/2026 à 18:13 — Les courriers sans période ne bloquent plus le circuit des reports
 
 Un courrier de liquidation transféré sur Wheelee revenait indéfiniment en
 « erreur technique pendant l'analyse », et le rattacher à la main n'y
@@ -54,6 +54,176 @@ technique pendant l'analyse » ne disait rien de ce qui s'était passé.
 > - Nouveau `convex/regression.reportStore.test.ts` (4 cas : coexistence, rejeu idempotent, non-collision avec un report périodique, dédup périodique inchangée) — vérifié en échec contre la version naïve avant d'être figé. 61 tests de régression Convex, 317 unitaires.
 > - Visibilité de l'erreur : `reportInbox.list` renvoie `error` (champ déjà écrit par `reportIdentify.setReview`, exposé nulle part) ; affiché sous le badge dans `src/routes/app/all/reports.tsx` (tronqué, complet au survol) ; `reportRecapFailureHtml` prend un `detail` optionnel borné à 300 caractères. Message brut, dev-facing, non traduit.
 > - Récap de succès sans période : titre « ✅ Report rangé — document ponctuel, sans période », objet « Albo OS — report rangé : document ponctuel ».
+
+## v1.180.0 — 05/08/2026 à 18:11 — Rattacher un report à une seconde participation
+
+Une même boîte détenue par Calte **et** Albo peut porter un nom différent de
+chaque côté — `Oprtrs & Co` ici, `OPRTRS CLUB` là ; `Parallel Invest SPV 13
+(Bernay)` et `Parallel Invest SPV13`. Rien ne permet de deviner que ces deux
+lignes sont la même boîte : elles se ressemblent autant que Sezame Immo 2 et
+Sezame Immo 6, qui sont deux véhicules bien distincts. Le report se rangeait
+donc d'un seul côté, et il n'y avait aucun moyen d'ajouter l'autre après
+coup.
+
+- **Un report peut désormais être rattaché à plusieurs participations**, et
+  on peut en ajouter une **même quand le report est déjà rangé** : la
+  nouvelle s'ajoute aux précédentes, celles déjà servies ne bougent pas.
+- **Les fiches apparentées vous sont proposées.** Quand vous choisissez une
+  participation, celles qui partagent son site web dans une **autre
+  organisation** apparaissent sous forme de cases à cocher, la plus proche
+  en tête. Rien n'est coché tout seul : sur un domaine de plateforme, les
+  voisines sont d'autres véhicules, à vous de dire lesquelles sont
+  concernées.
+- **La file vous le signale.** Un report rangé alors qu'une organisation a
+  une fiche sur le même domaine sans rien avoir reçu porte un repère
+  « + Calte ? » dans la colonne Participation, et un bouton « Rattacher
+  aussi ». Un report déjà rangé des deux côtés n'affiche rien.
+- **Aucun accusé en double** : ajouter une participation à un report déjà
+  traité ne renvoie pas de récapitulatif à qui l'avait transféré.
+
+Le repère nomme l'**organisation**, pas le nombre de fiches : sur un domaine
+comme celui de Parallel, l'autre organisation en héberge une quinzaine sans
+rapport, et un « +15 » n'aurait rien voulu dire.
+
+> **🔧 Notes techniques**
+>
+> - `reportInbox.assignCompany` prend `companyIds` (1..n) et devient
+>   **additif** sur une ligne `processed` : union avec `matchedCompanies`,
+>   `reportIds` remis à zéro, `notifiedAt` **conservé** (pas de second récap).
+>   Rejouer `reportStore.run` est sûr : il upsert par (société, période), donc
+>   les entités déjà servies sont mises à jour en place.
+> - `reportInbox.list` renvoie `matchedCompanyIds` et `relatedOrgNames` — les
+>   orgs qui n'ont **rien** reçu du report alors qu'elles portent une société
+>   sur un des domaines rattachés. Nommer l'org plutôt que compter les
+>   entités évite le « +15 » d'un domaine de sponsor.
+> - `listAssignTargets` expose `orgId` + `domain` ; le dialog
+>   (`src/routes/app/all/reports.tsx`) construit le bloc « même domaine, autre
+>   org », trié par un Dice sur bigrammes (`nameProximity`) — un tri, jamais
+>   une décision.
+> - Tests : `convex/regression.reportIdentify.test.ts` (ajout après coup,
+>   union, `notifiedAt` préservé, apparition/disparition du repère).
+
+## v1.179.0 — 05/08/2026 à 13:56 — Le pointage ne propose plus rien (et c'est voulu)
+
+Albo OS affichait des propositions de rapprochement un peu partout : un
+bandeau « Proposition » sous les lignes à pointer, une carte
+« Rapprochements suggérés », des « règles suggérées », et une proposition de
+solder l'échéance prévue juste après un pointage. **Tout cela est retiré.**
+
+La raison est simple : le système se trompait sans le dire. Il rattachait
+des transactions au mauvais deal, confondait un deal avec une échéance
+prévue, et rien à l'écran ne signalait que la proposition était fausse. Une
+proposition juste fait gagner cinq secondes ; une proposition fausse
+acceptée de confiance coûte beaucoup plus cher à retrouver.
+
+Le pointage redevient donc entièrement manuel : vous ouvrez la file, vous
+choisissez la destination avec le menu « Affecter à… », comme avant. Rien
+d'autre ne change — la classification (charge, impôt, produit, virement
+interne), les actions groupées, le détachement et l'historique sont
+intacts. L'assistant IA sait toujours pointer, mais il ne devine plus la
+cible : vous la lui nommez, il l'applique après approbation.
+
+Nouveau au passage : une échéance prévue se marque **« réalisée » depuis sa
+ligne**, dans « Échéances ponctuelles ». Vous y choisissez vous-même la
+transaction correspondante — la liste est triée de la plus récente à la
+plus ancienne, avec une recherche libre. Si la transaction paye moins que
+prévu, vous choisissez de clore avec l'écart ou de garder le reste attendu.
+
+C'est volontairement une étape en arrière, le temps de rassembler assez de
+cas réels pour reconstruire un rapprochement automatique digne de
+confiance. Chaque pointage fait à la main aujourd'hui alimente cette
+matière : l'historique des décisions est conservé intact.
+
+> **🔧 Notes techniques**
+>
+> - **Backend supprimé** : `transactions.getPointageSuggestions`,
+>   `forecasts.suggestForecastMatches`, `forecasts.suggestRules` /
+>   `dismissRuleSuggestion`, `agentToolsPointage.suggestMatchesInternal` +
+>   l'outil agent `suggestMatches` et son entrée MCP, ainsi que les moteurs
+>   purs `lib/suggest.ts`, `lib/entryMatching.ts`, `lib/transferPairs.ts`
+>   et `lib/recurrenceDetection.ts` (avec leurs tests).
+> - `transactions.matchTransaction` ne lit plus les `forecastEntries` : son
+>   retour `pendingEntry` (qui alimentait le toast « Réaliser l'échéance »)
+>   est supprimé, la mutation renvoie `null`. Le cœur `applyMatchToDeal`
+>   est inchangé.
+> - `lib/instructions.ts` : la consigne « utilise `suggestMatches` » est
+>   remplacée par une interdiction explicite de proposer ou deviner une
+>   cible — sans ça l'agent aurait cherché un outil disparu et inventé.
+> - **Front supprimé** : `SuggestionBand` + état `refusedSuggestions` dans
+>   `PointageTable.tsx`, `ForecastMatchSuggestions.tsx`,
+>   `SuggestedRules.tsx` (et le `RulePrefill` devenu mort), le renderer
+>   `suggestMatches` du panneau AI, clés i18n associées (fr + en).
+> - **Ajout** : `RealizeEntryDialog` dans `ForecastSection.tsx` — sélecteur
+>   de transaction via `transactions.listLedger` (date desc + recherche
+>   libre), **aucun classement ni présélection**, modes `close` /
+>   `keepRemainder` conservés. C'était le seul chemin manuel manquant :
+>   les deux appelants de `markEntryRealized` vivaient dans les surfaces
+>   supprimées.
+> - **Schéma inchangé, aucune migration.** `matchStatus`, `allocation` et
+>   surtout `matchingDecisions` (append-only) sont intacts. La table
+>   `dismissedRuleSuggestions` devient inerte mais reste déclarée.
+> - Garde-fou ajouté en anti-pattern dans `CLAUDE.md` + section refondue
+>   dans `KNOWN_ISSUES.md` « Pointage transaction → deal ».
+
+---
+
+## v1.178.0 — 05/08/2026 à 12:15 — Les filtres restent en place quand vous changez de page
+
+Vous filtriez la liste des investissements sur un instrument, vous ouvriez
+une fiche pour vérifier un chiffre, vous reveniez : la liste était revenue
+à zéro. Même chose sur le registre de trésorerie. Un filtre ne survivait
+pas à une navigation, ce qui obligeait à le reposer à chaque aller-retour.
+
+C'est fini. La recherche et les filtres sont désormais **mémorisés** :
+
+- **Liste Entreprises** (par organisation et vue consolidée) : recherche,
+  instrument, secteur.
+- **Deals consolidés** : recherche, instrument, statut, secteur.
+- **Registre de trésorerie** : recherche, montant min/max, statut et compte.
+
+Vous partez sur une fiche, sur une autre page, vous rechargez même l'écran :
+en revenant, la liste est exactement dans l'état où vous l'aviez laissée.
+La mémoire est propre à **l'onglet du navigateur** — un nouvel onglet repart
+sans filtre, et fermer l'onglet oublie tout. Chaque liste a la sienne : une
+organisation n'impose pas ses filtres à une autre, ni à la vue consolidée.
+
+Pour tout effacer d'un coup, le bouton **« Réinitialiser »** est à droite des
+filtres. Il existait déjà sur les listes d'investissements mais n'apparaissait
+que si une facette était cochée : il se déclenche maintenant dès qu'une
+**recherche** est en cours, et il efface recherche et filtres ensemble. Le
+registre de trésorerie, qui n'en avait pas, l'a désormais aussi.
+
+Un détail conservé : les liens qui ouvrent le registre déjà filtré (les
+boutons « Pointer » de la page À faire, les emails de rappel) restent
+prioritaires sur le dernier filtre mémorisé — ils vous emmènent bien là où
+ils le promettent.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau hook `src/hooks/usePersistentFilters.ts` : état de filtres
+>   miroité dans `sessionStorage` sous une clé passée par la vue
+>   (`participations:<slug|all>`, `deals:<slug|all>`, `cash-ledger:<slug>`).
+>   API `[filters, patch, reset]` + helper `toggleValue` pour les facettes
+>   multi-select ; valeurs JSON-sérialisables (tableaux, pas de `Set`).
+> - Restauration dans un `useEffect` **après** le premier render (pas dans
+>   l'état initial) : le serveur rend sans storage, lire pendant le render
+>   casserait l'hydratation — même pattern que `ThemePicker`. L'état porte
+>   la clé pour laquelle il a été restauré, ce qui empêche l'effet
+>   d'écriture de persister les valeurs par défaut par-dessus l'entrée
+>   sauvegardée (au montage comme au changement d'org).
+> - `ParticipationsView` et `DealsListView` : les `useState<Set<string>>`
+>   deviennent des tableaux persistés, re-dérivés en `Set` via `useMemo`
+>   (`FacetFilter` est inchangé). La condition d'affichage du bouton
+>   « Réinitialiser » passe de `hasFilters` à `search || hasFilters`, sur
+>   la valeur **non débouncée** pour réagir dès la première frappe.
+> - `TransactionsLedger` : statut, compte, recherche et bornes de montant
+>   passent dans le hook (`accountId: ''` = tous les comptes) ; un effet
+>   déclaré après le hook réapplique `initialFilter` (`?filter=`) par-dessus
+>   la valeur restaurée, et un bouton « Réinitialiser » (clé
+>   `pointage:filter.reset`, EN/FR) a été ajouté à la barre.
+> - Docs : `TESTING.md` SH23 (listes) et CA14 (registre),
+>   `docs/produit/04-participations.md` et `07-tresorerie.md`, plus une
+>   ligne `TEMPLATE_SYNC.md` (le hook est du core générique).
 
 ## v1.177.2 — 05/08/2026 à 12:00 — Un report de sponsor ne contamine plus les véhicules voisins
 

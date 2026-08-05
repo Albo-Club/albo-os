@@ -65,6 +65,13 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
   instrument et secteur — le filtre statut a disparu, les tableaux par
   statut jouent ce rôle. Le bandeau de tête (titre, menu ⋯, recherche et
   filtres) reste figé en haut de l'écran quand on descend dans la liste.
+  Ce que vous avez filtré **reste en place** : ouvrir une fiche société,
+  passer sur la trésorerie puis revenir retrouve la liste dans l'état où
+  vous l'aviez laissée, jusqu'à la fermeture de l'onglet du navigateur.
+  Le bouton **« Réinitialiser »** (à droite des filtres, visible dès qu'une
+  recherche ou un filtre est actif) efface tout d'un coup. Chaque liste
+  garde ses propres filtres : une organisation n'impose rien à une autre,
+  ni à la vue consolidée.
   Export **CSV ou Excel (.xlsx)**, généré à la demande ; il respecte la
   recherche et les filtres actifs (sans filtre, tout l'ensemble est
   exporté).
