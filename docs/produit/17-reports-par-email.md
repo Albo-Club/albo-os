@@ -39,6 +39,14 @@ chacune. En cas de doute (aucune correspondance, ou plusieurs sociétés
 possibles), le mail atterrit dans la boîte
 [Rapports entrants](12-vue-consolidee.md) pour assignation manuelle.
 
+**Cas des sponsors** (Sezame, Parallel, Anaxago, Rewatt, Virgil…) : leurs
+véhicules partagent tous le même domaine, qui dit donc **qui écrit**, pas
+**de quel véhicule il parle**. Sur ces domaines, le rattachement demande
+que le véhicule soit **nommé dans le message** (« Sezame Immo 6 ») ; sans
+ça, le mail part dans la boîte Rapports entrants pour un rattachement à la
+main, plutôt que d'être rangé au hasard chez un véhicule voisin. Un
+rattachement manuel ne touche lui aussi que le véhicule choisi.
+
 ### 3. Lecture du contenu — toutes les sources
 
 Chaque élément du mail est lu, selon son type :

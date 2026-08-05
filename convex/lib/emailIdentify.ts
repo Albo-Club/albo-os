@@ -1,6 +1,8 @@
 /**
- * Shared text helpers for matching an email against portfolio companies.
- * Used by the report identification corroboration (convex/reportIdentify.ts).
+ * Shared helpers for matching an email against portfolio companies: text
+ * lookup, and the identity rule that decides what "the same participation"
+ * means. Used by the report identification corroboration
+ * (convex/reportIdentify.ts) and by the manual attach (convex/reportInbox.ts).
  */
 
 export function escapeRegex(s: string): string {
@@ -21,21 +23,104 @@ export function nameAppearsInText(name: string, subject: string, body: string): 
   return new RegExp(`\\b${escapeRegex(name.toLowerCase())}\\b`).test(text)
 }
 
+export interface IdentityCandidate {
+  name: string
+  domain: string | null
+}
+
+export function normalizeName(name: string): string {
+  return name.toLowerCase().trim().replace(/\s+/g, ' ')
+}
+
+/**
+ * Domains carried by MORE THAN ONE participation — a sponsor domain
+ * (hellosezame.com, parallel-invest.com, anaxago.com…) where each vehicle is
+ * its own participation. Such a domain says who writes, never which vehicle,
+ * so it must not identify one.
+ */
+export function sharedDomains(candidates: Array<IdentityCandidate>): Set<string> {
+  const namesByDomain = new Map<string, Set<string>>()
+  for (const c of candidates) {
+    const domain = c.domain?.toLowerCase().trim()
+    if (!domain) continue
+    const names = namesByDomain.get(domain) ?? new Set<string>()
+    names.add(normalizeName(c.name))
+    namesByDomain.set(domain, names)
+  }
+  const shared = new Set<string>()
+  for (const [domain, names] of namesByDomain) {
+    if (names.size > 1) shared.add(domain)
+  }
+  return shared
+}
+
+/**
+ * What a candidate identifies. The domain, when it belongs to a single
+ * participation — two entities of the same company (across orgs, or twice in
+ * one) then share a key and fan out together. On a shared domain the name is
+ * the only per-entity signal left, so it becomes the key.
+ */
+export function identityKey(candidate: IdentityCandidate, shared: Set<string>): string {
+  const domain = candidate.domain?.toLowerCase().trim()
+  if (domain && !shared.has(domain)) return domain
+  return normalizeName(candidate.name)
+}
+
 /**
  * The distinct participations explicitly named in the mail, across the whole
- * candidate list (not just the model's picks). Identity key = domain when
- * present, else the lowercased name — the same rule as the ambiguity check
- * in convex/reportIdentify.ts, so several entities of one participation
- * count once.
+ * candidate list (not just the model's picks) — the same identity rule as the
+ * ambiguity check in convex/reportIdentify.ts, so several entities of one
+ * participation count once.
  */
 export function namedIdentities(
-  candidates: Array<{ name: string; domain: string | null }>,
+  candidates: Array<IdentityCandidate>,
   subject: string,
   body: string,
+  shared: Set<string>,
 ): Set<string> {
   const out = new Set<string>()
   for (const c of candidates) {
-    if (nameAppearsInText(c.name, subject, body)) out.add(c.domain ?? c.name.toLowerCase())
+    if (nameAppearsInText(c.name, subject, body)) out.add(identityKey(c, shared))
+  }
+  return out
+}
+
+/**
+ * Makes corroborated picks specific on a shared domain.
+ *
+ * The author's domain proves the sponsor, not the vehicle: when several
+ * vehicles live on it, only a name hit selects one. So within such a group,
+ * name-corroborated picks win; and with none, the pick is replaced by EVERY
+ * entity of the domain — the mail really is about one of them and we cannot
+ * tell which, which the caller's ambiguity check turns into a review.
+ */
+export function resolveOnSharedDomains<TCandidate extends IdentityCandidate>(
+  corroborated: Array<{ candidate: TCandidate; method: string }>,
+  candidates: Array<TCandidate>,
+  shared: Set<string>,
+): Array<{ candidate: TCandidate; method: string }> {
+  const out: Array<{ candidate: TCandidate; method: string }> = []
+  const done = new Set<string>()
+  for (const entry of corroborated) {
+    const domain = entry.candidate.domain?.toLowerCase().trim()
+    if (!domain || !shared.has(domain)) {
+      out.push(entry)
+      continue
+    }
+    if (done.has(domain)) continue
+    done.add(domain)
+    const named = corroborated.filter(
+      (e) => e.candidate.domain?.toLowerCase().trim() === domain && e.method.includes('name'),
+    )
+    if (named.length > 0) {
+      out.push(...named)
+    } else {
+      out.push(
+        ...candidates
+          .filter((c) => c.domain?.toLowerCase().trim() === domain)
+          .map((candidate) => ({ candidate, method: 'domain' })),
+      )
+    }
   }
   return out
 }
