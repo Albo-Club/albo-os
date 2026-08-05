@@ -273,9 +273,17 @@ même circuit et affichent la même colonne.
 À la création d'une participation avec un domaine web, un enrichissement
 automatique remplit le pitch et le résumé depuis le site de la société. Il
 est additif : il ne réécrit jamais un champ déjà renseigné à la main. Si
-plusieurs entités partagent le même domaine (ex. plusieurs SPV du même
-sponsor), une édition du pitch se propage à toutes pour qu'elles restent
+plusieurs entités partagent le même domaine (ex. les boutiques d'une même
+enseigne), une édition du pitch se propage à toutes pour qu'elles restent
 identiques.
+
+Les **véhicules d'investissement** (les SPV d'une plateforme comme Parallel
+ou Sezame) échappent à cette règle : ils partagent tous le site de leur
+sponsor tout en étant des opérations différentes. Leur pitch n'est donc
+jamais déduit du site ni recopié d'un SPV voisin — il vient des
+communications investisseur de la plateforme, dès que la fiche est rattachée
+à son SPV dans [Intégrations](15-integrations.md), ou de votre saisie. Et
+corriger le résumé d'un SPV ne touche plus les autres.
 
 ## Actions de cycle de vie
 

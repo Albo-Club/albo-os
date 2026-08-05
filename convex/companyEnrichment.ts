@@ -36,7 +36,11 @@ import {
 } from './_generated/server'
 import { getModel } from './agent'
 import { normalizeDomain } from './lib/domain'
-import { applyPitchToDomainGroup, pickCanonicalPitch } from './lib/pitch'
+import {
+  applyPitchToDomainGroup,
+  isVehicleEntity,
+  pickCanonicalPitch,
+} from './lib/pitch'
 import { htmlToText } from './lib/reportLinks'
 
 // Homepage text passed to the LLM (title + meta description + body text).
@@ -67,6 +71,7 @@ export const getTarget = internalQuery({
       name: company.name,
       kind: company.kind,
       domain,
+      isVehicle: isVehicleEntity(company),
       needsFill,
       canonicalOneLiner: canonical?.oneLiner ?? null,
       canonicalSummary: canonical?.summary ?? null,
@@ -224,6 +229,7 @@ export const enrich = internalAction({
       name: string
       kind: string
       domain: string | null
+      isVehicle: boolean
       needsFill: boolean
       canonicalOneLiner: string | null
       canonicalSummary: string | null
@@ -232,6 +238,10 @@ export const enrich = internalAction({
     })
     // A pitch is meaningless for group/legal entities — portfolio only.
     if (!target || target.kind !== 'portfolio') return null
+    // An investment vehicle (platform SPV) never takes its pitch from its
+    // domain — that domain is the sponsor's, shared with other operations.
+    // Its description comes from VASCO (`enrichFromVasco`) or by hand.
+    if (target.isVehicle) return null
     // Whole domain group already has both fields → nothing to do.
     if (!target.domain || !target.needsFill) return null
 
