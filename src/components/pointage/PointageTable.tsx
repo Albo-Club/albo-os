@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpRight, Check } from 'lucide-react'
+import { ArrowUpRight } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useConvexMutation } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
@@ -119,9 +119,6 @@ type RecentAction = {
   targetName?: string
 }
 
-/** A resolved one-click suggestion: apply `target`, shown as `label`. */
-type ResolvedSuggestion = { label: string; target: PointageTarget }
-
 /**
  * Status badge of a transaction row — « À pointer » in amber (the daily
  * signal of what is left to handle), every settled status in neutral grey.
@@ -145,8 +142,7 @@ function TxStatusBadge({
 /**
  * Single unified action of an unmatched row: the « Affecter à… » picker.
  * Selecting an entry applies immediately — the ~5 s « Annuler » banner covers
- * mistakes. When the backend proposes a target, it is offered separately, in
- * the SuggestionBand below the row (a proposal to accept, not an action).
+ * mistakes. Nothing is ever pre-filled: the target comes from the user.
  */
 function RowActions({
   deals,
@@ -171,48 +167,6 @@ function RowActions({
         onSelect={onAssign}
         disabled={pending}
       />
-    </div>
-  )
-}
-
-/**
- * The backend's proposal for one unmatched transaction, as a full-width band
- * under its row: it reads as something to accept or reject, and the target's
- * name stays legible however long it is. « Valider » applies the same
- * assignment as the picker; « Refuser » only hides the band (suggestions are
- * recomputed on every read, nothing is stored server-side — so a refusal
- * lasts as long as the page stays open).
- */
-function SuggestionBand({
-  suggestion,
-  pending,
-  onValidate,
-  onDismiss,
-}: {
-  suggestion: ResolvedSuggestion
-  pending: boolean
-  onValidate: () => void
-  onDismiss: () => void
-}) {
-  const { t } = useTranslation('pointage')
-  return (
-    <div className="bg-info/10 border-info/30 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border px-3 py-2">
-      <span className="text-xs font-semibold tracking-wide uppercase">
-        {t('suggestion.label')}
-      </span>
-      <span className="flex-1 text-sm">
-        {suggestion.target.kind === 'status'
-          ? t('suggestion.classifyAs')
-          : t('suggestion.attachTo')}{' '}
-        <span className="font-medium">{suggestion.label}</span>
-      </span>
-      <Button size="sm" disabled={pending} onClick={onValidate}>
-        <Check className="size-4 shrink-0" />
-        {t('suggestion.validate')}
-      </Button>
-      <Button size="sm" variant="ghost" disabled={pending} onClick={onDismiss}>
-        {t('suggestion.dismiss')}
-      </Button>
     </div>
   )
 }
@@ -320,19 +274,11 @@ function MatchLink({
  * goes through the backend mutations. Rendering is paginated locally
  * (cf. `usePagination`).
  */
-/** One-click suggestion of the inbox (transactions.getPointageSuggestions). */
-export type PointageSuggestion = {
-  transactionId: Id<'transactions'>
-  kind: 'internal_transfer' | 'deal' | 'equity' | 'intercompany_loan'
-  targetId: string | null
-}
-
 export function PointageTable({
   transactions,
   plannedEntries,
   deals,
   liabilityOptions,
-  suggestions,
   orgSlug,
   emptyMessage,
   pageResetKey,
@@ -348,8 +294,6 @@ export function PointageTable({
   deals: Array<DealOption> | undefined
   /** Liability targets (equity / C/C) of the org, built by the page. */
   liabilityOptions: LiabilityOptionGroups | undefined
-  /** One-click suggestions per unmatched row — absent = no chips. */
-  suggestions?: Array<PointageSuggestion>
   /** Org slug, to link a matched row to its deal / Passif. Absent = no link. */
   orgSlug?: string
   /** Alternative empty-state message (e.g. search with no results). */
@@ -396,38 +340,7 @@ export function PointageTable({
     [liabilityOptions],
   )
 
-  // Resolve the backend suggestions to a ready-to-apply target + label from
-  // the picker options already loaded (unresolvable → no chip, e.g. an
-  // archived deal absent from listOptions).
-  const suggestionByTx = useMemo(() => {
-    const map = new Map<Id<'transactions'>, ResolvedSuggestion>()
-    for (const s of suggestions ?? []) {
-      if (s.kind === 'internal_transfer') {
-        map.set(s.transactionId, {
-          label: t('actions.internal_transfer'),
-          target: { kind: 'status', status: 'internal_transfer' },
-        })
-      } else if (s.kind === 'deal' && s.targetId) {
-        const deal = dealsById.get(s.targetId)
-        if (!deal) continue
-        map.set(s.transactionId, {
-          label: deal.target?.name ?? deal.name ?? '—',
-          target: { kind: 'deal', deal },
-        })
-      } else if (s.targetId) {
-        const liability = liabilityByTarget.get(s.targetId)
-        if (!liability) continue
-        map.set(s.transactionId, {
-          label: liability.label,
-          target: { kind: 'liability', liability },
-        })
-      }
-    }
-    return map
-  }, [suggestions, dealsById, liabilityByTarget, t])
-
   const matchTransaction = useConvexMutation(api.transactions.matchTransaction)
-  const markEntryRealized = useConvexMutation(api.forecasts.markEntryRealized)
   const cancelForecastEntry = useConvexMutation(api.forecasts.cancelEntry)
   const allocateTransaction = useConvexMutation(
     api.liabilities.allocateTransaction,
@@ -469,11 +382,6 @@ export function PointageTable({
     () => new Set(),
   )
   const [bulkPending, setBulkPending] = useState(false)
-  // Suggestions refused this session (nothing is persisted server-side — cf.
-  // SuggestionBand): the band stays hidden until the page is reloaded.
-  const [refusedSuggestions, setRefusedSuggestions] = useState<
-    Set<Id<'transactions'>>
-  >(() => new Set())
   const [confirmStatus, setConfirmStatus] = useState<BulkStatus | null>(null)
   // Planned row awaiting the « Annuler l'échéance » confirmation.
   const [cancelEntryTarget, setCancelEntryTarget] =
@@ -524,21 +432,6 @@ export function PointageTable({
     )
   }
 
-  // Second gesture offered by the post-match toast: realize the deal's
-  // pending forecast entry against the just-matched transaction (mode
-  // `close` — the planned/actual gap stays readable, cf. forecasts.ts).
-  async function realizePendingEntry(
-    entryId: Id<'forecastEntries'>,
-    transactionId: Id<'transactions'>,
-  ) {
-    try {
-      await markEntryRealized({ entryId, transactionId, mode: 'close' })
-      toast.success(t('pendingEntry.realized'))
-    } catch (err) {
-      reportError(err)
-    }
-  }
-
   async function handleMatch(
     tx: UnmatchedTx,
     target: Extract<PointageTarget, { kind: 'deal' | 'liability' }>,
@@ -546,7 +439,7 @@ export function PointageTable({
     setPendingId(tx._id)
     try {
       if (target.kind === 'deal') {
-        const result = await matchTransaction({
+        await matchTransaction({
           transactionId: tx._id,
           dealId: target.deal._id,
         })
@@ -557,25 +450,6 @@ export function PointageTable({
             kind: 'matched',
             targetName: target.deal.target?.name ?? '—',
           })
-        // Deal with a pending planned entry → offer to realize it right away
-        // (reverse of the suggestions card's « Pointer sur le deal » toast).
-        const entry = result.pendingEntry
-        if (entry) {
-          toast(
-            t('pendingEntry.toast', {
-              label: entry.label,
-              date: fmtDate(entry.date),
-              amount: fmtSignedRounded(entry.amountCents, entry.direction),
-            }),
-            {
-              action: {
-                label: t('pendingEntry.realize'),
-                onClick: () => void realizePendingEntry(entry._id, tx._id),
-              },
-              duration: 10000,
-            },
-          )
-        }
       } else {
         await allocateTransaction({
           transactionId: tx._id,
@@ -984,9 +858,7 @@ export function PointageTable({
                     <Fragment key={entry._id}>
                       {divider}
                       <TableRow
-                        className={
-                          entry.overdue ? 'bg-warning/5' : 'bg-info/5'
-                        }
+                        className={entry.overdue ? 'bg-warning/5' : 'bg-info/5'}
                       >
                         <TableCell className="w-10" />
                         <TableCell className="whitespace-nowrap tabular-nums">
@@ -1042,19 +914,11 @@ export function PointageTable({
                   )
                 }
                 const { tx, recent: recentAction } = row
-                // A proposal only makes sense on a row still to reconcile,
-                // that was not just acted upon and whose band was not refused.
-                const suggestion =
-                  !recentAction &&
-                  (tx.matchStatus ?? 'unmatched') === 'unmatched' &&
-                  !refusedSuggestions.has(tx._id)
-                    ? suggestionByTx.get(tx._id)
-                    : undefined
                 return (
                   <Fragment key={tx._id}>
                     {divider}
                     <TableRow
-                      className={`cursor-pointer ${recentAction ? 'bg-muted/40' : ''} ${suggestion ? 'border-b-0' : ''}`}
+                      className={`cursor-pointer ${recentAction ? 'bg-muted/40' : ''}`}
                       onClick={() => setSheetTx(tx)}
                     >
                       <TableCell
@@ -1113,27 +977,6 @@ export function PointageTable({
                         {actionsFor(tx, recentAction)}
                       </TableCell>
                     </TableRow>
-                    {suggestion && (
-                      <TableRow className="hover:bg-transparent">
-                        <TableCell
-                          colSpan={statusColumn ? 7 : 6}
-                          className="pt-0 pb-3"
-                        >
-                          <SuggestionBand
-                            suggestion={suggestion}
-                            pending={pendingId === tx._id}
-                            onValidate={() =>
-                              void handleAssign(tx, suggestion.target)
-                            }
-                            onDismiss={() =>
-                              setRefusedSuggestions((prev) =>
-                                new Set(prev).add(tx._id),
-                              )
-                            }
-                          />
-                        </TableCell>
-                      </TableRow>
-                    )}
                   </Fragment>
                 )
               })
@@ -1212,7 +1055,9 @@ export function PointageTable({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('register.cancelEntryTitle')}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t('register.cancelEntryTitle')}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {cancelEntryTarget &&
                 t('register.cancelEntryBody', {
@@ -1282,4 +1127,3 @@ function CategorySelect({
     </Select>
   )
 }
-

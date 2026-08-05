@@ -46,9 +46,9 @@ Une cinquantaine d'outils, par domaine :
   initiale ou révisée) — coller un BP dans le chat suffit.
 - **Trésorerie** : comptes, transactions d'un deal, recherche de
   transactions avec totaux, création de transaction ou de compte.
-- **Pointage** : lister la file, suggérer des cibles, rapprocher à un deal
-  ou au passif, catégoriser (jusqu'à 50 lignes en une approbation),
-  dépointer, position TVA.
+- **Pointage** : lister la file, rapprocher à un deal ou au passif,
+  catégoriser (jusqu'à 50 lignes en une approbation), dépointer, position
+  TVA. Il **ne propose pas** de cible : vous la nommez, il l'applique.
 - **Passif** : consulter les positions et soldes, créer/éditer capital et
   comptes courants.
 - **Prévisionnel** : règles, échéances, solde projeté, réalisation d'une
@@ -81,8 +81,10 @@ bot Telegram, pour interroger ou saisir en mobilité.
 
 - L'assistant convertit automatiquement les montants (vous parlez en euros,
   il stocke en centimes) et répond dans votre langue.
-- Il ne pointe jamais une transaction de sa propre initiative : chaque
-  rapprochement est proposé puis approuvé.
+- Il ne pointe jamais une transaction de sa propre initiative, et il ne
+  devine pas la cible : vous indiquez la transaction **et** sa destination,
+  il exécute après votre approbation. Si la cible est ambiguë, il demande —
+  il ne choisit pas à votre place (cf. [Pointage](08-pointage.md)).
 
 ## Pages liées
 

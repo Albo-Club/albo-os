@@ -64,24 +64,24 @@ conserve l'historique (réalisées, annulées, retouchées).
 
 ## Le rapprochement au réalisé
 
-Il se fait au-dessus du registre, sur la Vue d'ensemble : pointer une
-échéance sur une transaction est de la même nature que pointer une
-transaction sur un deal.
+Il se fait depuis la ligne de l'échéance, dans « Échéances ponctuelles » :
+pointer une échéance sur une transaction est de la même nature que pointer
+une transaction sur un deal.
 
-Quand une transaction réelle correspond à une échéance attendue, Albo OS le
-**suggère** (fenêtres de date, montant et libellé) : rapprochement en un clic
-si les montants sont égaux, sinon un dialogue propose de clôturer avec écart
-ou de **garder le reliquat** (paiement partiel : l'échéance est réalisée au
-montant payé et le reste devient une nouvelle échéance ponctuelle). Si
-l'échéance est liée à un deal et la transaction pas encore pointée, la
-suggestion propose aussi de pointer la transaction sur le deal dans la
-foulée — deux gestes distincts.
+L'action « **Marquer réalisée** » ouvre la liste des transactions de
+l'organisation, de la plus récente à la plus ancienne, avec une recherche
+libre par libellé ou contrepartie. **Vous choisissez la transaction** :
+l'outil ne présélectionne rien et ne classe rien par vraisemblance.
 
-Le pont existe aussi dans l'autre sens : pointer une transaction sur un
-deal qui attend encore une échéance propose aussitôt de la réaliser —
-même en dehors des fenêtres de date et de montant des suggestions, le lien
-au deal suffit. Une échéance ne reste donc pas « en retard » simplement
-parce que le pointage a été fait avant le rapprochement.
+Si la transaction paye moins que prévu, deux issues explicites : clore avec
+l'écart (le montant prévu est conservé, l'écart reste lisible), ou **garder
+le reste attendu** — l'échéance est réalisée au montant payé et le reliquat
+devient une nouvelle échéance ponctuelle.
+
+Albo OS **suggérait** autrefois ces rapprochements automatiquement, dans les
+deux sens. Ces propositions ont été retirées : elles se trompaient en
+silence. Le [pointage](08-pointage.md) explique pourquoi et ce qui est prévu
+ensuite.
 
 ## Alertes
 

@@ -39,8 +39,9 @@ la Vue d'ensemble) ; le point d'entrée quotidien est la page
    d'un coup (charge, impôt, produit, virement interne).
 
 L'[assistant IA](11-assistant-ia.md) peut faire le pointage en conversation :
-il liste la file, propose des cibles probables, et chaque geste d'écriture
-passe par une approbation Confirmer/Refuser.
+il liste la file et exécute le rattachement que vous lui indiquez, avec une
+approbation Confirmer/Refuser à chaque écriture. Il ne devine jamais la
+cible : si vous ne la nommez pas, il vous la demande.
 
 ## Les règles apprenantes
 
@@ -52,29 +53,24 @@ demande avec le bouton « Appliquer les règles ». Deux gestes ne sont jamais
 appris : le rapprochement à un deal (jugement humain) et « Ignorer » (trop
 risqué en automatique).
 
-## Les suggestions
+## Pourquoi l'outil ne propose plus rien
 
-Dans la file « À pointer », les lignes que l'outil sait probablement classer
-portent un **bandeau « Proposition »** juste en dessous : la cible proposée
-en clair (nom complet, jamais tronqué), un bouton « Valider » qui applique, et
-« Refuser » qui écarte la proposition. Deux sources :
+Albo OS affichait autrefois des propositions de rapprochement : un bandeau
+« Proposition » sous les lignes à pointer, une carte « Rapprochements
+suggérés » au-dessus du registre, des « règles suggérées », et une
+proposition de solder l'échéance prévue juste après un pointage.
 
-- les **virements internes détectés automatiquement** : deux mouvements de
-  même montant, en sens opposés, entre deux comptes de l'organisation, à
-  quelques jours d'écart — les deux jambes sont proposées en « Virement
-  interne » ;
-- l'**historique** : quand des transactions au libellé similaire ont déjà
-  été pointées plusieurs fois vers le même deal ou la même cible de
-  passif, cette cible est proposée.
+**Tout cela a été retiré.** Le système se trompait sans le dire : il
+rattachait des transactions au mauvais deal, confondait un deal avec une
+échéance prévue, et rien dans l'écran ne signalait que la proposition était
+fausse. Une proposition juste fait gagner cinq secondes ; une proposition
+fausse acceptée de confiance coûte bien davantage à retrouver.
 
-« Refuser » ne fait que masquer le bandeau : rien n'est mémorisé, donc la
-proposition peut revenir au prochain chargement de la page tant que la
-transaction n'est pas pointée.
-
-L'assistant IA s'appuie sur le même moteur (jusqu'à trois cibles probables, en
-conversation). Dans les deux cas, ni l'outil ni l'assistant ne pointent jamais
-seuls : la décision reste humaine — valider le bandeau, ou approuver
-explicitement dans le chat.
+Le pointage est donc redevenu entièrement manuel : vous ouvrez la file, vous
+choisissez la destination. C'est volontairement une étape en arrière — le
+temps de rassembler assez de cas réels pour reconstruire un rapprochement
+automatique digne de confiance. Chaque pointage que vous faites aujourd'hui
+alimente cette matière.
 
 ## Un deal en term sheet devient actif au premier versement
 
@@ -97,20 +93,15 @@ continue de fonctionner : les deux chemins mènent au même statut.
 
 ## Le rapprochement des échéances prévues
 
-Au-dessus du registre, une carte « Rapprochements suggérés »
-rapproche l'autre bout de la chaîne : les échéances du
-[prévisionnel](09-previsionnel.md) dues ou en retard qui ressemblent à une
-transaction récente (même sens, dates et montants proches, libellé). C'est
-aussi un pointage — la transaction dit ce qui s'est réellement passé, la
-carte confirme que l'échéance attendue est bien celle-là. Un clic si les
-montants collent, sinon un dialogue pour clore avec l'écart ou garder le
-reliquat. Le détail du mécanisme est décrit dans le
-[prévisionnel](09-previsionnel.md).
+L'autre bout de la chaîne : une échéance du
+[prévisionnel](09-previsionnel.md) qui est réellement tombée se marque
+« réalisée » depuis sa ligne, dans « Échéances ponctuelles ». Vous y
+choisissez vous-même la transaction correspondante — la liste est simplement
+triée de la plus récente à la plus ancienne, avec une recherche libre.
 
-Le pont marche dans les deux sens : pointer une transaction sur un deal qui
-attend encore une échéance prévue propose aussitôt de la réaliser, et une
-échéance devenue sans objet s'annule directement depuis sa ligne du
-registre.
+Si la transaction paye moins que prévu, deux issues explicites : clore avec
+l'écart, ou garder le reste attendu au prévisionnel. Une échéance devenue
+sans objet s'annule directement depuis sa ligne du registre.
 
 ## La TVA, mise de côté
 
@@ -131,9 +122,9 @@ lien avec la qualification des charges.
 ### Sous le capot : ce que le pointage enregistre
 
 Chaque rapprochement à un deal est journalisé de façon permanente (décision,
-auteur, photo de la transaction au moment du geste). Ce journal sert de
-mémoire aux suggestions et, à terme, de données d'apprentissage pour un
-rattachement plus automatique. Les statuts d'écarté (charge, impôt, produit,
+auteur, photo de la transaction au moment du geste). Ce journal est conservé
+intact : c'est lui qui servira de matière d'apprentissage au futur
+rapprochement automatique. Les statuts d'écarté (charge, impôt, produit,
 virement interne, ignoré) sont des sous-types du même mécanisme : la ligne
 sort de la file, sans deal, et reste consultable par statut.
 

@@ -1678,21 +1678,20 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   chargées : sur une org > 1000 tx il ne « repêche » donc pas la queue
   masquée. Les lignes prévisionnelles n'ont pas de compte bancaire : un
   filtre compte actif les masque.
-- **Puces de suggestion de la file (`getPointageSuggestions`) — précision
-  avant rappel, labels résolus côté client.** La query ne couvre que les
-  **30 tx `unmatched` les plus récentes** (= le haut de la file triée date
-  desc) : au-delà, pas de puce, le picker reste le chemin. Deux moteurs :
-  paires de virements internes (`lib/transferPairs.ts`, pur et testé —
-  montant **exact**, sens opposés, comptes **différents**, ≤ 4 j, chaque
-  jambe appariée au plus une fois au plus proche en date) ; sinon top-1 du
-  moteur historique partagé avec l'agent (`lib/suggest.ts:rankCandidates`),
-  retenu seulement si le libellé similaire a été vu **≥ 2 fois** parmi les
-  tx déjà pointées. La query renvoie `(kind, targetId)` SANS label : le
-  front résout depuis `deals.listOptions`/`liabilities.listOptions` déjà
-  chargés (zéro lecture de plus) — une cible absente des options (deal
-  archivé…) fait silencieusement disparaître la puce, c'est voulu. Cliquer
-  une puce passe par les **mêmes mutations** que le picker : aucune écriture
-  nouvelle, les invariants du pointage restent intacts.
+- **Plus AUCUNE suggestion de rapprochement — suppression délibérée (août
+  2026).** Le workflow déterministe de suggestion a été retiré en entier :
+  puces de la file (`getPointageSuggestions`), moteurs `lib/suggest.ts` /
+  `lib/transferPairs.ts` / `lib/entryMatching.ts` /
+  `lib/recurrenceDetection.ts`, carte « Rapprochements suggérés », carte
+  « Règles suggérées », outil agent + MCP `suggestMatches`, et le retour
+  `pendingEntry` de `matchTransaction`. Motif : le système proposait des
+  rapprochements faux **silencieusement**, et son scoring cherchait deux
+  inconnues à la fois (quel deal ET quelle échéance) pour une seule
+  transaction — complexité multiplicative, impossible à auditer. Décision
+  produit : on repart d'une base 100 % manuelle, on collecte les cas réels
+  à la main, puis on reconstruit sur cette matière. **Ne pas re-câbler de
+  suggestion ici sans cette étape.** `matchingDecisions` (append-only) est
+  conservée intacte : c'est le dataset d'entraînement du futur moteur.
 
 ## Catégories & règles apprenantes (`convex/lib/categories.ts`, `categoryRules`)
 
@@ -1909,17 +1908,14 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   reliquat comme **one-shot pur** (sans `ruleId` ni `derivedKey` — visible
   dans la table des ponctuelles, jamais re-générée par `expandRules` ; ne
   pas lui remettre le `ruleId`, il re-entrerait en collision avec le filtre
-  `listEntries` et l'expansion). Les suggestions (`suggestForecastMatches` +
-  carte « Rapprochements suggérés ») viennent du moteur pur
-  `convex/lib/entryMatching.ts` (fenêtres sens/date/montant + score
-  montant/date/libellé, testé par `tests/entryMatching.test.ts`) ; une
-  transaction déjà portée par un `realizedTransactionId` n'est jamais
-  re-suggérée. Le pont **inverse** vit dans `transactions.ts:matchTransaction` :
-  son retour porte `pendingEntry` (l'échéance `pending` du deal la plus
-  proche en date, même sens, EUR, **sans** fenêtre date/montant — le lien
-  deal est le signal), que le front propose de réaliser via
-  `markEntryRealized` (mode `close`). matchTransaction ne fait que LIRE les
-  entries — la réalisation reste un geste forecasts.ts.
+  `listEntries` et l'expansion). Le choix de la transaction est **100 %
+  manuel** depuis août 2026 (cf. « Pointage transaction → deal ») : le
+  dialog « Marquer réalisée » du registre (`ForecastSection.tsx`) liste les
+  transactions de l'org via `transactions.listLedger` en ordre
+  anti-chronologique + recherche libre — **aucun classement, aucune
+  présélection**. Ne pas y réintroduire de tri par vraisemblance : c'est
+  exactement le mécanisme qui a été retiré. `matchTransaction` ne lit plus
+  les entries du tout.
 - **Tests purs hors de `convex/`.** La logique (récurrence UTC, clamping fin
   de mois, protection, agrégation mensuelle) vit dans
   `convex/lib/recurrence.ts` (zéro import Node/Convex) et est testée par
@@ -1931,8 +1927,8 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   7 = dimanche). Toute nouvelle logique de date doit passer par
   `convex/lib/recurrence.ts`, pas par `new Date()` local (fuseau serveur).
 - **`Date.now()` dans les queries de solde = cache Convex défait — accepté.**
-  `computeCashHistoryForOrgs` / `computeForecastGridForOrg` /
-  `suggestForecastMatches` bornent leurs fenêtres avec `Date.now()`, ce qui
+  `computeCashHistoryForOrgs` / `computeForecastGridForOrg` bornent leurs
+  fenêtres avec `Date.now()`, ce qui
   re-exécute la query plus souvent que nécessaire (audit perf juin 2026).
   Trade-off assumé : le vrai fix (passer l'horodatage arrondi en argument
   depuis le client) toucherait signatures, callsites et outils agent pour
@@ -2025,23 +2021,6 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   pour des holdings en position récupérable ; pour la faire taire sans
   créer d'échéance au prévisionnel, créer l'échéance puis l'annuler
   (`cancelled` garde la clé).
-- **La détection de récurrences ne crée JAMAIS de règle seule.**
-  `forecasts.suggestRules` (moteur pur `lib/recurrenceDetection.ts`, testé)
-  propose des règles depuis l'historique **24 mois** ; la création passe
-  toujours par le dialog prérempli (geste humain, `createRule` +
-  `expandRules` habituels). Calibrage volontairement généreux (Benjamin
-  trouvait la V1 trop timide) : ≥ 3 occurrences en hebdo/mensuel mais
-  **≥ 2 en trimestriel/annuel** (un intervalle propre suffit), et montants
-  **majoritairement** stables (≥ 60 % dans ±40 % de la médiane) au lieu de
-  « tous dans ±30 % » — une facture de rattrapage ou un montant variable ne
-  tue plus le groupe, la médiane est proposée et la fourchette min→max
-  reste visible sur la carte. Le groupement réutilise la MÊME clé de pattern
-  que les règles apprenantes de catégorie (`deriveCategoryPattern`) — si le
-  pattern d'un libellé change, les deux mécanismes bougent ensemble.
-  « Ignorer » écrit dans `dismissedRuleSuggestions` (org, pattern,
-  direction) et est définitif côté UI — pour ré-afficher une suggestion,
-  supprimer la ligne via le dashboard Convex (même stance V1 que
-  `categoryRules`).
 - **Lien deal ↔ prévisionnel : le `dealId` d'une règle est resynchronisé
   sur ses occurrences non protégées.** `expandRules` propage `rule.dealId`
   à l'insert ET au resync — changer le deal d'une règle re-pointe donc ses
