@@ -3321,6 +3321,39 @@ normal : doc email couvert par son report, image inline, pas de texte),
   visible, notifié, relançable — pas re-tenté en boucle par un second
   mécanisme.
 
+**⚠️ La fenêtre de Nebius est de 32 000 tokens, et un dépassement remonte en
+`provider_http_404`.** Le client RAG remet les chunks à l'embedder **par
+paquets de 100** (`makeBatches(…, 100)`, en dur, non configurable), et
+`@openrouter/ai-sdk-provider` laisse `maxEmbeddingsPerCall` à `undefined` :
+`embedMany` envoyait donc les 100 chunks (~100 k caractères) dans **une seule
+requête HTTP**. Soit ~27 k tokens en prose — 15 % de marge — et bien au-delà
+sur du texte dense (tableaux, chiffres). Au-dessus de la fenêtre, OpenRouter
+n'a plus aucun endpoint où router (`allow_fallbacks: false`, un seul provider)
+et répond **404, pas le 400 `context_length_exceeded`** qu'on aurait sans
+épinglage : c'est un refus de *routage*, pas une réponse du modèle. Vécu le
+05/08/2026 sur un classeur de 363 k caractères, juste après que le budget
+Excel soit passé de 40 k à `MAX_DOCUMENT_CHARS` (#350). Parade :
+`MAX_EMBEDDINGS_PER_CALL = 16` via `wrapEmbeddingModel` — chaque requête
+tombe à ~6 k tokens. Le wrapper **ne touche ni `modelId` ni `provider`**,
+donc l'identité du namespace ne bouge pas et aucun backfill n'est nécessaire ;
+si un jour on override l'un des deux, c'est une bascule de namespace (cf. plus
+bas). Piège de diagnostic : un 404 est classé **permanent** — zéro retry — et
+l'email d'échec parle quand même de « plusieurs tentatives espacées ».
+
+**Les tableurs ne sont pas indexés** (`documentSkipReason` → `'spreadsheet'`,
+via `isSpreadsheet` de `lib/fileText.ts`, xlsx/xls/xlsm/csv par extension ou
+content-type). Ce n'est pas un contournement du point précédent, c'est que le
+vectoriel ne marche pas sur du tabulaire : le découpage arrache les lignes à
+leur en-tête, et des colonnes de chiffres n'ont pas de voisinage sémantique —
+l'entrée coûte un embedding sans jamais être un hit utile. Le texte reste
+extrait, stocké et lisible sur la fiche ; seule l'entrée d'index disparaît.
+**Un tableur en pièce jointe d'un report reste indexé** dans l'entrée de son
+report (majoritairement de la prose) — décision assumée, le pipeline reports
+n'est pas touché. Si on veut un jour interroger un BP, la bonne réponse est un
+outil d'agent « lis ce document » (aucun n'existe : `agentToolsDocuments.ts`
+n'expose que la recherche sémantique, et `listCompanyDocuments` ne rend que
+des métadonnées), pas de la vectorisation.
+
 - **Un namespace RAG = une org** (`namespace = orgId`) : l'isolation
   multi-tenant est structurelle côté index, mais le namespace **isole sans
   autoriser** — toute surface de recherche re-vérifie l'appartenance

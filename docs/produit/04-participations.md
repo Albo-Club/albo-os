@@ -263,13 +263,21 @@ lecture, dit où en est cette indexation :
 | 🔍✓ | Indexé — l'assistant peut chercher dans son contenu |
 | Roue qui tourne | Indexation en cours (elle réessaie toute seule en cas de saturation passagère) |
 | ⚠️ avec un bouton ↻ | L'indexation a échoué malgré plusieurs tentatives — un **email** t'a prévenu, le bouton relance |
-| 🔍✗ | Rien à indexer, c'est normal (pas de texte, ou contenu déjà couvert par son report) |
+| 🔍✗ | Rien à indexer, c'est normal (pas de texte, contenu déjà couvert par son report, ou tableur) |
 | 🔍 cliquable | Document d'avant cette fonctionnalité — le bouton lance son indexation |
 
 Un échec d'indexation n'est **jamais silencieux** : après la dernière
 tentative, les membres de l'organisation reçoivent un email avec le document
 concerné et le bouton de relance à portée de clic. Le fichier lui-même n'est
 jamais affecté.
+
+> **Les tableurs (Excel, CSV) ne sont pas indexés**, et c'est volontaire : la
+> recherche de l'assistant fonctionne sur le sens des phrases, et des colonnes
+> de chiffres coupées de leur en-tête n'ont pas de sens à retrouver. Ils
+> affichent donc 🔍✗ « Tableur — non indexé ». Leur lecture, elle, se fait
+> normalement : le texte extrait reste consultable en un clic, onglet par
+> onglet. Un tableur reçu en pièce jointe d'un rapport reste couvert par la
+> recherche via le contenu de ce rapport.
 
 Les documents rangés sur une [fiche deal](05-deals.md) suivent exactement le
 même circuit et affichent la même colonne.

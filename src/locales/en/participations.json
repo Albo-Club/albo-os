@@ -694,6 +694,7 @@
     "detail": {
       "covered_by_report": "Covered by its report",
       "inline_image": "Inline image — not indexed",
+      "spreadsheet": "Spreadsheet — not indexed",
       "no_text": "No text to index",
       "no_content": "No content to index",
       "provider_unreachable": "Indexing service unreachable",
