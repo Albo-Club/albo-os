@@ -130,7 +130,6 @@
   "status": {
     "pending": "TS",
     "active": "Actif",
-    "partially_exited": "Exit partiel",
     "fully_exited": "Exité",
     "written_off": "Exit loss",
     "exit_win": "Exit win",
@@ -370,7 +369,6 @@
     "errors": {
       "invalid_siren": "Le SIREN doit contenir exactement 9 chiffres.",
       "siren_already_used": "Ce SIREN est déjà utilisé par une autre société.",
-      "attio_company_already_used": "Cette fiche Attio est déjà rattachée à une autre société.",
       "invalid_person_name": "Le nom d'une personne est vide.",
       "default": "Impossible d'enregistrer les modifications. Réessayez."
     }
@@ -696,6 +694,7 @@
     "detail": {
       "covered_by_report": "Couvert par son report",
       "inline_image": "Image intégrée — non indexée",
+      "spreadsheet": "Tableur — non indexé",
       "no_text": "Aucun texte à indexer",
       "no_content": "Aucun contenu à indexer",
       "provider_unreachable": "Service d'indexation injoignable",

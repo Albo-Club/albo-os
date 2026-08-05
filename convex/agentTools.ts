@@ -424,7 +424,6 @@ export const updateDealInternal = internalMutation({
     status: v.optional(
       v.union(
         v.literal('active'),
-        v.literal('partially_exited'),
         v.literal('fully_exited'),
         v.literal('written_off'),
       ),
@@ -619,7 +618,7 @@ const updateDeal = createTool({
     committedAmount: z.number().int().optional(),
     paidAmount: z.number().int().optional(),
     status: z
-      .enum(['active', 'partially_exited', 'fully_exited', 'written_off'])
+      .enum(['active', 'fully_exited', 'written_off'])
       .optional(),
     notes: z.string().optional(),
   }),
@@ -765,9 +764,7 @@ export const getDashboardSummaryInternal = internalQuery({
       .query('deals')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
-    const activeDeals = deals.filter(
-      (d) => d.status === 'active' || d.status === 'partially_exited',
-    )
+    const activeDeals = deals.filter((d) => d.status === 'active')
 
     // Per-deal indexed reads (cf. convex/dashboard.ts): a full org-wide
     // transactions collect here made every agent answer using this tool

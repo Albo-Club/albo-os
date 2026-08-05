@@ -28,6 +28,24 @@ export function isImage(filename: string, contentType?: string): boolean {
   return IMAGE_EXTS.has(ext(filename)) || Boolean(contentType?.startsWith('image/'))
 }
 
+/**
+ * Tabular file — workbook or CSV — by the same rules the extraction paths use
+ * to pick their parser (`documentsExtract.classify`). Kept here next to
+ * `isImage` so the readers and the indexer can never drift on what counts as
+ * a table.
+ */
+export function isSpreadsheet(filename: string, contentType?: string): boolean {
+  const e = ext(filename)
+  const ct = contentType ?? ''
+  return (
+    EXCEL_EXTS.has(e) ||
+    ct.includes('spreadsheet') ||
+    ct.includes('ms-excel') ||
+    e === 'csv' ||
+    ct === 'text/csv'
+  )
+}
+
 /** Bounds a file's text to the budget, flagging the cut so the UI can say so. */
 export function boundText(text: string): { text: string; truncated: boolean } {
   return text.length > MAX_DOCUMENT_CHARS

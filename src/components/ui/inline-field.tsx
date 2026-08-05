@@ -122,7 +122,12 @@ export function InlineField({
       editor = (
         <Select
           open
-          defaultValue={typeof rawValue === 'string' ? rawValue : undefined}
+          // CONTROLLED value on purpose (`value`, never `defaultValue`): Radix
+          // defers `onValueChange` to an effect when the value is uncontrolled,
+          // and that effect never runs here — picking an option also closes the
+          // editor, so the Select unmounts in the same commit and the write is
+          // silently lost. A controlled value fires `onValueChange` synchronously.
+          value={typeof rawValue === 'string' ? rawValue : ''}
           onValueChange={(v) => {
             setEditing(false)
             if (v !== rawValue) void onCommit?.(v)

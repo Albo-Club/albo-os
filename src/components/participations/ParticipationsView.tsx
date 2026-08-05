@@ -30,7 +30,7 @@ import { normalizeSearch } from '~/lib/searchText'
  * Stacks two participation tables sharing ONE toolbar: the companies with
  * active deals on top and an always-open section for the settled bucket
  * (fully_exited / written_off) below. The split is made server-side
- * (`CompanyRow.settled`) — `partially_exited` stays with the active rows.
+ * (`CompanyRow.settled`).
  *
  * The rows arrive pre-aggregated from the server projection
  * (deals.listParticipations / aggregate.listParticipations); search + facet

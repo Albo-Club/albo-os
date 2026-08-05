@@ -31,7 +31,7 @@
  *
  * `vectorDetail` names the failing pipeline layer (`classifyIndexError`):
  *   - our data:    'no_text' / 'no_content' / 'covered_by_report' /
- *                  'inline_image' (skips, not errors)
+ *                  'inline_image' / 'spreadsheet' (skips, not errors)
  *   - request out: 'provider_unreachable' (never reached the provider)
  *   - provider:    'provider_http_<status>' (HTTP error, e.g. _429 = the
  *                  provider's shared token quota is saturated)
@@ -39,12 +39,14 @@
  *   - our code:    'index_write_failed' (embeddings OK, Convex write failed)
  *
  * Sequencing: one document per action run (batch of 1); within a run the RAG
- * component caps each embedding HTTP call at 100 chunks (~50 pages of text),
- * so no single provider call ever carries a whole large corpus.
+ * component hands the embedder 100 chunks at a time, which we split further
+ * into MAX_EMBEDDINGS_PER_CALL-sized HTTP calls (see below), so no single
+ * provider call ever carries a whole large corpus.
  */
 
 import { RAG } from '@convex-dev/rag'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
+import { wrapEmbeddingModel } from 'ai'
 import { v } from 'convex/values'
 
 import { components, internal } from './_generated/api'
@@ -54,6 +56,7 @@ import {
   internalQuery,
 } from './_generated/server'
 import { readMembership } from './lib/agentScope'
+import { isSpreadsheet } from './lib/fileText'
 import { wantsAlert } from './lib/notificationPrefs'
 import { classifyIndexError } from './lib/vectorizeErrors'
 import { RESEND_FROM, resend } from './email'
@@ -68,6 +71,17 @@ import type { Doc, Id } from './_generated/dataModel'
 const EMBEDDING_MODEL = 'qwen/qwen3-embedding-8b'
 const EMBEDDING_DIMENSION = 4096 // Qwen3 native; Convex vector index max
 
+/**
+ * Chunks per embedding HTTP call. The RAG client batches chunks 100 at a time
+ * and the OpenRouter provider leaves `maxEmbeddingsPerCall` unset, so all 100
+ * (~100k chars) used to travel in a SINGLE request: ~27k tokens of prose, and
+ * well past 32k on dense tabular text. The pinned Nebius endpoint advertises a
+ * 32k-token window — above it OpenRouter has no endpoint left to route to
+ * (`allow_fallbacks: false`) and answers **404**, not a 400 context error.
+ * Sixteen keeps every request an order of magnitude under that ceiling.
+ */
+const MAX_EMBEDDINGS_PER_CALL = 16
+
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
 })
@@ -78,13 +92,22 @@ type Filters = {
 }
 
 export const rag = new RAG<Filters>(components.rag, {
-  textEmbeddingModel: openrouter.textEmbeddingModel(EMBEDDING_MODEL, {
-    // Pin the EU-hosted provider (Nebius Token Factory, NL) instead of
-    // OpenRouter's load balancing: document text must not transit through
-    // other hosts. No fallback on purpose — a saturated provider surfaces as
-    // a retried-then-notified failure (cf. header) rather than a silent
-    // reroute; widen only knowingly.
-    provider: { order: ['nebius'], allow_fallbacks: false },
+  // The wrapper only bounds the request size — it passes `modelId` and
+  // `provider` through untouched, so the namespace identity (namespace,
+  // modelId, dimension, filterNames) is unchanged and no backfill is needed.
+  textEmbeddingModel: wrapEmbeddingModel({
+    model: openrouter.textEmbeddingModel(EMBEDDING_MODEL, {
+      // Pin the EU-hosted provider (Nebius Token Factory, NL) instead of
+      // OpenRouter's load balancing: document text must not transit through
+      // other hosts. No fallback on purpose — a saturated provider surfaces as
+      // a retried-then-notified failure (cf. header) rather than a silent
+      // reroute; widen only knowingly.
+      provider: { order: ['nebius'], allow_fallbacks: false },
+    }),
+    middleware: {
+      specificationVersion: 'v3',
+      overrideMaxEmbeddingsPerCall: () => MAX_EMBEDDINGS_PER_CALL,
+    },
   }),
   embeddingDimension: EMBEDDING_DIMENSION,
   filterNames: ['companyId', 'kind'],
@@ -241,6 +264,13 @@ function documentSkipReason(
   // analysis artefacts.
   if (doc.source !== 'upload') return 'covered_by_report'
   if (doc.inline === true) return 'inline_image'
+  // Spreadsheets are deliberately out of the index: chunking a table tears
+  // rows away from their header, and columns of figures have no semantic
+  // neighbourhood, so retrieval on them does not work — the entry costs an
+  // embedding without ever being a useful hit. Their text is still extracted,
+  // stored and readable on the sheet. A spreadsheet arriving as a report
+  // attachment stays indexed inside its report entry (mostly prose).
+  if (isSpreadsheet(doc.title, doc.contentType)) return 'spreadsheet'
   if (!text) return 'no_text'
   return null
 }

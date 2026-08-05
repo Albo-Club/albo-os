@@ -30,6 +30,7 @@ pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip
 | Scories du 1er passage non filtré (résumés à tort) toutes orgs       | `convex/migrations/backfillCompanyEnrichment.ts` → `listEnrichedNonCompanies` / `clearByIds` / `clearByReason` | Le tout 1er backfill (#201) tournait sans filtre → des non-sociétés joignables ont reçu un résumé. `listEnrichedNonCompanies` (lecture seule) liste les entités motif-exclu **portant déjà** un texte. `clearByReason` vide des **buckets entiers** de motifs (plateformes/véhicules type `parallel_spv`, `anaxago_line`, `named_vehicle`… — **jamais** `side_deal` ni `lvdq_sub_entity`) ; `clearByIds` vide une **liste d'id** précise. |
 | Unification du pitch par domaine (existant) toutes orgs              | `convex/migrations/unifyDomainPitches.ts` → `dryRun` / `apply` / `report`                                    | Fige un même `oneLiner`+`summary` sur toutes les entités partageant un domaine (par org). Canonique = résumé le plus long du groupe (`lib/pitch.ts:pickCanonicalPitch`), écrit sur tous. Idempotent (groupes déjà identiques ou sans résumé ignorés). Corrige la dérive existante (ex. La Vie de Quartier). Runbook en tête du module. |
 | Description Parallel via VASCO (one-liner + résumé des SPV) toutes orgs | `convex/companyEnrichment.ts` → `companyEnrichment:backfillVascoPitches`                                    | Décrit **chaque entité Parallel rattachée** (portfolio + `vascoIssuerId`) à partir de ses communications VASCO en cache. **Écrase** `oneLiner`+`summary` (la description d'opération VASCO supplante celle du domaine, inadaptée aux SPV). Rafraîchit le cache par org d'abord. Org-agnostique (toute org avec une connexion VASCO active — Calte, Albo si branchée). Aussi déclenché **auto au rattachement** (`setVascoLink`). Non idempotent (régénère à chaque passage). Ancre : le lien `vascoClientSlug`+`vascoIssuerId`. |
+| Réparation du pitch de 2 SPV pollué par le domaine (albo SPV 23, calte SPV24) | `convex/migrations/fixSpvPitches.ts` → `dryRun` / `apply`                                                    | Réécrit `oneLiner`+`summary` des deux fiches qui avaient hérité du domaine `parallel-invest.com` avant le garde-fou véhicules (`lib/pitch.ts:isVehicleEntity`) : SPV 23 portait la plaquette du site Parallel, SPV24 le résumé mot pour mot de SPV11. Textes reconstruits depuis les données qu'on détient (notes de l'entité, deal Attio, instrument), pas depuis le site. Ancré par `_id` prod + garde nom **et** garde sur le texte erroné encore présent → idempotent, ne clobbe pas une saisie manuelle faite entre-temps. Un rattachement VASCO ultérieur (`enrichFromVasco`) reprend la main. Runbook en tête du module. |
 | Backfill Attio → deals (Term Sheet en cours)                         | `convex/attioSync.ts` → `attioSync:backfillTermSheets`                                                       | Importe les deals **actuellement** en Term Sheet dans Attio (le webhook ne prend que le futur). Query paginée, filtre stage TS par id, chacun dans `upsertFromDeal` (idempotent sur `attioDealId`, **ne crée jamais sur Invested** → pas de doublon avec le portefeuille déjà importé). Re-run sûr. Cf. `KNOWN_ISSUES.md` « Sync Attio → deals ». |
 
 | Fusion des deux lignes Palatine (org calte)                          | `convex/migrations/mergePalatineAccount:dryRun` / `apply` / `verify`                                        | Réunit la ligne importée d'Airtable (`PALATINE`, 88 tx jusqu'au 20/02/2026) et la ligne créée par Powens (`COMPTE COURANT GG21 CALTE`, acct 35) : la ligne **importée survit** (historique + pointages + `airtableId`) et reprend le lien Powens ; transactions, `matchingDecisions.txBankAccountId` et `forecasts.bankAccountId` repointés, ligne en double supprimée. Ancrée sur les `_id` prod (lus via `powens:diagnoseOrgAccountLinks`), gardes org/banque/état du lien, idempotente. Le second compte courant et les nantissements sont de vrais comptes distincts — non touchés. Le trou 21/02 → 08/06 se répare ensuite via `powens:backfillConnection` (`minDate: "2026-02-21"`). Runbook en tête du module. |
@@ -77,6 +78,25 @@ Retrait en deux temps, même règle « purger d'abord, resserrer ensuite » que
 `forecasts` : après avoir vérifié en prod que `migrateVascoConnections` a bien
 tourné (et un `connections:status` sain), purger les lignes puis retirer la
 table du `convex/schema.ts` dans une PR de suivi.
+
+## Retrait du statut `partially_exited` (fait — 05/08/2026)
+
+Le statut de deal `partially_exited` a été supprimé du schéma. Il n'apportait
+aucun traitement propre au-delà d'un badge vert « Exit win » sur une position
+encore ouverte : mêmes métriques, même bucket de liste, même suivi reporting
+qu'`active` (cf. l'entrée de changelog v1.176.0).
+
+Purge effectuée **avant** le resserrement du validateur, conformément à la
+règle « purger d'abord, resserrer ensuite » : un seul deal prod le portait,
+**VIASANA** (org `calte`, `k570y3ssbhjz8k9wvf68fgzp7s87rvfm`), repassé en
+`active` via un patch de statut seul. `exitedDate` et `exitProceeds` ont été
+**volontairement conservés** — le geste UI « Annuler la sortie » les aurait
+effacés, alors qu'ils gardent la trace de la cession partielle (256 715,86 €
+décaissés, 632 589,11 € reçus, MOIC 2,46x).
+
+Une cession partielle se saisit désormais sans statut dédié : le deal reste
+`active`, l'encaissement se lit dans les transactions pointées et le MOIC, et
+la `valuation` du reliquat détenu doit être mise à jour à la main.
 
 ## Chantier : retrait de la table legacy `forecasts`
 

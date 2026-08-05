@@ -2085,7 +2085,11 @@ volontairement hors scope (deals laissés sur le chapeau).
   `splitAlboSponsorSpvs:apply` (les deux sont idempotents, l'ordre suffit).
 - **Les companies SPV n'ont pas d'`attioCompanyId`.** Elles n'existent pas
   comme companies dans Attio (ce sont des deals là-bas) ; le pont Attio reste
-  sur la company chapeau archivée. Leur ancre d'idempotence est
+  sur la company chapeau archivée. Rien n'empêche plus de rattacher un SPV à la
+  fiche Attio du chapeau à la main (l'ancrage n'est plus unique — cf. § « Fiche
+  société » point 6), mais ça reste un raccourci de lecture vers le CRM : la
+  synchro continue de viser la première société de l'org portant l'ancrage.
+  Leur ancre d'idempotence est
   `airtableId = "split:attio:{attioDealId}"` (réutilisation du champ ancre
   d'import + index `by_airtable_id` — même pattern que l'import Airtable,
   malgré le nom).
@@ -2217,8 +2221,8 @@ le module Convex n'est qu'une coquille DB autour.
    il **n'écrase jamais** les montants/instrument.
 
 3. **Statut forward-only.** Un event ne fait jamais **régresser** le cycle de
-   vie (`STATUS_RANK` : `pending < active < partially_exited < fully_exited =
-   written_off`). Un Invested ne « ressuscite » pas un deal sorti. Un instrument
+   vie (`STATUS_RANK` : `pending < active < fully_exited = written_off`). Un
+   Invested ne « ressuscite » pas un deal sorti. Un instrument
    Attio absent (`unknown`) ne **dégrade** jamais un instrument connu au patch.
 
 4. **Ligne de prévisionnel : une seule par deal, toujours créée.** Dès qu'un
@@ -2472,17 +2476,23 @@ Pièges non-évidents :
    `defaultOpen` + `onOpenChange` pour l'ouvrir/fermer en inline). Le détail du
    composant partagé : section « Édition inline des fiches ».
 
-6. **L'ancrage `attioCompanyId` se pose à la main, et son unicité est
-   GLOBALE — pas par org.** La ligne « Fiche Attio » du panneau
-   (`AttioCompanyField`) permet de rattacher une société créée à la main à sa
-   fiche CRM : `companies.update` accepte désormais `attioCompanyId` (`''`
-   détache). ⚠️ Le piège : par analogie avec le SIREN on écrirait un contrôle
-   **par org**, ce qui serait faux. `by_attio_company_id` est un index
-   **global** et `convex/attioSync.ts:resolveOrCreateTargetCompany` le lit en
-   **`.unique()`** — deux sociétés portant le même ancrage, même dans deux orgs
-   différentes, font **throw la synchro** au prochain événement Attio. D'où
-   `assertAttioCompanyIdFree` (global, `ConvexError('attio_company_already_used')`),
-   couvert par `convex/regression.deals.test.ts`. Corollaire côté UI : l'ancrage
+6. **L'ancrage `attioCompanyId` se pose à la main, et il n'est PAS unique.**
+   La ligne « Fiche Attio » du panneau (`AttioCompanyField`) permet de
+   rattacher une société créée à la main à sa fiche CRM : `companies.update`
+   accepte `attioCompanyId` (`''` détache). Un même enregistrement Attio peut
+   être porté par **plusieurs** sociétés, y compris dans des orgs différentes —
+   Attio modélise une plateforme (Parallel Invest, Sezame) comme **une**
+   company là où Albo OS a une entité par SPV (cf. § « Split chapeaux Attio →
+   SPV »), donc l'unicité rendait ces SPV non rattachables.
+   ⚠️ Le piège qui en découle : `by_attio_company_id` est un index **global**,
+   et `convex/attioSync.ts:resolveOrCreateTargetCompany` **ne doit jamais** le
+   lire en `.unique()` (ça throwait la synchro au premier doublon). Il
+   `.collect()` puis prend la **première société de l'org** — l'ordre d'index
+   étant l'ordre de création, la cible d'un deal synchronisé reste stable quel
+   que soit le nombre de rattachements ajoutés après coup. Corollaire :
+   l'ancrage n'arbitre plus rien, il ne fait qu'ouvrir le CRM depuis une fiche
+   — pour changer la cible d'un deal, on change son `targetCompanyId`, pas
+   l'ancrage. Couvert par `convex/regression.deals.test.ts`. Côté UI, l'ancrage
    ne se **saisit** jamais, il se **choisit** dans les résultats de
    `attio.searchCompanies` — un id inventé enverrait les prochains deals sur la
    mauvaise société, en silence.
@@ -2560,6 +2570,30 @@ Points non-évidents :
   créable), `renderEditor` branche `SectorCombobox` avec `defaultOpen` +
   `onOpenChange` (props additives, défaut = comportement dialog inchangé) — un
   seul clic ouvre le picker, la fermeture quitte le mode édition.
+- **Le `Select` enum doit être CONTRÔLÉ (`value`), jamais `defaultValue`.**
+  Piège coûteux, corrigé après coup : `@radix-ui/react-use-controllable-state`
+  (≥ 1.2) n'appelle `onValueChange` de façon **synchrone** que si la valeur est
+  **contrôlée** ; en non contrôlé (`defaultValue`) il la diffère dans un
+  `useEffect`. Or Radix appelle `onValueChange` **puis** `onOpenChange(false)`,
+  et notre `onOpenChange` fait `setEditing(false)` → le `Select` est **démonté
+  dans le même commit**, l'effet ne s'exécute jamais et le `onCommit` est
+  **perdu en silence** : on choisissait « Trimestriel », la ligne se refermait,
+  rien n'était écrit (aucune erreur, aucun toast). Les autres formats n'étaient
+  pas touchés (ils écrivent dans `commit()`, synchrone), donc **seuls les enums
+  ne s'enregistraient pas** (périodicité du coupon, remboursement, durée, tour,
+  type de SAFE, type de fonds, type de bien). Règle générale, valable **partout
+  dans l'app, pas seulement ici** : **tout contrôle Radix (`Select`, `Tabs`,
+  `RadioGroup`, `Checkbox`…) doit être contrôlé dès que sa sélection peut
+  démonter le composant** — sinon le callback n'a pas le temps de partir.
+  Audit fait au moment du correctif : sur les 34 `<Select>` de `src/`, 33
+  étaient déjà contrôlés (`value=`), toutes les `Checkbox` aussi, les deux
+  `Tabs` non contrôlés ne déclenchent aucune écriture et restent montés, et les
+  combobox (`SectorCombobox`, `CompanyCombobox`, `DealCombobox`) appellent leur
+  `onChange` **elles-mêmes**, donc synchronement. Le seul autre non contrôlé
+  était le sélecteur de compte bancaire de la fiche placement
+  (`placements.$dealId.tsx`, « Enveloppe ») : il **fonctionnait**, mais
+  uniquement parce que son démontage attend l'aller-retour de la mutation —
+  passé en `value=""` pour ne pas laisser traîner le motif.
 
 ## Panneau Royalties — listes sur `deals` & collage du BP (`src/components/deals/RoyaltiesPanel.tsx`)
 
@@ -3075,6 +3109,24 @@ la dérive :
 - **Existant** : `migrations/unifyDomainPitches` fige rétroactivement (canonique
   = résumé le plus long, cf. `pickCanonicalPitch`).
 
+**Exception : les véhicules d'investissement** (`lib/pitch.ts:isVehicleEntity`).
+Un SPV de plateforme porte le domaine de son **sponsor** (les 15 SPV Parallel de
+Calte sont tous sur `parallel-invest.com`) alors que chacun est une **opération
+distincte** — la règle ci-dessus y produit des résumés faux. Vécu (05/08/2026) :
+à sa création, `PARALLEL INVEST SPV24` a hérité mot pour mot du résumé de
+`SPV11` (voisin au résumé le plus long), fiche comprise « logé via le SPV
+Parallel Invest SPV11 » ; et `Parallel Invest SPV 23` portait la plaquette du
+site Parallel. Un véhicule est donc exclu **des trois côtés** : pas
+d'enrichissement depuis le domaine (`enrich` s'arrête net), pas d'héritage du
+pitch d'un voisin, pas de propagation de son propre résumé au groupe (sinon une
+saisie à la main sur un SPV écrase les 14 autres). Sa description vient des
+communications VASCO (`enrichFromVasco`, cf. plus haut) ou de la saisie manuelle.
+Marqueurs, l'un des trois suffit : `sponsor`, `vascoIssuerId`, ou un jeton
+« SPVn » dans le nom (les lignes SPV de Calte n'ont pas de `sponsor` — c'est ce
+jeton qui les rattrape ; même jeton que le pont instruments,
+`vasco.ts:spvNumberOf`). Rattrapage des deux fiches polluées :
+`migrations/fixSpvPitches`.
+
 Portée **par org** (multi-tenant) : on ne propage jamais une édition Albo vers
 Calte, même si un domaine était partagé entre les deux. Le `oneLiner` n'a pas
 d'éditeur inline aujourd'hui (édité via génération/unif) ; s'il en gagne un,
@@ -3269,6 +3321,39 @@ normal : doc email couvert par son report, image inline, pas de texte),
   visible, notifié, relançable — pas re-tenté en boucle par un second
   mécanisme.
 
+**⚠️ La fenêtre de Nebius est de 32 000 tokens, et un dépassement remonte en
+`provider_http_404`.** Le client RAG remet les chunks à l'embedder **par
+paquets de 100** (`makeBatches(…, 100)`, en dur, non configurable), et
+`@openrouter/ai-sdk-provider` laisse `maxEmbeddingsPerCall` à `undefined` :
+`embedMany` envoyait donc les 100 chunks (~100 k caractères) dans **une seule
+requête HTTP**. Soit ~27 k tokens en prose — 15 % de marge — et bien au-delà
+sur du texte dense (tableaux, chiffres). Au-dessus de la fenêtre, OpenRouter
+n'a plus aucun endpoint où router (`allow_fallbacks: false`, un seul provider)
+et répond **404, pas le 400 `context_length_exceeded`** qu'on aurait sans
+épinglage : c'est un refus de *routage*, pas une réponse du modèle. Vécu le
+05/08/2026 sur un classeur de 363 k caractères, juste après que le budget
+Excel soit passé de 40 k à `MAX_DOCUMENT_CHARS` (#350). Parade :
+`MAX_EMBEDDINGS_PER_CALL = 16` via `wrapEmbeddingModel` — chaque requête
+tombe à ~6 k tokens. Le wrapper **ne touche ni `modelId` ni `provider`**,
+donc l'identité du namespace ne bouge pas et aucun backfill n'est nécessaire ;
+si un jour on override l'un des deux, c'est une bascule de namespace (cf. plus
+bas). Piège de diagnostic : un 404 est classé **permanent** — zéro retry — et
+l'email d'échec parle quand même de « plusieurs tentatives espacées ».
+
+**Les tableurs ne sont pas indexés** (`documentSkipReason` → `'spreadsheet'`,
+via `isSpreadsheet` de `lib/fileText.ts`, xlsx/xls/xlsm/csv par extension ou
+content-type). Ce n'est pas un contournement du point précédent, c'est que le
+vectoriel ne marche pas sur du tabulaire : le découpage arrache les lignes à
+leur en-tête, et des colonnes de chiffres n'ont pas de voisinage sémantique —
+l'entrée coûte un embedding sans jamais être un hit utile. Le texte reste
+extrait, stocké et lisible sur la fiche ; seule l'entrée d'index disparaît.
+**Un tableur en pièce jointe d'un report reste indexé** dans l'entrée de son
+report (majoritairement de la prose) — décision assumée, le pipeline reports
+n'est pas touché. Si on veut un jour interroger un BP, la bonne réponse est un
+outil d'agent « lis ce document » (aucun n'existe : `agentToolsDocuments.ts`
+n'expose que la recherche sémantique, et `listCompanyDocuments` ne rend que
+des métadonnées), pas de la vectorisation.
+
 - **Un namespace RAG = une org** (`namespace = orgId`) : l'isolation
   multi-tenant est structurelle côté index, mais le namespace **isole sans
   autoriser** — toute surface de recherche re-vérifie l'appartenance
@@ -3357,6 +3442,15 @@ calcule la liste des domaines disqualifiés sur l'ensemble des candidats
 - **Rattachement manuel** (`reportInbox.sameParticipation`, utilisé par
   `assignCompany` et `createFromUpload`) : même helper, sinon choisir Sezame
   Immo 6 à la main ré-arrosait Immo 2.
+
+**Ne pas confondre avec `isVehicleEntity`** (`convex/lib/pitch.ts`), qui règle
+le problème voisin du *pitch* : là, la question est « cette entité mérite-t-elle
+sa propre description ? » et se tranche entité par entité (sponsor renseigné,
+lien VASCO, jeton « SPVn »). Ici la question est « ce domaine désigne-t-il une
+participation ? » et ne se tranche qu'en regardant **les voisins** : un domaine
+sans doublon reste un identifiant parfaitement bon, et `laviedequartier.fr` —
+qui ne porte aucun de ces trois marqueurs — doit quand même être disqualifié.
+Deux questions, deux prédicats.
 
 Deux limites assumées :
 

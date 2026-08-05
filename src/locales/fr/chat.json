@@ -82,7 +82,6 @@
     },
     "status": {
       "active": "Actif",
-      "partially_exited": "Sortie partielle",
       "fully_exited": "Sorti",
       "written_off": "Passé en perte"
     },

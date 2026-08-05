@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 import { useConvexMutation } from '@convex-dev/react-query'
 import { useAction } from 'convex/react'
 import { toast } from 'sonner'
-import { ConvexError } from 'convex/values'
 
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
@@ -41,15 +40,8 @@ export function AttioCompanyField({
     try {
       await updateCompany({ id: company._id, patch: { attioCompanyId } })
       toast.success(t('edit.saved'))
-    } catch (err) {
-      const code = err instanceof ConvexError ? (err.data as string) : ''
-      toast.error(
-        t(
-          code === 'attio_company_already_used'
-            ? 'edit.errors.attio_company_already_used'
-            : 'edit.errors.default',
-        ),
-      )
+    } catch {
+      toast.error(t('edit.errors.default'))
     }
   }
 
