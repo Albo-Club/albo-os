@@ -2221,8 +2221,8 @@ le module Convex n'est qu'une coquille DB autour.
    il **n'écrase jamais** les montants/instrument.
 
 3. **Statut forward-only.** Un event ne fait jamais **régresser** le cycle de
-   vie (`STATUS_RANK` : `pending < active < partially_exited < fully_exited =
-   written_off`). Un Invested ne « ressuscite » pas un deal sorti. Un instrument
+   vie (`STATUS_RANK` : `pending < active < fully_exited = written_off`). Un
+   Invested ne « ressuscite » pas un deal sorti. Un instrument
    Attio absent (`unknown`) ne **dégrade** jamais un instrument connu au patch.
 
 4. **Ligne de prévisionnel : une seule par deal, toujours créée.** Dès qu'un

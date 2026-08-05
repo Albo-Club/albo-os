@@ -73,7 +73,6 @@ const dealStatus = v.union(
   // Attio sync (convex/attioSync.ts) and flipped to 'active' on Invested.
   v.literal('pending'),
   v.literal('active'),
-  v.literal('partially_exited'),
   v.literal('fully_exited'),
   v.literal('written_off'),
 )

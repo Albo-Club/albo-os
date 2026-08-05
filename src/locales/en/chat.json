@@ -82,7 +82,6 @@
     },
     "status": {
       "active": "Active",
-      "partially_exited": "Partial exit",
       "fully_exited": "Exited",
       "written_off": "Written off"
     },

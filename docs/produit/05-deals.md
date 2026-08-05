@@ -34,16 +34,14 @@ toutes organisations confondues.
   sheet (rien n'est décaissé). Les **fonds** affichent les deux — engagé
   (commit) vs **capital appelé** — car ils diffèrent réellement.
 - **Statut** : *engagé* (term sheet signée, pas encore câblé — créé
-  automatiquement depuis Attio), *actif*, *sorti partiellement*, **Exit
-  win** / **Exit loss** (sortie gagnante ou perdante, selon le multiple
-  réalisé). Le statut se lit sur un **seul badge**, en teinte claire, avec la
-  même **couleur** partout (fiche deal, liste des deals, fiche société) que
-  les bandeaux de la liste des participations : ambre = *engagé*, bleu =
-  position ouverte (actif), vert = Exit win, rouge = Exit loss. Une **sortie
-  partielle** vire au vert dès qu'elle est déjà dans le vert, jamais au rouge
-  (la position n'est pas soldée) : sinon elle reste bleue. Seule exception,
-  le **gris** : une sortie dont le multiple n'est pas calculable (aucun
-  capital décaissé) n'est ni une victoire ni une perte. Un deal *engagé*
+  automatiquement depuis Attio), *actif*, **Exit win** / **Exit loss**
+  (sortie gagnante ou perdante, selon le multiple réalisé). Le statut se lit
+  sur un **seul badge**, en teinte claire, avec la même **couleur** partout
+  (fiche deal, liste des deals, fiche société) que les bandeaux de la liste
+  des participations : ambre = *engagé*, bleu = position ouverte (actif),
+  vert = Exit win, rouge = Exit loss. Seule exception, le **gris** : une
+  sortie dont le multiple n'est pas calculable (aucun capital décaissé) n'est
+  ni une victoire ni une perte. Un deal *engagé*
   **passe tout seul en actif** dès qu'un décaissement lui est pointé
   (cf. [Pointage](08-pointage.md)).
 - **Dates** : signature (tri par défaut), closing, sortie.
@@ -111,17 +109,21 @@ visible pendant qu'on fait défiler la page.
 
 ## Gérer une sortie
 
-Le dialogue « Gérer la sortie » pose le statut (sortie totale, partielle,
-perte), la date et le produit de cession. Une sortie est **réversible** : on
+Le dialogue « Gérer la sortie » pose le statut (sortie totale ou perte
+totale), la date et le produit de cession. Une sortie est **réversible** : on
 peut l'annuler et le deal redevient actif.
 
 Une fois sorti, la **couleur du statut** dit comment ça s'est passé, déduite du
 multiple réalisé (MOIC, calculé depuis les transactions pointées) : **vert**
 au-dessus de 1 (« Exit win »), **rouge** en dessous (« Exit loss ») — une perte
-actée est toujours un « Exit loss » rouge. Pour une **sortie partielle**, le deal
-reste actif (on détient encore une partie) : seul un gain déjà réalisé est
-signalé (statut « Exit partiel » en **vert** quand le reçu dépasse déjà le
-capital déployé), jamais en rouge, puisque la position n'est pas soldée.
+actée est toujours un « Exit loss » rouge.
+
+Une **cession partielle** n'a pas de statut dédié : le deal reste **actif**,
+puisqu'on en détient encore une partie. L'argent déjà récupéré apparaît dans
+le reçu et dans le multiple réalisé du deal — c'est là qu'on lit le gain, pas
+dans le statut. Pensez à mettre à jour la **valorisation** de ce qui reste
+détenu après la cession, sans quoi la valeur du portefeuille compte à la fois
+le cash encaissé et la totalité de la ligne d'origine.
 
 ## Points d'attention
 
