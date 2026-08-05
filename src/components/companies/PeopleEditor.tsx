@@ -182,10 +182,12 @@ function PersonChip({
           target="_blank"
           rel="noreferrer"
           title={t('identity.attioOpen')}
-          className="flex min-w-0 items-center gap-1.5"
+          className="group flex min-w-0 items-center gap-1.5"
         >
           {avatar}
-          <span className="truncate">{person.name}</span>
+          <span className="truncate underline-offset-2 group-hover:underline">
+            {person.name}
+          </span>
           <ArrowUpRight
             aria-hidden="true"
             className="text-muted-foreground size-3.5 shrink-0"
