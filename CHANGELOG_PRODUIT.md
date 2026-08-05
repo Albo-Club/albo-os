@@ -23,6 +23,57 @@ bas de page.
 
 ---
 
+## v1.181.0 — 05/08/2026 à 19:54 — Un report rangé sur la mauvaise participation se détache
+
+Jusqu'ici, rattacher un report était à sens unique : on pouvait l'ajouter à
+une participation, jamais l'en retirer. Un rattachement fait un peu vite, ou
+tombé sur le mauvais véhicule d'un sponsor, restait donc sur la fiche pour
+toujours — avec ses fichiers et les KPIs qu'il avait renseignés.
+
+Le geste inverse existe maintenant, à l'endroit où l'erreur se constate comme
+à celui où elle se commet :
+
+- **Depuis la fiche société** : ouvrir le report dans la liste Documents &
+  rapports, puis « Détacher de cette participation ».
+- **Depuis les Rapports entrants** : la croix sur la puce de la participation
+  concernée.
+
+Dans les deux cas, le report quitte cette fiche **proprement** : ses fichiers
+et les KPIs qu'il avait alimentés partent avec lui, il sort de la recherche
+de la société, et la synthèse repart du report précédent. Ce qui ne bouge
+pas : les **autres** participations rattachées au même report gardent le
+leur, et le mail d'origine reste dans la file — il n'y a plus qu'à le
+rattacher là où il devait aller. Un détachement est définitif côté fiche,
+d'où la fenêtre de confirmation qui dit ce qui part.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle mutation publique `reportInbox.detachCompany({ reportId })`,
+>   miroir de `assignCompany` : `requireOrgMember` sur l'org du report, puis
+>   suppression de toute l'empreinte écrite par `reportStore.storeForCompany`
+>   pour **cette entité seulement** — ligne `companyReports`, lignes
+>   `documents` filtrées sur `companyId`, `kpiSnapshots` taggés
+>   `source: "report:<id>"`, repli de `companyIntelligence.latestReportId` sur
+>   le report suivant (ou effacement), et `vectorize.removeEntry` sur la clé
+>   `report:<id>`.
+> - Le **blob de storage n'est pas supprimé** : il est partagé par les lignes
+>   `documents` de toutes les entités du fan-out et par la pièce jointe de
+>   `inboundEmails`. Détail et pièges dans `KNOWN_ISSUES.md` § « Détacher un
+>   report ».
+> - La ligne de la file est corrigée dans la même transaction
+>   (`matchedCompanies`, `reportIds`), sinon un « Retraiter » ultérieur
+>   remettrait le report sur l'entité détachée. Ça a demandé un back-link
+>   `companyReports.inboundEmailId` (posé au rangement) ; les lignes
+>   antérieures sont retrouvées via `agentmailMessageId`.
+> - `reportInbox.list` expose désormais `matched: [{ companyId, name,
+>   reportId }]` au lieu de `matchedNames` + `matchedCompanyIds` — la file
+>   rend une puce par **entité** (deux orgs = deux puces) avec sa croix, et
+>   seules celles portant réellement un report en ont une.
+> - Couverture : `convex/regression.reportDetach.test.ts` (6 cas — périmètre
+>   de la suppression, blob préservé, correction de la file, repli et
+>   effacement du pointeur de synthèse, refus hors org). `TESTING.md` R28c /
+>   R28d.
+
 ## v1.180.2 — 05/08/2026 à 19:27 — Les fondateurs et co-investisseurs liés à Attio se voient enfin comme des liens
 
 Sur la fiche d'une participation, les puces des sections Fondateur(s),

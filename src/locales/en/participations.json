@@ -770,6 +770,13 @@
     "errors": {
       "too_large": "File is larger than 20 MB",
       "default": "Something went wrong"
+    },
+    "detach": {
+      "action": "Detach from this participation",
+      "confirmTitle": "Detach this report?",
+      "confirmBody": "The report will be removed from {{company}}: it leaves this fiche, along with its files and the KPIs it filled in. The other attached participations keep theirs, and the received file is not deleted.",
+      "confirm": "Detach",
+      "done": "Report detached from this participation"
     }
   },
   "silence": {

@@ -770,6 +770,13 @@
     "errors": {
       "too_large": "Le fichier dépasse 20 Mo",
       "default": "Une erreur est survenue"
+    },
+    "detach": {
+      "action": "Détacher de cette participation",
+      "confirmTitle": "Détacher ce rapport ?",
+      "confirmBody": "Le rapport sera retiré de {{company}} : il disparaît de cette fiche, avec ses fichiers et les KPIs qu’il avait renseignés. Les autres participations rattachées gardent le leur, et le fichier reçu n’est pas supprimé.",
+      "confirm": "Détacher",
+      "done": "Rapport détaché de cette participation"
     }
   },
   "silence": {

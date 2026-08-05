@@ -35,7 +35,8 @@
     "assign": "Rattacher",
     "reprocess": "Retraiter",
     "reject": "Rejeter",
-    "assignAlso": "Rattacher aussi"
+    "assignAlso": "Rattacher aussi",
+    "detach": "Détacher ce report de {{name}}"
   },
   "assignDialog": {
     "title": "Rattacher à une participation",
@@ -52,9 +53,16 @@
     "assigned": "Report rattaché — traitement relancé",
     "reprocessed": "Traitement relancé depuis le début",
     "rejected": "Email rejeté",
-    "error": "Action impossible — réessaie"
+    "error": "Action impossible — réessaie",
+    "detached": "Report détaché de la participation"
   },
   "related": {
     "hint": "Une fiche du même domaine existe dans {{orgs}}, où ce report n'est pas rattaché — ouvre « Rattacher aussi » pour l'ajouter."
+  },
+  "detachDialog": {
+    "title": "Détacher ce report ?",
+    "description": "Le report sera retiré de {{name}} : il disparaît de sa fiche, avec ses fichiers et les KPIs qu’il avait renseignés. Les autres participations rattachées gardent le leur.",
+    "cancel": "Annuler",
+    "confirm": "Détacher"
   }
 }
