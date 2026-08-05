@@ -2085,7 +2085,11 @@ volontairement hors scope (deals laissés sur le chapeau).
   `splitAlboSponsorSpvs:apply` (les deux sont idempotents, l'ordre suffit).
 - **Les companies SPV n'ont pas d'`attioCompanyId`.** Elles n'existent pas
   comme companies dans Attio (ce sont des deals là-bas) ; le pont Attio reste
-  sur la company chapeau archivée. Leur ancre d'idempotence est
+  sur la company chapeau archivée. Rien n'empêche plus de rattacher un SPV à la
+  fiche Attio du chapeau à la main (l'ancrage n'est plus unique — cf. § « Fiche
+  société » point 6), mais ça reste un raccourci de lecture vers le CRM : la
+  synchro continue de viser la première société de l'org portant l'ancrage.
+  Leur ancre d'idempotence est
   `airtableId = "split:attio:{attioDealId}"` (réutilisation du champ ancre
   d'import + index `by_airtable_id` — même pattern que l'import Airtable,
   malgré le nom).
@@ -2472,17 +2476,23 @@ Pièges non-évidents :
    `defaultOpen` + `onOpenChange` pour l'ouvrir/fermer en inline). Le détail du
    composant partagé : section « Édition inline des fiches ».
 
-6. **L'ancrage `attioCompanyId` se pose à la main, et son unicité est
-   GLOBALE — pas par org.** La ligne « Fiche Attio » du panneau
-   (`AttioCompanyField`) permet de rattacher une société créée à la main à sa
-   fiche CRM : `companies.update` accepte désormais `attioCompanyId` (`''`
-   détache). ⚠️ Le piège : par analogie avec le SIREN on écrirait un contrôle
-   **par org**, ce qui serait faux. `by_attio_company_id` est un index
-   **global** et `convex/attioSync.ts:resolveOrCreateTargetCompany` le lit en
-   **`.unique()`** — deux sociétés portant le même ancrage, même dans deux orgs
-   différentes, font **throw la synchro** au prochain événement Attio. D'où
-   `assertAttioCompanyIdFree` (global, `ConvexError('attio_company_already_used')`),
-   couvert par `convex/regression.deals.test.ts`. Corollaire côté UI : l'ancrage
+6. **L'ancrage `attioCompanyId` se pose à la main, et il n'est PAS unique.**
+   La ligne « Fiche Attio » du panneau (`AttioCompanyField`) permet de
+   rattacher une société créée à la main à sa fiche CRM : `companies.update`
+   accepte `attioCompanyId` (`''` détache). Un même enregistrement Attio peut
+   être porté par **plusieurs** sociétés, y compris dans des orgs différentes —
+   Attio modélise une plateforme (Parallel Invest, Sezame) comme **une**
+   company là où Albo OS a une entité par SPV (cf. § « Split chapeaux Attio →
+   SPV »), donc l'unicité rendait ces SPV non rattachables.
+   ⚠️ Le piège qui en découle : `by_attio_company_id` est un index **global**,
+   et `convex/attioSync.ts:resolveOrCreateTargetCompany` **ne doit jamais** le
+   lire en `.unique()` (ça throwait la synchro au premier doublon). Il
+   `.collect()` puis prend la **première société de l'org** — l'ordre d'index
+   étant l'ordre de création, la cible d'un deal synchronisé reste stable quel
+   que soit le nombre de rattachements ajoutés après coup. Corollaire :
+   l'ancrage n'arbitre plus rien, il ne fait qu'ouvrir le CRM depuis une fiche
+   — pour changer la cible d'un deal, on change son `targetCompanyId`, pas
+   l'ancrage. Couvert par `convex/regression.deals.test.ts`. Côté UI, l'ancrage
    ne se **saisit** jamais, il se **choisit** dans les résultats de
    `attio.searchCompanies` — un id inventé enverrait les prochains deals sur la
    mauvaise société, en silence.

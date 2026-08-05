@@ -160,10 +160,16 @@ rapports ou ses deals.
   et domaine, pour départager les homonymes). On ne peut pas saisir une
   référence à la main : ce lien est ce sur quoi la synchronisation des deals
   s'appuie, une valeur inventée enverrait les prochains deals sur la
-  mauvaise société. Une même fiche Attio ne peut être rattachée qu'à **une
-  seule** société, toutes organisations confondues. C'est utile surtout pour
-  les sociétés créées à la main dans Albo : celles qui arrivent par la
-  synchronisation sont déjà rattachées.
+  mauvaise société. Une même fiche Attio peut être rattachée à **plusieurs**
+  sociétés, y compris dans des organisations différentes : Attio ne connaît
+  souvent qu'une fiche là où Albo OS a une entité par véhicule (les SPV d'une
+  plateforme comme Parallel, par exemple). C'est utile surtout pour les
+  sociétés créées à la main dans Albo : celles qui arrivent par la
+  synchronisation sont déjà rattachées. À savoir : quand plusieurs sociétés
+  partagent la même fiche, les deals qui arrivent d'Attio continuent d'aller
+  sur la **première** d'entre elles (la plus ancienne de l'organisation) —
+  rattacher les autres sert à ouvrir le CRM depuis leur fiche, pas à
+  détourner la synchronisation.
 - **Résumé** : le résumé de la société, dans sa propre section, aligné à
   gauche et **éditable au clic** — on clique le texte, on écrit, on clique
   ailleurs et c'est enregistré (Échap annule).

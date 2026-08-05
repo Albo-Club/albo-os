@@ -43,31 +43,6 @@ export async function assertSirenFree(
   if (clash && clash._id !== selfId) throw new ConvexError('siren_already_used')
 }
 
-/**
- * Rejects an Attio company record already anchored to another company.
- *
- * Deliberately GLOBAL, not org-scoped like the SIREN above:
- * `by_attio_company_id` is a global index and the deal sync reads it with
- * `.unique()` (`resolveOrCreateTargetCompany`, convex/attioSync.ts), so a
- * second company claiming the same anchor — in this org or any other — makes
- * the sync throw at its next run. One Attio company ⟷ one Albo company.
- */
-async function assertAttioCompanyIdFree(
-  ctx: Ctx,
-  attioCompanyId: string,
-  selfId: Id<'companies'>,
-) {
-  const clash = await ctx.db
-    .query('companies')
-    .withIndex('by_attio_company_id', (q) =>
-      q.eq('attioCompanyId', attioCompanyId),
-    )
-    .first()
-  if (clash && clash._id !== selfId) {
-    throw new ConvexError('attio_company_already_used')
-  }
-}
-
 export const list = query({
   args: {
     orgId: v.id('organizations'),
@@ -332,13 +307,12 @@ export const update = mutation({
       const trimmed = patch.domain.trim()
       patch.domain = trimmed ? (normalizeDomain(trimmed) ?? trimmed) : undefined
     }
-    // Attio anchor: trimmed; '' unlinks (mirror of domain). Uniqueness is
-    // global — see assertAttioCompanyIdFree.
+    // Attio anchor: trimmed; '' unlinks (mirror of domain). NOT unique — one
+    // Attio record backs several entities (Attio knows one company "Parallel
+    // Invest" where Albo OS has one entity per SPV). The deal sync picks its
+    // target deterministically — cf. resolveOrCreateTargetCompany.
     if (patch.attioCompanyId !== undefined) {
       patch.attioCompanyId = patch.attioCompanyId.trim() || undefined
-    }
-    if (patch.attioCompanyId) {
-      await assertAttioCompanyIdFree(ctx, patch.attioCompanyId, id)
     }
     // Summary: trimmed; '' clears the field (mirror of domain behaviour).
     if (patch.summary !== undefined) {

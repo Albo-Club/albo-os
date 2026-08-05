@@ -370,7 +370,6 @@
     "errors": {
       "invalid_siren": "Le SIREN doit contenir exactement 9 chiffres.",
       "siren_already_used": "Ce SIREN est déjà utilisé par une autre société.",
-      "attio_company_already_used": "Cette fiche Attio est déjà rattachée à une autre société.",
       "invalid_person_name": "Le nom d'une personne est vide.",
       "default": "Impossible d'enregistrer les modifications. Réessayez."
     }
