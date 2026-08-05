@@ -23,6 +23,60 @@ bas de page.
 
 ---
 
+## v1.175.1 — 05/08/2026 à 10:55 — Les listes déroulantes des fiches s'enregistrent enfin
+
+Sur une fiche deal, choisir « Trimestriel » dans **Périodicité du coupon**
+ne servait à rien : la ligne se refermait, le champ restait sur « — », et
+rien n'indiquait que le choix venait d'être perdu. Même chose partout
+ailleurs pour un champ à choix multiple édité au clic — **Type de fonds**
+(« Private equity »…) sur un deal de fonds, mais aussi Remboursement,
+Durée, Tour, Type de SAFE et Type de bien.
+
+Le problème ne touchait **que** ces champs à liste déroulante. Les montants,
+pourcentages, dates et textes s'enregistraient normalement, ce qui rendait
+la panne d'autant plus déroutante : sur la même colonne de droite, un
+champ sur deux répondait.
+
+C'est corrigé : un choix dans une liste déroulante s'écrit immédiatement,
+avec le même retour que les autres champs (« Modifications enregistrées »),
+et la valeur est toujours là après rechargement de la page. Le correctif
+est fait dans le composant d'édition partagé, donc il vaut pour **tous**
+les champs à choix d'Albo OS, présents et à venir.
+
+> **🔧 Notes techniques**
+>
+> - Cause : dans `src/components/ui/inline-field.tsx`, l'éditeur des champs
+>   `format: 'enum'` rendait un `<Select open defaultValue=…>` (Radix) —
+>   donc une valeur **non contrôlée**. Depuis
+>   `@radix-ui/react-use-controllable-state` ≥ 1.2, `onValueChange` n'est
+>   appelé **synchronement** que si la valeur est **contrôlée** ; en non
+>   contrôlé, l'appel est différé dans un `useEffect`.
+> - Radix appelle `onValueChange` puis `onOpenChange(false)` ; notre
+>   `onOpenChange` fait `setEditing(false)`, ce qui **démonte le `Select`
+>   dans le même commit React**. L'effet différé n'a jamais lieu → `onCommit`
+>   jamais appelé → aucun `deals.update`, sans erreur ni toast.
+> - Correctif : `value={typeof rawValue === 'string' ? rawValue : ''}` à la
+>   place de `defaultValue` (Radix traite `''` comme « pas de valeur » et
+>   affiche le placeholder). Un seul prop, dans le composant partagé, donc
+>   valable pour tous les enums (`ENUM_FIELD_VALUES`).
+> - **Audit de tous les sélecteurs de l'app** (le bug ne devait pas dormir
+>   ailleurs) : sur les 34 `<Select>` de `src/`, 33 étaient déjà contrôlés ;
+>   toutes les `Checkbox` aussi ; les deux `Tabs` non contrôlés (`me.tsx`,
+>   `cash.index.tsx`) ne déclenchent aucune écriture ; les combobox
+>   (`SectorCombobox`, `CompanyCombobox`, `DealCombobox`) appellent leur
+>   `onChange` elles-mêmes, donc synchronement. Seul autre non contrôlé : le
+>   sélecteur de compte bancaire de la fiche placement (`placements.$dealId.tsx`,
+>   bloc « Enveloppe ») — il **marchait** (son démontage attend l'aller-retour
+>   de la mutation), passé en `value=""` par prudence.
+> - Non concernés, vérifiés : les `Select` de `DealFieldInput` (dialog
+>   d'édition, restent montés) et `SectorCombobox` (appelle `onChange`
+>   lui-même, synchrone).
+> - Règle ajoutée dans `KNOWN_ISSUES.md` § « Édition inline des fiches » :
+>   tout contrôle Radix dont la sélection le démonte doit être **contrôlé**.
+>   `TESTING.md` FD38 durci (le choix enum doit survivre au rechargement).
+
+---
+
 ## v1.175.0 — 04/08/2026 à 19:21 — Créer une société ou un deal depuis Claude, sans ouvrir l'app
 
 Le connecteur Claude savait lire le portefeuille, rien de plus. Pour entrer

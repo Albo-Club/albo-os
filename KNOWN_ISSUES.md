@@ -2560,6 +2560,30 @@ Points non-évidents :
   créable), `renderEditor` branche `SectorCombobox` avec `defaultOpen` +
   `onOpenChange` (props additives, défaut = comportement dialog inchangé) — un
   seul clic ouvre le picker, la fermeture quitte le mode édition.
+- **Le `Select` enum doit être CONTRÔLÉ (`value`), jamais `defaultValue`.**
+  Piège coûteux, corrigé après coup : `@radix-ui/react-use-controllable-state`
+  (≥ 1.2) n'appelle `onValueChange` de façon **synchrone** que si la valeur est
+  **contrôlée** ; en non contrôlé (`defaultValue`) il la diffère dans un
+  `useEffect`. Or Radix appelle `onValueChange` **puis** `onOpenChange(false)`,
+  et notre `onOpenChange` fait `setEditing(false)` → le `Select` est **démonté
+  dans le même commit**, l'effet ne s'exécute jamais et le `onCommit` est
+  **perdu en silence** : on choisissait « Trimestriel », la ligne se refermait,
+  rien n'était écrit (aucune erreur, aucun toast). Les autres formats n'étaient
+  pas touchés (ils écrivent dans `commit()`, synchrone), donc **seuls les enums
+  ne s'enregistraient pas** (périodicité du coupon, remboursement, durée, tour,
+  type de SAFE, type de fonds, type de bien). Règle générale, valable **partout
+  dans l'app, pas seulement ici** : **tout contrôle Radix (`Select`, `Tabs`,
+  `RadioGroup`, `Checkbox`…) doit être contrôlé dès que sa sélection peut
+  démonter le composant** — sinon le callback n'a pas le temps de partir.
+  Audit fait au moment du correctif : sur les 34 `<Select>` de `src/`, 33
+  étaient déjà contrôlés (`value=`), toutes les `Checkbox` aussi, les deux
+  `Tabs` non contrôlés ne déclenchent aucune écriture et restent montés, et les
+  combobox (`SectorCombobox`, `CompanyCombobox`, `DealCombobox`) appellent leur
+  `onChange` **elles-mêmes**, donc synchronement. Le seul autre non contrôlé
+  était le sélecteur de compte bancaire de la fiche placement
+  (`placements.$dealId.tsx`, « Enveloppe ») : il **fonctionnait**, mais
+  uniquement parce que son démontage attend l'aller-retour de la mutation —
+  passé en `value=""` pour ne pas laisser traîner le motif.
 
 ## Panneau Royalties — listes sur `deals` & collage du BP (`src/components/deals/RoyaltiesPanel.tsx`)
 
