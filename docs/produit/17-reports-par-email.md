@@ -105,6 +105,15 @@ mail — ou le même report pour la même période — ne crée **jamais de
 doublon** : la fiche est mise à jour. La synthèse IA de la société est
 relancée à chaque report ingéré.
 
+**Tous les courriers d'une participation ne couvrent pas une période.** Un
+avis de liquidation, une notification juridique, une annonce de levée
+n'ont ni période ni rythme. Ils sont rangés quand même, sans période,
+datés du jour de réception — avec leur titre, leur résumé et leurs points
+clés comme n'importe quel report. Rien n'est inventé : plutôt que de leur
+coller un mois au hasard, la période reste vide. Deux courriers ponctuels
+d'une même société ne se remplacent pas l'un l'autre, et aucun n'écrase le
+report périodique de la même période.
+
 ### 6. La réponse dans le fil
 
 Toute personne qui transfère reçoit une réponse dans son propre fil. Ce
@@ -120,8 +129,12 @@ qu'elle contient dépend de son rôle, réglé dans
   **récapitulatif détaillé** quand c'est rangé (société identifiée et mode
   de rattachement, période, sources lues ✅/⚠️, KPIs cibles trouvés ou
   absents, autres métriques enregistrées, valeurs inhabituelles à
-  vérifier), et le message **actionnable** quand ça coince (la cause + le
-  lien vers la boîte Rapports entrants).
+  vérifier), et le message **actionnable** quand ça coince (la cause, le
+  détail technique de l'échec, et le lien vers la boîte Rapports
+  entrants). Ce même détail technique s'affiche sous le statut de la ligne
+  dans la boîte Rapports entrants : quand une catégorie d'échec est trop
+  générique pour agir (« erreur technique »), c'est là que se lit ce qui
+  s'est réellement passé.
 
 Les autres personnes qui gèrent la file sont prévenues **uniquement quand
 il y a un problème**, par un email séparé. Un report qui se range

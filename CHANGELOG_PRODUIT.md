@@ -23,6 +23,38 @@ bas de page.
 
 ---
 
+## v1.180.1 — 05/08/2026 à 18:13 — Les courriers sans période ne bloquent plus le circuit des reports
+
+Un courrier de liquidation transféré sur Wheelee revenait indéfiniment en
+« erreur technique pendant l'analyse », et le rattacher à la main n'y
+changeait rien. La cause : le circuit exigeait de **tout** report une
+période couverte et un rythme (mensuel, trimestriel, annuel…). Un avis de
+liquidation, une notification juridique, une annonce de levée n'ont ni
+l'une ni l'autre — le circuit refusait donc la lecture pourtant correcte
+qu'en faisait l'IA, et bouclait à chaque nouvel essai puisque le contenu,
+lui, ne changeait jamais.
+
+Ces courriers sont désormais rangés comme les autres, avec leur titre,
+leur résumé et leurs points clés, **sans période**, à leur date de
+réception. Rien n'est inventé : plutôt que de leur coller un mois au
+hasard, la période reste vide. Deux courriers ponctuels d'une même société
+ne se remplacent plus l'un l'autre, et aucun n'écrase le report périodique
+de la même période.
+
+Second changement, valable pour **tous** les échecs : le message technique
+de l'erreur s'affiche maintenant sous le statut dans la boîte Rapports
+entrants, et dans l'email « Report non traité ». Jusqu'ici il n'était
+lisible que depuis la console technique — une catégorie comme « erreur
+technique pendant l'analyse » ne disait rien de ce qui s'était passé.
+
+> **🔧 Notes techniques**
+>
+> - `convex/reportStore.ts` : `report_period` et `report_type` passent en `.nullable()` dans `analysisSchema`, avec une règle explicite dans le `SYSTEM_PROMPT` (un document ponctuel est un report valide, `title`/`headline`/`key_highlights` toujours remplis, aucune période inventée). Les deux champs deviennent `v.optional` sur `storeForCompany` — le schéma Convex les déclarait déjà facultatifs.
+> - **Piège du dédoublonnage** : `by_company_period` avec `reportPeriod: undefined` matche *toutes* les lignes sans période d'une société — un `.first()` naïf aurait fait écraser silencieusement chaque courrier ponctuel par le suivant. Un document sans période est donc identifié par son message d'origine (`subject` + `emailDate`, portés par un mail comme par un dépôt manuel). `periodSortDate` retombe sur `receivedAt` pour garder un ancrage dans la timeline (index `by_company`). Détaillé dans `KNOWN_ISSUES.md` § « Report sans période ».
+> - Nouveau `convex/regression.reportStore.test.ts` (4 cas : coexistence, rejeu idempotent, non-collision avec un report périodique, dédup périodique inchangée) — vérifié en échec contre la version naïve avant d'être figé. 61 tests de régression Convex, 317 unitaires.
+> - Visibilité de l'erreur : `reportInbox.list` renvoie `error` (champ déjà écrit par `reportIdentify.setReview`, exposé nulle part) ; affiché sous le badge dans `src/routes/app/all/reports.tsx` (tronqué, complet au survol) ; `reportRecapFailureHtml` prend un `detail` optionnel borné à 300 caractères. Message brut, dev-facing, non traduit.
+> - Récap de succès sans période : titre « ✅ Report rangé — document ponctuel, sans période », objet « Albo OS — report rangé : document ponctuel ».
+
 ## v1.180.0 — 05/08/2026 à 18:11 — Rattacher un report à une seconde participation
 
 Une même boîte détenue par Calte **et** Albo peut porter un nom différent de

@@ -715,7 +715,10 @@ les clés déjà connues de la boîte en contexte (mémoire anti-dérive) ; la
 conversion (cents, bps) et le parsing de période sont du code
 (`lib/reportPeriod`, testés unitairement). Rangement **démultiplié** : un
 `companyReports` par entité matchée (dédup `(company, period)` → un renvoi
-met à jour), fichiers → `documents` (blob storage partagé), métriques
+met à jour ; un document **sans période** — courrier de liquidation,
+notification juridique — est rangé quand même, dédoublonné sur son message
+d'origine et daté de sa réception, cf. `KNOWN_ISSUES.md` « Report sans
+période »), fichiers → `documents` (blob storage partagé), métriques
 canoniques → `kpiSnapshots` (idempotent par company+métrique+période+report
 source), `companyIntelligence` re-déclenchée, statut → `processed`. Une
 métrique hors catalogue reste sur le snapshot brut du report (jamais dans
@@ -798,6 +801,9 @@ part (garde dans `reportNotify.send`), le report et ses documents portent
 | R31 | Fiche participation → carte « KPIs suivis » → Modifier          | Dialog : liste du catalogue cochable ; fiche vide → les métriques déjà vues sont pré-cochées ; Enregistrer → badges à jour (clés hors catalogue impossibles) |
 | R32 | Report d'une boîte **avec** fiche KPI cible                     | Récap : section « KPIs cibles » ✅ valeur / ⚠️ « absent de ce report » pour **chaque** cible ; les extras sous « Autres métriques enregistrées » ; plus de ligne « Habituelles mais absentes » |
 | R33 | Report d'une boîte **sans** fiche KPI cible                     | Comportement inchangé (mémoire implicite + « Habituelles mais absentes de ce report »)                         |
+| R34 | Forwarder un courrier **sans période** d'une participation (avis de liquidation, notification juridique, annonce de levée) | Statut « Traité » — plus d'« Erreur d'analyse ». Le courrier apparaît sur la fiche avec titre, résumé et points clés, **sans période**, classé à sa date de réception. Aucune période inventée (ne pas voir apparaître le mois du mail). Récap : « ✅ Report rangé — document ponctuel, sans période » |
+| R34b | Sur la même société, forwarder un **second** courrier sans période, puis re-forwarder le premier | Les deux courriers coexistent sur la fiche (aucun n'écrase l'autre) ; le re-forward du premier met sa ligne à jour sans créer de 3ᵉ. Un report périodique de la même société reste intact — vérifier notamment qu'un courrier ponctuel n'a pas remplacé le report de la période en cours |
+| R35 | Provoquer un échec d'analyse (couper `OPENROUTER_API_KEY`, ou rejouer une ligne connue en échec) puis ouvrir `/app/all/reports` | Sous le badge « À traiter » et sa raison, le **message technique brut** de l'échec (tronqué, complet au survol). Le même détail figure dans le mail « Report non traité » reçu par les abonnés « Problèmes de reports », borné à 300 caractères. Un motif sans message technique (participation introuvable, spam) n'affiche **rien** de plus |
 
 ## Communications Parallel (VASCO) → section Report par entité
 
