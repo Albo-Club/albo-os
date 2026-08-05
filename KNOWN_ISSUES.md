@@ -2560,6 +2560,20 @@ Points non-évidents :
   créable), `renderEditor` branche `SectorCombobox` avec `defaultOpen` +
   `onOpenChange` (props additives, défaut = comportement dialog inchangé) — un
   seul clic ouvre le picker, la fermeture quitte le mode édition.
+- **Le `Select` enum doit être CONTRÔLÉ (`value`), jamais `defaultValue`.**
+  Piège coûteux, corrigé après coup : `@radix-ui/react-use-controllable-state`
+  (≥ 1.2) n'appelle `onValueChange` de façon **synchrone** que si la valeur est
+  **contrôlée** ; en non contrôlé (`defaultValue`) il la diffère dans un
+  `useEffect`. Or Radix appelle `onValueChange` **puis** `onOpenChange(false)`,
+  et notre `onOpenChange` fait `setEditing(false)` → le `Select` est **démonté
+  dans le même commit**, l'effet ne s'exécute jamais et le `onCommit` est
+  **perdu en silence** : on choisissait « Trimestriel », la ligne se refermait,
+  rien n'était écrit (aucune erreur, aucun toast). Les autres formats n'étaient
+  pas touchés (ils écrivent dans `commit()`, synchrone), donc **seuls les enums
+  ne s'enregistraient pas** (périodicité du coupon, remboursement, durée, tour,
+  type de SAFE, type de fonds, type de bien). Règle générale : **tout contrôle
+  Radix dont la sélection démonte le composant doit être contrôlé** — sinon le
+  callback n'a pas le temps de partir.
 
 ## Panneau Royalties — listes sur `deals` & collage du BP (`src/components/deals/RoyaltiesPanel.tsx`)
 
