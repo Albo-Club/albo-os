@@ -531,8 +531,9 @@ export interface RecapSource {
 
 export interface ReportRecapData {
   companies: Array<{ name: string; orgName: string; url: string | null }>
-  reportPeriod: string
-  reportType: string
+  /** Absent on a one-off document that covers no period. */
+  reportPeriod?: string
+  reportType?: string
   matchMethod: string
   sources: Array<RecapSource>
   metricsFound: Array<RecapMetric>
@@ -592,6 +593,9 @@ const REVIEW_REASON_LABELS: Record<string, string> = {
   unknown_sender: 'expéditeur inconnu',
   spam: 'marqué comme spam',
 }
+
+/** Max characters of the raw technical message rendered in a failure recap. */
+const FAILURE_DETAIL_MAX = 300
 
 /** Max entry lines rendered per org in the overdue block (rest is "+N more"). */
 const OVERDUE_EMAIL_MAX_LINES = 8
@@ -1033,7 +1037,11 @@ export function reportRecapSuccessHtml(d: ReportRecapData): string {
       )}) — vérifier une éventuelle erreur d'unité`,
   )
 
-  return recapShell(`✅ Report rangé — ${esc(d.reportPeriod)} (${esc(d.reportType)})`, [
+  const periodLabel = d.reportPeriod
+    ? `${esc(d.reportPeriod)}${d.reportType ? ` (${esc(d.reportType)})` : ''}`
+    : 'document ponctuel, sans période'
+
+  return recapShell(`✅ Report rangé — ${periodLabel}`, [
     `<p style="margin: 0 0 4px;">${companies}</p>`,
     `<p style="margin: 0; color: ${MUTED};">Rattachement confirmé par : ${esc(matchMethodLabel(d.matchMethod))}</p>`,
     listBlock('Sources', sources),
@@ -1061,10 +1069,28 @@ export function reportReceiptHtml(): string {
   ])
 }
 
-/** Failure recap — replied in the thread (queue handlers only). */
-export function reportRecapFailureHtml(reason: string, queueUrl: string): string {
+/**
+ * Failure recap — replied in the thread (queue handlers only). `detail` is
+ * the raw technical message: dev-facing, never translated, and bounded —
+ * a Zod validation error runs to hundreds of characters.
+ */
+export function reportRecapFailureHtml(
+  reason: string,
+  queueUrl: string,
+  detail?: string,
+): string {
+  const trimmed = detail?.trim()
+  const bounded =
+    trimmed && trimmed.length > FAILURE_DETAIL_MAX
+      ? `${trimmed.slice(0, FAILURE_DETAIL_MAX)}…`
+      : trimmed
   return recapShell(`⚠️ Report non traité — ${esc(reviewReasonLabel(reason))}`, [
     `<p style="margin: 0; color: ${MUTED};">L'email est conservé dans la file « Reports entrants ». Tu peux le rattacher à une participation ou le retraiter depuis Albo OS.</p>`,
+    ...(bounded
+      ? [
+          `<p style="margin: 12px 0 0; color: ${MUTED}; font-size: 12px;">Détail technique : ${esc(bounded)}</p>`,
+        ]
+      : []),
     `<p style="margin: 12px 0 0;"><a href="${queueUrl}" style="color:${BRAND};">Ouvrir la file des reports entrants</a></p>`,
   ])
 }

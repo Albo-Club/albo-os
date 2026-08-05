@@ -197,6 +197,14 @@ function InboundReports() {
                         </span>
                       ) : null}
                     </div>
+                    {row.error ? (
+                      <p
+                        className="text-muted-foreground mt-1 max-w-xs truncate text-xs"
+                        title={row.error}
+                      >
+                        {row.error}
+                      </p>
+                    ) : null}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
                     {reviewable ? (

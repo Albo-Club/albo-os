@@ -1126,6 +1126,41 @@ Série entièrement positive ou entièrement négative : `zeroOffset` renvoie 1 
 0, les deux arrêts se confondent et le dégradé devient monochrome — pas de cas
 particulier à écrire.
 
+## Report sans période — le dédoublonnage ne peut pas rester sur la période
+
+`companyReports` se dédoublonne sur `(companyId, reportPeriod)` (index
+`by_company_period`) : renvoyer le report d'avril met à jour celui d'avril au
+lieu d'en créer un second. Correct tant que **tout** report porte une période.
+
+Il n'en porte pas toujours. Un courrier de liquidation, une notification
+juridique, une annonce de levée concernent bien la participation mais ne
+couvrent aucune période. Le schéma de sortie du LLM
+(`convex/reportStore.ts:analysisSchema`) exigeait pourtant `report_period`
+(string) et `report_type` (enum de 5 rythmes) : sur ce genre de document le
+modèle répondait `report_period: null` et laissait le reste vide, le
+`safeParse` échouait, et la ligne partait en `needs_review` /
+`analyze_error` — **définitivement**, puisque le contenu ne changera jamais.
+« Rattacher » et « Retraiter » relancent la même analyse et rebondissent à
+l'identique.
+
+Les deux champs sont donc `nullable` côté LLM, et **facultatifs** au
+rangement (le schéma Convex les déclarait déjà `v.optional`). Le piège est
+ce qui suit : avec `reportPeriod` absent, `q.eq('reportPeriod', undefined)`
+matche **tous** les reports sans période de la société. Un `.first()` naïf
+ferait écraser chaque courrier ponctuel par le suivant — perte de données
+silencieuse, sans aucune erreur. Un document sans période est donc identifié
+par son **message d'origine** (`subject` + `emailDate`, portés aussi bien par
+un mail que par un dépôt manuel), pas par le créneau vide.
+
+Règle : **toute nouvelle clé de dédoublonnage sur un champ optionnel doit
+dire ce qui se passe quand le champ est absent.** `undefined` n'est pas
+« pas de clé », c'est **une** clé — partagée par toutes les lignes qui n'ont
+rien. Couvert par `convex/regression.reportStore.test.ts`.
+
+Corollaire d'affichage : `periodSortDate` retombe sur la date de réception
+quand il n'y a pas de période, sinon le courrier n'aurait aucun ancrage dans
+la timeline de la fiche (l'index `by_company` trie là-dessus).
+
 ## Suite de régression Convex (`pnpm test:convex`) — 3 pièges du harness
 
 La suite (`convex/regression.*.test.ts` + harness `convex/regression.setup.ts`)

@@ -270,6 +270,10 @@ export const list = query({
           receivedAt: r.receivedAt,
           status: r.status,
           statusReason: r.statusReason ?? null,
+          // Raw technical message behind a failure. Dev-facing (never
+          // translated), but surfaced: without it a pipeline error is only
+          // readable from the Convex dashboard.
+          error: r.error ?? null,
           senderVerified: Boolean(r.senderUserId),
           matchedNames: [...new Set(matched.filter((n): n is string => !!n))],
           attachmentsCount: r.attachments.length,
