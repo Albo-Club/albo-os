@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
-import { Wand2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Wand2, X } from 'lucide-react'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { useDebouncedValue } from '~/hooks/useDebouncedValue'
+import { usePersistentFilters } from '~/hooks/usePersistentFilters'
 
 /**
  * The register's single « Statut » filter. 'all' = the whole register
@@ -87,10 +88,33 @@ export function TransactionsLedger({
   initialFilter?: LedgerFilter
 }) {
   const { t } = useTranslation(['pointage', 'passif'])
-  const [filter, setFilter] = useState<LedgerFilter>(initialFilter ?? 'all')
-  const [accountId, setAccountId] = useState<Id<'bankAccounts'> | undefined>(
-    undefined,
-  )
+
+  // The whole filter bar survives navigation (per tab, per org — see
+  // `usePersistentFilters`): leaving the register and coming back keeps it.
+  const [filters, setFilters, resetFilters] = usePersistentFilters<{
+    status: LedgerFilter
+    /** '' = all accounts (turned back into `undefined` below). */
+    accountId: string
+    search: string
+    minAmount: string
+    maxAmount: string
+  }>(`cash-ledger:${orgSlug}`, {
+    status: 'all',
+    accountId: '',
+    search: '',
+    minAmount: '',
+    maxAmount: '',
+  })
+  // `?filter=` (To do CTAs, emails) wins over the saved status: this effect
+  // is declared after the hook, so it runs after its restore.
+  useEffect(() => {
+    if (initialFilter) setFilters({ status: initialFilter })
+  }, [initialFilter, setFilters])
+
+  const filter = filters.status
+  const accountId = (filters.accountId || undefined) as
+    | Id<'bankAccounts'>
+    | undefined
   const [applyingRules, setApplyingRules] = useState(false)
   const applyCategoryRules = useConvexMutation(
     api.transactions.applyCategoryRules,
@@ -115,15 +139,14 @@ export function TransactionsLedger({
   }
 
   // Server-side search (Convex search index), debounced.
-  const [search, setSearch] = useState('')
+  const search = filters.search
   const searchArg = useDebouncedValue(search).trim() || undefined
 
   // Amount range, applied client-side on the loaded rows (the register is
   // bounded to the newest LEDGER_LIMIT transactions anyway — see
   // KNOWN_ISSUES « Registre Transactions »). Raw euro strings; invalid or
   // empty input = no bound.
-  const [minAmount, setMinAmount] = useState('')
-  const [maxAmount, setMaxAmount] = useState('')
+  const { minAmount, maxAmount } = filters
   const minCents = minAmount.trim() === '' ? null : eurosToCents(minAmount)
   const maxCents = maxAmount.trim() === '' ? null : eurosToCents(maxAmount)
   const amountActive = minCents != null || maxCents != null
@@ -212,6 +235,14 @@ export function TransactionsLedger({
       ? undefined // → PointageTable's inbox empty message (t('empty'))
       : t('viewEmpty')
 
+  // Undebounced `search` and raw amount strings so the reset button shows up
+  // on the first keystroke, and can clear an unparsable amount too.
+  const isFiltered =
+    filter !== 'all' ||
+    accountId !== undefined ||
+    Boolean(search) ||
+    Boolean(minAmount || maxAmount)
+
   const amountLabel = amountActive
     ? [
         minCents != null ? `≥ ${minAmount} €` : null,
@@ -227,7 +258,7 @@ export function TransactionsLedger({
         <Input
           type="search"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => setFilters({ search: e.target.value })}
           placeholder={t('search.placeholder')}
           className="max-w-sm"
         />
@@ -248,7 +279,7 @@ export function TransactionsLedger({
               <AmountInput
                 id="ledger-amount-min"
                 value={minAmount}
-                onChange={setMinAmount}
+                onChange={(v) => setFilters({ minAmount: v })}
                 placeholder="0"
               />
             </div>
@@ -257,7 +288,7 @@ export function TransactionsLedger({
               <AmountInput
                 id="ledger-amount-max"
                 value={maxAmount}
-                onChange={setMaxAmount}
+                onChange={(v) => setFilters({ maxAmount: v })}
                 placeholder="100 000"
               />
             </div>
@@ -265,10 +296,7 @@ export function TransactionsLedger({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  setMinAmount('')
-                  setMaxAmount('')
-                }}
+                onClick={() => setFilters({ minAmount: '', maxAmount: '' })}
               >
                 {t('filter.amountClear')}
               </Button>
@@ -277,7 +305,7 @@ export function TransactionsLedger({
         </Popover>
         <Select
           value={filter}
-          onValueChange={(v) => setFilter(v as LedgerFilter)}
+          onValueChange={(v) => setFilters({ status: v as LedgerFilter })}
         >
           <SelectTrigger className="w-64">
             <span className="text-muted-foreground mr-1">
@@ -299,9 +327,7 @@ export function TransactionsLedger({
         <Select
           value={accountId ?? ALL_ACCOUNTS}
           onValueChange={(v) =>
-            setAccountId(
-              v === ALL_ACCOUNTS ? undefined : (v as Id<'bankAccounts'>),
-            )
+            setFilters({ accountId: v === ALL_ACCOUNTS ? '' : v })
           }
         >
           <SelectTrigger className="w-64">
@@ -318,6 +344,17 @@ export function TransactionsLedger({
             ))}
           </SelectContent>
         </Select>
+        {isFiltered && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={resetFilters}
+            className="text-muted-foreground"
+          >
+            {t('filter.reset')}
+            <X className="size-4" />
+          </Button>
+        )}
         {filter === 'unmatched' && (
           <Button
             variant="outline"
