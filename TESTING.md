@@ -739,15 +739,18 @@ succès = participations (liens fiches) + méthode de match + sources
 ✅/📦/⚠️ + métriques enregistrées / **non reconnues** / **valeurs
 inhabituelles** (×8 vs dernière valeur connue) / **habituelles absentes** ;
 quarantaine = mail neuf aux membres. **Actions de la file** (page
-`/app/all/reports`) : Rattacher (dialog participation → fan-out même
-domaine/nom → reprise du pipeline où il s'était arrêté), Retraiter (reset
-complet + re-auth), Rejeter. Gabarits français dans
+`/app/all/reports`) : Rattacher (dialog participation → fan-out sur la même
+participation → reprise du pipeline où il s'était arrêté), Retraiter (reset
+complet + re-auth), Rejeter. **Identité d'une participation** (`identityKey`,
+`convex/lib/emailIdentify.ts`) : le domaine quand il n'en porte qu'une, le nom
+sinon — un domaine de sponsor (Sezame, Parallel…) porte plusieurs véhicules et
+n'en identifie donc aucun. Gabarits français dans
 `convex/emailTemplates.ts` (§ recaps).
 
 **Seconde porte d'entrée : l'ajout manuel depuis la fiche société** (bouton
 « Ajouter » + type Reporting, liste Documents & rapports — TP10b). `reportInbox.createFromUpload`
 crée une ligne `inboundEmails` marquée `origin: 'upload'` avec la
-participation **déjà matchée** (même fan-out domaine/nom) et enchaîne
+participation **déjà matchée** (même fan-out d'identité) et enchaîne
 directement sur l'extraction : les briques 4 et 5 tournent à l'identique, la
 brique 3 (identification LLM) est sautée — l'utilisateur a choisi la boîte.
 Les ids AgentMail de ces lignes sont des **placeholders** : aucun récap ne
@@ -767,7 +770,8 @@ part (garde dans `reportNotify.send`), le report et ses documents portent
 | R7  | Forwarder depuis l'adresse d'un **membre** (Benjamin/Clément)  | Badge « Reçu » (expéditeur authentifié, `senderUserId` posé)                                                  |
 | R8  | Email envoyé par une **adresse inconnue** (tiers direct)       | Badge « À traiter » + raison « Expéditeur inconnu » ; **aucun** email sortant vers l'expéditeur (anti-énum)  |
 | R9  | Email flaggé `spam` par AgentMail                              | Badge « À traiter » + raison « Spam » ; aucun traitement, aucun mail sortant                                  |
-| R10 | Forwarder un report d'une boîte du portefeuille (domaine connu) | Colonne Participation remplie avec la/les entité(s) ; si la boîte existe dans les 2 orgs ou via plusieurs entités de même domaine → **toutes** listées |
+| R10 | Forwarder un report d'une boîte du portefeuille (domaine connu, porté par cette seule participation) | Colonne Participation remplie avec la/les entité(s) ; si la boîte existe dans les 2 orgs → **toutes** listées |
+| R10b | Forwarder un report d'un **véhicule de sponsor** (domaine partagé : Sezame Immo 2/6, un SPV Parallel, une Anaxago…), (a) le mail nommant le véhicule (« Sezame Immo 6 »), (b) le mail ne le nommant pas | (a) **seul** le véhicule nommé est listé — jamais ses voisins de domaine ; (b) badge « À traiter » + raison « Plusieurs participations possibles » → « Rattacher » sur le bon véhicule, et le report ne part **que** sur celui-là (vérifier la fiche d'un véhicule voisin : rien) |
 | R11 | Forwarder un report ne matchant aucune participation           | Badge « À traiter » + raison « Participation introuvable » ; `realSenderEmail` posé si l'auteur réel était lisible |
 | R12 | Report d'un fonds transmettant une de ses lignes               | La participation matchée est la **cible** du report (corroborée par son nom dans le texte), pas le fonds     |
 | R13 | Sujet piégeux (nom court, mention de plateforme type LinkedIn) | Pas de faux match : corroboration domaine/nom obligatoire, emails et URLs exclus du matching par nom          |
