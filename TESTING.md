@@ -737,8 +737,9 @@ succès = participations (liens fiches) + méthode de match + sources
 inhabituelles** (×8 vs dernière valeur connue) / **habituelles absentes** ;
 quarantaine = mail neuf aux membres. **Actions de la file** (page
 `/app/all/reports`) : Rattacher (dialog participation → fan-out sur la même
-participation → reprise du pipeline où il s'était arrêté), Retraiter (reset
-complet + re-auth), Rejeter. **Identité d'une participation** (`identityKey`,
+participation → reprise du pipeline où il s'était arrêté), **Rattacher aussi**
+(sur une ligne déjà traitée : ajout d'une participation, jamais remplacement),
+Retraiter (reset complet + re-auth), Rejeter. **Identité d'une participation** (`identityKey`,
 `convex/lib/emailIdentify.ts`) : le domaine quand il n'en porte qu'une, le nom
 sinon — un domaine de sponsor (Sezame, Parallel…) porte plusieurs véhicules et
 n'en identifie donc aucun. Gabarits français dans
@@ -791,6 +792,7 @@ part (garde dans `reportNotify.send`), le report et ses documents portent
 | R27 | Email d'un inconnu (quarantaine)                                | Mail **neuf** aux abonnés « Problèmes de reports » (« Email en quarantaine ») ; **aucune** réponse dans le fil de l'inconnu |
 | R27b | Mail d'un **membre** flaggé `spam` (quarantaine, expéditeur connu) | Le membre reçoit la réponse correspondant à son rôle (accusé « bien reçu » s'il n'est pas abonné) ; les abonnés reçoivent la quarantaine en mail neuf |
 | R28 | Action « Rattacher » sur une ligne « À traiter »                | Dialog → choix participation → traitement reprend (extraction si pas faite, sinon fiche) → « Traité » + récap  |
+| R28b | **Rattacher à une seconde participation.** Sur une ligne **Traité** rattachée à une seule org alors que l'autre a une fiche du même domaine (`Oprtrs & Co` / `OPRTRS CLUB`) : lire la colonne Participation, puis « **Rattacher aussi** » → choisir la participation → le bloc « Même domaine, autre organisation » → cocher la jumelle → confirmer | Repère « **+ Calte ?** » (nom de l'org, pas un compteur) dans la colonne Participation, avec le détail au survol ; le bloc liste les fiches du même domaine des **autres** orgs, **décochées**, la plus proche en tête, celles déjà rattachées cochées et grisées. Après confirmation : les **deux** fiches sont listées, le report apparaît sur la fiche de la seconde org, celle de la première est **inchangée** (pas de doublon), le repère disparaît, et **aucun second récap** n'est envoyé au transféreur. Un report déjà rangé dans les deux orgs (fan-out automatique, ex. Waro) n'affiche **aucun** repère |
 | R29 | Action « Retraiter »                                            | Pipeline rejoué de zéro (re-auth incluse) ; utile après avoir rempli un domaine manquant                       |
 | R30 | Action « Rejeter »                                              | Ligne « Rejeté / Rejeté manuellement », aucun traitement ni email                                              |
 | R31 | Fiche participation → carte « KPIs suivis » → Modifier          | Dialog : liste du catalogue cochable ; fiche vide → les métriques déjà vues sont pré-cochées ; Enregistrer → badges à jour (clés hors catalogue impossibles) |

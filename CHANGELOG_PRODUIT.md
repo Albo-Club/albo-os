@@ -23,6 +23,54 @@ bas de page.
 
 ---
 
+## v1.180.0 — 05/08/2026 à 18:11 — Rattacher un report à une seconde participation
+
+Une même boîte détenue par Calte **et** Albo peut porter un nom différent de
+chaque côté — `Oprtrs & Co` ici, `OPRTRS CLUB` là ; `Parallel Invest SPV 13
+(Bernay)` et `Parallel Invest SPV13`. Rien ne permet de deviner que ces deux
+lignes sont la même boîte : elles se ressemblent autant que Sezame Immo 2 et
+Sezame Immo 6, qui sont deux véhicules bien distincts. Le report se rangeait
+donc d'un seul côté, et il n'y avait aucun moyen d'ajouter l'autre après
+coup.
+
+- **Un report peut désormais être rattaché à plusieurs participations**, et
+  on peut en ajouter une **même quand le report est déjà rangé** : la
+  nouvelle s'ajoute aux précédentes, celles déjà servies ne bougent pas.
+- **Les fiches apparentées vous sont proposées.** Quand vous choisissez une
+  participation, celles qui partagent son site web dans une **autre
+  organisation** apparaissent sous forme de cases à cocher, la plus proche
+  en tête. Rien n'est coché tout seul : sur un domaine de plateforme, les
+  voisines sont d'autres véhicules, à vous de dire lesquelles sont
+  concernées.
+- **La file vous le signale.** Un report rangé alors qu'une organisation a
+  une fiche sur le même domaine sans rien avoir reçu porte un repère
+  « + Calte ? » dans la colonne Participation, et un bouton « Rattacher
+  aussi ». Un report déjà rangé des deux côtés n'affiche rien.
+- **Aucun accusé en double** : ajouter une participation à un report déjà
+  traité ne renvoie pas de récapitulatif à qui l'avait transféré.
+
+Le repère nomme l'**organisation**, pas le nombre de fiches : sur un domaine
+comme celui de Parallel, l'autre organisation en héberge une quinzaine sans
+rapport, et un « +15 » n'aurait rien voulu dire.
+
+> **🔧 Notes techniques**
+>
+> - `reportInbox.assignCompany` prend `companyIds` (1..n) et devient
+>   **additif** sur une ligne `processed` : union avec `matchedCompanies`,
+>   `reportIds` remis à zéro, `notifiedAt` **conservé** (pas de second récap).
+>   Rejouer `reportStore.run` est sûr : il upsert par (société, période), donc
+>   les entités déjà servies sont mises à jour en place.
+> - `reportInbox.list` renvoie `matchedCompanyIds` et `relatedOrgNames` — les
+>   orgs qui n'ont **rien** reçu du report alors qu'elles portent une société
+>   sur un des domaines rattachés. Nommer l'org plutôt que compter les
+>   entités évite le « +15 » d'un domaine de sponsor.
+> - `listAssignTargets` expose `orgId` + `domain` ; le dialog
+>   (`src/routes/app/all/reports.tsx`) construit le bloc « même domaine, autre
+>   org », trié par un Dice sur bigrammes (`nameProximity`) — un tri, jamais
+>   une décision.
+> - Tests : `convex/regression.reportIdentify.test.ts` (ajout après coup,
+>   union, `notifiedAt` préservé, apparition/disparition du repère).
+
 ## v1.179.0 — 05/08/2026 à 13:56 — Le pointage ne propose plus rien (et c'est voulu)
 
 Albo OS affichait des propositions de rapprochement un peu partout : un

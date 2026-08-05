@@ -3438,9 +3438,38 @@ Deux limites assumées :
   n'accroche pas → file d'attente. Choix délibéré : pas de faux rattachement
   silencieux, au prix de lignes à traiter à la main.
 - Deux entités d'une **même boîte** nommées différemment sur un domaine de
-  sponsor ne fanent plus ensemble (aujourd'hui `Oprtrs & Co` côté Albo vs
-  `OPRTRS CLUB` côté Calte, et le doublon `goodtechlab.io`). Le correctif est
-  dans la **donnée** — aligner les deux noms — pas dans le code.
+  sponsor ne fanent plus ensemble (`Oprtrs & Co` côté Albo vs `OPRTRS CLUB`
+  côté Calte ; `Parallel Invest SPV 13 (Bernay)` vs `Parallel Invest SPV13`).
+  Aligner les noms règle le cas, mais ce n'est pas toujours souhaitable — une
+  org a le droit de nommer ses lignes comme elle veut. D'où le geste manuel
+  assisté ci-dessous.
+
+### Le domaine ne décide pas, mais il suggère
+
+Corollaire produit de la règle ci-dessus : ce que le domaine ne peut pas
+trancher, l'utilisateur le tranche — mais il faut le lui **proposer**, sinon
+il ne saura jamais qu'une fiche jumelle existe ailleurs.
+
+- `assignCompany` prend **1..n** sociétés et devient **additif** sur une ligne
+  `processed` (union avec `matchedCompanies`, jamais remplacement) : c'est la
+  seule façon de servir une boîte détenue par les deux orgs sous deux noms.
+  Rejouer `reportStore.run` est sûr — il upsert par (société, période), donc
+  les entités déjà servies sont mises à jour en place. `notifiedAt` est
+  **conservé** dans ce cas : pas de second accusé au transféreur.
+- `list` renvoie `relatedOrgNames` : les orgs qui n'ont **rien** reçu du
+  report alors qu'elles portent une société sur un des domaines rattachés.
+  Nommer l'**org** et non compter les entités est délibéré — sur
+  `parallel-invest.com`, l'autre org en héberge une quinzaine sans rapport, et
+  un « +15 » permanent ne voudrait rien dire. Un report déjà rangé des deux
+  côtés n'affiche donc rien.
+- Le tri du bloc de suggestion (`nameProximity`, Dice sur bigrammes, front)
+  **ne décide de rien**. La proximité de nom est un mauvais juge ici, et c'est
+  mesuré : les seules paires de noms proches entre orgs sont
+  `Sezame Immo 2/6` ↔ `SEZAME IMMO 4` (0,92) — soit exactement les mauvaises
+  réponses. Elle sert à faire remonter le bon candidat dans une liste, rien de
+  plus. Ne jamais la promouvoir en critère de rattachement.
+- Une fiche **sans domaine** ne peut rien suggérer (82 des 275 fiches Calte au
+  05/08/2026) : seul le sélecteur principal les atteint.
 
 ## Reports par email : le canal suit le geste, le contenu suit le rôle
 
