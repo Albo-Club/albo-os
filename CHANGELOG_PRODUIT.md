@@ -23,6 +23,65 @@ bas de page.
 
 ---
 
+## v1.175.1 — 05/08/2026 à 11:42 — Les tableurs sortent de la recherche de l'assistant
+
+Un budget Excel ajouté sur une fiche société refusait obstinément d'être
+indexé, et vous prévenait par email à chaque tentative. Deux choses derrière
+ce message, et une seule vraie question.
+
+Le déclencheur d'abord : depuis que les classeurs sont lus **en entier** (et
+non plus tronqués à leurs premières lignes), un gros budget part au service
+d'indexation en paquets nettement plus lourds qu'avant. Trop lourds pour
+l'hébergeur européen sur lequel on a volontairement épinglé ce service : il
+refusait la demande, sans repli possible ailleurs. Les envois sont désormais
+découpés bien plus finement — même contenu, même hébergeur, mais chaque
+demande passe.
+
+La vraie question ensuite : **est-ce qu'un tableur a sa place dans cette
+recherche ?** Non. L'assistant cherche sur le sens des phrases ; un tableau
+découpé en morceaux perd ses en-têtes, et des colonnes de chiffres n'ont pas
+de sens à retrouver. On indexait donc à perte.
+
+- **Excel et CSV ne sont plus indexés**, volontairement. Ils affichent
+  « Tableur — non indexé » à la place de l'alerte rouge, et ne déclenchent
+  plus d'email.
+- **Leur lecture ne change pas** : le texte extrait reste consultable en un
+  clic, tous les onglets, comme avant.
+- **Un tableur reçu par mail** reste couvert par la recherche à travers le
+  contenu du rapport qui le transporte.
+- **Tout le reste gagne de la marge** : pactes, term sheets, rapports et
+  documents juridiques étaient plus près de la même limite qu'on ne le
+  pensait.
+
+Une limite assumée : l'assistant ne sait donc pas répondre sur le contenu
+d'un business plan en tableur. Le jour où on le voudra, la bonne réponse
+sera de lui donner de quoi **lire** le document, pas de l'indexer.
+
+> **🔧 Notes techniques**
+>
+> - `convex/vectorize.ts` : `MAX_EMBEDDINGS_PER_CALL = 16` appliqué via
+>   `wrapEmbeddingModel` (`ai`). Le client `@convex-dev/rag` passe les chunks
+>   par paquets de 100 (en dur) et `@openrouter/ai-sdk-provider` laisse
+>   `maxEmbeddingsPerCall` à `undefined` : `embedMany` envoyait les 100 chunks
+>   (~100 k car.) en **une** requête, ~27 k tokens en prose et davantage sur du
+>   tabulaire, contre la fenêtre de 32 k tokens de l'endpoint Nebius épinglé.
+>   Au-delà, OpenRouter n'a plus d'endpoint où router (`allow_fallbacks: false`)
+>   et répond **404** — d'où le `provider_http_404`, classé permanent donc sans
+>   retry. Le wrapper laisse `modelId` et `provider` intacts : l'identité du
+>   namespace RAG ne bouge pas, aucun backfill nécessaire.
+> - `convex/lib/fileText.ts` : `isSpreadsheet(filename, contentType)`, mêmes
+>   règles que `documentsExtract.classify` (xlsx/xls/xlsm/csv, extension ou
+>   content-type), posé à côté de `isImage` pour que lecteurs et indexeur ne
+>   divergent pas. Consommé par `documentSkipReason` (`convex/vectorize.ts`),
+>   nouveau code de skip `'spreadsheet'` → état `skipped`, pas d'email.
+>   Libellés `participations:vectorization.detail.spreadsheet` (FR/EN).
+> - Le pipeline reports n'est **pas** touché : le texte d'une PJ tableur reste
+>   fondu dans `rawContent` et indexé avec son report.
+> - `tests/fileText.test.ts` (nouveau) couvre `isSpreadsheet` ; détails et
+>   pièges dans `KNOWN_ISSUES.md` § « Vectorisation ».
+
+---
+
 ## v1.175.0 — 04/08/2026 à 19:21 — Créer une société ou un deal depuis Claude, sans ouvrir l'app
 
 Le connecteur Claude savait lire le portefeuille, rien de plus. Pour entrer

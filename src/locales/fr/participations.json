@@ -696,6 +696,7 @@
     "detail": {
       "covered_by_report": "Couvert par son report",
       "inline_image": "Image intégrée — non indexée",
+      "spreadsheet": "Tableur — non indexé",
       "no_text": "Aucun texte à indexer",
       "no_content": "Aucun contenu à indexer",
       "provider_unreachable": "Service d'indexation injoignable",
