@@ -2571,9 +2571,19 @@ Points non-évidents :
   rien n'était écrit (aucune erreur, aucun toast). Les autres formats n'étaient
   pas touchés (ils écrivent dans `commit()`, synchrone), donc **seuls les enums
   ne s'enregistraient pas** (périodicité du coupon, remboursement, durée, tour,
-  type de SAFE, type de fonds, type de bien). Règle générale : **tout contrôle
-  Radix dont la sélection démonte le composant doit être contrôlé** — sinon le
-  callback n'a pas le temps de partir.
+  type de SAFE, type de fonds, type de bien). Règle générale, valable **partout
+  dans l'app, pas seulement ici** : **tout contrôle Radix (`Select`, `Tabs`,
+  `RadioGroup`, `Checkbox`…) doit être contrôlé dès que sa sélection peut
+  démonter le composant** — sinon le callback n'a pas le temps de partir.
+  Audit fait au moment du correctif : sur les 34 `<Select>` de `src/`, 33
+  étaient déjà contrôlés (`value=`), toutes les `Checkbox` aussi, les deux
+  `Tabs` non contrôlés ne déclenchent aucune écriture et restent montés, et les
+  combobox (`SectorCombobox`, `CompanyCombobox`, `DealCombobox`) appellent leur
+  `onChange` **elles-mêmes**, donc synchronement. Le seul autre non contrôlé
+  était le sélecteur de compte bancaire de la fiche placement
+  (`placements.$dealId.tsx`, « Enveloppe ») : il **fonctionnait**, mais
+  uniquement parce que son démontage attend l'aller-retour de la mutation —
+  passé en `value=""` pour ne pas laisser traîner le motif.
 
 ## Panneau Royalties — listes sur `deals` & collage du BP (`src/components/deals/RoyaltiesPanel.tsx`)
 

@@ -59,6 +59,15 @@ les champs à choix d'Albo OS, présents et à venir.
 >   place de `defaultValue` (Radix traite `''` comme « pas de valeur » et
 >   affiche le placeholder). Un seul prop, dans le composant partagé, donc
 >   valable pour tous les enums (`ENUM_FIELD_VALUES`).
+> - **Audit de tous les sélecteurs de l'app** (le bug ne devait pas dormir
+>   ailleurs) : sur les 34 `<Select>` de `src/`, 33 étaient déjà contrôlés ;
+>   toutes les `Checkbox` aussi ; les deux `Tabs` non contrôlés (`me.tsx`,
+>   `cash.index.tsx`) ne déclenchent aucune écriture ; les combobox
+>   (`SectorCombobox`, `CompanyCombobox`, `DealCombobox`) appellent leur
+>   `onChange` elles-mêmes, donc synchronement. Seul autre non contrôlé : le
+>   sélecteur de compte bancaire de la fiche placement (`placements.$dealId.tsx`,
+>   bloc « Enveloppe ») — il **marchait** (son démontage attend l'aller-retour
+>   de la mutation), passé en `value=""` par prudence.
 > - Non concernés, vérifiés : les `Select` de `DealFieldInput` (dialog
 >   d'édition, restent montés) et `SectorCombobox` (appelle `onChange`
 >   lui-même, synchrone).

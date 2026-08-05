@@ -371,7 +371,12 @@ function PlacementDetail() {
               {t('envelope.linkExplain')}
             </p>
             <div className="mt-3 flex justify-center">
-              <Select onValueChange={handleLinkAccount}>
+              {/* Controlled on an empty value (always the placeholder — this
+                  picker disappears once an account is linked). Uncontrolled,
+                  Radix would defer `onValueChange` to an effect, which only
+                  survives here because the unmount waits on the mutation's
+                  round-trip — see KNOWN_ISSUES « Édition inline des fiches ». */}
+              <Select value="" onValueChange={handleLinkAccount}>
                 <SelectTrigger
                   size="sm"
                   aria-label={t('envelope.selectPlaceholder')}
