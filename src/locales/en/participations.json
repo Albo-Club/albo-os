@@ -130,7 +130,6 @@
   "status": {
     "pending": "TS",
     "active": "Active",
-    "partially_exited": "Partial exit",
     "fully_exited": "Exited",
     "written_off": "Exit loss",
     "exit_win": "Exit win",
@@ -370,7 +369,6 @@
     "errors": {
       "invalid_siren": "The SIREN must be exactly 9 digits.",
       "siren_already_used": "This SIREN is already used by another company.",
-      "attio_company_already_used": "This Attio record is already linked to another company.",
       "invalid_person_name": "A person's name is empty.",
       "default": "Couldn't save changes. Please try again."
     }

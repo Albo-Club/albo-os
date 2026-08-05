@@ -661,13 +661,7 @@ export const mcpTools: Array<McpTool> = [
         .optional()
         .describe('SPV the investment goes through, when there is one'),
       status: z
-        .enum([
-          'pending',
-          'active',
-          'partially_exited',
-          'fully_exited',
-          'written_off',
-        ])
+        .enum(['pending', 'active', 'fully_exited', 'written_off'])
         .optional()
         .describe('Defaults to "active"; "pending" = signed but not wired'),
       ...dealValueSchema,
@@ -716,14 +710,7 @@ export const mcpTools: Array<McpTool> = [
       dealId: z.string(),
       instrumentKind: z.enum(INSTRUMENTS).optional(),
       viaSpvCompanyId: z.string().optional(),
-      status: z
-        .enum([
-          'active',
-          'partially_exited',
-          'fully_exited',
-          'written_off',
-        ])
-        .optional(),
+      status: z.enum(['active', 'fully_exited', 'written_off']).optional(),
       ...dealValueSchema,
     },
     write: true,

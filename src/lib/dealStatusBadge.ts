@@ -5,11 +5,8 @@
  * for its section bands (`participationBucketBand`), so a deal reads the same
  * everywhere: one badge, one palette.
  *   - pending (TS)               → amber   (committed, not yet wired)
- *   - active / partially_exited  → blue    (position open)
+ *   - active                     → blue    (position open)
  *   - fully_exited, moic ≥ 1     → green   (realized gain)
- *   - partially_exited, moic ≥ 1 → green   (realized gain on a still-open
- *                                           position; win-only — a MOIC < 1 is
- *                                           not a loss yet, so it stays blue)
  *   - fully_exited, moic < 1     → red     (realized loss)
  *   - written_off                → red     (loss booked, whatever the moic)
  *   - fully_exited, moic unknown → neutral (outcome not computable — never
@@ -50,11 +47,6 @@ export function dealBucket(
   if (status === 'fully_exited') {
     if (moic == null) return null
     return moic >= 1 ? 'exit_win' : 'exit_loss'
-  }
-  // partially_exited: the position is still open, so surface a realized win
-  // (green) but NEVER a loss — a MOIC < 1 on an open deal isn't a loss yet.
-  if (status === 'partially_exited' && moic != null && moic >= 1) {
-    return 'exit_win'
   }
   return 'active'
 }

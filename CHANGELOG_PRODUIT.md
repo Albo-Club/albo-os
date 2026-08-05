@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.175.1 — 05/08/2026 à 11:42 — Les tableurs sortent de la recherche de l'assistant
+## v1.177.1 — 05/08/2026 à 11:47 — Les tableurs sortent de la recherche de l'assistant
 
 Un budget Excel ajouté sur une fiche société refusait obstinément d'être
 indexé, et vous prévenait par email à chaque tentative. Deux choses derrière
@@ -79,6 +79,203 @@ sera de lui donner de quoi **lire** le document, pas de l'indexer.
 >   fondu dans `rawContent` et indexé avec son report.
 > - `tests/fileText.test.ts` (nouveau) couvre `isSpreadsheet` ; détails et
 >   pièges dans `KNOWN_ISSUES.md` § « Vectorisation ».
+
+---
+
+## v1.177.0 — 05/08/2026 à 11:35 — Une même fiche Attio se rattache à plusieurs sociétés
+
+Rattacher un SPV Parallel à sa fiche Attio était tout simplement impossible :
+la ligne **Fiche Attio** du bloc Identité répondait « Cette fiche Attio est
+déjà rattachée à une autre société ». Et pour cause — Attio ne connaît
+**qu'une** fiche « Parallel Invest », avec un deal par SPV, là où Albo OS
+tient **une entité par SPV**. La fiche était donc déjà prise par le chapeau,
+et aucun des SPV ne pouvait ouvrir le CRM depuis sa propre page.
+
+Désormais une même fiche Attio se rattache à **autant de sociétés que
+nécessaire**, y compris dans des organisations différentes. Le geste ne
+change pas : on clique la ligne, on cherche dans Attio, on choisit — et
+c'est accepté même si une autre société pointe déjà sur la même fiche.
+
+Un point à connaître : quand plusieurs sociétés partagent une fiche, les
+deals qui arrivent d'Attio continuent d'atterrir sur la **première** d'entre
+elles (la plus ancienne de l'organisation). Rattacher les suivantes sert à
+ouvrir le CRM depuis leur page, pas à détourner la synchronisation — pour
+changer la société cible d'un deal, ça se fait toujours sur le deal.
+
+> **🔧 Notes techniques**
+>
+> - `convex/companies.ts` : suppression de `assertAttioCompanyIdFree` et de son
+>   appel dans `update`. L'ancrage reste trimé, `''` détache toujours.
+> - `convex/attioSync.ts:resolveOrCreateTargetCompany` lisait
+>   `by_attio_company_id` en **`.unique()`** — c'était toute la raison d'être
+>   du garde-fou : un doublon aurait fait throw la synchro au prochain
+>   événement Attio. Remplacé par un `.collect()` + première société **de
+>   l'org** ; l'ordre d'index étant l'ordre de création, la cible d'un deal
+>   déjà synchronisé ne bouge pas.
+> - Effet de bord voulu du même passage : l'ancrage est désormais posé sur la
+>   société créée **dès qu'aucune société de cette org ne le porte** (avant :
+>   dès qu'une société le portait **où que ce soit**). Une org B qui recevait
+>   des deals sur une fiche déjà ancrée en org A créait jusqu'ici une société
+>   neuve à **chaque** événement, faute de pouvoir s'ancrer.
+> - Front : la branche d'erreur `attio_company_already_used` de
+>   `AttioCompanyField.tsx` et ses clés i18n fr/en tombent avec le code serveur
+>   qui les émettait.
+> - `convex/regression.deals.test.ts` : les deux tests qui asseyaient le refus
+>   (même org, puis cross-org) deviennent leur inverse, plus une assertion que
+>   la cible de la synchro ne bouge pas quand un second SPV réclame l'ancrage.
+
+---
+
+## v1.176.1 — 05/08/2026 à 11:28 — Chaque SPV a de nouveau son propre résumé
+
+La fiche de **Parallel Invest SPV24** décrivait, mot pour mot, l'opération du
+**SPV11** en Normandie — jusqu'à nommer SPV11 dans le texte. Rien à voir avec
+le rattachement du deal, qui était correct : c'est le résumé qui se recopiait
+d'un SPV à l'autre. En cause, une règle qui veut que deux fiches partageant le
+même site web affichent le même pitch — utile pour les boutiques d'une même
+enseigne, absurde pour des SPV, qui portent tous le site de leur plateforme
+tout en étant des opérations différentes.
+
+Désormais, un véhicule d'investissement (les SPV Parallel, Sezame et
+consorts) est traité pour ce qu'il est : une opération à part. Son résumé
+n'est plus déduit du site de la plateforme, plus jamais recopié depuis un SPV
+voisin, et le corriger à la main ne touche plus aucune autre fiche. Il vient
+des communications investisseur de la plateforme dès que la fiche est
+rattachée à son SPV, ou de votre saisie.
+
+Les deux fiches abîmées — **SPV 23 (STOA – Pessac)**, qui affichait la
+plaquette commerciale de Parallel, et **SPV24**, qui affichait SPV11 —
+retrouvent une description de leur propre opération.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau prédicat `isVehicleEntity` dans `convex/lib/pitch.ts` : `sponsor`,
+>   `vascoIssuerId`, ou jeton « SPVn » dans le nom (les lignes SPV de Calte
+>   n'ont pas de `sponsor` — même jeton que `vasco.ts:spvNumberOf`).
+> - Exclusion sur les trois chemins d'écriture du pitch :
+>   `companyEnrichment.enrich` s'arrête pour un véhicule (plus d'héritage du
+>   voisin canonique ni de génération depuis la home du sponsor),
+>   `applyPitchToDomainGroup` saute les lignes véhicules, et
+>   `companies.update` ne propage plus le `summary` édité si l'entité est un
+>   véhicule. `enrichFromVasco` / `applyVascoPitch` restent la source de
+>   vérité, inchangés.
+> - Cause racine : `getTarget` construisait le groupe de domaine sur
+>   `parallel-invest.com` (15 SPV côté Calte) et `pickCanonicalPitch` élisait
+>   le résumé le plus long, recopié tel quel sans appel LLM.
+> - Rattrapage données : `convex/migrations/fixSpvPitches.ts`
+>   (`dryRun`/`apply`), ancré `_id` + garde nom + garde sur le texte erroné,
+>   idempotent. Textes reconstruits depuis les notes de l'entité et le deal
+>   Attio, jamais depuis le site.
+> - Tests : `tests/pitch.test.ts` couvre le prédicat (SPV avec/sans espace,
+>   sponsor, lien VASCO, société ordinaire).
+
+---
+
+## v1.176.0 — 05/08/2026 à 11:24 — Le statut « Exit partiel » disparaît
+
+Le dialogue « Gérer la sortie » ne propose plus que **deux** types : sortie
+totale ou perte totale. Le troisième, « Exit partiel », est retiré.
+
+Il ne servait presque à rien. Un deal en exit partiel était traité **comme un
+deal actif** absolument partout : mêmes multiples, même valeur au tableau de
+bord, même place en haut des listes, même suivi des reportings manquants. Sa
+seule différence visible tenait à un badge vert quand l'argent déjà récupéré
+dépassait le capital investi. En échange, son nom laissait croire qu'il fallait
+le poser dès qu'on encaissait quelque chose — un coupon d'obligation, une
+royaltie, un remboursement — alors que ces rentrées sont le fonctionnement
+normal d'un placement, pas une sortie.
+
+**Une cession partielle se saisit toujours, autrement** : le deal reste
+**actif**, puisque vous en détenez encore une partie. L'argent récupéré se lit
+là où il a toujours été — dans le reçu et dans le multiple réalisé du deal.
+Pensez seulement à mettre à jour la **valorisation** de ce qui reste détenu :
+sans ça, la valeur du portefeuille compte à la fois le cash encaissé et la
+totalité de la ligne d'origine.
+
+Un seul deal était concerné en base, **VIASANA**, repassé en actif. Sa date et
+son produit de cession ont été conservés.
+
+> **🔧 Notes techniques**
+>
+> - Retrait de `partially_exited` du validateur `dealStatus`
+>   (`convex/schema.ts`, `convex/deals.ts:statusValidator`), des schémas
+>   d'outils agent (`convex/agentTools.ts`) et MCP (`convex/mcp/registry.ts`).
+> - Purge prod **avant** resserrement (règle « purger d'abord ») : VIASANA
+>   (`calte`) patché sur le seul champ `status` → `active`, ce qui préserve
+>   `exitedDate`/`exitProceeds` là où le geste « Annuler la sortie » les aurait
+>   mis à `null`. Tracé dans `MIGRATIONS.md`.
+> - Simplifications des tests de statut devenus binaires :
+>   `convex/dashboard.ts` (`isActive`), `convex/lib/reportFreshness.ts` (la
+>   boucle sur deux statuts devient un seul `withIndex('by_org_status')`),
+>   `convex/agentTools.ts` (`activeDeals`).
+> - `convex/lib/attioSync.ts` : `DealStatus` resserré et `STATUS_RANK`
+>   renuméroté (`pending 0 < active 1 < fully_exited = written_off 2`) — le
+>   ratchet forward-only est inchangé.
+> - `src/lib/dealStatusBadge.ts` : suppression de la branche « win-only »
+>   (v1.126.0) ; `dealBucket` n'a plus de cas particulier. Un seul badge, même
+>   palette.
+> - `src/components/deals/ExitDealDialog.tsx` : `EXIT_STATUSES` passe à deux
+>   entrées. `CompanyDealsTable.tsx` : `STATUS_ORDER` allégé.
+> - i18n : 4 clés `status.partially_exited` retirées (`participations` +
+>   `chat`, en & fr).
+> - `convex/airtableImport.ts` : la valeur Airtable legacy « Exit partiel »
+>   mappe désormais sur `active` (mapping explicite, pas le fallback).
+> - Docs : `docs/produit/05-deals.md`, `TESTING.md` (SH17, TD5, DL7),
+>   `KNOWN_ISSUES.md` (rangs Attio), `MIGRATIONS.md`.
+
+---
+
+## v1.175.1 — 05/08/2026 à 10:55 — Les listes déroulantes des fiches s'enregistrent enfin
+
+Sur une fiche deal, choisir « Trimestriel » dans **Périodicité du coupon**
+ne servait à rien : la ligne se refermait, le champ restait sur « — », et
+rien n'indiquait que le choix venait d'être perdu. Même chose partout
+ailleurs pour un champ à choix multiple édité au clic — **Type de fonds**
+(« Private equity »…) sur un deal de fonds, mais aussi Remboursement,
+Durée, Tour, Type de SAFE et Type de bien.
+
+Le problème ne touchait **que** ces champs à liste déroulante. Les montants,
+pourcentages, dates et textes s'enregistraient normalement, ce qui rendait
+la panne d'autant plus déroutante : sur la même colonne de droite, un
+champ sur deux répondait.
+
+C'est corrigé : un choix dans une liste déroulante s'écrit immédiatement,
+avec le même retour que les autres champs (« Modifications enregistrées »),
+et la valeur est toujours là après rechargement de la page. Le correctif
+est fait dans le composant d'édition partagé, donc il vaut pour **tous**
+les champs à choix d'Albo OS, présents et à venir.
+
+> **🔧 Notes techniques**
+>
+> - Cause : dans `src/components/ui/inline-field.tsx`, l'éditeur des champs
+>   `format: 'enum'` rendait un `<Select open defaultValue=…>` (Radix) —
+>   donc une valeur **non contrôlée**. Depuis
+>   `@radix-ui/react-use-controllable-state` ≥ 1.2, `onValueChange` n'est
+>   appelé **synchronement** que si la valeur est **contrôlée** ; en non
+>   contrôlé, l'appel est différé dans un `useEffect`.
+> - Radix appelle `onValueChange` puis `onOpenChange(false)` ; notre
+>   `onOpenChange` fait `setEditing(false)`, ce qui **démonte le `Select`
+>   dans le même commit React**. L'effet différé n'a jamais lieu → `onCommit`
+>   jamais appelé → aucun `deals.update`, sans erreur ni toast.
+> - Correctif : `value={typeof rawValue === 'string' ? rawValue : ''}` à la
+>   place de `defaultValue` (Radix traite `''` comme « pas de valeur » et
+>   affiche le placeholder). Un seul prop, dans le composant partagé, donc
+>   valable pour tous les enums (`ENUM_FIELD_VALUES`).
+> - **Audit de tous les sélecteurs de l'app** (le bug ne devait pas dormir
+>   ailleurs) : sur les 34 `<Select>` de `src/`, 33 étaient déjà contrôlés ;
+>   toutes les `Checkbox` aussi ; les deux `Tabs` non contrôlés (`me.tsx`,
+>   `cash.index.tsx`) ne déclenchent aucune écriture ; les combobox
+>   (`SectorCombobox`, `CompanyCombobox`, `DealCombobox`) appellent leur
+>   `onChange` elles-mêmes, donc synchronement. Seul autre non contrôlé : le
+>   sélecteur de compte bancaire de la fiche placement (`placements.$dealId.tsx`,
+>   bloc « Enveloppe ») — il **marchait** (son démontage attend l'aller-retour
+>   de la mutation), passé en `value=""` par prudence.
+> - Non concernés, vérifiés : les `Select` de `DealFieldInput` (dialog
+>   d'édition, restent montés) et `SectorCombobox` (appelle `onChange`
+>   lui-même, synchrone).
+> - Règle ajoutée dans `KNOWN_ISSUES.md` § « Édition inline des fiches » :
+>   tout contrôle Radix dont la sélection le démonte doit être **contrôlé**.
+>   `TESTING.md` FD38 durci (le choix enum doit survivre au rechargement).
 
 ---
 

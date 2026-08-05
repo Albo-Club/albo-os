@@ -97,22 +97,20 @@ export async function listSilentCompanies(
   // Live deals, kept per company for the never-reported fallback.
   const dealsByCompany = new Map<Id<'companies'>, Array<Id<'deals'>>>()
   const signedByCompany = new Map<Id<'companies'>, number>()
-  for (const status of ['active', 'partially_exited'] as const) {
-    const deals = await ctx.db
-      .query('deals')
-      .withIndex('by_org_status', (q) =>
-        q.eq('orgId', orgId).eq('status', status),
-      )
-      .collect()
-    for (const deal of deals) {
-      const list = dealsByCompany.get(deal.targetCompanyId) ?? []
-      list.push(deal._id)
-      dealsByCompany.set(deal.targetCompanyId, list)
-      const signed = deal.signedDate ?? deal._creationTime
-      const known = signedByCompany.get(deal.targetCompanyId)
-      if (known === undefined || signed < known) {
-        signedByCompany.set(deal.targetCompanyId, signed)
-      }
+  const activeDeals = await ctx.db
+    .query('deals')
+    .withIndex('by_org_status', (q) =>
+      q.eq('orgId', orgId).eq('status', 'active'),
+    )
+    .collect()
+  for (const deal of activeDeals) {
+    const list = dealsByCompany.get(deal.targetCompanyId) ?? []
+    list.push(deal._id)
+    dealsByCompany.set(deal.targetCompanyId, list)
+    const signed = deal.signedDate ?? deal._creationTime
+    const known = signedByCompany.get(deal.targetCompanyId)
+    if (known === undefined || signed < known) {
+      signedByCompany.set(deal.targetCompanyId, signed)
     }
   }
 

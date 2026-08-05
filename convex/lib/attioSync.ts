@@ -105,7 +105,6 @@ export function companyIdentityPatch(opts: {
 export type DealStatus =
   | 'pending'
   | 'active'
-  | 'partially_exited'
   | 'fully_exited'
   | 'written_off'
 
@@ -113,9 +112,8 @@ export type DealStatus =
 const STATUS_RANK: Record<DealStatus, number> = {
   pending: 0,
   active: 1,
-  partially_exited: 2,
-  fully_exited: 3,
-  written_off: 3,
+  fully_exited: 2,
+  written_off: 2,
 }
 
 /** Forward-only: true iff `to` is a strictly higher lifecycle rank than `from`. */

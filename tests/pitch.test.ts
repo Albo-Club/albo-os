@@ -8,7 +8,7 @@
  */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { pickCanonicalPitch } from '../convex/lib/pitch'
+import { isVehicleEntity, pickCanonicalPitch } from '../convex/lib/pitch'
 
 describe('pickCanonicalPitch', () => {
   it('returns null when no entity has a summary', () => {
@@ -41,5 +41,28 @@ describe('pickCanonicalPitch', () => {
       oneLiner: undefined,
       summary: 'résumé sans one-liner',
     })
+  })
+})
+
+describe('isVehicleEntity', () => {
+  it('detects a platform SPV by its name, with or without a space', () => {
+    assert.equal(isVehicleEntity({ name: 'PARALLEL INVEST SPV24' }), true)
+    assert.equal(
+      isVehicleEntity({ name: 'Parallel Invest SPV 23 (STOA - Pessac)' }),
+      true,
+    )
+  })
+
+  it('detects a sponsor or a VASCO link even without an SPV number', () => {
+    assert.equal(isVehicleEntity({ name: 'Sezame Immo 2', sponsor: 'Sezame' }), true)
+    assert.equal(
+      isVehicleEntity({ name: 'Une opération', vascoIssuerId: 'abc' }),
+      true,
+    )
+  })
+
+  it('leaves an ordinary portfolio company alone', () => {
+    assert.equal(isVehicleEntity({ name: 'La Vie de Quartier - Rue St Maur' }), false)
+    assert.equal(isVehicleEntity({ name: 'Reekom' }), false)
   })
 })
