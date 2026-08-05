@@ -38,7 +38,6 @@ describe('decideSyncAction — anti-duplicate + forward-only invariants', () => 
     const statuses: Array<DealStatus> = [
       'pending',
       'active',
-      'partially_exited',
       'fully_exited',
       'written_off',
     ]
@@ -64,7 +63,6 @@ describe('decideSyncAction — anti-duplicate + forward-only invariants', () => 
   it('Term Sheet never overwrites a deal Albo OS already owns (post-signature)', () => {
     const owned: Array<DealStatus> = [
       'active',
-      'partially_exited',
       'fully_exited',
       'written_off',
     ]
@@ -97,7 +95,6 @@ describe('advancesStatus — forward-only lifecycle', () => {
   })
   it('never revives an exited/written-off deal on an Invested event', () => {
     assert.equal(advancesStatus('fully_exited', 'active'), false)
-    assert.equal(advancesStatus('partially_exited', 'active'), false)
     assert.equal(advancesStatus('written_off', 'active'), false)
   })
 })

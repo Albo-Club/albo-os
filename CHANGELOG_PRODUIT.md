@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.175.2 — 05/08/2026 à 11:28 — Chaque SPV a de nouveau son propre résumé
+## v1.176.1 — 05/08/2026 à 11:28 — Chaque SPV a de nouveau son propre résumé
 
 La fiche de **Parallel Invest SPV24** décrivait, mot pour mot, l'opération du
 **SPV11** en Normandie — jusqu'à nommer SPV11 dans le texte. Rien à voir avec
@@ -65,6 +65,58 @@ retrouvent une description de leur propre opération.
 >   Attio, jamais depuis le site.
 > - Tests : `tests/pitch.test.ts` couvre le prédicat (SPV avec/sans espace,
 >   sponsor, lien VASCO, société ordinaire).
+
+## v1.176.0 — 05/08/2026 à 11:24 — Le statut « Exit partiel » disparaît
+
+Le dialogue « Gérer la sortie » ne propose plus que **deux** types : sortie
+totale ou perte totale. Le troisième, « Exit partiel », est retiré.
+
+Il ne servait presque à rien. Un deal en exit partiel était traité **comme un
+deal actif** absolument partout : mêmes multiples, même valeur au tableau de
+bord, même place en haut des listes, même suivi des reportings manquants. Sa
+seule différence visible tenait à un badge vert quand l'argent déjà récupéré
+dépassait le capital investi. En échange, son nom laissait croire qu'il fallait
+le poser dès qu'on encaissait quelque chose — un coupon d'obligation, une
+royaltie, un remboursement — alors que ces rentrées sont le fonctionnement
+normal d'un placement, pas une sortie.
+
+**Une cession partielle se saisit toujours, autrement** : le deal reste
+**actif**, puisque vous en détenez encore une partie. L'argent récupéré se lit
+là où il a toujours été — dans le reçu et dans le multiple réalisé du deal.
+Pensez seulement à mettre à jour la **valorisation** de ce qui reste détenu :
+sans ça, la valeur du portefeuille compte à la fois le cash encaissé et la
+totalité de la ligne d'origine.
+
+Un seul deal était concerné en base, **VIASANA**, repassé en actif. Sa date et
+son produit de cession ont été conservés.
+
+> **🔧 Notes techniques**
+>
+> - Retrait de `partially_exited` du validateur `dealStatus`
+>   (`convex/schema.ts`, `convex/deals.ts:statusValidator`), des schémas
+>   d'outils agent (`convex/agentTools.ts`) et MCP (`convex/mcp/registry.ts`).
+> - Purge prod **avant** resserrement (règle « purger d'abord ») : VIASANA
+>   (`calte`) patché sur le seul champ `status` → `active`, ce qui préserve
+>   `exitedDate`/`exitProceeds` là où le geste « Annuler la sortie » les aurait
+>   mis à `null`. Tracé dans `MIGRATIONS.md`.
+> - Simplifications des tests de statut devenus binaires :
+>   `convex/dashboard.ts` (`isActive`), `convex/lib/reportFreshness.ts` (la
+>   boucle sur deux statuts devient un seul `withIndex('by_org_status')`),
+>   `convex/agentTools.ts` (`activeDeals`).
+> - `convex/lib/attioSync.ts` : `DealStatus` resserré et `STATUS_RANK`
+>   renuméroté (`pending 0 < active 1 < fully_exited = written_off 2`) — le
+>   ratchet forward-only est inchangé.
+> - `src/lib/dealStatusBadge.ts` : suppression de la branche « win-only »
+>   (v1.126.0) ; `dealBucket` n'a plus de cas particulier. Un seul badge, même
+>   palette.
+> - `src/components/deals/ExitDealDialog.tsx` : `EXIT_STATUSES` passe à deux
+>   entrées. `CompanyDealsTable.tsx` : `STATUS_ORDER` allégé.
+> - i18n : 4 clés `status.partially_exited` retirées (`participations` +
+>   `chat`, en & fr).
+> - `convex/airtableImport.ts` : la valeur Airtable legacy « Exit partiel »
+>   mappe désormais sur `active` (mapping explicite, pas le fallback).
+> - Docs : `docs/produit/05-deals.md`, `TESTING.md` (SH17, TD5, DL7),
+>   `KNOWN_ISSUES.md` (rangs Attio), `MIGRATIONS.md`.
 
 ## v1.175.1 — 05/08/2026 à 10:55 — Les listes déroulantes des fiches s'enregistrent enfin
 

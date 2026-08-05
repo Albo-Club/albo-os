@@ -130,7 +130,6 @@
   "status": {
     "pending": "TS",
     "active": "Actif",
-    "partially_exited": "Exit partiel",
     "fully_exited": "Exité",
     "written_off": "Exit loss",
     "exit_win": "Exit win",

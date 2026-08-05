@@ -54,8 +54,7 @@ export const getDashboard = query({
           .query('valuations')
           .withIndex('by_deal_asof', (q) => q.eq('dealId', deal._id))
           .collect()
-        const isActive =
-          deal.status === 'active' || deal.status === 'partially_exited'
+        const isActive = deal.status === 'active'
         return { deal, txs, valuations, isActive }
       }),
     )
@@ -127,7 +126,7 @@ export const getDashboard = query({
     ).size
 
     // 8. Monthly NAV trend (hero sparkline), over the current holdings
-    //    (active + partially exited). For each month-end: latest valuation
+    //    (active). For each month-end: latest valuation
     //    as-of that month, else cumulative paid — same fallback as the point
     //    NAV, so the last point equals navCents.
     const active = perDeal.filter((row) => row.isActive)

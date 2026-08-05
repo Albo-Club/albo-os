@@ -33,11 +33,7 @@ import {
 } from '~/components/ui/select'
 
 /** Exit statuses offered in the dialog (display order). */
-const EXIT_STATUSES = [
-  'fully_exited',
-  'partially_exited',
-  'written_off',
-] as const
+const EXIT_STATUSES = ['fully_exited', 'written_off'] as const
 
 type ExitStatus = (typeof EXIT_STATUSES)[number]
 
