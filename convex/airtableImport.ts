@@ -149,7 +149,6 @@ type Instrument = Infer<typeof instrumentValidator>
 
 const statusValidator = v.union(
   v.literal('active'),
-  v.literal('partially_exited'),
   v.literal('fully_exited'),
   v.literal('written_off'),
 )
@@ -170,7 +169,9 @@ const parseDate = (s: unknown): number | undefined => {
 const STATUS_MAP: Record<string, string> = {
   Actif: 'active',
   Exit: 'fully_exited',
-  'Exit partiel': 'partially_exited',
+  // Legacy Airtable value: a partial exit leaves the position open, so it
+  // lands on 'active' (the status itself no longer exists).
+  'Exit partiel': 'active',
   Dead: 'written_off',
 }
 

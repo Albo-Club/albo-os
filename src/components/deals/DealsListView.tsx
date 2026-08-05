@@ -193,8 +193,8 @@ export function DealsListView({
   }, [deals, term, t, instrumentFilter, statusFilter, sectorFilter, hasFilters])
 
   // Split on status: fully_exited / written_off drop to the settled section
-  // below; everything else (including partially_exited) stays active. Same rule
-  // as the Companies view (ParticipationsView).
+  // below; everything else stays active. Same rule as the Companies view
+  // (ParticipationsView).
   const { active, settled } = useMemo(() => {
     if (!filtered) return { active: undefined, settled: undefined }
     const activeDeals: Array<DealListRow> = []

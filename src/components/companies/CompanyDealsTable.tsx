@@ -34,7 +34,6 @@ import {
 const STATUS_ORDER: Record<string, number> = {
   pending: 0,
   active: 1,
-  partially_exited: 1,
   fully_exited: 2,
   written_off: 2,
 }

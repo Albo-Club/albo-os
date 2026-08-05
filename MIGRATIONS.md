@@ -78,6 +78,25 @@ Retrait en deux temps, même règle « purger d'abord, resserrer ensuite » que
 tourné (et un `connections:status` sain), purger les lignes puis retirer la
 table du `convex/schema.ts` dans une PR de suivi.
 
+## Retrait du statut `partially_exited` (fait — 05/08/2026)
+
+Le statut de deal `partially_exited` a été supprimé du schéma. Il n'apportait
+aucun traitement propre au-delà d'un badge vert « Exit win » sur une position
+encore ouverte : mêmes métriques, même bucket de liste, même suivi reporting
+qu'`active` (cf. l'entrée de changelog v1.176.0).
+
+Purge effectuée **avant** le resserrement du validateur, conformément à la
+règle « purger d'abord, resserrer ensuite » : un seul deal prod le portait,
+**VIASANA** (org `calte`, `k570y3ssbhjz8k9wvf68fgzp7s87rvfm`), repassé en
+`active` via un patch de statut seul. `exitedDate` et `exitProceeds` ont été
+**volontairement conservés** — le geste UI « Annuler la sortie » les aurait
+effacés, alors qu'ils gardent la trace de la cession partielle (256 715,86 €
+décaissés, 632 589,11 € reçus, MOIC 2,46x).
+
+Une cession partielle se saisit désormais sans statut dédié : le deal reste
+`active`, l'encaissement se lit dans les transactions pointées et le MOIC, et
+la `valuation` du reliquat détenu doit être mise à jour à la main.
+
 ## Chantier : retrait de la table legacy `forecasts`
 
 La table `forecasts` est inerte (alimentée par l'import Airtable uniquement,
