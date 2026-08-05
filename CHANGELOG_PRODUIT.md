@@ -23,6 +23,49 @@ bas de page.
 
 ---
 
+## v1.176.1 — 05/08/2026 à 11:28 — Chaque SPV a de nouveau son propre résumé
+
+La fiche de **Parallel Invest SPV24** décrivait, mot pour mot, l'opération du
+**SPV11** en Normandie — jusqu'à nommer SPV11 dans le texte. Rien à voir avec
+le rattachement du deal, qui était correct : c'est le résumé qui se recopiait
+d'un SPV à l'autre. En cause, une règle qui veut que deux fiches partageant le
+même site web affichent le même pitch — utile pour les boutiques d'une même
+enseigne, absurde pour des SPV, qui portent tous le site de leur plateforme
+tout en étant des opérations différentes.
+
+Désormais, un véhicule d'investissement (les SPV Parallel, Sezame et
+consorts) est traité pour ce qu'il est : une opération à part. Son résumé
+n'est plus déduit du site de la plateforme, plus jamais recopié depuis un SPV
+voisin, et le corriger à la main ne touche plus aucune autre fiche. Il vient
+des communications investisseur de la plateforme dès que la fiche est
+rattachée à son SPV, ou de votre saisie.
+
+Les deux fiches abîmées — **SPV 23 (STOA – Pessac)**, qui affichait la
+plaquette commerciale de Parallel, et **SPV24**, qui affichait SPV11 —
+retrouvent une description de leur propre opération.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau prédicat `isVehicleEntity` dans `convex/lib/pitch.ts` : `sponsor`,
+>   `vascoIssuerId`, ou jeton « SPVn » dans le nom (les lignes SPV de Calte
+>   n'ont pas de `sponsor` — même jeton que `vasco.ts:spvNumberOf`).
+> - Exclusion sur les trois chemins d'écriture du pitch :
+>   `companyEnrichment.enrich` s'arrête pour un véhicule (plus d'héritage du
+>   voisin canonique ni de génération depuis la home du sponsor),
+>   `applyPitchToDomainGroup` saute les lignes véhicules, et
+>   `companies.update` ne propage plus le `summary` édité si l'entité est un
+>   véhicule. `enrichFromVasco` / `applyVascoPitch` restent la source de
+>   vérité, inchangés.
+> - Cause racine : `getTarget` construisait le groupe de domaine sur
+>   `parallel-invest.com` (15 SPV côté Calte) et `pickCanonicalPitch` élisait
+>   le résumé le plus long, recopié tel quel sans appel LLM.
+> - Rattrapage données : `convex/migrations/fixSpvPitches.ts`
+>   (`dryRun`/`apply`), ancré `_id` + garde nom + garde sur le texte erroné,
+>   idempotent. Textes reconstruits depuis les notes de l'entité et le deal
+>   Attio, jamais depuis le site.
+> - Tests : `tests/pitch.test.ts` couvre le prédicat (SPV avec/sans espace,
+>   sponsor, lien VASCO, société ordinaire).
+
 ## v1.176.0 — 05/08/2026 à 11:24 — Le statut « Exit partiel » disparaît
 
 Le dialogue « Gérer la sortie » ne propose plus que **deux** types : sortie
