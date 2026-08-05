@@ -23,6 +23,50 @@ bas de page.
 
 ---
 
+## v1.177.0 — 05/08/2026 à 11:35 — Une même fiche Attio se rattache à plusieurs sociétés
+
+Rattacher un SPV Parallel à sa fiche Attio était tout simplement impossible :
+la ligne **Fiche Attio** du bloc Identité répondait « Cette fiche Attio est
+déjà rattachée à une autre société ». Et pour cause — Attio ne connaît
+**qu'une** fiche « Parallel Invest », avec un deal par SPV, là où Albo OS
+tient **une entité par SPV**. La fiche était donc déjà prise par le chapeau,
+et aucun des SPV ne pouvait ouvrir le CRM depuis sa propre page.
+
+Désormais une même fiche Attio se rattache à **autant de sociétés que
+nécessaire**, y compris dans des organisations différentes. Le geste ne
+change pas : on clique la ligne, on cherche dans Attio, on choisit — et
+c'est accepté même si une autre société pointe déjà sur la même fiche.
+
+Un point à connaître : quand plusieurs sociétés partagent une fiche, les
+deals qui arrivent d'Attio continuent d'atterrir sur la **première** d'entre
+elles (la plus ancienne de l'organisation). Rattacher les suivantes sert à
+ouvrir le CRM depuis leur page, pas à détourner la synchronisation — pour
+changer la société cible d'un deal, ça se fait toujours sur le deal.
+
+> **🔧 Notes techniques**
+>
+> - `convex/companies.ts` : suppression de `assertAttioCompanyIdFree` et de son
+>   appel dans `update`. L'ancrage reste trimé, `''` détache toujours.
+> - `convex/attioSync.ts:resolveOrCreateTargetCompany` lisait
+>   `by_attio_company_id` en **`.unique()`** — c'était toute la raison d'être
+>   du garde-fou : un doublon aurait fait throw la synchro au prochain
+>   événement Attio. Remplacé par un `.collect()` + première société **de
+>   l'org** ; l'ordre d'index étant l'ordre de création, la cible d'un deal
+>   déjà synchronisé ne bouge pas.
+> - Effet de bord voulu du même passage : l'ancrage est désormais posé sur la
+>   société créée **dès qu'aucune société de cette org ne le porte** (avant :
+>   dès qu'une société le portait **où que ce soit**). Une org B qui recevait
+>   des deals sur une fiche déjà ancrée en org A créait jusqu'ici une société
+>   neuve à **chaque** événement, faute de pouvoir s'ancrer.
+> - Front : la branche d'erreur `attio_company_already_used` de
+>   `AttioCompanyField.tsx` et ses clés i18n fr/en tombent avec le code serveur
+>   qui les émettait.
+> - `convex/regression.deals.test.ts` : les deux tests qui asseyaient le refus
+>   (même org, puis cross-org) deviennent leur inverse, plus une assertion que
+>   la cible de la synchro ne bouge pas quand un second SPV réclame l'ancrage.
+
+---
+
 ## v1.176.1 — 05/08/2026 à 11:28 — Chaque SPV a de nouveau son propre résumé
 
 La fiche de **Parallel Invest SPV24** décrivait, mot pour mot, l'opération du
@@ -65,6 +109,8 @@ retrouvent une description de leur propre opération.
 >   Attio, jamais depuis le site.
 > - Tests : `tests/pitch.test.ts` couvre le prédicat (SPV avec/sans espace,
 >   sponsor, lien VASCO, société ordinaire).
+
+---
 
 ## v1.176.0 — 05/08/2026 à 11:24 — Le statut « Exit partiel » disparaît
 
@@ -117,6 +163,8 @@ son produit de cession ont été conservés.
 >   mappe désormais sur `active` (mapping explicite, pas le fallback).
 > - Docs : `docs/produit/05-deals.md`, `TESTING.md` (SH17, TD5, DL7),
 >   `KNOWN_ISSUES.md` (rangs Attio), `MIGRATIONS.md`.
+
+---
 
 ## v1.175.1 — 05/08/2026 à 10:55 — Les listes déroulantes des fiches s'enregistrent enfin
 

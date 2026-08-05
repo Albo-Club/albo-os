@@ -564,8 +564,12 @@ export const upsertFromDeal = internalMutation({
  * exists in this org, else create it with the Attio company identity (name +
  * domain). Falls back to a stub named after the deal when the identity fetch
  * failed — repaired later by `repairStubTargetCompany` on the next refresh.
- * The `attioCompanyId` anchor is only claimed when no company already holds
- * it, to preserve its uniqueness.
+ *
+ * The anchor is NOT unique: one Attio record backs several entities (Attio
+ * knows one company "Parallel Invest" where Albo OS has one entity per SPV).
+ * The sync therefore never reads it with `.unique()` — it takes the OLDEST
+ * anchored company OF THIS ORG (index order = creation order), a target that
+ * stays stable however many entities later claim the same record.
  */
 async function resolveOrCreateTargetCompany(
   ctx: MutationCtx,
@@ -579,9 +583,10 @@ async function resolveOrCreateTargetCompany(
         .withIndex('by_attio_company_id', (q) =>
           q.eq('attioCompanyId', attioCompanyId),
         )
-        .unique()
-    : null
-  if (anchored && anchored.orgId === orgId) return anchored._id
+        .collect()
+    : []
+  const inOrg = anchored.find((c) => c.orgId === orgId)
+  if (inOrg) return inOrg._id
   return await ctx.db.insert('companies', {
     orgId,
     name:
@@ -590,7 +595,10 @@ async function resolveOrCreateTargetCompany(
       ATTIO_STUB_COMPANY_NAME,
     kind: 'portfolio',
     ...(args.targetCompanyDomain ? { domain: args.targetCompanyDomain } : {}),
-    ...(attioCompanyId && !anchored ? { attioCompanyId } : {}),
+    // Claimed as soon as no company of THIS org holds it — an anchor held in
+    // another org no longer blocks it, so the next event of this org reuses
+    // the company just created instead of spawning a new one.
+    ...(attioCompanyId ? { attioCompanyId } : {}),
   })
 }
 
