@@ -23,6 +23,55 @@ bas de page.
 
 ---
 
+## v1.173.0 — 06/08/2026 à 11:53 — Toute la documentation juridique d'Albo Club rejoint les fiches société
+
+Les pactes, bulletins de souscription, statuts, procès-verbaux d'assemblée et
+comptes annuels d'Albo Club vivaient jusqu'ici uniquement dans le Drive. Ils
+sont désormais importables en une seule opération sur les fiches société :
+**320 documents répartis sur 42 participations**, avec leur type et, quand le
+nom de fichier le portait, leur date.
+
+Une fois importés, ils passent par la lecture automatique et deviennent
+consultables depuis la fiche société et interrogeables par l'assistant.
+
+Ce qui a été volontairement laissé de côté, et pourquoi :
+
+- **les documents nominatifs des autres investisseurs** (leurs bulletins,
+  leurs actes de renonciation, leurs engagements contractuels) : ils
+  n'engagent pas Albo Club et noieraient les fiches — la souscription
+  d'Auxicare en comptait quatorze pour une seule qui nous concerne ;
+- les certificats de signature, les récapitulatifs automatiques et les RIB ;
+- les decks et présentations, qui ne sont pas des documents juridiques ;
+- les fichiers dépassant la limite de 20 Mo, et les archives compressées,
+  que la lecture automatique ne sait pas ouvrir ;
+- la version la plus légère quand un même document existe en double —
+  typiquement un bulletin non signé à côté de sa version signée.
+
+Les documents déjà déposés à la main restent en place : l'import les
+reconnaît et ne les recrée pas.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau module `convex/migrations/legalDocsImport.ts` : `startUploads`
+>   (mint d'URLs d'upload), `attachBatch` (écriture des lignes `documents`,
+>   avec planification de `documentsExtract.run` comme le fait
+>   `documents:create`), plus `dryRun` et `verify` en lecture seule.
+> - Les octets ne transitent jamais par une fonction Convex : le script
+>   `scripts/import-legal-docs.mjs` tire le fichier de l'API Drive et le POSTe
+>   directement sur l'URL d'upload, qui accepte une requête non authentifiée.
+>   C'est ce qui permet un import piloté en CLI sans session utilisateur.
+> - Idempotence sur le triplet `companyId` + `title` + `size` : un re-run est
+>   un no-op, un run interrompu se reprend en le relançant. Le blob fraîchement
+>   téléversé d'une ligne ignorée est supprimé pour ne pas laisser de storage
+>   orphelin.
+> - La correspondance est figée dans `scripts/data/legal-docs-albo.json`
+>   (320 lignes : société, identifiant Drive, titre, type, période). Elle a été
+>   produite par balayage de l'arbre Drive « ⚠️ Investissements » puis revue à
+>   la main ; six documents Wheelee déjà présents en base en ont été retirés
+>   après rapprochement sur la taille en octets.
+> - Le titre stocké perd son extension, par cohérence avec les uploads
+>   manuels ; le type MIME est reconstruit depuis `sourceExt`.
+
 ## v1.172.0 — 03/08/2026 à 18:10 — Les rapports et les documents d'une société vivent enfin au même endroit
 
 Une fiche société avait deux onglets, et il fallait choisir le bon **avant**
