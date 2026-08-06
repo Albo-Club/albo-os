@@ -23,6 +23,25 @@ bas de page.
 
 ---
 
+## v1.182.1 — 06/08/2026 à 12:47 — L'import des documents juridiques survit à une coupure réseau
+
+Un incident réseau pendant l'import — une simple résolution DNS qui échoue —
+interrompait toute l'opération au lot en cours. L'import reprend maintenant
+tout seul : trois tentatives espacées avant de renoncer, et un lot en échec
+n'arrête plus les suivants. Les documents déjà importés ne sont jamais
+recréés, donc relancer reste sans risque.
+
+> **🔧 Notes techniques**
+>
+> - `scripts/import-legal-docs.mjs` : `convex()` enveloppe désormais
+>   `convexOnce()` avec trois tentatives et un backoff (4s, 8s). La CLI Convex
+>   shell-out meurt avec un code non nul sur un incident réseau transitoire —
+>   il suffit d'un échec DNS sur son reporting Sentry — ce qui faisait planter
+>   le script entier via un rejet non capturé.
+> - Les appels `startUploads` et `attachBatch` sont chacun dans un `try` : le
+>   lot concerné part dans `failures`, la boucle continue. Un `attachBatch`
+>   raté laisse des blobs non référencés, inertes, que le re-run réécrit.
+
 ## v1.182.0 — 06/08/2026 à 12:22 — Toute la documentation juridique d'Albo Club rejoint les fiches société
 
 Les pactes, bulletins de souscription, statuts, procès-verbaux d'assemblée et
