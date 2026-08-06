@@ -16,6 +16,7 @@ import { internalAction, internalMutation, mutation, query } from './_generated/
 import { fetchBody, getMessage } from './agentmail'
 import { requireAppUser, requireOrgMember } from './lib/auth'
 import { identityKey, sharedDomains } from './lib/emailIdentify'
+import { recomputeReportFreshness } from './lib/reportFreshness'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 
@@ -568,6 +569,11 @@ export const detachCompany = mutation({
     }
 
     await ctx.db.delete('companyReports', reportId)
+
+    // Freshness copy on the entity: rebuilt from what is left, since the
+    // ingestion side only ever moves it forward (cf. lib/reportFreshness.ts).
+    // Detaching the last report must put the participation back in silence.
+    await recomputeReportFreshness(ctx, report.companyId)
 
     // The synthesis pointed here: fall back on the most recent report left on
     // the entity, or clear the pointer when it was the last one.

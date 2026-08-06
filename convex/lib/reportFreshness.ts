@@ -60,6 +60,90 @@ export function silenceCutoff(now: number, months: number): number {
   return cutoff.getTime()
 }
 
+/**
+ * Records a stored report's dates on its company row — the denormalized copy
+ * `listSilentCompanies` reads (cf. `companies.lastReportAt` in the schema).
+ *
+ * Called from the single write site of `companyReports`
+ * (`reportStore.storeForCompany`), so the copy cannot silently fall behind.
+ * Monotonic: only a MORE RECENT date wins, which keeps a re-imported period
+ * or a back-dated report from rewinding the freshness. Writes nothing when
+ * neither date moves — an idempotent re-import stays a no-op.
+ */
+export async function recordReportOnCompany(
+  ctx: GenericMutationCtx<DataModel>,
+  companyId: Id<'companies'>,
+  report: { receivedAt: number; periodSortDate?: number },
+): Promise<void> {
+  const company = await ctx.db.get('companies', companyId)
+  if (!company) return
+
+  const patch: {
+    lastReportAt?: number
+    lastReportCoverageAt?: number
+  } = {}
+  if (
+    company.lastReportAt === undefined ||
+    report.receivedAt > company.lastReportAt
+  ) {
+    patch.lastReportAt = report.receivedAt
+  }
+  if (
+    report.periodSortDate !== undefined &&
+    (company.lastReportCoverageAt === undefined ||
+      report.periodSortDate > company.lastReportCoverageAt)
+  ) {
+    patch.lastReportCoverageAt = report.periodSortDate
+  }
+  if (Object.keys(patch).length === 0) return
+  await ctx.db.patch('companies', companyId, patch)
+}
+
+/**
+ * Rebuilds the freshness copy from the entity's REMAINING reports, clearing
+ * both fields when none is left.
+ *
+ * The counterpart of `recordReportOnCompany` for the one gesture that removes
+ * a report — `reportInbox.detachCompany`. Monotonic writing cannot walk back
+ * on its own: detaching the last report of a company would otherwise leave it
+ * looking fresher than it is, and silence it forever.
+ *
+ * Reads the company's own reports (indexed, one entity), which is affordable
+ * because this runs on a rare human gesture — never on a read path.
+ */
+export async function recomputeReportFreshness(
+  ctx: GenericMutationCtx<DataModel>,
+  companyId: Id<'companies'>,
+): Promise<void> {
+  const reports = await ctx.db
+    .query('companyReports')
+    .withIndex('by_company', (q) => q.eq('companyId', companyId))
+    .collect()
+
+  let lastReportAt: number | undefined
+  let lastReportCoverageAt: number | undefined
+  for (const report of reports) {
+    const receivedAt = report.emailDate ?? report._creationTime
+    if (lastReportAt === undefined || receivedAt > lastReportAt) {
+      lastReportAt = receivedAt
+    }
+    if (
+      report.periodSortDate !== undefined &&
+      (lastReportCoverageAt === undefined ||
+        report.periodSortDate > lastReportCoverageAt)
+    ) {
+      lastReportCoverageAt = report.periodSortDate
+    }
+  }
+
+  // `undefined` removes the field — an entity with no report left must read as
+  // « never gave news », not as « gave news at the epoch ».
+  await ctx.db.patch('companies', companyId, {
+    lastReportAt,
+    lastReportCoverageAt,
+  })
+}
+
 /** Earliest outflow reconciled on a deal, null when nothing is pointed. */
 async function firstOutflowAt(
   ctx: Ctx,
@@ -78,10 +162,12 @@ async function firstOutflowAt(
 }
 
 /**
- * The org's silent companies, longest silence first. One indexed scan of the
- * org's reports and one of its portal communications; the transactions are
- * only read for companies that never gave news (the sole case where the
- * disbursement date is needed).
+ * The org's silent companies, longest silence first. Reads the org's live
+ * deals, its portfolio companies and its portal communications; the reports
+ * themselves are NEVER read here — their two dates are denormalized on the
+ * company row (cf. `recordReportOnCompany`). The transactions are only read
+ * for companies that never gave news (the sole case where the disbursement
+ * date is needed).
  */
 export async function listSilentCompanies(
   ctx: Ctx,
@@ -111,27 +197,6 @@ export async function listSilentCompanies(
     const known = signedByCompany.get(deal.targetCompanyId)
     if (known === undefined || signed < known) {
       signedByCompany.set(deal.targetCompanyId, signed)
-    }
-  }
-
-  // Last reception + last covered period per company, in one scan.
-  const lastReport = new Map<Id<'companies'>, number>()
-  const coverage = new Map<Id<'companies'>, number>()
-  const reports = await ctx.db
-    .query('companyReports')
-    .withIndex('by_org', (q) => q.eq('orgId', orgId))
-    .collect()
-  for (const report of reports) {
-    const receivedAt = report.emailDate ?? report._creationTime
-    const known = lastReport.get(report.companyId)
-    if (known === undefined || receivedAt > known) {
-      lastReport.set(report.companyId, receivedAt)
-    }
-    if (report.periodSortDate !== undefined) {
-      const covered = coverage.get(report.companyId)
-      if (covered === undefined || report.periodSortDate > covered) {
-        coverage.set(report.companyId, report.periodSortDate)
-      }
     }
   }
 
@@ -183,7 +248,7 @@ export async function listSilentCompanies(
     if (!deals) continue
 
     // The most recent news wins, whichever channel carried it.
-    const reportedAt = lastReport.get(company._id) ?? null
+    const reportedAt = company.lastReportAt ?? null
     const communicatedAt = lastComm.get(company._id) ?? null
     let lastNewsAt: number | null = null
     let lastNewsSource: NewsSource | null = null
@@ -216,7 +281,7 @@ export async function listSilentCompanies(
       companyName: company.name,
       lastNewsAt,
       lastNewsSource,
-      coverageUntil: coverage.get(company._id) ?? null,
+      coverageUntil: company.lastReportCoverageAt ?? null,
       sinceAt,
     })
   }

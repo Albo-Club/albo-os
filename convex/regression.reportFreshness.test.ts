@@ -22,6 +22,7 @@ import {
   createUser,
   setupHarness,
 } from './regression.setup'
+import { recordReportOnCompany } from './lib/reportFreshness'
 import type { Harness } from './regression.setup'
 import type { Id } from './_generated/dataModel'
 
@@ -60,9 +61,9 @@ async function createReport(
   orgId: Id<'organizations'>,
   companyId: Id<'companies'>,
   opts: { emailDate: number; periodSortDate?: number },
-): Promise<void> {
-  await t.run(async (ctx) => {
-    await ctx.db.insert('companyReports', {
+): Promise<Id<'companyReports'>> {
+  return await t.run(async (ctx) => {
+    const reportId = await ctx.db.insert('companyReports', {
       orgId,
       companyId,
       source: 'email',
@@ -70,6 +71,14 @@ async function createReport(
       emailDate: opts.emailDate,
       periodSortDate: opts.periodSortDate,
     })
+    // Silence detection reads the freshness copy on the entity, never the
+    // reports — storing one means maintaining it, exactly as the ingestion
+    // pipeline does (reportStore.storeForCompany).
+    await recordReportOnCompany(ctx, companyId, {
+      receivedAt: opts.emailDate,
+      periodSortDate: opts.periodSortDate,
+    })
+    return reportId
   })
 }
 
@@ -369,5 +378,58 @@ describe('report freshness: silent companies', () => {
     })
 
     expect(await silentNames(user, org.orgId)).toEqual([])
+  })
+})
+
+describe('report freshness: detaching a report', () => {
+  test('puts a company back in silence when its last report is detached', async () => {
+    const { t, user, org } = await orgSetup('org-detach-silence')
+    const now = Date.now()
+    const company = await createPortfolioCompany(t, org.orgId, 'Mis-filed')
+    await createDeal(
+      t,
+      org.orgId,
+      org.rootCompanyId,
+      company,
+      'active',
+      now - 12 * MONTH,
+    )
+    // A report landed on the wrong participation and made it look fresh.
+    const reportId = await createReport(t, org.orgId, company, {
+      emailDate: now - 1 * MONTH,
+    })
+    expect(await silentNames(user, org.orgId)).toEqual([])
+
+    await user.as.mutation(api.reportInbox.detachCompany, { reportId })
+
+    // The freshness copy cannot walk back on its own — detaching has to
+    // rebuild it, otherwise the entity stays silently exempt forever.
+    expect(await silentNames(user, org.orgId)).toEqual(['Mis-filed'])
+  })
+
+  test('falls back on the report left when several were stored', async () => {
+    const { t, user, org } = await orgSetup('org-detach-fallback')
+    const now = Date.now()
+    const company = await createPortfolioCompany(t, org.orgId, 'Two reports')
+    await createDeal(
+      t,
+      org.orgId,
+      org.rootCompanyId,
+      company,
+      'active',
+      now - 12 * MONTH,
+    )
+    await createReport(t, org.orgId, company, { emailDate: now - 2 * MONTH })
+    const recent = await createReport(t, org.orgId, company, {
+      emailDate: now - 1 * MONTH,
+    })
+
+    await user.as.mutation(api.reportInbox.detachCompany, { reportId: recent })
+
+    // The older report still counts as news — 2 months is under the 4-month
+    // threshold, so no alert; the copy fell back rather than being cleared.
+    expect(await silentNames(user, org.orgId)).toEqual([])
+    const stored = await t.run(async (ctx) => ctx.db.get('companies', company))
+    expect(stored?.lastReportAt).toBe(now - 2 * MONTH)
   })
 })

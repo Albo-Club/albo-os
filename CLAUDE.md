@@ -531,6 +531,14 @@ export const remove = mutation({
   (`convex/lib/userPrefs.ts`). Same family: a mutation fired from a
   `useEffect` that depends on a Convex query observing the written data
   (cross-tab infinite loop). See `KNOWN_ISSUES.md` "Hot `users` row".
+- ❌ Une requête de liste qui `.collect()` une table dont les lignes portent
+  un champ texte volumineux (`rawContent`, `cleanedHtml`, `bodyHtml`,
+  `extractedText`…) pour n'en tirer que quelques champs légers. Convex lit la
+  **ligne entière** et facture les octets : le `.map()` de projection ne
+  réduit rien. Soit dénormaliser l'agrégat sur une ligne déjà lue (pattern
+  `companies.lastReportAt`), soit sortir le texte en table annexe (pattern
+  `documentTexts`). Cf. `KNOWN_ISSUES.md` « Database I/O : un gros champ
+  texte sur une ligne lue en liste ».
 - ❌ Interpolating a user-controlled value (name, org name, email address,
   free-text label, message relayed by a third party) into the **HTML**
   branch of a `convex/emailTemplates.ts` template without `esc()`. The

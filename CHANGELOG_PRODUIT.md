@@ -23,6 +23,58 @@ bas de page.
 
 ---
 
+## v1.181.1 — 06/08/2026 à 09:25 — La liste des participations arrête de relire tous les reportings
+
+Depuis l'arrivée de l'alerte « cette participation ne reporte plus », ouvrir
+la liste des participations faisait relire à la base **l'intégralité des
+reportings reçus** — le texte complet de chaque e-mail et de chaque pièce
+jointe — pour n'en tirer qu'une seule information par société : la date du
+dernier reçu. Invisible à l'usage, mais lourd : la consommation de la base a
+été multipliée par quatre en une journée, jusqu'à frôler le plafond mensuel
+du compte. Rien ne s'était cassé, mais l'outil s'approchait de la limite où
+il aurait pu s'arrêter.
+
+Cette date est désormais notée sur la fiche de la société **au moment où le
+reporting arrive**, une fois pour toutes. La liste la lit au passage, sans
+rouvrir un seul reporting. Rien ne change à l'écran : mêmes alertes, mêmes
+sociétés signalées, mêmes délais — c'est le chemin pour y arriver qui a été
+raccourci.
+
+> **🔧 Notes techniques**
+>
+> - Cause : `lib/reportFreshness.ts:listSilentCompanies` faisait un
+>   `.collect()` de `companyReports` par org pour en dériver deux dates par
+>   société. Convex lit la **ligne entière** — donc `rawContent` (≤ 300k
+>   caractères) et `cleanedHtml` (≤ 100k) à chaque exécution — et la fonction
+>   est appelée par `deals.listParticipations` **et**
+>   `aggregate.listParticipations`, deux requêtes réactives sur la page la
+>   plus ouverte de l'app.
+> - Correctif : dénormalisation de `companies.lastReportAt` et
+>   `lastReportCoverageAt`, maintenues par `recordReportOnCompany`
+>   (`lib/reportFreshness.ts`) appelé depuis `reportStore.storeForCompany`.
+>   Écriture monotone (max) : un report antidaté ne fait pas reculer la
+>   fraîcheur. La liste lit ces champs sur les `companies` qu'elle collectait
+>   déjà → coût de lecture supplémentaire nul.
+> - Les **quatre** sites de mutation de `companyReports` sont couverts :
+>   insert et patch (`reportStore`), patch d'état d'indexation (`vectorize`,
+>   sans effet sur les dates) et surtout la **suppression**
+>   (`reportInbox.detachCompany`, arrivé avec le détachement de la v1.181.0).
+>   Une écriture monotone ne sait pas reculer : détacher le dernier report
+>   d'une participation la laissait plus fraîche qu'elle ne l'est, donc
+>   dispensée d'alerte en silence. D'où `recomputeReportFreshness`, qui
+>   reconstruit depuis les reports restants sur ce seul geste — rare, humain,
+>   jamais sur un chemin de lecture.
+> - `migrations/backfillReportFreshness` (`dryRun`/`apply`/`report`)
+>   reconstruit les deux dates depuis les reports. **À lancer juste après le
+>   deploy**, sinon toute participation ayant reporté avant compte comme
+>   « sans nouvelle » — cf. `MIGRATIONS.md`.
+> - Comportement inchangé : `regression.reportFreshness.test.ts` passe sans
+>   modification de ses assertions (seul le fixture maintient désormais la
+>   copie, comme le pipeline).
+> - Le piège générique et les foyers restants (`documents.extractedText`,
+>   `reportInbox.list`, `companyReports.listByCompany`) sont documentés dans
+>   `KNOWN_ISSUES.md` « Database I/O : un gros champ texte sur une ligne lue
+>   en liste », plus un anti-pattern dans `CLAUDE.md`.
 ## v1.181.0 — 05/08/2026 à 19:54 — Un report rangé sur la mauvaise participation se détache
 
 Jusqu'ici, rattacher un report était à sens unique : on pouvait l'ajouter à
