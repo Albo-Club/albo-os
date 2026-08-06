@@ -3722,3 +3722,53 @@ Deux erreurs classiques :
    l'appel ne tronque pas, il **plante**, et le report part en `needs_review`.
    Toute hausse se raisonne contre cette fenêtre, jamais contre la taille de
    la ligne Convex (qui, elle, a de la marge : ~420 Ko sur 1 Mo).
+
+## Database I/O : un gros champ texte sur une ligne lue en liste
+
+Convex facture les **octets** lus (compteur « Database I/O »), et lire une
+ligne veut dire lire la ligne **entière** — il n'existe pas de projection
+côté serveur. Le `.map()` qui ne renvoie que trois champs au client réduit
+l'egress, jamais l'I/O : la ligne complète a déjà été lue et facturée.
+
+Conséquence : **un champ texte volumineux transforme toute requête de liste
+sur sa table en pompe à octets.** Le cas vécu (5 août 2026) : la détection
+des participations silencieuses scannait `companyReports` par org pour en
+extraire deux dates par société. Chaque ligne traînant `rawContent` (jusqu'à
+300k caractères) et `cleanedHtml` (100k), la requête de la liste des
+participations — la page d'accueil de l'outil, souscrite en réactif — lisait
+~15 Mo à chaque exécution. 600 Mo en une journée, sur un quota mensuel d'1 Go.
+
+Le réflexe qui ne marche pas : « lire moins souvent » (cron, cache, TTL). Ça
+ajoute du code, une table, une invalidation, et ça rend la donnée fausse
+entre deux passages.
+
+Les deux vrais remèdes, dans cet ordre :
+
+1. **Dénormaliser l'agrégat sur une ligne déjà lue.** Si la requête n'a
+   besoin que de N nombres par entité, les écrire sur l'entité au moment de
+   l'ingestion. C'est ce que font `companies.lastReportAt` /
+   `lastReportCoverageAt` (helper `recordReportOnCompany`,
+   `lib/reportFreshness.ts`) : la liste lit déjà les `companies`, donc le
+   scan disparaît pour un coût de lecture **nul**, et la valeur reste exacte.
+   Praticable uniquement si la table source a **peu de sites d'écriture** —
+   ici un seul (`reportStore.storeForCompany`) et aucune suppression. Prévoir
+   la migration de reconstruction qui va avec
+   (`migrations/backfillReportFreshness`), à la fois pour le rattrapage et
+   comme outil de réparation en cas de dérive.
+2. **Sortir le texte dans une table annexe**, une ligne par blob, lue
+   seulement quand quelqu'un ouvre vraiment le contenu. Pattern déjà en place
+   pour `documentTexts` (cf. le commentaire de la table dans `schema.ts`).
+
+Le contrôle avant d'écrire une requête de liste : *est-ce qu'une des lignes
+que je collecte porte un champ qui peut peser des dizaines de Ko ?* Si oui,
+un des deux remèdes ci-dessus, jamais un `.map()` de façade.
+
+**Restent à traiter** (mêmes symptômes, moindre volume) : `documents` et son
+champ legacy `extractedText` (chantier de purge déjà ouvert dans
+`MIGRATIONS.md`), lu à chaque ouverture de fiche société ; `reportInbox.list`
+qui prend 100 `inboundEmails` avec `bodyText` + `bodyHtml` + `extractedText` ;
+et `companyReports.listByCompany` qui prend 200 lignes avec `rawContent` pour
+n'afficher que titre et période.
+
+Pour instrumenter : dashboard Convex → **Functions**, colonne *Database
+bandwidth*, triée décroissante. Elle nomme le coupable en une minute.

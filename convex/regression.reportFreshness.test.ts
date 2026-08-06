@@ -22,6 +22,7 @@ import {
   createUser,
   setupHarness,
 } from './regression.setup'
+import { recordReportOnCompany } from './lib/reportFreshness'
 import type { Harness } from './regression.setup'
 import type { Id } from './_generated/dataModel'
 
@@ -68,6 +69,13 @@ async function createReport(
       source: 'email',
       status: 'completed',
       emailDate: opts.emailDate,
+      periodSortDate: opts.periodSortDate,
+    })
+    // Silence detection reads the freshness copy on the entity, never the
+    // reports — storing one means maintaining it, exactly as the ingestion
+    // pipeline does (reportStore.storeForCompany).
+    await recordReportOnCompany(ctx, companyId, {
+      receivedAt: opts.emailDate,
       periodSortDate: opts.periodSortDate,
     })
   })

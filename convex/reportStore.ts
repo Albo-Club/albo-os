@@ -24,6 +24,7 @@ import { internalAction, internalMutation, internalQuery } from './_generated/se
 import { getModel } from './agent'
 import { catalogPromptList, sanitizeKpiTargets, targetsPromptList, toCanonical } from './lib/metricCatalog'
 import { normalizePeriodDisplay, parsePeriod } from './lib/reportPeriod'
+import { recordReportOnCompany } from './lib/reportFreshness'
 import type { RawMetric } from './lib/metricCatalog'
 import type { Doc, Id } from './_generated/dataModel'
 
@@ -248,6 +249,13 @@ export const storeForCompany = internalMutation({
     } else {
       reportId = await ctx.db.insert('companyReports', reportFields)
     }
+
+    // Freshness copy on the entity — what silence detection reads, so it never
+    // has to scan the reports themselves (cf. lib/reportFreshness.ts).
+    await recordReportOnCompany(ctx, args.companyId, {
+      receivedAt: reportFields.emailDate,
+      periodSortDate: args.periodSortDate,
+    })
 
     // Files → documents rows (one per entity, same storage blob). The
     // content router already read each file (brick 4): its outcome becomes

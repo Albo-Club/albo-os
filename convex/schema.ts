@@ -563,6 +563,19 @@ export default defineSchema({
     // in Lot 5b). Each entry is either Attio-linked (attioRecordId) or free.
     people: v.optional(v.array(personValidator)),
     archivedAt: v.optional(v.number()),
+    // ── Report freshness (denormalized from `companyReports`) ──────────────
+    // Reception date of the most recent report, and the most recent period it
+    // covered. Both are DERIVED — the authoritative rows stay in
+    // `companyReports` — and maintained by `recordReportOnCompany`
+    // (lib/reportFreshness.ts) at ingestion time, the table's single write
+    // site. They live here because silence detection needs two numbers per
+    // company, and Convex reads whole rows: scanning the reports to recompute
+    // them re-read every report's `rawContent`/`cleanedHtml` on every render
+    // of the participations list. Monotonic (max), so a report arriving out of
+    // order never rewinds them. `migrations/backfillReportFreshness` rebuilds
+    // both from the reports if they ever drift. Absent = no report yet.
+    lastReportAt: v.optional(v.number()), // ms epoch
+    lastReportCoverageAt: v.optional(v.number()), // ms epoch
   })
     .index('by_org', ['orgId'])
     .index('by_org_kind', ['orgId', 'kind'])

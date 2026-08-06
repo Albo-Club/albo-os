@@ -23,6 +23,51 @@ bas de page.
 
 ---
 
+## v1.180.3 — 06/08/2026 à 09:25 — La liste des participations arrête de relire tous les reportings
+
+Depuis l'arrivée de l'alerte « cette participation ne reporte plus », ouvrir
+la liste des participations faisait relire à la base **l'intégralité des
+reportings reçus** — le texte complet de chaque e-mail et de chaque pièce
+jointe — pour n'en tirer qu'une seule information par société : la date du
+dernier reçu. Invisible à l'usage, mais lourd : la consommation de la base a
+été multipliée par quatre en une journée, jusqu'à frôler le plafond mensuel
+du compte. Rien ne s'était cassé, mais l'outil s'approchait de la limite où
+il aurait pu s'arrêter.
+
+Cette date est désormais notée sur la fiche de la société **au moment où le
+reporting arrive**, une fois pour toutes. La liste la lit au passage, sans
+rouvrir un seul reporting. Rien ne change à l'écran : mêmes alertes, mêmes
+sociétés signalées, mêmes délais — c'est le chemin pour y arriver qui a été
+raccourci.
+
+> **🔧 Notes techniques**
+>
+> - Cause : `lib/reportFreshness.ts:listSilentCompanies` faisait un
+>   `.collect()` de `companyReports` par org pour en dériver deux dates par
+>   société. Convex lit la **ligne entière** — donc `rawContent` (≤ 300k
+>   caractères) et `cleanedHtml` (≤ 100k) à chaque exécution — et la fonction
+>   est appelée par `deals.listParticipations` **et**
+>   `aggregate.listParticipations`, deux requêtes réactives sur la page la
+>   plus ouverte de l'app.
+> - Correctif : dénormalisation de `companies.lastReportAt` et
+>   `lastReportCoverageAt`, maintenues par `recordReportOnCompany`
+>   (`lib/reportFreshness.ts`) appelé depuis `reportStore.storeForCompany` —
+>   le site d'écriture **unique** de `companyReports`, sans suppression, donc
+>   pas de désynchronisation possible. Écriture monotone (max) : un report
+>   antidaté ne fait pas reculer la fraîcheur. La liste lit ces champs sur les
+>   `companies` qu'elle collectait déjà → coût de lecture supplémentaire nul.
+> - `migrations/backfillReportFreshness` (`dryRun`/`apply`/`report`)
+>   reconstruit les deux dates depuis les reports. **À lancer juste après le
+>   deploy**, sinon toute participation ayant reporté avant compte comme
+>   « sans nouvelle » — cf. `MIGRATIONS.md`.
+> - Comportement inchangé : `regression.reportFreshness.test.ts` passe sans
+>   modification de ses assertions (seul le fixture maintient désormais la
+>   copie, comme le pipeline).
+> - Le piège générique et les foyers restants (`documents.extractedText`,
+>   `reportInbox.list`, `companyReports.listByCompany`) sont documentés dans
+>   `KNOWN_ISSUES.md` « Database I/O : un gros champ texte sur une ligne lue
+>   en liste », plus un anti-pattern dans `CLAUDE.md`.
+
 ## v1.180.2 — 05/08/2026 à 19:27 — Les fondateurs et co-investisseurs liés à Attio se voient enfin comme des liens
 
 Sur la fiche d'une participation, les puces des sections Fondateur(s),
