@@ -115,6 +115,7 @@ import type * as seed from "../seed.js";
 import type * as telegram from "../telegram.js";
 import type * as todo from "../todo.js";
 import type * as transactions from "../transactions.js";
+import type * as transfers from "../transfers.js";
 import type * as users from "../users.js";
 import type * as valuations from "../valuations.js";
 import type * as vasco from "../vasco.js";
@@ -235,6 +236,7 @@ declare const fullApi: ApiFromModules<{
   telegram: typeof telegram;
   todo: typeof todo;
   transactions: typeof transactions;
+  transfers: typeof transfers;
   users: typeof users;
   valuations: typeof valuations;
   vasco: typeof vasco;

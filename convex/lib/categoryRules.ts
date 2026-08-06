@@ -17,11 +17,24 @@ type MutCtx = GenericMutationCtx<DataModel>
  * `unmatched` rows, where those are already unset).
  */
 
-export type CategoryRuleStatus =
-  | 'charge'
-  | 'tax'
-  | 'product'
-  | 'internal_transfer'
+/**
+ * Statuses a rule may still be created with. `internal_transfer` is
+ * deliberately ABSENT: like `ignored`, it removes a transaction from the
+ * analysis, so replaying it by label pattern builds a silent blind spot at
+ * scale — and an internal transfer now needs a counter-leg on a specific
+ * account, which a label pattern cannot know. The value stays in the schema
+ * union (existing rows must keep validating) but is neither created nor
+ * applied — cf. KNOWN_ISSUES.md « Virements internes ».
+ */
+export type CategoryRuleStatus = 'charge' | 'tax' | 'product'
+
+/** Statuses of rows already in the table, including retired ones. */
+type StoredRuleStatus = CategoryRuleStatus | 'internal_transfer'
+
+/** Is this stored rule still replayable? */
+export function isActiveRule(rule: { status: StoredRuleStatus }): boolean {
+  return rule.status !== 'internal_transfer'
+}
 
 /** An org's rules, loaded once per mutation (the table stays small). */
 export async function loadOrgRules(
@@ -96,10 +109,12 @@ export function ruleFieldsFor(
   category?: string
   vatRateBps?: 0 | 550 | 1000 | 2000
 } | null {
-  const rule = findMatchingRule(rules, searchText)
-  if (!rule) return null
+  // Retired `internal_transfer` rules are dropped BEFORE matching, so they
+  // cannot shadow a narrower live rule either.
+  const rule = findMatchingRule(rules.filter(isActiveRule), searchText)
+  if (!rule || !isActiveRule(rule)) return null
   return {
-    matchStatus: rule.status,
+    matchStatus: rule.status as CategoryRuleStatus,
     category: rule.category,
     vatRateBps: rule.vatRateBps,
   }

@@ -31,7 +31,7 @@ Pré-requis :
 | B8  | Miroir Linear   | `pnpm sync:linear-docs --all --dry-run` | `18 page(s) mirrored to Linear.` (exit 0) — hors-ligne, sans clé : valide que `docs/produit/` et la map `DOCS` de `scripts/sync-linear-docs.mjs` se correspondent (exit 2 sinon) et imprime le markdown qui partirait. La vraie poussée se fait au merge (workflow « Sync Linear docs », secret GitHub `LINEAR_API_KEY`) |
 | B9  | Smoke prod      | workflow « Prod smoke » (Actions → Run workflow) | Run vert contre la variable de repo `PROD_URL` (cron quotidien 7h Paris été / 6h hiver ; mêmes checks non authentifiés que B4, via `--url`). En échec : run rouge + issue labellisée `prod-smoke` ouverte automatiquement avec le détail des checks (commentée, pas dupliquée, si une est déjà ouverte) |
 | B10 | Code mort       | `pnpm deadcode`          | Exit 0, aucun résultat (knip) — audit **manuel** (volontairement hors CI) ; tant que les candidats de l'audit initial (PR #323) ne sont pas purgés, cette étape les liste et sort en exit 1. Brancher un job CI bloquant une fois le rapport vide                       |
-| B11 | Régression Convex | `pnpm test:convex`     | 56 tests verts (vitest + convex-test, backend en mémoire — aucun réseau, aucun déploiement) : isolation multi-tenant + rejet non-authentifié, rôles admin/member, invariants deals (unicité SIREN, investisseur `group_*`, idempotence upsert Attio), pointage (état matched/unmatched + `matchingDecisions` append-only + bascule term sheet → actif au premier décaissement pointé), forecast (`expandRules` idempotent, grille, `markEntryRealized`), passif (soldes C/C dérivés des transactions), vue agrégée cross-org |
+| B11 | Régression Convex | `pnpm test:convex`     | 84 tests verts (vitest + convex-test, backend en mémoire — aucun réseau, aucun déploiement) : isolation multi-tenant + rejet non-authentifié, rôles admin/member, invariants deals (unicité SIREN, investisseur `group_*`, idempotence upsert Attio), pointage (état matched/unmatched + `matchingDecisions` append-only + bascule term sheet → actif au premier décaissement pointé), forecast (`expandRules` idempotent, grille, `markEntryRealized`), passif (soldes C/C dérivés des transactions), virements internes (appariement à deux jambes, invariant même entité, écart de montant conservé), vue agrégée cross-org |
 
 > **Schéma & mapping d'instruments** (refonte fiches deal, `convex/schema.ts` +
 > `convex/lib/instrumentMapping.ts`). Validés par B1 : `INSTRUMENT_ARCHETYPE` et
@@ -856,10 +856,12 @@ connexion VASCO active (org `calte`).
 Pointage manuel (MVP 1) : `matchTransaction` / `ignoreTransaction` /
 `categorizeAsCharge` / `categorizeAsTax` / `categorizeAsProduct` /
 `categorizeAsInternalTransfer` / `unmatchTransaction` + file
-`listUnmatched` + consultation `listByStatus`. Chaque action écrit une ligne
-append-only dans `matchingDecisions` (dataset agent, phase 2). Prérequis :
-schéma déployé (champ `matchStatus` + table `matchingDecisions`). Détails et
-pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
+`listUnmatched` + consultation `listByStatus`, plus l'appariement des
+virements internes (`transfers:pairTransfer` / `unpairTransfer`). Chaque
+action écrit une ligne append-only dans `matchingDecisions` (dataset agent,
+phase 2). Prérequis : schéma déployé (champ `matchStatus` + tables
+`matchingDecisions` et `transfers`). Détails et pièges : `KNOWN_ISSUES.md`
+« Pointage transaction → deal » et « Virements internes ».
 
 | #   | Étape                                                                                                                    | Résultat attendu                                                                                                                                                                                         |
 | --- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -878,7 +880,10 @@ pièges : `KNOWN_ISSUES.md` « Pointage transaction → deal ».
 | R13 | `listByStatus` avec `status: 'charge'` (puis `'tax'`, `'product'`, `'internal_transfer'`)                                | Les tx classées dans ce statut, triées date desc, enrichies du compte ; les tx de R11/R12/R15/R16 ne sont plus dans `listUnmatched`                                                                      |
 | R14 | `bulkCategorize` avec plusieurs `transactionIds` + `status: 'charge'` (puis `'tax'`, `'product'`, `'internal_transfer'`) | Retour `{ succeeded: [...], failed: [] }` ; chaque tx → même patch que l'unitaire + une ligne `matchingDecisions` par tx ; un id invalide/d'une autre org atterrit dans `failed` sans bloquer les autres |
 | R15 | `categorizeAsProduct` sur une tx                                                                                         | Tx → `product`, `dealId` vidé, `reconciled: false` ; ligne `decision: 'product'` ; aucun impact sur les « Reçu » des deals                                                                               |
-| R16 | `categorizeAsInternalTransfer` sur une tx                                                                                | Tx → `internal_transfer`, `dealId` vidé, `reconciled: false` ; ligne `decision: 'internal_transfer'` (simple étiquette, pas d'appariement des deux jambes)                                               |
+| R16 | `categorizeAsInternalTransfer` sur une tx                                                                                | Tx → `internal_transfer`, `dealId` vidé, `reconciled: false` ; ligne `decision: 'internal_transfer'` ; **une ligne `transfers` est ouverte** et la tx y est allouée (`allocation.kind: 'transfer'`) — virement **incomplet** tant que la contrepartie manque ; **aucune règle apprise** |
+| R17 | `transfers:pairTransfer` sur deux jambes de comptes de la même entité, sens opposés                                     | Les deux tx partagent le même `allocation.targetId` et restent `internal_transfer` ; `transfers:getForTransaction` renvoie `complete: true` + `gapCents` + `transitDays` ; une entité différente / le même compte / le même sens → `transfer_wrong_entity` / `transfer_same_account` / `transfer_same_direction` |
+| R18 | `transfers:unpairTransfer` sur une jambe                                                                                | La jambe repasse `unmatched` (ligne `decision: 'unmatched'`) ; l'autre redevient incomplète ; la ligne `transfers` est **supprimée** quand elle n'a plus aucune jambe |
+| R19 | `convex run --prod transactions:dropInternalTransferRules '{}'`                                                         | `{ deleted: N, scanned: M }` — supprime les règles apprises `internal_transfer` (statut retiré de l'apprentissage) ; rejouer → `{ deleted: 0 }` ; les tx déjà classées par ces règles ne sont **pas** touchées (elles remontent dans « Virements à apparier ») |
 
 ### UI de pointage — registre de la Vue d'ensemble (`/app/$orgSlug/cash`)
 
@@ -888,7 +893,7 @@ sidebar ; l'ancienne route `/app/$orgSlug/pointage` **redirige** vers
 `/cash?filter=unmatched`, comme les CTAs de l'onglet À faire (le poste de
 travail quotidien). Plus de bouton « À pointer » : un seul menu
 **« Statut »** (Tous · À pointer (compteur) · Prévisionnel · Charges ·
-Impôts · Produits · Virements internes · Investissements · Comptes courants
+Impôts · Produits · Virements internes · Virements à apparier · Investissements · Comptes courants
 & emprunts · Ignorées), combiné à la recherche, au filtre **Montant**
 (min/max) et au sélecteur de compte. La colonne Statut est toujours
 affichée : « À pointer » en **ambre**, les statuts réglés en gris ; une
@@ -933,6 +938,18 @@ ligne pointée **reste visible** avec son nouveau statut (pas de bandeau
 | RU33  | Menu « Statut » → **Investissements**, puis **Comptes courants & emprunts** | Investissements = les tx rattachées à un **deal** ; Comptes courants & emprunts = celles allouées au **passif** (capital ou C/C / prêt intra-groupe) — les deux sous-ensembles du statut `matched`, d'où l'absence d'une entrée « Pointé » qui serait redondante. Requête `listLedger` via l'index `by_org_allocation_kind` (`matchedKind`) ; se cumule avec le filtre de compte et la recherche (avec un terme de recherche, le tri par nature s'applique après l'index de recherche) |
 | RU34  | Filtre **« Montant »** : min 1 000 €, max 5 000 € (popover, saisies formatées en milliers) | Seules les lignes (transactions **et** échéances) dont le montant absolu est dans [min, max] restent ; le bouton passe en état actif avec le résumé « ≥ 1 000 € · ≤ 5 000 € » ; « Effacer le filtre » réinitialise ; filtre appliqué côté client sur les 1000 lignes chargées (cf. `KNOWN_ISSUES.md` « Registre Transactions ») |
 | RU35  | Pointer une transaction **sortante** sur un deal en **term sheet** (statut `pending`) | Le deal passe en **actif** dans la foulée (badge de la fiche deal, liste des deals, sort de la table « Term sheets » des participations), même si le montant pointé est inférieur à l'engagement (cas fonds appelé par tranches) ; « Détacher » ensuite ne le ramène **pas** en term sheet ; pointer une transaction **entrante** sur un deal `pending` le laisse en term sheet ; un deal déjà sorti garde son statut (cf. `KNOWN_ISSUES.md` « Pointage transaction → deal ») |
+| RU36  | Picker « Affecter à… » → **Virement interne** sur une ligne | Le dialog « Choisir la contrepartie du virement » s'ouvre dans la foulée : mouvements des **autres comptes de la même entité**, en **sens inverse**, triés date desc, avec recherche libre ; aucune ligne présélectionnée, aucun tri par montant approchant (cf. `KNOWN_ISSUES.md` « Virements internes ») |
+| RU37  | Fermer ce dialog avec « Plus tard » | La ligne reste en **virement interne** avec un badge **ambre « Virement incomplet »** et un bouton « Apparier » ; elle apparaît sous le filtre Statut **« Virements à apparier »** |
+| RU38  | Dans le dialog, choisir la contrepartie | Mutation `transfers:pairTransfer` ; les **deux** lignes passent en virement interne, badge gris, et sortent du filtre « Virements à apparier » ; la fiche (clic ligne) affiche **Contrepartie** (montant · compte · date) |
+| RU39  | Apparier deux jambes de montants différents (ex. 50 000 € sortis, 49 985 € reçus) | Appariement **accepté** (frais bancaires, virement partiel) ; la fiche affiche **« Écart entre les deux jambes » = 15 €** en ambre — jamais absorbé |
+| RU40  | Apparier deux jambes à des dates différentes (banques différentes) | La fiche affiche **« Délai de transit »** en jours |
+| RU41  | Tenter d'apparier un mouvement d'une **autre entité** (via API — le dialog ne le propose pas) | `ConvexError('transfer_wrong_entity')`, toast explicite : « … ce n'est pas un virement interne. Pointez le mouvement vers l'entité concernée, comme un deal. » ; idem `transfer_same_account` / `transfer_same_direction` |
+| RU42  | Taguer les deux jambes séparément (ou via le bulk RU12), **puis** les apparier | Les deux demi-virements **fusionnent** en un seul : une seule ligne `transfers` reste (dashboard Convex), aucun orphelin |
+| RU43  | « Détacher » une jambe appariée | Mutation `transfers:unpairTransfer` (pas `unmatchTransaction`, routé par `allocation.kind`) ; la jambe repasse « À pointer », l'**autre** jambe redevient « Virement incomplet » ; détacher la dernière jambe supprime la ligne `transfers` |
+| RU44  | Sur une jambe appariée : forcer `categorizeAsCharge` / `unmatchTransaction` (API) | `ConvexError('allocated_to_transfer')` — il faut désapparier d'abord |
+| RU45  | Classer une ligne en **virement interne** puis regarder les règles apprenantes | **Aucune règle créée** (pas de toast « Règle mémorisée ») — le statut n'est plus apprenable ; une règle `internal_transfer` **préexistante** ne s'applique plus (nettoyage : `convex run transactions:dropInternalTransferRules '{}' --prod`) |
+| RU46  | Lignes taguées « virement interne » **avant** cette mise à jour | Elles apparaissent dans « Virements à apparier » (aucun backfill, aucune contrepartie devinée) ; les apparier fonctionne directement et adopte la ligne |
+| RU47  | Analyse par catégorie + grille prévisionnelle, avant/après appariement | **Inchangées** : les deux jambes restent exclues (`effectiveCategory` → null), qu'elles soient appariées ou non |
 
 ### Réattribution depuis la page d'un deal (`/app/$orgSlug/deals/$dealId`)
 

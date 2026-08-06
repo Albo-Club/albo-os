@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import { TargetCombobox } from './TargetCombobox'
+import { TransferPairDialog } from './TransferPairDialog'
 import {
   TransactionSheet,
   accountLabel,
@@ -123,20 +124,34 @@ type RecentAction = {
  * Status badge of a transaction row — « À pointer » in amber (the daily
  * signal of what is left to handle), every settled status in neutral grey.
  * Shared by the status column and the detail sheet.
+ *
+ * An internal transfer still missing its counter-leg reads as a transfer, in
+ * amber: it is not settled yet, and that is the whole point of making the
+ * transfer an object rather than a label.
  */
 function TxStatusBadge({
   status,
+  transferIncomplete,
 }: {
   status: NonNullable<UnmatchedTx['matchStatus']>
+  transferIncomplete?: boolean
 }) {
   const { t } = useTranslation('pointage')
-  return status === 'unmatched' ? (
-    <Badge variant="outline" className={UNMATCHED_TINT}>
-      {t('status.unmatched')}
-    </Badge>
-  ) : (
-    <Badge variant="secondary">{t(`status.${status}`)}</Badge>
-  )
+  if (status === 'unmatched') {
+    return (
+      <Badge variant="outline" className={UNMATCHED_TINT}>
+        {t('status.unmatched')}
+      </Badge>
+    )
+  }
+  if (status === 'internal_transfer' && transferIncomplete) {
+    return (
+      <Badge variant="outline" className={UNMATCHED_TINT}>
+        {t('status.transfer_incomplete')}
+      </Badge>
+    )
+  }
+  return <Badge variant="secondary">{t(`status.${status}`)}</Badge>
 }
 
 /**
@@ -214,7 +229,7 @@ function MatchLink({
   orgSlug,
 }: {
   allocation: {
-    kind: 'deal' | 'equity' | 'intercompany_loan'
+    kind: 'deal' | 'equity' | 'intercompany_loan' | 'transfer'
     targetId: string
   }
   dealsById: Map<string, DealOption>
@@ -223,6 +238,10 @@ function MatchLink({
 }) {
   const linkClass =
     'text-muted-foreground hover:text-foreground inline-flex max-w-xs items-center gap-0.5 truncate text-xs hover:underline'
+
+  // A transfer's counterpart is shown in the detail sheet (both legs, gap and
+  // transit delay) — the row itself carries no target to link to.
+  if (allocation.kind === 'transfer') return null
 
   if (allocation.kind === 'deal') {
     const deal = dealsById.get(allocation.targetId)
@@ -364,6 +383,7 @@ export function PointageTable({
   const unmatchTransaction = useConvexMutation(
     api.transactions.unmatchTransaction,
   )
+  const unpairTransfer = useConvexMutation(api.transfers.unpairTransfer)
   const bulkCategorize = useConvexMutation(api.transactions.bulkCategorize)
   const setCategory = useConvexMutation(api.transactions.setCategory)
 
@@ -378,6 +398,8 @@ export function PointageTable({
   const [recent, setRecent] = useState<Array<RecentAction>>([])
   const [pendingId, setPendingId] = useState<Id<'transactions'> | null>(null)
   const [sheetTx, setSheetTx] = useState<UnmatchedTx | null>(null)
+  // Leg awaiting its counter-leg — opens the pairing dialog.
+  const [pairingTx, setPairingTx] = useState<UnmatchedTx | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<Id<'transactions'>>>(
     () => new Set(),
   )
@@ -494,9 +516,16 @@ export function PointageTable({
             : await discardMutations[kind]({ transactionId: tx._id })
       // The gesture was memorized as a learned rule — surface it once so
       // the automatic classification of future rows is never a surprise.
-      if (result?.ruleCreated) toast(t('rules.created'))
+      // (An internal transfer is never learned: it returns no `ruleCreated`.)
+      if (result && 'ruleCreated' in result && result.ruleCreated) {
+        toast(t('rules.created'))
+      }
       if (!statusColumn) addRecent({ tx, kind })
       setSheetTx((cur) => (cur?._id === tx._id ? null : cur))
+      // An internal transfer is only half recorded at this point: chain
+      // straight into picking its counter-leg, so the transfer does not sit
+      // incomplete by inattention.
+      if (kind === 'internal_transfer') setPairingTx(tx)
     } catch (err) {
       reportError(err)
     } finally {
@@ -524,7 +553,11 @@ export function PointageTable({
   async function handleDetach(tx: UnmatchedTx) {
     setPendingId(tx._id)
     try {
-      if (
+      if (tx.allocation?.kind === 'transfer') {
+        // Detaching a transfer leg also disposes of the shared `transfers`
+        // row — a plain unmatch would strand it (backend guardrail).
+        await unpairTransfer({ transactionId: tx._id })
+      } else if (
         tx.allocation?.kind === 'equity' ||
         tx.allocation?.kind === 'intercompany_loan'
       ) {
@@ -751,6 +784,23 @@ export function PointageTable({
         </div>
       )
     }
+    // An internal transfer missing its counter-leg is one click from being
+    // completed — the whole point of surfacing it instead of hiding it.
+    if (status === 'internal_transfer' && tx.transferIncomplete) {
+      return (
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={pending}
+            onClick={() => setPairingTx(tx)}
+          >
+            {t('transfer.pair')}
+          </Button>
+          {detach}
+        </div>
+      )
+    }
     return <div className="flex justify-end">{detach}</div>
   }
 
@@ -961,6 +1011,7 @@ export function PointageTable({
                           <div className="flex flex-col items-start gap-1">
                             <TxStatusBadge
                               status={tx.matchStatus ?? 'unmatched'}
+                              transferIncomplete={tx.transferIncomplete}
                             />
                             {tx.allocation && (
                               <MatchLink
@@ -1083,6 +1134,8 @@ export function PointageTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <TransferPairDialog tx={pairingTx} onClose={() => setPairingTx(null)} />
     </>
   )
 }
