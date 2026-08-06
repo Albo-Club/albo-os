@@ -46,8 +46,29 @@ if (!token && !dry) {
   process.exit(1)
 }
 
-/** `convex run --prod <fn> <json>` → parsed stdout. */
-async function convex(fn, payload) {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * `convex run --prod <fn> <json>` → parsed stdout, retried.
+ *
+ * The CLI shells out and can die on a transient network fault — a DNS blip on
+ * its Sentry reporting is enough to kill the subprocess with a non-zero exit,
+ * which without this would abort a run mid-import. Three attempts with
+ * backoff; only then does the batch fail, and the loop keeps going.
+ */
+async function convex(fn, payload, attempt = 1) {
+  try {
+    return await convexOnce(fn, payload)
+  } catch (err) {
+    if (attempt >= 3) throw err
+    const wait = attempt * 4000
+    console.log(`    réseau instable (${fn}), nouvelle tentative dans ${wait / 1000}s…`)
+    await sleep(wait)
+    return convex(fn, payload, attempt + 1)
+  }
+}
+
+async function convexOnce(fn, payload) {
   const { stdout } = await run(
     'pnpm',
     ['exec', 'convex', 'run', '--prod', fn, JSON.stringify(payload)],
@@ -107,9 +128,16 @@ const failures = []
 
 for (let i = 0; i < rows.length; i += BATCH) {
   const slice = rows.slice(i, i + BATCH)
-  const urls = await convex('migrations/legalDocsImport:startUploads', {
-    count: slice.length,
-  })
+
+  let urls
+  try {
+    urls = await convex('migrations/legalDocsImport:startUploads', {
+      count: slice.length,
+    })
+  } catch (err) {
+    failures.push(`lot ${i}-${i + slice.length} : startUploads — ${err.message}`)
+    continue
+  }
 
   const attach = []
   for (const [j, row] of slice.entries()) {
@@ -133,12 +161,18 @@ for (let i = 0; i < rows.length; i += BATCH) {
   }
 
   if (attach.length > 0) {
-    const res = await convex('migrations/legalDocsImport:attachBatch', {
-      rows: attach,
-    })
-    created += res.created
-    skipped += res.skipped
-    failures.push(...res.failed)
+    try {
+      const res = await convex('migrations/legalDocsImport:attachBatch', {
+        rows: attach,
+      })
+      created += res.created
+      skipped += res.skipped
+      failures.push(...res.failed)
+    } catch (err) {
+      // The blobs are uploaded but unreferenced; re-running the script
+      // re-uploads and writes them. Unreferenced storage is inert.
+      failures.push(`lot ${i}-${i + slice.length} : attachBatch — ${err.message}`)
+    }
   }
   console.log(
     `  ${Math.min(i + BATCH, rows.length)}/${rows.length} — créés ${created}, déjà présents ${skipped}, échecs ${failures.length}`,

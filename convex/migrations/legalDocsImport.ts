@@ -16,6 +16,9 @@
  * unauthenticated POST, which is what lets a CLI-driven script upload without
  * a user session.
  *
+ * Resilience: the script retries each CLI call three times and isolates a
+ * failed batch, so a transient network fault costs one batch, not the run.
+ *
  * Idempotency: `attachBatch` skips a row when the company already carries a
  * document with the same title AND the same byte size. That triple is the same
  * key the mapping was deduplicated on, and it is what already protected the six
