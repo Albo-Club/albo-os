@@ -15,6 +15,8 @@ import { internal } from './_generated/api'
 import { internalAction, internalMutation, mutation, query } from './_generated/server'
 import { fetchBody, getMessage } from './agentmail'
 import { requireAppUser, requireOrgMember } from './lib/auth'
+import { identityKey, sharedDomains } from './lib/emailIdentify'
+import { recomputeReportFreshness } from './lib/reportFreshness'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 
@@ -247,20 +249,61 @@ export const hydrateBody = internalAction({
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    await requireAnyMember(ctx)
+    const user = await requireAnyMember(ctx)
 
     const rows = await ctx.db.query('inboundEmails').order('desc').take(100)
+    // Portfolio of the caller's orgs, read once: used to spot an org left
+    // out of a report it may concern (see `relatedOrgNames` below).
+    const visible = await visiblePortfolio(ctx, user._id)
+    const orgNames = new Map<Id<'organizations'>, string>()
+    for (const org of await ctx.db.query('organizations').collect()) {
+      orgNames.set(org._id, org.name)
+    }
 
     return Promise.all(
       rows.map(async (r) => {
         // Resolve matched participation names for display (≤100 rows × a few
         // entities each — bounded).
-        const matched = await Promise.all(
-          (r.matchedCompanies ?? []).map(async (m) => {
-            const company = await ctx.db.get('companies', m.companyId)
-            return company?.name ?? null
-          }),
+        const matchedCompanies = await Promise.all(
+          (r.matchedCompanies ?? []).map(async (m) => ctx.db.get('companies', m.companyId)),
         )
+        // The suggestion flag: an organization that received NOTHING from this
+        // report, while it holds a company on one of the matched domains. That
+        // is the "one company, two orgs, two names" case (Oprtrs & Co /
+        // OPRTRS CLUB), which no identity rule can merge on its own.
+        //
+        // Naming the ORG rather than counting entities is deliberate: on a
+        // sponsor domain the other org holds a dozen unrelated vehicles, so a
+        // count would read "+15" on every Parallel report and mean nothing.
+        // And a report already stored in both orgs raises no flag at all.
+        const matchedOrgs = new Set(matchedCompanies.map((c) => c?.orgId))
+        const matchedDomains = new Set(
+          matchedCompanies
+            .map((c) => c?.domain?.toLowerCase())
+            .filter((d): d is string => !!d),
+        )
+        const relatedOrgIds = new Set(
+          visible
+            .filter(
+              (c) =>
+                !matchedOrgs.has(c.orgId) &&
+                c.domain != null &&
+                matchedDomains.has(c.domain.toLowerCase()),
+            )
+            .map((c) => c.orgId),
+        )
+        const relatedOrgNames = [...relatedOrgIds]
+          .map((orgId) => orgNames.get(orgId))
+          .filter((n): n is string => !!n)
+        // Which stored report belongs to which entity, so the queue can offer
+        // to detach the one that landed on the wrong participation. Empty
+        // until the row is processed — and on rows stored before `reportIds`
+        // was recorded, where the fiche stays the way in.
+        const reportByCompany = new Map<string, Id<'companyReports'>>()
+        for (const reportId of r.reportIds ?? []) {
+          const report = await ctx.db.get('companyReports', reportId)
+          if (report) reportByCompany.set(report.companyId, report._id)
+        }
         const sources = r.sources ?? []
         return {
           _id: r._id,
@@ -269,8 +312,21 @@ export const list = query({
           receivedAt: r.receivedAt,
           status: r.status,
           statusReason: r.statusReason ?? null,
+          // Raw technical message behind a failure. Dev-facing (never
+          // translated), but surfaced: without it a pipeline error is only
+          // readable from the Convex dashboard.
+          error: r.error ?? null,
           senderVerified: Boolean(r.senderUserId),
-          matchedNames: [...new Set(matched.filter((n): n is string => !!n))],
+          // One entry per attached ENTITY (not per name): two orgs holding the
+          // same participation are two rows to detach independently.
+          matched: matchedCompanies
+            .filter((c): c is Doc<'companies'> => !!c)
+            .map((c) => ({
+              companyId: c._id,
+              name: c.name,
+              reportId: reportByCompany.get(c._id) ?? null,
+            })),
+          relatedOrgNames,
           attachmentsCount: r.attachments.length,
           hasBody: Boolean(r.bodyText || r.bodyHtml),
           sourcesSummary: r.sources
@@ -288,44 +344,77 @@ export const list = query({
 
 // ─── Review-queue actions (brick 6, public) ──────────────────────────────────
 
-/** Assignable targets: the caller's orgs' active portfolio companies. */
+/** Active portfolio companies of every org the user belongs to. */
+async function visiblePortfolio(ctx: QueryCtx, userId: Id<'users'>) {
+  const memberships = await ctx.db
+    .query('organizationMembers')
+    .withIndex('by_user', (q) => q.eq('userId', userId))
+    .collect()
+  const out: Array<Doc<'companies'>> = []
+  for (const m of memberships) {
+    const companies = await ctx.db
+      .query('companies')
+      .withIndex('by_org_kind', (q) => q.eq('orgId', m.orgId).eq('kind', 'portfolio'))
+      .collect()
+    for (const c of companies) {
+      if (!c.archivedAt) out.push(c)
+    }
+  }
+  return out
+}
+
+/**
+ * Assignable targets: the caller's orgs' active portfolio companies. `domain`
+ * comes along so the dialog can offer the entities related to the chosen one
+ * (same domain, other org) — a suggestion the user ticks, never a match.
+ */
 export const listAssignTargets = query({
   args: {},
   handler: async (ctx) => {
     const user = await requireAnyMember(ctx)
-    const memberships = await ctx.db
-      .query('organizationMembers')
-      .withIndex('by_user', (q) => q.eq('userId', user._id))
-      .collect()
-    const out: Array<{ companyId: Id<'companies'>; name: string; orgName: string }> = []
-    for (const m of memberships) {
-      const org = await ctx.db.get('organizations', m.orgId)
-      if (!org) continue
-      const companies = await ctx.db
-        .query('companies')
-        .withIndex('by_org_kind', (q) => q.eq('orgId', m.orgId).eq('kind', 'portfolio'))
-        .collect()
-      for (const c of companies) {
-        if (c.archivedAt) continue
-        out.push({ companyId: c._id, name: c.name, orgName: org.name })
+    const orgNames = new Map<Id<'organizations'>, string>()
+    const out: Array<{
+      companyId: Id<'companies'>
+      orgId: Id<'organizations'>
+      name: string
+      orgName: string
+      domain: string | null
+    }> = []
+    for (const c of await visiblePortfolio(ctx, user._id)) {
+      let orgName = orgNames.get(c.orgId)
+      if (orgName === undefined) {
+        orgName = (await ctx.db.get('organizations', c.orgId))?.name ?? ''
+        orgNames.set(c.orgId, orgName)
       }
+      out.push({
+        companyId: c._id,
+        orgId: c.orgId,
+        name: c.name,
+        orgName,
+        domain: c.domain?.toLowerCase() ?? null,
+      })
     }
     return out.sort((a, b) => a.name.localeCompare(b.name))
   },
 })
 
 /**
- * Every entity representing the same participation as `company`: same domain
- * or exact same name, across all orgs — the fan-out rule of automatic
- * identification (convex/reportIdentify.ts).
+ * Every entity representing the same participation as `company`, across all
+ * orgs — same identity key as automatic identification
+ * (convex/lib/emailIdentify.ts): the domain when it carries a single
+ * participation, else the name. A sponsor domain shared by several vehicles
+ * (Sezame Immo 2 / 6) therefore fans out to the chosen vehicle only.
  */
 async function sameParticipation(
   ctx: MutationCtx,
   company: Doc<'companies'>,
 ): Promise<Array<{ companyId: Id<'companies'>; orgId: Id<'organizations'> }>> {
-  const domain = company.domain?.toLowerCase() ?? null
-  const nameLc = company.name.toLowerCase()
-  const matched: Array<{ companyId: Id<'companies'>; orgId: Id<'organizations'> }> = []
+  const all: Array<{
+    companyId: Id<'companies'>
+    orgId: Id<'organizations'>
+    name: string
+    domain: string | null
+  }> = []
   const orgs = await ctx.db.query('organizations').collect()
   for (const org of orgs) {
     const companies = await ctx.db
@@ -333,46 +422,75 @@ async function sameParticipation(
       .withIndex('by_org_kind', (q) => q.eq('orgId', org._id).eq('kind', 'portfolio'))
       .collect()
     for (const c of companies) {
-      if (c.archivedAt) continue
-      const same =
-        c._id === company._id ||
-        (domain !== null && (c.domain ?? '').toLowerCase() === domain) ||
-        c.name.toLowerCase() === nameLc
-      if (same) matched.push({ companyId: c._id, orgId: c.orgId })
+      // The chosen company is kept even when archived — it is an explicit pick.
+      if (c.archivedAt && c._id !== company._id) continue
+      all.push({
+        companyId: c._id,
+        orgId: c.orgId,
+        name: c.name,
+        domain: c.domain?.toLowerCase() ?? null,
+      })
     }
   }
-  return matched
+  const shared = sharedDomains(all)
+  const key = identityKey(
+    { name: company.name, domain: company.domain?.toLowerCase() ?? null },
+    shared,
+  )
+  return all
+    .filter((c) => identityKey(c, shared) === key)
+    .map(({ companyId, orgId }) => ({ companyId, orgId }))
 }
 
 /**
- * Manually attach a reviewed email to a participation, then resume the
- * pipeline where it stopped (extraction if not done, else storage). The
- * match fans out to every entity sharing the chosen company's domain or
- * exact name — the same rule as automatic identification.
+ * Manually attach a reviewed email to one or several participations, then
+ * resume the pipeline where it stopped (extraction if not done, else
+ * storage). Each pick fans out to every entity representing it — the same
+ * identity rule as automatic identification.
+ *
+ * On an ALREADY PROCESSED row the call is ADDITIVE: the picks are added to
+ * the entities already attached, never replacing them. That is the only way
+ * to serve one company held by both orgs under different names (Oprtrs & Co
+ * / OPRTRS CLUB), which no identity rule can merge on its own. Re-running
+ * the storage is safe — it upserts per (company, period), so the entities
+ * already stored are updated in place while the new ones are created.
  */
 export const assignCompany = mutation({
-  args: { inboundEmailId: v.id('inboundEmails'), companyId: v.id('companies') },
-  handler: async (ctx, { inboundEmailId, companyId }) => {
+  args: {
+    inboundEmailId: v.id('inboundEmails'),
+    companyIds: v.array(v.id('companies')),
+  },
+  handler: async (ctx, { inboundEmailId, companyIds }) => {
     const user = await requireAppUser(ctx)
+    if (companyIds.length === 0) throw new ConvexError('invalid_args')
     const row = await ctx.db.get('inboundEmails', inboundEmailId)
     if (!row) throw new ConvexError('not_found')
-    if (row.status !== 'needs_review' && row.status !== 'rejected') {
+    const additive = row.status === 'processed'
+    if (!additive && row.status !== 'needs_review' && row.status !== 'rejected') {
       throw new ConvexError('invalid_status')
     }
-    const company = await ctx.db.get('companies', companyId)
-    if (!company || company.kind !== 'portfolio') throw new ConvexError('not_found')
-    await requireOrgMember(ctx, company.orgId)
 
-    const matched = await sameParticipation(ctx, company)
+    const matched = new Map<string, { companyId: Id<'companies'>; orgId: Id<'organizations'> }>()
+    if (additive) {
+      for (const m of row.matchedCompanies ?? []) matched.set(m.companyId, m)
+    }
+    for (const companyId of companyIds) {
+      const company = await ctx.db.get('companies', companyId)
+      if (!company || company.kind !== 'portfolio') throw new ConvexError('not_found')
+      await requireOrgMember(ctx, company.orgId)
+      for (const m of await sameParticipation(ctx, company)) matched.set(m.companyId, m)
+    }
 
     await ctx.db.patch('inboundEmails', inboundEmailId, {
       status: 'received',
       statusReason: undefined,
       error: undefined,
-      matchedCompanies: matched,
+      matchedCompanies: [...matched.values()],
       matchMethod: 'manual',
       reportIds: undefined,
-      notifiedAt: undefined,
+      // A processed row was already acknowledged: adding a participation to
+      // it must not send a second recap.
+      notifiedAt: additive ? row.notifiedAt : undefined,
       // Manual assignment vouches for the mail. Recap routing still
       // re-checks the ORIGINAL sender at send time (anti-enumeration).
       senderUserId: row.senderUserId ?? user._id,
@@ -382,6 +500,115 @@ export const assignCompany = mutation({
       row.sources ? internal.reportStore.run : internal.reportExtract.run,
       { inboundEmailId },
     )
+    return null
+  },
+})
+
+/**
+ * The row a report came from. Recent reports carry the back-link; older ones
+ * are found again through the AgentMail message id they share with their
+ * email. An upload stored before the back-link existed has no way home — the
+ * detach below still runs, only the queue row keeps its stale mention.
+ */
+async function sourceInbound(
+  ctx: MutationCtx,
+  report: Doc<'companyReports'>,
+): Promise<Doc<'inboundEmails'> | null> {
+  if (report.inboundEmailId) {
+    return await ctx.db.get('inboundEmails', report.inboundEmailId)
+  }
+  const messageId = report.agentmailMessageId
+  if (!messageId) return null
+  return await ctx.db
+    .query('inboundEmails')
+    .withIndex('by_message_id', (q) => q.eq('agentmailMessageId', messageId))
+    .first()
+}
+
+/**
+ * Detach a stored report from ONE entity — the mirror of `assignCompany`, for
+ * a report attached to a participation it does not concern.
+ *
+ * The scope is that entity alone: the other entities of the fan-out keep
+ * their own report. What goes with it is everything `reportStore.storeForCompany`
+ * wrote for this entity — the report row, its document rows, the KPI
+ * snapshots it sourced, its slot in `companyIntelligence`, its semantic-index
+ * entry — so the participation reads as if the report had never landed on it.
+ *
+ * Storage blobs are deliberately NOT deleted: one blob backs the document
+ * rows of EVERY fan-out entity and the source email's attachment. Detaching
+ * one participation must not blank the files of the others.
+ *
+ * The source row is corrected in the same transaction: the review queue stops
+ * claiming the participation, and a later replay does not put the report back.
+ */
+export const detachCompany = mutation({
+  args: { reportId: v.id('companyReports') },
+  handler: async (ctx, { reportId }) => {
+    const report = await ctx.db.get('companyReports', reportId)
+    if (!report) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, report.orgId)
+
+    // Document rows of this entity only — the blob stays (see above).
+    const docs = await ctx.db
+      .query('documents')
+      .withIndex('by_report', (q) => q.eq('reportId', reportId))
+      .collect()
+    for (const doc of docs) {
+      if (doc.companyId === report.companyId) await ctx.db.delete('documents', doc._id)
+    }
+
+    // KPI snapshots this report sourced (same tag as reportStore).
+    const sourceTag = `report:${reportId}`
+    const snapshots = await ctx.db
+      .query('kpiSnapshots')
+      .withIndex('by_company_metric', (q) => q.eq('companyId', report.companyId))
+      .collect()
+    for (const snap of snapshots) {
+      if (snap.source === sourceTag) await ctx.db.delete('kpiSnapshots', snap._id)
+    }
+
+    await ctx.db.delete('companyReports', reportId)
+
+    // Freshness copy on the entity: rebuilt from what is left, since the
+    // ingestion side only ever moves it forward (cf. lib/reportFreshness.ts).
+    // Detaching the last report must put the participation back in silence.
+    await recomputeReportFreshness(ctx, report.companyId)
+
+    // The synthesis pointed here: fall back on the most recent report left on
+    // the entity, or clear the pointer when it was the last one.
+    const intelligence = await ctx.db
+      .query('companyIntelligence')
+      .withIndex('by_company', (q) => q.eq('companyId', report.companyId))
+      .unique()
+    if (intelligence && intelligence.latestReportId === reportId) {
+      const next = await ctx.db
+        .query('companyReports')
+        .withIndex('by_company', (q) => q.eq('companyId', report.companyId))
+        .order('desc')
+        .first()
+      await ctx.db.patch('companyIntelligence', intelligence._id, {
+        latestReportId: next?._id,
+      })
+    }
+
+    const inbound = await sourceInbound(ctx, report)
+    if (inbound) {
+      const matched = (inbound.matchedCompanies ?? []).filter(
+        (m) => m.companyId !== report.companyId,
+      )
+      const remaining = (inbound.reportIds ?? []).filter((id) => id !== reportId)
+      await ctx.db.patch('inboundEmails', inbound._id, {
+        matchedCompanies: matched.length > 0 ? matched : undefined,
+        reportIds: remaining.length > 0 ? remaining : undefined,
+      })
+    }
+
+    // Drop the semantic-index entry (no-op if the report was never indexed).
+    await ctx.scheduler.runAfter(0, internal.vectorize.removeEntry, {
+      orgId: report.orgId,
+      key: `report:${reportId}`,
+    })
     return null
   },
 })

@@ -82,7 +82,6 @@
     },
     "status": {
       "active": "Active",
-      "partially_exited": "Partial exit",
       "fully_exited": "Exited",
       "written_off": "Written off"
     },
@@ -98,19 +97,6 @@
       "out": "Out",
       "vat": "VAT",
       "partial": "Partial total"
-    },
-    "suggest": {
-      "point": "Reconcile",
-      "pointed": "Transaction reconciled",
-      "pointedShort": "Reconciled",
-      "noCandidate": "No suggestion",
-      "unknownTarget": "Unknown target",
-      "score": "Score {{score}}",
-      "kind": {
-        "deal": "Deal",
-        "equity": "Equity",
-        "intercompany_loan": "Current account"
-      }
     },
     "forecast": {
       "starting": "Starting balance",

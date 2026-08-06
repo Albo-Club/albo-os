@@ -130,7 +130,6 @@
   "status": {
     "pending": "TS",
     "active": "Actif",
-    "partially_exited": "Exit partiel",
     "fully_exited": "Exité",
     "written_off": "Exit loss",
     "exit_win": "Exit win",
@@ -370,7 +369,6 @@
     "errors": {
       "invalid_siren": "Le SIREN doit contenir exactement 9 chiffres.",
       "siren_already_used": "Ce SIREN est déjà utilisé par une autre société.",
-      "attio_company_already_used": "Cette fiche Attio est déjà rattachée à une autre société.",
       "invalid_person_name": "Le nom d'une personne est vide.",
       "default": "Impossible d'enregistrer les modifications. Réessayez."
     }
@@ -696,6 +694,7 @@
     "detail": {
       "covered_by_report": "Couvert par son report",
       "inline_image": "Image intégrée — non indexée",
+      "spreadsheet": "Tableur — non indexé",
       "no_text": "Aucun texte à indexer",
       "no_content": "Aucun contenu à indexer",
       "provider_unreachable": "Service d'indexation injoignable",
@@ -771,6 +770,22 @@
     "errors": {
       "too_large": "Le fichier dépasse 20 Mo",
       "default": "Une erreur est survenue"
+    },
+    "detach": {
+      "action": "Détacher de cette participation",
+      "confirmTitle": "Détacher ce rapport ?",
+      "confirmBody": "Le rapport sera retiré de {{company}} : il disparaît de cette fiche, avec ses fichiers et les KPIs qu’il avait renseignés. Les autres participations rattachées gardent le leur, et le fichier reçu n’est pas supprimé.",
+      "confirm": "Détacher",
+      "done": "Rapport détaché de cette participation"
     }
+  },
+  "silence": {
+    "title": "Données obsolètes",
+    "lastReport_one": "Dernier report reçu il y a {{count}} mois",
+    "lastReport_other": "Dernier report reçu il y a {{count}} mois",
+    "lastComm_one": "Dernière communication il y a {{count}} mois",
+    "lastComm_other": "Dernière communication il y a {{count}} mois",
+    "never": "Aucune nouvelle depuis le versement des fonds du {{date}}",
+    "coverage": "Couverture jusqu'au {{date}}"
   }
 }

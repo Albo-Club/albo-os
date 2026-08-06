@@ -114,8 +114,9 @@ export const companiesWithOrg = internalQuery({
 // ─── Send ────────────────────────────────────────────────────────────────────
 
 const successPayloadValidator = v.object({
-  reportPeriod: v.string(),
-  reportType: v.string(),
+  // Both absent on a one-off document that covers no period.
+  reportPeriod: v.optional(v.string()),
+  reportType: v.optional(v.string()),
   matchMethod: v.string(),
   metricsFound: v.array(v.object({ metricType: v.string(), value: v.number(), unit: v.string() })),
   suspicious: v.array(
@@ -190,9 +191,9 @@ export const send = internalAction({
         missingUsual: success.missingUsual,
         targets: success.targets,
       })
-      subject = `Albo OS — report rangé : ${success.reportPeriod}`
+      subject = `Albo OS — report rangé : ${success.reportPeriod ?? 'document ponctuel'}`
     } else if (kind === 'failure') {
-      html = reportRecapFailureHtml(reason ?? 'unknown', queueUrl)
+      html = reportRecapFailureHtml(reason ?? 'unknown', queueUrl, row.error)
       subject = `Albo OS — report non traité (${reviewReasonLabel(reason ?? 'unknown')})`
     } else {
       html = reportQuarantineHtml(row.fromEmail, row.subject, reason ?? 'unknown', queueUrl)

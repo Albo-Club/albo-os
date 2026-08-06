@@ -73,6 +73,17 @@ export async function applyMatchToDeal(
     reconciledBy: decidedBy,
     reconciledAt: Date.now(),
   })
+  // A deal still in Term Sheet (`pending`) becomes `active` as soon as real
+  // money leaves for it: the pointed outflow IS the signal that the wire
+  // happened, so the deal no longer belongs to the anticipated bucket. The
+  // FIRST outflow is enough — a fund is live from its first capital call, long
+  // before the calls add up to the commitment. Forward-only, like the Attio
+  // 'Invested' path (convex/attioSync.ts): no other status is touched, and
+  // unmatching never demotes the deal back to `pending`.
+  if (deal.status === 'pending' && tx.direction === 'out') {
+    await ctx.db.patch('deals', dealId, { status: 'active' })
+  }
+
   await recordDecision(ctx, {
     transaction: tx,
     decision: 'matched',

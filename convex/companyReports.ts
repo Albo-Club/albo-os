@@ -9,6 +9,7 @@ import { internalQuery, query } from './_generated/server'
 import { readMembership } from './lib/agentScope'
 import { requireOrgMember } from './lib/auth'
 import { storageUnitFor } from './lib/metricCatalog'
+import { listSilentCompanies } from './lib/reportFreshness'
 import type { Doc, Id } from './_generated/dataModel'
 import type { QueryCtx } from './_generated/server'
 
@@ -127,6 +128,22 @@ export const listInternal = internalQuery({
       fromEmail: r.fromEmail ?? null,
       emailDate: r.emailDate ?? null,
     }))
+  },
+})
+
+/**
+ * The org's silent participations — companies past the org's silence
+ * threshold without a received report (cf. lib/reportFreshness.ts). Same
+ * detection as the badge on the participations list and the To do tab.
+ */
+export const silentInternal = internalQuery({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+  },
+  handler: async (ctx, { orgId, actorUserId }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    return await listSilentCompanies(ctx, orgId, Date.now())
   },
 })
 

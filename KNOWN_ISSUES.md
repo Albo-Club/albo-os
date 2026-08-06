@@ -788,8 +788,8 @@ Les outils d'écriture de l'agent portent `needsApproval: true`
 
 ## Serveur MCP distant (connector claude.ai) — OAuth via plugin BA `mcp`
 
-Le serveur MCP (`convex/mcp/`) expose ~22 outils **lecture seule** aux
-clients MCP externes. Architecture : resource server = httpAction `/mcp`
+Le serveur MCP (`convex/mcp/`) expose 26 outils aux clients MCP externes :
+22 en lecture, 4 en écriture (cf. point 6). Architecture : resource server = httpAction `/mcp`
 (JSON-RPC Streamable HTTP **stateless**, fait main — le SDK
 `@modelcontextprotocol/sdk` est Node-only et les httpActions tournent dans
 le runtime V8 Convex, sans `"use node"`) ; authorization server = plugin
@@ -809,7 +809,10 @@ Pièges et décisions :
    install du composant avec schéma régénéré ; (c) mini-AS maison.
 2. **Pas de binding d'audience RFC 8707** : les tokens BA sont opaques et
    le paramètre `resource` n'est pas validé. Accepté pour un outil interne
-   à 2 users — à revoir si le serveur expose un jour des écritures.
+   à 2 users. Depuis l'ouverture des écritures (point 6), un token volé
+   n'est plus seulement une fuite de lecture — la limite de dégât reste
+   qu'aucun outil MCP ne supprime, et que tout écrit est visible et
+   corrigeable dans l'app.
 3. **Reprise du flow OAuth après login.** Le plugin redirige les
    non-authentifiés vers `/login?<query OAuth>` et pose un cookie signé
    `oidc_login_prompt` (after-hook de reprise). On ne dépend **pas** de ce
@@ -828,16 +831,38 @@ Pièges et décisions :
 5. **`MCP_DEV_TOKEN` / `MCP_DEV_EMAIL`** (env Convex) : bypass OAuth pour
    curl et MCP Inspector. Les deux doivent être posés pour être actifs —
    ne jamais les laisser en prod hors session de test.
-6. **Écritures interdites par principe (v1).** MCP n'a pas d'équivalent de
-   `needsApproval` : une écriture exposée en MCP reposerait sur la
-   confirmation du client (Claude), pas sur nos boutons in-app. Si un jour
-   on en ajoute, décision explicite + section dédiée ici.
+6. **Écritures : où vit la validation humaine.** Le serveur expose 4 outils
+   d'écriture (`createCompany`, `updateCompany`, `createDeal`, `updateDeal`)
+   pour saisir une entité depuis une phrase dictée, hors app. MCP n'a
+   **pas** d'équivalent de `needsApproval` : le flag du chat in-app arrête
+   la génération et attend un clic sur nos boutons, mécanique qui n'existe
+   pas hors du panneau. Le point de contrôle est donc l'annotation MCP
+   `readOnlyHint: false` (spec 2025-06-18), émise dans `tools/list` et
+   calculée depuis le flag `write` de `defineTool` — c'est elle qui fait
+   demander confirmation au client. **Tout nouvel outil MCP qui écrit DOIT
+   porter `write: true`** ; sans lui il s'annonce en lecture seule et
+   s'exécute sans confirmation. Conséquences assumées :
+   - **Aucun blocage sur doublon**, seulement des avertissements
+     (`possibleDuplicates`, `convex/lib/duplicates.ts`). Sans écran de
+     revue, bloquer une création sur une heuristique de nom coûterait plus
+     cher que la corriger. Seule exception : `assertSirenFree`, invariant
+     de données déjà appliqué partout ailleurs — le chemin MCP ne doit pas
+     ouvrir de porte dérobée autour.
+   - **Pas de mutation dupliquée** : les internes de `convex/agentTools.ts`
+     sont élargis en champs optionnels plutôt que recopiés côté MCP, pour
+     garder une seule implémentation des garde-fous
+     (`assertInvestorIsGroupEntity`, `assertSameOrg`, normalisation domaine
+     et SIREN). Corollaire : élargir un interne modifie aussi ce que voit
+     l'agent in-app — les valeurs de retour sont additives (`similar`), les
+     schémas zod du chat restent inchangés.
+   - **Suppressions hors périmètre.** Aucun outil MCP ne supprime, et cette
+     limite est ce qui rend l'écriture directe acceptable.
 7. **Registre de schémas séparé.** Les outils agent sont en `zod/v3`
    (inline), incompatibles `z.toJSONSchema()` → `convex/mcp/registry.ts`
    re-déclare les schémas en zod v4. Si les args d'un internal changent,
    tenir les deux en phase.
 8. **claude.ai ne charge qu'un sous-ensemble des outils par conversation**
-   (sélection dynamique côté Anthropic, ~5 sur 22 observés). Conséquence :
+   (sélection dynamique côté Anthropic, ~5 sur 26 observés). Conséquence :
    `listOrgs` peut être absent et le modèle devine des slugs erronés.
    Mitigation en place : à `initialize`/`tools/list` (authentifiés), les
    orgs du caller sont injectées en `enum` sur le paramètre `org` de chaque
@@ -1100,6 +1125,71 @@ Trois conditions à respecter si on touche ce fichier :
 Série entièrement positive ou entièrement négative : `zeroOffset` renvoie 1 ou
 0, les deux arrêts se confondent et le dégradé devient monochrome — pas de cas
 particulier à écrire.
+
+## Report sans période — le dédoublonnage ne peut pas rester sur la période
+
+`companyReports` se dédoublonne sur `(companyId, reportPeriod)` (index
+`by_company_period`) : renvoyer le report d'avril met à jour celui d'avril au
+lieu d'en créer un second. Correct tant que **tout** report porte une période.
+
+Il n'en porte pas toujours. Un courrier de liquidation, une notification
+juridique, une annonce de levée concernent bien la participation mais ne
+couvrent aucune période. Le schéma de sortie du LLM
+(`convex/reportStore.ts:analysisSchema`) exigeait pourtant `report_period`
+(string) et `report_type` (enum de 5 rythmes) : sur ce genre de document le
+modèle répondait `report_period: null` et laissait le reste vide, le
+`safeParse` échouait, et la ligne partait en `needs_review` /
+`analyze_error` — **définitivement**, puisque le contenu ne changera jamais.
+« Rattacher » et « Retraiter » relancent la même analyse et rebondissent à
+l'identique.
+
+Les deux champs sont donc `nullable` côté LLM, et **facultatifs** au
+rangement (le schéma Convex les déclarait déjà `v.optional`). Le piège est
+ce qui suit : avec `reportPeriod` absent, `q.eq('reportPeriod', undefined)`
+matche **tous** les reports sans période de la société. Un `.first()` naïf
+ferait écraser chaque courrier ponctuel par le suivant — perte de données
+silencieuse, sans aucune erreur. Un document sans période est donc identifié
+par son **message d'origine** (`subject` + `emailDate`, portés aussi bien par
+un mail que par un dépôt manuel), pas par le créneau vide.
+
+Règle : **toute nouvelle clé de dédoublonnage sur un champ optionnel doit
+dire ce qui se passe quand le champ est absent.** `undefined` n'est pas
+« pas de clé », c'est **une** clé — partagée par toutes les lignes qui n'ont
+rien. Couvert par `convex/regression.reportStore.test.ts`.
+
+Corollaire d'affichage : `periodSortDate` retombe sur la date de réception
+quand il n'y a pas de période, sinon le courrier n'aurait aucun ancrage dans
+la timeline de la fiche (l'index `by_company` trie là-dessus).
+
+## Détacher un report — l'empreinte à défaire, et le blob qui reste
+
+Ranger un report écrit **cinq** choses par entité rattachée
+(`convex/reportStore.ts:storeForCompany`) : la ligne `companyReports`, une
+ligne `documents` par pièce jointe, les `kpiSnapshots` taggés
+`source: "report:<id>"`, le pointeur `companyIntelligence.latestReportId`, et
+une entrée d'index sémantique de clé `report:<id>`. Supprimer la seule ligne
+`companyReports` laisserait donc les KPIs dans les séries de la mauvaise boîte
+et le texte du report dans sa recherche. `reportInbox.detachCompany` défait les
+cinq, pour **une** entité — les autres entités du fan-out gardent la leur.
+
+Ce qu'il ne faut **pas** supprimer : le **blob de storage**. Un même blob est
+partagé par les lignes `documents` de toutes les entités du fan-out **et** par
+la pièce jointe de `inboundEmails`. Le détacher d'une participation ne doit pas
+aveugler les autres. (À l'inverse, `documents.remove` supprime bien le blob :
+c'est cohérent pour un document déposé à la main, mais cela reste un piège si
+on l'appelait un jour sur la copie d'un report — pré-existant, non touché ici.)
+
+Le second réflexe est de **corriger la ligne de la file** dans la même
+transaction (`matchedCompanies` et `reportIds`) : sans ça la file continue de
+revendiquer la participation, et surtout un « Retraiter » ultérieur **remettrait
+le report** sur l'entité qu'on vient d'en sortir. D'où le back-link
+`companyReports.inboundEmailId`, posé au rangement. Les lignes antérieures au
+champ sont retrouvées via `agentmailMessageId` (index `by_message_id`) ; un
+**dépôt manuel** antérieur, lui, n'a pas de chemin de retour (le rangement met
+délibérément `agentmailMessageId: undefined` sur les uploads) — le détachement
+marche quand même, seule la ligne de la file garde sa mention périmée.
+
+Couvert par `convex/regression.reportDetach.test.ts`.
 
 ## Suite de régression Convex (`pnpm test:convex`) — 3 pièges du harness
 
@@ -1607,6 +1697,21 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   (one-shot idempotent, `'{}'` = toutes les orgs, cf. `TESTING.md`). L'import
   CSV Mémo Bank a inséré sans `matchStatus` jusqu'au fix de juin 2026 — les
   lignes albo importées avant nécessitent ce backfill.
+- **Pointer une sortie fait basculer un deal en term sheet vers `active`.**
+  `applyMatchToDeal` (`convex/lib/pointage.ts`) patche le deal en
+  `status: 'active'` quand il est `pending` **et** que la transaction est
+  `direction: 'out'`. La **première** sortie suffit : un fonds est actif dès
+  son premier appel de capital, bien avant que les appels couvrent
+  l'engagement — un seuil « décaissé ≥ engagé » laisserait ces deals en term
+  sheet à tort. La règle vit dans le cœur partagé, donc elle couvre aussi le
+  pointage fait par l'agent (`agentToolsPointage.ts`). Bascule **en avant
+  uniquement**, comme le chemin Attio « Invested » : aucun autre statut n'est
+  touché, et `applyUnmatch` ne rétrograde pas (un deal `active` peut
+  légitimement n'avoir aucune transaction — import Airtable, webhook Attio, où
+  rétrograder serait une régression). Conséquence assumée : **aucun geste UI
+  ne ramène un deal en `pending`** — une activation par erreur se répare en
+  base (`convex run --prod`). Les deals déjà pointés avant cette règle ne sont
+  pas rattrapés : dépointer/repointer la transaction les fait basculer.
 - **`matchingDecisions` est append-only.** Une ligne par action de pointage
   (y compris le dé-pointage, signal négatif pour l'agent). Jamais de patch ni
   de delete. Le backfill n'y écrit **rien** (pas une décision humaine — ne pas
@@ -1638,21 +1743,20 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   chargées : sur une org > 1000 tx il ne « repêche » donc pas la queue
   masquée. Les lignes prévisionnelles n'ont pas de compte bancaire : un
   filtre compte actif les masque.
-- **Puces de suggestion de la file (`getPointageSuggestions`) — précision
-  avant rappel, labels résolus côté client.** La query ne couvre que les
-  **30 tx `unmatched` les plus récentes** (= le haut de la file triée date
-  desc) : au-delà, pas de puce, le picker reste le chemin. Deux moteurs :
-  paires de virements internes (`lib/transferPairs.ts`, pur et testé —
-  montant **exact**, sens opposés, comptes **différents**, ≤ 4 j, chaque
-  jambe appariée au plus une fois au plus proche en date) ; sinon top-1 du
-  moteur historique partagé avec l'agent (`lib/suggest.ts:rankCandidates`),
-  retenu seulement si le libellé similaire a été vu **≥ 2 fois** parmi les
-  tx déjà pointées. La query renvoie `(kind, targetId)` SANS label : le
-  front résout depuis `deals.listOptions`/`liabilities.listOptions` déjà
-  chargés (zéro lecture de plus) — une cible absente des options (deal
-  archivé…) fait silencieusement disparaître la puce, c'est voulu. Cliquer
-  une puce passe par les **mêmes mutations** que le picker : aucune écriture
-  nouvelle, les invariants du pointage restent intacts.
+- **Plus AUCUNE suggestion de rapprochement — suppression délibérée (août
+  2026).** Le workflow déterministe de suggestion a été retiré en entier :
+  puces de la file (`getPointageSuggestions`), moteurs `lib/suggest.ts` /
+  `lib/transferPairs.ts` / `lib/entryMatching.ts` /
+  `lib/recurrenceDetection.ts`, carte « Rapprochements suggérés », carte
+  « Règles suggérées », outil agent + MCP `suggestMatches`, et le retour
+  `pendingEntry` de `matchTransaction`. Motif : le système proposait des
+  rapprochements faux **silencieusement**, et son scoring cherchait deux
+  inconnues à la fois (quel deal ET quelle échéance) pour une seule
+  transaction — complexité multiplicative, impossible à auditer. Décision
+  produit : on repart d'une base 100 % manuelle, on collecte les cas réels
+  à la main, puis on reconstruit sur cette matière. **Ne pas re-câbler de
+  suggestion ici sans cette étape.** `matchingDecisions` (append-only) est
+  conservée intacte : c'est le dataset d'entraînement du futur moteur.
 
 ## Catégories & règles apprenantes (`convex/lib/categories.ts`, `categoryRules`)
 
@@ -1869,17 +1973,14 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   reliquat comme **one-shot pur** (sans `ruleId` ni `derivedKey` — visible
   dans la table des ponctuelles, jamais re-générée par `expandRules` ; ne
   pas lui remettre le `ruleId`, il re-entrerait en collision avec le filtre
-  `listEntries` et l'expansion). Les suggestions (`suggestForecastMatches` +
-  carte « Rapprochements suggérés ») viennent du moteur pur
-  `convex/lib/entryMatching.ts` (fenêtres sens/date/montant + score
-  montant/date/libellé, testé par `tests/entryMatching.test.ts`) ; une
-  transaction déjà portée par un `realizedTransactionId` n'est jamais
-  re-suggérée. Le pont **inverse** vit dans `transactions.ts:matchTransaction` :
-  son retour porte `pendingEntry` (l'échéance `pending` du deal la plus
-  proche en date, même sens, EUR, **sans** fenêtre date/montant — le lien
-  deal est le signal), que le front propose de réaliser via
-  `markEntryRealized` (mode `close`). matchTransaction ne fait que LIRE les
-  entries — la réalisation reste un geste forecasts.ts.
+  `listEntries` et l'expansion). Le choix de la transaction est **100 %
+  manuel** depuis août 2026 (cf. « Pointage transaction → deal ») : le
+  dialog « Marquer réalisée » du registre (`ForecastSection.tsx`) liste les
+  transactions de l'org via `transactions.listLedger` en ordre
+  anti-chronologique + recherche libre — **aucun classement, aucune
+  présélection**. Ne pas y réintroduire de tri par vraisemblance : c'est
+  exactement le mécanisme qui a été retiré. `matchTransaction` ne lit plus
+  les entries du tout.
 - **Tests purs hors de `convex/`.** La logique (récurrence UTC, clamping fin
   de mois, protection, agrégation mensuelle) vit dans
   `convex/lib/recurrence.ts` (zéro import Node/Convex) et est testée par
@@ -1891,8 +1992,8 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   7 = dimanche). Toute nouvelle logique de date doit passer par
   `convex/lib/recurrence.ts`, pas par `new Date()` local (fuseau serveur).
 - **`Date.now()` dans les queries de solde = cache Convex défait — accepté.**
-  `computeCashHistoryForOrgs` / `computeForecastGridForOrg` /
-  `suggestForecastMatches` bornent leurs fenêtres avec `Date.now()`, ce qui
+  `computeCashHistoryForOrgs` / `computeForecastGridForOrg` bornent leurs
+  fenêtres avec `Date.now()`, ce qui
   re-exécute la query plus souvent que nécessaire (audit perf juin 2026).
   Trade-off assumé : le vrai fix (passer l'horodatage arrondi en argument
   depuis le client) toucherait signatures, callsites et outils agent pour
@@ -1985,23 +2086,6 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   pour des holdings en position récupérable ; pour la faire taire sans
   créer d'échéance au prévisionnel, créer l'échéance puis l'annuler
   (`cancelled` garde la clé).
-- **La détection de récurrences ne crée JAMAIS de règle seule.**
-  `forecasts.suggestRules` (moteur pur `lib/recurrenceDetection.ts`, testé)
-  propose des règles depuis l'historique **24 mois** ; la création passe
-  toujours par le dialog prérempli (geste humain, `createRule` +
-  `expandRules` habituels). Calibrage volontairement généreux (Benjamin
-  trouvait la V1 trop timide) : ≥ 3 occurrences en hebdo/mensuel mais
-  **≥ 2 en trimestriel/annuel** (un intervalle propre suffit), et montants
-  **majoritairement** stables (≥ 60 % dans ±40 % de la médiane) au lieu de
-  « tous dans ±30 % » — une facture de rattrapage ou un montant variable ne
-  tue plus le groupe, la médiane est proposée et la fourchette min→max
-  reste visible sur la carte. Le groupement réutilise la MÊME clé de pattern
-  que les règles apprenantes de catégorie (`deriveCategoryPattern`) — si le
-  pattern d'un libellé change, les deux mécanismes bougent ensemble.
-  « Ignorer » écrit dans `dismissedRuleSuggestions` (org, pattern,
-  direction) et est définitif côté UI — pour ré-afficher une suggestion,
-  supprimer la ligne via le dashboard Convex (même stance V1 que
-  `categoryRules`).
 - **Lien deal ↔ prévisionnel : le `dealId` d'une règle est resynchronisé
   sur ses occurrences non protégées.** `expandRules` propage `rule.dealId`
   à l'insert ET au resync — changer le deal d'une règle re-pointe donc ses
@@ -2045,7 +2129,11 @@ volontairement hors scope (deals laissés sur le chapeau).
   `splitAlboSponsorSpvs:apply` (les deux sont idempotents, l'ordre suffit).
 - **Les companies SPV n'ont pas d'`attioCompanyId`.** Elles n'existent pas
   comme companies dans Attio (ce sont des deals là-bas) ; le pont Attio reste
-  sur la company chapeau archivée. Leur ancre d'idempotence est
+  sur la company chapeau archivée. Rien n'empêche plus de rattacher un SPV à la
+  fiche Attio du chapeau à la main (l'ancrage n'est plus unique — cf. § « Fiche
+  société » point 6), mais ça reste un raccourci de lecture vers le CRM : la
+  synchro continue de viser la première société de l'org portant l'ancrage.
+  Leur ancre d'idempotence est
   `airtableId = "split:attio:{attioDealId}"` (réutilisation du champ ancre
   d'import + index `by_airtable_id` — même pattern que l'import Airtable,
   malgré le nom).
@@ -2177,8 +2265,8 @@ le module Convex n'est qu'une coquille DB autour.
    il **n'écrase jamais** les montants/instrument.
 
 3. **Statut forward-only.** Un event ne fait jamais **régresser** le cycle de
-   vie (`STATUS_RANK` : `pending < active < partially_exited < fully_exited =
-   written_off`). Un Invested ne « ressuscite » pas un deal sorti. Un instrument
+   vie (`STATUS_RANK` : `pending < active < fully_exited = written_off`). Un
+   Invested ne « ressuscite » pas un deal sorti. Un instrument
    Attio absent (`unknown`) ne **dégrade** jamais un instrument connu au patch.
 
 4. **Ligne de prévisionnel : une seule par deal, toujours créée.** Dès qu'un
@@ -2432,17 +2520,23 @@ Pièges non-évidents :
    `defaultOpen` + `onOpenChange` pour l'ouvrir/fermer en inline). Le détail du
    composant partagé : section « Édition inline des fiches ».
 
-6. **L'ancrage `attioCompanyId` se pose à la main, et son unicité est
-   GLOBALE — pas par org.** La ligne « Fiche Attio » du panneau
-   (`AttioCompanyField`) permet de rattacher une société créée à la main à sa
-   fiche CRM : `companies.update` accepte désormais `attioCompanyId` (`''`
-   détache). ⚠️ Le piège : par analogie avec le SIREN on écrirait un contrôle
-   **par org**, ce qui serait faux. `by_attio_company_id` est un index
-   **global** et `convex/attioSync.ts:resolveOrCreateTargetCompany` le lit en
-   **`.unique()`** — deux sociétés portant le même ancrage, même dans deux orgs
-   différentes, font **throw la synchro** au prochain événement Attio. D'où
-   `assertAttioCompanyIdFree` (global, `ConvexError('attio_company_already_used')`),
-   couvert par `convex/regression.deals.test.ts`. Corollaire côté UI : l'ancrage
+6. **L'ancrage `attioCompanyId` se pose à la main, et il n'est PAS unique.**
+   La ligne « Fiche Attio » du panneau (`AttioCompanyField`) permet de
+   rattacher une société créée à la main à sa fiche CRM : `companies.update`
+   accepte `attioCompanyId` (`''` détache). Un même enregistrement Attio peut
+   être porté par **plusieurs** sociétés, y compris dans des orgs différentes —
+   Attio modélise une plateforme (Parallel Invest, Sezame) comme **une**
+   company là où Albo OS a une entité par SPV (cf. § « Split chapeaux Attio →
+   SPV »), donc l'unicité rendait ces SPV non rattachables.
+   ⚠️ Le piège qui en découle : `by_attio_company_id` est un index **global**,
+   et `convex/attioSync.ts:resolveOrCreateTargetCompany` **ne doit jamais** le
+   lire en `.unique()` (ça throwait la synchro au premier doublon). Il
+   `.collect()` puis prend la **première société de l'org** — l'ordre d'index
+   étant l'ordre de création, la cible d'un deal synchronisé reste stable quel
+   que soit le nombre de rattachements ajoutés après coup. Corollaire :
+   l'ancrage n'arbitre plus rien, il ne fait qu'ouvrir le CRM depuis une fiche
+   — pour changer la cible d'un deal, on change son `targetCompanyId`, pas
+   l'ancrage. Couvert par `convex/regression.deals.test.ts`. Côté UI, l'ancrage
    ne se **saisit** jamais, il se **choisit** dans les résultats de
    `attio.searchCompanies` — un id inventé enverrait les prochains deals sur la
    mauvaise société, en silence.
@@ -2520,6 +2614,30 @@ Points non-évidents :
   créable), `renderEditor` branche `SectorCombobox` avec `defaultOpen` +
   `onOpenChange` (props additives, défaut = comportement dialog inchangé) — un
   seul clic ouvre le picker, la fermeture quitte le mode édition.
+- **Le `Select` enum doit être CONTRÔLÉ (`value`), jamais `defaultValue`.**
+  Piège coûteux, corrigé après coup : `@radix-ui/react-use-controllable-state`
+  (≥ 1.2) n'appelle `onValueChange` de façon **synchrone** que si la valeur est
+  **contrôlée** ; en non contrôlé (`defaultValue`) il la diffère dans un
+  `useEffect`. Or Radix appelle `onValueChange` **puis** `onOpenChange(false)`,
+  et notre `onOpenChange` fait `setEditing(false)` → le `Select` est **démonté
+  dans le même commit**, l'effet ne s'exécute jamais et le `onCommit` est
+  **perdu en silence** : on choisissait « Trimestriel », la ligne se refermait,
+  rien n'était écrit (aucune erreur, aucun toast). Les autres formats n'étaient
+  pas touchés (ils écrivent dans `commit()`, synchrone), donc **seuls les enums
+  ne s'enregistraient pas** (périodicité du coupon, remboursement, durée, tour,
+  type de SAFE, type de fonds, type de bien). Règle générale, valable **partout
+  dans l'app, pas seulement ici** : **tout contrôle Radix (`Select`, `Tabs`,
+  `RadioGroup`, `Checkbox`…) doit être contrôlé dès que sa sélection peut
+  démonter le composant** — sinon le callback n'a pas le temps de partir.
+  Audit fait au moment du correctif : sur les 34 `<Select>` de `src/`, 33
+  étaient déjà contrôlés (`value=`), toutes les `Checkbox` aussi, les deux
+  `Tabs` non contrôlés ne déclenchent aucune écriture et restent montés, et les
+  combobox (`SectorCombobox`, `CompanyCombobox`, `DealCombobox`) appellent leur
+  `onChange` **elles-mêmes**, donc synchronement. Le seul autre non contrôlé
+  était le sélecteur de compte bancaire de la fiche placement
+  (`placements.$dealId.tsx`, « Enveloppe ») : il **fonctionnait**, mais
+  uniquement parce que son démontage attend l'aller-retour de la mutation —
+  passé en `value=""` pour ne pas laisser traîner le motif.
 
 ## Panneau Royalties — listes sur `deals` & collage du BP (`src/components/deals/RoyaltiesPanel.tsx`)
 
@@ -3035,6 +3153,24 @@ la dérive :
 - **Existant** : `migrations/unifyDomainPitches` fige rétroactivement (canonique
   = résumé le plus long, cf. `pickCanonicalPitch`).
 
+**Exception : les véhicules d'investissement** (`lib/pitch.ts:isVehicleEntity`).
+Un SPV de plateforme porte le domaine de son **sponsor** (les 15 SPV Parallel de
+Calte sont tous sur `parallel-invest.com`) alors que chacun est une **opération
+distincte** — la règle ci-dessus y produit des résumés faux. Vécu (05/08/2026) :
+à sa création, `PARALLEL INVEST SPV24` a hérité mot pour mot du résumé de
+`SPV11` (voisin au résumé le plus long), fiche comprise « logé via le SPV
+Parallel Invest SPV11 » ; et `Parallel Invest SPV 23` portait la plaquette du
+site Parallel. Un véhicule est donc exclu **des trois côtés** : pas
+d'enrichissement depuis le domaine (`enrich` s'arrête net), pas d'héritage du
+pitch d'un voisin, pas de propagation de son propre résumé au groupe (sinon une
+saisie à la main sur un SPV écrase les 14 autres). Sa description vient des
+communications VASCO (`enrichFromVasco`, cf. plus haut) ou de la saisie manuelle.
+Marqueurs, l'un des trois suffit : `sponsor`, `vascoIssuerId`, ou un jeton
+« SPVn » dans le nom (les lignes SPV de Calte n'ont pas de `sponsor` — c'est ce
+jeton qui les rattrape ; même jeton que le pont instruments,
+`vasco.ts:spvNumberOf`). Rattrapage des deux fiches polluées :
+`migrations/fixSpvPitches`.
+
 Portée **par org** (multi-tenant) : on ne propage jamais une édition Albo vers
 Calte, même si un domaine était partagé entre les deux. Le `oneLiner` n'a pas
 d'éditeur inline aujourd'hui (édité via génération/unif) ; s'il en gagne un,
@@ -3229,6 +3365,39 @@ normal : doc email couvert par son report, image inline, pas de texte),
   visible, notifié, relançable — pas re-tenté en boucle par un second
   mécanisme.
 
+**⚠️ La fenêtre de Nebius est de 32 000 tokens, et un dépassement remonte en
+`provider_http_404`.** Le client RAG remet les chunks à l'embedder **par
+paquets de 100** (`makeBatches(…, 100)`, en dur, non configurable), et
+`@openrouter/ai-sdk-provider` laisse `maxEmbeddingsPerCall` à `undefined` :
+`embedMany` envoyait donc les 100 chunks (~100 k caractères) dans **une seule
+requête HTTP**. Soit ~27 k tokens en prose — 15 % de marge — et bien au-delà
+sur du texte dense (tableaux, chiffres). Au-dessus de la fenêtre, OpenRouter
+n'a plus aucun endpoint où router (`allow_fallbacks: false`, un seul provider)
+et répond **404, pas le 400 `context_length_exceeded`** qu'on aurait sans
+épinglage : c'est un refus de *routage*, pas une réponse du modèle. Vécu le
+05/08/2026 sur un classeur de 363 k caractères, juste après que le budget
+Excel soit passé de 40 k à `MAX_DOCUMENT_CHARS` (#350). Parade :
+`MAX_EMBEDDINGS_PER_CALL = 16` via `wrapEmbeddingModel` — chaque requête
+tombe à ~6 k tokens. Le wrapper **ne touche ni `modelId` ni `provider`**,
+donc l'identité du namespace ne bouge pas et aucun backfill n'est nécessaire ;
+si un jour on override l'un des deux, c'est une bascule de namespace (cf. plus
+bas). Piège de diagnostic : un 404 est classé **permanent** — zéro retry — et
+l'email d'échec parle quand même de « plusieurs tentatives espacées ».
+
+**Les tableurs ne sont pas indexés** (`documentSkipReason` → `'spreadsheet'`,
+via `isSpreadsheet` de `lib/fileText.ts`, xlsx/xls/xlsm/csv par extension ou
+content-type). Ce n'est pas un contournement du point précédent, c'est que le
+vectoriel ne marche pas sur du tabulaire : le découpage arrache les lignes à
+leur en-tête, et des colonnes de chiffres n'ont pas de voisinage sémantique —
+l'entrée coûte un embedding sans jamais être un hit utile. Le texte reste
+extrait, stocké et lisible sur la fiche ; seule l'entrée d'index disparaît.
+**Un tableur en pièce jointe d'un report reste indexé** dans l'entrée de son
+report (majoritairement de la prose) — décision assumée, le pipeline reports
+n'est pas touché. Si on veut un jour interroger un BP, la bonne réponse est un
+outil d'agent « lis ce document » (aucun n'existe : `agentToolsDocuments.ts`
+n'expose que la recherche sémantique, et `listCompanyDocuments` ne rend que
+des métadonnées), pas de la vectorisation.
+
 - **Un namespace RAG = une org** (`namespace = orgId`) : l'isolation
   multi-tenant est structurelle côté index, mais le namespace **isole sans
   autoriser** — toute surface de recherche re-vérifie l'appartenance
@@ -3287,6 +3456,85 @@ pour un upload.
 Corollaire côté lecture : `origin` est **optionnel** (absent = email, les
 lignes d'avant la fonctionnalité n'ont rien). Tester `=== 'upload'`, jamais
 `!== 'email'`.
+
+## Un domaine n'identifie une participation que s'il n'en porte qu'une
+
+Le rattachement d'un report croise deux preuves : le domaine de l'auteur et
+le nom de la société écrit dans le mail. Le piège (ALB-110) : un **sponsor**
+héberge tous ses véhicules sur un seul domaine — `hellosezame.com` porte
+Sezame Immo 1/2/6, `parallel-invest.com` une vingtaine de SPV, idem
+`anaxago.com`, `rewatt.fr`, `wearevirgil.com`, `laviedequartier.fr`… Le
+domaine prouve alors **qui écrit**, jamais **de quel véhicule il parle**.
+
+La règle est portée par une seule notion, `identityKey`
+(`convex/lib/emailIdentify.ts`) : **le domaine identifie quand il ne porte
+qu'une participation, sinon c'est le nom normalisé**. `sharedDomains`
+calcule la liste des domaines disqualifiés sur l'ensemble des candidats
+(toutes orgs confondues). Trois conséquences, toutes dans le même fichier :
+
+- **Corroboration** (`resolveOnSharedDomains`) : sur un domaine partagé, les
+  candidats corroborés **par le nom** l'emportent ; si aucun ne l'est, la
+  sélection est remplacée par **tout le domaine** — ce qui produit ≥ 2 clés
+  d'identité, donc `ambiguous`, donc la file `/app/all/reports`. Le but est
+  qu'un pick LLM corroboré par le seul domaine ne soit **jamais** entériné :
+  c'est exactement comme ça qu'un report Sezame atterrissait sur le mauvais
+  véhicule.
+- **Ambiguïté et fan-out** (`reportIdentify.run`) : les deux se calculent sur
+  `identityKey`, plus sur `domain ?? name`. Le fan-out multi-org continue de
+  marcher — deux entités d'une même boîte partagent leur clé (domaine propre,
+  ou nom identique quand le domaine est celui d'un sponsor).
+- **Rattachement manuel** (`reportInbox.sameParticipation`, utilisé par
+  `assignCompany` et `createFromUpload`) : même helper, sinon choisir Sezame
+  Immo 6 à la main ré-arrosait Immo 2.
+
+**Ne pas confondre avec `isVehicleEntity`** (`convex/lib/pitch.ts`), qui règle
+le problème voisin du *pitch* : là, la question est « cette entité mérite-t-elle
+sa propre description ? » et se tranche entité par entité (sponsor renseigné,
+lien VASCO, jeton « SPVn »). Ici la question est « ce domaine désigne-t-il une
+participation ? » et ne se tranche qu'en regardant **les voisins** : un domaine
+sans doublon reste un identifiant parfaitement bon, et `laviedequartier.fr` —
+qui ne porte aucun de ces trois marqueurs — doit quand même être disqualifié.
+Deux questions, deux prédicats.
+
+Deux limites assumées :
+
+- Le seul discriminant accepté est le **nom complet** de l'entité
+  (`nameAppearsInText`, mot entier). Un mail qui ne dit que « SPV 6 »
+  n'accroche pas → file d'attente. Choix délibéré : pas de faux rattachement
+  silencieux, au prix de lignes à traiter à la main.
+- Deux entités d'une **même boîte** nommées différemment sur un domaine de
+  sponsor ne fanent plus ensemble (`Oprtrs & Co` côté Albo vs `OPRTRS CLUB`
+  côté Calte ; `Parallel Invest SPV 13 (Bernay)` vs `Parallel Invest SPV13`).
+  Aligner les noms règle le cas, mais ce n'est pas toujours souhaitable — une
+  org a le droit de nommer ses lignes comme elle veut. D'où le geste manuel
+  assisté ci-dessous.
+
+### Le domaine ne décide pas, mais il suggère
+
+Corollaire produit de la règle ci-dessus : ce que le domaine ne peut pas
+trancher, l'utilisateur le tranche — mais il faut le lui **proposer**, sinon
+il ne saura jamais qu'une fiche jumelle existe ailleurs.
+
+- `assignCompany` prend **1..n** sociétés et devient **additif** sur une ligne
+  `processed` (union avec `matchedCompanies`, jamais remplacement) : c'est la
+  seule façon de servir une boîte détenue par les deux orgs sous deux noms.
+  Rejouer `reportStore.run` est sûr — il upsert par (société, période), donc
+  les entités déjà servies sont mises à jour en place. `notifiedAt` est
+  **conservé** dans ce cas : pas de second accusé au transféreur.
+- `list` renvoie `relatedOrgNames` : les orgs qui n'ont **rien** reçu du
+  report alors qu'elles portent une société sur un des domaines rattachés.
+  Nommer l'**org** et non compter les entités est délibéré — sur
+  `parallel-invest.com`, l'autre org en héberge une quinzaine sans rapport, et
+  un « +15 » permanent ne voudrait rien dire. Un report déjà rangé des deux
+  côtés n'affiche donc rien.
+- Le tri du bloc de suggestion (`nameProximity`, Dice sur bigrammes, front)
+  **ne décide de rien**. La proximité de nom est un mauvais juge ici, et c'est
+  mesuré : les seules paires de noms proches entre orgs sont
+  `Sezame Immo 2/6` ↔ `SEZAME IMMO 4` (0,92) — soit exactement les mauvaises
+  réponses. Elle sert à faire remonter le bon candidat dans une liste, rien de
+  plus. Ne jamais la promouvoir en critère de rattachement.
+- Une fiche **sans domaine** ne peut rien suggérer (82 des 275 fiches Calte au
+  05/08/2026) : seul le sélecteur principal les atteint.
 
 ## Reports par email : le canal suit le geste, le contenu suit le rôle
 
@@ -3504,3 +3752,63 @@ Deux erreurs classiques :
    l'appel ne tronque pas, il **plante**, et le report part en `needs_review`.
    Toute hausse se raisonne contre cette fenêtre, jamais contre la taille de
    la ligne Convex (qui, elle, a de la marge : ~420 Ko sur 1 Mo).
+
+## Database I/O : un gros champ texte sur une ligne lue en liste
+
+Convex facture les **octets** lus (compteur « Database I/O »), et lire une
+ligne veut dire lire la ligne **entière** — il n'existe pas de projection
+côté serveur. Le `.map()` qui ne renvoie que trois champs au client réduit
+l'egress, jamais l'I/O : la ligne complète a déjà été lue et facturée.
+
+Conséquence : **un champ texte volumineux transforme toute requête de liste
+sur sa table en pompe à octets.** Le cas vécu (5 août 2026) : la détection
+des participations silencieuses scannait `companyReports` par org pour en
+extraire deux dates par société. Chaque ligne traînant `rawContent` (jusqu'à
+300k caractères) et `cleanedHtml` (100k), la requête de la liste des
+participations — la page d'accueil de l'outil, souscrite en réactif — lisait
+~15 Mo à chaque exécution. 600 Mo en une journée, sur un quota mensuel d'1 Go.
+
+Le réflexe qui ne marche pas : « lire moins souvent » (cron, cache, TTL). Ça
+ajoute du code, une table, une invalidation, et ça rend la donnée fausse
+entre deux passages.
+
+Les deux vrais remèdes, dans cet ordre :
+
+1. **Dénormaliser l'agrégat sur une ligne déjà lue.** Si la requête n'a
+   besoin que de N nombres par entité, les écrire sur l'entité au moment de
+   l'ingestion. C'est ce que font `companies.lastReportAt` /
+   `lastReportCoverageAt` (helper `recordReportOnCompany`,
+   `lib/reportFreshness.ts`) : la liste lit déjà les `companies`, donc le
+   scan disparaît pour un coût de lecture **nul**, et la valeur reste exacte.
+   Praticable uniquement si la table source a **peu de sites de mutation**, et
+   il faut les couvrir **tous** — création *et* suppression. Le piège vécu :
+   l'agrégat écrit en monotone (max) ne sait pas reculer, donc
+   `reportInbox.detachCompany`, qui supprime une ligne `companyReports`,
+   laissait la société plus fraîche qu'elle ne l'est — silencieusement
+   dispensée d'alerte pour toujours. D'où `recomputeReportFreshness`, qui
+   reconstruit depuis ce qui reste, appelé sur ce seul geste (rare, humain,
+   jamais sur un chemin de lecture). Prévoir aussi la migration de
+   reconstruction (`migrations/backfillReportFreshness`), à la fois pour le
+   rattrapage et comme outil de réparation en cas de dérive.
+
+   Le réflexe à garder : avant de dénormaliser, `grep` les
+   `insert`/`patch`/`delete` de la table source et vérifier que chacun met
+   l'agrégat à jour. Un chemin oublié ne casse rien tout de suite — il produit
+   une donnée fausse des semaines plus tard.
+2. **Sortir le texte dans une table annexe**, une ligne par blob, lue
+   seulement quand quelqu'un ouvre vraiment le contenu. Pattern déjà en place
+   pour `documentTexts` (cf. le commentaire de la table dans `schema.ts`).
+
+Le contrôle avant d'écrire une requête de liste : *est-ce qu'une des lignes
+que je collecte porte un champ qui peut peser des dizaines de Ko ?* Si oui,
+un des deux remèdes ci-dessus, jamais un `.map()` de façade.
+
+**Restent à traiter** (mêmes symptômes, moindre volume) : `documents` et son
+champ legacy `extractedText` (chantier de purge déjà ouvert dans
+`MIGRATIONS.md`), lu à chaque ouverture de fiche société ; `reportInbox.list`
+qui prend 100 `inboundEmails` avec `bodyText` + `bodyHtml` + `extractedText` ;
+et `companyReports.listByCompany` qui prend 200 lignes avec `rawContent` pour
+n'afficher que titre et période.
+
+Pour instrumenter : dashboard Convex → **Functions**, colonne *Database
+bandwidth*, triée décroissante. Elle nomme le coupable en une minute.

@@ -339,9 +339,11 @@ function VascoEntry({
 function ReportDetailDialog({
   openId,
   onClose,
+  onDetach,
 }: {
   openId: Id<'companyReports'> | null
   onClose: () => void
+  onDetach: () => void
 }) {
   const { t } = useTranslation('participations')
   const detail = useConvexQuery(
@@ -396,6 +398,13 @@ function ReportDetailDialog({
             )}
           </div>
         )}
+
+        {/* The way out when a report landed on the wrong participation. */}
+        <DialogFooter className="sm:justify-start">
+          <Button variant="outline" size="sm" onClick={onDetach}>
+            {t('timeline.detach.action')}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
@@ -917,6 +926,7 @@ export function CompanyTimelineSection({
   })
   const vasco = useVascoCommunications(company)
   const removeDocument = useConvexMutation(api.documents.remove)
+  const detachReport = useConvexMutation(api.reportInbox.detachCompany)
 
   const [filter, setFilter] = useState('all')
   const [addOpen, setAddOpen] = useState(false)
@@ -924,6 +934,7 @@ export function CompanyTimelineSection({
   const [commId, setCommId] = useState<string | null>(null)
   const [editDoc, setEditDoc] = useState<CompanyDoc | null>(null)
   const [deleteId, setDeleteId] = useState<Id<'documents'> | null>(null)
+  const [detachId, setDetachId] = useState<Id<'companyReports'> | null>(null)
   const [textDocId, setTextDocId] = useState<Id<'documents'> | null>(null)
 
   // A report's attachments are folded into their report's row, so they never
@@ -1016,6 +1027,18 @@ export function CompanyTimelineSection({
       toast.error(t('participations:timeline.errors.default'))
     } finally {
       setDeleteId(null)
+    }
+  }
+
+  async function handleDetach() {
+    if (!detachId) return
+    try {
+      await detachReport({ reportId: detachId })
+      toast.success(t('participations:timeline.detach.done'))
+    } catch {
+      toast.error(t('participations:timeline.errors.default'))
+    } finally {
+      setDetachId(null)
     }
   }
 
@@ -1182,7 +1205,14 @@ export function CompanyTimelineSection({
         onClose={() => setEditDoc(null)}
       />
 
-      <ReportDetailDialog openId={reportId} onClose={() => setReportId(null)} />
+      <ReportDetailDialog
+        openId={reportId}
+        onClose={() => setReportId(null)}
+        onDetach={() => {
+          setDetachId(reportId)
+          setReportId(null)
+        }}
+      />
 
       <VascoCommunicationDialog
         communication={openComm}
@@ -1217,6 +1247,33 @@ export function CompanyTimelineSection({
             </Button>
             <Button variant="destructive" onClick={() => void handleDelete()}>
               {t('common:actions.delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Detach confirmation */}
+      <Dialog
+        open={detachId !== null}
+        onOpenChange={(open) => !open && setDetachId(null)}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {t('participations:timeline.detach.confirmTitle')}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground text-sm">
+            {t('participations:timeline.detach.confirmBody', {
+              company: company.name,
+            })}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetachId(null)}>
+              {t('common:actions.cancel')}
+            </Button>
+            <Button variant="destructive" onClick={() => void handleDetach()}>
+              {t('participations:timeline.detach.confirm')}
             </Button>
           </DialogFooter>
         </DialogContent>

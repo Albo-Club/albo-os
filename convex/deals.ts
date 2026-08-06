@@ -15,6 +15,7 @@ import {
   termDurationValidator,
 } from './lib/instruments'
 import { isTreasuryPlacement } from './lib/instrumentMapping'
+import { listSilentCompanies, withReportAlerts } from './lib/reportFreshness'
 import {
   moic as moicRatio,
   proceedsFromReceived,
@@ -28,10 +29,9 @@ import type { DataModel, Doc, Id } from './_generated/dataModel'
 
 type Ctx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>
 
-const statusValidator = v.union(
+export const statusValidator = v.union(
   v.literal('pending'), // Attio Term Sheet (committed, not yet wired)
   v.literal('active'),
-  v.literal('partially_exited'),
   v.literal('fully_exited'),
   v.literal('written_off'),
 )
@@ -543,8 +543,10 @@ export const listParticipations = query({
       if (d.viaSpvCompanyId) referenced.add(d.viaSpvCompanyId)
     }
 
+    const silent = await listSilentCompanies(ctx, orgId, Date.now())
+
     return {
-      rows: buildParticipationRows(sources),
+      rows: withReportAlerts(buildParticipationRows(sources), silent),
       referencedCompanyIds: [...referenced],
     }
   },

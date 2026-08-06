@@ -8,6 +8,11 @@ import { ConvexError } from 'convex/values'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 
 import { api } from '../../../../../convex/_generated/api'
+import {
+  DEFAULT_SILENCE_MONTHS,
+  MAX_SILENCE_MONTHS,
+  MIN_SILENCE_MONTHS,
+} from '../../../../../convex/lib/reportFreshness'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { ImageUpload } from '~/components/ImageUpload'
@@ -39,6 +44,11 @@ function GeneralSettings() {
           .string()
           .min(1, t('validation:name.required'))
           .max(80, t('validation:name.tooLong')),
+        reportSilenceMonths: z
+          .number()
+          .int()
+          .min(MIN_SILENCE_MONTHS, t('validation:reportSilenceMonths.range'))
+          .max(MAX_SILENCE_MONTHS, t('validation:reportSilenceMonths.range')),
       }),
     [t],
   )
@@ -57,13 +67,20 @@ function GeneralSettings() {
   const canManage = role === 'admin' || role === 'owner'
 
   const form = useForm({
-    defaultValues: { name: '' },
+    defaultValues: {
+      name: '',
+      reportSilenceMonths: DEFAULT_SILENCE_MONTHS,
+    },
     validators: { onChange: schema, onSubmit: schema },
     onSubmit: async ({ value }) => {
       if (!org) return
       setSaving(true)
       try {
-        await update({ orgId: org._id, name: value.name })
+        await update({
+          orgId: org._id,
+          name: value.name,
+          reportSilenceMonths: value.reportSilenceMonths,
+        })
         toast.success(t('settings:general.updated'))
       } catch (err) {
         const code = err instanceof ConvexError ? (err.data as string) : ''
@@ -82,7 +99,10 @@ function GeneralSettings() {
 
   useEffect(() => {
     if (org) {
-      form.reset({ name: org.name })
+      form.reset({
+        name: org.name,
+        reportSilenceMonths: org.reportSilenceMonths ?? DEFAULT_SILENCE_MONTHS,
+      })
     }
   }, [org, form])
 
@@ -128,6 +148,38 @@ function GeneralSettings() {
                       disabled={!canManage}
                       aria-invalid={invalid || undefined}
                     />
+                    {invalid && <FieldError errors={field.state.meta.errors} />}
+                  </Field>
+                )
+              }}
+            </form.Field>
+
+            <form.Field name="reportSilenceMonths">
+              {(field) => {
+                const invalid =
+                  field.state.meta.isTouched && !field.state.meta.isValid
+                return (
+                  <Field data-invalid={invalid || undefined}>
+                    <FieldLabel htmlFor={field.name}>
+                      {t('settings:general.reportSilence')}
+                    </FieldLabel>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      type="number"
+                      min={MIN_SILENCE_MONTHS}
+                      max={MAX_SILENCE_MONTHS}
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) =>
+                        field.handleChange(e.target.valueAsNumber)
+                      }
+                      disabled={!canManage}
+                      aria-invalid={invalid || undefined}
+                    />
+                    <FieldDescription>
+                      {t('settings:general.reportSilenceHint')}
+                    </FieldDescription>
                     {invalid && <FieldError errors={field.state.meta.errors} />}
                   </Field>
                 )

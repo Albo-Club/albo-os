@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.173.0 — 06/08/2026 à 11:53 — Toute la documentation juridique d'Albo Club rejoint les fiches société
+## v1.182.0 — 06/08/2026 à 12:22 — Toute la documentation juridique d'Albo Club rejoint les fiches société
 
 Les pactes, bulletins de souscription, statuts, procès-verbaux d'assemblée et
 comptes annuels d'Albo Club vivaient jusqu'ici uniquement dans le Drive. Ils
@@ -71,6 +71,851 @@ reconnaît et ne les recrée pas.
 >   après rapprochement sur la taille en octets.
 > - Le titre stocké perd son extension, par cohérence avec les uploads
 >   manuels ; le type MIME est reconstruit depuis `sourceExt`.
+## v1.181.1 — 06/08/2026 à 09:25 — La liste des participations arrête de relire tous les reportings
+
+Depuis l'arrivée de l'alerte « cette participation ne reporte plus », ouvrir
+la liste des participations faisait relire à la base **l'intégralité des
+reportings reçus** — le texte complet de chaque e-mail et de chaque pièce
+jointe — pour n'en tirer qu'une seule information par société : la date du
+dernier reçu. Invisible à l'usage, mais lourd : la consommation de la base a
+été multipliée par quatre en une journée, jusqu'à frôler le plafond mensuel
+du compte. Rien ne s'était cassé, mais l'outil s'approchait de la limite où
+il aurait pu s'arrêter.
+
+Cette date est désormais notée sur la fiche de la société **au moment où le
+reporting arrive**, une fois pour toutes. La liste la lit au passage, sans
+rouvrir un seul reporting. Rien ne change à l'écran : mêmes alertes, mêmes
+sociétés signalées, mêmes délais — c'est le chemin pour y arriver qui a été
+raccourci.
+
+> **🔧 Notes techniques**
+>
+> - Cause : `lib/reportFreshness.ts:listSilentCompanies` faisait un
+>   `.collect()` de `companyReports` par org pour en dériver deux dates par
+>   société. Convex lit la **ligne entière** — donc `rawContent` (≤ 300k
+>   caractères) et `cleanedHtml` (≤ 100k) à chaque exécution — et la fonction
+>   est appelée par `deals.listParticipations` **et**
+>   `aggregate.listParticipations`, deux requêtes réactives sur la page la
+>   plus ouverte de l'app.
+> - Correctif : dénormalisation de `companies.lastReportAt` et
+>   `lastReportCoverageAt`, maintenues par `recordReportOnCompany`
+>   (`lib/reportFreshness.ts`) appelé depuis `reportStore.storeForCompany`.
+>   Écriture monotone (max) : un report antidaté ne fait pas reculer la
+>   fraîcheur. La liste lit ces champs sur les `companies` qu'elle collectait
+>   déjà → coût de lecture supplémentaire nul.
+> - Les **quatre** sites de mutation de `companyReports` sont couverts :
+>   insert et patch (`reportStore`), patch d'état d'indexation (`vectorize`,
+>   sans effet sur les dates) et surtout la **suppression**
+>   (`reportInbox.detachCompany`, arrivé avec le détachement de la v1.181.0).
+>   Une écriture monotone ne sait pas reculer : détacher le dernier report
+>   d'une participation la laissait plus fraîche qu'elle ne l'est, donc
+>   dispensée d'alerte en silence. D'où `recomputeReportFreshness`, qui
+>   reconstruit depuis les reports restants sur ce seul geste — rare, humain,
+>   jamais sur un chemin de lecture.
+> - `migrations/backfillReportFreshness` (`dryRun`/`apply`/`report`)
+>   reconstruit les deux dates depuis les reports. **À lancer juste après le
+>   deploy**, sinon toute participation ayant reporté avant compte comme
+>   « sans nouvelle » — cf. `MIGRATIONS.md`.
+> - Comportement inchangé : `regression.reportFreshness.test.ts` passe sans
+>   modification de ses assertions (seul le fixture maintient désormais la
+>   copie, comme le pipeline).
+> - Le piège générique et les foyers restants (`documents.extractedText`,
+>   `reportInbox.list`, `companyReports.listByCompany`) sont documentés dans
+>   `KNOWN_ISSUES.md` « Database I/O : un gros champ texte sur une ligne lue
+>   en liste », plus un anti-pattern dans `CLAUDE.md`.
+## v1.181.0 — 05/08/2026 à 19:54 — Un report rangé sur la mauvaise participation se détache
+
+Jusqu'ici, rattacher un report était à sens unique : on pouvait l'ajouter à
+une participation, jamais l'en retirer. Un rattachement fait un peu vite, ou
+tombé sur le mauvais véhicule d'un sponsor, restait donc sur la fiche pour
+toujours — avec ses fichiers et les KPIs qu'il avait renseignés.
+
+Le geste inverse existe maintenant, à l'endroit où l'erreur se constate comme
+à celui où elle se commet :
+
+- **Depuis la fiche société** : ouvrir le report dans la liste Documents &
+  rapports, puis « Détacher de cette participation ».
+- **Depuis les Rapports entrants** : la croix sur la puce de la participation
+  concernée.
+
+Dans les deux cas, le report quitte cette fiche **proprement** : ses fichiers
+et les KPIs qu'il avait alimentés partent avec lui, il sort de la recherche
+de la société, et la synthèse repart du report précédent. Ce qui ne bouge
+pas : les **autres** participations rattachées au même report gardent le
+leur, et le mail d'origine reste dans la file — il n'y a plus qu'à le
+rattacher là où il devait aller. Un détachement est définitif côté fiche,
+d'où la fenêtre de confirmation qui dit ce qui part.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle mutation publique `reportInbox.detachCompany({ reportId })`,
+>   miroir de `assignCompany` : `requireOrgMember` sur l'org du report, puis
+>   suppression de toute l'empreinte écrite par `reportStore.storeForCompany`
+>   pour **cette entité seulement** — ligne `companyReports`, lignes
+>   `documents` filtrées sur `companyId`, `kpiSnapshots` taggés
+>   `source: "report:<id>"`, repli de `companyIntelligence.latestReportId` sur
+>   le report suivant (ou effacement), et `vectorize.removeEntry` sur la clé
+>   `report:<id>`.
+> - Le **blob de storage n'est pas supprimé** : il est partagé par les lignes
+>   `documents` de toutes les entités du fan-out et par la pièce jointe de
+>   `inboundEmails`. Détail et pièges dans `KNOWN_ISSUES.md` § « Détacher un
+>   report ».
+> - La ligne de la file est corrigée dans la même transaction
+>   (`matchedCompanies`, `reportIds`), sinon un « Retraiter » ultérieur
+>   remettrait le report sur l'entité détachée. Ça a demandé un back-link
+>   `companyReports.inboundEmailId` (posé au rangement) ; les lignes
+>   antérieures sont retrouvées via `agentmailMessageId`.
+> - `reportInbox.list` expose désormais `matched: [{ companyId, name,
+>   reportId }]` au lieu de `matchedNames` + `matchedCompanyIds` — la file
+>   rend une puce par **entité** (deux orgs = deux puces) avec sa croix, et
+>   seules celles portant réellement un report en ont une.
+> - Couverture : `convex/regression.reportDetach.test.ts` (6 cas — périmètre
+>   de la suppression, blob préservé, correction de la file, repli et
+>   effacement du pointeur de synthèse, refus hors org). `TESTING.md` R28c /
+>   R28d.
+
+## v1.180.2 — 05/08/2026 à 19:27 — Les fondateurs et co-investisseurs liés à Attio se voient enfin comme des liens
+
+Sur la fiche d'une participation, les puces des sections Fondateur(s),
+Membres du board et Co-investisseurs ouvrent la fiche Attio correspondante
+quand elles sont reliées au CRM. Mais rien ne le disait vraiment : la puce
+changeait juste de fond au survol, exactement comme n'importe quel élément
+neutre, et la petite flèche en bout de puce se remarquait à peine. On ne
+savait pas où l'on pouvait cliquer.
+
+Le nom se **souligne** désormais au survol des puces reliées à Attio,
+comme partout ailleurs dans l'app. Les puces sans lien, elles, ne bougent
+pas — la différence entre « ça ouvre le CRM » et « c'est juste un nom »
+se lit maintenant d'un coup d'œil.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/PeopleEditor.tsx` (`PersonChip`) : ajout de
+>   `group` sur l'ancre Attio et de `underline-offset-2 group-hover:underline`
+>   sur le `span` du nom. Le soulignement porte sur le seul nom, pas sur
+>   l'avatar ni sur la flèche `ArrowUpRight` — ils vivent dans les gaps du
+>   flex.
+> - Aligne les puces sur la convention déjà en place pour le champ Attio de
+>   la fiche société (`AttioCompanyField.tsx`, `underline-offset-4
+>   hover:underline`).
+> - Le fond `has-[a:hover]:bg-accent` de la puce est conservé : les deux
+>   signaux se cumulent. La branche non liée (`url === null`) est inchangée.
+
+## v1.180.1 — 05/08/2026 à 18:13 — Les courriers sans période ne bloquent plus le circuit des reports
+
+Un courrier de liquidation transféré sur Wheelee revenait indéfiniment en
+« erreur technique pendant l'analyse », et le rattacher à la main n'y
+changeait rien. La cause : le circuit exigeait de **tout** report une
+période couverte et un rythme (mensuel, trimestriel, annuel…). Un avis de
+liquidation, une notification juridique, une annonce de levée n'ont ni
+l'une ni l'autre — le circuit refusait donc la lecture pourtant correcte
+qu'en faisait l'IA, et bouclait à chaque nouvel essai puisque le contenu,
+lui, ne changeait jamais.
+
+Ces courriers sont désormais rangés comme les autres, avec leur titre,
+leur résumé et leurs points clés, **sans période**, à leur date de
+réception. Rien n'est inventé : plutôt que de leur coller un mois au
+hasard, la période reste vide. Deux courriers ponctuels d'une même société
+ne se remplacent plus l'un l'autre, et aucun n'écrase le report périodique
+de la même période.
+
+Second changement, valable pour **tous** les échecs : le message technique
+de l'erreur s'affiche maintenant sous le statut dans la boîte Rapports
+entrants, et dans l'email « Report non traité ». Jusqu'ici il n'était
+lisible que depuis la console technique — une catégorie comme « erreur
+technique pendant l'analyse » ne disait rien de ce qui s'était passé.
+
+> **🔧 Notes techniques**
+>
+> - `convex/reportStore.ts` : `report_period` et `report_type` passent en `.nullable()` dans `analysisSchema`, avec une règle explicite dans le `SYSTEM_PROMPT` (un document ponctuel est un report valide, `title`/`headline`/`key_highlights` toujours remplis, aucune période inventée). Les deux champs deviennent `v.optional` sur `storeForCompany` — le schéma Convex les déclarait déjà facultatifs.
+> - **Piège du dédoublonnage** : `by_company_period` avec `reportPeriod: undefined` matche *toutes* les lignes sans période d'une société — un `.first()` naïf aurait fait écraser silencieusement chaque courrier ponctuel par le suivant. Un document sans période est donc identifié par son message d'origine (`subject` + `emailDate`, portés par un mail comme par un dépôt manuel). `periodSortDate` retombe sur `receivedAt` pour garder un ancrage dans la timeline (index `by_company`). Détaillé dans `KNOWN_ISSUES.md` § « Report sans période ».
+> - Nouveau `convex/regression.reportStore.test.ts` (4 cas : coexistence, rejeu idempotent, non-collision avec un report périodique, dédup périodique inchangée) — vérifié en échec contre la version naïve avant d'être figé. 61 tests de régression Convex, 317 unitaires.
+> - Visibilité de l'erreur : `reportInbox.list` renvoie `error` (champ déjà écrit par `reportIdentify.setReview`, exposé nulle part) ; affiché sous le badge dans `src/routes/app/all/reports.tsx` (tronqué, complet au survol) ; `reportRecapFailureHtml` prend un `detail` optionnel borné à 300 caractères. Message brut, dev-facing, non traduit.
+> - Récap de succès sans période : titre « ✅ Report rangé — document ponctuel, sans période », objet « Albo OS — report rangé : document ponctuel ».
+
+## v1.180.0 — 05/08/2026 à 18:11 — Rattacher un report à une seconde participation
+
+Une même boîte détenue par Calte **et** Albo peut porter un nom différent de
+chaque côté — `Oprtrs & Co` ici, `OPRTRS CLUB` là ; `Parallel Invest SPV 13
+(Bernay)` et `Parallel Invest SPV13`. Rien ne permet de deviner que ces deux
+lignes sont la même boîte : elles se ressemblent autant que Sezame Immo 2 et
+Sezame Immo 6, qui sont deux véhicules bien distincts. Le report se rangeait
+donc d'un seul côté, et il n'y avait aucun moyen d'ajouter l'autre après
+coup.
+
+- **Un report peut désormais être rattaché à plusieurs participations**, et
+  on peut en ajouter une **même quand le report est déjà rangé** : la
+  nouvelle s'ajoute aux précédentes, celles déjà servies ne bougent pas.
+- **Les fiches apparentées vous sont proposées.** Quand vous choisissez une
+  participation, celles qui partagent son site web dans une **autre
+  organisation** apparaissent sous forme de cases à cocher, la plus proche
+  en tête. Rien n'est coché tout seul : sur un domaine de plateforme, les
+  voisines sont d'autres véhicules, à vous de dire lesquelles sont
+  concernées.
+- **La file vous le signale.** Un report rangé alors qu'une organisation a
+  une fiche sur le même domaine sans rien avoir reçu porte un repère
+  « + Calte ? » dans la colonne Participation, et un bouton « Rattacher
+  aussi ». Un report déjà rangé des deux côtés n'affiche rien.
+- **Aucun accusé en double** : ajouter une participation à un report déjà
+  traité ne renvoie pas de récapitulatif à qui l'avait transféré.
+
+Le repère nomme l'**organisation**, pas le nombre de fiches : sur un domaine
+comme celui de Parallel, l'autre organisation en héberge une quinzaine sans
+rapport, et un « +15 » n'aurait rien voulu dire.
+
+> **🔧 Notes techniques**
+>
+> - `reportInbox.assignCompany` prend `companyIds` (1..n) et devient
+>   **additif** sur une ligne `processed` : union avec `matchedCompanies`,
+>   `reportIds` remis à zéro, `notifiedAt` **conservé** (pas de second récap).
+>   Rejouer `reportStore.run` est sûr : il upsert par (société, période), donc
+>   les entités déjà servies sont mises à jour en place.
+> - `reportInbox.list` renvoie `matchedCompanyIds` et `relatedOrgNames` — les
+>   orgs qui n'ont **rien** reçu du report alors qu'elles portent une société
+>   sur un des domaines rattachés. Nommer l'org plutôt que compter les
+>   entités évite le « +15 » d'un domaine de sponsor.
+> - `listAssignTargets` expose `orgId` + `domain` ; le dialog
+>   (`src/routes/app/all/reports.tsx`) construit le bloc « même domaine, autre
+>   org », trié par un Dice sur bigrammes (`nameProximity`) — un tri, jamais
+>   une décision.
+> - Tests : `convex/regression.reportIdentify.test.ts` (ajout après coup,
+>   union, `notifiedAt` préservé, apparition/disparition du repère).
+
+## v1.179.0 — 05/08/2026 à 13:56 — Le pointage ne propose plus rien (et c'est voulu)
+
+Albo OS affichait des propositions de rapprochement un peu partout : un
+bandeau « Proposition » sous les lignes à pointer, une carte
+« Rapprochements suggérés », des « règles suggérées », et une proposition de
+solder l'échéance prévue juste après un pointage. **Tout cela est retiré.**
+
+La raison est simple : le système se trompait sans le dire. Il rattachait
+des transactions au mauvais deal, confondait un deal avec une échéance
+prévue, et rien à l'écran ne signalait que la proposition était fausse. Une
+proposition juste fait gagner cinq secondes ; une proposition fausse
+acceptée de confiance coûte beaucoup plus cher à retrouver.
+
+Le pointage redevient donc entièrement manuel : vous ouvrez la file, vous
+choisissez la destination avec le menu « Affecter à… », comme avant. Rien
+d'autre ne change — la classification (charge, impôt, produit, virement
+interne), les actions groupées, le détachement et l'historique sont
+intacts. L'assistant IA sait toujours pointer, mais il ne devine plus la
+cible : vous la lui nommez, il l'applique après approbation.
+
+Nouveau au passage : une échéance prévue se marque **« réalisée » depuis sa
+ligne**, dans « Échéances ponctuelles ». Vous y choisissez vous-même la
+transaction correspondante — la liste est triée de la plus récente à la
+plus ancienne, avec une recherche libre. Si la transaction paye moins que
+prévu, vous choisissez de clore avec l'écart ou de garder le reste attendu.
+
+C'est volontairement une étape en arrière, le temps de rassembler assez de
+cas réels pour reconstruire un rapprochement automatique digne de
+confiance. Chaque pointage fait à la main aujourd'hui alimente cette
+matière : l'historique des décisions est conservé intact.
+
+> **🔧 Notes techniques**
+>
+> - **Backend supprimé** : `transactions.getPointageSuggestions`,
+>   `forecasts.suggestForecastMatches`, `forecasts.suggestRules` /
+>   `dismissRuleSuggestion`, `agentToolsPointage.suggestMatchesInternal` +
+>   l'outil agent `suggestMatches` et son entrée MCP, ainsi que les moteurs
+>   purs `lib/suggest.ts`, `lib/entryMatching.ts`, `lib/transferPairs.ts`
+>   et `lib/recurrenceDetection.ts` (avec leurs tests).
+> - `transactions.matchTransaction` ne lit plus les `forecastEntries` : son
+>   retour `pendingEntry` (qui alimentait le toast « Réaliser l'échéance »)
+>   est supprimé, la mutation renvoie `null`. Le cœur `applyMatchToDeal`
+>   est inchangé.
+> - `lib/instructions.ts` : la consigne « utilise `suggestMatches` » est
+>   remplacée par une interdiction explicite de proposer ou deviner une
+>   cible — sans ça l'agent aurait cherché un outil disparu et inventé.
+> - **Front supprimé** : `SuggestionBand` + état `refusedSuggestions` dans
+>   `PointageTable.tsx`, `ForecastMatchSuggestions.tsx`,
+>   `SuggestedRules.tsx` (et le `RulePrefill` devenu mort), le renderer
+>   `suggestMatches` du panneau AI, clés i18n associées (fr + en).
+> - **Ajout** : `RealizeEntryDialog` dans `ForecastSection.tsx` — sélecteur
+>   de transaction via `transactions.listLedger` (date desc + recherche
+>   libre), **aucun classement ni présélection**, modes `close` /
+>   `keepRemainder` conservés. C'était le seul chemin manuel manquant :
+>   les deux appelants de `markEntryRealized` vivaient dans les surfaces
+>   supprimées.
+> - **Schéma inchangé, aucune migration.** `matchStatus`, `allocation` et
+>   surtout `matchingDecisions` (append-only) sont intacts. La table
+>   `dismissedRuleSuggestions` devient inerte mais reste déclarée.
+> - Garde-fou ajouté en anti-pattern dans `CLAUDE.md` + section refondue
+>   dans `KNOWN_ISSUES.md` « Pointage transaction → deal ».
+
+---
+
+## v1.178.0 — 05/08/2026 à 12:15 — Les filtres restent en place quand vous changez de page
+
+Vous filtriez la liste des investissements sur un instrument, vous ouvriez
+une fiche pour vérifier un chiffre, vous reveniez : la liste était revenue
+à zéro. Même chose sur le registre de trésorerie. Un filtre ne survivait
+pas à une navigation, ce qui obligeait à le reposer à chaque aller-retour.
+
+C'est fini. La recherche et les filtres sont désormais **mémorisés** :
+
+- **Liste Entreprises** (par organisation et vue consolidée) : recherche,
+  instrument, secteur.
+- **Deals consolidés** : recherche, instrument, statut, secteur.
+- **Registre de trésorerie** : recherche, montant min/max, statut et compte.
+
+Vous partez sur une fiche, sur une autre page, vous rechargez même l'écran :
+en revenant, la liste est exactement dans l'état où vous l'aviez laissée.
+La mémoire est propre à **l'onglet du navigateur** — un nouvel onglet repart
+sans filtre, et fermer l'onglet oublie tout. Chaque liste a la sienne : une
+organisation n'impose pas ses filtres à une autre, ni à la vue consolidée.
+
+Pour tout effacer d'un coup, le bouton **« Réinitialiser »** est à droite des
+filtres. Il existait déjà sur les listes d'investissements mais n'apparaissait
+que si une facette était cochée : il se déclenche maintenant dès qu'une
+**recherche** est en cours, et il efface recherche et filtres ensemble. Le
+registre de trésorerie, qui n'en avait pas, l'a désormais aussi.
+
+Un détail conservé : les liens qui ouvrent le registre déjà filtré (les
+boutons « Pointer » de la page À faire, les emails de rappel) restent
+prioritaires sur le dernier filtre mémorisé — ils vous emmènent bien là où
+ils le promettent.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau hook `src/hooks/usePersistentFilters.ts` : état de filtres
+>   miroité dans `sessionStorage` sous une clé passée par la vue
+>   (`participations:<slug|all>`, `deals:<slug|all>`, `cash-ledger:<slug>`).
+>   API `[filters, patch, reset]` + helper `toggleValue` pour les facettes
+>   multi-select ; valeurs JSON-sérialisables (tableaux, pas de `Set`).
+> - Restauration dans un `useEffect` **après** le premier render (pas dans
+>   l'état initial) : le serveur rend sans storage, lire pendant le render
+>   casserait l'hydratation — même pattern que `ThemePicker`. L'état porte
+>   la clé pour laquelle il a été restauré, ce qui empêche l'effet
+>   d'écriture de persister les valeurs par défaut par-dessus l'entrée
+>   sauvegardée (au montage comme au changement d'org).
+> - `ParticipationsView` et `DealsListView` : les `useState<Set<string>>`
+>   deviennent des tableaux persistés, re-dérivés en `Set` via `useMemo`
+>   (`FacetFilter` est inchangé). La condition d'affichage du bouton
+>   « Réinitialiser » passe de `hasFilters` à `search || hasFilters`, sur
+>   la valeur **non débouncée** pour réagir dès la première frappe.
+> - `TransactionsLedger` : statut, compte, recherche et bornes de montant
+>   passent dans le hook (`accountId: ''` = tous les comptes) ; un effet
+>   déclaré après le hook réapplique `initialFilter` (`?filter=`) par-dessus
+>   la valeur restaurée, et un bouton « Réinitialiser » (clé
+>   `pointage:filter.reset`, EN/FR) a été ajouté à la barre.
+> - Docs : `TESTING.md` SH23 (listes) et CA14 (registre),
+>   `docs/produit/04-participations.md` et `07-tresorerie.md`, plus une
+>   ligne `TEMPLATE_SYNC.md` (le hook est du core générique).
+
+## v1.177.2 — 05/08/2026 à 12:00 — Un report de sponsor ne contamine plus les véhicules voisins
+
+Un report Sezame se rangeait à la fois sur Sezame Immo 2 et Sezame Immo 6.
+La raison : tous les véhicules d'un sponsor partagent le même site web, et
+c'est ce site qui servait à reconnaître la participation. Le même défaut
+guettait Parallel, Anaxago, Rewatt, Virgil ou La Vie de Quartier — partout
+où plusieurs lignes du portefeuille vivent sous un seul domaine.
+
+- **Le site ne suffit plus quand plusieurs lignes le partagent.** Il dit qui
+  écrit, pas de quel véhicule il parle. Sur ces domaines, il faut désormais
+  que le véhicule soit **nommé dans le message** pour que le report se range
+  tout seul.
+- **Le doute part dans la file, plus dans une fiche au hasard.** Si le
+  message ne nomme aucun véhicule, le mail atterrit dans Rapports entrants
+  avec la mention « plusieurs participations possibles » — vous le rattachez
+  en un clic, à la bonne ligne.
+- **Le rattachement à la main ne déborde plus non plus.** Choisir un
+  véhicule n'attache le report qu'à celui-là, alors qu'il arrosait avant
+  tous ses voisins de domaine. Idem pour un dépôt de fichier depuis une
+  fiche société.
+- **Ce qui ne change pas** : une même boîte détenue par Calte **et** Albo
+  reçoit toujours son report des deux côtés.
+
+Les reports déjà rangés au mauvais endroit avant ce correctif restent à
+corriger à la main.
+
+> **🔧 Notes techniques**
+>
+> - Une seule notion porte la règle : `identityKey` dans
+>   `convex/lib/emailIdentify.ts` — le domaine identifie une participation
+>   s'il n'en porte qu'une (`sharedDomains` calcule les domaines disqualifiés
+>   sur tous les candidats, toutes orgs), sinon c'est le nom normalisé.
+> - `reportIdentify.run` : nouvelle étape `resolveOnSharedDomains` entre la
+>   corroboration et la décision — sur un domaine partagé, les candidats
+>   corroborés par le **nom** l'emportent ; si aucun ne l'est, tout le domaine
+>   revient dans la sélection, ce qui produit ≥ 2 clés d'identité et donc
+>   `ambiguous`. Le test d'ambiguïté et le fan-out se calculent maintenant sur
+>   `identityKey` (le fan-out se réduit à un filtre sur la clé acceptée).
+> - `reportInbox.sameParticipation` (rattachement manuel + upload) passe par
+>   le même helper, sinon la correction manuelle ré-arrosait les voisins.
+> - Tests : `tests/emailIdentify.test.ts` (helpers purs) et
+>   `convex/regression.reportIdentify.test.ts` (fan-out du rattachement
+>   manuel, cas Sezame / Waro multi-org / SPV détenu par deux orgs).
+> - Limite assumée : le seul discriminant accepté est le nom complet de
+>   l'entité. Deux entités d'une même boîte nommées différemment sur un
+>   domaine de sponsor (`Oprtrs & Co` vs `OPRTRS CLUB`) ne fanent plus
+>   ensemble — à corriger dans la donnée, pas dans le code (cf.
+>   `KNOWN_ISSUES.md`).
+## v1.177.1 — 05/08/2026 à 11:47 — Les tableurs sortent de la recherche de l'assistant
+
+Un budget Excel ajouté sur une fiche société refusait obstinément d'être
+indexé, et vous prévenait par email à chaque tentative. Deux choses derrière
+ce message, et une seule vraie question.
+
+Le déclencheur d'abord : depuis que les classeurs sont lus **en entier** (et
+non plus tronqués à leurs premières lignes), un gros budget part au service
+d'indexation en paquets nettement plus lourds qu'avant. Trop lourds pour
+l'hébergeur européen sur lequel on a volontairement épinglé ce service : il
+refusait la demande, sans repli possible ailleurs. Les envois sont désormais
+découpés bien plus finement — même contenu, même hébergeur, mais chaque
+demande passe.
+
+La vraie question ensuite : **est-ce qu'un tableur a sa place dans cette
+recherche ?** Non. L'assistant cherche sur le sens des phrases ; un tableau
+découpé en morceaux perd ses en-têtes, et des colonnes de chiffres n'ont pas
+de sens à retrouver. On indexait donc à perte.
+
+- **Excel et CSV ne sont plus indexés**, volontairement. Ils affichent
+  « Tableur — non indexé » à la place de l'alerte rouge, et ne déclenchent
+  plus d'email.
+- **Leur lecture ne change pas** : le texte extrait reste consultable en un
+  clic, tous les onglets, comme avant.
+- **Un tableur reçu par mail** reste couvert par la recherche à travers le
+  contenu du rapport qui le transporte.
+- **Tout le reste gagne de la marge** : pactes, term sheets, rapports et
+  documents juridiques étaient plus près de la même limite qu'on ne le
+  pensait.
+
+Une limite assumée : l'assistant ne sait donc pas répondre sur le contenu
+d'un business plan en tableur. Le jour où on le voudra, la bonne réponse
+sera de lui donner de quoi **lire** le document, pas de l'indexer.
+
+> **🔧 Notes techniques**
+>
+> - `convex/vectorize.ts` : `MAX_EMBEDDINGS_PER_CALL = 16` appliqué via
+>   `wrapEmbeddingModel` (`ai`). Le client `@convex-dev/rag` passe les chunks
+>   par paquets de 100 (en dur) et `@openrouter/ai-sdk-provider` laisse
+>   `maxEmbeddingsPerCall` à `undefined` : `embedMany` envoyait les 100 chunks
+>   (~100 k car.) en **une** requête, ~27 k tokens en prose et davantage sur du
+>   tabulaire, contre la fenêtre de 32 k tokens de l'endpoint Nebius épinglé.
+>   Au-delà, OpenRouter n'a plus d'endpoint où router (`allow_fallbacks: false`)
+>   et répond **404** — d'où le `provider_http_404`, classé permanent donc sans
+>   retry. Le wrapper laisse `modelId` et `provider` intacts : l'identité du
+>   namespace RAG ne bouge pas, aucun backfill nécessaire.
+> - `convex/lib/fileText.ts` : `isSpreadsheet(filename, contentType)`, mêmes
+>   règles que `documentsExtract.classify` (xlsx/xls/xlsm/csv, extension ou
+>   content-type), posé à côté de `isImage` pour que lecteurs et indexeur ne
+>   divergent pas. Consommé par `documentSkipReason` (`convex/vectorize.ts`),
+>   nouveau code de skip `'spreadsheet'` → état `skipped`, pas d'email.
+>   Libellés `participations:vectorization.detail.spreadsheet` (FR/EN).
+> - Le pipeline reports n'est **pas** touché : le texte d'une PJ tableur reste
+>   fondu dans `rawContent` et indexé avec son report.
+> - `tests/fileText.test.ts` (nouveau) couvre `isSpreadsheet` ; détails et
+>   pièges dans `KNOWN_ISSUES.md` § « Vectorisation ».
+
+---
+
+## v1.177.0 — 05/08/2026 à 11:35 — Une même fiche Attio se rattache à plusieurs sociétés
+
+Rattacher un SPV Parallel à sa fiche Attio était tout simplement impossible :
+la ligne **Fiche Attio** du bloc Identité répondait « Cette fiche Attio est
+déjà rattachée à une autre société ». Et pour cause — Attio ne connaît
+**qu'une** fiche « Parallel Invest », avec un deal par SPV, là où Albo OS
+tient **une entité par SPV**. La fiche était donc déjà prise par le chapeau,
+et aucun des SPV ne pouvait ouvrir le CRM depuis sa propre page.
+
+Désormais une même fiche Attio se rattache à **autant de sociétés que
+nécessaire**, y compris dans des organisations différentes. Le geste ne
+change pas : on clique la ligne, on cherche dans Attio, on choisit — et
+c'est accepté même si une autre société pointe déjà sur la même fiche.
+
+Un point à connaître : quand plusieurs sociétés partagent une fiche, les
+deals qui arrivent d'Attio continuent d'atterrir sur la **première** d'entre
+elles (la plus ancienne de l'organisation). Rattacher les suivantes sert à
+ouvrir le CRM depuis leur page, pas à détourner la synchronisation — pour
+changer la société cible d'un deal, ça se fait toujours sur le deal.
+
+> **🔧 Notes techniques**
+>
+> - `convex/companies.ts` : suppression de `assertAttioCompanyIdFree` et de son
+>   appel dans `update`. L'ancrage reste trimé, `''` détache toujours.
+> - `convex/attioSync.ts:resolveOrCreateTargetCompany` lisait
+>   `by_attio_company_id` en **`.unique()`** — c'était toute la raison d'être
+>   du garde-fou : un doublon aurait fait throw la synchro au prochain
+>   événement Attio. Remplacé par un `.collect()` + première société **de
+>   l'org** ; l'ordre d'index étant l'ordre de création, la cible d'un deal
+>   déjà synchronisé ne bouge pas.
+> - Effet de bord voulu du même passage : l'ancrage est désormais posé sur la
+>   société créée **dès qu'aucune société de cette org ne le porte** (avant :
+>   dès qu'une société le portait **où que ce soit**). Une org B qui recevait
+>   des deals sur une fiche déjà ancrée en org A créait jusqu'ici une société
+>   neuve à **chaque** événement, faute de pouvoir s'ancrer.
+> - Front : la branche d'erreur `attio_company_already_used` de
+>   `AttioCompanyField.tsx` et ses clés i18n fr/en tombent avec le code serveur
+>   qui les émettait.
+> - `convex/regression.deals.test.ts` : les deux tests qui asseyaient le refus
+>   (même org, puis cross-org) deviennent leur inverse, plus une assertion que
+>   la cible de la synchro ne bouge pas quand un second SPV réclame l'ancrage.
+
+---
+
+## v1.176.1 — 05/08/2026 à 11:28 — Chaque SPV a de nouveau son propre résumé
+
+La fiche de **Parallel Invest SPV24** décrivait, mot pour mot, l'opération du
+**SPV11** en Normandie — jusqu'à nommer SPV11 dans le texte. Rien à voir avec
+le rattachement du deal, qui était correct : c'est le résumé qui se recopiait
+d'un SPV à l'autre. En cause, une règle qui veut que deux fiches partageant le
+même site web affichent le même pitch — utile pour les boutiques d'une même
+enseigne, absurde pour des SPV, qui portent tous le site de leur plateforme
+tout en étant des opérations différentes.
+
+Désormais, un véhicule d'investissement (les SPV Parallel, Sezame et
+consorts) est traité pour ce qu'il est : une opération à part. Son résumé
+n'est plus déduit du site de la plateforme, plus jamais recopié depuis un SPV
+voisin, et le corriger à la main ne touche plus aucune autre fiche. Il vient
+des communications investisseur de la plateforme dès que la fiche est
+rattachée à son SPV, ou de votre saisie.
+
+Les deux fiches abîmées — **SPV 23 (STOA – Pessac)**, qui affichait la
+plaquette commerciale de Parallel, et **SPV24**, qui affichait SPV11 —
+retrouvent une description de leur propre opération.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau prédicat `isVehicleEntity` dans `convex/lib/pitch.ts` : `sponsor`,
+>   `vascoIssuerId`, ou jeton « SPVn » dans le nom (les lignes SPV de Calte
+>   n'ont pas de `sponsor` — même jeton que `vasco.ts:spvNumberOf`).
+> - Exclusion sur les trois chemins d'écriture du pitch :
+>   `companyEnrichment.enrich` s'arrête pour un véhicule (plus d'héritage du
+>   voisin canonique ni de génération depuis la home du sponsor),
+>   `applyPitchToDomainGroup` saute les lignes véhicules, et
+>   `companies.update` ne propage plus le `summary` édité si l'entité est un
+>   véhicule. `enrichFromVasco` / `applyVascoPitch` restent la source de
+>   vérité, inchangés.
+> - Cause racine : `getTarget` construisait le groupe de domaine sur
+>   `parallel-invest.com` (15 SPV côté Calte) et `pickCanonicalPitch` élisait
+>   le résumé le plus long, recopié tel quel sans appel LLM.
+> - Rattrapage données : `convex/migrations/fixSpvPitches.ts`
+>   (`dryRun`/`apply`), ancré `_id` + garde nom + garde sur le texte erroné,
+>   idempotent. Textes reconstruits depuis les notes de l'entité et le deal
+>   Attio, jamais depuis le site.
+> - Tests : `tests/pitch.test.ts` couvre le prédicat (SPV avec/sans espace,
+>   sponsor, lien VASCO, société ordinaire).
+
+---
+
+## v1.176.0 — 05/08/2026 à 11:24 — Le statut « Exit partiel » disparaît
+
+Le dialogue « Gérer la sortie » ne propose plus que **deux** types : sortie
+totale ou perte totale. Le troisième, « Exit partiel », est retiré.
+
+Il ne servait presque à rien. Un deal en exit partiel était traité **comme un
+deal actif** absolument partout : mêmes multiples, même valeur au tableau de
+bord, même place en haut des listes, même suivi des reportings manquants. Sa
+seule différence visible tenait à un badge vert quand l'argent déjà récupéré
+dépassait le capital investi. En échange, son nom laissait croire qu'il fallait
+le poser dès qu'on encaissait quelque chose — un coupon d'obligation, une
+royaltie, un remboursement — alors que ces rentrées sont le fonctionnement
+normal d'un placement, pas une sortie.
+
+**Une cession partielle se saisit toujours, autrement** : le deal reste
+**actif**, puisque vous en détenez encore une partie. L'argent récupéré se lit
+là où il a toujours été — dans le reçu et dans le multiple réalisé du deal.
+Pensez seulement à mettre à jour la **valorisation** de ce qui reste détenu :
+sans ça, la valeur du portefeuille compte à la fois le cash encaissé et la
+totalité de la ligne d'origine.
+
+Un seul deal était concerné en base, **VIASANA**, repassé en actif. Sa date et
+son produit de cession ont été conservés.
+
+> **🔧 Notes techniques**
+>
+> - Retrait de `partially_exited` du validateur `dealStatus`
+>   (`convex/schema.ts`, `convex/deals.ts:statusValidator`), des schémas
+>   d'outils agent (`convex/agentTools.ts`) et MCP (`convex/mcp/registry.ts`).
+> - Purge prod **avant** resserrement (règle « purger d'abord ») : VIASANA
+>   (`calte`) patché sur le seul champ `status` → `active`, ce qui préserve
+>   `exitedDate`/`exitProceeds` là où le geste « Annuler la sortie » les aurait
+>   mis à `null`. Tracé dans `MIGRATIONS.md`.
+> - Simplifications des tests de statut devenus binaires :
+>   `convex/dashboard.ts` (`isActive`), `convex/lib/reportFreshness.ts` (la
+>   boucle sur deux statuts devient un seul `withIndex('by_org_status')`),
+>   `convex/agentTools.ts` (`activeDeals`).
+> - `convex/lib/attioSync.ts` : `DealStatus` resserré et `STATUS_RANK`
+>   renuméroté (`pending 0 < active 1 < fully_exited = written_off 2`) — le
+>   ratchet forward-only est inchangé.
+> - `src/lib/dealStatusBadge.ts` : suppression de la branche « win-only »
+>   (v1.126.0) ; `dealBucket` n'a plus de cas particulier. Un seul badge, même
+>   palette.
+> - `src/components/deals/ExitDealDialog.tsx` : `EXIT_STATUSES` passe à deux
+>   entrées. `CompanyDealsTable.tsx` : `STATUS_ORDER` allégé.
+> - i18n : 4 clés `status.partially_exited` retirées (`participations` +
+>   `chat`, en & fr).
+> - `convex/airtableImport.ts` : la valeur Airtable legacy « Exit partiel »
+>   mappe désormais sur `active` (mapping explicite, pas le fallback).
+> - Docs : `docs/produit/05-deals.md`, `TESTING.md` (SH17, TD5, DL7),
+>   `KNOWN_ISSUES.md` (rangs Attio), `MIGRATIONS.md`.
+
+---
+
+## v1.175.1 — 05/08/2026 à 10:55 — Les listes déroulantes des fiches s'enregistrent enfin
+
+Sur une fiche deal, choisir « Trimestriel » dans **Périodicité du coupon**
+ne servait à rien : la ligne se refermait, le champ restait sur « — », et
+rien n'indiquait que le choix venait d'être perdu. Même chose partout
+ailleurs pour un champ à choix multiple édité au clic — **Type de fonds**
+(« Private equity »…) sur un deal de fonds, mais aussi Remboursement,
+Durée, Tour, Type de SAFE et Type de bien.
+
+Le problème ne touchait **que** ces champs à liste déroulante. Les montants,
+pourcentages, dates et textes s'enregistraient normalement, ce qui rendait
+la panne d'autant plus déroutante : sur la même colonne de droite, un
+champ sur deux répondait.
+
+C'est corrigé : un choix dans une liste déroulante s'écrit immédiatement,
+avec le même retour que les autres champs (« Modifications enregistrées »),
+et la valeur est toujours là après rechargement de la page. Le correctif
+est fait dans le composant d'édition partagé, donc il vaut pour **tous**
+les champs à choix d'Albo OS, présents et à venir.
+
+> **🔧 Notes techniques**
+>
+> - Cause : dans `src/components/ui/inline-field.tsx`, l'éditeur des champs
+>   `format: 'enum'` rendait un `<Select open defaultValue=…>` (Radix) —
+>   donc une valeur **non contrôlée**. Depuis
+>   `@radix-ui/react-use-controllable-state` ≥ 1.2, `onValueChange` n'est
+>   appelé **synchronement** que si la valeur est **contrôlée** ; en non
+>   contrôlé, l'appel est différé dans un `useEffect`.
+> - Radix appelle `onValueChange` puis `onOpenChange(false)` ; notre
+>   `onOpenChange` fait `setEditing(false)`, ce qui **démonte le `Select`
+>   dans le même commit React**. L'effet différé n'a jamais lieu → `onCommit`
+>   jamais appelé → aucun `deals.update`, sans erreur ni toast.
+> - Correctif : `value={typeof rawValue === 'string' ? rawValue : ''}` à la
+>   place de `defaultValue` (Radix traite `''` comme « pas de valeur » et
+>   affiche le placeholder). Un seul prop, dans le composant partagé, donc
+>   valable pour tous les enums (`ENUM_FIELD_VALUES`).
+> - **Audit de tous les sélecteurs de l'app** (le bug ne devait pas dormir
+>   ailleurs) : sur les 34 `<Select>` de `src/`, 33 étaient déjà contrôlés ;
+>   toutes les `Checkbox` aussi ; les deux `Tabs` non contrôlés (`me.tsx`,
+>   `cash.index.tsx`) ne déclenchent aucune écriture ; les combobox
+>   (`SectorCombobox`, `CompanyCombobox`, `DealCombobox`) appellent leur
+>   `onChange` elles-mêmes, donc synchronement. Seul autre non contrôlé : le
+>   sélecteur de compte bancaire de la fiche placement (`placements.$dealId.tsx`,
+>   bloc « Enveloppe ») — il **marchait** (son démontage attend l'aller-retour
+>   de la mutation), passé en `value=""` par prudence.
+> - Non concernés, vérifiés : les `Select` de `DealFieldInput` (dialog
+>   d'édition, restent montés) et `SectorCombobox` (appelle `onChange`
+>   lui-même, synchrone).
+> - Règle ajoutée dans `KNOWN_ISSUES.md` § « Édition inline des fiches » :
+>   tout contrôle Radix dont la sélection le démonte doit être **contrôlé**.
+>   `TESTING.md` FD38 durci (le choix enum doit survivre au rechargement).
+
+---
+
+## v1.175.0 — 04/08/2026 à 19:21 — Créer une société ou un deal depuis Claude, sans ouvrir l'app
+
+Le connecteur Claude savait lire le portefeuille, rien de plus. Pour entrer
+une nouvelle boîte ou une nouvelle participation, il fallait revenir dans
+l'app — soit remplir le formulaire à la main, soit passer par l'assistant du
+panneau latéral. Deux allers-retours pour une information qu'on venait déjà
+de dicter.
+
+Le connecteur sait maintenant **écrire**. Vous donnez l'info en vrac, en une
+phrase, et c'est Claude qui range dans les bonnes cases.
+
+- **Quatre gestes possibles** : créer une société du portefeuille, créer un
+  deal, compléter une société existante, compléter un deal existant. Le reste
+  du connecteur ne change pas.
+- **Vous validez avant, toujours** : le connecteur annonce désormais quels
+  outils modifient les données, et Claude demande votre accord avant chaque
+  écriture. Rien ne part sans un clic de votre part.
+- **Un lien pour vérifier** : chaque création renvoie l'adresse de la fiche
+  dans l'app. Un clic et vous êtes dessus pour relire ou corriger.
+- **Il prévient au lieu de bloquer** : si une société ressemble à une fiche
+  déjà en base — même site, même nom à la forme juridique près — la fiche est
+  quand même créée, mais Claude vous signale les doublons possibles avec leurs
+  liens. Même chose pour un deal entre le même investisseur et la même cible :
+  c'est parfois un vrai second tour, à vous de juger. Seule exception, le
+  SIREN : un numéro déjà utilisé par une autre société est refusé net.
+- **Une limite assumée** : les paramètres de contrat de royalties (plan
+  d'affaires trimestriel, plancher et plafond de multiple) restent modifiables
+  uniquement dans l'app, sur leur écran dédié.
+
+> **🔧 Notes techniques**
+>
+> - Registre MCP (`convex/mcp/registry.ts`) : quatre outils d'écriture
+>   `createCompany` / `updateCompany` / `createDeal` / `updateDeal`, montants
+>   en cents, taux en bps, dates en ISO `YYYY-MM-DD` converties par
+>   `optionalISODate`. Schéma financier factorisé dans `dealValueSchema` +
+>   `dealValueArgs`. Les énums viennent des sources de vérité existantes
+>   (`lib/sectors.ts`, `lib/instruments.ts`), jamais redéclarées.
+> - `defineTool` prend un flag `write` et calcule `annotations`
+>   (`readOnlyHint`), émises dans `tools/list` (`convex/mcp/server.ts`) : c'est
+>   le signal MCP standard qui fait demander confirmation au client, puisque le
+>   `needsApproval` du chat in-app n'a pas d'équivalent hors app.
+> - Pas de mutation dupliquée : les internes existants de `convex/agentTools.ts`
+>   (`createCompanyInternal`, `createDealInternal`, `update*Internal`) sont
+>   élargis en champs **optionnels**. Les schémas zod des outils du chat sont
+>   inchangés — ils n'envoient simplement jamais les nouveaux champs. Effet de
+>   bord additif assumé : ces internes renvoient maintenant aussi `similar`,
+>   que l'agent in-app voit également.
+> - Détection de quasi-doublons dans `convex/lib/duplicates.ts`
+>   (`normalizeCompanyName` : accents, ponctuation et suffixe juridique repliés ;
+>   `findSimilarCompanies` sur domaine/nom, `findSimilarDeals` sur
+>   investisseur+cible). Jamais bloquant, sauf `assertSirenFree` — invariant
+>   déjà en place, exporté depuis `convex/companies.ts` pour éviter une seconde
+>   implémentation. Tests purs dans `tests/duplicates.test.ts`.
+> - Liens profonds construits depuis `SITE_URL`, avec routage
+>   `placements/` vs `deals/` via `isTreasuryPlacement`.
+
+---
+
+## v1.174.1 — 04/08/2026 à 19:09 — L'alerte « boîte silencieuse » écoute enfin les SPV
+
+L'alerte lancée ce matin criait au silence sur des sociétés qui parlaient
+pourtant très récemment : tous les SPV Parallel de CALTE portaient une
+pastille ambre alors que leurs communications dataient de quelques
+semaines.
+
+La cause tient en une phrase : l'alerte ne lisait que les rapports reçus
+**par email**. Or un SPV n'envoie jamais de mail — il **publie** sur le
+portail de son émetteur, et ces communications s'affichent déjà dans la
+fiche société. L'alerte regardait la seule boîte aux lettres, là où ces
+sociétés-là ne passent jamais.
+
+Désormais les deux canaux comptent à égalité : un rapport reçu par email
+et une communication publiée sur le portail remettent le compteur à zéro
+de la même façon. Le survol de la pastille précise **par quel canal** la
+dernière nouvelle est arrivée — « Dernier report reçu il y a 5 mois » ou
+« Dernière communication il y a 5 mois » — pour savoir où aller chercher.
+
+Un point à connaître : une entité ne bénéficie de ce rattrapage que si
+elle est **reliée à son émetteur** dans ses Intégrations. Un SPV non relié
+reste vu comme muet, puisque rien ne permet de savoir où il publie.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/reportFreshness.ts` : `listSilentCompanies` lit une seconde
+>   source, `vascoCommunicationsCache`, en plus de `companyReports`. La map
+>   `${vascoClientSlug}:${vascoIssuerId}` → `companyId` est construite depuis
+>   les `companies` déjà chargées ; le cache n'est lu que si au moins une
+>   entité porte un lien (pas d'abonnement Convex inutile sur une org sans
+>   connexion portail).
+> - `publishDate` est une chaîne ISO du portail : une date absente ou
+>   illisible est **écartée** plutôt que repliée sur `fetchedAt`, qui vaut
+>   toujours « aujourd'hui » et éteindrait l'alerte pour de mauvaises
+>   raisons.
+> - `SilentCompany.lastReportAt` devient `lastNewsAt`, plus `lastNewsSource`
+>   (`'report' | 'vasco'`) : le tooltip doit nommer le canal, sinon il envoie
+>   chercher un email qui n'existe pas. Les trois consommateurs suivent
+>   (`ParticipationsTable`, `todo.tsx`, outil agent `listSilentCompanies`).
+> - `convex/regression.reportFreshness.test.ts` : 4 tests de plus (10 au
+>   total) — communication récente vs vieille, entité non reliée qui ne lit
+>   rien du cache de l'org, communication sans date, et canal de la dernière
+>   nouvelle.
+> - Limite assumée : si la connexion au portail casse, les communications
+>   cessent d'être rafraîchies et l'alerte finit par se déclencher à tort.
+>   Non traité ici.
+
+---
+
+## v1.174.0 — 04/08/2026 à 16:54 — Les boîtes qui ne donnent plus de nouvelles se signalent toutes seules
+
+Une participation qui cesse de reporter ne fait pas de bruit : c'est
+justement le problème. Il fallait ouvrir l'onglet **À faire** pour s'en
+apercevoir, et le délai y était figé à trois mois pour tout le monde.
+
+- **Une pastille d'alerte dans la liste des participations**, à côté du nom
+  de la société. Au survol : depuis quand le dernier rapport est arrivé, et
+  **jusqu'à quelle période il couvrait** — un rapport reçu en mars peut ne
+  couvrir que janvier, et les deux dates ne disent pas la même chose.
+- **Le délai se règle par organisation** (Réglages → Général), à **4 mois**
+  par défaut. Le changer déplace le signal partout à la fois : la liste des
+  participations, l'onglet À faire et l'assistant disent toujours la même
+  chose.
+- **Les boîtes qui n'ont jamais reporté comptent aussi**, mais à partir du
+  **versement des fonds** : des fonds virés il y a deux semaines ne doivent
+  encore rien. Jusqu'ici elles étaient simplement invisibles.
+- **L'assistant sait répondre** à « quelles boîtes ne nous ont pas reporté
+  depuis longtemps ? », dans le chat comme sur Telegram.
+
+Le délai est toujours mesuré sur la **date de réception** d'un rapport, pas
+sur la période qu'il couvre : sinon une société qui reporte au trimestre
+paraîtrait en retard le lendemain de son envoi. Les term sheets en cours et
+les positions entièrement sorties ne sont jamais signalés.
+
+> **🔧 Notes techniques**
+>
+> - Détection centralisée dans `convex/lib/reportFreshness.ts`
+>   (`listSilentCompanies`) : un seul scan indexé `by_org` des
+>   `companyReports` pour le dernier `emailDate` et le dernier
+>   `periodSortDate` par société ; les transactions ne sont lues que pour les
+>   sociétés sans aucun rapport (`firstOutflowAt` sur l'index `by_deal`,
+>   repli sur `signedDate`). Scope : `companies.kind = 'portfolio'` non
+>   archivées, cibles d'un deal `active` / `partially_exited`.
+> - Seuil porté par `organizations.reportSilenceMonths` (optionnel, défaut
+>   `DEFAULT_SILENCE_MONTHS = 4`, bornes 1-24 validées dans
+>   `organizations.updateGeneral` et dans le schéma Zod du formulaire).
+> - Un producteur, trois consommateurs : `deals.listParticipations` et
+>   `aggregate.listParticipations` taguent leurs lignes via
+>   `withReportAlerts` (jamais sur les buckets `pending` / `settled`),
+>   `todo.getTodo` remplace sa boucle à N requêtes par le helper, et
+>   `companyReports.silentInternal` sert l'outil agent `listSilentCompanies`
+>   (lecture seule, `readMembership` sur la scope key du thread).
+> - Front : `SilenceBadge` local à `ParticipationsTable.tsx` (tooltip shadcn,
+>   le `TooltipProvider` vient du `SidebarProvider` du layout), champ
+>   « Alerte reporting » dans `settings/general.tsx`, i18n sous
+>   `participations:silence.*`, `todo:reports.*` et
+>   `settings:general.reportSilence*`.
+> - Invariants pinnés dans `convex/regression.reportFreshness.test.ts`
+>   (réception vs période couverte, décaissement pointé prioritaire sur la
+>   signature, seuil par org, exclusion des sorties et des archivées).
+
+---
+
+## v1.173.0 — 04/08/2026 à 16:48 — Un deal en term sheet passe en actif dès que l'argent part
+
+Jusqu'ici, un deal créé en **term sheet** y restait bloqué. On pouvait pointer
+le virement, voir le décaissé apparaître sur sa fiche — le deal continuait
+d'être compté parmi les engagements à venir, et rien dans l'application ne
+permettait de le passer en actif : il fallait repasser par Attio.
+
+C'est réglé : **pointer une sortie sur un deal en term sheet le fait passer en
+actif**. L'argent est parti, la position existe, elle sort de la liste des
+term sheets — dans la fiche, dans la liste des deals et dans les
+participations, sans rien avoir à faire de plus.
+
+Un seul versement suffit : inutile d'attendre que l'engagement soit couvert,
+un fonds étant bel et bien actif dès son premier appel de capital.
+
+Deux précisions :
+
+- la bascule ne va que dans ce sens — détacher la transaction ensuite ne
+  ramène pas le deal en term sheet, et un deal déjà sorti n'est jamais
+  ramené en actif ;
+- seules les **sorties** déclenchent le passage : pointer un retour ou une
+  distribution laisse le deal en term sheet.
+
+Passer le deal au stage « Invested » dans Attio continue bien sûr de
+fonctionner : les deux chemins mènent au même statut. En revanche les deals
+pointés **avant** cette mise à jour ne sont pas rattrapés — détacher puis
+repointer leur virement les fait basculer.
+
+> **🔧 Notes techniques**
+>
+> - La règle vit dans `applyMatchToDeal` (`convex/lib/pointage.ts`), le cœur
+>   partagé du pointage : elle couvre donc d'un coup la mutation manuelle
+>   `transactions.matchTransaction` et l'outil de pointage de l'agent
+>   (`agentToolsPointage.ts`), sans les toucher.
+> - Condition volontairement minimale : `deal.status === 'pending'` **et**
+>   `tx.direction === 'out'` → `patch('deals', dealId, { status: 'active' })`.
+>   Pas de seuil « décaissé ≥ engagé », qui laisserait un `fund_lp` appelé à
+>   30 % en term sheet.
+> - Forward-only, aligné sur `advancesStatus` du chemin Attio « Invested »
+>   (`convex/attioSync.ts`) : les autres statuts sont intouchés et
+>   `applyUnmatch` ne rétrograde pas (un deal `active` sans transaction est un
+>   cas légitime — import Airtable, webhook Attio).
+> - Couverture : 4 tests dans `convex/regression.pointage.test.ts` (sortie
+>   partielle → `active`, dépointage non rétrogradant, entrée sans effet,
+>   deal `fully_exited` inchangé). Rien d'autre n'a bougé : ni schéma, ni UI,
+>   ni migration.
+
+---
 
 ## v1.172.0 — 03/08/2026 à 18:10 — Les rapports et les documents d'une société vivent enfin au même endroit
 

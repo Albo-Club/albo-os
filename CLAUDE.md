@@ -244,8 +244,8 @@ alimentées (Powens/import) ; le pointage transaction → deal vit dans
 append-only — cf. `KNOWN_ISSUES.md` « Pointage transaction → deal »).
 Le prévisionnel de cash vit dans `forecastRules` + `forecastEntries`
 (`convex/forecasts.ts` : `expandRules` idempotent, `getForecastGrid`
-catégories × mois, rapprochement `markEntryRealized` +
-`suggestForecastMatches` — cf. `KNOWN_ISSUES.md` « Cash flow forecast »). Le passif vit dans `equityPositions` + `intercompanyLoans`,
+catégories × mois, rapprochement **manuel** `markEntryRealized` — cf.
+`KNOWN_ISSUES.md` « Cash flow forecast »). Le passif vit dans `equityPositions` + `intercompanyLoans`,
 avec pointage généralisé `transactions.allocation` et soldes de C/C
 **dérivés** des transactions (`convex/liabilities.ts:getLiabilities` —
 cf. `KNOWN_ISSUES.md` « Passif »). La table legacy `forecasts` reste
@@ -278,7 +278,7 @@ invitations, uploads, account lifecycle, super-admin, AI chat, sécurité.
 - **Backend** : Convex (`^1.x`) — queries, mutations, actions, HTTP routes, file storage, components.
 - **Auth** : Better Auth via `@convex-dev/better-auth` with `magicLink()` + `convex()`. Multi-tenant (orgs/members/invitations/roles) is implemented **natively in the Convex schema** (`organizations`, `organizationMembers`, `invitations` tables). The BA `organization()` plugin is deliberately **not loaded** — its tables aren't first-class Convex (no `withIndex` joins). See `KNOWN_ISSUES.md` for trade-offs.
 - **Emails** : `@convex-dev/resend` for transactional.
-- **AI** : `@convex-dev/agent` backend (default model `deepseek/deepseek-v4-pro` via OpenRouter, override via `OPENROUTER_MODEL`) + front sur `useUIMessages` de `@convex-dev/agent/react` (panneau latéral persistant `src/components/ai/AiPanel.tsx`, ⌘J/Ctrl+J). La couche présentation vient de **Vercel AI Elements** vendoré dans `src/components/ai-elements/` (composer `PromptInput` multiligne, `Conversation` stick-to-bottom, markdown streaming via `streamdown`, tool calls dépliables, suggestions) — fichiers à nous, mais re-appliquer les trims documentés dans `KNOWN_ISSUES.md` « Streamdown (panneau AI) » après toute maj depuis le registry. Threads/rename/stop restent maison. Streaming in-app via mutation `sendMessage` + query `listMessages` (la route HTTP `/api/chat` est un one-shot annexe). Provider abstracted via `getModel()` in `convex/agent.ts` ; system prompt par message via `buildInstructions` (`convex/lib/instructions.ts`, contexte route + org). L'agent expose des **outils DB scopés à l'org** (~50, un fichier par domaine : `convex/agentTools.ts` portfolio/cash, `agentToolsPointage.ts` (+ `suggestMatches`), `agentToolsLiabilities.ts`, `agentToolsForecasts.ts`, `agentToolsValuations.ts`, `agentToolsProjections.ts` BP + KPIs, `agentToolsReports.ts` reportings + synthèse IA en lecture seule, `agentToolsDocuments.ts` recherche sémantique). Chaque outil re-vérifie l'appartenance via la scope key `${orgId}:${userId}` du thread (l'action de stream n'a pas d'identité auth → `actorUserId` passé explicitement, helpers `convex/lib/agentScope.ts`). Les **écritures portent `needsApproval: true`** : la génération s'arrête, l'UI affiche Confirmer/Refuser, et `chat.respondToToolApproval` relance le stream — cf. `KNOWN_ISSUES.md` « Approbation d'outils (panneau AI) ». Tout nouvel outil d'écriture DOIT porter ce flag ; les suppressions restent hors agent (sauf `deleteForecastRule`).
+- **AI** : `@convex-dev/agent` backend (default model `deepseek/deepseek-v4-pro` via OpenRouter, override via `OPENROUTER_MODEL`) + front sur `useUIMessages` de `@convex-dev/agent/react` (panneau latéral persistant `src/components/ai/AiPanel.tsx`, ⌘J/Ctrl+J). La couche présentation vient de **Vercel AI Elements** vendoré dans `src/components/ai-elements/` (composer `PromptInput` multiligne, `Conversation` stick-to-bottom, markdown streaming via `streamdown`, tool calls dépliables, suggestions) — fichiers à nous, mais re-appliquer les trims documentés dans `KNOWN_ISSUES.md` « Streamdown (panneau AI) » après toute maj depuis le registry. Threads/rename/stop restent maison. Streaming in-app via mutation `sendMessage` + query `listMessages` (la route HTTP `/api/chat` est un one-shot annexe). Provider abstracted via `getModel()` in `convex/agent.ts` ; system prompt par message via `buildInstructions` (`convex/lib/instructions.ts`, contexte route + org). L'agent expose des **outils DB scopés à l'org** (~50, un fichier par domaine : `convex/agentTools.ts` portfolio/cash, `agentToolsPointage.ts`, `agentToolsLiabilities.ts`, `agentToolsForecasts.ts`, `agentToolsValuations.ts`, `agentToolsProjections.ts` BP + KPIs, `agentToolsReports.ts` reportings + synthèse IA en lecture seule, `agentToolsDocuments.ts` recherche sémantique). Chaque outil re-vérifie l'appartenance via la scope key `${orgId}:${userId}` du thread (l'action de stream n'a pas d'identité auth → `actorUserId` passé explicitement, helpers `convex/lib/agentScope.ts`). Les **écritures portent `needsApproval: true`** : la génération s'arrête, l'UI affiche Confirmer/Refuser, et `chat.respondToToolApproval` relance le stream — cf. `KNOWN_ISSUES.md` « Approbation d'outils (panneau AI) ». Tout nouvel outil d'écriture DOIT porter ce flag ; les suppressions restent hors agent (sauf `deleteForecastRule`). ⚠️ Ne pas confondre avec le serveur **MCP** (`convex/mcp/`), qui expose ses propres outils à des clients externes : `needsApproval` n'y a aucun effet (pas d'UI in-app pour l'afficher), c'est le flag `write: true` de `defineTool` — donc l'annotation `readOnlyHint: false` — qui fait demander confirmation. Tout nouvel outil MCP qui écrit DOIT le porter ; cf. `KNOWN_ISSUES.md` « Serveur MCP distant » point 6.
 - **File storage** : Convex native (`ctx.storage.generateUploadUrl()`), 20 MB cap.
 - **Observability** : Sentry (front + Convex actions). CORS strict, security headers, HMAC verify on webhooks.
 
@@ -531,6 +531,14 @@ export const remove = mutation({
   (`convex/lib/userPrefs.ts`). Same family: a mutation fired from a
   `useEffect` that depends on a Convex query observing the written data
   (cross-tab infinite loop). See `KNOWN_ISSUES.md` "Hot `users` row".
+- ❌ Une requête de liste qui `.collect()` une table dont les lignes portent
+  un champ texte volumineux (`rawContent`, `cleanedHtml`, `bodyHtml`,
+  `extractedText`…) pour n'en tirer que quelques champs légers. Convex lit la
+  **ligne entière** et facture les octets : le `.map()` de projection ne
+  réduit rien. Soit dénormaliser l'agrégat sur une ligne déjà lue (pattern
+  `companies.lastReportAt`), soit sortir le texte en table annexe (pattern
+  `documentTexts`). Cf. `KNOWN_ISSUES.md` « Database I/O : un gros champ
+  texte sur une ligne lue en liste ».
 - ❌ Interpolating a user-controlled value (name, org name, email address,
   free-text label, message relayed by a third party) into the **HTML**
   branch of a `convex/emailTemplates.ts` template without `esc()`. The
@@ -587,6 +595,17 @@ export const remove = mutation({
   has no built-in height cap, so tall content overflows the viewport with no
   way to reach the lower fields or the footer actions. Pattern already in
   `deals.$dealId.tsx`, `RoyaltiesPanel.tsx`, `CompanyReportsSection.tsx`.
+- ❌ Réintroduire une **suggestion de rapprochement** — puce dans la file de
+  pointage, carte « rapprochements suggérés », classement de candidats,
+  présélection d'une transaction ou d'une échéance, outil agent qui propose
+  une cible. Tout ce workflow a été **supprimé en août 2026** parce qu'il
+  produisait des rapprochements faux en silence (cf. `KNOWN_ISSUES.md`
+  « Pointage transaction → deal »). Le pointage et la réalisation d'échéance
+  sont des gestes **100 % humains** : l'app liste (date desc + recherche
+  libre), l'utilisateur choisit. Un sélecteur n'est pas une proposition tant
+  qu'il ne trie pas par vraisemblance. Le futur moteur se reconstruira sur
+  les cas réels collectés à la main et sur `matchingDecisions` — pas en
+  re-câblant l'ancien.
 - ❌ Une nouvelle connexion à une plateforme externe avec sa table et son CRUD
   dédiés. Déclarer la plateforme dans le registre `convex/lib/connectors.ts`
   et passer par le noyau commun `convex/connections.ts` (table générique

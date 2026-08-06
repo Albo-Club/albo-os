@@ -101,14 +101,8 @@
     "amount": "Montant",
     "amountMin": "Montant min (€)",
     "amountMax": "Montant max (€)",
-    "amountClear": "Effacer le filtre"
-  },
-  "suggestion": {
-    "label": "Proposition",
-    "attachTo": "rattacher à",
-    "classifyAs": "classer en",
-    "validate": "Valider",
-    "dismiss": "Refuser"
+    "amountClear": "Effacer le filtre",
+    "reset": "Réinitialiser"
   },
   "search": {
     "placeholder": "Rechercher une transaction…",
@@ -162,10 +156,5 @@
     "cancelEntryTitle": "Annuler cette échéance ?",
     "cancelEntryBody": "« {{label}} » du {{date}} ({{amount}}) ne comptera plus dans le solde projeté.",
     "entryCancelled": "Échéance annulée"
-  },
-  "pendingEntry": {
-    "toast": "Ce deal a une échéance prévue en attente : « {{label}} » du {{date}} ({{amount}}).",
-    "realize": "Réaliser l'échéance",
-    "realized": "Échéance réalisée — elle sort du prévisionnel."
   }
 }

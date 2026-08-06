@@ -14,16 +14,24 @@ import { z } from 'zod/v3'
 
 import { internal } from './_generated/api'
 import { internalMutation, internalQuery } from './_generated/server'
+import { assertSirenFree, normalizeSiren } from './companies'
 import {
   dealRealizedMetrics,
+  statusValidator as dealStatusValidator,
   lastValuationCents,
   transactionTotals,
 } from './deals'
 import { parseScope, readMembership } from './lib/agentScope'
+import { findSimilarCompanies, findSimilarDeals } from './lib/duplicates'
 import { isAvailableAccount } from './lib/bankAccounts'
 import { normalizeDomain } from './lib/domain'
 import { buildSearchText } from './lib/searchText'
-import { INSTRUMENTS, instrumentValidator } from './lib/instruments'
+import {
+  INSTRUMENTS,
+  fundTypeValidator,
+  instrumentValidator,
+  roundTypeValidator,
+} from './lib/instruments'
 import { residualValueCents } from './lib/metrics'
 import { SECTOR_SLUGS } from './lib/sectors'
 import type { Doc, Id } from './_generated/dataModel'
@@ -151,8 +159,15 @@ export const createCompanyInternal = internalMutation({
     sector: v.optional(v.string()),
     domain: v.optional(v.string()),
     countryCode: v.optional(v.string()),
+    // Legal identity — only ever sent by the MCP tools (the chat agent's own
+    // schema stops at the four fields above).
+    legalName: v.optional(v.string()),
+    siren: v.optional(v.string()),
+    legalForm: v.optional(v.string()),
+    totalShares: v.optional(v.number()),
+    notes: v.optional(v.string()),
   },
-  handler: async (ctx, { orgId, actorUserId, name, sector, domain, countryCode }) => {
+  handler: async (ctx, { orgId, actorUserId, name, domain, siren, ...rest }) => {
     await readMembership(ctx, orgId, actorUserId)
     const trimmed = name.trim()
     if (!trimmed) throw new ConvexError('invalid_name')
@@ -160,14 +175,24 @@ export const createCompanyInternal = internalMutation({
     const cleanedDomain = domain?.trim()
       ? (normalizeDomain(domain.trim()) ?? domain.trim())
       : undefined
+    // SIREN uniqueness is an invariant of the app, not a warning: same guard
+    // as companies.create, so the MCP path cannot introduce a clash.
+    const cleanedSiren = siren !== undefined ? normalizeSiren(siren) : undefined
+    if (cleanedSiren) await assertSirenFree(ctx, orgId, cleanedSiren)
+    // Lookalikes never block a creation here — they are reported back so the
+    // user arbitrates (cf. convex/lib/duplicates.ts).
+    const similar = await findSimilarCompanies(ctx, orgId, {
+      name: trimmed,
+      domain: cleanedDomain,
+    })
     // The agent only creates portfolio companies (never group entities).
     const id = await ctx.db.insert('companies', {
+      ...rest,
       orgId,
       name: trimmed,
       kind: 'portfolio',
-      sector,
       domain: cleanedDomain,
-      countryCode,
+      siren: cleanedSiren,
     })
     // Domain provided → auto-fill oneLiner + summary from the website
     // (additive — cf. convex/companyEnrichment.ts).
@@ -176,7 +201,7 @@ export const createCompanyInternal = internalMutation({
         companyId: id,
       })
     }
-    return { _id: id, name: trimmed }
+    return { _id: id, name: trimmed, similar }
   },
 })
 
@@ -203,6 +228,28 @@ export const createDealInternal = internalMutation({
     interestRate: v.optional(v.number()),
     signedDate: v.optional(v.number()),
     notes: v.optional(v.string()),
+    // Everything below is only ever sent by the MCP tools — the chat agent's
+    // own schema stops at the fields above.
+    name: v.optional(v.string()),
+    status: v.optional(dealStatusValidator),
+    sharesAcquired: v.optional(v.number()),
+    pricePerShare: v.optional(v.number()),
+    roundType: v.optional(roundTypeValidator),
+    roundSize: v.optional(v.number()),
+    preMoneyValuation: v.optional(v.number()),
+    postMoneyValuation: v.optional(v.number()),
+    entryValuation: v.optional(v.number()),
+    ownershipPct: v.optional(v.number()),
+    valuationCap: v.optional(v.number()),
+    discount: v.optional(v.number()),
+    principalAmount: v.optional(v.number()),
+    maturityDate: v.optional(v.number()),
+    closingDate: v.optional(v.number()),
+    exitedDate: v.optional(v.number()),
+    exitProceeds: v.optional(v.number()),
+    fundType: v.optional(fundTypeValidator),
+    vintageYear: v.optional(v.number()),
+    managementCompany: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await readMembership(ctx, args.orgId, args.actorUserId)
@@ -223,13 +270,19 @@ export const createDealInternal = internalMutation({
     if (!investor.kind.startsWith('group_')) {
       throw new ConvexError('investor_must_be_group_entity')
     }
-    const { actorUserId, ...rest } = args
+    // Warning only, never a block: a follow-on on a company we already back is
+    // a legitimate second deal (cf. convex/lib/duplicates.ts).
+    const similar = await findSimilarDeals(ctx, args.orgId, {
+      investorCompanyId: args.investorCompanyId,
+      targetCompanyId: args.targetCompanyId,
+    })
+    const { actorUserId, status, ...rest } = args
     const id = await ctx.db.insert('deals', {
       ...rest,
       currency: 'EUR',
-      status: 'active',
+      status: status ?? 'active',
     })
-    return { _id: id }
+    return { _id: id, similar }
   },
 })
 
@@ -371,18 +424,50 @@ export const updateDealInternal = internalMutation({
     status: v.optional(
       v.union(
         v.literal('active'),
-        v.literal('partially_exited'),
         v.literal('fully_exited'),
         v.literal('written_off'),
       ),
     ),
+    // Everything below is only ever sent by the MCP tools — the chat agent's
+    // own schema stops at the fields above.
+    name: v.optional(v.string()),
+    instrumentKind: v.optional(instrumentValidator),
+    viaSpvCompanyId: v.optional(v.id('companies')),
+    sharesAcquired: v.optional(v.number()),
+    pricePerShare: v.optional(v.number()),
+    roundType: v.optional(roundTypeValidator),
+    roundSize: v.optional(v.number()),
+    preMoneyValuation: v.optional(v.number()),
+    postMoneyValuation: v.optional(v.number()),
+    entryValuation: v.optional(v.number()),
+    ownershipPct: v.optional(v.number()),
+    valuationCap: v.optional(v.number()),
+    discount: v.optional(v.number()),
+    interestRate: v.optional(v.number()),
+    principalAmount: v.optional(v.number()),
+    maturityDate: v.optional(v.number()),
+    signedDate: v.optional(v.number()),
+    closingDate: v.optional(v.number()),
+    exitedDate: v.optional(v.number()),
+    exitProceeds: v.optional(v.number()),
+    fundType: v.optional(fundTypeValidator),
+    vintageYear: v.optional(v.number()),
+    managementCompany: v.optional(v.string()),
   },
   handler: async (ctx, { orgId, actorUserId, dealId, ...patch }) => {
     await readMembership(ctx, orgId, actorUserId)
     const deal = await ctx.db.get("deals", dealId)
     if (!deal || deal.orgId !== orgId) throw new ConvexError('not_found')
+    if (patch.viaSpvCompanyId) {
+      await assertSameOrg(ctx, orgId, patch.viaSpvCompanyId, 'spv_wrong_org')
+    }
     await ctx.db.patch("deals", dealId, patch)
-    return { _id: dealId }
+    // Effective kind after the patch — the MCP layer needs it to build the
+    // right deep link (placements live on their own page).
+    return {
+      _id: dealId,
+      instrumentKind: patch.instrumentKind ?? deal.instrumentKind,
+    }
   },
 })
 
@@ -533,7 +618,7 @@ const updateDeal = createTool({
     committedAmount: z.number().int().optional(),
     paidAmount: z.number().int().optional(),
     status: z
-      .enum(['active', 'partially_exited', 'fully_exited', 'written_off'])
+      .enum(['active', 'fully_exited', 'written_off'])
       .optional(),
     notes: z.string().optional(),
   }),
@@ -679,9 +764,7 @@ export const getDashboardSummaryInternal = internalQuery({
       .query('deals')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
-    const activeDeals = deals.filter(
-      (d) => d.status === 'active' || d.status === 'partially_exited',
-    )
+    const activeDeals = deals.filter((d) => d.status === 'active')
 
     // Per-deal indexed reads (cf. convex/dashboard.ts): a full org-wide
     // transactions collect here made every agent answer using this tool
@@ -790,11 +873,27 @@ export const updateCompanyInternal = internalMutation({
     domain: v.optional(v.string()),
     countryCode: v.optional(v.string()),
     notes: v.optional(v.string()),
+    // Only ever sent by the MCP tools — the chat agent's schema stops above.
+    siren: v.optional(v.string()),
+    legalForm: v.optional(v.string()),
+    totalShares: v.optional(v.number()),
   },
   handler: async (ctx, { orgId, actorUserId, companyId, ...patch }) => {
     await readMembership(ctx, orgId, actorUserId)
     const company = await ctx.db.get('companies', companyId)
     if (!company || company.orgId !== orgId) throw new ConvexError('not_found')
+    // Same normalisation + invariant as companies.update: '' clears the SIREN,
+    // and a clash with another company of the org is refused outright.
+    if (patch.siren !== undefined) {
+      patch.siren = normalizeSiren(patch.siren)
+      if (patch.siren) {
+        await assertSirenFree(ctx, orgId, patch.siren, companyId)
+      }
+    }
+    if (patch.domain !== undefined) {
+      const trimmed = patch.domain.trim()
+      patch.domain = trimmed ? (normalizeDomain(trimmed) ?? trimmed) : undefined
+    }
     await ctx.db.patch('companies', companyId, patch)
     return { _id: companyId }
   },

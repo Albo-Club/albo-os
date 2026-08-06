@@ -39,6 +39,36 @@ chacune. En cas de doute (aucune correspondance, ou plusieurs sociétés
 possibles), le mail atterrit dans la boîte
 [Rapports entrants](12-vue-consolidee.md) pour assignation manuelle.
 
+**Cas des sponsors** (Sezame, Parallel, Anaxago, Rewatt, Virgil…) : leurs
+véhicules partagent tous le même domaine, qui dit donc **qui écrit**, pas
+**de quel véhicule il parle**. Sur ces domaines, le rattachement demande
+que le véhicule soit **nommé dans le message** (« Sezame Immo 6 ») ; sans
+ça, le mail part dans la boîte Rapports entrants pour un rattachement à la
+main, plutôt que d'être rangé au hasard chez un véhicule voisin. Un
+rattachement manuel ne touche lui aussi que le véhicule choisi.
+
+**Quand la même boîte porte deux noms** (`Oprtrs & Co` côté Albo, `OPRTRS
+CLUB` côté Calte) : rien ne permet de deviner qu'il s'agit d'une seule
+participation — vu de l'outil, ces deux lignes se ressemblent autant que
+Sezame Immo 2 et Immo 6, qui sont bien deux véhicules. Le rattachement est
+donc **manuel et assisté** : au moment de choisir, les fiches qui partagent
+le site web dans une **autre organisation** sont proposées en cases à
+cocher (la plus proche en tête), jamais cochées d'avance. Et un report déjà
+rangé garde un bouton « **Rattacher aussi** » pour en ajouter une plus
+tard — la nouvelle s'ajoute, les précédentes ne bougent pas. La file
+signale le cas d'elle-même : un repère « + Calte ? » apparaît quand une
+organisation a une fiche sur le domaine du report sans rien avoir reçu.
+
+**Quand un report s'est rangé au mauvais endroit** — mauvais véhicule d'un
+sponsor, rattachement fait un peu vite — il se **détache**. Depuis la fiche
+société, en ouvrant le report : « Détacher de cette participation ». Depuis
+les Rapports entrants, par la croix sur la puce de la participation. Le
+report quitte cette fiche avec ses fichiers et les KPIs qu'il avait
+renseignés, et la synthèse de la société repart du report précédent. Les
+autres participations rattachées au même report gardent le leur, et le mail
+d'origine reste dans la file : il n'y a plus qu'à le rattacher là où il
+devait aller.
+
 ### 3. Lecture du contenu — toutes les sources
 
 Chaque élément du mail est lu, selon son type :
@@ -85,6 +115,15 @@ mail — ou le même report pour la même période — ne crée **jamais de
 doublon** : la fiche est mise à jour. La synthèse IA de la société est
 relancée à chaque report ingéré.
 
+**Tous les courriers d'une participation ne couvrent pas une période.** Un
+avis de liquidation, une notification juridique, une annonce de levée
+n'ont ni période ni rythme. Ils sont rangés quand même, sans période,
+datés du jour de réception — avec leur titre, leur résumé et leurs points
+clés comme n'importe quel report. Rien n'est inventé : plutôt que de leur
+coller un mois au hasard, la période reste vide. Deux courriers ponctuels
+d'une même société ne se remplacent pas l'un l'autre, et aucun n'écrase le
+report périodique de la même période.
+
 ### 6. La réponse dans le fil
 
 Toute personne qui transfère reçoit une réponse dans son propre fil. Ce
@@ -100,8 +139,12 @@ qu'elle contient dépend de son rôle, réglé dans
   **récapitulatif détaillé** quand c'est rangé (société identifiée et mode
   de rattachement, période, sources lues ✅/⚠️, KPIs cibles trouvés ou
   absents, autres métriques enregistrées, valeurs inhabituelles à
-  vérifier), et le message **actionnable** quand ça coince (la cause + le
-  lien vers la boîte Rapports entrants).
+  vérifier), et le message **actionnable** quand ça coince (la cause, le
+  détail technique de l'échec, et le lien vers la boîte Rapports
+  entrants). Ce même détail technique s'affiche sous le statut de la ligne
+  dans la boîte Rapports entrants : quand une catégorie d'échec est trop
+  générique pour agir (« erreur technique »), c'est là que se lit ce qui
+  s'est réellement passé.
 
 Les autres personnes qui gèrent la file sont prévenues **uniquement quand
 il y a un problème**, par un email séparé. Un report qui se range

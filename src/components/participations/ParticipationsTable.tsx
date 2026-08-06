@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { residualValueCents } from '../../../convex/lib/metrics'
@@ -19,6 +19,11 @@ import {
   TableRow,
 } from '~/components/ui/table'
 import { LoadingLine } from '~/components/ui/spinner'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '~/components/ui/tooltip'
 
 /** Minimal shape of an enriched deal, shared by per-org and aggregated views. */
 export type DealRow = {
@@ -310,6 +315,21 @@ export type CompanyRow = {
    * column then reads "1 sur 2", so the split never looks like a duplicate.
    */
   companyDealTotal?: number
+  /**
+   * Set when the company has gone silent — no report received past the org's
+   * threshold (convex/lib/reportFreshness.ts). Null on the pending and
+   * settled buckets, and on companies that report on time.
+   */
+  reportAlert?: {
+    /** Reception date of the last news, null when it never gave any. */
+    lastNewsAt: number | null
+    /** Channel that carried it: an emailed report, or a portal communication. */
+    lastNewsSource: 'report' | 'vasco' | null
+    /** Most recent period covered by a report, null when unknown. */
+    coverageUntil: number | null
+    /** What the silence runs from: last news, else first disbursement. */
+    sinceAt: number
+  } | null
 }
 
 /**
@@ -639,6 +659,55 @@ export function ParticipationsTable({
   )
 }
 
+/** Whole months elapsed since `from` (display only — 30-day months). */
+const monthsSince = (from: number) =>
+  Math.floor((Date.now() - from) / (30 * 24 * 60 * 60 * 1000))
+
+/**
+ * Amber warning on a participation that stopped giving news. The tooltip
+ * separates the two dates that matter: when the last news LANDED, and how
+ * far its content actually covers — a report received in March can still
+ * only cover January. It also names the channel, so the reader knows whether
+ * to look in the mailbox or on the issuer's portal.
+ */
+function SilenceBadge({
+  alert,
+}: {
+  alert: NonNullable<CompanyRow['reportAlert']>
+}) {
+  const { t } = useTranslation('participations')
+  const { fmtDate } = useFormatters()
+  const since =
+    alert.lastNewsAt === null
+      ? t('silence.never', { date: fmtDate(alert.sinceAt) })
+      : t(
+          alert.lastNewsSource === 'vasco'
+            ? 'silence.lastComm'
+            : 'silence.lastReport',
+          { count: monthsSince(alert.lastNewsAt) },
+        )
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className="shrink-0 text-amber-600 dark:text-amber-500"
+          aria-label={t('silence.title')}
+        >
+          <AlertTriangle className="size-4" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-64">
+        <p className="font-medium">{t('silence.title')}</p>
+        <p>{since}</p>
+        {alert.coverageUntil !== null && (
+          <p>{t('silence.coverage', { date: fmtDate(alert.coverageUntil) })}</p>
+        )}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 function CompanyTableRow({
   row,
   showOrg,
@@ -707,6 +776,7 @@ function CompanyTableRow({
           >
             {row.name}
           </span>
+          {row.reportAlert && <SilenceBadge alert={row.reportAlert} />}
         </span>
       </TableCell>
       <TableCell className={stickyCellClass} style={frozenScore}>

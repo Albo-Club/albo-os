@@ -4,7 +4,7 @@ import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { normalizeDomain } from './lib/domain'
 import { sanitizeKpiTargets } from './lib/metricCatalog'
-import { applyPitchToDomainGroup } from './lib/pitch'
+import { applyPitchToDomainGroup, isVehicleEntity } from './lib/pitch'
 import { personValidator } from './lib/people'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
 import type { DataModel, Id } from './_generated/dataModel'
@@ -22,7 +22,7 @@ const kindValidator = v.union(
 
 /** Normalizes a typed SIREN: strips spaces. '' = clears the field.
  * Throws 'invalid_siren' if non-empty and ≠ 9 digits. */
-function normalizeSiren(raw: string): string | undefined {
+export function normalizeSiren(raw: string): string | undefined {
   const cleaned = raw.replace(/\s/g, '')
   if (cleaned === '') return undefined
   if (!/^\d{9}$/.test(cleaned)) throw new ConvexError('invalid_siren')
@@ -30,7 +30,7 @@ function normalizeSiren(raw: string): string | undefined {
 }
 
 /** Rejects a SIREN already used by another company of the org. */
-async function assertSirenFree(
+export async function assertSirenFree(
   ctx: Ctx,
   orgId: Id<'organizations'>,
   siren: string,
@@ -41,31 +41,6 @@ async function assertSirenFree(
     .withIndex('by_org_siren', (q) => q.eq('orgId', orgId).eq('siren', siren))
     .first()
   if (clash && clash._id !== selfId) throw new ConvexError('siren_already_used')
-}
-
-/**
- * Rejects an Attio company record already anchored to another company.
- *
- * Deliberately GLOBAL, not org-scoped like the SIREN above:
- * `by_attio_company_id` is a global index and the deal sync reads it with
- * `.unique()` (`resolveOrCreateTargetCompany`, convex/attioSync.ts), so a
- * second company claiming the same anchor — in this org or any other — makes
- * the sync throw at its next run. One Attio company ⟷ one Albo company.
- */
-async function assertAttioCompanyIdFree(
-  ctx: Ctx,
-  attioCompanyId: string,
-  selfId: Id<'companies'>,
-) {
-  const clash = await ctx.db
-    .query('companies')
-    .withIndex('by_attio_company_id', (q) =>
-      q.eq('attioCompanyId', attioCompanyId),
-    )
-    .first()
-  if (clash && clash._id !== selfId) {
-    throw new ConvexError('attio_company_already_used')
-  }
 }
 
 export const list = query({
@@ -332,13 +307,12 @@ export const update = mutation({
       const trimmed = patch.domain.trim()
       patch.domain = trimmed ? (normalizeDomain(trimmed) ?? trimmed) : undefined
     }
-    // Attio anchor: trimmed; '' unlinks (mirror of domain). Uniqueness is
-    // global — see assertAttioCompanyIdFree.
+    // Attio anchor: trimmed; '' unlinks (mirror of domain). NOT unique — one
+    // Attio record backs several entities (Attio knows one company "Parallel
+    // Invest" where Albo OS has one entity per SPV). The deal sync picks its
+    // target deterministically — cf. resolveOrCreateTargetCompany.
     if (patch.attioCompanyId !== undefined) {
       patch.attioCompanyId = patch.attioCompanyId.trim() || undefined
-    }
-    if (patch.attioCompanyId) {
-      await assertAttioCompanyIdFree(ctx, patch.attioCompanyId, id)
     }
     // Summary: trimmed; '' clears the field (mirror of domain behaviour).
     if (patch.summary !== undefined) {
@@ -351,8 +325,10 @@ export const update = mutation({
     await ctx.db.patch("companies", id, patch)
     // Same-domain propagation: a pitch edit applies to every non-archived
     // entity of the org sharing the domain, so they stay identical (product
-    // rule — cf. convex/lib/pitch.ts). '' clears propagate too.
-    if ('summary' in patch) {
+    // rule — cf. convex/lib/pitch.ts). '' clears propagate too. A vehicle
+    // (platform SPV) is excluded both ways: its operation description must not
+    // travel to the other SPVs sharing the sponsor's domain.
+    if ('summary' in patch && !isVehicleEntity(company)) {
       const domain = patch.domain !== undefined ? patch.domain : company.domain
       if (domain) {
         await applyPitchToDomainGroup(

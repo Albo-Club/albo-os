@@ -6,8 +6,10 @@
  * candidate entities, and the fund-forward case. The pick is then
  * corroborated DETERMINISTICALLY (author domain == company domain, or
  * company name present in subject/body) — an uncorroborated LLM guess never
- * matches. Accepted matches are expanded to ALL entities representing the
- * same participation (same domain or same name, across both orgs).
+ * matches. A domain shared by several vehicles (a sponsor: Sezame, Parallel…)
+ * corroborates none of them on its own: the name has to pick one, else the
+ * mail goes to review. Accepted matches are expanded to ALL entities
+ * representing the same participation, across both orgs.
  *
  * Outcomes on the inboundEmails row:
  * - matched   → matchedCompanies filled, status back to 'received'
@@ -28,8 +30,11 @@ import { getModel } from './agent'
 import {
   acceptIdentification,
   extractJson,
+  identityKey,
   nameAppearsInText,
   namedIdentities,
+  resolveOnSharedDomains,
+  sharedDomains,
 } from './lib/emailIdentify'
 import type { Id } from './_generated/dataModel'
 
@@ -277,6 +282,9 @@ export const run = internalAction({
     const realSenderEmail = ident.real_sender_email?.toLowerCase().trim() || undefined
     const realDomain = emailDomain(realSenderEmail ?? null)
     const byId = new Map(candidates.map((c) => [String(c.companyId), c]))
+    // A domain identifies a participation only when it carries exactly one:
+    // a sponsor hosts several vehicles on the same one (Sezame Immo 2 / 6).
+    const shared = sharedDomains(candidates)
 
     // Deterministic corroboration of the LLM picks. A pick with no
     // corroborating signal is dropped — the model's word alone never matches.
@@ -295,11 +303,16 @@ export const run = internalAction({
       }
     }
 
+    // On a shared domain, domain corroboration proves the sponsor only: the
+    // name picks the vehicle, and without one the whole domain stays in play
+    // (→ ambiguous below, then attached by hand from the review queue).
+    const resolved = resolveOnSharedDomains(corroborated, candidates, shared)
+
     // The model's confidence only arbitrates when the mail names SEVERAL
     // participations; a single named one is unambiguous evidence on its own.
-    const named = namedIdentities(candidates, row.subject, body)
+    const named = namedIdentities(candidates, row.subject, body, shared)
     const accepted = acceptIdentification({
-      corroboratedCount: corroborated.length,
+      corroboratedCount: resolved.length,
       namedCount: named.size,
       confidence: ident.confidence,
     })
@@ -316,11 +329,10 @@ export const run = internalAction({
       return null
     }
 
-    // Ambiguity check: the corroborated picks must all represent the SAME
-    // participation. Identity key = domain when present, else normalized name.
-    const identityKeys = new Set(
-      corroborated.map(({ candidate }) => candidate.domain ?? candidate.name.toLowerCase()),
-    )
+    // Ambiguity check: the resolved picks must all represent the SAME
+    // participation (cf. `identityKey` — the domain when it identifies one,
+    // else the name).
+    const identityKeys = new Set(resolved.map(({ candidate }) => identityKey(candidate, shared)))
     if (identityKeys.size > 1) {
       console.log(
         `[reportIdentify] ambiguous match for ${row.agentmailMessageId}: [${[...identityKeys].join(', ')}]`,
@@ -333,25 +345,12 @@ export const run = internalAction({
       return null
     }
 
-    // Fan-out: expand to ALL entities representing this participation —
-    // same domain, or exact same name — across both orgs.
-    const matchedIds = new Set(corroborated.map(({ candidate }) => String(candidate.companyId)))
-    const domains = new Set(
-      corroborated.map(({ candidate }) => candidate.domain).filter((d): d is string => !!d),
-    )
-    const names = new Set(corroborated.map(({ candidate }) => candidate.name.toLowerCase()))
-    for (const c of candidates) {
-      if (matchedIds.has(String(c.companyId))) continue
-      const sameDomain = !!c.domain && domains.has(c.domain)
-      const sameName = names.has(c.name.toLowerCase())
-      if (sameDomain || sameName) matchedIds.add(String(c.companyId))
-    }
-
-    const matchedCompanies = [...matchedIds]
-      .map((id) => byId.get(id))
-      .filter((c): c is Candidate => !!c)
+    // Fan-out: ALL entities carrying the matched identity — the same
+    // participation in the other org, or a second entity for it here.
+    const matchedCompanies = candidates
+      .filter((c) => identityKeys.has(identityKey(c, shared)))
       .map((c) => ({ companyId: c.companyId, orgId: c.orgId }))
-    const method = [...new Set(corroborated.map(({ method: m }) => m))].join(',')
+    const method = [...new Set(resolved.map(({ method: m }) => m))].join(',')
 
     await ctx.runMutation(internal.reportIdentify.setMatch, {
       inboundEmailId,

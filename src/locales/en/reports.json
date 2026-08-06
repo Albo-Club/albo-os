@@ -34,12 +34,18 @@
   "actions": {
     "assign": "Assign",
     "reprocess": "Reprocess",
-    "reject": "Reject"
+    "reject": "Reject",
+    "assignAlso": "Attach as well",
+    "detach": "Detach this report from {{name}}"
   },
   "assignDialog": {
     "title": "Assign to a company",
-    "description": "The report will be attached to this company (and every entity sharing its domain or name, across all organizations), then processing resumes automatically.",
+    "titleAlso": "Attach to one more participation",
+    "description": "The report will be attached to this participation (and to every entity representing it, across all organizations), then processing resumes automatically. On an already processed report, the chosen participation is added to the previous ones.",
     "placeholder": "Pick a company…",
+    "relatedTitle": "Same domain, other organization",
+    "relatedHint": "These entities share the chosen participation’s website. On a sponsor domain they are often other vehicles — only tick the ones this report is really about.",
+    "alreadyAttached": " · already attached",
     "confirm": "Assign and process",
     "cancel": "Cancel"
   },
@@ -47,6 +53,16 @@
     "assigned": "Report assigned — processing resumed",
     "reprocessed": "Processing restarted from scratch",
     "rejected": "Email rejected",
-    "error": "Action failed — try again"
+    "error": "Action failed — try again",
+    "detached": "Report detached from the participation"
+  },
+  "related": {
+    "hint": "A company on the same domain exists in {{orgs}}, where this report is not attached — open “Attach as well” to add it."
+  },
+  "detachDialog": {
+    "title": "Detach this report?",
+    "description": "The report will be removed from {{name}}: it leaves its fiche, along with its files and the KPIs it filled in. The other attached participations keep theirs.",
+    "cancel": "Cancel",
+    "confirm": "Detach"
   }
 }

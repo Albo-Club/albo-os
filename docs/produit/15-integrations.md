@@ -98,10 +98,24 @@ principalement **claude.ai** — pour interroger le portefeuille sans ouvrir
 l'app (« quelle est ma position de trésorerie ? », « liste mes deals
 actifs »).
 
-- **Strictement en lecture seule** : ~22 outils de consultation (deals,
-  fiches sociétés, reportings des participations et synthèse IA, comptes,
-  transactions, prévisionnel, passif, valorisations, KPIs, TVA…), aucune
-  écriture.
+- **~22 outils de consultation** (deals, fiches sociétés, reportings des
+  participations et synthèse IA, comptes, transactions, prévisionnel, passif,
+  valorisations, KPIs, TVA…).
+- **4 outils d'écriture** : créer une société du portefeuille, créer un deal,
+  compléter une société existante, compléter un deal existant. Ils servent à
+  saisir une entité à partir d'une phrase dictée, sans ouvrir l'app. Tout le
+  reste — suppressions, pointage, prévisionnel, passif — demeure hors de
+  portée du connecteur.
+- **Vous validez chaque écriture** : le connecteur déclare quels outils
+  modifient les données, ce qui fait demander votre accord avant l'appel.
+  Chaque écriture renvoie le lien de la fiche dans l'app pour relire ou
+  corriger.
+- **Avertissement sur les doublons** : une société qui ressemble à une fiche
+  existante (même site, même nom à la forme juridique près) est quand même
+  créée, mais les doublons possibles sont signalés avec leurs liens ; idem
+  pour un deal entre le même investisseur et la même cible, qui peut
+  légitimement être un second tour. Un SIREN déjà utilisé dans
+  l'organisation, lui, est refusé.
 - **Sécurisé par OAuth** : la connexion passe par la page de connexion
   habituelle d'Albo OS, et chaque utilisateur ne voit que les organisations
   dont il est membre.
@@ -109,8 +123,9 @@ actifs »).
   connecteur personnalisé » → coller l'URL du serveur (`…/mcp`) → se
   connecter avec son compte Albo OS.
 
-À ne pas confondre avec l'[assistant IA in-app](11-assistant-ia.md), qui lui
-peut écrire (avec approbation).
+À ne pas confondre avec l'[assistant IA in-app](11-assistant-ia.md), qui
+couvre bien plus de domaines en écriture et fait valider ses actions par des
+boutons dans le panneau.
 
 ## Parallel / VASCO (communications SPV)
 

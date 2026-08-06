@@ -34,12 +34,18 @@
   "actions": {
     "assign": "Rattacher",
     "reprocess": "Retraiter",
-    "reject": "Rejeter"
+    "reject": "Rejeter",
+    "assignAlso": "Rattacher aussi",
+    "detach": "Détacher ce report de {{name}}"
   },
   "assignDialog": {
     "title": "Rattacher à une participation",
-    "description": "Le report sera rattaché à cette participation (et à toutes les entités du même domaine ou du même nom, dans toutes les organisations), puis le traitement reprend automatiquement.",
+    "titleAlso": "Rattacher à une participation de plus",
+    "description": "Le report sera rattaché à cette participation (et à toutes les entités qui la représentent, dans toutes les organisations), puis le traitement reprend automatiquement. Sur un report déjà traité, la participation choisie s'ajoute aux précédentes.",
     "placeholder": "Choisir une participation…",
+    "relatedTitle": "Même domaine, autre organisation",
+    "relatedHint": "Ces entités partagent le site web de la participation choisie. Sur un domaine de sponsor, ce sont souvent d'autres véhicules — coche seulement celles que ce report concerne vraiment.",
+    "alreadyAttached": " · déjà rattachée",
     "confirm": "Rattacher et traiter",
     "cancel": "Annuler"
   },
@@ -47,6 +53,16 @@
     "assigned": "Report rattaché — traitement relancé",
     "reprocessed": "Traitement relancé depuis le début",
     "rejected": "Email rejeté",
-    "error": "Action impossible — réessaie"
+    "error": "Action impossible — réessaie",
+    "detached": "Report détaché de la participation"
+  },
+  "related": {
+    "hint": "Une fiche du même domaine existe dans {{orgs}}, où ce report n'est pas rattaché — ouvre « Rattacher aussi » pour l'ajouter."
+  },
+  "detachDialog": {
+    "title": "Détacher ce report ?",
+    "description": "Le report sera retiré de {{name}} : il disparaît de sa fiche, avec ses fichiers et les KPIs qu’il avait renseignés. Les autres participations rattachées gardent le leur.",
+    "cancel": "Annuler",
+    "confirm": "Détacher"
   }
 }

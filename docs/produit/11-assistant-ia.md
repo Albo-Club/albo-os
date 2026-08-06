@@ -36,17 +36,19 @@ Une cinquantaine d'outils, par domaine :
   une société, consulter le résumé du véhicule, lister les documents.
 - **Reportings** : lire les comptes rendus reçus des participations
   (points clés, métriques extraites) et la synthèse IA d'une société — score
-  de santé, insights, alertes. En lecture seule : les reportings arrivent par
-  email, ils ne se créent pas depuis le chat.
+  de santé, insights, alertes, et lister les **boîtes silencieuses** (celles
+  qui n'ont plus reporté depuis le délai fixé par l'organisation). En lecture
+  seule : les reportings arrivent par email, ils ne se créent pas depuis le
+  chat.
 - **Valorisations et KPIs** : consulter l'historique, enregistrer une
   valorisation ou un KPI depuis un reporting.
 - **Business plans** : lire et remplacer les lignes d'un BP (version
   initiale ou révisée) — coller un BP dans le chat suffit.
 - **Trésorerie** : comptes, transactions d'un deal, recherche de
   transactions avec totaux, création de transaction ou de compte.
-- **Pointage** : lister la file, suggérer des cibles, rapprocher à un deal
-  ou au passif, catégoriser (jusqu'à 50 lignes en une approbation),
-  dépointer, position TVA.
+- **Pointage** : lister la file, rapprocher à un deal ou au passif,
+  catégoriser (jusqu'à 50 lignes en une approbation), dépointer, position
+  TVA. Il **ne propose pas** de cible : vous la nommez, il l'applique.
 - **Passif** : consulter les positions et soldes, créer/éditer capital et
   comptes courants.
 - **Prévisionnel** : règles, échéances, solde projeté, réalisation d'une
@@ -79,8 +81,10 @@ bot Telegram, pour interroger ou saisir en mobilité.
 
 - L'assistant convertit automatiquement les montants (vous parlez en euros,
   il stocke en centimes) et répond dans votre langue.
-- Il ne pointe jamais une transaction de sa propre initiative : chaque
-  rapprochement est proposé puis approuvé.
+- Il ne pointe jamais une transaction de sa propre initiative, et il ne
+  devine pas la cible : vous indiquez la transaction **et** sa destination,
+  il exécute après votre approbation. Si la cible est ambiguë, il demande —
+  il ne choisit pas à votre place (cf. [Pointage](08-pointage.md)).
 
 ## Pages liées
 

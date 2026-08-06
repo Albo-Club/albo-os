@@ -25,5 +25,8 @@
     "mismatch": "Les mots de passe ne correspondent pas",
     "different": "Le nouveau mot de passe doit être différent",
     "pwned": "Ce mot de passe est apparu dans des fuites de données connues. Choisissez-en un autre."
+  },
+  "reportSilenceMonths": {
+    "range": "Entre 1 et 24 mois"
   }
 }

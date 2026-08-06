@@ -36,6 +36,19 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
   d'exits remplacent le TVPI par **MOIC** et **TRI** annualisé. Tri par
   colonne sur les Actifs, clic vers la fiche ; pas de pagination — chaque
   tableau défile sous son en-tête et ses totaux.
+- **Alerte « boîte silencieuse »** : une pastille d'alerte ambre s'affiche à
+  côté du nom d'une société dont aucune nouvelle n'est arrivée depuis plus de
+  **4 mois** (délai réglable par organisation dans Réglages → Général). Deux
+  canaux comptent à égalité : les **rapports reçus par email** et les
+  **communications publiées sur le portail de l'émetteur** (les SPV Parallel
+  et consorts, cf. [Intégrations](15-integrations.md)) — un SPV ne rédige
+  rien, il publie, et l'alerte doit lire là où il parle. Le survol donne le
+  détail : par quel canal la dernière nouvelle est arrivée, depuis quand, et
+  jusqu'à quelle période elle couvrait — un rapport reçu en mars peut ne
+  couvrir que janvier. Une société qui n'a jamais donné de nouvelles est
+  comptée depuis le versement des fonds. Les term sheets en cours et les positions sorties
+  ne portent jamais cette pastille. Le même signal alimente le bloc
+  « Reportings manquants » de la page [À faire](16-a-faire.md).
 - **Colonnes alignées d'un tableau à l'autre** : les quatre tableaux
   partagent la même grille, donc chaque colonne tombe au même endroit et
   la page se lit d'un seul coup d'œil vertical. Un tableau qui n'a pas une
@@ -52,6 +65,13 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
   instrument et secteur — le filtre statut a disparu, les tableaux par
   statut jouent ce rôle. Le bandeau de tête (titre, menu ⋯, recherche et
   filtres) reste figé en haut de l'écran quand on descend dans la liste.
+  Ce que vous avez filtré **reste en place** : ouvrir une fiche société,
+  passer sur la trésorerie puis revenir retrouve la liste dans l'état où
+  vous l'aviez laissée, jusqu'à la fermeture de l'onglet du navigateur.
+  Le bouton **« Réinitialiser »** (à droite des filtres, visible dès qu'une
+  recherche ou un filtre est actif) efface tout d'un coup. Chaque liste
+  garde ses propres filtres : une organisation n'impose rien à une autre,
+  ni à la vue consolidée.
   Export **CSV ou Excel (.xlsx)**, généré à la demande ; il respecte la
   recherche et les filtres actifs (sans filtre, tout l'ensemble est
   exporté).
@@ -147,10 +167,16 @@ rapports ou ses deals.
   et domaine, pour départager les homonymes). On ne peut pas saisir une
   référence à la main : ce lien est ce sur quoi la synchronisation des deals
   s'appuie, une valeur inventée enverrait les prochains deals sur la
-  mauvaise société. Une même fiche Attio ne peut être rattachée qu'à **une
-  seule** société, toutes organisations confondues. C'est utile surtout pour
-  les sociétés créées à la main dans Albo : celles qui arrivent par la
-  synchronisation sont déjà rattachées.
+  mauvaise société. Une même fiche Attio peut être rattachée à **plusieurs**
+  sociétés, y compris dans des organisations différentes : Attio ne connaît
+  souvent qu'une fiche là où Albo OS a une entité par véhicule (les SPV d'une
+  plateforme comme Parallel, par exemple). C'est utile surtout pour les
+  sociétés créées à la main dans Albo : celles qui arrivent par la
+  synchronisation sont déjà rattachées. À savoir : quand plusieurs sociétés
+  partagent la même fiche, les deals qui arrivent d'Attio continuent d'aller
+  sur la **première** d'entre elles (la plus ancienne de l'organisation) —
+  rattacher les autres sert à ouvrir le CRM depuis leur fiche, pas à
+  détourner la synchronisation.
 - **Résumé** : le résumé de la société, dans sa propre section, aligné à
   gauche et **éditable au clic** — on clique le texte, on écrit, on clique
   ailleurs et c'est enregistré (Échap annule).
@@ -244,13 +270,21 @@ lecture, dit où en est cette indexation :
 | 🔍✓ | Indexé — l'assistant peut chercher dans son contenu |
 | Roue qui tourne | Indexation en cours (elle réessaie toute seule en cas de saturation passagère) |
 | ⚠️ avec un bouton ↻ | L'indexation a échoué malgré plusieurs tentatives — un **email** t'a prévenu, le bouton relance |
-| 🔍✗ | Rien à indexer, c'est normal (pas de texte, ou contenu déjà couvert par son report) |
+| 🔍✗ | Rien à indexer, c'est normal (pas de texte, contenu déjà couvert par son report, ou tableur) |
 | 🔍 cliquable | Document d'avant cette fonctionnalité — le bouton lance son indexation |
 
 Un échec d'indexation n'est **jamais silencieux** : après la dernière
 tentative, les membres de l'organisation reçoivent un email avec le document
 concerné et le bouton de relance à portée de clic. Le fichier lui-même n'est
 jamais affecté.
+
+> **Les tableurs (Excel, CSV) ne sont pas indexés**, et c'est volontaire : la
+> recherche de l'assistant fonctionne sur le sens des phrases, et des colonnes
+> de chiffres coupées de leur en-tête n'ont pas de sens à retrouver. Ils
+> affichent donc 🔍✗ « Tableur — non indexé ». Leur lecture, elle, se fait
+> normalement : le texte extrait reste consultable en un clic, onglet par
+> onglet. Un tableur reçu en pièce jointe d'un rapport reste couvert par la
+> recherche via le contenu de ce rapport.
 
 Les documents rangés sur une [fiche deal](05-deals.md) suivent exactement le
 même circuit et affichent la même colonne.
@@ -260,9 +294,17 @@ même circuit et affichent la même colonne.
 À la création d'une participation avec un domaine web, un enrichissement
 automatique remplit le pitch et le résumé depuis le site de la société. Il
 est additif : il ne réécrit jamais un champ déjà renseigné à la main. Si
-plusieurs entités partagent le même domaine (ex. plusieurs SPV du même
-sponsor), une édition du pitch se propage à toutes pour qu'elles restent
+plusieurs entités partagent le même domaine (ex. les boutiques d'une même
+enseigne), une édition du pitch se propage à toutes pour qu'elles restent
 identiques.
+
+Les **véhicules d'investissement** (les SPV d'une plateforme comme Parallel
+ou Sezame) échappent à cette règle : ils partagent tous le site de leur
+sponsor tout en étant des opérations différentes. Leur pitch n'est donc
+jamais déduit du site ni recopié d'un SPV voisin — il vient des
+communications investisseur de la plateforme, dès que la fiche est rattachée
+à son SPV dans [Intégrations](15-integrations.md), ou de votre saisie. Et
+corriger le résumé d'un SPV ne touche plus les autres.
 
 ## Actions de cycle de vie
 

@@ -27,7 +27,13 @@
  * RIBs, decks, Google-native files, anything above the 20 MB storage cap, and
  * the lighter of two versions of the same document.
  *
- * Execution (prod, manual — cf. MIGRATIONS.md):
+ * ⚠️ MERGE FIRST. `convex run --prod` calls the code DEPLOYED in prod, and
+ * prod is deployed by the Vercel build on `main`. These functions do not exist
+ * in prod until this PR is merged — running them before that fails with
+ * "Could not find function". Merging is safe: nothing here runs on deploy, the
+ * module only becomes callable.
+ *
+ * Execution (prod, manual — cf. MIGRATIONS.md), AFTER the merge has deployed:
  *   pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip
  *   pnpm exec convex run --prod migrations/legalDocsImport:dryRun
  *   # STOP: check the per-company counts against the spreadsheet, then:

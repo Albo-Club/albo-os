@@ -25,5 +25,8 @@
     "mismatch": "Passwords do not match",
     "different": "New password must be different",
     "pwned": "This password has appeared in known data breaches. Pick another."
+  },
+  "reportSilenceMonths": {
+    "range": "Between 1 and 24 months"
   }
 }
