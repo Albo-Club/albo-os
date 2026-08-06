@@ -23,6 +23,52 @@ bas de page.
 
 ---
 
+## v1.181.2 — 06/08/2026 à 10:30 — Un audit du portefeuille repris d'Airtable
+
+Le portefeuille CALTE a été repris d'Airtable, où il n'existait ni deal ni
+entité investisseuse : seulement des sociétés et des mouvements bancaires
+étiquetés. La reprise a donc fabriqué les deals en regroupant **tous les
+mouvements d'une même société portant le même type d'investissement**. Un
+seul deal peut ainsi mélanger des choses sans rapport — une acquisition
+immobilière et les avances en compte courant à la filiale, ou une cession de
+titres et des opérations de BSPCE d'un salarié.
+
+Repérer ces cas dans l'outil obligeait à ouvrir les 247 deals un par un, sans
+savoir lesquels valaient le coup d'œil. Un audit se lance désormais sur la
+base et sort la **liste de travail** : uniquement les deals qui demandent une
+décision, du plus gros montant au plus petit, chacun avec ses mouvements sous
+les yeux et le motif qui l'a signalé — versements espacés dans le temps,
+libellés qui parlent d'autre chose, société du groupe traitée comme une
+participation, fiche en double, ou montant du deal qui ne correspond pas à
+ses mouvements pointés. Le résultat s'affiche comme une page à garder ouverte
+à côté de l'outil pendant les corrections, avec un lien direct vers chaque
+fiche.
+
+Rien n'est modifié par cet audit : il regarde et il classe. Les corrections
+restent des gestes décidés au cas par cas.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `convex/migrations/auditAirtableImport.ts` (`report`,
+>   `internalQuery`, lecture seule, org `calte`) : périmètre limité aux deals
+>   portant un `airtableId` — les deals venus d'Attio ou saisis à la main
+>   n'ont jamais été agrégés, les drapeaux n'y auraient aucun sens.
+> - Cinq drapeaux par deal : `to_split` (≥ 2 grappes de décaissements
+>   espacées de plus de 90 j, ou libellés se scindant en groupes disjoints —
+>   union-find sur les mots des libellés), `intragroup` (nom de la cible =
+>   nom d'une entité `group_*` de l'org), `duplicate_target`, `pointing_gap`
+>   (`paidAmount` ≠ somme des mouvements pointés) et `no_movement`.
+> - Les mouvements non pointés sont réassociés par `counterparty` (le nom de
+>   l'Entreprise posé par l'import) et listés comme candidats sur les deals en
+>   écart : c'est le seul fil restant une fois le `dealId` retiré à l'insert
+>   pour cause de « Pointé » absent côté Airtable.
+> - Détail (mouvements, grappes) sérialisé pour les seuls deals signalés,
+>   plafonné à 40 lignes ; les deals propres ne sortent qu'en résumé.
+> - `scripts/render-audit-import.mjs` : rend le JSON en HTML autonome (aucune
+>   dépendance), liens vers `/app/{org}/deals/{id}` et
+>   `/app/{org}/participations/{id}`, base surchargeable via `--base=`.
+> - Runbook en tête du module, ligne ajoutée à `MIGRATIONS.md`.
+
 ## v1.181.1 — 06/08/2026 à 09:25 — La liste des participations arrête de relire tous les reportings
 
 Depuis l'arrivée de l'alerte « cette participation ne reporte plus », ouvrir
