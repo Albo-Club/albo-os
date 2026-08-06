@@ -965,6 +965,11 @@ export default defineSchema({
 
     // Provenance
     source: v.union(v.literal('email'), v.literal('upload')),
+    // Back-link to the row that produced this report, so detaching an entity
+    // can correct the queue side too (cf. reportInbox.detachCompany). Unset on
+    // rows stored before the field existed: an email-sourced one is found back
+    // through `agentmailMessageId`, an upload has no way home.
+    inboundEmailId: v.optional(v.id('inboundEmails')),
     agentmailInboxId: v.optional(v.string()),
     agentmailMessageId: v.optional(v.string()), // dedup key
     agentmailThreadId: v.optional(v.string()),

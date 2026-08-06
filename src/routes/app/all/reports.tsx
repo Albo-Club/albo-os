@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
+import { X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '../../../../convex/_generated/api'
@@ -95,14 +96,21 @@ function InboundReports() {
   const assignCompany = useConvexMutation(api.reportInbox.assignCompany)
   const reprocess = useConvexMutation(api.reportInbox.reprocess)
   const reject = useConvexMutation(api.reportInbox.reject)
+  const detachCompany = useConvexMutation(api.reportInbox.detachCompany)
 
   const [assignFor, setAssignFor] = useState<Id<'inboundEmails'> | null>(null)
   const [targetId, setTargetId] = useState<string>('')
   const [alsoIds, setAlsoIds] = useState<Array<string>>([])
+  const [detachFor, setDetachFor] = useState<{
+    reportId: Id<'companyReports'>
+    name: string
+  } | null>(null)
   const [busy, setBusy] = useState(false)
 
   const assignRow = (rows ?? []).find((r) => r._id === assignFor) ?? null
-  const attachedIds = new Set<string>(assignRow?.matchedCompanyIds ?? [])
+  const attachedIds = new Set<string>(
+    (assignRow?.matched ?? []).map((m) => m.companyId),
+  )
 
   // Entities related to the chosen one: SAME DOMAIN, ANOTHER organization —
   // one company held by both orgs under different names. Suggested, never
@@ -147,6 +155,15 @@ function InboundReports() {
       'toasts.assigned',
     )
     closeAssign()
+  }
+
+  const confirmDetach = async () => {
+    if (!detachFor) return
+    await run(
+      () => detachCompany({ reportId: detachFor.reportId }),
+      'toasts.detached',
+    )
+    setDetachFor(null)
   }
 
   return (
@@ -200,12 +217,40 @@ function InboundReports() {
                   <TableCell className="max-w-md truncate">
                     {row.subject}
                   </TableCell>
-                  <TableCell className="max-w-xs truncate">
-                    {row.matchedNames.length > 0 ? (
-                      <span className="flex items-center gap-1">
-                        <span className="truncate">
-                          {row.matchedNames.join(', ')}
-                        </span>
+                  <TableCell className="max-w-xs">
+                    {row.matched.length > 0 ? (
+                      <span className="flex flex-wrap items-center gap-1">
+                        {row.matched.map((m) => (
+                          <Badge
+                            key={m.companyId}
+                            variant="secondary"
+                            className="max-w-[16rem] font-normal"
+                          >
+                            <span className="truncate">{m.name}</span>
+                            {/* Only an entity actually carrying a report can
+                                be detached — before storage there is nothing
+                                on the fiche to take back. */}
+                            {m.reportId ? (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                aria-label={t('actions.detach', {
+                                  name: m.name,
+                                })}
+                                title={t('actions.detach', { name: m.name })}
+                                className="hover:text-destructive -mr-1 cursor-pointer disabled:cursor-default"
+                                onClick={() =>
+                                  setDetachFor({
+                                    reportId: m.reportId!,
+                                    name: m.name,
+                                  })
+                                }
+                              >
+                                <X className="size-3" />
+                              </button>
+                            ) : null}
+                          </Badge>
+                        ))}
                         {row.relatedOrgNames.length > 0 ? (
                           <Badge
                             variant="outline"
@@ -410,6 +455,34 @@ function InboundReports() {
             </Button>
             <Button disabled={!targetId || busy} onClick={confirmAssign}>
               {t('assignDialog.confirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={detachFor !== null}
+        onOpenChange={(open) => {
+          if (!open) setDetachFor(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('detachDialog.title')}</DialogTitle>
+            <DialogDescription>
+              {t('detachDialog.description', { name: detachFor?.name ?? '' })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetachFor(null)}>
+              {t('detachDialog.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={busy}
+              onClick={() => void confirmDetach()}
+            >
+              {t('detachDialog.confirm')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -35,7 +35,8 @@
     "assign": "Assign",
     "reprocess": "Reprocess",
     "reject": "Reject",
-    "assignAlso": "Attach as well"
+    "assignAlso": "Attach as well",
+    "detach": "Detach this report from {{name}}"
   },
   "assignDialog": {
     "title": "Assign to a company",
@@ -52,9 +53,16 @@
     "assigned": "Report assigned — processing resumed",
     "reprocessed": "Processing restarted from scratch",
     "rejected": "Email rejected",
-    "error": "Action failed — try again"
+    "error": "Action failed — try again",
+    "detached": "Report detached from the participation"
   },
   "related": {
     "hint": "A company on the same domain exists in {{orgs}}, where this report is not attached — open “Attach as well” to add it."
+  },
+  "detachDialog": {
+    "title": "Detach this report?",
+    "description": "The report will be removed from {{name}}: it leaves its fiche, along with its files and the KPIs it filled in. The other attached participations keep theirs.",
+    "cancel": "Cancel",
+    "confirm": "Detach"
   }
 }
