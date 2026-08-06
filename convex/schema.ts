@@ -110,7 +110,10 @@ const txMatchStatus = v.union(
   v.literal('charge'), // discarded: operating expense (subtype of « écarté »)
   v.literal('tax'), // discarded: tax (subtype of « écarté »)
   v.literal('product'), // discarded: non-deal income (subtype of « écarté »)
-  v.literal('internal_transfer'), // discarded: transfer between accounts (subtype of « écarté »)
+  // discarded: transfer between two accounts of the SAME entity (subtype of
+  // « écarté »). Paired to its counter-leg through `allocation.kind ===
+  // 'transfer'`; absent allocation = transfer still missing its counter-leg.
+  v.literal('internal_transfer'),
 )
 
 // Action recorded in the decision log (`unmatched` = un-matching, also logged).
@@ -154,10 +157,17 @@ export const equityPositionType = v.union(
 
 // Target of a generalized allocation (`transactions.allocation`). Coexists
 // with `dealId`: a deal match writes both (cf. convex/transactions.ts).
+//
+// `transfer` is the odd one out: it is the ONLY kind that does NOT imply
+// `matchStatus === 'matched'`. Both legs of an internal transfer keep
+// `matchStatus: 'internal_transfer'` (a « écarté » subtype, excluded from the
+// analysis) and carry `allocation.kind === 'transfer'` pointing at their
+// shared `transfers` row — cf. KNOWN_ISSUES.md « Virements internes ».
 const allocationKind = v.union(
   v.literal('deal'),
   v.literal('equity'),
   v.literal('intercompany_loan'),
+  v.literal('transfer'),
 )
 
 const forecastConfidence = v.union(
@@ -1369,10 +1379,12 @@ export default defineSchema({
     bankAccountId: v.id('bankAccounts'),
     dealId: v.optional(v.id('deals')),
     matchStatus: v.optional(txMatchStatus),
-    // Generalized matching: deal, equity position or inter-entity loan.
-    // Coexists with `dealId`: `dealId != null` ⟺ `allocation.kind === 'deal'`
-    // (backfill: transactions:backfillAllocation). `targetId` is the target's
-    // _id, stored as a string (no cross-table v.id() union).
+    // Generalized matching: deal, equity position, inter-entity loan or
+    // internal transfer. Coexists with `dealId`: `dealId != null` ⟺
+    // `allocation.kind === 'deal'` (backfill: transactions:backfillAllocation).
+    // `targetId` is the target's _id, stored as a string (no cross-table
+    // v.id() union). `kind === 'transfer'` is the only kind that leaves
+    // `matchStatus` at 'internal_transfer' instead of 'matched'.
     allocation: v.optional(
       v.object({
         kind: allocationKind,
@@ -1435,6 +1447,31 @@ export default defineSchema({
       searchField: 'searchText',
       filterFields: ['orgId', 'matchStatus', 'bankAccountId'],
     }),
+
+  /**
+   * transfers — internal transfer between two bank accounts of the SAME legal
+   * entity (`bankAccounts.ownerCompanyId`), possibly across banks. One row per
+   * transfer; its two legs are the transactions carrying
+   * `allocation = { kind: 'transfer', targetId: <transferId> }`, both kept at
+   * `matchStatus: 'internal_transfer'` so they stay excluded from the analysis
+   * (`lib/categories.ts:effectiveCategory` → null).
+   *
+   * DELIBERATELY almost empty: amount, dates, amount gap (bank fees) and
+   * in-transit delay are ALWAYS derived from the two legs, never stored —
+   * same principle as the C/C balances (`convex/liabilities.ts`). A row with
+   * a single allocated leg IS the representation of an incomplete transfer:
+   * nothing extra to flag it.
+   *
+   * `ownerCompanyId` is the invariant anchor: both legs must sit on accounts
+   * owned by this entity. A movement between two DIFFERENT entities is not an
+   * internal transfer — it is pointed to that entity like a deal
+   * (cf. KNOWN_ISSUES.md « Virements internes »).
+   */
+  transfers: defineTable({
+    orgId: v.id('organizations'),
+    ownerCompanyId: v.id('companies'), // must be a "group_*"
+    createdBy: v.id('users'),
+  }).index('by_org', ['orgId']),
 
   /**
    * categoryRules — learned auto-categorization rules ("Fygr pattern"):

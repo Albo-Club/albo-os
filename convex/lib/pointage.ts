@@ -2,6 +2,7 @@ import { ConvexError } from 'convex/values'
 
 import { recordDecision } from './matchingLog'
 import { loanSideForOrg } from './liabilities'
+import { transferLegs } from './transfers'
 
 import type { GenericMutationCtx } from 'convex/server'
 import type { DataModel, Doc, Id } from '../_generated/dataModel'
@@ -14,10 +15,15 @@ type MutCtx = GenericMutationCtx<DataModel>
  * public mutations (convex/transactions.ts, convex/liabilities.ts) and the
  * agent tools (convex/agentToolsPointage.ts) so they never diverge.
  *
- * Invariants (cf. KNOWN_ISSUES.md « Pointage » / « Passif »):
+ * Invariants (cf. KNOWN_ISSUES.md « Pointage » / « Passif » / « Virements
+ * internes »):
  * - `matchStatus === 'matched'` ⟺ matched to a deal (`dealId != null` +
  *   `allocation.kind === 'deal'`) OR allocated to liability (`dealId == null`
  *   + `allocation.kind === 'equity' | 'intercompany_loan'`).
+ * - `allocation.kind === 'transfer'` is the ONE allocation that keeps
+ *   `matchStatus: 'internal_transfer'` instead of 'matched': both legs stay
+ *   « écarté » (excluded from the analysis), the allocation only records
+ *   which transfer they belong to.
  * - `reconciled` (+ by/at) is a mirror derived from DEAL matching only.
  * - Every deal decision writes an append-only row to `matchingDecisions`
  *   (`source: 'manual' | 'agent_suggested'`); liability matching never
@@ -39,13 +45,19 @@ export type CategorizeStatus =
   | 'internal_transfer'
 
 /**
- * Guardrail: refuses to silently overwrite a liability allocation
- * (equity / C/C). Detach first via `applyDeallocate`.
+ * Guardrail: refuses to silently overwrite an allocation that this operation
+ * would leave orphaned — a liability (equity / C/C, detach via
+ * `applyDeallocate`) or an internal-transfer leg (detach via
+ * `applyUnpairTransfer`, otherwise the counter-leg keeps pointing at a
+ * transfer this one has left).
  */
-export function assertNotAllocatedToLiability(tx: Doc<'transactions'>) {
-  if (tx.allocation && tx.allocation.kind !== 'deal') {
-    throw new ConvexError('allocated_to_liability')
-  }
+export function assertNotAllocatedElsewhere(tx: Doc<'transactions'>) {
+  if (!tx.allocation || tx.allocation.kind === 'deal') return
+  throw new ConvexError(
+    tx.allocation.kind === 'transfer'
+      ? 'allocated_to_transfer'
+      : 'allocated_to_liability',
+  )
 }
 
 /** Matches a transaction to a deal of the same org. */
@@ -56,7 +68,7 @@ export async function applyMatchToDeal(
   decidedBy: Id<'users'>,
   source: PointageSource,
 ) {
-  assertNotAllocatedToLiability(tx)
+  assertNotAllocatedElsewhere(tx)
 
   const deal = await ctx.db.get('deals', dealId)
   if (!deal || deal.orgId !== tx.orgId) {
@@ -102,7 +114,7 @@ export async function applyUnmatch(
 ) {
   // A tx allocated to liability is detached via applyDeallocate — a deal
   // unmatch here would leave its allocation orphaned.
-  assertNotAllocatedToLiability(tx)
+  assertNotAllocatedElsewhere(tx)
 
   await ctx.db.patch('transactions', tx._id, {
     matchStatus: 'unmatched',
@@ -138,7 +150,7 @@ export async function applyCategorization(
   vatRateBps?: VatRateBps,
   category?: string,
 ) {
-  assertNotAllocatedToLiability(tx)
+  assertNotAllocatedElsewhere(tx)
   const vatBearing = status === 'charge' || status === 'product'
   await ctx.db.patch('transactions', tx._id, {
     matchStatus: status,
@@ -212,6 +224,11 @@ export async function applyDeallocate(ctx: MutCtx, tx: Doc<'transactions'>) {
   if (tx.allocation?.kind === 'deal') {
     throw new ConvexError('already_matched_to_deal')
   }
+  // A transfer leg is detached by `applyUnpairTransfer`, which also disposes
+  // of the shared `transfers` row — deallocating here would strand it.
+  if (tx.allocation?.kind === 'transfer') {
+    throw new ConvexError('allocated_to_transfer')
+  }
   if (!tx.allocation) return
 
   await ctx.db.patch('transactions', tx._id, {
@@ -220,4 +237,161 @@ export async function applyDeallocate(ctx: MutCtx, tx: Doc<'transactions'>) {
     vatRateBps: undefined,
     category: undefined,
   })
+}
+
+// ─── Internal transfers (two legs, same legal entity) ───────────────────────
+
+/** The entity (`group_*`) owning the account a transaction sits on. */
+async function ownerCompanyOf(
+  ctx: MutCtx,
+  tx: Doc<'transactions'>,
+): Promise<Id<'companies'>> {
+  const account = await ctx.db.get('bankAccounts', tx.bankAccountId)
+  if (!account) throw new ConvexError('not_found')
+  return account.ownerCompanyId
+}
+
+/**
+ * Opens an internal transfer on a single leg: creates the `transfers` row
+ * anchored on the leg's owning entity and allocates the leg to it. The
+ * transfer is INCOMPLETE until a counter-leg is paired — which is the point:
+ * it shows up as such instead of vanishing from the analysis unnoticed.
+ *
+ * The caller has already set the transaction to `internal_transfer`
+ * (`applyCategorization`), which cleared any previous allocation.
+ */
+export async function applyOpenTransfer(
+  ctx: MutCtx,
+  tx: Doc<'transactions'>,
+  createdBy: Id<'users'>,
+): Promise<Id<'transfers'>> {
+  const ownerCompanyId = await ownerCompanyOf(ctx, tx)
+  const transferId = await ctx.db.insert('transfers', {
+    orgId: tx.orgId,
+    ownerCompanyId,
+    createdBy,
+  })
+  await ctx.db.patch('transactions', tx._id, {
+    allocation: { kind: 'transfer', targetId: transferId },
+  })
+  return transferId
+}
+
+/**
+ * Pairs `leg` as the counter-leg of `transfer`.
+ *
+ * The invariant that makes an internal transfer verifiable: both legs sit on
+ * accounts owned by the SAME legal entity (`bankAccounts.ownerCompanyId`),
+ * on two different accounts, in opposite directions. A movement between two
+ * different entities is NOT an internal transfer — it is pointed to that
+ * entity like a deal (cf. KNOWN_ISSUES.md « Virements internes »).
+ *
+ * Amounts are deliberately NOT required to be equal: bank fees and partial
+ * transfers are real. The gap is surfaced by the readers, never absorbed.
+ *
+ * When `leg` already carries its own (incomplete) transfer — the usual case
+ * after a bulk categorization tagged both legs separately — that row is
+ * absorbed and deleted, so two half-transfers merge into one instead of
+ * dead-ending.
+ */
+export async function applyPairTransfer(
+  ctx: MutCtx,
+  transfer: Doc<'transfers'>,
+  leg: Doc<'transactions'>,
+  decidedBy: Id<'users'>,
+) {
+  if (leg.orgId !== transfer.orgId) throw new ConvexError('transfer_wrong_org')
+
+  const existing = await transferLegs(ctx, transfer)
+  if (existing.some((l) => l._id === leg._id)) return // already paired here
+  if (existing.length >= 2) throw new ConvexError('transfer_already_complete')
+
+  // The leg must be free, or hold nothing but its own incomplete transfer.
+  const legTransferId =
+    leg.allocation?.kind === 'transfer' ? leg.allocation.targetId : null
+  if (leg.allocation && !legTransferId) {
+    assertNotAllocatedElsewhere(leg) // deal → its own error code
+    throw new ConvexError('already_matched_to_deal')
+  }
+
+  if (existing.length === 1) {
+    const other = existing[0]
+    if (other.bankAccountId === leg.bankAccountId) {
+      throw new ConvexError('transfer_same_account')
+    }
+    if (other.direction === leg.direction) {
+      throw new ConvexError('transfer_same_direction')
+    }
+  }
+
+  const ownerCompanyId = await ownerCompanyOf(ctx, leg)
+  if (ownerCompanyId !== transfer.ownerCompanyId) {
+    throw new ConvexError('transfer_wrong_entity')
+  }
+
+  const wasTagged = leg.matchStatus === 'internal_transfer'
+  await ctx.db.patch('transactions', leg._id, {
+    matchStatus: 'internal_transfer',
+    dealId: undefined,
+    allocation: { kind: 'transfer', targetId: transfer._id },
+    vatRateBps: undefined,
+    category: undefined,
+    reconciled: false,
+    reconciledBy: undefined,
+    reconciledAt: undefined,
+  })
+  // Pairing a not-yet-tagged counter-leg IS the categorization gesture for
+  // it — log it like `applyCategorization` would, so the decision journal
+  // stays exhaustive.
+  if (!wasTagged) {
+    await recordDecision(ctx, {
+      transaction: leg,
+      decision: 'internal_transfer',
+      source: 'manual',
+      decidedBy,
+    })
+  }
+
+  // Absorb the leg's own half-transfer, now legless.
+  if (legTransferId && legTransferId !== transfer._id) {
+    const orphanId = ctx.db.normalizeId('transfers', legTransferId)
+    const orphan = orphanId ? await ctx.db.get('transfers', orphanId) : null
+    if (orphan && (await transferLegs(ctx, orphan)).length === 0) {
+      await ctx.db.delete('transfers', orphan._id)
+    }
+  }
+}
+
+/**
+ * Detaches one leg from its transfer: the transaction goes back to
+ * `unmatched` (same end state as `applyDeallocate` on a liability), and the
+ * `transfers` row is deleted once it has no leg left. The remaining leg, if
+ * any, stays tagged and simply becomes incomplete again.
+ */
+export async function applyUnpairTransfer(
+  ctx: MutCtx,
+  tx: Doc<'transactions'>,
+  decidedBy: Id<'users'>,
+) {
+  if (tx.allocation?.kind !== 'transfer') return
+
+  const transferId = ctx.db.normalizeId('transfers', tx.allocation.targetId)
+  const transfer = transferId ? await ctx.db.get('transfers', transferId) : null
+
+  await ctx.db.patch('transactions', tx._id, {
+    allocation: undefined,
+    matchStatus: 'unmatched',
+    vatRateBps: undefined,
+    category: undefined,
+  })
+  await recordDecision(ctx, {
+    transaction: tx,
+    decision: 'unmatched',
+    source: 'manual',
+    decidedBy,
+  })
+
+  if (transfer && (await transferLegs(ctx, transfer)).length === 0) {
+    await ctx.db.delete('transfers', transfer._id)
+  }
 }

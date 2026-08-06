@@ -10,8 +10,10 @@ import {
 import {
   applyCategorization,
   applyMatchToDeal,
+  applyOpenTransfer,
   applyUnmatch,
 } from './lib/pointage'
+import { isIncompleteTransferLeg, transferLegCounts } from './lib/transfers'
 import { buildSearchText, normalizeSearch } from './lib/searchText'
 import { vatCentsFromTtc, vatRateBpsValidator } from './lib/vat'
 
@@ -242,14 +244,30 @@ export const listLedger = query({
     ),
     /** 'deal' = investment flows, 'liability' = equity + C/C / loan moves. */
     matchedKind: v.optional(v.union(v.literal('deal'), v.literal('liability'))),
+    /**
+     * Splits `internal_transfer` by completeness, the same way `matchedKind`
+     * splits `matched` by nature of the attachment: 'incomplete' = a leg
+     * still missing its counter-leg (cf. lib/transfers.ts).
+     */
+    transferState: v.optional(v.literal('incomplete')),
     bankAccountId: v.optional(v.id('bankAccounts')),
     search: v.optional(v.string()),
   },
   handler: async (
     ctx,
-    { orgId, status, matchedKind, bankAccountId, search },
+    {
+      orgId,
+      status: statusArg,
+      matchedKind,
+      transferState,
+      bankAccountId,
+      search,
+    },
   ) => {
     await requireOrgMember(ctx, orgId)
+
+    // A transfer-state filter implies the `internal_transfer` status.
+    const status = transferState ? ('internal_transfer' as const) : statusArg
 
     const allocationKinds: ReadonlyArray<
       'deal' | 'equity' | 'intercompany_loan'
@@ -343,6 +361,19 @@ export const listLedger = query({
       )
     }
 
+    // Leg counts of the org's transfers, read once — an internal transfer is
+    // "incomplete" when its shared row holds fewer than two legs (or when the
+    // row does not exist at all: rows tagged before transfers became an
+    // object). Read only when internal transfers can actually be in the set.
+    const legCounts =
+      status === undefined || status === 'internal_transfer'
+        ? await transferLegCounts(ctx, orgId)
+        : new Map<string, number>()
+
+    if (transferState === 'incomplete') {
+      rows = rows.filter((tx) => isIncompleteTransferLeg(tx, legCounts))
+    }
+
     rows.sort((a, b) => b.transactionDate - a.transactionDate)
 
     return rows.map((tx) => {
@@ -358,6 +389,9 @@ export const listLedger = query({
         matchStatus: tx.matchStatus ?? 'unmatched',
         // Routes the un-match (deal vs liability) + Passif safety filter.
         allocation: tx.allocation ?? null,
+        // Internal transfer still missing its counter-leg — drives the
+        // « transfert incomplet » badge.
+        transferIncomplete: isIncompleteTransferLeg(tx, legCounts),
         // VAT (charge/product only) — null = to qualify.
         vatRateBps: tx.vatRateBps ?? null,
         // Broad treasury category (charge/product only) — null = to qualify.
@@ -563,10 +597,17 @@ export const categorizeAsProduct = mutation({
 })
 
 /**
- * Categorizes a transaction as an internal transfer (movement between two of
- * the user's accounts). V1: a simple label, no pairing of the two legs
- * (out ↔ in). Subtype of "set aside": same behavior as `ignoreTransaction`,
- * only the status differs so these transactions can be browsed later.
+ * Categorizes a transaction as an internal transfer (movement between two
+ * accounts of the SAME legal entity) and OPENS the transfer on this leg: the
+ * `transfers` row is created and the transaction allocated to it. The
+ * transfer stays INCOMPLETE until its counter-leg is paired by hand
+ * (`convex/transfers.ts:pairTransfer`) — and says so, instead of quietly
+ * leaving the analysis.
+ *
+ * Never memorizes a learned rule: a label pattern cannot know which account
+ * carries the counter-leg, and replaying an "exclude from analysis" status in
+ * bulk is exactly the silent blind spot `ignored` is kept out of the rules
+ * for (cf. KNOWN_ISSUES.md « Virements internes »).
  */
 export const categorizeAsInternalTransfer = mutation({
   args: { transactionId: v.id('transactions') },
@@ -576,13 +617,8 @@ export const categorizeAsInternalTransfer = mutation({
     const { user } = await requireOrgMember(ctx, tx.orgId)
 
     await applyCategorization(ctx, tx, 'internal_transfer', user._id, 'manual')
-    const rule = await upsertRuleFromGesture(ctx, {
-      orgId: tx.orgId,
-      tx,
-      status: 'internal_transfer',
-      createdBy: user._id,
-    })
-    return { ruleCreated: rule?.created ?? false }
+    const transferId = await applyOpenTransfer(ctx, tx, user._id)
+    return { transferId }
   },
 })
 
@@ -929,5 +965,37 @@ export const backfillAllocation = internalMutation({
       updated += 1
     }
     return { updated, skipped }
+  },
+})
+
+/**
+ * One-shot: deletes the learned rules that replay `internal_transfer`. That
+ * status is no longer learnable (a label pattern cannot know which account
+ * carries the counter-leg, and replaying an "exclude from analysis" status in
+ * bulk is a silent blind spot). `ruleFieldsFor` already ignores them, so this
+ * only cleans the table — nothing depends on it having run.
+ *
+ * Transactions already classified by such a rule are NOT touched: they stay
+ * tagged and surface as transfers to pair.
+ *
+ *   pnpm exec convex run transactions:dropInternalTransferRules '{}' --prod
+ */
+export const dropInternalTransferRules = internalMutation({
+  args: { orgId: v.optional(v.id('organizations')) },
+  handler: async (ctx, { orgId }) => {
+    const rules = orgId
+      ? await ctx.db
+          .query('categoryRules')
+          .withIndex('by_org', (q) => q.eq('orgId', orgId))
+          .collect()
+      : await ctx.db.query('categoryRules').collect()
+
+    let deleted = 0
+    for (const rule of rules) {
+      if (rule.status !== 'internal_transfer') continue
+      await ctx.db.delete('categoryRules', rule._id)
+      deleted += 1
+    }
+    return { deleted, scanned: rules.length }
   },
 })

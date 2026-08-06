@@ -81,6 +81,7 @@
     "tax": "Taxes",
     "product": "Income",
     "internal_transfer": "Internal transfers",
+    "transfer_incomplete": "Transfers to pair",
     "deal": "Investments",
     "liability": "Shareholder accounts & loans",
     "ignored": "Ignored"
@@ -93,7 +94,8 @@
     "charge": "Expense",
     "tax": "Tax",
     "product": "Income",
-    "internal_transfer": "Internal transfer"
+    "internal_transfer": "Internal transfer",
+    "transfer_incomplete": "Incomplete transfer"
   },
   "filter": {
     "allAccounts": "All accounts",
@@ -145,7 +147,15 @@
     "equity_wrong_org": "This equity position belongs to another organization.",
     "loan_wrong_org": "This transaction belongs to neither organization of the current account.",
     "already_matched_to_deal": "This transaction is already matched to a deal. Unmatch it first.",
-    "allocated_to_liability": "This transaction is allocated to a liability (equity or current account). Detach it from the Liabilities page first."
+    "allocated_to_liability": "This transaction is allocated to a liability (equity or current account). Detach it from the Liabilities page first.",
+    "allocated_to_transfer": "This transaction is a leg of an internal transfer. Detach it first.",
+    "transfer_wrong_entity": "Both accounts do not belong to the same entity: this is not an internal transfer. Point the movement to that entity, like a deal.",
+    "transfer_wrong_org": "This transaction belongs to another organization.",
+    "transfer_same_account": "Both legs sit on the same account.",
+    "transfer_same_direction": "Both legs go the same way: a transfer has one outflow and one inflow.",
+    "transfer_same_transaction": "A transaction cannot be its own counterpart.",
+    "transfer_already_complete": "This transfer already has both legs.",
+    "not_an_internal_transfer": "This transaction is not categorized as an internal transfer."
   },
   "register": {
     "today": "Today — {{date}}",
@@ -156,5 +166,21 @@
     "cancelEntryTitle": "Cancel this planned entry?",
     "cancelEntryBody": "“{{label}}” due {{date}} ({{amount}}) will no longer count toward the projected balance.",
     "entryCancelled": "Planned entry cancelled"
+  },
+  "transfer": {
+    "pair": "Pair",
+    "pairTitle": "Pick the transfer counterpart",
+    "pairDescription": "Movements on the other accounts of the same entity, in the opposite direction. {{amount}} from {{account}}.",
+    "searchPlaceholder": "Search a label…",
+    "loading": "Loading…",
+    "noCandidate": "No candidate movement on the other accounts of this entity.",
+    "pick": "Pick",
+    "later": "Later",
+    "counterpart": "Counterpart",
+    "missingLeg": "Counterpart missing",
+    "gap": "Gap between the two legs",
+    "transit": "Transit delay",
+    "transitDays_one": "{{count}} day",
+    "transitDays_other": "{{count}} days"
   }
 }

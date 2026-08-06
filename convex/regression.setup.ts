@@ -141,16 +141,35 @@ export async function createPortfolioCompany(
   })
 }
 
+/** Secondary `group_*` entity of an org (Caltimo, an SCI…). */
+export async function createGroupEntity(
+  t: Harness,
+  orgId: Id<'organizations'>,
+  name: string,
+): Promise<Id<'companies'>> {
+  return await t.run(async (ctx) => {
+    return await ctx.db.insert('companies', {
+      orgId,
+      name,
+      kind: 'group_operating',
+    })
+  })
+}
+
 /** EUR bank account owned by the org's root company. */
 export async function createBankAccount(
   t: Harness,
   org: TestOrg,
-  opts: { currentBalance?: number } = {},
+  opts: {
+    currentBalance?: number
+    /** Owning entity — defaults to the org's `group_root`. */
+    ownerCompanyId?: Id<'companies'>
+  } = {},
 ): Promise<Id<'bankAccounts'>> {
   return await t.run(async (ctx) => {
     return await ctx.db.insert('bankAccounts', {
       orgId: org.orgId,
-      ownerCompanyId: org.rootCompanyId,
+      ownerCompanyId: opts.ownerCompanyId ?? org.rootCompanyId,
       bankName: 'Test Bank',
       label: 'Compte test',
       currency: 'EUR',
@@ -208,7 +227,5 @@ export async function expectConvexError(
   if (outcome instanceof ConvexError && outcome.data === code) return
   // convex-test can rethrow wrapped errors — fall back to a message match.
   if (outcome instanceof Error && outcome.message.includes(code)) return
-  throw new Error(
-    `Expected ConvexError('${code}') but got: ${String(outcome)}`,
-  )
+  throw new Error(`Expected ConvexError('${code}') but got: ${String(outcome)}`)
 }

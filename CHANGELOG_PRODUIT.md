@@ -23,6 +23,76 @@ bas de page.
 
 ---
 
+## v1.183.0 — 06/08/2026 à 12:52 — Un virement interne devient un mouvement à deux jambes, plus une simple étiquette
+
+Jusqu'ici, classer une transaction en « virement interne » posait une
+étiquette sur cette ligne, et rien d'autre. Les deux jambes d'un même
+virement — l'argent qui part d'un compte, l'argent qui arrive sur l'autre —
+n'étaient reliées par rien. Personne ne pouvait donc voir qu'il en manquait
+une : une jambe classée toute seule sortait de l'analyse en silence, et une
+vraie dépense classée par erreur disparaissait sans laisser de trace.
+
+Un virement interne est désormais **un mouvement à deux jambes**. Quand vous
+classez une ligne en virement interne, Albo OS vous demande dans la foulée sa
+contrepartie et vous propose les mouvements des **autres comptes de la même
+entité**, en sens inverse. Vous choisissez, le virement est complet.
+
+Ce que ça change concrètement :
+
+- **Un virement incomplet se voit.** Le registre Trésorerie gagne un filtre
+  « Virements à apparier », et la ligne porte un badge orange tant que sa
+  contrepartie manque. Rien ne peut plus disparaître par inattention.
+- **L'écart entre les deux jambes est affiché.** Si 50 000 € partent et que
+  49 985 € arrivent, les 15 € de frais bancaires apparaissent sur la fiche du
+  mouvement au lieu de s'évaporer.
+- **Le délai de transit est visible.** Un virement parti lundi et arrivé
+  mercredi n'est plus un trou inexpliqué dans le solde.
+- **Un virement entre deux entités différentes est refusé.** Ce n'est pas un
+  virement interne : c'est un mouvement vers cette entité, à pointer comme un
+  investissement. Le message vous le dit et vous oriente.
+- **Les virements internes ne s'apprennent plus automatiquement.** Un
+  classement automatique par libellé pouvait retirer des mouvements de
+  l'analyse en série, sans que personne le remarque. Un libellé ne peut de
+  toute façon pas deviner sur quel compte se trouve la contrepartie.
+
+Les virements déjà classés avant cette mise à jour ne sont pas modifiés : ils
+apparaissent simplement dans « Virements à apparier », ce qui vous donne la
+liste de ce qui reste à relier. Rien ne change dans l'analyse des flux ni dans
+le prévisionnel — un virement interne en reste exclu, exactement comme avant.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle table `transfers` (`orgId`, `ownerCompanyId`, `createdBy`),
+>   délibérément minimale : montant, écart et délai de transit sont **dérivés**
+>   des deux jambes, jamais stockés (même principe que les soldes de C/C).
+> - Réutilise le pointage généralisé existant : `allocationKind` gagne
+>   `'transfer'`, et chaque jambe porte
+>   `allocation = { kind: 'transfer', targetId }`. C'est le **seul** kind qui
+>   laisse `matchStatus` à `'internal_transfer'` au lieu de `'matched'` — donc
+>   `effectiveCategory` continue de renvoyer `null` et l'analyse ne bouge pas.
+> - Cœur d'écriture dans `convex/lib/pointage.ts` : `applyOpenTransfer`,
+>   `applyPairTransfer` (invariant dur : même `bankAccounts.ownerCompanyId`,
+>   comptes distincts, sens opposés ; absorbe la demi-jambe adverse pour
+>   fusionner deux moitiés en un seul virement), `applyUnpairTransfer` (supprime
+>   la ligne `transfers` devenue sans jambe). `assertNotAllocatedToLiability`
+>   devient `assertNotAllocatedElsewhere` (nouveau code `allocated_to_transfer`).
+> - Helpers de lecture partagés dans `convex/lib/transfers.ts`
+>   (`transferLegs`, `transferLegCounts`, `isIncompleteTransferLeg`) — les
+>   lignes taguées avant la feature n'ont pas d'allocation et sont donc
+>   incomplètes **par construction**, sans backfill.
+> - API publique `convex/transfers.ts` : `getForTransaction` (écart + transit),
+>   `listPairable` (filtre **structurel**, jamais un tri par vraisemblance —
+>   cf. interdit anti-suggestion), `pairTransfer`, `unpairTransfer`.
+> - `listLedger` gagne `transferState: 'incomplete'` (même grammaire que
+>   `matchedKind`) et expose `transferIncomplete` par ligne.
+> - `internal_transfer` retiré de `CategoryRuleStatus` (création **et**
+>   application, via `isActiveRule`) ; la valeur reste dans l'union du schéma
+>   pour ne pas invalider les lignes existantes. One-shot
+>   `transactions:dropInternalTransferRules` pour nettoyer la table.
+> - Front : `TransferPairDialog.tsx` (enchaîné après le tag), badge et action
+>   « Apparier » dans `PointageTable`, bloc contrepartie/écart/transit dans
+>   `TransactionSheet`, filtre dans `TransactionsLedger`.
+> - 13 tests de régression dans `convex/regression.transfers.test.ts`.
 ## v1.182.1 — 06/08/2026 à 12:47 — L'import des documents juridiques survit à une coupure réseau
 
 Un incident réseau pendant l'import — une simple résolution DNS qui échoue —

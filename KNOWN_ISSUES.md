@@ -1758,6 +1758,75 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   suggestion ici sans cette étape.** `matchingDecisions` (append-only) est
   conservée intacte : c'est le dataset d'entraînement du futur moteur.
 
+## Virements internes (`convex/transfers.ts`, `convex/lib/transfers.ts`)
+
+Un virement interne est un mouvement entre deux comptes de la **même entité
+juridique** (`bankAccounts.ownerCompanyId`), éventuellement dans deux banques
+différentes. C'est le **seul** cas : un mouvement entre deux entités
+différentes se pointe **vers cette entité comme un deal**, et un mouvement
+entre deux orgs n'est pas non plus un virement interne.
+
+- **Un virement est un OBJET à deux jambes, pas une étiquette par ligne.**
+  C'est le point central, et c'était le bug de conception de la V1 : une
+  étiquette isolée ne se contredit jamais, donc rien ne vérifiait rien. Une
+  jambe taguée seule sortait de l'analyse en silence, et une vraie charge
+  taguée par erreur disparaissait sans trace. La table `transfers` porte
+  l'identité du virement ; les deux jambes sont les transactions qui portent
+  `allocation = { kind: 'transfer', targetId }`.
+- **`transfer` est le SEUL `allocation.kind` qui ne vaut pas `matched`.** Les
+  deux jambes restent à `matchStatus: 'internal_transfer'` (sous-type
+  d'« écarté »), donc `effectiveCategory` continue de renvoyer `null` et
+  l'analyse comme la grille prévisionnelle sont **inchangées**. Ne jamais
+  « normaliser » ça en `matched` : ça ferait basculer les deux jambes dans le
+  bucket Deals.
+- **Rien n'est stocké au-delà de l'identité.** Montant, écart entre les
+  jambes (frais bancaires, virement partiel) et délai de transit sont
+  **dérivés** à la lecture (`getForTransaction`) — même principe que les
+  soldes de C/C. Ne pas ajouter de champ montant sur `transfers` : il
+  divergerait des transactions dès la première correction bancaire.
+- **L'invariant dur : même `ownerCompanyId`.** `applyPairTransfer` refuse
+  deux comptes d'entités différentes (`transfer_wrong_entity`), le même compte
+  des deux côtés (`transfer_same_account`) et deux jambes de même sens
+  (`transfer_same_direction`). L'**égalité des montants n'est PAS imposée** :
+  les frais bancaires et les virements partiels sont réels, l'écart est
+  affiché, jamais absorbé.
+- **Une jambe seule = un virement incomplet, et c'est voulu.** Le mode de
+  panne EST la fonctionnalité : `transfers` avec une seule jambe se lit comme
+  incomplet, sans champ ni flag dédié. Filtre `transferState: 'incomplete'` du
+  registre + `transferIncomplete` par ligne (badge ambre).
+- **Les lignes taguées AVANT la feature n'ont pas d'allocation** → elles sont
+  incomplètes par construction (`isIncompleteTransferLeg`), donc visibles dans
+  « Virements à apparier ». **Aucun backfill** : deviner la contrepartie d'une
+  ligne historique produirait exactement les faux rapprochements silencieux
+  qui ont fait supprimer le moteur de suggestion. `pairTransfer` les adopte
+  au premier appariement (il ouvre la ligne `transfers` à la volée).
+- **Deux moitiés fusionnent.** Taguer les deux jambes séparément (cas normal
+  après un tag en masse) crée deux demi-virements ; `applyPairTransfer`
+  absorbe et supprime celui de la jambe adverse. Sans ça, l'utilisateur
+  tombait dans une impasse.
+- **`listPairable` est un FILTRE, pas une suggestion.** Il restreint par règle
+  structurelle (autres comptes de la même entité, sens opposé, jambe libre) et
+  trie par date décroissante — il ne classe jamais par vraisemblance et ne
+  présélectionne rien. C'est la frontière posée par `CLAUDE.md` : un sélecteur
+  n'est pas une proposition tant qu'il ne trie pas par vraisemblance. **Ne pas
+  y ajouter de score, de tri par montant approchant ni de présélection.**
+  Plafond : `PAIRABLE_PER_ACCOUNT` (100) lignes lues par compte — une
+  contrepartie plus ancienne se retrouve par la recherche.
+- **Détacher passe par `unpairTransfer`, jamais par `unmatch`/`deallocate`.**
+  Les deux garde-fous lèvent `allocated_to_transfer` : un dépointage naïf
+  laisserait la ligne `transfers` orpheline et la jambe adverse pointant dans
+  le vide. `unpairTransfer` remet la jambe en `unmatched` et supprime la ligne
+  `transfers` quand elle n'a plus aucune jambe.
+- **`internal_transfer` n'est plus une règle apprenable.** Retiré de
+  `CategoryRuleStatus` à la **création et à l'application** (`isActiveRule`) —
+  même motif qu'`ignored` : rejouer un statut « exclu de l'analyse » par
+  motif de libellé fabrique un angle mort silencieux à l'échelle, et un
+  libellé ne peut de toute façon pas savoir sur quel compte est la
+  contrepartie. La valeur **reste dans l'union du schéma** : la retirer
+  invaliderait les lignes `categoryRules` existantes à la lecture. One-shot
+  `transactions:dropInternalTransferRules` pour nettoyer la table ; l'union
+  pourra se resserrer dans une PR ultérieure.
+
 ## Catégories & règles apprenantes (`convex/lib/categories.ts`, `categoryRules`)
 
 Les grandes catégories de trésorerie (analyse entrées/sorties + futur

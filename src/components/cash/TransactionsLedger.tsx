@@ -36,7 +36,9 @@ import { usePersistentFilters } from '~/hooks/usePersistentFilters'
  * (planned entries + every transaction); 'unmatched' = everything left to
  * handle (unmatched transactions AND overdue planned entries); 'planned' =
  * the forecast entries alone; 'deal' and 'liability' split the 'matched'
- * status by nature of the attachment.
+ * status by nature of the attachment; 'transfer_incomplete' splits
+ * 'internal_transfer' the same way, by completeness — the legs still missing
+ * their counter-leg (cf. KNOWN_ISSUES « Virements internes »).
  */
 export type LedgerFilter =
   | 'all'
@@ -46,6 +48,7 @@ export type LedgerFilter =
   | 'tax'
   | 'product'
   | 'internal_transfer'
+  | 'transfer_incomplete'
   | 'deal'
   | 'liability'
   | 'ignored'
@@ -60,6 +63,7 @@ export const LEDGER_FILTERS: ReadonlyArray<LedgerFilter> = [
   'tax',
   'product',
   'internal_transfer',
+  'transfer_incomplete',
   'deal',
   'liability',
   'ignored',
@@ -161,14 +165,19 @@ export function TransactionsLedger({
   const liabilities = useConvexQuery(api.liabilities.listOptions, { orgId })
 
   const byAttachment = filter === 'deal' || filter === 'liability'
+  const byTransferState = filter === 'transfer_incomplete'
   const liveTransactions = useConvexQuery(
     api.transactions.listLedger,
     filter === 'planned'
       ? 'skip'
       : {
           orgId,
-          status: filter === 'all' || byAttachment ? undefined : filter,
+          status:
+            filter === 'all' || byAttachment || byTransferState
+              ? undefined
+              : filter,
           matchedKind: byAttachment ? filter : undefined,
+          transferState: byTransferState ? 'incomplete' : undefined,
           bankAccountId: accountId,
           search: searchArg,
         },
