@@ -566,14 +566,18 @@ export default defineSchema({
     // ── Report freshness (denormalized from `companyReports`) ──────────────
     // Reception date of the most recent report, and the most recent period it
     // covered. Both are DERIVED — the authoritative rows stay in
-    // `companyReports` — and maintained by `recordReportOnCompany`
-    // (lib/reportFreshness.ts) at ingestion time, the table's single write
-    // site. They live here because silence detection needs two numbers per
-    // company, and Convex reads whole rows: scanning the reports to recompute
-    // them re-read every report's `rawContent`/`cleanedHtml` on every render
-    // of the participations list. Monotonic (max), so a report arriving out of
-    // order never rewinds them. `migrations/backfillReportFreshness` rebuilds
-    // both from the reports if they ever drift. Absent = no report yet.
+    // `companyReports`. They live here because silence detection needs two
+    // numbers per company, and Convex reads whole rows: scanning the reports
+    // to recompute them re-read every report's `rawContent`/`cleanedHtml` on
+    // every render of the participations list.
+    //
+    // Maintained on BOTH sides of the table's lifecycle (lib/reportFreshness):
+    // `recordReportOnCompany` at ingestion, monotonic (max) so a back-dated
+    // report never rewinds them; `recomputeReportFreshness` on detach, which
+    // rebuilds from what is left — a monotonic write cannot walk back, and
+    // detaching the last report has to put the entity back in silence.
+    // `migrations/backfillReportFreshness` rebuilds both if they ever drift.
+    // Absent = no report yet.
     lastReportAt: v.optional(v.number()), // ms epoch
     lastReportCoverageAt: v.optional(v.number()), // ms epoch
   })
@@ -978,6 +982,11 @@ export default defineSchema({
 
     // Provenance
     source: v.union(v.literal('email'), v.literal('upload')),
+    // Back-link to the row that produced this report, so detaching an entity
+    // can correct the queue side too (cf. reportInbox.detachCompany). Unset on
+    // rows stored before the field existed: an email-sourced one is found back
+    // through `agentmailMessageId`, an upload has no way home.
+    inboundEmailId: v.optional(v.id('inboundEmails')),
     agentmailInboxId: v.optional(v.string()),
     agentmailMessageId: v.optional(v.string()), // dedup key
     agentmailThreadId: v.optional(v.string()),

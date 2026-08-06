@@ -191,6 +191,7 @@ export const storeForCompany = internalMutation({
       orgId: args.orgId,
       companyId: args.companyId,
       source: isUpload ? ('upload' as const) : ('email' as const),
+      inboundEmailId: args.inboundEmailId,
       agentmailInboxId: isUpload ? undefined : email.agentmailInboxId,
       agentmailMessageId: isUpload ? undefined : email.agentmailMessageId,
       agentmailThreadId: email.agentmailThreadId,

@@ -99,6 +99,51 @@ export async function recordReportOnCompany(
   await ctx.db.patch('companies', companyId, patch)
 }
 
+/**
+ * Rebuilds the freshness copy from the entity's REMAINING reports, clearing
+ * both fields when none is left.
+ *
+ * The counterpart of `recordReportOnCompany` for the one gesture that removes
+ * a report — `reportInbox.detachCompany`. Monotonic writing cannot walk back
+ * on its own: detaching the last report of a company would otherwise leave it
+ * looking fresher than it is, and silence it forever.
+ *
+ * Reads the company's own reports (indexed, one entity), which is affordable
+ * because this runs on a rare human gesture — never on a read path.
+ */
+export async function recomputeReportFreshness(
+  ctx: GenericMutationCtx<DataModel>,
+  companyId: Id<'companies'>,
+): Promise<void> {
+  const reports = await ctx.db
+    .query('companyReports')
+    .withIndex('by_company', (q) => q.eq('companyId', companyId))
+    .collect()
+
+  let lastReportAt: number | undefined
+  let lastReportCoverageAt: number | undefined
+  for (const report of reports) {
+    const receivedAt = report.emailDate ?? report._creationTime
+    if (lastReportAt === undefined || receivedAt > lastReportAt) {
+      lastReportAt = receivedAt
+    }
+    if (
+      report.periodSortDate !== undefined &&
+      (lastReportCoverageAt === undefined ||
+        report.periodSortDate > lastReportCoverageAt)
+    ) {
+      lastReportCoverageAt = report.periodSortDate
+    }
+  }
+
+  // `undefined` removes the field — an entity with no report left must read as
+  // « never gave news », not as « gave news at the epoch ».
+  await ctx.db.patch('companies', companyId, {
+    lastReportAt,
+    lastReportCoverageAt,
+  })
+}
+
 /** Earliest outflow reconciled on a deal, null when nothing is pointed. */
 async function firstOutflowAt(
   ctx: Ctx,

@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.180.3 — 06/08/2026 à 09:25 — La liste des participations arrête de relire tous les reportings
+## v1.181.1 — 06/08/2026 à 09:25 — La liste des participations arrête de relire tous les reportings
 
 Depuis l'arrivée de l'alerte « cette participation ne reporte plus », ouvrir
 la liste des participations faisait relire à la base **l'intégralité des
@@ -51,11 +51,19 @@ raccourci.
 >   plus ouverte de l'app.
 > - Correctif : dénormalisation de `companies.lastReportAt` et
 >   `lastReportCoverageAt`, maintenues par `recordReportOnCompany`
->   (`lib/reportFreshness.ts`) appelé depuis `reportStore.storeForCompany` —
->   le site d'écriture **unique** de `companyReports`, sans suppression, donc
->   pas de désynchronisation possible. Écriture monotone (max) : un report
->   antidaté ne fait pas reculer la fraîcheur. La liste lit ces champs sur les
->   `companies` qu'elle collectait déjà → coût de lecture supplémentaire nul.
+>   (`lib/reportFreshness.ts`) appelé depuis `reportStore.storeForCompany`.
+>   Écriture monotone (max) : un report antidaté ne fait pas reculer la
+>   fraîcheur. La liste lit ces champs sur les `companies` qu'elle collectait
+>   déjà → coût de lecture supplémentaire nul.
+> - Les **quatre** sites de mutation de `companyReports` sont couverts :
+>   insert et patch (`reportStore`), patch d'état d'indexation (`vectorize`,
+>   sans effet sur les dates) et surtout la **suppression**
+>   (`reportInbox.detachCompany`, arrivé avec le détachement de la v1.181.0).
+>   Une écriture monotone ne sait pas reculer : détacher le dernier report
+>   d'une participation la laissait plus fraîche qu'elle ne l'est, donc
+>   dispensée d'alerte en silence. D'où `recomputeReportFreshness`, qui
+>   reconstruit depuis les reports restants sur ce seul geste — rare, humain,
+>   jamais sur un chemin de lecture.
 > - `migrations/backfillReportFreshness` (`dryRun`/`apply`/`report`)
 >   reconstruit les deux dates depuis les reports. **À lancer juste après le
 >   deploy**, sinon toute participation ayant reporté avant compte comme
@@ -67,6 +75,56 @@ raccourci.
 >   `reportInbox.list`, `companyReports.listByCompany`) sont documentés dans
 >   `KNOWN_ISSUES.md` « Database I/O : un gros champ texte sur une ligne lue
 >   en liste », plus un anti-pattern dans `CLAUDE.md`.
+## v1.181.0 — 05/08/2026 à 19:54 — Un report rangé sur la mauvaise participation se détache
+
+Jusqu'ici, rattacher un report était à sens unique : on pouvait l'ajouter à
+une participation, jamais l'en retirer. Un rattachement fait un peu vite, ou
+tombé sur le mauvais véhicule d'un sponsor, restait donc sur la fiche pour
+toujours — avec ses fichiers et les KPIs qu'il avait renseignés.
+
+Le geste inverse existe maintenant, à l'endroit où l'erreur se constate comme
+à celui où elle se commet :
+
+- **Depuis la fiche société** : ouvrir le report dans la liste Documents &
+  rapports, puis « Détacher de cette participation ».
+- **Depuis les Rapports entrants** : la croix sur la puce de la participation
+  concernée.
+
+Dans les deux cas, le report quitte cette fiche **proprement** : ses fichiers
+et les KPIs qu'il avait alimentés partent avec lui, il sort de la recherche
+de la société, et la synthèse repart du report précédent. Ce qui ne bouge
+pas : les **autres** participations rattachées au même report gardent le
+leur, et le mail d'origine reste dans la file — il n'y a plus qu'à le
+rattacher là où il devait aller. Un détachement est définitif côté fiche,
+d'où la fenêtre de confirmation qui dit ce qui part.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle mutation publique `reportInbox.detachCompany({ reportId })`,
+>   miroir de `assignCompany` : `requireOrgMember` sur l'org du report, puis
+>   suppression de toute l'empreinte écrite par `reportStore.storeForCompany`
+>   pour **cette entité seulement** — ligne `companyReports`, lignes
+>   `documents` filtrées sur `companyId`, `kpiSnapshots` taggés
+>   `source: "report:<id>"`, repli de `companyIntelligence.latestReportId` sur
+>   le report suivant (ou effacement), et `vectorize.removeEntry` sur la clé
+>   `report:<id>`.
+> - Le **blob de storage n'est pas supprimé** : il est partagé par les lignes
+>   `documents` de toutes les entités du fan-out et par la pièce jointe de
+>   `inboundEmails`. Détail et pièges dans `KNOWN_ISSUES.md` § « Détacher un
+>   report ».
+> - La ligne de la file est corrigée dans la même transaction
+>   (`matchedCompanies`, `reportIds`), sinon un « Retraiter » ultérieur
+>   remettrait le report sur l'entité détachée. Ça a demandé un back-link
+>   `companyReports.inboundEmailId` (posé au rangement) ; les lignes
+>   antérieures sont retrouvées via `agentmailMessageId`.
+> - `reportInbox.list` expose désormais `matched: [{ companyId, name,
+>   reportId }]` au lieu de `matchedNames` + `matchedCompanyIds` — la file
+>   rend une puce par **entité** (deux orgs = deux puces) avec sa croix, et
+>   seules celles portant réellement un report en ont une.
+> - Couverture : `convex/regression.reportDetach.test.ts` (6 cas — périmètre
+>   de la suppression, blob préservé, correction de la file, repli et
+>   effacement du pointeur de synthèse, refus hors org). `TESTING.md` R28c /
+>   R28d.
 
 ## v1.180.2 — 05/08/2026 à 19:27 — Les fondateurs et co-investisseurs liés à Attio se voient enfin comme des liens
 

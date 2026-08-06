@@ -59,6 +59,16 @@ tard — la nouvelle s'ajoute, les précédentes ne bougent pas. La file
 signale le cas d'elle-même : un repère « + Calte ? » apparaît quand une
 organisation a une fiche sur le domaine du report sans rien avoir reçu.
 
+**Quand un report s'est rangé au mauvais endroit** — mauvais véhicule d'un
+sponsor, rattachement fait un peu vite — il se **détache**. Depuis la fiche
+société, en ouvrant le report : « Détacher de cette participation ». Depuis
+les Rapports entrants, par la croix sur la puce de la participation. Le
+report quitte cette fiche avec ses fichiers et les KPIs qu'il avait
+renseignés, et la synthèse de la société repart du report précédent. Les
+autres participations rattachées au même report gardent le leur, et le mail
+d'origine reste dans la file : il n'y a plus qu'à le rattacher là où il
+devait aller.
+
 ### 3. Lecture du contenu — toutes les sources
 
 Chaque élément du mail est lu, selon son type :

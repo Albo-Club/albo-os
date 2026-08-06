@@ -1161,6 +1161,36 @@ Corollaire d'affichage : `periodSortDate` retombe sur la date de réception
 quand il n'y a pas de période, sinon le courrier n'aurait aucun ancrage dans
 la timeline de la fiche (l'index `by_company` trie là-dessus).
 
+## Détacher un report — l'empreinte à défaire, et le blob qui reste
+
+Ranger un report écrit **cinq** choses par entité rattachée
+(`convex/reportStore.ts:storeForCompany`) : la ligne `companyReports`, une
+ligne `documents` par pièce jointe, les `kpiSnapshots` taggés
+`source: "report:<id>"`, le pointeur `companyIntelligence.latestReportId`, et
+une entrée d'index sémantique de clé `report:<id>`. Supprimer la seule ligne
+`companyReports` laisserait donc les KPIs dans les séries de la mauvaise boîte
+et le texte du report dans sa recherche. `reportInbox.detachCompany` défait les
+cinq, pour **une** entité — les autres entités du fan-out gardent la leur.
+
+Ce qu'il ne faut **pas** supprimer : le **blob de storage**. Un même blob est
+partagé par les lignes `documents` de toutes les entités du fan-out **et** par
+la pièce jointe de `inboundEmails`. Le détacher d'une participation ne doit pas
+aveugler les autres. (À l'inverse, `documents.remove` supprime bien le blob :
+c'est cohérent pour un document déposé à la main, mais cela reste un piège si
+on l'appelait un jour sur la copie d'un report — pré-existant, non touché ici.)
+
+Le second réflexe est de **corriger la ligne de la file** dans la même
+transaction (`matchedCompanies` et `reportIds`) : sans ça la file continue de
+revendiquer la participation, et surtout un « Retraiter » ultérieur **remettrait
+le report** sur l'entité qu'on vient d'en sortir. D'où le back-link
+`companyReports.inboundEmailId`, posé au rangement. Les lignes antérieures au
+champ sont retrouvées via `agentmailMessageId` (index `by_message_id`) ; un
+**dépôt manuel** antérieur, lui, n'a pas de chemin de retour (le rangement met
+délibérément `agentmailMessageId: undefined` sur les uploads) — le détachement
+marche quand même, seule la ligne de la file garde sa mention périmée.
+
+Couvert par `convex/regression.reportDetach.test.ts`.
+
 ## Suite de régression Convex (`pnpm test:convex`) — 3 pièges du harness
 
 La suite (`convex/regression.*.test.ts` + harness `convex/regression.setup.ts`)
@@ -3750,11 +3780,21 @@ Les deux vrais remèdes, dans cet ordre :
    `lastReportCoverageAt` (helper `recordReportOnCompany`,
    `lib/reportFreshness.ts`) : la liste lit déjà les `companies`, donc le
    scan disparaît pour un coût de lecture **nul**, et la valeur reste exacte.
-   Praticable uniquement si la table source a **peu de sites d'écriture** —
-   ici un seul (`reportStore.storeForCompany`) et aucune suppression. Prévoir
-   la migration de reconstruction qui va avec
-   (`migrations/backfillReportFreshness`), à la fois pour le rattrapage et
-   comme outil de réparation en cas de dérive.
+   Praticable uniquement si la table source a **peu de sites de mutation**, et
+   il faut les couvrir **tous** — création *et* suppression. Le piège vécu :
+   l'agrégat écrit en monotone (max) ne sait pas reculer, donc
+   `reportInbox.detachCompany`, qui supprime une ligne `companyReports`,
+   laissait la société plus fraîche qu'elle ne l'est — silencieusement
+   dispensée d'alerte pour toujours. D'où `recomputeReportFreshness`, qui
+   reconstruit depuis ce qui reste, appelé sur ce seul geste (rare, humain,
+   jamais sur un chemin de lecture). Prévoir aussi la migration de
+   reconstruction (`migrations/backfillReportFreshness`), à la fois pour le
+   rattrapage et comme outil de réparation en cas de dérive.
+
+   Le réflexe à garder : avant de dénormaliser, `grep` les
+   `insert`/`patch`/`delete` de la table source et vérifier que chacun met
+   l'agrégat à jour. Un chemin oublié ne casse rien tout de suite — il produit
+   une donnée fausse des semaines plus tard.
 2. **Sortir le texte dans une table annexe**, une ligne par blob, lue
    seulement quand quelqu'un ouvre vraiment le contenu. Pattern déjà en place
    pour `documentTexts` (cf. le commentaire de la table dans `schema.ts`).

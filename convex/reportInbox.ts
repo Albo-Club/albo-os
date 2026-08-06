@@ -16,6 +16,7 @@ import { internalAction, internalMutation, mutation, query } from './_generated/
 import { fetchBody, getMessage } from './agentmail'
 import { requireAppUser, requireOrgMember } from './lib/auth'
 import { identityKey, sharedDomains } from './lib/emailIdentify'
+import { recomputeReportFreshness } from './lib/reportFreshness'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 
@@ -294,6 +295,15 @@ export const list = query({
         const relatedOrgNames = [...relatedOrgIds]
           .map((orgId) => orgNames.get(orgId))
           .filter((n): n is string => !!n)
+        // Which stored report belongs to which entity, so the queue can offer
+        // to detach the one that landed on the wrong participation. Empty
+        // until the row is processed — and on rows stored before `reportIds`
+        // was recorded, where the fiche stays the way in.
+        const reportByCompany = new Map<string, Id<'companyReports'>>()
+        for (const reportId of r.reportIds ?? []) {
+          const report = await ctx.db.get('companyReports', reportId)
+          if (report) reportByCompany.set(report.companyId, report._id)
+        }
         const sources = r.sources ?? []
         return {
           _id: r._id,
@@ -307,12 +317,15 @@ export const list = query({
           // readable from the Convex dashboard.
           error: r.error ?? null,
           senderVerified: Boolean(r.senderUserId),
-          matchedNames: [
-            ...new Set(matchedCompanies.map((c) => c?.name).filter((n): n is string => !!n)),
-          ],
-          matchedCompanyIds: matchedCompanies
-            .map((c) => c?._id)
-            .filter((id): id is Id<'companies'> => !!id),
+          // One entry per attached ENTITY (not per name): two orgs holding the
+          // same participation are two rows to detach independently.
+          matched: matchedCompanies
+            .filter((c): c is Doc<'companies'> => !!c)
+            .map((c) => ({
+              companyId: c._id,
+              name: c.name,
+              reportId: reportByCompany.get(c._id) ?? null,
+            })),
           relatedOrgNames,
           attachmentsCount: r.attachments.length,
           hasBody: Boolean(r.bodyText || r.bodyHtml),
@@ -487,6 +500,115 @@ export const assignCompany = mutation({
       row.sources ? internal.reportStore.run : internal.reportExtract.run,
       { inboundEmailId },
     )
+    return null
+  },
+})
+
+/**
+ * The row a report came from. Recent reports carry the back-link; older ones
+ * are found again through the AgentMail message id they share with their
+ * email. An upload stored before the back-link existed has no way home — the
+ * detach below still runs, only the queue row keeps its stale mention.
+ */
+async function sourceInbound(
+  ctx: MutationCtx,
+  report: Doc<'companyReports'>,
+): Promise<Doc<'inboundEmails'> | null> {
+  if (report.inboundEmailId) {
+    return await ctx.db.get('inboundEmails', report.inboundEmailId)
+  }
+  const messageId = report.agentmailMessageId
+  if (!messageId) return null
+  return await ctx.db
+    .query('inboundEmails')
+    .withIndex('by_message_id', (q) => q.eq('agentmailMessageId', messageId))
+    .first()
+}
+
+/**
+ * Detach a stored report from ONE entity — the mirror of `assignCompany`, for
+ * a report attached to a participation it does not concern.
+ *
+ * The scope is that entity alone: the other entities of the fan-out keep
+ * their own report. What goes with it is everything `reportStore.storeForCompany`
+ * wrote for this entity — the report row, its document rows, the KPI
+ * snapshots it sourced, its slot in `companyIntelligence`, its semantic-index
+ * entry — so the participation reads as if the report had never landed on it.
+ *
+ * Storage blobs are deliberately NOT deleted: one blob backs the document
+ * rows of EVERY fan-out entity and the source email's attachment. Detaching
+ * one participation must not blank the files of the others.
+ *
+ * The source row is corrected in the same transaction: the review queue stops
+ * claiming the participation, and a later replay does not put the report back.
+ */
+export const detachCompany = mutation({
+  args: { reportId: v.id('companyReports') },
+  handler: async (ctx, { reportId }) => {
+    const report = await ctx.db.get('companyReports', reportId)
+    if (!report) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, report.orgId)
+
+    // Document rows of this entity only — the blob stays (see above).
+    const docs = await ctx.db
+      .query('documents')
+      .withIndex('by_report', (q) => q.eq('reportId', reportId))
+      .collect()
+    for (const doc of docs) {
+      if (doc.companyId === report.companyId) await ctx.db.delete('documents', doc._id)
+    }
+
+    // KPI snapshots this report sourced (same tag as reportStore).
+    const sourceTag = `report:${reportId}`
+    const snapshots = await ctx.db
+      .query('kpiSnapshots')
+      .withIndex('by_company_metric', (q) => q.eq('companyId', report.companyId))
+      .collect()
+    for (const snap of snapshots) {
+      if (snap.source === sourceTag) await ctx.db.delete('kpiSnapshots', snap._id)
+    }
+
+    await ctx.db.delete('companyReports', reportId)
+
+    // Freshness copy on the entity: rebuilt from what is left, since the
+    // ingestion side only ever moves it forward (cf. lib/reportFreshness.ts).
+    // Detaching the last report must put the participation back in silence.
+    await recomputeReportFreshness(ctx, report.companyId)
+
+    // The synthesis pointed here: fall back on the most recent report left on
+    // the entity, or clear the pointer when it was the last one.
+    const intelligence = await ctx.db
+      .query('companyIntelligence')
+      .withIndex('by_company', (q) => q.eq('companyId', report.companyId))
+      .unique()
+    if (intelligence && intelligence.latestReportId === reportId) {
+      const next = await ctx.db
+        .query('companyReports')
+        .withIndex('by_company', (q) => q.eq('companyId', report.companyId))
+        .order('desc')
+        .first()
+      await ctx.db.patch('companyIntelligence', intelligence._id, {
+        latestReportId: next?._id,
+      })
+    }
+
+    const inbound = await sourceInbound(ctx, report)
+    if (inbound) {
+      const matched = (inbound.matchedCompanies ?? []).filter(
+        (m) => m.companyId !== report.companyId,
+      )
+      const remaining = (inbound.reportIds ?? []).filter((id) => id !== reportId)
+      await ctx.db.patch('inboundEmails', inbound._id, {
+        matchedCompanies: matched.length > 0 ? matched : undefined,
+        reportIds: remaining.length > 0 ? remaining : undefined,
+      })
+    }
+
+    // Drop the semantic-index entry (no-op if the report was never indexed).
+    await ctx.scheduler.runAfter(0, internal.vectorize.removeEntry, {
+      orgId: report.orgId,
+      key: `report:${reportId}`,
+    })
     return null
   },
 })
