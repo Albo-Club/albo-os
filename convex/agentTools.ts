@@ -858,7 +858,76 @@ export const listCompanyDocumentsInternal = internalQuery({
       // Set when the file arrived as a report attachment: chains into
       // getCompanyReport for the analysed content.
       reportId: doc.reportId ?? null,
+      // Reading state: only an 'extracted' document has a text, so this is
+      // what tells a caller whether getDocumentText will return anything.
+      ocrState: doc.ocrState ?? null,
     }))
+  },
+})
+
+/**
+ * The extracted text of one document, PAGINATED. Sibling of the in-app
+ * `documents.getExtractedText`, with an explicit `actorUserId` (the MCP
+ * endpoint has no Convex auth identity).
+ *
+ * A stored text runs up to MAX_DOCUMENT_CHARS (900 000), which no client
+ * wants in a single response — hence the window: the caller walks the
+ * document with `nextOffset` until it comes back null.
+ */
+const DOCUMENT_TEXT_WINDOW = 40_000
+
+export const getDocumentTextInternal = internalQuery({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    documentId: v.id('documents'),
+    offset: v.optional(v.number()),
+  },
+  handler: async (ctx, { orgId, actorUserId, documentId, offset }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const doc = await ctx.db.get('documents', documentId)
+    if (!doc || doc.orgId !== orgId) throw new ConvexError('not_found')
+
+    // The text is keyed by the blob, not by the row: one file fanned out on
+    // several companies shares a single `documentTexts` row.
+    const row = await ctx.db
+      .query('documentTexts')
+      .withIndex('by_storage', (q) => q.eq('storageId', doc.storageId))
+      .first()
+
+    const base = {
+      _id: doc._id,
+      title: doc.title,
+      kind: doc.kind,
+      companyId: doc.companyId,
+      dealId: doc.dealId ?? null,
+      ocrState: doc.ocrState ?? null,
+      ocrDetail: doc.ocrDetail ?? null,
+    }
+    if (!row) {
+      return {
+        ...base,
+        text: null,
+        totalChars: 0,
+        offset: 0,
+        nextOffset: null,
+        truncated: false,
+      }
+    }
+
+    const start = Math.max(0, Math.trunc(offset ?? 0))
+    const text = row.text.slice(start, start + DOCUMENT_TEXT_WINDOW)
+    const end = start + text.length
+    return {
+      ...base,
+      text,
+      totalChars: row.text.length,
+      offset: start,
+      nextOffset: end < row.text.length ? end : null,
+      // Set when the file itself was cut at extraction time — the tail was
+      // never stored, so no offset will ever reach it.
+      truncated: row.truncated,
+    }
   },
 })
 

@@ -98,9 +98,17 @@ principalement **claude.ai** — pour interroger le portefeuille sans ouvrir
 l'app (« quelle est ma position de trésorerie ? », « liste mes deals
 actifs »).
 
-- **~22 outils de consultation** (deals, fiches sociétés, reportings des
+- **~24 outils de consultation** (deals, fiches sociétés, reportings des
   participations et synthèse IA, comptes, transactions, prévisionnel, passif,
   valorisations, KPIs, TVA…).
+- **La documentation des participations est interrogeable** : pactes
+  d'actionnaires, statuts, bulletins de souscription, PV d'assemblée, term
+  sheets, comptes annuels, business plans. Une recherche par le sens («
+  quelle est la clause de liquidité du pacte Sezame ? », « où ai-je un droit
+  de préemption ? ») rend des extraits en citant le document d'origine, et
+  le texte complet d'un document peut être lu au besoin. Seuls les documents
+  dont le texte a été lu par l'app sont concernés — un scan illisible ou un
+  fichier en échec de lecture reste invisible à la recherche.
 - **4 outils d'écriture** : créer une société du portefeuille, créer un deal,
   compléter une société existante, compléter un deal existant. Ils servent à
   saisir une entité à partir d'une phrase dictée, sans ouvrir l'app. Tout le

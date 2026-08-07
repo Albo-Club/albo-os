@@ -293,14 +293,75 @@ export const mcpTools: Array<McpTool> = [
   defineTool({
     name: 'listCompanyDocuments',
     description:
-      'List the documents attached to a company. Use listCompanies first if ' +
-      'you do not know the company id.',
+      'List the documents attached to a company: legal paperwork (pacte ' +
+      "d'actionnaires, statuts, bulletin de souscription, PV d'assemblée, " +
+      'term sheet, attestation), business plans, annual accounts and ' +
+      'reportings. Metadata only — call getDocumentText to read one, or ' +
+      'searchDocuments to find a passage across the whole org. `ocrState` ' +
+      'says whether the file was read: only "extracted" has a text. Use ' +
+      'listCompanies first if you do not know the company id.',
     schema: { org: orgSlug, companyId: z.string() },
     run: async (ctx, actorUserId, { org, companyId }) =>
       await ctx.runQuery(internal.agentTools.listCompanyDocumentsInternal, {
         orgId: await orgIdFor(ctx, actorUserId, org),
         actorUserId,
         companyId: companyId as Id<'companies'>,
+      }),
+  }),
+  defineTool({
+    name: 'searchDocuments',
+    description:
+      "Semantic search across the org's documents (pactes d'actionnaires, " +
+      "statuts, bulletins de souscription, PV d'assemblée, term sheets, " +
+      'comptes annuels, business plans) and investor reports. Finds ' +
+      'passages by MEANING, not keywords — query in natural language, ' +
+      'French or English, e.g. "clause de liquidité du pacte Sezame" or ' +
+      '"droit de préemption". Optionally restrict to one company with ' +
+      'companyId (from listCompanies). Returns scored excerpts with the ' +
+      'title of the source document — cite it when answering, and call ' +
+      'getDocumentText when an excerpt is not enough.',
+    schema: {
+      org: orgSlug,
+      query: z.string().describe('Natural-language search query'),
+      companyId: z.string().optional().describe('Restrict to one company'),
+      limit: z.number().int().min(1).max(30).optional(),
+    },
+    run: async (ctx, actorUserId, { org, query, companyId, limit }) =>
+      await ctx.runAction(internal.vectorize.searchInternal, {
+        orgId: await orgIdFor(ctx, actorUserId, org),
+        actorUserId,
+        query,
+        companyId: companyId as Id<'companies'> | undefined,
+        limit,
+      }),
+  }),
+  defineTool({
+    name: 'getDocumentText',
+    description:
+      'Read the full text extracted from one document (pacte, statuts, ' +
+      'bulletin de souscription, PV, comptes annuels, BP…). Use ' +
+      'listCompanyDocuments or searchDocuments first to get a document id. ' +
+      'The text comes in windows of 40 000 characters: when `nextOffset` is ' +
+      'not null, call again with `offset: nextOffset` for the rest. `text` ' +
+      'is null when the file was never read (see `ocrState`/`ocrDetail`), ' +
+      'and `truncated: true` means the file was cut at extraction time — ' +
+      'its tail was never stored.',
+    schema: {
+      org: orgSlug,
+      documentId: z.string(),
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Character offset to read from — the previous nextOffset'),
+    },
+    run: async (ctx, actorUserId, { org, documentId, offset }) =>
+      await ctx.runQuery(internal.agentTools.getDocumentTextInternal, {
+        orgId: await orgIdFor(ctx, actorUserId, org),
+        actorUserId,
+        documentId: documentId as Id<'documents'>,
+        offset,
       }),
   }),
   defineTool({
