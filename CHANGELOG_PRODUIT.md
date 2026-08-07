@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.188.4 — 07/08/2026 à 18:35 — Nettoyage du portefeuille CALTE repris d'Airtable
+## v1.189.1 — 07/08/2026 à 18:45 — Nettoyage du portefeuille CALTE repris d'Airtable
 
 Le portefeuille CALTE vient d'une base Airtable qui ne connaissait ni deal ni
 entité investisseuse : seulement des sociétés et des mouvements bancaires
@@ -92,6 +92,65 @@ passif.
 >   `intercompanyLoans` relie deux **organisations** et rejette `same_org`, donc
 >   le module Passif ne peut pas porter un compte courant entre deux entités
 >   d'une même org.
+## v1.189.0 — 07/08/2026 à 18:35 — La file des reports se répare toute seule
+
+Le correctif d'il y a une heure n'a tenu qu'un tour : les deux mêmes reports
+sont repartis en erreur, avec deux messages différents. C'est le signe qu'on
+rustinait des symptômes. Cette fois le problème est pris à la racine — et il
+y en avait deux, distincts.
+
+**Une reformulation ne fait plus perdre un report.** L'IA avait écrit
+« half-year » là où on attendait « semestriel » : le bon rythme, dit
+autrement. On exigeait d'elle l'exactitude d'un formulaire et on jetait le
+report entier au moindre écart. Désormais les formulations équivalentes sont
+traduites — le rythme, les unités (`k€`, `M€`, `%`), les nombres écrits avec
+une espace ou une virgule. Et surtout : **un chiffre illisible ne coûte plus
+que sa ligne**, là où il emportait avant les quinze autres et la fiche avec
+eux. Rien n'est deviné pour autant — une unité inconnue reste hors des
+séries plutôt que d'être convertie au hasard.
+
+**Un incident passager ne te dérange plus.** L'autre report était mort sur
+une requête coupée en route — rien à voir avec son contenu. Or la file
+traitait tout échec comme définitif : mail d'échec, et un « Retraiter »
+manuel comme seule sortie. Un hoquet de trois secondes te coûtait une
+intervention. Maintenant le report est repris tout seul, jusqu'à trois fois,
+à 1, 5 puis 15 minutes — **et tu n'es prévenu que si les trois échouent**. À
+l'inverse, un contenu réellement inexploitable arrive dans la file tout de
+suite : inutile de te le signaler vingt minutes plus tard.
+
+Les deux reports concernés peuvent être retraités depuis « Reports
+entrants ».
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `convex/lib/reportAnalysis.ts` : le contrat modèle au complet.
+>   `analysisSchema` reste **strict** (c'est lui qui contraint
+>   `generateObject`, et le JSON Schema qu'on en dérive est la seule consigne
+>   reçue par le provider) ; `parseLenient` lit le chemin de repli, où rien
+>   ne contraint le modèle — synonymes normalisés (`normalizeReportType`,
+>   `normalizeUnit`, `looseNumber`), métrique invalide filtrée seule. Échec
+>   uniquement si ni `title` ni `headline`.
+> - `parseIdentificationLenient` (`convex/lib/emailIdentify.ts`) fait pareil
+>   côté brique 3, avec `confidence` retombant sur `'low'` — la branche
+>   **stricte** de `acceptIdentification`, donc un écart resserre le
+>   rattachement au lieu de le relâcher.
+> - Nouveau `convex/lib/modelRetry.ts` : `isTransientModelError` +
+>   `RETRY_BACKOFFS_MS`. `ModelOutputError` porte nos propres échecs de
+>   lecture, pour que la classification (qui lit le message) ne prenne jamais
+>   un `raw_label` « timeout » pour une panne passagère.
+> - `reportInbox.retryAfterTransient` repasse la ligne en `received` (le
+>   statut qu'exigent déjà `markProcessing`/`markStoring`) et replanifie.
+>   Budget **par étape** via `retryStep` + `retryAttempts` sur
+>   `inboundEmails` : pas de reset à écrire ailleurs. Aucune notification —
+>   `claimNotify` ne tirant qu'une fois, un mail d'échec prématuré ferait
+>   taire le récap de succès.
+> - Les deux `callModel` relaient une erreur passagère au lieu de replier sur
+>   `generateText` : une requête coupée ne dit rien sur la sortie structurée,
+>   enchaîner une seconde génération brûle le même échec deux fois.
+> - Tests : `regression.reportAnalysisSchema.test.ts` (étendu),
+>   `regression.modelRetry.test.ts` et `regression.reportRetry.test.ts`
+>   (budget borné, retour en `received`, budget par étape).
+
 ## v1.188.3 — 07/08/2026 à 17:48 — Un report n'est plus perdu parce qu'une case était vide
 
 Deux reports — GOODVEST et WIND CAPITAL 2 — sont revenus en « erreur technique

@@ -157,6 +157,22 @@ C'est ce qui permet de confier le transfert des reports à quelqu'un sans
 jamais lui envoyer les erreurs — il reçoit toujours le même accusé de
 réception, et les problèmes atterrissent chez ceux qui tiennent la file.
 
+**Un incident passager ne te dérange plus.** Il arrive que la lecture
+échoue pour une raison qui n'a rien à voir avec le mail : la requête vers
+l'IA est coupée en route, le service est saturé. Dans ce cas le report
+n'est plus mis en échec — il est repris tout seul, jusqu'à trois fois, à
+quelques minutes d'intervalle. Tu n'es prévenu que si les trois tentatives
+échouent. Un problème qui se répare de lui-même ne génère donc plus ni
+mail, ni geste de ta part. En revanche, un mail dont le contenu est
+réellement inexploitable arrive tout de suite dans la file : inutile de te
+le signaler vingt minutes plus tard.
+
+Dans le même esprit, l'IA n'a plus besoin d'être parfaite dans sa
+formulation pour que le report soit rangé. Si elle écrit le rythme ou une
+unité autrement qu'attendu, c'est traduit ; et une valeur illisible ne
+coûte plus que cette ligne — les autres chiffres du report et la fiche
+elle-même sont rangés normalement.
+
 > **Sous le capot** — L'email est enregistré intégralement dès son
 > arrivée, avant tout traitement : si une étape échoue, rien n'est perdu
 > et « Retraiter » rejoue le circuit de zéro. L'adresse est hébergée chez
