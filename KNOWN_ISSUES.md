@@ -2198,6 +2198,18 @@ dérivés des transactions pointées (`allocation.kind === 'intercompany_loan'`)
   (`fromOrgId` créancier / `toOrgId` débiteur). Toute query doit vérifier que
   l'utilisateur est membre d'au moins une des deux (pattern `getLiabilities` :
   `requireOrgMember` sur l'org regardante, puis lecture par `by_from`/`by_to`).
+- **Le passif ne sait pas porter un C/C entre deux entités d'une même org.**
+  `intercompanyLoans` relie deux **organisations** (`fromOrgId` / `toOrgId`) et
+  `createIntercompanyLoan` rejette explicitement `same_org`. Or les entités du
+  groupe (Caltimo, RDB, Relais Chapelle, les SCI, Banco 2) ne sont pas des orgs :
+  ce sont des `companies` `group_*` **à l'intérieur** de l'org `calte`. Les
+  avances en compte courant que CALTE leur consent — 7,8 M€, la plus grosse
+  masse du portefeuille importé — ne peuvent donc pas descendre au passif, et
+  restent modélisées en deals `cca` comptés comme des participations. Les porter
+  au passif demande d'ouvrir la table aux `companies` (nouveau couple de champs
+  + dérivation des soldes + UI), pas un simple déplacement de lignes. Constat
+  posé pendant `migrations/cleanupCalteImport.ts` ; la granularité d'actifs au
+  31/12/2025 (Drive) les classe bien en créances, distinctes des titres.
 - **Pointage public : `liabilities:allocateTransaction` / `deallocateTransaction`.**
   Une tx allouée au passif passe en `matchStatus: 'matched'` **sans `dealId`**
   (elle sort de la file de pointage) ; le détachement la repasse `unmatched`.
