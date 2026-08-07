@@ -23,6 +23,51 @@ bas de page.
 
 ---
 
+## v1.188.1 — 07/08/2026 à 16:20 — La récupération des chiffres encaisse la saturation du modèle
+
+Au premier passage réel sur les documents juridiques, le modèle de lecture a
+été saturé côté fournisseur. L'outil a alors marqué en échec des dizaines de
+documents en quelques secondes, alors que la limite se lève en quelques
+minutes — et, surtout, il n'aurait rien gardé des documents déjà lus si le
+passage avait été interrompu.
+
+Trois corrections :
+
+- **Il attend au lieu d'abandonner.** Quand le modèle est saturé, l'outil
+  patiente (30 s, puis 1, 2 et 4 minutes) avant de réessayer. Une erreur qui
+  n'est pas une saturation n'est pas réessayée : ce serait du temps perdu.
+- **Il ne perd plus ce qu'il a lu.** Chaque document lu est mémorisé
+  immédiatement. Une interruption ne coûte plus que le document en cours, et
+  la relance repart exactement où elle s'est arrêtée.
+- **Il s'arrête proprement plutôt que de s'acharner.** Si deux documents
+  d'affilée résistent à toute l'attente, l'outil arrête le passage, le dit
+  clairement, et écrit un rapport marqué comme **partiel** — relancer plus
+  tard suffit.
+
+Un rythme d'appel un peu plus espacé a aussi été mis en place, pour éviter de
+déclencher la saturation.
+
+> **🔧 Notes techniques**
+>
+> - Cause exacte : `generateObject` retente 3 fois en interne puis lève ;
+>   `extractDocument` attrape et **renvoie** `{ error }`. L'action sort donc en
+>   succès, `convex run` en code 0, et le retry de `convex()` — qui ne se
+>   déclenche que sur throw du sous-processus — n'était jamais atteint.
+> - `scripts/backfill-deal-fields.mjs` : `RATE_LIMITED` (regex sur le message
+>   fournisseur), `extractWithBackoff` (`MODEL_BACKOFFS` 30/60/120/240 s,
+>   uniquement sur saturation), `PACE_MS` = 1,5 s entre deux appels.
+> - Écriture du cache déplacée en fin de **chaque** extraction réussie au lieu
+>   de la fin du run.
+> - Arrêt anticipé après 2 documents consécutifs ayant épuisé le backoff :
+>   `stopped` court-circuite la boucle avant l'arbitrage (planifier une société
+>   sur un jeu de documents à moitié lu produirait des trous qui ressemblent à
+>   des constats), et le rapport MD porte un bandeau « PARTIEL ».
+> - `stats.companies` compté à l'exécution et non depuis `selected.length`.
+> - Pièges consignés : `KNOWN_ISSUES.md` § « Backfill depuis la doc juridique »
+>   (point 4).
+
+---
+
 ## v1.188.0 — 07/08/2026 à 15:57 — Le score de santé se remet à trancher
 
 Le score IA de santé donnait presque toujours la même note. Sur le
