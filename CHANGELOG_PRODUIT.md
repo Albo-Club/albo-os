@@ -23,6 +23,68 @@ bas de page.
 
 ---
 
+## v1.184.0 — 07/08/2026 à 12:19 — Le connecteur Claude lit enfin la documentation juridique des participations
+
+Les 320 documents juridiques versés sur les fiches des participations —
+pactes d'actionnaires, statuts, bulletins de souscription, PV d'assemblée,
+term sheets, comptes annuels — étaient jusqu'ici invisibles depuis
+claude.ai. Le connecteur savait dire *qu'un* pacte existait sur une fiche :
+son titre, sa date, son poids. Il ne pouvait pas l'ouvrir, ni chercher
+dedans. Répondre à « qu'est-ce que dit la clause de liquidité de Sezame ? »
+supposait d'ouvrir l'app et de lire le PDF soi-même.
+
+Le connecteur accède maintenant au **contenu** de cette documentation, de
+deux façons complémentaires :
+
+- **Une recherche par le sens sur toute la documentation de
+  l'organisation.** On pose la question en français, sans deviner les mots
+  exacts du document : « où est-ce que j'ai un droit de préemption ? », «
+  quelles sont mes obligations de non-concurrence ? ». La réponse rend des
+  extraits en citant le document d'origine, et la recherche peut être
+  restreinte à une seule participation. Elle couvre aussi les reportings
+  investisseurs déjà analysés.
+- **La lecture intégrale d'un document**, quand un extrait ne suffit pas —
+  relire un pacte en entier, vérifier un article précis des statuts.
+
+En pratique, il devient possible de croiser depuis Claude une question
+juridique et les chiffres du portefeuille dans la même conversation : « sur
+quelles participations ai-je un droit de suite, et combien y ai-je investi
+? ».
+
+Deux limites à connaître. Seuls les documents **dont l'app a réussi à lire
+le texte** sont concernés : un scan de mauvaise qualité ou un fichier en
+échec de lecture reste invisible à la recherche — la fiche société indique
+l'état de lecture document par document. Et le connecteur reste en
+**lecture** sur ce périmètre : il ne peut ni ajouter, ni modifier, ni
+supprimer un document.
+
+> **🔧 Notes techniques**
+>
+> - Deux outils MCP en lecture ajoutés à `convex/mcp/registry.ts` (26 → 28
+>   outils, 24 en lecture) : `searchDocuments`, wrapper direct sur
+>   `internal.vectorize.searchInternal` — exactement le même appel que
+>   l'outil agent in-app `agentToolsDocuments.ts`, aucun backend nouveau ;
+>   et `getDocumentText`, adossé à un nouvel `internalQuery`
+>   `getDocumentTextInternal` (`convex/agentTools.ts`).
+> - `getDocumentTextInternal` est le pendant MCP de
+>   `documents.getExtractedText` : `actorUserId` explicite au lieu de
+>   l'identité de session (l'endpoint `/mcp` n'en a pas), `readMembership` +
+>   contrôle `doc.orgId === orgId`, lecture de `documentTexts` par
+>   `storageId` (le texte est propriété du blob, pas de la ligne).
+> - **Pagination obligatoire** : un texte stocké va jusqu'à
+>   `MAX_DOCUMENT_CHARS` (900 000 caractères), soit ~900 ko dans une seule
+>   réponse JSON-RPC. La lecture se fait donc par fenêtre de 40 000
+>   caractères avec `nextOffset` rappelé jusqu'à `null`. Ne pas confondre
+>   avec `truncated`, qui dit que le fichier a été coupé à l'extraction —
+>   détaillé dans `KNOWN_ISSUES.md` « Serveur MCP distant » point 9.
+> - `listCompanyDocumentsInternal` renvoie en plus `ocrState` (champ
+>   additif, l'agent in-app le voit aussi) : sans lui le client appelle
+>   `getDocumentText` à l'aveugle sur un document jamais lu et ne sait pas
+>   interpréter le `null`.
+> - ⚠️ Après déploiement : **déconnecter puis reconnecter** le connecteur
+>   Albo OS dans claude.ai — les schémas d'outils sont figés au moment de la
+>   connexion.
+
 ## v1.183.0 — 06/08/2026 à 12:52 — Un virement interne devient un mouvement à deux jambes, plus une simple étiquette
 
 Jusqu'ici, classer une transaction en « virement interne » posait une
