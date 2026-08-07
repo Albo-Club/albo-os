@@ -128,7 +128,11 @@ La colonne principale, dans l'ordre de lecture :
     déposé en mars), la date de dépôt sinon — et la ligne dit toujours
     laquelle des deux elle affiche.
   - **Rapports et communications** se présentent en bulles : titre, résumé
-    d'une ligne, date, et le nombre de fichiers joints. Un clic ouvre le
+    d'une ligne, date, et le nombre de fichiers joints. Leur pictogramme est
+    sur **fond bleuté** et leur est propre (un pour les rapports, un autre
+    pour les communications), là où un document garde un carré neutre : ce
+    qu'on nous a envoyé se distingue de ce qu'on a classé sans avoir à lire
+    le badge. Un clic ouvre le
     détail (points clés, métriques, contenu intégral ; corps et pièces
     jointes pour une communication VASCO). Les fichiers d'un rapport sont
     **repliés dedans** — ils ne prennent pas de ligne à part.

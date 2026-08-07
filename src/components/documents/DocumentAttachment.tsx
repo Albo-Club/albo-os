@@ -1,4 +1,13 @@
-import { FileSpreadsheet, FileText, Image, Pencil, Trash2 } from 'lucide-react'
+import {
+  File,
+  FileArchive,
+  FileSpreadsheet,
+  FileText,
+  Image,
+  Pencil,
+  Presentation,
+  Trash2,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { ReactNode } from 'react'
@@ -48,16 +57,44 @@ export type DocumentCard = {
   url: string | null
 }
 
+/**
+ * MIME → glyph. The order matters: the OOXML types all carry "document" in
+ * their subtype, so the specific families are tested before the text one. A
+ * type we do not recognise gets the blank sheet rather than the text one,
+ * which would claim something we do not know.
+ */
 function FileGlyph({ contentType }: { contentType: string | null }) {
-  if (contentType?.startsWith('image/')) return <Image />
+  if (!contentType) return <File />
+  if (contentType.startsWith('image/')) return <Image />
   if (
     contentType === 'text/csv' ||
-    contentType?.includes('spreadsheet') ||
-    contentType?.includes('excel')
+    contentType.includes('spreadsheet') ||
+    contentType.includes('excel')
   ) {
     return <FileSpreadsheet />
   }
-  return <FileText />
+  if (
+    contentType.includes('presentation') ||
+    contentType.includes('powerpoint')
+  ) {
+    return <Presentation />
+  }
+  if (
+    contentType.includes('zip') ||
+    contentType.includes('compressed') ||
+    contentType.includes('tar')
+  ) {
+    return <FileArchive />
+  }
+  if (
+    contentType === 'application/pdf' ||
+    contentType.startsWith('text/') ||
+    contentType.includes('word') ||
+    contentType.includes('document')
+  ) {
+    return <FileText />
+  }
+  return <File />
 }
 
 export function DocumentAttachment({
