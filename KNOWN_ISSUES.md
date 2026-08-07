@@ -1328,7 +1328,7 @@ Trois choses non évidentes qui coûteraient cher à redécouvrir :
 Le critère d'efficacité de la suite a été vérifié : commenter le
 `requireOrgMember` de `deals.list` fait rougir 2 tests (isolation lecture).
 
-## Backfill depuis la doc juridique — 3 pièges
+## Backfill depuis la doc juridique — 4 pièges
 
 `scripts/backfill-deal-fields.mjs` + `convex/migrations/alboDocBackfill.ts`
 remplissent les champs vides des `companies`/`deals` de l'org `albo` à partir
@@ -1371,6 +1371,20 @@ des documents juridiques déjà versés. Trois choses non évidentes.
    caractères) et le passe en argument. Bénéfice collatéral — le cache par
    hash de texte court-circuite le modèle **avant** l'appel, donc une relance
    sur le delta ne coûte que des lectures.
+
+4. **Un modèle saturé revient en SUCCÈS de l'action, pas en exception.** Le SDK
+   IA retente trois fois en interne, puis l'action attrape l'échec et **renvoie
+   proprement** `{ error: "…temporarily rate-limited upstream…" }`. Donc
+   `convex run` sort en code 0, la boucle de retry du script — qui ne se
+   déclenche que si le sous-processus plante — ne voit rien, et un run entier
+   peut brûler 300 documents en ÉCHEC en quelques secondes contre une limite
+   qui se lève en minutes. D'où, côté script : `RATE_LIMITED` reconnaît le
+   message, `MODEL_BACKOFFS` attend 30 s → 4 min, `PACE_MS` espace les appels,
+   et deux documents d'affilée qui épuisent le backoff **arrêtent le run**,
+   avec le même contrat « relancer plus tard reprend où c'était » que
+   `vectorize:backfillAll`. Corollaire non négociable : le cache est écrit
+   **après chaque document**, jamais en fin de run — sinon un arrêt jette tout
+   ce qui a déjà été payé.
 
 ## Convex dev typecheck
 
