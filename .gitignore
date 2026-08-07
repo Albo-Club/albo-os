@@ -36,3 +36,9 @@ app.config.timestamp_*.js
 # Convex prod snapshot exports (live data dumps — NEVER commit, repo is public).
 # Produced by the `convex export --prod --path …` safety step in MIGRATIONS.md.
 /albo-backup*.zip
+
+# Legal-doc backfill (scripts/backfill-deal-fields.mjs): extraction cache and
+# generated reports. Both carry live portfolio data — never commit, repo is
+# public. Deleting the cache only costs a re-read of the documents.
+/scripts/data/.backfill-cache.json
+/backfill-out/
