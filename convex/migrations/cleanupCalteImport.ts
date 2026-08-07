@@ -50,10 +50,18 @@
  * matched by (date, amount) inside their own deal and consumed once, so a part
  * whose movements are ambiguous or missing skips the whole deal. A company is
  * archived, never deleted — `archivedAt` is a reversible soft delete, and it
- * only runs on a card with zero incoming reference. A deal has no such field:
- * the emptied ones are hard-deleted, but only once every transaction,
- * valuation, projection, document and forecast has been re-pointed elsewhere
- * (same invariant as `deals.remove`). Hence the mandatory snapshot below.
+ * only runs on a card with zero incoming reference, counting EVERY table that
+ * can name a company (including `transfers` and the `matchedCompanies` array of
+ * the report-inbox rows). A deal has no such field, so the emptied ones are
+ * hard-deleted:
+ *   - on a merge (step 5), every transaction, valuation, projection, document,
+ *     forecast, rule, entry and matching decision moves to the surviving deal
+ *     first — same invariant as `deals.remove`;
+ *   - on a removal (step 6) there is nowhere to move them, so the deal is
+ *     deleted ONLY if it carries nothing but transactions. Anything else and
+ *     the row is left untouched and reported. `dryRun` shows those counts under
+ *     `otherRowsAttached`, so the stopping point can catch it.
+ * Hence the mandatory snapshot below.
  *
  * Execution order (prod, manual):
  *   pnpm exec convex export --prod --path ./calte-backup-$(date +%Y%m%d-%H%M).zip
@@ -61,6 +69,8 @@
  *   # STOP: validate the report, then and only then:
  *   pnpm exec convex run --prod migrations/cleanupCalteImport:apply
  *   pnpm exec convex run --prod migrations/cleanupCalteImport:verify
+ *   # Reports moved between cards: rebuild the denormalized freshness fields.
+ *   pnpm exec convex run --prod migrations/backfillReportFreshness:apply
  */
 import { ConvexError } from 'convex/values'
 import { internalMutation, internalQuery } from '../_generated/server'
@@ -735,6 +745,8 @@ async function companyRefs(
     banks,
     kpis,
     todos,
+    transfers,
+    inbox,
   ] = await Promise.all([
     ctx.db
       .query('deals')
@@ -794,6 +806,19 @@ async function companyRefs(
       .query('todos')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect(),
+    ctx.db
+      .query('transfers')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect(),
+    // Report-inbox rows name their matched companies inside an array, and the
+    // table carries no orgId. Only the queue still shown to a human can point
+    // at an archived card, so the scan is bounded to `needs_review` — reading
+    // the whole table would pull every rawContent/cleanedHtml with it
+    // (cf. CLAUDE.md, « un gros champ texte sur une ligne lue en liste »).
+    ctx.db
+      .query('inboundEmails')
+      .withIndex('by_status', (q) => q.eq('status', 'needs_review'))
+      .collect(),
   ])
   return {
     asTarget,
@@ -808,6 +833,10 @@ async function companyRefs(
     banks,
     kpis: kpis.filter((k) => k.companyId === id),
     todos: todos.filter((t) => t.companyId === id),
+    transfers: transfers.filter((t) => t.ownerCompanyId === id),
+    inbox: inbox.filter((e) =>
+      (e.matchedCompanies ?? []).some((m) => m.companyId === id),
+    ),
   }
 }
 
@@ -903,6 +932,33 @@ function assignMovements(
   }
   return { assignment }
 }
+
+/**
+ * Everything attached to a deal EXCEPT its transactions. A merge re-points all
+ * of it; a removal has no destination for it, so it must find zero here before
+ * deleting anything.
+ */
+function otherDealRefCounts(refs: Awaited<ReturnType<typeof dealRefs>>) {
+  const counts = {
+    valuations: refs.valuations.length,
+    projections: refs.projections.length,
+    documents: refs.docs.length,
+    forecasts: refs.forecasts.length,
+    forecastEntries: refs.entries.length,
+    forecastRules: refs.rules.length,
+    matchingDecisions: refs.decisions.length,
+  }
+  return {
+    ...counts,
+    total: Object.values(counts).reduce((s, n) => s + n, 0),
+  }
+}
+
+const describeCounts = (counts: Record<string, number>) =>
+  Object.entries(counts)
+    .filter(([key, n]) => key !== 'total' && n > 0)
+    .map(([key, n]) => `${n} ${key}`)
+    .join(', ')
 
 const sum = (txs: Array<Doc<'transactions'>>) =>
   txs.reduce((s, t) => s + t.amount, 0)
@@ -1091,11 +1147,16 @@ export const dryRun = internalQuery({
           }
         }
         const refs = await dealRefs(ctx, orgId, deal._id)
+        const attached = otherDealRefCounts(refs)
         return {
           expectedTarget: spec.expectedTarget,
           why: spec.why,
           movementsReturnedToQueue: refs.txs.length,
           paidAmount: deal.paidAmount ?? 0,
+          // Non-zero here means apply will refuse the removal: there is
+          // nowhere to re-point these rows, and deleting would orphan them.
+          otherRowsAttached: attached,
+          blocked: attached.total > 0,
         }
       }),
     )
@@ -1289,13 +1350,32 @@ export const apply = internalMutation({
       for (const t of refs.todos) {
         await ctx.db.patch('todos', t._id, { companyId: to._id })
       }
-      // One intelligence row per company: the surviving card keeps its own.
+      for (const t of refs.transfers) {
+        await ctx.db.patch('transfers', t._id, { ownerCompanyId: to._id })
+      }
+      // The review queue names its matched companies inside an array: rewrite
+      // the entry in place, or the row keeps pointing at the archived card
+      // while its reports have moved to the survivor.
+      for (const email of refs.inbox) {
+        await ctx.db.patch('inboundEmails', email._id, {
+          matchedCompanies: (email.matchedCompanies ?? []).map((m) =>
+            m.companyId === from._id ? { ...m, companyId: to._id } : m,
+          ),
+        })
+      }
+      // One intelligence row per company — the reader takes `.first()` by
+      // company, so a second row would be shadowed forever. The survivor keeps
+      // its own synthesis and the loser's row is dropped rather than left
+      // orphaned on an archived card; it is derived data, regenerated on demand.
       const targetIntel = await ctx.db
         .query('companyIntelligence')
         .withIndex('by_company', (q) => q.eq('companyId', to._id))
         .first()
       for (const row of refs.intel) {
-        if (targetIntel) continue
+        if (targetIntel) {
+          await ctx.db.delete('companyIntelligence', row._id)
+          continue
+        }
         await ctx.db.patch('companyIntelligence', row._id, {
           companyId: to._id,
         })
@@ -1374,6 +1454,17 @@ export const apply = internalMutation({
         continue
       }
       const refs = await dealRefs(ctx, orgId, deal._id)
+      // Unlike a merge, a removal has nowhere to re-point to. Anything other
+      // than transactions attached to the deal (a valuation, a projection, a
+      // document, a forecast, a matching decision) would be orphaned by the
+      // delete, so the row is left alone and reported instead of guessed.
+      const attached = otherDealRefCounts(refs)
+      if (attached.total > 0) {
+        done.skipped.push(
+          `removal: ${spec.expectedTarget} still carries ${describeCounts(attached)}`,
+        )
+        continue
+      }
       for (const t of refs.txs) {
         await ctx.db.patch('transactions', t._id, {
           dealId: undefined,
@@ -1385,14 +1476,14 @@ export const apply = internalMutation({
         })
       }
       await ctx.db.delete('deals', deal._id)
+      // Same rule as the shells above: the card goes only when NOTHING points
+      // at it any more — a partial check would archive a card still carrying
+      // relations, KPIs, e-mail links or todos (cf. companies.archive).
       const remaining = await companyRefs(ctx, orgId, deal.targetCompanyId)
-      const stillUsed =
-        remaining.asTarget.length +
-        remaining.asInvestor.length +
-        remaining.asViaSpv.length +
-        remaining.docs.length +
-        remaining.reports.length +
-        remaining.banks.length
+      const stillUsed = Object.values(remaining).reduce(
+        (s, arr) => s + arr.length,
+        0,
+      )
       if (stillUsed === 0) {
         await ctx.db.patch('companies', target._id, { archivedAt: Date.now() })
       }
