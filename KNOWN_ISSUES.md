@@ -1284,6 +1284,50 @@ Trois choses non évidentes qui coûteraient cher à redécouvrir :
 Le critère d'efficacité de la suite a été vérifié : commenter le
 `requireOrgMember` de `deals.list` fait rougir 2 tests (isolation lecture).
 
+## Backfill depuis la doc juridique — 3 pièges
+
+`scripts/backfill-deal-fields.mjs` + `convex/migrations/alboDocBackfill.ts`
+remplissent les champs vides des `companies`/`deals` de l'org `albo` à partir
+des documents juridiques déjà versés. Trois choses non évidentes.
+
+1. **Un même document contient plusieurs nombres d'actions, tous corrects.**
+   Sur Auxicare, le PV du Président porte **480 000** (capital après la seule
+   augmentation de capital), **548 943** (après exercice concomitant des BSA
+   Air) et le pacte **609 936** (base pleinement diluée, pool BSPCE inclus).
+   Les trois sont exacts dans leur contexte, et un extracteur qui prend le
+   premier croisé se trompe. Les règles, encodées dans
+   `convex/lib/docBackfill.ts` : `companies.totalShares` prend les actions
+   **émises** (jamais la base FD — un pool voté et non attribué n'est pas une
+   action) ; la base FD sert aux **valorisations** (post-money = FD × prix du
+   tour) et part dans les **notes du deal**, pas dans une colonne. Garde-fou :
+   quand le pacte imprime le % d'Albo, le script recalcule
+   `sharesAcquired / base FD` et flagge `coherence_base_FD_douteuse` si l'écart
+   dépasse 0,1 point — une base fausse se voit là, avant d'être multipliée par
+   le prix du tour.
+
+2. **`deals.ownershipPct` et le % affiché sur la fiche société ne sont pas le
+   même chiffre, et c'est normal.** `ownershipPct` est stocké en base
+   **pleinement diluée**, repris tel quel de la table de capitalisation
+   (Auxicare : `234` bps = 2,34 %). L'en-tête de
+   `src/routes/app/$orgSlug/participations.$companyId.tsx` calcule, lui,
+   `somme(deals.sharesAcquired) / companies.totalShares` — donc du **non
+   dilué** (Auxicare : 14 286 / 548 943 = 2,6 %). Réalité économique contre
+   réalité juridique : deux questions différentes, deux réponses différentes.
+   Ne pas « corriger » l'un avec l'autre sans arbitrage explicite ; si un jour
+   l'affichage doit changer, c'est une décision produit, pas un bug.
+
+3. **Un nouveau module de `convex/migrations/` ne peut pas s'auto-référencer
+   via `internal.…`.** `convex/_generated/api.d.ts` est **commité et périmé**
+   (il ne connaît pas les modules ajoutés depuis le dernier `convex dev`), et
+   la CI fait tourner `pnpm lint` = `tsc` sur cet état-là : un
+   `ctx.runQuery(internal.migrations.monModule.maQuery)` écrit dans
+   `monModule` casse le typecheck en CI alors qu'il est correct en prod. Le
+   contournement retenu ici est aussi le plus simple : l'action ne lit rien
+   elle-même, le script paginate le texte (`getDocText`, fenêtres de 40 000
+   caractères) et le passe en argument. Bénéfice collatéral — le cache par
+   hash de texte court-circuite le modèle **avant** l'appel, donc une relance
+   sur le delta ne coûte que des lectures.
+
 ## Convex dev typecheck
 
 `pnpm exec convex dev` runs its own typecheck (`--typecheck=enable`). If

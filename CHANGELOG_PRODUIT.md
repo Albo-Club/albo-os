@@ -23,6 +23,81 @@ bas de page.
 
 ---
 
+## v1.186.0 — 07/08/2026 à 13:35 — Récupérer les chiffres des participations depuis les documents juridiques
+
+Beaucoup de fiches deals et sociétés ont des cases vides — nombre de titres,
+prix de souscription, pourcentage de détention, taille et type du tour,
+valorisations, dates de closing — alors que l'information dort dans les
+pactes, bulletins de souscription et PV déjà déposés sur les fiches.
+
+Un nouvel outil les lit et propose de les remplir. Il fonctionne en deux
+temps, et le premier n'écrit **rien** :
+
+- **Proposition.** L'outil parcourt les participations d'Albo Club, fait lire
+  chaque document juridique, et rend un rapport en trois sections :
+  **propositions** (case vide, valeur trouvée), **écarts** (le document
+  contredit ce qui est déjà saisi) et **non traité** (avec le motif :
+  document illisible, tour non qualifié, sources contradictoires…). Chaque
+  ligne indique le document source et l'extrait exact qui justifie la valeur.
+- **Validation.** Le rapport sort aussi en tableur. Il suffit de mettre `1`
+  dans la colonne « ok » sur les lignes retenues et de relancer : seules
+  celles-là sont écrites.
+
+Trois garanties tenues par construction. Une valeur déjà saisie n'est
+**jamais** écrasée en silence : si un document la contredit, la ligne part en
+écarts et attend une validation explicite. Rien n'est deviné : quand un
+document ne dit pas quelque chose, la case reste vide avec un motif plutôt que
+de recevoir une estimation. Et les valorisations, qui se déduisent d'un calcul
+plutôt que de se lire, sont signalées comme telles — avec une alerte
+supplémentaire quand des instruments ont converti à prix réduit, ce qui gonfle
+mécaniquement le résultat.
+
+L'outil est rejouable : une nouvelle participation ou de nouveaux documents
+déposés, on relance et seul ce qui a changé est retraité.
+
+À noter : sur une fiche société, le pourcentage affiché en en-tête et le
+pourcentage de détention stocké sur le deal peuvent différer. Ce n'est pas une
+erreur — l'un rapporte les titres détenus au capital effectivement émis,
+l'autre reprend le pourcentage du pacte, calculé en incluant les titres à
+émettre. Deux questions différentes, deux réponses différentes.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `convex/lib/docBackfill.ts` : couche **pure** (aucun accès base,
+>   aucun réseau) qui arbitre les sources, convertit en centimes/bps/ISO,
+>   dérive les valorisations et trie en PROPOSITION / ECART / NON_TRAITE.
+>   `planDeal()` en est le seul point d'entrée.
+> - Nouveau `convex/migrations/alboDocBackfill.ts` : `listTargets` (cibles +
+>   valeurs courantes, sans une ligne de texte), `getDocText` (fenêtres de
+>   40 000 caractères), `extractDocument` (un appel `generateObject` par
+>   document, schéma Zod strict, `keepOnlyQuoted` rejette toute valeur dont
+>   l'extrait n'est pas littéralement dans le texte), `planForDeal`,
+>   `applyRows`.
+> - `applyRows` porte la règle cardinale : verrou optimiste sur
+>   `expectedCurrent` — la colonne doit encore contenir exactement ce que le
+>   dry-run a vu, sinon la ligne est refusée. C'est ce qui rend un 2ᵉ apply
+>   no-op et interdit l'écrasement silencieux. SIREN repassé par
+>   `normalizeSiren` + `assertSirenFree`, `roundType` revalidé contre l'enum.
+> - Nouveau `scripts/backfill-deal-fields.mjs` : orchestrateur deux modes
+>   (dry-run par défaut / `--apply <csv>`), pagination + recollage du texte,
+>   cache `scripts/data/.backfill-cache.json` par documentId + hash FNV-1a du
+>   texte qui court-circuite le modèle **avant** l'appel, rendu markdown + CSV
+>   (parseur RFC-4180 minimal, BOM strippé).
+> - Rattachement document → deal : un document portant `dealId` alimente ce
+>   deal ; sur une société à deal unique les documents non rattachés
+>   l'alimentent aussi ; sur une société à plusieurs deals ils n'alimentent
+>   que l'identité société (attribuer un pacte au mauvais tour serait
+>   exactement l'erreur plausible à éviter).
+> - `convex/regression.docBackfill.test.ts` : 17 tests sur fixture figée
+>   (l'extraction LLM n'est pas reproductible en CI, la couche déterministe
+>   si). Cas de référence Auxicare reproduit à l'identique, plus le piège des
+>   trois nombres d'actions, la hiérarchie des sources, le repli non dilué et
+>   la règle cardinale.
+> - `companies.notes` reste hors périmètre : aucune convention ne définit ce
+>   qui doit y figurer. La note de base FD va dans les notes du **deal**.
+
+---
+
 ## v1.185.0 — 07/08/2026 à 13:00 — L'historique de vos reportings rejoint Albo OS
 
 Jusqu'ici, Albo OS ne connaissait vos participations qu'à partir de juillet
@@ -87,6 +162,9 @@ latestReportId` est laissé intact (un import historique ne repointe pas
 > - Pourquoi aucune clé automatique ne convenait :
 >   `KNOWN_ISSUES.md` § « Reprise d'un historique de reports depuis un autre
 >   outil ». Runbook : `MIGRATIONS.md`.
+
+---
+
 ## v1.184.0 — 07/08/2026 à 12:19 — Le connecteur Claude lit enfin la documentation juridique des participations
 
 Les 320 documents juridiques versés sur les fiches des participations —
