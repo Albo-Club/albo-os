@@ -31,25 +31,36 @@ import type { Doc, Id } from './_generated/dataModel'
 const PIPELINE_VERSION = 'albo-os-v2'
 const MAX_TEXT = 30_000
 
-const analysisSchema = z.object({
+/**
+ * Every optional field is `.nullable().default(null)`, never a bare
+ * `.nullable()`: in Zod the latter allows the VALUE null but still requires
+ * the KEY, and a model answering in free JSON (the generateText fallback
+ * below) omits a key rather than writing `"x": null` — which used to reject
+ * the whole report over an absent `period`. Output type is unchanged
+ * (`string | null`), so downstream code is untouched.
+ */
+export const analysisSchema = z.object({
   title: z.string().describe('Titre court du report'),
   headline: z.string().describe('Résumé en une phrase'),
   key_highlights: z.array(z.string()).describe('3 à 6 points clés'),
   report_period: z
     .string()
     .nullable()
+    .default(null)
     .describe(
       'Période couverte, en anglais : "January 2026" | "Q4 2025" | "S1 2026" | "2025". null si le document ne couvre aucune période',
     ),
   report_type: z
     .enum(['monthly', 'bimonthly', 'quarterly', 'semi-annual', 'annual'])
     .nullable()
+    .default(null)
     .describe("null si le document n'a aucun rythme périodique"),
   metrics: z.array(
     z.object({
       catalog_key: z
         .string()
         .nullable()
+        .default(null)
         .describe('Clé du catalogue si la métrique y correspond, sinon null'),
       raw_label: z.string().describe("Libellé d'origine tel qu'écrit dans le report"),
       value: z.number().describe("Valeur numérique TELLE QU'ÉCRITE (aucune conversion)"),
@@ -57,6 +68,7 @@ const analysisSchema = z.object({
       period: z
         .string()
         .nullable()
+        .default(null)
         .describe('Période spécifique si différente de la période principale, sinon null'),
     }),
   ),

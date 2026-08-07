@@ -1174,6 +1174,42 @@ Corollaire d'affichage : `periodSortDate` retombe sur la date de réception
 quand il n'y a pas de période, sinon le courrier n'aurait aucun ancrage dans
 la timeline de la fiche (l'index `by_company` trie là-dessus).
 
+## Schéma Zod servi à un LLM : `.nullable()` exige la CLÉ, pas seulement la valeur
+
+Suite directe du § ci-dessus. Rendre `report_period` et `report_type`
+`nullable()` n'a réglé le problème qu'à moitié : deux reports (GOODVEST,
+WIND CAPITAL 2) sont repartis en `analyze_error` sur
+`metrics[0].period` — `expected string, received undefined`.
+
+En Zod, `.nullable()` autorise la **valeur** `null` mais laisse la **clé
+obligatoire**. Or un modèle qui répond en JSON libre **omet** une clé dont
+il n'a rien à dire, il n'écrit pas `"period": null`. Et `metrics[].period`
+n'existe que si une métrique couvre une autre période que le report : elle
+est absente de la quasi-totalité des métriques. Une clé manquante faisait
+donc rejeter le report **entier**, avec les 15 métriques valides qui
+l'accompagnaient.
+
+Pourquoi ça ne tombe pas sur tous les reports : le chemin nominal est
+`generateObject`, qui contraint le modèle au schéma. Le `safeParse` n'est
+atteint que par le **repli** `generateText` (JSON libre), déclenché quand
+`generateObject` échoue — et cet échec-là est logé en `console.warn`, donc
+invisible côté produit. Deux pannes en cascade sont nécessaires pour perdre
+un report, ce qui rend le bug rare et d'autant plus déroutant.
+
+**Règle : dans tout schéma Zod envoyé à un LLM, un champ optionnel s'écrit
+`.nullable().default(null)` (ou `.nullish()`), jamais `.nullable()` seul.**
+Le `.default(null)` sort la clé du `required` du JSON Schema **et** relit
+une clé absente comme `null` — le type de sortie reste `string | null`,
+donc le code en aval ne bouge pas. Appliqué à `analysisSchema`
+(`convex/reportStore.ts`) et à `identificationSchema`
+(`convex/reportIdentify.ts`). Couvert par
+`convex/regression.reportAnalysisSchema.test.ts`.
+
+Corollaire non traité, à garder en tête : une seule métrique mal formée
+fait encore échouer le report complet. Le jour où ça repique, la piste est
+de valider les métriques une par une et de jeter les invalides plutôt que
+le lot.
+
 ## Prompt de notation : l'exemple JSON fixe la note, et la symétrie forcée l'écrase
 
 Le score de santé de la synthèse IA (`INTELLIGENCE_SYSTEM_PROMPT`,
