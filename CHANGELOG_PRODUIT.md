@@ -23,6 +23,65 @@ bas de page.
 
 ---
 
+## v1.187.3 — 07/08/2026 à 16:10 — Rewatt ne compte plus que pour une seule société dans CALTE
+
+Le portefeuille CALTE affichait dix lignes Rewatt : une par adresse d'opération,
+plus une ligne pour la participation au capital, plus un doublon vide. Or il n'y
+a qu'une seule société derrière tout ça — Rewatt achète, rénove et revend chaque
+appartement depuis son propre bilan, sans créer de véhicule dédié. Dix lignes
+pour un seul partenaire, ça fausse le compte des participations et ça éclate son
+historique.
+
+Rewatt ne fait désormais qu'une seule ligne, qui porte son identité légale. Les
+huit opérations deviennent huit financements rattachés à cette ligne, chacun
+nommé par son adresse — Rue Monge, Rue Froment, Boulevard Ney… — donc on lit
+toujours quelle opération a rapporté quoi, sans avoir dix fiches à ouvrir.
+
+Deux corrections viennent avec :
+
+- **Sept des huit opérations étaient enregistrées comme des obligations.** Ce
+  n'en sont pas : ce sont des avances sur un compte courant d'associé, tirées
+  au fil des acquisitions sur une convention unique signée en avril 2023. Elles
+  sont requalifiées, avec leur taux réel (3 %, 4 %, ou indexé pour Rue Monge).
+  Seule l'opération du boulevard de Port-Royal est un véritable emprunt
+  obligataire.
+- **Le financement du boulevard de Port-Royal apparaissait toujours en cours**
+  alors qu'il a été remboursé le 30 décembre 2025. Il est soldé, avec le montant
+  effectivement encaissé.
+
+La ligne Rewatt de l'organisation Albo n'est pas concernée : elle était déjà
+unique et correctement rattachée.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau module one-shot `convex/migrations/consolidateRewattCalte.ts`
+>   (`dryRun` / `apply` / `verify`), sur le modèle de `calteInstrumentImport`.
+>   Il ne s'exécute pas au déploiement : lancement manuel en
+>   `convex run --prod` après merge, snapshot `convex export --prod` d'abord.
+> - `apply` fait cinq choses : pose l'identité légale (siren `950792473`,
+>   `legalName`, `legalForm`, `countryCode`, `sector`) sur la ligne `REWATT`
+>   survivante — champs vides uniquement, unicité SIREN re-vérifiée ; repointe
+>   les 8 deals via `targetCompanyId` et écrit leur adresse dans `deals.name` ;
+>   requalifie 7 deals `os` → `cca` avec `interestRate` / `principalAmount` ;
+>   solde le deal Port-Royal (`fully_exited`, 30/12/2025, 41 866,67 €) ;
+>   archive les 8 entités vidées + l'orphelin `Rewatt - Port Royal 5éme`.
+> - Sources : les lettres `Appel de fonds #N` / `Remboursement #N` et la
+>   `Convention d'avance en compte courant d'associés` du 20/04/2023 (Drive,
+>   dossier « REWATT »). Montants et taux repris verbatim ; les 8 montants
+>   rapprochent au centime le cash déjà enregistré sur chaque deal. Aucune
+>   valeur écrite sans pièce : la lettre de remboursement d'Esquirol est absente
+>   du Drive, donc sa sortie n'est pas renseignée.
+> - Gardes : ancrage par `_id` prod + contrôle du nom exact courant (attention,
+>   `REWATT - 33 chaussée d'Antin ` porte une espace finale) ; `resolveOperation`
+>   accepte la cible source **ou** la cible canonique, ce qui rend le second run
+>   no-op. Champs déjà remplis jamais écrasés, divergences remontées dans
+>   `mismatches`. Archivage = soft delete `archivedAt`, refusé tant qu'une
+>   référence subsiste (`blockingRefs` local, qui ajoute `companyReports` et
+>   `companyIntelligence` à la couverture de `companies.listBlockingRefs`).
+> - Chaque clé écrite est ajoutée à `deals.manuallyEditedFields`, sinon un
+>   re-run de `airtableImport:runImport` réécraserait tout (cf. `KNOWN_ISSUES.md`
+>   « Édition manuelle deals »).
+
 ## v1.187.2 — 07/08/2026 à 14:46 — On reconnaît un reporting d'un document au premier coup d'œil
 
 Dans la chronologie d'une entité, un reporting, une communication VASCO et un
