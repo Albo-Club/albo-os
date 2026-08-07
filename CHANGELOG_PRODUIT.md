@@ -23,6 +23,33 @@ bas de page.
 
 ---
 
+## v1.187.2 — 07/08/2026 à 14:46 — On reconnaît un reporting d'un document au premier coup d'œil
+
+Dans la chronologie d'une entité, un reporting, une communication VASCO et un
+simple document déposé portaient tous la même petite icône grise : il fallait
+lire le badge pour savoir ce qu'on avait sous les yeux.
+
+Les reportings et les communications ont désormais leur propre pictogramme, sur
+fond bleuté — la famille « ce qu'on nous a envoyé » se distingue d'un regard de
+la famille « ce qu'on a classé ». Et les documents eux-mêmes affichent une
+icône qui suit le type de fichier : tableur, présentation, archive, image, ou
+document texte, au lieu de la même feuille pour tout. Valable sur la fiche
+entité comme sur l'onglet documents d'un deal.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/documents/DocumentAttachment.tsx` : `FileGlyph` élargi
+>   (présentation, archive, PDF/Word/texte, `File` en repli). L'ordre des
+>   tests compte — les types OOXML contiennent tous « document » dans leur
+>   sous-type, donc les familles spécifiques passent avant.
+> - `src/components/companies/CompanyTimelineSection.tsx` : `CommunicationRow`
+>   prend une prop `glyph` (`FileChartColumn` pour un report, `Megaphone` pour
+>   VASCO) et son carré passe en `bg-info/10 text-info`. Le carré d'un
+>   document reste neutre — c'est la teinte qui porte la distinction de
+>   famille, l'icône la distinction de nature.
+> - Aucune couleur par type de fichier : `positive` sert à marquer une
+>   plus-value, le détourner en « vert Excel » aurait brouillé le signal.
+
 ## v1.187.1 — 07/08/2026 à 14:08 — Un fichier introuvable ne fait plus perdre son reporting
 
 Lors de la reprise de l'historique des reportings, quatre d'entre eux ne sont

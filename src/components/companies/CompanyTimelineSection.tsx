@@ -1,7 +1,15 @@
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
-import { ChevronRight, FileText, Paperclip, Plus, RefreshCw } from 'lucide-react'
+import {
+  ChevronRight,
+  FileChartColumn,
+  FileText,
+  Megaphone,
+  Paperclip,
+  Plus,
+  RefreshCw,
+} from 'lucide-react'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { ConvexError } from 'convex/values'
 import { toast } from 'sonner'
@@ -139,8 +147,14 @@ function useRelativeAge() {
 
 /** Shared shell of the two "communication" rows (report, VASCO): a square
  * glyph, a title line with badges, and a chevron — the whole row opens the
- * detail. Documents keep their own attachment card (they open a file). */
+ * detail. Documents keep their own attachment card (they open a file).
+ *
+ * The glyph square is tinted `info` where a document's stays neutral grey:
+ * in a single timeline, what tells a reporting from a filed PDF has to be
+ * readable before the badge is read. The glyph itself is the caller's, so a
+ * reporting and a VASCO communication are told apart too. */
 function CommunicationRow({
+  glyph,
   title,
   badges,
   preview,
@@ -149,6 +163,7 @@ function CommunicationRow({
   onOpen,
   ariaLabel,
 }: {
+  glyph: ReactNode
   title: string
   badges: ReactNode
   preview: string | null
@@ -171,8 +186,8 @@ function CommunicationRow({
       }}
       className="hover:bg-accent/40 focus-visible:ring-ring flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors focus-visible:ring-2 focus-visible:outline-none"
     >
-      <div className="bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-lg">
-        <FileText className="size-4" />
+      <div className="bg-info/10 text-info flex size-10 shrink-0 items-center justify-center rounded-lg">
+        {glyph}
       </div>
 
       <div className="min-w-0 flex-1">
@@ -269,6 +284,7 @@ function ReportEntry({
 
   return (
     <CommunicationRow
+      glyph={<FileChartColumn className="size-4" />}
       title={title}
       ariaLabel={t('timeline.openReport', { title })}
       badges={
@@ -308,6 +324,7 @@ function VascoEntry({
 
   return (
     <CommunicationRow
+      glyph={<Megaphone className="size-4" />}
       title={title}
       ariaLabel={t('participations:timeline.openCommunication', { title })}
       badges={
