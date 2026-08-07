@@ -22,6 +22,11 @@
  * is free and an interrupted run resumes by being re-run. Nothing is deleted,
  * nothing is overwritten — a report already present is skipped, never patched.
  *
+ * A file that cannot be fetched does NOT cost its report: Albo app holds
+ * `report_files` rows whose blob is absent from Storage, and the analysis and
+ * the text live on the report itself. Those reports are imported without the
+ * attachment, and the gaps are listed apart from the failures at the end.
+ *
  * Prerequisites:
  *   - SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (read access to Albote Prod)
  *   - the Convex prod deploy key already configured for `convex run --prod`
@@ -265,6 +270,9 @@ let created = 0
 let already = 0
 let blocked = 0
 const failures = []
+// Attachments that could not be fetched. Kept apart from `failures`: the
+// report itself landed, only a file is missing.
+const fileWarnings = []
 
 for (const [i, item] of plan
   .slice(0, limit === Infinity ? plan.length : limit)
@@ -279,21 +287,30 @@ for (const [i, item] of plan
         count: usable.length,
       })
       for (const [n, f] of usable.entries()) {
-        const bytes = await download(f.storage_path)
-        if (bytes.length > MAX_BYTES) {
-          failures.push(
-            `${label} — ${f.file_name} : ${Math.round(bytes.length / 1e6)} Mo > cap 20 Mo`,
-          )
-          continue
+        // A file that cannot be fetched must NOT cost the report. Albo app
+        // carries `report_files` rows whose blob is absent from Storage (the
+        // upload never landed, or the object was removed) — the analysis and
+        // the text live on the report itself, so it is imported without that
+        // attachment and the gap is reported at the end.
+        try {
+          const bytes = await download(f.storage_path)
+          if (bytes.length > MAX_BYTES) {
+            fileWarnings.push(
+              `${label} — ${f.file_name} : ${Math.round(bytes.length / 1e6)} Mo > cap 20 Mo`,
+            )
+            continue
+          }
+          const storageId = await upload(urls[n], bytes, f.mime_type)
+          uploaded.push({
+            storageId,
+            filename: f.original_file_name || f.file_name,
+            contentType: f.mime_type || undefined,
+            size: bytes.length,
+            text: f.original_text_report || undefined,
+          })
+        } catch (err) {
+          fileWarnings.push(`${label} — ${f.file_name} : ${err.message}`)
         }
-        const storageId = await upload(urls[n], bytes, f.mime_type)
-        uploaded.push({
-          storageId,
-          filename: f.original_file_name || f.file_name,
-          contentType: f.mime_type || undefined,
-          size: bytes.length,
-          text: f.original_text_report || undefined,
-        })
       }
     }
 
@@ -327,7 +344,7 @@ for (const [i, item] of plan
 
   if ((i + 1) % 10 === 0 || i + 1 === plan.length) {
     console.log(
-      `  ${i + 1}/${plan.length} — créés ${created}, déjà là ${already}, bloqués ${blocked}, échecs ${failures.length}`,
+      `  ${i + 1}/${plan.length} — créés ${created}, déjà là ${already}, bloqués ${blocked}, échecs ${failures.length}, pièces jointes manquantes ${fileWarnings.length}`,
     )
   }
 }
@@ -335,6 +352,12 @@ for (const [i, item] of plan
 console.log(
   `\nTerminé — créés : ${created}, déjà présents : ${already}, bloqués : ${blocked}, échecs : ${failures.length}`,
 )
+if (fileWarnings.length > 0) {
+  console.log(
+    `\nPièces jointes non récupérées (${fileWarnings.length}) — le report est importé sans elles :`,
+  )
+  for (const w of fileWarnings) console.log(`  - ${w}`)
+}
 if (failures.length > 0) {
   console.log('\nÉchecs :')
   for (const f of failures) console.log(`  - ${f}`)

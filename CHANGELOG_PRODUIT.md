@@ -23,6 +23,32 @@ bas de page.
 
 ---
 
+## v1.187.1 — 07/08/2026 à 14:08 — Un fichier introuvable ne fait plus perdre son reporting
+
+Lors de la reprise de l'historique des reportings, quatre d'entre eux ne sont
+pas passés. La cause : leur pièce jointe était référencée dans l'ancien outil
+mais le fichier lui-même n'existait plus. L'import s'arrêtait alors sur ce
+report et le laissait de côté — alors que son texte, son analyse et ses
+chiffres, eux, étaient parfaitement disponibles.
+
+Désormais une pièce jointe irrécupérable ne coûte plus que la pièce jointe :
+le reporting est importé sans elle, et les fichiers manquants sont listés à
+part en fin d'opération, distincts des vrais échecs.
+
+> **🔧 Notes techniques**
+>
+> - `scripts/import-albo-reports.mjs` : le téléchargement + upload de chaque
+>   fichier passe dans son propre `try/catch`. Un échec alimente désormais
+>   `fileWarnings` (nouveau compteur, affiché séparément) au lieu de faire
+>   remonter l'exception au `catch` du report, qui sautait l'appel à
+>   `importOne`.
+> - Cause racine côté source : des lignes `report_files` d'Albo app pointent
+>   vers un chemin sans objet dans Supabase Storage (`storage.objects` vide
+>   pour ces clés) — Storage répond 400, pas 404.
+> - Concernait 4 reports sur 139 : Jeen `March 2026` (les deux), Jeen
+>   `November 2025`, Tango `Q1 2026`. Le re-run les crée ; les 135 déjà
+>   importés ressortent en « déjà présents » grâce à `alboReportId`.
+
 ## v1.187.0 — 07/08/2026 à 13:43 — Un deal annulé n'est plus obligé de se déguiser en sortie
 
 Il arrive qu'un deal soit annulé **après** le virement : les fonds partent,
@@ -31,14 +57,14 @@ plus tard. C'est ce qui s'est passé sur le SPV Parallel Dix-huit. Les deux
 mouvements bancaires existent et doivent bien se pointer quelque part — donc
 le deal et l'entité en face doivent exister dans Albo OS.
 
-Jusqu'ici, aucun statut ne disait la vérité. *Actif* faisait croire à une
-position ouverte qu'on n'a jamais eue. *Exité* affichait un multiple de 1,00×
-et un badge vert « Exit win », comme une opération réussie. *Passé en perte*
+Jusqu'ici, aucun statut ne disait la vérité. _Actif_ faisait croire à une
+position ouverte qu'on n'a jamais eue. _Exité_ affichait un multiple de 1,00×
+et un badge vert « Exit win », comme une opération réussie. _Passé en perte_
 peignait la même chose en rouge. Trois façons de mentir sur le même mouvement
 aller-retour.
 
 Un quatrième statut arrive : **« Annulé »**. Il se pose dans le dialogue de
-sortie habituel (« Gérer la sortie » → type *Annulé*), avec la date du
+sortie habituel (« Gérer la sortie » → type _Annulé_), avec la date du
 remboursement et le montant remboursé, et il s'annule comme une sortie si
 c'était une erreur.
 
@@ -51,9 +77,9 @@ deal qui n'a jamais eu lieu.
 
 Il est aussi **volontairement discret**, pour ne pas encombrer des listes qui
 parlent de participations réelles. Il n'a pas de tableau dans la liste des
-participations : il vit dans une section repliée « *n* deals annulés » tout en
+participations : il vit dans une section repliée « _n_ deals annulés » tout en
 bas de la page, qui n'apparaît que s'il en existe au moins un. Dans la liste
-des deals, il est masqué tant qu'on n'a pas coché *Annulé* dans le filtre
+des deals, il est masqué tant qu'on n'a pas coché _Annulé_ dans le filtre
 Statut. Il reste visible normalement là où on le cherche vraiment : sur la
 fiche de la société (en dernier) et sur sa propre fiche, avec un badge
 **gris** — ni vert, ni rouge, puisque ce n'est ni une victoire ni une perte.
@@ -235,7 +261,7 @@ latestReportId` est laissé intact (un import historique ne repointe pas
 Les 320 documents juridiques versés sur les fiches des participations —
 pactes d'actionnaires, statuts, bulletins de souscription, PV d'assemblée,
 term sheets, comptes annuels — étaient jusqu'ici invisibles depuis
-claude.ai. Le connecteur savait dire *qu'un* pacte existait sur une fiche :
+claude.ai. Le connecteur savait dire _qu'un_ pacte existait sur une fiche :
 son titre, sa date, son poids. Il ne pouvait pas l'ouvrir, ni chercher
 dedans. Répondre à « qu'est-ce que dit la clause de liquidité de Sezame ? »
 supposait d'ouvrir l'app et de lire le PDF soi-même.
