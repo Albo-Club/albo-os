@@ -23,6 +23,39 @@ bas de page.
 
 ---
 
+## v1.189.2 — 07/08/2026 à 19:15 — Le compte courant Flexliving se recolle bien
+
+Le nettoyage du portefeuille a tourné sur la base : 26 participations
+découpées en 60, 13 fiches société en double archivées, 4 lignes qui n'en
+étaient pas retirées ou fusionnées. Une seule chose ne s'est pas faite —
+la fusion des deux comptes courants Flexliving, l'outil l'a refusée par
+excès de prudence.
+
+La raison : les deux fiches société avaient déjà été réunies quelques
+instants plus tôt dans la même opération, et le contrôle de sécurité,
+qui vérifie qu'on manipule bien la bonne ligne, cherchait encore
+l'ancienne. Il accepte désormais les deux lectures. Les 14 500 € de
+remboursements pourront rejoindre la ligne qui les concerne.
+
+Le prêt Wormser reste volontairement en dehors : il porte un échéancier
+de trésorerie bien vivant, que la sortie du portefeuille ne doit pas
+emporter.
+
+> **🔧 Notes techniques**
+>
+> - `migrations/cleanupCalteImport.ts` : la garde de `DEAL_MERGES` comparait
+>   le nom de la cible du deal absorbé au seul `expectedTarget`, alors que le
+>   bloc 4 (fusion des fiches) a déjà repointé ce `targetCompanyId` vers la
+>   fiche survivante plus tôt dans la même transaction. Nouveau
+>   `isExpectedMergeTarget` : source **ou** canonique, même forme que le
+>   `onSource || onCanonical` de `consolidateRewattCalte:resolveOperation`.
+>   Appliqué à `dryRun` et à `apply`.
+> - Relance de `apply` sûre : le module est idempotent, tous les autres blocs
+>   sont des no-op au second passage.
+> - `verify` après le run remonte deux écarts **préexistants**, hors périmètre
+>   de la migration : `CCA Albo` (400 000 € au deal contre 1 630 000 € de
+>   mouvements) et `DOKA - Pre-seed` (0 € contre 55 000 €).
+
 ## v1.189.1 — 07/08/2026 à 18:45 — Nettoyage du portefeuille CALTE repris d'Airtable
 
 Le portefeuille CALTE vient d'une base Airtable qui ne connaissait ni deal ni
