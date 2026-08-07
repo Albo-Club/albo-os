@@ -789,8 +789,8 @@ Les outils d'écriture de l'agent portent `needsApproval: true`
 
 ## Serveur MCP distant (connector claude.ai) — OAuth via plugin BA `mcp`
 
-Le serveur MCP (`convex/mcp/`) expose 26 outils aux clients MCP externes :
-22 en lecture, 4 en écriture (cf. point 6). Architecture : resource server = httpAction `/mcp`
+Le serveur MCP (`convex/mcp/`) expose 28 outils aux clients MCP externes :
+24 en lecture, 4 en écriture (cf. point 6). Architecture : resource server = httpAction `/mcp`
 (JSON-RPC Streamable HTTP **stateless**, fait main — le SDK
 `@modelcontextprotocol/sdk` est Node-only et les httpActions tournent dans
 le runtime V8 Convex, sans `"use node"`) ; authorization server = plugin
@@ -874,6 +874,18 @@ resource_metadata="…"` — c'est ce qui déclenche le flow côté client.
    la connexion** : après un déploiement qui les modifie, déconnecter puis
    reconnecter le connecteur (Customize → Connectors → Albo OS), sinon le
    modèle continue de voir les anciens schémas.
+9. **Lecture des documents : jamais un texte entier d'un coup.** Un
+   `documentTexts.text` monte à `MAX_DOCUMENT_CHARS` (900 000 caractères) —
+   le renvoyer tel quel ferait une réponse JSON-RPC de ~900 ko, hors de
+   portée de la fenêtre de contexte du client comme du budget de la
+   httpAction. `getDocumentText` renvoie donc une **fenêtre de 40 000
+   caractères** et un `nextOffset` que l'appelant rappelle jusqu'à `null`
+   (`getDocumentTextInternal`, `convex/agentTools.ts`). Ne pas confondre les
+   deux troncatures : `truncated: true` dit que le **fichier** a été coupé à
+   l'extraction (la fin n'a jamais été stockée, aucun offset ne l'atteindra),
+   `nextOffset` dit seulement qu'il reste du texte à lire. L'entrée normale
+   dans la doc reste `searchDocuments` (sémantique, extraits sourcés) : la
+   lecture intégrale est le recours quand un extrait ne suffit pas.
 
 ## tailwind-merge v3 obligatoire avec les composants shadcn « Tailwind v4 »
 
