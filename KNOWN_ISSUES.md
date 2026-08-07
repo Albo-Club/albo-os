@@ -12,14 +12,14 @@ comme s'il n'y avait pas de sticky du tout.
 
 Vérifié au navigateur (Chromium, scrollport de 700 px, panneau de 1100 px) :
 
-| Offset | Comportement |
-| --- | --- |
-| `bottom: 24px` seul | aucun figement, le panneau part par le haut |
-| `top: 24px` seul | figé en haut — le bas du panneau reste **inatteignable** |
-| `top` **et** `bottom` | identique à `top` seul (la contrainte haute gagne) |
+| Offset                | Comportement                                             |
+| --------------------- | -------------------------------------------------------- |
+| `bottom: 24px` seul   | aucun figement, le panneau part par le haut              |
+| `top: 24px` seul      | figé en haut — le bas du panneau reste **inatteignable** |
+| `top` **et** `bottom` | identique à `top` seul (la contrainte haute gagne)       |
 
 **Pourquoi** : un offset `bottom` ne retient pas une boîte qui remonte, il
-*tire vers le haut* une boîte dont la position naturelle est sous la ligne de
+_tire vers le haut_ une boîte dont la position naturelle est sous la ligne de
 flottaison (cas du pied de page collant). Il n'a donc aucun effet sur un
 panneau qui commence en haut de page.
 
@@ -639,14 +639,15 @@ récupérer le SHA du tip du repo concerné en **un** appel unauth
 (`curl -H "Accept: application/vnd.github.sha" https://api.github.com/repos/<source>/commits/<trackingRef>`),
 l'écrire dans le `pinnedRef` de ce skill dans `skills-lock.json`, puis lancer
 `pnpm run sync:skills` (mode défaut : vendor via `raw`, met à jour le SKILL.md
-+ le `computedHash`). `pnpm run sync:skills:check` repasse alors vert. Relire le
-diff de contenu du SKILL.md avant de committer (obligation CLAUDE.md), et ne
-bumper que le(s) skill(s) réellement dérivé(s) — laisser les autres `pinnedRef`
-en place est sans risque (pas de drift de contenu = check vert).
+
+- le `computedHash`). `pnpm run sync:skills:check` repasse alors vert. Relire le
+  diff de contenu du SKILL.md avant de committer (obligation CLAUDE.md), et ne
+  bumper que le(s) skill(s) réellement dérivé(s) — laisser les autres `pinnedRef`
+  en place est sans risque (pas de drift de contenu = check vert).
 
 ## Skills vendorisées : liens inter-familles, et pourquoi `..` est interdit dans `references`
 
-Les repos upstream shippent de plus en plus des *arbres* de skills
+Les repos upstream shippent de plus en plus des _arbres_ de skills
 (`TanStack/router` : `packages/<pkg>/skills/<skill>/[<sous>/]SKILL.md`). On
 vendorise **à plat**, une clé de lock par famille : `.agents/skills/<nom>/`.
 Deux conséquences :
@@ -654,7 +655,7 @@ Deux conséquences :
 - **Les liens frères à l'intérieur d'une famille résolvent, ceux qui en sortent
   non.** Une sous-skill vendorisée en `reference` garde sa position relative à
   son parent, donc `./middleware/SKILL.md` et `../server-functions/SKILL.md`
-  marchent. Mais upstream lie aussi *entre packages*
+  marchent. Mais upstream lie aussi _entre packages_
   (`../../../../router-core/skills/router-core/auth-and-guards/SKILL.md`), et ce
   préfixe n'existe pas en local — **18 liens** pendouillent aujourd'hui (audit :
   43 liens résolvent, 0 cassé à l'intérieur d'une famille). On ne les réécrit
@@ -666,7 +667,7 @@ Deux conséquences :
   marcher — `raw.githubusercontent.com` normalise le chemin et renvoie 200 —
   mais `vendor()` résout la même chaîne contre `.agents/skills/<nom>/` et écrit
   **hors** du répertoire de la skill. C'est pour ça que
-  `compositions/router-query`, pourtant *frère* de `react-router` upstream, est
+  `compositions/router-query`, pourtant _frère_ de `react-router` upstream, est
   sa propre entrée de lock (`tanstack-router-query`) plutôt qu'une référence en
   `../`.
 
@@ -701,7 +702,7 @@ leur nombre — **ne pas** augmenter `MAX_IN_FLIGHT`.
 
 `--check` et le mode par défaut comparaient tous deux **le hash du lock à
 l'upstream**, jamais **le lock au disque** : `isVendored()` ne testait que
-l'*existence* des fichiers. Conséquence, un fichier vendorisé édité à la main,
+l'_existence_ des fichiers. Conséquence, un fichier vendorisé édité à la main,
 tronqué ou simplement périmé était invisible des deux côtés. Démontré en
 ajoutant une ligne de garbage dans un `SKILL.md` : `--check` restait vert,
 exit 0.
@@ -712,10 +713,10 @@ Convex périmés découverts en portant les PR #50/#51 du template, dont
 
 Deux modes, deux questions, à ne pas confondre :
 
-| Mode | Question | Réseau | Où |
-| --- | --- | --- | --- |
-| `--verify` | « mon arbre est-il intact ? » | non | **CI, chaque PR** (job `skills-verify`) |
-| `--check` | « l'upstream a-t-il bougé ? » | oui | hook `SessionStart` + cron hebdo |
+| Mode       | Question                      | Réseau | Où                                      |
+| ---------- | ----------------------------- | ------ | --------------------------------------- |
+| `--verify` | « mon arbre est-il intact ? » | non    | **CI, chaque PR** (job `skills-verify`) |
+| `--check`  | « l'upstream a-t-il bougé ? » | oui    | hook `SessionStart` + cron hebdo        |
 
 La CI ne fait plus que le check local : il est déterministe, instantané et ne
 peut pas rougir à cause d'un hoquet de `raw.githubusercontent.com` sur une PR
@@ -804,7 +805,7 @@ Pièges et décisions :
    composant (0.12.x) embarque déjà `oauthApplication`, `oauthAccessToken`,
    `oauthConsent` et `jwks`. À re-vérifier à chaque upgrade du composant.
    Si le plugin casse, fallbacks dans l'ordre : (a) seeder un
-   `oauthApplication` à la main et utiliser les *Advanced settings* du
+   `oauthApplication` à la main et utiliser les _Advanced settings_ du
    connector claude.ai (client_id pré-enregistré, pas de DCR) ; (b) local
    install du composant avec schéma régénéré ; (c) mini-AS maison.
 2. **Pas de binding d'audience RFC 8707** : les tokens BA sont opaques et
@@ -827,7 +828,7 @@ Pièges et décisions :
    **root du domaine app** (issuer = `SITE_URL`) → route TanStack
    `src/routes/[.]well-known.oauth-authorization-server.ts` qui proxifie la
    route BA. Le 401 du `/mcp` porte `WWW-Authenticate: Bearer
-   resource_metadata="…"` — c'est ce qui déclenche le flow côté client.
+resource_metadata="…"` — c'est ce qui déclenche le flow côté client.
 5. **`MCP_DEV_TOKEN` / `MCP_DEV_EMAIL`** (env Convex) : bypass OAuth pour
    curl et MCP Inspector. Les deux doivent être posés pour être actifs —
    ne jamais les laisser en prod hors session de test.
@@ -1173,6 +1174,51 @@ Corollaire d'affichage : `periodSortDate` retombe sur la date de réception
 quand il n'y a pas de période, sinon le courrier n'aurait aucun ancrage dans
 la timeline de la fiche (l'index `by_company` trie là-dessus).
 
+## Reprise d'un historique de reports depuis un autre outil : aucune clé ne tient
+
+Migrer les reportings d'Albo app (Supabase) vers Albo OS a buté sur une
+évidence trompeuse : « deux reports de la même société sur la même période
+sont le même report ». C'est faux dans les deux sens, et chaque clé
+déterministe essayée casse sur des lignes réelles.
+
+- **La période** : l'update Q2 de Goodvest est `June - Q2 2026` côté Albo app
+  et `Q2 2026` côté Albo OS — même e-mail, à la seconde près. Le courrier de
+  liquidation de Wheelee n'a **aucune** période côté Albo OS. Trois doublons
+  passent au travers.
+- **`period_sort_date`** : même échec (2026-06-01 vs 2026-04-01 pour Goodvest),
+  parce que les deux outils ancrent un bimestriel sur des mois différents.
+- **La date d'e-mail** : 79 lignes sur 184 n'en ont aucune, et l'outil
+  d'arrivée porte souvent la date du **transfert**, pas celle de l'original
+  (65 secondes d'écart sur le même report AZmed). Surtout, une vieille période
+  peut arriver tard **des deux côtés** : les rapports annuels 2024 et 2025
+  d'AZmed ont atterri dans Albo app le 03/04/2026. Filtrer sur une fenêtre de
+  dates est donc un faux ami — c'est l'erreur qu'on a failli commettre.
+- **Le `Message-ID` RFC** : présent sur 73 lignes sur 184, et le pipeline
+  ingère des **transferts**, qui portent un nouveau `Message-ID`. Il ne
+  correspond jamais d'un système à l'autre.
+
+Et la clé se trompe aussi **dans l'autre sens** : Wandercraft a deux reports
+distincts en `March 2026` (le mensuel, et l'annonce Renault sur 350 robots) ;
+Bleen a deux documents distincts en `July 2026` (l'e-mail informel du 07/07 et
+la notification formelle du 30/07 au titre du pacte). Un skip sur collision de
+période les jette en silence.
+
+Règle : **pour rapprocher deux bases, comparer les CONTENUS** (headline, key
+highlights, métriques), participation par participation, puis **figer les
+décisions dans un fichier relu** — jamais recalculer une heuristique à
+l'exécution. Les gardes du code (`alboReportId` déjà présent, créneau
+`(companyId, reportPeriod)` occupé) restent un filet, pas la décision.
+Cf. `convex/migrations/alboReportsImport.ts` et
+`scripts/data/albo-reports-albo.json`.
+
+Corollaire : ne **jamais** rejouer un import historique à travers
+`reportStore.storeForCompany`. Cette fonction **met à jour sur place** en cas
+de collision de période et supprime les `documents` du report avant de les
+réécrire — un report de 2024 écraserait la ligne Albo OS courante et ses
+pièces jointes. L'import écrit ses lignes lui-même et **saute** au lieu de
+patcher. Même raison pour `companyIntelligence.latestReportId`, laissé
+intact : un import historique ne doit pas repointer la synthèse courante.
+
 ## Détacher un report — l'empreinte à défaire, et le blob qui reste
 
 Ranger un report écrit **cinq** choses par entité rattachée
@@ -1210,7 +1256,7 @@ tourne sur `convex-test` : backend en mémoire, aucun réseau, aucun déploiemen
 Trois choses non évidentes qui coûteraient cher à redécouvrir :
 
 1. **Les tests vivent dans `convex/` sans être déployés.** Le CLI Convex
-   ignore tout module dont le *basename* contient **plus d'un point**
+   ignore tout module dont le _basename_ contient **plus d'un point**
    (cf. `entryPoints()` dans le bundle CLI : « Skipping … that contains
    multiple dots »). `regression.tenancy.test.ts` comme `regression.setup.ts`
    sont donc invisibles pour `convex dev`/`deploy` — c'est la raison du
@@ -1224,19 +1270,63 @@ Trois choses non évidentes qui coûteraient cher à redécouvrir :
    l'entrée officielle `@convex-dev/better-auth/test` (`register(t)`), seed
    `user` + `session` par `components.betterAuth.adapter.create`, puis
    authentifie avec `t.withIdentity({ subject: <baUserId>, sessionId:
-   <sessionId> })`. Un identity sans `sessionId` = utilisateur silencieusement
+<sessionId> })`. Un identity sans `sessionId` = utilisateur silencieusement
    anonyme (les tests « rejette un non-membre » passeraient pour de mauvaises
    raisons).
 3. **`import.meta.glob` sous vitest = inline deps obligatoires.**
    `convex-test` et `@convex-dev/better-auth/test` utilisent
    `import.meta.glob` (construct Vite) ; servis depuis `node_modules` sans
    transformation, ils explosent. D'où `server.deps.inline: ['convex-test',
-   '@convex-dev/better-auth']` dans `vitest.config.ts` — et `SITE_URL` y est
+'@convex-dev/better-auth']` dans `vitest.config.ts` — et `SITE_URL` y est
    injecté car `convex/auth.ts` le lit au chargement du module (importé par
    `lib/auth.ts`, donc par quasi toutes les fonctions testées).
 
 Le critère d'efficacité de la suite a été vérifié : commenter le
 `requireOrgMember` de `deals.list` fait rougir 2 tests (isolation lecture).
+
+## Backfill depuis la doc juridique — 3 pièges
+
+`scripts/backfill-deal-fields.mjs` + `convex/migrations/alboDocBackfill.ts`
+remplissent les champs vides des `companies`/`deals` de l'org `albo` à partir
+des documents juridiques déjà versés. Trois choses non évidentes.
+
+1. **Un même document contient plusieurs nombres d'actions, tous corrects.**
+   Sur Auxicare, le PV du Président porte **480 000** (capital après la seule
+   augmentation de capital), **548 943** (après exercice concomitant des BSA
+   Air) et le pacte **609 936** (base pleinement diluée, pool BSPCE inclus).
+   Les trois sont exacts dans leur contexte, et un extracteur qui prend le
+   premier croisé se trompe. Les règles, encodées dans
+   `convex/lib/docBackfill.ts` : `companies.totalShares` prend les actions
+   **émises** (jamais la base FD — un pool voté et non attribué n'est pas une
+   action) ; la base FD sert aux **valorisations** (post-money = FD × prix du
+   tour) et part dans les **notes du deal**, pas dans une colonne. Garde-fou :
+   quand le pacte imprime le % d'Albo, le script recalcule
+   `sharesAcquired / base FD` et flagge `coherence_base_FD_douteuse` si l'écart
+   dépasse 0,1 point — une base fausse se voit là, avant d'être multipliée par
+   le prix du tour.
+
+2. **`deals.ownershipPct` et le % affiché sur la fiche société ne sont pas le
+   même chiffre, et c'est normal.** `ownershipPct` est stocké en base
+   **pleinement diluée**, repris tel quel de la table de capitalisation
+   (Auxicare : `234` bps = 2,34 %). L'en-tête de
+   `src/routes/app/$orgSlug/participations.$companyId.tsx` calcule, lui,
+   `somme(deals.sharesAcquired) / companies.totalShares` — donc du **non
+   dilué** (Auxicare : 14 286 / 548 943 = 2,6 %). Réalité économique contre
+   réalité juridique : deux questions différentes, deux réponses différentes.
+   Ne pas « corriger » l'un avec l'autre sans arbitrage explicite ; si un jour
+   l'affichage doit changer, c'est une décision produit, pas un bug.
+
+3. **Un nouveau module de `convex/migrations/` ne peut pas s'auto-référencer
+   via `internal.…`.** `convex/_generated/api.d.ts` est **commité et périmé**
+   (il ne connaît pas les modules ajoutés depuis le dernier `convex dev`), et
+   la CI fait tourner `pnpm lint` = `tsc` sur cet état-là : un
+   `ctx.runQuery(internal.migrations.monModule.maQuery)` écrit dans
+   `monModule` casse le typecheck en CI alors qu'il est correct en prod. Le
+   contournement retenu ici est aussi le plus simple : l'action ne lit rien
+   elle-même, le script paginate le texte (`getDocText`, fenêtres de 40 000
+   caractères) et le passe en argument. Bénéfice collatéral — le cache par
+   hash de texte court-circuite le modèle **avant** l'appel, donc une relance
+   sur le delta ne coûte que des lectures.
 
 ## Convex dev typecheck
 
@@ -1458,6 +1548,7 @@ Uint8Array(enc.encode(s))` produit bien de l'`ArrayBuffer`-backed.
   écriture (Powens re-livrera le webhook). Un match repose le lien sur le
   record existant (`powensAccountId`, `powensConnectionId`, backfill IBAN,
   solde) — jamais de doublon.
+
 - **La branche « déjà lié » re-tamponne `powensConnectionId`.** Un compte
   peut garder son id Powens tout en étant désormais livré par une AUTRE
   connexion. Sans ce re-tamponnage il resterait rattaché à une connexion
@@ -1655,11 +1746,10 @@ toutes les 6 h (`pollConnectionsHealth`). Points non évidents :
   surveillance, mais le compte paraît « connecté ». `listConnections`
   détecte ces orphelins (linked + non archivé + non clôturé + connexion non
   suivie) et les renvoie en `health: 'untracked'` (pastille « Non suivie »,
-  comptée dans la bannière). **Réparation opérateur** (cas Qonto) :
-  0. `convex run --prod powens:diagnoseOrgAccountLinks '{"orgSlug":"calte"}'`
-     — vue d'ensemble (IBAN, ids Powens, nb de tx par compte, connexions et
-     nombre de comptes desservis). C'est lui qui distingue un vrai second
-     compte d'un doublon de reconnexion.
+  comptée dans la bannière). **Réparation opérateur** (cas Qonto) : 0. `convex run --prod powens:diagnoseOrgAccountLinks '{"orgSlug":"calte"}'`
+  — vue d'ensemble (IBAN, ids Powens, nb de tx par compte, connexions et
+  nombre de comptes desservis). C'est lui qui distingue un vrai second
+  compte d'un doublon de reconnexion.
   1. `convex run --prod powens:diagnoseQontoMatch` — état des candidats.
   2. `convex run --prod powens:resetQontoPowensLink '{"bankAccountId":"…"}'`
      — délie le record (sinon la nouvelle connexion finit en
@@ -1745,8 +1835,7 @@ alimente le dataset d'apprentissage de l'agent de rattachement (phase 2).
   de pointage : « À pointer » = filtre `unmatched`, et fusionne les échéances
   prévisionnelles via `getUpcomingEntries`) lit `listLedger`, borné aux
   **1000 transactions les plus récentes** par filtre actif (`LEDGER_LIMIT`).
-  Au-delà, la queue la plus ancienne est masquée — le browse exhaustif (capé
-  200) reste sur `/cash/$accountId`. Comme `listUnmatched`, le registre passe
+  Au-delà, la queue la plus ancienne est masquée — le browse exhaustif (capé 200) reste sur `/cash/$accountId`. Comme `listUnmatched`, le registre passe
   par l'index `search_text` en mode recherche : une ligne sans `searchText`
   (pré-`backfillSearchText`) reste invisible à la recherche. Pas de pagination
   serveur (`usePaginatedQuery` n'est utilisé que par le chat) : on garde le
@@ -2135,7 +2224,7 @@ Couche prévisionnelle déterministe : `forecastRules` → `expandRules` →
   entre orgs.** Le bloc compte les `companyReports` créés dans les 7 jours
   via l'index `by_org`, en lisant du plus récent au plus ancien et en
   s'arrêtant au seuil (seules les lignes de la semaine sont touchées). Le
-  piège est le **fan-out multi-org** : une société détenue par Calte *et*
+  piège est le **fan-out multi-org** : une société détenue par Calte _et_
   Albo range un report dans chacune, donc un seul mail transféré compte 1
   dans les deux sections. Chaque ligne est juste dans son org ; le total du
   sujet, lui, peut dépasser le nombre de mails réellement transférés — c'est
@@ -2260,18 +2349,18 @@ n'affiche que les 10 dernières entrées et révèle le reste par paliers. Pour
 les frontières `^## ` et **classe chaque section par son titre** :
 
 - Une section est une **entrée** (paginée) si son titre contient le séparateur
-  ` — ` (em-dash entouré d'espaces). C'est garanti par le format imposé dans
+  `—` (em-dash entouré d'espaces). C'est garanti par le format imposé dans
   `CLAUDE.md` (`## vX.Y.Z — JJ/MM/AAAA à HH:MM — titre`), et ça couvre aussi les
   4 entrées historiques `## Mois AAAA — …`.
-- La **première** section sans ` — ` démarre le **footer** épinglé (en pratique
+- La **première** section sans `—` démarre le **footer** épinglé (en pratique
   le « Petit lexique » de bas de page, toujours en dernier).
 
 Conséquence à connaître avant d'éditer `CHANGELOG_PRODUIT.md` :
 
-- Un titre d'entrée **sans** ` — ` serait traité comme footer → toutes les
+- Un titre d'entrée **sans** `—` serait traité comme footer → toutes les
   entrées suivantes disparaîtraient de la pagination. Garder le format.
 - Toute nouvelle section de bas de page (après le lexique) doit rester **sans**
-  ` — ` pour être épinglée, ou elle sera paginée comme une entrée.
+  `—` pour être épinglée, ou elle sera paginée comme une entrée.
 
 Le découpage est sans perte (roundtrip `header + entries + footer === raw`).
 
@@ -2283,7 +2372,7 @@ name from **different places** — don't conflate them.
 1. **Runtime email** (`@convex-dev/resend`, `convex/email.ts`). Sends the app's
    transactional mail (auth, invitations, notifications). Its `RESEND_API_KEY`
    and `RESEND_FROM` live in the **Convex deployment env** (`pnpm exec convex
-   env set …`). Nothing here touches your shell.
+env set …`). Nothing here touches your shell.
 
 2. **Dev tooling** (the `resend@claude-plugins-official` Claude Code plugin,
    enabled in `.claude/settings.json`). Its bundled MCP server runs
@@ -2335,7 +2424,7 @@ le module Convex n'est qu'une coquille DB autour.
    Invested.** Un event Invested sans `attioDealId` correspondant est **skippé**
    (`invested_no_deal`). C'est ce qui permet d'activer la synchro « à partir de
    maintenant » sans réimporter le portefeuille déjà investi (import #184,
-   Airtable, saisie manuelle). **Conséquence** : un deal qui passe *directement*
+   Airtable, saisie manuelle). **Conséquence** : un deal qui passe _directement_
    en Invested sans jamais passer par Term Sheet ne sera **pas** créé
    automatiquement — le faire transiter par Term Sheet, ou l'ajouter à la main.
 
@@ -2799,7 +2888,7 @@ Points non-évidents :
   `floorMultiple`, `capMultiple`, `endDate` sont de simples champs **saisis**
   (aucune règle métier codée). Plancher/plafond sont stockés en **multiple** du
   capital ; le montant euro est **dérivé à l'affichage** (`multiple ×
-  capitalInvested`), jamais stocké. La barre de progression compare le cumul
+capitalInvested`), jamais stocké. La barre de progression compare le cumul
   des royalties réelles (`totals.actualRoyalty`) à ces deux montants — pur
   positionnement, aucune règle d'achèvement. Édités via le dialog partagé
   (`INSTRUMENT_FIELDS['royalty']` + `FIELD_FORMAT`).
@@ -2816,8 +2905,8 @@ Points non-évidents :
 - Cause : `EditableCa` appelait `useAmountField(draft, setDraft)` **dans** la
   branche `if (editing)`. Passer en édition faisait apparaître un hook qui
   n'existait pas au render précédent → `Rendered more hooks than during the
-  previous render` → crash. **Règle** : `useAmountField` (et tout hook) se
-  déclare au **top-level** du composant, ses props ne sont *spreadées* que
+previous render` → crash. **Règle** : `useAmountField` (et tout hook) se
+  déclare au **top-level** du composant, ses props ne sont _spreadées_ que
   quand l'input est rendu. Même pattern déjà appliqué dans `DealFieldInput`
   (`deals.$dealId.tsx`).
 - Filet manquant : `eslint-plugin-react-hooks` n'est **pas** dans la config
@@ -2917,7 +3006,7 @@ Côté cmdk : `shouldFilter={false}` car le filtrage est fait côté serveur —
 VASCO (`https://vasco.fund`) is the fund-admin platform behind investor portals
 like Parallel Invest (`parallel.vasco.fund`). Albo OS pulls the investor-side
 data that only lives on the platform (positions, valuations, documents) — a
-*pull* integration, distinct from the *push* AgentMail report pipeline.
+_pull_ integration, distinct from the _push_ AgentMail report pipeline.
 
 ### Endpoints & auth
 
@@ -3285,7 +3374,7 @@ avant le rendu SPA → coquille vide, détectée par le seuil
 (vérifié : 401 « bad IP reputation »). Sans aucune clé : comportement
 dégradé assumé, échec actionnable dans le récap.
 
-**Limites connues** : les fichiers *attachés dans* une page Notion ne sont
+**Limites connues** : les fichiers _attachés dans_ une page Notion ne sont
 pas téléchargés (le markdown rendu contient leurs liens signés — extraction
 dédiée à faire si le besoin réel se confirme) ; une page derrière un mur de
 login rend une coquille → échec normal.
@@ -3431,7 +3520,7 @@ normal : doc email couvert par son report, image inline, pas de texte),
   de `reextract` — il garde le texte extrait, seule l'entrée d'index est
   reconstruite). Un échec permanent (4xx ≠ 408/429) saute les retries.
 - **`vectorDetail` nomme la couche fautive** (`convex/lib/vectorizeErrors.ts:
-  classifyIndexError`, testé dans `tests/vectorizeErrors.test.ts`) :
+classifyIndexError`, testé dans `tests/vectorizeErrors.test.ts`) :
   `provider_http_<status>` (le provider a répondu une erreur — `_429` =
   quota partagé saturé), `provider_unreachable` (jamais atteint),
   `provider_bad_response` (200 inexploitable), `index_write_failed` (notre
@@ -3455,7 +3544,7 @@ requête HTTP**. Soit ~27 k tokens en prose — 15 % de marge — et bien au-del
 sur du texte dense (tableaux, chiffres). Au-dessus de la fenêtre, OpenRouter
 n'a plus aucun endpoint où router (`allow_fallbacks: false`, un seul provider)
 et répond **404, pas le 400 `context_length_exceeded`** qu'on aurait sans
-épinglage : c'est un refus de *routage*, pas une réponse du modèle. Vécu le
+épinglage : c'est un refus de _routage_, pas une réponse du modèle. Vécu le
 05/08/2026 sur un classeur de 363 k caractères, juste après que le budget
 Excel soit passé de 40 k à `MAX_DOCUMENT_CHARS` (#350). Parade :
 `MAX_EMBEDDINGS_PER_CALL = 16` via `wrapEmbeddingModel` — chaque requête
@@ -3569,7 +3658,7 @@ calcule la liste des domaines disqualifiés sur l'ensemble des candidats
   Immo 6 à la main ré-arrosait Immo 2.
 
 **Ne pas confondre avec `isVehicleEntity`** (`convex/lib/pitch.ts`), qui règle
-le problème voisin du *pitch* : là, la question est « cette entité mérite-t-elle
+le problème voisin du _pitch_ : là, la question est « cette entité mérite-t-elle
 sa propre description ? » et se tranche entité par entité (sponsor renseigné,
 lien VASCO, jeton « SPVn »). Ici la question est « ce domaine désigne-t-il une
 participation ? » et ne se tranche qu'en regardant **les voisins** : un domaine
@@ -3781,7 +3870,7 @@ donc tout le budget à lui seul, et la coupe tombait avant que les onglets
 suivants soient écrits. Symptôme côté produit : « l'OCR ne prend que le
 premier onglet » — alors qu'ils avaient tous été lus, puis jetés.
 
-**La règle à retenir** : un budget de caractères réparti *après*
+**La règle à retenir** : un budget de caractères réparti _après_
 concaténation n'est pas un plafond, c'est un ordre de priorité déguisé — le
 premier élément sert, les suivants disparaissent. Dès qu'une sortie agrège
 plusieurs sources (onglets, pièces jointes, sections), le budget doit être
@@ -3812,11 +3901,11 @@ passé sur le même mécanisme. Ne pas réintroduire de plafond local ici.
 Le pipeline empile trois bornes qui portent des noms proches et qu'on est
 tenté d'aligner. Elles ne se négocient pas de la même façon :
 
-| Constante | Valeur | Ce qui la contraint |
-| --- | --- | --- |
-| `MAX_DOCUMENT_CHARS` (`lib/fileText.ts`) | 900k | **Convex** : 1 Mo par document, tous champs confondus. Non négociable |
-| `MAX_EXTRACTED_CHARS` (`reportExtract.ts`) | 300k | **Le modèle** : ce texte part entier dans `callModel` |
-| `BODY_SNAPSHOT_MAX` (`reportInbox.ts`) | 100k | Corps d'email brut, partage la ligne avec `rawContent` |
+| Constante                                  | Valeur | Ce qui la contraint                                                   |
+| ------------------------------------------ | ------ | --------------------------------------------------------------------- |
+| `MAX_DOCUMENT_CHARS` (`lib/fileText.ts`)   | 900k   | **Convex** : 1 Mo par document, tous champs confondus. Non négociable |
+| `MAX_EXTRACTED_CHARS` (`reportExtract.ts`) | 300k   | **Le modèle** : ce texte part entier dans `callModel`                 |
+| `BODY_SNAPSHOT_MAX` (`reportInbox.ts`)     | 100k   | Corps d'email brut, partage la ligne avec `rawContent`                |
 
 Deux erreurs classiques :
 
@@ -3862,7 +3951,7 @@ Les deux vrais remèdes, dans cet ordre :
    `lib/reportFreshness.ts`) : la liste lit déjà les `companies`, donc le
    scan disparaît pour un coût de lecture **nul**, et la valeur reste exacte.
    Praticable uniquement si la table source a **peu de sites de mutation**, et
-   il faut les couvrir **tous** — création *et* suppression. Le piège vécu :
+   il faut les couvrir **tous** — création _et_ suppression. Le piège vécu :
    l'agrégat écrit en monotone (max) ne sait pas reculer, donc
    `reportInbox.detachCompany`, qui supprime une ligne `companyReports`,
    laissait la société plus fraîche qu'elle ne l'est — silencieusement
@@ -3876,12 +3965,13 @@ Les deux vrais remèdes, dans cet ordre :
    `insert`/`patch`/`delete` de la table source et vérifier que chacun met
    l'agrégat à jour. Un chemin oublié ne casse rien tout de suite — il produit
    une donnée fausse des semaines plus tard.
+
 2. **Sortir le texte dans une table annexe**, une ligne par blob, lue
    seulement quand quelqu'un ouvre vraiment le contenu. Pattern déjà en place
    pour `documentTexts` (cf. le commentaire de la table dans `schema.ts`).
 
-Le contrôle avant d'écrire une requête de liste : *est-ce qu'une des lignes
-que je collecte porte un champ qui peut peser des dizaines de Ko ?* Si oui,
+Le contrôle avant d'écrire une requête de liste : _est-ce qu'une des lignes
+que je collecte porte un champ qui peut peser des dizaines de Ko ?_ Si oui,
 un des deux remèdes ci-dessus, jamais un `.map()` de façade.
 
 **Restent à traiter** (mêmes symptômes, moindre volume) : `documents` et son
@@ -3891,5 +3981,5 @@ qui prend 100 `inboundEmails` avec `bodyText` + `bodyHtml` + `extractedText` ;
 et `companyReports.listByCompany` qui prend 200 lignes avec `rawContent` pour
 n'afficher que titre et période.
 
-Pour instrumenter : dashboard Convex → **Functions**, colonne *Database
-bandwidth*, triée décroissante. Elle nomme le coupable en une minute.
+Pour instrumenter : dashboard Convex → **Functions**, colonne _Database
+bandwidth_, triée décroissante. Elle nomme le coupable en une minute.

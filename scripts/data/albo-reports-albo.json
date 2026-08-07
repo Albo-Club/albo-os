@@ -1,0 +1,350 @@
+{
+  "_comment": "Frozen decisions for the one-shot import of Albo app investor reports into Albo OS (org `albo`). Reviewed with Benjamin on 07/08/2026 against a side-by-side of both inventories. Runbook: convex/migrations/alboReportsImport.ts",
+  "orgSlug": "albo",
+  "sourceWorkspace": {
+    "id": "94199e0b-93b4-45c6-8cc9-bff2c71b91a2",
+    "name": "Albo 1"
+  },
+  "excludedCompanies": [
+    {
+      "name": "Sezame",
+      "reports": 9,
+      "reason": "Investment vehicle whose news comes through the fund-admin portal, not by email. Also ambiguous: one Albo app row for two Albo OS entities (Sezame Immo 2 / Immo 6)."
+    },
+    {
+      "name": "AZmed",
+      "reports": 15,
+      "reason": "Participation linked to VASCO in Albo OS."
+    },
+    {
+      "name": "La vie de quartier",
+      "reports": 3,
+      "reason": "One Albo app row for four Albo OS entities (Holding + three shops). Attachment not decided."
+    }
+  ],
+  "companies": [
+    {
+      "source": "ACT Running",
+      "target": "ACT Running",
+      "companyId": "jx7dazc018z5t2g9pf75my07k987rbt1"
+    },
+    {
+      "source": "BackMarket",
+      "target": "BackMarket",
+      "companyId": "jx7c2j6x8zm19cg2dky1nfdv6x87sfy5"
+    },
+    {
+      "source": "Beyond Green",
+      "target": "Beyond Green",
+      "companyId": "jx78qs3pr8tq0ksxtywz5rrq6587rdmt"
+    },
+    {
+      "source": "Bleen",
+      "target": "Bleen",
+      "companyId": "jx770j9q5sqva04t4gkq3fyerd87s6fz"
+    },
+    {
+      "source": "Carbonfarm",
+      "target": "CarbonFarm",
+      "companyId": "jx7f66x612xx0zrzce4k41a9rh87shkp"
+    },
+    {
+      "source": "Cockpit Agriculture",
+      "target": "Cockpit Agriculture",
+      "companyId": "jx77vx2npwy75w80xdmcgrs04987s3ea"
+    },
+    {
+      "source": "Eben Home",
+      "target": "Eben Home",
+      "companyId": "jx71nk6w56zzbngapd4pzvj59x87r7d2"
+    },
+    {
+      "source": "Eclo Beauty",
+      "target": "Eclo Beauty",
+      "companyId": "jx78d1g9n2868k4g9az7ag4b8s87sk5t"
+    },
+    {
+      "source": "Genomines",
+      "target": "Genomines",
+      "companyId": "jx7d25nz1ed4q0p9xd875py76587r4g3"
+    },
+    {
+      "source": "Goodvest",
+      "target": "Goodvest",
+      "companyId": "jx72ej20pak0mqq05hshae3ayn87rjvy"
+    },
+    {
+      "source": "Hectarea",
+      "target": "Hectarea",
+      "companyId": "jx79z9rcha003f9910kh88f64s87rs51"
+    },
+    {
+      "source": "JOONE Paris",
+      "target": "JOONE Paris",
+      "companyId": "jx7e35h5h91mmk8nw531yq482s87r1nn"
+    },
+    {
+      "source": "Jeen",
+      "target": "Jeen",
+      "companyId": "jx7ez9pt7m8a6jab1zyfseawgd87rgxf"
+    },
+    {
+      "source": "Keenest",
+      "target": "Keenest",
+      "companyId": "jx7c3wgzp70vn1hftqb1p6wv9987ranq"
+    },
+    {
+      "source": "Komeet",
+      "target": "Komeet",
+      "companyId": "jx78h5ac4qbqva6bdfqz9kbn7d87smbh"
+    },
+    {
+      "source": "Les constructeurs du bois",
+      "target": "Les constructeurs du bois",
+      "companyId": "jx7901c7f8zvbm3vryrkgcssmh87rhh3"
+    },
+    {
+      "source": "Loewi",
+      "target": "Wheelee - Loewi",
+      "companyId": "jx7fgc6r15rydb31jpn4jyvc6x88dkmp"
+    },
+    {
+      "source": "Losanje",
+      "target": "Losanje",
+      "companyId": "jx728f588hby64q8y4c7twcb9587sz2v"
+    },
+    {
+      "source": "Marble",
+      "target": "Marble",
+      "companyId": "jx7fm5rmj0s4k4bj6sfr4zkecd8ajxt9"
+    },
+    {
+      "source": "Ouisub",
+      "target": "Ouisub",
+      "companyId": "jx78942c82np78n3gvyy7s4e5187s975"
+    },
+    {
+      "source": "Reekom",
+      "target": "Reekom",
+      "companyId": "jx71fa19ezp2vzaaj0k09gkmzn87rq97"
+    },
+    {
+      "source": "RegenSchool",
+      "target": "Regen School",
+      "companyId": "jx774qf54r5v58sxaew582x76587rtmt"
+    },
+    {
+      "source": "Resilience",
+      "target": "Resilience",
+      "companyId": "jx73memhv6nh8qhtpt3e8ytqjx87rvxh"
+    },
+    {
+      "source": "Rewatt",
+      "target": "Rewatt",
+      "companyId": "jx74fyn7n16pchhsq7eby61dss87sphz"
+    },
+    {
+      "source": "Tango",
+      "target": "Tango",
+      "companyId": "jx79jwd3y9rmsakghwagm48st187skyz"
+    },
+    {
+      "source": "The Fat Broccoli",
+      "target": "The Fat Broccoli",
+      "companyId": "jx72f9jrbntwwvhvcj026dd7z987sz2n"
+    },
+    {
+      "source": "Upcyclea",
+      "target": "Upcyclea",
+      "companyId": "jx72bsqr4wr6j5wqzeb2zbwkex87s6tx"
+    },
+    {
+      "source": "Versant",
+      "target": "Versant",
+      "companyId": "jx71te1271bdq9qt5qpny56zw187rz88"
+    },
+    {
+      "source": "Wandercraft",
+      "target": "Wandercraft",
+      "companyId": "jx78rdch9avsme496sqg8pw88x87rchk"
+    },
+    {
+      "source": "Waro",
+      "target": "Waro",
+      "companyId": "jx7dn3qdmqpxthb16q338v2trd87smzy"
+    },
+    {
+      "source": "Ziwig",
+      "target": "Ziwig",
+      "companyId": "jx77eqqaeggwwdemjgy20xa4k187r7cv"
+    }
+  ],
+  "_duplicatesComment": "Reports already present in Albo OS, verified on their CONTENT (headline, key highlights, metrics) — not on their title. Never imported. The `osPeriod` column shows where a period-based key alone would have failed.",
+  "duplicates": [
+    {
+      "id": "8bd482b2-bfaf-418e-874c-ae2df77bb412",
+      "company": "Carbonfarm",
+      "period": "May 2026",
+      "osPeriod": "May 2026",
+      "proof": "ACV 933k USD, cash 22k EUR"
+    },
+    {
+      "id": "ae58631b-1285-46fe-a768-f9a004d2e1f4",
+      "company": "Eben Home",
+      "period": "Q2 2026",
+      "osPeriod": "Q2 2026",
+      "proof": "record quarter, same Lucas Watrin forward"
+    },
+    {
+      "id": "2cc44a98-0027-49d2-b9cf-ff88944c23d8",
+      "company": "Goodvest",
+      "period": "May 2026",
+      "osPeriod": "May 2026",
+      "proof": "AuM +81% YoY, internal reorganisation"
+    },
+    {
+      "id": "2b1ec2b8-740a-482a-a2f9-da447f49d312",
+      "company": "Goodvest",
+      "period": "June - Q2 2026",
+      "osPeriod": "Q2 2026",
+      "proof": "35.6M inflows, AuM 307M, runway 23 months — same email to the second"
+    },
+    {
+      "id": "998721a7-0f85-4a4b-8ba8-722f31aea116",
+      "company": "Hectarea",
+      "period": "January - June 2026",
+      "osPeriod": "January - June 2026",
+      "proof": "+47% revenue vs H1 last year"
+    },
+    {
+      "id": "77106559-529e-4294-8c47-268889ce1818",
+      "company": "Komeet",
+      "period": "Q3 2025",
+      "osPeriod": "Q3 2025",
+      "proof": "same Q3 2025 YTD table, EBITDA +168,027 EUR"
+    },
+    {
+      "id": "ca6dc869-9490-46e6-b4ec-00c9e694ece6",
+      "company": "Loewi",
+      "period": "April 2026",
+      "osPeriod": "April 2026",
+      "proof": "Re-Cycles / Rebirth takeover at 40k EUR"
+    },
+    {
+      "id": "9797ae60-e8e1-4950-92fd-5229981f6bb1",
+      "company": "Loewi",
+      "period": "Q4 2025",
+      "osPeriod": "Q4 2025",
+      "proof": "same Q4 investor report"
+    },
+    {
+      "id": "cfeb73c9-2e94-4d9c-8f00-29d73a3a775e",
+      "company": "Loewi",
+      "period": "May 2026",
+      "osPeriod": "(empty)",
+      "proof": "Wheelee liquidation, total loss"
+    },
+    {
+      "id": "fe21df33-d10c-4bca-943f-3d320dd57d91",
+      "company": "Ouisub",
+      "period": "July 2026",
+      "osPeriod": "July 2026",
+      "proof": "quiet summer on sales, Meta Ads for September"
+    },
+    {
+      "id": "98c6ed65-7cb3-4fce-9bb4-90939a7bd237",
+      "company": "RegenSchool",
+      "period": "June 2026",
+      "osPeriod": "June 2026",
+      "proof": "apprenticeship placement still short"
+    },
+    {
+      "id": "bfbc2d98-6c61-4585-95a6-390be25758d8",
+      "company": "Resilience",
+      "period": "June 2026",
+      "osPeriod": "June 2026",
+      "proof": "Recovery Cat GmbH acquisition"
+    },
+    {
+      "id": "c67ddfb8-7f77-45c5-857b-0802b56075d2",
+      "company": "Tango",
+      "period": "July 2026",
+      "osPeriod": "July 2026",
+      "proof": "-19.7% vs June, 370h signed, 322k raise"
+    },
+    {
+      "id": "7eb04d3c-0ece-40dc-b8a0-789869ef1b2d",
+      "company": "Tango",
+      "period": "Q2 2026",
+      "osPeriod": "Q2 2026",
+      "proof": "GMV 145.5k, June record 52.7k, runway 12 months"
+    },
+    {
+      "id": "f6c9cc81-abb5-4e38-9a39-0fec67a01741",
+      "company": "Ziwig",
+      "period": "July 2026",
+      "osPeriod": "July 2026",
+      "proof": "NICE recommendation for Endotest"
+    },
+    {
+      "id": "41dbb30f-3941-4db5-861e-8cd7bedd393e",
+      "company": "Wandercraft",
+      "period": "March 2026",
+      "osPeriod": "March 2026",
+      "proof": "EVE regulatory milestone — headline word for word"
+    },
+    {
+      "id": "41087b3b-c8c7-4dc6-b312-2d19dff983cd",
+      "company": "Jeen",
+      "period": "June 2026",
+      "osPeriod": "June 2026",
+      "proof": "bank financing for the 4th centre — the title says 'Juillet 26', the content is June"
+    },
+    {
+      "id": "ddd0d677-61d1-419c-a72e-6cbd0e962f68",
+      "company": "Tango",
+      "period": "Q1 2026",
+      "osPeriod": "(none)",
+      "proof": "Same Notion document as the 07/04 manual import, exported again on 01/07. Benjamin's call: keep the 07/04 one only."
+    }
+  ],
+  "_allowPeriodCollisionComment": "Reports that legitimately share a (company, period) slot with another row — a distinct document, not a re-send. Without this opt-in the import guard would skip them silently. Each entry was arbitrated individually.",
+  "allowPeriodCollision": [
+    {
+      "id": "0ea34205-a83e-4f6c-955d-a6ddc990801e",
+      "company": "Bleen",
+      "period": "July 2026",
+      "why": "Informal 07/07 email about Jimmy joining the cap table. Albo OS already holds the 30/07 formal notice under the GET EDEN shareholders' agreement — the deed, not a re-send."
+    },
+    {
+      "id": "a791462c-ba82-4db3-881e-6f2ca28472ce",
+      "company": "Wandercraft",
+      "period": "March 2026",
+      "why": "Renault announcement (350 Calvin robots). Unrelated to the March monthly report Albo OS already holds."
+    },
+    {
+      "id": "f8db9f86-695e-4d40-8913-8a007f0d389d",
+      "company": "Bleen",
+      "period": "2025",
+      "why": "Spring 2026 investor update — distinct from the AGM below, both labelled 2025."
+    },
+    {
+      "id": "b313960e-688a-44b4-a65a-3629d497650a",
+      "company": "Bleen",
+      "period": "2025",
+      "why": "2026 Annual General Meeting — distinct from the spring update above."
+    },
+    {
+      "id": "afe8a7bb-3304-42e3-aba9-897dce0559ec",
+      "company": "Jeen",
+      "period": "March 2026",
+      "why": "March cash reporting — distinct month from the row below, both labelled March 2026."
+    },
+    {
+      "id": "3e46bf8d-4771-4567-b0f3-bf63c3a4ba15",
+      "company": "Jeen",
+      "period": "March 2026",
+      "why": "April cash reporting, mislabelled March 2026 at the source."
+    }
+  ]
+}
