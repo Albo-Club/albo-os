@@ -1194,6 +1194,12 @@ export default defineSchema({
     // Recap notification guard (brick 6): set once the recap/quarantine
     // email went out — retries never double-send.
     notifiedAt: v.optional(v.number()),
+    // Automatic recovery from a TRANSIENT model failure (aborted request,
+    // provider saturation). The step is carried alongside the counter so each
+    // brick gets its own budget without anyone having to reset it: a failure
+    // on a step other than `retryStep` starts back at 1.
+    retryStep: v.optional(v.union(v.literal('identify'), v.literal('analyze'))),
+    retryAttempts: v.optional(v.number()),
   })
     .index('by_message_id', ['agentmailMessageId'])
     .index('by_status', ['status']),

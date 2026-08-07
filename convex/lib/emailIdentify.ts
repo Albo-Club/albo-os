@@ -5,6 +5,8 @@
  * (convex/reportIdentify.ts) and by the manual attach (convex/reportInbox.ts).
  */
 
+import { ModelOutputError } from './modelRetry'
+
 export function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -165,7 +167,52 @@ export function extractJson(text: string): unknown {
     return JSON.parse(cleaned)
   } catch {
     const match = cleaned.match(/\{[\s\S]*\}/)
-    if (match) return JSON.parse(match[0])
-    throw new Error('no JSON found in model response')
+    // ModelOutputError, not a bare Error: an answer we cannot read will read
+    // no better in fifteen minutes, so it must never be retried.
+    if (!match) throw new ModelOutputError('no JSON found in model response')
+    try {
+      return JSON.parse(match[0])
+    } catch {
+      throw new ModelOutputError('model response is not valid JSON')
+    }
+  }
+}
+
+export interface Identification {
+  real_sender_email: string | null
+  company_ids: Array<string>
+  is_fund_forward: boolean
+  confidence: 'high' | 'low'
+  reason: string
+}
+
+/**
+ * Tolerant read of the identification answer, for the free-JSON fallback —
+ * same rule as `parseLenient` in `lib/reportAnalysis.ts`: nothing constrains
+ * the model there, so a reformulation must cost the field, not the email.
+ *
+ * `confidence` collapses to 'low' unless the model clearly said 'high': low
+ * is the STRICTER branch in `acceptIdentification` (it demands a single named
+ * candidate), so an unreadable confidence tightens the match instead of
+ * loosening it. Returns null only when no candidate id came back at all —
+ * there is then nothing to corroborate.
+ */
+export function parseIdentificationLenient(raw: unknown): Identification | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const ids = Array.isArray(o.company_ids)
+    ? o.company_ids.filter((id): id is string => typeof id === 'string' && id.trim() !== '')
+    : []
+  if (ids.length === 0) return null
+  const email = typeof o.real_sender_email === 'string' ? o.real_sender_email.trim() : ''
+  return {
+    real_sender_email: email === '' ? null : email,
+    company_ids: ids,
+    is_fund_forward: o.is_fund_forward === true,
+    confidence:
+      typeof o.confidence === 'string' && o.confidence.toLowerCase().trim() === 'high'
+        ? 'high'
+        : 'low',
+    reason: typeof o.reason === 'string' ? o.reason : '',
   }
 }

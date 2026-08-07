@@ -17,64 +17,21 @@
  */
 
 import { generateObject, generateText } from 'ai'
-import { z } from 'zod/v3'
 import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { internalAction, internalMutation, internalQuery } from './_generated/server'
 import { getModel } from './agent'
 import { catalogPromptList, sanitizeKpiTargets, targetsPromptList, toCanonical } from './lib/metricCatalog'
+import { ModelOutputError, isTransientModelError } from './lib/modelRetry'
+import { analysisSchema, parseLenient } from './lib/reportAnalysis'
 import { normalizePeriodDisplay, parsePeriod } from './lib/reportPeriod'
 import { recordReportOnCompany } from './lib/reportFreshness'
+import type { Analysis } from './lib/reportAnalysis'
 import type { RawMetric } from './lib/metricCatalog'
 import type { Doc, Id } from './_generated/dataModel'
 
 const PIPELINE_VERSION = 'albo-os-v2'
 const MAX_TEXT = 30_000
-
-/**
- * Every optional field is `.nullable().default(null)`, never a bare
- * `.nullable()`: in Zod the latter allows the VALUE null but still requires
- * the KEY, and a model answering in free JSON (the generateText fallback
- * below) omits a key rather than writing `"x": null` — which used to reject
- * the whole report over an absent `period`. Output type is unchanged
- * (`string | null`), so downstream code is untouched.
- */
-export const analysisSchema = z.object({
-  title: z.string().describe('Titre court du report'),
-  headline: z.string().describe('Résumé en une phrase'),
-  key_highlights: z.array(z.string()).describe('3 à 6 points clés'),
-  report_period: z
-    .string()
-    .nullable()
-    .default(null)
-    .describe(
-      'Période couverte, en anglais : "January 2026" | "Q4 2025" | "S1 2026" | "2025". null si le document ne couvre aucune période',
-    ),
-  report_type: z
-    .enum(['monthly', 'bimonthly', 'quarterly', 'semi-annual', 'annual'])
-    .nullable()
-    .default(null)
-    .describe("null si le document n'a aucun rythme périodique"),
-  metrics: z.array(
-    z.object({
-      catalog_key: z
-        .string()
-        .nullable()
-        .default(null)
-        .describe('Clé du catalogue si la métrique y correspond, sinon null'),
-      raw_label: z.string().describe("Libellé d'origine tel qu'écrit dans le report"),
-      value: z.number().describe("Valeur numérique TELLE QU'ÉCRITE (aucune conversion)"),
-      unit: z.enum(['EUR', 'kEUR', 'MEUR', 'percent', 'count', 'months', 'other']),
-      period: z
-        .string()
-        .nullable()
-        .default(null)
-        .describe('Période spécifique si différente de la période principale, sinon null'),
-    }),
-  ),
-})
-
-type Analysis = z.infer<typeof analysisSchema>
 
 // Agent prompts are user-facing copy in this project → French (cf. CLAUDE.md).
 const SYSTEM_PROMPT = `Tu extrais la fiche structurée d'un investor update (report) envoyé par une participation.
@@ -106,8 +63,14 @@ function extractJson(text: string): unknown {
     return JSON.parse(cleaned)
   } catch {
     const match = cleaned.match(/\{[\s\S]*\}/)
-    if (match) return JSON.parse(match[0])
-    throw new Error('no JSON found in model response')
+    // ModelOutputError, not a bare Error: an answer we cannot read will read
+    // no better in fifteen minutes, so it must never be retried.
+    if (!match) throw new ModelOutputError('no JSON found in model response')
+    try {
+      return JSON.parse(match[0])
+    } catch {
+      throw new ModelOutputError('model response is not valid JSON')
+    }
   }
 }
 
@@ -424,6 +387,10 @@ ${text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}\n[...tronqué]` : text}`
     })
     return object
   } catch (err) {
+    // A cut or throttled request says nothing about structured output: firing
+    // a second full generation right behind it just burns the same failure
+    // twice. Let it through to the retry, which waits before trying again.
+    if (isTransientModelError(err)) throw err
     console.warn(
       '[reportStore] generateObject failed, falling back to generateText:',
       err instanceof Error ? err.message : String(err),
@@ -433,11 +400,14 @@ ${text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}\n[...tronqué]` : text}`
       system: `${SYSTEM_PROMPT}\n\nRéponds UNIQUEMENT avec un JSON valide, sans markdown.`,
       prompt,
     })
-    const parsed = analysisSchema.safeParse(extractJson(out))
-    if (!parsed.success) {
-      throw new Error(`could not parse analysis: ${parsed.error.message}`)
+    // Tolerant read, not a second strict validation: nothing constrains the
+    // model here, so a reformulation ("half-year" for semi-annual) or an
+    // unreadable metric must cost that field alone, never the report.
+    const parsed = parseLenient(extractJson(out))
+    if (!parsed) {
+      throw new ModelOutputError('analysis has neither title nor headline')
     }
-    return parsed.data
+    return parsed
   }
 }
 
@@ -481,6 +451,15 @@ export const run = internalAction({
       )
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
+      // A cut request or a saturated provider is not this email's fault: it
+      // is rescheduled, silently, and only a spent budget reaches the user.
+      if (isTransientModelError(err)) {
+        const retried: boolean = await ctx.runMutation(internal.reportInbox.retryAfterTransient, {
+          inboundEmailId,
+          step: 'analyze',
+        })
+        if (retried) return null
+      }
       console.error(`[reportStore] analysis failed for ${row.agentmailMessageId}: ${message}`)
       await ctx.runMutation(internal.reportIdentify.setReview, {
         inboundEmailId,
