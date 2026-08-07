@@ -33,6 +33,8 @@
  *   5. Merges 3 duplicate deal pairs.
  *   6. Takes the 3 non-investment lines out of the portfolio, returning their
  *      movements to the pointage queue so they can be qualified properly.
+ *      Those three deals are DELETED, not archived — `deals` has no
+ *      `archivedAt` field; only their company card can be soft-deleted.
  *   7. Splits the 27 aggregated deals: the existing line keeps the earliest
  *      operation (its `airtableId`, its incoming movements and its history stay
  *      put), and each later operation becomes its own deal carrying its own
@@ -273,7 +275,8 @@ const DEAL_MERGES: Array<DealMerge> = [
  * Their movements go back to the pointage queue (`dealId` cleared,
  * `matchStatus: 'unmatched'`) so they can be qualified for what they are —
  * a loan repayment, a cash-account withdrawal, a share sale. The deal is
- * archived, and its company too when nothing else points at it.
+ * deleted (there is no soft delete on `deals`), and its company card archived
+ * when nothing else points at it.
  */
 const DEAL_REMOVALS: Array<{
   dealId: string
@@ -1076,6 +1079,7 @@ export const dryRun = internalQuery({
           currentSignedDate: deal?.signedDate ?? null,
           willWrite:
             deal &&
+            deal.orgId === orgId &&
             target?.name === spec.expectedTarget &&
             deal.signedDate == null
               ? new Date(spec.signedDate).toISOString().slice(0, 10)
@@ -1089,6 +1093,9 @@ export const dryRun = internalQuery({
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
     const rmExists = existingRm.some((c) => c.name === RM_EXPANSION.companyName)
+    // `apply` throws `group_root_absent` without it, aborting the whole run —
+    // the report must show that, not promise a creation that cannot happen.
+    const rmRootPresent = existingRm.some((c) => c.kind === 'group_root')
 
     const companyMerges = await Promise.all(
       COMPANY_MERGES.map(async (spec) => {
@@ -1098,6 +1105,9 @@ export const dryRun = internalQuery({
         )
         const to = await ctx.db.get('companies', spec.toId as Id<'companies'>)
         if (!from || !to) return { ...spec, skip: 'company_not_found' }
+        if (from.orgId !== orgId || to.orgId !== orgId) {
+          return { ...spec, skip: 'wrong_org' }
+        }
         if (from.archivedAt != null)
           return { ...spec, skip: 'already_archived' }
         if (from.name !== spec.expectedFrom || to.name !== spec.expectedTo) {
@@ -1240,18 +1250,33 @@ export const dryRun = internalQuery({
       }),
     )
 
+    // A blocked removal carries no `skip` key (it is a real, resolved row that
+    // apply will refuse), so it has to be counted separately — otherwise the
+    // headline numbers say "nothing blocking" for exactly the case the guard
+    // was added to catch.
+    const blockedRemovals = removals.filter(
+      (r) => !('skip' in r) && 'blocked' in r && r.blocked,
+    )
     const skipped = [
       ...companyMerges.filter((m) => 'skip' in m),
+      ...shells.filter(
+        (m) => 'skip' in m || ('willArchive' in m && !m.willArchive),
+      ),
       ...dealMerges.filter((m) => 'skip' in m),
       ...removals.filter((m) => 'skip' in m),
-      ...splits.filter((s) => 'skip' in s && s.skip !== 'already_split'),
+      ...blockedRemovals,
+      ...splits.filter((s) => 'skip' in s),
     ]
 
     return {
       org: { slug: org.slug, id: orgId },
       rename,
       signedDates: dates,
-      rmExpansion: { willCreate: !rmExists, alreadyPresent: rmExists },
+      rmExpansion: {
+        willCreate: !rmExists && rmRootPresent,
+        alreadyPresent: rmExists,
+        blocked: !rmExists && !rmRootPresent,
+      },
       companyMerges,
       emptyCompanies: shells,
       dealMerges,
@@ -1263,9 +1288,10 @@ export const dryRun = internalQuery({
           shells.filter((s) => !('skip' in s) && s.willArchive).length,
         dealsDeleted:
           dealMerges.filter((m) => !('skip' in m)).length +
-          removals.filter((r) => !('skip' in r)).length,
+          removals.filter((r) => !('skip' in r)).length -
+          blockedRemovals.length,
         dealsCreated:
-          (rmExists ? 0 : 1) +
+          (rmExists || !rmRootPresent ? 0 : 1) +
           splits
             .filter(
               (s): s is Extract<typeof s, { parts: unknown }> => 'parts' in s,
@@ -1551,6 +1577,10 @@ export const apply = internalMutation({
       // Same invariant as deals.remove: hard delete only once no transaction
       // is left attached — everything above has just been re-pointed.
       await ctx.db.delete('deals', from._id)
+      // Drop it from the scope too: `asViaSpv` is read from there, and a ghost
+      // row would make a later archive guard count a reference that no longer
+      // exists.
+      scope.allDeals = scope.allDeals.filter((d) => d._id !== from._id)
       done.dealsMerged.push(spec.expectedTarget)
     }
 
@@ -1597,6 +1627,7 @@ export const apply = internalMutation({
         })
       }
       await ctx.db.delete('deals', deal._id)
+      scope.allDeals = scope.allDeals.filter((d) => d._id !== deal._id)
       // Same rule as the shells above: the card goes only when NOTHING points
       // at it any more — a partial check would archive a card still carrying
       // relations, KPIs, e-mail links or todos (cf. companies.archive).
@@ -1620,9 +1651,10 @@ export const apply = internalMutation({
     for (const spec of SPLITS) {
       const resolved = await resolveSplit(ctx, orgId, spec, scope)
       if ('skip' in resolved) {
-        if (resolved.skip !== 'already_split') {
-          done.skipped.push(`split: ${spec.parts[0]?.name} — ${resolved.skip}`)
-        }
+        // `already_split` is normal on a re-run and abnormal on a first one:
+        // report it either way rather than let a silently skipped deal look
+        // like a deal that was split.
+        done.skipped.push(`split: ${spec.parts[0]?.name} — ${resolved.skip}`)
         continue
       }
       const { deal, parts } = resolved
