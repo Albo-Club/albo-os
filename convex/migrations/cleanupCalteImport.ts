@@ -675,6 +675,9 @@ const SPLITS: Array<Split> = [
     ],
   },
   {
+    // ⚠ the target name carries a trailing space in prod ("… PHARMACIES ").
+    // Harmless here — a split is anchored on the deal `_id` and its org, never
+    // on the name — but do not "fix" the name without re-reading this list.
     dealId: 'k5789yeg80cygsaxxbatq5mj7d87sm7a' as Id<'deals'>, // SIDE - COMPTOIR DES PHARMACIES
     parts: [
       {
