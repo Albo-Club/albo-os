@@ -33,9 +33,12 @@ import {
   identityKey,
   nameAppearsInText,
   namedIdentities,
+  parseIdentificationLenient,
   resolveOnSharedDomains,
   sharedDomains,
 } from './lib/emailIdentify'
+import { ModelOutputError, isTransientModelError } from './lib/modelRetry'
+import type { Identification } from './lib/emailIdentify'
 import type { Id } from './_generated/dataModel'
 
 const MAX_BODY = 15_000
@@ -70,7 +73,9 @@ const identificationSchema = z.object({
   reason: z.string().describe('Justification courte'),
 })
 
-type Identification = z.infer<typeof identificationSchema>
+// The lib interface is the single shape; assigning the schema's output to it
+// below is what keeps the two from drifting (typecheck fails if they do).
+type SchemaIdentification = z.infer<typeof identificationSchema>
 
 // Agent prompts are user-facing copy in this project → French (cf. CLAUDE.md).
 const SYSTEM_PROMPT = `Tu identifies à quelle participation du portefeuille appartient un report envoyé par email.
@@ -232,8 +237,10 @@ ${body.length > MAX_BODY ? `${body.slice(0, MAX_BODY)}\n[...tronqué]` : body}`
       system: SYSTEM_PROMPT,
       prompt,
     })
-    return object
+    const strict: SchemaIdentification = object
+    return strict
   } catch (err) {
+    if (isTransientModelError(err)) throw err
     console.warn(
       '[reportIdentify] generateObject failed, falling back to generateText:',
       err instanceof Error ? err.message : String(err),
@@ -243,11 +250,11 @@ ${body.length > MAX_BODY ? `${body.slice(0, MAX_BODY)}\n[...tronqué]` : body}`
       system: `${SYSTEM_PROMPT}\n\nRéponds UNIQUEMENT avec un JSON valide, sans markdown.`,
       prompt,
     })
-    const parsed = identificationSchema.safeParse(extractJson(text))
-    if (!parsed.success) {
-      throw new Error(`could not parse identification: ${parsed.error.message}`)
+    const parsed = parseIdentificationLenient(extractJson(text))
+    if (!parsed) {
+      throw new ModelOutputError('identification returned no candidate id')
     }
-    return parsed.data
+    return parsed
   }
 }
 
@@ -273,6 +280,15 @@ export const run = internalAction({
       ident = await callModel(candidates, row.fromEmail, row.subject, body)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
+      // Same rule as brick 5: a transient failure is rescheduled silently,
+      // and only a spent budget reaches the user.
+      if (isTransientModelError(err)) {
+        const retried: boolean = await ctx.runMutation(internal.reportInbox.retryAfterTransient, {
+          inboundEmailId,
+          step: 'identify',
+        })
+        if (retried) return null
+      }
       console.error(`[reportIdentify] LLM failed for ${row.agentmailMessageId}: ${message}`)
       await ctx.runMutation(internal.reportIdentify.setReview, {
         inboundEmailId,

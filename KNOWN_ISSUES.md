@@ -1200,15 +1200,94 @@ un report, ce qui rend le bug rare et d'autant plus déroutant.
 `.nullable().default(null)` (ou `.nullish()`), jamais `.nullable()` seul.**
 Le `.default(null)` sort la clé du `required` du JSON Schema **et** relit
 une clé absente comme `null` — le type de sortie reste `string | null`,
-donc le code en aval ne bouge pas. Appliqué à `analysisSchema`
-(`convex/reportStore.ts`) et à `identificationSchema`
-(`convex/reportIdentify.ts`). Couvert par
+donc le code en aval ne bouge pas.
+
+### Le correctif n'a tenu qu'un tour — et c'est ça, la vraie leçon
+
+Le report suivant est reparti en `analyze_error` sur
+`report_type: "half-year"` : le bon rythme, écrit autrement. Clé absente
+puis valeur reformulée : deux variantes d'**un seul** défaut de conception,
+qui n'est pas dans le schéma mais dans ce qu'on lui demande de faire. On
+exigeait d'un générateur de texte l'exactitude d'un formulaire, et au
+moindre écart on jetait le report entier. Rustiner la variante du jour
+garantit une troisième variante la semaine suivante.
+
+**Deux contrats, pas un.** Les deux chemins ne demandent pas la même chose
+et ne doivent pas partager la même sévérité :
+
+- `analysisSchema` (`convex/lib/reportAnalysis.ts`) est le contrat **strict**
+  passé à `generateObject`. C'est lui qui contraint le modèle dans le chemin
+  nominal, et le JSON Schema qu'on en dérive est la **seule** consigne que
+  reçoit le provider — le desserrer (`z.string()` au lieu d'un enum, un
+  `.transform()` qui dégrade le schéma en `ZodEffects`) enlèverait la
+  contrainte à l'endroit où elle marche.
+- `parseLenient` (même fichier) lit le chemin de **repli**, où le modèle
+  répond en JSON libre et où **rien** ne le contraint. Là, l'écart est le cas
+  normal : les synonymes sont ramenés au canonique (`half-year` →
+  `semi-annual`, `k€` → `kEUR`, `"1 200"` → `1200`), l'inconnu devient `null`
+  ou `'other'`, et ce qui n'est pas récupérable est **jeté seul**. Une
+  métrique illisible ne coûte plus que sa ligne.
+
+La tolérance n'invente jamais : une unité non reconnue devient `'other'`, que
+`toCanonical` refuse pour toute clé du catalogue — la métrique reste sur le
+snapshot brut au lieu d'entrer dans une série sous une unité devinée. Le seul
+échec restant est une réponse sans titre **ni** headline : il n'y a alors pas
+de fiche à ranger.
+
+Même principe côté identification (`parseIdentificationLenient`,
+`convex/lib/emailIdentify.ts`), avec une règle en plus : `confidence`
+retombe sur `'low'` par défaut, qui est la branche **stricte** de
+`acceptIdentification` — une confiance illisible resserre le rattachement au
+lieu de le relâcher.
+
+C'est le même principe que `normalizePeriodDisplay`, qui accepte « janvier
+2026 » et le traduit plutôt que de le refuser. Couvert par
 `convex/regression.reportAnalysisSchema.test.ts`.
 
-Corollaire non traité, à garder en tête : une seule métrique mal formée
-fait encore échouer le report complet. Le jour où ça repique, la piste est
-de valider les métriques une par une et de jeter les invalides plutôt que
-le lot.
+## Un échec de modèle n'est pas un échec de report
+
+Le même jour, l'autre report est mort sur `The operation was aborted` : la
+requête vers le modèle coupée en vol. Rien à voir avec le contenu du mail
+(le message ne vient d'aucune de nos dépendances — ni AI SDK, ni provider
+OpenRouter : c'est le runtime Convex qui a coupé).
+
+Le pipeline traitait **tout** échec comme définitif : `needs_review`, mail
+d'échec, et un « Retraiter » **manuel** comme seule sortie. Un hoquet réseau
+de trois secondes coûtait une intervention humaine — c'est ce qui rendait la
+file « relou » bien plus que les bugs de schéma.
+
+`convex/lib/modelRetry.ts` sépare les deux natures :
+
+- **Passager** (requête coupée, saturation, 429, 5xx, `fetch failed`) — la
+  même entrée réussirait plus tard. `retryAfterTransient`
+  (`convex/reportInbox.ts`) repasse la ligne en `received` — le statut que
+  réclament déjà les mutations de claim, donc la reprise rentre par la porte
+  normale — et replanifie à 1 / 5 / 15 min. **Aucune notification** : un
+  hoquet qui se répare ne doit rien coûter à l'utilisateur, et `claimNotify`
+  ne tirant qu'une fois, un mail d'échec prématuré ferait taire le récap de
+  succès qui suit.
+- **Définitif** (réponse illisible) — jamais réessayé : l'entrée ne changera
+  pas, et brûler 20 minutes de backoff ne fait que retarder l'information.
+
+Trois pièges, tous payés une fois :
+
+1. **La classification lit le MESSAGE d'erreur**, donc elle ne vaut que sur
+   les erreurs qu'on n'a pas écrites soi-même. Un report dont un `raw_label`
+   vaut « timeout » se classerait passager. D'où `ModelOutputError` : nos
+   propres échecs de lecture portent un type, et le type prime sur les mots.
+2. **Le budget est PAR étape** (`retryStep` à côté de `retryAttempts`) :
+   identification et analyse appellent toutes deux le modèle, et un mail qui a
+   survécu à deux identifications bancales doit garder un budget entier pour
+   son analyse. Porter l'étape à côté du compteur évite d'écrire un reset
+   quelque part dans le pipeline — et un reset manquant est exactement le
+   genre de bug qui ne se voit qu'au troisième incident.
+3. **Un `generateObject` coupé ne doit pas déclencher le repli.** Une requête
+   coupée ne dit rien sur la sortie structurée : enchaîner une seconde
+   génération complète derrière brûle le même échec deux fois. Les deux
+   `callModel` relaient donc l'erreur passagère au lieu de replier.
+
+Couvert par `convex/regression.modelRetry.test.ts` et
+`convex/regression.reportRetry.test.ts`.
 
 ## Prompt de notation : l'exemple JSON fixe la note, et la symétrie forcée l'écrase
 

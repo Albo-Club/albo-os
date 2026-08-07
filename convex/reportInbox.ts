@@ -16,6 +16,7 @@ import { internalAction, internalMutation, mutation, query } from './_generated/
 import { fetchBody, getMessage } from './agentmail'
 import { requireAppUser, requireOrgMember } from './lib/auth'
 import { identityKey, sharedDomains } from './lib/emailIdentify'
+import { RETRY_BACKOFFS_MS } from './lib/modelRetry'
 import { recomputeReportFreshness } from './lib/reportFreshness'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
@@ -236,6 +237,49 @@ export const hydrateBody = internalAction({
       await ctx.scheduler.runAfter(0, internal.reportIdentify.run, { inboundEmailId })
     }
     return null
+  },
+})
+
+/**
+ * Reschedule a brick that failed on a TRANSIENT model error (brick 3 or 5).
+ *
+ * Returns false once the budget is spent, and the caller then records the
+ * failure as before — so a definitive problem still reaches the user, just
+ * not a hiccup that clears on its own. The row goes back to 'received', which
+ * is exactly what each brick's claim mutation requires, so the retry re-enters
+ * through the normal door. No notification is sent here on purpose: a
+ * recovered hiccup must cost the user nothing, not even a mail (and
+ * `claimNotify` only fires once, so a premature failure mail would silence
+ * the success recap that follows).
+ */
+export const retryAfterTransient = internalMutation({
+  args: {
+    inboundEmailId: v.id('inboundEmails'),
+    step: v.union(v.literal('identify'), v.literal('analyze')),
+  },
+  handler: async (ctx, { inboundEmailId, step }): Promise<boolean> => {
+    const row = await ctx.db.get('inboundEmails', inboundEmailId)
+    if (!row) return false
+    // A failure on another step than the one being counted starts its own
+    // budget — no reset to write anywhere else in the pipeline.
+    const attempt = row.retryStep === step ? (row.retryAttempts ?? 0) + 1 : 1
+    if (attempt > RETRY_BACKOFFS_MS.length) return false
+    const delay = RETRY_BACKOFFS_MS[attempt - 1]
+
+    await ctx.db.patch('inboundEmails', inboundEmailId, {
+      status: 'received',
+      retryStep: step,
+      retryAttempts: attempt,
+    })
+    await ctx.scheduler.runAfter(
+      delay,
+      step === 'identify' ? internal.reportIdentify.run : internal.reportStore.run,
+      { inboundEmailId },
+    )
+    console.warn(
+      `[reportInbox] ${step} failed transiently for ${row.agentmailMessageId}, retry ${attempt}/${RETRY_BACKOFFS_MS.length} in ${delay / 1000}s`,
+    )
+    return true
   },
 })
 
