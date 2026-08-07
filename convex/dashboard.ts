@@ -60,11 +60,16 @@ export const getDashboard = query({
     )
 
     // 3. Deployed (out) / distributed (in), never netted — same definition as
-    //    the deal detail page.
+    //    the deal detail page. A cancelled deal is skipped entirely: its flows
+    //    net to zero (wired then refunded), so counting them would inflate
+    //    BOTH totals with capital that was never invested. The other
+    //    aggregates already exclude it (`isActive` is false and
+    //    `residualValueCents` returns 0 for a terminal status).
     const paidByDeal = new Map<string, number>()
     let deployedCents = 0
     let distributedCents = 0
     for (const { deal, txs } of perDeal) {
+      if (deal.status === 'cancelled') continue
       let paid = 0
       let received = 0
       for (const tx of txs) {
@@ -82,8 +87,8 @@ export const getDashboard = query({
     let navIsPartial = false
     for (const { deal, valuations, isActive } of perDeal) {
       const last = valuations.at(-1)
-      // residualValueCents returns 0 for exited/written-off deals, so the
-      // non-active ones contribute nothing (same as the previous `continue`).
+      // residualValueCents returns 0 for terminal deals (exited, written off
+      // or cancelled), so the non-active ones contribute nothing.
       navCents += residualValueCents({
         status: deal.status,
         lastValuationCents: last?.fairValue ?? null,

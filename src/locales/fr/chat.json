@@ -83,7 +83,8 @@
     "status": {
       "active": "Actif",
       "fully_exited": "Sorti",
-      "written_off": "Passé en perte"
+      "written_off": "Passé en perte",
+      "cancelled": "Annulé"
     },
     "tx": {
       "date": "Date",

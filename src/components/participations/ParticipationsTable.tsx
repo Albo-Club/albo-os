@@ -291,6 +291,12 @@ export type CompanyRow = {
   pending: boolean
   /** True for the fully_exited / written_off bucket (exit tables). */
   settled: boolean
+  /**
+   * True for the cancelled bucket (deal called off, funds wired then
+   * refunded). Not an open position, not a realized outcome: these rows never
+   * reach a status table, only the collapsed section at the bottom of the page.
+   */
+  cancelled: boolean
   dealCount: number
   /** Engagé (cents): summed commitments — the pending table's amount. */
   committed: number

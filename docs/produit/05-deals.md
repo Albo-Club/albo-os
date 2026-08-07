@@ -39,9 +39,10 @@ toutes organisations confondues.
   sur un **seul badge**, en teinte claire, avec la même **couleur** partout
   (fiche deal, liste des deals, fiche société) que les bandeaux de la liste
   des participations : ambre = *engagé*, bleu = position ouverte (actif),
-  vert = Exit win, rouge = Exit loss. Seule exception, le **gris** : une
-  sortie dont le multiple n'est pas calculable (aucun capital décaissé) n'est
-  ni une victoire ni une perte. Un deal *engagé*
+  vert = Exit win, rouge = Exit loss. Le **gris** couvre les deux cas qui ne
+  sont ni une victoire ni une perte : une sortie dont le multiple n'est pas
+  calculable (aucun capital décaissé), et un deal **annulé** (cf. « Annuler un
+  deal » plus bas). Un deal *engagé*
   **passe tout seul en actif** dès qu'un décaissement lui est pointé
   (cf. [Pointage](08-pointage.md)).
 - **Dates** : signature (tri par défaut), closing, sortie.
@@ -117,6 +118,33 @@ Une fois sorti, la **couleur du statut** dit comment ça s'est passé, déduite 
 multiple réalisé (MOIC, calculé depuis les transactions pointées) : **vert**
 au-dessus de 1 (« Exit win »), **rouge** en dessous (« Exit loss ») — une perte
 actée est toujours un « Exit loss » rouge.
+
+## Annuler un deal
+
+Il arrive qu'un deal soit **annulé après le virement** : les fonds partent,
+l'opération ne se fait finalement pas, l'argent revient. Les deux mouvements
+bancaires existent et doivent être pointés sur quelque chose — donc le deal
+(et l'entité en face) doit exister dans Albo OS. Mais ce n'est **ni une
+sortie ni une perte** : il n'y a jamais eu de participation.
+
+Le statut **« Annulé »** est là pour ça. Il se pose dans le même dialogue que
+les sorties (« Gérer la sortie » → type *Annulé*), avec la date du
+remboursement et le montant remboursé, et il est **réversible** comme une
+sortie.
+
+Un deal annulé est traité comme **hors performance** : pas de multiple, pas de
+TRI, pas de TVPI — un remboursement n'est pas un retour, et l'afficher à 1,00×
+en vert raconterait une victoire qui n'a pas eu lieu. Il ne compte ni dans le
+capital déployé, ni dans le distribué, ni dans la valeur du portefeuille, ni
+dans le nombre de participations du tableau de bord, et l'entreprise n'est plus
+attendue sur ses reportings.
+
+Côté affichage, il est **volontairement discret** : absent des tableaux par
+statut de la liste des participations — il vit dans une section repliée
+« *n* deals annulés » en bas de page, qui n'apparaît que s'il en existe au
+moins un — et masqué de la liste des deals tant qu'on n'a pas coché *Annulé*
+dans le filtre Statut. Il reste visible normalement sur la **fiche société**
+(en dernier) et sur sa propre fiche.
 
 Une **cession partielle** n'a pas de statut dédié : le deal reste **actif**,
 puisqu'on en détient encore une partie. L'argent déjà récupéré apparaît dans

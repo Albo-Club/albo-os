@@ -174,8 +174,14 @@ export function DealsListView({
 
   const filtered = useMemo(() => {
     if (!deals) return deals
-    if (!term && !hasFilters) return deals
+    // Cancelled deals stay out of the list by default: wired then refunded,
+    // they are neither an open position nor a realized outcome. Ticking
+    // "Cancelled" in the Status facet is what brings them back — the facet
+    // options are built on the unfiltered set, so the box is always there.
+    const showCancelled = statusFilter.has('cancelled')
     return deals.filter((d) => {
+      if (!showCancelled && d.status === 'cancelled') return false
+      if (!term && !hasFilters) return true
       const matchesSearch =
         !term ||
         [
@@ -208,13 +214,18 @@ export function DealsListView({
 
   // Split on status: fully_exited / written_off drop to the settled section
   // below; everything else stays active. Same rule as the Companies view
-  // (ParticipationsView).
+  // (ParticipationsView). A cancelled deal — only ever here when the facet
+  // asked for it — joins the settled section: it is closed, just not an exit.
   const { active, settled } = useMemo(() => {
     if (!filtered) return { active: undefined, settled: undefined }
     const activeDeals: Array<DealListRow> = []
     const settledDeals: Array<DealListRow> = []
     for (const d of filtered) {
-      if (d.status === 'fully_exited' || d.status === 'written_off') {
+      if (
+        d.status === 'fully_exited' ||
+        d.status === 'written_off' ||
+        d.status === 'cancelled'
+      ) {
         settledDeals.push(d)
       } else {
         activeDeals.push(d)

@@ -97,6 +97,10 @@ describe('advancesStatus — forward-only lifecycle', () => {
     assert.equal(advancesStatus('fully_exited', 'active'), false)
     assert.equal(advancesStatus('written_off', 'active'), false)
   })
+  it('never revives a cancelled deal on an Invested event', () => {
+    assert.equal(advancesStatus('cancelled', 'active'), false)
+    assert.equal(advancesStatus('cancelled', 'pending'), false)
+  })
 })
 
 describe('resolveInstrumentKind — Attio type_d_invest → instrumentKind', () => {

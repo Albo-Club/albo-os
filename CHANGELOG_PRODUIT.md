@@ -23,6 +23,71 @@ bas de page.
 
 ---
 
+## v1.187.0 — 07/08/2026 à 13:43 — Un deal annulé n'est plus obligé de se déguiser en sortie
+
+Il arrive qu'un deal soit annulé **après** le virement : les fonds partent,
+l'opération ne se fait finalement pas, l'argent revient quelques semaines
+plus tard. C'est ce qui s'est passé sur le SPV Parallel Dix-huit. Les deux
+mouvements bancaires existent et doivent bien se pointer quelque part — donc
+le deal et l'entité en face doivent exister dans Albo OS.
+
+Jusqu'ici, aucun statut ne disait la vérité. *Actif* faisait croire à une
+position ouverte qu'on n'a jamais eue. *Exité* affichait un multiple de 1,00×
+et un badge vert « Exit win », comme une opération réussie. *Passé en perte*
+peignait la même chose en rouge. Trois façons de mentir sur le même mouvement
+aller-retour.
+
+Un quatrième statut arrive : **« Annulé »**. Il se pose dans le dialogue de
+sortie habituel (« Gérer la sortie » → type *Annulé*), avec la date du
+remboursement et le montant remboursé, et il s'annule comme une sortie si
+c'était une erreur.
+
+Un deal annulé est **hors performance** : pas de multiple, pas de TRI, pas de
+TVPI — un remboursement n'est pas un retour. Il ne compte ni dans le capital
+déployé, ni dans le distribué, ni dans la valeur du portefeuille, ni dans le
+nombre de participations du tableau de bord. Et l'entreprise en face n'est
+plus attendue sur ses reportings : plus d'alerte « boîte silencieuse » pour un
+deal qui n'a jamais eu lieu.
+
+Il est aussi **volontairement discret**, pour ne pas encombrer des listes qui
+parlent de participations réelles. Il n'a pas de tableau dans la liste des
+participations : il vit dans une section repliée « *n* deals annulés » tout en
+bas de la page, qui n'apparaît que s'il en existe au moins un. Dans la liste
+des deals, il est masqué tant qu'on n'a pas coché *Annulé* dans le filtre
+Statut. Il reste visible normalement là où on le cherche vraiment : sur la
+fiche de la société (en dernier) et sur sa propre fiche, avec un badge
+**gris** — ni vert, ni rouge, puisque ce n'est ni une victoire ni une perte.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau littéral `cancelled` sur `dealStatus` (`convex/schema.ts`) et sur
+>   `statusValidator` (`convex/deals.ts`), propagé aux enums des outils agent
+>   (`convex/agentTools.ts`) et MCP (`convex/mcp/registry.ts`).
+> - Statut **terminal** : `isTerminalStatus` extrait dans
+>   `convex/lib/metrics.ts` (utilisé par `residualValueCents`, qui rend 0), et
+>   rang 2 dans le `STATUS_RANK` de `convex/lib/attioSync.ts` — un événement
+>   Attio « Invested » ne peut plus ressusciter un deal annulé.
+> - `buildParticipationRows` (`convex/deals.ts`) gagne un bucket `cancelled` à
+>   part entière, avec `tvpi`/`moic`/`tri` à `null` (les deux derniers
+>   l'étaient déjà, conditionnés sur `settled`). `withReportAlerts`
+>   (`convex/lib/reportFreshness.ts`) n'alerte plus sur ces lignes.
+> - `convex/dashboard.ts` saute les deals annulés dans le calcul
+>   déployé/distribué : leurs flux se neutralisent, les compter gonflerait les
+>   deux compteurs bruts. Les autres agrégats les excluaient déjà via
+>   `isActive` et `residualValueCents`.
+> - Front : bucket `cancelled` gris neutre dans `src/lib/dealStatusBadge.ts`
+>   (source unique de la couleur), section repliée `CancelledSection` dans
+>   `ParticipationsView.tsx` (même pattern que « Entités archivées »),
+>   masquage par défaut dans `DealsListView.tsx` sauf facette cochée,
+>   `STATUS_ORDER` à 3 dans `CompanyDealsTable.tsx`, 3ᵉ option dans
+>   `ExitDealDialog.tsx`. Libellés en/fr dans `participations.json` et
+>   `chat.json`.
+> - Tests ajoutés : `residualValueCents` sur `cancelled`
+>   (`tests/metrics.test.ts`) et non-résurrection par `advancesStatus`
+>   (`tests/attioSync.test.ts`).
+
+---
+
 ## v1.186.0 — 07/08/2026 à 13:35 — Récupérer les chiffres des participations depuis les documents juridiques
 
 Beaucoup de fiches deals et sociétés ont des cases vides — nombre de titres,

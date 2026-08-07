@@ -83,7 +83,8 @@
     "status": {
       "active": "Active",
       "fully_exited": "Exited",
-      "written_off": "Written off"
+      "written_off": "Written off",
+      "cancelled": "Cancelled"
     },
     "tx": {
       "date": "Date",

@@ -108,6 +108,17 @@ describe('residualValueCents', () => {
     )
   })
 
+  it('0 on a cancelled deal — the funds came back, nothing is held', () => {
+    assert.equal(
+      residualValueCents({
+        status: 'cancelled',
+        lastValuationCents: 50000,
+        paidActual: 30000,
+      }),
+      0,
+    )
+  })
+
   it('last valuation, falling back to cost then 0', () => {
     assert.equal(
       residualValueCents({

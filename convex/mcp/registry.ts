@@ -712,7 +712,7 @@ export const mcpTools: Array<McpTool> = [
         .optional()
         .describe('SPV the investment goes through, when there is one'),
       status: z
-        .enum(['pending', 'active', 'fully_exited', 'written_off'])
+        .enum(['pending', 'active', 'fully_exited', 'written_off', 'cancelled'])
         .optional()
         .describe('Defaults to "active"; "pending" = signed but not wired'),
       ...dealValueSchema,
@@ -755,13 +755,16 @@ export const mcpTools: Array<McpTool> = [
       '— anything omitted is left untouched. Use listDeals first to get the ' +
       'id. Amounts in CENTS EUR, rates in BASIS POINTS, dates as ISO ' +
       '"YYYY-MM-DD". To record an exit, set status plus exitedDateISO and ' +
-      'exitProceeds.',
+      'exitProceeds. "cancelled" = deal called off after the funds were wired ' +
+      'and refunded (neither an exit nor a write-off).',
     schema: {
       org: orgSlug,
       dealId: z.string(),
       instrumentKind: z.enum(INSTRUMENTS).optional(),
       viaSpvCompanyId: z.string().optional(),
-      status: z.enum(['active', 'fully_exited', 'written_off']).optional(),
+      status: z
+        .enum(['active', 'fully_exited', 'written_off', 'cancelled'])
+        .optional(),
       ...dealValueSchema,
     },
     write: true,

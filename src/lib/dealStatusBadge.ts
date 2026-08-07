@@ -9,6 +9,9 @@
  *   - fully_exited, moic ≥ 1     → green   (realized gain)
  *   - fully_exited, moic < 1     → red     (realized loss)
  *   - written_off                → red     (loss booked, whatever the moic)
+ *   - cancelled                  → neutral (called off, funds refunded — the
+ *                                           refund is not a return, so never
+ *                                           green even at a 1.00x)
  *   - fully_exited, moic unknown → neutral (outcome not computable — never
  *                                           claim a win nor a loss)
  *
@@ -22,8 +25,17 @@ export type DealBadgeVisual = {
   className?: string
 }
 
-/** Status buckets the participations list splits into (one table each). */
-export type ParticipationBucket = 'pending' | 'active' | 'exit_win' | 'exit_loss'
+/**
+ * Status buckets the participations list splits into (one table each), plus
+ * `cancelled` — which gets no table of its own: it lives in the collapsed
+ * section at the bottom of the page.
+ */
+export type ParticipationBucket =
+  | 'pending'
+  | 'active'
+  | 'exit_win'
+  | 'exit_loss'
+  | 'cancelled'
 
 // Light tints (outline base + coloured overlay): readable on both themes.
 const BUCKET_TINT: Record<ParticipationBucket, string> = {
@@ -31,6 +43,7 @@ const BUCKET_TINT: Record<ParticipationBucket, string> = {
   active: 'border-info/40 bg-info/10 text-info',
   exit_win: 'border-positive/40 bg-positive/10 text-positive',
   exit_loss: 'border-destructive/40 bg-destructive/10 text-destructive',
+  cancelled: 'border-border bg-muted text-muted-foreground',
 }
 
 /**
@@ -43,6 +56,7 @@ export function dealBucket(
   moic?: number | null,
 ): ParticipationBucket | null {
   if (status === 'pending') return 'pending'
+  if (status === 'cancelled') return 'cancelled'
   if (status === 'written_off') return 'exit_loss'
   if (status === 'fully_exited') {
     if (moic == null) return null
@@ -79,6 +93,8 @@ export function participationBucketBand(bucket: ParticipationBucket): {
       return { band: 'bg-positive/10', dot: 'bg-positive' }
     case 'exit_loss':
       return { band: 'bg-destructive/10', dot: 'bg-destructive' }
+    case 'cancelled':
+      return { band: 'bg-muted', dot: 'bg-muted-foreground' }
   }
 }
 

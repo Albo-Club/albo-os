@@ -133,7 +133,12 @@
     "fully_exited": "Exited",
     "written_off": "Exit loss",
     "exit_win": "Exit win",
-    "exit_loss": "Exit loss"
+    "exit_loss": "Exit loss",
+    "cancelled": "Cancelled"
+  },
+  "cancelled": {
+    "sectionTitle_one": "{{count}} cancelled deal",
+    "sectionTitle_other": "{{count}} cancelled deals"
   },
   "exit": {
     "action": "Mark as exited",

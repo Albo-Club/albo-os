@@ -90,15 +90,29 @@ export function realizedCashflows(
 }
 
 /**
- * Residual value of a deal for the TVPI / NAV: 0 once exited or written off,
- * otherwise the last known valuation, falling back to cost (amount paid).
+ * Terminal statuses: the position is closed, so it carries no residual value
+ * and no forward-looking metric. `cancelled` is terminal too — the deal was
+ * called off and the funds refunded, so there never was a position to value.
+ */
+export function isTerminalStatus(status: string): boolean {
+  return (
+    status === 'fully_exited' ||
+    status === 'written_off' ||
+    status === 'cancelled'
+  )
+}
+
+/**
+ * Residual value of a deal for the TVPI / NAV: 0 once the deal is terminal
+ * (exited, written off or cancelled), otherwise the last known valuation,
+ * falling back to cost (amount paid).
  */
 export function residualValueCents(args: {
   status: string
   lastValuationCents: number | null | undefined
   paidActual: number | null | undefined
 }): number {
-  if (args.status === 'fully_exited' || args.status === 'written_off') return 0
+  if (isTerminalStatus(args.status)) return 0
   return args.lastValuationCents ?? args.paidActual ?? 0
 }
 
