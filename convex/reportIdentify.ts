@@ -53,9 +53,12 @@ const IGNORED_DOMAINS = new Set([
 ])
 
 const identificationSchema = z.object({
+  // `.default(null)`: a bare `.nullable()` still requires the key, and the
+  // generateText fallback omits it instead of writing null (cf. reportStore).
   real_sender_email: z
     .string()
     .nullable()
+    .default(null)
     .describe("Adresse email de l'auteur réel du message d'origine (bloc de transfert), sinon null"),
   company_ids: z
     .array(z.string())
