@@ -23,6 +23,43 @@ bas de page.
 
 ---
 
+## v1.188.3 — 07/08/2026 à 17:48 — Un report n'est plus perdu parce qu'une case était vide
+
+Deux reports — GOODVEST et WIND CAPITAL 2 — sont revenus en « erreur technique
+pendant l'analyse » et n'ont jamais été rangés. Le mail était pourtant bien
+reçu, bien rattaché à la bonne participation, et son contenu bien lu : c'est la
+dernière étape, celle qui remplit la fiche du report, qui refusait le résultat.
+
+En cause, une case facultative laissée vide. Chaque chiffre extrait peut porter
+sa propre période, utile seulement quand il ne couvre pas la même que le report
+— donc vide dans l'immense majorité des cas. Le contrôle qualité exigeait quand
+même qu'elle soit là, et rejetait la fiche entière quand elle manquait : tous
+les autres chiffres du report partaient avec.
+
+Une case facultative absente est désormais lue comme vide, ce qui est sa
+signification. Les deux reports concernés peuvent être retraités depuis la file
+« Reports entrants » — rien n'a été perdu, l'e-mail et ses pièces jointes sont
+toujours là.
+
+> **🔧 Notes techniques**
+>
+> - `analysisSchema` (`convex/reportStore.ts`) : les quatre champs optionnels
+>   (`report_period`, `report_type`, `metrics[].catalog_key`,
+>   `metrics[].period`) passent de `.nullable()` à `.nullable().default(null)`.
+>   En Zod, `.nullable()` autorise la valeur `null` mais rend la **clé**
+>   obligatoire — or un modèle répondant en JSON libre omet la clé au lieu
+>   d'écrire `"period": null`. Le type de sortie reste `string | null`, donc
+>   `RawMetric`, `toCanonical` et `storeForCompany` sont inchangés.
+> - Même correctif sur `real_sender_email` dans `identificationSchema`
+>   (`convex/reportIdentify.ts`), même défaut latent.
+> - Ce `safeParse` n'est atteint que par le repli `generateText`, déclenché
+>   quand `generateObject` échoue (logué en `console.warn` seulement). La
+>   cause de cet échec initial sur ces deux mails reste à confirmer dans les
+>   logs Convex prod — piste : reports longs, sortie tronquée.
+> - Nouveau `convex/regression.reportAnalysisSchema.test.ts` (3 cas) : une clé
+>   optionnelle omise se lit `null`, un champ requis manquant échoue toujours.
+> - Piège documenté dans `KNOWN_ISSUES.md` § « Schéma Zod servi à un LLM ».
+
 ## v1.188.2 — 07/08/2026 à 16:14 — Rewatt ne compte plus que pour une seule société dans CALTE
 
 Le portefeuille CALTE affichait dix lignes Rewatt : une par adresse d'opération,
