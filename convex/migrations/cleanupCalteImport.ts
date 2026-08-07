@@ -789,6 +789,21 @@ async function loadScope(ctx: Ctx, orgId: Id<'organizations'>) {
 
 type Scope = Awaited<ReturnType<typeof loadScope>>
 
+/**
+ * Is this the right deal to absorb? Its target is either still the duplicate
+ * card (`expectedTarget`) or ALREADY the surviving one, because the company
+ * merge of step 4 re-pointed it earlier in the same run — the case that made
+ * the Flexliving merge refuse itself on 07/08/2026. Both readings are valid;
+ * anything else means the anchor went stale. Same shape as the source-or-
+ * canonical check in `consolidateRewattCalte.ts:resolveOperation`.
+ */
+const isExpectedMergeTarget = (
+  target: Doc<'companies'> | null,
+  spec: DealMerge,
+) =>
+  target != null &&
+  (target.name === spec.expectedTarget || target.name === spec.expectedTargetTo)
+
 /** Every row pointing at a company, per table — used to guard archiving. */
 async function companyRefs(
   ctx: Ctx,
@@ -1173,7 +1188,7 @@ export const dryRun = internalQuery({
           ctx.db.get('companies', to.targetCompanyId),
         ])
         if (
-          fromTarget?.name !== spec.expectedTarget ||
+          !isExpectedMergeTarget(fromTarget, spec) ||
           toTarget?.name !== spec.expectedTargetTo
         ) {
           return {
@@ -1535,7 +1550,7 @@ export const apply = internalMutation({
         ctx.db.get('companies', to.targetCompanyId),
       ])
       if (
-        fromTarget?.name !== spec.expectedTarget ||
+        !isExpectedMergeTarget(fromTarget, spec) ||
         toTarget?.name !== spec.expectedTargetTo
       ) {
         done.skipped.push(`merge deal: ${spec.expectedTarget} target mismatch`)
