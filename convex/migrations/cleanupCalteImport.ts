@@ -235,7 +235,11 @@ const EMPTY_COMPANIES: Array<{ id: string; expectedName: string }> = [
 type DealMerge = {
   fromId: string
   toId: string
+  /** Exact current target name of the deal being absorbed. */
   expectedTarget: string
+  /** Exact current target name of the surviving deal — they can differ when
+   * the duplicate lives on a second spelling of the same company. */
+  expectedTargetTo: string
   why: string
 }
 
@@ -244,18 +248,21 @@ const DEAL_MERGES: Array<DealMerge> = [
     fromId: 'k578rmjbyz06jmg212fq5d23dd87sjry',
     toId: 'k579z2tdrmk02asp8qrb8z1g1x87r6r8',
     expectedTarget: 'SEZAME IMMO 1',
+    expectedTargetTo: 'SEZAME IMMO 1',
     why: 'empty bond line carrying only the 61 254 € repayment of the share deal',
   },
   {
     fromId: 'k574b27n34astmgxq4mbrazdgx87sttv',
     toId: 'k579xrf4c1be41gmymx8qtkc1s87ssgd',
     expectedTarget: 'FLEX LIVING',
+    expectedTargetTo: 'FLEXLIVING',
     why: 'current-account repayments landed on the duplicate spelling of the company',
   },
   {
     fromId: 'k570g8kwr8jp0geh0dhcpvjx9h87syfh',
     toId: 'k5767zbwge5wdhzp7mx4t1nybn87r1b9',
     expectedTarget: 'BUREAUX A PARTAGE - REMB C/C',
+    expectedTargetTo: 'BUREAUX A PARTAGER (Ubiq / Morning)',
     why: 'second, empty current-account line for Bureaux à Partager',
   },
 ]
@@ -726,16 +733,66 @@ function withManualFlags(deal: Doc<'deals'>, keys: Array<string>) {
   return [...edited]
 }
 
+/**
+ * The org-wide tables that carry no per-company / per-deal index. They are read
+ * ONCE per run and filtered in memory: `companyRefs` runs 16 times and
+ * `dealRefs` 33 times in a single `apply`, and re-collecting these inside every
+ * call would multiply the read volume by that much — straight into Convex's
+ * per-transaction read ceiling, which would abort the whole one-shot.
+ *
+ * `apply` mutates some of these rows, so every write below also updates the
+ * in-memory document: the scope must not go stale between two blocks.
+ */
+async function loadScope(ctx: Ctx, orgId: Id<'organizations'>) {
+  const [allDeals, kpis, todos, transfers, rules, decisions, inbox] =
+    await Promise.all([
+      ctx.db
+        .query('deals')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('kpiSnapshots')
+        .withIndex('by_org_period', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('todos')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('transfers')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('forecastRules')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('matchingDecisions')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+      // Bounded on purpose: only the queue still shown to a human can name an
+      // archived card, and the full table carries every rawContent/cleanedHtml
+      // (cf. CLAUDE.md, « un gros champ texte sur une ligne lue en liste »).
+      ctx.db
+        .query('inboundEmails')
+        .withIndex('by_status', (q) => q.eq('status', 'needs_review'))
+        .collect(),
+    ])
+  return { allDeals, kpis, todos, transfers, rules, decisions, inbox }
+}
+
+type Scope = Awaited<ReturnType<typeof loadScope>>
+
 /** Every row pointing at a company, per table — used to guard archiving. */
 async function companyRefs(
   ctx: Ctx,
   orgId: Id<'organizations'>,
   id: Id<'companies'>,
+  scope: Scope,
 ) {
   const [
     asTarget,
     asInvestor,
-    allDeals,
     relParent,
     relChild,
     docs,
@@ -743,10 +800,6 @@ async function companyRefs(
     intel,
     links,
     banks,
-    kpis,
-    todos,
-    transfers,
-    inbox,
   ] = await Promise.all([
     ctx.db
       .query('deals')
@@ -759,10 +812,6 @@ async function companyRefs(
       .withIndex('by_org_investor', (q) =>
         q.eq('orgId', orgId).eq('investorCompanyId', id),
       )
-      .collect(),
-    ctx.db
-      .query('deals')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect(),
     ctx.db
       .query('companyRelations')
@@ -798,32 +847,11 @@ async function companyRefs(
         q.eq('orgId', orgId).eq('ownerCompanyId', id),
       )
       .collect(),
-    ctx.db
-      .query('kpiSnapshots')
-      .withIndex('by_org_period', (q) => q.eq('orgId', orgId))
-      .collect(),
-    ctx.db
-      .query('todos')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .collect(),
-    ctx.db
-      .query('transfers')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .collect(),
-    // Report-inbox rows name their matched companies inside an array, and the
-    // table carries no orgId. Only the queue still shown to a human can point
-    // at an archived card, so the scan is bounded to `needs_review` — reading
-    // the whole table would pull every rawContent/cleanedHtml with it
-    // (cf. CLAUDE.md, « un gros champ texte sur une ligne lue en liste »).
-    ctx.db
-      .query('inboundEmails')
-      .withIndex('by_status', (q) => q.eq('status', 'needs_review'))
-      .collect(),
   ])
   return {
     asTarget,
     asInvestor,
-    asViaSpv: allDeals.filter((d) => d.viaSpvCompanyId === id),
+    asViaSpv: scope.allDeals.filter((d) => d.viaSpvCompanyId === id),
     relParent,
     relChild,
     docs,
@@ -831,60 +859,49 @@ async function companyRefs(
     intel,
     links,
     banks,
-    kpis: kpis.filter((k) => k.companyId === id),
-    todos: todos.filter((t) => t.companyId === id),
-    transfers: transfers.filter((t) => t.ownerCompanyId === id),
-    inbox: inbox.filter((e) =>
+    kpis: scope.kpis.filter((k) => k.companyId === id),
+    todos: scope.todos.filter((t) => t.companyId === id),
+    transfers: scope.transfers.filter((t) => t.ownerCompanyId === id),
+    inbox: scope.inbox.filter((e) =>
       (e.matchedCompanies ?? []).some((m) => m.companyId === id),
     ),
   }
 }
 
 /** Every row pointing at a deal, per table. */
-async function dealRefs(ctx: Ctx, orgId: Id<'organizations'>, id: Id<'deals'>) {
-  const [
-    txs,
-    valuations,
-    projections,
-    docs,
-    forecasts,
-    entries,
-    rules,
-    decisions,
-  ] = await Promise.all([
-    ctx.db
-      .query('transactions')
-      .withIndex('by_deal', (q) => q.eq('dealId', id))
-      .collect(),
-    ctx.db
-      .query('valuations')
-      .withIndex('by_deal_asof', (q) => q.eq('dealId', id))
-      .collect(),
-    ctx.db
-      .query('dealProjections')
-      .withIndex('by_deal_version', (q) => q.eq('dealId', id))
-      .collect(),
-    ctx.db
-      .query('documents')
-      .withIndex('by_deal', (q) => q.eq('dealId', id))
-      .collect(),
-    ctx.db
-      .query('forecasts')
-      .withIndex('by_deal', (q) => q.eq('dealId', id))
-      .collect(),
-    ctx.db
-      .query('forecastEntries')
-      .withIndex('by_deal', (q) => q.eq('dealId', id))
-      .collect(),
-    ctx.db
-      .query('forecastRules')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .collect(),
-    ctx.db
-      .query('matchingDecisions')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .collect(),
-  ])
+async function dealRefs(
+  ctx: Ctx,
+  _orgId: Id<'organizations'>,
+  id: Id<'deals'>,
+  scope: Scope,
+) {
+  const [txs, valuations, projections, docs, forecasts, entries] =
+    await Promise.all([
+      ctx.db
+        .query('transactions')
+        .withIndex('by_deal', (q) => q.eq('dealId', id))
+        .collect(),
+      ctx.db
+        .query('valuations')
+        .withIndex('by_deal_asof', (q) => q.eq('dealId', id))
+        .collect(),
+      ctx.db
+        .query('dealProjections')
+        .withIndex('by_deal_version', (q) => q.eq('dealId', id))
+        .collect(),
+      ctx.db
+        .query('documents')
+        .withIndex('by_deal', (q) => q.eq('dealId', id))
+        .collect(),
+      ctx.db
+        .query('forecasts')
+        .withIndex('by_deal', (q) => q.eq('dealId', id))
+        .collect(),
+      ctx.db
+        .query('forecastEntries')
+        .withIndex('by_deal', (q) => q.eq('dealId', id))
+        .collect(),
+    ])
   return {
     txs,
     valuations,
@@ -892,45 +909,9 @@ async function dealRefs(ctx: Ctx, orgId: Id<'organizations'>, id: Id<'deals'>) {
     docs,
     forecasts,
     entries,
-    rules: rules.filter((r) => r.dealId === id),
-    decisions: decisions.filter((d) => d.dealId === id),
+    rules: scope.rules.filter((r) => r.dealId === id),
+    decisions: scope.decisions.filter((d) => d.dealId === id),
   }
-}
-
-/**
- * Assigns each part's declared movements to an actual outgoing transaction of
- * the deal, matched on (date, amount) and consumed once — two identical
- * movements on the same day are handled. Returns a reason instead when a
- * movement matches nothing, so the deal is skipped rather than half-split.
- */
-function assignMovements(
-  parts: Array<SplitPart>,
-  txs: Array<Doc<'transactions'>>,
-): { assignment: Array<Array<Doc<'transactions'>>> } | { skip: string } {
-  const pool = txs.filter((t) => t.direction === 'out')
-  const used = new Set<Id<'transactions'>>()
-  const assignment: Array<Array<Doc<'transactions'>>> = []
-  for (const part of parts) {
-    if (part.movements.length === 0) return { skip: 'part_without_movement' }
-    const picked: Array<Doc<'transactions'>> = []
-    for (const m of part.movements) {
-      const hit = pool.find(
-        (t) =>
-          !used.has(t._id) &&
-          t.transactionDate === m.date &&
-          t.amount === m.amount,
-      )
-      if (!hit) {
-        return {
-          skip: `movement_not_found (${new Date(m.date).toISOString().slice(0, 10)}, ${m.amount} cents)`,
-        }
-      }
-      used.add(hit._id)
-      picked.push(hit)
-    }
-    assignment.push(picked)
-  }
-  return { assignment }
 }
 
 /**
@@ -960,6 +941,50 @@ const describeCounts = (counts: Record<string, number>) =>
     .map(([key, n]) => `${n} ${key}`)
     .join(', ')
 
+/**
+ * Assigns each part's declared movements to an actual outgoing transaction of
+ * the deal, matched on (date, amount) and consumed once — two identical
+ * movements on the same day are handled. Returns a reason instead when a
+ * declared movement matches nothing, OR when an outgoing transaction of the
+ * deal is left unclaimed: in both cases the picture in the code and the picture
+ * in the database disagree, and a partial split would silently under-count the
+ * amount left on the first part.
+ */
+function assignMovements(
+  parts: Array<SplitPart>,
+  txs: Array<Doc<'transactions'>>,
+): { assignment: Array<Array<Doc<'transactions'>>> } | { skip: string } {
+  const pool = txs.filter((t) => t.direction === 'out')
+  const used = new Set<Id<'transactions'>>()
+  const assignment: Array<Array<Doc<'transactions'>>> = []
+  for (const part of parts) {
+    if (part.movements.length === 0) return { skip: 'part_without_movement' }
+    const picked: Array<Doc<'transactions'>> = []
+    for (const m of part.movements) {
+      const hit = pool.find(
+        (t) =>
+          !used.has(t._id) &&
+          t.transactionDate === m.date &&
+          t.amount === m.amount,
+      )
+      if (!hit) {
+        return {
+          skip: `movement_not_found (${new Date(m.date).toISOString().slice(0, 10)}, ${m.amount} cents)`,
+        }
+      }
+      used.add(hit._id)
+      picked.push(hit)
+    }
+    assignment.push(picked)
+  }
+  if (used.size !== pool.length) {
+    return {
+      skip: `unclaimed_movements (${pool.length - used.size} outgoing transaction(s) belong to no part)`,
+    }
+  }
+  return { assignment }
+}
+
 const sum = (txs: Array<Doc<'transactions'>>) =>
   txs.reduce((s, t) => s + t.amount, 0)
 const earliest = (txs: Array<Doc<'transactions'>>) =>
@@ -969,7 +994,12 @@ const earliest = (txs: Array<Doc<'transactions'>>) =>
   )
 
 /** Resolves one split against the live rows, without writing. */
-async function resolveSplit(ctx: Ctx, orgId: Id<'organizations'>, spec: Split) {
+async function resolveSplit(
+  ctx: Ctx,
+  orgId: Id<'organizations'>,
+  spec: Split,
+  scope: Scope,
+) {
   const deal = await ctx.db.get('deals', spec.dealId)
   if (!deal) return { skip: 'deal_not_found', spec }
   if (deal.orgId !== orgId) return { skip: 'wrong_org', spec }
@@ -987,7 +1017,7 @@ async function resolveSplit(ctx: Ctx, orgId: Id<'organizations'>, spec: Split) {
     .every((p) => siblings.some((s) => s.name === p.name))
   if (alreadyDone) return { skip: 'already_split', spec }
 
-  const refs = await dealRefs(ctx, orgId, deal._id)
+  const refs = await dealRefs(ctx, orgId, deal._id, scope)
   const assigned = assignMovements(spec.parts, refs.txs)
   if ('skip' in assigned) return { skip: assigned.skip, spec }
 
@@ -1011,6 +1041,7 @@ export const dryRun = internalQuery({
   handler: async (ctx) => {
     const org = await getOrg(ctx)
     const orgId = org._id
+    const scope = await loadScope(ctx, orgId)
 
     const renameTarget = await ctx.db.get(
       'companies',
@@ -1072,7 +1103,7 @@ export const dryRun = internalQuery({
             skip: `name_mismatch (from: ${from.name}, to: ${to.name})`,
           }
         }
-        const refs = await companyRefs(ctx, orgId, from._id)
+        const refs = await companyRefs(ctx, orgId, from._id, scope)
         return {
           expectedFrom: spec.expectedFrom,
           expectedTo: spec.expectedTo,
@@ -1101,12 +1132,13 @@ export const dryRun = internalQuery({
           spec.id as Id<'companies'>,
         )
         if (!company) return { ...spec, skip: 'not_found' }
+        if (company.orgId !== orgId) return { ...spec, skip: 'wrong_org' }
         if (company.archivedAt != null)
           return { ...spec, skip: 'already_archived' }
         if (company.name !== spec.expectedName) {
           return { ...spec, skip: `name_mismatch (${company.name})` }
         }
-        const refs = await companyRefs(ctx, orgId, company._id)
+        const refs = await companyRefs(ctx, orgId, company._id, scope)
         const total = Object.values(refs).reduce((s, arr) => s + arr.length, 0)
         return { ...spec, incomingReferences: total, willArchive: total === 0 }
       }),
@@ -1118,7 +1150,25 @@ export const dryRun = internalQuery({
         const to = await ctx.db.get('deals', spec.toId as Id<'deals'>)
         if (!to) return { ...spec, skip: 'target_deal_not_found' }
         if (!from) return { ...spec, skip: 'already_merged' }
-        const refs = await dealRefs(ctx, orgId, from._id)
+        // `by_deal` has no org component: without this check a stale id would
+        // re-point another org's transactions and then delete its deal.
+        if (from.orgId !== orgId || to.orgId !== orgId) {
+          return { ...spec, skip: 'wrong_org' }
+        }
+        const [fromTarget, toTarget] = await Promise.all([
+          ctx.db.get('companies', from.targetCompanyId),
+          ctx.db.get('companies', to.targetCompanyId),
+        ])
+        if (
+          fromTarget?.name !== spec.expectedTarget ||
+          toTarget?.name !== spec.expectedTargetTo
+        ) {
+          return {
+            ...spec,
+            skip: `target_mismatch (from: ${fromTarget?.name ?? 'none'}, to: ${toTarget?.name ?? 'none'})`,
+          }
+        }
+        const refs = await dealRefs(ctx, orgId, from._id, scope)
         return {
           expectedTarget: spec.expectedTarget,
           why: spec.why,
@@ -1139,6 +1189,7 @@ export const dryRun = internalQuery({
       DEAL_REMOVALS.map(async (spec) => {
         const deal = await ctx.db.get('deals', spec.dealId as Id<'deals'>)
         if (!deal) return { ...spec, skip: 'already_removed' }
+        if (deal.orgId !== orgId) return { ...spec, skip: 'wrong_org' }
         const target = await ctx.db.get('companies', deal.targetCompanyId)
         if (target?.name !== spec.expectedTarget) {
           return {
@@ -1146,7 +1197,7 @@ export const dryRun = internalQuery({
             skip: `target_mismatch (${target?.name ?? 'none'})`,
           }
         }
-        const refs = await dealRefs(ctx, orgId, deal._id)
+        const refs = await dealRefs(ctx, orgId, deal._id, scope)
         const attached = otherDealRefCounts(refs)
         return {
           expectedTarget: spec.expectedTarget,
@@ -1163,7 +1214,7 @@ export const dryRun = internalQuery({
 
     const splits = await Promise.all(
       SPLITS.map(async (spec) => {
-        const resolved = await resolveSplit(ctx, orgId, spec)
+        const resolved = await resolveSplit(ctx, orgId, spec, scope)
         if ('skip' in resolved) {
           return {
             target: null,
@@ -1230,6 +1281,7 @@ export const apply = internalMutation({
   handler: async (ctx: MutCtx) => {
     const org = await getOrg(ctx)
     const orgId = org._id
+    const scope = await loadScope(ctx, orgId)
     const done: Record<string, Array<string>> = {
       renamed: [],
       datesSet: [],
@@ -1307,12 +1359,22 @@ export const apply = internalMutation({
     for (const spec of COMPANY_MERGES) {
       const from = await ctx.db.get('companies', spec.fromId as Id<'companies'>)
       const to = await ctx.db.get('companies', spec.toId as Id<'companies'>)
-      if (!from || !to || from.archivedAt != null) continue
+      if (!from || !to) {
+        done.skipped.push(
+          `merge company: ${spec.expectedFrom} anchor not found`,
+        )
+        continue
+      }
+      if (from.archivedAt != null) continue // already merged
+      if (from.orgId !== orgId || to.orgId !== orgId) {
+        done.skipped.push(`merge company: ${spec.expectedFrom} wrong org`)
+        continue
+      }
       if (from.name !== spec.expectedFrom || to.name !== spec.expectedTo) {
         done.skipped.push(`merge company: ${spec.expectedFrom} name mismatch`)
         continue
       }
-      const refs = await companyRefs(ctx, orgId, from._id)
+      const refs = await companyRefs(ctx, orgId, from._id, scope)
       for (const d of refs.asTarget) {
         await ctx.db.patch('deals', d._id, { targetCompanyId: to._id })
       }
@@ -1321,6 +1383,7 @@ export const apply = internalMutation({
       }
       for (const d of refs.asViaSpv) {
         await ctx.db.patch('deals', d._id, { viaSpvCompanyId: to._id })
+        d.viaSpvCompanyId = to._id // keep the scope truthful for later blocks
       }
       for (const r of refs.relParent) {
         await ctx.db.patch('companyRelations', r._id, {
@@ -1346,39 +1409,49 @@ export const apply = internalMutation({
       }
       for (const k of refs.kpis) {
         await ctx.db.patch('kpiSnapshots', k._id, { companyId: to._id })
+        k.companyId = to._id
       }
       for (const t of refs.todos) {
         await ctx.db.patch('todos', t._id, { companyId: to._id })
+        t.companyId = to._id
       }
       for (const t of refs.transfers) {
         await ctx.db.patch('transfers', t._id, { ownerCompanyId: to._id })
+        t.ownerCompanyId = to._id
       }
       // The review queue names its matched companies inside an array: rewrite
       // the entry in place, or the row keeps pointing at the archived card
       // while its reports have moved to the survivor.
       for (const email of refs.inbox) {
+        const rewritten = (email.matchedCompanies ?? []).map((m) =>
+          m.companyId === from._id ? { ...m, companyId: to._id } : m,
+        )
         await ctx.db.patch('inboundEmails', email._id, {
-          matchedCompanies: (email.matchedCompanies ?? []).map((m) =>
-            m.companyId === from._id ? { ...m, companyId: to._id } : m,
-          ),
+          matchedCompanies: rewritten,
         })
+        email.matchedCompanies = rewritten
       }
       // One intelligence row per company — the reader takes `.first()` by
       // company, so a second row would be shadowed forever. The survivor keeps
       // its own synthesis and the loser's row is dropped rather than left
       // orphaned on an archived card; it is derived data, regenerated on demand.
-      const targetIntel = await ctx.db
-        .query('companyIntelligence')
-        .withIndex('by_company', (q) => q.eq('companyId', to._id))
-        .first()
+      let keptIntel =
+        (await ctx.db
+          .query('companyIntelligence')
+          .withIndex('by_company', (q) => q.eq('companyId', to._id))
+          .first()) != null
       for (const row of refs.intel) {
-        if (targetIntel) {
+        if (keptIntel) {
           await ctx.db.delete('companyIntelligence', row._id)
           continue
         }
         await ctx.db.patch('companyIntelligence', row._id, {
           companyId: to._id,
         })
+        // The merged card may carry more than one row; only the first moves,
+        // or the survivor would end up with several and the reader (`.first()`)
+        // would shadow all but one forever.
+        keptIntel = true
       }
       await ctx.db.patch('companies', from._id, { archivedAt: Date.now() })
       done.companiesMerged.push(`${spec.expectedFrom} → ${spec.expectedTo}`)
@@ -1387,12 +1460,20 @@ export const apply = internalMutation({
     // 4b. Empty shells — archived only with zero incoming reference.
     for (const spec of EMPTY_COMPANIES) {
       const company = await ctx.db.get('companies', spec.id as Id<'companies'>)
-      if (!company || company.archivedAt != null) continue
+      if (!company) {
+        done.skipped.push(`shell: ${spec.expectedName} anchor not found`)
+        continue
+      }
+      if (company.archivedAt != null) continue // already archived
+      if (company.orgId !== orgId) {
+        done.skipped.push(`shell: ${spec.expectedName} wrong org`)
+        continue
+      }
       if (company.name !== spec.expectedName) {
         done.skipped.push(`shell: ${spec.expectedName} name mismatch`)
         continue
       }
-      const refs = await companyRefs(ctx, orgId, company._id)
+      const refs = await companyRefs(ctx, orgId, company._id, scope)
       const total = Object.values(refs).reduce((s, arr) => s + arr.length, 0)
       if (total > 0) {
         done.skipped.push(`shell: ${spec.expectedName} still referenced`)
@@ -1406,8 +1487,32 @@ export const apply = internalMutation({
     for (const spec of DEAL_MERGES) {
       const from = await ctx.db.get('deals', spec.fromId as Id<'deals'>)
       const to = await ctx.db.get('deals', spec.toId as Id<'deals'>)
-      if (!from || !to) continue
-      const refs = await dealRefs(ctx, orgId, from._id)
+      if (!to) {
+        done.skipped.push(
+          `merge deal: ${spec.expectedTarget} survivor not found`,
+        )
+        continue
+      }
+      if (!from) continue // already merged
+      // `by_deal` carries no org component, so without these two checks a
+      // stale anchor would re-point another org's transactions and then hard
+      // delete its deal. The names are not unique across orgs either.
+      if (from.orgId !== orgId || to.orgId !== orgId) {
+        done.skipped.push(`merge deal: ${spec.expectedTarget} wrong org`)
+        continue
+      }
+      const [fromTarget, toTarget] = await Promise.all([
+        ctx.db.get('companies', from.targetCompanyId),
+        ctx.db.get('companies', to.targetCompanyId),
+      ])
+      if (
+        fromTarget?.name !== spec.expectedTarget ||
+        toTarget?.name !== spec.expectedTargetTo
+      ) {
+        done.skipped.push(`merge deal: ${spec.expectedTarget} target mismatch`)
+        continue
+      }
+      const refs = await dealRefs(ctx, orgId, from._id, scope)
       for (const t of refs.txs) {
         await ctx.db.patch('transactions', t._id, {
           dealId: to._id,
@@ -1434,9 +1539,11 @@ export const apply = internalMutation({
       }
       for (const r of refs.rules) {
         await ctx.db.patch('forecastRules', r._id, { dealId: to._id })
+        r.dealId = to._id
       }
       for (const dec of refs.decisions) {
         await ctx.db.patch('matchingDecisions', dec._id, { dealId: to._id })
+        dec.dealId = to._id
       }
       // Same invariant as deals.remove: hard delete only once no transaction
       // is left attached — everything above has just been re-pointed.
@@ -1447,13 +1554,17 @@ export const apply = internalMutation({
     // 6. Lines that are not investments.
     for (const spec of DEAL_REMOVALS) {
       const deal = await ctx.db.get('deals', spec.dealId as Id<'deals'>)
-      if (!deal) continue
+      if (!deal) continue // already removed
+      if (deal.orgId !== orgId) {
+        done.skipped.push(`removal: ${spec.expectedTarget} wrong org`)
+        continue
+      }
       const target = await ctx.db.get('companies', deal.targetCompanyId)
       if (target?.name !== spec.expectedTarget) {
         done.skipped.push(`removal: ${spec.expectedTarget} target mismatch`)
         continue
       }
-      const refs = await dealRefs(ctx, orgId, deal._id)
+      const refs = await dealRefs(ctx, orgId, deal._id, scope)
       // Unlike a merge, a removal has nowhere to re-point to. Anything other
       // than transactions attached to the deal (a valuation, a projection, a
       // document, a forecast, a matching decision) would be orphaned by the
@@ -1466,20 +1577,32 @@ export const apply = internalMutation({
         continue
       }
       for (const t of refs.txs) {
+        // Same shape as `applyUnmatch` (convex/lib/pointage.ts): a row put
+        // back in the queue carries no allocation at all — keeping a
+        // liability one while forcing `unmatched` would leave a phantom leg
+        // in the current-account balances — and no VAT/category, which only
+        // exist on the charge/product statuses.
         await ctx.db.patch('transactions', t._id, {
           dealId: undefined,
-          allocation: t.allocation?.kind === 'deal' ? undefined : t.allocation,
+          allocation: undefined,
           matchStatus: 'unmatched' as const,
           reconciled: false,
           reconciledAt: undefined,
           reconciledBy: undefined,
+          vatRateBps: undefined,
+          category: undefined,
         })
       }
       await ctx.db.delete('deals', deal._id)
       // Same rule as the shells above: the card goes only when NOTHING points
       // at it any more — a partial check would archive a card still carrying
       // relations, KPIs, e-mail links or todos (cf. companies.archive).
-      const remaining = await companyRefs(ctx, orgId, deal.targetCompanyId)
+      const remaining = await companyRefs(
+        ctx,
+        orgId,
+        deal.targetCompanyId,
+        scope,
+      )
       const stillUsed = Object.values(remaining).reduce(
         (s, arr) => s + arr.length,
         0,
@@ -1492,7 +1615,7 @@ export const apply = internalMutation({
 
     // 7. Splits.
     for (const spec of SPLITS) {
-      const resolved = await resolveSplit(ctx, orgId, spec)
+      const resolved = await resolveSplit(ctx, orgId, spec, scope)
       if ('skip' in resolved) {
         if (resolved.skip !== 'already_split') {
           done.skipped.push(`split: ${spec.parts[0]?.name} — ${resolved.skip}`)
