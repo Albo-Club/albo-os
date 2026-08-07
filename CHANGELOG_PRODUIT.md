@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.185.0 — 07/08/2026 à 13:35 — Récupérer les chiffres des participations depuis les documents juridiques
+## v1.186.0 — 07/08/2026 à 13:35 — Récupérer les chiffres des participations depuis les documents juridiques
 
 Beaucoup de fiches deals et sociétés ont des cases vides — nombre de titres,
 prix de souscription, pourcentage de détention, taille et type du tour,
@@ -95,6 +95,73 @@ l'autre reprend le pourcentage du pacte, calculé en incluant les titres à
 >   la règle cardinale.
 > - `companies.notes` reste hors périmètre : aucune convention ne définit ce
 >   qui doit y figurer. La note de base FD va dans les notes du **deal**.
+
+---
+
+## v1.185.0 — 07/08/2026 à 13:00 — L'historique de vos reportings rejoint Albo OS
+
+Jusqu'ici, Albo OS ne connaissait vos participations qu'à partir de juillet
+2026, date à laquelle les reportings ont commencé à arriver par e-mail. Tout
+ce qui précède — deux ans et demi d'updates investisseurs, depuis janvier
+2024 — vivait dans l'autre outil. Résultat : une fiche participation
+commençait au milieu de l'histoire.
+
+Cette mise à jour apporte la machinerie qui rapatrie cet historique dans
+l'org Albo : **139 reportings** sur **31 participations**, avec leurs pièces
+jointes. Une fois l'opération lancée, la frise d'une participation se lit
+d'un bout à l'autre, et l'assistant IA peut s'appuyer dessus.
+
+Le soin a porté sur les doublons. Certains reportings étaient présents des
+deux côtés, et rien ne permettait de les reconnaître automatiquement : selon
+les cas, la période diffère (un même e-mail Goodvest est classé « juin » ici
+et « T2 » là), la date d'arrivée diffère, ou l'identifiant du message ne
+correspond pas parce que nous recevons des transferts. Les reportings ont
+donc été comparés sur leur **contenu**, participation par participation :
+**18 doublons** ont été écartés après vérification.
+
+L'inverse a été traité avec la même attention : deux documents peuvent
+légitimement partager une période sans être le même. L'annonce Wandercraft ×
+Renault et le reporting mensuel de mars sont deux choses différentes ; chez
+Bleen, l'e-mail annonçant l'entrée de Jimmy au capital et la notification
+formelle au titre du pacte aussi. Ces cas-là ont été conservés en double,
+délibérément.
+
+Trois participations restent volontairement de côté : celles dont les
+nouvelles passent par un portail plutôt que par e-mail, et une dont il faut
+encore décider à quelle entité rattacher les reportings.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau champ `companyReports.alboReportId` (+ index `by_albo_report`) :
+>   l'uuid de la ligne Supabase d'origine, seule clé d'idempotence de
+>   l'import. Additif, jamais posé par le pipeline e-mail ni par un dépôt
+>   manuel.
+> - `convex/migrations/alboReportsImport.ts` — `startUploads` (URLs d'upload),
+>   `plan` (état Albo OS lu en direct pour le dry run), `importOne` (écriture
+>   d'un report + ses `documents` + `documentTexts`), `verify`. `importOne`
+>   renvoie toujours `created` / `already_imported` / `period_taken` : une
+>   collision **saute**, elle n'écrase jamais.
+> - `scripts/import-albo-reports.mjs` — lit Supabase, résout les décisions,
+>   fait transiter les octets de Supabase Storage vers Convex storage sans
+>   passer par une fonction Convex. `--dry` par défaut.
+> - `scripts/data/albo-reports-albo.json` — décisions figées et relues :
+>   mapping des 31 participations, 18 doublons vérifiés sur le contenu,
+>   6 lignes explicitement autorisées à partager un créneau de période,
+>   3 participations écartées avec leur motif.
+> - **N'utilise pas** `reportStore.storeForCompany` : elle met à jour sur
+>   place et supprime les `documents` du report. `companyIntelligence.
+latestReportId` est laissé intact (un import historique ne repointe pas
+>   la synthèse courante). `recordReportOnCompany` est monotone, donc la
+>   fraîcheur ne recule pas.
+> - Les métriques sont recopiées telles quelles dans `metrics` (affichage) et
+>   n'alimentent pas `kpiSnapshots` : le catalogue canonique diffère et aucun
+>   LLM ne tourne pendant l'import. Le texte déjà extrait des pièces jointes
+>   est repris dans `documentTexts` pour ne pas repayer l'OCR.
+> - Les lignes arrivent en `vectorState: 'pending'` ; l'indexation se fait
+>   ensuite via `vectorize:backfillAll` (éviter une rafale d'embeddings).
+> - Pourquoi aucune clé automatique ne convenait :
+>   `KNOWN_ISSUES.md` § « Reprise d'un historique de reports depuis un autre
+>   outil ». Runbook : `MIGRATIONS.md`.
 
 ---
 
@@ -230,6 +297,7 @@ le prévisionnel — un virement interne en reste exclu, exactement comme avant.
 >   « Apparier » dans `PointageTable`, bloc contrepartie/écart/transit dans
 >   `TransactionSheet`, filtre dans `TransactionsLedger`.
 > - 13 tests de régression dans `convex/regression.transfers.test.ts`.
+
 ## v1.182.1 — 06/08/2026 à 12:47 — L'import des documents juridiques survit à une coupure réseau
 
 Un incident réseau pendant l'import — une simple résolution DNS qui échoue —
@@ -297,6 +365,7 @@ reconnaît et ne les recrée pas.
 >   après rapprochement sur la taille en octets.
 > - Le titre stocké perd son extension, par cohérence avec les uploads
 >   manuels ; le type MIME est reconstruit depuis `sourceExt`.
+
 ## v1.181.1 — 06/08/2026 à 09:25 — La liste des participations arrête de relire tous les reportings
 
 Depuis l'arrivée de l'alerte « cette participation ne reporte plus », ouvrir
@@ -349,6 +418,7 @@ raccourci.
 >   `reportInbox.list`, `companyReports.listByCompany`) sont documentés dans
 >   `KNOWN_ISSUES.md` « Database I/O : un gros champ texte sur une ligne lue
 >   en liste », plus un anti-pattern dans `CLAUDE.md`.
+
 ## v1.181.0 — 05/08/2026 à 19:54 — Un report rangé sur la mauvaise participation se détache
 
 Jusqu'ici, rattacher un report était à sens unique : on pouvait l'ajouter à
@@ -392,7 +462,7 @@ d'où la fenêtre de confirmation qui dit ce qui part.
 >   `companyReports.inboundEmailId` (posé au rangement) ; les lignes
 >   antérieures sont retrouvées via `agentmailMessageId`.
 > - `reportInbox.list` expose désormais `matched: [{ companyId, name,
->   reportId }]` au lieu de `matchedNames` + `matchedCompanyIds` — la file
+reportId }]` au lieu de `matchedNames` + `matchedCompanyIds` — la file
 >   rend une puce par **entité** (deux orgs = deux puces) avec sa croix, et
 >   seules celles portant réellement un report en ont une.
 > - Couverture : `convex/regression.reportDetach.test.ts` (6 cas — périmètre
@@ -423,7 +493,7 @@ se lit maintenant d'un coup d'œil.
 >   flex.
 > - Aligne les puces sur la convention déjà en place pour le champ Attio de
 >   la fiche société (`AttioCompanyField.tsx`, `underline-offset-4
->   hover:underline`).
+hover:underline`).
 > - Le fond `has-[a:hover]:bg-accent` de la puce est conservé : les deux
 >   signaux se cumulent. La branche non liée (`url === null`) est inchangée.
 
@@ -454,7 +524,7 @@ technique pendant l'analyse » ne disait rien de ce qui s'était passé.
 > **🔧 Notes techniques**
 >
 > - `convex/reportStore.ts` : `report_period` et `report_type` passent en `.nullable()` dans `analysisSchema`, avec une règle explicite dans le `SYSTEM_PROMPT` (un document ponctuel est un report valide, `title`/`headline`/`key_highlights` toujours remplis, aucune période inventée). Les deux champs deviennent `v.optional` sur `storeForCompany` — le schéma Convex les déclarait déjà facultatifs.
-> - **Piège du dédoublonnage** : `by_company_period` avec `reportPeriod: undefined` matche *toutes* les lignes sans période d'une société — un `.first()` naïf aurait fait écraser silencieusement chaque courrier ponctuel par le suivant. Un document sans période est donc identifié par son message d'origine (`subject` + `emailDate`, portés par un mail comme par un dépôt manuel). `periodSortDate` retombe sur `receivedAt` pour garder un ancrage dans la timeline (index `by_company`). Détaillé dans `KNOWN_ISSUES.md` § « Report sans période ».
+> - **Piège du dédoublonnage** : `by_company_period` avec `reportPeriod: undefined` matche _toutes_ les lignes sans période d'une société — un `.first()` naïf aurait fait écraser silencieusement chaque courrier ponctuel par le suivant. Un document sans période est donc identifié par son message d'origine (`subject` + `emailDate`, portés par un mail comme par un dépôt manuel). `periodSortDate` retombe sur `receivedAt` pour garder un ancrage dans la timeline (index `by_company`). Détaillé dans `KNOWN_ISSUES.md` § « Report sans période ».
 > - Nouveau `convex/regression.reportStore.test.ts` (4 cas : coexistence, rejeu idempotent, non-collision avec un report périodique, dédup périodique inchangée) — vérifié en échec contre la version naïve avant d'être figé. 61 tests de régression Convex, 317 unitaires.
 > - Visibilité de l'erreur : `reportInbox.list` renvoie `error` (champ déjà écrit par `reportIdentify.setReview`, exposé nulle part) ; affiché sous le badge dans `src/routes/app/all/reports.tsx` (tronqué, complet au survol) ; `reportRecapFailureHtml` prend un `detail` optionnel borné à 300 caractères. Message brut, dev-facing, non traduit.
 > - Récap de succès sans période : titre « ✅ Report rangé — document ponctuel, sans période », objet « Albo OS — report rangé : document ponctuel ».
@@ -677,6 +747,7 @@ corriger à la main.
 >   domaine de sponsor (`Oprtrs & Co` vs `OPRTRS CLUB`) ne fanent plus
 >   ensemble — à corriger dans la donnée, pas dans le code (cf.
 >   `KNOWN_ISSUES.md`).
+
 ## v1.177.1 — 05/08/2026 à 11:47 — Les tableurs sortent de la recherche de l'assistant
 
 Un budget Excel ajouté sur une fiche société refusait obstinément d'être
@@ -1210,6 +1281,7 @@ société, il remonte désormais aussi ceux rattachés à ses deals.
 >   `reportings` sont supprimés, `dealDocuments` reste à la fiche deal).
 
 ---
+
 ## v1.171.1 — 03/08/2026 à 17:36 — Toute la pastille ouvre la fiche Attio, pas seulement la flèche
 
 Sur une fiche société, les pastilles de personnes rattachées à Attio ne
@@ -1696,7 +1768,7 @@ document, synthèse IA, synchronisation bancaire, panneau IA) sont inchangés.
 >   Inline pour se centrer dans un parent flex comme dans une `TableCell`
 >   en `text-center`, sans s'étirer.
 > - Famille « chargement de données » : les ~25 `<div|p className="…text-sm">
->   {t('loading')}</…>` disséminés dans les routes et les composants sont
+{t('loading')}</…>` disséminés dans les routes et les composants sont
 >   remplacés par `<LoadingLine>{t('loading')}</LoadingLine>`. Aucune clé i18n
 >   nouvelle, aucune condition de rendu touchée.
 > - Famille « upload » : `<Spinner />` conditionné à l'état `saving` dans les
@@ -1840,6 +1912,7 @@ de l'historique.
 >   ajouté à la seule tuile « solde total ».
 > - `tests/vat.test.ts` perd le test de miroir front (le module n'existe
 >   plus), garde la dérivation Convex.
+
 ## v1.160.0 — 30/07/2026 à 18:25 — Rattacher une société à sa fiche Attio, depuis sa fiche
 
 Les sociétés qui arrivent par la synchronisation Attio sont déjà rattachées à
@@ -1955,6 +2028,7 @@ archiver, supprimer.
 > - Docs : `TESTING.md` (TP11, TP11b, nouveau TP11d, FD17),
 >   `docs/produit/04-participations.md`, `docs/produit/05-deals.md`,
 >   `KNOWN_ISSUES.md` (§ personnes), `TEMPLATE_SYNC.md` (ligne `InlineField`).
+
 ## v1.158.0 — 30/07/2026 à 17:11 — Créer un placement depuis la page Placements
 
 Jusqu'ici, un placement (contrat de capitalisation, dépôt à terme,
@@ -2100,6 +2174,7 @@ dans la liste ou laisse vide, ce qui était la principale source de dérive.
 > - Doc : `TESTING.md` SH19c (libellé le plus long) + nouvelle ligne SH22,
 >   `MIGRATIONS.md`, `docs/produit/04-participations.md` § « Les secteurs »,
 >   anti-pattern `CLAUDE.md`.
+
 ## v1.155.1 — 30/07/2026 à 16:40 — Plan de test de la fiche deal remis d'équerre
 
 Rien ne change dans l'application : deux étapes du plan de test interne
@@ -2378,7 +2453,7 @@ une victoire ni une perte.
 >   sortie n'est pas calculable) — même arbre de décision que le découpage
 >   par société de `ParticipationsView`. `dealStatusBadge()` en dérive
 >   directement sa teinte via la table `BUCKET_TINT` (`border-X/40 bg-X/10
->   text-X` sur les tokens `warning` / `info` / `positive` / `destructive`),
+text-X` sur les tokens `warning` / `info` / `positive` / `destructive`),
 >   donc plus de règle « signal-only » : l'actif passe de `secondary` neutre à
 >   bleu, et le TS d'un ambre plein à un ambre teinté.
 > - `dealStatusAccent()` supprimée : elle n'avait qu'un appelant, le liseré de
@@ -2425,6 +2500,7 @@ l'une de ces garanties, la mise en production est bloquée automatiquement.
 > - Les fichiers vivent dans `convex/` sans être déployés : le CLI Convex
 >   ignore tout module dont le nom contient plus d'un point (cf.
 >   `KNOWN_ISSUES.md`). Aucun code métier modifié.
+
 ## v1.150.2 — 30/07/2026 à 10:28 — Ménage : organisations parasites et commande de rattrapage
 
 Deux corvées d'entretien, invisibles dans l'app au quotidien.
@@ -2614,7 +2690,7 @@ capitalisation) viendra avec la connexion Powens Wealth.
 >
 > - Sidebar : `nav.ts` remplace les entrées Entreprises + Placements par une
 >   entrée `items.investments` → `/participations`, avec `alsoActiveOn:
->   ['/app/$orgSlug/placements']` honoré par `AppSidebar.tsx` ; sous-onglets
+['/app/$orgSlug/placements']` honoré par `AppSidebar.tsx` ; sous-onglets
 >   partagés `src/components/investments/InvestmentsTabs.tsx` (Links stylés
 >   TabsTrigger) rendus dans les headers des deux pages.
 > - Liquidité : champ optionnel `deals.liquidity`
@@ -2669,6 +2745,7 @@ imposée (v1.147.1) sait aller rechercher, une fois la fusion faite.
 >   (20/02/2026). Le trou 21/02 → 08/06 se comble donc ensuite via
 >   `powens:backfillConnection` avec `minDate: "2026-02-21"` — au-dessus du
 >   plancher, et sans doublon (idempotence par `powensTxId`).
+
 ## v1.147.1 — 29/07/2026 à 20:05 — Réparer un trou de synchro repéré après coup
 
 Le rattrapage livré en v1.147.0 repart de la dernière transaction connue sur
@@ -2900,7 +2977,7 @@ contenu, rien ne change.
 >   sur le scrollport (la hauteur bouge quand le résumé/les personnes se
 >   chargent, ou quand le panneau IA s'ouvre).
 > - Le scroll de l'app n'est pas celui de la fenêtre (shell `h-svh
->   overflow-hidden`, défilement dans un `div overflow-y-auto`), d'où la
+overflow-hidden`, défilement dans un `div overflow-y-auto`), d'où la
 >   remontée d'ancêtres `scrollParent()` au lieu de `window.innerHeight`.
 > - Panneau plus court que l'écran → repli sur un `top` positif, sinon il
 >   serait figé en bas avec un blanc au-dessus.
@@ -3030,6 +3107,7 @@ d'un clic sur la valeur, et les champs vides gardent leur tiret.
 >   Icônes lucide : `IdCard`, `AlignLeft`, `User`, `Users`, `Handshake`.
 > - Aucune nouvelle clé i18n : les libellés existants sont réutilisés tels
 >   quels, y compris `identity.summary` promu en titre de section.
+
 ## v1.141.0 — 28/07/2026 à 18:07 — Documents : voir ce que la machine a lu
 
 Jusqu'ici, savoir si un document avait bien été déchiffré supposait de
@@ -3090,6 +3168,7 @@ deux histoires différentes.
 > - `deals:remove` supprimait le blob d'un document de deal sans passer par
 >   `documents:remove` : sa ligne `documentTexts` serait restée orpheline.
 >   Helper `convex/lib/documentTexts.ts` appelé aux deux endroits.
+
 ## v1.140.0 — 28/07/2026 à 14:57 — Les documents d'une société se rangent en juridique et en reporting
 
 Sur la fiche d'une société, l'onglet **Documents** mélangeait deux familles
@@ -3205,7 +3284,7 @@ demande les documents d'une société. Conséquence à garder en tête :
 >   `convex/agentTools.ts:listCompanyDocumentsInternal` pour l'assistant).
 > - `convex/deals.ts:remove` : suppression en cascade des documents du deal
 >   **et** de leurs fichiers (`ctx.storage.delete`), sinon lignes orphelines
->   + storage qui fuit. Le refus sur transactions rapprochées est inchangé.
+>   - storage qui fuit. Le refus sur transactions rapprochées est inchangé.
 > - Front : `src/components/deals/DealDocumentsSection.tsx` (calqué sur
 >   `ReportingsSection`), branché dans
 >   `src/routes/app/$orgSlug/deals.$dealId.tsx` à la place du placeholder,
@@ -3215,6 +3294,7 @@ demande les documents d'une société. Conséquence à garder en tête :
 >   (upload / 20 Mo / download / suppression) et FD42 (cloisonnement
 >   société ↔ deal, cascade à la suppression) ; note sur TP6.
 >   `docs/produit/05-deals.md` et `04-participations.md` mis à jour.
+
 ## v1.138.1 — 27/07/2026 à 23:03 — Une colonne Secteur plus compacte
 
 Sur la liste Entreprises, la colonne **Secteur** était calibrée sur le
@@ -3357,7 +3437,7 @@ filtres en cours (sans filtre, tout est exporté comme avant).
 >   `tests/siren.test.ts`), appliqué à l'affichage seulement (l'édition
 >   garde la valeur brute).
 > - Synthèse IA : `KpiTile` passe en subgrid (`grid-rows-subgrid
->   row-span-4`, placeholders pour tendance/contexte absents) pour aligner
+row-span-4`, placeholders pour tendance/contexte absents) pour aligner
 >   les rangées entre tuiles ; contexte en `line-clamp-2` + tooltip.
 > - Liste : colonne chevron retirée de `ParticipationsTable.tsx` (colgroup
 >   et `colSpan` recalés). Export : `handleExport(format)` dans
@@ -3867,6 +3947,7 @@ sur votre tableau de bord.
 > - Docs : section « Return-URL `?redirect=` » dans `KNOWN_ISSUES.md`,
 >   anti-pattern dans `CLAUDE.md`, ligne A4 de `TESTING.md` corrigée (le garde
 >   `/app` n'ajoute aucun paramètre de retour) et nouvelle ligne S8.
+
 ## v1.129.2 — 26/07/2026 à 15:00 — Documentation des agents : contrôle d'intégrité
 
 Changement interne, sans effet visible dans l'application. La documentation
@@ -3879,7 +3960,7 @@ le signale et une seule commande le répare.
 > Suite de la v1.129.1. En portant les PR du template, on a découvert que
 > `scripts/sync-skills.mjs` ne vérifiait **jamais** l'état du disque : `--check`
 > comme le mode par défaut comparaient le hash du lock à l'**upstream**, et
-> `isVendored()` ne testait que l'*existence* des fichiers. Un fichier vendorisé
+> `isVendored()` ne testait que l'_existence_ des fichiers. Un fichier vendorisé
 > édité à la main, tronqué ou périmé était invisible des deux côtés — démontré
 > en ajoutant une ligne dans un `SKILL.md` : `--check` restait vert, exit 0.
 > C'est la cause racine des trois fichiers `references/` Convex périmés
@@ -4102,6 +4183,7 @@ haut pour savoir où vous êtes ou pour rouvrir le menu d'actions : le repère
 reste toujours visible.
 
 > **🔧 Notes techniques**
+>
 > - Barre de titre rendue `sticky top-0` dans `participations.$companyId.tsx`
 >   et `deals.$dealId.tsx` — le conteneur de scroll est le `div.overflow-y-auto`
 >   qui enveloppe l'`Outlet` (`app/$orgSlug/route.tsx`), donc pas de JS.
@@ -4159,6 +4241,7 @@ automatiquement rattachée au deal et remonte aussitôt dans le prévisionnel de
 trésorerie.
 
 > **🔧 Notes techniques**
+>
 > - Aucune évolution backend ni de schéma : `forecastEntries.dealId` et la
 >   mutation `createManualEntry` (avec `dealId`) existaient déjà.
 > - `EntryDialog` (`src/components/cash/ForecastSection.tsx`) est désormais
@@ -4294,6 +4377,7 @@ un vrai suivi, inspiré des outils de gestion de portefeuille :
 >   indicateur tri-state cliquable (tokens `--warning`/`--positive`),
 >   composer repliable (Input + Selects société/membre + date), raccourci
 >   clavier T (ignoré dans les champs), suppression au survol.
+
 ## v1.120.0 — 22/07/2026 à 12:06 — Gmail : email d'alerte quand une boîte doit être reconnectée
 
 Plus besoin de surveiller la page Intégrations : quand l'autorisation d'une
@@ -4622,6 +4706,7 @@ colonnes pendant que le one-liner était rogné.
 > - Aucune autre colonne touchée — le tableau reste en `table-layout: auto`,
 >   le one-liner absorbe simplement l'espace horizontal restant via son
 >   plafond élargi.
+
 ## v1.112.1 — 21/07/2026 à 12:20 — Intégrations : état de connexion honnête et erreurs visibles
 
 Fin des signaux contradictoires sur les connexions aux portails
@@ -4754,6 +4839,7 @@ longtemps avant l'affichage de vos données.
 >   tel quel, les navigations SPA ne paient aucun aller-retour serveur —
 >   cf. `KNOWN_ISSUES.md` « Préchargement de session SSR ».
 > - `useAuthState` (garde anti-flash) volontairement intouché.
+
 ## v1.111.4 — 21/07/2026 à 10:25 — Convex à jour, et les dépendances mises à jour toutes seules
 
 Le moteur de données de l'app (Convex) passe à sa dernière version. Et un
@@ -4832,6 +4918,7 @@ page) devient sensiblement plus rapide, sur deux fronts :
 >   (l'environnement distant ne peut pas lancer la codegen — cf.
 >   `KNOWN_ISSUES.md` « Codegen Convex hors-ligne ») ; le prochain
 >   `convex dev`/`convex deploy` la régénère à l'identique.
+
 ## v1.111.0 — 20/07/2026 à 19:41 — Intégrations : la tour de contrôle
 
 La page **Réglages → Intégrations** devient le point d'entrée unique des
@@ -4904,7 +4991,7 @@ VASCO) suffira à faire apparaître ses communications — sans développement.
 >   (1 module = 1 plateforme) ; `powens.ts` expose `connectionHealth` pour le
 >   statut du registre.
 > - Migration one-shot idempotente `migrations/externalConnections:
->   migrateVascoConnections` (à lancer juste après le deploy — cf.
+migrateVascoConnections` (à lancer juste après le deploy — cf.
 >   `MIGRATIONS.md`) ; table `vascoConnections` conservée déclarée-mais-inerte.
 > - Page `settings/integrations` : query publique sanitisée
 >   `connections.listIntegrations` (jamais de secret), pastilles d'état par
@@ -5150,7 +5237,7 @@ définitif.
 > **🔧 Notes techniques**
 >
 > - `convex/lib/recurrenceDetection.ts` : `DETECTION_MIN_OCCURRENCES_LONG
->   = 2` (trimestriel/annuel, appliqué après `detectFrequency`),
+= 2` (trimestriel/annuel, appliqué après `detectFrequency`),
 >   stabilité des montants en règle **majoritaire** (`≥ 60 %` dans
 >   `±40 %` de la médiane, constantes `DETECTION_AMOUNT_MAJORITY` /
 >   `DETECTION_AMOUNT_TOLERANCE`) au lieu du gate tous-montants ±30 %.
@@ -5323,6 +5410,7 @@ sans refaire toute la connexion.
 > - UI : `src/components/cash/BankConnectionsHealth.tsx` (query
 >   `powens.listConnections`), section insérée sous les comptes sur
 >   `/app/$orgSlug/cash`.
+
 ## v1.98.0 — 16/07/2026 à 15:57 — Deals : « Secondaire » redevient un type de tour, retiré des instruments
 
 « Secondaire » n'est plus proposé comme **type d'instrument** à la création ou
@@ -5330,10 +5418,11 @@ sans refaire toute la connexion.
 deal en **actions** dont le **tour** est « Secondaire » — là où cette
 information a du sens. Les deals importés depuis Attio en « Secondary Shares »
 arrivent maintenant en deal actions avec le tour « Secondaire » prérempli.
-Rien n'est perdu par ailleurs : un *fonds* secondaire reste un engagement dans
+Rien n'est perdu par ailleurs : un _fonds_ secondaire reste un engagement dans
 un **fonds** de type « Secondaire ».
 
 > **🔧 Notes techniques**
+>
 > - Retrait de `'secondary'` de `INSTRUMENTS` (`convex/lib/instruments.ts`) ;
 >   le round type `'secondary'` (dans `ROUND_TYPES`) est inchangé. Nettoyage
 >   des mappings d'archétype (`instrumentMapping.ts`), du picker d'édition
@@ -5438,7 +5527,7 @@ disponible sur les deals en **equity via SPV** — c'est la même notion de tour
 financement de la société cible, que l'investissement passe en direct ou via un
 véhicule intermédiaire.
 
-- Sur une fiche deal *parts de SPV*, le champ **« Tour »** s'affiche à côté des
+- Sur une fiche deal _parts de SPV_, le champ **« Tour »** s'affiche à côté des
   valorisations et s'édite d'un clic (même liste de choix que pour un deal en
   actions).
 
@@ -5536,8 +5625,7 @@ Plusieurs améliorations sur les deals, remontées à l'usage :
 > - `convex/lib/instruments.ts` : `'secondary'` ajouté à `ROUND_TYPES` — le
 >   validator, le champ `roundType` du schéma et les options d'édition en
 >   dérivent (union élargie, rétro-compatible, **aucune migration**).
-> - `convex/lib/instrumentMapping.ts` : `EQUITY_FIELDS` +`sharesAcquired`
->   +`pricePerShare` −`ownershipPct` ; `SAFE`/`BSA`/`OC` −`ownershipPct` ;
+> - `convex/lib/instrumentMapping.ts` : `EQUITY_FIELDS` +`sharesAcquired` +`pricePerShare` −`ownershipPct` ; `SAFE`/`BSA`/`OC` −`ownershipPct` ;
 >   `FONDS_FIELDS` +`closingDate`. `spvOwnershipPct` (SPV) laissé intact. Le
 >   champ `ownershipPct` reste au schéma (données préservées, juste plus
 >   affiché). `pricePerShare` était déjà câblé (format `eur`, i18n fr/en).
@@ -5667,6 +5755,7 @@ stade ; c'est le socle avant de fiabiliser les fiches SPV.
 > Écriture via `applyInstrumentBridgePatch` (marque `manuallyEditedFields`).
 > Piège de cycle d'inférence TS documenté dans `KNOWN_ISSUES.md`
 > « VASCO API → instrument bridge ».
+
 ## v1.90.0 — 15/07/2026 à 17:39 — Fiches Parallel : la description de l'opération est générée depuis Parallel
 
 Les SPV Parallel n'avaient pas de description utile : le one-liner et le résumé
@@ -5688,9 +5777,9 @@ branchée).
 > - `companyEnrichment.ts` : 2ᵉ source de pitch « VASCO » à côté de la source
 >   « site web ». `enrichFromVasco` lit les communications en cache
 >   (`vascoCommunicationsCache`, filtré par `vascoClientSlug` + `vascoIssuerId`)
->   + le nom du SPV → `generatePitch` (helper LLM factorisé, `getModel()`) →
->   `applyVascoPitch` qui **écrase** `oneLiner` + `summary` (vs `applyEnrichment`,
->   additif). Skip si non rattaché / pas de comms en cache.
+>   - le nom du SPV → `generatePitch` (helper LLM factorisé, `getModel()`) →
+>     `applyVascoPitch` qui **écrase** `oneLiner` + `summary` (vs `applyEnrichment`,
+>     additif). Skip si non rattaché / pas de comms en cache.
 > - Déclencheurs org-agnostiques (pilotés par le lien VASCO, jamais l'org) :
 >   `setVascoLink` planifie `enrichFromVasco` ; backfill one-shot
 >   `backfillVascoPitches` (rafraîchit le cache par org puis décrit toutes les
@@ -5878,7 +5967,7 @@ notes techniques) — tant qu'elle ne l'est pas, rien ne change.
 >   **pure** dans `convex/lib/attioSync.ts` (`decideSyncAction`), testée
 >   (`tests/attioSync.test.ts`). Term Sheet → deal `pending` + une
 >   `forecastEntries` (`direction: out`, `confidence: expected`, `category:
->   deals`, `derivedKey: deal:{id}` **stable**, date = `date_de_l_investissement`,
+deals`, `derivedKey: deal:{id}` **stable**, date = `date_de_l_investissement`,
 >   montant = `value` Attio) ; Invested → statut `active` (forward-only) +
 >   `confidence: confirmed`. **Jamais de création sur Invested** (verrou
 >   anti-doublon). Frontière d'attribution : `pending` = Attio source (refresh),
@@ -5889,7 +5978,7 @@ notes techniques) — tant qu'elle ne l'est pas, rien ne change.
 > - Webhook durci : re-fetch transitoire (réseau / 5xx Attio) → 503 (retry) ;
 >   erreur de config (secret/clé absente) → 200 (pas de tempête de retries).
 > - Activation prod : `pnpm exec convex env set ATTIO_WEBHOOK_SECRET <secret>`
->   + webhook Attio `record.updated` sur l'objet `deals` → `/attio/webhook`.
+>   - webhook Attio `record.updated` sur l'objet `deals` → `/attio/webhook`.
 
 ## v1.86.2 — 14/07/2026 à 12:20 — Reports par email : extraction Notion fiabilisée
 
@@ -5943,7 +6032,7 @@ changement.
 >
 > - `convex/vasco.ts` : trois actions org-guardées, lecture live (login +
 >   appels externes, non réactives) — `fetchCommunications({orgId, clientSlug,
->   issuerId})` (scope `GetCommunications(userId)`, filtré par issuer, tri date
+issuerId})` (scope `GetCommunications(userId)`, filtré par issuer, tri date
 >   desc), `listVascoIssuers` (émetteurs distincts + dernier titre pour le
 >   picker), `downloadCommunicationDocument` (le `downloadUrl` VASCO est
 >   authentifié → proxy : login + fetch bearer → `ctx.storage` → `getUrl`).
@@ -5955,8 +6044,7 @@ changement.
 >   Report de `participations.$companyId` (bloc communications + dialog de
 >   rattachement) ; namespace i18n `vasco` (en+fr). Le linker n'apparaît que sur
 >   une entité Parallel (`sponsor`/`group`) ou déjà rattachée.
-> - Détails et pièges (accès investisseur, proxy download, doublon de connexion
->   401) : `KNOWN_ISSUES.md` § « VASCO API » ; recette de test : `TESTING.md`
+> - Détails et pièges (accès investisseur, proxy download, doublon de connexion 401) : `KNOWN_ISSUES.md` § « VASCO API » ; recette de test : `TESTING.md`
 >   § « Communications Parallel ».
 
 ## v1.85.0 — 14/07/2026 à 14:23 — Le prévisionnel se rattache aux deals
@@ -6100,7 +6188,7 @@ l'API avant de construire l'affichage.
 >
 > - `convex/vasco.ts` : nouvelle `internalAction` `probeCommunications`
 >   (diagnostic CLI — `npx convex run --prod vasco:probeCommunications
->   '{"orgSlug":"calte"}'`) : login, liste des comptes, puis `GetCommunications`
+'{"orgSlug":"calte"}'`) : login, liste des comptes, puis `GetCommunications`
 >   sous chaque scoping candidat (`userId`, `accountId`). Renvoie la réponse
 >   GraphQL **brute** (`data` + `errors` + `extensions.warnings`), car le refus
 >   d'accès de la persona investisseur arrive en `warnings` (champ `null`) et non
@@ -6111,6 +6199,7 @@ l'API avant de construire l'affichage.
 > - Aucune UI ni écriture DB. Phase 1 (dé-risquage) de l'étape 2b VASCO ;
 >   l'affichage (read path org-guardé + rattachement entité↔émetteur + bloc dans
 >   `CompanyReportsSection` + roll-up org) suivra une fois l'accès prouvé.
+
 ## v1.83.0 — 14/07/2026 à 13:09 — Le prévisionnel se mesure, vous alerte, et anticipe la TVA
 
 Trois compléments au prévisionnel de trésorerie :
@@ -6353,7 +6442,7 @@ ne changent pas.
 >
 > - `ParticipationsTable.tsx` : sous-composant `OneLinerCell` qui détecte la
 >   troncature via un callback ref stable + `ResizeObserver` (`scrollWidth >
->   clientWidth`), robuste au resize et au swap span↔bouton. Seuls les
+clientWidth`), robuste au resize et au swap span↔bouton. Seuls les
 >   one-liners coupés deviennent un `PopoverTrigger` ; `stopPropagation` sur le
 >   clic/keydown du bouton et sur le `PopoverContent` pour ne jamais déclencher
 >   la navigation de ligne (`role="link"`).
@@ -6411,7 +6500,7 @@ partiel quand vous lui demandez de pointer une échéance.
 >   `forecasts.suggestForecastMatches` (exclut les tx `ignored`/virements
 >   internes et celles déjà portées par un `realizedTransactionId`).
 > - `markEntryRealized` (+ outil agent) prend `mode: 'close' |
->   'keepRemainder'` via le cœur partagé `applyMarkEntryRealized` ; le
+'keepRemainder'` via le cœur partagé `applyMarkEntryRealized` ; le
 >   reliquat devient une entry one-shot pure (sans `ruleId`/`derivedKey`).
 > - UI : `src/components/cash/ForecastMatchSuggestions.tsx` (carte + dialog
 >   de décision), i18n fr/en `cash:forecast.suggestions`.
@@ -6420,6 +6509,7 @@ partiel quand vous lui demandez de pointer une échéance.
 >   (`historyMonths: 0`) ; l'ancienne sémantique fenêtrée
 >   (`buildMonthlyBalance`, query publique `getForecastBalance`) est
 >   supprimée. KNOWN_ISSUES/TESTING mis à jour (F6-F14, FC16-FC18).
+
 ## v1.76.1 — 14/07/2026 à 10:44 — Parallel (VASCO) : lecture des positions + vérif en prod
 
 Suite de la connexion Parallel. Albo OS lit désormais tes **positions réelles**
@@ -6888,7 +6978,7 @@ montant et il s'enregistre **sans changer de page**.
 > - Bug de _rules of hooks_ : `EditableCa` (`RoyaltiesPanel.tsx`) appelait
 >   `useAmountField` **dans** la branche `if (editing)`. Le passage en édition
 >   ajoutait un hook absent du render précédent → `Rendered more hooks than
->   during the previous render`. Le hook est remonté au **top-level** du
+during the previous render`. Le hook est remonté au **top-level** du
 >   composant, ses props n'étant _spreadées_ sur l'input que quand la cellule
 >   est ouverte (même pattern que `DealFieldInput`).
 > - Pourquoi « Deal introuvable » : la route `deals.$dealId.tsx` déclare **le
@@ -7679,7 +7769,7 @@ déborde plus à droite.
 >
 > - `src/components/deals/RoyaltiesPanel.tsx` : ancrage de l'étiquette flottante
 >   du curseur rendu sensible aux bords. Extraction de `cursorPct =
->   barPct(realizedCumul)` (réutilisé par l'étiquette et le remplissage), puis
+barPct(realizedCumul)` (réutilisé par l'étiquette et le remplissage), puis
 >   bascule de `-translate-x-1/2` vers `translate-x-0` (≤ 5 %) ou
 >   `-translate-x-full` (≥ 95 %) pour éviter le clipping hors de la piste.
 
@@ -7735,6 +7825,7 @@ cellule repasse à « — »), alors que saisir **« 0 »** conserve un point à
 >   via `removeBpPoint` / `removeActual` (filter sans réinsertion, patch
 >   `deals.update`). L'affichage `value == null ? '—' : fmtEur(value)` distingue
 >   déjà point absent / point à 0 — seul le comportement d'édition changeait.
+
 ## v1.48.1 — 30/06/2026 à 10:30 — Royalties : TRI masqué tant que le capital n'est pas recouvré + barre plus lisible
 
 Sur la fiche d'un investissement à royalties, le **TRI annualisé** ne s'affiche
@@ -7834,7 +7925,7 @@ remplacé par ce tableau) ; il reste disponible pour les autres instruments.
 > **🔧 Notes techniques**
 >
 > - Parsing : `parseAmountToCents` (`src/lib/royalties.ts`) devient
->   *space-aware* — `hadSpaceGroup = /\d\s\d/.test(raw)` ; une virgule seule
+>   _space-aware_ — `hadSpaceGroup = /\d\s\d/.test(raw)` ; une virgule seule
 >   suivie de 3 chiffres n'est traitée comme séparateur de milliers que si aucun
 >   espace n'a déjà groupé les milliers, sinon c'est une décimale. Régression
 >   couverte dans `tests/royalties.test.ts` (cas « 311 995,152 » → 31199515).
@@ -7867,7 +7958,7 @@ lorsqu'il contient le symbole de l'euro : la règle s'enregistre normalement.
 >
 > - `parseEuros` (`src/components/cash/ForecastSection.tsx`) ne retirait que les
 >   espaces et la virgule ; un `€` collé au montant donnait `Number("5580€") =
->   NaN`, donc `amountCents === null` → `invalid === true` → bouton désactivé.
+NaN`, donc `amountCents === null` → `invalid === true` → bouton désactivé.
 > - Fix : la regex de nettoyage retire aussi le symbole `€` (`/[\s€]/g`).
 
 ## v1.46.0 — 29/06/2026 à 19:11 — Suivi des royalties trimestre par trimestre
@@ -7931,6 +8022,7 @@ le multiple s'écarte de 1.
 >   existant réutilisé, aucune couleur en dur.
 > - Périmètre strict liste entreprises ; le même rendu muted pourrait être
 >   partagé plus tard avec la fiche deal / les cards KPI du dashboard (autre PR).
+
 ## v1.44.0 — 29/06/2026 à 17:44 — Nouveau moteur pour l'assistant IA
 
 L'assistant IA d'Albo OS change de moteur : il tourne désormais sur le modèle
@@ -8014,10 +8106,10 @@ leurs valeurs et s'affichent simplement avec ces champs.
 >   `postMoneyValuation`. `underlyingTarget` **retiré de l'affichage** (la cible
 >   passe par `targetCompanyId`) mais conservé en base, en sommeil.
 > - 1 seule colonne neuve : `spvName v.optional(v.string())` (`convex/schema.ts`
->   + `dealFields` dans `convex/deals.ts`, éditable) ; `FIELD_FORMAT: 'text'`
->   (`InstrumentBlock.tsx`). `spvOwnershipPct` / `structuringFees` réutilisés tels
->   quels. `viaSpvCompanyId` (référence entité) **non** utilisé : le SPV n'est pas
->   modélisé comme entité.
+>   - `dealFields` dans `convex/deals.ts`, éditable) ; `FIELD_FORMAT: 'text'`
+>     (`InstrumentBlock.tsx`). `spvOwnershipPct` / `structuringFees` réutilisés tels
+>     quels. `viaSpvCompanyId` (référence entité) **non** utilisé : le SPV n'est pas
+>     modélisé comme entité.
 > - Libellé i18n EN/FR « Equity via SPV » (fiche `participations.json` + vue agent
 >   `chat.json`) ; nouveau libellé `field.spvName`. Incohérence assumée et
 >   documentée : equity direct → `ownershipPct`, equity via SPV →
@@ -8048,11 +8140,11 @@ s'affichent simplement avec les champs adaptés à leur nature.
 >   nouveau `OC_FIELDS` ; tous deux retirés de `SAFE_FIELDS`. Archétype `equity`
 >   et render `fields` inchangés pour les trois.
 > - 8 colonnes neuves (toutes `v.optional`, en sommeil) dans `convex/schema.ts`
->   + `convex/deals.ts` `dealFields` : `grantDate`, `warrantsCount`,
->   `warrantPrice`, `strikePrice`, `warrantParity`, `exerciseDeadlineDate`
->   (BSA), `conversionRatio`, `conversionDiscount` (OC). L'OC réutilise
->   `interestRate` + `maturityDate` (bloc debt) et le trio post-conversion
->   `conversionValuation` / `sharesAcquired` / `ownershipPct`.
+>   - `convex/deals.ts` `dealFields` : `grantDate`, `warrantsCount`,
+>     `warrantPrice`, `strikePrice`, `warrantParity`, `exerciseDeadlineDate`
+>     (BSA), `conversionRatio`, `conversionDiscount` (OC). L'OC réutilise
+>     `interestRate` + `maturityDate` (bloc debt) et le trio post-conversion
+>     `conversionValuation` / `sharesAcquired` / `ownershipPct`.
 > - `SAFE_TYPES` garde `oc` (validateur, en sommeil) ; nouveau
 >   `SAFE_TYPE_OPTIONS = ['safe','bsa_air']` alimente le select via
 >   `ENUM_FIELD_VALUES.safeType`.
@@ -8077,7 +8169,7 @@ met à jour immédiatement**.
 > **🔧 Notes techniques**
 >
 > - Nouvelle query publique `convex/forecasts.ts` `listEntries({ orgId,
->   status? })` : `requireOrgMember`, index `by_org_and_date` (tri date
+status? })` : `requireOrgMember`, index `by_org_and_date` (tri date
 >   ascendant gratuit), filtre `ruleId == null` (seules les one-shot pures),
 >   renvoie les Doc bruts. Calquée sur `agentToolsForecasts.listEntriesInternal`
 >   mais sans filtre date ni limite (V1).
@@ -8190,8 +8282,8 @@ perdre du contenu.
 > - `src/routes/app/$orgSlug/changelog.tsx` : `parseChangelog()` (pur, exécuté
 >   une fois au chargement du module) découpe l'import `?raw` en
 >   `header` / `entries[]` / `footer`. Les entrées sont les sections `## …`
->   dont le titre porte le séparateur ` — ` (couvre `## vX.Y.Z — …` **et** les
->   4 entrées historiques `## Mois AAAA — …`) ; le premier titre sans ` — `
+>   dont le titre porte le séparateur `—` (couvre `## vX.Y.Z — …` **et** les
+>   4 entrées historiques `## Mois AAAA — …`) ; le premier titre sans `—`
 >   (le « Petit lexique ») démarre le footer, toujours épinglé.
 > - Rendu en deux blocs `ReactMarkdown` (entête + N entrées visibles, puis
 >   footer) partageant le même `markdownComponents` extrait au niveau module ;
@@ -8286,6 +8378,7 @@ qu'on ne cherche pas réellement à supprimer.
 >   `disabled={…|| dealCount > 0}` / `disabled={…|| linkedCount > 0}`. Garde
 >   serveur (`company_has_references`, `deal_has_transactions`) inchangée.
 > - `TESTING.md` : lignes AR1 et DD2 mises à jour.
+
 ## v1.33.1 — 25/06/2026 à 22:32 — Diagnostic : entités portfolio sans deal (lecture seule)
 
 Nouveau diagnostic interne, en lecture seule, qui mesure sur les deux véhicules
@@ -8452,6 +8545,7 @@ et l'icône de secours reprend sa place.
 >   `edit.companyDescription` mise à jour.
 > - Aucun stockage de logo (cf. `KNOWN_ISSUES.md` « Logos d'entreprises ») :
 >   le domaine continue d'être hotlinké à la volée par `CompanyLogo`.
+
 ## v1.28.3 — 24/06/2026 à 22:10 — Diagnostic : détail d'identité des entités cibles (lecture seule)
 
 Complément au diagnostic interne : un relevé en lecture seule du détail complet
@@ -8462,7 +8556,7 @@ changement visible, aucune donnée modifiée.
 > **🔧 Notes techniques**
 >
 > - `convex/migrations/diagnoseAlboUmbrellas.ts` : nouvel `internalQuery
->   entityDetails` (lecture seule). Pour chaque umbrella albo + ses entités
+entityDetails` (lecture seule). Pour chaque umbrella albo + ses entités
 >   cibles candidates, renvoie le doc complet via `entityView` (tous les champs
 >   d'identité + `_creationTime` + `archivedAt`) avec un bloc `identityFilled`
 >   indiquant quels champs sont réellement remplis (coquille vs entité complète).
@@ -8531,6 +8625,7 @@ sans dire **à quoi** elle était rattachée. C'est corrigé.
 >   au `TransactionSheet` (prop `match`, clé i18n `pointage:detail.matchedTo`).
 > - Fiche compte (`cash.$accountId.tsx`) : colonne « Deal » rendue cliquable
 >   (le serveur renvoyait déjà `tx.deal`). Reste deal-only par design.
+
 ## v1.27.2 — 24/06/2026 à 20:20 — Nom de la société dans le fil d'Ariane
 
 Sur la fiche d'une entreprise, le dernier élément du fil d'Ariane (en haut de
@@ -8673,7 +8768,7 @@ les adresses et vos données restent identiques.
 >   le namespace `participations`, les chemins `/participations*` et la table
 >   restent inchangés ; `{{count}}` et les suffixes de phrases préservés.
 > - `TESTING.md` : libellés rafraîchis dans la section App shell (SH1/SH4/SH5)
->   + nouvelle vérif SH13 (nav/breadcrumb/KPI/liste/fiche, EN et FR).
+>   - nouvelle vérif SH13 (nav/breadcrumb/KPI/liste/fiche, EN et FR).
 
 ## v1.24.0 — 24/06/2026 à 18:14 — Participations : clic sur une ligne ouvre la fiche
 
@@ -8701,7 +8796,7 @@ changent pas.
 
 Les **Participations** reviennent à une présentation simple : **une ligne par
 société**, dépliable vers ses deals. Le regroupement de plusieurs sociétés sous
-un même « groupe » (badges *groupe*/*sponsor*, bouton « Voir le groupe » et page
+un même « groupe » (badges _groupe_/_sponsor_, bouton « Voir le groupe » et page
 de consolidation dédiée) est **retiré** — il ajoutait de la complexité sans usage
 réel. Le tri, la recherche, la pagination et l'export CSV restent identiques. Côté
 société, le champ **« Groupe »** disparaît des fenêtres de création et de
@@ -8864,9 +8959,9 @@ fiche : son changement définitif arrivera dans un lot dédié.
 > - Backend : 7 validateurs enum d'archétype (`roundType`, `safeType`,
 >   `couponPeriodicity`, `repaymentModality`, `termDuration`, `fundType`,
 >   `propertyType`) déplacés vers `convex/lib/instruments.ts` (source unique,
->   + tableaux `ENUM_FIELD_VALUES` pour les selects) ; `schema.ts` et
->   `deals.ts` les importent. `dealFields` (partagé `create`/`update`) étendu
->   des ~25 champs d'archétype manquants.
+>   - tableaux `ENUM_FIELD_VALUES` pour les selects) ; `schema.ts` et
+>     `deals.ts` les importent. `dealFields` (partagé `create`/`update`) étendu
+>     des ~25 champs d'archétype manquants.
 > - Garde-fou : nouvelle colonne `deals.manuallyEditedFields: string[]`.
 >   `deals.update` ajoute au set **toute** clé patchée (uniforme côté écriture) ;
 >   `airtableImport.ts:upsertDeals` retire du patch les colonnes présentes dans
@@ -9019,6 +9114,7 @@ l'instant ; les nouvelles informations s'afficheront avec les prochaines mises
 >   discount).
 > - Aucune mutation, aucune migration, aucune commande `--prod` : colonnes en
 >   sommeil jusqu'au câblage du front (Lot 2).
+
 ## v1.16.0 — 23/06/2026 à 18:36 — Participations : distinguer sponsors et groupes
 
 Les **groupes de participations** peuvent désormais être de deux natures :
@@ -9063,6 +9159,7 @@ dé-rapprocher au préalable. Une fois le deal supprimé, on revient sur la fich
 la société.
 
 > **🔧 Notes techniques**
+>
 > - Backend : garde ajoutée dans `convex/deals.ts` `remove` — avant le hard
 >   delete, lecture de l'index `by_deal` ; si une transaction est liée →
 >   `ConvexError('deal_has_transactions')` (préserve l'invariant
@@ -9083,6 +9180,7 @@ pourra bientôt créer ou mettre à jour le deal correspondant. Ce lot pose la
 plomberie technique côté serveur ; rien n'est encore visible ni écrit en base.
 
 > **🔧 Notes techniques**
+>
 > - Nouveau endpoint webhook `POST /attio/webhook` (`convex/http.ts` →
 >   `convex/attioSync.ts:attioWebhook`). Vérification de signature
 >   HMAC-SHA256 (hex) sur le corps brut, header `Attio-Signature`, secret
@@ -9113,6 +9211,7 @@ aussitôt dans la liste de la fiche. Les erreurs de cohérence (investisseur inv
 mauvaise organisation) affichent un message clair.
 
 > **🔧 Notes techniques**
+>
 > - Front uniquement, dans `participations.$companyId.tsx` : nouveau
 >   `CreateDealDialog` (Dialog shadcn + `Select` investisseur/instrument) ouvert
 >   depuis l'en-tête de la fiche. **Aucune mutation backend ajoutée ni modifiée.**
@@ -9138,10 +9237,11 @@ vers sa fiche. Si le SIREN est invalide ou déjà utilisé, un message clair s'a
 sans rien créer.
 
 > **🔧 Notes techniques**
+>
 > - Front uniquement, dans `participations.index.tsx` : nouveau
 >   `CreateCompanyDialog` (calqué sur `EditCompanyDialog` pour le style, la
 >   validation SIREN et le `<datalist>` groupe via `api.participations.listGroups`)
->   + bouton « Nouvelle entité » dans l'en-tête de la liste.
+>   - bouton « Nouvelle entité » dans l'en-tête de la liste.
 > - Soumission : `companies.create({ orgId, name, kind: 'portfolio', siren? })`
 >   (`kind` forcé, non exposé), puis `companies.update({ id, patch: { group } })`
 >   **conditionnel** si un groupe est saisi (`create` n'accepte pas `group`).
@@ -9161,6 +9261,7 @@ du portefeuille **qui n'appartiennent à aucun groupe** ; cochez-en plusieurs,
 validez, et elles rejoignent aussitôt la liste et les KPI consolidés.
 
 > **🔧 Notes techniques**
+>
 > - Front uniquement, dans `participations.group.$slug.tsx` : nouveau
 >   `AddEntityDialog` (Dialog + liste de `Checkbox`) ouvert depuis l'en-tête de
 >   `EntityList` (qui reçoit désormais `orgId`).
@@ -9192,6 +9293,7 @@ ou les boutiques d'une même enseigne).
 - La vue **toutes organisations** bénéficie aussi de ce regroupement.
 
 > **🔧 Notes techniques**
+>
 > - Schéma : champ optionnel `companies.group` (clé logique, distinct de
 >   `sponsor`) + index `by_org_group` ; nouvelle table `portfolioGroupSettings`
 >   (slug d'URL stable généré une fois, `displayName` renommable, config `blocks`)
@@ -9232,6 +9334,7 @@ Accepter une invitation est désormais plus simple et fiable.
   la vérification de l'e-mail.
 
 > **🔧 Notes techniques**
+>
 > - Cause racine : `signUp.email` n'embarquait pas le token d'invitation et,
 >   sous `requireEmailVerification`, n'ouvrait jamais de session → `invitations.accept`
 >   ne se rejouait jamais. Fix : hook `databaseHooks.user.create.before`
@@ -9264,6 +9367,7 @@ Le tableau de bord adopte une mise en page plus éditoriale et plus dense.
   lien vers la trésorerie.
 
 > **🔧 Notes techniques**
+>
 > - `convex/dashboard.ts` (`getDashboard`) : ajout de `accountsCount` (comptes
 >   EUR non archivés) et de `navSeries` (série NAV mensuelle, plafonnée à ~24
 >   points). Les transactions et valuations sont désormais lues une seule fois
@@ -9392,7 +9496,7 @@ masquées pour une interface plus nette (le défilement reste inchangé).
 >   en `notation: 'compact'`, 1 décimale.
 > - `KpiCard` (`src/components/dashboard/KpiCard.tsx`) gagne une prop `title`
 >   (tooltip natif du montant exact) ; valeur passée en `tabular-nums
->   whitespace-nowrap`.
+whitespace-nowrap`.
 > - Tableau de bord (`src/routes/app/$orgSlug/index.tsx`) : KPI monétaires
 >   (deployed/distributed/cash/nav) en compact, montant complet en `title`.
 > - Masquage global des scrollbars natives dans `src/styles/app.css`

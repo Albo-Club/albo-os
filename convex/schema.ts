@@ -1052,11 +1052,17 @@ export default defineSchema({
       ),
     ),
     vectorDetail: v.optional(v.string()),
+    // Provenance anchor of the one-shot Albo app import: the uuid of the
+    // Supabase `company_reports` row this came from. Sole idempotency key of
+    // that import — cf. `convex/migrations/alboReportsImport.ts`. Unset on
+    // every row born from the email pipeline or a manual upload.
+    alboReportId: v.optional(v.string()),
   })
     .index('by_company', ['companyId', 'periodSortDate'])
     .index('by_org', ['orgId'])
     .index('by_message_id', ['agentmailMessageId'])
-    .index('by_company_period', ['companyId', 'reportPeriod']),
+    .index('by_company_period', ['companyId', 'reportPeriod'])
+    .index('by_albo_report', ['alboReportId']),
 
   /**
    * companyIntelligence — one row per company holding the AI synthesis
