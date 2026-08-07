@@ -102,6 +102,19 @@ La colonne principale, dans l'ordre de lecture :
   boîte est la première chose qu'on voit. Elle
   est régénérée automatiquement à chaque rapport ingéré, et peut être
   relancée à la main.
+- **Ce que vaut le score de santé.** Il note l'entreprise, pas la qualité de
+  son reporting, sur trois axes : trajectoire par rapport au plan,
+  trésorerie et runway, solidité de la structure (rentabilité, gouvernance,
+  financement). Les bandes : **9-10 excellent**, **7-8 en bonne voie**,
+  **5-6 à surveiller**, **3-4 préoccupant**, **1-2 critique**. C'est l'axe
+  le plus dégradé qui commande — un runway sous six mois sans financement
+  engagé plafonne la note, même avec un chiffre d'affaires en forte hausse.
+  Les points forts et les points de vigilance comptent de un à trois items
+  chacun : les deux colonnes n'ont pas à être de même longueur.
+- **Sans rapport, pas de note.** Une société dont aucun reporting (ni
+  communication Parallel) n'est encore arrivé affiche « aucune donnée » et
+  reste vide dans la colonne Score — plutôt qu'une note fabriquée à partir
+  du seul nom de la boîte.
 - **Deals de la société** : un tableau au même style que la liste des
   participations (badge de statut coloré — ambre term sheet, bleu actif,
   vert Exit win, rouge Exit loss, gris annulé —, date de

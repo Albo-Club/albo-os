@@ -86,12 +86,18 @@ export const getContext = internalQuery({
     { companyId },
   ): Promise<{
     text: string
+    hasReports: boolean
     vascoClientSlug: string | null
     vascoIssuerId: string | null
   }> => {
     const company = await ctx.db.get('companies', companyId)
     if (!company)
-      return { text: '', vascoClientSlug: null, vascoIssuerId: null }
+      return {
+        text: '',
+        hasReports: false,
+        vascoClientSlug: null,
+        vascoIssuerId: null,
+      }
 
     const parts: Array<string> = [`## Entreprise: ${company.name}`]
     if (company.domain) parts.push(`Domaine: ${company.domain}`)
@@ -117,6 +123,7 @@ export const getContext = internalQuery({
 
     return {
       text: parts.join('\n'),
+      hasReports: reports.length > 0,
       vascoClientSlug: company.vascoClientSlug ?? null,
       vascoIssuerId: company.vascoIssuerId ?? null,
     }
@@ -269,10 +276,8 @@ export const runAnalysis = internalAction({
     })
 
     try {
-      const { text, vascoClientSlug, vascoIssuerId } = await ctx.runQuery(
-        internal.intelligence.getContext,
-        { companyId },
-      )
+      const { text, hasReports, vascoClientSlug, vascoIssuerId } =
+        await ctx.runQuery(internal.intelligence.getContext, { companyId })
 
       // Live-pull the entity's Parallel/VASCO investor communications, if
       // linked, and fold them into the context. getContext is a query (can't
@@ -286,13 +291,21 @@ export const runAnalysis = internalAction({
         vascoBlock = formatCommunications(comms)
       }
 
-      // Empty only when there is neither company/report context nor comms — a
-      // bare Parallel entity with communications is still worth analyzing.
-      if (!text && !vascoBlock) {
+      // No report and no communication → `no_data`, never a score. The company
+      // row alone (name, sector, notes) always makes `text` non-empty, so
+      // gating on it would score an entity nobody ever reported on: the model
+      // then invents its good points ("domaine .com professionnel") and the
+      // health score becomes noise in the score column. A bare Parallel entity
+      // with communications is still worth analyzing.
+      if (!hasReports && !vascoBlock) {
+        // Clear any previous synthesis: the Participations score column reads
+        // `aiAnalysis` alone (`aiScoresByCompany`), so leaving a stale one here
+        // would keep a score in the list while the sheet says "no data".
         await ctx.runMutation(internal.intelligence.upsertIntelligence, {
           companyId,
           orgId,
           status: 'no_data',
+          analysis: null,
         })
         return
       }

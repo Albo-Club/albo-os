@@ -1174,6 +1174,50 @@ Corollaire d'affichage : `periodSortDate` retombe sur la date de réception
 quand il n'y a pas de période, sinon le courrier n'aurait aucun ancrage dans
 la timeline de la fiche (l'index `by_company` trie là-dessus).
 
+## Prompt de notation : l'exemple JSON fixe la note, et la symétrie forcée l'écrase
+
+Le score de santé de la synthèse IA (`INTELLIGENCE_SYSTEM_PROMPT`,
+`convex/lib/reportPrompts.ts`) est sorti sur **4 → 7** pour tout le
+portefeuille, dont 8 sociétés sur 10 entre 5 et 7. Wandercraft (Next40,
+contrat Renault, 18 M€ non dilutif) et ACT Running (CA divisé par deux, 13 %
+du budget annuel après cinq mois) tenaient en **un point d'écart**. Une
+colonne qui ne sépare pas ces deux-là ne trie rien.
+
+Trois causes, toutes dans le prompt :
+
+1. **L'exemple JSON ancre.** Le bloc « FORMAT DE SORTIE » portait
+   `"score": 6`. C'était le seul chiffre du prompt, et le seul champ de
+   l'exemple qu'aucune donnée d'entrée ne contraint (les `good_points` de
+   l'exemple, eux, sont forcément réécrits). Le modèle le recopiait. Règle :
+   **dans un prompt de notation, un exemple ne porte jamais de note en
+   dur** — un placeholder (`<entier 1-10 issu du BARÈME>`) et un barème.
+2. **Aucun barème.** La règle disait comment *nommer* la note (« Excellent »
+   8-10, « En bonne voie » 6-7…), jamais ce qui la *mérite*. Nommer n'est pas
+   noter : sans critères durs (runway, écart au plan, gouvernance) et sans
+   règle de plafond par l'axe le plus dégradé, un LLM converge sur le milieu,
+   qui n'est jamais franchement faux.
+3. **La symétrie forcée.** `good_points` / `bad_points` **exactement 3
+   chacun**, plus une posture « toujours montrer le positif ET le négatif ».
+   Une boîte qui décroche partout devait produire trois bons points — d'où
+   « domaine .com professionnel » — et une boîte qui cartonne trois mauvais.
+   L'analyse rendue est mitigée, la note suit. Les compteurs sont passés à
+   « 1 à 3 ».
+
+Corollaire, corrigé en même temps : `runAnalysis` ne déclenchait **jamais**
+son statut `no_data`. La garde testait `!text`, or `getContext` renvoie
+toujours au moins `## Entreprise: <nom>` — branche morte. Une société sans
+aucun reporting recevait donc une vraie note (RGOODS : 5/10, bons points
+inventés à partir du nom de domaine). La garde porte maintenant sur
+`hasReports || vascoBlock`, et le statut `no_data` **efface** l'analyse
+précédente : la colonne Score des Participations lit `aiAnalysis` seule
+(`deals.aiScoresByCompany`), sans regarder le statut — une synthèse périmée
+laissée en base afficherait une note dans la liste pendant que la fiche
+annonce « aucune donnée ».
+
+Le barème du prompt et `scoreVerdict` (`src/lib/reportScore.ts`) sont
+**alignés bande par bande** (7-10 vert, 5-6 ambre, 1-4 rouge). Déplacer un
+seuil d'un côté sans l'autre affiche « En bonne voie » en ambre.
+
 ## Reprise d'un historique de reports depuis un autre outil : aucune clé ne tient
 
 Migrer les reportings d'Albo app (Supabase) vers Albo OS a buté sur une
@@ -1284,7 +1328,7 @@ Trois choses non évidentes qui coûteraient cher à redécouvrir :
 Le critère d'efficacité de la suite a été vérifié : commenter le
 `requireOrgMember` de `deals.list` fait rougir 2 tests (isolation lecture).
 
-## Backfill depuis la doc juridique — 3 pièges
+## Backfill depuis la doc juridique — 4 pièges
 
 `scripts/backfill-deal-fields.mjs` + `convex/migrations/alboDocBackfill.ts`
 remplissent les champs vides des `companies`/`deals` de l'org `albo` à partir
@@ -1327,6 +1371,20 @@ des documents juridiques déjà versés. Trois choses non évidentes.
    caractères) et le passe en argument. Bénéfice collatéral — le cache par
    hash de texte court-circuite le modèle **avant** l'appel, donc une relance
    sur le delta ne coûte que des lectures.
+
+4. **Un modèle saturé revient en SUCCÈS de l'action, pas en exception.** Le SDK
+   IA retente trois fois en interne, puis l'action attrape l'échec et **renvoie
+   proprement** `{ error: "…temporarily rate-limited upstream…" }`. Donc
+   `convex run` sort en code 0, la boucle de retry du script — qui ne se
+   déclenche que si le sous-processus plante — ne voit rien, et un run entier
+   peut brûler 300 documents en ÉCHEC en quelques secondes contre une limite
+   qui se lève en minutes. D'où, côté script : `RATE_LIMITED` reconnaît le
+   message, `MODEL_BACKOFFS` attend 30 s → 4 min, `PACE_MS` espace les appels,
+   et deux documents d'affilée qui épuisent le backoff **arrêtent le run**,
+   avec le même contrat « relancer plus tard reprend où c'était » que
+   `vectorize:backfillAll`. Corollaire non négociable : le cache est écrit
+   **après chaque document**, jamais en fin de run — sinon un arrêt jette tout
+   ce qui a déjà été payé.
 
 ## Convex dev typecheck
 

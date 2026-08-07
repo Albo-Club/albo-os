@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.187.3 — 07/08/2026 à 16:10 — Rewatt ne compte plus que pour une seule société dans CALTE
+## v1.188.2 — 07/08/2026 à 16:14 — Rewatt ne compte plus que pour une seule société dans CALTE
 
 Le portefeuille CALTE affichait dix lignes Rewatt : une par adresse d'opération,
 plus une ligne pour la participation au capital, plus un doublon vide. Or il n'y
@@ -81,6 +81,104 @@ unique et correctement rattachée.
 > - Chaque clé écrite est ajoutée à `deals.manuallyEditedFields`, sinon un
 >   re-run de `airtableImport:runImport` réécraserait tout (cf. `KNOWN_ISSUES.md`
 >   « Édition manuelle deals »).
+## v1.188.1 — 07/08/2026 à 16:20 — La récupération des chiffres encaisse la saturation du modèle
+
+Au premier passage réel sur les documents juridiques, le modèle de lecture a
+été saturé côté fournisseur. L'outil a alors marqué en échec des dizaines de
+documents en quelques secondes, alors que la limite se lève en quelques
+minutes — et, surtout, il n'aurait rien gardé des documents déjà lus si le
+passage avait été interrompu.
+
+Trois corrections :
+
+- **Il attend au lieu d'abandonner.** Quand le modèle est saturé, l'outil
+  patiente (30 s, puis 1, 2 et 4 minutes) avant de réessayer. Une erreur qui
+  n'est pas une saturation n'est pas réessayée : ce serait du temps perdu.
+- **Il ne perd plus ce qu'il a lu.** Chaque document lu est mémorisé
+  immédiatement. Une interruption ne coûte plus que le document en cours, et
+  la relance repart exactement où elle s'est arrêtée.
+- **Il s'arrête proprement plutôt que de s'acharner.** Si deux documents
+  d'affilée résistent à toute l'attente, l'outil arrête le passage, le dit
+  clairement, et écrit un rapport marqué comme **partiel** — relancer plus
+  tard suffit.
+
+Un rythme d'appel un peu plus espacé a aussi été mis en place, pour éviter de
+déclencher la saturation.
+
+> **🔧 Notes techniques**
+>
+> - Cause exacte : `generateObject` retente 3 fois en interne puis lève ;
+>   `extractDocument` attrape et **renvoie** `{ error }`. L'action sort donc en
+>   succès, `convex run` en code 0, et le retry de `convex()` — qui ne se
+>   déclenche que sur throw du sous-processus — n'était jamais atteint.
+> - `scripts/backfill-deal-fields.mjs` : `RATE_LIMITED` (regex sur le message
+>   fournisseur), `extractWithBackoff` (`MODEL_BACKOFFS` 30/60/120/240 s,
+>   uniquement sur saturation), `PACE_MS` = 1,5 s entre deux appels.
+> - Écriture du cache déplacée en fin de **chaque** extraction réussie au lieu
+>   de la fin du run.
+> - Arrêt anticipé après 2 documents consécutifs ayant épuisé le backoff :
+>   `stopped` court-circuite la boucle avant l'arbitrage (planifier une société
+>   sur un jeu de documents à moitié lu produirait des trous qui ressemblent à
+>   des constats), et le rapport MD porte un bandeau « PARTIEL ».
+> - `stats.companies` compté à l'exécution et non depuis `selected.length`.
+> - Pièges consignés : `KNOWN_ISSUES.md` § « Backfill depuis la doc juridique »
+>   (point 4).
+
+---
+
+## v1.188.0 — 07/08/2026 à 15:57 — Le score de santé se remet à trancher
+
+Le score IA de santé donnait presque toujours la même note. Sur le
+portefeuille Albo, tout tenait entre 4 et 7 — et huit sociétés sur dix entre
+5 et 7. Wandercraft, qui entre au Next40 et signe 350 robots avec Renault,
+et une marque dont le chiffre d'affaires a été divisé par deux et qui n'a
+fait que 13 % de son budget annuel : un point d'écart. Une note qui ne
+sépare pas ces deux-là ne sert à rien.
+
+L'analyse dispose maintenant d'un vrai barème. Elle note l'entreprise — pas
+la qualité de son reporting — sur trois axes : la trajectoire par rapport au
+plan, la trésorerie et le runway, la solidité de la structure (rentabilité,
+gouvernance, financement). Neuf ou dix pour une boîte excellente, sept-huit
+en bonne voie, cinq-six à surveiller, trois-quatre préoccupant, un-deux
+critique. C'est l'axe le plus dégradé qui commande : un runway sous six mois
+sans financement engagé plafonne la note, quel que soit le reste.
+
+L'analyse ne s'oblige plus non plus à trouver trois points forts et trois
+points de vigilance à chaque société. Elle en donne un à trois de chaque
+côté, selon ce que disent réellement les chiffres — une boîte qui décroche
+partout n'a plus à se voir inventer des qualités pour faire nombre.
+
+Enfin, une société dont aucun reporting n'est encore arrivé n'est plus notée
+du tout : elle affiche « aucune donnée » et reste vide dans la colonne Score.
+Jusqu'ici elle recevait une vraie note, construite à partir de son seul nom
+de domaine.
+
+Les notes déjà affichées datent de l'ancien barème : elles se mettront à jour
+au prochain reporting reçu, ou tout de suite avec « Relancer l'analyse » sur
+la fiche de la société.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/reportPrompts.ts` — `INTELLIGENCE_SYSTEM_PROMPT` : ajout d'une
+>   section « BARÈME DU SCORE DE SANTÉ » (5 bandes ancrées sur runway / écart
+>   au plan / structure, règle de plafond par l'axe le plus dégradé, consigne
+>   d'usage de toute l'échelle). Le `"score": 6` de l'exemple JSON devient un
+>   placeholder : c'était le seul chiffre du prompt, et le modèle le recopiait
+>   (cf. `KNOWN_ISSUES.md` « Prompt de notation »). `good_points` /
+>   `bad_points` passent de « EXACTEMENT 3 » à « 1 à 3 », et la posture
+>   n'exige plus un contrepoids absent des données.
+> - `convex/intelligence.ts` — la branche `no_data` de `runAnalysis` était
+>   morte : elle testait `!text`, or `getContext` renvoie toujours au moins
+>   l'en-tête `## Entreprise:`. `getContext` expose désormais `hasReports` et
+>   la garde porte sur `hasReports || vascoBlock`. Le statut `no_data` passe
+>   `analysis: null` pour effacer une synthèse périmée — la colonne Score lit
+>   `aiAnalysis` seule (`deals.aiScoresByCompany`), sans regarder le statut.
+> - `src/lib/reportScore.ts` — commentaire seul : le barème du prompt et les
+>   seuils de `scoreVerdict` sont alignés bande par bande (7-10 vert / 5-6
+>   ambre / 1-4 rouge), les déplacer séparément casse la cohérence
+>   libellé ↔ couleur.
+> - Docs : `docs/produit/04-participations.md` (barème + cas sans reporting),
+>   `TESTING.md` TP12, `KNOWN_ISSUES.md`.
 
 ## v1.187.2 — 07/08/2026 à 14:46 — On reconnaît un reporting d'un document au premier coup d'œil
 

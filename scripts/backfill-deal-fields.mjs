@@ -91,6 +91,42 @@ function textHash(text) {
 }
 
 /**
+ * The model provider is saturated, not broken.
+ *
+ * `generateObject` already retries three times inside the action and then
+ * returns cleanly with this message, so the action SUCCEEDS while reporting a
+ * failure — which means the `convex()` retry above (it only fires when the
+ * subprocess throws) never sees it. Without this recognition a whole run would
+ * burn every document into ÉCHEC in a few seconds, against a limit that lifts
+ * in minutes.
+ */
+const RATE_LIMITED = /rate.?limit|temporarily|429|quota|too many requests/i
+
+/** Long enough to outlast an upstream cooldown: ~7 min of patience total. */
+const MODEL_BACKOFFS = [30_000, 60_000, 120_000, 240_000]
+
+/** Breathing room between two model calls — ~320 documents at full tilt is what trips the limit. */
+const PACE_MS = 1_500
+
+/**
+ * One extraction, with a backoff that matches how the provider actually fails.
+ * A non-rate-limit error (unreadable text, schema refusal) is returned as-is:
+ * retrying it would just cost time.
+ */
+async function extractWithBackoff(text) {
+  for (let attempt = 0; ; attempt += 1) {
+    const res = await convex('migrations/alboDocBackfill:extractDocument', {
+      text,
+    })
+    const limited = res.error && RATE_LIMITED.test(res.error)
+    if (!limited || attempt >= MODEL_BACKOFFS.length) return res
+    const wait = MODEL_BACKOFFS[attempt]
+    console.log(`    modèle saturé, nouvelle tentative dans ${wait / 1000}s…`)
+    await sleep(wait)
+  }
+}
+
+/**
  * Walks a document's text through the 40 000-char windows of `getDocText` and
  * glues it back together. Stops at MAX_EXTRACT_CHARS and says so — a document
  * silently cut in half would produce a cap table read from its first page.
@@ -221,6 +257,12 @@ function toMarkdown(rows, stats) {
     '',
     '## Résumé',
     '',
+    ...(stats.stopped
+      ? [
+          `> ⏸️ **Rapport PARTIEL — arrêt anticipé (${stats.stopped}).** Toutes les participations n'ont pas été parcourues. Relancer la même commande plus tard : le cache reprend où c'était.`,
+          '',
+        ]
+      : []),
     `- participations parcourues : **${stats.companies}**`,
     `- documents lus par le modèle : **${stats.extracted}** (dont **${stats.cached}** repris du cache, **${stats.failed}** en échec)`,
     `- documents ignorés (nature non probante : bp, reporting, attestation, other) : **${stats.skippedKind}**`,
@@ -283,7 +325,9 @@ async function dryRun() {
 
   const rows = []
   const stats = {
-    companies: selected.length,
+    // Counted as they are processed, not upfront: an early stop must not
+    // report participations it never reached.
+    companies: 0,
     extracted: 0,
     cached: 0,
     failed: 0,
@@ -293,7 +337,14 @@ async function dryRun() {
     confirmed: 0,
   }
 
+  /** Consecutive documents that outlasted the full backoff. */
+  let exhausted = 0
+  /** Set to the reason when the run gives up early; the cache resumes it. */
+  let stopped = null
+
   for (const company of selected) {
+    if (stopped) break
+    stats.companies += 1
     console.log(
       `\n▸ ${company.companyName} (${company.deals.length} deal(s), ${company.documents.length} doc(s))`,
     )
@@ -340,9 +391,8 @@ async function dryRun() {
         continue
       }
 
-      const res = await convex('migrations/alboDocBackfill:extractDocument', {
-        text,
-      })
+      await sleep(PACE_MS)
+      const res = await extractWithBackoff(text)
       if (res.error || !res.extraction) {
         stats.failed += 1
         console.log(
@@ -356,14 +406,31 @@ async function dryRun() {
             doc,
           ),
         )
+        // Two documents in a row that outlasted the full backoff means the
+        // provider is down, not busy. Stop and keep what was read — the same
+        // "STOPPED … run again later to resume" contract as
+        // `vectorize:backfillAll`, and the cache makes the resume free.
+        if (res.error && RATE_LIMITED.test(res.error)) {
+          exhausted += 1
+          if (exhausted >= 2) {
+            stopped = 'modèle saturé'
+            break
+          }
+        } else {
+          exhausted = 0
+        }
         continue
       }
+      exhausted = 0
       stats.extracted += 1
       stats.droppedQuotes += res.dropped.length
       console.log(
         `  · ${doc.title} — lu${res.dropped.length ? ` (${res.dropped.length} valeur(s) sans extrait rejetée(s))` : ''}${truncated ? ' [texte tronqué]' : ''}`,
       )
       cache[doc.documentId] = { hash, extraction: res.extraction }
+      // Persisted per document, not at the end of the run: a 300-document pass
+      // that dies on the last one must not throw away everything it paid for.
+      await writeFile(CACHE, JSON.stringify(cache, null, 1))
       byDocId.set(doc.documentId, {
         ...res.extraction,
         documentId: doc.documentId,
@@ -371,6 +438,10 @@ async function dryRun() {
         documentKind: doc.kind,
       })
     }
+
+    // Planning this company on a half-read document set would produce a report
+    // whose gaps look like findings. Stop before the arbitration instead.
+    if (stopped) break
 
     const single = company.deals.length === 1
     for (const deal of company.deals) {
@@ -414,9 +485,16 @@ async function dryRun() {
   const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '')
   const base = `${outDir}/backfill-albo-${stamp}`
   await writeFile(`${base}.csv`, toCsv(rows))
-  await writeFile(`${base}.md`, toMarkdown(rows, stats))
+  await writeFile(`${base}.md`, toMarkdown(rows, { ...stats, stopped }))
 
   console.log(`\n${'─'.repeat(60)}`)
+  if (stopped) {
+    console.log(
+      `⏸️  ARRÊT ANTICIPÉ (${stopped}) — le rapport ci-dessous est PARTIEL.\n` +
+        `   Relance la même commande plus tard : le cache reprend où c'était,\n` +
+        `   seuls les documents non encore lus repasseront au modèle.\n`,
+    )
+  }
   console.log(
     `Propositions : ${rows.filter((r) => r.section === 'PROPOSITION').length}`,
   )
