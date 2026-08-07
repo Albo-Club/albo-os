@@ -23,6 +23,76 @@ bas de page.
 
 ---
 
+## v1.189.0 — 07/08/2026 à 17:45 — Nettoyage du portefeuille CALTE repris d'Airtable
+
+Le portefeuille CALTE vient d'une base Airtable qui ne connaissait ni deal ni
+entité investisseuse : seulement des sociétés et des mouvements bancaires
+étiquetés. La reprise a donc **fabriqué** les participations, en regroupant tous
+les mouvements d'une même société portant la même étiquette. Une seule ligne
+pouvait ainsi mélanger des choses sans rapport — une acquisition immobilière et
+les avances en compte courant à la filiale, une cession de titres et les BSPCE
+d'un salarié, un pre-seed et un bridge signé deux ans plus tard.
+
+Les 247 participations issues de cette reprise ont été relues une par une, sur
+leurs mouvements bancaires, et recoupées avec le document de remise au propre du
+4 août. Le nettoyage qui en découle est prêt à être lancé sur la base :
+
+- **27 participations qui en contenaient plusieurs sont découpées en 62.**
+  Chaque tour retrouve sa vraie date d'entrée et son vrai montant, au lieu d'un
+  cumul écrasé sur la date du premier versement. Les encaissements (exits,
+  remboursements, coupons) restent sur la ligne d'origine : une revente porte
+  presque toujours sur l'ensemble des titres, pas sur un tour précis.
+- **10 fiches société en double disparaissent.** Les entités du groupe —
+  Caltimo, RDB, Relais Chapelle, les SCI, Banco 2 — avaient chacune une seconde
+  fiche créée par la reprise, plus Cœur Pigalle, Asterion Side Onima et
+  Flexliving en double graphie. Deux fiches Batch vides sont archivées ; les
+  quatre fonds Batch, eux, sont bien quatre fonds distincts.
+- **Trois lignes sortent du portefeuille** parce que ce ne sont pas des
+  investissements : le prêt Wormser que CALTE rembourse (les parts Iroko en sont
+  la garantie), un retrait de cagnotte Anaxago et une cession de titres à un
+  tiers. Leurs mouvements repartent dans la file de pointage pour être qualifiés
+  correctement.
+- **Trois doublons de participation** sont réunis, dont des remboursements qui
+  atterrissaient sur une ligne vide au lieu de la ligne qu'ils remboursent.
+- Une participation manquante est créée (RM Expansion), deux dates de signature
+  sont posées, et Sant Roch devient Sant Roch - Contrast — nom commercial et nom
+  de la SAS.
+
+Rien n'est perdu : les fiches sont archivées et non supprimées, et une
+sauvegarde complète est prise avant toute écriture.
+
+Deux sujets restent ouverts et ne sont pas touchés ici : le dossier Bureaux à
+Partager, dont la répartition entre titres et compte courant demande un
+arbitrage, et les avances en compte courant aux filiales, qui resteront
+comptées comme des participations tant que l'outil ne saura pas les porter au
+passif.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `convex/migrations/cleanupCalteImport.ts` (`dryRun` / `apply` /
+>   `verify`), même patron que `consolidateRewattCalte.ts` : ancrage par `_id`
+>   prod, garde sur le nom exact, rapport avant écriture.
+> - Découpage : les mouvements déclarés sont appariés par (date, montant) aux
+>   transactions sortantes du deal et consommés une fois — deux versements
+>   identiques le même jour sont gérés, une part introuvable fait sauter le deal
+>   entier plutôt qu'un découpage partiel. Le deal existant garde son
+>   `airtableId` et porte la première opération ; les suivantes sont insérées
+>   avec le même investisseur, la même cible et le même `instrumentKind`, et se
+>   distinguent par `deals.name`.
+> - Fusions : toutes les tables référençant une `company` (deals ×3 rôles,
+>   `companyRelations`, `documents`, `companyReports`, `companyEmailLinks`,
+>   `bankAccounts`, `kpiSnapshots`, `todos`, `companyIntelligence`) et un `deal`
+>   (`transactions` + `allocation.targetId`, `valuations`, `dealProjections`,
+>   `documents`, `forecasts`, `forecastRules`, `forecastEntries`,
+>   `matchingDecisions`) sont repointées avant archivage ou suppression.
+> - Les fiches sont archivées (`archivedAt`), refusé s'il reste une référence ;
+>   les deals, qui n'ont pas ce champ, sont supprimés une fois vidés — invariant
+>   de `deals.remove`. Clés écrites ajoutées à `manuallyEditedFields`.
+> - Contrainte relevée au passage et documentée dans `KNOWN_ISSUES.md` :
+>   `intercompanyLoans` relie deux **organisations** et rejette `same_org`, donc
+>   le module Passif ne peut pas porter un compte courant entre deux entités
+>   d'une même org.
+
 ## v1.188.2 — 07/08/2026 à 16:14 — Rewatt ne compte plus que pour une seule société dans CALTE
 
 Le portefeuille CALTE affichait dix lignes Rewatt : une par adresse d'opération,
