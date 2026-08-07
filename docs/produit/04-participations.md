@@ -22,6 +22,11 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
   term sheet en cours, pas de tableau ambre. Le compteur du bandeau compte
   les **deals** (pas les lignes) : même nombre que la ligne de totaux du
   tableau — tout se raisonne en deals.
+- **Les deals annulés n'ont pas de tableau** (ni de ligne dans les autres) :
+  ils vivent dans une section repliée « *n* deals annulés » tout en bas de la
+  page, affichée seulement s'il en existe. Un deal annulé — virement parti
+  puis remboursé — n'est ni une position ouverte ni une sortie, et il ne
+  compte dans aucun total (cf. [Deals](05-deals.md#annuler-un-deal)).
 - **Une société peut apparaître dans plusieurs tableaux** quand ses deals
   n'ont pas tous le même statut (ex. un deal sorti et un nouveau ticket en
   cours) : chaque tableau garde ainsi des sommes exactes. Pour que ça ne se
@@ -99,8 +104,9 @@ La colonne principale, dans l'ordre de lecture :
   relancée à la main.
 - **Deals de la société** : un tableau au même style que la liste des
   participations (badge de statut coloré — ambre term sheet, bleu actif,
-  vert Exit win, rouge Exit loss —, date de
-  signature, investi, reçu, TVPI), les term sheets en premier, chaque
+  vert Exit win, rouge Exit loss, gris annulé —, date de
+  signature, investi, reçu, TVPI), les term sheets en premier et les deals
+  annulés en dernier, chaque
   **ligne cliquable** vers la
   [fiche deal](05-deals.md) — c'est le seul chemin d'accès aux deals. Un
   deal se crée depuis cette fiche (menu ⋯) ; le formulaire propose

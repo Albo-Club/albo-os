@@ -576,11 +576,23 @@ export const remove = mutation({
   colour has **one source**: `dealStatusBadge(status, moic)`
   (`src/lib/dealStatusBadge.ts`) — amber for `pending`, blue for an open
   position, green/red for a winning/losing exit (from the realized MOIC), red
-  for `written_off`, neutral grey only when the outcome isn't computable. It
-  runs on the same four-bucket palette as the participations list bands
+  for `written_off`, neutral grey for `cancelled` and when the outcome isn't
+  computable. It runs on the same palette as the participations list bands
   (`dealBucket` / `participationBucketBand`), so a deal reads the same on the
   deal sheet, the deals list and the company sheet. One badge per deal, and no
   second status marker beside it (no accent bar, no duplicate exit badge).
+- ❌ Letting a `cancelled` deal into a performance figure. It is the status of
+  a deal called off **after** the funds were wired and refunded: the two bank
+  movements exist and must stay matchable, but there never was a position. So
+  it is terminal (`isTerminalStatus` in `convex/lib/metrics.ts`, rank 2 in
+  `attioSync.STATUS_RANK`) and carries **no** MOIC / TVPI / TRI, no residual
+  value, no report-freshness alert, and no share of deployed or distributed
+  capital — a refund is not a return, and a 1.00x shown in green would claim a
+  win that never happened. Any new KPI, export or agent tool that aggregates
+  deals must exclude it explicitly. It is also deliberately discreet in the UI
+  (no table of its own in the participations list, hidden from the deals list
+  until the Status facet asks for it) — see `docs/produit/05-deals.md`
+  § « Annuler un deal ».
 - ❌ Adding a `companies.sector` value that describes the **vehicle** (SPV,
   fund, studio, carried structure) or a transversal **lens** (climate,
   impact), or writing a free-typed sector from code. The canonical list is

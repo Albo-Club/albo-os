@@ -75,6 +75,10 @@ const dealStatus = v.union(
   v.literal('active'),
   v.literal('fully_exited'),
   v.literal('written_off'),
+  // Deal called off after the funds were wired and refunded: the flows exist
+  // (and stay matchable) but there never was a position, so it is neither an
+  // exit nor a write-off. Terminal, and kept out of every performance ratio.
+  v.literal('cancelled'),
 )
 
 // Instrument-archetype enums (dashboard refonte). Consumed only by the

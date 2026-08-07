@@ -291,14 +291,16 @@ export async function listSilentCompanies(
 }
 
 /**
- * Tags participation rows with their silence alert. Pending and settled rows
- * never carry one: nothing is disbursed yet, or the position is closed.
+ * Tags participation rows with their silence alert. Pending, settled and
+ * cancelled rows never carry one: nothing is disbursed yet, the position is
+ * closed, or the deal was called off — none of them owes us any news.
  */
 export function withReportAlerts<
   T extends {
     companyId: Id<'companies'>
     pending: boolean
     settled: boolean
+    cancelled: boolean
   },
 >(
   rows: Array<T>,
@@ -308,7 +310,7 @@ export function withReportAlerts<
   return rows.map((row) => ({
     ...row,
     reportAlert:
-      row.pending || row.settled
+      row.pending || row.settled || row.cancelled
         ? null
         : (byCompany.get(row.companyId) ?? null),
   }))

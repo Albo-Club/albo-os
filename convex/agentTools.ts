@@ -426,6 +426,7 @@ export const updateDealInternal = internalMutation({
         v.literal('active'),
         v.literal('fully_exited'),
         v.literal('written_off'),
+        v.literal('cancelled'),
       ),
     ),
     // Everything below is only ever sent by the MCP tools — the chat agent's
@@ -618,7 +619,7 @@ const updateDeal = createTool({
     committedAmount: z.number().int().optional(),
     paidAmount: z.number().int().optional(),
     status: z
-      .enum(['active', 'fully_exited', 'written_off'])
+      .enum(['active', 'fully_exited', 'written_off', 'cancelled'])
       .optional(),
     notes: z.string().optional(),
   }),

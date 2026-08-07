@@ -34,6 +34,7 @@ export const statusValidator = v.union(
   v.literal('active'),
   v.literal('fully_exited'),
   v.literal('written_off'),
+  v.literal('cancelled'), // called off, funds wired then refunded
 )
 
 // Single source of truth: convex/lib/instruments.ts
@@ -399,6 +400,7 @@ export function buildParticipationRows(deals: Array<ParticipationDealSource>) {
     org: { name: string; slug: string } | null
     pending: boolean
     settled: boolean
+    cancelled: boolean
     dealCount: number
     committed: number
     paid: number
@@ -417,7 +419,17 @@ export function buildParticipationRows(deals: Array<ParticipationDealSource>) {
   for (const d of deals) {
     const pending = d.status === 'pending'
     const settled = d.status === 'fully_exited' || d.status === 'written_off'
-    const bucket = pending ? 'pending' : settled ? 'settled' : 'active'
+    // Cancelled deals get their own bucket: they are neither an open position
+    // nor a realized outcome, so they must not land in the active table nor
+    // pollute the exit ratios.
+    const cancelled = d.status === 'cancelled'
+    const bucket = pending
+      ? 'pending'
+      : cancelled
+        ? 'cancelled'
+        : settled
+          ? 'settled'
+          : 'active'
     const key = `${d.targetCompanyId}:${bucket}`
     const g = map.get(key) ?? {
       companyId: d.targetCompanyId,
@@ -428,6 +440,7 @@ export function buildParticipationRows(deals: Array<ParticipationDealSource>) {
       org: d.org,
       pending,
       settled,
+      cancelled,
       dealCount: 0,
       committed: 0,
       paid: 0,
@@ -475,14 +488,16 @@ export function buildParticipationRows(deals: Array<ParticipationDealSource>) {
       org: g.org,
       pending: g.pending,
       settled: g.settled,
+      cancelled: g.cancelled,
       dealCount: g.dealCount,
       committed: g.committed,
       invested: g.paid,
       received: g.received,
       // TVPI keeps the GROSS received (not de-VAT'd), unlike the MOIC.
-      // Pending rows have no ratio at all: nothing is wired yet.
+      // Pending rows have no ratio at all: nothing is wired yet. Cancelled
+      // rows have none either: a refund is not a return.
       tvpi:
-        g.settled || g.pending
+        g.settled || g.pending || g.cancelled
           ? null
           : tvpiRatio({
               capital: g.paid,

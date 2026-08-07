@@ -133,7 +133,12 @@
     "fully_exited": "Exité",
     "written_off": "Exit loss",
     "exit_win": "Exit win",
-    "exit_loss": "Exit loss"
+    "exit_loss": "Exit loss",
+    "cancelled": "Annulé"
+  },
+  "cancelled": {
+    "sectionTitle_one": "{{count}} deal annulé",
+    "sectionTitle_other": "{{count}} deals annulés"
   },
   "exit": {
     "action": "Marquer comme sorti",

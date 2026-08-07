@@ -36,6 +36,8 @@ const STATUS_ORDER: Record<string, number> = {
   active: 1,
   fully_exited: 2,
   written_off: 2,
+  // Cancelled deals close the list: they are the least actionable of all.
+  cancelled: 3,
 }
 
 export function CompanyDealsTable({

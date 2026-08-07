@@ -32,8 +32,12 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 
-/** Exit statuses offered in the dialog (display order). */
-const EXIT_STATUSES = ['fully_exited', 'written_off'] as const
+/**
+ * Terminal statuses offered in the dialog (display order). `cancelled` closes
+ * the list: the deal was called off after the funds were wired and refunded —
+ * the date is the refund date and the proceeds the amount refunded.
+ */
+const EXIT_STATUSES = ['fully_exited', 'written_off', 'cancelled'] as const
 
 type ExitStatus = (typeof EXIT_STATUSES)[number]
 

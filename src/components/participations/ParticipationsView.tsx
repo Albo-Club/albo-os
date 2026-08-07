@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from 'react'
-import { Download, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ChevronDown, Download, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { tvpi as tvpiRatio } from '../../../convex/lib/metrics'
@@ -186,14 +186,18 @@ export function ParticipationsView({
     const active: Array<CompanyRow> = []
     const exitWin: Array<CompanyRow> = []
     const exitLoss: Array<CompanyRow> = []
+    const cancelled: Array<CompanyRow> = []
     for (const r of filtered) {
       if (r.pending) pending.push(decorate(r))
+      // Cancelled before the `!settled` test: a called-off deal is not an open
+      // position, and it never reaches the exit tables (no win, no loss).
+      else if (r.cancelled) cancelled.push(decorate(r))
       else if (!r.settled) active.push(decorate(r))
       else if (r.writtenOff || (r.moic != null && r.moic < 1))
         exitLoss.push(decorate(r))
       else exitWin.push(decorate(r))
     }
-    return { pending, active, exitWin, exitLoss }
+    return { pending, active, exitWin, exitLoss, cancelled }
   }, [filtered, rows])
 
   // Flat export (one deal per row), CSV or Excel. Follows the current search
@@ -450,7 +454,64 @@ export function ParticipationsView({
           )
         })
       )}
+
+      <CancelledSection
+        rows={buckets?.cancelled}
+        showOrg={showOrg}
+        orgSlug={orgSlug}
+        isFiltered={isFiltered}
+      />
     </div>
+  )
+}
+
+/**
+ * Cancelled deals — wired then refunded, so neither an open position nor a
+ * realized outcome. Kept out of the status tables and of every total, and
+ * surfaced here only: a collapsed section at the bottom, rendered only when
+ * there IS one (same discreet-door pattern as the "archived entities" and
+ * "entities without a deal" sections of the participations page).
+ */
+function CancelledSection({
+  rows,
+  showOrg,
+  orgSlug,
+  isFiltered,
+}: {
+  rows: Array<CompanyRow> | undefined
+  showOrg: boolean
+  orgSlug?: string
+  isFiltered: boolean
+}) {
+  const { t } = useTranslation('participations')
+  const [open, setOpen] = useState(false)
+
+  if (!rows || rows.length === 0) return null
+
+  return (
+    <section className="space-y-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm"
+      >
+        <ChevronDown
+          className={cn('size-4 transition-transform', open && 'rotate-180')}
+        />
+        {t('cancelled.sectionTitle', {
+          count: rows.reduce((n, r) => n + r.dealCount, 0),
+        })}
+      </button>
+      {open && (
+        <ParticipationsTable
+          rows={rows}
+          showOrg={showOrg}
+          orgSlug={orgSlug}
+          variant="settled"
+          isFiltered={isFiltered}
+        />
+      )}
+    </section>
   )
 }
 

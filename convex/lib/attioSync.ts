@@ -107,13 +107,19 @@ export type DealStatus =
   | 'active'
   | 'fully_exited'
   | 'written_off'
+  | 'cancelled'
 
-/** Lifecycle rank — status is forward-only (never moves to a lower rank). */
+/**
+ * Lifecycle rank — status is forward-only (never moves to a lower rank).
+ * `cancelled` is terminal like the exits: an Attio "Invested" event must not
+ * resurrect a deal we already booked as called off.
+ */
 const STATUS_RANK: Record<DealStatus, number> = {
   pending: 0,
   active: 1,
   fully_exited: 2,
   written_off: 2,
+  cancelled: 2,
 }
 
 /** Forward-only: true iff `to` is a strictly higher lifecycle rank than `from`. */
