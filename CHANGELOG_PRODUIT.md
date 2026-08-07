@@ -23,6 +23,60 @@ bas de page.
 
 ---
 
+## v1.188.0 — 07/08/2026 à 15:57 — Le score de santé se remet à trancher
+
+Le score IA de santé donnait presque toujours la même note. Sur le
+portefeuille Albo, tout tenait entre 4 et 7 — et huit sociétés sur dix entre
+5 et 7. Wandercraft, qui entre au Next40 et signe 350 robots avec Renault,
+et une marque dont le chiffre d'affaires a été divisé par deux et qui n'a
+fait que 13 % de son budget annuel : un point d'écart. Une note qui ne
+sépare pas ces deux-là ne sert à rien.
+
+L'analyse dispose maintenant d'un vrai barème. Elle note l'entreprise — pas
+la qualité de son reporting — sur trois axes : la trajectoire par rapport au
+plan, la trésorerie et le runway, la solidité de la structure (rentabilité,
+gouvernance, financement). Neuf ou dix pour une boîte excellente, sept-huit
+en bonne voie, cinq-six à surveiller, trois-quatre préoccupant, un-deux
+critique. C'est l'axe le plus dégradé qui commande : un runway sous six mois
+sans financement engagé plafonne la note, quel que soit le reste.
+
+L'analyse ne s'oblige plus non plus à trouver trois points forts et trois
+points de vigilance à chaque société. Elle en donne un à trois de chaque
+côté, selon ce que disent réellement les chiffres — une boîte qui décroche
+partout n'a plus à se voir inventer des qualités pour faire nombre.
+
+Enfin, une société dont aucun reporting n'est encore arrivé n'est plus notée
+du tout : elle affiche « aucune donnée » et reste vide dans la colonne Score.
+Jusqu'ici elle recevait une vraie note, construite à partir de son seul nom
+de domaine.
+
+Les notes déjà affichées datent de l'ancien barème : elles se mettront à jour
+au prochain reporting reçu, ou tout de suite avec « Relancer l'analyse » sur
+la fiche de la société.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/reportPrompts.ts` — `INTELLIGENCE_SYSTEM_PROMPT` : ajout d'une
+>   section « BARÈME DU SCORE DE SANTÉ » (5 bandes ancrées sur runway / écart
+>   au plan / structure, règle de plafond par l'axe le plus dégradé, consigne
+>   d'usage de toute l'échelle). Le `"score": 6` de l'exemple JSON devient un
+>   placeholder : c'était le seul chiffre du prompt, et le modèle le recopiait
+>   (cf. `KNOWN_ISSUES.md` « Prompt de notation »). `good_points` /
+>   `bad_points` passent de « EXACTEMENT 3 » à « 1 à 3 », et la posture
+>   n'exige plus un contrepoids absent des données.
+> - `convex/intelligence.ts` — la branche `no_data` de `runAnalysis` était
+>   morte : elle testait `!text`, or `getContext` renvoie toujours au moins
+>   l'en-tête `## Entreprise:`. `getContext` expose désormais `hasReports` et
+>   la garde porte sur `hasReports || vascoBlock`. Le statut `no_data` passe
+>   `analysis: null` pour effacer une synthèse périmée — la colonne Score lit
+>   `aiAnalysis` seule (`deals.aiScoresByCompany`), sans regarder le statut.
+> - `src/lib/reportScore.ts` — commentaire seul : le barème du prompt et les
+>   seuils de `scoreVerdict` sont alignés bande par bande (7-10 vert / 5-6
+>   ambre / 1-4 rouge), les déplacer séparément casse la cohérence
+>   libellé ↔ couleur.
+> - Docs : `docs/produit/04-participations.md` (barème + cas sans reporting),
+>   `TESTING.md` TP12, `KNOWN_ISSUES.md`.
+
 ## v1.187.2 — 07/08/2026 à 14:46 — On reconnaît un reporting d'un document au premier coup d'œil
 
 Dans la chronologie d'une entité, un reporting, une communication VASCO et un
