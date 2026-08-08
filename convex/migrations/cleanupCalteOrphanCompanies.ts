@@ -45,7 +45,12 @@
  * Conventions (cf. convex/schema.ts): amounts in CENTS, dates in ms epoch UTC.
  * Idempotent & guarded: cards are anchored by their prod `_id` and cross-checked
  * against their exact current name; an already-archived card is a no-op, and a
- * card that gained a reference since the audit is reported instead of archived.
+ * card that gained a reference since the audit is reported instead of archived
+ * (11 tables can name a company, `deals` counted on its three roles).
+ * A deal is created only if the card carries none AND every one of its declared
+ * movements still checks out — all-or-nothing, because a half-pointed deal
+ * would be permanent: the "card already has a deal" guard makes the second run
+ * a no-op, so the missing legs could never be caught up.
  * Nothing is hard-deleted.
  *
  * Execution order (prod, manual):
@@ -57,7 +62,7 @@
 import { ConvexError } from 'convex/values'
 import { internalMutation, internalQuery } from '../_generated/server'
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
-import type { DataModel, Id } from '../_generated/dataModel'
+import type { DataModel, Doc, Id } from '../_generated/dataModel'
 
 type Ctx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>
 
@@ -397,6 +402,34 @@ const MISSING_DEALS: Array<MissingDeal> = [
   },
 ]
 
+/** ISO day of a ms epoch, for the reports. */
+const day = (ms: number) => new Date(ms).toISOString().slice(0, 10)
+
+/**
+ * Is this still the movement the audit saw, and still free to be pointed?
+ *
+ * Free means still in the matching queue AND carrying no allocation: a
+ * liability leg is `matched` WITHOUT a `dealId` (convex/liabilities.ts), so
+ * `dealId == null` alone would not catch it. `matchStatus` is optional in the
+ * schema — absence reads as `unmatched` (convex/schema.ts) — hence the `??`.
+ *
+ * Dates are compared at DAY granularity: the declared value is midnight UTC,
+ * whereas an imported movement can carry any time of day, and a false negative
+ * here silently drops the movement. The `_id` is the anchor; amount, direction
+ * and day are the staleness cross-check.
+ */
+const isExpectedMovement = (
+  tx: Doc<'transactions'>,
+  orgId: Id<'organizations'>,
+  m: { date: number; amount: number; direction: 'in' | 'out' },
+) =>
+  tx.orgId === orgId &&
+  (tx.matchStatus ?? 'unmatched') === 'unmatched' &&
+  tx.allocation == null &&
+  day(tx.transactionDate) === day(m.date) &&
+  tx.amount === m.amount &&
+  tx.direction === m.direction
+
 async function getOrg(ctx: Ctx) {
   const org = await ctx.db
     .query('organizations')
@@ -407,19 +440,56 @@ async function getOrg(ctx: Ctx) {
 }
 
 /**
- * Everything that can name a company. An orphan card should score zero on all
- * of it — anything else means the audit went stale and the row is reported
- * instead of archived.
+ * The org-wide tables that carry no per-company index. They are read ONCE per
+ * run and filtered in memory: `incomingRefs` runs 41 times in a single `apply`,
+ * and re-collecting these inside every call would multiply the read volume by
+ * that much — straight into Convex's per-transaction read ceiling, which would
+ * abort the whole one-shot. Same reason as `cleanupCalteImport:loadScope`.
+ *
+ * The scope cannot go stale mid-run: `apply` archives every card BEFORE
+ * inserting any deal, and the deals it inserts carry no `viaSpvCompanyId` —
+ * the only field of `allDeals` this reads.
  */
+async function loadScope(ctx: Ctx, orgId: Id<'organizations'>) {
+  const [allDeals, kpis, todos, transfers, inbox] = await Promise.all([
+    ctx.db
+      .query('deals')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect(),
+    ctx.db
+      .query('kpiSnapshots')
+      .withIndex('by_org_period', (q) => q.eq('orgId', orgId))
+      .collect(),
+    ctx.db
+      .query('todos')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect(),
+    ctx.db
+      .query('transfers')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect(),
+    // Bounded on purpose: only the queue still shown to a human can name an
+    // archived card, and the full table carries every rawContent/cleanedHtml
+    // (cf. CLAUDE.md, « un gros champ texte sur une ligne lue en liste »).
+    ctx.db
+      .query('inboundEmails')
+      .withIndex('by_status', (q) => q.eq('status', 'needs_review'))
+      .collect(),
+  ])
+  return { allDeals, kpis, todos, transfers, inbox }
+}
+
+type Scope = Awaited<ReturnType<typeof loadScope>>
+
 async function incomingRefs(
   ctx: Ctx,
   orgId: Id<'organizations'>,
   id: Id<'companies'>,
+  scope: Scope,
 ) {
   const [
     asTarget,
     asInvestor,
-    allDeals,
     relParent,
     relChild,
     docs,
@@ -427,9 +497,6 @@ async function incomingRefs(
     intel,
     links,
     banks,
-    kpis,
-    todos,
-    transfers,
   ] = await Promise.all([
     ctx.db
       .query('deals')
@@ -442,10 +509,6 @@ async function incomingRefs(
       .withIndex('by_org_investor', (q) =>
         q.eq('orgId', orgId).eq('investorCompanyId', id),
       )
-      .collect(),
-    ctx.db
-      .query('deals')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect(),
     ctx.db
       .query('companyRelations')
@@ -481,33 +544,24 @@ async function incomingRefs(
         q.eq('orgId', orgId).eq('ownerCompanyId', id),
       )
       .collect(),
-    ctx.db
-      .query('kpiSnapshots')
-      .withIndex('by_org_period', (q) => q.eq('orgId', orgId))
-      .collect(),
-    ctx.db
-      .query('todos')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .collect(),
-    ctx.db
-      .query('transfers')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .collect(),
   ])
   return {
     deals:
       asTarget.length +
       asInvestor.length +
-      allDeals.filter((d) => d.viaSpvCompanyId === id).length,
+      scope.allDeals.filter((d) => d.viaSpvCompanyId === id).length,
     relations: relParent.length + relChild.length,
     documents: docs.length,
     reports: reports.length,
     intelligence: intel.length,
     emailLinks: links.length,
     bankAccounts: banks.length,
-    kpiSnapshots: kpis.filter((k) => k.companyId === id).length,
-    todos: todos.filter((t) => t.companyId === id).length,
-    transfers: transfers.filter((t) => t.ownerCompanyId === id).length,
+    kpiSnapshots: scope.kpis.filter((k) => k.companyId === id).length,
+    todos: scope.todos.filter((t) => t.companyId === id).length,
+    transfers: scope.transfers.filter((t) => t.ownerCompanyId === id).length,
+    inbox: scope.inbox.filter((e) =>
+      (e.matchedCompanies ?? []).some((m) => m.companyId === id),
+    ).length,
   }
 }
 
@@ -521,6 +575,7 @@ export const dryRun = internalQuery({
   handler: async (ctx) => {
     const org = await getOrg(ctx)
     const orgId = org._id
+    const scope = await loadScope(ctx, orgId)
 
     const archive = await Promise.all(
       ARCHIVE.map(async (spec) => {
@@ -535,7 +590,7 @@ export const dryRun = internalQuery({
         if (company.name !== spec.expectedName) {
           return { ...spec, skip: `name_mismatch (${company.name})` }
         }
-        const refs = await incomingRefs(ctx, orgId, company._id)
+        const refs = await incomingRefs(ctx, orgId, company._id, scope)
         const total = totalRefs(refs)
         return {
           name: spec.expectedName,
@@ -570,32 +625,31 @@ export const dryRun = internalQuery({
               m.transactionId as Id<'transactions'>,
             )
             return {
-              date: new Date(m.date).toISOString().slice(0, 10),
+              date: day(m.date),
               amount: m.amount,
               direction: m.direction,
-              found: tx != null,
-              matches:
-                tx?.orgId === orgId &&
-                tx.transactionDate === m.date &&
-                tx.amount === m.amount &&
-                tx.direction === m.direction,
-              stillFree:
-                tx?.matchStatus === 'unmatched' && tx.allocation == null,
+              // Same predicate `apply` will use, so the report never says yes
+              // to something the mutation then refuses.
+              ready: tx != null && isExpectedMovement(tx, orgId, m),
             }
           }),
         )
+        // All-or-nothing, exactly like `apply`: one stale movement and the deal
+        // is not created at all, rather than created half-pointed.
+        const allReady = movements.every((m) => m.ready)
         return {
           name: spec.expectedName,
           instrumentKind: spec.instrumentKind,
           paidAmount: spec.paidAmount,
-          signedDate: spec.signedDate
-            ? new Date(spec.signedDate).toISOString().slice(0, 10)
-            : null,
-          willCreate: existing.length === 0,
-          alreadyHasDeals: existing.length,
-          exit: spec.exit
-            ? new Date(spec.exit.exitedDate).toISOString().slice(0, 10)
-            : null,
+          signedDate: spec.signedDate ? day(spec.signedDate) : null,
+          willCreate: existing.length === 0 && allReady,
+          ...(existing.length > 0
+            ? { blockedBy: `card already carries ${existing.length} deal(s)` }
+            : {}),
+          ...(!allReady
+            ? { blockedBy: 'a movement changed since the audit' }
+            : {}),
+          exit: spec.exit ? day(spec.exit.exitedDate) : null,
           movements,
           source: spec.source,
         }
@@ -616,8 +670,16 @@ export const dryRun = internalQuery({
         willArchive: archive.filter((r) => 'willArchive' in r && r.willArchive)
           .length,
         byKind,
+        // `already_archived` is the expected state of a second run, not a
+        // problem — counting it as blocking would make the re-run report
+        // unreadable (41 "blocked" rows on a migration that is simply done).
+        alreadyDone: archive.filter(
+          (r) => 'skip' in r && r.skip === 'already_archived',
+        ).length,
         blocked: archive.filter(
-          (r) => 'skip' in r || ('willArchive' in r && !r.willArchive),
+          (r) =>
+            ('skip' in r && r.skip !== 'already_archived') ||
+            ('willArchive' in r && !r.willArchive),
         ).length,
         dealsCreated: creations.filter((c) => 'willCreate' in c && c.willCreate)
           .length,
@@ -633,6 +695,7 @@ export const apply = internalMutation({
   handler: async (ctx) => {
     const org = await getOrg(ctx)
     const orgId = org._id
+    const scope = await loadScope(ctx, orgId)
     const archived: Array<string> = []
     const created: Array<string> = []
     const skipped: Array<string> = []
@@ -643,16 +706,18 @@ export const apply = internalMutation({
         skipped.push(`${spec.expectedName}: anchor not found`)
         continue
       }
-      if (company.archivedAt != null) continue // already archived
+      // Org BEFORE `archivedAt`, same order as `dryRun`: a stale id landing on
+      // another org's archived card must be reported, not counted as done.
       if (company.orgId !== orgId) {
         skipped.push(`${spec.expectedName}: wrong org`)
         continue
       }
+      if (company.archivedAt != null) continue // already archived
       if (company.name !== spec.expectedName) {
         skipped.push(`${spec.expectedName}: name mismatch (${company.name})`)
         continue
       }
-      const refs = await incomingRefs(ctx, orgId, company._id)
+      const refs = await incomingRefs(ctx, orgId, company._id, scope)
       if (totalRefs(refs) > 0) {
         skipped.push(
           `${spec.expectedName}: still referenced (${Object.entries(refs)
@@ -693,7 +758,34 @@ export const apply = internalMutation({
           q.eq('orgId', orgId).eq('targetCompanyId', company._id),
         )
         .collect()
-      if (existing.length > 0) continue // already created
+      if (existing.length > 0) {
+        skipped.push(
+          `${spec.expectedName}: card already carries ${existing.length} deal(s), nothing created`,
+        )
+        continue
+      }
+      // Resolve EVERY movement before writing anything: a deal inserted with
+      // only half its movements would be permanent — the `existing.length`
+      // guard above makes a second run a no-op, so the missing legs could never
+      // be caught up. Le Chaptal is the case that matters: with only its
+      // outgoing leg it would read as a 0.00x loss on a C/C repaid in full.
+      const movements: Array<Doc<'transactions'>> = []
+      let unresolved: string | null = null
+      for (const m of spec.movements ?? []) {
+        const tx = await ctx.db.get(
+          'transactions',
+          m.transactionId as Id<'transactions'>,
+        )
+        if (!tx || !isExpectedMovement(tx, orgId, m)) {
+          unresolved = `${spec.expectedName}: movement ${day(m.date)} changed since the audit — deal NOT created`
+          break
+        }
+        movements.push(tx)
+      }
+      if (unresolved) {
+        skipped.push(unresolved)
+        continue
+      }
       const dealId = await ctx.db.insert('deals', {
         orgId,
         investorCompanyId: root._id,
@@ -715,28 +807,7 @@ export const apply = internalMutation({
       })
       created.push(spec.expectedName)
 
-      for (const m of spec.movements ?? []) {
-        const tx = await ctx.db.get(
-          'transactions',
-          m.transactionId as Id<'transactions'>,
-        )
-        // Point it only if it is still the movement the audit saw, and free —
-        // free meaning still in the queue AND carrying no allocation, since a
-        // liability leg is `matched` without a `dealId` (convex/liabilities.ts).
-        if (
-          !tx ||
-          tx.orgId !== orgId ||
-          tx.matchStatus !== 'unmatched' ||
-          tx.allocation != null ||
-          tx.transactionDate !== m.date ||
-          tx.amount !== m.amount ||
-          tx.direction !== m.direction
-        ) {
-          skipped.push(
-            `${spec.expectedName}: movement ${new Date(m.date).toISOString().slice(0, 10)} not pointed (changed since the audit)`,
-          )
-          continue
-        }
+      for (const tx of movements) {
         // Same shape as `applyMatchToDeal` (convex/lib/pointage.ts): VAT and
         // category only exist on the charge/product statuses. No
         // `matchingDecisions` row and no `reconciledBy` — that dataset records
