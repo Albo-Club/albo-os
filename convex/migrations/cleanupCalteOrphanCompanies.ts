@@ -1,7 +1,7 @@
 /**
  * One-shot cleanup of the `calte` companies the Airtable import created for
- * something that is not a portfolio company, plus the two real holdings it
- * never gave a deal to.
+ * something that is not a portfolio company, plus the three holdings it never
+ * gave a deal to.
  *
  * Context. The import created a `portfolio` card for EVERY row of the Airtable
  * `Entreprise` table, whatever the movement behind it was for — a donation, a
@@ -10,14 +10,13 @@
  * was arbitrated against the bank movements and against the signed 31/12/2025
  * accounts (`plaquette ECGE`, attestation of 07/04/2026):
  *
- *   - 39 are not portfolio companies and are archived here. The evidence is
+ *   - 41 are not portfolio companies and are archived here. The evidence is
  *     recorded per row in `kind`: a donation, a supplier invoiced monthly with
- *     VAT, the tax office, a bank/technical label, an import artefact, or a
- *     natural person. None of them appears in the balance sheet's asset detail.
- *   - 2 ARE real holdings that simply never got a deal — the accounts carry
- *     them, the tool did not. They get their deal here.
- *   - 3 are left untouched pending arbitration (Le Chaptal, Upcyclea, The Fat
- *     Broccoli): see the runbook note at the bottom of this comment.
+ *     VAT, the tax office, a bank/technical label, an import artefact, a natural
+ *     person, a dealflow card or a holding of the other vehicle. None of them
+ *     appears in the balance sheet's asset detail.
+ *   - 3 ARE real positions that simply never got a deal — the accounts or the
+ *     bank movements carry them, the tool did not. They get their deal here.
  *
  * Two of the archived rows deserve their own line, because they are NOT
  * nothing — they are simply not participations:
@@ -29,16 +28,19 @@
  *     company one can invest in.
  *
  * What this migration does:
- *   1. Archives the 39 cards (`archivedAt`), each guarded on its exact current
+ *   1. Archives the 41 cards (`archivedAt`), each guarded on its exact current
  *      name and refused outright if anything still points at it.
- *   2. Creates the deal of `PRIV. EQUITY ROTHSCHILD` (387 321 €, `fund_lp`) and
- *      of `INVEST FOR PLANET` (5 000 €, `share`) on their existing cards,
- *      with CALTE's `group_root` as investor. Amounts come verbatim from the
- *      asset detail of the signed accounts.
- *   3. Points the single Invest for Planet movement (5 000 €, 11/01/2021, HSBC)
- *      to its new deal. Rothschild has NO movement in the base — the money went
- *      out before the imported period — so its deal carries the balance-sheet
- *      amount and no signature date rather than an invented one.
+ *   2. Creates three deals on their existing cards, with CALTE's `group_root` as
+ *      investor: `PRIV. EQUITY ROTHSCHILD` (387 321 €, `fund_lp`),
+ *      `INVEST FOR PLANET` (5 000 €, `share`) — both verbatim from the asset
+ *      detail of the signed accounts — and `LE CHAPTAL` (10 000 €, `cca`,
+ *      signed 01/10/2025, repaid 15/07/2026, so `fully_exited` at 10 000 € of
+ *      proceeds), read off the two bank movements.
+ *   3. Points every declared movement to its new deal: Invest for Planet's
+ *      single one (5 000 €, 11/01/2021, HSBC) and Le Chaptal's two (out then
+ *      back). Rothschild has NO movement in the base — the money went out before
+ *      the imported period — so its deal carries the balance-sheet amount and no
+ *      signature date rather than an invented one.
  *
  * Conventions (cf. convex/schema.ts): amounts in CENTS, dates in ms epoch UTC.
  * Idempotent & guarded: cards are anchored by their prod `_id` and cross-checked
@@ -51,14 +53,6 @@
  *   pnpm exec convex run --prod migrations/cleanupCalteOrphanCompanies:dryRun
  *   # STOP: validate the report, then and only then:
  *   pnpm exec convex run --prod migrations/cleanupCalteOrphanCompanies:apply
- *
- * Still open, to add to `ARCHIVE` or to `MISSING_DEALS` once arbitrated:
- *   - `Le Chaptal` — 10 000 € out 01/10/2025, 10 000 € back 15/07/2026, both
- *     unmatched: a current account advanced then repaid. The balance sheet
- *     carries the equity side separately («BAR DES MAKS - YBB LE CHAPTAL»).
- *   - `Upcyclea` — no movement, absent from the balance sheet, enriched card.
- *   - `The Fat Broccoli` — no movement and absent from the CALTE balance sheet,
- *     but sends its reports to the `albo` org.
  */
 import { ConvexError } from 'convex/values'
 import { internalMutation, internalQuery } from '../_generated/server'
@@ -81,6 +75,9 @@ const iso = (date: string) => Date.parse(`${date}T00:00:00.000Z`)
  *   banking         — a bank, a pledged account or a transfer label
  *   import_artefact — a duplicate, or a card left behind by a deleted deal
  *   not_a_company   — a natural person, or CALTE itself
+ *   dealflow        — a company looked at, never invested in: no movement, no
+ *                     line in the balance sheet. Its place is Attio.
+ *   wrong_org       — a holding of the OTHER vehicle, created here by mistake
  */
 type Archive = {
   id: string
@@ -92,6 +89,8 @@ type Archive = {
     | 'banking'
     | 'import_artefact'
     | 'not_a_company'
+    | 'dealflow'
+    | 'wrong_org'
 }
 
 const ARCHIVE: Array<Archive> = [
@@ -297,22 +296,48 @@ const ARCHIVE: Array<Archive> = [
     expectedName: 'Calte SASU',
     kind: 'not_a_company',
   },
+  // — dealflow —
+  {
+    // Enriched card (site + pitch) but not a single euro left the accounts and
+    // the balance sheet ignores it: a file that was looked at, not an
+    // investment.
+    id: 'jx76b6ed08sra315psj5dcmdq587skx8',
+    expectedName: 'Upcyclea',
+    kind: 'dealflow',
+  },
+  // — wrong_org —
+  {
+    // No movement and nothing in the CALTE balance sheet, but it sends its
+    // investor reports to the `albo` org, where its own card lives.
+    id: 'jx71cfp12542nze5743bh4t3e987rjpn',
+    expectedName: 'The Fat Broccoli',
+    kind: 'wrong_org',
+  },
 ]
 
 /**
- * The two holdings the accounts carry and the tool does not. Amounts are the
- * `Détail de l'Actif` figures at 31/12/2025, unchanged since 31/12/2024 — both
- * predate the imported movements.
+ * The three positions the accounts or the bank statements carry and the tool
+ * does not. Rothschild and Invest for Planet come from the `Détail de l'Actif`
+ * at 31/12/2025, unchanged since 31/12/2024; Le Chaptal is read off its two
+ * movements, an advance in current account since repaid in full — hence the
+ * `exit`, and a deal born already closed.
  */
 type MissingDeal = {
   companyId: string
   expectedName: string
-  instrumentKind: 'fund_lp' | 'share'
+  instrumentKind: 'fund_lp' | 'share' | 'cca'
   paidAmount: number
   /** Absent when no movement dates the entry — never invented. */
   signedDate?: number
-  /** The single movement to point at the new deal, when there is one. */
-  movement?: { transactionId: string; date: number; amount: number }
+  /** Set when the position is already closed (an advance since repaid). */
+  exit?: { exitedDate: number; exitProceeds: number }
+  /** The movements to point at the new deal, guarded one by one. */
+  movements?: Array<{
+    transactionId: string
+    date: number
+    amount: number
+    direction: 'in' | 'out'
+  }>
   source: string
 }
 
@@ -331,13 +356,44 @@ const MISSING_DEALS: Array<MissingDeal> = [
     instrumentKind: 'share',
     paidAmount: 5_000_00,
     signedDate: iso('2021-01-11'),
-    movement: {
-      transactionId: 'kh776hdhvj0mm51ts0px8sfces87s971',
-      date: iso('2021-01-11'),
-      amount: 5_000_00,
-    },
+    movements: [
+      {
+        transactionId: 'kh776hdhvj0mm51ts0px8sfces87s971',
+        date: iso('2021-01-11'),
+        amount: 5_000_00,
+        direction: 'out',
+      },
+    ],
     source:
       '« TITRES INVEST FOR PLANET » — 5 000 € au bilan, et un mouvement sortant de 5 000 € du 11/01/2021 (HSBC) resté non pointé.',
+  },
+  {
+    // Not a duplicate of the equity line: the balance sheet carries the shares
+    // separately («BAR DES MAKS - YBB LE CHAPTAL», 453 €, which already has its
+    // own deal). This is the current account — advanced, then repaid in full,
+    // so the position closes the day the money comes back.
+    companyId: 'jx7b99my7rxcj671en3wkneyx587r14b',
+    expectedName: 'LE CHAPTAL',
+    instrumentKind: 'cca',
+    paidAmount: 10_000_00,
+    signedDate: iso('2025-10-01'),
+    exit: { exitedDate: iso('2026-07-15'), exitProceeds: 10_000_00 },
+    movements: [
+      {
+        transactionId: 'kh72ad882jqtkrqc0yy0wpkzpx87sctb',
+        date: iso('2025-10-01'),
+        amount: 10_000_00,
+        direction: 'out',
+      },
+      {
+        transactionId: 'kh714vh4ntgmjp417ns1znhkmn8bf0he',
+        date: iso('2026-07-15'),
+        amount: 10_000_00,
+        direction: 'in',
+      },
+    ],
+    source:
+      'Avance en compte courant : 10 000 € sortis le 01/10/2025 (« SAS YBB - LE CHAPTAL ») et 10 000 € revenus le 15/07/2026 (« ARNI rbt chaptal cca »), les deux non pointés. Le capital est porté à part au bilan.',
   },
 ]
 
@@ -507,12 +563,27 @@ export const dryRun = internalQuery({
             q.eq('orgId', orgId).eq('targetCompanyId', company._id),
           )
           .collect()
-        const tx = spec.movement
-          ? await ctx.db.get(
+        const movements = await Promise.all(
+          (spec.movements ?? []).map(async (m) => {
+            const tx = await ctx.db.get(
               'transactions',
-              spec.movement.transactionId as Id<'transactions'>,
+              m.transactionId as Id<'transactions'>,
             )
-          : null
+            return {
+              date: new Date(m.date).toISOString().slice(0, 10),
+              amount: m.amount,
+              direction: m.direction,
+              found: tx != null,
+              matches:
+                tx?.orgId === orgId &&
+                tx.transactionDate === m.date &&
+                tx.amount === m.amount &&
+                tx.direction === m.direction,
+              stillFree:
+                tx?.matchStatus === 'unmatched' && tx.allocation == null,
+            }
+          }),
+        )
         return {
           name: spec.expectedName,
           instrumentKind: spec.instrumentKind,
@@ -522,16 +593,10 @@ export const dryRun = internalQuery({
             : null,
           willCreate: existing.length === 0,
           alreadyHasDeals: existing.length,
-          movement: spec.movement
-            ? {
-                found: Boolean(tx),
-                matches:
-                  tx?.transactionDate === spec.movement.date &&
-                  tx.amount === spec.movement.amount &&
-                  tx.direction === 'out',
-                alreadyMatched: tx?.dealId != null,
-              }
+          exit: spec.exit
+            ? new Date(spec.exit.exitedDate).toISOString().slice(0, 10)
             : null,
+          movements,
           source: spec.source,
         }
       }),
@@ -635,40 +700,57 @@ export const apply = internalMutation({
         targetCompanyId: company._id,
         instrumentKind: spec.instrumentKind,
         currency: 'EUR',
-        status: 'active',
+        status: spec.exit ? ('fully_exited' as const) : ('active' as const),
         paidAmount: spec.paidAmount,
         signedDate: spec.signedDate,
+        exitedDate: spec.exit?.exitedDate,
+        exitProceeds: spec.exit?.exitProceeds,
         notes: spec.source,
-        manuallyEditedFields: ['paidAmount', 'signedDate', 'notes'],
+        manuallyEditedFields: [
+          'paidAmount',
+          'signedDate',
+          'notes',
+          ...(spec.exit ? ['status', 'exitedDate', 'exitProceeds'] : []),
+        ],
       })
       created.push(spec.expectedName)
 
-      if (!spec.movement) continue
-      const tx = await ctx.db.get(
-        'transactions',
-        spec.movement.transactionId as Id<'transactions'>,
-      )
-      // Point it only if it is still the movement the audit saw, and still free.
-      if (
-        !tx ||
-        tx.orgId !== orgId ||
-        tx.dealId != null ||
-        tx.transactionDate !== spec.movement.date ||
-        tx.amount !== spec.movement.amount ||
-        tx.direction !== 'out'
-      ) {
-        skipped.push(
-          `${spec.expectedName}: movement not pointed (changed since the audit)`,
+      for (const m of spec.movements ?? []) {
+        const tx = await ctx.db.get(
+          'transactions',
+          m.transactionId as Id<'transactions'>,
         )
-        continue
+        // Point it only if it is still the movement the audit saw, and free —
+        // free meaning still in the queue AND carrying no allocation, since a
+        // liability leg is `matched` without a `dealId` (convex/liabilities.ts).
+        if (
+          !tx ||
+          tx.orgId !== orgId ||
+          tx.matchStatus !== 'unmatched' ||
+          tx.allocation != null ||
+          tx.transactionDate !== m.date ||
+          tx.amount !== m.amount ||
+          tx.direction !== m.direction
+        ) {
+          skipped.push(
+            `${spec.expectedName}: movement ${new Date(m.date).toISOString().slice(0, 10)} not pointed (changed since the audit)`,
+          )
+          continue
+        }
+        // Same shape as `applyMatchToDeal` (convex/lib/pointage.ts): VAT and
+        // category only exist on the charge/product statuses. No
+        // `matchingDecisions` row and no `reconciledBy` — that dataset records
+        // HUMAN pointing decisions, and a migration is not one.
+        await ctx.db.patch('transactions', tx._id, {
+          dealId,
+          allocation: { kind: 'deal' as const, targetId: dealId },
+          matchStatus: 'matched' as const,
+          reconciled: true,
+          reconciledAt: Date.now(),
+          vatRateBps: undefined,
+          category: undefined,
+        })
       }
-      await ctx.db.patch('transactions', tx._id, {
-        dealId,
-        allocation: { kind: 'deal' as const, targetId: dealId },
-        matchStatus: 'matched' as const,
-        reconciled: true,
-        reconciledAt: Date.now(),
-      })
     }
 
     return { archived, created, skipped }

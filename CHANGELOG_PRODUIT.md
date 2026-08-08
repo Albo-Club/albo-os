@@ -34,15 +34,19 @@ passage — et même une fiche pour CALTE elle-même.
 
 Après le nettoyage précédent, 44 de ces fiches ne portaient plus aucune
 participation. Chacune a été tranchée sur ses mouvements bancaires et sur la
-plaquette signée au 31/12/2025 : **39 sont archivées**. Deux d'entre elles
+plaquette signée au 31/12/2025 : **41 sont archivées**. Deux d'entre elles
 méritent d'être signalées parce qu'elles ne sont pas rien, elles ne sont
 simplement pas des participations — le compte courant de Clément (70 700 €,
 qui est au passif) et le nantissement de 3 280 000 € (un actif, mais un
 compte bloqué en garantie d'un prêt).
 
-Et dans l'autre sens, la plaquette a révélé **deux vraies participations que
-l'outil ignorait** : Priv. Equity Rothschild pour 387 321 € et Invest for
-Planet pour 5 000 €. Elles sont créées, aux montants du bilan certifié.
+Et dans l'autre sens, la plaquette et les relevés ont révélé **trois positions
+que l'outil ignorait** : Priv. Equity Rothschild pour 387 321 €, Invest for
+Planet pour 5 000 € — toutes deux aux montants du bilan certifié — et l'avance
+en compte courant du Chaptal, 10 000 € sortis le 01/10/2025 et remboursés en
+totalité le 15/07/2026, donc créée puis soldée dans le même geste. Les trois
+mouvements bancaires correspondants, restés jusqu'ici en attente, sont pointés
+sur leur ligne.
 
 Rien n'est perdu : les fiches sont archivées, pas supprimées.
 
@@ -53,15 +57,15 @@ Rien n'est perdu : les fiches sont archivées, pas supprimées.
 >   sur le nom exact, archivage refusé si une seule référence subsiste
 >   (14 tables couvertes, `deals` compté sur ses trois rôles).
 > - Chaque ligne porte son `kind` — `donation`, `supplier`, `tax`, `banking`,
->   `import_artefact`, `not_a_company` — pour que la preuve du classement reste
->   dans le code plutôt que d'être à re-dériver.
-> - `MISSING_DEALS` crée les deux deals manquants sur les fiches existantes,
->   investisseur = `group_root` de l'org. Le mouvement Invest for Planet
->   (5 000 €, 11/01/2021, HSBC) est pointé sur le nouveau deal, sous garde
->   (montant, date, sens, non déjà pointé). Rothschild n'a aucun mouvement dans
->   la base : `signedDate` reste vide plutôt qu'inventée.
-> - Trois fiches restent en attente d'arbitrage, documentées en tête du module :
->   Le Chaptal, Upcyclea, The Fat Broccoli.
+>   `import_artefact`, `not_a_company`, `dealflow`, `wrong_org` — pour que la
+>   preuve du classement reste dans le code plutôt que d'être à re-dériver.
+> - `MISSING_DEALS` crée les trois deals manquants sur les fiches existantes,
+>   investisseur = `group_root` de l'org. Chaque `movements[]` déclaré est pointé
+>   sur le nouveau deal sous garde (org, montant, date, sens, non déjà pointé) :
+>   un mouvement qui a bougé depuis l'audit est remonté dans `skipped`, il n'est
+>   pas forcé. Rothschild n'a aucun mouvement dans la base : `signedDate` reste
+>   vide plutôt qu'inventée. Le Chaptal, remboursé, naît `fully_exited` avec
+>   `exitedDate` + `exitProceeds`.
 
 ## v1.189.2 — 07/08/2026 à 19:15 — Le compte courant Flexliving se recolle bien
 
