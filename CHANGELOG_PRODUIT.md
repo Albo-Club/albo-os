@@ -86,6 +86,49 @@ deux fois, et deux loyers Tiny Home au même jour.
 >   ajouté au chantier « retrait de la table legacy `forecasts` » :
 >   `fetchForecastSourceRows` ne doit plus être supprimé avec elle.
 
+## v1.189.5 — 08/08/2026 à 11:39 — La cofo de Climate House sort de la fiche Climate House
+
+Deux personnes physiques figuraient dans le portefeuille CALTE comme s'il
+s'agissait de sociétés dans lesquelles on avait investi. En réalité, le
+18/05/2026, CALTE a **racheté à deux cofondateurs de Climate House** les titres
+qu'ils détenaient dans leur véhicule commun. L'ancien import avait lu le
+**vendeur** comme la cible de l'investissement — d'où deux fiches à 2 000 €
+au nom de personnes.
+
+L'occasion a fait apparaître une confusion plus ancienne : **la cofo de
+Climate House est une société à part entière**, distincte de Climate House.
+Les comptes certifiés le disent d'ailleurs sur deux lignes séparées. L'outil,
+lui, mettait l'entrée dans la cofo (10 000 €, novembre 2025) sur la fiche
+Climate House.
+
+Les deux sont désormais dissociées :
+
+- **Cofo Climate House** — nouvelle fiche, 14 000 € : l'entrée de 10 000 € et
+  les deux rachats de 2 000 €.
+- **Climate House** — garde ses 20 000 € de titres et son compte courant.
+
+Les deux fiches au nom de personnes sont archivées. Les mouvements bancaires
+suivent leur investissement, rien n'est dépointé.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `convex/migrations/reassignClimateHouseCofoDeals.ts` (`dryRun` /
+>   `apply`) : crée la fiche `Cofo Climate House` (réutilisée si elle existe
+>   déjà), repointe 3 deals via `targetCompanyId`, archive les 2 fiches
+>   personne.
+> - Les deux rachats reçoivent un `deals.name` (« Rachat titres cofondateur —
+>   … ») : sans ça la fiche porterait deux deals de 2 000 € signés le même jour,
+>   impossibles à distinguer. Même patron que l'adresse dans le nom du deal sur
+>   REWATT.
+> - Les transactions ne sont pas touchées : elles portent un `dealId`, jamais
+>   une société.
+> - `resolve()` accepte la fiche **source ou** la fiche canonique (règle de
+>   `consolidateRewattCalte`) → 2ᵉ run no-op. Clés écrites ajoutées à
+>   `manuallyEditedFields`, sinon `airtableImport:runImport` remettrait le
+>   vendeur en cible.
+> - Archivage refusé s'il reste une référence (11 tables) ; le deal en instance
+>   de départ est décompté pour ne pas se bloquer lui-même.
+
 ## v1.189.4 — 08/08/2026 à 10:30 — Les trois dernières fiches du ménage CALTE
 
 Le nettoyage précédent a archivé 38 fiches sur 41 et **refusé les trois
