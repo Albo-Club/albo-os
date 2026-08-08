@@ -23,6 +23,46 @@ bas de page.
 
 ---
 
+## v1.189.4 — 08/08/2026 à 10:30 — Les trois dernières fiches du ménage CALTE
+
+Le nettoyage précédent a archivé 38 fiches sur 41 et **refusé les trois
+dernières** : chacune portait encore quelque chose, et le garde-fou préfère
+signaler plutôt que de laisser des données pendues à une fiche archivée. Voici
+ce qu'elles portaient, et ce qu'on en fait.
+
+**Serendip Invest** et **Calte SASU** étaient retenues par un lien vers un
+e-mail — un reliquat de l'ancienne fonctionnalité e-mails, retirée depuis, que
+plus rien ne lit dans l'app. Ces liens morts sont supprimés, les deux fiches
+partent en archive.
+
+**Upcyclea** est un cas différent, et je m'étais trompé en la classant en
+« dossier regardé jamais investi ». Upcyclea est **une participation Albo
+Club** : elle a sa propre fiche de ce côté-là. Ce que portait la fiche CALTE —
+le reporting annuel 2025, son PDF, sa synthèse et ses 17 indicateurs — est le
+**double exact** de ce que porte déjà la fiche Albo, qui a en plus les
+rapports T3 et T4 2025. Rien d'unique côté CALTE : le reporting était
+simplement arrivé sur les deux fiches à la fois. On le détache de la fiche
+CALTE (la fiche Albo garde tout), puis la fiche s'archive.
+
+À l'arrivée, le portefeuille CALTE ne contient plus que des participations.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `convex/migrations/archiveCalteBlockedCards.ts` (`dryRun` /
+>   `apply`) : reprend les 3 fiches remontées en `skipped` par
+>   `cleanupCalteOrphanCompanies:apply`.
+> - Les références sont scindées en **`clearable`** (`companyEmailLinks`,
+>   table legacy inerte ; `companyIntelligence`, donnée dérivée régénérée à la
+>   demande — même arbitrage que `cleanupCalteImport`) et **`blocking`** (tout
+>   le reste). Une fiche encore `blocking` n'est **pas** touchée du tout : rien
+>   n'est supprimé sur une fiche qui resterait bloquée de toute façon.
+> - Le reporting Upcyclea est détaché **depuis l'app** via
+>   `reportInbox.detachCompany`, pas réimplémenté ici : cette mutation corrige
+>   aussi la ligne `inboundEmails` source (un replay ne remet pas le report) et
+>   retire l'entrée d'index sémantique. Le `dryRun` porte le rappel et refuse
+>   d'archiver tant que le détachement n'est pas fait.
+> - Mêmes gardes que ses sœurs : ancrage `_id` prod, nom exact, org, idempotent.
+
 ## v1.189.3 — 08/08/2026 à 09:30 — Le portefeuille ne contient plus que des participations
 
 L'ancienne base Airtable créait une fiche société pour **chaque** ligne de
