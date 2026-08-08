@@ -22,8 +22,16 @@ import {
   internalMutation,
   internalQuery,
 } from './_generated/server'
+import {
+  AIRTABLE_KEY_RANGE,
+  airtableDerivedKey,
+  findInternalDuplicates,
+  planForecastImport,
+} from './lib/airtableForecasts'
 import { buildSearchText } from './lib/searchText'
-import type { Id } from './_generated/dataModel'
+import type { PlannedEntry } from './lib/airtableForecasts'
+import type { DataModel, Id } from './_generated/dataModel'
+import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
 import type { Infer } from 'convex/values'
 
 const BASE_ID = 'appVRf06AHghMkPZG'
@@ -239,7 +247,7 @@ export const ensureImportScaffold = internalMutation({
         notes: "Entité investisseuse créée pour l'import Airtable one-shot.",
         airtableId: SENTINEL_INVESTOR,
       })
-      investor = await ctx.db.get("companies", id)
+      investor = await ctx.db.get('companies', id)
     }
     const investorCompanyId = investor!._id
 
@@ -256,7 +264,7 @@ export const ensureImportScaffold = internalMutation({
         currency: 'EUR',
         airtableId: SENTINEL_BANK,
       })
-      fallback = await ctx.db.get("bankAccounts", id)
+      fallback = await ctx.db.get('bankAccounts', id)
     }
 
     return {
@@ -297,7 +305,7 @@ export const upsertCompanies = internalMutation({
         airtableId: r.airtableId,
       }
       if (existing) {
-        await ctx.db.patch("companies", existing._id, fields)
+        await ctx.db.patch('companies', existing._id, fields)
         map[r.airtableId] = existing._id
       } else {
         map[r.airtableId] = await ctx.db.insert('companies', fields)
@@ -339,7 +347,7 @@ export const upsertBankAccounts = internalMutation({
         airtableId: r.airtableId,
       }
       if (existing) {
-        await ctx.db.patch("bankAccounts", existing._id, fields)
+        await ctx.db.patch('bankAccounts', existing._id, fields)
         map[r.airtableId] = existing._id
       } else {
         map[r.airtableId] = await ctx.db.insert('bankAccounts', fields)
@@ -395,7 +403,7 @@ export const upsertDeals = internalMutation({
         for (const key of existing.manuallyEditedFields ?? []) {
           delete (patch as Record<string, unknown>)[key]
         }
-        await ctx.db.patch("deals", existing._id, patch)
+        await ctx.db.patch('deals', existing._id, patch)
         map[r.key] = existing._id
       } else {
         map[r.key] = await ctx.db.insert('deals', fields)
@@ -447,7 +455,7 @@ export const upsertTransactions = internalMutation({
       if (existing) {
         // Import re-run: do not overwrite the pointage state
         // (matchStatus / dealId / reconciled) already set on the row.
-        await ctx.db.patch("transactions", existing._id, fields)
+        await ctx.db.patch('transactions', existing._id, fields)
         patched += 1
       } else {
         // Pointage: only a dealId validated on the Airtable side ("Pointé"
@@ -457,7 +465,9 @@ export const upsertTransactions = internalMutation({
         await ctx.db.insert('transactions', {
           ...fields,
           dealId: isMatched ? r.dealId : undefined,
-          matchStatus: isMatched ? ('matched' as const) : ('unmatched' as const),
+          matchStatus: isMatched
+            ? ('matched' as const)
+            : ('unmatched' as const),
           reconciled: isMatched,
         })
         inserted += 1
@@ -484,7 +494,9 @@ export const finalizeValuations = internalMutation({
   },
   handler: async (ctx, { orgId, entryRows, valuationRows }) => {
     for (const r of entryRows) {
-      await ctx.db.patch("deals", r.dealId, { entryValuation: r.entryValuation })
+      await ctx.db.patch('deals', r.dealId, {
+        entryValuation: r.entryValuation,
+      })
     }
     let inserted = 0
     let patched = 0
@@ -503,7 +515,7 @@ export const finalizeValuations = internalMutation({
         airtableId: r.airtableId,
       }
       if (existing) {
-        await ctx.db.patch("valuations", existing._id, fields)
+        await ctx.db.patch('valuations', existing._id, fields)
         patched += 1
       } else {
         await ctx.db.insert('valuations', fields)
@@ -547,7 +559,7 @@ export const upsertForecasts = internalMutation({
         airtableId: r.airtableId,
       }
       if (existing) {
-        await ctx.db.patch("forecasts", existing._id, fields)
+        await ctx.db.patch('forecasts', existing._id, fields)
         patched += 1
       } else {
         await ctx.db.insert('forecasts', fields)
@@ -594,6 +606,55 @@ async function fetchAll(tableId: string): Promise<Array<AirtableRecord>> {
 
 const firstLink = (v0: unknown): string | undefined =>
   Array.isArray(v0) && v0.length > 0 ? String(v0[0]) : undefined
+
+/**
+ * Raw pull of the two forecast tables, normalized to the shape shared by both
+ * consumers: the legacy `forecasts` upsert of `runImport` below, and the
+ * one-shot port to `forecastEntries` (« Forecast tables → échéances » section
+ * at the end of this file).
+ *
+ * `direction` comes from the table of origin, never from the sign of the
+ * amount: the « sortie » table holds a handful of positive cells, and the
+ * table a row was filed under is the reliable signal. Missing amount/date are
+ * surfaced as `undefined` rather than defaulted — each consumer decides what
+ * to do with a hole.
+ */
+export type ForecastSourceRow = {
+  airtableId: string
+  companyRecId?: string
+  direction: 'in' | 'out'
+  amountCents?: number
+  dateMs?: number
+  label: string
+  createdTime: string
+}
+
+export async function fetchForecastSourceRows(): Promise<
+  Array<ForecastSourceRow>
+> {
+  const build = (
+    records: Array<AirtableRecord>,
+    fields: { name: string; entreprise: string; amount: string; date: string },
+    direction: 'in' | 'out',
+  ): Array<ForecastSourceRow> =>
+    records.map((rec) => {
+      const f = rec.fields
+      const cents = eurToCents(f[fields.amount])
+      return {
+        airtableId: rec.id,
+        companyRecId: firstLink(f[fields.entreprise]),
+        direction,
+        amountCents: cents === undefined ? undefined : Math.abs(cents),
+        dateMs: parseDate(f[fields.date]),
+        label: String(f[fields.name] ?? '(prévisionnel)'),
+        createdTime: rec.createdTime,
+      }
+    })
+
+  const prRecords = await fetchAll(TBL.prevRentree)
+  const psRecords = await fetchAll(TBL.prevSortie)
+  return [...build(prRecords, F.pr, 'in'), ...build(psRecords, F.ps, 'out')]
+}
 
 export const runImport = internalAction({
   args: {},
@@ -717,12 +778,15 @@ export const runImport = internalAction({
         status: STATUS_MAP[statut] ?? 'active',
         direction,
         amount: Math.abs(amount),
-        date: parseDate(f[F.mv.date]) ?? parseDate(rec.createdTime) ?? Date.now(),
+        date:
+          parseDate(f[F.mv.date]) ?? parseDate(rec.createdTime) ?? Date.now(),
         label: String(f[F.mv.nom] ?? '(sans libellé)'),
         counterparty: companyRecId
           ? entRecords.find((e) => e.id === companyRecId)?.fields[F.ent.nom]
             ? String(
-                entRecords.find((e) => e.id === companyRecId)!.fields[F.ent.nom],
+                entRecords.find((e) => e.id === companyRecId)!.fields[
+                  F.ent.nom
+                ],
               )
             : undefined
           : undefined,
@@ -778,7 +842,9 @@ export const runImport = internalAction({
     }
 
     const dealMap: Record<string, Id<'deals'>> = {}
-    const dealAggList = [...dealAgg.values()].filter((d0) => companyMap[d0.companyRecId])
+    const dealAggList = [...dealAgg.values()].filter(
+      (d0) => companyMap[d0.companyRecId],
+    )
     for (const batch of chunk(dealAggList, BATCH)) {
       const rows = batch.map((d0) => ({
         key: d0.key,
@@ -827,7 +893,10 @@ export const runImport = internalAction({
 
     // ── 6. Valuations + entryValuation (from Entreprise) ──
     // Primary deal per company: 'share' takes priority, else 1st instrument.
-    const dealsByCompany = new Map<string, Array<{ key: string; instrument: string }>>()
+    const dealsByCompany = new Map<
+      string,
+      Array<{ key: string; instrument: string }>
+    >()
     for (const d0 of dealAggList) {
       const arr = dealsByCompany.get(d0.companyRecId) ?? []
       arr.push({ key: d0.key, instrument: d0.instrument })
@@ -881,33 +950,17 @@ export const runImport = internalAction({
       return key ? dealMap[key] : undefined
     }
 
-    const buildForecastRows = (
-      records: Array<AirtableRecord>,
-      fields: { name: string; entreprise: string; amount: string; date: string },
-      direction: 'in' | 'out',
-    ) =>
-      records.map((rec) => {
-        const f = rec.fields
-        const companyRecId = firstLink(f[fields.entreprise])
-        return {
-          airtableId: rec.id,
-          dealId: uniqueDealId(companyRecId),
-          direction,
-          expectedAmount: Math.abs(eurToCents(f[fields.amount]) ?? 0),
-          expectedDate:
-            parseDate(f[fields.date]) ?? parseDate(rec.createdTime) ?? now,
-          label: String(f[fields.name] ?? '(prévisionnel)'),
-        }
-      })
-
-    const prRecords = await fetchAll(TBL.prevRentree)
-    const psRecords = await fetchAll(TBL.prevSortie)
+    const sourceForecasts = await fetchForecastSourceRows()
     let fcInserted = 0
     let fcPatched = 0
-    const allForecasts = [
-      ...buildForecastRows(prRecords, F.pr, 'in'),
-      ...buildForecastRows(psRecords, F.ps, 'out'),
-    ]
+    const allForecasts = sourceForecasts.map((row) => ({
+      airtableId: row.airtableId,
+      dealId: uniqueDealId(row.companyRecId),
+      direction: row.direction,
+      expectedAmount: row.amountCents ?? 0,
+      expectedDate: row.dateMs ?? parseDate(row.createdTime) ?? now,
+      label: row.label,
+    }))
     for (const batch of chunk(allForecasts, BATCH)) {
       const res: { inserted: number; patched: number } = await ctx.runMutation(
         internal.airtableImport.upsertForecasts,
@@ -927,7 +980,7 @@ export const runImport = internalAction({
       forecasts: {
         inserted: fcInserted,
         patched: fcPatched,
-        source: prRecords.length + psRecords.length,
+        source: sourceForecasts.length,
       },
     }
   },
@@ -955,20 +1008,50 @@ export const verify = internalQuery({
     if (!org) throw new ConvexError('calte_org_absent')
     const orgId = org._id
 
-    const [companies, deals, transactions, bankAccounts, valuations, forecasts] =
-      await Promise.all([
-        ctx.db.query('companies').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
-        ctx.db.query('deals').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
-        ctx.db.query('transactions').withIndex('by_org_date', (q) => q.eq('orgId', orgId)).collect(),
-        ctx.db.query('bankAccounts').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
-        ctx.db.query('valuations').withIndex('by_org_asof', (q) => q.eq('orgId', orgId)).collect(),
-        ctx.db.query('forecasts').withIndex('by_org_date', (q) => q.eq('orgId', orgId)).collect(),
-      ])
+    const [
+      companies,
+      deals,
+      transactions,
+      bankAccounts,
+      valuations,
+      forecasts,
+    ] = await Promise.all([
+      ctx.db
+        .query('companies')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('deals')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('transactions')
+        .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('bankAccounts')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('valuations')
+        .withIndex('by_org_asof', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('forecasts')
+        .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+        .collect(),
+    ])
 
     // Aggregate transactions per deal (single pass).
     const txByDeal = new Map<
       Id<'deals'>,
-      { count: number; nIn: number; nOut: number; sumIn: number; sumOut: number }
+      {
+        count: number
+        nIn: number
+        nOut: number
+        sumIn: number
+        sumOut: number
+      }
     >()
     const dealIds = new Set(deals.map((d) => d._id))
     let txIn = 0
@@ -1005,25 +1088,28 @@ export const verify = internalQuery({
       companiesByKind[c.kind] = (companiesByKind[c.kind] ?? 0) + 1
     }
 
-    const fallbackBank = bankAccounts.find((b) => b.airtableId === SENTINEL_BANK)
+    const fallbackBank = bankAccounts.find(
+      (b) => b.airtableId === SENTINEL_BANK,
+    )
     const txOnFallbackBank = fallbackBank
       ? transactions.filter((t) => t.bankAccountId === fallbackBank._id).length
       : 0
-    const importInvestor = companies.find((c) => c.airtableId === SENTINEL_INVESTOR)
+    const importInvestor = companies.find(
+      (c) => c.airtableId === SENTINEL_INVESTOR,
+    )
 
     // Sample: the deals with the most transactions (most telling for the
     // in/out check), enriched with the target company.
     const sampleDeals = [...deals]
       .sort(
         (a, b) =>
-          (txByDeal.get(b._id)?.count ?? 0) -
-          (txByDeal.get(a._id)?.count ?? 0),
+          (txByDeal.get(b._id)?.count ?? 0) - (txByDeal.get(a._id)?.count ?? 0),
       )
       .slice(0, n)
     const samples = await Promise.all(
       sampleDeals.map(async (d) => {
-        const target = await ctx.db.get("companies", d.targetCompanyId)
-        const investor = await ctx.db.get("companies", d.investorCompanyId)
+        const target = await ctx.db.get('companies', d.targetCompanyId)
+        const investor = await ctx.db.get('companies', d.investorCompanyId)
         const agg = txByDeal.get(d._id) ?? {
           count: 0,
           nIn: 0,
@@ -1070,7 +1156,9 @@ export const verify = internalQuery({
         importInvestorPresent: Boolean(importInvestor),
         importInvestorIsGroupRoot: importInvestor?.kind === 'group_root',
         samplesAllTargetSameOrg: samples.every((s) => s.targetSameOrg),
-        samplesAllInvestorGroupRoot: samples.every((s) => s.investorIsGroupRoot),
+        samplesAllInvestorGroupRoot: samples.every(
+          (s) => s.investorIsGroupRoot,
+        ),
       },
       samples,
     }
@@ -1121,7 +1209,7 @@ export const consolidateImportInvestor = internalMutation({
       )
       .collect()
     for (const d of deals) {
-      await ctx.db.patch("deals", d._id, { investorCompanyId: canonical._id })
+      await ctx.db.patch('deals', d._id, { investorCompanyId: canonical._id })
       dealsRepointed += 1
     }
 
@@ -1133,12 +1221,14 @@ export const consolidateImportInvestor = internalMutation({
       )
       .collect()
     for (const b of banks) {
-      await ctx.db.patch("bankAccounts", b._id, { ownerCompanyId: canonical._id })
+      await ctx.db.patch('bankAccounts', b._id, {
+        ownerCompanyId: canonical._id,
+      })
       banksRepointed += 1
     }
 
     // The placeholder has no incoming reference left → safe to delete.
-    await ctx.db.delete("companies", importEntity._id)
+    await ctx.db.delete('companies', importEntity._id)
 
     return {
       consolidated: true,
@@ -1192,10 +1282,22 @@ export const orphanReport = internalQuery({
     const mvSet = new Set(mvIds)
 
     const [companies, bankAccounts, deals, transactions] = await Promise.all([
-      ctx.db.query('companies').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
-      ctx.db.query('bankAccounts').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
-      ctx.db.query('deals').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
-      ctx.db.query('transactions').withIndex('by_org_date', (q) => q.eq('orgId', orgId)).collect(),
+      ctx.db
+        .query('companies')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('bankAccounts')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('deals')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('transactions')
+        .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+        .collect(),
     ])
 
     const orphanCompanies = companies
@@ -1205,7 +1307,12 @@ export const orphanReport = internalQuery({
           c.airtableId !== SENTINEL_INVESTOR &&
           !entSet.has(c.airtableId),
       )
-      .map((c) => ({ id: c._id, airtableId: c.airtableId, name: c.name, kind: c.kind }))
+      .map((c) => ({
+        id: c._id,
+        airtableId: c.airtableId,
+        name: c.name,
+        kind: c.kind,
+      }))
 
     const orphanBankAccounts = bankAccounts
       .filter(
@@ -1333,15 +1440,39 @@ export const duplicateReport = internalQuery({
       }
     }
 
-    const [companies, bankAccounts, deals, transactions, valuations, forecasts] =
-      await Promise.all([
-        ctx.db.query('companies').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
-        ctx.db.query('bankAccounts').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
-        ctx.db.query('deals').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
-        ctx.db.query('transactions').withIndex('by_org_date', (q) => q.eq('orgId', orgId)).collect(),
-        ctx.db.query('valuations').withIndex('by_org_asof', (q) => q.eq('orgId', orgId)).collect(),
-        ctx.db.query('forecasts').withIndex('by_org_date', (q) => q.eq('orgId', orgId)).collect(),
-      ])
+    const [
+      companies,
+      bankAccounts,
+      deals,
+      transactions,
+      valuations,
+      forecasts,
+    ] = await Promise.all([
+      ctx.db
+        .query('companies')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('bankAccounts')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('deals')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('transactions')
+        .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('valuations')
+        .withIndex('by_org_asof', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('forecasts')
+        .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+        .collect(),
+    ])
 
     return {
       companies: analyze(companies, (c) => ({ name: c.name, kind: c.kind })),
@@ -1438,7 +1569,7 @@ export const cleanupTestData = internalMutation({
 
     // 1. Validation: existence, org, absence of airtableId.
     for (const id of companyIds) {
-      const d = await ctx.db.get("companies", id)
+      const d = await ctx.db.get('companies', id)
       if (!d) problems.push(`company ${id} introuvable`)
       else if (d.orgId !== orgId) problems.push(`company ${id} hors org calte`)
       else if (d.airtableId)
@@ -1446,7 +1577,7 @@ export const cleanupTestData = internalMutation({
       else plan.companies.push({ id, label: d.name })
     }
     for (const id of dealIds) {
-      const d = await ctx.db.get("deals", id)
+      const d = await ctx.db.get('deals', id)
       if (!d) problems.push(`deal ${id} introuvable`)
       else if (d.orgId !== orgId) problems.push(`deal ${id} hors org calte`)
       else if (d.airtableId)
@@ -1454,37 +1585,71 @@ export const cleanupTestData = internalMutation({
       else plan.deals.push({ id, label: d.instrumentKind })
     }
     for (const id of txIds) {
-      const d = await ctx.db.get("transactions", id)
+      const d = await ctx.db.get('transactions', id)
       if (!d) problems.push(`transaction ${id} introuvable`)
-      else if (d.orgId !== orgId) problems.push(`transaction ${id} hors org calte`)
+      else if (d.orgId !== orgId)
+        problems.push(`transaction ${id} hors org calte`)
       else if (d.airtableId)
-        problems.push(`transaction ${id} a un airtableId (${d.airtableId}) — refus`)
+        problems.push(
+          `transaction ${id} a un airtableId (${d.airtableId}) — refus`,
+        )
       else plan.transactions.push({ id, label: d.rawLabel })
     }
     for (const id of bankIds) {
-      const d = await ctx.db.get("bankAccounts", id)
+      const d = await ctx.db.get('bankAccounts', id)
       if (!d) problems.push(`bankAccount ${id} introuvable`)
-      else if (d.orgId !== orgId) problems.push(`bankAccount ${id} hors org calte`)
+      else if (d.orgId !== orgId)
+        problems.push(`bankAccount ${id} hors org calte`)
       else if (d.airtableId)
-        problems.push(`bankAccount ${id} a un airtableId (${d.airtableId}) — refus`)
+        problems.push(
+          `bankAccount ${id} a un airtableId (${d.airtableId}) — refus`,
+        )
       else plan.bankAccounts.push({ id, label: d.label })
     }
 
     // 2. Incoming references from KEPT rows → blocker.
-    const [allDeals, allTx, allValuations, allForecasts, allRelations, allKpis] =
-      await Promise.all([
-        ctx.db.query('deals').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
-        ctx.db.query('transactions').withIndex('by_org_date', (q) => q.eq('orgId', orgId)).collect(),
-        ctx.db.query('valuations').withIndex('by_org_asof', (q) => q.eq('orgId', orgId)).collect(),
-        ctx.db.query('forecasts').withIndex('by_org_date', (q) => q.eq('orgId', orgId)).collect(),
-        ctx.db.query('companyRelations').withIndex('by_org', (q) => q.eq('orgId', orgId)).collect(),
-        ctx.db.query('kpiSnapshots').withIndex('by_org_period', (q) => q.eq('orgId', orgId)).collect(),
-      ])
+    const [
+      allDeals,
+      allTx,
+      allValuations,
+      allForecasts,
+      allRelations,
+      allKpis,
+    ] = await Promise.all([
+      ctx.db
+        .query('deals')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('transactions')
+        .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('valuations')
+        .withIndex('by_org_asof', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('forecasts')
+        .withIndex('by_org_date', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('companyRelations')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect(),
+      ctx.db
+        .query('kpiSnapshots')
+        .withIndex('by_org_period', (q) => q.eq('orgId', orgId))
+        .collect(),
+    ])
 
     // companies referenced by kept deals / accounts / relations / kpis
     for (const d of allDeals) {
       if (dealSet.has(d._id)) continue
-      for (const ref of [d.investorCompanyId, d.targetCompanyId, d.viaSpvCompanyId]) {
+      for (const ref of [
+        d.investorCompanyId,
+        d.targetCompanyId,
+        d.viaSpvCompanyId,
+      ]) {
         if (ref && companySet.has(ref))
           problems.push(`company ${ref} référencée par deal conservé ${d._id}`)
       }
@@ -1496,7 +1661,9 @@ export const cleanupTestData = internalMutation({
     for (const b of allBanks) {
       if (bankSet.has(b._id)) continue
       if (companySet.has(b.ownerCompanyId))
-        problems.push(`company ${b.ownerCompanyId} référencée par compte conservé ${b._id}`)
+        problems.push(
+          `company ${b.ownerCompanyId} référencée par compte conservé ${b._id}`,
+        )
     }
     for (const r of allRelations) {
       if (companySet.has(r.parentCompanyId) || companySet.has(r.childCompanyId))
@@ -1504,39 +1671,53 @@ export const cleanupTestData = internalMutation({
     }
     for (const k of allKpis) {
       if (companySet.has(k.companyId))
-        problems.push(`company ${k.companyId} référencée par kpiSnapshot ${k._id}`)
+        problems.push(
+          `company ${k.companyId} référencée par kpiSnapshot ${k._id}`,
+        )
     }
 
     // deals referenced by kept tx / valuations / forecasts
     for (const t of allTx) {
       if (txSet.has(t._id)) continue
       if (t.dealId && dealSet.has(t.dealId))
-        problems.push(`deal ${t.dealId} référencé par transaction conservée ${t._id}`)
+        problems.push(
+          `deal ${t.dealId} référencé par transaction conservée ${t._id}`,
+        )
     }
     for (const vrow of allValuations) {
       if (dealSet.has(vrow.dealId))
-        problems.push(`deal ${vrow.dealId} référencé par valuation conservée ${vrow._id}`)
+        problems.push(
+          `deal ${vrow.dealId} référencé par valuation conservée ${vrow._id}`,
+        )
     }
     for (const f of allForecasts) {
       if (f.dealId && dealSet.has(f.dealId))
-        problems.push(`deal ${f.dealId} référencé par forecast conservé ${f._id}`)
+        problems.push(
+          `deal ${f.dealId} référencé par forecast conservé ${f._id}`,
+        )
     }
 
     // bankAccounts referenced by kept tx / forecasts
     for (const t of allTx) {
       if (txSet.has(t._id)) continue
       if (bankSet.has(t.bankAccountId))
-        problems.push(`bankAccount ${t.bankAccountId} référencé par transaction conservée ${t._id}`)
+        problems.push(
+          `bankAccount ${t.bankAccountId} référencé par transaction conservée ${t._id}`,
+        )
     }
     for (const f of allForecasts) {
       if (f.bankAccountId && bankSet.has(f.bankAccountId))
-        problems.push(`bankAccount ${f.bankAccountId} référencé par forecast conservé ${f._id}`)
+        problems.push(
+          `bankAccount ${f.bankAccountId} référencé par forecast conservé ${f._id}`,
+        )
     }
 
     // transactions referenced by kept forecasts.realizedTransactionId
     for (const f of allForecasts) {
       if (f.realizedTransactionId && txSet.has(f.realizedTransactionId))
-        problems.push(`transaction ${f.realizedTransactionId} référencée par forecast ${f._id}`)
+        problems.push(
+          `transaction ${f.realizedTransactionId} référencée par forecast ${f._id}`,
+        )
     }
 
     if (problems.length > 0) {
@@ -1558,10 +1739,10 @@ export const cleanupTestData = internalMutation({
     }
 
     // 3. Delete in dependency order.
-    for (const id of txIds) await ctx.db.delete("transactions", id)
-    for (const id of dealIds) await ctx.db.delete("deals", id)
-    for (const id of bankIds) await ctx.db.delete("bankAccounts", id)
-    for (const id of companyIds) await ctx.db.delete("companies", id)
+    for (const id of txIds) await ctx.db.delete('transactions', id)
+    for (const id of dealIds) await ctx.db.delete('deals', id)
+    for (const id of bankIds) await ctx.db.delete('bankAccounts', id)
+    for (const id of companyIds) await ctx.db.delete('companies', id)
 
     return {
       ok: true,
@@ -1571,6 +1752,333 @@ export const cleanupTestData = internalMutation({
         deals: dealIds.length,
         transactions: txIds.length,
         bankAccounts: bankIds.length,
+      },
+    }
+  },
+})
+
+// ─── Forecast tables → échéances (one-shot port) ─────────────────────────────
+
+/**
+ * Ports « Prévision de rentrée » / « Prévision de sortie » into the org's
+ * ÉCHÉANCES (`forecastEntries`), which is what the cash page actually reads.
+ *
+ * Why a second pass at all: `runImport` above already pulls both tables, but
+ * writes them into the legacy `forecasts` table — which NO query reads. That
+ * is why the prévisionnel never showed up in the app.
+ *
+ * Decisions taken here, and why:
+ *   - Direction comes from the table of origin, never from the sign of the
+ *     amount (a handful of « sortie » cells are positive) — cf.
+ *     convex/lib/airtableForecasts.ts.
+ *   - Entries land as `expected`, NOT `confirmed`: a prévisionnel is not a
+ *     commitment, so it feeds the "avec planifié" curve and leaves the
+ *     committed trajectory untouched. Upgrading one is a UI gesture.
+ *   - Past-dated rows ARE imported. An overdue entry stays expected until it
+ *     is reconciled or cancelled — dropping it would silently improve the
+ *     outlook right as the source of truth is switched off.
+ *   - Ten rows restating an existing recurring rule are excluded
+ *     (`RULE_DUPLICATE_ROWS`); duplicates INTERNAL to Airtable are only
+ *     reported, never merged — that arbitration stays human.
+ *   - A row is linked to a deal only when its Airtable company resolves to
+ *     exactly ONE deal. The `1 deal = Entreprise × instrumentKind` shortcut of
+ *     the original import has since been undone (cleanupCalteImport,
+ *     consolidateRewattCalte), so the mapping is no longer 1:1 and a guess
+ *     would attach money to the wrong position.
+ *
+ * Idempotent: each entry carries `derivedKey` = "airtable:{recordId}", so a
+ * re-run patches instead of duplicating. No `ruleId`, so `expandRules` never
+ * touches these rows and they show up in the one-off table.
+ *
+ * Execution order (prod, manual):
+ *   pnpm exec convex export --prod --path ./calte-backup-$(date +%Y%m%d-%H%M).zip
+ *   pnpm exec convex run --prod airtableImport:forecastEntriesDryRun
+ *   # STOP: read the report, then and only then:
+ *   pnpm exec convex run --prod airtableImport:forecastEntriesApply
+ *   pnpm exec convex run --prod airtableImport:forecastEntriesVerify
+ */
+
+/** Wire shape of the pulled rows, handed from the action to the DB layer. */
+const forecastSourceValidator = v.object({
+  airtableId: v.string(),
+  companyRecId: v.optional(v.string()),
+  direction: v.union(v.literal('in'), v.literal('out')),
+  amountCents: v.optional(v.number()),
+  dateMs: v.optional(v.number()),
+  label: v.string(),
+  createdTime: v.string(),
+})
+
+type ForecastCtx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>
+
+async function requireCalteOrgId(
+  ctx: ForecastCtx,
+): Promise<Id<'organizations'>> {
+  const org = await ctx.db
+    .query('organizations')
+    .withIndex('by_slug', (q) => q.eq('slug', 'calte'))
+    .first()
+  if (!org) throw new ConvexError('calte_org_absent')
+  return org._id
+}
+
+type DealResolution = {
+  dealId?: Id<'deals'>
+  reason: 'linked' | 'no_company' | 'company_unknown' | 'ambiguous' | 'no_deal'
+}
+
+/**
+ * Airtable company record → the org's single deal on that company, when there
+ * is exactly one. Anything else stays unlinked and is counted in the report.
+ */
+async function resolveForecastDeal(
+  ctx: ForecastCtx,
+  orgId: Id<'organizations'>,
+  companyRecId: string | undefined,
+): Promise<DealResolution> {
+  if (!companyRecId) return { reason: 'no_company' }
+  const company = await ctx.db
+    .query('companies')
+    .withIndex('by_airtable_id', (q) => q.eq('airtableId', companyRecId))
+    .first()
+  if (!company || company.orgId !== orgId) return { reason: 'company_unknown' }
+
+  const deals = await ctx.db
+    .query('deals')
+    .withIndex('by_org_target', (q) =>
+      q.eq('orgId', orgId).eq('targetCompanyId', company._id),
+    )
+    .collect()
+  if (deals.length === 0) return { reason: 'no_deal' }
+  if (deals.length > 1) return { reason: 'ambiguous' }
+  return { dealId: deals[0]._id, reason: 'linked' }
+}
+
+/** Plans the rows and resolves their deals — shared by the report and apply. */
+async function buildForecastPlan(
+  ctx: ForecastCtx,
+  rows: Array<ForecastSourceRow>,
+) {
+  const orgId = await requireCalteOrgId(ctx)
+  const { entries, skipped } = planForecastImport(rows)
+  const resolutions = new Map<string, DealResolution>()
+  for (const entry of entries) {
+    resolutions.set(
+      entry.airtableId,
+      await resolveForecastDeal(ctx, orgId, entry.companyRecId),
+    )
+  }
+  return { orgId, entries, skipped, resolutions }
+}
+
+/** Fields of the forecast entry an Airtable row becomes. */
+function forecastEntryFields(
+  orgId: Id<'organizations'>,
+  entry: PlannedEntry,
+  dealId: Id<'deals'> | undefined,
+) {
+  return {
+    orgId,
+    date: entry.dateMs,
+    amountCents: entry.amountCents,
+    direction: entry.direction,
+    confidence: 'expected' as const,
+    status: 'pending' as const,
+    label: entry.label,
+    // Mirrors the existing deal-linked rules; an unlinked row keeps no
+    // category rather than being filed under a guessed one.
+    category: dealId ? 'deals' : undefined,
+    dealId,
+    derivedKey: airtableDerivedKey(entry.airtableId),
+    overridden: false,
+    currency: 'EUR',
+  }
+}
+
+const toEur = (cents: number) => Math.round(cents / 100)
+
+/** Read-only report — the gate before `forecastEntriesApply`. */
+export const forecastEntriesReport = internalQuery({
+  args: { rows: v.array(forecastSourceValidator) },
+  handler: async (ctx, { rows }) => {
+    const { entries, skipped, resolutions } = await buildForecastPlan(ctx, rows)
+    const now = Date.now()
+
+    let alreadyImported = 0
+    for (const entry of entries) {
+      const existing = await ctx.db
+        .query('forecastEntries')
+        .withIndex('by_derivedKey', (q) =>
+          q.eq('derivedKey', airtableDerivedKey(entry.airtableId)),
+        )
+        .unique()
+      if (existing) alreadyImported += 1
+    }
+
+    const linkage = {
+      linked: 0,
+      no_company: 0,
+      company_unknown: 0,
+      ambiguous: 0,
+      no_deal: 0,
+    }
+    for (const resolution of resolutions.values())
+      linkage[resolution.reason] += 1
+
+    let inCents = 0
+    let outCents = 0
+    for (const entry of entries) {
+      if (entry.direction === 'in') inCents += entry.amountCents
+      else outCents += entry.amountCents
+    }
+
+    return {
+      pulled: rows.length,
+      toImport: entries.length,
+      alreadyImported,
+      skipped: skipped.map((s) => ({
+        airtableId: s.airtableId,
+        label: s.label,
+        reason: s.reason,
+      })),
+      linkage,
+      overdue: entries.filter((e) => e.dateMs < now).length,
+      totals: {
+        inEur: toEur(inCents),
+        outEur: toEur(outCents),
+        netEur: toEur(inCents - outCents),
+      },
+      // Same money entered twice in Airtable — reported, never merged.
+      internalDuplicates: findInternalDuplicates(entries).map((group) =>
+        group.map((e) => ({
+          airtableId: e.airtableId,
+          label: e.label,
+          eur: toEur(e.amountCents),
+          dateISO: new Date(e.dateMs).toISOString().slice(0, 10),
+        })),
+      ),
+      // Sanity check on the biggest lines: an amount that looks like a whole
+      // operation rather than the CALTE share is worth a human look.
+      largest: [...entries]
+        .sort((a, b) => b.amountCents - a.amountCents)
+        .slice(0, 5)
+        .map((e) => ({
+          label: e.label,
+          eur: toEur(e.amountCents),
+          direction: e.direction,
+        })),
+    }
+  },
+})
+
+/** Writes the entries (insert or patch by `derivedKey`). */
+export const forecastEntriesApplyRows = internalMutation({
+  args: { rows: v.array(forecastSourceValidator) },
+  handler: async (ctx, { rows }) => {
+    const { orgId, entries, skipped, resolutions } = await buildForecastPlan(
+      ctx,
+      rows,
+    )
+
+    let inserted = 0
+    let patched = 0
+    let protectedRows = 0
+    for (const entry of entries) {
+      const dealId = resolutions.get(entry.airtableId)?.dealId
+      const fields = forecastEntryFields(orgId, entry, dealId)
+      const existing = await ctx.db
+        .query('forecastEntries')
+        .withIndex('by_derivedKey', (q) =>
+          q.eq('derivedKey', airtableDerivedKey(entry.airtableId)),
+        )
+        .unique()
+      if (!existing) {
+        await ctx.db.insert('forecastEntries', fields)
+        inserted += 1
+        continue
+      }
+      // An entry reconciled or cancelled by hand is history, not projection:
+      // a re-run must never resurrect it (same stance as expandRules towards
+      // a protected occurrence).
+      if (existing.status !== 'pending') {
+        protectedRows += 1
+        continue
+      }
+      await ctx.db.patch('forecastEntries', existing._id, fields)
+      patched += 1
+    }
+    return {
+      inserted,
+      patched,
+      protected: protectedRows,
+      skipped: skipped.length,
+    }
+  },
+})
+
+/** Pull + report. Read-only. */
+export const forecastEntriesDryRun = internalAction({
+  args: {},
+  handler: async (ctx): Promise<Record<string, unknown>> => {
+    const rows = await fetchForecastSourceRows()
+    return await ctx.runQuery(internal.airtableImport.forecastEntriesReport, {
+      rows,
+    })
+  },
+})
+
+/** Pull + write. Idempotent. */
+export const forecastEntriesApply = internalAction({
+  args: {},
+  handler: async (ctx): Promise<Record<string, unknown>> => {
+    const rows = await fetchForecastSourceRows()
+    return await ctx.runMutation(
+      internal.airtableImport.forecastEntriesApplyRows,
+      { rows },
+    )
+  },
+})
+
+/**
+ * Post-import check, offline: counts what carries an `airtable:` key in the
+ * org and confirms one entry per Airtable record.
+ */
+export const forecastEntriesVerify = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const orgId = await requireCalteOrgId(ctx)
+    const rows = await ctx.db
+      .query('forecastEntries')
+      .withIndex('by_derivedKey', (q) =>
+        q
+          .gte('derivedKey', AIRTABLE_KEY_RANGE.start)
+          .lt('derivedKey', AIRTABLE_KEY_RANGE.end),
+      )
+      .collect()
+
+    const mine = rows.filter((r) => r.orgId === orgId)
+    const keys = new Set(mine.map((r) => r.derivedKey))
+    const byStatus = { pending: 0, realized: 0, cancelled: 0 }
+    let inCents = 0
+    let outCents = 0
+    for (const row of mine) {
+      byStatus[row.status] += 1
+      if (row.status !== 'pending') continue
+      if (row.direction === 'in') inCents += row.amountCents
+      else outCents += row.amountCents
+    }
+
+    return {
+      imported: mine.length,
+      distinctKeys: keys.size,
+      duplicates: mine.length - keys.size,
+      otherOrgs: rows.length - mine.length,
+      byStatus,
+      linkedToDeal: mine.filter((r) => r.dealId != null).length,
+      pendingTotals: {
+        inEur: toEur(inCents),
+        outEur: toEur(outCents),
+        netEur: toEur(inCents - outCents),
       },
     }
   },

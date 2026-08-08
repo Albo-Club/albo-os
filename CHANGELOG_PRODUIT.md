@@ -23,6 +23,69 @@ bas de page.
 
 ---
 
+## v1.190.0 — 08/08/2026 à 11:45 — Le prévisionnel Airtable arrive dans les échéances
+
+Airtable s'éteint, et il gardait encore quelque chose que l'app ne montrait
+pas : les **prévisions de rentrée et de sortie**. 83 rentrées et 32 sorties
+qui vivaient là-bas sans jamais apparaître nulle part dans Albo OS.
+
+Elles rejoignent CALTE, dans **Trésorerie → Échéances ponctuelles**. Elles
+comptent dans la courbe de trésorerie, se rapprochent d'une transaction
+comme n'importe quelle échéance, et se modifient ou s'annulent à la main.
+
+Trois choix qui méritent d'être dits, parce qu'ils se voient à l'écran :
+
+- **Elles arrivent en « attendu », pas en « confirmé ».** Un prévisionnel
+  n'est pas un engagement : ces montants nourrissent le scénario _avec
+  planifié_ et laissent la courbe _engagée_ — la lecture prudente —
+  exactement comme elle était. Vous pouvez passer une ligne en confirmé au
+  cas par cas quand elle se solidifie.
+- **Les échéances déjà dépassées sont reprises aussi**, et remontent donc
+  « en retard ». C'est voulu : les écarter aurait embelli la trajectoire en
+  silence au moment précis où la source disparaît. Il y en a une quinzaine à
+  passer en revue une bonne fois.
+- **Dix lignes ont été écartées** parce qu'elles redisaient une règle
+  récurrente que vous avez déjà dans l'app : les loyers IROKO (mensuels et
+  annuels) et le remboursement Wormser. Les importer aurait compté le même
+  argent deux, voire trois fois.
+
+Deux réserves, signalées et **pas** corrigées d'office — c'est à vous de
+trancher dans l'app : quelques lignes rattachées à aucun deal (les fiches
+sociétés ont été redécoupées depuis l'import d'origine, le lien automatique
+n'est plus fiable et une erreur accrocherait de l'argent à la mauvaise
+position), et deux doublons internes à Airtable — Weefin secondaire saisi
+deux fois, et deux loyers Tiny Home au même jour.
+
+> **🔧 Notes techniques**
+>
+> - Le cœur d'arbitrage est isolé et testé : `convex/lib/airtableForecasts.ts`
+>   (`planForecastImport`, `RULE_DUPLICATE_ROWS`, `findInternalDuplicates`,
+>   `airtableDerivedKey`) + `tests/airtableForecasts.test.ts`. Le sens vient de
+>   la table d'origine, jamais du signe du montant : la table « sortie »
+>   contient quelques cellules positives, et le classement fait foi.
+> - Le tirage des deux tables est factorisé dans
+>   `airtableImport.fetchForecastSourceRows()`, désormais partagé entre
+>   l'upsert legacy `forecasts` de `runImport` (comportement inchangé : il
+>   ré-applique ses propres valeurs par défaut) et le nouveau port.
+> - Opération one-shot : `airtableImport:forecastEntriesDryRun` /
+>   `forecastEntriesApply` / `forecastEntriesVerify`. Idempotente via
+>   `forecastEntries.derivedKey` = `airtable:{recordId}` (nouveau préfixe,
+>   documenté dans `convex/schema.ts`) ; pas de `ruleId`, donc `expandRules`
+>   n'y touche jamais et les lignes vivent dans la table des ponctuelles. Une
+>   échéance déjà rapprochée ou annulée n'est jamais réécrite par un re-run.
+> - Rattachement au deal seulement si la société Airtable résout vers **un
+>   seul** deal (`by_airtable_id` puis `by_org_target`) : le
+>   `1 deal = Entreprise × instrumentKind` de l'import d'origine a été défait
+>   par `cleanupCalteImport` et `consolidateRewattCalte`.
+> - Le tout vit dans `convex/airtableImport.ts` plutôt que dans un module
+>   `convex/migrations/` dédié : un nouveau module Convex ne peut pas
+>   s'auto-référencer via `internal.…` sans régénérer `_generated/api.d.ts`
+>   (cf. `KNOWN_ISSUES.md` « `convex codegen` can't run in the remote exec
+>   environment »), et ce fichier est déjà le module d'import one-shot
+>   Airtable. Index de l'opération dans `MIGRATIONS.md`, avec un garde-fou
+>   ajouté au chantier « retrait de la table legacy `forecasts` » :
+>   `fetchForecastSourceRows` ne doit plus être supprimé avec elle.
+
 ## v1.189.4 — 08/08/2026 à 10:30 — Les trois dernières fiches du ménage CALTE
 
 Le nettoyage précédent a archivé 38 fiches sur 41 et **refusé les trois
@@ -209,6 +272,7 @@ passif.
 >   `intercompanyLoans` relie deux **organisations** et rejette `same_org`, donc
 >   le module Passif ne peut pas porter un compte courant entre deux entités
 >   d'une même org.
+
 ## v1.189.0 — 07/08/2026 à 18:35 — La file des reports se répare toute seule
 
 Le correctif d'il y a une heure n'a tenu qu'un tour : les deux mêmes reports
@@ -363,6 +427,7 @@ unique et correctement rattachée.
 > - Chaque clé écrite est ajoutée à `deals.manuallyEditedFields`, sinon un
 >   re-run de `airtableImport:runImport` réécraserait tout (cf. `KNOWN_ISSUES.md`
 >   « Édition manuelle deals »).
+
 ## v1.188.1 — 07/08/2026 à 16:20 — La récupération des chiffres encaisse la saturation du modèle
 
 Au premier passage réel sur les documents juridiques, le modèle de lecture a

@@ -1658,9 +1658,11 @@ export default defineSchema({
    *
    * `derivedKey` = idempotency key for auto rows, format
    * "rule:{ruleId}:{YYYY-MM-DD}", "vat:{orgId}:{YYYY-Qn}" (quarterly VAT
-   * suggestion — no ruleId, so the row stays a plain editable one-off) or
-   * "deal:{dealId}:{YYYY-MM-DD}" for the future deriveFromDeals. Null for
-   * 100 % manual rows.
+   * suggestion — no ruleId, so the row stays a plain editable one-off),
+   * "airtable:{recordId}" (one-shot port of the Airtable forecast tables —
+   * cf. convex/migrations/airtableForecastsToEntries.ts, likewise a plain
+   * one-off) or "deal:{dealId}:{YYYY-MM-DD}" for the future deriveFromDeals.
+   * Null for 100 % manual rows.
    */
   forecastEntries: defineTable({
     orgId: v.id('organizations'),
