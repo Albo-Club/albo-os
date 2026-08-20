@@ -1,0 +1,18 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+# Shared repository settings — the Mac app reads this file from the default
+# branch on the remote, so it only takes effect for new workspaces once merged
+# into `main`.
+#
+# Why a setup script: a fresh worktree has no `node_modules`, and without this
+# every workspace waits on a manual install — the window in which an agent that
+# can't find `node_modules` improvises an `npm install` and commits a stray
+# `package-lock.json`. The install itself is close to free: the pnpm store lives
+# on the same APFS volume, so packages are copy-on-write clones, ~12 s and a few
+# tens of MB per worktree (see KNOWN_ISSUES.md § "node_modules dans 11
+# worktrees"). `--frozen-lockfile` guarantees the worktree matches the lockfile.
+#
+# `.env.local` is not handled here: gitignored files are carried over by Files
+# to copy, whose default `.env*` pattern already covers it.
+[scripts]
+setup = "pnpm install --frozen-lockfile"

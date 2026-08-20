@@ -9,15 +9,15 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # No `version:` — action-setup reads `packageManager` from package.json.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -53,3 +53,56 @@ jobs:
             trigger on PRs created with `GITHUB_TOKEN`).
           labels: dependencies
           delete-branch: true
+
+      # A weekly job that fails in silence is worse than no job: it looks like
+      # dependencies are being kept up to date while nothing lands. This ran
+      # red every Monday for over a month (a better-auth bump breaking `pnpm
+      # lint`) and nobody saw it. Same open-or-comment shape as prod-smoke.yml.
+      - name: Open or update failure issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            const body = [
+              'La mise à jour hebdomadaire des dépendances a échoué.',
+              '',
+              `Run : ${runUrl}`,
+              '',
+              "Une dépendance mise à jour dans sa plage semver ne compile plus :",
+              "aucune PR n'a été ouverte, donc **aucune mise à jour de dépendance",
+              "n'est passée**. Ouvrir le run ci-dessus, lire l'étape en échec, puis",
+              "corriger l'incompatibilité (ou épingler le paquet fautif dans",
+              '`pnpm.overrides`, cf. KNOWN_ISSUES.md) pour que le run du lundi',
+              'suivant aboutisse.',
+              '',
+              'Les échecs suivants sont commentés ici — refermer ce ticket une fois',
+              'le workflow revenu au vert.',
+            ].join('\n')
+
+            const { data: labelled } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'dependencies',
+            })
+            // listForRepo returns pull requests too, and the `chore/update-deps`
+            // PR carries this very label — commenting the failure onto it would
+            // bury the alert in the PR it is meant to replace.
+            const open = labelled.filter((i) => !i.pull_request)
+            if (open.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: open[0].number,
+                body: `Nouvel échec.\n\n${body}`,
+              })
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '🔴 Mise à jour des dépendances : le run hebdomadaire échoue',
+                labels: ['dependencies'],
+                body,
+              })
+            }
