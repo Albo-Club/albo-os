@@ -475,6 +475,65 @@ together when upstream fixes land. (`pnpm update` in `scripts/update-deps.mjs`
 respects `pnpm.overrides`, so a pin is enough to hold the weekly bump back —
 there is no separate bot config to disable since `renovate.json` was removed.)
 
+## `@convex-dev/better-auth` : fenêtre de versions verrouillée
+
+**Ne pas « débloquer » ces deux versions sans lire cette section.** Le pin a
+coûté un bisect complet et il protège d'une régression de typage **et** d'une
+régression de perf, tout en gardant un correctif de sécurité.
+
+```json
+"@convex-dev/better-auth": "0.12.2",   // exact, pas ^ ni ~
+"better-auth": "~1.6.30"               // 1.6.x seulement, jamais 1.7
+```
+
+**Pourquoi `better-auth` doit rester ≥ 1.6.22** : `GHSA-qq9h-g4jm-xgf3`
+(sévérité **high**) — *Account takeover via pre-account hijacking on
+magic-link and email-OTP sign-in*, plage `>= 1.1.3, < 1.6.22`. `convex/auth.ts`
+charge `magicLink()`, donc le projet est dans la surface d'attaque. Toute
+opération qui ferait redescendre `better-auth` sous 1.6.22 réintroduit la
+faille.
+
+**Pourquoi `better-auth` ne doit pas atteindre 1.7** : l'adapter déclare le
+peer `>=1.6.9 <1.7.0`, et 1.7 supprime l'export `mcp` de `better-auth/plugins`
+dont `convex/auth.ts` dépend (`TS2305`). Le `~` est là pour ça — un `^` laisse
+passer 1.7.x et c'est exactement ce qui cassait le job hebdomadaire.
+
+**Pourquoi l'adapter est épinglé en exact `0.12.2`** — bisect (adapter ×
+better-auth, `tsc` + `pnpm test:convex`) :
+
+| adapter | better-auth | `tsc`         | `test:convex`      |
+| ------- | ----------- | ------------- | ------------------ |
+| 0.12.2  | 1.6.16      | ✅            | ✅ 120/120         |
+| 0.12.2  | **1.6.30**  | ✅            | ✅ 120/120 (×3)    |
+| 0.12.3  | 1.6.30      | ✅            | ❌ 2 à 4 timeouts  |
+| 0.12.4  | 1.6.30      | ❌ `TS2322`   | —                  |
+| 0.12.5  | 1.6.30      | ❌ `TS2322`   | —                  |
+
+- **0.12.4 / 0.12.5** : `useSession().data` s'effondre en `never`, donc
+  `ReactAuthClient<…>` n'est plus assignable à `AuthClient` sur la prop
+  `authClient` de `ConvexBetterAuthProvider` (`src/routes/__root.tsx:111`).
+  Cause : better-auth ≥ 1.6.18 nomme ses types de retour (`ReactAuthClient`)
+  au lieu d'un type structurel anonyme, et le `AuthClient` de l'adapter — bâti
+  sur `Omit<BetterAuthClientPlugin, "$InferServerPlugin" | "getActions">` dans
+  `dist/plugins/cross-domain/client.d.ts` — ne s'unifie plus. Le diff
+  0.12.3 → 0.12.4 est **exactement** ce passage à un `CrossDomainClientPlugin`
+  nommé, avec l'import qui bascule de `better-auth` vers `better-auth/client`.
+- **0.12.3** : typecheck, mais ralentit le harness `convex-test` au point de
+  faire expirer 2 à 4 tests sur 120 (timeout 5 s), avec un nombre variable
+  d'un run à l'autre. Le contrôle a été fait : `main` en 0.12.2 passe 120/120
+  deux fois d'affilée sur la même machine, 0.12.3 échoue deux fois. Ce n'est
+  pas de la charge machine.
+
+⚠️ Un `^0.12.2` ou un `~0.12.2` **ne protège pas** : sur une version `0.x`, les
+deux se lisent `>=0.12.2 <0.13.0` et laissent donc passer 0.12.3, 0.12.4 et
+0.12.5. Seule la version exacte tient.
+
+**Condition de déblocage** : suivi amont `get-convex/better-auth#420` (ouvert,
+reproduit par deux tiers jusqu'en better-auth 1.6.25). Quand une version de
+l'adapter publie le correctif de typage, dérouler la matrice ci-dessus avant
+d'élargir la contrainte — `tsc` **et** `pnpm test:convex` en trois passes, la
+régression de perf de 0.12.3 ne se voit pas au typecheck.
+
 ## Version de pnpm : trois pins, dont un invisible
 
 **Le piège** : `pnpm-lock.yaml` ne dit pas quel pnpm l'a écrit —
