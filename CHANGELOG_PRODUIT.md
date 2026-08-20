@@ -65,10 +65,12 @@ endroit au lieu de quatre.
 >   11.22.0 (corepack), CI 10.x, et Vercel **10.28.0 choisi « d'après la
 >   date de création du projet »** (log de build), un pin invisible hors du
 >   repo. Le pin retenu est celui que la prod exécute déjà : corepack
->   réaligne le local, `pnpm/action-setup` réaligne la CI, et le champ est
->   un **no-op pour Vercel** (sans `ENABLE_EXPERIMENTAL_COREPACK` il l'ignore
->   et reste sur 10.28.0) — donc zéro risque sur un déploiement prod-only.
->   Le lockfile (`lockfileVersion 9.0`) n'a pas bougé.
+>   réaligne le local, `pnpm/action-setup` réaligne la CI, et **Vercel lit
+>   le champ** : le build preview de la PR est passé de « Using pnpm@10.x
+>   based on project creation date » à « with package.json#packageManager
+>   pnpm@10.28.0 » — même version, donc aucun changement de comportement,
+>   mais l'heuristique hors repo disparaît. Le lockfile n'a pas bougé
+>   (toujours en `lockfileVersion` 9.0).
 > - **Aucun champ `engines`**, et c'est délibéré dans les deux cas.
 >   `engines.pnpm` : la doc Vercel documente `ERR_PNPM_UNSUPPORTED_ENGINE`
 >   quand il ne colle pas au pnpm réellement choisi (par heuristique), donc
