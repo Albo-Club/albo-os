@@ -3,6 +3,7 @@
   "private": true,
   "sideEffects": false,
   "type": "module",
+  "packageManager": "pnpm@10.28.0",
   "scripts": {
     "dev": "concurrently -k -n vite,convex -c blue,magenta \"pnpm dev:vite\" \"pnpm dev:convex\"",
     "dev:vite": "vite dev",

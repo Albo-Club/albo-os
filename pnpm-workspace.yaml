@@ -1,6 +1,11 @@
+# Build scripts are opt-in. Both keys are declared on purpose: pnpm 11+ reads
+# `allowBuilds`, pnpm 10 reads `onlyBuiltDependencies`. Keeping them in sync
+# means the repo installs cleanly whichever major runs it — a placeholder left
+# in `allowBuilds` made pnpm 11 exit 1 on every `pnpm install` (and therefore
+# on every `pnpm <script>`) while CI on pnpm 10 stayed green.
 allowBuilds:
-  esbuild: set this to true or false
-  unrs-resolver: set this to true or false
+  esbuild: true
+  unrs-resolver: true
 onlyBuiltDependencies:
   - esbuild
   - unrs-resolver

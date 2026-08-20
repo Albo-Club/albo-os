@@ -23,6 +23,80 @@ bas de page.
 
 ---
 
+## v1.190.1 — 20/08/2026 à 11:51 — Les mises à jour de dépendances repartent
+
+Rien de visible dans l'app : cette version répare l'outillage qui la
+construit.
+
+Trois choses étaient cassées, chacune en silence.
+
+- **Les commandes de développement ne démarraient plus** sur les postes
+  équipés de la dernière version de l'outil qui installe les dépendances.
+  Un réglage laissé à moitié rempli faisait échouer chaque commande, alors
+  que la même chose passait sans problème sur le serveur de build. Réparé,
+  et écrit de façon à valoir pour l'ancienne comme pour la nouvelle version.
+- **Le robot qui met les dépendances à jour chaque lundi échouait depuis
+  plus d'un mois**, sans que personne ne le voie. Il faisait pourtant son
+  travail : il refusait d'ouvrir une mise à jour qui casse la compilation.
+  Mais son échec ne se voyait nulle part, ce qui donnait l'illusion que les
+  dépendances étaient tenues à jour alors qu'aucune n'avait bougé. Il ouvre
+  désormais un ticket quand il échoue.
+- **Un second robot de mise à jour était annoncé mais n'avait jamais été
+  activé** — sa configuration promettait une politique qui n'existait pas.
+  Elle est retirée : un seul mécanisme, celui qui fonctionne.
+
+Au passage, les nouveaux espaces de travail installent leurs dépendances
+tout seuls, et la version de l'outil d'installation est fixée à un seul
+endroit au lieu de quatre.
+
+> **🔧 Notes techniques**
+>
+> - `pnpm-workspace.yaml` : `allowBuilds` portait encore les placeholders du
+>   template (`"set this to true or false"`). pnpm 11 lit `allowBuilds` et
+>   ignore `onlyBuiltDependencies` → valeur non booléenne = build refusé →
+>   `ERR_PNPM_IGNORED_BUILDS` en **exit 1**, et comme pnpm 11 lance un
+>   `runDepsStatusCheck` avant chaque script, **tout `pnpm <script>` sortait
+>   en 1** en local (y compris le hook `SessionStart`). La CI, pinnée sur
+>   pnpm 10, lisait `onlyBuiltDependencies` et restait verte. Les deux clés
+>   sont désormais correctes et synchronisées : l'install passe sur 10 comme
+>   sur 11.
+> - `package.json` : ajout de `packageManager: "pnpm@10.28.0"`, seul champ
+>   ajouté. Trois versions de pnpm cohabitaient — local
+>   11.22.0 (corepack), CI 10.x, et Vercel **10.28.0 choisi « d'après la
+>   date de création du projet »** (log de build), un pin invisible hors du
+>   repo. Le pin retenu est celui que la prod exécute déjà : corepack
+>   réaligne le local, `pnpm/action-setup` réaligne la CI, et le champ est
+>   un **no-op pour Vercel** (sans `ENABLE_EXPERIMENTAL_COREPACK` il l'ignore
+>   et reste sur 10.28.0) — donc zéro risque sur un déploiement prod-only.
+>   Le lockfile (`lockfileVersion 9.0`) n'a pas bougé.
+> - **Aucun champ `engines`**, et c'est délibéré dans les deux cas.
+>   `engines.pnpm` : la doc Vercel documente `ERR_PNPM_UNSUPPORTED_ENGINE`
+>   quand il ne colle pas au pnpm réellement choisi (par heuristique), donc
+>   il armerait une panne de build au prochain patch de leur côté.
+>   `engines.node` : le projet Vercel tourne sur **Node 24.x** et un
+>   `engines.node` dans `package.json` **écrase le réglage projet** — le
+>   déclarer aurait rétrogradé la prod en silence. Node reste désaligné
+>   (local 22, CI 22, Vercel 24) ; c'est un sujet à part, pas un effet de
+>   bord à embarquer ici.
+> - `ci.yml`, `update-deps.yml`, `sync-skills.yml` : `version: 10` retiré des
+>   trois `pnpm/action-setup@v4` — sans `version:`, l'action lit
+>   `packageManager`. Une seule source de vérité à bumper.
+> - `update-deps.yml` : step `if: failure()` qui ouvre (ou commente) une
+>   issue `dependencies` avec l'URL du run, + `permissions.issues: write`.
+>   Le job échouait chaque lundi depuis le 21/07 au moins (5/5) sur un
+>   `TS2322` dans `src/routes/__root.tsx` déclenché par un bump `better-auth`
+>   — correctif hors périmètre, c'est l'issue qui le portera.
+> - `renovate.json` supprimé : app jamais installée (0 PR, 0 branche
+>   `renovate/*`), config morte redondante avec `update-deps.yml` — ce que
+>   `TEMPLATE_SYNC.md` actait déjà (« Replaces the dormant Renovate app »).
+> - `.conductor/settings.toml` créé, avec pour `scripts.setup` un
+>   `pnpm install --frozen-lockfile` (et non `conductor.json`, legacy).
+>   Aucun setup n'existait, ni dans le repo ni côté app.
+> - `KNOWN_ISSUES.md` : deux sections neuves — la mesure du coût disque réel
+>   des `node_modules` en worktrees (clones CoW APFS) et le triple pin pnpm.
+
+---
+
 ## v1.190.0 — 08/08/2026 à 11:45 — Le prévisionnel Airtable arrive dans les échéances
 
 Airtable s'éteint, et il gardait encore quelque chose que l'app ne montrait
