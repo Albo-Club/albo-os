@@ -23,6 +23,68 @@ bas de page.
 
 ---
 
+## v1.190.2 — 20/08/2026 à 13:03 — Faille de connexion par lien magique corrigée
+
+**À lire même si le reste ne vous intéresse pas.** La bibliothèque qui gère la
+connexion à Albo OS portait une faille classée **sévère**, qui touche
+précisément le mode de connexion utilisé ici : le lien magique reçu par
+e-mail. Elle permettait, dans certaines conditions, de prendre la main sur un
+compte en le « préparant » avant que son propriétaire ne se connecte pour la
+première fois.
+
+Albo OS tournait sur une version vulnérable. Cette mise à jour installe la
+version corrigée. **Rien à faire de votre côté**, aucun changement visible à
+l'usage, et les sessions ouvertes restent valides.
+
+Pourquoi ça n'avait pas été corrigé plus tôt : la version corrective était
+mécaniquement bloquée. L'outil qui met les dépendances à jour chaque semaine
+échouait, parce qu'un composant intermédiaire refusait cette nouvelle version
+— c'est ce blocage qui a été levé au passage, et il l'est pour de bon.
+
+> **🔧 Notes techniques**
+>
+> - **Faille** : `GHSA-qq9h-g4jm-xgf3`, sévérité **high** — « Account takeover
+>   via pre-account hijacking on magic-link and email-OTP sign-in ». Plage
+>   vulnérable `>= 1.1.3, < 1.6.22`, corrigée en **1.6.22**. La prod tournait
+>   en `better-auth@1.6.16` et `convex/auth.ts` charge bien `magicLink()` :
+>   exposition directe. `pnpm audit` passe de 28 vulnérabilités (14 high) à 27
+>   (13 high), l'advisory disparaît.
+> - **Ce qui bloquait** : `@convex-dev/better-auth` casse le typage à partir
+>   de `better-auth@1.6.18` — `useSession().data` s'effondre en `never`, d'où
+>   `TS2322` sur la prop `authClient` de `ConvexBetterAuthProvider`
+>   (`src/routes/__root.tsx:111`). Cause amont : better-auth 1.6.18+ expose
+>   des types de retour **nommés** (`ReactAuthClient`) là où c'était un type
+>   structurel anonyme, et le `AuthClient` du composant
+>   (`Omit<BetterAuthClientPlugin, …>` autour de `PluginsWithoutCrossDomain`)
+>   ne s'unifie plus. Suivi amont : `get-convex/better-auth#420` (ouvert,
+>   confirmé par deux tiers, reproduit jusqu'en 1.6.25).
+> - **Bisect** (le tableau qui justifie le pin) :
+>
+>   | adapter | better-auth | `tsc` | `test:convex` |
+>   | ------- | ----------- | ----- | ------------- |
+>   | 0.12.2  | 1.6.16      | ✅    | ✅            |
+>   | 0.12.2  | **1.6.30**  | ✅    | ✅            |
+>   | 0.12.3  | 1.6.30      | ✅    | ❌ timeouts   |
+>   | 0.12.4  | 1.6.30      | ❌    | —             |
+>   | 0.12.5  | 1.6.30      | ❌    | —             |
+>
+>   L'échappatoire est donc l'adapter **0.12.2**, celui déjà en prod : il
+>   accepte la version corrigée. 0.12.3 typecheck mais ralentit le harness
+>   `convex-test` au point de faire expirer 2 à 4 tests sur 120 (timeout 5 s,
+>   nombre variable d'un run à l'autre) — écarté aussi.
+>
+> - **Changement** : `@convex-dev/better-auth` épinglé en **exact** `0.12.2`
+>   (un `^` ou un `~` laisserait passer 0.12.3+ en 0.x), et `better-auth` en
+>   `~1.6.30` — patches 1.6.x automatiques, jamais 1.7.x qui sort de la plage
+>   de peer de l'adapter (`>=1.6.9 <1.7.0`) et supprime l'export
+>   `better-auth/plugins#mcp` dont `convex/auth.ts` dépend.
+> - **Vérification** : `pnpm update` complet (37 deps directes) puis `lint` /
+>   `test:unit` / `test:convex` ×3 / `build` — tous verts, adapter maintenu en
+>   0.12.2. Le job hebdomadaire n'est donc plus bloqué. Les 37 bumps ne sont
+>   **pas** dans cette PR : ils partiront dans la PR du job, séparément.
+> - **Condition de déblocage du pin** : documentée dans `KNOWN_ISSUES.md`
+>   § « `@convex-dev/better-auth` : fenêtre de versions verrouillée ».
+
 ## v1.190.1 — 20/08/2026 à 11:51 — Les mises à jour de dépendances repartent
 
 Rien de visible dans l'app : cette version répare l'outillage qui la
