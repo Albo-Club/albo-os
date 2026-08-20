@@ -467,13 +467,53 @@ The shell guard in `package.json` → `build:vercel` requires **both**
 
 ## pnpm.overrides
 
-No active overrides. History of past pins (TanStack router-core duplication
-breaking `server.handlers` type augmentation; `better-call@1.3.5` shipping
-broken) lives in git — pattern to reuse if a dep breaks upstream: pin in
-`pnpm.overrides`, document the unblock condition here, and remove both
-together when upstream fixes land. (`pnpm update` in `scripts/update-deps.mjs`
-respects `pnpm.overrides`, so a pin is enough to hold the weekly bump back —
-there is no separate bot config to disable since `renovate.json` was removed.)
+Pattern: pin in `pnpm.overrides`, document the unblock condition here, and
+remove both together when upstream fixes land. (`pnpm update` in
+`scripts/update-deps.mjs` respects `pnpm.overrides`, so a pin is enough to hold
+the weekly bump back — there is no separate bot config to disable since
+`renovate.json` was removed.) History of past pins (TanStack router-core
+duplication breaking `server.handlers` type augmentation; `better-call@1.3.5`
+shipping broken) lives in git.
+
+### `unstorage: 2.0.0-alpha.7` — alpha.8 imports `destr` without declaring it
+
+```json
+"pnpm": { "overrides": { "unstorage": "2.0.0-alpha.7" } }
+```
+
+`unstorage@2.0.0-alpha.8` is a **broken publish**: its `dist/index.mjs` imports
+`destr` five times, and its manifest declares **no dependencies at all**. On a
+clean install nothing else pulls `destr` into the tree, so the build dies
+before it starts:
+
+```
+failed to load config from vite.config.ts
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'destr'
+  imported from node_modules/.pnpm/unstorage@2.0.0-alpha.8/node_modules/unstorage/dist/index.mjs
+```
+
+Why it reaches us: `nitro@3.0.260429-beta` depends on `unstorage: ^2.0.0-alpha.7`,
+and a caret on a **prerelease** accepts later prereleases of the same version —
+`^2.0.0-alpha.7` therefore lets `alpha.8` through. We cannot fall back to the
+stable line (`1.17.5`, which *does* declare `destr`): it is outside nitro's
+range. Staying on `alpha.7` is the only option.
+
+⚠️ The whole `2.0.0-alpha.*` line declares zero dependencies (`.6`, `.7`, `.8`
+all checked against the registry), so `alpha.7` works by luck — it simply does
+not import `destr` yet. Any future alpha can reintroduce the problem.
+
+**Unblock condition**: an `unstorage` 2.0.0 alpha (or the 2.0.0 release) whose
+manifest actually declares its runtime dependencies. Check with
+`npm view unstorage@<version> dependencies` — if it prints nothing, do not lift
+the pin. Verify by removing the override, running `pnpm update`, then
+`rm -rf node_modules && pnpm install && pnpm build`.
+
+> **Verify on a clean tree.** This class of bug is invisible on a warm
+> `node_modules`: a leftover copy of the missing package from an earlier
+> install resolves the import and the build passes locally while CI fails.
+> That happened here — a local "build green" was reported before CI caught the
+> real state. For any dependency change, the build check is
+> `rm -rf node_modules && pnpm install && pnpm build`, never a plain rebuild.
 
 ## `@convex-dev/better-auth` : fenêtre de versions verrouillée
 

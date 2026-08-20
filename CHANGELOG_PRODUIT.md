@@ -23,6 +23,49 @@ bas de page.
 
 ---
 
+## v1.190.3 — 20/08/2026 à 18:11 — Le robot de mise à jour repasse au vert
+
+Suite directe des deux versions précédentes, et fin de l'histoire : la mise à
+jour hebdomadaire des dépendances fonctionne à nouveau de bout en bout.
+
+Une fois la faille de connexion corrigée, le robot est allé plus loin qu'avant
+mais butait encore, sur un tout autre obstacle : une brique technique publiée
+en amont dans un état cassé, qui réclamait un composant qu'elle avait oublié
+d'emporter avec elle. La version précédente de cette brique est désormais
+maintenue en place explicitement, le temps que l'éditeur corrige.
+
+Aucun effet visible dans l'app. Ce qui change : les mises à jour de sécurité
+et de correctifs recommenceront à arriver toutes seules chaque lundi.
+
+> **🔧 Notes techniques**
+>
+> - **Symptôme** : `pnpm build` mourait avant de démarrer, sur un
+>   `failed to load config from vite.config.ts` suivi d'un
+>   `ERR_MODULE_NOT_FOUND` réclamant le paquet `destr`, importé depuis
+>   `unstorage@2.0.0-alpha.8`.
+> - **Cause** : publication cassée en amont. Le `dist/index.mjs` d'alpha.8
+>   importe `destr` cinq fois et son manifeste ne déclare **aucune**
+>   dépendance. Sur une install propre, rien d'autre n'amène `destr` dans
+>   l'arbre. alpha.7 ne marche que parce qu'elle n'importe pas encore `destr` —
+>   toute la ligne `2.0.0-alpha.*` déclare zéro dépendance.
+> - **Chemin** : `nitro@3.0.260429-beta` dépend de `unstorage: ^2.0.0-alpha.7`,
+>   et un caret sur une **préversion** accepte les préversions suivantes — d'où
+>   le passage en alpha.8. Retomber sur la stable `1.17.5` (qui, elle, déclare
+>   bien `destr`) est impossible : hors de la plage de nitro.
+> - **Correctif** : `pnpm.overrides` → `"unstorage": "2.0.0-alpha.7"`, le
+>   patron déjà documenté dans `KNOWN_ISSUES.md`, avec sa condition de
+>   déblocage (une alpha dont `npm view … dependencies` renvoie enfin quelque
+>   chose).
+> - **Vérification** : job du lundi rejoué **sur arbre vierge** — `pnpm update`
+>   complet (37 deps directes), puis `rm -rf node_modules`, `pnpm install`,
+>   `lint`, `test:unit`, `test:convex` (120/120), `build` — tous verts.
+> - **Leçon, ajoutée à `KNOWN_ISSUES.md`** : ce type de bug est **invisible sur
+>   un `node_modules` chaud**, une copie résiduelle du paquet manquant
+>   satisfaisant l'import. C'est ce qui a produit un « build vert » local
+>   erroné à la version précédente, pendant que la CI voyait juste. Toute
+>   vérification de dépendance passe désormais par
+>   `rm -rf node_modules && pnpm install && pnpm build`.
+
 ## v1.190.2 — 20/08/2026 à 13:03 — Faille de connexion par lien magique corrigée
 
 **À lire même si le reste ne vous intéresse pas.** La bibliothèque qui gère la

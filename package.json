@@ -103,5 +103,10 @@
     "vite": "^8.0.9",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.10"
+  },
+  "pnpm": {
+    "overrides": {
+      "unstorage": "2.0.0-alpha.7"
+    }
   }
 }
