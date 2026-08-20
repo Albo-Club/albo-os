@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  unstorage: 2.0.0-alpha.7
+
 importers:
 
   .:
