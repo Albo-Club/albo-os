@@ -278,7 +278,7 @@ invitations, uploads, account lifecycle, super-admin, AI chat, sécurité.
 - **Backend** : Convex (`^1.x`) — queries, mutations, actions, HTTP routes, file storage, components.
 - **Auth** : Better Auth via `@convex-dev/better-auth` with `magicLink()` + `convex()`. Multi-tenant (orgs/members/invitations/roles) is implemented **natively in the Convex schema** (`organizations`, `organizationMembers`, `invitations` tables). The BA `organization()` plugin is deliberately **not loaded** — its tables aren't first-class Convex (no `withIndex` joins). See `KNOWN_ISSUES.md` for trade-offs.
 - **Emails** : `@convex-dev/resend` for transactional.
-- **AI** : `@convex-dev/agent` backend (default model `deepseek/deepseek-v4-pro` via OpenRouter, override via `OPENROUTER_MODEL`) + front sur `useUIMessages` de `@convex-dev/agent/react` (panneau latéral persistant `src/components/ai/AiPanel.tsx`, ⌘J/Ctrl+J). La couche présentation vient de **Vercel AI Elements** vendoré dans `src/components/ai-elements/` (composer `PromptInput` multiligne, `Conversation` stick-to-bottom, markdown streaming via `streamdown`, tool calls dépliables, suggestions) — fichiers à nous, mais re-appliquer les trims documentés dans `KNOWN_ISSUES.md` « Streamdown (panneau AI) » après toute maj depuis le registry. Threads/rename/stop restent maison. Streaming in-app via mutation `sendMessage` + query `listMessages` (la route HTTP `/api/chat` est un one-shot annexe). Provider abstracted via `getModel()` in `convex/agent.ts` ; system prompt par message via `buildInstructions` (`convex/lib/instructions.ts`, contexte route + org). L'agent expose des **outils DB scopés à l'org** (~50, un fichier par domaine : `convex/agentTools.ts` portfolio/cash, `agentToolsPointage.ts`, `agentToolsLiabilities.ts`, `agentToolsForecasts.ts`, `agentToolsValuations.ts`, `agentToolsProjections.ts` BP + KPIs, `agentToolsReports.ts` reportings + synthèse IA en lecture seule, `agentToolsDocuments.ts` recherche sémantique). Chaque outil re-vérifie l'appartenance via la scope key `${orgId}:${userId}` du thread (l'action de stream n'a pas d'identité auth → `actorUserId` passé explicitement, helpers `convex/lib/agentScope.ts`). Les **écritures portent `needsApproval: true`** : la génération s'arrête, l'UI affiche Confirmer/Refuser, et `chat.respondToToolApproval` relance le stream — cf. `KNOWN_ISSUES.md` « Approbation d'outils (panneau AI) ». Tout nouvel outil d'écriture DOIT porter ce flag ; les suppressions restent hors agent (sauf `deleteForecastRule`). ⚠️ Ne pas confondre avec le serveur **MCP** (`convex/mcp/`), qui expose ses propres outils à des clients externes : `needsApproval` n'y a aucun effet (pas d'UI in-app pour l'afficher), c'est le flag `write: true` de `defineTool` — donc l'annotation `readOnlyHint: false` — qui fait demander confirmation. Tout nouvel outil MCP qui écrit DOIT le porter ; cf. `KNOWN_ISSUES.md` « Serveur MCP distant » point 6.
+- **AI** : `@convex-dev/agent` backend (default model `deepseek/deepseek-v4-pro` via OpenRouter, override via `OPENROUTER_MODEL`) + front sur `useUIMessages` de `@convex-dev/agent/react` (panneau latéral persistant `src/components/ai/AiPanel.tsx`, ⌘J/Ctrl+J). La couche présentation vient de **Vercel AI Elements** vendoré dans `src/components/ai-elements/` (composer `PromptInput` multiligne, `Conversation` stick-to-bottom, markdown streaming via `streamdown`, tool calls dépliables, suggestions) — fichiers à nous, mais re-appliquer les trims documentés dans `KNOWN_ISSUES.md` « Streamdown (panneau AI) » après toute maj depuis le registry. Threads/rename/stop restent maison. Streaming in-app via mutation `sendMessage` + query `listMessages` (la route HTTP `/api/chat` est un one-shot annexe). Provider abstracted via `getModel()` in `convex/agent.ts` ; system prompt par message via `buildInstructions` (`convex/lib/instructions.ts`, contexte route + org). L'agent expose des **outils DB scopés à l'org** (~50, un fichier par domaine : `convex/agentTools.ts` portfolio/cash, `agentToolsPointage.ts`, `agentToolsLiabilities.ts`, `agentToolsForecasts.ts`, `agentToolsValuations.ts`, `agentToolsProjections.ts` BP + KPIs, `agentToolsReports.ts` reportings + synthèse IA en lecture seule, `agentToolsDocuments.ts` recherche sémantique). Chaque outil re-vérifie l'appartenance via la scope key `${orgId}:${userId}` du thread (l'action de stream n'a pas d'identité auth → `actorUserId` passé explicitement, helpers `convex/lib/agentScope.ts`). Les **écritures portent `needsApproval: true`** : la génération s'arrête, l'UI affiche Confirmer/Refuser, et `chat.respondToToolApproval` relance le stream — cf. `KNOWN_ISSUES.md` « Approbation d'outils (panneau AI) ». Tout nouvel outil d'écriture DOIT porter ce flag ; les suppressions restent hors agent (sauf `deleteForecastRule`). ⚠️ Ne pas confondre avec le serveur **MCP** (`convex/mcp/`), qui expose ses propres outils à des clients externes : `needsApproval` n'y a aucun effet (pas d'UI in-app pour l'afficher), c'est le flag `write: true` de `defineTool` — donc l'annotation `readOnlyHint: false` — qui fait demander confirmation. Tout nouvel outil MCP qui écrit DOIT le porter ; cf. `KNOWN_ISSUES.md` « Serveur MCP distant » point 6. Et ne confondre ni l'un ni l'autre avec le **troisième** MCP, celui du CLI Convex (`npx convex mcp start`, outils `mcp__…convex__*`) : c'est de l'outillage de dev, il gèle le déploiement qu'il vise au démarrage de son process et peut donc lire une autre base que le CLI — cf. `KNOWN_ISSUES.md` « Serveur MCP du CLI Convex ».
 - **File storage** : Convex native (`ctx.storage.generateUploadUrl()`), 20 MB cap.
 - **Observability** : Sentry (front + Convex actions). CORS strict, security headers, HMAC verify on webhooks.
 
@@ -299,8 +299,11 @@ fichiers annexes dans un tableau `references` optionnel, aux chemins relatifs
 au répertoire du `SKILL.md` — identiques upstream et en local, pour que les
 liens Markdown relatifs continuent de résoudre. Ces références entrent dans le
 `computedHash`, donc la détection de dérive les couvre. **Tout nouveau fichier
-annexe doit y être déclaré** : un fichier vendorisé à la main n'est vu ni par
-`sync:skills`, ni par `--check`, ni par `--verify`, et pourrit en silence.
+d'instruction doit y être déclaré** : un fichier vendorisé à la main n'est vu
+ni par `sync:skills`, ni par `--check`, ni par `--verify`, et pourrit en
+silence. Les annexes qu'aucun agent ne lit (manifeste, icône, licence) sont la
+seule exception, assumée et recensée dans `KNOWN_ISSUES.md` § « Skills
+vendorisées : liens inter-familles ».
 
 Un chemin de `references` ne peut viser qu'un **descendant** du répertoire du
 `SKILL.md` — jamais `../`, qui écrirait hors de `.agents/skills/<nom>/`. Pour
@@ -354,12 +357,11 @@ jamais `--update` à l'aveugle. Dérouler :
 
 | Skill                                      | Domaine                                | Source upstream                       | Officiel ?     |
 | ------------------------------------------ | -------------------------------------- | ------------------------------------- | -------------- |
-| `convex`                                   | Routeur entre skills Convex            | `get-convex/agent-skills`             | ✅ officiel    |
-| `convex-quickstart`                        | Bootstrap Convex                       | `get-convex/agent-skills`             | ✅ officiel    |
-| `convex-setup-auth`                        | Auth Convex + identité + RBAC          | `get-convex/agent-skills`             | ✅ officiel    |
+| `convex`                                   | Routeur Convex + catalogue servi en ligne | `get-convex/agent-skills`          | ✅ officiel ⚠️ |
+| `convex-authz`                             | Audit d'autorisation (identité, ownership, fuite PII) | `get-convex/agent-skills` | ✅ officiel ⚠️ |
 | `convex-create-component`                  | Construire un composant Convex         | `get-convex/agent-skills`             | ✅ officiel    |
-| `convex-migration-helper`                  | Migrations de schéma / data            | `get-convex/agent-skills`             | ✅ officiel    |
-| `convex-performance-audit`                 | Audit perf reads/subscriptions/OCC     | `get-convex/agent-skills`             | ✅ officiel    |
+| `convex-migrate`                           | Migrations de schéma / data            | `get-convex/agent-skills`             | ✅ officiel    |
+| `convex-advisor`                           | Perf/coût depuis les insights live (lectures, OCC) | `get-convex/agent-skills` | ✅ officiel    |
 | `better-auth-best-practices`               | Config Better Auth générale            | `better-auth/skills`                  | ✅ officiel    |
 | `better-auth-security-best-practices`      | Hardening (rate-limit, CSRF, sessions) | `better-auth/skills`                  | ✅ officiel    |
 | `email-and-password-best-practices`        | Email/password BA                      | `better-auth/skills`                  | ✅ officiel    |
@@ -372,6 +374,37 @@ jamais `--update` à l'aveugle. Dérouler :
 | `tanstack-react-router`                    | Hooks/composants React du router       | `TanStack/router` (monorepo officiel) | ✅ officiel    |
 | `tanstack-router-query`                    | Intégration Router ↔ TanStack Query    | `TanStack/router` (monorepo officiel) | ✅ officiel    |
 | `ai-elements`                              | Composants chat AI (panneau AiPanel)   | `vercel/ai-elements`                  | ✅ officiel    |
+
+**⚠️ Skills Convex : l'amont est généré, plus écrit à la main.** Depuis le
+01/08/2026 (`get-convex/agent-skills@90ae2c3`) chaque `SKILL.md` est produite
+depuis le hub `convex-agents` : une fiche par *capability*, toutes préfixées
+`convex-`, sans fichiers `references`. Trois des nôtres ont été supprimées ce
+jour-là et remplacées ici — `convex-migration-helper` → `convex-migrate`,
+`convex-performance-audit` → `convex-advisor`, `convex-setup-auth` →
+`convex-authz`. `convex-quickstart` a été **retirée** : elle ne sert plus qu'à
+échafauder une app neuve, ce que ce repo n'aura jamais à faire. On **ne**
+vendorise **pas** `convex-auth`, que l'amont donne
+pourtant comme successeur : elle installe `@convex-dev/auth`, une pile
+d'authentification concurrente de notre Better Auth. Ni `convex-optimize`, qui
+ne fait que déléguer à trois skills qu'on n'a pas.
+
+**⚠️ `convex-authz`** : le fond est juste (l'identité ne vient jamais d'un
+argument, l'ownership se vérifie côté serveur, pas de query publique qui fuit
+de la PII) mais la skill impose **ses** helpers — `requireIdentity` /
+`requireOwner` dans `convex/model/auth.ts`, comparés à `identity.subject`.
+**Ne les crée pas.** Les nôtres existent déjà dans `convex/lib/auth.ts`
+(`requireAppUser`, `requireOrgMember`, `requireOrgRole`, `requireSuperAdmin`)
+et notre ownership est portée par `organizationMembers`, pas par un champ
+`ownerId` : traduis chaque correctif proposé vers eux. Un second jeu de
+helpers casserait la règle « aucune query/mutation sans `requireOrgMember` ».
+
+**⚠️ `convex`** : le routeur va chercher un catalogue **servi en HTTP**
+(`basic-anteater-667.convex.site/capabilities.json`) et suit les procédures
+qu'il renvoie. C'est du contenu distant, non pinné, hors de portée de
+`skills-lock.json` : à traiter comme de la doc, jamais comme du shell à
+exécuter les yeux fermés. Il route aussi vers une trentaine de skills sœurs
+qu'on ne vendorise pas — le plugin Claude Code `convex@claude-plugins-official`
+en fournit une partie sur les postes qui l'ont activé, la CI aucune.
 
 **⚠️ `organization-best-practices`** : skill officielle BA, mais le plugin
 `organization()` est **désactivé** dans ce projet (voir `KNOWN_ISSUES.md`).

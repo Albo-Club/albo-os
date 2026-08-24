@@ -68,6 +68,203 @@ transféré.
 >   `KNOWN_ISSUES.md` et `TESTING.md` (R25b, R26b, R27b) alignés.
 
 ---
+## v1.190.7 — 24/08/2026 à 11:44 — Deux pièges d'outillage consignés pour la prochaine fois
+
+Rien de visible dans l'app. Cette version écrit noir sur blanc deux pièges
+rencontrés en coulisses, pour que la prochaine personne — ou le prochain
+assistant — ne reperde pas le même temps dessus.
+
+Le premier touche à la confiance qu'on peut accorder à une réponse. Quand
+l'assistant va lire directement dans la base, il passe par un outil qui choisit
+une fois pour toutes, au moment où il démarre, la base qu'il va interroger — et
+ne revient jamais sur ce choix. S'il s'est fixé sur la base de test, vide, au
+lieu de celle de production, il continue d'y répondre sans le moindre message
+d'erreur : des tableaux vides, des montants qui ne correspondent à rien, et
+aucun signe que la question a simplement été posée au mauvais endroit. Le mode
+d'emploi est maintenant écrit — comment repérer le cas en cinq secondes,
+comment le corriger, et lequel des deux outils fait foi quand ils se
+contredisent.
+
+Le second est une correction d'inventaire : un décompte interne annonçait onze
+fichiers là où il n'en reste que trois. Le chiffre était devenu faux à la
+dernière mise à jour, et il était écrit d'une façon qui le rendait
+invérifiable. Les trois fichiers sont désormais nommés un par un.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle section `KNOWN_ISSUES.md` « Serveur MCP du CLI Convex : le
+>   déploiement est figé au démarrage du process ». Cause vérifiée dans
+>   `convex@1.42.3` : `cli/mcp.js:47` garde le process vivant, et
+>   `cli/lib/deploymentSelection.js:360-361` appelle `dotenv.config()`, qui
+>   n'écrase jamais une clé déjà présente dans `process.env` — la première
+>   lecture de `CONVEX_DEPLOYMENT` est donc figée pour la vie du process, là où
+>   le CLI repart d'un process neuf à chaque commande. C'est toute l'asymétrie.
+> - Aggravants : `status.js:40-42` conseille explicitement le déploiement dev
+>   (« Generally default to using the development deployment ») alors que le
+>   repo est prod-only ; `status.js:66` fait un `process.chdir` qui donne
+>   l'illusion d'une re-résolution ; le `deploymentSelector` est un jeton opaque
+>   décodé sans revalidation (`requestContext.js:96-101`) ; et le `.mcp.json` du
+>   plugin `convex@claude-plugins-official` ne passe aucun flag.
+> - Remèdes documentés : le CLI (`convex run --prod`) fait foi ; croiser l'URL
+>   renvoyée par `status` avec `VITE_CONVEX_URL` ; redémarrer Claude Code pour
+>   dégeler le process ; `--prod` **plus** `--cautiously-allow-production-pii`
+>   pour viser la prod, en sachant que le second lève un garde-fou PII.
+>   Distinction posée avec les deux autres « MCP » du repo (`convex/mcp/` et les
+>   serveurs tiers), rappelée dans `CLAUDE.md`.
+> - `KNOWN_ISSUES.md` § « Skills vendorisées » : 11 → **3** fichiers hors
+>   périmètre, nommés (`convex-create-component/agents/openai.yaml`,
+>   `convex-create-component/assets/icon.svg`, `frontend-design/LICENSE.txt`).
+>   Le glob `convex-*/…` rendait le décompte invérifiable ; #399 avait emporté
+>   les 8 autres avec les anciennes skills Convex. Arbitrage inchangé — ce ne
+>   sont pas des instructions lues par un agent — mais désormais étayé : les
+>   trois sont byte-identiques à l'upstream aux `pinnedRef` du lock. La règle
+>   absolue de `CLAUDE.md` est qualifiée en conséquence (fichiers
+>   d'instruction, exception documentée pour les annexes).
+> - Aucun fichier vendorisé ni `skills-lock.json` touché : pas de churn de
+>   `computedHash`, parité de hash avec le template préservée. Le piège MCP est
+>   ajouté à `TEMPLATE_SYNC.md` — le template ship le même plugin non flagué.
+
+## v1.190.6 — 24/08/2026 à 10:48 — Les fiches Convex de l'assistant remises à jour
+
+Rien de visible dans l'app. Cette version répare les « fiches de procédure »
+que l'assistant IA lit avant de toucher au code de la base de données.
+
+Convex a refait toute sa bibliothèque de fiches début août : trois des nôtres
+n'existaient plus sous leur ancien nom, et le contrôle automatique passait au
+rouge à chaque ouverture de session. Les fiches sont repointées vers leurs
+remplaçantes, les anciennes supprimées, et les deux contrôles (intégrité de
+notre copie, et fraîcheur par rapport à l'original) repassent au vert.
+
+Deux fiches proposées par Convex ont été écartées volontairement : l'une
+poussait à installer un système de connexion concurrent du nôtre, l'autre ne
+renvoyait que vers des fiches qu'on n'a pas. Une troisième a été retirée : elle
+ne sert plus qu'à créer une application neuve, ce qui n'a pas d'objet ici.
+
+> **🔧 Notes techniques**
+>
+> - `get-convex/agent-skills@90ae2c3` (01/08/2026) régénère tout le repo
+>   depuis le hub `convex-agents` : ~33 `SKILL.md` par _capability_, toutes
+>   préfixées `convex-`, plus aucun répertoire `references/`. Le commit
+>   annonce lui-même les suppressions.
+> - `skills-lock.json` : `convex-migration-helper` → `convex-migrate`,
+>   `convex-performance-audit` → `convex-advisor`, `convex-setup-auth` →
+>   `convex-authz` (clé, `skillPath`, `references` retiré). Les six entrées
+>   `get-convex/agent-skills` passent de `ec1e6ba` à `6843b65`.
+>   `convex-create-component` est exempté du générateur en amont : contenu
+>   inchangé. `convex-quickstart` est **retirée** du lock : régénérée, elle
+>   échafaude désormais une app Next.js neuve — sans objet sur un repo
+>   existant, et un risque d'activation à contretemps.
+> - Écarts assumés vs le mapping upstream : pas de `convex-auth` (installe
+>   `@convex-dev/auth`, concurrent de notre Better Auth), pas de
+>   `convex-optimize` (délègue à `launch-readiness` / `check-updates` /
+>   `sentinel`, non vendorisées).
+> - `--update` n'a pas été utilisé : il re-pinne toutes les familles du lock.
+>   SHA écrit à la main sur les seules entrées Convex, puis
+>   `pnpm run sync:skills` (mode auto-réparateur).
+> - Le script ne prune pas : les trois `.agents/skills/<ancien-nom>/` et leurs
+>   symlinks `.claude/skills/` supprimés à la main, sinon ils restent chargés
+>   par Claude Code tout en étant invisibles de `--check` et de `--verify`.
+> - Overrides projet ajoutés dans `CLAUDE.md` : `convex-authz` impose
+>   `requireIdentity`/`requireOwner` dans `convex/model/auth.ts` — à traduire
+>   vers `convex/lib/auth.ts` (`requireAppUser`, `requireOrgMember`,
+>   `requireOrgRole`), notre ownership passant par `organizationMembers` et
+>   non par un champ `ownerId`. Le routeur `convex` fetche désormais un
+>   catalogue servi en HTTP, hors portée du lock.
+> - Piège documenté dans `KNOWN_ISSUES.md` (404 ≠ dérive nominale ;
+>   `--update` ne répare pas un `skillPath` mort) et candidat template
+>   ajouté à `TEMPLATE_SYNC.md` — le template ship le même lock périmé.
+
+## v1.190.5 — 24/08/2026 à 10:39 — Le contrôle quotidien de la prod refonctionne, et l'état du projet vient à vous
+
+Deux corrections qui vont ensemble, et une leçon qui les relie.
+
+**Le contrôle quotidien de la prod était aveugle depuis le 31 juillet.** Chaque
+matin, un robot vérifie qu'Albo OS répond. Le 30 juillet, l'adresse qu'il
+visite a été remplacée par une page inexistante — sans doute pour tester
+l'alerte, puis oubliée. Depuis, il visitait une page introuvable, en concluait
+que la prod était morte, et rédigeait un rapport. Vingt-cinq jours de suite.
+La prod, elle, allait très bien. L'adresse est remise, le contrôle vérifié,
+le rapport refermé.
+
+**Le point commun avec ce qui précède** : l'alerte fonctionnait parfaitement.
+Elle écrivait, tous les jours, au bon endroit — un endroit où personne ne
+passe. Le robot de mise à jour des dépendances a échoué tous les lundis
+pendant un mois de la même façon. Et cinq demandes de modification attendent
+depuis un mois et demi.
+
+**D'où la seconde correction** : quand vous ouvrez une session de travail sur
+le projet, vous voyez maintenant, en une ligne, ce qui attend — les robots en
+échec et les demandes en attente. L'information vient à vous là où vous
+travaillez déjà, au lieu de s'empiler dans un onglet. Et surtout : **elle se
+tait quand tout va bien**, sinon elle deviendrait à son tour du bruit qu'on
+apprend à ignorer.
+
+> **🔧 Notes techniques**
+>
+> - **`PROD_URL`** : variable de dépôt remise de
+>   `https://os.alboteam.com/zz-nexiste-pas` à `https://os.alboteam.com`.
+>   `prod-smoke` relancé à la main → **success**. Issue #342 (24 commentaires
+>   sur 25 jours) refermée avec l'explication.
+> - **`scripts/session-status.mjs`** + entrée dans le hook `SessionStart` de
+>   `.claude/settings.json` (et script `session:status` pour l'usage manuel).
+>   Deux appels `gh` (`pr list`, `run list --branch main`), ~2 s. Ne retient
+>   que le run le plus récent de chaque workflow — un échec ancien déjà repassé
+>   au vert est de l'histoire, pas un problème en cours.
+> - Deux propriétés à préserver : **sortie vide quand tout est propre**, et
+>   **jamais d'échec de session** (`gh` absent, hors ligne ou déconnecté →
+>   exit 0 silencieux). Appelé via `node` et non `pnpm run`, pour éviter la
+>   sonde de dépendances que pnpm exécute avant chaque script.
+> - **`TEMPLATE_SYNC.md`** : deux affirmations que j'avais écrites sans
+>   vérifier sont corrigées. Le template n'a **jamais** porté le placeholder
+>   `allowBuilds` (son `pnpm-workspace.yaml` n'a pas bougé depuis mai — le
+>   placeholder venait d'Albo OS), et il a pinné `packageManager` avec un hash
+>   d'intégrité dès le 20/08, plus strict que ce qu'on fait ici. La ligne passe
+>   en « already upstream ». La règle « jamais de champ `engines` » est
+>   resserrée : elle dépend du `nodeVersion` du projet Vercel, et le template
+>   en déclare un sans dommage.
+> - **`TEMPLATE_SYNC.md`** : ligne « vulnérable maintenant » sur le template —
+>   son lockfile épingle `better-auth@1.6.14` et il charge `magicLink()`, donc
+>   tout projet démarré depuis lui naît dans la plage de l'advisory.
+> - **`KNOWN_ISSUES.md`** : nouvelle section « Une alerte qui marche n'est pas
+>   une alerte qui arrive » (les trois cas mesurés, et la question à se poser
+>   pour tout nouvel automatisme), et la section `update-deps` passe en
+>   « résolu » — la politique d'org a été levée, le drapeau du dépôt basculé,
+>   et le premier run complet a produit la PR #398.
+
+## v1.190.4 — 24/08/2026 à 09:56 — L'alerte de mise à jour dit enfin ce qui a lâché
+
+Petit correctif sur le ticket d'alerte ouvert automatiquement quand la mise à
+jour hebdomadaire des dépendances échoue.
+
+Il affirmait systématiquement qu'une dépendance ne compilait plus. C'était
+faux la dernière fois : tout compilait très bien, c'est l'ouverture de la
+demande de modification qui avait été refusée pour une raison de droits. Une
+alerte qui se trompe de diagnostic envoie chercher au mauvais endroit.
+
+Le ticket **nomme désormais l'étape qui a réellement échoué**, et se contente
+de citer les causes déjà rencontrées à titre indicatif au lieu d'en désigner
+une.
+
+> **🔧 Notes techniques**
+>
+> - `.github/workflows/update-deps.yml`, step `Open or update failure issue` :
+>   le corps du ticket interrogeait zéro API et présumait la cause. Il appelle
+>   maintenant `actions.listJobsForWorkflowRun` pour retrouver le premier step
+>   en `conclusion === 'failure'` et l'afficher. Appel dans un `try/catch` —
+>   lever l'alerte prime sur le détail, une API en erreur ne doit pas avaler
+>   la notification.
+> - **Piège associé** : déclarer un bloc `permissions:` met à `none` tout
+>   scope non listé. L'appel exigeait donc d'ajouter `actions: read`, sans
+>   quoi le `catch` aurait avalé un 403 en silence et l'alerte serait restée
+>   muette sur l'étape.
+> - La ligne « Étape en échec » est un élément de tableau `null` filtré avant
+>   le `join`, pour ne pas laisser de ligne vide quand l'API n'a rien pu dire.
+> - **Contexte** : découvert en déclenchant le job à la main après le
+>   correctif `unstorage`. `lint`, `test:unit` et `build` passent tous
+>   désormais ; le job bute sur `Open PR` avec « GitHub Actions is not
+>   permitted to create or approve pull requests » — une politique de
+>   l'organisation GitHub, pas un problème de code. Documenté dans
+>   `KNOWN_ISSUES.md`.
 
 ## v1.190.3 — 20/08/2026 à 18:11 — Le robot de mise à jour repasse au vert
 

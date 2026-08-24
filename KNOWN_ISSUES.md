@@ -574,6 +574,94 @@ l'adapter publie le correctif de typage, dérouler la matrice ci-dessus avant
 d'élargir la contrainte — `tsc` **et** `pnpm test:convex` en trois passes, la
 régression de perf de 0.12.3 ne se voit pas au typecheck.
 
+## Une alerte qui marche n'est pas une alerte qui arrive
+
+Trois automatismes de ce dépôt ont échoué **bruyamment et correctement**, sans
+que personne ne le voie. Ce n'est pas un bug d'émission, c'est un problème de
+destination — et c'est le mode de défaillance le plus coûteux du répertoire,
+parce qu'il se déguise en « tout va bien ».
+
+- **`prod-smoke`** : la variable de dépôt `PROD_URL` a été mise à
+  `https://os.alboteam.com/zz-nexiste-pas` le 30/07, vraisemblablement pour
+  vérifier que l'alerte fonctionnait, puis jamais remise. Le contrôle quotidien
+  de la prod a donc interrogé une 404 **du 31/07 au 24/08**, concluant chaque
+  matin que la prod était morte. Son mécanisme d'alerte a parfaitement joué :
+  l'issue #342 a accumulé **24 commentaires en 25 jours**. Lus par personne. Le
+  filet de sécurité runtime était aveugle pendant tout ce temps.
+- **`update-deps`** : rouge tous les lundis pendant plus d'un mois, sans
+  notification d'aucune sorte jusqu'à ce qu'on lui en ajoute une.
+- **Les pull requests** : cinq sont restées ouvertes 39 à 53 jours, alors que
+  leur auteur *recevait* les notifications GitHub.
+
+**La leçon, à appliquer à tout nouvel automatisme** : se demander non pas
+« est-ce que ça alerte ? » mais « **où atterrit l'alerte, et est-ce que
+quelqu'un passe par là ?** ». Un ticket GitHub n'est pas une destination si
+personne n'ouvre l'onglet Issues.
+
+D'où le hook `SessionStart` (`scripts/session-status.mjs`) : il remonte les
+workflows rouges et les PR ouvertes **au démarrage d'une session Claude Code**,
+c'est-à-dire à l'endroit où le travail se fait réellement. Deux propriétés le
+rendent utilisable dans la durée, et il faut les préserver :
+
+1. **Il se tait quand tout va bien.** Une alerte qui parle à chaque session
+   devient du papier peint — exactement le mécanisme qui a rendu les 24
+   commentaires de #342 invisibles.
+2. **Il ne peut pas faire échouer une session.** `gh` absent, hors ligne ou
+   déconnecté : sortie 0, sans rien afficher. Perdre le rapport est acceptable,
+   bloquer le démarrage ne l'est pas.
+
+⚠️ Corollaire pour le hook voisin `sync:skills:check` : tant qu'il sort en
+erreur à chaque session pour une dérive non traitée, il entraîne à ignorer la
+sortie des hooks — et emporte celui-ci avec lui.
+
+## `update-deps` et l'ouverture de PR par GitHub Actions — résolu
+
+**Résolu le 24/08/2026.** Conservé parce que le symptôme est déroutant et que
+le réglage peut être remis à zéro.
+
+Le job validait tout (`lint`, `test:unit`, `build` verts) puis échouait à la
+dernière étape :
+
+```
+GitHub Actions is not permitted to create or approve pull requests.
+```
+
+Ce n'est pas du code, c'est un réglage — et il se lit à **deux** niveaux.
+Basculer le drapeau du dépôt seul renvoie un `409` :
+
+```
+gh api -X PUT repos/Albo-Club/albo-os/actions/permissions/workflow -F can_approve_pull_request_reviews=true
+→ 409 The organization does not allow GitHub Actions to create or approve pull requests
+```
+
+La politique de l'org `Albo-Club` prime, et c'est le **défaut de GitHub** pour
+les organisations — pas nécessairement un choix délibéré. Il a fallu la lever
+côté org (owner requis, *Settings → Actions → Workflow permissions*) **puis**
+basculer le drapeau du dépôt, les deux étant nécessaires.
+
+Conséquence à connaître : ce workflow **n'avait jamais réussi à ouvrir une PR
+depuis sa création** le 21/07/2026. Les échecs antérieurs s'arrêtaient plus
+tôt, sur `pnpm lint`, ce qui a masqué le problème jusqu'à ce que les blocages
+amont soient levés. Le premier passage complet a produit la PR #398.
+
+État attendu aujourd'hui :
+
+```
+gh api repos/Albo-Club/albo-os/actions/permissions/workflow
+→ { "default_workflow_permissions": "read",
+    "can_approve_pull_request_reviews": true }
+```
+
+`default_workflow_permissions` reste volontairement à `read` : chaque workflow
+déclare ses propres `permissions:`, ce qui est plus étroit qu'un défaut
+permissif.
+
+Si le symptôme réapparaît, vérifier l'org **avant** le dépôt. Deux
+contournements restent possibles sans toucher à la politique : un PAT
+fine-grained en secret pour le step `create-pull-request`, ou laisser le
+workflow pousser la branche (permis par `contents: write`, hors du champ de la
+politique) et ouvrir la PR à la main.
+
 ## Version de pnpm : trois pins, dont un invisible
 
 **Le piège** : `pnpm-lock.yaml` ne dit pas quel pnpm l'a écrit —
@@ -903,11 +991,24 @@ Deux conséquences :
 Règle : une entrée de lock par répertoire upstream où l'on veut enraciner un
 arbre ; `references` ne vise que des descendants de ce répertoire.
 
-**Reste hors périmètre** : 11 fichiers non-Markdown vendorisés à la main
-(`convex-*/agents/openai.yaml`, `convex-*/assets/icon.svg`,
-`frontend-design/LICENSE.txt`) ne sont dans aucun `references`, donc ni
-rafraîchis ni drift-checkés. Ce ne sont pas des instructions lues par un agent
-— les déclarer ferait diverger nos hashes de ceux du template pour zéro gain.
+**Reste hors périmètre** : **3** fichiers non-Markdown vendorisés à la main ne
+sont dans aucun `references`, donc ni rafraîchis ni drift-checkés —
+`convex-create-component/agents/openai.yaml` (manifeste OpenAI),
+`convex-create-component/assets/icon.svg` (icône) et
+`frontend-design/LICENSE.txt` (Apache 2.0). Ils étaient 11 : #399 a emporté les
+8 autres avec les anciennes skills Convex, et les fiches régénérées en amont
+n'ont plus ni `agents/` ni `assets/`. Les nommer un par un plutôt que par glob
+est délibéré — c'est le glob `convex-*/…` qui avait rendu le décompte
+invérifiable, et donc faux pendant des semaines.
+
+L'arbitrage tient : ce ne sont pas des instructions lues par un agent, et les
+déclarer ferait diverger nos hashes de ceux du template pour zéro gain. Il
+tient **aussi parce qu'on l'a vérifié** : les trois sont aujourd'hui
+byte-identiques à l'upstream aux `pinnedRef` du lock. À rouvrir si l'un d'eux
+devient une instruction lue par un agent — techniquement c'est trivial (ce sont
+des descendants du répertoire du `SKILL.md`, donc ni `../`, ni seconde entrée
+de lock, ni `MAX_IN_FLIGHT` à toucher, et ce sont des fichiers texte, ce
+qu'exige un vendor qui passe par `res.text()`).
 
 ## `sync:skills --check` a besoin d'un plafond de fetchs simultanés
 
@@ -958,6 +1059,47 @@ Le mode par défaut est aussi devenu **auto-réparateur** : il réécrit un fich
 qui ne correspond plus au `computedHash`, donc un `pnpm run sync:skills` répare
 un arbre corrompu. `--force` n'est plus nécessaire pour ça (il reste utile pour
 tout re-télécharger sans condition).
+
+## Skills vendorisées : quand l'amont supprime ou renomme une skill
+
+`sync:skills:check` a deux vocabulaires d'échec, et `--update` n'en traite
+qu'un :
+
+- `~ <skill>: main moved since pinned <sha>` → dérive **nominale**, l'original
+  a bougé au même chemin. `pnpm run sync:skills:update` répare.
+- `✗ <skill>: 404 https://raw.githubusercontent.com/…` → le `skillPath`
+  **n'existe plus** en amont. `--update` ne répare rien : il avance le
+  `pinnedRef` puis refetche exactement le même chemin mort, et ressort 404.
+
+Le second cas veut dire que l'amont a restructuré son arbre. Retrouver où la
+skill est passée — le message du commit de suppression le dit souvent
+explicitement — puis corriger l'entrée du lock à la main : nouvelle clé,
+nouveau `skillPath`, et **retirer `references`** si la nouvelle version n'a
+plus de fichiers annexes.
+
+Deux pièges à ce moment-là :
+
+1. **`--update` re-pinne tout le monde.** Il résout le tip de chaque
+   `trackingRef` du lock, pas seulement celui qui t'intéresse : les familles
+   sans dérive voient quand même leur `pinnedRef` sauter, ce qui noie le diff
+   qu'on est justement censé relire. Pour rester chirurgical, écrire le SHA
+   cible à la main dans les seules entrées concernées puis lancer le
+   `pnpm run sync:skills` par défaut — il est auto-réparateur, re-vendorise et
+   réécrit les `computedHash` tout seul.
+2. **Le script ne fait pas le ménage.** `vendor()` écrit, ne supprime jamais,
+   et `--verify` n'itère que sur les clés du lock. Un dossier
+   `.agents/skills/<ancien-nom>/` retiré du lock reste sur le disque **et
+   reste chargé par Claude Code**, tout en étant invisible des deux
+   garde-fous. Le supprimer à la main, avec son symlink
+   `.claude/skills/<ancien-nom>`.
+
+Cas vécu : le 01/08/2026, `get-convex/agent-skills` est passé de 6 skills
+écrites à la main à ~33 fiches générées depuis un hub interne (commit
+`90ae2c3`). Trois de nos cinq skills Convex ont disparu d'un coup, et avec
+elles ~1 550 lignes de `references/` rédigées. Les remplaçantes font 23 à
+36 lignes : le fond Convex ne vit plus dans les skills mais dans
+`convex/_generated/ai/guidelines.md` (régénéré par `convex dev`, et qui prime
+sur tout) et dans le catalogue servi en ligne par le routeur `convex`.
 
 ## Streamdown (panneau AI) — `@source` Tailwind v4, plugins retirés, labels tool
 
@@ -1115,6 +1257,86 @@ resource_metadata="…"` — c'est ce qui déclenche le flow côté client.
    `nextOffset` dit seulement qu'il reste du texte à lire. L'entrée normale
    dans la doc reste `searchDocuments` (sémantique, extraits sourcés) : la
    lecture intégrale est le recours quand un extrait ne suffit pas.
+
+## Serveur MCP du CLI Convex : le déploiement est figé au démarrage du process
+
+**Trois « MCP » cohabitent dans ce repo, et ce ne sont pas les mêmes.**
+(1) `convex/mcp/` — le serveur que **l'app** expose à des clients externes
+(section juste au-dessus). (2) `npx convex mcp start` — l'outillage **de dev**
+du CLI Convex, dont Claude Code tire les outils `mcp__…convex__*` (`status`,
+`data`, `tables`, `runOneoffQuery`, `logs`…) : c'est celui-ci le sujet.
+(3) Les MCP tiers (resend, context7, shadcn). Un problème sur l'un ne dit
+strictement rien des deux autres.
+
+**Le piège** : le MCP et le CLI ne voient pas le même déploiement, et c'est le
+MCP qui a tort. `convex run --prod` renvoie les vraies données pendant que
+`tables` / `data` via MCP décrivent une base vide. Aucune erreur, aucun
+avertissement — juste des tables absentes et des chiffres qui ne correspondent
+à rien. On croit à un bug applicatif ; c'est un problème d'adressage.
+
+**Pourquoi** (vérifié dans `convex@1.42.3`, sous `node_modules/convex/dist/esm/`) :
+
+- Le serveur MCP est un **process long-vivant** — `cli/mcp.js:47` bloque sur
+  `await new Promise(() => {})`. Le CLI en ligne de commande, lui, est un
+  process **neuf à chaque invocation**. Toute l'asymétrie est là.
+- `cli/lib/deploymentSelection.js:360-361` fait `dotenv.config({ path:
+  '.env.local' })` puis `dotenv.config()`. Or **`dotenv` n'écrase jamais une
+  clé déjà présente dans `process.env`** : la toute première lecture de
+  `CONVEX_DEPLOYMENT` est donc figée pour la vie du process. Éditer
+  `.env.local` ensuite ne change rien tant que Claude Code n'a pas redémarré.
+- `cli/lib/mcp/tools/status.js:66` fait un `process.chdir(projectDir)` à chaque
+  appel, ce qui **donne l'illusion** que le projet est re-résolu. Le `chdir` a
+  bien lieu ; la relecture d'env, non.
+- La description du tool `status` (`status.js:40-42`) pousse explicitement
+  l'agent vers le dev : « Generally default to using the development deployment
+  unless you'd specifically like to debug issues in production. » Sur ce repo
+  **prod-only** (cf. `CLAUDE.md` § « Workflow déploiement »), c'est le pire
+  conseil possible : le déploiement dev existe bel et bien, mais ce n'est qu'un
+  vestige vide.
+- Le `deploymentSelector` est un **jeton opaque** —
+  `${kind}:${btoa(JSON.stringify({ projectDir, deployment }))}`
+  (`requestContext.js:96-101`) — que les autres outils décodent **sans
+  revalider**. Un sélecteur récupéré au tour précédent, ou copié depuis un
+  autre workspace, reste « valide » et continue de viser l'ancien couple.
+- La prod est de toute façon **fermée par défaut** : `requestContext.js:69-73`
+  refuse `data` / `logs` / `runOneoffQuery` sur un déploiement `prod` tant que
+  ni `--cautiously-allow-production-pii` (lecture) ni
+  `--dangerously-enable-production-deployments` (lecture + écriture) n'est posé.
+
+**Facteur aggravant : le plugin ne passe aucun flag.** Le serveur vient du
+plugin `convex@claude-plugins-official`, installé au **scope user**, dont le
+`.mcp.json` se réduit à `npx -y convex@latest mcp start` — ni `--prod`, ni
+`--project-dir`, ni `cwd`. (Et `convex@latest` est résolu par npx, donc pas
+forcément la version du repo.) Les options existent pourtant : `mcp.js:41`
+appelle `addDeploymentSelectionOptions`, qui apporte `--prod`,
+`--deployment <ref>` et `--env-file <path>`.
+
+**Facteur aggravant : Conductor.** `.env.local` est gitignored et n'est pas
+toujours recopié dans le workspace — quand il manque, `status` répond
+`No CONVEX_DEPLOYMENT set`, ou pire, le process retombe sur ce qu'il a hérité
+d'ailleurs.
+
+**La solution**, du moins cher au plus engageant :
+
+1. **Le CLI fait foi.** `convex run --prod`, `convex export --prod` : c'est
+   déjà la convention du repo, et c'est exactement pour ça qu'ils voient juste.
+   En cas de doute sur un chiffre, trancher au CLI, pas au MCP.
+2. **Croiser l'URL avant de lire.** `status` renvoie l'URL du déploiement qu'il
+   vise ; la comparer au `VITE_CONVEX_URL` de `.env.local`. Contrôle en cinq
+   secondes qui attrape le cas à tous les coups.
+3. **Redémarrer Claude Code** — nouveau process MCP, nouvelle lecture d'env.
+   C'est le seul moyen de dégeler la valeur sans toucher à la config.
+4. **Viser la prod depuis le MCP** demande `--prod` **plus**
+   `--cautiously-allow-production-pii`. Ce second flag n'est pas une case de
+   confort : c'est la levée explicite du garde-fou PII de Convex. Ne pas le
+   committer à la légère.
+5. `--env-file <path>` est le **seul** mécanisme qui court-circuite vraiment le
+   gel : il est lu en amont (`deploymentSelection.js:335-337`, via `ctx.fs`) et
+   ne passe donc pas par le `process.env` figé.
+
+Même famille, vue d'un autre angle : `vercel link` wipes `CONVEX_DEPLOYMENT`
+from `.env.local` (plus haut) et sa règle finale — `CONVEX_DEPLOYMENT` est un
+binding dev **par développeur**, pas une cible de déploiement.
 
 ## tailwind-merge v3 obligatoire avec les composants shadcn « Tailwind v4 »
 
