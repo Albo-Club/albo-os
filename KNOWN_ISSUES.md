@@ -467,13 +467,200 @@ The shell guard in `package.json` → `build:vercel` requires **both**
 
 ## pnpm.overrides
 
-No active overrides. History of past pins (TanStack router-core duplication
-breaking `server.handlers` type augmentation; `better-call@1.3.5` shipping
-broken) lives in git — pattern to reuse if a dep breaks upstream: pin in
-`pnpm.overrides`, document the unblock condition here, and remove both
-together when upstream fixes land. (`pnpm update` in `scripts/update-deps.mjs`
-respects `pnpm.overrides`, so a pin is enough to hold the weekly bump back —
-there is no separate bot config to disable since `renovate.json` was removed.)
+Pattern: pin in `pnpm.overrides`, document the unblock condition here, and
+remove both together when upstream fixes land. (`pnpm update` in
+`scripts/update-deps.mjs` respects `pnpm.overrides`, so a pin is enough to hold
+the weekly bump back — there is no separate bot config to disable since
+`renovate.json` was removed.) History of past pins (TanStack router-core
+duplication breaking `server.handlers` type augmentation; `better-call@1.3.5`
+shipping broken) lives in git.
+
+### `unstorage: 2.0.0-alpha.7` — alpha.8 imports `destr` without declaring it
+
+```json
+"pnpm": { "overrides": { "unstorage": "2.0.0-alpha.7" } }
+```
+
+`unstorage@2.0.0-alpha.8` is a **broken publish**: its `dist/index.mjs` imports
+`destr` five times, and its manifest declares **no dependencies at all**. On a
+clean install nothing else pulls `destr` into the tree, so the build dies
+before it starts:
+
+```
+failed to load config from vite.config.ts
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'destr'
+  imported from node_modules/.pnpm/unstorage@2.0.0-alpha.8/node_modules/unstorage/dist/index.mjs
+```
+
+Why it reaches us: `nitro@3.0.260429-beta` depends on `unstorage: ^2.0.0-alpha.7`,
+and a caret on a **prerelease** accepts later prereleases of the same version —
+`^2.0.0-alpha.7` therefore lets `alpha.8` through. We cannot fall back to the
+stable line (`1.17.5`, which *does* declare `destr`): it is outside nitro's
+range. Staying on `alpha.7` is the only option.
+
+⚠️ The whole `2.0.0-alpha.*` line declares zero dependencies (`.6`, `.7`, `.8`
+all checked against the registry), so `alpha.7` works by luck — it simply does
+not import `destr` yet. Any future alpha can reintroduce the problem.
+
+**Unblock condition**: an `unstorage` 2.0.0 alpha (or the 2.0.0 release) whose
+manifest actually declares its runtime dependencies. Check with
+`npm view unstorage@<version> dependencies` — if it prints nothing, do not lift
+the pin. Verify by removing the override, running `pnpm update`, then
+`rm -rf node_modules && pnpm install && pnpm build`.
+
+> **Verify on a clean tree.** This class of bug is invisible on a warm
+> `node_modules`: a leftover copy of the missing package from an earlier
+> install resolves the import and the build passes locally while CI fails.
+> That happened here — a local "build green" was reported before CI caught the
+> real state. For any dependency change, the build check is
+> `rm -rf node_modules && pnpm install && pnpm build`, never a plain rebuild.
+
+## `@convex-dev/better-auth` : fenêtre de versions verrouillée
+
+**Ne pas « débloquer » ces deux versions sans lire cette section.** Le pin a
+coûté un bisect complet et il protège d'une régression de typage **et** d'une
+régression de perf, tout en gardant un correctif de sécurité.
+
+```json
+"@convex-dev/better-auth": "0.12.2",   // exact, pas ^ ni ~
+"better-auth": "~1.6.30"               // 1.6.x seulement, jamais 1.7
+```
+
+**Pourquoi `better-auth` doit rester ≥ 1.6.22** : `GHSA-qq9h-g4jm-xgf3`
+(sévérité **high**) — *Account takeover via pre-account hijacking on
+magic-link and email-OTP sign-in*, plage `>= 1.1.3, < 1.6.22`. `convex/auth.ts`
+charge `magicLink()`, donc le projet est dans la surface d'attaque. Toute
+opération qui ferait redescendre `better-auth` sous 1.6.22 réintroduit la
+faille.
+
+**Pourquoi `better-auth` ne doit pas atteindre 1.7** : l'adapter déclare le
+peer `>=1.6.9 <1.7.0`, et 1.7 supprime l'export `mcp` de `better-auth/plugins`
+dont `convex/auth.ts` dépend (`TS2305`). Le `~` est là pour ça — un `^` laisse
+passer 1.7.x et c'est exactement ce qui cassait le job hebdomadaire.
+
+**Pourquoi l'adapter est épinglé en exact `0.12.2`** — bisect (adapter ×
+better-auth, `tsc` + `pnpm test:convex`) :
+
+| adapter | better-auth | `tsc`         | `test:convex`      |
+| ------- | ----------- | ------------- | ------------------ |
+| 0.12.2  | 1.6.16      | ✅            | ✅ 120/120         |
+| 0.12.2  | **1.6.30**  | ✅            | ✅ 120/120 (×3)    |
+| 0.12.3  | 1.6.30      | ✅            | ❌ 2 à 4 timeouts  |
+| 0.12.4  | 1.6.30      | ❌ `TS2322`   | —                  |
+| 0.12.5  | 1.6.30      | ❌ `TS2322`   | —                  |
+
+- **0.12.4 / 0.12.5** : `useSession().data` s'effondre en `never`, donc
+  `ReactAuthClient<…>` n'est plus assignable à `AuthClient` sur la prop
+  `authClient` de `ConvexBetterAuthProvider` (`src/routes/__root.tsx:111`).
+  Cause : better-auth ≥ 1.6.18 nomme ses types de retour (`ReactAuthClient`)
+  au lieu d'un type structurel anonyme, et le `AuthClient` de l'adapter — bâti
+  sur `Omit<BetterAuthClientPlugin, "$InferServerPlugin" | "getActions">` dans
+  `dist/plugins/cross-domain/client.d.ts` — ne s'unifie plus. Le diff
+  0.12.3 → 0.12.4 est **exactement** ce passage à un `CrossDomainClientPlugin`
+  nommé, avec l'import qui bascule de `better-auth` vers `better-auth/client`.
+- **0.12.3** : typecheck, mais ralentit le harness `convex-test` au point de
+  faire expirer 2 à 4 tests sur 120 (timeout 5 s), avec un nombre variable
+  d'un run à l'autre. Le contrôle a été fait : `main` en 0.12.2 passe 120/120
+  deux fois d'affilée sur la même machine, 0.12.3 échoue deux fois. Ce n'est
+  pas de la charge machine.
+
+⚠️ Un `^0.12.2` ou un `~0.12.2` **ne protège pas** : sur une version `0.x`, les
+deux se lisent `>=0.12.2 <0.13.0` et laissent donc passer 0.12.3, 0.12.4 et
+0.12.5. Seule la version exacte tient.
+
+**Condition de déblocage** : suivi amont `get-convex/better-auth#420` (ouvert,
+reproduit par deux tiers jusqu'en better-auth 1.6.25). Quand une version de
+l'adapter publie le correctif de typage, dérouler la matrice ci-dessus avant
+d'élargir la contrainte — `tsc` **et** `pnpm test:convex` en trois passes, la
+régression de perf de 0.12.3 ne se voit pas au typecheck.
+
+## Une alerte qui marche n'est pas une alerte qui arrive
+
+Trois automatismes de ce dépôt ont échoué **bruyamment et correctement**, sans
+que personne ne le voie. Ce n'est pas un bug d'émission, c'est un problème de
+destination — et c'est le mode de défaillance le plus coûteux du répertoire,
+parce qu'il se déguise en « tout va bien ».
+
+- **`prod-smoke`** : la variable de dépôt `PROD_URL` a été mise à
+  `https://os.alboteam.com/zz-nexiste-pas` le 30/07, vraisemblablement pour
+  vérifier que l'alerte fonctionnait, puis jamais remise. Le contrôle quotidien
+  de la prod a donc interrogé une 404 **du 31/07 au 24/08**, concluant chaque
+  matin que la prod était morte. Son mécanisme d'alerte a parfaitement joué :
+  l'issue #342 a accumulé **24 commentaires en 25 jours**. Lus par personne. Le
+  filet de sécurité runtime était aveugle pendant tout ce temps.
+- **`update-deps`** : rouge tous les lundis pendant plus d'un mois, sans
+  notification d'aucune sorte jusqu'à ce qu'on lui en ajoute une.
+- **Les pull requests** : cinq sont restées ouvertes 39 à 53 jours, alors que
+  leur auteur *recevait* les notifications GitHub.
+
+**La leçon, à appliquer à tout nouvel automatisme** : se demander non pas
+« est-ce que ça alerte ? » mais « **où atterrit l'alerte, et est-ce que
+quelqu'un passe par là ?** ». Un ticket GitHub n'est pas une destination si
+personne n'ouvre l'onglet Issues.
+
+D'où le hook `SessionStart` (`scripts/session-status.mjs`) : il remonte les
+workflows rouges et les PR ouvertes **au démarrage d'une session Claude Code**,
+c'est-à-dire à l'endroit où le travail se fait réellement. Deux propriétés le
+rendent utilisable dans la durée, et il faut les préserver :
+
+1. **Il se tait quand tout va bien.** Une alerte qui parle à chaque session
+   devient du papier peint — exactement le mécanisme qui a rendu les 24
+   commentaires de #342 invisibles.
+2. **Il ne peut pas faire échouer une session.** `gh` absent, hors ligne ou
+   déconnecté : sortie 0, sans rien afficher. Perdre le rapport est acceptable,
+   bloquer le démarrage ne l'est pas.
+
+⚠️ Corollaire pour le hook voisin `sync:skills:check` : tant qu'il sort en
+erreur à chaque session pour une dérive non traitée, il entraîne à ignorer la
+sortie des hooks — et emporte celui-ci avec lui.
+
+## `update-deps` et l'ouverture de PR par GitHub Actions — résolu
+
+**Résolu le 24/08/2026.** Conservé parce que le symptôme est déroutant et que
+le réglage peut être remis à zéro.
+
+Le job validait tout (`lint`, `test:unit`, `build` verts) puis échouait à la
+dernière étape :
+
+```
+GitHub Actions is not permitted to create or approve pull requests.
+```
+
+Ce n'est pas du code, c'est un réglage — et il se lit à **deux** niveaux.
+Basculer le drapeau du dépôt seul renvoie un `409` :
+
+```
+gh api -X PUT repos/Albo-Club/albo-os/actions/permissions/workflow -F can_approve_pull_request_reviews=true
+→ 409 The organization does not allow GitHub Actions to create or approve pull requests
+```
+
+La politique de l'org `Albo-Club` prime, et c'est le **défaut de GitHub** pour
+les organisations — pas nécessairement un choix délibéré. Il a fallu la lever
+côté org (owner requis, *Settings → Actions → Workflow permissions*) **puis**
+basculer le drapeau du dépôt, les deux étant nécessaires.
+
+Conséquence à connaître : ce workflow **n'avait jamais réussi à ouvrir une PR
+depuis sa création** le 21/07/2026. Les échecs antérieurs s'arrêtaient plus
+tôt, sur `pnpm lint`, ce qui a masqué le problème jusqu'à ce que les blocages
+amont soient levés. Le premier passage complet a produit la PR #398.
+
+État attendu aujourd'hui :
+
+```
+gh api repos/Albo-Club/albo-os/actions/permissions/workflow
+→ { "default_workflow_permissions": "read",
+    "can_approve_pull_request_reviews": true }
+```
+
+`default_workflow_permissions` reste volontairement à `read` : chaque workflow
+déclare ses propres `permissions:`, ce qui est plus étroit qu'un défaut
+permissif.
+
+Si le symptôme réapparaît, vérifier l'org **avant** le dépôt. Deux
+contournements restent possibles sans toucher à la politique : un PAT
+fine-grained en secret pour le step `create-pull-request`, ou laisser le
+workflow pousser la branche (permis par `contents: write`, hors du champ de la
+politique) et ouvrir la PR à la main.
 
 ## Version de pnpm : trois pins, dont un invisible
 

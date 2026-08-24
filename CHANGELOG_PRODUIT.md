@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.190.2 — 24/08/2026 à 10:00 — Les fiches Convex de l'assistant remises à jour
+## v1.190.6 — 24/08/2026 à 10:48 — Les fiches Convex de l'assistant remises à jour
 
 Rien de visible dans l'app. Cette version répare les « fiches de procédure »
 que l'assistant IA lit avant de toucher au code de la base de données.
@@ -72,6 +72,203 @@ ne sert plus qu'à créer une application neuve, ce qui n'a pas d'objet ici.
 > - Piège documenté dans `KNOWN_ISSUES.md` (404 ≠ dérive nominale ;
 >   `--update` ne répare pas un `skillPath` mort) et candidat template
 >   ajouté à `TEMPLATE_SYNC.md` — le template ship le même lock périmé.
+
+## v1.190.5 — 24/08/2026 à 10:39 — Le contrôle quotidien de la prod refonctionne, et l'état du projet vient à vous
+
+Deux corrections qui vont ensemble, et une leçon qui les relie.
+
+**Le contrôle quotidien de la prod était aveugle depuis le 31 juillet.** Chaque
+matin, un robot vérifie qu'Albo OS répond. Le 30 juillet, l'adresse qu'il
+visite a été remplacée par une page inexistante — sans doute pour tester
+l'alerte, puis oubliée. Depuis, il visitait une page introuvable, en concluait
+que la prod était morte, et rédigeait un rapport. Vingt-cinq jours de suite.
+La prod, elle, allait très bien. L'adresse est remise, le contrôle vérifié,
+le rapport refermé.
+
+**Le point commun avec ce qui précède** : l'alerte fonctionnait parfaitement.
+Elle écrivait, tous les jours, au bon endroit — un endroit où personne ne
+passe. Le robot de mise à jour des dépendances a échoué tous les lundis
+pendant un mois de la même façon. Et cinq demandes de modification attendent
+depuis un mois et demi.
+
+**D'où la seconde correction** : quand vous ouvrez une session de travail sur
+le projet, vous voyez maintenant, en une ligne, ce qui attend — les robots en
+échec et les demandes en attente. L'information vient à vous là où vous
+travaillez déjà, au lieu de s'empiler dans un onglet. Et surtout : **elle se
+tait quand tout va bien**, sinon elle deviendrait à son tour du bruit qu'on
+apprend à ignorer.
+
+> **🔧 Notes techniques**
+>
+> - **`PROD_URL`** : variable de dépôt remise de
+>   `https://os.alboteam.com/zz-nexiste-pas` à `https://os.alboteam.com`.
+>   `prod-smoke` relancé à la main → **success**. Issue #342 (24 commentaires
+>   sur 25 jours) refermée avec l'explication.
+> - **`scripts/session-status.mjs`** + entrée dans le hook `SessionStart` de
+>   `.claude/settings.json` (et script `session:status` pour l'usage manuel).
+>   Deux appels `gh` (`pr list`, `run list --branch main`), ~2 s. Ne retient
+>   que le run le plus récent de chaque workflow — un échec ancien déjà repassé
+>   au vert est de l'histoire, pas un problème en cours.
+> - Deux propriétés à préserver : **sortie vide quand tout est propre**, et
+>   **jamais d'échec de session** (`gh` absent, hors ligne ou déconnecté →
+>   exit 0 silencieux). Appelé via `node` et non `pnpm run`, pour éviter la
+>   sonde de dépendances que pnpm exécute avant chaque script.
+> - **`TEMPLATE_SYNC.md`** : deux affirmations que j'avais écrites sans
+>   vérifier sont corrigées. Le template n'a **jamais** porté le placeholder
+>   `allowBuilds` (son `pnpm-workspace.yaml` n'a pas bougé depuis mai — le
+>   placeholder venait d'Albo OS), et il a pinné `packageManager` avec un hash
+>   d'intégrité dès le 20/08, plus strict que ce qu'on fait ici. La ligne passe
+>   en « already upstream ». La règle « jamais de champ `engines` » est
+>   resserrée : elle dépend du `nodeVersion` du projet Vercel, et le template
+>   en déclare un sans dommage.
+> - **`TEMPLATE_SYNC.md`** : ligne « vulnérable maintenant » sur le template —
+>   son lockfile épingle `better-auth@1.6.14` et il charge `magicLink()`, donc
+>   tout projet démarré depuis lui naît dans la plage de l'advisory.
+> - **`KNOWN_ISSUES.md`** : nouvelle section « Une alerte qui marche n'est pas
+>   une alerte qui arrive » (les trois cas mesurés, et la question à se poser
+>   pour tout nouvel automatisme), et la section `update-deps` passe en
+>   « résolu » — la politique d'org a été levée, le drapeau du dépôt basculé,
+>   et le premier run complet a produit la PR #398.
+
+## v1.190.4 — 24/08/2026 à 09:56 — L'alerte de mise à jour dit enfin ce qui a lâché
+
+Petit correctif sur le ticket d'alerte ouvert automatiquement quand la mise à
+jour hebdomadaire des dépendances échoue.
+
+Il affirmait systématiquement qu'une dépendance ne compilait plus. C'était
+faux la dernière fois : tout compilait très bien, c'est l'ouverture de la
+demande de modification qui avait été refusée pour une raison de droits. Une
+alerte qui se trompe de diagnostic envoie chercher au mauvais endroit.
+
+Le ticket **nomme désormais l'étape qui a réellement échoué**, et se contente
+de citer les causes déjà rencontrées à titre indicatif au lieu d'en désigner
+une.
+
+> **🔧 Notes techniques**
+>
+> - `.github/workflows/update-deps.yml`, step `Open or update failure issue` :
+>   le corps du ticket interrogeait zéro API et présumait la cause. Il appelle
+>   maintenant `actions.listJobsForWorkflowRun` pour retrouver le premier step
+>   en `conclusion === 'failure'` et l'afficher. Appel dans un `try/catch` —
+>   lever l'alerte prime sur le détail, une API en erreur ne doit pas avaler
+>   la notification.
+> - **Piège associé** : déclarer un bloc `permissions:` met à `none` tout
+>   scope non listé. L'appel exigeait donc d'ajouter `actions: read`, sans
+>   quoi le `catch` aurait avalé un 403 en silence et l'alerte serait restée
+>   muette sur l'étape.
+> - La ligne « Étape en échec » est un élément de tableau `null` filtré avant
+>   le `join`, pour ne pas laisser de ligne vide quand l'API n'a rien pu dire.
+> - **Contexte** : découvert en déclenchant le job à la main après le
+>   correctif `unstorage`. `lint`, `test:unit` et `build` passent tous
+>   désormais ; le job bute sur `Open PR` avec « GitHub Actions is not
+>   permitted to create or approve pull requests » — une politique de
+>   l'organisation GitHub, pas un problème de code. Documenté dans
+>   `KNOWN_ISSUES.md`.
+
+## v1.190.3 — 20/08/2026 à 18:11 — Le robot de mise à jour repasse au vert
+
+Suite directe des deux versions précédentes, et fin de l'histoire : la mise à
+jour hebdomadaire des dépendances fonctionne à nouveau de bout en bout.
+
+Une fois la faille de connexion corrigée, le robot est allé plus loin qu'avant
+mais butait encore, sur un tout autre obstacle : une brique technique publiée
+en amont dans un état cassé, qui réclamait un composant qu'elle avait oublié
+d'emporter avec elle. La version précédente de cette brique est désormais
+maintenue en place explicitement, le temps que l'éditeur corrige.
+
+Aucun effet visible dans l'app. Ce qui change : les mises à jour de sécurité
+et de correctifs recommenceront à arriver toutes seules chaque lundi.
+
+> **🔧 Notes techniques**
+>
+> - **Symptôme** : `pnpm build` mourait avant de démarrer, sur un
+>   `failed to load config from vite.config.ts` suivi d'un
+>   `ERR_MODULE_NOT_FOUND` réclamant le paquet `destr`, importé depuis
+>   `unstorage@2.0.0-alpha.8`.
+> - **Cause** : publication cassée en amont. Le `dist/index.mjs` d'alpha.8
+>   importe `destr` cinq fois et son manifeste ne déclare **aucune**
+>   dépendance. Sur une install propre, rien d'autre n'amène `destr` dans
+>   l'arbre. alpha.7 ne marche que parce qu'elle n'importe pas encore `destr` —
+>   toute la ligne `2.0.0-alpha.*` déclare zéro dépendance.
+> - **Chemin** : `nitro@3.0.260429-beta` dépend de `unstorage: ^2.0.0-alpha.7`,
+>   et un caret sur une **préversion** accepte les préversions suivantes — d'où
+>   le passage en alpha.8. Retomber sur la stable `1.17.5` (qui, elle, déclare
+>   bien `destr`) est impossible : hors de la plage de nitro.
+> - **Correctif** : `pnpm.overrides` → `"unstorage": "2.0.0-alpha.7"`, le
+>   patron déjà documenté dans `KNOWN_ISSUES.md`, avec sa condition de
+>   déblocage (une alpha dont `npm view … dependencies` renvoie enfin quelque
+>   chose).
+> - **Vérification** : job du lundi rejoué **sur arbre vierge** — `pnpm update`
+>   complet (37 deps directes), puis `rm -rf node_modules`, `pnpm install`,
+>   `lint`, `test:unit`, `test:convex` (120/120), `build` — tous verts.
+> - **Leçon, ajoutée à `KNOWN_ISSUES.md`** : ce type de bug est **invisible sur
+>   un `node_modules` chaud**, une copie résiduelle du paquet manquant
+>   satisfaisant l'import. C'est ce qui a produit un « build vert » local
+>   erroné à la version précédente, pendant que la CI voyait juste. Toute
+>   vérification de dépendance passe désormais par
+>   `rm -rf node_modules && pnpm install && pnpm build`.
+
+## v1.190.2 — 20/08/2026 à 13:03 — Faille de connexion par lien magique corrigée
+
+**À lire même si le reste ne vous intéresse pas.** La bibliothèque qui gère la
+connexion à Albo OS portait une faille classée **sévère**, qui touche
+précisément le mode de connexion utilisé ici : le lien magique reçu par
+e-mail. Elle permettait, dans certaines conditions, de prendre la main sur un
+compte en le « préparant » avant que son propriétaire ne se connecte pour la
+première fois.
+
+Albo OS tournait sur une version vulnérable. Cette mise à jour installe la
+version corrigée. **Rien à faire de votre côté**, aucun changement visible à
+l'usage, et les sessions ouvertes restent valides.
+
+Pourquoi ça n'avait pas été corrigé plus tôt : la version corrective était
+mécaniquement bloquée. L'outil qui met les dépendances à jour chaque semaine
+échouait, parce qu'un composant intermédiaire refusait cette nouvelle version
+— c'est ce blocage qui a été levé au passage, et il l'est pour de bon.
+
+> **🔧 Notes techniques**
+>
+> - **Faille** : `GHSA-qq9h-g4jm-xgf3`, sévérité **high** — « Account takeover
+>   via pre-account hijacking on magic-link and email-OTP sign-in ». Plage
+>   vulnérable `>= 1.1.3, < 1.6.22`, corrigée en **1.6.22**. La prod tournait
+>   en `better-auth@1.6.16` et `convex/auth.ts` charge bien `magicLink()` :
+>   exposition directe. `pnpm audit` passe de 28 vulnérabilités (14 high) à 27
+>   (13 high), l'advisory disparaît.
+> - **Ce qui bloquait** : `@convex-dev/better-auth` casse le typage à partir
+>   de `better-auth@1.6.18` — `useSession().data` s'effondre en `never`, d'où
+>   `TS2322` sur la prop `authClient` de `ConvexBetterAuthProvider`
+>   (`src/routes/__root.tsx:111`). Cause amont : better-auth 1.6.18+ expose
+>   des types de retour **nommés** (`ReactAuthClient`) là où c'était un type
+>   structurel anonyme, et le `AuthClient` du composant
+>   (`Omit<BetterAuthClientPlugin, …>` autour de `PluginsWithoutCrossDomain`)
+>   ne s'unifie plus. Suivi amont : `get-convex/better-auth#420` (ouvert,
+>   confirmé par deux tiers, reproduit jusqu'en 1.6.25).
+> - **Bisect** (le tableau qui justifie le pin) :
+>
+>   | adapter | better-auth | `tsc` | `test:convex` |
+>   | ------- | ----------- | ----- | ------------- |
+>   | 0.12.2  | 1.6.16      | ✅    | ✅            |
+>   | 0.12.2  | **1.6.30**  | ✅    | ✅            |
+>   | 0.12.3  | 1.6.30      | ✅    | ❌ timeouts   |
+>   | 0.12.4  | 1.6.30      | ❌    | —             |
+>   | 0.12.5  | 1.6.30      | ❌    | —             |
+>
+>   L'échappatoire est donc l'adapter **0.12.2**, celui déjà en prod : il
+>   accepte la version corrigée. 0.12.3 typecheck mais ralentit le harness
+>   `convex-test` au point de faire expirer 2 à 4 tests sur 120 (timeout 5 s,
+>   nombre variable d'un run à l'autre) — écarté aussi.
+>
+> - **Changement** : `@convex-dev/better-auth` épinglé en **exact** `0.12.2`
+>   (un `^` ou un `~` laisserait passer 0.12.3+ en 0.x), et `better-auth` en
+>   `~1.6.30` — patches 1.6.x automatiques, jamais 1.7.x qui sort de la plage
+>   de peer de l'adapter (`>=1.6.9 <1.7.0`) et supprime l'export
+>   `better-auth/plugins#mcp` dont `convex/auth.ts` dépend.
+> - **Vérification** : `pnpm update` complet (37 deps directes) puis `lint` /
+>   `test:unit` / `test:convex` ×3 / `build` — tous verts, adapter maintenu en
+>   0.12.2. Le job hebdomadaire n'est donc plus bloqué. Les 37 bumps ne sont
+>   **pas** dans cette PR : ils partiront dans la PR du job, séparément.
+> - **Condition de déblocage du pin** : documentée dans `KNOWN_ISSUES.md`
+>   § « `@convex-dev/better-auth` : fenêtre de versions verrouillée ».
 
 ## v1.190.1 — 20/08/2026 à 11:51 — Les mises à jour de dépendances repartent
 

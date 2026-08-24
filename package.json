@@ -28,11 +28,12 @@
     "test:convex": "vitest run",
     "deadcode": "knip",
     "sync:skills:update": "node scripts/sync-skills.mjs --update",
-    "sync:linear-docs": "node scripts/sync-linear-docs.mjs"
+    "sync:linear-docs": "node scripts/sync-linear-docs.mjs",
+    "session:status": "node scripts/session-status.mjs"
   },
   "dependencies": {
     "@convex-dev/agent": "^0.6.3",
-    "@convex-dev/better-auth": "^0.12.2",
+    "@convex-dev/better-auth": "0.12.2",
     "@convex-dev/rag": "^0.7.5",
     "@convex-dev/rate-limiter": "^0.3.2",
     "@convex-dev/react-query": "^0.1.0",
@@ -54,7 +55,7 @@
     "@zxcvbn-ts/language-common": "^3.0.4",
     "@zxcvbn-ts/language-en": "^3.0.2",
     "ai": "^6.0.177",
-    "better-auth": "^1.6.16",
+    "better-auth": "~1.6.30",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -103,5 +104,10 @@
     "vite": "^8.0.9",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.10"
+  },
+  "pnpm": {
+    "overrides": {
+      "unstorage": "2.0.0-alpha.7"
+    }
   }
 }
