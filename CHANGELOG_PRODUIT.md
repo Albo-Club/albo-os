@@ -23,6 +23,63 @@ bas de page.
 
 ---
 
+## v1.190.5 — 24/08/2026 à 10:39 — Le contrôle quotidien de la prod refonctionne, et l'état du projet vient à vous
+
+Deux corrections qui vont ensemble, et une leçon qui les relie.
+
+**Le contrôle quotidien de la prod était aveugle depuis le 31 juillet.** Chaque
+matin, un robot vérifie qu'Albo OS répond. Le 30 juillet, l'adresse qu'il
+visite a été remplacée par une page inexistante — sans doute pour tester
+l'alerte, puis oubliée. Depuis, il visitait une page introuvable, en concluait
+que la prod était morte, et rédigeait un rapport. Vingt-cinq jours de suite.
+La prod, elle, allait très bien. L'adresse est remise, le contrôle vérifié,
+le rapport refermé.
+
+**Le point commun avec ce qui précède** : l'alerte fonctionnait parfaitement.
+Elle écrivait, tous les jours, au bon endroit — un endroit où personne ne
+passe. Le robot de mise à jour des dépendances a échoué tous les lundis
+pendant un mois de la même façon. Et cinq demandes de modification attendent
+depuis un mois et demi.
+
+**D'où la seconde correction** : quand vous ouvrez une session de travail sur
+le projet, vous voyez maintenant, en une ligne, ce qui attend — les robots en
+échec et les demandes en attente. L'information vient à vous là où vous
+travaillez déjà, au lieu de s'empiler dans un onglet. Et surtout : **elle se
+tait quand tout va bien**, sinon elle deviendrait à son tour du bruit qu'on
+apprend à ignorer.
+
+> **🔧 Notes techniques**
+>
+> - **`PROD_URL`** : variable de dépôt remise de
+>   `https://os.alboteam.com/zz-nexiste-pas` à `https://os.alboteam.com`.
+>   `prod-smoke` relancé à la main → **success**. Issue #342 (24 commentaires
+>   sur 25 jours) refermée avec l'explication.
+> - **`scripts/session-status.mjs`** + entrée dans le hook `SessionStart` de
+>   `.claude/settings.json` (et script `session:status` pour l'usage manuel).
+>   Deux appels `gh` (`pr list`, `run list --branch main`), ~2 s. Ne retient
+>   que le run le plus récent de chaque workflow — un échec ancien déjà repassé
+>   au vert est de l'histoire, pas un problème en cours.
+> - Deux propriétés à préserver : **sortie vide quand tout est propre**, et
+>   **jamais d'échec de session** (`gh` absent, hors ligne ou déconnecté →
+>   exit 0 silencieux). Appelé via `node` et non `pnpm run`, pour éviter la
+>   sonde de dépendances que pnpm exécute avant chaque script.
+> - **`TEMPLATE_SYNC.md`** : deux affirmations que j'avais écrites sans
+>   vérifier sont corrigées. Le template n'a **jamais** porté le placeholder
+>   `allowBuilds` (son `pnpm-workspace.yaml` n'a pas bougé depuis mai — le
+>   placeholder venait d'Albo OS), et il a pinné `packageManager` avec un hash
+>   d'intégrité dès le 20/08, plus strict que ce qu'on fait ici. La ligne passe
+>   en « already upstream ». La règle « jamais de champ `engines` » est
+>   resserrée : elle dépend du `nodeVersion` du projet Vercel, et le template
+>   en déclare un sans dommage.
+> - **`TEMPLATE_SYNC.md`** : ligne « vulnérable maintenant » sur le template —
+>   son lockfile épingle `better-auth@1.6.14` et il charge `magicLink()`, donc
+>   tout projet démarré depuis lui naît dans la plage de l'advisory.
+> - **`KNOWN_ISSUES.md`** : nouvelle section « Une alerte qui marche n'est pas
+>   une alerte qui arrive » (les trois cas mesurés, et la question à se poser
+>   pour tout nouvel automatisme), et la section `update-deps` passe en
+>   « résolu » — la politique d'org a été levée, le drapeau du dépôt basculé,
+>   et le premier run complet a produit la PR #398.
+
 ## v1.190.4 — 24/08/2026 à 09:56 — L'alerte de mise à jour dit enfin ce qui a lâché
 
 Petit correctif sur le ticket d'alerte ouvert automatiquement quand la mise à
