@@ -23,6 +23,62 @@ bas de page.
 
 ---
 
+## v1.190.7 — 24/08/2026 à 11:44 — Deux pièges d'outillage consignés pour la prochaine fois
+
+Rien de visible dans l'app. Cette version écrit noir sur blanc deux pièges
+rencontrés en coulisses, pour que la prochaine personne — ou le prochain
+assistant — ne reperde pas le même temps dessus.
+
+Le premier touche à la confiance qu'on peut accorder à une réponse. Quand
+l'assistant va lire directement dans la base, il passe par un outil qui choisit
+une fois pour toutes, au moment où il démarre, la base qu'il va interroger — et
+ne revient jamais sur ce choix. S'il s'est fixé sur la base de test, vide, au
+lieu de celle de production, il continue d'y répondre sans le moindre message
+d'erreur : des tableaux vides, des montants qui ne correspondent à rien, et
+aucun signe que la question a simplement été posée au mauvais endroit. Le mode
+d'emploi est maintenant écrit — comment repérer le cas en cinq secondes,
+comment le corriger, et lequel des deux outils fait foi quand ils se
+contredisent.
+
+Le second est une correction d'inventaire : un décompte interne annonçait onze
+fichiers là où il n'en reste que trois. Le chiffre était devenu faux à la
+dernière mise à jour, et il était écrit d'une façon qui le rendait
+invérifiable. Les trois fichiers sont désormais nommés un par un.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle section `KNOWN_ISSUES.md` « Serveur MCP du CLI Convex : le
+>   déploiement est figé au démarrage du process ». Cause vérifiée dans
+>   `convex@1.42.3` : `cli/mcp.js:47` garde le process vivant, et
+>   `cli/lib/deploymentSelection.js:360-361` appelle `dotenv.config()`, qui
+>   n'écrase jamais une clé déjà présente dans `process.env` — la première
+>   lecture de `CONVEX_DEPLOYMENT` est donc figée pour la vie du process, là où
+>   le CLI repart d'un process neuf à chaque commande. C'est toute l'asymétrie.
+> - Aggravants : `status.js:40-42` conseille explicitement le déploiement dev
+>   (« Generally default to using the development deployment ») alors que le
+>   repo est prod-only ; `status.js:66` fait un `process.chdir` qui donne
+>   l'illusion d'une re-résolution ; le `deploymentSelector` est un jeton opaque
+>   décodé sans revalidation (`requestContext.js:96-101`) ; et le `.mcp.json` du
+>   plugin `convex@claude-plugins-official` ne passe aucun flag.
+> - Remèdes documentés : le CLI (`convex run --prod`) fait foi ; croiser l'URL
+>   renvoyée par `status` avec `VITE_CONVEX_URL` ; redémarrer Claude Code pour
+>   dégeler le process ; `--prod` **plus** `--cautiously-allow-production-pii`
+>   pour viser la prod, en sachant que le second lève un garde-fou PII.
+>   Distinction posée avec les deux autres « MCP » du repo (`convex/mcp/` et les
+>   serveurs tiers), rappelée dans `CLAUDE.md`.
+> - `KNOWN_ISSUES.md` § « Skills vendorisées » : 11 → **3** fichiers hors
+>   périmètre, nommés (`convex-create-component/agents/openai.yaml`,
+>   `convex-create-component/assets/icon.svg`, `frontend-design/LICENSE.txt`).
+>   Le glob `convex-*/…` rendait le décompte invérifiable ; #399 avait emporté
+>   les 8 autres avec les anciennes skills Convex. Arbitrage inchangé — ce ne
+>   sont pas des instructions lues par un agent — mais désormais étayé : les
+>   trois sont byte-identiques à l'upstream aux `pinnedRef` du lock. La règle
+>   absolue de `CLAUDE.md` est qualifiée en conséquence (fichiers
+>   d'instruction, exception documentée pour les annexes).
+> - Aucun fichier vendorisé ni `skills-lock.json` touché : pas de churn de
+>   `computedHash`, parité de hash avec le template préservée. Le piège MCP est
+>   ajouté à `TEMPLATE_SYNC.md` — le template ship le même plugin non flagué.
+
 ## v1.190.6 — 24/08/2026 à 10:48 — Les fiches Convex de l'assistant remises à jour
 
 Rien de visible dans l'app. Cette version répare les « fiches de procédure »

@@ -991,11 +991,24 @@ Deux conséquences :
 Règle : une entrée de lock par répertoire upstream où l'on veut enraciner un
 arbre ; `references` ne vise que des descendants de ce répertoire.
 
-**Reste hors périmètre** : 11 fichiers non-Markdown vendorisés à la main
-(`convex-*/agents/openai.yaml`, `convex-*/assets/icon.svg`,
-`frontend-design/LICENSE.txt`) ne sont dans aucun `references`, donc ni
-rafraîchis ni drift-checkés. Ce ne sont pas des instructions lues par un agent
-— les déclarer ferait diverger nos hashes de ceux du template pour zéro gain.
+**Reste hors périmètre** : **3** fichiers non-Markdown vendorisés à la main ne
+sont dans aucun `references`, donc ni rafraîchis ni drift-checkés —
+`convex-create-component/agents/openai.yaml` (manifeste OpenAI),
+`convex-create-component/assets/icon.svg` (icône) et
+`frontend-design/LICENSE.txt` (Apache 2.0). Ils étaient 11 : #399 a emporté les
+8 autres avec les anciennes skills Convex, et les fiches régénérées en amont
+n'ont plus ni `agents/` ni `assets/`. Les nommer un par un plutôt que par glob
+est délibéré — c'est le glob `convex-*/…` qui avait rendu le décompte
+invérifiable, et donc faux pendant des semaines.
+
+L'arbitrage tient : ce ne sont pas des instructions lues par un agent, et les
+déclarer ferait diverger nos hashes de ceux du template pour zéro gain. Il
+tient **aussi parce qu'on l'a vérifié** : les trois sont aujourd'hui
+byte-identiques à l'upstream aux `pinnedRef` du lock. À rouvrir si l'un d'eux
+devient une instruction lue par un agent — techniquement c'est trivial (ce sont
+des descendants du répertoire du `SKILL.md`, donc ni `../`, ni seconde entrée
+de lock, ni `MAX_IN_FLIGHT` à toucher, et ce sont des fichiers texte, ce
+qu'exige un vendor qui passe par `res.text()`).
 
 ## `sync:skills --check` a besoin d'un plafond de fetchs simultanés
 
@@ -1244,6 +1257,86 @@ resource_metadata="…"` — c'est ce qui déclenche le flow côté client.
    `nextOffset` dit seulement qu'il reste du texte à lire. L'entrée normale
    dans la doc reste `searchDocuments` (sémantique, extraits sourcés) : la
    lecture intégrale est le recours quand un extrait ne suffit pas.
+
+## Serveur MCP du CLI Convex : le déploiement est figé au démarrage du process
+
+**Trois « MCP » cohabitent dans ce repo, et ce ne sont pas les mêmes.**
+(1) `convex/mcp/` — le serveur que **l'app** expose à des clients externes
+(section juste au-dessus). (2) `npx convex mcp start` — l'outillage **de dev**
+du CLI Convex, dont Claude Code tire les outils `mcp__…convex__*` (`status`,
+`data`, `tables`, `runOneoffQuery`, `logs`…) : c'est celui-ci le sujet.
+(3) Les MCP tiers (resend, context7, shadcn). Un problème sur l'un ne dit
+strictement rien des deux autres.
+
+**Le piège** : le MCP et le CLI ne voient pas le même déploiement, et c'est le
+MCP qui a tort. `convex run --prod` renvoie les vraies données pendant que
+`tables` / `data` via MCP décrivent une base vide. Aucune erreur, aucun
+avertissement — juste des tables absentes et des chiffres qui ne correspondent
+à rien. On croit à un bug applicatif ; c'est un problème d'adressage.
+
+**Pourquoi** (vérifié dans `convex@1.42.3`, sous `node_modules/convex/dist/esm/`) :
+
+- Le serveur MCP est un **process long-vivant** — `cli/mcp.js:47` bloque sur
+  `await new Promise(() => {})`. Le CLI en ligne de commande, lui, est un
+  process **neuf à chaque invocation**. Toute l'asymétrie est là.
+- `cli/lib/deploymentSelection.js:360-361` fait `dotenv.config({ path:
+  '.env.local' })` puis `dotenv.config()`. Or **`dotenv` n'écrase jamais une
+  clé déjà présente dans `process.env`** : la toute première lecture de
+  `CONVEX_DEPLOYMENT` est donc figée pour la vie du process. Éditer
+  `.env.local` ensuite ne change rien tant que Claude Code n'a pas redémarré.
+- `cli/lib/mcp/tools/status.js:66` fait un `process.chdir(projectDir)` à chaque
+  appel, ce qui **donne l'illusion** que le projet est re-résolu. Le `chdir` a
+  bien lieu ; la relecture d'env, non.
+- La description du tool `status` (`status.js:40-42`) pousse explicitement
+  l'agent vers le dev : « Generally default to using the development deployment
+  unless you'd specifically like to debug issues in production. » Sur ce repo
+  **prod-only** (cf. `CLAUDE.md` § « Workflow déploiement »), c'est le pire
+  conseil possible : le déploiement dev existe bel et bien, mais ce n'est qu'un
+  vestige vide.
+- Le `deploymentSelector` est un **jeton opaque** —
+  `${kind}:${btoa(JSON.stringify({ projectDir, deployment }))}`
+  (`requestContext.js:96-101`) — que les autres outils décodent **sans
+  revalider**. Un sélecteur récupéré au tour précédent, ou copié depuis un
+  autre workspace, reste « valide » et continue de viser l'ancien couple.
+- La prod est de toute façon **fermée par défaut** : `requestContext.js:69-73`
+  refuse `data` / `logs` / `runOneoffQuery` sur un déploiement `prod` tant que
+  ni `--cautiously-allow-production-pii` (lecture) ni
+  `--dangerously-enable-production-deployments` (lecture + écriture) n'est posé.
+
+**Facteur aggravant : le plugin ne passe aucun flag.** Le serveur vient du
+plugin `convex@claude-plugins-official`, installé au **scope user**, dont le
+`.mcp.json` se réduit à `npx -y convex@latest mcp start` — ni `--prod`, ni
+`--project-dir`, ni `cwd`. (Et `convex@latest` est résolu par npx, donc pas
+forcément la version du repo.) Les options existent pourtant : `mcp.js:41`
+appelle `addDeploymentSelectionOptions`, qui apporte `--prod`,
+`--deployment <ref>` et `--env-file <path>`.
+
+**Facteur aggravant : Conductor.** `.env.local` est gitignored et n'est pas
+toujours recopié dans le workspace — quand il manque, `status` répond
+`No CONVEX_DEPLOYMENT set`, ou pire, le process retombe sur ce qu'il a hérité
+d'ailleurs.
+
+**La solution**, du moins cher au plus engageant :
+
+1. **Le CLI fait foi.** `convex run --prod`, `convex export --prod` : c'est
+   déjà la convention du repo, et c'est exactement pour ça qu'ils voient juste.
+   En cas de doute sur un chiffre, trancher au CLI, pas au MCP.
+2. **Croiser l'URL avant de lire.** `status` renvoie l'URL du déploiement qu'il
+   vise ; la comparer au `VITE_CONVEX_URL` de `.env.local`. Contrôle en cinq
+   secondes qui attrape le cas à tous les coups.
+3. **Redémarrer Claude Code** — nouveau process MCP, nouvelle lecture d'env.
+   C'est le seul moyen de dégeler la valeur sans toucher à la config.
+4. **Viser la prod depuis le MCP** demande `--prod` **plus**
+   `--cautiously-allow-production-pii`. Ce second flag n'est pas une case de
+   confort : c'est la levée explicite du garde-fou PII de Convex. Ne pas le
+   committer à la légère.
+5. `--env-file <path>` est le **seul** mécanisme qui court-circuite vraiment le
+   gel : il est lu en amont (`deploymentSelection.js:335-337`, via `ctx.fs`) et
+   ne passe donc pas par le `process.env` figé.
+
+Même famille, vue d'un autre angle : `vercel link` wipes `CONVEX_DEPLOYMENT`
+from `.env.local` (plus haut) et sa règle finale — `CONVEX_DEPLOYMENT` est un
+binding dev **par développeur**, pas une cible de déploiement.
 
 ## tailwind-merge v3 obligatoire avec les composants shadcn « Tailwind v4 »
 
