@@ -198,7 +198,7 @@
       },
       "reportIssues": {
         "label": "Report problems",
-        "help": "Mails from the incoming reports queue: quarantine, processing failure, outcome of a manually assigned mail. Also decides what you get for the reports you forward yourself: ticked, the detailed recap or the failure cause; unticked, a plain \"well received\" — the same message either way."
+        "help": "Mails from the incoming reports queue, for reports you did not forward yourself: quarantine, processing failure, outcome of a manually assigned mail. It has no effect on the reports you do forward: the reply in your own thread is always the detailed one — the recap when it is filed, the cause when it fails."
       },
       "weeklyReports": {
         "label": "Weekly reports",

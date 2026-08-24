@@ -198,7 +198,7 @@
       },
       "reportIssues": {
         "label": "Problèmes de reports",
-        "help": "Les emails de la file Rapports entrants : quarantaine, échec de traitement, suite donnée à un mail assigné à la main. Décide aussi de ce que tu reçois pour les reports que tu transfères toi-même : coché, tu as le récapitulatif détaillé ou la cause de l'échec ; décoché, tu reçois « Report bien reçu », le même message dans les deux cas."
+        "help": "Les emails de la file Rapports entrants pour les reports que tu n'as pas transférés toi-même : quarantaine, échec de traitement, suite donnée à un mail assigné à la main. Sans effet sur les reports que tu transfères : la réponse dans ton fil est toujours détaillée — le récapitulatif quand c'est rangé, la cause quand ça coince."
       },
       "weeklyReports": {
         "label": "Reports de la semaine",

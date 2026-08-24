@@ -4120,54 +4120,53 @@ il ne saura jamais qu'une fiche jumelle existe ailleurs.
 - Une fiche **sans domaine** ne peut rien suggérer (82 des 275 fiches Calte au
   05/08/2026) : seul le sélecteur principal les atteint.
 
-## Reports par email : le canal suit le geste, le contenu suit le rôle
+## Reports par email : tout suit le geste, la préférence ne gate que le non sollicité
 
 Le routage des récaps (`convex/lib/reportRouting.ts:routeRecap`, appliqué
-par `reportNotify.send`) croise **deux axes indépendants**. Les confondre
-est l'erreur naturelle, et c'est ce qui casse la promesse faite au
-transféreur :
+par `reportNotify.send`) tient en une règle : **la réponse dans le fil d'un
+transféreur membre est toujours la vraie** — récap détaillé sur succès,
+cause + lien vers la file sur échec ou quarantaine. Aucune préférence n'y
+entre. Un mail neuf part en plus aux abonnés `reportIssues` quand il y a un
+problème, et le transféreur en est retiré (il l'a déjà eu en fil).
 
-- **Le canal** dépend du geste : un membre qui a transféré reçoit la
-  réponse **dans son propre fil** ; tous les autres reçoivent un **mail
-  neuf**.
-- **Le contenu** dépend du rôle : qui gère la file (abonné `reportIssues`)
-  reçoit la version actionnable — récap détaillé sur succès, cause + lien
-  vers la file sur échec ; qui ne fait que transférer reçoit un **accusé de
-  réception identique au caractère près, succès comme échec**.
+**Ce que la préférence `reportIssues` gouverne, et rien d'autre** : le
+courrier **non sollicité**, c'est-à-dire les problèmes des reports que son
+lecteur n'a **pas** transférés lui-même. `listRecipients` sert donc
+uniquement de liste de destinataires.
 
-Ce dernier point est le cœur du dispositif, et il est **contre-intuitif** :
-`reportReceiptHtml()` ne prend délibérément **aucun argument**. Lui en
-passer un — la cause, le nom de la société, un simple ✅/⚠️ — suffirait à
-révéler le résultat, et le transféreur se remettrait à surveiller un
-diagnostic qu'il ne traitera pas. Si un jour la fonction gagne un
-paramètre, la garantie tombe.
+**Pourquoi c'était différent avant, et pourquoi on est revenu dessus.**
+De v1.169.0 (03/08/2026) à v1.191.0 (24/08/2026), la même case décidait
+*aussi* du contenu de la réponse en fil : un membre non abonné recevait un
+accusé neutre (`reportReceiptHtml`, supprimé depuis) rigoureusement
+identique en succès et en échec. L'intention — ne pas envoyer un
+diagnostic à quelqu'un dont le rôle s'arrête au transfert — était bonne,
+l'implémentation non : une seule case répondait à **deux questions
+distinctes**, « est-ce que je veux les problèmes de la file dans ma boîte ? »
+et « est-ce que je veux voir ce qu'est devenu le report que je viens de
+transférer ? ». Répondre non à la première coupait la seconde, et un
+transféreur se retrouvait sans moyen de vérifier la société retenue par
+l'IA ni les métriques extraites. **Ne pas recâbler une préférence sur le
+contenu d'une réponse transactionnelle** : si le besoin de déléguer le
+transfert sans diagnostic revient, il lui faut sa propre préférence.
 
-Le corollaire symétrique : un **succès ne notifie jamais un tiers**
-(`alertOthers: false`). Une chaîne qui marche ne produit aucun mail pour
-qui ne l'a pas déclenchée. Ajouter une notification de succès aux
-gestionnaires ferait un mail par report entrant.
+Ce qui reste vrai et n'a pas bougé :
 
-Trois pièges à ne pas redécouvrir :
-
-- **Ne pas « réparer » l'accusé neutre** en y ajoutant l'issue : c'est le
-  comportement voulu, pas un oubli.
-- **Ne pas promettre d'humain dans l'accusé** (« l'équipe a été prévenue ») :
-  ce serait faux le jour où personne n'est abonné à `reportIssues`. Le
-  texte ne dit que ce qui est vrai dans tous les cas — le mail est
-  conservé et rejouable depuis la file.
-- **Un nouveau membre est abonné d'office** (opt-out). Ajouter quelqu'un
-  qui ne doit voir que ses accusés demande de décocher « Problèmes de
-  reports » sur sa ligne, Réglages → Membres.
-
-Le garde-fou anti-énumération reste par-dessus tout ça : **jamais** de
-réponse à un expéditeur non membre, quoi qu'il arrive.
+- **Le garde-fou anti-énumération** : **jamais** de réponse à un expéditeur
+  non membre, quoi qu'il arrive. C'est aussi ce qui rend la règle
+  ci-dessus sûre — un « transféreur extérieur » n'existe pas, le seul
+  lecteur possible d'une réponse en fil est un membre.
+- **Un succès ne notifie jamais un tiers** (`alertOthers: false`). Une
+  chaîne qui marche ne produit aucun mail pour qui ne l'a pas déclenchée.
+  Ajouter une notification de succès aux gestionnaires ferait un mail par
+  report entrant.
+- **Un nouveau membre est abonné d'office** (opt-out).
 
 Limite connue et assumée : si **personne** n'est abonné à `reportIssues`,
-un échec ne notifie plus personne pendant que le transféreur, lui, reçoit
-son « bien reçu ». Rien n'est perdu — la ligne reste dans la file
-`/app/all/reports` — mais plus aucun mail ne le signale. Pas de garde-fou
-en base (on ne bloque pas le désabonnement du dernier abonné) : à 3 users
-la file est regardée.
+l'échec d'un report que personne n'a transféré (quarantaine, ligne assignée
+à la main) ne notifie plus personne. Rien n'est perdu — la ligne reste dans
+la file `/app/all/reports` — mais plus aucun mail ne le signale. Pas de
+garde-fou en base (on ne bloque pas le désabonnement du dernier abonné) : à
+3 users la file est regardée.
 
 ## `companyReports.metrics` — des nombres nus, unité stockée ailleurs
 
