@@ -23,6 +23,56 @@ bas de page.
 
 ---
 
+## v1.190.6 — 24/08/2026 à 10:48 — Les fiches Convex de l'assistant remises à jour
+
+Rien de visible dans l'app. Cette version répare les « fiches de procédure »
+que l'assistant IA lit avant de toucher au code de la base de données.
+
+Convex a refait toute sa bibliothèque de fiches début août : trois des nôtres
+n'existaient plus sous leur ancien nom, et le contrôle automatique passait au
+rouge à chaque ouverture de session. Les fiches sont repointées vers leurs
+remplaçantes, les anciennes supprimées, et les deux contrôles (intégrité de
+notre copie, et fraîcheur par rapport à l'original) repassent au vert.
+
+Deux fiches proposées par Convex ont été écartées volontairement : l'une
+poussait à installer un système de connexion concurrent du nôtre, l'autre ne
+renvoyait que vers des fiches qu'on n'a pas. Une troisième a été retirée : elle
+ne sert plus qu'à créer une application neuve, ce qui n'a pas d'objet ici.
+
+> **🔧 Notes techniques**
+>
+> - `get-convex/agent-skills@90ae2c3` (01/08/2026) régénère tout le repo
+>   depuis le hub `convex-agents` : ~33 `SKILL.md` par _capability_, toutes
+>   préfixées `convex-`, plus aucun répertoire `references/`. Le commit
+>   annonce lui-même les suppressions.
+> - `skills-lock.json` : `convex-migration-helper` → `convex-migrate`,
+>   `convex-performance-audit` → `convex-advisor`, `convex-setup-auth` →
+>   `convex-authz` (clé, `skillPath`, `references` retiré). Les six entrées
+>   `get-convex/agent-skills` passent de `ec1e6ba` à `6843b65`.
+>   `convex-create-component` est exempté du générateur en amont : contenu
+>   inchangé. `convex-quickstart` est **retirée** du lock : régénérée, elle
+>   échafaude désormais une app Next.js neuve — sans objet sur un repo
+>   existant, et un risque d'activation à contretemps.
+> - Écarts assumés vs le mapping upstream : pas de `convex-auth` (installe
+>   `@convex-dev/auth`, concurrent de notre Better Auth), pas de
+>   `convex-optimize` (délègue à `launch-readiness` / `check-updates` /
+>   `sentinel`, non vendorisées).
+> - `--update` n'a pas été utilisé : il re-pinne toutes les familles du lock.
+>   SHA écrit à la main sur les seules entrées Convex, puis
+>   `pnpm run sync:skills` (mode auto-réparateur).
+> - Le script ne prune pas : les trois `.agents/skills/<ancien-nom>/` et leurs
+>   symlinks `.claude/skills/` supprimés à la main, sinon ils restent chargés
+>   par Claude Code tout en étant invisibles de `--check` et de `--verify`.
+> - Overrides projet ajoutés dans `CLAUDE.md` : `convex-authz` impose
+>   `requireIdentity`/`requireOwner` dans `convex/model/auth.ts` — à traduire
+>   vers `convex/lib/auth.ts` (`requireAppUser`, `requireOrgMember`,
+>   `requireOrgRole`), notre ownership passant par `organizationMembers` et
+>   non par un champ `ownerId`. Le routeur `convex` fetche désormais un
+>   catalogue servi en HTTP, hors portée du lock.
+> - Piège documenté dans `KNOWN_ISSUES.md` (404 ≠ dérive nominale ;
+>   `--update` ne répare pas un `skillPath` mort) et candidat template
+>   ajouté à `TEMPLATE_SYNC.md` — le template ship le même lock périmé.
+
 ## v1.190.5 — 24/08/2026 à 10:39 — Le contrôle quotidien de la prod refonctionne, et l'état du projet vient à vous
 
 Deux corrections qui vont ensemble, et une leçon qui les relie.

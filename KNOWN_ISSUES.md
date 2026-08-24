@@ -1047,6 +1047,47 @@ qui ne correspond plus au `computedHash`, donc un `pnpm run sync:skills` répare
 un arbre corrompu. `--force` n'est plus nécessaire pour ça (il reste utile pour
 tout re-télécharger sans condition).
 
+## Skills vendorisées : quand l'amont supprime ou renomme une skill
+
+`sync:skills:check` a deux vocabulaires d'échec, et `--update` n'en traite
+qu'un :
+
+- `~ <skill>: main moved since pinned <sha>` → dérive **nominale**, l'original
+  a bougé au même chemin. `pnpm run sync:skills:update` répare.
+- `✗ <skill>: 404 https://raw.githubusercontent.com/…` → le `skillPath`
+  **n'existe plus** en amont. `--update` ne répare rien : il avance le
+  `pinnedRef` puis refetche exactement le même chemin mort, et ressort 404.
+
+Le second cas veut dire que l'amont a restructuré son arbre. Retrouver où la
+skill est passée — le message du commit de suppression le dit souvent
+explicitement — puis corriger l'entrée du lock à la main : nouvelle clé,
+nouveau `skillPath`, et **retirer `references`** si la nouvelle version n'a
+plus de fichiers annexes.
+
+Deux pièges à ce moment-là :
+
+1. **`--update` re-pinne tout le monde.** Il résout le tip de chaque
+   `trackingRef` du lock, pas seulement celui qui t'intéresse : les familles
+   sans dérive voient quand même leur `pinnedRef` sauter, ce qui noie le diff
+   qu'on est justement censé relire. Pour rester chirurgical, écrire le SHA
+   cible à la main dans les seules entrées concernées puis lancer le
+   `pnpm run sync:skills` par défaut — il est auto-réparateur, re-vendorise et
+   réécrit les `computedHash` tout seul.
+2. **Le script ne fait pas le ménage.** `vendor()` écrit, ne supprime jamais,
+   et `--verify` n'itère que sur les clés du lock. Un dossier
+   `.agents/skills/<ancien-nom>/` retiré du lock reste sur le disque **et
+   reste chargé par Claude Code**, tout en étant invisible des deux
+   garde-fous. Le supprimer à la main, avec son symlink
+   `.claude/skills/<ancien-nom>`.
+
+Cas vécu : le 01/08/2026, `get-convex/agent-skills` est passé de 6 skills
+écrites à la main à ~33 fiches générées depuis un hub interne (commit
+`90ae2c3`). Trois de nos cinq skills Convex ont disparu d'un coup, et avec
+elles ~1 550 lignes de `references/` rédigées. Les remplaçantes font 23 à
+36 lignes : le fond Convex ne vit plus dans les skills mais dans
+`convex/_generated/ai/guidelines.md` (régénéré par `convex dev`, et qui prime
+sur tout) et dans le catalogue servi en ligne par le routeur `convex`.
+
 ## Streamdown (panneau AI) — `@source` Tailwind v4, plugins retirés, labels tool
 
 Le markdown du chat AI est rendu par `streamdown` (via `MessageResponse`
