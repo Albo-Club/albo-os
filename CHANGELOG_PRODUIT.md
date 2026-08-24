@@ -23,6 +23,41 @@ bas de page.
 
 ---
 
+## v1.190.4 — 24/08/2026 à 09:56 — L'alerte de mise à jour dit enfin ce qui a lâché
+
+Petit correctif sur le ticket d'alerte ouvert automatiquement quand la mise à
+jour hebdomadaire des dépendances échoue.
+
+Il affirmait systématiquement qu'une dépendance ne compilait plus. C'était
+faux la dernière fois : tout compilait très bien, c'est l'ouverture de la
+demande de modification qui avait été refusée pour une raison de droits. Une
+alerte qui se trompe de diagnostic envoie chercher au mauvais endroit.
+
+Le ticket **nomme désormais l'étape qui a réellement échoué**, et se contente
+de citer les causes déjà rencontrées à titre indicatif au lieu d'en désigner
+une.
+
+> **🔧 Notes techniques**
+>
+> - `.github/workflows/update-deps.yml`, step `Open or update failure issue` :
+>   le corps du ticket interrogeait zéro API et présumait la cause. Il appelle
+>   maintenant `actions.listJobsForWorkflowRun` pour retrouver le premier step
+>   en `conclusion === 'failure'` et l'afficher. Appel dans un `try/catch` —
+>   lever l'alerte prime sur le détail, une API en erreur ne doit pas avaler
+>   la notification.
+> - **Piège associé** : déclarer un bloc `permissions:` met à `none` tout
+>   scope non listé. L'appel exigeait donc d'ajouter `actions: read`, sans
+>   quoi le `catch` aurait avalé un 403 en silence et l'alerte serait restée
+>   muette sur l'étape.
+> - La ligne « Étape en échec » est un élément de tableau `null` filtré avant
+>   le `join`, pour ne pas laisser de ligne vide quand l'API n'a rien pu dire.
+> - **Contexte** : découvert en déclenchant le job à la main après le
+>   correctif `unstorage`. `lint`, `test:unit` et `build` passent tous
+>   désormais ; le job bute sur `Open PR` avec « GitHub Actions is not
+>   permitted to create or approve pull requests » — une politique de
+>   l'organisation GitHub, pas un problème de code. Documenté dans
+>   `KNOWN_ISSUES.md`.
+
 ## v1.190.3 — 20/08/2026 à 18:11 — Le robot de mise à jour repasse au vert
 
 Suite directe des deux versions précédentes, et fin de l'histoire : la mise à
