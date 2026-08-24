@@ -28,7 +28,8 @@
     "test:convex": "vitest run",
     "deadcode": "knip",
     "sync:skills:update": "node scripts/sync-skills.mjs --update",
-    "sync:linear-docs": "node scripts/sync-linear-docs.mjs"
+    "sync:linear-docs": "node scripts/sync-linear-docs.mjs",
+    "session:status": "node scripts/session-status.mjs"
   },
   "dependencies": {
     "@convex-dev/agent": "^0.6.3",
