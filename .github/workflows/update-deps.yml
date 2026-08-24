@@ -10,6 +10,8 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
+  # actions: read — needed to look up which step failed (see the alert step).
+  actions: read
 
 jobs:
   update:
@@ -64,21 +66,51 @@ jobs:
         with:
           script: |
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+
+            // Name the step that actually failed instead of presuming a cause.
+            // This job fails on a dependency incompatibility (lint, build) as
+            // readily as on plumbing (a repo setting refusing the PR), and an
+            // alert that guesses sends the reader looking in the wrong place.
+            let failedStep = null
+            try {
+              const { data } = await github.rest.actions.listJobsForWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: context.runId,
+              })
+              for (const job of data.jobs) {
+                const step = (job.steps || []).find((s) => s.conclusion === 'failure')
+                if (step) {
+                  failedStep = step.name
+                  break
+                }
+              }
+            } catch {
+              // Raising the alert matters more than the detail — carry on without it.
+            }
+
             const body = [
-              'La mise à jour hebdomadaire des dépendances a échoué.',
+              'La mise à jour hebdomadaire des dépendances a échoué :',
+              "aucune PR n'a été ouverte, donc **aucune mise à jour de dépendance",
+              "n'est passée**.",
               '',
               `Run : ${runUrl}`,
+              failedStep ? `Étape en échec : \`${failedStep}\`` : null,
               '',
-              "Une dépendance mise à jour dans sa plage semver ne compile plus :",
-              "aucune PR n'a été ouverte, donc **aucune mise à jour de dépendance",
-              "n'est passée**. Ouvrir le run ci-dessus, lire l'étape en échec, puis",
-              "corriger l'incompatibilité (ou épingler le paquet fautif dans",
-              '`pnpm.overrides`, cf. KNOWN_ISSUES.md) pour que le run du lundi',
-              'suivant aboutisse.',
+              "Ouvrir le run, lire l'étape en échec, puis corriger. Les deux causes",
+              'déjà rencontrées, à titre indicatif — ce ne sont pas les seules :',
+              '',
+              '- une dépendance ne compile plus dans sa plage semver → corriger le',
+              "  code, ou épingler le paquet fautif dans `pnpm.overrides` (cf.",
+              '  `KNOWN_ISSUES.md`) ;',
+              "- l'ouverture de la PR est refusée → réglage du dépôt ou de",
+              "  l'organisation, rien à voir avec les dépendances.",
               '',
               'Les échecs suivants sont commentés ici — refermer ce ticket une fois',
               'le workflow revenu au vert.',
-            ].join('\n')
+            ]
+              .filter((line) => line !== null)
+              .join('\n')
 
             const { data: labelled } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,

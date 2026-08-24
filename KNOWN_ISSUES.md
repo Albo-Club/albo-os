@@ -574,6 +574,53 @@ l'adapter publie le correctif de typage, dérouler la matrice ci-dessus avant
 d'élargir la contrainte — `tsc` **et** `pnpm test:convex` en trois passes, la
 régression de perf de 0.12.3 ne se voit pas au typecheck.
 
+## `update-deps` ne peut pas ouvrir sa PR : politique de l'organisation
+
+Le job hebdomadaire valide tout (`lint`, `test:unit`, `build` verts) puis
+échoue à la dernière étape :
+
+```
+GitHub Actions is not permitted to create or approve pull requests.
+```
+
+Ce n'est pas du code. C'est un réglage, et il se lit à deux niveaux :
+
+```
+gh api repos/Albo-Club/albo-os/actions/permissions/workflow
+→ { "default_workflow_permissions": "read",
+    "can_approve_pull_request_reviews": false }
+```
+
+Tenter de basculer le drapeau **au niveau du dépôt** renvoie un `409` :
+`The organization does not allow GitHub Actions to create or approve pull
+requests`. La politique de l'org `Albo-Club` prime — le réglage dépôt ne peut
+pas la contourner. C'est le **défaut de GitHub** pour les organisations, pas
+nécessairement un choix délibéré.
+
+Conséquence à connaître : **ce workflow n'a jamais réussi à ouvrir une PR
+depuis sa création** (21/07/2026). Les échecs antérieurs s'arrêtaient plus tôt,
+sur `pnpm lint`, ce qui a masqué le problème jusqu'à ce que les blocages amont
+soient levés.
+
+Trois issues possibles, par ordre de simplicité :
+
+1. **Autoriser au niveau de l'org** — `https://github.com/organizations/Albo-Club/settings/actions`
+   → *Workflow permissions* → cocher « Allow GitHub Actions to create and
+   approve pull requests », puis basculer le drapeau du dépôt (l'appel API
+   ci-dessus passe une fois l'org permissive). Demande un owner d'org, et vaut
+   pour **tous** les dépôts de l'org — GitHub réunit *créer* et *approuver*
+   dans un seul interrupteur.
+2. **Un PAT fine-grained** en secret, consommé par le step
+   `peter-evans/create-pull-request`. Périmètre étroit, ne touche pas à la
+   politique d'org, mais un secret à faire tourner — et son expiration
+   ressortira comme un échec du job (donc visible, désormais).
+3. **Renoncer à la PR automatique** : laisser le workflow pousser la branche
+   (permis par `contents: write`, hors du champ de la politique) et ouvrir la
+   PR à la main. Un clic par semaine, aucun secret, aucune politique modifiée.
+
+Tant qu'aucune n'est retenue, le job reste rouge chaque lundi et le ticket
+d'alerte se rouvre — ce qui est le comportement voulu, pas un bug.
+
 ## Version de pnpm : trois pins, dont un invisible
 
 **Le piège** : `pnpm-lock.yaml` ne dit pas quel pnpm l'a écrit —
