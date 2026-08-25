@@ -7,9 +7,13 @@
  * Single source of truth for the agent model id (OpenRouter slug), shared
  * with convex/agent.ts. Server-only module — never imported client-side, so
  * the top-level env read is safe (and works under node:test).
+ *
+ * The leading `~` is not a typo: it marks an OpenRouter alias that always
+ * redirects to the latest model of the family, so the served model can move
+ * without a commit here — cf. KNOWN_ISSUES.md « Modèle de l'agent ».
  */
 export const AGENT_MODEL =
-  process.env.OPENROUTER_MODEL ?? 'deepseek/deepseek-v4-pro'
+  process.env.OPENROUTER_MODEL ?? '~deepseek/deepseek-v4-flash-latest'
 
 export const BASE_INSTRUCTIONS = [
   // Identity & scope. The model id is stated explicitly: without it, the

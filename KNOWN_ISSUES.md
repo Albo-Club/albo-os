@@ -820,7 +820,8 @@ find . \( -path ./node_modules -o -path ./.output \) -prune -o \
 ## Modèle de l'agent (OpenRouter / DeepSeek)
 
 L'agent IA a tourné sur Anthropic Claude (≤ v1.5.1), puis Mistral Medium 3.5,
-et tourne désormais sur **`deepseek/deepseek-v4-pro` servi via OpenRouter**.
+puis DeepSeek V4 Pro, et tourne désormais sur
+**`~deepseek/deepseek-v4-flash-latest` servi via OpenRouter**.
 
 - **Provider abstrait.** `getModel()` dans `convex/agent.ts` isole le
   provider : `createOpenRouter({ apiKey })` puis `openrouter.chat(AGENT_MODEL)`.
@@ -828,10 +829,29 @@ et tourne désormais sur **`deepseek/deepseek-v4-pro` servi via OpenRouter**.
   Mistral, Claude…) ne touche qu'`AGENT_MODEL` ; changer de provider ne
   touche que cette fonction. Pas un one-way door.
 - **Id du modèle.** Source unique `convex/lib/instructions.ts:AGENT_MODEL`,
-  défaut `deepseek/deepseek-v4-pro`. Override via la var d'env Convex
+  défaut `~deepseek/deepseek-v4-flash-latest`. Override via la var d'env Convex
   `OPENROUTER_MODEL` (n'importe quel slug du catalogue OpenRouter, ex.
-  `deepseek/deepseek-v4-flash` pour moins cher). La clé vit dans l'env Convex
-  sous `OPENROUTER_API_KEY`.
+  `deepseek/deepseek-v4-pro` pour un modèle plus capable et ~9× plus cher). La
+  clé vit dans l'env Convex sous `OPENROUTER_API_KEY`.
+- **Le `~` du défaut n'est pas une coquille : c'est un alias mouvant.** Chez
+  OpenRouter, un slug préfixé `~` (`~deepseek/deepseek-v4-flash-latest`) est
+  une redirection vers la dernière version de la famille — aujourd'hui
+  `deepseek/deepseek-v4-flash-0731`, demain sa remplaçante, **sans commit chez
+  nous**. Deux conséquences à connaître avant de débugger un comportement qui
+  « a changé tout seul » :
+  - `getModel()` ne sert pas que le chat : l'extraction de métriques des
+    reports (`reportStore.ts`), l'enrichissement de sociétés
+    (`companyEnrichment.ts`), l'identification d'expéditeur
+    (`reportIdentify.ts`) et l'intelligence société (`intelligence.ts`) tapent
+    le même modèle. Une bascule d'alias peut donc déplacer la qualité d'une
+    extraction sans qu'aucune ligne du repo n'ait bougé.
+  - Le system prompt annonce l'alias comme id du modèle, donc l'agent répond
+    `~deepseek/deepseek-v4-flash-latest` — ce qui n'est **pas** un deployment
+    id. Le modèle réellement servi se lit dans le champ `model` des lignes
+    `llm_usage` (logs Convex) ou sur le dashboard OpenRouter.
+
+  Si un jour on veut figer : poser le slug daté en env
+  (`pnpm exec convex env set --prod OPENROUTER_MODEL "deepseek/deepseek-v4-flash-0731"`).
 - **L'agent qui prétend être un autre modèle n'est PAS une preuve.** Les LLM
   ne connaissent pas leur deployment id : interrogé « quel modèle es-tu ? »,
   il invente. Le system prompt (`convex/lib/instructions.ts`) injecte l'id

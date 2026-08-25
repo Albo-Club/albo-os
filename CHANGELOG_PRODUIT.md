@@ -23,6 +23,57 @@ bas de page.
 
 ---
 
+## v1.192.0 — 25/08/2026 à 18:54 — L'assistant passe sur un moteur plus rapide
+
+L'assistant de l'app change de moteur : il tourne désormais sur la génération
+**Flash** du modèle DeepSeek, là où il utilisait jusqu'ici la génération
+**Pro**. Concrètement, ses réponses arrivent plus vite, et il coûte environ
+neuf fois moins cher à faire tourner — pour un coût de fonctionnement qui
+devient marginal à notre volume.
+
+Rien ne change dans ce qu'il sait faire : mêmes accès à vos données, mêmes
+outils, mêmes demandes de confirmation avant toute écriture. Le même moteur
+alimente aussi, en arrière-plan, la lecture des reportings reçus par email,
+l'enrichissement des fiches sociétés et les synthèses de participations.
+
+Une nuance à connaître : le moteur est déclaré sous sa forme « dernière
+version en date ». Il suivra donc automatiquement les prochaines versions de
+cette génération, sans intervention de notre part. Si l'assistant se met un
+jour à répondre différemment sans que rien n'ait été modifié dans l'app,
+c'est la première piste à regarder.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/instructions.ts` : `AGENT_MODEL` par défaut passe de
+>   `deepseek/deepseek-v4-pro` à `~deepseek/deepseek-v4-flash-latest`. Source
+>   unique inchangée, toujours surchargeable par la var d'env Convex
+>   `OPENROUTER_MODEL`. Aucun autre code touché — `getModel()`
+>   (`convex/agent.ts`) et ses cinq consommateurs (`reportStore`,
+>   `companyEnrichment`, `reportIdentify`, `intelligence`,
+>   `migrations/alboDocBackfill`) héritent du changement.
+> - Le slug retenu est l'**alias** OpenRouter préfixé `~`, qui redirige
+>   aujourd'hui vers `deepseek/deepseek-v4-flash-0731` (1,31 M tokens de
+>   contexte, `tools` + `structured_outputs` supportés — donc `generateObject`
+>   et l'approbation d'outils fonctionnent à l'identique). Choix assumé de
+>   l'alias plutôt que du slug daté : arbitrage produit, le compromis est
+>   documenté.
+> - Le system prompt reste littéralement vrai (« You run on the DeepSeek
+>   model … ») : on ne change pas de famille, donc pas de correction de
+>   wording. En revanche l'agent annonce désormais un alias de routage comme
+>   son id, et non un deployment id — le modèle réellement servi se lit dans
+>   le champ `model` des lignes `llm_usage` (logs Convex).
+> - Le prompt caching côté DeepSeek reste automatique sur le préfixe partagé
+>   (system prompt + schémas d'outils), sans clé de cache à injecter : le
+>   wrapper `fetch` supprimé à l'époque de Mistral n'a pas à revenir.
+> - `KNOWN_ISSUES.md` § « Modèle de l'agent » : nouvelle puce sur l'alias
+>   mouvant (surface d'impact au-delà du chat + id annoncé ≠ deployment id) et
+>   la commande pour figer sur le slug daté si besoin. Défaut mis à jour dans
+>   `CLAUDE.md`, `README.md`, `.env.example` et `TESTING.md`.
+> - ⚠️ Le code ne porte que le **défaut**. Si `OPENROUTER_MODEL` est déjà posé
+>   sur le déploiement prod, c'est lui qui gagne : le basculement effectif
+>   demande `pnpm exec convex env set --prod OPENROUTER_MODEL "~deepseek/deepseek-v4-flash-latest"`
+>   (ou la suppression de la variable pour retomber sur le défaut du code).
+
 ## v1.191.0 — 25/08/2026 à 14:45 — Un document ne peut plus rester « en cours de lecture » pour toujours
 
 Quand un document entre dans l'app, son texte est lu automatiquement — c'est
