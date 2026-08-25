@@ -1,5 +1,6 @@
 /**
- * Near-duplicate detection for the MCP write tools (convex/mcp/registry.ts).
+ * Near-duplicate detection: the MCP write tools (convex/mcp/registry.ts) for
+ * companies and deals, and the legal-doc import's audit query for documents.
  *
  * Those tools write straight to the DB: unlike the in-app chat agent, there
  * is no `needsApproval` round-trip through the UI. So a creation NEVER blocks
@@ -159,4 +160,53 @@ export async function findSimilarDeals(
       committedAmount: row.committedAmount ?? null,
       signedDate: row.signedDate ?? null,
     }))
+}
+
+// ─── Documents ───────────────────────────────────────────────────────────────
+
+/**
+ * Comparison key for a document title: accents dropped, case folded, every run
+ * of punctuation or whitespace flattened to a single space. Makes
+ * `20260402_-_HECTAREA_-_Pacte_Version_Finale` and
+ * `20260402 - HECTAREA - Pacte Version Finale` collide.
+ */
+export function normalizeDocumentTitle(raw: string): string {
+  return raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+type DocumentLike = {
+  companyId: Id<'companies'>
+  title: string
+}
+
+/**
+ * Groups a company's documents that look like the same file deposited twice.
+ * Returns only the collisions, in encounter order.
+ *
+ * The key is company + normalized title, and the byte size is deliberately
+ * EXCLUDED. That exclusion is the whole point: the import's idempotency guard
+ * keys on title AND size, and re-exporting the same PDF moves the size by a
+ * few bytes of metadata — which is exactly how the four Hectarea twins walked
+ * past a detector that shared the guard's key (ALB-127).
+ *
+ * Same asymmetry as the company/deal matchers above: this REPORTS, it never
+ * decides. A false positive costs a glance; the guard, which destroys the blob
+ * it skips, keeps its strict key.
+ */
+export function groupDuplicateDocuments<T extends DocumentLike>(
+  docs: Array<T>,
+): Array<Array<T>> {
+  const groups = new Map<string, Array<T>>()
+  for (const doc of docs) {
+    const key = `${doc.companyId}|${normalizeDocumentTitle(doc.title)}`
+    const group = groups.get(key)
+    if (group) group.push(doc)
+    else groups.set(key, [doc])
+  }
+  return [...groups.values()].filter((group) => group.length > 1)
 }
