@@ -15,7 +15,7 @@ sidebar wired in, transactional emails, rate-limiting, and CI/CD on day one.
 | Styling      | Tailwind v4 (CSS-first) · shadcn/ui · Inter · tokens in oklch |
 | Auth         | Better Auth (email/password + magic link) + `organization()`  |
 | Email        | Resend (HTML + plain text templates)                          |
-| AI           | Convex Agent + OpenRouter (DeepSeek V4 Pro default, with tools) |
+| AI           | Convex Agent + OpenRouter (DeepSeek V4 Flash default, with tools) |
 | Limiter      | `@convex-dev/rate-limiter`                                    |
 | Observ.      | Sentry (front-end), Convex built-in logs                      |
 
@@ -97,7 +97,7 @@ convex/                Convex backend
   invitations.ts       invite, accept, revoke (with email send)
   users.ts             me, provisionMe, updateProfile
   admin.ts             super-admin queries + purgeExcept (dev cleanup)
-  agent.ts             AI agent instance (OpenRouter, default DeepSeek V4 Pro)
+  agent.ts             AI agent instance (OpenRouter, default DeepSeek V4 Flash)
   chat.ts              threads, sendMessage, listMessages, HTTP /api/chat
   rateLimiters.ts      named limits + consumeLimit helper
   lib/auth.ts          requireAppUser, requireOrgMember, requireOrgRole, …
