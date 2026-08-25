@@ -962,7 +962,12 @@ export default defineSchema({
     .index('by_company', ['companyId', 'uploadedAt'])
     .index('by_deal', ['dealId', 'uploadedAt'])
     .index('by_org', ['orgId'])
-    .index('by_report', ['reportId']),
+    .index('by_report', ['reportId'])
+    // Reading states, oldest first — read by the sweeper that picks up the
+    // documents whose extraction never came back (documentsExtract.ts
+    // `sweepStalePending`). Low cardinality on the first field is fine: the
+    // sweeper only ever ranges over the 'pending' bucket.
+    .index('by_ocr_state', ['ocrState', 'uploadedAt']),
 
   /**
    * documentTexts — the extracted text of a stored file. ONE row per storage

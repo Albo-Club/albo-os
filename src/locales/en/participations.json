@@ -683,7 +683,8 @@
       "file_too_large": "File too large",
       "small_image_skipped": "Small image skipped",
       "empty_workbook": "Empty workbook",
-      "unsupported_format": "Format not read"
+      "unsupported_format": "Format not read",
+      "stuck_pending": "Reading never finished"
     },
     "retryError": "Could not restart the reading"
   },
