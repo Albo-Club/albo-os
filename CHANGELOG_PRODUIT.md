@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.191.0 — 24/08/2026 à 11:51 — Le détail de tes transferts ne dépend plus d'une case
+## v1.192.0 — 25/08/2026 à 15:08 — Le détail de tes transferts ne dépend plus d'une case
 
 Quand tu transfères un investor update à l'adresse dédiée, tu reçois désormais
 **toujours la vraie réponse** dans ton fil : le récapitulatif détaillé quand le
@@ -68,6 +68,68 @@ transféré.
 >   `KNOWN_ISSUES.md` et `TESTING.md` (R25b, R26b, R27b) alignés.
 
 ---
+## v1.191.0 — 25/08/2026 à 14:45 — Un document ne peut plus rester « en cours de lecture » pour toujours
+
+Quand un document entre dans l'app, son texte est lu automatiquement — c'est
+ce qui le rend consultable et surtout trouvable par l'assistant. Jusqu'ici, si
+cette lecture s'interrompait en cours de route, le document restait affiché
+« Lecture en cours… » **indéfiniment**, et personne n'avait de raison de s'en
+apercevoir : dans la liste il a l'air parfaitement normal, il s'ouvre, il se
+télécharge. Seul l'assistant savait qu'il ne l'avait jamais lu — et il ne le
+disait pas.
+
+Ce n'était pas « un document en moins ». Sur la fiche Hectarea, le PV
+d'assemblée générale signé est resté bloqué quatre mois, pendant lesquels
+toute question sur cette AG était répondue depuis un **extrait caviardé** du
+même PV, où plusieurs décisions sont remplacées par des « […] ». C'est la
+mauvaise version qui faisait autorité, en silence.
+
+Désormais, une lecture qui ne revient pas est reprise automatiquement dans
+l'heure. Si la seconde tentative échoue elle aussi, le document bascule en
+rouge **« Lecture jamais terminée »**, avec son bouton de relance manuelle à
+côté. Le principe : mieux vaut une alerte visible qu'une attente éternelle
+qui ressemble à du normal.
+
+Au passage, l'outil de contrôle des imports en masse de documents a été
+corrigé : il était censé signaler les fichiers déposés deux fois, mais il
+reconnaissait un doublon exactement de la même façon que le mécanisme censé
+les empêcher — il ne pouvait donc signaler que ceux qui n'avaient jamais eu
+lieu. Il compare maintenant les titres à la façon d'un lecteur humain, en
+ignorant tirets, majuscules et accents, et il ne se laisse plus tromper par
+les quelques octets d'écart entre deux exports du même PDF. Les quatre
+doublons déjà présents sur Hectarea, eux, restent à supprimer à la main : ce
+correctif regarde vers les prochains imports, il ne touche à aucune donnée.
+
+> **🔧 Notes techniques**
+>
+> - `convex/documentsExtract.ts` : nouvelle `sweepStalePending`
+>   (`internalMutation`), branchée sur un cron horaire dans `convex/crons.ts`.
+>   `run` est un monde clos (finit toujours sur `extracted`/`skipped`/`failed`),
+>   donc un `pending` qui survit = action morte en route. Deux étapes pour ne
+>   pas boucler sur un OCR facturé : relance + estampille
+>   `ocrDetail: 'sweep_retry'`, puis abandon sur `failed`/`stuck_pending`.
+>   L'estampille vit dans `ocrDetail` (invisible tant que l'état est `pending`,
+>   et `documents:reextract` la nettoie déjà → une relance humaine ré-arme la
+>   reprise auto). Nouvel index `documents.by_ocr_state`
+>   (`['ocrState','uploadedAt']`), période de grâce d'1 h, lot de 20.
+> - `convex/lib/duplicates.ts` : `normalizeDocumentTitle` +
+>   `groupDuplicateDocuments`, clé société + titre normalisé, **taille exclue**.
+>   `migrations/legalDocsImport.ts:verify` s'y branche et renvoie désormais des
+>   groupes `{ company, rows: [{ _id, title, size }] }` — les tailles servent à
+>   arbitrer, plus à identifier. Le garde-fou d'`attachBatch` garde sa clé
+>   stricte : il supprime le blob qu'il saute, un faux positif y détruirait un
+>   vrai document.
+> - Régression : `convex/regression.docHygiene.test.ts` (7 cas — machine à
+>   états du sweep, et les 4 vraies paires Hectarea vs leurs voisins distincts).
+>   Vérifié rouge avec l'ancienne clé.
+> - i18n `participations:documentReading.detail.stuck_pending` (EN/FR).
+>   Docs : `KNOWN_ISSUES.md` (2 sections), `TESTING.md` TP6e,
+>   `docs/produit/04-participations.md`, `MIGRATIONS.md`.
+> - Effet de bord attendu au déploiement : le PV d'AG Hectarea (`pending`
+>   depuis avril) est repris dès le premier passage du cron. Cf. ALB-127.
+
+---
+
 ## v1.190.7 — 24/08/2026 à 11:44 — Deux pièges d'outillage consignés pour la prochaine fois
 
 Rien de visible dans l'app. Cette version écrit noir sur blanc deux pièges

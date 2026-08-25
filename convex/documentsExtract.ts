@@ -8,6 +8,11 @@
  * 'extracted' | 'skipped' | 'failed' on the document, so a document is never
  * left silently unreadable — and a failed read never touches the file.
  *
+ * The one hole in that closed world is the run dying mid-way (timeout, crash,
+ * cancellation): the row then keeps the 'pending' it was created with, and
+ * nothing used to come back for it. `sweepStalePending` at the bottom of this
+ * file is that missing return trip.
+ *
  * The text itself is written once per storage blob (`documentTexts`), which
  * is what lets the report fan-out share a single extraction across the
  * `documents` rows of every matched entity.
@@ -217,5 +222,76 @@ export const run = internalAction({
 
     console.log(`[documentsExtract] ${target.title}: ${state}${detail ? ` (${detail})` : ''}`)
     return null
+  },
+})
+
+// ─── The sweeper ─────────────────────────────────────────────────────────────
+
+/** Grace period before a 'pending' row is considered abandoned. */
+const STALE_PENDING_MS = 60 * 60 * 1000
+/** Rows handled per sweep — one bad batch must not fan out unbounded. */
+const SWEEP_BATCH = 20
+/** `ocrDetail` stamp marking a row the sweeper has already relaunched once. */
+const SWEEP_STAMP = 'sweep_retry'
+
+/**
+ * Picks up the documents whose reading never came back. A row still 'pending'
+ * an hour after its upload means the scheduled action never reached its end —
+ * `run` cannot terminate on 'pending'. Nothing used to notice: the only
+ * relaunch is the per-document button, which you have to already know to
+ * click, so the file stayed invisible to semantic search indefinitely and
+ * silently (it looks perfectly normal in the list). Cf. ALB-127.
+ *
+ * Two steps, so a document that kills the reader every time cannot loop on a
+ * billed OCR call forever:
+ *   1. first sweep → relaunch the reading, stamped `sweep_retry`;
+ *   2. still 'pending' at the next sweep → give up on 'failed' /
+ *      'stuck_pending', which the front renders in red with its manual ↻.
+ *
+ * The stamp lives in `ocrDetail` rather than in a column of its own: the
+ * front ignores `ocrDetail` while 'pending', and `documents:reextract` already
+ * clears it — so a human relaunch re-arms the automatic retry for free.
+ *
+ * Staleness is read off `uploadedAt`, which a relaunch does not move. A manual
+ * ↻ on an old document therefore looks stale at once, and a sweep landing
+ * inside a long reading can relaunch it a second time. Harmless: `run` adopts
+ * the text the first pass stored instead of paying for a second OCR, and both
+ * passes write the same verdict.
+ */
+export const sweepStalePending = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cutoff = Date.now() - STALE_PENDING_MS
+    const stale = await ctx.db
+      .query('documents')
+      .withIndex('by_ocr_state', (q) =>
+        q.eq('ocrState', 'pending').lt('uploadedAt', cutoff),
+      )
+      .take(SWEEP_BATCH)
+
+    let relaunched = 0
+    let abandoned = 0
+    for (const doc of stale) {
+      if (doc.ocrDetail === SWEEP_STAMP) {
+        await ctx.db.patch('documents', doc._id, {
+          ocrState: 'failed',
+          ocrDetail: 'stuck_pending',
+        })
+        abandoned++
+        continue
+      }
+      await ctx.db.patch('documents', doc._id, { ocrDetail: SWEEP_STAMP })
+      await ctx.scheduler.runAfter(0, internal.documentsExtract.run, {
+        documentId: doc._id,
+      })
+      relaunched++
+    }
+
+    if (relaunched || abandoned) {
+      console.log(
+        `[documentsExtract] sweep: ${relaunched} relaunched, ${abandoned} abandoned`,
+      )
+    }
+    return { relaunched, abandoned }
   },
 })

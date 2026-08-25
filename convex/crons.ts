@@ -59,6 +59,17 @@ crons.interval(
   {},
 )
 
+// Pick up the documents whose reading never came back. `documentsExtract.run`
+// cannot end on 'pending', so a row still pending an hour later means the
+// action died mid-way — and nothing else ever revisits it. One relaunch, then
+// a visible 'failed'. cf. convex/documentsExtract.ts `sweepStalePending`.
+crons.interval(
+  'sweep stale pending documents',
+  { hours: 1 },
+  internal.documentsExtract.sweepStalePending,
+  {},
+)
+
 // Keep the Vercel SSR function warm (internal tool → near-zero traffic →
 // cold start on most arrivals otherwise). cf. convex/warmup.ts.
 crons.interval('warm vercel ssr', { minutes: 5 }, internal.warmup.pingSite, {})

@@ -25,6 +25,17 @@
  * Wheelee documents deposited by hand before this import. Re-running is a
  * no-op; an interrupted run resumes by simply re-running.
  *
+ * That strict key is deliberate, and `verify`'s duplicate detector deliberately
+ * does NOT share it — the two answer opposite questions. The guard DESTROYS
+ * (a skip deletes the blob it just uploaded), so it must never fire on a
+ * lookalike: strict. The detector only REPORTS, so a false positive costs a
+ * glance: loose. They used to run the same key, which made the detector
+ * structurally blind to exactly the class of duplicate it existed to catch —
+ * the Hectarea lot came in twice under two naming conventions
+ * (`20260402_-_HECTAREA_-_Pacte…` vs `20260402 - HECTAREA - Pacte…`, ±5 bytes
+ * of PDF metadata apart), the guard rightly saw two different files, and the
+ * detector reported nothing. Cf. ALB-127 and KNOWN_ISSUES.md.
+ *
  * What the mapping deliberately leaves out (all motivated in the reviewed
  * spreadsheet): documents naming another investor, signature certificates,
  * RIBs, decks, Google-native files, anything above the 20 MB storage cap, and
@@ -46,6 +57,7 @@
 import { ConvexError, v } from 'convex/values'
 import { internal } from '../_generated/api'
 import { internalMutation, internalQuery } from '../_generated/server'
+import { groupDuplicateDocuments } from '../lib/duplicates'
 
 import type { Id } from '../_generated/dataModel'
 
@@ -240,14 +252,31 @@ export const verify = internalQuery({
       byOcr[doc.ocrState ?? 'none'] = (byOcr[doc.ocrState ?? 'none'] ?? 0) + 1
     }
 
-    // Same-title + same-size pairs should not exist after an idempotent run.
-    const seen = new Set<string>()
-    const duplicates: Array<string> = []
-    for (const doc of uploads) {
-      const key = `${doc.companyId}|${doc.title}|${doc.size ?? 0}`
-      if (seen.has(key)) duplicates.push(doc.title)
-      seen.add(key)
-    }
+    // Near-duplicates, on a key looser than this module's own idempotency
+    // guard (see header for why the two must differ).
+    const collisions = groupDuplicateDocuments(uploads)
+    // One read per company that actually collides — not the whole table.
+    const names = new Map(
+      await Promise.all(
+        [...new Set(collisions.map((group) => group[0].companyId))].map(
+          async (companyId) =>
+            [
+              companyId,
+              (await ctx.db.get('companies', companyId))?.name ?? '(supprimée)',
+            ] as const,
+        ),
+      ),
+    )
+    // Sizes travel with each row: the human arbitrates from them. A handful of
+    // bytes apart is a twin to delete, megabytes apart is two real versions.
+    const duplicates = collisions.map((group) => ({
+      company: names.get(group[0].companyId) ?? '(supprimée)',
+      rows: group.map((doc) => ({
+        _id: doc._id,
+        title: doc.title,
+        size: doc.size ?? 0,
+      })),
+    }))
 
     return {
       org: slug,

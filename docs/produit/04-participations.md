@@ -267,11 +267,19 @@ en est :
 
 | Ce que tu vois | Ce que ça veut dire |
 | --- | --- |
-| « Lecture en cours… » | Le document vient d'arriver, la lecture tourne |
+| « Lecture en cours… » | Le document vient d'arriver, la lecture tourne (elle ne peut plus y rester bloquée, voir plus bas) |
 | « 12 400 car. » | Lu — clique pour relire le texte extrait |
 | ⚠️ avec une cause | La lecture a échoué (fichier illisible, protégé…) — le bouton ↻ relance |
 | « Petite image ignorée », « Format non lu » | Rien à lire, c'est normal (logo, format non géré) |
 | « Analyser » | Document déposé avant cette fonctionnalité — le bouton lance sa lecture |
+
+Une lecture qui **ne revient jamais** est rattrapée toute seule : dans
+l'heure, l'app relance le document resté en attente, et si la seconde
+tentative n'aboutit pas davantage, il bascule en rouge « Lecture jamais
+terminée » avec son bouton ↻. C'est volontairement bruyant — un document
+qui reste indéfiniment « en cours » a l'air parfaitement normal dans la
+liste, alors que l'assistant, lui, ne le voit pas : il répondrait depuis les
+autres documents sans jamais dire qu'il en manque un.
 
 Le texte extrait s'ouvre en un clic : c'est ce qui permet de **vérifier ce
 que la machine a réellement lu** avant de faire confiance aux métriques

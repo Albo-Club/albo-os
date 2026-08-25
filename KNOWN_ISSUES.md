@@ -4618,3 +4618,83 @@ n'afficher que titre et période.
 
 Pour instrumenter : dashboard Convex → **Functions**, colonne _Database
 bandwidth_, triée décroissante. Elle nomme le coupable en une minute.
+
+---
+
+## Un état d'attente que personne ne balaie (`documents.ocrState: 'pending'`)
+
+`documentsExtract.run` est écrit comme un monde clos : quelle que soit l'issue
+— texte obtenu, format non lisible, OCR en échec — il se termine **toujours**
+en inscrivant `extracted`, `skipped` ou `failed`. Il ne peut pas se terminer
+sur `pending`.
+
+D'où la lecture d'un `pending` qui traîne : ce n'est pas « la lecture est
+lente », c'est **l'action n'est jamais allée au bout** — timeout, plantage,
+annulation. L'état initial de la ligne n'a jamais été remplacé.
+
+Le piège n'est pas la panne, c'est ce qui vient après : **rien ne repassait**.
+Le seul geste de relance est le bouton « Relancer la lecture », qui vit *sur*
+le document — il faut donc déjà savoir lequel regarder. Aucune vue n'agrège
+les `pending`, aucun cron ne les ramassait. Un document pouvait rester
+invisible à la recherche sémantique indéfiniment, et **silencieusement** : dans
+la liste il a l'air parfaitement normal, il se télécharge, rien ne signale que
+son texte n'a jamais été lu. Le cas fondateur (ALB-127) : le PV d'AG signé
+d'Hectarea, bloqué quatre mois, pendant lesquels toute question sur cette AG
+était répondue depuis l'**extrait caviardé** du même PV — pas « un document en
+moins », la mauvaise version qui fait autorité.
+
+`documentsExtract.sweepStalePending` (cron horaire) est le trajet retour
+manquant. Deux étapes, pour qu'un document qui tue le lecteur à chaque passage
+ne boucle pas éternellement sur un appel OCR facturé :
+
+1. premier passage → relance la lecture, estampille `ocrDetail: 'sweep_retry'` ;
+2. toujours `pending` au passage suivant → abandon sur `failed` /
+   `stuck_pending`, que le front affiche en rouge avec son ↻ manuel.
+
+Deux détails d'implémentation qui ont l'air arbitraires et ne le sont pas :
+
+- **L'estampille vit dans `ocrDetail`**, pas dans une colonne à elle. Le front
+  ignore `ocrDetail` tant que l'état est `pending` (elle est donc invisible),
+  et `documents:reextract` le remet déjà à `undefined` — une relance humaine
+  ré-arme donc gratuitement la reprise automatique.
+- **L'ancienneté se lit sur `uploadedAt`**, qu'une relance ne déplace pas. Un ↻
+  manuel sur un vieux document paraît donc périmé immédiatement, et un passage
+  du cron tombant pendant une lecture longue peut la relancer une seconde fois.
+  Sans conséquence : `run` adopte le texte déjà stocké au lieu de repayer un
+  OCR, et les deux passes écrivent le même verdict. Une colonne
+  `ocrStartedAt` supprimerait la course ; elle ne valait pas son prix.
+
+Pas de notification : l'abandon se voit sur la fiche, comme n'importe quelle
+lecture en échec. Si un jour ça mérite un email, c'est le modèle de
+`vectorize.ts` (échec définitif → mail aux membres) qu'il faut reprendre.
+
+## Détecter un doublon et empêcher un doublon ne veulent pas la même clé
+
+`legalDocsImport.attachBatch` saute une ligne quand la société porte déjà un
+document de **même titre et même taille en octets**. Cette clé stricte est la
+bonne : quand le garde-fou conclut « doublon », il **supprime le blob qu'il
+vient de téléverser**. Un faux positif y détruit un vrai document.
+
+Le détecteur de `verify` utilisait **la même clé**. Conséquence structurelle :
+il ne pouvait signaler que les doublons que le garde-fou avait déjà bloqués,
+c'est-à-dire aucun. Un détecteur de fumée branché sur le capteur de
+l'extincteur.
+
+Le cas réel (ALB-127) : le lot Hectarea est arrivé en deux passes, sous deux
+conventions de nommage, et les **deux** moitiés de la clé tombent à côté —
+`20260402_-_HECTAREA_-_Pacte_Version_Finale` (1 781 079 o) contre
+`20260402 - HECTAREA - Pacte Version Finale` (1 781 084 o). Le même PDF
+ré-exporté pèse quelques octets de plus (métadonnées internes). Quatre paires
+ainsi, non signalées.
+
+La règle à retenir : **ce qui détruit doit être strict, ce qui signale doit
+être lâche**. `groupDuplicateDocuments` (`convex/lib/duplicates.ts`) regroupe
+sur société + titre normalisé (casse, accents, `_`/`-`/espaces aplatis) et
+**exclut délibérément la taille** — c'est précisément l'exclusion qui rattrape
+la classe manquée. Les tailles voyagent dans le rapport, pas dans la clé :
+c'est ce qui permet d'arbitrer à l'œil (quelques octets d'écart = un jumeau à
+supprimer ; des mégaoctets = deux vraies versions).
+
+Ne pas « corriger » le garde-fou dans l'autre sens en resserrant le détecteur,
+ni l'inverse : les deux fonctions répondent à des questions opposées et doivent
+diverger.

@@ -683,7 +683,8 @@
       "file_too_large": "Fichier trop volumineux",
       "small_image_skipped": "Petite image ignorée",
       "empty_workbook": "Classeur vide",
-      "unsupported_format": "Format non lu"
+      "unsupported_format": "Format non lu",
+      "stuck_pending": "Lecture jamais terminée"
     },
     "retryError": "Impossible de relancer la lecture"
   },
