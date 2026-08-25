@@ -3,13 +3,20 @@
  * it can be pinned by tests without a deployment (convex/reportNotify.ts does
  * the sending).
  *
- * Two axes, deliberately independent:
- * - The CHANNEL follows the gesture: a member who forwarded gets the answer
- *   as a reply IN THEIR OWN THREAD; everyone else gets a fresh email.
- * - The CONTENT follows the role: whoever handles the review queue gets the
- *   actionable version (cause + link); whoever only forwards gets a receipt
- *   that is byte-for-byte the SAME whatever the outcome — someone who is not
- *   in charge of fixing anything should not have to read a verdict.
+ * One rule: EVERYTHING follows the gesture. A member who forwarded a report
+ * gets the answer in their own thread, and that answer is the real one —
+ * the detailed recap on success, the cause and the queue link on a problem.
+ * Nobody else hears about a success; a problem also reaches the members who
+ * subscribed to it, as a fresh mail.
+ *
+ * The `reportIssues` preference deliberately plays NO part here. It gates the
+ * UNSOLICITED mail only — the problems of reports you did not forward — and
+ * `reportNotify.send` reads it through `listRecipients`. It used to decide the
+ * content of the thread reply too, which conflated two questions: "do I want
+ * the queue's problems in my inbox?" and "do I want to see what happened to
+ * the report I just forwarded?". Answering the first with "no" silenced the
+ * second, which is how a forwarder ended up unable to check the company the AI
+ * picked.
  *
  * The anti-enumeration guard sits above all of it: a non-member sender is
  * NEVER replied to, so the address can't be probed.
@@ -23,8 +30,6 @@ export type ThreadReply =
   | 'recap'
   /** Actionable problem mail: reason + link to the review queue. */
   | 'alert'
-  /** Neutral "well received", identical on success and on failure. */
-  | 'receipt'
   | null
 
 export type RecapRoute = {
@@ -39,27 +44,16 @@ export type RecapRoute = {
 export function routeRecap({
   kind,
   senderIsMember,
-  senderHandlesIssues,
 }: {
   kind: RecapKind
   senderIsMember: boolean
-  /** Member AND subscribed to report problems. */
-  senderHandlesIssues: boolean
 }): RecapRoute {
   // Unknown sender: never reply. A quarantined mail (or a row someone
   // assigned by hand from the queue) is reported to the handlers instead.
   if (!senderIsMember) return { reply: null, alertOthers: true }
 
-  if (kind === 'success') {
-    // Nobody is told about a success they did not trigger.
-    return {
-      reply: senderHandlesIssues ? 'recap' : 'receipt',
-      alertOthers: false,
-    }
-  }
+  // Nobody is told about a success they did not trigger.
+  if (kind === 'success') return { reply: 'recap', alertOthers: false }
 
-  return {
-    reply: senderHandlesIssues ? 'alert' : 'receipt',
-    alertOthers: true,
-  }
+  return { reply: 'alert', alertOthers: true }
 }

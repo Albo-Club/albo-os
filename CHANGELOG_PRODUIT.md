@@ -23,6 +23,51 @@ bas de page.
 
 ---
 
+## v1.193.0 — 25/08/2026 à 19:56 — Le détail de tes transferts ne dépend plus d'une case
+
+Quand tu transfères un investor update à l'adresse dédiée, tu reçois désormais
+**toujours la vraie réponse** dans ton fil : le récapitulatif détaillé quand le
+report est rangé — société identifiée, mode de rattachement, période, sources
+lues, métriques enregistrées, valeurs à vérifier — et la cause plus le lien
+vers la file quand ça coince.
+
+Jusqu'ici ce contenu dépendait de la case « Problèmes de reports ». Décochée,
+tu recevais « Report bien reçu », deux phrases sans le moindre détail. Le
+raisonnement de départ était bon — ne pas envoyer un diagnostic à quelqu'un
+dont le rôle s'arrête au transfert — mais une seule case répondait à deux
+questions qui n'ont rien à voir : « est-ce que je veux les problèmes de la file
+dans ma boîte ? » et « est-ce que je veux voir ce qu'est devenu le report que
+je viens de transférer ? ». Répondre non à la première coupait la seconde, et
+on se retrouvait sans moyen de vérifier la société retenue par l'IA.
+
+Chaque réglage retrouve donc son périmètre : **la réponse à ton transfert
+t'appartient**, elle arrive toujours complète ; **« Problèmes de reports » ne
+gouverne plus que le courrier non sollicité**, c'est-à-dire les problèmes des
+reports que tu n'as *pas* transférés toi-même.
+
+Rien ne change pour le reste : un email venant de quelqu'un qui n'est pas
+membre part toujours en quarantaine sans aucune réponse, et un report qui se
+range correctement ne prévient toujours personne d'autre que celui qui l'a
+transféré.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/reportRouting.ts:routeRecap` ne prend plus que `kind` et
+>   `senderIsMember` : membre → `recap` sur succès, `alert` sur
+>   échec/quarantaine ; non-membre → `null`. La variante `receipt` et le
+>   paramètre `senderHandlesIssues` disparaissent.
+> - `emailTemplates.ts:reportReceiptHtml()` est supprimé (orphelin), ainsi que
+>   la branche correspondante dans `reportNotify.send`. `listRecipients` reste,
+>   mais ne sert plus que de liste de destinataires pour `alertOthers` — son
+>   second usage (« l'expéditeur gère-t-il la file ? ») n'a plus lieu d'être.
+> - `tests/reportRouting.test.ts` réécrit : les deux cas anti-énumération sont
+>   conservés à l'identique, un nouveau cas épingle qu'un membre n'est **jamais**
+>   laissé sans réponse.
+> - Copie `alerts.kinds.reportIssues.help` reformulée (FR + EN) pour ne plus
+>   promettre un effet sur les transferts personnels. Docs produit 14 et 17,
+>   `KNOWN_ISSUES.md` et `TESTING.md` (R25b, R26b, R27b) alignés.
+
+---
 ## v1.192.0 — 25/08/2026 à 18:54 — L'assistant passe sur un moteur plus rapide
 
 L'assistant de l'app change de moteur : il tourne désormais sur la génération

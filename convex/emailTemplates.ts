@@ -1054,22 +1054,6 @@ export function reportRecapSuccessHtml(d: ReportRecapData): string {
 }
 
 /**
- * Receipt for a member who forwards reports without handling the queue.
- * Deliberately takes NO argument: it must read exactly the same whether the
- * report was filed or fell over, so that a forwarder never has to wonder why
- * this one looks different. Everything it claims is true in both cases — the
- * mail is stored and replayable from the review queue either way — and it
- * promises nothing about a human, which would be a lie the day nobody
- * subscribes to report problems.
- */
-export function reportReceiptHtml(): string {
-  return recapShell('📬 Report bien reçu', [
-    `<p style="margin: 0;">Merci — ton email est bien arrivé, avec ses pièces jointes, et son contenu est conservé.</p>`,
-    `<p style="margin: 12px 0 0; color: ${MUTED};">Il suit son cours dans Albo OS. Tu n'as rien d'autre à faire.</p>`,
-  ])
-}
-
-/**
  * Failure recap — replied in the thread (queue handlers only). `detail` is
  * the raw technical message: dev-facing, never translated, and bounded —
  * a Zod validation error runs to hundreds of characters.

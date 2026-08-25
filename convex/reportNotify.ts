@@ -3,9 +3,9 @@
  * no Resend in this pipeline).
  *
  * Routing rule: the decision lives in `lib/reportRouting.ts:routeRecap`
- * (channel follows the gesture, content follows the role — see there). The
- * sender is re-checked as a member AT SEND TIME, and a non-member is NEVER
- * replied to, so the address cannot be probed.
+ * (everything follows the gesture — see there). The sender is re-checked as a
+ * member AT SEND TIME, and a non-member is NEVER replied to, so the address
+ * cannot be probed.
  *
  * Idempotent: `notifiedAt` is claimed transactionally before sending, so
  * scheduler retries never double-send. One claim covers BOTH sends of a
@@ -21,7 +21,6 @@ import {
   reportQuarantineHtml,
   reportRecapFailureHtml,
   reportRecapSuccessHtml,
-  reportReceiptHtml,
   reviewReasonLabel,
 } from './emailTemplates'
 import { wantsAlert } from './lib/notificationPrefs'
@@ -50,10 +49,9 @@ export const claimNotify = internalMutation({
  * email, a forward that could not be processed, or the outcome of a row
  * someone assigned by hand from the queue. They share one opt-out.
  *
- * This list does double duty in `send`: it is both the recipient list AND
- * the test for "does the sender handle the queue?", which is what decides
- * between the actionable mail and the neutral receipt. The receipt itself is
- * never gated — it answers a gesture its reader just made.
+ * This gates the UNSOLICITED mail only: the problems of reports the reader
+ * did not forward. The reply in a forwarder's own thread is never gated —
+ * it answers a gesture its reader just made (cf. `lib/reportRouting.ts`).
  */
 export const listRecipients = internalQuery({
   args: {},
@@ -204,18 +202,15 @@ export const send = internalAction({
       internal.reportNotify.listRecipients,
       {},
     )
-    // `fromEmail` is lowercased at normalization and `users.email` is
-    // lowercase (Better Auth), so a plain match is enough here.
-    const senderHandlesIssues =
-      senderIsMember && recipients.includes(row.fromEmail)
-    const route = routeRecap({ kind, senderIsMember, senderHandlesIssues })
+    const route = routeRecap({ kind, senderIsMember })
 
     if (route.reply) {
-      const body = route.reply === 'receipt' ? reportReceiptHtml() : html
-      await replyToMessage(row.agentmailInboxId, row.agentmailMessageId, body)
+      await replyToMessage(row.agentmailInboxId, row.agentmailMessageId, html)
     }
     if (route.alertOthers) {
-      // The forwarder, when they handle the queue, already got it in-thread.
+      // The forwarder, when they subscribe, already got it in-thread.
+      // `fromEmail` is lowercased at normalization and `users.email` is
+      // lowercase (Better Auth), so a plain match is enough here.
       const others = recipients.filter((email) => email !== row.fromEmail)
       if (others.length > 0) {
         await sendMessage(row.agentmailInboxId, others, subject, html)

@@ -61,17 +61,12 @@ Trois choses à savoir :
 
 Ce que ce tableau **ne coupe pas** : les emails qui répondent à un geste
 qu'on vient de faire — invitation, lien de connexion, et la réponse au
-transfert d'un report. Ces derniers arrivent toujours, mais leur contenu
-dépend de la case « Problèmes de reports » :
+transfert d'un report. Cette réponse arrive toujours, et toujours
+détaillée : le récapitulatif quand le report est rangé, la cause et le lien
+vers la file quand ça coince.
 
-- **Case décochée** → tu reçois **« Report bien reçu »**, le même message
-  que le report se soit rangé ou non.
-- **Case cochée** → tu reçois le récapitulatif détaillé quand c'est rangé,
-  et le message actionnable (cause + lien vers la file) quand ça coince.
-
-C'est ce qui permet de confier à quelqu'un le seul rôle de **transférer
-des reports** : il reçoit toujours le même accusé, sans jamais voir une
-erreur, qui part à ceux qui gèrent la file. Voir
+« Problèmes de reports » ne règle donc que le courrier **non sollicité** :
+les problèmes des reports qu'on n'a **pas** transférés soi-même. Voir
 [Reports par email](17-reports-par-email.md).
 
 ## Le workflow d'invitation

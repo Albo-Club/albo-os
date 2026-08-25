@@ -126,36 +126,32 @@ report périodique de la même période.
 
 ### 6. La réponse dans le fil
 
-Toute personne qui transfère reçoit une réponse dans son propre fil. Ce
-qu'elle contient dépend de son rôle, réglé dans
-[Réglages → Membres](14-organisations-membres-invitations.md) :
+Toute personne qui transfère reçoit une réponse dans son propre fil, et
+c'est **toujours la vraie** :
 
-- **Tu ne gères pas la file** (case « Problèmes de reports » décochée) → tu
-  reçois **« Report bien reçu »**, exactement le même message que le report
-  se soit rangé ou non. Pas de verdict, pas de lien, rien à faire. C'est
-  volontaire : on ne demande pas à quelqu'un dont le rôle s'arrête au
-  transfert de lire un diagnostic qu'il ne traitera pas.
-- **Tu gères la file** (case cochée) → tu reçois le vrai contenu : le
-  **récapitulatif détaillé** quand c'est rangé (société identifiée et mode
-  de rattachement, période, sources lues ✅/⚠️, KPIs cibles trouvés ou
-  absents, autres métriques enregistrées, valeurs inhabituelles à
-  vérifier), et le message **actionnable** quand ça coince (la cause, le
-  détail technique de l'échec, et le lien vers la boîte Rapports
-  entrants). Ce même détail technique s'affiche sous le statut de la ligne
-  dans la boîte Rapports entrants : quand une catégorie d'échec est trop
-  générique pour agir (« erreur technique »), c'est là que se lit ce qui
-  s'est réellement passé.
+- **Quand c'est rangé** → le **récapitulatif détaillé** : société
+  identifiée et mode de rattachement, période, sources lues ✅/⚠️, KPIs
+  cibles trouvés ou absents, autres métriques enregistrées, valeurs
+  inhabituelles à vérifier.
+- **Quand ça coince** → le message **actionnable** : la cause, le détail
+  technique de l'échec, et le lien vers la boîte Rapports entrants. Ce
+  même détail technique s'affiche sous le statut de la ligne dans la
+  boîte : quand une catégorie d'échec est trop générique pour agir
+  (« erreur technique »), c'est là que se lit ce qui s'est réellement
+  passé.
 
-Les autres personnes qui gèrent la file sont prévenues **uniquement quand
-il y a un problème**, par un email séparé. Un report qui se range
-correctement ne génère aucune notification pour qui ne l'a pas transféré :
-pas de bruit pour une chaîne qui marche. Le volume, lui, se lit dans le
-**point hebdo du lundi**, qui compte les reports rangés dans la semaine
-(voir [Prévisionnel](09-previsionnel.md)).
+Aucun réglage ne modifie ça. Une réponse à un transfert répond au geste
+qu'on vient de faire — on ne peut pas se retrouver privé du détail de son
+propre transfert, ne serait-ce que pour vérifier la société retenue.
 
-C'est ce qui permet de confier le transfert des reports à quelqu'un sans
-jamais lui envoyer les erreurs — il reçoit toujours le même accusé de
-réception, et les problèmes atterrissent chez ceux qui tiennent la file.
+Ce qui **est** réglable, c'est le courrier qu'on ne demande pas : les
+problèmes des reports qu'on n'a **pas** transférés soi-même. Ils partent en
+email séparé aux personnes abonnées (case « Problèmes de reports » dans
+[Réglages → Membres](14-organisations-membres-invitations.md)). Un report
+qui se range correctement ne génère aucune notification pour qui ne l'a pas
+transféré : pas de bruit pour une chaîne qui marche. Le volume, lui, se lit
+dans le **point hebdo du lundi**, qui compte les reports rangés dans la
+semaine (voir [Prévisionnel](09-previsionnel.md)).
 
 **Un incident passager ne te dérange plus.** Il arrive que la lecture
 échoue pour une raison qui n'a rien à voir avec le mail : la requête vers
@@ -211,9 +207,11 @@ boîte [Rapports entrants](12-vue-consolidee.md), comme un mail.
   voulu (sécurité + contrôle de ce qui entre). Le dépôt manuel depuis la
   fiche société est l'autre porte d'entrée, réservée aux membres de
   l'organisation de la société. Pour qu'une nouvelle personne puisse
-  transférer, il faut donc **l'ajouter comme membre** — et penser à
-  décocher « Problèmes de reports » sur sa ligne si elle ne doit pas gérer
-  la file (tout est activé par défaut).
+  transférer, il faut donc **l'ajouter comme membre** — et elle recevra
+  alors le récapitulatif détaillé de ses propres transferts, comme tout le
+  monde. Décocher « Problèmes de reports » sur sa ligne lui évite en
+  revanche les problèmes des reports des autres (tout est activé par
+  défaut).
 - **Liens Notion** : la page doit être partagée publiquement. Une page
   privée échoue proprement (source ⚠️, reste du mail traité).
 - **Métriques hors catalogue** : visibles dans le récap sous « non
