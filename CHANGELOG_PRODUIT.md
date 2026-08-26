@@ -23,6 +23,34 @@ bas de page.
 
 ---
 
+## v1.195.1 — 26/08/2026 à 20:41 — Le garde-fou qui empêchait un build cassé était rangé dans un tiroir que plus personne n'ouvre
+
+Rien de visible dans l'app. Une consigne interne qui protège l'application
+d'une brique tierce défectueuse était écrite au mauvais endroit : l'outil qui
+installe les dépendances a déménagé ce réglage, et ne lisait donc plus la
+consigne. Elle est déplacée là où elle est de nouveau prise en compte.
+
+Rien ne change aujourd'hui — aucune version de brique n'a bougé — mais la
+protection redevient effective pour les mises à jour à venir, au lieu de tomber
+au premier déploiement qui recalcule les dépendances.
+
+> **🔧 Notes techniques**
+>
+> - Déplacement de l'override `unstorage: 2.0.0-alpha.7` du champ `pnpm` de
+>   `package.json` vers la clé `overrides` de `pnpm-workspace.yaml`. pnpm 11 ne
+>   lit plus ce champ (`The "pnpm" field in package.json is no longer read by
+>   pnpm`) : le pin était devenu inerte, masqué par le lockfile et par le
+>   `packageManager` encore en 10.x.
+> - Vérifié sur une copie jetable avec `pnpm@10.28.0` (la version de
+>   `packageManager`, donc celle de la CI et de Vercel) : lockfile supprimé,
+>   résolution complète → `unstorage@2.0.0-alpha.7`. Contre-épreuve sans
+>   override → `alpha.9`, dont le manifeste ne déclare toujours aucune
+>   dépendance (`npm view` vide, comme `.6` à `.8`) : le pin reste nécessaire.
+> - `KNOWN_ISSUES.md` § « pnpm.overrides » : snippet passé en YAML + section
+>   sur le piège du champ mort. Message d'échec de `update-deps.yml` et ligne
+>   `TEMPLATE_SYNC.md` repointés vers le nouvel emplacement, plus une entrée de
+>   backlog template pour la règle elle-même.
+
 ## v1.195.0 — 26/08/2026 à 20:02 — Une adresse maison pour les reports, et un accusé qui revient au bon expéditeur
 
 L'adresse de dépôt des reports peut désormais être une adresse à vous —

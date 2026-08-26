@@ -543,18 +543,30 @@ The shell guard in `package.json` → `build:vercel` requires **both**
 
 ## pnpm.overrides
 
-Pattern: pin in `pnpm.overrides`, document the unblock condition here, and
-remove both together when upstream fixes land. (`pnpm update` in
-`scripts/update-deps.mjs` respects `pnpm.overrides`, so a pin is enough to hold
-the weekly bump back — there is no separate bot config to disable since
-`renovate.json` was removed.) History of past pins (TanStack router-core
-duplication breaking `server.handlers` type augmentation; `better-call@1.3.5`
-shipping broken) lives in git.
+Pattern: pin in the `overrides` map of **`pnpm-workspace.yaml`**, document the
+unblock condition here, and remove both together when upstream fixes land.
+(`pnpm update` in `scripts/update-deps.mjs` respects those overrides, so a pin
+is enough to hold the weekly bump back — there is no separate bot config to
+disable since `renovate.json` was removed.) History of past pins (TanStack
+router-core duplication breaking `server.handlers` type augmentation;
+`better-call@1.3.5` shipping broken) lives in git.
+
+⚠️ **Never write a pin in the `pnpm` field of `package.json`.** pnpm 11 stopped
+reading that field — it prints `The "pnpm" field in package.json is no longer
+read by pnpm. The following keys were ignored: "pnpm.overrides"` and resolves
+as if the pin did not exist. The failure is silent and delayed: the lockfile
+still holds the pinned version, so nothing breaks until someone installs
+without `--frozen-lockfile` (Vercel does: `installCommand` is
+`pnpm install --frozen-lockfile=false`) or `packageManager` is bumped past 10.
+Both `pnpm@10.28.0` (our `packageManager`) and pnpm 11 read `overrides` from
+`pnpm-workspace.yaml`, so that file is the only place a pin belongs.
 
 ### `unstorage: 2.0.0-alpha.7` — alpha.8 imports `destr` without declaring it
 
-```json
-"pnpm": { "overrides": { "unstorage": "2.0.0-alpha.7" } }
+```yaml
+# pnpm-workspace.yaml
+overrides:
+  unstorage: 2.0.0-alpha.7
 ```
 
 `unstorage@2.0.0-alpha.8` is a **broken publish**: its `dist/index.mjs` imports
@@ -574,9 +586,11 @@ and a caret on a **prerelease** accepts later prereleases of the same version �
 stable line (`1.17.5`, which *does* declare `destr`): it is outside nitro's
 range. Staying on `alpha.7` is the only option.
 
-⚠️ The whole `2.0.0-alpha.*` line declares zero dependencies (`.6`, `.7`, `.8`
+⚠️ The whole `2.0.0-alpha.*` line declares zero dependencies (`.6` through `.9`
 all checked against the registry), so `alpha.7` works by luck — it simply does
-not import `destr` yet. Any future alpha can reintroduce the problem.
+not import `destr` yet. Any future alpha can reintroduce the problem: with the
+override removed, a fresh resolution today picks `alpha.9`, whose manifest is
+just as empty.
 
 **Unblock condition**: an `unstorage` 2.0.0 alpha (or the 2.0.0 release) whose
 manifest actually declares its runtime dependencies. Check with

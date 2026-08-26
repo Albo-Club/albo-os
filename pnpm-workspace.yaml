@@ -9,3 +9,10 @@ allowBuilds:
 onlyBuiltDependencies:
   - esbuild
   - unrs-resolver
+
+# Version pins. This lives here, not in the `pnpm` field of package.json:
+# pnpm 11+ no longer reads that field and warns that the keys were ignored —
+# a pin left there is silently inert. See KNOWN_ISSUES.md § "pnpm.overrides"
+# for the unblock condition of each entry.
+overrides:
+  unstorage: 2.0.0-alpha.7
