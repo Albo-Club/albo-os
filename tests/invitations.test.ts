@@ -15,6 +15,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   emailsMatch,
+  isInviteLive,
   isInviteLiveForSignup,
   normalizeEmail,
 } from '../convex/lib/invitations'
@@ -32,6 +33,29 @@ describe('emailsMatch', () => {
 
   it('rejects genuinely different addresses', () => {
     assert.equal(emailsMatch('alice@example.com', 'bob@example.com'), false)
+  })
+})
+
+describe('isInviteLive', () => {
+  const now = 1_000_000
+
+  it('accepts a pending, unexpired invitation', () => {
+    assert.equal(isInviteLive({ expiresAt: now + 1 }, now), true)
+  })
+
+  it('accepts one expiring exactly now', () => {
+    assert.equal(isInviteLive({ expiresAt: now }, now), true)
+  })
+
+  it('rejects an accepted invitation', () => {
+    assert.equal(
+      isInviteLive({ expiresAt: now + 1, acceptedAt: now - 1 }, now),
+      false,
+    )
+  })
+
+  it('rejects an expired invitation', () => {
+    assert.equal(isInviteLive({ expiresAt: now - 1 }, now), false)
   })
 })
 

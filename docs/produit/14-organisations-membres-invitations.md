@@ -92,11 +92,17 @@ clair sous le tableau.
    email et par organisation.
 3. Le lien d'acceptation s'adapte à la situation : pas de compte → mini
    inscription pré-remplie (l'email est déjà vérifié par le lien) ; compte
-   existant non connecté → connexion ; déjà connecté avec le bon email →
-   acceptation automatique ; connecté avec un autre email → écran « mauvais
-   compte ».
+   existant jamais activé → la personne choisit son mot de passe sur place et
+   rejoint dans la foulée ; compte existant non connecté → connexion, avec
+   « mot de passe oublié » et le renvoi de l'e-mail de vérification à portée ;
+   déjà connecté avec le bon email → acceptation automatique ; connecté avec
+   un autre email → écran « mauvais compte ».
 4. À l'acceptation, la personne devient membre avec le rôle prévu. Rouvrir le
    lien ne casse rien.
+
+Dans tous les cas l'invité repart avec un compte complet — adresse vérifiée et
+mot de passe qu'il a choisi — avec lequel il se reconnecte ensuite normalement.
+Une invitation ne demande jamais un mot de passe que personne n'a défini.
 
 ## Super-admin (`/app/admin`)
 

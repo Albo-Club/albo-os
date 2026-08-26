@@ -23,6 +23,60 @@ bas de page.
 
 ---
 
+## v1.194.0 — 26/08/2026 à 19:30 — Une invitation ne peut plus demander un mot de passe qui n'existe pas
+
+Inviter quelqu'un pouvait se terminer en cul-de-sac. Si une trace de compte
+traînait déjà sur son adresse — une inscription abandonnée en cours de route,
+un vieux compte jamais activé — la page d'invitation lui demandait « votre mot
+de passe ». Un mot de passe que personne n'avait jamais défini. Aucune issue
+depuis cet écran : ni « mot de passe oublié », ni explication, et le lien
+magique renvoyait sur ce même formulaire sans dire pourquoi.
+
+**La page distingue désormais trois situations au lieu de deux.** Un compte
+existe vraiment (adresse déjà confirmée) → on demande le mot de passe, avec
+« Mot de passe oublié ? » à portée de main et, si l'adresse n'a jamais été
+confirmée, le bouton pour se renvoyer l'e-mail de vérification. Une trace de
+compte sans confirmation → la personne **choisit son mot de passe sur place**
+et rejoint dans la foulée : suivre le lien d'invitation reçu dans sa boîte
+prouve déjà qu'elle en est propriétaire, ce que l'application faisait déjà
+pour une inscription neuve. Aucun compte → l'inscription habituelle, inchangée.
+
+Dans les trois cas la personne repart avec un compte complet : adresse
+vérifiée et mot de passe qu'elle a choisi, avec lequel elle se reconnecte
+ensuite normalement. Aucun raccourci, aucun compte à moitié créé.
+
+**Et quand un lien de connexion échoue, ça se voit.** Un lien magique expiré
+(ils ne durent que quelques minutes) ou déjà utilisé ramenait sur le
+formulaire d'invitation sans un mot — d'où l'impression que le bouton ne
+faisait rien. Le motif de l'échec est maintenant affiché, avec quoi faire
+ensuite.
+
+> **🔧 Notes techniques**
+>
+> - `invitations.preview` renvoie `accountState: 'none' | 'claimable' |
+>   'active'` à la place du booléen `accountExists` : une ligne Better Auth ne
+>   vaut pas compte utilisable, `emailVerified: false` veut dire que personne
+>   n'a jamais prouvé posséder la boîte mail — donc ce qui est posé dessus ne
+>   prouve rien (c'est la position de Better Auth lui-même, cf.
+>   `revokeUnprovenAccountAccess`).
+> - Nouveau plugin Better Auth `convex/lib/authInvite.ts` — endpoint
+>   `POST /invitation/set-password`, chargé dans `convex/auth.ts` et
+>   rate-limité (5/min). Gated par le token d'invitation, résolu côté serveur
+>   via `internal.invitations.liveInviteEmail` (le body ne fait que
+>   recouper). Il jette l'identifiant non prouvé et les sessions en cours,
+>   pose le mot de passe choisi et `emailVerified: true`. **Il refuse un
+>   compte vérifié** (`account_already_active`) : un token d'invitation ne
+>   doit jamais pouvoir écraser le mot de passe d'un compte réel. Il n'ouvre
+>   pas de session — le front enchaîne `signIn.email`, comme le fait déjà le
+>   parcours d'inscription.
+> - `accept-invite.$token.tsx` : trois branches (`SignInToAccept` +
+>   « mot de passe oublié » + renvoi de vérification, `CreateAccountCard`
+>   avec `claim` true/false), et `validateSearch` sur `error` pour afficher
+>   le `?error=` que Better Auth renvoie après un `/magic-link/verify` raté.
+> - Couverture : `convex/regression.invitations.test.ts` (les trois
+>   `accountState`, `liveInviteEmail`) et `tests/invitations.test.ts`
+>   (`isInviteLive`).
+
 ## v1.193.2 — 26/08/2026 à 12:10 — Les reports de fonds retrouvent leur véhicule
 
 Un mail de Batch Ventures annonçant la revente d'une de leurs boîtes

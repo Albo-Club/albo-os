@@ -22,17 +22,30 @@ type InviteForSignup = {
 }
 
 /**
+ * Is this invitation still pending (not yet accepted) and unexpired at `now`?
+ * Holding such a token proves possession of the invited mailbox, which is what
+ * gates both the verification bypass at signup and the password claim of an
+ * unverified account (`/invitation/set-password`).
+ */
+export function isInviteLive(
+  inv: Pick<InviteForSignup, 'acceptedAt' | 'expiresAt'>,
+  now: number,
+): boolean {
+  if (inv.acceptedAt) return false
+  return inv.expiresAt >= now
+}
+
+/**
  * Is this invitation a valid basis to skip email verification for a signup of
- * `signupEmail`? True only when it is still pending (not yet accepted), not
- * expired at `now`, and addressed to `signupEmail`. This is the token-gated
- * trust check: following the signed, single-use link proves inbox possession.
+ * `signupEmail`? True only when it is still live and addressed to
+ * `signupEmail`. This is the token-gated trust check: following the signed,
+ * single-use link proves inbox possession.
  */
 export function isInviteLiveForSignup(
   inv: InviteForSignup,
   signupEmail: string,
   now: number,
 ): boolean {
-  if (inv.acceptedAt) return false
-  if (inv.expiresAt < now) return false
+  if (!isInviteLive(inv, now)) return false
   return emailsMatch(inv.email, signupEmail)
 }

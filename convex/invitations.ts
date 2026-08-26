@@ -2,7 +2,11 @@ import { ConvexError, v } from 'convex/values'
 import { internalQuery, mutation, query } from './_generated/server'
 import { components } from './_generated/api'
 import { invitationRoleValidator } from './schema'
-import { emailsMatch, isInviteLiveForSignup } from './lib/invitations'
+import {
+  emailsMatch,
+  isInviteLive,
+  isInviteLiveForSignup,
+} from './lib/invitations'
 import { provisionAppUser, requireOrgRole } from './lib/auth'
 import { setLastOrgSlug } from './lib/userPrefs'
 import { RESEND_FROM, resend } from './email'
@@ -88,7 +92,16 @@ export const create = mutation({
 /**
  * Public preview of an invitation by token. The token itself authenticates
  * access — no auth required. Returns minimal info so the accept page can
- * branch its UI between sign-in / sign-up / switch-account.
+ * branch its UI between sign-in / sign-up / claim / switch-account.
+ *
+ * `accountState` is what the page branches on. Three states, not two: a Better
+ * Auth row alone does not mean the invitee has a usable account. An unverified
+ * row (`claimable`) carries no proof that anyone owns the mailbox, so whatever
+ * sits on it — a password typed during an aborted attempt, an orphan row from
+ * an earlier era — proves nothing and must never be presented as "sign in with
+ * your password". Better Auth itself takes that stance when a magic link lands
+ * on an unverified row (`revokeUnprovenAccountAccess`). See KNOWN_ISSUES.md
+ * « Invitation : compte fantôme ».
  */
 export const preview = query({
   args: { token: v.string() },
@@ -117,15 +130,20 @@ export const preview = query({
       model: 'user',
       paginationOpts: { numItems: 1, cursor: null },
       where: [{ field: 'email', operator: 'eq', value: inv.email }],
-    })) as { page: Array<{ email?: string }> }
-    const accountExists = result.page.length > 0
+    })) as { page: Array<{ email?: string; emailVerified?: boolean }> }
+    const accountState =
+      result.page.length === 0
+        ? ('none' as const)
+        : result.page[0].emailVerified
+          ? ('active' as const)
+          : ('claimable' as const)
 
     return {
       kind: 'ok' as const,
       email: inv.email,
       role: inv.role,
       orgName: org.name,
-      accountExists,
+      accountState,
     }
   },
 })
@@ -202,6 +220,25 @@ export const validateInviteForSignup = internalQuery({
       .unique()
     if (!inv) return false
     return isInviteLiveForSignup(inv, email, Date.now())
+  },
+})
+
+/**
+ * Internal — the email a live invitation was addressed to, or null when the
+ * token is unknown, already accepted or expired. Backs the
+ * `/invitation/set-password` Better Auth endpoint (convex/lib/authInvite.ts):
+ * the token is the only credential the caller has, so the email it resolves to
+ * must come from the server, never from the request body.
+ */
+export const liveInviteEmail = internalQuery({
+  args: { token: v.string() },
+  handler: async (ctx, { token }): Promise<string | null> => {
+    const inv = await ctx.db
+      .query('invitations')
+      .withIndex('by_token', (q) => q.eq('token', token))
+      .unique()
+    if (!inv) return null
+    return isInviteLive(inv, Date.now()) ? inv.email : null
   },
 })
 

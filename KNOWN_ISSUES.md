@@ -241,6 +241,82 @@ Logique pure isolée dans `convex/lib/invitations.ts` (`isInviteLiveForSignup`,
 `emailsMatch`) et testée dans `tests/invitations.test.ts` ; le parcours complet
 (signup → signin → accept) se valide à la main via TESTING.md (M3, I5, I9–I12).
 
+## Invitation : le compte fantôme (`accountState`)
+
+Une ligne Better Auth sur l'adresse invitée **ne vaut pas compte utilisable**.
+La page d'accept branchait sur un booléen `accountExists`, donc toute ligne
+existante donnait l'écran « connectez-vous avec votre mot de passe » — y
+compris quand ce mot de passe n'avait jamais été défini. Sans issue depuis cet
+écran : pas de « mot de passe oublié », pas de renvoi de vérification, et un
+lien magique raté qui ramène sur le même formulaire (cf. § suivant). Vécu en
+prod le 26/08/2026 sur une invitation à un gmail perso.
+
+Trois façons d'hériter d'une telle ligne, toutes rencontrables :
+
+- une inscription depuis la page d'accept dont le `signIn` enchaîné a échoué
+  (le user BA est créé, la personne ne va jamais au bout) ;
+- un compte de l'époque d'avant `magicLink({ disableSignUp: true })` — le
+  plugin créait alors un user au premier clic ;
+- un `/register` abandonné avant la vérification.
+
+**La règle** : `emailVerified === false` signifie que personne n'a jamais
+prouvé posséder cette boîte mail, donc **rien de ce qui est posé sur la ligne
+ne prouve quoi que ce soit** — mot de passe compris. C'est déjà la position de
+Better Auth : quand un lien magique atterrit sur une ligne non vérifiée, il
+supprime l'identifiant `credential` et révoque les sessions
+(`revokeUnprovenAccountAccess`) avant de poser la sienne.
+
+D'où `invitations.preview` → `accountState: 'none' | 'claimable' | 'active'`,
+et un parcours par état qui aboutit **toujours** à un compte complet (adresse
+vérifiée + mot de passe choisi par l'invité) :
+
+| État        | Écran                     | Chemin                                                    |
+| ----------- | ------------------------- | --------------------------------------------------------- |
+| `none`      | inscription               | `signUp.email` + `inviteToken` (§ précédent), puis signIn   |
+| `claimable` | « choisissez votre mdp »  | `POST /invitation/set-password`, puis signIn                |
+| `active`    | connexion                 | mot de passe, « mot de passe oublié », renvoi de vérif      |
+
+L'endpoint (`convex/lib/authInvite.ts`, plugin BA chargé dans `convex/auth.ts`)
+est gated par le token d'invitation — la même preuve de possession de boîte
+mail qui dispense déjà de la vérification au signup. Trois invariants à ne pas
+casser :
+
+1. **L'e-mail vient du token**, jamais du body : `internal.invitations.
+   liveInviteEmail` le résout côté serveur, le body n'est que recoupé.
+2. **Un compte `active` est refusé** (`account_already_active`). Autoriser
+   l'écrasement d'un mot de passe réel depuis un token d'invitation en ferait
+   une primitive de prise de contrôle. Ces comptes-là passent par la connexion
+   ou `/forgot-password`.
+3. **L'endpoint n'ouvre pas de session.** Il pose des identifiants, le front
+   enchaîne `signIn.email`. Un endpoint maison qui minte une session est une
+   surface qu'on n'a pas besoin d'ouvrir — et un compte sans mot de passe
+   qu'on paierait plus tard (règle 4 du § « Account linking »).
+
+Un `accountState` regagné en booléen, ou un quatrième état, se re-vérifie dans
+`convex/regression.invitations.test.ts`.
+
+## Lien magique : l'échec revient en `?error=`, pas en exception
+
+`/magic-link/verify` ne renvoie jamais d'erreur au client : il **redirige vers
+la `callbackURL` avec `?error=…`** (`INVALID_TOKEN` quand le lien a expiré ou
+a déjà été consommé, `new_user_signup_disabled` quand aucun compte ne porte
+l'adresse — notre `disableSignUp: true`). Une page qui ignore ce paramètre
+réaffiche donc son formulaire à l'identique, et l'utilisateur conclut que le
+bouton ne fait rien. C'est ce qui a masqué le § précédent pendant toute une
+séance de debug.
+
+Deux choses à retenir avant de recâbler un lien magique quelque part :
+
+- **Toute page atteignable par une `callbackURL` doit lire `error`.**
+  `/accept-invite/$token` le fait (`validateSearch` + `LinkErrorAlert`).
+  `/login` le lit aussi mais l'affiche comme une erreur de connexion sociale,
+  et sa `callbackURL` pointe sur `/app` : un échec y perd le paramètre dans la
+  redirection vers `/login`. À corriger le jour où ça coûte.
+- **Un lien magique vit 5 minutes** (`expiresIn` par défaut du plugin, jamais
+  configuré ici) et il est à usage unique — un scanner d'e-mails qui préfetche
+  le lien le consomme avant l'humain. Ne jamais lire « le lien ne marche pas »
+  comme « le compte n'existe pas ».
+
 ## Google OAuth (template — opt-in)
 
 Google social login is wired but **off by default** so the repo stays a clean
