@@ -84,6 +84,26 @@ envoyé au transféreur (« l'équipe a été prévenue ») serait faux et l'éc
 n'atteindrait personne. La liste de ceux qui les reçoivent est écrite en
 clair sous le tableau.
 
+## Adresses d'envoi des reports
+
+Sous le tableau des alertes, une carte liste pour chaque membre ses
+**adresses secondaires** : le Gmail perso, l'adresse dans une autre boîte,
+celles depuis lesquelles il lui arrive de transférer un investor update.
+
+Ce n'est **pas** un filtre d'entrée. N'importe qui peut écrire à l'adresse
+de dépôt des reports, et c'est le contenu du mail qui décide s'il est rangé.
+Déclarer une adresse sert à une seule chose : **reconnaître son auteur**, et
+donc lui envoyer l'accusé complet — qui contient des montants et des liens
+vers vos fiches, et ne part jamais à quelqu'un d'inconnu. Sans déclaration,
+un report transféré depuis une adresse perso se range quand même, mais en
+silence.
+
+Une adresse appartient à une seule personne, et l'adresse du groupe de
+transfert elle-même ne peut être réclamée par personne. Chacun gère sa
+propre ligne, un admin gère celle des autres. **Ces adresses ne permettent
+pas de se connecter** : elles ne servent qu'à attribuer un mail entrant.
+Voir [Reports par email](17-reports-par-email.md).
+
 ## Le workflow d'invitation
 
 1. Un admin/owner saisit l'email et le rôle. Un email part (dans la langue

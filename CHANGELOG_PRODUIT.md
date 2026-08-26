@@ -23,6 +23,84 @@ bas de page.
 
 ---
 
+## v1.195.0 — 26/08/2026 à 20:02 — Une adresse maison pour les reports, et un accusé qui revient au bon expéditeur
+
+L'adresse de dépôt des reports peut désormais être une adresse à vous —
+`report@alboteam.com` — au lieu de l'adresse technique du prestataire. C'est un
+groupe : vous en êtes membres, vous recevez chacun une copie de ce qui y passe,
+et le circuit y est abonné comme un membre de plus.
+
+**N'importe qui peut y écrire, et personne n'a besoin d'être inscrit à
+l'avance.** Un fondateur qui envoie son update directement à cette adresse est
+traité comme un transfert : ce qui décide qu'un report est rangé, c'est son
+contenu — le circuit doit reconnaître une participation et le prouver — jamais
+l'identité de l'expéditeur. Ce qui reste fermé, c'est la **réponse** : l'accusé
+porte vos montants, vos organisations et des liens vers vos fiches, donc il ne
+part jamais vers quelqu'un qui n'est pas membre. Un inconnu n'obtient rien, pas
+même la confirmation que l'adresse existe.
+
+**L'accusé revient à celui qui a transféré, jamais au groupe.** C'était le vrai
+risque de cette adresse partagée : une réponse envoyée à l'alias serait
+redistribuée à tout le monde — et au circuit lui-même, qui répondrait à son
+tour, en boucle. Le destinataire est maintenant **imposé** par l'app, plus
+jamais déduit du mail reçu. Et si le groupe a réécrit l'expéditeur en route,
+le vrai auteur est retrouvé dans les en-têtes du message.
+
+**Tu peux transférer depuis une autre adresse que celle de ton compte.**
+Réglages → Membres, nouvelle carte « Adresses d'envoi des reports » : déclare
+ton Gmail perso ou ton adresse dans une autre boîte, et tu reçois l'accusé
+complet comme depuis ton adresse habituelle. Sans déclaration, le report se
+range quand même, mais en silence — le circuit ne sait pas que c'est toi. Une
+adresse déclarée n'ouvre aucun droit et ne permet pas de se connecter : elle
+sert uniquement à reconnaître l'auteur d'un transfert.
+
+**Le spam ne réveille plus personne.** Une adresse ouverte reçoit des
+sollicitations : un mail que le circuit ne rattache à rien, ou marqué comme
+spam, attend maintenant dans les Rapports entrants **sans déclencher le moindre
+email**. Une alerte par pub reçue, c'est la boîte qui se remplit — exactement ce
+qu'on venait de corriger. La file reste l'endroit où ça se traite, et le point
+du lundi la résume.
+
+À faire côté console avant de confier l'adresse : sur le groupe, **préfixe de
+sujet vide et footer désactivé**, et « Envoyer les réponses à » réglé sur
+l'expéditeur du message. Ces trois réglages sont ce qui empêche Google de
+remplacer l'expéditeur par l'adresse du groupe.
+
+> **🔧 Notes techniques**
+>
+> - `lib/reportSenders.ts` (nouveau) : `resolveMemberByEmail` (compte **ou**
+>   alias, puis appartenance à une org) et la liste noire `blockedSenderAddresses`
+>   — l'inbox (son `inbox_id` AgentMail **est** son adresse) + les alias du
+>   groupe, variable `REPORT_GROUP_ADDRESSES` (séparateur virgule).
+> - `agentmail.replyToMessage` prend un `to` **obligatoire**. L'API AgentMail
+>   documente `to` comme optionnel mais ne dit **nulle part** à qui part une
+>   réponse sans lui : c'était déduit du message d'origine, donc de son `From` /
+>   `Reply-To`. `reply_all` reste proscrit (il répondrait au groupe).
+> - `agentmail.originalSenderOf` lit `X-Original-Sender` via **Get Message** :
+>   le payload du webhook `message.received` ne porte aucun en-tête. L'appel
+>   n'a lieu que si le `From` reçu est une adresse bloquée — sinon rejet
+>   silencieux (`dropped loop-back`).
+> - `reportInbox.ingest` : l'appartenance ne conditionne plus le traitement,
+>   seulement l'attribution (`senderUserId`). `unknown_sender` disparaît comme
+>   motif de blocage ; `reprocess` rejoue toujours, spam compris.
+> - `reportIdentify.markProcessing` refusait toute ligne sans `senderUserId` :
+>   un second garde en aval qui annulait le changement en silence (ligne créée,
+>   jamais analysée). Retiré — la claim reste exclusive. Test vérifié **rouge**
+>   contre l'ancien garde.
+> - `lib/reportRouting.ts` : `!senderIsMember` → `alertOthers: false` et
+>   `broadcast: kind === 'success'`. `reportNotify` compare l'abonnement aux
+>   erreurs sur le `userId`, plus sur l'adresse (un alias est la même personne).
+> - Schéma : `userEmailAliases` (`by_email`, `by_user`) + `organizations`
+>   `listMemberAliases` / `addMemberAlias` / `removeMemberAlias` (refus
+>   `email_taken`, `blocked_address`, `invalid_email` ; admin pour la ligne
+>   d'un autre) et `SendingAddressesCard`.
+> - Tests : `tests/reportSenders.test.ts` (6 cas purs sur la liste noire) et
+>   `convex/regression.reportSenders.test.ts` (8 cas base). `tests/reportRouting`
+>   mis à jour sur la nouvelle règle du silence. 150 tests Convex, 314 unitaires.
+> - Quatrième garde-fou **hors code**, à poser dans la console AgentMail :
+>   `report@alboteam.com` dans la *send block list* de l'inbox — plus aucun mail
+>   sortant ne peut atteindre le groupe, quelle que soit la régression.
+
 ## v1.194.0 — 26/08/2026 à 19:30 — Une invitation ne peut plus demander un mot de passe qui n'existe pas
 
 Inviter quelqu'un pouvait se terminer en cul-de-sac. Si une trace de compte

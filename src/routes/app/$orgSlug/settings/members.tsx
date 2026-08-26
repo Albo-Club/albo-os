@@ -8,6 +8,7 @@ import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { api } from '../../../../../convex/_generated/api'
 import type { Id } from '../../../../../convex/_generated/dataModel'
 import { AlertPrefsCard } from '~/components/settings/AlertPrefsCard'
+import { SendingAddressesCard } from '~/components/settings/SendingAddressesCard'
 import { Button } from '~/components/ui/button'
 import {
   Card,
@@ -241,6 +242,13 @@ function MembersSettings() {
       </Card>
 
       <AlertPrefsCard
+        orgId={org?._id}
+        members={members}
+        myUserId={myUserId}
+        canManage={canManage}
+      />
+
+      <SendingAddressesCard
         orgId={org?._id}
         members={members}
         myUserId={myUserId}

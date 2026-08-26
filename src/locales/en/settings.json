@@ -212,5 +212,21 @@
     "issueRecipients": "Right now, report failures go to {{names}}.",
     "issueRecipientsNone": "Nobody receives report failures.",
     "lastRecipient": "Not possible: someone has to receive report failures. Tick another person's box first."
+  },
+  "sendingAddresses": {
+    "title": "Report sending addresses",
+    "description": "Reports forwarded to the dedicated address are filed whoever sent them — their content decides. Declaring a secondary address here (personal Gmail, a work address elsewhere) does something else: it ties the mail to its author, who then gets the full confirmation instead of the silence a stranger gets. It is never an access grant, and never a way to sign in.",
+    "none": "No secondary address",
+    "placeholder": "address@example.com",
+    "add": "Add",
+    "remove": "Remove address {{email}}",
+    "errors": {
+      "invalid_email": "Invalid email address",
+      "email_taken": "That address already belongs to someone",
+      "blocked_address": "That is the forwarding group's own address: it cannot belong to anyone",
+      "insufficient_role": "Admins or owners only",
+      "not_found": "Member not found",
+      "default": "Action failed"
+    }
   }
 }

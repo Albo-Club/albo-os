@@ -14,6 +14,7 @@ import {
 } from './lib/notificationPrefs'
 import { MAX_SILENCE_MONTHS, MIN_SILENCE_MONTHS } from './lib/reportFreshness'
 import { isLastReportIssueRecipient, reportIssueRecipients } from './lib/reportRecipients'
+import { isBlockedSender } from './lib/reportSenders'
 import { setLastOrgSlug } from './lib/userPrefs'
 import { resolveAvatarUrl, resolveLogoUrl } from './lib/storage'
 import type { DataModel, Id } from './_generated/dataModel'
@@ -120,6 +121,117 @@ export const listReportIssueRecipients = query({
       userId: r.userId,
       name: r.name ?? r.email,
     }))
+  },
+})
+
+// ─── Sending addresses (report forwards) ─────────────────────────────────────
+
+/**
+ * The secondary addresses each member of `orgId` may forward reports from.
+ *
+ * These are NOT an access filter — anyone can write to the report address and
+ * the content decides whether anything is filed. They are an identity map:
+ * a report forwarded from a declared address earns its sender the full
+ * confirmation instead of the silence a stranger gets.
+ */
+export const listMemberAliases = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+    const members = await ctx.db
+      .query('organizationMembers')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    const out: Array<{ _id: Id<'userEmailAliases'>; userId: Id<'users'>; email: string }> = []
+    for (const m of members) {
+      const aliases = await ctx.db
+        .query('userEmailAliases')
+        .withIndex('by_user', (q) => q.eq('userId', m.userId))
+        .collect()
+      for (const a of aliases) out.push({ _id: a._id, userId: a.userId, email: a.email })
+    }
+    return out
+  },
+})
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/**
+ * Declare an address a member forwards from. Anyone adds their own; adding
+ * one for someone else needs admin, and the target must be a member of
+ * `orgId` — the aliases being global, that membership check is what stops an
+ * admin from reaching into a user they share no org with.
+ *
+ * An address belongs to exactly one person: it is refused when it is already
+ * an account address or another alias, since two owners would make "who may
+ * be answered" ambiguous. The mailing group's own address is refused too — it
+ * is what the loop guard drops.
+ */
+export const addMemberAlias = mutation({
+  args: {
+    orgId: v.id('organizations'),
+    userId: v.id('users'),
+    email: v.string(),
+  },
+  handler: async (ctx, { orgId, userId, email }) => {
+    const me = await requireAppUser(ctx)
+    if (userId === me._id) {
+      await requireOrgMember(ctx, orgId)
+    } else {
+      await requireOrgRole(ctx, orgId, 'admin')
+      const target = await ctx.db
+        .query('organizationMembers')
+        .withIndex('by_org_and_user', (q) => q.eq('orgId', orgId).eq('userId', userId))
+        .unique()
+      if (!target) throw new ConvexError('not_found')
+    }
+
+    const normalized = email.trim().toLowerCase()
+    if (!EMAIL_RE.test(normalized)) throw new ConvexError('invalid_email')
+    if (isBlockedSender(normalized, process.env.AGENTMAIL_INBOX_ID ?? '')) {
+      throw new ConvexError('blocked_address')
+    }
+
+    const asAccount = await ctx.db
+      .query('users')
+      .withIndex('by_email', (q) => q.eq('email', normalized))
+      .first()
+    if (asAccount) throw new ConvexError('email_taken')
+    const asAlias = await ctx.db
+      .query('userEmailAliases')
+      .withIndex('by_email', (q) => q.eq('email', normalized))
+      .first()
+    if (asAlias) throw new ConvexError('email_taken')
+
+    await ctx.db.insert('userEmailAliases', {
+      userId,
+      email: normalized,
+      addedBy: me._id,
+      addedAt: Date.now(),
+    })
+    return null
+  },
+})
+
+/** Drop a declared address. Same rule as adding it. */
+export const removeMemberAlias = mutation({
+  args: { orgId: v.id('organizations'), aliasId: v.id('userEmailAliases') },
+  handler: async (ctx, { orgId, aliasId }) => {
+    const me = await requireAppUser(ctx)
+    const alias = await ctx.db.get('userEmailAliases', aliasId)
+    if (!alias) throw new ConvexError('not_found')
+    if (alias.userId === me._id) {
+      await requireOrgMember(ctx, orgId)
+    } else {
+      await requireOrgRole(ctx, orgId, 'admin')
+      const target = await ctx.db
+        .query('organizationMembers')
+        .withIndex('by_org_and_user', (q) => q.eq('orgId', orgId).eq('userId', alias.userId))
+        .unique()
+      if (!target) throw new ConvexError('not_found')
+    }
+    await ctx.db.delete('userEmailAliases', aliasId)
+    return null
   },
 })
 

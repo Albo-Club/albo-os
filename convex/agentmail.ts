@@ -17,6 +17,7 @@
 import { ConvexError } from 'convex/values'
 import { httpAction } from './_generated/server'
 import { internal } from './_generated/api'
+import { isBlockedSender } from './lib/reportSenders'
 
 const API_BASE = 'https://api.agentmail.to/v0'
 
@@ -227,23 +228,58 @@ export async function downloadAttachment(
 }
 
 /**
+ * The `X-Original-Sender` a mailing group (Google Groups) stamps on a message
+ * it forwards. Null when absent or unreadable.
+ *
+ * The `message.received` webhook payload carries no headers at all, so this
+ * costs one extra API call — only made when the `From` we received is an
+ * address we refuse to answer, i.e. when the group rewrote it.
+ */
+export async function originalSenderOf(
+  inboxId: string,
+  messageId: string,
+): Promise<string | null> {
+  const msg = await getMessage(inboxId, messageId)
+  const raw = msg?.headers
+  if (!raw || typeof raw !== 'object') return null
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (key.toLowerCase() !== 'x-original-sender') continue
+    const address = parseFromAddress(String(value))
+    return address.includes('@') ? address : null
+  }
+  return null
+}
+
+/**
  * Reply within a message's thread (success/failure recap to the forwarder).
  * NEVER call this for a message whose sender is not an authenticated member
  * — the reply would leak to the external sender (anti-enumeration).
+ *
+ * `to` is ALWAYS passed explicitly. AgentMail documents `to` as optional but
+ * never says who receives a reply without it: it derives the recipients from
+ * the original message, so a `From`/`Reply-To` pointing at the mailing group
+ * would send our confirmation to the group — which redelivers it to this
+ * inbox. We never let the provider guess, and never use `reply_all`, which
+ * would deliberately answer every recipient of the original message.
  */
 export async function replyToMessage(
   inboxId: string,
   messageId: string,
   html: string,
+  to: Array<string>,
 ): Promise<boolean> {
   const headers = authHeaders()
   if (!headers) {
     console.warn('[agentmail] reply skipped — no AGENTMAIL_API_KEY')
     return false
   }
+  if (to.length === 0) {
+    console.error('[agentmail] reply skipped — no recipient')
+    return false
+  }
   const res = await fetch(
     `${API_BASE}/inboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}/reply`,
-    { method: 'POST', headers, body: JSON.stringify({ html }) },
+    { method: 'POST', headers, body: JSON.stringify({ to, html }) },
   )
   if (!res.ok) console.error(`[agentmail] reply status=${res.status}`)
   return res.ok
@@ -348,10 +384,25 @@ export const agentmailWebhook = httpAction(async (ctx, request) => {
     `[agentmail] payload keys: [${Object.keys(payload).join(', ')}] message keys: [${Object.keys(rawMsg).join(', ')}]`,
   )
 
-  // Loop guard: never ingest a message sent by the inbox itself (e.g. our
-  // own confirmation replies landing back as thread activity).
-  if (message.from && message.from === message.inboxId.toLowerCase()) {
-    return Response.json({ status: 'ignored', reason: 'self' })
+  // Loop guard. A message whose sender is the inbox itself, or the mailing
+  // group that fronts it, can only be our own answer coming back around.
+  //
+  // One recovery before dropping it: a group that had to rewrite `From` (a
+  // subject prefix or a footer breaks DKIM, so Google Groups munges the
+  // header) still stamps the real author in `X-Original-Sender`. If we find
+  // one, the mail is a genuine forward and gets processed under that author.
+  // If we do not, it is a loop and dies here — silently, since answering it
+  // is exactly what we are preventing.
+  if (message.from && isBlockedSender(message.from, message.inboxId)) {
+    const original = await originalSenderOf(message.inboxId, message.messageId)
+    if (!original || isBlockedSender(original, message.inboxId)) {
+      console.warn(
+        `[agentmail] dropped loop-back from=${message.from} subject="${message.subject}"`,
+      )
+      return Response.json({ status: 'ignored', reason: 'loop' })
+    }
+    console.log(`[agentmail] group forward: from=${message.from} → ${original}`)
+    message.from = original
   }
 
   const inboundEmailId = await ctx.runMutation(internal.reportInbox.ingest, { message })

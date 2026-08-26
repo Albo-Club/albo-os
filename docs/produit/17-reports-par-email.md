@@ -4,7 +4,9 @@
 
 Les investor updates des participations arrivent par email. Plutôt que de
 les recopier à la main, on les **transfère à une adresse dédiée** :
-`report-albo-os@agentmail.to`. Le circuit fait le reste — identifier la
+`report@alboteam.com`. C'est un groupe — vous en êtes membres, donc vous
+recevez chacun une copie de ce qui y passe — et le circuit y est abonné
+comme un membre de plus. Le circuit fait le reste — identifier la
 société, lire tout le contenu (texte, pièces jointes, liens), en extraire
 les KPIs, ranger le report sur la fiche société et répondre dans le fil
 avec un récapitulatif. À l'usage : transférer le mail, lire le récap,
@@ -19,11 +21,28 @@ la lecture du contenu. Voir « Ajouter un report à la main » plus bas.
 
 ### 1. Transférer le mail
 
-Toi ou Ben transférez l'update reçu (avec ses pièces jointes) à l'adresse
-dédiée. Seuls les emails transférés par un **membre du workspace** sont
-traités : un email arrivant de n'importe qui d'autre part en quarantaine,
-sans réponse à l'expéditeur (pour ne jamais révéler que l'adresse existe) —
-vous êtes prévenus par un email séparé.
+Transférez l'update reçu, avec ses pièces jointes, à l'adresse dédiée.
+**N'importe qui peut y écrire** — vous, mais aussi un fondateur qui envoie
+son update directement. Personne n'a besoin d'être déclaré à l'avance : ce
+qui décide qu'un report est rangé, c'est son **contenu**, pas son
+expéditeur. Un mail que le circuit ne sait rattacher à aucune participation
+reste dans la boîte [Rapports entrants](12-vue-consolidee.md), sans email à
+personne.
+
+**Ce qui dépend de l'expéditeur, c'est la réponse.** Un accusé de réception
+contient vos montants, vos organisations et des liens vers vos fiches : il
+ne part donc **jamais** vers quelqu'un qui n'est pas membre. Un inconnu dont
+le report se range correctement n'en saura rien — il ne reçoit rien du tout,
+et l'adresse ne révèle même pas qu'elle existe.
+
+**Pour recevoir l'accusé depuis une autre adresse que celle de ton compte**
+— ton Gmail perso, ton adresse dans une autre boîte — déclare-la dans
+[Réglages → Membres](14-organisations-membres-invitations.md), carte
+« Adresses d'envoi des reports ». Sans ça, un report transféré depuis cette
+adresse se rangera très bien, mais tu n'auras pas de retour : le circuit ne
+sait pas que c'est toi. Une adresse déclarée n'ouvre aucun droit et ne
+permet pas de se connecter — elle sert uniquement à te reconnaître comme
+l'auteur d'un transfert.
 
 ### 2. Identification de la participation
 
@@ -187,6 +206,12 @@ C'est ce qui permet de confier le transfert des reports à quelqu'un sans
 jamais lui envoyer les erreurs : il sait si c'est passé ou non, il ne voit
 jamais le diagnostic.
 
+**L'accusé part toujours à la personne qui a transféré**, jamais à l'adresse
+du groupe — sinon tout le monde recevrait la réponse, et le circuit se
+répondrait à lui-même en boucle. Le destinataire est imposé par le circuit,
+pas déduit du mail reçu ; et si le groupe a réécrit l'expéditeur en cours de
+route, le vrai auteur est retrouvé dans les en-têtes du message.
+
 **Les autres membres de l'organisation sont prévenus qu'un report est
 arrivé.** Ils reçoivent le même mail que le transféreur — société, fiche,
 points clés, synthèse — précédé de qui l'a transféré, dans un mail à part.
@@ -268,14 +293,20 @@ passe en « analyse échouée » — le dépôt reste rattrapable depuis la boî
 
 ## Points d'attention
 
-- **Tout passe par un forward d'un membre** : un email envoyé directement
-  par une participation à l'adresse dédiée part en quarantaine. C'est
-  voulu (sécurité + contrôle de ce qui entre). Le dépôt manuel depuis la
-  fiche société est l'autre porte d'entrée, réservée aux membres de
-  l'organisation de la société. Pour qu'une nouvelle personne puisse
-  transférer, il faut donc **l'ajouter comme membre** — et penser à
+- **L'adresse est ouverte, la réponse ne l'est pas** : n'importe qui peut
+  écrire à l'adresse dédiée, y compris une participation qui envoie son
+  update directement, et ça se range si le contenu le permet. Ce qui reste
+  fermé, c'est le retour : pas de membre, pas d'accusé. Pour qu'une personne
+  reçoive les accusés, il faut **l'ajouter comme membre** — et penser à
   décocher « Problèmes de reports » sur sa ligne si elle ne doit pas gérer
-  la file (tout est activé par défaut).
+  la file (tout est activé par défaut). Le dépôt manuel depuis la fiche
+  société est l'autre porte d'entrée, réservée aux membres de l'organisation
+  de la société.
+- **Le spam ne réveille personne** : l'adresse étant ouverte, un mail que le
+  circuit ne rattache à rien — ou qu'AgentMail marque comme spam — attend
+  dans la boîte Rapports entrants sans déclencher le moindre email. Une
+  alerte par pub reçue remplirait vos boîtes ; la file est faite pour ça, et
+  le point hebdo du lundi la résume.
 - **Liens Notion** : la page doit être partagée publiquement. Une page
   privée échoue proprement (source ⚠️, reste du mail traité).
 - **Métriques hors catalogue** : visibles dans le récap sous « non
