@@ -463,6 +463,11 @@ sans snapshot (`convex export --prod`) au préalable.
 | I10 | Multi-org : user déjà membre de Beta, accepte une invitation pour Acme | Atterrit sur `/app/acme` (org de l'invitation), pas sur Beta ; membre des deux |
 | I11 | Rejouer un lien déjà accepté en étant déjà membre (recharger la page) | Pas d'erreur : accept idempotent, retour silencieux vers l'org, pas de membre en double |
 | I12 | Signup hors invitation (`/register` sans `redirect=/accept-invite/...`) | Écran « vérifie ton email » **toujours** présent (la non-régression : seul un token valide saute la vérif) |
+| I13 | Ligne Better Auth **non vérifiée** sur l'email invité (forcer `emailVerified: false`) → ouvrir le lien | Écran « Choisissez un mot de passe », **pas** l'écran de connexion. Le mot de passe saisi ouvre la session et l'invitation est acceptée dans la foulée |
+| I14 | Même cas, mais l'ancienne ligne portait un mot de passe (tentative avortée) | L'ancien mot de passe ne fonctionne **plus** après le claim (identifiant non prouvé supprimé) ; le nouveau fonctionne sur `/login` |
+| I15 | Compte **vérifié** invité : appeler `POST /api/auth/invitation/set-password` avec un token d'invitation valide | Refusé (`account_already_active`) — un token d'invitation n'écrase jamais le mot de passe d'un compte réel |
+| I16 | Ouvrir `/accept-invite/<token>?error=INVALID_TOKEN` | Alerte visible expliquant que le lien a expiré ou a déjà servi, formulaire toujours utilisable en dessous |
+| I17 | Compte vérifié invité : depuis l'écran de connexion de l'invitation, cliquer « Mot de passe oublié ? » | Redirige vers `/forgot-password` (l'écran n'est jamais un cul-de-sac) |
 
 > **Niveau 3 — CRUD métier (companies / deals)** : ce niveau sera écrit en
 > V0 quand les mutations `companies.*` / `deals.*` existeront (real-time

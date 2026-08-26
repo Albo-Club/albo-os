@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexAuth } from 'convex/react'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useForm } from '@tanstack/react-form'
@@ -14,6 +14,7 @@ import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { classifyAuthError, formatAuthError } from '~/lib/auth-errors'
 import { isPasswordPwned } from '~/lib/hibp'
+import { Alert, AlertDescription } from '~/components/ui/alert'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Spinner } from '~/components/ui/spinner'
@@ -36,7 +37,17 @@ import {
   CardTitle,
 } from '~/components/ui/card'
 
+// Better Auth appends ?error=... when a magic-link verify fails — an expired
+// link (they live 5 minutes), one already consumed, or one for an address with
+// no account — and redirects back to the callbackURL, which for the invite
+// flow is this page. Swallowing it left the invitee on the very same form with
+// no clue anything had failed.
+const searchSchema = z.object({
+  error: z.string().optional(),
+})
+
 export const Route = createFileRoute('/accept-invite/$token')({
+  validateSearch: searchSchema,
   component: AcceptInvitePage,
   head: () => ({
     meta: [
@@ -57,6 +68,7 @@ type Preview = NonNullable<
 function AcceptInvitePage() {
   const { t } = useTranslation('auth')
   const { token } = Route.useParams()
+  const { error: linkError } = Route.useSearch()
   const navigate = useNavigate()
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth()
   const preview = useConvexQuery(api.invitations.preview, { token })
@@ -140,10 +152,41 @@ function AcceptInvitePage() {
     )
   }
 
-  return preview.accountExists ? (
-    <SignInToAccept preview={preview} />
-  ) : (
-    <SignUpToAccept preview={preview} token={token} />
+  // Three states, never two. `claimable` is a Better Auth row nobody ever
+  // proved they own (unverified): asking it for a password would ask for one
+  // that was never set — the dead end this page used to have. See
+  // `invitations.preview`.
+  if (preview.accountState === 'active') {
+    return <SignInToAccept preview={preview} linkError={linkError} />
+  }
+  return (
+    <CreateAccountCard
+      preview={preview}
+      token={token}
+      claim={preview.accountState === 'claimable'}
+      linkError={linkError}
+    />
+  )
+}
+
+/**
+ * Surfaces the `?error=` Better Auth hands back when a magic-link verify
+ * fails. Without it the redirect lands on an unchanged form and the failure is
+ * invisible.
+ */
+function LinkErrorAlert({ code }: { code?: string }) {
+  const { t } = useTranslation('auth')
+  if (!code) return null
+  const key =
+    code === 'INVALID_TOKEN'
+      ? 'expired'
+      : code === 'new_user_signup_disabled'
+        ? 'noAccount'
+        : 'generic'
+  return (
+    <Alert variant="destructive">
+      <AlertDescription>{t(`acceptInvite.linkErrors.${key}`)}</AlertDescription>
+    </Alert>
   )
 }
 
@@ -245,8 +288,10 @@ function SwitchAccountCard({
 
 function SignInToAccept({
   preview,
+  linkError,
 }: {
   preview: Extract<Preview, { kind: 'ok' }>
+  linkError?: string
 }) {
   const { t } = useTranslation(['auth', 'validation', 'errors'])
   const te = (k: string) => t(`errors:${k}`)
@@ -259,6 +304,8 @@ function SignInToAccept({
   )
   const [loading, setLoading] = useState(false)
   const [magicLoading, setMagicLoading] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
+  const [unverified, setUnverified] = useState(false)
 
   const form = useForm({
     defaultValues: { password: '' },
@@ -271,12 +318,34 @@ function SignInToAccept({
       })
       setLoading(false)
       if (error) {
-        toast.error(formatAuthError(classifyAuthError(error), 'signin', te))
+        const code = classifyAuthError(error)
+        // Same affordance as /login: a verified account can still be sitting
+        // on an unverified Better Auth row after a legacy signup, and a toast
+        // alone leaves no way out.
+        if (code === 'EMAIL_NOT_VERIFIED') {
+          setUnverified(true)
+          return
+        }
+        toast.error(formatAuthError(code, 'signin', te))
         return
       }
       // useConvexAuth flips → auto-accept effect fires in parent
     },
   })
+
+  const onResendVerification = async () => {
+    setResendLoading(true)
+    const { error } = await authClient.sendVerificationEmail({
+      email: preview.email,
+      callbackURL: window.location.pathname,
+    })
+    setResendLoading(false)
+    if (error) {
+      toast.error(formatAuthError(classifyAuthError(error), 'verify', te))
+      return
+    }
+    toast.success(t('auth:signIn.verificationResent'))
+  }
 
   const onMagicLink = async () => {
     setMagicLoading(true)
@@ -315,7 +384,29 @@ function SignInToAccept({
             void form.handleSubmit()
           }}
         >
-          <CardContent>
+          <CardContent className="flex flex-col gap-6">
+            <LinkErrorAlert code={linkError} />
+            {unverified && (
+              <div className="border-border bg-muted/50 text-foreground rounded-md border p-3 text-sm">
+                <p className="mb-2">
+                  <Trans
+                    t={t}
+                    i18nKey="auth:signIn.unverified"
+                    values={{ email: preview.email }}
+                  />
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onResendVerification}
+                  disabled={resendLoading}
+                >
+                  {resendLoading && <Spinner />}
+                  {t('auth:signIn.resendVerification')}
+                </Button>
+              </div>
+            )}
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="invite-email">
@@ -335,9 +426,17 @@ function SignInToAccept({
                     field.state.meta.isTouched && !field.state.meta.isValid
                   return (
                     <Field data-invalid={invalid || undefined}>
-                      <FieldLabel htmlFor={field.name}>
-                        {t('auth:fields.password')}
-                      </FieldLabel>
+                      <div className="flex items-center">
+                        <FieldLabel htmlFor={field.name}>
+                          {t('auth:fields.password')}
+                        </FieldLabel>
+                        <Link
+                          to="/forgot-password"
+                          className="text-muted-foreground ml-auto text-sm underline-offset-4 hover:underline"
+                        >
+                          {t('auth:signIn.forgot')}
+                        </Link>
+                      </div>
                       <PasswordInput
                         id={field.name}
                         name={field.name}
@@ -379,12 +478,25 @@ function SignInToAccept({
   )
 }
 
-function SignUpToAccept({
+/**
+ * One form, two doors — both end on a complete account (verified email + a
+ * password the invitee chose):
+ *  - `claim: false` — no Better Auth row yet: plain signup, the invitation
+ *    token rides along so verification is skipped.
+ *  - `claim: true` — an unverified row exists: the token lets the invitee set
+ *    their own password on it (`/invitation/set-password`), which also
+ *    verifies the address. Signing in is then the same chained call.
+ */
+function CreateAccountCard({
   preview,
   token,
+  claim,
+  linkError,
 }: {
   preview: Extract<Preview, { kind: 'ok' }>
   token: string
+  claim: boolean
+  linkError?: string
 }) {
   const { t } = useTranslation(['auth', 'validation', 'errors'])
   const te = (k: string) => t(`errors:${k}`)
@@ -404,6 +516,37 @@ function SignUpToAccept({
     validators: { onChange: signUpSchema, onSubmit: signUpSchema },
     onSubmit: async ({ value }) => {
       setLoading(true)
+      if (claim) {
+        // The row exists but nobody ever proved they own the mailbox, so
+        // signUp would 409 and signIn has nothing to check against. The
+        // endpoint sets the password the invitee just picked and verifies the
+        // address; the sign-in below is then the ordinary one.
+        const { error } = await authClient.$fetch('/invitation/set-password', {
+          method: 'POST',
+          body: {
+            token,
+            email: preview.email,
+            password: value.password,
+            name: value.name,
+          },
+        })
+        if (error) {
+          setLoading(false)
+          toast.error(formatAuthError(classifyAuthError(error), 'signup', te))
+          return
+        }
+        const { error: signInError } = await authClient.signIn.email({
+          email: preview.email,
+          password: value.password,
+        })
+        setLoading(false)
+        if (signInError) {
+          toast.error(
+            formatAuthError(classifyAuthError(signInError), 'signin', te),
+          )
+        }
+        return
+      }
       // Carry the invitation token in the signup body: the user.create.before
       // hook (convex/auth.ts) validates it and marks the invitee emailVerified,
       // so no inbox round-trip is needed. `callbackURL` is a safety net — if the
@@ -464,7 +607,11 @@ function SignUpToAccept({
           <CardDescription>
             <Trans
               t={t}
-              i18nKey="auth:acceptInvite.signUpDescription"
+              i18nKey={
+                claim
+                  ? 'auth:acceptInvite.claimDescription'
+                  : 'auth:acceptInvite.signUpDescription'
+              }
               values={{ email: preview.email }}
             />
           </CardDescription>
@@ -477,7 +624,8 @@ function SignUpToAccept({
             void form.handleSubmit()
           }}
         >
-          <CardContent>
+          <CardContent className="flex flex-col gap-6">
+            <LinkErrorAlert code={linkError} />
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="invite-email">
