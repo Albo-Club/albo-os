@@ -550,6 +550,14 @@ const EUR_FMT = new Intl.NumberFormat('fr-FR', {
   maximumFractionDigits: 0,
 })
 
+/** Real money, reconciled from a bank movement: always to the cent. */
+const EUR_CENTS_FMT = new Intl.NumberFormat('fr-FR', {
+  style: 'currency',
+  currency: 'EUR',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
 function formatMetricValue(value: number, unit: string): string {
   if (unit === 'EUR_cents') return EUR_FMT.format(value / 100)
   if (unit === 'bps') return `${(value / 100).toLocaleString('fr-FR')} %`
@@ -1082,8 +1090,13 @@ export interface ReportEntityCard {
   logoUrl: string | null
   /** Fiche URL — null when SITE_URL is unset. */
   url: string | null
-  /** Total committed across the org's deals, in EUR cents. */
-  committedCents?: number
+  /**
+   * What the org actually wired to this company, in EUR cents — the sum of
+   * the outflows reconciled against its deals ("Versé" in the app), not the
+   * commitment. Most CALTE deals carry no commitment at all, so keying the
+   * line on it left it blank on nearly every report.
+   */
+  paidCents?: number
   /** First investment date on this company, ms epoch. */
   firstInvestmentAt?: number
   /** Period label of the report that came before this one. */
@@ -1141,16 +1154,19 @@ function entityBlock(e: ReportEntityCard): string {
 }
 
 /**
- * Fiche facts. Committed is a piloting figure, so it is rounded to the euro
- * (cf. CLAUDE.md "l'actuel au centime, l'estimé arrondi"). Returns '' when the
- * company carries neither a deal nor an earlier report.
+ * Fiche facts. "Versé" comes from reconciled bank movements, so it is shown
+ * TO THE CENT — cf. CLAUDE.md "l'actuel au centime, l'estimé arrondi". A
+ * commitment would have been rounded to the euro; this is not one.
+ * Returns '' when the company carries neither a payment nor an earlier report.
  */
 function factsBlock(e: ReportEntityCard): string {
   const parts: Array<string> = []
-  if (e.committedCents !== undefined) {
-    const when = e.firstInvestmentAt ? ` en ${MONTH_FMT.format(new Date(e.firstInvestmentAt))}` : ''
+  if (e.paidCents !== undefined) {
+    const when = e.firstInvestmentAt
+      ? ` depuis ${MONTH_FMT.format(new Date(e.firstInvestmentAt))}`
+      : ''
     parts.push(
-      `Investi&nbsp;: <b style="color:${BRAND};">${esc(EUR_FMT.format(e.committedCents / 100))}</b>${esc(when)}`,
+      `Versé&nbsp;: <b style="color:${BRAND};">${esc(EUR_CENTS_FMT.format(e.paidCents / 100))}</b>${esc(when)}`,
     )
   }
   if (e.previousPeriod) {
