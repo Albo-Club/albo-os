@@ -23,6 +23,33 @@ bas de page.
 
 ---
 
+## v1.192.2 — 26/08/2026 à 11:15 — Rattacher un invité à une organisation sans passer par le mail
+
+Quand une invitation reste en attente parce que le mail n'est jamais arrivé
+ou que le lien s'est perdu, l'invité peut désormais être rattaché
+directement à l'organisation, avec le rôle prévu par l'invitation. C'est une
+opération de maintenance lancée à la main, pas un bouton dans l'app : elle
+suppose que la personne s'est déjà connectée au moins une fois avec
+l'adresse invitée — sinon il n'y a pas de compte à rattacher, et il faut
+qu'elle crée le sien.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle migration one-shot `convex/migrations/forceAcceptInvitations.ts`
+>   (`inspect` lecture seule / `apply`), paramétrée par `orgSlug` + liste
+>   d'emails, runbook en tête de module et ligne ajoutée à `MIGRATIONS.md`.
+> - `apply` reproduit ce que fait `invitations:accept` — insert
+>   `organizationMembers` avec le rôle de l'invitation puis stamp
+>   `acceptedAt` — mais sans l'identité de session, donc sans le contrôle
+>   `emailsMatch`. Idempotente : `already_member` rattrape un `acceptedAt`
+>   manquant, comme le replay bénin de `accept`.
+> - Deux refus explicites plutôt qu'un write hasardeux : `no_account` (aucune
+>   ligne `users` pour l'adresse — on ne crée pas de compte Better Auth ici,
+>   ça fabriquerait un doublon d'utilisateur) et `no_invitation` (la
+>   migration force une invitation existante, elle n'invente pas
+>   d'appartenance). Une invitation expirée passe quand même, signalée par
+>   `wasExpired`.
+
 ## v1.192.1 — 26/08/2026 à 09:22 — Transférer un report ne remplit plus ta boîte
 
 Un seul investor update transféré à l'adresse dédiée pouvait produire
