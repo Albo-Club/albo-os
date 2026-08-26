@@ -124,38 +124,64 @@ coller un mois au hasard, la période reste vide. Deux courriers ponctuels
 d'une même société ne se remplacent pas l'un l'autre, et aucun n'écrase le
 report périodique de la même période.
 
-### 6. La réponse dans le fil
+### 6. Les mails de retour
 
-Toute personne qui transfère reçoit une réponse dans son propre fil. Ce
-qu'elle contient dépend de son rôle, réglé dans
-[Réglages → Membres](14-organisations-membres-invitations.md) :
+**Quand le report est rangé**, la personne qui l'a transféré reçoit une
+réponse dans son propre fil. Elle contient :
 
-- **Tu ne gères pas la file** (case « Problèmes de reports » décochée) → tu
-  reçois **« Report bien reçu »**, exactement le même message que le report
-  se soit rangé ou non. Pas de verdict, pas de lien, rien à faire. C'est
-  volontaire : on ne demande pas à quelqu'un dont le rôle s'arrête au
-  transfert de lire un diagnostic qu'il ne traitera pas.
-- **Tu gères la file** (case cochée) → tu reçois le vrai contenu : le
-  **récapitulatif détaillé** quand c'est rangé (société identifiée et mode
-  de rattachement, période, sources lues ✅/⚠️, KPIs cibles trouvés ou
-  absents, autres métriques enregistrées, valeurs inhabituelles à
-  vérifier), et le message **actionnable** quand ça coince (la cause, le
-  détail technique de l'échec, et le lien vers la boîte Rapports
-  entrants). Ce même détail technique s'affiche sous le statut de la ligne
-  dans la boîte Rapports entrants : quand une catégorie d'échec est trop
-  générique pour agir (« erreur technique »), c'est là que se lit ce qui
-  s'est réellement passé.
+- la **société**, son logo et l'organisation où le report a été rangé ;
+- la **fiche** en une ligne — total engagé, date du premier investissement,
+  période du report précédent ;
+- **ce que dit ce report**, en trois points ;
+- **où en est la boîte** : la carte de synthèse IA de la fiche — note de
+  santé et verdict, résumé, points forts et points de vigilance, les trois
+  KPI suivis ;
+- un **bouton** qui ouvre la fiche.
 
-Les autres personnes qui gèrent la file sont prévenues **uniquement quand
-il y a un problème**, par un email séparé. Un report qui se range
-correctement ne génère aucune notification pour qui ne l'a pas transféré :
-pas de bruit pour une chaîne qui marche. Le volume, lui, se lit dans le
-**point hebdo du lundi**, qui compte les reports rangés dans la semaine
-(voir [Prévisionnel](09-previsionnel.md)).
+Le mail attend que l'analyse de la boîte soit à jour avant de partir : il
+arrive quelques dizaines de secondes après le rangement, et la synthèse
+qu'il porte tient compte du report qu'on vient de recevoir. Si l'analyse
+échoue, le mail part quand même, sans cette carte.
+
+**Si tu gères la file** (case « Problèmes de reports » cochée dans
+[Réglages → Membres](14-organisations-membres-invitations.md)), le même
+mail porte en plus le **contrôle qualité** : mode de rattachement, sources
+lues ✅/⚠️, KPIs cibles trouvés ou absents, autres métriques enregistrées,
+valeurs inhabituelles à vérifier.
+
+**Quand ça coince**, ce que tu reçois dépend du même réglage :
+
+- **Tu ne gères pas la file** → un message court : ton mail est bien
+  arrivé, il n'a pas pu être rangé automatiquement, l'équipe a été prévenue
+  et s'en occupe. **Ni la cause, ni la société, ni de lien** — rien sur quoi
+  tu pourrais agir. (Il ne peut pas nommer la société : dans une bonne
+  moitié des cas, l'échec est justement le circuit qui n'a pas su
+  l'identifier.) Quand le problème est réglé, tu reçois la confirmation
+  complète, qui rappelle en une ligne que c'est la suite de ce blocage.
+- **Tu gères la file** → le message **actionnable** : la cause, le détail
+  technique de l'échec, et le lien vers la boîte Rapports entrants. Ce même
+  détail s'affiche sous le statut de la ligne dans la file : quand une
+  catégorie d'échec est trop générique pour agir (« erreur technique »),
+  c'est là que se lit ce qui s'est réellement passé.
 
 C'est ce qui permet de confier le transfert des reports à quelqu'un sans
-jamais lui envoyer les erreurs — il reçoit toujours le même accusé de
-réception, et les problèmes atterrissent chez ceux qui tiennent la file.
+jamais lui envoyer les erreurs : il sait si c'est passé ou non, il ne voit
+jamais le diagnostic.
+
+**Les autres membres de l'organisation sont prévenus qu'un report est
+arrivé.** Ils reçoivent le même mail que le transféreur — société, fiche,
+points clés, synthèse — précédé de qui l'a transféré, dans un mail à part.
+Ça vaut aussi pour un report déposé à la main depuis une fiche société.
+Chacun peut couper cet envoi sur sa ligne, case « Nouveaux reports ». Le
+volume, lui, se lit dans le **point hebdo du lundi**, qui compte les reports
+rangés dans la semaine (voir [Prévisionnel](09-previsionnel.md)).
+
+**Quand le report était déjà là** — vous êtes deux à avoir transféré le même
+investor update — le second reçoit un accusé court : « ce report était déjà
+dans Albo OS, il a été rafraîchi, rien n'a été dupliqué », avec le lien vers
+la fiche. **Personne d'autre n'est prévenu** : il n'y a pas de nouvelle. En
+base, rien ne se duplique jamais — ni le report, ni ses KPIs, ni ses
+fichiers.
 
 **Un transfert, une réponse — et c'est tout.** Ce que tu fais ensuite dans
 la file te regarde, pas la personne qui a transféré le mail. « Retraiter »
@@ -215,10 +241,11 @@ points clés et ses métriques, et les fichiers déposés sont repliés dedans. 
 dans **chaque organisation** où la société existe, et la synthèse IA est
 relancée.
 
-Deux différences avec le mail : **aucun récapitulatif n'est envoyé** (tu es
-devant l'écran, le résultat est sous tes yeux), et si l'analyse échoue, la
-ligne passe en « analyse échouée » — le dépôt reste rattrapable depuis la
-boîte [Rapports entrants](12-vue-consolidee.md), comme un mail.
+Deux différences avec le mail : **toi, tu ne reçois rien** (tu es devant
+l'écran, le résultat est sous tes yeux) — les autres membres, eux, sont
+prévenus comme pour un report transféré ; et si l'analyse échoue, la ligne
+passe en « analyse échouée » — le dépôt reste rattrapable depuis la boîte
+[Rapports entrants](12-vue-consolidee.md), comme un mail.
 
 ## Points d'attention
 

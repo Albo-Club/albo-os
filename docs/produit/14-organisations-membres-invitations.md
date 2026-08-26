@@ -49,6 +49,7 @@ emails récurrents** que l'application envoie :
 | Échec d'indexation | Un document n'a pas pu être indexé pour la recherche de l'assistant IA. Envoyé sur le moment. |
 | Reports de la semaine | Le nombre de reports rangés sur les participations. Arrive dans le point hebdo du lundi. |
 | Problèmes de reports | Les emails de la file Rapports entrants : quarantaine, échec de traitement, suite donnée à un mail assigné à la main. Envoyé sur le moment. Cette case décide **aussi** de ce que tu reçois pour les reports que tu transfères toi-même (voir plus bas). |
+| Nouveaux reports | Un report d'une de tes participations vient d'être rangé, transféré ou déposé par quelqu'un d'autre. Envoyé sur le moment. Rien n'est envoyé pour un report déjà présent ni pour un retraitement. |
 
 Trois choses à savoir :
 
@@ -64,15 +65,24 @@ qu'on vient de faire — invitation, lien de connexion, et la réponse au
 transfert d'un report. Ces derniers arrivent toujours, mais leur contenu
 dépend de la case « Problèmes de reports » :
 
-- **Case décochée** → tu reçois **« Report bien reçu »**, le même message
-  que le report se soit rangé ou non.
-- **Case cochée** → tu reçois le récapitulatif détaillé quand c'est rangé,
-  et le message actionnable (cause + lien vers la file) quand ça coince.
+- **Case décochée** → tu reçois la confirmation quand le report est rangé
+  (société, fiche, points clés, synthèse de la boîte), et un message court
+  quand ça coince : il n'est pas passé, l'équipe s'en occupe. Sans la cause,
+  sans lien, sans rien à faire.
+- **Case cochée** → la même confirmation, plus le **contrôle qualité**
+  (sources lues, KPIs cibles, valeurs inhabituelles), et le message
+  actionnable (cause + lien vers la file) quand ça coince.
 
 C'est ce qui permet de confier à quelqu'un le seul rôle de **transférer
-des reports** : il reçoit toujours le même accusé, sans jamais voir une
-erreur, qui part à ceux qui gèrent la file. Voir
+des reports** : il sait si son report est passé ou non, il ne voit jamais
+le diagnostic, qui part à ceux qui gèrent la file. Voir
 [Reports par email](17-reports-par-email.md).
+
+Une règle particulière sur cette case : **elle ne peut pas être décochée
+partout**. Quelqu'un doit rester destinataire des erreurs, sinon le message
+envoyé au transféreur (« l'équipe a été prévenue ») serait faux et l'échec
+n'atteindrait personne. La liste de ceux qui les reçoivent est écrite en
+clair sous le tableau.
 
 ## Le workflow d'invitation
 

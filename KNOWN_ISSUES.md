@@ -3060,8 +3060,15 @@ non-évidents :
 
 2. **Le token `VITE_LOGO_DEV_TOKEN` est une clé _publishable_ (`pk_…`)**,
    conçue pour être embarquée côté client. L'anti-pattern « pas de `VITE_` sur
-   un secret » **ne s'applique pas** ici — ne la migre pas vers la Convex env.
-   Absente → fallback icône bâtiment partout (aucune image cassée).
+   un secret » **ne s'applique pas** ici. Absente → fallback icône bâtiment
+   partout (aucune image cassée).
+   **Depuis ALB-115 elle est aussi nécessaire côté Convex** : les mails de
+   confirmation de report affichent le logo, et un template serveur ne voit pas
+   l'env Vite du front. `reportNotify.logoUrl()` lit `LOGO_DEV_TOKEN` puis
+   `VITE_LOGO_DEV_TOKEN` — poser l'une des deux avec
+   `pnpm exec convex env set`. Ce n'est pas une migration : la valeur vit aux
+   deux endroits, ce qu'une clé publishable autorise. Absente côté serveur, le
+   mail affiche l'initiale de la société.
 
 3. **Le `domain` vient d'un snapshot Attio figé**
    (`convex/migrations/attioAlboImport.ts`, 28/05/2026), pas d'une sync live.
@@ -4364,10 +4371,10 @@ il ne saura jamais qu'une fiche jumelle existe ailleurs.
 - Une fiche **sans domaine** ne peut rien suggérer (82 des 275 fiches Calte au
   05/08/2026) : seul le sélecteur principal les atteint.
 
-## Reports par email : le canal suit le geste, le contenu suit le rôle
+## Reports par email : canal, contenu, audience — trois axes, pas un
 
 Le routage des récaps (`convex/lib/reportRouting.ts:routeRecap`, appliqué
-par `reportNotify.send`) croise **deux axes indépendants**. Les confondre
+par `reportNotify.send`) croise **trois axes indépendants**. Les confondre
 est l'erreur naturelle, et c'est ce qui casse la promesse faite au
 transféreur :
 
@@ -4375,43 +4382,104 @@ transféreur :
   réponse **dans son propre fil** ; tous les autres reçoivent un **mail
   neuf**.
 - **Le contenu** dépend du rôle : qui gère la file (abonné `reportIssues`)
-  reçoit la version actionnable — récap détaillé sur succès, cause + lien
-  vers la file sur échec ; qui ne fait que transférer reçoit un **accusé de
-  réception identique au caractère près, succès comme échec**.
+  reçoit en plus le **bloc contrôle qualité** (sources lues, KPIs cibles,
+  valeurs inhabituelles) et la cause exacte quand ça coince ; qui ne fait
+  que transférer reçoit la même confirmation **sans ce bloc**, et un avis
+  d'échec **sans cause, sans lien, sans détail technique**.
+- **L'audience** dépend de l'événement : un report qui se range pour la
+  **première fois** est une nouvelle pour l'organisation, donc les autres
+  membres sont prévenus (`broadcast`). Un doublon, un retraitement ou un
+  échec n'en est pas une : personne d'autre n'entend parler.
 
-Ce dernier point est le cœur du dispositif, et il est **contre-intuitif** :
-`reportReceiptHtml()` ne prend délibérément **aucun argument**. Lui en
-passer un — la cause, le nom de la société, un simple ✅/⚠️ — suffirait à
-révéler le résultat, et le transféreur se remettrait à surveiller un
-diagnostic qu'il ne traitera pas. Si un jour la fonction gagne un
-paramètre, la garantie tombe.
+### Ce qui a changé en août 2026, et pourquoi
 
-Le corollaire symétrique : un **succès ne notifie jamais un tiers**
-(`alertOthers: false`). Une chaîne qui marche ne produit aucun mail pour
-qui ne l'a pas déclenchée. Ajouter une notification de succès aux
-gestionnaires ferait un mail par report entrant.
+Jusqu'à ALB-115, le transféreur non-gestionnaire recevait un accusé
+**identique au caractère près, succès comme échec** (`reportReceiptHtml()`,
+sans argument). L'intention était bonne — ne pas faire lire un diagnostic à
+qui ne le traitera pas — mais le prix était trop élevé : quand ça coinçait,
+il lisait « bien reçu, ça suit son cours » pendant que rien ne se rangeait.
+Un accusé qui ment n'est pas de la discrétion.
 
-Trois pièges à ne pas redécouvrir :
+Le partage est désormais : **le verdict oui, le diagnostic non.** Il sait
+si c'est passé ou pas ; il ne sait ni pourquoi, ni où, ni quoi faire.
 
-- **Ne pas « réparer » l'accusé neutre** en y ajoutant l'issue : c'est le
-  comportement voulu, pas un oubli.
-- **Ne pas promettre d'humain dans l'accusé** (« l'équipe a été prévenue ») :
-  ce serait faux le jour où personne n'est abonné à `reportIssues`. Le
-  texte ne dit que ce qui est vrai dans tous les cas — le mail est
-  conservé et rejouable depuis la file.
+### Les pièges à ne pas redécouvrir
+
+- **L'avis d'échec ne nomme jamais la société.** Dans une bonne moitié des
+  cas, l'échec EST le circuit qui n'a pas su l'identifier. Il ne porte que
+  l'objet du mail transféré et sa date.
+- **« L'équipe Albo OS a été prévenue » n'est vrai que par construction.**
+  `organizations.setMemberAlertPref` refuse de décocher le **dernier**
+  abonné à `reportIssues` (`ConvexError('last_report_recipient')`, helper
+  `lib/reportRecipients.ts`). Retirer ce garde-fou remet la phrase en
+  situation de mentir — et fait disparaître les échecs sans témoin. C'est
+  le remplacement de la limite assumée d'avant, qui laissait la liste se
+  vider.
+- **La diffusion à l'org est débrayable, l'accusé du transféreur non.**
+  `reportAdded` est une notification qui arrive sans qu'on l'ait demandée,
+  donc opt-out (Réglages → Membres). La réponse au transféreur répond à son
+  geste : elle n'a pas d'interrupteur, et ne doit pas en gagner un.
+- **Un doublon ne diffuse pas.** `reportStore.storeForCompany` remonte
+  `created`; une fan-out où **rien** n'a été créé bascule en
+  `kind: 'duplicate'`. Rebrancher la diffusion dessus renverrait un « nouveau
+  report » à toute l'équipe pour un report qu'elle a déjà lu — le retour
+  exact du bug ALB-145, par une autre porte.
+- **« Rafraîchi », pas « ignoré ».** Rien ne distingue un second transfert
+  du même mail d'une **version corrigée** de la même période : les deux
+  mettent à jour le report rangé. Le texte du doublon reste donc vrai dans
+  les deux cas. Comparer les contenus pour trancher serait fragile et
+  inexplicable en cas d'erreur.
 - **Un nouveau membre est abonné d'office** (opt-out). Ajouter quelqu'un
   qui ne doit voir que ses accusés demande de décocher « Problèmes de
   reports » sur sa ligne, Réglages → Membres.
 
 Le garde-fou anti-énumération reste par-dessus tout ça : **jamais** de
-réponse à un expéditeur non membre, quoi qu'il arrive.
+réponse à un expéditeur non membre, quoi qu'il arrive — et jamais de
+diffusion non plus, puisque rien n'a été rangé.
 
-Limite connue et assumée : si **personne** n'est abonné à `reportIssues`,
-un échec ne notifie plus personne pendant que le transféreur, lui, reçoit
-son « bien reçu ». Rien n'est perdu — la ligne reste dans la file
-`/app/all/reports` — mais plus aucun mail ne le signale. Pas de garde-fou
-en base (on ne bloque pas le désabonnement du dernier abonné) : à 3 users
-la file est regardée.
+## Le mail de confirmation attend l'analyse, et ne l'attend pas indéfiniment
+
+La confirmation porte la carte « où en est la boîte », qui vient de
+`companyIntelligence.aiAnalysis`. Or cette analyse est **relancée par
+l'arrivée du report** : à la seconde où le rangement se termine, la dernière
+analyse *terminée* est celle du report **précédent**. Envoyer le mail à ce
+moment-là, c'est annoncer le report de juillet en décrivant la boîte en juin.
+
+D'où `intelligence.runAnalysisBatch` : `reportStore` ne planifie plus l'envoi
+lui-même, il planifie le batch d'analyses **qui déclenche l'envoi à la fin**.
+Le mail arrive quelques dizaines de secondes plus tard et dit vrai.
+
+Deux propriétés à ne pas casser :
+
+- **Une analyse en échec ne retient pas le mail.** `runAnalysis` avale ses
+  propres erreurs, donc le batch va au bout dans tous les cas et la
+  confirmation part **sans la carte de synthèse** plutôt que jamais. Ajouter
+  un `throw` dans `runAnalysis` supprimerait silencieusement des accusés.
+- **Un seul batch pour toute la fan-out.** Relancer `runAnalysis` par entité
+  en fire-and-forget *et* planifier l'envoi à côté, c'est la course qu'on
+  vient d'enlever : le premier terminé enverrait le mail avec les analyses
+  des autres encore en vol.
+
+## Logo d'entité dans un email : hotlink logo.dev, repli sur l'initiale
+
+`reportNotify.logoUrl()` construit la même URL que `CompanyLogo.tsx` côté
+front, mais lit `LOGO_DEV_TOKEN` (ou `VITE_LOGO_DEV_TOKEN`) **dans
+l'environnement Convex** — la variable `VITE_` du front n'existe pas côté
+serveur. Sans token ou sans domaine, la fonction rend `null` et le template
+affiche l'initiale de la société : une variable manquante coûte une lettre,
+jamais une image cassée.
+
+Deux contraintes de client mail assumées dans `emailTemplates.ts` :
+
+- **Pas de SVG.** L'anneau de score de la fiche (`ScoreRing`) est un cercle
+  SVG ; Gmail le supprime des mails reçus. Le mail affiche un carré arrondi
+  bordé de la couleur du verdict, avec le chiffre dedans. Les seuils
+  (`≥7` vert, `5-6` ambre, `≤4` rouge) sont dupliqués dans
+  `emailTemplates.scoreColor` : bouger `src/lib/reportScore.ts` sans bouger
+  l'autre fait lire « En bonne voie » en ambre dans le mail.
+- **Pas de variables CSS ni d'oklch.** Les tokens de marque sont convertis
+  en hex en dur : `--positive` → `#009966`, `--destructive` → `#e7000b`,
+  `--warning` → `#d27c1b`.
 
 ## `notifiedAt` est un droit de parole, pas un compteur d'envois (ALB-145)
 

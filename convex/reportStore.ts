@@ -154,7 +154,10 @@ export const storeForCompany = internalMutation({
     rawMetrics: v.any(), // full as-written snapshot (audit, replayable)
     canonical: v.array(canonicalValidator),
   },
-  handler: async (ctx, args): Promise<Id<'companyReports'>> => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ reportId: Id<'companyReports'>; created: boolean }> => {
     const email = await ctx.db.get('inboundEmails', args.inboundEmailId)
     if (!email) throw new Error('inbound email not found')
 
@@ -323,7 +326,11 @@ export const storeForCompany = internalMutation({
       reportId,
     })
 
-    return reportId
+    // `created: false` means the dedup above found this period already filed.
+    // The caller turns a fan-out where NOTHING was created into a duplicate
+    // notice instead of a confirmation — and stays silent towards the org,
+    // since nothing new happened.
+    return { reportId, created: !existing }
   },
 })
 
@@ -502,8 +509,9 @@ export const run = internalAction({
 
     // Fan-out storage: one report per matched entity, in its org.
     const reportIds: Array<Id<'companyReports'>> = []
+    let anyCreated = false
     for (const m of matched) {
-      const reportId: Id<'companyReports'> = await ctx.runMutation(
+      const stored: { reportId: Id<'companyReports'>; created: boolean } = await ctx.runMutation(
         internal.reportStore.storeForCompany,
         {
           companyId: m.companyId,
@@ -522,12 +530,8 @@ export const run = internalAction({
           canonical,
         },
       )
-      reportIds.push(reportId)
-      // Re-trigger the per-company AI synthesis (Cerveau 3), fire-and-forget.
-      await ctx.scheduler.runAfter(0, internal.intelligence.runAnalysis, {
-        companyId: m.companyId,
-        orgId: m.orgId,
-      })
+      reportIds.push(stored.reportId)
+      if (stored.created) anyCreated = true
     }
 
     await ctx.runMutation(internal.reportStore.markProcessed, { inboundEmailId, reportIds })
@@ -570,24 +574,55 @@ export const run = internalAction({
             .filter((k) => !canonicalKeys.has(k))
             .slice(0, 6)
 
-    await ctx.scheduler.runAfter(0, internal.reportNotify.send, {
-      inboundEmailId,
-      kind: 'success',
-      success: {
-        reportPeriod: reportPeriod ?? undefined,
-        reportType: analysis.report_type ?? undefined,
-        matchMethod: row.matchMethod ?? 'unknown',
-        metricsFound: canonical.map((c) => ({
-          metricType: c.metricType,
-          value: c.value,
-          unit: c.unit,
-        })),
-        suspicious,
-        unrecognized,
-        missingUsual,
-        targets: targetChecklist,
-      },
-    })
+    // Nothing was created: every entity already carried this period. The
+    // forwarder still gets an answer — they made a gesture — but a short one,
+    // and the rest of the org hears nothing, because nothing is new.
+    if (!anyCreated) {
+      await ctx.scheduler.runAfter(0, internal.reportNotify.send, {
+        inboundEmailId,
+        kind: 'duplicate',
+        success: {
+          reportPeriod: reportPeriod ?? undefined,
+          reportType: analysis.report_type ?? undefined,
+          highlights: analysis.key_highlights,
+          quality: {
+            matchMethod: row.matchMethod ?? 'unknown',
+            metricsFound: [],
+            suspicious: [],
+            unrecognized: [],
+            missingUsual: [],
+          },
+        },
+      })
+    } else {
+      // Re-trigger the per-company AI syntheses (Cerveau 3), and let the batch
+      // release the confirmation once they are in: the mail carries "where the
+      // company stands", which is only true after THIS report is folded in.
+      await ctx.scheduler.runAfter(0, internal.intelligence.runAnalysisBatch, {
+        refs: matched.map((m) => ({ companyId: m.companyId, orgId: m.orgId })),
+        send: {
+          inboundEmailId,
+          kind: 'success' as const,
+          success: {
+            reportPeriod: reportPeriod ?? undefined,
+            reportType: analysis.report_type ?? undefined,
+            highlights: analysis.key_highlights,
+            quality: {
+              matchMethod: row.matchMethod ?? 'unknown',
+              metricsFound: canonical.map((c) => ({
+                metricType: c.metricType,
+                value: c.value,
+                unit: c.unit,
+              })),
+              suspicious,
+              unrecognized,
+              missingUsual,
+              targets: targetChecklist,
+            },
+          },
+        },
+      })
+    }
 
     console.log(
       `[reportStore] ${row.agentmailMessageId}: stored ${reportIds.length} report(s), period="${reportPeriod ?? 'none'}", ${canonical.length} canonical metrics, ${(analysis.metrics as Array<RawMetric>).length - canonical.length} raw-only`,

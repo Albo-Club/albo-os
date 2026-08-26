@@ -11,6 +11,10 @@ type Ctx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>
  * is transactional (invitation, magic link, the answer to a forwarded report)
  * and is NOT configurable — it is the direct reply to a gesture its recipient
  * just made.
+ *
+ * That line is what puts `reportAdded` here: the confirmation the FORWARDER
+ * gets answers their own gesture and stays unconditional, while the copy the
+ * rest of the org receives arrives unasked, so it needs an off switch.
  */
 export const NOTIFICATION_KINDS = [
   'cashThreshold',
@@ -18,6 +22,7 @@ export const NOTIFICATION_KINDS = [
   'bankConnection',
   'indexFailure',
   'reportIssues',
+  'reportAdded',
   'weeklyReports',
 ] as const
 
@@ -34,6 +39,7 @@ const PREF_FIELD = {
   bankConnection: 'notifyBankConnection',
   indexFailure: 'notifyIndexFailure',
   reportIssues: 'notifyReportIssues',
+  reportAdded: 'notifyReportAdded',
   weeklyReports: 'notifyWeeklyReports',
 } as const satisfies Record<NotificationKind, keyof Doc<'userPrefs'>>
 
