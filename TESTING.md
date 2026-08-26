@@ -730,7 +730,10 @@ les séries). Page de suivi : `/app/all/reports`. Prérequis :
 `<CONVEX_SITE_URL>/agentmail/webhook` configurée dans la console AgentMail ;
 **domaines remplis sur les `companies` portfolio**. Boucle fermée par la
 brique 6 : **récaps 100 % AgentMail** (`reportNotify.send`, idempotent via
-`notifiedAt`). Routage dans `lib/reportRouting.ts:routeRecap` — **canal selon
+`notifiedAt`, **jamais relâché** : rejouer une ligne depuis la file est muet,
+sauf l'unique mail de bonne nouvelle quand une ligne qui avait annoncé un
+problème finit par passer — `notifiedKind`, cf. R29b/R29c et ALB-145).
+Routage dans `lib/reportRouting.ts:routeRecap` — **canal selon
 le geste** (le membre qui a transféré est répondu dans son fil, les autres
 reçoivent un mail neuf), **contenu selon le rôle** (abonné « Problèmes de
 reports » → récap détaillé sur succès / cause + lien sur échec ; non-abonné →
@@ -746,7 +749,7 @@ participation → reprise du pipeline où il s'était arrêté), **Rattacher aus
 (sur une ligne déjà traitée : ajout d'une participation, jamais remplacement),
 **Détacher** (croix sur la puce d'une participation rangée : retire le report
 de cette entité seule — c'est le miroir de « Rattacher », disponible aussi
-depuis la fiche société), Retraiter (reset complet + re-auth), Rejeter. **Identité d'une participation** (`identityKey`,
+depuis la fiche société), Retraiter (reset complet + re-auth, sans réarmer le récap), Rejeter. **Identité d'une participation** (`identityKey`,
 `convex/lib/emailIdentify.ts`) : le domaine quand il n'en porte qu'une, le nom
 sinon — un domaine de sponsor (Sezame, Parallel…) porte plusieurs véhicules et
 n'en identifie donc aucun. Gabarits français dans
@@ -798,11 +801,13 @@ part (garde dans `reportNotify.send`), le report et ses documents portent
 | R26b | Forward d'un membre **non abonné** qui échoue                  | Il reçoit « Report bien reçu » — **identique au caractère près** à celui de R25b (comparer les deux mails : aucun mot ne doit différer) ; les abonnés reçoivent l'alerte « Report non traité » en mail neuf |
 | R27 | Email d'un inconnu (quarantaine)                                | Mail **neuf** aux abonnés « Problèmes de reports » (« Email en quarantaine ») ; **aucune** réponse dans le fil de l'inconnu |
 | R27b | Mail d'un **membre** flaggé `spam` (quarantaine, expéditeur connu) | Le membre reçoit la réponse correspondant à son rôle (accusé « bien reçu » s'il n'est pas abonné) ; les abonnés reçoivent la quarantaine en mail neuf |
-| R28 | Action « Rattacher » sur une ligne « À traiter »                | Dialog → choix participation → traitement reprend (extraction si pas faite, sinon fiche) → « Traité » + récap  |
+| R28 | Action « Rattacher » sur une ligne « À traiter »                | Dialog → choix participation → traitement reprend (extraction si pas faite, sinon fiche) → « Traité ». Le transféreur reçoit **un** mail : le récap de succès, parce que la ligne avait annoncé un échec. Recommencer (« Rattacher aussi ») n'en envoie aucun |
 | R28b | **Rattacher à une seconde participation.** Sur une ligne **Traité** rattachée à une seule org alors que l'autre a une fiche du même domaine (`Oprtrs & Co` / `OPRTRS CLUB`) : lire la colonne Participation, puis « **Rattacher aussi** » → choisir la participation → le bloc « Même domaine, autre organisation » → cocher la jumelle → confirmer | Repère « **+ Calte ?** » (nom de l'org, pas un compteur) dans la colonne Participation, avec le détail au survol ; le bloc liste les fiches du même domaine des **autres** orgs, **décochées**, la plus proche en tête, celles déjà rattachées cochées et grisées. Après confirmation : les **deux** fiches sont listées, le report apparaît sur la fiche de la seconde org, celle de la première est **inchangée** (pas de doublon), le repère disparaît, et **aucun second récap** n'est envoyé au transféreur. Un report déjà rangé dans les deux orgs (fan-out automatique, ex. Waro) n'affiche **aucun** repère |
 | R28c | **Détacher depuis la file.** Sur une ligne « Traité » rangée dans **deux** entités (fan-out R20), cliquer la **croix** sur la puce de l'entité à retirer → confirmer | La puce disparaît de la colonne Participation ; sur la fiche de cette entité, le report **et ses fichiers** ont disparu, ses KPIs issus de ce report aussi (vérifier la série sur la fiche), et la synthèse retombe sur le report précédent (ou se vide s'il n'y en avait pas). L'**autre** entité est strictement inchangée : report, fichiers ouvrables, KPIs. Aucune croix sur une ligne non traitée (rien n'est encore rangé — utiliser « Retraiter ») |
 | R28d | **Détacher depuis la fiche société.** Ouvrir le report sur la fiche (liste Documents & rapports) → « **Détacher de cette participation** » → confirmer. Puis « Rattacher » le même mail sur la bonne entité depuis `/app/all/reports` | Le report quitte la fiche ; la ligne de la file ne mentionne plus cette participation. Le rattachement sur la bonne entité range le report là où il devait aller — et un « Retraiter » ultérieur ne **remet pas** le report sur l'entité détachée. Détacher le **dernier** report d'une entité vide sa liste sans erreur |
 | R29 | Action « Retraiter »                                            | Pipeline rejoué de zéro (re-auth incluse) ; utile après avoir rempli un domaine manquant                       |
+| R29b | **Une relance ne réécrit pas au transféreur (ALB-145).** Sur une ligne déjà **Traité** (récap reçu), cliquer « Retraiter » 3 fois de suite, en surveillant la boîte du transféreur | **Aucun** nouveau mail, les 3 fois. La ligne repasse bien par tout le circuit et son statut se met à jour dans la file — c'est là que le résultat se lit. Même chose sur une ligne en échec retraitée qui échoue encore : silence |
+| R29c | **La bonne nouvelle passe, une seule fois.** Sur une ligne **en échec** (récap « Report non traité » reçu), corriger la cause (remplir le domaine de la fiche) puis « Retraiter ». Puis « Retraiter » encore une fois | Le transféreur reçoit **un** récap de succès à la première relance réussie — c'est le seul mail qu'une relance peut produire. La seconde relance, elle, est muette |
 | R30 | Action « Rejeter »                                              | Ligne « Rejeté / Rejeté manuellement », aucun traitement ni email                                              |
 | R31 | Fiche participation → carte « KPIs suivis » → Modifier          | Dialog : liste du catalogue cochable ; fiche vide → les métriques déjà vues sont pré-cochées ; Enregistrer → badges à jour (clés hors catalogue impossibles) |
 | R32 | Report d'une boîte **avec** fiche KPI cible                     | Récap : section « KPIs cibles » ✅ valeur / ⚠️ « absent de ce report » pour **chaque** cible ; les extras sous « Autres métriques enregistrées » ; plus de ligne « Habituelles mais absentes » |

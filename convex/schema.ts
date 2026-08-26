@@ -1199,6 +1199,15 @@ export default defineSchema({
     // Recap notification guard (brick 6): set once the recap/quarantine
     // email went out — retries never double-send.
     notifiedAt: v.optional(v.number()),
+    // Outcome the last notification announced. A manual replay ("Retraiter" /
+    // "Rattacher") no longer clears `notifiedAt`, so this is what decides
+    // whether a REPLAY may speak again: only a row whose last word was a
+    // problem earns one more mail, and only to say it finally went through.
+    // Absent on rows notified before this field existed — treated as final
+    // (silence), because the bug this closes was an excess of mail.
+    notifiedKind: v.optional(
+      v.union(v.literal('success'), v.literal('failure'), v.literal('quarantine')),
+    ),
     // Automatic recovery from a TRANSIENT model failure (aborted request,
     // provider saturation). The step is carried alongside the counter so each
     // brick gets its own budget without anyone having to reset it: a failure

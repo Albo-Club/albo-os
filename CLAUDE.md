@@ -658,6 +658,13 @@ export const remove = mutation({
   type d'auth). Le module de la plateforme ne contient que sa logique métier
   (pull/push) et adapte les lignes via `parseConnection` — cf. `convex/vasco.ts`
   comme module de référence.
+- ❌ Remettre `inboundEmails.notifiedAt` à `undefined` dans une nouvelle
+  action de la file des reports. Ce champ n'est pas un compteur d'envois,
+  c'est un **droit de parole** : un transfert = une réponse, et rejouer le
+  pipeline (« Retraiter », « Rattacher ») doit rester muet. Le seul mail
+  qu'une relance peut produire est celui de la bonne nouvelle, arbitré dans
+  `reportNotify.claimNotify` via le `kind` — jamais par un reset. Cf.
+  `KNOWN_ISSUES.md` « `notifiedAt` est un droit de parole ».
 - ❌ Anchor `#section` for nav between major sections.
 - ❌ Unrequested dark/light toggle.
 - ❌ `tailwind.config.js` (Tailwind v4 is CSS-first).

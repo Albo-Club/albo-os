@@ -23,6 +23,64 @@ bas de page.
 
 ---
 
+## v1.192.1 — 26/08/2026 à 09:22 — Transférer un report ne remplit plus ta boîte
+
+Un seul investor update transféré à l'adresse dédiée pouvait produire
+**quatre accusés de réception**, étalés sur plusieurs jours, sans que
+personne ne comprenne pourquoi. Le record signalé : une quarantaine de mails
+pour une seule série de reports.
+
+La cause n'était pas un emballement du circuit, mais une règle mal posée. Les
+deux boutons de la file « Reports entrants » — **Retraiter** et **Rattacher** —
+rejouent tout le traitement, et ils remettaient au passage le compteur
+d'accusés à zéro. Chaque clic renvoyait donc un mail à la personne qui avait
+transféré le report. C'est logique vu du code, absurde vu de la boîte mail :
+elle a envoyé un email une fois, et se retrouve à recevoir le journal de bord
+de tout ce qu'on fait ensuite de son côté.
+
+Désormais : **un transfert, une réponse.** Retraiter et Rattacher rejouent le
+circuit **en silence**. Le résultat de la relance se lit là où tu l'as
+déclenchée — dans la file, où le statut de la ligne se met à jour — et plus
+dans la boîte de quelqu'un d'autre.
+
+Une exception, et une seule : la bonne nouvelle. Quand une ligne qui avait
+annoncé un problème finit par passer, le transféreur reçoit **un** dernier
+mail pour le lui dire. Il avait été prévenu que ça coinçait, il est prévenu
+que c'est réglé. À l'inverse, une relance qui échoue encore ne dit rien : ce
+constat ne lui demande aucun geste, et la file l'affiche déjà.
+
+Un cas ancien reste muet : un report reçu **avant** cette mise à jour et
+réparé à la main aujourd'hui n'enverra pas son mail de bonne nouvelle. Son
+historique ne dit pas ce qui lui avait été annoncé, et entre risquer un mail
+de trop et un mail de moins, le circuit choisit le silence.
+
+> **🔧 Notes techniques**
+>
+> - `inboundEmails.notifiedAt` est la **seule** barrière anti-doublon, et elle
+>   est posée par ligne. `reportInbox.reprocess` et `assignCompany` (branche
+>   non-additive) la remettaient à `undefined` : c'est le bug, pas le
+>   pipeline. Les deux mutations ne touchent plus au champ.
+> - Nouveau `inboundEmails.notifiedKind`
+>   (`success` | `failure` | `quarantine`) : ce que le dernier mail a annoncé.
+>   `reportNotify.claimNotify` prend désormais le `kind` et arbitre —
+>   première prise toujours accordée ; ensuite refus, **sauf** `success` sur
+>   une ligne dont le dernier mot était `failure`/`quarantine`. Un `notifiedAt`
+>   sans `notifiedKind` (lignes antérieures) est traité comme définitif :
+>   biais assumé vers le silence.
+> - Diagnostic conduit sur les vrais mails (en-têtes bruts) et non sur les
+>   logs : les quatre accusés Corma portent le **même** `In-Reply-To`, donc
+>   aucune boucle d'emails ni ligne dupliquée — c'était bien une seule ligne
+>   ré-autorisée à parler. `reprocess`/`assignCompany` ne sont appelées que
+>   depuis `src/routes/app/all/reports.tsx` : aucun cron, aucun outil agent
+>   ou MCP ne peut déclencher un accusé.
+> - `convex/regression.reportNotifyReplay.test.ts` (8 cas : première prise,
+>   5 relances muettes, échec après échec, mail de réparation unique,
+>   quarantaine réparée, ligne sans genre, et les deux mutations qui
+>   conservent `notifiedAt`). **Vérifié rouge** contre l'ancien code — les 8
+>   échouent. 135 tests de régression Convex, 297 unitaires.
+> - `TESTING.md` : R28 précisé, R29b et R29c ajoutés. Piège consigné dans
+>   `KNOWN_ISSUES.md` § « `notifiedAt` est un droit de parole ».
+
 ## v1.192.0 — 25/08/2026 à 18:54 — L'assistant passe sur un moteur plus rapide
 
 L'assistant de l'app change de moteur : il tourne désormais sur la génération

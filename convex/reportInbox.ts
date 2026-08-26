@@ -248,9 +248,10 @@ export const hydrateBody = internalAction({
  * not a hiccup that clears on its own. The row goes back to 'received', which
  * is exactly what each brick's claim mutation requires, so the retry re-enters
  * through the normal door. No notification is sent here on purpose: a
- * recovered hiccup must cost the user nothing, not even a mail (and
- * `claimNotify` only fires once, so a premature failure mail would silence
- * the success recap that follows).
+ * recovered hiccup must cost the user nothing, not even a mail. A premature
+ * failure mail would not silence the success recap that follows —
+ * `claimNotify` lets that one through — but it would announce a problem that
+ * never was, and then correct itself. Two mails for a non-event.
  */
 export const retryAfterTransient = internalMutation({
   args: {
@@ -532,9 +533,10 @@ export const assignCompany = mutation({
       matchedCompanies: [...matched.values()],
       matchMethod: 'manual',
       reportIds: undefined,
-      // A processed row was already acknowledged: adding a participation to
-      // it must not send a second recap.
-      notifiedAt: additive ? row.notifiedAt : undefined,
+      // `notifiedAt` is deliberately left alone: the forwarder already had
+      // their answer, and attaching a participation by hand is OUR gesture,
+      // not theirs. A row that had failed still gets the one recovery mail
+      // when the replay succeeds — that call lives in `claimNotify`.
       // Manual assignment vouches for the mail. Recap routing still
       // re-checks the ORIGINAL sender at send time (anti-enumeration).
       senderUserId: row.senderUserId ?? user._id,
@@ -678,7 +680,8 @@ export const reprocess = mutation({
       extractedText: undefined,
       reportIds: undefined,
       error: undefined,
-      notifiedAt: undefined,
+      // Not reset — see `assignCompany` above and `reportNotify.claimNotify`:
+      // replaying a row is silent, except for the recovery mail on success.
       processedAt: undefined,
     })
     if (senderUserId) {
