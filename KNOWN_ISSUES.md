@@ -4884,3 +4884,78 @@ supprimer ; des mégaoctets = deux vraies versions).
 Ne pas « corriger » le garde-fou dans l'autre sens en resserrant le détecteur,
 ni l'inverse : les deux fonctions répondent à des questions opposées et doivent
 diverger.
+
+---
+
+## Groupe de transfert devant l'inbox AgentMail : la boucle de mails
+
+L'adresse de dépôt des reports n'est plus l'adresse AgentMail nue mais un
+**groupe Google** (`report@alboteam.com`) dont l'inbox AgentMail est membre,
+au même titre que les humains. C'est confortable — une adresse maison, tout le
+monde reçoit une copie — et ça introduit un piège que rien ne signale avant
+qu'il se déclenche : **l'accusé peut repartir vers le groupe, qui le
+redistribue à l'inbox, qui répond**. Une boucle qui spamme tout le monde.
+
+Trois choses la rendent possible, il faut les couper toutes les trois.
+
+1. **AgentMail devine le destinataire d'une réponse.** `POST
+   /inboxes/{id}/messages/{msg}/reply` accepte `to`, mais leur doc **ne dit
+   nulle part** à qui part la réponse quand on l'omet — c'est déduit du
+   message d'origine, donc de son `From` / `Reply-To`. On ne parie pas
+   là-dessus : `replyToMessage()` prend un `to` **obligatoire**. Ne jamais
+   utiliser `reply_all`, qui répondrait à tous les destinataires du mail
+   d'origine — donc au groupe.
+
+2. **Google Groups réécrit le `From`.** Dès que le groupe **modifie** le
+   message (préfixe de sujet, footer « standard Groups »), la signature DKIM
+   saute et Google remplace l'expéditeur par l'adresse du groupe pour que le
+   mail passe DMARC. Le circuit voit alors un mail « envoyé par le groupe ».
+   → Côté console : **préfixe de sujet vide, footer désactivé**, et
+   « Envoyer les réponses à » = **expéditeur du message** (le mettre sur « le
+   groupe » pose un `Reply-To` vers le groupe, même effet).
+   → Côté code : quand le `From` est une adresse bloquée, on va lire
+   `X-Original-Sender` (que Groups pose systématiquement) via **Get Message** —
+   le payload du webhook `message.received` ne contient **aucun** en-tête,
+   d'où l'appel API supplémentaire, fait uniquement dans ce cas.
+
+3. **Rien n'empêchait d'ingérer notre propre mail.** `lib/reportSenders.ts`
+   tient la liste noire : l'inbox elle-même (son `inbox_id` EST son adresse
+   chez AgentMail) et les alias du groupe (`REPORT_GROUP_ADDRESSES`,
+   séparés par des virgules). Un mail qui en vient et qui ne porte pas de
+   `X-Original-Sender` exploitable est **rejeté en silence** — répondre est
+   précisément ce qu'on évite.
+
+Et une quatrième barrière qui ne dépend pas de notre code, à poser dans la
+console AgentMail : `report@alboteam.com` dans la **send block list** de
+l'inbox (`Lists`, direction `send`, type `block`). À partir de là aucun mail
+sortant ne peut atteindre le groupe, quelle que soit la régression.
+
+### Corollaire : une adresse ouverte ne peut pas alerter sur tout
+
+Le groupe accepte les mails de n'importe qui, comme `hello@`. Le circuit
+traitait déjà les inconnus en quarantaine **avec** une alerte aux abonnés
+« Problèmes de reports » : avec une adresse ouverte, ça fait un mail d'alerte
+par pub reçue — exactement la boîte qui se remplit qu'on venait de corriger
+(cf. § « `notifiedAt` est un droit de parole »). Donc :
+
+- un mail d'inconnu qui **se range** est diffusé à l'org (c'est une nouvelle) ;
+- tout le reste — inconnu non identifié, spam — attend dans la file **sans
+  aucun mail**, ni à lui ni à nous.
+
+Ne pas rebrancher une alerte là-dessus. La file est l'endroit où ça se traite,
+et le point hebdo du lundi la résume.
+
+### Ce qu'un alias est, et ce qu'il n'est pas
+
+`userEmailAliases` (Réglages → Membres) rattache une adresse secondaire à un
+membre. C'est une **carte d'identité**, jamais un droit d'accès :
+
+- ça ne décide **pas** si un mail est traité — le contenu s'en charge
+  (`reportIdentify` doit rattacher une participation ET corroborer le choix) ;
+- ça décide **à qui on a le droit de répondre**, l'accusé portant montants,
+  organisations et liens de fiches ;
+- ce n'est **pas** un moyen de connexion : rien dans Better Auth ne lit cette
+  table.
+
+Une adresse appartient à une seule personne (refus `email_taken` sinon),
+et l'adresse du groupe ne peut être réclamée par personne (`blocked_address`).

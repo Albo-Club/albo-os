@@ -742,11 +742,22 @@ court sans cause ni lien), **audience selon l'événement** (un report rangé
 pour la première fois est diffusé aux autres membres de l'org — case
 « Nouveaux reports » ; un doublon, un retraitement et un échec ne diffusent
 rien). Anti-énumération : l'expéditeur est re-vérifié membre
-AU MOMENT de l'envoi, non-membre → jamais de réponse ; récap
+AU MOMENT de l'envoi, non-membre → jamais de réponse — et **jamais d'alerte
+non plus** : l'adresse est ouverte (groupe de transfert), donc un mail non
+identifié attend dans la file en silence. Le traitement, lui, ne dépend
+**pas** de l'expéditeur : c'est le contenu qui décide (`reportIdentify`).
+Un membre est reconnu à son adresse de compte **ou** à une adresse
+secondaire déclarée (Réglages → Membres, table `userEmailAliases`) ; récap
 succès = participations (liens fiches) + méthode de match + sources
 ✅/📦/⚠️ + métriques enregistrées / **non reconnues** / **valeurs
 inhabituelles** (×8 vs dernière valeur connue) / **habituelles absentes** ;
-quarantaine = mail neuf aux membres. **Actions de la file** (page
+quarantaine = mail neuf aux membres, **sauf spam** (silence total : la ligne
+est dans la file, c'est là qu'on la traite). **Boucle de mails** : l'inbox et
+le/les alias du groupe (`REPORT_GROUP_ADDRESSES`) ne sont jamais ingérés ni
+répondus (`lib/reportSenders.ts`) ; un mail dont le `From` est le groupe est
+rattrapé via l'en-tête `X-Original-Sender` s'il en porte un, sinon rejeté en
+silence. Le destinataire de la réponse est **imposé** (`to` explicite sur
+l'API AgentMail), jamais déduit du mail reçu. **Actions de la file** (page
 `/app/all/reports`) : Rattacher (dialog participation → fan-out sur la même
 participation → reprise du pipeline où il s'était arrêté), **Rattacher aussi**
 (sur une ligne déjà traitée : ajout d'une participation, jamais remplacement),
@@ -804,8 +815,9 @@ part (garde dans `reportNotify.send`), le report et ses documents portent
 | R25b | Forward réussi par un membre **non abonné** (le transféreur type) | Même confirmation que R25 (société + logo, ligne fiche, 3 points clés, carte de synthèse, bouton), **sans** le bloc contrôle qualité (ni sources, ni KPIs cibles, ni valeurs inhabituelles) |
 | R26 | Forward d'un membre **abonné** qui échoue (participation introuvable) | Réponse **dans son fil** « Report non traité » + cause + lien vers la file ; les **autres** abonnés reçoivent la même alerte en mail neuf ; lui ne la reçoit **pas** deux fois |
 | R26b | Forward d'un membre **non abonné** qui échoue                  | Il reçoit « ton report n'a pas pu être rangé » : l'objet du mail transféré, sa date, « l'équipe a été prévenue ». **Aucune cause, aucun nom de société, aucun lien.** Les abonnés reçoivent l'alerte « Report non traité » en mail neuf |
-| R27 | Email d'un inconnu (quarantaine)                                | Mail **neuf** aux abonnés « Problèmes de reports » (« Email en quarantaine ») ; **aucune** réponse dans le fil de l'inconnu |
-| R27b | Mail d'un **membre** flaggé `spam` (quarantaine, expéditeur connu) | Le membre reçoit la réponse correspondant à son rôle (le message court s'il n'est pas abonné) ; les abonnés reçoivent la quarantaine en mail neuf |
+| R27 | Email d'un **inconnu** (non-membre) qui nomme une participation | Traité comme n'importe quel mail — c'est le contenu qui décide. S'il se range : les membres de l'org reçoivent la diffusion « nouveau report ». **Aucune** réponse à l'inconnu, jamais |
+| R27b | Email d'un **inconnu** que l'analyse ne rattache à rien (pub, newsletter) | La ligne reste « À traiter » dans la file, **aucun mail à personne** : ni à lui, ni aux abonnés « Problèmes de reports ». L'adresse étant ouverte, une alerte par mail non identifié remplirait la boîte |
+| R27c | Mail flaggé `spam` par AgentMail                                | Ligne « À traiter » (motif `spam`), **silence total** même si l'expéditeur est un membre. « Retraiter » sur cette ligne relance le circuit complet |
 | R28 | Action « Rattacher » sur une ligne « À traiter »                | Dialog → choix participation → traitement reprend (extraction si pas faite, sinon fiche) → « Traité ». Le transféreur reçoit **un** mail : le récap de succès, parce que la ligne avait annoncé un échec. Recommencer (« Rattacher aussi ») n'en envoie aucun |
 | R28b | **Rattacher à une seconde participation.** Sur une ligne **Traité** rattachée à une seule org alors que l'autre a une fiche du même domaine (`Oprtrs & Co` / `OPRTRS CLUB`) : lire la colonne Participation, puis « **Rattacher aussi** » → choisir la participation → le bloc « Même domaine, autre organisation » → cocher la jumelle → confirmer | Repère « **+ Calte ?** » (nom de l'org, pas un compteur) dans la colonne Participation, avec le détail au survol ; le bloc liste les fiches du même domaine des **autres** orgs, **décochées**, la plus proche en tête, celles déjà rattachées cochées et grisées. Après confirmation : les **deux** fiches sont listées, le report apparaît sur la fiche de la seconde org, celle de la première est **inchangée** (pas de doublon), le repère disparaît, et **aucun second récap** n'est envoyé au transféreur. Un report déjà rangé dans les deux orgs (fan-out automatique, ex. Waro) n'affiche **aucun** repère |
 | R28c | **Détacher depuis la file.** Sur une ligne « Traité » rangée dans **deux** entités (fan-out R20), cliquer la **croix** sur la puce de l'entité à retirer → confirmer | La puce disparaît de la colonne Participation ; sur la fiche de cette entité, le report **et ses fichiers** ont disparu, ses KPIs issus de ce report aussi (vérifier la série sur la fiche), et la synthèse retombe sur le report précédent (ou se vide s'il n'y en avait pas). L'**autre** entité est strictement inchangée : report, fichiers ouvrables, KPIs. Aucune croix sur une ligne non traitée (rien n'est encore rangé — utiliser « Retraiter ») |
@@ -820,6 +832,11 @@ part (garde dans `reportNotify.send`), le report et ses documents portent
 | R32e | **Dépôt manuel : les autres sont prévenus.** Déposer un PDF de type Reporting depuis une fiche société | Le déposant ne reçoit **aucun** mail ; les autres membres de l'org reçoivent le mail « nouveau report » |
 | R32f | **Le mail de réparation se présente comme tel.** Après R26b (échec annoncé au transféreur non abonné), rattacher la ligne à la main | Le transféreur reçoit la confirmation complète, précédée de « **Le report qui coinçait est maintenant rangé.** ». Une seconde relance reste muette |
 | R32g | **Le dernier destinataire d'erreurs ne peut pas se retirer.** Réglages → Membres → décocher « Problèmes de reports » sur tout le monde sauf une personne, puis tenter de décocher la dernière | Refus avec un message explicite ; la case reste cochée. La ligne sous le tableau nomme en clair qui reçoit les erreurs et se met à jour à chaque changement |
+| R33a | **Transfert via le groupe.** Depuis ton adresse alboteam, transférer un investor update à `report@alboteam.com` (groupe dont AgentMail est membre) | Le report se range. L'accusé arrive dans **ta** boîte, et son en-tête « À : » porte **ton** adresse — jamais `report@alboteam.com`. Aucun autre membre du groupe ne reçoit l'accusé (ils ont reçu le mail d'origine par le groupe, et la diffusion « nouveau report » s'ils l'ont cochée) |
+| R33b | **Le groupe réécrit l'expéditeur.** Activer un préfixe de sujet (ou le footer) sur le groupe — ce qui casse la signature et fait remplacer le `From` par l'adresse du groupe — puis transférer | Le circuit récupère l'auteur réel dans `X-Original-Sender` : le report se range sous son nom et l'accusé lui part quand même. Logs : `group forward: from=… → …`. **Remettre ensuite préfixe et footer à vide** : c'est la configuration recommandée |
+| R33c | **Anti-boucle.** Envoyer à l'inbox AgentMail un mail dont le `From` est `report@alboteam.com` sans `X-Original-Sender` (ou laisser une réponse de l'inbox revenir par le groupe) | Rien n'est créé : aucune ligne dans la file, aucun mail. Log `dropped loop-back from=…`. Vérifier aussi côté AgentMail que `report@alboteam.com` est dans la **send block list** de l'inbox |
+| R33d | **Adresse secondaire.** Réglages → Membres → « Adresses d'envoi des reports » → ajouter ton Gmail perso. Transférer un report depuis ce Gmail | Le report se range **et** tu reçois l'accusé complet (comme depuis ton adresse alboteam). Retirer l'adresse, re-transférer un autre report : il se range toujours, mais **plus aucun accusé** — tu es redevenu un inconnu pour le circuit |
+| R33e | **Une adresse appartient à une seule personne.** Tenter de déclarer une adresse déjà utilisée par un compte ou par un autre membre, puis l'adresse du groupe elle-même | Refus explicite dans les deux cas (« déjà rattachée à quelqu'un », « c'est l'adresse du groupe de transfert »). Un membre simple ne peut pas modifier la ligne d'un autre, mais gère la sienne |
 | R30 | Action « Rejeter »                                              | Ligne « Rejeté / Rejeté manuellement », aucun traitement ni email                                              |
 | R31 | Fiche participation → carte « KPIs suivis » → Modifier          | Dialog : liste du catalogue cochable ; fiche vide → les métriques déjà vues sont pré-cochées ; Enregistrer → badges à jour (clés hors catalogue impossibles) |
 | R32 | Report d'une boîte **avec** fiche KPI cible                     | Récap : section « KPIs cibles » ✅ valeur / ⚠️ « absent de ce report » pour **chaque** cible ; les extras sous « Autres métriques enregistrées » ; plus de ligne « Habituelles mais absentes » |

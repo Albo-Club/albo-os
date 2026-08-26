@@ -18,6 +18,7 @@ import { requireAppUser, requireOrgMember } from './lib/auth'
 import { identityKey, sharedDomains } from './lib/emailIdentify'
 import { RETRY_BACKOFFS_MS } from './lib/modelRetry'
 import { recomputeReportFreshness } from './lib/reportFreshness'
+import { resolveMemberByEmail } from './lib/reportSenders'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 
@@ -55,19 +56,10 @@ function truncate(s: string): string | undefined {
   return trimmed.length > BODY_SNAPSHOT_MAX ? trimmed.slice(0, BODY_SNAPSHOT_MAX) : trimmed
 }
 
-/** The user id when `email` belongs to a member of ≥1 org, else null. */
+/** The user id when `email` belongs to a member of ≥1 org (account address or
+ *  declared alias), else null. */
 async function memberUserIdFor(ctx: QueryCtx, email: string): Promise<Id<'users'> | null> {
-  if (!email) return null
-  const user = await ctx.db
-    .query('users')
-    .withIndex('by_email', (q) => q.eq('email', email))
-    .first()
-  if (!user) return null
-  const membership = await ctx.db
-    .query('organizationMembers')
-    .withIndex('by_user', (q) => q.eq('userId', user._id))
-    .first()
-  return membership ? user._id : null
+  return resolveMemberByEmail(ctx, email)
 }
 
 /** Same access boundary as the aggregated view: any member of ≥1 org. */
@@ -109,10 +101,17 @@ export const ingest = internalMutation({
     const bodyText = truncate(message.text)
     const bodyHtml = truncate(message.html)
 
-    // Brick 2 — sender authentication + spam quarantine. `message.from` is
-    // lowercased at normalization; users.email is lowercase (Better Auth).
-    // A case mismatch fails safe: the row lands in quarantine, not in the
-    // pipeline.
+    // Brick 2 — spam quarantine, then sender attribution.
+    //
+    // Being a member is NOT a condition to process the mail: the report
+    // address is open, and what decides whether anything is filed is the
+    // CONTENT (`reportIdentify` must match a participation and corroborate it
+    // deterministically). Attribution decides something else entirely — who
+    // may be answered, since the confirmation carries amounts and fiche links.
+    // An unknown sender is processed and never written to.
+    //
+    // `message.from` is lowercased at normalization, like `users.email`
+    // (Better Auth) and the declared aliases.
     let status: 'received' | 'needs_review' = 'received'
     let statusReason: string | undefined
     let senderUserId: Id<'users'> | undefined
@@ -121,13 +120,7 @@ export const ingest = internalMutation({
       status = 'needs_review'
       statusReason = 'spam'
     } else {
-      const memberId = await memberUserIdFor(ctx, message.from)
-      if (memberId) {
-        senderUserId = memberId
-      } else {
-        status = 'needs_review'
-        statusReason = 'unknown_sender'
-      }
+      senderUserId = (await memberUserIdFor(ctx, message.from)) ?? undefined
     }
 
     const id = await ctx.db.insert('inboundEmails', {
@@ -148,27 +141,31 @@ export const ingest = internalMutation({
     })
 
     // Large messages arrive without bodies in the webhook payload — hydrate
-    // from the presigned body_url (fallback: the messages API). For an
-    // authenticated sender, identification (brick 3) runs right after the
-    // body is available: directly, or chained after hydration.
-    const authenticated = Boolean(senderUserId)
+    // from the presigned body_url (fallback: the messages API). Identification
+    // (brick 3) runs right after the body is available — directly, or chained
+    // after hydration — for every mail the spam filter let through, whoever
+    // sent it.
+    const processable = status === 'received'
     if (!bodyText && !bodyHtml) {
       await ctx.scheduler.runAfter(0, internal.reportInbox.hydrateBody, {
         inboundEmailId: id,
         inboxId: message.inboxId,
         messageId: message.messageId,
         bodyUrl: message.bodyUrl,
-        thenIdentify: authenticated,
+        thenIdentify: processable,
       })
-    } else if (authenticated) {
+    } else if (processable) {
       await ctx.scheduler.runAfter(0, internal.reportIdentify.run, {
         inboundEmailId: id,
       })
     }
 
     // Quarantine notice (brick 6): a FRESH email to the members — never any
-    // reply to the unknown sender (anti-enumeration).
-    if (status === 'needs_review' && statusReason) {
+    // reply to the sender (anti-enumeration). Spam stays SILENT: the report
+    // address is open to the outside, so alerting on every unwanted mail is
+    // how the inbox fills up again (cf. KNOWN_ISSUES "notifiedAt est un droit
+    // de parole"). It is in the queue, which is where it is dealt with.
+    if (status === 'needs_review' && statusReason && statusReason !== 'spam') {
       await ctx.scheduler.runAfter(0, internal.reportNotify.send, {
         inboundEmailId: id,
         kind: 'quarantine',
@@ -668,10 +665,13 @@ export const reprocess = mutation({
     if (!row) throw new ConvexError('not_found')
     if (row.status === 'processing') throw new ConvexError('invalid_status')
 
+    // A member asked for the replay, so the row is processed whoever sent it
+    // — including one the spam filter had parked. Attribution is re-read all
+    // the same: it is what decides who may be answered at the end.
     const senderUserId = await memberUserIdFor(ctx, row.fromEmail)
     await ctx.db.patch('inboundEmails', inboundEmailId, {
-      status: senderUserId ? 'received' : 'needs_review',
-      statusReason: senderUserId ? undefined : 'unknown_sender',
+      status: 'received',
+      statusReason: undefined,
       senderUserId: senderUserId ?? undefined,
       matchedCompanies: undefined,
       matchMethod: undefined,
@@ -684,9 +684,7 @@ export const reprocess = mutation({
       // replaying a row is silent, except for the recovery mail on success.
       processedAt: undefined,
     })
-    if (senderUserId) {
-      await ctx.scheduler.runAfter(0, internal.reportIdentify.run, { inboundEmailId })
-    }
+    await ctx.scheduler.runAfter(0, internal.reportIdentify.run, { inboundEmailId })
     return null
   },
 })

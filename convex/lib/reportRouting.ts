@@ -16,7 +16,9 @@
  *   a duplicate or a failure is not news — nobody else hears about it.
  *
  * The anti-enumeration guard sits above all of it: a non-member sender is
- * NEVER replied to, so the address can't be probed.
+ * NEVER replied to, so the address can't be probed. Note that it guards the
+ * ANSWER only — not the processing. Whether a mail is filed is decided by its
+ * content (`reportIdentify`), never by who sent it.
  */
 
 export type RecapKind = 'success' | 'duplicate' | 'failure' | 'quarantine'
@@ -62,10 +64,19 @@ export function routeRecap({
   /** Member AND subscribed to report problems. */
   senderHandlesIssues: boolean
 }): RecapRoute {
-  // Unknown sender: never reply. A quarantined mail (or a row someone
-  // assigned by hand from the queue) is reported to the handlers instead.
+  // Unknown sender: never reply, and never raise an alert either. The report
+  // address is open to the outside — a founder writes to it directly, and so
+  // does the odd stranger — so a problem mail per unidentified message is the
+  // inbox filling up again. What a stranger's mail produces is what it earned:
+  // a filed report is news the organization hears about; anything else waits
+  // in the queue, silently.
   if (!senderIsMember) {
-    return { reply: null, withQuality: false, alertOthers: true, broadcast: false }
+    return {
+      reply: null,
+      withQuality: false,
+      alertOthers: false,
+      broadcast: kind === 'success',
+    }
   }
 
   if (kind === 'success') {

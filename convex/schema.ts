@@ -251,6 +251,26 @@ export default defineSchema({
     notifyWeeklyReports: v.optional(v.boolean()),
   }).index('by_user', ['userId']),
 
+  /**
+   * Secondary addresses a member forwards reports from — a personal Gmail, a
+   * work address at another company. NOT a login: an alias only attributes an
+   * INBOUND email to a member, so the report pipeline can reply to them with
+   * the full confirmation instead of staying silent.
+   *
+   * It is not an access filter either: anyone may write to the report inbox
+   * and the content analysis decides whether the mail is filed. The alias only
+   * decides who is entitled to an answer.
+   */
+  userEmailAliases: defineTable({
+    userId: v.id('users'),
+    /** Lowercased, like `users.email` and the normalized `fromEmail`. */
+    email: v.string(),
+    addedBy: v.id('users'),
+    addedAt: v.number(),
+  })
+    .index('by_email', ['email'])
+    .index('by_user', ['userId']),
+
   organizations: defineTable({
     slug: v.string(),
     name: v.string(),

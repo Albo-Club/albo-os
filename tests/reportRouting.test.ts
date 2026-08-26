@@ -109,15 +109,20 @@ describe('routeRecap — anti-enumeration', () => {
     }
   })
 
-  it('never announces their report either — nothing was filed for them', () => {
-    for (const kind of ALL) {
-      assert.equal(routeRecap({ kind, ...stranger }).broadcast, false)
-    }
+  it('announces to the organization a report a stranger got filed', () => {
+    // The report address is open: a founder writing in directly is the point.
+    // What was filed is news, even though its sender hears nothing back.
+    assert.equal(routeRecap({ kind: 'success', ...stranger }).broadcast, true)
   })
 
-  it('still reports it to the handlers, including a row assigned by hand', () => {
-    // 'success' here = a quarantined mail someone attached manually; the
-    // handlers hear how it ended, the unknown sender hears nothing.
-    assert.equal(routeRecap({ kind: 'success', ...stranger }).alertOthers, true)
+  it('stays silent on anything a stranger sent that was not filed', () => {
+    // No reply AND no alert: with an open address, one problem mail per
+    // unidentified message is the inbox filling up again. The queue holds it.
+    for (const kind of ['duplicate', 'failure', 'quarantine'] as const) {
+      const route = routeRecap({ kind, ...stranger })
+      assert.equal(route.broadcast, false, `broadcast on ${kind}`)
+      assert.equal(route.alertOthers, false, `alerted on ${kind}`)
+    }
+    assert.equal(routeRecap({ kind: 'success', ...stranger }).alertOthers, false)
   })
 })

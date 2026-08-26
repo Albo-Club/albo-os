@@ -212,5 +212,21 @@
     "issueRecipients": "Aujourd'hui, les erreurs de reports partent à {{names}}.",
     "issueRecipientsNone": "Personne ne reçoit les erreurs de reports.",
     "lastRecipient": "Impossible : quelqu'un doit recevoir les erreurs de reports. Coche d'abord la case d'une autre personne."
+  },
+  "sendingAddresses": {
+    "title": "Adresses d'envoi des reports",
+    "description": "Les reports transférés à l'adresse dédiée sont rangés quel que soit leur expéditeur — c'est leur contenu qui décide. Déclarer ici une adresse secondaire (Gmail perso, adresse professionnelle ailleurs) sert à autre chose : elle rattache le mail à son auteur, qui reçoit alors l'accusé complet au lieu du silence réservé aux inconnus. Ce n'est jamais un droit d'accès, et jamais un moyen de connexion.",
+    "none": "Aucune adresse secondaire",
+    "placeholder": "adresse@exemple.com",
+    "add": "Ajouter",
+    "remove": "Retirer l'adresse {{email}}",
+    "errors": {
+      "invalid_email": "Adresse email invalide",
+      "email_taken": "Cette adresse est déjà rattachée à quelqu'un",
+      "blocked_address": "Cette adresse est celle du groupe de transfert : elle ne peut appartenir à personne",
+      "insufficient_role": "Réservé aux admins ou propriétaires",
+      "not_found": "Membre introuvable",
+      "default": "Échec de l'action"
+    }
   }
 }

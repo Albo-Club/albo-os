@@ -38,6 +38,7 @@ import {
 } from './emailTemplates'
 import { wantsAlert } from './lib/notificationPrefs'
 import { reportIssueRecipients } from './lib/reportRecipients'
+import { isBlockedSender, resolveMemberByEmail } from './lib/reportSenders'
 import { recapKindValidator, reportSendArgs } from './lib/reportNotifyArgs'
 import { routeRecap } from './lib/reportRouting'
 import type { ReportEntityCard } from './emailTemplates'
@@ -132,26 +133,22 @@ export const claimNotify = internalMutation({
  */
 export const listRecipients = internalQuery({
   args: {},
-  handler: async (ctx): Promise<Array<string>> => {
-    return (await reportIssueRecipients(ctx)).map((r) => r.email)
+  handler: async (ctx): Promise<Array<{ userId: Id<'users'>; email: string }>> => {
+    return (await reportIssueRecipients(ctx)).map((r) => ({
+      userId: r.userId,
+      email: r.email,
+    }))
   },
 })
 
-/** The app user behind an email address, when they are a member. Checked at
- *  send time so a membership revoked since the forward is honoured. */
+/** The app user behind an email address, when they are a member — their
+ *  account address or any alias they declared. Checked at send time so a
+ *  membership revoked since the forward is honoured. */
 export const memberByEmail = internalQuery({
   args: { email: v.string() },
   handler: async (ctx, { email }): Promise<{ userId: Id<'users'> } | null> => {
-    const user = await ctx.db
-      .query('users')
-      .withIndex('by_email', (q) => q.eq('email', email))
-      .first()
-    if (!user) return null
-    const membership = await ctx.db
-      .query('organizationMembers')
-      .withIndex('by_user', (q) => q.eq('userId', user._id))
-      .first()
-    return membership ? { userId: user._id } : null
+    const userId = await resolveMemberByEmail(ctx, email)
+    return userId ? { userId } : null
   },
 })
 
@@ -319,10 +316,15 @@ export const send = internalAction({
       internal.reportNotify.memberByEmail,
       { email: row.fromEmail },
     )
-    const recipients: Array<string> = await ctx.runQuery(internal.reportNotify.listRecipients, {})
-    // `fromEmail` is lowercased at normalization and `users.email` is
-    // lowercase (Better Auth), so a plain match is enough here.
-    const senderHandlesIssues = Boolean(member) && recipients.includes(row.fromEmail)
+    const recipients: Array<{ userId: Id<'users'>; email: string }> = await ctx.runQuery(
+      internal.reportNotify.listRecipients,
+      {},
+    )
+    // Compared on the user, not the address: someone who forwarded from a
+    // declared alias is the same person as the account subscribed to the
+    // problem mails.
+    const senderHandlesIssues =
+      member !== null && recipients.some((r) => r.userId === member.userId)
     const route = routeRecap({ kind, senderIsMember: Boolean(member), senderHandlesIssues })
 
     // A manual upload has no AgentMail thread to reply to (the ids are
@@ -364,7 +366,15 @@ export const send = internalAction({
       } else if (route.reply === 'soft') {
         body = reportSoftFailureHtml(row.subject, row.receivedAt)
       }
-      if (body) await replyToMessage(row.agentmailInboxId, row.agentmailMessageId, body)
+      // The recipient is imposed, never inferred: the reply goes to the
+      // person who forwarded, and to nobody else. Last guard before the wire
+      // — an address we refuse to talk to (the mailing group, this inbox) is
+      // dropped even if it got this far.
+      if (body && !isBlockedSender(row.fromEmail, row.agentmailInboxId)) {
+        await replyToMessage(row.agentmailInboxId, row.agentmailMessageId, body, [
+          row.fromEmail,
+        ])
+      }
     }
 
     // ── The problem mail to the other queue handlers ─────────────────────
@@ -377,7 +387,9 @@ export const send = internalAction({
         kind === 'quarantine'
           ? 'Albo OS — email en quarantaine'
           : `Albo OS — report non traité (${reviewReasonLabel(reason ?? 'unknown')})`
-      const others = recipients.filter((email) => email !== row.fromEmail)
+      const others = recipients
+        .filter((r) => r.userId !== member?.userId)
+        .map((r) => r.email)
       if (others.length > 0) {
         await sendMessage(outboundInbox(row.agentmailInboxId), others, subject, html)
       }

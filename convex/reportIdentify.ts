@@ -147,12 +147,19 @@ export const listCandidates = internalQuery({
   },
 })
 
-/** Claim the row for identification; false if it's not in a runnable state. */
+/**
+ * Claim the row for identification; false if it's not in a runnable state.
+ *
+ * Deliberately blind to `senderUserId`: the report address is open, so being
+ * a member is not what earns a mail its analysis — the content is judged the
+ * same whoever sent it. Attribution only decides who may be answered at the
+ * end (`lib/reportRouting.ts`).
+ */
 export const markProcessing = internalMutation({
   args: { inboundEmailId: v.id('inboundEmails') },
   handler: async (ctx, { inboundEmailId }): Promise<boolean> => {
     const row = await ctx.db.get('inboundEmails', inboundEmailId)
-    if (!row || row.status !== 'received' || !row.senderUserId || row.matchedCompanies) {
+    if (!row || row.status !== 'received' || row.matchedCompanies) {
       return false
     }
     await ctx.db.patch('inboundEmails', inboundEmailId, { status: 'processing' })
