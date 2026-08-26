@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.193.1 — 26/08/2026 à 12:10 — Les reports de fonds retrouvent leur véhicule
+## v1.193.2 — 26/08/2026 à 12:10 — Les reports de fonds retrouvent leur véhicule
 
 Un mail de Batch Ventures annonçant la revente d'une de leurs boîtes
 revenait « Participation introuvable », alors que le fonds est bien au
@@ -84,6 +84,36 @@ véhicule reste dans les Rapports entrants.
 > - Suite : renommer les fiches Batch en prod pour qu'elles portent le
 >   libellé du sponsor, et passer les autres familles (Parallel, Sezame,
 >   Anaxago) au même crible.
+
+---
+
+## v1.193.1 — 26/08/2026 à 12:03 — Le mail de report annonce le versé, pas l'engagé
+
+Sur le premier report reçu en vrai, la ligne de fiche du mail était vide. Elle
+affichait le montant **engagé**, or ce champ n'est presque jamais rempli côté
+Calte : 275 des 280 lignes d'investissement n'en ont pas. La ligne aurait donc
+disparu sur la quasi-totalité des reports.
+
+Elle affiche désormais le **versé** — ce qui est réellement sorti en banque sur
+les deals de la société, au centime, comme partout ailleurs dans l'app dès
+qu'un chiffre vient d'un mouvement bancaire — avec le mois depuis lequel.
+
+Deux précisions : une distribution qui revient ne vient jamais en déduction du
+versé (c'est du Reçu, une autre colonne), et un deal signé mais pas encore
+financé fait disparaître la ligne plutôt que d'annoncer « Versé : 0 € ».
+
+> **🔧 Notes techniques**
+>
+> - `reportNotify.entityCards` somme `deals.transactionTotals(...).paidActual`
+>   sur les deals de la société au lieu de `committedAmount`. Le champ de
+>   `ReportEntityCard` devient `paidCents`.
+> - Rendu par `EUR_CENTS_FMT` (2 décimales) et non `EUR_FMT` : un versé est un
+>   montant réel, cf. « l'actuel au centime, l'estimé arrondi ».
+> - `paid > 0 ? paid : undefined` — pas de « Versé : 0 € » sur un deal signé
+>   non financé.
+> - `regression.reportAudience.test.ts` : deux cas neufs — la somme ignore les
+>   entrées et couvre plusieurs deals sans `committedAmount` ; un deal engagé
+>   sans transaction ne produit aucun chiffre.
 
 ---
 

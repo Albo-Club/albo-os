@@ -18,8 +18,10 @@
 import { describe, expect, test } from 'vitest'
 import { api, internal } from './_generated/api'
 import {
+  createBankAccount,
   createOrg,
   createPortfolioCompany,
+  createTransaction,
   createUser,
   expectConvexError,
   setupHarness,
@@ -60,38 +62,86 @@ describe('entityCards — a reader only sees their own organizations', () => {
     expect(forClement[0].orgName).toBe('albo')
   })
 
-  test('the fiche line totals every deal and dates the first one', async () => {
+  test('the fiche line sums what actually went out, not what was committed', async () => {
+    // 275 of CALTE's 280 deals carry no `committedAmount` — keying this line
+    // on the commitment left it blank on nearly every report. It reads the
+    // reconciled bank movements instead, the app's own "Versé".
     const t = setupHarness()
     const ben = await createUser(t, 'benjamin@test.dev')
     const org = await createOrg(t, 'albo', [{ userId: ben.userId, role: 'owner' }])
-    const companyId = await createPortfolioCompany(t, org.orgId, 'Eben Home')
+    const companyId = await createPortfolioCompany(t, org.orgId, 'Batch Venture')
+    const account = await createBankAccount(t, org)
 
     const early = Date.UTC(2025, 9, 13)
     const late = Date.UTC(2026, 3, 1)
-    await t.run(async (ctx) => {
-      for (const [amount, when] of [
-        [100_000, early],
-        [1_060_000, late],
-      ] as const) {
-        await ctx.db.insert('deals', {
-          orgId: org.orgId,
-          investorCompanyId: org.rootCompanyId,
-          targetCompanyId: companyId,
-          instrumentKind: 'spv_share',
-          committedAmount: amount,
-          signedDate: when,
-          status: 'active',
-          currency: 'EUR',
-        })
+    const dealIds = await t.run(async (ctx) => {
+      const ids = []
+      for (const when of [early, late]) {
+        ids.push(
+          await ctx.db.insert('deals', {
+            orgId: org.orgId,
+            investorCompanyId: org.rootCompanyId,
+            targetCompanyId: companyId,
+            instrumentKind: 'fund_lp',
+            // Deliberately absent — this is the CALTE shape.
+            signedDate: when,
+            status: 'active',
+            currency: 'EUR',
+          }),
+        )
       }
+      return ids
+    })
+
+    // Two outflows and one inflow: "Versé" counts the outflows only, and a
+    // distribution coming back must never be netted off it.
+    const txs = [
+      { deal: 0, direction: 'out' as const, amount: 34_824_040 },
+      { deal: 1, direction: 'out' as const, amount: 1_000_000 },
+      { deal: 0, direction: 'in' as const, amount: 752_884 },
+    ]
+    for (const tx of txs) {
+      const id = await createTransaction(t, org.orgId, account, {
+        direction: tx.direction,
+        amount: tx.amount,
+      })
+      await t.run(async (ctx) => {
+        await ctx.db.patch('transactions', id, { dealId: dealIds[tx.deal] })
+      })
+    }
+
+    const [card] = await t.query(internal.reportNotify.entityCards, {
+      refs: [{ companyId, orgId: org.orgId }],
+      userId: ben.userId,
+    })
+    expect(card.paidCents).toBe(35_824_040)
+    expect(card.firstInvestmentAt).toBe(early)
+  })
+
+  test('a deal with a commitment but no payment shows no figure at all', async () => {
+    // Announcing "Versé : 0 €" on a signed-but-unfunded deal would be worse
+    // than saying nothing: the line disappears instead.
+    const t = setupHarness()
+    const ben = await createUser(t, 'benjamin@test.dev')
+    const org = await createOrg(t, 'albo', [{ userId: ben.userId, role: 'owner' }])
+    const companyId = await createPortfolioCompany(t, org.orgId, 'You.switch')
+    await t.run(async (ctx) => {
+      await ctx.db.insert('deals', {
+        orgId: org.orgId,
+        investorCompanyId: org.rootCompanyId,
+        targetCompanyId: companyId,
+        instrumentKind: 'os',
+        committedAmount: 30_000_000,
+        status: 'pending',
+        currency: 'EUR',
+      })
     })
 
     const [card] = await t.query(internal.reportNotify.entityCards, {
       refs: [{ companyId, orgId: org.orgId }],
       userId: ben.userId,
     })
-    expect(card.committedCents).toBe(1_160_000)
-    expect(card.firstInvestmentAt).toBe(early)
+    expect(card.paidCents).toBeUndefined()
   })
 })
 

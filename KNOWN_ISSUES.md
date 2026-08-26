@@ -4467,6 +4467,32 @@ Le garde-fou anti-énumération reste par-dessus tout ça : **jamais** de
 réponse à un expéditeur non membre, quoi qu'il arrive — et jamais de
 diffusion non plus, puisque rien n'a été rangé.
 
+## Le chiffre de la fiche dans un mail : le versé, jamais l'engagé
+
+La ligne de fiche du mail de confirmation affiche le **Versé** — la somme des
+sorties bancaires rapprochées sur les deals de la société
+(`deals.transactionTotals`, la définition de l'app) — et **pas**
+`committedAmount`.
+
+La raison est dans la donnée : **275 des 280 deals de CALTE n'ont pas de
+`committedAmount`**. Le champ n'est renseigné que côté Albo. Une ligne calée
+dessus restait donc vide sur la quasi-totalité des reports Calte — c'est le
+premier report réel qui l'a montré, pas un test.
+
+Trois conséquences à ne pas défaire :
+
+- **Le montant est affiché au centime.** Un versé vient d'un mouvement
+  bancaire, donc « l'actuel au centime, l'estimé arrondi » (CLAUDE.md)
+  s'applique : `EUR_CENTS_FMT`, pas `EUR_FMT`. Un engagement, lui, aurait été
+  arrondi à l'euro — ce n'en est pas un.
+- **Les entrées ne sont jamais nettées.** `transactionTotals` sépare
+  Versé (sorties) et Reçu (entrées) ; une distribution qui revient ne réduit
+  pas le versé. Netter donnerait un chiffre qui ne correspond à aucune colonne
+  de l'app.
+- **Zéro n'est pas affiché.** Un deal signé mais non financé fait disparaître
+  la ligne plutôt qu'annoncer « Versé : 0 € », qui se lirait comme une
+  anomalie alors que c'est un état normal (`paid > 0 ? paid : undefined`).
+
 ## Le mail de confirmation attend l'analyse, et ne l'attend pas indéfiniment
 
 La confirmation porte la carte « où en est la boîte », qui vient de
