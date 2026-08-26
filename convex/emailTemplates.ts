@@ -529,11 +529,11 @@ export interface RecapSource {
   detail?: string
 }
 
-export interface ReportRecapData {
-  companies: Array<{ name: string; orgName: string; url: string | null }>
-  /** Absent on a one-off document that covers no period. */
-  reportPeriod?: string
-  reportType?: string
+/**
+ * Everything the pipeline can say about HOW it read the report, as opposed to
+ * what the report says. Appended to the confirmation for queue handlers only.
+ */
+export interface ReportQuality {
   matchMethod: string
   sources: Array<RecapSource>
   metricsFound: Array<RecapMetric>
@@ -1003,15 +1003,13 @@ function listBlock(heading: string, items: Array<string>): string {
 </ul>`
 }
 
-/** Success recap — replied in the forward's thread. */
-export function reportRecapSuccessHtml(d: ReportRecapData): string {
-  const companies = d.companies
-    .map((c) => {
-      const label = `${esc(c.name)} <span style="color:${MUTED};">(${esc(c.orgName)})</span>`
-      return c.url ? `<a href="${c.url}" style="color:${BRAND};">${label}</a>` : label
-    })
-    .join(' · ')
-
+/**
+ * Quality-control blocks appended to the confirmation for whoever handles the
+ * review queue: what was read, which target KPIs were found, which values look
+ * off. Never shown to someone whose role stops at forwarding — they have
+ * nothing to do with it.
+ */
+function qualityBlocks(d: ReportQuality): Array<string> {
   const sources = d.sources.map((s) => {
     const icon = STATE_ICONS[s.state] ?? ''
     const detail = s.detail ? ` — ${esc(SOURCE_DETAIL_LABELS[s.detail] ?? s.detail)}` : ''
@@ -1037,35 +1035,317 @@ export function reportRecapSuccessHtml(d: ReportRecapData): string {
       )}) — vérifier une éventuelle erreur d'unité`,
   )
 
-  const periodLabel = d.reportPeriod
-    ? `${esc(d.reportPeriod)}${d.reportType ? ` (${esc(d.reportType)})` : ''}`
-    : 'document ponctuel, sans période'
-
-  return recapShell(`✅ Report rangé — ${periodLabel}`, [
-    `<p style="margin: 0 0 4px;">${companies}</p>`,
-    `<p style="margin: 0; color: ${MUTED};">Rattachement confirmé par : ${esc(matchMethodLabel(d.matchMethod))}</p>`,
+  return [
+    `<p style="margin:22px 0 0;color:${MUTED};font-size:13px;">Rattachement confirmé par : ${esc(matchMethodLabel(d.matchMethod))}</p>`,
     listBlock('Sources', sources),
     listBlock('KPIs cibles', targets),
     listBlock(targets.length > 0 ? 'Autres métriques enregistrées' : 'Métriques enregistrées', metrics),
     listBlock('⚠️ Valeurs inhabituelles', suspicious),
     listBlock('Métriques non reconnues (conservées sur le report, hors séries)', d.unrecognized.map(esc)),
     listBlock('Habituelles mais absentes de ce report', d.missingUsual.map(esc)),
+  ].filter(Boolean)
+}
+
+/**
+ * Confirmation, soft failure and duplicate notices — the three mails a
+ * forwarder can receive, plus the copy broadcast to the rest of the org.
+ *
+ * These carry business data (committed amount, AI synthesis) where the
+ * recap above carries pipeline data (sources read, metrics extracted). The
+ * caller is responsible for scoping `entities` to the recipient's own
+ * organizations — see `reportNotify.entityCards`.
+ */
+
+/** Brand tones, from src/styles/brand.css (oklch converted to hex: mail
+ *  clients have no custom properties and no oklch support). */
+const TONE_POSITIVE = '#009966'
+const TONE_NEGATIVE = '#e7000b'
+const TONE_WARNING = '#d27c1b'
+
+/**
+ * Score → colour. Mirrors `scoreVerdict` in src/lib/reportScore.ts band for
+ * band: move one, move the other, or a company reads "En bonne voie" in amber
+ * on the fiche and in green in its mail.
+ */
+function scoreColor(score: number): string {
+  if (score >= 7) return TONE_POSITIVE
+  if (score >= 5) return TONE_WARNING
+  return TONE_NEGATIVE
+}
+
+const MONTH_FMT = new Intl.DateTimeFormat('fr-FR', { month: 'short', year: 'numeric' })
+
+export interface ReportEntityCard {
+  name: string
+  orgName: string
+  /** logo.dev URL — null when the company carries no website domain. */
+  logoUrl: string | null
+  /** Fiche URL — null when SITE_URL is unset. */
+  url: string | null
+  /** Total committed across the org's deals, in EUR cents. */
+  committedCents?: number
+  /** First investment date on this company, ms epoch. */
+  firstInvestmentAt?: number
+  /** Period label of the report that came before this one. */
+  previousPeriod?: string
+  synthesis?: ReportSynthesis
+}
+
+export interface ReportSynthesis {
+  score?: number
+  scoreLabel?: string
+  summary: string
+  goodPoints: Array<string>
+  badPoints: Array<string>
+  insights: Array<{
+    label: string
+    value: string
+    trend?: string
+    direction?: 'up' | 'down' | 'stable'
+    context?: string
+  }>
+}
+
+export interface ReportConfirmationData {
+  entities: Array<ReportEntityCard>
+  /** Absent on a one-off document that covers no period. */
+  reportPeriod?: string
+  /** Key highlights of the report just filed — capped at 3 by the caller. */
+  highlights: Array<string>
+  /** True when this confirmation closes a failure the forwarder was told about. */
+  afterFix?: boolean
+  /** Set on the copy sent to members who did not forward anything. */
+  forwardedBy?: string
+  /** Present only for a reader who handles the review queue. */
+  quality?: ReportQuality
+}
+
+/** Entity identity block: logo (or initial), name, organization. */
+function entityBlock(e: ReportEntityCard): string {
+  const logo = e.logoUrl
+    ? `<img src="${e.logoUrl}" width="40" height="40" alt="" style="display:block;width:40px;height:40px;border-radius:6px;background:#f1f1f3;">`
+    : `<div style="width:40px;height:40px;border-radius:6px;background:#f1f1f3;color:${MUTED};font-weight:600;font-size:15px;text-align:center;line-height:40px;">${esc(e.name.slice(0, 1).toUpperCase())}</div>`
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid ${BORDER};border-radius:8px;">
+  <tr><td style="padding:12px 14px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td width="40" valign="middle" style="padding-right:12px;">${logo}</td>
+        <td valign="middle">
+          <div style="font-weight:600;line-height:1.3;">${esc(e.name)}</div>
+          <div style="color:${MUTED};font-size:13px;line-height:1.3;">${esc(e.orgName)}</div>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+</table>`
+}
+
+/**
+ * Fiche facts. Committed is a piloting figure, so it is rounded to the euro
+ * (cf. CLAUDE.md "l'actuel au centime, l'estimé arrondi"). Returns '' when the
+ * company carries neither a deal nor an earlier report.
+ */
+function factsBlock(e: ReportEntityCard): string {
+  const parts: Array<string> = []
+  if (e.committedCents !== undefined) {
+    const when = e.firstInvestmentAt ? ` en ${MONTH_FMT.format(new Date(e.firstInvestmentAt))}` : ''
+    parts.push(
+      `Investi&nbsp;: <b style="color:${BRAND};">${esc(EUR_FMT.format(e.committedCents / 100))}</b>${esc(when)}`,
+    )
+  }
+  if (e.previousPeriod) {
+    parts.push(`Report précédent&nbsp;: <b style="color:${BRAND};">${esc(e.previousPeriod)}</b>`)
+  }
+  if (parts.length === 0) return ''
+  return `<p style="margin:12px 0 0;color:${MUTED};font-size:13px;">${parts.join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</p>`
+}
+
+/** One KPI tile. Fixed row heights so the three tiles align line by line. */
+function insightTile(i: ReportSynthesis['insights'][number]): string {
+  const tone =
+    i.direction === 'up' ? TONE_POSITIVE : i.direction === 'down' ? TONE_NEGATIVE : null
+  const chip = i.trend
+    ? `<span style="display:inline-block;border:1px solid ${tone ?? BORDER};color:${tone ?? MUTED};font-size:11px;padding:1px 6px;border-radius:999px;line-height:1.4;">${esc(i.trend)}</span>`
+    : ''
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid ${BORDER};border-radius:8px;">
+  <tr><td style="padding:11px 12px;">
+    <div style="color:${MUTED};font-size:10px;letter-spacing:0.05em;text-transform:uppercase;height:14px;line-height:14px;overflow:hidden;">${esc(i.label)}</div>
+    <div style="font-size:21px;font-weight:600;height:28px;line-height:28px;margin-top:2px;">${esc(i.value)}</div>
+    <div style="height:24px;line-height:24px;">${chip}</div>
+    ${i.context ? `<div style="color:${MUTED};font-size:11px;margin-top:4px;line-height:1.35;">${esc(i.context)}</div>` : ''}
+  </td></tr>
+</table>`
+}
+
+/**
+ * The fiche's own synthesis card, rebuilt for email. The score is a bordered
+ * rounded square rather than the app's SVG progress ring: Gmail strips SVG
+ * from received mail, so the ring would arrive empty.
+ */
+function synthesisCard(name: string, s: ReportSynthesis): string {
+  const blocks: Array<string> = [
+    `<p style="margin:0 0 14px;color:${MUTED};font-size:12px;">Synthèse IA · où en est ${esc(name)}</p>`,
+  ]
+
+  if (s.score !== undefined) {
+    const color = scoreColor(s.score)
+    blocks.push(`<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td width="44" valign="middle" style="padding-right:12px;">
+      <div style="width:44px;height:44px;border-radius:10px;border:2px solid ${color};color:${color};font-size:19px;font-weight:600;text-align:center;line-height:40px;">${s.score}</div>
+    </td>
+    <td valign="middle">
+      ${s.scoreLabel ? `<span style="font-weight:600;font-size:15px;">${esc(s.scoreLabel)}</span>` : ''}
+      <span style="color:${MUTED};font-size:14px;">&nbsp;Score ${s.score}/10</span>
+    </td>
+  </tr>
+</table>`)
+  }
+
+  blocks.push(`<p style="margin:14px 0 0;color:#3f4147;">${esc(s.summary)}</p>`)
+
+  if (s.goodPoints.length > 0 || s.badPoints.length > 0) {
+    const col = (heading: string, color: string, items: Array<string>, pad: string) =>
+      `<td valign="top" width="50%" style="${pad}">
+    <p style="margin:0 0 7px;color:${color};font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;">${heading}</p>
+    ${items.map((it, idx) => `<p style="margin:0 0 ${idx === items.length - 1 ? '0' : '5px'};font-size:13px;line-height:1.4;">${esc(it)}</p>`).join('\n    ')}
+  </td>`
+    blocks.push(`<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:18px;">
+  <tr>
+  ${col('Points forts', TONE_POSITIVE, s.goodPoints, 'padding-right:10px;')}
+  ${col('Points de vigilance', TONE_NEGATIVE, s.badPoints, 'padding-left:10px;')}
+  </tr>
+</table>`)
+  }
+
+  if (s.insights.length > 0) {
+    const cells = s.insights
+      .slice(0, 3)
+      .map((i, idx, all) => {
+        const pad =
+          idx === 0
+            ? 'padding-right:5px;'
+            : idx === all.length - 1
+              ? 'padding-left:5px;'
+              : 'padding:0 5px;'
+        return `<td valign="top" width="${Math.floor(100 / all.length)}%" style="${pad}">${insightTile(i)}</td>`
+      })
+      .join('\n  ')
+    blocks.push(`<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:18px;">
+  <tr>
+  ${cells}
+  </tr>
+</table>`)
+  }
+
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid ${BORDER};border-radius:8px;margin-top:22px;">
+  <tr><td style="padding:18px;">
+${blocks.join('\n')}
+  </td></tr>
+</table>`
+}
+
+/** Primary action button. Inline-block anchor — no VML, Outlook shows a square. */
+function buttonBlock(label: string, url: string): string {
+  return `<p style="margin:22px 0 0;"><a href="${url}" style="display:inline-block;background:${BUTTON_BG};color:${BUTTON_FG};text-decoration:none;font-weight:500;font-size:14px;padding:10px 18px;border-radius:6px;">${esc(label)}</a></p>`
+}
+
+/** Bulleted list rendered as a table — <ul> indentation is unreliable in mail. */
+function bulletBlock(heading: string, items: Array<string>): string {
+  if (items.length === 0) return ''
+  const rows = items
+    .map(
+      (it, idx) =>
+        `<tr>
+    <td width="16" valign="top" style="color:${MUTED};line-height:1.5;">•</td>
+    <td valign="top" style="color:#3f4147;${idx === items.length - 1 ? '' : 'padding-bottom:7px;'}">${esc(it)}</td>
+  </tr>`,
+    )
+    .join('\n  ')
+  return `<p style="margin:20px 0 8px;font-weight:600;">${heading}</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+  ${rows}
+</table>`
+}
+
+/**
+ * The report is filed — the mail that carries the whole point of the circuit.
+ * Same template for the forwarder's thread reply and for the copy the rest of
+ * the org receives; `forwardedBy` and `afterFix` are the only differences.
+ */
+export function reportConfirmationHtml(d: ReportConfirmationData): string {
+  const periodLabel = d.reportPeriod ? esc(d.reportPeriod) : 'document ponctuel'
+  const title = d.forwardedBy
+    ? `📈 Nouveau report — ${periodLabel}`
+    : `✅ Report rangé — ${periodLabel}`
+
+  const blocks: Array<string> = []
+
+  if (d.afterFix) {
+    blocks.push(
+      `<p style="margin:0 0 14px;color:${MUTED};">Le report qui coinçait est maintenant rangé.</p>`,
+    )
+  }
+  if (d.forwardedBy) {
+    blocks.push(
+      `<p style="margin:0 0 14px;color:${MUTED};">Transféré par ${esc(d.forwardedBy)}.</p>`,
+    )
+  }
+
+  for (const e of d.entities) {
+    blocks.push(entityBlock(e))
+    const facts = factsBlock(e)
+    if (facts) blocks.push(facts)
+    blocks.push(bulletBlock('Ce que dit ce report', d.highlights.slice(0, 3)))
+    if (e.synthesis) blocks.push(synthesisCard(e.name, e.synthesis))
+    if (e.url) blocks.push(buttonBlock(`Ouvrir la fiche ${e.name}`, e.url))
+  }
+
+  if (d.quality) blocks.push(...qualityBlocks(d.quality))
+
+  if (!d.forwardedBy) {
+    blocks.push(
+      `<p style="margin:14px 0 0;color:${MUTED};font-size:13px;">Tu n'as rien d'autre à faire.</p>`,
+    )
+  }
+
+  return recapShell(title, blocks.filter(Boolean))
+}
+
+/**
+ * The report could not be filed, told to someone whose role stops at
+ * forwarding. No cause, no technical detail, no link to the queue: nothing
+ * they could act on. It cannot name the company either — half the failures
+ * are precisely the circuit failing to identify one.
+ *
+ * It promises a human, which is only true because the front forbids emptying
+ * the report-issues recipient list (`organizations.setMemberAlertPref`).
+ */
+export function reportSoftFailureHtml(subject: string, receivedAt: number): string {
+  const day = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' }).format(
+    new Date(receivedAt),
+  )
+  return recapShell("⚠️ Ton report n'a pas pu être rangé automatiquement", [
+    `<p style="margin:0;">Le mail «&nbsp;<i>${esc(subject)}</i>&nbsp;», transféré le ${esc(day)}, est bien arrivé avec ses pièces jointes. Rien n'est perdu.</p>`,
+    `<p style="margin:12px 0 0;color:${MUTED};">L'équipe Albo OS a été prévenue et va le rattacher à la main. Tu recevras la confirmation dès que ce sera fait&nbsp;— rien à faire de ton côté.</p>`,
   ])
 }
 
 /**
- * Receipt for a member who forwards reports without handling the queue.
- * Deliberately takes NO argument: it must read exactly the same whether the
- * report was filed or fell over, so that a forwarder never has to wonder why
- * this one looks different. Everything it claims is true in both cases — the
- * mail is stored and replayable from the review queue either way — and it
- * promises nothing about a human, which would be a lie the day nobody
- * subscribes to report problems.
+ * The report was already in Albo OS — a second forward of something already
+ * filed. "Rafraîchi" rather than "ignoré" on purpose: nothing distinguishes a
+ * duplicate from a corrected version of the same period, and both really do
+ * update the stored report.
  */
-export function reportReceiptHtml(): string {
-  return recapShell('📬 Report bien reçu', [
-    `<p style="margin: 0;">Merci — ton email est bien arrivé, avec ses pièces jointes, et son contenu est conservé.</p>`,
-    `<p style="margin: 12px 0 0; color: ${MUTED};">Il suit son cours dans Albo OS. Tu n'as rien d'autre à faire.</p>`,
+export function reportDuplicateHtml(d: {
+  entityName: string
+  reportPeriod?: string
+  url: string | null
+}): string {
+  const period = d.reportPeriod ? `, ${esc(d.reportPeriod)}` : ''
+  return recapShell(`📬 Déjà rangé — ${esc(d.entityName)}${period}`, [
+    `<p style="margin:0;color:${MUTED};">Ce report était déjà dans Albo OS. Il a été rafraîchi avec ce que contenait ton mail, rien n'a été dupliqué.</p>`,
+    ...(d.url ? [buttonBlock(`Ouvrir la fiche ${d.entityName}`, d.url)] : []),
   ])
 }
 

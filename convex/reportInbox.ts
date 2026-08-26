@@ -721,8 +721,11 @@ const UPLOAD_SCAN = 50
  * participation is chosen by the user, so identification (brick 3) is skipped
  * — the match is preset here, with the usual multi-org fan-out.
  *
- * The row is not an email: `origin: 'upload'` marks it, the AgentMail ids are
- * placeholders, and no recap mail goes out (cf. `reportNotify.send`).
+ * The row is not an email: `origin: 'upload'` marks it and the AgentMail ids
+ * are placeholders, so there is no thread to reply in — the uploader gets no
+ * mail, they are in front of the fiche that shows the outcome. The rest of the
+ * org is still told a report arrived: same event, same announcement
+ * (cf. `reportNotify.send`).
  */
 export const createFromUpload = mutation({
   args: {

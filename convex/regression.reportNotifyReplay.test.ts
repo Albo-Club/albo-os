@@ -62,9 +62,13 @@ async function readNotified(t: Harness, id: Id<'inboundEmails'>): Promise<Notifi
 async function claim(
   t: Harness,
   id: Id<'inboundEmails'>,
-  kind: 'success' | 'failure' | 'quarantine',
+  kind: 'success' | 'duplicate' | 'failure' | 'quarantine',
 ): Promise<boolean> {
-  return await t.mutation(internal.reportNotify.claimNotify, { inboundEmailId: id, kind })
+  const res = await t.mutation(internal.reportNotify.claimNotify, {
+    inboundEmailId: id,
+    kind,
+  })
+  return res.claimed
 }
 
 describe('claimNotify — one gesture, one answer', () => {

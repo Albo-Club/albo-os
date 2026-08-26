@@ -60,7 +60,7 @@ async function store(
   inboundEmailId: Id<'inboundEmails'>,
   reportPeriod: string,
 ): Promise<Id<'companyReports'>> {
-  return await t.mutation(internal.reportStore.storeForCompany, {
+  const stored = await t.mutation(internal.reportStore.storeForCompany, {
     companyId,
     orgId,
     inboundEmailId,
@@ -81,6 +81,7 @@ async function store(
       },
     ],
   })
+  return stored.reportId
 }
 
 /** Two orgs holding the same participation — the usual fan-out shape. */
