@@ -1,28 +1,22 @@
 /// <reference types="vite/client" />
 /**
- * Regression: who hears about a report, and what they are shown (ALB-115).
+ * Regression: what a report mail is allowed to show, and who it reaches
+ * (ALB-115). The routing decision itself is pure and pinned in
+ * `tests/reportRouting.test.ts`; this file covers what needs the database.
  *
- * Three rules are load-bearing here and each one is easy to undo by accident:
+ * Two rules are load-bearing here and each one is easy to undo by accident:
  *
- * 1. A report that lands for the FIRST time is news for the organization, so
- *    the other members are told. A duplicate is not news — a second forward of
- *    something already filed answers only the person who forwarded it, and
- *    announces nothing to anybody else. Without that distinction, re-sending
- *    one investor update mails the whole team a second time about a report
- *    they already read.
- *
- * 2. The mail carries committed amounts and fiche links, so its entity list is
+ * 1. The mail carries committed amounts and fiche links, so its entity list is
  *    scoped to the reader's OWN organizations. A member of Albo alone must
  *    never receive the Calte line of a company that exists on both sides — the
  *    app itself refuses to show it to them.
  *
- * 3. The report-issue recipient list can never be emptied. The notice a
+ * 2. The report-issue recipient list can never be emptied. The notice a
  *    forwarder gets on failure says the team has been told; with nobody
  *    subscribed that sentence is a lie AND the failure reaches no one.
  */
 import { describe, expect, test } from 'vitest'
 import { api, internal } from './_generated/api'
-import { routeRecap } from './lib/reportRouting'
 import {
   createOrg,
   createPortfolioCompany,
@@ -32,68 +26,6 @@ import {
 } from './regression.setup'
 import type { Harness } from './regression.setup'
 import type { Id } from './_generated/dataModel'
-
-describe('routeRecap — audience follows the event', () => {
-  test('a first-time report is announced to the org, a duplicate to nobody', () => {
-    const success = routeRecap({
-      kind: 'success',
-      senderIsMember: true,
-      senderHandlesIssues: false,
-    })
-    expect(success.reply).toBe('confirmation')
-    expect(success.broadcast).toBe(true)
-
-    const duplicate = routeRecap({
-      kind: 'duplicate',
-      senderIsMember: true,
-      senderHandlesIssues: false,
-    })
-    expect(duplicate.reply).toBe('duplicate')
-    // The whole point: nothing new happened, so nobody else is disturbed.
-    expect(duplicate.broadcast).toBe(false)
-    expect(duplicate.alertOthers).toBe(false)
-  })
-
-  test('a failure never reaches the org, and never carries a cause to a forwarder', () => {
-    const forwarder = routeRecap({
-      kind: 'failure',
-      senderIsMember: true,
-      senderHandlesIssues: false,
-    })
-    expect(forwarder.reply).toBe('soft')
-    expect(forwarder.withQuality).toBe(false)
-    expect(forwarder.broadcast).toBe(false)
-    // The people who hold the queue still hear about it.
-    expect(forwarder.alertOthers).toBe(true)
-
-    const handler = routeRecap({
-      kind: 'failure',
-      senderIsMember: true,
-      senderHandlesIssues: true,
-    })
-    expect(handler.reply).toBe('alert')
-  })
-
-  test('the quality block follows the role, not the outcome', () => {
-    expect(
-      routeRecap({ kind: 'success', senderIsMember: true, senderHandlesIssues: true })
-        .withQuality,
-    ).toBe(true)
-    expect(
-      routeRecap({ kind: 'success', senderIsMember: true, senderHandlesIssues: false })
-        .withQuality,
-    ).toBe(false)
-  })
-
-  test('an unknown sender is never replied to, whatever happened', () => {
-    for (const kind of ['success', 'duplicate', 'failure', 'quarantine'] as const) {
-      const route = routeRecap({ kind, senderIsMember: false, senderHandlesIssues: false })
-      // Anti-enumeration: replying would confirm the address exists.
-      expect(route.reply).toBeNull()
-      expect(route.broadcast).toBe(false)
-    }
-  })
-})
 
 describe('entityCards — a reader only sees their own organizations', () => {
   test('the Calte line of a cross-org company is dropped for an Albo-only member', async () => {
