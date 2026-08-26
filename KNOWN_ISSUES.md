@@ -4333,16 +4333,46 @@ Deux questions, deux prédicats.
 
 Deux limites assumées :
 
-- Le seul discriminant accepté est le **nom complet** de l'entité
-  (`nameAppearsInText`, mot entier). Un mail qui ne dit que « SPV 6 »
-  n'accroche pas → file d'attente. Choix délibéré : pas de faux rattachement
-  silencieux, au prix de lignes à traiter à la main.
+- Le seul discriminant accepté est le **nom** de l'entité, écrit en entier
+  (`nameAppearsInText`, mot entier, recherche de sous-chaîne). Un mail qui ne
+  dit que « SPV 6 » n'accroche pas → file d'attente. Choix délibéré : pas de
+  faux rattachement silencieux, au prix de lignes à traiter à la main.
+  Deux tolérances, et deux seulement (`matchableName`) : un groupe entre
+  **parenthèses en fin de nom** est retiré — c'est notre annotation
+  (« (Fund n°2) », « (ex:YEASTY) »), jamais un mot que le sponsor écrit — et
+  les espaces multiples sont réduits des deux côtés. D'où la **règle de
+  nommage** : la fiche porte le libellé que le sponsor écrit lui-même
+  (« Batch Ventures 2025 »), l'annotation maison va en fin de nom entre
+  parenthèses. `identityKey` garde le nom **complet** : deux entités qui ne
+  diffèrent que par leur annotation restent deux participations, et un mail
+  qui nommerait les deux part en revue au lieu d'atterrir sur l'une. Une
+  seule collision dans le portefeuille au 26/08/2026 — les trois fiches
+  `Banco (…)`, sans domaine, qui n'accrochaient déjà rien.
 - Deux entités d'une **même boîte** nommées différemment sur un domaine de
   sponsor ne fanent plus ensemble (`Oprtrs & Co` côté Albo vs `OPRTRS CLUB`
   côté Calte ; `Parallel Invest SPV 13 (Bernay)` vs `Parallel Invest SPV13`).
   Aligner les noms règle le cas, mais ce n'est pas toujours souhaitable — une
   org a le droit de nommer ses lignes comme elle veut. D'où le geste manuel
   assisté ci-dessous.
+
+### Le fonds peut être la participation, pas seulement l'expéditeur
+
+Un fonds qui transmet le reporting d'une de ses boîtes (`is_fund_forward`)
+se lit de deux façons, et le prompt s'était figé sur une seule : « la
+participation cherchée est la CIBLE du report ». Vrai pour un véhicule de
+side (Asterion, SIDE) où c'est bien la boîte qu'on détient ; faux pour un
+fonds dont on est LP — Batch Ventures écrivant « ZeroEntropy acquired by
+Notion », où ZeroEntropy n'est nulle part au portefeuille et le
+fonds si. Le prompt tranche désormais sur la liste des candidats, les deux
+lectures étant exclusives : la cible si elle y figure, sinon le fonds.
+
+Corollaire sur la corroboration : sur un transfert de fonds, le domaine de
+l'auteur est celui du **fonds** — il ne peut donc corroborer qu'un pick qui
+EST le fonds, jamais la boîte dont le report parle. On ne le neutralise
+plus (il l'était, ce qui rendait le cas LP structurellement inaccessible).
+Et la protection tient toute seule quand le fonds a plusieurs millésimes
+sur son domaine : `batch.ventures` en porte quatre, c'est donc un domaine
+partagé, et le nom du véhicule reste obligatoire.
 
 ### Le domaine ne décide pas, mais il suggère
 

@@ -47,6 +47,25 @@ que le véhicule soit **nommé dans le message** (« Sezame Immo 6 ») ; sans
 main, plutôt que d'être rangé au hasard chez un véhicule voisin. Un
 rattachement manuel ne touche lui aussi que le véhicule choisi.
 
+**Comment nommer une fiche pour qu'elle soit reconnue** : le nom de la
+fiche est ce que le circuit cherche dans le message. Il doit donc être le
+libellé que la société ou le sponsor écrit lui-même — « Batch Ventures
+2025 », « Sezame Immo 6 » — et pas une abréviation maison. Pas besoin qu'il
+soit l'objet exact du mail : il suffit qu'il y figure en entier, quelle que
+soit la ponctuation autour (« [Batch Ventures 2025] ZeroEntropy… », « Batch
+Ventures 2025, LP | Capital Call »). Ce que vous mettez **entre parenthèses
+en fin de nom** est ignoré au moment du rattachement : c'est la place pour
+votre propre annotation, celle qui vous dit de quel véhicule il s'agit
+(« Batch Ventures 2025 (Fund n°2) »).
+
+**Quand la participation est le fonds lui-même** : un fonds dont vous êtes
+souscripteur (Batch Ventures, Eutopia…) envoie des nouvelles de **ses**
+participations — une revente, une distribution. La société citée n'est pas
+à votre portefeuille, le fonds si : le report est rangé sur le fonds. S'il
+a plusieurs millésimes, le mail doit nommer celui qui est concerné, sinon
+il part dans la file — un capital call « Batch Ventures YC 2026 » ne doit
+pas atterrir sur le fonds 2025.
+
 **Quand la même boîte porte deux noms** (`Oprtrs & Co` côté Albo, `OPRTRS
 CLUB` côté Calte) : rien ne permet de deviner qu'il s'agit d'une seule
 participation — vu de l'outil, ces deux lignes se ressemblent autant que

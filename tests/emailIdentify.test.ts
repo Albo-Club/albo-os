@@ -37,6 +37,16 @@ const SEZAME = [
 ]
 const SEZAME_SHARED = sharedDomains(SEZAME)
 
+// One fund, four vehicles on its own domain: the domain says "Batch", never
+// which millésime. The fiche names carry the sponsor label plus our note.
+const BATCH = [
+  { name: 'Batch Ventures 2025 (Fund n°2)', domain: 'batch.ventures' },
+  { name: 'Batch Ventures YC 2026', domain: 'batch.ventures' },
+  { name: 'Batch Ventures CTO Fund I', domain: 'batch.ventures' },
+  { name: 'Batch Ventures 1 (Summer 2024 / YC S24)', domain: 'batch.ventures' },
+]
+const BATCH_SHARED = sharedDomains(BATCH)
+
 describe('nameAppearsInText', () => {
   it('matches a whole word in the body', () => {
     assert.equal(nameAppearsInText('Sant Roch', 'Investor update', 'Le mois de juin chez Sant Roch'), true)
@@ -51,6 +61,75 @@ describe('nameAppearsInText', () => {
 
   it('does not match a substring of a longer word', () => {
     assert.equal(nameAppearsInText('Hexa', 'Update', 'un rapport hexadécimal'), false)
+  })
+
+  // A fund writes its own label in the subject ("[Batch Ventures 2025]") and
+  // will never write the note we keep for ourselves at the end of the fiche
+  // name. The name carries both; only the label is looked for.
+  it('matches the sponsor label when the fiche name ends with our own note', () => {
+    assert.equal(
+      nameAppearsInText(
+        'Batch Ventures 2025 (Fund n°2)',
+        'Fwd: [Batch Ventures 2025] ZeroEntropy acquired by Notion + capital distribution',
+        '',
+      ),
+      true,
+    )
+  })
+
+  it('matches a label the sender wrapped in its own suffix', () => {
+    assert.equal(
+      nameAppearsInText(
+        'Batch Ventures YC 2026',
+        'Batch Ventures YC 2026, LP | Capital Call Notice | Calte',
+        '',
+      ),
+      true,
+    )
+  })
+
+  it('keeps the vehicles apart — the annotation is dropped, not the number', () => {
+    assert.equal(
+      nameAppearsInText(
+        'Batch Ventures YC 2026',
+        'Fwd: [Batch Ventures 2025] ZeroEntropy acquired by Notion',
+        '',
+      ),
+      false,
+    )
+  })
+
+  it('keeps a parenthetical that is not at the end of the name', () => {
+    assert.equal(
+      nameAppearsInText('SIDE - ADEQUA (POTIONS) - AB tasty', 'Reporting', 'SIDE - ADEQUA - AB tasty'),
+      false,
+    )
+    assert.equal(
+      nameAppearsInText(
+        'SIDE - ADEQUA (POTIONS) - AB tasty',
+        'Reporting',
+        'des nouvelles de SIDE - ADEQUA (POTIONS) - AB tasty',
+      ),
+      true,
+    )
+  })
+
+  it('tolerates a double space in the fiche name and a line break in the mail', () => {
+    assert.equal(
+      nameAppearsInText('Batch  Ventures 2025', '[Batch Ventures 2025] Capital Call', ''),
+      true,
+    )
+    assert.equal(
+      nameAppearsInText('Batch Ventures 2025', 'Reporting', 'le fonds Batch\nVentures 2025 distribue'),
+      true,
+    )
+  })
+
+  it('ignores a name left with less than three characters once trimmed', () => {
+    assert.equal(
+      nameAppearsInText('BV (Batch Ventures 2025)', '[Batch Ventures 2025] Capital Call', ''),
+      false,
+    )
   })
 })
 
@@ -124,6 +203,23 @@ describe('namedIdentities', () => {
       sharedDomains(PORTFOLIO),
     )
     assert.deepEqual([...named], ['eben home'])
+  })
+
+  // Four vehicles of one fund on the sponsor domain: the mail names one, so
+  // only that one is in play — the annotation on the fiche does not blur it.
+  it('names a single vehicle among the millésimes of one fund', () => {
+    const named = namedIdentities(
+      BATCH,
+      'Fwd: [Batch Ventures 2025] ZeroEntropy acquired by Notion + capital distribution',
+      '',
+      BATCH_SHARED,
+    )
+    assert.deepEqual([...named], ['batch ventures 2025 (fund n°2)'])
+  })
+
+  it('names none when the mail only speaks of the fund family', () => {
+    const named = namedIdentities(BATCH, 'Fwd: [Batch Ventures] +11 investments + webinar', '', BATCH_SHARED)
+    assert.equal(named.size, 0)
   })
 })
 
