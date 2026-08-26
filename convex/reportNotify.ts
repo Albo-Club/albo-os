@@ -11,6 +11,11 @@
  * scheduler retries never double-send. One claim covers BOTH sends of a
  * problem (the forwarder's thread reply and the fresh mail to the other
  * handlers) — they happen in the same action run.
+ *
+ * The claim is NEVER released. Replaying a row from the queue ("Retraiter" /
+ * "Rattacher") re-runs the whole pipeline in silence: the forwarder sent one
+ * email and gets one answer, however many times the row is re-processed
+ * afterwards. The single exception is the good news — see `claimNotify`.
  */
 
 import { v } from 'convex/values'
@@ -34,13 +39,37 @@ function siteUrl(): string {
 
 // ─── Queries / mutations ─────────────────────────────────────────────────────
 
-/** Claim the notification slot; false when already notified (idempotence). */
+const recapKindValidator = v.union(
+  v.literal('success'),
+  v.literal('failure'),
+  v.literal('quarantine'),
+)
+
+/**
+ * Claim the notification slot; false when the row has already had its say.
+ *
+ * The first outcome always goes out. After that the guard holds through every
+ * replay, with ONE exception: a row whose last word was a problem may speak
+ * once more, and only to announce that it finally went through. A second
+ * problem after a first one stays silent — the queue already shows it, and a
+ * mail per attempt is exactly what made this circuit unusable.
+ *
+ * A row notified before `notifiedKind` existed carries no outcome; it is
+ * treated as final. Erring toward silence is deliberate here.
+ */
 export const claimNotify = internalMutation({
-  args: { inboundEmailId: v.id('inboundEmails') },
-  handler: async (ctx, { inboundEmailId }): Promise<boolean> => {
+  args: { inboundEmailId: v.id('inboundEmails'), kind: recapKindValidator },
+  handler: async (ctx, { inboundEmailId, kind }): Promise<boolean> => {
     const row = await ctx.db.get('inboundEmails', inboundEmailId)
-    if (!row || row.notifiedAt) return false
-    await ctx.db.patch('inboundEmails', inboundEmailId, { notifiedAt: Date.now() })
+    if (!row) return false
+    if (row.notifiedAt) {
+      if (kind !== 'success') return false
+      if (row.notifiedKind !== 'failure' && row.notifiedKind !== 'quarantine') return false
+    }
+    await ctx.db.patch('inboundEmails', inboundEmailId, {
+      notifiedAt: Date.now(),
+      notifiedKind: kind,
+    })
     return true
   },
 })
@@ -152,6 +181,7 @@ export const send = internalAction({
   handler: async (ctx, { inboundEmailId, kind, reason, success }) => {
     const claimed: boolean = await ctx.runMutation(internal.reportNotify.claimNotify, {
       inboundEmailId,
+      kind,
     })
     if (!claimed) return null
 

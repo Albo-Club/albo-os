@@ -1714,9 +1714,11 @@ file « relou » bien plus que les bugs de schéma.
   (`convex/reportInbox.ts`) repasse la ligne en `received` — le statut que
   réclament déjà les mutations de claim, donc la reprise rentre par la porte
   normale — et replanifie à 1 / 5 / 15 min. **Aucune notification** : un
-  hoquet qui se répare ne doit rien coûter à l'utilisateur, et `claimNotify`
-  ne tirant qu'une fois, un mail d'échec prématuré ferait taire le récap de
-  succès qui suit.
+  hoquet qui se répare ne doit rien coûter à l'utilisateur. Un mail d'échec
+  prématuré ne ferait plus taire le récap de succès (`claimNotify` laisse
+  passer la réparation, cf. § « `notifiedAt` est un droit de parole »), mais
+  il annoncerait un problème qui n'a pas eu lieu, puis se corrigerait :
+  deux mails pour un non-événement.
 - **Définitif** (réponse illisible) — jamais réessayé : l'entrée ne changera
   pas, et brûler 20 minutes de backoff ne fait que retarder l'information.
 
@@ -4390,6 +4392,45 @@ son « bien reçu ». Rien n'est perdu — la ligne reste dans la file
 `/app/all/reports` — mais plus aucun mail ne le signale. Pas de garde-fou
 en base (on ne bloque pas le désabonnement du dernier abonné) : à 3 users
 la file est regardée.
+
+## `notifiedAt` est un droit de parole, pas un compteur d'envois (ALB-145)
+
+`inboundEmails.notifiedAt` est la **seule** barrière anti-doublon des récaps,
+et elle est posée **par ligne**. Deux mutations la remettaient à zéro —
+`reportInbox.reprocess` (« Retraiter ») et `assignCompany` sur une ligne pas
+encore traitée (« Rattacher ») — ce qui paraît logique : on rejoue le
+pipeline, donc on ré-arme la notification. C'est le bug. Chaque clic renvoyait
+un accusé au transféreur, sans plafond : quatre accusés sur un seul transfert
+Corma (17→21/08/2026), trois en deux minutes sur un mail Sant Roch, et ~40
+mails pour une série de lignes retraitées en lot.
+
+La règle est une règle **produit**, pas une optimisation : **un transfert, une
+réponse**. La boîte du transféreur n'est pas un journal de bord ; ce qui se
+passe ensuite dans la file est notre travail, pas le sien.
+
+D'où la mécanique actuelle (`reportNotify.claimNotify`) :
+
+- La claim n'est **jamais** relâchée. `reprocess` et `assignCompany` ne
+  touchent plus à `notifiedAt` — le pipeline se rejoue en silence, le statut
+  de la ligne dans la file EST le retour utilisateur.
+- `notifiedKind` mémorise **ce que le dernier mail a annoncé**. Une ligne dont
+  le dernier mot était un problème (`failure` / `quarantine`) a droit à **un**
+  mail de plus, et uniquement pour dire que c'est passé (`success`). C'est le
+  seul cas où une relance parle.
+- Un second problème après un premier est **muet**. Le tenter serait la
+  régression naturelle (« il faut bien le prévenir que ça coince encore ») :
+  non — la file l'affiche, et c'est exactement ce qui produisait le spam.
+- Une ligne notifiée **avant** l'existence de `notifiedKind` porte un
+  `notifiedAt` sans genre : traitée comme définitive. Un report ancien réparé
+  à la main n'enverra donc rien. Biais assumé vers le silence — le bug corrigé
+  était un excès de mails, pas un manque.
+
+Piège symétrique à ne pas réintroduire : **ré-armer la claim ailleurs**. Toute
+nouvelle action de la file qui « repart de zéro » doit laisser `notifiedAt` en
+place ; si elle a besoin d'un mail, il passe par `claimNotify` avec son `kind`
+et se fait arbitrer là, jamais par un reset. Épinglé par
+`convex/regression.reportNotifyReplay.test.ts` (8 cas), vérifié rouge contre
+l'ancien code.
 
 ## `companyReports.metrics` — des nombres nus, unité stockée ailleurs
 

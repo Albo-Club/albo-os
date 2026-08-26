@@ -157,6 +157,19 @@ C'est ce qui permet de confier le transfert des reports à quelqu'un sans
 jamais lui envoyer les erreurs — il reçoit toujours le même accusé de
 réception, et les problèmes atterrissent chez ceux qui tiennent la file.
 
+**Un transfert, une réponse — et c'est tout.** Ce que tu fais ensuite dans
+la file te regarde, pas la personne qui a transféré le mail. « Retraiter »
+et « Rattacher » rejouent tout le circuit **en silence** : sa boîte n'est
+pas un journal de bord, et retraiter cinquante lignes d'un coup ne doit pas
+lui faire cinquante mails. Le résultat de la relance se lit là où tu l'as
+déclenchée — dans la file, où le statut de la ligne se met à jour.
+
+Une seule exception, et c'est la bonne nouvelle : quand une ligne qui avait
+annoncé un problème finit par passer, le transféreur reçoit **un** dernier
+mail pour le lui dire. Il avait été prévenu que ça coinçait, il est prévenu
+que c'est réglé. Une relance qui échoue encore, elle, ne dit rien : la
+personne n'a rien à faire de ce constat, et la file l'affiche déjà.
+
 **Un incident passager ne te dérange plus.** Il arrive que la lecture
 échoue pour une raison qui n'a rien à voir avec le mail : la requête vers
 l'IA est coupée en route, le service est saturé. Dans ce cas le report
@@ -176,7 +189,10 @@ elle-même sont rangés normalement.
 > **Sous le capot** — L'email est enregistré intégralement dès son
 > arrivée, avant tout traitement : si une étape échoue, rien n'est perdu
 > et « Retraiter » rejoue le circuit de zéro. L'adresse est hébergée chez
-> AgentMail, qui notifie Albo OS à chaque email et envoie les récaps.
+> AgentMail, qui notifie Albo OS à chaque email et envoie les récaps. Le
+> droit de parole d'un mail est posé une fois pour toutes, avec ce qu'il a
+> annoncé : c'est ce qui rend les relances muettes et laisse quand même
+> passer le mail de réparation.
 
 ## Ajouter un report à la main
 
