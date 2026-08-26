@@ -27,6 +27,7 @@ import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { internalAction, internalMutation, internalQuery } from './_generated/server'
 import { replyToMessage, sendMessage } from './agentmail'
+import { transactionTotals } from './deals'
 import {
   reportConfirmationHtml,
   reportDuplicateHtml,
@@ -184,15 +185,23 @@ export const entityCards = internalQuery({
       if (!company || !org) continue
 
       // Fiche figures: one company can carry several deals (Eben Home has
-      // three). Total committed + first investment date — the per-line detail
-      // is one click away on the fiche.
+      // three). What went out + when it started — the per-line detail is one
+      // click away on the fiche.
+      //
+      // The figure is "Versé", summed from the bank movements reconciled
+      // against each deal (`transactionTotals`, the app's own definition), NOT
+      // the commitment: 275 of CALTE's 280 deals carry no `committedAmount`,
+      // so keying this line on it left it blank on nearly every report.
       const deals = await ctx.db
         .query('deals')
         .withIndex('by_org_target', (q) =>
           q.eq('orgId', ref.orgId).eq('targetCompanyId', ref.companyId),
         )
         .collect()
-      const committed = deals.reduce((sum, d) => sum + (d.committedAmount ?? 0), 0)
+      let paid = 0
+      for (const deal of deals) {
+        paid += (await transactionTotals(ctx, deal._id)).paidActual
+      }
       const dates = deals
         .map((d) => d.investmentDate ?? d.signedDate)
         .filter((d): d is number => typeof d === 'number')
@@ -219,7 +228,7 @@ export const entityCards = internalQuery({
         url: siteUrl()
           ? `${siteUrl()}/app/${org.slug}/participations/${company._id}`
           : null,
-        committedCents: committed > 0 ? committed : undefined,
+        paidCents: paid > 0 ? paid : undefined,
         firstInvestmentAt: dates.length > 0 ? Math.min(...dates) : undefined,
         previousPeriod: recent[1]?.reportPeriod,
         synthesis: ai?.executive_summary

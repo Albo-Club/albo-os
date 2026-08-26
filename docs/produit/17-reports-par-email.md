@@ -130,8 +130,8 @@ report périodique de la même période.
 réponse dans son propre fil. Elle contient :
 
 - la **société**, son logo et l'organisation où le report a été rangé ;
-- la **fiche** en une ligne — total engagé, date du premier investissement,
-  période du report précédent ;
+- la **fiche** en une ligne — le **versé** (ce qui est réellement sorti en
+  banque, au centime), depuis quand, et la période du report précédent ;
 - **ce que dit ce report**, en trois points ;
 - **où en est la boîte** : la carte de synthèse IA de la fiche — note de
   santé et verdict, résumé, points forts et points de vigilance, les trois
