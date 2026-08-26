@@ -247,6 +247,7 @@ export default defineSchema({
     notifyBankConnection: v.optional(v.boolean()),
     notifyIndexFailure: v.optional(v.boolean()),
     notifyReportIssues: v.optional(v.boolean()),
+    notifyReportAdded: v.optional(v.boolean()),
     notifyWeeklyReports: v.optional(v.boolean()),
   }).index('by_user', ['userId']),
 
@@ -1206,7 +1207,12 @@ export default defineSchema({
     // Absent on rows notified before this field existed — treated as final
     // (silence), because the bug this closes was an excess of mail.
     notifiedKind: v.optional(
-      v.union(v.literal('success'), v.literal('failure'), v.literal('quarantine')),
+      v.union(
+        v.literal('success'),
+        v.literal('duplicate'),
+        v.literal('failure'),
+        v.literal('quarantine'),
+      ),
     ),
     // Automatic recovery from a TRANSIENT model failure (aborted request,
     // provider saturation). The step is carried alongside the counter so each

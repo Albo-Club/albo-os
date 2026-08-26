@@ -13,6 +13,7 @@ import {
   setAlertPref,
 } from './lib/notificationPrefs'
 import { MAX_SILENCE_MONTHS, MIN_SILENCE_MONTHS } from './lib/reportFreshness'
+import { isLastReportIssueRecipient, reportIssueRecipients } from './lib/reportRecipients'
 import { setLastOrgSlug } from './lib/userPrefs'
 import { resolveAvatarUrl, resolveLogoUrl } from './lib/storage'
 import type { DataModel, Id } from './_generated/dataModel'
@@ -93,8 +94,32 @@ export const setMemberAlertPref = mutation({
         .unique()
       if (!target) throw new ConvexError('not_found')
     }
+    // The report problem mails must always land somewhere: the notice a
+    // forwarder gets on failure promises the team was told. Emptying the list
+    // would make that a lie and lose the failure entirely.
+    if (kind === 'reportIssues' && !enabled && (await isLastReportIssueRecipient(ctx, userId))) {
+      throw new ConvexError('last_report_recipient')
+    }
+
     await setAlertPref(ctx, userId, kind, enabled)
     return null
+  },
+})
+
+/**
+ * Who currently receives the report pipeline's problem mails, spelled out
+ * under the alert matrix. Reading a column of ticks to work out whether
+ * anybody is on duty is exactly how a list ends up empty without anyone
+ * noticing.
+ */
+export const listReportIssueRecipients = query({
+  args: { orgId: v.id('organizations') },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgMember(ctx, orgId)
+    return (await reportIssueRecipients(ctx)).map((r) => ({
+      userId: r.userId,
+      name: r.name ?? r.email,
+    }))
   },
 })
 

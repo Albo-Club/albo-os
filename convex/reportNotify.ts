@@ -3,19 +3,24 @@
  * no Resend in this pipeline).
  *
  * Routing rule: the decision lives in `lib/reportRouting.ts:routeRecap`
- * (channel follows the gesture, content follows the role — see there). The
- * sender is re-checked as a member AT SEND TIME, and a non-member is NEVER
- * replied to, so the address cannot be probed.
+ * (channel follows the gesture, content follows the role, audience follows
+ * the event — see there). The sender is re-checked as a member AT SEND TIME,
+ * and a non-member is NEVER replied to, so the address cannot be probed.
  *
  * Idempotent: `notifiedAt` is claimed transactionally before sending, so
- * scheduler retries never double-send. One claim covers BOTH sends of a
- * problem (the forwarder's thread reply and the fresh mail to the other
- * handlers) — they happen in the same action run.
+ * scheduler retries never double-send. One claim covers EVERY send of one
+ * outcome (the forwarder's thread reply, the fresh mail to the other
+ * handlers, the copy broadcast to the org) — they happen in the same run.
  *
  * The claim is NEVER released. Replaying a row from the queue ("Retraiter" /
  * "Rattacher") re-runs the whole pipeline in silence: the forwarder sent one
  * email and gets one answer, however many times the row is re-processed
  * afterwards. The single exception is the good news — see `claimNotify`.
+ *
+ * Every mail is built PER RECIPIENT: it carries committed amounts and fiche
+ * links, so the entities it lists are scoped to the organizations that
+ * recipient actually belongs to (`entityCards`). Two people can receive the
+ * same report announcement and legitimately see different lines.
  */
 
 import { v } from 'convex/values'
@@ -23,30 +28,61 @@ import { internal } from './_generated/api'
 import { internalAction, internalMutation, internalQuery } from './_generated/server'
 import { replyToMessage, sendMessage } from './agentmail'
 import {
+  reportConfirmationHtml,
+  reportDuplicateHtml,
   reportQuarantineHtml,
   reportRecapFailureHtml,
-  reportRecapSuccessHtml,
-  reportReceiptHtml,
+  reportSoftFailureHtml,
   reviewReasonLabel,
 } from './emailTemplates'
 import { wantsAlert } from './lib/notificationPrefs'
+import { reportIssueRecipients } from './lib/reportRecipients'
+import { recapKindValidator, reportSendArgs } from './lib/reportNotifyArgs'
 import { routeRecap } from './lib/reportRouting'
-import type { RecapMetric, RecapSuspicious } from './emailTemplates'
+import type { ReportEntityCard } from './emailTemplates'
+import type { Id } from './_generated/dataModel'
+
+/** One tile of `companyIntelligence.aiAnalysis.top_insights`. The column is
+ *  `v.any()` in the schema, so the shape is named here rather than inferred. */
+type AiInsight = {
+  label?: string
+  current_value?: string
+  trend?: string
+  trend_direction?: 'up' | 'down' | 'stable'
+  context?: string
+}
 
 function siteUrl(): string {
   return (process.env.SITE_URL ?? '').replace(/\/$/, '')
 }
 
-// ─── Queries / mutations ─────────────────────────────────────────────────────
-
-const recapKindValidator = v.union(
-  v.literal('success'),
-  v.literal('failure'),
-  v.literal('quarantine'),
-)
+/**
+ * Outbound inbox. A manual upload carries a placeholder inbox id (the row is
+ * not an email — cf. KNOWN_ISSUES "inboundEmails contient des lignes qui ne
+ * sont PAS des emails"), so a broadcast about one has to fall back to the
+ * configured inbox.
+ */
+function outboundInbox(rowInboxId: string): string {
+  return rowInboxId === 'manual-upload'
+    ? (process.env.AGENTMAIL_INBOX_ID ?? rowInboxId)
+    : rowInboxId
+}
 
 /**
- * Claim the notification slot; false when the row has already had its say.
+ * Hotlinked company logo, same source as the app's `CompanyLogo`. Null without
+ * a domain or a token — the template then falls back to the initial, so a
+ * missing env var costs a letter, never a broken image.
+ */
+function logoUrl(domain: string | undefined): string | null {
+  const token = process.env.LOGO_DEV_TOKEN ?? process.env.VITE_LOGO_DEV_TOKEN
+  if (!domain || !token) return null
+  return `https://img.logo.dev/${domain}?token=${token}&size=128&format=png`
+}
+
+// ─── Queries / mutations ─────────────────────────────────────────────────────
+
+/**
+ * Claim the notification slot, and report what the row's last word was.
  *
  * The first outcome always goes out. After that the guard holds through every
  * replay, with ONE exception: a row whose last word was a problem may speak
@@ -56,21 +92,29 @@ const recapKindValidator = v.union(
  *
  * A row notified before `notifiedKind` existed carries no outcome; it is
  * treated as final. Erring toward silence is deliberate here.
+ *
+ * `previousKind` is what lets the confirmation say "the report that was stuck
+ * is now filed" instead of reading like an ordinary first answer.
  */
 export const claimNotify = internalMutation({
   args: { inboundEmailId: v.id('inboundEmails'), kind: recapKindValidator },
-  handler: async (ctx, { inboundEmailId, kind }): Promise<boolean> => {
+  handler: async (
+    ctx,
+    { inboundEmailId, kind },
+  ): Promise<{ claimed: boolean; previousKind?: string }> => {
     const row = await ctx.db.get('inboundEmails', inboundEmailId)
-    if (!row) return false
+    if (!row) return { claimed: false }
     if (row.notifiedAt) {
-      if (kind !== 'success') return false
-      if (row.notifiedKind !== 'failure' && row.notifiedKind !== 'quarantine') return false
+      if (kind !== 'success') return { claimed: false }
+      if (row.notifiedKind !== 'failure' && row.notifiedKind !== 'quarantine') {
+        return { claimed: false }
+      }
     }
     await ctx.db.patch('inboundEmails', inboundEmailId, {
       notifiedAt: Date.now(),
       notifiedKind: kind,
     })
-    return true
+    return { claimed: true, previousKind: row.notifiedKind }
   },
 })
 
@@ -81,180 +125,289 @@ export const claimNotify = internalMutation({
  *
  * This list does double duty in `send`: it is both the recipient list AND
  * the test for "does the sender handle the queue?", which is what decides
- * between the actionable mail and the neutral receipt. The receipt itself is
- * never gated — it answers a gesture its reader just made.
+ * whether their confirmation carries the quality-control block. The
+ * confirmation itself is never gated — it answers a gesture its reader just
+ * made.
  */
 export const listRecipients = internalQuery({
   args: {},
   handler: async (ctx): Promise<Array<string>> => {
-    const memberships = await ctx.db.query('organizationMembers').take(50)
-    const userIds = [...new Set(memberships.map((m) => m.userId))]
-    const emails: Array<string> = []
-    for (const userId of userIds) {
-      if (!(await wantsAlert(ctx, userId, 'reportIssues'))) continue
-      const user = await ctx.db.get('users', userId)
-      if (user?.email) emails.push(user.email)
-    }
-    return [...new Set(emails)]
+    return (await reportIssueRecipients(ctx)).map((r) => r.email)
   },
 })
 
-/** Is this email address an authenticated member? (checked at send time) */
-export const isMemberEmail = internalQuery({
+/** The app user behind an email address, when they are a member. Checked at
+ *  send time so a membership revoked since the forward is honoured. */
+export const memberByEmail = internalQuery({
   args: { email: v.string() },
-  handler: async (ctx, { email }): Promise<boolean> => {
+  handler: async (ctx, { email }): Promise<{ userId: Id<'users'> } | null> => {
     const user = await ctx.db
       .query('users')
       .withIndex('by_email', (q) => q.eq('email', email))
       .first()
-    if (!user) return false
+    if (!user) return null
     const membership = await ctx.db
       .query('organizationMembers')
       .withIndex('by_user', (q) => q.eq('userId', user._id))
       .first()
-    return Boolean(membership)
+    return membership ? { userId: user._id } : null
   },
 })
 
-/** Matched companies enriched with org name + slug (for links). */
-export const companiesWithOrg = internalQuery({
+/**
+ * The entities a given reader may be told about, with everything the
+ * confirmation shows: identity, fiche figures, and the company's AI synthesis.
+ *
+ * Scoped to the reader's own organizations. A report filed in both Calte and
+ * Albo announces only the side the reader belongs to — otherwise the mail
+ * would carry a committed amount the app itself refuses to show them, behind
+ * a link that answers 403.
+ */
+export const entityCards = internalQuery({
   args: {
     refs: v.array(v.object({ companyId: v.id('companies'), orgId: v.id('organizations') })),
+    userId: v.id('users'),
   },
-  handler: async (ctx, { refs }) => {
-    const out: Array<{ name: string; orgName: string; url: string | null }> = []
+  handler: async (ctx, { refs, userId }): Promise<Array<ReportEntityCard>> => {
+    const out: Array<ReportEntityCard> = []
     for (const ref of refs) {
+      const membership = await ctx.db
+        .query('organizationMembers')
+        .withIndex('by_org_and_user', (q) => q.eq('orgId', ref.orgId).eq('userId', userId))
+        .unique()
+      if (!membership) continue
+
       const [company, org] = await Promise.all([
         ctx.db.get('companies', ref.companyId),
         ctx.db.get('organizations', ref.orgId),
       ])
       if (!company || !org) continue
-      const base = siteUrl()
+
+      // Fiche figures: one company can carry several deals (Eben Home has
+      // three). Total committed + first investment date — the per-line detail
+      // is one click away on the fiche.
+      const deals = await ctx.db
+        .query('deals')
+        .withIndex('by_org_target', (q) =>
+          q.eq('orgId', ref.orgId).eq('targetCompanyId', ref.companyId),
+        )
+        .collect()
+      const committed = deals.reduce((sum, d) => sum + (d.committedAmount ?? 0), 0)
+      const dates = deals
+        .map((d) => d.investmentDate ?? d.signedDate)
+        .filter((d): d is number => typeof d === 'number')
+
+      // The report that came BEFORE the one just filed: the freshest two, and
+      // we want the second. On a duplicate the newest IS the one re-sent, so
+      // the label can legitimately repeat — it is still the previous period.
+      const recent = await ctx.db
+        .query('companyReports')
+        .withIndex('by_company', (q) => q.eq('companyId', ref.companyId))
+        .order('desc')
+        .take(2)
+
+      const intelligence = await ctx.db
+        .query('companyIntelligence')
+        .withIndex('by_company', (q) => q.eq('companyId', ref.companyId))
+        .unique()
+      const ai = intelligence?.aiAnalysisStatus === 'completed' ? intelligence.aiAnalysis : null
+
       out.push({
         name: company.name,
         orgName: org.name,
-        url: base ? `${base}/app/${org.slug}/participations/${company._id}` : null,
+        logoUrl: logoUrl(company.domain),
+        url: siteUrl()
+          ? `${siteUrl()}/app/${org.slug}/participations/${company._id}`
+          : null,
+        committedCents: committed > 0 ? committed : undefined,
+        firstInvestmentAt: dates.length > 0 ? Math.min(...dates) : undefined,
+        previousPeriod: recent[1]?.reportPeriod,
+        synthesis: ai?.executive_summary
+          ? {
+              score: ai.health_score?.score,
+              scoreLabel: ai.health_score?.label,
+              summary: ai.executive_summary,
+              goodPoints: ai.health_score?.good_points ?? [],
+              badPoints: ai.health_score?.bad_points ?? [],
+              insights: (ai.top_insights ?? []).map((i: AiInsight) => ({
+                label: i.label ?? '',
+                value: i.current_value ?? '',
+                trend: i.trend,
+                direction: i.trend_direction,
+                context: i.context,
+              })),
+            }
+          : undefined,
       })
     }
     return out
   },
 })
 
-// ─── Send ────────────────────────────────────────────────────────────────────
-
-const successPayloadValidator = v.object({
-  // Both absent on a one-off document that covers no period.
-  reportPeriod: v.optional(v.string()),
-  reportType: v.optional(v.string()),
-  matchMethod: v.string(),
-  metricsFound: v.array(v.object({ metricType: v.string(), value: v.number(), unit: v.string() })),
-  suspicious: v.array(
-    v.object({
-      metricType: v.string(),
-      value: v.number(),
-      unit: v.string(),
-      previousValue: v.number(),
-    }),
-  ),
-  unrecognized: v.array(v.string()),
-  missingUsual: v.array(v.string()),
-  // Fiche KPI cible checklist (present when the company defines targets).
-  targets: v.optional(
-    v.array(
-      v.object({
-        metricType: v.string(),
-        found: v.boolean(),
-        value: v.optional(v.number()),
-        unit: v.optional(v.string()),
-      }),
-    ),
-  ),
+/**
+ * Who else in the report's organizations hears that it arrived. The forwarder
+ * is excluded — they already got the answer in their own thread — and so is
+ * anyone who turned the announcement off.
+ */
+export const broadcastTargets = internalQuery({
+  args: {
+    orgIds: v.array(v.id('organizations')),
+    excludeUserId: v.optional(v.id('users')),
+  },
+  handler: async (
+    ctx,
+    { orgIds, excludeUserId },
+  ): Promise<Array<{ userId: Id<'users'>; email: string }>> => {
+    const seen = new Set<string>()
+    const out: Array<{ userId: Id<'users'>; email: string }> = []
+    for (const orgId of [...new Set(orgIds)]) {
+      const members = await ctx.db
+        .query('organizationMembers')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .take(50)
+      for (const m of members) {
+        if (m.userId === excludeUserId) continue
+        if (seen.has(m.userId)) continue
+        seen.add(m.userId)
+        if (!(await wantsAlert(ctx, m.userId, 'reportAdded'))) continue
+        const user = await ctx.db.get('users', m.userId)
+        if (user?.email) out.push({ userId: m.userId, email: user.email })
+      }
+    }
+    return out
+  },
 })
 
-export const send = internalAction({
-  args: {
-    inboundEmailId: v.id('inboundEmails'),
-    kind: v.union(v.literal('success'), v.literal('failure'), v.literal('quarantine')),
-    reason: v.optional(v.string()),
-    success: v.optional(successPayloadValidator),
+/** Display name of the person who forwarded, for the broadcast copy. */
+export const displayNameOf = internalQuery({
+  args: { email: v.string() },
+  handler: async (ctx, { email }): Promise<string> => {
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_email', (q) => q.eq('email', email))
+      .first()
+    return user?.name || email
   },
+})
+
+// ─── Send ────────────────────────────────────────────────────────────────────
+
+export const send = internalAction({
+  args: reportSendArgs,
   handler: async (ctx, { inboundEmailId, kind, reason, success }) => {
-    const claimed: boolean = await ctx.runMutation(internal.reportNotify.claimNotify, {
-      inboundEmailId,
-      kind,
-    })
-    if (!claimed) return null
+    const claim: { claimed: boolean; previousKind?: string } = await ctx.runMutation(
+      internal.reportNotify.claimNotify,
+      { inboundEmailId, kind },
+    )
+    if (!claim.claimed) return null
 
     const row = await ctx.runQuery(internal.reportIdentify.getRow, { inboundEmailId })
     if (!row) return null
 
-    // Manual upload: no AgentMail thread to reply to (the ids are
-    // placeholders), and the user is in front of the company sheet, which
-    // shows the outcome. No recap mail.
-    if (row.origin === 'upload') {
-      console.log(`[reportNotify] ${kind} recap skipped for manual upload ${inboundEmailId}`)
-      return null
-    }
-
     const queueUrl = `${siteUrl()}/app/all/reports`
-    const senderIsMember: boolean = await ctx.runQuery(internal.reportNotify.isMemberEmail, {
-      email: row.fromEmail,
-    })
-
-    let html: string
-    let subject: string
-    if (kind === 'success' && success) {
-      const companies = await ctx.runQuery(internal.reportNotify.companiesWithOrg, {
-        refs: row.matchedCompanies ?? [],
-      })
-      const metricsFound: Array<RecapMetric> = success.metricsFound
-      const suspicious: Array<RecapSuspicious> = success.suspicious
-      html = reportRecapSuccessHtml({
-        companies,
-        reportPeriod: success.reportPeriod,
-        reportType: success.reportType,
-        matchMethod: success.matchMethod,
-        sources: row.sources ?? [],
-        metricsFound,
-        suspicious,
-        unrecognized: success.unrecognized,
-        missingUsual: success.missingUsual,
-        targets: success.targets,
-      })
-      subject = `Albo OS — report rangé : ${success.reportPeriod ?? 'document ponctuel'}`
-    } else if (kind === 'failure') {
-      html = reportRecapFailureHtml(reason ?? 'unknown', queueUrl, row.error)
-      subject = `Albo OS — report non traité (${reviewReasonLabel(reason ?? 'unknown')})`
-    } else {
-      html = reportQuarantineHtml(row.fromEmail, row.subject, reason ?? 'unknown', queueUrl)
-      subject = 'Albo OS — email en quarantaine'
-    }
-
-    const recipients: Array<string> = await ctx.runQuery(
-      internal.reportNotify.listRecipients,
-      {},
+    const refs = row.matchedCompanies ?? []
+    const member: { userId: Id<'users'> } | null = await ctx.runQuery(
+      internal.reportNotify.memberByEmail,
+      { email: row.fromEmail },
     )
+    const recipients: Array<string> = await ctx.runQuery(internal.reportNotify.listRecipients, {})
     // `fromEmail` is lowercased at normalization and `users.email` is
     // lowercase (Better Auth), so a plain match is enough here.
-    const senderHandlesIssues =
-      senderIsMember && recipients.includes(row.fromEmail)
-    const route = routeRecap({ kind, senderIsMember, senderHandlesIssues })
+    const senderHandlesIssues = Boolean(member) && recipients.includes(row.fromEmail)
+    const route = routeRecap({ kind, senderIsMember: Boolean(member), senderHandlesIssues })
 
-    if (route.reply) {
-      const body = route.reply === 'receipt' ? reportReceiptHtml() : html
-      await replyToMessage(row.agentmailInboxId, row.agentmailMessageId, body)
+    // A manual upload has no AgentMail thread to reply to (the ids are
+    // placeholders) and its author is in front of the fiche, which shows the
+    // outcome. No reply — but the rest of the org still hears about it.
+    const canReply = row.origin !== 'upload'
+    const period = success?.reportPeriod
+
+    // ── The forwarder's answer, in their own thread ──────────────────────
+    if (route.reply && canReply) {
+      let body: string | null = null
+      if (route.reply === 'confirmation' && success && member) {
+        const cards: Array<ReportEntityCard> = await ctx.runQuery(
+          internal.reportNotify.entityCards,
+          { refs, userId: member.userId },
+        )
+        body = reportConfirmationHtml({
+          entities: cards,
+          reportPeriod: period,
+          highlights: success.highlights,
+          // They were told it was stuck; say that it no longer is.
+          afterFix: claim.previousKind === 'failure' || claim.previousKind === 'quarantine',
+          quality: route.withQuality
+            ? { ...success.quality, sources: row.sources ?? [] }
+            : undefined,
+        })
+      } else if (route.reply === 'duplicate' && member) {
+        const cards: Array<ReportEntityCard> = await ctx.runQuery(
+          internal.reportNotify.entityCards,
+          { refs, userId: member.userId },
+        )
+        body = reportDuplicateHtml({
+          entityName: cards[0]?.name ?? 'cette participation',
+          reportPeriod: period,
+          url: cards[0]?.url ?? null,
+        })
+      } else if (route.reply === 'alert') {
+        body = reportRecapFailureHtml(reason ?? 'unknown', queueUrl, row.error)
+      } else if (route.reply === 'soft') {
+        body = reportSoftFailureHtml(row.subject, row.receivedAt)
+      }
+      if (body) await replyToMessage(row.agentmailInboxId, row.agentmailMessageId, body)
     }
+
+    // ── The problem mail to the other queue handlers ─────────────────────
     if (route.alertOthers) {
-      // The forwarder, when they handle the queue, already got it in-thread.
+      const html =
+        kind === 'quarantine'
+          ? reportQuarantineHtml(row.fromEmail, row.subject, reason ?? 'unknown', queueUrl)
+          : reportRecapFailureHtml(reason ?? 'unknown', queueUrl, row.error)
+      const subject =
+        kind === 'quarantine'
+          ? 'Albo OS — email en quarantaine'
+          : `Albo OS — report non traité (${reviewReasonLabel(reason ?? 'unknown')})`
       const others = recipients.filter((email) => email !== row.fromEmail)
       if (others.length > 0) {
-        await sendMessage(row.agentmailInboxId, others, subject, html)
+        await sendMessage(outboundInbox(row.agentmailInboxId), others, subject, html)
+      }
+    }
+
+    // ── The announcement to the rest of the organization ─────────────────
+    if (route.broadcast && success) {
+      const forwardedBy: string = await ctx.runQuery(internal.reportNotify.displayNameOf, {
+        email: row.fromEmail,
+      })
+      const targets: Array<{ userId: Id<'users'>; email: string }> = await ctx.runQuery(
+        internal.reportNotify.broadcastTargets,
+        { orgIds: refs.map((r) => r.orgId), excludeUserId: member?.userId },
+      )
+      for (const target of targets) {
+        const cards: Array<ReportEntityCard> = await ctx.runQuery(
+          internal.reportNotify.entityCards,
+          { refs, userId: target.userId },
+        )
+        // Every entity of this report sits outside their organizations.
+        if (cards.length === 0) continue
+        const names = cards.map((c) => c.name).join(', ')
+        await sendMessage(
+          outboundInbox(row.agentmailInboxId),
+          [target.email],
+          `Albo OS — nouveau report ${names}${period ? ` (${period})` : ''}`,
+          reportConfirmationHtml({
+            entities: cards,
+            reportPeriod: period,
+            highlights: success.highlights,
+            forwardedBy,
+          }),
+        )
       }
     }
 
     console.log(
-      `[reportNotify] ${kind} recap for ${row.agentmailMessageId} ` +
-        `(reply=${route.reply ?? 'none'}, alertOthers=${route.alertOthers})`,
+      `[reportNotify] ${kind} for ${row.agentmailMessageId} ` +
+        `(reply=${route.reply ?? 'none'}, alertOthers=${route.alertOthers}, broadcast=${route.broadcast})`,
     )
     return null
   },

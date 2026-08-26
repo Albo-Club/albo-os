@@ -29,6 +29,7 @@ const KINDS = [
   'bankConnection',
   'indexFailure',
   'reportIssues',
+  'reportAdded',
   'weeklyReports',
 ] as const
 
@@ -53,6 +54,12 @@ export function AlertPrefsCard({
     orgId ? { orgId } : 'skip',
   )
   const setPref = useConvexMutation(api.organizations.setMemberAlertPref)
+  // Spelled out under the matrix: reading a column of ticks to work out who is
+  // on duty is exactly how the list ends up empty without anyone noticing.
+  const issueRecipients = useConvexQuery(
+    api.organizations.listReportIssueRecipients,
+    orgId ? { orgId } : 'skip',
+  )
 
   const byUser = new Map(prefs?.map((p) => [p.userId, p.prefs]))
 
@@ -66,6 +73,10 @@ export function AlertPrefsCard({
       await setPref({ orgId, userId, kind, enabled })
     } catch (err) {
       const code = err instanceof ConvexError ? (err.data as string) : ''
+      if (code === 'last_report_recipient') {
+        toast.error(t('settings:alerts.lastRecipient'))
+        return
+      }
       toast.error(
         t(
           code === 'insufficient_role' || code === 'not_found'
@@ -130,6 +141,15 @@ export function AlertPrefsCard({
             </Table>
           </div>
         )}
+        {issueRecipients ? (
+          <p className="text-muted-foreground text-sm">
+            {issueRecipients.length > 0
+              ? t('settings:alerts.issueRecipients', {
+                  names: issueRecipients.map((r) => r.name).join(', '),
+                })
+              : t('settings:alerts.issueRecipientsNone')}
+          </p>
+        ) : null}
         <dl className="text-muted-foreground space-y-2 text-xs">
           {KINDS.map((kind) => (
             <div key={kind}>

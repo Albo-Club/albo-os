@@ -12,6 +12,7 @@
 import { Agent, createThread, stepCountIs } from '@convex-dev/agent'
 import { ConvexError, v } from 'convex/values'
 import { components, internal } from './_generated/api'
+import { reportSendArgs } from './lib/reportNotifyArgs'
 import {
   internalAction,
   internalMutation,
@@ -343,6 +344,33 @@ export const runAnalysis = internalAction({
         status: 'error',
       })
     }
+  },
+})
+
+/**
+ * Re-run the synthesis for every entity of one report fan-out, THEN release
+ * the confirmation mail.
+ *
+ * The mail waits on the analysis on purpose. It carries "where the company
+ * stands", and that block only tells the truth once THIS report has been
+ * folded in — sent at filing time it would describe the previous one. The
+ * cost is a few dozen seconds of delay.
+ *
+ * A failed analysis never holds the mail back: `runAnalysis` swallows its own
+ * errors, and the confirmation then goes out without the synthesis card
+ * rather than not at all.
+ */
+export const runAnalysisBatch = internalAction({
+  args: {
+    refs: v.array(v.object({ companyId: v.id('companies'), orgId: v.id('organizations') })),
+    send: v.optional(v.object(reportSendArgs)),
+  },
+  handler: async (ctx, { refs, send }) => {
+    for (const ref of refs) {
+      await ctx.runAction(internal.intelligence.runAnalysis, ref)
+    }
+    if (send) await ctx.runAction(internal.reportNotify.send, send)
+    return null
   },
 })
 

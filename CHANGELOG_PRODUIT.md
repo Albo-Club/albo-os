@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.192.2 — 26/08/2026 à 11:15 — Rattacher un invité à une organisation sans passer par le mail
+## v1.193.1 — 26/08/2026 à 11:15 — Rattacher un invité à une organisation sans passer par le mail
 
 Quand une invitation reste en attente parce que le mail n'est jamais arrivé
 ou que le lien s'est perdu, l'invité peut désormais être rattaché
@@ -49,6 +49,83 @@ qu'elle crée le sien.
 >   migration force une invitation existante, elle n'invente pas
 >   d'appartenance). Une invitation expirée passe quand même, signalée par
 >   `wasExpired`.
+
+## v1.193.0 — 26/08/2026 à 11:03 — Le mail qui dit vraiment ce que le report raconte
+
+Transférer un investor update donnait jusqu'ici un accusé de deux lignes :
+« bien reçu, ça suit son cours ». Le même message que ça se soit rangé ou
+non — donc un message qui pouvait mentir. Il est remplacé par un vrai mail.
+
+**Quand le report est rangé**, tu reçois la société et son logo,
+l'organisation où il a été rangé, la ligne de fiche (total investi, date du
+premier investissement, période du report précédent), **ce que dit ce
+report en trois points**, la **carte de synthèse de la boîte** telle qu'elle
+s'affiche sur sa fiche — note de santé, résumé, points forts, points de
+vigilance et les trois KPI suivis — et un bouton qui ouvre la fiche.
+
+Ce mail attend que l'analyse de la boîte soit à jour avant de partir. Il
+arrive quelques dizaines de secondes après le rangement, mais la synthèse
+qu'il porte tient compte du report qu'on vient de recevoir, pas du
+précédent.
+
+**Quand ça coince**, celui qui a transféré reçoit un message court : son
+mail est bien arrivé, il n'a pas pu être rangé, l'équipe a été prévenue et
+s'en occupe. Ni la cause, ni le nom de la société, ni de lien — rien sur
+quoi il pourrait agir. Quand c'est réparé, il reçoit la confirmation
+complète, qui rappelle en une ligne que c'est la suite du blocage. C'est ce
+qui permet de confier l'adresse de transfert à quelqu'un sans jamais lui
+envoyer une erreur technique.
+
+Pour que cette phrase reste vraie, **la liste de ceux qui reçoivent les
+erreurs ne peut plus être vidée** : impossible de décocher la dernière
+personne, et la liste s'affiche désormais en clair sous le tableau des
+alertes, dans Réglages → Membres.
+
+**Les autres membres de l'organisation sont maintenant prévenus** qu'un
+report est arrivé : ils reçoivent le même mail, précédé de qui l'a
+transféré. Ça vaut aussi pour un report déposé à la main depuis une fiche
+société. Une nouvelle case « Nouveaux reports » permet de couper cet envoi.
+
+**Et si vous transférez le même report à deux**, le second reçoit un accusé
+court — « ce report était déjà là, il a été rafraîchi » — et **personne
+d'autre n'est dérangé** : il n'y a pas de nouvelle à annoncer.
+
+> **🔧 Notes techniques**
+>
+> - `emailTemplates.ts` : `reportReceiptHtml()` (sans argument, volontairement
+>   identique succès/échec) est remplacé par `reportConfirmationHtml`,
+>   `reportSoftFailureHtml` et `reportDuplicateHtml`. `reportRecapSuccessHtml`
+>   disparaît au profit de `qualityBlocks()`, désormais un **bloc optionnel**
+>   de la confirmation (`ReportRecapData` → `ReportQuality`). Mise en page en
+>   `<table>` avec hauteurs fixes sur les tuiles KPI ; tokens de marque
+>   convertis en hex (`#009966` / `#e7000b` / `#d27c1b`) et anneau de score SVG
+>   remplacé par un carré bordé — Gmail supprime le SVG des mails reçus.
+> - `lib/reportRouting.ts` : `routeRecap` gagne un troisième axe (`broadcast`)
+>   et le kind `duplicate`. Le canal suit le geste, le contenu suit le rôle
+>   (`withQuality`), l'audience suit l'événement.
+> - `reportStore.storeForCompany` retourne `{ reportId, created }` ; une
+>   fan-out où rien n'a été créé bascule en `kind: 'duplicate'` — pas de
+>   diffusion.
+> - `intelligence.runAnalysisBatch` remplace les `runAnalysis` fire-and-forget
+>   par entité et déclenche l'envoi **à la fin** des analyses. Une analyse en
+>   échec ne retient pas le mail (la confirmation part sans la carte).
+> - `reportNotify` : mails construits **par destinataire**. `entityCards`
+>   filtre sur `organizationMembers` (montants et liens jamais hors org),
+>   agrège les deals via `by_org_target` et lit `companyIntelligence`.
+>   `broadcastTargets` exclut le transféreur et respecte le nouveau kind
+>   `reportAdded`. `claimNotify` retourne `previousKind`, ce qui donne la
+>   ligne « le report qui coinçait est maintenant rangé ».
+> - `lib/reportRecipients.ts` : définition unique des destinataires
+>   `reportIssues`, utilisée par l'envoi, par l'écran et par le garde-fou
+>   `last_report_recipient` dans `organizations.setMemberAlertPref`. Nouvelle
+>   query `listReportIssueRecipients` + lecture en clair dans `AlertPrefsCard`.
+> - Le dépôt manuel (`origin: 'upload'`) ne répond plus « rien à personne » :
+>   pas de fil où répondre, mais la diffusion org a lieu (repli sur
+>   `AGENTMAIL_INBOX_ID`).
+> - Env : poser `LOGO_DEV_TOKEN` (ou `VITE_LOGO_DEV_TOKEN`) côté Convex pour
+>   les logos dans les mails ; sans elle, initiale de la société.
+> - Tests : `regression.reportAudience.test.ts` (10 cas) couvre le routage,
+>   le cloisonnement multi-org, la diffusion et le garde-fou.
 
 ## v1.192.1 — 26/08/2026 à 09:22 — Transférer un report ne remplit plus ta boîte
 

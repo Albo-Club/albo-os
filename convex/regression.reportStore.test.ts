@@ -43,7 +43,7 @@ async function store(
   inboundEmailId: Id<'inboundEmails'>,
   reportPeriod?: string,
 ): Promise<Id<'companyReports'>> {
-  return await t.mutation(internal.reportStore.storeForCompany, {
+  const stored = await t.mutation(internal.reportStore.storeForCompany, {
     companyId,
     orgId,
     inboundEmailId,
@@ -56,6 +56,7 @@ async function store(
     rawMetrics: [],
     canonical: [],
   })
+  return stored.reportId
 }
 
 describe('storeForCompany — period-less reports', () => {
