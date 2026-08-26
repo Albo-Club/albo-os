@@ -12,17 +12,46 @@ export function escapeRegex(s: string): string {
 }
 
 /**
+ * The part of a company name a sender can be expected to write.
+ *
+ * A TRAILING parenthetical is OUR annotation — "(Fund n°2)", "(ex:YEASTY)",
+ * "(renovation man)" — never a word the sponsor puts in its subject, and
+ * repeated spaces are typos. Dropping both is what lets a fiche be named
+ * after the label the sponsor uses while still carrying the note that tells
+ * us which vehicle it is. Only a trailing group goes: "SIDE - ADEQUA
+ * (POTIONS) - AB tasty" keeps its middle one.
+ *
+ * `identityKey` deliberately keeps the FULL name: two entities differing
+ * only by their annotation stay two participations, so a mail naming both
+ * goes to review instead of landing on one of them.
+ */
+function matchableName(name: string): string {
+  return name
+    .replace(/\s*\([^)]*\)\s*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
  * Whole-word company-name lookup in the email text, with emails and URLs
  * stripped first (lesson from Albo App: "alboteam" inside
  * report@alboteam.com must not match a company named Alboteam).
+ *
+ * The lookup is a substring one, on purpose: the name has to be written in
+ * full, but the sender may wrap it in anything — "[Batch Ventures 2025]
+ * ZeroEntropy acquired…", "Batch Ventures YC 2026, LP | Capital Call".
+ * Whitespace collapses on both sides so a name split across two lines by
+ * the mail client still matches.
  */
 export function nameAppearsInText(name: string, subject: string, body: string): boolean {
-  if (name.length < 3) return false
+  const needle = matchableName(name)
+  if (needle.length < 3) return false
   const text = `${subject}\n${body}`
     .toLowerCase()
     .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '')
     .replace(/https?:\/\/\S+/g, '')
-  return new RegExp(`\\b${escapeRegex(name.toLowerCase())}\\b`).test(text)
+    .replace(/\s+/g, ' ')
+  return new RegExp(`\\b${escapeRegex(needle.toLowerCase())}\\b`).test(text)
 }
 
 export interface IdentityCandidate {

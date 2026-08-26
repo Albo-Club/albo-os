@@ -23,6 +23,70 @@ bas de page.
 
 ---
 
+## v1.193.2 — 26/08/2026 à 12:10 — Les reports de fonds retrouvent leur véhicule
+
+Un mail de Batch Ventures annonçant la revente d'une de leurs boîtes
+revenait « Participation introuvable », alors que le fonds est bien au
+portefeuille. Deux raisons, corrigées toutes les deux.
+
+**Le nom de la fiche peut enfin porter votre annotation.** Le circuit
+cherche le nom de la société dans le message ; il devait jusqu'ici y
+figurer au caractère près, annotation comprise. Une fiche nommée « Batch
+Ventures 2025 (Fund n°2) » ne pouvait donc jamais accrocher un mail
+intitulé « [Batch Ventures 2025] … ». Désormais ce qui est **entre
+parenthèses en fin de nom** est ignoré au moment du rattachement : le nom
+sert à reconnaître le message, la parenthèse vous sert à vous. Les espaces
+en double ne bloquent plus rien non plus.
+
+La règle de nommage qui en découle : nommez la fiche comme la société ou le
+sponsor s'appelle lui-même, et mettez votre repère entre parenthèses à la
+fin. C'est ce qui permet aux capital calls envoyés par l'administrateur du
+fonds — depuis un domaine qui n'est ni le vôtre ni celui du fonds — de se
+ranger quand même au bon endroit.
+
+**Un fonds peut être la participation, pas seulement l'expéditeur.**
+Quand un fonds transmettait des nouvelles d'une de ses boîtes, le circuit
+cherchait cette boîte-là. Logique pour un véhicule de co-investissement,
+faux pour un fonds dont vous êtes souscripteur : la boîte citée n'est pas à
+votre portefeuille, le fonds si. Le report se range maintenant sur le
+fonds. Si le fonds a plusieurs millésimes, le mail doit toujours nommer
+celui qui est concerné — sinon direction la file, plutôt qu'un rangement au
+hasard entre deux millésimes.
+
+Inchangé : rien ne se range sans preuve vérifiable, et un mail qui parle de
+la famille (« [Batch Ventures] +11 investissements ») sans nommer de
+véhicule reste dans les Rapports entrants.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/emailIdentify.ts` : `nameAppearsInText` compare désormais
+>   sur `matchableName(name)` — retrait d'un groupe parenthésé **terminal**
+>   (une parenthèse au milieu est conservée : `SIDE - ADEQUA (POTIONS) - AB
+>   tasty`) et réduction des espaces multiples des deux côtés (le texte est
+>   aplati, donc un nom coupé par un retour à la ligne accroche aussi). La
+>   recherche reste mot-entier, déterministe, sans fuzzy — le classement par
+>   proximité de nom reste proscrit comme critère de rattachement.
+> - `identityKey` garde volontairement le nom **complet** : deux entités qui
+>   ne diffèrent que par leur annotation restent deux participations, et un
+>   mail nommant les deux part en `ambiguous`. Aucun impact sur le fan-out
+>   multi-org ni sur la règle des domaines de sponsors.
+> - `convex/reportIdentify.ts` : le prompt d'identification tranche le cas
+>   `is_fund_forward` sur la liste des candidats, les deux lectures étant
+>   exclusives (la cible du report si elle y figure, sinon le fonds
+>   lui-même). La corroboration par domaine n'est plus neutralisée sur un
+>   transfert de fonds — elle ne peut de toute façon corroborer qu'un
+>   candidat dont le domaine **est** celui de l'auteur, donc le fonds ; sur
+>   un domaine portant plusieurs millésimes (`batch.ventures` en porte
+>   quatre) la règle des domaines partagés continue d'exiger le nom.
+> - Tests : `tests/emailIdentify.test.ts` (annotation terminale, parenthèse
+>   médiane, double espace, retour à la ligne, discrimination entre
+>   millésimes, mail « famille » qui ne nomme rien).
+> - Suite : renommer les fiches Batch en prod pour qu'elles portent le
+>   libellé du sponsor, et passer les autres familles (Parallel, Sezame,
+>   Anaxago) au même crible.
+
+---
+
 ## v1.193.1 — 26/08/2026 à 12:03 — Le mail de report annonce le versé, pas l'engagé
 
 Sur le premier report reçu en vrai, la ligne de fiche du mail était vide. Elle
@@ -50,6 +114,8 @@ financé fait disparaître la ligne plutôt que d'annoncer « Versé : 0 € ».
 > - `regression.reportAudience.test.ts` : deux cas neufs — la somme ignore les
 >   entrées et couvre plusieurs deals sans `committedAmount` ; un deal engagé
 >   sans transaction ne produit aucun chiffre.
+
+---
 
 ## v1.193.0 — 26/08/2026 à 11:03 — Le mail qui dit vraiment ce que le report raconte
 
