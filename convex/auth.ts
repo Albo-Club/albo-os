@@ -15,6 +15,7 @@ import {
   verificationEmail,
 } from './emailTemplates'
 import { consumeLimit } from './rateLimiters'
+import { invitationPassword } from './lib/authInvite'
 import type { DataModel } from './_generated/dataModel'
 import type { GenericCtx } from '@convex-dev/better-auth'
 
@@ -63,6 +64,9 @@ export const createAuth = (ctx: GenericCtx<DataModel>) =>
         '/forgot-password': { window: 60, max: 3 },
         '/reset-password': { window: 60, max: 5 },
         '/sign-in/magic-link': { window: 60, max: 3 },
+        // Password claim of an unverified account, gated by an invitation
+        // token (convex/lib/authInvite.ts).
+        '/invitation/set-password': { window: 60, max: 5 },
         '/sign-in/social': { window: 60, max: 10 },
         '/magic-link/verify': { window: 60, max: 5 },
         '/email-verification/send': { window: 60, max: 3 },
@@ -328,6 +332,9 @@ export const createAuth = (ctx: GenericCtx<DataModel>) =>
       // proxy so the authorize flow shares the login page's session cookies.
       // See KNOWN_ISSUES.md « Serveur MCP distant ».
       mcp({ loginPage: '/login' }),
+      // Lets an invitee set their own password on an unverified account,
+      // gated by their invitation token. See convex/lib/authInvite.ts.
+      invitationPassword(ctx),
       convex({ authConfig }),
     ],
   })
