@@ -11,8 +11,11 @@ import type { DataModel, Id } from './_generated/dataModel'
 
 type Ctx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>
 
+// Mirrors `companyKind` in schema.ts — see the note there on why the four
+// sub-types are deprecated in favour of `group_entity`.
 const kindValidator = v.union(
   v.literal('group_root'),
+  v.literal('group_entity'),
   v.literal('group_operating'),
   v.literal('group_sci'),
   v.literal('group_spv'),
@@ -68,7 +71,7 @@ export const list = query({
 export const getById = query({
   args: { id: v.id('companies') },
   handler: async (ctx, { id }) => {
-    const company = await ctx.db.get("companies", id)
+    const company = await ctx.db.get('companies', id)
     if (!company) throw new ConvexError('not_found')
     await requireOrgMember(ctx, company.orgId)
     return company
@@ -123,52 +126,60 @@ async function listBlockingRefs(
   orgId: Id<'organizations'>,
   companyId: Id<'companies'>,
 ) {
-  const [asTarget, asInvestor, asParent, asChild, kpis, accounts, docs, orgDeals] =
-    await Promise.all([
-      ctx.db
-        .query('deals')
-        .withIndex('by_org_target', (q) =>
-          q.eq('orgId', orgId).eq('targetCompanyId', companyId),
-        )
-        .collect(),
-      ctx.db
-        .query('deals')
-        .withIndex('by_org_investor', (q) =>
-          q.eq('orgId', orgId).eq('investorCompanyId', companyId),
-        )
-        .collect(),
-      ctx.db
-        .query('companyRelations')
-        .withIndex('by_parent', (q) =>
-          q.eq('orgId', orgId).eq('parentCompanyId', companyId),
-        )
-        .collect(),
-      ctx.db
-        .query('companyRelations')
-        .withIndex('by_child', (q) =>
-          q.eq('orgId', orgId).eq('childCompanyId', companyId),
-        )
-        .collect(),
-      ctx.db
-        .query('kpiSnapshots')
-        .withIndex('by_company_metric', (q) => q.eq('companyId', companyId))
-        .collect(),
-      ctx.db
-        .query('bankAccounts')
-        .withIndex('by_owner', (q) =>
-          q.eq('orgId', orgId).eq('ownerCompanyId', companyId),
-        )
-        .collect(),
-      ctx.db
-        .query('documents')
-        .withIndex('by_company', (q) => q.eq('companyId', companyId))
-        .collect(),
-      // No index on viaSpvCompanyId: scan the org's deals (low volume).
-      ctx.db
-        .query('deals')
-        .withIndex('by_org', (q) => q.eq('orgId', orgId))
-        .collect(),
-    ])
+  const [
+    asTarget,
+    asInvestor,
+    asParent,
+    asChild,
+    kpis,
+    accounts,
+    docs,
+    orgDeals,
+  ] = await Promise.all([
+    ctx.db
+      .query('deals')
+      .withIndex('by_org_target', (q) =>
+        q.eq('orgId', orgId).eq('targetCompanyId', companyId),
+      )
+      .collect(),
+    ctx.db
+      .query('deals')
+      .withIndex('by_org_investor', (q) =>
+        q.eq('orgId', orgId).eq('investorCompanyId', companyId),
+      )
+      .collect(),
+    ctx.db
+      .query('companyRelations')
+      .withIndex('by_parent', (q) =>
+        q.eq('orgId', orgId).eq('parentCompanyId', companyId),
+      )
+      .collect(),
+    ctx.db
+      .query('companyRelations')
+      .withIndex('by_child', (q) =>
+        q.eq('orgId', orgId).eq('childCompanyId', companyId),
+      )
+      .collect(),
+    ctx.db
+      .query('kpiSnapshots')
+      .withIndex('by_company_metric', (q) => q.eq('companyId', companyId))
+      .collect(),
+    ctx.db
+      .query('bankAccounts')
+      .withIndex('by_owner', (q) =>
+        q.eq('orgId', orgId).eq('ownerCompanyId', companyId),
+      )
+      .collect(),
+    ctx.db
+      .query('documents')
+      .withIndex('by_company', (q) => q.eq('companyId', companyId))
+      .collect(),
+    // No index on viaSpvCompanyId: scan the org's deals (low volume).
+    ctx.db
+      .query('deals')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect(),
+  ])
   return {
     dealsAsTarget: asTarget.length,
     dealsAsInvestor: asInvestor.length,
@@ -193,13 +204,13 @@ const hasBlockingRefs = (refs: Awaited<ReturnType<typeof listBlockingRefs>>) =>
 export const archive = mutation({
   args: { id: v.id('companies') },
   handler: async (ctx, { id }) => {
-    const company = await ctx.db.get("companies", id)
+    const company = await ctx.db.get('companies', id)
     if (!company) throw new ConvexError('not_found')
     await requireOrgMember(ctx, company.orgId)
     if (company.archivedAt != null) return id
     const refs = await listBlockingRefs(ctx, company.orgId, id)
     if (hasBlockingRefs(refs)) throw new ConvexError('company_has_references')
-    await ctx.db.patch("companies", id, { archivedAt: Date.now() })
+    await ctx.db.patch('companies', id, { archivedAt: Date.now() })
     return id
   },
 })
@@ -208,10 +219,10 @@ export const archive = mutation({
 export const restore = mutation({
   args: { id: v.id('companies') },
   handler: async (ctx, { id }) => {
-    const company = await ctx.db.get("companies", id)
+    const company = await ctx.db.get('companies', id)
     if (!company) throw new ConvexError('not_found')
     await requireOrgMember(ctx, company.orgId)
-    await ctx.db.patch("companies", id, { archivedAt: undefined })
+    await ctx.db.patch('companies', id, { archivedAt: undefined })
     return id
   },
 })
@@ -227,7 +238,7 @@ export const restore = mutation({
 export const remove = mutation({
   args: { id: v.id('companies') },
   handler: async (ctx, { id }) => {
-    const company = await ctx.db.get("companies", id)
+    const company = await ctx.db.get('companies', id)
     if (!company) throw new ConvexError('not_found')
     await requireOrgMember(ctx, company.orgId)
     if (company.kind.startsWith('group_')) {
@@ -235,7 +246,7 @@ export const remove = mutation({
     }
     const refs = await listBlockingRefs(ctx, company.orgId, id)
     if (hasBlockingRefs(refs)) throw new ConvexError('company_has_references')
-    await ctx.db.delete("companies", id)
+    await ctx.db.delete('companies', id)
     return { deletedId: id }
   },
 })
@@ -279,12 +290,16 @@ export const update = mutation({
     }),
   },
   handler: async (ctx, { id, patch }) => {
-    const company = await ctx.db.get("companies", id)
+    const company = await ctx.db.get('companies', id)
     if (!company) throw new ConvexError('not_found')
     await requireOrgMember(ctx, company.orgId)
 
     // Guardrail: never demote the org's root entity.
-    if (company.kind === 'group_root' && patch.kind && patch.kind !== 'group_root') {
+    if (
+      company.kind === 'group_root' &&
+      patch.kind &&
+      patch.kind !== 'group_root'
+    ) {
       throw new ConvexError('cannot_change_root_kind')
     }
     // People: full-list replacement. Reject empty names before any write so
@@ -322,7 +337,7 @@ export const update = mutation({
     if (patch.kpiTargets !== undefined) {
       patch.kpiTargets = sanitizeKpiTargets(patch.kpiTargets)
     }
-    await ctx.db.patch("companies", id, patch)
+    await ctx.db.patch('companies', id, patch)
     // Same-domain propagation: a pitch edit applies to every non-archived
     // entity of the org sharing the domain, so they stay identical (product
     // rule — cf. convex/lib/pitch.ts). '' clears propagate too. A vehicle
