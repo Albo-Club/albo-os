@@ -23,6 +23,45 @@ bas de page.
 
 ---
 
+## v1.196.0 — 28/08/2026 à 14:34 — Chaque société du groupe aura son propre espace
+
+Jusqu'ici, les filiales de CALTE — Caltimo, RDB, Relais Chapelle, les SCI,
+Banco 2 — n'existaient que comme des lignes à l'intérieur de l'espace CALTE.
+Sans comptes bancaires à elles, sans bilan, et avec une TVA calculée pour les
+huit sociétés réunies, donc juste pour aucune.
+
+Chacune reçoit maintenant son propre espace, sur le modèle d'Albo Club : ses
+comptes, ses investissements, son capital, ses comptes courants. Les espaces
+restent à plat — aucun n'est « dans » un autre. Ce qui relie deux sociétés du
+groupe, ce sont des liens financiers lisibles des deux côtés : une avance de
+CALTE à une filiale est un investissement chez CALTE et une dette chez la
+filiale.
+
+Cette mise à jour prépare le terrain : elle crée les espaces et n'y touche à
+rien d'autre. Les comptes bancaires des filiales, leurs biens et leurs
+emprunts arrivent ensuite.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle migration one-shot `convex/migrations/createSubsidiaryOrgs.ts`
+>   (`inspect` lecture seule / `apply`) : crée les 7 orgs filiales de `calte`,
+>   y recopie les membres de `calte` avec leur rôle, et y insère une
+>   `companies` `group_root` clonée depuis la ligne source (identité légale
+>   uniquement — `attioCompanyId` et `airtableId` volontairement non clonés).
+>   Idempotente et **strictement additive** : aucune ligne existante n'est
+>   modifiée.
+> - `inspect` remonte par filiale `dealsAsInvestor` et `bankAccountsOwned` :
+>   les deux compteurs qui conditionnent une éventuelle reclassification de la
+>   ligne source de `group_*` vers `portfolio` (un investisseur de deal et un
+>   propriétaire de compte doivent être `group_*`). Non fait ici — décision
+>   séparée.
+> - Doc : `CLAUDE.md` § « Modèle multi-org » réécrit (1 société juridique =
+>   1 org, orgs à plat, pourquoi le passif le supposait déjà et pourquoi la
+>   TVA était fausse) ; nouvelle section `KNOWN_ISSUES.md` sur ce que la
+>   création des orgs ne règle pas (les 7,8 M€ d'avances restent des deals
+>   `cca`, l'écran Participations ne lit que les `deals`, Powens est par org) ;
+>   `MIGRATIONS.md` + `docs/produit/01` et `02` mis à jour.
+
 ## v1.195.1 — 26/08/2026 à 20:41 — Le garde-fou qui empêchait un build cassé était rangé dans un tiroir que plus personne n'ouvre
 
 Rien de visible dans l'app. Une consigne interne qui protège l'application

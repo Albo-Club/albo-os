@@ -2744,6 +2744,45 @@ TVA récupérable. Pas un module de déclaration.
   donne la position cumulée, pas le solde restant à récupérer après
   déclarations.
 
+## Une org par société juridique — et ce que la création des orgs ne règle pas
+
+Décision ALB-128 : **une société = une org**, orgs **à plat** (pas d'org mère,
+pas d'héritage de droits — le garde-fou `requireOrgMember` n'est pas touché).
+Ce qui relie deux sociétés du groupe vit au passif : `equityPositions` pour le
+capital, `intercompanyLoans` pour les comptes courants. Le raisonnement
+complet est dans `CLAUDE.md` § « Modèle multi-org ».
+
+- **Une filiale existe à deux endroits** : sa propre org (une `companies`
+  `group_root`) et sa ligne dans `calte`. Ce n'est pas un doublon à nettoyer —
+  c'est le patron d'Albo Club, en prod depuis le début. Les deux lignes
+  partagent le SIREN (l'unicité est **par org**, index `by_org_siren`) ; en
+  revanche `attioCompanyId` / `airtableId` ne sont **jamais** clonés, ils
+  ancrent une ligne et une seule.
+- **La ligne source reste une entité `group_*` de `calte`.**
+  `migrations/createSubsidiaryOrgs` est strictement additive : elle ne
+  rebascule pas la ligne en `portfolio`, parce qu'une entité `group_*` peut
+  porter des deals **comme investisseur** et **posséder des comptes
+  bancaires**, deux choses qui exigent un `group_*` dans leur org
+  (`assertInvestorIsGroupEntity`, `bankAccounts.ownerCompanyId`). Son
+  `inspect` renvoie les deux compteurs (`dealsAsInvestor`,
+  `bankAccountsOwned`) : tant qu'ils ne sont pas à 0, la reclassification
+  demanderait de déplacer ces lignes d'abord — une opération inter-org, pas
+  un changement de champ (cf. `migrations/reassignDealOrg`, 100 lignes pour
+  **un** deal encore `pending`).
+- **Créer les orgs ne déplace pas les 7,8 M€ d'avances.** Elles restent des
+  deals `cca` dans `calte` tant qu'un chantier dédié ne les a pas basculées en
+  `intercompanyLoans` — c'est cette bascule, pas la création des orgs, qui les
+  fera apparaître en dette côté filiale.
+- **Une avance en C/C est un ACTIF côté prêteur.** La page Passif l'affiche
+  déjà des deux côtés avec le signe inversé (+ créance / − dette), mais
+  l'écran Participations ne lit que les `deals` : faire apparaître une avance
+  parmi les investissements de CALTE demande de lui apprendre à lire aussi les
+  `intercompanyLoans`. Non fait à ce jour.
+- **Powens est par org** (`powensUsers`, `powensConnections`) : une filiale =
+  son propre user Powens et ses propres connexions bancaires. Rien n'était
+  connecté pour les filiales avant ALB-128, donc il n'y a pas de reprise à
+  faire — seulement des branchements à créer.
+
 ## Passif — `equityPositions` / `intercompanyLoans` / soldes dérivés (`convex/liabilities.ts`)
 
 Le passif (capitaux propres + C/C d'associés) est modélisé par deux tables

@@ -26,16 +26,21 @@ Le passage de relais est automatisé : quand un deal atteint le stage
 (pending) ; quand il passe « Invested », il devient *actif*. Les détails sont
 dans [Intégrations](15-integrations.md).
 
-## Un véhicule d'investissement = une organisation
+## Une société = une organisation
 
-Chaque véhicule est une **organisation** distincte dans Albo OS, avec ses
-propres données, cloisonnées des autres :
+Chaque société du groupe est une **organisation** distincte dans Albo OS,
+avec ses propres données, cloisonnées des autres : ses comptes bancaires, ses
+investissements, son capital et ses comptes courants. CALTE, Albo Club, et
+chacune des filiales — Caltimo, RDB, Relais Chapelle, les SCI, Banco 2 — ont
+la leur.
 
-- l'organisation **calte** : CALTE et ses entités (Caltimo, RDB, Relais
-  Chapelle, les SCIs, Banco 2…) ;
-- l'organisation **albo** : Albo Club.
+Les organisations sont **à plat** : aucune n'est « dans » une autre. Ce qui
+relie deux sociétés du groupe, ce sont des liens financiers, lisibles des
+deux côtés : le capital détenu et les comptes courants. Une avance de CALTE à
+une de ses filiales est donc un investissement du côté de CALTE, et une dette
+du côté de la filiale — le même euro, vu des deux bords.
 
-Créer un nouveau véhicule d'investissement = créer une nouvelle organisation.
+Créer une nouvelle société = créer une nouvelle organisation.
 Un utilisateur peut être membre de plusieurs organisations et bascule de
 l'une à l'autre via le sélecteur en haut de la barre latérale. Une
 [vue consolidée](12-vue-consolidee.md) en lecture seule agrège toutes les
