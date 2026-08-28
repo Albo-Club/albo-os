@@ -187,14 +187,29 @@ Albo OS = OS de pilotage du family office **CALTE** + holding d'invest
 - Ponts conservés en base : `attioCompanyId` / `attioDealId` (strings,
   uniqueness gérée côté mutation, pas au schéma).
 
-**Modèle multi-org (1 véhicule d'invest = 1 organisation)** :
+**Modèle multi-org (1 société juridique = 1 organisation)** :
 
-- Chaque véhicule est une **organisation Better Auth distincte** : org `calte`
-  (CALTE + Caltimo + RDB + Relais Chapelle + SCIs + Banco 2) et org `albo`
-  (Albo Club). Une nouvelle entité d'invest = une **nouvelle org**.
+- Chaque société du groupe est une **org distincte** : `calte`, `albo`, et les
+  sept filiales CALTE (`caltimo`, `rdb`, `relais-chapelle`, `sci-chapelle`,
+  `sci-chapelle-2`, `sci-upload`, `banco-2` — créées par
+  `migrations/createSubsidiaryOrgs`). Une nouvelle société = une **nouvelle
+  org**. Le critère est la **personnalité morale**, pas le fait d'investir :
+  le format d'une org (investissements + trésorerie + capitaux propres) est
+  celui d'un bilan, et les tables du passif le supposent déjà
+  (`intercompanyLoans` relie deux **orgs** et rejette `same_org`). Une org par
+  société est aussi ce qui rend la TVA juste — `getVatPosition` somme **toute
+  l'org**, donc une position par société.
+- Les orgs sont **à plat** : aucune n'est « dans » une autre, il n'y a pas
+  d'org mère. Ce qui relie deux sociétés du groupe, ce sont des **liens de
+  passif** (`equityPositions` pour le capital, `intercompanyLoans` pour les
+  comptes courants), lisibles des deux côtés — patron déjà en place entre
+  CALTE et Albo. Corollaire : **pas de vue consolidée groupe** hors
+  `/app/all`, et une org à la fois pour le pointage comme pour l'agent IA.
 - `companies.kind = "group_*"` = les **entités juridiques** d'une org (sa
   racine `group_root` + sous-entités) ; `portfolio` = les boîtes investies.
-  Ne pas confondre l'**org** (le véhicule) avec ses `companies`.
+  Ne pas confondre l'**org** (la société) avec ses `companies` : une filiale
+  existe donc à deux endroits — sa propre org (`group_root`) et sa ligne dans
+  `calte`. C'est voulu, et c'est déjà le cas d'Albo Club.
 - **Droits par org** via `organizationMembers.role` (owner/admin/member).
 - **Vue agrégée cross-org** (`/app/all`, `convex/aggregate.ts`) : union
   **lecture seule** des deals de **toutes** les orgs dont l'user est membre

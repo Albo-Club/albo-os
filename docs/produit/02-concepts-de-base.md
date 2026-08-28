@@ -2,7 +2,7 @@
 
 ## Organisations et rôles
 
-Une **organisation** = un véhicule d'investissement (voir la
+Une **organisation** = une société du groupe (voir la
 [vue d'ensemble](01-vue-densemble.md)). Toutes les données métier — deals,
 sociétés, transactions, prévisionnel, passif — appartiennent à une
 organisation et ne sont visibles que par ses membres.
@@ -21,16 +21,19 @@ donne accès à l'administration de la plateforme entière.
 Toutes les sociétés vivent dans le même annuaire, mais deux natures se
 distinguent :
 
-- **Entités du groupe** : les sociétés juridiques *du véhicule lui-même* — la
-  holding racine (CALTE, Albo Club), les sociétés opérationnelles, les SCI,
-  les SPV du groupe, la société de gestion. Ce sont elles qui investissent :
-  **l'investisseur d'un deal est toujours une entité du groupe**. Elles ne
-  peuvent pas être supprimées.
+- **Entités du groupe** : les sociétés juridiques *de l'organisation
+  elle-même* — sa société racine (CALTE dans l'organisation CALTE, Albo Club
+  dans Albo…), et le cas échéant ses SPV. Ce sont elles qui investissent et
+  qui portent les comptes bancaires : **l'investisseur d'un deal est toujours
+  une entité du groupe**. Elles ne peuvent pas être supprimées.
 - **Participations** (portfolio) : les sociétés *dans lesquelles* on a
   investi — startups, fonds, SPV externes, SCPI.
 
-À ne pas confondre : l'**organisation** est le véhicule (le contenant) ; les
-**entités du groupe** sont ses sociétés juridiques (le contenu).
+À ne pas confondre : l'**organisation** est l'espace (le contenant) ; les
+**entités du groupe** sont les sociétés juridiques qui y vivent (le contenu).
+Une filiale apparaît donc à deux endroits : dans son organisation à elle, et
+dans celle de CALTE au titre de ce que CALTE y a investi. C'est voulu — c'est
+déjà le cas d'Albo Club.
 
 ## Conventions de données
 
