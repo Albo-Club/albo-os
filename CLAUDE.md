@@ -210,6 +210,17 @@ Albo OS = OS de pilotage du family office **CALTE** + holding d'invest
   Ne pas confondre l'**org** (la société) avec ses `companies` : une filiale
   existe donc à deux endroits — sa propre org (`group_root`) et sa ligne dans
   `calte`. C'est voulu, et c'est déjà le cas d'Albo Club.
+- **Trois valeurs de `kind`, pas plus** : `group_root` (la société de l'org,
+  seule valeur `group_*` lue pour elle-même — Attio, passif, migrations),
+  `group_entity` (toute autre entité juridique de l'org, ex. un SPV),
+  `portfolio`. Le seul test qui porte du comportement est
+  `kind.startsWith('group_')` : il décide qui peut être investisseur d'un deal
+  (`assertInvestorIsGroupEntity`) et propriétaire d'un compte
+  (`bankAccounts.ownerCompanyId`). **Ne pas réintroduire de sous-type
+  descriptif** (`group_sci`, `group_manco`…) : quatre ont vécu sans qu'aucun
+  code ne les lise, et ont été repliés par
+  `migrations/collapseGroupKinds`. La nature d'une société se lit dans
+  `legalForm`.
 - **Droits par org** via `organizationMembers.role` (owner/admin/member).
 - **Vue agrégée cross-org** (`/app/all`, `convex/aggregate.ts`) : union
   **lecture seule** des deals de **toutes** les orgs dont l'user est membre

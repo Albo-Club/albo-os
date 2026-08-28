@@ -23,6 +23,39 @@ bas de page.
 
 ---
 
+## v1.196.2 — 28/08/2026 à 16:30 — Une étiquette qui ne servait à rien sur les sociétés du groupe
+
+Chaque société du groupe portait un type — « société d'exploitation », « SCI »,
+« société de gestion » — qui n'avait aucun effet : aucun écran ne l'affichait,
+aucun calcul ne s'en servait, et l'app ne permettait même pas de le choisir.
+Une distinction qui promet quelque chose et ne tient rien finit par tromper.
+
+Ces quatre étiquettes sont repliées en une seule. Ce qui compte reste inchangé :
+une société du groupe peut investir et détenir un compte bancaire, une société
+du portefeuille non. La nature juridique d'une société continue de se lire dans
+sa forme (SAS, SCI, SASU), là où elle a toujours été juste.
+
+Rien ne change à l'écran.
+
+> **🔧 Notes techniques**
+>
+> - Étape 1 d'un purge-then-narrow. `companyKind` (schema.ts) et
+>   `kindValidator` (companies.ts) acceptent désormais **aussi**
+>   `group_entity` ; les quatre valeurs dépréciées restent tolérées le temps
+>   que la donnée soit réécrite.
+> - Nouvelle migration `convex/migrations/collapseGroupKinds.ts`
+>   (`dryRun` / `apply` / `verify`) : réécrit `group_operating`, `group_sci`,
+>   `group_spv` et `group_manco` en `group_entity`. `group_root` et
+>   `portfolio` sont épargnés — seules valeurs lues pour elles-mêmes (Attio,
+>   page Passif, rattachement des reportings). Idempotente.
+> - `verify` est la porte de l'étape 2 : le retrait des quatre littéraux du
+>   schéma ne partira que quand elle renverra `remaining: 0`. L'ordre inverse
+>   ferait échouer le déploiement.
+> - `CLAUDE.md` § Modèle multi-org fixe la règle : trois valeurs de `kind`, et
+>   pas de nouveau sous-type descriptif — la nature se lit dans `legalForm`.
+> - `convex/regression.groupKinds.test.ts` couvre le comptage, la réécriture,
+>   la préservation de `group_root` / `portfolio` et l'idempotence.
+
 ## v1.196.1 — 28/08/2026 à 16:15 — Le compte courant entre CALTE et Albo était à l'envers
 
 L'avance de trésorerie entre CALTE et Albo Club était enregistrée dans le

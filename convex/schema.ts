@@ -52,15 +52,30 @@ export const invitationRoleValidator = v.union(
 // (one org per investment vehicle), no longer by a field. The aggregated
 // view (convex/aggregate.ts) unions the user's orgs.
 
+/**
+ * Only the `group_*` / `portfolio` split carries behaviour: a deal's investor
+ * and a bank account's owner must be `group_*`, and the app splits the two
+ * lists on the same test (`kind.startsWith('group_')`). `group_root` is the
+ * one group value read on its own — it is how an org finds its own company
+ * (Attio term sheets, the Passif page, the migrations).
+ *
+ * The former sub-types (`group_operating` / `group_sci` / `group_spv` /
+ * `group_manco`) described the nature of the company and nothing ever read
+ * them; they are being collapsed into `group_entity` by
+ * `migrations/collapseGroupKinds`, and will be dropped from this union once
+ * no row carries them (purge-then-narrow — cf. KNOWN_ISSUES.md).
+ */
 const companyKind = v.union(
   // Root of the org (the investment holding: CALTE in the Calte org,
   // Albo Club in the Albo org)
   v.literal('group_root'),
-  // Sub-entities of the group (inherit the scope of their root)
-  v.literal('group_operating'), // Caltimo, Relais Chapelle, RDB
-  v.literal('group_sci'), // SCI Chapelle 1, 2, SCI Upload
-  v.literal('group_spv'), // SPV Eben Home, SPV Hectarea…
-  v.literal('group_manco'), // Banco 2
+  // Any other legal entity of the org (SPVs…)
+  v.literal('group_entity'),
+  // DEPRECATED — collapsed into `group_entity`, kept until the data is clean.
+  v.literal('group_operating'),
+  v.literal('group_sci'),
+  v.literal('group_spv'),
+  v.literal('group_manco'),
   // External
   v.literal('portfolio'), // invested companies, LP funds, SCPI, external mancos
 )
