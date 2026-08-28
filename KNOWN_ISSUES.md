@@ -2812,6 +2812,14 @@ dérivés des transactions pointées (`allocation.kind === 'intercompany_loan'`)
   + dérivation des soldes + UI), pas un simple déplacement de lignes. Constat
   posé pendant `migrations/cleanupCalteImport.ts` ; la granularité d'actifs au
   31/12/2025 (Drive) les classe bien en créances, distinctes des titres.
+- **Un C/C saisi à l'envers ne se voit qu'aux mouvements.** Le sens vit dans
+  `fromOrgId` (créancier) / `toOrgId` (débiteur), et rien ne le vérifie à la
+  création. Le symptôme : les deux soldes dérivés contredisent les rôles —
+  le « créancier » ressort négatif (il a encaissé), le « débiteur » positif
+  (il a décaissé). C'est le cas trouvé sur CALTE ↔ Albo (corrigé par
+  `migrations/fixLoanDirection`, qui expose ce test sous `looksReversed`).
+  Ne pas confondre avec l'écart de pointage ci-dessus : là, les deux signes
+  sont cohérents et seuls les montants divergent.
 - **Pointage public : `liabilities:allocateTransaction` / `deallocateTransaction`.**
   Une tx allouée au passif passe en `matchStatus: 'matched'` **sans `dealId`**
   (elle sort de la file de pointage) ; le détachement la repasse `unmatched`.
