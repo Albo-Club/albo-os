@@ -23,6 +23,39 @@ bas de page.
 
 ---
 
+## v1.196.1 — 28/08/2026 à 16:15 — Le compte courant entre CALTE et Albo était à l'envers
+
+L'avance de trésorerie entre CALTE et Albo Club était enregistrée dans le
+mauvais sens : l'app présentait Albo comme le prêteur et CALTE comme
+l'emprunteur, alors que les mouvements bancaires des deux côtés disent
+l'inverse — c'est CALTE qui a avancé les fonds.
+
+Une fois la correction passée, la somme apparaît comme une créance chez CALTE
+et une dette chez Albo, ce qui est sa nature réelle.
+
+À noter au passage : les deux côtés n'affichent pas le même montant, parce que
+CALTE n'a rattaché que deux mouvements à ce compte courant là où Albo en a
+rattaché six. Ce n'est pas une erreur de l'app — c'est le signal qu'il reste
+des mouvements à pointer côté CALTE.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle migration one-shot `convex/migrations/fixLoanDirection.ts`
+>   (`inspect` / `apply`). `inspect` liste tous les `intercompanyLoans` avec
+>   les deux soldes dérivés (`computeLoanBalanceCents` sur les transactions
+>   allouées de chaque org) et un flag `looksReversed` : vrai quand les deux
+>   signes contredisent les rôles enregistrés.
+> - `apply` intervertit `fromOrgId` / `toOrgId` sur un prêt. Une inversion
+>   n'étant pas idempotente, elle exige `currentFromSlug` / `currentToSlug` et
+>   lève `direction_mismatch` sinon — un second passage échoue au lieu de
+>   remettre l'erreur. Les transactions pointées ne bougent pas : elles visent
+>   le prêt, et chaque solde est re-dérivé depuis les rôles inversés.
+> - `convex/regression.loanDirection.test.ts` couvre la détection, la
+>   correction et le refus du second passage.
+> - `KNOWN_ISSUES.md` § Passif : comment distinguer un sens inversé (les deux
+>   signes se contredisent) d'un simple trou de pointage (signes cohérents,
+>   montants qui divergent).
+
 ## v1.196.0 — 28/08/2026 à 14:34 — Chaque société du groupe aura son propre espace
 
 Jusqu'ici, les filiales de CALTE — Caltimo, RDB, Relais Chapelle, les SCI,
