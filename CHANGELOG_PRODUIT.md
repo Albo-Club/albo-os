@@ -23,6 +23,85 @@ bas de page.
 
 ---
 
+## v1.196.3 — 29/08/2026 à 20:42 — Le cahier des charges du suivi de la dette et des garanties
+
+Albo OS sait dire ce que le groupe possède, pas ce qu'il doit. Aucun prêt
+bancaire n'existe aujourd'hui dans l'application : le capital restant dû de
+chaque société vit dans des tableaux d'amortissement PDF, et personne ne
+peut dire, sans ressortir les actes, combien il reste de marge disponible
+sur un contrat de capitalisation mis en gage pour trois prêts différents.
+
+Ce cahier des charges décrit le module à construire : les prêts contractés
+par chaque société, les garanties qui les couvrent (nantissement,
+hypothèque, privilège de prêteur de deniers, caution, garantie
+d'organisme), les biens immobiliers détenus par les SCI, et la structure
+capitalistique des filiales. Une garantie y est décrite par trois
+informations distinctes — sa forme, l'actif sur lequel elle porte, et qui
+s'engage — ce qui permet enfin de lire la même garantie depuis le prêt,
+depuis l'actif gagé, et depuis la société garante, sans jamais saisir
+l'information deux fois.
+
+Rien n'est développé à ce stade : le document est un plan découpé en sept
+lots livrables, dont le premier répond déjà à « combien cette société
+doit-elle, à qui, jusqu'à quand ». Le patrimoine personnel reste
+explicitement hors de l'application.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau fichier `SPEC.md` à la racine, issu d'une interview de cadrage.
+>   Aucun code applicatif : pas de `convex/`, pas de composant React, pas de
+>   migration.
+> - Modèle retenu : `loans` (paramètres du prêt, sans capital restant dû —
+>   dérivé d'une fonction pure d'amortissement `lib/amortization.ts`, pas de
+>   table d'échéancier), `guarantees` (ligne unique inter-orgs portant forme /
+>   assiette polymorphe / garant, sur le patron polymorphe d'`equityPositions`
+>   et le patron inter-orgs d'`intercompanyLoans`), `properties` +
+>   `propertyValuations`.
+> - `properties.costBasis` : un poste de prix de revient a **une** source —
+>   `manual` ou `flows` — choisie poste par poste, jamais l'addition des deux.
+>   Les champs de montant saisis d'une première version (prix d'achat, frais,
+>   travaux) ont été retirés : ils doublonnaient les flux pointés.
+> - Extensions : deux valeurs sur `allocationKind` (`loan`, `property`), un
+>   `allocation.category` optionnel (six natures pour un bien : acquisition,
+>   frais d'acquisition, travaux, charges, loyer, revente — une transaction
+>   n'est jamais éclatée), `equityPositions.ownershipBps`,
+>   `forecastEntries.loanId`, et le passage de `documents.companyId` en
+>   optionnel — seul changement de contrainte sur une table existante, à
+>   auditer en début de lot 4.
+> - Autorisation : `requireGuaranteeParty` calqué sur `requireLoanParty`
+>   (membre d'au moins une org partie). Les orgs restent à plat, aucun
+>   héritage de droits.
+> - Réemploi assumé : le sélecteur de pointage existant gagne deux groupes
+>   (`liabilities:listOptions` + `lib/liabilityOptions.ts`) ; `forecastEntries`
+>   avec `derivedKey "loan:{id}:{date}"` pour les échéances ; le XIRR des deals
+>   pour le TRI d'un bien revendu ; le patron « transactions rattachées +
+>   réaffectation » des fiches deal pour la fiche prêt — aucun geste de
+>   rattachement nouveau.
+> - UI vérifiée contre le code : la barre latérale a quatre entrées, Immobilier
+>   devient le troisième onglet d'`InvestmentsTabs`. Modules affichés seulement
+>   s'ils contiennent quelque chose ou ont été activés (chantier transverse,
+>   lot 6).
+> - `loans.amortizationKind` ouvre quatre types (annuité constante, capital
+>   constant, in fine, révolving), chacun avec sa formule et sa génération
+>   d'occurrences dans `forecastEntries` — un in fine doit faire apparaître son
+>   ballon à date, pas lissé sur vingt ans. `deferralKind` distingue le différé
+>   partiel du différé total. Le révolving est la seule ligne du module dont le
+>   restant dû est saisi et non dérivé, faute d'échéancier dont le déduire.
+> - `loanRates` (table, pas tableau sur le prêt : la série grandit sans borne
+>   et `loans` est lu en liste) porte les révisions `actual` et les paliers
+>   `forecast`. Taux applicable = dernier `fromDate <= date`, à défaut
+>   `loans.rateBps` — un prêt à taux fixe n'a aucune ligne à saisir.
+> - `guarantees.rank` et un ordre d'affichage par force décroissante, signalé
+>   comme convention de lecture et non comme vérité juridique.
+> - Le test de validation imposé (réinstancier les 10 lignes de l'annexe
+>   fournie) est déroulé ligne par ligne en § 10 : 7 rentrent, 3 sortent par
+>   décision produit assumée, aucune n'échoue par insuffisance du modèle.
+> - `KNOWN_ISSUES.md` gagne une section sur `documents.companyId`, obligatoire
+>   aujourd'hui : le relâcher se déploiera sans broncher côté Convex alors que
+>   tout le code qui suppose le champ présent continuera de compiler et cassera
+>   à l'exécution. Audit des lectures d'abord, schéma ensuite.
+
+---
 ## v1.196.2 — 28/08/2026 à 16:30 — Une étiquette qui ne servait à rien sur les sociétés du groupe
 
 Chaque société du groupe portait un type — « société d'exploitation », « SCI »,

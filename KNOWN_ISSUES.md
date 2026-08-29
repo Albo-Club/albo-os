@@ -5096,3 +5096,31 @@ membre. C'est une **carte d'identité**, jamais un droit d'accès :
 
 Une adresse appartient à une seule personne (refus `email_taken` sinon),
 et l'adresse du groupe ne peut être réclamée par personne (`blocked_address`).
+
+## Un document ne peut se rattacher qu'à une société (`documents.companyId`)
+
+`documents.companyId` est **obligatoire** (`v.id('companies')`, pas
+`v.optional`). Un document ne peut donc exister qu'accroché à une société —
+et à rien d'autre.
+
+Ça passe inaperçu tant qu'on ne documente que des sociétés et des deals
+(`dealId` est optionnel, mais il vient *en plus* de `companyId`, jamais à sa
+place). Ça bloque dès qu'un objet à documenter n'est pas une société : un acte
+de prêt, un acte de nantissement, un compromis de vente. Aucun d'eux n'a de
+société-cible au sens portfolio, et il n'existe aucune valeur de `companyId`
+honnête à leur donner.
+
+**Le piège n'est pas la contrainte, c'est le sens du changement.** Convex
+accepte d'élargir un champ (requis → optionnel) et refuse de le resserrer.
+Passer `companyId` en optionnel se déploiera donc sans broncher — et c'est
+exactement ce qui rend l'opération dangereuse : **tout le code qui lit
+`doc.companyId` en le supposant présent continuera de compiler**, et cassera à
+l'exécution sur le premier document sans société. Les jointures, les filtres
+par entité, les vues Docs d'une fiche société, la vectorisation par org.
+
+Donc l'ordre : auditer d'abord toutes les lectures de `companyId`, les rendre
+tolérantes à l'absence, et seulement ensuite relâcher le schéma. Jamais
+l'inverse, jamais « en passant » dans une PR qui fait autre chose.
+
+Cf. le cahier des charges Dette & Garanties, qui bute dessus pour attacher un
+acte de prêt à un prêt.
