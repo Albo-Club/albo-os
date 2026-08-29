@@ -51,25 +51,39 @@ explicitement hors de l'application.
 > - Nouveau fichier `SPEC.md` à la racine, issu d'une interview de cadrage.
 >   Aucun code applicatif : pas de `convex/`, pas de composant React, pas de
 >   migration.
-> - Modèle proposé : `loans` (paramètres du prêt, sans capital restant dû —
->   dérivé d'une fonction pure d'amortissement, pas de table d'échéancier),
->   `guarantees` (ligne unique inter-orgs portant forme / assiette
->   polymorphe / garant, sur le patron `intercompanyLoans`), `properties` +
->   `propertyValuations`. Extensions : deux valeurs sur `allocationKind`
->   (`loan`, `property`), `equityPositions.ownershipBps`,
+> - Modèle retenu : `loans` (paramètres du prêt, sans capital restant dû —
+>   dérivé d'une fonction pure d'amortissement `lib/amortization.ts`, pas de
+>   table d'échéancier), `guarantees` (ligne unique inter-orgs portant forme /
+>   assiette polymorphe / garant, sur le patron polymorphe d'`equityPositions`
+>   et le patron inter-orgs d'`intercompanyLoans`), `properties` +
+>   `propertyValuations`.
+> - `properties.costBasis` : un poste de prix de revient a **une** source —
+>   `manual` ou `flows` — choisie poste par poste, jamais l'addition des deux.
+>   Les champs de montant saisis d'une première version (prix d'achat, frais,
+>   travaux) ont été retirés : ils doublonnaient les flux pointés.
+> - Extensions : deux valeurs sur `allocationKind` (`loan`, `property`), un
+>   `allocation.category` optionnel (six natures pour un bien : acquisition,
+>   frais d'acquisition, travaux, charges, loyer, revente — une transaction
+>   n'est jamais éclatée), `equityPositions.ownershipBps`,
 >   `forecastEntries.loanId`, et le passage de `documents.companyId` en
 >   optionnel — seul changement de contrainte sur une table existante, à
->   auditer.
+>   auditer en début de lot 4.
 > - Autorisation : `requireGuaranteeParty` calqué sur `requireLoanParty`
 >   (membre d'au moins une org partie). Les orgs restent à plat, aucun
 >   héritage de droits.
-> - Réemploi assumé : `forecastEntries` avec `derivedKey "loan:{id}:{date}"`
->   pour les échéances, le XIRR des deals pour le TRI d'un bien revendu, le
->   patron « plan vs réel » des royalties pour l'échéancier.
+> - Réemploi assumé : le sélecteur de pointage existant gagne deux groupes
+>   (`liabilities:listOptions` + `lib/liabilityOptions.ts`) ; `forecastEntries`
+>   avec `derivedKey "loan:{id}:{date}"` pour les échéances ; le XIRR des deals
+>   pour le TRI d'un bien revendu ; le patron « transactions rattachées +
+>   réaffectation » des fiches deal pour la fiche prêt — aucun geste de
+>   rattachement nouveau.
+> - UI vérifiée contre le code : la barre latérale a quatre entrées, Immobilier
+>   devient le troisième onglet d'`InvestmentsTabs`. Modules affichés seulement
+>   s'ils contiennent quelque chose ou ont été activés (chantier transverse,
+>   lot 6).
 > - Le test de validation imposé (réinstancier les 10 lignes de l'annexe
 >   fournie) est déroulé ligne par ligne en § 10 : 7 rentrent, 3 sortent par
->   décision produit, 1 dépend d'une question restée ouverte (emprunteur
->   hors groupe).
+>   décision produit assumée, aucune n'échoue par insuffisance du modèle.
 
 ---
 ## v1.196.2 — 28/08/2026 à 16:30 — Une étiquette qui ne servait à rien sur les sociétés du groupe
