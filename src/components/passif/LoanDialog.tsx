@@ -38,6 +38,9 @@ const KINDS = [
 
 const STATUSES = ['active', 'repaid', 'cancelled'] as const
 
+/** Projection horizon of the loan instalments, aligned with the cash tab. */
+const FORECAST_MONTHS = 24
+
 /** Today's date as `YYYY-MM-DD` (default value of the date fields). */
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -123,6 +126,13 @@ export function LoanDialog({
   const reportError = useReportError('passif')
   const createLoan = useConvexMutation(api.loans.create)
   const updateLoan = useConvexMutation(api.loans.update)
+  // Every save re-projects the schedule into the forecast (idempotent per
+  // derivedKey), exactly as saving a forecast rule re-runs `expandRules`.
+  // « Corriger » recomputes everything, so a stale instalment must not
+  // survive in the projection.
+  const expandLoanSchedules = useConvexMutation(
+    api.forecasts.expandLoanSchedules,
+  )
 
   const [label, setLabel] = useState(loan?.label ?? '')
   const [lenderName, setLenderName] = useState(loan?.lenderName ?? '')
@@ -224,6 +234,7 @@ export function LoanDialog({
         await createLoan({ orgId, ...fields })
         toast.success(t('passif:create.debt.success'))
       }
+      await expandLoanSchedules({ orgId, horizonMonths: FORECAST_MONTHS })
       onClose()
     } catch (err) {
       reportError(err)

@@ -437,6 +437,7 @@ export async function expandLoanSchedulesForOrgs(
   let created = 0
   let updated = 0
   let skippedProtected = 0
+  let removedStale = 0
 
   for (const oid of orgIds) {
     const loans = await ctx.db
@@ -477,6 +478,7 @@ export async function expandLoanSchedulesForOrgs(
       if (schedule.length === 0) continue
       loansProcessed += 1
 
+      const liveKeys = new Set<string>()
       for (const row of schedule) {
         // Only the future: a past instalment is a bank movement, and its
         // place is the matching queue, not the projection.
@@ -487,6 +489,7 @@ export async function expandLoanSchedulesForOrgs(
         if (amountCents <= 0) continue
 
         const derivedKey = loanDerivedKey(loan._id, row.date)
+        liveKeys.add(derivedKey)
         const existing = await ctx.db
           .query('forecastEntries')
           .withIndex('by_derivedKey', (q) => q.eq('derivedKey', derivedKey))
@@ -525,10 +528,27 @@ export async function expandLoanSchedulesForOrgs(
           updated += 1
         }
       }
+
+      // « Corriger » overwrites the terms and recomputes everything (C7), so
+      // an instalment the new schedule no longer produces must not survive as
+      // a ghost in the projection. Only PRISTINE future occurrences are
+      // dropped: a hand-edited, realized or cancelled entry is a human
+      // decision and is left alone, exactly as expandRules leaves it alone.
+      const derived = await ctx.db
+        .query('forecastEntries')
+        .withIndex('by_loan', (q) => q.eq('loanId', loan._id))
+        .collect()
+      for (const entry of derived) {
+        if (entry.date < now) continue
+        if (entry.overridden || entry.status !== 'pending') continue
+        if (entry.derivedKey && liveKeys.has(entry.derivedKey)) continue
+        await ctx.db.delete('forecastEntries', entry._id)
+        removedStale += 1
+      }
     }
   }
 
-  return { loansProcessed, created, updated, skippedProtected }
+  return { loansProcessed, created, updated, skippedProtected, removedStale }
 }
 
 /**

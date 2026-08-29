@@ -25,6 +25,9 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 
+/** Projection horizon of the loan instalments, aligned with the cash tab. */
+const FORECAST_MONTHS = 24
+
 /** `YYYY-MM-DD` → midnight UTC, per the schema's date convention. */
 const dateInputToMs = (value: string) => Date.parse(`${value}T00:00:00.000Z`)
 
@@ -46,6 +49,11 @@ export function LoanRateDialog({
   const { t } = useTranslation(['passif', 'common'])
   const reportError = useReportError('passif')
   const addRate = useConvexMutation(api.loans.addRate)
+  // A rate step moves every instalment after it, so the projection is
+  // rebuilt — same stance as saving the loan itself.
+  const expandLoanSchedules = useConvexMutation(
+    api.forecasts.expandLoanSchedules,
+  )
 
   const [fromDate, setFromDate] = useState(
     new Date().toISOString().slice(0, 10),
@@ -68,6 +76,7 @@ export function LoanRateDialog({
         rateBps,
         kind,
       })
+      await expandLoanSchedules({ horizonMonths: FORECAST_MONTHS })
       toast.success(t('passif:loan.rates.success'))
       onClose()
     } catch (err) {

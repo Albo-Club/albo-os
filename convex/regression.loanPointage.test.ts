@@ -326,6 +326,66 @@ describe('loan instalments in the cash forecast', () => {
     expect(balloon!.amountCents).toBeGreaterThan(6_600_000_00)
   })
 
+  test('correcting a loan drops the instalments it no longer produces', async () => {
+    const { t, user, org, loanId } = await setup()
+    await user.as.mutation(api.forecasts.expandLoanSchedules, {
+      orgId: org.orgId,
+      horizonMonths: 24,
+    })
+    const before = await t.run(async (ctx) =>
+      ctx.db.query('forecastEntries').collect(),
+    )
+    expect(before.length).toBeGreaterThan(12)
+
+    // « Corriger » shortens the loan: it now ends before the horizon, so the
+    // instalments past the new term must not survive as ghosts (C7).
+    await user.as.mutation(api.loans.update, {
+      loanId,
+      status: 'active',
+      ...terms(Date.now()),
+      durationMonths: 18,
+    })
+    const rerun = await user.as.mutation(api.forecasts.expandLoanSchedules, {
+      orgId: org.orgId,
+      horizonMonths: 24,
+    })
+    expect(rerun.removedStale).toBeGreaterThan(0)
+    const after = await t.run(async (ctx) =>
+      ctx.db.query('forecastEntries').collect(),
+    )
+    expect(after.length).toBeLessThan(before.length)
+  })
+
+  test('a hand-edited instalment survives the purge', async () => {
+    const { t, user, org, loanId } = await setup()
+    await user.as.mutation(api.forecasts.expandLoanSchedules, {
+      orgId: org.orgId,
+      horizonMonths: 24,
+    })
+    // Protect the LAST future occurrence — the one a shortened term drops.
+    const protectedId = await t.run(async (ctx) => {
+      const rows = await ctx.db.query('forecastEntries').collect()
+      rows.sort((a, b) => b.date - a.date)
+      await ctx.db.patch('forecastEntries', rows[0]._id, { overridden: true })
+      return rows[0]._id
+    })
+    await user.as.mutation(api.loans.update, {
+      loanId,
+      status: 'active',
+      ...terms(Date.now()),
+      durationMonths: 18,
+    })
+    await user.as.mutation(api.forecasts.expandLoanSchedules, {
+      orgId: org.orgId,
+      horizonMonths: 24,
+    })
+    const survivor = await t.run(async (ctx) =>
+      ctx.db.get('forecastEntries', protectedId),
+    )
+    // A human decision is never undone by a regeneration.
+    expect(survivor).not.toBeNull()
+  })
+
   test('a settled loan projects nothing', async () => {
     const { t, user, org, loanId } = await setup()
     await user.as.mutation(api.loans.update, {
