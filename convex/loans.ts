@@ -400,10 +400,11 @@ export const update = mutation({
 })
 
 /**
- * Deletes a loan. Refused while transactions are still matched to it
- * (`has_allocations`, same guardrail as a current account) or while
- * documents hang off it (`has_documents`) — a deed must never be orphaned
- * in silence.
+ * Deletes a loan. Refused while guarantees still point at it
+ * (`has_guarantees`, C11 — detach them first), while transactions are
+ * matched to it (`has_allocations`, same guardrail as a current account),
+ * or while documents hang off it (`has_documents`) — a deed must never be
+ * orphaned in silence.
  */
 export const remove = mutation({
   args: { loanId: v.id('loans') },
@@ -411,6 +412,12 @@ export const remove = mutation({
     const loan = await ctx.db.get('loans', loanId)
     if (!loan) throw new ConvexError('not_found')
     await requireOrgMember(ctx, loan.orgId)
+
+    const guarantee = await ctx.db
+      .query('guarantees')
+      .withIndex('by_loan', (q) => q.eq('loanId', loanId))
+      .first()
+    if (guarantee) throw new ConvexError('has_guarantees')
 
     const allocated = await ctx.db
       .query('transactions')

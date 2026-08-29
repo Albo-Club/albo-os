@@ -122,7 +122,11 @@
     "account_wrong_org": "This bank account belongs to another organization.",
     "rate_is_fixed": "This loan has a fixed rate: there is no revision to enter.",
     "has_documents": "Documents are still attached to this row. Detach them first.",
-    "missing_anchor": "This document must be attached to a company, a deal or a loan."
+    "missing_anchor": "This document must be attached to a company, a deal or a loan.",
+    "ambiguous_borrower": "Choose either a group loan or an outside borrower, not both.",
+    "ambiguous_pledgor": "Choose either a group company or a free-text label, not both.",
+    "missing_subject": "The guarantee's subject is required.",
+    "invalid_rank": "The rank must be at least 1."
   },
   "edit": {
     "equity": {
@@ -241,5 +245,97 @@
       "correct": "Correct",
       "delete": "Delete"
     }
+  },
+  "guarantees": {
+    "title": "Guarantees",
+    "empty": "No guarantee on this loan.",
+    "add": "Add",
+    "form": {
+      "nantissement": "Pledge",
+      "hypotheque": "Mortgage",
+      "ppd": "PPD",
+      "caution": "Surety",
+      "garantie_organisme": "Institutional guarantee"
+    },
+    "formHint": {
+      "ppd": "vendor's lien"
+    },
+    "rank": "rank {{rank}}",
+    "rankFirst": "first rank",
+    "unquantified": "not quantified",
+    "released": "Released",
+    "releasedOn": "released on {{date}}",
+    "actOn": "deed {{date}}",
+    "subjectLabel": "Subject",
+    "pledgorLabel": "guarantor",
+    "pledgorUnknown": "guarantor not recorded",
+    "assetLine": "Asset {{value}} · already pledged {{pledged}} · margin {{margin}}",
+    "assetLineNoValue": "Asset not valued · already pledged {{pledged}}",
+    "unquantifiedNote_one": "{{count}} guarantee not quantified, excluded from the total.",
+    "unquantifiedNote_other": "{{count}} guarantees not quantified, excluded from the total.",
+    "negativeMargin": "The pledged amount exceeds the asset's value.",
+    "sortNote": "Ordered strongest first — a display convention, not a legal truth: a second rank is only worth what is left.",
+    "given": {
+      "title": "Guarantees given",
+      "subtitle": "assets pledged for a third party",
+      "empty": "{{org}} pledges none of its assets.",
+      "forBorrower": "for {{borrower}}"
+    },
+    "onDeal": {
+      "title": "Pledges on this contract",
+      "empty": "This contract is pledged nowhere.",
+      "value": "Current value",
+      "pledged": "Total pledged",
+      "margin": "Available margin",
+      "noValue": "This contract has no valuation: the available margin cannot be computed.",
+      "total": "Total pledged",
+      "beneficiary": "Beneficiary"
+    },
+    "dialog": {
+      "createTitle": "New guarantee",
+      "editTitle": "Edit the guarantee",
+      "description": "Three independent pieces of information: the form of the security, the asset it bites on, and who commits.",
+      "formLabel": "Form",
+      "rankLabel": "Rank (optional)",
+      "amountLabel": "Pledged amount (€)",
+      "amountHint": "Leave empty for an unquantified guarantee (unlimited surety). It will be excluded from the total and listed apart.",
+      "actDateLabel": "Deed date",
+      "beneficiaryLabel": "Beneficiary",
+      "beneficiaryLoan": "A group loan",
+      "beneficiaryExternal": "A borrower outside the group",
+      "borrowerLabelLabel": "Borrower name",
+      "borrowerLabelPlaceholder": "SARL Bremontier",
+      "loanLabel": "Loan",
+      "subjectKindLabel": "Subject",
+      "subjectPlacement": "A placement",
+      "subjectShares": "A company's shares",
+      "subjectExternal": "Nothing of ours",
+      "subjectDealLabel": "Placement",
+      "subjectCompanyLabel": "Company",
+      "subjectLabelLabel": "Subject label",
+      "subjectLabelPlaceholder": "Saccef guarantee",
+      "pledgorKindLabel": "Guarantor",
+      "pledgorOrg": "A group company",
+      "pledgorExternal": "An outside guarantor",
+      "pledgorNone": "Not recorded",
+      "pledgorOrgLabel": "Guaranteeing company",
+      "pledgorLabelLabel": "Guarantor name",
+      "pledgorLabelPlaceholder": "Saccef",
+      "notesLabel": "Notes",
+      "choose": "Choose…",
+      "createSuccess": "Guarantee created",
+      "editSuccess": "Guarantee updated"
+    },
+    "menu": {
+      "release": "Record the release",
+      "unrelease": "Undo the release",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "released_success": "Release recorded",
+    "unreleased_success": "Release undone",
+    "deleteConfirmTitle": "Delete this guarantee?",
+    "deleteConfirmBody": "Deleting erases the row. For a guarantee that has ended, prefer the release: it keeps the history.",
+    "deleteSuccess": "Guarantee deleted"
   }
 }

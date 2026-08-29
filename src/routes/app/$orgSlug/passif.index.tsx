@@ -18,6 +18,7 @@ import {
 } from '~/components/passif/CreateLiabilityDialogs'
 import { EquityTable, LoansTable } from '~/components/passif/PassifTables'
 import { BankDebtTable } from '~/components/passif/BankDebtTable'
+import { GuaranteesGivenSection } from '~/components/passif/GuaranteesGivenSection'
 import { LoanDialog } from '~/components/passif/LoanDialog'
 
 export const Route = createFileRoute('/app/$orgSlug/passif/')({
@@ -57,6 +58,12 @@ function Passif() {
   )
   const accounts = useConvexQuery(
     api.cash.listAccounts,
+    org ? { orgId: org._id } : 'skip',
+  )
+  // Off-balance-sheet: what this company pledged for someone else. Read
+  // from the guarantor side of the very same rows the loans read (D13).
+  const guaranteesGiven = useConvexQuery(
+    api.guarantees.listByPledgorOrg,
     org ? { orgId: org._id } : 'skip',
   )
 
@@ -124,6 +131,11 @@ function Passif() {
           onEdit={setEditEquity}
         />
       </section>
+
+      <GuaranteesGivenSection
+        orgName={org?.name ?? ''}
+        guarantees={guaranteesGiven}
+      />
 
       {org && openDialog === 'debt' && (
         <LoanDialog

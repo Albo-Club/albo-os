@@ -122,7 +122,11 @@
     "account_wrong_org": "Ce compte bancaire appartient à une autre organisation.",
     "rate_is_fixed": "Ce prêt est à taux fixe : il n'y a pas de révision à saisir.",
     "has_documents": "Des documents sont encore rattachés à cette ligne. Détachez-les d'abord.",
-    "missing_anchor": "Ce document doit être rattaché à une société, un deal ou un prêt."
+    "missing_anchor": "Ce document doit être rattaché à une société, un deal ou un prêt.",
+    "ambiguous_borrower": "Choisissez soit un prêt du groupe, soit un emprunteur externe, pas les deux.",
+    "ambiguous_pledgor": "Choisissez soit une société du groupe, soit un libellé libre, pas les deux.",
+    "missing_subject": "L'assiette de la garantie est obligatoire.",
+    "invalid_rank": "Le rang doit être au moins 1."
   },
   "edit": {
     "equity": {
@@ -241,5 +245,97 @@
       "correct": "Corriger",
       "delete": "Supprimer"
     }
+  },
+  "guarantees": {
+    "title": "Garanties",
+    "empty": "Aucune garantie sur ce prêt.",
+    "add": "Ajouter",
+    "form": {
+      "nantissement": "Nantissement",
+      "hypotheque": "Hypothèque",
+      "ppd": "PPD",
+      "caution": "Caution",
+      "garantie_organisme": "Garantie d'organisme"
+    },
+    "formHint": {
+      "ppd": "privilège de prêteur de deniers"
+    },
+    "rank": "{{rank}}e rang",
+    "rankFirst": "1er rang",
+    "unquantified": "non chiffrée",
+    "released": "Mainlevée",
+    "releasedOn": "levée le {{date}}",
+    "actOn": "acte {{date}}",
+    "subjectLabel": "Assiette",
+    "pledgorLabel": "garant",
+    "pledgorUnknown": "garant non renseigné",
+    "assetLine": "Assiette {{value}} · déjà gagée {{pledged}} · marge {{margin}}",
+    "assetLineNoValue": "Assiette non valorisée · déjà gagée {{pledged}}",
+    "unquantifiedNote_one": "{{count}} garantie non chiffrée, exclue du total.",
+    "unquantifiedNote_other": "{{count}} garanties non chiffrées, exclues du total.",
+    "negativeMargin": "Le montant gagé dépasse la valeur de l'actif.",
+    "sortNote": "Triées de la plus forte à la moins forte — convention d'affichage, pas une vérité juridique : un second rang ne vaut que le reliquat.",
+    "given": {
+      "title": "Garanties données",
+      "subtitle": "actifs mis en gage pour un tiers",
+      "empty": "{{org}} ne met aucun de ses actifs en gage.",
+      "forBorrower": "pour {{borrower}}"
+    },
+    "onDeal": {
+      "title": "Nantissements sur ce contrat",
+      "empty": "Ce contrat n'est mis en gage nulle part.",
+      "value": "Valeur actuelle",
+      "pledged": "Total gagé",
+      "margin": "Marge disponible",
+      "noValue": "Ce contrat n'a pas de valorisation : la marge disponible ne peut pas être calculée.",
+      "total": "Total gagé",
+      "beneficiary": "Bénéficiaire"
+    },
+    "dialog": {
+      "createTitle": "Nouvelle garantie",
+      "editTitle": "Modifier la garantie",
+      "description": "Trois informations indépendantes : la forme du gage, l'assiette sur laquelle il porte, et qui s'engage.",
+      "formLabel": "Forme",
+      "rankLabel": "Rang (optionnel)",
+      "amountLabel": "Montant gagé (€)",
+      "amountHint": "Laisser vide pour une garantie non chiffrée (caution illimitée). Elle sera exclue du total et listée à part.",
+      "actDateLabel": "Date de l'acte",
+      "beneficiaryLabel": "Bénéficiaire",
+      "beneficiaryLoan": "Un prêt du groupe",
+      "beneficiaryExternal": "Un emprunteur hors groupe",
+      "borrowerLabelLabel": "Nom de l'emprunteur",
+      "borrowerLabelPlaceholder": "SARL Bremontier",
+      "loanLabel": "Prêt",
+      "subjectKindLabel": "Assiette",
+      "subjectPlacement": "Un placement",
+      "subjectShares": "Les titres d'une société",
+      "subjectExternal": "Rien de chez nous",
+      "subjectDealLabel": "Placement",
+      "subjectCompanyLabel": "Société",
+      "subjectLabelLabel": "Libellé de l'assiette",
+      "subjectLabelPlaceholder": "Garantie Saccef",
+      "pledgorKindLabel": "Garant",
+      "pledgorOrg": "Une société du groupe",
+      "pledgorExternal": "Un garant externe",
+      "pledgorNone": "Non renseigné",
+      "pledgorOrgLabel": "Société garante",
+      "pledgorLabelLabel": "Nom du garant",
+      "pledgorLabelPlaceholder": "Saccef",
+      "notesLabel": "Notes",
+      "choose": "Choisir…",
+      "createSuccess": "Garantie créée",
+      "editSuccess": "Garantie mise à jour"
+    },
+    "menu": {
+      "release": "Enregistrer la mainlevée",
+      "unrelease": "Annuler la mainlevée",
+      "edit": "Modifier",
+      "delete": "Supprimer"
+    },
+    "released_success": "Mainlevée enregistrée",
+    "unreleased_success": "Mainlevée annulée",
+    "deleteConfirmTitle": "Supprimer cette garantie ?",
+    "deleteConfirmBody": "Supprimer efface la ligne. Pour une garantie qui a pris fin, préférez la mainlevée : elle garde l'historique.",
+    "deleteSuccess": "Garantie supprimée"
   }
 }

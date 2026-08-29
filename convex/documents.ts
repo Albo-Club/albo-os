@@ -21,6 +21,7 @@ import { ConvexError, v } from 'convex/values'
 import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import { requireGuaranteeParty } from './guarantees'
 import { deleteStorageText } from './lib/documentTexts'
 
 import type { Id } from './_generated/dataModel'
@@ -200,6 +201,33 @@ export const listByLoan = query({
   },
 })
 
+/** A guarantee's deeds, most recent first. Like a loan's: no company. */
+export const listByGuarantee = query({
+  args: { guaranteeId: v.id('guarantees') },
+  handler: async (ctx, { guaranteeId }) => {
+    const guarantee = await ctx.db.get('guarantees', guaranteeId)
+    if (!guarantee) throw new ConvexError('not_found')
+    await requireGuaranteeParty(ctx, guarantee)
+
+    const rows = await ctx.db
+      .query('documents')
+      .withIndex('by_guarantee', (q) => q.eq('guaranteeId', guaranteeId))
+      .order('desc')
+      .take(200)
+
+    return await Promise.all(
+      rows.map(async (doc) => ({
+        _id: doc._id,
+        title: doc.title,
+        kind: doc.kind,
+        uploadedAt: doc.uploadedAt,
+        ocrState: doc.ocrState ?? null,
+        url: await ctx.storage.getUrl(doc.storageId),
+      })),
+    )
+  },
+})
+
 /** The extracted text of a document — loaded only when the user opens it. */
 export const getExtractedText = query({
   args: { documentId: v.id('documents') },
@@ -228,7 +256,9 @@ export const getExtractedText = query({
  *
  * `companyId` is optional since the Dette & Garanties module — a loan deed
  * has no portfolio company. Every anchor supplied must live in the SAME org,
- * otherwise the row would show on a fiche of another tenant.
+ * otherwise the row would show on a fiche of another tenant. A guarantee is
+ * the one anchor with no org of its own: its deed is filed in the borrower's
+ * org (falling back to the guarantor's), which is where the debt is read.
  */
 export const create = mutation({
   args: {
@@ -237,6 +267,8 @@ export const create = mutation({
     dealId: v.optional(v.id('deals')),
     // Set to attach the document to a bank loan (offer letter, deed).
     loanId: v.optional(v.id('loans')),
+    // Set to attach the document to a guarantee (deed of pledge, mortgage).
+    guaranteeId: v.optional(v.id('guarantees')),
     title: v.string(),
     kind: kindValidator,
     period: v.optional(v.number()),
@@ -251,8 +283,20 @@ export const create = mutation({
     if (args.loanId && !loan) throw new ConvexError('not_found')
     const deal = args.dealId ? await ctx.db.get('deals', args.dealId) : null
     if (args.dealId && !deal) throw new ConvexError('not_found')
+    const guarantee = args.guaranteeId
+      ? await ctx.db.get('guarantees', args.guaranteeId)
+      : null
+    if (args.guaranteeId && !guarantee) throw new ConvexError('not_found')
 
-    const orgId = company?.orgId ?? loan?.orgId ?? deal?.orgId
+    // A guarantee has no org of its own — it spans up to three. Its deed is
+    // filed in the borrower's org, falling back to the guarantor's, so the
+    // row lands where the debt is read from.
+    const guaranteeOrgId =
+      guarantee?.borrowerOrgId ??
+      guarantee?.pledgorOrgId ??
+      guarantee?.subjectOrgId
+    const orgId =
+      company?.orgId ?? loan?.orgId ?? deal?.orgId ?? guaranteeOrgId
     if (!orgId) throw new ConvexError('missing_anchor')
     const { user } = await requireOrgMember(ctx, orgId)
 
@@ -268,6 +312,10 @@ export const create = mutation({
       }
     }
     if (loan && loan.orgId !== orgId) throw new ConvexError('not_found')
+    // A guarantee spans several orgs: the resolved one must be one of them.
+    if (guarantee && guaranteeOrgId !== orgId) {
+      throw new ConvexError('not_found')
+    }
 
     const title = args.title.trim()
     if (!title) throw new ConvexError('invalid_title')
@@ -278,6 +326,7 @@ export const create = mutation({
       companyId: args.companyId,
       dealId: args.dealId,
       loanId: args.loanId,
+      guaranteeId: args.guaranteeId,
       title,
       kind: args.kind,
       period: args.period,

@@ -220,6 +220,31 @@ export const loanRateStepKind = v.union(
   v.literal('forecast'),
 )
 
+// ─── Guarantee enums (guarantees) ───────────────────────────────────────────
+
+// The FORM of a security interest — what kind of hold it gives the lender.
+// Independent of its subject and of its guarantor (SPEC D17): a single field
+// could not say « caution given by CALTE over its own shares ».
+export const guaranteeForm = v.union(
+  v.literal('nantissement'),
+  v.literal('hypotheque'),
+  v.literal('ppd'),
+  v.literal('caution'),
+  v.literal('garantie_organisme'),
+)
+
+// The SUBJECT the security bites on. `external` covers what is not ours at
+// all — an institution's guarantee (Saccef), or a third party's asset.
+//
+// `property` lands with the `properties` table (lot 4): a literal can be
+// added to a union with no migration, whereas declaring a table nothing
+// reads would be dead weight in the schema.
+export const guaranteeSubjectKind = v.union(
+  v.literal('placement'),
+  v.literal('shares'),
+  v.literal('external'),
+)
+
 // Target of a generalized allocation (`transactions.allocation`). Coexists
 // with `dealId`: a deal match writes both (cf. convex/transactions.ts).
 //
@@ -981,6 +1006,8 @@ export default defineSchema({
     dealId: v.optional(v.id('deals')),
     // Bank loan this deed hangs off (offer letter, amortization table).
     loanId: v.optional(v.id('loans')),
+    // Guarantee deed (nantissement, hypothèque, acte de caution).
+    guaranteeId: v.optional(v.id('guarantees')),
     title: v.string(),
     // Company kinds first, then the deal-specific ones. One widened union
     // rather than two columns: which subset is offered is a UI concern.
@@ -1059,6 +1086,7 @@ export default defineSchema({
     .index('by_company', ['companyId', 'uploadedAt'])
     .index('by_deal', ['dealId', 'uploadedAt'])
     .index('by_loan', ['loanId', 'uploadedAt'])
+    .index('by_guarantee', ['guaranteeId', 'uploadedAt'])
     .index('by_org', ['orgId'])
     .index('by_report', ['reportId'])
     // Reading states, oldest first — read by the sweeper that picks up the
@@ -1440,6 +1468,76 @@ export default defineSchema({
     kind: loanRateStepKind,
     notes: v.optional(v.string()),
   }).index('by_loan_from', ['loanId', 'fromDate']),
+
+  /**
+   * guarantees — the link between a debt and the security that covers it.
+   * The central table of the Dette & Garanties module.
+   *
+   * ONE row, THREE independent pieces of information (SPEC D17), and hence
+   * three readings of the very same row (D13) — nothing is stored twice:
+   * - `form` — the kind of hold: nantissement, hypothèque, PPD, caution,
+   *   garantie d'organisme.
+   * - `subject*` — what is pledged. Read from the ASSET's sheet: « this
+   *   contract is pledged for the benefit of SCI Chapelle ».
+   * - `pledgor*` — who commits. Read from the GUARANTOR's page: « I stood
+   *   surety for RDB ».
+   *
+   * The polymorphic pattern is `equityPositions`' (several optional fields
+   * discriminated by a nature field), NOT `transactions.allocation`'s, whose
+   * untyped `targetId: string` would lose the referential integrity that
+   * matters most here.
+   *
+   * A guarantee may cross two orgs (the loan in `sci-chapelle`, the asset in
+   * `calte`), so `requireOrgMember` is not enough on its own:
+   * `requireGuaranteeParty` (convex/guarantees.ts) requires membership of at
+   * least ONE of the parties, mirroring `requireLoanParty`. Orgs stay flat —
+   * no inheritance of rights.
+   *
+   * The beneficiary can be OUTSIDE the group (`borrowerLabel`, SPEC D-QA):
+   * without those rows the available margin on our own asset would be
+   * overstated — an error in our disfavour, and an invisible one.
+   */
+  guarantees: defineTable({
+    // ── Beneficiary: EITHER a group loan, OR an outside borrower ──────────
+    loanId: v.optional(v.id('loans')),
+    // Denormalized from the loan, never taken from an argument — it is what
+    // the `by_borrower_org` index reads.
+    borrowerOrgId: v.optional(v.id('organizations')),
+    borrowerLabel: v.optional(v.string()), // "SARL Bremontier"
+
+    // ── The guarantor: a group company, a free label, or unknown ──────────
+    // Unknown is a real case: the source deeds name a caution without saying
+    // who stands it (SPEC Q-B). A personal caution is a LABEL, never a
+    // person object — no natural person exists in Albo OS (D1, D46).
+    pledgorOrgId: v.optional(v.id('organizations')),
+    pledgorLabel: v.optional(v.string()), // "Saccef", "Clément Alteresco"
+
+    // ── The subject ───────────────────────────────────────────────────────
+    subjectKind: guaranteeSubjectKind,
+    subjectDealId: v.optional(v.id('deals')), // 'placement'
+    subjectCompanyId: v.optional(v.id('companies')), // 'shares'
+    // Org the subject lives in, denormalized from it — a party for the
+    // authorization check.
+    subjectOrgId: v.optional(v.id('organizations')),
+    subjectLabel: v.optional(v.string()), // 'external'
+
+    // ── The pledge ────────────────────────────────────────────────────────
+    form: guaranteeForm,
+    rank: v.optional(v.number()), // 1 = first rank, 2 = second… (D48)
+    // Absent = not quantified (an unlimited caution). EXCLUDED from the
+    // pledged total and listed apart: showing it as 0 would lie (C3).
+    pledgedAmountCents: v.optional(v.number()),
+    actDate: v.optional(v.number()),
+    // Mainlevée. Absent = active. The row STAYS (history) but leaves the
+    // pledged total (C6).
+    releasedAt: v.optional(v.number()),
+    notes: v.optional(v.string()),
+  })
+    .index('by_loan', ['loanId'])
+    .index('by_borrower_org', ['borrowerOrgId'])
+    .index('by_pledgor_org', ['pledgorOrgId'])
+    .index('by_subject_deal', ['subjectDealId'])
+    .index('by_subject_company', ['subjectCompanyId']),
 
   // ─── Liabilities (equity + shareholder current accounts) ──────────────────
 

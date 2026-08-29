@@ -11,6 +11,7 @@ import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { cn } from '~/lib/utils'
 import { LoanDialog } from '~/components/passif/LoanDialog'
+import { LoanGuaranteesSection } from '~/components/passif/LoanGuaranteesSection'
 import { LoanRateDialog } from '~/components/passif/LoanRateDialog'
 import {
   PAGE_SIZE,
@@ -292,6 +293,8 @@ function LoanSheet() {
           }
         />
       </div>
+
+      <LoanGuaranteesSection loanId={loan._id} orgId={loan.orgId} />
 
       {/* Rate series — variable-rate loans only. On a fixed rate there is
           nothing to enter and nothing to maintain (SPEC § 4.1 bis). */}

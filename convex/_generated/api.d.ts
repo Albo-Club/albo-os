@@ -46,6 +46,7 @@ import type * as intelligence from "../intelligence.js";
 import type * as investments from "../investments.js";
 import type * as invitations from "../invitations.js";
 import type * as kpis from "../kpis.js";
+import type * as guarantees from "../guarantees.js";
 import type * as liabilities from "../liabilities.js";
 import type * as loans from "../loans.js";
 import type * as lib_agentScope from "../lib/agentScope.js";
@@ -168,6 +169,7 @@ declare const fullApi: ApiFromModules<{
   investments: typeof investments;
   invitations: typeof invitations;
   kpis: typeof kpis;
+  guarantees: typeof guarantees;
   liabilities: typeof liabilities;
   loans: typeof loans;
   "lib/agentScope": typeof lib_agentScope;
