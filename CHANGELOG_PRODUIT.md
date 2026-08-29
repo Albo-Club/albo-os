@@ -81,9 +81,25 @@ explicitement hors de l'application.
 >   devient le troisième onglet d'`InvestmentsTabs`. Modules affichés seulement
 >   s'ils contiennent quelque chose ou ont été activés (chantier transverse,
 >   lot 6).
+> - `loans.amortizationKind` ouvre quatre types (annuité constante, capital
+>   constant, in fine, révolving), chacun avec sa formule et sa génération
+>   d'occurrences dans `forecastEntries` — un in fine doit faire apparaître son
+>   ballon à date, pas lissé sur vingt ans. `deferralKind` distingue le différé
+>   partiel du différé total. Le révolving est la seule ligne du module dont le
+>   restant dû est saisi et non dérivé, faute d'échéancier dont le déduire.
+> - `loanRates` (table, pas tableau sur le prêt : la série grandit sans borne
+>   et `loans` est lu en liste) porte les révisions `actual` et les paliers
+>   `forecast`. Taux applicable = dernier `fromDate <= date`, à défaut
+>   `loans.rateBps` — un prêt à taux fixe n'a aucune ligne à saisir.
+> - `guarantees.rank` et un ordre d'affichage par force décroissante, signalé
+>   comme convention de lecture et non comme vérité juridique.
 > - Le test de validation imposé (réinstancier les 10 lignes de l'annexe
 >   fournie) est déroulé ligne par ligne en § 10 : 7 rentrent, 3 sortent par
 >   décision produit assumée, aucune n'échoue par insuffisance du modèle.
+> - `KNOWN_ISSUES.md` gagne une section sur `documents.companyId`, obligatoire
+>   aujourd'hui : le relâcher se déploiera sans broncher côté Convex alors que
+>   tout le code qui suppose le champ présent continuera de compiler et cassera
+>   à l'exécution. Audit des lectures d'abord, schéma ensuite.
 
 ---
 ## v1.196.2 — 28/08/2026 à 16:30 — Une étiquette qui ne servait à rien sur les sociétés du groupe

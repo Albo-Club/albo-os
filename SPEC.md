@@ -454,10 +454,10 @@ compromis n'a pas de société-cible au sens portfolio.
 ```
 
 **C'est le seul changement de contrainte sur une table existante, et le seul
-vrai risque du chantier.** Relâcher un champ requis passe côté Convex
-(élargir oui, resserrer non), mais **tout le code qui lit `doc.companyId` en
-le supposant présent doit être audité**. À traiter en début de lot 4, pas en
-passant.
+vrai risque du chantier.** Le détail du piège — pourquoi le sens du changement
+le rend dangereux, et dans quel ordre procéder — est documenté dans
+`KNOWN_ISSUES.md` § « Un document ne peut se rattacher qu'à une société ».
+À traiter en début de lot 4, jamais en passant.
 
 Deux valeurs à ajouter à `documents.kind` : `acte_pret`, `acte_garantie`.
 
