@@ -659,18 +659,66 @@ masquer automatiquement un module vide rendrait impossible la création de son
 
 Chantier **transverse à l'app**, sorti en lot 6.
 
+```
+┌────────────────────┬─────────────────────────────────────────────────────┐
+│ [SC2] SCI Chapelle2│  Investissements                                    │
+│                    │  SCI Chapelle 2                                     │
+│  □ À faire         │                                                     │
+│  ■ Investissements │  [Immobilier]  [⋯]   Entreprises et Placements sont │
+│  □ Trésorerie      │                      masqués : rien dedans          │
+│  □ Passif          │                                                     │
+│                    │  ┌ BIENS ─────────────────── [+ Nouveau bien] ────┐ │
+│  ESPACE DE TRAVAIL │  │ 18 rue de la Chapelle          [Détenu]        │ │
+│  □ Réglages        │  │ Immeuble · Paris 18e · locatif nu    860 000 € │ │
+│  □ Nouveautés      │  ├────────────────────────────────────────────────┤ │
+│                    │  │ 1 bien                              860 000 € │ │
+│  [+ Activer un     │  └────────────────────────────────────────────────┘ │
+│     module]        │                                                     │
+└────────────────────┴─────────────────────────────────────────────────────┘
+```
+
+La barre latérale garde ses **quatre entrées** ; le module n'en ajoute aucune.
+Le ⋯ à côté des sous-onglets permet de réactiver Entreprises ou Placements
+pour y créer un premier élément.
+
 ### 6.3 Passif d'une société — page unique (**D32**)
 
 `/app/$orgSlug/passif` — quatre sections, dans cet ordre (**D39**) :
 
 ```
-Dette bancaire            → total restant dû, en bas de section
-Comptes courants          → solde net, en bas de section
-Capital                   → capital social, en bas de section
-─────────────────────────
-Garanties données         → détachée : ce que cette société met en gage
-                            pour d'autres. Ce n'est pas une dette.
+┌──────────────────────────────────────────────────────────────────────────┐
+│  Passif                                                                  │
+│  Ce que SCI Chapelle doit, et à qui                                      │
+│                                                                          │
+│  ┌ DETTE BANCAIRE ────────────────────────────── [+ Nouveau prêt] ─────┐ │
+│  │ Prêt Palatine 2021                          ● En cours    387 980 € │ │
+│  │ Banque Palatine · 1,85 % · jusqu'en 06/2041  [Nantissement]         │ │
+│  ├──────────────────────────────────────────────────────────────────────┤ │
+│  │ Total restant dû                                          387 980 € │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│  ┌ COMPTES COURANTS ──────────────────────────────── [+ Nouveau] ──────┐ │
+│  │ CALTE ↗ → SCI Chapelle                                − 1 240 000 € │ │
+│  │ Avance de trésorerie · non rémunérée · depuis 03/2021                │ │
+│  ├──────────────────────────────────────────────────────────────────────┤ │
+│  │ Solde net                                             − 1 240 000 € │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│  ┌ CAPITAL ───────────────────────────────────────── [+ Ligne] ────────┐ │
+│  │ Capital social                                            10 000 €  │ │
+│  │ CALTE ↗ 60 % · M. Y 40 % · au 12/03/2019                            │ │
+│  ├──────────────────────────────────────────────────────────────────────┤ │
+│  │ Capital social                                            10 000 €  │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│  ┌ GARANTIES DONNÉES ──── actifs mis en gage pour un tiers ────────────┐ │
+│  │ SCI Chapelle ne met aucun de ses actifs en gage.                     │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
+
+Le bloc « Garanties données » est visuellement **détaché** des trois autres
+(fond atténué) : ce n'est pas une dette, c'est un engagement hors bilan.
 
 **Aucune tuile en tête de page** (**D38**). Un bandeau de chiffres répète ce
 qui suit. Et surtout, un « total dû » qui additionnerait le capital serait
@@ -718,6 +766,73 @@ rattachées et permet de les **réaffecter** via un panneau latéral ; le
 rattachement initial se fait dans la file de Pointage. Aucun geste nouveau
 n'est introduit.
 
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  ← Passif    Prêt Palatine 2021                      ● En cours    [ ⋯ ] │
+│  Banque Palatine · SCI Chapelle · signé le 14/06/2021                    │
+│  ──────────────────────────────────────────────────────────────────────  │
+│  EMPRUNTÉ   RESTANT DÛ   TYPE                TAUX        MENSUALITÉ  ASSUR│
+│  500 000 €  387 980 €    Annuité constante   1,85 % fixe  2 494 €    42 € │
+│  ──────────────────────────────────────────────────────────────────────  │
+│                                                                          │
+│  ┌ GARANTIES ──────────────────────────────────── [+ Ajouter] ─────────┐ │
+│  │ [Nantissement] [1er rang]                                 150 000 € │ │
+│  │ Assiette Concerto Capi n°060 ↗ · garant CALTE ↗ · acte 14/06/2021    │ │
+│  │ ┌ Assiette 1 400 000 € · déjà gagée 950 000 € · marge 450 000 €    ┐ │ │
+│  │ [Caution]                                              non chiffrée │ │
+│  │ Caution personnelle — Clément Alteresco · acte 14/06/2021            │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│  ┌ ÉCHÉANCIER ────────────────── plan calculé · réel pointé ───────────┐ │
+│  │ Échéance    Mensualité  Capital  Intérêts  Restant dû        Réel   │ │
+│  │ 05/11/2026    2 494 €   1 902 €    592 €    382 284 €           —   │ │ ← grisée
+│  │ 05/10/2026    2 494 €   1 899 €    595 €    384 186 €           —   │ │
+│  │ 05/09/2026    2 494 €   1 896 €    598 €    386 084 €           —   │ │
+│  │ 05/08/2026    2 494 €   1 893 €    601 €    387 980 €    à pointer  │ │ ← ambrée
+│  │ 05/07/2026    2 494 €   1 890 €    604 €    389 873 €   2 536,00 €  │ │ ← verte
+│  └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│  ┌ TRANSACTIONS ──────────── rattachées depuis la file de Pointage ────┐ │
+│  │ 05/07/2026  Sortie  2 536,00 €  PRLV PALATINE PRET 8842190          │ │
+│  │ 05/06/2026  Sortie  2 536,00 €  PRLV PALATINE PRET 8842190          │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│  ┌ DOCUMENTS ────────────────────────────────────── [+ Ajouter] ───────┐ │
+│  │ Offre de prêt.pdf · Tableau d'amortissement 2026.pdf                 │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+Le réel (2 536,00 €) ne vaut pas la mensualité du plan (2 494 €) : il inclut
+l'assurance. Les deux colonnes évitent de « corriger » un chiffre juste.
+
+**Variante taux variable / révolving** — la section Taux remplace l'échéancier
+quand il n'y en a pas :
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  ← Passif    Crédit lombard 2023                     ● En cours    [ ⋯ ] │
+│  Neuflize · Banco 2 · adossé au compte-titres n°228                      │
+│  ──────────────────────────────────────────────────────────────────────  │
+│  ENCOURS      PLAFOND       TYPE        TAUX                             │
+│  6 600 000 €  8 000 000 €   Révolving   4,10 % variable                  │
+│  ──────────────────────────────────────────────────────────────────────  │
+│                                                                          │
+│  ┌ TAUX ───────── révisions passées et paliers projetés ─ [+ Palier] ──┐ │
+│  │ À partir du     Taux      Nature                                     │ │
+│  │ 01/01/2028      3,80 %    [Projeté]                                  │ │ ← grisée
+│  │ 01/01/2027      4,00 %    [Projeté]                                  │ │
+│  │ 01/07/2026      4,10 %    ● Constaté                                 │ │
+│  │ 01/04/2026      4,35 %    ● Constaté                                 │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│  ┌ ÉCHÉANCIER ────────────────────────────────────────────────────────┐ │
+│  │ Un crédit révolving n'a pas d'échéancier : seuls les intérêts sur    │ │
+│  │ l'encours sont projetés. Marge de tirage restante : 1 400 000 €.     │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
 ### 6.5 Fiche d'un placement — le bloc ajouté
 
 Sur la fiche placement existante, un bloc « Nantissements sur ce contrat » :
@@ -725,6 +840,31 @@ valeur actuelle, total gagé, marge disponible, puis une ligne par gage — y
 compris ceux qui bénéficient à une autre société du groupe ou à un tiers.
 
 C'est l'écran qui porte la valeur principale du module (U3).
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  Concerto Capi n°060                                  [Nanti]     [ ⋯ ]  │
+│  Contrat de capitalisation · CALTE · non liquide                         │
+│  ──────────────────────────────────────────────────────────────────────  │
+│  VALEUR ACTUELLE      TOTAL GAGÉ        MARGE DISPONIBLE                 │
+│  1 400 000 €          950 000 €         450 000 €                        │
+│  ──────────────────────────────────────────────────────────────────────  │
+│                                                                          │
+│  ┌ NANTISSEMENTS SUR CE CONTRAT ───────────────────────────────────────┐ │
+│  │ CALTE — Prêt Neuflize                                     300 000 € │ │
+│  │ Même espace · acte du 02/2020                                        │ │
+│  │ SCI Chapelle — Prêt Palatine 2021 ↗                        150 000 € │ │
+│  │ Autre espace du groupe · acte du 06/2021                             │ │
+│  │ SARL Bremontier                                           500 000 € │ │
+│  │ Emprunteur hors groupe · acte du 11/2022                             │ │
+│  ├──────────────────────────────────────────────────────────────────────┤ │
+│  │ Total gagé                                                950 000 € │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+La troisième ligne est la raison d'être de **D-QA** : sans elle l'app
+afficherait 950 000 € de marge au lieu de 450 000 €.
 
 ### 6.6 Onglet Immobilier
 
@@ -739,6 +879,55 @@ C'est l'écran qui porte la valeur principale du module (U3).
 - **Emprunt lié & sûreté**.
 - **Documents** (**D33**).
 
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  18 rue de la Chapelle                                [Détenu]    [ ⋯ ]  │
+│  Immeuble · Paris 18e · locatif nu · acquis le 09/02/2019                │
+│  ──────────────────────────────────────────────────────────────────────  │
+│  PRIX DE REVIENT   VALEUR 03/2026   PLUS-VALUE LATENTE   RENDEMENT NET   │
+│  742 000 €         860 000 €        + 118 000 €          5,8 %           │
+│  ──────────────────────────────────────────────────────────────────────  │
+│                                                                          │
+│  ┌ PRIX DE REVIENT ─── un seul montant par poste · une seule source ───┐ │
+│  │ Poste                    Montant          Source                     │ │
+│  │ Acquisition              658 800,00 €     [Saisi]                    │ │
+│  │ Frais d'acquisition       18 300,00 €     [Saisi]                    │ │
+│  │ Travaux                   64 900,00 €     ● 4 flux                   │ │
+│  ├──────────────────────────────────────────────────────────────────────┤ │
+│  │ Prix de revient          742 000,00 €                                │ │
+│  ├──────────────────────────────────────────────────────────────────────┤ │
+│  │ Acquis en 2019, avant la connexion bancaire — les deux premiers      │ │
+│  │ postes sont saisis. Les travaux de 2024 viennent des virements.      │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│  ┌ EXPLOITATION ──── 12 mois glissants · uniquement des flux pointés ──┐ │
+│  │ Loyers encaissés                                       58 200,00 €  │ │
+│  │ Charges payées                                       − 14 900,00 €  │ │
+│  ├──────────────────────────────────────────────────────────────────────┤ │
+│  │ Résultat net                                           43 300,00 €  │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│  ┌ VALORISATIONS ──────────────────────────── [+ Estimation] ──────────┐ │
+│  │ Mars 2026      Estimation agence                          860 000 € │ │
+│  │ Février 2025   Estimation agence                          815 000 € │ │
+│  │ Février 2019   Prix d'acquisition                         610 000 € │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│  ┌ EMPRUNT LIÉ & SÛRETÉ ───────────────────────────────────────────────┐ │
+│  │ Prêt Crédit Mutuel 2019 ↗                                 368 400 € │ │
+│  │ Restant dû · jusqu'en 02/2039                                        │ │
+│  │ [PPD] privilège de prêteur de deniers · garant SCI Chapelle 2        │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│  ┌ DOCUMENTS ────────────────────────────────────── [+ Ajouter] ───────┐ │
+│  │ Acte de vente.pdf · Devis travaux toiture.pdf                        │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+La colonne **Source** est l'interrupteur : cliquer dessus bascule le poste
+entre `Saisi` et `N flux`. Un seul montant est affiché, jamais deux.
+
 ### 6.7 Le geste de pointage
 
 Le sélecteur **existe déjà** dans la file de Pointage, avec ses groupes Deals /
@@ -747,6 +936,33 @@ Capitaux propres / Comptes courants (`convex/liabilities.ts:listOptions` +
 
 Le seul élément réellement nouveau est le choix de la **nature de la dépense**
 quand la cible est un bien (§ 4.6).
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  VIR SCP NOTAIRES CHAPELLE                              − 658 800,00 €   │
+│  09/02/2019 · Compte Crédit Mutuel ····2210                              │
+│                                                                          │
+│  RATTACHER À                          NATURE DE LA DÉPENSE               │
+│  ┌────────────────────────────┐       ┌──────────────────────────────┐   │
+│  │ Rechercher…                │       │ [Acquisition] ← sélectionné  │   │
+│  │ ── Deals ───────────────── │       │ [Frais d'acquisition]        │   │
+│  │   Anaxago — Duhesme        │       │ [Travaux]                    │   │
+│  │ ── Prêts ──────── NOUVEAU  │       │ [Charges]                    │   │
+│  │   Crédit Mutuel 2019       │       │                              │   │
+│  │ ── Biens ──────── NOUVEAU  │       │ Si transaction entrante :    │   │
+│  │ ▸ 18 rue de la Chapelle    │       │ [Loyer]  [Revente]           │   │
+│  │ ── Capitaux propres ────── │       └──────────────────────────────┘   │
+│  │   Capital social           │                                          │
+│  │ ── Comptes courants ────── │       Une transaction, un bien, UNE      │
+│  │   CALTE → SCI Chapelle     │       seule nature. Ce virement couvre   │
+│  └────────────────────────────┘       le prix et les droits : il part    │
+│                                       en Acquisition, on ne le découpe   │
+│                                       pas.                               │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+Rien n'est proposé, rien n'est pré-sélectionné, rien n'est classé par
+vraisemblance : l'app liste, l'utilisateur choisit.
 
 ### 6.8 Onglet « À faire » (**D19**)
 
