@@ -79,7 +79,13 @@ différencié (**D2**).
   pointage, les soldes et la TVA.
 - **La bascule des 7,8 M€ d'avances CALTE → filiales** (**D30**) — chantier
   de données à part.
-- **L'échéancier multi-périodes** (avenant, renégociation) — lot 5 (**D35**).
+- **La renégociation avec historique** (garder l'avant et l'après d'un avenant)
+  — lot 5 (**D35**). À ne pas confondre avec un taux variable, qui est géré
+  dès le lot 1 (**D47**) : réviser un taux prévu au contrat n'est pas
+  renégocier le contrat.
+- **La récupération automatique d'un index de taux** (Euribor…) — **D47**,
+  cf. Q-F.
+- **Les covenants bancaires** (ratios LTV, DSCR imposés par le prêteur).
 - **La gestion locative** au sens métier : quittances, appels de loyer,
   relances, indexation IRL, états des lieux. Un bien est suivi comme un actif,
   pas comme un bail.
@@ -109,12 +115,17 @@ loans
   principalCents     number                montant emprunté
   signedDate         number                ms epoch
   firstPaymentDate   number                ms epoch
-  durationMonths     number
-  rateBps            number                taux nominal (1100 = 11 %)
+  durationMonths     number?               absent pour un révolving
+  amortizationKind   'constant_annuity' | 'constant_capital'
+                     | 'bullet' | 'revolving'          ← D45
+  creditLimitCents   number?               plafond autorisé (révolving seulement)
+  rateBps            number                taux À LA SIGNATURE (1100 = 11 %)
   rateKind           'fixed' | 'variable'
   insuranceMonthlyCents  number?           assurance emprunteur, cents/mois
   paymentFrequency   'monthly' | 'quarterly'
   deferralMonths     number?               différé d'amortissement
+  deferralKind       'partial' | 'total'?  partiel = intérêts payés ;
+                                           total = intérêts capitalisés  ← D45
   bankAccountId      Id<'bankAccounts'>?   compte de prélèvement (même org)
   status             'active' | 'repaid' | 'cancelled'
   notes              string?
@@ -123,6 +134,66 @@ loans
   .index('by_org_status', ['orgId', 'status'])
   .index('by_bank_account', ['bankAccountId'])
 ```
+
+**Les quatre types d'amortissement** (**D45**) — sans eux, le lot 1 ne saurait
+saisir qu'une minorité des prêts du groupe :
+
+| Type | Ce qu'on paie | Restant dû | Champs requis |
+|---|---|---|---|
+| `constant_annuity` | Mensualité fixe, part de capital croissante | Calculé | `durationMonths` |
+| `constant_capital` | Capital fixe (`P/n`), mensualité décroissante | Calculé | `durationMonths` |
+| `bullet` (in fine) | Intérêts seuls, **capital en une fois à l'échéance** | = `principalCents` jusqu'au terme | `durationMonths` |
+| `revolving` (lombard) | Intérêts sur l'encours ; **pas d'échéancier** | = `principalCents`, saisi | `creditLimitCents` |
+
+**Le révolving est le cas particulier assumé.** Il n'a ni échéancier ni durée
+fixe : `principalCents` y désigne l'**encours courant**, mis à jour à la main
+(le geste « Corriger » du lot 1, puis « Mettre à jour au JJ/MM » au lot 5).
+C'est la seule ligne du module où un restant dû est saisi plutôt que dérivé —
+limitation documentée, pas oubli.
+
+**Pas de champ « capital restant dû »** sur les trois autres types — il est
+dérivé, par la même philosophie que les soldes de comptes courants
+(`KNOWN_ISSUES.md` § Passif) : un chiffre stocké se désynchronise, un chiffre
+dérivé ne peut pas.
+
+### 4.1 bis `loanRates` — les révisions d'un taux variable (**D47**)
+
+```
+loanRates
+  orgId     Id<'organizations'>
+  loanId    Id<'loans'>
+  fromDate  number     ms epoch, date d'effet
+  rateBps   number
+  kind      'actual' | 'forecast'
+  notes     string?
+
+  .index('by_loan_from', ['loanId', 'fromDate'])
+```
+
+**Une table et non un tableau sur le prêt** : sur vingt ans à révision
+trimestrielle la série grandit sans borne, et `loans` est lu en liste sur la
+page Passif — c'est exactement l'anti-pattern signalé dans `CLAUDE.md` (un
+champ volumineux sur une ligne lue en liste ; Convex lit et facture la ligne
+entière).
+
+**Deux natures dans la même série, même forme :**
+
+- `actual` — une révision qui a eu lieu : « depuis le 01/07/2026, 3,4 % ».
+- `forecast` — une hypothèse de pilotage : « à partir de 2028, tabler sur 3,8 % ».
+
+**Règle du taux applicable à une date** : le dernier `loanRates` dont
+`fromDate <= date`, à défaut `loans.rateBps` (le taux à la signature). Un prêt
+à taux fixe n'a donc **aucune** ligne `loanRates` — rien à saisir, rien à
+maintenir.
+
+> **L'échéancier d'un prêt à taux variable est une projection, pas un plan.**
+> Personne ne connaît le taux de 2029. L'UI doit le dire : au-delà de la
+> dernière révision `actual`, les échéances sont marquées comme projetées.
+
+**Aucune récupération automatique d'index** (Euribor…). Ce serait une source
+de données externe, dont l'app n'a aucun équivalent aujourd'hui : un connecteur
+à construire, maintenir et sécuriser, pour une poignée de prêts. Noté en
+évolution (**Q-F**), pas construit.
 
 **Pas de champ « capital restant dû »** — il est dérivé, par la même
 philosophie que les soldes de comptes courants (`KNOWN_ISSUES.md` § Passif) :
@@ -136,6 +207,8 @@ prévisionnelles, dans `forecastEntries` (§ 4.7).
 **Pas de `searchText`** — ce champ n'existe que sur `transactions`, qui porte
 un `searchIndex` pour la recherche du pointage. Le copier ailleurs serait du
 gras sans usage.
+
+**Pas de covenants** (LTV, DSCR imposés par la banque) — hors périmètre.
 
 ### 4.2 `guarantees` — le lien prêt ↔ sûreté
 
@@ -171,6 +244,7 @@ guarantees
   // ── Le gage ─────────────────────────────────────────────────────────
   form               'nantissement' | 'hypotheque' | 'ppd' | 'caution'
                      | 'garantie_organisme'
+  rank               number?               1 = premier rang, 2 = second…  ← D48
   pledgedAmountCents number?               absent si non chiffré (caution illimitée)
   actDate            number?
   releasedAt         number?               mainlevée. Absent = active.
@@ -341,6 +415,25 @@ existantes :
   loanId     Id<'loans'>?   ← nouveau, symétrique du dealId déjà présent
 ```
 
+**Ce que chaque type produit dans le prévisionnel** (**D45**) — c'est le vrai
+enjeu du champ `amortizationKind` :
+
+| Type | Lignes générées |
+|---|---|
+| `constant_annuity` | Une ligne par échéance, montant constant |
+| `constant_capital` | Une ligne par échéance, montant décroissant |
+| `bullet` | De petites lignes d'intérêts, **puis une ligne de capital énorme à l'échéance** |
+| `revolving` | Des lignes d'intérêts sur l'encours, jusqu'à `endDate` ou l'horizon |
+
+> **C'est là que le type change la vie.** Un in fine de 6,6 M€ doit faire
+> apparaître 6,6 M€ dans la trésorerie prévisionnelle à une date précise. Sans
+> `amortizationKind`, le prévisionnel lisserait ce capital sur toute la durée
+> et le ballon serait invisible jusqu'à ce qu'il tombe.
+
+Sur un **taux variable**, les occurrences sont recalculées à partir de la série
+`loanRates` (§ 4.1 bis) : le prévisionnel varie d'un palier à l'autre au lieu
+de supposer un taux plat pour vingt ans.
+
 Le flag `overridden` protège une occurrence éditée à la main, comme pour les
 règles.
 
@@ -396,16 +489,49 @@ Deux valeurs à ajouter à `documents.kind` : `acte_pret`, `acte_garantie`.
 
 ### 5.1 Échéancier et capital restant dû
 
-**Le plan** — annuité constante :
+`i` = taux périodique = (taux applicable à la date, § 4.1 bis) / 10000 / 12,
+recalculé **à chaque échéance** — un taux variable fait varier `i` en cours de
+route. `n` = `durationMonths`.
+
+**Annuité constante**
 
 ```
-mensualité = P × (i / (1 − (1 + i)^(−n)))   i = rateBps / 10000 / 12
-                                            n = durationMonths
+mensualité = P × (i / (1 − (1 + i)^(−n)))
+intérêts   = capital restant × i
+capital    = mensualité − intérêts
 ```
 
-Chaque échéance se décompose en intérêts (`capital restant × i`), capital
-(`mensualité − intérêts`) et assurance (`insuranceMonthlyCents`, **hors**
-mensualité). Un différé produit des échéances d'intérêts seuls.
+**Capital constant**
+
+```
+capital    = P / n                     (fixe)
+intérêts   = capital restant × i       (décroissants)
+mensualité = capital + intérêts        (décroissante)
+```
+
+**In fine (`bullet`)**
+
+```
+échéances 1..n−1 : intérêts seuls = P × i     capital = 0
+échéance n       : intérêts + P                ← le ballon
+capital restant dû = P jusqu'au terme
+```
+
+**Révolving (`lombard`)**
+
+Aucun échéancier. Les intérêts sont calculés sur l'encours courant
+(`principalCents × i`) et projetés jusqu'à `endDate` si elle est connue, sinon
+jusqu'à l'horizon du prévisionnel. Le restant dû est l'encours saisi.
+
+**Le différé** (`deferralMonths` + `deferralKind`) :
+
+- `partial` — pendant le différé, échéances d'intérêts seuls ; le capital
+  reste à `P`.
+- `total` — rien n'est payé ; les intérêts se **capitalisent** et le capital
+  amorti démarre au-dessus de `P`.
+
+**L'assurance** (`insuranceMonthlyCents`) est **hors** mensualité, dans une
+colonne à part : le prélèvement réel vaut mensualité + assurance.
 
 **Le réel** — la somme des transactions allouées `kind: 'loan'` sur ce prêt.
 
@@ -434,6 +560,26 @@ Trois précautions :
    inscrit à l'acte. Il peut la dépasser : c'est l'information utile.
 3. **Cette lecture traverse les orgs.** Ce n'est pas une vue consolidée au sens
    de D14 : c'est la lecture d'un lien déjà accepté en D13.
+4. **Le montant gagé ne décroît pas** avec la dette. Un nantissement de
+   300 K€ sur un prêt dont il ne reste que 150 K€ vaut juridiquement 300 K€
+   jusqu'à la mainlevée. La marge affichée est donc **pessimiste** — c'est
+   voulu, pas un bug.
+
+**Ordre d'affichage des sûretés** (**D48**), de la plus forte à la moins
+forte :
+
+| # | Forme | Pourquoi ce rang |
+|---|---|---|
+| 1 | **PPD** | Sûreté réelle immobilière ; son rang remonte à la date de la vente et prime une hypothèque inscrite avant. |
+| 2 | **Hypothèque** | Sûreté réelle immobilière. |
+| 3 | **Nantissement** | Sûreté réelle sur titres ou contrat, réalisable rapidement. |
+| 4 | **Garantie d'organisme** | Sûreté personnelle, mais le garant est une institution capitalisée. |
+| 5 | **Caution** | Sûreté personnelle ; ne vaut que la solvabilité du garant. |
+
+> ⚠️ **C'est une convention d'affichage, pas une vérité juridique.** La force
+> réelle d'une sûreté dépend aussi de son `rank` (premier ou second sur le même
+> actif — un second rang ne vaut que ce qui reste après le premier) et de la
+> situation du débiteur. Le tri sert à lire vite, pas à conclure.
 
 ### 5.3 Prix de revient et rentabilité d'un bien
 
@@ -449,6 +595,11 @@ résultat net       = revenus − charges
 rendement net      = résultat net / prix de revient
 plus-value latente = dernière valorisation − prix de revient
 ```
+
+**Tous les montants d'un bien sont TTC** (**D49**). Ils viennent de flux
+bancaires, et un flux bancaire est TTC par nature. Reconstituer du HT
+obligerait à ventiler la TVA poste par poste ; sur un locatif nu il n'y a de
+toute façon rien à récupérer.
 
 Les échéances de prêt ne sont **jamais** des charges du bien : elles sont
 allouées au prêt, pas au bien.
@@ -530,14 +681,23 @@ colonne invite à les comparer alors qu'ils ne se comparent pas.
 - **En-tête** : statut, et un menu **⋯** portant « Corriger » et « Mettre à
   jour au JJ/MM » (**D40**). Gestes rares, qui touchent aux fondations du
   calcul : les exposer en permanence donnerait envie de les utiliser.
-- **Chiffres clés** en ligne (emprunté, restant dû, taux, mensualité,
-  assurance, dernière échéance) — pas de tuiles encadrées.
-- **Garanties** : forme, assiette (lien), garant (lien), montant gagé, et la
-  marge disponible sur l'assiette.
+- **Chiffres clés** en ligne (emprunté, restant dû, type d'amortissement, taux
+  courant, mensualité, assurance, dernière échéance) — pas de tuiles encadrées.
+- **Garanties** : forme, assiette (lien), garant (lien), montant gagé, rang, et
+  la marge disponible sur l'assiette. Triées par force décroissante (**D48**).
+- **Taux** (prêts variables seulement) : la série `loanRates`, révisions
+  passées et paliers projetés, avec un bouton d'ajout. Absent sur un taux fixe.
 - **Échéancier** : date, mensualité, capital, intérêts, restant dû, réel.
   Trois états lisibles — à venir (grisée), échue à pointer (ambrée), pointée
   (verte). L'ambre marque une attente, pas une faute : le rouge reste réservé
   à ce qui va mal.
+  Sur un **taux variable**, les échéances postérieures à la dernière révision
+  `actual` sont marquées **projetées** — l'app ne prétend pas connaître le taux
+  de 2029.
+  Sur un **in fine**, la dernière ligne porte le ballon de capital, mise en
+  évidence.
+  Sur un **révolving**, il n'y a pas d'échéancier : un encadré l'explique et
+  affiche l'encours et le plafond.
 - **Transactions** : le tableau des prélèvements rattachés (date, sens,
   montant, libellé).
 - **Documents**.
@@ -608,6 +768,12 @@ manière de ceux déjà en place :
 | C13 | Bien acquis avant la connexion bancaire | Postes en source `manual`. Le virement de 2019 n'existera jamais dans l'app — une connexion bancaire ne remonte pas si loin. |
 | C14 | Flux pointés sur un poste resté en source `manual` | Le montant saisi fait foi ; les flux ne s'y ajoutent **jamais**. L'UI signale qu'ils ne sont pas comptés, pour ne pas masquer de la donnée. |
 | C15 | Virement notaire couvrant prix + droits | Rangé entier dans `acquisition`. Pour garder le détail, laisser les deux postes en `manual`. |
+| C16 | Prêt in fine | `bullet`. Restant dû = capital jusqu'au terme ; le prévisionnel porte le ballon à sa date. |
+| C17 | Crédit lombard / révolving | `revolving`. Pas d'échéancier, pas de durée ; l'encours est saisi, seule ligne saisie du module. Le plafond (`creditLimitCents`) permet d'afficher la marge de tirage. |
+| C18 | Différé total | Les intérêts se capitalisent : le capital amorti démarre **au-dessus** du montant emprunté. À ne pas confondre avec le différé partiel. |
+| C19 | Taux variable au-delà de la dernière révision connue | Échéances marquées **projetées**. Un palier `forecast` les fait varier ; sans palier, le dernier taux connu est prolongé à plat. |
+| C20 | Sûreté de second rang | `rank: 2`. Elle ne vaut que ce qui reste après le premier rang — la marge disponible ne le modélise pas, c'est signalé (§ 5.2). |
+| C21 | Caution personnelle du dirigeant | `form: 'caution'`, `pledgorLabel: "Clément Alteresco"` (**D46**). Aucun objet personne créé — cohérent avec D1. |
 
 ---
 
@@ -650,6 +816,11 @@ manière de ceux déjà en place :
 | **D43** | Un poste de prix de revient a **une** source : saisi ou flux, jamais l'addition. Choix **par poste** | Un interrupteur global forcerait à sacrifier soit l'acquisition ancienne, soit les travaux récents. |
 | **D44** | La liste des prêts ne montre pas le montant gagé, seulement un badge | Deux natures de montant dans une colonne invitent à une comparaison qui n'a pas de sens. |
 | **D-QA** | On suit les garanties données à un emprunteur hors groupe | Sans elles, la marge disponible sur l'actif serait surévaluée — une erreur en notre défaveur, invisible. |
+| **D45** | Quatre types d'amortissement (annuité, capital constant, in fine, révolving) + différé partiel/total | Un groupe de holdings et de SCI n'emprunte pas qu'en annuité constante. Un in fine de 6,6 M€ lissé sur vingt ans rendrait le ballon invisible dans le prévisionnel. Rétrofitter ce champ obligerait à réécrire le cœur du calcul. |
+| **D46** | Caution personnelle = un libellé de garant, aucun objet personne | Cas le plus fréquent sur un prêt de SCI, et cohérent avec D1. |
+| **D47** | Taux variable : série datée `loanRates` (`actual` + `forecast`), pas de récupération d'index | Un échéancier à taux variable est une projection ; les paliers la rendent explicite. Un connecteur Euribor serait une source externe inédite dans l'app, pour une poignée de prêts. |
+| **D48** | Sûretés triées de la plus forte à la moins forte + champ `rank` | Convention d'affichage pour lire vite. Sans `rank`, un second rang serait indiscernable d'un premier alors qu'il ne vaut que le reliquat. |
+| **D49** | Tous les montants d'un bien sont TTC | Ils viennent de flux bancaires, TTC par nature. Reconstituer du HT demanderait de ventiler la TVA poste par poste, sans gain sur un locatif nu. |
 
 ---
 
@@ -673,6 +844,14 @@ pas été tranchées. Le modèle les absorbe toutes les trois sans modification.
 `lenderName` est un texte libre. Si on veut un jour « toutes mes dettes chez
 Palatine », il faudra un référentiel. Le texte libre suffit au lot 1 et la
 migration reste simple.
+
+### Q-F — Récupération automatique d'un index de taux
+
+Le niveau retenu (**D47**) est la saisie manuelle des révisions et des paliers.
+Aller chercher l'Euribor automatiquement demanderait une **source de données
+externe**, dont l'app n'a aujourd'hui aucun équivalent : un connecteur à
+construire, maintenir et sécuriser. À reconsidérer si le nombre de prêts
+variables devient significatif.
 
 ### Q-E — Import de transactions
 
@@ -721,15 +900,17 @@ l'actif (ligne 4) — sont portés nativement.
 
 ### Lot 1 — Les prêts *(le plus petit incrément utile)*
 
-Table `loans`, échéancier calculé, capital restant dû, fiche prêt, bloc
+Tables `loans` et `loanRates`, **les quatre types d'amortissement**, différé
+partiel/total, échéancier calculé, capital restant dû, fiche prêt, bloc
 « Dette bancaire » sur la page Passif, documents attachés. Le geste
 « Corriger » uniquement.
 
 **Ce que ça apporte** : ouvrir un espace et savoir combien la société doit, à
 qui, à quel taux, jusqu'à quand. L'app l'ignore complètement aujourd'hui.
 
-**Critère de succès** : les prêts de l'annexe (hors Clément) sont saisis et le
-capital restant dû correspond au tableau de la banque à moins d'un euro près.
+**Critère de succès** : les prêts de l'annexe (hors Clément) sont saisis —
+**y compris un in fine et un révolving** — et le capital restant dû correspond
+au tableau de la banque à moins d'un euro près.
 
 ### Lot 2 — Les garanties
 
@@ -801,15 +982,21 @@ Outils d'écriture sur prêts, garanties et biens, tous avec
    d'héritage de droits — les orgs restent à plat.
 5. **Aucun chiffre stocké qui puisse être dérivé.** Capital restant dû, marge
    disponible, rendement, résultat d'exploitation : calculés à la lecture.
-6. **`documents.companyId` → optionnel** est le seul changement de contrainte
+   Seule exception assumée : l'encours d'un révolving, qui n'est déductible
+   d'aucun échéancier (§ 4.1).
+6. **`lib/amortization.ts` est une fonction pure et le restera.** Elle prend
+   les paramètres du prêt et la série de taux, elle rend un échéancier. Aucun
+   accès Convex, testable en `node:test` — c'est ce qui rend les quatre types
+   vérifiables un par un.
+7. **`documents.companyId` → optionnel** est le seul changement de contrainte
    sur une table existante. À auditer sérieusement (lot 4).
-7. **Un seul XIRR dans le repo.** Le TRI d'un bien revendu réutilise
+8. **Un seul XIRR dans le repo.** Le TRI d'un bien revendu réutilise
    l'implémentation des deals.
-8. **Attention à la lecture en liste.** Ne jamais `.collect()` une table dont
+9. **Attention à la lecture en liste.** Ne jamais `.collect()` une table dont
    une ligne porte un champ texte volumineux pour n'en tirer que des champs
    légers — Convex lit et facture la ligne entière.
-9. **i18n.** Toute chaîne visible passe par `t()` avec une entrée `en` **et**
+10. **i18n.** Toute chaîne visible passe par `t()` avec une entrée `en` **et**
    `fr`. Nouveaux namespaces à prévoir : `immobilier`, et des ajouts dans
    `passif`, `pointage`, `nav`.
-10. **Saisie d'un montant en euros** → `AmountInput` / `useAmountField`, jamais
+11. **Saisie d'un montant en euros** → `AmountInput` / `useAmountField`, jamais
     un `<input type="number">` brut.
