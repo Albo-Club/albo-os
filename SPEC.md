@@ -457,7 +457,17 @@ compromis n'a pas de société-cible au sens portfolio.
 vrai risque du chantier.** Le détail du piège — pourquoi le sens du changement
 le rend dangereux, et dans quel ordre procéder — est documenté dans
 `KNOWN_ISSUES.md` § « Un document ne peut se rattacher qu'à une société ».
-À traiter en début de lot 4, jamais en passant.
+
+**Il se traite au lot 1**, avec la table `loans` et dans la même PR : c'est le
+lot qui a besoin d'attacher un acte de prêt. Le sortir en PR isolée prendrait
+le risque du schéma sans aucun code pour l'exercer. Le lot 4 n'ajoute ensuite
+que `propertyId`.
+
+Ampleur mesurée de l'audit : **15 fichiers `convex/`** (`documents`,
+`agentToolsDocuments`, `companies`, `deals`, `intelligence`, `reportInbox`,
+`reportStore`, `vectorize`, `companyEnrichment`, `agentTools` et leurs tests de
+régression) et **5 fichiers `src/`** (fiches société et deal, participations,
+todo, reports cross-org).
 
 Deux valeurs à ajouter à `documents.kind` : `acte_pret`, `acte_garantie`.
 
@@ -902,8 +912,21 @@ l'actif (ligne 4) — sont portés nativement.
 
 Tables `loans` et `loanRates`, **les quatre types d'amortissement**, différé
 partiel/total, échéancier calculé, capital restant dû, fiche prêt, bloc
-« Dette bancaire » sur la page Passif, documents attachés. Le geste
-« Corriger » uniquement.
+« Dette bancaire » sur la page Passif. Le geste « Corriger » uniquement.
+
+**Et les documents attachés au prêt — dans ce lot, pas plus tard.** Attacher un
+acte de prêt exige de relâcher `documents.companyId` (§ 4.8). L'ordre est
+imposé et non négociable :
+
+1. **Auditer** toutes les lectures de `doc.companyId` — 15 fichiers `convex/`
+   et 5 fichiers `src/` y touchent — et les rendre tolérantes à l'absence.
+2. **Relâcher** le schéma (`companyId` optionnel) et ajouter `loanId`.
+3. **Tester** : un document sans société ne casse ni les fiches société, ni
+   les filtres, ni la vectorisation par org.
+
+Ces trois étapes partent **dans la même PR que la table `loans`** : séparées,
+elles prendraient le risque du schéma sans rien pour l'exercer. C'est aussi ce
+qui évite deux allers-retours au lieu d'un.
 
 **Ce que ça apporte** : ouvrir un espace et savoir combien la société doit, à
 qui, à quel taux, jusqu'à quand. L'app l'ignore complètement aujourd'hui.
@@ -933,9 +956,9 @@ l'échéancier, et les 6 prochaines échéances apparaissent dans le prévisionn
 
 Tables `properties` et `propertyValuations`, onglet Immobilier,
 `allocation.kind: 'property'` + `category`, prix de revient à source par poste,
-rentabilité, mode marchand de biens, documents. Inclut le passage de
-`documents.companyId` en optionnel (§ 4.8) — **à traiter en début de lot, avec
-audit des lectures existantes**.
+rentabilité, mode marchand de biens, et `documents.propertyId` (le relâchement
+de `companyId` et son audit ont eu lieu au lot 1 — il ne reste ici que le champ
+à ajouter).
 
 **Critère de succès** : un bien saisi affiche son prix de revient poste par
 poste avec la source de chacun, sa courbe de valeur, son rendement net réel, et
