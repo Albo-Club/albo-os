@@ -8,6 +8,10 @@
  * company list is the superset (`listByCompany` returns deal documents too,
  * carrying their deal, so a pacte is reachable from the entity that signed it).
  *
+ * Since the Dette & Garanties module a row may hang off a BANK LOAN instead
+ * (`loanId`), with no company at all: a loan deed has no portfolio target.
+ * `orgId` carries the tenancy in every case — see `create`.
+ *
  * Both carry the same reading state (`ocrState`) so the front can tell,
  * per document, whether its text was read — the extracted text itself is
  * fetched on demand via `getExtractedText`, never with the list.
@@ -35,6 +39,8 @@ const kindValidator = v.union(
   v.literal('pacte'),
   v.literal('subscription'),
   v.literal('attestation'),
+  v.literal('acte_pret'),
+  v.literal('acte_garantie'),
 )
 
 async function validateUpload(
@@ -157,6 +163,43 @@ export const listByDeal = query({
   },
 })
 
+/**
+ * A loan's documents (offer letter, amortization table, deed), most recent
+ * first. Never goes through `by_company`: these rows usually have no company.
+ */
+export const listByLoan = query({
+  args: { loanId: v.id('loans') },
+  handler: async (ctx, { loanId }) => {
+    const loan = await ctx.db.get('loans', loanId)
+    if (!loan) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, loan.orgId)
+
+    const rows = await ctx.db
+      .query('documents')
+      .withIndex('by_loan', (q) => q.eq('loanId', loanId))
+      .order('desc')
+      .take(200)
+
+    return await Promise.all(
+      rows.map(async (doc) => ({
+        _id: doc._id,
+        title: doc.title,
+        kind: doc.kind,
+        period: doc.period ?? null,
+        contentType: doc.contentType ?? null,
+        size: doc.size ?? null,
+        uploadedAt: doc.uploadedAt,
+        ocrState: doc.ocrState ?? null,
+        ocrDetail: doc.ocrDetail ?? null,
+        ocrChars: doc.ocrChars ?? null,
+        vectorState: doc.vectorState ?? null,
+        vectorDetail: doc.vectorDetail ?? null,
+        url: await ctx.storage.getUrl(doc.storageId),
+      })),
+    )
+  },
+})
+
 /** The extracted text of a document — loaded only when the user opens it. */
 export const getExtractedText = query({
   args: { documentId: v.id('documents') },
@@ -174,43 +217,67 @@ export const getExtractedText = query({
   },
 })
 
+/**
+ * Creates a document from an already-uploaded blob.
+ *
+ * The org is NEVER taken from an argument — it is resolved from the anchor
+ * the document hangs off (`companyId`, else `loanId`, else `dealId`), and
+ * membership is checked on that resolved org. At least one anchor is
+ * required (`missing_anchor`): without one the row would be org-scoped but
+ * reachable from nowhere.
+ *
+ * `companyId` is optional since the Dette & Garanties module — a loan deed
+ * has no portfolio company. Every anchor supplied must live in the SAME org,
+ * otherwise the row would show on a fiche of another tenant.
+ */
 export const create = mutation({
   args: {
-    companyId: v.id('companies'),
+    companyId: v.optional(v.id('companies')),
     // Set to attach the document to a single deal instead of the company.
     dealId: v.optional(v.id('deals')),
+    // Set to attach the document to a bank loan (offer letter, deed).
+    loanId: v.optional(v.id('loans')),
     title: v.string(),
     kind: kindValidator,
     period: v.optional(v.number()),
     storageId: v.id('_storage'),
   },
   handler: async (ctx, args) => {
-    const company = await ctx.db.get('companies', args.companyId)
-    if (!company) throw new ConvexError('not_found')
-    const { user } = await requireOrgMember(ctx, company.orgId)
+    const company = args.companyId
+      ? await ctx.db.get('companies', args.companyId)
+      : null
+    if (args.companyId && !company) throw new ConvexError('not_found')
+    const loan = args.loanId ? await ctx.db.get('loans', args.loanId) : null
+    if (args.loanId && !loan) throw new ConvexError('not_found')
+    const deal = args.dealId ? await ctx.db.get('deals', args.dealId) : null
+    if (args.dealId && !deal) throw new ConvexError('not_found')
+
+    const orgId = company?.orgId ?? loan?.orgId ?? deal?.orgId
+    if (!orgId) throw new ConvexError('missing_anchor')
+    const { user } = await requireOrgMember(ctx, orgId)
 
     // A deal document must belong to the same org AND target the company it
     // is filed under, otherwise the row would be reachable from the wrong
-    // fiche.
-    if (args.dealId) {
-      const deal = await ctx.db.get('deals', args.dealId)
+    // fiche. With no company anchor, the org check alone applies.
+    if (deal) {
       if (
-        !deal ||
-        deal.orgId !== company.orgId ||
-        deal.targetCompanyId !== args.companyId
+        deal.orgId !== orgId ||
+        (args.companyId && deal.targetCompanyId !== args.companyId)
       ) {
         throw new ConvexError('not_found')
       }
     }
+    if (loan && loan.orgId !== orgId) throw new ConvexError('not_found')
 
     const title = args.title.trim()
     if (!title) throw new ConvexError('invalid_title')
     const { contentType, size } = await validateUpload(ctx, args.storageId)
 
     const documentId = await ctx.db.insert('documents', {
-      orgId: company.orgId,
+      orgId,
       companyId: args.companyId,
       dealId: args.dealId,
+      loanId: args.loanId,
       title,
       kind: args.kind,
       period: args.period,

@@ -46,6 +46,7 @@ import { Route as AppOrgSlugPlacementsDealIdRouteImport } from './routes/app/$or
 import { Route as AppOrgSlugParticipationsCompanyIdRouteImport } from './routes/app/$orgSlug/participations.$companyId'
 import { Route as AppOrgSlugDealsDealIdRouteImport } from './routes/app/$orgSlug/deals.$dealId'
 import { Route as AppOrgSlugCashAccountIdRouteImport } from './routes/app/$orgSlug/cash.$accountId'
+import { Route as AppOrgSlugPassifPretsLoanIdRouteImport } from './routes/app/$orgSlug/passif.prets.$loanId'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -241,6 +242,12 @@ const AppOrgSlugCashAccountIdRoute = AppOrgSlugCashAccountIdRouteImport.update({
   path: '/cash/$accountId',
   getParentRoute: () => AppOrgSlugRouteRoute,
 } as any)
+const AppOrgSlugPassifPretsLoanIdRoute =
+  AppOrgSlugPassifPretsLoanIdRouteImport.update({
+    id: '/passif/prets/$loanId',
+    path: '/passif/prets/$loanId',
+    getParentRoute: () => AppOrgSlugRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -280,6 +287,7 @@ export interface FileRoutesByFullPath {
   '/app/$orgSlug/placements/': typeof AppOrgSlugPlacementsIndexRoute
   '/app/$orgSlug/pointage/': typeof AppOrgSlugPointageIndexRoute
   '/app/$orgSlug/settings/': typeof AppOrgSlugSettingsIndexRoute
+  '/app/$orgSlug/passif/prets/$loanId': typeof AppOrgSlugPassifPretsLoanIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -315,6 +323,7 @@ export interface FileRoutesByTo {
   '/app/$orgSlug/placements': typeof AppOrgSlugPlacementsIndexRoute
   '/app/$orgSlug/pointage': typeof AppOrgSlugPointageIndexRoute
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsIndexRoute
+  '/app/$orgSlug/passif/prets/$loanId': typeof AppOrgSlugPassifPretsLoanIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -355,6 +364,7 @@ export interface FileRoutesById {
   '/app/$orgSlug/placements/': typeof AppOrgSlugPlacementsIndexRoute
   '/app/$orgSlug/pointage/': typeof AppOrgSlugPointageIndexRoute
   '/app/$orgSlug/settings/': typeof AppOrgSlugSettingsIndexRoute
+  '/app/$orgSlug/passif/prets/$loanId': typeof AppOrgSlugPassifPretsLoanIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -396,6 +406,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/placements/'
     | '/app/$orgSlug/pointage/'
     | '/app/$orgSlug/settings/'
+    | '/app/$orgSlug/passif/prets/$loanId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -431,6 +442,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/placements'
     | '/app/$orgSlug/pointage'
     | '/app/$orgSlug/settings'
+    | '/app/$orgSlug/passif/prets/$loanId'
   id:
     | '__root__'
     | '/'
@@ -470,6 +482,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/placements/'
     | '/app/$orgSlug/pointage/'
     | '/app/$orgSlug/settings/'
+    | '/app/$orgSlug/passif/prets/$loanId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -745,6 +758,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrgSlugCashAccountIdRouteImport
       parentRoute: typeof AppOrgSlugRouteRoute
     }
+    '/app/$orgSlug/passif/prets/$loanId': {
+      id: '/app/$orgSlug/passif/prets/$loanId'
+      path: '/passif/prets/$loanId'
+      fullPath: '/app/$orgSlug/passif/prets/$loanId'
+      preLoaderRoute: typeof AppOrgSlugPassifPretsLoanIdRouteImport
+      parentRoute: typeof AppOrgSlugRouteRoute
+    }
   }
 }
 
@@ -784,6 +804,7 @@ interface AppOrgSlugRouteRouteChildren {
   AppOrgSlugPassifIndexRoute: typeof AppOrgSlugPassifIndexRoute
   AppOrgSlugPlacementsIndexRoute: typeof AppOrgSlugPlacementsIndexRoute
   AppOrgSlugPointageIndexRoute: typeof AppOrgSlugPointageIndexRoute
+  AppOrgSlugPassifPretsLoanIdRoute: typeof AppOrgSlugPassifPretsLoanIdRoute
 }
 
 const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
@@ -801,6 +822,7 @@ const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
   AppOrgSlugPassifIndexRoute: AppOrgSlugPassifIndexRoute,
   AppOrgSlugPlacementsIndexRoute: AppOrgSlugPlacementsIndexRoute,
   AppOrgSlugPointageIndexRoute: AppOrgSlugPointageIndexRoute,
+  AppOrgSlugPassifPretsLoanIdRoute: AppOrgSlugPassifPretsLoanIdRoute,
 }
 
 const AppOrgSlugRouteRouteWithChildren = AppOrgSlugRouteRoute._addFileChildren(

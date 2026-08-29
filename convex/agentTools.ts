@@ -900,7 +900,9 @@ export const getDocumentTextInternal = internalQuery({
       _id: doc._id,
       title: doc.title,
       kind: doc.kind,
-      companyId: doc.companyId,
+      // Explicit null rather than an absent key: a document need not hang off
+      // a company (loan deed, guarantee deed).
+      companyId: doc.companyId ?? null,
       dealId: doc.dealId ?? null,
       ocrState: doc.ocrState ?? null,
       ocrDetail: doc.ocrDetail ?? null,

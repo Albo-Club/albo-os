@@ -199,12 +199,17 @@ export const dryRun = internalQuery({
       .withIndex('by_org', (q) => q.eq('orgId', org._id))
       .collect()
 
-    const perCompany = new Map<Id<'companies'>, number>()
+    // A document need not hang off a company since the Dette & Garanties
+    // module: orphans get their own bucket instead of an `undefined` key
+    // that `ctx.db.get` would then choke on.
+    const perCompany = new Map<Id<'companies'> | null, number>()
     for (const doc of docs) {
-      perCompany.set(doc.companyId, (perCompany.get(doc.companyId) ?? 0) + 1)
+      const key = doc.companyId ?? null
+      perCompany.set(key, (perCompany.get(key) ?? 0) + 1)
     }
     const rows = await Promise.all(
       [...perCompany.entries()].map(async ([companyId, count]) => {
+        if (companyId === null) return { company: '(non classé)', count }
         const company = await ctx.db.get('companies', companyId)
         return { company: company?.name ?? '(supprimée)', count }
       }),
@@ -256,9 +261,16 @@ export const verify = internalQuery({
     // guard (see header for why the two must differ).
     const collisions = groupDuplicateDocuments(uploads)
     // One read per company that actually collides — not the whole table.
+    const collidingCompanyIds = [
+      ...new Set(
+        collisions.flatMap((group) =>
+          group[0].companyId ? [group[0].companyId] : [],
+        ),
+      ),
+    ]
     const names = new Map(
       await Promise.all(
-        [...new Set(collisions.map((group) => group[0].companyId))].map(
+        collidingCompanyIds.map(
           async (companyId) =>
             [
               companyId,
@@ -270,7 +282,9 @@ export const verify = internalQuery({
     // Sizes travel with each row: the human arbitrates from them. A handful of
     // bytes apart is a twin to delete, megabytes apart is two real versions.
     const duplicates = collisions.map((group) => ({
-      company: names.get(group[0].companyId) ?? '(supprimée)',
+      company: group[0].companyId
+        ? (names.get(group[0].companyId) ?? '(supprimée)')
+        : '(non classé)',
       rows: group.map((doc) => ({
         _id: doc._id,
         title: doc.title,

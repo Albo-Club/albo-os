@@ -64,6 +64,44 @@
       "ratePlaceholder": "3",
       "blockedLabel": "Blocked",
       "success": "Current account created"
+    },
+    "debt": {
+      "button": "New loan",
+      "title": "New bank loan",
+      "description": "The contract terms. The schedule and the outstanding capital are computed — never entered.",
+      "labelLabel": "Label",
+      "labelPlaceholder": "Palatine loan 2021",
+      "lenderLabel": "Lender",
+      "lenderPlaceholder": "Banque Palatine",
+      "principalLabel": "Amount borrowed (€)",
+      "principalRevolvingLabel": "Current drawn amount (€)",
+      "principalPlaceholder": "500 000",
+      "signedLabel": "Signature date",
+      "firstPaymentLabel": "First instalment",
+      "durationLabel": "Duration (months)",
+      "durationPlaceholder": "240",
+      "kindLabel": "Amortization type",
+      "limitLabel": "Authorized ceiling (€)",
+      "limitPlaceholder": "8 000 000",
+      "endDateLabel": "Credit end (optional)",
+      "rateLabel": "Rate at signature (%)",
+      "ratePlaceholder": "1.85",
+      "rateKindLabel": "Rate nature",
+      "frequencyLabel": "Frequency",
+      "frequencyMonthly": "Monthly",
+      "frequencyQuarterly": "Quarterly",
+      "insuranceLabel": "Insurance (€/month)",
+      "insurancePlaceholder": "42",
+      "deferralLabel": "Deferral (months)",
+      "deferralKindLabel": "Deferral nature",
+      "deferralPartial": "Partial — interest paid",
+      "deferralTotal": "Total — interest capitalized",
+      "accountLabel": "Direct-debit account",
+      "accountNone": "—",
+      "statusLabel": "Status",
+      "notesLabel": "Notes",
+      "revolvingHint": "A revolving credit has neither duration nor schedule: the drawn amount is entered and corrected by hand.",
+      "success": "Loan created"
     }
   },
   "errors": {
@@ -75,7 +113,16 @@
     "same_org": "The creditor and the debtor must be two different organizations.",
     "not_a_party": "You must be a member of at least one of the two organizations of the current account.",
     "invalid_rate": "The rate must be positive.",
-    "has_allocations": "Transactions are still allocated to this line. Detach them first."
+    "has_allocations": "Transactions are still allocated to this line. Detach them first.",
+    "invalid_label": "Label and lender are required.",
+    "missing_duration": "An amortizing loan needs a duration.",
+    "deferral_too_long": "The deferral must be shorter than the loan duration.",
+    "invalid_deferral": "The deferral must be positive.",
+    "limit_below_outstanding": "The ceiling cannot be below the drawn amount.",
+    "account_wrong_org": "This bank account belongs to another organization.",
+    "rate_is_fixed": "This loan has a fixed rate: there is no revision to enter.",
+    "has_documents": "Documents are still attached to this row. Detach them first.",
+    "missing_anchor": "This document must be attached to a company, a deal or a loan."
   },
   "edit": {
     "equity": {
@@ -86,11 +133,113 @@
       "title": "Edit current account",
       "description": "The creditor and debtor cannot be changed — delete and recreate the account instead.",
       "success": "Current account updated"
+    },
+    "debt": {
+      "title": "Correct the loan",
+      "description": "Correcting overwrites the terms and recomputes the whole schedule. For a variable-rate revision, add a rate step instead.",
+      "success": "Loan updated"
     }
   },
   "delete": {
     "confirmTitle": "Delete this line?",
     "confirmBody": "Deletion is refused while transactions are still allocated to it — detach them first.",
-    "success": "Deleted"
+    "success": "Deleted",
+    "debtConfirmBody": "Deletion is refused while documents or transactions are still attached — detach them first."
+  },
+  "debt": {
+    "title": "Bank debt",
+    "empty": "No bank loan.",
+    "col": {
+      "label": "Loan",
+      "lender": "Lender",
+      "terms": "Terms",
+      "outstanding": "Outstanding"
+    },
+    "total": "Total outstanding",
+    "until": "until {{date}}",
+    "noMaturity": "no maturity",
+    "status": {
+      "active": "Active",
+      "repaid": "Repaid",
+      "cancelled": "Cancelled"
+    },
+    "kind": {
+      "constant_annuity": "Constant annuity",
+      "constant_capital": "Constant capital",
+      "bullet": "Bullet",
+      "revolving": "Revolving"
+    },
+    "rateFixed": "fixed",
+    "rateVariable": "variable"
+  },
+  "loan": {
+    "metaTitle": "Loan — Albo OS",
+    "back": "← Liabilities",
+    "notFound": "This loan cannot be found.",
+    "signedOn": "signed on {{date}}",
+    "debitedFrom": "debited from {{account}}",
+    "stats": {
+      "principal": "Borrowed",
+      "outstanding": "Outstanding",
+      "kind": "Type",
+      "rate": "Rate",
+      "payment": "Monthly payment",
+      "paymentQuarterly": "Instalment",
+      "insurance": "Insurance",
+      "outstandingRevolving": "Drawn",
+      "limit": "Ceiling",
+      "maturity": "Last instalment"
+    },
+    "schedule": {
+      "title": "Schedule",
+      "hint": "computed plan",
+      "empty": "The terms entered cannot produce a schedule.",
+      "col": {
+        "date": "Instalment",
+        "payment": "Payment",
+        "capital": "Capital",
+        "interest": "Interest",
+        "insurance": "Insurance",
+        "outstanding": "Outstanding"
+      },
+      "projected": "Projected",
+      "balloon": "Balloon",
+      "deferred": "Deferred",
+      "capitalized": "Capitalized",
+      "upcoming": "Upcoming",
+      "due": "Due",
+      "revolvingTitle": "No schedule",
+      "revolvingBody": "A revolving credit has no schedule: only the interest on the drawn amount is projected.",
+      "revolvingHeadroom": "Remaining drawdown headroom: {{amount}}.",
+      "insuranceNote": "Insurance sits outside the instalment: the actual direct debit is instalment + insurance."
+    },
+    "rates": {
+      "title": "Rate",
+      "hint": "past revisions and projected steps",
+      "add": "Step",
+      "empty": "No revision entered — the rate at signature applies.",
+      "col": {
+        "from": "From",
+        "rate": "Rate",
+        "nature": "Nature"
+      },
+      "actual": "Actual",
+      "forecast": "Projected",
+      "dialogTitle": "New rate step",
+      "dialogDescription": "A revision that happened, or a steering assumption. Instalments past the last actual revision are flagged as projected.",
+      "fromLabel": "Effective date",
+      "rateLabel": "Annual rate (%)",
+      "natureLabel": "Nature",
+      "success": "Rate step saved",
+      "deleted": "Rate step removed"
+    },
+    "documents": {
+      "title": "Documents",
+      "empty": "No document attached to this loan."
+    },
+    "menu": {
+      "correct": "Correct",
+      "delete": "Delete"
+    }
   }
 }

@@ -64,6 +64,44 @@
       "ratePlaceholder": "3",
       "blockedLabel": "Bloqué",
       "success": "Compte courant créé"
+    },
+    "debt": {
+      "button": "Nouveau prêt",
+      "title": "Nouveau prêt bancaire",
+      "description": "Les conditions du contrat. L'échéancier et le capital restant dû sont calculés — rien n'est saisi.",
+      "labelLabel": "Libellé",
+      "labelPlaceholder": "Prêt Palatine 2021",
+      "lenderLabel": "Prêteur",
+      "lenderPlaceholder": "Banque Palatine",
+      "principalLabel": "Montant emprunté (€)",
+      "principalRevolvingLabel": "Encours actuel (€)",
+      "principalPlaceholder": "500 000",
+      "signedLabel": "Date de signature",
+      "firstPaymentLabel": "Première échéance",
+      "durationLabel": "Durée (mois)",
+      "durationPlaceholder": "240",
+      "kindLabel": "Type d'amortissement",
+      "limitLabel": "Plafond autorisé (€)",
+      "limitPlaceholder": "8 000 000",
+      "endDateLabel": "Fin du crédit (optionnel)",
+      "rateLabel": "Taux à la signature (%)",
+      "ratePlaceholder": "1,85",
+      "rateKindLabel": "Nature du taux",
+      "frequencyLabel": "Périodicité",
+      "frequencyMonthly": "Mensuelle",
+      "frequencyQuarterly": "Trimestrielle",
+      "insuranceLabel": "Assurance (€/mois)",
+      "insurancePlaceholder": "42",
+      "deferralLabel": "Différé (mois)",
+      "deferralKindLabel": "Nature du différé",
+      "deferralPartial": "Partiel — intérêts payés",
+      "deferralTotal": "Total — intérêts capitalisés",
+      "accountLabel": "Compte de prélèvement",
+      "accountNone": "—",
+      "statusLabel": "Statut",
+      "notesLabel": "Notes",
+      "revolvingHint": "Un révolving n'a ni durée ni échéancier : l'encours est saisi et corrigé à la main.",
+      "success": "Prêt créé"
     }
   },
   "errors": {
@@ -75,7 +113,16 @@
     "same_org": "Le créancier et le débiteur doivent être deux organisations différentes.",
     "not_a_party": "Vous devez être membre d'au moins une des deux organisations du compte courant.",
     "invalid_rate": "Le taux doit être positif.",
-    "has_allocations": "Des transactions sont encore pointées sur cette ligne. Détachez-les d’abord."
+    "has_allocations": "Des transactions sont encore pointées sur cette ligne. Détachez-les d’abord.",
+    "invalid_label": "Le libellé et le prêteur sont obligatoires.",
+    "missing_duration": "Un prêt amortissable a besoin d'une durée.",
+    "deferral_too_long": "Le différé doit être plus court que la durée du prêt.",
+    "invalid_deferral": "Le différé doit être positif.",
+    "limit_below_outstanding": "Le plafond ne peut pas être inférieur à l'encours.",
+    "account_wrong_org": "Ce compte bancaire appartient à une autre organisation.",
+    "rate_is_fixed": "Ce prêt est à taux fixe : il n'y a pas de révision à saisir.",
+    "has_documents": "Des documents sont encore rattachés à cette ligne. Détachez-les d'abord.",
+    "missing_anchor": "Ce document doit être rattaché à une société, un deal ou un prêt."
   },
   "edit": {
     "equity": {
@@ -86,11 +133,113 @@
       "title": "Modifier le compte courant",
       "description": "Le créancier et le débiteur ne sont pas modifiables — supprimez puis recréez le compte.",
       "success": "Compte courant mis à jour"
+    },
+    "debt": {
+      "title": "Corriger le prêt",
+      "description": "Corriger écrase les conditions et recalcule tout l'échéancier. Pour une révision de taux variable, passer par un palier.",
+      "success": "Prêt mis à jour"
     }
   },
   "delete": {
     "confirmTitle": "Supprimer cette ligne ?",
     "confirmBody": "La suppression est refusée tant que des transactions y sont pointées — détachez-les d’abord.",
-    "success": "Supprimé"
+    "success": "Supprimé",
+    "debtConfirmBody": "La suppression est refusée tant que des documents ou des transactions y sont rattachés — détachez-les d'abord."
+  },
+  "debt": {
+    "title": "Dette bancaire",
+    "empty": "Aucun prêt bancaire.",
+    "col": {
+      "label": "Prêt",
+      "lender": "Prêteur",
+      "terms": "Conditions",
+      "outstanding": "Restant dû"
+    },
+    "total": "Total restant dû",
+    "until": "jusqu'en {{date}}",
+    "noMaturity": "sans échéance",
+    "status": {
+      "active": "En cours",
+      "repaid": "Soldé",
+      "cancelled": "Annulé"
+    },
+    "kind": {
+      "constant_annuity": "Annuité constante",
+      "constant_capital": "Capital constant",
+      "bullet": "In fine",
+      "revolving": "Révolving"
+    },
+    "rateFixed": "fixe",
+    "rateVariable": "variable"
+  },
+  "loan": {
+    "metaTitle": "Prêt — Albo OS",
+    "back": "← Passif",
+    "notFound": "Ce prêt est introuvable.",
+    "signedOn": "signé le {{date}}",
+    "debitedFrom": "prélevé sur {{account}}",
+    "stats": {
+      "principal": "Emprunté",
+      "outstanding": "Restant dû",
+      "kind": "Type",
+      "rate": "Taux",
+      "payment": "Mensualité",
+      "paymentQuarterly": "Échéance",
+      "insurance": "Assurance",
+      "outstandingRevolving": "Encours",
+      "limit": "Plafond",
+      "maturity": "Dernière échéance"
+    },
+    "schedule": {
+      "title": "Échéancier",
+      "hint": "plan calculé",
+      "empty": "Les conditions saisies ne permettent pas de calculer d'échéancier.",
+      "col": {
+        "date": "Échéance",
+        "payment": "Mensualité",
+        "capital": "Capital",
+        "interest": "Intérêts",
+        "insurance": "Assurance",
+        "outstanding": "Restant dû"
+      },
+      "projected": "Projetée",
+      "balloon": "Ballon",
+      "deferred": "Différé",
+      "capitalized": "Capitalisés",
+      "upcoming": "À venir",
+      "due": "Échue",
+      "revolvingTitle": "Pas d'échéancier",
+      "revolvingBody": "Un crédit révolving n'a pas d'échéancier : seuls les intérêts sur l'encours sont projetés.",
+      "revolvingHeadroom": "Marge de tirage restante : {{amount}}.",
+      "insuranceNote": "L'assurance est hors mensualité : le prélèvement réel vaut mensualité + assurance."
+    },
+    "rates": {
+      "title": "Taux",
+      "hint": "révisions passées et paliers projetés",
+      "add": "Palier",
+      "empty": "Aucune révision saisie — le taux de signature s'applique.",
+      "col": {
+        "from": "À partir du",
+        "rate": "Taux",
+        "nature": "Nature"
+      },
+      "actual": "Constaté",
+      "forecast": "Projeté",
+      "dialogTitle": "Nouveau palier de taux",
+      "dialogDescription": "Une révision qui a eu lieu, ou une hypothèse de pilotage. Les échéances au-delà de la dernière révision constatée sont marquées projetées.",
+      "fromLabel": "Date d'effet",
+      "rateLabel": "Taux annuel (%)",
+      "natureLabel": "Nature",
+      "success": "Palier enregistré",
+      "deleted": "Palier supprimé"
+    },
+    "documents": {
+      "title": "Documents",
+      "empty": "Aucun document rattaché à ce prêt."
+    },
+    "menu": {
+      "correct": "Corriger",
+      "delete": "Supprimer"
+    }
   }
 }

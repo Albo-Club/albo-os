@@ -222,8 +222,15 @@ export const storeForCompany = internalMutation({
         .query('documents')
         .withIndex('by_report', (q) => q.eq('reportId', reportId))
         .collect()
+      // `companyId` is optional on `documents` since the Dette & Garanties
+      // module, but a row carrying a `reportId` always has one: report rows
+      // are only ever created below, with `args.companyId`. A row without a
+      // company is therefore not part of this fan-out — skipping it is
+      // deliberate, not an oversight.
       for (const o of olds) {
-        if (o.companyId === args.companyId) await ctx.db.delete('documents', o._id)
+        if (o.companyId && o.companyId === args.companyId) {
+          await ctx.db.delete('documents', o._id)
+        }
       }
     } else {
       reportId = await ctx.db.insert('companyReports', reportFields)
