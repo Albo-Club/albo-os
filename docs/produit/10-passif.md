@@ -3,9 +3,18 @@
 ## À quoi ça sert
 
 La page Passif (`/app/<org>/passif`) suit ce que le véhicule **doit** et ce
-qui a été **apporté** : les capitaux propres (capital social, primes
-d'émission, augmentations de capital) et les comptes courants entre entités
-du groupe.
+qui a été **apporté** : la dette bancaire, les comptes courants entre entités
+du groupe, et les capitaux propres (capital social, primes d'émission,
+augmentations de capital).
+
+Les sections sont dans cet ordre d'utilité : **dette bancaire → comptes
+courants → capitaux propres**, puis, détaché en bas de page, les **garanties
+données**. Chaque section porte son propre total et **il n'y a pas de total
+global** : le capital n'est pas exigible, un chiffre qui l'additionnerait à
+la dette serait faux.
+
+La dette bancaire, les échéanciers et les garanties ont leur propre page :
+[Dette bancaire et garanties](18-dette-et-garanties.md).
 
 ## Capitaux propres
 
@@ -52,7 +61,12 @@ un signal : il reste un pointage à faire de l'autre côté.
 
 - Le rapprochement des transactions vers ces cibles se fait dans l'onglet
   **Transactions** de la Trésorerie, pas sur la page Passif (qui, elle,
-  permet le détachement).
+  permet le détachement). Le sélecteur y propose quatre groupes : Deals,
+  Prêts bancaires, Capitaux propres, Comptes courants.
+- **Un compte courant d'associé n'est pas un prêt bancaire.** Le premier
+  relie deux sociétés du groupe et son solde se dérive des mouvements ; le
+  second est une dette envers une banque, avec un échéancier calculé (cf.
+  [Dette bancaire et garanties](18-dette-et-garanties.md)).
 - Une transaction allouée au passif sort de la file de pointage mais n'est
   pas comptée comme « pointée deal » dans les vues deal.
 

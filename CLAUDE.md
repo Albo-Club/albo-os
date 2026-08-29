@@ -666,6 +666,20 @@ export const remove = mutation({
   has no built-in height cap, so tall content overflows the viewport with no
   way to reach the lower fields or the footer actions. Pattern already in
   `deals.$dealId.tsx`, `RoyaltiesPanel.tsx`, `CompanyReportsSection.tsx`.
+- ❌ Stocker un capital restant dû, une marge disponible, un solde ou tout
+  autre chiffre **dérivable**. L'échéancier d'un prêt est recalculé à chaque
+  lecture par `convex/lib/amortization.ts` (fonction pure), la marge d'un
+  actif gagé par `convex/lib/guarantees.ts`, les soldes de C/C par
+  `convex/liabilities.ts`. Un chiffre stocké se désynchronise ; un chiffre
+  dérivé ne peut pas. La **seule** exception assumée de tout le module est
+  l'encours d'un `revolving`, qu'aucun échéancier ne peut déduire — elle est
+  documentée au schéma et ne se généralise pas.
+- ❌ Transformer une attribution de **calendrier** en moteur de
+  rapprochement. `attributeActuals` place un flux DÉJÀ pointé sur l'échéance
+  dont il occupe la période : c'est déterministe et explicable par les seules
+  dates. Y ajouter un tri par vraisemblance, une présélection ou une
+  proposition rejouerait exactement le mécanisme retiré en août 2026
+  (cf. règle suivante).
 - ❌ Réintroduire une **suggestion de rapprochement** — puce dans la file de
   pointage, carte « rapprochements suggérés », classement de candidats,
   présélection d'une transaction ou d'une échéance, outil agent qui propose
@@ -677,6 +691,19 @@ export const remove = mutation({
   qu'il ne trie pas par vraisemblance. Le futur moteur se reconstruira sur
   les cas réels collectés à la main et sur `matchingDecisions` — pas en
   re-câblant l'ancien.
+- ❌ Prendre l'`orgId` en **argument** d'une mutation pour contourner une
+  ancre devenue optionnelle. `documents:create` résout l'org depuis l'ancre
+  présente (`companyId`, sinon `loanId`, sinon `guaranteeId`, sinon
+  `dealId`) puis vérifie l'appartenance dessus ; sans ancre, elle refuse
+  (`missing_anchor`). Une org fournie par l'appelant est un trou de tenancy,
+  pas un raccourci — cf. `KNOWN_ISSUES.md` « Un document ne peut se rattacher
+  qu'à une société ».
+- ❌ Relâcher une contrainte de schéma (requis → optionnel) **avant** d'avoir
+  rendu les lectures tolérantes à l'absence. Convex accepte d'élargir un
+  champ et refuse de le resserrer : le déploiement passe sans broncher, tout
+  le code qui suppose la présence continue de compiler, et casse à
+  l'exécution sur la première ligne sans valeur. L'ordre est : auditer,
+  rendre tolérant, relâcher, tester. Jamais l'inverse, jamais « en passant ».
 - ❌ Une nouvelle connexion à une plateforme externe avec sa table et son CRUD
   dédiés. Déclarer la plateforme dans le registre `convex/lib/connectors.ts`
   et passer par le noyau commun `convex/connections.ts` (table générique

@@ -38,6 +38,7 @@ expliqué simplement dans un encadré « Sous le capot ».
 | [Pointage](08-pointage.md) | Rapprochement des transactions, catégorisation, TVA |
 | [Prévisionnel](09-previsionnel.md) | Règles récurrentes, solde projeté, rapprochement au réalisé, alertes |
 | [Passif](10-passif.md) | Capitaux propres, comptes courants inter-entités |
+| [Dette bancaire et garanties](18-dette-et-garanties.md) | Prêts, échéanciers calculés, capital restant dû, nantissements et marge disponible |
 
 ### Transverse
 
