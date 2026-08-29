@@ -23,6 +23,56 @@ bas de page.
 
 ---
 
+## v1.196.2 — 29/08/2026 à 20:42 — Le cahier des charges du suivi de la dette et des garanties
+
+Albo OS sait dire ce que le groupe possède, pas ce qu'il doit. Aucun prêt
+bancaire n'existe aujourd'hui dans l'application : le capital restant dû de
+chaque société vit dans des tableaux d'amortissement PDF, et personne ne
+peut dire, sans ressortir les actes, combien il reste de marge disponible
+sur un contrat de capitalisation mis en gage pour trois prêts différents.
+
+Ce cahier des charges décrit le module à construire : les prêts contractés
+par chaque société, les garanties qui les couvrent (nantissement,
+hypothèque, privilège de prêteur de deniers, caution, garantie
+d'organisme), les biens immobiliers détenus par les SCI, et la structure
+capitalistique des filiales. Une garantie y est décrite par trois
+informations distinctes — sa forme, l'actif sur lequel elle porte, et qui
+s'engage — ce qui permet enfin de lire la même garantie depuis le prêt,
+depuis l'actif gagé, et depuis la société garante, sans jamais saisir
+l'information deux fois.
+
+Rien n'est développé à ce stade : le document est un plan découpé en sept
+lots livrables, dont le premier répond déjà à « combien cette société
+doit-elle, à qui, jusqu'à quand ». Le patrimoine personnel reste
+explicitement hors de l'application.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau fichier `SPEC.md` à la racine, issu d'une interview de cadrage.
+>   Aucun code applicatif : pas de `convex/`, pas de composant React, pas de
+>   migration.
+> - Modèle proposé : `loans` (paramètres du prêt, sans capital restant dû —
+>   dérivé d'une fonction pure d'amortissement, pas de table d'échéancier),
+>   `guarantees` (ligne unique inter-orgs portant forme / assiette
+>   polymorphe / garant, sur le patron `intercompanyLoans`), `properties` +
+>   `propertyValuations`. Extensions : deux valeurs sur `allocationKind`
+>   (`loan`, `property`), `equityPositions.ownershipBps`,
+>   `forecastEntries.loanId`, et le passage de `documents.companyId` en
+>   optionnel — seul changement de contrainte sur une table existante, à
+>   auditer.
+> - Autorisation : `requireGuaranteeParty` calqué sur `requireLoanParty`
+>   (membre d'au moins une org partie). Les orgs restent à plat, aucun
+>   héritage de droits.
+> - Réemploi assumé : `forecastEntries` avec `derivedKey "loan:{id}:{date}"`
+>   pour les échéances, le XIRR des deals pour le TRI d'un bien revendu, le
+>   patron « plan vs réel » des royalties pour l'échéancier.
+> - Le test de validation imposé (réinstancier les 10 lignes de l'annexe
+>   fournie) est déroulé ligne par ligne en § 10 : 7 rentrent, 3 sortent par
+>   décision produit, 1 dépend d'une question restée ouverte (emprunteur
+>   hors groupe).
+
+---
+
 ## v1.196.1 — 28/08/2026 à 16:15 — Le compte courant entre CALTE et Albo était à l'envers
 
 L'avance de trésorerie entre CALTE et Albo Club était enregistrée dans le
