@@ -45,5 +45,12 @@
     "neverReported": "No news since the funds were wired on {{date}}",
     "hint_one": "Participations with no report or communication for over {{count}} month (threshold set in Settings → General).",
     "hint_other": "Participations with no report or communication for over {{count}} months (threshold set in Settings → General)."
+  },
+  "overdueInstalments": {
+    "title": "Loan instalments to match",
+    "subtitle": "A due instalment with no matched direct debit — matching happens in the matching queue.",
+    "row": "{{label}} · {{lender}}",
+    "empty": "No pending instalment.",
+    "more": "and {{count}} more"
   }
 }

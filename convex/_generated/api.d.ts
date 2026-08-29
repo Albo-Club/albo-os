@@ -11,6 +11,7 @@
 import type * as admin from "../admin.js";
 import type * as agent from "../agent.js";
 import type * as agentTools from "../agentTools.js";
+import type * as agentToolsDebt from "../agentToolsDebt.js";
 import type * as agentToolsDocuments from "../agentToolsDocuments.js";
 import type * as agentToolsForecasts from "../agentToolsForecasts.js";
 import type * as agentToolsIntelligence from "../agentToolsIntelligence.js";
@@ -134,6 +135,7 @@ declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   agent: typeof agent;
   agentTools: typeof agentTools;
+  agentToolsDebt: typeof agentToolsDebt;
   agentToolsDocuments: typeof agentToolsDocuments;
   agentToolsForecasts: typeof agentToolsForecasts;
   agentToolsIntelligence: typeof agentToolsIntelligence;

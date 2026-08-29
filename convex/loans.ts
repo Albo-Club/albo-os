@@ -19,6 +19,7 @@ import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import {
+  attributeActuals,
   buildSchedule,
   outstandingAt,
   summarize,
@@ -176,12 +177,12 @@ export const listOptions = query({
 })
 
 /**
- * The loan sheet: the row, its rate series, its full schedule and the
- * headline figures — every one of them derived.
+ * The loan sheet: the row, its rate series, its full schedule, the matched
+ * transactions and the headline figures — every one of them derived.
  *
- * Reads NO transaction yet: matching a direct debit to a loan
- * (`allocation.kind: 'loan'`) is the next lot, and with it the « Réel »
- * column of the schedule.
+ * Matching a direct debit to a loan is a POINTAGE gesture; the sheet only
+ * reads (SPEC D41). The « Réel » column is the consequence of that gesture,
+ * never a second way to perform it.
  */
 export const getById = query({
   args: { loanId: v.id('loans') },
@@ -203,12 +204,50 @@ export const getById = query({
     const schedule = scheduleOf(loan, rates, now)
     const summary = summarize(loan, schedule, now)
 
+    // Transactions matched to this loan — the « Réel » column of the
+    // schedule and the transactions table under it.
+    const txs = await ctx.db
+      .query('transactions')
+      .withIndex('by_org_allocation_target', (q) =>
+        q.eq('orgId', loan.orgId).eq('allocation.targetId', loanId as string),
+      )
+      .collect()
+    const transactions = txs
+      .filter((tx) => tx.allocation?.kind === 'loan')
+      .map((tx) => ({
+        _id: tx._id,
+        direction: tx.direction,
+        amount: tx.amount,
+        transactionDate: tx.transactionDate,
+        rawLabel: tx.rawLabel,
+        counterparty: tx.counterparty ?? null,
+      }))
+      .sort((a, b) => b.transactionDate - a.transactionDate)
+
     const account = loan.bankAccountId
       ? await ctx.db.get('bankAccounts', loan.bankAccountId)
       : null
 
+    // Per-instalment actual: a CALENDAR attribution, never a likelihood
+    // match (cf. lib/amortization.ts:attributeActuals).
+    const actuals = attributeActuals(
+      schedule,
+      transactions.map((tx) => ({
+        transactionDate: tx.transactionDate,
+        amountCents: tx.direction === 'out' ? tx.amount : -tx.amount,
+      })),
+    )
+
     return {
       loan,
+      transactions,
+      // Actual outflows, all instalments together. The plan stays the source
+      // of the outstanding; the actual is a CONTROL (§ 5.1) — a divergence
+      // points at an incomplete matching or an unrecorded event, not a bug.
+      paidCents: transactions.reduce(
+        (sum, tx) => sum + (tx.direction === 'out' ? tx.amount : -tx.amount),
+        0,
+      ),
       rates: rateRows
         .map((row) => ({
           _id: row._id,
@@ -218,7 +257,10 @@ export const getById = query({
           notes: row.notes ?? null,
         }))
         .sort((a, b) => b.fromDate - a.fromDate),
-      schedule,
+      schedule: schedule.map((row, index) => ({
+        ...row,
+        actualCents: actuals[index],
+      })),
       accountLabel: account ? (account.displayName ?? account.label) : null,
       summary: {
         ...summary,

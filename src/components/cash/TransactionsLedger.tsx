@@ -163,6 +163,9 @@ export function TransactionsLedger({
   // Lightweight options (ids + names only) for the inline matching comboboxes.
   const deals = useConvexQuery(api.deals.listOptions, { orgId })
   const liabilities = useConvexQuery(api.liabilities.listOptions, { orgId })
+  // Bank debt has its own lightweight options query — each combobox group is
+  // fed DIRECTLY from its source, never from a flattened re-filtered list.
+  const bankLoans = useConvexQuery(api.loans.listOptions, { orgId })
 
   const byAttachment = filter === 'deal' || filter === 'liability'
   const byTransferState = filter === 'transfer_incomplete'
@@ -188,13 +191,17 @@ export function TransactionsLedger({
   const upcoming = useConvexQuery(api.forecasts.getUpcomingEntries, { orgId })
   const liabilityOptions = useMemo<LiabilityOptionGroups | undefined>(() => {
     if (!liabilities) return undefined
-    return buildLiabilityOptions(liabilities, {
-      equityType: (type) =>
-        t(`passif:equity.type.${type}`, { defaultValue: type }),
-      receivable: t('passif:loans.receivable'),
-      payable: t('passif:loans.payable'),
-    })
-  }, [liabilities, t])
+    return buildLiabilityOptions(
+      liabilities,
+      {
+        equityType: (type) =>
+          t(`passif:equity.type.${type}`, { defaultValue: type }),
+        receivable: t('passif:loans.receivable'),
+        payable: t('passif:loans.payable'),
+      },
+      bankLoans,
+    )
+  }, [liabilities, bankLoans, t])
 
   // Keep the last list displayed while a new filter/search reloads (no flash).
   const lastRef = useRef(liveTransactions)

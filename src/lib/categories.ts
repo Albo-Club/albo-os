@@ -27,6 +27,8 @@ export const DERIVED_FORECAST_CATEGORIES = [
   'deals',
   'equity',
   'intercos',
+  // Bank debt service (`allocation.kind === 'loan'`) — cf. the convex mirror.
+  'debt',
   'taxes',
 ] as const
 

@@ -498,6 +498,62 @@ function Todo() {
         )}
       </TodoSection>
 
+      {/* Loan instalments due with nothing matched. A DERIVED signal (D19),
+          never stored: the schedule is recomputed and compared with what
+          actually left the bank. It says WHICH instalment is waiting — the
+          matching itself stays in the queue, and nothing is proposed here. */}
+      <TodoSection
+        title={t('overdueInstalments.title')}
+        count={data.overdueInstalmentsCount}
+      >
+        {data.overdueInstalments.length === 0 ? (
+          <EmptyHint label={t('overdueInstalments.empty')} />
+        ) : (
+          <>
+            <div className="divide-y rounded-lg border">
+              {data.overdueInstalments.map((row) => (
+                <div
+                  key={`${row.loanId}-${row.date}`}
+                  className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2.5 text-sm"
+                >
+                  <span className="flex min-w-0 flex-col">
+                    <Link
+                      to="/app/$orgSlug/passif/prets/$loanId"
+                      params={{ orgSlug, loanId: row.loanId }}
+                      className="truncate font-medium hover:underline"
+                    >
+                      {t('overdueInstalments.row', {
+                        label: row.label,
+                        lender: row.lenderName,
+                      })}
+                    </Link>
+                    <span className="text-muted-foreground text-xs">
+                      {fmtDate(row.date)}
+                    </span>
+                  </span>
+                  <span className="tabular-nums">
+                    {fmtEur(row.amountCents)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {data.overdueInstalmentsCount >
+            data.overdueInstalments.length ? (
+              <p className="text-muted-foreground text-xs">
+                {t('overdueInstalments.more', {
+                  count:
+                    data.overdueInstalmentsCount -
+                    data.overdueInstalments.length,
+                })}
+              </p>
+            ) : null}
+            <p className="text-muted-foreground text-xs">
+              {t('overdueInstalments.subtitle')}
+            </p>
+          </>
+        )}
+      </TodoSection>
+
       <TodoSection
         title={t('reports.title')}
         count={data.missingReports.length}

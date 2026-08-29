@@ -14,17 +14,19 @@
 
 /** Pointable liability target (option of a pointage combobox group). */
 export type LiabilityOption = {
-  kind: 'equity' | 'intercompany_loan'
+  kind: 'equity' | 'intercompany_loan' | 'loan'
   /** Target _id as a string (`transactions.allocation` convention). */
   targetId: string
   label: string
   sublabel: string
 }
 
-/** The two liability groups of the combobox, built separately. */
+/** The three liability groups of the combobox, built separately. */
 export type LiabilityOptionGroups = {
   equityOptions: Array<LiabilityOption>
   loanOptions: Array<LiabilityOption>
+  /** Bank debt (`loans`) — NOT the shareholder current accounts above. */
+  bankLoanOptions: Array<LiabilityOption>
 }
 
 /** Subset of the `getLiabilities` return consumed by the combobox. */
@@ -41,6 +43,18 @@ export type LiabilitiesForOptions = {
   }>
 }
 
+/**
+ * Subset of the `loans:listOptions` return consumed by the combobox. A
+ * SEPARATE source from `LiabilitiesForOptions` on purpose: each group is fed
+ * directly from its own query, never from a flattened list re-filtered by
+ * `kind` — that is the wiring the tests lock down.
+ */
+export type BankLoansForOptions = Array<{
+  _id: string
+  label: string
+  lenderName: string
+}>
+
 /** Resolved labels (i18n on the caller side). */
 export type LiabilityOptionLabels = {
   /** Label of an equity position type (e.g. « Capital social »). */
@@ -52,13 +66,18 @@ export type LiabilityOptionLabels = {
 }
 
 /**
- * Builds the « Capitaux propres » and « Comptes courants » group options of
- * the pointage combobox. A loan is identified by its `_id` (an
+ * Builds the « Capitaux propres », « Comptes courants » and « Prêts » group
+ * options of the pointage combobox. A loan is identified by its `_id` (an
  * `intercompanyLoan` has NO `orgId` — only fromOrgId/toOrgId).
+ *
+ * `bankLoans` is undefined while its own query is still loading: the group
+ * then renders EMPTY rather than absent — « missing » and « empty » must
+ * stay distinguishable (KNOWN_ISSUES « Passif »).
  */
 export function buildLiabilityOptions(
   liabilities: LiabilitiesForOptions,
   labels: LiabilityOptionLabels,
+  bankLoans: BankLoansForOptions = [],
 ): LiabilityOptionGroups {
   return {
     equityOptions: liabilities.equityPositions.map((position) => ({
@@ -72,6 +91,12 @@ export function buildLiabilityOptions(
       targetId: loan._id,
       label: loan.counterpartyName ?? '—',
       sublabel: loan.side === 'creditor' ? labels.receivable : labels.payable,
+    })),
+    bankLoanOptions: bankLoans.map((loan) => ({
+      kind: 'loan' as const,
+      targetId: loan._id,
+      label: loan.label,
+      sublabel: loan.lenderName,
     })),
   }
 }

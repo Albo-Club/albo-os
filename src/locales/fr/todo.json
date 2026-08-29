@@ -45,5 +45,12 @@
     "neverReported": "Aucune nouvelle depuis le versement des fonds du {{date}}",
     "hint_one": "Participations sans report ni communication depuis plus de {{count}} mois (seuil réglable dans Réglages → Général).",
     "hint_other": "Participations sans report ni communication depuis plus de {{count}} mois (seuil réglable dans Réglages → Général)."
+  },
+  "overdueInstalments": {
+    "title": "Échéances de prêt à pointer",
+    "subtitle": "Une échéance échue sans prélèvement rattaché — le rattachement se fait dans la file de Pointage.",
+    "row": "{{label}} · {{lender}}",
+    "empty": "Aucune échéance en attente.",
+    "more": "et {{count}} autre(s)"
   }
 }

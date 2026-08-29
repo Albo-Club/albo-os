@@ -253,11 +253,16 @@ export const guaranteeSubjectKind = v.union(
 // `matchStatus: 'internal_transfer'` (a « écarté » subtype, excluded from the
 // analysis) and carry `allocation.kind === 'transfer'` pointing at their
 // shared `transfers` row — cf. KNOWN_ISSUES.md « Virements internes ».
+//
+// `loan` targets a BANK loan (`loans`), not a shareholder current account —
+// `intercompany_loan` keeps that meaning. The two are unrelated: one is a
+// debt to a bank, the other an advance between two group companies.
 const allocationKind = v.union(
   v.literal('deal'),
   v.literal('equity'),
   v.literal('intercompany_loan'),
   v.literal('transfer'),
+  v.literal('loan'),
 )
 
 const forecastConfidence = v.union(
@@ -1937,7 +1942,9 @@ export default defineSchema({
    * it.
    *
    * `derivedKey` = idempotency key for auto rows, format
-   * "rule:{ruleId}:{YYYY-MM-DD}", "vat:{orgId}:{YYYY-Qn}" (quarterly VAT
+   * "rule:{ruleId}:{YYYY-MM-DD}", "loan:{loanId}:{YYYY-MM-DD}" (an
+   * instalment derived from a bank loan's computed schedule — cf.
+   * convex/forecasts.ts:expandLoanSchedules), "vat:{orgId}:{YYYY-Qn}" (quarterly VAT
    * suggestion — no ruleId, so the row stays a plain editable one-off),
    * "airtable:{recordId}" (one-shot port of the Airtable forecast tables —
    * cf. convex/migrations/airtableForecastsToEntries.ts, likewise a plain
@@ -1957,6 +1964,9 @@ export default defineSchema({
     // Optional deal link: copied from the rule by expandRules, or set by
     // hand on a one-off. Feeds the deal page's forecast section.
     dealId: v.optional(v.id('deals')),
+    // Optional bank-loan link, symmetric to `dealId`: an instalment derived
+    // from a loan's schedule (`derivedKey` "loan:{loanId}:{YYYY-MM-DD}").
+    loanId: v.optional(v.id('loans')),
     derivedKey: v.optional(v.string()),
     overridden: v.boolean(),
     realizedTransactionId: v.optional(v.id('transactions')), // filled on matching
@@ -1976,7 +1986,8 @@ export default defineSchema({
     .index('by_org_and_date', ['orgId', 'date'])
     .index('by_derivedKey', ['derivedKey'])
     .index('by_rule', ['ruleId'])
-    .index('by_deal', ['dealId']),
+    .index('by_deal', ['dealId'])
+    .index('by_loan', ['loanId']),
 
   /**
    * todos — manual tasks of the « To do » tab (convex/todo.ts). Only the

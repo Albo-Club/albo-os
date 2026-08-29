@@ -426,6 +426,9 @@ function LoanSheet() {
                     <TableHead className="text-right">
                       {t('passif:loan.schedule.col.outstanding')}
                     </TableHead>
+                    <TableHead className="text-right">
+                      {t('passif:loan.schedule.colActual')}
+                    </TableHead>
                     <TableHead className="w-32" />
                   </TableRow>
                 </TableHeader>
@@ -465,6 +468,23 @@ function LoanSheet() {
                         <TableCell className="text-right tabular-nums">
                           {fmtEurCents(row.remainingCents)}
                         </TableCell>
+                        {/* The actual is the CONSEQUENCE of a matching
+                            gesture made in the queue, never a way to make
+                            one here (SPEC D41). Amber marks a wait, not a
+                            fault — red stays for what goes wrong. */}
+                        <TableCell className="text-right tabular-nums">
+                          {row.actualCents != null ? (
+                            <span className="text-emerald-700 dark:text-emerald-400">
+                              {fmtEurCents(row.actualCents)}
+                            </span>
+                          ) : isDue ? (
+                            <span className="text-amber-700 dark:text-amber-400">
+                              {t('passif:loan.schedule.toMatch')}
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </TableCell>
                         <TableCell className="space-x-1 text-right">
                           {row.isBalloon ? (
                             <Badge variant="outline">
@@ -497,11 +517,78 @@ function LoanSheet() {
               pageCount={pageCount}
               onPageChange={setPage}
             />
+            <p className="text-muted-foreground text-xs">
+              {t('passif:loan.schedule.attributionNote')}
+            </p>
             {loan.insuranceMonthlyCents != null ? (
               <p className="text-muted-foreground text-xs">
                 {t('passif:loan.schedule.insuranceNote')}
               </p>
             ) : null}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-medium">
+            {t('passif:loan.transactions.title')}
+          </h2>
+          <p className="text-muted-foreground text-xs">
+            {t('passif:loan.transactions.hint')}
+          </p>
+        </div>
+        {sheet.transactions.length === 0 ? (
+          <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
+            {t('passif:loan.transactions.empty')}
+          </div>
+        ) : (
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>
+                    {t('passif:loan.transactions.col.date')}
+                  </TableHead>
+                  <TableHead>
+                    {t('passif:loan.transactions.col.direction')}
+                  </TableHead>
+                  <TableHead className="text-right">
+                    {t('passif:loan.transactions.col.amount')}
+                  </TableHead>
+                  <TableHead>
+                    {t('passif:loan.transactions.col.label')}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sheet.transactions.map((tx) => (
+                  <TableRow key={tx._id}>
+                    <TableCell className="whitespace-nowrap tabular-nums">
+                      {fmtDate(tx.transactionDate)}
+                    </TableCell>
+                    <TableCell>
+                      {t(`passif:loan.transactions.${tx.direction}`)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {fmtEurCents(tx.amount)}
+                    </TableCell>
+                    <TableCell className="max-w-[320px] truncate">
+                      {tx.rawLabel}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="bg-muted/40 font-medium">
+                  <TableCell colSpan={2}>
+                    {t('passif:loan.transactions.total')}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {fmtEurCents(sheet.paidCents)}
+                  </TableCell>
+                  <TableCell />
+                </TableRow>
+              </TableBody>
+            </Table>
           </div>
         )}
       </section>

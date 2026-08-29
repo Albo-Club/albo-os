@@ -85,12 +85,57 @@ describe('buildLiabilityOptions', () => {
     assert.equal(groups.loanOptions[0].sublabel, 'Dette')
   })
 
-  it('aucune donnée → deux groupes vides (jamais undefined)', () => {
+  it('aucune donnée → trois groupes vides (jamais undefined)', () => {
     const groups = buildLiabilityOptions(
       { equityPositions: [], loans: [] },
       labels,
     )
 
-    assert.deepEqual(groups, { equityOptions: [], loanOptions: [] })
+    assert.deepEqual(groups, {
+      equityOptions: [],
+      loanOptions: [],
+      bankLoanOptions: [],
+    })
+  })
+
+  it('un prêt bancaire alimente le groupe Prêts', () => {
+    const groups = buildLiabilityOptions(
+      { equityPositions: [], loans: [] },
+      labels,
+      [
+        {
+          _id: 'bankloan_1',
+          label: 'Prêt Palatine 2021',
+          lenderName: 'Banque Palatine',
+        },
+      ],
+    )
+
+    assert.deepEqual(groups.bankLoanOptions, [
+      {
+        kind: 'loan',
+        targetId: 'bankloan_1',
+        label: 'Prêt Palatine 2021',
+        sublabel: 'Banque Palatine',
+      },
+    ])
+    // Chaque groupe vient de SA source : un prêt bancaire ne fuit jamais
+    // dans les comptes courants, et réciproquement.
+    assert.deepEqual(groups.loanOptions, [])
+  })
+
+  it('un compte courant ne fuit pas dans le groupe Prêts', () => {
+    const groups = buildLiabilityOptions(
+      {
+        equityPositions: [],
+        loans: [
+          { _id: 'loan_1', side: 'creditor', counterpartyName: 'Albo Club' },
+        ],
+      },
+      labels,
+    )
+
+    assert.equal(groups.loanOptions.length, 1)
+    assert.deepEqual(groups.bankLoanOptions, [])
   })
 })

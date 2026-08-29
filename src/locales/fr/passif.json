@@ -215,7 +215,11 @@
       "revolvingTitle": "Pas d'échéancier",
       "revolvingBody": "Un crédit révolving n'a pas d'échéancier : seuls les intérêts sur l'encours sont projetés.",
       "revolvingHeadroom": "Marge de tirage restante : {{amount}}.",
-      "insuranceNote": "L'assurance est hors mensualité : le prélèvement réel vaut mensualité + assurance."
+      "insuranceNote": "L'assurance est hors mensualité : le prélèvement réel vaut mensualité + assurance.",
+      "colActual": "Réel",
+      "toMatch": "À pointer",
+      "matchedHint": "Le réel inclut l'assurance : il ne vaut pas la mensualité du plan, et c'est normal.",
+      "attributionNote": "Le réel est rattaché à l'échéance dont il occupe la période — un rapprochement de calendrier, pas une proposition. Le rattachement d'une transaction à ce prêt se fait dans la file de Pointage."
     },
     "rates": {
       "title": "Taux",
@@ -244,6 +248,20 @@
     "menu": {
       "correct": "Corriger",
       "delete": "Supprimer"
+    },
+    "transactions": {
+      "title": "Transactions",
+      "hint": "rattachées depuis la file de Pointage",
+      "empty": "Aucune transaction rattachée à ce prêt.",
+      "col": {
+        "date": "Date",
+        "direction": "Sens",
+        "amount": "Montant",
+        "label": "Libellé"
+      },
+      "in": "Entrée",
+      "out": "Sortie",
+      "total": "Total réel versé"
     }
   },
   "guarantees": {

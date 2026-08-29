@@ -171,16 +171,17 @@ export async function applyCategorization(
 }
 
 /**
- * Allocates a transaction to an equity position (`equity`) or an
- * inter-entity current account (`intercompany_loan`). The target must belong
- * to the same org as the transaction (for a C/C: the tx org must be one of
- * the two parties to the loan). NEVER writes to `matchingDecisions`, never
- * touches `reconciled` (mirror of deal matching only).
+ * Allocates a transaction to an equity position (`equity`), an inter-entity
+ * current account (`intercompany_loan`) or a BANK loan (`loan`). The target
+ * must belong to the same org as the transaction (for a C/C: the tx org must
+ * be one of the two parties to the loan). NEVER writes to
+ * `matchingDecisions`, never touches `reconciled` (mirror of deal matching
+ * only).
  */
 export async function applyAllocateToLiability(
   ctx: MutCtx,
   tx: Doc<'transactions'>,
-  kind: 'equity' | 'intercompany_loan',
+  kind: 'equity' | 'intercompany_loan' | 'loan',
   targetId: string,
 ) {
   // Guardrail: no silent double matching. A tx matched to a deal must be
@@ -196,6 +197,15 @@ export async function applyAllocateToLiability(
       : null
     if (!position) throw new ConvexError('not_found')
     if (position.orgId !== tx.orgId) throw new ConvexError('equity_wrong_org')
+  } else if (kind === 'loan') {
+    // A bank loan belongs to exactly ONE org (the borrowing company), so a
+    // plain org comparison is enough — no two-sided case as for a C/C.
+    const bankLoanId = ctx.db.normalizeId('loans', targetId)
+    const bankLoan = bankLoanId ? await ctx.db.get('loans', bankLoanId) : null
+    if (!bankLoan) throw new ConvexError('not_found')
+    if (bankLoan.orgId !== tx.orgId) {
+      throw new ConvexError('bank_loan_wrong_org')
+    }
   } else {
     const loanId = ctx.db.normalizeId('intercompanyLoans', targetId)
     const loan = loanId ? await ctx.db.get('intercompanyLoans', loanId) : null

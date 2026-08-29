@@ -215,7 +215,11 @@
       "revolvingTitle": "No schedule",
       "revolvingBody": "A revolving credit has no schedule: only the interest on the drawn amount is projected.",
       "revolvingHeadroom": "Remaining drawdown headroom: {{amount}}.",
-      "insuranceNote": "Insurance sits outside the instalment: the actual direct debit is instalment + insurance."
+      "insuranceNote": "Insurance sits outside the instalment: the actual direct debit is instalment + insurance.",
+      "colActual": "Actual",
+      "toMatch": "To match",
+      "matchedHint": "The actual includes the insurance: it does not equal the planned instalment, and that is expected.",
+      "attributionNote": "An actual is placed on the instalment whose period it falls in — a calendar attribution, not a proposal. Matching a transaction to this loan happens in the matching queue."
     },
     "rates": {
       "title": "Rate",
@@ -244,6 +248,20 @@
     "menu": {
       "correct": "Correct",
       "delete": "Delete"
+    },
+    "transactions": {
+      "title": "Transactions",
+      "hint": "matched from the matching queue",
+      "empty": "No transaction matched to this loan.",
+      "col": {
+        "date": "Date",
+        "direction": "Direction",
+        "amount": "Amount",
+        "label": "Label"
+      },
+      "in": "In",
+      "out": "Out",
+      "total": "Total actually paid"
     }
   },
   "guarantees": {

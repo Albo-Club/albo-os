@@ -178,6 +178,7 @@ function RowActions({
         deals={deals}
         equityOptions={liabilityOptions?.equityOptions}
         loanOptions={liabilityOptions?.loanOptions}
+        bankLoanOptions={liabilityOptions?.bankLoanOptions}
         direction={direction}
         onSelect={onAssign}
         disabled={pending}
@@ -229,7 +230,7 @@ function MatchLink({
   orgSlug,
 }: {
   allocation: {
-    kind: 'deal' | 'equity' | 'intercompany_loan' | 'transfer'
+    kind: 'deal' | 'equity' | 'intercompany_loan' | 'transfer' | 'loan'
     targetId: string
   }
   dealsById: Map<string, DealOption>
@@ -354,6 +355,7 @@ export function PointageTable({
         [
           ...(liabilityOptions?.equityOptions ?? []),
           ...(liabilityOptions?.loanOptions ?? []),
+          ...(liabilityOptions?.bankLoanOptions ?? []),
         ].map((o) => [o.targetId, o]),
       ),
     [liabilityOptions],
@@ -559,7 +561,8 @@ export function PointageTable({
         await unpairTransfer({ transactionId: tx._id })
       } else if (
         tx.allocation?.kind === 'equity' ||
-        tx.allocation?.kind === 'intercompany_loan'
+        tx.allocation?.kind === 'intercompany_loan' ||
+        tx.allocation?.kind === 'loan'
       ) {
         await deallocateTransaction({ transactionId: tx._id })
       } else {

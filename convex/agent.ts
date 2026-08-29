@@ -5,6 +5,7 @@ import { components } from './_generated/api'
 import { dealTools } from './agentTools'
 import { documentTools } from './agentToolsDocuments'
 import { forecastTools } from './agentToolsForecasts'
+import { debtTools } from './agentToolsDebt'
 import { liabilityTools } from './agentToolsLiabilities'
 import { pointageTools } from './agentToolsPointage'
 import { projectionTools } from './agentToolsProjections'
@@ -36,6 +37,7 @@ export const chatAgent = new Agent(components.agent, {
     ...dealTools,
     ...pointageTools,
     ...liabilityTools,
+    ...debtTools,
     ...forecastTools,
     ...valuationTools,
     ...projectionTools,

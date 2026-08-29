@@ -399,6 +399,48 @@ export function outstandingAt(
   return outstanding
 }
 
+/** An actual outflow matched to the loan, as read from `transactions`. */
+export type ActualPayment = {
+  transactionDate: number
+  amountCents: number
+}
+
+/**
+ * Attributes each actual payment to the instalment whose PERIOD contains its
+ * date, and returns the total per instalment (`null` = nothing landed there).
+ *
+ * ⚠️ This is a CALENDAR attribution, not a match. It answers « what went out
+ * of the bank between this instalment and the next », which is deterministic
+ * and explainable from the dates alone. It is NOT a likelihood ranking, it
+ * proposes nothing and pre-selects nothing: the human decides which
+ * transaction belongs to the loan, in the matching queue, and this only
+ * places the consequence on the right line (repo rule, cf. CLAUDE.md).
+ *
+ * A payment made before the first instalment is attributed to the first; one
+ * made after the last, to the last. So a late payment shows up on the period
+ * it actually landed in — which is the honest reading, and the one that makes
+ * a missed instalment visible rather than papering over it.
+ */
+export function attributeActuals(
+  schedule: ReadonlyArray<ScheduleRow>,
+  payments: ReadonlyArray<ActualPayment>,
+): Array<number | null> {
+  const totals = new Array<number | null>(schedule.length).fill(null)
+  if (schedule.length === 0) return totals
+
+  for (const payment of payments) {
+    // Last instalment whose date is <= the payment; the first one when the
+    // payment predates the whole schedule.
+    let index = 0
+    for (let k = 0; k < schedule.length; k++) {
+      if (schedule[k].date <= payment.transactionDate) index = k
+      else break
+    }
+    totals[index] = (totals[index] ?? 0) + payment.amountCents
+  }
+  return totals
+}
+
 export type ScheduleSummary = {
   /** Capital outstanding today. */
   outstandingCents: number
