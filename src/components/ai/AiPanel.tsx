@@ -260,9 +260,10 @@ export function AiPanel({
 }) {
   const { t, i18n } = useTranslation(['chat', 'common'])
   const location = useLocation()
-  // Entity currently in view (deal / company sheet), read from the matched
-  // route params — forwarded to the agent so it knows what "this deal / this
-  // company" refers to. `strict: false`: undefined off those routes.
+  // Entity currently in view (deal / company / loan / property sheet), read
+  // from the matched route params — forwarded to the agent so it knows what
+  // "this deal", "ce prêt" or "ce bien" refers to. `strict: false`:
+  // undefined off those routes.
   const params = useParams({ strict: false })
   const entity = useMemo(() => {
     if (typeof params.dealId === 'string') {
@@ -271,8 +272,14 @@ export function AiPanel({
     if (typeof params.companyId === 'string') {
       return { kind: 'company' as const, id: params.companyId }
     }
+    if (typeof params.loanId === 'string') {
+      return { kind: 'loan' as const, id: params.loanId }
+    }
+    if (typeof params.propertyId === 'string') {
+      return { kind: 'property' as const, id: params.propertyId }
+    }
     return undefined
-  }, [params.dealId, params.companyId])
+  }, [params.dealId, params.companyId, params.loanId, params.propertyId])
   const [threadId, setThreadId] = useState<string | null>(null)
   // true = the user asked for a new thread: don't re-adopt the latest
   // existing thread until they have sent something.

@@ -91,6 +91,37 @@ export const BASE_INSTRUCTIONS = [
     'deallocateTransaction to detach a transaction from a liability (C/C or ' +
     'equity) — returns it to the unmatched queue.',
 
+  // Bank debt, guarantees and real estate
+  'Bank debt: listLoans gives the loans of the org with their CAPITAL ' +
+    'OUTSTANDING, and getLoanSchedule the amortization schedule of one. ' +
+    'Nothing derivable is stored — the outstanding is recomputed from the ' +
+    'terms, so you enter the CONTRACT (amount, duration, rate, frequency, ' +
+    'amortization kind), never the outstanding. The one exception is a ' +
+    'revolving credit, whose principalCents IS the drawn amount. Revising a ' +
+    'variable rate is addLoanRate (the contract provides for it); ' +
+    'renegotiating is addLoanAmendment (it keeps the history); fixing a typo ' +
+    'is neither — send the user to the app.',
+
+  'Guarantees: a security carries THREE independent facts — its form, the ' +
+    'asset it bites on, and who commits. listGuarantees reads them from any ' +
+    'of the three sides, and getPledgesOnDeal gives the AVAILABLE MARGIN on ' +
+    'a pledged placement. That margin is deliberately pessimistic: a pledged ' +
+    'amount does not shrink as the debt is repaid. An unquantified guarantee ' +
+    '(an unlimited caution) is excluded from the total and counted apart — ' +
+    'never report it as 0. A mainlevée is releaseGuarantee, which keeps the ' +
+    'row as history.',
+
+  'Real estate: listProperties gives the properties of the org with their ' +
+    'cost price line item by line item. Each line item has ONE source — an ' +
+    'entered amount OR the matched flows, never the two added together — and ' +
+    'the choice is per line item (setPropertyCostSource). Rents, charges, ' +
+    'yield and latent gain are NEVER entered: they come from matched ' +
+    'transactions and from valuations (addPropertyValuation, no automatic ' +
+    'estimate). A flow is matched to a property with ' +
+    'allocateTransactionToLiability, kind "property", and it REQUIRES a ' +
+    'category saying what the flow is. All property amounts are ' +
+    'TAX-INCLUSIVE.',
+
   // Forecast
   'Cash-flow forecast: recurring rules (listForecastRules / ' +
     'createForecastRule) expand into dated entries (expandForecastRules, ' +
@@ -135,17 +166,32 @@ export const BASE_INSTRUCTIONS = [
     'Deletion operations are NOT available via tools (except ' +
     'deleteForecastRule, which is reversible by re-creating the rule) — ' +
     'for other deletions (companies, deals, documents, bank accounts, ' +
-    'equity positions, loans), redirect the user to the app UI.',
+    'equity positions, C/C, bank loans, guarantees, properties), redirect ' +
+    'the user to the app UI. A mainlevée (releaseGuarantee) is NOT a ' +
+    'deletion and is available.',
 ].join('\n\n')
 
 /**
  * Per-message system prompt: base instructions + where the user currently is
  * in the app (route + org), so the agent can ground its answers.
  */
+/**
+ * Which tools to reach for when the user says « this <entity> ». One entry
+ * per sheet that can carry a context — a sheet whose kind is missing here
+ * would send the model hunting.
+ */
+const ENTITY_TOOLS: Record<'deal' | 'company' | 'loan' | 'property', string> = {
+  deal: 'listDeals then filter by this id, listValuations, listTransactions',
+  company:
+    'getCompany, listCompanyReports, getCompanyIntelligence, listCompanyDocuments',
+  loan: 'listLoans then filter by this id, getLoanSchedule, listGuarantees',
+  property: 'listProperties then filter by this id, listGuarantees',
+}
+
 export function buildInstructions(pageContext?: {
   route?: string
   orgName?: string
-  entity?: { kind: 'deal' | 'company'; id: string }
+  entity?: { kind: 'deal' | 'company' | 'loan' | 'property'; id: string }
 }): string {
   const parts = [BASE_INSTRUCTIONS]
   if (pageContext?.orgName) {
@@ -164,11 +210,7 @@ export function buildInstructions(pageContext?: {
       `The user is viewing the ${kind} with id "${id}". When they say ` +
         `"this ${kind}" (or "ce deal" / "cette société"), they mean this one — ` +
         'operate on it. Fetch its details first with the matching tool ' +
-        `(${
-          kind === 'deal'
-            ? 'listDeals then filter by this id, listValuations, listTransactions'
-            : 'getCompany, listCompanyReports, getCompanyIntelligence, listCompanyDocuments'
-        }) before answering.`,
+        `(${ENTITY_TOOLS[kind]}) before answering.`,
     )
   }
   return parts.join('\n\n')

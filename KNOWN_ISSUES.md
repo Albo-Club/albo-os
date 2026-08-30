@@ -5464,3 +5464,31 @@ lue par le front est « contient quelque chose **OU** activé »
 - **Seuls les slugs connus survivent à l'écriture** : `setEnabled` refiltre
   la liste sur `ALL_MODULES`, donc un module retiré du code ne traîne pas
   dans les lignes de production.
+
+## `needsApproval` ne se relit PAS comme un booléen
+
+Piège trouvé en écrivant le test du lot 7. Le SDK AI **normalise**
+`needsApproval` en **prédicat** : qu'on lui passe `true`, `false` ou rien du
+tout, l'outil construit expose une **fonction**.
+
+```ts
+// FAUX — passe silencieusement sur TOUS les outils : une fonction n'est
+// pas `true`, donc l'assertion est verte même sur un outil sans le flag.
+expect(tool.needsApproval).toBe(true)
+
+// JUSTE — il faut l'APPELER.
+expect(await tool.needsApproval({}, {})).toBe(true)
+```
+
+C'est exactement le genre de test vert qui ne protège rien : il aurait
+laissé passer un outil d'écriture ajouté sans le flag, c'est-à-dire le seul
+scénario qu'il existe pour attraper. `convex/regression.debtWrites.test.ts`
+appelle le prédicat, et vérifie aussi que les outils de **lecture** rendent
+`false` — sinon la moitié « les lectures ne demandent pas » ne prouverait
+rien non plus.
+
+⚠️ Ne pas confondre avec le serveur **MCP**, où `needsApproval` n'a **aucun
+effet** (pas d'UI in-app pour l'afficher) : là c'est le flag `write: true` de
+`defineTool`, donc l'annotation `readOnlyHint: false`, qui fait demander
+confirmation au client. Les deux sont testés séparément parce que ce sont
+deux mécanismes différents sur les mêmes opérations.

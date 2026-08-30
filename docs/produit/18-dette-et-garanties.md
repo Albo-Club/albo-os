@@ -259,10 +259,27 @@ depuis la recherche de l'assistant IA.
 
 ## L'assistant IA
 
-L'assistant sait lire la dette : les prêts d'une société et leur capital
+L'assistant sait **lire** la dette : les prêts d'une société et leur capital
 restant dû, l'échéancier d'un prêt autour d'aujourd'hui, les garanties
-auxquelles la société est partie, et ce qu'un placement garantit au total. Il
-ne sait pas encore écrire — la saisie reste manuelle.
+auxquelles la société est partie, et ce qu'un placement garantit au total.
+
+Il sait aussi **écrire** : créer un prêt, ajouter un palier de taux sur un
+prêt variable, enregistrer un avenant daté, créer une sûreté, enregistrer une
+mainlevée. **Chaque écriture demande votre accord** — l'assistant s'arrête et
+affiche Confirmer / Refuser.
+
+Ce qu'il ne fait pas :
+
+- **Supprimer.** Retirer un prêt ou une garantie reste un geste de
+  l'application. Une mainlevée n'est pas une suppression : la ligne reste.
+- **Corriger un prêt.** Écraser des conditions détruit un historique ; ce
+  geste-là se fait à la main. L'assistant peut en revanche enregistrer un
+  **avenant**, qui le conserve.
+- **Saisir un capital restant dû.** Il n'y a pas de champ pour ça : ce sont
+  les conditions du contrat qui se saisissent, le reste en découle.
+
+Sur la fiche d'un prêt, il sait de quoi vous parlez quand vous dites « ce
+prêt ».
 
 ## Points d'attention
 

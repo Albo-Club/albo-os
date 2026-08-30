@@ -150,6 +150,23 @@ calculé sur les flux datés réels, avec la même méthode que le TRI des deals
 Un prix de vente sans date (ou l'inverse) est refusé : une demi-vente
 produirait un résultat silencieusement faux.
 
+## L'assistant IA
+
+L'assistant sait **lire** les biens : leur prix de revient poste par poste
+avec la source de chacun, la dernière valeur connue, la plus-value latente et
+le rendement net.
+
+Il sait aussi **écrire** : créer un bien, basculer la source d'un poste,
+ajouter une valorisation datée, et rattacher un flux à un bien — en
+demandant alors la nature de la dépense, comme le ferait la file de
+pointage. **Chaque écriture demande votre accord.**
+
+Ce qu'il ne fait pas : supprimer un bien (geste de l'application), ni saisir
+un loyer, une charge ou un rendement — ils n'existent nulle part comme champ.
+
+Sur la fiche d'un bien, il sait de quoi vous parlez quand vous dites « ce
+bien ».
+
 ## Points d'attention
 
 - **Tous les montants sont TTC.** Ils viennent de flux bancaires, TTC par
@@ -179,3 +196,4 @@ produirait un résultat silencieusement faux.
 - [Placements](19-placements.md) et [Participations](04-participations.md) —
   les deux autres onglets d'Investissements.
 - [À faire](16-a-faire.md) — le signal des biens dont la valeur a vieilli.
+- [Assistant IA](11-assistant-ia.md) — ce qu'il sait lire et écrire ici.

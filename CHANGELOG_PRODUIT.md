@@ -23,6 +23,82 @@ bas de page.
 
 ---
 
+## v1.201.0 — 30/08/2026 à 12:40 — L'assistant sait aussi écrire la dette et l'immobilier
+
+Lot 7, le dernier du module Dette & Garanties. L'assistant savait déjà lire
+les prêts, les garanties et les biens ; il peut maintenant les **écrire** —
+et chaque écriture passe devant vous.
+
+**Ce qu'il sait faire de plus.** Créer un prêt, ajouter un palier de taux sur
+un prêt variable, enregistrer un avenant daté. Créer une sûreté sur un prêt,
+enregistrer une mainlevée. Créer un bien, basculer la source d'un poste de
+prix de revient, ajouter une valorisation datée. Et rattacher un flux à un
+prêt ou à un bien — ce dernier point comblant au passage un oubli : il savait
+lire un prêt depuis le mois dernier, mais pas y rattacher un prélèvement,
+alors que c'était possible à la main.
+
+**Chaque écriture demande votre accord**, sans exception. La génération
+s'arrête, Confirmer / Refuser s'affiche, et rien n'est écrit tant que vous
+n'avez pas tranché.
+
+**Ce qu'il ne fait toujours pas, et pourquoi.**
+
+- **Supprimer.** Retirer un prêt, une garantie ou un bien reste un geste de
+  l'application. Une mainlevée n'est pas une suppression — elle est
+  disponible, et elle conserve la ligne.
+- **Corriger un prêt.** Écraser des conditions détruit un historique. Il peut
+  en revanche enregistrer un **avenant**, qui le conserve.
+- **Saisir un résultat.** Ni capital restant dû, ni loyer, ni charge, ni
+  rendement : ce sont les conditions et les flux qui se saisissent, le reste
+  en découle. Il n'y a pas de champ, donc pas d'outil.
+- **Deviner une cible.** Comme pour le pointage, vous nommez la transaction
+  et sa destination. Sur un bien, il demande aussi la nature du flux plutôt
+  que de la supposer.
+
+**Il sait de quoi vous parlez.** Sur la fiche d'un prêt ou d'un bien, « ce
+prêt » et « ce bien » désignent celui que vous avez sous les yeux — comme
+c'était déjà le cas sur une fiche deal ou société.
+
+**Côté connecteur Claude** (le serveur MCP), les mêmes opérations sont
+exposées et marquées comme des écritures, pour que le client demande
+confirmation de son côté.
+
+> **🔧 Notes techniques**
+>
+> - **`convex/agentToolsDebt.ts`** passe de lecture seule à lecture/écriture :
+>   8 outils d'écriture (`createLoan`, `addLoanRate`, `addLoanAmendment`,
+>   `createGuarantee`, `releaseGuarantee`, `createProperty`,
+>   `setPropertyCostSource`, `addPropertyValuation`) + `listProperties` en
+>   lecture. Tous les writes portent `needsApproval: true` ; chaque
+>   `internalMutation` re-vérifie l'appartenance via la scope key du thread,
+>   l'action de stream n'ayant aucune identité auth.
+> - **L'org de l'assiette d'une garantie est résolue DEPUIS l'actif**, jamais
+>   prise en argument — sinon un appelant pourrait se déclarer partie d'une
+>   garantie qui ne le concerne pas.
+> - **Correctif** : `agentToolsPointage:allocateTransactionToLiability`
+>   acceptait `equity | intercompany_loan` seulement (livré au lot 4) ; il
+>   accepte désormais aussi `loan` et `property` + la catégorie.
+> - **MCP** : `listLoans`, `listGuarantees`, `listProperties` en lecture,
+>   `createLoan`, `createProperty`, `addPropertyValuation` avec
+>   `write: true` (donc `readOnlyHint: false`). ⚠️ `needsApproval` n'a aucun
+>   effet là-bas — pas d'UI in-app pour l'afficher.
+> - **Contexte d'entité élargi** de `deal | company` à
+>   `deal | company | loan | property` dans `lib/instructions.ts`, `chat.ts`
+>   (validateur + args de `streamAsync`) et `AiPanel`.
+> - **`BASE_INSTRUCTIONS`** gagne trois paragraphes (dette, garanties,
+>   immobilier). Les outils de dette du lot 3 n'en avaient aucun : le modèle
+>   les avait sans savoir quoi en faire.
+> - **Piège documenté** : le SDK AI **normalise** `needsApproval` en
+>   prédicat, y compris quand le flag est absent. `expect(x.needsApproval)
+>   .toBe(true)` passe donc sur **tous** les outils et ne prouve rien — il
+>   faut **appeler** la fonction. Détail dans `KNOWN_ISSUES.md`.
+> - **Tests** : `convex/regression.debtWrites.test.ts` (28 cas) — le flag
+>   d'approbation appelé outil par outil dans les deux sens, les annotations
+>   MCP, l'absence d'outil de suppression, la résolution d'org, et la
+>   tenancy.
+
+---
+
 ## v1.200.0 — 30/08/2026 à 12:05 — Chaque société ne voit que ce qui la concerne
 
 Lot 6 du module Dette & Garanties, et le seul qui ne parle pas de dette :
