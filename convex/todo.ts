@@ -2,7 +2,8 @@ import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { listSilentCompanies } from './lib/reportFreshness'
-import { attributeActuals, buildSchedule } from './lib/amortization'
+import { attributeActuals } from './lib/amortization'
+import { loanSchedule } from './loans'
 
 import type { Doc, Id } from './_generated/dataModel'
 
@@ -88,31 +89,9 @@ export const getTodo = query({
       amountCents: number
     }> = []
     for (const loan of activeLoans) {
-      const rateRows = await ctx.db
-        .query('loanRates')
-        .withIndex('by_loan_from', (q) => q.eq('loanId', loan._id))
-        .collect()
-      const schedule = buildSchedule(
-        {
-          principalCents: loan.principalCents,
-          firstPaymentDate: loan.firstPaymentDate,
-          durationMonths: loan.durationMonths,
-          amortizationKind: loan.amortizationKind,
-          rateBps: loan.rateBps,
-          rateKind: loan.rateKind,
-          paymentFrequency: loan.paymentFrequency,
-          deferralMonths: loan.deferralMonths,
-          deferralKind: loan.deferralKind,
-          insuranceMonthlyCents: loan.insuranceMonthlyCents,
-          endDate: loan.endDate,
-        },
-        rateRows.map((row) => ({
-          fromDate: row.fromDate,
-          rateBps: row.rateBps,
-          kind: row.kind,
-        })),
-        { horizonDate: now },
-      )
+      // Through the single shared reader (rate steps + amendments), so the
+      // signal never names an instalment the loan sheet does not show.
+      const schedule = await loanSchedule(ctx, loan, { horizonDate: now })
       if (schedule.length === 0) continue
 
       const txs = await ctx.db

@@ -20,12 +20,28 @@ La dette bancaire, les échéanciers et les garanties ont leur propre page :
 
 Une position de capital = un type (capital social, prime d'émission,
 augmentation, report à nouveau), un montant, une date d'effet, un nombre
-d'actions éventuel, et un **détenteur** : soit une organisation du groupe,
-soit un tiers externe désigné par un libellé libre.
+d'actions éventuel, un **% de détention** éventuel, et un **détenteur** :
+soit une organisation du groupe, soit un tiers externe désigné par un
+libellé libre.
 
 Les transactions bancaires correspondantes (l'apport reçu, par exemple) se
 rattachent à la position depuis le [pointage](08-pointage.md) et apparaissent
 en sous-lignes, détachables.
+
+### Le % de détention ne se saisit qu'ici
+
+C'est la **structure capitalistique de la société émettrice** qui fait foi.
+Le pourcentage se saisit sur sa propre page Passif — « CALTE 60 %, M. Y
+40 % » se lit chez la SCI, pas chez CALTE.
+
+Côté détenteur, l'application **lit** ce pourcentage au lieu d'en garder une
+copie. Deux saisies finiraient par diverger, et rien ne dirait laquelle a
+raison.
+
+Le % est **facultatif**, et l'absence est un vrai état : une prime d'émission
+ou un report à nouveau ne portent aucune part du capital. L'application
+affiche alors « — », jamais 0 % — qui affirmerait que le détenteur ne possède
+rien.
 
 ## Comptes courants inter-entités
 

@@ -10,7 +10,8 @@
       "type": "Type",
       "holder": "Holder",
       "date": "Date",
-      "amount": "Amount"
+      "amount": "Amount",
+      "ownership": "Ownership"
     },
     "total": "Total",
     "type": {
@@ -49,7 +50,10 @@
       "dateLabel": "Effective date",
       "sharesLabel": "Shares (optional)",
       "sharesPlaceholder": "1,000",
-      "success": "Equity position created"
+      "success": "Equity position created",
+      "ownershipLabel": "Ownership share (%)",
+      "ownershipPlaceholder": "60",
+      "ownershipHint": "This company's cap table is the truth: the equity deal on the holder's side reads this percentage instead of re-entering it."
     },
     "loan": {
       "button": "Current account",
@@ -128,7 +132,10 @@
     "missing_subject": "The guarantee's subject is required.",
     "invalid_rank": "The rank must be at least 1.",
     "property_wrong_org": "This property belongs to another organization.",
-    "missing_category": "Pick the nature of the flow for a property."
+    "missing_category": "Pick the nature of the flow for a property.",
+    "invalid_ownership": "The ownership share must be between 0 and 100.",
+    "revolving_not_amendable": "A revolving credit has no schedule to segment: correct its terms instead.",
+    "amendment_before_start": "An amendment must take effect after the first instalment. Before that, it is a correction."
   },
   "edit": {
     "equity": {
@@ -249,7 +256,8 @@
     },
     "menu": {
       "correct": "Correct",
-      "delete": "Delete"
+      "delete": "Delete",
+      "amend": "Update as of…"
     },
     "transactions": {
       "title": "Transactions",
@@ -264,6 +272,35 @@
       "in": "In",
       "out": "Out",
       "total": "Total actually paid"
+    },
+    "amendments": {
+      "title": "Amendments",
+      "hint": "the terms changed along the way — the history is kept",
+      "col": {
+        "from": "From",
+        "changes": "What changes"
+      },
+      "dialogTitle": "Update the terms",
+      "dialogDescription": "An amendment keeps the history: the instalments already run do not move, and the new terms apply to the capital that remains. To fix a typo, use « Correct » instead.",
+      "effectiveLabel": "Effective date",
+      "rateLabel": "New rate (%)",
+      "durationLabel": "Remaining duration (months)",
+      "insuranceLabel": "New insurance (€/month)",
+      "outstandingLabel": "Capital outstanding at the effective date",
+      "outstandingHint": "Only fill this in if the lender restated it: otherwise the app derives it from the schedule.",
+      "notesLabel": "Notes",
+      "emptyMeansUnchanged": "A field left empty stays unchanged.",
+      "save": "Save the amendment",
+      "success": "Amendment saved.",
+      "deleted": "Amendment deleted.",
+      "change": {
+        "rate": "rate {{value}}",
+        "duration_one": "{{count}} month left",
+        "duration_other": "{{count}} months left",
+        "insurance": "insurance {{value}}",
+        "outstanding": "outstanding {{value}}",
+        "none": "terms unchanged"
+      }
     }
   },
   "guarantees": {

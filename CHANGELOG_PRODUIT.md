@@ -23,6 +23,93 @@ bas de page.
 
 ---
 
+## v1.199.0 — 30/08/2026 à 11:35 — Qui détient quoi, et les prêts qu'on renégocie
+
+Lot 5 du module Dette & Garanties : la structure capitalistique des sociétés
+du groupe, et la possibilité d'**amender** un prêt sans réécrire son passé.
+
+**Le % de détention, saisi à un seul endroit.** La section Capital de chaque
+société gagne une colonne **Détention**. Le pourcentage se saisit sur la page
+Passif de la société **émettrice** — « CALTE 60 %, M. Y 40 % » se lit chez la
+SCI, pas chez CALTE. Côté détenteur, l'application **lit** ce pourcentage au
+lieu d'en garder une copie : deux saisies finiraient par diverger, et rien ne
+dirait laquelle a raison.
+
+Le % reste facultatif, et l'absence est un vrai état : une prime d'émission
+ou un report à nouveau ne portent aucune part du capital. L'application
+affiche alors « — », jamais « 0 % » — qui affirmerait que le détenteur ne
+possède rien.
+
+**Renégocier un prêt sans effacer ce qui a été payé.** Le menu ⋯ d'une fiche
+de prêt porte désormais **deux** gestes, et la différence est tout le sujet :
+
+- **Corriger** écrase les conditions, comme si les anciennes n'avaient jamais
+  existé. C'est pour une faute de saisie.
+- **Mettre à jour au…** enregistre un **avenant daté** : les échéances déjà
+  passées ne bougent pas, et les nouvelles conditions s'appliquent au capital
+  restant à partir de la date d'effet.
+
+L'application ne peut pas deviner lequel des deux s'applique — une faute de
+frappe et une renégociation ressemblent exactement à la même chose. C'est
+vous qui tranchez.
+
+Seul ce qui change se saisit : un champ laissé vide reste inchangé. Une
+renégociation qui ne touche que le taux, c'est un nombre à taper. Et si la
+banque a **recalculé** le capital restant dû à la date d'effet, son chiffre
+peut être saisi et prend le pas sur celui que l'application dériverait.
+
+L'échéancier devient alors **multi-périodes** : une seule liste continue, où
+la partie déjà courue reste exactement ce qu'elle était et la suite est
+recalculée. Les avenants apparaissent dans une section dédiée, la plus
+récente en tête, avec ce que chacun a changé — et cette section n'existe pas
+tant qu'il n'y a pas d'avenant.
+
+Trois gestes voisins à ne pas confondre : **corriger** écrase, **amender**
+conserve, et **ajouter un palier de taux** n'est ni l'un ni l'autre — c'est
+le contrat lui-même qui prévoyait la révision. Un crédit révolving, qui n'a
+pas d'échéancier à segmenter, n'est pas amendable : ses conditions se
+corrigent en place.
+
+> **🔧 Notes techniques**
+>
+> - **Schéma, additif** : `equityPositions.ownershipBps` (optionnel, bps) et
+>   table `loanAmendments` (`by_loan_from`), dont chaque champ de conditions
+>   est optionnel — absent = inchangé.
+> - **`lib/amortization.ts`** — nouvelle fonction pure
+>   `buildScheduleWithAmendments` : coupe le segment courant à la date
+>   d'effet, reprend le restant dû atteint (ou celui recalé par la banque via
+>   `outstandingCents`, la seule exception assumée au « rien de dérivable
+>   n'est stocké » de ce coin), réancre la série sur la première échéance
+>   non servie et renumérote en continu. Sans avenant elle rend exactement
+>   `buildSchedule` — le cas courant ne paie rien pour une fonctionnalité
+>   qu'il n'utilise pas.
+> - **Un seul lecteur d'échéancier.** Quatre surfaces en lisaient un (fiche,
+>   prévisionnel, « À faire », agent), chacune reconstruisant les termes à la
+>   main. Elles passent désormais toutes par `loans:loanSchedule`, qui charge
+>   paliers **et** avenants — sans quoi une renégociation ferait diverger la
+>   projection et la fiche sur le même prêt, invisible jusqu'au premier
+>   avenant puis faux partout d'un coup.
+> - **`loans:addAmendment` / `removeAmendment`** — une date, un avenant
+>   (ré-entrer la même date remplace) ; refus avant la première échéance
+>   (`amendment_before_start`, c'est une correction) et sur un révolving
+>   (`revolving_not_amendable`). La suppression du prêt emporte ses avenants
+>   comme elle emportait déjà ses paliers.
+> - **`liabilities:getOwnershipForCompany`** — lecture inter-org du %, par le
+>   chemin que D33 nomme : `by_holder_org` borne aux positions détenues
+>   ailleurs, puis le SIREN joint les deux côtés. C'est la clé que
+>   `migrations/createSubsidiaryOrgs` a construite en clonant délibérément le
+>   SIREN sur le `group_root` de chaque filiale.
+> - ⚠️ **`companyRelations.ownershipPct` reste en base** et porte le même
+>   fait en `0-100` : c'est le doublon préexistant que D33 interdit. Il n'est
+>   pas retiré ici (donnée de production, lu par `companies.ts`) — signalé
+>   dans `KNOWN_ISSUES.md`, à arbitrer comme un chantier de données à part.
+> - **Tests** : `tests/amortization.test.ts` § avenants (9 cas : le passé
+>   inchangé au centime, le capital repris, la durée restante, l'enchaînement
+>   de plusieurs avenants dans le désordre, la numérotation continue) et
+>   `convex/regression.equityAmendments.test.ts` (14 cas).
+
+---
+
 ## v1.198.0 — 30/08/2026 à 11:05 — L'immobilier entre dans Albo OS
 
 Albo OS savait ce que le groupe possède en participations et en placements,

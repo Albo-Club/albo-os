@@ -1,5 +1,11 @@
 import { useState } from 'react'
-import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
+import {
+  CalendarClock,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+} from 'lucide-react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
@@ -10,6 +16,7 @@ import type { Id } from '../../../../convex/_generated/dataModel'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { cn } from '~/lib/utils'
+import { LoanAmendmentDialog } from '~/components/passif/LoanAmendmentDialog'
 import { LoanDialog } from '~/components/passif/LoanDialog'
 import { LoanGuaranteesSection } from '~/components/passif/LoanGuaranteesSection'
 import { LoanRateDialog } from '~/components/passif/LoanRateDialog'
@@ -130,6 +137,7 @@ function LoanSheet() {
   const { fmtEur, fmtEurCents, fmtRate, fmtDate } = useLoanFormatters()
 
   const [editing, setEditing] = useState(false)
+  const [amending, setAmending] = useState(false)
   const [addingRate, setAddingRate] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -146,6 +154,7 @@ function LoanSheet() {
   })
   const removeLoan = useConvexMutation(api.loans.remove)
   const removeRate = useConvexMutation(api.loans.removeRate)
+  const removeAmendment = useConvexMutation(api.loans.removeAmendment)
 
   // Most recent instalment first — the one being watched sits at the top.
   const schedule = [...(sheet?.schedule ?? [])].reverse()
@@ -214,6 +223,16 @@ function LoanSheet() {
                   <Pencil className="mr-2 size-4" />
                   {t('passif:loan.menu.correct')}
                 </DropdownMenuItem>
+                {/* The second of the two rare gestures (SPEC D35, D40):
+                    « Corriger » overwrites a typo, « Mettre à jour » keeps
+                    the history of a renegotiation. A revolving has no
+                    schedule to segment — it is corrected in place. */}
+                {!isRevolving ? (
+                  <DropdownMenuItem onSelect={() => setAmending(true)}>
+                    <CalendarClock className="mr-2 size-4" />
+                    {t('passif:loan.menu.amend')}
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   variant="destructive"
@@ -370,6 +389,115 @@ function LoanSheet() {
               </Table>
             </div>
           )}
+        </section>
+      ) : null}
+
+      {/* Amendments — only when there are any. A loan that was never
+          renegotiated has nothing to show, and an empty section would just
+          advertise a gesture nobody needs (SPEC D35). */}
+      {sheet.amendments.length > 0 ? (
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-lg font-medium">
+              {t('passif:loan.amendments.title')}
+            </h2>
+            <p className="text-muted-foreground text-xs">
+              {t('passif:loan.amendments.hint')}
+            </p>
+          </div>
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>
+                    {t('passif:loan.amendments.col.from')}
+                  </TableHead>
+                  <TableHead>
+                    {t('passif:loan.amendments.col.changes')}
+                  </TableHead>
+                  <TableHead className="w-14" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sheet.amendments.map((amendment) => {
+                  // Only what the amendment actually changed — an untouched
+                  // field carries over, and listing it would suggest it moved.
+                  const changes: Array<string> = []
+                  if (amendment.rateBps != null) {
+                    changes.push(
+                      t('passif:loan.amendments.change.rate', {
+                        value: fmtRate(amendment.rateBps),
+                      }),
+                    )
+                  }
+                  if (amendment.durationMonths != null) {
+                    changes.push(
+                      t('passif:loan.amendments.change.duration', {
+                        count: amendment.durationMonths,
+                      }),
+                    )
+                  }
+                  if (amendment.insuranceMonthlyCents != null) {
+                    changes.push(
+                      t('passif:loan.amendments.change.insurance', {
+                        value: fmtEur(amendment.insuranceMonthlyCents),
+                      }),
+                    )
+                  }
+                  if (amendment.outstandingCents != null) {
+                    changes.push(
+                      t('passif:loan.amendments.change.outstanding', {
+                        value: fmtEur(amendment.outstandingCents),
+                      }),
+                    )
+                  }
+                  return (
+                    <TableRow key={amendment._id}>
+                      <TableCell className="whitespace-nowrap tabular-nums">
+                        {fmtDate(amendment.effectiveDate)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span>
+                            {changes.length > 0
+                              ? changes.join(' · ')
+                              : t('passif:loan.amendments.change.none')}
+                          </span>
+                          {amendment.notes ? (
+                            <span className="text-muted-foreground text-xs">
+                              {amendment.notes}
+                            </span>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive size-7"
+                          aria-label={t('common:actions.delete')}
+                          onClick={async () => {
+                            try {
+                              await removeAmendment({
+                                amendmentId: amendment._id,
+                              })
+                              toast.success(
+                                t('passif:loan.amendments.deleted'),
+                              )
+                            } catch (err) {
+                              reportError(err)
+                            }
+                          }}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </section>
       ) : null}
 
@@ -623,6 +751,9 @@ function LoanSheet() {
         )}
       </section>
 
+      {amending ? (
+        <LoanAmendmentDialog loan={loan} onClose={() => setAmending(false)} />
+      ) : null}
       {editing ? (
         <LoanDialog
           orgId={loan.orgId}

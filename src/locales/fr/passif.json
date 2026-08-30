@@ -10,7 +10,8 @@
       "type": "Type",
       "holder": "Détenteur",
       "date": "Date",
-      "amount": "Montant"
+      "amount": "Montant",
+      "ownership": "Détention"
     },
     "total": "Total",
     "type": {
@@ -49,7 +50,10 @@
       "dateLabel": "Date d'effet",
       "sharesLabel": "Parts (optionnel)",
       "sharesPlaceholder": "1 000",
-      "success": "Position de capital créée"
+      "success": "Position de capital créée",
+      "ownershipLabel": "% de détention",
+      "ownershipPlaceholder": "60",
+      "ownershipHint": "La structure capitalistique de cette société fait foi : le deal equity côté détenteur lit ce pourcentage au lieu de le re-saisir."
     },
     "loan": {
       "button": "Compte courant",
@@ -128,7 +132,10 @@
     "missing_subject": "L'assiette de la garantie est obligatoire.",
     "invalid_rank": "Le rang doit être au moins 1.",
     "property_wrong_org": "Ce bien appartient à une autre organisation.",
-    "missing_category": "Choisissez la nature de la dépense pour un bien."
+    "missing_category": "Choisissez la nature de la dépense pour un bien.",
+    "invalid_ownership": "Le % de détention doit être compris entre 0 et 100.",
+    "revolving_not_amendable": "Un crédit révolving n'a pas d'échéancier à segmenter : corrigez ses conditions.",
+    "amendment_before_start": "Un avenant doit prendre effet après la première échéance. Avant, c'est une correction."
   },
   "edit": {
     "equity": {
@@ -249,7 +256,8 @@
     },
     "menu": {
       "correct": "Corriger",
-      "delete": "Supprimer"
+      "delete": "Supprimer",
+      "amend": "Mettre à jour au…"
     },
     "transactions": {
       "title": "Transactions",
@@ -264,6 +272,35 @@
       "in": "Entrée",
       "out": "Sortie",
       "total": "Total réel versé"
+    },
+    "amendments": {
+      "title": "Avenants",
+      "hint": "les conditions ont changé en cours de route — l'historique est conservé",
+      "col": {
+        "from": "À partir du",
+        "changes": "Ce qui change"
+      },
+      "dialogTitle": "Mettre à jour les conditions",
+      "dialogDescription": "Un avenant conserve l'historique : les échéances déjà passées ne bougent pas, les nouvelles conditions s'appliquent au capital restant. Pour corriger une faute de saisie, utilisez « Corriger ».",
+      "effectiveLabel": "Date d'effet",
+      "rateLabel": "Nouveau taux (%)",
+      "durationLabel": "Durée restante (mois)",
+      "insuranceLabel": "Nouvelle assurance (€/mois)",
+      "outstandingLabel": "Capital restant dû à la date d'effet",
+      "outstandingHint": "À renseigner seulement si la banque l'a recalculé : sinon l'application dérive le montant de l'échéancier.",
+      "notesLabel": "Notes",
+      "emptyMeansUnchanged": "Un champ laissé vide reste inchangé.",
+      "save": "Enregistrer l'avenant",
+      "success": "Avenant enregistré.",
+      "deleted": "Avenant supprimé.",
+      "change": {
+        "rate": "taux {{value}}",
+        "duration_one": "{{count}} mois restant",
+        "duration_other": "{{count}} mois restants",
+        "insurance": "assurance {{value}}",
+        "outstanding": "capital restant {{value}}",
+        "none": "conditions inchangées"
+      }
     }
   },
   "guarantees": {

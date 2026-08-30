@@ -5358,3 +5358,74 @@ visible : ils ne cassaient rien, ils **omettaient**.
 La leçon commune : quand une union de `kind` s'élargit, ces deux sites ne
 lèvent aucune erreur de type — ils continuent de compiler en ignorant la
 nouvelle valeur. Les vérifier fait partie de l'ajout d'un `allocationKind`.
+
+## Avenant ≠ correction ≠ révision de taux (`convex/loans.ts`)
+
+Trois gestes voisins sur les mêmes conditions, et les confondre produit des
+échéanciers faux en silence.
+
+| Geste | Fonction | Ce qu'il fait du passé |
+|---|---|---|
+| **Corriger** | `loans:update` | l'**écrase** — comme si les anciennes conditions n'avaient jamais existé |
+| **Mettre à jour au JJ/MM** | `loans:addAmendment` | le **conserve** — les échéances déjà passées ne bougent pas |
+| **Palier de taux** | `loans:addRate` | ne le touche pas non plus, mais c'est le contrat lui-même qui prévoit la révision |
+
+- **L'app ne peut pas deviner lequel s'applique.** Une faute de frappe et un
+  avenant produisent la même intention apparente (« ce taux n'est pas le
+  bon ») ; seul l'utilisateur sait. D'où deux gestes, tous deux dans le menu
+  ⋯ — pas un seul qui devinerait.
+- **Réviser un taux variable n'est PAS amender le contrat.** `loanRates`
+  porte les paliers prévus au contrat ; `loanAmendments` porte ce qui a été
+  renégocié. Les deux coexistent sur le même prêt et se composent.
+- **Un avenant antérieur à la première échéance est refusé**
+  (`amendment_before_start`) : il n'y a pas d'historique à conserver, c'est
+  une correction.
+- **Un révolving n'est pas amendable** (`revolving_not_amendable`) : sans
+  échéancier, il n'y a pas de segment à couper. Ses conditions se corrigent
+  en place.
+- **`outstandingCents` est la seule exception assumée** à « rien de dérivable
+  n'est stocké » dans ce coin : quand la banque recale le capital à la date
+  d'effet, son chiffre doit gagner sur celui que l'app dériverait. Absent —
+  le cas normal — l'app dérive.
+- **Un champ vide veut dire « inchangé », pas « zéro ».** Envoyer `rateBps:
+  0` déclarerait un prêt à taux nul, ce qui est légal et n'a rien à voir.
+
+### Un seul lecteur d'échéancier : `loans:loanSchedule`
+
+`buildScheduleWithAmendments` compose les segments, mais **quatre** surfaces
+lisent un échéancier : la fiche du prêt, l'expansion du prévisionnel, le
+signal « À faire » et l'agent. Elles passent toutes par `loanSchedule`
+(`convex/loans.ts`), qui charge les paliers **et** les avenants.
+
+Reconstruire l'échéancier à la main ailleurs est exactement ce qui fait
+diverger la projection et la fiche sur le même prêt — invisible tant
+qu'aucun prêt n'est renégocié, puis faux partout d'un coup. Les trois
+copies qui existaient avant le lot 5 ont été repliées sur ce lecteur.
+
+## Le % de détention vit dans la table de capitalisation de l'émettrice
+
+`equityPositions.ownershipBps` (bps, 6000 = 60 %) est **le** endroit du %.
+Côté détenteur, `liabilities:getOwnershipForCompany` le **lit** au lieu d'en
+garder une copie (SPEC D33).
+
+- **La clé de jointure est le SIREN**, et c'est voulu :
+  `migrations/createSubsidiaryOrgs` **clone** délibérément le SIREN de la
+  société source sur le `group_root` de la nouvelle org, et l'unicité est
+  par org précisément pour que le même SIREN apparaisse des deux côtés. Le
+  chemin de lecture part de `by_holder_org` (borné aux positions que cette
+  org détient ailleurs), puis compare les SIREN.
+- **Absent ≠ 0 %.** Une ligne de prime d'émission ou de report à nouveau ne
+  porte aucune part du capital, et une société sans SIREN ne se rattache à
+  rien. Les deux rendent `null`, jamais `0`.
+
+### ⚠️ `companyRelations.ownershipPct` est un doublon préexistant
+
+Il porte le même fait (le % de détention CALTE → filiale), en pourcentage
+`0-100` et non en bps, alimenté par `convex/seed.ts`. C'est exactement la
+seconde vérité que D33 interdit.
+
+Il n'a **pas** été retiré au lot 5 : le champ est en production, il est lu
+par `convex/companies.ts`, et le resserrer est un chantier de données à part
+(purger puis resserrer, cf. la règle du repo). À arbitrer — tant qu'il vit,
+c'est `equityPositions.ownershipBps` qui fait foi côté produit, et lui qui
+est affiché.

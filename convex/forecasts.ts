@@ -30,7 +30,7 @@ import {
   previousQuarter,
   ruleDerivedKey,
 } from './lib/recurrence'
-import { buildSchedule } from './lib/amortization'
+import { loanSchedule } from './loans'
 import { sectionsFor } from './lib/weeklyDigest'
 import { computeVatPositionForOrg } from './transactions'
 import type { GridTx, HistoryTx } from './lib/recurrence'
@@ -448,33 +448,13 @@ export async function expandLoanSchedulesForOrgs(
       .collect()
 
     for (const loan of loans) {
-      const rateRows = await ctx.db
-        .query('loanRates')
-        .withIndex('by_loan_from', (q) => q.eq('loanId', loan._id))
-        .collect()
-      const schedule = buildSchedule(
-        {
-          principalCents: loan.principalCents,
-          firstPaymentDate: loan.firstPaymentDate,
-          durationMonths: loan.durationMonths,
-          amortizationKind: loan.amortizationKind,
-          rateBps: loan.rateBps,
-          rateKind: loan.rateKind,
-          paymentFrequency: loan.paymentFrequency,
-          deferralMonths: loan.deferralMonths,
-          deferralKind: loan.deferralKind,
-          insuranceMonthlyCents: loan.insuranceMonthlyCents,
-          endDate: loan.endDate,
-        },
-        rateRows.map((row) => ({
-          fromDate: row.fromDate,
-          rateBps: row.rateBps,
-          kind: row.kind,
-        })),
-        // A revolving with no end date is projected to the horizon — past
-        // that, an open-ended credit would generate interest rows forever.
-        { horizonDate: horizonEnd },
-      )
+      // Rate steps AND amendments, through the single shared reader — the
+      // projection must never describe a different loan than the sheet does.
+      // A revolving with no end date stops at the horizon; past that, an
+      // open-ended credit would generate interest rows forever.
+      const schedule = await loanSchedule(ctx, loan, {
+        horizonDate: horizonEnd,
+      })
       if (schedule.length === 0) continue
       loansProcessed += 1
 

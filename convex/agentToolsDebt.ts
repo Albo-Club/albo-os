@@ -20,15 +20,15 @@ import { internalQuery } from './_generated/server'
 import { parseScope, readMembership } from './lib/agentScope'
 import {
   attributeActuals,
-  buildSchedule,
   summarize,
 } from './lib/amortization'
 import { sortByStrength, summarizePledges } from './lib/guarantees'
 import { addMonthsUtc } from './lib/recurrence'
+import { loanSchedule } from './loans'
 
 import type { Doc, Id } from './_generated/dataModel'
 import type { QueryCtx } from './_generated/server'
-import type { RateStep, ScheduleRow } from './lib/amortization'
+import type { ScheduleRow } from './lib/amortization'
 
 function toISODate(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10)
@@ -42,32 +42,11 @@ async function scheduleOf(
   loan: Doc<'loans'>,
   now: number,
 ): Promise<Array<ScheduleRow>> {
-  const rows = await ctx.db
-    .query('loanRates')
-    .withIndex('by_loan_from', (q) => q.eq('loanId', loan._id))
-    .collect()
-  const rates: Array<RateStep> = rows.map((row) => ({
-    fromDate: row.fromDate,
-    rateBps: row.rateBps,
-    kind: row.kind,
-  }))
-  return buildSchedule(
-    {
-      principalCents: loan.principalCents,
-      firstPaymentDate: loan.firstPaymentDate,
-      durationMonths: loan.durationMonths,
-      amortizationKind: loan.amortizationKind,
-      rateBps: loan.rateBps,
-      rateKind: loan.rateKind,
-      paymentFrequency: loan.paymentFrequency,
-      deferralMonths: loan.deferralMonths,
-      deferralKind: loan.deferralKind,
-      insuranceMonthlyCents: loan.insuranceMonthlyCents,
-      endDate: loan.endDate,
-    },
-    rates,
-    { horizonDate: addMonthsUtc(now, REVOLVING_HORIZON_MONTHS) },
-  )
+  // Through the single shared reader (rate steps + amendments), so the agent
+  // never describes a different loan than the sheet does.
+  return await loanSchedule(ctx, loan, {
+    horizonDate: addMonthsUtc(now, REVOLVING_HORIZON_MONTHS),
+  })
 }
 
 // ─── Internal queries (re-check membership) ─────────────────────────────────

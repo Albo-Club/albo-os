@@ -1547,6 +1547,39 @@ export default defineSchema({
   }).index('by_loan_from', ['loanId', 'fromDate']),
 
   /**
+   * loanAmendments — dated amendments to a loan's terms, the « Mettre à jour
+   * au JJ/MM » gesture (SPEC D35).
+   *
+   * NOT to be confused with the two neighbours it sits between:
+   * - « Corriger » (`loans:update`) OVERWRITES the terms, as if the previous
+   *   ones had never existed. That is for a typo — the app cannot tell one
+   *   from an amendment, so the user says which it is.
+   * - `loanRates` carries the revisions of a VARIABLE rate that the contract
+   *   itself provides for. Revising a rate as planned is not amending the
+   *   contract.
+   *
+   * An amendment KEEPS the history: the instalments already run under the
+   * old terms stay as they were, and the new terms apply to the capital that
+   * remains. Only the fields it changes are set; the rest carries over.
+   *
+   * Nothing derivable is stored here either — `outstandingCents` is the ONE
+   * optional exception, for when the lender restates the capital at the
+   * effective date and its figure must win over the derived one.
+   */
+  loanAmendments: defineTable({
+    orgId: v.id('organizations'),
+    loanId: v.id('loans'),
+    effectiveDate: v.number(), // ms epoch
+    rateBps: v.optional(v.number()),
+    durationMonths: v.optional(v.number()), // REMAINING from the effective date
+    amortizationKind: v.optional(amortizationKind),
+    paymentFrequency: v.optional(loanPaymentFrequency),
+    insuranceMonthlyCents: v.optional(v.number()),
+    outstandingCents: v.optional(v.number()), // restated by the lender
+    notes: v.optional(v.string()),
+  }).index('by_loan_from', ['loanId', 'effectiveDate']),
+
+  /**
    * guarantees — the link between a debt and the security that covers it.
    * The central table of the Dette & Garanties module.
    *
@@ -1712,6 +1745,11 @@ export default defineSchema({
     type: equityPositionType,
     amountCents: v.number(), // cents EUR
     shares: v.optional(v.number()),
+    // Ownership share in BASIS POINTS (6000 = 60 %). The % lives HERE and
+    // nowhere else (SPEC D33): the issuing company's cap table is the truth,
+    // and the equity deal on CALTE's side READS it instead of re-entering it.
+    // Two entries would diverge.
+    ownershipBps: v.optional(v.number()),
     effectiveDate: v.number(), // ms epoch
     actDriveId: v.optional(v.string()),
     airtableId: v.optional(v.string()), // Airtable import anchor (idempotency)

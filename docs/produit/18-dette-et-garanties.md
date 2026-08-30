@@ -101,15 +101,33 @@ pas. Un prêt variable porte une série datée de paliers, de deux natures :
 Le taux appliqué à une date est celui du dernier palier dont la date d'effet
 est passée. Ajouter un palier recalcule l'échéancier et le prévisionnel.
 
-### Corriger un prêt
+### Corriger un prêt, ou l'amender
 
-Le menu **⋯** porte le geste « Corriger ». Il **écrase** les conditions et
-recalcule tout l'échéancier : l'application ne peut pas deviner si c'est une
-faute de frappe ou un avenant. Garder l'avant et l'après d'un avenant est
-une évolution prévue.
+Le menu **⋯** porte **deux** gestes, et la différence est tout le sujet :
+l'application ne peut pas deviner si un chiffre qui change est une faute de
+frappe ou une renégociation. C'est vous qui le dites.
 
-⚠️ Réviser un taux variable n'est **pas** une correction : cela passe par un
-palier, qui garde l'historique.
+| Geste | Ce qu'il fait du passé |
+|---|---|
+| **Corriger** | L'**écrase**. Les conditions sont remplacées comme si les anciennes n'avaient jamais existé, et tout l'échéancier est recalculé. Pour une faute de saisie. |
+| **Mettre à jour au…** | Le **conserve**. Les échéances déjà passées ne bougent pas ; les nouvelles conditions s'appliquent au capital restant, à partir de la date d'effet. Pour un avenant. |
+
+Dans le second cas, seul ce qui change se saisit : un champ laissé vide
+reste inchangé. Une renégociation qui ne touche que le taux, c'est un seul
+nombre à taper. Si la banque a **recalculé** le capital restant dû à la date
+d'effet, son chiffre peut être saisi et prend le pas sur celui que
+l'application dériverait ; sinon elle le dérive elle-même.
+
+Les avenants apparaissent alors dans une section dédiée de la fiche, la plus
+récente en tête, avec ce que chacun a changé. La section n'existe pas tant
+qu'il n'y a pas d'avenant.
+
+⚠️ Réviser un taux variable n'est **ni** une correction **ni** un avenant :
+cela passe par un palier. Le contrat prévoit la révision — il n'est pas
+renégocié.
+
+⚠️ Un crédit révolving n'a pas d'échéancier à segmenter : il n'est pas
+amendable, ses conditions se corrigent en place.
 
 ## Les garanties
 
