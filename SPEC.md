@@ -126,6 +126,8 @@ loans
   deferralMonths     number?               différé d'amortissement
   deferralKind       'partial' | 'total'?  partiel = intérêts payés ;
                                            total = intérêts capitalisés  ← D45
+  endDate            number?               ms epoch — borne de projection
+                                           d'un révolving (cf. ci-dessous)
   bankAccountId      Id<'bankAccounts'>?   compte de prélèvement (même org)
   status             'active' | 'repaid' | 'cancelled'
   notes              string?
@@ -144,6 +146,12 @@ saisir qu'une minorité des prêts du groupe :
 | `constant_capital` | Capital fixe (`P/n`), mensualité décroissante | Calculé | `durationMonths` |
 | `bullet` (in fine) | Intérêts seuls, **capital en une fois à l'échéance** | = `principalCents` jusqu'au terme | `durationMonths` |
 | `revolving` (lombard) | Intérêts sur l'encours ; **pas d'échéancier** | = `principalCents`, saisi | `creditLimitCents` |
+
+**`endDate` n'a de sens que sur un révolving.** Un crédit sans échéancier et
+sans durée projetterait des intérêts indéfiniment : `endDate` borne cette
+projection quand le contrat a un terme connu. Absente, la projection s'arrête
+à l'horizon du prévisionnel. Les trois autres types tirent leur borne de
+`durationMonths` et ignorent ce champ.
 
 **Le révolving est le cas particulier assumé.** Il n'a ni échéancier ni durée
 fixe : `principalCents` y désigne l'**encours courant**, mis à jour à la main
@@ -463,11 +471,16 @@ lot qui a besoin d'attacher un acte de prêt. Le sortir en PR isolée prendrait
 le risque du schéma sans aucun code pour l'exercer. Le lot 4 n'ajoute ensuite
 que `propertyId`.
 
-Ampleur mesurée de l'audit : **15 fichiers `convex/`** (`documents`,
-`agentToolsDocuments`, `companies`, `deals`, `intelligence`, `reportInbox`,
-`reportStore`, `vectorize`, `companyEnrichment`, `agentTools` et leurs tests de
-régression) et **5 fichiers `src/`** (fiches société et deal, participations,
-todo, reports cross-org).
+Ampleur réelle de l'audit, **vérifiée dans le code** : les fichiers `convex/`
+qui lisent la table `documents` sont `documents`, `documentsExtract`,
+`companies`, `deals`, `reportInbox`, `reportStore`, `vectorize`, `agentTools`,
+`lib/duplicates`, `migrations/legalDocsImport` et leurs tests de régression.
+
+⚠️ `intelligence.ts` et `companyEnrichment.ts` **ne touchent jamais** cette
+table — une première version de ce cahier des charges les listait, à tort :
+leur champ `documents` est une propriété d'un objet report, pas la table. Et
+**aucun fichier `src/`** ne lit `companyId` sur un document : les queries de
+liste ne le renvoient pas.
 
 Deux valeurs à ajouter à `documents.kind` : `acte_pret`, `acte_garantie`.
 

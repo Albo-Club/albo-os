@@ -126,7 +126,18 @@
     "emptyEquity": "No equity position for this organization.",
     "emptyLoans": "No current account for this organization.",
     "groupBankLoans": "Bank loans",
-    "emptyBankLoans": "No bank loan for this organization."
+    "emptyBankLoans": "No bank loan for this organization.",
+    "groupProperties": "Properties",
+    "emptyProperties": "No property",
+    "natureHeading": "Nature of the flow",
+    "nature": {
+      "acquisition": "Acquisition",
+      "frais_acquisition": "Acquisition costs",
+      "travaux": "Works",
+      "charges": "Charges",
+      "loyer": "Rent",
+      "revente": "Resale"
+    }
   },
   "detail": {
     "title": "Transaction",

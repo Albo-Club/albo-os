@@ -17,6 +17,7 @@ import { describe, it } from 'node:test'
 import {
   annuityCents,
   applicableRateBps,
+  attributeActuals,
   buildSchedule,
   outstandingAt,
   periodicRate,
@@ -433,5 +434,82 @@ describe('helpers exposés', () => {
 
   it('annuityCents rend 0 sur une durée nulle', () => {
     assert.equal(annuityCents(100_00, 0.01, 0), 0)
+  })
+})
+
+/**
+ * `attributeActuals` is the one place a « rapprochement » could sneak back
+ * into the module. These tests pin what it IS — a calendar placement,
+ * explainable from the dates alone — and, just as importantly, what it must
+ * never become: a likelihood ranking, a proposal, a pre-selection. That
+ * mechanism was removed from the repo in August 2026 and must not be
+ * re-wired here (cf. CLAUDE.md, KNOWN_ISSUES.md « Pointage transaction →
+ * deal »).
+ */
+describe('attribution du réel : un calendrier, jamais une suggestion', () => {
+  const schedule = buildSchedule(loan({ durationMonths: 4 }))
+
+  it("place chaque flux sur l'échéance dont il occupe la période", () => {
+    const actuals = attributeActuals(schedule, [
+      // Deux jours après la 2e échéance → il appartient à sa période.
+      { transactionDate: schedule[1].date + 2 * 24 * 60 * 60 * 1000, amountCents: 2_536_00 },
+    ])
+    assert.deepEqual(actuals, [null, 2_536_00, null, null])
+  })
+
+  it('ne dépend QUE des dates — le montant n’influence jamais le placement', () => {
+    const date = schedule[2].date + 1000
+    const petit = attributeActuals(schedule, [
+      { transactionDate: date, amountCents: 1 },
+    ])
+    const enorme = attributeActuals(schedule, [
+      { transactionDate: date, amountCents: 999_999_00 },
+    ])
+    // Un moteur de vraisemblance aurait déplacé le montant aberrant vers
+    // l'échéance « la plus probable ». Celui-ci ne bouge pas.
+    assert.equal(petit.findIndex((v) => v !== null), 2)
+    assert.equal(enorme.findIndex((v) => v !== null), 2)
+  })
+
+  it("est déterministe : l'ordre des flux ne change pas le résultat", () => {
+    const flows = [
+      { transactionDate: schedule[0].date, amountCents: 100_00 },
+      { transactionDate: schedule[2].date, amountCents: 300_00 },
+      { transactionDate: schedule[1].date, amountCents: 200_00 },
+    ]
+    const a = attributeActuals(schedule, flows)
+    const b = attributeActuals(schedule, [...flows].reverse())
+    assert.deepEqual(a, b)
+    assert.deepEqual(a, [100_00, 200_00, 300_00, null])
+  })
+
+  it('cumule plusieurs flux tombés dans la même période', () => {
+    const actuals = attributeActuals(schedule, [
+      { transactionDate: schedule[1].date, amountCents: 2_000_00 },
+      { transactionDate: schedule[1].date + 1000, amountCents: 536_00 },
+    ])
+    assert.equal(actuals[1], 2_536_00)
+  })
+
+  it('un paiement en retard reste sur la période où il est TOMBÉ', () => {
+    // Il serait tentant de le ramener sur l'échéance qu'il était censé
+    // couvrir. C'est exactement ce qu'on refuse : la lecture honnête laisse
+    // l'échéance manquée visible.
+    const actuals = attributeActuals(schedule, [
+      { transactionDate: schedule[2].date + 1000, amountCents: 2_536_00 },
+    ])
+    assert.equal(actuals[1], null)
+    assert.equal(actuals[2], 2_536_00)
+  })
+
+  it('un flux antérieur au plan va sur la première échéance, pas nulle part', () => {
+    const actuals = attributeActuals(schedule, [
+      { transactionDate: schedule[0].date - 90 * 24 * 60 * 60 * 1000, amountCents: 500_00 },
+    ])
+    assert.equal(actuals[0], 500_00)
+  })
+
+  it('un échéancier vide ne rend aucune ligne', () => {
+    assert.deepEqual(attributeActuals([], [{ transactionDate: 0, amountCents: 1 }]), [])
   })
 })

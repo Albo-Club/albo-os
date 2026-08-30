@@ -42,8 +42,22 @@ export type TxDetails = {
     | 'internal_transfer'
   /** Generalized allocation — routes the un-match (deal / liability / transfer). */
   allocation?: {
-    kind: 'deal' | 'equity' | 'intercompany_loan' | 'transfer' | 'loan'
+    kind:
+      | 'deal'
+      | 'equity'
+      | 'intercompany_loan'
+      | 'transfer'
+      | 'loan'
+      | 'property'
     targetId: string
+    /** Nature of the flow — property targets only (SPEC D42). */
+    category?:
+      | 'acquisition'
+      | 'frais_acquisition'
+      | 'travaux'
+      | 'charges'
+      | 'loyer'
+      | 'revente'
   } | null
   /** Internal transfer still missing its counter-leg (cf. lib/transfers.ts). */
   transferIncomplete?: boolean
@@ -90,7 +104,9 @@ export function accountLabel(tx: TxDetails) {
  * Localized error toast built from the `ConvexError` code of mutations.
  * The namespace holds the `errors.*` keys (pointage by default, passif…).
  */
-export function useReportError(namespace: 'pointage' | 'passif' = 'pointage') {
+export function useReportError(
+  namespace: 'pointage' | 'passif' | 'immobilier' = 'pointage',
+) {
   const { t } = useTranslation(namespace)
   return (err: unknown) => {
     const code = err instanceof ConvexError ? (err.data as string) : ''

@@ -118,9 +118,9 @@ rend lisible de trois côtés :
 
 - **Sa forme** — nantissement, hypothèque, privilège de prêteur de deniers
   (PPD), caution, garantie d'organisme.
-- **Son assiette** — l'actif sur lequel elle porte : un placement, les titres
-  d'une société, ou rien de chez nous (une garantie Saccef, l'actif d'un
-  tiers).
+- **Son assiette** — l'actif sur lequel elle porte : un placement, un **bien
+  immobilier**, les titres d'une société, ou rien de chez nous (une garantie
+  Saccef, l'actif d'un tiers).
 - **Son garant** — une société du groupe, un garant externe désigné par un
   libellé, ou personne de renseigné (les actes sont souvent muets sur ce
   point).
@@ -257,10 +257,11 @@ ne sait pas encore écrire — la saisie reste manuelle.
 - **Un prêt portant des garanties ne se supprime pas** : il faut détacher les
   garanties d'abord. Idem s'il porte des documents ou des transactions
   pointées.
-- **Les biens immobiliers ne sont pas encore modélisés** : une garantie ne
-  peut donc pas encore porter sur un bien (PPD, hypothèque sur un immeuble).
-  L'assiette « les titres d'une société » et « rien de chez nous » couvrent le
-  reste.
+- **Une sûreté sur un bien immobilier se lit des deux côtés.** Un privilège
+  de prêteur de deniers ou une hypothèque prend le bien pour assiette : la
+  ligne apparaît sur la fiche du prêt **et** sur la fiche du bien, à partir de
+  la même saisie. Sa marge disponible se compare à la dernière valorisation du
+  bien. Voir [Immobilier](20-immobilier.md).
 
 ## Pages liées
 
@@ -271,4 +272,6 @@ ne sait pas encore écrire — la saisie reste manuelle.
   échéances.
 - [Placements](19-placements.md) — la fiche qui porte le bloc des
   nantissements.
+- [Immobilier](20-immobilier.md) — les biens qu'une PPD ou une hypothèque
+  prend pour assiette.
 - [À faire](16-a-faire.md) — le signal des échéances en attente.

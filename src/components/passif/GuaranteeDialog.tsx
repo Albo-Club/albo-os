@@ -33,7 +33,7 @@ type GuaranteeForm =
   | 'ppd'
   | 'caution'
   | 'garantie_organisme'
-type SubjectKind = 'placement' | 'shares' | 'external'
+type SubjectKind = 'placement' | 'property' | 'shares' | 'external'
 
 const FORMS = [
   'ppd',
@@ -137,6 +137,9 @@ export function GuaranteeDialog({
   const [subjectCompany, setSubjectCompany] = useState<string>(
     guarantee?.subject.companyId ?? '',
   )
+  const [subjectProperty, setSubjectProperty] = useState<string>(
+    guarantee?.subject.propertyId ?? '',
+  )
   const [subjectLabel, setSubjectLabel] = useState(
     guarantee?.subjectKind === 'external' ? (guarantee.subject.label ?? '') : '',
   )
@@ -171,6 +174,13 @@ export function GuaranteeDialog({
     api.companies.list,
     subjectKind === 'shares' ? { orgId } : 'skip',
   )
+  // The properties of THIS org. A security on a building held elsewhere in
+  // the group is entered from that org's side — the row is then read from
+  // both (D13), so there is nothing to duplicate here.
+  const properties = useConvexQuery(
+    api.properties.listOptions,
+    subjectKind === 'property' ? { orgId } : 'skip',
+  )
 
   const valid =
     (beneficiary === 'loan'
@@ -178,9 +188,11 @@ export function GuaranteeDialog({
       : borrowerLabel.trim() !== '') &&
     (subjectKind === 'placement'
       ? subjectDeal !== ''
-      : subjectKind === 'shares'
-        ? subjectCompany !== ''
-        : subjectLabel.trim() !== '') &&
+      : subjectKind === 'property'
+        ? subjectProperty !== ''
+        : subjectKind === 'shares'
+          ? subjectCompany !== ''
+          : subjectLabel.trim() !== '') &&
     (pledgorKind !== 'external' || pledgorLabel.trim() !== '')
 
   async function handleSave() {
@@ -205,6 +217,10 @@ export function GuaranteeDialog({
         subjectDealId:
           subjectKind === 'placement'
             ? (subjectDeal as Id<'deals'>)
+            : undefined,
+        subjectPropertyId:
+          subjectKind === 'property'
+            ? (subjectProperty as Id<'properties'>)
             : undefined,
         subjectCompanyId:
           subjectKind === 'shares'
@@ -361,6 +377,9 @@ export function GuaranteeDialog({
                 <SelectItem value="placement">
                   {t('passif:guarantees.dialog.subjectPlacement')}
                 </SelectItem>
+                <SelectItem value="property">
+                  {t('passif:guarantees.dialog.subjectProperty')}
+                </SelectItem>
                 <SelectItem value="shares">
                   {t('passif:guarantees.dialog.subjectShares')}
                 </SelectItem>
@@ -385,6 +404,26 @@ export function GuaranteeDialog({
                   {(deals ?? []).map((option) => (
                     <SelectItem key={option._id} value={option._id}>
                       {option.name ?? option.target?.name ?? option._id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          ) : subjectKind === 'property' ? (
+            <Field
+              label={t('passif:guarantees.dialog.subjectPropertyLabel')}
+              htmlFor="g-property"
+            >
+              <Select value={subjectProperty} onValueChange={setSubjectProperty}>
+                <SelectTrigger id="g-property" className="w-full">
+                  <SelectValue
+                    placeholder={t('passif:guarantees.dialog.choose')}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {(properties ?? []).map((property) => (
+                    <SelectItem key={property._id} value={property._id}>
+                      {property.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

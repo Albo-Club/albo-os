@@ -22,17 +22,52 @@ import {
 } from '~/components/ui/popover'
 
 /**
- * Outcome of the unified « Affecter à… » picker: a deal, a liability
- * target, a charge/product category (null = to qualify later), or a plain
- * status (tax / internal transfer / ignored). One picker, one gesture —
- * the backend routing stays the caller's job (match vs allocate vs
- * categorize, cf. KNOWN_ISSUES « Pointage transaction → deal »).
+ * Outcome of the unified « Affecter à… » picker: a deal, a liability or
+ * asset target, a charge/product category (null = to qualify later), or a
+ * plain status (tax / internal transfer / ignored). The backend routing
+ * stays the caller's job (match vs allocate vs categorize, cf.
+ * KNOWN_ISSUES « Pointage transaction → deal »).
+ *
+ * One gesture everywhere, with ONE exception: a property target opens a
+ * second panel asking what the flow IS (SPEC § 6.7) — a property flow
+ * cannot be read without its nature. That panel offers; it never proposes,
+ * pre-selects or ranks.
  */
 export type PointageTarget =
   | { kind: 'deal'; deal: DealOption }
-  | { kind: 'liability'; liability: LiabilityOption }
+  | {
+      kind: 'liability'
+      liability: LiabilityOption
+      /**
+       * Nature of the flow — set for a PROPERTY target only, where the
+       * picker asks for it in a second panel before emitting (SPEC § 6.7).
+       */
+      category?: FlowCategory
+    }
   | { kind: 'category'; status: 'charge' | 'product'; category: string | null }
   | { kind: 'status'; status: 'tax' | 'internal_transfer' | 'ignored' }
+
+/** The six natures a flow on a property can carry (SPEC D42). */
+export type FlowCategory =
+  | 'acquisition'
+  | 'frais_acquisition'
+  | 'travaux'
+  | 'charges'
+  | 'loyer'
+  | 'revente'
+
+/**
+ * Natures offered per direction, in the order of the mockup: a debit pays
+ * for the property, a credit comes from it.
+ *
+ * This is what the picker OFFERS, not what the mutation accepts — a refund
+ * is a real movement and stays enterable through the agent or a correction
+ * (cf. convex/lib/pointage.ts).
+ */
+const FLOW_CATEGORIES: Record<'in' | 'out', ReadonlyArray<FlowCategory>> = {
+  out: ['acquisition', 'frais_acquisition', 'travaux', 'charges'],
+  in: ['loyer', 'revente'],
+}
 
 /**
  * Unified searchable pointage picker (Popover + Command): Deals / Prêts /
@@ -52,6 +87,7 @@ export function TargetCombobox({
   equityOptions,
   loanOptions,
   bankLoanOptions,
+  propertyOptions,
   direction,
   onSelect,
   disabled,
@@ -61,6 +97,8 @@ export function TargetCombobox({
   loanOptions: Array<LiabilityOption> | undefined
   /** Bank debt — a direct debit on a loan. NOT the current accounts above. */
   bankLoanOptions: Array<LiabilityOption> | undefined
+  /** Real-estate assets — the one group that asks for a nature afterwards. */
+  propertyOptions: Array<LiabilityOption> | undefined
   /** Transaction direction — orders the charge/product groups. */
   direction: 'in' | 'out'
   onSelect: (target: PointageTarget) => void
@@ -68,11 +106,33 @@ export function TargetCombobox({
 }) {
   const { t } = useTranslation(['pointage', 'common'])
   const [open, setOpen] = useState(false)
+  // A property target waiting for its nature — the second panel of the
+  // gesture. Never a suggestion: nothing is pre-selected, the list is not
+  // ranked, and the picker simply refuses to emit until the user says what
+  // the flow is.
+  const [pendingProperty, setPendingProperty] =
+    useState<LiabilityOption | null>(null)
   const dealTitle = useDealTitle()
+
+  const close = () => {
+    setOpen(false)
+    setPendingProperty(null)
+  }
 
   const pick = (target: PointageTarget) => {
     onSelect(target)
-    setOpen(false)
+    close()
+  }
+
+  const pickTarget = (option: LiabilityOption) => {
+    // A property flow is unreadable without its nature (cost / charge /
+    // rent), so the picker asks before applying. Every other target applies
+    // straight away, as before.
+    if (option.kind === 'property') {
+      setPendingProperty(option)
+      return
+    }
+    pick({ kind: 'liability', liability: option })
   }
 
   const liabilityGroups = [
@@ -95,6 +155,12 @@ export function TargetCombobox({
       heading: t('pointage:combobox.groupLoans'),
       emptyLabel: t('pointage:combobox.emptyLoans'),
       options: loanOptions,
+    },
+    {
+      key: 'property',
+      heading: t('pointage:combobox.groupProperties'),
+      emptyLabel: t('pointage:combobox.emptyProperties'),
+      options: propertyOptions,
     },
   ]
 
@@ -139,7 +205,7 @@ export function TargetCombobox({
     loanOptions === undefined
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(next) => (next ? setOpen(true) : close())}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -156,6 +222,48 @@ export function TargetCombobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-0" align="end">
+        {/* Second panel of the gesture: the property is chosen, the nature
+            of the flow is not. One transaction, one property, ONE nature —
+            it is never split (SPEC D42). Nothing is pre-selected here. */}
+        {pendingProperty ? (
+          <div className="p-1">
+            <div className="px-2 py-1.5">
+              <p className="text-muted-foreground text-xs">
+                {t('pointage:combobox.natureHeading')}
+              </p>
+              <p className="truncate text-sm font-medium">
+                {pendingProperty.label}
+              </p>
+            </div>
+            <div className="flex flex-col">
+              {FLOW_CATEGORIES[direction].map((category) => (
+                <Button
+                  key={category}
+                  variant="ghost"
+                  size="sm"
+                  className="justify-start font-normal"
+                  onClick={() =>
+                    pick({
+                      kind: 'liability',
+                      liability: pendingProperty,
+                      category,
+                    })
+                  }
+                >
+                  {t(`pointage:combobox.nature.${category}`)}
+                </Button>
+              ))}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground justify-start font-normal"
+                onClick={() => setPendingProperty(null)}
+              >
+                {t('common:actions.cancel')}
+              </Button>
+            </div>
+          </div>
+        ) : (
         <Command>
           <CommandInput placeholder={t('pointage:combobox.search')} />
           <CommandList>
@@ -200,9 +308,7 @@ export function TargetCombobox({
                     <CommandItem
                       key={option.targetId}
                       value={`${option.label} ${option.sublabel} ${option.targetId}`}
-                      onSelect={() =>
-                        pick({ kind: 'liability', liability: option })
-                      }
+                      onSelect={() => pickTarget(option)}
                     >
                       <span className="flex min-w-0 flex-col">
                         <span className="truncate">{option.label}</span>
@@ -256,6 +362,7 @@ export function TargetCombobox({
             </CommandGroup>
           </CommandList>
         </Command>
+        )}
       </PopoverContent>
     </Popover>
   )

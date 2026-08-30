@@ -2,8 +2,11 @@ import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 /**
- * Shared sub-nav of the Investissements section: two router links switching
- * between the Entreprises (participations) and Placements pages. Styled
+ * Shared sub-nav of the Investissements section: three router links
+ * switching between the Entreprises (participations), Placements and
+ * Immobilier pages. Real estate is a TAB here and not a sidebar entry: a
+ * property would distort the TVPI/MOIC of the portfolio if it sat under
+ * Entreprises (SPEC D28), but it is still an investment. Styled
  * exactly like the shadcn TabsList/TabsTrigger default variant from
  * `~/components/ui/tabs` — but built from `Link`s with a `data-state`
  * attribute, since these are navigation tabs (the active one is derived
@@ -20,9 +23,9 @@ export function InvestmentsTabs({
   active,
 }: {
   orgSlug: string
-  active: 'entreprises' | 'placements'
+  active: 'entreprises' | 'placements' | 'immobilier'
 }) {
-  const { t } = useTranslation(['participations', 'placements'])
+  const { t } = useTranslation(['participations', 'placements', 'immobilier'])
 
   return (
     // Mirror of ui/tabs.tsx TabsList (default variant, horizontal).
@@ -42,6 +45,14 @@ export function InvestmentsTabs({
         className={triggerClass}
       >
         {t('placements:title')}
+      </Link>
+      <Link
+        to="/app/$orgSlug/immobilier"
+        params={{ orgSlug }}
+        data-state={active === 'immobilier' ? 'active' : 'inactive'}
+        className={triggerClass}
+      >
+        {t('immobilier:title')}
       </Link>
     </div>
   )

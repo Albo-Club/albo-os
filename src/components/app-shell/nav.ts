@@ -45,7 +45,10 @@ export function getNavGroups(): Array<NavGroup> {
         {
           titleKey: 'items.investments',
           to: '/app/$orgSlug/participations',
-          alsoActiveOn: ['/app/$orgSlug/placements'],
+          alsoActiveOn: [
+            '/app/$orgSlug/placements',
+            '/app/$orgSlug/immobilier',
+          ],
           icon: ChartCandlestick,
         },
         {

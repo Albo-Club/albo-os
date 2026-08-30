@@ -179,6 +179,7 @@ function RowActions({
         equityOptions={liabilityOptions?.equityOptions}
         loanOptions={liabilityOptions?.loanOptions}
         bankLoanOptions={liabilityOptions?.bankLoanOptions}
+        propertyOptions={liabilityOptions?.propertyOptions}
         direction={direction}
         onSelect={onAssign}
         disabled={pending}
@@ -230,7 +231,13 @@ function MatchLink({
   orgSlug,
 }: {
   allocation: {
-    kind: 'deal' | 'equity' | 'intercompany_loan' | 'transfer' | 'loan'
+    kind:
+      | 'deal'
+      | 'equity'
+      | 'intercompany_loan'
+      | 'transfer'
+      | 'loan'
+      | 'property'
     targetId: string
   }
   dealsById: Map<string, DealOption>
@@ -263,10 +270,31 @@ function MatchLink({
     )
   }
 
-  // equity | intercompany_loan → no per-entity detail, link to the Passif page.
   const label = liabilityByTarget.get(allocation.targetId)?.label ?? null
   if (!label) return null
-  return orgSlug ? (
+  if (!orgSlug) {
+    return <span className="text-muted-foreground text-xs">{label}</span>
+  }
+
+  // A property has a sheet of its own — link there rather than to the Passif
+  // page, which knows nothing about it.
+  if (allocation.kind === 'property') {
+    return (
+      <Link
+        to="/app/$orgSlug/immobilier/$propertyId"
+        params={{ orgSlug, propertyId: allocation.targetId }}
+        onClick={(e) => e.stopPropagation()}
+        className={linkClass}
+      >
+        <span className="truncate">{label}</span>
+        <ArrowUpRight className="size-3 shrink-0" />
+      </Link>
+    )
+  }
+
+  // equity | intercompany_loan | loan → no per-entity detail on the row, link
+  // to the Passif page where all three are read.
+  return (
     <Link
       to="/app/$orgSlug/passif"
       params={{ orgSlug }}
@@ -276,8 +304,6 @@ function MatchLink({
       <span className="truncate">{label}</span>
       <ArrowUpRight className="size-3 shrink-0" />
     </Link>
-  ) : (
-    <span className="text-muted-foreground text-xs">{label}</span>
   )
 }
 
@@ -356,6 +382,7 @@ export function PointageTable({
           ...(liabilityOptions?.equityOptions ?? []),
           ...(liabilityOptions?.loanOptions ?? []),
           ...(liabilityOptions?.bankLoanOptions ?? []),
+          ...(liabilityOptions?.propertyOptions ?? []),
         ].map((o) => [o.targetId, o]),
       ),
     [liabilityOptions],
@@ -479,6 +506,9 @@ export function PointageTable({
           transactionId: tx._id,
           kind: target.liability.kind,
           targetId: target.liability.targetId,
+          // Only a property carries one, and the picker made it mandatory
+          // there before it could emit this target.
+          category: target.category,
         })
         if (!statusColumn)
           addRecent({
@@ -562,7 +592,8 @@ export function PointageTable({
       } else if (
         tx.allocation?.kind === 'equity' ||
         tx.allocation?.kind === 'intercompany_loan' ||
-        tx.allocation?.kind === 'loan'
+        tx.allocation?.kind === 'loan' ||
+        tx.allocation?.kind === 'property'
       ) {
         await deallocateTransaction({ transactionId: tx._id })
       } else {

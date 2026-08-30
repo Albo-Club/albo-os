@@ -23,6 +23,135 @@ bas de page.
 
 ---
 
+## v1.198.0 — 30/08/2026 à 11:05 — L'immobilier entre dans Albo OS
+
+Albo OS savait ce que le groupe possède en participations et en placements,
+et ce qu'il doit à ses banques. Il sait maintenant répondre à : **« que
+possède cette société en immobilier, combien ça vaut, et combien ça
+rapporte ? »** C'est le lot 4 du module Dette & Garanties.
+
+**Un troisième onglet, pas une entrée de plus.** L'Immobilier s'installe à
+côté d'Entreprises et de Placements, dans Investissements. Un bien reste un
+investissement — il fausserait simplement les multiples du portefeuille s'il
+était rangé avec les participations. Le menu de gauche ne bouge pas.
+
+**Le prix de revient, et son interrupteur.** C'est le cœur du module. Un bien
+a trois postes de revient — acquisition, frais d'acquisition, travaux — et
+chacun porte **un seul montant**, venu d'**une seule source** : soit le
+montant que vous avez saisi, soit la somme des flux bancaires pointés sur ce
+bien. **Jamais l'addition des deux.**
+
+Et le choix se fait **poste par poste**, parce que les deux cas coexistent
+sur le même immeuble : un bien acquis en 2019 a un prix qui ne sera jamais
+dans l'application — la connexion bancaire ne remonte pas si loin — pendant
+que ses travaux de 2024 sont de vrais virements. Un interrupteur unique
+obligerait à sacrifier l'un ou l'autre. La colonne « Source » de la fiche
+bascule le poste d'un clic, et le montant saisi est conservé : on peut
+revenir sans rien retaper.
+
+Quand des flux sont pointés sur un poste resté en « Saisi », la fiche le
+**dit** — « 2 flux ne sont pas comptés » — au lieu de les cacher. Ils ne sont
+pas additionnés, mais vous savez qu'ils existent.
+
+**La rentabilité est réelle, jamais théorique.** Loyers encaissés, charges
+payées, résultat net : sur 12 mois glissants, et uniquement à partir de
+transactions pointées. Un bien sans flux rattaché affiche zéro, pas une
+estimation. Les échéances de prêt ne sont jamais des charges du bien — elles
+sont rattachées au prêt, sinon la même sortie serait comptée deux fois.
+
+**Les valorisations sont datées et saisies à la main.** Aucune estimation
+automatique. Tant qu'aucune valeur n'est connue, la plus-value latente est
+**inconnue**, pas nulle : l'application ne prétend pas savoir.
+
+**Le marchand de biens est un usage, pas un objet à part.** Quand il est
+choisi, la fiche masque l'exploitation — un bien acheté pour être revendu ne
+s'exploite pas — et met en avant le prix de revient puis le résultat de
+sortie, calculé sur les flux datés réels à la revente.
+
+**Une hypothèque peut enfin porter sur un immeuble.** Jusqu'ici une garantie
+ne pouvait prendre pour assiette qu'un placement, des titres ou « rien de
+chez nous » : le privilège de prêteur de deniers d'une SCI sur son propre
+bien n'était pas saisissable. Il l'est. Et il se lit des **deux côtés** — sur
+la fiche du prêt et sur la fiche du bien — à partir d'une seule saisie.
+
+**Pointer un flux sur un bien.** Le sélecteur de la file de Pointage gagne un
+groupe **Biens**. C'est le seul endroit de l'application où choisir une cible
+en appelle une seconde : la **nature de la dépense**. Sans elle, impossible de
+savoir si les 40 000 € qui sortent sont des travaux, des charges ou une part
+du prix. Une transaction, un bien, une seule nature — jamais de découpage. Et
+comme partout : rien n'est proposé, rien n'est présélectionné, rien n'est
+classé par vraisemblance.
+
+**Un signal de plus dans « À faire ».** Les biens détenus sans estimation
+depuis plus de 18 mois y remontent : leur plus-value et leur rendement se
+comparent sinon à une valeur qui ne veut plus dire grand-chose.
+
+**Deux oublis du lot précédent corrigés au passage.** Les transactions
+pointées sur un **prêt bancaire** n'apparaissaient dans aucun onglet du
+registre de trésorerie ; elles figurent désormais avec les comptes courants.
+Et l'assistant IA, qui savait lire un prêt, ne savait pas y **rattacher** un
+prélèvement alors que c'était possible à la main : il le sait maintenant, et
+sait aussi pointer sur un bien.
+
+> **🔧 Notes techniques**
+>
+> - **Schéma, strictement additif** (prod) : tables `properties` (avec
+>   `costBasis` : un tableau borné à trois postes, chacun portant sa `source`
+>   et son `manualAmountCents`) et `propertyValuations`. Élargissements
+>   d'unions : `guaranteeSubjectKind` += `'property'`, `allocationKind` +=
+>   `'property'`. Nouveaux champs optionnels : `guarantees.subjectPropertyId`,
+>   `documents.propertyId`, `transactions.allocation.category`. Nouveaux index
+>   `by_subject_property`, `by_property`, `properties.by_org(_status)`,
+>   `propertyValuations.by_property_asof`. Le validateur est exporté sous
+>   `propertyAssetType` : `propertyType` était déjà pris au niveau module par
+>   le champ d'instrument d'un deal immo.
+> - **`convex/lib/properties.ts`** — moteur pur (aucun import Convex, testé en
+>   `node:test` hors `convex/`, comme `amortization.ts`) : `resolveCostBasis`
+>   (une source par poste, remboursements soustraits, flux ignorés comptés à
+>   part), `operatingResult` (12 mois glissants), `netYield`,
+>   `latentGainCents`, `exitCashflows` (branché sur le **seul** `xirr` du
+>   repo). Rien de dérivable n'est stocké.
+> - **`convex/properties.ts`** — `list` / `listOptions` / `getById` / `create`
+>   / `update` / `remove` / `setCostPosteSource` / `addValuation` /
+>   `removeValuation`, toutes derrière `requireOrgMember`. Garde-fous de
+>   suppression : `has_guarantees`, `has_allocations`, `has_documents`.
+> - **`convex/guarantees.ts`** — `describeSubject`, `siblingPledges`,
+>   `subjectValueCents` et `resolveParties` apprennent `'property'` ; nouvelle
+>   query `listBySubjectProperty` (miroir de `listBySubjectDeal`). L'org de
+>   l'assiette continue d'être lue sur l'actif, jamais sur un argument.
+> - **`convex/lib/pointage.ts`** — `applyAllocateToLiability` accepte
+>   `'property'` + un `category` optionnel : requis sur un bien
+>   (`missing_category`), refusé ailleurs (`category_not_supported`), et l'org
+>   du bien est vérifiée comme celle d'un prêt (`property_wrong_org`). La
+>   direction n'est **pas** contrainte à la mutation : un remboursement de
+>   travaux revient en `in` et se soustrait du poste.
+> - **`lib/categories.ts` (les deux miroirs)** — `effectiveCategory` range
+>   `'property'` dans un nouveau seau `real_estate`. Sans ça un flux
+>   immobilier tombait dans `'deals'` et polluait les investissements **en
+>   silence** — c'est le piège du fichier.
+> - **Correctifs lot 3** : `transactions:listLedger` (le filtre « liability »
+>   omettait `'loan'`, désormais `['equity','intercompany_loan','loan',
+>   'property']`) et `agentToolsPointage:allocateTransactionToLiability`
+>   (l'énum s'arrêtait à `equity | intercompany_loan`).
+> - **Front** : routes `immobilier.index.tsx` / `immobilier.$propertyId.tsx`,
+>   composants `src/components/immobilier/*`, troisième onglet dans
+>   `InvestmentsTabs` + `alsoActiveOn` dans `nav.ts`. Le `TargetCombobox`
+>   gagne un second panneau pour la nature (état `pendingProperty`), le seul
+>   endroit du picker qui n'applique pas au premier clic. Namespace i18n
+>   `immobilier` (fr + en) + ajouts dans `pointage`, `passif`, `todo`.
+> - **Tests** : `tests/properties.test.ts` (moteur pur) et
+>   `convex/regression.properties.test.ts` (bout en bout, 16 cas). Ajout de
+>   `tests/amortization.test.ts` § « attribution du réel » qui épingle le
+>   caractère **déterministe et calendaire** d'`attributeActuals` — le montant
+>   n'influence jamais le placement, l'ordre des flux non plus.
+> - **Doc** : nouvelle page produit `docs/produit/20-immobilier.md` (+ son
+>   document Linear et son entrée dans `DOCS`), `SPEC.md` corrigé sur deux
+>   points (`loans.endDate` documenté au § 4.1 ; `intelligence.ts` et
+>   `companyEnrichment.ts` retirés de la liste d'audit du § 4.8 — ils ne
+>   touchent jamais la table `documents`).
+
+---
+
 ## v1.197.0 — 29/08/2026 à 23:31 — Ce que chaque société doit, et ce qui est mis en gage
 
 Albo OS savait dire ce que le groupe possède. Il sait maintenant dire ce

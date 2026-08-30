@@ -48,6 +48,12 @@ export const DERIVED_FORECAST_CATEGORIES = [
   // direct debits matched to that loan — same bucket, so the grid's
   // plan-vs-actual consumption lines up.
   'debt',
+  // Real estate (`allocation.kind === 'property'`): ONE bucket for the six
+  // natures a property flow can carry. The nature says what the amount does
+  // to the property's own figures (cost basis, operating result, capital
+  // gain); the treasury analysis only needs to know the money went to real
+  // estate, and six rows there would fragment it for nothing.
+  'real_estate',
   'taxes',
 ] as const
 
@@ -80,7 +86,7 @@ export function isValidCategory(
  * Analysis bucket of a transaction, derived from the pointage state:
  * - deal match → 'deals' (investments out / returns in — the direction is
  *   carried separately by the caller);
- * - liability allocation → 'equity' | 'intercos';
+ * - liability allocation → 'equity' | 'intercos' | 'debt' | 'real_estate';
  * - tax → 'taxes'; charge/product → stored category or 'uncategorized';
  * - unmatched (or pre-backfill absent status) → 'unmatched';
  * - ignored / internal_transfer → null: EXCLUDED from the analysis (an
@@ -96,6 +102,7 @@ export function effectiveCategory(
       if (tx.allocation?.kind === 'equity') return 'equity'
       if (tx.allocation?.kind === 'intercompany_loan') return 'intercos'
       if (tx.allocation?.kind === 'loan') return 'debt'
+      if (tx.allocation?.kind === 'property') return 'real_estate'
       return 'deals'
     case 'tax':
       return 'taxes'

@@ -166,6 +166,9 @@ export function TransactionsLedger({
   // Bank debt has its own lightweight options query — each combobox group is
   // fed DIRECTLY from its source, never from a flattened re-filtered list.
   const bankLoans = useConvexQuery(api.loans.listOptions, { orgId })
+  // Same rule for the properties: their own query, so the group is fed
+  // directly from its source rather than a flattened re-filtered list.
+  const properties = useConvexQuery(api.properties.listOptions, { orgId })
 
   const byAttachment = filter === 'deal' || filter === 'liability'
   const byTransferState = filter === 'transfer_incomplete'
@@ -200,8 +203,9 @@ export function TransactionsLedger({
         payable: t('passif:loans.payable'),
       },
       bankLoans,
+      properties,
     )
-  }, [liabilities, bankLoans, t])
+  }, [liabilities, bankLoans, properties, t])
 
   // Keep the last list displayed while a new filter/search reloads (no flash).
   const lastRef = useRef(liveTransactions)

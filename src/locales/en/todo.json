@@ -52,5 +52,12 @@
     "row": "{{label}} · {{lender}}",
     "empty": "No pending instalment.",
     "more": "and {{count}} more"
+  },
+  "staleValuations": {
+    "title": "Properties to revalue",
+    "empty": "No property whose value has gone stale.",
+    "subtitle": "A property with no estimate for over 18 months: its latent gain and its yield compare against a figure that has stopped meaning much.",
+    "lastValued": "last valued on {{date}}",
+    "neverValued": "never valued"
   }
 }

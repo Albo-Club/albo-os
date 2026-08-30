@@ -5245,9 +5245,10 @@ refuserait des lectures parfaitement fondées.
   marge d'un actif serait surévaluée — une erreur en notre défaveur, et
   invisible. Ce n'est pas une vue consolidée au sens de D14, c'est la lecture
   d'un lien déjà accepté.
-- **`subjectKind` n'a pas encore `'property'`** : la valeur arrivera avec la
-  table `properties`. Élargir une union Convex ne demande aucune migration ;
-  déclarer une table que rien ne lit aurait été du gras.
+- **`subjectKind` porte `'property'` depuis le lot 4**, avec la table
+  `properties` et l'index `by_subject_property`. Élargir une union Convex n'a
+  demandé aucune migration — c'est pour ça que la valeur avait été laissée de
+  côté au lot 2 plutôt que déclarée à vide.
 
 ## Échéances de prêt dans le prévisionnel (`forecasts:expandLoanSchedules`)
 
@@ -5274,3 +5275,86 @@ c'est l'échéancier calculé du prêt.
   chaque palier de taux, comme `expandRules` l'est à chaque sauvegarde de
   règle. Aucun cron : sans ce déclencheur, la mutation existerait sans que
   rien ne l'appelle.
+
+## Prix de revient d'un bien : une source par poste, jamais l'addition
+
+`convex/lib/properties.ts:resolveCostBasis` rend **un seul montant par
+poste**, pris à **une seule** source : le montant saisi (`manual`) ou la
+somme des transactions pointées sur ce bien avec cette catégorie (`flows`).
+Le choix est **par poste**, pas global.
+
+- **Pourquoi par poste.** Un bien acquis en 2019 a un prix saisi — la
+  connexion bancaire ne remonte pas si loin (C13) — et des travaux de 2024
+  qui, eux, sont de vrais virements. Un interrupteur global forcerait à
+  sacrifier l'un ou l'autre.
+- **L'addition des deux est un bug, pas une fonctionnalité** (D43, C14).
+  C'est la seule chose que ce design existe pour empêcher, et elle est
+  verrouillée par test des deux côtés : `tests/properties.test.ts` (moteur
+  pur) et `convex/regression.properties.test.ts` (bout en bout).
+- **`manualAmountCents` est CONSERVÉ quand le poste passe en `flows`.** Il
+  n'est simplement plus lu. Rebasculer ne doit pas obliger à ressaisir.
+- **Les flux d'un poste resté en `manual` sont comptés à part et affichés**
+  (`ignoredFlowCount` / `ignoredFlowCents`). Les masquer laisserait croire
+  qu'ils n'existent pas ; les additionner serait le bug. On les nomme.
+- **Le TRI de sortie lit comme le prix de revient** : un poste en `manual`
+  entre dans les flux datés à la date d'acquisition, et ses transactions
+  sont ignorées. Sinon le TRI et le prix de revient raconteraient deux
+  histoires différentes du même bien.
+- **Tout est TTC** (D49). Les montants viennent de flux bancaires, TTC par
+  nature. Reconstituer du HT demanderait de ventiler la TVA poste par poste,
+  sans gain sur un locatif nu.
+
+## `allocation.category` n'est pas `transactions.category`
+
+Deux champs, deux sens, et ils se ressemblent assez pour qu'on les confonde.
+
+| | `allocation.category` | `transactions.category` |
+|---|---|---|
+| Où | **dans** l'objet `allocation` | à la racine de la transaction |
+| Sert à | dire ce qu'un flux **est** sur un bien (acquisition, travaux, loyer…) | le slug de trésorerie d'une **charge / produit** |
+| Vit avec | l'allocation | les statuts `charge` / `product` uniquement |
+| Au pointage | posé avec l'allocation | **effacé** par toute allocation |
+
+`applyAllocateToLiability` écrit le premier et met le second à `undefined`
+dans le même patch — c'est volontaire et ce n'est pas une contradiction :
+un flux rattaché à un bien n'est plus une charge à qualifier.
+
+Corollaires :
+
+- **La catégorie est OBLIGATOIRE sur un `property`** (`missing_category`) et
+  **refusée partout ailleurs** (`category_not_supported`). Un flux sur un
+  bien sans sa nature serait illisible ; une nature sur une position de
+  capitaux propres ne serait lue par personne.
+- **La direction n'est pas contrainte à la mutation.** Le sélecteur propose
+  les natures sortantes sur un débit et les entrantes sur un crédit
+  (SPEC § 6.7), mais un remboursement est un vrai mouvement : des travaux
+  remboursés reviennent en `in` sous `travaux`, et le moteur les **retranche**
+  du poste. L'interdire à la mutation rendrait cette transaction impossible à
+  pointer.
+- **`effectiveCategory` range tout `property` dans un seul seau,
+  `real_estate`.** La nature dit ce que le montant fait aux chiffres **du
+  bien** ; l'analyse de trésorerie n'a besoin que de savoir que l'argent est
+  allé à l'immobilier. Six lignes là-bas fragmenteraient pour rien. ⚠️ Un
+  `kind` d'allocation oublié dans cette fonction tombe dans `'deals'` et
+  pollue le seau des investissements **en silence** — c'est le piège du
+  fichier.
+
+## Deux bugs du lot 3 corrigés au lot 4
+
+Repérés en câblant `'property'` dans les mêmes unions. Aucun des deux n'était
+visible : ils ne cassaient rien, ils **omettaient**.
+
+1. **`transactions:listLedger`** — le filtre « Comptes courants & emprunts »
+   ne listait que `['equity', 'intercompany_loan']`. Une transaction pointée
+   sur un **prêt bancaire** n'apparaissait donc dans **aucun** onglet du
+   registre : pas un deal, pas une « liability » non plus. La liste doit
+   rester exhaustive — un `kind` qui manque là rend ses transactions
+   invisibles.
+2. **`agentToolsPointage:allocateTransactionToLiability`** — l'énum de
+   l'outil s'était arrêtée à `equity | intercompany_loan`. L'assistant ne
+   savait pas pointer un prélèvement de prêt alors que l'humain le pouvait
+   depuis le lot 3.
+
+La leçon commune : quand une union de `kind` s'élargit, ces deux sites ne
+lèvent aucune erreur de type — ils continuent de compiler en ignorant la
+nouvelle valeur. Les vérifier fait partie de l'ajout d'un `allocationKind`.

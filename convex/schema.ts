@@ -235,14 +235,60 @@ export const guaranteeForm = v.union(
 
 // The SUBJECT the security bites on. `external` covers what is not ours at
 // all — an institution's guarantee (Saccef), or a third party's asset.
-//
-// `property` lands with the `properties` table (lot 4): a literal can be
-// added to a union with no migration, whereas declaring a table nothing
-// reads would be dead weight in the schema.
 export const guaranteeSubjectKind = v.union(
   v.literal('placement'),
+  v.literal('property'),
   v.literal('shares'),
   v.literal('external'),
+)
+
+// ─── Property enums (properties) ────────────────────────────────────────────
+
+// Named `propertyAssetType` and not `propertyType`: that name is already
+// taken at module level by the INSTRUMENT field of a real-estate deal
+// (residentiel / commercial / bureau / autre, cf. lib/instruments.ts). Two
+// different axes, two different vocabularies — the table field below keeps
+// the natural name.
+export const propertyAssetType = v.union(
+  v.literal('appartement'),
+  v.literal('maison'),
+  v.literal('immeuble'),
+  v.literal('local_commercial'),
+  v.literal('terrain'),
+)
+
+// What the property is USED for. `marchand_de_biens` is a usage, not a
+// separate object (SPEC D29): 80 % of the fields are shared with a rental,
+// and a property can change usage. When it is set, the UI hides the
+// operating result and puts the cost basis and the exit IRR forward.
+export const propertyUsage = v.union(
+  v.literal('locatif_nu'),
+  v.literal('locatif_meuble'),
+  v.literal('colocation'),
+  v.literal('saisonnier'),
+  v.literal('commercial'),
+  v.literal('marchand_de_biens'),
+  v.literal('residence_secondaire'),
+)
+
+export const propertyStatus = v.union(v.literal('held'), v.literal('sold'))
+
+// The three cost-basis line items of a property. They are the only ones that
+// enter the cost price; `charges` / `loyer` / `revente` are flow categories
+// (see `allocationCategory`) and never a line item.
+export const propertyCostPoste = v.union(
+  v.literal('acquisition'),
+  v.literal('frais_acquisition'),
+  v.literal('travaux'),
+)
+
+// Where a cost-basis line item takes its amount from — ONE source per item,
+// chosen per item (SPEC D43). `manual` = the entered amount stands;
+// `flows` = the sum of the transactions allocated to this property with this
+// category. NEVER the addition of the two: that is a bug, not a feature.
+export const propertyCostSource = v.union(
+  v.literal('manual'),
+  v.literal('flows'),
 )
 
 // Target of a generalized allocation (`transactions.allocation`). Coexists
@@ -257,12 +303,34 @@ export const guaranteeSubjectKind = v.union(
 // `loan` targets a BANK loan (`loans`), not a shareholder current account —
 // `intercompany_loan` keeps that meaning. The two are unrelated: one is a
 // debt to a bank, the other an advance between two group companies.
+//
+// `property` targets a real-estate asset (`properties`). It is the only kind
+// that carries an `allocation.category` — see `allocationCategory`.
 const allocationKind = v.union(
   v.literal('deal'),
   v.literal('equity'),
   v.literal('intercompany_loan'),
   v.literal('transfer'),
   v.literal('loan'),
+  v.literal('property'),
+)
+
+// Nature of a flow on a property (SPEC D42) — six values, and a transaction
+// carries exactly ONE. A transaction is never split: a notary transfer
+// covering the price AND the duties goes whole into `acquisition`; keeping
+// the detail on an old property is what the `manual` cost source is for.
+//
+// Three of them feed the cost basis (`acquisition`, `frais_acquisition`,
+// `travaux` — the values of `propertyCostPoste`), two the operating result
+// (`charges` out, `loyer` in), and one the realized capital gain
+// (`revente`).
+export const allocationCategory = v.union(
+  v.literal('acquisition'),
+  v.literal('frais_acquisition'),
+  v.literal('travaux'),
+  v.literal('charges'),
+  v.literal('loyer'),
+  v.literal('revente'),
 )
 
 const forecastConfidence = v.union(
@@ -997,8 +1065,9 @@ export default defineSchema({
    * `companyId` is OPTIONAL since the Dette & Garanties module: a loan deed
    * has no portfolio company to hang off, and no honest value to give the
    * field. `orgId` — never optional — is what carries the tenancy; the
-   * anchors (`companyId` / `dealId` / `loanId`) are labels on top of it, and
-   * `documents:create` requires at least one of them to resolve the org.
+   * anchors (`companyId` / `dealId` / `loanId` / `guaranteeId` /
+   * `propertyId`) are labels on top of it, and `documents:create` requires
+   * at least one of them to resolve the org.
    *
    * ⚠️ A row with no `companyId` is INVISIBLE to the `by_company` index (a
    * missing value never equals an id), so it never shows on a company sheet.
@@ -1013,6 +1082,8 @@ export default defineSchema({
     loanId: v.optional(v.id('loans')),
     // Guarantee deed (nantissement, hypothèque, acte de caution).
     guaranteeId: v.optional(v.id('guarantees')),
+    // Real-estate deed (acte de vente, compromis, devis de travaux).
+    propertyId: v.optional(v.id('properties')),
     title: v.string(),
     // Company kinds first, then the deal-specific ones. One widened union
     // rather than two columns: which subset is offered is a UI concern.
@@ -1092,6 +1163,7 @@ export default defineSchema({
     .index('by_deal', ['dealId', 'uploadedAt'])
     .index('by_loan', ['loanId', 'uploadedAt'])
     .index('by_guarantee', ['guaranteeId', 'uploadedAt'])
+    .index('by_property', ['propertyId', 'uploadedAt'])
     .index('by_org', ['orgId'])
     .index('by_report', ['reportId'])
     // Reading states, oldest first — read by the sweeper that picks up the
@@ -1520,6 +1592,7 @@ export default defineSchema({
     // ── The subject ───────────────────────────────────────────────────────
     subjectKind: guaranteeSubjectKind,
     subjectDealId: v.optional(v.id('deals')), // 'placement'
+    subjectPropertyId: v.optional(v.id('properties')), // 'property'
     subjectCompanyId: v.optional(v.id('companies')), // 'shares'
     // Org the subject lives in, denormalized from it — a party for the
     // authorization check.
@@ -1542,7 +1615,86 @@ export default defineSchema({
     .index('by_borrower_org', ['borrowerOrgId'])
     .index('by_pledgor_org', ['pledgorOrgId'])
     .index('by_subject_deal', ['subjectDealId'])
+    .index('by_subject_property', ['subjectPropertyId'])
     .index('by_subject_company', ['subjectCompanyId']),
+
+  // ─── Real estate (properties + their valuations) ──────────────────────────
+
+  /**
+   * properties — a real-estate asset held by a group company.
+   *
+   * A first-class object because a PPD or a mortgage has to bite on
+   * something (SPEC D20), and because « what does this SCI own, what is it
+   * worth, what does it earn » had no answer in the app.
+   *
+   * NO amount is entered outside `costBasis`. The `purchasePriceCents` /
+   * `notaryFeesCents` / `worksCents` columns of the first draft are gone:
+   * they duplicated the matched flows (D43). Rents and charges are likewise
+   * never entered — they are the transactions allocated to the property.
+   *
+   * No `detention` field either: the property lives in the org that holds
+   * it, and a second place to say so would be a second truth.
+   *
+   * Every amount of a property is TAX-INCLUSIVE (D49). They come from bank
+   * flows, and a bank flow is tax-inclusive by nature.
+   */
+  properties: defineTable({
+    orgId: v.id('organizations'), // holding company (D20)
+    name: v.string(), // "18 rue de la Chapelle"
+    address: v.string(),
+    propertyType: propertyAssetType,
+    usage: propertyUsage,
+    surfaceSqm: v.optional(v.number()),
+    // Date of acquisition, for the sheet's subtitle and the exit IRR anchor.
+    acquiredDate: v.optional(v.number()), // ms epoch
+
+    /**
+     * Cost basis, ONE source per line item (D43) — and the choice is per
+     * item, because a property bought in 2019 (before the bank connection)
+     * needs `manual` on its price while its 2024 works come from `flows`.
+     * A global switch would force sacrificing one or the other.
+     *
+     * Bounded by construction: at most one row per `propertyCostPoste`, so
+     * three — this array can never grow into the anti-pattern of an
+     * unbounded list on a row read in a list.
+     *
+     * `manualAmountCents` is KEPT when the source is `flows`, so switching
+     * back does not mean re-typing it. It is simply not read.
+     */
+    costBasis: v.array(
+      v.object({
+        poste: propertyCostPoste,
+        source: propertyCostSource,
+        manualAmountCents: v.optional(v.number()),
+      }),
+    ),
+
+    status: propertyStatus,
+    saleDate: v.optional(v.number()),
+    salePriceCents: v.optional(v.number()),
+    notes: v.optional(v.string()),
+  })
+    .index('by_org', ['orgId'])
+    .index('by_org_status', ['orgId', 'status']),
+
+  /**
+   * propertyValuations — the value of a property over time.
+   *
+   * A table of its own rather than `valuations`, which requires a `dealId`.
+   * Same shape, same « last known value » reading. No automatic estimate:
+   * no PriceHubble, no third-party API (D20) — `source` is a free label
+   * ("estimation agence", "notaire", "à dire d'expert").
+   */
+  propertyValuations: defineTable({
+    orgId: v.id('organizations'),
+    propertyId: v.id('properties'),
+    asOf: v.number(), // ms epoch
+    valueCents: v.number(),
+    source: v.optional(v.string()),
+    notes: v.optional(v.string()),
+  })
+    .index('by_property_asof', ['propertyId', 'asOf'])
+    .index('by_org_asof', ['orgId', 'asOf']),
 
   // ─── Liabilities (equity + shareholder current accounts) ──────────────────
 
@@ -1686,10 +1838,17 @@ export default defineSchema({
     // `targetId` is the target's _id, stored as a string (no cross-table
     // v.id() union). `kind === 'transfer'` is the only kind that leaves
     // `matchStatus` at 'internal_transfer' instead of 'matched'.
+    //
+    // `category` says WHAT the flow is on its target — used by `property`
+    // only, where it decides whether the amount enters the cost basis, the
+    // operating result or the capital gain. Do NOT confuse it with the
+    // top-level `category` below, which is the treasury slug of a
+    // charge/product and is CLEARED by every allocation.
     allocation: v.optional(
       v.object({
         kind: allocationKind,
         targetId: v.string(),
+        category: v.optional(allocationCategory),
       }),
     ),
     direction: txDirection,

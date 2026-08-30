@@ -201,6 +201,43 @@ export const listByLoan = query({
   },
 })
 
+/**
+ * A property's documents (deed of sale, compromis, works quote), most recent
+ * first. Like a loan's: these rows have no portfolio company.
+ */
+export const listByProperty = query({
+  args: { propertyId: v.id('properties') },
+  handler: async (ctx, { propertyId }) => {
+    const property = await ctx.db.get('properties', propertyId)
+    if (!property) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, property.orgId)
+
+    const rows = await ctx.db
+      .query('documents')
+      .withIndex('by_property', (q) => q.eq('propertyId', propertyId))
+      .order('desc')
+      .take(200)
+
+    return await Promise.all(
+      rows.map(async (doc) => ({
+        _id: doc._id,
+        title: doc.title,
+        kind: doc.kind,
+        period: doc.period ?? null,
+        contentType: doc.contentType ?? null,
+        size: doc.size ?? null,
+        uploadedAt: doc.uploadedAt,
+        ocrState: doc.ocrState ?? null,
+        ocrDetail: doc.ocrDetail ?? null,
+        ocrChars: doc.ocrChars ?? null,
+        vectorState: doc.vectorState ?? null,
+        vectorDetail: doc.vectorDetail ?? null,
+        url: await ctx.storage.getUrl(doc.storageId),
+      })),
+    )
+  },
+})
+
 /** A guarantee's deeds, most recent first. Like a loan's: no company. */
 export const listByGuarantee = query({
   args: { guaranteeId: v.id('guarantees') },
@@ -249,10 +286,10 @@ export const getExtractedText = query({
  * Creates a document from an already-uploaded blob.
  *
  * The org is NEVER taken from an argument — it is resolved from the anchor
- * the document hangs off (`companyId`, else `loanId`, else `dealId`), and
- * membership is checked on that resolved org. At least one anchor is
- * required (`missing_anchor`): without one the row would be org-scoped but
- * reachable from nowhere.
+ * the document hangs off (`companyId`, else `loanId`, else `propertyId`,
+ * else `dealId`), and membership is checked on that resolved org. At least
+ * one anchor is required (`missing_anchor`): without one the row would be
+ * org-scoped but reachable from nowhere.
  *
  * `companyId` is optional since the Dette & Garanties module — a loan deed
  * has no portfolio company. Every anchor supplied must live in the SAME org,
@@ -269,6 +306,8 @@ export const create = mutation({
     loanId: v.optional(v.id('loans')),
     // Set to attach the document to a guarantee (deed of pledge, mortgage).
     guaranteeId: v.optional(v.id('guarantees')),
+    // Set to attach the document to a property (deed of sale, works quote).
+    propertyId: v.optional(v.id('properties')),
     title: v.string(),
     kind: kindValidator,
     period: v.optional(v.number()),
@@ -281,6 +320,10 @@ export const create = mutation({
     if (args.companyId && !company) throw new ConvexError('not_found')
     const loan = args.loanId ? await ctx.db.get('loans', args.loanId) : null
     if (args.loanId && !loan) throw new ConvexError('not_found')
+    const property = args.propertyId
+      ? await ctx.db.get('properties', args.propertyId)
+      : null
+    if (args.propertyId && !property) throw new ConvexError('not_found')
     const deal = args.dealId ? await ctx.db.get('deals', args.dealId) : null
     if (args.dealId && !deal) throw new ConvexError('not_found')
     const guarantee = args.guaranteeId
@@ -296,7 +339,11 @@ export const create = mutation({
       guarantee?.pledgorOrgId ??
       guarantee?.subjectOrgId
     const orgId =
-      company?.orgId ?? loan?.orgId ?? deal?.orgId ?? guaranteeOrgId
+      company?.orgId ??
+      loan?.orgId ??
+      property?.orgId ??
+      deal?.orgId ??
+      guaranteeOrgId
     if (!orgId) throw new ConvexError('missing_anchor')
     const { user } = await requireOrgMember(ctx, orgId)
 
@@ -312,6 +359,9 @@ export const create = mutation({
       }
     }
     if (loan && loan.orgId !== orgId) throw new ConvexError('not_found')
+    if (property && property.orgId !== orgId) {
+      throw new ConvexError('not_found')
+    }
     // A guarantee spans several orgs: the resolved one must be one of them.
     if (guarantee && guaranteeOrgId !== orgId) {
       throw new ConvexError('not_found')
@@ -327,6 +377,7 @@ export const create = mutation({
       dealId: args.dealId,
       loanId: args.loanId,
       guaranteeId: args.guaranteeId,
+      propertyId: args.propertyId,
       title,
       kind: args.kind,
       period: args.period,

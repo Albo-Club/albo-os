@@ -4,7 +4,7 @@ import { requireAppUser, requireOrgMember } from './lib/auth'
 import { computeLoanBalanceCents, loanSideForOrg } from './lib/liabilities'
 import { applyAllocateToLiability, applyDeallocate } from './lib/pointage'
 import { buildSearchText } from './lib/searchText'
-import { equityPositionType } from './schema'
+import { allocationCategory, equityPositionType } from './schema'
 
 import type { QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
@@ -188,9 +188,14 @@ export const getLiabilities = query({
 
 /**
  * Allocates a transaction to an equity position (`equity`), an inter-entity
- * current account (`intercompany_loan`) or a bank loan (`loan`). The target
- * must belong to the same org as the transaction (for a C/C: the tx's org
- * must be one of the loan's two parties).
+ * current account (`intercompany_loan`), a bank loan (`loan`) or a property
+ * (`property`). The target must belong to the same org as the transaction
+ * (for a C/C: the tx's org must be one of the loan's two parties).
+ *
+ * `category` is the nature of the flow on the target — required on a
+ * `property`, refused elsewhere. It is the ONLY thing the property matching
+ * gesture adds: the user picks the target, then says what the flow is.
+ * Nothing is suggested, nothing is pre-selected.
  */
 export const allocateTransaction = mutation({
   args: {
@@ -201,16 +206,19 @@ export const allocateTransaction = mutation({
       // Bank loan (`loans`) — a debt to a bank, unrelated to the
       // shareholder current account that `intercompany_loan` means.
       v.literal('loan'),
+      // Real-estate asset (`properties`).
+      v.literal('property'),
     ),
     targetId: v.string(),
+    category: v.optional(allocationCategory),
   },
-  handler: async (ctx, { transactionId, kind, targetId }) => {
+  handler: async (ctx, { transactionId, kind, targetId, category }) => {
     const tx = await ctx.db.get('transactions', transactionId)
     if (!tx) throw new ConvexError('not_found')
     await requireOrgMember(ctx, tx.orgId)
 
     // Core shared with the agent tools: convex/lib/pointage.ts.
-    await applyAllocateToLiability(ctx, tx, kind, targetId)
+    await applyAllocateToLiability(ctx, tx, kind, targetId, category)
     return null
   },
 })

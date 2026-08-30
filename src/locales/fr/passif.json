@@ -122,11 +122,13 @@
     "account_wrong_org": "Ce compte bancaire appartient à une autre organisation.",
     "rate_is_fixed": "Ce prêt est à taux fixe : il n'y a pas de révision à saisir.",
     "has_documents": "Des documents sont encore rattachés à cette ligne. Détachez-les d'abord.",
-    "missing_anchor": "Ce document doit être rattaché à une société, un deal ou un prêt.",
+    "missing_anchor": "Ce document doit être rattaché à une société, un deal, un prêt ou un bien.",
     "ambiguous_borrower": "Choisissez soit un prêt du groupe, soit un emprunteur externe, pas les deux.",
     "ambiguous_pledgor": "Choisissez soit une société du groupe, soit un libellé libre, pas les deux.",
     "missing_subject": "L'assiette de la garantie est obligatoire.",
-    "invalid_rank": "Le rang doit être au moins 1."
+    "invalid_rank": "Le rang doit être au moins 1.",
+    "property_wrong_org": "Ce bien appartient à une autre organisation.",
+    "missing_category": "Choisissez la nature de la dépense pour un bien."
   },
   "edit": {
     "equity": {
@@ -342,7 +344,9 @@
       "notesLabel": "Notes",
       "choose": "Choisir…",
       "createSuccess": "Garantie créée",
-      "editSuccess": "Garantie mise à jour"
+      "editSuccess": "Garantie mise à jour",
+      "subjectProperty": "Un bien immobilier",
+      "subjectPropertyLabel": "Bien"
     },
     "menu": {
       "release": "Enregistrer la mainlevée",

@@ -122,11 +122,13 @@
     "account_wrong_org": "This bank account belongs to another organization.",
     "rate_is_fixed": "This loan has a fixed rate: there is no revision to enter.",
     "has_documents": "Documents are still attached to this row. Detach them first.",
-    "missing_anchor": "This document must be attached to a company, a deal or a loan.",
+    "missing_anchor": "This document must be attached to a company, a deal, a loan or a property.",
     "ambiguous_borrower": "Choose either a group loan or an outside borrower, not both.",
     "ambiguous_pledgor": "Choose either a group company or a free-text label, not both.",
     "missing_subject": "The guarantee's subject is required.",
-    "invalid_rank": "The rank must be at least 1."
+    "invalid_rank": "The rank must be at least 1.",
+    "property_wrong_org": "This property belongs to another organization.",
+    "missing_category": "Pick the nature of the flow for a property."
   },
   "edit": {
     "equity": {
@@ -342,7 +344,9 @@
       "notesLabel": "Notes",
       "choose": "Choose…",
       "createSuccess": "Guarantee created",
-      "editSuccess": "Guarantee updated"
+      "editSuccess": "Guarantee updated",
+      "subjectProperty": "A property",
+      "subjectPropertyLabel": "Property"
     },
     "menu": {
       "release": "Record the release",

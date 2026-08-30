@@ -269,13 +269,19 @@ export const listLedger = query({
     // A transfer-state filter implies the `internal_transfer` status.
     const status = transferState ? ('internal_transfer' as const) : statusArg
 
+    // `liability` means « everything matched that is not a deal ». The list
+    // must stay exhaustive: a kind missing here makes its transactions
+    // invisible in BOTH ledger tabs — they are not deals, and they would not
+    // be liabilities either. (`loan` and `property` were added by the Dette
+    // & Garanties module; `transfer` is deliberately out, its legs are
+    // `internal_transfer`, not `matched`.)
     const allocationKinds: ReadonlyArray<
-      'deal' | 'equity' | 'intercompany_loan'
+      'deal' | 'equity' | 'intercompany_loan' | 'loan' | 'property'
     > | null =
       matchedKind === 'deal'
         ? ['deal']
         : matchedKind === 'liability'
-          ? ['equity', 'intercompany_loan']
+          ? ['equity', 'intercompany_loan', 'loan', 'property']
           : null
 
     // The org's accounts, read once — also gates the by-account branch below

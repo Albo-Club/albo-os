@@ -126,7 +126,18 @@
     "emptyEquity": "Aucune position de capital pour cette organisation.",
     "emptyLoans": "Aucun compte courant pour cette organisation.",
     "groupBankLoans": "Prêts bancaires",
-    "emptyBankLoans": "Aucun prêt bancaire pour cette organisation."
+    "emptyBankLoans": "Aucun prêt bancaire pour cette organisation.",
+    "groupProperties": "Biens",
+    "emptyProperties": "Aucun bien",
+    "natureHeading": "Nature de la dépense",
+    "nature": {
+      "acquisition": "Acquisition",
+      "frais_acquisition": "Frais d'acquisition",
+      "travaux": "Travaux",
+      "charges": "Charges",
+      "loyer": "Loyer",
+      "revente": "Revente"
+    }
   },
   "detail": {
     "title": "Transaction",

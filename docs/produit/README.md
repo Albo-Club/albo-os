@@ -40,6 +40,12 @@ expliqué simplement dans un encadré « Sous le capot ».
 | [Passif](10-passif.md) | Capitaux propres, comptes courants inter-entités |
 | [Dette bancaire et garanties](18-dette-et-garanties.md) | Prêts, échéanciers calculés, capital restant dû, nantissements et marge disponible |
 
+### Immobilier
+
+| Page | Contenu |
+| --- | --- |
+| [Immobilier](20-immobilier.md) | Biens détenus : prix de revient poste par poste, valorisations, rentabilité réelle, marchand de biens |
+
 ### Transverse
 
 | Page | Contenu |

@@ -39,6 +39,30 @@ la Vue d'ensemble) ; le point d'entrée quotidien est la page
    d'un coup (charge, impôt, produit, virement interne). Les virements
    classés en masse restent à apparier (voir ci-dessous).
 
+## Rattacher un flux à un bien immobilier
+
+Le sélecteur « Affecter à… » propose un groupe **Biens** à côté des Deals,
+des Prêts, des Capitaux propres et des Comptes courants.
+
+C'est le seul choix du pointage qui en appelle un second : après avoir
+désigné le bien, l'application demande la **nature de la dépense**. Sans
+elle, elle ne saurait pas si les 40 000 € qui sortent sont des travaux, des
+charges ou une partie du prix d'achat — et le prix de revient comme la
+rentabilité en dépendent.
+
+| Sens | Natures proposées |
+|---|---|
+| Sortie | Acquisition · Frais d'acquisition · Travaux · Charges |
+| Entrée | Loyer · Revente |
+
+**Une transaction, un bien, une seule nature** — jamais de découpage. Un
+virement au notaire qui couvre le prix et les droits part entier en
+« Acquisition ». Pour garder le détail sur un bien ancien, les postes
+concernés restent en source « Saisi » sur la fiche du bien.
+
+Ce second temps ne propose rien et ne présélectionne rien : il liste les
+natures possibles, vous choisissez. Voir [Immobilier](20-immobilier.md).
+
 ## Les virements internes
 
 Un virement interne est un mouvement entre deux comptes de la **même
@@ -167,9 +191,13 @@ sort de la file, sans deal, et reste consultable par statut.
   classe jamais par vraisemblance et ne présélectionne rien.
 - Les types « investissements » et « comptes courants & emprunts » sont deux
   vues du même statut « pointé » : la première montre ce qui est rattaché à
-  un deal, la seconde ce qui est alloué au [passif](10-passif.md).
+  un deal, la seconde **tout le reste** — capitaux propres, comptes courants,
+  prêts bancaires et biens immobiliers. Les prêts en étaient absents par
+  erreur jusqu'ici, ils y figurent désormais.
 
 ## Pages liées
 
 - [Trésorerie](07-tresorerie.md), [Deals](05-deals.md),
   [Passif](10-passif.md), [Assistant IA](11-assistant-ia.md)
+- [Dette bancaire et garanties](18-dette-et-garanties.md) et
+  [Immobilier](20-immobilier.md) — les deux cibles ajoutées au sélecteur.

@@ -37,6 +37,7 @@ import { Route as AppOrgSlugPointageIndexRouteImport } from './routes/app/$orgSl
 import { Route as AppOrgSlugPlacementsIndexRouteImport } from './routes/app/$orgSlug/placements.index'
 import { Route as AppOrgSlugPassifIndexRouteImport } from './routes/app/$orgSlug/passif.index'
 import { Route as AppOrgSlugParticipationsIndexRouteImport } from './routes/app/$orgSlug/participations.index'
+import { Route as AppOrgSlugImmobilierIndexRouteImport } from './routes/app/$orgSlug/immobilier.index'
 import { Route as AppOrgSlugCashIndexRouteImport } from './routes/app/$orgSlug/cash.index'
 import { Route as AppOrgSlugSettingsMembersRouteImport } from './routes/app/$orgSlug/settings/members'
 import { Route as AppOrgSlugSettingsInvitationsRouteImport } from './routes/app/$orgSlug/settings/invitations'
@@ -44,6 +45,7 @@ import { Route as AppOrgSlugSettingsIntegrationsRouteImport } from './routes/app
 import { Route as AppOrgSlugSettingsGeneralRouteImport } from './routes/app/$orgSlug/settings/general'
 import { Route as AppOrgSlugPlacementsDealIdRouteImport } from './routes/app/$orgSlug/placements.$dealId'
 import { Route as AppOrgSlugParticipationsCompanyIdRouteImport } from './routes/app/$orgSlug/participations.$companyId'
+import { Route as AppOrgSlugImmobilierPropertyIdRouteImport } from './routes/app/$orgSlug/immobilier.$propertyId'
 import { Route as AppOrgSlugDealsDealIdRouteImport } from './routes/app/$orgSlug/deals.$dealId'
 import { Route as AppOrgSlugCashAccountIdRouteImport } from './routes/app/$orgSlug/cash.$accountId'
 import { Route as AppOrgSlugPassifPretsLoanIdRouteImport } from './routes/app/$orgSlug/passif.prets.$loanId'
@@ -191,6 +193,12 @@ const AppOrgSlugParticipationsIndexRoute =
     path: '/participations/',
     getParentRoute: () => AppOrgSlugRouteRoute,
   } as any)
+const AppOrgSlugImmobilierIndexRoute =
+  AppOrgSlugImmobilierIndexRouteImport.update({
+    id: '/immobilier/',
+    path: '/immobilier/',
+    getParentRoute: () => AppOrgSlugRouteRoute,
+  } as any)
 const AppOrgSlugCashIndexRoute = AppOrgSlugCashIndexRouteImport.update({
   id: '/cash/',
   path: '/cash/',
@@ -230,6 +238,12 @@ const AppOrgSlugParticipationsCompanyIdRoute =
   AppOrgSlugParticipationsCompanyIdRouteImport.update({
     id: '/participations/$companyId',
     path: '/participations/$companyId',
+    getParentRoute: () => AppOrgSlugRouteRoute,
+  } as any)
+const AppOrgSlugImmobilierPropertyIdRoute =
+  AppOrgSlugImmobilierPropertyIdRouteImport.update({
+    id: '/immobilier/$propertyId',
+    path: '/immobilier/$propertyId',
     getParentRoute: () => AppOrgSlugRouteRoute,
   } as any)
 const AppOrgSlugDealsDealIdRoute = AppOrgSlugDealsDealIdRouteImport.update({
@@ -275,6 +289,7 @@ export interface FileRoutesByFullPath {
   '/app/all/': typeof AppAllIndexRoute
   '/app/$orgSlug/cash/$accountId': typeof AppOrgSlugCashAccountIdRoute
   '/app/$orgSlug/deals/$dealId': typeof AppOrgSlugDealsDealIdRoute
+  '/app/$orgSlug/immobilier/$propertyId': typeof AppOrgSlugImmobilierPropertyIdRoute
   '/app/$orgSlug/participations/$companyId': typeof AppOrgSlugParticipationsCompanyIdRoute
   '/app/$orgSlug/placements/$dealId': typeof AppOrgSlugPlacementsDealIdRoute
   '/app/$orgSlug/settings/general': typeof AppOrgSlugSettingsGeneralRoute
@@ -282,6 +297,7 @@ export interface FileRoutesByFullPath {
   '/app/$orgSlug/settings/invitations': typeof AppOrgSlugSettingsInvitationsRoute
   '/app/$orgSlug/settings/members': typeof AppOrgSlugSettingsMembersRoute
   '/app/$orgSlug/cash/': typeof AppOrgSlugCashIndexRoute
+  '/app/$orgSlug/immobilier/': typeof AppOrgSlugImmobilierIndexRoute
   '/app/$orgSlug/participations/': typeof AppOrgSlugParticipationsIndexRoute
   '/app/$orgSlug/passif/': typeof AppOrgSlugPassifIndexRoute
   '/app/$orgSlug/placements/': typeof AppOrgSlugPlacementsIndexRoute
@@ -311,6 +327,7 @@ export interface FileRoutesByTo {
   '/app/all': typeof AppAllIndexRoute
   '/app/$orgSlug/cash/$accountId': typeof AppOrgSlugCashAccountIdRoute
   '/app/$orgSlug/deals/$dealId': typeof AppOrgSlugDealsDealIdRoute
+  '/app/$orgSlug/immobilier/$propertyId': typeof AppOrgSlugImmobilierPropertyIdRoute
   '/app/$orgSlug/participations/$companyId': typeof AppOrgSlugParticipationsCompanyIdRoute
   '/app/$orgSlug/placements/$dealId': typeof AppOrgSlugPlacementsDealIdRoute
   '/app/$orgSlug/settings/general': typeof AppOrgSlugSettingsGeneralRoute
@@ -318,6 +335,7 @@ export interface FileRoutesByTo {
   '/app/$orgSlug/settings/invitations': typeof AppOrgSlugSettingsInvitationsRoute
   '/app/$orgSlug/settings/members': typeof AppOrgSlugSettingsMembersRoute
   '/app/$orgSlug/cash': typeof AppOrgSlugCashIndexRoute
+  '/app/$orgSlug/immobilier': typeof AppOrgSlugImmobilierIndexRoute
   '/app/$orgSlug/participations': typeof AppOrgSlugParticipationsIndexRoute
   '/app/$orgSlug/passif': typeof AppOrgSlugPassifIndexRoute
   '/app/$orgSlug/placements': typeof AppOrgSlugPlacementsIndexRoute
@@ -352,6 +370,7 @@ export interface FileRoutesById {
   '/app/all/': typeof AppAllIndexRoute
   '/app/$orgSlug/cash/$accountId': typeof AppOrgSlugCashAccountIdRoute
   '/app/$orgSlug/deals/$dealId': typeof AppOrgSlugDealsDealIdRoute
+  '/app/$orgSlug/immobilier/$propertyId': typeof AppOrgSlugImmobilierPropertyIdRoute
   '/app/$orgSlug/participations/$companyId': typeof AppOrgSlugParticipationsCompanyIdRoute
   '/app/$orgSlug/placements/$dealId': typeof AppOrgSlugPlacementsDealIdRoute
   '/app/$orgSlug/settings/general': typeof AppOrgSlugSettingsGeneralRoute
@@ -359,6 +378,7 @@ export interface FileRoutesById {
   '/app/$orgSlug/settings/invitations': typeof AppOrgSlugSettingsInvitationsRoute
   '/app/$orgSlug/settings/members': typeof AppOrgSlugSettingsMembersRoute
   '/app/$orgSlug/cash/': typeof AppOrgSlugCashIndexRoute
+  '/app/$orgSlug/immobilier/': typeof AppOrgSlugImmobilierIndexRoute
   '/app/$orgSlug/participations/': typeof AppOrgSlugParticipationsIndexRoute
   '/app/$orgSlug/passif/': typeof AppOrgSlugPassifIndexRoute
   '/app/$orgSlug/placements/': typeof AppOrgSlugPlacementsIndexRoute
@@ -394,6 +414,7 @@ export interface FileRouteTypes {
     | '/app/all/'
     | '/app/$orgSlug/cash/$accountId'
     | '/app/$orgSlug/deals/$dealId'
+    | '/app/$orgSlug/immobilier/$propertyId'
     | '/app/$orgSlug/participations/$companyId'
     | '/app/$orgSlug/placements/$dealId'
     | '/app/$orgSlug/settings/general'
@@ -401,6 +422,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/settings/invitations'
     | '/app/$orgSlug/settings/members'
     | '/app/$orgSlug/cash/'
+    | '/app/$orgSlug/immobilier/'
     | '/app/$orgSlug/participations/'
     | '/app/$orgSlug/passif/'
     | '/app/$orgSlug/placements/'
@@ -430,6 +452,7 @@ export interface FileRouteTypes {
     | '/app/all'
     | '/app/$orgSlug/cash/$accountId'
     | '/app/$orgSlug/deals/$dealId'
+    | '/app/$orgSlug/immobilier/$propertyId'
     | '/app/$orgSlug/participations/$companyId'
     | '/app/$orgSlug/placements/$dealId'
     | '/app/$orgSlug/settings/general'
@@ -437,6 +460,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/settings/invitations'
     | '/app/$orgSlug/settings/members'
     | '/app/$orgSlug/cash'
+    | '/app/$orgSlug/immobilier'
     | '/app/$orgSlug/participations'
     | '/app/$orgSlug/passif'
     | '/app/$orgSlug/placements'
@@ -470,6 +494,7 @@ export interface FileRouteTypes {
     | '/app/all/'
     | '/app/$orgSlug/cash/$accountId'
     | '/app/$orgSlug/deals/$dealId'
+    | '/app/$orgSlug/immobilier/$propertyId'
     | '/app/$orgSlug/participations/$companyId'
     | '/app/$orgSlug/placements/$dealId'
     | '/app/$orgSlug/settings/general'
@@ -477,6 +502,7 @@ export interface FileRouteTypes {
     | '/app/$orgSlug/settings/invitations'
     | '/app/$orgSlug/settings/members'
     | '/app/$orgSlug/cash/'
+    | '/app/$orgSlug/immobilier/'
     | '/app/$orgSlug/participations/'
     | '/app/$orgSlug/passif/'
     | '/app/$orgSlug/placements/'
@@ -695,6 +721,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrgSlugParticipationsIndexRouteImport
       parentRoute: typeof AppOrgSlugRouteRoute
     }
+    '/app/$orgSlug/immobilier/': {
+      id: '/app/$orgSlug/immobilier/'
+      path: '/immobilier'
+      fullPath: '/app/$orgSlug/immobilier/'
+      preLoaderRoute: typeof AppOrgSlugImmobilierIndexRouteImport
+      parentRoute: typeof AppOrgSlugRouteRoute
+    }
     '/app/$orgSlug/cash/': {
       id: '/app/$orgSlug/cash/'
       path: '/cash'
@@ -742,6 +775,13 @@ declare module '@tanstack/react-router' {
       path: '/participations/$companyId'
       fullPath: '/app/$orgSlug/participations/$companyId'
       preLoaderRoute: typeof AppOrgSlugParticipationsCompanyIdRouteImport
+      parentRoute: typeof AppOrgSlugRouteRoute
+    }
+    '/app/$orgSlug/immobilier/$propertyId': {
+      id: '/app/$orgSlug/immobilier/$propertyId'
+      path: '/immobilier/$propertyId'
+      fullPath: '/app/$orgSlug/immobilier/$propertyId'
+      preLoaderRoute: typeof AppOrgSlugImmobilierPropertyIdRouteImport
       parentRoute: typeof AppOrgSlugRouteRoute
     }
     '/app/$orgSlug/deals/$dealId': {
@@ -797,9 +837,11 @@ interface AppOrgSlugRouteRouteChildren {
   AppOrgSlugIndexRoute: typeof AppOrgSlugIndexRoute
   AppOrgSlugCashAccountIdRoute: typeof AppOrgSlugCashAccountIdRoute
   AppOrgSlugDealsDealIdRoute: typeof AppOrgSlugDealsDealIdRoute
+  AppOrgSlugImmobilierPropertyIdRoute: typeof AppOrgSlugImmobilierPropertyIdRoute
   AppOrgSlugParticipationsCompanyIdRoute: typeof AppOrgSlugParticipationsCompanyIdRoute
   AppOrgSlugPlacementsDealIdRoute: typeof AppOrgSlugPlacementsDealIdRoute
   AppOrgSlugCashIndexRoute: typeof AppOrgSlugCashIndexRoute
+  AppOrgSlugImmobilierIndexRoute: typeof AppOrgSlugImmobilierIndexRoute
   AppOrgSlugParticipationsIndexRoute: typeof AppOrgSlugParticipationsIndexRoute
   AppOrgSlugPassifIndexRoute: typeof AppOrgSlugPassifIndexRoute
   AppOrgSlugPlacementsIndexRoute: typeof AppOrgSlugPlacementsIndexRoute
@@ -814,10 +856,12 @@ const AppOrgSlugRouteRouteChildren: AppOrgSlugRouteRouteChildren = {
   AppOrgSlugIndexRoute: AppOrgSlugIndexRoute,
   AppOrgSlugCashAccountIdRoute: AppOrgSlugCashAccountIdRoute,
   AppOrgSlugDealsDealIdRoute: AppOrgSlugDealsDealIdRoute,
+  AppOrgSlugImmobilierPropertyIdRoute: AppOrgSlugImmobilierPropertyIdRoute,
   AppOrgSlugParticipationsCompanyIdRoute:
     AppOrgSlugParticipationsCompanyIdRoute,
   AppOrgSlugPlacementsDealIdRoute: AppOrgSlugPlacementsDealIdRoute,
   AppOrgSlugCashIndexRoute: AppOrgSlugCashIndexRoute,
+  AppOrgSlugImmobilierIndexRoute: AppOrgSlugImmobilierIndexRoute,
   AppOrgSlugParticipationsIndexRoute: AppOrgSlugParticipationsIndexRoute,
   AppOrgSlugPassifIndexRoute: AppOrgSlugPassifIndexRoute,
   AppOrgSlugPlacementsIndexRoute: AppOrgSlugPlacementsIndexRoute,
