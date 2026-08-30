@@ -16,6 +16,7 @@ import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireAppUser, requireOrgMember } from './lib/auth'
 import { sortByStrength, summarizePledges } from './lib/guarantees'
+import { propertyValueCents } from './properties'
 import { guaranteeForm, guaranteeSubjectKind } from './schema'
 
 import type { QueryCtx } from './_generated/server'
@@ -97,6 +98,16 @@ async function describeSubject(ctx: QueryCtx, guarantee: Doc<'guarantees'>) {
     return {
       label: deal?.name ?? target?.name ?? null,
       dealId: guarantee.subjectDealId,
+      propertyId: null,
+      companyId: null,
+    }
+  }
+  if (guarantee.subjectKind === 'property' && guarantee.subjectPropertyId) {
+    const property = await ctx.db.get('properties', guarantee.subjectPropertyId)
+    return {
+      label: property?.name ?? null,
+      dealId: null,
+      propertyId: guarantee.subjectPropertyId,
       companyId: null,
     }
   }
@@ -105,12 +116,14 @@ async function describeSubject(ctx: QueryCtx, guarantee: Doc<'guarantees'>) {
     return {
       label: company?.name ?? null,
       dealId: null,
+      propertyId: null,
       companyId: guarantee.subjectCompanyId,
     }
   }
   return {
     label: guarantee.subjectLabel ?? null,
     dealId: null,
+    propertyId: null,
     companyId: null,
   }
 }
@@ -148,6 +161,14 @@ async function siblingPledges(
       )
       .collect()
   }
+  if (guarantee.subjectKind === 'property' && guarantee.subjectPropertyId) {
+    return await ctx.db
+      .query('guarantees')
+      .withIndex('by_subject_property', (q) =>
+        q.eq('subjectPropertyId', guarantee.subjectPropertyId),
+      )
+      .collect()
+  }
   if (guarantee.subjectKind === 'shares' && guarantee.subjectCompanyId) {
     return await ctx.db
       .query('guarantees')
@@ -167,6 +188,11 @@ async function subjectValueCents(
 ): Promise<number | null> {
   if (guarantee.subjectKind === 'placement' && guarantee.subjectDealId) {
     return await dealValueCents(ctx, guarantee.subjectDealId)
+  }
+  if (guarantee.subjectKind === 'property' && guarantee.subjectPropertyId) {
+    // Last known valuation of the property — the same « last known value »
+    // reading as a placement, from `propertyValuations` (SPEC § 5.2).
+    return await propertyValueCents(ctx, guarantee.subjectPropertyId)
   }
   // Shares of a group company have no valuation table of their own, and an
   // outside subject is not ours to value — both answer « unknown » rather
@@ -274,6 +300,51 @@ export const listBySubjectDeal = query({
 })
 
 /**
+ * « Emprunt lié & sûreté » block of a property sheet: every security biting
+ * on this property, and the loan each one covers.
+ *
+ * Mirror of `listBySubjectDeal` for a placement — same cross-org reading
+ * (D13): a PPD taken by SCI Chapelle 2 on its own building reads from the
+ * loan sheet AND from the property sheet, out of the one row.
+ */
+export const listBySubjectProperty = query({
+  args: { propertyId: v.id('properties') },
+  handler: async (ctx, { propertyId }) => {
+    const property = await ctx.db.get('properties', propertyId)
+    if (!property) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, property.orgId)
+
+    const rows = await ctx.db
+      .query('guarantees')
+      .withIndex('by_subject_property', (q) =>
+        q.eq('subjectPropertyId', propertyId),
+      )
+      .collect()
+
+    const guarantees = await Promise.all(
+      sortByStrength(rows).map(async (guarantee) => {
+        const loan = guarantee.loanId
+          ? await ctx.db.get('loans', guarantee.loanId)
+          : null
+        return {
+          ...(await enrich(ctx, guarantee)),
+          loanLabel: loan?.label ?? null,
+          loanLenderName: loan?.lenderName ?? null,
+        }
+      }),
+    )
+
+    return {
+      summary: summarizePledges(
+        await propertyValueCents(ctx, propertyId),
+        rows,
+      ),
+      guarantees,
+    }
+  },
+})
+
+/**
  * « Garanties données » block of the Passif page: the assets this org has
  * pledged for someone else. An off-balance-sheet commitment, not a debt —
  * which is why the section stands apart from the three others (SPEC § 6.3).
@@ -314,6 +385,7 @@ const guaranteeArgs = {
   // Subject.
   subjectKind: guaranteeSubjectKind,
   subjectDealId: v.optional(v.id('deals')),
+  subjectPropertyId: v.optional(v.id('properties')),
   subjectCompanyId: v.optional(v.id('companies')),
   subjectLabel: v.optional(v.string()),
   // The pledge.
@@ -331,6 +403,7 @@ type GuaranteeArgs = {
   pledgorLabel?: string
   subjectKind: Doc<'guarantees'>['subjectKind']
   subjectDealId?: Id<'deals'>
+  subjectPropertyId?: Id<'properties'>
   subjectCompanyId?: Id<'companies'>
   subjectLabel?: string
   rank?: number
@@ -373,6 +446,7 @@ async function resolveParties(ctx: QueryCtx, args: GuaranteeArgs) {
 
   let subjectOrgId: Id<'organizations'> | undefined
   let subjectDealId: Id<'deals'> | undefined
+  let subjectPropertyId: Id<'properties'> | undefined
   let subjectCompanyId: Id<'companies'> | undefined
   let subjectLabel: string | undefined
 
@@ -382,6 +456,12 @@ async function resolveParties(ctx: QueryCtx, args: GuaranteeArgs) {
     if (!deal) throw new ConvexError('not_found')
     subjectDealId = deal._id
     subjectOrgId = deal.orgId
+  } else if (args.subjectKind === 'property') {
+    if (!args.subjectPropertyId) throw new ConvexError('missing_subject')
+    const property = await ctx.db.get('properties', args.subjectPropertyId)
+    if (!property) throw new ConvexError('not_found')
+    subjectPropertyId = property._id
+    subjectOrgId = property.orgId
   } else if (args.subjectKind === 'shares') {
     if (!args.subjectCompanyId) throw new ConvexError('missing_subject')
     const company = await ctx.db.get('companies', args.subjectCompanyId)
@@ -399,6 +479,7 @@ async function resolveParties(ctx: QueryCtx, args: GuaranteeArgs) {
     pledgorLabel,
     subjectOrgId,
     subjectDealId,
+    subjectPropertyId,
     subjectCompanyId,
     subjectLabel,
   }
@@ -424,6 +505,7 @@ export const create = mutation({
       pledgorLabel: resolved.pledgorLabel,
       subjectKind: args.subjectKind,
       subjectDealId: resolved.subjectDealId,
+      subjectPropertyId: resolved.subjectPropertyId,
       subjectCompanyId: resolved.subjectCompanyId,
       subjectOrgId: resolved.subjectOrgId,
       subjectLabel: resolved.subjectLabel,
@@ -466,6 +548,7 @@ export const update = mutation({
       pledgorLabel: resolved.pledgorLabel,
       subjectKind: args.subjectKind,
       subjectDealId: resolved.subjectDealId,
+      subjectPropertyId: resolved.subjectPropertyId,
       subjectCompanyId: resolved.subjectCompanyId,
       subjectOrgId: resolved.subjectOrgId,
       subjectLabel: resolved.subjectLabel,

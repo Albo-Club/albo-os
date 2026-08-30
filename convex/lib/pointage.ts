@@ -19,7 +19,8 @@ type MutCtx = GenericMutationCtx<DataModel>
  * internes »):
  * - `matchStatus === 'matched'` ⟺ matched to a deal (`dealId != null` +
  *   `allocation.kind === 'deal'`) OR allocated to liability (`dealId == null`
- *   + `allocation.kind === 'equity' | 'intercompany_loan'`).
+ *   + `allocation.kind === 'equity' | 'intercompany_loan' | 'loan' |
+ *   'property'`).
  * - `allocation.kind === 'transfer'` is the ONE allocation that keeps
  *   `matchStatus: 'internal_transfer'` instead of 'matched': both legs stay
  *   « écarté » (excluded from the analysis), the allocation only records
@@ -43,6 +44,25 @@ export type CategorizeStatus =
   | 'tax'
   | 'product'
   | 'internal_transfer'
+
+/**
+ * Nature of a flow on a property (SPEC D42). One per transaction, never two:
+ * a notary transfer covering the price AND the duties goes whole into
+ * `acquisition` — it is never split.
+ *
+ * The direction is NOT constrained here. The picker offers the outgoing
+ * natures on a debit and the incoming ones on a credit (SPEC § 6.7), but a
+ * refund is a real movement: works reimbursed come back `in` under
+ * `travaux`, and the engine subtracts them from the line item. Forbidding
+ * that at the mutation would leave such a transaction impossible to match.
+ */
+export type AllocationCategory =
+  | 'acquisition'
+  | 'frais_acquisition'
+  | 'travaux'
+  | 'charges'
+  | 'loyer'
+  | 'revente'
 
 /**
  * Guardrail: refuses to silently overwrite an allocation that this operation
@@ -172,17 +192,24 @@ export async function applyCategorization(
 
 /**
  * Allocates a transaction to an equity position (`equity`), an inter-entity
- * current account (`intercompany_loan`) or a BANK loan (`loan`). The target
- * must belong to the same org as the transaction (for a C/C: the tx org must
- * be one of the two parties to the loan). NEVER writes to
- * `matchingDecisions`, never touches `reconciled` (mirror of deal matching
- * only).
+ * current account (`intercompany_loan`), a BANK loan (`loan`) or a PROPERTY
+ * (`property`). The target must belong to the same org as the transaction
+ * (for a C/C: the tx org must be one of the two parties to the loan). NEVER
+ * writes to `matchingDecisions`, never touches `reconciled` (mirror of deal
+ * matching only).
  */
 export async function applyAllocateToLiability(
   ctx: MutCtx,
   tx: Doc<'transactions'>,
-  kind: 'equity' | 'intercompany_loan' | 'loan',
+  kind: 'equity' | 'intercompany_loan' | 'loan' | 'property',
   targetId: string,
+  /**
+   * Nature of the flow on its target — `property` only, where it decides
+   * whether the amount enters the cost basis, the operating result or the
+   * capital gain. Required there, refused everywhere else: a category on an
+   * equity position would mean nothing and nothing would read it.
+   */
+  category?: AllocationCategory,
 ) {
   // Guardrail: no silent double matching. A tx matched to a deal must be
   // unmatched (applyUnmatch) before going to liability.
@@ -206,6 +233,17 @@ export async function applyAllocateToLiability(
     if (bankLoan.orgId !== tx.orgId) {
       throw new ConvexError('bank_loan_wrong_org')
     }
+  } else if (kind === 'property') {
+    // A property belongs to exactly ONE org (the holding company) — same
+    // single-sided check as a bank loan.
+    const propertyId = ctx.db.normalizeId('properties', targetId)
+    const property = propertyId
+      ? await ctx.db.get('properties', propertyId)
+      : null
+    if (!property) throw new ConvexError('not_found')
+    if (property.orgId !== tx.orgId) {
+      throw new ConvexError('property_wrong_org')
+    }
   } else {
     const loanId = ctx.db.normalizeId('intercompanyLoans', targetId)
     const loan = loanId ? await ctx.db.get('intercompanyLoans', loanId) : null
@@ -217,8 +255,17 @@ export async function applyAllocateToLiability(
     }
   }
 
+  // A property flow without its nature could not be read: the app would not
+  // know whether it is a cost, a charge or a rent. Everywhere else a
+  // category would be dead weight.
+  if (kind === 'property') {
+    if (!category) throw new ConvexError('missing_category')
+  } else if (category) {
+    throw new ConvexError('category_not_supported')
+  }
+
   await ctx.db.patch('transactions', tx._id, {
-    allocation: { kind, targetId },
+    allocation: { kind, targetId, category },
     matchStatus: 'matched',
     vatRateBps: undefined,
     category: undefined,

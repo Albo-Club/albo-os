@@ -9,7 +9,7 @@ vide, rien n'est en attente.
 
 ## Comment ça marche
 
-La page empile cinq blocs :
+La page empile sept blocs :
 
 1. **Connexions bancaires dégradées** — la même bannière que sur la
    Trésorerie : si une banque demande une reconnexion ou n'a pas synchronisé
@@ -32,13 +32,25 @@ La page empile cinq blocs :
    dont la date est passée sans qu'elles soient réalisées ni annulées (même
    définition que le badge « En retard » du registre) ; le bouton ouvre le
    même registre filtré.
-5. **Reportings manquants** — les participations dont aucun rapport n'est
+5. **Échéances de prêt en attente** — les échéances d'un prêt bancaire déjà
+   échues sur lesquelles aucun prélèvement n'est pointé. L'application
+   recalcule l'échéancier et le compare à ce qui est réellement sorti de la
+   banque : elle dit **quelle** échéance attend, le rattachement se fait dans
+   la file de [pointage](08-pointage.md). Rien n'est proposé ici. Chaque ligne
+   renvoie vers la fiche du prêt.
+6. **Biens à revaloriser** — les biens détenus sans estimation depuis plus de
+   **18 mois**, ou jamais estimés. Leur plus-value latente et leur rendement
+   se comparent sinon à une valeur qui ne veut plus dire grand-chose. Chaque
+   ligne renvoie vers la fiche du bien.
+7. **Reportings manquants** — les participations dont aucun rapport n'est
    arrivé depuis plus de **4 mois** (délai réglable par organisation dans
    Réglages → Général). Chaque ligne renvoie vers la fiche de la société.
 
 Tous les blocs sauf les tâches sont **automatiques** : un item disparaît de
 lui-même dès que l'action est faite (transaction pointée, banque
-reconnectée, échéance réalisée, rapport reçu).
+reconnectée, échéance réalisée, prélèvement rattaché, estimation saisie,
+rapport reçu). Rien n'est stocké : chaque signal est **recalculé** à
+l'ouverture de la page.
 
 ## Points d'attention
 
@@ -70,3 +82,6 @@ reconnectée, échéance réalisée, rapport reçu).
 - [Trésorerie](07-tresorerie.md) — connexions bancaires et transactions
 - [Prévisionnel](09-previsionnel.md) — les échéances et leur rapprochement
 - [Participations](04-participations.md) — les fiches sociétés et leurs rapports
+- [Dette bancaire et garanties](18-dette-et-garanties.md) — les prêts dont les
+  échéances remontent ici
+- [Immobilier](20-immobilier.md) — les biens dont la valeur a vieilli

@@ -23,6 +23,357 @@ bas de page.
 
 ---
 
+## v1.201.0 — 30/08/2026 à 12:40 — L'assistant sait aussi écrire la dette et l'immobilier
+
+Lot 7, le dernier du module Dette & Garanties. L'assistant savait déjà lire
+les prêts, les garanties et les biens ; il peut maintenant les **écrire** —
+et chaque écriture passe devant vous.
+
+**Ce qu'il sait faire de plus.** Créer un prêt, ajouter un palier de taux sur
+un prêt variable, enregistrer un avenant daté. Créer une sûreté sur un prêt,
+enregistrer une mainlevée. Créer un bien, basculer la source d'un poste de
+prix de revient, ajouter une valorisation datée. Et rattacher un flux à un
+prêt ou à un bien — ce dernier point comblant au passage un oubli : il savait
+lire un prêt depuis le mois dernier, mais pas y rattacher un prélèvement,
+alors que c'était possible à la main.
+
+**Chaque écriture demande votre accord**, sans exception. La génération
+s'arrête, Confirmer / Refuser s'affiche, et rien n'est écrit tant que vous
+n'avez pas tranché.
+
+**Ce qu'il ne fait toujours pas, et pourquoi.**
+
+- **Supprimer.** Retirer un prêt, une garantie ou un bien reste un geste de
+  l'application. Une mainlevée n'est pas une suppression — elle est
+  disponible, et elle conserve la ligne.
+- **Corriger un prêt.** Écraser des conditions détruit un historique. Il peut
+  en revanche enregistrer un **avenant**, qui le conserve.
+- **Saisir un résultat.** Ni capital restant dû, ni loyer, ni charge, ni
+  rendement : ce sont les conditions et les flux qui se saisissent, le reste
+  en découle. Il n'y a pas de champ, donc pas d'outil.
+- **Deviner une cible.** Comme pour le pointage, vous nommez la transaction
+  et sa destination. Sur un bien, il demande aussi la nature du flux plutôt
+  que de la supposer.
+
+**Il sait de quoi vous parlez.** Sur la fiche d'un prêt ou d'un bien, « ce
+prêt » et « ce bien » désignent celui que vous avez sous les yeux — comme
+c'était déjà le cas sur une fiche deal ou société.
+
+**Côté connecteur Claude** (le serveur MCP), les mêmes opérations sont
+exposées et marquées comme des écritures, pour que le client demande
+confirmation de son côté.
+
+> **🔧 Notes techniques**
+>
+> - **`convex/agentToolsDebt.ts`** passe de lecture seule à lecture/écriture :
+>   8 outils d'écriture (`createLoan`, `addLoanRate`, `addLoanAmendment`,
+>   `createGuarantee`, `releaseGuarantee`, `createProperty`,
+>   `setPropertyCostSource`, `addPropertyValuation`) + `listProperties` en
+>   lecture. Tous les writes portent `needsApproval: true` ; chaque
+>   `internalMutation` re-vérifie l'appartenance via la scope key du thread,
+>   l'action de stream n'ayant aucune identité auth.
+> - **L'org de l'assiette d'une garantie est résolue DEPUIS l'actif**, jamais
+>   prise en argument — sinon un appelant pourrait se déclarer partie d'une
+>   garantie qui ne le concerne pas.
+> - **Correctif** : `agentToolsPointage:allocateTransactionToLiability`
+>   acceptait `equity | intercompany_loan` seulement (livré au lot 4) ; il
+>   accepte désormais aussi `loan` et `property` + la catégorie.
+> - **MCP** : `listLoans`, `listGuarantees`, `listProperties` en lecture,
+>   `createLoan`, `createProperty`, `addPropertyValuation` avec
+>   `write: true` (donc `readOnlyHint: false`). ⚠️ `needsApproval` n'a aucun
+>   effet là-bas — pas d'UI in-app pour l'afficher.
+> - **Contexte d'entité élargi** de `deal | company` à
+>   `deal | company | loan | property` dans `lib/instructions.ts`, `chat.ts`
+>   (validateur + args de `streamAsync`) et `AiPanel`.
+> - **`BASE_INSTRUCTIONS`** gagne trois paragraphes (dette, garanties,
+>   immobilier). Les outils de dette du lot 3 n'en avaient aucun : le modèle
+>   les avait sans savoir quoi en faire.
+> - **Piège documenté** : le SDK AI **normalise** `needsApproval` en
+>   prédicat, y compris quand le flag est absent. `expect(x.needsApproval)
+>   .toBe(true)` passe donc sur **tous** les outils et ne prouve rien — il
+>   faut **appeler** la fonction. Détail dans `KNOWN_ISSUES.md`.
+> - **Tests** : `convex/regression.debtWrites.test.ts` (28 cas) — le flag
+>   d'approbation appelé outil par outil dans les deux sens, les annotations
+>   MCP, l'absence d'outil de suppression, la résolution d'org, et la
+>   tenancy.
+
+---
+
+## v1.200.0 — 30/08/2026 à 12:05 — Chaque société ne voit que ce qui la concerne
+
+Lot 6 du module Dette & Garanties, et le seul qui ne parle pas de dette :
+un chantier transverse à toute l'application.
+
+Toutes les organisations ne font pas la même chose. Une SCI qui détient un
+immeuble n'a ni participation ni placement ; une holding d'investissement n'a
+pas de bien. Jusqu'ici chaque espace affichait tous les modules, vides
+compris — et un module vide, c'est du bruit qu'il faut apprendre à ignorer.
+
+**Un module s'affiche s'il contient quelque chose.** Rien à déclarer, rien à
+régler : la première ligne créée le fait apparaître. L'application le
+vérifie à chaque affichage plutôt que de garder un réglage qui finirait par
+se désynchroniser.
+
+Cela vaut pour les entrées de la barre latérale — Investissements,
+Trésorerie, Passif — **et** pour les trois sous-onglets d'Investissements.
+
+**Et le problème de l'œuf et de la poule ?** Si un module vide est masqué,
+comment y créer son premier élément ? C'est le rôle du bouton **« Activer un
+module »** en bas de la barre latérale, et du **⋯** à côté des sous-onglets.
+Ils listent exactement ce qui est masqué et le ramènent d'un clic ; le
+module reste alors visible même vide, le temps d'y créer quelque chose.
+
+Deux garde-fous qui comptent :
+
+- **Éteindre un module qui contient des lignes ne les cache pas.** Le contenu
+  l'emporte — des lignes existantes ne doivent jamais devenir inaccessibles.
+- **La page ou l'onglet que vous consultez ne se masque jamais**, même si le
+  module vient de se vider. Se retrouver sur une page dont l'onglet a disparu
+  serait une trappe.
+
+**« À faire » ne se masque pas** : c'est là que remontent les signaux de tous
+les autres modules. Le masquer masquerait le moyen d'agir sur le reste.
+
+> **🔧 Notes techniques**
+>
+> - **Schéma, additif** : `organizations.enabledModules` (tableau optionnel
+>   de slugs, borné par construction à un par module connu).
+> - **`convex/lib/modules.ts`** — le registre et la règle, purs et partagés
+>   par le serveur et les deux surfaces : `isVisible` = « contient quelque
+>   chose OU activé », `visibleModules`, `activatableModules`. Testés en
+>   `node:test`.
+> - **`convex/modules.ts:list`** — une sonde `.first()` par module à chaque
+>   lecture (une question d'existence, jamais un comptage). La racine
+>   `group_root` de l'org est explicitement exclue du contenu d'Entreprises :
+>   la compter rendrait l'onglet définitivement non vide et la règle sans
+>   objet. `setEnabled` refiltre sur `ALL_MODULES`, donc un module retiré du
+>   code ne traîne pas en base.
+> - **Front** : `nav.ts` étiquette chaque entrée de son module,
+>   `AppSidebar` filtre et rend `ModuleActivator`, `InvestmentsTabs` fait de
+>   même pour ses trois onglets et garde toujours l'onglet actif. Pendant le
+>   chargement de la query **tout** s'affiche : une barre latérale qui perd
+>   des entrées le temps d'un aller-retour se lit comme une perte de données.
+> - **Tests** : `tests/modules.test.ts` (règle pure) et
+>   `convex/regression.modules.test.ts` (10 cas bout en bout).
+
+---
+
+## v1.199.0 — 30/08/2026 à 11:35 — Qui détient quoi, et les prêts qu'on renégocie
+
+Lot 5 du module Dette & Garanties : la structure capitalistique des sociétés
+du groupe, et la possibilité d'**amender** un prêt sans réécrire son passé.
+
+**Le % de détention, saisi à un seul endroit.** La section Capital de chaque
+société gagne une colonne **Détention**. Le pourcentage se saisit sur la page
+Passif de la société **émettrice** — « CALTE 60 %, M. Y 40 % » se lit chez la
+SCI, pas chez CALTE. Côté détenteur, l'application **lit** ce pourcentage au
+lieu d'en garder une copie : deux saisies finiraient par diverger, et rien ne
+dirait laquelle a raison.
+
+Le % reste facultatif, et l'absence est un vrai état : une prime d'émission
+ou un report à nouveau ne portent aucune part du capital. L'application
+affiche alors « — », jamais « 0 % » — qui affirmerait que le détenteur ne
+possède rien.
+
+**Renégocier un prêt sans effacer ce qui a été payé.** Le menu ⋯ d'une fiche
+de prêt porte désormais **deux** gestes, et la différence est tout le sujet :
+
+- **Corriger** écrase les conditions, comme si les anciennes n'avaient jamais
+  existé. C'est pour une faute de saisie.
+- **Mettre à jour au…** enregistre un **avenant daté** : les échéances déjà
+  passées ne bougent pas, et les nouvelles conditions s'appliquent au capital
+  restant à partir de la date d'effet.
+
+L'application ne peut pas deviner lequel des deux s'applique — une faute de
+frappe et une renégociation ressemblent exactement à la même chose. C'est
+vous qui tranchez.
+
+Seul ce qui change se saisit : un champ laissé vide reste inchangé. Une
+renégociation qui ne touche que le taux, c'est un nombre à taper. Et si la
+banque a **recalculé** le capital restant dû à la date d'effet, son chiffre
+peut être saisi et prend le pas sur celui que l'application dériverait.
+
+L'échéancier devient alors **multi-périodes** : une seule liste continue, où
+la partie déjà courue reste exactement ce qu'elle était et la suite est
+recalculée. Les avenants apparaissent dans une section dédiée, la plus
+récente en tête, avec ce que chacun a changé — et cette section n'existe pas
+tant qu'il n'y a pas d'avenant.
+
+Trois gestes voisins à ne pas confondre : **corriger** écrase, **amender**
+conserve, et **ajouter un palier de taux** n'est ni l'un ni l'autre — c'est
+le contrat lui-même qui prévoyait la révision. Un crédit révolving, qui n'a
+pas d'échéancier à segmenter, n'est pas amendable : ses conditions se
+corrigent en place.
+
+> **🔧 Notes techniques**
+>
+> - **Schéma, additif** : `equityPositions.ownershipBps` (optionnel, bps) et
+>   table `loanAmendments` (`by_loan_from`), dont chaque champ de conditions
+>   est optionnel — absent = inchangé.
+> - **`lib/amortization.ts`** — nouvelle fonction pure
+>   `buildScheduleWithAmendments` : coupe le segment courant à la date
+>   d'effet, reprend le restant dû atteint (ou celui recalé par la banque via
+>   `outstandingCents`, la seule exception assumée au « rien de dérivable
+>   n'est stocké » de ce coin), réancre la série sur la première échéance
+>   non servie et renumérote en continu. Sans avenant elle rend exactement
+>   `buildSchedule` — le cas courant ne paie rien pour une fonctionnalité
+>   qu'il n'utilise pas.
+> - **Un seul lecteur d'échéancier.** Quatre surfaces en lisaient un (fiche,
+>   prévisionnel, « À faire », agent), chacune reconstruisant les termes à la
+>   main. Elles passent désormais toutes par `loans:loanSchedule`, qui charge
+>   paliers **et** avenants — sans quoi une renégociation ferait diverger la
+>   projection et la fiche sur le même prêt, invisible jusqu'au premier
+>   avenant puis faux partout d'un coup.
+> - **`loans:addAmendment` / `removeAmendment`** — une date, un avenant
+>   (ré-entrer la même date remplace) ; refus avant la première échéance
+>   (`amendment_before_start`, c'est une correction) et sur un révolving
+>   (`revolving_not_amendable`). La suppression du prêt emporte ses avenants
+>   comme elle emportait déjà ses paliers.
+> - **`liabilities:getOwnershipForCompany`** — lecture inter-org du %, par le
+>   chemin que D33 nomme : `by_holder_org` borne aux positions détenues
+>   ailleurs, puis le SIREN joint les deux côtés. C'est la clé que
+>   `migrations/createSubsidiaryOrgs` a construite en clonant délibérément le
+>   SIREN sur le `group_root` de chaque filiale.
+> - ⚠️ **`companyRelations.ownershipPct` reste en base** et porte le même
+>   fait en `0-100` : c'est le doublon préexistant que D33 interdit. Il n'est
+>   pas retiré ici (donnée de production, lu par `companies.ts`) — signalé
+>   dans `KNOWN_ISSUES.md`, à arbitrer comme un chantier de données à part.
+> - **Tests** : `tests/amortization.test.ts` § avenants (9 cas : le passé
+>   inchangé au centime, le capital repris, la durée restante, l'enchaînement
+>   de plusieurs avenants dans le désordre, la numérotation continue) et
+>   `convex/regression.equityAmendments.test.ts` (14 cas).
+
+---
+
+## v1.198.0 — 30/08/2026 à 11:05 — L'immobilier entre dans Albo OS
+
+Albo OS savait ce que le groupe possède en participations et en placements,
+et ce qu'il doit à ses banques. Il sait maintenant répondre à : **« que
+possède cette société en immobilier, combien ça vaut, et combien ça
+rapporte ? »** C'est le lot 4 du module Dette & Garanties.
+
+**Un troisième onglet, pas une entrée de plus.** L'Immobilier s'installe à
+côté d'Entreprises et de Placements, dans Investissements. Un bien reste un
+investissement — il fausserait simplement les multiples du portefeuille s'il
+était rangé avec les participations. Le menu de gauche ne bouge pas.
+
+**Le prix de revient, et son interrupteur.** C'est le cœur du module. Un bien
+a trois postes de revient — acquisition, frais d'acquisition, travaux — et
+chacun porte **un seul montant**, venu d'**une seule source** : soit le
+montant que vous avez saisi, soit la somme des flux bancaires pointés sur ce
+bien. **Jamais l'addition des deux.**
+
+Et le choix se fait **poste par poste**, parce que les deux cas coexistent
+sur le même immeuble : un bien acquis en 2019 a un prix qui ne sera jamais
+dans l'application — la connexion bancaire ne remonte pas si loin — pendant
+que ses travaux de 2024 sont de vrais virements. Un interrupteur unique
+obligerait à sacrifier l'un ou l'autre. La colonne « Source » de la fiche
+bascule le poste d'un clic, et le montant saisi est conservé : on peut
+revenir sans rien retaper.
+
+Quand des flux sont pointés sur un poste resté en « Saisi », la fiche le
+**dit** — « 2 flux ne sont pas comptés » — au lieu de les cacher. Ils ne sont
+pas additionnés, mais vous savez qu'ils existent.
+
+**La rentabilité est réelle, jamais théorique.** Loyers encaissés, charges
+payées, résultat net : sur 12 mois glissants, et uniquement à partir de
+transactions pointées. Un bien sans flux rattaché affiche zéro, pas une
+estimation. Les échéances de prêt ne sont jamais des charges du bien — elles
+sont rattachées au prêt, sinon la même sortie serait comptée deux fois.
+
+**Les valorisations sont datées et saisies à la main.** Aucune estimation
+automatique. Tant qu'aucune valeur n'est connue, la plus-value latente est
+**inconnue**, pas nulle : l'application ne prétend pas savoir.
+
+**Le marchand de biens est un usage, pas un objet à part.** Quand il est
+choisi, la fiche masque l'exploitation — un bien acheté pour être revendu ne
+s'exploite pas — et met en avant le prix de revient puis le résultat de
+sortie, calculé sur les flux datés réels à la revente.
+
+**Une hypothèque peut enfin porter sur un immeuble.** Jusqu'ici une garantie
+ne pouvait prendre pour assiette qu'un placement, des titres ou « rien de
+chez nous » : le privilège de prêteur de deniers d'une SCI sur son propre
+bien n'était pas saisissable. Il l'est. Et il se lit des **deux côtés** — sur
+la fiche du prêt et sur la fiche du bien — à partir d'une seule saisie.
+
+**Pointer un flux sur un bien.** Le sélecteur de la file de Pointage gagne un
+groupe **Biens**. C'est le seul endroit de l'application où choisir une cible
+en appelle une seconde : la **nature de la dépense**. Sans elle, impossible de
+savoir si les 40 000 € qui sortent sont des travaux, des charges ou une part
+du prix. Une transaction, un bien, une seule nature — jamais de découpage. Et
+comme partout : rien n'est proposé, rien n'est présélectionné, rien n'est
+classé par vraisemblance.
+
+**Un signal de plus dans « À faire ».** Les biens détenus sans estimation
+depuis plus de 18 mois y remontent : leur plus-value et leur rendement se
+comparent sinon à une valeur qui ne veut plus dire grand-chose.
+
+**Deux oublis du lot précédent corrigés au passage.** Les transactions
+pointées sur un **prêt bancaire** n'apparaissaient dans aucun onglet du
+registre de trésorerie ; elles figurent désormais avec les comptes courants.
+Et l'assistant IA, qui savait lire un prêt, ne savait pas y **rattacher** un
+prélèvement alors que c'était possible à la main : il le sait maintenant, et
+sait aussi pointer sur un bien.
+
+> **🔧 Notes techniques**
+>
+> - **Schéma, strictement additif** (prod) : tables `properties` (avec
+>   `costBasis` : un tableau borné à trois postes, chacun portant sa `source`
+>   et son `manualAmountCents`) et `propertyValuations`. Élargissements
+>   d'unions : `guaranteeSubjectKind` += `'property'`, `allocationKind` +=
+>   `'property'`. Nouveaux champs optionnels : `guarantees.subjectPropertyId`,
+>   `documents.propertyId`, `transactions.allocation.category`. Nouveaux index
+>   `by_subject_property`, `by_property`, `properties.by_org(_status)`,
+>   `propertyValuations.by_property_asof`. Le validateur est exporté sous
+>   `propertyAssetType` : `propertyType` était déjà pris au niveau module par
+>   le champ d'instrument d'un deal immo.
+> - **`convex/lib/properties.ts`** — moteur pur (aucun import Convex, testé en
+>   `node:test` hors `convex/`, comme `amortization.ts`) : `resolveCostBasis`
+>   (une source par poste, remboursements soustraits, flux ignorés comptés à
+>   part), `operatingResult` (12 mois glissants), `netYield`,
+>   `latentGainCents`, `exitCashflows` (branché sur le **seul** `xirr` du
+>   repo). Rien de dérivable n'est stocké.
+> - **`convex/properties.ts`** — `list` / `listOptions` / `getById` / `create`
+>   / `update` / `remove` / `setCostPosteSource` / `addValuation` /
+>   `removeValuation`, toutes derrière `requireOrgMember`. Garde-fous de
+>   suppression : `has_guarantees`, `has_allocations`, `has_documents`.
+> - **`convex/guarantees.ts`** — `describeSubject`, `siblingPledges`,
+>   `subjectValueCents` et `resolveParties` apprennent `'property'` ; nouvelle
+>   query `listBySubjectProperty` (miroir de `listBySubjectDeal`). L'org de
+>   l'assiette continue d'être lue sur l'actif, jamais sur un argument.
+> - **`convex/lib/pointage.ts`** — `applyAllocateToLiability` accepte
+>   `'property'` + un `category` optionnel : requis sur un bien
+>   (`missing_category`), refusé ailleurs (`category_not_supported`), et l'org
+>   du bien est vérifiée comme celle d'un prêt (`property_wrong_org`). La
+>   direction n'est **pas** contrainte à la mutation : un remboursement de
+>   travaux revient en `in` et se soustrait du poste.
+> - **`lib/categories.ts` (les deux miroirs)** — `effectiveCategory` range
+>   `'property'` dans un nouveau seau `real_estate`. Sans ça un flux
+>   immobilier tombait dans `'deals'` et polluait les investissements **en
+>   silence** — c'est le piège du fichier.
+> - **Correctifs lot 3** : `transactions:listLedger` (le filtre « liability »
+>   omettait `'loan'`, désormais `['equity','intercompany_loan','loan',
+>   'property']`) et `agentToolsPointage:allocateTransactionToLiability`
+>   (l'énum s'arrêtait à `equity | intercompany_loan`).
+> - **Front** : routes `immobilier.index.tsx` / `immobilier.$propertyId.tsx`,
+>   composants `src/components/immobilier/*`, troisième onglet dans
+>   `InvestmentsTabs` + `alsoActiveOn` dans `nav.ts`. Le `TargetCombobox`
+>   gagne un second panneau pour la nature (état `pendingProperty`), le seul
+>   endroit du picker qui n'applique pas au premier clic. Namespace i18n
+>   `immobilier` (fr + en) + ajouts dans `pointage`, `passif`, `todo`.
+> - **Tests** : `tests/properties.test.ts` (moteur pur) et
+>   `convex/regression.properties.test.ts` (bout en bout, 16 cas). Ajout de
+>   `tests/amortization.test.ts` § « attribution du réel » qui épingle le
+>   caractère **déterministe et calendaire** d'`attributeActuals` — le montant
+>   n'influence jamais le placement, l'ordre des flux non plus.
+> - **Doc** : nouvelle page produit `docs/produit/20-immobilier.md` (+ son
+>   document Linear et son entrée dans `DOCS`), `SPEC.md` corrigé sur deux
+>   points (`loans.endDate` documenté au § 4.1 ; `intelligence.ts` et
+>   `companyEnrichment.ts` retirés de la liste d'audit du § 4.8 — ils ne
+>   touchent jamais la table `documents`).
+
+---
+
 ## v1.197.0 — 29/08/2026 à 23:31 — Ce que chaque société doit, et ce qui est mis en gage
 
 Albo OS savait dire ce que le groupe possède. Il sait maintenant dire ce

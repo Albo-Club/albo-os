@@ -4,7 +4,7 @@ import { requireAppUser, requireOrgMember } from './lib/auth'
 import { computeLoanBalanceCents, loanSideForOrg } from './lib/liabilities'
 import { applyAllocateToLiability, applyDeallocate } from './lib/pointage'
 import { buildSearchText } from './lib/searchText'
-import { equityPositionType } from './schema'
+import { allocationCategory, equityPositionType } from './schema'
 
 import type { QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
@@ -166,6 +166,65 @@ export const listOptions = query({
 })
 
 /**
+ * The ownership share the CURRENT org holds in a group company, READ from
+ * that company's own cap table (SPEC D33).
+ *
+ * The % lives in exactly one place: the `equityPositions` of the issuing
+ * org. CALTE's side of the same fact — the equity deal on a subsidiary —
+ * reads it here instead of carrying a second copy. Two entries would
+ * diverge, and nothing would say which one is right.
+ *
+ * The path is the one D33 names: `by_holder_org` gives the positions this
+ * org holds elsewhere; the issuing org is then matched to the company on
+ * this side by SIREN. That is the key the subsidiary orgs were built on —
+ * `migrations/createSubsidiaryOrgs` deliberately CLONES the SIREN onto the
+ * new org's `group_root`, and uniqueness is per-org precisely so the same
+ * SIREN may appear on both sides.
+ *
+ * Returns `null` when the company has no SIREN, when no org's root matches
+ * it, or when the cap table carries no share — an unknown share is not 0 %.
+ */
+export const getOwnershipForCompany = query({
+  args: {
+    orgId: v.id('organizations'),
+    companyId: v.id('companies'),
+  },
+  handler: async (ctx, { orgId, companyId }) => {
+    await requireOrgMember(ctx, orgId)
+    const company = await ctx.db.get('companies', companyId)
+    if (!company || company.orgId !== orgId) throw new ConvexError('not_found')
+    if (!company.siren) return null
+
+    // Bounded by the number of positions this org holds elsewhere — a
+    // handful, not a table scan.
+    const held = await ctx.db
+      .query('equityPositions')
+      .withIndex('by_holder_org', (q) => q.eq('holderOrgId', orgId))
+      .collect()
+
+    for (const position of held) {
+      if (position.ownershipBps == null) continue
+      const root = await ctx.db
+        .query('companies')
+        .withIndex('by_org_kind', (q) =>
+          q.eq('orgId', position.orgId).eq('kind', 'group_root'),
+        )
+        .first()
+      if (!root || root.siren !== company.siren) continue
+      const issuer = await ctx.db.get('organizations', position.orgId)
+      return {
+        ownershipBps: position.ownershipBps,
+        positionId: position._id,
+        issuingOrgSlug: issuer?.slug ?? null,
+        issuingOrgName: issuer?.name ?? null,
+        effectiveDate: position.effectiveDate,
+      }
+    }
+    return null
+  },
+})
+
+/**
  * An org's liabilities: issued equity positions + inter-entity current
  * accounts, with balances derived from the allocated transactions.
  */
@@ -188,9 +247,14 @@ export const getLiabilities = query({
 
 /**
  * Allocates a transaction to an equity position (`equity`), an inter-entity
- * current account (`intercompany_loan`) or a bank loan (`loan`). The target
- * must belong to the same org as the transaction (for a C/C: the tx's org
- * must be one of the loan's two parties).
+ * current account (`intercompany_loan`), a bank loan (`loan`) or a property
+ * (`property`). The target must belong to the same org as the transaction
+ * (for a C/C: the tx's org must be one of the loan's two parties).
+ *
+ * `category` is the nature of the flow on the target — required on a
+ * `property`, refused elsewhere. It is the ONLY thing the property matching
+ * gesture adds: the user picks the target, then says what the flow is.
+ * Nothing is suggested, nothing is pre-selected.
  */
 export const allocateTransaction = mutation({
   args: {
@@ -201,16 +265,19 @@ export const allocateTransaction = mutation({
       // Bank loan (`loans`) — a debt to a bank, unrelated to the
       // shareholder current account that `intercompany_loan` means.
       v.literal('loan'),
+      // Real-estate asset (`properties`).
+      v.literal('property'),
     ),
     targetId: v.string(),
+    category: v.optional(allocationCategory),
   },
-  handler: async (ctx, { transactionId, kind, targetId }) => {
+  handler: async (ctx, { transactionId, kind, targetId, category }) => {
     const tx = await ctx.db.get('transactions', transactionId)
     if (!tx) throw new ConvexError('not_found')
     await requireOrgMember(ctx, tx.orgId)
 
     // Core shared with the agent tools: convex/lib/pointage.ts.
-    await applyAllocateToLiability(ctx, tx, kind, targetId)
+    await applyAllocateToLiability(ctx, tx, kind, targetId, category)
     return null
   },
 })
@@ -241,6 +308,22 @@ export const deallocateTransaction = mutation({
 // getLiabilities).
 
 /**
+ * An ownership share is a fraction of a company, in basis points: strictly
+ * positive and at most 100 %. Absent is a valid state — plenty of equity
+ * lines (a share premium, retained earnings) carry no share of their own.
+ */
+function assertValidOwnership(ownershipBps?: number) {
+  if (ownershipBps == null) return
+  if (
+    !Number.isInteger(ownershipBps) ||
+    ownershipBps <= 0 ||
+    ownershipBps > 10_000
+  ) {
+    throw new ConvexError('invalid_ownership')
+  }
+}
+
+/**
  * Creates an equity position issued by the org. The holder is EITHER a group
  * org (`holderOrgId`), OR a free-text label (`holderLabel`), or neither
  * (equity with no named holder). `holderPersonId` is not exposed (no persons
@@ -254,12 +337,14 @@ export const createEquityPosition = mutation({
     type: equityPositionType,
     amountCents: v.number(),
     shares: v.optional(v.number()),
+    ownershipBps: v.optional(v.number()),
     effectiveDate: v.number(),
   },
   handler: async (ctx, args) => {
     await requireOrgMember(ctx, args.orgId)
 
     if (args.amountCents <= 0) throw new ConvexError('invalid_amount')
+    assertValidOwnership(args.ownershipBps)
     // A single holder source (both empty = allowed).
     if (args.holderOrgId && args.holderLabel) {
       throw new ConvexError('ambiguous_holder')
@@ -276,6 +361,7 @@ export const createEquityPosition = mutation({
       type: args.type,
       amountCents: args.amountCents,
       shares: args.shares,
+      ownershipBps: args.ownershipBps,
       effectiveDate: args.effectiveDate,
     })
   },
@@ -395,6 +481,7 @@ export const updateEquityPosition = mutation({
     type: equityPositionType,
     amountCents: v.number(),
     shares: v.optional(v.number()),
+    ownershipBps: v.optional(v.number()),
     effectiveDate: v.number(),
   },
   handler: async (ctx, args) => {
@@ -403,6 +490,7 @@ export const updateEquityPosition = mutation({
     await requireOrgMember(ctx, position.orgId)
 
     if (args.amountCents <= 0) throw new ConvexError('invalid_amount')
+    assertValidOwnership(args.ownershipBps)
     if (args.holderOrgId && args.holderLabel) {
       throw new ConvexError('ambiguous_holder')
     }
@@ -419,6 +507,7 @@ export const updateEquityPosition = mutation({
       type: args.type,
       amountCents: args.amountCents,
       shares: args.shares,
+      ownershipBps: args.ownershipBps,
       effectiveDate: args.effectiveDate,
     })
     return null

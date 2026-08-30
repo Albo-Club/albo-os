@@ -85,7 +85,7 @@ describe('buildLiabilityOptions', () => {
     assert.equal(groups.loanOptions[0].sublabel, 'Dette')
   })
 
-  it('aucune donnée → trois groupes vides (jamais undefined)', () => {
+  it('aucune donnée → quatre groupes vides (jamais undefined)', () => {
     const groups = buildLiabilityOptions(
       { equityPositions: [], loans: [] },
       labels,
@@ -95,6 +95,7 @@ describe('buildLiabilityOptions', () => {
       equityOptions: [],
       loanOptions: [],
       bankLoanOptions: [],
+      propertyOptions: [],
     })
   })
 
@@ -124,6 +125,34 @@ describe('buildLiabilityOptions', () => {
     assert.deepEqual(groups.loanOptions, [])
   })
 
+  it('un bien alimente le groupe Biens', () => {
+    const groups = buildLiabilityOptions(
+      { equityPositions: [], loans: [] },
+      labels,
+      [],
+      [
+        {
+          _id: 'property_1',
+          name: '18 rue de la Chapelle',
+          address: 'Paris 18e',
+        },
+      ],
+    )
+
+    assert.deepEqual(groups.propertyOptions, [
+      {
+        kind: 'property',
+        targetId: 'property_1',
+        label: '18 rue de la Chapelle',
+        sublabel: 'Paris 18e',
+      },
+    ])
+    // Même règle que pour les prêts : chaque groupe vient de SA source, un
+    // bien ne fuit ni dans les prêts ni dans les comptes courants.
+    assert.deepEqual(groups.bankLoanOptions, [])
+    assert.deepEqual(groups.loanOptions, [])
+  })
+
   it('un compte courant ne fuit pas dans le groupe Prêts', () => {
     const groups = buildLiabilityOptions(
       {
@@ -137,5 +166,6 @@ describe('buildLiabilityOptions', () => {
 
     assert.equal(groups.loanOptions.length, 1)
     assert.deepEqual(groups.bankLoanOptions, [])
+    assert.deepEqual(groups.propertyOptions, [])
   })
 })

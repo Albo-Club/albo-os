@@ -14,19 +14,25 @@
 
 /** Pointable liability target (option of a pointage combobox group). */
 export type LiabilityOption = {
-  kind: 'equity' | 'intercompany_loan' | 'loan'
+  kind: 'equity' | 'intercompany_loan' | 'loan' | 'property'
   /** Target _id as a string (`transactions.allocation` convention). */
   targetId: string
   label: string
   sublabel: string
 }
 
-/** The three liability groups of the combobox, built separately. */
+/** The four target groups of the combobox, built separately. */
 export type LiabilityOptionGroups = {
   equityOptions: Array<LiabilityOption>
   loanOptions: Array<LiabilityOption>
   /** Bank debt (`loans`) — NOT the shareholder current accounts above. */
   bankLoanOptions: Array<LiabilityOption>
+  /**
+   * Real-estate assets (`properties`). The only group whose targets need a
+   * second choice — the nature of the flow (SPEC D42) — which the combobox
+   * asks for before it emits the target.
+   */
+  propertyOptions: Array<LiabilityOption>
 }
 
 /** Subset of the `getLiabilities` return consumed by the combobox. */
@@ -55,6 +61,13 @@ export type BankLoansForOptions = Array<{
   lenderName: string
 }>
 
+/** Subset of the `properties:listOptions` return consumed by the combobox. */
+export type PropertiesForOptions = Array<{
+  _id: string
+  name: string
+  address: string
+}>
+
 /** Resolved labels (i18n on the caller side). */
 export type LiabilityOptionLabels = {
   /** Label of an equity position type (e.g. « Capital social »). */
@@ -66,18 +79,21 @@ export type LiabilityOptionLabels = {
 }
 
 /**
- * Builds the « Capitaux propres », « Comptes courants » and « Prêts » group
- * options of the pointage combobox. A loan is identified by its `_id` (an
- * `intercompanyLoan` has NO `orgId` — only fromOrgId/toOrgId).
+ * Builds the « Capitaux propres », « Comptes courants », « Prêts » and
+ * « Biens » group options of the pointage combobox. A loan is identified by
+ * its `_id` (an `intercompanyLoan` has NO `orgId` — only
+ * fromOrgId/toOrgId).
  *
- * `bankLoans` is undefined while its own query is still loading: the group
- * then renders EMPTY rather than absent — « missing » and « empty » must
- * stay distinguishable (KNOWN_ISSUES « Passif »).
+ * `bankLoans` and `properties` are undefined while their own queries are
+ * still loading: the group then renders EMPTY rather than absent —
+ * « missing » and « empty » must stay distinguishable (KNOWN_ISSUES
+ * « Passif »).
  */
 export function buildLiabilityOptions(
   liabilities: LiabilitiesForOptions,
   labels: LiabilityOptionLabels,
   bankLoans: BankLoansForOptions = [],
+  properties: PropertiesForOptions = [],
 ): LiabilityOptionGroups {
   return {
     equityOptions: liabilities.equityPositions.map((position) => ({
@@ -97,6 +113,12 @@ export function buildLiabilityOptions(
       targetId: loan._id,
       label: loan.label,
       sublabel: loan.lenderName,
+    })),
+    propertyOptions: properties.map((property) => ({
+      kind: 'property' as const,
+      targetId: property._id,
+      label: property.name,
+      sublabel: property.address,
     })),
   }
 }

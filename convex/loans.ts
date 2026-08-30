@@ -20,7 +20,7 @@ import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import {
   attributeActuals,
-  buildSchedule,
+  buildScheduleWithAmendments,
   outstandingAt,
   summarize,
 } from './lib/amortization'
@@ -36,7 +36,12 @@ import {
 
 import type { QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
-import type { LoanTerms, RateStep, ScheduleRow } from './lib/amortization'
+import type {
+  LoanAmendment,
+  LoanTerms,
+  RateStep,
+  ScheduleRow,
+} from './lib/amortization'
 
 /**
  * How far a revolving credit with no `endDate` is projected. Matches the
@@ -62,6 +67,29 @@ function termsOf(loan: Doc<'loans'>): LoanTerms {
   }
 }
 
+/**
+ * The loan's dated amendments, oldest first. Empty on a loan that has never
+ * been renegotiated — which is every loan until someone uses the gesture.
+ */
+async function amendmentsOf(
+  ctx: QueryCtx,
+  loanId: Id<'loans'>,
+): Promise<Array<LoanAmendment>> {
+  const rows = await ctx.db
+    .query('loanAmendments')
+    .withIndex('by_loan_from', (q) => q.eq('loanId', loanId))
+    .collect()
+  return rows.map((row) => ({
+    effectiveDate: row.effectiveDate,
+    rateBps: row.rateBps,
+    durationMonths: row.durationMonths,
+    amortizationKind: row.amortizationKind,
+    paymentFrequency: row.paymentFrequency,
+    insuranceMonthlyCents: row.insuranceMonthlyCents,
+    outstandingCents: row.outstandingCents,
+  }))
+}
+
 /** The loan's rate steps, oldest first. Empty on a fixed-rate loan. */
 async function ratesOf(
   ctx: QueryCtx,
@@ -78,13 +106,18 @@ async function ratesOf(
   }))
 }
 
-/** Schedule of a stored loan, with the revolving projection bounded. */
+/**
+ * Schedule of a stored loan, amendments applied and the revolving
+ * projection bounded. With no amendment this is the plain `buildSchedule`
+ * of lot 1 — nothing changes for a loan that was never renegotiated.
+ */
 function scheduleOf(
   loan: Doc<'loans'>,
   rates: Array<RateStep>,
   now: number,
+  amendments: Array<LoanAmendment> = [],
 ): Array<ScheduleRow> {
-  return buildSchedule(termsOf(loan), rates, {
+  return buildScheduleWithAmendments(termsOf(loan), rates, amendments, {
     horizonDate: addMonthsUtc(now, REVOLVING_HORIZON_MONTHS),
   })
 }
@@ -114,7 +147,8 @@ export const list = query({
     const rows = await Promise.all(
       loans.map(async (loan) => {
         const rates = await ratesOf(ctx, loan._id)
-        const schedule = scheduleOf(loan, rates, now)
+        const amendments = await amendmentsOf(ctx, loan._id)
+        const schedule = scheduleOf(loan, rates, now, amendments)
         const summary = summarize(loan, schedule, now)
         return {
           _id: loan._id,
@@ -201,7 +235,16 @@ export const getById = query({
       rateBps: row.rateBps,
       kind: row.kind,
     }))
-    const schedule = scheduleOf(loan, rates, now)
+    const amendmentRows = await ctx.db
+      .query('loanAmendments')
+      .withIndex('by_loan_from', (q) => q.eq('loanId', loanId))
+      .collect()
+    const schedule = scheduleOf(
+      loan,
+      rates,
+      now,
+      await amendmentsOf(ctx, loanId),
+    )
     const summary = summarize(loan, schedule, now)
 
     // Transactions matched to this loan — the « Réel » column of the
@@ -257,6 +300,20 @@ export const getById = query({
           notes: row.notes ?? null,
         }))
         .sort((a, b) => b.fromDate - a.fromDate),
+      // Most recent first — the terms in force sit at the top.
+      amendments: amendmentRows
+        .map((row) => ({
+          _id: row._id,
+          effectiveDate: row.effectiveDate,
+          rateBps: row.rateBps ?? null,
+          durationMonths: row.durationMonths ?? null,
+          amortizationKind: row.amortizationKind ?? null,
+          paymentFrequency: row.paymentFrequency ?? null,
+          insuranceMonthlyCents: row.insuranceMonthlyCents ?? null,
+          outstandingCents: row.outstandingCents ?? null,
+          notes: row.notes ?? null,
+        }))
+        .sort((a, b) => b.effectiveDate - a.effectiveDate),
       schedule: schedule.map((row, index) => ({
         ...row,
         actualCents: actuals[index],
@@ -475,12 +532,20 @@ export const remove = mutation({
       .first()
     if (doc) throw new ConvexError('has_documents')
 
-    // The rate series has no life of its own — it goes with the loan.
+    // Neither the rate series nor the amendments have a life of their own —
+    // they go with the loan.
     const rates = await ctx.db
       .query('loanRates')
       .withIndex('by_loan_from', (q) => q.eq('loanId', loanId))
       .collect()
     for (const rate of rates) await ctx.db.delete('loanRates', rate._id)
+    const amendments = await ctx.db
+      .query('loanAmendments')
+      .withIndex('by_loan_from', (q) => q.eq('loanId', loanId))
+      .collect()
+    for (const row of amendments) {
+      await ctx.db.delete('loanAmendments', row._id)
+    }
     await ctx.db.delete('loans', loanId)
     return null
   },
@@ -551,6 +616,26 @@ export const removeRate = mutation({
 
 // ─── Shared read core (agent tools reuse it after their own auth) ───────────
 
+/**
+ * The schedule of one loan, rate steps AND amendments applied.
+ *
+ * The single entry point for every reader — the loan sheet, the forecast
+ * expansion, the « À faire » signal and the agent. Rebuilding it by hand
+ * anywhere else is how the projection and the sheet come to disagree about
+ * the same loan, which is exactly what a renegotiation would cause.
+ */
+export async function loanSchedule(
+  ctx: QueryCtx,
+  loan: Doc<'loans'>,
+  opts: { horizonDate: number },
+): Promise<Array<ScheduleRow>> {
+  const [rates, amendments] = await Promise.all([
+    ratesOf(ctx, loan._id),
+    amendmentsOf(ctx, loan._id),
+  ])
+  return buildScheduleWithAmendments(termsOf(loan), rates, amendments, opts)
+}
+
 /** Outstanding capital of one loan at a date — derived, never stored. */
 export async function loanOutstandingCents(
   ctx: QueryCtx,
@@ -559,5 +644,105 @@ export async function loanOutstandingCents(
 ): Promise<number> {
   if (loan.status !== 'active') return 0
   const rates = await ratesOf(ctx, loan._id)
-  return outstandingAt(loan, scheduleOf(loan, rates, at), at)
+  const amendments = await amendmentsOf(ctx, loan._id)
+  return outstandingAt(loan, scheduleOf(loan, rates, at, amendments), at)
 }
+
+// ─── Amendments (« Mettre à jour au JJ/MM ») ────────────────────────────────
+
+/**
+ * Records a dated amendment to the loan's terms. Only the fields that
+ * actually change are passed; the rest carries over from the terms in force
+ * before that date.
+ *
+ * This is the OTHER half of D35, and the difference with « Corriger » is the
+ * whole point: `update` overwrites, as if the old terms had never existed —
+ * that is for a typo. An amendment keeps them: the instalments already run
+ * stay exactly as they were, and the new terms apply to the capital that
+ * remains. The app cannot tell a typo from a renegotiation, so the user does.
+ *
+ * One amendment per effective date — re-entering the same date replaces the
+ * previous one rather than stacking a second truth on it (same rule as a
+ * rate step).
+ *
+ * Refused on a `revolving`: it has no schedule to segment, and its terms are
+ * corrected in place.
+ */
+export const addAmendment = mutation({
+  args: {
+    loanId: v.id('loans'),
+    effectiveDate: v.number(),
+    rateBps: v.optional(v.number()),
+    durationMonths: v.optional(v.number()),
+    amortizationKind: v.optional(amortizationKind),
+    paymentFrequency: v.optional(loanPaymentFrequency),
+    insuranceMonthlyCents: v.optional(v.number()),
+    outstandingCents: v.optional(v.number()),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const loan = await ctx.db.get('loans', args.loanId)
+    if (!loan) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, loan.orgId)
+    if (loan.amortizationKind === 'revolving') {
+      throw new ConvexError('revolving_not_amendable')
+    }
+    if (args.effectiveDate <= loan.firstPaymentDate) {
+      // Before the first instalment there is nothing to keep the history of:
+      // that is a correction, not an amendment.
+      throw new ConvexError('amendment_before_start')
+    }
+    if (args.rateBps != null && args.rateBps < 0) {
+      throw new ConvexError('invalid_rate')
+    }
+    if (args.durationMonths != null && args.durationMonths <= 0) {
+      throw new ConvexError('missing_duration')
+    }
+    if (args.outstandingCents != null && args.outstandingCents < 0) {
+      throw new ConvexError('invalid_amount')
+    }
+    if (
+      args.insuranceMonthlyCents != null &&
+      args.insuranceMonthlyCents < 0
+    ) {
+      throw new ConvexError('invalid_amount')
+    }
+
+    const existing = await ctx.db
+      .query('loanAmendments')
+      .withIndex('by_loan_from', (q) =>
+        q.eq('loanId', args.loanId).eq('effectiveDate', args.effectiveDate),
+      )
+      .first()
+    const fields = {
+      rateBps: args.rateBps,
+      durationMonths: args.durationMonths,
+      amortizationKind: args.amortizationKind,
+      paymentFrequency: args.paymentFrequency,
+      insuranceMonthlyCents: args.insuranceMonthlyCents,
+      outstandingCents: args.outstandingCents,
+      notes: args.notes?.trim() || undefined,
+    }
+    if (existing) {
+      await ctx.db.patch('loanAmendments', existing._id, fields)
+      return existing._id
+    }
+    return await ctx.db.insert('loanAmendments', {
+      orgId: loan.orgId,
+      loanId: args.loanId,
+      effectiveDate: args.effectiveDate,
+      ...fields,
+    })
+  },
+})
+
+export const removeAmendment = mutation({
+  args: { amendmentId: v.id('loanAmendments') },
+  handler: async (ctx, { amendmentId }) => {
+    const amendment = await ctx.db.get('loanAmendments', amendmentId)
+    if (!amendment) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, amendment.orgId)
+    await ctx.db.delete('loanAmendments', amendmentId)
+    return null
+  },
+})

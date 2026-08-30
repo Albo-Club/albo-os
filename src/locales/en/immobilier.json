@@ -1,0 +1,176 @@
+{
+  "metaTitle": "Real estate — Albo OS",
+  "metaTitleDetail": "Property — Albo OS",
+  "title": "Real estate",
+  "subtitle": "The properties this company holds: cost price, value, and what they actually earn.",
+  "loading": "Loading…",
+  "list": {
+    "empty": "No property for this company.",
+    "emptyHint": "Create a property to follow its cost price, its value and its yield.",
+    "col": {
+      "name": "Property",
+      "type": "Type",
+      "usage": "Usage",
+      "cost": "Cost price",
+      "value": "Value",
+      "yield": "Net yield"
+    },
+    "total": "Total",
+    "totalHint": "Value of the properties held — sold ones are not counted.",
+    "count_one": "{{count}} property",
+    "count_other": "{{count}} properties"
+  },
+  "create": {
+    "button": "New property",
+    "title": "New property",
+    "editTitle": "Correct the property",
+    "description": "The terms of the property. Rents and charges are not entered: they come from the matched transactions.",
+    "success": "Property created.",
+    "editSuccess": "Property updated.",
+    "save": "Save"
+  },
+  "fields": {
+    "name": "Name",
+    "namePlaceholder": "18 rue de la Chapelle",
+    "address": "Address",
+    "addressPlaceholder": "Paris 18e",
+    "propertyType": "Type",
+    "usage": "Usage",
+    "surface": "Surface (sqm)",
+    "acquiredDate": "Acquisition date",
+    "notes": "Notes",
+    "status": "Status",
+    "saleDate": "Sale date",
+    "salePrice": "Sale price",
+    "costBasis": "Cost price",
+    "costBasisHint": "One amount per line item, and one source. A line item on « Flows » is the sum of the transactions matched to this property; the entered amount is never added to it."
+  },
+  "type": {
+    "appartement": "Flat",
+    "maison": "House",
+    "immeuble": "Building",
+    "local_commercial": "Commercial premises",
+    "terrain": "Land"
+  },
+  "usage": {
+    "locatif_nu": "Unfurnished rental",
+    "locatif_meuble": "Furnished rental",
+    "colocation": "House share",
+    "saisonnier": "Seasonal rental",
+    "commercial": "Commercial",
+    "marchand_de_biens": "Property trading",
+    "residence_secondaire": "Second home"
+  },
+  "status": {
+    "held": "Held",
+    "sold": "Sold"
+  },
+  "poste": {
+    "acquisition": "Acquisition",
+    "frais_acquisition": "Acquisition costs",
+    "travaux": "Works"
+  },
+  "source": {
+    "manual": "Entered",
+    "flows_one": "{{count}} flow",
+    "flows_other": "{{count}} flows",
+    "flowsEmpty": "No flow",
+    "switchToFlows": "Switch to the matched flows",
+    "switchToManual": "Switch to an entered amount",
+    "switched": "Line item source updated.",
+    "ignored_one": "{{count}} flow matched to this line item is not counted: the entered amount stands.",
+    "ignored_other": "{{count}} flows matched to this line item are not counted: the entered amount stands."
+  },
+  "sheet": {
+    "back": "← Real estate",
+    "notFound": "Property not found.",
+    "stats": {
+      "cost": "Cost price",
+      "value": "Value",
+      "gain": "Latent gain",
+      "yield": "Net yield",
+      "exitIrr": "Exit IRR",
+      "salePrice": "Sale price"
+    },
+    "costBasis": {
+      "title": "Cost price",
+      "hint": "One amount per line item · one source",
+      "col": {
+        "poste": "Line item",
+        "amount": "Amount",
+        "source": "Source"
+      },
+      "total": "Cost price"
+    },
+    "operating": {
+      "title": "Operations",
+      "hint": "trailing 12 months · matched flows only",
+      "revenue": "Rents received",
+      "charges": "Charges paid",
+      "net": "Net result",
+      "empty": "No flow matched to this property over the last twelve months.",
+      "hiddenForDealer": "A property held for trading is not operated: the result is read at the resale."
+    },
+    "valuations": {
+      "title": "Valuations",
+      "add": "Estimate",
+      "empty": "No valuation. The latent gain and the yield have no value to compare against.",
+      "col": {
+        "date": "Date",
+        "source": "Source",
+        "value": "Value"
+      },
+      "deleted": "Valuation deleted.",
+      "dialogTitle": "New estimate",
+      "dialogDescription": "No automatic estimate: the value is the one you know.",
+      "asOf": "Date",
+      "value": "Value",
+      "source": "Source",
+      "sourcePlaceholder": "Agency estimate, notary, expert appraisal…",
+      "saved": "Valuation saved."
+    },
+    "guarantees": {
+      "title": "Related loan & security",
+      "empty": "No security bites on this property.",
+      "loanLabel": "Secured loan",
+      "noLoan": "Borrower outside the group"
+    },
+    "transactions": {
+      "title": "Transactions",
+      "hint": "matched from the Pointage queue",
+      "empty": "No transaction matched to this property.",
+      "col": {
+        "date": "Date",
+        "nature": "Nature",
+        "amount": "Amount",
+        "label": "Label"
+      }
+    },
+    "documents": {
+      "title": "Documents",
+      "empty": "No document."
+    },
+    "menu": {
+      "correct": "Correct",
+      "delete": "Delete the property"
+    },
+    "delete": {
+      "confirmTitle": "Delete this property?",
+      "confirmBody": "The property and its valuations are deleted. This action is final.",
+      "success": "Property deleted."
+    },
+    "soldOn": "sold on {{date}}",
+    "acquiredOn": "acquired on {{date}}"
+  },
+  "errors": {
+    "failed": "The action failed. Please try again.",
+    "not_found": "Property not found.",
+    "invalid_label": "The property name is required.",
+    "invalid_amount": "The amount must be positive.",
+    "duplicate_cost_poste": "A cost line item can only appear once.",
+    "missing_sale": "A sold property needs a sale date and a sale price.",
+    "has_guarantees": "A security still bites on this property. Detach it first.",
+    "has_allocations": "Transactions are still matched to this property. Detach them first.",
+    "has_documents": "Documents are still attached to this property. Detach them first."
+  }
+}

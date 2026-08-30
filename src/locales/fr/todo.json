@@ -52,5 +52,12 @@
     "row": "{{label}} · {{lender}}",
     "empty": "Aucune échéance en attente.",
     "more": "et {{count}} autre(s)"
+  },
+  "staleValuations": {
+    "title": "Biens à revaloriser",
+    "empty": "Aucun bien dont la valeur ait vieilli.",
+    "subtitle": "Un bien sans estimation depuis plus de 18 mois : sa plus-value latente et son rendement se comparent à une valeur qui ne veut plus dire grand-chose.",
+    "lastValued": "dernière estimation le {{date}}",
+    "neverValued": "jamais estimé"
   }
 }

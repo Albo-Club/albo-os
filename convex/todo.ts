@@ -2,7 +2,8 @@ import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { listSilentCompanies } from './lib/reportFreshness'
-import { attributeActuals, buildSchedule } from './lib/amortization'
+import { attributeActuals } from './lib/amortization'
+import { loanSchedule } from './loans'
 
 import type { Doc, Id } from './_generated/dataModel'
 
@@ -15,6 +16,9 @@ const OVERDUE_INSTALMENT_PREVIEW = 5
 
 /** Done tasks stay visible this long, then drop from the list (kept in DB). */
 const DONE_VISIBLE_MS = 30 * 24 * 60 * 60 * 1000
+
+/** A property's value is considered stale past this (SPEC § 6.8). */
+const STALE_VALUATION_MS = 18 * 30 * 24 * 60 * 60 * 1000
 
 /**
  * Aggregated feed of the « To do » tab. Only the signals with no existing
@@ -85,31 +89,9 @@ export const getTodo = query({
       amountCents: number
     }> = []
     for (const loan of activeLoans) {
-      const rateRows = await ctx.db
-        .query('loanRates')
-        .withIndex('by_loan_from', (q) => q.eq('loanId', loan._id))
-        .collect()
-      const schedule = buildSchedule(
-        {
-          principalCents: loan.principalCents,
-          firstPaymentDate: loan.firstPaymentDate,
-          durationMonths: loan.durationMonths,
-          amortizationKind: loan.amortizationKind,
-          rateBps: loan.rateBps,
-          rateKind: loan.rateKind,
-          paymentFrequency: loan.paymentFrequency,
-          deferralMonths: loan.deferralMonths,
-          deferralKind: loan.deferralKind,
-          insuranceMonthlyCents: loan.insuranceMonthlyCents,
-          endDate: loan.endDate,
-        },
-        rateRows.map((row) => ({
-          fromDate: row.fromDate,
-          rateBps: row.rateBps,
-          kind: row.kind,
-        })),
-        { horizonDate: now },
-      )
+      // Through the single shared reader (rate steps + amendments), so the
+      // signal never names an instalment the loan sheet does not show.
+      const schedule = await loanSchedule(ctx, loan, { horizonDate: now })
       if (schedule.length === 0) continue
 
       const txs = await ctx.db
@@ -151,6 +133,47 @@ export const getTodo = query({
       OVERDUE_INSTALMENT_PREVIEW,
     )
 
+    // ── Properties whose value has gone stale ─────────────────────────────
+    // A DERIVED signal, like the one above (SPEC D19, § 6.8): a property
+    // nobody has revalued in eighteen months carries a latent gain and a
+    // yield computed against a figure that has stopped meaning anything.
+    // Sold properties are out — their value is the sale price, and it is not
+    // going to move.
+    const heldProperties = await ctx.db
+      .query('properties')
+      .withIndex('by_org_status', (q) =>
+        q.eq('orgId', orgId).eq('status', 'held'),
+      )
+      .collect()
+    const staleValuations: Array<{
+      propertyId: Id<'properties'>
+      name: string
+      address: string
+      lastValuationAt: number | null
+    }> = []
+    for (const property of heldProperties) {
+      const last = await ctx.db
+        .query('propertyValuations')
+        .withIndex('by_property_asof', (q) =>
+          q.eq('propertyId', property._id),
+        )
+        .order('desc')
+        .first()
+      // Never valued counts as stale: it is the same missing answer to « what
+      // is it worth », and the one the user can act on straight away.
+      if (last && now - last.asOf <= STALE_VALUATION_MS) continue
+      staleValuations.push({
+        propertyId: property._id,
+        name: property.name,
+        address: property.address,
+        lastValuationAt: last?.asOf ?? null,
+      })
+    }
+    // Oldest first — the one that has waited longest is the one to do.
+    staleValuations.sort(
+      (a, b) => (a.lastValuationAt ?? 0) - (b.lastValuationAt ?? 0),
+    )
+
     // ── Manual tasks ──────────────────────────────────────────────────────
     // Done tasks older than DONE_VISIBLE_MS are hidden (not deleted). Within
     // a status group the UI keeps this order: due date first, then newest.
@@ -187,6 +210,7 @@ export const getTodo = query({
       missingReports,
       overdueInstalmentsCount: overdueInstalments.length,
       overdueInstalments: overdueInstalmentsPreview,
+      staleValuations,
       tasks: tasks.map((task: Doc<'todos'>) => ({
         _id: task._id,
         title: task.title,

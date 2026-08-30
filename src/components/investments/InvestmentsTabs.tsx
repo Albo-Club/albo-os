@@ -1,9 +1,19 @@
 import { Link } from '@tanstack/react-router'
+import { useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 
+import { api } from '../../../convex/_generated/api'
+import { TAB_MODULES, isVisible } from '../../../convex/lib/modules'
+import type { Id } from '../../../convex/_generated/dataModel'
+import type { TabModule } from '../../../convex/lib/modules'
+import { ModuleActivator } from '~/components/app-shell/ModuleActivator'
+
 /**
- * Shared sub-nav of the Investissements section: two router links switching
- * between the Entreprises (participations) and Placements pages. Styled
+ * Shared sub-nav of the Investissements section: three router links
+ * switching between the Entreprises (participations), Placements and
+ * Immobilier pages. Real estate is a TAB here and not a sidebar entry: a
+ * property would distort the TVPI/MOIC of the portfolio if it sat under
+ * Entreprises (SPEC D28), but it is still an investment. Styled
  * exactly like the shadcn TabsList/TabsTrigger default variant from
  * `~/components/ui/tabs` — but built from `Link`s with a `data-state`
  * attribute, since these are navigation tabs (the active one is derived
@@ -18,31 +28,73 @@ const triggerClass =
 export function InvestmentsTabs({
   orgSlug,
   active,
+  orgId,
 }: {
   orgSlug: string
-  active: 'entreprises' | 'placements'
+  active: TabModule
+  /** Absent = every tab is shown (no org resolved yet). */
+  orgId?: Id<'organizations'>
 }) {
-  const { t } = useTranslation(['participations', 'placements'])
+  const { t } = useTranslation(['participations', 'placements', 'immobilier'])
+  const modules = useConvexQuery(
+    api.modules.list,
+    orgId ? { orgId } : 'skip',
+  )
+
+  // A tab that holds nothing is hidden (SPEC D37) — but the one being looked
+  // at never is: hiding the page you are on would be a trapdoor. While the
+  // query is in flight everything shows, so tabs never flicker away.
+  const shows = (tab: TabModule) => {
+    if (tab === active || !modules) return true
+    const state = modules.find((row) => row.key === tab)
+    return state ? isVisible(state) : true
+  }
 
   return (
-    // Mirror of ui/tabs.tsx TabsList (default variant, horizontal).
-    <div className="bg-muted text-muted-foreground inline-flex h-9 w-fit items-center justify-center rounded-lg p-[3px]">
-      <Link
-        to="/app/$orgSlug/participations"
-        params={{ orgSlug }}
-        data-state={active === 'entreprises' ? 'active' : 'inactive'}
-        className={triggerClass}
-      >
-        {t('participations:title')}
-      </Link>
-      <Link
-        to="/app/$orgSlug/placements"
-        params={{ orgSlug }}
-        data-state={active === 'placements' ? 'active' : 'inactive'}
-        className={triggerClass}
-      >
-        {t('placements:title')}
-      </Link>
+    <div className="flex items-center gap-2">
+      {/* Mirror of ui/tabs.tsx TabsList (default variant, horizontal). */}
+      <div className="bg-muted text-muted-foreground inline-flex h-9 w-fit items-center justify-center rounded-lg p-[3px]">
+        {shows('entreprises') ? (
+          <Link
+            to="/app/$orgSlug/participations"
+            params={{ orgSlug }}
+            data-state={active === 'entreprises' ? 'active' : 'inactive'}
+            className={triggerClass}
+          >
+            {t('participations:title')}
+          </Link>
+        ) : null}
+        {shows('placements') ? (
+          <Link
+            to="/app/$orgSlug/placements"
+            params={{ orgSlug }}
+            data-state={active === 'placements' ? 'active' : 'inactive'}
+            className={triggerClass}
+          >
+            {t('placements:title')}
+          </Link>
+        ) : null}
+        {shows('immobilier') ? (
+          <Link
+            to="/app/$orgSlug/immobilier"
+            params={{ orgSlug }}
+            data-state={active === 'immobilier' ? 'active' : 'inactive'}
+            className={triggerClass}
+          >
+            {t('immobilier:title')}
+          </Link>
+        ) : null}
+      </div>
+      {/* Brings back a hidden tab — indispensable, since that is exactly
+          where its first element gets created (SPEC D37). */}
+      {orgId ? (
+        <ModuleActivator
+          orgId={orgId}
+          states={modules}
+          among={TAB_MODULES}
+          variant="tabs"
+        />
+      ) : null}
     </div>
   )
 }

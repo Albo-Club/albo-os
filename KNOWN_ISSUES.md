@@ -5245,9 +5245,10 @@ refuserait des lectures parfaitement fondées.
   marge d'un actif serait surévaluée — une erreur en notre défaveur, et
   invisible. Ce n'est pas une vue consolidée au sens de D14, c'est la lecture
   d'un lien déjà accepté.
-- **`subjectKind` n'a pas encore `'property'`** : la valeur arrivera avec la
-  table `properties`. Élargir une union Convex ne demande aucune migration ;
-  déclarer une table que rien ne lit aurait été du gras.
+- **`subjectKind` porte `'property'` depuis le lot 4**, avec la table
+  `properties` et l'index `by_subject_property`. Élargir une union Convex n'a
+  demandé aucune migration — c'est pour ça que la valeur avait été laissée de
+  côté au lot 2 plutôt que déclarée à vide.
 
 ## Échéances de prêt dans le prévisionnel (`forecasts:expandLoanSchedules`)
 
@@ -5274,3 +5275,220 @@ c'est l'échéancier calculé du prêt.
   chaque palier de taux, comme `expandRules` l'est à chaque sauvegarde de
   règle. Aucun cron : sans ce déclencheur, la mutation existerait sans que
   rien ne l'appelle.
+
+## Prix de revient d'un bien : une source par poste, jamais l'addition
+
+`convex/lib/properties.ts:resolveCostBasis` rend **un seul montant par
+poste**, pris à **une seule** source : le montant saisi (`manual`) ou la
+somme des transactions pointées sur ce bien avec cette catégorie (`flows`).
+Le choix est **par poste**, pas global.
+
+- **Pourquoi par poste.** Un bien acquis en 2019 a un prix saisi — la
+  connexion bancaire ne remonte pas si loin (C13) — et des travaux de 2024
+  qui, eux, sont de vrais virements. Un interrupteur global forcerait à
+  sacrifier l'un ou l'autre.
+- **L'addition des deux est un bug, pas une fonctionnalité** (D43, C14).
+  C'est la seule chose que ce design existe pour empêcher, et elle est
+  verrouillée par test des deux côtés : `tests/properties.test.ts` (moteur
+  pur) et `convex/regression.properties.test.ts` (bout en bout).
+- **`manualAmountCents` est CONSERVÉ quand le poste passe en `flows`.** Il
+  n'est simplement plus lu. Rebasculer ne doit pas obliger à ressaisir.
+- **Les flux d'un poste resté en `manual` sont comptés à part et affichés**
+  (`ignoredFlowCount` / `ignoredFlowCents`). Les masquer laisserait croire
+  qu'ils n'existent pas ; les additionner serait le bug. On les nomme.
+- **Le TRI de sortie lit comme le prix de revient** : un poste en `manual`
+  entre dans les flux datés à la date d'acquisition, et ses transactions
+  sont ignorées. Sinon le TRI et le prix de revient raconteraient deux
+  histoires différentes du même bien.
+- **Tout est TTC** (D49). Les montants viennent de flux bancaires, TTC par
+  nature. Reconstituer du HT demanderait de ventiler la TVA poste par poste,
+  sans gain sur un locatif nu.
+
+## `allocation.category` n'est pas `transactions.category`
+
+Deux champs, deux sens, et ils se ressemblent assez pour qu'on les confonde.
+
+| | `allocation.category` | `transactions.category` |
+|---|---|---|
+| Où | **dans** l'objet `allocation` | à la racine de la transaction |
+| Sert à | dire ce qu'un flux **est** sur un bien (acquisition, travaux, loyer…) | le slug de trésorerie d'une **charge / produit** |
+| Vit avec | l'allocation | les statuts `charge` / `product` uniquement |
+| Au pointage | posé avec l'allocation | **effacé** par toute allocation |
+
+`applyAllocateToLiability` écrit le premier et met le second à `undefined`
+dans le même patch — c'est volontaire et ce n'est pas une contradiction :
+un flux rattaché à un bien n'est plus une charge à qualifier.
+
+Corollaires :
+
+- **La catégorie est OBLIGATOIRE sur un `property`** (`missing_category`) et
+  **refusée partout ailleurs** (`category_not_supported`). Un flux sur un
+  bien sans sa nature serait illisible ; une nature sur une position de
+  capitaux propres ne serait lue par personne.
+- **La direction n'est pas contrainte à la mutation.** Le sélecteur propose
+  les natures sortantes sur un débit et les entrantes sur un crédit
+  (SPEC § 6.7), mais un remboursement est un vrai mouvement : des travaux
+  remboursés reviennent en `in` sous `travaux`, et le moteur les **retranche**
+  du poste. L'interdire à la mutation rendrait cette transaction impossible à
+  pointer.
+- **`effectiveCategory` range tout `property` dans un seul seau,
+  `real_estate`.** La nature dit ce que le montant fait aux chiffres **du
+  bien** ; l'analyse de trésorerie n'a besoin que de savoir que l'argent est
+  allé à l'immobilier. Six lignes là-bas fragmenteraient pour rien. ⚠️ Un
+  `kind` d'allocation oublié dans cette fonction tombe dans `'deals'` et
+  pollue le seau des investissements **en silence** — c'est le piège du
+  fichier.
+
+## Deux bugs du lot 3 corrigés au lot 4
+
+Repérés en câblant `'property'` dans les mêmes unions. Aucun des deux n'était
+visible : ils ne cassaient rien, ils **omettaient**.
+
+1. **`transactions:listLedger`** — le filtre « Comptes courants & emprunts »
+   ne listait que `['equity', 'intercompany_loan']`. Une transaction pointée
+   sur un **prêt bancaire** n'apparaissait donc dans **aucun** onglet du
+   registre : pas un deal, pas une « liability » non plus. La liste doit
+   rester exhaustive — un `kind` qui manque là rend ses transactions
+   invisibles.
+2. **`agentToolsPointage:allocateTransactionToLiability`** — l'énum de
+   l'outil s'était arrêtée à `equity | intercompany_loan`. L'assistant ne
+   savait pas pointer un prélèvement de prêt alors que l'humain le pouvait
+   depuis le lot 3.
+
+La leçon commune : quand une union de `kind` s'élargit, ces deux sites ne
+lèvent aucune erreur de type — ils continuent de compiler en ignorant la
+nouvelle valeur. Les vérifier fait partie de l'ajout d'un `allocationKind`.
+
+## Avenant ≠ correction ≠ révision de taux (`convex/loans.ts`)
+
+Trois gestes voisins sur les mêmes conditions, et les confondre produit des
+échéanciers faux en silence.
+
+| Geste | Fonction | Ce qu'il fait du passé |
+|---|---|---|
+| **Corriger** | `loans:update` | l'**écrase** — comme si les anciennes conditions n'avaient jamais existé |
+| **Mettre à jour au JJ/MM** | `loans:addAmendment` | le **conserve** — les échéances déjà passées ne bougent pas |
+| **Palier de taux** | `loans:addRate` | ne le touche pas non plus, mais c'est le contrat lui-même qui prévoit la révision |
+
+- **L'app ne peut pas deviner lequel s'applique.** Une faute de frappe et un
+  avenant produisent la même intention apparente (« ce taux n'est pas le
+  bon ») ; seul l'utilisateur sait. D'où deux gestes, tous deux dans le menu
+  ⋯ — pas un seul qui devinerait.
+- **Réviser un taux variable n'est PAS amender le contrat.** `loanRates`
+  porte les paliers prévus au contrat ; `loanAmendments` porte ce qui a été
+  renégocié. Les deux coexistent sur le même prêt et se composent.
+- **Un avenant antérieur à la première échéance est refusé**
+  (`amendment_before_start`) : il n'y a pas d'historique à conserver, c'est
+  une correction.
+- **Un révolving n'est pas amendable** (`revolving_not_amendable`) : sans
+  échéancier, il n'y a pas de segment à couper. Ses conditions se corrigent
+  en place.
+- **`outstandingCents` est la seule exception assumée** à « rien de dérivable
+  n'est stocké » dans ce coin : quand la banque recale le capital à la date
+  d'effet, son chiffre doit gagner sur celui que l'app dériverait. Absent —
+  le cas normal — l'app dérive.
+- **Un champ vide veut dire « inchangé », pas « zéro ».** Envoyer `rateBps:
+  0` déclarerait un prêt à taux nul, ce qui est légal et n'a rien à voir.
+
+### Un seul lecteur d'échéancier : `loans:loanSchedule`
+
+`buildScheduleWithAmendments` compose les segments, mais **quatre** surfaces
+lisent un échéancier : la fiche du prêt, l'expansion du prévisionnel, le
+signal « À faire » et l'agent. Elles passent toutes par `loanSchedule`
+(`convex/loans.ts`), qui charge les paliers **et** les avenants.
+
+Reconstruire l'échéancier à la main ailleurs est exactement ce qui fait
+diverger la projection et la fiche sur le même prêt — invisible tant
+qu'aucun prêt n'est renégocié, puis faux partout d'un coup. Les trois
+copies qui existaient avant le lot 5 ont été repliées sur ce lecteur.
+
+## Le % de détention vit dans la table de capitalisation de l'émettrice
+
+`equityPositions.ownershipBps` (bps, 6000 = 60 %) est **le** endroit du %.
+Côté détenteur, `liabilities:getOwnershipForCompany` le **lit** au lieu d'en
+garder une copie (SPEC D33).
+
+- **La clé de jointure est le SIREN**, et c'est voulu :
+  `migrations/createSubsidiaryOrgs` **clone** délibérément le SIREN de la
+  société source sur le `group_root` de la nouvelle org, et l'unicité est
+  par org précisément pour que le même SIREN apparaisse des deux côtés. Le
+  chemin de lecture part de `by_holder_org` (borné aux positions que cette
+  org détient ailleurs), puis compare les SIREN.
+- **Absent ≠ 0 %.** Une ligne de prime d'émission ou de report à nouveau ne
+  porte aucune part du capital, et une société sans SIREN ne se rattache à
+  rien. Les deux rendent `null`, jamais `0`.
+
+### ⚠️ `companyRelations.ownershipPct` est un doublon préexistant
+
+Il porte le même fait (le % de détention CALTE → filiale), en pourcentage
+`0-100` et non en bps, alimenté par `convex/seed.ts`. C'est exactement la
+seconde vérité que D33 interdit.
+
+Il n'a **pas** été retiré au lot 5 : le champ est en production, il est lu
+par `convex/companies.ts`, et le resserrer est un chantier de données à part
+(purger puis resserrer, cf. la règle du repo). À arbitrer — tant qu'il vit,
+c'est `equityPositions.ownershipBps` qui fait foi côté produit, et lui qui
+est affiché.
+
+## Modules activables : la visibilité est dérivée, l'activation est stockée
+
+`convex/modules.ts:list` répond « ce module contient-il quelque chose ? »
+par une sonde `.first()` à chaque lecture. Rien n'est mis en cache — un
+module apparaît à la seconde où sa première ligne existe, et il n'y a aucun
+drapeau d'affichage à maintenir.
+
+Ce qui EST stocké, c'est uniquement l'**activation à la main**
+(`organizations.enabledModules`), et elle ne dit pas « visible » : la règle
+lue par le front est « contient quelque chose **OU** activé »
+(`lib/modules.ts:isVisible`, partagé par le serveur et les deux surfaces).
+
+- **L'activation explicite n'est pas un confort, c'est ce qui rend la règle
+  utilisable.** Masquer automatiquement un module vide le masquerait
+  exactement quand on en a besoin : pour y créer son **premier** élément. Le
+  menu ⋯ le ramène toujours.
+- **Éteindre un module qui contient des lignes ne les cache pas.** Le contenu
+  gagne. Sinon des lignes existantes deviendraient invisibles sans retour
+  possible.
+- **La racine de l'org ne compte pas comme contenu.** Chaque org a sa
+  société `group_root` : la compter rendrait l'onglet Entreprises
+  définitivement non vide, et la règle sans objet.
+- **« À faire » n'est pas un module activable**, et c'est délibéré : il porte
+  les signaux de tous les autres. Le masquer masquerait le moyen d'agir sur
+  le reste.
+- **L'onglet consulté ne se masque jamais.** `InvestmentsTabs` garde
+  toujours l'onglet actif visible — se retrouver sur une page dont l'onglet a
+  disparu serait une trappe. Même raison pour le rendu pendant le chargement
+  de la query : tout s'affiche, sinon la barre latérale « perdrait » des
+  entrées le temps d'un aller-retour, ce qui se lit comme une perte de
+  données.
+- **Seuls les slugs connus survivent à l'écriture** : `setEnabled` refiltre
+  la liste sur `ALL_MODULES`, donc un module retiré du code ne traîne pas
+  dans les lignes de production.
+
+## `needsApproval` ne se relit PAS comme un booléen
+
+Piège trouvé en écrivant le test du lot 7. Le SDK AI **normalise**
+`needsApproval` en **prédicat** : qu'on lui passe `true`, `false` ou rien du
+tout, l'outil construit expose une **fonction**.
+
+```ts
+// FAUX — passe silencieusement sur TOUS les outils : une fonction n'est
+// pas `true`, donc l'assertion est verte même sur un outil sans le flag.
+expect(tool.needsApproval).toBe(true)
+
+// JUSTE — il faut l'APPELER.
+expect(await tool.needsApproval({}, {})).toBe(true)
+```
+
+C'est exactement le genre de test vert qui ne protège rien : il aurait
+laissé passer un outil d'écriture ajouté sans le flag, c'est-à-dire le seul
+scénario qu'il existe pour attraper. `convex/regression.debtWrites.test.ts`
+appelle le prédicat, et vérifie aussi que les outils de **lecture** rendent
+`false` — sinon la moitié « les lectures ne demandent pas » ne prouverait
+rien non plus.
+
+⚠️ Ne pas confondre avec le serveur **MCP**, où `needsApproval` n'a **aucun
+effet** (pas d'UI in-app pour l'afficher) : là c'est le flag `write: true` de
+`defineTool`, donc l'annotation `readOnlyHint: false`, qui fait demander
+confirmation au client. Les deux sont testés séparément parce que ce sont
+deux mécanismes différents sur les mêmes opérations.

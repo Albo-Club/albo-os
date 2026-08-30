@@ -1,0 +1,176 @@
+{
+  "metaTitle": "Immobilier — Albo OS",
+  "metaTitleDetail": "Bien — Albo OS",
+  "title": "Immobilier",
+  "subtitle": "Les biens détenus par cette société : prix de revient, valeur, et ce qu'ils rapportent réellement.",
+  "loading": "Chargement…",
+  "list": {
+    "empty": "Aucun bien pour cette société.",
+    "emptyHint": "Créez un bien pour suivre son prix de revient, sa valeur et sa rentabilité.",
+    "col": {
+      "name": "Bien",
+      "type": "Type",
+      "usage": "Usage",
+      "cost": "Prix de revient",
+      "value": "Valeur",
+      "yield": "Rendement net"
+    },
+    "total": "Total",
+    "totalHint": "Valeur des biens détenus — les biens vendus n'y figurent pas.",
+    "count_one": "{{count}} bien",
+    "count_other": "{{count}} biens"
+  },
+  "create": {
+    "button": "Nouveau bien",
+    "title": "Nouveau bien",
+    "editTitle": "Corriger le bien",
+    "description": "Les conditions du bien. Les loyers et les charges ne se saisissent pas : ils viennent des transactions pointées.",
+    "success": "Bien créé.",
+    "editSuccess": "Bien mis à jour.",
+    "save": "Enregistrer"
+  },
+  "fields": {
+    "name": "Nom",
+    "namePlaceholder": "18 rue de la Chapelle",
+    "address": "Adresse",
+    "addressPlaceholder": "Paris 18e",
+    "propertyType": "Type",
+    "usage": "Usage",
+    "surface": "Surface (m²)",
+    "acquiredDate": "Date d'acquisition",
+    "notes": "Notes",
+    "status": "Statut",
+    "saleDate": "Date de vente",
+    "salePrice": "Prix de vente",
+    "costBasis": "Prix de revient",
+    "costBasisHint": "Un seul montant par poste, et une seule source. Un poste en « Flux » est la somme des transactions pointées sur ce bien ; le montant saisi n'y est jamais ajouté."
+  },
+  "type": {
+    "appartement": "Appartement",
+    "maison": "Maison",
+    "immeuble": "Immeuble",
+    "local_commercial": "Local commercial",
+    "terrain": "Terrain"
+  },
+  "usage": {
+    "locatif_nu": "Locatif nu",
+    "locatif_meuble": "Locatif meublé",
+    "colocation": "Colocation",
+    "saisonnier": "Saisonnier",
+    "commercial": "Commercial",
+    "marchand_de_biens": "Marchand de biens",
+    "residence_secondaire": "Résidence secondaire"
+  },
+  "status": {
+    "held": "Détenu",
+    "sold": "Vendu"
+  },
+  "poste": {
+    "acquisition": "Acquisition",
+    "frais_acquisition": "Frais d'acquisition",
+    "travaux": "Travaux"
+  },
+  "source": {
+    "manual": "Saisi",
+    "flows_one": "{{count}} flux",
+    "flows_other": "{{count}} flux",
+    "flowsEmpty": "Aucun flux",
+    "switchToFlows": "Basculer sur les flux pointés",
+    "switchToManual": "Basculer sur un montant saisi",
+    "switched": "Source du poste mise à jour.",
+    "ignored_one": "{{count}} flux pointé sur ce poste n'est pas compté : le montant saisi fait foi.",
+    "ignored_other": "{{count}} flux pointés sur ce poste ne sont pas comptés : le montant saisi fait foi."
+  },
+  "sheet": {
+    "back": "← Immobilier",
+    "notFound": "Bien introuvable.",
+    "stats": {
+      "cost": "Prix de revient",
+      "value": "Valeur",
+      "gain": "Plus-value latente",
+      "yield": "Rendement net",
+      "exitIrr": "TRI de sortie",
+      "salePrice": "Prix de vente"
+    },
+    "costBasis": {
+      "title": "Prix de revient",
+      "hint": "Un seul montant par poste · une seule source",
+      "col": {
+        "poste": "Poste",
+        "amount": "Montant",
+        "source": "Source"
+      },
+      "total": "Prix de revient"
+    },
+    "operating": {
+      "title": "Exploitation",
+      "hint": "12 mois glissants · uniquement des flux pointés",
+      "revenue": "Loyers encaissés",
+      "charges": "Charges payées",
+      "net": "Résultat net",
+      "empty": "Aucun flux pointé sur ce bien sur les douze derniers mois.",
+      "hiddenForDealer": "Un bien en marchand de biens ne s'exploite pas : le résultat se lit à la revente."
+    },
+    "valuations": {
+      "title": "Valorisations",
+      "add": "Estimation",
+      "empty": "Aucune valorisation. La plus-value latente et le rendement n'ont pas de valeur à laquelle se comparer.",
+      "col": {
+        "date": "Date",
+        "source": "Source",
+        "value": "Valeur"
+      },
+      "deleted": "Valorisation supprimée.",
+      "dialogTitle": "Nouvelle estimation",
+      "dialogDescription": "Aucune estimation automatique : la valeur est celle que vous connaissez.",
+      "asOf": "Date",
+      "value": "Valeur",
+      "source": "Source",
+      "sourcePlaceholder": "Estimation agence, notaire, à dire d'expert…",
+      "saved": "Valorisation enregistrée."
+    },
+    "guarantees": {
+      "title": "Emprunt lié & sûreté",
+      "empty": "Aucune sûreté ne porte sur ce bien.",
+      "loanLabel": "Prêt garanti",
+      "noLoan": "Emprunteur hors groupe"
+    },
+    "transactions": {
+      "title": "Transactions",
+      "hint": "rattachées depuis la file de Pointage",
+      "empty": "Aucune transaction rattachée à ce bien.",
+      "col": {
+        "date": "Date",
+        "nature": "Nature",
+        "amount": "Montant",
+        "label": "Libellé"
+      }
+    },
+    "documents": {
+      "title": "Documents",
+      "empty": "Aucun document."
+    },
+    "menu": {
+      "correct": "Corriger",
+      "delete": "Supprimer le bien"
+    },
+    "delete": {
+      "confirmTitle": "Supprimer ce bien ?",
+      "confirmBody": "Le bien et ses valorisations sont supprimés. Cette action est définitive.",
+      "success": "Bien supprimé."
+    },
+    "soldOn": "vendu le {{date}}",
+    "acquiredOn": "acquis le {{date}}"
+  },
+  "errors": {
+    "failed": "L'action a échoué. Veuillez réessayer.",
+    "not_found": "Bien introuvable.",
+    "invalid_label": "Le nom du bien est obligatoire.",
+    "invalid_amount": "Le montant doit être positif.",
+    "duplicate_cost_poste": "Un poste de prix de revient ne peut apparaître qu'une fois.",
+    "missing_sale": "Un bien vendu a besoin d'une date et d'un prix de vente.",
+    "has_guarantees": "Une sûreté porte encore sur ce bien. Détachez-la d'abord.",
+    "has_allocations": "Des transactions sont encore pointées sur ce bien. Détachez-les d'abord.",
+    "has_documents": "Des documents sont encore rattachés à ce bien. Détachez-les d'abord."
+  }
+}

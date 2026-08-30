@@ -143,7 +143,12 @@ const contextValidator = v.optional(
     route: v.string(),
     entity: v.optional(
       v.object({
-        kind: v.union(v.literal('deal'), v.literal('company')),
+        kind: v.union(
+          v.literal('deal'),
+          v.literal('company'),
+          v.literal('loan'),
+          v.literal('property'),
+        ),
         id: v.string(),
       }),
     ),
@@ -271,7 +276,14 @@ export const streamAsync = internalAction({
     promptMessageId: v.string(),
     route: v.optional(v.string()),
     orgName: v.optional(v.string()),
-    entityKind: v.optional(v.union(v.literal('deal'), v.literal('company'))),
+    entityKind: v.optional(
+      v.union(
+        v.literal('deal'),
+        v.literal('company'),
+        v.literal('loan'),
+        v.literal('property'),
+      ),
+    ),
     entityId: v.optional(v.string()),
   },
   handler: async (

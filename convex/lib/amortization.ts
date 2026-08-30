@@ -376,6 +376,104 @@ function buildRevolving(
   return rows
 }
 
+/**
+ * A dated AMENDMENT to a loan's terms — the « Mettre à jour au JJ/MM »
+ * gesture (SPEC D35). Only the fields the amendment actually changes are
+ * set; everything else carries over from the segment before it.
+ *
+ * This is NOT « Corriger », which overwrites the terms as if the previous
+ * ones had never existed (a typo). An amendment KEEPS the history: the
+ * instalments already run under the old terms stay exactly as they were,
+ * and the new terms apply to what is left from the effective date on.
+ */
+export type LoanAmendment = {
+  /** Date the new terms take effect, ms epoch UTC. */
+  effectiveDate: number
+  rateBps?: number
+  /** Duration REMAINING from the effective date, in months. */
+  durationMonths?: number
+  amortizationKind?: AmortizationKind
+  paymentFrequency?: PaymentFrequency
+  insuranceMonthlyCents?: number
+  /**
+   * Capital outstanding restated by the lender at the effective date. Absent
+   * = the outstanding the previous segment had reached, which is the normal
+   * case: the app derives it rather than asking.
+   */
+  outstandingCents?: number
+}
+
+/**
+ * Builds a schedule across successive sets of terms.
+ *
+ * Each amendment closes the running segment at its effective date and opens
+ * a new one on the capital that remains. So a renegotiation shows what was
+ * actually paid before it and what is planned after — which is precisely
+ * what « Corriger » cannot express, since it rewrites the whole past.
+ *
+ * With no amendment this is `buildSchedule`, unchanged — the common case
+ * pays nothing for a feature it does not use.
+ */
+export function buildScheduleWithAmendments(
+  loan: LoanTerms,
+  rates: ReadonlyArray<RateStep> = [],
+  amendments: ReadonlyArray<LoanAmendment> = [],
+  opts: ScheduleOptions = {},
+): Array<ScheduleRow> {
+  if (amendments.length === 0) return buildSchedule(loan, rates, opts)
+
+  const ordered = [...amendments].sort(
+    (a, b) => a.effectiveDate - b.effectiveDate,
+  )
+  const rows: Array<ScheduleRow> = []
+  let terms = loan
+
+  for (const amendment of ordered) {
+    const segment = buildSchedule(terms, rates, opts)
+    const kept = segment.filter((row) => row.date < amendment.effectiveDate)
+    const dropped = segment.slice(kept.length)
+    rows.push(...kept)
+
+    // What the previous terms had left at the cut. An amendment may restate
+    // it — the lender's figure wins when it is given.
+    const carried =
+      kept.length > 0
+        ? kept[kept.length - 1].remainingCents
+        : Math.max(0, Math.round(terms.principalCents))
+    const outstanding = amendment.outstandingCents ?? carried
+
+    const frequency = amendment.paymentFrequency ?? terms.paymentFrequency
+    const stepMonths = monthsPerPeriod(frequency)
+    // The new series keeps the old rhythm: it restarts on the first
+    // instalment the amendment did not let through, so the day of the month
+    // never drifts. With nothing left to drop, the effective date anchors it.
+    const firstPaymentDate = dropped[0]?.date ?? amendment.effectiveDate
+    // Remaining duration: what the amendment says, else what was left.
+    const durationMonths =
+      amendment.durationMonths ?? dropped.length * stepMonths
+
+    terms = {
+      ...terms,
+      principalCents: outstanding,
+      firstPaymentDate,
+      durationMonths,
+      amortizationKind: amendment.amortizationKind ?? terms.amortizationKind,
+      paymentFrequency: frequency,
+      rateBps: amendment.rateBps ?? terms.rateBps,
+      insuranceMonthlyCents:
+        amendment.insuranceMonthlyCents ?? terms.insuranceMonthlyCents,
+      // A deferral belongs to the original contract, not to what follows it.
+      deferralMonths: undefined,
+      deferralKind: undefined,
+    }
+  }
+
+  rows.push(...buildSchedule(terms, rates, opts))
+  // One continuous numbering across the segments — the sheet shows a single
+  // schedule, not a pile of them.
+  return rows.map((row, index) => ({ ...row, index: index + 1 }))
+}
+
 // ─── Reading the schedule ───────────────────────────────────────────────────
 
 /**

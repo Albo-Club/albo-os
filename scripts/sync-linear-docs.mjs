@@ -121,6 +121,10 @@ const DOCS = {
     id: '155997df-f22c-4d82-b914-f7c079f6bd66',
     url: 'https://linear.app/alboteam/document/19-placements-f2a1db1ff3cb',
   },
+  '20-immobilier.md': {
+    id: '9a644bf7-2754-4873-88c6-a7ef641a7c23',
+    url: 'https://linear.app/alboteam/document/20-immobilier-b7e02a79159b',
+  },
 }
 
 const args = process.argv.slice(2)

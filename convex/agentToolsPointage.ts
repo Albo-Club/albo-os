@@ -27,6 +27,7 @@ import {
 } from './lib/pointage'
 import { normalizeSearch } from './lib/searchText'
 import { vatCentsFromTtc, vatRateBpsValidator } from './lib/vat'
+import { allocationCategory } from './schema'
 import type { Doc, Id } from './_generated/dataModel'
 import type { QueryCtx } from './_generated/server'
 
@@ -243,16 +244,22 @@ export const allocateToLiabilityInternal = internalMutation({
     orgId: v.id('organizations'),
     actorUserId: v.id('users'),
     transactionId: v.id('transactions'),
-    kind: v.union(v.literal('equity'), v.literal('intercompany_loan')),
+    kind: v.union(
+      v.literal('equity'),
+      v.literal('intercompany_loan'),
+      v.literal('loan'),
+      v.literal('property'),
+    ),
     targetId: v.string(),
+    category: v.optional(allocationCategory),
   },
   handler: async (
     ctx,
-    { orgId, actorUserId, transactionId, kind, targetId },
+    { orgId, actorUserId, transactionId, kind, targetId, category },
   ) => {
     await readMembership(ctx, orgId, actorUserId)
     const tx = await getOrgTransaction(ctx, orgId, transactionId)
-    await applyAllocateToLiability(ctx, tx, kind, targetId)
+    await applyAllocateToLiability(ctx, tx, kind, targetId, category)
     return { _id: transactionId, matchStatus: 'matched' as const }
   },
 })
@@ -405,16 +412,36 @@ const matchTransactionToDeal = createTool({
 
 const allocateTransactionToLiability = createTool({
   description:
-    'Reconcile a transaction with a liability of the current org: an equity ' +
-    'position (kind "equity") or an intercompany loan (kind ' +
-    '"intercompany_loan"). Find target ids via listLiabilities. The user ' +
-    'approves via in-app buttons. Fails if the transaction is matched to a ' +
-    'deal (unpoint it first).',
+    'Reconcile a transaction with a liability or asset of the current org: ' +
+    'an equity position (kind "equity"), an intercompany loan (kind ' +
+    '"intercompany_loan"), a BANK loan (kind "loan" — a direct debit on a ' +
+    'bank debt, find ids via listLoans) or a PROPERTY (kind "property", ids ' +
+    'via listProperties). Find liability ids via listLiabilities. On a ' +
+    'property, `category` is REQUIRED and says what the flow is: ' +
+    '"acquisition", "frais_acquisition" or "travaux" (they enter the cost ' +
+    'price), "charges" or "loyer" (operating result), "revente" (capital ' +
+    'gain). One transaction carries ONE category and is never split. Do not ' +
+    'set `category` for the other kinds. The user approves via in-app ' +
+    'buttons. Fails if the transaction is matched to a deal (unpoint it ' +
+    'first).',
   needsApproval: true,
   inputSchema: z.object({
     transactionId: z.string(),
-    kind: z.enum(['equity', 'intercompany_loan']),
-    targetId: z.string().describe('equityPositions or intercompanyLoans id'),
+    kind: z.enum(['equity', 'intercompany_loan', 'loan', 'property']),
+    targetId: z
+      .string()
+      .describe('equityPositions, intercompanyLoans, loans or properties id'),
+    category: z
+      .enum([
+        'acquisition',
+        'frais_acquisition',
+        'travaux',
+        'charges',
+        'loyer',
+        'revente',
+      ])
+      .optional()
+      .describe('Required for kind "property", forbidden otherwise'),
   }),
   execute: async (ctx, input): Promise<unknown> => {
     const { orgId, userId } = parseScope(ctx.userId)
@@ -426,6 +453,7 @@ const allocateTransactionToLiability = createTool({
         transactionId: input.transactionId as Id<'transactions'>,
         kind: input.kind,
         targetId: input.targetId,
+        category: input.category,
       },
     )
   },

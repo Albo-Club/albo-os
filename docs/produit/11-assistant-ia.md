@@ -28,7 +28,7 @@ connecté.
 
 ## Ce qu'il sait faire
 
-Une cinquantaine d'outils, par domaine :
+Une soixantaine d'outils, par domaine :
 
 - **Portfolio** : lister sociétés et deals (avec performance), consulter la
   fiche complète d'une société (secteur, pitch, identité légale, personnes,
@@ -51,6 +51,18 @@ Une cinquantaine d'outils, par domaine :
   TVA. Il **ne propose pas** de cible : vous la nommez, il l'applique.
 - **Passif** : consulter les positions et soldes, créer/éditer capital et
   comptes courants.
+- **Dette bancaire** : lister les prêts avec leur **capital restant dû** et
+  l'échéancier de l'un d'eux ; créer un prêt, ajouter un **palier de taux**
+  sur un prêt variable, enregistrer un **avenant** daté. Ce qui se saisit,
+  ce sont les conditions du contrat — jamais le restant dû, qui en découle.
+- **Garanties** : lire une sûreté depuis n'importe lequel de ses trois côtés
+  (le prêt, l'actif, le garant), consulter la **marge disponible** sur un
+  placement gagé ; créer une sûreté sur un prêt, enregistrer une
+  **mainlevée** (qui n'est pas une suppression : la ligne reste).
+- **Immobilier** : lister les biens avec leur prix de revient poste par
+  poste et la source de chacun ; créer un bien, basculer la source d'un
+  poste, ajouter une valorisation datée. Les loyers, charges et rendements
+  ne se saisissent jamais — ils viennent des flux pointés.
 - **Prévisionnel** : règles, échéances, solde projeté, réalisation d'une
   échéance, écritures ponctuelles.
 - **Contenu des documents et reports** : recherche par le sens (pas par
@@ -84,9 +96,20 @@ bot Telegram, pour interroger ou saisir en mobilité.
 - Il ne pointe jamais une transaction de sa propre initiative, et il ne
   devine pas la cible : vous indiquez la transaction **et** sa destination,
   il exécute après votre approbation. Si la cible est ambiguë, il demande —
-  il ne choisit pas à votre place (cf. [Pointage](08-pointage.md)).
+  il ne choisit pas à votre place (cf. [Pointage](08-pointage.md)). Sur un
+  **bien**, il demande aussi la nature du flux, pour la même raison.
+- **Toute écriture demande votre accord**, sans exception — y compris les
+  nouveaux outils sur les prêts, les garanties et les biens.
+- **Les suppressions ne passent pas par l'assistant.** Supprimer un prêt,
+  une garantie ou un bien reste un geste de l'application. Une **mainlevée**
+  n'est pas une suppression : elle est disponible, et elle conserve la ligne.
+- Sur la fiche d'un **prêt** ou d'un **bien**, l'assistant sait de quoi vous
+  parlez quand vous dites « ce prêt » ou « ce bien » — comme il le faisait
+  déjà sur une fiche deal ou société.
 
 ## Pages liées
 
 - [Pointage](08-pointage.md), [Deals](05-deals.md) (business plans),
   [Intégrations](15-integrations.md) (interroger Albo OS depuis Claude)
+- [Dette bancaire et garanties](18-dette-et-garanties.md) et
+  [Immobilier](20-immobilier.md) — les domaines ouverts à l'assistant

@@ -67,7 +67,11 @@ function Placements() {
             {t('create.button')}
           </Button>
         </div>
-        <InvestmentsTabs orgSlug={orgSlug} active="placements" />
+        <InvestmentsTabs
+          orgSlug={orgSlug}
+          active="placements"
+          orgId={org?._id}
+        />
         <p className="text-muted-foreground text-sm">{t('subtitle')}</p>
       </div>
       <PlacementsView

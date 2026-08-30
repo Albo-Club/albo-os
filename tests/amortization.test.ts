@@ -17,7 +17,9 @@ import { describe, it } from 'node:test'
 import {
   annuityCents,
   applicableRateBps,
+  attributeActuals,
   buildSchedule,
+  buildScheduleWithAmendments,
   outstandingAt,
   periodicRate,
   summarize,
@@ -433,5 +435,200 @@ describe('helpers exposés', () => {
 
   it('annuityCents rend 0 sur une durée nulle', () => {
     assert.equal(annuityCents(100_00, 0.01, 0), 0)
+  })
+})
+
+/**
+ * `attributeActuals` is the one place a « rapprochement » could sneak back
+ * into the module. These tests pin what it IS — a calendar placement,
+ * explainable from the dates alone — and, just as importantly, what it must
+ * never become: a likelihood ranking, a proposal, a pre-selection. That
+ * mechanism was removed from the repo in August 2026 and must not be
+ * re-wired here (cf. CLAUDE.md, KNOWN_ISSUES.md « Pointage transaction →
+ * deal »).
+ */
+describe('attribution du réel : un calendrier, jamais une suggestion', () => {
+  const schedule = buildSchedule(loan({ durationMonths: 4 }))
+
+  it("place chaque flux sur l'échéance dont il occupe la période", () => {
+    const actuals = attributeActuals(schedule, [
+      // Deux jours après la 2e échéance → il appartient à sa période.
+      { transactionDate: schedule[1].date + 2 * 24 * 60 * 60 * 1000, amountCents: 2_536_00 },
+    ])
+    assert.deepEqual(actuals, [null, 2_536_00, null, null])
+  })
+
+  it('ne dépend QUE des dates — le montant n’influence jamais le placement', () => {
+    const date = schedule[2].date + 1000
+    const petit = attributeActuals(schedule, [
+      { transactionDate: date, amountCents: 1 },
+    ])
+    const enorme = attributeActuals(schedule, [
+      { transactionDate: date, amountCents: 999_999_00 },
+    ])
+    // Un moteur de vraisemblance aurait déplacé le montant aberrant vers
+    // l'échéance « la plus probable ». Celui-ci ne bouge pas.
+    assert.equal(petit.findIndex((v) => v !== null), 2)
+    assert.equal(enorme.findIndex((v) => v !== null), 2)
+  })
+
+  it("est déterministe : l'ordre des flux ne change pas le résultat", () => {
+    const flows = [
+      { transactionDate: schedule[0].date, amountCents: 100_00 },
+      { transactionDate: schedule[2].date, amountCents: 300_00 },
+      { transactionDate: schedule[1].date, amountCents: 200_00 },
+    ]
+    const a = attributeActuals(schedule, flows)
+    const b = attributeActuals(schedule, [...flows].reverse())
+    assert.deepEqual(a, b)
+    assert.deepEqual(a, [100_00, 200_00, 300_00, null])
+  })
+
+  it('cumule plusieurs flux tombés dans la même période', () => {
+    const actuals = attributeActuals(schedule, [
+      { transactionDate: schedule[1].date, amountCents: 2_000_00 },
+      { transactionDate: schedule[1].date + 1000, amountCents: 536_00 },
+    ])
+    assert.equal(actuals[1], 2_536_00)
+  })
+
+  it('un paiement en retard reste sur la période où il est TOMBÉ', () => {
+    // Il serait tentant de le ramener sur l'échéance qu'il était censé
+    // couvrir. C'est exactement ce qu'on refuse : la lecture honnête laisse
+    // l'échéance manquée visible.
+    const actuals = attributeActuals(schedule, [
+      { transactionDate: schedule[2].date + 1000, amountCents: 2_536_00 },
+    ])
+    assert.equal(actuals[1], null)
+    assert.equal(actuals[2], 2_536_00)
+  })
+
+  it('un flux antérieur au plan va sur la première échéance, pas nulle part', () => {
+    const actuals = attributeActuals(schedule, [
+      { transactionDate: schedule[0].date - 90 * 24 * 60 * 60 * 1000, amountCents: 500_00 },
+    ])
+    assert.equal(actuals[0], 500_00)
+  })
+
+  it('un échéancier vide ne rend aucune ligne', () => {
+    assert.deepEqual(attributeActuals([], [{ transactionDate: 0, amountCents: 1 }]), [])
+  })
+})
+
+/**
+ * « Mettre à jour au JJ/MM » (SPEC D35). The point of an amendment is what
+ * it does NOT do: it never rewrites the instalments already run. That is the
+ * whole difference with « Corriger », which overwrites the terms as if the
+ * previous ones had never existed.
+ */
+describe('avenants : le passé ne bouge pas, le reste est recalculé', () => {
+  const base = loan({ durationMonths: 24, rateBps: 1200 })
+
+  it('sans avenant, rend exactement buildSchedule', () => {
+    assert.deepEqual(
+      buildScheduleWithAmendments(base, [], []),
+      buildSchedule(base, []),
+    )
+  })
+
+  it("les échéances antérieures à la date d'effet sont INCHANGÉES", () => {
+    const plain = buildSchedule(base, [])
+    const cut = plain[6].date
+    const amended = buildScheduleWithAmendments(base, [], [
+      { effectiveDate: cut, rateBps: 300 },
+    ])
+
+    // Les six premières lignes sont identiques, au centime.
+    for (let k = 0; k < 6; k++) {
+      assert.equal(amended[k].paymentCents, plain[k].paymentCents)
+      assert.equal(amended[k].capitalCents, plain[k].capitalCents)
+      assert.equal(amended[k].remainingCents, plain[k].remainingCents)
+    }
+  })
+
+  it("le nouveau taux s'applique à partir de la date d'effet", () => {
+    const plain = buildSchedule(base, [])
+    const cut = plain[6].date
+    const amended = buildScheduleWithAmendments(base, [], [
+      { effectiveDate: cut, rateBps: 300 },
+    ])
+
+    assert.equal(amended[5].rateBps, 1200)
+    assert.equal(amended[6].rateBps, 300)
+    // Un taux plus bas coûte moins cher : la mensualité baisse.
+    assert.ok(amended[6].paymentCents < plain[6].paymentCents)
+  })
+
+  it('le capital repris est celui que le segment précédent avait atteint', () => {
+    const plain = buildSchedule(base, [])
+    const cut = plain[6].date
+    const amended = buildScheduleWithAmendments(base, [], [
+      { effectiveDate: cut, rateBps: 300 },
+    ])
+    // Le segment 2 démarre sur le restant dû du segment 1 : la 7e ligne
+    // amortit ce capital-là, pas le principal d'origine.
+    assert.ok(amended[6].remainingCents < plain[5].remainingCents)
+    assert.ok(amended[6].remainingCents > 0)
+  })
+
+  it('la banque peut recaler le capital restant dû', () => {
+    const plain = buildSchedule(base, [])
+    const cut = plain[6].date
+    const amended = buildScheduleWithAmendments(base, [], [
+      { effectiveDate: cut, outstandingCents: 50_000_00 },
+    ])
+    // Le chiffre du prêteur gagne sur celui qui serait dérivé.
+    assert.ok(amended[6].remainingCents < 50_000_00)
+    assert.equal(
+      amended[6].remainingCents + amended[6].capitalCents,
+      50_000_00,
+    )
+  })
+
+  it('la durée restante raccourcit ou rallonge la série', () => {
+    const plain = buildSchedule(base, [])
+    const cut = plain[6].date
+    const shorter = buildScheduleWithAmendments(base, [], [
+      { effectiveDate: cut, durationMonths: 6 },
+    ])
+    assert.equal(shorter.length, 6 + 6)
+    // Rembourser le même capital en moins de temps coûte plus cher par mois.
+    assert.ok(shorter[6].paymentCents > plain[6].paymentCents)
+  })
+
+  it('enchaîne plusieurs avenants dans l’ordre des dates', () => {
+    const plain = buildSchedule(base, [])
+    const first = plain[6].date
+    const second = plain[12].date
+    const amended = buildScheduleWithAmendments(base, [], [
+      // Volontairement dans le désordre : la fonction les remet en ordre.
+      { effectiveDate: second, rateBps: 800 },
+      { effectiveDate: first, rateBps: 300 },
+    ])
+    assert.equal(amended[5].rateBps, 1200)
+    assert.equal(amended[6].rateBps, 300)
+    assert.equal(amended[12].rateBps, 800)
+  })
+
+  it('la numérotation reste continue à travers les segments', () => {
+    const plain = buildSchedule(base, [])
+    const amended = buildScheduleWithAmendments(base, [], [
+      { effectiveDate: plain[6].date, rateBps: 300 },
+    ])
+    assert.deepEqual(
+      amended.map((row) => row.index),
+      amended.map((_, k) => k + 1),
+    )
+  })
+
+  it('un avenant postérieur à la dernière échéance ne casse rien', () => {
+    const plain = buildSchedule(base, [])
+    const after = plain[plain.length - 1].date + 365 * 24 * 60 * 60 * 1000
+    const amended = buildScheduleWithAmendments(base, [], [
+      { effectiveDate: after, rateBps: 300 },
+    ])
+    // Tout le plan d'origine est conservé, et rien n'est projeté au-delà.
+    assert.equal(amended.length, plain.length)
+    assert.equal(amended[plain.length - 1].remainingCents, 0)
   })
 })

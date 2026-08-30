@@ -496,6 +496,50 @@ export const mcpTools: Array<McpTool> = [
       ),
   }),
   defineTool({
+    name: 'listLoans',
+    description:
+      'Bank loans of an org with the CAPITAL OUTSTANDING of each. The ' +
+      'outstanding is DERIVED from the computed amortization schedule, never ' +
+      'stored — except on a revolving credit, whose principalCents IS the ' +
+      'drawn amount. Amounts in CENTS EUR, rates in BASIS POINTS ' +
+      '(185 = 1.85 %).',
+    schema: { org: orgSlug },
+    run: async (ctx, actorUserId, { org }) =>
+      await ctx.runQuery(internal.agentToolsDebt.listLoansInternal, {
+        orgId: await orgIdFor(ctx, actorUserId, org),
+        actorUserId,
+      }),
+  }),
+  defineTool({
+    name: 'listGuarantees',
+    description:
+      'Securities of an org, read from any of the three sides they link: the ' +
+      'loan they cover, the asset they bite on, the guarantor who commits. ' +
+      'An unquantified guarantee (an unlimited caution) is excluded from the ' +
+      'pledged total and counted apart — never report it as 0.',
+    schema: { org: orgSlug },
+    run: async (ctx, actorUserId, { org }) =>
+      await ctx.runQuery(internal.agentToolsDebt.listGuaranteesInternal, {
+        orgId: await orgIdFor(ctx, actorUserId, org),
+        actorUserId,
+      }),
+  }),
+  defineTool({
+    name: 'listProperties',
+    description:
+      'Real-estate properties of an org with their COST PRICE line item by ' +
+      'line item and the source of each (an entered amount OR the matched ' +
+      'flows — never both added together), the last known value, the latent ' +
+      'gain and the net yield. All derived on every read. Amounts in CENTS ' +
+      'EUR, TAX-INCLUSIVE.',
+    schema: { org: orgSlug },
+    run: async (ctx, actorUserId, { org }) =>
+      await ctx.runQuery(internal.agentToolsDebt.listPropertiesInternal, {
+        orgId: await orgIdFor(ctx, actorUserId, org),
+        actorUserId,
+      }),
+  }),
+  defineTool({
     name: 'listForecastRules',
     description:
       'List the cash-flow forecast rules of an org (recurring or one-shot ' +
@@ -787,6 +831,138 @@ export const mcpTools: Array<McpTool> = [
         _id: updated._id,
         url: dealUrl(org, updated._id, updated.instrumentKind),
       }
+    },
+  }),
+  defineTool({
+    name: 'createLoan',
+    description:
+      'Create a BANK loan for an org. Enter the TERMS OF THE CONTRACT only — ' +
+      'never the capital outstanding, which is computed from them. ' +
+      'amortizationKind drives everything: "constant_annuity" (fixed ' +
+      'instalment), "constant_capital" (fixed capital slice), "bullet" (in ' +
+      'fine: interest only then the whole capital at the end), "revolving" ' +
+      '(lombard: no schedule, and principalCents is then the CURRENT DRAWN ' +
+      'AMOUNT). durationMonths is the TOTAL duration, deferral included, and ' +
+      'is required except on a revolving. Amounts in CENTS EUR, rates in ' +
+      'BASIS POINTS. Dates are "YYYY-MM-DD".',
+    schema: {
+      org: orgSlug,
+      label: z.string().min(1).describe('e.g. "Prêt Palatine 2021"'),
+      lenderName: z.string().min(1).describe('e.g. "Banque Palatine"'),
+      principalCents: z.number().int().positive().describe('cents EUR'),
+      signedDate: z.string().describe('ISO date "YYYY-MM-DD"'),
+      firstPaymentDate: z.string().describe('ISO date of the 1st instalment'),
+      durationMonths: z.number().int().positive().optional(),
+      amortizationKind: z.enum([
+        'constant_annuity',
+        'constant_capital',
+        'bullet',
+        'revolving',
+      ]),
+      creditLimitCents: z.number().int().positive().optional(),
+      rateBps: z.number().int().min(0).describe('basis points at signature'),
+      rateKind: z.enum(['fixed', 'variable']),
+      insuranceMonthlyCents: z.number().int().min(0).optional(),
+      paymentFrequency: z.enum(['monthly', 'quarterly']),
+      deferralMonths: z.number().int().min(0).optional(),
+      deferralKind: z.enum(['partial', 'total']).optional(),
+      notes: z.string().optional(),
+    },
+    write: true,
+    run: async (ctx, actorUserId, { org, signedDate, firstPaymentDate, ...fields }) => {
+      const orgId = await orgIdFor(ctx, actorUserId, org)
+      const created = await ctx.runMutation(
+        internal.agentToolsDebt.createLoanInternal,
+        {
+          orgId,
+          actorUserId,
+          ...fields,
+          signedDate: parseISODate(signedDate),
+          firstPaymentDate: parseISODate(firstPaymentDate),
+        },
+      )
+      return { _id: created._id, url: appUrl(org, 'passif') }
+    },
+  }),
+  defineTool({
+    name: 'createProperty',
+    description:
+      'Create a real-estate property held by an org. The three cost line ' +
+      'items start as ENTERED amounts — nothing is matched to a brand-new ' +
+      'property, so reading them from the flows would give zero. Rents, ' +
+      'charges, yield and latent gain are NEVER entered: they come from ' +
+      'matched transactions and valuations. usage "marchand_de_biens" means ' +
+      'held for resale. Amounts in CENTS EUR, all TAX-INCLUSIVE.',
+    schema: {
+      org: orgSlug,
+      name: z.string().min(1).describe('e.g. "18 rue de la Chapelle"'),
+      address: z.string(),
+      propertyType: z.enum([
+        'appartement',
+        'maison',
+        'immeuble',
+        'local_commercial',
+        'terrain',
+      ]),
+      usage: z.enum([
+        'locatif_nu',
+        'locatif_meuble',
+        'colocation',
+        'saisonnier',
+        'commercial',
+        'marchand_de_biens',
+        'residence_secondaire',
+      ]),
+      surfaceSqm: z.number().positive().optional(),
+      acquiredDate: z.string().optional().describe('ISO date "YYYY-MM-DD"'),
+      acquisitionCents: z.number().int().min(0).optional(),
+      acquisitionFeesCents: z.number().int().min(0).optional(),
+      worksCents: z.number().int().min(0).optional(),
+      notes: z.string().optional(),
+    },
+    write: true,
+    run: async (ctx, actorUserId, { org, acquiredDate, ...fields }) => {
+      const orgId = await orgIdFor(ctx, actorUserId, org)
+      const created = await ctx.runMutation(
+        internal.agentToolsDebt.createPropertyInternal,
+        {
+          orgId,
+          actorUserId,
+          ...fields,
+          acquiredDate: optionalISODate(acquiredDate),
+        },
+      )
+      return { _id: created._id, url: appUrl(org, 'immobilier') }
+    },
+  }),
+  defineTool({
+    name: 'addPropertyValuation',
+    description:
+      'Add a dated valuation to a property. There is NO automatic estimate — ' +
+      'the value is the one the user knows, and `source` is a free label ' +
+      '("estimation agence", "notaire"). One valuation per date: the same ' +
+      'date replaces. Amounts in CENTS EUR. Find ids via listProperties.',
+    schema: {
+      org: orgSlug,
+      propertyId: z.string().describe('Property id from listProperties'),
+      asOf: z.string().describe('ISO date "YYYY-MM-DD"'),
+      valueCents: z.number().int().min(0).describe('cents EUR'),
+      source: z.string().optional(),
+    },
+    write: true,
+    run: async (ctx, actorUserId, { org, propertyId, asOf, ...fields }) => {
+      const orgId = await orgIdFor(ctx, actorUserId, org)
+      const created = await ctx.runMutation(
+        internal.agentToolsDebt.addPropertyValuationInternal,
+        {
+          orgId,
+          actorUserId,
+          propertyId: propertyId as Id<'properties'>,
+          asOf: parseISODate(asOf),
+          ...fields,
+        },
+      )
+      return { _id: created._id, url: appUrl(org, 'immobilier') }
     },
   }),
 ]

@@ -1,9 +1,13 @@
 import { Link, useLocation } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
+import { SIDEBAR_MODULES, isVisible } from '../../../convex/lib/modules'
 import { OrgSwitcher } from './OrgSwitcher'
 import { NavUser } from './NavUser'
 import { getNavGroups } from './nav'
+import { ModuleActivator } from './ModuleActivator'
+import type { ModuleState } from '../../../convex/lib/modules'
+import type { Id } from '../../../convex/_generated/dataModel'
 import type { NavGroup } from './nav'
 import { Badge } from '~/components/ui/badge'
 import {
@@ -44,12 +48,17 @@ export function AppSidebar({
   myRole,
   me,
   navGroups,
+  orgId,
+  modules,
 }: {
   orgs: Array<Org>
   currentSlug: string
   myRole: string | undefined
   me: Me
   navGroups?: Array<NavGroup>
+  /** Absent in the cross-org view, which has no modules to activate. */
+  orgId?: Id<'organizations'>
+  modules?: Array<ModuleState>
 }) {
   const location = useLocation()
   const { t } = useTranslation(['nav', 'common'])
@@ -127,10 +136,28 @@ export function AppSidebar({
       </SidebarHeader>
       <SidebarContent>
         {groups.map((group) => {
-          const visibleItems = group.items.filter(
-            (item) => !item.adminOnly || isAdmin,
-          )
-          if (visibleItems.length === 0) return null
+          const visibleItems = group.items.filter((item) => {
+            if (item.adminOnly && !isAdmin) return false
+            // An entry with no module is always shown — « À faire » carries
+            // the signals of every other one, and the workspace entries are
+            // not modules (SPEC D37).
+            if (!item.module) return true
+            // While the query is in flight, show everything: a sidebar that
+            // flickers items away on load reads as data loss.
+            if (!modules) return true
+            const state = modules.find((row) => row.key === item.module)
+            return state ? isVisible(state) : true
+          })
+          const activator =
+            orgId && !group.secondary ? (
+              <ModuleActivator
+                orgId={orgId}
+                states={modules}
+                among={SIDEBAR_MODULES}
+                variant="sidebar"
+              />
+            ) : null
+          if (visibleItems.length === 0 && !activator) return null
           return (
             <SidebarGroup
               key={group.labelKey}
@@ -144,6 +171,7 @@ export function AppSidebar({
                   {visibleItems.map((item) =>
                     renderItem(item, group.secondary ? 'sm' : undefined),
                   )}
+                  {activator}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

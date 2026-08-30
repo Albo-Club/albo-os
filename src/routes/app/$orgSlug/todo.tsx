@@ -554,6 +554,53 @@ function Todo() {
         )}
       </TodoSection>
 
+      {/* Properties nobody has revalued in eighteen months. Same DERIVED
+          shape as the block above: the latent gain and the yield of such a
+          property are computed against a figure that has stopped meaning
+          anything, and only a human can refresh it. */}
+      <TodoSection
+        title={t('staleValuations.title')}
+        count={data.staleValuations.length}
+      >
+        {data.staleValuations.length === 0 ? (
+          <EmptyHint label={t('staleValuations.empty')} />
+        ) : (
+          <>
+            <div className="divide-y rounded-lg border">
+              {data.staleValuations.map((row) => (
+                <div
+                  key={row.propertyId}
+                  className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2.5 text-sm"
+                >
+                  <span className="flex min-w-0 flex-col">
+                    <Link
+                      to="/app/$orgSlug/immobilier/$propertyId"
+                      params={{ orgSlug, propertyId: row.propertyId }}
+                      className="truncate font-medium hover:underline"
+                    >
+                      {row.name}
+                    </Link>
+                    <span className="text-muted-foreground text-xs">
+                      {row.address}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground text-xs">
+                    {row.lastValuationAt != null
+                      ? t('staleValuations.lastValued', {
+                          date: fmtDate(row.lastValuationAt),
+                        })
+                      : t('staleValuations.neverValued')}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="text-muted-foreground text-xs">
+              {t('staleValuations.subtitle')}
+            </p>
+          </>
+        )}
+      </TodoSection>
+
       <TodoSection
         title={t('reports.title')}
         count={data.missingReports.length}

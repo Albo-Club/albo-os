@@ -100,6 +100,11 @@ export function CreateEquityDialog({
   const [shares, setShares] = useState(
     position?.shares != null ? String(position.shares) : '',
   )
+  // Ownership share, TYPED in percent and stored in basis points. A
+  // percentage is not money — the native numeric input is the right one.
+  const [ownership, setOwnership] = useState(
+    position?.ownershipBps != null ? String(position.ownershipBps / 100) : '',
+  )
   const [pending, setPending] = useState(false)
 
   // The issuing org cannot hold its own capital.
@@ -117,6 +122,7 @@ export function CreateEquityDialog({
     setPending(true)
     try {
       const sharesValue = Number.parseInt(shares, 10)
+      const ownershipPct = Number.parseFloat(ownership.replace(',', '.'))
       const fields = {
         type,
         amountCents,
@@ -126,6 +132,12 @@ export function CreateEquityDialog({
             : undefined,
         holderLabel: holder === 'external' ? holderLabel.trim() : undefined,
         shares: Number.isFinite(sharesValue) ? sharesValue : undefined,
+        // Empty is a real state: a share premium or retained earnings carry
+        // no share of the capital.
+        ownershipBps:
+          Number.isFinite(ownershipPct) && ownershipPct > 0
+            ? Math.round(ownershipPct * 100)
+            : undefined,
         effectiveDate: new Date(date).getTime(),
       }
       if (position) {
@@ -240,6 +252,24 @@ export function CreateEquityDialog({
               onChange={(e) => setShares(e.target.value)}
               placeholder={t('passif:create.equity.sharesPlaceholder')}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="equity-ownership">
+              {t('passif:create.equity.ownershipLabel')}
+            </Label>
+            <Input
+              id="equity-ownership"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={ownership}
+              onChange={(e) => setOwnership(e.target.value)}
+              placeholder={t('passif:create.equity.ownershipPlaceholder')}
+            />
+            <p className="text-muted-foreground text-xs">
+              {t('passif:create.equity.ownershipHint')}
+            </p>
           </div>
         </div>
         <DialogFooter>

@@ -101,15 +101,33 @@ pas. Un prêt variable porte une série datée de paliers, de deux natures :
 Le taux appliqué à une date est celui du dernier palier dont la date d'effet
 est passée. Ajouter un palier recalcule l'échéancier et le prévisionnel.
 
-### Corriger un prêt
+### Corriger un prêt, ou l'amender
 
-Le menu **⋯** porte le geste « Corriger ». Il **écrase** les conditions et
-recalcule tout l'échéancier : l'application ne peut pas deviner si c'est une
-faute de frappe ou un avenant. Garder l'avant et l'après d'un avenant est
-une évolution prévue.
+Le menu **⋯** porte **deux** gestes, et la différence est tout le sujet :
+l'application ne peut pas deviner si un chiffre qui change est une faute de
+frappe ou une renégociation. C'est vous qui le dites.
 
-⚠️ Réviser un taux variable n'est **pas** une correction : cela passe par un
-palier, qui garde l'historique.
+| Geste | Ce qu'il fait du passé |
+|---|---|
+| **Corriger** | L'**écrase**. Les conditions sont remplacées comme si les anciennes n'avaient jamais existé, et tout l'échéancier est recalculé. Pour une faute de saisie. |
+| **Mettre à jour au…** | Le **conserve**. Les échéances déjà passées ne bougent pas ; les nouvelles conditions s'appliquent au capital restant, à partir de la date d'effet. Pour un avenant. |
+
+Dans le second cas, seul ce qui change se saisit : un champ laissé vide
+reste inchangé. Une renégociation qui ne touche que le taux, c'est un seul
+nombre à taper. Si la banque a **recalculé** le capital restant dû à la date
+d'effet, son chiffre peut être saisi et prend le pas sur celui que
+l'application dériverait ; sinon elle le dérive elle-même.
+
+Les avenants apparaissent alors dans une section dédiée de la fiche, la plus
+récente en tête, avec ce que chacun a changé. La section n'existe pas tant
+qu'il n'y a pas d'avenant.
+
+⚠️ Réviser un taux variable n'est **ni** une correction **ni** un avenant :
+cela passe par un palier. Le contrat prévoit la révision — il n'est pas
+renégocié.
+
+⚠️ Un crédit révolving n'a pas d'échéancier à segmenter : il n'est pas
+amendable, ses conditions se corrigent en place.
 
 ## Les garanties
 
@@ -118,9 +136,9 @@ rend lisible de trois côtés :
 
 - **Sa forme** — nantissement, hypothèque, privilège de prêteur de deniers
   (PPD), caution, garantie d'organisme.
-- **Son assiette** — l'actif sur lequel elle porte : un placement, les titres
-  d'une société, ou rien de chez nous (une garantie Saccef, l'actif d'un
-  tiers).
+- **Son assiette** — l'actif sur lequel elle porte : un placement, un **bien
+  immobilier**, les titres d'une société, ou rien de chez nous (une garantie
+  Saccef, l'actif d'un tiers).
 - **Son garant** — une société du groupe, un garant externe désigné par un
   libellé, ou personne de renseigné (les actes sont souvent muets sur ce
   point).
@@ -241,10 +259,27 @@ depuis la recherche de l'assistant IA.
 
 ## L'assistant IA
 
-L'assistant sait lire la dette : les prêts d'une société et leur capital
+L'assistant sait **lire** la dette : les prêts d'une société et leur capital
 restant dû, l'échéancier d'un prêt autour d'aujourd'hui, les garanties
-auxquelles la société est partie, et ce qu'un placement garantit au total. Il
-ne sait pas encore écrire — la saisie reste manuelle.
+auxquelles la société est partie, et ce qu'un placement garantit au total.
+
+Il sait aussi **écrire** : créer un prêt, ajouter un palier de taux sur un
+prêt variable, enregistrer un avenant daté, créer une sûreté, enregistrer une
+mainlevée. **Chaque écriture demande votre accord** — l'assistant s'arrête et
+affiche Confirmer / Refuser.
+
+Ce qu'il ne fait pas :
+
+- **Supprimer.** Retirer un prêt ou une garantie reste un geste de
+  l'application. Une mainlevée n'est pas une suppression : la ligne reste.
+- **Corriger un prêt.** Écraser des conditions détruit un historique ; ce
+  geste-là se fait à la main. L'assistant peut en revanche enregistrer un
+  **avenant**, qui le conserve.
+- **Saisir un capital restant dû.** Il n'y a pas de champ pour ça : ce sont
+  les conditions du contrat qui se saisissent, le reste en découle.
+
+Sur la fiche d'un prêt, il sait de quoi vous parlez quand vous dites « ce
+prêt ».
 
 ## Points d'attention
 
@@ -257,10 +292,11 @@ ne sait pas encore écrire — la saisie reste manuelle.
 - **Un prêt portant des garanties ne se supprime pas** : il faut détacher les
   garanties d'abord. Idem s'il porte des documents ou des transactions
   pointées.
-- **Les biens immobiliers ne sont pas encore modélisés** : une garantie ne
-  peut donc pas encore porter sur un bien (PPD, hypothèque sur un immeuble).
-  L'assiette « les titres d'une société » et « rien de chez nous » couvrent le
-  reste.
+- **Une sûreté sur un bien immobilier se lit des deux côtés.** Un privilège
+  de prêteur de deniers ou une hypothèque prend le bien pour assiette : la
+  ligne apparaît sur la fiche du prêt **et** sur la fiche du bien, à partir de
+  la même saisie. Sa marge disponible se compare à la dernière valorisation du
+  bien. Voir [Immobilier](20-immobilier.md).
 
 ## Pages liées
 
@@ -271,4 +307,6 @@ ne sait pas encore écrire — la saisie reste manuelle.
   échéances.
 - [Placements](19-placements.md) — la fiche qui porte le bloc des
   nantissements.
+- [Immobilier](20-immobilier.md) — les biens qu'une PPD ou une hypothèque
+  prend pour assiette.
 - [À faire](16-a-faire.md) — le signal des échéances en attente.

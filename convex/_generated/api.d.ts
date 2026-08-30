@@ -102,9 +102,11 @@ import type * as migrations_normalizeCompanyDomains from "../migrations/normaliz
 import type * as migrations_reassignDealOrg from "../migrations/reassignDealOrg.js";
 import type * as migrations_splitAlboSponsorSpvs from "../migrations/splitAlboSponsorSpvs.js";
 import type * as migrations_unifyDomainPitches from "../migrations/unifyDomainPitches.js";
+import type * as modules from "../modules.js";
 import type * as notifications from "../notifications.js";
 import type * as organizations from "../organizations.js";
 import type * as powens from "../powens.js";
+import type * as properties from "../properties.js";
 import type * as projections from "../projections.js";
 import type * as publicConfig from "../publicConfig.js";
 import type * as rateLimiters from "../rateLimiters.js";
@@ -226,9 +228,11 @@ declare const fullApi: ApiFromModules<{
   "migrations/reassignDealOrg": typeof migrations_reassignDealOrg;
   "migrations/splitAlboSponsorSpvs": typeof migrations_splitAlboSponsorSpvs;
   "migrations/unifyDomainPitches": typeof migrations_unifyDomainPitches;
+  modules: typeof modules;
   notifications: typeof notifications;
   organizations: typeof organizations;
   powens: typeof powens;
+  properties: typeof properties;
   projections: typeof projections;
   publicConfig: typeof publicConfig;
   rateLimiters: typeof rateLimiters;

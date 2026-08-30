@@ -24,6 +24,7 @@ import enPassif from '~/locales/en/passif.json'
 import enReports from '~/locales/en/reports.json'
 import enVasco from '~/locales/en/vasco.json'
 import enTodo from '~/locales/en/todo.json'
+import enImmobilier from '~/locales/en/immobilier.json'
 
 import frCommon from '~/locales/fr/common.json'
 import frAuth from '~/locales/fr/auth.json'
@@ -44,6 +45,7 @@ import frPassif from '~/locales/fr/passif.json'
 import frReports from '~/locales/fr/reports.json'
 import frVasco from '~/locales/fr/vasco.json'
 import frTodo from '~/locales/fr/todo.json'
+import frImmobilier from '~/locales/fr/immobilier.json'
 
 export const NAMESPACES = [
   'common',
@@ -65,6 +67,7 @@ export const NAMESPACES = [
   'reports',
   'vasco',
   'todo',
+  'immobilier',
 ] as const
 
 export const defaultNS = 'common'
@@ -90,6 +93,7 @@ export const resources = {
     reports: enReports,
     vasco: enVasco,
     todo: enTodo,
+    immobilier: enImmobilier,
   },
   fr: {
     common: frCommon,
@@ -111,6 +115,7 @@ export const resources = {
     reports: frReports,
     vasco: frVasco,
     todo: frTodo,
+    immobilier: frImmobilier,
   },
 } as const
 

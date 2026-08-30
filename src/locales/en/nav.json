@@ -104,5 +104,16 @@
   "changelogPage": {
     "metaTitle": "What's new — Albo OS",
     "showOlder": "Show older updates ({{remaining}})"
+  },
+  "modules": {
+    "activate": "Activate a module",
+    "activated": "{{module}} activated.",
+    "failed": "Activation failed.",
+    "investments": "Investments",
+    "cash": "Cash",
+    "passif": "Liabilities",
+    "entreprises": "Companies",
+    "placements": "Placements",
+    "immobilier": "Real estate"
   }
 }

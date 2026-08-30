@@ -59,6 +59,8 @@ export type EquityPositionRow = {
   holderOrgId?: Id<'organizations'>
   holderLabel?: string
   shares?: number
+  /** Ownership share in basis points (6000 = 60 %). Absent is a real state. */
+  ownershipBps?: number
   holderName: string | null
   transactions: Array<AllocatedTx>
 }
@@ -255,9 +257,15 @@ export function EquityTable({
   positions: Array<EquityPositionRow> | undefined
   onEdit: (position: EquityPositionRow) => void
 }) {
-  const { t } = useTranslation('passif')
+  const { t, i18n } = useTranslation('passif')
   const { fmtDate } = useFormatters()
   const { fmtEur } = usePassifFormatters()
+  // A share of capital, in basis points (6000 = 60 %).
+  const fmtOwnership = (bps: number) =>
+    new Intl.NumberFormat(i18n.language, {
+      style: 'percent',
+      maximumFractionDigits: 2,
+    }).format(bps / 10_000)
   const reportError = useReportError('passif')
   const deleteEquityPosition = useConvexMutation(
     api.liabilities.deleteEquityPosition,
@@ -296,6 +304,9 @@ export function EquityTable({
           <TableRow>
             <TableHead>{t('equity.col.type')}</TableHead>
             <TableHead>{t('equity.col.holder')}</TableHead>
+            <TableHead className="text-right">
+              {t('equity.col.ownership')}
+            </TableHead>
             <TableHead>{t('equity.col.date')}</TableHead>
             <TableHead className="text-right">
               {t('equity.col.amount')}
@@ -307,7 +318,7 @@ export function EquityTable({
           {!positions ? (
             <TableRow>
               <TableCell
-                colSpan={5}
+                colSpan={6}
                 className="text-muted-foreground text-center"
               >
                 <LoadingLine>{t('loading')}</LoadingLine>
@@ -320,6 +331,15 @@ export function EquityTable({
                   <TableRow>
                     <TableCell>{t(`equity.type.${position.type}`)}</TableCell>
                     <TableCell>{position.holderName ?? '—'}</TableCell>
+                    {/* The ownership share lives HERE and nowhere else
+                        (SPEC D33) — the issuing company's cap table is the
+                        truth, and CALTE's side reads it. Absent is a real
+                        state: a share premium carries no share. */}
+                    <TableCell className="text-right tabular-nums">
+                      {position.ownershipBps != null
+                        ? fmtOwnership(position.ownershipBps)
+                        : '—'}
+                    </TableCell>
                     <TableCell className="whitespace-nowrap tabular-nums">
                       {fmtDate(position.effectiveDate)}
                     </TableCell>
@@ -335,12 +355,12 @@ export function EquityTable({
                   </TableRow>
                   <AllocatedTxRows
                     transactions={position.transactions}
-                    colSpan={4}
+                    colSpan={5}
                   />
                 </Fragment>
               ))}
               <TableRow className="bg-muted/40 font-medium">
-                <TableCell colSpan={3}>{t('equity.total')}</TableCell>
+                <TableCell colSpan={4}>{t('equity.total')}</TableCell>
                 <TableCell className="text-right tabular-nums">
                   {fmtEur(totalCents)}
                 </TableCell>
