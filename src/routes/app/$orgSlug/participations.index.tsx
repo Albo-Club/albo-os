@@ -386,7 +386,11 @@ function Participations() {
                 </DropdownMenu>
               )}
             </div>
-            <InvestmentsTabs orgSlug={orgSlug} active="entreprises" />
+            <InvestmentsTabs
+          orgSlug={orgSlug}
+          active="entreprises"
+          orgId={org?._id}
+        />
           </div>
         }
         loadExportDeals={

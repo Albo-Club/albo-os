@@ -5429,3 +5429,38 @@ par `convex/companies.ts`, et le resserrer est un chantier de données à part
 (purger puis resserrer, cf. la règle du repo). À arbitrer — tant qu'il vit,
 c'est `equityPositions.ownershipBps` qui fait foi côté produit, et lui qui
 est affiché.
+
+## Modules activables : la visibilité est dérivée, l'activation est stockée
+
+`convex/modules.ts:list` répond « ce module contient-il quelque chose ? »
+par une sonde `.first()` à chaque lecture. Rien n'est mis en cache — un
+module apparaît à la seconde où sa première ligne existe, et il n'y a aucun
+drapeau d'affichage à maintenir.
+
+Ce qui EST stocké, c'est uniquement l'**activation à la main**
+(`organizations.enabledModules`), et elle ne dit pas « visible » : la règle
+lue par le front est « contient quelque chose **OU** activé »
+(`lib/modules.ts:isVisible`, partagé par le serveur et les deux surfaces).
+
+- **L'activation explicite n'est pas un confort, c'est ce qui rend la règle
+  utilisable.** Masquer automatiquement un module vide le masquerait
+  exactement quand on en a besoin : pour y créer son **premier** élément. Le
+  menu ⋯ le ramène toujours.
+- **Éteindre un module qui contient des lignes ne les cache pas.** Le contenu
+  gagne. Sinon des lignes existantes deviendraient invisibles sans retour
+  possible.
+- **La racine de l'org ne compte pas comme contenu.** Chaque org a sa
+  société `group_root` : la compter rendrait l'onglet Entreprises
+  définitivement non vide, et la règle sans objet.
+- **« À faire » n'est pas un module activable**, et c'est délibéré : il porte
+  les signaux de tous les autres. Le masquer masquerait le moyen d'agir sur
+  le reste.
+- **L'onglet consulté ne se masque jamais.** `InvestmentsTabs` garde
+  toujours l'onglet actif visible — se retrouver sur une page dont l'onglet a
+  disparu serait une trappe. Même raison pour le rendu pendant le chargement
+  de la query : tout s'affiche, sinon la barre latérale « perdrait » des
+  entrées le temps d'un aller-retour, ce qui se lit comme une perte de
+  données.
+- **Seuls les slugs connus survivent à l'écriture** : `setEnabled` refiltre
+  la liste sur `ALL_MODULES`, donc un module retiré du code ne traîne pas
+  dans les lignes de production.

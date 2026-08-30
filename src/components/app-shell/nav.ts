@@ -14,6 +14,12 @@ import type { LucideIcon } from 'lucide-react'
 export type NavLeaf = {
   /** i18n key under the `nav` namespace, e.g. `items.participations`. */
   titleKey: string
+  /**
+   * Activatable module this entry belongs to (SPEC D37). Absent = always
+   * shown: « À faire » aggregates the signals of every other module, and the
+   * workspace entries are not modules at all.
+   */
+  module?: 'investments' | 'cash' | 'passif'
   to: string
   /** Extra path prefixes that keep this item highlighted. */
   alsoActiveOn?: Array<string>
@@ -44,6 +50,7 @@ export function getNavGroups(): Array<NavGroup> {
         },
         {
           titleKey: 'items.investments',
+          module: 'investments',
           to: '/app/$orgSlug/participations',
           alsoActiveOn: [
             '/app/$orgSlug/placements',
@@ -53,11 +60,13 @@ export function getNavGroups(): Array<NavGroup> {
         },
         {
           titleKey: 'items.cash',
+          module: 'cash',
           to: '/app/$orgSlug/cash',
           icon: Wallet,
         },
         {
           titleKey: 'items.passif',
+          module: 'passif',
           to: '/app/$orgSlug/passif',
           icon: Scale,
         },

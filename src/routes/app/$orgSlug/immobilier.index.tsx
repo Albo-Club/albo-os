@@ -63,7 +63,11 @@ function Immobilier() {
             {t('immobilier:create.button')}
           </Button>
         </div>
-        <InvestmentsTabs orgSlug={orgSlug} active="immobilier" />
+        <InvestmentsTabs
+          orgSlug={orgSlug}
+          active="immobilier"
+          orgId={org?._id}
+        />
         <p className="text-muted-foreground text-sm">
           {t('immobilier:subtitle')}
         </p>

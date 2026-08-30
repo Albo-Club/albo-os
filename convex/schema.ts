@@ -440,6 +440,14 @@ export default defineSchema({
     // Months without a received report past which a participation is flagged
     // as silent (unset = DEFAULT_SILENCE_MONTHS, cf. lib/reportFreshness.ts).
     reportSilenceMonths: v.optional(v.number()),
+    // Modules turned on BY HAND for this org (slugs from lib/modules.ts). A
+    // module already showing because it holds something is not listed here —
+    // this is the explicit override, not a display cache (SPEC D37).
+    //
+    // Bounded by construction: at most one entry per known module. The list
+    // is deliberately NOT the source of what is visible; `modules:list`
+    // derives that from « holds something OR is listed here ».
+    enabledModules: v.optional(v.array(v.string())),
   }).index('by_slug', ['slug']),
 
   organizationMembers: defineTable({

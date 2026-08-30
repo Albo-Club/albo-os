@@ -58,15 +58,46 @@ Quelques conventions traversent toute l'application :
 
 - **Barre latérale gauche** (repliable, ⌘B) : le sélecteur d'organisation en
   haut (avec l'entrée « Toutes les organisations »), puis les sections
-  À faire, Investissements (deux sous-onglets : Entreprises et Placements),
-  Trésorerie, Passif, et l'espace de travail (Paramètres, Nouveautés). En
-  pied : le menu utilisateur. Les deals s'ouvrent depuis la fiche d'une
-  participation — ils n'ont plus d'entrée dédiée dans le menu.
+  À faire, Investissements (trois sous-onglets : Entreprises, Placements et
+  [Immobilier](20-immobilier.md)), Trésorerie, Passif, et l'espace de travail
+  (Paramètres, Nouveautés). En pied : le menu utilisateur. Les deals
+  s'ouvrent depuis la fiche d'une participation — ils n'ont plus d'entrée
+  dédiée dans le menu.
 - **Palette de commandes** (⌘K) : recherche globale dans l'organisation —
   deals, sociétés, transactions — avec navigation directe vers la fiche, et
   l'action « Demander à l'IA » qui transmet la requête à l'assistant.
 - **Assistant IA** (⌘J) : panneau latéral droit persistant, décrit dans
   [Assistant IA](11-assistant-ia.md).
+
+## Les modules qui s'affichent
+
+Toutes les organisations ne font pas la même chose. Une SCI qui détient un
+immeuble n'a ni participation ni placement ; une holding d'investissement n'a
+pas de bien.
+
+Un module **s'affiche s'il contient quelque chose**. Rien n'est à déclarer :
+la première ligne créée le fait apparaître, et l'application le vérifie à
+chaque affichage plutôt que de garder un réglage à maintenir.
+
+Cela vaut pour les entrées de la barre latérale (Investissements, Trésorerie,
+Passif) **et** pour les trois sous-onglets d'Investissements.
+
+Reste le problème de l'œuf et de la poule : si un module vide est masqué,
+comment y créer son premier élément ? D'où le bouton **« Activer un
+module »** en bas de la barre latérale, et le **⋯** à côté des sous-onglets.
+Ils listent ce qui est masqué et le ramènent d'un clic — le module reste
+alors visible même vide, le temps d'y créer quelque chose.
+
+Deux garde-fous :
+
+- **Éteindre un module qui contient des lignes ne les cache pas.** Le contenu
+  l'emporte : des lignes existantes ne doivent jamais devenir inaccessibles.
+- **L'onglet ou la page consultée ne se masque jamais**, même si le module
+  vient de se vider. Se retrouver sur une page dont l'onglet a disparu serait
+  une trappe.
+
+**« À faire » ne se masque pas** : c'est là que remontent les signaux de tous
+les autres modules.
 
 ## Pages liées
 

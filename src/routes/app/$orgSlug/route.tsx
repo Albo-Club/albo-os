@@ -50,6 +50,12 @@ function OrgLayout() {
   const { t } = useTranslation('nav')
   const me = useConvexQuery(api.users.me)
   const org = useConvexQuery(api.organizations.bySlug, { slug: orgSlug })
+  // Which modules this org shows (SPEC D37). Derived on every read from what
+  // each module holds — never a cached display flag.
+  const modules = useConvexQuery(
+    api.modules.list,
+    org ? { orgId: org._id } : 'skip',
+  )
   const setLastOrg = useConvexMutation(api.organizations.setLastOrg)
   // Last slug this tab already persisted (or decided not to). Without it,
   // two tabs open on different orgs ping-pong `setLastOrg` forever: each
@@ -149,6 +155,8 @@ function OrgLayout() {
           avatarUrl: me.user.avatarUrl,
           superAdmin: me.user.superAdmin,
         }}
+        orgId={org?._id}
+        modules={modules}
       />
       <SidebarInset className="overflow-hidden">
         <AppHeader

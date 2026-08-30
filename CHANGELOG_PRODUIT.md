@@ -23,6 +23,65 @@ bas de page.
 
 ---
 
+## v1.200.0 — 30/08/2026 à 12:05 — Chaque société ne voit que ce qui la concerne
+
+Lot 6 du module Dette & Garanties, et le seul qui ne parle pas de dette :
+un chantier transverse à toute l'application.
+
+Toutes les organisations ne font pas la même chose. Une SCI qui détient un
+immeuble n'a ni participation ni placement ; une holding d'investissement n'a
+pas de bien. Jusqu'ici chaque espace affichait tous les modules, vides
+compris — et un module vide, c'est du bruit qu'il faut apprendre à ignorer.
+
+**Un module s'affiche s'il contient quelque chose.** Rien à déclarer, rien à
+régler : la première ligne créée le fait apparaître. L'application le
+vérifie à chaque affichage plutôt que de garder un réglage qui finirait par
+se désynchroniser.
+
+Cela vaut pour les entrées de la barre latérale — Investissements,
+Trésorerie, Passif — **et** pour les trois sous-onglets d'Investissements.
+
+**Et le problème de l'œuf et de la poule ?** Si un module vide est masqué,
+comment y créer son premier élément ? C'est le rôle du bouton **« Activer un
+module »** en bas de la barre latérale, et du **⋯** à côté des sous-onglets.
+Ils listent exactement ce qui est masqué et le ramènent d'un clic ; le
+module reste alors visible même vide, le temps d'y créer quelque chose.
+
+Deux garde-fous qui comptent :
+
+- **Éteindre un module qui contient des lignes ne les cache pas.** Le contenu
+  l'emporte — des lignes existantes ne doivent jamais devenir inaccessibles.
+- **La page ou l'onglet que vous consultez ne se masque jamais**, même si le
+  module vient de se vider. Se retrouver sur une page dont l'onglet a disparu
+  serait une trappe.
+
+**« À faire » ne se masque pas** : c'est là que remontent les signaux de tous
+les autres modules. Le masquer masquerait le moyen d'agir sur le reste.
+
+> **🔧 Notes techniques**
+>
+> - **Schéma, additif** : `organizations.enabledModules` (tableau optionnel
+>   de slugs, borné par construction à un par module connu).
+> - **`convex/lib/modules.ts`** — le registre et la règle, purs et partagés
+>   par le serveur et les deux surfaces : `isVisible` = « contient quelque
+>   chose OU activé », `visibleModules`, `activatableModules`. Testés en
+>   `node:test`.
+> - **`convex/modules.ts:list`** — une sonde `.first()` par module à chaque
+>   lecture (une question d'existence, jamais un comptage). La racine
+>   `group_root` de l'org est explicitement exclue du contenu d'Entreprises :
+>   la compter rendrait l'onglet définitivement non vide et la règle sans
+>   objet. `setEnabled` refiltre sur `ALL_MODULES`, donc un module retiré du
+>   code ne traîne pas en base.
+> - **Front** : `nav.ts` étiquette chaque entrée de son module,
+>   `AppSidebar` filtre et rend `ModuleActivator`, `InvestmentsTabs` fait de
+>   même pour ses trois onglets et garde toujours l'onglet actif. Pendant le
+>   chargement de la query **tout** s'affiche : une barre latérale qui perd
+>   des entrées le temps d'un aller-retour se lit comme une perte de données.
+> - **Tests** : `tests/modules.test.ts` (règle pure) et
+>   `convex/regression.modules.test.ts` (10 cas bout en bout).
+
+---
+
 ## v1.199.0 — 30/08/2026 à 11:35 — Qui détient quoi, et les prêts qu'on renégocie
 
 Lot 5 du module Dette & Garanties : la structure capitalistique des sociétés
