@@ -174,6 +174,77 @@ export const equityPositionType = v.union(
   v.literal('report_a_nouveau'),
 )
 
+// ─── Bank debt enums (loans / loanRates) ────────────────────────────────────
+
+// How the capital of a loan is repaid. Exported for the public mutations
+// (convex/loans.ts); the pure engine mirrors it as a TS union
+// (convex/lib/amortization.ts `AmortizationKind`).
+//
+// `revolving` is the odd one out: no schedule, no fixed duration — its
+// `principalCents` is the CURRENT OUTSTANDING, entered by hand. It is the
+// module's one assumed exception to "nothing derivable is stored".
+export const amortizationKind = v.union(
+  v.literal('constant_annuity'),
+  v.literal('constant_capital'),
+  v.literal('bullet'),
+  v.literal('revolving'),
+)
+
+// A fixed-rate loan has NO `loanRates` row at all — nothing to enter,
+// nothing to maintain.
+export const loanRateKind = v.union(v.literal('fixed'), v.literal('variable'))
+
+export const loanPaymentFrequency = v.union(
+  v.literal('monthly'),
+  v.literal('quarterly'),
+)
+
+// Deferred amortization: `partial` = the interest is paid, `total` = it
+// capitalizes (the amortized capital then starts ABOVE the principal).
+export const loanDeferralKind = v.union(
+  v.literal('partial'),
+  v.literal('total'),
+)
+
+export const loanStatus = v.union(
+  v.literal('active'),
+  v.literal('repaid'),
+  v.literal('cancelled'),
+)
+
+// Nature of a dated rate step: `actual` = a revision that happened,
+// `forecast` = a steering assumption. Instalments beyond the last `actual`
+// are flagged as projected — the app does not pretend to know the 2029 rate.
+export const loanRateStepKind = v.union(
+  v.literal('actual'),
+  v.literal('forecast'),
+)
+
+// ─── Guarantee enums (guarantees) ───────────────────────────────────────────
+
+// The FORM of a security interest — what kind of hold it gives the lender.
+// Independent of its subject and of its guarantor (SPEC D17): a single field
+// could not say « caution given by CALTE over its own shares ».
+export const guaranteeForm = v.union(
+  v.literal('nantissement'),
+  v.literal('hypotheque'),
+  v.literal('ppd'),
+  v.literal('caution'),
+  v.literal('garantie_organisme'),
+)
+
+// The SUBJECT the security bites on. `external` covers what is not ours at
+// all — an institution's guarantee (Saccef), or a third party's asset.
+//
+// `property` lands with the `properties` table (lot 4): a literal can be
+// added to a union with no migration, whereas declaring a table nothing
+// reads would be dead weight in the schema.
+export const guaranteeSubjectKind = v.union(
+  v.literal('placement'),
+  v.literal('shares'),
+  v.literal('external'),
+)
+
 // Target of a generalized allocation (`transactions.allocation`). Coexists
 // with `dealId`: a deal match writes both (cf. convex/transactions.ts).
 //
@@ -182,11 +253,16 @@ export const equityPositionType = v.union(
 // `matchStatus: 'internal_transfer'` (a « écarté » subtype, excluded from the
 // analysis) and carry `allocation.kind === 'transfer'` pointing at their
 // shared `transfers` row — cf. KNOWN_ISSUES.md « Virements internes ».
+//
+// `loan` targets a BANK loan (`loans`), not a shareholder current account —
+// `intercompany_loan` keeps that meaning. The two are unrelated: one is a
+// debt to a bank, the other an advance between two group companies.
 const allocationKind = v.union(
   v.literal('deal'),
   v.literal('equity'),
   v.literal('intercompany_loan'),
   v.literal('transfer'),
+  v.literal('loan'),
 )
 
 const forecastConfidence = v.union(
@@ -916,13 +992,27 @@ export default defineSchema({
    * own (`by_deal`), and the company timeline lists everything filed under the
    * entity, deal documents included — a pacte binds the legal entity, so
    * hiding it from the entity would be the trap. One row, two views: `dealId`
-   * is a label, never a second copy. `companyId` stays filled (the deal's
-   * target) so the org scoping and the `by_company` index work for both kinds.
+   * is a label, never a second copy.
+   *
+   * `companyId` is OPTIONAL since the Dette & Garanties module: a loan deed
+   * has no portfolio company to hang off, and no honest value to give the
+   * field. `orgId` — never optional — is what carries the tenancy; the
+   * anchors (`companyId` / `dealId` / `loanId`) are labels on top of it, and
+   * `documents:create` requires at least one of them to resolve the org.
+   *
+   * ⚠️ A row with no `companyId` is INVISIBLE to the `by_company` index (a
+   * missing value never equals an id), so it never shows on a company sheet.
+   * That is intended: it is reachable from its own anchor's sheet, from the
+   * org-wide semantic search, and from `by_org`.
    */
   documents: defineTable({
     orgId: v.id('organizations'),
-    companyId: v.id('companies'),
+    companyId: v.optional(v.id('companies')),
     dealId: v.optional(v.id('deals')),
+    // Bank loan this deed hangs off (offer letter, amortization table).
+    loanId: v.optional(v.id('loans')),
+    // Guarantee deed (nantissement, hypothèque, acte de caution).
+    guaranteeId: v.optional(v.id('guarantees')),
     title: v.string(),
     // Company kinds first, then the deal-specific ones. One widened union
     // rather than two columns: which subset is offered is a UI concern.
@@ -935,6 +1025,9 @@ export default defineSchema({
       v.literal('pacte'),
       v.literal('subscription'),
       v.literal('attestation'),
+      // Debt & guarantees deeds — no company target at all.
+      v.literal('acte_pret'),
+      v.literal('acte_garantie'),
     ),
     // Company docs: covered period (month). Deal docs: the document's own
     // date (signature…). Same storage, the label differs per surface.
@@ -997,6 +1090,8 @@ export default defineSchema({
   })
     .index('by_company', ['companyId', 'uploadedAt'])
     .index('by_deal', ['dealId', 'uploadedAt'])
+    .index('by_loan', ['loanId', 'uploadedAt'])
+    .index('by_guarantee', ['guaranteeId', 'uploadedAt'])
     .index('by_org', ['orgId'])
     .index('by_report', ['reportId'])
     // Reading states, oldest first — read by the sweeper that picks up the
@@ -1313,6 +1408,141 @@ export default defineSchema({
     .index('by_company_and_sentAt', ['companyId', 'sentAt'])
     .index('by_org_and_sentAt', ['orgId', 'sentAt'])
     .index('by_email', ['emailId']),
+
+  // ─── Bank debt (loans + dated rate series) ────────────────────────────────
+
+  /**
+   * loans — a bank loan taken out by a group company. `orgId` is the
+   * BORROWING company (one legal entity = one org).
+   *
+   * NO "capital outstanding" field, by the same philosophy as the current
+   * account balances (KNOWN_ISSUES.md § Passif): a stored figure drifts, a
+   * derived one cannot. The schedule is recomputed on every read by the pure
+   * engine `convex/lib/amortization.ts` — nothing about it is stored either,
+   * not even a table of instalments.
+   *
+   * The ONE exception: on a `revolving` (lombard) credit there is no schedule
+   * to derive anything from, so `principalCents` holds the CURRENT
+   * OUTSTANDING, entered by hand. Documented limitation, not an oversight.
+   */
+  loans: defineTable({
+    orgId: v.id('organizations'), // borrowing company
+    label: v.string(), // "Prêt Palatine 2021"
+    lenderName: v.string(), // free text — no lender registry (cf. SPEC Q-D)
+    // Amount borrowed. On a `revolving`: the current outstanding (see above).
+    principalCents: v.number(),
+    signedDate: v.number(), // ms epoch
+    firstPaymentDate: v.number(), // ms epoch — anchors the whole schedule
+    // TOTAL duration, deferral included. Absent on a revolving only.
+    durationMonths: v.optional(v.number()),
+    amortizationKind,
+    creditLimitCents: v.optional(v.number()), // revolving: authorized ceiling
+    rateBps: v.number(), // rate AT SIGNATURE (1100 = 11 %)
+    rateKind: loanRateKind,
+    insuranceMonthlyCents: v.optional(v.number()), // OUTSIDE the instalment
+    paymentFrequency: loanPaymentFrequency,
+    deferralMonths: v.optional(v.number()),
+    deferralKind: v.optional(loanDeferralKind),
+    // Bound of the interest projection of a revolving, when the credit has a
+    // known end. Absent = projected up to the forecast horizon.
+    endDate: v.optional(v.number()),
+    bankAccountId: v.optional(v.id('bankAccounts')), // direct-debit account, same org
+    status: loanStatus,
+    notes: v.optional(v.string()),
+  })
+    .index('by_org', ['orgId'])
+    .index('by_org_status', ['orgId', 'status'])
+    .index('by_bank_account', ['bankAccountId']),
+
+  /**
+   * loanRates — dated revisions of a VARIABLE rate. A table rather than an
+   * array on the loan: over twenty years of quarterly revisions the series
+   * grows without bound, and `loans` is read as a list on the Passif page —
+   * exactly the anti-pattern of CLAUDE.md (Convex reads and bills the whole
+   * row).
+   *
+   * Rule of the rate applicable to a date: the last step whose
+   * `fromDate <= date`, falling back to `loans.rateBps`. A fixed-rate loan
+   * therefore has NO row here.
+   */
+  loanRates: defineTable({
+    orgId: v.id('organizations'),
+    loanId: v.id('loans'),
+    fromDate: v.number(), // ms epoch, effective date
+    rateBps: v.number(),
+    kind: loanRateStepKind,
+    notes: v.optional(v.string()),
+  }).index('by_loan_from', ['loanId', 'fromDate']),
+
+  /**
+   * guarantees — the link between a debt and the security that covers it.
+   * The central table of the Dette & Garanties module.
+   *
+   * ONE row, THREE independent pieces of information (SPEC D17), and hence
+   * three readings of the very same row (D13) — nothing is stored twice:
+   * - `form` — the kind of hold: nantissement, hypothèque, PPD, caution,
+   *   garantie d'organisme.
+   * - `subject*` — what is pledged. Read from the ASSET's sheet: « this
+   *   contract is pledged for the benefit of SCI Chapelle ».
+   * - `pledgor*` — who commits. Read from the GUARANTOR's page: « I stood
+   *   surety for RDB ».
+   *
+   * The polymorphic pattern is `equityPositions`' (several optional fields
+   * discriminated by a nature field), NOT `transactions.allocation`'s, whose
+   * untyped `targetId: string` would lose the referential integrity that
+   * matters most here.
+   *
+   * A guarantee may cross two orgs (the loan in `sci-chapelle`, the asset in
+   * `calte`), so `requireOrgMember` is not enough on its own:
+   * `requireGuaranteeParty` (convex/guarantees.ts) requires membership of at
+   * least ONE of the parties, mirroring `requireLoanParty`. Orgs stay flat —
+   * no inheritance of rights.
+   *
+   * The beneficiary can be OUTSIDE the group (`borrowerLabel`, SPEC D-QA):
+   * without those rows the available margin on our own asset would be
+   * overstated — an error in our disfavour, and an invisible one.
+   */
+  guarantees: defineTable({
+    // ── Beneficiary: EITHER a group loan, OR an outside borrower ──────────
+    loanId: v.optional(v.id('loans')),
+    // Denormalized from the loan, never taken from an argument — it is what
+    // the `by_borrower_org` index reads.
+    borrowerOrgId: v.optional(v.id('organizations')),
+    borrowerLabel: v.optional(v.string()), // "SARL Bremontier"
+
+    // ── The guarantor: a group company, a free label, or unknown ──────────
+    // Unknown is a real case: the source deeds name a caution without saying
+    // who stands it (SPEC Q-B). A personal caution is a LABEL, never a
+    // person object — no natural person exists in Albo OS (D1, D46).
+    pledgorOrgId: v.optional(v.id('organizations')),
+    pledgorLabel: v.optional(v.string()), // "Saccef", "Clément Alteresco"
+
+    // ── The subject ───────────────────────────────────────────────────────
+    subjectKind: guaranteeSubjectKind,
+    subjectDealId: v.optional(v.id('deals')), // 'placement'
+    subjectCompanyId: v.optional(v.id('companies')), // 'shares'
+    // Org the subject lives in, denormalized from it — a party for the
+    // authorization check.
+    subjectOrgId: v.optional(v.id('organizations')),
+    subjectLabel: v.optional(v.string()), // 'external'
+
+    // ── The pledge ────────────────────────────────────────────────────────
+    form: guaranteeForm,
+    rank: v.optional(v.number()), // 1 = first rank, 2 = second… (D48)
+    // Absent = not quantified (an unlimited caution). EXCLUDED from the
+    // pledged total and listed apart: showing it as 0 would lie (C3).
+    pledgedAmountCents: v.optional(v.number()),
+    actDate: v.optional(v.number()),
+    // Mainlevée. Absent = active. The row STAYS (history) but leaves the
+    // pledged total (C6).
+    releasedAt: v.optional(v.number()),
+    notes: v.optional(v.string()),
+  })
+    .index('by_loan', ['loanId'])
+    .index('by_borrower_org', ['borrowerOrgId'])
+    .index('by_pledgor_org', ['pledgorOrgId'])
+    .index('by_subject_deal', ['subjectDealId'])
+    .index('by_subject_company', ['subjectCompanyId']),
 
   // ─── Liabilities (equity + shareholder current accounts) ──────────────────
 
@@ -1712,7 +1942,9 @@ export default defineSchema({
    * it.
    *
    * `derivedKey` = idempotency key for auto rows, format
-   * "rule:{ruleId}:{YYYY-MM-DD}", "vat:{orgId}:{YYYY-Qn}" (quarterly VAT
+   * "rule:{ruleId}:{YYYY-MM-DD}", "loan:{loanId}:{YYYY-MM-DD}" (an
+   * instalment derived from a bank loan's computed schedule — cf.
+   * convex/forecasts.ts:expandLoanSchedules), "vat:{orgId}:{YYYY-Qn}" (quarterly VAT
    * suggestion — no ruleId, so the row stays a plain editable one-off),
    * "airtable:{recordId}" (one-shot port of the Airtable forecast tables —
    * cf. convex/migrations/airtableForecastsToEntries.ts, likewise a plain
@@ -1732,6 +1964,9 @@ export default defineSchema({
     // Optional deal link: copied from the rule by expandRules, or set by
     // hand on a one-off. Feeds the deal page's forecast section.
     dealId: v.optional(v.id('deals')),
+    // Optional bank-loan link, symmetric to `dealId`: an instalment derived
+    // from a loan's schedule (`derivedKey` "loan:{loanId}:{YYYY-MM-DD}").
+    loanId: v.optional(v.id('loans')),
     derivedKey: v.optional(v.string()),
     overridden: v.boolean(),
     realizedTransactionId: v.optional(v.id('transactions')), // filled on matching
@@ -1751,7 +1986,8 @@ export default defineSchema({
     .index('by_org_and_date', ['orgId', 'date'])
     .index('by_derivedKey', ['derivedKey'])
     .index('by_rule', ['ruleId'])
-    .index('by_deal', ['dealId']),
+    .index('by_deal', ['dealId'])
+    .index('by_loan', ['loanId']),
 
   /**
    * todos — manual tasks of the « To do » tab (convex/todo.ts). Only the

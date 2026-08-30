@@ -113,6 +113,10 @@ const DOCS = {
     id: '6d37ad80-3722-487d-a062-7be55d171dad',
     url: 'https://linear.app/alboteam/document/17-reports-par-email-1ede940ce6de',
   },
+  '18-dette-et-garanties.md': {
+    id: 'b634f99c-fa4c-4424-b945-19dc514299cc',
+    url: 'https://linear.app/alboteam/document/18-dette-bancaire-et-garanties-58565b8fb4c5',
+  },
   '19-placements.md': {
     id: '155997df-f22c-4d82-b914-f7c079f6bd66',
     url: 'https://linear.app/alboteam/document/19-placements-f2a1db1ff3cb',

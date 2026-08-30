@@ -11,6 +11,7 @@
 import type * as admin from "../admin.js";
 import type * as agent from "../agent.js";
 import type * as agentTools from "../agentTools.js";
+import type * as agentToolsDebt from "../agentToolsDebt.js";
 import type * as agentToolsDocuments from "../agentToolsDocuments.js";
 import type * as agentToolsForecasts from "../agentToolsForecasts.js";
 import type * as agentToolsIntelligence from "../agentToolsIntelligence.js";
@@ -46,7 +47,9 @@ import type * as intelligence from "../intelligence.js";
 import type * as investments from "../investments.js";
 import type * as invitations from "../invitations.js";
 import type * as kpis from "../kpis.js";
+import type * as guarantees from "../guarantees.js";
 import type * as liabilities from "../liabilities.js";
+import type * as loans from "../loans.js";
 import type * as lib_agentScope from "../lib/agentScope.js";
 import type * as lib_attioSync from "../lib/attioSync.js";
 import type * as lib_auth from "../lib/auth.js";
@@ -132,6 +135,7 @@ declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   agent: typeof agent;
   agentTools: typeof agentTools;
+  agentToolsDebt: typeof agentToolsDebt;
   agentToolsDocuments: typeof agentToolsDocuments;
   agentToolsForecasts: typeof agentToolsForecasts;
   agentToolsIntelligence: typeof agentToolsIntelligence;
@@ -167,7 +171,9 @@ declare const fullApi: ApiFromModules<{
   investments: typeof investments;
   invitations: typeof invitations;
   kpis: typeof kpis;
+  guarantees: typeof guarantees;
   liabilities: typeof liabilities;
+  loans: typeof loans;
   "lib/agentScope": typeof lib_agentScope;
   "lib/attioSync": typeof lib_attioSync;
   "lib/auth": typeof lib_auth;

@@ -5122,5 +5122,155 @@ Donc l'ordre : auditer d'abord toutes les lectures de `companyId`, les rendre
 tolérantes à l'absence, et seulement ensuite relâcher le schéma. Jamais
 l'inverse, jamais « en passant » dans une PR qui fait autre chose.
 
-Cf. le cahier des charges Dette & Garanties, qui bute dessus pour attacher un
-acte de prêt à un prêt.
+### ✅ Fait (août 2026, module Dette & Garanties)
+
+`companyId` **est** optionnel depuis le lot 1. L'ordre ci-dessus a été
+suivi ; l'audit avait trouvé **5 crashs runtime** et **1 corruption
+silencieuse**, corrigés AVANT le relâchement :
+
+| Site | Ce qui cassait |
+|---|---|
+| `vectorize.getDocumentForIndex` | `ctx.db.get('companies', undefined)` → exception |
+| `vectorize.indexDocumentImpl` | `filterValues` avec une valeur `undefined` dans l'index vectoriel |
+| `vectorize.notifyIndexFailure` | argument requis → `ArgumentValidationError` sur la notification d'échec, et URL `/participations/undefined` |
+| `migrations/legalDocsImport` (`audit`, `verify`) | `db.get(undefined)` sur la clé `undefined` du regroupement |
+| `lib/duplicates.ts` | clé `"undefined\|titre"` → **tous** les documents non classés fusionnés en un seul groupe de doublons |
+
+Ce qu'il faut retenir pour la suite :
+
+- **`orgId` porte la multi-tenance, pas `companyId`.** Les ancres
+  (`companyId` / `dealId` / `loanId` / `guaranteeId`) sont des étiquettes
+  par-dessus. `documents:create` ne prend **jamais** l'org en argument : elle
+  la résout depuis l'ancre présente et vérifie l'appartenance dessus. Sans
+  ancre → `missing_anchor`. Passer un `orgId` en argument serait un trou de
+  tenancy, pas un raccourci.
+- **Une ligne sans `companyId` est invisible de l'index `by_company`** (une
+  valeur absente n'égale jamais un id) : elle ne s'affiche donc sur aucune
+  fiche société. C'est voulu — elle se lit depuis sa propre ancre, depuis
+  `by_org` et depuis la recherche sémantique. Ne pas « réparer » ça.
+- **Une ligne portant un `reportId` a toujours sa société** (elle ne peut
+  venir que de `reportStore`). Les comparaisons de `reportInbox:detachCompany`
+  et `reportStore` sont explicitement gardées là-dessus : un document non
+  classé n'appartient à aucun fan-out de report.
+- **`intelligence.ts` et `companyEnrichment.ts` ne touchent jamais la table
+  `documents`** — le cahier des charges les listait, à tort. Et **aucun
+  fichier `src/`** ne lit `companyId` sur un document : les deux queries de
+  liste ne le renvoient pas.
+
+## Échéancier de prêt : une fonction pure, et rien de stocké (`convex/lib/amortization.ts`)
+
+Le capital restant dû d'un prêt n'est **stocké nulle part**. Il n'y a ni
+colonne, ni table d'échéances : `buildSchedule` reconstruit tout à chaque
+lecture, comme les soldes de comptes courants se dérivent des transactions
+(§ Passif). Un chiffre stocké se désynchronise, un chiffre dérivé ne peut
+pas — et « Corriger » un prêt fait bouger le restant dû sans reprise de
+données.
+
+- **Une seule exception assumée : l'encours d'un `revolving`.** Un crédit
+  lombard n'a ni durée ni échéancier, donc rien dont déduire son encours :
+  `principalCents` **est** l'encours, saisi et corrigé à la main. C'est
+  documenté au schéma. Ne pas généraliser ce champ aux trois autres types.
+- **`durationMonths` est la durée TOTALE, différé inclus.** Le nombre de
+  périodes d'amortissement vaut `durationMonths − deferralMonths` (converties
+  en périodes). Un différé ≥ durée est rejeté à la mutation
+  (`deferral_too_long`) ; côté moteur il est clampé pour laisser au moins une
+  échéance, parce qu'une query ne doit jamais lever sur de la donnée stockée.
+- **`periodicRate` fait UNE division**, `(bps × mois) / (10000 × 12)`. La
+  forme naturelle `(bps / 10000) × (mois / 12)` rend
+  `0.009999999999999998` pour un taux mensuel de 12 %, et cet artefact
+  voyage ensuite sur 240 échéances. Ne pas la « simplifier ».
+- **La dernière échéance absorbe la dérive d'arrondi** : son capital vaut ce
+  qui reste. C'est ce que fait le tableau de la banque, et c'est ce qui garde
+  le restant dû à moins d'un euro du sien.
+- **Le différé total capitalise des intérêts ARRONDIS au centime à chaque
+  période**, pas la formule fermée. 100 000 € à 1 % capitalisés six fois
+  donnent 106 152,01 € et non les 106 152,02 € de `P × 1,01⁶`. C'est la
+  banque qui a raison, pas la formule.
+- **Les dates ne dérivent pas** : chaque échéance est recalculée depuis
+  l'ancre (`addMonthsUtc(firstPaymentDate, k × pas)`), jamais de proche en
+  proche. Un ancrage au 31 donne 31/01 → 28/02 → 31/03, alors qu'un pas à pas
+  donnerait 28/03.
+- **`projected` ne concerne que les prêts à taux variable.** La règle est
+  littérale : au-delà de la dernière révision `actual`, l'app ne connaît pas
+  le taux. Sans aucune révision `actual`, le taux de signature tient et rien
+  n'est projeté — seuls les paliers `forecast` le sont. Un prêt à taux fixe
+  n'a **jamais** d'échéance projetée.
+- **Le fichier de test est `tests/amortization.test.ts`, hors de `convex/`** :
+  un import `node:test` dans `convex/` casse le bundle de déploiement (même
+  raison que `lib/recurrence.ts`). Il tourne avec `pnpm test:unit`, PAS avec
+  `pnpm test:convex` (qui n'inclut que `convex/**/*.test.ts`).
+
+## Le « Réel » d'une échéance est un rapprochement de calendrier, pas une suggestion
+
+`attributeActuals` place chaque flux déjà pointé sur l'échéance dont il
+occupe la **période**. C'est déterministe et explicable à partir des seules
+dates : « ce qui est sorti de la banque entre cette échéance et la
+suivante ».
+
+Ce n'en est **pas** un moteur de rapprochement, et il ne doit pas le devenir.
+L'humain décide qu'une transaction appartient au prêt, dans la file de
+pointage ; la fonction ne fait que placer la conséquence sur la bonne ligne.
+Elle ne propose rien, ne présélectionne rien, ne classe rien par
+vraisemblance — c'est exactement le mécanisme retiré en août 2026 (cf.
+« Pointage transaction → deal »). **Ne pas le re-câbler ici.**
+
+Corollaire assumé : un paiement en retard reste sur la période où il est
+tombé, pas sur celle qu'il était censé couvrir. C'est la lecture honnête —
+elle rend une échéance manquée visible au lieu de la masquer.
+
+## Garanties : `requireOrgMember` ne suffit pas (`convex/guarantees.ts`)
+
+Une garantie traverse légitimement deux orgs — le prêt dans `sci-chapelle`,
+l'assiette dans `calte`. `requireOrgMember` sur une seule d'entre elles
+refuserait des lectures parfaitement fondées.
+
+- **`requireGuaranteeParty` est calqué sur `requireLoanParty`** : membre d'au
+  moins une des orgs parties (`borrowerOrgId`, `pledgorOrgId`,
+  `subjectOrgId`). Une garantie qui ne touche **aucune** org du groupe est
+  refusée (`not_a_party`) : rien dans Albo OS ne justifierait de la lire. Les
+  orgs restent à plat, aucun héritage de droits.
+- **Les orgs dénormalisées ne viennent jamais d'un argument.**
+  `borrowerOrgId` est lu sur le prêt, `subjectOrgId` sur l'actif. Sinon un
+  appelant pourrait se déclarer partie d'une garantie qui ne le concerne pas.
+- **`update` vérifie l'appartenance AVANT et APRÈS.** Sans le second contrôle,
+  on pourrait déplacer une garantie hors de ses propres orgs, ou dans celles
+  de quelqu'un d'autre.
+- **La marge disponible est volontairement pessimiste.** Un montant gagé ne
+  décroît pas quand la dette se rembourse : il vaut son montant d'acte
+  jusqu'à la mainlevée. Une marge négative est une information (le gage
+  dépasse la valeur de l'actif), pas un bug. Et une garantie **non chiffrée**
+  est exclue du total et comptée à part — l'afficher comme 0 mentirait.
+- **La lecture traverse les orgs, et c'est le but.** Sans les gages qui
+  profitent à une autre société du groupe ou à un emprunteur hors groupe, la
+  marge d'un actif serait surévaluée — une erreur en notre défaveur, et
+  invisible. Ce n'est pas une vue consolidée au sens de D14, c'est la lecture
+  d'un lien déjà accepté.
+- **`subjectKind` n'a pas encore `'property'`** : la valeur arrivera avec la
+  table `properties`. Élargir une union Convex ne demande aucune migration ;
+  déclarer une table que rien ne lit aurait été du gras.
+
+## Échéances de prêt dans le prévisionnel (`forecasts:expandLoanSchedules`)
+
+Même contrat que `expandRules`, mais la source n'est pas une récurrence :
+c'est l'échéancier calculé du prêt.
+
+- **Idempotent par `derivedKey`** (`"loan:{loanId}:{YYYY-MM-DD}"`), et la
+  décision create/update/skip passe par le même `entryUpsertAction` pur : une
+  occurrence éditée à la main, réalisée ou annulée n'est **jamais** réécrite.
+- **Le montant projeté inclut l'assurance.** La fiche du prêt garde
+  mensualité et assurance séparées (c'est ce que dit le contrat) ; le
+  prévisionnel, lui, veut ce qui sort réellement du compte.
+- **Une purge existe, et elle est bornée.** « Corriger » écrase les conditions
+  et recalcule tout : une échéance que le nouvel échéancier ne produit plus
+  serait sinon un fantôme dans la projection. Seules les occurrences
+  **futures et intactes** sont supprimées — une entry `overridden`,
+  `realized` ou `cancelled` est une décision humaine, jamais défaite par une
+  régénération. `expandRules` n'a pas cette purge (une règle ne se raccourcit
+  pas de la même façon) : ne pas les aligner à l'aveugle.
+- **Rien n'est projeté dans le passé** : une échéance échue est un mouvement
+  bancaire, sa place est la file de pointage. Et un prêt non `active` ne
+  projette rien du tout.
+- **L'expansion est rejouée depuis l'UI** à chaque enregistrement de prêt et à
+  chaque palier de taux, comme `expandRules` l'est à chaque sauvegarde de
+  règle. Aucun cron : sans ce déclencheur, la mutation existerait sans que
+  rien ne l'appelle.

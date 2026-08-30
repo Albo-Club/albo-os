@@ -127,7 +127,11 @@ export const getDocumentForIndex = internalQuery({
   handler: async (ctx, { documentId }) => {
     const doc = await ctx.db.get('documents', documentId)
     if (!doc) return null
-    const company = await ctx.db.get('companies', doc.companyId)
+    // A document need not hang off a company (loan deed, guarantee deed…):
+    // `companyId` is optional since the Dette & Garanties module.
+    const company = doc.companyId
+      ? await ctx.db.get('companies', doc.companyId)
+      : null
     const textRow = await ctx.db
       .query('documentTexts')
       .withIndex('by_storage', (q) => q.eq('storageId', doc.storageId))
@@ -210,7 +214,9 @@ export const setReportState = internalMutation({
 export const notifyIndexFailure = internalMutation({
   args: {
     orgId: v.id('organizations'),
-    companyId: v.id('companies'),
+    // Optional: a document filed under neither a company nor a deal (loan
+    // deed, guarantee deed) still has to be able to report its failure.
+    companyId: v.optional(v.id('companies')),
     dealId: v.optional(v.id('deals')),
     itemLabel: v.string(),
     detail: v.string(),
@@ -221,7 +227,9 @@ export const notifyIndexFailure = internalMutation({
     const siteUrl = process.env.SITE_URL ?? ''
     const targetUrl = dealId
       ? `${siteUrl}/app/${org.slug}/deals/${dealId}`
-      : `${siteUrl}/app/${org.slug}/participations/${companyId}`
+      : companyId
+        ? `${siteUrl}/app/${org.slug}/participations/${companyId}`
+        : `${siteUrl}/app/${org.slug}`
 
     const members = await ctx.db
       .query('organizationMembers')
@@ -282,15 +290,22 @@ async function indexDocumentImpl(
   text: string,
 ): Promise<void> {
   // Header line so company / kind / title are searchable content too.
-  const header = `Document "${doc.title}" (${doc.kind}) — ${companyName}`
+  const header = companyName
+    ? `Document "${doc.title}" (${doc.kind}) — ${companyName}`
+    : `Document "${doc.title}" (${doc.kind})`
   await rag.add(ctx, {
     namespace: doc.orgId,
     key: `doc:${doc._id}`,
     title: doc.title,
     text: `${header}\n\n${text}`,
+    // A document with no company carries NO `companyId` filter value rather
+    // than an undefined one: it must stay findable by an org-wide search and
+    // must never fall into a company-scoped one.
     filterValues: [
-      { name: 'companyId', value: doc.companyId },
-      { name: 'kind', value: doc.kind },
+      ...(doc.companyId
+        ? [{ name: 'companyId' as const, value: doc.companyId as string }]
+        : []),
+      { name: 'kind' as const, value: doc.kind },
     ],
   })
 }

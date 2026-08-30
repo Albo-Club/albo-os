@@ -25,10 +25,12 @@ import {
   buildMonthlyHistory,
   entryUpsertAction,
   expandOccurrences,
+  loanDerivedKey,
   monthKey,
   previousQuarter,
   ruleDerivedKey,
 } from './lib/recurrence'
+import { buildSchedule } from './lib/amortization'
 import { sectionsFor } from './lib/weeklyDigest'
 import { computeVatPositionForOrg } from './transactions'
 import type { GridTx, HistoryTx } from './lib/recurrence'
@@ -396,6 +398,176 @@ export async function expandRulesForOrgs(
 
   return { rulesProcessed, created, updated, skippedProtected }
 }
+
+// ─── Loan schedule → occurrence expansion ───────────────────────────────────
+
+/**
+ * The forecast category a loan instalment falls under. Loan outflows are
+ * debt service, not a generic charge — sharing the slug with the rules makes
+ * the plan-vs-actual consumption of the grid line up.
+ */
+const LOAN_CATEGORY = 'debt'
+
+/**
+ * Expands ACTIVE loans' computed schedules into `forecastEntries` over
+ * `horizonMonths`, so a bank direct debit shows in the cash projection.
+ *
+ * This is where `amortizationKind` earns its keep (SPEC D45): an in fine
+ * loan produces small interest lines and then ONE huge capital line at
+ * maturity. Without the kind, the projection would smooth that 6,6 M€
+ * balloon over twenty years and it would stay invisible until it landed.
+ *
+ * Same contract as `expandRulesForOrgs`:
+ * - idempotent by `derivedKey` ("loan:{loanId}:{YYYY-MM-DD}");
+ * - an entry edited by hand (`overridden`), realized or cancelled is NEVER
+ *   rewritten — the decision is the pure `entryUpsertAction`;
+ * - the instalment INCLUDES the insurance, because what leaves the bank
+ *   account is instalment + insurance (§ 5.1). The loan sheet keeps the two
+ *   apart; the cash projection cares about the actual outflow.
+ */
+export async function expandLoanSchedulesForOrgs(
+  ctx: GenericMutationCtx<DataModel>,
+  orgIds: Array<Id<'organizations'>>,
+  horizonMonths: number,
+) {
+  const now = Date.now()
+  const horizonEnd = addMonthsUtc(now, horizonMonths)
+
+  let loansProcessed = 0
+  let created = 0
+  let updated = 0
+  let skippedProtected = 0
+  let removedStale = 0
+
+  for (const oid of orgIds) {
+    const loans = await ctx.db
+      .query('loans')
+      .withIndex('by_org_status', (q) =>
+        q.eq('orgId', oid).eq('status', 'active'),
+      )
+      .collect()
+
+    for (const loan of loans) {
+      const rateRows = await ctx.db
+        .query('loanRates')
+        .withIndex('by_loan_from', (q) => q.eq('loanId', loan._id))
+        .collect()
+      const schedule = buildSchedule(
+        {
+          principalCents: loan.principalCents,
+          firstPaymentDate: loan.firstPaymentDate,
+          durationMonths: loan.durationMonths,
+          amortizationKind: loan.amortizationKind,
+          rateBps: loan.rateBps,
+          rateKind: loan.rateKind,
+          paymentFrequency: loan.paymentFrequency,
+          deferralMonths: loan.deferralMonths,
+          deferralKind: loan.deferralKind,
+          insuranceMonthlyCents: loan.insuranceMonthlyCents,
+          endDate: loan.endDate,
+        },
+        rateRows.map((row) => ({
+          fromDate: row.fromDate,
+          rateBps: row.rateBps,
+          kind: row.kind,
+        })),
+        // A revolving with no end date is projected to the horizon — past
+        // that, an open-ended credit would generate interest rows forever.
+        { horizonDate: horizonEnd },
+      )
+      if (schedule.length === 0) continue
+      loansProcessed += 1
+
+      const liveKeys = new Set<string>()
+      for (const row of schedule) {
+        // Only the future: a past instalment is a bank movement, and its
+        // place is the matching queue, not the projection.
+        if (row.date < now || row.date > horizonEnd) continue
+        // A totally deferred instalment costs nothing — projecting a zero
+        // line would clutter the grid with rows that move no cash.
+        const amountCents = row.paymentCents + row.insuranceCents
+        if (amountCents <= 0) continue
+
+        const derivedKey = loanDerivedKey(loan._id, row.date)
+        liveKeys.add(derivedKey)
+        const existing = await ctx.db
+          .query('forecastEntries')
+          .withIndex('by_derivedKey', (q) => q.eq('derivedKey', derivedKey))
+          .unique()
+
+        if (existing === null) {
+          await ctx.db.insert('forecastEntries', {
+            orgId: oid,
+            date: row.date,
+            amountCents,
+            direction: 'out',
+            // A contractual instalment is committed, not a hypothesis —
+            // except past the last known rate of a variable loan, where the
+            // engine itself says the figure is a projection.
+            confidence: row.projected ? 'expected' : 'confirmed',
+            status: 'pending',
+            label: loan.label,
+            category: LOAN_CATEGORY,
+            loanId: loan._id,
+            derivedKey,
+            overridden: false,
+            currency: 'EUR',
+          })
+          created += 1
+        } else if (entryUpsertAction(existing) === 'skip') {
+          skippedProtected += 1
+        } else {
+          await ctx.db.patch('forecastEntries', existing._id, {
+            amountCents,
+            direction: 'out',
+            confidence: row.projected ? 'expected' : 'confirmed',
+            label: loan.label,
+            category: LOAN_CATEGORY,
+            loanId: loan._id,
+          })
+          updated += 1
+        }
+      }
+
+      // « Corriger » overwrites the terms and recomputes everything (C7), so
+      // an instalment the new schedule no longer produces must not survive as
+      // a ghost in the projection. Only PRISTINE future occurrences are
+      // dropped: a hand-edited, realized or cancelled entry is a human
+      // decision and is left alone, exactly as expandRules leaves it alone.
+      const derived = await ctx.db
+        .query('forecastEntries')
+        .withIndex('by_loan', (q) => q.eq('loanId', loan._id))
+        .collect()
+      for (const entry of derived) {
+        if (entry.date < now) continue
+        if (entry.overridden || entry.status !== 'pending') continue
+        if (entry.derivedKey && liveKeys.has(entry.derivedKey)) continue
+        await ctx.db.delete('forecastEntries', entry._id)
+        removedStale += 1
+      }
+    }
+  }
+
+  return { loansProcessed, created, updated, skippedProtected, removedStale }
+}
+
+/**
+ * Public entry point for the loan expansion. Separate from `expandRules` so
+ * a loan whose terms were corrected can be re-projected on its own, and so
+ * the two counters stay readable.
+ */
+export const expandLoanSchedules = mutation({
+  args: {
+    orgId: v.optional(v.id('organizations')),
+    horizonMonths: v.number(),
+  },
+  handler: async (ctx, { orgId, horizonMonths }) => {
+    assertValidHorizon(horizonMonths)
+    const orgIds = await resolveOrgScope(ctx, orgId)
+    return await expandLoanSchedulesForOrgs(ctx, orgIds, horizonMonths)
+  },
+})
+
 
 // ─── Real balance history ────────────────────────────────────────────────────
 

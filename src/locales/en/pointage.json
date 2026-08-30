@@ -124,7 +124,9 @@
     "productUnqualified": "Income — category to qualify",
     "emptyDeals": "No deal for this organization.",
     "emptyEquity": "No equity position for this organization.",
-    "emptyLoans": "No current account for this organization."
+    "emptyLoans": "No current account for this organization.",
+    "groupBankLoans": "Bank loans",
+    "emptyBankLoans": "No bank loan for this organization."
   },
   "detail": {
     "title": "Transaction",

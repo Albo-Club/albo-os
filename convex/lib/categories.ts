@@ -43,6 +43,11 @@ export const DERIVED_FORECAST_CATEGORIES = [
   'deals',
   'equity',
   'intercos',
+  // Bank debt service (`allocation.kind === 'loan'`): the instalments the
+  // forecast layer derives from a loan's schedule land here, and so do the
+  // direct debits matched to that loan — same bucket, so the grid's
+  // plan-vs-actual consumption lines up.
+  'debt',
   'taxes',
 ] as const
 
@@ -90,6 +95,7 @@ export function effectiveCategory(
     case 'matched':
       if (tx.allocation?.kind === 'equity') return 'equity'
       if (tx.allocation?.kind === 'intercompany_loan') return 'intercos'
+      if (tx.allocation?.kind === 'loan') return 'debt'
       return 'deals'
     case 'tax':
       return 'taxes'

@@ -23,6 +23,136 @@ bas de page.
 
 ---
 
+## v1.197.0 — 29/08/2026 à 23:31 — Ce que chaque société doit, et ce qui est mis en gage
+
+Albo OS savait dire ce que le groupe possède. Il sait maintenant dire ce
+qu'il **doit**, à qui, jusqu'à quand — et ce qui a été mis en gage pour
+l'obtenir. Les trois premiers lots du module Dette & Garanties sont livrés.
+
+**La dette bancaire.** La page Passif de chaque société s'ouvre sur ses
+prêts : prêteur, taux courant, échéance finale, capital restant dû. Chaque
+prêt a sa fiche, avec son échéancier complet. Ce qui se saisit, ce sont les
+conditions du contrat — le montant emprunté, la durée, le taux, la
+périodicité, l'assurance, le différé éventuel. Jamais le résultat du calcul :
+le capital restant dû est recalculé à chaque lecture, il ne peut donc pas se
+désynchroniser. Corriger un prêt le fait bouger immédiatement.
+
+Les quatre façons d'emprunter sont là dès maintenant : annuité constante,
+capital constant, in fine, et crédit révolving. Un groupe de holdings et de
+SCI n'emprunte pas qu'en annuité constante, et le type change tout — un in
+fine de 6,6 M€ fait apparaître ses 6,6 M€ dans la trésorerie prévisionnelle
+**à sa date**, au lieu d'être lissé sur vingt ans et de rester invisible
+jusqu'à ce qu'il tombe. Le différé existe en deux natures, à ne pas
+confondre : partiel, on paie les intérêts ; total, ils se capitalisent et
+l'amortissement démarre au-dessus du montant emprunté.
+
+Un prêt à taux variable porte une série datée de paliers, constatés ou
+projetés. Au-delà de la dernière révision constatée, les échéances sont
+marquées **projetées** : l'application ne prétend pas connaître le taux de
+2029. Un prêt à taux fixe n'a rien à saisir là — la section n'apparaît même
+pas.
+
+**Les garanties.** Une garantie est décrite par trois informations
+distinctes : sa forme (nantissement, hypothèque, privilège de prêteur de
+deniers, caution, garantie d'organisme), l'actif sur lequel elle porte, et
+qui s'engage. Elle est saisie une seule fois et se lit de trois côtés :
+depuis le prêt qu'elle couvre, depuis l'actif qu'elle grève, depuis la
+société garante. Rien n'est saisi deux fois, donc rien ne peut diverger — et
+la lecture traverse les sociétés : un contrat détenu par CALTE qui garantit
+un prêt d'une SCI se lit dans les deux espaces.
+
+La question qui obligeait jusqu'ici à ressortir les actes a enfin sa réponse.
+Sur la fiche d'un placement, un bloc affiche sa valeur actuelle, le total
+gagé et la **marge disponible**. Il compte tous les gages, y compris ceux qui
+profitent à une autre société du groupe et ceux qui profitent à un emprunteur
+extérieur — sans ces derniers, la marge serait surévaluée, une erreur en
+notre défaveur et invisible. Trois précautions expliquent des chiffres
+parfois surprenants : une caution illimitée n'est pas comptée dans le total
+(elle est listée à part, l'afficher comme zéro mentirait) ; un montant gagé
+peut dépasser la valeur de l'actif, et la marge devient négative ; un montant
+gagé ne décroît pas quand la dette se rembourse, il vaut son montant d'acte
+jusqu'à la mainlevée. La marge affichée est donc volontairement pessimiste.
+
+Les sûretés s'affichent de la plus forte à la moins forte. C'est une
+convention de lecture, pas une vérité juridique : un second rang ne vaut que
+ce qui reste après le premier.
+
+**Le branchement sur l'existant.** Le sélecteur de pointage gagne un groupe
+« Prêts bancaires ». Rattacher un prélèvement à son prêt le sort de la file
+et fait apparaître le montant dans la colonne Réel de l'échéancier, en face
+de la bonne échéance. Le réel ne vaut pas la mensualité du plan — il inclut
+l'assurance — et les deux colonnes coexistent précisément pour éviter de
+« corriger » un chiffre juste.
+
+Rien n'est proposé, rien n'est pré-sélectionné, rien n'est classé par
+vraisemblance : l'application liste, vous choisissez. Seule la conséquence
+est automatique.
+
+Les échéances à venir alimentent le prévisionnel de trésorerie, l'onglet
+À faire signale les échéances échues sans prélèvement rattaché, et
+l'assistant IA sait désormais répondre à « combien RDB doit-elle encore ».
+
+Les actes de prêt et de nantissement se rattachent directement au prêt ou à
+la garantie : ils n'ont pas de société-cible au sens portefeuille, et n'ont
+plus besoin d'en emprunter une.
+
+Restent à venir : l'immobilier, la structure capitalistique des filiales, les
+avenants avec historique, et l'écriture par l'assistant.
+
+> **🔧 Notes techniques**
+>
+> - **Lot 1 — les prêts.** Tables `loans` + `loanRates`. Le cœur est
+>   `convex/lib/amortization.ts` : fonction **pure**, zéro import Convex ni
+>   Node, testée par `tests/amortization.test.ts` en `node:test` (hors
+>   `convex/`, sinon le bundle de déploiement casse) — même patron que
+>   `lib/recurrence.ts`, dont elle réutilise la date-math UTC.
+>   `buildSchedule` couvre les quatre `amortizationKind`, le différé
+>   partiel/total, la périodicité mensuelle/trimestrielle et la série de
+>   taux ; `outstandingAt` / `summarize` en dérivent les chiffres de la
+>   fiche. Aucun capital restant dû stocké, aucune table d'échéancier — la
+>   seule exception assumée est l'encours d'un `revolving`, documentée au
+>   schéma. `periodicRate` fait UNE division (`bps × mois / (10000 × 12)`) :
+>   la forme en deux divisions rendait 0,009999999999999998 pour un taux
+>   mensuel de 12 %, artefact qui voyageait ensuite sur 240 échéances.
+> - **`documents.companyId` → optionnel**, seul changement de contrainte sur
+>   une table existante. L'ordre de `KNOWN_ISSUES.md` a été suivi : audit
+>   d'abord, tolérance ensuite, schéma enfin. L'audit a trouvé 5 crashs
+>   runtime (`vectorize.getDocumentForIndex`, `indexDocumentImpl`,
+>   `notifyIndexFailure`, et deux `db.get(undefined)` dans
+>   `migrations/legalDocsImport`) et 1 corruption silencieuse
+>   (`lib/duplicates.ts` clé `"undefined|titre"` fusionnant tous les
+>   documents non classés). `documents.create` ne prend jamais l'org en
+>   argument : elle la résout depuis l'ancre (`companyId`, sinon `loanId`,
+>   sinon `guaranteeId`, sinon `dealId`) et vérifie l'appartenance dessus.
+> - **Lot 2 — les garanties.** Table `guarantees` sur le patron polymorphe
+>   d'`equityPositions`. `requireGuaranteeParty` (`convex/guarantees.ts`) est
+>   calqué sur `requireLoanParty` : membre d'au moins une des orgs parties
+>   (`borrowerOrgId` / `pledgorOrgId` / `subjectOrgId`), refus si la garantie
+>   ne touche aucune org du groupe. Les orgs dénormalisées sont résolues
+>   depuis les lignes référencées, jamais depuis un argument. Marge et tri
+>   dans `convex/lib/guarantees.ts` (pur, `tests/guarantees.test.ts`).
+>   `subjectKind` n'a pas encore `'property'` : la valeur arrivera avec la
+>   table `properties` (élargir une union est sans migration).
+> - **Lot 3 — le branchement.** `allocationKind` gagne `'loan'` ;
+>   `applyAllocateToLiability` accepte la cible et vérifie l'org
+>   (`bank_loan_wrong_org`). `buildLiabilityOptions` construit un troisième
+>   groupe alimenté DIRECTEMENT par `loans.listOptions`, jamais par une liste
+>   aplatie re-filtrée. Le réel par échéance est `attributeActuals` : un
+>   rapprochement de **calendrier** d'un flux déjà pointé, pas un moteur de
+>   suggestion — ne pas le transformer en classement par vraisemblance.
+>   `forecasts.expandLoanSchedules` projette les échéances futures
+>   (`derivedKey` `"loan:{loanId}:{YYYY-MM-DD}"`, `entryUpsertAction`
+>   respecté) et purge les occurrences futures intactes que le nouvel
+>   échéancier ne produit plus. Nouveau bucket d'analyse `debt` dans
+>   `lib/categories.ts` (et sa copie miroir `src/lib/categories.ts`).
+>   `convex/agentToolsDebt.ts` expose quatre outils de **lecture seule** ;
+>   toute écriture devra porter `needsApproval: true`.
+> - **Tests** : `tests/amortization.test.ts` (41), `tests/guarantees.test.ts`
+>   (17), `convex/regression.loans.test.ts`,
+>   `convex/regression.docOptionalCompany.test.ts`,
+>   `convex/regression.guarantees.test.ts`,
+>   `convex/regression.loanPointage.test.ts`.
+
 ## v1.196.3 — 29/08/2026 à 20:42 — Le cahier des charges du suivi de la dette et des garanties
 
 Albo OS sait dire ce que le groupe possède, pas ce qu'il doit. Aucun prêt

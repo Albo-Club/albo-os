@@ -41,6 +41,16 @@ export function ruleDerivedKey(ruleId: string, occurrenceMs: number): string {
   return `rule:${ruleId}:${isoDay(occurrenceMs)}`
 }
 
+/**
+ * Idempotency key of an instalment derived from a bank loan's computed
+ * schedule (convex/forecasts.ts:expandLoanSchedules). Same shape as a rule's
+ * key, different namespace: a loan has no `forecastRules` row — its
+ * occurrences come from the amortization engine, not from a recurrence.
+ */
+export function loanDerivedKey(loanId: string, occurrenceMs: number): string {
+  return `loan:${loanId}:${isoDay(occurrenceMs)}`
+}
+
 // ─── Forecast entry shape ────────────────────────────────────────────────────
 
 export type ForecastConfidence = 'confirmed' | 'expected' | 'probable'

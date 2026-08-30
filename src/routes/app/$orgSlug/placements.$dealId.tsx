@@ -21,6 +21,7 @@ import { directionTone, signTone } from '~/lib/moneyTone'
 import { xirr } from '~/lib/xirr'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { KpiCard } from '~/components/placements/KpiCard'
+import { DealPledgesSection } from '~/components/passif/DealPledgesSection'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { Button } from '~/components/ui/button'
 import { LoadingLine } from '~/components/ui/spinner'
@@ -514,6 +515,8 @@ function PlacementDetail() {
           </>
         )}
       </section>
+
+      <DealPledgesSection dealId={deal._id} />
 
       <section className="space-y-3">
         <h2 className="text-sm font-medium">{t('fiche.tx.title')}</h2>

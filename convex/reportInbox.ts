@@ -597,8 +597,13 @@ export const detachCompany = mutation({
       .query('documents')
       .withIndex('by_report', (q) => q.eq('reportId', reportId))
       .collect()
+    // Same invariant as reportStore: a `reportId`-bearing row always carries
+    // the report's company, so an unfiled document can never belong to this
+    // fan-out (`companyId` became optional with the Dette & Garanties module).
     for (const doc of docs) {
-      if (doc.companyId === report.companyId) await ctx.db.delete('documents', doc._id)
+      if (doc.companyId && doc.companyId === report.companyId) {
+        await ctx.db.delete('documents', doc._id)
+      }
     }
 
     // KPI snapshots this report sourced (same tag as reportStore).

@@ -180,7 +180,8 @@ export function normalizeDocumentTitle(raw: string): string {
 }
 
 type DocumentLike = {
-  companyId: Id<'companies'>
+  /** Absent on a document filed under no company (loan deed, guarantee deed). */
+  companyId?: Id<'companies'>
   title: string
 }
 
@@ -203,7 +204,12 @@ export function groupDuplicateDocuments<T extends DocumentLike>(
 ): Array<Array<T>> {
   const groups = new Map<string, Array<T>>()
   for (const doc of docs) {
-    const key = `${doc.companyId}|${normalizeDocumentTitle(doc.title)}`
+    // A document with no company gets its OWN namespace, never the string
+    // "undefined": keying orphans on a stringified absence would collapse
+    // every unfiled document of every company into one bucket and report
+    // them all as duplicates of each other.
+    const scope = doc.companyId ?? '__unfiled__'
+    const key = `${scope}|${normalizeDocumentTitle(doc.title)}`
     const group = groups.get(key)
     if (group) group.push(doc)
     else groups.set(key, [doc])

@@ -42,7 +42,7 @@ export type TxDetails = {
     | 'internal_transfer'
   /** Generalized allocation — routes the un-match (deal / liability / transfer). */
   allocation?: {
-    kind: 'deal' | 'equity' | 'intercompany_loan' | 'transfer'
+    kind: 'deal' | 'equity' | 'intercompany_loan' | 'transfer' | 'loan'
     targetId: string
   } | null
   /** Internal transfer still missing its counter-leg (cf. lib/transfers.ts). */

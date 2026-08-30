@@ -2,12 +2,16 @@ import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { listSilentCompanies } from './lib/reportFreshness'
+import { attributeActuals, buildSchedule } from './lib/amortization'
 
 import type { Doc, Id } from './_generated/dataModel'
 
 /** How many unmatched transactions the tab previews (the full queue lives on
  * the Cash → Transactions tab). */
 const UNMATCHED_PREVIEW = 5
+
+/** How many overdue loan instalments the tab previews. */
+const OVERDUE_INSTALMENT_PREVIEW = 5
 
 /** Done tasks stay visible this long, then drop from the list (kept in DB). */
 const DONE_VISIBLE_MS = 30 * 24 * 60 * 60 * 1000
@@ -61,6 +65,92 @@ export const getTodo = query({
     // (lib/reportFreshness.ts), so the two surfaces never disagree.
     const missingReports = await listSilentCompanies(ctx, orgId, now)
 
+    // ── Loan instalments due with nothing matched ─────────────────────────
+    // A DERIVED signal, never stored (SPEC D19): the schedule is recomputed
+    // and compared with what actually went out. An instalment whose calendar
+    // period holds no matched outflow is a matching gap to close — the app
+    // says WHICH instalment, and the human goes and matches it in the queue.
+    // Nothing is proposed, nothing is pre-selected.
+    const activeLoans = await ctx.db
+      .query('loans')
+      .withIndex('by_org_status', (q) =>
+        q.eq('orgId', orgId).eq('status', 'active'),
+      )
+      .collect()
+    const overdueInstalments: Array<{
+      loanId: Id<'loans'>
+      label: string
+      lenderName: string
+      date: number
+      amountCents: number
+    }> = []
+    for (const loan of activeLoans) {
+      const rateRows = await ctx.db
+        .query('loanRates')
+        .withIndex('by_loan_from', (q) => q.eq('loanId', loan._id))
+        .collect()
+      const schedule = buildSchedule(
+        {
+          principalCents: loan.principalCents,
+          firstPaymentDate: loan.firstPaymentDate,
+          durationMonths: loan.durationMonths,
+          amortizationKind: loan.amortizationKind,
+          rateBps: loan.rateBps,
+          rateKind: loan.rateKind,
+          paymentFrequency: loan.paymentFrequency,
+          deferralMonths: loan.deferralMonths,
+          deferralKind: loan.deferralKind,
+          insuranceMonthlyCents: loan.insuranceMonthlyCents,
+          endDate: loan.endDate,
+        },
+        rateRows.map((row) => ({
+          fromDate: row.fromDate,
+          rateBps: row.rateBps,
+          kind: row.kind,
+        })),
+        { horizonDate: now },
+      )
+      if (schedule.length === 0) continue
+
+      const txs = await ctx.db
+        .query('transactions')
+        .withIndex('by_org_allocation_target', (q) =>
+          q.eq('orgId', orgId).eq('allocation.targetId', loan._id as string),
+        )
+        .collect()
+      const actuals = attributeActuals(
+        schedule,
+        txs
+          .filter((tx) => tx.allocation?.kind === 'loan')
+          .map((tx) => ({
+            transactionDate: tx.transactionDate,
+            amountCents: tx.direction === 'out' ? tx.amount : -tx.amount,
+          })),
+      )
+      schedule.forEach((row, index) => {
+        // Only what is already DUE, and only what actually costs something:
+        // a totally deferred instalment moves no cash to look for.
+        if (row.date > now) return
+        const dueCents = row.paymentCents + row.insuranceCents
+        if (dueCents <= 0) return
+        if (actuals[index] != null) return
+        overdueInstalments.push({
+          loanId: loan._id,
+          label: loan.label,
+          lenderName: loan.lenderName,
+          date: row.date,
+          amountCents: dueCents,
+        })
+      })
+    }
+    // Most recent first, and bounded: the tab is a preview, the exhaustive
+    // reading lives on the loan sheet.
+    overdueInstalments.sort((a, b) => b.date - a.date)
+    const overdueInstalmentsPreview = overdueInstalments.slice(
+      0,
+      OVERDUE_INSTALMENT_PREVIEW,
+    )
+
     // ── Manual tasks ──────────────────────────────────────────────────────
     // Done tasks older than DONE_VISIBLE_MS are hidden (not deleted). Within
     // a status group the UI keeps this order: due date first, then newest.
@@ -95,6 +185,8 @@ export const getTodo = query({
       unmatchedCount: unmatched.length,
       unmatchedPreview,
       missingReports,
+      overdueInstalmentsCount: overdueInstalments.length,
+      overdueInstalments: overdueInstalmentsPreview,
       tasks: tasks.map((task: Doc<'todos'>) => ({
         _id: task._id,
         title: task.title,

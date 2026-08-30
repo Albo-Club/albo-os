@@ -35,7 +35,7 @@ export type PointageTarget =
   | { kind: 'status'; status: 'tax' | 'internal_transfer' | 'ignored' }
 
 /**
- * Unified searchable pointage picker (Popover + Command): Deals /
+ * Unified searchable pointage picker (Popover + Command): Deals / Prêts /
  * Capitaux propres / Comptes courants (fed from `listOptions`, never a
  * flattened re-filtered list), then the charge and product categories as
  * direct leaves, then Impôt / Virement interne / Ignorer. Selecting an
@@ -51,6 +51,7 @@ export function TargetCombobox({
   deals,
   equityOptions,
   loanOptions,
+  bankLoanOptions,
   direction,
   onSelect,
   disabled,
@@ -58,6 +59,8 @@ export function TargetCombobox({
   deals: Array<DealOption> | undefined
   equityOptions: Array<LiabilityOption> | undefined
   loanOptions: Array<LiabilityOption> | undefined
+  /** Bank debt — a direct debit on a loan. NOT the current accounts above. */
+  bankLoanOptions: Array<LiabilityOption> | undefined
   /** Transaction direction — orders the charge/product groups. */
   direction: 'in' | 'out'
   onSelect: (target: PointageTarget) => void
@@ -73,6 +76,14 @@ export function TargetCombobox({
   }
 
   const liabilityGroups = [
+    {
+      // Bank debt first among the liability groups: a direct debit on a loan
+      // is the most frequent gesture of the three.
+      key: 'loan',
+      heading: t('pointage:combobox.groupBankLoans'),
+      emptyLabel: t('pointage:combobox.emptyBankLoans'),
+      options: bankLoanOptions,
+    },
     {
       key: 'equity',
       heading: t('pointage:combobox.groupEquity'),

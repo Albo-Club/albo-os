@@ -187,15 +187,21 @@ export const getLiabilities = query({
 // matching only).
 
 /**
- * Allocates a transaction to an equity position (`equity`) or an
- * inter-entity current account (`intercompany_loan`). The target must belong
- * to the same org as the transaction (for a C/C: the tx's org must be one of
- * the loan's two parties).
+ * Allocates a transaction to an equity position (`equity`), an inter-entity
+ * current account (`intercompany_loan`) or a bank loan (`loan`). The target
+ * must belong to the same org as the transaction (for a C/C: the tx's org
+ * must be one of the loan's two parties).
  */
 export const allocateTransaction = mutation({
   args: {
     transactionId: v.id('transactions'),
-    kind: v.union(v.literal('equity'), v.literal('intercompany_loan')),
+    kind: v.union(
+      v.literal('equity'),
+      v.literal('intercompany_loan'),
+      // Bank loan (`loans`) — a debt to a bank, unrelated to the
+      // shareholder current account that `intercompany_loan` means.
+      v.literal('loan'),
+    ),
     targetId: v.string(),
   },
   handler: async (ctx, { transactionId, kind, targetId }) => {

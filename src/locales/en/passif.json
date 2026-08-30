@@ -64,6 +64,44 @@
       "ratePlaceholder": "3",
       "blockedLabel": "Blocked",
       "success": "Current account created"
+    },
+    "debt": {
+      "button": "New loan",
+      "title": "New bank loan",
+      "description": "The contract terms. The schedule and the outstanding capital are computed — never entered.",
+      "labelLabel": "Label",
+      "labelPlaceholder": "Palatine loan 2021",
+      "lenderLabel": "Lender",
+      "lenderPlaceholder": "Banque Palatine",
+      "principalLabel": "Amount borrowed (€)",
+      "principalRevolvingLabel": "Current drawn amount (€)",
+      "principalPlaceholder": "500 000",
+      "signedLabel": "Signature date",
+      "firstPaymentLabel": "First instalment",
+      "durationLabel": "Duration (months)",
+      "durationPlaceholder": "240",
+      "kindLabel": "Amortization type",
+      "limitLabel": "Authorized ceiling (€)",
+      "limitPlaceholder": "8 000 000",
+      "endDateLabel": "Credit end (optional)",
+      "rateLabel": "Rate at signature (%)",
+      "ratePlaceholder": "1.85",
+      "rateKindLabel": "Rate nature",
+      "frequencyLabel": "Frequency",
+      "frequencyMonthly": "Monthly",
+      "frequencyQuarterly": "Quarterly",
+      "insuranceLabel": "Insurance (€/month)",
+      "insurancePlaceholder": "42",
+      "deferralLabel": "Deferral (months)",
+      "deferralKindLabel": "Deferral nature",
+      "deferralPartial": "Partial — interest paid",
+      "deferralTotal": "Total — interest capitalized",
+      "accountLabel": "Direct-debit account",
+      "accountNone": "—",
+      "statusLabel": "Status",
+      "notesLabel": "Notes",
+      "revolvingHint": "A revolving credit has neither duration nor schedule: the drawn amount is entered and corrected by hand.",
+      "success": "Loan created"
     }
   },
   "errors": {
@@ -75,7 +113,20 @@
     "same_org": "The creditor and the debtor must be two different organizations.",
     "not_a_party": "You must be a member of at least one of the two organizations of the current account.",
     "invalid_rate": "The rate must be positive.",
-    "has_allocations": "Transactions are still allocated to this line. Detach them first."
+    "has_allocations": "Transactions are still allocated to this line. Detach them first.",
+    "invalid_label": "Label and lender are required.",
+    "missing_duration": "An amortizing loan needs a duration.",
+    "deferral_too_long": "The deferral must be shorter than the loan duration.",
+    "invalid_deferral": "The deferral must be positive.",
+    "limit_below_outstanding": "The ceiling cannot be below the drawn amount.",
+    "account_wrong_org": "This bank account belongs to another organization.",
+    "rate_is_fixed": "This loan has a fixed rate: there is no revision to enter.",
+    "has_documents": "Documents are still attached to this row. Detach them first.",
+    "missing_anchor": "This document must be attached to a company, a deal or a loan.",
+    "ambiguous_borrower": "Choose either a group loan or an outside borrower, not both.",
+    "ambiguous_pledgor": "Choose either a group company or a free-text label, not both.",
+    "missing_subject": "The guarantee's subject is required.",
+    "invalid_rank": "The rank must be at least 1."
   },
   "edit": {
     "equity": {
@@ -86,11 +137,223 @@
       "title": "Edit current account",
       "description": "The creditor and debtor cannot be changed — delete and recreate the account instead.",
       "success": "Current account updated"
+    },
+    "debt": {
+      "title": "Correct the loan",
+      "description": "Correcting overwrites the terms and recomputes the whole schedule. For a variable-rate revision, add a rate step instead.",
+      "success": "Loan updated"
     }
   },
   "delete": {
     "confirmTitle": "Delete this line?",
     "confirmBody": "Deletion is refused while transactions are still allocated to it — detach them first.",
-    "success": "Deleted"
+    "success": "Deleted",
+    "debtConfirmBody": "Deletion is refused while documents or transactions are still attached — detach them first."
+  },
+  "debt": {
+    "title": "Bank debt",
+    "empty": "No bank loan.",
+    "col": {
+      "label": "Loan",
+      "lender": "Lender",
+      "terms": "Terms",
+      "outstanding": "Outstanding"
+    },
+    "total": "Total outstanding",
+    "until": "until {{date}}",
+    "noMaturity": "no maturity",
+    "status": {
+      "active": "Active",
+      "repaid": "Repaid",
+      "cancelled": "Cancelled"
+    },
+    "kind": {
+      "constant_annuity": "Constant annuity",
+      "constant_capital": "Constant capital",
+      "bullet": "Bullet",
+      "revolving": "Revolving"
+    },
+    "rateFixed": "fixed",
+    "rateVariable": "variable"
+  },
+  "loan": {
+    "metaTitle": "Loan — Albo OS",
+    "back": "← Liabilities",
+    "notFound": "This loan cannot be found.",
+    "signedOn": "signed on {{date}}",
+    "debitedFrom": "debited from {{account}}",
+    "stats": {
+      "principal": "Borrowed",
+      "outstanding": "Outstanding",
+      "kind": "Type",
+      "rate": "Rate",
+      "payment": "Monthly payment",
+      "paymentQuarterly": "Instalment",
+      "insurance": "Insurance",
+      "outstandingRevolving": "Drawn",
+      "limit": "Ceiling",
+      "maturity": "Last instalment"
+    },
+    "schedule": {
+      "title": "Schedule",
+      "hint": "computed plan",
+      "empty": "The terms entered cannot produce a schedule.",
+      "col": {
+        "date": "Instalment",
+        "payment": "Payment",
+        "capital": "Capital",
+        "interest": "Interest",
+        "insurance": "Insurance",
+        "outstanding": "Outstanding"
+      },
+      "projected": "Projected",
+      "balloon": "Balloon",
+      "deferred": "Deferred",
+      "capitalized": "Capitalized",
+      "upcoming": "Upcoming",
+      "due": "Due",
+      "revolvingTitle": "No schedule",
+      "revolvingBody": "A revolving credit has no schedule: only the interest on the drawn amount is projected.",
+      "revolvingHeadroom": "Remaining drawdown headroom: {{amount}}.",
+      "insuranceNote": "Insurance sits outside the instalment: the actual direct debit is instalment + insurance.",
+      "colActual": "Actual",
+      "toMatch": "To match",
+      "matchedHint": "The actual includes the insurance: it does not equal the planned instalment, and that is expected.",
+      "attributionNote": "An actual is placed on the instalment whose period it falls in — a calendar attribution, not a proposal. Matching a transaction to this loan happens in the matching queue."
+    },
+    "rates": {
+      "title": "Rate",
+      "hint": "past revisions and projected steps",
+      "add": "Step",
+      "empty": "No revision entered — the rate at signature applies.",
+      "col": {
+        "from": "From",
+        "rate": "Rate",
+        "nature": "Nature"
+      },
+      "actual": "Actual",
+      "forecast": "Projected",
+      "dialogTitle": "New rate step",
+      "dialogDescription": "A revision that happened, or a steering assumption. Instalments past the last actual revision are flagged as projected.",
+      "fromLabel": "Effective date",
+      "rateLabel": "Annual rate (%)",
+      "natureLabel": "Nature",
+      "success": "Rate step saved",
+      "deleted": "Rate step removed"
+    },
+    "documents": {
+      "title": "Documents",
+      "empty": "No document attached to this loan."
+    },
+    "menu": {
+      "correct": "Correct",
+      "delete": "Delete"
+    },
+    "transactions": {
+      "title": "Transactions",
+      "hint": "matched from the matching queue",
+      "empty": "No transaction matched to this loan.",
+      "col": {
+        "date": "Date",
+        "direction": "Direction",
+        "amount": "Amount",
+        "label": "Label"
+      },
+      "in": "In",
+      "out": "Out",
+      "total": "Total actually paid"
+    }
+  },
+  "guarantees": {
+    "title": "Guarantees",
+    "empty": "No guarantee on this loan.",
+    "add": "Add",
+    "form": {
+      "nantissement": "Pledge",
+      "hypotheque": "Mortgage",
+      "ppd": "PPD",
+      "caution": "Surety",
+      "garantie_organisme": "Institutional guarantee"
+    },
+    "formHint": {
+      "ppd": "vendor's lien"
+    },
+    "rank": "rank {{rank}}",
+    "rankFirst": "first rank",
+    "unquantified": "not quantified",
+    "released": "Released",
+    "releasedOn": "released on {{date}}",
+    "actOn": "deed {{date}}",
+    "subjectLabel": "Subject",
+    "pledgorLabel": "guarantor",
+    "pledgorUnknown": "guarantor not recorded",
+    "assetLine": "Asset {{value}} · already pledged {{pledged}} · margin {{margin}}",
+    "assetLineNoValue": "Asset not valued · already pledged {{pledged}}",
+    "unquantifiedNote_one": "{{count}} guarantee not quantified, excluded from the total.",
+    "unquantifiedNote_other": "{{count}} guarantees not quantified, excluded from the total.",
+    "negativeMargin": "The pledged amount exceeds the asset's value.",
+    "sortNote": "Ordered strongest first — a display convention, not a legal truth: a second rank is only worth what is left.",
+    "given": {
+      "title": "Guarantees given",
+      "subtitle": "assets pledged for a third party",
+      "empty": "{{org}} pledges none of its assets.",
+      "forBorrower": "for {{borrower}}"
+    },
+    "onDeal": {
+      "title": "Pledges on this contract",
+      "empty": "This contract is pledged nowhere.",
+      "value": "Current value",
+      "pledged": "Total pledged",
+      "margin": "Available margin",
+      "noValue": "This contract has no valuation: the available margin cannot be computed.",
+      "total": "Total pledged",
+      "beneficiary": "Beneficiary"
+    },
+    "dialog": {
+      "createTitle": "New guarantee",
+      "editTitle": "Edit the guarantee",
+      "description": "Three independent pieces of information: the form of the security, the asset it bites on, and who commits.",
+      "formLabel": "Form",
+      "rankLabel": "Rank (optional)",
+      "amountLabel": "Pledged amount (€)",
+      "amountHint": "Leave empty for an unquantified guarantee (unlimited surety). It will be excluded from the total and listed apart.",
+      "actDateLabel": "Deed date",
+      "beneficiaryLabel": "Beneficiary",
+      "beneficiaryLoan": "A group loan",
+      "beneficiaryExternal": "A borrower outside the group",
+      "borrowerLabelLabel": "Borrower name",
+      "borrowerLabelPlaceholder": "SARL Bremontier",
+      "loanLabel": "Loan",
+      "subjectKindLabel": "Subject",
+      "subjectPlacement": "A placement",
+      "subjectShares": "A company's shares",
+      "subjectExternal": "Nothing of ours",
+      "subjectDealLabel": "Placement",
+      "subjectCompanyLabel": "Company",
+      "subjectLabelLabel": "Subject label",
+      "subjectLabelPlaceholder": "Saccef guarantee",
+      "pledgorKindLabel": "Guarantor",
+      "pledgorOrg": "A group company",
+      "pledgorExternal": "An outside guarantor",
+      "pledgorNone": "Not recorded",
+      "pledgorOrgLabel": "Guaranteeing company",
+      "pledgorLabelLabel": "Guarantor name",
+      "pledgorLabelPlaceholder": "Saccef",
+      "notesLabel": "Notes",
+      "choose": "Choose…",
+      "createSuccess": "Guarantee created",
+      "editSuccess": "Guarantee updated"
+    },
+    "menu": {
+      "release": "Record the release",
+      "unrelease": "Undo the release",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "released_success": "Release recorded",
+    "unreleased_success": "Release undone",
+    "deleteConfirmTitle": "Delete this guarantee?",
+    "deleteConfirmBody": "Deleting erases the row. For a guarantee that has ended, prefer the release: it keeps the history.",
+    "deleteSuccess": "Guarantee deleted"
   }
 }
