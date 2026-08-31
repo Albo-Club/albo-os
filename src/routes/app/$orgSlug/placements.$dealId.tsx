@@ -22,6 +22,7 @@ import { xirr } from '~/lib/xirr'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { KpiCard } from '~/components/placements/KpiCard'
 import { DealPledgesSection } from '~/components/passif/DealPledgesSection'
+import { Badge } from '~/components/ui/badge'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { Button } from '~/components/ui/button'
 import { LoadingLine } from '~/components/ui/spinner'
@@ -99,6 +100,11 @@ function PlacementDetail() {
     id: dealId as Id<'deals'>,
   })
   const txs = useConvexQuery(api.transactions.listByDeal, {
+    dealId: dealId as Id<'deals'>,
+  })
+  // Same query the « Nantissements » block below already runs — one
+  // subscription, read twice, no second round-trip.
+  const pledges = useConvexQuery(api.guarantees.listBySubjectDeal, {
     dealId: dealId as Id<'deals'>,
   })
   const valuations = useConvexQuery(api.valuations.list, {
@@ -267,7 +273,17 @@ function PlacementDetail() {
             size="lg"
           />
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
+              {/* One word in the header for the fact that changes how this
+                  contract can be used (SPEC § 6.5). The amounts, the
+                  beneficiaries and the remaining margin are in the
+                  « Nantissements » block below — the badge only says « look
+                  down », it never doubles the figures. */}
+              {pledges && pledges.summary.activeCount > 0 ? (
+                <Badge variant="secondary">{t('placements:pledged')}</Badge>
+              ) : null}
+            </div>
             <p className="text-muted-foreground text-sm">
               {t(`participations:instrument.${deal.instrumentKind}`, {
                 defaultValue: deal.instrumentKind,

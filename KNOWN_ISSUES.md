@@ -5548,6 +5548,35 @@ par `convex/companies.ts`, et le resserrer est un chantier de données à part
 c'est `equityPositions.ownershipBps` qui fait foi côté produit, et lui qui
 est affiché.
 
+## Un signal dérivé sans référentiel : le loyer qui ne tombe plus (`convex/todo.ts`)
+
+La spec demandait « loyer attendu non encaissé » (§ 6.8) et écartait la
+gestion locative (D24). Les deux ensemble sont contradictoires : **il n'existe
+nulle part de loyer attendu** — pas de bail, pas de montant théorique, rien à
+quoi comparer. Le signal est donc bâti sur la seule attente disponible :
+l'**habitude du bien lui-même**.
+
+Règle : un loyer a été encaissé aux mois M−2, M−3 et M−4, et **rien** au mois
+M−1. Deux détails portent tout le poids, et les changer casse le signal :
+
+- **Le mois en cours n'est jamais jugé.** La fenêtre s'arrête au dernier mois
+  *complet*. Juger le mois courant ferait crier ce signal sur **tous** les
+  biens à chaque début de mois — un loyer prélevé le 5 n'est pas en retard le
+  2. C'est la raison pour laquelle la fenêtre est décalée d'un cran, et pas
+  « les 3 derniers mois » comme on l'écrirait spontanément.
+- **Un bien jamais loué ne dit rien.** Le signal lit une habitude rompue ;
+  sans habitude il n'y a rien à rompre. Sans ce garde-fou, chaque garage et
+  chaque terrain remonterait pour toujours.
+
+Les mois sont comparés via un **index absolu** (`année × 12 + mois`, UTC), pas
+par soustraction de timestamps : « le mois précédent » doit traverser décembre
+sans y penser, et un mois n'a pas une durée fixe.
+
+⚠️ Ce n'est pas une suggestion de rapprochement et ça ne doit pas le devenir.
+Le signal dit qu'un loyer **manque**, jamais quelle transaction pourrait être
+ce loyer. Un flux non pointé le fait d'ailleurs remonter à tort — c'est
+assumé : c'est un pointage à faire, donc une action à faire.
+
 ## Modules activables : la visibilité est dérivée, l'activation est stockée
 
 `convex/modules.ts:list` répond « ce module contient-il quelque chose ? »

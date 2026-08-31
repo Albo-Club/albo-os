@@ -106,9 +106,15 @@ date, une valeur.
 
 ### Emprunt lié & sûreté
 
-Les sûretés qui portent sur ce bien, avec le prêt que chacune couvre. C'est
-la **même ligne** que celle affichée sur la fiche du prêt, lue de l'autre
-côté — rien n'est saisi deux fois, donc les deux vues ne peuvent pas
+Les sûretés qui portent sur ce bien, avec le prêt que chacune couvre, **ce
+qu'il reste à devoir dessus et jusqu'à quand**. Une sûreté seule ne dit rien
+de l'exposition : c'est la dette qu'elle garantit qui la porte. Le restant dû
+est recalculé à chaque lecture, jamais stocké. Un crédit révolving n'affiche
+d'échéance finale que si le contrat lui en donne une — il n'en a pas par
+nature.
+
+C'est la **même ligne** que celle affichée sur la fiche du prêt, lue de
+l'autre côté — rien n'est saisi deux fois, donc les deux vues ne peuvent pas
 diverger. Voir [Dette bancaire et garanties](18-dette-et-garanties.md).
 
 On ne crée pas une sûreté depuis ici : elle se saisit depuis le prêt qu'elle
@@ -140,6 +146,12 @@ deux postes en source « Saisi ».
 Comme partout dans le pointage : rien n'est proposé, rien n'est
 pré-sélectionné, rien n'est classé par vraisemblance. L'application liste,
 vous choisissez.
+
+Le tableau **Transactions** de la fiche porte un bouton **« Détacher »** par
+ligne. La fiche défait un pointage, elle n'en fait jamais : détacher renvoie
+le mouvement dans la file, où vous choisissez sa cible **et** sa nature — un
+flux immobilier ne peut pas changer de cible sans que la seconde question
+soit reposée.
 
 ### Vendre un bien
 

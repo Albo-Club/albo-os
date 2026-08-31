@@ -133,7 +133,9 @@
       "title": "Emprunt lié & sûreté",
       "empty": "Aucune sûreté ne porte sur ce bien.",
       "loanLabel": "Prêt garanti",
-      "noLoan": "Emprunteur hors groupe"
+      "noLoan": "Emprunteur hors groupe",
+      "loanOutstanding": "Reste dû {{amount}}",
+      "loanUntil": "jusqu’en {{date}}"
     },
     "transactions": {
       "title": "Transactions",

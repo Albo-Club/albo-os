@@ -42,14 +42,23 @@ La page empile sept blocs :
    **18 mois**, ou jamais estimés. Leur plus-value latente et leur rendement
    se comparent sinon à une valeur qui ne veut plus dire grand-chose. Chaque
    ligne renvoie vers la fiche du bien.
-7. **Reportings manquants** — les participations dont aucun rapport n'est
+7. **Loyers qui ne sont plus tombés** — les biens qui encaissaient un loyer
+   chaque mois et pour lesquels **le mois dernier, rien n'est arrivé**.
+   L'application n'a nulle part de « loyer attendu » à quoi comparer — un
+   bail n'est pas modélisé — donc c'est l'**habitude du bien lui-même** qui
+   sert d'attente. Deux limites assumées : le **mois en cours n'est jamais
+   jugé** (un loyer du 5 n'est pas en retard le 2, et juger le mois courant
+   ferait crier ce signal à chaque début de mois), et un bien **jamais loué**
+   n'apparaît pas — il n'y a pas d'habitude à comparer. Chaque ligne renvoie
+   vers la fiche du bien.
+8. **Reportings manquants** — les participations dont aucun rapport n'est
    arrivé depuis plus de **4 mois** (délai réglable par organisation dans
    Réglages → Général). Chaque ligne renvoie vers la fiche de la société.
 
 Tous les blocs sauf les tâches sont **automatiques** : un item disparaît de
 lui-même dès que l'action est faite (transaction pointée, banque
 reconnectée, échéance réalisée, prélèvement rattaché, estimation saisie,
-rapport reçu). Rien n'est stocké : chaque signal est **recalculé** à
+loyer encaissé et pointé, rapport reçu). Rien n'est stocké : chaque signal est **recalculé** à
 l'ouverture de la page.
 
 ## Points d'attention

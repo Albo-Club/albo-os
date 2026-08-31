@@ -119,5 +119,6 @@
       "default": "Impossible de créer le placement. Réessayez."
     }
   },
-  "pledgedHint": "Fonds bloqués (nantissement, séquestre) : hors de la trésorerie disponible. Le solde se met à jour sur la fiche du compte."
+  "pledgedHint": "Fonds bloqués (nantissement, séquestre) : hors de la trésorerie disponible. Le solde se met à jour sur la fiche du compte.",
+  "pledged": "Nanti"
 }

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../../../convex/_generated/api'
 
 import type { Id } from '../../../convex/_generated/dataModel'
+import { usePropertyFormatters } from '~/components/immobilier/formatters'
 import {
   GuaranteeBadges,
   GuarantorName,
@@ -28,7 +29,8 @@ export function PropertyGuaranteesSection({
   orgSlug: string
 }) {
   const { t } = useTranslation('immobilier')
-  const { fmtPledged, fmtDate } = useGuaranteeFormatters()
+  const { fmtPledged, fmtEur, fmtDate } = useGuaranteeFormatters()
+  const { fmtMonthYear } = usePropertyFormatters()
   const data = useConvexQuery(api.guarantees.listBySubjectProperty, {
     propertyId,
   })
@@ -68,6 +70,22 @@ export function PropertyGuaranteesSection({
                     ? ` · ${fmtDate(guarantee.actDate)}`
                     : ''}
                 </p>
+                {/* A security says nothing about the exposure without the
+                    debt it covers (SPEC § 6.6): how much is LEFT on that
+                    loan, and until when. Both derived, never stored — and
+                    rounded to the euro, like every computed figure. */}
+                {guarantee.loanOutstandingCents != null ? (
+                  <p className="text-muted-foreground text-xs">
+                    {t('sheet.guarantees.loanOutstanding', {
+                      amount: fmtEur(guarantee.loanOutstandingCents),
+                    })}
+                    {guarantee.loanLastPaymentDate != null
+                      ? ` · ${t('sheet.guarantees.loanUntil', {
+                          date: fmtMonthYear(guarantee.loanLastPaymentDate),
+                        })}`
+                      : ''}
+                  </p>
+                ) : null}
               </div>
               <span className="shrink-0 tabular-nums">
                 {guarantee.pledgedAmountCents != null

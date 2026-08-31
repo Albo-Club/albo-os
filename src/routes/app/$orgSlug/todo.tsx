@@ -601,6 +601,52 @@ function Todo() {
         )}
       </TodoSection>
 
+      {/* A property that was letting and stopped. There is no « expected
+          rent » to compare against — a lease is out of scope — so the
+          property's OWN habit is the expectation, and only a human can say
+          whether the tenant left, the rent is late, or the flow just went
+          unmatched. */}
+      <TodoSection
+        title={t('missingRents.title')}
+        count={data.missingRents.length}
+      >
+        {data.missingRents.length === 0 ? (
+          <EmptyHint label={t('missingRents.empty')} />
+        ) : (
+          <>
+            <div className="divide-y rounded-lg border">
+              {data.missingRents.map((row) => (
+                <div
+                  key={row.propertyId}
+                  className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2.5 text-sm"
+                >
+                  <span className="flex min-w-0 flex-col">
+                    <Link
+                      to="/app/$orgSlug/immobilier/$propertyId"
+                      params={{ orgSlug, propertyId: row.propertyId }}
+                      className="truncate font-medium hover:underline"
+                    >
+                      {row.name}
+                    </Link>
+                    <span className="text-muted-foreground text-xs">
+                      {row.address}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground text-xs">
+                    {t('missingRents.lastRent', {
+                      date: fmtDate(row.lastRentAt),
+                    })}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="text-muted-foreground text-xs">
+              {t('missingRents.subtitle')}
+            </p>
+          </>
+        )}
+      </TodoSection>
+
       <TodoSection
         title={t('reports.title')}
         count={data.missingReports.length}

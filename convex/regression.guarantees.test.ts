@@ -137,6 +137,84 @@ async function concertoSetup() {
   return { t, user, calte, sci, concertoId, calteLoan, sciLoan }
 }
 
+describe('guarantees: what the neighbouring surfaces read', () => {
+  test('the debt list carries the FORMS of a loan’s securities, never amounts', async () => {
+    const { user, calte, calteLoan } = await concertoSetup()
+    // A second, weaker security on the same loan, plus one already released.
+    await user.as.mutation(api.guarantees.create, {
+      loanId: calteLoan,
+      pledgorLabel: 'Clément Alteresco',
+      subjectKind: 'external',
+      subjectLabel: 'Caution personnelle',
+      form: 'caution',
+    })
+    const releasedId = await user.as.mutation(api.guarantees.create, {
+      loanId: calteLoan,
+      pledgorOrgId: calte.orgId,
+      subjectKind: 'shares',
+      subjectCompanyId: calte.rootCompanyId,
+      form: 'hypotheque',
+    })
+    await user.as.mutation(api.guarantees.setReleased, {
+      guaranteeId: releasedId,
+      releasedAt: Date.now(),
+    })
+
+    const { loans } = await user.as.query(api.loans.list, {
+      orgId: calte.orgId,
+    })
+    const row = loans.find((loan) => loan._id === calteLoan)!
+    // Strongest first, deduplicated, and the released one is gone: it no
+    // longer bites, so badging it would overstate what covers the loan.
+    expect(row.guaranteeForms).toEqual(['nantissement', 'caution'])
+    // D44: the list carries ONE nature of figure, the outstanding. No
+    // pledged amount travels with it.
+    expect(JSON.stringify(row)).not.toContain('pledged')
+  })
+
+  test('a property’s securities carry the outstanding of the loan they cover', async () => {
+    const { t, user, sci, sciLoan } = await concertoSetup()
+    const propertyId = await user.as.mutation(api.properties.create, {
+      orgId: sci.orgId,
+      name: '18 rue de la Chapelle',
+      address: 'Paris 18e',
+      propertyType: 'immeuble',
+      usage: 'locatif_nu',
+      costBasis: [],
+    })
+    await user.as.mutation(api.guarantees.create, {
+      loanId: sciLoan,
+      pledgorOrgId: sci.orgId,
+      subjectKind: 'property',
+      subjectPropertyId: propertyId,
+      form: 'ppd',
+      pledgedAmountCents: 400_000_00,
+    })
+
+    const view = await user.as.query(api.guarantees.listBySubjectProperty, {
+      propertyId,
+    })
+    const row = view.guarantees[0]
+    expect(row.loanLabel).toBe('Prêt SCI Chapelle 2021')
+    // Derived from the schedule, never stored — and it is the DEBT's figure,
+    // not the pledge's: 500 K€ borrowed, so what is left is under that and
+    // above zero, while the pledge stays at its deed value of 400 K€.
+    expect(row.loanOutstandingCents).toBeGreaterThan(0)
+    expect(row.loanOutstandingCents).toBeLessThan(500_000_00)
+    expect(row.loanOutstandingCents).not.toBe(row.pledgedAmountCents)
+    expect(row.loanLastPaymentDate).not.toBeNull()
+
+    // A settled loan owes nothing, exactly as in the debt list.
+    await t.run(async (ctx) => {
+      await ctx.db.patch('loans', sciLoan, { status: 'repaid' })
+    })
+    const after = await user.as.query(api.guarantees.listBySubjectProperty, {
+      propertyId,
+    })
+    expect(after.guarantees[0].loanOutstandingCents).toBe(0)
+  })
+})
+
 describe('guarantees: one row, three readings (D13)', () => {
   test('the asset shows its three pledges and its margin, across orgs', async () => {
     const { user, concertoId } = await concertoSetup()

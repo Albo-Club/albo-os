@@ -35,7 +35,8 @@
     "domain": "Domaine",
     "ownership": "Détention",
     "ownershipGlobal": "Détention globale (%)",
-    "sharesConsolidated": "Nb d'actions consolidé"
+    "sharesConsolidated": "Nb d'actions consolidé",
+    "ownershipFromCapTable": "table de capitalisation ↗"
   },
   "sectors": {
     "saas": "SaaS / Logiciel",

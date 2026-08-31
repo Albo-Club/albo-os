@@ -67,6 +67,12 @@ la **liquidité modifiable**, les quatre tuiles du compte, l'**historique du
 solde** (chaque mise à jour crée un point daté) et les **transactions
 pointées** sur le placement.
 
+Quand une sûreté porte sur le contrat, un badge **« Nanti »** apparaît à côté
+du nom. Un seul mot, parce que c'est le fait qui change l'usage possible du
+placement — les montants, les bénéficiaires et la marge restante sont dans le
+bloc « Nantissements sur ce contrat » plus bas. Le badge dit « regarde en
+dessous », il ne double aucun chiffre.
+
 ### Le contenu de l'enveloppe
 
 La fiche affiche aussi les **positions** du compte (les titres d'un

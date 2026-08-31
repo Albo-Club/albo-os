@@ -35,7 +35,8 @@
     "domain": "Domain",
     "ownership": "Ownership",
     "ownershipGlobal": "Global ownership (%)",
-    "sharesConsolidated": "Consolidated shares"
+    "sharesConsolidated": "Consolidated shares",
+    "ownershipFromCapTable": "cap table ↗"
   },
   "sectors": {
     "saas": "SaaS / Software",

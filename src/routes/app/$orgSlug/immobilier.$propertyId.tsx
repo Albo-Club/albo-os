@@ -129,6 +129,10 @@ function PropertySheet() {
   const documents = useConvexQuery(api.documents.listByProperty, {
     propertyId: propertyId as Id<'properties'>,
   })
+  const deallocateTransaction = useConvexMutation(
+    api.liabilities.deallocateTransaction,
+  )
+  const [detaching, setDetaching] = useState<Id<'transactions'> | null>(null)
   const removeProperty = useConvexMutation(api.properties.remove)
   const removeValuation = useConvexMutation(api.properties.removeValuation)
 
@@ -145,6 +149,19 @@ function PropertySheet() {
   // resale, so the sheet puts the cost basis and the exit forward instead
   // (SPEC D29 / § 4.3).
   const isDealer = property.usage === 'marchand_de_biens'
+
+  async function handleDetach(transactionId: Id<'transactions'>) {
+    setDetaching(transactionId)
+    try {
+      // No toast: the row leaves the table by itself (Convex reactivity),
+      // which is the feedback — same as the Passif page's allocated rows.
+      await deallocateTransaction({ transactionId })
+    } catch (err) {
+      reportError(err)
+    } finally {
+      setDetaching(null)
+    }
+  }
 
   async function handleDelete() {
     try {
@@ -449,6 +466,7 @@ function PropertySheet() {
                   <TableHead>
                     {t('immobilier:sheet.transactions.col.label')}
                   </TableHead>
+                  <TableHead className="w-28" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -481,6 +499,21 @@ function PropertySheet() {
                     </TableCell>
                     <TableCell className="max-w-[320px] truncate">
                       {tx.rawLabel}
+                    </TableCell>
+                    {/* The sheet UNDOES a matching, it never makes one
+                        (SPEC D41). Detaching sends the movement back to the
+                        queue, where the human picks its target AND its
+                        nature — a property flow cannot be re-aimed without
+                        re-answering that second question. */}
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={detaching === tx._id}
+                        onClick={() => void handleDetach(tx._id)}
+                      >
+                        {t('passif:allocated.detach')}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

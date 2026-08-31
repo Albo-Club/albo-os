@@ -59,5 +59,11 @@
     "subtitle": "A property with no estimate for over 18 months: its latent gain and its yield compare against a figure that has stopped meaning much.",
     "lastValued": "last valued on {{date}}",
     "neverValued": "never valued"
+  },
+  "missingRents": {
+    "title": "Rents that stopped coming in",
+    "empty": "No missing rent.",
+    "lastRent": "last rent on {{date}}",
+    "subtitle": "These properties collected a rent every month, and last month nothing arrived. The current month is never judged — a rent due on the 5th is not late on the 2nd. A property that has never been let does not show here: there is no habit to compare against."
   }
 }

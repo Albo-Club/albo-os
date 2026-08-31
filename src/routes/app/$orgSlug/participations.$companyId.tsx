@@ -431,6 +431,13 @@ function ParticipationDetail() {
     api.deals.list,
     org ? { orgId: org._id, targetCompanyId: companyId as Id<'companies'> } : 'skip',
   )
+  // The AUTHORITATIVE ownership share, when this company is a group
+  // subsidiary with a cap table of its own (SPEC D33). Null for a plain
+  // portfolio company, which has no such table.
+  const capTable = useConvexQuery(
+    api.liabilities.getOwnershipForCompany,
+    org ? { orgId: org._id, companyId: companyId as Id<'companies'> } : 'skip',
+  )
 
   // Deals targeting this entity block archiving (the obvious Sezame case).
   // Other references (investor/SPV, relations, KPI, accounts, documents) are
@@ -526,14 +533,32 @@ function ParticipationDetail() {
     [heldShares, i18n.language],
   )
 
+  /**
+   * The ownership share, from the ONE place it is allowed to live (SPEC D33).
+   *
+   * When the company is a group subsidiary, its own cap table is the truth
+   * and this side READS it — it does not compute a second one. Otherwise the
+   * two would diverge and nothing would say which is right: the share-count
+   * ratio below is an approximation (it needs `totalShares` to be current,
+   * and it ignores anything held outside a deal), while the subsidiary's cap
+   * table is what was actually filed.
+   *
+   * `from` says which of the two answered, so the panel can point at the
+   * subsidiary rather than leave the figure unexplained.
+   */
   const ownership = useMemo(() => {
+    const fmt = (ratio: number) =>
+      new Intl.NumberFormat(i18n.language, {
+        style: 'percent',
+        maximumFractionDigits: 1,
+      }).format(ratio)
+    if (capTable) {
+      return { label: fmt(capTable.ownershipBps / 10000), from: capTable }
+    }
     const total = company?.totalShares
     if (!total || total <= 0 || heldShares <= 0) return null
-    return new Intl.NumberFormat(i18n.language, {
-      style: 'percent',
-      maximumFractionDigits: 1,
-    }).format(heldShares / total)
-  }, [heldShares, company?.totalShares, i18n.language])
+    return { label: fmt(heldShares / total), from: null }
+  }, [capTable, heldShares, company?.totalShares, i18n.language])
 
   return (
     <main className="flex-1 space-y-6 p-6">
@@ -552,7 +577,7 @@ function ParticipationDetail() {
         </h1>
         {ownership && (
           <span className="text-muted-foreground text-sm">
-            {t('info.ownership')} {ownership}
+            {t('info.ownership')} {ownership.label}
           </span>
         )}
         {company && (
@@ -710,7 +735,26 @@ function ParticipationDetail() {
                 />
                 <IdentityField
                   label={t('info.ownershipGlobal')}
-                  value={ownership}
+                  value={
+                    ownership && (
+                      <>
+                        {ownership.label}
+                        {/* Where the figure comes from, when it is the
+                            subsidiary's own cap table rather than a ratio of
+                            share counts. Unexplained, the two would look like
+                            the same kind of number. */}
+                        {ownership.from?.issuingOrgSlug ? (
+                          <Link
+                            to="/app/$orgSlug/passif"
+                            params={{ orgSlug: ownership.from.issuingOrgSlug }}
+                            className="text-muted-foreground ml-2 text-xs font-normal hover:underline"
+                          >
+                            {t('info.ownershipFromCapTable')}
+                          </Link>
+                        ) : null}
+                      </>
+                    )
+                  }
                 />
                 <IdentityField
                   label={t('info.sharesConsolidated')}

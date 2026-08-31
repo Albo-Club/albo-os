@@ -15,7 +15,9 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireAppUser, requireOrgMember } from './lib/auth'
+import { summarize } from './lib/amortization'
 import { sortByStrength, summarizePledges } from './lib/guarantees'
+import { loanSchedule } from './loans'
 import { propertyValueCents } from './properties'
 import { guaranteeForm, guaranteeSubjectKind } from './schema'
 
@@ -321,15 +323,43 @@ export const listBySubjectProperty = query({
       )
       .collect()
 
+    const now = Date.now()
     const guarantees = await Promise.all(
       sortByStrength(rows).map(async (guarantee) => {
         const loan = guarantee.loanId
           ? await ctx.db.get('loans', guarantee.loanId)
           : null
+        // « Emprunt lié & sûreté » (SPEC § 6.6) names the debt the security
+        // secures, so it has to say how much of it is LEFT and until when — a
+        // security without its debt says nothing about the exposure. Both come
+        // from ONE schedule (`summarize` returns the pair), so reading them
+        // costs the same as reading either. Derived, never stored; a settled
+        // or cancelled loan owes nothing, exactly as in `loans:list`.
+        const summary = loan
+          ? summarize(
+              loan,
+              await loanSchedule(ctx, loan, { horizonDate: now }),
+              now,
+            )
+          : null
         return {
           ...(await enrich(ctx, guarantee)),
           loanLabel: loan?.label ?? null,
           loanLenderName: loan?.lenderName ?? null,
+          loanOutstandingCents:
+            loan && summary
+              ? loan.status === 'active'
+                ? summary.outstandingCents
+                : 0
+              : null,
+          // A revolving has no maturity to show unless the contract gives it
+          // one: its schedule is bounded by the caller, so `summarize` would
+          // otherwise report the horizon we just passed in as if it were the
+          // last instalment.
+          loanLastPaymentDate:
+            loan?.amortizationKind === 'revolving'
+              ? (loan.endDate ?? null)
+              : (summary?.lastPaymentDate ?? null),
         }
       }),
     )
