@@ -332,7 +332,9 @@
       "title": "Garanties données",
       "subtitle": "actifs mis en gage pour un tiers",
       "empty": "{{org}} ne met aucun de ses actifs en gage.",
-      "forBorrower": "pour {{borrower}}"
+      "forBorrower": "pour {{borrower}}",
+      "otherSecurity": "autre sûreté sur cette dette",
+      "thirdParty": "sûreté d'un tiers"
     },
     "onDeal": {
       "title": "Nantissements sur ce contrat",

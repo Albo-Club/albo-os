@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 
 import type { Id } from '../../../convex/_generated/dataModel'
-import type { LoanGuarantee } from '~/components/passif/GuaranteeList'
+import type { EditableGuarantee } from '~/components/passif/GuaranteeList'
 import { useReportError } from '~/components/pointage/TransactionSheet'
 import { AmountInput } from '~/components/ui/amount-input'
 import { Button } from '~/components/ui/button'
@@ -89,10 +89,12 @@ function Field({
  * - an **unknown guarantor**: the source deeds often name a caution without
  *   saying who stands it (Q-B).
  *
- * `orgId` scopes the pickers to the org being looked at. The guarantee itself
- * may well point at another org's asset — that is the whole point of D13 —
- * but a picker listing every org's deals would be unreadable, so the asset is
- * chosen from the org that holds it.
+ * `orgId` is the org being looked at. It does two things: it scopes the
+ * pickers — the guarantee may well point at another org's asset, that is the
+ * whole point of D13, but a picker listing every org's deals would be
+ * unreadable — and, on a creation, it is the org the security is FILED in.
+ * That filing org is what lets a security with no group party at all exist
+ * (SPEC § 10 line 10b); an edit never moves it.
  */
 export function GuaranteeDialog({
   orgId,
@@ -103,7 +105,7 @@ export function GuaranteeDialog({
   orgId: Id<'organizations'>
   /** Prefills the beneficiary when opened from a loan sheet. */
   loanId?: Id<'loans'>
-  guarantee?: LoanGuarantee
+  guarantee?: EditableGuarantee
   onClose: () => void
 }) {
   const { t } = useTranslation(['passif', 'common'])
@@ -240,7 +242,7 @@ export function GuaranteeDialog({
         await updateGuarantee({ guaranteeId: guarantee._id, ...fields })
         toast.success(t('passif:guarantees.dialog.editSuccess'))
       } else {
-        await createGuarantee(fields)
+        await createGuarantee({ orgId, ...fields })
         toast.success(t('passif:guarantees.dialog.createSuccess'))
       }
       onClose()

@@ -132,10 +132,13 @@ function Passif() {
         />
       </section>
 
-      <GuaranteesGivenSection
-        orgName={org?.name ?? ''}
-        guarantees={guaranteesGiven}
-      />
+      {org ? (
+        <GuaranteesGivenSection
+          orgId={org._id}
+          orgName={org.name}
+          guarantees={guaranteesGiven}
+        />
+      ) : null}
 
       {org && openDialog === 'debt' && (
         <LoanDialog

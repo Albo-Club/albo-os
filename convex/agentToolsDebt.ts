@@ -198,7 +198,10 @@ export const listGuaranteesInternal = internalQuery({
   handler: async (ctx, { orgId, actorUserId }) => {
     await readMembership(ctx, orgId, actorUserId)
 
-    // Three readings of the same table, from this org's point of view.
+    // Three readings of the same table, from this org's point of view, plus
+    // what the org merely FILED: a third party's security on the same
+    // outside debt as ours has no party of ours at all, and it is what says
+    // our own pledge is not alone on that debt (SPEC § 10 line 10b).
     const asBorrower = await ctx.db
       .query('guarantees')
       .withIndex('by_borrower_org', (q) => q.eq('borrowerOrgId', orgId))
@@ -207,10 +210,14 @@ export const listGuaranteesInternal = internalQuery({
       .query('guarantees')
       .withIndex('by_pledgor_org', (q) => q.eq('pledgorOrgId', orgId))
       .collect()
+    const filed = await ctx.db
+      .query('guarantees')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
 
     const seen = new Set<Id<'guarantees'>>()
     const rows: Array<Doc<'guarantees'>> = []
-    for (const row of [...asBorrower, ...asPledgor]) {
+    for (const row of [...asBorrower, ...asPledgor, ...filed]) {
       if (seen.has(row._id)) continue
       seen.add(row._id)
       rows.push(row)
@@ -677,6 +684,7 @@ export const createGuaranteeInternal = internalMutation({
     }
 
     const _id = await ctx.db.insert('guarantees', {
+      orgId: args.orgId,
       loanId: args.loanId,
       borrowerOrgId: loan.orgId,
       pledgorOrgId: args.pledgorOrgId,

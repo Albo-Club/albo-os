@@ -104,6 +104,7 @@ async function concertoSetup() {
 
   // (a) CALTE's own loan, pledged 300 K€.
   await user.as.mutation(api.guarantees.create, {
+    orgId: calte.orgId,
     loanId: calteLoan,
     pledgorOrgId: calte.orgId,
     subjectKind: 'placement',
@@ -115,6 +116,7 @@ async function concertoSetup() {
   })
   // (b) The SCI's loan — the asset is in ANOTHER org (D13).
   await user.as.mutation(api.guarantees.create, {
+    orgId: sci.orgId,
     loanId: sciLoan,
     pledgorOrgId: calte.orgId,
     subjectKind: 'placement',
@@ -126,6 +128,7 @@ async function concertoSetup() {
   })
   // (c) An outside borrower, with no loan of ours at all (D-QA).
   await user.as.mutation(api.guarantees.create, {
+    orgId: calte.orgId,
     borrowerLabel: 'SARL Bremontier',
     pledgorOrgId: calte.orgId,
     subjectKind: 'placement',
@@ -142,6 +145,7 @@ describe('guarantees: what the neighbouring surfaces read', () => {
     const { user, calte, calteLoan } = await concertoSetup()
     // A second, weaker security on the same loan, plus one already released.
     await user.as.mutation(api.guarantees.create, {
+      orgId: calte.orgId,
       loanId: calteLoan,
       pledgorLabel: 'Clément Alteresco',
       subjectKind: 'external',
@@ -149,6 +153,7 @@ describe('guarantees: what the neighbouring surfaces read', () => {
       form: 'caution',
     })
     const releasedId = await user.as.mutation(api.guarantees.create, {
+      orgId: calte.orgId,
       loanId: calteLoan,
       pledgorOrgId: calte.orgId,
       subjectKind: 'shares',
@@ -183,6 +188,7 @@ describe('guarantees: what the neighbouring surfaces read', () => {
       costBasis: [],
     })
     await user.as.mutation(api.guarantees.create, {
+      orgId: sci.orgId,
       loanId: sciLoan,
       pledgorOrgId: sci.orgId,
       subjectKind: 'property',
@@ -273,9 +279,92 @@ describe('guarantees: one row, three readings (D13)', () => {
     ])
   })
 
-  test('the guarantees are ordered strongest first (D48)', async () => {
-    const { user, calteLoan } = await concertoSetup()
+  test('a third party’s security on the same outside debt hangs under ours', async () => {
+    const { user, calte, concertoId } = await concertoSetup()
+    // SPEC § 10 line 10b: 250 K€ on M. Peninque's AV Vibrato, standing on
+    // the SAME Bremontier debt as our own 500 K€. No party of ours at all —
+    // only CALTE's filing anchors it.
     await user.as.mutation(api.guarantees.create, {
+      orgId: calte.orgId,
+      borrowerLabel: 'SARL Bremontier',
+      pledgorLabel: 'M. Peninque',
+      subjectKind: 'external',
+      subjectLabel: 'AV Vibrato — M. Peninque',
+      form: 'nantissement',
+      pledgedAmountCents: 250_000_00,
+    })
+
+    const rows = await user.as.query(api.guarantees.listByPledgorOrg, {
+      orgId: calte.orgId,
+    })
+    // Still THREE top-level rows: the co-security is not a fourth pledge of
+    // ours, it is context on the one we gave for Bremontier.
+    expect(rows).toHaveLength(3)
+    const bremontier = rows.find(
+      (row) => row.borrowerName === 'SARL Bremontier',
+    )!
+    expect(bremontier.isOwnPledge).toBe(true)
+    expect(bremontier.pledgedAmountCents).toBe(500_000_00)
+    expect(bremontier.otherSecurities).toHaveLength(1)
+    expect(bremontier.otherSecurities[0].pledgedAmountCents).toBe(250_000_00)
+    expect(bremontier.otherSecurities[0].pledgorName).toBe('M. Peninque')
+    // It hangs under that pledge and nowhere else.
+    expect(
+      rows.filter((row) => row.otherSecurities.length > 0),
+    ).toHaveLength(1)
+    // And it never counts as a pledge on OUR asset: the Concerto Capi's
+    // margin is untouched by a security that bites on someone else's AV.
+    const view = await user.as.query(api.guarantees.listBySubjectDeal, {
+      dealId: concertoId,
+    })
+    expect(view.summary.pledgedTotalCents).toBe(950_000_00)
+  })
+
+  test('a co-security matching no pledge of ours is listed on its own', async () => {
+    const { user, calte } = await concertoSetup()
+    await user.as.mutation(api.guarantees.create, {
+      orgId: calte.orgId,
+      borrowerLabel: 'SCI Tiers',
+      pledgorLabel: 'M. Peninque',
+      subjectKind: 'external',
+      subjectLabel: 'AV Vibrato',
+      form: 'caution',
+      pledgedAmountCents: 90_000_00,
+    })
+    const rows = await user.as.query(api.guarantees.listByPledgorOrg, {
+      orgId: calte.orgId,
+    })
+    // Four rows, not three: a row must never become unreachable because no
+    // pledge of ours happens to share its borrower.
+    expect(rows).toHaveLength(4)
+    const orphan = rows.find((row) => row.borrowerName === 'SCI Tiers')!
+    expect(orphan.isOwnPledge).toBe(false)
+    expect(orphan.pledgorName).toBe('M. Peninque')
+  })
+
+  test('securities on a group loan are not repeated in « Garanties données »', async () => {
+    const { user, calte, calteLoan } = await concertoSetup()
+    // Filed in CALTE, on CALTE's own loan, but stood by an outside body: the
+    // loan sheet already lists it, so the given-guarantees block stays quiet.
+    await user.as.mutation(api.guarantees.create, {
+      orgId: calte.orgId,
+      loanId: calteLoan,
+      pledgorLabel: 'Saccef',
+      subjectKind: 'external',
+      subjectLabel: 'Garantie Saccef',
+      form: 'garantie_organisme',
+    })
+    const rows = await user.as.query(api.guarantees.listByPledgorOrg, {
+      orgId: calte.orgId,
+    })
+    expect(rows).toHaveLength(3)
+    expect(rows.flatMap((row) => row.otherSecurities)).toHaveLength(0)
+  })
+
+  test('the guarantees are ordered strongest first (D48)', async () => {
+    const { user, calte, calteLoan } = await concertoSetup()
+    await user.as.mutation(api.guarantees.create, {
+      orgId: calte.orgId,
       loanId: calteLoan,
       pledgorLabel: 'Clément Alteresco',
       subjectKind: 'external',
@@ -283,6 +372,7 @@ describe('guarantees: one row, three readings (D13)', () => {
       form: 'caution',
     })
     await user.as.mutation(api.guarantees.create, {
+      orgId: calte.orgId,
       loanId: calteLoan,
       pledgorLabel: 'Saccef',
       subjectKind: 'external',
@@ -333,6 +423,7 @@ describe('guarantees: mainlevée and unquantified pledges', () => {
   test('an unquantified caution is excluded from the total, counted apart (C3)', async () => {
     const { user, calte, calteLoan, concertoId } = await concertoSetup()
     await user.as.mutation(api.guarantees.create, {
+      orgId: calte.orgId,
       loanId: calteLoan,
       pledgorOrgId: calte.orgId,
       subjectKind: 'placement',
@@ -369,6 +460,7 @@ describe('guarantees: requireGuaranteeParty', () => {
       ...loanTerms,
     })
     const guaranteeId = await sciOnly.as.mutation(api.guarantees.create, {
+      orgId: sci.orgId,
       loanId,
       pledgorOrgId: calte.orgId,
       subjectKind: 'placement',
@@ -386,11 +478,14 @@ describe('guarantees: requireGuaranteeParty', () => {
   test('a member of NO party is refused', async () => {
     const { t, calte, concertoId, calteLoan } = await concertoSetup()
     const outsider = await createUser(t, 'outsider@test.dev')
-    await createOrg(t, 'org-outsider', [
+    const theirs = await createOrg(t, 'org-outsider', [
       { userId: outsider.userId, role: 'owner' },
     ])
+    // Filing it in an org they DO belong to changes nothing: the loan and
+    // the pledged asset are still someone else's.
     await expectConvexError(
       outsider.as.mutation(api.guarantees.create, {
+        orgId: theirs.orgId,
         loanId: calteLoan,
         pledgorOrgId: calte.orgId,
         subjectKind: 'placement',
@@ -412,20 +507,42 @@ describe('guarantees: requireGuaranteeParty', () => {
     )
   })
 
-  test('a guarantee touching no group org at all is refused', async () => {
-    const { user } = await concertoSetup()
-    // Outside borrower, outside guarantor, outside asset: no party to be a
-    // member of, so nothing in Albo OS justifies the row.
+  test('a guarantee touching no group org at all is filed in the recording org', async () => {
+    const { user, calte } = await concertoSetup()
+    // SPEC § 10 line 10b: outside borrower, outside guarantor, outside
+    // asset. Nothing anchors the row but the org that records it — and
+    // without the row, our own 500 K€ on the Concerto Capi reads as the only
+    // security on that debt.
+    const id = await user.as.mutation(api.guarantees.create, {
+      orgId: calte.orgId,
+      borrowerLabel: 'SARL Bremontier',
+      pledgorLabel: 'M. Peninque',
+      subjectKind: 'external',
+      subjectLabel: 'AV Vibrato — M. Peninque',
+      form: 'nantissement',
+      pledgedAmountCents: 250_000_00,
+    })
+    expect(id).toBeDefined()
+  })
+
+  test('the recording org must be one of ours', async () => {
+    const { t, user, calte } = await concertoSetup()
+    const stranger = await createUser(t, 'stranger@test.dev')
+    const theirs = await createOrg(t, 'org-stranger', [
+      { userId: stranger.userId, role: 'owner' },
+    ])
+    // Everything else about the row is legitimate — CALTE stands the
+    // security — but it is not ours to drop into someone else's Passif.
     await expectConvexError(
       user.as.mutation(api.guarantees.create, {
+        orgId: theirs.orgId,
         borrowerLabel: 'SARL Bremontier',
-        pledgorLabel: 'M. Peninque',
+        pledgorOrgId: calte.orgId,
         subjectKind: 'external',
-        subjectLabel: 'AV Vibrato — M. Peninque',
+        subjectLabel: 'AV Vibrato',
         form: 'nantissement',
-        pledgedAmountCents: 250_000_00,
       }),
-      'not_a_party',
+      'not_a_member',
     )
   })
 })
@@ -434,6 +551,7 @@ describe('guarantees: shape validation', () => {
   test('a beneficiary must be exactly one of loan / outside label', async () => {
     const { user, calte, calteLoan, concertoId } = await concertoSetup()
     const base = {
+      orgId: calte.orgId,
       pledgorOrgId: calte.orgId,
       subjectKind: 'placement' as const,
       subjectDealId: concertoId,
@@ -457,6 +575,7 @@ describe('guarantees: shape validation', () => {
     const { user, calte, calteLoan, concertoId } = await concertoSetup()
     await expectConvexError(
       user.as.mutation(api.guarantees.create, {
+        orgId: calte.orgId,
         loanId: calteLoan,
         pledgorOrgId: calte.orgId,
         pledgorLabel: 'Saccef',
@@ -469,8 +588,9 @@ describe('guarantees: shape validation', () => {
   })
 
   test('an unknown guarantor is accepted — the source deeds are often mute', async () => {
-    const { user, calteLoan } = await concertoSetup()
+    const { user, calte, calteLoan } = await concertoSetup()
     const guaranteeId = await user.as.mutation(api.guarantees.create, {
+      orgId: calte.orgId,
       loanId: calteLoan,
       subjectKind: 'external',
       subjectLabel: 'Caution — garant à préciser',
@@ -480,9 +600,10 @@ describe('guarantees: shape validation', () => {
   })
 
   test('the subject must match its subjectKind', async () => {
-    const { user, calteLoan } = await concertoSetup()
+    const { user, calte, calteLoan } = await concertoSetup()
     await expectConvexError(
       user.as.mutation(api.guarantees.create, {
+        orgId: calte.orgId,
         loanId: calteLoan,
         subjectKind: 'placement',
         form: 'nantissement',
@@ -491,6 +612,7 @@ describe('guarantees: shape validation', () => {
     )
     await expectConvexError(
       user.as.mutation(api.guarantees.create, {
+        orgId: calte.orgId,
         loanId: calteLoan,
         subjectKind: 'external',
         subjectLabel: '   ',
@@ -508,6 +630,7 @@ describe('guarantees: shape validation', () => {
       ...loanTerms,
     })
     const guaranteeId = await user.as.mutation(api.guarantees.create, {
+      orgId: sci.orgId,
       loanId,
       subjectKind: 'placement',
       subjectDealId: concertoId,
@@ -523,8 +646,9 @@ describe('guarantees: shape validation', () => {
   })
 
   test('a rank below 1 and a non-positive amount are refused', async () => {
-    const { user, calteLoan, concertoId } = await concertoSetup()
+    const { user, calte, calteLoan, concertoId } = await concertoSetup()
     const base = {
+      orgId: calte.orgId,
       loanId: calteLoan,
       subjectKind: 'placement' as const,
       subjectDealId: concertoId,
@@ -597,6 +721,7 @@ describe('guarantees: deletion guardrails', () => {
   test('a guarantee carrying documents cannot be deleted', async () => {
     const { t, user, calte, calteLoan, concertoId } = await concertoSetup()
     const guaranteeId = await user.as.mutation(api.guarantees.create, {
+      orgId: calte.orgId,
       loanId: calteLoan,
       pledgorOrgId: calte.orgId,
       subjectKind: 'placement',
@@ -630,6 +755,7 @@ describe('guarantees: deletion guardrails', () => {
       ...loanTerms,
     })
     const guaranteeId = await user.as.mutation(api.guarantees.create, {
+      orgId: sci.orgId,
       loanId,
       pledgorOrgId: calte.orgId,
       subjectKind: 'placement',

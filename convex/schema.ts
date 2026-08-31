@@ -1614,8 +1614,20 @@ export default defineSchema({
    * The beneficiary can be OUTSIDE the group (`borrowerLabel`, SPEC D-QA):
    * without those rows the available margin on our own asset would be
    * overstated — an error in our disfavour, and an invisible one.
+   *
+   * `orgId` is the org that RECORDS the guarantee — not a fourth party. It
+   * exists because a security can legitimately have NO group party at all
+   * (SPEC § 10 line 10b: a third party's surety on the same outside debt as
+   * ours, which shares the burden and must be known to read our own
+   * exposure). Such a row has nothing else to hang from — no loan, no asset
+   * of ours, no guarantor of ours — and was refused outright until now.
+   * Optional only until `migrations/backfillGuaranteeOrg` has run in prod.
    */
   guarantees: defineTable({
+    // The org whose Passif this guarantee is filed in. It anchors the row;
+    // it is NOT a fourth information beside the three of D17.
+    orgId: v.optional(v.id('organizations')),
+
     // ── Beneficiary: EITHER a group loan, OR an outside borrower ──────────
     loanId: v.optional(v.id('loans')),
     // Denormalized from the loan, never taken from an argument — it is what
@@ -1652,6 +1664,7 @@ export default defineSchema({
     releasedAt: v.optional(v.number()),
     notes: v.optional(v.string()),
   })
+    .index('by_org', ['orgId'])
     .index('by_loan', ['loanId'])
     .index('by_borrower_org', ['borrowerOrgId'])
     .index('by_pledgor_org', ['pledgorOrgId'])

@@ -231,6 +231,11 @@ Table centrale du module. Elle porte **trois informations indépendantes**
 
 ```
 guarantees
+  // ── Où la ligne est classée ─────────────────────────────────────────
+  orgId              Id<'organizations'>?  société qui ENREGISTRE la sûreté
+  // Pas une quatrième partie : l'ancre de la ligne. Optionnel le temps du
+  // remplissage en prod (migrations/backfillGuaranteeOrg), puis requis.
+
   // ── Bénéficiaire ────────────────────────────────────────────────────
   loanId             Id<'loans'>?          prêt interne au groupe
   borrowerOrgId      Id<'organizations'>?  org du prêt (dénormalisé, indexé)
@@ -258,6 +263,7 @@ guarantees
   releasedAt         number?               mainlevée. Absent = active.
   notes              string?
 
+  .index('by_org',             ['orgId'])
   .index('by_loan',            ['loanId'])
   .index('by_borrower_org',    ['borrowerOrgId'])
   .index('by_pledgor_org',     ['pledgorOrgId'])
@@ -265,6 +271,14 @@ guarantees
   .index('by_subject_property',['subjectPropertyId'])
   .index('by_subject_company', ['subjectCompanyId'])
 ```
+
+**`orgId` — la société qui enregistre, pas une partie de plus.** Une sûreté
+peut légitimement n'avoir **aucune** partie du groupe : le cas 10b du § 10
+(la sûreté d'un tiers sur la même dette hors groupe que la nôtre) n'a ni
+prêt, ni actif, ni garant de chez nous. Sans ancre, cette ligne n'était
+rattachable à rien et était refusée — alors que c'est elle qui dit que nos
+500 K€ ne sont pas seuls sur cette dette. `orgId` est vérifié
+(`requireOrgMember`) et jamais cru sur parole ; il ne bouge pas à l'édition.
 
 **Une seule ligne, trois lectures** (**D13**) — rien n'est stocké deux fois :
 
@@ -724,7 +738,7 @@ pour y créer un premier élément.
 │  │ Capital social                                            10 000 €  │ │
 │  └──────────────────────────────────────────────────────────────────────┘ │
 │                                                                          │
-│  ┌ GARANTIES DONNÉES ──── actifs mis en gage pour un tiers ────────────┐ │
+│  ┌ GARANTIES DONNÉES ─── actifs en gage pour un tiers ─ [+ Ajouter] ──┐ │
 │  │ SCI Chapelle ne met aucun de ses actifs en gage.                     │ │
 │  └──────────────────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────────────────┘
@@ -732,6 +746,16 @@ pour y créer un premier élément.
 
 Le bloc « Garanties données » est visuellement **détaché** des trois autres
 (fond atténué) : ce n'est pas une dette, c'est un engagement hors bilan.
+
+C'est aussi le **seul** endroit où une sûreté donnée à un emprunteur **hors
+groupe** peut être créée et corrigée — elle ne pend à aucune fiche de prêt de
+chez nous. D'où le « + » et le menu **⋯** par ligne ici, et pas seulement sur
+la fiche du prêt. Sous une sûreté à nous s'affichent, en sous-ligne, les
+sûretés qu'un **tiers** a données sur la **même** dette hors groupe (§ 10,
+cas 10b) : nos 500 K€ ne sont pas seuls dessus. Une sûreté de tiers qui ne
+correspond à aucune sûreté de chez nous est listée pour elle-même plutôt que
+cachée. Les sûretés portant sur un **prêt du groupe** n'y sont pas reprises :
+la fiche du prêt les liste déjà.
 
 **Aucune tuile en tête de page** (**D38**). Un bandeau de chiffres répète ce
 qui suit. Et surtout, un « total dû » qui additionnerait le capital serait
@@ -1119,7 +1143,7 @@ ici.
 | 7 | SCI Chapelle — 500 K€ ; nantissement AV 150 K€ ; Concerto Capi n°060 | ✅ **Rentre** | 1 `loans` (org `sci-chapelle`) + 1 `guarantees` **inter-espaces** : assiette dans `calte`, `pledgorOrgId: calte`, `borrowerOrgId: sci-chapelle`, 150 000 00. Une ligne, lue des deux côtés (**D13**). |
 | 8 | SCI Chapelle 2 — 538 K€ ; PPD + caution | ⚠️ **Rentre, donnée incomplète** | 1 `loans` (org `sci-chapelle-2`). 2 `guarantees` : (a) `ppd`, `subjectKind: property`, le bien de la SCI, `pledgorOrgId: sci-chapelle-2` — **suppose le bien saisi** (lot 4) ; (b) `caution`, garant et montant **non fournis** (**Q-B**). |
 | 9 | SCI Upload — 1,3 M€ ; nantissement titres 60 K€ ; compte-titres Upload, valo 61 K€ | ✅ **Rentre** | 1 `loans` (org `sci-upload`) + 1 `guarantees` mono-espace, 60 000 00. |
-| 10 | SARL Bremontier — 672 K€ / 1 150 K€ ; nantissement AV 500 K€ sur CALTE (Concerto Capi n°060) + 250 K€ sur M. Peninque (AV Vibrato, valo 476 K€) | ✅ **Rentre** (**D-QA**) | Bremontier n'est pas une org, M. Peninque n'existe pas. 2 `guarantees` sans `loanId`, `borrowerLabel: "SARL Bremontier"` : (a) assiette Concerto Capi 060, `pledgorOrgId: calte`, 500 000 00 ; (b) `subjectKind: external`, `subjectLabel: "AV Vibrato — M. Peninque"`, `pledgorLabel: "M. Peninque"`, 250 000 00. Sans D-QA, la marge du Concerto Capi serait fausse de 500 K€. |
+| 10 | SARL Bremontier — 672 K€ / 1 150 K€ ; nantissement AV 500 K€ sur CALTE (Concerto Capi n°060) + 250 K€ sur M. Peninque (AV Vibrato, valo 476 K€) | ✅ **Rentre** (**D-QA**) | Bremontier n'est pas une org, M. Peninque n'existe pas. 2 `guarantees` sans `loanId`, `borrowerLabel: "SARL Bremontier"` : (a) assiette Concerto Capi 060, `pledgorOrgId: calte`, 500 000 00 ; (b) `subjectKind: external`, `subjectLabel: "AV Vibrato — M. Peninque"`, `pledgorLabel: "M. Peninque"`, 250 000 00. Sans D-QA, la marge du Concerto Capi serait fausse de 500 K€. La ligne (b) n'a **aucune** partie du groupe : c'est `orgId` (§ 4.2) qui la classe, dans `calte`, sous la sûreté (a) qu'elle accompagne. |
 
 ### Verdict
 
