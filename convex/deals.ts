@@ -782,6 +782,20 @@ export const remove = mutation({
       .withIndex('by_deal', (q) => q.eq('dealId', id))
       .first()
     if (linked) throw new ConvexError('deal_has_transactions')
+    // A pledged placement never disappears in silence (SPEC C12): deleting it
+    // would leave the guarantee pointing at nothing, and the available margin
+    // it feeds would lose its subject without a word. Same guardrail as
+    // `loans:remove` and `properties:remove`, which had it from the start.
+    //
+    // `releasedAt` is deliberately NOT filtered out: a mainlevée keeps the row
+    // as history (C6), and that history still needs its subject to be
+    // readable. Releasing therefore does not unblock the deletion — only
+    // detaching (deleting the guarantee) does.
+    const pledge = await ctx.db
+      .query('guarantees')
+      .withIndex('by_subject_deal', (q) => q.eq('subjectDealId', id))
+      .first()
+    if (pledge) throw new ConvexError('is_pledged')
     // Deal documents are owned by the deal (they don't show anywhere else),
     // so they go with it — files included, or the storage leaks.
     const docs = await ctx.db

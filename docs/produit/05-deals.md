@@ -142,6 +142,12 @@ le cash encaissé et la totalité de la ligne d'origine.
 
 - **Supprimer un deal est refusé** tant que des transactions lui sont
   rattachées — il faut les détacher d'abord (aucune transaction orpheline).
+- **Supprimer un placement mis en gage est refusé** aussi. Une garantie qui
+  pointe dessus perdrait son assiette, et la marge disponible calculée sur cet
+  actif n'aurait plus de quoi se comparer. Détachez la garantie d'abord — y
+  compris si elle a déjà fait l'objet d'une mainlevée : la ligne reste en
+  historique, et cet historique a besoin de son assiette. Voir
+  [Dette bancaire et garanties](18-dette-et-garanties.md).
 - **Supprimer un deal supprime aussi les documents qui lui sont rattachés**,
   fichiers compris — y compris ceux qu'on voit sur la fiche de la société,
   badgés au nom du deal. À récupérer avant, si besoin.

@@ -23,6 +23,71 @@ bas de page.
 
 ---
 
+## v1.203.2 — 31/08/2026 à 16:12 — Trois chiffres remis d'aplomb sur la dette
+
+Un audit à froid du module Dette & Garanties a fait remonter trois endroits
+où l'application affichait ou protégeait mal un chiffre. Aucun n'était
+visible à l'œil nu, et c'est bien le problème.
+
+**Le ballon d'un prêt in fine ne peut plus disparaître.** Un prêt in fine
+dont le différé couvrait toute la durée produisait un échéancier fait
+uniquement d'intérêts : aucun remboursement de capital, un restant dû figé
+au montant emprunté même après le terme, et surtout **aucune trace du
+capital dans le prévisionnel de trésorerie**. Sur un in fine de 6,6 M€, la
+somme n'apparaissait nulle part avant de tomber. La saisie refuse désormais
+un différé aussi long que la durée — pour les quatre types de prêt, sans
+exception — et un prêt déjà enregistré de cette façon retrouve son ballon
+tout seul à la lecture.
+
+**Un placement mis en gage ne se supprime plus en silence.** Supprimer un
+contrat nanti laissait la garantie qui s'appuyait dessus sans assiette : plus
+de libellé, plus de valeur à laquelle comparer la marge disponible. La
+suppression est maintenant refusée tant qu'une garantie pointe sur le
+placement — y compris une garantie déjà levée, dont l'historique a lui aussi
+besoin de son assiette pour se lire. Les prêts et les biens étaient déjà
+protégés ainsi ; le placement ne l'était pas.
+
+**L'échéancier ne prétend plus au centime près.** Les colonnes du plan
+(mensualité, capital, intérêts, assurance, restant dû) s'affichent désormais
+arrondies à l'euro, tandis que la colonne Réel reste au centime. Le plan est
+un calcul, le réel est un relevé bancaire : les afficher avec la même
+précision invitait à comparer au centime deux chiffres qui ne mesurent pas la
+même chose, et donnait envie de « corriger » un écart parfaitement normal —
+celui de l'assurance.
+
+> **🔧 Notes techniques**
+>
+> - **Ballon in fine** : `assertValidTerms` (`convex/loans.ts`) n'exempte plus
+>   `amortizationKind === 'bullet'` du contrôle `deferral >= durationMonths`,
+>   et `buildSchedule` (`convex/lib/amortization.ts`) clampe `deferralPeriods`
+>   à `totalPeriods − 1` pour tous les types. Les deux sont nécessaires : la
+>   validation ferme la saisie, le clamp répare la donnée déjà stockée (une
+>   query ne doit jamais lever). Le clamp exemptait le `bullet` au motif qu'un
+>   in fine est déjà « intérêts seuls » — mais la période supprimée était
+>   celle qui porte le ballon. Tests : `tests/amortization.test.ts` (le ballon
+>   survit au différé total) + `convex/regression.loans.test.ts` (la mutation
+>   refuse). `KNOWN_ISSUES.md` décrivait déjà le comportement corrigé : c'est
+>   la doc qui avait raison, pas le code.
+> - **C12** : `deals:remove` (`convex/deals.ts`) interroge l'index
+>   `by_subject_deal` de `guarantees` et lève `is_pledged`. Le garde-fou
+>   ignore `releasedAt` volontairement, comme ses jumeaux `loans:remove` et
+>   `properties:remove`. Surfacé dans `deals.$dealId.tsx` via la table
+>   d'erreurs existante. Nouvelle section `KNOWN_ISSUES.md` et nouvel
+>   anti-pattern `CLAUDE.md` sur la vraie cause : le garde-fou vit dans le
+>   fichier de l'objet référencé, jamais dans celui de la table qu'on écrit.
+> - **Arrondis** : les colonnes de plan de l'échéancier passent de
+>   `fmtEurCents` à `fmtEur` (`passif.prets.$loanId.tsx`), conformément à
+>   § 5.4 « l'actuel au centime, l'estimé arrondi ». Colonne Réel, table des
+>   transactions et total versé restent au centime.
+> - **Hygiène** : `modules:list` mémoïse la lecture des deals de l'org (les
+>   sondes `entreprises`, `placements` et `investments` la relisaient quatre
+>   fois par chargement de page) ; commentaire corrigé sur
+>   `properties:getById`, qui annonçait renvoyer les sûretés du bien alors
+>   qu'elles se lisent depuis `guarantees:listBySubjectProperty`.
+> - **SPEC § 12.5** assume désormais **deux** exceptions au non-stockage —
+>   l'encours d'un révolving et `loanAmendments.outstandingCents` — avec le
+>   critère qui les autorise : un fait extérieur constaté, jamais un calcul
+>   qu'on préfère figer.
 ## v1.203.1 — 31/08/2026 à 15:54 — Une barre de recherche pour rattacher un report
 
 Dans les Rapports entrants, rattacher un mail à une participation passait par

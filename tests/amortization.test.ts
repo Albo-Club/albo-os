@@ -186,6 +186,20 @@ describe('in fine (bullet)', () => {
     assert.equal(outstandingAt(terms, rows, utc(2022, 12, 5)), 6_600_000_00)
     assert.equal(outstandingAt(terms, rows, utc(2030, 1, 1)), 0)
   })
+
+  it('garde son ballon même si le différé couvre toute la durée', () => {
+    // Régression : le différé mangeait la totalité de l’échéancier d’un in
+    // fine, qui ne produisait alors AUCUNE ligne de capital. Le restant dû
+    // restait au capital emprunté après le terme et les 6,6 M€ n’entraient
+    // jamais dans le prévisionnel — précisément ce que D45 veut empêcher.
+    const rows = buildSchedule({ ...terms, deferralMonths: 24 })
+    assert.equal(rows.length, 24)
+    const last = rows[23]
+    assert.equal(last.isBalloon, true)
+    assert.equal(last.capitalCents, 6_600_000_00)
+    assert.equal(last.remainingCents, 0)
+    assert.equal(outstandingAt(terms, rows, utc(2030, 1, 1)), 0)
+  })
 })
 
 describe('révolving (lombard)', () => {

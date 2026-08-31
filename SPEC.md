@@ -1234,8 +1234,20 @@ Outils d'écriture sur prêts, garanties et biens, tous avec
    d'héritage de droits — les orgs restent à plat.
 5. **Aucun chiffre stocké qui puisse être dérivé.** Capital restant dû, marge
    disponible, rendement, résultat d'exploitation : calculés à la lecture.
-   Seule exception assumée : l'encours d'un révolving, qui n'est déductible
-   d'aucun échéancier (§ 4.1).
+   **Deux** exceptions assumées, et deux seulement :
+   - l'**encours d'un révolving**, qui n'est déductible d'aucun échéancier
+     (§ 4.1) ;
+   - le **capital re-notifié par la banque à la date d'un avenant**
+     (`loanAmendments.outstandingCents`, lot 5). Quand le prêteur redresse le
+     capital restant — arrondi de son côté, remboursement partiel jamais
+     pointé chez nous — son chiffre est un **constat**, et l'app n'a aucun
+     moyen de le dériver. Le champ est optionnel : absent, c'est le montant
+     atteint par le plan précédent qui fait foi, ce qui reste le cas normal.
+
+   Le critère qui autorise ces deux-là, et qui doit être opposé à toute
+   demande d'une troisième : le chiffre est un **fait extérieur constaté**,
+   pas un calcul qu'on préférerait figer. « Ce serait plus simple de le
+   stocker » n'a jamais rempli ce critère.
 6. **`lib/amortization.ts` est une fonction pure et le restera.** Elle prend
    les paramètres du prêt et la série de taux, elle rend un échéancier. Aucun
    accès Convex, testable en `node:test` — c'est ce qui rend les quatre types

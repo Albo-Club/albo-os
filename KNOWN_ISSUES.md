@@ -5248,6 +5248,16 @@ données.
   en périodes). Un différé ≥ durée est rejeté à la mutation
   (`deferral_too_long`) ; côté moteur il est clampé pour laisser au moins une
   échéance, parce qu'une query ne doit jamais lever sur de la donnée stockée.
+  **Les deux garde-fous valent pour les quatre types, in fine compris.** Ils
+  ont d'abord exempté le `bullet` — il est déjà « intérêts seuls », donc un
+  différé y semblait sans effet — et c'était faux : la période d'amortissement
+  qu'ils supprimaient était précisément celle qui porte le **ballon**.
+  L'échéancier sortait sans aucune ligne de capital, le restant dû restait au
+  capital emprunté après le terme, et les 6,6 M€ n'entraient jamais dans le
+  prévisionnel — l'échec exact que `amortizationKind` existe pour empêcher
+  (D45). Morale réutilisable : sur un type d'amortissement, une exemption qui
+  se justifie par « de toute façon ce type ne fait rien de particulier ici »
+  mérite d'être exécutée avant d'être crue.
 - **`periodicRate` fait UNE division**, `(bps × mois) / (10000 × 12)`. La
   forme naturelle `(bps / 10000) × (mois / 12)` rend
   `0.009999999999999998` pour un taux mensuel de 12 %, et cet artefact
@@ -5290,6 +5300,32 @@ vraisemblance — c'est exactement le mécanisme retiré en août 2026 (cf.
 Corollaire assumé : un paiement en retard reste sur la période où il est
 tombé, pas sur celle qu'il était censé couvrir. C'est la lecture honnête —
 elle rend une échéance manquée visible au lieu de la masquer.
+
+## Une table polymorphe doit un garde-fou de suppression à CHACUNE de ses assiettes
+
+`guarantees` référence quatre choses différentes selon `subjectKind` : un
+placement (`subjectDealId`), un bien (`subjectPropertyId`), une société
+(`subjectCompanyId`), ou rien du tout (`subjectLabel`). Chaque table ainsi
+référencée doit refuser sa propre suppression tant qu'une garantie pointe
+dessus — sans quoi la ligne survit à son assiette et devient illisible : plus
+de libellé, plus de valorisation à quoi comparer la marge.
+
+`loans:remove` (`has_guarantees`) et `properties:remove` (`has_guarantees`)
+l'ont fait dès le premier jour. **`deals:remove` ne l'a pas fait**, et un
+placement nanti a pu être supprimé en silence pendant deux PR. La raison est
+mécanique et se reproduira : le garde-fou vit dans le fichier de l'assiette,
+pas dans celui de la garantie, donc écrire `guarantees.ts` ne le rappelle
+jamais. `deals.ts` est en plus un fichier **ancien**, qu'on ne rouvre pas en
+ajoutant une table neuve.
+
+Règle : quand une nouvelle table référence des tables existantes, la liste
+des `remove` à modifier est celle des tables **référencées**, et elle se
+dresse depuis le champ, pas depuis le fichier qu'on est en train d'écrire.
+
+⚠️ Le garde-fou ignore `releasedAt` **exprès**. Une mainlevée garde la ligne
+en historique (C6), et cet historique a toujours besoin de son assiette pour
+se lire. Lever une garantie ne débloque donc pas la suppression de l'actif :
+il faut la détacher.
 
 ## Garanties : `requireOrgMember` ne suffit pas (`convex/guarantees.ts`)
 
