@@ -172,6 +172,24 @@ describe('loans: term validation', () => {
     )
   })
 
+  test('an IN FINE deferral covering the whole term is refused too', async () => {
+    // It used to be exempt, and the exemption cost the balloon: the schedule
+    // came out with no capital line at all, so the outstanding never fell and
+    // the capital never reached the cash projection.
+    const { user, org } = await orgSetup()
+    await expectConvexError(
+      user.as.mutation(api.loans.create, {
+        orgId: org.orgId,
+        ...palatine,
+        amortizationKind: 'bullet',
+        durationMonths: 24,
+        deferralMonths: 24,
+        deferralKind: 'partial',
+      }),
+      'deferral_too_long',
+    )
+  })
+
   test('a revolving ceiling below the outstanding is refused', async () => {
     const { user, org } = await orgSetup()
     await expectConvexError(

@@ -374,7 +374,13 @@ function assertValidTerms(args: {
   const deferral = args.deferralMonths ?? 0
   if (deferral < 0) throw new ConvexError('invalid_deferral')
   // A deferral covering the whole term would leave nothing to amortize.
-  if (args.amortizationKind !== 'bullet' && deferral >= args.durationMonths) {
+  // This holds for an in fine too, and the exemption it used to enjoy was a
+  // bug: a `bullet` whose deferral ate its whole duration produced a schedule
+  // of interest with NO capital line — the balloon vanished from the sheet
+  // and, worse, from the cash projection, which is the one thing D45 exists
+  // to prevent. An in fine is already interest-only by nature; a deferral as
+  // long as the term says nothing more, and costs the balloon.
+  if (deferral >= args.durationMonths) {
     throw new ConvexError('deferral_too_long')
   }
 }
