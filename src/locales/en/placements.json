@@ -119,5 +119,6 @@
       "default": "Could not create the placement. Please retry."
     }
   },
-  "pledgedHint": "Blocked funds (pledge, escrow): out of the available treasury. The balance is updated on the account page."
+  "pledgedHint": "Blocked funds (pledge, escrow): out of the available treasury. The balance is updated on the account page.",
+  "pledged": "Pledged"
 }

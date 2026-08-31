@@ -133,7 +133,9 @@
       "title": "Related loan & security",
       "empty": "No security bites on this property.",
       "loanLabel": "Secured loan",
-      "noLoan": "Borrower outside the group"
+      "noLoan": "Borrower outside the group",
+      "loanOutstanding": "{{amount}} outstanding",
+      "loanUntil": "until {{date}}"
     },
     "transactions": {
       "title": "Transactions",

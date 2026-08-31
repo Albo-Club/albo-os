@@ -139,7 +139,20 @@ export function BankDebtTable({
                       : t('debt.noMaturity')}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={loan.status} />
+                    <div className="flex flex-wrap items-center gap-1">
+                      <StatusBadge status={loan.status} />
+                      {/* The FORM of each active security, never its amount
+                          (SPEC D44): this column's right-hand neighbour holds
+                          outstanding capital, and a pledged amount beside it
+                          would invite a comparison that means nothing. The
+                          assiette, the guarantor, the amount and the margin
+                          live on the loan sheet. */}
+                      {loan.guaranteeForms.map((form) => (
+                        <Badge key={form} variant="secondary">
+                          {t(`guarantees.form.${form}`)}
+                        </Badge>
+                      ))}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {fmtEur(loan.outstandingCents)}

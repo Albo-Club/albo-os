@@ -24,6 +24,7 @@ import {
   outstandingAt,
   summarize,
 } from './lib/amortization'
+import { isActive, sortByStrength } from './lib/guarantees'
 import { addMonthsUtc } from './lib/recurrence'
 import {
   amortizationKind,
@@ -150,9 +151,24 @@ export const list = query({
         const amendments = await amendmentsOf(ctx, loan._id)
         const schedule = scheduleOf(loan, rates, now, amendments)
         const summary = summarize(loan, schedule, now)
+        // The FORMS of the securities covering this loan, strongest first —
+        // never their amounts (SPEC D44). The Passif list carries one nature
+        // of figure in its right-hand column, the outstanding; a pledged
+        // amount beside it would invite a comparison that means nothing. The
+        // detail lives on the loan sheet.
+        const pledges = await ctx.db
+          .query('guarantees')
+          .withIndex('by_loan', (q) => q.eq('loanId', loan._id))
+          .collect()
+        const guaranteeForms = [
+          ...new Set(
+            sortByStrength(pledges.filter(isActive)).map((row) => row.form),
+          ),
+        ]
         return {
           _id: loan._id,
           label: loan.label,
+          guaranteeForms,
           lenderName: loan.lenderName,
           principalCents: loan.principalCents,
           amortizationKind: loan.amortizationKind,

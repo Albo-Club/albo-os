@@ -152,6 +152,10 @@ function LoanSheet() {
   const documents = useConvexQuery(api.documents.listByLoan, {
     loanId: loanId as Id<'loans'>,
   })
+  const deallocateTransaction = useConvexMutation(
+    api.liabilities.deallocateTransaction,
+  )
+  const [detaching, setDetaching] = useState<Id<'transactions'> | null>(null)
   const removeLoan = useConvexMutation(api.loans.remove)
   const removeRate = useConvexMutation(api.loans.removeRate)
   const removeAmendment = useConvexMutation(api.loans.removeAmendment)
@@ -171,6 +175,19 @@ function LoanSheet() {
   const { loan, summary } = sheet
   const isRevolving = loan.amortizationKind === 'revolving'
   const now = Date.now()
+
+  async function handleDetach(transactionId: Id<'transactions'>) {
+    setDetaching(transactionId)
+    try {
+      // No toast: the row leaves the table by itself (Convex reactivity),
+      // which is the feedback — same as the Passif page's allocated rows.
+      await deallocateTransaction({ transactionId })
+    } catch (err) {
+      reportError(err)
+    } finally {
+      setDetaching(null)
+    }
+  }
 
   async function handleDelete() {
     try {
@@ -687,6 +704,7 @@ function LoanSheet() {
                   <TableHead>
                     {t('passif:loan.transactions.col.label')}
                   </TableHead>
+                  <TableHead className="w-28" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -704,6 +722,21 @@ function LoanSheet() {
                     <TableCell className="max-w-[320px] truncate">
                       {tx.rawLabel}
                     </TableCell>
+                    {/* The sheet UNDOES a matching, it never makes one
+                        (SPEC D41). Detaching sends the movement back to the
+                        queue, where the human picks its target — the same
+                        gesture the Passif page offers on an equity line or a
+                        current account. */}
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={detaching === tx._id}
+                        onClick={() => void handleDetach(tx._id)}
+                      >
+                        {t('passif:allocated.detach')}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="bg-muted/40 font-medium">
@@ -713,7 +746,7 @@ function LoanSheet() {
                   <TableCell className="text-right tabular-nums">
                     {fmtEurCents(sheet.paidCents)}
                   </TableCell>
-                  <TableCell />
+                  <TableCell colSpan={2} />
                 </TableRow>
               </TableBody>
             </Table>
