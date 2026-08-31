@@ -680,10 +680,11 @@ function DealDetail() {
       }
     } catch (err) {
       const code = err instanceof ConvexError ? (err.data as string) : ''
+      const known = code === 'deal_has_transactions' || code === 'is_pledged'
       toast.error(
         t(
-          code === 'deal_has_transactions'
-            ? 'participations:deleteDeal.errors.deal_has_transactions'
+          known
+            ? `participations:deleteDeal.errors.${code}`
             : 'participations:deleteDeal.errors.default',
         ),
       )

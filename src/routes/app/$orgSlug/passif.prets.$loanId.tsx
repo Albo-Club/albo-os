@@ -25,6 +25,7 @@ import {
   PaginationFooter,
   usePagination,
 } from '~/components/data-table/LocalPagination'
+import { DocumentsSection } from '~/components/documents/DocumentsSection'
 import { useReportError } from '~/components/pointage/TransactionSheet'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
@@ -52,6 +53,14 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+
+/**
+ * Kinds offered when filing a document on a loan, most likely first — the
+ * first one is the dialog's default. `acte_pret` exists for exactly this
+ * (SPEC § 4.8); `legal` and `other` catch the rest without inventing a kind
+ * per paper.
+ */
+const LOAN_DOC_KINDS = ['acte_pret', 'legal', 'other'] as const
 
 export const Route = createFileRoute('/app/$orgSlug/passif/prets/$loanId')({
   component: LoanSheet,
@@ -96,9 +105,14 @@ function Stat({ label, value }: { label: string; value: string }) {
 /**
  * Formatters of the loan sheet. Two families on purpose, per the house rule
  * « l'actuel au centime, l'estimé arrondi » (CLAUDE.md):
- * - `fmtEur` (rounded) for the outstanding, the principal, the ceiling —
- *   computed steering figures.
- * - `fmtEurCents` for the schedule rows, which must tie to the bank.
+ * - `fmtEur` (rounded) for everything the app COMPUTES — the outstanding, the
+ *   principal, the ceiling, and every plan column of the schedule.
+ * - `fmtEurCents` for what actually moved through the bank: the Réel column,
+ *   the matched transactions and their total.
+ *
+ * The split runs between plan and reality, not between screens (§ 5.4). It is
+ * what makes 2 494 € of plan next to 2 536,00 € debited read as the insurance
+ * rather than as a figure someone should go and correct.
  */
 function useLoanFormatters() {
   const { i18n } = useTranslation('passif')
@@ -596,22 +610,30 @@ function LoanSheet() {
                         <TableCell className="whitespace-nowrap tabular-nums">
                           {fmtDate(row.date)}
                         </TableCell>
+                        {/* The PLAN is rounded to the euro and the REAL is
+                            not (§ 5.4, « l'actuel au centime, l'estimé
+                            arrondi »). That contrast is the point of the two
+                            columns: 2 494 € of plan against 2 536,00 €
+                            actually debited is not an error to go and fix,
+                            it is the insurance. Centimes on a computed
+                            instalment would claim a precision it does not
+                            have, and make the two look comparable. */}
                         <TableCell className="text-right tabular-nums">
-                          {fmtEurCents(row.paymentCents)}
+                          {fmtEur(row.paymentCents)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {fmtEurCents(row.capitalCents)}
+                          {fmtEur(row.capitalCents)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {fmtEurCents(row.interestCents)}
+                          {fmtEur(row.interestCents)}
                         </TableCell>
                         {loan.insuranceMonthlyCents != null ? (
                           <TableCell className="text-right tabular-nums">
-                            {fmtEurCents(row.insuranceCents)}
+                            {fmtEur(row.insuranceCents)}
                           </TableCell>
                         ) : null}
                         <TableCell className="text-right tabular-nums">
-                          {fmtEurCents(row.remainingCents)}
+                          {fmtEur(row.remainingCents)}
                         </TableCell>
                         {/* The actual is the CONSEQUENCE of a matching
                             gesture made in the queue, never a way to make
@@ -754,35 +776,12 @@ function LoanSheet() {
         )}
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">
-          {t('passif:loan.documents.title')}
-        </h2>
-        {!documents || documents.length === 0 ? (
-          <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
-            {t('passif:loan.documents.empty')}
-          </div>
-        ) : (
-          <ul className="divide-y rounded-lg border">
-            {documents.map((doc) => (
-              <li key={doc._id} className="p-3 text-sm">
-                {doc.url ? (
-                  <a
-                    href={doc.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:underline"
-                  >
-                    {doc.title}
-                  </a>
-                ) : (
-                  doc.title
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <DocumentsSection
+        anchor={{ kind: 'loan', loanId: loan._id }}
+        docs={documents}
+        kinds={LOAN_DOC_KINDS}
+        title={t('documents:loan.title')}
+      />
 
       {amending ? (
         <LoanAmendmentDialog loan={loan} onClose={() => setAmending(false)} />

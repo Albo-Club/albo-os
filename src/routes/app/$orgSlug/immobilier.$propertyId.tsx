@@ -15,6 +15,7 @@ import { PropertyDialog } from '~/components/immobilier/PropertyDialog'
 import { PropertyGuaranteesSection } from '~/components/immobilier/PropertyGuaranteesSection'
 import { PropertyValuationDialog } from '~/components/immobilier/PropertyValuationDialog'
 import { usePropertyFormatters } from '~/components/immobilier/formatters'
+import { DocumentsSection } from '~/components/documents/DocumentsSection'
 import { useReportError } from '~/components/pointage/TransactionSheet'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
@@ -42,6 +43,14 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+
+/**
+ * Kinds offered when filing a document on a property, most likely first — the
+ * first one is the dialog's default. A deed of sale or a compromis is
+ * `legal`; a works quote is `other`. No property-specific kind was added:
+ * two buckets already say all a property needs to say.
+ */
+const PROPERTY_DOC_KINDS = ['legal', 'other'] as const
 
 export const Route = createFileRoute('/app/$orgSlug/immobilier/$propertyId')({
   component: PropertySheet,
@@ -514,35 +523,12 @@ function PropertySheet() {
         )}
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">
-          {t('immobilier:sheet.documents.title')}
-        </h2>
-        {!documents || documents.length === 0 ? (
-          <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
-            {t('immobilier:sheet.documents.empty')}
-          </div>
-        ) : (
-          <ul className="divide-y rounded-lg border">
-            {documents.map((doc) => (
-              <li key={doc._id} className="p-3 text-sm">
-                {doc.url ? (
-                  <a
-                    href={doc.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:underline"
-                  >
-                    {doc.title}
-                  </a>
-                ) : (
-                  doc.title
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <DocumentsSection
+        anchor={{ kind: 'property', propertyId: property._id }}
+        docs={documents}
+        kinds={PROPERTY_DOC_KINDS}
+        title={t('documents:property.title')}
+      />
 
       {editing ? (
         <PropertyDialog

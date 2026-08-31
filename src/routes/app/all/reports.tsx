@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
-import { X } from 'lucide-react'
+import { Check, ChevronsUpDown, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '../../../../convex/_generated/api'
 import type { Id } from '../../../../convex/_generated/dataModel'
 import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
+import { cn } from '~/lib/utils'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
@@ -22,12 +23,18 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select'
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '~/components/ui/command'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '~/components/ui/popover'
 import { Skeleton } from '~/components/ui/skeleton'
 import { Spinner } from '~/components/ui/spinner'
 import {
@@ -87,6 +94,89 @@ function nameProximity(a: string, b: string): number {
   if (ga.size === 0 || gb.size === 0) return 0
   const shared = [...ga].filter((g) => gb.has(g)).length
   return (2 * shared) / (ga.size + gb.size)
+}
+
+/** Minimal shape of an assign target (return of `api.reportInbox.listAssignTargets`). */
+type AssignTarget = {
+  companyId: Id<'companies'>
+  name: string
+  orgName: string
+}
+
+/**
+ * Searchable combobox of the participations the user can attach a report to
+ * (Popover + Command). Mirrors `CompanyCombobox` on the deal sheet; the search
+ * matches the participation name and its organization, since the same company
+ * can appear once per org.
+ */
+function TargetCombobox({
+  targets,
+  value,
+  onSelect,
+}: {
+  targets: Array<AssignTarget> | undefined
+  value: string
+  onSelect: (companyId: string) => void
+}) {
+  const { t } = useTranslation('reports')
+  const [open, setOpen] = useState(false)
+  const selected = targets?.find((c) => c.companyId === value)
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={!targets}
+          className="w-full justify-between font-normal"
+        >
+          <span className="truncate">
+            {selected
+              ? `${selected.name} — ${selected.orgName}`
+              : t('assignDialog.placeholder')}
+          </span>
+          <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+        <Command>
+          <CommandInput placeholder={t('assignDialog.search')} />
+          <CommandList>
+            <CommandEmpty>{t('assignDialog.empty')}</CommandEmpty>
+            <CommandGroup>
+              {(targets ?? []).map((c) => (
+                <CommandItem
+                  key={c.companyId}
+                  // The companyId guarantees cmdk uniqueness when two orgs
+                  // hold a company under the same name.
+                  value={`${c.name} ${c.orgName} ${c.companyId}`}
+                  onSelect={() => {
+                    onSelect(c.companyId)
+                    setOpen(false)
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      'size-4',
+                      c.companyId === value ? 'opacity-100' : 'opacity-0',
+                    )}
+                  />
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate">{c.name}</span>
+                    <span className="text-muted-foreground truncate text-xs">
+                      {c.orgName}
+                    </span>
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
 }
 
 function InboundReports() {
@@ -391,24 +481,14 @@ function InboundReports() {
             </DialogTitle>
             <DialogDescription>{t('assignDialog.description')}</DialogDescription>
           </DialogHeader>
-          <Select
+          <TargetCombobox
+            targets={targets}
             value={targetId}
-            onValueChange={(value) => {
+            onSelect={(value) => {
               setTargetId(value)
               setAlsoIds([])
             }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder={t('assignDialog.placeholder')} />
-            </SelectTrigger>
-            <SelectContent>
-              {(targets ?? []).map((c) => (
-                <SelectItem key={c.companyId} value={c.companyId}>
-                  {c.name} — {c.orgName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
 
           {related.length > 0 ? (
             <div className="space-y-2">

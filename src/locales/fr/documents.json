@@ -1,0 +1,48 @@
+{
+  "upload": "Ajouter",
+  "loading": "Chargement…",
+  "empty": "Aucun document.",
+  "added": "Document ajouté",
+  "updated": "Document mis à jour",
+  "deleted": "Document supprimé",
+  "uploading": "Envoi…",
+  "dialogTitle": "Nouveau document",
+  "editDialogTitle": "Modifier le document",
+  "titleLabel": "Titre",
+  "kindLabel": "Type",
+  "dateLabel": "Date du document (facultatif)",
+  "addedOn": "Ajouté le {{date}}",
+  "deleteConfirmTitle": "Supprimer ce document ?",
+  "deleteConfirmBody": "Le fichier est supprimé définitivement. Cette action est irréversible.",
+  "kind": {
+    "acte_pret": "Acte de prêt",
+    "acte_garantie": "Acte de garantie",
+    "legal": "Juridique",
+    "other": "Autre",
+    "reporting": "Reporting",
+    "bp": "Business plan",
+    "term_sheet": "Term sheet",
+    "pacte": "Pacte",
+    "subscription": "Bulletin de souscription",
+    "attestation": "Attestation"
+  },
+  "errors": {
+    "too_large": "Le fichier dépasse 20 Mo.",
+    "default": "Impossible d’enregistrer le document. Réessayez."
+  },
+  "loan": {
+    "title": "Documents",
+    "hint": "Offre de prêt, tableau d’amortissement, acte."
+  },
+  "property": {
+    "title": "Documents",
+    "hint": "Acte de vente, compromis, devis de travaux."
+  },
+  "guarantee": {
+    "action": "Documents",
+    "count": "{{count}} document",
+    "count_other": "{{count}} documents",
+    "dialogTitle": "Documents de la garantie",
+    "sectionTitle": "Actes rattachés"
+  }
+}

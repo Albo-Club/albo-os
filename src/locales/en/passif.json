@@ -250,10 +250,6 @@
       "success": "Rate step saved",
       "deleted": "Rate step removed"
     },
-    "documents": {
-      "title": "Documents",
-      "empty": "No document attached to this loan."
-    },
     "menu": {
       "correct": "Correct",
       "delete": "Delete",

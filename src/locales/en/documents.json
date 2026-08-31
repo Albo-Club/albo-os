@@ -1,0 +1,48 @@
+{
+  "upload": "Add",
+  "loading": "Loading…",
+  "empty": "No document.",
+  "added": "Document added",
+  "updated": "Document updated",
+  "deleted": "Document deleted",
+  "uploading": "Uploading…",
+  "dialogTitle": "New document",
+  "editDialogTitle": "Edit document",
+  "titleLabel": "Title",
+  "kindLabel": "Type",
+  "dateLabel": "Document date (optional)",
+  "addedOn": "Added on {{date}}",
+  "deleteConfirmTitle": "Delete this document?",
+  "deleteConfirmBody": "The file is deleted permanently. This cannot be undone.",
+  "kind": {
+    "acte_pret": "Loan deed",
+    "acte_garantie": "Security deed",
+    "legal": "Legal",
+    "other": "Other",
+    "reporting": "Reporting",
+    "bp": "Business plan",
+    "term_sheet": "Term sheet",
+    "pacte": "Shareholders' agreement",
+    "subscription": "Subscription form",
+    "attestation": "Certificate"
+  },
+  "errors": {
+    "too_large": "The file is larger than 20 MB.",
+    "default": "Couldn't save the document. Please try again."
+  },
+  "loan": {
+    "title": "Documents",
+    "hint": "Offer letter, amortization table, deed."
+  },
+  "property": {
+    "title": "Documents",
+    "hint": "Deed of sale, preliminary contract, works quotes."
+  },
+  "guarantee": {
+    "action": "Documents",
+    "count": "{{count}} document",
+    "count_other": "{{count}} documents",
+    "dialogTitle": "Security documents",
+    "sectionTitle": "Attached deeds"
+  }
+}

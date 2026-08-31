@@ -419,6 +419,7 @@
     "deleted": "Deal deleted",
     "errors": {
       "deal_has_transactions": "This deal has reconciled transactions. Unreconcile them before deleting.",
+      "is_pledged": "This placement carries a guarantee. Detach it before deleting.",
       "default": "Couldn't delete the deal. Please try again."
     }
   },

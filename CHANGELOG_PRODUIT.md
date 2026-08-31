@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.205.0 — 31/08/2026 à 15:58 — Six informations que les fiches savaient sans les dire
+## v1.205.0 — 31/08/2026 à 16:25 — Six informations que les fiches savaient sans les dire
 
 Suite de l'audit du module Dette & Garanties. Ici, rien n'était faux : c'était
 de l'information que l'application possédait déjà et n'affichait nulle part.
@@ -93,6 +93,160 @@ puisqu'il n'y a pas d'habitude à comparer.
 >   tests couvrent le cas nominal, le mois courant non jugé, le bien jamais
 >   loué, et le fait qu'une charge n'est pas un loyer. Voir `KNOWN_ISSUES.md`
 >   « Un signal dérivé sans référentiel ».
+## v1.204.0 — 31/08/2026 à 16:00 — Ranger ses actes avec ses prêts et ses biens
+
+Le module Dette & Garanties savait tout stocker sauf le papier. Un prêt, un
+bien et une garantie affichaient bien une section « Documents » — mais sans
+aucun moyen d'y déposer quoi que ce soit, elle restait vide à jamais.
+C'est réparé : **on peut désormais rattacher des fichiers aux trois**.
+
+**Sur un prêt** — l'offre de prêt, le tableau d'amortissement de la banque,
+l'acte. La section Documents de la fiche accepte maintenant les dépôts, et
+liste ce qui est là avec sa date et son poids.
+
+**Sur un bien** — l'acte de vente, le compromis, les devis de travaux.
+
+**Sur une garantie** — l'acte de nantissement, l'inscription d'hypothèque,
+l'acte de caution. On y accède par le menu ⋯ de la garantie, sur la fiche du
+prêt. Ce choix est délibéré : une liste de sûretés se lit pour comparer des
+montants et des rangs, et une zone de dépôt sous chaque ligne aurait enterré
+cette lecture.
+
+Chaque fichier peut porter un **type** (acte de prêt, acte de garantie,
+juridique, autre) et une **date**, se renommer, s'ouvrir d'un clic et se
+supprimer. Comme ailleurs dans l'application, la limite est de 20 Mo par
+fichier, et le contenu des PDF est lu automatiquement pour que l'assistant
+puisse le retrouver.
+
+Un point à connaître : ces documents n'apparaissent **pas** sur la fiche
+d'une société du portefeuille. C'est voulu — un acte de prêt n'a pas de
+société-cible, il appartient à son prêt. On le retrouve depuis sa fiche
+d'origine et par la recherche.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau composant partagé `src/components/documents/DocumentsSection.tsx`,
+>   branché sur la fiche prêt, la fiche bien et — via un dialog ouvert depuis
+>   le ⋯ d'une garantie — `LoanGuaranteesSection`. Il prend une `anchor`
+>   discriminée (`loan` / `property` / `guarantee`) et **jamais un `orgId`** :
+>   `documents:create` résout l'org depuis l'ancre présente, une org fournie
+>   par l'appelant serait un trou de tenancy.
+> - Délibérément plus maigre que la surface documents de la fiche société
+>   (`CompanyDocumentsCard` + `AddDocumentDialog`), qu'il n'étend pas : pas de
+>   recherche, pas de regroupement par type, pas de sélection multiple. Une
+>   société de portefeuille accumule des dizaines de pièces ; un prêt porte une
+>   offre et un tableau. Un filtre sur quatre lignes est du mobilier. Si un
+>   prêt se met un jour à en accumuler autant, il faudra adopter cette
+>   surface-là plutôt que faire grossir celle-ci jusqu'à la recopier.
+> - L'appelant possède la query et passe `docs` : les trois ancres ont trois
+>   queries différentes, et un hook ne peut pas être appelé par ligne de liste
+>   (le cas garantie en rend un par garantie). Côté garantie, `skip` tant que
+>   le dialog est fermé.
+> - `documents:listByGuarantee` renvoyait une projection plus pauvre que ses
+>   deux jumelles (ni `period`, ni `size`, ni `contentType`, ni l'état de
+>   lecture). Alignée sur `listByLoan` — les trois alimentent le même
+>   composant, et un champ manquant sur l'une est un champ inutilisable sur
+>   les trois. Un test compare désormais les jeux de clés des trois.
+> - Nouveau namespace i18n `documents` (en + fr), et retrait des clés
+>   `passif:loan.documents` / `immobilier:sheet.documents` que le composant
+>   partagé rend orphelines.
+> - `convex/regression.docOptionalCompany.test.ts` couvre maintenant les trois
+>   ancres : un bien et une garantie en sont, aucune des lignes ne porte de
+>   `companyId`, et les trois projections sont identiques.
+## v1.203.2 — 31/08/2026 à 16:12 — Trois chiffres remis d'aplomb sur la dette
+
+Un audit à froid du module Dette & Garanties a fait remonter trois endroits
+où l'application affichait ou protégeait mal un chiffre. Aucun n'était
+visible à l'œil nu, et c'est bien le problème.
+
+**Le ballon d'un prêt in fine ne peut plus disparaître.** Un prêt in fine
+dont le différé couvrait toute la durée produisait un échéancier fait
+uniquement d'intérêts : aucun remboursement de capital, un restant dû figé
+au montant emprunté même après le terme, et surtout **aucune trace du
+capital dans le prévisionnel de trésorerie**. Sur un in fine de 6,6 M€, la
+somme n'apparaissait nulle part avant de tomber. La saisie refuse désormais
+un différé aussi long que la durée — pour les quatre types de prêt, sans
+exception — et un prêt déjà enregistré de cette façon retrouve son ballon
+tout seul à la lecture.
+
+**Un placement mis en gage ne se supprime plus en silence.** Supprimer un
+contrat nanti laissait la garantie qui s'appuyait dessus sans assiette : plus
+de libellé, plus de valeur à laquelle comparer la marge disponible. La
+suppression est maintenant refusée tant qu'une garantie pointe sur le
+placement — y compris une garantie déjà levée, dont l'historique a lui aussi
+besoin de son assiette pour se lire. Les prêts et les biens étaient déjà
+protégés ainsi ; le placement ne l'était pas.
+
+**L'échéancier ne prétend plus au centime près.** Les colonnes du plan
+(mensualité, capital, intérêts, assurance, restant dû) s'affichent désormais
+arrondies à l'euro, tandis que la colonne Réel reste au centime. Le plan est
+un calcul, le réel est un relevé bancaire : les afficher avec la même
+précision invitait à comparer au centime deux chiffres qui ne mesurent pas la
+même chose, et donnait envie de « corriger » un écart parfaitement normal —
+celui de l'assurance.
+
+> **🔧 Notes techniques**
+>
+> - **Ballon in fine** : `assertValidTerms` (`convex/loans.ts`) n'exempte plus
+>   `amortizationKind === 'bullet'` du contrôle `deferral >= durationMonths`,
+>   et `buildSchedule` (`convex/lib/amortization.ts`) clampe `deferralPeriods`
+>   à `totalPeriods − 1` pour tous les types. Les deux sont nécessaires : la
+>   validation ferme la saisie, le clamp répare la donnée déjà stockée (une
+>   query ne doit jamais lever). Le clamp exemptait le `bullet` au motif qu'un
+>   in fine est déjà « intérêts seuls » — mais la période supprimée était
+>   celle qui porte le ballon. Tests : `tests/amortization.test.ts` (le ballon
+>   survit au différé total) + `convex/regression.loans.test.ts` (la mutation
+>   refuse). `KNOWN_ISSUES.md` décrivait déjà le comportement corrigé : c'est
+>   la doc qui avait raison, pas le code.
+> - **C12** : `deals:remove` (`convex/deals.ts`) interroge l'index
+>   `by_subject_deal` de `guarantees` et lève `is_pledged`. Le garde-fou
+>   ignore `releasedAt` volontairement, comme ses jumeaux `loans:remove` et
+>   `properties:remove`. Surfacé dans `deals.$dealId.tsx` via la table
+>   d'erreurs existante. Nouvelle section `KNOWN_ISSUES.md` et nouvel
+>   anti-pattern `CLAUDE.md` sur la vraie cause : le garde-fou vit dans le
+>   fichier de l'objet référencé, jamais dans celui de la table qu'on écrit.
+> - **Arrondis** : les colonnes de plan de l'échéancier passent de
+>   `fmtEurCents` à `fmtEur` (`passif.prets.$loanId.tsx`), conformément à
+>   § 5.4 « l'actuel au centime, l'estimé arrondi ». Colonne Réel, table des
+>   transactions et total versé restent au centime.
+> - **Hygiène** : `modules:list` mémoïse la lecture des deals de l'org (les
+>   sondes `entreprises`, `placements` et `investments` la relisaient quatre
+>   fois par chargement de page) ; commentaire corrigé sur
+>   `properties:getById`, qui annonçait renvoyer les sûretés du bien alors
+>   qu'elles se lisent depuis `guarantees:listBySubjectProperty`.
+> - **SPEC § 12.5** assume désormais **deux** exceptions au non-stockage —
+>   l'encours d'un révolving et `loanAmendments.outstandingCents` — avec le
+>   critère qui les autorise : un fait extérieur constaté, jamais un calcul
+>   qu'on préfère figer.
+## v1.203.1 — 31/08/2026 à 15:54 — Une barre de recherche pour rattacher un report
+
+Dans les Rapports entrants, rattacher un mail à une participation passait par
+une liste déroulante qui affichait tout le portefeuille de toutes vos
+organisations, à faire défiler jusqu'à la bonne ligne. Le sélecteur devient un
+champ de recherche : tapez les premières lettres du nom de la participation ou
+de son organisation, la liste se filtre à la frappe, Entrée valide. Le reste ne
+bouge pas — les fiches du même domaine dans une autre organisation restent
+proposées en cases à cocher sous le choix, et « Rattacher et traiter » reste le
+geste final.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/all/reports.tsx` : le `Select` shadcn de la modale
+>   d'attachement est remplacé par un combobox `TargetCombobox` local
+>   (Popover + Command/cmdk), sur le même patron que `CompanyCombobox`
+>   (`deals.$dealId.tsx`) et `DealCombobox` — un combobox de ce type tourne
+>   déjà dans une `Dialog` ailleurs dans l'app.
+> - La valeur `cmdk` de chaque item concatène nom + organisation +
+>   `companyId`, pour que la recherche porte sur les deux libellés et que
+>   deux orgs détenant une société homonyme restent distinctes.
+> - Comportement inchangé : choisir une participation réinitialise les cases
+>   « même domaine, autre organisation », et `assignCompany` est appelée à
+>   l'identique.
+> - Deux clés i18n ajoutées (`assignDialog.search`, `assignDialog.empty`) en
+>   `fr` et `en` ; `docs/produit/17-reports-par-email.md` mis à jour.
+
+---
+
 ## v1.203.0 — 31/08/2026 à 15:17 — Les documents quittent le fil des rapports
 
 Sur une fiche société, tout vivait dans une seule liste : les rapports reçus,

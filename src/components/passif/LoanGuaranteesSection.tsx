@@ -16,6 +16,7 @@ import {
   useGuaranteeFormatters,
 } from '~/components/passif/GuaranteeList'
 import { GuaranteeDialog } from '~/components/passif/GuaranteeDialog'
+import { DocumentsSection } from '~/components/documents/DocumentsSection'
 import { useReportError } from '~/components/pointage/TransactionSheet'
 import { Button } from '~/components/ui/button'
 import {
@@ -33,6 +34,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
+
+/**
+ * Kinds offered when filing a document on a security, most likely first —
+ * the first one is the dialog's default. `acte_garantie` exists for exactly
+ * this (SPEC § 4.8).
+ */
+const GUARANTEE_DOC_KINDS = ['acte_garantie', 'legal', 'other'] as const
 
 /**
  * « Garanties » section of a loan sheet: what covers this loan, and how much
@@ -62,6 +70,15 @@ export function LoanGuaranteesSection({
   const [editing, setEditing] = useState<LoanGuarantee | null>(null)
   const [confirmDelete, setConfirmDelete] =
     useState<Id<'guarantees'> | null>(null)
+  // The deed of ONE security. Opened from the row's ⋯ rather than inlined
+  // under it: a list of securities is read to compare amounts and ranks, and
+  // an upload zone per row would bury that. `skip` keeps the query from
+  // running at all until the dialog is open.
+  const [docsFor, setDocsFor] = useState<LoanGuarantee | null>(null)
+  const guaranteeDocs = useConvexQuery(
+    api.documents.listByGuarantee,
+    docsFor ? { guaranteeId: docsFor._id } : 'skip',
+  )
 
   async function handleRelease(guarantee: LoanGuarantee) {
     try {
@@ -138,6 +155,11 @@ export function LoanGuaranteesSection({
                           onSelect={() => setEditing(guarantee)}
                         >
                           {t('passif:guarantees.menu.edit')}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => setDocsFor(guarantee)}
+                        >
+                          {t('documents:guarantee.action')}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={() => void handleRelease(guarantee)}
@@ -220,6 +242,26 @@ export function LoanGuaranteesSection({
                 {t('common:actions.delete')}
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      {docsFor ? (
+        <Dialog open onOpenChange={(open) => !open && setDocsFor(null)}>
+          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{t('documents:guarantee.dialogTitle')}</DialogTitle>
+              <DialogDescription>
+                {t(`passif:guarantees.form.${docsFor.form}`)}
+                {docsFor.subject.label ? ` · ${docsFor.subject.label}` : ''}
+              </DialogDescription>
+            </DialogHeader>
+            <DocumentsSection
+              anchor={{ kind: 'guarantee', guaranteeId: docsFor._id }}
+              docs={guaranteeDocs}
+              kinds={GUARANTEE_DOC_KINDS}
+              title={t('documents:guarantee.sectionTitle')}
+            />
           </DialogContent>
         </Dialog>
       ) : null}

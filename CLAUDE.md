@@ -671,9 +671,24 @@ export const remove = mutation({
   lecture par `convex/lib/amortization.ts` (fonction pure), la marge d'un
   actif gagé par `convex/lib/guarantees.ts`, les soldes de C/C par
   `convex/liabilities.ts`. Un chiffre stocké se désynchronise ; un chiffre
-  dérivé ne peut pas. La **seule** exception assumée de tout le module est
-  l'encours d'un `revolving`, qu'aucun échéancier ne peut déduire — elle est
-  documentée au schéma et ne se généralise pas.
+  dérivé ne peut pas. Le module assume **deux** exceptions, toutes deux
+  documentées au schéma, et aucune ne se généralise : l'encours d'un
+  `revolving`, qu'aucun échéancier ne peut déduire ; et
+  `loanAmendments.outstandingCents`, le capital que la banque **re-notifie**
+  à la date d'un avenant. Le critère commun n'est pas la commodité, c'est que
+  le chiffre soit un **constat** dont l'app n'a aucun moyen de dérivation —
+  pas un calcul qu'on préfère figer. Il reste optionnel : absent, le montant
+  atteint par le plan précédent fait foi.
+- ❌ Ajouter une table qui référence des tables existantes sans poser, dans
+  **chacune** d'elles, le refus de suppression correspondant. Le garde-fou
+  vit dans le fichier de l'objet référencé (`deals.ts`, `properties.ts`…),
+  jamais dans celui qu'on est en train d'écrire, donc rien ne le rappelle :
+  `deals:remove` a laissé supprimer un placement nanti pendant deux PR alors
+  que `loans:remove` et `properties:remove` refusaient déjà. La liste des
+  `remove` à modifier se dresse depuis les **champs de référence** de la
+  nouvelle table, pas depuis le fichier ouvert. Cf. `KNOWN_ISSUES.md` « Une
+  table polymorphe doit un garde-fou de suppression à CHACUNE de ses
+  assiettes ».
 - ❌ Transformer une attribution de **calendrier** en moteur de
   rapprochement. `attributeActuals` place un flux DÉJÀ pointé sur l'échéance
   dont il occupe la période : c'est déterministe et explicable par les seules

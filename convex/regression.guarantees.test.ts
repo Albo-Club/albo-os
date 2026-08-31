@@ -553,6 +553,47 @@ describe('guarantees: deletion guardrails', () => {
     )
   })
 
+  test('a pledged placement cannot be deleted (C12)', async () => {
+    const { user, concertoId } = await concertoSetup()
+    await expectConvexError(
+      user.as.mutation(api.deals.remove, { id: concertoId }),
+      'is_pledged',
+    )
+  })
+
+  test('a RELEASED guarantee still blocks its placement’s deletion', async () => {
+    // A mainlevée keeps the row as history (C6), and that history still needs
+    // its subject: deleting the deal would leave it describing nothing.
+    // Detaching — deleting the guarantee — is the way out, as for a loan.
+    const { t, user, concertoId } = await concertoSetup()
+    const ids = await t.run(async (ctx) =>
+      (
+        await ctx.db
+          .query('guarantees')
+          .withIndex('by_subject_deal', (q) =>
+            q.eq('subjectDealId', concertoId),
+          )
+          .collect()
+      ).map((row) => row._id),
+    )
+    for (const guaranteeId of ids) {
+      await user.as.mutation(api.guarantees.setReleased, {
+        guaranteeId,
+        releasedAt: Date.now(),
+      })
+    }
+    await expectConvexError(
+      user.as.mutation(api.deals.remove, { id: concertoId }),
+      'is_pledged',
+    )
+
+    // Detaching them all is the way out, and then the deletion goes through.
+    for (const guaranteeId of ids) {
+      await user.as.mutation(api.guarantees.remove, { guaranteeId })
+    }
+    await user.as.mutation(api.deals.remove, { id: concertoId })
+  })
+
   test('a guarantee carrying documents cannot be deleted', async () => {
     const { t, user, calte, calteLoan, concertoId } = await concertoSetup()
     const guaranteeId = await user.as.mutation(api.guarantees.create, {
