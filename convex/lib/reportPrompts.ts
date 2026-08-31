@@ -116,6 +116,7 @@ RÈGLES DE CALCUL
 - executive_summary : 2 phrases MAX, chiffrées (le fait marquant + la vigilance principale ; une seule phrase si un seul des deux existe)
 - good_points / bad_points : 1 à 3 items chacun, max 8 mots avec 1 chiffre. N'invente rien pour atteindre 3 — les deux colonnes n'ont pas à être de même longueur.
 - top_insights : EXACTEMENT 3, les 3 KPI les plus importants. current_value et trend OBLIGATOIRES, jamais vides. trend_direction : "up" | "down" | "stable"
+- top_insights.label : 2-3 mots max. current_value : une VALEUR, pas une phrase — 12 caractères max, chiffrée quand c'est possible ("86k€", "6-7 mois", "100%"). Le détail va dans context (≤ 8 mots), jamais dans current_value.
 - alerts : MAXIMUM 3 (1 "critical" max, 1 "warning" max, TOUJOURS 1 "info" positive). title 4-6 mots, message ≤ 10 mots
 - Si le contexte contient des projections (BP/deck) ET des résultats réels (reports) : compare-les, souligne les écarts dans executive_summary/top_insights/alerts.
 - AUCUN texte hors du bloc \`\`\`json. Le JSON ne contient QUE : executive_summary, health_score, top_insights, alerts.`

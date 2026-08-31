@@ -1295,8 +1295,8 @@ function entityBlock(e: ReportEntityCard): string {
   <tr><td style="padding:12px 14px;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0">
       <tr>
-        <td width="40" valign="middle" style="padding-right:12px;">${logo}</td>
-        <td valign="middle">
+        <td width="40" valign="middle" style="vertical-align:middle;padding-right:12px;">${logo}</td>
+        <td valign="middle" style="vertical-align:middle;">
           <div style="font-weight:600;line-height:1.3;">${esc(e.name)}</div>
           <div style="color:${MUTED};font-size:13px;line-height:1.3;">${esc(e.orgName)}</div>
         </td>
@@ -1329,21 +1329,35 @@ function factsBlock(e: ReportEntityCard): string {
   return `<p style="margin:12px 0 0;color:${MUTED};font-size:13px;">${parts.join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</p>`
 }
 
-/** One KPI tile. Fixed row heights so the three tiles align line by line. */
-function insightTile(i: ReportSynthesis['insights'][number]): string {
+/**
+ * Font size of a KPI value, from its length. A tile is ~180px wide in a
+ * 560px shell: a short figure ("86k€") can be big, a long one wraps and
+ * has to shrink. No fixed heights anywhere — a value that wraps used to
+ * overflow its 28px box and paint over the context line below.
+ */
+function valueFontSize(value: string): number {
+  if (value.length <= 12) return 21
+  if (value.length <= 24) return 17
+  return 15
+}
+
+/**
+ * One KPI tile, as a table CELL rather than a nested table: cells of the same
+ * row share its height, so the three tiles keep a common baseline whatever
+ * their text — which is what the removed fixed heights were trying to buy.
+ */
+function insightCell(i: ReportSynthesis['insights'][number], width: string): string {
   const tone =
     i.direction === 'up' ? TONE_POSITIVE : i.direction === 'down' ? TONE_NEGATIVE : null
   const chip = i.trend
     ? `<span style="display:inline-block;border:1px solid ${tone ?? BORDER};color:${tone ?? MUTED};font-size:11px;padding:1px 6px;border-radius:999px;line-height:1.4;">${esc(i.trend)}</span>`
     : ''
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid ${BORDER};border-radius:8px;">
-  <tr><td style="padding:11px 12px;">
-    <div style="color:${MUTED};font-size:10px;letter-spacing:0.05em;text-transform:uppercase;height:14px;line-height:14px;overflow:hidden;">${esc(i.label)}</div>
-    <div style="font-size:21px;font-weight:600;height:28px;line-height:28px;margin-top:2px;">${esc(i.value)}</div>
-    <div style="height:24px;line-height:24px;">${chip}</div>
-    ${i.context ? `<div style="color:${MUTED};font-size:11px;margin-top:4px;line-height:1.35;">${esc(i.context)}</div>` : ''}
-  </td></tr>
-</table>`
+  return `<td width="${width}" valign="top" style="vertical-align:top;border:1px solid ${BORDER};border-radius:8px;padding:11px 12px;">
+    <div style="color:${MUTED};font-size:10px;letter-spacing:0.05em;text-transform:uppercase;line-height:1.3;">${esc(i.label)}</div>
+    <div style="font-size:${valueFontSize(i.value)}px;font-weight:600;line-height:1.25;margin-top:3px;word-break:break-word;">${esc(i.value)}</div>
+    ${chip ? `<div style="margin-top:5px;line-height:1.4;">${chip}</div>` : ''}
+    ${i.context ? `<div style="color:${MUTED};font-size:11px;margin-top:5px;line-height:1.35;">${esc(i.context)}</div>` : ''}
+  </td>`
 }
 
 /**
@@ -1360,10 +1374,10 @@ function synthesisCard(name: string, s: ReportSynthesis): string {
     const color = scoreColor(s.score)
     blocks.push(`<table role="presentation" cellpadding="0" cellspacing="0" border="0">
   <tr>
-    <td width="44" valign="middle" style="padding-right:12px;">
+    <td width="44" valign="middle" style="vertical-align:middle;padding-right:12px;">
       <div style="width:44px;height:44px;border-radius:10px;border:2px solid ${color};color:${color};font-size:19px;font-weight:600;text-align:center;line-height:40px;">${s.score}</div>
     </td>
-    <td valign="middle">
+    <td valign="middle" style="vertical-align:middle;">
       ${s.scoreLabel ? `<span style="font-weight:600;font-size:15px;">${esc(s.scoreLabel)}</span>` : ''}
       <span style="color:${MUTED};font-size:14px;">&nbsp;Score ${s.score}/10</span>
     </td>
@@ -1375,7 +1389,7 @@ function synthesisCard(name: string, s: ReportSynthesis): string {
 
   if (s.goodPoints.length > 0 || s.badPoints.length > 0) {
     const col = (heading: string, color: string, items: Array<string>, pad: string) =>
-      `<td valign="top" width="50%" style="${pad}">
+      `<td valign="top" width="50%" style="vertical-align:top;${pad}">
     <p style="margin:0 0 7px;color:${color};font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;">${heading}</p>
     ${items.map((it, idx) => `<p style="margin:0 0 ${idx === items.length - 1 ? '0' : '5px'};font-size:13px;line-height:1.4;">${esc(it)}</p>`).join('\n    ')}
   </td>`
@@ -1388,18 +1402,12 @@ function synthesisCard(name: string, s: ReportSynthesis): string {
   }
 
   if (s.insights.length > 0) {
-    const cells = s.insights
-      .slice(0, 3)
-      .map((i, idx, all) => {
-        const pad =
-          idx === 0
-            ? 'padding-right:5px;'
-            : idx === all.length - 1
-              ? 'padding-left:5px;'
-              : 'padding:0 5px;'
-        return `<td valign="top" width="${Math.floor(100 / all.length)}%" style="${pad}">${insightTile(i)}</td>`
-      })
-      .join('\n  ')
+    const tiles = s.insights.slice(0, 3)
+    // Gutters are spacer cells: the tiles carry the border themselves, so
+    // padding between them is not an option.
+    const gutter = `<td width="10" style="font-size:0;line-height:0;">&nbsp;</td>`
+    const width = `${Math.floor((100 - 2 * tiles.length) / tiles.length)}%`
+    const cells = tiles.map((i) => insightCell(i, width)).join(`\n  ${gutter}\n  `)
     blocks.push(`<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:18px;">
   <tr>
   ${cells}
@@ -1426,8 +1434,8 @@ function bulletBlock(heading: string, items: Array<string>): string {
     .map(
       (it, idx) =>
         `<tr>
-    <td width="16" valign="top" style="color:${MUTED};line-height:1.5;">•</td>
-    <td valign="top" style="color:#3f4147;${idx === items.length - 1 ? '' : 'padding-bottom:7px;'}">${esc(it)}</td>
+    <td width="16" valign="top" style="vertical-align:top;color:${MUTED};font-size:14px;line-height:1.5;">•</td>
+    <td valign="top" style="vertical-align:top;color:#3f4147;font-size:14px;line-height:1.5;${idx === items.length - 1 ? '' : 'padding-bottom:7px;'}">${esc(it)}</td>
   </tr>`,
     )
     .join('\n  ')

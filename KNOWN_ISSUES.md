@@ -5639,3 +5639,40 @@ effet** (pas d'UI in-app pour l'afficher) : là c'est le flag `write: true` de
 `defineTool`, donc l'annotation `readOnlyHint: false`, qui fait demander
 confirmation au client. Les deux sont testés séparément parce que ce sont
 deux mécanismes différents sur les mêmes opérations.
+
+## HTML email : ni hauteur fixe, ni `valign` seul (`convex/emailTemplates.ts`)
+
+Le mail « Report rangé » est arrivé illisible chez un destinataire : le
+libellé d'une tuile KPI se peignait par-dessus sa ligne de contexte, les
+puces flottaient sous leur texte et les colonnes « Points forts » /
+« Points de vigilance » ne démarraient pas à la même hauteur. Deux causes
+distinctes, toutes deux à éviter dans **tout** gabarit d'email.
+
+**1. Une hauteur fixe sur un texte écrit par l'IA finit toujours par
+déborder.** Les tuiles portaient `height:28px;line-height:28px` sur la
+valeur, pour que les trois tuiles s'alignent ligne à ligne. Dès qu'une
+valeur passe sur deux lignes (« Holding Estime (100% Auxicare) »), la
+seconde ligne sort de la boîte — `overflow:hidden` ne sauve rien, les
+clients mail le neutralisent. Un texte de longueur non bornée se met en
+`line-height` relatif, jamais en hauteur fixe. Pour l'aligner quand même :
+mettre bordure et padding sur le `<td>` lui-même et espacer avec des
+cellules vides, car les cellules d'une même ligne partagent la hauteur de
+la ligne — une table imbriquée dans le `<td>`, elle, ne s'étire pas.
+
+**2. L'attribut `valign="top"` ne suffit pas.** Certains clients strippent
+les attributs de présentation ; la cellule retombe alors sur son défaut,
+`vertical-align: middle`, et tout ce qui est plus court que son voisin se
+retrouve centré. C'est la signature du symptôme : un décalage d'une
+demi-ligne, proportionnel à l'écart de contenu entre les deux cellules.
+Toujours doubler l'attribut d'un `style="vertical-align:top"` inline —
+l'attribut reste pour les vieux Outlook.
+
+`tests/reportEmail.test.ts` fige les deux : aucune hauteur fixe sur du
+texte du modèle, et aucun `valign=` sans son équivalent CSS dans la même
+balise. Le rendu se vérifie à l'œil en retirant les `valign` du HTML avant
+de l'ouvrir dans un navigateur — c'est exactement ce que fait le client
+fautif.
+
+⚠️ Les autres gabarits du fichier (digest hebdo, relevé de mouvements)
+portent encore des `valign` nus. Ils n'ont pas montré le symptôme, mais ils
+y sont exposés.
