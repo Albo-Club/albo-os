@@ -269,6 +269,21 @@ n'ont pas de société-cible au sens portefeuille, et n'apparaissent donc pas
 sur une fiche société — ils se lisent depuis le prêt ou la garantie, et
 depuis la recherche de l'assistant IA.
 
+**Sur un prêt**, la section Documents de la fiche porte un bouton
+« Ajouter ». Chaque fichier peut recevoir un type (acte de prêt, juridique,
+autre) et une date, se renommer, s'ouvrir d'un clic et se supprimer. La
+limite est de 20 Mo par fichier, et le texte des PDF est lu automatiquement
+pour que l'assistant puisse le retrouver.
+
+**Sur une garantie**, les actes se rattachent depuis le menu **⋯** de la
+ligne, sur la fiche du prêt. Ils ne sont pas déposés directement sous la
+ligne, et c'est délibéré : une liste de sûretés se lit pour comparer des
+montants et des rangs, une zone de dépôt par ligne enterrerait cette lecture.
+
+⚠️ Un prêt ou une garantie qui porte des documents ne peut pas être
+supprimé : un acte ne doit jamais être orphelin en silence. Il faut retirer
+les documents d'abord.
+
 ## L'assistant IA
 
 L'assistant sait **lire** la dette : les prêts d'une société et leur capital

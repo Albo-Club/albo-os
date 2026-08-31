@@ -25,6 +25,7 @@ import {
   PaginationFooter,
   usePagination,
 } from '~/components/data-table/LocalPagination'
+import { DocumentsSection } from '~/components/documents/DocumentsSection'
 import { useReportError } from '~/components/pointage/TransactionSheet'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
@@ -52,6 +53,14 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+
+/**
+ * Kinds offered when filing a document on a loan, most likely first — the
+ * first one is the dialog's default. `acte_pret` exists for exactly this
+ * (SPEC § 4.8); `legal` and `other` catch the rest without inventing a kind
+ * per paper.
+ */
+const LOAN_DOC_KINDS = ['acte_pret', 'legal', 'other'] as const
 
 export const Route = createFileRoute('/app/$orgSlug/passif/prets/$loanId')({
   component: LoanSheet,
@@ -734,35 +743,12 @@ function LoanSheet() {
         )}
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">
-          {t('passif:loan.documents.title')}
-        </h2>
-        {!documents || documents.length === 0 ? (
-          <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
-            {t('passif:loan.documents.empty')}
-          </div>
-        ) : (
-          <ul className="divide-y rounded-lg border">
-            {documents.map((doc) => (
-              <li key={doc._id} className="p-3 text-sm">
-                {doc.url ? (
-                  <a
-                    href={doc.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:underline"
-                  >
-                    {doc.title}
-                  </a>
-                ) : (
-                  doc.title
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <DocumentsSection
+        anchor={{ kind: 'loan', loanId: loan._id }}
+        docs={documents}
+        kinds={LOAN_DOC_KINDS}
+        title={t('documents:loan.title')}
+      />
 
       {amending ? (
         <LoanAmendmentDialog loan={loan} onClose={() => setAmending(false)} />

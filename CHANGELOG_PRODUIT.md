@@ -23,6 +23,66 @@ bas de page.
 
 ---
 
+## v1.204.0 — 31/08/2026 à 16:00 — Ranger ses actes avec ses prêts et ses biens
+
+Le module Dette & Garanties savait tout stocker sauf le papier. Un prêt, un
+bien et une garantie affichaient bien une section « Documents » — mais sans
+aucun moyen d'y déposer quoi que ce soit, elle restait vide à jamais.
+C'est réparé : **on peut désormais rattacher des fichiers aux trois**.
+
+**Sur un prêt** — l'offre de prêt, le tableau d'amortissement de la banque,
+l'acte. La section Documents de la fiche accepte maintenant les dépôts, et
+liste ce qui est là avec sa date et son poids.
+
+**Sur un bien** — l'acte de vente, le compromis, les devis de travaux.
+
+**Sur une garantie** — l'acte de nantissement, l'inscription d'hypothèque,
+l'acte de caution. On y accède par le menu ⋯ de la garantie, sur la fiche du
+prêt. Ce choix est délibéré : une liste de sûretés se lit pour comparer des
+montants et des rangs, et une zone de dépôt sous chaque ligne aurait enterré
+cette lecture.
+
+Chaque fichier peut porter un **type** (acte de prêt, acte de garantie,
+juridique, autre) et une **date**, se renommer, s'ouvrir d'un clic et se
+supprimer. Comme ailleurs dans l'application, la limite est de 20 Mo par
+fichier, et le contenu des PDF est lu automatiquement pour que l'assistant
+puisse le retrouver.
+
+Un point à connaître : ces documents n'apparaissent **pas** sur la fiche
+d'une société du portefeuille. C'est voulu — un acte de prêt n'a pas de
+société-cible, il appartient à son prêt. On le retrouve depuis sa fiche
+d'origine et par la recherche.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau composant partagé `src/components/documents/DocumentsSection.tsx`,
+>   branché sur la fiche prêt, la fiche bien et — via un dialog ouvert depuis
+>   le ⋯ d'une garantie — `LoanGuaranteesSection`. Il prend une `anchor`
+>   discriminée (`loan` / `property` / `guarantee`) et **jamais un `orgId`** :
+>   `documents:create` résout l'org depuis l'ancre présente, une org fournie
+>   par l'appelant serait un trou de tenancy.
+> - Délibérément plus maigre que la surface documents de la fiche société
+>   (`CompanyDocumentsCard` + `AddDocumentDialog`), qu'il n'étend pas : pas de
+>   recherche, pas de regroupement par type, pas de sélection multiple. Une
+>   société de portefeuille accumule des dizaines de pièces ; un prêt porte une
+>   offre et un tableau. Un filtre sur quatre lignes est du mobilier. Si un
+>   prêt se met un jour à en accumuler autant, il faudra adopter cette
+>   surface-là plutôt que faire grossir celle-ci jusqu'à la recopier.
+> - L'appelant possède la query et passe `docs` : les trois ancres ont trois
+>   queries différentes, et un hook ne peut pas être appelé par ligne de liste
+>   (le cas garantie en rend un par garantie). Côté garantie, `skip` tant que
+>   le dialog est fermé.
+> - `documents:listByGuarantee` renvoyait une projection plus pauvre que ses
+>   deux jumelles (ni `period`, ni `size`, ni `contentType`, ni l'état de
+>   lecture). Alignée sur `listByLoan` — les trois alimentent le même
+>   composant, et un champ manquant sur l'une est un champ inutilisable sur
+>   les trois. Un test compare désormais les jeux de clés des trois.
+> - Nouveau namespace i18n `documents` (en + fr), et retrait des clés
+>   `passif:loan.documents` / `immobilier:sheet.documents` que le composant
+>   partagé rend orphelines.
+> - `convex/regression.docOptionalCompany.test.ts` couvre maintenant les trois
+>   ancres : un bien et une garantie en sont, aucune des lignes ne porte de
+>   `companyId`, et les trois projections sont identiques.
 ## v1.203.2 — 31/08/2026 à 16:12 — Trois chiffres remis d'aplomb sur la dette
 
 Un audit à froid du module Dette & Garanties a fait remonter trois endroits

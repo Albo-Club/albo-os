@@ -106,6 +106,72 @@ describe('documents: a row can hang off a loan instead of a company', () => {
     expect(onCompany.map((doc) => doc.title)).toEqual(['Reporting Q2.pdf'])
   })
 
+  test('a property and a guarantee are anchors too, with the SAME shape', async () => {
+    // The three anchored lists feed one front component, so a field missing
+    // from one of them is a field the component cannot use on any of them.
+    const { t, user, org, loanId } = await setup()
+    const propertyId = await user.as.mutation(api.properties.create, {
+      orgId: org.orgId,
+      name: '18 rue de la Chapelle',
+      address: 'Paris 18e',
+      propertyType: 'immeuble',
+      usage: 'locatif_nu',
+      costBasis: [],
+    })
+    const guaranteeId = await user.as.mutation(api.guarantees.create, {
+      loanId,
+      pledgorOrgId: org.orgId,
+      subjectKind: 'property',
+      subjectPropertyId: propertyId,
+      form: 'ppd',
+      pledgedAmountCents: 300_000_00,
+    })
+
+    await user.as.mutation(api.documents.create, {
+      loanId,
+      title: 'Offre de prêt.pdf',
+      kind: 'acte_pret',
+      storageId: await blob(t, 'offre'),
+    })
+    await user.as.mutation(api.documents.create, {
+      propertyId,
+      title: 'Acte de vente.pdf',
+      kind: 'legal',
+      period: utc(2019, 2, 9),
+      storageId: await blob(t, 'vente'),
+    })
+    await user.as.mutation(api.documents.create, {
+      guaranteeId,
+      title: 'Acte de PPD.pdf',
+      kind: 'acte_garantie',
+      storageId: await blob(t, 'ppd'),
+    })
+
+    const onProperty = await user.as.query(api.documents.listByProperty, {
+      propertyId,
+    })
+    const onGuarantee = await user.as.query(api.documents.listByGuarantee, {
+      guaranteeId,
+    })
+    expect(onProperty.map((doc) => doc.title)).toEqual(['Acte de vente.pdf'])
+    expect(onGuarantee.map((doc) => doc.title)).toEqual(['Acte de PPD.pdf'])
+    // Same keys on all three: the shared section reads `period`, `size`,
+    // `contentType` and the reading state, whatever the anchor.
+    const onLoanKeys = Object.keys(
+      (
+        await user.as.query(api.documents.listByLoan, { loanId })
+      )[0] ?? {},
+    ).sort()
+    expect(Object.keys(onProperty[0]).sort()).toEqual(onLoanKeys)
+    expect(Object.keys(onGuarantee[0]).sort()).toEqual(onLoanKeys)
+    expect(onProperty[0].period).toBe(utc(2019, 2, 9))
+    // And neither carries a company, which is the whole point.
+    const rows = await t.run(async (ctx) =>
+      ctx.db.query('documents').collect(),
+    )
+    expect(rows.every((row) => row.companyId === undefined)).toBe(true)
+  })
+
   test('a document with no anchor at all is refused', async () => {
     const { t, user } = await setup()
     await expectConvexError(

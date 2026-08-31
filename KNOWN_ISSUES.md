@@ -5229,6 +5229,15 @@ Ce qu'il faut retenir pour la suite :
   `documents`** — le cahier des charges les listait, à tort. Et **aucun
   fichier `src/`** ne lit `companyId` sur un document : les deux queries de
   liste ne le renvoient pas.
+- **Les trois queries d'ancre doivent garder la MÊME projection.**
+  `listByLoan`, `listByProperty` et `listByGuarantee` alimentent un seul
+  composant (`src/components/documents/DocumentsSection.tsx`), donc un champ
+  absent de l'une est un champ inutilisable sur les trois. `listByGuarantee`
+  est partie en production avec une projection plus pauvre (ni `period`, ni
+  `size`, ni `contentType`, ni état de lecture) — le typage ne l'a pas vu
+  tant qu'aucun appelant commun n'existait. Un test compare désormais les
+  jeux de clés des trois (`regression.docOptionalCompany.test.ts`) : c'est
+  ce qui rend l'écart visible avant l'écran.
 
 ## Échéancier de prêt : une fonction pure, et rien de stocké (`convex/lib/amortization.ts`)
 
