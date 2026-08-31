@@ -119,6 +119,7 @@ describe('documents: a row can hang off a loan instead of a company', () => {
       costBasis: [],
     })
     const guaranteeId = await user.as.mutation(api.guarantees.create, {
+      orgId: org.orgId,
       loanId,
       pledgorOrgId: org.orgId,
       subjectKind: 'property',

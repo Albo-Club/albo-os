@@ -710,9 +710,19 @@ export const remove = mutation({
   ancre devenue optionnelle. `documents:create` résout l'org depuis l'ancre
   présente (`companyId`, sinon `loanId`, sinon `guaranteeId`, sinon
   `dealId`) puis vérifie l'appartenance dessus ; sans ancre, elle refuse
-  (`missing_anchor`). Une org fournie par l'appelant est un trou de tenancy,
-  pas un raccourci — cf. `KNOWN_ISSUES.md` « Un document ne peut se rattacher
-  qu'à une société ».
+  (`missing_anchor`). Une org fournie par l'appelant **à la place** d'une org
+  dérivable est un trou de tenancy, pas un raccourci — cf.
+  `KNOWN_ISSUES.md` « Un document ne peut se rattacher qu'à une société ».
+  Le critère n'est pas « l'org est un argument » (`loans:create`,
+  `properties:create`, `guarantees:create` en prennent un, légitimement),
+  c'est **qu'une source de vérité existait et qu'on l'a ignorée**. Quand rien
+  ne dérive l'org — `guarantees:create` sur une sûreté dont aucune partie
+  n'est du groupe — l'argument est la seule voie, et il reste **vérifié**
+  (`requireOrgMember`), jamais cru sur parole. Deux réflexes dans ce cas :
+  les orgs qu'on peut lire sur une ligne référencée (le prêt, l'actif) se
+  lisent **quand même** là-bas, et elles gardent leur propre contrôle
+  d'appartenance — sinon l'argument devient la porte d'entrée du passif d'un
+  autre.
 - ❌ Relâcher une contrainte de schéma (requis → optionnel) **avant** d'avoir
   rendu les lectures tolérantes à l'absence. Convex accepte d'élargir un
   champ et refuse de le resserrer : le déploiement passe sans broncher, tout

@@ -332,7 +332,9 @@
       "title": "Guarantees given",
       "subtitle": "assets pledged for a third party",
       "empty": "{{org}} pledges none of its assets.",
-      "forBorrower": "for {{borrower}}"
+      "forBorrower": "for {{borrower}}",
+      "otherSecurity": "another security on this debt",
+      "thirdParty": "third-party security"
     },
     "onDeal": {
       "title": "Pledges on this contract",

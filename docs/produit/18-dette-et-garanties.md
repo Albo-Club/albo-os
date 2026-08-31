@@ -214,6 +214,34 @@ En bas de la page Passif, détaché des trois autres sections, un bloc
 quelqu'un d'autre. Ce n'est pas une dette, c'est un engagement hors bilan :
 d'où sa mise à l'écart visuelle, et l'absence de total.
 
+C'est aussi le **seul endroit** où se saisit et se corrige une garantie
+donnée à un emprunteur **hors groupe** : elle ne pend à aucune fiche de prêt
+de chez nous. Le bloc porte donc un bouton **Ajouter** et, sur chaque ligne,
+un menu **⋯** (modifier, mainlevée, supprimer). Corollaire : une société qui
+n'a aucun prêt peut désormais enregistrer une garantie — auparavant, faute
+de point d'entrée, elle ne le pouvait pas.
+
+### Les sûretés d'un tiers sur la même dette
+
+Quand on garantit l'emprunt de quelqu'un d'extérieur au groupe, on n'est
+souvent pas le seul à le faire. L'exemple réel : sur les 1,15 M€ empruntés
+par la SARL Bremontier, CALTE a nanti 500 000 € sur son contrat Concerto
+Capi, et un tiers a nanti 500 000 € de plus sur une assurance-vie à lui.
+
+Cette seconde sûreté ne touche **rien** de chez nous : ni notre prêt, ni
+notre actif, ni notre société. Elle se saisit quand même, dans l'espace où
+on la constate, et elle s'affiche en **sous-ligne** sous notre propre
+garantie sur la même dette : « autre sûreté sur cette dette : … ». Sans elle,
+on lirait notre gage comme la seule sûreté du créancier — ce qu'il n'est pas.
+
+Si aucune garantie de chez nous ne porte sur cet emprunteur, la sûreté du
+tiers apparaît **seule**, badgée « sûreté d'un tiers », avec le nom du
+garant : rien ne disparaît faute de ligne à qui s'accrocher.
+
+⚠️ Les garanties qui couvrent un **prêt du groupe** ne sont pas reprises dans
+ce bloc, même quand un organisme externe les stand : la fiche du prêt les
+liste déjà, et elles ne disent rien de ce que cette société a **donné**.
+
 ### Mainlevée
 
 Une garantie qui a pris fin se marque en **mainlevée**. Sa ligne reste —

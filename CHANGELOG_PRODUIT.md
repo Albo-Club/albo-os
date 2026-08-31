@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.205.1 — 31/08/2026 à 19:15 — Le mail d'accusé de réception redevient lisible
+## v1.206.1 — 31/08/2026 à 19:15 — Le mail d'accusé de réception redevient lisible
 
 Quand un report est rangé, l'email de confirmation reprend la synthèse de la
 fiche : le score, les points forts et de vigilance, et trois tuiles de KPI.
@@ -60,6 +60,68 @@ ne démarraient pas à la même hauteur.
 >   textes longs, aucune hauteur fixe, aucun `valign` sans CSS équivalent.
 >   Piège documenté dans `KNOWN_ISSUES.md` § « HTML email : ni hauteur fixe,
 >   ni `valign` seul ».
+
+## v1.206.0 — 31/08/2026 à 18:37 — La garantie qu'un tiers donne sur la même dette
+
+Quand on garantit l'emprunt de quelqu'un d'extérieur au groupe, on n'est
+souvent pas le seul à le faire. Sur les 1,15 M€ empruntés par la SARL
+Bremontier, CALTE a nanti 500 000 € sur son contrat Concerto Capi — et un
+tiers a nanti autant sur une assurance-vie à lui. Cette seconde sûreté ne
+touche rien de chez nous : ni notre prêt, ni notre actif, ni notre société.
+L'app la refusait donc, et on lisait notre gage comme la seule sûreté du
+créancier.
+
+Elle se saisit désormais, dans l'espace où on la constate, et elle s'affiche
+en sous-ligne sous notre propre garantie sur la même dette : « autre sûreté
+sur cette dette : … ». Si aucune garantie de chez nous ne porte sur cet
+emprunteur, elle apparaît seule, badgée « sûreté d'un tiers » avec le nom du
+garant — rien ne disparaît faute de ligne à qui s'accrocher.
+
+Le bloc **Garanties données**, en bas de la page Passif, gagne au passage un
+bouton **Ajouter** et un menu **⋯** par ligne (modifier, mainlevée,
+supprimer). C'était le trou : une garantie donnée hors groupe ne pend à
+aucune fiche de prêt, donc elle n'avait aucun endroit d'où être créée ni
+corrigée — et une société sans aucun prêt ne pouvait enregistrer aucune
+garantie du tout.
+
+Les garanties qui couvrent un prêt du groupe ne sont pas reprises dans ce
+bloc : la fiche du prêt les liste déjà, et elles ne disent rien de ce que
+cette société a **donné**.
+
+> **🔧 Notes techniques**
+>
+> - `guarantees.orgId` (optionnel + index `by_org`, `convex/schema.ts`) : la
+>   société qui **enregistre** la sûreté, pas une quatrième partie. Elle
+>   ancre la ligne du cas 10b de `SPEC.md` § 10, qui n'a ni `loanId`, ni
+>   `pledgorOrgId`, ni `subjectOrgId` et tombait donc sur `not_a_party`.
+> - `requireGuaranteeParty` inclut `orgId` dans ses parties (lecture).
+>   L'écriture passe par `requireCanFile` : `requireOrgMember(orgId)` **et**
+>   au moins une org de chez nous parmi les orgs **référencées** (lues sur le
+>   prêt et sur l'actif, jamais sur un argument) — sauf quand il n'y en a
+>   aucune, le cas 10b. Sans le second contrôle, un membre de `calte`
+>   pourrait accrocher une ligne au prêt et à l'actif de `sci-upload`.
+>   `update` ne patche pas `orgId` : une sûreté ne déménage pas.
+> - `guarantees:listByPledgorOrg` lit `by_pledgor_org` (nos sûretés) **et**
+>   `by_org` (ce que l'org a classé sans le donner). Les secondes s'accrochent
+>   en `otherSecurities` sous **la première** de nos sûretés portant le même
+>   `borrowerLabel` normalisé ; celles sans correspondance remontent en ligne
+>   à part (`isOwnPledge: false`). Les sûretés sur un prêt du groupe sont
+>   exclues (la fiche du prêt les liste déjà).
+> - Front : `GuaranteesGivenSection` prend l'`orgId`, ouvre `GuaranteeDialog`
+>   en création et en édition (nouveau type `EditableGuarantee` dans
+>   `GuaranteeList.tsx`, satisfait par les deux formes de ligne), et rend les
+>   sous-lignes. `GuaranteeDialog` envoie l'`orgId` de la page à la création.
+> - Côté agent : `createGuaranteeInternal` écrit l'`orgId` du thread, et
+>   `listGuaranteesInternal` lit aussi `by_org`.
+> - `convex/migrations/backfillGuaranteeOrg.ts` (`dryRun` / `apply` /
+>   `verify`, idempotent) remplit le champ depuis `pledgorOrgId` →
+>   `borrowerOrgId` → `subjectOrgId`. **Étape 1 d'un purge-then-narrow** : le
+>   champ ne devient requis qu'après le passage en prod (`verify` à
+>   `clean: true`). Une ligne sans aucune des trois parties est signalée, pas
+>   rangée au hasard.
+> - Tests : 4 cas de plus dans `convex/regression.guarantees.test.ts` (sûreté
+>   sans partie acceptée, passif d'un inconnu refusé, co-sûreté accrochée une
+>   seule fois, co-sûreté orpheline listée seule, prêt du groupe non repris).
 
 ## v1.205.0 — 31/08/2026 à 16:25 — Six informations que les fiches savaient sans les dire
 

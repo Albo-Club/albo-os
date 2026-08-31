@@ -525,6 +525,7 @@ describe('properties: a pledged asset never disappears in silence', () => {
       paymentFrequency: 'monthly',
     })
     await user.as.mutation(api.guarantees.create, {
+      orgId: org.orgId,
       loanId,
       pledgorOrgId: org.orgId,
       subjectKind: 'property',
@@ -610,6 +611,7 @@ describe('guarantees: a PPD on a building reads from BOTH sides (D13)', () => {
       paymentFrequency: 'monthly',
     })
     await user.as.mutation(api.guarantees.create, {
+      orgId: org.orgId,
       loanId,
       pledgorOrgId: org.orgId,
       subjectKind: 'property',

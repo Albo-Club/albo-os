@@ -5343,10 +5343,25 @@ l'assiette dans `calte`. `requireOrgMember` sur une seule d'entre elles
 refuserait des lectures parfaitement fondées.
 
 - **`requireGuaranteeParty` est calqué sur `requireLoanParty`** : membre d'au
-  moins une des orgs parties (`borrowerOrgId`, `pledgorOrgId`,
-  `subjectOrgId`). Une garantie qui ne touche **aucune** org du groupe est
-  refusée (`not_a_party`) : rien dans Albo OS ne justifierait de la lire. Les
-  orgs restent à plat, aucun héritage de droits.
+  moins une des orgs de la ligne (`orgId`, `borrowerOrgId`, `pledgorOrgId`,
+  `subjectOrgId`). Les orgs restent à plat, aucun héritage de droits.
+- **`orgId` est l'org qui ENREGISTRE la sûreté, pas une quatrième partie.**
+  Il existe parce qu'une sûreté peut n'avoir **aucune** partie du groupe : la
+  sûreté qu'un tiers donne sur la même dette hors groupe que la nôtre (SPEC
+  § 10 cas 10b) n'a ni prêt, ni actif, ni garant de chez nous, et était donc
+  refusée (`not_a_party`) — alors que c'est elle qui dit que nos 500 K€ ne
+  sont pas seuls sur cette dette.
+- **Lire demande une partie, écrire en demande deux.** L'appelant choisit
+  `orgId` mais pas les autres orgs, lues sur le prêt et sur l'actif. Donc :
+  (1) `requireOrgMember(orgId)` — on ne dépose rien dans le passif d'un
+  inconnu ; (2) les orgs **référencées** doivent inclure une des nôtres, sans
+  quoi un membre de `calte` accrocherait une ligne au prêt et à l'actif de
+  `sci-upload`, qui la verrait apparaître sur sa fiche de prêt ; (3) sauf
+  s'il n'y a **aucune** org référencée — le cas 10b, où (1) porte le contrôle
+  seul. Prendre `orgId` en argument n'est pas le trou de tenancy interdit par
+  `CLAUDE.md` tant qu'il est **vérifié** et non cru sur parole (même patron
+  que `properties:create`). `update` ne le patche pas : une sûreté ne
+  déménage pas d'un passif à l'autre.
 - **Les orgs dénormalisées ne viennent jamais d'un argument.**
   `borrowerOrgId` est lu sur le prêt, `subjectOrgId` sur l'actif. Sinon un
   appelant pourrait se déclarer partie d'une garantie qui ne le concerne pas.
@@ -5367,6 +5382,21 @@ refuserait des lectures parfaitement fondées.
   `properties` et l'index `by_subject_property`. Élargir une union Convex n'a
   demandé aucune migration — c'est pour ça que la valeur avait été laissée de
   côté au lot 2 plutôt que déclarée à vide.
+- **« Garanties données » est le seul écran où une sûreté hors groupe se
+  crée et se corrige.** Elle ne pend à aucune fiche de prêt de chez nous, et
+  sans point d'entrée là une org sans prêt ne pouvait enregistrer aucune
+  sûreté. Le bloc porte donc un « + » et un menu ⋯ par ligne.
+- **Une sûreté de tiers n'est jamais une sous-ligne ET RIEN D'AUTRE.**
+  `listByPledgorOrg` accroche les sûretés de tiers sous **la première** de
+  nos sûretés portant le même emprunteur hors groupe (sinon deux sûretés sur
+  la même dette afficheraient deux fois la même co-sûreté) ; celles qui ne
+  correspondent à aucune sûreté de chez nous remontent en ligne à part
+  (`isOwnPledge: false`). Sans ça, supprimer notre sûreté rendrait la
+  co-sûreté invisible partout. Le regroupement se fait sur le `borrowerLabel`
+  normalisé — c'est tout ce qu'un emprunteur hors groupe est.
+- **Les sûretés portant sur un prêt du groupe ne sont pas reprises dans ce
+  bloc** : la fiche du prêt les liste déjà, et les répéter ne dirait rien de
+  ce que cette société a **donné**.
 
 ## Échéances de prêt dans le prévisionnel (`forecasts:expandLoanSchedules`)
 

@@ -25,14 +25,21 @@ import type { QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import type { PledgeSummary } from './lib/guarantees'
 
-/** The orgs a guarantee touches: borrower, guarantor, and asset holder. */
-function partiesOf(
-  guarantee: Pick<
-    Doc<'guarantees'>,
-    'borrowerOrgId' | 'pledgorOrgId' | 'subjectOrgId'
-  >,
-): Array<Id<'organizations'>> {
+/**
+ * The orgs a guarantee touches: the one it is filed in, plus the borrower,
+ * the guarantor and the asset holder.
+ *
+ * `orgId` sits in the list because it is the ONLY anchor of a guarantee whose
+ * three other parties are all outside the group (SPEC § 10 line 10b).
+ */
+export type GuaranteeParties = Pick<
+  Doc<'guarantees'>,
+  'orgId' | 'borrowerOrgId' | 'pledgorOrgId' | 'subjectOrgId'
+>
+
+function partiesOf(guarantee: GuaranteeParties): Array<Id<'organizations'>> {
   return [
+    guarantee.orgId,
     guarantee.borrowerOrgId,
     guarantee.pledgorOrgId,
     guarantee.subjectOrgId,
@@ -40,19 +47,17 @@ function partiesOf(
 }
 
 /**
- * Checks that the user is a member of at least one of the orgs a guarantee
- * touches (same rule as `requireLoanParty` for a current account).
+ * READ check: membership of at least one of the orgs a guarantee touches
+ * (same rule as `requireLoanParty` for a current account).
  *
- * A guarantee with NO group org at all — an outside borrower, an outside
- * guarantor, an outside asset — has no party to be a member of, and is
- * refused: nothing in Albo OS would justify reading it.
+ * A row with no org at all — no filing org, no group borrower, guarantor or
+ * asset — has no party to be a member of and is refused. That case is
+ * unreachable for anything created since `orgId` exists; it survives for the
+ * rows written before it.
  */
 export async function requireGuaranteeParty(
   ctx: QueryCtx,
-  guarantee: Pick<
-    Doc<'guarantees'>,
-    'borrowerOrgId' | 'pledgorOrgId' | 'subjectOrgId'
-  >,
+  guarantee: GuaranteeParties,
 ): Promise<void> {
   const user = await requireAppUser(ctx)
   const parties = partiesOf(guarantee)
@@ -70,6 +75,38 @@ export async function requireGuaranteeParty(
   if (!memberships.some((member) => member !== null)) {
     throw new ConvexError('not_a_party')
   }
+}
+
+/**
+ * WRITE check. Reading needs one party; writing needs two things, because
+ * the caller chooses the filing org but NOT the others — those are read
+ * from the loan and from the pledged asset.
+ *
+ * 1. The filing org must be one of ours: nothing gets dropped into a
+ *    stranger's Passif.
+ * 2. The REFERENCED orgs must include one of ours too — otherwise a member
+ *    of `calte` could hang a row off `sci-upload`'s loan and `sci-upload`'s
+ *    asset, and it would show up on their loan sheet. Filing on another
+ *    org's loan from an org we do belong to stays allowed: that is the
+ *    cross-org guarantee of D13.
+ * 3. Unless there is no referenced org at ALL — the out-of-group guarantee
+ *    this whole filing org exists for. Condition 1 then carries the check.
+ *
+ * `orgId` is undefined only on a row written before the field existed; the
+ * referenced orgs then carry the check alone, exactly as they used to.
+ */
+async function requireCanFile(
+  ctx: QueryCtx,
+  orgId: Id<'organizations'> | undefined,
+  referenced: Omit<GuaranteeParties, 'orgId'>,
+): Promise<void> {
+  if (orgId) await requireOrgMember(ctx, orgId)
+  const parties = { ...referenced, orgId: undefined }
+  if (partiesOf(parties).length === 0) {
+    if (!orgId) throw new ConvexError('not_a_party')
+    return
+  }
+  await requireGuaranteeParty(ctx, parties)
 }
 
 // ─── Shape returned to the front ────────────────────────────────────────────
@@ -374,32 +411,89 @@ export const listBySubjectProperty = query({
   },
 })
 
+/** Grouping key of an outside debt: its borrower is only ever a label. */
+function outsideBorrowerKey(guarantee: Doc<'guarantees'>): string | null {
+  if (guarantee.loanId) return null
+  const label = guarantee.borrowerLabel?.trim().toLowerCase()
+  return label || null
+}
+
 /**
  * « Garanties données » block of the Passif page: the assets this org has
  * pledged for someone else. An off-balance-sheet commitment, not a debt —
  * which is why the section stands apart from the three others (SPEC § 6.3).
+ *
+ * It also carries the securities the org FILED without giving them: a third
+ * party's surety on the same outside debt as ours (SPEC § 10 line 10b). Those
+ * hang under our own pledge on that borrower, because that is what they mean
+ * — our 500 K€ is not alone on this debt. One that matches no pledge of ours
+ * is listed on its own rather than dropped: a row must never become
+ * unreachable because the pledge it sat under was deleted.
+ *
+ * Securities on a group LOAN are deliberately not pulled in: the loan sheet
+ * already lists every one of them, and repeating them here would say nothing
+ * new about what this org has given.
  */
 export const listByPledgorOrg = query({
   args: { orgId: v.id('organizations') },
   handler: async (ctx, { orgId }) => {
     await requireOrgMember(ctx, orgId)
 
-    const rows = await ctx.db
+    const given = await ctx.db
       .query('guarantees')
       .withIndex('by_pledgor_org', (q) => q.eq('pledgorOrgId', orgId))
       .collect()
+    const givenIds = new Set(given.map((row) => row._id))
 
-    return await Promise.all(
-      sortByStrength(rows).map(async (guarantee) => {
-        const loan = guarantee.loanId
-          ? await ctx.db.get('loans', guarantee.loanId)
-          : null
+    const filed = await ctx.db
+      .query('guarantees')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    const others = new Map<string, Array<Doc<'guarantees'>>>()
+    for (const row of sortByStrength(filed)) {
+      if (givenIds.has(row._id)) continue
+      const key = outsideBorrowerKey(row)
+      if (!key) continue
+      const bucket = others.get(key)
+      if (bucket) bucket.push(row)
+      else others.set(key, [row])
+    }
+
+    const describe = async (guarantee: Doc<'guarantees'>) => {
+      const loan = guarantee.loanId
+        ? await ctx.db.get('loans', guarantee.loanId)
+        : null
+      return {
+        ...(await enrich(ctx, guarantee)),
+        loanLabel: loan?.label ?? null,
+      }
+    }
+
+    const rows = await Promise.all(
+      sortByStrength(given).map(async (guarantee) => {
+        // Only the FIRST of our pledges on a given borrower carries them,
+        // or two pledges on the same debt would show the same co-security
+        // twice.
+        const key = outsideBorrowerKey(guarantee)
+        const attached = key ? (others.get(key) ?? []) : []
+        if (key) others.delete(key)
         return {
-          ...(await enrich(ctx, guarantee)),
-          loanLabel: loan?.label ?? null,
+          ...(await describe(guarantee)),
+          isOwnPledge: true,
+          otherSecurities: await Promise.all(attached.map(describe)),
         }
       }),
     )
+
+    const orphans = await Promise.all(
+      [...others.values()].flat().map(async (guarantee) => ({
+        ...(await describe(guarantee)),
+        isOwnPledge: false,
+        otherSecurities: [] as Array<Awaited<ReturnType<typeof describe>>>,
+      })),
+    )
+
+    return [...rows, ...orphans]
   },
 })
 
@@ -506,6 +600,7 @@ async function resolveParties(ctx: QueryCtx, args: GuaranteeArgs) {
   return {
     borrowerOrgId,
     borrowerLabel,
+    pledgorOrgId: args.pledgorOrgId,
     pledgorLabel,
     subjectOrgId,
     subjectDealId,
@@ -517,17 +612,21 @@ async function resolveParties(ctx: QueryCtx, args: GuaranteeArgs) {
 
 // ─── Writes ─────────────────────────────────────────────────────────────────
 
+/**
+ * `orgId` is the org whose Passif the guarantee is filed in — the page the
+ * user is on. It is an argument because nothing else can supply it: the very
+ * row it was added for references no org of ours at all. That is not the
+ * tenancy shortcut CLAUDE.md forbids, because it is checked
+ * (`requireOrgMember`) rather than trusted, same as `properties:create`.
+ */
 export const create = mutation({
-  args: guaranteeArgs,
-  handler: async (ctx, args) => {
+  args: { orgId: v.id('organizations'), ...guaranteeArgs },
+  handler: async (ctx, { orgId, ...args }) => {
     const resolved = await resolveParties(ctx, args)
-    await requireGuaranteeParty(ctx, {
-      borrowerOrgId: resolved.borrowerOrgId,
-      pledgorOrgId: args.pledgorOrgId,
-      subjectOrgId: resolved.subjectOrgId,
-    })
+    await requireCanFile(ctx, orgId, resolved)
 
     return await ctx.db.insert('guarantees', {
+      orgId,
       loanId: args.loanId,
       borrowerOrgId: resolved.borrowerOrgId,
       borrowerLabel: resolved.borrowerLabel,
@@ -564,11 +663,9 @@ export const update = mutation({
     await requireGuaranteeParty(ctx, existing)
 
     const resolved = await resolveParties(ctx, args)
-    await requireGuaranteeParty(ctx, {
-      borrowerOrgId: resolved.borrowerOrgId,
-      pledgorOrgId: args.pledgorOrgId,
-      subjectOrgId: resolved.subjectOrgId,
-    })
+    // The filing org is not editable: a guarantee does not move from one
+    // Passif to another, and leaving it out of the patch is what keeps it.
+    await requireCanFile(ctx, existing.orgId, resolved)
 
     await ctx.db.patch('guarantees', guaranteeId, {
       loanId: args.loanId,
