@@ -54,8 +54,8 @@ pas le faire, et la seconde est la vraie :
    (~900 000 caractères, ~1,05 octet/caractère en UTF-8) sature la ligne à
    lui seul.
 2. **Convex lit toujours la ligne entière.** `documents:listByCompany` charge
-   jusqu'à 200 lignes à chaque ouverture de la liste « Documents & rapports »
-   d'une fiche société. Avec le texte
+   jusqu'à 200 lignes à chaque ouverture d'une fiche société (la carte
+   Documents et la liste des rapports partagent la même requête). Avec le texte
    sur la ligne, c'est des dizaines de Mo relus à chaque affichage, pour
    afficher un titre et une taille.
 
@@ -3426,6 +3426,78 @@ ce mapping ailleurs. Décisions non-évidentes :
       custom peut s'appuyer sur le dialog générique sans formulaire dédié. Le
       `LeadSpvPanel` n'expose qu'un bouton « Modifier » qui appelle `onEdit`
       (ouvre ce même dialog).
+
+## Documents & rapports : deux surfaces, et pourquoi on a re-séparé
+
+### Ce qui s'est passé
+
+Les onglets « Rapports » et « Documents » de la fiche société ont d'abord été
+**fusionnés** en une liste chronologique unique, pour une raison juste :
+classer un fichier avant de savoir ce qu'il contient est une décision qu'on
+prend mal, et un reporting déposé dans l'onglet Documents restait un PDF muet.
+
+Ce qui a changé ensuite, c'est le **volume**, et il est très inégal d'une
+société à l'autre : 2 documents pour 7 rapports chez Jeen (la liste unique se
+lit très bien), **36 documents chez Hectarea** — pactes, PV d'AG, statuts,
+bulletins — et 28 chez Eben Home, tous déposés le même jour. Sur une fiche
+pareille l'axe chronologique ne trie plus rien, puisque tout est arrivé
+ensemble, et le rapport de board est noyé au milieu des actes.
+
+Deuxième symptôme, lisible dans les données : sur Eben Home, quatre pièces
+juridiques (deux avenants au pacte, une adhésion au pacte SPV, une facture)
+portent `kind: 'reporting'` et un `reportId` — elles sont parties dans le
+circuit d'analyse et sont aujourd'hui repliées dans une ligne de rapport. La
+porte d'ajout unique avait « Reporting » comme valeur par défaut : l'erreur ne
+demandait aucun geste.
+
+### Le découpage retenu
+
+Un rapport est un **journal** (lu dans l'ordre, une fois, quand il arrive) ; un
+document est un **coffre** (cherché par nature, longtemps après, parce qu'il
+faut signer ou voter). Un journal se trie par date, un coffre par type — les
+mettre dans la même liste force chacun à adopter le tri de l'autre.
+
+- `CompanyReportsSection` — rapports + communications VASCO, colonne
+  principale, tri chronologique.
+- `CompanyDocumentsCard` — carte du panneau de droite (compteur + 5 plus
+  récents) et son tiroir : recherche par titre, filtres et **regroupement par
+  type**.
+
+Trois invariants à ne pas casser :
+
+1. **Les pièces jointes d'un rapport (`reportId` non nul) ne sont JAMAIS dans
+   le coffre.** Elles _sont_ le rapport, repliées dans sa ligne. Le filtre
+   existe des deux côtés : l'oublier côté carte fait apparaître chaque fichier
+   deux fois et fausse le compteur.
+2. **La porte d'ajout reste unique** (`AddDocumentDialog`), avec le sélecteur
+   des 8 types entier des deux côtés — seul le `defaultKind` change
+   (`reporting` depuis les rapports, `legal` depuis le coffre). Dupliquer le
+   dialogue en deux formulaires spécialisés ramènerait le problème d'origine :
+   un fichier qu'on ne peut plus reclasser sans fermer la fenêtre.
+3. **Ne pas remettre d'onglets.** C'est exactement l'état d'avant la fusion, et
+   il rend le coffre invisible tant qu'on lit le journal.
+
+### Le tiroir empile trois couches Radix
+
+Le dialogue d'édition s'ouvre **par-dessus** le `Sheet`, et il contient un
+`Select` : trois couches Radix superposées, le terrain classique du
+`pointer-events: none` resté sur `<body>` après fermeture. Ça fonctionne —
+chaque contenu Radix repose son `pointer-events: auto` et la pile de
+`DismissableLayer` gère le reste — mais c'est le premier endroit à re-tester
+après une maj de `radix-ui` (cf. `TESTING.md` TP6c).
+
+### La suppression d'un deal détruit toujours ses documents
+
+`deals.remove` supprime les lignes `documents` portant son `dealId`, fichier
+stocké compris. Le commentaire qui l'autorisait disait « ils ne s'affichent
+nulle part ailleurs » : c'était vrai avant la fusion de la timeline, ça ne
+l'est plus — un document de deal est visible sur la fiche société, badgé
+« Deal · … ». **Aucun document ne porte de `dealId` en prod** (vérifié sur
+Hectarea, 36 documents, et Eben Home, 28 documents), donc la conséquence est
+nulle aujourd'hui ; elle ne le reste que tant que le champ « Rattacher à un
+deal » n'est pas utilisé. Le correctif serait de **détacher** (retirer le
+`dealId`, garder la ligne dès qu'il y a un `companyId`) plutôt que de
+détruire — traité à part, hors du périmètre de la re-séparation.
 
 ## Fiche entité — identité (édition inline), champs manquants & lien Attio
 

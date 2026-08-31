@@ -325,7 +325,7 @@ passe en « analyse échouée » — le dépôt reste rattrapable depuis la boî
 ## Pages liées
 
 - [Vue consolidée](12-vue-consolidee.md) (boîte Rapports entrants),
-  [Participations](04-participations.md) (liste « Documents & rapports » des
-  fiches),
+  [Participations](04-participations.md) (liste « Rapports & communications »
+  des fiches),
   [Valorisations, KPIs et métriques](06-valorisations-et-kpis.md)
   (catalogue, fiche KPI cible), [Intégrations](15-integrations.md)

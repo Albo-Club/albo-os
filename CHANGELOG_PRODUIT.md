@@ -23,6 +23,73 @@ bas de page.
 
 ---
 
+## v1.202.0 — 31/08/2026 à 15:15 — Les documents quittent le fil des rapports
+
+Sur une fiche société, tout vivait dans une seule liste : les rapports reçus,
+les communications des plateformes et les documents déposés, mélangés du plus
+récent au plus ancien. Ça se lisait bien sur une boîte à deux documents. Sur
+Hectarea, qui en compte trente-six déposés le même jour, le rapport de board
+disparaissait au milieu des pactes et des PV d'assemblée — et trier par date
+ne servait à rien, puisque tout était arrivé ensemble.
+
+**Deux endroits, deux usages.** La colonne principale ne porte plus que ce que
+la société nous envoie : les **rapports** et les **communications** des
+plateformes, dans l'ordre. Les documents, eux, remontent dans le panneau de
+droite, dans une carte **Documents** placée sous la fiche d'identité — avec
+leur nombre, les cinq plus récents et un bouton pour en ajouter. Un rapport se
+lit dans l'ordre, une fois, quand il arrive ; un document se cherche par
+nature, longtemps après, parce qu'il faut signer ou voter. Ce ne sont pas les
+mêmes gestes.
+
+**Un vrai coffre, avec une recherche.** « Voir les N documents » ouvre un
+tiroir latéral qui montre enfin la bibliothèque complète : une **recherche par
+titre** — elle n'existait nulle part jusqu'ici, et c'est ce qui manquait le
+plus au-delà de vingt documents —, des **filtres par type** qui ne proposent
+que ce qui est réellement présent, et les documents **regroupés par type**
+plutôt qu'empilés par date. Les titres longs y sont enfin lisibles en entier.
+
+**Deux portes d'ajout au lieu d'une.** Le bouton de la section rapports dit
+« Ajouter un rapport » et lance l'analyse ; le **+** de la carte Documents
+dépose simplement le fichier. Le type reste modifiable dans les deux cas — on
+peut toujours changer d'avis en cours de route —, mais la porte qu'on pousse
+dit désormais ce qu'on dépose. C'est ce qui manquait : quelques pièces
+juridiques étaient parties dans le circuit d'analyse sans que personne ne
+touche au menu déroulant.
+
+**La fiche deal perd son bloc Documents.** Il n'a jamais servi : aucun
+document du portefeuille n'y avait été déposé, et tout est classé au niveau de
+la société. Un document rattaché à un deal reste visible sur la fiche de la
+société, badgé au nom du deal, comme avant.
+
+> **🔧 Notes techniques**
+>
+> - `CompanyTimelineSection.tsx` → `CompanyReportsSection.tsx` : les entrées
+>   `type: 'doc'` et le filtre par type sortent du fil, qui ne porte plus que
+>   les rapports et les communications VASCO. Les pièces jointes d'un rapport
+>   (`reportId`) restent repliées dans sa ligne.
+> - Nouveau `CompanyDocumentsCard.tsx` : la carte du panneau de droite, son
+>   tiroir (`Sheet` shadcn, recherche + filtres + groupes par `kind`, tous
+>   côté client sur la liste déjà chargée) et les dialogues d'édition /
+>   suppression / texte extrait, déplacés depuis la timeline.
+> - `AddDocumentDialog.tsx` extrait et partagé par les deux portes, avec une
+>   prop `defaultKind` (`reporting` / `legal`) ; le sélecteur des 8 types reste
+>   entier des deux côtés, et le titre du dialogue suit le type courant.
+> - `documentFields.tsx` : vocabulaire des types, conversions de dates,
+>   `KindSelect` / `DealSelect` / `useDealLabel`, partagés par les deux.
+> - `participations.$companyId.tsx` : l'`<aside>` devient un conteneur de deux
+>   cartes (identité, puis documents) au lieu d'être lui-même la carte. Le
+>   collant (`useStickyBottom`) et le `lg:items-start` du parent sont
+>   inchangés — cf. `KNOWN_ISSUES.md` § « Panneau latéral figé ».
+> - Fiche deal : `DealDocumentsSection.tsx` supprimé (425 lignes), avec la
+>   query `documents.listByDeal` devenue sans appelant et le bloc i18n
+>   `participations:dealDocuments.*`. L'index `by_deal` reste utilisé par les
+>   transactions, le prévisionnel et les projections.
+> - i18n : `participations:timeline.*` ne garde que les clés du fil de
+>   rapports, tout le reste passe sous `participations:documents.*` (fr + en).
+> - Le pourquoi de la re-séparation, ses trois invariants et la cascade de
+>   suppression d'un deal sont dans `KNOWN_ISSUES.md` § « Documents &
+>   rapports : deux surfaces ».
+
 ## v1.201.0 — 30/08/2026 à 12:40 — L'assistant sait aussi écrire la dette et l'immobilier
 
 Lot 7, le dernier du module Dette & Garanties. L'assistant savait déjà lire
