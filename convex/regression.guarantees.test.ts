@@ -643,6 +643,39 @@ describe('guarantees: shape validation', () => {
     // Borrower org read off the loan, subject org off the deal.
     expect(stored?.borrowerOrgId).toBe(sci.orgId)
     expect(stored?.subjectOrgId).toBe(calte.orgId)
+    // And the filing org is the one that was asked for — every row carries
+    // one, which is what keeps a guarantee with no group party readable.
+    expect(stored?.orgId).toBe(sci.orgId)
+  })
+
+  test('editing a guarantee never moves it to another Passif', async () => {
+    const { t, user, sci, calte, calteLoan, concertoId } = await concertoSetup()
+    const guaranteeId = await user.as.mutation(api.guarantees.create, {
+      orgId: sci.orgId,
+      borrowerLabel: 'SARL Bremontier',
+      pledgorOrgId: calte.orgId,
+      subjectKind: 'placement',
+      subjectDealId: concertoId,
+      form: 'nantissement',
+      pledgedAmountCents: 200_000_00,
+    })
+    // Rewrite every party: the beneficiary becomes a group loan, the subject
+    // the shares of another company. The filing org is not an argument of
+    // `update`, and nothing here may substitute for one.
+    await user.as.mutation(api.guarantees.update, {
+      guaranteeId,
+      loanId: calteLoan,
+      pledgorOrgId: calte.orgId,
+      subjectKind: 'shares',
+      subjectCompanyId: calte.rootCompanyId,
+      form: 'caution',
+    })
+    const stored = await t.run(async (ctx) =>
+      ctx.db.get('guarantees', guaranteeId),
+    )
+    expect(stored?.orgId).toBe(sci.orgId)
+    expect(stored?.borrowerOrgId).toBe(calte.orgId)
+    expect(stored?.subjectCompanyId).toBe(calte.rootCompanyId)
   })
 
   test('a rank below 1 and a non-positive amount are refused', async () => {

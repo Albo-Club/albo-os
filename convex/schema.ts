@@ -1620,13 +1620,18 @@ export default defineSchema({
    * (SPEC § 10 line 10b: a third party's surety on the same outside debt as
    * ours, which shares the burden and must be known to read our own
    * exposure). Such a row has nothing else to hang from — no loan, no asset
-   * of ours, no guarantor of ours — and was refused outright until now.
-   * Optional only until `migrations/backfillGuaranteeOrg` has run in prod.
+   * of ours, no guarantor of ours — and was refused outright until it.
+   *
+   * REQUIRED: every guarantee is filed somewhere. It shipped optional for
+   * one release so `migrations/backfillGuaranteeOrg` could fill the rows
+   * written before it — there turned out to be none, the table being still
+   * empty in prod, and the field was tightened straight away. Convex accepts
+   * widening and refuses narrowing, so the order was never negotiable.
    */
   guarantees: defineTable({
     // The org whose Passif this guarantee is filed in. It anchors the row;
     // it is NOT a fourth information beside the three of D17.
-    orgId: v.optional(v.id('organizations')),
+    orgId: v.id('organizations'),
 
     // ── Beneficiary: EITHER a group loan, OR an outside borrower ──────────
     loanId: v.optional(v.id('loans')),

@@ -51,7 +51,6 @@ pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip
 | Consolidation des lignes REWATT (org `calte`) | `convex/migrations/consolidateRewattCalte.ts` → `dryRun` / `apply` / `verify` | Replie les **10 lignes REWATT** de `calte` sur une seule : Rewatt porte chaque opération sur son propre bilan (pas de SPV par adresse), donc 1 personne morale = 1 `company`. `apply` pose l'identité légale (SIREN `950792473`, `legalName`/`legalForm`/`countryCode`/`sector`) sur la ligne `REWATT` survivante (champs vides seulement, unicité SIREN re-vérifiée), repointe les **8 deals** d'opération via `targetCompanyId` en écrivant l'adresse dans `deals.name`, **requalifie 7 deals `os` → `cca`** (ce sont des avances sur la `Convention d'avance en compte courant d'associés` du 20/04/2023, pas des obligations — seul 92 bd de Port-Royal a un contrat d'émission) avec `interestRate`/`principalAmount`, solde Port-Royal (`fully_exited`, 30/12/2025, 41 866,67 €), puis **archive** les 8 entités vidées + l'orphelin `Rewatt - Port Royal 5éme` (doublon de 92 bd de Port-Royal : ni deal, ni document, ni dossier Drive). Montants/taux repris verbatim des lettres `Appel de fonds #N` / `Remboursement #N` (Drive « REWATT ») ; ils rapprochent au centime le cash déjà enregistré. **Idempotente** : ancrage par `_id` prod + garde sur le nom exact (⚠ `REWATT - 33 chaussée d'Antin ` a une espace finale), cible source **ou** canonique acceptée → 2ᵉ run no-op ; champs déjà remplis jamais écrasés (remontés en `mismatches`). Archivage = soft delete réversible, refusé s'il reste une référence. Clés écrites ajoutées à `manuallyEditedFields` (sinon `airtableImport:runImport` réécrase). Hors périmètre : l'org `albo`, déjà sur une entité unique. ⚠️ **À lancer seulement APRÈS le merge**. Runbook en tête du module. |
 | Repli des sous-types `companies.kind` (ALB-128) | `convex/migrations/collapseGroupKinds.ts` → `dryRun` / `apply` / `verify` | Réécrit `group_operating` / `group_sci` / `group_spv` / `group_manco` en `group_entity` ; `group_root` et `portfolio` intacts (seules valeurs lues pour elles-mêmes). **Étape 1 d'un purge-then-narrow** : l'union accepte déjà `group_entity`, et les quatre valeurs dépréciées ne quittent le schéma qu'une fois `verify` à `remaining: 0` — l'ordre inverse ferait échouer le déploiement (Convex refuse un schéma plus strict que la donnée). Idempotente. |
 | Sens d'un compte courant inter-sociétés | `convex/migrations/fixLoanDirection.ts` → `inspect` / `apply` | `inspect` (lecture seule) liste tous les `intercompanyLoans` avec les deux soldes dérivés et un flag `looksReversed` : les deux signes contredisent les rôles enregistrés (le « créancier » a encaissé, le « débiteur » a décaissé). `apply` intervertit `fromOrgId` / `toOrgId` sur UN prêt. **Non idempotente par nature** — elle exige le sens qu'elle s'attend à trouver (`currentFromSlug` / `currentToSlug`) et rejette tout le reste (`direction_mismatch`), donc un second passage échoue au lieu de ré-inverser. Les transactions pointées ne sont pas touchées. |
-| Remplissage de `guarantees.orgId` | `convex/migrations/backfillGuaranteeOrg.ts` → `dryRun` / `apply` / `verify` | Donne à chaque sûreté la société qui l'**enregistre**, lue dans l'ordre `pledgorOrgId` → `borrowerOrgId` → `subjectOrgId` — jamais inventée. Le champ existe pour la sûreté qui n'a **aucune** partie du groupe (SPEC § 10 cas 10b), jusque-là refusée faute d'ancre. **Étape 1 d'un purge-then-narrow** : le champ ship optionnel, cette migration le remplit, et il ne devient requis qu'une fois `verify` à `clean: true`. Une ligne sans aucune des trois parties est **signalée**, pas rangée au hasard. Idempotente. |
 | Création des orgs filiales CALTE (ALB-128) | `convex/migrations/createSubsidiaryOrgs.ts` → `inspect` / `apply` | Donne une org à chacune des 7 filiales (Caltimo, RDB, Relais Chapelle, SCI Chapelle 1 & 2, SCI Upload, Banco 2) : org + membres de `calte` recopiés avec leur rôle + société `group_root` clonée depuis la ligne source (identité légale seulement — ni `attioCompanyId` ni `airtableId`). **Strictement additive** : aucune ligne existante n'est modifiée, la ligne source reste une entité `group_*` de `calte` avec ses deals et ses comptes. `inspect` (lecture seule) liste ce qui serait créé et, par filiale, `dealsAsInvestor` / `bankAccountsOwned` — les deux compteurs qui diraient si la ligne source peut un jour devenir une simple participation. Idempotente. |
 
 Les ponts Attio (`attioCompanyId` / `attioDealId`) et l'ingestion Powens sont
@@ -112,6 +111,26 @@ décaissés, 632 589,11 € reçus, MOIC 2,46x).
 Une cession partielle se saisit désormais sans statut dédié : le deal reste
 `active`, l'encaissement se lit dans les transactions pointées et le MOIC, et
 la `valuation` du reliquat détenu doit être mise à jour à la main.
+
+## Resserrement de `guarantees.orgId` (fait — 31/08/2026)
+
+`guarantees.orgId` — la société qui **enregistre** une sûreté — est né
+optionnel (PR #425) pour la seule raison qui vaille : les lignes écrites
+avant lui ne pouvaient pas le porter, et Convex refuse un schéma plus strict
+que la donnée. Une migration `backfillGuaranteeOrg` (`dryRun` / `apply` /
+`verify`) devait les remplir depuis `pledgorOrgId` → `borrowerOrgId` →
+`subjectOrgId`, sans jamais inventer de valeur.
+
+**Elle n'a rien eu à faire.** Le `dryRun` en prod a rendu `missing: 0` : la
+table `guarantees` était encore **vide**, le module Dette & Garanties ayant
+été déployé le jour même. Le champ a donc été passé en requis dans la foulée,
+et le fichier de migration supprimé — resserré, il ne peut plus rencontrer
+une seule ligne à remplir, et le garder aurait demandé de faire taire le lint
+qui le dit (`no-unnecessary-condition`).
+
+Leçon pour la prochaine fois : **compter la donnée avant d'écrire le filet**.
+La prod est lisible depuis la session (outils MCP en lecture) ; une table
+vide se constate en une requête, et les deux PR auraient tenu en une.
 
 ## Chantier : retrait de la table legacy `forecasts`
 
