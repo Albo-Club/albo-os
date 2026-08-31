@@ -89,21 +89,6 @@ visible pendant qu'on fait défiler la page.
 - **Transactions** : les mouvements bancaires rattachés au deal. Un clic
   ouvre le détail avec possibilité de **réaffecter** la transaction à un
   autre deal.
-- **Documents** : les pièces propres à **ce deal** — term sheet, pacte ou
-  statuts, bulletin de souscription, attestation ou KBIS, et « autre » pour
-  le reste. Cette liste ne montre que les documents **de ce deal**, mais ils
-  apparaissent aussi dans la liste « Documents & rapports » de la
-  [société](04-participations.md), avec le badge du deal : un pacte engage
-  l'entité autant que le deal qui l'a produit, et il n'y a jamais qu'un seul
-  fichier stocké. On dépose un fichier (**20 Mo maximum**) en lui donnant un titre,
-  un type et, si utile, la **date du document** (signature par exemple) —
-  cette date est facultative. **Plusieurs fichiers peuvent être déposés en
-  une fois** : chacun garde son titre, le type et la date s'appliquant à
-  tout le lot. Présentation identique à celle de la société :
-  une box par document, un **clic pour l'ouvrir**, un **crayon** pour
-  corriger titre / type / date, une corbeille (avec confirmation), un filtre
-  par type, et l'état de sa **lecture** automatique — mêmes règles que côté
-  société, détaillées dans [Participations](04-participations.md).
 - **Notes** : texte libre, sous les détails de l'instrument dans le panneau de
   droite, **éditables au clic** comme les autres lignes du panneau : on clique
   le texte, on écrit, on clique ailleurs — c'est enregistré. Échap annule.
@@ -163,8 +148,9 @@ le cash encaissé et la totalité de la ligne d'origine.
   compris si elle a déjà fait l'objet d'une mainlevée : la ligne reste en
   historique, et cet historique a besoin de son assiette. Voir
   [Dette bancaire et garanties](18-dette-et-garanties.md).
-- **Supprimer un deal supprime aussi ses documents**, fichiers compris.
-  Ils n'existent nulle part ailleurs : à récupérer avant, si besoin.
+- **Supprimer un deal supprime aussi les documents qui lui sont rattachés**,
+  fichiers compris — y compris ceux qu'on voit sur la fiche de la société,
+  badgés au nom du deal. À récupérer avant, si besoin.
 - Les métriques affichées (Versé, Reçu, MOIC, TRI) sont **toujours
   recalculées** depuis les transactions pointées — le pointage est donc la
   condition pour que les chiffres soient justes. Voir

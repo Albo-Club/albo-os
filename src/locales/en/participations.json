@@ -522,41 +522,6 @@
     "dialogDescription": "Check the KPIs to track as series. Each report recap will flag the missing ones.",
     "saved": "KPI sheet saved"
   },
-  "dealDocuments": {
-    "title": "Documents",
-    "upload": "Add a doc",
-    "uploading": "Uploading…",
-    "empty": "No document yet. Term sheet, shareholders' agreement, subscription form… anything specific to this deal.",
-    "added_one": "Document added",
-    "added_other": "{{count}} documents added",
-    "deleted": "Document deleted",
-    "deleteConfirmTitle": "Delete this document?",
-    "deleteConfirmBody": "The file will be permanently deleted.",
-    "dialogTitle_one": "New document",
-    "dialogTitle_other": "{{count}} new documents",
-    "titleLabel_one": "Title",
-    "titleLabel_other": "Titles",
-    "kindLabel": "Type",
-    "dateLabel": "Document date (optional)",
-    "kind": {
-      "term_sheet": "Term sheet",
-      "pacte": "Shareholders' agreement",
-      "subscription": "Subscription form",
-      "attestation": "Certificate / registry extract",
-      "other": "Other"
-    },
-    "errors": {
-      "too_large": "File is larger than 20 MB",
-      "default": "Something went wrong"
-    },
-    "updated": "Document updated",
-    "editDialogTitle": "Edit document",
-    "addedOn": "Added on {{date}}",
-    "filter": {
-      "label": "Type:",
-      "all": "all"
-    }
-  },
   "reports": {
     "title": "Investor reports",
     "empty": "No report yet.",
@@ -715,8 +680,41 @@
     "edit": "Edit"
   },
   "timeline": {
-    "title": "Documents & reports",
-    "empty": "Nothing yet. Reports, communications and uploaded documents will show up here, most recent first.",
+    "title": "Reports & communications",
+    "empty": "Nothing yet. Received reports and platform communications will show up here, most recent first.",
+    "refreshVasco": "Refresh VASCO",
+    "files_one": "1 file",
+    "files_other": "{{count}} files",
+    "openReport": "Open report “{{title}}”",
+    "openCommunication": "Open communication “{{title}}”",
+    "badge": {
+      "report": "Report",
+      "vasco": "VASCO"
+    },
+    "add": {
+      "action": "Add a report"
+    },
+    "detach": {
+      "action": "Detach from this participation",
+      "confirmTitle": "Detach this report?",
+      "confirmBody": "The report will be removed from {{company}}: it leaves this fiche, along with its files and the KPIs it filled in. The other attached participations keep theirs, and the received file is not deleted.",
+      "confirm": "Detach",
+      "done": "Report detached from this participation"
+    }
+  },
+  "documents": {
+    "card": {
+      "title": "Documents",
+      "empty": "No document filed on this company yet.",
+      "viewAll_one": "View the document",
+      "viewAll_other": "View the {{count}} documents"
+    },
+    "sheet": {
+      "title": "Documents · {{company}}",
+      "description": "Every document filed on this company, grouped by kind.",
+      "search": "Search a document…",
+      "noMatch": "No document matches."
+    },
     "addedOn": "Added on {{date}}",
     "uploading": "Uploading…",
     "queued": "Report sent — the analysis is running.",
@@ -727,11 +725,6 @@
     "editTitle": "Edit document",
     "deleteConfirmTitle": "Delete this document?",
     "deleteConfirmBody": "The file will be permanently deleted.",
-    "refreshVasco": "Refresh VASCO",
-    "files_one": "1 file",
-    "files_other": "{{count}} files",
-    "openReport": "Open report “{{title}}”",
-    "openCommunication": "Open communication “{{title}}”",
     "dealBadge": "Deal · {{deal}}",
     "dealLabel": "Attach to a deal (optional)",
     "dealNone": "None — entity document",
@@ -740,13 +733,7 @@
     "titleLabel_other": "Titles",
     "periodLabel": "Covered period (optional)",
     "dateLabel": "Document date (optional)",
-    "badge": {
-      "report": "Report",
-      "vasco": "VASCO"
-    },
     "group": {
-      "communications": "Communications",
-      "documents": "Documents",
       "company": "Company documents",
       "deal": "Deal documents"
     },
@@ -761,12 +748,12 @@
       "attestation": "Certificate / registry extract"
     },
     "filter": {
-      "label": "Type:",
-      "all": "all"
+      "all": "All"
     },
     "add": {
       "action": "Add",
       "title": "Add a document",
+      "titleReport": "Add a report",
       "pick": "Choose files",
       "analysisHint": "A reporting is analysed automatically: period, key points and metrics are extracted, and the company synthesis is refreshed. Title and period come from the analysis.",
       "noteLabel": "Note (optional)",
@@ -777,13 +764,6 @@
     "errors": {
       "too_large": "File is larger than 20 MB",
       "default": "Something went wrong"
-    },
-    "detach": {
-      "action": "Detach from this participation",
-      "confirmTitle": "Detach this report?",
-      "confirmBody": "The report will be removed from {{company}}: it leaves this fiche, along with its files and the KPIs it filled in. The other attached participations keep theirs, and the received file is not deleted.",
-      "confirm": "Detach",
-      "done": "Report detached from this participation"
     }
   },
   "silence": {
