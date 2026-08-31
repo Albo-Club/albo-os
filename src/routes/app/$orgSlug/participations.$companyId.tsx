@@ -34,7 +34,8 @@ import {
 } from '~/components/companies/EntityFiche'
 import { AttioCompanyField } from '~/components/companies/AttioCompanyField'
 import { PeopleEditor } from '~/components/companies/PeopleEditor'
-import { CompanyTimelineSection } from '~/components/companies/CompanyTimelineSection'
+import { CompanyDocumentsCard } from '~/components/companies/CompanyDocumentsCard'
+import { CompanyReportsSection } from '~/components/companies/CompanyReportsSection'
 import { CompanyAiSynthesisBlock } from '~/components/companies/CompanyAiSynthesisBlock'
 import { EntityIntegrationsDialog } from '~/components/companies/EntityIntegrationsDialog'
 import { Button } from '~/components/ui/button'
@@ -651,21 +652,21 @@ function ParticipationDetail() {
             )}
           </IdentitySection>
 
-          {/* One timeline: reports, VASCO communications and documents (deal
-              documents included), sorted by date. */}
+          {/* What the company sends us — analysed reports and VASCO
+              communications — in one chronological feed. The documents it
+              produced live in the identity panel, not here. */}
           {company && (
-            <CompanyTimelineSection
-              company={company}
-              orgSlug={orgSlug}
-              deals={deals ?? []}
-            />
+            <CompanyReportsSection company={company} deals={deals ?? []} />
           )}
         </div>
 
-        {/* Identity side panel ("fiche d'identité"): identity fields, summary
-            and people, stacked in one calm card. Each section is introduced by
-            a small squared icon chip; the data itself carries no box — label
-            left, value right, hairline between rows.
+        {/* Side panel: the identity card ("fiche d'identité") — identity
+            fields, summary and people, stacked in one calm card, each section
+            introduced by a small squared icon chip; the data itself carries no
+            box — label left, value right, hairline between rows — then the
+            documents card under it. Two cards rather than one section more:
+            the vault carries its own count and its own add button, and it can
+            grow without breaking the rhythm of the identity rows.
 
             From lg up the panel is sticky: it scrolls with the page until its
             bottom edge is reached, then freezes while the main column keeps
@@ -673,124 +674,139 @@ function ParticipationDetail() {
         <aside
           ref={asideRef}
           style={{ top: asideTop }}
-          className="bg-card w-full shrink-0 space-y-5 rounded-xl border p-4 lg:sticky lg:w-80"
+          className="w-full shrink-0 space-y-4 lg:sticky lg:w-80"
         >
-          {/* Identity — sector / SIREN / domain edit inline (click the value);
+          <div className="bg-card space-y-5 rounded-xl border p-4">
+            {/* Identity — sector / SIREN / domain edit inline (click the value);
               ownership, share count and the Attio link are computed/derived
               and stay read-only. */}
-          <IdentitySection
-            title={t('identity.title')}
-            icon={<IdCard className="size-3.5" />}
-          >
-            <div className="flex flex-col">
-              <InlineField
-                layout="row"
-                label={t('info.sector')}
-                format="text"
-                rawValue={company?.sector}
-                display={
-                  company?.sector
-                    ? t(`sectors.${company.sector}`, {
-                        defaultValue: company.sector,
-                      })
-                    : ''
-                }
-                ariaLabel={t('edit.inlineLabel', { field: t('info.sector') })}
-                disabled={!company}
-                renderEditor={({ done }) =>
-                  company ? (
-                    <SectorCombobox
-                      value={company.sector ?? ''}
-                      defaultOpen
-                      onOpenChange={(o) => !o && done()}
-                      onChange={(v) => void saveCompany({ sector: v })}
-                      extraSectors={company.sector ? [company.sector] : []}
-                    />
-                  ) : null
-                }
-              />
-              <InlineField
-                layout="row"
-                label={t('info.siren')}
-                format="text"
-                rawValue={company?.siren}
-                display={formatSiren(company?.siren)}
-                ariaLabel={t('edit.inlineLabel', { field: t('info.siren') })}
-                disabled={!company}
-                onCommit={(v) => saveCompany({ siren: String(v) })}
-                onClear={() => saveCompany({ siren: '' })}
-              />
-              <InlineField
-                layout="row"
-                label={t('info.domain')}
-                format="text"
-                rawValue={company?.domain}
-                display={company?.domain ?? ''}
-                ariaLabel={t('edit.inlineLabel', { field: t('info.domain') })}
-                disabled={!company}
-                onCommit={(v) => saveCompany({ domain: String(v) })}
-                onClear={() => saveCompany({ domain: '' })}
-              />
-              <IdentityField
-                label={t('info.ownershipGlobal')}
-                value={
-                  ownership && (
-                    <>
-                      {ownership.label}
-                      {/* Where the figure comes from, when it is the
-                          subsidiary's own cap table rather than a ratio of
-                          share counts. Unexplained, the two would look like
-                          the same kind of number. */}
-                      {ownership.from?.issuingOrgSlug ? (
-                        <Link
-                          to="/app/$orgSlug/passif"
-                          params={{ orgSlug: ownership.from.issuingOrgSlug }}
-                          className="text-muted-foreground ml-2 text-xs font-normal hover:underline"
-                        >
-                          {t('info.ownershipFromCapTable')}
-                        </Link>
-                      ) : null}
-                    </>
-                  )
-                }
-              />
-              <IdentityField
-                label={t('info.sharesConsolidated')}
-                value={sharesConsolidated}
-              />
-              {company && org && (
-                <AttioCompanyField company={company} orgId={org._id} />
-              )}
-            </div>
-          </IdentitySection>
+            <IdentitySection
+              title={t('identity.title')}
+              icon={<IdCard className="size-3.5" />}
+            >
+              <div className="flex flex-col">
+                <InlineField
+                  layout="row"
+                  label={t('info.sector')}
+                  format="text"
+                  rawValue={company?.sector}
+                  display={
+                    company?.sector
+                      ? t(`sectors.${company.sector}`, {
+                          defaultValue: company.sector,
+                        })
+                      : ''
+                  }
+                  ariaLabel={t('edit.inlineLabel', { field: t('info.sector') })}
+                  disabled={!company}
+                  renderEditor={({ done }) =>
+                    company ? (
+                      <SectorCombobox
+                        value={company.sector ?? ''}
+                        defaultOpen
+                        onOpenChange={(o) => !o && done()}
+                        onChange={(v) => void saveCompany({ sector: v })}
+                        extraSectors={company.sector ? [company.sector] : []}
+                      />
+                    ) : null
+                  }
+                />
+                <InlineField
+                  layout="row"
+                  label={t('info.siren')}
+                  format="text"
+                  rawValue={company?.siren}
+                  display={formatSiren(company?.siren)}
+                  ariaLabel={t('edit.inlineLabel', { field: t('info.siren') })}
+                  disabled={!company}
+                  onCommit={(v) => saveCompany({ siren: String(v) })}
+                  onClear={() => saveCompany({ siren: '' })}
+                />
+                <InlineField
+                  layout="row"
+                  label={t('info.domain')}
+                  format="text"
+                  rawValue={company?.domain}
+                  display={company?.domain ?? ''}
+                  ariaLabel={t('edit.inlineLabel', { field: t('info.domain') })}
+                  disabled={!company}
+                  onCommit={(v) => saveCompany({ domain: String(v) })}
+                  onClear={() => saveCompany({ domain: '' })}
+                />
+                <IdentityField
+                  label={t('info.ownershipGlobal')}
+                  value={
+                    ownership && (
+                      <>
+                        {ownership.label}
+                        {/* Where the figure comes from, when it is the
+                            subsidiary's own cap table rather than a ratio of
+                            share counts. Unexplained, the two would look like
+                            the same kind of number. */}
+                        {ownership.from?.issuingOrgSlug ? (
+                          <Link
+                            to="/app/$orgSlug/passif"
+                            params={{ orgSlug: ownership.from.issuingOrgSlug }}
+                            className="text-muted-foreground ml-2 text-xs font-normal hover:underline"
+                          >
+                            {t('info.ownershipFromCapTable')}
+                          </Link>
+                        ) : null}
+                      </>
+                    )
+                  }
+                />
+                <IdentityField
+                  label={t('info.sharesConsolidated')}
+                  value={sharesConsolidated}
+                />
+                {company && org && (
+                  <AttioCompanyField company={company} orgId={org._id} />
+                )}
+              </div>
+            </IdentitySection>
 
-          {/* Optional 2-3 line summary, promoted to its own section, edited
+            {/* Optional 2-3 line summary, promoted to its own section, edited
               in place like the identity rows above. Left aligned on purpose:
               justifying a paragraph in a 320px column digs white rivers
               between the words. */}
-          <IdentitySection
-            title={t('identity.summary')}
-            icon={<AlignLeft className="size-3.5" />}
-          >
-            <InlineField
-              layout="block"
-              format="multiline"
-              label={t('identity.summary')}
-              rawValue={company?.summary}
-              display={company?.summary ?? ''}
-              placeholder={t('identity.summaryPlaceholder')}
-              ariaLabel={t('edit.inlineLabel', {
-                field: t('identity.summary'),
-              })}
-              disabled={!company}
-              onCommit={(v) => saveCompany({ summary: String(v) })}
-              onClear={() => saveCompany({ summary: '' })}
-            />
-          </IdentitySection>
+            <IdentitySection
+              title={t('identity.summary')}
+              icon={<AlignLeft className="size-3.5" />}
+            >
+              <InlineField
+                layout="block"
+                format="multiline"
+                label={t('identity.summary')}
+                rawValue={company?.summary}
+                display={company?.summary ?? ''}
+                placeholder={t('identity.summaryPlaceholder')}
+                ariaLabel={t('edit.inlineLabel', {
+                  field: t('identity.summary'),
+                })}
+                disabled={!company}
+                onCommit={(v) => saveCompany({ summary: String(v) })}
+                onClear={() => saveCompany({ summary: '' })}
+              />
+            </IdentitySection>
 
-          {/* People — founders / board / co-investors, added / renamed /
-              removed in place (Attio search as an aid). */}
-          {company && org && <PeopleEditor company={company} orgId={org._id} />}
+            {/* People — founders / board / co-investors, added / renamed /
+                removed in place (Attio search as an aid). */}
+            {company && org && (
+              <PeopleEditor company={company} orgId={org._id} />
+            )}
+          </div>
+
+          {/* The vault: everything filed on this entity, deal documents
+              included. Five most recent here, the whole library in its
+              sheet. */}
+          {company && (
+            <CompanyDocumentsCard
+              company={company}
+              orgSlug={orgSlug}
+              deals={deals ?? []}
+            />
+          )}
         </aside>
       </div>
 
