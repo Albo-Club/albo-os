@@ -150,6 +150,19 @@ calculé sur les flux datés réels, avec la même méthode que le TRI des deals
 Un prix de vente sans date (ou l'inverse) est refusé : une demi-vente
 produirait un résultat silencieusement faux.
 
+### Les documents du bien
+
+L'acte de vente, le compromis, les devis de travaux se rattachent directement
+au bien, depuis la section Documents de sa fiche. Chaque fichier peut
+recevoir un type (juridique, autre) et une date, se renommer, s'ouvrir d'un
+clic et se supprimer. La limite est de 20 Mo par fichier, et le texte des PDF
+est lu automatiquement pour que l'assistant puisse le retrouver.
+
+Ces documents n'ont pas de société-cible au sens portefeuille : ils
+n'apparaissent donc **pas** sur une fiche société, seulement sur celle du
+bien et dans la recherche. Un bien qui porte des documents ne peut pas être
+supprimé tant qu'ils sont là.
+
 ## L'assistant IA
 
 L'assistant sait **lire** les biens : leur prix de revient poste par poste
