@@ -184,7 +184,11 @@ export const listOptions = query({
 /**
  * The property sheet: the row, its cost basis line item by line item with
  * the source of each, its trailing-twelve-month operating result, its
- * valuations, its matched flows, and the loans whose security bites on it.
+ * valuations and its matched flows.
+ *
+ * NOT the securities biting on it: those are read from the guarantee's own
+ * side (`guarantees:listBySubjectProperty`), so that the property sheet and
+ * the loan sheet describe the same row through the same code (D13).
  *
  * Every figure is derived. Matching a flow to a property is a POINTAGE
  * gesture; the sheet only reads (SPEC D41).

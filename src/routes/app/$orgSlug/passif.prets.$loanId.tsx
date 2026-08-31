@@ -96,9 +96,14 @@ function Stat({ label, value }: { label: string; value: string }) {
 /**
  * Formatters of the loan sheet. Two families on purpose, per the house rule
  * « l'actuel au centime, l'estimé arrondi » (CLAUDE.md):
- * - `fmtEur` (rounded) for the outstanding, the principal, the ceiling —
- *   computed steering figures.
- * - `fmtEurCents` for the schedule rows, which must tie to the bank.
+ * - `fmtEur` (rounded) for everything the app COMPUTES — the outstanding, the
+ *   principal, the ceiling, and every plan column of the schedule.
+ * - `fmtEurCents` for what actually moved through the bank: the Réel column,
+ *   the matched transactions and their total.
+ *
+ * The split runs between plan and reality, not between screens (§ 5.4). It is
+ * what makes 2 494 € of plan next to 2 536,00 € debited read as the insurance
+ * rather than as a figure someone should go and correct.
  */
 function useLoanFormatters() {
   const { i18n } = useTranslation('passif')
@@ -579,22 +584,30 @@ function LoanSheet() {
                         <TableCell className="whitespace-nowrap tabular-nums">
                           {fmtDate(row.date)}
                         </TableCell>
+                        {/* The PLAN is rounded to the euro and the REAL is
+                            not (§ 5.4, « l'actuel au centime, l'estimé
+                            arrondi »). That contrast is the point of the two
+                            columns: 2 494 € of plan against 2 536,00 €
+                            actually debited is not an error to go and fix,
+                            it is the insurance. Centimes on a computed
+                            instalment would claim a precision it does not
+                            have, and make the two look comparable. */}
                         <TableCell className="text-right tabular-nums">
-                          {fmtEurCents(row.paymentCents)}
+                          {fmtEur(row.paymentCents)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {fmtEurCents(row.capitalCents)}
+                          {fmtEur(row.capitalCents)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {fmtEurCents(row.interestCents)}
+                          {fmtEur(row.interestCents)}
                         </TableCell>
                         {loan.insuranceMonthlyCents != null ? (
                           <TableCell className="text-right tabular-nums">
-                            {fmtEurCents(row.insuranceCents)}
+                            {fmtEur(row.insuranceCents)}
                           </TableCell>
                         ) : null}
                         <TableCell className="text-right tabular-nums">
-                          {fmtEurCents(row.remainingCents)}
+                          {fmtEur(row.remainingCents)}
                         </TableCell>
                         {/* The actual is the CONSEQUENCE of a matching
                             gesture made in the queue, never a way to make
