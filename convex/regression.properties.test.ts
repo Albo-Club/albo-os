@@ -25,6 +25,8 @@ import {
   setupHarness,
 } from './regression.setup'
 
+import type { Id } from './_generated/dataModel'
+
 const utc = (y: number, m: number, d: number) => Date.UTC(y, m - 1, d)
 
 async function orgSetup() {
@@ -378,6 +380,127 @@ describe('properties: matching is human, and scoped to the org', () => {
     expect(tx?.allocation).toBeUndefined()
     const sheet = await user.as.query(api.properties.getById, { propertyId })
     expect(sheet.operating.revenueCents).toBe(0)
+  })
+})
+
+describe('properties: the rent that stopped coming in (« À faire »)', () => {
+  /**
+   * Files `count` monthly rents on the property, the most recent landing
+   * `skipMonths` complete months ago. Day 5 of each month, like a real
+   * standing order.
+   */
+  async function rents(
+    t: Awaited<ReturnType<typeof orgSetup>>['t'],
+    user: Awaited<ReturnType<typeof orgSetup>>['user'],
+    org: Awaited<ReturnType<typeof orgSetup>>['org'],
+    propertyId: Id<'properties'>,
+    accountId: Id<'bankAccounts'>,
+    months: Array<number>,
+  ) {
+    const now = new Date()
+    for (const back of months) {
+      const date = Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth() - back,
+        5,
+      )
+      const txId = await createTransaction(t, org.orgId, accountId, {
+        direction: 'in',
+        amount: 1_500_00,
+        transactionDate: date,
+      })
+      await user.as.mutation(api.liabilities.allocateTransaction, {
+        transactionId: txId,
+        kind: 'property',
+        targetId: propertyId,
+        category: 'loyer',
+      })
+    }
+  }
+
+  test('a rent that landed for three months and then stopped is flagged', async () => {
+    const { t, user, org } = await orgSetup()
+    const propertyId = await user.as.mutation(api.properties.create, {
+      orgId: org.orgId,
+      ...chapelle,
+    })
+    const accountId = await createBankAccount(t, org)
+    // M-2, M-3, M-4 paid; M-1 (the last COMPLETE month) empty.
+    await rents(t, user, org, propertyId, accountId, [2, 3, 4])
+
+    const todo = await user.as.query(api.todo.getTodo, { orgId: org.orgId })
+    expect(todo.missingRents.map((row) => row.propertyId)).toEqual([propertyId])
+  })
+
+  test('a rent that arrived last month is not flagged', async () => {
+    const { t, user, org } = await orgSetup()
+    const propertyId = await user.as.mutation(api.properties.create, {
+      orgId: org.orgId,
+      ...chapelle,
+    })
+    const accountId = await createBankAccount(t, org)
+    await rents(t, user, org, propertyId, accountId, [1, 2, 3, 4])
+
+    const todo = await user.as.query(api.todo.getTodo, { orgId: org.orgId })
+    expect(todo.missingRents).toEqual([])
+  })
+
+  test('a property that has NEVER been let says nothing', async () => {
+    // The signal reads a broken habit. With no habit there is nothing to
+    // break, and flagging it would nag about every garage and every plot.
+    const { user, org } = await orgSetup()
+    await user.as.mutation(api.properties.create, {
+      orgId: org.orgId,
+      ...chapelle,
+    })
+    const todo = await user.as.query(api.todo.getTodo, { orgId: org.orgId })
+    expect(todo.missingRents).toEqual([])
+  })
+
+  test('the CURRENT month is never judged', async () => {
+    // A rent due on the 5th is not late on the 2nd. Judging the running
+    // month would fire this signal on every property, every month start.
+    const { t, user, org } = await orgSetup()
+    const propertyId = await user.as.mutation(api.properties.create, {
+      orgId: org.orgId,
+      ...chapelle,
+    })
+    const accountId = await createBankAccount(t, org)
+    // Paid every month up to and including the last complete one; nothing
+    // yet this month — which must NOT be held against the property.
+    await rents(t, user, org, propertyId, accountId, [1, 2, 3, 4])
+
+    const todo = await user.as.query(api.todo.getTodo, { orgId: org.orgId })
+    expect(todo.missingRents).toEqual([])
+  })
+
+  test('a charge is not a rent', async () => {
+    const { t, user, org } = await orgSetup()
+    const propertyId = await user.as.mutation(api.properties.create, {
+      orgId: org.orgId,
+      ...chapelle,
+    })
+    const accountId = await createBankAccount(t, org)
+    await rents(t, user, org, propertyId, accountId, [2, 3, 4])
+    // An outflow last month closes no gap: the rent is still missing.
+    const chargeId = await createTransaction(t, org.orgId, accountId, {
+      direction: 'out',
+      amount: 200_00,
+      transactionDate: Date.UTC(
+        new Date().getUTCFullYear(),
+        new Date().getUTCMonth() - 1,
+        12,
+      ),
+    })
+    await user.as.mutation(api.liabilities.allocateTransaction, {
+      transactionId: chargeId,
+      kind: 'property',
+      targetId: propertyId,
+      category: 'charges',
+    })
+
+    const todo = await user.as.query(api.todo.getTodo, { orgId: org.orgId })
+    expect(todo.missingRents.map((row) => row.propertyId)).toEqual([propertyId])
   })
 })
 

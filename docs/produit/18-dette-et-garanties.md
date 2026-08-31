@@ -25,9 +25,11 @@ restant dû.
 
 Un seul montant par ligne, et d'une seule nature : la colonne de droite ne
 contient que du restant dû. Un montant gagé n'y figure pas — la ligne porte
-un badge, et le détail vit sur la fiche du prêt. Empiler deux natures de
-montant dans la même colonne inviterait à les comparer alors qu'elles ne se
-comparent pas.
+un **badge par forme de sûreté active** (Nantissement, PPD, Caution…), trié
+de la plus forte à la moins forte, et le détail — assiette, garant, montant,
+marge — vit sur la fiche du prêt. Une sûreté levée ne badge plus : elle ne
+couvre plus rien. Empiler deux natures de montant dans la même colonne
+inviterait à les comparer alors qu'elles ne se comparent pas.
 
 Chaque section porte son propre total, et **il n'y a pas de total global** :
 le capital n'est pas exigible. Un chiffre qui l'additionnerait à la dette
@@ -87,6 +89,15 @@ Sur un **in fine**, la dernière ligne porte le ballon de capital, mise en
 évidence. Sur un **prêt à taux variable**, les échéances postérieures à la
 dernière révision constatée sont marquées **projetées** : l'application ne
 prétend pas connaître le taux de 2029.
+
+### Les prélèvements rattachés
+
+Le tableau des transactions pointées sur le prêt, avec un bouton
+**« Détacher »** par ligne. La fiche **défait** un pointage, elle n'en fait
+jamais : détacher renvoie le mouvement dans la file de
+[pointage](08-pointage.md), où vous choisissez sa cible. C'est le même geste
+que sur les lignes de capital et de comptes courants de la page
+[Passif](10-passif.md).
 
 ### Le taux d'un prêt variable
 

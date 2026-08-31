@@ -21,6 +21,15 @@ const DONE_VISIBLE_MS = 30 * 24 * 60 * 60 * 1000
 const STALE_VALUATION_MS = 18 * 30 * 24 * 60 * 60 * 1000
 
 /**
+ * Months since year 0, UTC — a total order over calendar months, so « the
+ * month before » never has to worry about December.
+ */
+function monthIndex(ms: number): number {
+  const d = new Date(ms)
+  return d.getUTCFullYear() * 12 + d.getUTCMonth()
+}
+
+/**
  * Aggregated feed of the « To do » tab. Only the signals with no existing
  * public query live here: the degraded bank connections reuse
  * `powens.listConnections` and the overdue forecast entries reuse
@@ -174,6 +183,57 @@ export const getTodo = query({
       (a, b) => (a.lastValuationAt ?? 0) - (b.lastValuationAt ?? 0),
     )
 
+    // ── Properties whose rent stopped arriving ────────────────────────────
+    // A DERIVED signal like the two above (SPEC D19, § 6.8), and the only way
+    // to build it: there is no « expected rent » anywhere to compare against,
+    // because a lease is out of scope (D24). So the property's OWN history is
+    // the expectation — a rent that landed every month and then did not.
+    //
+    // Two deliberate limits, both preferable to a signal that cries wolf:
+    // - The CURRENT month is never judged. A rent due on the 5th is not late
+    //   on the 2nd, and judging it would fire this signal every month start.
+    //   The window is the last COMPLETE month, against the three before it.
+    // - A property that has never been let says nothing. Silence is only
+    //   readable against a habit, and there is no habit to break.
+    const missingRents: Array<{
+      propertyId: Id<'properties'>
+      name: string
+      address: string
+      lastRentAt: number
+    }> = []
+    for (const property of heldProperties) {
+      const txs = await ctx.db
+        .query('transactions')
+        .withIndex('by_org_allocation_target', (q) =>
+          q
+            .eq('orgId', orgId)
+            .eq('allocation.targetId', property._id as string),
+        )
+        .collect()
+      const rents = txs.filter(
+        (tx) =>
+          tx.allocation?.kind === 'property' &&
+          tx.allocation.category === 'loyer' &&
+          tx.direction === 'in',
+      )
+      if (rents.length === 0) continue
+      const months = new Set(rents.map((tx) => monthIndex(tx.transactionDate)))
+      const lastComplete = monthIndex(now) - 1
+      const habit =
+        months.has(lastComplete - 1) &&
+        months.has(lastComplete - 2) &&
+        months.has(lastComplete - 3)
+      if (!habit || months.has(lastComplete)) continue
+      missingRents.push({
+        propertyId: property._id,
+        name: property.name,
+        address: property.address,
+        lastRentAt: Math.max(...rents.map((tx) => tx.transactionDate)),
+      })
+    }
+    // Longest silence first.
+    missingRents.sort((a, b) => a.lastRentAt - b.lastRentAt)
+
     // ── Manual tasks ──────────────────────────────────────────────────────
     // Done tasks older than DONE_VISIBLE_MS are hidden (not deleted). Within
     // a status group the UI keeps this order: due date first, then newest.
@@ -211,6 +271,7 @@ export const getTodo = query({
       overdueInstalmentsCount: overdueInstalments.length,
       overdueInstalments: overdueInstalmentsPreview,
       staleValuations,
+      missingRents,
       tasks: tasks.map((task: Doc<'todos'>) => ({
         _id: task._id,
         title: task.title,

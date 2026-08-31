@@ -23,6 +23,77 @@ bas de page.
 
 ---
 
+## v1.203.0 — 31/08/2026 à 15:29 — Six informations que les fiches savaient sans les dire
+
+Suite de l'audit du module Dette & Garanties. Ici, rien n'était faux : c'était
+de l'information que l'application possédait déjà et n'affichait nulle part.
+
+**La liste des prêts dit maintenant ce qui les garantit.** Chaque ligne du
+bloc Dette bancaire porte un badge par sûreté active — Nantissement, PPD,
+Caution — de la plus forte à la moins forte. Une sûreté levée ne badge plus :
+elle ne couvre plus rien. Toujours aucun montant gagé dans la colonne de
+droite, qui ne contient que du restant dû.
+
+**La fiche d'un bien dit ce qu'il reste à devoir sur le prêt qu'il garantit.**
+Une sûreté seule ne dit rien de l'exposition : c'est la dette qu'elle couvre
+qui la porte. Le bloc « Emprunt lié & sûreté » affiche donc le restant dû et
+l'échéance finale du prêt.
+
+**Un placement mis en gage le dit dans son en-tête**, par un badge « Nanti ».
+Un seul mot, parce que c'est le fait qui change l'usage possible du contrat ;
+les montants restent dans le bloc « Nantissements » plus bas.
+
+**Le % de détention d'une filiale vient enfin d'un seul endroit.** Sur la
+fiche d'une société du groupe vue depuis CALTE, le pourcentage affiché est
+celui saisi dans la table de capitalisation de la filiale, avec un lien vers
+sa page Passif. L'application calculait jusqu'ici un second pourcentage à
+partir du nombre d'actions — une approximation qui pouvait diverger du
+chiffre officiel sans que rien ne dise lequel avait raison.
+
+**On peut détacher une transaction depuis la fiche d'un prêt ou d'un bien.**
+Un prélèvement pointé sur le mauvais prêt se corrigeait jusqu'ici uniquement
+depuis le registre de Trésorerie. La fiche **défait** un pointage, elle n'en
+fait jamais : détacher renvoie le mouvement dans la file, où vous choisissez
+sa cible.
+
+**Un loyer qui cesse de tomber remonte dans « À faire ».** Un bien qui
+encaissait un loyer chaque mois et pour lequel le mois dernier rien n'est
+arrivé apparaît dans un nouveau bloc. Deux limites assumées, qui évitent un
+signal qui crie pour rien : le **mois en cours n'est jamais jugé** — un loyer
+du 5 n'est pas en retard le 2 — et un bien **jamais loué** n'apparaît pas,
+puisqu'il n'y a pas d'habitude à comparer.
+
+> **🔧 Notes techniques**
+>
+> - **Badge de sûreté** : `loans:list` renvoie `guaranteeForms`, les formes
+>   des garanties actives d'un prêt, dédupliquées et triées par
+>   `sortByStrength`. Jamais `pledgedAmountCents` — un test l'assure en
+>   vérifiant qu'aucun montant gagé ne voyage dans la ligne (D44).
+> - **Restant dû du prêt lié** : `guarantees:listBySubjectProperty` renvoie
+>   `loanOutstandingCents` et `loanLastPaymentDate`, tirés d'un **seul**
+>   échéancier (`summarize` rend la paire). Piège traité : un révolving n'a
+>   pas d'échéance finale, et son échéancier est borné par l'appelant —
+>   `summarize` aurait rapporté l'horizon passé en argument comme si c'était
+>   la dernière échéance. Le champ ne vaut donc que `loan.endDate` sur ce type.
+> - **% de détention (D33)** : `liabilities:getOwnershipForCompany` existait,
+>   testée, et n'était appelée par aucun écran. Branchée sur
+>   `participations.$companyId.tsx` ; quand elle répond, elle **remplace** le
+>   ratio actions/total plutôt que de s'afficher à côté. `docs/produit/10`
+>   affirmait déjà que « côté détenteur, l'application lit ce pourcentage » :
+>   la doc était en avance sur le code, elle est maintenant vraie.
+> - **Détacher** : bouton par ligne appelant `liabilities:deallocateTransaction`
+>   sur les deux fiches. Écart assumé avec le plan, qui annonçait un panneau
+>   de réaffectation façon fiche deal : la page Passif a déjà cette convention
+>   pour ce geste sur cette mutation, et la fiche prêt en est la voisine
+>   directe. Un second patron pour le même geste aurait coûté un concept de
+>   plus ; le registre de Trésorerie garde la réaffectation directe.
+> - **Signal loyer** : dérivé dans `todo:getTodo`, sans nouveau champ. Fenêtre
+>   décalée d'un cran (M−1 vide, M−2/M−3/M−4 servis) et comparaison par index
+>   de mois absolu (`année × 12 + mois`, UTC) pour traverser décembre. Cinq
+>   tests couvrent le cas nominal, le mois courant non jugé, le bien jamais
+>   loué, et le fait qu'une charge n'est pas un loyer. Voir `KNOWN_ISSUES.md`
+>   « Un signal dérivé sans référentiel ».
+
 ## v1.201.0 — 30/08/2026 à 12:40 — L'assistant sait aussi écrire la dette et l'immobilier
 
 Lot 7, le dernier du module Dette & Garanties. L'assistant savait déjà lire

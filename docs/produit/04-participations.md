@@ -180,7 +180,15 @@ rapports ou ses deals.
 - **Identité** : secteur, SIREN (affiché par groupes de trois chiffres),
   domaine — éditables en ligne (clic sur la valeur) — plus le % de
   détention et le nombre d'actions consolidé, qui sont calculés et donc en
-  lecture seule. Les champs se lisent en lignes — libellé à gauche, valeur
+  lecture seule. Le **% de détention** vient de deux endroits, et le premier
+  gagne toujours : si la société est une **filiale du groupe**, c'est sa
+  propre structure capitalistique qui fait foi — le chiffre porte alors un
+  lien vers sa page Passif, là où il se saisit. Sinon, c'est le rapport entre
+  les actions détenues et le total des actions de la société. Le second n'est
+  qu'une approximation (il suppose le nombre total d'actions à jour) ; quand
+  la source qui fait foi existe, l'application ne calcule pas un second
+  chiffre à côté — deux pourcentages finiraient par diverger, et rien ne
+  dirait lequel a raison. Voir [Passif](10-passif.md). Les champs se lisent en lignes — libellé à gauche, valeur
   à droite, séparés par un filet fin — de sorte que même les libellés longs
   tiennent sur une seule ligne dans la largeur du panneau.
 - **Fiche Attio** : la dernière ligne du bloc Identité rattache la société à
