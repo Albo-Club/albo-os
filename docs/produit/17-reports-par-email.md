@@ -89,9 +89,11 @@ pas atterrir sur le fonds 2025.
 CLUB` côté Calte) : rien ne permet de deviner qu'il s'agit d'une seule
 participation — vu de l'outil, ces deux lignes se ressemblent autant que
 Sezame Immo 2 et Immo 6, qui sont bien deux véhicules. Le rattachement est
-donc **manuel et assisté** : au moment de choisir, les fiches qui partagent
-le site web dans une **autre organisation** sont proposées en cases à
-cocher (la plus proche en tête), jamais cochées d'avance. Et un report déjà
+donc **manuel et assisté** : la participation se cherche au clavier (tapez
+les premières lettres de son nom ou de son organisation, la liste se
+filtre), et les fiches qui partagent le site web dans une **autre
+organisation** sont proposées en cases à cocher (la plus proche en tête),
+jamais cochées d'avance. Et un report déjà
 rangé garde un bouton « **Rattacher aussi** » pour en ajouter une plus
 tard — la nouvelle s'ajoute, les précédentes ne bougent pas. La file
 signale le cas d'elle-même : un repère « + Calte ? » apparaît quand une

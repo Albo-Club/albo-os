@@ -43,6 +43,8 @@
     "titleAlso": "Attach to one more participation",
     "description": "The report will be attached to this participation (and to every entity representing it, across all organizations), then processing resumes automatically. On an already processed report, the chosen participation is added to the previous ones.",
     "placeholder": "Pick a company…",
+    "search": "Search a company…",
+    "empty": "No company found",
     "relatedTitle": "Same domain, other organization",
     "relatedHint": "These entities share the chosen participation’s website. On a sponsor domain they are often other vehicles — only tick the ones this report is really about.",
     "alreadyAttached": " · already attached",

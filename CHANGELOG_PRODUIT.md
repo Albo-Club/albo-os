@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.203.1 — 31/08/2026 à 15:55 — Trois chiffres remis d'aplomb sur la dette
+## v1.203.2 — 31/08/2026 à 16:12 — Trois chiffres remis d'aplomb sur la dette
 
 Un audit à froid du module Dette & Garanties a fait remonter trois endroits
 où l'application affichait ou protégeait mal un chiffre. Aucun n'était
@@ -88,6 +88,35 @@ celui de l'assurance.
 >   l'encours d'un révolving et `loanAmendments.outstandingCents` — avec le
 >   critère qui les autorise : un fait extérieur constaté, jamais un calcul
 >   qu'on préfère figer.
+## v1.203.1 — 31/08/2026 à 15:54 — Une barre de recherche pour rattacher un report
+
+Dans les Rapports entrants, rattacher un mail à une participation passait par
+une liste déroulante qui affichait tout le portefeuille de toutes vos
+organisations, à faire défiler jusqu'à la bonne ligne. Le sélecteur devient un
+champ de recherche : tapez les premières lettres du nom de la participation ou
+de son organisation, la liste se filtre à la frappe, Entrée valide. Le reste ne
+bouge pas — les fiches du même domaine dans une autre organisation restent
+proposées en cases à cocher sous le choix, et « Rattacher et traiter » reste le
+geste final.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/all/reports.tsx` : le `Select` shadcn de la modale
+>   d'attachement est remplacé par un combobox `TargetCombobox` local
+>   (Popover + Command/cmdk), sur le même patron que `CompanyCombobox`
+>   (`deals.$dealId.tsx`) et `DealCombobox` — un combobox de ce type tourne
+>   déjà dans une `Dialog` ailleurs dans l'app.
+> - La valeur `cmdk` de chaque item concatène nom + organisation +
+>   `companyId`, pour que la recherche porte sur les deux libellés et que
+>   deux orgs détenant une société homonyme restent distinctes.
+> - Comportement inchangé : choisir une participation réinitialise les cases
+>   « même domaine, autre organisation », et `assignCompany` est appelée à
+>   l'identique.
+> - Deux clés i18n ajoutées (`assignDialog.search`, `assignDialog.empty`) en
+>   `fr` et `en` ; `docs/produit/17-reports-par-email.md` mis à jour.
+
+---
+
 ## v1.203.0 — 31/08/2026 à 15:17 — Les documents quittent le fil des rapports
 
 Sur une fiche société, tout vivait dans une seule liste : les rapports reçus,
