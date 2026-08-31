@@ -126,48 +126,60 @@ La colonne principale, dans l'ordre de lecture :
   d'emblée **tous les champs de l'instrument** choisi (montant, dates dont
   le closing, tour, valorisations, titres acquis…) pour tout renseigner en
   une fois.
-- **Documents & rapports** : une **seule liste chronologique**, du plus
-  récent au plus ancien, où se mélangent tout ce qui concerne la société —
-  les rapports investisseurs analysés (reçus par mail ou déposés à la main),
-  les communications Parallel/VASCO des SPV (voir
-  [Intégrations](15-integrations.md)) et les documents déposés (reporting,
-  BP, juridique, autre) **y compris ceux rattachés à un deal** (term sheet,
-  pacte, bulletin de souscription, attestation). Un pacte engage l'entité
-  autant que le deal qui l'a produit : il est donc visible ici, avec le badge
-  du deal concerné qui renvoie vers sa [fiche](05-deals.md) — un seul
-  fichier, deux endroits où le retrouver, jamais deux copies.
+- **Rapports & communications** : le **journal** de la société — ce qu'elle
+  nous envoie, du plus récent au plus ancien. On y trouve les rapports
+  investisseurs analysés (reçus par mail ou déposés à la main) et les
+  communications Parallel/VASCO des SPV (voir
+  [Intégrations](15-integrations.md)).
   - **Ce qui classe une ligne, c'est sa date** : la période couverte quand
     elle existe (un reporting de janvier se range en janvier même s'il est
-    déposé en mars), la date de dépôt sinon — et la ligne dit toujours
+    déposé en mars), la date de réception sinon — et la ligne dit toujours
     laquelle des deux elle affiche.
-  - **Rapports et communications** se présentent en bulles : titre, résumé
-    d'une ligne, date, et le nombre de fichiers joints. Leur pictogramme est
-    sur **fond bleuté** et leur est propre (un pour les rapports, un autre
-    pour les communications), là où un document garde un carré neutre : ce
-    qu'on nous a envoyé se distingue de ce qu'on a classé sans avoir à lire
-    le badge. Un clic ouvre le
-    détail (points clés, métriques, contenu intégral ; corps et pièces
-    jointes pour une communication VASCO). Les fichiers d'un rapport sont
-    **repliés dedans** — ils ne prennent pas de ligne à part.
-  - **Documents** : chacun se présente comme une **pièce jointe** — une
-    petite box qui porte l'icône de son format, son titre, le badge de son
-    type et, en dessous, sa date et son poids. Un **clic sur la box ouvre le
-    document**. À droite, l'état de sa **lecture** (voir ci-dessous), un
-    **crayon** pour corriger le titre, le type ou la date, et une corbeille
-    (avec confirmation).
-  - **Un filtre par type**, en haut, ne propose que ce qui est réellement
-    présent sur la fiche, groupé en communications (rapports, VASCO) et
-    documents. C'est lui qui sort un pacte au milieu de quarante rapports.
-- **Le bouton « Ajouter »** ouvre une seule fenêtre, et c'est le **type
-  choisi qui décide du traitement** : un **Reporting** part dans le circuit
-  d'analyse (période, points clés, métriques, synthèse relancée — voir
-  [Reports par email](17-reports-par-email.md)) et le bouton devient
-  « Analyser et ajouter » ; tout autre type est simplement déposé et lu pour
-  la recherche. On peut **sélectionner plusieurs fichiers d'un coup** :
-  chacun garde son titre, pré-rempli par le nom du fichier et modifiable,
-  tandis que le type et la date choisis s'appliquent à tout le lot. Un
-  document peut être rattaché à un **deal** au passage (facultatif) — sans
-  rattachement, il reste au niveau de l'entité. 20 Mo par fichier.
+  - Chaque ligne se présente en bulle : titre, résumé d'une ligne, date, et
+    le nombre de fichiers joints. Le pictogramme est sur **fond bleuté** et
+    propre à sa nature (un pour les rapports, un autre pour les
+    communications). Un clic ouvre le détail (points clés, métriques,
+    contenu intégral ; corps et pièces jointes pour une communication
+    VASCO). Les fichiers d'un rapport sont **repliés dedans** — ils ne
+    prennent pas de ligne à part, et ne comptent pas non plus dans les
+    documents de la société.
+  - **Le bouton « Ajouter un rapport »** ouvre la fenêtre de dépôt avec le
+    type **Reporting** déjà choisi : le fichier part dans le circuit
+    d'analyse (période, points clés, métriques, synthèse relancée — voir
+    [Reports par email](17-reports-par-email.md)) et le bouton dit
+    « Analyser et ajouter ». Le type reste modifiable dans la fenêtre : en
+    choisir un autre range simplement le fichier dans les documents, sans
+    analyse.
+
+Les documents, à droite, sous l'identité. Ce sont deux choses différentes :
+un rapport est un **journal**, qu'on lit dans l'ordre, une fois, quand il
+arrive ; un document est un **coffre**, qu'on cherche par nature, longtemps
+après, parce qu'il faut signer ou voter. La carte **Documents** du panneau
+d'identité porte le coffre : le nombre total, les **cinq plus récents** (titre,
+type, date), et un bouton **+** qui ouvre la fenêtre de dépôt — avec, cette
+fois, un type de document par défaut plutôt que le circuit d'analyse. Un clic
+sur une ligne ouvre le fichier.
+
+- **« Voir les N documents »** ouvre le **tiroir** latéral, la bibliothèque
+  complète. On y trouve une **recherche par titre**, des **filtres par type**
+  (seuls les types réellement présents sont proposés, chacun avec son
+  compte), et les documents **regroupés par type** plutôt que par date : sur
+  une société dont les trente-six pièces ont été déposées le même jour,
+  l'ordre chronologique ne répond à rien, là où « où est le pacte ? » est la
+  vraie question.
+- Chaque document s'y présente comme une **pièce jointe** — une box qui porte
+  l'icône de son format, son titre, le badge de son type et, en dessous, sa
+  date et son poids. Un **clic sur la box ouvre le document**. À droite,
+  l'état de sa **lecture** (voir ci-dessous), un **crayon** pour corriger le
+  titre, le type ou la date, et une corbeille (avec confirmation).
+- **Les documents rattachés à un deal sont ici aussi**, badgés au nom du deal,
+  le badge menant à sa [fiche](05-deals.md) : un pacte engage l'entité autant
+  que le deal qui l'a produit, et il n'y a jamais qu'un seul fichier stocké.
+  Le rattachement est facultatif, proposé à l'ajout ; sans lui, le document
+  reste au niveau de l'entité.
+- **Le dépôt accepte plusieurs fichiers d'un coup** : chacun garde son titre,
+  pré-rempli par le nom du fichier et modifiable, tandis que le type et la
+  date choisis s'appliquent à tout le lot. 20 Mo par fichier.
 
 Le panneau d'identité, à droite. Il se présente comme une carte, au même
 style que la synthèse IA, et chaque section y est introduite par une petite

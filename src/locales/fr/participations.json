@@ -521,41 +521,6 @@
     "dialogDescription": "Coche les KPIs à suivre en série. Le récap de chaque report indiquera ceux qui manquent.",
     "saved": "Fiche KPI enregistrée"
   },
-  "dealDocuments": {
-    "title": "Documents",
-    "upload": "Ajouter un doc",
-    "uploading": "Envoi…",
-    "empty": "Aucun document. Term sheet, pacte, bulletin de souscription… tout ce qui concerne ce deal précisément.",
-    "added_one": "Document ajouté",
-    "added_other": "{{count}} documents ajoutés",
-    "deleted": "Document supprimé",
-    "deleteConfirmTitle": "Supprimer ce document ?",
-    "deleteConfirmBody": "Le fichier sera définitivement supprimé.",
-    "dialogTitle_one": "Nouveau document",
-    "dialogTitle_other": "{{count}} nouveaux documents",
-    "titleLabel_one": "Titre",
-    "titleLabel_other": "Titres",
-    "kindLabel": "Type",
-    "dateLabel": "Date du document (optionnel)",
-    "kind": {
-      "term_sheet": "Term sheet",
-      "pacte": "Pacte / statuts",
-      "subscription": "Bulletin de souscription",
-      "attestation": "Attestation / KBIS",
-      "other": "Autre"
-    },
-    "errors": {
-      "too_large": "Le fichier dépasse 20 Mo",
-      "default": "Une erreur est survenue"
-    },
-    "updated": "Document modifié",
-    "editDialogTitle": "Modifier le document",
-    "addedOn": "Ajouté le {{date}}",
-    "filter": {
-      "label": "Type :",
-      "all": "tous"
-    }
-  },
   "reports": {
     "title": "Reports investisseur",
     "empty": "Aucun report pour l'instant.",
@@ -714,8 +679,41 @@
     "edit": "Modifier"
   },
   "timeline": {
-    "title": "Documents & rapports",
-    "empty": "Rien pour l'instant. Les rapports reçus, les communications et les documents déposés apparaîtront ici, du plus récent au plus ancien.",
+    "title": "Rapports & communications",
+    "empty": "Rien pour l'instant. Les rapports reçus et les communications des plateformes apparaîtront ici, du plus récent au plus ancien.",
+    "refreshVasco": "Rafraîchir VASCO",
+    "files_one": "1 fichier",
+    "files_other": "{{count}} fichiers",
+    "openReport": "Ouvrir le rapport « {{title}} »",
+    "openCommunication": "Ouvrir la communication « {{title}} »",
+    "badge": {
+      "report": "Rapport",
+      "vasco": "VASCO"
+    },
+    "add": {
+      "action": "Ajouter un rapport"
+    },
+    "detach": {
+      "action": "Détacher de cette participation",
+      "confirmTitle": "Détacher ce rapport ?",
+      "confirmBody": "Le rapport sera retiré de {{company}} : il disparaît de cette fiche, avec ses fichiers et les KPIs qu’il avait renseignés. Les autres participations rattachées gardent le leur, et le fichier reçu n’est pas supprimé.",
+      "confirm": "Détacher",
+      "done": "Rapport détaché de cette participation"
+    }
+  },
+  "documents": {
+    "card": {
+      "title": "Documents",
+      "empty": "Aucun document déposé sur cette société.",
+      "viewAll_one": "Voir le document",
+      "viewAll_other": "Voir les {{count}} documents"
+    },
+    "sheet": {
+      "title": "Documents · {{company}}",
+      "description": "Tous les documents déposés sur cette société, regroupés par type.",
+      "search": "Rechercher un document…",
+      "noMatch": "Aucun document ne correspond."
+    },
     "addedOn": "Ajouté le {{date}}",
     "uploading": "Envoi…",
     "queued": "Report envoyé — l'analyse est en cours.",
@@ -726,11 +724,6 @@
     "editTitle": "Modifier le document",
     "deleteConfirmTitle": "Supprimer ce document ?",
     "deleteConfirmBody": "Le fichier sera définitivement supprimé.",
-    "refreshVasco": "Rafraîchir VASCO",
-    "files_one": "1 fichier",
-    "files_other": "{{count}} fichiers",
-    "openReport": "Ouvrir le rapport « {{title}} »",
-    "openCommunication": "Ouvrir la communication « {{title}} »",
     "dealBadge": "Deal · {{deal}}",
     "dealLabel": "Rattacher à un deal (optionnel)",
     "dealNone": "Aucun — document de l'entité",
@@ -739,13 +732,7 @@
     "titleLabel_other": "Titres",
     "periodLabel": "Période couverte (optionnel)",
     "dateLabel": "Date du document (optionnel)",
-    "badge": {
-      "report": "Rapport",
-      "vasco": "VASCO"
-    },
     "group": {
-      "communications": "Communications",
-      "documents": "Documents",
       "company": "Documents société",
       "deal": "Documents de deal"
     },
@@ -760,12 +747,12 @@
       "attestation": "Attestation / KBIS"
     },
     "filter": {
-      "label": "Type :",
-      "all": "tous"
+      "all": "Tous"
     },
     "add": {
       "action": "Ajouter",
       "title": "Ajouter un document",
+      "titleReport": "Ajouter un rapport",
       "pick": "Choisir des fichiers",
       "analysisHint": "Un reporting est analysé automatiquement : période, points clés et métriques sont extraits, et la synthèse de la société est relancée. Titre et période sont donnés par l'analyse.",
       "noteLabel": "Note (optionnel)",
@@ -776,13 +763,6 @@
     "errors": {
       "too_large": "Le fichier dépasse 20 Mo",
       "default": "Une erreur est survenue"
-    },
-    "detach": {
-      "action": "Détacher de cette participation",
-      "confirmTitle": "Détacher ce rapport ?",
-      "confirmBody": "Le rapport sera retiré de {{company}} : il disparaît de cette fiche, avec ses fichiers et les KPIs qu’il avait renseignés. Les autres participations rattachées gardent le leur, et le fichier reçu n’est pas supprimé.",
-      "confirm": "Détacher",
-      "done": "Rapport détaché de cette participation"
     }
   },
   "silence": {
