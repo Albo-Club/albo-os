@@ -16,6 +16,30 @@ export type DealPledges = FunctionReturnType<
 >
 
 /**
+ * What `GuaranteeDialog` needs to prefill an edit — the fields every
+ * guarantee surface returns, and no more. Both `LoanGuarantee` and
+ * `PledgorGuarantee` satisfy it, so a security can be corrected from the
+ * loan sheet AND from « Garanties données », which is the only place a
+ * security given to an outside borrower shows up at all.
+ */
+export type EditableGuarantee = Pick<
+  LoanGuarantee,
+  | '_id'
+  | 'form'
+  | 'rank'
+  | 'pledgedAmountCents'
+  | 'actDate'
+  | 'releasedAt'
+  | 'notes'
+  | 'loanId'
+  | 'subjectKind'
+  | 'subject'
+  | 'borrowerName'
+  | 'pledgorName'
+  | 'pledgorOrgSlug'
+>
+
+/**
  * Formatters shared by the guarantee surfaces.
  *
  * The pledged amount is at the CENTIME: it is the figure written on the deed,
