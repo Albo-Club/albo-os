@@ -418,6 +418,7 @@
     "deleted": "Deal supprimé",
     "errors": {
       "deal_has_transactions": "Ce deal a des mouvements rapprochés. Dé-rapprochez-les avant de supprimer.",
+      "is_pledged": "Ce placement porte une garantie. Détachez-la avant de supprimer.",
       "default": "Impossible de supprimer le deal. Réessayez."
     }
   },
