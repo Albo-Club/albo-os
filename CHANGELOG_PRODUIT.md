@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.202.0 — 31/08/2026 à 14:55 — Ranger ses actes avec ses prêts et ses biens
+## v1.203.0 — 31/08/2026 à 15:45 — Ranger ses actes avec ses prêts et ses biens
 
 Le module Dette & Garanties savait tout stocker sauf le papier. Un prêt, un
 bien et une garantie affichaient bien une section « Documents » — mais sans
@@ -80,6 +80,58 @@ d'origine et par la recherche.
 > - `convex/regression.docOptionalCompany.test.ts` couvre maintenant les trois
 >   ancres : un bien et une garantie en sont, aucune des lignes ne porte de
 >   `companyId`, et les trois projections sont identiques.
+## v1.202.0 — 31/08/2026 à 15:09 — Le point hebdo du lundi raconte enfin la semaine
+
+Le mail du lundi matin se contentait d'annoncer « 3 reports rangés cette
+semaine » : un compteur, aucune idée de quelles boîtes avaient donné de
+leurs nouvelles ni de ce qu'elles disaient. Il reprend maintenant la forme
+du mail qu'on reçoit après avoir transféré un report.
+
+**Un mail par famille, plus un mail fourre-tout.** Albo reçoit le sien,
+Calte et ses filiales le leur — deux bilans ne se mélangent plus dans le
+même email. Une famille qui n'a rien à signaler n'envoie rien ; l'objet
+porte le nom de la famille (« Point hebdo Calte — 4 reports rangés »).
+
+**Les reports de la semaine, une carte par société.** Logo, nom cliquable
+vers la fiche, période couverte, la note de santé de la boîte (la même que
+sur sa fiche) et les deux points clés du report. Au-delà de six sociétés
+dans une même organisation, le reste se compte en « + N autres ».
+
+**Le reste du mail passe au même format.** La trésorerie devient une carte
+avec le montant projeté en évidence et le seuil en dessous ; les échéances
+en retard, une liste à puces en vrac jusqu'ici, deviennent un tableau
+lisible — date, libellé, montant aligné à droite, en rouge ou en vert selon
+le sens.
+
+Rien ne change côté réglages : chacun choisit toujours les trois morceaux
+qu'il veut recevoir depuis Réglages → Membres, et qui coupe tout ne reçoit
+toujours rien.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/weeklyDigest.ts` : `familyOf(slug)` route une org vers son
+>   mail (`albo` seule, tout le reste avec `calte`) et `digestsFor()`
+>   remplace `sectionsFor()` comme cœur testable — elle rend 0 à 2 digests
+>   par membre. « Tout le reste » plutôt qu'une liste figée des 7 slugs de
+>   filiales : les orgs sont à plat, rien au schéma ne dit qui est filiale de
+>   qui, et une liste ferait disparaître une 8e filiale du point hebdo au
+>   lieu de la mettre dans le mail CALTE.
+> - `convex/emailTemplates.ts` : `weeklyDigestEmail()` prend un `familyName`
+>   et rend ses trois blocs en cartes (`digestCard`), avec un
+>   `reportCard(DigestReportItem)` — pastille `scoreColor()` partagée avec la
+>   synthèse du mail de confirmation, 2 highlights max, 6 cartes max
+>   (`REPORT_EMAIL_MAX_CARDS`). Le mail reste bilingue en/fr, contrairement
+>   aux recaps de report qui sont FR-only.
+> - `convex/forecasts.ts` `sendWeeklyDigest` : la boucle qui comptait les
+>   reports de la semaine collecte en plus société + `companyIntelligence`
+>   (`health_score`) pour les 6 premières ; au-delà elle ne fait plus que
+>   compter. L'envoi boucle sur les familles, `notified` compte désormais les
+>   mails envoyés.
+> - `logoUrl()` sort de `convex/reportNotify.ts` pour devenir
+>   `companyLogoUrl()` dans `convex/lib/domain.ts`, partagé par les deux
+>   circuits d'email.
+> - `tests/weeklyDigest.test.ts` couvre `familyOf` et `digestsFor` (split,
+>   filiale dans le mail CALTE, famille muette qui disparaît seule).
 
 ## v1.201.0 — 30/08/2026 à 12:40 — L'assistant sait aussi écrire la dette et l'immobilier
 
