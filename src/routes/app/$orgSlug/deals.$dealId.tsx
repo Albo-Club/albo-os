@@ -38,7 +38,6 @@ import {
 } from '~/components/data-table/LocalPagination'
 import { ExitDealDialog } from '~/components/deals/ExitDealDialog'
 import { DealForecastSection } from '~/components/deals/DealForecastSection'
-import { DealDocumentsSection } from '~/components/deals/DealDocumentsSection'
 import { FundSection } from '~/components/deals/FundSection'
 import {
   FIELD_FORMAT,
@@ -831,13 +830,6 @@ function DealDetail() {
               txs={txs}
             />
           )}
-
-          {/* Documents filed on this deal only (term sheet, pacte…) — the
-              company's own documents live on its fiche. */}
-          <DealDocumentsSection
-            dealId={deal._id}
-            companyId={deal.target?._id}
-          />
         </div>
 
         {/* Instrument side panel, mirror of the company fiche's identity panel:

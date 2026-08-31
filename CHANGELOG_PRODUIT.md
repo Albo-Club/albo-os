@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.203.0 — 31/08/2026 à 15:45 — Ranger ses actes avec ses prêts et ses biens
+## v1.204.0 — 31/08/2026 à 16:00 — Ranger ses actes avec ses prêts et ses biens
 
 Le module Dette & Garanties savait tout stocker sauf le papier. Un prêt, un
 bien et une garantie affichaient bien une section « Documents » — mais sans
@@ -61,10 +61,13 @@ d'origine et par la recherche.
 >   discriminée (`loan` / `property` / `guarantee`) et **jamais un `orgId`** :
 >   `documents:create` résout l'org depuis l'ancre présente, une org fournie
 >   par l'appelant serait un trou de tenancy.
-> - Délibérément plus maigre que `DealDocumentsSection`, qu'il n'étend pas :
->   pas de filtre par type ni de sélection multiple. Une société de
->   portefeuille accumule des dizaines de reportings ; un prêt porte une offre
->   et un tableau. Un filtre sur quatre lignes est du mobilier.
+> - Délibérément plus maigre que la surface documents de la fiche société
+>   (`CompanyDocumentsCard` + `AddDocumentDialog`), qu'il n'étend pas : pas de
+>   recherche, pas de regroupement par type, pas de sélection multiple. Une
+>   société de portefeuille accumule des dizaines de pièces ; un prêt porte une
+>   offre et un tableau. Un filtre sur quatre lignes est du mobilier. Si un
+>   prêt se met un jour à en accumuler autant, il faudra adopter cette
+>   surface-là plutôt que faire grossir celle-ci jusqu'à la recopier.
 > - L'appelant possède la query et passe `docs` : les trois ancres ont trois
 >   queries différentes, et un hook ne peut pas être appelé par ligne de liste
 >   (le cas garantie en rend un par garantie). Côté garantie, `skip` tant que
@@ -80,6 +83,72 @@ d'origine et par la recherche.
 > - `convex/regression.docOptionalCompany.test.ts` couvre maintenant les trois
 >   ancres : un bien et une garantie en sont, aucune des lignes ne porte de
 >   `companyId`, et les trois projections sont identiques.
+## v1.203.0 — 31/08/2026 à 15:17 — Les documents quittent le fil des rapports
+
+Sur une fiche société, tout vivait dans une seule liste : les rapports reçus,
+les communications des plateformes et les documents déposés, mélangés du plus
+récent au plus ancien. Ça se lisait bien sur une boîte à deux documents. Sur
+Hectarea, qui en compte trente-six déposés le même jour, le rapport de board
+disparaissait au milieu des pactes et des PV d'assemblée — et trier par date
+ne servait à rien, puisque tout était arrivé ensemble.
+
+**Deux endroits, deux usages.** La colonne principale ne porte plus que ce que
+la société nous envoie : les **rapports** et les **communications** des
+plateformes, dans l'ordre. Les documents, eux, remontent dans le panneau de
+droite, dans une carte **Documents** placée sous la fiche d'identité — avec
+leur nombre, les cinq plus récents et un bouton pour en ajouter. Un rapport se
+lit dans l'ordre, une fois, quand il arrive ; un document se cherche par
+nature, longtemps après, parce qu'il faut signer ou voter. Ce ne sont pas les
+mêmes gestes.
+
+**Un vrai coffre, avec une recherche.** « Voir les N documents » ouvre un
+tiroir latéral qui montre enfin la bibliothèque complète : une **recherche par
+titre** — elle n'existait nulle part jusqu'ici, et c'est ce qui manquait le
+plus au-delà de vingt documents —, des **filtres par type** qui ne proposent
+que ce qui est réellement présent, et les documents **regroupés par type**
+plutôt qu'empilés par date. Les titres longs y sont enfin lisibles en entier.
+
+**Deux portes d'ajout au lieu d'une.** Le bouton de la section rapports dit
+« Ajouter un rapport » et lance l'analyse ; le **+** de la carte Documents
+dépose simplement le fichier. Le type reste modifiable dans les deux cas — on
+peut toujours changer d'avis en cours de route —, mais la porte qu'on pousse
+dit désormais ce qu'on dépose. C'est ce qui manquait : quelques pièces
+juridiques étaient parties dans le circuit d'analyse sans que personne ne
+touche au menu déroulant.
+
+**La fiche deal perd son bloc Documents.** Il n'a jamais servi : aucun
+document du portefeuille n'y avait été déposé, et tout est classé au niveau de
+la société. Un document rattaché à un deal reste visible sur la fiche de la
+société, badgé au nom du deal, comme avant.
+
+> **🔧 Notes techniques**
+>
+> - `CompanyTimelineSection.tsx` → `CompanyReportsSection.tsx` : les entrées
+>   `type: 'doc'` et le filtre par type sortent du fil, qui ne porte plus que
+>   les rapports et les communications VASCO. Les pièces jointes d'un rapport
+>   (`reportId`) restent repliées dans sa ligne.
+> - Nouveau `CompanyDocumentsCard.tsx` : la carte du panneau de droite, son
+>   tiroir (`Sheet` shadcn, recherche + filtres + groupes par `kind`, tous
+>   côté client sur la liste déjà chargée) et les dialogues d'édition /
+>   suppression / texte extrait, déplacés depuis la timeline.
+> - `AddDocumentDialog.tsx` extrait et partagé par les deux portes, avec une
+>   prop `defaultKind` (`reporting` / `legal`) ; le sélecteur des 8 types reste
+>   entier des deux côtés, et le titre du dialogue suit le type courant.
+> - `documentFields.tsx` : vocabulaire des types, conversions de dates,
+>   `KindSelect` / `DealSelect` / `useDealLabel`, partagés par les deux.
+> - `participations.$companyId.tsx` : l'`<aside>` devient un conteneur de deux
+>   cartes (identité, puis documents) au lieu d'être lui-même la carte. Le
+>   collant (`useStickyBottom`) et le `lg:items-start` du parent sont
+>   inchangés — cf. `KNOWN_ISSUES.md` § « Panneau latéral figé ».
+> - Fiche deal : `DealDocumentsSection.tsx` supprimé (425 lignes), avec la
+>   query `documents.listByDeal` devenue sans appelant et le bloc i18n
+>   `participations:dealDocuments.*`. L'index `by_deal` reste utilisé par les
+>   transactions, le prévisionnel et les projections.
+> - i18n : `participations:timeline.*` ne garde que les clés du fil de
+>   rapports, tout le reste passe sous `participations:documents.*` (fr + en).
+> - Le pourquoi de la re-séparation, ses trois invariants et la cascade de
+>   suppression d'un deal sont dans `KNOWN_ISSUES.md` § « Documents &
+>   rapports : deux surfaces ».
 ## v1.202.0 — 31/08/2026 à 15:09 — Le point hebdo du lundi raconte enfin la semaine
 
 Le mail du lundi matin se contentait d'annoncer « 3 reports rangés cette

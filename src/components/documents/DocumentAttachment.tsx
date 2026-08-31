@@ -33,18 +33,18 @@ import {
 import { Badge } from '~/components/ui/badge'
 
 /**
- * One document as an attachment card, shared by the company Documents tab and
- * the deal one. Deliberately not a table row: a document is a file you open,
- * not a line of data to compare — the tables on these fiches carry deals and
+ * One document as an attachment card, used by the documents card of a company
+ * fiche. Deliberately not a table row: a document is a file you open, not a
+ * line of data to compare — the tables on these fiches carry deals and
  * amounts, so documents get their own shape.
  *
  * The whole card opens the file (`AttachmentTrigger` over the download URL);
  * the reading state, the edit pencil and the delete bin sit above it. The
- * caller owns the wording of the description line, since a company document
- * carries a covered period and a deal document its own date.
+ * caller owns the wording of the description line, since a document filed
+ * under an entity carries a covered period and a deal document its own date.
  */
 
-/** The subset of `documents.listByCompany` / `listByDeal` a card needs. */
+/** The subset of `documents.listByCompany` a card needs. */
 export type DocumentCard = {
   _id: Id<'documents'>
   title: string
@@ -63,7 +63,7 @@ export type DocumentCard = {
  * type we do not recognise gets the blank sheet rather than the text one,
  * which would claim something we do not know.
  */
-function FileGlyph({ contentType }: { contentType: string | null }) {
+export function FileGlyph({ contentType }: { contentType: string | null }) {
   if (!contentType) return <File />
   if (contentType.startsWith('image/')) return <Image />
   if (

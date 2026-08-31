@@ -62,11 +62,16 @@ function toDateInput(period: number): string {
  * Documents attached to a loan, a property or a guarantee: upload to Convex
  * storage (20 MB cap), list, retitle, delete.
  *
- * Deliberately LEANER than `DealDocumentsSection`, which it deliberately does
- * not extend. That one carries a kind filter and multi-file picking because a
- * portfolio company accumulates dozens of reportings; a loan carries an offer
+ * Deliberately LEANER than the company fiche's own documents surface
+ * (`CompanyDocumentsCard` + `AddDocumentDialog`), which it does not extend.
+ * That one carries search, grouping by kind and multi-file picking because a
+ * portfolio company accumulates dozens of pieces; a loan carries an offer
  * letter and an amortization table, a property a deed and a couple of quotes.
  * A filter over four rows is furniture, not a feature.
+ *
+ * ⚠️ If a loan or a property ever starts accumulating documents the way a
+ * company does, the right move is to adopt that surface rather than grow
+ * this one into a second copy of it.
  *
  * The caller owns the query and passes `docs` — the three anchors have three
  * different queries, and a hook cannot be called per row of a list (the

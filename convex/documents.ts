@@ -4,9 +4,10 @@
  * `files:generateUploadUrl` (existing), then `documents:create` with the
  * storageId. Two ways in: manual upload here, and the report pipeline
  * (`source: 'email'`, rows created by `reportStore.ts`). A row hangs off a
- * company, and additionally off one of its deals when `dealId` is set — the
- * company list is the superset (`listByCompany` returns deal documents too,
- * carrying their deal, so a pacte is reachable from the entity that signed it).
+ * company, and additionally off one of its deals when `dealId` is set. There
+ * is no per-deal list any more: a document is read from the entity that signed
+ * it, `listByCompany` returning the deal ones too, carrying their deal so the
+ * fiche can badge them and link back to the deal sheet.
  *
  * Since the Dette & Garanties module a row may hang off a BANK LOAN instead
  * (`loanId`), with no company at all: a loan deed has no portfolio target.
@@ -121,41 +122,6 @@ export const listByCompany = query({
         ocrDetail: doc.ocrDetail ?? null,
         ocrChars: doc.ocrChars ?? null,
         // Semantic-index state (vectorize.ts) — same trace, one layer down.
-        vectorState: doc.vectorState ?? null,
-        vectorDetail: doc.vectorDetail ?? null,
-        url: await ctx.storage.getUrl(doc.storageId),
-      })),
-    )
-  },
-})
-
-/** A deal's documents, most recent first, with download URL. */
-export const listByDeal = query({
-  args: { dealId: v.id('deals') },
-  handler: async (ctx, { dealId }) => {
-    const deal = await ctx.db.get('deals', dealId)
-    if (!deal) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, deal.orgId)
-
-    const rows = await ctx.db
-      .query('documents')
-      .withIndex('by_deal', (q) => q.eq('dealId', dealId))
-      .order('desc')
-      .take(200)
-
-    return await Promise.all(
-      rows.map(async (doc) => ({
-        _id: doc._id,
-        title: doc.title,
-        kind: doc.kind,
-        period: doc.period ?? null,
-        contentType: doc.contentType ?? null,
-        size: doc.size ?? null,
-        uploadedAt: doc.uploadedAt,
-        // Same reading state as a company document — one pipeline, one story.
-        ocrState: doc.ocrState ?? null,
-        ocrDetail: doc.ocrDetail ?? null,
-        ocrChars: doc.ocrChars ?? null,
         vectorState: doc.vectorState ?? null,
         vectorDetail: doc.vectorDetail ?? null,
         url: await ctx.storage.getUrl(doc.storageId),
