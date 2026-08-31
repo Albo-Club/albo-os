@@ -23,6 +23,44 @@ bas de page.
 
 ---
 
+## v1.206.1 — 31/08/2026 à 19:15 — Le mail d'accusé de réception redevient lisible
+
+Quand un report est rangé, l'email de confirmation reprend la synthèse de la
+fiche : le score, les points forts et de vigilance, et trois tuiles de KPI.
+Chez certains clients mail, cette partie arrivait cassée — le texte d'une
+tuile se superposait à la ligne du dessous, les puces et les deux colonnes
+ne démarraient pas à la même hauteur.
+
+- Les tuiles n'ont plus de hauteur imposée : un libellé long s'affiche en
+  entier, dans une taille adaptée à sa longueur, sans jamais recouvrir ce
+  qui suit.
+- Les trois tuiles gardent une hauteur commune, quel que soit leur contenu.
+- Les puces et les colonnes « Points forts » / « Points de vigilance »
+  s'alignent en haut dans tous les clients mail.
+- Les KPI de la synthèse sont désormais des valeurs courtes et chiffrées,
+  comme prévu au départ : le détail passe dans la ligne de contexte, plus
+  dans le gros chiffre.
+
+> **🔧 Notes techniques**
+>
+> - `convex/emailTemplates.ts` : `insightTile` devient `insightCell` et rend
+>   un `<td>` bordé au lieu d'une table imbriquée — les cellules d'une même
+>   ligne partagent sa hauteur, ce que les `height:14/28/24px` (+
+>   `overflow:hidden`) tentaient d'obtenir et qui débordait dès qu'une valeur
+>   passait sur deux lignes. Nouvelle fonction `valueFontSize` (21/17/15px
+>   selon la longueur), gouttières en cellules vides.
+> - Tous les `valign=` des blocs du mail report sont doublés d'un
+>   `style="vertical-align:…"` : certains clients strippent l'attribut, la
+>   cellule retombe alors sur `middle` — d'où les puces et la colonne
+>   « vigilance » décalées d'une demi-ligne.
+> - `convex/lib/reportPrompts.ts` : `top_insights.current_value` borné à
+>   12 caractères (une valeur, pas une phrase), `label` à 2-3 mots, le détail
+>   renvoyé dans `context`.
+> - `tests/reportEmail.test.ts` (nouveau, `pnpm test:unit`) : rendu avec des
+>   textes longs, aucune hauteur fixe, aucun `valign` sans CSS équivalent.
+>   Piège documenté dans `KNOWN_ISSUES.md` § « HTML email : ni hauteur fixe,
+>   ni `valign` seul ».
+
 ## v1.206.0 — 31/08/2026 à 18:37 — La garantie qu'un tiers donne sur la même dette
 
 Quand on garantit l'emprunt de quelqu'un d'extérieur au groupe, on n'est
