@@ -98,14 +98,18 @@ ensuite.
   objet s'**annule** directement depuis sa ligne du registre (occurrences
   de règles récurrentes comprises), avec confirmation : elle sort du solde
   projeté.
-- **Le point hebdo du lundi matin** : un seul email, une section par
-  organisation, qui rassemble les seuils de trésorerie franchis, les
-  échéances en retard (celles dépassées de plus d'un jour sans avoir été
-  rapprochées) et le **nombre de reports rangés dans la semaine**, avec les
-  liens pour aller traiter ce qui doit l'être. Rien à signaler = pas
-  d'email. Chacun choisit les trois morceaux qu'il veut y voir depuis
-  **Réglages → Membres** ; qui coupe les trois ne reçoit plus le point
-  hebdo du tout. Voir
+- **Le point hebdo du lundi matin** : **deux emails séparés** — un pour
+  Albo, un pour Calte et ses filiales (une section par société à
+  l'intérieur), pour ne jamais mélanger deux bilans dans le même mail. Une
+  famille qui n'a rien à dire n'envoie rien du tout. Chacun rassemble les
+  seuils de trésorerie franchis, les échéances en retard (celles dépassées
+  de plus d'un jour sans avoir été rapprochées) et **les reports reçus dans
+  la semaine, une carte par société** : logo, période couverte, note de
+  santé de la boîte et deux points clés du report — avec les liens pour
+  aller traiter ce qui doit l'être. Rien à signaler = pas d'email. Chacun
+  choisit les trois morceaux qu'il veut y voir depuis **Réglages →
+  Membres** ; qui coupe les trois ne reçoit plus le point hebdo du tout.
+  Voir
   [Organisations, membres et invitations](14-organisations-membres-invitations.md)
   et [Reports par email](17-reports-par-email.md).
 

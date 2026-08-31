@@ -28,3 +28,14 @@ export function normalizeDomain(raw: string): string | null {
   if (!s || /[\s[\]()]/.test(s) || !s.includes('.')) return null
   return s
 }
+
+/**
+ * Hotlinked company logo, same source as the app's `CompanyLogo`. Null without
+ * a domain or a token — callers then fall back to the company's initial, so a
+ * missing env var costs a letter, never a broken image.
+ */
+export function companyLogoUrl(domain: string | undefined): string | null {
+  const token = process.env.LOGO_DEV_TOKEN ?? process.env.VITE_LOGO_DEV_TOKEN
+  if (!domain || !token) return null
+  return `https://img.logo.dev/${domain}?token=${token}&size=128&format=png`
+}
