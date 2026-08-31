@@ -250,10 +250,6 @@
       "success": "Palier enregistré",
       "deleted": "Palier supprimé"
     },
-    "documents": {
-      "title": "Documents",
-      "empty": "Aucun document rattaché à ce prêt."
-    },
     "menu": {
       "correct": "Corriger",
       "delete": "Supprimer",

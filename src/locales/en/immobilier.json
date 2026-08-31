@@ -146,10 +146,6 @@
         "label": "Label"
       }
     },
-    "documents": {
-      "title": "Documents",
-      "empty": "No document."
-    },
     "menu": {
       "correct": "Correct",
       "delete": "Delete the property"

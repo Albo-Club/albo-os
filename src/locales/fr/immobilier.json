@@ -146,10 +146,6 @@
         "label": "Libellé"
       }
     },
-    "documents": {
-      "title": "Documents",
-      "empty": "Aucun document."
-    },
     "menu": {
       "correct": "Corriger",
       "delete": "Supprimer le bien"

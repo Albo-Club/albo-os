@@ -238,7 +238,13 @@ export const listByProperty = query({
   },
 })
 
-/** A guarantee's deeds, most recent first. Like a loan's: no company. */
+/**
+ * A guarantee's deeds, most recent first. Like a loan's: no company.
+ *
+ * Same projection as `listByLoan` / `listByProperty`, deliberately: the three
+ * feed the SAME front component, and a narrower shape here would only mean
+ * that component asking less of all three.
+ */
 export const listByGuarantee = query({
   args: { guaranteeId: v.id('guarantees') },
   handler: async (ctx, { guaranteeId }) => {
@@ -257,8 +263,15 @@ export const listByGuarantee = query({
         _id: doc._id,
         title: doc.title,
         kind: doc.kind,
+        period: doc.period ?? null,
+        contentType: doc.contentType ?? null,
+        size: doc.size ?? null,
         uploadedAt: doc.uploadedAt,
         ocrState: doc.ocrState ?? null,
+        ocrDetail: doc.ocrDetail ?? null,
+        ocrChars: doc.ocrChars ?? null,
+        vectorState: doc.vectorState ?? null,
+        vectorDetail: doc.vectorDetail ?? null,
         url: await ctx.storage.getUrl(doc.storageId),
       })),
     )
