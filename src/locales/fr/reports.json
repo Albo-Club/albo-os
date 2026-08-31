@@ -43,6 +43,8 @@
     "titleAlso": "Rattacher à une participation de plus",
     "description": "Le report sera rattaché à cette participation (et à toutes les entités qui la représentent, dans toutes les organisations), puis le traitement reprend automatiquement. Sur un report déjà traité, la participation choisie s'ajoute aux précédentes.",
     "placeholder": "Choisir une participation…",
+    "search": "Rechercher une participation…",
+    "empty": "Aucune participation trouvée",
     "relatedTitle": "Même domaine, autre organisation",
     "relatedHint": "Ces entités partagent le site web de la participation choisie. Sur un domaine de sponsor, ce sont souvent d'autres véhicules — coche seulement celles que ce report concerne vraiment.",
     "alreadyAttached": " · déjà rattachée",
