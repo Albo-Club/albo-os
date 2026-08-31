@@ -36,6 +36,7 @@ import {
   reportSoftFailureHtml,
   reviewReasonLabel,
 } from './emailTemplates'
+import { companyLogoUrl } from './lib/domain'
 import { wantsAlert } from './lib/notificationPrefs'
 import { reportIssueRecipients } from './lib/reportRecipients'
 import { isBlockedSender, resolveMemberByEmail } from './lib/reportSenders'
@@ -68,17 +69,6 @@ function outboundInbox(rowInboxId: string): string {
   return rowInboxId === 'manual-upload'
     ? (process.env.AGENTMAIL_INBOX_ID ?? rowInboxId)
     : rowInboxId
-}
-
-/**
- * Hotlinked company logo, same source as the app's `CompanyLogo`. Null without
- * a domain or a token — the template then falls back to the initial, so a
- * missing env var costs a letter, never a broken image.
- */
-function logoUrl(domain: string | undefined): string | null {
-  const token = process.env.LOGO_DEV_TOKEN ?? process.env.VITE_LOGO_DEV_TOKEN
-  if (!domain || !token) return null
-  return `https://img.logo.dev/${domain}?token=${token}&size=128&format=png`
 }
 
 // ─── Queries / mutations ─────────────────────────────────────────────────────
@@ -221,7 +211,7 @@ export const entityCards = internalQuery({
       out.push({
         name: company.name,
         orgName: org.name,
-        logoUrl: logoUrl(company.domain),
+        logoUrl: companyLogoUrl(company.domain),
         url: siteUrl()
           ? `${siteUrl()}/app/${org.slug}/participations/${company._id}`
           : null,

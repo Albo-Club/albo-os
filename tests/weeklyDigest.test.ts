@@ -13,7 +13,7 @@
 
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { sectionsFor } from '../convex/lib/weeklyDigest'
+import { digestsFor, familyOf, sectionsFor } from '../convex/lib/weeklyDigest'
 import type { OrgFinding } from '../convex/lib/weeklyDigest'
 
 const CASH: NonNullable<OrgFinding['cash']> = {
@@ -30,9 +30,23 @@ const OVERDUE: NonNullable<OrgFinding['overdue']> = {
   forecastUrl: 'https://app.test/app/calte/cash?filter=unmatched',
 }
 
-const REPORTS: NonNullable<OrgFinding['reports']> = { count: 4 }
+const REPORTS: NonNullable<OrgFinding['reports']> = {
+  count: 4,
+  items: [
+    {
+      companyName: 'Hectarea',
+      logoUrl: null,
+      url: 'https://app.test/app/calte/participations/c1',
+      period: 'Q2 2026',
+      score: 7,
+      scoreLabel: 'Solide',
+      highlights: ['ARR x2 sur le trimestre', 'Runway 14 mois'],
+    },
+  ],
+}
 
 const BOTH: OrgFinding = {
+  orgSlug: 'calte',
   orgName: 'Calte',
   cash: CASH,
   overdue: OVERDUE,
@@ -64,7 +78,7 @@ describe('sectionsFor', () => {
   it('drops the org entirely when every one of its blocks is muted', () => {
     assert.deepEqual(
       sectionsFor(
-        [{ orgName: 'Calte', cash: CASH, overdue: null, reports: null }],
+        [{ orgSlug: 'calte', orgName: 'Calte', cash: CASH, overdue: null, reports: null }],
         { ...ALL_ON, cashThreshold: false },
       ),
       [],
@@ -77,6 +91,7 @@ describe('sectionsFor', () => {
         [
           BOTH,
           {
+            orgSlug: 'albo',
             orgName: 'Albo',
             cash: CASH,
             overdue: OVERDUE,
@@ -95,7 +110,16 @@ describe('sectionsFor', () => {
 
   it('carries one section per org, in the order they were found', () => {
     const sections = sectionsFor(
-      [BOTH, { orgName: 'Albo', cash: null, overdue: OVERDUE, reports: null }],
+      [
+        BOTH,
+        {
+          orgSlug: 'albo',
+          orgName: 'Albo',
+          cash: null,
+          overdue: OVERDUE,
+          reports: null,
+        },
+      ],
       ALL_ON,
     )
     assert.deepEqual(
@@ -112,6 +136,7 @@ describe('sectionsFor', () => {
 
 describe('sectionsFor — the weekly report count', () => {
   const ONLY_REPORTS: OrgFinding = {
+    orgSlug: 'calte',
     orgName: 'Calte',
     cash: null,
     overdue: null,
@@ -142,5 +167,89 @@ describe('sectionsFor — the weekly report count', () => {
     assert.equal(section.reports, null)
     assert.deepEqual(section.cash, CASH)
     assert.deepEqual(section.overdue, OVERDUE)
+  })
+})
+
+describe('familyOf', () => {
+  it('gives Albo Club its own mail', () => {
+    assert.equal(familyOf('albo'), 'albo')
+  })
+
+  it('puts CALTE and every subsidiary in the same one', () => {
+    for (const slug of ['calte', 'caltimo', 'rdb', 'sci-upload', 'banco-2']) {
+      assert.equal(familyOf(slug), 'calte')
+    }
+  })
+
+  it('routes an org created tomorrow to the CALTE mail rather than nowhere', () => {
+    assert.equal(familyOf('sci-chapelle-3'), 'calte')
+  })
+})
+
+describe('digestsFor', () => {
+  const ALBO: OrgFinding = {
+    orgSlug: 'albo',
+    orgName: 'Albo',
+    cash: null,
+    overdue: null,
+    reports: REPORTS,
+  }
+  const CALTIMO: OrgFinding = {
+    orgSlug: 'caltimo',
+    orgName: 'Caltimo',
+    cash: CASH,
+    overdue: null,
+    reports: null,
+  }
+
+  it('sends one mail for Albo and one for CALTE, Albo first', () => {
+    const digests = digestsFor([BOTH, ALBO], ALL_ON)
+    assert.deepEqual(
+      digests.map((d) => d.family),
+      ['albo', 'calte'],
+    )
+  })
+
+  it('keeps a subsidiary in the CALTE mail, never in the Albo one', () => {
+    const digests = digestsFor([ALBO, BOTH, CALTIMO], ALL_ON)
+    const calte = digests.find((d) => d.family === 'calte')
+    assert.deepEqual(
+      calte?.sections.map((s) => s.orgName),
+      ['Calte', 'Caltimo'],
+    )
+    const albo = digests.find((d) => d.family === 'albo')
+    assert.deepEqual(
+      albo?.sections.map((s) => s.orgName),
+      ['Albo'],
+    )
+  })
+
+  it('sends a single mail when only one family has something to say', () => {
+    const digests = digestsFor([ALBO], ALL_ON)
+    assert.equal(digests.length, 1)
+    assert.equal(digests[0].family, 'albo')
+  })
+
+  it('drops a family whose only block the member muted', () => {
+    // Albo has nothing but reports, CALTIMO nothing but a cash breach.
+    const digests = digestsFor([ALBO, CALTIMO], {
+      ...ALL_ON,
+      weeklyReports: false,
+    })
+    assert.deepEqual(
+      digests.map((d) => d.family),
+      ['calte'],
+    )
+  })
+
+  it('sends nothing at all when every block is muted', () => {
+    assert.deepEqual(
+      digestsFor([ALBO, BOTH, CALTIMO], {
+        cashThreshold: false,
+        overdueEntries: false,
+        weeklyReports: false,
+      }),
+      [],
+    )
   })
 })
