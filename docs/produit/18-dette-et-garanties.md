@@ -55,6 +55,11 @@ paie les intérêts et le capital reste au montant emprunté ; *total*, on ne
 paie rien et les intérêts se capitalisent — l'amortissement démarre alors
 **au-dessus** du montant emprunté.
 
+Dans tous les cas, le différé doit être **plus court que la durée du prêt**,
+in fine compris. Un différé qui couvre toute la durée ne laisserait rien à
+amortir : sur un in fine, il ferait disparaître le ballon de capital — de la
+fiche comme du prévisionnel. La saisie le refuse.
+
 ### Le crédit révolving, la seule exception
 
 Un révolving n'a ni durée ni échéancier. Son encours est donc **saisi à la
@@ -82,6 +87,13 @@ attente, pas une faute, le rouge reste réservé à ce qui va mal ; une
 Le réel ne vaut pas la mensualité du plan, et c'est normal : il inclut
 l'assurance, qui est hors mensualité. Les deux colonnes coexistent
 précisément pour éviter de « corriger » un chiffre juste.
+
+C'est aussi pourquoi elles ne s'affichent pas avec la même précision : **les
+colonnes du plan sont arrondies à l'euro, le réel est au centime**. Le plan
+est un calcul, le réel est un relevé bancaire. Mettre des centimes partout
+donnerait à la mensualité théorique une précision qu'elle n'a pas, et
+inviterait à comparer les deux chiffres au centime près alors qu'ils ne
+mesurent pas la même chose.
 
 Sur un **in fine**, la dernière ligne porte le ballon de capital, mise en
 évidence. Sur un **prêt à taux variable**, les échéances postérieures à la
