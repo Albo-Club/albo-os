@@ -608,6 +608,12 @@ const FAILURE_DETAIL_MAX = 300
 /** Max entry lines rendered per org in the overdue block (rest is "+N more"). */
 const OVERDUE_EMAIL_MAX_LINES = 8
 
+/** Max report cards rendered per org in the digest (rest is "+N more"). */
+export const REPORT_EMAIL_MAX_CARDS = 6
+
+/** Key points shown under a report card — a recap card, not the report. */
+const REPORT_EMAIL_MAX_HIGHLIGHTS = 2
+
 export type DigestOverdueEntry = {
   date: number
   label: string
@@ -616,7 +622,30 @@ export type DigestOverdueEntry = {
 }
 
 /**
- * One org's worth of the weekly digest. Both blocks are optional: a section
+ * One report filed this week, as the Monday mail shows it: which company sent
+ * it, the period it covers, where that company's health stands, and what the
+ * report says. Same ingredients as the confirmation the forwarder gets
+ * (`reportConfirmationHtml`), minus the score ring, the strengths/watch-outs
+ * columns and the KPI tiles — six of those in one mail is a report, not a
+ * digest.
+ */
+export type DigestReportItem = {
+  companyName: string
+  /** logo.dev URL — null when the company carries no website domain. */
+  logoUrl: string | null
+  /** Fiche URL — null when SITE_URL is unset. */
+  url: string | null
+  /** Period the report covers. Absent on a one-off document. */
+  period?: string
+  /** AI health score of the company (0-10) and its label, when analysed. */
+  score?: number
+  scoreLabel?: string
+  /** Key points of the report. The caller passes them all, two are shown. */
+  highlights: Array<string>
+}
+
+/**
+ * One org's worth of the weekly digest. Every block is optional: a section
  * is only built when the org has something to say AND the recipient still
  * subscribes to that alert, so a reader who muted overdue entries gets the
  * very same mail minus that block.
@@ -634,23 +663,96 @@ export type DigestSection = {
     forecastUrl: string
   } | null
   /**
-   * Reports filed on this org's companies over the past week. Null when
-   * there were none, or when the reader muted the block — an org with
-   * nothing to say drops out of the digest entirely.
+   * Reports filed on this org's companies over the past week. `count` is the
+   * week's total, `items` the ones the mail has room for. Null when there
+   * were none, or when the reader muted the block — an org with nothing to
+   * say drops out of the digest entirely.
    */
-  reports: { count: number } | null
+  reports: { count: number; items: Array<DigestReportItem> } | null
+}
+
+/** The digest's unit of layout — the bordered box the report mail uses too. */
+function digestCard(inner: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid ${BORDER};border-radius:8px;">
+  <tr><td style="padding:14px 16px;">${inner}</td></tr>
+</table>`
+}
+
+/** Small uppercase caption heading a card. */
+function cardLabel(text: string): string {
+  return `<div style="color:${MUTED};font-size:10px;letter-spacing:0.05em;text-transform:uppercase;line-height:1.4;">${text}</div>`
+}
+
+/** A card's secondary action — a link, never a second button. */
+function cardLink(label: string, url: string): string {
+  return `<p style="margin:12px 0 0;font-size:13px;"><a href="${url}" style="color:${BRAND};font-weight:500;">${label} →</a></p>`
+}
+
+/** Company logo, or its initial when the company carries no domain. */
+function digestAvatar(name: string, logoUrl: string | null): string {
+  return logoUrl
+    ? `<img src="${logoUrl}" width="32" height="32" alt="" style="display:block;width:32px;height:32px;border-radius:6px;background:#f1f1f3;">`
+    : `<div style="width:32px;height:32px;border-radius:6px;background:#f1f1f3;color:${MUTED};font-weight:600;font-size:13px;text-align:center;line-height:32px;">${esc(name.slice(0, 1).toUpperCase())}</div>`
 }
 
 /**
- * The Monday digest: one mail per member, one section per org, sent by
- * `forecasts.sendWeeklyDigest`. Callers must pass at least one section
- * carrying at least one block — an empty digest is never sent.
+ * One report, one card: identity + period on the left, health chip on the
+ * right, two key points underneath. The company name carries the link to its
+ * fiche — a button per card would drown the mail.
+ */
+function reportCard(item: DigestReportItem): string {
+  const name = esc(item.companyName)
+  const title = item.url
+    ? `<a href="${item.url}" style="color:${BRAND};text-decoration:none;font-weight:600;">${name}</a>`
+    : `<span style="font-weight:600;">${name}</span>`
+  const chip =
+    item.score !== undefined
+      ? `<span style="display:inline-block;border:1px solid ${scoreColor(item.score)};color:${scoreColor(item.score)};font-size:11px;padding:2px 8px;border-radius:999px;line-height:1.4;white-space:nowrap;">${item.scoreLabel ? `${esc(item.scoreLabel)} · ` : ''}${item.score}/10</span>`
+      : ''
+  const points = item.highlights
+    .slice(0, REPORT_EMAIL_MAX_HIGHLIGHTS)
+    .map(
+      (h) => `<tr>
+      <td width="14" valign="top" style="color:${MUTED};font-size:13px;line-height:1.5;">•</td>
+      <td valign="top" style="color:#3f4147;font-size:13px;line-height:1.5;padding-bottom:3px;">${esc(h)}</td>
+    </tr>`,
+    )
+    .join('\n    ')
+
+  return digestCard(`<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+    <tr>
+      <td width="32" valign="middle" style="padding-right:10px;">${digestAvatar(item.companyName, item.logoUrl)}</td>
+      <td valign="middle" style="line-height:1.35;">
+        <div>${title}</div>
+        ${item.period ? `<div style="color:${MUTED};font-size:12px;">${esc(item.period)}</div>` : ''}
+      </td>
+      <td valign="middle" align="right">${chip}</td>
+    </tr>
+  </table>${
+    points
+      ? `
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:10px;">
+    ${points}
+  </table>`
+      : ''
+  }`)
+}
+
+/**
+ * The Monday digest: one mail per member AND PER FAMILY — Albo Club on one
+ * side, CALTE and its subsidiaries on the other (`lib/weeklyDigest.ts`
+ * `familyOf`), so a mail never mixes two balance sheets. One section per org
+ * inside, sent by `forecasts.sendWeeklyDigest`. Callers must pass at least
+ * one section carrying at least one block — an empty digest is never sent.
  */
 export function weeklyDigestEmail({
   locale,
+  familyName,
   sections,
 }: {
   locale: EmailLocale
+  /** Name of the family this mail covers, e.g. "Albo" or "Calte". */
+  familyName: string
   sections: Array<DigestSection>
 }) {
   const eur = (cents: number) =>
@@ -672,12 +774,14 @@ export function weeklyDigestEmail({
 
   const c = pick(locale, {
     en: {
-      heading: 'Your weekly digest',
-      cashLine: (s: NonNullable<DigestSection['cash']>) =>
-        `Projected cash drops to <strong>${eur(s.minProjectedCents)}</strong> within the next 3 months — below your ${eur(s.thresholdCents)} threshold.`,
+      heading: (name: string) => `Your weekly digest — ${name}`,
+      cashLabel: 'Projected cash · next 3 months',
+      cashUnder: (threshold: number) => `Below your ${eur(threshold)} threshold`,
       cashText: (s: NonNullable<DigestSection['cash']>) =>
         `Projected cash drops to ${eur(s.minProjectedCents)} within the next 3 months — below your ${eur(s.thresholdCents)} threshold.`,
       cashCta: 'Open the cash forecast',
+      overdueLabel: (n: number) =>
+        `${n} overdue ${n === 1 ? 'entry' : 'entries'}`,
       overdueLine: (n: number) =>
         `${n} expected ${n === 1 ? 'entry is' : 'entries are'} past due and not reconciled yet:`,
       overdueCta: 'Open the forecast',
@@ -696,12 +800,13 @@ export function weeklyDigestEmail({
       footer: `You receive this every Monday for the organisations you belong to. Choose which alerts reach you in Settings → Members.`,
     },
     fr: {
-      heading: 'Votre point hebdo',
-      cashLine: (s: NonNullable<DigestSection['cash']>) =>
-        `Le solde projeté descend à <strong>${eur(s.minProjectedCents)}</strong> dans les 3 prochains mois — sous votre seuil de ${eur(s.thresholdCents)}.`,
+      heading: (name: string) => `Votre point hebdo — ${name}`,
+      cashLabel: 'Trésorerie projetée · 3 mois',
+      cashUnder: (threshold: number) => `Sous votre seuil de ${eur(threshold)}`,
       cashText: (s: NonNullable<DigestSection['cash']>) =>
         `Le solde projeté descend à ${eur(s.minProjectedCents)} dans les 3 prochains mois — sous votre seuil de ${eur(s.thresholdCents)}.`,
       cashCta: 'Ouvrir le prévisionnel',
+      overdueLabel: (n: number) => `${n} échéance(s) en retard`,
       overdueLine: (n: number) =>
         `${n} échéance(s) attendue(s) dépassée(s), non rapprochée(s) :`,
       overdueCta: 'Ouvrir le prévisionnel',
@@ -724,9 +829,9 @@ export function weeklyDigestEmail({
     (sum, s) => sum + (s.overdue?.entries.length ?? 0),
     0,
   )
-  // Summed across orgs on purpose: the subject is a headline, not a ledger.
-  // A company held by two orgs files one report in each, so this total can
-  // exceed the number of emails forwarded (cf. KNOWN_ISSUES).
+  // Summed across the family's orgs on purpose: the subject is a headline,
+  // not a ledger. A company held by two orgs files one report in each, so
+  // this total can exceed the number of emails forwarded (cf. KNOWN_ISSUES).
   const reportsCount = sections.reduce(
     (sum, s) => sum + (s.reports?.count ?? 0),
     0,
@@ -739,44 +844,92 @@ export function weeklyDigestEmail({
     .filter(Boolean)
     .join(', ')
 
-  const paragraphs = sections.map((s) => {
-    const blocks = [
-      `<p style="margin:0 0 8px; font-weight:600; font-size:16px;">${esc(s.orgName)}</p>`,
-    ]
+  // The org name is a heading only when the mail carries several — the Albo
+  // mail would otherwise repeat what its own title already says.
+  const showOrgNames = sections.length > 1
+
+  const paragraphs = sections.flatMap((s) => {
+    const blocks: Array<string> = []
+    if (showOrgNames) {
+      blocks.push(
+        `<p style="margin:0; font-weight:600; font-size:16px;">${esc(s.orgName)}</p>`,
+      )
+    }
     if (s.cash) {
       blocks.push(
-        `<p style="margin:0 0 12px;">${c.cashLine(s.cash)}<br>` +
-          `<a href="${s.cash.cashUrl}" style="color:${BRAND};">${c.cashCta}</a></p>`,
+        digestCard(
+          cardLabel(c.cashLabel) +
+            `<div style="font-size:22px;font-weight:600;color:${TONE_NEGATIVE};line-height:1.25;margin-top:3px;">${eur(s.cash.minProjectedCents)}</div>` +
+            `<div style="color:${MUTED};font-size:13px;margin-top:2px;">${c.cashUnder(s.cash.thresholdCents)}</div>` +
+            cardLink(c.cashCta, s.cash.cashUrl),
+        ),
       )
     }
     if (s.reports) {
       blocks.push(
-        `<p style="margin:0 0 12px;">${c.reportsLine(s.reports.count)}</p>`,
+        `<p style="margin:0;color:${MUTED};font-size:13px;">${c.reportsLine(s.reports.count)}</p>`,
       )
+      blocks.push(...s.reports.items.slice(0, REPORT_EMAIL_MAX_CARDS).map(reportCard))
+      const hiddenReports = s.reports.count - Math.min(s.reports.items.length, REPORT_EMAIL_MAX_CARDS)
+      if (hiddenReports > 0) {
+        blocks.push(
+          `<p style="margin:0;color:${MUTED};font-size:13px;">${c.more(hiddenReports)}</p>`,
+        )
+      }
     }
     if (s.overdue) {
       const shown = s.overdue.entries.slice(0, OVERDUE_EMAIL_MAX_LINES)
       const hidden = s.overdue.entries.length - shown.length
-      const list = shown
-        .map((e) => `• ${line(e, esc(e.label))}`)
-        .join('<br>')
-        .concat(
-          hidden > 0
-            ? `<br><span style="color:${MUTED};">${c.more(hidden)}</span>`
-            : '',
+      const rows = shown
+        .map(
+          (e) => `<tr>
+      <td valign="top" style="color:${MUTED};font-size:12px;white-space:nowrap;padding:3px 10px 3px 0;">${fmtDate(e.date)}</td>
+      <td valign="top" style="font-size:13px;line-height:1.4;padding:3px 0;">${esc(e.label)}</td>
+      <td valign="top" align="right" style="font-size:13px;font-weight:600;white-space:nowrap;padding:3px 0 3px 10px;color:${e.direction === 'out' ? TONE_NEGATIVE : TONE_POSITIVE};">${e.direction === 'out' ? '−' : '+'}${eur(e.amountCents)}</td>
+    </tr>`,
         )
+        .join('\n    ')
       blocks.push(
-        `<p style="margin:0 0 12px;">${c.overdueLine(s.overdue.entries.length)}<br>` +
-          `${list}<br><a href="${s.overdue.forecastUrl}" style="color:${BRAND};">${c.overdueCta}</a></p>`,
+        digestCard(
+          cardLabel(c.overdueLabel(s.overdue.entries.length)) +
+            `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:8px;">
+    ${rows}
+  </table>` +
+            (hidden > 0
+              ? `<p style="margin:8px 0 0;color:${MUTED};font-size:13px;">${c.more(hidden)}</p>`
+              : '') +
+            cardLink(c.overdueCta, s.overdue.forecastUrl),
+        ),
       )
     }
-    return blocks.join('')
+    return blocks
   })
 
   const text = sections.flatMap((s) => {
     const parts = [s.orgName.toUpperCase()]
     if (s.cash) parts.push(`${c.cashText(s.cash)}\n${s.cash.cashUrl}`)
-    if (s.reports) parts.push(c.reportsText(s.reports.count))
+    if (s.reports) {
+      parts.push(
+        [
+          c.reportsText(s.reports.count),
+          ...s.reports.items.slice(0, REPORT_EMAIL_MAX_CARDS).map((item) => {
+            const head = [
+              `- ${item.companyName}`,
+              item.period,
+              item.score !== undefined ? `${item.score}/10` : undefined,
+            ]
+              .filter(Boolean)
+              .join(' — ')
+            return [
+              head,
+              ...item.highlights
+                .slice(0, REPORT_EMAIL_MAX_HIGHLIGHTS)
+                .map((h) => `  • ${h}`),
+            ].join('\n')
+          }),
+        ].join('\n'),
+      )
+    }
     if (s.overdue) {
       parts.push(
         `${c.overdueLine(s.overdue.entries.length)}\n` +
@@ -790,13 +943,13 @@ export function weeklyDigestEmail({
   const html = layout({
     locale,
     preheader: summary,
-    heading: c.heading,
+    heading: c.heading(esc(familyName)),
     paragraphs,
     footer: c.footer,
   })
 
   return {
-    subject: `${c.subjectPrefix} — ${summary}`,
+    subject: `${c.subjectPrefix} ${familyName} — ${summary}`,
     html,
     text: plainText(text),
   }

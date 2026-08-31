@@ -14,10 +14,11 @@
 import { ConvexError, v } from 'convex/values'
 import { internalMutation, mutation, query } from './_generated/server'
 import { RESEND_FROM, resend } from './email'
-import { weeklyDigestEmail } from './emailTemplates'
+import { REPORT_EMAIL_MAX_CARDS, weeklyDigestEmail } from './emailTemplates'
 import { requireAppUser, requireOrgMember } from './lib/auth'
 import { isAvailableAccount } from './lib/bankAccounts'
 import { effectiveCategory, isValidForecastCategory } from './lib/categories'
+import { companyLogoUrl } from './lib/domain'
 import { readAlertPrefs } from './lib/notificationPrefs'
 import {
   addMonthsUtc,
@@ -31,8 +32,9 @@ import {
   ruleDerivedKey,
 } from './lib/recurrence'
 import { loanSchedule } from './loans'
-import { sectionsFor } from './lib/weeklyDigest'
+import { FAMILY_HEAD_SLUG, digestsFor } from './lib/weeklyDigest'
 import { computeVatPositionForOrg } from './transactions'
+import type { DigestReportItem } from './emailTemplates'
 import type { GridTx, HistoryTx } from './lib/recurrence'
 import type { OrgFinding } from './lib/weeklyDigest'
 import type { DataModel, Doc, Id } from './_generated/dataModel'
@@ -1304,8 +1306,13 @@ const DIGEST_WINDOW_MS = 7 * DAY_MS
 /**
  * The Monday digest (cron, 07:00 UTC — convex/crons.ts, no auth like
  * captureSnapshots). Replaces the two former daily alert crons: cash
- * threshold breaches and overdue forecast entries now travel together, one
- * mail per member, one section per org they belong to.
+ * threshold breaches, overdue forecast entries and the week's reports travel
+ * together, one section per org.
+ *
+ * Split PER FAMILY (lib/weeklyDigest.ts `familyOf`): Albo Club on one side,
+ * CALTE and its subsidiaries on the other, so a mail never mixes two balance
+ * sheets. One member therefore receives up to two mails — a family with
+ * nothing to say sends none.
  *
  * The weekly cadence IS the anti-spam — hence no cooldown and no "newly
  * overdue" window any more: each run is a fresh photo of what is off today.
@@ -1378,16 +1385,45 @@ export const sendWeeklyDigest = internalMutation({
       // and stopping at the cutoff touches only the week's rows.
       const filedSince = now - DIGEST_WINDOW_MS
       let reportsCount = 0
+      const reportItems: Array<DigestReportItem> = []
       for await (const report of ctx.db
         .query('companyReports')
         .withIndex('by_org', (q) => q.eq('orgId', org._id))
         .order('desc')) {
         if (report._creationTime < filedSince) break
         reportsCount += 1
+        // Past the cap the mail shows "+ N more", so stop reading the
+        // company and its synthesis — the count alone needs neither.
+        if (reportItems.length >= REPORT_EMAIL_MAX_CARDS) continue
+        const company = await ctx.db.get('companies', report.companyId)
+        if (!company) continue
+        const intelligence = await ctx.db
+          .query('companyIntelligence')
+          .withIndex('by_company', (q) => q.eq('companyId', report.companyId))
+          .unique()
+        // Same health score as the confirmation mail's synthesis card, read
+        // from the fiche rather than recomputed. Absent until the company has
+        // been analysed — the card then simply carries no chip.
+        const health =
+          intelligence?.aiAnalysisStatus === 'completed'
+            ? intelligence.aiAnalysis?.health_score
+            : undefined
+        reportItems.push({
+          companyName: company.name,
+          logoUrl: companyLogoUrl(company.domain),
+          url: siteUrl
+            ? `${siteUrl}/app/${org.slug}/participations/${company._id}`
+            : null,
+          period: report.reportPeriod,
+          score: health?.score,
+          scoreLabel: health?.label,
+          highlights: report.keyHighlights ?? [],
+        })
       }
 
       if (!cash && entries.length === 0 && reportsCount === 0) continue
       findings.set(org._id, {
+        orgSlug: org.slug,
         orgName: org.name,
         cash,
         overdue:
@@ -1397,7 +1433,8 @@ export const sendWeeklyDigest = internalMutation({
                 forecastUrl: `${siteUrl}/app/${org.slug}/cash?filter=unmatched`,
               }
             : null,
-        reports: reportsCount > 0 ? { count: reportsCount } : null,
+        reports:
+          reportsCount > 0 ? { count: reportsCount, items: reportItems } : null,
       })
     }
 
@@ -1418,24 +1455,35 @@ export const sendWeeklyDigest = internalMutation({
       }
     }
 
+    // Mails sent, not members reached: one person can legitimately receive
+    // both the Albo mail and the CALTE one.
     let notified = 0
     for (const [userId, list] of findingsByUser) {
-      const sections = sectionsFor(list, await readAlertPrefs(ctx, userId))
-      if (sections.length === 0) continue
+      const digests = digestsFor(list, await readAlertPrefs(ctx, userId))
+      if (digests.length === 0) continue
       const user = await ctx.db.get('users', userId)
       if (!user?.email) continue
-      const { subject, html, text } = weeklyDigestEmail({
-        locale: user.preferredLanguage === 'fr' ? 'fr' : 'en',
-        sections,
-      })
-      await resend.sendEmail(ctx, {
-        from: RESEND_FROM,
-        to: user.email,
-        subject,
-        html,
-        text,
-      })
-      notified += 1
+      for (const digest of digests) {
+        // The mail is titled with the family's head org, read from the org
+        // rows so a rename follows on its own. A family whose head is missing
+        // falls back to its first section — it still has a name to show.
+        const familyName =
+          orgs.find((o) => o.slug === FAMILY_HEAD_SLUG[digest.family])?.name ??
+          digest.sections[0].orgName
+        const { subject, html, text } = weeklyDigestEmail({
+          locale: user.preferredLanguage === 'fr' ? 'fr' : 'en',
+          familyName,
+          sections: digest.sections,
+        })
+        await resend.sendEmail(ctx, {
+          from: RESEND_FROM,
+          to: user.email,
+          subject,
+          html,
+          text,
+        })
+        notified += 1
+      }
     }
     return { notified }
   },
