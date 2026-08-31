@@ -47,7 +47,7 @@ emails récurrents** que l'application envoie :
 | Échéances en retard | Des échéances attendues sont dépassées et toujours non rapprochées. Arrive dans le point hebdo du lundi. |
 | Connexion bancaire | Une connexion bancaire tombe en panne ou cesse de se synchroniser. Envoyé sur le moment. |
 | Échec d'indexation | Un document n'a pas pu être indexé pour la recherche de l'assistant IA. Envoyé sur le moment. |
-| Reports de la semaine | Le nombre de reports rangés sur les participations. Arrive dans le point hebdo du lundi. |
+| Reports de la semaine | Les reports rangés sur les participations, une carte par société (période, santé, deux points clés). Arrive dans le point hebdo du lundi. |
 | Problèmes de reports | Les emails de la file Rapports entrants : quarantaine, échec de traitement, suite donnée à un mail assigné à la main. Envoyé sur le moment. Cette case décide **aussi** de ce que tu reçois pour les reports que tu transfères toi-même (voir plus bas). |
 | Nouveaux reports | Un report d'une de tes participations vient d'être rangé, transféré ou déposé par quelqu'un d'autre. Envoyé sur le moment. Rien n'est envoyé pour un report déjà présent ni pour un retraitement. |
 

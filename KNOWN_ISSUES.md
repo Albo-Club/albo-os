@@ -3200,8 +3200,9 @@ non-évidents :
    un secret » **ne s'applique pas** ici. Absente → fallback icône bâtiment
    partout (aucune image cassée).
    **Depuis ALB-115 elle est aussi nécessaire côté Convex** : les mails de
-   confirmation de report affichent le logo, et un template serveur ne voit pas
-   l'env Vite du front. `reportNotify.logoUrl()` lit `LOGO_DEV_TOKEN` puis
+   confirmation de report et le point hebdo du lundi affichent le logo, et un
+   template serveur ne voit pas l'env Vite du front. `companyLogoUrl()`
+   (`convex/lib/domain.ts`) lit `LOGO_DEV_TOKEN` puis
    `VITE_LOGO_DEV_TOKEN` — poser l'une des deux avec
    `pnpm exec convex env set`. Ce n'est pas une migration : la valeur vit aux
    deux endroits, ce qu'une clé publishable autorise. Absente côté serveur, le
