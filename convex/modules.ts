@@ -18,14 +18,39 @@ import { isTreasuryPlacement } from './lib/instrumentMapping'
 import { ALL_MODULES, isModuleKey } from './lib/modules'
 
 import type { QueryCtx } from './_generated/server'
-import type { Id } from './_generated/dataModel'
+import type { Doc, Id } from './_generated/dataModel'
 import type { ModuleKey, ModuleState } from './lib/modules'
+
+/** The org's deals, read at most once per `list` call. */
+type DealsReader = () => Promise<Array<Doc<'deals'>>>
+
+/**
+ * Memoizes the org's deals for the duration of one `list` call.
+ *
+ * Deals are the one table a probe cannot answer with `.first()`: whether the
+ * Entreprises tab holds something depends on the INSTRUMENT of each deal, so
+ * the rows have to be read. Three probes need them — `entreprises`,
+ * `placements`, and `investments`, which asks both — so reading them per
+ * probe meant four reads of the whole table for one answer, on every
+ * navigation, since the sidebar re-runs this query each time.
+ */
+function dealsReader(ctx: QueryCtx, orgId: Id<'organizations'>): DealsReader {
+  let pending: Promise<Array<Doc<'deals'>>> | null = null
+  return () => {
+    pending ??= ctx.db
+      .query('deals')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    return pending
+  }
+}
 
 /** Does this org hold at least one row of the given module? */
 async function probe(
   ctx: QueryCtx,
   orgId: Id<'organizations'>,
   key: ModuleKey,
+  deals: DealsReader,
 ): Promise<boolean> {
   const byOrg = (table: 'deals' | 'companies' | 'properties') =>
     ctx.db
@@ -45,27 +70,22 @@ async function probe(
         )
         .first()
       if (companies) return true
-      const deals = await ctx.db
-        .query('deals')
-        .withIndex('by_org', (q) => q.eq('orgId', orgId))
-        .collect()
-      return deals.some((deal) => !isTreasuryPlacement(deal.instrumentKind))
+      return (await deals()).some(
+        (deal) => !isTreasuryPlacement(deal.instrumentKind),
+      )
     }
-    case 'placements': {
-      const deals = await ctx.db
-        .query('deals')
-        .withIndex('by_org', (q) => q.eq('orgId', orgId))
-        .collect()
-      return deals.some((deal) => isTreasuryPlacement(deal.instrumentKind))
-    }
+    case 'placements':
+      return (await deals()).some((deal) =>
+        isTreasuryPlacement(deal.instrumentKind),
+      )
     case 'immobilier':
       return (await byOrg('properties')) !== null
     case 'investments':
       // The section shows as soon as ANY of its three tabs holds something.
       return (
-        (await probe(ctx, orgId, 'entreprises')) ||
-        (await probe(ctx, orgId, 'placements')) ||
-        (await probe(ctx, orgId, 'immobilier'))
+        (await probe(ctx, orgId, 'entreprises', deals)) ||
+        (await probe(ctx, orgId, 'placements', deals)) ||
+        (await probe(ctx, orgId, 'immobilier', deals))
       )
     case 'cash':
       return (
@@ -118,11 +138,13 @@ export const list = query({
     const org = await ctx.db.get('organizations', orgId)
     const enabled = new Set(org?.enabledModules ?? [])
 
+    // One reader shared by every probe of this call — see `dealsReader`.
+    const deals = dealsReader(ctx, orgId)
     const states: Array<ModuleState> = []
     for (const key of ALL_MODULES) {
       states.push({
         key,
-        hasContent: await probe(ctx, orgId, key),
+        hasContent: await probe(ctx, orgId, key, deals),
         enabled: enabled.has(key),
       })
     }

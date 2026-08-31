@@ -83,6 +83,100 @@ d'origine et par la recherche.
 > - `convex/regression.docOptionalCompany.test.ts` couvre maintenant les trois
 >   ancres : un bien et une garantie en sont, aucune des lignes ne porte de
 >   `companyId`, et les trois projections sont identiques.
+## v1.203.2 — 31/08/2026 à 16:12 — Trois chiffres remis d'aplomb sur la dette
+
+Un audit à froid du module Dette & Garanties a fait remonter trois endroits
+où l'application affichait ou protégeait mal un chiffre. Aucun n'était
+visible à l'œil nu, et c'est bien le problème.
+
+**Le ballon d'un prêt in fine ne peut plus disparaître.** Un prêt in fine
+dont le différé couvrait toute la durée produisait un échéancier fait
+uniquement d'intérêts : aucun remboursement de capital, un restant dû figé
+au montant emprunté même après le terme, et surtout **aucune trace du
+capital dans le prévisionnel de trésorerie**. Sur un in fine de 6,6 M€, la
+somme n'apparaissait nulle part avant de tomber. La saisie refuse désormais
+un différé aussi long que la durée — pour les quatre types de prêt, sans
+exception — et un prêt déjà enregistré de cette façon retrouve son ballon
+tout seul à la lecture.
+
+**Un placement mis en gage ne se supprime plus en silence.** Supprimer un
+contrat nanti laissait la garantie qui s'appuyait dessus sans assiette : plus
+de libellé, plus de valeur à laquelle comparer la marge disponible. La
+suppression est maintenant refusée tant qu'une garantie pointe sur le
+placement — y compris une garantie déjà levée, dont l'historique a lui aussi
+besoin de son assiette pour se lire. Les prêts et les biens étaient déjà
+protégés ainsi ; le placement ne l'était pas.
+
+**L'échéancier ne prétend plus au centime près.** Les colonnes du plan
+(mensualité, capital, intérêts, assurance, restant dû) s'affichent désormais
+arrondies à l'euro, tandis que la colonne Réel reste au centime. Le plan est
+un calcul, le réel est un relevé bancaire : les afficher avec la même
+précision invitait à comparer au centime deux chiffres qui ne mesurent pas la
+même chose, et donnait envie de « corriger » un écart parfaitement normal —
+celui de l'assurance.
+
+> **🔧 Notes techniques**
+>
+> - **Ballon in fine** : `assertValidTerms` (`convex/loans.ts`) n'exempte plus
+>   `amortizationKind === 'bullet'` du contrôle `deferral >= durationMonths`,
+>   et `buildSchedule` (`convex/lib/amortization.ts`) clampe `deferralPeriods`
+>   à `totalPeriods − 1` pour tous les types. Les deux sont nécessaires : la
+>   validation ferme la saisie, le clamp répare la donnée déjà stockée (une
+>   query ne doit jamais lever). Le clamp exemptait le `bullet` au motif qu'un
+>   in fine est déjà « intérêts seuls » — mais la période supprimée était
+>   celle qui porte le ballon. Tests : `tests/amortization.test.ts` (le ballon
+>   survit au différé total) + `convex/regression.loans.test.ts` (la mutation
+>   refuse). `KNOWN_ISSUES.md` décrivait déjà le comportement corrigé : c'est
+>   la doc qui avait raison, pas le code.
+> - **C12** : `deals:remove` (`convex/deals.ts`) interroge l'index
+>   `by_subject_deal` de `guarantees` et lève `is_pledged`. Le garde-fou
+>   ignore `releasedAt` volontairement, comme ses jumeaux `loans:remove` et
+>   `properties:remove`. Surfacé dans `deals.$dealId.tsx` via la table
+>   d'erreurs existante. Nouvelle section `KNOWN_ISSUES.md` et nouvel
+>   anti-pattern `CLAUDE.md` sur la vraie cause : le garde-fou vit dans le
+>   fichier de l'objet référencé, jamais dans celui de la table qu'on écrit.
+> - **Arrondis** : les colonnes de plan de l'échéancier passent de
+>   `fmtEurCents` à `fmtEur` (`passif.prets.$loanId.tsx`), conformément à
+>   § 5.4 « l'actuel au centime, l'estimé arrondi ». Colonne Réel, table des
+>   transactions et total versé restent au centime.
+> - **Hygiène** : `modules:list` mémoïse la lecture des deals de l'org (les
+>   sondes `entreprises`, `placements` et `investments` la relisaient quatre
+>   fois par chargement de page) ; commentaire corrigé sur
+>   `properties:getById`, qui annonçait renvoyer les sûretés du bien alors
+>   qu'elles se lisent depuis `guarantees:listBySubjectProperty`.
+> - **SPEC § 12.5** assume désormais **deux** exceptions au non-stockage —
+>   l'encours d'un révolving et `loanAmendments.outstandingCents` — avec le
+>   critère qui les autorise : un fait extérieur constaté, jamais un calcul
+>   qu'on préfère figer.
+## v1.203.1 — 31/08/2026 à 15:54 — Une barre de recherche pour rattacher un report
+
+Dans les Rapports entrants, rattacher un mail à une participation passait par
+une liste déroulante qui affichait tout le portefeuille de toutes vos
+organisations, à faire défiler jusqu'à la bonne ligne. Le sélecteur devient un
+champ de recherche : tapez les premières lettres du nom de la participation ou
+de son organisation, la liste se filtre à la frappe, Entrée valide. Le reste ne
+bouge pas — les fiches du même domaine dans une autre organisation restent
+proposées en cases à cocher sous le choix, et « Rattacher et traiter » reste le
+geste final.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/app/all/reports.tsx` : le `Select` shadcn de la modale
+>   d'attachement est remplacé par un combobox `TargetCombobox` local
+>   (Popover + Command/cmdk), sur le même patron que `CompanyCombobox`
+>   (`deals.$dealId.tsx`) et `DealCombobox` — un combobox de ce type tourne
+>   déjà dans une `Dialog` ailleurs dans l'app.
+> - La valeur `cmdk` de chaque item concatène nom + organisation +
+>   `companyId`, pour que la recherche porte sur les deux libellés et que
+>   deux orgs détenant une société homonyme restent distinctes.
+> - Comportement inchangé : choisir une participation réinitialise les cases
+>   « même domaine, autre organisation », et `assignCompany` est appelée à
+>   l'identique.
+> - Deux clés i18n ajoutées (`assignDialog.search`, `assignDialog.empty`) en
+>   `fr` et `en` ; `docs/produit/17-reports-par-email.md` mis à jour.
+
+---
+
 ## v1.203.0 — 31/08/2026 à 15:17 — Les documents quittent le fil des rapports
 
 Sur une fiche société, tout vivait dans une seule liste : les rapports reçus,

@@ -238,8 +238,15 @@ export function buildSchedule(
     MAX_PERIODS,
     Math.max(1, Math.round(loan.durationMonths / stepMonths)),
   )
+  // At least ONE amortization period always survives the deferral — on an in
+  // fine too, where that last period IS the balloon. Letting the deferral
+  // swallow the whole term produced a schedule of interest with no capital
+  // line at all: the outstanding stayed at the principal past maturity and
+  // the balloon never reached the cash projection. The mutation refuses such
+  // terms (`deferral_too_long`); this clamp is what repairs a loan already
+  // stored that way, since a query must never throw on stored data.
   const deferralPeriods = Math.min(
-    totalPeriods - (loan.amortizationKind === 'bullet' ? 0 : 1),
+    totalPeriods - 1,
     Math.max(0, Math.round((loan.deferralMonths ?? 0) / stepMonths)),
   )
   const deferralKind: DeferralKind = loan.deferralKind ?? 'partial'
