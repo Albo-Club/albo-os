@@ -26,13 +26,15 @@ la vue de l'organisation concernée : un clic sur une ligne y renvoie.
 ## La boîte des rapports entrants
 
 Les investor updates reçus par email arrivent dans cette boîte : expéditeur,
-sujet, participation rapprochée automatiquement, état de l'extraction et
-pièces jointes. Pour les lignes que le rapprochement automatique n'a pas su
-traiter (« à revoir » ou rejetées), trois actions : **Assigner** à une
-société, **Retraiter**, **Rejeter**. Le contenu analysé alimente ensuite la
-fiche société ([Participations](04-participations.md) : rapports, synthèse
-IA, KPIs). Le circuit d'ingestion lui-même est décrit dans
-[Reports par email](17-reports-par-email.md).
+sujet, participation rapprochée, état de l'extraction et pièces jointes.
+C'est ici qu'on reprend la main sur une ligne que le rapprochement
+automatique n'a pas su traiter. Le contenu analysé alimente ensuite la fiche
+société ([Participations](04-participations.md) : rapports, synthèse IA,
+KPIs).
+
+Le circuit complet — ce que l'application fait seule, les actions
+disponibles sur une ligne et ce que chacune déclenche — est décrit dans
+[Reports par email](17-reports-par-email.md), qui fait foi.
 
 ## Points d'attention
 

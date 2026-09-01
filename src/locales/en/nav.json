@@ -21,6 +21,7 @@
     "passif": "Liabilities",
     "settings": "Settings",
     "changelog": "What's new",
+    "docs": "Documentation",
     "reports": "Inbound reports"
   },
   "navUser": {
@@ -104,6 +105,14 @@
   "changelogPage": {
     "metaTitle": "What's new — Albo OS",
     "showOlder": "Show older updates ({{remaining}})"
+  },
+  "docsPage": {
+    "metaTitle": "Documentation — Albo OS",
+    "metaTitlePage": "{{title}} — Albo OS",
+    "title": "Documentation",
+    "subtitle": "What Albo OS can do, feature by feature.",
+    "summary": "Contents",
+    "notFound": "This documentation page does not exist."
   },
   "modules": {
     "activate": "Activate a module",

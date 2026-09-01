@@ -54,8 +54,8 @@ deals (voir [Pointage](08-pointage.md)) :
   royalties, dont les encaissements sont TTC, le Reçu est dé-TVAisé (÷ 1,2)
   dans ce calcul — et uniquement dans celui-là.
 - **TVPI** : (Reçu brut + valeur résiduelle) ÷ Versé. La valeur résiduelle
-  vaut : zéro si le deal est sorti ou en perte ; sinon la dernière
-  valorisation connue ; à défaut, le coût.
+  vaut : zéro dès que le deal est terminé — sorti, en perte ou annulé ;
+  sinon la dernière valorisation connue ; à défaut, le coût.
 - **DPI** : Distribué ÷ Versé, au niveau du portefeuille.
 - **TRI (XIRR)** : taux de rendement interne annualisé, calculé sur les flux
   datés réels. Au niveau d'une société, les flux de tous ses deals sont
@@ -68,6 +68,10 @@ deals (voir [Pointage](08-pointage.md)) :
   deal n'existe pas pour le MOIC/TRI. Le pointage est la source de tout.
 - Une valorisation ne remplace jamais la précédente : c'est un historique,
   la plus récente gagne.
+- **Un deal annulé ne porte aucune de ces métriques** : ni MOIC, ni TVPI, ni
+  TRI, et il ne compte ni dans le capital déployé, ni dans le distribué, ni
+  dans la NAV. Un remboursement n'est pas un retour. Le détail est dans
+  [Deals](05-deals.md) § « Annuler un deal ».
 
 ## Pages liées
 

@@ -9,7 +9,7 @@ vide, rien n'est en attente.
 
 ## Comment ça marche
 
-La page empile sept blocs :
+La page empile huit blocs :
 
 1. **Connexions bancaires dégradées** — la même bannière que sur la
    Trésorerie : si une banque demande une reconnexion ou n'a pas synchronisé

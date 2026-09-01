@@ -21,6 +21,7 @@
     "passif": "Passif",
     "settings": "Paramètres",
     "changelog": "Nouveautés",
+    "docs": "Documentation",
     "reports": "Reports entrants"
   },
   "navUser": {
@@ -104,6 +105,14 @@
   "changelogPage": {
     "metaTitle": "Nouveautés — Albo OS",
     "showOlder": "Voir les nouveautés plus anciennes ({{remaining}})"
+  },
+  "docsPage": {
+    "metaTitle": "Documentation — Albo OS",
+    "metaTitlePage": "{{title}} — Albo OS",
+    "title": "Documentation",
+    "subtitle": "Ce que sait faire Albo OS, fonctionnalité par fonctionnalité.",
+    "summary": "Sommaire",
+    "notFound": "Cette page de documentation n'existe pas."
   },
   "modules": {
     "activate": "Activer un module",
