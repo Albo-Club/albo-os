@@ -60,6 +60,9 @@ expliqué simplement dans un encadré « Sous le capot ».
 
 ## Comment cette doc vit
 
+- **Lecture dans l'app** : le menu **Documentation** (bas de la barre
+  latérale) rend ces pages telles quelles, liens entre pages compris. C'est
+  le même contenu que ci-dessous — pas une copie : la page est le fichier.
 - **Source de vérité** : ce dossier (`docs/produit/`), versionné avec le code.
   Toute PR qui ajoute, modifie ou retire une fonctionnalité visible met à jour
   la page correspondante **dans la même PR** (règle dans `CLAUDE.md`,

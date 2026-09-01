@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.206.2 — 31/08/2026 à 19:38 — Toute garantie est classée quelque part
+## v1.207.1 — 01/09/2026 à 18:13 — Toute garantie est classée quelque part
 
 Suite technique de la version précédente, sans effet visible. Le champ qui dit
 dans quelle société une garantie est enregistrée devient **obligatoire** : il
@@ -51,6 +51,54 @@ peut lire.
 >   absent disparaissent — elles ne pouvaient plus rien tolérer.
 > - Deux tests de plus : l'org de dépôt est bien celle demandée à la création,
 >   et une édition qui réécrit **toutes** les parties ne la déplace pas.
+## v1.207.0 — 01/09/2026 à 16:51 — La documentation d'Albo OS se lit dans Albo OS
+
+Il existait déjà une documentation produit complète — vingt pages qui
+expliquent, fonctionnalité par fonctionnalité, ce que l'outil sait faire.
+Elle n'était lisible que sur GitHub ou dans Linear, c'est-à-dire nulle part
+quand on est en train de s'en servir.
+
+- Un menu **Documentation** apparaît en bas de la barre latérale, à côté de
+  Nouveautés. Il ouvre le sommaire, et la liste des vingt pages reste
+  affichée à gauche pendant la lecture.
+- Les liens entre pages naviguent **dans l'application** : cliquer « Deals »
+  depuis la page Participations ouvre la page Deals, sans partir sur GitHub.
+- Chaque page a sa propre adresse, donc se met en favori et se partage.
+- Ce n'est pas une copie : la page affichée **est** le fichier du dépôt. Une
+  documentation corrigée dans une PR est à jour dans l'app au déploiement
+  suivant, sans recopie possible à oublier.
+
+Au passage, l'audit qui a précédé a corrigé trois inexactitudes : la page des
+métriques ne disait pas qu'un deal **annulé** ne porte ni multiple ni TVPI ni
+TRI, la vue consolidée décrivait trois actions sur les reports entrants au
+lieu de cinq, et la page « À faire » annonçait sept blocs pour en détailler
+huit.
+
+> **🔧 Notes techniques**
+>
+> - Routes `src/routes/app/$orgSlug/docs.tsx` (layout + sommaire latéral),
+>   `docs.index.tsx` (rend `README.md`) et `docs.$page.tsx` (`beforeLoad`
+>   lève `notFound()` sur un slug inconnu, `head()` titre la page).
+> - `src/lib/produitDocs.ts` : `import.meta.glob<string>('../../docs/produit/*.md',
+>   { query: '?raw', eager: true })`. Le dossier est **globbé**, pas listé —
+>   une page ajoutée apparaît au build suivant sans inscription nulle part.
+>   Slug = nom de fichier, titre = H1, ordre = numérotation des fichiers.
+> - `src/components/docs/markdown.tsx` : la table de composants markdown est
+>   sortie de `changelog.tsx` (déplacement pur, rendu du changelog inchangé)
+>   et partagée. `DocMarkdown.tsx` la surcharge pour les tableaux GFM et pour
+>   les liens : `NN-slug.md` → `Link` vers la route interne, `README.md` →
+>   sommaire, `../../CHANGELOG_PRODUIT.md` → `/changelog`, cible inconnue →
+>   texte simple (même règle que le miroir Linear). Les 171 liens du dossier
+>   résolvent.
+> - Corrections de l'audit : `docs/produit/06-valorisations-et-kpis.md`
+>   (statut `cancelled`, cf. `convex/lib/metrics.ts:isTerminalStatus`),
+>   `12-vue-consolidee.md` (la duplication du circuit reports est remplacée
+>   par un renvoi vers `17-reports-par-email.md`, qui fait foi),
+>   `16-a-faire.md` (« sept » → « huit » blocs). `CLAUDE.md` : l'assistant
+>   passe de « ~50 outils / 8 fichiers » à « ~65 / 10 » — `agentToolsDebt.ts`
+>   et `agentToolsIntelligence.ts` manquaient à l'énumération.
+> - `TESTING.md` : SH24.
+
 ## v1.206.1 — 31/08/2026 à 19:15 — Le mail d'accusé de réception redevient lisible
 
 Quand un report est rangé, l'email de confirmation reprend la synthèse de la
