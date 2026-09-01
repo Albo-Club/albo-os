@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Building2,
   ChartCandlestick,
   Handshake,
@@ -80,6 +81,11 @@ export function getNavGroups(): Array<NavGroup> {
           titleKey: 'items.settings',
           to: '/app/$orgSlug/settings',
           icon: Settings,
+        },
+        {
+          titleKey: 'items.docs',
+          to: '/app/$orgSlug/docs',
+          icon: BookOpen,
         },
         {
           titleKey: 'items.changelog',

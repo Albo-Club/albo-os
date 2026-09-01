@@ -60,9 +60,9 @@ Quelques conventions traversent toute l'application :
   haut (avec l'entrée « Toutes les organisations »), puis les sections
   À faire, Investissements (trois sous-onglets : Entreprises, Placements et
   [Immobilier](20-immobilier.md)), Trésorerie, Passif, et l'espace de travail
-  (Paramètres, Nouveautés). En pied : le menu utilisateur. Les deals
-  s'ouvrent depuis la fiche d'une participation — ils n'ont plus d'entrée
-  dédiée dans le menu.
+  (Paramètres, Documentation, Nouveautés). En pied : le menu utilisateur.
+  Les deals s'ouvrent depuis la fiche d'une participation — ils n'ont plus
+  d'entrée dédiée dans le menu.
 - **Palette de commandes** (⌘K) : recherche globale dans l'organisation —
   deals, sociétés, transactions — avec navigation directe vers la fiche, et
   l'action « Demander à l'IA » qui transmet la requête à l'assistant.
