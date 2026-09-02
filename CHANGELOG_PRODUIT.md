@@ -23,6 +23,51 @@ bas de page.
 
 ---
 
+## v1.208.0 — 02/09/2026 à 09:14 — L'assistant passe sur le moteur GLM Flash
+
+L'assistant de l'app change de moteur : il tourne désormais sur **GLM Flash**,
+là où il utilisait jusqu'ici la génération Flash de DeepSeek. Le changement
+est un choix d'outil, pas une évolution de l'app : mêmes accès à vos données,
+mêmes outils, mêmes demandes de confirmation avant toute écriture, même
+capacité à ingérer de longs documents.
+
+Comme précédemment, le même moteur alimente aussi, en arrière-plan, la lecture
+des reportings reçus par email, l'enrichissement des fiches sociétés,
+l'identification de l'expéditeur d'un report et les synthèses de
+participations. Si vous constatez une différence de qualité sur l'une de ces
+lectures automatiques, c'est la première piste à regarder.
+
+Le moteur reste déclaré sous sa forme « dernière version en date » : il suivra
+donc automatiquement les prochaines versions de cette génération, sans
+intervention de notre part.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/instructions.ts` : `AGENT_MODEL` par défaut passe de
+>   `~deepseek/deepseek-v4-flash-latest` à `~z-ai/glm-flash-latest`. Source
+>   unique inchangée, toujours surchargeable par la var d'env Convex
+>   `OPENROUTER_MODEL`. Aucune autre logique touchée — `getModel()`
+>   (`convex/agent.ts`) et ses cinq consommateurs (`reportStore`,
+>   `companyEnrichment`, `reportIdentify`, `intelligence`,
+>   `migrations/alboDocBackfill`) héritent du changement.
+> - Slug retenu : l'**alias** OpenRouter préfixé `~`, qui redirige aujourd'hui
+>   vers `z-ai/glm-5.3-flash` — 1,31 M tokens de contexte (identique à
+>   l'ancien), `tools` + `structured_outputs` supportés, donc `generateObject`
+>   et l'approbation d'outils fonctionnent à l'identique.
+> - Coût : 0,075 $/M en entrée et 0,25 $/M en sortie, contre 0,05 / 0,16 pour
+>   DeepSeek V4 Flash — soit ~1,5× plus cher, ce qui reste marginal à notre
+>   volume. Le cache de préfixe reste automatique côté fournisseur
+>   (`input_cache_read` à 0,015 $/M), sans clé à injecter : le wrapper `fetch`
+>   supprimé à l'époque de Mistral n'a pas à revenir.
+> - Wording du system prompt corrigé (« You run on the GLM model … ») et
+>   commentaire d'en-tête de `convex/agent.ts` mis à jour. `KNOWN_ISSUES.md`
+>   § « Modèle de l'agent » retitré (OpenRouter / GLM) ; défaut mis à jour
+>   dans `CLAUDE.md`, `.env.example` et `TESTING.md`.
+> - ⚠️ Le code ne porte que le **défaut**. Si `OPENROUTER_MODEL` est posé sur
+>   le déploiement prod, c'est lui qui gagne : le basculement effectif demande
+>   `pnpm exec convex env set --prod OPENROUTER_MODEL "~z-ai/glm-flash-latest"`
+>   (ou la suppression de la variable pour retomber sur le défaut du code).
+
 ## v1.207.0 — 01/09/2026 à 16:51 — La documentation d'Albo OS se lit dans Albo OS
 
 Il existait déjà une documentation produit complète — vingt pages qui
