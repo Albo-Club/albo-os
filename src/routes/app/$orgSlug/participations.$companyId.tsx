@@ -71,21 +71,23 @@ import {
 } from '~/components/ui/select'
 import { useStickyBottom } from '~/hooks/useStickyBottom'
 
-export const Route = createFileRoute('/app/$orgSlug/participations/$companyId')({
-  component: ParticipationDetail,
-  errorComponent: NotFound,
-  notFoundComponent: NotFound,
-  head: () => ({
-    meta: [
-      {
-        title: getI18n(getLocale()).getFixedT(
-          null,
-          'participations',
-        )('metaTitleDetail'),
-      },
-    ],
-  }),
-})
+export const Route = createFileRoute('/app/$orgSlug/participations/$companyId')(
+  {
+    component: ParticipationDetail,
+    errorComponent: NotFound,
+    notFoundComponent: NotFound,
+    head: () => ({
+      meta: [
+        {
+          title: getI18n(getLocale()).getFixedT(
+            null,
+            'participations',
+          )('metaTitleDetail'),
+        },
+      ],
+    }),
+  },
+)
 
 function BackLink({ orgSlug }: { orgSlug: string }) {
   const { t } = useTranslation('participations')
@@ -264,7 +266,9 @@ function CreateDealDialog({
         targetCompanyId: company._id,
         instrumentKind: instrument as InstrumentKind,
         committedAmount:
-          amount.trim() === '' ? undefined : (eurosToCents(amount) ?? undefined),
+          amount.trim() === ''
+            ? undefined
+            : (eurosToCents(amount) ?? undefined),
         signedDate: signed === '' ? undefined : new Date(signed).getTime(),
         ...extras,
       })
@@ -429,7 +433,9 @@ function ParticipationDetail() {
   })
   const deals = useConvexQuery(
     api.deals.list,
-    org ? { orgId: org._id, targetCompanyId: companyId as Id<'companies'> } : 'skip',
+    org
+      ? { orgId: org._id, targetCompanyId: companyId as Id<'companies'> }
+      : 'skip',
   )
   // The AUTHORITATIVE ownership share, when this company is a group
   // subsidiary with a cap table of its own (SPEC D33). Null for a plain
@@ -655,9 +661,7 @@ function ParticipationDetail() {
           {/* What the company sends us — analysed reports and VASCO
               communications — in one chronological feed. The documents it
               produced live in the identity panel, not here. */}
-          {company && (
-            <CompanyReportsSection company={company} deals={deals ?? []} />
-          )}
+          {company && <CompanyReportsSection company={company} />}
         </div>
 
         {/* Side panel: the identity card ("fiche d'identité") — identity
@@ -801,11 +805,7 @@ function ParticipationDetail() {
               included. Five most recent here, the whole library in its
               sheet. */}
           {company && (
-            <CompanyDocumentsCard
-              company={company}
-              orgSlug={orgSlug}
-              deals={deals ?? []}
-            />
+            <CompanyDocumentsCard company={company} orgSlug={orgSlug} />
           )}
         </aside>
       </div>

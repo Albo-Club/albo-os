@@ -3499,11 +3499,15 @@ Trois invariants à ne pas casser :
    le coffre.** Elles _sont_ le rapport, repliées dans sa ligne. Le filtre
    existe des deux côtés : l'oublier côté carte fait apparaître chaque fichier
    deux fois et fausse le compteur.
-2. **La porte d'ajout reste unique** (`AddDocumentDialog`), avec le sélecteur
-   des 8 types entier des deux côtés — seul le `defaultKind` change
-   (`reporting` depuis les rapports, `legal` depuis le coffre). Dupliquer le
-   dialogue en deux formulaires spécialisés ramènerait le problème d'origine :
-   un fichier qu'on ne peut plus reclasser sans fermer la fenêtre.
+2. **Les deux portes d'ajout ne demandent plus rien** (ALB-239). Le coffre
+   dépose via `AddFilesDialog` (fichiers, rien d'autre — le type est lu dans
+   le document par `documentsClassify`), le journal via `AddReportDialog`
+   (fichiers + note, circuit d'analyse). Le sélecteur de type partagé n'existe
+   plus qu'à la **correction**, ce qui répond au problème d'origine — un
+   fichier mal classé se reclasse sur sa ligne, sans rouvrir de formulaire.
+   Corollaire : `AddReportDialog` n'est offert que sur une société
+   `portfolio`, seule que `reportInbox.createFromUpload` accepte ; ailleurs
+   le sélecteur servait de rattrapage silencieux.
 3. **Ne pas remettre d'onglets.** C'est exactement l'état d'avant la fusion, et
    il rend le coffre invisible tant qu'on lit le journal.
 

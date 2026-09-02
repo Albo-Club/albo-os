@@ -8,8 +8,7 @@ import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { FunctionReturnType } from 'convex/server'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
-import type { DealOption, DocKind } from '~/components/companies/documentFields'
-import { AddDocumentDialog } from '~/components/companies/AddDocumentDialog'
+import type { DocKind } from '~/components/companies/documentFields'
 import {
   KIND_ORDER,
   KindSelect,
@@ -24,6 +23,7 @@ import {
   DocumentAttachment,
   FileGlyph,
 } from '~/components/documents/DocumentAttachment'
+import { AddFilesDialog } from '~/components/documents/AddFilesDialog'
 import { ExtractedTextDialog } from '~/components/documents/DocumentReading'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { Badge } from '~/components/ui/badge'
@@ -72,11 +72,9 @@ const PREVIEW_COUNT = 5
 export function CompanyDocumentsCard({
   company,
   orgSlug,
-  deals,
 }: {
   company: Doc<'companies'>
   orgSlug: string
-  deals: Array<DealOption>
 }) {
   const { t } = useTranslation(['participations', 'common'])
   const { fmtDate } = useFormatters()
@@ -198,10 +196,8 @@ export function CompanyDocumentsCard({
         onOpenText={setTextDocId}
       />
 
-      <AddDocumentDialog
-        company={company}
-        deals={deals}
-        defaultKind="legal"
+      <AddFilesDialog
+        anchor={{ kind: 'company', companyId: company._id }}
         open={addOpen}
         onClose={() => setAddOpen(false)}
       />
