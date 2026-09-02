@@ -1752,6 +1752,46 @@ Corollaire d'affichage : `periodSortDate` retombe sur la date de réception
 quand il n'y a pas de période, sinon le courrier n'aurait aucun ancrage dans
 la timeline de la fiche (l'index `by_company` trie là-dessus).
 
+## Une société n'est pas toujours une seule histoire (reports par opération)
+
+Découvert en traitant ALB-237, **non résolu** — la décision produit a été de
+ne pas y toucher pour l'instant. À lire avant de toucher au rangement d'un
+report ou à ce qui en découle.
+
+Tout le pipeline reports est chaîné sur la **société** : le stockage
+(`companyReports` sur `(companyId, reportPeriod)`), les KPIs
+(`kpiSnapshots` sur `(companyId, metricType, période)`), la synthèse IA
+(`intelligence.ts` lit les N derniers reports **de la société**), la
+fraîcheur (`companies.lastReportAt`). Ça suppose qu'une société raconte
+**une** histoire.
+
+Deux modélisations coexistent en base pour la même réalité économique :
+
+- **Une entité par opération** — la convention dominante. Parallel Invest
+  (~15 entités `SPV4`, `SPV16 (Beauvoir-sur-Niort)`…) et Anaxago (~16,
+  `Anaxago - Chaligny`…) ont une société par projet, sur le même domaine.
+  `reportIdentify` est écrit pour ça : sur un domaine partagé par plusieurs
+  entités, le domaine ne prouve que le sponsor, c'est le **nom écrit dans le
+  mail** qui désigne l'opération (`lib/emailIdentify.ts`). Le champ
+  `companies.group` (+ `portfolioGroupSettings`) reconsolide la ligne dans la
+  liste — il n'est **activé nulle part** dans CALTE aujourd'hui.
+- **Une entité, plusieurs opérations** — Rewatt : neuf deals (huit tranches
+  de CCA remboursées, une ligne vivante), et des reports d'opération («Point
+  d'avancement Rewatt — 16 rue Boursault»). Là, le chaînage société ment :
+  la synthèse IA mélange des opérations sans rapport, et surtout **deux
+  reports d'opérations différentes pour la même période s'écrasent l'un
+  l'autre** (patch en place sur `(companyId, reportPeriod)` — cf. le § sur le
+  dédoublonnage plus haut). Silencieux, aucune erreur.
+
+Ce qui a été fait pour ALB-237 se limite à l'accusé de réception, qui ne
+somme plus les deals ouverts et les deals soldés. Le reste est assumé. Si le
+sujet revient, deux pistes : découper Rewatt en une entité par opération
+(zéro code, mais éclate la lecture de la contrepartie — les CCA sont des
+créances sur Rewatt SAS, pas sur l'immeuble), ou ancrer le report sur son
+opération (`dealId` sur `companyReports`, clé de dédoublonnage étendue,
+synthèse par opération). Le critère est métier : **est-ce que l'opération a
+une existence juridique propre ?**
+
 ## Schéma Zod servi à un LLM : `.nullable()` exige la CLÉ, pas seulement la valeur
 
 Suite directe du § ci-dessus. Rendre `report_period` et `report_type`
