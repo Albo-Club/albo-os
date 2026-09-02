@@ -36,7 +36,8 @@
     "reprocess": "Retraiter",
     "reject": "Rejeter",
     "assignAlso": "Rattacher aussi",
-    "detach": "Détacher ce report de {{name}}"
+    "detach": "Détacher ce report de {{name}}",
+    "deleteReport": "Supprimer ce report et ses fichiers de {{name}}"
   },
   "assignDialog": {
     "title": "Rattacher à une participation",
@@ -56,7 +57,8 @@
     "reprocessed": "Traitement relancé depuis le début",
     "rejected": "Email rejeté",
     "error": "Action impossible — réessaie",
-    "detached": "Report détaché de la participation"
+    "detached": "Report détaché de la participation",
+    "deleted": "Report supprimé, fichiers compris"
   },
   "related": {
     "hint": "Une fiche du même domaine existe dans {{orgs}}, où ce report n'est pas rattaché — ouvre « Rattacher aussi » pour l'ajouter."
@@ -66,5 +68,11 @@
     "description": "Le report sera retiré de {{name}} : il disparaît de sa fiche, avec ses fichiers et les KPIs qu’il avait renseignés. Les autres participations rattachées gardent le leur.",
     "cancel": "Annuler",
     "confirm": "Détacher"
+  },
+  "deleteDialog": {
+    "title": "Supprimer ce report ?",
+    "description": "Le report sera retiré de {{name}} avec ses fichiers, les KPIs qu’il avait renseignés et son indexation. Un fichier est effacé dès qu’aucune autre participation ne s’en sert : cet email perd alors sa pièce jointe et ne pourra plus être retraité. Irréversible.",
+    "cancel": "Annuler",
+    "confirm": "Supprimer"
   }
 }

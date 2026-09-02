@@ -155,6 +155,15 @@ La colonne principale, dans l'ordre de lecture :
     rapport lui-même. Le bouton dit « Analyser et ajouter ». Ce bouton
     n'existe que sur une société du portefeuille : l'analyse ne sait pas lire
     une entité du groupe, dont les pièces se déposent dans les documents.
+  - **Deux façons de retirer un rapport**, au bas de son détail.
+    « Détacher de cette participation » le retire de cette fiche seulement,
+    en gardant les fichiers et le mail d'origine rejouable — c'est le geste
+    du mauvais rangement. « Supprimer définitivement » fait la même chose et
+    emporte les fichiers : ils sont effacés dès qu'aucune autre participation
+    ne s'en sert, et le mail d'origine perd sa pièce jointe. Les deux gestes
+    existent aussi depuis les Rapports entrants (la croix détache, la
+    corbeille supprime). Détail dans
+    [Reports par email](17-reports-par-email.md).
 
 Les documents, à droite, sous l'identité. Ce sont deux choses différentes :
 un rapport est un **journal**, qu'on lit dans l'ordre, une fois, quand il

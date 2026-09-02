@@ -15,10 +15,12 @@ import { internal } from './_generated/api'
 import { internalAction, internalMutation, mutation, query } from './_generated/server'
 import { fetchBody, getMessage } from './agentmail'
 import { requireAppUser, requireOrgMember } from './lib/auth'
+import { releaseStorage } from './lib/documentBlobs'
 import { identityKey, sharedDomains } from './lib/emailIdentify'
 import { RETRY_BACKOFFS_MS } from './lib/modelRetry'
 import { recomputeReportFreshness } from './lib/reportFreshness'
 import { resolveMemberByEmail } from './lib/reportSenders'
+import { sourceInbound } from './lib/reportSource'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 
@@ -548,29 +550,8 @@ export const assignCompany = mutation({
 })
 
 /**
- * The row a report came from. Recent reports carry the back-link; older ones
- * are found again through the AgentMail message id they share with their
- * email. An upload stored before the back-link existed has no way home — the
- * detach below still runs, only the queue row keeps its stale mention.
- */
-async function sourceInbound(
-  ctx: MutationCtx,
-  report: Doc<'companyReports'>,
-): Promise<Doc<'inboundEmails'> | null> {
-  if (report.inboundEmailId) {
-    return await ctx.db.get('inboundEmails', report.inboundEmailId)
-  }
-  const messageId = report.agentmailMessageId
-  if (!messageId) return null
-  return await ctx.db
-    .query('inboundEmails')
-    .withIndex('by_message_id', (q) => q.eq('agentmailMessageId', messageId))
-    .first()
-}
-
-/**
- * Detach a stored report from ONE entity — the mirror of `assignCompany`, for
- * a report attached to a participation it does not concern.
+ * Remove a stored report from ONE entity — the shared body of `detachCompany`
+ * and `deleteReport` below, which differ only on what happens to the files.
  *
  * The scope is that entity alone: the other entities of the fan-out keep
  * their own report. What goes with it is everything `reportStore.storeForCompany`
@@ -578,12 +559,109 @@ async function sourceInbound(
  * snapshots it sourced, its slot in `companyIntelligence`, its semantic-index
  * entry — so the participation reads as if the report had never landed on it.
  *
- * Storage blobs are deliberately NOT deleted: one blob backs the document
- * rows of EVERY fan-out entity and the source email's attachment. Detaching
- * one participation must not blank the files of the others.
- *
  * The source row is corrected in the same transaction: the review queue stops
  * claiming the participation, and a later replay does not put the report back.
+ */
+async function removeReportForCompany(
+  ctx: MutationCtx,
+  report: Doc<'companyReports'>,
+  { deleteFiles }: { deleteFiles: boolean },
+): Promise<void> {
+  const reportId = report._id
+  // Read once: it is both what gets corrected below and, when the files go,
+  // the attachment holder `releaseStorage` has to empty.
+  const inbound = await sourceInbound(ctx, report)
+
+  // Document rows of this entity only.
+  const docs = await ctx.db
+    .query('documents')
+    .withIndex('by_report', (q) => q.eq('reportId', reportId))
+    .collect()
+  // Same invariant as reportStore: a `reportId`-bearing row always carries
+  // the report's company, so an unfiled document can never belong to this
+  // fan-out (`companyId` became optional with the Dette & Garanties module).
+  for (const doc of docs) {
+    if (doc.companyId && doc.companyId === report.companyId) {
+      await ctx.db.delete('documents', doc._id)
+      // Detaching keeps the file: one blob backs the document rows of EVERY
+      // fan-out entity and the source email's attachment, so it must not be
+      // blanked for the others. Deleting frees it — but only once this row
+      // was the last one pointing at it (cf. lib/documentBlobs.ts).
+      if (deleteFiles) {
+        await releaseStorage(ctx, doc.storageId, { inboundEmailId: inbound?._id })
+      }
+    }
+  }
+
+  // KPI snapshots this report sourced (same tag as reportStore).
+  const sourceTag = `report:${reportId}`
+  const snapshots = await ctx.db
+    .query('kpiSnapshots')
+    .withIndex('by_company_metric', (q) => q.eq('companyId', report.companyId))
+    .collect()
+  for (const snap of snapshots) {
+    if (snap.source === sourceTag) await ctx.db.delete('kpiSnapshots', snap._id)
+  }
+
+  await ctx.db.delete('companyReports', reportId)
+
+  // Freshness copy on the entity: rebuilt from what is left, since the
+  // ingestion side only ever moves it forward (cf. lib/reportFreshness.ts).
+  // Removing the last report must put the participation back in silence.
+  await recomputeReportFreshness(ctx, report.companyId)
+
+  // The synthesis pointed here: fall back on the most recent report left on
+  // the entity, or clear the pointer when it was the last one.
+  const intelligence = await ctx.db
+    .query('companyIntelligence')
+    .withIndex('by_company', (q) => q.eq('companyId', report.companyId))
+    .unique()
+  if (intelligence && intelligence.latestReportId === reportId) {
+    const next = await ctx.db
+      .query('companyReports')
+      .withIndex('by_company', (q) => q.eq('companyId', report.companyId))
+      .order('desc')
+      .first()
+    await ctx.db.patch('companyIntelligence', intelligence._id, {
+      latestReportId: next?._id,
+    })
+  }
+
+  if (inbound) {
+    const matched = (inbound.matchedCompanies ?? []).filter(
+      (m) => m.companyId !== report.companyId,
+    )
+    const remaining = (inbound.reportIds ?? []).filter((id) => id !== reportId)
+    await ctx.db.patch('inboundEmails', inbound._id, {
+      matchedCompanies: matched.length > 0 ? matched : undefined,
+      reportIds: remaining.length > 0 ? remaining : undefined,
+    })
+  }
+
+  // Drop the semantic-index entry (no-op if the report was never indexed).
+  await ctx.scheduler.runAfter(0, internal.vectorize.removeEntry, {
+    orgId: report.orgId,
+    key: `report:${reportId}`,
+  })
+
+  // The synthesis read this report: re-run it on what is left. Ingestion
+  // triggers the analysis, so removal has to as well — otherwise the note
+  // keeps describing a report that is no longer there. Removing the last
+  // one is the case that matters most: `runAnalysis` then lands on
+  // `no_data` and CLEARS the note, which is what puts the entity back to
+  // "aucune donnée" instead of leaving an orphan score in the list.
+  await ctx.scheduler.runAfter(0, internal.intelligence.runAnalysis, {
+    companyId: report.companyId,
+    orgId: report.orgId,
+  })
+}
+
+/**
+ * Detach a stored report from ONE entity — the mirror of `assignCompany`, for
+ * a report attached to a participation it does not concern.
+ *
+ * The files are kept: the mail is intact in the queue, so a `reprocess` can
+ * file the report where it belongs. Use `deleteReport` to get rid of it.
  */
 export const detachCompany = mutation({
   args: { reportId: v.id('companyReports') },
@@ -591,83 +669,28 @@ export const detachCompany = mutation({
     const report = await ctx.db.get('companyReports', reportId)
     if (!report) throw new ConvexError('not_found')
     await requireOrgMember(ctx, report.orgId)
+    await removeReportForCompany(ctx, report, { deleteFiles: false })
+    return null
+  },
+})
 
-    // Document rows of this entity only — the blob stays (see above).
-    const docs = await ctx.db
-      .query('documents')
-      .withIndex('by_report', (q) => q.eq('reportId', reportId))
-      .collect()
-    // Same invariant as reportStore: a `reportId`-bearing row always carries
-    // the report's company, so an unfiled document can never belong to this
-    // fan-out (`companyId` became optional with the Dette & Garanties module).
-    for (const doc of docs) {
-      if (doc.companyId && doc.companyId === report.companyId) {
-        await ctx.db.delete('documents', doc._id)
-      }
-    }
-
-    // KPI snapshots this report sourced (same tag as reportStore).
-    const sourceTag = `report:${reportId}`
-    const snapshots = await ctx.db
-      .query('kpiSnapshots')
-      .withIndex('by_company_metric', (q) => q.eq('companyId', report.companyId))
-      .collect()
-    for (const snap of snapshots) {
-      if (snap.source === sourceTag) await ctx.db.delete('kpiSnapshots', snap._id)
-    }
-
-    await ctx.db.delete('companyReports', reportId)
-
-    // Freshness copy on the entity: rebuilt from what is left, since the
-    // ingestion side only ever moves it forward (cf. lib/reportFreshness.ts).
-    // Detaching the last report must put the participation back in silence.
-    await recomputeReportFreshness(ctx, report.companyId)
-
-    // The synthesis pointed here: fall back on the most recent report left on
-    // the entity, or clear the pointer when it was the last one.
-    const intelligence = await ctx.db
-      .query('companyIntelligence')
-      .withIndex('by_company', (q) => q.eq('companyId', report.companyId))
-      .unique()
-    if (intelligence && intelligence.latestReportId === reportId) {
-      const next = await ctx.db
-        .query('companyReports')
-        .withIndex('by_company', (q) => q.eq('companyId', report.companyId))
-        .order('desc')
-        .first()
-      await ctx.db.patch('companyIntelligence', intelligence._id, {
-        latestReportId: next?._id,
-      })
-    }
-
-    const inbound = await sourceInbound(ctx, report)
-    if (inbound) {
-      const matched = (inbound.matchedCompanies ?? []).filter(
-        (m) => m.companyId !== report.companyId,
-      )
-      const remaining = (inbound.reportIds ?? []).filter((id) => id !== reportId)
-      await ctx.db.patch('inboundEmails', inbound._id, {
-        matchedCompanies: matched.length > 0 ? matched : undefined,
-        reportIds: remaining.length > 0 ? remaining : undefined,
-      })
-    }
-
-    // Drop the semantic-index entry (no-op if the report was never indexed).
-    await ctx.scheduler.runAfter(0, internal.vectorize.removeEntry, {
-      orgId: report.orgId,
-      key: `report:${reportId}`,
-    })
-
-    // The synthesis read this report: re-run it on what is left. Ingestion
-    // triggers the analysis, so removal has to as well — otherwise the note
-    // keeps describing a report that is no longer there. Detaching the last
-    // one is the case that matters most: `runAnalysis` then lands on
-    // `no_data` and CLEARS the note, which is what puts the entity back to
-    // "aucune donnée" instead of leaving an orphan score in the list.
-    await ctx.scheduler.runAfter(0, internal.intelligence.runAnalysis, {
-      companyId: report.companyId,
-      orgId: report.orgId,
-    })
+/**
+ * Delete a stored report from ONE entity, files included — for a report that
+ * has nothing to do here at all (a test, a duplicate, a mistake).
+ *
+ * Same scope as `detachCompany`, one difference: each file goes as soon as no
+ * `documents` row points at it any more. The source email is not treated as a
+ * holder — it loses the attachment along the way, so a file deleted here is
+ * really gone from the app, at the price of an email that can no longer be
+ * replayed into a report (cf. ALB-240).
+ */
+export const deleteReport = mutation({
+  args: { reportId: v.id('companyReports') },
+  handler: async (ctx, { reportId }) => {
+    const report = await ctx.db.get('companyReports', reportId)
+    if (!report) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, report.orgId)
+    await removeReportForCompany(ctx, report, { deleteFiles: true })
     return null
   },
 })
