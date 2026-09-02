@@ -36,6 +36,7 @@ export type EditableGuarantee = Pick<
   | 'subject'
   | 'borrowerName'
   | 'pledgorName'
+  | 'pledgorOrgId'
   | 'pledgorOrgSlug'
 >
 

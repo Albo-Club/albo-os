@@ -23,6 +23,44 @@ bas de page.
 
 ---
 
+## v1.209.2 — 02/09/2026 à 15:10 — Corriger une garantie ne change plus son garant
+
+Quand une société du groupe garantit l'emprunt d'une autre — le contrat
+d'assurance-vie de CALTE qui garantit le prêt de la SCI Chapelle, par exemple —
+ouvrir cette garantie depuis le Passif de l'emprunteuse pour y corriger un
+détail **remplaçait le garant par la société de la page**. Le champ « Garant »
+se rouvrait sur la société courante au lieu du garant réel, et un simple
+enregistrement suffisait à déplacer la garantie, sans alerte ni trace.
+
+Le champ affiche désormais le garant inscrit sur la garantie. Corriger un
+montant, un rang ou une date ne touche plus à qui s'est porté garant.
+
+C'est le cas de figure central du module — un actif détenu par une société qui
+garantit l'emprunt d'une autre — et le seul écran depuis lequel une garantie se
+corrige, donc la correction valait d'être faite avant toute saisie.
+
+> **🔧 Notes techniques**
+>
+> - `GuaranteeDialog.tsx` initialisait onze champs depuis la ligne éditée et le
+>   douzième (`pledgorOrg`) depuis l'`orgId` de la page. À la sauvegarde, ce
+>   `pledgorOrgId` partait tel quel dans `guarantees:update` : réassignation
+>   silencieuse, aucune erreur, aucune validation franchie.
+> - Il **ne pouvait pas** faire mieux : `enrich()` (`convex/guarantees.ts`) ne
+>   rendait que `pledgorOrgSlug`, un libellé, quand le `<Select>` a besoin de
+>   l'id. La correction expose `pledgorOrgId` à côté du slug — comme
+>   `subjectOrgId` juste au-dessus — puis le fait remonter dans
+>   `EditableGuarantee` (`GuaranteeList.tsx`) et dans l'état du dialogue.
+> - **Un test Convex** pin le contrat côté serveur (la moitié qui peut
+>   régresser en silence) : sur la sûreté inter-sociétés de l'annexe, les deux
+>   surfaces d'édition — fiche du prêt et Passif du garant — rendent bien
+>   `pledgorOrgId`. Vérifié en le retirant : le test tombe. La préselection
+>   elle-même se vérifie à la main (`TESTING.md` GG7), le repo n'ayant aucun
+>   harnais de test de composant React et en introduire un pour ça aurait été
+>   une infra entière non demandée.
+> - Le patron `useState(orgId)` sur un champ éditable n'existait nulle part
+>   ailleurs dans `src/` — défaut isolé, désormais consigné en anti-patron dans
+>   `CLAUDE.md`.
+
 ## v1.209.1 — 02/09/2026 à 13:35 — Toute garantie est classée quelque part
 
 Suite technique de la version précédente, sans effet visible. Le champ qui dit

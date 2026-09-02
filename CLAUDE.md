@@ -661,6 +661,17 @@ export const remove = mutation({
   exactly how `climate` had to be retired). A missing bucket is arbitrated in
   that file, with its assignment rules; agent tools take the enum, never a
   free string.
+- ❌ An edit dialog that seeds a field from the **page's** context
+  (`useState(orgId)`) instead of from the row being edited
+  (`useState(row.fieldId ?? orgId)`). Nothing fails: the field renders, the
+  form validates, and saving rewrites that value to the page's — so opening
+  a guarantee guaranteed by CALTE from the SCI's Passif and pressing Save
+  moved the guarantor, silently. Two reflexes: a dialog that edits reads
+  **every** field from the row, page context being the fallback for creation
+  only; and if the field is a `<Select>` of ids, the row must carry the
+  **id**, not just a display slug — an enriched read that hands back
+  `pledgorOrgSlug` and not `pledgorOrgId` makes the correct default
+  unwritable (`convex/guarantees.ts:enrich`).
 - ❌ A `DialogContent` whose content can grow tall (long lists, repeatable
   rows, many fields) without `max-h-[85vh] overflow-y-auto`. shadcn's dialog
   has no built-in height cap, so tall content overflows the viewport with no
