@@ -4061,6 +4061,23 @@ new is persisted — the result still lands in `companyIntelligence`).
   synthesis still runs on the company/report context alone. The `no_data` guard
   is evaluated on (context **OR** comms), so a bare Parallel entity with only
   communications is still analyzed.
+- **Le cache est UPSERTÉ, pas effacé-réécrit (09/2026).** Le remplacement
+  total ne faussait aucune date affichée — la fiche lit `publishDate`, la date
+  du portail — mais il détruisait l'**identité** des lignes : chaque
+  communication était supprimée puis recréée à chaque cycle, donc aucun état ne
+  pouvait y vivre. C'est devenu bloquant avec le mail d'annonce, qui a besoin
+  d'un marqueur « déjà annoncée » : posé sur une ligne, il aurait été balayé
+  48 h plus tard et le même mail serait reparti indéfiniment. La mutation
+  insère donc ce qui est nouveau, patche ce qui a bougé, supprime ce que le
+  portail ne liste plus. Deux gains au passage : « nouveau » devient
+  **structurel** (aucune ligne n'existait) au lieu d'être recalculé à la volée,
+  et une ligne connue coûte un patch au lieu d'un delete + insert.
+  ⚠️ Le patch ne porte **pas** `announcedAt` : c'est précisément ce qui le fait
+  survivre. Y ajouter le champ par mégarde re-annoncerait tout à chaque synchro.
+  ⚠️ Un pull **vide mais réussi** (le portail ne renvoie rien) vide le cache, et
+  le remplissage suivant repasse donc en bootstrap, donc muet. C'était déjà le
+  cas avant (le remplacement total effaçait pareil) et ça échoue du bon côté :
+  on préfère un silence à une volée de mails.
 - **Un pull est une photo, pas un événement — c'est ce qui bloquait le
   déclenchement automatique (ALB-238).** Jusqu'en 09/2026 la synthèse ne partait
   qu'en bout de pipeline mail (`reportStore.run`) : un reporting publié sur le
@@ -4095,6 +4112,24 @@ new is persisted — the result still lands in `companyIntelligence`).
   « connu » et la détection ci-dessus ne se déclenchera **jamais** sur son
   backlog. Sans ce second fil, une entité fraîchement rattachée attendrait la
   prochaine publication de Parallel — potentiellement des mois.
+- **L'annonce par mail (`convex/vascoNotify.ts`).** Une publication n'a ni
+  expéditeur ni fil : personne ne nous a rien envoyé, donc il n'y a personne à
+  qui répondre. Ce qu'elle produit est l'**annonce** que le reste de l'org
+  reçoit déjà quand un report est rangé — même gabarit
+  (`reportConfirmationHtml`), même carte d'entité, même bloc de synthèse — en
+  mail frais aux membres qui n'ont pas coupé `reportAdded`.
+  Deux ordres portent la valeur et ne se permutent pas : la **synthèse tourne
+  avant** que le mail ne soit construit (la carte dit « où en est la boîte », ce
+  qui n'est vrai qu'une fois la publication intégrée — même raison que
+  `reportStore` attendant `runAnalysisBatch`) ; et l'annonce est **réclamée
+  avant** d'être envoyée (`claimArrivals` estampille `announcedAt` dans une
+  transaction), jamais après, sinon une reprise du scheduler enverrait deux
+  fois. Comme `notifiedAt`, la marque n'est **jamais** relâchée : un mail perdu
+  coûte moins cher qu'une boucle de doublons. Corollaire : l'absence
+  d'`AGENTMAIL_INBOX_ID` est testée **avant** la réclamation — sinon on
+  brûlerait l'annonce sans rien envoyer.
+  Un mail **par société**, pas un mail groupé par synchro : une publication est
+  un événement, comme un report reçu.
 - **Chemin manuel.** `intelligence.rerun` (mutation publique org-member-guarded,
   bouton « Relancer l'analyse ») reste utile pour re-scorer après une édition à
   la main ou rejouer une synthèse en échec.

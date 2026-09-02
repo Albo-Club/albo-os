@@ -783,7 +783,12 @@ export const remove = mutation({
   se fait **depuis** ce cache (on choisit dans une liste déjà remplie), le
   backlog de l'entité est déjà « connu » à l'instant du lien — la mutation de
   rattachement doit porter son propre déclenchement, sinon l'entité attend la
-  prochaine publication.
+  prochaine publication. Et dès qu'un état doit vivre **par élément** (« déjà
+  annoncé », « déjà traité »), le cache doit passer en **upsert** : effacer et
+  réinsérer détruit l'identité des lignes, donc le marqueur, donc l'anti-doublon
+  — le champ marqueur ne doit alors surtout pas figurer dans le patch de
+  rafraîchissement. Un premier remplissage se traite à part : tout y est neuf
+  par construction, donc on marque sans notifier.
 - ❌ Une nouvelle connexion à une plateforme externe avec sa table et son CRUD
   dédiés. Déclarer la plateforme dans le registre `convex/lib/connectors.ts`
   et passer par le noyau commun `convex/connections.ts` (table générique

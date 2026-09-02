@@ -294,6 +294,24 @@ prévenus comme pour un report transféré ; et si l'analyse échoue, la ligne
 passe en « analyse échouée » — le dépôt reste rattrapable depuis la boîte
 [Rapports entrants](12-vue-consolidee.md), comme un mail.
 
+## Une publication Parallel produit le même mail
+
+Un reporting publié sur le portail Parallel n'arrive par aucun email : Albo OS
+va le chercher. Il donne pourtant lieu au **même mail d'annonce** qu'un report
+transféré — carte de la société, lien vers sa fiche, titres des publications et
+note de santé remise à jour — envoyé aux membres de l'organisation dès que
+l'analyse a intégré la publication.
+
+Trois différences, toutes dues au fait que personne n'a rien envoyé : il n'y a
+pas de réponse dans un fil de discussion (il n'y a pas de fil), la ligne
+d'origine dit « Publié sur le portail le … » au lieu de « Transféré par … », et
+il n'y a pas de bloc « ce que dit ce report » — les chiffres d'une publication
+Parallel ne sont pas extraits, c'est la synthèse qui porte le fond.
+
+Chaque publication n'est annoncée **qu'une fois**, quel que soit le nombre de
+synchronisations. Le détail du circuit est dans
+[Intégrations](15-integrations.md).
+
 ## Points d'attention
 
 - **L'adresse est ouverte, la réponse ne l'est pas** : n'importe qui peut

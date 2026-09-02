@@ -23,6 +23,66 @@ bas de page.
 
 ---
 
+## v1.210.0 — 02/09/2026 à 15:50 — Une publication Parallel te prévient par email
+
+Jusqu'ici, un reporting publié sur le portail Parallel mettait bien la fiche et
+la note de santé à jour, mais en silence : il fallait ouvrir l'app pour
+s'apercevoir qu'il y avait du neuf. Un reporting transféré par email, lui,
+donnait un accusé de réception.
+
+Désormais, une publication Parallel envoie **le même email** — un par société
+concernée : carte de la société, lien vers sa fiche, titres des publications, et
+la note de santé **remise à jour de cette publication** (score, résumé, points
+forts et de vigilance, KPIs). Il part aux membres de l'organisation qui n'ont
+pas désactivé les annonces de reporting.
+
+Trois différences, toutes dues au fait que personne n'a rien envoyé : pas de
+réponse dans un fil de discussion (il n'y en a pas), la ligne d'origine dit
+« Publié sur le portail le … » au lieu de « Transféré par … », et il n'y a pas
+de bloc « ce que dit ce report » — les chiffres d'une publication Parallel ne
+sont pas extraits, c'est la synthèse qui porte le fond.
+
+**Chaque publication n'est annoncée qu'une fois**, quel que soit le nombre de
+synchronisations. Et le tout premier remplissage du cache d'un portail
+n'envoie rien : un historique n'est pas une nouvelle.
+
+> **🔧 Notes techniques**
+>
+> - **Prérequis : le cache Parallel passe en upsert.** `replaceCommunicationsCache`
+>   effaçait tout et réinsérait à chaque cycle. Aucune date affichée n'en était
+>   faussée (la fiche lit `publishDate`), mais l'**identité** des lignes était
+>   détruite, donc aucun état ne pouvait y vivre — un marqueur « déjà annoncée »
+>   aurait été balayé toutes les 48 h et le même mail serait reparti
+>   indéfiniment. La mutation insère le nouveau, patche ce qui a bougé, supprime
+>   ce que le portail ne liste plus. « Nouveau » devient structurel (aucune
+>   ligne n'existait) au lieu d'être recalculé à la volée, et une ligne connue
+>   coûte un patch au lieu d'un delete + insert. ⚠️ `announcedAt` n'est
+>   **pas** dans le patch de rafraîchissement : c'est ce qui le fait survivre.
+> - **`convex/vascoNotify.ts`** (nouveau module, miroir de `reportNotify`) :
+>   `claimArrivals` estampille `announcedAt` en transaction puis rend ce que les
+>   communications disent ; `announce` vérifie l'inbox sortante **avant** de
+>   réclamer (sinon l'annonce serait brûlée sans envoi), réclame, lance
+>   `intelligence.runAnalysis`, puis construit un mail **par destinataire** via
+>   `reportNotify.entityCards` et `reportConfirmationHtml`.
+> - **Deux ordres non permutables** : la synthèse tourne avant la construction
+>   du mail (la carte dit « où en est la boîte »), et la réclamation précède
+>   l'envoi (une reprise du scheduler ne doit pas doubler). Comme `notifiedAt`,
+>   la marque n'est jamais relâchée.
+> - **Bootstrap** : un premier remplissage marque tout comme déjà annoncé et ne
+>   planifie que les analyses. Un pull vide mais réussi vide le cache et rend le
+>   remplissage suivant silencieux — ça échoue du bon côté.
+> - `emailTemplates` : `publishedOn` et `publicationTitles` optionnels sur
+>   `ReportConfirmationData`, le titre « Nouveau report » couvrant les deux
+>   origines. Aucun changement pour le canal mail.
+> - **Non régression** : `regression.vascoAnalysis.test.ts` passe de 6 à 11 cas.
+>   Contrôle négatif dans les deux sens — le garde-fou du bootstrap retiré fait
+>   échouer « le premier remplissage n'annonce pas », le marqueur non posé fait
+>   échouer « une arrivée n'est réclamée qu'une fois ».
+> - ⚠️ `convex/_generated/api.d.ts` porte **deux lignes ajoutées à la main**
+>   pour le nouveau module : le codegen ne tourne pas hors ligne, et c'est
+>   l'exception documentée dans `KNOWN_ISSUES.md` § « Codegen Convex hors-ligne ».
+>   Le prochain `convex deploy` réécrit le même contenu.
+
 ## v1.209.3 — 02/09/2026 à 15:19 — La note IA suit les corrections et les retraits
 
 Deux situations laissaient la synthèse d'une société décrire autre chose que
