@@ -16,10 +16,10 @@ import { AGENT_MODEL, BASE_INSTRUCTIONS } from './lib/instructions'
 /**
  * OpenRouter gateway (OpenAI-compatible). The model id lives in
  * `AGENT_MODEL` (single source, overridable via the OPENROUTER_MODEL env
- * var); the key is read from OPENROUTER_API_KEY in the Convex env. DeepSeek
+ * var); the key is read from OPENROUTER_API_KEY in the Convex env. GLM
  * caches the shared system-prompt + tool-schemas prefix automatically
  * server-side (no per-request cache key to inject), so no fetch wrapper is
- * needed — cf. KNOWN_ISSUES.md « Modèle de l'agent (OpenRouter / DeepSeek) ».
+ * needed — cf. KNOWN_ISSUES.md « Modèle de l'agent (OpenRouter / GLM) ».
  */
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,

@@ -12,7 +12,7 @@ Pré-requis :
   - `SITE_URL` (`http://localhost:3000` en local)
   - `RESEND_API_KEY` + `RESEND_FROM` + `RESEND_TEST_MODE=true` en dev
   - `OPENROUTER_API_KEY` (modèle par défaut :
-    `~deepseek/deepseek-v4-flash-latest`)
+    `~z-ai/glm-flash-latest`)
 - `.env.local` rempli (`VITE_CONVEX_URL`, `CONVEX_DEPLOYMENT`)
 - 2 navigateurs (ou 1 navigateur + 1 fenêtre incognito) prêts pour les
   tests multi-tenant
@@ -1360,7 +1360,7 @@ cf. `KNOWN_ISSUES.md` « Serveur MCP distant »). Pour M2-M5, poser
 - Emails non reçus → `RESEND_API_KEY` valide + `RESEND_TEST_MODE=false` pour
   recevoir réellement.
 - AI ne stream pas → `OPENROUTER_API_KEY` + vérifier `convex/agent.ts` (modèle
-  par défaut `~deepseek/deepseek-v4-flash-latest`).
+  par défaut `~z-ai/glm-flash-latest`).
 - Bot Telegram muet → `TELEGRAM_BOT_TOKEN`/`TELEGRAM_WEBHOOK_SECRET` côté
   Convex env + `curl https://api.telegram.org/bot<token>/getWebhookInfo`
   pour vérifier l'URL du webhook et les erreurs de livraison.
