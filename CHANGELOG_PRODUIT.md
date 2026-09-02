@@ -23,6 +23,52 @@ bas de page.
 
 ---
 
+## v1.209.3 — 02/09/2026 à 15:19 — La note IA suit les corrections et les retraits
+
+Deux situations laissaient la synthèse d'une société décrire autre chose que
+ce que sa fiche affichait.
+
+**Un rapport corrigé.** Un fondateur envoie son reporting, puis le renvoie
+avec un chiffre rectifié. La fiche montrait bien la nouvelle version, mais
+l'app classait l'envoi en « déjà reçu » : la note de santé continuait de
+commenter la version périmée, et personne n'était prévenu. Un renvoi qui
+change réellement quelque chose est désormais traité comme du neuf — la note
+se met à jour et le récap part normalement. Un renvoi strictement identique,
+lui, reste silencieux comme avant : pas de mail, pas d'analyse inutile.
+
+**Un rapport détaché.** Retirer un rapport d'une société ne recalculait pas sa
+note, qui continuait de décrire un rapport absent. Elle est maintenant
+recalculée sur ce qui reste. Et si c'était le dernier, la fiche repasse
+franchement à « aucune donnée » : plus de score orphelin dans la liste des
+participations en face d'une fiche vide.
+
+> **🔧 Notes techniques**
+>
+> - **Même cause que ALB-238, deux symptômes.** Le recalcul de la synthèse
+>   était accroché à « une ligne `companyReports` a été créée », pas à « le
+>   contenu a changé », et seulement du côté de l'ajout.
+> - **Renvoi corrigé** : `reportStore.storeForCompany` renvoie désormais
+>   `changed` en plus de `created`, calculé par `reportContentChanged` — qui
+>   compare exactement ce que la fiche affiche et ce qui nourrit
+>   `intelligence.getContext` (`headline`, `title`, `keyHighlights`,
+>   `metrics`, `rawContent`). Hors comparaison : `processedAt`,
+>   `pipelineVersion`, identifiants AgentMail, `inboundEmailId` — ils changent
+>   à chaque renvoi sans changer ce que le report dit. Les cartes de métriques
+>   sont comparées **clés triées** (l'extraction reconstruit l'objet à chaque
+>   passage). `reportStore.run` bascule de `anyCreated` à `anyNews`.
+> - **Détachement** : `reportInbox.detachCompany` planifie
+>   `intelligence.runAnalysis`. Sur le dernier report, `runAnalysis` tombe sur
+>   `no_data`, qui efface l'analyse — c'est ce qui vide la colonne Score IA,
+>   laquelle lit `aiAnalysis` seule.
+> - **Non régression** : `convex/regression.reportAnalysisTriggers.test.ts`
+>   (8 cas). Contrôle négatif effectué dans les deux sens — les 5 cas de
+>   correction échouent si `reportContentChanged` est neutralisé, le cas du
+>   détachement échoue si la planification est retirée.
+> - Docs : `KNOWN_ISSUES.md` § « Un report renvoyé n'est pas forcément un
+>   doublon » (nouvelle) et § « Détacher un report » (sixième effet), règle
+>   anti-pattern dans `CLAUDE.md` (déclencher sur le contenu, et respecter la
+>   symétrie ajout/retrait), `TESTING.md` R21, R28d et compteur B11,
+>   `docs/produit/04-participations.md`.
 ## v1.209.2 — 02/09/2026 à 15:10 — Corriger une garantie ne change plus son garant
 
 Quand une société du groupe garantit l'emprunt d'une autre — le contrat
