@@ -701,6 +701,13 @@
       "confirmBody": "The report will be removed from {{company}}: it leaves this fiche, along with its files and the KPIs it filled in. The other attached participations keep theirs, and the received file is not deleted.",
       "confirm": "Detach",
       "done": "Report detached from this participation"
+    },
+    "deleteReport": {
+      "action": "Delete permanently",
+      "confirmTitle": "Delete this report?",
+      "confirmBody": "The report leaves {{company}} along with its files, the KPIs it filled in and its search indexing. A file is erased from storage as soon as no other participation uses it: the source email then loses its attachment and can no longer be reprocessed. Irreversible.",
+      "confirm": "Delete",
+      "done": "Report deleted"
     }
   },
   "documents": {

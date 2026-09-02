@@ -23,7 +23,8 @@ import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { requireGuaranteeParty } from './guarantees'
-import { deleteStorageText } from './lib/documentTexts'
+import { releaseStorage } from './lib/documentBlobs'
+import { sourceInbound } from './lib/reportSource'
 
 import type { Id } from './_generated/dataModel'
 import type { MutationCtx } from './_generated/server'
@@ -478,10 +479,14 @@ export const remove = mutation({
     const doc = await ctx.db.get('documents', documentId)
     if (!doc) throw new ConvexError('not_found')
     await requireOrgMember(ctx, doc.orgId)
-    // The text is keyed by the blob, and the blob goes with the document.
-    await deleteStorageText(ctx, doc.storageId)
-    await ctx.storage.delete(doc.storageId)
     await ctx.db.delete('documents', documentId)
+    // The text is keyed by the blob, and both only go when nothing points at
+    // the blob any more: a report's file backs one row per fan-out entity, so
+    // deleting it from one fiche must not blank the others. The source email
+    // is not a holder — it loses the attachment with the last row.
+    const report = doc.reportId ? await ctx.db.get('companyReports', doc.reportId) : null
+    const inbound = report ? await sourceInbound(ctx, report) : null
+    await releaseStorage(ctx, doc.storageId, { inboundEmailId: inbound?._id })
     // Drop the semantic-index entry (no-op if the doc was never indexed).
     await ctx.scheduler.runAfter(0, internal.vectorize.removeEntry, {
       orgId: doc.orgId,

@@ -293,10 +293,12 @@ function ReportDetailDialog({
   openId,
   onClose,
   onDetach,
+  onDelete,
 }: {
   openId: Id<'companyReports'> | null
   onClose: () => void
   onDetach: () => void
+  onDelete: () => void
 }) {
   const { t } = useTranslation('participations')
   const detail = useConvexQuery(
@@ -354,10 +356,14 @@ function ReportDetailDialog({
           </div>
         )}
 
-        {/* The way out when a report landed on the wrong participation. */}
+        {/* Two ways out: detach leaves the files (and the mail replayable),
+            delete takes them with it. */}
         <DialogFooter className="sm:justify-start">
           <Button variant="outline" size="sm" onClick={onDetach}>
             {t('timeline.detach.action')}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onDelete}>
+            {t('timeline.deleteReport.action')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -419,11 +425,17 @@ export function CompanyReportsSection({
   })
   const vasco = useVascoCommunications(company)
   const detachReport = useConvexMutation(api.reportInbox.detachCompany)
+  const deleteReport = useConvexMutation(api.reportInbox.deleteReport)
 
   const [addOpen, setAddOpen] = useState(false)
   const [reportId, setReportId] = useState<Id<'companyReports'> | null>(null)
   const [commId, setCommId] = useState<string | null>(null)
-  const [detachId, setDetachId] = useState<Id<'companyReports'> | null>(null)
+  // Same confirmation dialog for both ways out — only the copy and the
+  // mutation differ (detach keeps the files, delete takes them).
+  const [confirm, setConfirm] = useState<{
+    reportId: Id<'companyReports'>
+    mode: 'detach' | 'deleteReport'
+  } | null>(null)
 
   // A report's attachments are folded into their report's row. This is the
   // only reason the section reads the documents at all.
@@ -467,15 +479,20 @@ export function CompanyReportsSection({
   const openComm =
     vasco.communications.find((c) => c.communicationId === commId) ?? null
 
-  async function handleDetach() {
-    if (!detachId) return
+  // The dialog stays mounted while it closes, so the copy falls back on the
+  // detach wording rather than flipping mid-animation.
+  const confirmMode = confirm?.mode ?? 'detach'
+
+  async function handleConfirm() {
+    if (!confirm) return
+    const run = confirm.mode === 'detach' ? detachReport : deleteReport
     try {
-      await detachReport({ reportId: detachId })
-      toast.success(t('participations:timeline.detach.done'))
+      await run({ reportId: confirm.reportId })
+      toast.success(t(`participations:timeline.${confirm.mode}.done`))
     } catch {
       toast.error(t('participations:documents.errors.default'))
     } finally {
-      setDetachId(null)
+      setConfirm(null)
     }
   }
 
@@ -555,7 +572,11 @@ export function CompanyReportsSection({
         openId={reportId}
         onClose={() => setReportId(null)}
         onDetach={() => {
-          setDetachId(reportId)
+          if (reportId) setConfirm({ reportId, mode: 'detach' })
+          setReportId(null)
+        }}
+        onDelete={() => {
+          if (reportId) setConfirm({ reportId, mode: 'deleteReport' })
           setReportId(null)
         }}
       />
@@ -567,28 +588,28 @@ export function CompanyReportsSection({
         onClose={() => setCommId(null)}
       />
 
-      {/* Detach confirmation */}
+      {/* Detach / delete confirmation */}
       <Dialog
-        open={detachId !== null}
-        onOpenChange={(open) => !open && setDetachId(null)}
+        open={confirm !== null}
+        onOpenChange={(open) => !open && setConfirm(null)}
       >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>
-              {t('participations:timeline.detach.confirmTitle')}
+              {t(`participations:timeline.${confirmMode}.confirmTitle`)}
             </DialogTitle>
           </DialogHeader>
           <p className="text-muted-foreground text-sm">
-            {t('participations:timeline.detach.confirmBody', {
+            {t(`participations:timeline.${confirmMode}.confirmBody`, {
               company: company.name,
             })}
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDetachId(null)}>
+            <Button variant="outline" onClick={() => setConfirm(null)}>
               {t('common:actions.cancel')}
             </Button>
-            <Button variant="destructive" onClick={() => void handleDetach()}>
-              {t('participations:timeline.detach.confirm')}
+            <Button variant="destructive" onClick={() => void handleConfirm()}>
+              {t(`participations:timeline.${confirmMode}.confirm`)}
             </Button>
           </DialogFooter>
         </DialogContent>

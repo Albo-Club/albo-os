@@ -109,6 +109,17 @@ autres participations rattachées au même report gardent le leur, et le mail
 d'origine reste dans la file : il n'y a plus qu'à le rattacher là où il
 devait aller.
 
+**Quand un report n'a rien à faire nulle part** — un test, un doublon, une
+pièce envoyée par erreur — il se **supprime**, depuis la fiche société en
+ouvrant le report : « Supprimer définitivement ». Le report quitte la fiche
+comme au détachement, mais cette fois les fichiers partent avec lui : ils
+sont effacés du stockage dès que plus aucune participation ne s'en sert, et
+le mail d'origine perd alors sa pièce jointe. Il reste listé dans les
+Rapports entrants, avec le nom et le poids du fichier, mais il n'y a plus
+rien à télécharger ni à retraiter. C'est la différence entre les deux
+gestes : **détacher** répare un mauvais rangement et laisse tout rejouable,
+**supprimer** fait vraiment disparaître le fichier.
+
 ### 3. Lecture du contenu — toutes les sources
 
 Chaque élément du mail est lu, selon son type :

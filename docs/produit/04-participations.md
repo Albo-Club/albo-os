@@ -151,6 +151,13 @@ La colonne principale, dans l'ordre de lecture :
     « Analyser et ajouter ». Le type reste modifiable dans la fenêtre : en
     choisir un autre range simplement le fichier dans les documents, sans
     analyse.
+  - **Deux façons de retirer un rapport**, au bas de son détail.
+    « Détacher de cette participation » le retire de cette fiche seulement,
+    en gardant les fichiers et le mail d'origine rejouable — c'est le geste
+    du mauvais rangement. « Supprimer définitivement » fait la même chose et
+    emporte les fichiers : ils sont effacés dès qu'aucune autre participation
+    ne s'en sert, et le mail d'origine perd sa pièce jointe. Détail des deux
+    dans [Reports par email](17-reports-par-email.md).
 
 Les documents, à droite, sous l'identité. Ce sont deux choses différentes :
 un rapport est un **journal**, qu'on lit dans l'ordre, une fois, quand il
