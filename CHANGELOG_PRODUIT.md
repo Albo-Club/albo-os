@@ -23,6 +23,56 @@ bas de page.
 
 ---
 
+## v1.213.1 — 02/09/2026 à 18:16 — Le contenu des fenêtres reste dans le cadre
+
+Quand une fenêtre s'ouvrait par-dessus la page — ajouter des documents,
+confirmer une suppression, éditer une ligne — un texte long débordait du
+cadre : les noms de fichiers passaient par-dessus le bord, et le bouton de
+validation se retrouvait carrément en dehors de la boîte, coupé. Le contenu
+ne collait plus à la marge de la fenêtre, et rien ne signalait ce qui était
+tronqué.
+
+C'est corrigé à la source, pour toutes les fenêtres et toutes les cartes de
+l'app d'un coup : un nom trop long est désormais abrégé avec des points de
+suspension (le nom complet apparaît au survol), les boutons restent à leur
+place, et un mot sans espace — nom de fichier, adresse e-mail, lien — passe
+à la ligne au lieu de sortir du cadre. Le nom de la société dans la colonne
+« Org » de la liste des participations, qui pouvait mordre sur la colonne
+voisine, est abrégé de la même façon.
+
+> **🔧 Notes techniques**
+>
+> - Cause racine : `DialogContent`, `AlertDialogContent` et `CardHeader`
+>   (`src/components/ui/`) sont des `grid`. Un enfant de grille a
+>   `min-width: auto` = sa taille min-content, donc un fragment insécable
+>   gonfle la colonne implicite au-delà du `max-w-*` du conteneur — tous les
+>   enfants suivent, `DialogFooter` compris, d'où les boutons hors cadre.
+> - `truncate` ne corrigeait rien : son `overflow: hidden` annule la taille
+>   minimale **automatique** d'un item flex/grid, pas la contribution
+>   min-content qui dimensionne la piste. D'où les passes précédentes sans
+>   effet. Correctif : `[&>*]:min-w-0` sur les trois primitives — les
+>   `truncate` déjà posés dans les 46 appelants deviennent effectifs.
+> - Second mode d'échec, indépendant : un mot sans opportunité de coupure
+>   reste plus large que la boîte. Filet global `overflow-wrap: break-word`
+>   sur `body` (`src/styles/app.css`), qui ne se déclenche que si le mot ne
+>   tient pas seul sur une ligne.
+> - `ParticipationsTable.tsx` : badge org de la colonne à largeur fixe passé
+>   en `max-w-full` + `title` + `<span className="truncate">`, selon
+>   l'anti-pattern déjà documenté dans `CLAUDE.md`. Même borne sur le badge
+>   **Secteur** de la même table, dont le débordement était jusqu'ici assumé
+>   au commentaire, et sur les deux grilles de `alert.tsx`.
+> - Non-régression : `tests/uiLayoutGuards.test.ts` balaie
+>   `src/components/ui/*.tsx` et exige la borne sur tout conteneur en `grid`
+>   (table `EXEMPT` motivée pour ceux qui n'ont rien à borner). Nécessaire
+>   parce que ces fichiers sont **générés** — un `shadcn add` réécrit la
+>   primitive et efface la classe en silence.
+> - Vérifié en rendant le markup réel de `AddFilesDialog` avec le CSS buildé
+>   dans Chromium headless, avec et sans le patch. Détail du piège dans
+>   `KNOWN_ISSUES.md` § « `truncate` ne retient rien dans une boîte en
+>   `grid` » ; candidat template ajouté à `TEMPLATE_SYNC.md`.
+
+---
+
 ## v1.213.0 — 02/09/2026 à 18:03 — Un email de reporting se supprime pour de bon
 
 La suppression d'un rapport, livrée ce matin, ne servait à rien sur un mail
