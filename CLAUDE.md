@@ -745,6 +745,20 @@ export const remove = mutation({
   le code qui suppose la présence continue de compiler, et casse à
   l'exécution sur la première ligne sans valeur. L'ordre est : auditer,
   rendre tolérant, relâcher, tester. Jamais l'inverse, jamais « en passant ».
+- ❌ Accrocher un déclencheur métier (analyse, notification, alerte) à une
+  intégration **pull** sans lui avoir d'abord donné une mémoire du « déjà vu ».
+  Un webhook est un **événement** — il arrive une fois, sa nouveauté est
+  intrinsèque. Un pull est une **photo** : `replaceCommunicationsCache` (VASCO)
+  purge et réinsère tout le lot, donc après le swap chaque ligne porte le même
+  `fetchedAt` et plus rien ne dit ce qui vient d'arriver. Un `scheduler.runAfter`
+  posé après le refresh ne laisse que « tout rejouer à chaque tick » ou « ne
+  jamais rien rejouer ». Le diff se fait **dans** le remplacement, avant le
+  delete, et c'est lui qui décide qui part en aval — cf. `KNOWN_ISSUES.md`
+  « Communications → AI synthesis » (ALB-238). Corollaire : quand un rattachement
+  se fait **depuis** ce cache (on choisit dans une liste déjà remplie), le
+  backlog de l'entité est déjà « connu » à l'instant du lien — la mutation de
+  rattachement doit porter son propre déclenchement, sinon l'entité attend la
+  prochaine publication.
 - ❌ Une nouvelle connexion à une plateforme externe avec sa table et son CRUD
   dédiés. Déclarer la plateforme dans le registre `convex/lib/connectors.ts`
   et passer par le noyau commun `convex/connections.ts` (table générique

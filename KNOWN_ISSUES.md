@@ -4049,14 +4049,43 @@ new is persisted — the result still lands in `companyIntelligence`).
   synthesis still runs on the company/report context alone. The `no_data` guard
   is evaluated on (context **OR** comms), so a bare Parallel entity with only
   communications is still analyzed.
-- **Trigger = report mail OR the manual button, never automatic on link.** The
-  synthesis auto-runs **only** from the report-mail ingestion fan-out
-  (`reportStore`). Parallel/VASCO entities receive no mail report, so they are
-  never auto-analyzed. The on-demand path is the public mutation
-  `intelligence.rerun` (org-member-guarded, "Relancer l'analyse" button) — it
-  sets `processing` and schedules `runAnalysis`. **By design there is no
-  auto-trigger** on `companies.setVascoLink` and no cron; the button is the only
-  new trigger.
+- **Un pull est une photo, pas un événement — c'est ce qui bloquait le
+  déclenchement automatique (ALB-238).** Jusqu'en 09/2026 la synthèse ne partait
+  qu'en bout de pipeline mail (`reportStore.run`) : un reporting publié sur le
+  portail était mis en cache, affiché, et jamais analysé. Le réflexe — « ajouter
+  un `scheduler.runAfter` après le refresh » — ne marche pas, et la raison est
+  structurelle : `replaceCommunicationsCache` **purge puis réinsère** tout le
+  lot de la paire (org, clientSlug), donc après le swap toutes les lignes
+  portent le **même `fetchedAt`** et plus rien ne distingue une communication
+  publiée hier d'une publiée l'an dernier. Brancher naïvement le fil ne laissait
+  que deux issues, toutes deux fausses : réanalyser **toutes** les entités liées
+  à chaque tick de cron (48 h × N appels LLM + recherche web), ou ne rien
+  réanalyser.
+  La détection vit donc **dans** le remplacement, seul moment où « nouveau » est
+  connaissable : les `communicationId` sur le point d'être supprimés sont lus
+  **avant** le delete, le lot pullé est diffé contre eux, et
+  `scheduleAnalysisForIssuers` planifie **un `intelligence.runAnalysis` par
+  entité** liée à un émetteur porteur d'au moins une communication nouvelle.
+  Sans mail (personne n'a rien transféré, il n'y a personne à qui répondre) —
+  et donc **pas** `runAnalysisBatch`, dont la boucle séquentielle n'existe que
+  pour envoyer l'accusé après ses analyses : un premier remplissage à N entités
+  y ferait tenir N appels LLM dans une seule action.
+  Deux propriétés à ne pas casser : un pull en échec **n'atteint jamais** le
+  remplacement (l'appelant garde le cache précédent), donc une panne du portail
+  ne peut pas simuler une vague d'arrivées ; et la mémoire est **par
+  clientSlug**, sinon un second portail masquerait une arrivée en réutilisant un
+  id. Au tout premier remplissage, tout est neuf — c'est le bootstrap assumé
+  d'une org qui n'a jamais pullé, borné par son nombre d'entités liées.
+- **Le lien est son propre déclencheur.** `companies.setVascoLink` planifie
+  aussi `runAnalysis`. Ce n'est pas une ceinture-bretelles : on rattache une
+  entité **depuis le cache** (les émetteurs se choisissent dans une liste que le
+  cron a déjà remplie), donc au moment du lien tout son historique est déjà
+  « connu » et la détection ci-dessus ne se déclenchera **jamais** sur son
+  backlog. Sans ce second fil, une entité fraîchement rattachée attendrait la
+  prochaine publication de Parallel — potentiellement des mois.
+- **Chemin manuel.** `intelligence.rerun` (mutation publique org-member-guarded,
+  bouton « Relancer l'analyse ») reste utile pour re-scorer après une édition à
+  la main ou rejouer une synthèse en échec.
 
 ### Communications → entity pitch (one-liner + résumé)
 

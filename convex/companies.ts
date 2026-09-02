@@ -389,13 +389,22 @@ export const setVascoLink = mutation({
         : { vascoClientSlug: undefined, vascoIssuerId: undefined }
     await ctx.db.patch('companies', id, link)
     // Newly linked to a Parallel SPV → (re)generate its operation pitch from the
-    // VASCO communications (fire-and-forget; overwrites the domain-based one).
+    // VASCO communications (fire-and-forget; overwrites the domain-based one),
+    // and run the AI synthesis, which now has the issuer's communications to
+    // read. The link is made FROM the cache (issuers are picked in a list the
+    // cron already filled), so every communication is by then "already known"
+    // and the arrival detection in `vasco.replaceCommunicationsCache` will
+    // never fire for this entity's backlog — the link is its own trigger.
     if (clientSlug && issuerId) {
       await ctx.scheduler.runAfter(
         0,
         internal.companyEnrichment.enrichFromVasco,
         { companyId: id },
       )
+      await ctx.scheduler.runAfter(0, internal.intelligence.runAnalysis, {
+        companyId: id,
+        orgId: company.orgId,
+      })
     }
     return id
   },
