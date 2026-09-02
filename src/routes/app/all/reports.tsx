@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
-import { Check, ChevronsUpDown, X } from 'lucide-react'
+import { Check, ChevronsUpDown, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '../../../../convex/_generated/api'
@@ -187,13 +187,17 @@ function InboundReports() {
   const reprocess = useConvexMutation(api.reportInbox.reprocess)
   const reject = useConvexMutation(api.reportInbox.reject)
   const detachCompany = useConvexMutation(api.reportInbox.detachCompany)
+  const deleteReport = useConvexMutation(api.reportInbox.deleteReport)
 
   const [assignFor, setAssignFor] = useState<Id<'inboundEmails'> | null>(null)
   const [targetId, setTargetId] = useState<string>('')
   const [alsoIds, setAlsoIds] = useState<Array<string>>([])
-  const [detachFor, setDetachFor] = useState<{
+  // Both ways out of a wrongly filed report share one dialog: detaching keeps
+  // the files (this email stays replayable), deleting takes them.
+  const [confirmFor, setConfirmFor] = useState<{
     reportId: Id<'companyReports'>
     name: string
+    mode: 'detach' | 'delete'
   } | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -218,6 +222,11 @@ function InboundReports() {
       )
       .sort((a, b) => nameProximity(b.name, target.name) - nameProximity(a.name, target.name))
   }, [targets, targetId])
+
+  // The dialog stays mounted while it closes — keep the copy stable until it
+  // is gone rather than flipping mid-animation.
+  const removalDialog =
+    confirmFor?.mode === 'delete' ? 'deleteDialog' : 'detachDialog'
 
   const closeAssign = () => {
     setAssignFor(null)
@@ -247,13 +256,14 @@ function InboundReports() {
     closeAssign()
   }
 
-  const confirmDetach = async () => {
-    if (!detachFor) return
+  const confirmRemoval = async () => {
+    if (!confirmFor) return
+    const mutate = confirmFor.mode === 'detach' ? detachCompany : deleteReport
     await run(
-      () => detachCompany({ reportId: detachFor.reportId }),
-      'toasts.detached',
+      () => mutate({ reportId: confirmFor.reportId }),
+      confirmFor.mode === 'detach' ? 'toasts.detached' : 'toasts.deleted',
     )
-    setDetachFor(null)
+    setConfirmFor(null)
   }
 
   return (
@@ -318,26 +328,50 @@ function InboundReports() {
                           >
                             <span className="truncate">{m.name}</span>
                             {/* Only an entity actually carrying a report can
-                                be detached — before storage there is nothing
-                                on the fiche to take back. */}
+                                be detached or deleted — before storage there
+                                is nothing on the fiche to take back. The cross
+                                keeps the files, the bin takes them. */}
                             {m.reportId ? (
-                              <button
-                                type="button"
-                                disabled={busy}
-                                aria-label={t('actions.detach', {
-                                  name: m.name,
-                                })}
-                                title={t('actions.detach', { name: m.name })}
-                                className="hover:text-destructive -mr-1 cursor-pointer disabled:cursor-default"
-                                onClick={() =>
-                                  setDetachFor({
-                                    reportId: m.reportId!,
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  aria-label={t('actions.detach', {
                                     name: m.name,
-                                  })
-                                }
-                              >
-                                <X className="size-3" />
-                              </button>
+                                  })}
+                                  title={t('actions.detach', { name: m.name })}
+                                  className="hover:text-destructive cursor-pointer disabled:cursor-default"
+                                  onClick={() =>
+                                    setConfirmFor({
+                                      reportId: m.reportId!,
+                                      name: m.name,
+                                      mode: 'detach',
+                                    })
+                                  }
+                                >
+                                  <X className="size-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  aria-label={t('actions.deleteReport', {
+                                    name: m.name,
+                                  })}
+                                  title={t('actions.deleteReport', {
+                                    name: m.name,
+                                  })}
+                                  className="hover:text-destructive -mr-1 cursor-pointer disabled:cursor-default"
+                                  onClick={() =>
+                                    setConfirmFor({
+                                      reportId: m.reportId!,
+                                      name: m.name,
+                                      mode: 'delete',
+                                    })
+                                  }
+                                >
+                                  <Trash2 className="size-3" />
+                                </button>
+                              </>
                             ) : null}
                           </Badge>
                         ))}
@@ -544,28 +578,28 @@ function InboundReports() {
       </Dialog>
 
       <Dialog
-        open={detachFor !== null}
+        open={confirmFor !== null}
         onOpenChange={(open) => {
-          if (!open) setDetachFor(null)
+          if (!open) setConfirmFor(null)
         }}
       >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>{t('detachDialog.title')}</DialogTitle>
+            <DialogTitle>{t(`${removalDialog}.title`)}</DialogTitle>
             <DialogDescription>
-              {t('detachDialog.description', { name: detachFor?.name ?? '' })}
+              {t(`${removalDialog}.description`, { name: confirmFor?.name ?? '' })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDetachFor(null)}>
-              {t('detachDialog.cancel')}
+            <Button variant="outline" onClick={() => setConfirmFor(null)}>
+              {t(`${removalDialog}.cancel`)}
             </Button>
             <Button
               variant="destructive"
               disabled={busy}
-              onClick={() => void confirmDetach()}
+              onClick={() => void confirmRemoval()}
             >
-              {t('detachDialog.confirm')}
+              {t(`${removalDialog}.confirm`)}
             </Button>
           </DialogFooter>
         </DialogContent>

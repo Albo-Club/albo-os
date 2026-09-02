@@ -1,15 +1,19 @@
 /// <reference types="vite/client" />
 /**
- * Regression: detaching a report from ONE entity
- * (convex/reportInbox.ts:detachCompany).
+ * Regression: removing a report from ONE entity — both ways out
+ * (convex/reportInbox.ts:detachCompany and :deleteReport).
  *
  * A report emailed once lands on every entity representing the participation
  * (multi-org fan-out), and a manual assignment can put it on an entity it does
- * not concern. Detaching has to undo everything the storage wrote for THAT
+ * not concern. Removing it has to undo everything the storage wrote for THAT
  * entity — report row, document rows, sourced KPI snapshots, synthesis
- * pointer — while leaving the other entities' copies and the shared storage
- * blob untouched, and correcting the queue row so a replay does not put it
- * back.
+ * pointer — while leaving the other entities' copies untouched, and
+ * correcting the queue row so a replay does not put it back.
+ *
+ * The two differ on the file only (ALB-240): detaching keeps it, deleting
+ * frees it once no `documents` row points at it any more — the source email
+ * losing its attachment along the way. `documents:remove` obeys the same
+ * count, which is what stops one fiche from blanking the files of the others.
  */
 import { describe, expect, test } from 'vitest'
 import { api, internal } from './_generated/api'
@@ -203,5 +207,126 @@ describe('detachCompany', () => {
       outsider.as.mutation(api.reportInbox.detachCompany, { reportId: s.wrongReport }),
       'not_a_member',
     )
+  })
+})
+
+describe('deleteReport', () => {
+  test('removes the report footprint on that entity only', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'benjamin@test.dev')
+    const s = await setupFanOut(t, user)
+
+    await user.as.mutation(api.reportInbox.deleteReport, { reportId: s.wrongReport })
+
+    const state = await t.run(async (ctx) => ({
+      reports: await ctx.db.query('companyReports').collect(),
+      documents: await ctx.db.query('documents').collect(),
+      snapshots: await ctx.db.query('kpiSnapshots').collect(),
+    }))
+    expect(state.reports.map((r) => r._id)).toEqual([s.rightReport])
+    expect(state.documents.map((d) => d.companyId)).toEqual([s.right])
+    expect(state.snapshots.map((k) => k.companyId)).toEqual([s.right])
+  })
+
+  test('keeps the file while another entity still points at it', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'benjamin@test.dev')
+    const s = await setupFanOut(t, user)
+
+    await user.as.mutation(api.reportInbox.deleteReport, { reportId: s.wrongReport })
+
+    // The right entity's document row still backs the blob — deleting the
+    // report of the wrong one must not blank its file.
+    const state = await t.run(async (ctx) => ({
+      hasBlob: (await ctx.storage.get(s.storageId)) !== null,
+      row: await ctx.db.get('inboundEmails', s.emailId),
+    }))
+    expect(state.hasBlob).toBe(true)
+    expect(state.row?.attachments[0]?.storageId).toBe(s.storageId)
+  })
+
+  test('frees the file, its text and the mail attachment with the last row', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'benjamin@test.dev')
+    const s = await setupFanOut(t, user)
+    // The extracted text is keyed by the blob, not by the row pointing at it.
+    await t.run(async (ctx) => {
+      await ctx.db.insert('documentTexts', {
+        storageId: s.storageId,
+        text: 'contenu extrait',
+        truncated: false,
+      })
+    })
+
+    await user.as.mutation(api.reportInbox.deleteReport, { reportId: s.wrongReport })
+    await user.as.mutation(api.reportInbox.deleteReport, { reportId: s.rightReport })
+
+    const state = await t.run(async (ctx) => ({
+      hasBlob: (await ctx.storage.get(s.storageId)) !== null,
+      texts: await ctx.db.query('documentTexts').collect(),
+      row: await ctx.db.get('inboundEmails', s.emailId),
+    }))
+    expect(state.hasBlob).toBe(false)
+    expect(state.texts).toEqual([])
+    // The queue row survives, its attachment keeps its name and loses the file.
+    expect(state.row?.attachments[0]?.filename).toBe('update.pdf')
+    expect(state.row?.attachments[0]?.storageId).toBeUndefined()
+  })
+
+  test('refuses a report of an org the caller does not belong to', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'benjamin@test.dev')
+    const outsider = await createUser(t, 'outsider@test.dev')
+    const s = await setupFanOut(t, user)
+
+    await expectConvexError(
+      outsider.as.mutation(api.reportInbox.deleteReport, { reportId: s.wrongReport }),
+      'not_a_member',
+    )
+  })
+})
+
+describe('documents:remove', () => {
+  test('keeps a blob another fan-out row still points at', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'benjamin@test.dev')
+    const s = await setupFanOut(t, user)
+    const wrongDoc = await t.run(async (ctx) => {
+      const rows = await ctx.db
+        .query('documents')
+        .withIndex('by_report', (q) => q.eq('reportId', s.wrongReport))
+        .collect()
+      return rows[0]._id
+    })
+
+    await user.as.mutation(api.documents.remove, { documentId: wrongDoc })
+
+    // Deleting one fiche's row used to delete the file itself, blanking the
+    // download of every other entity of the fan-out.
+    const hasBlob = await t.run(
+      async (ctx) => (await ctx.storage.get(s.storageId)) !== null,
+    )
+    expect(hasBlob).toBe(true)
+  })
+
+  test('frees the blob and the mail attachment with the last row', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'benjamin@test.dev')
+    const s = await setupFanOut(t, user)
+    const docIds = await t.run(async (ctx) => {
+      const rows = await ctx.db.query('documents').collect()
+      return rows.map((d) => d._id)
+    })
+
+    for (const documentId of docIds) {
+      await user.as.mutation(api.documents.remove, { documentId })
+    }
+
+    const state = await t.run(async (ctx) => ({
+      hasBlob: (await ctx.storage.get(s.storageId)) !== null,
+      row: await ctx.db.get('inboundEmails', s.emailId),
+    }))
+    expect(state.hasBlob).toBe(false)
+    expect(state.row?.attachments[0]?.storageId).toBeUndefined()
   })
 })
