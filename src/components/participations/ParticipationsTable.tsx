@@ -794,7 +794,13 @@ function CompanyTableRow({
       </TableCell>
       {showOrg && (
         <TableCell>
-          {row.org ? <Badge variant="outline">{row.org.name}</Badge> : '—'}
+          {row.org ? (
+            <Badge variant="outline" className="max-w-full" title={row.org.name}>
+              <span className="truncate">{row.org.name}</span>
+            </Badge>
+          ) : (
+            '—'
+          )}
         </TableCell>
       )}
       <TableCell>

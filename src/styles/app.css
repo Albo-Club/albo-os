@@ -17,6 +17,15 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+  /* Safety net against the overflow class of bug: a token with no break
+     opportunity (a file name, a mailbox, a URL) is wider than the box that
+     holds it, so it spills over the padding — and app-wide hidden
+     scrollbars mean nothing signals it. `break-word` only kicks in when the
+     word does not fit on a line of its own, so ordinary text is untouched.
+     It does NOT replace a `truncate` where one line is the intent. */
+  body {
+    overflow-wrap: break-word;
+  }
   .using-mouse * {
     outline: none !important;
   }

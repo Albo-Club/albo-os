@@ -677,6 +677,19 @@ export const remove = mutation({
   has no built-in height cap, so tall content overflows the viewport with no
   way to reach the lower fields or the footer actions. Pattern already in
   `deals.$dealId.tsx`, `RoyaltiesPanel.tsx`, `CompanyReportsSection.tsx`.
+- ❌ Répondre à un contenu qui **sort d'une boîte en largeur** par un
+  `truncate` de plus sur le texte. `DialogContent`, `AlertDialogContent` et
+  `CardHeader` sont des **grilles** : leurs enfants ont `min-width: auto`,
+  donc un fragment insécable (nom de fichier, mail, URL) gonfle la colonne
+  au-delà du `max-w-*` et emmène tout le contenu — boutons du pied compris —
+  hors du padding. `truncate` n'y peut rien : son `overflow: hidden` n'annule
+  pas la contribution min-content qui dimensionne la piste. La borne est déjà
+  posée à la source (`[&>*]:min-w-0` sur les trois primitives) et un filet
+  global (`overflow-wrap: break-word` sur `body`) coupe les mots trop longs :
+  toute nouvelle **grille** qui reçoit de la donnée utilisateur doit porter la
+  même borne. Signature du symptôme : texte coupé **sans ellipse** et boutons
+  qui bougent avec — cf. `KNOWN_ISSUES.md` « `truncate` ne retient rien dans
+  une boîte en `grid` ».
 - ❌ A `Badge` (or a `Button`) carrying **unbounded user data** — a company or
   org name, a deal label, a document title, an email — without a `max-w-*`
   cap and a `truncate` on its text. Both components bake `shrink-0` and

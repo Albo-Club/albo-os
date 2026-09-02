@@ -5841,3 +5841,50 @@ fautif.
 ⚠️ Les autres gabarits du fichier (digest hebdo, relevé de mouvements)
 portent encore des `valign` nus. Ils n'ont pas montré le symptôme, mais ils
 y sont exposés.
+
+## `truncate` ne retient rien dans une boîte en `grid` (dialogs, cartes)
+
+Le contenu d'un dialog sortait de sa boîte : dans « Ajouter des documents »,
+les noms de fichiers se peignaient par-dessus le bord et le bouton
+« Ajouter » du pied se retrouvait **hors** du cadre blanc. Le réflexe —
+poser un `truncate` sur le texte — a été appliqué plusieurs fois, sans
+jamais rien changer. Voilà pourquoi.
+
+`DialogContent`, `AlertDialogContent` et `CardHeader` sont des **grilles**.
+Un enfant de grille a `min-width: auto`, c'est-à-dire *sa taille min-content*
+— la largeur de son plus long fragment insécable. Un nom de fichier de 70
+caractères gonfle donc la colonne implicite **au-delà** du `max-w-*` de la
+boîte, et comme tous les enfants partagent cette colonne, le pied de dialog
+part avec : son `justify-end` s'aligne sur une colonne plus large que le
+cadre. Ce n'est pas « du texte qui dépasse », c'est **la colonne** qui a
+grandi.
+
+`truncate` ne corrige pas ça. Son `overflow: hidden` annule la *taille
+minimale automatique* d'un item flex/grid, mais **pas la contribution
+min-content** qui dimensionne la piste : un `<li class="truncate">` mesure
+toujours son texte entier pour la grille parente. Deux symptômes qui
+signent le diagnostic : le texte est coupé **net, sans ellipse** (la
+troncature n'a jamais eu lieu, c'est l'`overflow-x` de la boîte qui rogne),
+et les **boutons** bougent avec lui.
+
+Le correctif est sur la primitive, une fois pour toutes : `[&>*]:min-w-0`
+sur les trois conteneurs de `src/components/ui/`. La piste ne peut plus
+être gonflée, la boîte garde son `p-6`, et les `truncate` déjà posés dans
+les 46 appelants se mettent enfin à tronquer.
+
+Deuxième mode d'échec, indépendant : un **mot sans opportunité de coupure**
+(nom de fichier en `snake_case`, adresse mail, URL) reste plus large que la
+boîte même une fois la piste bornée, et déborde du padding. Le filet est
+global — `overflow-wrap: break-word` sur `body` dans `src/styles/app.css`.
+Il ne se déclenche que lorsque le mot ne tient pas seul sur une ligne, donc
+le texte courant est intact ; il ne remplace **pas** un `truncate` là où
+l'intention est de rester sur une ligne.
+
+⚠️ Les barres de défilement sont masquées partout dans l'app (même fichier),
+donc le débordement horizontal ne se signale par rien : ni ellipse, ni
+scrollbar. Un contenu peut être coupé sans qu'aucun indice ne le dise —
+raison de plus pour borner à la source plutôt que de compter sur le rognage.
+
+Reproduction hors app : ouvrir un `DialogContent` (classes réelles, CSS
+buildé) avec deux noms de fichiers de 70 caractères, une fois avec et une
+fois sans `[&>*]:min-w-0`. Sans le patch, le bouton du pied sort du cadre.
