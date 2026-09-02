@@ -23,6 +23,68 @@ bas de page.
 
 ---
 
+## v1.210.0 — 02/09/2026 à 15:46 — Déposer un document ne demande plus rien
+
+Le formulaire d'ajout d'un document posait quatre questions — type, période,
+titre, deal — sur un fichier que l'app allait de toute façon lire quelques
+secondes plus tard. Il n'en pose plus aucune.
+
+**Déposer.** La fenêtre se réduit à « choisir des fichiers », plusieurs d'un
+coup, sur une société comme sur un prêt, une garantie ou un bien. Chaque
+fichier est ensuite lu, et **se classe tout seul** : son type, et sa date
+quand le document la porte, se remplissent quelques secondes plus tard, sans
+recharger la page. Chacun selon son propre contenu — déposer un pacte, un
+business plan et un KBIS d'un seul geste range les trois correctement, là où
+l'ancien formulaire appliquait un type unique à tout le lot.
+
+Le titre reste le nom du fichier : c'est vous qui l'avez nommé. Un classement
+qui tombe à côté se corrige au crayon, sur la ligne du document — et une
+correction faite à la main n'est jamais réécrite. Un fichier illisible (scan
+sans texte, format non reconnu) reste simplement en « Autre ».
+
+**Ajouter un rapport** garde sa porte et son circuit d'analyse, et perd lui
+aussi son sélecteur : les fichiers, une note de contexte si elle aide
+l'analyse, c'est tout. Le bouton disparaît en revanche des entités du
+groupe — l'analyse n'a jamais su lire autre chose qu'une société du
+portefeuille, le sélecteur servait jusqu'ici de rattrapage silencieux.
+
+**Deux choses disparaissent.** Le rattachement d'un document à un deal ne se
+crée plus au dépôt : les documents déjà rattachés gardent leur badge et leur
+lien vers la fiche du deal, les nouveaux restent au niveau de l'entité. Et un
+reporting ne peut plus être déposé par la carte Documents : il passe par
+« Ajouter un rapport », seule porte qui déclenche l'analyse.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `convex/documentsClassify.ts` : `run` (action) appelle le modèle
+>   sur le texte déjà extrait (fenêtre 12 000 car.) et rend `{ kind, period }` ;
+>   `apply` (mutation) arbitre. Branché en fin de `documentsExtract.run`,
+>   uniquement sur un état `extracted` — une lecture ratée ne coûte aucun appel.
+> - Deux garde-fous côté code, pas côté prompt : le `kind` n'est accepté que
+>   dans le vocabulaire de l'**ancre** (`VOCABULARIES`, société / prêt /
+>   garantie / bien), et le patch ne s'applique qu'à une ligne encore dans son
+>   état de dépôt (`source: 'upload'`, `kind: 'other'`, pas de `period`) — un
+>   type choisi par un humain n'est jamais écrasé. `reporting` n'est dans aucun
+>   vocabulaire : c'est un aiguillage vers `reportInbox.createFromUpload`, pas
+>   une étiquette. Ré-indexation sémantique quand le type change.
+> - Front : `AddDocumentDialog` est remplacé par deux composants —
+>   `documents/AddFilesDialog.tsx` (dépôt nu, partagé par la carte Documents
+>   d'une société **et** par `DocumentsSection`, qui passe donc au multi-fichiers)
+>   et `companies/AddReportDialog.tsx` (fichiers + note, pipeline d'analyse,
+>   affiché seulement si `company.kind === 'portfolio'`). `DocumentAnchor` et
+>   `anchorArgs` déménagent dans `AddFilesDialog`, augmentés du cas `company`.
+> - Orphelins retirés : `DealSelect` / `DealOption` / `MAX_BYTES` de
+>   `documentFields.tsx`, la prop `deals` de `CompanyDocumentsCard` et
+>   `CompanyReportsSection`, et les clés i18n correspondantes.
+> - `convex/regression.docClassify.test.ts` (7 tests) fixe l'arbitrage :
+>   vocabulaire par ancre, refus de `reporting`, non-écrasement d'un choix
+>   humain, document sans texte hors cible, et `parsePeriod` qui refuse tout
+>   ce qui n'est pas `AAAA-MM[-JJ]`.
+> - ⚠️ `convex/_generated/api.d.ts` a été complété **à la main** (deux lignes
+>   pour le nouveau module) : la session n'avait pas de déploiement Convex pour
+>   lancer `convex codegen`. Le prochain `convex dev`/`deploy` régénère à
+>   l'identique.
+
 ## v1.209.3 — 02/09/2026 à 15:19 — La note IA suit les corrections et les retraits
 
 Deux situations laissaient la synthèse d'une société décrire autre chose que

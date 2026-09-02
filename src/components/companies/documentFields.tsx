@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next'
 
 import type { api } from '../../../convex/_generated/api'
 import type { FunctionArgs } from 'convex/server'
-import type { Id } from '../../../convex/_generated/dataModel'
 import {
   Select,
   SelectContent,
@@ -14,13 +13,11 @@ import {
 } from '~/components/ui/select'
 
 /**
- * The pieces both document doors share: the kind vocabulary, the date
- * conversions, and the two selects. They live here rather than in one of the
- * two surfaces because the add dialog and the documents card each need them,
- * and neither owns the other.
+ * The pieces the company documents surface shares between its list and its
+ * correction dialog: the kind vocabulary, the date conversions, the kind
+ * select. Filing a document asks for none of them (`AddFilesDialog`) — they
+ * only serve reading and correcting.
  */
-
-export const MAX_BYTES = 20 * 1024 * 1024 // project storage cap (cf. convex/files.ts)
 
 /** Kinds offered on an entity, then the deal-specific ones. `other` sits in
  * the first group only — it is the same value in the schema. */
@@ -39,14 +36,6 @@ export const KIND_ORDER = [
 ] as ReadonlyArray<string>
 
 export type DocKind = FunctionArgs<typeof api.documents.create>['kind']
-
-/** A deal, reduced to what the picker and the badge need. `name` is optional:
- * the enriched deal rows leave it undefined, the document query nulls it. */
-export type DealOption = {
-  _id: Id<'deals'>
-  name?: string | null
-  instrumentKind: string
-}
 
 /** Deal kinds carry a document date, entity kinds a covered period. */
 export function isDealKind(kind: string): boolean {
@@ -113,35 +102,6 @@ export function KindSelect({
             </SelectItem>
           ))}
         </SelectGroup>
-      </SelectContent>
-    </Select>
-  )
-}
-
-export function DealSelect({
-  deals,
-  value,
-  onChange,
-}: {
-  deals: Array<DealOption>
-  value: string
-  onChange: (value: string) => void
-}) {
-  const { t } = useTranslation('participations')
-  const label = useDealLabel()
-
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="w-full">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="none">{t('documents.dealNone')}</SelectItem>
-        {deals.map((deal) => (
-          <SelectItem key={deal._id} value={deal._id}>
-            {label(deal)}
-          </SelectItem>
-        ))}
       </SelectContent>
     </Select>
   )

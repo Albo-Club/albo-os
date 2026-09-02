@@ -17,8 +17,7 @@ import type { ReactNode } from 'react'
 import type { FunctionReturnType } from 'convex/server'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import type { VascoCommunication } from '../../../convex/vasco'
-import type { DealOption } from '~/components/companies/documentFields'
-import { AddDocumentDialog } from '~/components/companies/AddDocumentDialog'
+import { AddReportDialog } from '~/components/companies/AddReportDialog'
 import {
   VascoCommunicationDialog,
   useIsoDate,
@@ -401,10 +400,8 @@ function UploadProgressLine({
 
 export function CompanyReportsSection({
   company,
-  deals,
 }: {
   company: Doc<'companies'>
-  deals: Array<DealOption>
 }) {
   const { t } = useTranslation(['participations', 'vasco', 'common'])
 
@@ -500,10 +497,15 @@ export function CompanyReportsSection({
           </Button>
         )}
 
-        <Button size="sm" onClick={() => setAddOpen(true)}>
-          <Plus className="size-4" />
-          {t('participations:timeline.add.action')}
-        </Button>
+        {/* The pipeline only analyses a portfolio company (`createFromUpload`
+            refuses anything else), so the door is not offered elsewhere — a
+            group entity files its documents in the identity panel. */}
+        {company.kind === 'portfolio' && (
+          <Button size="sm" onClick={() => setAddOpen(true)}>
+            <Plus className="size-4" />
+            {t('participations:timeline.add.action')}
+          </Button>
+        )}
       </div>
 
       {pending?.map((row) => (
@@ -543,10 +545,8 @@ export function CompanyReportsSection({
         </div>
       )}
 
-      <AddDocumentDialog
-        company={company}
-        deals={deals}
-        defaultKind="reporting"
+      <AddReportDialog
+        companyId={company._id}
         open={addOpen}
         onClose={() => setAddOpen(false)}
       />

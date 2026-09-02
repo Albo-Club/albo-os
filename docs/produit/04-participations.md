@@ -148,21 +148,20 @@ La colonne principale, dans l'ordre de lecture :
     VASCO). Les fichiers d'un rapport sont **repliés dedans** — ils ne
     prennent pas de ligne à part, et ne comptent pas non plus dans les
     documents de la société.
-  - **Le bouton « Ajouter un rapport »** ouvre la fenêtre de dépôt avec le
-    type **Reporting** déjà choisi : le fichier part dans le circuit
-    d'analyse (période, points clés, métriques, synthèse relancée — voir
-    [Reports par email](17-reports-par-email.md)) et le bouton dit
-    « Analyser et ajouter ». Le type reste modifiable dans la fenêtre : en
-    choisir un autre range simplement le fichier dans les documents, sans
-    analyse.
+  - **Le bouton « Ajouter un rapport »** ouvre une fenêtre qui ne demande que
+    les fichiers et, si on veut, une note de contexte : le lot part dans le
+    circuit d'analyse (période, points clés, métriques, synthèse relancée —
+    voir [Reports par email](17-reports-par-email.md)), qui nomme et date le
+    rapport lui-même. Le bouton dit « Analyser et ajouter ». Ce bouton
+    n'existe que sur une société du portefeuille : l'analyse ne sait pas lire
+    une entité du groupe, dont les pièces se déposent dans les documents.
 
 Les documents, à droite, sous l'identité. Ce sont deux choses différentes :
 un rapport est un **journal**, qu'on lit dans l'ordre, une fois, quand il
 arrive ; un document est un **coffre**, qu'on cherche par nature, longtemps
 après, parce qu'il faut signer ou voter. La carte **Documents** du panneau
 d'identité porte le coffre : le nombre total, les **cinq plus récents** (titre,
-type, date), et un bouton **+** qui ouvre la fenêtre de dépôt — avec, cette
-fois, un type de document par défaut plutôt que le circuit d'analyse. Un clic
+type, date), et un bouton **+** qui ouvre la fenêtre de dépôt. Un clic
 sur une ligne ouvre le fichier.
 
 - **« Voir les N documents »** ouvre le **tiroir** latéral, la bibliothèque
@@ -180,11 +179,16 @@ sur une ligne ouvre le fichier.
 - **Les documents rattachés à un deal sont ici aussi**, badgés au nom du deal,
   le badge menant à sa [fiche](05-deals.md) : un pacte engage l'entité autant
   que le deal qui l'a produit, et il n'y a jamais qu'un seul fichier stocké.
-  Le rattachement est facultatif, proposé à l'ajout ; sans lui, le document
-  reste au niveau de l'entité.
-- **Le dépôt accepte plusieurs fichiers d'un coup** : chacun garde son titre,
-  pré-rempli par le nom du fichier et modifiable, tandis que le type et la
-  date choisis s'appliquent à tout le lot. 20 Mo par fichier.
+  Ce rattachement n'est plus proposé au dépôt : les documents déjà rattachés
+  gardent leur badge, les nouveaux restent au niveau de l'entité.
+- **Le dépôt ne demande que les fichiers**, plusieurs d'un coup, 20 Mo
+  chacun. Ni type, ni date, ni titre à saisir : chaque fichier est lu après
+  le dépôt et **se classe tout seul** — son type et, quand le document la
+  porte, sa date se remplissent quelques secondes plus tard, chacun selon son
+  propre contenu. Le titre reste le nom du fichier. Un classement qui tombe à
+  côté se corrige au crayon, sur la ligne du document ; une correction faite
+  à la main n'est jamais réécrite. Un fichier illisible (scan sans texte,
+  format non reconnu) reste simplement en « Autre ».
 
 Le panneau d'identité, à droite. Il se présente comme une carte, au même
 style que la synthèse IA, et chaque section y est introduite par une petite

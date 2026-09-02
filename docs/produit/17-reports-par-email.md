@@ -269,17 +269,19 @@ elle-même sont rangés normalement.
 
 ## Ajouter un report à la main
 
-Sur la fiche d'une participation, le bouton **« Ajouter »** ouvre une
-fenêtre où choisir un ou plusieurs fichiers (PDF, Excel, image — 20 Mo par
-fichier). C'est le **type** qui décide de la suite : choisir **Reporting**
-lance le même circuit qu'un mail transféré, à partir de l'étape 3 — les
-étapes 1 et 2 n'ont pas lieu d'être puisque tu as choisi la société
-toi-même. Le bouton porte alors « Analyser et ajouter », et une note de
-contexte peut être jointe ; ni titre ni période ne sont demandés, c'est
-l'analyse qui les donne. Tout autre type (BP, juridique, pacte…) est un
-simple dépôt, sans analyse.
+Sur la fiche d'une participation, le bouton **« Ajouter un rapport »** ouvre
+une fenêtre où choisir un ou plusieurs fichiers (PDF, Excel, image — 20 Mo
+par fichier) et, si besoin, joindre une note de contexte. C'est tout ce
+qu'elle demande : le lot suit le même circuit qu'un mail transféré à partir
+de l'étape 3 — les étapes 1 et 2 n'ont pas lieu d'être puisque tu as choisi
+la société toi-même — et ni titre ni période ne sont demandés, c'est
+l'analyse qui les donne. Le bouton porte « Analyser et ajouter ».
 
-L'option n'existe que sur une **participation** : une entité du groupe n'a
+Une pièce qui n'est **pas** un rapport (BP, juridique, pacte…) ne passe pas
+par là : elle se dépose dans les documents de la société, où elle est classée
+toute seule (voir [Participations](04-participations.md)).
+
+Le bouton n'existe que sur une **participation** : une entité du groupe n'a
 pas de reporting investisseur à analyser.
 
 Le temps de l'analyse, une ligne « analyse en cours… » s'affiche en haut de
