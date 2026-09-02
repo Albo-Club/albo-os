@@ -377,10 +377,13 @@ export const runAnalysisBatch = internalAction({
 /**
  * Manually (re)trigger the AI synthesis for one entity. Public, org-member
  * guarded (same as `getByCompany`). Sets the row to `processing` so the
- * reactive UI flips immediately, then schedules `runAnalysis`. This is the
- * on-demand path: the synthesis is otherwise only (re)triggered on report-mail
- * ingestion (`reportStore`), so Parallel/VASCO entities — which receive no mail
- * report — rely on this button to get analyzed.
+ * reactive UI flips immediately, then schedules `runAnalysis`.
+ *
+ * This is the on-demand path, on top of the three automatic ones: report-mail
+ * ingestion (`reportStore.run`), the arrival of a VASCO communication
+ * (`vasco.replaceCommunicationsCache`) and the linking of an entity to its
+ * issuer (`companies.setVascoLink`). It stays useful to re-score after editing
+ * a company by hand, or to retry a synthesis that failed.
  */
 export const rerun = mutation({
   args: { companyId: v.id('companies') },

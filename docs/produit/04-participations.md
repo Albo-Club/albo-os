@@ -100,7 +100,8 @@ La colonne principale, dans l'ordre de lecture :
   tendance — chiffres, variations et lignes de contexte alignés d'une
   tuile à l'autre, contexte lisible sur deux lignes — la santé de la
   boîte est la première chose qu'on voit. Elle
-  est régénérée automatiquement à chaque rapport ingéré, et peut être
+  est régénérée automatiquement à chaque rapport reçu — qu'il arrive par
+  email ou qu'il soit publié sur le portail Parallel — et peut être
   relancée à la main.
 - **Ce que vaut le score de santé.** Il note l'entreprise, pas la qualité de
   son reporting, sur trois axes : trajectoire par rapport au plan,

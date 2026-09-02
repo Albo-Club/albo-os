@@ -23,6 +23,68 @@ bas de page.
 
 ---
 
+## v1.208.0 — 02/09/2026 à 10:46 — Un reporting Parallel déclenche son analyse tout seul
+
+Jusqu'ici, seul un reporting **reçu par email** relançait la synthèse IA de la
+société. Un reporting publié sur le portail Parallel était bien récupéré,
+rangé et affiché — mais il fallait aller cliquer « Relancer l'analyse » à la
+main pour que la note de santé en tienne compte. En pratique, personne n'y
+pensait, et la synthèse d'une société suivie via Parallel décrivait la
+situation d'avant.
+
+Désormais, une communication **nouvelle** sur le portail relance l'analyse de
+la société concernée toute seule, exactement comme un reporting reçu par
+email. Seules les sociétés dont l'émetteur a réellement publié sont
+recalculées : une synchronisation qui ne ramène rien ne relance rien.
+
+Deuxième correction, dans la foulée : **rattacher** une société à son émetteur
+Parallel lance aussi son analyse immédiatement. Auparavant, une société
+fraîchement rattachée devait attendre la publication suivante — parfois des
+mois — pour être analysée une première fois.
+
+Aucun email n'est envoyé dans ces deux cas : personne n'a rien transféré, il
+n'y a personne à qui répondre. Le bouton « Relancer l'analyse » reste
+disponible pour re-scorer après une modification à la main ou rejouer une
+analyse en échec.
+
+> **🔧 Notes techniques**
+>
+> - **Cause racine (ALB-238), pas un fil oublié.** `intelligence.runAnalysisBatch`
+>   n'était planifié qu'en fin de pipeline mail (`reportStore.run`). Le pull
+>   VASCO se terminait sur `vasco.replaceCommunicationsCache` sans aval. Le
+>   plug ne pouvait pas être ajouté tel quel : la mutation **purge puis
+>   réinsère** tout le lot de la paire (org, clientSlug), donc après le swap
+>   toutes les lignes portent le même `fetchedAt` et plus rien ne distingue une
+>   communication qui vient d'arriver d'une ancienne. Un webhook est un
+>   événement, un pull est une photo.
+> - **La détection vit dans le remplacement**, seul moment où « nouveau » est
+>   connaissable : les `communicationId` sur le point d'être supprimés sont lus
+>   avant le delete, le lot pullé est diffé contre eux, et
+>   `scheduleAnalysisForIssuers` planifie **un `runAnalysis` par entité** liée à
+>   un émetteur porteur d'une communication nouvelle (non archivées,
+>   `clientSlug` respecté). Pas `runAnalysisBatch` : sa boucle séquentielle ne
+>   sert qu'à envoyer l'accusé après ses analyses, et il n'y a pas de mail ici —
+>   des jobs indépendants évitent en plus de tenir N appels LLM dans une seule
+>   action au premier remplissage.
+> - **`companies.setVascoLink` planifie aussi `runAnalysis`.** Le rattachement
+>   se fait **depuis** le cache, donc au moment du lien tout le backlog de
+>   l'entité est déjà « connu » et la détection ci-dessus ne se déclencherait
+>   jamais dessus. Le lien est son propre déclencheur.
+> - **Non régression** : `convex/regression.vascoAnalysis.test.ts` (6 cas) —
+>   arrivée détectée, re-pull identique silencieux, périmètre limité aux
+>   émetteurs qui ont publié, émetteur orphelin et entité archivée ignorés,
+>   mémoire cloisonnée par `clientSlug`, rattachement déclencheur. Les tests
+>   lisent la file `_scheduled_functions` sans l'exécuter (sinon appels LLM
+>   réels).
+> - Docs : `KNOWN_ISSUES.md` § « Communications → AI synthesis » réécrit (la
+>   section affirmait « by design there is no auto-trigger »), règle
+>   anti-pattern ajoutée dans `CLAUDE.md` (pull ⇒ mémoire du « déjà vu » avant
+>   déclencheur), `TESTING.md` TP12b + IG9, `docs/produit/` 04 et 15.
+> - **Hors périmètre, signalé** : une communication VASCO n'est toujours pas
+>   une ligne `companyReports` (lue live par `pullCommunicationsForSynthesis`),
+>   donc elle reste invisible pour la fraîcheur des reportings et les
+>   notifications. Chantier séparé.
+
 ## v1.207.0 — 01/09/2026 à 16:51 — La documentation d'Albo OS se lit dans Albo OS
 
 Il existait déjà une documentation produit complète — vingt pages qui

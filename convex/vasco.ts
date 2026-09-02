@@ -36,6 +36,7 @@ import { internal } from './_generated/api'
 import { requireOrgMember } from './lib/auth'
 import { getConnector, parseConnection } from './lib/connectors'
 import type { GenericActionCtx } from 'convex/server'
+import type { MutationCtx } from './_generated/server'
 import type { DataModel, Doc, Id } from './_generated/dataModel'
 
 type ActionCtx = GenericActionCtx<DataModel>
@@ -972,7 +973,24 @@ async function activeConnectionsForClient(
 
 /** Atomically replace the cached communications of one (org, clientSlug): drop
  * the stale rows, insert the freshly pulled set. One transaction, so a reader
- * never sees a half-empty cache. */
+ * never sees a half-empty cache.
+ *
+ * The replace is also where the arrival of a report is DETECTED. A pull is a
+ * photo of the portal, not an event: after the swap every row carries the same
+ * `fetchedAt`, so nothing downstream can tell a communication published today
+ * from one published last year. The `communicationId`s about to be dropped are
+ * therefore read BEFORE the delete, and the pulled set is diffed against them
+ * — the only moment in the whole flow where "new" is knowable.
+ *
+ * Each entity linked to an issuer carrying at least one new communication gets
+ * its AI synthesis re-run, which is what makes a VASCO report behave like a
+ * mail report (whose analysis is fired at the end of `reportStore.run`). No
+ * mail is sent: nobody forwarded anything, so there is no one to answer.
+ *
+ * On a first fill the whole set reads as new — that IS the bootstrap of an org
+ * that has never pulled, and it is bounded by its number of linked entities.
+ * A failed pull never reaches here (the caller keeps the previous cache), so a
+ * transient portal outage cannot fake a wave of arrivals. */
 export const replaceCommunicationsCache = internalMutation({
   args: {
     orgId: v.id('organizations'),
@@ -1002,9 +1020,12 @@ export const replaceCommunicationsCache = internalMutation({
       .query('vascoCommunicationsCache')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
+    // Memory of what this client already held, captured before the delete.
+    const known = new Set<string>()
     for (const row of existing) {
-      if (row.clientSlug === clientSlug)
-        await ctx.db.delete('vascoCommunicationsCache', row._id)
+      if (row.clientSlug !== clientSlug) continue
+      known.add(row.communicationId)
+      await ctx.db.delete('vascoCommunicationsCache', row._id)
     }
     const fetchedAt = Date.now()
     for (const c of communications) {
@@ -1027,8 +1048,52 @@ export const replaceCommunicationsCache = internalMutation({
         fetchedAt,
       })
     }
+
+    const freshIssuers = new Set(
+      communications
+        .filter((c) => !known.has(c.communicationId))
+        .map((c) => c.issuerId),
+    )
+    if (freshIssuers.size > 0)
+      await scheduleAnalysisForIssuers(ctx, orgId, clientSlug, freshIssuers)
   },
 })
+
+/** Re-run the AI synthesis of every entity of `orgId` linked to one of
+ * `issuerIds` on `clientSlug`. No index on the VASCO link — the org's entities
+ * are read and filtered, the same way `lib/reportFreshness` and
+ * `companyEnrichment` resolve that link. Archived entities are skipped: the
+ * portal keeps publishing on a position we stopped following.
+ *
+ * One job PER entity, not `runAnalysisBatch`: that batch exists to sequence the
+ * confirmation mail after its analyses, and there is no mail here. Its loop is
+ * sequential, so a first fill with many linked entities would run every LLM
+ * call inside a single action — the one shape that can hit the action time
+ * limit. Independent jobs also mean one failure never buries the others. */
+async function scheduleAnalysisForIssuers(
+  ctx: MutationCtx,
+  orgId: Id<'organizations'>,
+  clientSlug: string,
+  issuerIds: Set<string>,
+): Promise<void> {
+  const companies = await ctx.db
+    .query('companies')
+    .withIndex('by_org', (q) => q.eq('orgId', orgId))
+    .collect()
+  for (const company of companies) {
+    if (
+      company.archivedAt != null ||
+      company.vascoClientSlug !== clientSlug ||
+      company.vascoIssuerId == null ||
+      !issuerIds.has(company.vascoIssuerId)
+    )
+      continue
+    await ctx.scheduler.runAfter(0, internal.intelligence.runAnalysis, {
+      companyId: company._id,
+      orgId,
+    })
+  }
+}
 
 /** Atomically replace the cached portfolio issuers of one (org, clientSlug):
  * drop the stale rows, insert the freshly pulled set. Same discipline as
