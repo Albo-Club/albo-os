@@ -688,7 +688,10 @@ export const remove = mutation({
   global (`overflow-wrap: break-word` sur `body`) coupe les mots trop longs :
   toute nouvelle **grille** qui reçoit de la donnée utilisateur doit porter la
   même borne. Signature du symptôme : texte coupé **sans ellipse** et boutons
-  qui bougent avec — cf. `KNOWN_ISSUES.md` « `truncate` ne retient rien dans
+  qui bougent avec. La borne est tenue par `tests/uiLayoutGuards.test.ts`
+  (en CI) : une primitive en grille ajoutée sans elle fait rougir le test,
+  et une primitive qui n'a rien à borner s'inscrit dans sa table `EXEMPT`
+  avec sa raison. Cf. `KNOWN_ISSUES.md` « `truncate` ne retient rien dans
   une boîte en `grid` ».
 - ❌ A `Badge` (or a `Button`) carrying **unbounded user data** — a company or
   org name, a deal label, a document title, an email — without a `max-w-*`

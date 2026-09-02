@@ -5888,3 +5888,17 @@ raison de plus pour borner à la source plutôt que de compter sur le rognage.
 Reproduction hors app : ouvrir un `DialogContent` (classes réelles, CSS
 buildé) avec deux noms de fichiers de 70 caractères, une fois avec et une
 fois sans `[&>*]:min-w-0`. Sans le patch, le bouton du pied sort du cadre.
+
+**Ce qui empêche le retour** : `tests/uiLayoutGuards.test.ts` (lancé par
+`pnpm test:unit`, donc par la CI) balaie `src/components/ui/*.tsx`, repère
+tout conteneur en `grid` et exige la borne. Deux raisons pour un test
+plutôt qu'une ligne de doc. D'abord `src/components/ui/` est du code
+**généré** : `pnpm dlx shadcn@latest add dialog` réécrit le fichier et
+efface la classe en silence — le symptôme revient sans que le diff
+n'explique rien. Ensuite toute **nouvelle** primitive en grille tirée du
+registry arrive avec le même piège ; le test force la décision à être prise
+une fois, à découvert. Une primitive qui n'a rien à borner (largeur libre,
+enfants de taille fixe) s'inscrit dans la table `EXEMPT` **avec sa raison** :
+c'est un arbitrage, pas un interrupteur. Aujourd'hui deux entrées —
+`checkbox.tsx` (une case à cocher de taille fixe) et `chart.tsx` (tooltip
+flottant, rien ne cape sa largeur).
