@@ -264,6 +264,11 @@ async function enrich(ctx: QueryCtx, guarantee: Doc<'guarantees'>) {
     subject,
     subjectOrgId: guarantee.subjectOrgId ?? null,
     pledgorName: pledgor.name,
+    // The slug names the guarantor, the id selects it: the edit dialog
+    // preselects its guarantor `<Select>` from this, and without it an edit
+    // silently reassigns the guarantee to the org of the page it is opened
+    // from.
+    pledgorOrgId: guarantee.pledgorOrgId ?? null,
     pledgorOrgSlug: pledgor.orgSlug,
     borrowerName: borrower.name,
     borrowerOrgSlug: borrower.orgSlug,
