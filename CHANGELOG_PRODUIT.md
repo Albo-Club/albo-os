@@ -23,6 +23,34 @@ bas de page.
 
 ---
 
+## v1.209.1 — 02/09/2026 à 13:35 — Toute garantie est classée quelque part
+
+Suite technique de la version précédente, sans effet visible. Le champ qui dit
+dans quelle société une garantie est enregistrée devient **obligatoire** : il
+n'existe plus de sûreté sans domicile, donc plus de sûreté que personne ne
+peut lire.
+
+> **🔧 Notes techniques**
+>
+> - `guarantees.orgId` passe de `v.optional(v.id('organizations'))` à
+>   `v.id('organizations')` (`convex/schema.ts`). Il n'avait vécu optionnel
+>   qu'une release, le temps du remplissage prévu par le purge-then-narrow.
+> - **Le remplissage n'a rien eu à faire** : `backfillGuaranteeOrg:dryRun` en
+>   prod a rendu `missing: 0`, la table `guarantees` étant encore vide (le
+>   module a été déployé le jour même). Le fichier de migration est supprimé —
+>   resserré, il ne peut plus rencontrer une ligne à remplir, et le garder
+>   aurait demandé de museler `no-unnecessary-condition`. La trace de
+>   l'opération vit dans `MIGRATIONS.md` § « Resserrement de
+>   `guarantees.orgId` », avec la leçon : compter la donnée **avant** d'écrire
+>   le filet, la prod étant lisible depuis la session.
+> - `convex/guarantees.ts` : `partiesOf` prend l'org de dépôt en second
+>   argument plutôt que dans l'objet, ce qui sépare enfin les orgs
+>   **référencées** (lues sur le prêt et sur l'actif) de celle où la ligne est
+>   classée. Les deux contrôles partagent `assertMemberOfAny` et ne diffèrent
+>   plus que par la liste passée. Les branches qui toléraient un `orgId`
+>   absent disparaissent — elles ne pouvaient plus rien tolérer.
+> - Deux tests de plus : l'org de dépôt est bien celle demandée à la création,
+>   et une édition qui réécrit **toutes** les parties ne la déplace pas.
 ## v1.209.0 — 02/09/2026 à 10:46 — Un reporting Parallel déclenche son analyse tout seul
 
 Jusqu'ici, seul un reporting **reçu par email** relançait la synthèse IA de la

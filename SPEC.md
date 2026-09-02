@@ -232,9 +232,9 @@ Table centrale du module. Elle porte **trois informations indépendantes**
 ```
 guarantees
   // ── Où la ligne est classée ─────────────────────────────────────────
-  orgId              Id<'organizations'>?  société qui ENREGISTRE la sûreté
-  // Pas une quatrième partie : l'ancre de la ligne. Optionnel le temps du
-  // remplissage en prod (migrations/backfillGuaranteeOrg), puis requis.
+  orgId              Id<'organizations'>   société qui ENREGISTRE la sûreté
+  // Pas une quatrième partie : l'ancre de la ligne. Requis — toute sûreté
+  // est classée quelque part.
 
   // ── Bénéficiaire ────────────────────────────────────────────────────
   loanId             Id<'loans'>?          prêt interne au groupe
@@ -279,6 +279,12 @@ prêt, ni actif, ni garant de chez nous. Sans ancre, cette ligne n'était
 rattachable à rien et était refusée — alors que c'est elle qui dit que nos
 500 K€ ne sont pas seuls sur cette dette. `orgId` est vérifié
 (`requireOrgMember`) et jamais cru sur parole ; il ne bouge pas à l'édition.
+
+Il est **requis**, et c'est ce qui rend cette sûreté-là lisible : la liste des
+orgs d'une ligne n'est jamais vide, donc il y a toujours quelqu'un pour qui la
+lire. Lire demande d'être membre de l'une d'elles ; **écrire** en demande deux
+— l'org de dépôt (choisie par l'appelant, donc vérifiée) et, s'il y en a, une
+des orgs **référencées**, lues sur le prêt et sur l'actif.
 
 **Une seule ligne, trois lectures** (**D13**) — rien n'est stocké deux fois :
 

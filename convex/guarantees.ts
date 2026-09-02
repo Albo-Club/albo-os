@@ -25,43 +25,40 @@ import type { QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import type { PledgeSummary } from './lib/guarantees'
 
-/**
- * The orgs a guarantee touches: the one it is filed in, plus the borrower,
- * the guarantor and the asset holder.
- *
- * `orgId` sits in the list because it is the ONLY anchor of a guarantee whose
- * three other parties are all outside the group (SPEC § 10 line 10b).
- */
-export type GuaranteeParties = Pick<
+/** The orgs a guarantee REFERENCES: borrower, guarantor, asset holder. */
+type ReferencedParties = Pick<
   Doc<'guarantees'>,
-  'orgId' | 'borrowerOrgId' | 'pledgorOrgId' | 'subjectOrgId'
+  'borrowerOrgId' | 'pledgorOrgId' | 'subjectOrgId'
 >
 
-function partiesOf(guarantee: GuaranteeParties): Array<Id<'organizations'>> {
+/**
+ * The orgs a guarantee touches: the one it is filed in, plus the three it
+ * references.
+ *
+ * `orgId` belongs in the list because it is the ONLY one a guarantee whose
+ * three other parties are all outside the group has (SPEC § 10 line 10b).
+ */
+export type GuaranteeParties = ReferencedParties &
+  Pick<Doc<'guarantees'>, 'orgId'>
+
+function partiesOf(
+  referenced: ReferencedParties,
+  orgId?: Id<'organizations'>,
+): Array<Id<'organizations'>> {
   return [
-    guarantee.orgId,
-    guarantee.borrowerOrgId,
-    guarantee.pledgorOrgId,
-    guarantee.subjectOrgId,
-  ].filter((orgId): orgId is Id<'organizations'> => orgId != null)
+    orgId,
+    referenced.borrowerOrgId,
+    referenced.pledgorOrgId,
+    referenced.subjectOrgId,
+  ].filter((id): id is Id<'organizations'> => id != null)
 }
 
-/**
- * READ check: membership of at least one of the orgs a guarantee touches
- * (same rule as `requireLoanParty` for a current account).
- *
- * A row with no org at all — no filing org, no group borrower, guarantor or
- * asset — has no party to be a member of and is refused. That case is
- * unreachable for anything created since `orgId` exists; it survives for the
- * rows written before it.
- */
-export async function requireGuaranteeParty(
+/** Membership of at least one of `parties`, which must not be empty. */
+async function assertMemberOfAny(
   ctx: QueryCtx,
-  guarantee: GuaranteeParties,
+  parties: Array<Id<'organizations'>>,
 ): Promise<void> {
   const user = await requireAppUser(ctx)
-  const parties = partiesOf(guarantee)
-  if (parties.length === 0) throw new ConvexError('not_a_party')
   const memberships = await Promise.all(
     parties.map((orgId) =>
       ctx.db
@@ -78,6 +75,21 @@ export async function requireGuaranteeParty(
 }
 
 /**
+ * READ check: membership of at least one of the orgs a guarantee touches
+ * (same rule as `requireLoanParty` for a current account).
+ *
+ * The list is never empty — `orgId` is required, so every row is filed
+ * somewhere — which is exactly what makes the out-of-group guarantee
+ * readable at all.
+ */
+export async function requireGuaranteeParty(
+  ctx: QueryCtx,
+  guarantee: GuaranteeParties,
+): Promise<void> {
+  await assertMemberOfAny(ctx, partiesOf(guarantee, guarantee.orgId))
+}
+
+/**
  * WRITE check. Reading needs one party; writing needs two things, because
  * the caller chooses the filing org but NOT the others — those are read
  * from the loan and from the pledged asset.
@@ -91,22 +103,15 @@ export async function requireGuaranteeParty(
  *    cross-org guarantee of D13.
  * 3. Unless there is no referenced org at ALL — the out-of-group guarantee
  *    this whole filing org exists for. Condition 1 then carries the check.
- *
- * `orgId` is undefined only on a row written before the field existed; the
- * referenced orgs then carry the check alone, exactly as they used to.
  */
 async function requireCanFile(
   ctx: QueryCtx,
-  orgId: Id<'organizations'> | undefined,
-  referenced: Omit<GuaranteeParties, 'orgId'>,
+  orgId: Id<'organizations'>,
+  referenced: ReferencedParties,
 ): Promise<void> {
-  if (orgId) await requireOrgMember(ctx, orgId)
-  const parties = { ...referenced, orgId: undefined }
-  if (partiesOf(parties).length === 0) {
-    if (!orgId) throw new ConvexError('not_a_party')
-    return
-  }
-  await requireGuaranteeParty(ctx, parties)
+  await requireOrgMember(ctx, orgId)
+  const parties = partiesOf(referenced)
+  if (parties.length > 0) await assertMemberOfAny(ctx, parties)
 }
 
 // ─── Shape returned to the front ────────────────────────────────────────────

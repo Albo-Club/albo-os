@@ -5381,7 +5381,10 @@ refuserait des lectures parfaitement fondées.
   sûreté qu'un tiers donne sur la même dette hors groupe que la nôtre (SPEC
   § 10 cas 10b) n'a ni prêt, ni actif, ni garant de chez nous, et était donc
   refusée (`not_a_party`) — alors que c'est elle qui dit que nos 500 K€ ne
-  sont pas seuls sur cette dette.
+  sont pas seuls sur cette dette. Il est **requis** : c'est ce qui garantit
+  que la liste des orgs d'une ligne n'est jamais vide, donc qu'aucune sûreté
+  n'est illisible. Il a vécu optionnel une seule release, le temps d'un
+  remplissage qui n'a trouvé aucune ligne (cf. `MIGRATIONS.md`).
 - **Lire demande une partie, écrire en demande deux.** L'appelant choisit
   `orgId` mais pas les autres orgs, lues sur le prêt et sur l'actif. Donc :
   (1) `requireOrgMember(orgId)` — on ne dépose rien dans le passif d'un
@@ -5392,7 +5395,9 @@ refuserait des lectures parfaitement fondées.
   seul. Prendre `orgId` en argument n'est pas le trou de tenancy interdit par
   `CLAUDE.md` tant qu'il est **vérifié** et non cru sur parole (même patron
   que `properties:create`). `update` ne le patche pas : une sûreté ne
-  déménage pas d'un passif à l'autre.
+  déménage pas d'un passif à l'autre. Les deux contrôles partagent
+  `assertMemberOfAny` ; ce qui les distingue est la liste qu'ils lui passent,
+  pas la façon de vérifier.
 - **Les orgs dénormalisées ne viennent jamais d'un argument.**
   `borrowerOrgId` est lu sur le prêt, `subjectOrgId` sur l'actif. Sinon un
   appelant pourrait se déclarer partie d'une garantie qui ne le concerne pas.
