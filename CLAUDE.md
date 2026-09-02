@@ -745,6 +745,20 @@ export const remove = mutation({
   le code qui suppose la présence continue de compiler, et casse à
   l'exécution sur la première ligne sans valeur. L'ordre est : auditer,
   rendre tolérant, relâcher, tester. Jamais l'inverse, jamais « en passant ».
+- ❌ Déclencher un recalcul d'**état** (synthèse IA, score, agrégat) sur « une
+  ligne a été créée » plutôt que sur « le contenu a changé », et ne le brancher
+  que du côté de l'ajout. Deux symptômes, une seule cause — corrigés ensemble
+  en 09/2026 : un report renvoyé pour la même période **écrase** la ligne, donc
+  rien n'était « créé » et la fiche montrait la version corrigée pendant que la
+  note décrivait l'ancienne ; et détacher un report ne relançait rien, donc la
+  note continuait de décrire un report absent. Deux réflexes : comparer le
+  **contenu utile** (ce que la fiche affiche et ce qui nourrit le calcul), pas
+  la présence d'une ligne ni des champs qui bougent à chaque passage
+  (`processedAt`, versions, identifiants de message) — et comparer les cartes
+  clé-valeur **clés triées**, sinon un simple changement d'ordre relance tout ;
+  puis vérifier la **symétrie** : si l'ajout déclenche, le retrait doit
+  déclencher aussi. Cf. `KNOWN_ISSUES.md` « Un report renvoyé n'est pas
+  forcément un doublon » et « Détacher un report ».
 - ❌ Accrocher un déclencheur métier (analyse, notification, alerte) à une
   intégration **pull** sans lui avoir d'abord donné une mémoire du « déjà vu ».
   Un webhook est un **événement** — il arrive une fois, sa nouveauté est

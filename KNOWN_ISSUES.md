@@ -1954,6 +1954,18 @@ une entrée d'index sémantique de clé `report:<id>`. Supprimer la seule ligne
 et le texte du report dans sa recherche. `reportInbox.detachCompany` défait les
 cinq, pour **une** entité — les autres entités du fan-out gardent la leur.
 
+**Sixième chose, ajoutée en 09/2026 : relancer la synthèse.** Le pointeur
+`latestReportId` retombait bien sur le report suivant, mais `aiAnalysis` — le
+texte et la note affichés — continuait de décrire le report qu'on venait de
+retirer. Le déclencheur ne portait que sur l'ingestion : ce qui s'ajoute
+déclenche, ce qui se retire non. Une note n'est pas un journal auquel on
+n'ajoute que des lignes, c'est un **état** : la symétrie est obligatoire.
+`detachCompany` planifie donc `intelligence.runAnalysis` sur ce qui reste. Le
+cas qui compte le plus est le détachement du **dernier** report : `runAnalysis`
+tombe alors sur `no_data`, qui **efface** l'analyse — c'est ce qui remet
+l'entité à « aucune donnée » au lieu de laisser un score orphelin dans la
+colonne Score IA des Participations (qui lit `aiAnalysis` seule).
+
 Ce qu'il ne faut **pas** supprimer : le **blob de storage**. Un même blob est
 partagé par les lignes `documents` de toutes les entités du fan-out **et** par
 la pièce jointe de `inboundEmails`. Le détacher d'une participation ne doit pas
@@ -4388,6 +4400,39 @@ dans l'historique git si besoin de s'en inspirer.
   conservé dans `reportExtract.run`.
 - Les emails transactionnels (magic link, invitations, alertes) n'ont
   jamais fait partie de la feature et sont intacts.
+
+## Un report renvoyé n'est pas forcément un doublon
+
+Le dédoublonnage range un report renvoyé pour le même couple (société,
+période) **en écrasant la ligne existante** (`reportStore.storeForCompany`).
+C'est voulu : une seule ligne par période dans la liste. Mais le pipeline en
+déduisait « rien n'a été créé, donc rien de neuf » et classait l'événement en
+doublon : pas de synthèse relancée, pas de récap.
+
+Or les deux cas sont différents et se ressemblent :
+
+- **le même report renvoyé** (Benjamin retransfère un mail déjà traité) — rien
+  n'a changé, il faut rester muet et surtout ne pas rebrûler un appel LLM ;
+- **le report corrigé** (le fondateur renvoie sa version rectifiée) — le
+  contenu stocké est bel et bien remplacé, donc la fiche montre la nouvelle
+  version **pendant que la synthèse décrit encore l'ancienne**, et personne
+  n'est prévenu.
+
+Le tri se fait donc sur le **contenu**, pas sur « une ligne existait déjà » :
+`reportContentChanged` compare exactement ce que la fiche affiche et ce qui
+nourrit la synthèse (`intelligence.getContext`) — `headline`, `title`,
+`keyHighlights`, `metrics`, `rawContent`. Sont volontairement **hors**
+comparaison `processedAt`, `pipelineVersion`, les identifiants AgentMail et
+`inboundEmailId` : ils changent à chaque renvoi et ne changent pas ce que le
+report **dit**. Les cartes de métriques sont comparées **clés triées** — la
+couche d'extraction reconstruit l'objet à chaque passage, et un ordre de clés
+différent n'est pas un report différent (sans ça, chaque renvoi identique
+repartait en analyse).
+
+Corollaire pour le récap : un renvoi correctif produit un vrai « succès » (la
+synthèse puis le mail), pas un « déjà là ». Il porte son propre
+`inboundEmails`, donc le droit de parole de `claimNotify` est neuf — cf.
+« `notifiedAt` est un droit de parole ».
 
 ## Vectorisation documents & reports — RAG par org (`convex/vectorize.ts`)
 
