@@ -109,6 +109,19 @@ autres participations rattachées au même report gardent le leur, et le mail
 d'origine reste dans la file : il n'y a plus qu'à le rattacher là où il
 devait aller.
 
+**Quand un report n'a rien à faire nulle part** — un test, un doublon, une
+pièce envoyée par erreur — il se **supprime**. Depuis la fiche société, en
+ouvrant le report : « Supprimer définitivement ». Depuis les Rapports
+entrants, par la corbeille à côté de la croix sur la puce de la
+participation. Le report quitte la fiche
+comme au détachement, mais cette fois les fichiers partent avec lui : ils
+sont effacés du stockage dès que plus aucune participation ne s'en sert, et
+le mail d'origine perd alors sa pièce jointe. Il reste listé dans les
+Rapports entrants, avec le nom et le poids du fichier, mais il n'y a plus
+rien à télécharger ni à retraiter. C'est la différence entre les deux
+gestes : **détacher** répare un mauvais rangement et laisse tout rejouable,
+**supprimer** fait vraiment disparaître le fichier.
+
 ### 3. Lecture du contenu — toutes les sources
 
 Chaque élément du mail est lu, selon son type :
@@ -276,17 +289,19 @@ elle-même sont rangés normalement.
 
 ## Ajouter un report à la main
 
-Sur la fiche d'une participation, le bouton **« Ajouter »** ouvre une
-fenêtre où choisir un ou plusieurs fichiers (PDF, Excel, image — 20 Mo par
-fichier). C'est le **type** qui décide de la suite : choisir **Reporting**
-lance le même circuit qu'un mail transféré, à partir de l'étape 3 — les
-étapes 1 et 2 n'ont pas lieu d'être puisque tu as choisi la société
-toi-même. Le bouton porte alors « Analyser et ajouter », et une note de
-contexte peut être jointe ; ni titre ni période ne sont demandés, c'est
-l'analyse qui les donne. Tout autre type (BP, juridique, pacte…) est un
-simple dépôt, sans analyse.
+Sur la fiche d'une participation, le bouton **« Ajouter un rapport »** ouvre
+une fenêtre où choisir un ou plusieurs fichiers (PDF, Excel, image — 20 Mo
+par fichier) et, si besoin, joindre une note de contexte. C'est tout ce
+qu'elle demande : le lot suit le même circuit qu'un mail transféré à partir
+de l'étape 3 — les étapes 1 et 2 n'ont pas lieu d'être puisque tu as choisi
+la société toi-même — et ni titre ni période ne sont demandés, c'est
+l'analyse qui les donne. Le bouton porte « Analyser et ajouter ».
 
-L'option n'existe que sur une **participation** : une entité du groupe n'a
+Une pièce qui n'est **pas** un rapport (BP, juridique, pacte…) ne passe pas
+par là : elle se dépose dans les documents de la société, où elle est classée
+toute seule (voir [Participations](04-participations.md)).
+
+Le bouton n'existe que sur une **participation** : une entité du groupe n'a
 pas de reporting investisseur à analyser.
 
 Le temps de l'analyse, une ligne « analyse en cours… » s'affiche en haut de
@@ -300,6 +315,24 @@ l'écran, le résultat est sous tes yeux) — les autres membres, eux, sont
 prévenus comme pour un report transféré ; et si l'analyse échoue, la ligne
 passe en « analyse échouée » — le dépôt reste rattrapable depuis la boîte
 [Rapports entrants](12-vue-consolidee.md), comme un mail.
+
+## Une publication Parallel produit le même mail
+
+Un reporting publié sur le portail Parallel n'arrive par aucun email : Albo OS
+va le chercher. Il donne pourtant lieu au **même mail d'annonce** qu'un report
+transféré — carte de la société, lien vers sa fiche, titres des publications et
+note de santé remise à jour — envoyé aux membres de l'organisation dès que
+l'analyse a intégré la publication.
+
+Trois différences, toutes dues au fait que personne n'a rien envoyé : il n'y a
+pas de réponse dans un fil de discussion (il n'y a pas de fil), la ligne
+d'origine dit « Publié sur le portail le … » au lieu de « Transféré par … », et
+il n'y a pas de bloc « ce que dit ce report » — les chiffres d'une publication
+Parallel ne sont pas extraits, c'est la synthèse qui porte le fond.
+
+Chaque publication n'est annoncée **qu'une fois**, quel que soit le nombre de
+synchronisations. Le détail du circuit est dans
+[Intégrations](15-integrations.md).
 
 ## Points d'attention
 

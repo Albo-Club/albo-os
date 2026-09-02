@@ -701,6 +701,13 @@
       "confirmBody": "Le rapport sera retiré de {{company}} : il disparaît de cette fiche, avec ses fichiers et les KPIs qu’il avait renseignés. Les autres participations rattachées gardent le leur, et le fichier reçu n’est pas supprimé.",
       "confirm": "Détacher",
       "done": "Rapport détaché de cette participation"
+    },
+    "deleteReport": {
+      "action": "Supprimer définitivement",
+      "confirmTitle": "Supprimer ce rapport ?",
+      "confirmBody": "Le rapport est retiré de {{company}} avec ses fichiers, les KPIs qu’il avait renseignés et son indexation pour la recherche. Un fichier est effacé du stockage dès qu’aucune autre participation ne s’en sert : le mail d’origine perd alors sa pièce jointe et ne pourra plus être retraité. Irréversible.",
+      "confirm": "Supprimer",
+      "done": "Rapport supprimé"
     }
   },
   "documents": {
@@ -719,16 +726,12 @@
     "addedOn": "Ajouté le {{date}}",
     "uploading": "Envoi…",
     "queued": "Report envoyé — l'analyse est en cours.",
-    "added_one": "Document ajouté",
-    "added_other": "{{count}} documents ajoutés",
     "updated": "Document modifié",
     "deleted": "Document supprimé",
     "editTitle": "Modifier le document",
     "deleteConfirmTitle": "Supprimer ce document ?",
     "deleteConfirmBody": "Le fichier sera définitivement supprimé.",
     "dealBadge": "Deal · {{deal}}",
-    "dealLabel": "Rattacher à un deal (optionnel)",
-    "dealNone": "Aucun — document de l'entité",
     "kindLabel": "Type",
     "titleLabel_one": "Titre",
     "titleLabel_other": "Titres",
@@ -759,7 +762,6 @@
       "analysisHint": "Un reporting est analysé automatiquement : période, points clés et métriques sont extraits, et la synthèse de la société est relancée. Titre et période sont donnés par l'analyse.",
       "noteLabel": "Note (optionnel)",
       "notePlaceholder": "Contexte utile à l'analyse : message d'accompagnement, précisions…",
-      "submit": "Ajouter",
       "submitAnalyse": "Analyser et ajouter"
     },
     "errors": {

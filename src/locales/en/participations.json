@@ -701,6 +701,13 @@
       "confirmBody": "The report will be removed from {{company}}: it leaves this fiche, along with its files and the KPIs it filled in. The other attached participations keep theirs, and the received file is not deleted.",
       "confirm": "Detach",
       "done": "Report detached from this participation"
+    },
+    "deleteReport": {
+      "action": "Delete permanently",
+      "confirmTitle": "Delete this report?",
+      "confirmBody": "The report leaves {{company}} along with its files, the KPIs it filled in and its search indexing. A file is erased from storage as soon as no other participation uses it: the source email then loses its attachment and can no longer be reprocessed. Irreversible.",
+      "confirm": "Delete",
+      "done": "Report deleted"
     }
   },
   "documents": {
@@ -719,16 +726,12 @@
     "addedOn": "Added on {{date}}",
     "uploading": "Uploading…",
     "queued": "Report sent — the analysis is running.",
-    "added_one": "Document added",
-    "added_other": "{{count}} documents added",
     "updated": "Document updated",
     "deleted": "Document deleted",
     "editTitle": "Edit document",
     "deleteConfirmTitle": "Delete this document?",
     "deleteConfirmBody": "The file will be permanently deleted.",
     "dealBadge": "Deal · {{deal}}",
-    "dealLabel": "Attach to a deal (optional)",
-    "dealNone": "None — entity document",
     "kindLabel": "Type",
     "titleLabel_one": "Title",
     "titleLabel_other": "Titles",
@@ -759,7 +762,6 @@
       "analysisHint": "A reporting is analysed automatically: period, key points and metrics are extracted, and the company synthesis is refreshed. Title and period come from the analysis.",
       "noteLabel": "Note (optional)",
       "notePlaceholder": "Context for the analysis: covering message, clarifications…",
-      "submit": "Add",
       "submitAnalyse": "Analyse and add"
     },
     "errors": {

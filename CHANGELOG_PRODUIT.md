@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.209.4 — 02/09/2026 à 17:45 — L'accusé de réception d'un report ne mélange plus l'argent placé et l'argent revenu
+## v1.212.1 — 02/09/2026 à 17:45 — L'accusé de réception d'un report ne mélange plus l'argent placé et l'argent revenu
 
 Quand une société porte plusieurs deals, le mail de confirmation d'un report
 additionnait tout ce qui était sorti en banque depuis le premier
@@ -62,7 +62,183 @@ deal soldé garde une seule ligne, comme avant.
 >   en base, avec le deal annulé) et `tests/reportEmail.test.ts` (le rendu
 >   des deux lignes).
 
----
+## v1.212.0 — 02/09/2026 à 16:04 — Une publication Parallel te prévient par email
+
+Jusqu'ici, un reporting publié sur le portail Parallel mettait bien la fiche et
+la note de santé à jour, mais en silence : il fallait ouvrir l'app pour
+s'apercevoir qu'il y avait du neuf. Un reporting transféré par email, lui,
+donnait un accusé de réception.
+
+Désormais, une publication Parallel envoie **le même email** — un par société
+concernée : carte de la société, lien vers sa fiche, titres des publications, et
+la note de santé **remise à jour de cette publication** (score, résumé, points
+forts et de vigilance, KPIs). Il part aux membres de l'organisation qui n'ont
+pas désactivé les annonces de reporting.
+
+Trois différences, toutes dues au fait que personne n'a rien envoyé : pas de
+réponse dans un fil de discussion (il n'y en a pas), la ligne d'origine dit
+« Publié sur le portail le … » au lieu de « Transféré par … », et il n'y a pas
+de bloc « ce que dit ce report » — les chiffres d'une publication Parallel ne
+sont pas extraits, c'est la synthèse qui porte le fond.
+
+**Chaque publication n'est annoncée qu'une fois**, quel que soit le nombre de
+synchronisations. Et le tout premier remplissage du cache d'un portail
+n'envoie rien : un historique n'est pas une nouvelle.
+
+> **🔧 Notes techniques**
+>
+> - **Prérequis : le cache Parallel passe en upsert.** `replaceCommunicationsCache`
+>   effaçait tout et réinsérait à chaque cycle. Aucune date affichée n'en était
+>   faussée (la fiche lit `publishDate`), mais l'**identité** des lignes était
+>   détruite, donc aucun état ne pouvait y vivre — un marqueur « déjà annoncée »
+>   aurait été balayé toutes les 48 h et le même mail serait reparti
+>   indéfiniment. La mutation insère le nouveau, patche ce qui a bougé, supprime
+>   ce que le portail ne liste plus. « Nouveau » devient structurel (aucune
+>   ligne n'existait) au lieu d'être recalculé à la volée, et une ligne connue
+>   coûte un patch au lieu d'un delete + insert. ⚠️ `announcedAt` n'est
+>   **pas** dans le patch de rafraîchissement : c'est ce qui le fait survivre.
+> - **`convex/vascoNotify.ts`** (nouveau module, miroir de `reportNotify`) :
+>   `claimArrivals` estampille `announcedAt` en transaction puis rend ce que les
+>   communications disent ; `announce` vérifie l'inbox sortante **avant** de
+>   réclamer (sinon l'annonce serait brûlée sans envoi), réclame, lance
+>   `intelligence.runAnalysis`, puis construit un mail **par destinataire** via
+>   `reportNotify.entityCards` et `reportConfirmationHtml`.
+> - **Deux ordres non permutables** : la synthèse tourne avant la construction
+>   du mail (la carte dit « où en est la boîte »), et la réclamation précède
+>   l'envoi (une reprise du scheduler ne doit pas doubler). Comme `notifiedAt`,
+>   la marque n'est jamais relâchée.
+> - **Bootstrap** : un premier remplissage marque tout comme déjà annoncé et ne
+>   planifie que les analyses. Un pull vide mais réussi vide le cache et rend le
+>   remplissage suivant silencieux — ça échoue du bon côté.
+> - `emailTemplates` : `publishedOn` et `publicationTitles` optionnels sur
+>   `ReportConfirmationData`, le titre « Nouveau report » couvrant les deux
+>   origines. Aucun changement pour le canal mail.
+> - **Non régression** : `regression.vascoAnalysis.test.ts` passe de 6 à 11 cas.
+>   Contrôle négatif dans les deux sens — le garde-fou du bootstrap retiré fait
+>   échouer « le premier remplissage n'annonce pas », le marqueur non posé fait
+>   échouer « une arrivée n'est réclamée qu'une fois ».
+> - ⚠️ `convex/_generated/api.d.ts` porte **deux lignes ajoutées à la main**
+>   pour le nouveau module : le codegen ne tourne pas hors ligne, et c'est
+>   l'exception documentée dans `KNOWN_ISSUES.md` § « Codegen Convex hors-ligne ».
+>   Le prochain `convex deploy` réécrit le même contenu.
+## v1.211.0 — 02/09/2026 à 15:46 — Déposer un document ne demande plus rien
+
+Le formulaire d'ajout d'un document posait quatre questions — type, période,
+titre, deal — sur un fichier que l'app allait de toute façon lire quelques
+secondes plus tard. Il n'en pose plus aucune.
+
+**Déposer.** La fenêtre se réduit à « choisir des fichiers », plusieurs d'un
+coup, sur une société comme sur un prêt, une garantie ou un bien. Chaque
+fichier est ensuite lu, et **se classe tout seul** : son type, et sa date
+quand le document la porte, se remplissent quelques secondes plus tard, sans
+recharger la page. Chacun selon son propre contenu — déposer un pacte, un
+business plan et un KBIS d'un seul geste range les trois correctement, là où
+l'ancien formulaire appliquait un type unique à tout le lot.
+
+Le titre reste le nom du fichier : c'est vous qui l'avez nommé. Un classement
+qui tombe à côté se corrige au crayon, sur la ligne du document — et une
+correction faite à la main n'est jamais réécrite. Un fichier illisible (scan
+sans texte, format non reconnu) reste simplement en « Autre ».
+
+**Ajouter un rapport** garde sa porte et son circuit d'analyse, et perd lui
+aussi son sélecteur : les fichiers, une note de contexte si elle aide
+l'analyse, c'est tout. Le bouton disparaît en revanche des entités du
+groupe — l'analyse n'a jamais su lire autre chose qu'une société du
+portefeuille, le sélecteur servait jusqu'ici de rattrapage silencieux.
+
+**Deux choses disparaissent.** Le rattachement d'un document à un deal ne se
+crée plus au dépôt : les documents déjà rattachés gardent leur badge et leur
+lien vers la fiche du deal, les nouveaux restent au niveau de l'entité. Et un
+reporting ne peut plus être déposé par la carte Documents : il passe par
+« Ajouter un rapport », seule porte qui déclenche l'analyse.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `convex/documentsClassify.ts` : `run` (action) appelle le modèle
+>   sur le texte déjà extrait (fenêtre 12 000 car.) et rend `{ kind, period }` ;
+>   `apply` (mutation) arbitre. Branché en fin de `documentsExtract.run`,
+>   uniquement sur un état `extracted` — une lecture ratée ne coûte aucun appel.
+> - Deux garde-fous côté code, pas côté prompt : le `kind` n'est accepté que
+>   dans le vocabulaire de l'**ancre** (`VOCABULARIES`, société / prêt /
+>   garantie / bien), et le patch ne s'applique qu'à une ligne encore dans son
+>   état de dépôt (`source: 'upload'`, `kind: 'other'`, pas de `period`) — un
+>   type choisi par un humain n'est jamais écrasé. `reporting` n'est dans aucun
+>   vocabulaire : c'est un aiguillage vers `reportInbox.createFromUpload`, pas
+>   une étiquette. Ré-indexation sémantique quand le type change.
+> - Front : `AddDocumentDialog` est remplacé par deux composants —
+>   `documents/AddFilesDialog.tsx` (dépôt nu, partagé par la carte Documents
+>   d'une société **et** par `DocumentsSection`, qui passe donc au multi-fichiers)
+>   et `companies/AddReportDialog.tsx` (fichiers + note, pipeline d'analyse,
+>   affiché seulement si `company.kind === 'portfolio'`). `DocumentAnchor` et
+>   `anchorArgs` déménagent dans `AddFilesDialog`, augmentés du cas `company`.
+> - Orphelins retirés : `DealSelect` / `DealOption` / `MAX_BYTES` de
+>   `documentFields.tsx`, la prop `deals` de `CompanyDocumentsCard` et
+>   `CompanyReportsSection`, et les clés i18n correspondantes.
+> - `convex/regression.docClassify.test.ts` (7 tests) fixe l'arbitrage :
+>   vocabulaire par ancre, refus de `reporting`, non-écrasement d'un choix
+>   humain, document sans texte hors cible, et `parsePeriod` qui refuse tout
+>   ce qui n'est pas `AAAA-MM[-JJ]`.
+> - ⚠️ `convex/_generated/api.d.ts` a été complété **à la main** (deux lignes
+>   pour le nouveau module) : la session n'avait pas de déploiement Convex pour
+>   lancer `convex codegen`. Le prochain `convex dev`/`deploy` régénère à
+>   l'identique.
+## v1.210.0 — 02/09/2026 à 15:31 — Un rapport se supprime, fichier compris
+
+Jusqu'ici, un rapport arrivé au mauvais endroit ne pouvait que se
+**détacher** : il quittait la fiche, mais son fichier restait dans le
+stockage sans que rien ne permette de l'enlever. Le détail d'un rapport
+propose désormais un second geste, **« Supprimer définitivement »** : le
+rapport quitte la fiche comme au détachement, et cette fois le fichier part
+avec lui — dès lors qu'aucune autre participation ne s'en sert. Le mail
+d'origine perd alors sa pièce jointe : il reste listé dans les Rapports
+entrants avec le nom et le poids du fichier, mais il n'y a plus rien à
+télécharger ni à retraiter. Le même geste est disponible depuis les
+**Rapports entrants**, par la corbeille à côté de la croix sur la puce de la
+participation.
+
+Les deux gestes restent distincts, et la fenêtre de confirmation dit ce que
+chacun emporte : **détacher** répare un mauvais rangement en laissant tout
+rejouable, **supprimer** fait vraiment disparaître le fichier.
+
+Au passage, un défaut silencieux est corrigé côté documents. Le même fichier
+peut être rattaché à plusieurs sociétés à la fois — c'est le cas de tout
+reporting reçu pour une boîte détenue par deux de nos organisations.
+Supprimer ce document depuis une fiche effaçait jusqu'ici le fichier pour
+**toutes** les autres, sans avertissement : la ligne restait, le
+téléchargement ne donnait plus rien. Désormais un fichier n'est effacé que
+lorsque plus aucune fiche ne le désigne.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `convex/lib/documentBlobs.ts` : `releaseStorage(ctx, storageId,
+>   { inboundEmailId })` supprime le blob **et** sa ligne `documentTexts`
+>   seulement si le nouvel index `documents.by_storage` ne trouve plus de
+>   ligne. Le mail source n'est pas compté comme détenteur : le `storageId`
+>   de sa pièce jointe est remis à `undefined` au passage (nom et taille
+>   conservés). Tout chemin de suppression l'appelle **après** avoir
+>   supprimé sa propre ligne — plus jamais `ctx.storage.delete` en direct.
+> - `documents:remove` et la cascade de `deals:remove` passent dessus : c'est
+>   la correction du blanchiment silencieux des lignes sœurs du fan-out.
+> - `convex/reportInbox.ts` : le corps de `detachCompany` devient
+>   `removeReportForCompany(ctx, report, { deleteFiles })`, partagé avec la
+>   nouvelle mutation `deleteReport`. Les deux font exactement le même
+>   ménage (ligne `companyReports`, lignes `documents` de l'entité,
+>   `kpiSnapshots` sourcés, fraîcheur, pointeur `companyIntelligence`,
+>   correction de la ligne `inboundEmails`, entrée d'index sémantique) et ne
+>   diffèrent que sur le sort des fichiers.
+> - `sourceInbound` sort de `reportInbox.ts` vers `convex/lib/reportSource.ts`
+>   pour être lisible aussi depuis `documents:remove`.
+> - Front : `CompanyReportsSection.tsx` porte les deux boutons dans le pied du
+>   détail d'un rapport, et `routes/app/all/reports.tsx` une seconde icône
+>   (corbeille) à côté de la croix sur la puce de chaque participation. Les
+>   deux surfaces partagent le même schéma — une seule fenêtre de
+>   confirmation paramétrée par le mode, dont le texte dit ce que le geste
+>   emporte.
+> - 6 tests de régression ajoutés à `regression.reportDetach.test.ts`,
+>   dont deux qui échouent sur l'ancien `documents:remove`.
+> - Merge de `main` : la relance de la synthèse ajoutée par la v1.209.3 vit
+>   désormais dans le corps partagé, donc une **suppression** rafraîchit la
+>   note comme un détachement.
 
 ## v1.209.3 — 02/09/2026 à 15:19 — La note IA suit les corrections et les retraits
 

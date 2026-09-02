@@ -36,6 +36,7 @@ import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
 import type * as deals from "../deals.js";
 import type * as documents from "../documents.js";
+import type * as documentsClassify from "../documentsClassify.js";
 import type * as documentsExtract from "../documentsExtract.js";
 import type * as email from "../email.js";
 import type * as emailTemplates from "../emailTemplates.js";
@@ -124,6 +125,7 @@ import type * as transfers from "../transfers.js";
 import type * as users from "../users.js";
 import type * as valuations from "../valuations.js";
 import type * as vasco from "../vasco.js";
+import type * as vascoNotify from "../vascoNotify.js";
 import type * as vectorize from "../vectorize.js";
 import type * as warmup from "../warmup.js";
 
@@ -162,6 +164,7 @@ declare const fullApi: ApiFromModules<{
   dashboard: typeof dashboard;
   deals: typeof deals;
   documents: typeof documents;
+  documentsClassify: typeof documentsClassify;
   documentsExtract: typeof documentsExtract;
   email: typeof email;
   emailTemplates: typeof emailTemplates;
@@ -250,6 +253,7 @@ declare const fullApi: ApiFromModules<{
   users: typeof users;
   valuations: typeof valuations;
   vasco: typeof vasco;
+  vascoNotify: typeof vascoNotify;
   vectorize: typeof vectorize;
   warmup: typeof warmup;
 }>;

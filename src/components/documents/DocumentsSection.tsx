@@ -1,13 +1,14 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useConvexMutation } from '@convex-dev/react-query'
-import { ConvexError } from 'convex/values'
 import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
 import type { FunctionArgs, FunctionReturnType } from 'convex/server'
 import type { Id } from '../../../convex/_generated/dataModel'
+import type { DocumentAnchor } from '~/components/documents/AddFilesDialog'
+import { AddFilesDialog } from '~/components/documents/AddFilesDialog'
 import { DocumentAttachment } from '~/components/documents/DocumentAttachment'
 import { ExtractedTextDialog } from '~/components/documents/DocumentReading'
 import { Button } from '~/components/ui/button'
@@ -29,20 +30,7 @@ import {
 } from '~/components/ui/select'
 import { LoadingLine, Spinner } from '~/components/ui/spinner'
 
-const MAX_BYTES = 20 * 1024 * 1024
-
 type DocKind = FunctionArgs<typeof api.documents.create>['kind']
-
-/**
- * What the document hangs off. `documents:create` resolves the org from
- * whichever anchor is present and refuses a row with none, so the anchor is
- * the ONLY thing the caller has to supply — never an `orgId`, which would be
- * a tenancy hole (cf. `CLAUDE.md`).
- */
-export type DocumentAnchor =
-  | { kind: 'loan'; loanId: Id<'loans'> }
-  | { kind: 'property'; propertyId: Id<'properties'> }
-  | { kind: 'guarantee'; guaranteeId: Id<'guarantees'> }
 
 /** Rows of `documents:listByLoan` — `listByProperty` / `listByGuarantee` return the same shape. */
 type AnchoredDoc = FunctionReturnType<typeof api.documents.listByLoan>[number]
@@ -59,15 +47,16 @@ function toDateInput(period: number): string {
 }
 
 /**
- * Documents attached to a loan, a property or a guarantee: upload to Convex
- * storage (20 MB cap), list, retitle, delete.
+ * Documents attached to a loan, a property or a guarantee: list, correct,
+ * delete. Filing them is the shared `AddFilesDialog`'s job, here as on a
+ * company fiche — one door, no metadata, the type read from the file.
  *
- * Deliberately LEANER than the company fiche's own documents surface
- * (`CompanyDocumentsCard` + `AddDocumentDialog`), which it does not extend.
- * That one carries search, grouping by kind and multi-file picking because a
- * portfolio company accumulates dozens of pieces; a loan carries an offer
- * letter and an amortization table, a property a deed and a couple of quotes.
- * A filter over four rows is furniture, not a feature.
+ * The rest stays deliberately LEANER than the company fiche's own documents
+ * surface (`CompanyDocumentsCard`), which it does not extend. That one
+ * carries search and grouping by kind because a portfolio company
+ * accumulates dozens of pieces; a loan carries an offer letter and an
+ * amortization table, a property a deed and a couple of quotes. A filter
+ * over four rows is furniture, not a feature.
  *
  * ⚠️ If a loan or a property ever starts accumulating documents the way a
  * company does, the right move is to adopt that surface rather than grow
@@ -104,15 +93,10 @@ export function DocumentsSection({
       year: 'numeric',
       timeZone: 'UTC',
     })
-  const generateUploadUrl = useConvexMutation(api.files.generateUploadUrl)
-  const createDocument = useConvexMutation(api.documents.create)
   const updateDocument = useConvexMutation(api.documents.update)
   const removeDocument = useConvexMutation(api.documents.remove)
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  // Exactly one of the two is set while the metadata dialog is open: the
-  // picked file (creation) or the id of the document being retitled.
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
   const [editingId, setEditingId] = useState<Id<'documents'> | null>(null)
   const [docTitle, setDocTitle] = useState('')
   const [kind, setKind] = useState<DocKind>(kinds[0])
@@ -125,20 +109,8 @@ export function DocumentsSection({
     t(`documents:kind.${value}`, { defaultValue: value })
 
   function closeForm() {
-    setPendingFile(null)
     setEditingId(null)
     setDocTitle('')
-    setDocDate('')
-  }
-
-  function handlePick(file: File) {
-    if (file.size > MAX_BYTES) {
-      toast.error(t('documents:errors.too_large'))
-      return
-    }
-    setPendingFile(file)
-    setDocTitle(file.name.replace(/\.[^.]+$/, ''))
-    setKind(kinds[0])
     setDocDate('')
   }
 
@@ -152,52 +124,19 @@ export function DocumentsSection({
   }
 
   async function handleSave() {
+    if (!editingId) return
     setSaving(true)
     try {
-      const period = docDate ? Date.parse(`${docDate}T00:00:00Z`) : undefined
-
-      if (editingId) {
-        await updateDocument({
-          documentId: editingId,
-          title: docTitle.trim(),
-          kind,
-          period,
-        })
-        toast.success(t('documents:updated'))
-        closeForm()
-        return
-      }
-
-      if (!pendingFile) return
-      const url = await generateUploadUrl({})
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': pendingFile.type || 'application/octet-stream',
-        },
-        body: pendingFile,
-      })
-      if (!res.ok) {
-        toast.error(t('documents:errors.default'))
-        return
-      }
-      const { storageId } = (await res.json()) as { storageId: Id<'_storage'> }
-      await createDocument({
-        ...anchorArgs(anchor),
+      await updateDocument({
+        documentId: editingId,
         title: docTitle.trim(),
         kind,
-        period,
-        storageId,
+        period: docDate ? Date.parse(`${docDate}T00:00:00Z`) : undefined,
       })
-      toast.success(t('documents:added'))
+      toast.success(t('documents:updated'))
       closeForm()
-    } catch (err) {
-      const code = err instanceof ConvexError ? (err.data as string) : ''
-      toast.error(
-        code === 'too_large'
-          ? t('documents:errors.too_large')
-          : t('documents:errors.default'),
-      )
+    } catch {
+      toast.error(t('documents:errors.default'))
     } finally {
       setSaving(false)
     }
@@ -219,25 +158,16 @@ export function DocumentsSection({
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-lg font-medium">{title}</h2>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => fileInputRef.current?.click()}
-        >
+        <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
           <Plus className="size-4" />
           {t('documents:upload')}
         </Button>
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        onChange={(e) => {
-          const picked = e.target.files?.[0]
-          e.target.value = ''
-          if (picked) handlePick(picked)
-        }}
+      <AddFilesDialog
+        anchor={anchor}
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
       />
 
       {!docs ? (
@@ -269,18 +199,15 @@ export function DocumentsSection({
         </div>
       )}
 
-      {/* Metadata dialog: after a file is picked, or on the edit pencil. */}
+      {/* Metadata dialog — correction only: a document is filed without
+          metadata and classified from its own text. */}
       <Dialog
-        open={pendingFile !== null || editingId !== null}
+        open={editingId !== null}
         onOpenChange={(open) => !open && closeForm()}
       >
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {editingId
-                ? t('documents:editDialogTitle')
-                : t('documents:dialogTitle')}
-            </DialogTitle>
+            <DialogTitle>{t('documents:editDialogTitle')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -369,16 +296,4 @@ export function DocumentsSection({
       />
     </section>
   )
-}
-
-/** The anchor as `documents:create` expects it — exactly one id. */
-function anchorArgs(anchor: DocumentAnchor) {
-  switch (anchor.kind) {
-    case 'loan':
-      return { loanId: anchor.loanId }
-    case 'property':
-      return { propertyId: anchor.propertyId }
-    case 'guarantee':
-      return { guaranteeId: anchor.guaranteeId }
-  }
 }

@@ -92,14 +92,29 @@ qu'aucun code **actuel** ne l'écrit, pas qu'aucune **donnée** ne le porte.
 Avant de retirer un champ, regarder la prod. Le chantier de retrait
 (reprise du texte puis purge) est dans `MIGRATIONS.md`.
 
-### Le corollaire qui mord
+### Le corollaire qui mord — un blob se libère au comptage (ALB-240)
 
-`documents:remove` supprime le blob **et** sa ligne `documentTexts`. Sur un
-document issu du fan-out, ça vaut aussi pour les lignes sœurs des autres
-entités, qui perdent le fichier — comportement **préexistant** (la
-suppression du blob était déjà inconditionnelle), simplement étendu au
-texte pour rester cohérent. À traiter le jour où le fan-out multi-org
-devient courant.
+Le pendant de « une ligne `documentTexts` par blob » est qu'un blob a
+**plusieurs propriétaires** : une ligne `documents` par entité du fan-out,
+plus la pièce jointe de l'`inboundEmails` d'origine. Longtemps,
+`documents:remove` supprimait le blob **inconditionnellement** : supprimer le
+document depuis la fiche A blanchissait le fichier de la fiche B et du mail,
+sans rien casser bruyamment — les lignes restaient, leur URL de
+téléchargement ne résolvait plus.
+
+Depuis ALB-240, tout chemin de suppression passe par
+`releaseStorage` (`convex/lib/documentBlobs.ts`) **après** avoir supprimé sa
+propre ligne : le blob et son texte ne partent que si l'index `by_storage` ne
+trouve plus personne. Le mail source, lui, n'est **pas** compté comme
+propriétaire — il perd sa pièce jointe (`storageId` remis à `undefined`, nom
+et taille conservés) en même temps que le fichier. C'est un arbitrage assumé :
+un fichier supprimé disparaît vraiment, au prix d'un mail qu'un « Retraiter »
+ne pourra plus transformer en rapport.
+
+Donc : **jamais `ctx.storage.delete` sur un blob de `documents`**, toujours
+`releaseStorage`. Et une nouvelle table qui pointerait un `storageId` partagé
+doit être ajoutée au comptage — sinon elle perdra ses fichiers en silence,
+exactement comme le fan-out les perdait.
 
 ## Account linking & verified email (anti-doublon)
 
@@ -3524,11 +3539,15 @@ Trois invariants à ne pas casser :
    le coffre.** Elles _sont_ le rapport, repliées dans sa ligne. Le filtre
    existe des deux côtés : l'oublier côté carte fait apparaître chaque fichier
    deux fois et fausse le compteur.
-2. **La porte d'ajout reste unique** (`AddDocumentDialog`), avec le sélecteur
-   des 8 types entier des deux côtés — seul le `defaultKind` change
-   (`reporting` depuis les rapports, `legal` depuis le coffre). Dupliquer le
-   dialogue en deux formulaires spécialisés ramènerait le problème d'origine :
-   un fichier qu'on ne peut plus reclasser sans fermer la fenêtre.
+2. **Les deux portes d'ajout ne demandent plus rien** (ALB-239). Le coffre
+   dépose via `AddFilesDialog` (fichiers, rien d'autre — le type est lu dans
+   le document par `documentsClassify`), le journal via `AddReportDialog`
+   (fichiers + note, circuit d'analyse). Le sélecteur de type partagé n'existe
+   plus qu'à la **correction**, ce qui répond au problème d'origine — un
+   fichier mal classé se reclasse sur sa ligne, sans rouvrir de formulaire.
+   Corollaire : `AddReportDialog` n'est offert que sur une société
+   `portfolio`, seule que `reportInbox.createFromUpload` accepte ; ailleurs
+   le sélecteur servait de rattrapage silencieux.
 3. **Ne pas remettre d'onglets.** C'est exactement l'état d'avant la fusion, et
    il rend le coffre invisible tant qu'on lit le journal.
 
@@ -4101,6 +4120,23 @@ new is persisted — the result still lands in `companyIntelligence`).
   synthesis still runs on the company/report context alone. The `no_data` guard
   is evaluated on (context **OR** comms), so a bare Parallel entity with only
   communications is still analyzed.
+- **Le cache est UPSERTÉ, pas effacé-réécrit (09/2026).** Le remplacement
+  total ne faussait aucune date affichée — la fiche lit `publishDate`, la date
+  du portail — mais il détruisait l'**identité** des lignes : chaque
+  communication était supprimée puis recréée à chaque cycle, donc aucun état ne
+  pouvait y vivre. C'est devenu bloquant avec le mail d'annonce, qui a besoin
+  d'un marqueur « déjà annoncée » : posé sur une ligne, il aurait été balayé
+  48 h plus tard et le même mail serait reparti indéfiniment. La mutation
+  insère donc ce qui est nouveau, patche ce qui a bougé, supprime ce que le
+  portail ne liste plus. Deux gains au passage : « nouveau » devient
+  **structurel** (aucune ligne n'existait) au lieu d'être recalculé à la volée,
+  et une ligne connue coûte un patch au lieu d'un delete + insert.
+  ⚠️ Le patch ne porte **pas** `announcedAt` : c'est précisément ce qui le fait
+  survivre. Y ajouter le champ par mégarde re-annoncerait tout à chaque synchro.
+  ⚠️ Un pull **vide mais réussi** (le portail ne renvoie rien) vide le cache, et
+  le remplissage suivant repasse donc en bootstrap, donc muet. C'était déjà le
+  cas avant (le remplacement total effaçait pareil) et ça échoue du bon côté :
+  on préfère un silence à une volée de mails.
 - **Un pull est une photo, pas un événement — c'est ce qui bloquait le
   déclenchement automatique (ALB-238).** Jusqu'en 09/2026 la synthèse ne partait
   qu'en bout de pipeline mail (`reportStore.run`) : un reporting publié sur le
@@ -4135,6 +4171,24 @@ new is persisted — the result still lands in `companyIntelligence`).
   « connu » et la détection ci-dessus ne se déclenchera **jamais** sur son
   backlog. Sans ce second fil, une entité fraîchement rattachée attendrait la
   prochaine publication de Parallel — potentiellement des mois.
+- **L'annonce par mail (`convex/vascoNotify.ts`).** Une publication n'a ni
+  expéditeur ni fil : personne ne nous a rien envoyé, donc il n'y a personne à
+  qui répondre. Ce qu'elle produit est l'**annonce** que le reste de l'org
+  reçoit déjà quand un report est rangé — même gabarit
+  (`reportConfirmationHtml`), même carte d'entité, même bloc de synthèse — en
+  mail frais aux membres qui n'ont pas coupé `reportAdded`.
+  Deux ordres portent la valeur et ne se permutent pas : la **synthèse tourne
+  avant** que le mail ne soit construit (la carte dit « où en est la boîte », ce
+  qui n'est vrai qu'une fois la publication intégrée — même raison que
+  `reportStore` attendant `runAnalysisBatch`) ; et l'annonce est **réclamée
+  avant** d'être envoyée (`claimArrivals` estampille `announcedAt` dans une
+  transaction), jamais après, sinon une reprise du scheduler enverrait deux
+  fois. Comme `notifiedAt`, la marque n'est **jamais** relâchée : un mail perdu
+  coûte moins cher qu'une boucle de doublons. Corollaire : l'absence
+  d'`AGENTMAIL_INBOX_ID` est testée **avant** la réclamation — sinon on
+  brûlerait l'annonce sans rien envoyer.
+  Un mail **par société**, pas un mail groupé par synchro : une publication est
+  un événement, comme un report reçu.
 - **Chemin manuel.** `intelligence.rerun` (mutation publique org-member-guarded,
   bouton « Relancer l'analyse ») reste utile pour re-scorer après une édition à
   la main ou rejouer une synthèse en échec.

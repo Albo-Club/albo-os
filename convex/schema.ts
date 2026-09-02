@@ -674,6 +674,13 @@ export default defineSchema({
       }),
     ),
     fetchedAt: v.number(), // when this row was last pulled
+    // Set once the arrival of this communication has been announced by mail.
+    // Never reset — same discipline as `inboundEmails.notifiedAt`: one
+    // arrival, one mail, however many times the portal is re-pulled. It can
+    // only live here because the cache is UPSERTED, not wiped and rewritten:
+    // a full replace would drop the marker every cycle and re-announce
+    // everything (cf. KNOWN_ISSUES.md « VASCO API »).
+    announcedAt: v.optional(v.number()),
   }).index('by_org', ['orgId']),
 
   /**
@@ -1178,7 +1185,11 @@ export default defineSchema({
     // documents whose extraction never came back (documentsExtract.ts
     // `sweepStalePending`). Low cardinality on the first field is fine: the
     // sweeper only ever ranges over the 'pending' bucket.
-    .index('by_ocr_state', ['ocrState', 'uploadedAt']),
+    .index('by_ocr_state', ['ocrState', 'uploadedAt'])
+    // Who still points at a blob — read before freeing one (lib/documentBlobs).
+    // A single blob backs one row per fan-out entity, so a deletion has to
+    // count the rows left rather than assume it owns the file.
+    .index('by_storage', ['storageId']),
 
   /**
    * documentTexts — the extracted text of a stored file. ONE row per storage
