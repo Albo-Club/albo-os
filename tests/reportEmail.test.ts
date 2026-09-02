@@ -82,3 +82,42 @@ describe('reportConfirmationHtml', () => {
     }
   })
 })
+
+describe('reportConfirmationHtml — the fiche facts line', () => {
+  /** Rewatt in CALTE: eight CCA tranches repaid, one share position open. */
+  const REWATT: ReportConfirmationData = {
+    highlights: [],
+    entities: [
+      {
+        name: 'REWATT',
+        orgName: 'Calte',
+        logoUrl: null,
+        url: null,
+        openPaidCents: 4_995_000,
+        firstInvestmentAt: Date.UTC(2023, 3, 24),
+        settled: { dealCount: 8, paidCents: 342_075_000, receivedCents: 354_734_428 },
+      },
+    ],
+  }
+
+  it('states the open position apart from what came back (ALB-237)', () => {
+    // The one sum used to announce 3 470 700,00 € on a company where 49 950 €
+    // is at work. Both figures come from bank movements, so both are to the
+    // cent.
+    const html = reportConfirmationHtml(REWATT)
+    assert.match(html, /Versé&nbsp;: <b[^>]*>49\u202f950,00\u00a0€<\/b> depuis avr\. 2023/)
+    assert.match(
+      html,
+      /Soldé&nbsp;: <b[^>]*>3\u202f547\u202f344,28\u00a0€<\/b> reçus pour 3\u202f420\u202f750,00\u00a0€ versés \(8 deals\)/,
+    )
+    assert.equal(html.includes('3\u202f470\u202f700,00'), false)
+  })
+
+  it('says nothing about a side that carries no movement', () => {
+    const html = reportConfirmationHtml({
+      ...REWATT,
+      entities: [{ ...REWATT.entities[0], settled: undefined }],
+    })
+    assert.equal(html.includes('Soldé'), false)
+  })
+})

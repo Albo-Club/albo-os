@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.212.1 — 02/09/2026 à 17:45 — Le contenu des fenêtres reste dans le cadre
+## v1.212.2 — 02/09/2026 à 17:45 — Le contenu des fenêtres reste dans le cadre
 
 Quand une fenêtre s'ouvrait par-dessus la page — ajouter des documents,
 confirmer une suppression, éditer une ligne — un texte long débordait du
@@ -72,6 +72,45 @@ voisine, est abrégé de la même façon.
 >   `grid` » ; candidat template ajouté à `TEMPLATE_SYNC.md`.
 
 ---
+
+## v1.212.1 — 02/09/2026 à 17:45 — L'accusé de réception d'un report ne mélange plus l'argent placé et l'argent revenu
+
+Quand une société porte plusieurs deals, le mail de confirmation d'un report
+additionnait tout ce qui était sorti en banque depuis le premier
+investissement — y compris des avances remboursées depuis longtemps. Sur une
+participation où huit tranches avaient été remboursées et une seule ligne
+restait vivante, il annonçait 3,47 M€ « versés » là où 49 950 € sont
+réellement en jeu.
+
+Le mail sépare désormais les deux, comme le fait déjà la liste des
+participations :
+
+- **Versé** : ce qui est encore engagé, sur les deals ouverts uniquement, et
+  depuis quand.
+- **Soldé** : à côté, ce que les deals déjà sortis ont rapporté pour ce
+  qu'ils avaient coûté, et combien ils étaient.
+
+Un deal **annulé** — celui dont les fonds sont partis puis revenus — n'entre
+dans aucun des deux : il n'y a jamais eu de position. Et une société sans
+deal soldé garde une seule ligne, comme avant.
+
+> **🔧 Notes techniques**
+>
+> - `convex/reportNotify.ts:entityCards` répartit les deals de la société
+>   dans les mêmes seaux que `deals.ts:buildParticipationRows` : `pending` /
+>   `active` d'un côté (`openPaidCents`, `firstInvestmentAt` calculés sur
+>   eux seuls), `fully_exited` / `written_off` de l'autre (`settled`), et
+>   `cancelled` exclu des deux.
+> - `convex/emailTemplates.ts` : `ReportEntityCard.paidCents` devient
+>   `openPaidCents` (le nom mentait sur ce qu'il sommait), plus le bloc
+>   optionnel `settled` rendu par `factsBlock`. Même règle que la ligne
+>   existante — un seau sans aucun mouvement ne s'affiche pas plutôt que
+>   d'annoncer des zéros.
+> - Le mail de diffusion aux autres membres réutilise la même carte, il est
+>   corrigé du même coup.
+> - Régressions : `convex/regression.reportAudience.test.ts` (le cas Rewatt
+>   en base, avec le deal annulé) et `tests/reportEmail.test.ts` (le rendu
+>   des deux lignes).
 
 ## v1.212.0 — 02/09/2026 à 16:04 — Une publication Parallel te prévient par email
 
