@@ -309,10 +309,12 @@ sur une fiche société — ils se lisent depuis le prêt ou la garantie, et
 depuis la recherche de l'assistant IA.
 
 **Sur un prêt**, la section Documents de la fiche porte un bouton
-« Ajouter ». Chaque fichier peut recevoir un type (acte de prêt, juridique,
-autre) et une date, se renommer, s'ouvrir d'un clic et se supprimer. La
-limite est de 20 Mo par fichier, et le texte des PDF est lu automatiquement
-pour que l'assistant puisse le retrouver.
+« Ajouter » qui ne demande que les fichiers, plusieurs d'un coup. Le texte
+des PDF est lu automatiquement — pour que l'assistant puisse les retrouver,
+et pour que chaque fichier **se classe tout seul** (acte de prêt, juridique,
+autre) avec sa date quand le document la porte. Chacun se renomme, se
+reclasse, s'ouvre d'un clic et se supprime. La limite est de 20 Mo par
+fichier.
 
 **Sur une garantie**, les actes se rattachent depuis le menu **⋯** de la
 ligne, sur la fiche du prêt. Ils ne sont pas déposés directement sous la

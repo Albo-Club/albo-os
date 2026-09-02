@@ -165,10 +165,12 @@ produirait un résultat silencieusement faux.
 ### Les documents du bien
 
 L'acte de vente, le compromis, les devis de travaux se rattachent directement
-au bien, depuis la section Documents de sa fiche. Chaque fichier peut
-recevoir un type (juridique, autre) et une date, se renommer, s'ouvrir d'un
-clic et se supprimer. La limite est de 20 Mo par fichier, et le texte des PDF
-est lu automatiquement pour que l'assistant puisse le retrouver.
+au bien, depuis la section Documents de sa fiche : le dépôt ne demande que
+les fichiers, plusieurs d'un coup. Le texte des PDF est lu automatiquement —
+pour que l'assistant puisse les retrouver, et pour que chaque fichier **se
+classe tout seul** (juridique, autre) avec sa date quand le document la
+porte. Chacun se renomme, se reclasse, s'ouvre d'un clic et se supprime. La
+limite est de 20 Mo par fichier.
 
 Ces documents n'ont pas de société-cible au sens portefeuille : ils
 n'apparaissent donc **pas** sur une fiche société, seulement sur celle du

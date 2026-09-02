@@ -20,9 +20,19 @@
 
 import { v } from 'convex/values'
 import { internal } from './_generated/api'
-import { internalAction, internalMutation, internalQuery } from './_generated/server'
+import {
+  internalAction,
+  internalMutation,
+  internalQuery,
+} from './_generated/server'
 import { csvToText, excelToText } from './lib/excel'
-import { EXCEL_EXTS, MIN_OCR_IMAGE_BYTES, boundText, ext, isImage } from './lib/fileText'
+import {
+  EXCEL_EXTS,
+  MIN_OCR_IMAGE_BYTES,
+  boundText,
+  ext,
+  isImage,
+} from './lib/fileText'
 import { ocrImage, ocrPdf } from './lib/ocr'
 
 import type { Id } from './_generated/dataModel'
@@ -42,11 +52,19 @@ interface ExtractTarget {
  * the content type leads and the title's extension is the fallback (for email
  * attachments the title IS the filename).
  */
-function classify(title: string, contentType?: string): 'pdf' | 'excel' | 'csv' | 'image' | 'other' {
+function classify(
+  title: string,
+  contentType?: string,
+): 'pdf' | 'excel' | 'csv' | 'image' | 'other' {
   const e = ext(title)
   const ct = contentType ?? ''
   if (e === 'pdf' || ct === 'application/pdf') return 'pdf'
-  if (EXCEL_EXTS.has(e) || ct.includes('spreadsheet') || ct.includes('ms-excel')) return 'excel'
+  if (
+    EXCEL_EXTS.has(e) ||
+    ct.includes('spreadsheet') ||
+    ct.includes('ms-excel')
+  )
+    return 'excel'
   if (e === 'csv' || ct === 'text/csv') return 'csv'
   if (isImage(title, contentType)) return 'image'
   return 'other'
@@ -107,7 +125,11 @@ export const setState = internalMutation({
   handler: async (ctx, { documentId, ocrState, ocrDetail, ocrChars }) => {
     const doc = await ctx.db.get('documents', documentId)
     if (!doc) return null
-    await ctx.db.patch('documents', documentId, { ocrState, ocrDetail, ocrChars })
+    await ctx.db.patch('documents', documentId, {
+      ocrState,
+      ocrDetail,
+      ocrChars,
+    })
     return null
   },
 })
@@ -117,9 +139,12 @@ export const setState = internalMutation({
 export const run = internalAction({
   args: { documentId: v.id('documents') },
   handler: async (ctx, { documentId }) => {
-    const target: ExtractTarget | null = await ctx.runQuery(internal.documentsExtract.getTarget, {
-      documentId,
-    })
+    const target: ExtractTarget | null = await ctx.runQuery(
+      internal.documentsExtract.getTarget,
+      {
+        documentId,
+      },
+    )
     if (!target) return null
 
     // The blob's text is already known (report attachment, or the same file
@@ -132,6 +157,9 @@ export const run = internalAction({
       })
       // Text available → semantic index (skips non-upload rows itself).
       await ctx.scheduler.runAfter(0, internal.vectorize.indexDocument, {
+        documentId,
+      })
+      await ctx.scheduler.runAfter(0, internal.documentsClassify.run, {
         documentId,
       })
       return null
@@ -168,7 +196,10 @@ export const run = internalAction({
           if (text) state = 'extracted'
           else detail = 'empty_workbook'
         } catch (err) {
-          console.warn(`[documentsExtract] excel parse failed for ${target.title}:`, err)
+          console.warn(
+            `[documentsExtract] excel parse failed for ${target.title}:`,
+            err,
+          )
           state = 'failed'
           detail = 'parse_failed'
         }
@@ -212,6 +243,11 @@ export const run = internalAction({
       await ctx.scheduler.runAfter(0, internal.vectorize.indexDocument, {
         documentId,
       })
+      // …and the type of the document, which the add form no longer asks
+      // for. Only here: a reading that failed has nothing to classify.
+      await ctx.scheduler.runAfter(0, internal.documentsClassify.run, {
+        documentId,
+      })
     } else {
       await ctx.runMutation(internal.documentsExtract.setState, {
         documentId,
@@ -220,7 +256,9 @@ export const run = internalAction({
       })
     }
 
-    console.log(`[documentsExtract] ${target.title}: ${state}${detail ? ` (${detail})` : ''}`)
+    console.log(
+      `[documentsExtract] ${target.title}: ${state}${detail ? ` (${detail})` : ''}`,
+    )
     return null
   },
 })
