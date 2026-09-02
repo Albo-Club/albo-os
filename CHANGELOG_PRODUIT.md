@@ -23,6 +23,53 @@ bas de page.
 
 ---
 
+## v1.213.0 — 02/09/2026 à 17:39 — Un email de reporting se supprime pour de bon
+
+La suppression d'un rapport, livrée ce matin, ne servait à rien sur un mail
+que l'app n'avait jamais rangé : les deux gestes vivent sur la puce d'une
+participation, et un mail sans rapport n'a pas de puce. « Rejeter » ne
+supprimait rien non plus — il rangeait la ligne dans un coin de la file, avec
+sa pièce jointe intacte dans le stockage. Il n'y avait donc, en pratique,
+aucun moyen de se débarrasser d'un mail arrivé par erreur.
+
+Chaque ligne des **Rapports entrants** porte maintenant un bouton
+**« Supprimer »**, et il est radical : le mail disparaît de la file avec
+**tout ce qu'il a produit** — les rapports rangés sur les participations, les
+KPIs qu'ils avaient renseignés, leur indexation pour la recherche, les pièces
+jointes. Rien ne subsiste, sur aucune organisation.
+
+Deux conséquences à connaître. Un mail supprimé n'est plus « connu » de
+l'app : si exactement le même message était renvoyé, il serait traité comme
+un nouveau. Et un mail en cours de traitement ne se supprime pas — le bouton
+attend que le pipeline ait fini.
+
+> **🔧 Notes techniques**
+>
+> - `reportInbox.deleteEmail` : cascade complète. `reportsOfInbound` réunit
+>   les rapports par le back-link `inboundEmails.reportIds` **et** par
+>   `companyReports.by_message_id` (aucun des deux n'est complet seul : un
+>   dépôt manuel n'a pas d'identifiant de message, une vieille ligne n'a pas
+>   de back-link), puis chacun passe par `removeReportForCompany(...,
+>   { deleteFiles: true })`. Les pièces jointes qu'aucun rapport n'a
+>   revendiquées sont libérées ensuite via `releaseStorage`, sur une
+>   **relecture** de la ligne (la cascade vide au passage ce qu'elle
+>   affranchit). La ligne est supprimée en dernier.
+> - **Tenancy** : la file est cross-org, donc `requireOrgMember` est vérifié
+>   sur l'org de **chaque** rapport, en boucle complète **avant** la moindre
+>   suppression — un membre d'une seule org du fan-out ne peut pas emporter
+>   le rapport d'une autre.
+> - Refus sur `status: 'processing'` (`invalid_status`) : le pipeline
+>   écrirait dans une ligne disparue.
+> - La ligne étant la mémoire de dédup d'`ingest` (clé
+>   `agentmailMessageId`), la supprimer rouvre la porte à un rejeu du même
+>   webhook. Arbitrage assumé et documenté.
+> - Front : bouton dans la colonne d'actions de `routes/app/all/reports.tsx`,
+>   présent sur tous les statuts sauf `processing` (qui garde le tiret), avec
+>   sa fenêtre de confirmation. i18n `reports:actions.deleteEmail`,
+>   `deleteEmailDialog.*`, `toasts.emailDeleted`.
+> - 4 tests de régression : cascade complète, mail jamais rangé, refus en
+>   cours de traitement, refus cross-org sans rien supprimer au passage.
+
 ## v1.212.0 — 02/09/2026 à 16:04 — Une publication Parallel te prévient par email
 
 Jusqu'ici, un reporting publié sur le portail Parallel mettait bien la fiche et

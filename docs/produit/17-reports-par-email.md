@@ -122,6 +122,23 @@ rien à télécharger ni à retraiter. C'est la différence entre les deux
 gestes : **détacher** répare un mauvais rangement et laisse tout rejouable,
 **supprimer** fait vraiment disparaître le fichier.
 
+**Quand c'est le mail entier qui n'aurait jamais dû arriver** — un test, une
+pièce envoyée par erreur, un envoi en double — chaque ligne des Rapports
+entrants porte un bouton **« Supprimer »**. Il est radical : le mail quitte
+la file avec **tout ce qu'il a produit**, sur toutes les organisations à la
+fois — les rapports rangés sur les participations, leurs KPIs, leur
+indexation pour la recherche, les pièces jointes. C'est le seul geste qui
+vaut pour un mail que l'app n'a jamais rangé : les deux gestes précédents
+vivent sur la puce d'une participation, et un mail sans rapport n'en a pas.
+Deux choses à savoir : un mail supprimé n'est plus « connu » de l'app, donc
+si exactement le même message était renvoyé il serait traité comme un
+nouveau ; et un mail **en cours de traitement** ne se supprime pas — le
+bouton revient quand le pipeline a fini.
+
+À ne pas confondre avec **« Rejeter »**, qui ne supprime rien : il range la
+ligne dans la file avec le statut « rejeté », fichier compris, pour dire « ce
+mail n'a pas à être traité » sans rien détruire.
+
 ### 3. Lecture du contenu — toutes les sources
 
 Chaque élément du mail est lu, selon son type :

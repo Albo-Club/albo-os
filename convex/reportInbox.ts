@@ -746,6 +746,83 @@ export const reject = mutation({
   },
 })
 
+/**
+ * Every report a mail produced, across the whole multi-org fan-out.
+ *
+ * Two ways in, deliberately: the back-link the queue row keeps (`reportIds`,
+ * written by `reportStore.markProcessed`) and the AgentMail message id the
+ * reports carry. Neither is complete alone — an upload has no message id, and
+ * a row stored before `reportIds` existed has no back-link — so the union is
+ * what makes a deletion exhaustive.
+ */
+async function reportsOfInbound(
+  ctx: MutationCtx,
+  row: Doc<'inboundEmails'>,
+): Promise<Array<Doc<'companyReports'>>> {
+  const found = new Map<Id<'companyReports'>, Doc<'companyReports'>>()
+  for (const reportId of row.reportIds ?? []) {
+    const report = await ctx.db.get('companyReports', reportId)
+    if (report) found.set(report._id, report)
+  }
+  if (row.agentmailMessageId) {
+    const byMessage = await ctx.db
+      .query('companyReports')
+      .withIndex('by_message_id', (q) =>
+        q.eq('agentmailMessageId', row.agentmailMessageId),
+      )
+      .collect()
+    for (const report of byMessage) {
+      if (report.inboundEmailId === row._id) found.set(report._id, report)
+    }
+  }
+  return [...found.values()]
+}
+
+/**
+ * Delete an inbound mail and EVERYTHING it produced — the definitive way out
+ * for a mail that should never have landed (a test, a duplicate, a file sent
+ * by mistake).
+ *
+ * The cascade is the point: every report of the fan-out with its documents,
+ * KPI snapshots and semantic-index entry, then the attachments themselves,
+ * then the row. Nothing is kept as a tombstone — the mail is gone from the
+ * queue, and a redelivery of that same message would be treated as new, since
+ * the row IS the dedup memory (`ingest` keys on `agentmailMessageId`). That
+ * is the accepted price of "définitivement" (ALB-240).
+ *
+ * A mail still `processing` is refused: its pipeline is mid-flight and would
+ * write into a row that no longer exists.
+ */
+export const deleteEmail = mutation({
+  args: { inboundEmailId: v.id('inboundEmails') },
+  handler: async (ctx, { inboundEmailId }) => {
+    await requireAnyMember(ctx)
+    const row = await ctx.db.get('inboundEmails', inboundEmailId)
+    if (!row) throw new ConvexError('not_found')
+    if (row.status === 'processing') throw new ConvexError('invalid_status')
+
+    // The queue spans every org, so membership is checked on each org the
+    // cascade is about to write into — ALL of them before deleting anything.
+    const reports = await reportsOfInbound(ctx, row)
+    for (const report of reports) {
+      await requireOrgMember(ctx, report.orgId)
+    }
+    for (const report of reports) {
+      await removeReportForCompany(ctx, report, { deleteFiles: true })
+    }
+
+    // Attachments no report ever claimed (a mail that was never filed keeps
+    // its own files). Re-read: the cascade above empties what it frees.
+    const left = await ctx.db.get('inboundEmails', inboundEmailId)
+    for (const att of left?.attachments ?? []) {
+      if (att.storageId) await releaseStorage(ctx, att.storageId)
+    }
+
+    await ctx.db.delete('inboundEmails', inboundEmailId)
+    return null
+  },
+})
+
 // ─── Manual upload (company sheet) ───────────────────────────────────────────
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024 // project storage cap (cf. files.ts)

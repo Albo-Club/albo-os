@@ -37,7 +37,8 @@
     "reject": "Reject",
     "assignAlso": "Attach as well",
     "detach": "Detach this report from {{name}}",
-    "deleteReport": "Delete this report and its files from {{name}}"
+    "deleteReport": "Delete this report and its files from {{name}}",
+    "deleteEmail": "Delete"
   },
   "assignDialog": {
     "title": "Assign to a company",
@@ -58,7 +59,8 @@
     "rejected": "Email rejected",
     "error": "Action failed — try again",
     "detached": "Report detached from the participation",
-    "deleted": "Report deleted, files included"
+    "deleted": "Report deleted, files included",
+    "emailDeleted": "Email permanently deleted"
   },
   "related": {
     "hint": "A company on the same domain exists in {{orgs}}, where this report is not attached — open “Attach as well” to add it."
@@ -72,6 +74,12 @@
   "deleteDialog": {
     "title": "Delete this report?",
     "description": "The report will be removed from {{name}} along with its files, the KPIs it filled in and its indexing. A file is erased as soon as no other participation uses it: this email then loses its attachment and can no longer be reprocessed. Irreversible.",
+    "cancel": "Cancel",
+    "confirm": "Delete"
+  },
+  "deleteEmailDialog": {
+    "title": "Delete this email permanently?",
+    "description": "“{{subject}}” and everything it produced go: the reports filed on the participations, their KPIs, their indexing, the attachments and the email itself. The row leaves the queue — were the same message redelivered, it would be treated as new. Irreversible.",
     "cancel": "Cancel",
     "confirm": "Delete"
   }

@@ -188,6 +188,7 @@ function InboundReports() {
   const reject = useConvexMutation(api.reportInbox.reject)
   const detachCompany = useConvexMutation(api.reportInbox.detachCompany)
   const deleteReport = useConvexMutation(api.reportInbox.deleteReport)
+  const deleteEmail = useConvexMutation(api.reportInbox.deleteEmail)
 
   const [assignFor, setAssignFor] = useState<Id<'inboundEmails'> | null>(null)
   const [targetId, setTargetId] = useState<string>('')
@@ -198,6 +199,10 @@ function InboundReports() {
     reportId: Id<'companyReports'>
     name: string
     mode: 'detach' | 'delete'
+  } | null>(null)
+  const [deleteEmailFor, setDeleteEmailFor] = useState<{
+    inboundEmailId: Id<'inboundEmails'>
+    subject: string
   } | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -254,6 +259,15 @@ function InboundReports() {
       'toasts.assigned',
     )
     closeAssign()
+  }
+
+  const confirmDeleteEmail = async () => {
+    if (!deleteEmailFor) return
+    await run(
+      () => deleteEmail({ inboundEmailId: deleteEmailFor.inboundEmailId }),
+      'toasts.emailDeleted',
+    )
+    setDeleteEmailFor(null)
   }
 
   const confirmRemoval = async () => {
@@ -439,60 +453,80 @@ function InboundReports() {
                     ) : null}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {row.status === 'processed' ? (
-                      // Adding a participation to an already stored report:
-                      // the only way to serve a company held by both orgs
-                      // under different names.
-                      <Button
-                        size="sm"
-                        variant={row.relatedOrgNames.length > 0 ? 'outline' : 'ghost'}
-                        disabled={busy}
-                        onClick={() => setAssignFor(row._id)}
-                      >
-                        {t('actions.assignAlso')}
-                      </Button>
-                    ) : reviewable ? (
-                      <div className="flex gap-1">
+                    <div className="flex gap-1">
+                      {row.status === 'processed' ? (
+                        // Adding a participation to an already stored report:
+                        // the only way to serve a company held by both orgs
+                        // under different names.
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant={row.relatedOrgNames.length > 0 ? 'outline' : 'ghost'}
                           disabled={busy}
                           onClick={() => setAssignFor(row._id)}
                         >
-                          {t('actions.assign')}
+                          {t('actions.assignAlso')}
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={busy}
-                          onClick={() =>
-                            run(
-                              () => reprocess({ inboundEmailId: row._id }),
-                              'toasts.reprocessed',
-                            )
-                          }
-                        >
-                          {t('actions.reprocess')}
-                        </Button>
-                        {row.status === 'needs_review' ? (
+                      ) : reviewable ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => setAssignFor(row._id)}
+                          >
+                            {t('actions.assign')}
+                          </Button>
                           <Button
                             size="sm"
                             variant="ghost"
                             disabled={busy}
                             onClick={() =>
                               run(
-                                () => reject({ inboundEmailId: row._id }),
-                                'toasts.rejected',
+                                () => reprocess({ inboundEmailId: row._id }),
+                                'toasts.reprocessed',
                               )
                             }
                           >
-                            {t('actions.reject')}
+                            {t('actions.reprocess')}
                           </Button>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
+                          {row.status === 'needs_review' ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy}
+                              onClick={() =>
+                                run(
+                                  () => reject({ inboundEmailId: row._id }),
+                                  'toasts.rejected',
+                                )
+                              }
+                            >
+                              {t('actions.reject')}
+                            </Button>
+                          ) : null}
+                        </>
+                      ) : null}
+                      {/* The definitive way out, on every row the pipeline is
+                          not currently working on. */}
+                      {row.status === 'processing' ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="hover:text-destructive"
+                          disabled={busy}
+                          onClick={() =>
+                            setDeleteEmailFor({
+                              inboundEmailId: row._id,
+                              subject: row.subject,
+                            })
+                          }
+                        >
+                          {t('actions.deleteEmail')}
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               )
@@ -572,6 +606,36 @@ function InboundReports() {
             </Button>
             <Button disabled={!targetId || busy} onClick={confirmAssign}>
               {t('assignDialog.confirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteEmailFor !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteEmailFor(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('deleteEmailDialog.title')}</DialogTitle>
+            <DialogDescription>
+              {t('deleteEmailDialog.description', {
+                subject: deleteEmailFor?.subject ?? '',
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteEmailFor(null)}>
+              {t('deleteEmailDialog.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={busy}
+              onClick={() => void confirmDeleteEmail()}
+            >
+              {t('deleteEmailDialog.confirm')}
             </Button>
           </DialogFooter>
         </DialogContent>

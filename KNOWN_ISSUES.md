@@ -1958,7 +1958,7 @@ pièces jointes. L'import écrit ses lignes lui-même et **saute** au lieu de
 patcher. Même raison pour `companyIntelligence.latestReportId`, laissé
 intact : un import historique ne doit pas repointer la synthèse courante.
 
-## Détacher un report — l'empreinte à défaire, et le blob qui reste
+## Retirer un report — l'empreinte à défaire, et le blob qui se compte
 
 Ranger un report écrit **cinq** choses par entité rattachée
 (`convex/reportStore.ts:storeForCompany`) : la ligne `companyReports`, une
@@ -1981,12 +1981,14 @@ tombe alors sur `no_data`, qui **efface** l'analyse — c'est ce qui remet
 l'entité à « aucune donnée » au lieu de laisser un score orphelin dans la
 colonne Score IA des Participations (qui lit `aiAnalysis` seule).
 
-Ce qu'il ne faut **pas** supprimer : le **blob de storage**. Un même blob est
-partagé par les lignes `documents` de toutes les entités du fan-out **et** par
-la pièce jointe de `inboundEmails`. Le détacher d'une participation ne doit pas
-aveugler les autres. (À l'inverse, `documents.remove` supprime bien le blob :
-c'est cohérent pour un document déposé à la main, mais cela reste un piège si
-on l'appelait un jour sur la copie d'un report — pré-existant, non touché ici.)
+Ce qu'il ne faut **pas** supprimer en détachant : le **blob de storage**. Un
+même blob est partagé par les lignes `documents` de toutes les entités du
+fan-out **et** par la pièce jointe de `inboundEmails` ; le détacher d'une
+participation ne doit pas aveugler les autres. Depuis ALB-240 ce n'est plus une
+consigne mais un **comptage** : tout chemin de suppression passe par
+`releaseStorage` (cf. § « Texte extrait d'un document », sous-section « Le
+corollaire qui mord »), qui ne libère le fichier que si plus aucune ligne ne le
+désigne. `detachCompany` ne l'appelle simplement pas.
 
 Le second réflexe est de **corriger la ligne de la file** dans la même
 transaction (`matchedCompanies` et `reportIds`) : sans ça la file continue de
@@ -1997,6 +1999,34 @@ champ sont retrouvées via `agentmailMessageId` (index `by_message_id`) ; un
 **dépôt manuel** antérieur, lui, n'a pas de chemin de retour (le rangement met
 délibérément `agentmailMessageId: undefined` sur les uploads) — le détachement
 marche quand même, seule la ligne de la file garde sa mention périmée.
+
+**Trois sorties, pas une** (ALB-240). `detachCompany` retire le report d'**une**
+entité en gardant les fichiers ; `deleteReport` fait la même chose en les
+libérant ; `deleteEmail` supprime la **ligne de la file** et, en cascade, tout
+ce qu'elle a produit sur **toutes** les entités. Trois points non évidents sur
+la troisième :
+
+- **La ligne de la file EST la mémoire de dédup.** `ingest` refuse un message
+  déjà vu en cherchant son `agentmailMessageId` dans `inboundEmails` : c'est ce
+  qui protège des rejeux de webhook AgentMail. Supprimer la ligne efface donc
+  cette mémoire, et un rejeu du même message serait ré-ingéré comme neuf
+  (analyse refaite, accusé de réception renvoyé — `notifiedAt` vit lui aussi
+  sur la ligne). Arbitrage assumé : c'est le prix de « définitivement », et la
+  fenêtre est étroite (les rejeux arrivent dans les minutes qui suivent). Un
+  jour où ça mordrait, la réponse n'est pas de garder la ligne en tombstone
+  mais une table de messages vus, séparée de la file.
+- **La liste des rapports à emporter se lit des deux côtés.** Ni le back-link
+  `inboundEmails.reportIds` ni l'index `companyReports.by_message_id` n'est
+  complet seul (un dépôt manuel n'a pas d'identifiant de message, une ligne
+  antérieure au back-link n'a pas de `reportIds`) : `reportsOfInbound` en fait
+  l'**union**. Une cascade qui n'en lirait qu'un laisserait des rapports
+  orphelins pointant une ligne disparue.
+- **La file est cross-org, la cascade non.** `requireAnyMember` suffit à voir
+  la file, mais pas à écrire dans l'org d'un rapport : `requireOrgMember` est
+  vérifié sur **chaque** org concernée, en boucle complète **avant** la
+  première suppression. Sinon un membre d'une seule org du fan-out emporterait
+  au passage le rapport d'une autre, et un refus à mi-parcours laisserait une
+  suppression partielle.
 
 Couvert par `convex/regression.reportDetach.test.ts`.
 
