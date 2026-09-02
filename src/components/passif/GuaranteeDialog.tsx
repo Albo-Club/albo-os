@@ -154,7 +154,9 @@ export function GuaranteeDialog({
           : 'none'
       : 'org',
   )
-  const [pledgorOrg, setPledgorOrg] = useState<string>(orgId)
+  const [pledgorOrg, setPledgorOrg] = useState<string>(
+    guarantee?.pledgorOrgId ?? orgId,
+  )
   const [pledgorLabel, setPledgorLabel] = useState(
     guarantee && !guarantee.pledgorOrgSlug ? (guarantee.pledgorName ?? '') : '',
   )
