@@ -156,8 +156,10 @@ La colonne principale, dans l'ordre de lecture :
     en gardant les fichiers et le mail d'origine rejouable — c'est le geste
     du mauvais rangement. « Supprimer définitivement » fait la même chose et
     emporte les fichiers : ils sont effacés dès qu'aucune autre participation
-    ne s'en sert, et le mail d'origine perd sa pièce jointe. Détail des deux
-    dans [Reports par email](17-reports-par-email.md).
+    ne s'en sert, et le mail d'origine perd sa pièce jointe. Les deux gestes
+    existent aussi depuis les Rapports entrants (la croix détache, la
+    corbeille supprime). Détail dans
+    [Reports par email](17-reports-par-email.md).
 
 Les documents, à droite, sous l'identité. Ce sont deux choses différentes :
 un rapport est un **journal**, qu'on lit dans l'ordre, une fois, quand il

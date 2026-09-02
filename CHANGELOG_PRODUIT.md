@@ -33,7 +33,9 @@ rapport quitte la fiche comme au détachement, et cette fois le fichier part
 avec lui — dès lors qu'aucune autre participation ne s'en sert. Le mail
 d'origine perd alors sa pièce jointe : il reste listé dans les Rapports
 entrants avec le nom et le poids du fichier, mais il n'y a plus rien à
-télécharger ni à retraiter.
+télécharger ni à retraiter. Le même geste est disponible depuis les
+**Rapports entrants**, par la corbeille à côté de la croix sur la puce de la
+participation.
 
 Les deux gestes restent distincts, et la fenêtre de confirmation dit ce que
 chacun emporte : **détacher** répare un mauvais rangement en laissant tout
@@ -68,10 +70,11 @@ lorsque plus aucune fiche ne le désigne.
 > - `sourceInbound` sort de `reportInbox.ts` vers `convex/lib/reportSource.ts`
 >   pour être lisible aussi depuis `documents:remove`.
 > - Front : `CompanyReportsSection.tsx` porte les deux boutons dans le pied du
->   détail d'un rapport et une seule fenêtre de confirmation paramétrée par
->   le mode (`detach` / `deleteReport`). La file `/app/all/reports` reste au
->   détachement seul — une suppression y viserait le fichier que la ligne
->   affiche.
+>   détail d'un rapport, et `routes/app/all/reports.tsx` une seconde icône
+>   (corbeille) à côté de la croix sur la puce de chaque participation. Les
+>   deux surfaces partagent le même schéma — une seule fenêtre de
+>   confirmation paramétrée par le mode, dont le texte dit ce que le geste
+>   emporte.
 > - 6 tests de régression ajoutés à `regression.reportDetach.test.ts`,
 >   dont deux qui échouent sur l'ancien `documents:remove`.
 

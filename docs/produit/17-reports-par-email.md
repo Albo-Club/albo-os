@@ -110,8 +110,10 @@ d'origine reste dans la file : il n'y a plus qu'à le rattacher là où il
 devait aller.
 
 **Quand un report n'a rien à faire nulle part** — un test, un doublon, une
-pièce envoyée par erreur — il se **supprime**, depuis la fiche société en
-ouvrant le report : « Supprimer définitivement ». Le report quitte la fiche
+pièce envoyée par erreur — il se **supprime**. Depuis la fiche société, en
+ouvrant le report : « Supprimer définitivement ». Depuis les Rapports
+entrants, par la corbeille à côté de la croix sur la puce de la
+participation. Le report quitte la fiche
 comme au détachement, mais cette fois les fichiers partent avec lui : ils
 sont effacés du stockage dès que plus aucune participation ne s'en sert, et
 le mail d'origine perd alors sa pièce jointe. Il reste listé dans les
