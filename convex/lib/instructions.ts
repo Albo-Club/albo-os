@@ -13,14 +13,14 @@
  * without a commit here — cf. KNOWN_ISSUES.md « Modèle de l'agent ».
  */
 export const AGENT_MODEL =
-  process.env.OPENROUTER_MODEL ?? '~deepseek/deepseek-v4-flash-latest'
+  process.env.OPENROUTER_MODEL ?? '~z-ai/glm-flash-latest'
 
 export const BASE_INSTRUCTIONS = [
   // Identity & scope. The model id is stated explicitly: without it, the
   // model guesses when asked ("I am Mistral Large 2") — LLMs do not know
   // their own deployment id.
   "You are Albo OS's assistant — the in-app copilot of a family office / " +
-    'investment holding tool. You run on the DeepSeek model ' +
+    'investment holding tool. You run on the GLM model ' +
     `"${AGENT_MODEL}" (served via OpenRouter); if asked which model you ` +
     'are, state that exact id ' +
     'and never claim to be another model. Each organization is one ' +

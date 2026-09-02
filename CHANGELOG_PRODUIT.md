@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.208.0 — 02/09/2026 à 10:46 — Un reporting Parallel déclenche son analyse tout seul
+## v1.209.0 — 02/09/2026 à 10:46 — Un reporting Parallel déclenche son analyse tout seul
 
 Jusqu'ici, seul un reporting **reçu par email** relançait la synthèse IA de la
 société. Un reporting publié sur le portail Parallel était bien récupéré,
@@ -84,6 +84,101 @@ analyse en échec.
 >   une ligne `companyReports` (lue live par `pullCommunicationsForSynthesis`),
 >   donc elle reste invisible pour la fraîcheur des reportings et les
 >   notifications. Chantier séparé.
+## v1.208.0 — 02/09/2026 à 09:14 — L'assistant passe sur le moteur GLM Flash
+
+L'assistant de l'app change de moteur : il tourne désormais sur **GLM Flash**,
+là où il utilisait jusqu'ici la génération Flash de DeepSeek. Le changement
+est un choix d'outil, pas une évolution de l'app : mêmes accès à vos données,
+mêmes outils, mêmes demandes de confirmation avant toute écriture, même
+capacité à ingérer de longs documents.
+
+Comme précédemment, le même moteur alimente aussi, en arrière-plan, la lecture
+des reportings reçus par email, l'enrichissement des fiches sociétés,
+l'identification de l'expéditeur d'un report et les synthèses de
+participations. Si vous constatez une différence de qualité sur l'une de ces
+lectures automatiques, c'est la première piste à regarder.
+
+Le moteur reste déclaré sous sa forme « dernière version en date » : il suivra
+donc automatiquement les prochaines versions de cette génération, sans
+intervention de notre part.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/instructions.ts` : `AGENT_MODEL` par défaut passe de
+>   `~deepseek/deepseek-v4-flash-latest` à `~z-ai/glm-flash-latest`. Source
+>   unique inchangée, toujours surchargeable par la var d'env Convex
+>   `OPENROUTER_MODEL`. Aucune autre logique touchée — `getModel()`
+>   (`convex/agent.ts`) et ses cinq consommateurs (`reportStore`,
+>   `companyEnrichment`, `reportIdentify`, `intelligence`,
+>   `migrations/alboDocBackfill`) héritent du changement.
+> - Slug retenu : l'**alias** OpenRouter préfixé `~`, qui redirige aujourd'hui
+>   vers `z-ai/glm-5.3-flash` — 1,31 M tokens de contexte (identique à
+>   l'ancien), `tools` + `structured_outputs` supportés, donc `generateObject`
+>   et l'approbation d'outils fonctionnent à l'identique.
+> - Coût : 0,075 $/M en entrée et 0,25 $/M en sortie, contre 0,05 / 0,16 pour
+>   DeepSeek V4 Flash — soit ~1,5× plus cher, ce qui reste marginal à notre
+>   volume. Le cache de préfixe reste automatique côté fournisseur
+>   (`input_cache_read` à 0,015 $/M), sans clé à injecter : le wrapper `fetch`
+>   supprimé à l'époque de Mistral n'a pas à revenir.
+> - Wording du system prompt corrigé (« You run on the GLM model … ») et
+>   commentaire d'en-tête de `convex/agent.ts` mis à jour. `KNOWN_ISSUES.md`
+>   § « Modèle de l'agent » retitré (OpenRouter / GLM) ; défaut mis à jour
+>   dans `CLAUDE.md`, `.env.example` et `TESTING.md`.
+> - ⚠️ Le code ne porte que le **défaut**. Si `OPENROUTER_MODEL` est posé sur
+>   le déploiement prod, c'est lui qui gagne : le basculement effectif demande
+>   `pnpm exec convex env set --prod OPENROUTER_MODEL "~z-ai/glm-flash-latest"`
+>   (ou la suppression de la variable pour retomber sur le défaut du code).
+> - Claim périmé nettoyé au passage : la liste « Trade-offs vs
+>   PROJECT_BRIEF.md » de `KNOWN_ISSUES.md` annonçait encore
+>   `deepseek/deepseek-v4-pro` comme défaut de l'agent (faux depuis la bascule
+>   Flash de la v1.192.0). Elle ne répète plus la valeur — elle renvoie à
+>   `AGENT_MODEL` et au § « Modèle de l'agent », donc elle ne peut plus
+>   dériver.
+
+## v1.207.1 — 02/09/2026 à 08:51 — Les étiquettes ne se chevauchent plus
+
+Dans le tiroir des documents d'une société, l'étiquette bleue « Deal · … »
+passait par-dessus le compteur de caractères et les icônes de droite quand
+le nom du deal était un peu long. La faute à des étiquettes qui refusaient
+de rétrécir ou de passer à la ligne : faute de place, elles débordaient
+simplement sur ce qu'il y avait à côté.
+
+- Dans le tiroir des documents, l'étiquette du deal **passe à la ligne**
+  sous le titre plutôt que de recouvrir les actions, et s'abrège avec des
+  points de suspension si le nom du deal est très long (le nom entier reste
+  lisible au survol).
+- Même correction sur les deux autres endroits où le même défaut existait
+  sans avoir encore été repéré : l'étiquette de société d'une tâche de la
+  page **À faire**, et l'étiquette « + autres sociétés ? » des reports
+  entrants dans la vue consolidée.
+
+Le reste de l'application a été passé en revue pour ce défaut précis : les
+autres écrans étaient déjà corrects. Un point de vigilance reste ouvert, non
+corrigé ici parce qu'il touche la largeur des colonnes : dans la liste
+Entreprises en vue consolidée, la colonne des sociétés du groupe est étroite
+et un nom long (« Relais Chapelle ») peut mordre sur la colonne voisine.
+
+> **🔧 Notes techniques**
+>
+> - Cause commune : `Badge` et `Button` (`src/components/ui/*`) portent
+>   `shrink-0` + `whitespace-nowrap` dans leur variante de base. Dans une
+>   ligne flex contrainte ils ne rétrécissent ni ne passent à la ligne, et
+>   rien ne les rogne — ils débordent en silence sur le voisin. Le symptôme
+>   n'apparaît que si le badge porte une **donnée non bornée** (nom de
+>   société, d'org, libellé de deal), d'où son caractère intermittent.
+> - `DocumentAttachment.tsx` : `flex-wrap` sur la ligne titre + badges.
+>   `CompanyDocumentsCard.tsx` : badge deal en `max-w-full` + `truncate` +
+>   `title`. Le plafond **`max-w-full`, pas une valeur fixe** — mesuré dans
+>   le sheet (`sm:max-w-lg`), `max-w-[16rem]` laissait encore 80 px de
+>   débordement, `max-w-full` tombe à 0.
+> - Même patron appliqué à `todo.tsx` (badge société) et à
+>   `all/reports.tsx` (badge « + orgs ? », qui était le seul de sa cellule
+>   sans plafond alors que ses voisins en avaient un).
+> - Vérification : réplique DOM des cartes rendue dans Chromium avec le CSS
+>   Tailwind du projet, débordement mesuré au pixel (106 px avant → 0 après)
+>   plutôt que constaté à l'œil.
+> - Règle ajoutée aux anti-patterns de `CLAUDE.md` ; ligne TP10c de
+>   `TESTING.md` complétée.
 
 ## v1.207.0 — 01/09/2026 à 16:51 — La documentation d'Albo OS se lit dans Albo OS
 

@@ -384,16 +384,25 @@ function DocumentsSheet({
                           // Above the card's full-surface open-the-file overlay
                           // (`AttachmentTrigger`, z-10), otherwise the link to
                           // the deal would be unclickable.
-                          className="text-info border-info/50 relative z-20 shrink-0 font-normal"
+                          // A deal name is free text. `max-w-full` (not a fixed
+                          // cap) is what holds in the narrow documents sheet:
+                          // the badge takes at most the row, wraps under it,
+                          // and ellipsizes — it never runs over the actions.
+                          className="text-info border-info/50 relative z-20 max-w-full shrink-0 font-normal"
+                          title={t('participations:documents.dealBadge', {
+                            deal: dealLabel(doc.deal),
+                          })}
                         >
                           <Link
                             to="/app/$orgSlug/deals/$dealId"
                             params={{ orgSlug, dealId: doc.deal._id }}
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {t('participations:documents.dealBadge', {
-                              deal: dealLabel(doc.deal),
-                            })}
+                            <span className="truncate">
+                              {t('participations:documents.dealBadge', {
+                                deal: dealLabel(doc.deal),
+                              })}
+                            </span>
                           </Link>
                         </Badge>
                       )
