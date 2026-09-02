@@ -1282,6 +1282,13 @@ export interface ReportConfirmationData {
   afterFix?: boolean
   /** Set on the copy sent to members who did not forward anything. */
   forwardedBy?: string
+  /** Portal arrival instead of a forward: nobody sent this, it was published.
+   *  Reads the same as `forwardedBy` (it is news for everyone), but says where
+   *  it came from rather than who relayed it. */
+  publishedOn?: string
+  /** Titles of the publications this announcement covers — the portal gives no
+   *  extracted highlights, so the titles are what names the arrival. */
+  publicationTitles?: Array<string>
   /** Present only for a reader who handles the review queue. */
   quality?: ReportQuality
 }
@@ -1452,7 +1459,8 @@ function bulletBlock(heading: string, items: Array<string>): string {
  */
 export function reportConfirmationHtml(d: ReportConfirmationData): string {
   const periodLabel = d.reportPeriod ? esc(d.reportPeriod) : 'document ponctuel'
-  const title = d.forwardedBy
+  const announced = Boolean(d.forwardedBy) || Boolean(d.publishedOn)
+  const title = announced
     ? `📈 Nouveau report — ${periodLabel}`
     : `✅ Report rangé — ${periodLabel}`
 
@@ -1467,6 +1475,10 @@ export function reportConfirmationHtml(d: ReportConfirmationData): string {
     blocks.push(
       `<p style="margin:0 0 14px;color:${MUTED};">Transféré par ${esc(d.forwardedBy)}.</p>`,
     )
+  } else if (d.publishedOn) {
+    blocks.push(
+      `<p style="margin:0 0 14px;color:${MUTED};">${esc(d.publishedOn)}.</p>`,
+    )
   }
 
   for (const e of d.entities) {
@@ -1474,13 +1486,15 @@ export function reportConfirmationHtml(d: ReportConfirmationData): string {
     const facts = factsBlock(e)
     if (facts) blocks.push(facts)
     blocks.push(bulletBlock('Ce que dit ce report', d.highlights.slice(0, 3)))
+    if (d.publicationTitles?.length)
+      blocks.push(bulletBlock('Publications', d.publicationTitles))
     if (e.synthesis) blocks.push(synthesisCard(e.name, e.synthesis))
     if (e.url) blocks.push(buttonBlock(`Ouvrir la fiche ${e.name}`, e.url))
   }
 
   if (d.quality) blocks.push(...qualityBlocks(d.quality))
 
-  if (!d.forwardedBy) {
+  if (!announced) {
     blocks.push(
       `<p style="margin:14px 0 0;color:${MUTED};font-size:13px;">Tu n'as rien d'autre à faire.</p>`,
     )

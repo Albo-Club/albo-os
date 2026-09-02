@@ -125,6 +125,7 @@ import type * as transfers from "../transfers.js";
 import type * as users from "../users.js";
 import type * as valuations from "../valuations.js";
 import type * as vasco from "../vasco.js";
+import type * as vascoNotify from "../vascoNotify.js";
 import type * as vectorize from "../vectorize.js";
 import type * as warmup from "../warmup.js";
 
@@ -252,6 +253,7 @@ declare const fullApi: ApiFromModules<{
   users: typeof users;
   valuations: typeof valuations;
   vasco: typeof vasco;
+  vascoNotify: typeof vascoNotify;
   vectorize: typeof vectorize;
   warmup: typeof warmup;
 }>;

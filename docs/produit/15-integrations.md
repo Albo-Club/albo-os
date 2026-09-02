@@ -162,8 +162,16 @@ concernée, exactement comme un reporting reçu par email : rien à cliquer. Seu
 les sociétés dont l'émetteur a effectivement publié sont recalculées — une
 synchronisation qui ne ramène rien ne relance rien. Rattacher une société à son
 émetteur lance également son analyse dans la foulée, sans attendre la prochaine
-publication. Aucun email n'est envoyé dans ces deux cas : personne n'a rien
-transféré, il n'y a personne à qui répondre. Le rattachement (et le
+publication.
+
+Une fois l'analyse à jour, **un email d'annonce part** — un par société qui a
+publié, au même format que l'accusé de réception d'un reporting transféré :
+carte de la société, lien vers sa fiche, titre des publications, et la note de
+santé remise à jour. Il est adressé aux membres de l'organisation qui n'ont pas
+désactivé les annonces de reporting. Chaque publication n'est annoncée
+**qu'une fois** : rejouer une synchronisation ne renvoie rien. Le rattachement
+d'une société, lui, met à jour son analyse sans envoyer d'email — c'est un
+geste interne, pas une nouvelle du portail. Le rattachement (et le
 détachement) se gèrent au même endroit qu'au départ : **⋯ → Intégrations**.
 
 ## Ingestion des rapports par email

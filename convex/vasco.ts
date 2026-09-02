@@ -971,24 +971,31 @@ async function activeConnectionsForClient(
 // button). The UI reads the cache via reactive queries (instant); freshness is
 // bounded by the cron cadence. cf. KNOWN_ISSUES.md "VASCO API".
 
-/** Atomically replace the cached communications of one (org, clientSlug): drop
- * the stale rows, insert the freshly pulled set. One transaction, so a reader
- * never sees a half-empty cache.
+/** Reconcile the cached communications of one (org, clientSlug) with what the
+ * portal just returned: insert what is new, patch what moved, drop what the
+ * portal no longer lists. One transaction, so a reader never sees a half-empty
+ * cache.
  *
- * The replace is also where the arrival of a report is DETECTED. A pull is a
- * photo of the portal, not an event: after the swap every row carries the same
- * `fetchedAt`, so nothing downstream can tell a communication published today
- * from one published last year. The `communicationId`s about to be dropped are
- * therefore read BEFORE the delete, and the pulled set is diffed against them
- * — the only moment in the whole flow where "new" is knowable.
+ * UPSERT, not "wipe and rewrite" — the distinction carries the whole feature.
+ * A pull is a photo of the portal, not an event, so nothing in the payload
+ * says what just arrived; the answer has to come from what we already held.
+ * Wiping first threw that away: every row was recreated on every cycle, so no
+ * per-communication state could survive (`announcedAt` would be reset every
+ * 48h and the same mail would go out forever), and "new" had to be recomputed
+ * in flight. Here a row that already existed keeps its identity and its
+ * marker, and NEW is simply "no row existed" — structural, not derived.
  *
- * Each entity linked to an issuer carrying at least one new communication gets
- * its AI synthesis re-run, which is what makes a VASCO report behave like a
- * mail report (whose analysis is fired at the end of `reportStore.run`). No
- * mail is sent: nobody forwarded anything, so there is no one to answer.
+ * What follows an arrival, per entity linked to that issuer: the AI synthesis
+ * is re-run, then the announcement mail goes out — in that order, so the mail
+ * carries a note that has folded the new communication in (same discipline as
+ * `reportStore.run` → `runAnalysisBatch`). See `vascoNotify.announce`.
  *
- * On a first fill the whole set reads as new — that IS the bootstrap of an org
- * that has never pulled, and it is bounded by its number of linked entities.
+ * FIRST FILL is the one arrival that must stay silent. An org whose cache was
+ * never filled (or was emptied) would read its whole history as new and send a
+ * mail per communication. Its entities are still analyzed — that IS the
+ * bootstrap, and it is bounded by the number of linked entities — but every
+ * row is marked as already announced, so nothing is mailed.
+ *
  * A failed pull never reaches here (the caller keeps the previous cache), so a
  * transient portal outage cannot fake a wave of arrivals. */
 export const replaceCommunicationsCache = internalMutation({
@@ -1016,20 +1023,24 @@ export const replaceCommunicationsCache = internalMutation({
     ),
   },
   handler: async (ctx, { orgId, clientSlug, communications }) => {
-    const existing = await ctx.db
+    const rows = await ctx.db
       .query('vascoCommunicationsCache')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
-    // Memory of what this client already held, captured before the delete.
-    const known = new Set<string>()
-    for (const row of existing) {
-      if (row.clientSlug !== clientSlug) continue
-      known.add(row.communicationId)
-      await ctx.db.delete('vascoCommunicationsCache', row._id)
+    const held = new Map<string, Doc<'vascoCommunicationsCache'>>()
+    for (const row of rows) {
+      if (row.clientSlug === clientSlug) held.set(row.communicationId, row)
     }
+    // Nothing held for this portal yet: the whole pull reads as new, which is
+    // the bootstrap — analyze, but never mail a backlog.
+    const bootstrap = held.size === 0
     const fetchedAt = Date.now()
+
+    const arrivedIssuers = new Set<string>()
+    const seen = new Set<string>()
     for (const c of communications) {
-      await ctx.db.insert('vascoCommunicationsCache', {
+      seen.add(c.communicationId)
+      const fields = {
         orgId,
         clientSlug,
         issuerId: c.issuerId,
@@ -1046,35 +1057,56 @@ export const replaceCommunicationsCache = internalMutation({
           createdAt: d.createdAt ?? undefined,
         })),
         fetchedAt,
+      }
+      const current = held.get(c.communicationId)
+      if (current) {
+        // Known: refresh the payload, keep the row — and with it `announcedAt`,
+        // which is what stops the next cycle from re-announcing.
+        await ctx.db.patch('vascoCommunicationsCache', current._id, fields)
+        continue
+      }
+      await ctx.db.insert('vascoCommunicationsCache', {
+        ...fields,
+        // A bootstrap fill is marked as already announced: the backlog is not
+        // news, and mailing it one communication at a time is the one failure
+        // mode worth designing against.
+        announcedAt: bootstrap ? fetchedAt : undefined,
       })
+      arrivedIssuers.add(c.issuerId)
     }
 
-    const freshIssuers = new Set(
-      communications
-        .filter((c) => !known.has(c.communicationId))
-        .map((c) => c.issuerId),
-    )
-    if (freshIssuers.size > 0)
-      await scheduleAnalysisForIssuers(ctx, orgId, clientSlug, freshIssuers)
+    // Gone from the portal → gone from the cache. Nothing else prunes it, and
+    // a row the portal no longer lists would keep showing on the fiche.
+    for (const [communicationId, row] of held) {
+      if (!seen.has(communicationId))
+        await ctx.db.delete('vascoCommunicationsCache', row._id)
+    }
+
+    if (arrivedIssuers.size > 0)
+      await scheduleArrivals(ctx, orgId, clientSlug, arrivedIssuers, !bootstrap)
   },
 })
 
-/** Re-run the AI synthesis of every entity of `orgId` linked to one of
- * `issuerIds` on `clientSlug`. No index on the VASCO link — the org's entities
- * are read and filtered, the same way `lib/reportFreshness` and
- * `companyEnrichment` resolve that link. Archived entities are skipped: the
- * portal keeps publishing on a position we stopped following.
+/** Fan an arrival out to the entities of `orgId` linked to one of `issuerIds`
+ * on `clientSlug`. No index on the VASCO link — the org's entities are read and
+ * filtered, the same way `lib/reportFreshness` and `companyEnrichment` resolve
+ * that link. Archived entities are skipped: the portal keeps publishing on a
+ * position we stopped following.
  *
- * One job PER entity, not `runAnalysisBatch`: that batch exists to sequence the
- * confirmation mail after its analyses, and there is no mail here. Its loop is
- * sequential, so a first fill with many linked entities would run every LLM
- * call inside a single action — the one shape that can hit the action time
- * limit. Independent jobs also mean one failure never buries the others. */
-async function scheduleAnalysisForIssuers(
+ * `announce` false (bootstrap) schedules the synthesis alone. Otherwise it
+ * schedules `vascoNotify.announce`, which runs that same synthesis and THEN
+ * mails the recap — the order matters, the mail carries the note.
+ *
+ * One job PER entity, never a batch: the loop of `runAnalysisBatch` is
+ * sequential, so a fill touching many linked entities would run every LLM call
+ * inside a single action — the one shape that can hit the action time limit.
+ * Independent jobs also mean one failure never buries the others. */
+async function scheduleArrivals(
   ctx: MutationCtx,
   orgId: Id<'organizations'>,
   clientSlug: string,
   issuerIds: Set<string>,
+  announce: boolean,
 ): Promise<void> {
   const companies = await ctx.db
     .query('companies')
@@ -1088,10 +1120,19 @@ async function scheduleAnalysisForIssuers(
       !issuerIds.has(company.vascoIssuerId)
     )
       continue
-    await ctx.scheduler.runAfter(0, internal.intelligence.runAnalysis, {
-      companyId: company._id,
-      orgId,
-    })
+    if (announce) {
+      await ctx.scheduler.runAfter(0, internal.vascoNotify.announce, {
+        companyId: company._id,
+        orgId,
+        clientSlug,
+        issuerId: company.vascoIssuerId,
+      })
+    } else {
+      await ctx.scheduler.runAfter(0, internal.intelligence.runAnalysis, {
+        companyId: company._id,
+        orgId,
+      })
+    }
   }
 }
 
