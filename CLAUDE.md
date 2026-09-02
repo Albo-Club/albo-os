@@ -666,6 +666,22 @@ export const remove = mutation({
   has no built-in height cap, so tall content overflows the viewport with no
   way to reach the lower fields or the footer actions. Pattern already in
   `deals.$dealId.tsx`, `RoyaltiesPanel.tsx`, `CompanyReportsSection.tsx`.
+- ❌ A `Badge` (or a `Button`) carrying **unbounded user data** — a company or
+  org name, a deal label, a document title, an email — without a `max-w-*`
+  cap and a `truncate` on its text. Both components bake `shrink-0` and
+  `whitespace-nowrap` into their base variant, so in a width-capped row they
+  neither shrink nor wrap: they **spill over the neighbour** — the action
+  cluster of the row, or the next column of a `table-fixed` grid. Nothing
+  clips them, so the overlap is silent. Pattern: a `max-w-*` on the badge, a
+  `title` with the full value, and the label inside a
+  `<span className="truncate">`. Which cap depends on the room: a fixed one
+  (`max-w-[16rem]`) inside a container wider than it (a table cell —
+  `all/reports.tsx`), `max-w-full` wherever the container itself can be
+  narrow (a sheet, a panel — `CompanyDocumentsCard.tsx`), since a fixed cap
+  larger than the row overflows exactly like no cap at all. A short static
+  i18n label needs none of this. Its sibling rule: a row that mixes such a
+  badge with a flexible label is `flex-wrap`, so the badge drops to a second
+  line rather than over the actions (`DocumentAttachment.tsx`).
 - ❌ Stocker un capital restant dû, une marge disponible, un solde ou tout
   autre chiffre **dérivable**. L'échéancier d'un prêt est recalculé à chaque
   lecture par `convex/lib/amortization.ts` (fonction pure), la marge d'un

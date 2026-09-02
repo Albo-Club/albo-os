@@ -351,9 +351,12 @@ function Todo() {
                           >
                             <Badge
                               variant="outline"
-                              className="text-muted-foreground hover:text-foreground font-normal"
+                              className="text-muted-foreground hover:text-foreground max-w-[16rem] font-normal"
+                              title={task.company.name}
                             >
-                              {task.company.name}
+                              <span className="truncate">
+                                {task.company.name}
+                              </span>
                             </Badge>
                           </Link>
                         )}
