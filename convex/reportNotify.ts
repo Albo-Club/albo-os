@@ -172,8 +172,15 @@ export const entityCards = internalQuery({
       if (!company || !org) continue
 
       // Fiche figures: one company can carry several deals (Eben Home has
-      // three). What went out + when it started — the per-line detail is one
-      // click away on the fiche.
+      // three, Rewatt nine), and they are not all of the same nature — CCA
+      // tranches repaid years ago sit next to a share position still open.
+      // Summing the lot into one "Versé" announced 3,47 M€ on a company where
+      // 49 950 € is actually at work (ALB-237), and it contradicted the app,
+      // whose participations list already splits a company into open /
+      // settled / cancelled tables. Same split here, same buckets.
+      //
+      // `cancelled` enters neither side: the funds were wired and refunded,
+      // so there never was a position (cf. CLAUDE.md).
       //
       // The figure is "Versé", summed from the bank movements reconciled
       // against each deal (`transactionTotals`, the app's own definition), NOT
@@ -185,13 +192,24 @@ export const entityCards = internalQuery({
           q.eq('orgId', ref.orgId).eq('targetCompanyId', ref.companyId),
         )
         .collect()
-      let paid = 0
+      let openPaid = 0
+      let settledCount = 0
+      let settledPaid = 0
+      let settledReceived = 0
+      const openDates: Array<number> = []
       for (const deal of deals) {
-        paid += (await transactionTotals(ctx, deal._id)).paidActual
+        if (deal.status === 'cancelled') continue
+        const totals = await transactionTotals(ctx, deal._id)
+        if (deal.status === 'fully_exited' || deal.status === 'written_off') {
+          settledCount += 1
+          settledPaid += totals.paidActual
+          settledReceived += totals.received
+          continue
+        }
+        openPaid += totals.paidActual
+        const startedAt = deal.investmentDate ?? deal.signedDate
+        if (typeof startedAt === 'number') openDates.push(startedAt)
       }
-      const dates = deals
-        .map((d) => d.investmentDate ?? d.signedDate)
-        .filter((d): d is number => typeof d === 'number')
 
       // The report that came BEFORE the one just filed: the freshest two, and
       // we want the second. On a duplicate the newest IS the one re-sent, so
@@ -215,8 +233,18 @@ export const entityCards = internalQuery({
         url: siteUrl()
           ? `${siteUrl()}/app/${org.slug}/participations/${company._id}`
           : null,
-        paidCents: paid > 0 ? paid : undefined,
-        firstInvestmentAt: dates.length > 0 ? Math.min(...dates) : undefined,
+        openPaidCents: openPaid > 0 ? openPaid : undefined,
+        firstInvestmentAt: openDates.length > 0 ? Math.min(...openDates) : undefined,
+        // Same rule as the open line: a bucket with no movement at all says
+        // nothing rather than announcing zeroes.
+        settled:
+          settledPaid > 0 || settledReceived > 0
+            ? {
+                dealCount: settledCount,
+                paidCents: settledPaid,
+                receivedCents: settledReceived,
+              }
+            : undefined,
         previousPeriod: recent[1]?.reportPeriod,
         synthesis: ai?.executive_summary
           ? {

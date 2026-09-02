@@ -114,8 +114,78 @@ describe('entityCards — a reader only sees their own organizations', () => {
       refs: [{ companyId, orgId: org.orgId }],
       userId: ben.userId,
     })
-    expect(card.paidCents).toBe(35_824_040)
+    expect(card.openPaidCents).toBe(35_824_040)
     expect(card.firstInvestmentAt).toBe(early)
+  })
+
+  test('the tranches already repaid are stated apart, never as money at work', async () => {
+    // ALB-237, seen on Rewatt: eight CCA tranches repaid years ago plus one
+    // open share position. Summed, the mail announced 3,47 M€ "Versé" on a
+    // company where 49 950 € is actually at work — and it contradicted the
+    // participations list, which splits the same company into open / settled
+    // tables. A cancelled deal belongs to neither: wired then refunded, it
+    // never was a position.
+    const t = setupHarness()
+    const ben = await createUser(t, 'benjamin@test.dev')
+    const org = await createOrg(t, 'albo', [{ userId: ben.userId, role: 'owner' }])
+    const companyId = await createPortfolioCompany(t, org.orgId, 'Rewatt')
+    const account = await createBankAccount(t, org)
+
+    const exitedAt = Date.UTC(2023, 3, 24)
+    const openedAt = Date.UTC(2024, 4, 1)
+    const [exited, open, cancelled] = await t.run(async (ctx) => {
+      const ids = []
+      for (const deal of [
+        { status: 'fully_exited' as const, kind: 'cca' as const, when: exitedAt },
+        { status: 'active' as const, kind: 'share' as const, when: openedAt },
+        { status: 'cancelled' as const, kind: 'cca' as const, when: openedAt },
+      ]) {
+        ids.push(
+          await ctx.db.insert('deals', {
+            orgId: org.orgId,
+            investorCompanyId: org.rootCompanyId,
+            targetCompanyId: companyId,
+            instrumentKind: deal.kind,
+            signedDate: deal.when,
+            status: deal.status,
+            currency: 'EUR',
+          }),
+        )
+      }
+      return ids
+    })
+
+    const flows = [
+      { deal: exited, direction: 'out' as const, amount: 60_000_000 },
+      { deal: exited, direction: 'in' as const, amount: 62_240_000 },
+      { deal: open, direction: 'out' as const, amount: 4_995_000 },
+      // The refunded round trip of the cancelled deal: both movements exist
+      // and stay matchable, and neither shows up in the mail.
+      { deal: cancelled, direction: 'out' as const, amount: 10_000_000 },
+      { deal: cancelled, direction: 'in' as const, amount: 10_000_000 },
+    ]
+    for (const flow of flows) {
+      const id = await createTransaction(t, org.orgId, account, {
+        direction: flow.direction,
+        amount: flow.amount,
+      })
+      await t.run(async (ctx) => {
+        await ctx.db.patch('transactions', id, { dealId: flow.deal })
+      })
+    }
+
+    const [card] = await t.query(internal.reportNotify.entityCards, {
+      refs: [{ companyId, orgId: org.orgId }],
+      userId: ben.userId,
+    })
+    expect(card.openPaidCents).toBe(4_995_000)
+    // Dated on the open deal, not on the tranche repaid a year earlier.
+    expect(card.firstInvestmentAt).toBe(openedAt)
+    expect(card.settled).toEqual({
+      dealCount: 1,
+      paidCents: 60_000_000,
+      receivedCents: 62_240_000,
+    })
   })
 
   test('a deal with a commitment but no payment shows no figure at all', async () => {
@@ -141,7 +211,7 @@ describe('entityCards — a reader only sees their own organizations', () => {
       refs: [{ companyId, orgId: org.orgId }],
       userId: ben.userId,
     })
-    expect(card.paidCents).toBeUndefined()
+    expect(card.openPaidCents).toBeUndefined()
   })
 })
 

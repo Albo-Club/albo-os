@@ -1244,14 +1244,25 @@ export interface ReportEntityCard {
   /** Fiche URL — null when SITE_URL is unset. */
   url: string | null
   /**
-   * What the org actually wired to this company, in EUR cents — the sum of
-   * the outflows reconciled against its deals ("Versé" in the app), not the
+   * What the org has at work in this company right now, in EUR cents — the
+   * outflows reconciled against its OPEN deals ("Versé" in the app), not the
    * commitment. Most CALTE deals carry no commitment at all, so keying the
    * line on it left it blank on nearly every report.
    */
-  paidCents?: number
-  /** First investment date on this company, ms epoch. */
+  openPaidCents?: number
+  /** First investment date among the open deals, ms epoch. */
   firstInvestmentAt?: number
+  /**
+   * The closed side of the same company: exits and write-offs, summed. Kept
+   * apart from the line above so CCA tranches repaid years ago stop being
+   * announced as money still at work (ALB-237). Absent when the company has
+   * no settled deal carrying a movement.
+   */
+  settled?: {
+    dealCount: number
+    paidCents: number
+    receivedCents: number
+  }
   /** Period label of the report that came before this one. */
   previousPeriod?: string
   synthesis?: ReportSynthesis
@@ -1314,19 +1325,29 @@ function entityBlock(e: ReportEntityCard): string {
 }
 
 /**
- * Fiche facts. "Versé" comes from reconciled bank movements, so it is shown
- * TO THE CENT — cf. CLAUDE.md "l'actuel au centime, l'estimé arrondi". A
- * commitment would have been rounded to the euro; this is not one.
- * Returns '' when the company carries neither a payment nor an earlier report.
+ * Fiche facts: the open position first, then the settled one, then the
+ * previous period. Both amounts come from reconciled bank movements, so they
+ * are shown TO THE CENT — cf. CLAUDE.md "l'actuel au centime, l'estimé
+ * arrondi". A commitment would have been rounded to the euro; these are not.
+ * Returns '' when the company carries neither a movement nor an earlier
+ * report.
  */
 function factsBlock(e: ReportEntityCard): string {
   const parts: Array<string> = []
-  if (e.paidCents !== undefined) {
+  if (e.openPaidCents !== undefined) {
     const when = e.firstInvestmentAt
       ? ` depuis ${MONTH_FMT.format(new Date(e.firstInvestmentAt))}`
       : ''
     parts.push(
-      `Versé&nbsp;: <b style="color:${BRAND};">${esc(EUR_CENTS_FMT.format(e.paidCents / 100))}</b>${esc(when)}`,
+      `Versé&nbsp;: <b style="color:${BRAND};">${esc(EUR_CENTS_FMT.format(e.openPaidCents / 100))}</b>${esc(when)}`,
+    )
+  }
+  if (e.settled) {
+    const { dealCount, paidCents, receivedCents } = e.settled
+    const deals = `${dealCount} deal${dealCount > 1 ? 's' : ''}`
+    parts.push(
+      `Soldé&nbsp;: <b style="color:${BRAND};">${esc(EUR_CENTS_FMT.format(receivedCents / 100))}</b>` +
+        ` reçus pour ${esc(EUR_CENTS_FMT.format(paidCents / 100))} versés (${deals})`,
     )
   }
   if (e.previousPeriod) {
