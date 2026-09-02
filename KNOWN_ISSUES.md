@@ -92,14 +92,29 @@ qu'aucun code **actuel** ne l'écrit, pas qu'aucune **donnée** ne le porte.
 Avant de retirer un champ, regarder la prod. Le chantier de retrait
 (reprise du texte puis purge) est dans `MIGRATIONS.md`.
 
-### Le corollaire qui mord
+### Le corollaire qui mord — un blob se libère au comptage (ALB-240)
 
-`documents:remove` supprime le blob **et** sa ligne `documentTexts`. Sur un
-document issu du fan-out, ça vaut aussi pour les lignes sœurs des autres
-entités, qui perdent le fichier — comportement **préexistant** (la
-suppression du blob était déjà inconditionnelle), simplement étendu au
-texte pour rester cohérent. À traiter le jour où le fan-out multi-org
-devient courant.
+Le pendant de « une ligne `documentTexts` par blob » est qu'un blob a
+**plusieurs propriétaires** : une ligne `documents` par entité du fan-out,
+plus la pièce jointe de l'`inboundEmails` d'origine. Longtemps,
+`documents:remove` supprimait le blob **inconditionnellement** : supprimer le
+document depuis la fiche A blanchissait le fichier de la fiche B et du mail,
+sans rien casser bruyamment — les lignes restaient, leur URL de
+téléchargement ne résolvait plus.
+
+Depuis ALB-240, tout chemin de suppression passe par
+`releaseStorage` (`convex/lib/documentBlobs.ts`) **après** avoir supprimé sa
+propre ligne : le blob et son texte ne partent que si l'index `by_storage` ne
+trouve plus personne. Le mail source, lui, n'est **pas** compté comme
+propriétaire — il perd sa pièce jointe (`storageId` remis à `undefined`, nom
+et taille conservés) en même temps que le fichier. C'est un arbitrage assumé :
+un fichier supprimé disparaît vraiment, au prix d'un mail qu'un « Retraiter »
+ne pourra plus transformer en rapport.
+
+Donc : **jamais `ctx.storage.delete` sur un blob de `documents`**, toujours
+`releaseStorage`. Et une nouvelle table qui pointerait un `storageId` partagé
+doit être ajoutée au comptage — sinon elle perdra ses fichiers en silence,
+exactement comme le fan-out les perdait.
 
 ## Account linking & verified email (anti-doublon)
 

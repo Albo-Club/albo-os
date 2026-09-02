@@ -701,6 +701,13 @@
       "confirmBody": "Le rapport sera retiré de {{company}} : il disparaît de cette fiche, avec ses fichiers et les KPIs qu’il avait renseignés. Les autres participations rattachées gardent le leur, et le fichier reçu n’est pas supprimé.",
       "confirm": "Détacher",
       "done": "Rapport détaché de cette participation"
+    },
+    "deleteReport": {
+      "action": "Supprimer définitivement",
+      "confirmTitle": "Supprimer ce rapport ?",
+      "confirmBody": "Le rapport est retiré de {{company}} avec ses fichiers, les KPIs qu’il avait renseignés et son indexation pour la recherche. Un fichier est effacé du stockage dès qu’aucune autre participation ne s’en sert : le mail d’origine perd alors sa pièce jointe et ne pourra plus être retraité. Irréversible.",
+      "confirm": "Supprimer",
+      "done": "Rapport supprimé"
     }
   },
   "documents": {
