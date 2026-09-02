@@ -661,6 +661,17 @@ export const remove = mutation({
   exactly how `climate` had to be retired). A missing bucket is arbitrated in
   that file, with its assignment rules; agent tools take the enum, never a
   free string.
+- ❌ An edit dialog that seeds a field from the **page's** context
+  (`useState(orgId)`) instead of from the row being edited
+  (`useState(row.fieldId ?? orgId)`). Nothing fails: the field renders, the
+  form validates, and saving rewrites that value to the page's — so opening
+  a guarantee guaranteed by CALTE from the SCI's Passif and pressing Save
+  moved the guarantor, silently. Two reflexes: a dialog that edits reads
+  **every** field from the row, page context being the fallback for creation
+  only; and if the field is a `<Select>` of ids, the row must carry the
+  **id**, not just a display slug — an enriched read that hands back
+  `pledgorOrgSlug` and not `pledgorOrgId` makes the correct default
+  unwritable (`convex/guarantees.ts:enrich`).
 - ❌ A `DialogContent` whose content can grow tall (long lists, repeatable
   rows, many fields) without `max-h-[85vh] overflow-y-auto`. shadcn's dialog
   has no built-in height cap, so tall content overflows the viewport with no
@@ -745,6 +756,20 @@ export const remove = mutation({
   le code qui suppose la présence continue de compiler, et casse à
   l'exécution sur la première ligne sans valeur. L'ordre est : auditer,
   rendre tolérant, relâcher, tester. Jamais l'inverse, jamais « en passant ».
+- ❌ Déclencher un recalcul d'**état** (synthèse IA, score, agrégat) sur « une
+  ligne a été créée » plutôt que sur « le contenu a changé », et ne le brancher
+  que du côté de l'ajout. Deux symptômes, une seule cause — corrigés ensemble
+  en 09/2026 : un report renvoyé pour la même période **écrase** la ligne, donc
+  rien n'était « créé » et la fiche montrait la version corrigée pendant que la
+  note décrivait l'ancienne ; et détacher un report ne relançait rien, donc la
+  note continuait de décrire un report absent. Deux réflexes : comparer le
+  **contenu utile** (ce que la fiche affiche et ce qui nourrit le calcul), pas
+  la présence d'une ligne ni des champs qui bougent à chaque passage
+  (`processedAt`, versions, identifiants de message) — et comparer les cartes
+  clé-valeur **clés triées**, sinon un simple changement d'ordre relance tout ;
+  puis vérifier la **symétrie** : si l'ajout déclenche, le retrait doit
+  déclencher aussi. Cf. `KNOWN_ISSUES.md` « Un report renvoyé n'est pas
+  forcément un doublon » et « Détacher un report ».
 - ❌ Accrocher un déclencheur métier (analyse, notification, alerte) à une
   intégration **pull** sans lui avoir d'abord donné une mémoire du « déjà vu ».
   Un webhook est un **événement** — il arrive une fois, sa nouveauté est

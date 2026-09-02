@@ -77,6 +77,93 @@ lorsque plus aucune fiche ne le désigne.
 >   emporte.
 > - 6 tests de régression ajoutés à `regression.reportDetach.test.ts`,
 >   dont deux qui échouent sur l'ancien `documents:remove`.
+> - Merge de `main` : la relance de la synthèse ajoutée par la v1.209.3 vit
+>   désormais dans le corps partagé, donc une **suppression** rafraîchit la
+>   note comme un détachement.
+
+## v1.209.3 — 02/09/2026 à 15:19 — La note IA suit les corrections et les retraits
+
+Deux situations laissaient la synthèse d'une société décrire autre chose que
+ce que sa fiche affichait.
+
+**Un rapport corrigé.** Un fondateur envoie son reporting, puis le renvoie
+avec un chiffre rectifié. La fiche montrait bien la nouvelle version, mais
+l'app classait l'envoi en « déjà reçu » : la note de santé continuait de
+commenter la version périmée, et personne n'était prévenu. Un renvoi qui
+change réellement quelque chose est désormais traité comme du neuf — la note
+se met à jour et le récap part normalement. Un renvoi strictement identique,
+lui, reste silencieux comme avant : pas de mail, pas d'analyse inutile.
+
+**Un rapport détaché.** Retirer un rapport d'une société ne recalculait pas sa
+note, qui continuait de décrire un rapport absent. Elle est maintenant
+recalculée sur ce qui reste. Et si c'était le dernier, la fiche repasse
+franchement à « aucune donnée » : plus de score orphelin dans la liste des
+participations en face d'une fiche vide.
+
+> **🔧 Notes techniques**
+>
+> - **Même cause que ALB-238, deux symptômes.** Le recalcul de la synthèse
+>   était accroché à « une ligne `companyReports` a été créée », pas à « le
+>   contenu a changé », et seulement du côté de l'ajout.
+> - **Renvoi corrigé** : `reportStore.storeForCompany` renvoie désormais
+>   `changed` en plus de `created`, calculé par `reportContentChanged` — qui
+>   compare exactement ce que la fiche affiche et ce qui nourrit
+>   `intelligence.getContext` (`headline`, `title`, `keyHighlights`,
+>   `metrics`, `rawContent`). Hors comparaison : `processedAt`,
+>   `pipelineVersion`, identifiants AgentMail, `inboundEmailId` — ils changent
+>   à chaque renvoi sans changer ce que le report dit. Les cartes de métriques
+>   sont comparées **clés triées** (l'extraction reconstruit l'objet à chaque
+>   passage). `reportStore.run` bascule de `anyCreated` à `anyNews`.
+> - **Détachement** : `reportInbox.detachCompany` planifie
+>   `intelligence.runAnalysis`. Sur le dernier report, `runAnalysis` tombe sur
+>   `no_data`, qui efface l'analyse — c'est ce qui vide la colonne Score IA,
+>   laquelle lit `aiAnalysis` seule.
+> - **Non régression** : `convex/regression.reportAnalysisTriggers.test.ts`
+>   (8 cas). Contrôle négatif effectué dans les deux sens — les 5 cas de
+>   correction échouent si `reportContentChanged` est neutralisé, le cas du
+>   détachement échoue si la planification est retirée.
+> - Docs : `KNOWN_ISSUES.md` § « Un report renvoyé n'est pas forcément un
+>   doublon » (nouvelle) et § « Détacher un report » (sixième effet), règle
+>   anti-pattern dans `CLAUDE.md` (déclencher sur le contenu, et respecter la
+>   symétrie ajout/retrait), `TESTING.md` R21, R28d et compteur B11,
+>   `docs/produit/04-participations.md`.
+## v1.209.2 — 02/09/2026 à 15:10 — Corriger une garantie ne change plus son garant
+
+Quand une société du groupe garantit l'emprunt d'une autre — le contrat
+d'assurance-vie de CALTE qui garantit le prêt de la SCI Chapelle, par exemple —
+ouvrir cette garantie depuis le Passif de l'emprunteuse pour y corriger un
+détail **remplaçait le garant par la société de la page**. Le champ « Garant »
+se rouvrait sur la société courante au lieu du garant réel, et un simple
+enregistrement suffisait à déplacer la garantie, sans alerte ni trace.
+
+Le champ affiche désormais le garant inscrit sur la garantie. Corriger un
+montant, un rang ou une date ne touche plus à qui s'est porté garant.
+
+C'est le cas de figure central du module — un actif détenu par une société qui
+garantit l'emprunt d'une autre — et le seul écran depuis lequel une garantie se
+corrige, donc la correction valait d'être faite avant toute saisie.
+
+> **🔧 Notes techniques**
+>
+> - `GuaranteeDialog.tsx` initialisait onze champs depuis la ligne éditée et le
+>   douzième (`pledgorOrg`) depuis l'`orgId` de la page. À la sauvegarde, ce
+>   `pledgorOrgId` partait tel quel dans `guarantees:update` : réassignation
+>   silencieuse, aucune erreur, aucune validation franchie.
+> - Il **ne pouvait pas** faire mieux : `enrich()` (`convex/guarantees.ts`) ne
+>   rendait que `pledgorOrgSlug`, un libellé, quand le `<Select>` a besoin de
+>   l'id. La correction expose `pledgorOrgId` à côté du slug — comme
+>   `subjectOrgId` juste au-dessus — puis le fait remonter dans
+>   `EditableGuarantee` (`GuaranteeList.tsx`) et dans l'état du dialogue.
+> - **Un test Convex** pin le contrat côté serveur (la moitié qui peut
+>   régresser en silence) : sur la sûreté inter-sociétés de l'annexe, les deux
+>   surfaces d'édition — fiche du prêt et Passif du garant — rendent bien
+>   `pledgorOrgId`. Vérifié en le retirant : le test tombe. La préselection
+>   elle-même se vérifie à la main (`TESTING.md` GG7), le repo n'ayant aucun
+>   harnais de test de composant React et en introduire un pour ça aurait été
+>   une infra entière non demandée.
+> - Le patron `useState(orgId)` sur un champ éditable n'existait nulle part
+>   ailleurs dans `src/` — défaut isolé, désormais consigné en anti-patron dans
+>   `CLAUDE.md`.
 
 ## v1.209.1 — 02/09/2026 à 13:35 — Toute garantie est classée quelque part
 

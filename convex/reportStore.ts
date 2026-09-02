@@ -131,6 +131,44 @@ const canonicalValidator = v.object({
   periodEnd: v.number(),
 })
 
+/**
+ * Did a re-sent report actually bring something new?
+ *
+ * A second forward of the SAME report is a duplicate: it must stay silent and
+ * must not burn an LLM call. But a CORRECTED report re-sent for the same
+ * (company, period) overwrites the stored row in place — the fiche shows the
+ * new version while the synthesis still describes the old one, and nobody is
+ * told. So the two cases are separated on content, not on "a row already
+ * existed".
+ *
+ * Compared: exactly what the fiche shows and what feeds the synthesis
+ * (`intelligence.getContext`). Deliberately NOT compared: `processedAt`,
+ * `pipelineVersion`, the AgentMail ids and `inboundEmailId` — all of them
+ * change on every re-send and none of them changes what the report SAYS.
+ * Metric maps are compared key-sorted: the extraction rebuilds the object on
+ * each run, and a different key order is not a different report.
+ */
+function reportContentChanged(
+  before: Doc<'companyReports'>,
+  after: { headline?: string; title?: string; keyHighlights?: Array<string>; metrics: unknown; rawContent?: string },
+): boolean {
+  const stable = (value: unknown): string => {
+    if (value == null) return ''
+    if (typeof value !== 'object' || Array.isArray(value)) return JSON.stringify(value)
+    const entries = Object.entries(value as Record<string, unknown>).sort(
+      ([a], [b]) => a.localeCompare(b),
+    )
+    return JSON.stringify(entries)
+  }
+  return (
+    (before.headline ?? '') !== (after.headline ?? '') ||
+    (before.title ?? '') !== (after.title ?? '') ||
+    stable(before.keyHighlights) !== stable(after.keyHighlights) ||
+    stable(before.metrics) !== stable(after.metrics) ||
+    (before.rawContent ?? '') !== (after.rawContent ?? '')
+  )
+}
+
 export const storeForCompany = internalMutation({
   args: {
     companyId: v.id('companies'),
@@ -157,7 +195,7 @@ export const storeForCompany = internalMutation({
   handler: async (
     ctx,
     args,
-  ): Promise<{ reportId: Id<'companyReports'>; created: boolean }> => {
+  ): Promise<{ reportId: Id<'companyReports'>; created: boolean; changed: boolean }> => {
     const email = await ctx.db.get('inboundEmails', args.inboundEmailId)
     if (!email) throw new Error('inbound email not found')
 
@@ -213,7 +251,9 @@ export const storeForCompany = internalMutation({
         ).find((r) => r.subject === email.subject && r.emailDate === email.receivedAt) ?? null)
 
     let reportId: Id<'companyReports'>
+    let changed = false
     if (existing) {
+      changed = reportContentChanged(existing, reportFields)
       await ctx.db.patch('companyReports', existing._id, reportFields)
       reportId = existing._id
       // Replace the document rows for this report. Storage blobs are NOT
@@ -337,7 +377,7 @@ export const storeForCompany = internalMutation({
     // The caller turns a fan-out where NOTHING was created into a duplicate
     // notice instead of a confirmation — and stays silent towards the org,
     // since nothing new happened.
-    return { reportId, created: !existing }
+    return { reportId, created: !existing, changed }
   },
 })
 
@@ -516,9 +556,16 @@ export const run = internalAction({
 
     // Fan-out storage: one report per matched entity, in its org.
     const reportIds: Array<Id<'companyReports'>> = []
-    let anyCreated = false
+    // News = a report filed for the first time, OR one whose content was
+    // actually corrected by this re-send. Both deserve the synthesis and the
+    // confirmation; a byte-identical re-forward deserves neither.
+    let anyNews = false
     for (const m of matched) {
-      const stored: { reportId: Id<'companyReports'>; created: boolean } = await ctx.runMutation(
+      const stored: {
+        reportId: Id<'companyReports'>
+        created: boolean
+        changed: boolean
+      } = await ctx.runMutation(
         internal.reportStore.storeForCompany,
         {
           companyId: m.companyId,
@@ -538,7 +585,7 @@ export const run = internalAction({
         },
       )
       reportIds.push(stored.reportId)
-      if (stored.created) anyCreated = true
+      if (stored.created || stored.changed) anyNews = true
     }
 
     await ctx.runMutation(internal.reportStore.markProcessed, { inboundEmailId, reportIds })
@@ -581,10 +628,12 @@ export const run = internalAction({
             .filter((k) => !canonicalKeys.has(k))
             .slice(0, 6)
 
-    // Nothing was created: every entity already carried this period. The
-    // forwarder still gets an answer — they made a gesture — but a short one,
-    // and the rest of the org hears nothing, because nothing is new.
-    if (!anyCreated) {
+    // Nothing new: every entity already carried this period AND the content
+    // came back identical. The forwarder still gets an answer — they made a
+    // gesture — but a short one, and the rest of the org hears nothing,
+    // because nothing is new. A re-send that CORRECTED the report does not
+    // land here: it counts as news (cf. `reportContentChanged`).
+    if (!anyNews) {
       await ctx.scheduler.runAfter(0, internal.reportNotify.send, {
         inboundEmailId,
         kind: 'duplicate',

@@ -643,6 +643,17 @@ async function removeReportForCompany(
     orgId: report.orgId,
     key: `report:${reportId}`,
   })
+
+  // The synthesis read this report: re-run it on what is left. Ingestion
+  // triggers the analysis, so removal has to as well — otherwise the note
+  // keeps describing a report that is no longer there. Removing the last
+  // one is the case that matters most: `runAnalysis` then lands on
+  // `no_data` and CLEARS the note, which is what puts the entity back to
+  // "aucune donnée" instead of leaving an orphan score in the list.
+  await ctx.scheduler.runAfter(0, internal.intelligence.runAnalysis, {
+    companyId: report.companyId,
+    orgId: report.orgId,
+  })
 }
 
 /**

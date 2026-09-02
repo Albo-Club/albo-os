@@ -279,6 +279,29 @@ describe('guarantees: one row, three readings (D13)', () => {
     ])
   })
 
+  test('the guarantor comes back as an id, not only as a slug', async () => {
+    const { user, calte, sciLoan } = await concertoSetup()
+    // The SCI's loan sheet is where this guarantee is edited from, and its
+    // guarantor is CALTE. The edit dialog preselects the guarantor from this
+    // id: with only the slug, saving from the SCI's page would move the
+    // guarantee onto the SCI.
+    const [onLoan] = await user.as.query(api.guarantees.listByLoan, {
+      loanId: sciLoan,
+    })
+    expect(onLoan.pledgorOrgSlug).toBe('calte')
+    expect(onLoan.pledgorOrgId).toBe(calte.orgId)
+
+    // Same on the guarantor's own Passif, the other surface that edits.
+    const given = await user.as.query(api.guarantees.listByPledgorOrg, {
+      orgId: calte.orgId,
+    })
+    expect(given.map((row) => row.pledgorOrgId)).toEqual([
+      calte.orgId,
+      calte.orgId,
+      calte.orgId,
+    ])
+  })
+
   test('a third party’s security on the same outside debt hangs under ours', async () => {
     const { user, calte, concertoId } = await concertoSetup()
     // SPEC § 10 line 10b: 250 K€ on M. Peninque's AV Vibrato, standing on

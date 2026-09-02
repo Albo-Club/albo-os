@@ -102,7 +102,11 @@ La colonne principale, dans l'ordre de lecture :
   boîte est la première chose qu'on voit. Elle
   est régénérée automatiquement à chaque rapport reçu — qu'il arrive par
   email ou qu'il soit publié sur le portail Parallel — et peut être
-  relancée à la main.
+  relancée à la main. Elle suit aussi les corrections : renvoyer un
+  rapport déjà reçu avec un chiffre rectifié la met à jour, alors qu'un
+  renvoi strictement identique ne relance rien ; et détacher un rapport la
+  recalcule sur ce qui reste — s'il n'en reste aucun, la fiche repasse à
+  « aucune donnée » plutôt que de garder une note devenue sans objet.
 - **Ce que vaut le score de santé.** Il note l'entreprise, pas la qualité de
   son reporting, sur trois axes : trajectoire par rapport au plan,
   trésorerie et runway, solidité de la structure (rentabilité, gouvernance,
