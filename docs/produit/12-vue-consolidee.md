@@ -40,7 +40,11 @@ disponibles sur une ligne et ce que chacune déclenche — est décrit dans
 
 - Une nouvelle organisation apparaît ici **automatiquement** dès que vous en
   devenez membre — rien à configurer.
-- La vue est strictement en lecture : aucun bouton de création ni d'édition.
+- Les listes consolidées (participations, deals) sont en **lecture seule** :
+  aucun bouton de création ni d'édition, l'édition se fait dans l'organisation
+  concernée. La boîte des rapports entrants fait exception — c'est une file de
+  travail, et ses actions (rattacher, retraiter, rejeter, supprimer) s'exercent
+  bien depuis ici.
 
 ## Pages liées
 

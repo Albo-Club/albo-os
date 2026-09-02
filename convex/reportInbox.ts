@@ -746,6 +746,81 @@ export const reject = mutation({
   },
 })
 
+/**
+ * Every report a mail produced, across the whole multi-org fan-out.
+ *
+ * Two ways in, deliberately: the back-link the queue row keeps (`reportIds`,
+ * written by `reportStore.markProcessed`) and the AgentMail message id the
+ * reports carry. Neither is complete alone — an upload has no message id, and
+ * a row stored before `reportIds` existed has no back-link — so the union is
+ * what makes the deletion guard below trustworthy: a report missed here would
+ * be left pointing at a queue row that no longer exists.
+ */
+async function reportsOfInbound(
+  ctx: MutationCtx,
+  row: Doc<'inboundEmails'>,
+): Promise<Array<Doc<'companyReports'>>> {
+  const found = new Map<Id<'companyReports'>, Doc<'companyReports'>>()
+  for (const reportId of row.reportIds ?? []) {
+    const report = await ctx.db.get('companyReports', reportId)
+    if (report) found.set(report._id, report)
+  }
+  if (row.agentmailMessageId) {
+    const byMessage = await ctx.db
+      .query('companyReports')
+      .withIndex('by_message_id', (q) =>
+        q.eq('agentmailMessageId', row.agentmailMessageId),
+      )
+      .collect()
+    for (const report of byMessage) {
+      if (report.inboundEmailId === row._id) found.set(report._id, report)
+    }
+  }
+  return [...found.values()]
+}
+
+/**
+ * Delete an inbound mail and its attachments — the definitive way out for a
+ * mail that should never have landed (a test, a duplicate, a file sent by
+ * mistake).
+ *
+ * Refused as long as the mail still has a report filed somewhere
+ * (`has_reports`): the participations have to be freed first, one by one, from
+ * the fiche or from the queue. The deletion does NOT cascade on purpose —
+ * removing a report is a per-entity decision, taken where its consequences are
+ * visible (KPIs, synthesis, files shared with the other entities of the
+ * fan-out), not swept away from a queue row that shows none of it.
+ *
+ * Nothing is kept as a tombstone once the mail does go: it is gone from the
+ * queue, and a redelivery of that same message would be treated as new, since
+ * the row IS the dedup memory (`ingest` keys on `agentmailMessageId`). That is
+ * the accepted price of "définitivement" (ALB-240).
+ *
+ * A mail still `processing` is refused too: its pipeline is mid-flight and
+ * would write into a row that no longer exists.
+ */
+export const deleteEmail = mutation({
+  args: { inboundEmailId: v.id('inboundEmails') },
+  handler: async (ctx, { inboundEmailId }) => {
+    await requireAnyMember(ctx)
+    const row = await ctx.db.get('inboundEmails', inboundEmailId)
+    if (!row) throw new ConvexError('not_found')
+    if (row.status === 'processing') throw new ConvexError('invalid_status')
+
+    const reports = await reportsOfInbound(ctx, row)
+    if (reports.length > 0) throw new ConvexError('has_reports')
+
+    // Nothing was ever filed, so no `documents` row points at these blobs and
+    // `releaseStorage` frees them — it still counts rather than assuming.
+    for (const att of row.attachments) {
+      if (att.storageId) await releaseStorage(ctx, att.storageId)
+    }
+
+    await ctx.db.delete('inboundEmails', inboundEmailId)
+    return null
+  },
+})
+
 // ─── Manual upload (company sheet) ───────────────────────────────────────────
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024 // project storage cap (cf. files.ts)
