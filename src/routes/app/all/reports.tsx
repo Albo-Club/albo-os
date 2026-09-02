@@ -344,11 +344,14 @@ function InboundReports() {
                         {row.relatedOrgNames.length > 0 ? (
                           <Badge
                             variant="outline"
+                            className="max-w-[16rem]"
                             title={t('related.hint', {
                               orgs: row.relatedOrgNames.join(', '),
                             })}
                           >
-                            + {row.relatedOrgNames.join(', ')} ?
+                            <span className="truncate">
+                              + {row.relatedOrgNames.join(', ')} ?
+                            </span>
                           </Badge>
                         ) : null}
                       </span>
