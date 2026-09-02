@@ -15,9 +15,10 @@
  * losing its attachment along the way. `documents:remove` obeys the same
  * count, which is what stops one fiche from blanking the files of the others.
  *
- * `deleteEmail` is the third exit, one level up: the queue row and everything
- * it produced, on every entity at once, files included. Nothing survives as a
- * tombstone — not even the dedup memory, which IS the row.
+ * `deleteEmail` is the third exit, one level up: the queue row and its
+ * attachments — but only once nothing it filed is left, the two exits above
+ * being how a participation is freed. Nothing survives as a tombstone, not
+ * even the dedup memory, which IS the row.
  */
 import { describe, expect, test } from 'vitest'
 import { api, internal } from './_generated/api'
@@ -336,32 +337,39 @@ describe('documents:remove', () => {
 })
 
 describe('deleteEmail', () => {
-  test('takes the whole fan-out, the files and the queue row with it', async () => {
+  test('refuses a mail whose reports are still filed somewhere', async () => {
     const t = setupHarness()
     const user = await createUser(t, 'benjamin@test.dev')
     const s = await setupFanOut(t, user)
-    await t.run(async (ctx) => {
-      await ctx.db.insert('documentTexts', {
-        storageId: s.storageId,
-        text: 'contenu extrait',
-        truncated: false,
-      })
-    })
+
+    await expectConvexError(
+      user.as.mutation(api.reportInbox.deleteEmail, { inboundEmailId: s.emailId }),
+      'has_reports',
+    )
+    // Nothing half-done: the guard runs before any write.
+    const state = await t.run(async (ctx) => ({
+      reports: await ctx.db.query('companyReports').collect(),
+      emails: await ctx.db.query('inboundEmails').collect(),
+      hasBlob: (await ctx.storage.get(s.storageId)) !== null,
+    }))
+    expect(state.reports).toHaveLength(2)
+    expect(state.emails).toHaveLength(1)
+    expect(state.hasBlob).toBe(true)
+  })
+
+  test('lets the mail go once every participation has been freed', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'benjamin@test.dev')
+    const s = await setupFanOut(t, user)
+    await user.as.mutation(api.reportInbox.detachCompany, { reportId: s.wrongReport })
+    await user.as.mutation(api.reportInbox.deleteReport, { reportId: s.rightReport })
 
     await user.as.mutation(api.reportInbox.deleteEmail, { inboundEmailId: s.emailId })
 
     const state = await t.run(async (ctx) => ({
-      reports: await ctx.db.query('companyReports').collect(),
-      documents: await ctx.db.query('documents').collect(),
-      snapshots: await ctx.db.query('kpiSnapshots').collect(),
-      texts: await ctx.db.query('documentTexts').collect(),
       emails: await ctx.db.query('inboundEmails').collect(),
       hasBlob: (await ctx.storage.get(s.storageId)) !== null,
     }))
-    expect(state.reports).toEqual([])
-    expect(state.documents).toEqual([])
-    expect(state.snapshots).toEqual([])
-    expect(state.texts).toEqual([])
     expect(state.emails).toEqual([])
     expect(state.hasBlob).toBe(false)
   })
@@ -373,15 +381,24 @@ describe('deleteEmail', () => {
     const storageId = await t.run(async (ctx) =>
       ctx.storage.store(new Blob(['pdf'], { type: 'application/pdf' })),
     )
+    await t.run(async (ctx) => {
+      await ctx.db.insert('documentTexts', {
+        storageId,
+        text: 'contenu extrait',
+        truncated: false,
+      })
+    })
     const emailId = await createInboundEmail(t, storageId)
 
     await user.as.mutation(api.reportInbox.deleteEmail, { inboundEmailId: emailId })
 
     const state = await t.run(async (ctx) => ({
       emails: await ctx.db.query('inboundEmails').collect(),
+      texts: await ctx.db.query('documentTexts').collect(),
       hasBlob: (await ctx.storage.get(storageId)) !== null,
     }))
     expect(state.emails).toEqual([])
+    expect(state.texts).toEqual([])
     expect(state.hasBlob).toBe(false)
   })
 
@@ -397,29 +414,5 @@ describe('deleteEmail', () => {
       user.as.mutation(api.reportInbox.deleteEmail, { inboundEmailId: s.emailId }),
       'invalid_status',
     )
-  })
-
-  test('refuses when a report belongs to an org the caller is not in', async () => {
-    const t = setupHarness()
-    const user = await createUser(t, 'benjamin@test.dev')
-    const s = await setupFanOut(t, user)
-    // A member of ONE org of the fan-out passes the queue's own boundary, so
-    // the cascade re-checks every org it is about to write into.
-    const other = await createUser(t, 'clement@test.dev')
-    await t.run(async (ctx) => {
-      await ctx.db.insert('organizationMembers', {
-        orgId: s.albo.orgId,
-        userId: other.userId,
-        role: 'owner',
-        joinedAt: Date.now(),
-      })
-    })
-
-    await expectConvexError(
-      other.as.mutation(api.reportInbox.deleteEmail, { inboundEmailId: s.emailId }),
-      'not_a_member',
-    )
-    const reports = await t.run(async (ctx) => ctx.db.query('companyReports').collect())
-    expect(reports).toHaveLength(2)
   })
 })

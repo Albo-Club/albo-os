@@ -2002,9 +2002,18 @@ marche quand même, seule la ligne de la file garde sa mention périmée.
 
 **Trois sorties, pas une** (ALB-240). `detachCompany` retire le report d'**une**
 entité en gardant les fichiers ; `deleteReport` fait la même chose en les
-libérant ; `deleteEmail` supprime la **ligne de la file** et, en cascade, tout
-ce qu'elle a produit sur **toutes** les entités. Trois points non évidents sur
-la troisième :
+libérant ; `deleteEmail` supprime la **ligne de la file** et ses pièces jointes.
+
+La troisième ne **cascade pas** : elle refuse (`has_reports`) tant qu'un report
+issu du mail est rangé quelque part. Le réflexe inverse — « je supprime le mail,
+donc tout ce qu'il a produit » — a été écrit puis retiré avant merge, et c'est
+le bon sens de lecture : retirer un report a des conséquences par entité (KPIs
+retirés des séries, synthèse recalculée, fichiers partagés avec les autres
+entités du fan-out) qui ne sont visibles **que** depuis la fiche. Les balayer
+depuis une ligne de file qui n'en montre rien, c'est exactement le genre de
+geste dont on découvre l'effet trois semaines plus tard. L'ordre imposé —
+libérer chaque participation, puis supprimer le mail — coûte deux clics et rend
+chaque perte explicite. Trois points non évidents dessus :
 
 - **La ligne de la file EST la mémoire de dédup.** `ingest` refuse un message
   déjà vu en cherchant son `agentmailMessageId` dans `inboundEmails` : c'est ce
@@ -2015,18 +2024,16 @@ la troisième :
   fenêtre est étroite (les rejeux arrivent dans les minutes qui suivent). Un
   jour où ça mordrait, la réponse n'est pas de garder la ligne en tombstone
   mais une table de messages vus, séparée de la file.
-- **La liste des rapports à emporter se lit des deux côtés.** Ni le back-link
+- **Le garde-fou se lit des deux côtés.** Ni le back-link
   `inboundEmails.reportIds` ni l'index `companyReports.by_message_id` n'est
   complet seul (un dépôt manuel n'a pas d'identifiant de message, une ligne
   antérieure au back-link n'a pas de `reportIds`) : `reportsOfInbound` en fait
-  l'**union**. Une cascade qui n'en lirait qu'un laisserait des rapports
-  orphelins pointant une ligne disparue.
-- **La file est cross-org, la cascade non.** `requireAnyMember` suffit à voir
-  la file, mais pas à écrire dans l'org d'un rapport : `requireOrgMember` est
-  vérifié sur **chaque** org concernée, en boucle complète **avant** la
-  première suppression. Sinon un membre d'une seule org du fan-out emporterait
-  au passage le rapport d'une autre, et un refus à mi-parcours laisserait une
-  suppression partielle.
+  l'**union**. Un garde-fou qui n'en lirait qu'un laisserait passer la
+  suppression d'un mail dont un report survit, orphelin, pointant une ligne
+  disparue.
+- **Le refus arrive avant la première écriture.** Rien de partiel : ni pièce
+  jointe libérée, ni ligne touchée. C'est ce qui rend le message « détache
+  d'abord » honnête, et c'est pinné par un test.
 
 Couvert par `convex/regression.reportDetach.test.ts`.
 

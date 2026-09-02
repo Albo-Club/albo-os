@@ -38,7 +38,8 @@
     "assignAlso": "Rattacher aussi",
     "detach": "Détacher ce report de {{name}}",
     "deleteReport": "Supprimer ce report et ses fichiers de {{name}}",
-    "deleteEmail": "Supprimer"
+    "deleteEmail": "Supprimer",
+    "deleteEmailBlocked": "Détache d’abord ce report des participations"
   },
   "assignDialog": {
     "title": "Rattacher à une participation",
@@ -79,7 +80,7 @@
   },
   "deleteEmailDialog": {
     "title": "Supprimer cet email définitivement ?",
-    "description": "« {{subject}} » et tout ce qu’il a produit disparaissent : les rapports rangés sur les participations, leurs KPIs, leur indexation, les pièces jointes et le mail lui-même. La ligne quitte la file — si le même message était renvoyé, il serait traité comme neuf. Irréversible.",
+    "description": "« {{subject}} » et ses pièces jointes disparaissent définitivement, et la ligne quitte la file — si le même message était renvoyé, il serait traité comme neuf. Irréversible.",
     "cancel": "Annuler",
     "confirm": "Supprimer"
   }

@@ -124,12 +124,19 @@ gestes : **détacher** répare un mauvais rangement et laisse tout rejouable,
 
 **Quand c'est le mail entier qui n'aurait jamais dû arriver** — un test, une
 pièce envoyée par erreur, un envoi en double — chaque ligne des Rapports
-entrants porte un bouton **« Supprimer »**. Il est radical : le mail quitte
-la file avec **tout ce qu'il a produit**, sur toutes les organisations à la
-fois — les rapports rangés sur les participations, leurs KPIs, leur
-indexation pour la recherche, les pièces jointes. C'est le seul geste qui
-vaut pour un mail que l'app n'a jamais rangé : les deux gestes précédents
-vivent sur la puce d'une participation, et un mail sans rapport n'en a pas.
+entrants porte un bouton **« Supprimer »** : le mail quitte la file avec ses
+pièces jointes, définitivement. C'est le seul geste qui vaut pour un mail que
+l'app n'a jamais rangé, les deux précédents vivant sur la puce d'une
+participation.
+
+Il ne s'active que si **plus aucune participation ne tient de rapport issu de
+ce mail**. Sinon il reste grisé, et le survol dit quoi faire : détacher (ou
+supprimer) d'abord le rapport, participation par participation. Ce n'est pas
+une lourdeur gratuite — retirer un rapport a des conséquences qui ne se
+voient que sur la fiche : les KPIs qu'il alimentait, la synthèse qui se
+recalcule, les fichiers partagés avec les autres participations rattachées au
+même mail. Ça se décide là où on les voit.
+
 Deux choses à savoir : un mail supprimé n'est plus « connu » de l'app, donc
 si exactement le même message était renvoyé il serait traité comme un
 nouveau ; et un mail **en cours de traitement** ne se supprime pas — le

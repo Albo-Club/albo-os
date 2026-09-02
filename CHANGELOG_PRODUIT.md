@@ -33,42 +33,49 @@ sa pièce jointe intacte dans le stockage. Il n'y avait donc, en pratique,
 aucun moyen de se débarrasser d'un mail arrivé par erreur.
 
 Chaque ligne des **Rapports entrants** porte maintenant un bouton
-**« Supprimer »**, et il est radical : le mail disparaît de la file avec
-**tout ce qu'il a produit** — les rapports rangés sur les participations, les
-KPIs qu'ils avaient renseignés, leur indexation pour la recherche, les pièces
-jointes. Rien ne subsiste, sur aucune organisation.
+**« Supprimer »** : le mail quitte la file avec ses pièces jointes,
+définitivement.
 
-Deux conséquences à connaître. Un mail supprimé n'est plus « connu » de
-l'app : si exactement le même message était renvoyé, il serait traité comme
-un nouveau. Et un mail en cours de traitement ne se supprime pas — le bouton
-attend que le pipeline ait fini.
+Il ne s'active que si **plus aucune participation ne tient de rapport issu de
+ce mail**. Sinon il reste grisé, avec l'explication au survol : détache (ou
+supprime) d'abord le rapport, participation par participation. C'est
+volontaire — retirer un rapport a des conséquences visibles sur la fiche (les
+KPIs qu'il alimentait, la synthèse, les fichiers partagés avec les autres
+participations rattachées au même mail), et ça se décide là où on les voit,
+pas d'un bouton dans une file qui n'en montre rien.
+
+Deux choses à savoir : un mail supprimé n'est plus « connu » de l'app, donc si
+exactement le même message était renvoyé il serait traité comme un nouveau ; et
+un mail en cours de traitement ne se supprime pas — le bouton revient quand le
+pipeline a fini.
 
 > **🔧 Notes techniques**
 >
-> - `reportInbox.deleteEmail` : cascade complète. `reportsOfInbound` réunit
->   les rapports par le back-link `inboundEmails.reportIds` **et** par
->   `companyReports.by_message_id` (aucun des deux n'est complet seul : un
->   dépôt manuel n'a pas d'identifiant de message, une vieille ligne n'a pas
->   de back-link), puis chacun passe par `removeReportForCompany(...,
->   { deleteFiles: true })`. Les pièces jointes qu'aucun rapport n'a
->   revendiquées sont libérées ensuite via `releaseStorage`, sur une
->   **relecture** de la ligne (la cascade vide au passage ce qu'elle
->   affranchit). La ligne est supprimée en dernier.
-> - **Tenancy** : la file est cross-org, donc `requireOrgMember` est vérifié
->   sur l'org de **chaque** rapport, en boucle complète **avant** la moindre
->   suppression — un membre d'une seule org du fan-out ne peut pas emporter
->   le rapport d'une autre.
-> - Refus sur `status: 'processing'` (`invalid_status`) : le pipeline
+> - `reportInbox.deleteEmail` : refuse (`has_reports`) tant que
+>   `reportsOfInbound` trouve un rapport, **avant** toute écriture. Pas de
+>   cascade : la suppression d'un rapport reste per-entité
+>   (`detachCompany` / `deleteReport`).
+> - `reportsOfInbound` réunit les rapports par le back-link
+>   `inboundEmails.reportIds` **et** par `companyReports.by_message_id` —
+>   aucun des deux n'est complet seul (un dépôt manuel n'a pas d'identifiant
+>   de message, une vieille ligne pas de back-link), et un rapport manqué ici
+>   pointerait une ligne de file disparue.
+> - Les pièces jointes passent par `releaseStorage` : sans rapport rangé
+>   aucune ligne `documents` ne les désigne, donc elles partent — le comptage
+>   est fait quand même plutôt que supposé.
+> - Refus aussi sur `status: 'processing'` (`invalid_status`) : le pipeline
 >   écrirait dans une ligne disparue.
-> - La ligne étant la mémoire de dédup d'`ingest` (clé
->   `agentmailMessageId`), la supprimer rouvre la porte à un rejeu du même
->   webhook. Arbitrage assumé et documenté.
+> - La ligne étant la mémoire de dédup d'`ingest` (clé `agentmailMessageId`),
+>   la supprimer rouvre la porte à un rejeu du même webhook. Arbitrage assumé
+>   et documenté.
 > - Front : bouton dans la colonne d'actions de `routes/app/all/reports.tsx`,
->   présent sur tous les statuts sauf `processing` (qui garde le tiret), avec
->   sa fenêtre de confirmation. i18n `reports:actions.deleteEmail`,
->   `deleteEmailDialog.*`, `toasts.emailDeleted`.
-> - 4 tests de régression : cascade complète, mail jamais rangé, refus en
->   cours de traitement, refus cross-org sans rien supprimer au passage.
+>   désactivé avec un `title` explicatif quand la ligne porte encore un
+>   rapport, absent sur `processing`. i18n `reports:actions.deleteEmail` /
+>   `deleteEmailBlocked`, `deleteEmailDialog.*`, `toasts.emailDeleted`.
+> - 4 tests de régression : refus tant qu'un rapport tient (sans rien écrire),
+>   suppression possible une fois les participations libérées, mail jamais
+>   rangé (pièce jointe et texte extrait libérés), refus en cours de
+>   traitement.
 
 ## v1.212.0 — 02/09/2026 à 16:04 — Une publication Parallel te prévient par email
 

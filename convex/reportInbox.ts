@@ -753,7 +753,8 @@ export const reject = mutation({
  * written by `reportStore.markProcessed`) and the AgentMail message id the
  * reports carry. Neither is complete alone — an upload has no message id, and
  * a row stored before `reportIds` existed has no back-link — so the union is
- * what makes a deletion exhaustive.
+ * what makes the deletion guard below trustworthy: a report missed here would
+ * be left pointing at a queue row that no longer exists.
  */
 async function reportsOfInbound(
   ctx: MutationCtx,
@@ -779,19 +780,24 @@ async function reportsOfInbound(
 }
 
 /**
- * Delete an inbound mail and EVERYTHING it produced — the definitive way out
- * for a mail that should never have landed (a test, a duplicate, a file sent
- * by mistake).
+ * Delete an inbound mail and its attachments — the definitive way out for a
+ * mail that should never have landed (a test, a duplicate, a file sent by
+ * mistake).
  *
- * The cascade is the point: every report of the fan-out with its documents,
- * KPI snapshots and semantic-index entry, then the attachments themselves,
- * then the row. Nothing is kept as a tombstone — the mail is gone from the
+ * Refused as long as the mail still has a report filed somewhere
+ * (`has_reports`): the participations have to be freed first, one by one, from
+ * the fiche or from the queue. The deletion does NOT cascade on purpose —
+ * removing a report is a per-entity decision, taken where its consequences are
+ * visible (KPIs, synthesis, files shared with the other entities of the
+ * fan-out), not swept away from a queue row that shows none of it.
+ *
+ * Nothing is kept as a tombstone once the mail does go: it is gone from the
  * queue, and a redelivery of that same message would be treated as new, since
- * the row IS the dedup memory (`ingest` keys on `agentmailMessageId`). That
- * is the accepted price of "définitivement" (ALB-240).
+ * the row IS the dedup memory (`ingest` keys on `agentmailMessageId`). That is
+ * the accepted price of "définitivement" (ALB-240).
  *
- * A mail still `processing` is refused: its pipeline is mid-flight and would
- * write into a row that no longer exists.
+ * A mail still `processing` is refused too: its pipeline is mid-flight and
+ * would write into a row that no longer exists.
  */
 export const deleteEmail = mutation({
   args: { inboundEmailId: v.id('inboundEmails') },
@@ -801,20 +807,12 @@ export const deleteEmail = mutation({
     if (!row) throw new ConvexError('not_found')
     if (row.status === 'processing') throw new ConvexError('invalid_status')
 
-    // The queue spans every org, so membership is checked on each org the
-    // cascade is about to write into — ALL of them before deleting anything.
     const reports = await reportsOfInbound(ctx, row)
-    for (const report of reports) {
-      await requireOrgMember(ctx, report.orgId)
-    }
-    for (const report of reports) {
-      await removeReportForCompany(ctx, report, { deleteFiles: true })
-    }
+    if (reports.length > 0) throw new ConvexError('has_reports')
 
-    // Attachments no report ever claimed (a mail that was never filed keeps
-    // its own files). Re-read: the cascade above empties what it frees.
-    const left = await ctx.db.get('inboundEmails', inboundEmailId)
-    for (const att of left?.attachments ?? []) {
+    // Nothing was ever filed, so no `documents` row points at these blobs and
+    // `releaseStorage` frees them — it still counts rather than assuming.
+    for (const att of row.attachments) {
       if (att.storageId) await releaseStorage(ctx, att.storageId)
     }
 

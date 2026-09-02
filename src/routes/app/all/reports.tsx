@@ -315,6 +315,8 @@ function InboundReports() {
             {rows.map((row) => {
               const reviewable =
                 row.status === 'needs_review' || row.status === 'rejected'
+              // A mail is only deletable once nothing it filed is left.
+              const hasReports = row.matched.some((m) => m.reportId)
               return (
                 <TableRow key={row._id}>
                   <TableCell className="text-muted-foreground whitespace-nowrap">
@@ -507,7 +509,9 @@ function InboundReports() {
                         </>
                       ) : null}
                       {/* The definitive way out, on every row the pipeline is
-                          not currently working on. */}
+                          not working on — and only once no participation holds
+                          a report from it: those are freed one by one, where
+                          the consequences show. */}
                       {row.status === 'processing' ? (
                         <span className="text-muted-foreground">—</span>
                       ) : (
@@ -515,7 +519,12 @@ function InboundReports() {
                           size="sm"
                           variant="ghost"
                           className="hover:text-destructive"
-                          disabled={busy}
+                          disabled={busy || hasReports}
+                          title={
+                            hasReports
+                              ? t('actions.deleteEmailBlocked')
+                              : undefined
+                          }
                           onClick={() =>
                             setDeleteEmailFor({
                               inboundEmailId: row._id,

@@ -38,7 +38,8 @@
     "assignAlso": "Attach as well",
     "detach": "Detach this report from {{name}}",
     "deleteReport": "Delete this report and its files from {{name}}",
-    "deleteEmail": "Delete"
+    "deleteEmail": "Delete",
+    "deleteEmailBlocked": "Detach this report from the participations first"
   },
   "assignDialog": {
     "title": "Assign to a company",
@@ -79,7 +80,7 @@
   },
   "deleteEmailDialog": {
     "title": "Delete this email permanently?",
-    "description": "“{{subject}}” and everything it produced go: the reports filed on the participations, their KPIs, their indexing, the attachments and the email itself. The row leaves the queue — were the same message redelivered, it would be treated as new. Irreversible.",
+    "description": "“{{subject}}” and its attachments are permanently deleted, and the row leaves the queue — were the same message redelivered, it would be treated as new. Irreversible.",
     "cancel": "Cancel",
     "confirm": "Delete"
   }
