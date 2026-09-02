@@ -58,8 +58,9 @@ voisine, est abrégé de la même façon.
 >   tient pas seul sur une ligne.
 > - `ParticipationsTable.tsx` : badge org de la colonne à largeur fixe passé
 >   en `max-w-full` + `title` + `<span className="truncate">`, selon
->   l'anti-pattern déjà documenté dans `CLAUDE.md`. Même borne sur les deux
->   grilles de `alert.tsx`.
+>   l'anti-pattern déjà documenté dans `CLAUDE.md`. Même borne sur le badge
+>   **Secteur** de la même table, dont le débordement était jusqu'ici assumé
+>   au commentaire, et sur les deux grilles de `alert.tsx`.
 > - Non-régression : `tests/uiLayoutGuards.test.ts` balaie
 >   `src/components/ui/*.tsx` et exige la borne sur tout conteneur en `grid`
 >   (table `EXEMPT` motivée pour ceux qui n'ont rien à borner). Nécessaire

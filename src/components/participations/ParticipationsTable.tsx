@@ -125,9 +125,12 @@ const footCellClass = 'sticky bottom-0 z-20 border-t bg-muted'
  * Each width is sized against the widest real content of its slot — header
  * label (plus the sort icon where the active variant sorts) or cell — measured
  * with the FALLBACK font of the brand stack, not Inter: Inter is narrower, so
- * a column that fits without it fits with it. Cells are `whitespace-nowrap`
- * with no overflow clamp, so a column that is one pixel short does not
- * ellipsize, it spills into its neighbour.
+ * a column that fits without it fits with it. Amount cells are
+ * `whitespace-nowrap` with no overflow clamp, so a column one pixel short
+ * does not ellipsize, it spills into its neighbour — acceptable there, since
+ * their content is a formatted number of bounded length. The two cells
+ * carrying TYPED data (the org and sector badges) are clamped instead: a
+ * badge is `whitespace-nowrap` too, and their length is not ours to bound.
  */
 const COL_WIDTHS = {
   org: 104,
@@ -140,8 +143,10 @@ const COL_WIDTHS = {
   /**
    * Holds the widest predefined sector label (see convex/lib/sectors.ts) on a
    * single line inside its badge: "Industrie / Circulaire" measures ~116px of
-   * the ~126px a badge leaves here. A free-typed sector longer than that
-   * spills into the next column like any other cell.
+   * the ~126px a badge leaves here, so no predefined label ever ellipsizes.
+   * A free-typed sector longer than that is cut with an ellipsis (full value
+   * on hover) rather than spilling into the next column — a badge carries
+   * `whitespace-nowrap`, so nothing else would stop it.
    */
   sector: 160,
 } as const
@@ -795,7 +800,11 @@ function CompanyTableRow({
       {showOrg && (
         <TableCell>
           {row.org ? (
-            <Badge variant="outline" className="max-w-full" title={row.org.name}>
+            <Badge
+              variant="outline"
+              className="max-w-full"
+              title={row.org.name}
+            >
               <span className="truncate">{row.org.name}</span>
             </Badge>
           ) : (
@@ -805,8 +814,14 @@ function CompanyTableRow({
       )}
       <TableCell>
         {row.sector ? (
-          <Badge variant="outline">
-            {t(`sectors.${row.sector}`, { defaultValue: row.sector })}
+          <Badge
+            variant="outline"
+            className="max-w-full"
+            title={t(`sectors.${row.sector}`, { defaultValue: row.sector })}
+          >
+            <span className="truncate">
+              {t(`sectors.${row.sector}`, { defaultValue: row.sector })}
+            </span>
           </Badge>
         ) : (
           <span className="text-muted-foreground">—</span>
