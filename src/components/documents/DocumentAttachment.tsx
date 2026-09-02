@@ -142,7 +142,10 @@ export function DocumentAttachment({
         <FileGlyph contentType={doc.contentType} />
       </AttachmentMedia>
       <AttachmentContent>
-        <div className="flex min-w-0 items-center gap-2">
+        {/* Wrapping: a badge carries `shrink-0`, so on a narrow card (the
+            documents sheet is `sm:max-w-lg`) an unwrapped row would spill
+            over the action cluster instead of going to a second line. */}
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <AttachmentTitle>{doc.title}</AttachmentTitle>
           <Badge variant="outline" className="shrink-0 font-normal">
             {kindLabel}

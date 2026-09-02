@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.207.1 — 01/09/2026 à 18:13 — Toute garantie est classée quelque part
+## v1.207.2 — 02/09/2026 à 10:26 — Toute garantie est classée quelque part
 
 Suite technique de la version précédente, sans effet visible. Le champ qui dit
 dans quelle société une garantie est enregistrée devient **obligatoire** : il
@@ -51,6 +51,51 @@ peut lire.
 >   absent disparaissent — elles ne pouvaient plus rien tolérer.
 > - Deux tests de plus : l'org de dépôt est bien celle demandée à la création,
 >   et une édition qui réécrit **toutes** les parties ne la déplace pas.
+## v1.207.1 — 02/09/2026 à 08:51 — Les étiquettes ne se chevauchent plus
+
+Dans le tiroir des documents d'une société, l'étiquette bleue « Deal · … »
+passait par-dessus le compteur de caractères et les icônes de droite quand
+le nom du deal était un peu long. La faute à des étiquettes qui refusaient
+de rétrécir ou de passer à la ligne : faute de place, elles débordaient
+simplement sur ce qu'il y avait à côté.
+
+- Dans le tiroir des documents, l'étiquette du deal **passe à la ligne**
+  sous le titre plutôt que de recouvrir les actions, et s'abrège avec des
+  points de suspension si le nom du deal est très long (le nom entier reste
+  lisible au survol).
+- Même correction sur les deux autres endroits où le même défaut existait
+  sans avoir encore été repéré : l'étiquette de société d'une tâche de la
+  page **À faire**, et l'étiquette « + autres sociétés ? » des reports
+  entrants dans la vue consolidée.
+
+Le reste de l'application a été passé en revue pour ce défaut précis : les
+autres écrans étaient déjà corrects. Un point de vigilance reste ouvert, non
+corrigé ici parce qu'il touche la largeur des colonnes : dans la liste
+Entreprises en vue consolidée, la colonne des sociétés du groupe est étroite
+et un nom long (« Relais Chapelle ») peut mordre sur la colonne voisine.
+
+> **🔧 Notes techniques**
+>
+> - Cause commune : `Badge` et `Button` (`src/components/ui/*`) portent
+>   `shrink-0` + `whitespace-nowrap` dans leur variante de base. Dans une
+>   ligne flex contrainte ils ne rétrécissent ni ne passent à la ligne, et
+>   rien ne les rogne — ils débordent en silence sur le voisin. Le symptôme
+>   n'apparaît que si le badge porte une **donnée non bornée** (nom de
+>   société, d'org, libellé de deal), d'où son caractère intermittent.
+> - `DocumentAttachment.tsx` : `flex-wrap` sur la ligne titre + badges.
+>   `CompanyDocumentsCard.tsx` : badge deal en `max-w-full` + `truncate` +
+>   `title`. Le plafond **`max-w-full`, pas une valeur fixe** — mesuré dans
+>   le sheet (`sm:max-w-lg`), `max-w-[16rem]` laissait encore 80 px de
+>   débordement, `max-w-full` tombe à 0.
+> - Même patron appliqué à `todo.tsx` (badge société) et à
+>   `all/reports.tsx` (badge « + orgs ? », qui était le seul de sa cellule
+>   sans plafond alors que ses voisins en avaient un).
+> - Vérification : réplique DOM des cartes rendue dans Chromium avec le CSS
+>   Tailwind du projet, débordement mesuré au pixel (106 px avant → 0 après)
+>   plutôt que constaté à l'œil.
+> - Règle ajoutée aux anti-patterns de `CLAUDE.md` ; ligne TP10c de
+>   `TESTING.md` complétée.
+
 ## v1.207.0 — 01/09/2026 à 16:51 — La documentation d'Albo OS se lit dans Albo OS
 
 Il existait déjà une documentation produit complète — vingt pages qui
