@@ -67,6 +67,12 @@ intervention de notre part.
 >   le déploiement prod, c'est lui qui gagne : le basculement effectif demande
 >   `pnpm exec convex env set --prod OPENROUTER_MODEL "~z-ai/glm-flash-latest"`
 >   (ou la suppression de la variable pour retomber sur le défaut du code).
+> - Claim périmé nettoyé au passage : la liste « Trade-offs vs
+>   PROJECT_BRIEF.md » de `KNOWN_ISSUES.md` annonçait encore
+>   `deepseek/deepseek-v4-pro` comme défaut de l'agent (faux depuis la bascule
+>   Flash de la v1.192.0). Elle ne répète plus la valeur — elle renvoie à
+>   `AGENT_MODEL` et au § « Modèle de l'agent », donc elle ne peut plus
+>   dériver.
 
 ## v1.207.1 — 02/09/2026 à 08:51 — Les étiquettes ne se chevauchent plus
 

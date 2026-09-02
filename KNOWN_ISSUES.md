@@ -1557,9 +1557,10 @@ audit.
   compact tool-call display, thread history/rename/delete and stop are now
   hand-rolled in `src/components/ai/AiPanel.tsx`. Remaining loss vs
   assistant-ui: attachments, edit/regenerate.
-- **Agent model default `deepseek/deepseek-v4-pro` via OpenRouter** —
-  remplace les défauts précédents (Mistral Medium, puis Anthropic). Override
-  via `OPENROUTER_MODEL` env var.
+- **Agent servi par OpenRouter**, pas par Anthropic comme au brief. Le modèle
+  a changé plusieurs fois depuis ; son défaut courant n'est pas répété ici —
+  il vit dans `convex/lib/instructions.ts` (`AGENT_MODEL`), documenté au
+  § « Modèle de l'agent ». Override via la var d'env `OPENROUTER_MODEL`.
 - **Rate-limit thresholds** chosen for usable defaults (e.g. invitations 20/h
   burst 5) rather than the brief's tight 3/min example.
 - **Super-admin lacks impersonate** — out of scope for MVP, needs a careful
