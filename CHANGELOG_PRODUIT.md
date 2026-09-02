@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.207.2 — 02/09/2026 à 10:26 — Toute garantie est classée quelque part
+## v1.209.1 — 02/09/2026 à 13:35 — Toute garantie est classée quelque part
 
 Suite technique de la version précédente, sans effet visible. Le champ qui dit
 dans quelle société une garantie est enregistrée devient **obligatoire** : il
@@ -51,6 +51,118 @@ peut lire.
 >   absent disparaissent — elles ne pouvaient plus rien tolérer.
 > - Deux tests de plus : l'org de dépôt est bien celle demandée à la création,
 >   et une édition qui réécrit **toutes** les parties ne la déplace pas.
+## v1.209.0 — 02/09/2026 à 10:46 — Un reporting Parallel déclenche son analyse tout seul
+
+Jusqu'ici, seul un reporting **reçu par email** relançait la synthèse IA de la
+société. Un reporting publié sur le portail Parallel était bien récupéré,
+rangé et affiché — mais il fallait aller cliquer « Relancer l'analyse » à la
+main pour que la note de santé en tienne compte. En pratique, personne n'y
+pensait, et la synthèse d'une société suivie via Parallel décrivait la
+situation d'avant.
+
+Désormais, une communication **nouvelle** sur le portail relance l'analyse de
+la société concernée toute seule, exactement comme un reporting reçu par
+email. Seules les sociétés dont l'émetteur a réellement publié sont
+recalculées : une synchronisation qui ne ramène rien ne relance rien.
+
+Deuxième correction, dans la foulée : **rattacher** une société à son émetteur
+Parallel lance aussi son analyse immédiatement. Auparavant, une société
+fraîchement rattachée devait attendre la publication suivante — parfois des
+mois — pour être analysée une première fois.
+
+Aucun email n'est envoyé dans ces deux cas : personne n'a rien transféré, il
+n'y a personne à qui répondre. Le bouton « Relancer l'analyse » reste
+disponible pour re-scorer après une modification à la main ou rejouer une
+analyse en échec.
+
+> **🔧 Notes techniques**
+>
+> - **Cause racine (ALB-238), pas un fil oublié.** `intelligence.runAnalysisBatch`
+>   n'était planifié qu'en fin de pipeline mail (`reportStore.run`). Le pull
+>   VASCO se terminait sur `vasco.replaceCommunicationsCache` sans aval. Le
+>   plug ne pouvait pas être ajouté tel quel : la mutation **purge puis
+>   réinsère** tout le lot de la paire (org, clientSlug), donc après le swap
+>   toutes les lignes portent le même `fetchedAt` et plus rien ne distingue une
+>   communication qui vient d'arriver d'une ancienne. Un webhook est un
+>   événement, un pull est une photo.
+> - **La détection vit dans le remplacement**, seul moment où « nouveau » est
+>   connaissable : les `communicationId` sur le point d'être supprimés sont lus
+>   avant le delete, le lot pullé est diffé contre eux, et
+>   `scheduleAnalysisForIssuers` planifie **un `runAnalysis` par entité** liée à
+>   un émetteur porteur d'une communication nouvelle (non archivées,
+>   `clientSlug` respecté). Pas `runAnalysisBatch` : sa boucle séquentielle ne
+>   sert qu'à envoyer l'accusé après ses analyses, et il n'y a pas de mail ici —
+>   des jobs indépendants évitent en plus de tenir N appels LLM dans une seule
+>   action au premier remplissage.
+> - **`companies.setVascoLink` planifie aussi `runAnalysis`.** Le rattachement
+>   se fait **depuis** le cache, donc au moment du lien tout le backlog de
+>   l'entité est déjà « connu » et la détection ci-dessus ne se déclencherait
+>   jamais dessus. Le lien est son propre déclencheur.
+> - **Non régression** : `convex/regression.vascoAnalysis.test.ts` (6 cas) —
+>   arrivée détectée, re-pull identique silencieux, périmètre limité aux
+>   émetteurs qui ont publié, émetteur orphelin et entité archivée ignorés,
+>   mémoire cloisonnée par `clientSlug`, rattachement déclencheur. Les tests
+>   lisent la file `_scheduled_functions` sans l'exécuter (sinon appels LLM
+>   réels).
+> - Docs : `KNOWN_ISSUES.md` § « Communications → AI synthesis » réécrit (la
+>   section affirmait « by design there is no auto-trigger »), règle
+>   anti-pattern ajoutée dans `CLAUDE.md` (pull ⇒ mémoire du « déjà vu » avant
+>   déclencheur), `TESTING.md` TP12b + IG9, `docs/produit/` 04 et 15.
+> - **Hors périmètre, signalé** : une communication VASCO n'est toujours pas
+>   une ligne `companyReports` (lue live par `pullCommunicationsForSynthesis`),
+>   donc elle reste invisible pour la fraîcheur des reportings et les
+>   notifications. Chantier séparé.
+## v1.208.0 — 02/09/2026 à 09:14 — L'assistant passe sur le moteur GLM Flash
+
+L'assistant de l'app change de moteur : il tourne désormais sur **GLM Flash**,
+là où il utilisait jusqu'ici la génération Flash de DeepSeek. Le changement
+est un choix d'outil, pas une évolution de l'app : mêmes accès à vos données,
+mêmes outils, mêmes demandes de confirmation avant toute écriture, même
+capacité à ingérer de longs documents.
+
+Comme précédemment, le même moteur alimente aussi, en arrière-plan, la lecture
+des reportings reçus par email, l'enrichissement des fiches sociétés,
+l'identification de l'expéditeur d'un report et les synthèses de
+participations. Si vous constatez une différence de qualité sur l'une de ces
+lectures automatiques, c'est la première piste à regarder.
+
+Le moteur reste déclaré sous sa forme « dernière version en date » : il suivra
+donc automatiquement les prochaines versions de cette génération, sans
+intervention de notre part.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/instructions.ts` : `AGENT_MODEL` par défaut passe de
+>   `~deepseek/deepseek-v4-flash-latest` à `~z-ai/glm-flash-latest`. Source
+>   unique inchangée, toujours surchargeable par la var d'env Convex
+>   `OPENROUTER_MODEL`. Aucune autre logique touchée — `getModel()`
+>   (`convex/agent.ts`) et ses cinq consommateurs (`reportStore`,
+>   `companyEnrichment`, `reportIdentify`, `intelligence`,
+>   `migrations/alboDocBackfill`) héritent du changement.
+> - Slug retenu : l'**alias** OpenRouter préfixé `~`, qui redirige aujourd'hui
+>   vers `z-ai/glm-5.3-flash` — 1,31 M tokens de contexte (identique à
+>   l'ancien), `tools` + `structured_outputs` supportés, donc `generateObject`
+>   et l'approbation d'outils fonctionnent à l'identique.
+> - Coût : 0,075 $/M en entrée et 0,25 $/M en sortie, contre 0,05 / 0,16 pour
+>   DeepSeek V4 Flash — soit ~1,5× plus cher, ce qui reste marginal à notre
+>   volume. Le cache de préfixe reste automatique côté fournisseur
+>   (`input_cache_read` à 0,015 $/M), sans clé à injecter : le wrapper `fetch`
+>   supprimé à l'époque de Mistral n'a pas à revenir.
+> - Wording du system prompt corrigé (« You run on the GLM model … ») et
+>   commentaire d'en-tête de `convex/agent.ts` mis à jour. `KNOWN_ISSUES.md`
+>   § « Modèle de l'agent » retitré (OpenRouter / GLM) ; défaut mis à jour
+>   dans `CLAUDE.md`, `.env.example` et `TESTING.md`.
+> - ⚠️ Le code ne porte que le **défaut**. Si `OPENROUTER_MODEL` est posé sur
+>   le déploiement prod, c'est lui qui gagne : le basculement effectif demande
+>   `pnpm exec convex env set --prod OPENROUTER_MODEL "~z-ai/glm-flash-latest"`
+>   (ou la suppression de la variable pour retomber sur le défaut du code).
+> - Claim périmé nettoyé au passage : la liste « Trade-offs vs
+>   PROJECT_BRIEF.md » de `KNOWN_ISSUES.md` annonçait encore
+>   `deepseek/deepseek-v4-pro` comme défaut de l'agent (faux depuis la bascule
+>   Flash de la v1.192.0). Elle ne répète plus la valeur — elle renvoie à
+>   `AGENT_MODEL` et au § « Modèle de l'agent », donc elle ne peut plus
+>   dériver.
+
 ## v1.207.1 — 02/09/2026 à 08:51 — Les étiquettes ne se chevauchent plus
 
 Dans le tiroir des documents d'une société, l'étiquette bleue « Deal · … »
