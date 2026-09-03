@@ -74,6 +74,32 @@ distincte.
 
 ---
 
+## v1.213.2 — 03/09/2026 à 10:10 — Prérequis d'envoi des mails de reports
+
+Documentation interne : la liste des réglages à poser en production pour le
+circuit des reports par email était incomplète — l'adresse de la boîte
+d'envoi n'y figurait pas, alors que trois envois en dépendent (l'annonce
+d'une publication Parallel, la diffusion aux autres membres d'un report
+déposé à la main, et le mail signalant un report non traité). Aucun
+changement dans l'app.
+
+> **🔧 Notes techniques**
+>
+> - `TESTING.md` (brique reports par email) : ajout de `AGENTMAIL_INBOX_ID`
+>   à la liste des prérequis prod, avec sa valeur
+>   (`report-albo-os@agentmail.to` — chez AgentMail l'id d'une inbox est son
+>   adresse) et les chemins qui la lisent.
+> - Trois lectures concernées : `vascoNotify.announce` (sortie anticipée sans
+>   la variable, annonce reportée sans être consommée),
+>   `reportNotify.outboundInbox` (repli quand la ligne porte le placeholder
+>   `manual-upload`) et `organizations.addMemberAlias` (l'adresse de l'inbox
+>   fait partie des expéditeurs bloqués). L'ingestion n'est pas concernée :
+>   l'id d'inbox arrive dans le payload du webhook.
+> - Pas de changement de code : la variable se pose côté environnement Convex
+>   prod.
+
+---
+
 ## v1.213.1 — 02/09/2026 à 18:16 — Le contenu des fenêtres reste dans le cadre
 
 Quand une fenêtre s'ouvrait par-dessus la page — ajouter des documents,
