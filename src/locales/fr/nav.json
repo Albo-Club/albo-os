@@ -112,6 +112,8 @@
     "title": "Documentation",
     "subtitle": "Ce que sait faire Albo OS, fonctionnalité par fonctionnalité.",
     "summary": "Sommaire",
+    "searchPlaceholder": "Rechercher dans la documentation…",
+    "searchEmpty": "Aucune page ne correspond.",
     "notFound": "Cette page de documentation n'existe pas."
   },
   "modules": {

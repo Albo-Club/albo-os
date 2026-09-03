@@ -10,6 +10,9 @@ export default defineConfig([
   // them only produces parser errors. Kept in sync with `.prettierignore`.
   globalIgnores([
     'convex/_generated',
+    // Generated from docs/produit by scripts/gen-product-docs.mjs (gitignored;
+    // flat config does not read .gitignore, unlike Prettier).
+    'convex/lib/productDocs.generated.ts',
     '.output',
     '.nitro',
     'prettier.config.js',

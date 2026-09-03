@@ -1,11 +1,12 @@
 {
-  "placeholder": "Rechercher deals, sociétés, mouvements…",
+  "placeholder": "Rechercher deals, sociétés, mouvements, documentation…",
   "empty": "Aucun résultat.",
-  "hint": "Tapez pour chercher dans les deals, sociétés et mouvements.",
+  "hint": "Tapez pour chercher dans les deals, sociétés, mouvements et la documentation.",
   "groups": {
     "deals": "Deals",
     "companies": "Sociétés",
-    "transactions": "Mouvements"
+    "transactions": "Mouvements",
+    "docs": "Documentation"
   },
   "askAi": "Demander à l'IA : « {{query}} »",
   "movementIn": "Entrée",

@@ -23,6 +23,57 @@ bas de page.
 
 ---
 
+## v1.214.0 — 03/09/2026 à 17:18 — La documentation se cherche, et l'assistant la lit
+
+La page Documentation gagne une barre de recherche : tapez quelques mots
+(« previsionnel », sans accent, suffit) et les pages qui en parlent
+s'affichent, avec la section concernée et un extrait où les mots trouvés sont
+surlignés. Un clic ouvre la page. La même recherche est dans la palette ⌘K,
+depuis n'importe quel écran : un groupe « Documentation » apparaît sous les
+deals, sociétés et mouvements.
+
+L'assistant IA (panneau ⌘J, Telegram) et le connecteur Claude savent
+désormais lire ce mode d'emploi. À « comment marche le pointage ? », il
+ouvre la page Pointage et répond avec, en la citant — au lieu d'improviser à
+partir de ses outils. Les questions sur vos documents (« que dit le pacte de
+X ? ») passent toujours par la recherche dans les documents, qui reste
+distincte.
+
+> **🔧 Notes techniques**
+>
+> - Le bundler Convex (esbuild) n'a pas de loader `.md` :
+>   `scripts/gen-product-docs.mjs` écrit `convex/lib/productDocs.generated.ts`
+>   (gitignoré, régénéré au `postinstall` et au démarrage de `pnpm dev`)
+>   depuis `docs/produit/*.md`. `src/lib/produitDocs.ts` n'est plus qu'un
+>   ré-export de `convex/lib/productDocs.ts` : UI et IA lisent le même texte.
+> - `convex/lib/productDocs.ts` (pur, testé dans `tests/productDocs.test.ts`) :
+>   `searchProductDocs` — pliage accents/casse, mots vides, poids 50 sur le
+>   H1, 8 sur les H2/H3, occurrences du corps pour 1 000 caractères (une
+>   longue page ne gagne pas au volume), bonus si tous les termes sont
+>   présents ; extrait ±90 caractères recadré sur les mots ; `splitByTerms`
+>   pour le surlignage ; `PRODUCT_DOC_INDEX` pour le prompt. Le pliage du
+>   corpus est paresseux (premier appel), le module étant embarqué dans le
+>   layout org via ⌘K.
+> - Front : `Input` de recherche dans `docs.tsx` (état local, dès 2 caractères
+>   `DocsSearchResults` remplace l'`Outlet`), groupe « Documentation » dans
+>   `CommandPalette.tsx` (pur client, aucune requête Convex).
+> - Agent : `convex/agentToolsProductDocs.ts` (`searchProductDocs`,
+>   `getProductDoc`, lecture seule, sans `parseScope` — constante de build
+>   identique pour toutes les orgs), bloc « Product documentation » + index
+>   des pages dans `BASE_INSTRUCTIONS`. MCP : mêmes outils dans
+>   `convex/mcp/registry.ts`, sans argument `org` (comme `listOrgs`) ;
+>   `SERVER_INSTRUCTIONS` corrigé au passage (sept outils d'écriture, pas
+>   quatre).
+> - `eslint.config.mjs` / `.prettierignore` ignorent le fichier généré (la
+>   config flat ne lit pas `.gitignore`). Piège documenté dans
+>   `KNOWN_ISSUES.md` § « Documentation produit côté Convex ».
+> - `convex/_generated/api.d.ts` régénéré par `convex codegen` : il gagne
+>   `agentToolsProductDocs` et `lib/productDocs`, et rattrape au passage une
+>   dérive antérieure (modules supprimés encore listés, `lib/*` et
+>   `migrations/*` absents) que `skipLibCheck` masquait.
+
+---
+
 ## v1.213.2 — 03/09/2026 à 10:10 — Prérequis d'envoi des mails de reports
 
 Documentation interne : la liste des réglages à poser en production pour le

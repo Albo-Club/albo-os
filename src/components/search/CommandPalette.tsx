@@ -1,16 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowDownLeft,
   ArrowUpRight,
+  BookOpen,
   Building2,
   Handshake,
   Sparkles,
 } from 'lucide-react'
 
 import { api } from '../../../convex/_generated/api'
+import { searchProductDocs } from '../../../convex/lib/productDocs'
 import type { Id } from '../../../convex/_generated/dataModel'
 import {
   Command,
@@ -28,8 +30,9 @@ import { useDealTitle, useFormatters } from '~/components/participations/Partici
 /**
  * App-wide command palette (⌘K), scoped to the current org. Searches deals,
  * companies and movements at once (`api.search.global`) and groups the results
- * so the user can pick whether they meant a company or a deal. An "Ask the AI"
- * action forwards the raw query to the assistant panel.
+ * so the user can pick whether they meant a company or a deal. The product
+ * documentation is searched too, client-side (the pages are bundled). An
+ * "Ask the AI" action forwards the raw query to the assistant panel.
  *
  * `open` state is owned by the org layout (mirrors the ⌘J AI panel toggle).
  */
@@ -67,11 +70,17 @@ export function CommandPalette({
     onOpenChange(false)
   }
 
+  const docHits = useMemo(
+    () => (term.length >= 2 ? searchProductDocs(term, 4) : []),
+    [term],
+  )
+
   const hasResults =
-    results &&
-    (results.deals.length > 0 ||
-      results.companies.length > 0 ||
-      results.transactions.length > 0)
+    docHits.length > 0 ||
+    (results &&
+      (results.deals.length > 0 ||
+        results.companies.length > 0 ||
+        results.transactions.length > 0))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -184,6 +193,35 @@ export function CommandPalette({
                     <span className="flex-1 truncate">{tx.label}</span>
                     <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
                       {fmtEur(tx.amount)}
+                    </span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+
+            {docHits.length > 0 && (
+              <CommandGroup heading={t('search:groups.docs')}>
+                {docHits.map((hit) => (
+                  <CommandItem
+                    key={hit.slug}
+                    value={`doc-${hit.slug}`}
+                    onSelect={() => {
+                      close()
+                      void navigate({
+                        to: '/app/$orgSlug/docs/$page',
+                        params: { orgSlug, page: hit.slug },
+                      })
+                    }}
+                  >
+                    <BookOpen className="size-4 shrink-0 opacity-60" />
+                    <span className="flex-1 truncate">
+                      {hit.title}
+                      {hit.heading && (
+                        <span className="text-muted-foreground">
+                          {' '}
+                          · {hit.heading}
+                        </span>
+                      )}
                     </span>
                   </CommandItem>
                 ))}

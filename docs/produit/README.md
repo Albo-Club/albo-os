@@ -63,6 +63,11 @@ expliqué simplement dans un encadré « Sous le capot ».
 - **Lecture dans l'app** : le menu **Documentation** (bas de la barre
   latérale) rend ces pages telles quelles, liens entre pages compris. C'est
   le même contenu que ci-dessous — pas une copie : la page est le fichier.
+- **Recherche** : la page Documentation a une barre de recherche par
+  mots-clés (accents facultatifs) qui rend les pages avec la section et un
+  extrait ; la palette ⌘K propose un groupe « Documentation » depuis
+  n'importe quel écran. L'assistant IA et le connecteur Claude lisent ces
+  mêmes pages pour répondre aux questions « comment marche… ».
 - **Source de vérité** : ce dossier (`docs/produit/`), versionné avec le code.
   Toute PR qui ajoute, modifie ou retire une fonctionnalité visible met à jour
   la page correspondante **dans la même PR** (règle dans `CLAUDE.md`,

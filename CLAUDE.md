@@ -823,6 +823,14 @@ export const remove = mutation({
 - ❌ Unrequested dark/light toggle.
 - ❌ `tailwind.config.js` (Tailwind v4 is CSS-first).
 - ❌ Editing `routeTree.gen.ts` or `convex/_generated/*` manually.
+- ❌ Editing `convex/lib/productDocs.generated.ts`, or reading
+  `docs/produit/*.md` from code by any path other than
+  `convex/lib/productDocs.ts`. The file is generated from the folder by
+  `pnpm gen:docs` (run by `pnpm install` and at `pnpm dev` start) and
+  gitignored: edit the `.md`, and a page added to the folder shows up at the
+  next run, nothing to register. If `tsc` cannot find the module, run
+  `pnpm gen:docs`. See `KNOWN_ISSUES.md` « Documentation produit côté
+  Convex ».
 - ❌ Hardcoding a user-facing string anywhere (UI **or** transactional
   email). All user-facing copy goes through i18n: `t()` from react-i18next
   with namespaced keys in `src/locales/{en,fr}/<ns>.json`, or the bilingual
