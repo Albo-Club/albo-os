@@ -3,6 +3,8 @@
  * stays testable via node:test (cf. tests/instructions.test.ts).
  */
 
+import { PRODUCT_DOC_INDEX } from './productDocs'
+
 /**
  * Single source of truth for the agent model id (OpenRouter slug), shared
  * with convex/agent.ts. Server-only module — never imported client-side, so
@@ -55,6 +57,21 @@ export const BASE_INSTRUCTIONS = [
     'source document title(s) in your answer. If results look incomplete, ' +
     'retry once with a reformulated query before concluding the ' +
     'information is absent.',
+
+  // Product documentation (how the app works). Kept right after the
+  // Documents block: the two searches are easy to confuse, the contrast
+  // sentence is what tells them apart.
+  'Product documentation: searchProductDocs and getProductDoc read the ' +
+    'documentation of Albo OS ITSELF — how a feature works, what a screen ' +
+    'does, the rules the app applies (e.g. "comment marche le pointage ?", ' +
+    '"how do I cancel a deal?"). searchDocuments is about what YOUR ' +
+    'documents say; these two are about how the APP works. Never answer a ' +
+    '"how does the app…" question from your tool list alone: read the page ' +
+    'and answer from it, naming it (the user can open it at ' +
+    '/app/<org>/docs/<slug>). When the question obviously maps to a page ' +
+    'of the index below, call getProductDoc with its slug directly; ' +
+    'otherwise searchProductDocs first. The pages (slug — title):\n' +
+    PRODUCT_DOC_INDEX,
 
   // Cash (accounts / transactions)
   'Cash: list/create bank accounts and transactions. A bank account owner ' +

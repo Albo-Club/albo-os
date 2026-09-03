@@ -37,9 +37,12 @@ const SERVER_INSTRUCTIONS =
   'Access to Albo OS portfolio data (family office CALTE + Albo Club). ' +
   'Monetary amounts are integers in EUR CENTS (100000 = 1 000 €). Rates are ' +
   'in BASIS POINTS (1100 = 11%). Dates are ISO strings or ms epoch. One ' +
-  'investment vehicle = one organization: pass the `org` slug to every tool. ' +
-  'Most tools read. The four write tools (createCompany, updateCompany, ' +
-  'createDeal, updateDeal) commit immediately — confirm with the user before ' +
+  'investment vehicle = one organization: pass the `org` slug to every tool ' +
+  'except listOrgs and the two product-documentation tools ' +
+  '(searchProductDocs, getProductDoc), which explain how the app itself ' +
+  'works. Most tools read. The seven write tools (createCompany, ' +
+  'updateCompany, createDeal, updateDeal, createLoan, createProperty, ' +
+  'addPropertyValuation) commit immediately — confirm with the user before ' +
   'calling one, and report back the `url` and any `possibleDuplicates` the ' +
   'call returns.'
 

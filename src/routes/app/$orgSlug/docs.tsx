@@ -1,6 +1,10 @@
 import { Link, Outlet, createFileRoute, useLocation } from '@tanstack/react-router'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Search } from 'lucide-react'
 
+import { DocsSearchResults } from '~/components/docs/DocsSearchResults'
+import { Input } from '~/components/ui/input'
 import { docPages } from '~/lib/produitDocs'
 import { cn } from '~/lib/utils'
 
@@ -18,14 +22,33 @@ function DocsLayout() {
   const { orgSlug } = Route.useParams()
   const location = useLocation()
   const summaryPath = `/app/${orgSlug}/docs`
+  // Local state, no URL param: the search is a way to reach a page, not a
+  // page. From 2 characters the hits replace the page; the sidebar stays.
+  const [query, setQuery] = useState('')
+  const term = query.trim()
 
   return (
     <main className="flex-1 space-y-6 p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {t('docsPage.title')}
-        </h1>
-        <p className="text-muted-foreground text-sm">{t('docsPage.subtitle')}</p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {t('docsPage.title')}
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            {t('docsPage.subtitle')}
+          </p>
+        </div>
+        <div className="relative w-full max-w-xs">
+          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+          <Input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('docsPage.searchPlaceholder')}
+            aria-label={t('docsPage.searchPlaceholder')}
+            className="pl-8"
+          />
+        </div>
       </header>
 
       <div className="flex flex-col gap-8 lg:flex-row">
@@ -60,7 +83,15 @@ function DocsLayout() {
         </nav>
 
         <div className="min-w-0 max-w-3xl flex-1 pb-16">
-          <Outlet />
+          {term.length >= 2 ? (
+            <DocsSearchResults
+              term={term}
+              orgSlug={orgSlug}
+              onNavigate={() => setQuery('')}
+            />
+          ) : (
+            <Outlet />
+          )}
         </div>
       </div>
     </main>

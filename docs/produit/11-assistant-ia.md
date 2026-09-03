@@ -70,6 +70,12 @@ Une soixantaine d'outils, par domaine :
   sheets, BP, reportings…) et dans les reports reçus par email — « que dit
   le pacte de X sur la liquidité ? », « quelles boîtes ont parlé de
   recrutement ? ». L'assistant cite les documents sources dans sa réponse.
+- **Mode d'emploi de l'app** : cette documentation. À « comment marche le
+  pointage ? » ou « comment annuler un deal ? », l'assistant lit la page
+  concernée et répond avec, en la nommant — au lieu de deviner depuis ses
+  outils. C'est une lecture distincte de celle de vos documents : le pacte de
+  X relève de la recherche dans les documents, le fonctionnement de l'app de
+  celle-ci.
 
 ## Les approbations : Confirmer / Refuser
 

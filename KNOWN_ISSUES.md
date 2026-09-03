@@ -5979,3 +5979,60 @@ enfants de taille fixe) s'inscrit dans la table `EXEMPT` **avec sa raison** :
 c'est un arbitrage, pas un interrupteur. Aujourd'hui deux entrées —
 `checkbox.tsx` (une case à cocher de taille fixe) et `chart.tsx` (tooltip
 flottant, rien ne cape sa largeur).
+
+## Documentation produit côté Convex : un module généré, gitignoré
+
+`docs/produit/*.md` est lu par l'app (lecteur + ⌘K) **et** par l'assistant
+(outils `searchProductDocs` / `getProductDoc`, index des pages dans le prompt
+système). Côté Vite un glob `?raw` suffisait ; côté Convex, non : le bundler
+est esbuild, qui n'a **pas de loader `.md`**, et Convex n'expose aucun réglage
+de loaders (`node_modules/convex/dist/cjs/bundler/index.js`, liste
+`ENTRY_POINT_EXTENSIONS` : js/ts/tsx + json/text/css). Que le dossier soit
+hors de `convex/` n'est pas le blocage — esbuild suit les imports relatifs —
+c'est bien l'extension.
+
+Les alternatives coûtent plus qu'elles ne rapportent :
+
+- **une table Convex** alimentée par seed : la règle 7 de `CLAUDE.md` impose de
+  mettre à jour la page **dans la même PR** que le code, et le miroir Linear
+  lit le dossier au merge — la doc doit rester un fichier du dépôt ;
+- **la doc écrite en JSON / template literal** : illisible sur GitHub et dans
+  Linear ;
+- **un JSON généré** : `convex/tsconfig.json` n'a pas `resolveJsonModule`, le
+  typecheck de `convex dev` refuserait l'import.
+
+D'où `scripts/gen-product-docs.mjs` → `convex/lib/productDocs.generated.ts`
+(les pages en littéraux de chaîne), consommé par `convex/lib/productDocs.ts`
+que `src/lib/produitDocs.ts` ré-exporte : UI et IA lisent exactement le même
+texte. Le fichier est **gitignoré** et régénéré par `postinstall` (couvre
+la CI, Vercel — l'install précède `convex deploy` — et le poste local) et au
+démarrage de `pnpm dev`. Le committer ferait un conflit de 170 Ko à chaque PR
+qui touche la doc, c'est-à-dire presque toutes.
+
+Trois conséquences à connaître :
+
+- **`Cannot find module './productDocs.generated'`** au typecheck = le
+  postinstall n'a pas tourné (`pnpm install --ignore-scripts`, clone sans
+  install). Remède : `pnpm gen:docs`.
+- **Éditer un `.md` pendant `pnpm dev`** ne se voit plus à chaud : il faut
+  relancer `pnpm gen:docs` (ou `pnpm dev`, qui le fait). Avant, le glob Vite
+  rechargeait la page ; c'est une régression assumée, la doc ne s'édite pas en
+  boucle courte.
+- **ESLint lit le fichier généré** si on ne l'ignore pas explicitement : la
+  config flat ne lit pas `.gitignore`, contrairement à Prettier 3. D'où
+  l'entrée dans `globalIgnores` (`eslint.config.mjs`) et, par symétrie, dans
+  `.prettierignore`.
+
+Coût côté client : les 170 Ko de markdown, jusque-là confinés au chunk
+paresseux de la route docs, partent dans le chunk du layout org via ⌘K. Le
+pliage du corpus (accents, casse) est fait au **premier appel** de la
+recherche, pas au chargement du module — à garder ainsi.
+
+`convex codegen` ne liste **pas** le module généré dans `_generated/api.d.ts`
+(vérifié : seul `lib/productDocs` y entre), donc le fichier committé ne
+référence jamais un fichier absent d'un clone frais. À savoir au passage :
+`skipLibCheck: true` (les deux tsconfig) fait que `tsc` ne vérifie **pas** les
+imports d'`api.d.ts` — un module supprimé y reste listé sans rien casser, et
+c'est ainsi que le fichier a pu dériver (`gmail`, `lib/suggest`…) jusqu'à la
+régénération de septembre 2026. Seul `convex dev` / `convex codegen` le
+remet d'équerre, et il faut un `CONVEX_DEPLOYMENT` pour le lancer.

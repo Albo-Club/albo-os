@@ -25,6 +25,11 @@ import { z } from 'zod'
 import { internal } from '../_generated/api'
 import { isTreasuryPlacement } from '../lib/instrumentMapping'
 import { FUND_TYPES, INSTRUMENTS, ROUND_TYPES } from '../lib/instruments'
+import {
+  getProductDoc,
+  productDocs,
+  searchProductDocs,
+} from '../lib/productDocs'
 import { SECTOR_SLUGS } from '../lib/sectors'
 import type { ActionCtx } from '../_generated/server'
 import type { Id } from '../_generated/dataModel'
@@ -214,6 +219,45 @@ export const mcpTools: Array<McpTool> = [
       await ctx.runQuery(internal.mcp.queries.listOrgsForUser, {
         actorUserId,
       }),
+  }),
+  // The two tools below take no `org`, like listOrgs: they read the product
+  // documentation (docs/produit, bundled at install by
+  // scripts/gen-product-docs.mjs), a build-time constant identical for every
+  // org. orgAwareSchema (server.ts) tolerates the missing property.
+  defineTool({
+    name: 'searchProductDocs',
+    description:
+      'Keyword search in the PRODUCT DOCUMENTATION of Albo OS — how the app ' +
+      'itself works (features, workflows, rules, what a screen does). Use ' +
+      'it for "how do I…" questions about the app; NOT for the content of ' +
+      "the org's own documents, which is searchDocuments. Accents are " +
+      'optional. Returns pages ranked by relevance with the nearest ' +
+      'heading and an excerpt; read the full page with getProductDoc.',
+    schema: {
+      query: z.string().describe('Keywords, French or English'),
+      limit: z.number().int().min(1).max(20).optional(),
+    },
+    run: (_ctx, _actorUserId, { query, limit }) =>
+      Promise.resolve({ results: searchProductDocs(query, limit) }),
+  }),
+  defineTool({
+    name: 'getProductDoc',
+    description:
+      'Read one page of the product documentation of Albo OS in full ' +
+      '(markdown, in French), by slug — slugs come from searchProductDocs. ' +
+      'An unknown slug returns the list of available ones.',
+    schema: { slug: z.string().describe('Page slug, e.g. "08-pointage"') },
+    run: (_ctx, _actorUserId, { slug }) => {
+      const doc = getProductDoc(slug)
+      return Promise.resolve(
+        doc
+          ? { slug: doc.slug, title: doc.title, markdown: doc.markdown }
+          : {
+              error: 'unknown_slug',
+              availableSlugs: productDocs.map((page) => page.slug),
+            },
+      )
+    },
   }),
   defineTool({
     name: 'listCompanies',

@@ -7,6 +7,7 @@
 **/public
 **/public
 convex/_generated/
+convex/lib/productDocs.generated.ts
 example/convex/_generated/
 convex/README.md
 pnpm-lock.yaml
