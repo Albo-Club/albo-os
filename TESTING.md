@@ -789,7 +789,10 @@ canoniques → `kpiSnapshots` (idempotent par company+métrique+période+report
 source), `companyIntelligence` re-déclenchée, statut → `processed`. Une
 métrique hors catalogue reste sur le snapshot brut du report (jamais dans
 les séries). Page de suivi : `/app/all/reports`. Prérequis :
-`AGENTMAIL_API_KEY`, `AGENTMAIL_WEBHOOK_SECRET`, `OPENROUTER_API_KEY`,
+`AGENTMAIL_API_KEY`, `AGENTMAIL_INBOX_ID` (l'adresse de l'inbox elle-même,
+`report-albo-os@agentmail.to` — chez AgentMail l'id d'une inbox EST son
+adresse ; lue par les envois sortants : annonce VASCO, diffusion d'un report
+déposé à la main), `AGENTMAIL_WEBHOOK_SECRET`, `OPENROUTER_API_KEY`,
 `MISTRAL_API_KEY` posés en prod ; URL webhook
 `<CONVEX_SITE_URL>/agentmail/webhook` configurée dans la console AgentMail ;
 **domaines remplis sur les `companies` portfolio**. Boucle fermée par la
