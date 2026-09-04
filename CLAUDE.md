@@ -749,6 +749,20 @@ export const remove = mutation({
   qu'il ne trie pas par vraisemblance. Le futur moteur se reconstruira sur
   les cas réels collectés à la main et sur `matchingDecisions` — pas en
   re-câblant l'ancien.
+- ❌ Faire porter au **passif** d'une org le côté créancier d'une relation
+  intra-groupe. Une avance en compte courant est une **dette** chez celui qui
+  la reçoit et un **actif** chez celui qui la consent : seul le débiteur voit
+  et pointe un `intercompanyLoans` (`loansOfOrg` ne lit que `by_to`,
+  `applyAllocateToLiability` refuse la jambe du créancier), le prêteur porte
+  la même avance en deal `cca` sur la société bénéficiaire. C'est le patron
+  déjà en place pour le capital (`equityPositions` chez l'émettrice, deal chez
+  le détenteur — SPEC D33), et la raison en est concrète : tant que les deux
+  côtés étaient acceptés, les décaissements de CALTE vers Albo se sont
+  **répartis** entre le deal et le C/C, rendant les deux chiffres faux sans
+  que rien ne le signale. Le critère se généralise : un objet à deux faces
+  économiques se saisit **une fois par face**, chacune dans l'écran qui la
+  représente — jamais la même face deux fois, jamais un actif dans un passif.
+  Cf. `KNOWN_ISSUES.md` « Passif ».
 - ❌ Prendre l'`orgId` en **argument** d'une mutation pour contourner une
   ancre devenue optionnelle. `documents:create` résout l'org depuis l'ancre
   présente (`companyId`, sinon `loanId`, sinon `guaranteeId`, sinon

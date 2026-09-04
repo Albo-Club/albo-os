@@ -25,11 +25,9 @@
     "title": "Comptes courants d'associés",
     "empty": "Aucun compte courant inter-entités.",
     "col": {
-      "counterparty": "Contrepartie",
-      "side": "Position",
+      "counterparty": "Créancier",
       "balance": "Solde"
     },
-    "receivable": "Créance",
     "payable": "Dette"
   },
   "allocated": {
@@ -58,7 +56,7 @@
     "loan": {
       "button": "Compte courant",
       "title": "Nouveau compte courant",
-      "description": "Compte courant d'associé entre deux organisations. Le solde sera dérivé des transactions pointées dessus.",
+      "description": "Compte courant que cette organisation doit à une autre du groupe. Le solde sera dérivé des transactions pointées dessus. Une avance qu'elle consent, elle, se saisit en deal « compte courant » sur la société bénéficiaire.",
       "fromLabel": "Créancier (prête)",
       "toLabel": "Débiteur (emprunte)",
       "orgPlaceholder": "Choisir une organisation",

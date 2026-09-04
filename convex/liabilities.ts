@@ -1,7 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 import { internalMutation, mutation, query } from './_generated/server'
 import { requireAppUser, requireOrgMember } from './lib/auth'
-import { computeLoanBalanceCents, loanSideForOrg } from './lib/liabilities'
+import { computeLoanBalanceCents } from './lib/liabilities'
 import { applyAllocateToLiability, applyDeallocate } from './lib/pointage'
 import { buildSearchText } from './lib/searchText'
 import { allocationCategory, equityPositionType } from './schema'
@@ -34,43 +34,37 @@ async function holderNameOf(ctx: QueryCtx, position: Doc<'equityPositions'>) {
   )
 }
 
-/** Counterparty display name of a loan, seen from `orgId`'s side. */
-async function counterpartyNameOf(
-  ctx: QueryCtx,
-  loan: Doc<'intercompanyLoans'>,
-  orgId: Id<'organizations'>,
-) {
-  const counterpartyOrg = await ctx.db.get(
-    'organizations',
-    loan.fromOrgId === orgId ? loan.toOrgId : loan.fromOrgId,
-  )
-  return counterpartyOrg?.name ?? loan.fromLabel ?? loan.fromPersonId ?? null
+/** Creditor display name of a loan — the counterparty of the debtor org. */
+async function creditorNameOf(ctx: QueryCtx, loan: Doc<'intercompanyLoans'>) {
+  const creditorOrg = await ctx.db.get('organizations', loan.fromOrgId)
+  return creditorOrg?.name ?? loan.fromLabel ?? loan.fromPersonId ?? null
 }
 
-/** An org's C/C loans (creditor or debtor side), deduped by _id. */
+/**
+ * The C/C the org OWES — its debtor side only (`by_to`).
+ *
+ * A C/C is deliberately one-sided here: the debtor carries the debt in its
+ * Passif, the creditor carries the very same advance as an ASSET, i.e. a
+ * `cca` deal on the borrower's company. That is the pattern equity already
+ * follows (the issuer's `equityPositions`, the holder's share deal), and
+ * the reason the creditor side is gone: a Passif page listing a receivable
+ * showed an asset, and let the same advance be recorded twice.
+ * Cf. KNOWN_ISSUES.md « Passif ».
+ */
 async function loansOfOrg(ctx: QueryCtx, orgId: Id<'organizations'>) {
-  const asCreditor = await ctx.db
-    .query('intercompanyLoans')
-    .withIndex('by_from', (q) => q.eq('fromOrgId', orgId))
-    .collect()
-  const asDebtor = await ctx.db
+  return await ctx.db
     .query('intercompanyLoans')
     .withIndex('by_to', (q) => q.eq('toOrgId', orgId))
     .collect()
-  const loansById = new Map<Id<'intercompanyLoans'>, Doc<'intercompanyLoans'>>()
-  for (const loan of [...asCreditor, ...asDebtor]) {
-    loansById.set(loan._id, loan)
-  }
-  return [...loansById.values()]
 }
 
 /**
  * Liabilities read logic, shared by the public query (after auth).
  *
- * Balances are NEVER stored: each org sums ITS OWN transactions whose
+ * Balances are NEVER stored: the org sums ITS OWN transactions whose
  * `allocation` targets the loan (index `by_org_allocation_target`).
- * Sign: + = receivable (org is creditor), − = debt (org is debtor).
- * Cf. convex/lib/liabilities.ts.
+ * Only the debtor side is read, so the balance is always ≤ 0 = debt
+ * (in = borrowing, out = repayment). Cf. convex/lib/liabilities.ts.
  */
 export async function getLiabilitiesForOrg(
   ctx: QueryCtx,
@@ -108,20 +102,16 @@ export async function getLiabilitiesForOrg(
     }),
   )
 
-  // 2. C/C accounts where the org is creditor or debtor (deduped by _id).
+  // 2. C/C the org owes (debtor side only).
   // 3. Per-loan balance derived from THIS org's transactions, enriched with
-  //    the counterparty name (the loan's other org) and the allocated txs.
+  //    the creditor's name and the allocated txs.
   const loans = await Promise.all(
     (await loansOfOrg(ctx, orgId)).map(async (loan) => {
       const allocated = await allocatedTxs(loan._id, 'intercompany_loan')
-      const side = loanSideForOrg(loan, orgId)
       return {
         ...loan,
-        // `side` is non-null by construction (the loan comes from this org's
-        // by_from / by_to indexes); creditor fallback for safety.
-        side: side ?? 'creditor',
         balanceCents: computeLoanBalanceCents(allocated),
-        counterpartyName: await counterpartyNameOf(ctx, loan, orgId),
+        counterpartyName: await creditorNameOf(ctx, loan),
         transactions: allocated.map(pickAllocatedTx),
       }
     }),
@@ -156,8 +146,7 @@ export const listOptions = query({
     const loans = await Promise.all(
       (await loansOfOrg(ctx, orgId)).map(async (loan) => ({
         _id: loan._id,
-        side: loanSideForOrg(loan, orgId) ?? ('creditor' as const),
-        counterpartyName: await counterpartyNameOf(ctx, loan, orgId),
+        counterpartyName: await creditorNameOf(ctx, loan),
       })),
     )
 
@@ -225,8 +214,8 @@ export const getOwnershipForCompany = query({
 })
 
 /**
- * An org's liabilities: issued equity positions + inter-entity current
- * accounts, with balances derived from the allocated transactions.
+ * An org's liabilities: issued equity positions + the inter-entity current
+ * accounts it OWES, with balances derived from the allocated transactions.
  */
 export const getLiabilities = query({
   args: { orgId: v.id('organizations') },
@@ -249,7 +238,8 @@ export const getLiabilities = query({
  * Allocates a transaction to an equity position (`equity`), an inter-entity
  * current account (`intercompany_loan`), a bank loan (`loan`) or a property
  * (`property`). The target must belong to the same org as the transaction
- * (for a C/C: the tx's org must be one of the loan's two parties).
+ * (for a C/C: the tx's org must be the DEBTOR — the creditor's side of the
+ * advance is a `cca` deal, not a liability).
  *
  * `category` is the nature of the flow on the target — required on a
  * `property`, refused elsewhere. It is the ONLY thing the property matching
@@ -591,12 +581,13 @@ const TEST_MARKER = '[TEST liabilities]'
 
 /**
  * Seeds the verification scenario: 1 equityPosition issued by fromOrg,
- * 1 C/C fromOrg → toOrg, and 2 transactions allocated to them (one leg per
- * org: `out` on the creditor side, `in` on the debtor side, 100 000 € each).
+ * 1 C/C fromOrg → toOrg, and the debtor's leg of a 100 000 € advance (`in`
+ * on toOrg). The creditor has NO leg here: its side of the advance is a
+ * `cca` deal, and allocating it on the C/C is refused (`loan_wrong_side`).
  *
  * Then expected via getLiabilities:
- *   fromOrg (creditor) → side 'creditor', balanceCents +10_000_000
- *   toOrg (debtor)     → side 'debtor',   balanceCents −10_000_000
+ *   fromOrg (creditor) → no loan at all (only the debtor sees a C/C)
+ *   toOrg (debtor)     → balanceCents −10_000_000
  *
  *   pnpm exec convex run liabilities:seedTestScenario \
  *     '{"fromOrgId": "…", "toOrgId": "…"}'
@@ -634,7 +625,6 @@ export const seedTestScenario = internalMutation({
         currency: 'EUR',
       })
     }
-    const fromAccountId = await accountFor(fromOrgId)
     const toAccountId = await accountFor(toOrgId)
 
     // 1 equity position issued by the creditor (free-text TEST holder).
@@ -655,31 +645,24 @@ export const seedTestScenario = internalMutation({
       openedDate: now,
     })
 
-    // 2 transactions allocated to the loan: one leg per org.
-    const insertLeg = async (
-      orgId: Id<'organizations'>,
-      bankAccountId: Id<'bankAccounts'>,
-      direction: 'in' | 'out',
-    ) =>
-      await ctx.db.insert('transactions', {
-        orgId,
-        bankAccountId,
-        direction,
-        amount: amountCents,
-        transactionDate: now,
-        rawLabel: `${TEST_MARKER} avance C/C`,
-        searchText: buildSearchText(`${TEST_MARKER} avance C/C`, undefined),
-        source: 'manual',
-        // A tx allocated to liabilities is `matched` without dealId (same
-        // state allocateTransaction would produce).
-        matchStatus: 'matched',
-        allocation: { kind: 'intercompany_loan', targetId: loanId },
-        reconciled: false,
-      })
-    const fromTxId = await insertLeg(fromOrgId, fromAccountId, 'out')
-    const toTxId = await insertLeg(toOrgId, toAccountId, 'in')
+    // The debtor's leg of the advance (the only one a C/C carries).
+    const toTxId = await ctx.db.insert('transactions', {
+      orgId: toOrgId,
+      bankAccountId: toAccountId,
+      direction: 'in',
+      amount: amountCents,
+      transactionDate: now,
+      rawLabel: `${TEST_MARKER} avance C/C`,
+      searchText: buildSearchText(`${TEST_MARKER} avance C/C`, undefined),
+      source: 'manual',
+      // A tx allocated to liabilities is `matched` without dealId (same
+      // state allocateTransaction would produce).
+      matchStatus: 'matched',
+      allocation: { kind: 'intercompany_loan', targetId: loanId },
+      reconciled: false,
+    })
 
-    return { equityPositionId, loanId, fromTxId, toTxId }
+    return { equityPositionId, loanId, toTxId }
   },
 })
 
