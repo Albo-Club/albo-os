@@ -133,9 +133,12 @@ actifs »).
 - **Sécurisé par OAuth** : la connexion passe par la page de connexion
   habituelle d'Albo OS, et chaque utilisateur ne voit que les organisations
   dont il est membre.
+- **L'URL à coller est affichée dans l'app** : Réglages → Intégrations, carte
+  « Connecteur Claude (MCP) », avec un bouton pour la copier. Elle est la même
+  pour tout le monde — c'est le compte qui change, pas l'adresse.
 - **Branchement** dans claude.ai : Réglages → Connecteurs → « Ajouter un
-  connecteur personnalisé » → coller l'URL du serveur (`…/mcp`) → se
-  connecter avec son compte Albo OS.
+  connecteur personnalisé » → coller l'URL copiée → se connecter avec son
+  compte Albo OS.
 
 À ne pas confondre avec l'[assistant IA in-app](11-assistant-ia.md), qui
 couvre bien plus de domaines en écriture et fait valider ses actions par des

@@ -665,8 +665,9 @@ l'objet `deals` → `/attio/webhook`. Montant = `value` (ticket engagé), org vi
 
 Webhook `CONNECTION_SYNCED` → `/powens/webhook` (HMAC) → `ingestConnectionSync`.
 Prérequis : `POWENS_WEBHOOK_SECRET` posé en prod ; provider HMAC + URL webhook
-`https://mellow-curlew-738.convex.site/powens/webhook` configurés chez Powens
-(activer `CONNECTION_SYNCED`) ; orgs `calte`/`albo` + entités group seedées.
+`https://mellow-curlew-738.eu-west-1.convex.site/powens/webhook` configurés
+chez Powens (activer `CONNECTION_SYNCED`) ; orgs `calte`/`albo` + entités
+group seedées.
 La connexion des banques se fait par l'opérateur via le Powens Webview.
 
 | #   | Étape                                                                               | Résultat attendu                                                                                                                     |
@@ -1335,16 +1336,23 @@ Pré-requis : déploiement prod (routes `/mcp` + métadonnées well-known —
 cf. `KNOWN_ISSUES.md` « Serveur MCP distant »). Pour M2-M5, poser
 `MCP_DEV_TOKEN` + `MCP_DEV_EMAIL` (env Convex) — **les retirer après**.
 
+L'URL canonique du connecteur est `<site-url>/mcp` (domaine app), servie par
+le proxy `src/routes/mcp.ts`. L'endpoint Convex `<convex-site-url>/mcp` reste
+en place derrière lui : c'est l'amont, plus une URL à documenter.
+
 | #   | Étape                                                                                                  | Résultat attendu                                                                                                  |
 | --- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| M1  | `POST <convex-site-url>/mcp` sans header `Authorization` (curl)                                        | 401 + header `WWW-Authenticate` pointant `/.well-known/oauth-protected-resource`                                  |
+| M1  | `POST <site-url>/mcp` sans header `Authorization` (curl)                                               | 401 + header `WWW-Authenticate` pointant `<site-url>/.well-known/oauth-protected-resource/mcp` (domaine app, pas convex.site) |
+| M1b | `GET <site-url>/mcp` puis `OPTIONS <site-url>/mcp`                                                     | 405 + `Allow: POST, OPTIONS` ; puis 204 + en-têtes CORS, sans corps                                               |
+| M1c | `GET <site-url>/.well-known/oauth-protected-resource` et `…/oauth-protected-resource/mcp`              | 200 JSON identiques, `resource` = `<site-url>/mcp`, `authorization_servers` = `[<site-url>]`                      |
+| M1d | `POST <site-url>/mcp` avec `Mcp-Protocol-Version: 1999-01-01` et un `Authorization` bidon              | 400 JSON-RPC `Unsupported protocol version` (prouve que l'en-tête traverse le proxy jusqu'à Convex)               |
 | M2  | `initialize` avec `Authorization: Bearer $MCP_DEV_TOKEN`                                               | 200, `result.protocolVersion`, `capabilities.tools`, `instructions` (conventions cents/bps)                       |
 | M3  | `tools/list`                                                                                            | 28 outils avec `description` + `inputSchema` ; le param `org` porte un `enum` = slugs des orgs du user ; les 24 outils de lecture portent `annotations.readOnlyHint: true`, les 4 outils d'écriture `false` |
 | M4  | `tools/call listOrgs` puis `listDeals {org:"<slug>"}`                                                  | Orgs du user `MCP_DEV_EMAIL`, puis deals scopés à l'org                                                           |
 | M5  | `tools/call listDeals` avec un slug d'org dont l'user n'est **pas** membre                             | Résultat `isError` (`agent_tools_forbidden` / `org_not_found`), aucune donnée ne fuite                            |
 | M6  | GET `<site-url>/.well-known/oauth-authorization-server`                                                | 200 JSON, `issuer` = domaine app, endpoints sous `/api/auth/mcp/*`                                                |
-| M7  | `npx @modelcontextprotocol/inspector` → URL `<convex-site-url>/mcp`, auth OAuth                        | DCR → redirect `/login` → sign-in → retour → outils listés et appelables                                          |
-| M8  | claude.ai → Settings → Connectors → *Add custom connector* (URL `/mcp`), puis « liste les deals de … » | Flow OAuth via `/login`, connector actif, réponse avec les données de l'org                                       |
+| M7  | `npx @modelcontextprotocol/inspector` → URL `<site-url>/mcp`, auth OAuth                               | DCR → redirect `/login` → sign-in → retour → outils listés et appelables                                          |
+| M8  | Albo OS → Réglages → Intégrations → carte « Connecteur Claude (MCP) » : copier l'URL, la coller dans claude.ai → Settings → Connectors → *Add custom connector*, puis « liste les deals de … » | Flow OAuth via `/login`, connector actif, réponse avec les données de l'org                                       |
 | M9  | Rejouer M8 en se connectant par **lien magique**                                                       | Après le clic dans l'email, le flow OAuth reprend et aboutit (callbackURL)                                        |
 | M10 | Spammer ~25 `tools/call` d'affilée                                                                     | Résultat `isError` `rate_limited` (bucket `mcpToolCall`, 60/min/user)                                             |
 | M11 | `tools/call listCompanyReports {org, companyId}` sur une participation qui a des reportings, puis `getCompanyReport` sur un id rendu | Timeline (headline + période), puis contenu : `keyHighlights` + `metrics` sous forme de liste `{key, value, unit}` — jamais de `rawContent` |

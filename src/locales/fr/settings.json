@@ -173,6 +173,18 @@
         "clientSlug": "parallel",
         "username": "prenom@alboteam.com"
       }
+    },
+    "mcp": {
+      "title": "Connecteur Claude (MCP)",
+      "description": "Interrogez votre portefeuille depuis claude.ai sans ouvrir l'app. La connexion se fait avec votre compte Albo OS et ne donne accès qu'aux organisations dont vous êtes membre.",
+      "urlLabel": "URL du serveur",
+      "urlHelp": "À coller telle quelle dans claude.ai. Chacun se connecte avec son propre compte.",
+      "copy": "Copier l'URL",
+      "steps": {
+        "open": "Dans claude.ai : Réglages → Connecteurs → « Ajouter un connecteur personnalisé ».",
+        "paste": "Collez l'URL ci-dessus.",
+        "signIn": "Connectez-vous avec votre compte Albo OS pour autoriser l'accès."
+      }
     }
   },
   "alerts": {

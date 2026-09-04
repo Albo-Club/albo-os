@@ -1,11 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { useAction } from 'convex/react'
 import { ConvexError } from 'convex/values'
 import { toast } from 'sonner'
-import { Link2, Loader2, Pencil, RefreshCw, Unlink } from 'lucide-react'
+import {
+  Check,
+  Copy,
+  Link2,
+  Loader2,
+  Pencil,
+  RefreshCw,
+  Unlink,
+} from 'lucide-react'
 
 import { api } from '../../../../../convex/_generated/api'
 import type { Id } from '../../../../../convex/_generated/dataModel'
@@ -62,7 +70,8 @@ function StateDot({ state, label }: { state: string; label: string }) {
   )
 }
 
-type Integration = (typeof api.connections.listIntegrations)['_returnType'][number]
+type Integration =
+  (typeof api.connections.listIntegrations)['_returnType'][number]
 
 function IntegrationsSettings() {
   const { t } = useTranslation(['settings'])
@@ -130,7 +139,77 @@ function IntegrationsList({
         orgId={orgId}
         canManage={canManage}
       />
+      <McpConnectorCard />
     </div>
+  )
+}
+
+/**
+ * The claude.ai / MCP connector. Unlike every other row on this page it is a
+ * *personal* OAuth grant, not an org connection: there is nothing to store,
+ * nothing to sync and no admin gate — only the URL to paste, which is why it
+ * lives in its own card rather than in the platform registry.
+ *
+ * The URL is read from the browser rather than from an env var so it is
+ * always the domain the user is actually on (localhost, preview, prod).
+ */
+function McpConnectorCard() {
+  const { t } = useTranslation(['settings'])
+  const [url, setUrl] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    setUrl(`${window.location.origin}/mcp`)
+  }, [])
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('settings:integrations.mcp.title')}</CardTitle>
+        <CardDescription>
+          {t('settings:integrations.mcp.description')}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Field>
+          <FieldLabel htmlFor="mcp-url">
+            {t('settings:integrations.mcp.urlLabel')}
+          </FieldLabel>
+          <div className="flex items-center gap-2">
+            <Input id="mcp-url" readOnly value={url} className="font-mono" />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={copy}
+              disabled={!url}
+              title={t('settings:integrations.mcp.copy')}
+              aria-label={t('settings:integrations.mcp.copy')}
+            >
+              {copied ? (
+                <Check className="size-4 text-emerald-600" />
+              ) : (
+                <Copy className="size-4" />
+              )}
+            </Button>
+          </div>
+          <FieldDescription>
+            {t('settings:integrations.mcp.urlHelp')}
+          </FieldDescription>
+        </Field>
+        <ol className="text-muted-foreground list-decimal space-y-1 pl-5 text-sm">
+          <li>{t('settings:integrations.mcp.steps.open')}</li>
+          <li>{t('settings:integrations.mcp.steps.paste')}</li>
+          <li>{t('settings:integrations.mcp.steps.signIn')}</li>
+        </ol>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -276,7 +355,9 @@ function PlatformRow({
               disabled={syncing}
               onClick={() => void handleSync()}
             >
-              <RefreshCw className={`size-4 ${syncing ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`size-4 ${syncing ? 'animate-spin' : ''}`}
+              />
             </Button>
           )}
           {canManage && item.auth === 'webview' && (

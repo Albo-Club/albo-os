@@ -173,6 +173,18 @@
         "clientSlug": "parallel",
         "username": "name@alboteam.com"
       }
+    },
+    "mcp": {
+      "title": "Claude connector (MCP)",
+      "description": "Query your portfolio from claude.ai without opening the app. You sign in with your Albo OS account and only reach the organizations you are a member of.",
+      "urlLabel": "Server URL",
+      "urlHelp": "Paste it as-is into claude.ai. Everyone connects with their own account.",
+      "copy": "Copy the URL",
+      "steps": {
+        "open": "In claude.ai: Settings → Connectors → “Add custom connector”.",
+        "paste": "Paste the URL above.",
+        "signIn": "Sign in with your Albo OS account to authorize access."
+      }
     }
   },
   "alerts": {

@@ -23,6 +23,54 @@ bas de page.
 
 ---
 
+## v1.216.0 — 04/09/2026 à 21:45 — Brancher Claude sur Albo OS se fait depuis l'app
+
+Le connecteur qui permet d'interroger le portefeuille depuis claude.ai
+existait déjà, mais rien dans l'app ne disait quelle adresse coller — et
+l'adresse en question était celle, illisible, du serveur technique.
+
+Deux choses changent. L'adresse du connecteur est désormais celle de l'app
+elle-même : `https://os.alboteam.com/mcp`. Et elle est **affichée** dans
+Réglages → Intégrations, dans une carte « Connecteur Claude (MCP) » qui donne
+l'URL, un bouton pour la copier et les trois étapes du branchement côté
+claude.ai. Chacun s'y connecte avec son propre compte et ne voit que les
+organisations dont il est membre.
+
+Un connecteur déjà branché sur l'ancienne adresse continue de fonctionner. Pour
+passer à la nouvelle, il faut le supprimer dans claude.ai et le rajouter avec
+l'URL affichée dans l'app.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/mcp.ts` : reverse proxy sur le domaine app vers
+>   `<convex-site-url>/mcp`. Passe-plat intégral sauf deux en-têtes —
+>   `WWW-Authenticate` réécrit vers le document RFC 9728 du domaine app (c'est
+>   ce qui rend la ressource annoncée cohérente avec l'URL appelée), et
+>   `Cache-Control: no-store`. Corps bufferisé (gotcha `duplex: 'half'` sur
+>   Vercel, cf. `src/routes/api/auth/$.ts`), corps `null` forcé sur les statuts
+>   sans corps (le `OPTIONS` amont répond 204), 401 court-circuité localement
+>   quand `Authorization` est absent.
+> - `src/routes/[.]well-known.oauth-protected-resource.ts` + `.mcp.ts` :
+>   métadonnées RFC 9728 servies sur le domaine app, corps commun dans
+>   `src/lib/mcp-metadata.ts`, origine lue sur la requête (donc juste en local
+>   et en preview). `/.well-known` est réservé par Vercel : impossible de
+>   passer par un rewrite, il faut une route de l'app.
+> - **Aucune modification côté `convex/`** : Convex continue d'annoncer
+>   convex.site dans ses propres métadonnées, ce qui laisse intact un
+>   connecteur enregistré sur l'ancienne URL. C'est la raison pour laquelle la
+>   réécriture de l'en-tête vit dans le proxy.
+> - `settings/integrations.tsx` : carte `McpConnectorCard`, hors registre
+>   `CONNECTORS` (c'est une autorisation personnelle, pas une connexion d'org :
+>   ni stockage, ni synchro, ni garde-fou admin). URL dérivée de
+>   `window.location.origin` — aucune variable d'env, aucun nom de déploiement
+>   en dur.
+> - Docs : `KNOWN_ISSUES.md` « Serveur MCP distant » points 4 et 5 réécrits
+>   (+ renumérotation), `README.md`, `TESTING.md` (M1, M1b–M1d, M7, M8).
+>   Au passage : l'URL webhook Powens de `TESTING.md` avait perdu son segment
+>   de région (`.eu-west-1`) et pointait dans le vide.
+
+---
+
 ## v1.215.0 — 04/09/2026 à 10:57 — Une avance en compte courant ne se saisit plus des deux côtés
 
 Une avance en compte courant entre deux sociétés du groupe pouvait jusqu'ici
