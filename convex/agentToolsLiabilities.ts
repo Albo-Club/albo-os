@@ -57,7 +57,6 @@ export const listLiabilitiesInternal = internalQuery({
       loans: loans.map((loan) => ({
         _id: loan._id,
         counterpartyName: loan.counterpartyName,
-        side: loan.side,
         balanceCents: loan.balanceCents,
         interestRateBps: loan.interestRateBps ?? 0,
         isBlocked: loan.isBlocked,
@@ -98,7 +97,6 @@ export const createIntercompanyLoanInternal = internalMutation({
   args: {
     orgId: v.id('organizations'),
     actorUserId: v.id('users'),
-    role: v.union(v.literal('creditor'), v.literal('debtor')),
     counterpartyOrgSlug: v.string(),
     interestRateBps: v.optional(v.number()),
     isBlocked: v.boolean(),
@@ -118,14 +116,13 @@ export const createIntercompanyLoanInternal = internalMutation({
       throw new ConvexError('invalid_rate')
     }
 
-    // The thread's org is always one of the two parties (same
-    // "not_a_party" rule as the public mutation, guaranteed by construction).
-    const fromOrgId = args.role === 'creditor' ? args.orgId : counterparty._id
-    const toOrgId = args.role === 'creditor' ? counterparty._id : args.orgId
-
+    // The thread's org is always the DEBTOR: a C/C is a liability, and the
+    // creditor's side of the same advance is a `cca` deal on the borrower's
+    // company (cf. convex/liabilities.ts:loansOfOrg). Creating the mirror
+    // from the lender's org would produce a row invisible from it.
     const id = await ctx.db.insert('intercompanyLoans', {
-      fromOrgId,
-      toOrgId,
+      fromOrgId: counterparty._id,
+      toOrgId: args.orgId,
       interestRateBps: args.interestRateBps,
       isBlocked: args.isBlocked,
       openedDate: args.openedDate,
@@ -139,9 +136,10 @@ export const createIntercompanyLoanInternal = internalMutation({
 const listLiabilities = createTool({
   description:
     'List the liabilities of the current org: equity positions (issued ' +
-    'capital) and intercompany current accounts (C/C). Loan balances are ' +
-    'DERIVED from allocated transactions (positive = receivable, negative ' +
-    '= debt). Use this to find target ids for ' +
+    'capital) and the intercompany current accounts (C/C) it OWES. Loan ' +
+    'balances are DERIVED from allocated transactions (negative = debt). ' +
+    'A C/C the org LENT is not here: the lender carries it as a `cca` deal ' +
+    'on the borrower, listed by listDeals. Use this to find target ids for ' +
     'allocateTransactionToLiability. Amounts in CENTS EUR, rates in basis ' +
     'points.',
   inputSchema: z.object({}),
@@ -191,16 +189,17 @@ const createEquityPosition = createTool({
 
 const createIntercompanyLoan = createTool({
   description:
-    'Create an intercompany current account (C/C) between the current org ' +
-    'and another org of the group, identified by its slug (e.g. "calte", ' +
-    '"albo"). role is the position of the CURRENT org: "creditor" (it lends) ' +
-    'or "debtor" (it borrows). interestRateBps in basis points (11% → 1100), ' +
-    'omit for 0. The balance is derived later from allocated transactions. ' +
-    'The user approves via in-app buttons.',
+    'Create an intercompany current account (C/C) the CURRENT org owes to ' +
+    'another org of the group, identified by its slug (e.g. "calte", ' +
+    '"albo") — that other org is the creditor, the current one the debtor. ' +
+    'A C/C the current org LENDS is not created here: record it as a `cca` ' +
+    'deal on the borrower, or create the C/C from the borrower org. ' +
+    'interestRateBps in basis points (11% → 1100), omit for 0. The balance ' +
+    'is derived later from allocated transactions. The user approves via ' +
+    'in-app buttons.',
   needsApproval: true,
   inputSchema: z.object({
-    role: z.enum(['creditor', 'debtor']),
-    counterpartyOrgSlug: z.string().describe('Slug of the other org'),
+    counterpartyOrgSlug: z.string().describe('Slug of the creditor org'),
     interestRateBps: z.number().int().min(0).optional(),
     isBlocked: z.boolean().optional().describe('Blocked C/C, default false'),
     openedDateISO: z.string().describe('ISO date "YYYY-MM-DD"'),
@@ -212,7 +211,6 @@ const createIntercompanyLoan = createTool({
       {
         orgId,
         actorUserId: userId,
-        role: input.role,
         counterpartyOrgSlug: input.counterpartyOrgSlug,
         interestRateBps: input.interestRateBps,
         isBlocked: input.isBlocked ?? false,

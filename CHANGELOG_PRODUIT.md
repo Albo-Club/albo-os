@@ -23,6 +23,55 @@ bas de page.
 
 ---
 
+## v1.215.0 — 04/09/2026 à 10:57 — Une avance en compte courant ne se saisit plus des deux côtés
+
+Une avance en compte courant entre deux sociétés du groupe pouvait jusqu'ici
+s'enregistrer de deux façons concurrentes : en compte courant sur la page
+Passif du prêteur, ou en deal « compte courant » dans ses participations.
+Résultat sur CALTE → Albo Club : les virements s'étaient répartis entre les
+deux, et aucun des deux chiffres n'était juste.
+
+Le Passif ne montre désormais que ce que la société **doit**. Un compte
+courant n'apparaît plus que dans l'organisation **débitrice**, la colonne
+« Position » (créance / dette) disparaît — un compte courant affiché est
+toujours une dette — et pointer un virement dessus depuis l'organisation
+prêteuse est refusé, avec un message qui dit où le pointer.
+
+Côté prêteur, rien de nouveau à apprendre : l'avance se suit là où elle est
+déjà suivie pour les sept filiales de CALTE, en deal « compte courant » sur la
+société bénéficiaire, dans les participations. À la création d'un compte
+courant, seul le créancier se choisit maintenant : le débiteur est
+l'organisation en cours.
+
+La fiche d'Albo Club côté CALTE a par ailleurs récupéré son identité légale
+(SIREN, forme juridique), ce qui rebranche la lecture automatique du
+pourcentage de détention depuis la table de capitalisation d'Albo.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/pointage.ts` — `applyAllocateToLiability` refuse la jambe du
+>   créancier sur un `intercompany_loan` (`loan_wrong_side`). Point d'entrée
+>   unique, partagé par `liabilities:allocateTransaction` et l'outil agent
+>   `allocateTransactionToLiability`.
+> - `convex/liabilities.ts` — `loansOfOrg` ne lit plus que l'index `by_to`
+>   (débiteur) ; `side` disparaît de `getLiabilities` / `listOptions`,
+>   `counterpartyNameOf` devient `creditorNameOf`. `seedTestScenario` ne pose
+>   plus que la jambe débitrice.
+> - Front — `PassifTables.tsx` perd la colonne Position et le badge
+>   créance/dette ; `liabilityOptions.ts` n'a plus qu'un libellé « Dette » ;
+>   `CreateLiabilityDialogs.tsx` fige le débiteur sur l'org courante et retire
+>   celle-ci de la liste des créanciers.
+> - Agent — `agentToolsLiabilities.createIntercompanyLoan` perd son paramètre
+>   `role` (l'org du thread est toujours débitrice) ; descriptions d'outils
+>   réalignées.
+> - Tests — `regression.liabilities.test.ts` (jambe créancière refusée,
+>   créancier qui ne voit aucun C/C, remboursement partiel côté débiteur) et
+>   `tests/liabilityOptions.test.ts`.
+> - Le pont org↔org (`getOwnershipForCompany`, match par SIREN) reste le seul
+>   lien entre les deux côtés et ne couvre que le capital : aucun
+>   rapprochement automatique entre le versé du deal `cca` et le solde du C/C.
+>   Noté dans `KNOWN_ISSUES.md` « Passif ».
+
 ## v1.214.1 — 04/09/2026 à 10:49 — Chaque société du groupe sait qui la détient
 
 Le Passif des sept filiales de CALTE était vide : rien n'y disait qui

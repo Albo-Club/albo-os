@@ -199,7 +199,6 @@ export function TransactionsLedger({
       {
         equityType: (type) =>
           t(`passif:equity.type.${type}`, { defaultValue: type }),
-        receivable: t('passif:loans.receivable'),
         payable: t('passif:loans.payable'),
       },
       bankLoans,

@@ -44,7 +44,6 @@ export type LiabilitiesForOptions = {
   }>
   loans: Array<{
     _id: string
-    side: 'creditor' | 'debtor'
     counterpartyName: string | null
   }>
 }
@@ -72,9 +71,7 @@ export type PropertiesForOptions = Array<{
 export type LiabilityOptionLabels = {
   /** Label of an equity position type (e.g. « Capital social »). */
   equityType: (type: string) => string
-  /** « Créance » (receivable) */
-  receivable: string
-  /** « Dette » (payable) */
+  /** « Dette » (payable) — a C/C is only ever pointable by its debtor. */
   payable: string
 }
 
@@ -82,7 +79,9 @@ export type LiabilityOptionLabels = {
  * Builds the « Capitaux propres », « Comptes courants », « Prêts » and
  * « Biens » group options of the pointage combobox. A loan is identified by
  * its `_id` (an `intercompanyLoan` has NO `orgId` — only
- * fromOrgId/toOrgId).
+ * fromOrgId/toOrgId), and only the C/C the org OWES reach this list: the
+ * lender's side of an advance is pointed on its `cca` deal, in the Deals
+ * group.
  *
  * `bankLoans` and `properties` are undefined while their own queries are
  * still loading: the group then renders EMPTY rather than absent —
@@ -106,7 +105,7 @@ export function buildLiabilityOptions(
       kind: 'intercompany_loan' as const,
       targetId: loan._id,
       label: loan.counterpartyName ?? '—',
-      sublabel: loan.side === 'creditor' ? labels.receivable : labels.payable,
+      sublabel: labels.payable,
     })),
     bankLoanOptions: bankLoans.map((loan) => ({
       kind: 'loan' as const,

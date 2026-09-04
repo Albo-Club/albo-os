@@ -413,8 +413,10 @@ const matchTransactionToDeal = createTool({
 const allocateTransactionToLiability = createTool({
   description:
     'Reconcile a transaction with a liability or asset of the current org: ' +
-    'an equity position (kind "equity"), an intercompany loan (kind ' +
-    '"intercompany_loan"), a BANK loan (kind "loan" — a direct debit on a ' +
+    'an equity position (kind "equity"), an intercompany current account ' +
+    'the org OWES (kind "intercompany_loan" — only the debtor allocates ' +
+    'there; the lender records its side as a `cca` deal), a BANK loan ' +
+    '(kind "loan" — a direct debit on a ' +
     'bank debt, find ids via listLoans) or a PROPERTY (kind "property", ids ' +
     'via listProperties). Find liability ids via listLiabilities. On a ' +
     'property, `category` is REQUIRED and says what the flow is: ' +
