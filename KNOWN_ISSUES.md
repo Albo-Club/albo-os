@@ -1287,7 +1287,7 @@ Les outils d'écriture de l'agent portent `needsApproval: true`
 ## Serveur MCP distant (connector claude.ai) — OAuth via plugin BA `mcp`
 
 Le serveur MCP (`convex/mcp/`) expose 28 outils aux clients MCP externes :
-24 en lecture, 4 en écriture (cf. point 6). Architecture : resource server = httpAction `/mcp`
+24 en lecture, 4 en écriture (cf. point 7). Architecture : resource server = httpAction `/mcp`
 (JSON-RPC Streamable HTTP **stateless**, fait main — le SDK
 `@modelcontextprotocol/sdk` est Node-only et les httpActions tournent dans
 le runtime V8 Convex, sans `"use node"`) ; authorization server = plugin
@@ -1307,7 +1307,7 @@ Pièges et décisions :
    install du composant avec schéma régénéré ; (c) mini-AS maison.
 2. **Pas de binding d'audience RFC 8707** : les tokens BA sont opaques et
    le paramètre `resource` n'est pas validé. Accepté pour un outil interne
-   à 2 users. Depuis l'ouverture des écritures (point 6), un token volé
+   à 2 users. Depuis l'ouverture des écritures (point 7), un token volé
    n'est plus seulement une fuite de lecture — la limite de dégât reste
    qu'aucun outil MCP ne supprime, et que tout écrit est visible et
    corrigeable dans l'app.
@@ -1318,18 +1318,46 @@ Pièges et décisions :
    partir des params et la passe en `callbackURL` — embarquée dans le lien
    magique, elle survit au roundtrip email (méthode de connexion
    principale). Ne pas retirer ce fallback.
-4. **Métadonnées de découverte à deux endroits.** RFC 9728
-   (`/.well-known/oauth-protected-resource`, + variante `/mcp`) est servie
-   sur **convex.site** (l'hôte de la ressource) et pointe vers le domaine
-   app ; RFC 8414 (`/.well-known/oauth-authorization-server`) doit être au
-   **root du domaine app** (issuer = `SITE_URL`) → route TanStack
-   `src/routes/[.]well-known.oauth-authorization-server.ts` qui proxifie la
-   route BA. Le 401 du `/mcp` porte `WWW-Authenticate: Bearer
-resource_metadata="…"` — c'est ce qui déclenche le flow côté client.
-5. **`MCP_DEV_TOKEN` / `MCP_DEV_EMAIL`** (env Convex) : bypass OAuth pour
+4. **L'URL du connecteur est celle du domaine app, pas celle de Convex.**
+   `src/routes/mcp.ts` est un reverse proxy vers `<convex-site-url>/mcp` :
+   ce qu'un utilisateur colle dans claude.ai est
+   `https://os.alboteam.com/mcp`, même origine que l'authorization server,
+   et l'UI (carte « Connecteur Claude » dans Réglages → Intégrations) le
+   dérive de `window.location.origin` — aucune variable d'env, aucun nom de
+   déploiement en dur. Trois choses ne sont pas négociables dans ce proxy :
+   - **Il réécrit `WWW-Authenticate`** vers
+     `<site-url>/.well-known/oauth-protected-resource/mcp` — c'est ce qui
+     rend la ressource annoncée cohérente avec l'URL réellement appelée, et
+     c'est **pourquoi la réécriture vit ici et pas dans
+     `convex/mcp/server.ts`** : Convex continue d'annoncer convex.site, donc
+     un connecteur enregistré sur l'ancienne URL garde des métadonnées
+     justes. Ne pas « nettoyer » ça en changeant `unauthorized()` côté
+     Convex, ni le remplacer par un rewrite CDN — un rewrite est un tuyau
+     bête, il ne peut pas réécrire d'en-tête.
+   - **Il renvoie un corps `null`** sur 101/204/205/304 : le `OPTIONS` de
+     Convex répond 204, et `new Response(body, { status: 204 })` jette un
+     `TypeError` même avec une chaîne vide.
+   - **Il bufferise le corps** avant de le relayer — même gotcha
+     `duplex: 'half'` que le proxy Better Auth (`src/routes/api/auth/$.ts`).
+5. **Métadonnées de découverte à trois endroits.** RFC 9728
+   (`/.well-known/oauth-protected-resource`, + la variante path-insérée
+   `/mcp`, forme correcte pour une ressource qui porte un chemin et celle
+   qu'annonce le 401) est servie **sur le domaine app**
+   (`src/routes/[.]well-known.oauth-protected-resource*.ts`, corps commun
+   dans `src/lib/mcp-metadata.ts` — l'origine est lue sur la requête, donc
+   juste en local et en preview comme en prod) et **aussi** sur convex.site,
+   pour l'ancienne URL. RFC 8414 (`/.well-known/oauth-authorization-server`)
+   doit être au **root du domaine app** (issuer = `SITE_URL`) → route
+   TanStack `src/routes/[.]well-known.oauth-authorization-server.ts` qui
+   proxifie la route BA. Le 401 du `/mcp` porte `WWW-Authenticate: Bearer
+   resource_metadata="…"` — c'est ce qui déclenche le flow côté client.
+   ⚠️ `/.well-known` est **réservé par Vercel** : ces chemins ne peuvent pas
+   passer par un `rewrite` `vercel.json` ni par un `routeRules` Nitro, ils
+   doivent être servis par une route de l'app.
+6. **`MCP_DEV_TOKEN` / `MCP_DEV_EMAIL`** (env Convex) : bypass OAuth pour
    curl et MCP Inspector. Les deux doivent être posés pour être actifs —
    ne jamais les laisser en prod hors session de test.
-6. **Écritures : où vit la validation humaine.** Le serveur expose 4 outils
+7. **Écritures : où vit la validation humaine.** Le serveur expose 4 outils
    d'écriture (`createCompany`, `updateCompany`, `createDeal`, `updateDeal`)
    pour saisir une entité depuis une phrase dictée, hors app. MCP n'a
    **pas** d'équivalent de `needsApproval` : le flag du chat in-app arrête
@@ -1355,11 +1383,11 @@ resource_metadata="…"` — c'est ce qui déclenche le flow côté client.
      schémas zod du chat restent inchangés.
    - **Suppressions hors périmètre.** Aucun outil MCP ne supprime, et cette
      limite est ce qui rend l'écriture directe acceptable.
-7. **Registre de schémas séparé.** Les outils agent sont en `zod/v3`
+8. **Registre de schémas séparé.** Les outils agent sont en `zod/v3`
    (inline), incompatibles `z.toJSONSchema()` → `convex/mcp/registry.ts`
    re-déclare les schémas en zod v4. Si les args d'un internal changent,
    tenir les deux en phase.
-8. **claude.ai ne charge qu'un sous-ensemble des outils par conversation**
+9. **claude.ai ne charge qu'un sous-ensemble des outils par conversation**
    (sélection dynamique côté Anthropic, ~5 sur 26 observés). Conséquence :
    `listOrgs` peut être absent et le modèle devine des slugs erronés.
    Mitigation en place : à `initialize`/`tools/list` (authentifiés), les
@@ -1371,7 +1399,7 @@ resource_metadata="…"` — c'est ce qui déclenche le flow côté client.
    la connexion** : après un déploiement qui les modifie, déconnecter puis
    reconnecter le connecteur (Customize → Connectors → Albo OS), sinon le
    modèle continue de voir les anciens schémas.
-9. **Lecture des documents : jamais un texte entier d'un coup.** Un
+10. **Lecture des documents : jamais un texte entier d'un coup.** Un
    `documentTexts.text` monte à `MAX_DOCUMENT_CHARS` (900 000 caractères) —
    le renvoyer tel quel ferait une réponse JSON-RPC de ~900 ko, hors de
    portée de la fenêtre de contexte du client comme du budget de la
