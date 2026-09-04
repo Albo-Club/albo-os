@@ -23,6 +23,50 @@ bas de page.
 
 ---
 
+## v1.214.1 — 04/09/2026 à 10:49 — Chaque société du groupe sait qui la détient
+
+Le Passif des sept filiales de CALTE était vide : rien n'y disait qui
+détenait le capital. Les cap tables sont désormais renseignées, entité par
+entité et associé par associé — CALTE, mais aussi Felisa Mendoza Garcia sur
+les deux SCI Chapelle, MATRIX sur SCI Upload, Nexity et les salariés Morning
+sur Banco 2, Clément Alteresco sur CALTE elle-même. Chaque tableau boucle à
+100 % du capital : plus de moitié manquante dont on ne sait pas si c'est un
+oubli de saisie.
+
+Conséquence directe : le pourcentage de détention apparaît maintenant sur la
+fiche de chaque filiale vue depuis CALTE. Il n'est saisi qu'une fois, dans la
+société qui émet le capital, et la fiche côté CALTE le lit — deux saisies
+auraient fini par diverger.
+
+Deux réserves assumées. La répartition de **Banco 2** (50/50) est
+déclarative : aucun document ne l'établit, il faudra le registre des
+mouvements de titres pour la confirmer, et le nombre d'actions de CALTE reste
+donc vide. Et les montants Banco 2 sont arrondis au centime inférieur — le
+capital de la société ne tombe pas juste au centime.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/seedGroupCapTables.ts` — table de constantes
+>   `CAP_TABLES` (14 lignes, une par associé), chacune portant sa `source`
+>   documentaire : statuts constitutifs et Kbis du Drive, recoupés pour
+>   quatre entités par l'annexe « Filiales et participations » des comptes
+>   CALTE 2024. `inspect` (lecture seule) puis `apply`, cf. le runbook en
+>   tête de fichier et `MIGRATIONS.md`.
+> - Strictement additif : crée une position absente, complète un
+>   `ownershipBps` manquant sur une position existante (cas des deux lignes
+>   Albo, seedées sans part), et **n'écrase jamais** une part divergente —
+>   elle remonte dans `conflicts`. Idempotent : un second `apply` n'écrit
+>   rien.
+> - Garde-fous à la construction du plan : un détenteur et un seul par ligne
+>   (`ambiguous_holder`, miroir de `createEquityPosition`), et somme des
+>   parts ≤ 100 % par org (`ownership_over_100`). `inspect` renvoie la somme
+>   des parts et des montants par org, plus l'`incorporationDate` du
+>   `group_root` à comparer à l'œil avec la date d'effet retenue (date de
+>   constitution).
+> - `convex/regression.capTables.test.ts` : création complète, idempotence,
+>   complétion d'une part absente sans toucher au montant ni à la date,
+>   refus d'écraser une part contradictoire.
+
 ## v1.214.0 — 03/09/2026 à 17:18 — La documentation se cherche, et l'assistant la lit
 
 La page Documentation gagne une barre de recherche : tapez quelques mots
