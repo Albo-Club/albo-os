@@ -27,7 +27,7 @@ bas de page.
 
 Les pactes, bulletins de souscription, statuts, PV d'assemblée, contrats
 d'émission, appels de fonds et attestations de coupon des participations CALTE
-vivaient jusqu'ici uniquement dans le Drive. **805 documents, répartis sur 194
+vivaient jusqu'ici uniquement dans le Drive. **785 documents, répartis sur 190
 fiches société**, sont prêts à être versés dans Albo OS : ils apparaîtront sur
 la fiche de chaque participation, et l'assistant IA saura les lire et les citer
 comme il le fait déjà pour ceux d'Albo Club.
@@ -36,10 +36,14 @@ Ce qui reste dehors, volontairement : les tableurs de suivi et fichiers de
 travail, les captures d'écran et justificatifs de virement, les RIB, les
 récapitulatifs de signature Docusign, les formulaires KYC et fiscaux, les
 archives `.zip`, les fichiers Google natifs, et les documents nominatifs
-d'autres investisseurs. Vingt-cinq fichiers de plus ont été écartés après
-relecture : leur dossier Drive ne correspond à aucune fiche société évidente
-(attestations de valorisation des SPV Anaxago, Banco, Heritage Biarritz,
-Omnis Liber, Pulse 1, Bastille Cycles).
+d'autres investisseurs. Quarante-cinq fichiers de plus ont été écartés après
+relecture. Vingt-cinq parce que leur dossier Drive ne correspond à aucune fiche
+société évidente (attestations de valorisation des SPV Anaxago, Banco, Heritage
+Biarritz, Omnis Liber, Pulse 1, Bastille Cycles). Vingt parce que leur
+rattachement restait ambigu et n'a pas été tranché : Chapelle et Banco 2, qui
+sont des entités du groupe et non des participations ; Club Tylia, MARBLE et
+Obligation PIXEL - 18b Villiers, dont le nom de dossier et le contenu des actes
+ne désignent pas la même société.
 
 Le versement lui-même se fait à la main après la mise en ligne, une fois la
 correspondance relue.
@@ -53,7 +57,7 @@ correspondance relue.
 >   à jour.
 > - `scripts/import-legal-docs.mjs` apprend `--mapping <fichier>` (défaut :
 >   `data/legal-docs-albo.json`) et connaît le type MIME `.doc`.
-> - `scripts/data/legal-docs-calte.json` : correspondance figée, 805 lignes
+> - `scripts/data/legal-docs-calte.json` : correspondance figée, 785 lignes
 >   (société + `companyId`, titre, `kind`, date, id Drive, taille, dossier
 >   d'origine), construite depuis un inventaire exhaustif du Drive « CALTE SAS ›
 >   CALTE - Investissements » (958 fichiers, 134 dossiers de participation,
