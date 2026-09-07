@@ -23,6 +23,47 @@ bas de page.
 
 ---
 
+## v1.216.1 — 07/09/2026 à 17:25 — BILLIV n'apparaît plus qu'une fois dans le portefeuille CALTE
+
+Le portefeuille CALTE affichait BILLIV deux fois : une fiche pour l'entrée de
+décembre 2021 (25 000 €) et une seconde, créée par l'import historique, pour le
+réinvestissement de mars 2024 (100 004 €). Deux fiches, un seul et même
+investissement — le montant total, le TVPI et le nombre de participations s'en
+trouvaient faussés.
+
+Une opération de reprise vient rattacher le réinvestissement de 2024 à la fiche
+d'origine, celle qui porte le premier deal, puis archiver la fiche devenue
+vide. BILLIV apparaît désormais une seule fois, avec ses deux opérations et
+125 004 € investis. Le libellé « Projet BILLIV 2024 T2 » n'est pas perdu : il
+devient le nom de l'opération de 2024, pour continuer à distinguer les deux
+entrées.
+
+Rien ne bouge côté banque : les mouvements pointés restent attachés à leur
+opération. L'archivage est réversible.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle migration one-shot `convex/migrations/mergeBillivCalte.ts`
+>   (`dryRun` / `apply`), sur le patron de `reassignClimateHouseCofoDeals` :
+>   repointe `deals.targetCompanyId` du deal `k57c4mq…` vers la fiche
+>   `jx7aqyk…` (`SIDE ASTERION BILLIV`), puis archive `jx7e7sd…`
+>   (`SIDE ASTERION - Projet BILLIV 2024 T2`) via `archivedAt`.
+> - `deals.name` n'est écrit que si le deal n'en porte pas encore ; les clés
+>   patchées entrent dans `manuallyEditedFields` pour qu'un ré-import Airtable
+>   ne remette pas l'ancienne cible.
+> - Gardes : `_id` prod ancrés, noms exacts des deux fiches, `paidAmount` du
+>   deal déplacé, et vérification que la fiche survivante porte bien le deal de
+>   2021 (c'est ce qui la désigne). Cible source **ou** canonique acceptée → 2ᵉ
+>   run no-op. L'archivage réutilise l'inventaire de références en 11 tables des
+>   migrations sœurs et refuse plutôt que de forcer (`archiveBlockedBy`).
+> - Aucun changement d'UI : le dialogue « Modifier » de la fiche deal expose
+>   déjà la société cible, et `companies:archive` le bouton d'archivage — la
+>   migration ne fait que rejouer ces deux gestes de façon tracée et rejouable.
+> - Runbook (export prod, `dryRun`, puis `apply`) en tête du module ; ligne
+>   ajoutée à `MIGRATIONS.md`.
+
+---
+
 ## v1.216.0 — 04/09/2026 à 21:45 — Brancher Claude sur Albo OS se fait depuis l'app
 
 Le connecteur qui permet d'interroger le portefeuille depuis claude.ai
