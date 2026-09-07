@@ -573,6 +573,14 @@
     {
       "id": "c599b550-213c-4b57-8d84-c471142fe102",
       "note": "Reglo 'Monthly Report - Data Not Available' (periode January 2024) -- 1 caractere. Coquille vide."
+    },
+    {
+      "id": "a9917ff7-130e-4daf-94c9-bca466268c44",
+      "note": "Virgil Properties Q2 2026 : Albo OS tient deja l'original du fondateur (keyvan@wearevirgil.com, meme jour, meme trimestre) ; cette ligne est le transfert de Clement."
+    },
+    {
+      "id": "6dfc6f5e-457c-40c0-853d-fe304d3fdf41",
+      "note": "« Emprunte Mon Toutou - Reporting Novembre 2025 » range sous SIDE Capital : c'est le MEME report que 92ddd3b4, range sous « Emprunte Mon toutou ». Meme date, meme headline. Doublon interne a Albo app, les deux visant desormais SIDE EMPRUNTE MON TOUTOU."
     }
   ],
   "_allowPeriodCollisionComment": "Rows explicitly allowed to share a (company, period) slot with an existing report. The default is to SKIP on collision; each entry here is an arbitrated exception. The --dry run reports every collision it meets against LIVE data, so a collision absent from this list is a STOP, not a silent skip.",
@@ -620,6 +628,38 @@
     {
       "id": "5f1aa3e2-a74e-4672-82d4-626ff4df2d3e",
       "note": "Voir ci-dessus."
+    },
+    {
+      "id": "463e43eb-07d4-427d-bfdb-439a2872938e",
+      "note": "50 Partners H1 2026 : le rapport semestriel du FPCI et le releve de compte individuel b9f46114 sont deux documents distincts publies le meme jour."
+    },
+    {
+      "id": "b9f46114-3240-4d64-82c2-c6055afeae50",
+      "note": "Voir ci-dessus — le releve de compte au 30/06/2026."
+    },
+    {
+      "id": "6f9fcd62-86ff-4ecb-bc60-001b4fe1a031",
+      "note": "Jeen April 2026 : la newsletter d'avril (3e centre, collecte 750 k€) et le reporting de tresorerie 386a6245 portent la meme periode sans etre le meme document."
+    },
+    {
+      "id": "386a6245-0e42-44e9-be68-df052c59a1b2",
+      "note": "Voir ci-dessus — le reporting de tresorerie."
+    },
+    {
+      "id": "2f58955b-97e2-4688-91a3-68f92a60bafd",
+      "note": "Sant Roch : « Investor Update - March » (ouverture le 2 mars) et « Investor Update - April » ac697e82 (break-even au 1er mois) sont deux envois distincts, tous deux etiquetes March 2026 par Albo app."
+    },
+    {
+      "id": "ac697e82-6614-450b-a414-d8e0f921ba93",
+      "note": "Voir ci-dessus — l'update d'avril, mal etiquete March 2026 a la source."
+    },
+    {
+      "id": "da7f0673-1481-4eaf-9d1d-153c1f944254",
+      "note": "Eiffel Q1 2026 : le comite d'investisseurs (254 M€ engages) et le rapport trimestriel f2c1b1db au 31/03 sont deux documents."
+    },
+    {
+      "id": "f2c1b1db-beda-4e68-b7ef-44b9e9c0f5a7",
+      "note": "Voir ci-dessus — le rapport trimestriel au 31 mars 2026."
     }
   ]
 }

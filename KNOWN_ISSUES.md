@@ -2034,6 +2034,26 @@ ces reports sur la mauvaise fiche, sans que rien ne le signale. D'où
 `reportOverrides` dans le fichier de décisions : ciblage **par report**, et
 liste d'ids quand un report appartient légitimement à plusieurs sociétés.
 
+Deux pièges de mécanique, découverts en exécutant la reprise CALTE :
+
+**Une collision de période peut naître du run lui-même.** Le `--dry` compare à
+l'état de la base **avant** l'import ; en cours d'exécution, chaque report créé
+occupe son créneau `(société, période)`, donc un report plus loin dans le même
+lot peut buter sur un report que le lot vient d'écrire. Le plan en annonçait 1,
+l'exécution en a bloqué 6. Ce n'est pas une dérive : le garde-fou saute au lieu
+d'écraser. Mais il faut que le mode `--apply` **nomme** ce qu'il a bloqué —
+sinon ces cas-là, absents du plan, ne se découvrent qu'en relançant un `--dry`.
+
+**Un report peut être trop gros pour être écrit, et l'erreur ne le dit pas.**
+Le business plan Doinsport porte 15,2 M caractères — un classeur Excel aplati,
+cellules vides comprises, 46× la ligne suivante. Il franchit deux plafonds : le
+**1 MiB par document Convex**, et l'`ARG_MAX` du système, la charge voyageant en
+argv parce que `convex run` ne lit ses arguments ni d'un fichier ni de stdin.
+C'est l'OS qui parle en premier (`spawn E2BIG`), ce qui masque la limite Convex
+et fait chercher un problème de transport là où il y a un problème de taille.
+D'où `MAX_TEXT_CHARS` dans le script d'import : tronquer le texte et le
+signaler, plutôt que perdre le report.
+
 Corollaire sur l'idempotence : dès qu'un report peut viser plusieurs sociétés,
 la clé d'ancrage est la **paire** `(alboReportId, companyId)`. Sur l'uuid seul,
 le garde-fou répond « déjà importé » après la première société du fan-out et
