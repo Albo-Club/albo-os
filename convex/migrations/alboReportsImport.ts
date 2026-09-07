@@ -1,10 +1,24 @@
 /**
- * One-shot import of the Albo app investor reports into Albo OS (org `albo`).
+ * Import of the Albo app investor reports into Albo OS.
  *
- * Albo app (Supabase, workspace « Albo 1 ») carries the reporting history that
- * predates the AgentMail pipeline — 184 rows back to January 2024, where Albo
- * OS only started receiving reports in July 2026. This brings the backlog over
- * so a participation's timeline is complete in one place.
+ * Albo app (Supabase) carries the reporting history that predates the
+ * AgentMail pipeline, where Albo OS only started receiving reports in July
+ * 2026. This brings the backlog over so a participation's timeline is complete
+ * in one place. It is driven by ONE decision file per source workspace, and
+ * each file stays COMPLETE for its workspace — the script treats an unmapped
+ * company as a fatal error, so a partial file would abort on the rows an
+ * earlier pass already handled:
+ *   - « Albo 1 » → `scripts/data/albo-reports-albo.json`. 08/2026 imported 139
+ *     rows; the 09/2026 pass extends the same file with the participations it
+ *     had set aside (Sezame, La vie de quartier) and the rows that arrived
+ *     since. Re-running it is free — the anchor makes every earlier row a
+ *     no-op.
+ *   - « CALTE portfolio » → `albo-reports-calte.json` (09/2026, 233 rows).
+ *
+ * The TARGET is a company id, never an org: `importOne` derives the org from
+ * the company it writes on. So a decision file crosses orgs for free, which
+ * the Sezame case needs — Immo 1 is a `calte` fiche while Immo 2 and Immo 6
+ * are `albo` ones, and the source is a single Albo app row per letter.
  *
  * ── Why the decisions are frozen in a file, not computed here ──────────────
  * There is NO deterministic key that identifies the same report on both sides.
@@ -19,10 +33,20 @@
  *     2025 annuals landed in Albo app on 03/04/2026.
  *   - RFC Message-ID: present on 73 of 184, and Albo OS ingests FORWARDS,
  *     which carry a new Message-ID. It never matches across the two.
- * So the 18 duplicates were identified by comparing CONTENT (headline, key
- * highlights, metrics) participation by participation, reviewed with Benjamin,
- * and frozen in `scripts/data/albo-reports-albo.json`. That file is the
- * decision; the guards below are only a backstop.
+ * So duplicates are identified by comparing CONTENT (headline, key highlights,
+ * metrics, sender) participation by participation, reviewed with Benjamin, and
+ * frozen in the decision file. That file is the decision; the guards below are
+ * only a backstop. The CALTE pass confirmed the rule twice over: AZmed's
+ * update #82 is labelled `May 2026` in Albo OS and `June 2026` in Albo app —
+ * only the update NUMBER identifies it — and two GreenGo rows sent the same
+ * day under near-identical titles turned out to be two distinct months.
+ *
+ * A corollary the CALTE pass added: an Albo app "company" is sometimes a
+ * BUCKET holding reports about several vehicles, and it is the report TITLE
+ * that names the real one (`Rapport de gestion Annuel 2025 – Asterion F2`,
+ * `RM Expansion — Point d'étape S1 2026`). Hence `reportOverrides` in the
+ * decision file: per-report targeting, and a list of ids when one report
+ * legitimately belongs to several companies.
  *
  * Split of responsibilities — the model never carries the bytes:
  *   - `scripts/import-albo-reports.mjs` reads Supabase, resolves the frozen
@@ -30,25 +54,27 @@
  *     Convex upload URL;
  *   - this module only mints those URLs and writes the rows.
  *
- * Idempotency: `companyReports.alboReportId` holds the uuid of the source row.
- * `importOne` returns `already_imported` when it is already there, so a re-run
- * is free and an interrupted run resumes by being re-run.
+ * Idempotency: `companyReports.alboReportId` holds the uuid of the source row,
+ * and the guard reads the PAIR `(alboReportId, companyId)` — on the uuid alone
+ * a fan-out would stop after its first company. `importOne` returns
+ * `already_imported` when the row is already there, so a re-run is free and an
+ * interrupted run resumes by being re-run.
  *
  * ── Why this does NOT reuse `reportStore.storeForCompany` ─────────────────
  * That function UPDATES IN PLACE on a period collision (and deletes the
  * report's `documents` rows before rewriting them). Replaying a 2024 report
  * through it would overwrite the current Albo OS row for that period and drop
  * its attachments. Here a collision SKIPS, unless the decision file explicitly
- * opted that uuid in (`allowPeriodCollision` — six rows, each arbitrated).
- * For the same reason `companyIntelligence.latestReportId` is left alone: a
- * historical import must not repoint the current synthesis.
+ * opted that uuid in (`allowPeriodCollision`, each row arbitrated). For the
+ * same reason `companyIntelligence.latestReportId` is left alone: a historical
+ * import must not repoint the current synthesis.
  *
  * Freshness (`companies.lastReportAt`) is safe to call: `recordReportOnCompany`
  * is monotonic, so a back-dated report never rewinds it.
  *
  * Vectorisation: rows land `vectorState: 'pending'` and are picked up by
- * `vectorize:backfillOrg albo` afterwards — scheduling 139 embeddings inline
- * would burst the provider quota (cf. MIGRATIONS.md).
+ * `vectorize:backfillAll` afterwards — scheduling hundreds of embeddings
+ * inline would burst the provider quota (cf. MIGRATIONS.md).
  *
  * Metrics are copied AS-IS into `metrics` (Benjamin's call): they display, but
  * they do not feed `kpiSnapshots`, whose canonical catalogue differs. No LLM
@@ -58,12 +84,22 @@
  * prod is deployed by the Vercel build on `main`. These functions do not exist
  * in prod until this PR is merged. Merging is safe: nothing runs on deploy.
  *
- * Execution (prod, manual — cf. MIGRATIONS.md), AFTER the merge has deployed:
+ * Execution (prod, manual — cf. MIGRATIONS.md), AFTER the merge has deployed.
+ * One pass per decision file; `--dry` is the default and writes nothing.
  *   pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip
- *   SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/import-albo-reports.mjs --dry
- *   # STOP: check the plan (expect 139 to import, 18 duplicates skipped), then:
- *   SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/import-albo-reports.mjs --apply
- *   pnpm exec convex run --prod migrations/alboReportsImport:verify '{}'
+ *
+ *   # CALTE portfolio → org `calte` (expect 233 to create)
+ *   SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/import-albo-reports.mjs \
+ *     --decisions scripts/data/albo-reports-calte.json --dry
+ *   # STOP: read the plan, arbitrate any collision it reports, then --apply.
+ *
+ *   # Albo 1, second pass → orgs `albo` + `calte` (expect 11 to create, the
+ *   # 139 of August coming back « déjà présents »)
+ *   SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/import-albo-reports.mjs \
+ *     --decisions scripts/data/albo-reports-albo.json --dry
+ *
+ *   pnpm exec convex run --prod migrations/alboReportsImport:verify '{"orgSlug":"calte"}'
+ *   pnpm exec convex run --prod migrations/alboReportsImport:verify '{"orgSlug":"albo"}'
  *   pnpm exec convex run --prod vectorize:backfillAll '{}'
  */
 import { ConvexError, v } from 'convex/values'
@@ -186,10 +222,13 @@ export const importOne = internalMutation({
       throw new ConvexError(`company_not_portfolio:${company.name}`)
     }
 
+    // Keyed on the PAIR: the same source report may target several companies
+    // (cf. the index comment in `schema.ts`), so "already imported" is a
+    // question about this company, not about the uuid.
     const already = await ctx.db
       .query('companyReports')
       .withIndex('by_albo_report', (q) =>
-        q.eq('alboReportId', args.alboReportId),
+        q.eq('alboReportId', args.alboReportId).eq('companyId', args.companyId),
       )
       .first()
     if (already) {
@@ -293,19 +332,21 @@ export const importOne = internalMutation({
 })
 
 /**
- * Post-import check: per company, how many reports came from the import and
- * how many periods carry more than one row. A period with several rows is not
- * an error by itself — six were opted in deliberately — so the caller compares
- * this list against `allowPeriodCollision` in the decision file.
+ * Post-import check for ONE org: per company, how many reports came from the
+ * import and how many periods carry more than one row. A period with several
+ * rows is not an error by itself — each one is opted in deliberately — so the
+ * caller compares this list against `allowPeriodCollision` in the decision
+ * file. Run it once per org the decision file touches: a file can cross orgs
+ * (Sezame Immo 1 is a `calte` fiche, Immo 2 and 6 are `albo` ones).
  */
 export const verify = internalQuery({
-  args: {},
-  handler: async (ctx) => {
+  args: { orgSlug: v.optional(v.string()) },
+  handler: async (ctx, { orgSlug = 'albo' }) => {
     const org = await ctx.db
       .query('organizations')
-      .withIndex('by_slug', (q) => q.eq('slug', 'albo'))
+      .withIndex('by_slug', (q) => q.eq('slug', orgSlug))
       .unique()
-    if (!org) throw new ConvexError('org_not_found:albo')
+    if (!org) throw new ConvexError(`org_not_found:${orgSlug}`)
 
     const reports = await ctx.db
       .query('companyReports')

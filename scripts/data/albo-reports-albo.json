@@ -1,25 +1,14 @@
 {
-  "_comment": "Frozen decisions for the one-shot import of Albo app investor reports into Albo OS (org `albo`). Reviewed with Benjamin on 07/08/2026 against a side-by-side of both inventories. Runbook: convex/migrations/alboReportsImport.ts",
-  "orgSlug": "albo",
+  "_comment": "Frozen decisions for the import of Albo app investor reports from the « Albo 1 » workspace into Albo OS. First pass reviewed with Benjamin on 07/08/2026 (139 reports); second pass on 07/09/2026 adds the participations the first one had set aside and the reports that arrived since. The file stays COMPLETE for its workspace — the script treats an unmapped company as a fatal error, and a re-run is free thanks to the (alboReportId, companyId) anchor. Targets are Albo OS company ids and the org is DERIVED from the company, so a decision may legitimately cross orgs (Sezame Immo 1 is a `calte` fiche). Runbook: convex/migrations/alboReportsImport.ts",
   "sourceWorkspace": {
     "id": "94199e0b-93b4-45c6-8cc9-bff2c71b91a2",
     "name": "Albo 1"
   },
   "excludedCompanies": [
     {
-      "name": "Sezame",
-      "reports": 9,
-      "reason": "Investment vehicle whose news comes through the fund-admin portal, not by email. Also ambiguous: one Albo app row for two Albo OS entities (Sezame Immo 2 / Immo 6)."
-    },
-    {
       "name": "AZmed",
       "reports": 15,
-      "reason": "Participation linked to VASCO in Albo OS."
-    },
-    {
-      "name": "La vie de quartier",
-      "reports": 3,
-      "reason": "One Albo app row for four Albo OS entities (Holding + three shops). Attachment not decided."
+      "reason": "Already in Albo OS through the VASCO pull: the participation is held via a Parallel SPV, so the fund admin's communications land in `vascoCommunicationsCache` — a different table from `companyReports`, which is why they are invisible to listCompanyReports. They are NOT missing. Confirmed by Benjamin on 07/09/2026."
     }
   ],
   "companies": [
@@ -177,6 +166,16 @@
       "source": "Ziwig",
       "target": "Ziwig",
       "companyId": "jx77eqqaeggwwdemjgy20xa4k187r7cv"
+    },
+    {
+      "source": "Sezame",
+      "target": "Sezame Immo 2",
+      "companyId": "jx7fdmxmrmm12w20mydzkdn7fx87xxdd"
+    },
+    {
+      "source": "La vie de quartier",
+      "target": "La vie de Quartier - Holding",
+      "companyId": "jx7agg7khvm20qt2pryer2rxb987r8w5"
     }
   ],
   "_duplicatesComment": "Reports already present in Albo OS, verified on their CONTENT (headline, key highlights, metrics) — not on their title. Never imported. The `osPeriod` column shows where a period-based key alone would have failed.",
@@ -306,6 +305,18 @@
       "period": "Q1 2026",
       "osPeriod": "(none)",
       "proof": "Same Notion document as the 07/04 manual import, exported again on 01/07. Benjamin's call: keep the 07/04 one only."
+    },
+    {
+      "id": "94e565da-cb1c-4625-a909-82cc1c42d686",
+      "note": "« Bulletin semestriel - Sezame Immo 2 - S1 2026 » déjà dans Albo OS (et accroché à tort AUSSI à Immo 6 — défaut de fan-out du pipeline, à nettoyer hors de cet import)."
+    },
+    {
+      "id": "14e90ec4-c0b0-4c4c-b5c3-34ad67ddd905",
+      "note": "Sezame « Missing Report Content » (période Unknown) — coquille vide."
+    },
+    {
+      "id": "e7c20108-bfcf-4ec9-ad2d-db4a0a5f47ec",
+      "note": "Tango « Investor Update - Août 2026 » déjà dans Albo OS (même période, même expéditeur lea@tango.fr)."
     }
   ],
   "_allowPeriodCollisionComment": "Reports that legitimately share a (company, period) slot with another row — a distinct document, not a re-send. Without this opt-in the import guard would skip them silently. Each entry was arbitrated individually.",
@@ -345,6 +356,48 @@
       "company": "Jeen",
       "period": "March 2026",
       "why": "April cash reporting, mislabelled March 2026 at the source."
+    }
+  ],
+  "_reportOverridesComment": "Per-REPORT targeting. Sezame and La vie de quartier were set aside in August as « 1 Albo app row -> N Albo OS fiches »; they are not ambiguous at all, each report TITLE names its vehicle. `companyIds` with several entries is a deliberate fan-out.",
+  "reportOverrides": [
+    {
+      "id": "d2578e46-0514-4e15-a00d-89164470da32",
+      "companyIds": ["jx7d4g7a32s28qvfzy7h0wex9n87s8gy"],
+      "note": "« Sezame Immo 1 - Investor Letter 2024 » -> fiche calte.",
+      "targets": ["SEZAME IMMO 1 (org calte)"]
+    },
+    {
+      "id": "a8e09977-a819-4d68-8c81-4877c5c92488",
+      "companyIds": ["jx7d4g7a32s28qvfzy7h0wex9n87s8gy"],
+      "note": "« Club deal Sezame Immo 1 - Reporting 2025 » -> fiche calte.",
+      "targets": ["SEZAME IMMO 1 (org calte)"]
+    },
+    {
+      "id": "721425b3-0588-4c1e-bd7f-0be4a64a8ab6",
+      "companyIds": ["jx7d4g7a32s28qvfzy7h0wex9n87s8gy"],
+      "note": "« Bulletin semestriel - Sezame Immo 1 - S1 2026 » -> fiche calte.",
+      "targets": ["SEZAME IMMO 1 (org calte)"]
+    },
+    {
+      "id": "1445d657-57e9-4af1-bbf1-cb0b75f537b6",
+      "companyIds": ["jx7d3vsve9fqx891gbk6phqgf587wgdn"],
+      "note": "« Sezame Immo 6 - 4 acquisitions réalisées » -> Immo 6.",
+      "targets": ["Sezame Immo 6"]
+    },
+    {
+      "id": "9ed9b86a-e11a-427a-a0b6-0ad5cc5ab50b",
+      "companyIds": [
+        "jx7d4g7a32s28qvfzy7h0wex9n87s8gy",
+        "jx7fdmxmrmm12w20mydzkdn7fx87xxdd"
+      ],
+      "note": "Lettre générique « Sezame Investor Letter Q1 2025 and Club Deal Presentation » : fan-out sur les seuls véhicules vivants en avril 2025. PAS Immo 6 (ouvert en avril 2026) ni Immo 4, et surtout PAS les fiches SEZAME / SAS OVERSEED de calte — une AUTRE société (cannabis médical, overseed.fr) qui porte le même nom.",
+      "targets": ["SEZAME IMMO 1 (org calte)", "Sezame Immo 2"]
+    },
+    {
+      "id": "b9c98c91-7baa-4c68-b4bc-ffc5c1443140",
+      "companyIds": ["jx7332wvprgbtksfsnsnbvd35d8990c2"],
+      "note": "« Attribution local commercial 28 Rue du Rendez-vous » -> la fiche du commerce, pas la holding.",
+      "targets": ["La Vie de Quartier - Rue du RDV"]
     }
   ]
 }

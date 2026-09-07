@@ -1293,7 +1293,13 @@ export default defineSchema({
     .index('by_org', ['orgId'])
     .index('by_message_id', ['agentmailMessageId'])
     .index('by_company_period', ['companyId', 'reportPeriod'])
-    .index('by_albo_report', ['alboReportId']),
+    // The pair, not the uuid alone: one source report can legitimately land on
+    // SEVERAL companies (a quarterly LP webinar covering four Batch vehicles,
+    // a letter covering two Sezame ones). Keyed on `alboReportId` only, the
+    // import's "already there?" guard would answer yes after the first of the
+    // fan-out and drop the rest in silence. Queries that only know the uuid
+    // still use it as an index prefix.
+    .index('by_albo_report', ['alboReportId', 'companyId']),
 
   /**
    * companyIntelligence — one row per company holding the AI synthesis

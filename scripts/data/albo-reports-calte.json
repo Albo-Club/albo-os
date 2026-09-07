@@ -1,0 +1,625 @@
+{
+  "_comment": "Frozen decisions for the one-shot import of Albo app investor reports from the CALTE workspace into Albo OS. Reviewed with Benjamin on 07/09/2026 against a live side-by-side of both inventories. Targets are Albo OS company ids; the org is DERIVED from the company, so a decision may legitimately cross orgs. Runbook: convex/migrations/alboReportsImport.ts",
+  "sourceWorkspace": {
+    "id": "06e7b48d-bb20-4eb2-a62e-3d04878e84cb",
+    "name": "CALTE portfolio"
+  },
+  "_excludedComment": "Whole participations left out, with the reason each was arbitrated.",
+  "excludedCompanies": [
+    {
+      "name": "KIMPA",
+      "reports": 1,
+      "reason": "Its only report ('Informations sortie & coupon Les Constructeurs du Bois - Gerardmer') is already in Albo OS on the `albo` fiche Les constructeurs du bois, same title and same sender. Benjamin's call: drop it rather than mirror it on the calte side."
+    }
+  ],
+  "companies": [
+    {
+      "source": "50 Partners",
+      "target": "50 PARTNERS",
+      "companyId": "jx79q7x7f4hx9fdaf96r75rfp587r2mb"
+    },
+    {
+      "source": "Agilitest",
+      "target": "SIDE AGILITEST",
+      "companyId": "jx73se1xz8w1mesfx32vw0vb0s87rxrf"
+    },
+    {
+      "source": "Aktio",
+      "target": "SIDE ASTERION AKTIO",
+      "companyId": "jx767rfyk66q93ptb7nrqmewcd87sn73"
+    },
+    {
+      "source": "Alaya",
+      "target": "ALAYA.BIO INC",
+      "companyId": "jx73c5zyzvdekfdrh278wsesm587sd9p"
+    },
+    {
+      "source": "Apnée Paris",
+      "target": "SIDE - OneGreen APNEE",
+      "companyId": "jx7dvqekhzcxst4nm2s4zhw68s87rcza"
+    },
+    {
+      "source": "Arkéa Investment Services",
+      "target": "ARKEA",
+      "companyId": "jx75gm6pb39w58m6fyjz7eg6pn87sm4e"
+    },
+    {
+      "source": "Artefact",
+      "target": "LA VIRGULE",
+      "companyId": "jx765gkn8fdz3vbxsewea7v6ys87s9jc"
+    },
+    {
+      "source": "Asterion Ventures",
+      "target": "ASTERION F1",
+      "companyId": "jx7969hfvsm7g6vjas80eeysqs87rrrh"
+    },
+    {
+      "source": "Baker Staff",
+      "target": "SIDE BAKERSTAFF",
+      "companyId": "jx76wtp3s2gdxh0f3eff51d0kn87smpf"
+    },
+    {
+      "source": "Batch Ventures",
+      "target": "Batch Ventures YC 2026",
+      "companyId": "jx7cgcjb2sw4nx39dx7ewhmc6187sp71"
+    },
+    {
+      "source": "Bib Batteries",
+      "target": "SIDE FAMILY VENTURES BIB BATTERIES",
+      "companyId": "jx7bsj7nb7h16er1kq631magjn87r0xv"
+    },
+    {
+      "source": "billiv",
+      "target": "SIDE ASTERION BILLIV",
+      "companyId": "jx7aqyk12f19aqae93jdfq7cp987rjft"
+    },
+    {
+      "source": "Bocoloco",
+      "target": "ASTERION SIDE BOCOLOCO",
+      "companyId": "jx7cfvpdwkrs3w7nvw47vv5s0x87s3jb"
+    },
+    {
+      "source": "Caeli Energie",
+      "target": "Asterion Side CAELI",
+      "companyId": "jx7aschz534c7cyz4vdjxjj3x187sdrx"
+    },
+    {
+      "source": "Capté",
+      "target": "SIDE  - CAPTE",
+      "companyId": "jx7cc2wtssg3ejetg1ck2cxskn87rdvz"
+    },
+    {
+      "source": "Chance",
+      "target": "CHANCE VIA TECHMIND",
+      "companyId": "jx75kf1hntnf03vy2wpmwc3j8x87rhx0"
+    },
+    {
+      "source": "Chilli",
+      "target": "Roundtable Regroop (Chilli.club)",
+      "companyId": "jx7bsdasyav04ygp3qcjryw6g187rp3h"
+    },
+    {
+      "source": "CircularPlace",
+      "target": "CIRCULARPLACE PARTNERS",
+      "companyId": "jx77505rzw2rakrbwdhvncjtbd87s98k"
+    },
+    {
+      "source": "Climate Club",
+      "target": "CLIMATE CLUB",
+      "companyId": "jx776pj5v1g1atcx3ebdb1mycs87r9jt"
+    },
+    {
+      "source": "COCOLI",
+      "target": "COCOLI GMBH",
+      "companyId": "jx776564szk0v2f5t71tr2egd987sbyd"
+    },
+    {
+      "source": "Corma",
+      "target": "Corma",
+      "companyId": "jx7aj8p8s9jy9w1a8k9ffawxns87rx47"
+    },
+    {
+      "source": "CrushON",
+      "target": "CrushON",
+      "companyId": "jx713ftzeqrjcxabktntdveew587sdvc"
+    },
+    {
+      "source": "Delicity",
+      "target": "SIDE Delicity",
+      "companyId": "jx79bfkf01kgsajnphkjvxxyqs87s879"
+    },
+    {
+      "source": "Doinsport",
+      "target": "SIDE DOINSPORT",
+      "companyId": "jx7fyw1xpej8ggc21b5wsvr2ms87rdy3"
+    },
+    {
+      "source": "Eiffel Investment Group",
+      "target": "EIFFEL",
+      "companyId": "jx78nrw35nyed6ehag2dhzv5ws87r52t"
+    },
+    {
+      "source": "Emprunte Mon toutou",
+      "target": "SIDE EMPRUNTE MON TOUTOU",
+      "companyId": "jx79ys6rwr9c1v5ht3t7av997987stgr"
+    },
+    {
+      "source": "Eutopia",
+      "target": "Eutopia Co Invest Dynamo",
+      "companyId": "jx75ysvhgpqrb1ysfax2p01nn187rfap"
+    },
+    {
+      "source": "Extracadabra",
+      "target": "EXTRACADABRA",
+      "companyId": "jx7bgfs9zwa70nmk6fjrxcmy0x87rep7"
+    },
+    {
+      "source": "Feeli",
+      "target": "SIDE FEELI",
+      "companyId": "jx70bz9yvagvbe3f7qnbq3gt6h87r1k5"
+    },
+    {
+      "source": "Flexliving",
+      "target": "FLEXLIVING",
+      "companyId": "jx79rp6ptbzz6yvn2nscv16h3587sw9n"
+    },
+    {
+      "source": "Galion.exe",
+      "target": "Galion.exe Origin",
+      "companyId": "jx790f70expa8667vb6z2p77tx87rwdc"
+    },
+    {
+      "source": "Good Only Ventures",
+      "target": "GOOD ONLY VENTURES",
+      "companyId": "jx7ed316rxp65x64z21qjbnasd87rbbq"
+    },
+    {
+      "source": "GreenGo",
+      "target": "GREENGO PARTNERS",
+      "companyId": "jx71j72h065dphskdf2sm8ghr587snch"
+    },
+    {
+      "source": "GVA (Global Venture Access)",
+      "target": "GVA",
+      "companyId": "jx76gexpebkcq92tvphf18r8k987sqy1"
+    },
+    {
+      "source": "Hop3team",
+      "target": "SIDE HOP3TEAM",
+      "companyId": "jx732vebx3k66t2ne4jp8sgwz587rzcf"
+    },
+    {
+      "source": "Inari Properties",
+      "target": "Virgil Properties 2023 - Inari",
+      "companyId": "jx721m6kkr9xx2v1ywjcezfvp187sydr"
+    },
+    {
+      "source": "Interstis",
+      "target": "SIDE - INTERSTIS",
+      "companyId": "jx79gw4cdnk0wgqnz6h6vdg3ks87sf7m"
+    },
+    {
+      "source": "Jeen",
+      "target": "JEEN",
+      "companyId": "jx7c72wk80x7mhr63p2qdbs32587skqj"
+    },
+    {
+      "source": "Kazaden",
+      "target": "SIDE KAZADEN ",
+      "companyId": "jx7az31n8vr9cmd9n9se304hgn87ryjm"
+    },
+    {
+      "source": "Keenat",
+      "target": "SIDE ASTERION KEENAT",
+      "companyId": "jx757kabzy8kxnx2smk1aerwy187scgd"
+    },
+    {
+      "source": "KIDIBAM",
+      "target": "LE TRICYCLE (KIDIBAM)",
+      "companyId": "jx7d8y8dvswq178padk9fvvv1n87rk29"
+    },
+    {
+      "source": "Klara",
+      "target": "SIDE KLARA (MOOVEO)",
+      "companyId": "jx72qbzzf84q375bv6gs3dcax187sxtx"
+    },
+    {
+      "source": "Komeet",
+      "target": "SIDE WENABI",
+      "companyId": "jx70ng7853e6ma6ckdak14wavn87sqr3"
+    },
+    {
+      "source": "La Ceinture Verte",
+      "target": "CEINTURE VERT GROUP",
+      "companyId": "jx7dqbks892h56sjqcq7eram3n87rjr4"
+    },
+    {
+      "source": "Latour Capital",
+      "target": "LATOUR CAPITAL IV",
+      "companyId": "jx7eh5fq9n01ye2c04g9065gpd87s0ar"
+    },
+    {
+      "source": "Layan",
+      "target": "LAYAN",
+      "companyId": "jx7edfzmc3zsfzs43nzfyd1fc187sg4g"
+    },
+    {
+      "source": "Le Comptoir Des Pharmacies",
+      "target": "SIDE - COMPTOIR DES PHARMACIES ",
+      "companyId": "jx730j9j7cxc69qfxyzewattj987rprs"
+    },
+    {
+      "source": "Live Tonight",
+      "target": "Side Live Tonight",
+      "companyId": "jx755m6q3yymasxnbkq5kt8rn587rd13"
+    },
+    {
+      "source": "makesense",
+      "target": "JOBS THAT MAKSENSE",
+      "companyId": "jx77ydhjej9v8qra10erj6e5ns87sxhe"
+    },
+    {
+      "source": "Maslow Group",
+      "target": "MASLOW",
+      "companyId": "jx74pe256mrjm18s5jfemqgj5s87ryat"
+    },
+    {
+      "source": "Melting Spot",
+      "target": "SIDE MELTING SPOT",
+      "companyId": "jx790yzt7x19hzzrvt7416qc6587raf1"
+    },
+    {
+      "source": "Mineral",
+      "target": "Holding Mineral Capital 3",
+      "companyId": "jx720k1e90v35wym19q1r0z0b987s4xz"
+    },
+    {
+      "source": "MIO Group",
+      "target": "MIO Agence Marketing Pote Benhamou",
+      "companyId": "jx77xd7xttqzw5ep3bhmmxpjg587rqjr"
+    },
+    {
+      "source": "Monstock",
+      "target": "SIDE MONSTOCK (mon stock)",
+      "companyId": "jx70v5vj6nf4st73p7x98jtty187rhdt"
+    },
+    {
+      "source": "Oghji",
+      "target": "SIDE - OGHJI",
+      "companyId": "jx7epzmg2rvqxv7n8j9xpj2y7187ssmt"
+    },
+    {
+      "source": "Omni",
+      "target": "OMNI COMMUNITY",
+      "companyId": "jx7bfj9232sp1r49p0rptdw7s187sesm"
+    },
+    {
+      "source": "Onima",
+      "target": "ASTERION SIDE ONIMA (ex:YEASTY)",
+      "companyId": "jx7csjxyd8kne6mq1s03pb307587sveg"
+    },
+    {
+      "source": "OpenClimat",
+      "target": "OPENCLIMAT",
+      "companyId": "jx774fgf7bw87gxgwa7wm4hs3987re5y"
+    },
+    {
+      "source": "OPRTRS CLUB",
+      "target": "OPRTRS CLUB",
+      "companyId": "jx7c3nw0ftckbdbqx31p0t0k3n87ss1b"
+    },
+    {
+      "source": "Ordalie - Legal OS",
+      "target": "SIDE INOVEXUS Ordalie",
+      "companyId": "jx77d8scs7m0q60raasxeyrz1h87ss0s"
+    },
+    {
+      "source": "Orus Energy",
+      "target": "Asterion Side - Projet Orus Energy",
+      "companyId": "jx764dr0zg8gxdasjaa1r5hemh87s7fw"
+    },
+    {
+      "source": "Osol",
+      "target": "OSOL",
+      "companyId": "jx76zpnzpmy1rz0sa645myqm9x87rjvs"
+    },
+    {
+      "source": "Ostrea",
+      "target": "OSTREA",
+      "companyId": "jx7390hnj247qv72p168f5p6g587rq8p"
+    },
+    {
+      "source": "OVNI Capital",
+      "target": "OVNI VENTURES",
+      "companyId": "jx7bchwhd1ys8cw7astsyqkvj987rhxh"
+    },
+    {
+      "source": "Pollen",
+      "target": "POLLEN",
+      "companyId": "jx7fs1pq8r090fq78y7p3g3z3d87s5g1"
+    },
+    {
+      "source": "Prolong",
+      "target": "PROLONG",
+      "companyId": "jx71kx4wf8k9eb7pwy9jbrxmv587sgg6"
+    },
+    {
+      "source": "Reglo",
+      "target": "REGLO PET FOOD",
+      "companyId": "jx7d0zaf8rj52c3xkcpzgsvptn87r9y8"
+    },
+    {
+      "source": "Renovation Man",
+      "target": "I ARTISAN (renovation man)",
+      "companyId": "jx77ta1nxqqnam5be7by2m31vs87rvtt"
+    },
+    {
+      "source": "Revolte",
+      "target": "REVOLTE",
+      "companyId": "jx725dk9ce3r3bvkfwb22c59hh87s6p7"
+    },
+    {
+      "source": "Sant Roch",
+      "target": "Sant Roch - Contrast",
+      "companyId": "jx791zxbc2hqn667jzgcjhcrs987sbm9"
+    },
+    {
+      "source": "SCI OUTWORK VERDONNE",
+      "target": "SCI OUTWORK VERDONNE",
+      "companyId": "jx70rm9ymy9zmteqkk4477anbn87sdqq"
+    },
+    {
+      "source": "Seelab",
+      "target": "SIDE  Seelab",
+      "companyId": "jx77kdnkvsvnb33dq1xzy8jzgx87rw4c"
+    },
+    {
+      "source": "SIDE Capital",
+      "target": "SIDE EMPRUNTE MON TOUTOU",
+      "companyId": "jx79ys6rwr9c1v5ht3t7av997987stgr"
+    },
+    {
+      "source": "Smart-Services",
+      "target": "SMART SERVICES",
+      "companyId": "jx7fc4d6pma8ab41p0qy0pjwpn87s0ye"
+    },
+    {
+      "source": "Stockoss",
+      "target": "SPACELY STOCKAGE (STOCKOSS)",
+      "companyId": "jx76efk3zh3e2jyy7ev3kt5eqx87s144"
+    },
+    {
+      "source": "Timeleft",
+      "target": "SIDE  TIMELEFT",
+      "companyId": "jx7a7689wegfrby47b93cy4yk987rpmj"
+    },
+    {
+      "source": "Tudigo",
+      "target": "TUDIGO - CAP'ETUDES (Tudi Holding 90)",
+      "companyId": "jx79p9knkqrbphvhpdksv92zax87sy05"
+    },
+    {
+      "source": "Tulip",
+      "target": "SIDE Tulip",
+      "companyId": "jx7cq6hv5634745qvtjt6vmxj987rkdt"
+    },
+    {
+      "source": "Urbyn",
+      "target": "ASTERION SIDE URBYN ",
+      "companyId": "jx7e7hdv1v100wt2nqyfpmr21h87s7km"
+    },
+    {
+      "source": "Veevart",
+      "target": "VEEVART eCLUB",
+      "companyId": "jx743pv08k8jndw2j20nf67p4d87sfgx"
+    },
+    {
+      "source": "Velvet House",
+      "target": "VELVET",
+      "companyId": "jx793zq3fkx132ghp0ypjhafdx87s7m3"
+    },
+    {
+      "source": "Virgil",
+      "target": "Virgil Properties 2023 - Inari",
+      "companyId": "jx721m6kkr9xx2v1ywjcezfvp187sydr"
+    },
+    {
+      "source": "Virgil Properties",
+      "target": "VIRGIL Properties 2020",
+      "companyId": "jx7f2h3wcs68pr3ap2peb12x4d87sbqg"
+    },
+    {
+      "source": "WeeFin",
+      "target": "SIDE ASTERION WEEFIN",
+      "companyId": "jx78y9b14rmbw271816rb223gn87r7fy"
+    },
+    {
+      "source": "Wind Capital 2",
+      "target": "WIND CAPITAL 2",
+      "companyId": "jx7bv9eka7a313ak687jgff08n87ssq0"
+    }
+  ],
+  "_reportOverridesComment": "Per-REPORT targeting. The Albo app buckets several vehicles under one company row, and the report TITLE names the real one. `companyIds` with several entries is a deliberate fan-out (one source report -> one companyReports row per company), which is what the pipeline does natively for a multi-entity participation.",
+  "reportOverrides": [
+    {
+      "id": "d31d68d3-3d86-4c61-9e45-737650930f0b",
+      "companyIds": ["jx78ygxttsegwz6q5dpzvdq5d187rte7"],
+      "note": "Titre 'Reporting Eutopia II - Q1 2026' -> EUTOPIA 2, pas Co Invest Dynamo.",
+      "targets": ["EUTOPIA 2"]
+    },
+    {
+      "id": "2cf2087f-2813-4318-bf93-25f821161e09",
+      "companyIds": ["jx78ygxttsegwz6q5dpzvdq5d187rte7"],
+      "note": "Titre 'Reporting Q2 2026 Eutopia II FPCI' -> EUTOPIA 2.",
+      "targets": ["EUTOPIA 2"]
+    },
+    {
+      "id": "1671f91a-9074-4399-ac84-eadbf406d586",
+      "companyIds": ["jx72czysjmcb0tq6ynn8va3x2x87r13f"],
+      "note": "Titre 'Rapport de gestion Annuel 2025 - Asterion F2' -> ASTERION F2.",
+      "targets": ["ASTERION F2"]
+    },
+    {
+      "id": "aa24803c-bf85-4b00-8dbf-e289acaec4d4",
+      "companyIds": ["jx720k1e90v35wym19q1r0z0b987s4xz"],
+      "note": "Operation Lyon Vaise -> Holding Mineral Capital 3 (capture d'ecran Benjamin: obligation 21/02/2025).",
+      "targets": ["Holding Mineral Capital 3"]
+    },
+    {
+      "id": "1fe83e93-0ff2-4592-98d8-f8043f98747c",
+      "companyIds": ["jx7fersxp0kea617gjxn1yjqen87s5rk"],
+      "note": "Operation Sebastopol -> Holding Mineral Capital 7 (capture d'ecran Benjamin: action 03/03/2025).",
+      "targets": ["Holding Mineral Capital 7"]
+    },
+    {
+      "id": "08f85751-540c-457e-9173-972d56445edc",
+      "companyIds": ["jx7cgcjb2sw4nx39dx7ewhmc6187sp71"],
+      "note": "'Batch Ventures 2026 / First Close' -> Batch Ventures YC 2026.",
+      "targets": ["Batch Ventures YC 2026"]
+    },
+    {
+      "id": "35b53759-b800-416b-a7e4-50ea2d44aa6c",
+      "companyIds": [
+        "jx70a5900cmrqkt0a9an14mc1987sm40",
+        "jx7867nq6qxj696x1ybg2f7zxd87ram7",
+        "jx7ap03syhqx2tpqm7n0qg8v5x87stza",
+        "jx7cgcjb2sw4nx39dx7ewhmc6187sp71"
+      ],
+      "note": "Webinaire LP trimestriel: couvre toute la relation manager -> fan-out sur les 4 vehicules Batch.",
+      "targets": [
+        "Batch Ventures 1",
+        "Batch Ventures 2025 (Fund n°2)",
+        "Batch Ventures CTO Fund I",
+        "Batch Ventures YC 2026"
+      ]
+    },
+    {
+      "id": "350bda10-9bc4-4264-84f8-8dca2cd69d47",
+      "companyIds": [
+        "jx70a5900cmrqkt0a9an14mc1987sm40",
+        "jx7867nq6qxj696x1ybg2f7zxd87ram7",
+        "jx7ap03syhqx2tpqm7n0qg8v5x87stza",
+        "jx7cgcjb2sw4nx39dx7ewhmc6187sp71"
+      ],
+      "note": "Idem, webinaire LP juillet 2026.",
+      "targets": [
+        "Batch Ventures 1",
+        "Batch Ventures 2025 (Fund n°2)",
+        "Batch Ventures CTO Fund I",
+        "Batch Ventures YC 2026"
+      ]
+    },
+    {
+      "id": "40efa711-b1d6-43e4-970d-078538fc49da",
+      "companyIds": ["jx780mh0t3xakndp8vvsrm49018c15ta"],
+      "note": "Titre 'RM Expansion - Point d'etape S1 2026' -> RM Expansion, pas I ARTISAN.",
+      "targets": ["RM Expansion"]
+    }
+  ],
+  "_duplicatesComment": "Reports Albo OS already holds. Identified by CONTENT (title, headline, figures, sender), never by a computed key -- cf. KNOWN_ISSUES.md 'Reprise d'un historique de reports'.",
+  "duplicates": [
+    {
+      "id": "2125b806-6418-487f-80de-aed93d2e08ad",
+      "note": "Corma June 2026 = 'Corma June investor update' deja dans Albo OS."
+    },
+    {
+      "id": "410a8aee-a619-480b-908a-38c780cb3fa8",
+      "note": "Corma July 2026 = 'Corma July 2026 investor update' (MRR 31,4k, Qonto)."
+    },
+    {
+      "id": "e31709ce-75d6-4096-b9e2-cc736683b2b4",
+      "note": "Maslow 'News Juillet 2026' (juin, canicule) deja dans Albo OS."
+    },
+    {
+      "id": "ed37d06d-938d-4ba6-abb7-72f94d16a468",
+      "note": "Reglo Q2 2026 deja dans Albo OS."
+    },
+    {
+      "id": "27422b67-4c8d-4930-a1ab-68f586f60c08",
+      "note": "Reglo Q2 2026 -- seconde ligne Albo app du meme envoi, doublon du meme report."
+    },
+    {
+      "id": "178c5ae5-b703-413d-a800-bf588fbd9ed7",
+      "note": "Reglo Q1 2026 en double DANS Albo app (meme jour, contenu plus pauvre que 37295e6d). Doublon d'ingestion, pas deux envois."
+    },
+    {
+      "id": "bd5ebceb-1153-4472-af1a-f56dd262ee33",
+      "note": "Baker Staff June 2026 = 'Baker Staff devient Baker Interim' deja dans Albo OS."
+    },
+    {
+      "id": "fff03c91-c279-49f0-a324-c581f63c26b9",
+      "note": "MIO Group H1 2026 deja dans Albo OS."
+    },
+    {
+      "id": "d7a68335-67a1-42ca-8961-7d7bbb29ee6b",
+      "note": "OpenClimat Q2 2026 (Tesco UK, 1M ARR) deja dans Albo OS."
+    },
+    {
+      "id": "13e731d8-11f7-42a9-bbe0-350b0a1f5c96",
+      "note": "Osol Q2 2026 (ARR 2,51M) deja dans Albo OS."
+    },
+    {
+      "id": "203d9661-f60d-4124-993b-f8b96a76d832",
+      "note": "Prolong S1 2026 deja dans Albo OS."
+    },
+    {
+      "id": "2083c11f-6895-46c1-a866-6c676a97fa0f",
+      "note": "Wind Capital 2 'Rapport Impact 2025' deja dans Albo OS."
+    },
+    {
+      "id": "d1a24dce-2182-498e-90a3-f93afc09ede3",
+      "note": "Doinsport 'Fwd: Reporting Doinsport & Newsletter' -- 0 caractere, ni date ni periode. Coquille vide."
+    },
+    {
+      "id": "c599b550-213c-4b57-8d84-c471142fe102",
+      "note": "Reglo 'Monthly Report - Data Not Available' (periode January 2024) -- 1 caractere. Coquille vide."
+    }
+  ],
+  "_allowPeriodCollisionComment": "Rows explicitly allowed to share a (company, period) slot with an existing report. The default is to SKIP on collision; each entry here is an arbitrated exception. The --dry run reports every collision it meets against LIVE data, so a collision absent from this list is a STOP, not a silent skip.",
+  "allowPeriodCollision": [
+    {
+      "id": "22a85fa5-d416-427b-83fe-f52f12346649",
+      "note": "COCOLI Q1 2026 (24/04, avec PJ) et 3b81d2c7 (15/05, texte plus riche): 3 semaines d'ecart, contenus differents -- renvoi enrichi, on garde les deux."
+    },
+    {
+      "id": "3b81d2c7-40a6-46db-a237-cee47b9fd97d",
+      "note": "Voir ci-dessus."
+    },
+    {
+      "id": "d93644e0-f388-4714-b29f-fc03f5377e44",
+      "note": "billiv: deux mails distincts le 17/07 ('Point de situation' et 'redressement judiciaire'). Meme cas que Bleen dans KNOWN_ISSUES."
+    },
+    {
+      "id": "9f7b2895-b3d4-445c-8c58-a1f0d7139fb2",
+      "note": "Voir ci-dessus."
+    },
+    {
+      "id": "42140b39-ed2a-47d3-a798-903d6294275a",
+      "note": "SCI Outwork Verdonne: 4 documents distincts ingeres le meme jour, deux sur May 2026."
+    },
+    {
+      "id": "4f55a6fb-51b8-46ed-9d50-26c8531452e5",
+      "note": "Voir ci-dessus."
+    },
+    {
+      "id": "fc97198d-4493-4c3e-8790-5896528957fd",
+      "note": "Wind Capital 2 'Rapport de gestion et Rapport annuel audite 2025': periode 2025 deja occupee dans Albo OS par le Rapport Impact 2025, autre document."
+    },
+    {
+      "id": "807eda30-2e84-4e3d-a4cf-171247111f59",
+      "note": "Reglo 'Reglo news - bilan 2025' et 80fab5a4 'Comptes annuels 2025' partagent la periode 2025: une lettre investisseurs et une liasse comptable."
+    },
+    {
+      "id": "80fab5a4-77f1-4565-9c12-1c648e400e1e",
+      "note": "Voir ci-dessus."
+    },
+    {
+      "id": "3856f7a7-a16f-4e67-b9f7-a33ced9256b9",
+      "note": "Inari 'Rapport d'activite trimestriel Q4-2025' et Virgil 5f1aa3e2 (meme periode) atterrissent tous deux sur Virgil Properties 2023 - Inari."
+    },
+    {
+      "id": "5f1aa3e2-a74e-4672-82d4-626ff4df2d3e",
+      "note": "Voir ci-dessus."
+    }
+  ]
+}

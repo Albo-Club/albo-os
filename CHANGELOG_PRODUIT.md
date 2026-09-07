@@ -23,6 +23,50 @@ bas de page.
 
 ---
 
+## v1.214.2 — 07/09/2026 à 18:40 — Le reporting CALTE rapatrié de l'ancien outil
+
+Pendant plusieurs mois les deux outils ont tourné en parallèle : certains
+reportings arrivaient dans Albo OS, d'autres restaient dans l'ancienne
+application. Résultat, l'historique d'une participation était coupé en deux
+selon qui avait fait suivre le mail.
+
+Cette reprise ramène **233 reportings CALTE** sur 85 participations, pièces
+jointes comprises, et complète au passage le portefeuille Albo Club avec les
+trois participations que la reprise d'août avait laissées de côté — Sezame,
+La vie de quartier, et le dernier reporting Komeet. Les fiches concernées
+retrouvent leur historique complet, jusqu'à novembre 2024 pour certaines.
+
+Aucun doublon : chaque reporting déjà présent dans Albo OS a été identifié un
+par un et écarté, en comparant les contenus plutôt qu'en se fiant aux dates.
+Les reportings AZmed ne sont pas repris — ils arrivent déjà par la connexion
+du gestionnaire de fonds.
+
+> **🔧 Notes techniques**
+>
+> - Import piloté par **un fichier de décisions par workspace source** :
+>   `scripts/data/albo-reports-calte.json` (nouveau, 85 sociétés) et
+>   `albo-reports-albo.json` (étendu — le fichier reste **complet** pour son
+>   workspace, le script traitant une société non mappée comme une erreur
+>   fatale ; le re-run des 139 lignes d'août est un no-op).
+> - `companyReports` : l'index `by_albo_report` passe de `['alboReportId']` à
+>   la paire `['alboReportId', 'companyId']`, et le garde-fou de `importOne`
+>   avec lui. Sans ça un **fan-out** (un report source → plusieurs sociétés)
+>   s'arrêtait après la première et sautait les suivantes en silence, avec un
+>   statut `already_imported` trompeur. Couvert par
+>   `convex/regression.alboReportsImport.test.ts`.
+> - Nouveau bloc `reportOverrides` dans le fichier de décisions : ciblage
+>   **par report** (le titre nomme le véhicule réel — « Asterion F2 »,
+>   « RM Expansion ») et liste d'ids pour le fan-out délibéré. La cible étant
+>   une société, l'org est dérivée : un fichier traverse les orgs sans rien de
+>   plus (Sezame Immo 1 est une fiche `calte`, Immo 2 et 6 des fiches `albo`).
+> - `scripts/import-albo-reports.mjs` prend `--decisions <fichier>` ; `verify`
+>   prend un `orgSlug`.
+> - Écartés et documentés : AZmed (15 reports, déjà présents via VASCO — table
+>   `vascoCommunicationsCache`, distincte de `companyReports`), KIMPA, 3 lignes
+>   sans contenu, 14 doublons.
+
+---
+
 ## v1.214.1 — 04/09/2026 à 10:49 — Chaque société du groupe sait qui la détient
 
 Le Passif des sept filiales de CALTE était vide : rien n'y disait qui
