@@ -23,6 +23,47 @@ bas de page.
 
 ---
 
+## v1.216.3 — 07/09/2026 à 19:53 — Reprise des reportings : les derniers cas tranchés
+
+La reprise du reporting CALTE a fait entrer 232 reportings. Six sont restés à
+la porte parce qu'un autre reporting occupait déjà leur période, et un
+septième n'a pas pu être écrit du tout. Cette mise à jour tranche les sept.
+
+Deux des six étaient de vrais doublons — Virgil Properties dont Albo OS
+tenait déjà l'original, et un reporting Emprunte Mon Toutou classé deux fois
+dans l'ancien outil. Les quatre autres étaient des documents bien distincts
+qui partagent une période : chez 50 Partners le rapport semestriel du fonds
+et le relevé de compte individuel, chez Jeen la newsletter et le reporting de
+trésorerie, chez Sant Roch deux updates mensuels mal étiquetés à la source,
+chez Eiffel le comité d'investisseurs et le rapport trimestriel. Ils seront
+repris à la prochaine exécution.
+
+Le septième, le business plan Doinsport, est un classeur de 15 millions de
+caractères — l'équivalent d'un tableur entier aplati, cellules vides
+comprises. Son texte est désormais tronqué pour tenir, et le reporting entre
+avec son analyse, ses chiffres et ses pièces jointes.
+
+> **🔧 Notes techniques**
+>
+> - `scripts/data/albo-reports-calte.json` : 2 entrées dans `duplicates`
+>   (Virgil Q2 2026, le report Emprunte Mon Toutou rangé sous SIDE Capital) et
+>   8 dans `allowPeriodCollision` (les 4 paires arbitrées, les deux côtés de
+>   chaque paire pour que la décision ne dépende pas de l'ordre de traitement).
+> - `scripts/import-albo-reports.mjs` — trois correctifs révélés par le run :
+>   - **Plafond de texte** `MAX_TEXT_CHARS` (500 k caractères, `capTexts`).
+>     Doinsport violait deux limites : le cap de 1 MiB par document Convex, et
+>     l'`ARG_MAX` de l'OS — la charge transite en argv, `convex run` ne sachant
+>     lire ses arguments ni d'un fichier ni de stdin (`spawn E2BIG`). Les trims
+>     sont listés en fin de run.
+>   - **Les reports bloqués sont nommés**, plus seulement comptés. Une
+>     collision née *pendant* le run — un report du lot venant de prendre le
+>     créneau — est invisible au `--dry`, qui compare à l'état antérieur.
+>   - **Un argument inconnu arrête le script.** `--decisions` passé à une
+>     révision qui l'ignorait est retombé sur son fichier par défaut, et a
+>     affiché le plan d'un autre workspace sans rien signaler.
+
+---
+
 ## v1.216.2 — 07/09/2026 à 18:42 — Le reporting CALTE rapatrié de l'ancien outil
 
 Pendant plusieurs mois les deux outils ont tourné en parallèle : certains
