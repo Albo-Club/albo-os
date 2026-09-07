@@ -297,6 +297,11 @@ export function CreateEquityDialog({
  * parties are NOT editable (the derived balance depends on the loan's
  * identity): only date, rate and blocked flag are. Rate in % converted
  * to bps.
+ *
+ * On creation the DEBTOR is always the current org: a Passif page only ever
+ * records what the org owes, and the lender's side of the same advance is a
+ * `cca` deal on the borrower. Letting the creditor be picked here produced a
+ * row invisible from the very page it was created on.
  */
 export function CreateLoanDialog({
   orgId,
@@ -318,8 +323,10 @@ export function CreateLoanDialog({
     api.liabilities.updateIntercompanyLoan,
   )
 
-  const [fromOrgId, setFromOrgId] = useState<string>(loan?.fromOrgId ?? orgId)
-  const [toOrgId, setToOrgId] = useState<string>(loan?.toOrgId ?? '')
+  const [fromOrgId, setFromOrgId] = useState<string>(loan?.fromOrgId ?? '')
+  // Fixed to the current org on creation (debtor-only rule), and not
+  // editable afterwards either.
+  const toOrgId = loan?.toOrgId ?? orgId
   const [date, setDate] = useState(
     loan ? msToDateInput(loan.openedDate) : today(),
   )
@@ -333,7 +340,7 @@ export function CreateLoanDialog({
   const ratePct = Number.parseFloat(rate.replace(',', '.'))
   const valid =
     fromOrgId !== '' &&
-    toOrgId !== '' &&
+    // Defensive: the creditor select already excludes the current org.
     fromOrgId !== toOrgId &&
     date !== '' &&
     (!remunerated || (Number.isFinite(ratePct) && ratePct >= 0))
@@ -353,7 +360,7 @@ export function CreateLoanDialog({
       } else {
         await createIntercompanyLoan({
           fromOrgId: fromOrgId as Id<'organizations'>,
-          toOrgId: toOrgId as Id<'organizations'>,
+          toOrgId,
           ...fields,
         })
         toast.success(t('passif:create.loan.success'))
@@ -370,13 +377,15 @@ export function CreateLoanDialog({
     value: string,
     onChange: (value: string) => void,
     placeholder: string,
+    options: Array<OrgOption>,
+    disabled: boolean,
   ) => (
-    <Select value={value} onValueChange={onChange} disabled={!!loan}>
+    <Select value={value} onValueChange={onChange} disabled={disabled}>
       <SelectTrigger className="w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {orgs.map((org) => (
+        {options.map((org) => (
           <SelectItem key={org._id} value={org._id}>
             {org.name}
           </SelectItem>
@@ -405,19 +414,18 @@ export function CreateLoanDialog({
               fromOrgId,
               setFromOrgId,
               t('passif:create.loan.orgPlaceholder'),
+              orgs.filter((org) => org._id !== toOrgId),
+              !!loan,
             )}
           </div>
           <div className="space-y-2">
             <Label>{t('passif:create.loan.toLabel')}</Label>
             {orgSelect(
               toOrgId,
-              setToOrgId,
+              () => {},
               t('passif:create.loan.orgPlaceholder'),
-            )}
-            {fromOrgId !== '' && fromOrgId === toOrgId && (
-              <p className="text-destructive text-xs">
-                {t('passif:errors.same_org')}
-              </p>
+              orgs,
+              true,
             )}
           </div>
           <div className="space-y-2">

@@ -10,13 +10,8 @@ import {
   useFormatters,
   useReportError,
 } from '~/components/pointage/TransactionSheet'
-import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
-import {
-  directionBadgeClass,
-  directionTone,
-  signTone,
-} from '~/lib/moneyTone'
+import { directionTone, signTone } from '~/lib/moneyTone'
 import {
   Dialog,
   DialogContent,
@@ -65,7 +60,11 @@ export type EquityPositionRow = {
   transactions: Array<AllocatedTx>
 }
 
-/** Enriched inter-entity C/C (resolved counterparty + balance + txs). */
+/**
+ * Enriched inter-entity C/C the org OWES (resolved creditor + balance +
+ * txs). There is no creditor-side row: the lender carries the same advance
+ * as a `cca` deal (cf. convex/liabilities.ts:loansOfOrg).
+ */
 export type LoanRow = {
   _id: Id<'intercompanyLoans'>
   fromOrgId: Id<'organizations'>
@@ -73,7 +72,6 @@ export type LoanRow = {
   interestRateBps?: number
   isBlocked: boolean
   openedDate: number
-  side: 'creditor' | 'debtor'
   balanceCents: number
   counterpartyName: string | null
   transactions: Array<AllocatedTx>
@@ -382,10 +380,8 @@ export function EquityTable({
 // ─── Shareholder current accounts ────────────────────────────────────────────
 
 /**
- * Inter-entity C/C as seen by the org: counterparty, position
- * (receivable/debt per `side`) and signed derived balance (green =
- * receivable, red = debt). Allocated transactions appear as sub-rows with
- * « Détacher ».
+ * The C/C the org owes: creditor and signed derived balance (red = debt).
+ * Allocated transactions appear as sub-rows with « Détacher ».
  */
 export function LoansTable({
   loans,
@@ -428,7 +424,6 @@ export function LoansTable({
         <TableHeader>
           <TableRow>
             <TableHead>{t('loans.col.counterparty')}</TableHead>
-            <TableHead>{t('loans.col.side')}</TableHead>
             <TableHead className="text-right">
               {t('loans.col.balance')}
             </TableHead>
@@ -439,7 +434,7 @@ export function LoansTable({
           {!loans ? (
             <TableRow>
               <TableCell
-                colSpan={4}
+                colSpan={3}
                 className="text-muted-foreground text-center"
               >
                 <LoadingLine>{t('loading')}</LoadingLine>
@@ -450,18 +445,6 @@ export function LoansTable({
               <Fragment key={loan._id}>
                 <TableRow>
                   <TableCell>{loan.counterpartyName ?? '—'}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={directionBadgeClass(loan.side === 'creditor')}
-                    >
-                      {t(
-                        loan.side === 'creditor'
-                          ? 'loans.receivable'
-                          : 'loans.payable',
-                      )}
-                    </Badge>
-                  </TableCell>
                   <TableCell
                     className={`text-right font-medium tabular-nums ${balanceTone(loan.balanceCents)}`}
                   >
@@ -474,7 +457,7 @@ export function LoansTable({
                     />
                   </TableCell>
                 </TableRow>
-                <AllocatedTxRows transactions={loan.transactions} colSpan={3} />
+                <AllocatedTxRows transactions={loan.transactions} colSpan={2} />
               </Fragment>
             ))
           )}

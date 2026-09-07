@@ -25,11 +25,9 @@
     "title": "Shareholder current accounts",
     "empty": "No intercompany current account.",
     "col": {
-      "counterparty": "Counterparty",
-      "side": "Position",
+      "counterparty": "Creditor",
       "balance": "Balance"
     },
-    "receivable": "Receivable",
     "payable": "Payable"
   },
   "allocated": {
@@ -58,7 +56,7 @@
     "loan": {
       "button": "Current account",
       "title": "New current account",
-      "description": "Shareholder current account between two organizations. Its balance is derived from the transactions allocated to it.",
+      "description": "A current account this organization owes to another of the group. Its balance is derived from the transactions allocated to it. An advance it grants is recorded the other way round: as a current-account deal on the borrowing company.",
       "fromLabel": "Creditor (lends)",
       "toLabel": "Debtor (borrows)",
       "orgPlaceholder": "Choose an organization",

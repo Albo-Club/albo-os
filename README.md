@@ -203,19 +203,24 @@ reachable from Telegram (`convex/telegram.ts`, webhook at
 
 ## MCP server (claude.ai connector)
 
-A remote MCP server (`convex/mcp/`, Streamable HTTP endpoint at
-`<convex-site-url>/mcp`) exposes the **read-only** portfolio tools (~18:
-deals, cash, pointage, liabilities, forecasts, valuations, KPIs) to external
-MCP clients. No write tools on this surface. Auth is OAuth 2.1 (PKCE +
-dynamic client registration) provided by the Better Auth `mcp` plugin — the
-flow goes through the regular `/login` page, and each user only sees the
-orgs they are a member of.
+A remote MCP server exposes the portfolio tools (35: deals, cash, pointage,
+liabilities, forecasts, valuations, KPIs, documents, product docs — 7 of them
+write) to external MCP clients. Auth is OAuth 2.1 (PKCE + dynamic client
+registration) provided by the Better Auth `mcp` plugin — the flow goes
+through the regular `/login` page, and each user only sees the orgs they are
+a member of.
+
+**The connector URL is `<site-url>/mcp`** (prod: `https://os.alboteam.com/mcp`)
+— same origin as the OAuth authorization server. The JSON-RPC handler itself
+lives in `convex/mcp/` on convex.site; `src/routes/mcp.ts` is a thin reverse
+proxy in front of it, so the URL a user pastes is the app's own domain and the
+UI can derive it from `window.location.origin`. RFC 9728 metadata is served on
+the app domain too (`src/routes/[.]well-known.oauth-protected-resource*.ts`).
 
 **Connect from claude.ai**
 
-1. claude.ai → Settings → Connectors → *Add custom connector*.
-2. URL: `<convex-site-url>/mcp`
-   (e.g. `https://<deployment>.convex.site/mcp`).
+1. Albo OS → Settings → Integrations → *Claude connector (MCP)*, copy the URL.
+2. claude.ai → Settings → Connectors → *Add custom connector*, paste it.
 3. Complete the OAuth sign-in with your Albo OS account.
 
 **Testing without OAuth** (curl / MCP Inspector): set both env vars, then

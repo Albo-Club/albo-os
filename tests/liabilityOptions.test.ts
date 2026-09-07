@@ -16,7 +16,6 @@ import { buildLiabilityOptions } from '../src/lib/liabilityOptions'
 
 const labels = {
   equityType: (type: string) => `type:${type}`,
-  receivable: 'Créance',
   payable: 'Dette',
 }
 
@@ -28,7 +27,6 @@ describe('buildLiabilityOptions', () => {
         loans: [
           {
             _id: 'loan_1',
-            side: 'creditor',
             counterpartyName: 'Albo Club',
           },
         ],
@@ -41,7 +39,7 @@ describe('buildLiabilityOptions', () => {
       kind: 'intercompany_loan',
       targetId: 'loan_1',
       label: 'Albo Club',
-      sublabel: 'Créance',
+      sublabel: 'Dette',
     })
   })
 
@@ -71,7 +69,7 @@ describe('buildLiabilityOptions', () => {
         equityPositions: [
           { _id: 'equity_1', type: 'capital_social', holderName: null },
         ],
-        loans: [{ _id: 'loan_1', side: 'debtor', counterpartyName: null }],
+        loans: [{ _id: 'loan_1', counterpartyName: null }],
       },
       labels,
     )
@@ -81,7 +79,7 @@ describe('buildLiabilityOptions', () => {
     // Missing holder / counterparty → placeholder.
     assert.equal(groups.equityOptions[0].sublabel, '—')
     assert.equal(groups.loanOptions[0].label, '—')
-    // Debtor side → "Dette" sublabel.
+    // Only the debtor sees a C/C → the sublabel is always "Dette".
     assert.equal(groups.loanOptions[0].sublabel, 'Dette')
   })
 
@@ -158,7 +156,7 @@ describe('buildLiabilityOptions', () => {
       {
         equityPositions: [],
         loans: [
-          { _id: 'loan_1', side: 'creditor', counterpartyName: 'Albo Club' },
+          { _id: 'loan_1', counterpartyName: 'Albo Club' },
         ],
       },
       labels,

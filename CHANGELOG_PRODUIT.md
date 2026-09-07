@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.214.2 — 07/09/2026 à 18:40 — Le reporting CALTE rapatrié de l'ancien outil
+## v1.216.2 — 07/09/2026 à 18:42 — Le reporting CALTE rapatrié de l'ancien outil
 
 Pendant plusieurs mois les deux outils ont tourné en parallèle : certains
 reportings arrivaient dans Albo OS, d'autres restaient dans l'ancienne
@@ -66,6 +66,144 @@ du gestionnaire de fonds.
 >   sans contenu, 14 doublons.
 
 ---
+
+## v1.216.1 — 07/09/2026 à 17:25 — BILLIV n'apparaît plus qu'une fois dans le portefeuille CALTE
+
+Le portefeuille CALTE affichait BILLIV deux fois : une fiche pour l'entrée de
+décembre 2021 (25 000 €) et une seconde, créée par l'import historique, pour le
+réinvestissement de mars 2024 (100 004 €). Deux fiches, un seul et même
+investissement — le montant total, le TVPI et le nombre de participations s'en
+trouvaient faussés.
+
+Une opération de reprise vient rattacher le réinvestissement de 2024 à la fiche
+d'origine, celle qui porte le premier deal, puis archiver la fiche devenue
+vide. BILLIV apparaît désormais une seule fois, avec ses deux opérations et
+125 004 € investis. Le libellé « Projet BILLIV 2024 T2 » n'est pas perdu : il
+devient le nom de l'opération de 2024, pour continuer à distinguer les deux
+entrées.
+
+Rien ne bouge côté banque : les mouvements pointés restent attachés à leur
+opération. L'archivage est réversible.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle migration one-shot `convex/migrations/mergeBillivCalte.ts`
+>   (`dryRun` / `apply`), sur le patron de `reassignClimateHouseCofoDeals` :
+>   repointe `deals.targetCompanyId` du deal `k57c4mq…` vers la fiche
+>   `jx7aqyk…` (`SIDE ASTERION BILLIV`), puis archive `jx7e7sd…`
+>   (`SIDE ASTERION - Projet BILLIV 2024 T2`) via `archivedAt`.
+> - `deals.name` n'est écrit que si le deal n'en porte pas encore ; les clés
+>   patchées entrent dans `manuallyEditedFields` pour qu'un ré-import Airtable
+>   ne remette pas l'ancienne cible.
+> - Gardes : `_id` prod ancrés, noms exacts des deux fiches, `paidAmount` du
+>   deal déplacé, et vérification que la fiche survivante porte bien le deal de
+>   2021 (c'est ce qui la désigne). Cible source **ou** canonique acceptée → 2ᵉ
+>   run no-op. L'archivage réutilise l'inventaire de références en 11 tables des
+>   migrations sœurs et refuse plutôt que de forcer (`archiveBlockedBy`).
+> - Aucun changement d'UI : le dialogue « Modifier » de la fiche deal expose
+>   déjà la société cible, et `companies:archive` le bouton d'archivage — la
+>   migration ne fait que rejouer ces deux gestes de façon tracée et rejouable.
+> - Runbook (export prod, `dryRun`, puis `apply`) en tête du module ; ligne
+>   ajoutée à `MIGRATIONS.md`.
+
+---
+
+## v1.216.0 — 04/09/2026 à 21:45 — Brancher Claude sur Albo OS se fait depuis l'app
+
+Le connecteur qui permet d'interroger le portefeuille depuis claude.ai
+existait déjà, mais rien dans l'app ne disait quelle adresse coller — et
+l'adresse en question était celle, illisible, du serveur technique.
+
+Deux choses changent. L'adresse du connecteur est désormais celle de l'app
+elle-même : `https://os.alboteam.com/mcp`. Et elle est **affichée** dans
+Réglages → Intégrations, dans une carte « Connecteur Claude (MCP) » qui donne
+l'URL, un bouton pour la copier et les trois étapes du branchement côté
+claude.ai. Chacun s'y connecte avec son propre compte et ne voit que les
+organisations dont il est membre.
+
+Un connecteur déjà branché sur l'ancienne adresse continue de fonctionner. Pour
+passer à la nouvelle, il faut le supprimer dans claude.ai et le rajouter avec
+l'URL affichée dans l'app.
+
+> **🔧 Notes techniques**
+>
+> - `src/routes/mcp.ts` : reverse proxy sur le domaine app vers
+>   `<convex-site-url>/mcp`. Passe-plat intégral sauf deux en-têtes —
+>   `WWW-Authenticate` réécrit vers le document RFC 9728 du domaine app (c'est
+>   ce qui rend la ressource annoncée cohérente avec l'URL appelée), et
+>   `Cache-Control: no-store`. Corps bufferisé (gotcha `duplex: 'half'` sur
+>   Vercel, cf. `src/routes/api/auth/$.ts`), corps `null` forcé sur les statuts
+>   sans corps (le `OPTIONS` amont répond 204), 401 court-circuité localement
+>   quand `Authorization` est absent.
+> - `src/routes/[.]well-known.oauth-protected-resource.ts` + `.mcp.ts` :
+>   métadonnées RFC 9728 servies sur le domaine app, corps commun dans
+>   `src/lib/mcp-metadata.ts`, origine lue sur la requête (donc juste en local
+>   et en preview). `/.well-known` est réservé par Vercel : impossible de
+>   passer par un rewrite, il faut une route de l'app.
+> - **Aucune modification côté `convex/`** : Convex continue d'annoncer
+>   convex.site dans ses propres métadonnées, ce qui laisse intact un
+>   connecteur enregistré sur l'ancienne URL. C'est la raison pour laquelle la
+>   réécriture de l'en-tête vit dans le proxy.
+> - `settings/integrations.tsx` : carte `McpConnectorCard`, hors registre
+>   `CONNECTORS` (c'est une autorisation personnelle, pas une connexion d'org :
+>   ni stockage, ni synchro, ni garde-fou admin). URL dérivée de
+>   `window.location.origin` — aucune variable d'env, aucun nom de déploiement
+>   en dur.
+> - Docs : `KNOWN_ISSUES.md` « Serveur MCP distant » points 4 et 5 réécrits
+>   (+ renumérotation), `README.md`, `TESTING.md` (M1, M1b–M1d, M7, M8).
+>   Au passage : l'URL webhook Powens de `TESTING.md` avait perdu son segment
+>   de région (`.eu-west-1`) et pointait dans le vide.
+
+---
+
+## v1.215.0 — 04/09/2026 à 10:57 — Une avance en compte courant ne se saisit plus des deux côtés
+
+Une avance en compte courant entre deux sociétés du groupe pouvait jusqu'ici
+s'enregistrer de deux façons concurrentes : en compte courant sur la page
+Passif du prêteur, ou en deal « compte courant » dans ses participations.
+Résultat sur CALTE → Albo Club : les virements s'étaient répartis entre les
+deux, et aucun des deux chiffres n'était juste.
+
+Le Passif ne montre désormais que ce que la société **doit**. Un compte
+courant n'apparaît plus que dans l'organisation **débitrice**, la colonne
+« Position » (créance / dette) disparaît — un compte courant affiché est
+toujours une dette — et pointer un virement dessus depuis l'organisation
+prêteuse est refusé, avec un message qui dit où le pointer.
+
+Côté prêteur, rien de nouveau à apprendre : l'avance se suit là où elle est
+déjà suivie pour les sept filiales de CALTE, en deal « compte courant » sur la
+société bénéficiaire, dans les participations. À la création d'un compte
+courant, seul le créancier se choisit maintenant : le débiteur est
+l'organisation en cours.
+
+La fiche d'Albo Club côté CALTE a par ailleurs récupéré son identité légale
+(SIREN, forme juridique), ce qui rebranche la lecture automatique du
+pourcentage de détention depuis la table de capitalisation d'Albo.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/pointage.ts` — `applyAllocateToLiability` refuse la jambe du
+>   créancier sur un `intercompany_loan` (`loan_wrong_side`). Point d'entrée
+>   unique, partagé par `liabilities:allocateTransaction` et l'outil agent
+>   `allocateTransactionToLiability`.
+> - `convex/liabilities.ts` — `loansOfOrg` ne lit plus que l'index `by_to`
+>   (débiteur) ; `side` disparaît de `getLiabilities` / `listOptions`,
+>   `counterpartyNameOf` devient `creditorNameOf`. `seedTestScenario` ne pose
+>   plus que la jambe débitrice.
+> - Front — `PassifTables.tsx` perd la colonne Position et le badge
+>   créance/dette ; `liabilityOptions.ts` n'a plus qu'un libellé « Dette » ;
+>   `CreateLiabilityDialogs.tsx` fige le débiteur sur l'org courante et retire
+>   celle-ci de la liste des créanciers.
+> - Agent — `agentToolsLiabilities.createIntercompanyLoan` perd son paramètre
+>   `role` (l'org du thread est toujours débitrice) ; descriptions d'outils
+>   réalignées.
+> - Tests — `regression.liabilities.test.ts` (jambe créancière refusée,
+>   créancier qui ne voit aucun C/C, remboursement partiel côté débiteur) et
+>   `tests/liabilityOptions.test.ts`.
+> - Le pont org↔org (`getOwnershipForCompany`, match par SIREN) reste le seul
+>   lien entre les deux côtés et ne couvre que le capital : aucun
+>   rapprochement automatique entre le versé du deal `cca` et le solde du C/C.
+>   Noté dans `KNOWN_ISSUES.md` « Passif ».
 
 ## v1.214.1 — 04/09/2026 à 10:49 — Chaque société du groupe sait qui la détient
 

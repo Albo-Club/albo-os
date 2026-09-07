@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as McpRouteImport } from './routes/mcp'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AppRouteRouteImport } from './routes/app/route'
@@ -20,6 +21,7 @@ import { Route as AppOnboardingRouteImport } from './routes/app/onboarding'
 import { Route as AppMeRouteImport } from './routes/app/me'
 import { Route as AppAdminRouteImport } from './routes/app/admin'
 import { Route as AcceptInviteTokenRouteImport } from './routes/accept-invite.$token'
+import { Route as DotwellKnownOauthProtectedResourceRouteImport } from './routes/[.]well-known.oauth-protected-resource'
 import { Route as DotwellKnownOauthAuthorizationServerRouteImport } from './routes/[.]well-known.oauth-authorization-server'
 import { Route as AppAllRouteRouteImport } from './routes/app/all/route'
 import { Route as AppOrgSlugRouteRouteImport } from './routes/app/$orgSlug/route'
@@ -32,6 +34,7 @@ import { Route as AppOrgSlugTodoRouteImport } from './routes/app/$orgSlug/todo'
 import { Route as AppOrgSlugDocsRouteImport } from './routes/app/$orgSlug/docs'
 import { Route as AppOrgSlugChangelogRouteImport } from './routes/app/$orgSlug/changelog'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as DotwellKnownOauthProtectedResourceMcpRouteImport } from './routes/[.]well-known.oauth-protected-resource.mcp'
 import { Route as AppOrgSlugSettingsRouteRouteImport } from './routes/app/$orgSlug/settings/route'
 import { Route as AppOrgSlugSettingsIndexRouteImport } from './routes/app/$orgSlug/settings/index'
 import { Route as AppOrgSlugPointageIndexRouteImport } from './routes/app/$orgSlug/pointage.index'
@@ -61,6 +64,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -108,6 +116,12 @@ const AcceptInviteTokenRoute = AcceptInviteTokenRouteImport.update({
   path: '/accept-invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DotwellKnownOauthProtectedResourceRoute =
+  DotwellKnownOauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const DotwellKnownOauthAuthorizationServerRoute =
   DotwellKnownOauthAuthorizationServerRouteImport.update({
     id: '/.well-known/oauth-authorization-server',
@@ -169,6 +183,12 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DotwellKnownOauthProtectedResourceMcpRoute =
+  DotwellKnownOauthProtectedResourceMcpRouteImport.update({
+    id: '/mcp',
+    path: '/mcp',
+    getParentRoute: () => DotwellKnownOauthProtectedResourceRoute,
+  } as any)
 const AppOrgSlugSettingsRouteRoute = AppOrgSlugSettingsRouteRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -286,17 +306,20 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRouteRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/mcp': typeof McpRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
   '/app/all': typeof AppAllRouteRouteWithChildren
   '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
+  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRouteWithChildren
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
   '/app/admin': typeof AppAdminRoute
   '/app/me': typeof AppMeRoute
   '/app/onboarding': typeof AppOnboardingRoute
   '/app/': typeof AppIndexRoute
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsRouteRouteWithChildren
+  '/.well-known/oauth-protected-resource/mcp': typeof DotwellKnownOauthProtectedResourceMcpRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/$orgSlug/changelog': typeof AppOrgSlugChangelogRoute
   '/app/$orgSlug/docs': typeof AppOrgSlugDocsRouteWithChildren
@@ -330,14 +353,17 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/mcp': typeof McpRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
+  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRouteWithChildren
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
   '/app/admin': typeof AppAdminRoute
   '/app/me': typeof AppMeRoute
   '/app/onboarding': typeof AppOnboardingRoute
   '/app': typeof AppIndexRoute
+  '/.well-known/oauth-protected-resource/mcp': typeof DotwellKnownOauthProtectedResourceMcpRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/$orgSlug/changelog': typeof AppOrgSlugChangelogRoute
   '/app/$orgSlug/todo': typeof AppOrgSlugTodoRoute
@@ -372,17 +398,20 @@ export interface FileRoutesById {
   '/app': typeof AppRouteRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/mcp': typeof McpRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/app/$orgSlug': typeof AppOrgSlugRouteRouteWithChildren
   '/app/all': typeof AppAllRouteRouteWithChildren
   '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
+  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRouteWithChildren
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
   '/app/admin': typeof AppAdminRoute
   '/app/me': typeof AppMeRoute
   '/app/onboarding': typeof AppOnboardingRoute
   '/app/': typeof AppIndexRoute
   '/app/$orgSlug/settings': typeof AppOrgSlugSettingsRouteRouteWithChildren
+  '/.well-known/oauth-protected-resource/mcp': typeof DotwellKnownOauthProtectedResourceMcpRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/$orgSlug/changelog': typeof AppOrgSlugChangelogRoute
   '/app/$orgSlug/docs': typeof AppOrgSlugDocsRouteWithChildren
@@ -419,17 +448,20 @@ export interface FileRouteTypes {
     | '/app'
     | '/forgot-password'
     | '/login'
+    | '/mcp'
     | '/register'
     | '/reset-password'
     | '/app/$orgSlug'
     | '/app/all'
     | '/.well-known/oauth-authorization-server'
+    | '/.well-known/oauth-protected-resource'
     | '/accept-invite/$token'
     | '/app/admin'
     | '/app/me'
     | '/app/onboarding'
     | '/app/'
     | '/app/$orgSlug/settings'
+    | '/.well-known/oauth-protected-resource/mcp'
     | '/api/auth/$'
     | '/app/$orgSlug/changelog'
     | '/app/$orgSlug/docs'
@@ -463,14 +495,17 @@ export interface FileRouteTypes {
     | '/'
     | '/forgot-password'
     | '/login'
+    | '/mcp'
     | '/register'
     | '/reset-password'
     | '/.well-known/oauth-authorization-server'
+    | '/.well-known/oauth-protected-resource'
     | '/accept-invite/$token'
     | '/app/admin'
     | '/app/me'
     | '/app/onboarding'
     | '/app'
+    | '/.well-known/oauth-protected-resource/mcp'
     | '/api/auth/$'
     | '/app/$orgSlug/changelog'
     | '/app/$orgSlug/todo'
@@ -504,17 +539,20 @@ export interface FileRouteTypes {
     | '/app'
     | '/forgot-password'
     | '/login'
+    | '/mcp'
     | '/register'
     | '/reset-password'
     | '/app/$orgSlug'
     | '/app/all'
     | '/.well-known/oauth-authorization-server'
+    | '/.well-known/oauth-protected-resource'
     | '/accept-invite/$token'
     | '/app/admin'
     | '/app/me'
     | '/app/onboarding'
     | '/app/'
     | '/app/$orgSlug/settings'
+    | '/.well-known/oauth-protected-resource/mcp'
     | '/api/auth/$'
     | '/app/$orgSlug/changelog'
     | '/app/$orgSlug/docs'
@@ -550,9 +588,11 @@ export interface RootRouteChildren {
   AppRouteRoute: typeof AppRouteRouteWithChildren
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  McpRoute: typeof McpRoute
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   DotwellKnownOauthAuthorizationServerRoute: typeof DotwellKnownOauthAuthorizationServerRoute
+  DotwellKnownOauthProtectedResourceRoute: typeof DotwellKnownOauthProtectedResourceRouteWithChildren
   AcceptInviteTokenRoute: typeof AcceptInviteTokenRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
@@ -571,6 +611,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -634,6 +681,13 @@ declare module '@tanstack/react-router' {
       path: '/accept-invite/$token'
       fullPath: '/accept-invite/$token'
       preLoaderRoute: typeof AcceptInviteTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof DotwellKnownOauthProtectedResourceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.well-known/oauth-authorization-server': {
@@ -719,6 +773,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/auth/$'
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/.well-known/oauth-protected-resource/mcp': {
+      id: '/.well-known/oauth-protected-resource/mcp'
+      path: '/mcp'
+      fullPath: '/.well-known/oauth-protected-resource/mcp'
+      preLoaderRoute: typeof DotwellKnownOauthProtectedResourceMcpRouteImport
+      parentRoute: typeof DotwellKnownOauthProtectedResourceRoute
     }
     '/app/$orgSlug/settings': {
       id: '/app/$orgSlug/settings'
@@ -984,15 +1045,33 @@ const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
   AppRouteRouteChildren,
 )
 
+interface DotwellKnownOauthProtectedResourceRouteChildren {
+  DotwellKnownOauthProtectedResourceMcpRoute: typeof DotwellKnownOauthProtectedResourceMcpRoute
+}
+
+const DotwellKnownOauthProtectedResourceRouteChildren: DotwellKnownOauthProtectedResourceRouteChildren =
+  {
+    DotwellKnownOauthProtectedResourceMcpRoute:
+      DotwellKnownOauthProtectedResourceMcpRoute,
+  }
+
+const DotwellKnownOauthProtectedResourceRouteWithChildren =
+  DotwellKnownOauthProtectedResourceRoute._addFileChildren(
+    DotwellKnownOauthProtectedResourceRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRouteRoute: AppRouteRouteWithChildren,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  McpRoute: McpRoute,
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   DotwellKnownOauthAuthorizationServerRoute:
     DotwellKnownOauthAuthorizationServerRoute,
+  DotwellKnownOauthProtectedResourceRoute:
+    DotwellKnownOauthProtectedResourceRouteWithChildren,
   AcceptInviteTokenRoute: AcceptInviteTokenRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }

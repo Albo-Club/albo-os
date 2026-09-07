@@ -248,10 +248,20 @@ export async function applyAllocateToLiability(
     const loanId = ctx.db.normalizeId('intercompanyLoans', targetId)
     const loan = loanId ? await ctx.db.get('intercompanyLoans', loanId) : null
     if (!loan) throw new ConvexError('not_found')
-    // The tx must belong to one of the two orgs of the C/C (creditor or
-    // debtor) — otherwise it cannot carry a leg of this loan.
+    // The tx must belong to one of the two orgs of the C/C — otherwise it
+    // cannot carry a leg of this loan at all.
     if (loanSideForOrg(loan, tx.orgId) === null) {
       throw new ConvexError('loan_wrong_org')
+    }
+    // ONLY the debtor allocates on a C/C. The creditor's side of the very
+    // same advance is an ASSET, and an asset is carried by a `cca` deal on
+    // the borrower's company — the pattern already in force for equity
+    // (`equity_wrong_org` above: only the issuer allocates, the holder
+    // allocates on its deal). Accepting both sides let the same advance be
+    // recorded twice, and split the creditor's own legs between the two
+    // records. Cf. KNOWN_ISSUES.md « Passif ».
+    if (loan.toOrgId !== tx.orgId) {
+      throw new ConvexError('loan_wrong_side')
     }
   }
 

@@ -47,20 +47,37 @@ rien.
 
 Un compte courant relie deux organisations du groupe : un **créancier** (qui
 prête) et un **débiteur** (qui emprunte). Il peut être rémunéré (taux) et
-bloqué. Le tableau montre chaque relation avec la position (créance ou
-dette) et le solde signé.
+bloqué. Le tableau montre le créancier et le solde.
+
+### Une avance ne se saisit qu'une fois, du côté de celui qui doit
+
+Le Passif ne montre que ce que la société **doit** : un compte courant
+n'apparaît donc que dans l'organisation **débitrice**, et c'est la seule où
+l'on peut en créer un ou y pointer un virement.
+
+Vu du prêteur, la même avance n'est pas une dette mais un **placement** : il
+la saisit comme un investissement, avec un deal de type « compte courant »
+sur la société bénéficiaire. C'est déjà ainsi que sont suivies les avances
+que CALTE consent à ses filiales — et c'est exactement la logique du capital
+(cf. plus haut) : la société émettrice porte les fonds reçus, celui qui les
+a apportés porte sa participation.
+
+Concrètement : CALTE avance 100 000 € à Albo. Albo enregistre un compte
+courant sur sa page Passif et y pointe le virement reçu. CALTE, elle, pointe
+son décaissement sur son deal « compte courant — Albo Club », dans ses
+participations. Une avance, deux écritures, chacune du bon côté.
 
 ### Sous le capot : des soldes jamais saisis, toujours dérivés
 
 Le solde d'un compte courant n'est **jamais saisi à la main** : il est
-calculé depuis les transactions pointées dessus, chaque organisation sommant
-**ses propres** mouvements. Côté créancier : les sorties (prêts) moins les
-entrées (remboursements reçus) = la créance. Côté débiteur : l'inverse = la
-dette.
+calculé depuis les transactions que l'organisation débitrice a pointées
+dessus — les entrées (l'argent emprunté) moins les sorties (les
+remboursements). D'où un solde toujours négatif : c'est une dette.
 
-Conséquence importante : si une seule des deux organisations a pointé sa
-jambe du virement, **les deux soldes divergent**. Ce n'est pas un bug, c'est
-un signal : il reste un pointage à faire de l'autre côté.
+Point d'attention : le solde du compte courant chez le débiteur et le montant
+versé sur le deal chez le prêteur devraient se répondre, mais **rien ne le
+vérifie automatiquement**. Un écart entre les deux signifie qu'il reste un
+virement à pointer quelque part.
 
 ## Actions
 
@@ -68,7 +85,9 @@ un signal : il reste un pointage à faire de l'autre côté.
   et + Compte courant).
 - **Éditer** : montant/type/détenteur pour le capital ; taux, blocage et date
   pour un compte courant — mais **pas ses parties** (changer de contrepartie
-  = supprimer et recréer, le solde dépend de l'identité des deux orgs).
+  = supprimer et recréer, le solde dépend de l'identité des deux orgs). À la
+  création d'un compte courant, seul le créancier se choisit : le débiteur est
+  l'organisation en cours.
 - **Détacher** une transaction allouée (elle repart en file de pointage).
 - **Supprimer** : refusé tant que des transactions restent allouées — il faut
   tout détacher d'abord, des deux côtés pour un compte courant.
@@ -83,9 +102,13 @@ un signal : il reste un pointage à faire de l'autre côté.
   relie deux sociétés du groupe et son solde se dérive des mouvements ; le
   second est une dette envers une banque, avec un échéancier calculé (cf.
   [Dette bancaire et garanties](18-dette-et-garanties.md)).
+- **Un compte courant vide côté prêteur est normal**, pas un oubli : sa
+  créance est dans ses [participations](04-participations.md), pas dans son
+  passif.
 - Une transaction allouée au passif sort de la file de pointage mais n'est
   pas comptée comme « pointée deal » dans les vues deal.
 
 ## Pages liées
 
-- [Pointage](08-pointage.md), [Trésorerie](07-tresorerie.md)
+- [Pointage](08-pointage.md), [Trésorerie](07-tresorerie.md),
+  [Participations](04-participations.md)

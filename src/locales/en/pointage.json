@@ -159,6 +159,7 @@
     "deal_wrong_org": "This deal belongs to another organization.",
     "equity_wrong_org": "This equity position belongs to another organization.",
     "loan_wrong_org": "This transaction belongs to neither organization of the current account.",
+    "loan_wrong_side": "Only the debtor allocates on a current account. On the lender's side, the advance is matched to the borrower's current-account deal.",
     "already_matched_to_deal": "This transaction is already matched to a deal. Unmatch it first.",
     "allocated_to_liability": "This transaction is allocated to a liability (equity or current account). Detach it from the Liabilities page first.",
     "allocated_to_transfer": "This transaction is a leg of an internal transfer. Detach it first.",

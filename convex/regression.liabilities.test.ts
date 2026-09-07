@@ -2,10 +2,13 @@
 /**
  * Regression: liabilities (passif) — convex/liabilities.ts.
  *
- * Invariant (KNOWN_ISSUES « Passif »): C/C balances are NEVER stored — each
- * org derives its balance from ITS OWN transactions allocated to the loan
- * (Σ out − Σ in). Allocating / deallocating a transaction must therefore be
- * immediately reflected in `getLiabilities`.
+ * Two invariants (KNOWN_ISSUES « Passif »):
+ * - C/C balances are NEVER stored — the debtor derives its balance from ITS
+ *   OWN transactions allocated to the loan (Σ out − Σ in), so allocating /
+ *   deallocating is immediately reflected in `getLiabilities`.
+ * - ONLY the debtor carries a C/C. The creditor's side of the same advance
+ *   is an asset (a `cca` deal on the borrower), so it neither appears in its
+ *   Passif nor accepts an allocation.
  */
 import { describe, expect, test } from 'vitest'
 import { api } from './_generated/api'
@@ -38,23 +41,14 @@ async function loanSetup() {
 }
 
 describe('liabilities: C/C balances derived from transactions', () => {
-  test('each org derives its own signed balance from its allocated legs', async () => {
+  test('only the debtor carries the C/C and derives its balance from its legs', async () => {
     const { t, user, fromOrg, toOrg, loanId } = await loanSetup()
     const fromAccount = await createBankAccount(t, fromOrg)
     const toAccount = await createBankAccount(t, toOrg)
-    // One leg per org: out on the creditor side, in on the debtor side.
-    const fromTx = await createTransaction(t, fromOrg.orgId, fromAccount, {
-      direction: 'out',
-      amount: 10_000_000, // 100 000 €
-    })
+    // The debtor's leg: it receives the advance.
     const toTx = await createTransaction(t, toOrg.orgId, toAccount, {
       direction: 'in',
-      amount: 10_000_000,
-    })
-    await user.as.mutation(api.liabilities.allocateTransaction, {
-      transactionId: fromTx,
-      kind: 'intercompany_loan',
-      targetId: loanId,
+      amount: 10_000_000, // 100 000 €
     })
     await user.as.mutation(api.liabilities.allocateTransaction, {
       transactionId: toTx,
@@ -62,36 +56,44 @@ describe('liabilities: C/C balances derived from transactions', () => {
       targetId: loanId,
     })
 
-    const fromSide = await user.as.query(api.liabilities.getLiabilities, {
-      orgId: fromOrg.orgId,
-    })
-    expect(fromSide.loans).toHaveLength(1)
-    expect(fromSide.loans[0]).toMatchObject({
-      side: 'creditor',
-      balanceCents: 10_000_000, // + = receivable
-    })
-    expect(fromSide.loans[0].transactions).toHaveLength(1)
-
     const toSide = await user.as.query(api.liabilities.getLiabilities, {
       orgId: toOrg.orgId,
     })
     expect(toSide.loans).toHaveLength(1)
-    expect(toSide.loans[0]).toMatchObject({
-      side: 'debtor',
-      balanceCents: -10_000_000, // − = debt
-    })
+    expect(toSide.loans[0]).toMatchObject({ balanceCents: -10_000_000 })
     expect(toSide.loans[0].transactions).toHaveLength(1)
-  })
 
-  test('a partial repayment moves the derived balance, deallocating restores it', async () => {
-    const { t, user, fromOrg, toOrg, loanId } = await loanSetup()
-    const fromAccount = await createBankAccount(t, fromOrg)
-    const advance = await createTransaction(t, fromOrg.orgId, fromAccount, {
+    // The creditor's leg is refused: its side of the advance is a `cca`
+    // deal, never a liability.
+    const fromTx = await createTransaction(t, fromOrg.orgId, fromAccount, {
       direction: 'out',
       amount: 10_000_000,
     })
-    const repayment = await createTransaction(t, fromOrg.orgId, fromAccount, {
+    await expectConvexError(
+      user.as.mutation(api.liabilities.allocateTransaction, {
+        transactionId: fromTx,
+        kind: 'intercompany_loan',
+        targetId: loanId,
+      }),
+      'loan_wrong_side',
+    )
+
+    // ... and the creditor does not see the C/C at all.
+    const fromSide = await user.as.query(api.liabilities.getLiabilities, {
+      orgId: fromOrg.orgId,
+    })
+    expect(fromSide.loans).toHaveLength(0)
+  })
+
+  test('a partial repayment moves the derived balance, deallocating restores it', async () => {
+    const { t, user, toOrg, loanId } = await loanSetup()
+    const toAccount = await createBankAccount(t, toOrg)
+    const advance = await createTransaction(t, toOrg.orgId, toAccount, {
       direction: 'in',
+      amount: 10_000_000,
+    })
+    const repayment = await createTransaction(t, toOrg.orgId, toAccount, {
+      direction: 'out',
       amount: 4_000_000,
     })
     await user.as.mutation(api.liabilities.allocateTransaction, {
@@ -105,10 +107,10 @@ describe('liabilities: C/C balances derived from transactions', () => {
       targetId: loanId,
     })
 
-    let fromSide = await user.as.query(api.liabilities.getLiabilities, {
-      orgId: fromOrg.orgId,
+    let toSide = await user.as.query(api.liabilities.getLiabilities, {
+      orgId: toOrg.orgId,
     })
-    expect(fromSide.loans[0].balanceCents).toBe(6_000_000)
+    expect(toSide.loans[0].balanceCents).toBe(-6_000_000)
 
     // The allocation flips the tx to `matched` without a dealId.
     const tx = await t.run(async (ctx) => ctx.db.get('transactions', repayment))
@@ -118,26 +120,19 @@ describe('liabilities: C/C balances derived from transactions', () => {
     })
     expect(tx?.dealId).toBeUndefined()
 
-    // Deallocating the repayment restores the full receivable.
+    // Deallocating the repayment restores the full debt.
     await user.as.mutation(api.liabilities.deallocateTransaction, {
       transactionId: repayment,
     })
-    fromSide = await user.as.query(api.liabilities.getLiabilities, {
-      orgId: fromOrg.orgId,
+    toSide = await user.as.query(api.liabilities.getLiabilities, {
+      orgId: toOrg.orgId,
     })
-    expect(fromSide.loans[0].balanceCents).toBe(10_000_000)
+    expect(toSide.loans[0].balanceCents).toBe(-10_000_000)
     const deallocated = await t.run(async (ctx) =>
       ctx.db.get('transactions', repayment),
     )
     expect(deallocated).toMatchObject({ matchStatus: 'unmatched' })
     expect(deallocated?.allocation).toBeUndefined()
-
-    // The debtor org never allocated anything: its side stays at 0 (the
-    // divergence is a reconciliation signal, never a shared stored balance).
-    const toSide = await user.as.query(api.liabilities.getLiabilities, {
-      orgId: toOrg.orgId,
-    })
-    expect(toSide.loans[0].balanceCents).toBe(0)
   })
 
   test('allocating a transaction to a loan the org is not a party to is refused', async () => {
