@@ -1,12 +1,18 @@
 /**
- * One-shot import of the Albo Club legal documentation from Google Drive into
- * `documents` (org `albo`, 42 portfolio companies, ~320 files).
+ * One-shot import of a legal-documentation lot from Google Drive into
+ * `documents`. Two lots so far: Albo Club (org `albo`, 42 portfolio companies,
+ * ~320 files) and CALTE (org `calte`, 194 companies, ~800 files).
  *
- * Why a migration and not the app's upload form: the files live in the Drive
- * tree « ⚠️ Investissements », one folder per participation, nested up to five
- * levels. Depositing them through the UI means ~50 passes; the mapping work
- * (which document belongs to which company, under which `kind`) was done once,
- * reviewed, and frozen in `scripts/data/legal-docs-albo.json`.
+ * Nothing here is org-specific: `dryRun` and `verify` take an `orgSlug`, and
+ * `attachBatch` reads the org off the company it is given. A new lot is a new
+ * mapping file, not a new module.
+ *
+ * Why a migration and not the app's upload form: the files live in a Drive
+ * tree (« ⚠️ Investissements » for Albo, « CALTE - Investissements » for
+ * CALTE), one folder per participation, nested up to five levels. Depositing
+ * them through the UI means ~50 passes per lot; the mapping work (which
+ * document belongs to which company, under which `kind`) was done once,
+ * reviewed, and frozen in `scripts/data/legal-docs-<org>.json`.
  *
  * Split of responsibilities — the model never carries the bytes:
  *   - `scripts/import-legal-docs.mjs` reads the frozen mapping, pulls each file
@@ -47,12 +53,18 @@
  * "Could not find function". Merging is safe: nothing here runs on deploy, the
  * module only becomes callable.
  *
- * Execution (prod, manual — cf. MIGRATIONS.md), AFTER the merge has deployed:
+ * Execution (prod, manual — cf. MIGRATIONS.md), AFTER the merge has deployed.
+ * The Albo lot (mapping and org slug both default):
  *   pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip
  *   pnpm exec convex run --prod migrations/legalDocsImport:dryRun
  *   # STOP: check the per-company counts against the spreadsheet, then:
  *   GDRIVE_TOKEN=... node scripts/import-legal-docs.mjs
  *   pnpm exec convex run --prod migrations/legalDocsImport:verify
+ * The CALTE lot — same steps, both the org and the mapping spelled out:
+ *   pnpm exec convex run --prod migrations/legalDocsImport:dryRun '{"orgSlug":"calte"}'
+ *   GDRIVE_TOKEN=... node scripts/import-legal-docs.mjs \
+ *     --mapping scripts/data/legal-docs-calte.json
+ *   pnpm exec convex run --prod migrations/legalDocsImport:verify '{"orgSlug":"calte"}'
  */
 import { ConvexError, v } from 'convex/values'
 import { internal } from '../_generated/api'

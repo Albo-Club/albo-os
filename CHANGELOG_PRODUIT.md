@@ -23,6 +23,54 @@ bas de page.
 
 ---
 
+## v1.217.0 — 07/09/2026 à 20:10 — La documentation juridique de CALTE rejoint les fiches société
+
+Les pactes, bulletins de souscription, statuts, PV d'assemblée, contrats
+d'émission, appels de fonds et attestations de coupon des participations CALTE
+vivaient jusqu'ici uniquement dans le Drive. **785 documents, répartis sur 190
+fiches société**, sont prêts à être versés dans Albo OS : ils apparaîtront sur
+la fiche de chaque participation, et l'assistant IA saura les lire et les citer
+comme il le fait déjà pour ceux d'Albo Club.
+
+Ce qui reste dehors, volontairement : les tableurs de suivi et fichiers de
+travail, les captures d'écran et justificatifs de virement, les RIB, les
+récapitulatifs de signature Docusign, les formulaires KYC et fiscaux, les
+archives `.zip`, les fichiers Google natifs, et les documents nominatifs
+d'autres investisseurs. Quarante-cinq fichiers de plus ont été écartés après
+relecture. Vingt-cinq parce que leur dossier Drive ne correspond à aucune fiche
+société évidente (attestations de valorisation des SPV Anaxago, Banco, Heritage
+Biarritz, Omnis Liber, Pulse 1, Bastille Cycles). Vingt parce que leur
+rattachement restait ambigu et n'a pas été tranché : Chapelle et Banco 2, qui
+sont des entités du groupe et non des participations ; Club Tylia, MARBLE et
+Obligation PIXEL - 18b Villiers, dont le nom de dossier et le contenu des actes
+ne désignent pas la même société.
+
+Le versement lui-même se fait à la main après la mise en ligne, une fois la
+correspondance relue.
+
+> **🔧 Notes techniques**
+>
+> - Aucune nouvelle fonctionnalité : c'est le **second lot** de l'import déjà
+>   utilisé pour Albo Club. `convex/migrations/legalDocsImport.ts` était déjà
+>   générique (`dryRun`/`verify` prennent un `orgSlug`, `attachBatch` déduit
+>   l'org de la société) et n'a pas bougé — seul son entête de runbook est mis
+>   à jour.
+> - `scripts/import-legal-docs.mjs` apprend `--mapping <fichier>` (défaut :
+>   `data/legal-docs-albo.json`) et connaît le type MIME `.doc`.
+> - `scripts/data/legal-docs-calte.json` : correspondance figée, 785 lignes
+>   (société + `companyId`, titre, `kind`, date, id Drive, taille, dossier
+>   d'origine), construite depuis un inventaire exhaustif du Drive « CALTE SAS ›
+>   CALTE - Investissements » (958 fichiers, 134 dossiers de participation,
+>   jusqu'à 5 niveaux).
+> - Rattachements per-fichier là où un dossier Drive couvre plusieurs sociétés :
+>   SPV Parallel, projets Anaxago, bulletins SIDE/Tylia, fonds Batch Ventures,
+>   véhicules Virgil, lignes Sezame, KIMPA (One.five / Eiffel), Mineral
+>   (Sébastopol / Lyon Vaise), PYROGE (Pelouze / Berger).
+> - Idempotence inchangée : `companyId` + `title` + `size`. Un re-run est un
+>   no-op, un run interrompu se reprend.
+
+---
+
 ## v1.216.3 — 07/09/2026 à 19:53 — Reprise des reportings : les derniers cas tranchés
 
 La reprise du reporting CALTE a fait entrer 232 reportings. Six sont restés à
@@ -573,6 +621,7 @@ n'envoie rien : un historique n'est pas une nouvelle.
 >   pour le nouveau module : le codegen ne tourne pas hors ligne, et c'est
 >   l'exception documentée dans `KNOWN_ISSUES.md` § « Codegen Convex hors-ligne ».
 >   Le prochain `convex deploy` réécrit le même contenu.
+
 ## v1.211.0 — 02/09/2026 à 15:46 — Déposer un document ne demande plus rien
 
 Le formulaire d'ajout d'un document posait quatre questions — type, période,
@@ -634,6 +683,7 @@ reporting ne peut plus être déposé par la carte Documents : il passe par
 >   pour le nouveau module) : la session n'avait pas de déploiement Convex pour
 >   lancer `convex codegen`. Le prochain `convex dev`/`deploy` régénère à
 >   l'identique.
+
 ## v1.210.0 — 02/09/2026 à 15:31 — Un rapport se supprime, fichier compris
 
 Jusqu'ici, un rapport arrivé au mauvais endroit ne pouvait que se
@@ -663,7 +713,7 @@ lorsque plus aucune fiche ne le désigne.
 > **🔧 Notes techniques**
 >
 > - Nouveau `convex/lib/documentBlobs.ts` : `releaseStorage(ctx, storageId,
->   { inboundEmailId })` supprime le blob **et** sa ligne `documentTexts`
+{ inboundEmailId })` supprime le blob **et** sa ligne `documentTexts`
 >   seulement si le nouvel index `documents.by_storage` ne trouve plus de
 >   ligne. Le mail source n'est pas compté comme détenteur : le `storageId`
 >   de sa pièce jointe est remis à `undefined` au passage (nom et taille
@@ -738,6 +788,7 @@ participations en face d'une fiche vide.
 >   anti-pattern dans `CLAUDE.md` (déclencher sur le contenu, et respecter la
 >   symétrie ajout/retrait), `TESTING.md` R21, R28d et compteur B11,
 >   `docs/produit/04-participations.md`.
+
 ## v1.209.2 — 02/09/2026 à 15:10 — Corriger une garantie ne change plus son garant
 
 Quand une société du groupe garantit l'emprunt d'une autre — le contrat
@@ -804,6 +855,7 @@ peut lire.
 >   absent disparaissent — elles ne pouvaient plus rien tolérer.
 > - Deux tests de plus : l'org de dépôt est bien celle demandée à la création,
 >   et une édition qui réécrit **toutes** les parties ne la déplace pas.
+
 ## v1.209.0 — 02/09/2026 à 10:46 — Un reporting Parallel déclenche son analyse tout seul
 
 Jusqu'ici, seul un reporting **reçu par email** relançait la synthèse IA de la
@@ -865,6 +917,7 @@ analyse en échec.
 >   une ligne `companyReports` (lue live par `pullCommunicationsForSynthesis`),
 >   donc elle reste invisible pour la fraîcheur des reportings et les
 >   notifications. Chantier séparé.
+
 ## v1.208.0 — 02/09/2026 à 09:14 — L'assistant passe sur le moteur GLM Flash
 
 L'assistant de l'app change de moteur : il tourne désormais sur **GLM Flash**,
@@ -990,7 +1043,7 @@ huit.
 >   `docs.index.tsx` (rend `README.md`) et `docs.$page.tsx` (`beforeLoad`
 >   lève `notFound()` sur un slug inconnu, `head()` titre la page).
 > - `src/lib/produitDocs.ts` : `import.meta.glob<string>('../../docs/produit/*.md',
->   { query: '?raw', eager: true })`. Le dossier est **globbé**, pas listé —
+{ query: '?raw', eager: true })`. Le dossier est **globbé**, pas listé —
 >   une page ajoutée apparaît au build suivant sans inscription nulle part.
 >   Slug = nom de fichier, titre = H1, ordre = numérotation des fichiers.
 > - `src/components/docs/markdown.tsx` : la table de composants markdown est
@@ -1179,6 +1232,7 @@ puisqu'il n'y a pas d'habitude à comparer.
 >   tests couvrent le cas nominal, le mois courant non jugé, le bien jamais
 >   loué, et le fait qu'une charge n'est pas un loyer. Voir `KNOWN_ISSUES.md`
 >   « Un signal dérivé sans référentiel ».
+
 ## v1.204.0 — 31/08/2026 à 16:00 — Ranger ses actes avec ses prêts et ses biens
 
 Le module Dette & Garanties savait tout stocker sauf le papier. Un prêt, un
@@ -1239,6 +1293,7 @@ d'origine et par la recherche.
 > - `convex/regression.docOptionalCompany.test.ts` couvre maintenant les trois
 >   ancres : un bien et une garantie en sont, aucune des lignes ne porte de
 >   `companyId`, et les trois projections sont identiques.
+
 ## v1.203.2 — 31/08/2026 à 16:12 — Trois chiffres remis d'aplomb sur la dette
 
 Un audit à froid du module Dette & Garanties a fait remonter trois endroits
@@ -1304,6 +1359,7 @@ celui de l'assurance.
 >   l'encours d'un révolving et `loanAmendments.outstandingCents` — avec le
 >   critère qui les autorise : un fait extérieur constaté, jamais un calcul
 >   qu'on préfère figer.
+
 ## v1.203.1 — 31/08/2026 à 15:54 — Une barre de recherche pour rattacher un report
 
 Dans les Rapports entrants, rattacher un mail à une participation passait par
@@ -1399,6 +1455,7 @@ société, badgé au nom du deal, comme avant.
 > - Le pourquoi de la re-séparation, ses trois invariants et la cascade de
 >   suppression d'un deal sont dans `KNOWN_ISSUES.md` § « Documents &
 >   rapports : deux surfaces ».
+
 ## v1.202.0 — 31/08/2026 à 15:09 — Le point hebdo du lundi raconte enfin la semaine
 
 Le mail du lundi matin se contentait d'annoncer « 3 reports rangés cette
@@ -1519,7 +1576,7 @@ confirmation de son côté.
 >   les avait sans savoir quoi en faire.
 > - **Piège documenté** : le SDK AI **normalise** `needsApproval` en
 >   prédicat, y compris quand le flag est absent. `expect(x.needsApproval)
->   .toBe(true)` passe donc sur **tous** les outils et ne prouve rien — il
+.toBe(true)` passe donc sur **tous** les outils et ne prouve rien — il
 >   faut **appeler** la fonction. Détail dans `KNOWN_ISSUES.md`.
 > - **Tests** : `convex/regression.debtWrites.test.ts` (28 cas) — le flag
 >   d'approbation appelé outil par outil dans les deux sens, les annotations
@@ -1782,7 +1839,7 @@ sait aussi pointer sur un bien.
 >   silence** — c'est le piège du fichier.
 > - **Correctifs lot 3** : `transactions:listLedger` (le filtre « liability »
 >   omettait `'loan'`, désormais `['equity','intercompany_loan','loan',
->   'property']`) et `agentToolsPointage:allocateTransactionToLiability`
+'property']`) et `agentToolsPointage:allocateTransactionToLiability`
 >   (l'énum s'arrêtait à `equity | intercompany_loan`).
 > - **Front** : routes `immobilier.index.tsx` / `immobilier.$propertyId.tsx`,
 >   composants `src/components/immobilier/*`, troisième onglet dans
@@ -1828,8 +1885,7 @@ l'amortissement démarre au-dessus du montant emprunté.
 
 Un prêt à taux variable porte une série datée de paliers, constatés ou
 projetés. Au-delà de la dernière révision constatée, les échéances sont
-marquées **projetées** : l'application ne prétend pas connaître le taux de
-2029. Un prêt à taux fixe n'a rien à saisir là — la section n'apparaît même
+marquées **projetées** : l'application ne prétend pas connaître le taux de 2029. Un prêt à taux fixe n'a rien à saisir là — la section n'apparaît même
 pas.
 
 **Les garanties.** Une garantie est décrite par trois informations
@@ -2012,6 +2068,7 @@ explicitement hors de l'application.
 >   à l'exécution. Audit des lectures d'abord, schéma ensuite.
 
 ---
+
 ## v1.196.2 — 28/08/2026 à 16:30 — Une étiquette qui ne servait à rien sur les sociétés du groupe
 
 Chaque société du groupe portait un type — « société d'exploitation », « SCI »,
@@ -2133,7 +2190,7 @@ au premier déploiement qui recalcule les dépendances.
 > - Déplacement de l'override `unstorage: 2.0.0-alpha.7` du champ `pnpm` de
 >   `package.json` vers la clé `overrides` de `pnpm-workspace.yaml`. pnpm 11 ne
 >   lit plus ce champ (`The "pnpm" field in package.json is no longer read by
->   pnpm`) : le pin était devenu inerte, masqué par le lockfile et par le
+pnpm`) : le pin était devenu inerte, masqué par le lockfile et par le
 >   `packageManager` encore en 10.x.
 > - Vérifié sur une copie jetable avec `pnpm@10.28.0` (la version de
 >   `packageManager`, donc celle de la CI et de Vercel) : lockfile supprimé,
@@ -2220,7 +2277,7 @@ remplacer l'expéditeur par l'adresse du groupe.
 >   `convex/regression.reportSenders.test.ts` (8 cas base). `tests/reportRouting`
 >   mis à jour sur la nouvelle règle du silence. 150 tests Convex, 314 unitaires.
 > - Quatrième garde-fou **hors code**, à poser dans la console AgentMail :
->   `report@alboteam.com` dans la *send block list* de l'inbox — plus aucun mail
+>   `report@alboteam.com` dans la _send block list_ de l'inbox — plus aucun mail
 >   sortant ne peut atteindre le groupe, quelle que soit la régression.
 
 ## v1.194.0 — 26/08/2026 à 19:30 — Une invitation ne peut plus demander un mot de passe qui n'existe pas
@@ -2254,7 +2311,7 @@ ensuite.
 > **🔧 Notes techniques**
 >
 > - `invitations.preview` renvoie `accountState: 'none' | 'claimable' |
->   'active'` à la place du booléen `accountExists` : une ligne Better Auth ne
+'active'` à la place du booléen `accountExists` : une ligne Better Auth ne
 >   vaut pas compte utilisable, `emailVerified: false` veut dire que personne
 >   n'a jamais prouvé posséder la boîte mail — donc ce qui est posé dessus ne
 >   prouve rien (c'est la position de Better Auth lui-même, cf.
@@ -2316,7 +2373,7 @@ véhicule reste dans les Rapports entrants.
 > - `convex/lib/emailIdentify.ts` : `nameAppearsInText` compare désormais
 >   sur `matchableName(name)` — retrait d'un groupe parenthésé **terminal**
 >   (une parenthèse au milieu est conservée : `SIDE - ADEQUA (POTIONS) - AB
->   tasty`) et réduction des espaces multiples des deux côtés (le texte est
+tasty`) et réduction des espaces multiples des deux côtés (le texte est
 >   aplati, donc un nom coupé par un retour à la ligne accroche aussi). La
 >   recherche reste mot-entier, déterministe, sans fuzzy — le classement par
 >   proximité de nom reste proscrit comme critère de rattachement.

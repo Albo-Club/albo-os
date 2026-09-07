@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 /**
- * One-shot upload of the Albo Club legal documentation: Google Drive → Convex.
+ * One-shot upload of a frozen legal-documentation mapping: Google Drive →
+ * Convex. Two lots have been mapped so far — Albo Club
+ * (`scripts/data/legal-docs-albo.json`, the default) and CALTE
+ * (`scripts/data/legal-docs-calte.json`, passed with `--mapping`).
  *
- * Reads the frozen mapping `scripts/data/legal-docs-albo.json` (one row per
- * document: company, title, kind, date, Drive id), then for each batch:
+ * Reads the mapping (one row per document: company, title, kind, date, Drive
+ * id), then for each batch:
  *   1. asks Convex for upload URLs   (migrations/legalDocsImport:startUploads)
  *   2. streams the file from Drive and POSTs it to its URL
  *   3. writes the rows               (migrations/legalDocsImport:attachBatch)
@@ -22,14 +25,15 @@
  *   - the Convex prod deploy key already configured for `convex run --prod`
  *
  * Usage:
- *   GDRIVE_TOKEN=ya29.… node scripts/import-legal-docs.mjs [--limit N] [--dry]
+ *   GDRIVE_TOKEN=ya29.… node scripts/import-legal-docs.mjs \
+ *     [--mapping scripts/data/legal-docs-calte.json] [--limit N] [--dry]
  */
 import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
 
 const run = promisify(execFile)
-const MAPPING = new URL('./data/legal-docs-albo.json', import.meta.url)
+const DEFAULT_MAPPING = './data/legal-docs-albo.json'
 const BATCH = 25
 const DRIVE = 'https://www.googleapis.com/drive/v3/files'
 
@@ -37,11 +41,17 @@ const args = process.argv.slice(2)
 const dry = args.includes('--dry')
 const limitFlag = args.indexOf('--limit')
 const limit = limitFlag === -1 ? Infinity : Number(args[limitFlag + 1])
+const mappingFlag = args.indexOf('--mapping')
+// Relative to the CWD when given on the command line, to the script otherwise.
+const MAPPING =
+  mappingFlag === -1
+    ? new URL(DEFAULT_MAPPING, import.meta.url)
+    : new URL(args[mappingFlag + 1], `file://${process.cwd()}/`)
 
 const token = process.env.GDRIVE_TOKEN
 if (!token && !dry) {
   console.error(
-    'GDRIVE_TOKEN manquant. Voir MIGRATIONS.md § « Import documents juridiques Albo ».',
+    'GDRIVE_TOKEN manquant. Voir MIGRATIONS.md § « Import documentation juridique ».',
   )
   process.exit(1)
 }
@@ -62,7 +72,9 @@ async function convex(fn, payload, attempt = 1) {
   } catch (err) {
     if (attempt >= 3) throw err
     const wait = attempt * 4000
-    console.log(`    réseau instable (${fn}), nouvelle tentative dans ${wait / 1000}s…`)
+    console.log(
+      `    réseau instable (${fn}), nouvelle tentative dans ${wait / 1000}s…`,
+    )
     await sleep(wait)
     return convex(fn, payload, attempt + 1)
   }
@@ -75,16 +87,22 @@ async function convexOnce(fn, payload) {
     { maxBuffer: 32 * 1024 * 1024 },
   )
   // The CLI prints a banner before the JSON payload on some versions.
-  const start = stdout.indexOf('[') === -1 ? stdout.indexOf('{') : Math.min(
-    ...[stdout.indexOf('['), stdout.indexOf('{')].filter((i) => i !== -1),
-  )
+  const start =
+    stdout.indexOf('[') === -1
+      ? stdout.indexOf('{')
+      : Math.min(
+          ...[stdout.indexOf('['), stdout.indexOf('{')].filter((i) => i !== -1),
+        )
   return JSON.parse(stdout.slice(start))
 }
 
 async function fetchFromDrive(fileId) {
-  const res = await fetch(`${DRIVE}/${fileId}?alt=media&supportsAllDrives=true`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  const res = await fetch(
+    `${DRIVE}/${fileId}?alt=media&supportsAllDrives=true`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  )
   if (!res.ok) throw new Error(`drive_${res.status}`)
   return Buffer.from(await res.arrayBuffer())
 }
@@ -105,6 +123,7 @@ const CONTENT_TYPES = {
   pdf: 'application/pdf',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  doc: 'application/msword',
   pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 }
 
@@ -114,7 +133,9 @@ function contentTypeOf(sourceExt) {
 
 const { rows: all } = JSON.parse(await readFile(MAPPING, 'utf8'))
 const rows = all.slice(0, limit)
-console.log(`${rows.length} documents à importer (sur ${all.length} dans le mapping)`)
+console.log(
+  `${rows.length} documents à importer (sur ${all.length} dans le mapping)`,
+)
 if (dry) {
   const perCompany = {}
   for (const r of rows) perCompany[r.company] = (perCompany[r.company] ?? 0) + 1
@@ -135,7 +156,9 @@ for (let i = 0; i < rows.length; i += BATCH) {
       count: slice.length,
     })
   } catch (err) {
-    failures.push(`lot ${i}-${i + slice.length} : startUploads — ${err.message}`)
+    failures.push(
+      `lot ${i}-${i + slice.length} : startUploads — ${err.message}`,
+    )
     continue
   }
 
@@ -171,7 +194,9 @@ for (let i = 0; i < rows.length; i += BATCH) {
     } catch (err) {
       // The blobs are uploaded but unreferenced; re-running the script
       // re-uploads and writes them. Unreferenced storage is inert.
-      failures.push(`lot ${i}-${i + slice.length} : attachBatch — ${err.message}`)
+      failures.push(
+        `lot ${i}-${i + slice.length} : attachBatch — ${err.message}`,
+      )
     }
   }
   console.log(
@@ -179,7 +204,9 @@ for (let i = 0; i < rows.length; i += BATCH) {
   )
 }
 
-console.log(`\nTerminé — créés : ${created}, déjà présents : ${skipped}, échecs : ${failures.length}`)
+console.log(
+  `\nTerminé — créés : ${created}, déjà présents : ${skipped}, échecs : ${failures.length}`,
+)
 if (failures.length > 0) {
   console.log('\nÉchecs :')
   for (const f of failures) console.log(`  - ${f}`)
