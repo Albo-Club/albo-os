@@ -23,6 +23,53 @@ bas de page.
 
 ---
 
+## v1.216.1 — 07/09/2026 à 14:50 — Mise à jour des dépendances
+
+Mise à jour technique hebdomadaire des briques logicielles de l'app
+(35 brique(s) logicielle(s) mises à jour). Aucun changement visible dans l'app.
+
+> **🔧 Notes techniques**
+>
+> - `pnpm update` (dans les plages semver déclarées — jamais de saut de
+>   version majeure) via `.github/workflows/update-deps.yml` ;
+>   `pnpm lint`, `pnpm test:unit` et `pnpm build` sont passés dans le run
+>   avant ouverture de la PR.
+> - `@convex-dev/agent` 0.6.3 → 0.6.4
+> - `@convex-dev/rag` 0.7.5 → 0.7.6
+> - `@convex-dev/resend` 0.2.3 → 0.2.8
+> - `@convex-dev/workpool` 0.4.6 → 0.4.11
+> - `@radix-ui/react-dialog` 1.1.15 → 1.1.23
+> - `@radix-ui/react-dropdown-menu` 2.1.16 → 2.1.24
+> - `@radix-ui/react-label` 2.1.8 → 2.1.15
+> - `@radix-ui/react-slot` 1.2.4 → 1.3.3
+> - `@sentry/react` 10.52.0 → 10.73.0
+> - `@tanstack/react-form` 1.32.0 → 1.33.5
+> - `@tanstack/react-query` 5.100.10 → 5.102.8
+> - `ai` 6.0.177 → 6.0.277
+> - `convex` 1.42.3 → 1.45.0
+> - `convex-helpers` 0.1.116 → 0.1.124
+> - `date-fns` 4.1.0 → 4.4.0
+> - `i18next` 26.2.0 → 26.4.2
+> - `nanoid` 5.1.11 → 5.1.16
+> - `radix-ui` 1.4.3 → 1.6.7
+> - `react` 19.2.6 → 19.2.8
+> - `react-dom` 19.2.6 → 19.2.8
+> - `react-i18next` 17.0.8 → 17.0.13
+> - `streamdown` 2.5.0 → 2.6.0
+> - `zod` 4.4.3 → 4.5.4
+> - `@tailwindcss/vite` 4.3.0 → 4.3.3
+> - `@types/node` 25.7.0 → 25.9.5
+> - `@types/react` 19.2.14 → 19.2.18
+> - `@types/react-dom` 19.2.3 → 19.2.7
+> - `concurrently` 9.2.1 → 9.2.4
+> - `eslint` 10.3.0 → 10.10.0
+> - `knip` 6.29.0 → 6.34.0
+> - `prettier` 3.8.3 → 3.9.6
+> - `tailwindcss` 4.3.0 → 4.3.3
+> - `tsx` 4.21.0 → 4.23.13
+> - `vite` 8.0.12 → 8.2.2
+> - `vitest` 4.1.10 → 4.1.11
+
 ## v1.216.0 — 04/09/2026 à 21:45 — Brancher Claude sur Albo OS se fait depuis l'app
 
 Le connecteur qui permet d'interroger le portefeuille depuis claude.ai
