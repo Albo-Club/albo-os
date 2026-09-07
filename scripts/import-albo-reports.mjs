@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * One-shot import of the Albo app investor reports: Supabase → Convex.
+ * Import of the Albo app investor reports: Supabase → Convex.
  *
- * Reads the frozen decisions `scripts/data/albo-reports-albo.json` (company
- * mapping, 18 verified duplicates to skip, 6 rows allowed to share a period),
- * pulls the matching rows from Supabase, then for each report:
+ * Reads a frozen decision file — one per source workspace, named by
+ * `--decisions` (company mapping, per-report targeting, verified duplicates to
+ * skip, rows allowed to share a period) — pulls the matching rows from
+ * Supabase, then for each report:
  *   1. downloads its attachments from Supabase Storage
  *   2. asks Convex for upload URLs  (migrations/alboReportsImport:startUploads)
  *   3. POSTs each file to its URL
@@ -18,9 +19,15 @@
  * it first — the collision check then runs against LIVE data rather than the
  * snapshot the decision file was reviewed on.
  *
- * Idempotent: `importOne` anchors `companyReports.alboReportId`, so a re-run
- * is free and an interrupted run resumes by being re-run. Nothing is deleted,
- * nothing is overwritten — a report already present is skipped, never patched.
+ * Idempotent: `importOne` anchors the pair `(alboReportId, companyId)`, so a
+ * re-run is free and an interrupted run resumes by being re-run. Nothing is
+ * deleted, nothing is overwritten — a report already present is skipped, never
+ * patched.
+ *
+ * `reportOverrides` in the decision file retargets a single report, and a list
+ * of ids fans it out: one source row becomes one `companyReports` row per
+ * company, which is what the pipeline does natively for a participation held
+ * through several entities. The target is a company, so a file may cross orgs.
  *
  * A file that cannot be fetched does NOT cost its report: Albo app holds
  * `report_files` rows whose blob is absent from Storage, and the analysis and
@@ -32,14 +39,16 @@
  *   - the Convex prod deploy key already configured for `convex run --prod`
  *
  * Usage:
- *   SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/import-albo-reports.mjs [--dry|--apply] [--limit N]
+ *   SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/import-albo-reports.mjs \
+ *     --decisions scripts/data/albo-reports-calte.json [--dry|--apply] [--limit N]
+ *
+ * `--decisions` defaults to `albo-reports-albo.json`, the August 2026 pass.
  */
 import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
 
 const run = promisify(execFile)
-const DECISIONS = new URL('./data/albo-reports-albo.json', import.meta.url)
 const BUCKET = 'report-files'
 const MAX_BYTES = 20 * 1024 * 1024 // storage cap, cf. convex/documents.ts
 
@@ -47,6 +56,12 @@ const args = process.argv.slice(2)
 const apply = args.includes('--apply')
 const limitFlag = args.indexOf('--limit')
 const limit = limitFlag === -1 ? Infinity : Number(args[limitFlag + 1])
+// One decision file per source workspace; it also names the workspace to read.
+const decisionsFlag = args.indexOf('--decisions')
+const DECISIONS =
+  decisionsFlag === -1
+    ? new URL('./data/albo-reports-albo.json', import.meta.url)
+    : new URL(args[decisionsFlag + 1], `file://${process.cwd()}/`)
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -130,9 +145,29 @@ const byCompanyName = new Map(decisions.companies.map((c) => [c.source, c]))
 const duplicates = new Set(decisions.duplicates.map((d) => d.id))
 const allowCollision = new Set(decisions.allowPeriodCollision.map((d) => d.id))
 const excluded = new Set(decisions.excludedCompanies.map((c) => c.name))
+// Per-report targeting. An Albo app "company" is sometimes a bucket mixing
+// several vehicles, and a report can legitimately belong to more than one —
+// hence a LIST of target ids, which fans the source row out.
+const overrides = new Map(
+  (decisions.reportOverrides ?? []).map((o) => [o.id, o.companyIds]),
+)
+/**
+ * Every Albo OS company the run can write to, defaults and overrides alike,
+ * with the readable name the plan prints. An override carries its own
+ * `targets` labels: the companies it names are the ones a human most needs to
+ * read back before `--apply`, and an id tells nobody anything.
+ */
+const targetsById = new Map(
+  decisions.companies.map((c) => [c.companyId, c.target]),
+)
+for (const o of decisions.reportOverrides ?? []) {
+  o.companyIds.forEach((id, n) => {
+    if (!targetsById.has(id)) targetsById.set(id, o.targets?.[n] ?? id)
+  })
+}
 
 console.log(
-  `\nDécisions : ${decisions.companies.length} participations, ${duplicates.size} doublons écartés, ${allowCollision.size} collisions de période autorisées`,
+  `\nDécisions (${decisions.sourceWorkspace.name}) : ${decisions.companies.length} participations, ${overrides.size} reports reciblés, ${duplicates.size} écartés, ${allowCollision.size} collisions de période autorisées`,
 )
 
 // ── Source side ────────────────────────────────────────────────────────────
@@ -169,20 +204,25 @@ for (const r of reports) {
     skippedDuplicate.push(`${name} — ${r.report_period ?? '(sans période)'}`)
     continue
   }
-  const target = byCompanyName.get(name)
-  if (!target) {
+  // A report either carries its own targets (it names its vehicle in the
+  // title) or falls back to its company's default mapping.
+  const targets = overrides.get(r.id) ?? [byCompanyName.get(name)?.companyId]
+  if (targets.some((t) => !t)) {
     unmapped.push(`${name} — ${r.report_period ?? '(sans période)'}`)
     continue
   }
-  plan.push({
-    report: r,
-    company: target,
-    files: filesByReport.get(r.id) ?? [],
-  })
+  for (const companyId of targets) {
+    plan.push({
+      report: r,
+      company: { companyId, target: targetsById.get(companyId) ?? companyId },
+      files: filesByReport.get(r.id) ?? [],
+    })
+  }
 }
 
+const sourceRows = new Set(plan.map((p) => p.report.id)).size
 console.log(
-  `Source : ${reports.length} reports lus — ${plan.length} à importer, ${skippedDuplicate.length} doublons, ${skippedExcluded.length} sur participations écartées`,
+  `Source : ${reports.length} reports lus — ${sourceRows} à importer (${plan.length} lignes après fan-out), ${skippedDuplicate.length} écartés, ${skippedExcluded.length} sur participations écartées`,
 )
 if (unmapped.length > 0) {
   console.error(`\n⚠️  ${unmapped.length} reports sans participation cible :`)
@@ -192,7 +232,7 @@ if (unmapped.length > 0) {
 
 // ── Target side: what Albo OS already holds, read live ─────────────────────
 const existing = await convex('migrations/alboReportsImport:plan', {
-  companyIds: decisions.companies.map((c) => c.companyId),
+  companyIds: [...targetsById.keys()],
 })
 const osByCompany = new Map((existing ?? []).map((e) => [e.companyId, e]))
 const missing = (existing ?? []).filter((e) => e.missing)
@@ -364,6 +404,6 @@ if (failures.length > 0) {
   process.exitCode = 1
 }
 console.log(
-  "\nEnsuite : convex run --prod migrations/alboReportsImport:verify '{}'",
+  '\nEnsuite : convex run --prod migrations/alboReportsImport:verify \'{"orgSlug":"…"}\' — une fois par org touchée',
 )
 console.log("Puis    : convex run --prod vectorize:backfillAll '{}'")
