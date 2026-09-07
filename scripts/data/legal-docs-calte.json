@@ -1,7 +1,7 @@
 {
   "org": "calte",
   "generatedFrom": "Drive « CALTE SAS > CALTE - Investissements »",
-  "count": 800,
+  "count": 805,
   "rows": [
     {
       "company": "1KM A PIED",
@@ -6448,6 +6448,26 @@
     {
       "company": "SIDE 1",
       "companyId": "jx75zy634aen5bz3hbene34y8187r5jg",
+      "driveFileId": "18BPfhu4MLmawu-wDBeJkQJIYz430Pvxr",
+      "title": "SIDE - Bons souscription Actions",
+      "kind": "subscription",
+      "sourceExt": "pdf",
+      "size": 76688,
+      "folder": "SIDE 1 & 2"
+    },
+    {
+      "company": "SIDE 1",
+      "companyId": "jx75zy634aen5bz3hbene34y8187r5jg",
+      "driveFileId": "1Q3sd2046NlpDLMtfY1zTBbKPiFaVGJ1B",
+      "title": "SIDE - Reduction de capital - Avis d offre",
+      "kind": "legal",
+      "sourceExt": "pdf",
+      "size": 366493,
+      "folder": "SIDE 1 & 2"
+    },
+    {
+      "company": "SIDE 1",
+      "companyId": "jx75zy634aen5bz3hbene34y8187r5jg",
       "driveFileId": "1j24xKWcigQlDFWbzFKgqw33nGZVF2OA0",
       "title": "SIDE - RK - Rapport du president",
       "kind": "legal",
@@ -6464,6 +6484,36 @@
       "sourceExt": "pdf",
       "size": 201443,
       "folder": "SIDE 1 & 2 > SIDE 1 RK > RK 2"
+    },
+    {
+      "company": "SIDE 2",
+      "companyId": "jx748rcwmgvh3jbtkhjxmv29w187s4e5",
+      "driveFileId": "1i-3TVUT7KMhTjqhovsNZipZpFrGQ02iS",
+      "title": "SIDE 2 - Bulletin de souscription",
+      "kind": "subscription",
+      "sourceExt": "pdf",
+      "size": 75740,
+      "folder": "SIDE 1 & 2"
+    },
+    {
+      "company": "SIDE 2",
+      "companyId": "jx748rcwmgvh3jbtkhjxmv29w187s4e5",
+      "driveFileId": "1dGjYCQYJS6nlmoq1q0EIlKaXv6Lvxp5T",
+      "title": "SIDE 2 - PV AGO",
+      "kind": "legal",
+      "sourceExt": "pdf",
+      "size": 399683,
+      "folder": "SIDE 1 & 2"
+    },
+    {
+      "company": "SIDE 2",
+      "companyId": "jx748rcwmgvh3jbtkhjxmv29w187s4e5",
+      "driveFileId": "17T4X4C2o12rxYTCmHryJqw-DO9rosyb7",
+      "title": "SIDE 2 - Reduction de capital - Avis d offre",
+      "kind": "legal",
+      "sourceExt": "pdf",
+      "size": 365766,
+      "folder": "SIDE 1 & 2"
     },
     {
       "company": "SIDE 2",
