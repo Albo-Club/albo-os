@@ -2018,6 +2018,49 @@ l'exécution. Les gardes du code (`alboReportId` déjà présent, créneau
 Cf. `convex/migrations/alboReportsImport.ts` et
 `scripts/data/albo-reports-albo.json`.
 
+La reprise CALTE (09/2026) a confirmé la règle deux fois de plus, dans les
+deux sens. L'update **#82** d'AZmed est étiqueté `May 2026` dans Albo OS et
+`June 2026` dans Albo app : seul le **numéro d'update** l'identifie. Et deux
+lignes GreenGo envoyées le même jour sous des titres qui ne diffèrent que par
+un accent (« Fevrier » / « Février ») se sont révélées être **deux mois
+distincts** — les écarter comme doublon aurait perdu janvier.
+
+Elle a aussi ajouté un piège de forme : côté source, une « société » est
+parfois un **fourre-tout** qui mélange les reports de plusieurs véhicules, et
+c'est le **titre du report** qui nomme le vrai (« Rapport de gestion Annuel
+2025 – Asterion F2 », « RM Expansion — Point d'étape S1 2026 », « Emprunte Mon
+Toutou » rangé sous « SIDE Capital »). Un mapping société → société place donc
+ces reports sur la mauvaise fiche, sans que rien ne le signale. D'où
+`reportOverrides` dans le fichier de décisions : ciblage **par report**, et
+liste d'ids quand un report appartient légitimement à plusieurs sociétés.
+
+Deux pièges de mécanique, découverts en exécutant la reprise CALTE :
+
+**Une collision de période peut naître du run lui-même.** Le `--dry` compare à
+l'état de la base **avant** l'import ; en cours d'exécution, chaque report créé
+occupe son créneau `(société, période)`, donc un report plus loin dans le même
+lot peut buter sur un report que le lot vient d'écrire. Le plan en annonçait 1,
+l'exécution en a bloqué 6. Ce n'est pas une dérive : le garde-fou saute au lieu
+d'écraser. Mais il faut que le mode `--apply` **nomme** ce qu'il a bloqué —
+sinon ces cas-là, absents du plan, ne se découvrent qu'en relançant un `--dry`.
+
+**Un report peut être trop gros pour être écrit, et l'erreur ne le dit pas.**
+Le business plan Doinsport porte 15,2 M caractères — un classeur Excel aplati,
+cellules vides comprises, 46× la ligne suivante. Il franchit deux plafonds : le
+**1 MiB par document Convex**, et l'`ARG_MAX` du système, la charge voyageant en
+argv parce que `convex run` ne lit ses arguments ni d'un fichier ni de stdin.
+C'est l'OS qui parle en premier (`spawn E2BIG`), ce qui masque la limite Convex
+et fait chercher un problème de transport là où il y a un problème de taille.
+D'où `MAX_TEXT_CHARS` dans le script d'import : tronquer le texte et le
+signaler, plutôt que perdre le report.
+
+Corollaire sur l'idempotence : dès qu'un report peut viser plusieurs sociétés,
+la clé d'ancrage est la **paire** `(alboReportId, companyId)`. Sur l'uuid seul,
+le garde-fou répond « déjà importé » après la première société du fan-out et
+jette les suivantes **en silence** — avec un statut `already_imported`, donc
+sans erreur ni ligne manquante visible dans le résumé du run. Tenu par
+`convex/regression.alboReportsImport.test.ts`.
+
 Corollaire : ne **jamais** rejouer un import historique à travers
 `reportStore.storeForCompany`. Cette fonction **met à jour sur place** en cas
 de collision de période et supprime les `documents` du report avant de les
@@ -4035,6 +4078,23 @@ VASCO (`https://vasco.fund`) is the fund-admin platform behind investor portals
 like Parallel Invest (`parallel.vasco.fund`). Albo OS pulls the investor-side
 data that only lives on the platform (positions, valuations, documents) — a
 _pull_ integration, distinct from the _push_ AgentMail report pipeline.
+
+### Deux tables alimentent la même fiche — ne pas conclure « il manque des reports »
+
+Les communications VASCO vivent dans **`vascoCommunicationsCache`**, jamais dans
+`companyReports`. La fiche d'une participation les affiche côte à côte, mais
+tout ce qui interroge les reports — `listCompanyReports`, l'outil MCP du même
+nom, les outils agent de `agentToolsReports.ts` — ne lit que `companyReports` et
+renvoie donc **vide** sur une participation dont l'actualité arrive par VASCO.
+
+Le piège a coûté un aller-retour lors de la reprise CALTE : AZmed apparaissait
+avec 3 reports côté Albo OS contre 15 côté ancien outil, ce qui ressemblait à un
+trou de 12 lignes. En réalité la participation est détenue **via un SPV
+Parallel**, donc son historique arrive complet par le pull VASCO — les importer
+aurait créé un doublon dans une autre table, invisible à tout contrôle
+d'unicité. Réflexe avant de conclure qu'un historique manque : vérifier si
+l'entité porte `vascoClientSlug` / `vascoIssuerId`, ou si son résumé mentionne un
+véhicule intermédiaire.
 
 ### Endpoints & auth
 

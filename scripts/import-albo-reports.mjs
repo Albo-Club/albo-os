@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * One-shot import of the Albo app investor reports: Supabase → Convex.
+ * Import of the Albo app investor reports: Supabase → Convex.
  *
- * Reads the frozen decisions `scripts/data/albo-reports-albo.json` (company
- * mapping, 18 verified duplicates to skip, 6 rows allowed to share a period),
- * pulls the matching rows from Supabase, then for each report:
+ * Reads a frozen decision file — one per source workspace, named by
+ * `--decisions` (company mapping, per-report targeting, verified duplicates to
+ * skip, rows allowed to share a period) — pulls the matching rows from
+ * Supabase, then for each report:
  *   1. downloads its attachments from Supabase Storage
  *   2. asks Convex for upload URLs  (migrations/alboReportsImport:startUploads)
  *   3. POSTs each file to its URL
@@ -18,9 +19,15 @@
  * it first — the collision check then runs against LIVE data rather than the
  * snapshot the decision file was reviewed on.
  *
- * Idempotent: `importOne` anchors `companyReports.alboReportId`, so a re-run
- * is free and an interrupted run resumes by being re-run. Nothing is deleted,
- * nothing is overwritten — a report already present is skipped, never patched.
+ * Idempotent: `importOne` anchors the pair `(alboReportId, companyId)`, so a
+ * re-run is free and an interrupted run resumes by being re-run. Nothing is
+ * deleted, nothing is overwritten — a report already present is skipped, never
+ * patched.
+ *
+ * `reportOverrides` in the decision file retargets a single report, and a list
+ * of ids fans it out: one source row becomes one `companyReports` row per
+ * company, which is what the pipeline does natively for a participation held
+ * through several entities. The target is a company, so a file may cross orgs.
  *
  * A file that cannot be fetched does NOT cost its report: Albo app holds
  * `report_files` rows whose blob is absent from Storage, and the analysis and
@@ -32,21 +39,85 @@
  *   - the Convex prod deploy key already configured for `convex run --prod`
  *
  * Usage:
- *   SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/import-albo-reports.mjs [--dry|--apply] [--limit N]
+ *   SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/import-albo-reports.mjs \
+ *     --decisions scripts/data/albo-reports-calte.json [--dry|--apply] [--limit N]
+ *
+ * `--decisions` defaults to `albo-reports-albo.json`, the August 2026 pass.
  */
 import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
 
 const run = promisify(execFile)
-const DECISIONS = new URL('./data/albo-reports-albo.json', import.meta.url)
 const BUCKET = 'report-files'
 const MAX_BYTES = 20 * 1024 * 1024 // storage cap, cf. convex/documents.ts
 
 const args = process.argv.slice(2)
+
+// Refuse an argument this script does not know rather than ignore it. Silence
+// here is dangerous: run against an older revision, `--decisions <file>` was
+// simply not read, the run fell back to its default decision file, and the
+// plan it printed was for the WRONG workspace — with nothing saying so.
+const FLAGS = new Set(['--dry', '--apply'])
+const FLAGS_WITH_VALUE = new Set(['--limit', '--decisions'])
+for (let i = 0; i < args.length; i++) {
+  if (FLAGS_WITH_VALUE.has(args[i])) {
+    if (args[i + 1] === undefined) {
+      console.error(`Valeur manquante après ${args[i]}.`)
+      process.exit(1)
+    }
+    i += 1
+    continue
+  }
+  if (FLAGS.has(args[i])) continue
+  console.error(
+    `Argument inconnu : ${args[i]}\n` +
+      'Attendus : --dry | --apply | --limit <n> | --decisions <fichier>',
+  )
+  process.exit(1)
+}
+
 const apply = args.includes('--apply')
 const limitFlag = args.indexOf('--limit')
 const limit = limitFlag === -1 ? Infinity : Number(args[limitFlag + 1])
+// One decision file per source workspace; it also names the workspace to read.
+const decisionsFlag = args.indexOf('--decisions')
+const DECISIONS =
+  decisionsFlag === -1
+    ? new URL('./data/albo-reports-albo.json', import.meta.url)
+    : new URL(args[decisionsFlag + 1], `file://${process.cwd()}/`)
+
+/**
+ * Combined cap on the two text fields of a report, in characters.
+ *
+ * Two hard ceilings sit just above it, and one Albo app row breaks both:
+ * Doinsport's « Business Plan Doinsport 2030 » carries 15.2 M characters —
+ * an Excel workbook flattened to text, empty cells included, 46× the next
+ * largest row. A Convex document is capped at 1 MiB, so that report could
+ * never be stored whole; and the payload travels as a JSON argv blob to
+ * `convex run`, which has no way to read arguments from a file or stdin, so
+ * the OS refused the command outright (`spawn E2BIG`) before Convex ever saw
+ * it. Trimming keeps the report — headline, metrics, analysis, attachments —
+ * and loses only spreadsheet padding. Every trim is reported at the end.
+ */
+const MAX_TEXT_CHARS = 500_000
+
+/** Trims the pair within the budget, taking from the longer field first. */
+function capTexts(rawContent, cleanedHtml) {
+  const len = (s) => s?.length ?? 0
+  let raw = rawContent
+  let cleaned = cleanedHtml
+  const before = len(raw) + len(cleaned)
+  if (len(raw) > MAX_TEXT_CHARS) raw = raw.slice(0, MAX_TEXT_CHARS)
+  if (len(cleaned) > MAX_TEXT_CHARS) cleaned = cleaned.slice(0, MAX_TEXT_CHARS)
+  // Each field now fits, so the excess is never larger than the longer one.
+  const over = len(raw) + len(cleaned) - MAX_TEXT_CHARS
+  if (over > 0) {
+    if (len(raw) >= len(cleaned)) raw = raw.slice(0, len(raw) - over)
+    else cleaned = cleaned.slice(0, len(cleaned) - over)
+  }
+  return { raw, cleaned, trimmed: before - (len(raw) + len(cleaned)) }
+}
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -130,9 +201,29 @@ const byCompanyName = new Map(decisions.companies.map((c) => [c.source, c]))
 const duplicates = new Set(decisions.duplicates.map((d) => d.id))
 const allowCollision = new Set(decisions.allowPeriodCollision.map((d) => d.id))
 const excluded = new Set(decisions.excludedCompanies.map((c) => c.name))
+// Per-report targeting. An Albo app "company" is sometimes a bucket mixing
+// several vehicles, and a report can legitimately belong to more than one —
+// hence a LIST of target ids, which fans the source row out.
+const overrides = new Map(
+  (decisions.reportOverrides ?? []).map((o) => [o.id, o.companyIds]),
+)
+/**
+ * Every Albo OS company the run can write to, defaults and overrides alike,
+ * with the readable name the plan prints. An override carries its own
+ * `targets` labels: the companies it names are the ones a human most needs to
+ * read back before `--apply`, and an id tells nobody anything.
+ */
+const targetsById = new Map(
+  decisions.companies.map((c) => [c.companyId, c.target]),
+)
+for (const o of decisions.reportOverrides ?? []) {
+  o.companyIds.forEach((id, n) => {
+    if (!targetsById.has(id)) targetsById.set(id, o.targets?.[n] ?? id)
+  })
+}
 
 console.log(
-  `\nDécisions : ${decisions.companies.length} participations, ${duplicates.size} doublons écartés, ${allowCollision.size} collisions de période autorisées`,
+  `\nDécisions (${decisions.sourceWorkspace.name}) : ${decisions.companies.length} participations, ${overrides.size} reports reciblés, ${duplicates.size} écartés, ${allowCollision.size} collisions de période autorisées`,
 )
 
 // ── Source side ────────────────────────────────────────────────────────────
@@ -169,20 +260,25 @@ for (const r of reports) {
     skippedDuplicate.push(`${name} — ${r.report_period ?? '(sans période)'}`)
     continue
   }
-  const target = byCompanyName.get(name)
-  if (!target) {
+  // A report either carries its own targets (it names its vehicle in the
+  // title) or falls back to its company's default mapping.
+  const targets = overrides.get(r.id) ?? [byCompanyName.get(name)?.companyId]
+  if (targets.some((t) => !t)) {
     unmapped.push(`${name} — ${r.report_period ?? '(sans période)'}`)
     continue
   }
-  plan.push({
-    report: r,
-    company: target,
-    files: filesByReport.get(r.id) ?? [],
-  })
+  for (const companyId of targets) {
+    plan.push({
+      report: r,
+      company: { companyId, target: targetsById.get(companyId) ?? companyId },
+      files: filesByReport.get(r.id) ?? [],
+    })
+  }
 }
 
+const sourceRows = new Set(plan.map((p) => p.report.id)).size
 console.log(
-  `Source : ${reports.length} reports lus — ${plan.length} à importer, ${skippedDuplicate.length} doublons, ${skippedExcluded.length} sur participations écartées`,
+  `Source : ${reports.length} reports lus — ${sourceRows} à importer (${plan.length} lignes après fan-out), ${skippedDuplicate.length} écartés, ${skippedExcluded.length} sur participations écartées`,
 )
 if (unmapped.length > 0) {
   console.error(`\n⚠️  ${unmapped.length} reports sans participation cible :`)
@@ -192,7 +288,7 @@ if (unmapped.length > 0) {
 
 // ── Target side: what Albo OS already holds, read live ─────────────────────
 const existing = await convex('migrations/alboReportsImport:plan', {
-  companyIds: decisions.companies.map((c) => c.companyId),
+  companyIds: [...targetsById.keys()],
 })
 const osByCompany = new Map((existing ?? []).map((e) => [e.companyId, e]))
 const missing = (existing ?? []).filter((e) => e.missing)
@@ -269,6 +365,11 @@ if (!apply) {
 let created = 0
 let already = 0
 let blocked = 0
+// Reports whose (company, period) slot was already taken. Listed, not just
+// counted — see the push site.
+const blockedRows = []
+// Reports whose text was trimmed to fit the Convex document cap.
+const textWarnings = []
 const failures = []
 // Attachments that could not be fetched. Kept apart from `failures`: the
 // report itself landed, only a file is missing.
@@ -280,6 +381,12 @@ for (const [i, item] of plan
   const r = item.report
   const label = `${item.company.target} — ${r.report_period ?? '(sans période)'}`
   try {
+    const texts = capTexts(r.raw_content, r.cleaned_content)
+    if (texts.trimmed > 0) {
+      textWarnings.push(
+        `${label} — « ${r.report_title ?? ''} » : texte tronqué de ${Math.round(texts.trimmed / 1000)} k caractères`,
+      )
+    }
     const usable = item.files.filter((f) => f.storage_path)
     const uploaded = []
     if (usable.length > 0) {
@@ -327,8 +434,8 @@ for (const [i, item] of plan
         : undefined,
       reportType: TYPES.has(r.report_type) ? r.report_type : undefined,
       metrics: r.metrics || undefined,
-      rawContent: r.raw_content || undefined,
-      cleanedHtml: r.cleaned_content || undefined,
+      rawContent: texts.raw || undefined,
+      cleanedHtml: texts.cleaned || undefined,
       fromEmail: r.email_from || r.sender_email || undefined,
       subject: r.email_subject || undefined,
       emailDate: r.email_date ? Date.parse(r.email_date) : undefined,
@@ -337,7 +444,14 @@ for (const [i, item] of plan
 
     if (res.status === 'created') created += 1
     else if (res.status === 'already_imported') already += 1
-    else blocked += 1
+    else {
+      blocked += 1
+      // Name it, don't just count it. A collision met during the run — one
+      // report of this very batch having just taken the slot — is invisible
+      // to the dry run, which compares against the state BEFORE it, so this
+      // list is the only place those surface.
+      blockedRows.push(`${label} — « ${r.report_title ?? ''} »`)
+    }
   } catch (err) {
     failures.push(`${label} : ${err.message}`)
   }
@@ -352,6 +466,18 @@ for (const [i, item] of plan
 console.log(
   `\nTerminé — créés : ${created}, déjà présents : ${already}, bloqués : ${blocked}, échecs : ${failures.length}`,
 )
+if (blockedRows.length > 0) {
+  console.log(
+    `\nBloqués par une période déjà occupée (${blockedRows.length}) — rien n'a été écrasé, À ARBITRER :`,
+  )
+  for (const b of blockedRows) console.log(`  - ${b}`)
+}
+if (textWarnings.length > 0) {
+  console.log(
+    `\nTextes tronqués (${textWarnings.length}) — le report est importé, seul le texte est coupé :`,
+  )
+  for (const w of textWarnings) console.log(`  - ${w}`)
+}
 if (fileWarnings.length > 0) {
   console.log(
     `\nPièces jointes non récupérées (${fileWarnings.length}) — le report est importé sans elles :`,
@@ -364,6 +490,6 @@ if (failures.length > 0) {
   process.exitCode = 1
 }
 console.log(
-  "\nEnsuite : convex run --prod migrations/alboReportsImport:verify '{}'",
+  '\nEnsuite : convex run --prod migrations/alboReportsImport:verify \'{"orgSlug":"…"}\' — une fois par org touchée',
 )
 console.log("Puis    : convex run --prod vectorize:backfillAll '{}'")

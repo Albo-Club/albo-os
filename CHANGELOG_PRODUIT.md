@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.217.0 — 07/09/2026 à 19:30 — La documentation juridique de CALTE rejoint les fiches société
+## v1.217.0 — 07/09/2026 à 20:10 — La documentation juridique de CALTE rejoint les fiches société
 
 Les pactes, bulletins de souscription, statuts, PV d'assemblée, contrats
 d'émission, appels de fonds et attestations de coupon des participations CALTE
@@ -68,6 +68,91 @@ correspondance relue.
 >   (Sébastopol / Lyon Vaise), PYROGE (Pelouze / Berger).
 > - Idempotence inchangée : `companyId` + `title` + `size`. Un re-run est un
 >   no-op, un run interrompu se reprend.
+
+---
+
+## v1.216.3 — 07/09/2026 à 19:53 — Reprise des reportings : les derniers cas tranchés
+
+La reprise du reporting CALTE a fait entrer 232 reportings. Six sont restés à
+la porte parce qu'un autre reporting occupait déjà leur période, et un
+septième n'a pas pu être écrit du tout. Cette mise à jour tranche les sept.
+
+Deux des six étaient de vrais doublons — Virgil Properties dont Albo OS
+tenait déjà l'original, et un reporting Emprunte Mon Toutou classé deux fois
+dans l'ancien outil. Les quatre autres étaient des documents bien distincts
+qui partagent une période : chez 50 Partners le rapport semestriel du fonds
+et le relevé de compte individuel, chez Jeen la newsletter et le reporting de
+trésorerie, chez Sant Roch deux updates mensuels mal étiquetés à la source,
+chez Eiffel le comité d'investisseurs et le rapport trimestriel. Ils seront
+repris à la prochaine exécution.
+
+Le septième, le business plan Doinsport, est un classeur de 15 millions de
+caractères — l'équivalent d'un tableur entier aplati, cellules vides
+comprises. Son texte est désormais tronqué pour tenir, et le reporting entre
+avec son analyse, ses chiffres et ses pièces jointes.
+
+> **🔧 Notes techniques**
+>
+> - `scripts/data/albo-reports-calte.json` : 2 entrées dans `duplicates`
+>   (Virgil Q2 2026, le report Emprunte Mon Toutou rangé sous SIDE Capital) et
+>   8 dans `allowPeriodCollision` (les 4 paires arbitrées, les deux côtés de
+>   chaque paire pour que la décision ne dépende pas de l'ordre de traitement).
+> - `scripts/import-albo-reports.mjs` — trois correctifs révélés par le run :
+>   - **Plafond de texte** `MAX_TEXT_CHARS` (500 k caractères, `capTexts`).
+>     Doinsport violait deux limites : le cap de 1 MiB par document Convex, et
+>     l'`ARG_MAX` de l'OS — la charge transite en argv, `convex run` ne sachant
+>     lire ses arguments ni d'un fichier ni de stdin (`spawn E2BIG`). Les trims
+>     sont listés en fin de run.
+>   - **Les reports bloqués sont nommés**, plus seulement comptés. Une
+>     collision née *pendant* le run — un report du lot venant de prendre le
+>     créneau — est invisible au `--dry`, qui compare à l'état antérieur.
+>   - **Un argument inconnu arrête le script.** `--decisions` passé à une
+>     révision qui l'ignorait est retombé sur son fichier par défaut, et a
+>     affiché le plan d'un autre workspace sans rien signaler.
+
+---
+
+## v1.216.2 — 07/09/2026 à 18:42 — Le reporting CALTE rapatrié de l'ancien outil
+
+Pendant plusieurs mois les deux outils ont tourné en parallèle : certains
+reportings arrivaient dans Albo OS, d'autres restaient dans l'ancienne
+application. Résultat, l'historique d'une participation était coupé en deux
+selon qui avait fait suivre le mail.
+
+Cette reprise ramène **233 reportings CALTE** sur 85 participations, pièces
+jointes comprises, et complète au passage le portefeuille Albo Club avec les
+trois participations que la reprise d'août avait laissées de côté — Sezame,
+La vie de quartier, et le dernier reporting Komeet. Les fiches concernées
+retrouvent leur historique complet, jusqu'à novembre 2024 pour certaines.
+
+Aucun doublon : chaque reporting déjà présent dans Albo OS a été identifié un
+par un et écarté, en comparant les contenus plutôt qu'en se fiant aux dates.
+Les reportings AZmed ne sont pas repris — ils arrivent déjà par la connexion
+du gestionnaire de fonds.
+
+> **🔧 Notes techniques**
+>
+> - Import piloté par **un fichier de décisions par workspace source** :
+>   `scripts/data/albo-reports-calte.json` (nouveau, 85 sociétés) et
+>   `albo-reports-albo.json` (étendu — le fichier reste **complet** pour son
+>   workspace, le script traitant une société non mappée comme une erreur
+>   fatale ; le re-run des 139 lignes d'août est un no-op).
+> - `companyReports` : l'index `by_albo_report` passe de `['alboReportId']` à
+>   la paire `['alboReportId', 'companyId']`, et le garde-fou de `importOne`
+>   avec lui. Sans ça un **fan-out** (un report source → plusieurs sociétés)
+>   s'arrêtait après la première et sautait les suivantes en silence, avec un
+>   statut `already_imported` trompeur. Couvert par
+>   `convex/regression.alboReportsImport.test.ts`.
+> - Nouveau bloc `reportOverrides` dans le fichier de décisions : ciblage
+>   **par report** (le titre nomme le véhicule réel — « Asterion F2 »,
+>   « RM Expansion ») et liste d'ids pour le fan-out délibéré. La cible étant
+>   une société, l'org est dérivée : un fichier traverse les orgs sans rien de
+>   plus (Sezame Immo 1 est une fiche `calte`, Immo 2 et 6 des fiches `albo`).
+> - `scripts/import-albo-reports.mjs` prend `--decisions <fichier>` ; `verify`
+>   prend un `orgSlug`.
+> - Écartés et documentés : AZmed (15 reports, déjà présents via VASCO — table
+>   `vascoCommunicationsCache`, distincte de `companyReports`), KIMPA, 3 lignes
+>   sans contenu, 14 doublons.
 
 ---
 
