@@ -535,37 +535,58 @@ export const searchInternal = internalAction({
 // failure marks the row and moves on. No failure emails here: this is a
 // manual operation, the returned summary IS the feedback.
 
-const BACKFILL_BATCH = 2000
+/**
+ * Rows listed per page.
+ *
+ * A listing exists only to hand back ids, but Convex reads the WHOLE row —
+ * there is no column projection — and a `companyReports` row carries its
+ * `rawContent`, up to the 1 MiB document cap. Asking for a whole org at once
+ * therefore drags the entire corpus through the 8 MiB per-query read limit:
+ * it works until it doesn't, and the error then points at the read limit, not
+ * at the listing that caused it. Pages keep every read bounded whatever the
+ * corpus grows to.
+ */
+const BACKFILL_PAGE = 50
+
+/**
+ * The states the backfill still owes work on. `indexed` and `skipped` are
+ * done, and asking the index for the rest is what makes a run on an
+ * up-to-date org read nothing at all. A row that never went through carries
+ * no `vectorState`, which Convex indexes as `undefined` like any other value.
+ */
+const PENDING_VECTOR_STATES = [undefined, 'pending' as const, 'failed' as const]
 
 export const listDocumentIdsForBackfill = internalQuery({
   args: { orgId: v.id('organizations') },
   handler: async (ctx, { orgId }) => {
-    const rows = await ctx.db
-      .query('documents')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .take(BACKFILL_BATCH)
-    if (rows.length === BACKFILL_BATCH) {
-      console.warn(
-        `[vectorize] backfill hit the ${BACKFILL_BATCH} documents cap for org ${orgId} — rows beyond the cap were NOT indexed`,
-      )
+    const ids: Array<Id<'documents'>> = []
+    for (const vectorState of PENDING_VECTOR_STATES) {
+      const rows = await ctx.db
+        .query('documents')
+        .withIndex('by_org_vector_state', (q) =>
+          q.eq('orgId', orgId).eq('vectorState', vectorState),
+        )
+        .take(BACKFILL_PAGE)
+      ids.push(...rows.map((r) => r._id))
     }
-    return rows.map((r) => r._id)
+    return ids
   },
 })
 
 export const listReportIdsForBackfill = internalQuery({
   args: { orgId: v.id('organizations') },
   handler: async (ctx, { orgId }) => {
-    const rows = await ctx.db
-      .query('companyReports')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .take(BACKFILL_BATCH)
-    if (rows.length === BACKFILL_BATCH) {
-      console.warn(
-        `[vectorize] backfill hit the ${BACKFILL_BATCH} reports cap for org ${orgId} — rows beyond the cap were NOT indexed`,
-      )
+    const ids: Array<Id<'companyReports'>> = []
+    for (const vectorState of PENDING_VECTOR_STATES) {
+      const rows = await ctx.db
+        .query('companyReports')
+        .withIndex('by_org_vector_state', (q) =>
+          q.eq('orgId', orgId).eq('vectorState', vectorState),
+        )
+        .take(BACKFILL_PAGE)
+      ids.push(...rows.map((r) => r._id))
     }
-    return rows.map((r) => r._id)
+    return ids
   },
 })
 
@@ -598,76 +619,89 @@ async function backfillOrgImpl(
     stoppedOn: null,
   }
 
-  const docIds = await ctx.runQuery(
-    internal.vectorize.listDocumentIdsForBackfill,
-    { orgId },
-  )
-  for (const documentId of docIds) {
-    const found = await ctx.runQuery(internal.vectorize.getDocumentForIndex, {
-      documentId,
-    })
-    if (!found) continue
-    // Resumability: done rows cost nothing on a re-run.
-    const state = found.doc.vectorState
-    if (state === 'indexed' || state === 'skipped') continue
+  // Page until the work queue stops yielding rows this run has not already
+  // handled. Processing a row moves it out of the queue, so the pages advance
+  // on their own; the rows that stay put — a failure, a document handed to the
+  // OCR — are what the seen set is for, otherwise the same page would come
+  // back for ever.
+  const seenDocuments = new Set<string>()
+  while (!tally.stoppedOn) {
+    const docIds = (
+      await ctx.runQuery(internal.vectorize.listDocumentIdsForBackfill, {
+        orgId,
+      })
+    ).filter((id) => !seenDocuments.has(id))
+    if (docIds.length === 0) break
+    for (const documentId of docIds) {
+      seenDocuments.add(documentId)
+      const found = await ctx.runQuery(internal.vectorize.getDocumentForIndex, {
+        documentId,
+      })
+      if (!found) continue
+      // Resumability: done rows cost nothing on a re-run.
+      const state = found.doc.vectorState
+      if (state === 'indexed' || state === 'skipped') continue
 
-    if (
-      found.doc.source === 'upload' &&
-      found.doc.inline !== true &&
-      !found.text &&
-      !found.doc.ocrState
-    ) {
-      // Uploaded before extraction existed: run the reading now — its end
-      // schedules indexDocument, so the entry lands once the OCR is done.
-      await ctx.scheduler.runAfter(0, internal.documentsExtract.run, {
-        documentId,
-      })
-      tally.queued++
-      continue
-    }
+      if (
+        found.doc.source === 'upload' &&
+        found.doc.inline !== true &&
+        !found.text &&
+        !found.doc.ocrState
+      ) {
+        // Uploaded before extraction existed: run the reading now — its end
+        // schedules indexDocument, so the entry lands once the OCR is done.
+        await ctx.scheduler.runAfter(0, internal.documentsExtract.run, {
+          documentId,
+        })
+        tally.queued++
+        continue
+      }
 
-    const skip = documentSkipReason(found.doc, found.text)
-    if (skip) {
-      await ctx.runMutation(internal.vectorize.setDocumentState, {
-        documentId,
-        vectorState: 'skipped',
-        vectorDetail: skip,
-      })
-      tally.skipped++
-      continue
-    }
+      const skip = documentSkipReason(found.doc, found.text)
+      if (skip) {
+        await ctx.runMutation(internal.vectorize.setDocumentState, {
+          documentId,
+          vectorState: 'skipped',
+          vectorDetail: skip,
+        })
+        tally.skipped++
+        continue
+      }
 
-    try {
-      await indexDocumentImpl(ctx, found.doc, found.companyName, found.text!)
-      await ctx.runMutation(internal.vectorize.setDocumentState, {
-        documentId,
-        vectorState: 'indexed',
-      })
-      tally.indexed++
-    } catch (err) {
-      const failure = classifyIndexError(err)
-      await ctx.runMutation(internal.vectorize.setDocumentState, {
-        documentId,
-        vectorState: 'failed',
-        vectorDetail: failure.detail,
-      })
-      tally.failed++
-      console.error(
-        `[vectorize] backfill document ${documentId} failed (${failure.detail})`,
-      )
-      if (failure.transient) {
-        tally.stoppedOn = failure.detail
-        break
+      try {
+        await indexDocumentImpl(ctx, found.doc, found.companyName, found.text!)
+        await ctx.runMutation(internal.vectorize.setDocumentState, {
+          documentId,
+          vectorState: 'indexed',
+        })
+        tally.indexed++
+      } catch (err) {
+        const failure = classifyIndexError(err)
+        await ctx.runMutation(internal.vectorize.setDocumentState, {
+          documentId,
+          vectorState: 'failed',
+          vectorDetail: failure.detail,
+        })
+        tally.failed++
+        console.error(
+          `[vectorize] backfill document ${documentId} failed (${failure.detail})`,
+        )
+        if (failure.transient) {
+          tally.stoppedOn = failure.detail
+          break
+        }
       }
     }
   }
 
-  if (!tally.stoppedOn) {
-    const reportIds = await ctx.runQuery(
-      internal.vectorize.listReportIdsForBackfill,
-      { orgId },
-    )
+  const seenReports = new Set<string>()
+  while (!tally.stoppedOn) {
+    const reportIds = (
+      await ctx.runQuery(internal.vectorize.listReportIdsForBackfill, { orgId })
+    ).filter((id) => !seenReports.has(id))
+    if (reportIds.length === 0) break
     for (const reportId of reportIds) {
+      seenReports.add(reportId)
       const found = await ctx.runQuery(internal.vectorize.getReportForIndex, {
         reportId,
       })
