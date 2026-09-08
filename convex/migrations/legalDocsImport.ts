@@ -71,10 +71,43 @@ import { internal } from '../_generated/api'
 import { internalMutation, internalQuery } from '../_generated/server'
 import { groupDuplicateDocuments } from '../lib/duplicates'
 
-import type { Id } from '../_generated/dataModel'
+import type { QueryCtx } from '../_generated/server'
+import type { Doc, Id } from '../_generated/dataModel'
 
 const MAX_BYTES = 20 * 1024 * 1024 // storage cap, cf. convex/documents.ts
 const MAX_BATCH = 200 // upload URLs minted per call
+
+/** Characters of extracted text shown beside a colliding document. */
+const EXCERPT_CHARS = 200
+
+/**
+ * Opening of a document's extracted text, to tell two same-named files apart:
+ * a signed copy from an unsigned one, one month's invoice from another. Size
+ * alone says they differ, never how.
+ *
+ * Images are left out, and that exclusion is the read budget. Inline email
+ * pictures — logos, Outlook signatures, charts pasted in a body — are four
+ * fifths of the collisions on `calte` (fifteen copies of one signature under
+ * a single company) and carry nothing to arbitrate. Convex hands back whole
+ * rows, so pulling their `documentTexts` in would be the same
+ * read-the-corpus-to-learn-nothing that `vectorize`'s backfill was just cured
+ * of. Restricted to real documents, this reads a few dozen rows.
+ */
+async function duplicateExcerpt(
+  ctx: QueryCtx,
+  doc: Doc<'documents'>,
+): Promise<string | null> {
+  if (doc.contentType?.startsWith('image/')) return null
+  const row = await ctx.db
+    .query('documentTexts')
+    .withIndex('by_storage', (q) => q.eq('storageId', doc.storageId))
+    .first()
+  if (!row?.text) return null
+  // Collapse the whitespace: a PDF's text arrives with the newlines of its
+  // layout, which would push the useful words past the excerpt.
+  const flat = row.text.replace(/\s+/g, ' ').trim()
+  return flat.slice(0, EXCERPT_CHARS)
+}
 
 /** Same union as `documents.kind` — kept local so a schema drift breaks here. */
 const kindValidator = v.union(
@@ -292,17 +325,23 @@ export const verify = internalQuery({
       ),
     )
     // Sizes travel with each row: the human arbitrates from them. A handful of
-    // bytes apart is a twin to delete, megabytes apart is two real versions.
-    const duplicates = collisions.map((group) => ({
-      company: group[0].companyId
-        ? (names.get(group[0].companyId) ?? '(supprimée)')
-        : '(non classé)',
-      rows: group.map((doc) => ({
-        _id: doc._id,
-        title: doc.title,
-        size: doc.size ?? 0,
+    // bytes apart is a twin to delete, megabytes apart is two real versions —
+    // and when they differ, `excerpt` says WHICH two versions.
+    const duplicates = await Promise.all(
+      collisions.map(async (group) => ({
+        company: group[0].companyId
+          ? (names.get(group[0].companyId) ?? '(supprimée)')
+          : '(non classé)',
+        rows: await Promise.all(
+          group.map(async (doc) => ({
+            _id: doc._id,
+            title: doc.title,
+            size: doc.size ?? 0,
+            excerpt: await duplicateExcerpt(ctx, doc),
+          })),
+        ),
       })),
-    }))
+    )
 
     return {
       org: slug,

@@ -23,6 +23,40 @@ bas de page.
 
 ---
 
+## v1.217.3 — 08/09/2026 à 19:55 — Le rapport de doublons dit enfin en quoi deux fichiers diffèrent
+
+Le contrôle de l'import juridique signale les documents qui portent le même
+nom sur la même société. Il en liste 17 sur CALTE — des bulletins de
+souscription, un formulaire de vote, quatre factures Tiny Home — mais ne
+donnait que leur taille. Deux tailles différentes disent que les fichiers ne
+sont pas les mêmes ; elles ne disent pas lequel est la version signée.
+
+Chaque ligne affiche désormais le **début du texte du document**. « Signé
+le… », une date, un nom : l'arbitrage se fait sur pièce, en une lecture, au
+lieu d'ouvrir les fichiers deux à deux.
+
+Aucun document n'est supprimé, ni même modifié : c'est un rapport de lecture.
+
+> **🔧 Notes techniques**
+>
+> - `migrations/legalDocsImport:verify` : chaque ligne de `duplicates` porte un
+>   `excerpt` (200 premiers caractères du `documentTexts` du blob, espaces
+>   aplatis — le texte d'un PDF arrive avec les retours à la ligne de sa mise
+>   en page, qui repousseraient les mots utiles hors de l'extrait).
+> - **Les images sont exclues de cette lecture, et cette exclusion EST le
+>   budget de lecture.** Les images inline des mails (logos, signatures
+>   Outlook, graphiques collés dans un corps) font les quatre cinquièmes des
+>   collisions de l'org `calte` — quinze exemplaires d'une même signature sous
+>   une seule société — et n'ont rien à arbitrer. Convex rendant la ligne
+>   entière, lire leurs `documentTexts` referait la lecture de corpus corrigée
+>   en v1.217.1. Restreint aux vrais documents, le contrôle lit quelques
+>   dizaines de lignes.
+> - `convex/regression.legalDocsVerify.test.ts` : 4 tests. Le filtre images est
+>   épinglé par un cas où les deux images **portent** un texte — le retirer
+>   fait rougir le test.
+
+---
+
 ## v1.217.2 — 08/09/2026 à 18:20 — Les documents que l'assistant n'avait pas pu lire repassent en lecture
 
 L'arrivée de la documentation juridique CALTE a déposé 785 documents d'un coup
