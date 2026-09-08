@@ -23,6 +23,44 @@ bas de page.
 
 ---
 
+## v1.217.2 — 08/09/2026 à 18:20 — Les documents que l'assistant n'avait pas pu lire repassent en lecture
+
+L'arrivée de la documentation juridique CALTE a déposé 785 documents d'un coup
+sur les fiches société. Ils sont tous là et tous consultables, mais 171 d'entre
+eux n'ont pas pu être **lus** : le service qui extrait le texte des PDF a
+refusé de suivre le rythme. Or c'est cette lecture qui permet à l'assistant de
+citer un pacte ou de retrouver une clause — sans elle, le document est visible
+mais muet. Il y avait du contenu important dans le lot : statuts et pacte
+Asterion F1, pacte MyTraffic, l'ensemble du dossier Nota Climat, les appels de
+fonds Eiffel.
+
+Rien ne les rattrapait tout seuls. Cette mise à jour ajoute de quoi relancer
+ces lectures, cette fois une par une au lieu d'un bloc — ce qui laisse au
+service le temps de répondre. La relance se déclenche à la main et se rejoue
+autant de fois que nécessaire ; ce qui résiste encore après deux passages est
+un fichier réellement illisible, et il sera nommé.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `convex/migrations/retryDocOcr.ts` → `run({orgSlug, limit?,
+>   spacingSeconds?})`. Reprend les `documents` en `ocrState: 'failed'` de
+>   l'org, applique le même reset que `documents:reextract` (suppression de la
+>   ligne `documentTexts` en cache, retour en `pending`, `vectorState` remis à
+>   `pending`) et reprogramme `documentsExtract.run` **espacé** de 3 s par
+>   défaut.
+> - Cause : `convex/lib/ocr.ts` renvoie `''` sur toute réponse non-OK de
+>   l'API Mistral OCR, donc un `429` est indiscernable d'un fichier corrompu —
+>   les deux atterrissent en `ocrDetail: 'ocr_failed'`.
+> - Pourquoi un module et pas la mutation existante : `documents:reextract`
+>   passe par `requireOrgMember`, donc `convex run` (sans identité) ne peut pas
+>   l'appeler ; et le cron `documentsExtract.sweepStalePending` ne reprend que
+>   les lectures bloquées en `pending`, jamais celles finies en `failed`.
+> - Aucun changement du pipeline d'extraction : la migration le rejoue, elle ne
+>   le réécrit pas. Idempotente (ne lit que `failed`) et rejouable jusqu'à
+>   `relaunched: 0`.
+
+---
+
 ## v1.217.1 — 08/09/2026 à 17:21 — Le rattrapage de la recherche documentaire ne pliera plus sous le volume
 
 L'outil qui remet la recherche sémantique à jour — celui qu'on lance après un
