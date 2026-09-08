@@ -1186,6 +1186,11 @@ export default defineSchema({
     // `sweepStalePending`). Low cardinality on the first field is fine: the
     // sweeper only ever ranges over the 'pending' bucket.
     .index('by_ocr_state', ['ocrState', 'uploadedAt'])
+    // The backfill's work queue (vectorize.ts `listDocumentIdsForBackfill`).
+    // Convex reads whole rows, never a column, so listing an org to keep only
+    // the ids costs the whole table; restricted to the rows whose indexing is
+    // still owed, a backfill on an up-to-date org reads nothing at all.
+    .index('by_org_vector_state', ['orgId', 'vectorState'])
     // Who still points at a blob — read before freeing one (lib/documentBlobs).
     // A single blob backs one row per fan-out entity, so a deletion has to
     // count the rows left rather than assume it owns the file.
@@ -1299,7 +1304,11 @@ export default defineSchema({
     // import's "already there?" guard would answer yes after the first of the
     // fan-out and drop the rest in silence. Queries that only know the uuid
     // still use it as an index prefix.
-    .index('by_albo_report', ['alboReportId', 'companyId']),
+    .index('by_albo_report', ['alboReportId', 'companyId'])
+    // Same work queue as documents, and the reason is sharper here: a report
+    // carries its whole `rawContent` on the row, so listing an org to keep
+    // only the ids drags the entire corpus through the 8 MiB read cap.
+    .index('by_org_vector_state', ['orgId', 'vectorState']),
 
   /**
    * companyIntelligence — one row per company holding the AI synthesis

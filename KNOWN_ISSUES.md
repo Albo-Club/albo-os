@@ -5311,6 +5311,24 @@ Les deux vrais remèdes, dans cet ordre :
    seulement quand quelqu'un ouvre vraiment le contenu. Pattern déjà en place
    pour `documentTexts` (cf. le commentaire de la table dans `schema.ts`).
 
+3. **Ne demander que les lignes dont on a encore besoin**, quand la requête
+   sert une file de travail. Le backfill de vectorisation listait toute une
+   org (`take(2000)` sur `by_org`) pour n'en garder que les ids, puis sautait
+   en boucle les lignes déjà indexées : tout le corpus lu pour découvrir
+   qu'il n'y avait rien à faire. Un index sur l'**état**
+   (`by_org_vector_state`) et une lecture par pages de 50 suffisent — sur une
+   base à jour la requête ne lit plus rien, et le plafond de 8 Mio par
+   requête devient hors d'atteinte quel que soit le volume.
+
+   Deux choses rendaient ce cas-là particulièrement traître, et se
+   généralisent. D'abord c'est une **falaise, pas une pente** : ça passe, ça
+   passe, puis ça lève. Ensuite l'outil concerné est un **outil de
+   rattrapage**, lancé à la main et rarement — donc il aurait cassé le jour
+   précis où on en avait besoin, après un import massif ou une panne
+   d'indexation, l'ingestion quotidienne (qui indexe à l'écriture) n'ayant
+   jamais rien laissé voir. Un chemin froid ne se surveille pas tout seul :
+   c'est au moment où on grossit la table qu'il faut aller le relire.
+
 Le contrôle avant d'écrire une requête de liste : _est-ce qu'une des lignes
 que je collecte porte un champ qui peut peser des dizaines de Ko ?_ Si oui,
 un des deux remèdes ci-dessus, jamais un `.map()` de façade.

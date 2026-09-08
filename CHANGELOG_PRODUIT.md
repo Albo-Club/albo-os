@@ -23,6 +23,43 @@ bas de page.
 
 ---
 
+## v1.217.1 — 08/09/2026 à 17:21 — Le rattrapage de la recherche documentaire ne pliera plus sous le volume
+
+L'outil qui remet la recherche sémantique à jour — celui qu'on lance après un
+import massif ou une panne d'indexation — repassait en revue la totalité des
+reportings d'une société à chaque lancement, y compris ceux déjà indexés,
+avant de constater qu'il n'avait rien à faire. Avec 388 reportings rapatriés
+de l'ancien outil, ce passage à vide arrivait à portée de la limite technique
+au-delà de laquelle il aurait cessé de fonctionner — sans prévenir, et le jour
+précis où on en aurait eu besoin.
+
+Il ne regarde désormais que ce qui lui reste à traiter, et par petits lots.
+Sur une base à jour, il ne lit plus rien du tout. Le fonctionnement quotidien
+n'était pas concerné : un reporting qui arrive s'indexe à l'écriture, comme
+avant.
+
+> **🔧 Notes techniques**
+>
+> - Index `by_org_vector_state` (`['orgId', 'vectorState']`) ajouté sur
+>   `companyReports` et `documents` (`convex/schema.ts`).
+> - `vectorize.listReportIdsForBackfill` / `listDocumentIdsForBackfill` ne
+>   listent plus l'org entière : elles interrogent l'index sur les seuls états
+>   restant à traiter (absent, `pending`, `failed`), par pages de
+>   `BACKFILL_PAGE` (50) au lieu d'un `take(2000)`. Convex n'a pas de
+>   projection de colonnes — il rend la **ligne entière**, donc le
+>   `rawContent` — et la lecture d'une requête est plafonnée à 8 Mio : lister
+>   une org pour n'en garder que les ids traînait tout le corpus dans ce
+>   plafond. Anti-pattern déjà consigné dans `CLAUDE.md`.
+> - `backfillOrgImpl` enchaîne les pages jusqu'à épuisement. Une ligne traitée
+>   sort de la file, donc les pages avancent seules ; un `Set` des ids déjà vus
+>   arrête la boucle sur celles qui n'en sortent pas (échec, document parti à
+>   l'OCR).
+> - `convex/regression.vectorizeBackfill.test.ts` : 4 tests (base à jour → file
+>   vide, seuls les états restants sont listés, plafond par page, isolation par
+>   org). Trois tombent contre l'ancienne requête.
+
+---
+
 ## v1.217.0 — 07/09/2026 à 20:10 — La documentation juridique de CALTE rejoint les fiches société
 
 Les pactes, bulletins de souscription, statuts, PV d'assemblée, contrats
