@@ -405,3 +405,126 @@ export const verify = internalQuery({
     }
   },
 })
+
+/**
+ * Read-only audit: on this org's VASCO-linked entities, what does each of the
+ * TWO news channels hold?
+ *
+ * Why it exists. A participation's fiche merges two tables in one timeline
+ * (`CompanyReportsSection`): the reports of `companyReports` and the portal
+ * communications of `vascoCommunicationsCache`. Nothing enforces unicity
+ * ACROSS them, and nothing can — the two sides share no key (cf. the header
+ * on why period, email date and Message-ID all fail even between two report
+ * tables). So the import's three guards — the `(alboReportId, companyId)`
+ * anchor, the `(company, period)` skip, the hand-frozen `duplicates` list —
+ * are all blind to the portal: the only thing that kept an Albo app backlog
+ * off a fiche already served by VASCO was the human review, which raised the
+ * question exactly once (AZmed, `albo-reports-albo.json`).
+ *
+ * This says nothing about which pairs ARE duplicates: it puts both sides of
+ * each linked entity on the table, lightly, so the call is made on the
+ * evidence — same posture as `legalDocsImport:verify`. Guessing the pairs
+ * here would rebuild the likelihood-ranked matcher this project deleted in
+ * 08/2026 (cf. CLAUDE.md).
+ *
+ * It answers the reverse question too, which matters as much: a linked entity
+ * with ZERO cached communication is one whose backlog was excluded as "already
+ * on the portal" while the portal holds nothing — a hole, not a duplicate.
+ *
+ * Scope, deliberately: entity by entity, the way the fiche reads. A report
+ * held on a company fiche whose portal communications hang off a SEPARATE SPV
+ * fiche is a real overlap this does not see, and no per-entity read can.
+ *
+ * Read budget: communications are read for the whole org (their only index is
+ * `by_org`, same access path as `companyEnrichment.getVascoEnrichmentTarget`),
+ * but reports are read PER LINKED ENTITY — those rows carry `rawContent`, and
+ * an org-wide `.collect()` would drag the whole corpus through the read cap
+ * (cf. KNOWN_ISSUES.md « Database I/O »).
+ *
+ *   pnpm exec convex run --prod migrations/alboReportsImport:auditVascoOverlap '{"orgSlug":"calte"}'
+ *   pnpm exec convex run --prod migrations/alboReportsImport:auditVascoOverlap '{"orgSlug":"albo"}'
+ */
+export const auditVascoOverlap = internalQuery({
+  args: { orgSlug: v.string() },
+  handler: async (ctx, { orgSlug }) => {
+    const org = await ctx.db
+      .query('organizations')
+      .withIndex('by_slug', (q) => q.eq('slug', orgSlug))
+      .first()
+    if (!org) throw new ConvexError(`org_not_found:${orgSlug}`)
+
+    const companies = await ctx.db
+      .query('companies')
+      .withIndex('by_org', (q) => q.eq('orgId', org._id))
+      .collect()
+    // Archived entities stay in: the portal keeps publishing on a position we
+    // stopped following, so an archived fiche can hold a duplicate too.
+    const linked = companies.filter(
+      (c) => c.kind === 'portfolio' && c.vascoClientSlug && c.vascoIssuerId,
+    )
+
+    const comms = await ctx.db
+      .query('vascoCommunicationsCache')
+      .withIndex('by_org', (q) => q.eq('orgId', org._id))
+      .collect()
+
+    const entities = []
+    for (const company of linked) {
+      const communications = comms
+        .filter(
+          (c) =>
+            c.clientSlug === company.vascoClientSlug &&
+            c.issuerId === company.vascoIssuerId,
+        )
+        .map((c) => ({
+          title: c.title ?? null,
+          period: c.period ?? null,
+          publishDate: c.publishDate ?? null,
+        }))
+
+      const rows = await ctx.db
+        .query('companyReports')
+        .withIndex('by_company', (q) => q.eq('companyId', company._id))
+        .collect()
+      const reports = rows.map((r) => ({
+        _id: r._id,
+        title: r.title ?? null,
+        period: r.reportPeriod ?? null,
+        emailDate: r.emailDate ?? null,
+        // The provenance that decides what a cleanup may touch: an imported
+        // row can be dropped, a row born from the inbox cannot.
+        importedFromAlboApp: Boolean(r.alboReportId),
+      }))
+
+      entities.push({
+        companyId: company._id,
+        name: company.name,
+        archived: company.archivedAt != null,
+        vascoIssuerId: company.vascoIssuerId,
+        communications: communications.length,
+        reports: reports.length,
+        importedReports: reports.filter((r) => r.importedFromAlboApp).length,
+        rows: { communications, reports },
+      })
+    }
+    entities.sort((a, b) => a.name.localeCompare(b.name))
+
+    return {
+      org: orgSlug,
+      linkedEntities: linked.length,
+      // The entities to read first: both channels feed the same timeline.
+      bothChannels: entities.filter(
+        (e) => e.communications > 0 && e.reports > 0,
+      ).length,
+      // An import landed on an entity the portal also serves — the shape the
+      // CALTE pass never arbitrated.
+      importedOnLinked: entities.filter((e) => e.importedReports > 0).length,
+      // Linked, but the portal holds nothing: a backlog excluded as "already
+      // there" would be missing, not duplicated.
+      linkedWithoutCommunications: entities.filter(
+        (e) => e.communications === 0,
+      ).length,
+      entities,
+    }
+  },
+})

@@ -23,6 +23,54 @@ bas de page.
 
 ---
 
+## v1.217.5 — 09/09/2026 à 11:04 — Un contrôle dit où les reports et les communications Parallel se recouvrent
+
+L'actualité d'une participation peut arriver par deux canaux : les reportings
+reçus par mail, et les communications publiées sur le portail Parallel. La
+fiche les affiche dans la même frise, mais rien ne vérifiait qu'un même
+document n'était pas présent des deux côtés — et la reprise de l'historique de
+l'ancienne app ne s'est posé la question qu'une fois, pour AZmed.
+
+Un contrôle répond maintenant à la question, participation par participation :
+pour chacune de celles qui sont reliées à un émetteur Parallel, il liste ce que
+tient le portail et ce que tiennent les reportings, en signalant ceux qui
+viennent de l'ancienne app. Il ne décide rien et ne supprime rien : c'est une
+lecture, faite pour que l'arbitrage se fasse sur pièces.
+
+Il éclaire aussi le cas inverse, qui compte autant : une participation reliée
+au portail alors que celui-ci ne tient rien. Là, l'historique écarté à
+l'import parce qu'il était « déjà là » manque, au lieu d'être en double.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle query en lecture seule `auditVascoOverlap` dans
+>   `convex/migrations/alboReportsImport.ts` (argument `orgSlug`, à lancer par
+>   `convex run --prod`, une fois par org). Elle rend, par entité portant
+>   `vascoClientSlug` + `vascoIssuerId` : le nombre et l'entête des
+>   communications de `vascoCommunicationsCache`, les reports de
+>   `companyReports` avec un drapeau `importedFromAlboApp` (= `alboReportId`
+>   présent), et trois compteurs de tête (`bothChannels`, `importedOnLinked`,
+>   `linkedWithoutCommunications`).
+> - Aucun appariement n'est proposé : les deux côtés ne partagent aucune clé
+>   (cf. l'entête du module sur l'échec de la période, de la date de mail et du
+>   Message-ID), et deviner les paires reconstruirait le moteur de
+>   rapprochement retiré en 08/2026. Même posture que `legalDocsImport:verify`
+>   — on pose les pièces, l'humain tranche.
+> - Budget de lecture : les communications sont lues pour l'org (seul index
+>   `by_org`, même chemin que `companyEnrichment.getVascoEnrichmentTarget`),
+>   mais les reports le sont **par entité reliée** via `by_company` — ces
+>   lignes portent `rawContent`, un `.collect()` par org tirerait tout le
+>   corpus (cf. `KNOWN_ISSUES.md` « Database I/O »).
+> - Angle mort assumé, documenté dans l'entête : le recoupement se lit entité
+>   par entité, comme la fiche. Un report posé sur une fiche société dont les
+>   communications pendent à une fiche SPV distincte échappe au contrôle.
+> - Trois tests dans `convex/regression.alboReportsImport.test.ts` : les deux
+>   canaux sur une même entité, l'entité reliée à un portail vide, et un report
+>   né de la boîte mail qui ne doit jamais ressortir comme importé (c'est ce
+>   drapeau qui décidera de ce qu'un nettoyage peut toucher).
+
+---
+
 ## v1.217.4 — 09/09/2026 à 10:48 — Les quinze doublons de documents CALTE arbitrés à la main sont retirés
 
 Le contrôle de l'import juridique avait sorti les documents portant le même

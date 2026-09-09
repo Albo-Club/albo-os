@@ -4096,6 +4096,14 @@ d'unicité. Réflexe avant de conclure qu'un historique manque : vérifier si
 l'entité porte `vascoClientSlug` / `vascoIssuerId`, ou si son résumé mentionne un
 véhicule intermédiaire.
 
+Ce recoupement se lit avec `migrations/alboReportsImport:auditVascoOverlap`
+(`convex run --prod`, un passage par org) : pour chaque entité reliée à un
+émetteur, il pose côte à côte les communications du portail et les reports,
+en signalant ceux venus de l'import Albo app. Il ne propose aucun appariement
+— aucune clé ne relie les deux tables — et il éclaire autant le cas inverse :
+une entité reliée dont le portail ne tient rien a un historique **manquant**,
+pas en double.
+
 ### Endpoints & auth
 
 - GraphQL at `https://api.<clientSlug>.vasco.fund/graphql/` (public sibling
