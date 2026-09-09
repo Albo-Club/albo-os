@@ -47,6 +47,7 @@ pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip
 | Purge des règles apprises « virement interne » (toutes orgs) | `convex/transactions.ts` → `transactions:dropInternalTransferRules` (`'{}'` = toutes les orgs) | Supprime les lignes `categoryRules` de statut `internal_transfer` : le statut n'est plus apprenable (un libellé ne peut pas savoir sur quel compte est la contrepartie, et rejouer un statut « exclu de l'analyse » en masse crée un angle mort silencieux). Idempotente (re-run → `{ deleted: 0 }`), non destructive pour les transactions : celles déjà classées par ces règles gardent leur statut et remontent dans « Virements à apparier ». **Non bloquante** — `ruleFieldsFor` ignore déjà ces règles via `isActiveRule`, la purge ne fait que nettoyer la table. La valeur reste dans l'union du schéma tant que la table n'est pas propre (la retirer invaliderait les lignes existantes). Cf. `KNOWN_ISSUES.md` « Virements internes ». |
 | Normalisation des secteurs sur la liste réduite (toutes orgs) | `convex/migrations/normalizeSectors.ts` → `dryRun` / `apply` / `report` | Aligne `companies.sector` sur la taxonomie réduite de `convex/lib/sectors.ts` (14 entrées). Deux passes : **décisions par entité** (18 lignes Albo, ancrées `_id` prod + garde nom — une même valeur d'origine peut partir sur deux secteurs différents, ex. `services` → `industry` pour Reekom mais `silver` pour Tango/Auxicare) puis **alias par valeur** pour tout le reste, archivées incluses (`Agritech`, `Retail`, `Mobility`, `Circular Economy`, `Start-up Studio`, `Carried Interest Structure`, `Climate Tech / Fund`, `Immobilier`, `Promotion immobilière`). Idempotente (n'écrit que si la valeur change), non destructive : une valeur sans lecture unique n'est **pas** réécrite en `other` mais remontée dans `needsManualReview`. ⚠️ **À lancer juste après le deploy** de la liste réduite : entre les deux, les entités encore sur `climate` / `services` / une valeur libre affichent la chaîne brute au lieu d'un libellé traduit. Runbook en tête du module. |
 | Import des reportings Albo app → Albo OS (Supabase → `companyReports`) | `convex/migrations/alboReportsImport.ts` → `plan` / `importOne` / `verify` + `node scripts/import-albo-reports.mjs --decisions <fichier>` | Rapatrie l'historique de reportings antérieur au pipeline AgentMail, pièces jointes comprises. **Un fichier de décisions par workspace source, et chaque fichier reste COMPLET pour le sien** — le script traite une société non mappée comme une erreur fatale, donc un fichier partiel avorterait sur les lignes déjà traitées. `scripts/data/albo-reports-albo.json` (« Albo 1 » : 139 lignes en 08/2026, étendu en 09/2026 avec Sezame, La vie de quartier et Komeet Q2 2026) et `albo-reports-calte.json` (« CALTE portfolio » : 233 lignes sur 85 participations, nov. 2024 → sept. 2026). **Idempotent sur la paire `(alboReportId, companyId)`** — index `by_albo_report` : re-run gratuit, run interrompu reprenable, et un **fan-out** (un report source → plusieurs sociétés, ex. un webinaire LP couvrant les 4 véhicules Batch) n'est plus tronqué après la première société. Les octets vont de Supabase Storage à Convex sans passer par une fonction. La cible est une **société**, jamais une org : l'org est dérivée, donc un fichier traverse les orgs (Sezame Immo 1 est une fiche `calte`, Immo 2 et 6 des fiches `albo`). Décisions relues avec Benjamin : doublons vérifiés **sur le contenu** (aucune clé automatique ne les identifie — cf. `KNOWN_ISSUES.md` « Reprise d'un historique de reports »), `reportOverrides` pour le ciblage par report quand le titre nomme un autre véhicule que son dossier, `allowPeriodCollision` pour les créneaux partagés arbitrés. Écartés : AZmed (déjà présent via VASCO — cf. `KNOWN_ISSUES.md`), KIMPA, les lignes sans contenu. `importOne` **saute** sur collision, il n'écrase jamais — d'où le refus d'utiliser `reportStore.storeForCompany`. Prérequis : `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (lecture Albote Prod). Lancer `--dry` d'abord : le contrôle de collision se fait alors sur la donnée **live**, et toute collision non listée est un STOP, pas un skip silencieux. ⚠️ **À lancer seulement APRÈS le merge**. Puis `verify` **une fois par org touchée** (`'{"orgSlug":"calte"}'`), et enchaîner avec `vectorize:backfillAll` (les lignes arrivent `vectorState: 'pending'`). Runbook complet en tête du module. Contrôle annexe `auditVascoOverlap` (`{"orgSlug":"calte"}`) : **lecture seule**, il liste pour chaque participation reliée à un émetteur VASCO ce que tient le portail face à ce que tiennent ses reports (dont ceux venus de l'import) — la seule chose que ni l'ancre ni la collision de période ne voient, les deux tables ne partageant aucune clé (cf. `KNOWN_ISSUES.md` « VASCO API »). Il ne propose aucun appariement : l'arbitrage est humain. |
+| Reprise de l'historique Parallel (portail → `companyReports`) | `convex/migrations/vascoReportsBackfill.ts` → `plan` / `run` | Fait digérer par le pipeline report les ~190 communications déjà en cache (128 sur `calte`, 61 sur `albo`), que le cron ne repassera jamais chercher — il ne voit que ce qui **arrive**. Chaque publication devient un `companyReports` (`source: 'vasco'`) : pièces jointes téléchargées et OCRisées, fiche, métriques, indexation. **À lancer par paliers**, `companyId` restreignant à une entité : une participation d'abord (BackMarket, servie par les deux canaux), puis l'org `albo`, puis `calte` — la qualité d'une publication digérée ne se connaît qu'en en lisant une, et un palier permet de s'arrêter à 3 lignes plutôt qu'à 190. `plan` n'écrit rien et dit ce qui reste dû. **Idempotent** sur l'identifiant du portail (`agentmailMessageId = vasco:<client>:<commId>`) : re-run gratuit, reprise possible. Ne peut pas abîmer un report venu par mail — `storeForCompany` laisse une publication prendre un créneau `(société, période)` **libre**, jamais un occupé (cf. `KNOWN_ISSUES.md` « Une communication est DIGÉRÉE en report »). Coût : par publication, un téléchargement, un OCR et un appel modèle, puis la synthèse de l'entité — borné mais pas gratuit, d'où les paliers. ⚠️ **À lancer seulement APRÈS le merge**. |
 | Dissociation `Cofo Climate House` / `CLIMATE HOUSE` (org `calte`) | `convex/migrations/reassignClimateHouseCofoDeals.ts` → `dryRun` / `apply` | La cofo de Climate House est une **personne morale distincte** de Climate House — les comptes signés au 31/12/2025 portent deux lignes séparées (« TP LES COFOS DE LA CLIMATE HOUSE » 10 000 € et « TP CLIMATE HOUSE (2,22 %) » 20 100 €), l'outil n'en avait qu'une. Crée la fiche `Cofo Climate House` (réutilisée si déjà présente → 2ᵉ run no-op) et y repointe **3 deals** : l'entrée de 10 000 € (17/11/2025, qui était sur la fiche Climate House) et les **2 rachats de titres de cofondateurs** de 2 000 € du 18/05/2026, que l'import Airtable avait rattachés au **vendeur** — d'où deux fiches `portfolio` au nom de personnes physiques (`EL IDRISSI MOHAMED`, `KUHANATHAN Ano Sujithan`), archivées ici. Les deux rachats reçoivent un `deals.name` (sinon deux deals de 2 000 € signés le même jour, indistinguables). Les **transactions ne sont pas touchées** : elles portent un `dealId`, jamais une société. **Idempotente** : ancrage `_id` prod + garde sur le nom exact **et** le `paidAmount`, fiche source **ou** canonique acceptée ; archivage refusé s'il reste une référence (11 tables), le deal en instance de départ étant décompté pour ne pas se bloquer lui-même. Clés écrites ajoutées à `manuallyEditedFields`. Runbook en tête du module. |
 | Fusion des deux fiches BILLIV (org `calte`) | `convex/migrations/mergeBillivCalte.ts` → `dryRun` / `apply` | `calte` portait deux fois la même société — même domaine `billiv.fr`, même pitch, même résumé — l'import Airtable ayant créé une fiche par vague d'entrée : `SIDE ASTERION BILLIV` (31/12/2021, 25 000 €) et `SIDE ASTERION - Projet BILLIV 2024 T2` (25/03/2024, 100 004 €). Repointe le deal 2024 (`targetCompanyId`) sur la fiche qui porte le deal le plus ancien, y recopie le libellé de vague dans `deals.name` **seulement si le deal n'en a pas** (sinon, la fiche 2024 disparue, les deux deals afficheraient le même titre dérivé), puis **archive** la fiche vidée. Les **transactions ne sont pas touchées** : elles portent un `dealId`, jamais une société. **Idempotente** : ancrage `_id` prod + garde sur les deux noms exacts et sur le `paidAmount` du deal, fiche source **ou** canonique acceptée → 2ᵉ run no-op ; la fiche survivante est elle-même vérifiée comme portant le deal de 2021 — c'est ce qui la désigne. Archivage refusé s'il reste une référence (11 tables), remontée en `archiveBlockedBy`. Clés écrites ajoutées à `manuallyEditedFields` (sinon `airtableImport:runImport` réécrase). Runbook en tête du module. |
 | Fiches `calte` refusées par la garde de `cleanupCalteOrphanCompanies` | `convex/migrations/archiveCalteBlockedCards.ts` → `dryRun` / `apply` | À lancer APRÈS `cleanupCalteOrphanCompanies`, qui a archivé 38 fiches sur 41 et **refusé les 3 dernières** (chacune portait encore une référence — la garde signale plutôt qu'elle n'orpheline). ⚠️ **Une étape manuelle d'abord** : détacher le reporting « 2025 SUMMARY » de la fiche `Upcyclea` **depuis l'app** (`reportInbox.detachCompany`, bouton présent sur la fiche) — la mutation existante corrige aussi la ligne `inboundEmails` source (un replay ne remet pas le report) et retire l'entrée d'index sémantique, ce qu'une migration n'a pas à réimplémenter. Upcyclea n'est PAS du dealflow : c'est une participation `albo`, et la fiche `calte` portait un **doublon exact** (même e-mail, même PDF, mêmes 17 snapshots) de ce que porte déjà la fiche albo, qui a en plus les T3/T4 2025. La migration ne fait ensuite que trois choses : supprimer les lignes `companyEmailLinks` (table **legacy inerte**, lue par rien — c'est le seul blocage que l'app n'offre aucun moyen de lever, il retenait `SERENDIP INVEST` et `Calte SASU`), supprimer la ligne `companyIntelligence` résiduelle (donnée dérivée régénérée à la demande, même arbitrage que `cleanupCalteImport` ; `detachCompany` n'en efface que le pointeur) et archiver. Les références sont scindées en `clearable` / `blocking` : une fiche encore `blocking` (report, KPI, document, deal…) n'est **pas touchée du tout**, rien n'y est supprimé — un détachement oublié laisse la fiche exactement dans l'état où elle a été trouvée. **Idempotente** : ancrage `_id` prod + nom exact + org, fiche déjà archivée = no-op. Runbook en tête du module. |
@@ -57,6 +58,7 @@ pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip
 | Sens d'un compte courant inter-sociétés | `convex/migrations/fixLoanDirection.ts` → `inspect` / `apply` | `inspect` (lecture seule) liste tous les `intercompanyLoans` avec les deux soldes dérivés et un flag `looksReversed` : les deux signes contredisent les rôles enregistrés (le « créancier » a encaissé, le « débiteur » a décaissé). `apply` intervertit `fromOrgId` / `toOrgId` sur UN prêt. **Non idempotente par nature** — elle exige le sens qu'elle s'attend à trouver (`currentFromSlug` / `currentToSlug`) et rejette tout le reste (`direction_mismatch`), donc un second passage échoue au lieu de ré-inverser. Les transactions pointées ne sont pas touchées. |
 | Création des orgs filiales CALTE (ALB-128) | `convex/migrations/createSubsidiaryOrgs.ts` → `inspect` / `apply` | Donne une org à chacune des 7 filiales (Caltimo, RDB, Relais Chapelle, SCI Chapelle 1 & 2, SCI Upload, Banco 2) : org + membres de `calte` recopiés avec leur rôle + société `group_root` clonée depuis la ligne source (identité légale seulement — ni `attioCompanyId` ni `airtableId`). **Strictement additive** : aucune ligne existante n'est modifiée, la ligne source reste une entité `group_*` de `calte` avec ses deals et ses comptes. `inspect` (lecture seule) liste ce qui serait créé et, par filiale, `dealsAsInvestor` / `bankAccountsOwned` — les deux compteurs qui diraient si la ligne source peut un jour devenir une simple participation. Idempotente. |
 | Cap tables des entités du groupe | `convex/migrations/seedGroupCapTables.ts` → `inspect` / `apply` | Renseigne les `equityPositions` de CALTE, des 7 filiales et d'Albo Club — une ligne par associé, part en `ownershipBps` (c'est elle que lit la fiche société côté CALTE via `liabilities:getOwnershipForCompany`). Sources documentaires citées ligne à ligne dans la table `CAP_TABLES` (statuts + Kbis du Drive). Additif et idempotent : crée ce qui manque, complète un `ownershipBps` absent, n'écrase jamais une part divergente (remontée dans `conflicts`). `inspect` d'abord — vérifier `ownershipSumBps` = 10000 par org et `conflict` = 0. ⚠ La répartition Banco 2 (50/50) est déclarative, à confirmer par le registre des mouvements de titres. |
+| Fusion des comptes courants en double (org `calte`) | `convex/migrations/mergeGroupCcaDeals.ts` → `inspect` / `apply` | Replie les DEUX lignes `cca` que CALTE portait sur Caltimo, SCI Chapelle et SCI Upload — séquelle de la requalification des `real_estate_direct` en `cca` (09/09/2026, faite via les outils MCP). La ligne conservée est celle qui porte le plus de transactions ; elle récupère celles de l'autre, prend la date de signature la plus ancienne et **perd son `paidAmount`** (instantané figé par l'import Airtable, cf. `KNOWN_ISSUES.md`). `matchingDecisions` n'est jamais réécrit (table append-only). Toute autre référence à la ligne absorbée (valorisation, projection, document, garantie, prévisionnel) **bloque** la paire : vérifier `blocked` vide dans `inspect` avant d'appliquer. Idempotent : une cible déjà à une seule ligne ressort `done`. |
 | Audit du stockage de fichiers (lecture seule) | `convex/migrations/storageAudit.ts` (`scanPage` / `describe`) + `node scripts/storage-audit.mjs` | Dit **où sont les octets** du file storage Convex : total, répartition par type et par tranche de taille, gisement de PDF > 1 Mo, et les 30 plus gros fichiers nommés (titre, `kind`, porte d'entrée `upload` / `email`). Motivation : les backups automatisés sont facturés à l'**egress** (0,132 $/Go au-delà d'1 Go/mois), donc la taille de la base est multipliée par le nombre d'exports — cette mesure décide si le levier est la compression à l'import, une recompression de l'existant, ou aucun des deux. **N'écrit rien, ne télécharge aucun fichier** : deux `internalQuery`, pas de snapshot préalable nécessaire, re-run gratuit. La pagination et l'agrégation vivent dans le script et non dans une action Convex, pour que le module n'ait pas à se référencer lui-même via `internal.*` — cf. `KNOWN_ISSUES.md` « Un nouveau module Convex ne peut pas se citer lui-même ». Ne couvre **que** le file storage : la taille de la base se lit sur le dashboard (Convex → Settings → Usage), facturée sur la même ligne d'egress. |
 
 Les ponts Attio (`attioCompanyId` / `attioDealId`) et l'ingestion Powens sont
@@ -103,19 +105,78 @@ Un fichier dont le nom ne suit pas la convention n'est **jamais** supprimé.
 
 ### Mise en place (une seule fois)
 
-1. **Google Cloud** : créer un projet, activer **Google Drive API**, créer un **service account**, lui générer une clé **JSON**.
-2. Drive → **Drives partagés** → nouveau drive (ex. `Albo OS — Backups`) →
-   **Gérer les membres** → ajouter l'e-mail du service account en
-   **Gestionnaire de contenu** (il doit pouvoir écrire *et* supprimer).
-3. Relever l'ID du dossier dans son URL.
-4. GitHub → Settings → Secrets and variables → Actions → trois secrets :
-   `CONVEX_DEPLOY_KEY` (dashboard Convex → déploiement **prod**),
-   `GDRIVE_SERVICE_ACCOUNT` (le JSON entier), `GDRIVE_BACKUP_FOLDER_ID`.
+L'authentification passe par **Workload Identity Federation** : GitHub échange
+l'identité OIDC du run contre un jeton Google d'une heure qui usurpe le compte
+de service. **Aucune clé n'est créée ni stockée.** Ce n'est pas un raffinement
+gratuit : la règle d'organisation `iam.disableServiceAccountKeyCreation` est
+active sur ce Workspace et interdit de générer une clé de compte de service —
+la désactiver pour un seul cron serait le mauvais arbitrage.
 
-⚠️ L'étape 2 n'est pas optionnelle : un service account **n'a aucun quota de
-stockage propre**. Pointé ailleurs que sur un Drive partagé dont il est
-membre, l'upload échoue. C'est aussi cette appartenance — et elle seule — qui
-borne la portée du scope `drive` demandé par le script.
+**1. Le projet et le compte de service** (Cloud Shell ou `gcloud` local) :
+
+```bash
+PROJECT_ID=albo-os-backup
+REPO=Albo-Club/albo-os
+
+gcloud projects create $PROJECT_ID            # ou réutiliser un projet existant
+gcloud config set project $PROJECT_ID
+gcloud services enable drive.googleapis.com iamcredentials.googleapis.com sts.googleapis.com
+
+gcloud iam service-accounts create albo-os-backup --display-name="Albo OS backup"
+```
+
+**2. Le pool d'identité et la confiance envers CE dépôt** :
+
+```bash
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+SA=albo-os-backup@$PROJECT_ID.iam.gserviceaccount.com
+
+gcloud iam workload-identity-pools create github --location=global \
+  --display-name="GitHub Actions"
+
+gcloud iam workload-identity-pools providers create-oidc albo-os \
+  --location=global --workload-identity-pool=github \
+  --issuer-uri="https://token.actions.githubusercontent.com" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+  --attribute-condition="assertion.repository=='$REPO'"
+
+gcloud iam service-accounts add-iam-policy-binding $SA \
+  --role=roles/iam.workloadIdentityUser \
+  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attributes.repository/$REPO"
+```
+
+⚠️ L'`--attribute-condition` n'est pas cosmétique : sans elle, **n'importe quel
+dépôt GitHub** pourrait demander un jeton pour ce compte de service.
+
+Le chemin du provider à reporter dans GitHub :
+`projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/albo-os`
+
+**3. Le Drive partagé** (inchangé, et toujours l'étape qu'on oublie) :
+
+Drive → **Drives partagés** → nouveau drive (ex. `Albo OS — Backups`) → y créer
+un dossier `snapshots` → **Gérer les membres** → ajouter l'e-mail du compte de
+service en **Gestionnaire de contenu** (il doit pouvoir écrire *et* supprimer,
+sinon la purge échoue). Google avertit que l'adresse est hors de
+l'organisation : normal pour un compte de service. Relever l'ID du dossier
+dans son URL.
+
+⚠️ Un compte de service **n'a aucun quota de stockage propre**. Pointé
+ailleurs que sur un Drive partagé dont il est membre, l'upload échoue. C'est
+aussi cette appartenance — et elle seule — qui borne la portée du scope
+`drive`.
+
+**4. GitHub** → Settings → Secrets and variables → Actions :
+
+| Onglet | Nom | Valeur |
+| --- | --- | --- |
+| **Secrets** | `CONVEX_DEPLOY_KEY` | dashboard Convex → déploiement **prod** → Deploy key |
+| **Variables** | `GCP_WORKLOAD_IDENTITY_PROVIDER` | le chemin du provider de l'étape 2 |
+| **Variables** | `GCP_SERVICE_ACCOUNT` | `albo-os-backup@<projet>.iam.gserviceaccount.com` |
+| **Variables** | `GDRIVE_BACKUP_FOLDER_ID` | l'ID du dossier de l'étape 3 |
+
+Seule la clé Convex est un secret. Les trois autres sont des **variables** :
+le chemin du provider est inerte sans le lien de confiance vers ce dépôt, et
+le dossier Drive est protégé par l'appartenance, pas par l'obscurité.
 
 ⚠️ Le Drive est le **même compte Google** que les documents métier : un compte
 compromis ou fermé emporte les sauvegardes avec les originaux. Arbitrage
@@ -124,14 +185,24 @@ l'accès restreint sont la mitigation.
 
 ### Vérifier
 
+À blanc en local — le script n'authentifie rien lui-même, il faut donc lui
+fournir un jeton (valable une heure) :
+
 ```bash
+export GDRIVE_ACCESS_TOKEN=$(gcloud auth print-access-token \
+  --impersonate-service-account=albo-os-backup@<projet>.iam.gserviceaccount.com \
+  --scopes=https://www.googleapis.com/auth/drive)
+export GDRIVE_BACKUP_FOLDER_ID=<id>
 node scripts/convex-backup.mjs --dry   # dit ce qui partirait et ce qui serait purgé
 ```
 
-Puis Actions → « Convex backup » → Run workflow (case « archive complète »
-pour forcer les fichiers). Un échec ouvre une issue labellisée `convex-backup`
-— sauf si ce sont les secrets qui manquent, ce qui est un état de setup, pas
-un incident.
+Puis, pour de vrai : Actions → « Convex backup » → Run workflow, en cochant
+**« Forcer une archive complète »** au premier essai — ça valide d'un coup
+l'export, les fichiers, l'auth WIF, l'upload et la purge.
+
+Un échec ouvre une issue labellisée `convex-backup`. Deux exceptions
+volontaires, qui sont des états de setup et non des incidents : une
+configuration manquante, et un échec de l'étape d'authentification.
 
 ### Restaurer
 

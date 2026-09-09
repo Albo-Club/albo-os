@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.219.0 — 09/09/2026 à 17:51 — Un accès bancaire peut servir plusieurs sociétés
+## v1.220.0 — 09/09/2026 à 17:55 — Un accès bancaire peut servir plusieurs sociétés
 
 Un même accès en banque porte souvent les comptes de plusieurs sociétés du
 groupe : l'accès Palatine de CALTE, par exemple, porte aussi les comptes
@@ -69,6 +69,146 @@ avoir connecté la banque.
 > - Couverture : `convex/regression.powensCrossOrg.test.ts` (9 tests) ;
 >   `KNOWN_ISSUES.md` § « Ingestion Powens », `TESTING.md` CA15,
 >   `docs/produit/07-tresorerie.md`.
+
+## v1.219.2 — 09/09/2026 à 17:40 — Un compte courant par filiale, et plus deux
+
+CALTE finance ses filiales par leur compte courant d'associé, et par rien
+d'autre : leur capital est de 1 000 €, souscrit à la constitution et jamais
+augmenté. Cinq de ces avances étaient pourtant enregistrées comme de
+l'immobilier détenu en direct — ce que les libellés bancaires démentaient
+eux-mêmes (« RDB Compte courant », « Virement vers Compte Courant »). Elles
+ont été requalifiées en comptes courants, ce qui a laissé Caltimo, SCI
+Chapelle et SCI Upload avec **deux lignes** chacune pour une seule et même
+relation.
+
+Cette migration les replie en une. La ligne conservée récupère toutes les
+transactions de l'autre et reprend la date de signature la plus ancienne,
+pour couvrir toute l'histoire de l'avance.
+
+Elle perd aussi son montant « versé » saisi. Ce chiffre venait de la reprise
+Airtable et n'avait plus bougé depuis, alors que le montant réellement
+décaissé est recalculé à chaque affichage depuis les virements pointés. Un
+chiffre figé qui contredit le chiffre vivant vaut moins que pas de chiffre du
+tout.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/mergeGroupCcaDeals.ts` — `inspect` / `apply`, cf.
+>   runbook en tête de fichier et `MIGRATIONS.md`. Les cibles sont désignées
+>   par **nom de société**, pas par id de deal : la ligne conservée est celle
+>   qui porte le plus de transactions (date la plus ancienne en cas
+>   d'égalité), donc le script choisit la même rangée quoi qu'il arrive à la
+>   base entre l'écriture et l'exécution.
+> - Sur la survivante : `dealId` des transactions absorbées repointé,
+>   `signedDate` reculée si besoin, `paidAmount` **effacé** (`undefined` au
+>   patch Convex). La ligne absorbée est ensuite supprimée.
+> - `matchingDecisions` est laissé intact — la table est append-only par
+>   contrat, un instantané de ce que le décideur voyait ; la réécrire
+>   falsifierait l'historique.
+> - Les sept autres tables qui référencent un deal (valorisations,
+>   projections, documents, garanties, prévisionnel ×3) **bloquent** la paire
+>   plutôt que de se retrouver orphelines — même règle que `deals:remove`.
+> - `convex/regression.mergeCca.test.ts` : fusion complète, refus sur
+>   référence tierce sans bloquer les autres paires, historique de pointage
+>   préservé, idempotence.
+## v1.219.1 — 09/09/2026 à 17:16 — La sauvegarde s'authentifie sans clé à stocker
+
+Correctif de mise en service, invisible à l'écran. La sauvegarde automatique
+devait s'identifier auprès de Google avec une clé de compte de service — sauf
+que notre organisation Google interdit d'en créer, à raison : une clé de ce
+type ne périme jamais et se promène dans les presse-papiers.
+
+La sauvegarde utilise désormais un mécanisme sans clé : au moment de démarrer,
+elle prouve son identité à Google et reçoit une autorisation valable une heure.
+Rien à créer, rien à stocker, rien à faire tourner tous les six mois, et une
+autorisation qui ne sert à rien si elle fuite une fois expirée.
+
+Effet de bord agréable : il n'y a plus qu'un seul vrai secret à saisir, celui
+de la base.
+
+> **🔧 Notes techniques**
+>
+> - `scripts/convex-backup.mjs` n'authentifie plus rien lui-même : il lit un
+>   `GDRIVE_ACCESS_TOKEN` fourni par l'appelant. La signature JWT RS256 maison
+>   (`node:crypto`) et le parsing du JSON de compte de service disparaissent —
+>   le script raccourcit.
+> - `.github/workflows/convex-backup.yml` : étape `google-github-actions/auth@v3`
+>   en `token_format: access_token`, scope `drive`, plus `id-token: write` dans
+>   les permissions du job (sans quoi le runner ne peut pas émettre le jeton
+>   OIDC). L'échec de cette étape n'ouvre pas d'issue : c'est un état de setup.
+> - Le secret `GDRIVE_SERVICE_ACCOUNT` est remplacé par deux **variables** de
+>   dépôt, `GCP_WORKLOAD_IDENTITY_PROVIDER` et `GCP_SERVICE_ACCOUNT` ;
+>   `GDRIVE_BACKUP_FOLDER_ID` passe aussi en variable. Aucune n'est sensible :
+>   le chemin du provider est inerte sans le lien de confiance vers ce dépôt.
+>   `CONVEX_DEPLOY_KEY` reste le seul secret.
+> - Runbook `MIGRATIONS.md` réécrit avec les commandes `gcloud` (pool, provider
+>   OIDC, binding `roles/iam.workloadIdentityUser`). ⚠️ L'`--attribute-condition`
+>   sur `assertion.repository` est obligatoire : sans elle, n'importe quel dépôt
+>   GitHub pourrait obtenir un jeton pour ce compte de service.
+> - Déclencheur : `iam.disableServiceAccountKeyCreation` est appliquée sur le
+>   Workspace. La désactiver pour un cron aurait levé la protection pour toute
+>   l'organisation.
+
+---
+
+## v1.219.0 — 09/09/2026 à 17:06 — Les publications Parallel deviennent de vrais reportings
+
+Une participation peut donner de ses nouvelles par deux chemins : un reporting
+transféré par mail, et une publication sur le portail Parallel. Seul le premier
+était vraiment exploité — lu, résumé, ses chiffres extraits, ses pièces jointes
+rangées, son contenu cherchable et connu de l'assistant. Le second se contentait
+d'apparaître dans la frise avec son titre et sa date.
+
+Les publications du portail passent désormais par le même traitement que les
+reportings reçus par mail. Leurs documents sont récupérés et lus, y compris les
+PDF, et chaque publication devient un reporting à part entière : résumé, points
+clés, chiffres, recherche, et réponses de l'assistant. Concrètement, les
+quatorze SPV Parallel de CALTE, qui n'avaient aucun reporting dans l'app alors
+que le portail en tient plus de cent, cessent d'être des pages muettes.
+
+Un garde-fou important : quand le même document arrive par les deux chemins, la
+version reçue par mail reste la référence et n'est jamais remplacée. Une
+publication ne vient garnir que les périodes encore vides.
+
+Le mail d'annonce d'une publication ne change pas de forme, mais il arrive
+maintenant avec les chiffres du reporting en plus de la synthèse.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `convex/vascoIngest.ts` : une publication entre par une **troisième
+>   origine** `inboundEmails.origin = 'vasco'`, à côté de `email` et `upload`.
+>   Aucun second pipeline — `reportExtract` sait déjà lire une pièce jointe
+>   **déjà en storage** (chemin des lignes reprises de l'ancienne timeline
+>   Gmail), donc il suffit de télécharger les documents du portail
+>   (`vasco.storeCommunicationDocument`, action système sans identité) et de
+>   poser le `storageId`. Ancre d'idempotence :
+>   `agentmailMessageId = vasco:<clientSlug>:<communicationId>`.
+> - `reportStore.storeForCompany` : une publication prend un créneau
+>   `(société, période)` **libre**, jamais un occupé — la dédup met à jour sur
+>   place, ce qui aurait écrasé un report mail par une publication au PDF
+>   illisible, en masse pendant la reprise. Son propre créneau n'est pas
+>   « occupé » : une publication corrigée doit pouvoir rafraîchir son report.
+> - Chaîne d'arrivée recâblée : `scheduleArrivals` planifie une
+>   `vascoIngest.ingestIssuer` par **émetteur** (plus une analyse par entité) ;
+>   la synthèse et l'annonce sont libérées par la queue du pipeline
+>   (`runAnalysisBatch`, nouveau paramètre `announce`), ce qui préserve l'ordre
+>   « la note intègre la publication avant que le mail ne la cite ».
+>   `vascoNotify.announce` ne lance donc plus `runAnalysis` et ne doit jamais
+>   être planifié seul. Le silence du premier remplissage tient au marqueur
+>   `announcedAt`, plus à un drapeau d'appelant.
+> - Une publication qu'on n'arrive pas à analyser est quand même annoncée : le
+>   portail n'a pas d'autre voix, et se taire perdrait la nouvelle en plus du
+>   reporting.
+> - Reprise de l'historique : `migrations/vascoReportsBackfill.ts`
+>   (`plan` / `run`, argument `companyId` pour restreindre) — **par paliers**,
+>   une participation puis une org puis l'autre. Runbook dans `MIGRATIONS.md`.
+> - Tests : `regression.vascoIngest.test.ts` (6 cas — ancrage, périmètre, et
+>   surtout le créneau occupé laissé intact) ; les 11 cas de
+>   `regression.vascoAnalysis.test.ts` réécrits sur la nouvelle chaîne, en
+>   protégeant les mêmes propriétés (le lecteur de file résout une ingestion
+>   vers les entités de son émetteur, donc les assertions restent en entités).
+
+---
 
 ## v1.218.0 — 09/09/2026 à 15:41 — Les données sont sauvegardées automatiquement, tous les jours
 

@@ -1226,8 +1226,14 @@ export default defineSchema({
     orgId: v.id('organizations'),
     companyId: v.id('companies'),
 
-    // Provenance
-    source: v.union(v.literal('email'), v.literal('upload')),
+    // Provenance. 'vasco' = digested from a Parallel portal publication
+    // (`inboundEmails.origin === 'vasco'`) — the channel that lets a portal
+    // communication be read, summarised and searched like any other report.
+    source: v.union(
+      v.literal('email'),
+      v.literal('upload'),
+      v.literal('vasco'),
+    ),
     // Back-link to the row that produced this report, so detaching an entity
     // can correct the queue side too (cf. reportInbox.detachCompany). Unset on
     // rows stored before the field existed: an email-sourced one is found back
@@ -1351,9 +1357,14 @@ export default defineSchema({
    */
   inboundEmails: defineTable({
     // Absent = email (the historical case). 'upload' = manual upload from the
-    // front: the AgentMail ids below are placeholders, the company is already
-    // matched, and the pipeline starts at extraction (brick 4).
-    origin: v.optional(v.union(v.literal('email'), v.literal('upload'))),
+    // front, 'vasco' = a communication published on the Parallel portal: in
+    // both, the AgentMail ids below are placeholders, the company is already
+    // matched, and the pipeline starts at extraction (brick 4). A portal
+    // publication carries no forwarder, so it is announced by
+    // `vascoNotify.announce`, never answered by `reportNotify.send`.
+    origin: v.optional(
+      v.union(v.literal('email'), v.literal('upload'), v.literal('vasco')),
+    ),
 
     // AgentMail provenance
     agentmailInboxId: v.string(),

@@ -800,6 +800,19 @@ export const remove = mutation({
   puis vérifier la **symétrie** : si l'ajout déclenche, le retrait doit
   déclencher aussi. Cf. `KNOWN_ISSUES.md` « Un report renvoyé n'est pas
   forcément un doublon » et « Détacher un report ».
+- ❌ Brancher un **second canal** sur une écriture qui déduplique « en mettant
+  à jour sur place », sans décider lequel des deux gagne le créneau. Un report
+  se range par `(société, période)` et un doublon **écrase** — juste pour un
+  renvoi corrigé du même expéditeur, destructeur dès qu'une autre source écrit
+  dans la même case. Le même document arrive par mail ET par le portail
+  Parallel : la version mail porte le message complet et les pièces de
+  l'expéditeur, la publication peut n'être qu'un mot d'accompagnement avec un
+  PDF illisible — donc **le canal secondaire prend un créneau libre, jamais un
+  occupé** (`reportStore.storeForCompany`), son propre créneau ne comptant pas
+  comme occupé sous peine d'interdire ses corrections. Le réflexe : avant de
+  faire écrire une nouvelle source dans une table partagée, chercher la clé de
+  dédup et se demander ce qu'elle **détruit** quand les deux sources se
+  rencontrent — une reprise d'historique le fait par centaines et en silence.
 - ❌ Accrocher un déclencheur métier (analyse, notification, alerte) à une
   intégration **pull** sans lui avoir d'abord donné une mémoire du « déjà vu ».
   Un webhook est un **événement** — il arrive une fois, sa nouveauté est

@@ -3865,6 +3865,18 @@ dérivé). `paidActual` (décaissé réel) est **calculé** depuis les transacti
 (`transactionTotals`) et n'est jamais éditable — distinct de `paidAmount`
 (colonne, « montant contractuel »).
 
+⚠️ **Sur un deal issu de l'import Airtable, `paidAmount` est un instantané
+figé**, pas un montant contractuel : `airtableImport` l'a calculé une fois, en
+sommant les mouvements sortants **qu'Airtable connaissait ce jour-là**, et
+plus rien ne le rafraîchit. Il dérive donc de `paidActual` au fil des
+pointages, sans que rien ne le signale — c'est ainsi que le C/C Albo affichait
+400 000 € saisis pour 1 880 000 € réellement pointés. Aucun calcul ne le lit
+(participations, KPIs, NAV et capital déployé passent tous par `paidActual`) :
+il ne survit que comme champ éditable de la fiche deal. Devant un écart
+saisi / pointé sur une ligne importée, c'est donc le **pointé** qui fait foi,
+et le bon geste est d'effacer le champ plutôt que de le recalculer — un
+chiffre figé qu'on rafraîchit une fois se re-périme aussitôt.
+
 ## Édition inline des fiches (`src/components/ui/inline-field.tsx`)
 
 Les blocs **« Détails de l'instrument »** (fiche deal) et **« Identité »** (fiche
@@ -4124,13 +4136,37 @@ like Parallel Invest (`parallel.vasco.fund`). Albo OS pulls the investor-side
 data that only lives on the platform (positions, valuations, documents) — a
 _pull_ integration, distinct from the _push_ AgentMail report pipeline.
 
-### Deux tables alimentent la même fiche — ne pas conclure « il manque des reports »
+### Une communication est DIGÉRÉE en report — et ne prend jamais un créneau occupé
 
-Les communications VASCO vivent dans **`vascoCommunicationsCache`**, jamais dans
-`companyReports`. La fiche d'une participation les affiche côte à côte, mais
-tout ce qui interroge les reports — `listCompanyReports`, l'outil MCP du même
-nom, les outils agent de `agentToolsReports.ts` — ne lit que `companyReports` et
-renvoie donc **vide** sur une participation dont l'actualité arrive par VASCO.
+Depuis 09/2026 une publication du portail entre dans le pipeline report par une
+**troisième origine** `inboundEmails.origin = 'vasco'` (`convex/vascoIngest.ts`),
+à côté du mail et de l'upload manuel : ses pièces jointes sont téléchargées et
+stockées, le texte est extrait et OCRisé, la fiche et les métriques sont
+produites, la ligne est indexée. Elle devient donc un `companyReports`
+(`source: 'vasco'`) visible de `listCompanyReports`, de l'outil MCP et des
+outils agent — ce qui n'était pas le cas avant, et laissait les 14 SPV Parallel
+de `calte` à **zéro report** malgré 128 publications.
+
+`vascoCommunicationsCache` reste ce qu'il était : le cache du pull, la mémoire
+du « déjà vu » et du « déjà annoncé ». Ce n'est plus la seule trace d'une
+publication.
+
+⚠️ **La règle qui rend l'opération sûre** : `reportStore.storeForCompany`
+déduplique sur `(société, période)` et **met à jour sur place**. Juste pour un
+report renvoyé corrigé, destructeur ici — le même document arrive par les deux
+canaux, la version mail est la plus riche (corps complet, métriques, pièces
+jointes de l'expéditeur), et une publication dont la substance est dans un PDF
+mal OCRisé l'écraserait en silence. Donc **une publication prend un créneau
+libre, jamais un créneau occupé** ; son propre créneau ne compte pas comme
+occupé, sinon une correction du portail ne pourrait plus atterrir. Tenu par
+`regression.vascoIngest.test.ts`.
+
+Ancrage : `agentmailMessageId = vasco:<clientSlug>:<communicationId>` —
+l'identifiant du portail, stable d'un pull à l'autre. Rejouer est gratuit, une
+reprise interrompue reprend, et le cron de 48 h ne peut pas ré-ingérer ce qu'il
+re-liste. Namespacé par `clientSlug` pour la même raison que la mémoire
+d'annonce : un second portail réutilisant un id ne doit pas masquer une
+publication.
 
 Le piège a coûté un aller-retour lors de la reprise CALTE : AZmed apparaissait
 avec 3 reports côté Albo OS contre 15 côté ancien outil, ce qui ressemblait à un
@@ -4343,14 +4379,20 @@ new is persisted — the result still lands in `companyIntelligence`).
   à chaque tick de cron (48 h × N appels LLM + recherche web), ou ne rien
   réanalyser.
   La détection vit donc **dans** le remplacement, seul moment où « nouveau » est
-  connaissable : les `communicationId` sur le point d'être supprimés sont lus
-  **avant** le delete, le lot pullé est diffé contre eux, et
-  `scheduleAnalysisForIssuers` planifie **un `intelligence.runAnalysis` par
-  entité** liée à un émetteur porteur d'au moins une communication nouvelle.
-  Sans mail (personne n'a rien transféré, il n'y a personne à qui répondre) —
-  et donc **pas** `runAnalysisBatch`, dont la boucle séquentielle n'existe que
-  pour envoyer l'accusé après ses analyses : un premier remplissage à N entités
-  y ferait tenir N appels LLM dans une seule action.
+  connaissable — depuis le passage en upsert (ci-dessus), « nouveau » est même
+  **structurel** : aucune ligne n'existait. `scheduleArrivals` planifie alors
+  **un `vascoIngest.ingestIssuer` par ÉMETTEUR** qui a publié (jamais un par
+  entité : une ingestion éventaille la publication sur toutes les entités
+  liées, une par entité ferait le même travail deux fois).
+  ⚠️ Ce n'est plus ici que partent la synthèse et l'annonce : elles sont
+  libérées par la **queue du pipeline** (`reportStore.run` →
+  `intelligence.runAnalysisBatch`, paramètre `announce`), ce qui préserve
+  l'ordre « la note intègre la publication avant que le mail ne la cite ».
+  `vascoNotify.announce` ne lance donc plus lui-même `runAnalysis` et ne doit
+  **jamais** être planifié seul. Le silence du premier remplissage n'a plus
+  besoin d'un drapeau : le bootstrap estampille `announcedAt` sur chaque ligne,
+  donc `claimArrivals` ne trouve rien à réclamer — c'est le marqueur la mémoire,
+  pas l'appelant.
   Deux propriétés à ne pas casser : un pull en échec **n'atteint jamais** le
   remplacement (l'appelant garde le cache précédent), donc une panne du portail
   ne peut pas simuler une vague d'arrivées ; et la mémoire est **par
