@@ -199,17 +199,24 @@ export const storeForCompany = internalMutation({
     const email = await ctx.db.get('inboundEmails', args.inboundEmailId)
     if (!email) throw new Error('inbound email not found')
 
-    // A manual upload (`origin: 'upload'`) carries no real AgentMail message:
-    // its provenance is the upload, and the placeholder ids stay out.
+    // Neither a manual upload (`origin: 'upload'`) nor a portal publication
+    // (`origin: 'vasco'`) carries a real AgentMail message: their provenance
+    // is elsewhere, and the placeholder ids stay out.
     const isUpload = email.origin === 'upload'
+    const isPortal = email.origin === 'vasco'
+    const synthetic = isUpload || isPortal
 
     const reportFields = {
       orgId: args.orgId,
       companyId: args.companyId,
-      source: isUpload ? ('upload' as const) : ('email' as const),
+      source: isPortal
+        ? ('vasco' as const)
+        : isUpload
+          ? ('upload' as const)
+          : ('email' as const),
       inboundEmailId: args.inboundEmailId,
-      agentmailInboxId: isUpload ? undefined : email.agentmailInboxId,
-      agentmailMessageId: isUpload ? undefined : email.agentmailMessageId,
+      agentmailInboxId: synthetic ? undefined : email.agentmailInboxId,
+      agentmailMessageId: synthetic ? undefined : email.agentmailMessageId,
       agentmailThreadId: email.agentmailThreadId,
       fromEmail: email.realSenderEmail ?? email.fromEmail,
       subject: email.subject,
@@ -249,6 +256,20 @@ export const storeForCompany = internalMutation({
             )
             .collect()
         ).find((r) => r.subject === email.subject && r.emailDate === email.receivedAt) ?? null)
+
+    // A PORTAL publication takes a free slot, never an occupied one. Storage
+    // updates in place, which is right for a corrected re-send and destructive
+    // here: the same document reaches us by both channels, and the mail
+    // version is the richer one — full body, extracted metrics, the files the
+    // sender attached. A publication whose substance sits in a PDF that failed
+    // to OCR would replace it, attachments included, and the historical
+    // ingestion would do it by the hundred without a sound. So it stands
+    // aside, and the fiche keeps the version that says the most.
+    // Its own earlier version is not an occupied slot: a publication the
+    // portal CORRECTED must still refresh the report it produced.
+    if (existing && isPortal && existing.source !== 'vasco') {
+      return { reportId: existing._id, created: false, changed: false }
+    }
 
     let reportId: Id<'companyReports'>
     let changed = false
@@ -520,6 +541,26 @@ export const run = internalAction({
         statusReason: 'analyze_error',
         error: message,
       })
+      // A publication we could not digest still arrived, and the org is told:
+      // the announcement is the portal's only voice, and staying silent here
+      // would lose the news as well as the report. No synthesis precedes it —
+      // nothing was folded in — so the card carries the note it already had,
+      // which is exactly true.
+      if (row.origin === 'vasco') {
+        const issuerId = companies.find((c) => c?.vascoIssuerId)?.vascoIssuerId
+        const clientSlug = companies.find((c) => c?.vascoClientSlug)
+          ?.vascoClientSlug
+        if (issuerId && clientSlug) {
+          for (const m of matched) {
+            await ctx.scheduler.runAfter(0, internal.vascoNotify.announce, {
+              companyId: m.companyId,
+              orgId: m.orgId,
+              clientSlug,
+              issuerId,
+            })
+          }
+        }
+      }
       return null
     }
 
@@ -633,7 +674,26 @@ export const run = internalAction({
     // gesture — but a short one, and the rest of the org hears nothing,
     // because nothing is new. A re-send that CORRECTED the report does not
     // land here: it counts as news (cf. `reportContentChanged`).
-    if (!anyNews) {
+    // ── A portal publication is announced, never answered ───────────────
+    // There is no forwarder and no thread: nobody sent us anything, so the
+    // mail channel's confirmation has no addressee. What the org gets instead
+    // is `vascoNotify.announce`, released HERE — after the syntheses, so the
+    // card it carries has folded this publication in (the ordering the mail
+    // channel protects with `send`, kept identical). The claim marker makes
+    // that release idempotent and batched: whichever publication of a pull
+    // finishes first claims them all and mails once, the others find nothing
+    // and stay silent. Nothing new (the slot was already taken by a mail
+    // report) is not a reason to skip it — the publication still arrived, and
+    // the announcement is what says so.
+    if (row.origin === 'vasco') {
+      const issuerId = companies.find((c) => c?.vascoIssuerId)?.vascoIssuerId
+      const clientSlug = companies.find((c) => c?.vascoClientSlug)?.vascoClientSlug
+      await ctx.scheduler.runAfter(0, internal.intelligence.runAnalysisBatch, {
+        refs: matched.map((m) => ({ companyId: m.companyId, orgId: m.orgId })),
+        announce:
+          issuerId && clientSlug ? { clientSlug, issuerId } : undefined,
+      })
+    } else if (!anyNews) {
       await ctx.scheduler.runAfter(0, internal.reportNotify.send, {
         inboundEmailId,
         kind: 'duplicate',

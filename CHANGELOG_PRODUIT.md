@@ -23,6 +23,65 @@ bas de page.
 
 ---
 
+## v1.219.0 — 09/09/2026 à 17:06 — Les publications Parallel deviennent de vrais reportings
+
+Une participation peut donner de ses nouvelles par deux chemins : un reporting
+transféré par mail, et une publication sur le portail Parallel. Seul le premier
+était vraiment exploité — lu, résumé, ses chiffres extraits, ses pièces jointes
+rangées, son contenu cherchable et connu de l'assistant. Le second se contentait
+d'apparaître dans la frise avec son titre et sa date.
+
+Les publications du portail passent désormais par le même traitement que les
+reportings reçus par mail. Leurs documents sont récupérés et lus, y compris les
+PDF, et chaque publication devient un reporting à part entière : résumé, points
+clés, chiffres, recherche, et réponses de l'assistant. Concrètement, les
+quatorze SPV Parallel de CALTE, qui n'avaient aucun reporting dans l'app alors
+que le portail en tient plus de cent, cessent d'être des pages muettes.
+
+Un garde-fou important : quand le même document arrive par les deux chemins, la
+version reçue par mail reste la référence et n'est jamais remplacée. Une
+publication ne vient garnir que les périodes encore vides.
+
+Le mail d'annonce d'une publication ne change pas de forme, mais il arrive
+maintenant avec les chiffres du reporting en plus de la synthèse.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `convex/vascoIngest.ts` : une publication entre par une **troisième
+>   origine** `inboundEmails.origin = 'vasco'`, à côté de `email` et `upload`.
+>   Aucun second pipeline — `reportExtract` sait déjà lire une pièce jointe
+>   **déjà en storage** (chemin des lignes reprises de l'ancienne timeline
+>   Gmail), donc il suffit de télécharger les documents du portail
+>   (`vasco.storeCommunicationDocument`, action système sans identité) et de
+>   poser le `storageId`. Ancre d'idempotence :
+>   `agentmailMessageId = vasco:<clientSlug>:<communicationId>`.
+> - `reportStore.storeForCompany` : une publication prend un créneau
+>   `(société, période)` **libre**, jamais un occupé — la dédup met à jour sur
+>   place, ce qui aurait écrasé un report mail par une publication au PDF
+>   illisible, en masse pendant la reprise. Son propre créneau n'est pas
+>   « occupé » : une publication corrigée doit pouvoir rafraîchir son report.
+> - Chaîne d'arrivée recâblée : `scheduleArrivals` planifie une
+>   `vascoIngest.ingestIssuer` par **émetteur** (plus une analyse par entité) ;
+>   la synthèse et l'annonce sont libérées par la queue du pipeline
+>   (`runAnalysisBatch`, nouveau paramètre `announce`), ce qui préserve l'ordre
+>   « la note intègre la publication avant que le mail ne la cite ».
+>   `vascoNotify.announce` ne lance donc plus `runAnalysis` et ne doit jamais
+>   être planifié seul. Le silence du premier remplissage tient au marqueur
+>   `announcedAt`, plus à un drapeau d'appelant.
+> - Une publication qu'on n'arrive pas à analyser est quand même annoncée : le
+>   portail n'a pas d'autre voix, et se taire perdrait la nouvelle en plus du
+>   reporting.
+> - Reprise de l'historique : `migrations/vascoReportsBackfill.ts`
+>   (`plan` / `run`, argument `companyId` pour restreindre) — **par paliers**,
+>   une participation puis une org puis l'autre. Runbook dans `MIGRATIONS.md`.
+> - Tests : `regression.vascoIngest.test.ts` (6 cas — ancrage, périmètre, et
+>   surtout le créneau occupé laissé intact) ; les 11 cas de
+>   `regression.vascoAnalysis.test.ts` réécrits sur la nouvelle chaîne, en
+>   protégeant les mêmes propriétés (le lecteur de file résout une ingestion
+>   vers les entités de son émetteur, donc les assertions restent en entités).
+
+---
+
 ## v1.218.0 — 09/09/2026 à 15:41 — Les données sont sauvegardées automatiquement, tous les jours
 
 Jusqu'ici, sauvegarder Albo OS voulait dire y penser et lancer une commande à

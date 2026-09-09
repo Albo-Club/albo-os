@@ -1083,56 +1083,60 @@ export const replaceCommunicationsCache = internalMutation({
     }
 
     if (arrivedIssuers.size > 0)
-      await scheduleArrivals(ctx, orgId, clientSlug, arrivedIssuers, !bootstrap)
+      await scheduleArrivals(ctx, orgId, clientSlug, arrivedIssuers)
   },
 })
 
-/** Fan an arrival out to the entities of `orgId` linked to one of `issuerIds`
- * on `clientSlug`. No index on the VASCO link — the org's entities are read and
- * filtered, the same way `lib/reportFreshness` and `companyEnrichment` resolve
- * that link. Archived entities are skipped: the portal keeps publishing on a
- * position we stopped following.
+/** Hand every issuer that just published to the ingestion that turns its
+ * communications into reports (`vascoIngest.ingestIssuer`). No index on the
+ * VASCO link — the org's entities are read and filtered, the same way
+ * `lib/reportFreshness` and `companyEnrichment` resolve that link. An issuer
+ * no live entity is linked to is dropped here: a publication with nowhere to
+ * land is not a report. Archived entities are skipped for the same reason as
+ * before — the portal keeps publishing on a position we stopped following.
  *
- * `announce` false (bootstrap) schedules the synthesis alone. Otherwise it
- * schedules `vascoNotify.announce`, which runs that same synthesis and THEN
- * mails the recap — the order matters, the mail carries the note.
+ * What used to fork here no longer does, and the two branches it replaced are
+ * both preserved further down the line:
+ *   - the SYNTHESIS is now the pipeline's own tail (`reportStore.run` →
+ *     `intelligence.runAnalysisBatch`), which is what makes the note fold the
+ *     publication in before anything quotes it;
+ *   - the ANNOUNCEMENT is released by that same tail, so the mail still comes
+ *     after the synthesis. Bootstrap silence no longer needs a flag: a first
+ *     fill stamps `announcedAt` on every row, so `vascoNotify.claimArrivals`
+ *     finds nothing to claim and mails nothing — the marker is the memory, not
+ *     the caller.
  *
- * One job PER entity, never a batch: the loop of `runAnalysisBatch` is
- * sequential, so a fill touching many linked entities would run every LLM call
- * inside a single action — the one shape that can hit the action time limit.
- * Independent jobs also mean one failure never buries the others. */
+ * One job PER ISSUER, never one for the org: each run downloads files and
+ * starts a pipeline per publication, so a busy issuer cannot drag the others
+ * down and one failure never buries the rest. */
 async function scheduleArrivals(
   ctx: MutationCtx,
   orgId: Id<'organizations'>,
   clientSlug: string,
   issuerIds: Set<string>,
-  announce: boolean,
 ): Promise<void> {
   const companies = await ctx.db
     .query('companies')
     .withIndex('by_org', (q) => q.eq('orgId', orgId))
     .collect()
+  const live = new Set<string>()
   for (const company of companies) {
     if (
       company.archivedAt != null ||
+      company.kind !== 'portfolio' ||
       company.vascoClientSlug !== clientSlug ||
       company.vascoIssuerId == null ||
       !issuerIds.has(company.vascoIssuerId)
     )
       continue
-    if (announce) {
-      await ctx.scheduler.runAfter(0, internal.vascoNotify.announce, {
-        companyId: company._id,
-        orgId,
-        clientSlug,
-        issuerId: company.vascoIssuerId,
-      })
-    } else {
-      await ctx.scheduler.runAfter(0, internal.intelligence.runAnalysis, {
-        companyId: company._id,
-        orgId,
-      })
-    }
+    live.add(company.vascoIssuerId)
+  }
+  for (const issuerId of live) {
+    await ctx.scheduler.runAfter(0, internal.vascoIngest.ingestIssuer, {
+      orgId,
+      clientSlug,
+      issuerId,
+    })
   }
 }
 
@@ -1449,6 +1453,63 @@ export const pullCommunicationsForSynthesis = internalAction({
       }
     }
     return []
+  },
+})
+
+/**
+ * System-context download: stores one portal document in Convex storage and
+ * hands back its id, for the ingestion that turns a communication into a
+ * report (`vascoIngest`).
+ *
+ * Auth-less sibling of `downloadCommunicationDocument` below, and for the same
+ * reason as `pullCommunicationsForSynthesis`: the caller is a scheduled action
+ * with no user identity, so it resolves connections through
+ * `connections.listActiveForOrg` and never through the guarded
+ * `authorizeAndListActive`. Never exposed to the client.
+ *
+ * Returns `null` rather than throwing: one unreadable document must not abort
+ * the ingestion of the communication that carries it — the pipeline records it
+ * as a failed source and keeps the rest, exactly as it does for a mail
+ * attachment it could not fetch.
+ */
+export const storeCommunicationDocument = internalAction({
+  args: {
+    orgId: v.id('organizations'),
+    clientSlug: v.string(),
+    documentId: v.string(),
+  },
+  handler: async (
+    ctx,
+    { orgId, clientSlug, documentId },
+  ): Promise<{ storageId: Id<'_storage'>; contentType?: string; size?: number } | null> => {
+    const conns: Array<VascoConnection> = await ctx.runQuery(
+      internal.connections.listActiveForOrg,
+      { orgId, platform: 'vasco' },
+    )
+    for (const conn of conns.filter((c) => connClientSlug(c) === clientSlug)) {
+      try {
+        const creds = vascoCreds(conn)
+        const { token } = await vascoLogin(creds)
+        const res = await fetch(
+          `${vascoBaseUrl(creds.clientSlug)}/documents/${documentId}/download`,
+          { headers: { Authorization: `Bearer ${token}`, 'User-Agent': USER_AGENT } },
+        )
+        if (!res.ok) continue
+        const blob = await res.blob()
+        const storageId = await ctx.storage.store(blob)
+        return {
+          storageId,
+          contentType: blob.type || undefined,
+          size: blob.size || undefined,
+        }
+      } catch (err) {
+        console.warn(
+          `[vasco] document ${documentId} download failed:`,
+          err instanceof Error ? err.message : String(err),
+        )
+      }
+    }
+    return null
   },
 })
 
