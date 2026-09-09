@@ -141,6 +141,7 @@ import type * as migrations_reassignClimateHouseCofoDeals from "../migrations/re
 import type * as migrations_reassignDealOrg from "../migrations/reassignDealOrg.js";
 import type * as migrations_splitAlboSponsorSpvs from "../migrations/splitAlboSponsorSpvs.js";
 import type * as migrations_unifyDomainPitches from "../migrations/unifyDomainPitches.js";
+import type * as migrations_vascoReportsBackfill from "../migrations/vascoReportsBackfill.js";
 import type * as modules from "../modules.js";
 import type * as notifications from "../notifications.js";
 import type * as organizations from "../organizations.js";
@@ -163,6 +164,7 @@ import type * as transfers from "../transfers.js";
 import type * as users from "../users.js";
 import type * as valuations from "../valuations.js";
 import type * as vasco from "../vasco.js";
+import type * as vascoIngest from "../vascoIngest.js";
 import type * as vascoNotify from "../vascoNotify.js";
 import type * as vectorize from "../vectorize.js";
 import type * as warmup from "../warmup.js";
@@ -307,6 +309,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/reassignDealOrg": typeof migrations_reassignDealOrg;
   "migrations/splitAlboSponsorSpvs": typeof migrations_splitAlboSponsorSpvs;
   "migrations/unifyDomainPitches": typeof migrations_unifyDomainPitches;
+  "migrations/vascoReportsBackfill": typeof migrations_vascoReportsBackfill;
   modules: typeof modules;
   notifications: typeof notifications;
   organizations: typeof organizations;
@@ -329,6 +332,7 @@ declare const fullApi: ApiFromModules<{
   users: typeof users;
   valuations: typeof valuations;
   vasco: typeof vasco;
+  vascoIngest: typeof vascoIngest;
   vascoNotify: typeof vascoNotify;
   vectorize: typeof vectorize;
   warmup: typeof warmup;

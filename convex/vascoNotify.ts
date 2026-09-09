@@ -12,9 +12,12 @@
  *
  * - the synthesis runs BEFORE the mail is built. The card's whole point is
  *   "where the company stands", and that is only true once this publication
- *   has been folded in (same reason `reportStore` waits on
- *   `runAnalysisBatch`). A failed synthesis never holds the mail back — the
- *   card then simply carries no note.
+ *   has been folded in. That synthesis is no longer run here: since the portal
+ *   channel became a report pipeline, it is `intelligence.runAnalysisBatch`
+ *   that runs it and THEN releases this announcement — the same shape the mail
+ *   channel uses for its own confirmation (`send`). The ordering is unchanged;
+ *   only its owner is. So this action must never be scheduled on its own: it
+ *   would mail a card whose note has not seen the publication.
  * - the announcement is CLAIMED before it is sent, never after. `announcedAt`
  *   is stamped on the communications inside one transaction, so a scheduler
  *   retry finds them claimed and stays silent. Like `inboundEmails.notifiedAt`
@@ -129,9 +132,6 @@ export const announce = internalAction({
       issuerId,
     })
     if (arrivals.length === 0) return null
-
-    // The note must fold this publication in before the mail quotes it.
-    await ctx.runAction(internal.intelligence.runAnalysis, { companyId, orgId })
 
     const targets: Array<{ userId: Id<'users'>; email: string }> =
       await ctx.runQuery(internal.reportNotify.broadcastTargets, {
