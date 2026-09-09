@@ -23,6 +23,44 @@ bas de page.
 
 ---
 
+## v1.218.1 — 09/09/2026 à 17:16 — La sauvegarde s'authentifie sans clé à stocker
+
+Correctif de mise en service, invisible à l'écran. La sauvegarde automatique
+devait s'identifier auprès de Google avec une clé de compte de service — sauf
+que notre organisation Google interdit d'en créer, à raison : une clé de ce
+type ne périme jamais et se promène dans les presse-papiers.
+
+La sauvegarde utilise désormais un mécanisme sans clé : au moment de démarrer,
+elle prouve son identité à Google et reçoit une autorisation valable une heure.
+Rien à créer, rien à stocker, rien à faire tourner tous les six mois, et une
+autorisation qui ne sert à rien si elle fuite une fois expirée.
+
+Effet de bord agréable : il n'y a plus qu'un seul vrai secret à saisir, celui
+de la base.
+
+> **🔧 Notes techniques**
+>
+> - `scripts/convex-backup.mjs` n'authentifie plus rien lui-même : il lit un
+>   `GDRIVE_ACCESS_TOKEN` fourni par l'appelant. La signature JWT RS256 maison
+>   (`node:crypto`) et le parsing du JSON de compte de service disparaissent —
+>   le script raccourcit.
+> - `.github/workflows/convex-backup.yml` : étape `google-github-actions/auth@v3`
+>   en `token_format: access_token`, scope `drive`, plus `id-token: write` dans
+>   les permissions du job (sans quoi le runner ne peut pas émettre le jeton
+>   OIDC). L'échec de cette étape n'ouvre pas d'issue : c'est un état de setup.
+> - Le secret `GDRIVE_SERVICE_ACCOUNT` est remplacé par deux **variables** de
+>   dépôt, `GCP_WORKLOAD_IDENTITY_PROVIDER` et `GCP_SERVICE_ACCOUNT` ;
+>   `GDRIVE_BACKUP_FOLDER_ID` passe aussi en variable. Aucune n'est sensible :
+>   le chemin du provider est inerte sans le lien de confiance vers ce dépôt.
+>   `CONVEX_DEPLOY_KEY` reste le seul secret.
+> - Runbook `MIGRATIONS.md` réécrit avec les commandes `gcloud` (pool, provider
+>   OIDC, binding `roles/iam.workloadIdentityUser`). ⚠️ L'`--attribute-condition`
+>   sur `assertion.repository` est obligatoire : sans elle, n'importe quel dépôt
+>   GitHub pourrait obtenir un jeton pour ce compte de service.
+> - Déclencheur : `iam.disableServiceAccountKeyCreation` est appliquée sur le
+>   Workspace. La désactiver pour un cron aurait levé la protection pour toute
+>   l'organisation.
+
 ## v1.218.0 — 09/09/2026 à 15:41 — Les données sont sauvegardées automatiquement, tous les jours
 
 Jusqu'ici, sauvegarder Albo OS voulait dire y penser et lancer une commande à
