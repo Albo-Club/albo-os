@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
-import { ArrowUpRight, Pencil } from 'lucide-react'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { ArrowUpRight, Building2, Pencil } from 'lucide-react'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
+import { ConvexError } from 'convex/values'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -22,6 +23,13 @@ import {
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 import { LoadingLine } from '~/components/ui/spinner'
 import {
   Table,
@@ -240,11 +248,154 @@ function EditAccountDialog({
   )
 }
 
+/**
+ * Attaches the account to another company of the group. One bank login can
+ * carry the accounts of several companies (a Palatine access holding the
+ * current accounts of two SCIs): the Powens connection stays with the org
+ * that created it, while the account — and its transactions — joins the org
+ * that owns it. The server refuses the move as soon as the account is tied to
+ * something in its current org (cf. `cash.moveAccountToOrg`).
+ */
+function MoveAccountDialog({
+  account,
+  orgSlug,
+  onClose,
+}: {
+  account: { _id: Id<'bankAccounts'>; label: string; displayName: string | null }
+  orgSlug: string
+  onClose: () => void
+}) {
+  const { t } = useTranslation(['cash', 'common'])
+  const navigate = useNavigate()
+  const moveAccount = useConvexMutation(api.cash.moveAccountToOrg)
+  const me = useConvexQuery(api.users.me, {})
+  const [targetOrgId, setTargetOrgId] = useState('')
+  const [ownerCompanyId, setOwnerCompanyId] = useState('')
+  const [pending, setPending] = useState(false)
+
+  // Only the orgs where the move is allowed: admin on both sides.
+  const orgs =
+    me?.kind === 'ready'
+      ? me.orgs.filter(
+          (o) =>
+            o.slug !== orgSlug && (o.role === 'owner' || o.role === 'admin'),
+        )
+      : []
+  const target = orgs.find((o) => o._id === targetOrgId) ?? null
+  const companies = useConvexQuery(
+    api.companies.list,
+    targetOrgId ? { orgId: targetOrgId as Id<'organizations'> } : 'skip',
+  )
+  // Only a legal entity of the target org can own a bank account.
+  const entities = (companies ?? []).filter((c) => c.kind.startsWith('group_'))
+
+  async function handleMove() {
+    if (!target || !ownerCompanyId) return
+    setPending(true)
+    try {
+      await moveAccount({
+        bankAccountId: account._id,
+        targetOrgId: target._id,
+        ownerCompanyId: ownerCompanyId as Id<'companies'>,
+      })
+      toast.success(t('cash:move.moved', { org: target.name }))
+      onClose()
+      await navigate({
+        to: '/app/$orgSlug/cash',
+        params: { orgSlug: target.slug },
+      })
+    } catch (err) {
+      const code = err instanceof ConvexError ? (err.data as string) : ''
+      const known = [
+        'account_has_matched_transactions',
+        'account_used_by_deal',
+        'account_used_by_loan',
+        'insufficient_role',
+      ]
+      toast.error(
+        t(
+          known.includes(code)
+            ? `cash:move.errors.${code}`
+            : 'cash:move.errors.default',
+        ),
+      )
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{t('cash:move.title')}</DialogTitle>
+          <DialogDescription>{t('cash:move.description')}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="move-org">{t('cash:move.orgLabel')}</Label>
+            <Select
+              value={targetOrgId}
+              onValueChange={(value) => {
+                setTargetOrgId(value)
+                setOwnerCompanyId('')
+              }}
+            >
+              <SelectTrigger id="move-org" className="w-full">
+                <SelectValue placeholder={t('cash:move.orgPlaceholder')} />
+              </SelectTrigger>
+              <SelectContent>
+                {orgs.map((o) => (
+                  <SelectItem key={o._id} value={o._id}>
+                    {o.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="move-owner">{t('cash:move.ownerLabel')}</Label>
+            <Select
+              value={ownerCompanyId}
+              onValueChange={setOwnerCompanyId}
+              disabled={!targetOrgId || entities.length === 0}
+            >
+              <SelectTrigger id="move-owner" className="w-full">
+                <SelectValue placeholder={t('cash:move.ownerPlaceholder')} />
+              </SelectTrigger>
+              <SelectContent>
+                {entities.map((c) => (
+                  <SelectItem key={c._id} value={c._id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-muted-foreground text-xs">{t('cash:move.hint')}</p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={pending}>
+            {t('common:actions.cancel')}
+          </Button>
+          <Button
+            onClick={handleMove}
+            disabled={pending || !target || !ownerCompanyId}
+          >
+            {t('cash:move.confirm')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function AccountDetail() {
   const { t, i18n } = useTranslation(['cash', 'common'])
   const lang = i18n.language
   const { orgSlug, accountId } = Route.useParams()
   const [renameOpen, setRenameOpen] = useState(false)
+  const [moveOpen, setMoveOpen] = useState(false)
   const account = useConvexQuery(api.cash.getAccount, {
     bankAccountId: accountId as Id<'bankAccounts'>,
   })
@@ -329,6 +480,16 @@ function AccountDetail() {
             >
               <Pencil className="size-4" />
               {t('common:actions.edit')}
+            </Button>
+          )}
+          {account && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMoveOpen(true)}
+            >
+              <Building2 className="size-4" />
+              {t('cash:move.action')}
             </Button>
           )}
         </div>
@@ -430,6 +591,13 @@ function AccountDetail() {
         <EditAccountDialog
           account={account}
           onClose={() => setRenameOpen(false)}
+        />
+      )}
+      {account && moveOpen && (
+        <MoveAccountDialog
+          account={account}
+          orgSlug={orgSlug}
+          onClose={() => setMoveOpen(false)}
         />
       )}
     </main>

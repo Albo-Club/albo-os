@@ -55,6 +55,25 @@
       "default": "Couldn't update the account. Please try again."
     }
   },
+  "move": {
+    "action": "Reassign",
+    "title": "Reassign to another company",
+    "description": "One bank login can carry the accounts of several companies of the group. The connection stays where it was created; the account joins the company that owns it.",
+    "orgLabel": "Company",
+    "orgPlaceholder": "Pick a company",
+    "ownerLabel": "Owning entity",
+    "ownerPlaceholder": "Pick an entity",
+    "hint": "The account's transactions follow it: they leave the current company's treasury and VAT position.",
+    "confirm": "Reassign",
+    "moved": "Account reassigned to {{org}}",
+    "errors": {
+      "account_has_matched_transactions": "This account has matched transactions. Unmatch them before reassigning it.",
+      "account_used_by_deal": "This account backs a placement of the current company. Detach it from the placement first.",
+      "account_used_by_loan": "This account is a loan's direct-debit account. Change it on the loan first.",
+      "insufficient_role": "You must be an admin of both companies to reassign an account.",
+      "default": "Could not reassign the account. Please try again."
+    }
+  },
   "connect": {
     "button": "Connect a bank",
     "connecting": "Connecting…",
