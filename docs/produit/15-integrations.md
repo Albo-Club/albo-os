@@ -181,6 +181,11 @@ publication déjà traitée n'est jamais reprise deux fois. Rattacher une socié
 son émetteur lance également son analyse dans la foulée, sans attendre la
 prochaine publication.
 
+**Quand un SPV est détenu par deux sociétés du groupe** — CALTE et Albo Club
+ont souscrit à la même opération, chacune avec sa fiche — la publication
+apparaît sur **les deux**. Elle concerne l'opération, donc les deux
+investisseurs, et le portail l'adresse d'ailleurs aux deux.
+
 **Quand le même document arrive par les deux chemins**, la version reçue par
 email fait foi et n'est jamais remplacée : une publication ne vient garnir que
 les périodes encore vides. La raison est simple — un reporting transféré porte

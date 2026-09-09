@@ -80,6 +80,17 @@ function receivedAtOf(publishDate: string | undefined): number {
  * we stopped following, and digesting it would revive a fiche on purpose left
  * quiet. An issuer no entity is linked to yields no company, and the caller
  * then ingests nothing: a publication with nowhere to land is not a report.
+ *
+ * ⚠️ Entities are looked up across **every** org, not just `orgId`. The same
+ * SPV is often held by two of the group's companies — CALTE and Albo Club both
+ * subscribed to Bernay — and each keeps its own fiche for it. The publication
+ * concerns the operation, so it concerns both investors, and it must land on
+ * both fiches: the very fan-out a letter covering two Sezame vehicles already
+ * gets. Org-scoping this read is what left CALTE's Bernay fiche empty while
+ * Albo's carried all eight publications — the anchor is keyed by portal, not
+ * by org, so the first org to run claimed the ids and the second found nothing
+ * left to do. `orgId` still decides which cached copy is read and whose
+ * connection downloads the files; only the fan-out is group-wide.
  */
 export const pendingForIssuer = internalQuery({
   args: {
@@ -88,12 +99,11 @@ export const pendingForIssuer = internalQuery({
     issuerId: v.string(),
   },
   handler: async (ctx, { orgId, clientSlug, issuerId }) => {
-    const companies = (
-      await ctx.db
-        .query('companies')
-        .withIndex('by_org', (q) => q.eq('orgId', orgId))
-        .collect()
-    )
+    // Full scan: the VASCO link carries no index, and the lookup is group-wide
+    // by design (see above). `companies` rows are light — nothing of
+    // `rawContent` size lives here — and this runs once per issuer, from a
+    // refresh or a migration, never from a user-facing query.
+    const companies = (await ctx.db.query('companies').collect())
       .filter(
         (c) =>
           c.kind === 'portfolio' &&

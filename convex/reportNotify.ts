@@ -66,7 +66,7 @@ function siteUrl(): string {
  * configured inbox.
  */
 function outboundInbox(rowInboxId: string): string {
-  return rowInboxId === 'manual-upload'
+  return rowInboxId === 'manual-upload' || rowInboxId === 'vasco-portal'
     ? (process.env.AGENTMAIL_INBOX_ID ?? rowInboxId)
     : rowInboxId
 }
@@ -345,10 +345,18 @@ export const send = internalAction({
       member !== null && recipients.some((r) => r.userId === member.userId)
     const route = routeRecap({ kind, senderIsMember: Boolean(member), senderHandlesIssues })
 
-    // A manual upload has no AgentMail thread to reply to (the ids are
-    // placeholders) and its author is in front of the fiche, which shows the
-    // outcome. No reply — but the rest of the org still hears about it.
-    const canReply = row.origin !== 'upload'
+    // Only a real email can be replied to. A manual upload and a portal
+    // publication both carry placeholder AgentMail ids, and neither has a
+    // forwarder waiting: the upload's author is in front of the fiche, the
+    // portal has no author at all. No reply — the rest of the org still hears
+    // about an upload; a publication is announced by `vascoNotify` instead.
+    //
+    // Today an unknown sender already stops both the reply and the broadcast
+    // for a portal row, so this guard changes nothing in practice. It is here
+    // because that protection is INDIRECT — it holds only as long as
+    // `portail@…vasco.fund` matches no member — and the invariant we actually
+    // rely on is about the row's ORIGIN.
+    const canReply = row.origin === undefined || row.origin === 'email'
     const period = success?.reportPeriod
 
     // ── The forwarder's answer, in their own thread ──────────────────────
