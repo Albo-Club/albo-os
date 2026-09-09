@@ -35,14 +35,14 @@ Les deux sont corrigés et consignés, pour que la prochaine mise en service
 > **🔧 Notes techniques**
 >
 > - **Permissions du deploy key Convex.** `convex export` passe par l'API
->   Backups, pas par une lecture de données : une clé ne portant que
->   `deployment:data:view` échoue sur `You do not have permission to perform
->   this operation (deployment:backups:create)`. Il faut
->   `deployment:backups:create` + `deployment:backups:download` (+
->   `data:view`), et jamais `backups:delete` ni `backups:import`. Convex ne
->   documente ce mapping nulle part — la liste vient du premier run réel, et
->   est désormais dans `MIGRATIONS.md`, `TESTING.md` B12 et l'en-tête du
->   script.
+>   Backups, pas par une lecture de données. Il faut `deployment:backups:view`
+>   + `:create` + `:download` (+ `data:view`), et jamais `backups:delete` ni
+>   `backups:import`. Convex ne documente ce mapping nulle part **et le CLI ne
+>   signale que la première permission manquante** : chaque essai n'en révèle
+>   qu'une, et les permissions d'une clé ne se modifient pas — il faut en
+>   recréer une à chaque fois. Deux runs perdus à les découvrir une par une,
+>   d'où la liste donnée entière dans `MIGRATIONS.md`, `TESTING.md` B12 et
+>   l'en-tête du script.
 > - **`GDRIVE_BACKUP_FOLDER_ID` accepte l'URL Drive.** Coller l'URL entière
 >   est le réflexe naturel (c'est ce que donne la barre d'adresse) et
 >   échouait beaucoup plus loin, sur un 404 Drive opaque au moment de

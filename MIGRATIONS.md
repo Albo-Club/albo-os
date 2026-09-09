@@ -190,14 +190,18 @@ pas par une lecture de données : une clé qui ne porte que
 `You do not have permission to perform this operation (deployment:backups:create)`.
 Cocher :
 
+- `deployment:backups:view`
 - `deployment:backups:create`
 - `deployment:backups:download`
 - `deployment:data:view`
 
 Et **rien d'autre** — surtout pas `backups:delete` ni `backups:import`, qui
-sont destructives et dont une sauvegarde n'a aucun besoin. La documentation
-Convex ne dit nulle part quelle permission va avec quelle commande : cette
-liste vient du premier run réel.
+sont destructives et dont une sauvegarde n'a aucun besoin.
+
+La documentation Convex ne dit nulle part quelle permission va avec quelle
+commande, et le CLI ne signale **que la première manquante** : chaque essai
+n'en révèle qu'une, et les permissions d'une clé ne se modifient pas — il faut
+en recréer une. D'où la liste donnée entière : elle a coûté deux runs.
 
 ⚠️ **`GDRIVE_BACKUP_FOLDER_ID` est l'identifiant, pas l'URL.** Coller l'URL
 entière est le réflexe naturel ; le script sait désormais en extraire l'id,

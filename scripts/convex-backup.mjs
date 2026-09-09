@@ -30,10 +30,13 @@
  *
  * Environment:
  *   - CONVEX_DEPLOY_KEY        prod deploy key, read by the Convex CLI (secret).
- *                              Needs `deployment:backups:create` and
- *                              `deployment:backups:download`: `convex export`
+ *                              Needs `deployment:backups:view`,
+ *                              `:create` AND `:download`: `convex export`
  *                              goes through the Backups API, not plain data
- *                              reads — a key holding only `data:view` fails.
+ *                              reads. Convex reveals the missing permission
+ *                              one error at a time, so grant the three at
+ *                              once — `data:view` alone fails, and so does
+ *                              create+download without view.
  *   - GDRIVE_ACCESS_TOKEN      a short-lived Google OAuth access token
  *   - GDRIVE_BACKUP_FOLDER_ID  the target folder on the shared drive
  *
