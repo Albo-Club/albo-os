@@ -141,6 +141,7 @@ import type * as migrations_reassignClimateHouseCofoDeals from "../migrations/re
 import type * as migrations_reassignDealOrg from "../migrations/reassignDealOrg.js";
 import type * as migrations_splitAlboSponsorSpvs from "../migrations/splitAlboSponsorSpvs.js";
 import type * as migrations_unifyDomainPitches from "../migrations/unifyDomainPitches.js";
+import type * as migrations_vascoReingestIssuer from "../migrations/vascoReingestIssuer.js";
 import type * as migrations_vascoReportsBackfill from "../migrations/vascoReportsBackfill.js";
 import type * as modules from "../modules.js";
 import type * as notifications from "../notifications.js";
@@ -309,6 +310,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/reassignDealOrg": typeof migrations_reassignDealOrg;
   "migrations/splitAlboSponsorSpvs": typeof migrations_splitAlboSponsorSpvs;
   "migrations/unifyDomainPitches": typeof migrations_unifyDomainPitches;
+  "migrations/vascoReingestIssuer": typeof migrations_vascoReingestIssuer;
   "migrations/vascoReportsBackfill": typeof migrations_vascoReportsBackfill;
   modules: typeof modules;
   notifications: typeof notifications;

@@ -4161,6 +4161,18 @@ libre, jamais un créneau occupé** ; son propre créneau ne compte pas comme
 occupé, sinon une correction du portail ne pourrait plus atterrir. Tenu par
 `regression.vascoIngest.test.ts`.
 
+⚠️ **Un émetteur peut être détenu par plusieurs orgs.** CALTE et Albo Club ont
+toutes deux souscrit à Bernay, donc le SPV existe en deux fiches. L'ancre étant
+keyée par **portail** et non par org, la première org traitée réclame les
+identifiants et la seconde ne trouve plus rien à faire : sa fiche reste vide et
+la reprise affiche `0` pour elle, indiscernable de « rien à faire ». D'où la
+règle : `pendingForIssuer` cherche les entités dans **toutes** les orgs, et
+`orgId` ne décide plus que du cache lu et de la connexion qui télécharge. Une
+ancre globale exige un éventail global — c'est leur combinaison qui sous-sert
+en silence, pas l'une ou l'autre. Réparer l'existant demande de défaire puis
+refaire (`migrations/vascoReingestIssuer`) : l'ancre rend une ligne déjà posée
+définitivement inerte.
+
 Ancrage : `agentmailMessageId = vasco:<clientSlug>:<communicationId>` —
 l'identifiant du portail, stable d'un pull à l'autre. Rejouer est gratuit, une
 reprise interrompue reprend, et le cron de 48 h ne peut pas ré-ingérer ce qu'il

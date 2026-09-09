@@ -167,10 +167,15 @@ export const run = internalAction({
       results.push({ name: target.name, ...outcome })
     }
 
+    // `queued`, not `ingested`: this counts the publications HANDED TO the
+    // pipeline, not the reports that came out of it. The free-slot rule runs
+    // at the very end of each run, long after this returns — reading this
+    // number as "reports created" is what made a 6-publication run look like
+    // it had bypassed the guard.
     return {
       org: orgSlug,
       issuers: results.length,
-      ingested: results.reduce((n, r) => n + r.ingested, 0),
+      queued: results.reduce((n, r) => n + r.ingested, 0),
       skipped: results.reduce((n, r) => n + r.skipped, 0),
       results,
     }
