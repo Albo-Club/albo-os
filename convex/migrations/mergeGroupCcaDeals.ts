@@ -1,6 +1,6 @@
 /**
  * One current account per subsidiary — merges the duplicate `cca` deals
- * CALTE carries on three of its group entities.
+ * CALTE carries on four of its group entities.
  *
  * CALTE funds its subsidiaries through their shareholder current account, and
  * nothing else: their capital is 1 000 €, subscribed at incorporation and
@@ -10,6 +10,13 @@
  * courant » and « Virement vers Compte Courant ». Requalifying them to `cca`
  * left Caltimo, SCI Chapelle and SCI Upload with TWO `cca` lines each,
  * splitting one relation in two.
+ *
+ * RDB got there another way: RDB repaid 2 300 000 € of its current account in
+ * July 2026, which made the line look settled, so the transfers that followed
+ * were pointed onto a fresh one. But a partial repayment does not close a
+ * current account, it moves its balance — 468 155 € were still owed — and a
+ * current account is a running balance rather than a series of contracts.
+ * Same lender, same borrower, same instrument: one relation, one line.
  *
  * This merges each pair back into one line: the absorbed deal's transactions
  * are re-pointed onto the survivor, then the emptied deal is deleted.
@@ -53,8 +60,8 @@ type Ctx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>
 
 const ORG_SLUG = 'calte'
 
-/** The three group entities CALTE ended up funding through two `cca` lines. */
-const TARGET_COMPANIES = ['Caltimo', 'SCI Chapelle', 'SCI Upload'] as const
+/** The four group entities CALTE ended up funding through two `cca` lines. */
+const TARGET_COMPANIES = ['Caltimo', 'SCI Chapelle', 'SCI Upload', 'RDB'] as const
 
 /** What still points at the absorbed deal and would be orphaned by its deletion. */
 type Blockers = {
