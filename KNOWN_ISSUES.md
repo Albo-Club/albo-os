@@ -3820,6 +3820,18 @@ dérivé). `paidActual` (décaissé réel) est **calculé** depuis les transacti
 (`transactionTotals`) et n'est jamais éditable — distinct de `paidAmount`
 (colonne, « montant contractuel »).
 
+⚠️ **Sur un deal issu de l'import Airtable, `paidAmount` est un instantané
+figé**, pas un montant contractuel : `airtableImport` l'a calculé une fois, en
+sommant les mouvements sortants **qu'Airtable connaissait ce jour-là**, et
+plus rien ne le rafraîchit. Il dérive donc de `paidActual` au fil des
+pointages, sans que rien ne le signale — c'est ainsi que le C/C Albo affichait
+400 000 € saisis pour 1 880 000 € réellement pointés. Aucun calcul ne le lit
+(participations, KPIs, NAV et capital déployé passent tous par `paidActual`) :
+il ne survit que comme champ éditable de la fiche deal. Devant un écart
+saisi / pointé sur une ligne importée, c'est donc le **pointé** qui fait foi,
+et le bon geste est d'effacer le champ plutôt que de le recalculer — un
+chiffre figé qu'on rafraîchit une fois se re-périme aussitôt.
+
 ## Édition inline des fiches (`src/components/ui/inline-field.tsx`)
 
 Les blocs **« Détails de l'instrument »** (fiche deal) et **« Identité »** (fiche

@@ -23,6 +23,48 @@ bas de page.
 
 ---
 
+## v1.218.1 — 09/09/2026 à 17:40 — Un compte courant par filiale, et plus deux
+
+CALTE finance ses filiales par leur compte courant d'associé, et par rien
+d'autre : leur capital est de 1 000 €, souscrit à la constitution et jamais
+augmenté. Cinq de ces avances étaient pourtant enregistrées comme de
+l'immobilier détenu en direct — ce que les libellés bancaires démentaient
+eux-mêmes (« RDB Compte courant », « Virement vers Compte Courant »). Elles
+ont été requalifiées en comptes courants, ce qui a laissé Caltimo, SCI
+Chapelle et SCI Upload avec **deux lignes** chacune pour une seule et même
+relation.
+
+Cette migration les replie en une. La ligne conservée récupère toutes les
+transactions de l'autre et reprend la date de signature la plus ancienne,
+pour couvrir toute l'histoire de l'avance.
+
+Elle perd aussi son montant « versé » saisi. Ce chiffre venait de la reprise
+Airtable et n'avait plus bougé depuis, alors que le montant réellement
+décaissé est recalculé à chaque affichage depuis les virements pointés. Un
+chiffre figé qui contredit le chiffre vivant vaut moins que pas de chiffre du
+tout.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/mergeGroupCcaDeals.ts` — `inspect` / `apply`, cf.
+>   runbook en tête de fichier et `MIGRATIONS.md`. Les cibles sont désignées
+>   par **nom de société**, pas par id de deal : la ligne conservée est celle
+>   qui porte le plus de transactions (date la plus ancienne en cas
+>   d'égalité), donc le script choisit la même rangée quoi qu'il arrive à la
+>   base entre l'écriture et l'exécution.
+> - Sur la survivante : `dealId` des transactions absorbées repointé,
+>   `signedDate` reculée si besoin, `paidAmount` **effacé** (`undefined` au
+>   patch Convex). La ligne absorbée est ensuite supprimée.
+> - `matchingDecisions` est laissé intact — la table est append-only par
+>   contrat, un instantané de ce que le décideur voyait ; la réécrire
+>   falsifierait l'historique.
+> - Les sept autres tables qui référencent un deal (valorisations,
+>   projections, documents, garanties, prévisionnel ×3) **bloquent** la paire
+>   plutôt que de se retrouver orphelines — même règle que `deals:remove`.
+> - `convex/regression.mergeCca.test.ts` : fusion complète, refus sur
+>   référence tierce sans bloquer les autres paires, historique de pointage
+>   préservé, idempotence.
+
 ## v1.218.0 — 09/09/2026 à 15:41 — Les données sont sauvegardées automatiquement, tous les jours
 
 Jusqu'ici, sauvegarder Albo OS voulait dire y penser et lancer une commande à
