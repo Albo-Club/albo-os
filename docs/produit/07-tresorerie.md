@@ -79,6 +79,28 @@ La page de détail d'un compte montre son historique de transactions
 (recherche, lien vers le deal rattaché) et permet d'éditer nom personnalisé,
 solde manuel, nanti, clôturé.
 
+### Un accès bancaire, plusieurs sociétés
+
+Un même accès en banque porte souvent les comptes de plusieurs sociétés du
+groupe (l'accès Palatine de CALTE porte aussi les comptes courants des deux
+SCI Chapelle). Comme chaque société est une organisation à part entière dans
+Albo OS, ces comptes arrivent d'abord dans la société qui a lancé la
+connexion, puis se **rattachent** un par un à la leur : bouton
+« Rattacher » sur la page du compte, on choisit la société et l'entité
+titulaire.
+
+Le compte part avec **toutes ses transactions** : il quitte la trésorerie,
+le prévisionnel et la position de TVA de la société de départ, et entre dans
+ceux de la nouvelle. La connexion bancaire, elle, ne bouge pas — elle reste
+suivie (et se reconnecte) depuis la société qui l'a créée, et continue
+d'alimenter le compte déplacé.
+
+Deux garde-fous : il faut être **administrateur des deux sociétés**, et le
+rattachement est refusé tant que le compte est accroché à quelque chose de sa
+société actuelle — une transaction déjà pointée, un placement adossé au
+compte, un prêt qui y est prélevé. On défait ce lien d'abord. Le geste est
+donc à faire **tôt**, juste après la connexion.
+
 ### Surveillance des connexions
 
 La section « Connexions bancaires » (onglet Gestion) affiche
