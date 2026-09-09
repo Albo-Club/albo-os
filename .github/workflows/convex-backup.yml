@@ -1,0 +1,140 @@
+name: Convex backup
+
+# Daily backup of the production deployment to a Google Drive shared drive
+# (ALB-234). Convex has no scheduled export to a destination we choose, so
+# this workflow is the scheduler: it runs the CLI and pushes the archive.
+#
+# ONE export per day. Its kind depends on the date, decided by the script:
+#   - every day                        → data only
+#   - Sunday, and the 1st of the month → data + file storage
+# Files are billed as egress on every export and never change after upload,
+# so they ride the weekly and monthly restore points, not the daily one.
+#
+# Retention (7 daily / 4 weekly / 12 monthly) is recomputed from what is in
+# the folder, so a missed run does not break the rotation.
+#
+# Requires four repository SECRETS (Settings → Secrets and variables → Actions):
+#   CONVEX_DEPLOY_KEY        prod deploy key (Convex dashboard → prod → Deploy key)
+#   GDRIVE_SERVICE_ACCOUNT   the service-account JSON, verbatim
+#   GDRIVE_BACKUP_FOLDER_ID  folder id on the shared drive
+# ⚠️ The service account must be a member of a SHARED drive: it has no
+# storage quota of its own. Setup runbook in MIGRATIONS.md.
+
+on:
+  schedule:
+    # 03:00 UTC = 05:00 Paris in summer, 04:00 in winter. Cron is fixed UTC
+    # and the drift is irrelevant for a backup — same choice as prod-smoke.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      full:
+        description: 'Forcer une archive complète (données + fichiers)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+# A run holds the retention of the whole folder: two at once could both
+# decide to purge the same archive, or upload the same name twice.
+concurrency:
+  group: convex-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Missing secrets are a SETUP state, not an incident: fail with an
+      # actionable message and skip the issue-opening step below.
+      - name: Require the backup secrets
+        id: secrets
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+          GDRIVE_SERVICE_ACCOUNT: ${{ secrets.GDRIVE_SERVICE_ACCOUNT }}
+          GDRIVE_BACKUP_FOLDER_ID: ${{ secrets.GDRIVE_BACKUP_FOLDER_ID }}
+        run: |
+          missing=""
+          [ -z "$CONVEX_DEPLOY_KEY" ] && missing="$missing CONVEX_DEPLOY_KEY"
+          [ -z "$GDRIVE_SERVICE_ACCOUNT" ] && missing="$missing GDRIVE_SERVICE_ACCOUNT"
+          [ -z "$GDRIVE_BACKUP_FOLDER_ID" ] && missing="$missing GDRIVE_BACKUP_FOLDER_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Secrets manquants :$missing — voir MIGRATIONS.md § « Backup automatique Convex → Drive »."
+            exit 1
+          fi
+
+      - name: Export, verify, upload, purge
+        id: backup
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+          GDRIVE_SERVICE_ACCOUNT: ${{ secrets.GDRIVE_SERVICE_ACCOUNT }}
+          GDRIVE_BACKUP_FOLDER_ID: ${{ secrets.GDRIVE_BACKUP_FOLDER_ID }}
+        run: |
+          set -o pipefail
+          node scripts/convex-backup.mjs ${{ inputs.full && '--full' || '' }} 2>&1 \
+            | tee /dev/stderr | sed -e 's/\x1b\[[0-9;]*m//g' > backup-output.txt
+
+      # Only a real backup failure opens an alert — not a missing secret,
+      # which the step above already explains in the run.
+      - name: Open or update failure issue
+        if: ${{ failure() && steps.backup.outcome == 'failure' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            let output = '(pas de sortie capturée)'
+            try {
+              output = fs.readFileSync('backup-output.txt', 'utf8').trim()
+            } catch {}
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            const body = [
+              'La sauvegarde quotidienne de la prod Convex a échoué.',
+              '',
+              "⚠️ Tant que ce n'est pas corrigé, il n'y a **pas de sauvegarde du jour**.",
+              '',
+              `Run : ${runUrl}`,
+              '',
+              'Runbook : `MIGRATIONS.md` § « Backup automatique Convex → Drive ».',
+              '',
+              '<details><summary>Sortie du script</summary>',
+              '',
+              '```',
+              output,
+              '```',
+              '',
+              '</details>',
+            ].join('\n')
+
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'convex-backup',
+            })
+            if (open.length > 0) {
+              // An alert is already open: log the new failure there instead
+              // of opening a duplicate.
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: open[0].number,
+                body: `Nouvel échec de la sauvegarde.\n\n${body}`,
+              })
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '🔴 Backup Convex : la sauvegarde quotidienne a échoué',
+                labels: ['convex-backup'],
+                body,
+              })
+            }

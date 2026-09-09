@@ -23,6 +23,58 @@ bas de page.
 
 ---
 
+## v1.218.0 — 09/09/2026 à 15:41 — Les données sont sauvegardées automatiquement, tous les jours
+
+Jusqu'ici, sauvegarder Albo OS voulait dire y penser et lancer une commande à
+la main. C'est maintenant automatique : chaque nuit, une copie complète des
+données part sur un Drive partagé dédié.
+
+Le rythme suit ce qui change vraiment. Tous les jours, les données : la
+synchro bancaire, les reportings reçus, ce qui a été saisi. Le dimanche et le
+1er du mois, la copie embarque **aussi** tous les documents stockés — un PDF
+ne changeant jamais après son dépôt, le recopier chaque nuit ne protégerait de
+rien et coûterait quinze fois plus cher.
+
+On conserve les 7 derniers jours, les 4 dernières semaines et les 12 derniers
+mois, soit un peu plus d'un an de points de restauration. Les plus anciennes
+s'effacent toutes seules.
+
+Deux garde-fous : la copie est **contrôlée avant d'être envoyée** — une archive
+abîmée qui partirait en silence serait pire que pas de sauvegarde du tout — et
+le ménage des anciennes n'a lieu qu'une fois la nouvelle bien arrivée. Si quoi
+que ce soit échoue, une alerte est ouverte automatiquement : on ne découvre pas
+un backup manquant le jour où on en a besoin.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `.github/workflows/convex-backup.yml` : cron quotidien 03:00 UTC +
+>   `workflow_dispatch` (avec une case « archive complète »). `concurrency`
+>   sur un groupe unique — deux runs simultanés pourraient purger la même
+>   archive. Échec réel → issue labellisée `convex-backup` (commentée, pas
+>   dupliquée), sur le modèle de `prod-smoke.yml` ; des secrets absents sont
+>   traités à part, comme un état de setup et non un incident.
+> - Nouveau `scripts/convex-backup.mjs` : `convex export --prod`
+>   (+ `--include-file-storage` le dimanche et le 1er), vérification, upload
+>   Drive résumable, purge. Auth par JWT de service account signé avec
+>   `node:crypto` (RS256) — aucune dépendance ajoutée, l'API Drive en `fetch`
+>   brut comme `import-legal-docs.mjs`.
+> - Nouveau `scripts/lib/backup-retention.mjs` : la rotation 7/4/12 en
+>   **fonction pure** sur les noms de fichiers, sans horloge ni état. Un run
+>   manqué, rejoué ou en retard converge sur le même ensemble ; les horizons se
+>   comptent sur les archives présentes, pas sur le calendrier ; un nom hors
+>   convention n'est jamais supprimé. Seule une archive `-full` peut occuper un
+>   créneau hebdo ou mensuel. 12 tests dans `tests/backupRetention.test.ts`.
+> - Vérification avant envoi : plancher de taille, `unzip -t` (CRC de chaque
+>   entrée, donc détection d'une archive tronquée), présence effective des
+>   tables `organizations` et `deals`, et du dossier `_storage` pour une
+>   `-full`. La purge ne s'exécute qu'après confirmation de l'upload.
+> - Runbook (mise en place, vérification, restauration) dans `MIGRATIONS.md`,
+>   ligne B12 dans `TESTING.md`. ⚠️ La restauration est **documentée mais
+>   jamais déroulée** — `import --replace-all` sur la prod est destructif.
+> - Contexte de coût (ALB-234) : Convex facture l'egress à chaque export
+>   (0,132 $/Go au-delà d'1 Go/mois). Sortir les fichiers du quotidien fait
+>   passer la note d'environ 80 $/an à 5 $/an sur un stockage de 1,70 Go.
+
 ## v1.217.6 — 09/09/2026 à 12:52 — Savoir ce qui pèse dans les documents stockés
 
 Changement purement technique, rien ne change à l'écran. Avant d'automatiser
