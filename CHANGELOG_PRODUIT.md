@@ -23,6 +23,51 @@ bas de page.
 
 ---
 
+## v1.220.2 — 09/09/2026 à 18:32 — La première sauvegarde réelle corrige deux détails de mise en service
+
+Toujours invisible à l'écran. Le premier lancement de la sauvegarde
+automatique a buté sur deux points que seule une exécution réelle pouvait
+révéler : l'autorisation demandée à la base n'était pas la bonne, et le
+repère du dossier de destination était accepté sous une forme trop stricte.
+Les deux sont corrigés et consignés, pour que la prochaine mise en service
+— ou la même à refaire un jour — ne repasse pas par là.
+
+> **🔧 Notes techniques**
+>
+> - **Permissions du deploy key Convex.** `convex export` passe par l'API
+>   Backups, pas par une lecture de données. Il faut `deployment:backups:view`
+>   + `:create` + `:download` (+ `data:view`), et jamais `backups:delete` ni
+>   `backups:import`. Convex ne documente ce mapping nulle part **et le CLI ne
+>   signale que la première permission manquante** : chaque essai n'en révèle
+>   qu'une, et les permissions d'une clé ne se modifient pas — il faut en
+>   recréer une à chaque fois. Deux runs perdus à les découvrir une par une,
+>   d'où la liste donnée entière dans `MIGRATIONS.md`, `TESTING.md` B12 et
+>   l'en-tête du script.
+> - **`ExportInProgress`, conséquence de ce qui précède.** Une clé portant
+>   `backups:create` sans `backups:view` fait passer la *demande* d'export et
+>   échouer la lecture de son état : l'export continue côté Convex, qui n'en
+>   autorise qu'un à la fois, et le run suivant se prend
+>   `400 Bad Request: ExportInProgress`. Rien à corriger — attendre et
+>   relancer. Documenté comme tel dans le runbook, avec la note que le cron
+>   quotidien n'y est pas exposé.
+> - **`GDRIVE_BACKUP_FOLDER_ID` accepte l'URL Drive.** Coller l'URL entière
+>   est le réflexe naturel (c'est ce que donne la barre d'adresse) et
+>   échouait beaucoup plus loin, sur un 404 Drive opaque au moment de
+>   l'upload. `folderIdFrom` extrait l'id de `/folders/<id>` et laisse passer
+>   un id déjà nu.
+> - Validé côté auth : l'échange OIDC → jeton Google d'une heure a fonctionné
+>   du premier coup sur le run réel, credentials WIF exportés sans clé.
+> - Le garde-fou d'alerte a fait son office : l'échec a ouvert une issue
+>   `convex-backup` avec la sortie du script.
+> - Porte aussi le correctif du binding WIF : dans le `principalSet`, le
+>   segment est `attribute.repository` au **singulier**, sans quoi
+>   `INVALID_ARGUMENT: Invalid principalSet member` — constaté au setup réel,
+>   et d'autant plus discret que les trois commandes précédentes réussissent.
+
+---
+
+---
+
 ## v1.220.1 — 09/09/2026 à 18:22 — RDB aussi n'a qu'un seul compte courant
 
 RDB portait, comme trois autres filiales avant elle, deux lignes de compte

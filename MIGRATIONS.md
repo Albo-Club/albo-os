@@ -142,11 +142,17 @@ gcloud iam workload-identity-pools providers create-oidc albo-os \
 
 gcloud iam service-accounts add-iam-policy-binding $SA \
   --role=roles/iam.workloadIdentityUser \
-  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attributes.repository/$REPO"
+  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/$REPO"
 ```
 
 ⚠️ L'`--attribute-condition` n'est pas cosmétique : sans elle, **n'importe quel
 dépôt GitHub** pourrait demander un jeton pour ce compte de service.
+
+⚠️ Dans le `principalSet`, le segment est `attribute.repository` au
+**singulier** — `attributes.` fait échouer le binding sur un
+`INVALID_ARGUMENT: Invalid principalSet member` qui ne dit pas pourquoi. Les
+trois commandes précédentes réussissent quand même, donc l'erreur arrive
+au milieu d'une sortie qui a l'air saine.
 
 Le chemin du provider à reporter dans GitHub :
 `projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/albo-os`
@@ -169,7 +175,7 @@ aussi cette appartenance — et elle seule — qui borne la portée du scope
 
 | Onglet | Nom | Valeur |
 | --- | --- | --- |
-| **Secrets** | `CONVEX_DEPLOY_KEY` | dashboard Convex → déploiement **prod** → Deploy key |
+| **Secrets** | `CONVEX_DEPLOY_KEY` | dashboard Convex → déploiement **prod** → Create Deploy Key (permissions ci-dessous) |
 | **Variables** | `GCP_WORKLOAD_IDENTITY_PROVIDER` | le chemin du provider de l'étape 2 |
 | **Variables** | `GCP_SERVICE_ACCOUNT` | `albo-os-backup@<projet>.iam.gserviceaccount.com` |
 | **Variables** | `GDRIVE_BACKUP_FOLDER_ID` | l'ID du dossier de l'étape 3 |
@@ -177,6 +183,39 @@ aussi cette appartenance — et elle seule — qui borne la portée du scope
 Seule la clé Convex est un secret. Les trois autres sont des **variables** :
 le chemin du provider est inerte sans le lien de confiance vers ce dépôt, et
 le dossier Drive est protégé par l'appartenance, pas par l'obscurité.
+
+⚠️ **Permissions de la clé Convex.** `convex export` passe par l'API Backups,
+pas par une lecture de données : une clé qui ne porte que
+`deployment:data:view` échoue sur
+`You do not have permission to perform this operation (deployment:backups:create)`.
+Cocher :
+
+- `deployment:backups:view`
+- `deployment:backups:create`
+- `deployment:backups:download`
+- `deployment:data:view`
+
+Et **rien d'autre** — surtout pas `backups:delete` ni `backups:import`, qui
+sont destructives et dont une sauvegarde n'a aucun besoin.
+
+La documentation Convex ne dit nulle part quelle permission va avec quelle
+commande, et le CLI ne signale **que la première manquante** : chaque essai
+n'en révèle qu'une, et les permissions d'une clé ne se modifient pas — il faut
+en recréer une. D'où la liste donnée entière : elle a coûté deux runs.
+
+⚠️ **`ExportInProgress` : attendre, ne rien corriger.** Convex n'autorise
+qu'un export à la fois, et un run qui échoue **après** avoir demandé l'export
+en laisse un qui tourne côté serveur — c'est exactement ce que fait une clé
+qui a `backups:create` mais pas `backups:view` : la demande passe, la lecture
+d'état échoue, l'export continue. Le run suivant se prend alors
+`400 Bad Request: ExportInProgress`. Ce n'est pas une erreur de
+configuration : laisser l'export en cours se terminer (quelques minutes sur
+~1,7 Go) et relancer. Le cron quotidien n'y est pas exposé, 24 h suffisant
+largement.
+
+⚠️ **`GDRIVE_BACKUP_FOLDER_ID` est l'identifiant, pas l'URL.** Coller l'URL
+entière est le réflexe naturel ; le script sait désormais en extraire l'id,
+mais autant donner directement `1AbC…`.
 
 ⚠️ Le Drive est le **même compte Google** que les documents métier : un compte
 compromis ou fermé emporte les sauvegardes avec les originaux. Arbitrage

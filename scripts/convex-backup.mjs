@@ -29,7 +29,14 @@
  * A corrupt archive pushed silently is worse than no backup at all.
  *
  * Environment:
- *   - CONVEX_DEPLOY_KEY        prod deploy key, read by the Convex CLI (secret)
+ *   - CONVEX_DEPLOY_KEY        prod deploy key, read by the Convex CLI (secret).
+ *                              Needs `deployment:backups:view`,
+ *                              `:create` AND `:download`: `convex export`
+ *                              goes through the Backups API, not plain data
+ *                              reads. Convex reveals the missing permission
+ *                              one error at a time, so grant the three at
+ *                              once — `data:view` alone fails, and so does
+ *                              create+download without view.
  *   - GDRIVE_ACCESS_TOKEN      a short-lived Google OAuth access token
  *   - GDRIVE_BACKUP_FOLDER_ID  the target folder on the shared drive
  *
@@ -86,6 +93,16 @@ const FILES_URL = 'https://www.googleapis.com/drive/v3/files'
 
 const human = (b) =>
   b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(2)} Go` : `${(b / 1024 ** 2).toFixed(1)} Mo`
+
+/**
+ * The folder id, from either the raw id or the Drive URL it sits in. Pasting
+ * the whole URL is the natural mistake — it is what the address bar offers —
+ * and left as-is it fails much later, on an opaque Drive 404 at upload time.
+ */
+function folderIdFrom(value) {
+  const fromUrl = /\/folders\/([A-Za-z0-9_-]+)/.exec(value)
+  return fromUrl ? fromUrl[1] : value.trim()
+}
 
 function requireEnv(name) {
   const value = process.env[name]
@@ -212,7 +229,7 @@ async function main() {
 
   console.log(`Archive du jour : ${name} (${includeFiles ? 'données + fichiers' : 'données seules'})`)
 
-  const folderId = requireEnv('GDRIVE_BACKUP_FOLDER_ID')
+  const folderId = folderIdFrom(requireEnv('GDRIVE_BACKUP_FOLDER_ID'))
   // Nothing to sign here: the token is handed in by the caller (Workload
   // Identity Federation in CI), so no long-lived credential ever exists.
   const token = requireEnv('GDRIVE_ACCESS_TOKEN')
