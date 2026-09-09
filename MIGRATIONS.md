@@ -203,6 +203,16 @@ commande, et le CLI ne signale **que la première manquante** : chaque essai
 n'en révèle qu'une, et les permissions d'une clé ne se modifient pas — il faut
 en recréer une. D'où la liste donnée entière : elle a coûté deux runs.
 
+⚠️ **`ExportInProgress` : attendre, ne rien corriger.** Convex n'autorise
+qu'un export à la fois, et un run qui échoue **après** avoir demandé l'export
+en laisse un qui tourne côté serveur — c'est exactement ce que fait une clé
+qui a `backups:create` mais pas `backups:view` : la demande passe, la lecture
+d'état échoue, l'export continue. Le run suivant se prend alors
+`400 Bad Request: ExportInProgress`. Ce n'est pas une erreur de
+configuration : laisser l'export en cours se terminer (quelques minutes sur
+~1,7 Go) et relancer. Le cron quotidien n'y est pas exposé, 24 h suffisant
+largement.
+
 ⚠️ **`GDRIVE_BACKUP_FOLDER_ID` est l'identifiant, pas l'URL.** Coller l'URL
 entière est le réflexe naturel ; le script sait désormais en extraire l'id,
 mais autant donner directement `1AbC…`.

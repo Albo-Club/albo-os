@@ -43,6 +43,13 @@ Les deux sont corrigés et consignés, pour que la prochaine mise en service
 >   recréer une à chaque fois. Deux runs perdus à les découvrir une par une,
 >   d'où la liste donnée entière dans `MIGRATIONS.md`, `TESTING.md` B12 et
 >   l'en-tête du script.
+> - **`ExportInProgress`, conséquence de ce qui précède.** Une clé portant
+>   `backups:create` sans `backups:view` fait passer la *demande* d'export et
+>   échouer la lecture de son état : l'export continue côté Convex, qui n'en
+>   autorise qu'un à la fois, et le run suivant se prend
+>   `400 Bad Request: ExportInProgress`. Rien à corriger — attendre et
+>   relancer. Documenté comme tel dans le runbook, avec la note que le cron
+>   quotidien n'y est pas exposé.
 > - **`GDRIVE_BACKUP_FOLDER_ID` accepte l'URL Drive.** Coller l'URL entière
 >   est le réflexe naturel (c'est ce que donne la barre d'adresse) et
 >   échouait beaucoup plus loin, sur un 404 Drive opaque au moment de
