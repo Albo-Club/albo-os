@@ -40,6 +40,8 @@ import type { Id } from './_generated/dataModel'
 
 const CLIENT = 'parallel'
 
+type Kind = 'ingest' | 'analysis' | 'announce'
+
 async function orgSetup(slug = 'org-vasco') {
   const t = setupHarness()
   const user = await createUser(t, `${slug}@test.dev`)
@@ -78,11 +80,13 @@ async function linkToIssuer(
  * entry point. Each call returns only what was queued SINCE the previous one,
  * so a test can assert one refresh at a time.
  *
- * Two job shapes count, and the distinction is itself an invariant: a
- * BOOTSTRAP fill queues `intelligence.runAnalysis` alone (analyze the backlog,
- * mail nothing), while a later ARRIVAL queues `vascoNotify.announce`, which
- * runs that same synthesis and then mails the recap. `queued()` returns the
- * companies; `queuedKinds()` returns which of the two they went through.
+ * Three job shapes count. An ARRIVAL now queues `vascoIngest.ingestIssuer` —
+ * the publication is digested into a report, and the synthesis and the
+ * announcement are released by that pipeline's own tail — while LINKING an
+ * entity still queues `intelligence.runAnalysis` directly. The reader resolves
+ * an ingestion back to the entities of its issuer, so the assertions stay what
+ * they always were: WHICH entities a refresh puts to work. `queued()` returns
+ * the companies; `queuedKinds()` returns how each got there.
  *
  * The queue is read, never run: both would reach for the LLM, the portal and
  * AgentMail. What is under test is who gets queued and how, not what the model
@@ -90,7 +94,7 @@ async function linkToIssuer(
  */
 function watchQueue(t: Harness): {
   queued: () => Promise<Array<Id<'companies'>>>
-  queuedKinds: () => Array<'analysis' | 'announce'>
+  queuedKinds: () => Array<Kind>
 } {
   let seen = 0
   const drain = async () => {
@@ -99,13 +103,27 @@ function watchQueue(t: Harness): {
     )
     const fresh = jobs.slice(seen)
     seen = jobs.length
-    const out: Array<{ companyId: Id<'companies'>; kind: 'analysis' | 'announce' }> = []
+    const out: Array<{ companyId: Id<'companies'>; kind: Kind }> = []
     for (const job of fresh) {
       const args = job.args[0] as {
         refs?: Array<{ companyId: Id<'companies'> }>
         companyId?: Id<'companies'>
+        clientSlug?: string
+        issuerId?: string
       }
-      if (job.name.endsWith('vascoNotify:announce') && args.companyId)
+      if (job.name.endsWith('vascoIngest:ingestIssuer') && args.issuerId) {
+        // An ingestion names an ISSUER, not an entity: resolve it back the way
+        // the ingestion itself will, so the assertions keep reading in entities.
+        const linked = await t.run(async (ctx) =>
+          (await ctx.db.query('companies').collect()).filter(
+            (c) =>
+              c.vascoClientSlug === args.clientSlug &&
+              c.vascoIssuerId === args.issuerId &&
+              c.archivedAt == null,
+          ),
+        )
+        for (const c of linked) out.push({ companyId: c._id, kind: 'ingest' })
+      } else if (job.name.endsWith('vascoNotify:announce') && args.companyId)
         out.push({ companyId: args.companyId, kind: 'announce' })
       else if (job.name.endsWith('runAnalysisBatch'))
         for (const ref of args.refs ?? [])
@@ -115,7 +133,7 @@ function watchQueue(t: Harness): {
     }
     return out
   }
-  let pending: Array<{ companyId: Id<'companies'>; kind: 'analysis' | 'announce' }> = []
+  let pending: Array<{ companyId: Id<'companies'>; kind: Kind }> = []
   return {
     queued: async () => {
       pending = await drain()
@@ -310,7 +328,7 @@ describe('the cache is upserted, and an arrival is announced once', () => {
     expect(rows.map((r) => r.communicationId)).toEqual(['c1'])
   })
 
-  test('the first fill analyzes but never announces', async () => {
+  test('the first fill is digested but can never be announced', async () => {
     const { t, org } = await orgSetup('org-bootstrap')
     const companyId = await createPortfolioCompany(t, org.orgId, 'SPV Alpha')
     await linkToIssuer(t, companyId, 'iss-1')
@@ -321,17 +339,38 @@ describe('the cache is upserted, and an arrival is announced once', () => {
       clientSlug: CLIENT,
       communications: [comm('c1', 'iss-1'), comm('c2', 'iss-1')],
     })
+    // A backlog IS digested — that is the point of the channel — and what
+    // keeps it silent is the MARKER, not the caller: every row of a first fill
+    // is stamped, so the claim at the end of the pipeline finds nothing and no
+    // mail can leave.
     expect(await queued()).toEqual([companyId])
-    expect(queuedKinds()).toEqual(['analysis'])
+    expect(queuedKinds()).toEqual(['ingest'])
+    expect(
+      await t.mutation(internal.vascoNotify.claimArrivals, {
+        orgId: org.orgId,
+        clientSlug: CLIENT,
+        issuerId: 'iss-1',
+      }),
+    ).toEqual([])
 
-    // Next publication: same entity, but this one IS news.
+    // Next publication: same entity, same ingestion — but this one IS news,
+    // so this time there is something to claim.
     await t.mutation(internal.vasco.replaceCommunicationsCache, {
       orgId: org.orgId,
       clientSlug: CLIENT,
       communications: [comm('c1', 'iss-1'), comm('c2', 'iss-1'), comm('c3', 'iss-1')],
     })
     expect(await queued()).toEqual([companyId])
-    expect(queuedKinds()).toEqual(['announce'])
+    expect(queuedKinds()).toEqual(['ingest'])
+    expect(
+      (
+        await t.mutation(internal.vascoNotify.claimArrivals, {
+          orgId: org.orgId,
+          clientSlug: CLIENT,
+          issuerId: 'iss-1',
+        })
+      ).map((a) => a.title),
+    ).toEqual(['Reporting c3'])
   })
 
   test('an arrival is claimed once — a replay finds nothing to say', async () => {

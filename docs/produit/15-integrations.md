@@ -166,12 +166,27 @@ pièces jointes, téléchargeables une par une depuis le portail. Un bouton
 **« Rafraîchir VASCO »** apparaît en haut de la liste sur les fiches rattachées
 uniquement ; une fiche non rattachée n'affiche rien.
 
-Une communication **nouvelle** relance toute seule la synthèse IA de la société
-concernée, exactement comme un reporting reçu par email : rien à cliquer. Seules
-les sociétés dont l'émetteur a effectivement publié sont recalculées — une
-synchronisation qui ne ramène rien ne relance rien. Rattacher une société à son
-émetteur lance également son analyse dans la foulée, sans attendre la prochaine
-publication.
+Une communication **nouvelle** est **analysée comme un reporting reçu par
+email** : ses documents sont récupérés et lus — PDF compris —, et elle devient un
+reporting à part entière, avec son résumé, ses points clés, ses chiffres, ses
+pièces jointes attachées à la ligne. Elle est dès lors cherchable et connue de
+l'assistant, ce qui n'était pas le cas quand une publication n'était qu'un titre
+et une date : un SPV qui ne rédige jamais de mail cesse d'être une page muette.
+
+La synthèse IA de la société est relancée dans la foulée, puis le mail
+d'annonce part — dans cet ordre, pour que la note qu'il cite ait déjà intégré la
+publication. Seules les sociétés dont l'émetteur a effectivement publié sont
+concernées : une synchronisation qui ne ramène rien ne relance rien, et une
+publication déjà traitée n'est jamais reprise deux fois. Rattacher une société à
+son émetteur lance également son analyse dans la foulée, sans attendre la
+prochaine publication.
+
+**Quand le même document arrive par les deux chemins**, la version reçue par
+email fait foi et n'est jamais remplacée : une publication ne vient garnir que
+les périodes encore vides. La raison est simple — un reporting transféré porte
+le message complet et les pièces de l'expéditeur, là où une publication peut
+n'être qu'un mot d'accompagnement avec un PDF que l'app ne parvient pas
+toujours à lire.
 
 Une fois l'analyse à jour, **un email d'annonce part** — un par société qui a
 publié, au même format que l'accusé de réception d'un reporting transféré :

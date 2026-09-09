@@ -28,10 +28,23 @@
  *   3. a name this script did not write is never deleted.
  * A corrupt archive pushed silently is worse than no backup at all.
  *
- * Prerequisites (all set as GitHub Actions secrets):
- *   - CONVEX_DEPLOY_KEY       prod deploy key, read by the Convex CLI
- *   - GDRIVE_SERVICE_ACCOUNT  the service-account JSON, verbatim
- *   - GDRIVE_BACKUP_FOLDER_ID the target folder on the shared drive
+ * Environment:
+ *   - CONVEX_DEPLOY_KEY        prod deploy key, read by the Convex CLI (secret)
+ *   - GDRIVE_ACCESS_TOKEN      a short-lived Google OAuth access token
+ *   - GDRIVE_BACKUP_FOLDER_ID  the target folder on the shared drive
+ *
+ * This script does NOT authenticate to Google itself. In CI the token comes
+ * from Workload Identity Federation (`google-github-actions/auth`), which
+ * trades GitHub's OIDC identity for an access token that impersonates the
+ * service account — so there is no key file to create, store or rotate. That
+ * also sidesteps `iam.disableServiceAccountKeyCreation`, the org policy that
+ * blocks key creation on this Google Workspace and which it would be wrong to
+ * turn off for one cron job.
+ *
+ * To run it by hand, mint an hour-long token yourself:
+ *   GDRIVE_ACCESS_TOKEN=$(gcloud auth print-access-token \
+ *     --impersonate-service-account=<sa>@<project>.iam.gserviceaccount.com \
+ *     --scopes=https://www.googleapis.com/auth/drive)
  *
  * ⚠️ The service account has NO storage quota of its own: the target must be
  * a folder on a SHARED DRIVE it is a member of ("Gestionnaire de contenu"),
@@ -47,7 +60,6 @@
 import { execFile } from 'node:child_process'
 import { createReadStream } from 'node:fs'
 import { mkdtemp, rm, stat } from 'node:fs/promises'
-import { createSign } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
@@ -69,7 +81,6 @@ const EXPECTED_TABLES = ['organizations', 'deals']
 /** An export smaller than this is not plausible — treat it as a failed run. */
 const MIN_PLAUSIBLE_BYTES = 1024 * 1024
 
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive'
 const UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files'
 const FILES_URL = 'https://www.googleapis.com/drive/v3/files'
 
@@ -93,50 +104,6 @@ function decideKind(now) {
   if (args.includes('--full')) return true
   if (args.includes('--data-only')) return false
   return now.getUTCDay() === 0 || now.getUTCDate() === 1
-}
-
-// ── Google auth ───────────────────────────────────────────────────────────
-// A service-account JWT signed locally, exchanged for an access token. Node's
-// crypto signs RS256 out of the box, so this needs no googleapis dependency —
-// same choice as scripts/import-legal-docs.mjs, which talks to Drive over
-// plain fetch.
-const b64url = (buf) =>
-  Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-
-async function getAccessToken(serviceAccountJson) {
-  let sa
-  try {
-    sa = JSON.parse(serviceAccountJson)
-  } catch {
-    throw new Error('GDRIVE_SERVICE_ACCOUNT n\'est pas du JSON valide (colle le fichier entier).')
-  }
-  if (!sa.client_email || !sa.private_key) {
-    throw new Error('GDRIVE_SERVICE_ACCOUNT : client_email ou private_key manquant.')
-  }
-
-  const iat = Math.floor(Date.now() / 1000)
-  const claims = {
-    iss: sa.client_email,
-    scope: DRIVE_SCOPE,
-    aud: 'https://oauth2.googleapis.com/token',
-    iat,
-    exp: iat + 3600,
-  }
-  const unsigned = `${b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.${b64url(JSON.stringify(claims))}`
-  const signer = createSign('RSA-SHA256')
-  signer.update(unsigned)
-  const jwt = `${unsigned}.${b64url(signer.sign(sa.private_key))}`
-
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
-    }),
-  })
-  if (!res.ok) throw new Error(`Auth Google refusée (${res.status}) : ${await res.text()}`)
-  return (await res.json()).access_token
 }
 
 // ── Export + verification ─────────────────────────────────────────────────
@@ -246,7 +213,9 @@ async function main() {
   console.log(`Archive du jour : ${name} (${includeFiles ? 'données + fichiers' : 'données seules'})`)
 
   const folderId = requireEnv('GDRIVE_BACKUP_FOLDER_ID')
-  const serviceAccount = requireEnv('GDRIVE_SERVICE_ACCOUNT')
+  // Nothing to sign here: the token is handed in by the caller (Workload
+  // Identity Federation in CI), so no long-lived credential ever exists.
+  const token = requireEnv('GDRIVE_ACCESS_TOKEN')
 
   const dir = await mkdtemp(join(tmpdir(), 'albo-backup-'))
   const path = join(dir, name)
@@ -257,7 +226,6 @@ async function main() {
     const { size, entries } = await verifyArchive(path, includeFiles)
     console.log(`  archive vérifiée : ${human(size)}, ${entries} entrées`)
 
-    const token = await getAccessToken(serviceAccount)
     const existing = await listArchives(token, folderId)
     const { keep, drop, unknown } = planRetention([...existing.map((f) => f.name), name])
 
