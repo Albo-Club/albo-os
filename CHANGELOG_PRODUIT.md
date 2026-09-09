@@ -23,6 +23,44 @@ bas de page.
 
 ---
 
+## v1.217.4 — 09/09/2026 à 10:48 — Les quinze doublons de documents CALTE arbitrés à la main sont retirés
+
+Le contrôle de l'import juridique avait sorti les documents portant le même
+nom sur la même société, avec un extrait de leur texte pour les départager.
+L'arbitrage est fait : quinze fichiers en double disparaissent des fiches
+CALTE — deux dépôts strictement identiques signés Docusign, un rapport
+mensuel déposé deux fois, quatre bulletins de souscription réexportés en
+version allégée, et huit scans dont un exemplaire n'avait aucun texte
+lisible. Dans chaque paire, l'exemplaire conservé est celui qui porte le
+plus d'information.
+
+Deux cas sont volontairement laissés intacts : les deux bulletins
+BELLEVILLES, qui ne sont pas des doublons (le modèle vierge de l'émetteur
+d'un côté, le bulletin rempli par CALTE de l'autre), et les trois exports du
+même tableur JEEN, en attente d'arbitrage.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau one-shot `convex/migrations/purgeDuplicateLegalDocs.ts`
+>   (`dryRun` / `apply`) : les quinze paires sont figées en dur par `_id` de
+>   prod (à supprimer → à garder) avec le motif de chaque arbitrage — jamais
+>   sous forme de règle, une règle « garder le plus lourd » aurait détruit le
+>   bulletin BELLEVILLES rempli par CALTE.
+> - Garde-fous dans `resolve` : le survivant doit exister, les deux lignes
+>   être dans `calte`, sur la **même** société, avec la même clé
+>   `normalizeDocumentTitle` — sinon la migration refuse au lieu de supprimer
+>   une ligne étrangère. Une ligne déjà partie est signalée, pas une erreur
+>   (rejouable).
+> - Suppression dans l'ordre de `documents:remove` : la ligne d'abord, puis
+>   `releaseStorage` (le blob n'est libéré que si plus aucune ligne ne le
+>   référence), puis `internal.vectorize.removeEntry` pour retirer l'entrée
+>   d'index sémantique.
+> - Pas de test unitaire : comme les autres one-shots ancrés sur des `_id` de
+>   prod (`mergeBillivCalte`, `purgeStrayOrgs`), les identifiants ne sont pas
+>   fabricables en test — la vérification est le `dryRun` du runbook.
+
+---
+
 ## v1.217.3 — 08/09/2026 à 19:55 — Le rapport de doublons dit enfin en quoi deux fichiers diffèrent
 
 Le contrôle de l'import juridique signale les documents qui portent le même
