@@ -2491,6 +2491,51 @@ Uint8Array(enc.encode(s))` produit bien de l'`ArrayBuffer`-backed.
   Albo Club (org albo). Un connecteur non mappé → `unmapped_powens_account`
   (erreur visible, **pas** d'écriture muette dans la mauvaise org). Qonto n'y
   figure pas (toujours résolu par match du record existant).
+- **Un accès bancaire n'appartient pas à une seule société.** Le mapping
+  ci-dessus est par **connecteur**, jamais par compte : l'accès Palatine de
+  CALTE porte aussi les comptes courants des SCI Chapelle 1 et 2, et tout
+  serait donc créé dans `calte`, propriété de CALTE — en silence, sans erreur,
+  avec pour conséquence une position TVA de CALTE qui intègre les flux des
+  SCI (`getVatPosition` somme toute l'org) et un solde de départ de
+  prévisionnel faux des deux côtés. La création n'a pas été rendue
+  « intelligente » (routage par IBAN en dur = un déploiement par compte) :
+  le compte naît dans l'org de la connexion, puis un admin le **rattache** à
+  sa société depuis la fiche compte (`cash.moveAccountToOrg`). Le geste est
+  humain, générique, et rejoue le patron du pointage (l'app liste, l'humain
+  choisit).
+
+  Trois conséquences à ne pas défaire :
+
+  1. **`powensFeedOrgId` est l'autorisation**, pas une commodité. C'est le
+     seul motif pour lequel l'ingestion accepte d'écrire hors de l'org du
+     user Powens ; sans ce tampon, un compte d'une autre org est **ignoré**
+     (warning, rien d'écrit). Il est posé par le rattachement, qui exige le
+     rôle admin sur les **deux** orgs — c'est la chaîne d'autorisation
+     complète. Il survit à une reconnexion, contrairement à
+     `powensConnectionId` qui change à chaque fois : c'est précisément
+     pourquoi le contrôle ne peut pas porter sur ce dernier.
+  2. **« Les comptes d'une connexion » se lisent par connexion, jamais par
+     org** (index `by_powens_connection`). `connectionAccounts`,
+     `listAccountsForBackfill` et `listConnections` le font : une lecture par
+     org ferait passer une connexion saine pour « obsolète » (elle
+     n'alimenterait plus rien de visible), donc éteindrait ses alertes, et le
+     rattrapage sauterait le compte déplacé en laissant un trou dans son
+     historique. Symétriquement, l'org d'accueil doit **exclure** ses comptes
+     à `powensFeedOrgId` étranger du scan des orphelins « untracked », sinon
+     elle affiche une fausse connexion morte.
+  3. **La reprise de lien d'une reconnexion doit voir les comptes déplacés.**
+     `matchExistingAccount` reçoit les comptes de l'org **plus** ceux qu'elle
+     alimente ailleurs (index `by_powens_feed_org`). Sans ça, une reconnexion
+     — qui redistribue de nouveaux ids de compte — ne reconnaîtrait plus le
+     compte déplacé et en **recréerait un doublon** dans l'org de la
+     connexion.
+
+  Le rattachement est **refusé** dès que le compte est accroché à quelque
+  chose de son org d'origine (transaction pointée, placement `deals.
+  bankAccountId`, compte de prélèvement d'un prêt) : le déplacer laisserait
+  ces liens à cheval sur deux orgs. On défait le lien d'abord. Les
+  transactions, elles, suivent le compte — leur `orgId` est ce qui scope
+  toute la lecture cash, la TVA et le prévisionnel.
 - **codegen** : comme pour l'import Airtable, `internal.powens.*` n'apparaît
   dans `_generated/api.d.ts` qu'après codegen. L'entrée `powens` y a été ajoutée
   pour passer le `typecheck` local ; `convex deploy` la régénère à l'identique.

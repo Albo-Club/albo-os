@@ -23,6 +23,53 @@ bas de page.
 
 ---
 
+## v1.220.0 — 09/09/2026 à 17:55 — Un accès bancaire peut servir plusieurs sociétés
+
+Un même accès en banque porte souvent les comptes de plusieurs sociétés du
+groupe : l'accès Palatine de CALTE, par exemple, porte aussi les comptes
+courants des deux SCI Chapelle. Jusqu'ici tous ces comptes atterrissaient
+dans la société qui avait lancé la connexion, sans que rien ne le signale —
+avec des soldes, un prévisionnel et une position de TVA qui mélangeaient
+deux sociétés.
+
+Chaque compte peut désormais être **rattaché à la société à qui il
+appartient**. Sur la page du compte, un bouton « Rattacher » : on choisit la
+société et son entité titulaire, et le compte s'en va avec toutes ses
+transactions. La connexion bancaire, elle, ne bouge pas — elle reste suivie
+et se reconnecte depuis la société qui l'a créée, tout en continuant
+d'alimenter le compte déplacé, y compris après une reconnexion.
+
+Deux garde-fous : il faut être administrateur des deux sociétés, et le
+rattachement est refusé tant que le compte est accroché à quelque chose de sa
+société actuelle — une transaction déjà pointée, un placement adossé au
+compte, un prêt qui y est prélevé. Le geste est donc à faire juste après
+avoir connecté la banque.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle mutation `cash.moveAccountToOrg` (admin sur les **deux** orgs) :
+>   déplace `bankAccounts.orgId` + `ownerCompanyId`, re-tamponne l'`orgId` des
+>   `transactions` et des `investmentPositions` du compte. Refus explicite si
+>   une transaction porte `dealId`/`allocation`, si un `deals.bankAccountId` ou
+>   un `loans.bankAccountId` pointe le compte.
+> - Nouveau champ `bankAccounts.powensFeedOrgId` : l'autorisation qui permet à
+>   l'ingestion d'écrire hors de l'org du user Powens. `resolveAccount` accepte
+>   `linked.orgId !== org._id` **uniquement** si ce tampon désigne l'org de la
+>   connexion ; il survit aux reconnexions, contrairement à
+>   `powensConnectionId`.
+> - « Les comptes d'une connexion » se lisent par connexion (nouvel index
+>   `by_powens_connection`) dans `connectionAccounts`,
+>   `listAccountsForBackfill` (qui perd son argument `orgId`) et
+>   `listConnections` — sinon une connexion saine passerait pour obsolète et le
+>   rattrapage sauterait le compte déplacé. Les candidats de
+>   `matchExistingAccount` incluent les comptes alimentés depuis l'org (index
+>   `by_powens_feed_org`), sans quoi une reconnexion recréerait un doublon.
+> - UI : dialog « Rattacher » sur `/cash/$accountId` (sélecteur d'orgs filtré
+>   sur le rôle admin + entités `group_*` de la cible), i18n `cash:move.*`.
+> - Couverture : `convex/regression.powensCrossOrg.test.ts` (9 tests) ;
+>   `KNOWN_ISSUES.md` § « Ingestion Powens », `TESTING.md` CA15,
+>   `docs/produit/07-tresorerie.md`.
+
 ## v1.219.2 — 09/09/2026 à 17:40 — Un compte courant par filiale, et plus deux
 
 CALTE finance ses filiales par leur compte courant d'associé, et par rien

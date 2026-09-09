@@ -1852,6 +1852,9 @@ export default defineSchema({
    * manual in the meantime.
    */
   bankAccounts: defineTable({
+    // Org the account BELONGS to. Not necessarily the org holding the Powens
+    // connection that feeds it: one bank login can carry the accounts of
+    // several companies of the group (cf. `powensFeedOrgId`).
     orgId: v.id('organizations'),
     ownerCompanyId: v.id('companies'), // must be a "group_*"
     bankName: v.string(), // "Qonto", "Palatine", "Neuflize", "Wormser"
@@ -1875,12 +1878,25 @@ export default defineSchema({
     balanceAsOf: v.optional(v.number()),
     powensConnectionId: v.optional(v.string()),
     powensAccountId: v.optional(v.string()),
+    // Set ONLY when the account was attached to another org than the one
+    // whose Powens user feeds it (`cash.moveAccountToOrg`). It is the
+    // authorization the ingestion checks: without it, a Powens user may
+    // never write outside its own org. Survives a reconnection, unlike
+    // `powensConnectionId` (new ids at each reconnect).
+    powensFeedOrgId: v.optional(v.id('organizations')),
     airtableId: v.optional(v.string()), // Airtable import anchor
     archivedAt: v.optional(v.number()),
   })
     .index('by_org', ['orgId'])
     .index('by_owner', ['orgId', 'ownerCompanyId'])
     .index('by_powens_account', ['powensAccountId'])
+    // Accounts fed by one connection — read WITHOUT the org, because an
+    // account can be attached to an org other than the one holding the
+    // connection (cf. `cash.moveAccountToOrg`).
+    .index('by_powens_connection', ['powensConnectionId'])
+    // Accounts fed by the connections of one org but living elsewhere —
+    // the reconnection takeover has to see them (`matchExistingAccount`).
+    .index('by_powens_feed_org', ['powensFeedOrgId'])
     .index('by_airtable_id', ['airtableId']),
 
   /**

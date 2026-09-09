@@ -531,8 +531,11 @@ async function resolveAccount(
     )
     .first()
   if (linked) {
-    // Consistency: the linked account must belong to the Powens user's org.
-    if (linked.orgId !== org._id) {
+    // Consistency: the linked account belongs to the Powens user's org, OR
+    // it was deliberately attached to another org while staying fed from
+    // here (`cash.moveAccountToOrg` stamps `powensFeedOrgId`). Without that
+    // stamp, a Powens user never writes outside its own org.
+    if (linked.orgId !== org._id && linked.powensFeedOrgId !== org._id) {
       console.warn(
         `[powens] compte acct ${acc.powensAccountId} déjà lié à une autre org ` +
           `que celle du user Powens (${org.slug}) — ignoré`,
@@ -560,12 +563,21 @@ async function resolveAccount(
   // 2. Same real account already recorded, under other ids (reconnection) or
   // not yet linked (record imported from Airtable) → take over the link
   // instead of creating a second row for the same bank.
-  const orgAccounts = await ctx.db
-    .query('bankAccounts')
-    .withIndex('by_org', (q) => q.eq('orgId', org._id))
-    .collect()
+  // Candidates: the org's own accounts PLUS those it feeds in another org.
+  // A reconnection hands out new account ids, so a moved account has to stay
+  // recognizable here — otherwise it would be duplicated back into this org.
+  const candidates = [
+    ...(await ctx.db
+      .query('bankAccounts')
+      .withIndex('by_org', (q) => q.eq('orgId', org._id))
+      .collect()),
+    ...(await ctx.db
+      .query('bankAccounts')
+      .withIndex('by_powens_feed_org', (q) => q.eq('powensFeedOrgId', org._id))
+      .collect()),
+  ]
   const match = matchExistingAccount(
-    orgAccounts.map((a) => ({
+    candidates.map((a) => ({
       id: a._id,
       bankName: a.bankName,
       label: a.label,
@@ -740,19 +752,21 @@ async function writeAccountTransactions(
 
 // ─── Connection health: upsert + change-triggered email alert ─────────────────
 
-/** Accounts of the org currently fed by a connection (archived excluded) —
- * a connection feeding none is a leftover, not an incident. */
+/** Accounts currently fed by a connection (archived excluded) — a connection
+ * feeding none is a leftover, not an incident. Read by connection and NOT by
+ * org: an account it feeds may live in another org (`powensFeedOrgId`), and
+ * missing it would turn a healthy connection into an "obsolete" one. */
 async function connectionAccounts(
   ctx: QueryCtx,
   row: Doc<'powensConnections'>,
 ): Promise<Array<Doc<'bankAccounts'>>> {
   const accounts = await ctx.db
     .query('bankAccounts')
-    .withIndex('by_org', (q) => q.eq('orgId', row.orgId))
+    .withIndex('by_powens_connection', (q) =>
+      q.eq('powensConnectionId', row.powensConnectionId),
+    )
     .collect()
-  return accounts.filter(
-    (a) => !a.archivedAt && a.powensConnectionId === row.powensConnectionId,
-  )
+  return accounts.filter((a) => !a.archivedAt)
 }
 
 /** Emails every org member when a connection's health degrades. Anti-spam:
@@ -1128,7 +1142,25 @@ export const listConnections = query({
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
     const now = Date.now()
-    // Labels of the accounts fed by each connection (small org-scoped set).
+    // Accounts fed by each connection, read BY CONNECTION: one of them may
+    // be attached to another org (`powensFeedOrgId`) and must still appear
+    // under the connection that feeds it — otherwise the connection looks
+    // like it feeds nothing, i.e. obsolete.
+    const fedByConnection = new Map<string, Array<Doc<'bankAccounts'>>>()
+    for (const r of rows) {
+      const fed = await ctx.db
+        .query('bankAccounts')
+        .withIndex('by_powens_connection', (q) =>
+          q.eq('powensConnectionId', r.powensConnectionId),
+        )
+        .collect()
+      fedByConnection.set(
+        r.powensConnectionId,
+        fed.filter((a) => !a.archivedAt),
+      )
+    }
+    // The org's own accounts — only to spot the Powens-linked ones that no
+    // tracked connection feeds.
     const accounts = await ctx.db
       .query('bankAccounts')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
@@ -1146,12 +1178,9 @@ export const listConnections = query({
     const tracked: Array<ConnectionListItem> = rows
       .map((r) => {
         const health = connectionHealth(r, now)
-        const accountLabels = accounts
-          .filter(
-            (a) =>
-              a.powensConnectionId === r.powensConnectionId && !a.archivedAt,
-          )
-          .map((a) => a.displayName ?? a.label)
+        const accountLabels = (
+          fedByConnection.get(r.powensConnectionId) ?? []
+        ).map((a) => a.displayName ?? a.label)
         return {
           key: r._id,
           powensConnectionId: r.powensConnectionId,
@@ -1182,6 +1211,9 @@ export const listConnections = query({
         a.powensAccountId &&
         !a.archivedAt &&
         a.accountStatus !== 'closed' &&
+        // Fed from another org: its connection is monitored there, listing
+        // it here as untracked would raise a false dead-connection alarm.
+        (a.powensFeedOrgId == null || a.powensFeedOrgId === orgId) &&
         (!a.powensConnectionId || !trackedIds.has(a.powensConnectionId)),
     )
     const byBank = new Map<string, Array<Doc<'bankAccounts'>>>()
@@ -1229,11 +1261,15 @@ const BACKFILL_MAX_PAGES = 20
  * with no movement yet) means there is nothing to resume FROM: its history
  * starts at its own cutover, so the catch-up skips it. */
 export const listAccountsForBackfill = internalQuery({
-  args: { orgId: v.id('organizations'), powensConnectionId: v.string() },
-  handler: async (ctx, { orgId, powensConnectionId }) => {
+  args: { powensConnectionId: v.string() },
+  handler: async (ctx, { powensConnectionId }) => {
+    // By connection, not by org: an account fed by this connection may live
+    // in another org, and skipping it would leave a hole in its history.
     const accounts = await ctx.db
       .query('bankAccounts')
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .withIndex('by_powens_connection', (q) =>
+        q.eq('powensConnectionId', powensConnectionId),
+      )
       .collect()
     const rows: Array<{
       bankAccountId: Id<'bankAccounts'>
@@ -1242,7 +1278,6 @@ export const listAccountsForBackfill = internalQuery({
       lastTransactionAt: number | null
     }> = []
     for (const a of accounts) {
-      if (a.powensConnectionId !== powensConnectionId) continue
       if (!a.powensAccountId || a.archivedAt) continue
       const last = await ctx.db
         .query('transactions')
@@ -1349,7 +1384,7 @@ export const backfillConnection = internalAction({
     }
     const accounts = await ctx.runQuery(
       internal.powens.listAccountsForBackfill,
-      { orgId, powensConnectionId },
+      { powensConnectionId },
     )
 
     for (const account of accounts) {

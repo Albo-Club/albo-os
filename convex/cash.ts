@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
-import { requireOrgMember } from './lib/auth'
+import { requireOrgMember, requireOrgRole } from './lib/auth'
 import { isListedAccount } from './lib/bankAccounts'
 import { normalizeSearch } from './lib/searchText'
 import type { Doc } from './_generated/dataModel'
@@ -153,6 +153,93 @@ export const updateAccountName = mutation({
       displayName: trimmed === '' ? undefined : trimmed,
     })
     return bankAccountId
+  },
+})
+
+/**
+ * Attaches a bank account to ANOTHER org of the group, under the entity that
+ * owns it there. One bank login can carry the accounts of several companies
+ * (a Palatine access holding the current accounts of two SCIs): the Powens
+ * connection stays with the org that holds the login, while each account goes
+ * to its own company. `powensFeedOrgId` records that authorization — it is
+ * what lets the ingestion keep writing from the other org (convex/powens.ts),
+ * and unlike `powensConnectionId` it survives a reconnection.
+ *
+ * Refused as soon as the account is tied to something in its current org (a
+ * matched transaction, a placement, a loan's direct-debit account): moving it
+ * would leave those links pointing across orgs. Undo the link first.
+ *
+ * The transactions follow the account: their `orgId` is what every cash read,
+ * the VAT position and the forecast are scoped by.
+ */
+export const moveAccountToOrg = mutation({
+  args: {
+    bankAccountId: v.id('bankAccounts'),
+    targetOrgId: v.id('organizations'),
+    ownerCompanyId: v.id('companies'),
+  },
+  handler: async (ctx, { bankAccountId, targetOrgId, ownerCompanyId }) => {
+    const account = await ctx.db.get('bankAccounts', bankAccountId)
+    if (!account) throw new ConvexError('not_found')
+    if (account.orgId === targetOrgId) throw new ConvexError('already_in_org')
+    // Admin on BOTH sides: the account leaves one org and enters another.
+    await requireOrgRole(ctx, account.orgId, 'admin')
+    await requireOrgRole(ctx, targetOrgId, 'admin')
+
+    const owner = await ctx.db.get('companies', ownerCompanyId)
+    if (!owner || owner.orgId !== targetOrgId) {
+      throw new ConvexError('owner_not_in_target_org')
+    }
+    if (!owner.kind.startsWith('group_')) {
+      throw new ConvexError('owner_not_group_entity')
+    }
+
+    const transactions = await ctx.db
+      .query('transactions')
+      .withIndex('by_account_date', (q) => q.eq('bankAccountId', bankAccountId))
+      .collect()
+    if (transactions.some((t) => t.dealId != null || t.allocation != null)) {
+      throw new ConvexError('account_has_matched_transactions')
+    }
+    const loan = await ctx.db
+      .query('loans')
+      .withIndex('by_bank_account', (q) => q.eq('bankAccountId', bankAccountId))
+      .first()
+    if (loan) throw new ConvexError('account_used_by_loan')
+    // No index on `deals.bankAccountId` — a full org scan is fine on this
+    // rare admin path.
+    const deals = await ctx.db
+      .query('deals')
+      .withIndex('by_org', (q) => q.eq('orgId', account.orgId))
+      .collect()
+    if (deals.some((d) => d.bankAccountId === bankAccountId)) {
+      throw new ConvexError('account_used_by_deal')
+    }
+
+    await ctx.db.patch('bankAccounts', bankAccountId, {
+      orgId: targetOrgId,
+      ownerCompanyId,
+      // Which org's Powens user may keep feeding this account. Cleared when
+      // the account comes back home, or when nothing feeds it.
+      powensFeedOrgId:
+        account.powensAccountId == null ||
+        (account.powensFeedOrgId ?? account.orgId) === targetOrgId
+          ? undefined
+          : (account.powensFeedOrgId ?? account.orgId),
+    })
+    for (const tx of transactions) {
+      await ctx.db.patch('transactions', tx._id, { orgId: targetOrgId })
+    }
+    const positions = await ctx.db
+      .query('investmentPositions')
+      .withIndex('by_account', (q) => q.eq('bankAccountId', bankAccountId))
+      .collect()
+    for (const position of positions) {
+      await ctx.db.patch('investmentPositions', position._id, {
+        orgId: targetOrgId,
+      })
+    }
+    return { movedTransactions: transactions.length }
   },
 })
 

@@ -55,6 +55,25 @@
       "default": "Impossible de mettre à jour le compte. Réessayez."
     }
   },
+  "move": {
+    "action": "Rattacher",
+    "title": "Rattacher à une autre société",
+    "description": "Un même accès bancaire peut porter les comptes de plusieurs sociétés du groupe. La connexion reste là où elle a été créée ; le compte, lui, rejoint la société à qui il appartient.",
+    "orgLabel": "Société",
+    "orgPlaceholder": "Choisir une société",
+    "ownerLabel": "Entité propriétaire",
+    "ownerPlaceholder": "Choisir une entité",
+    "hint": "Les transactions du compte suivent le compte : elles quittent la trésorerie et la position TVA de la société actuelle.",
+    "confirm": "Rattacher",
+    "moved": "Compte rattaché à {{org}}",
+    "errors": {
+      "account_has_matched_transactions": "Ce compte a des transactions déjà pointées. Dépointez-les avant de le rattacher ailleurs.",
+      "account_used_by_deal": "Ce compte est adossé à un placement de la société actuelle. Détachez-le du placement d'abord.",
+      "account_used_by_loan": "Ce compte est le compte de prélèvement d'un prêt. Changez-le sur le prêt d'abord.",
+      "insufficient_role": "Il faut être administrateur des deux sociétés pour rattacher un compte.",
+      "default": "Impossible de rattacher le compte. Réessayez."
+    }
+  },
   "connect": {
     "button": "Connecter une banque",
     "connecting": "Connexion…",
