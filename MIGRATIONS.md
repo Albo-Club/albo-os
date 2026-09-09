@@ -59,7 +59,7 @@ pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip
 | Sens d'un compte courant inter-sociétés | `convex/migrations/fixLoanDirection.ts` → `inspect` / `apply` | `inspect` (lecture seule) liste tous les `intercompanyLoans` avec les deux soldes dérivés et un flag `looksReversed` : les deux signes contredisent les rôles enregistrés (le « créancier » a encaissé, le « débiteur » a décaissé). `apply` intervertit `fromOrgId` / `toOrgId` sur UN prêt. **Non idempotente par nature** — elle exige le sens qu'elle s'attend à trouver (`currentFromSlug` / `currentToSlug`) et rejette tout le reste (`direction_mismatch`), donc un second passage échoue au lieu de ré-inverser. Les transactions pointées ne sont pas touchées. |
 | Création des orgs filiales CALTE (ALB-128) | `convex/migrations/createSubsidiaryOrgs.ts` → `inspect` / `apply` | Donne une org à chacune des 7 filiales (Caltimo, RDB, Relais Chapelle, SCI Chapelle 1 & 2, SCI Upload, Banco 2) : org + membres de `calte` recopiés avec leur rôle + société `group_root` clonée depuis la ligne source (identité légale seulement — ni `attioCompanyId` ni `airtableId`). **Strictement additive** : aucune ligne existante n'est modifiée, la ligne source reste une entité `group_*` de `calte` avec ses deals et ses comptes. `inspect` (lecture seule) liste ce qui serait créé et, par filiale, `dealsAsInvestor` / `bankAccountsOwned` — les deux compteurs qui diraient si la ligne source peut un jour devenir une simple participation. Idempotente. |
 | Cap tables des entités du groupe | `convex/migrations/seedGroupCapTables.ts` → `inspect` / `apply` | Renseigne les `equityPositions` de CALTE, des 7 filiales et d'Albo Club — une ligne par associé, part en `ownershipBps` (c'est elle que lit la fiche société côté CALTE via `liabilities:getOwnershipForCompany`). Sources documentaires citées ligne à ligne dans la table `CAP_TABLES` (statuts + Kbis du Drive). Additif et idempotent : crée ce qui manque, complète un `ownershipBps` absent, n'écrase jamais une part divergente (remontée dans `conflicts`). `inspect` d'abord — vérifier `ownershipSumBps` = 10000 par org et `conflict` = 0. ⚠ La répartition Banco 2 (50/50) est déclarative, à confirmer par le registre des mouvements de titres. |
-| Fusion des comptes courants en double (org `calte`) | `convex/migrations/mergeGroupCcaDeals.ts` → `inspect` / `apply` | Replie les DEUX lignes `cca` que CALTE portait sur Caltimo, SCI Chapelle et SCI Upload — séquelle de la requalification des `real_estate_direct` en `cca` (09/09/2026, faite via les outils MCP). La ligne conservée est celle qui porte le plus de transactions ; elle récupère celles de l'autre, prend la date de signature la plus ancienne et **perd son `paidAmount`** (instantané figé par l'import Airtable, cf. `KNOWN_ISSUES.md`). `matchingDecisions` n'est jamais réécrit (table append-only). Toute autre référence à la ligne absorbée (valorisation, projection, document, garantie, prévisionnel) **bloque** la paire : vérifier `blocked` vide dans `inspect` avant d'appliquer. Idempotent : une cible déjà à une seule ligne ressort `done`. |
+| Fusion des comptes courants en double (org `calte`) | `convex/migrations/mergeGroupCcaDeals.ts` → `inspect` / `apply` | Replie les DEUX lignes `cca` que CALTE portait sur Caltimo, SCI Chapelle, SCI Upload et RDB. Pour les trois premières c'est une séquelle de la requalification des `real_estate_direct` en `cca` (09/09/2026, faite via les outils MCP) ; pour RDB, un remboursement partiel de 2 300 000 € en juillet 2026 a fait paraître la ligne soldée et les virements suivants ont été pointés sur une ligne neuve — or un remboursement partiel ne clôt pas un compte courant, il en déplace le solde (468 155 € restaient dus). Les trois premières ont été appliquées le 09/09/2026 : un nouveau passage les ressort `done` et ne traite que RDB. La ligne conservée est celle qui porte le plus de transactions ; elle récupère celles de l'autre, prend la date de signature la plus ancienne et **perd son `paidAmount`** (instantané figé par l'import Airtable, cf. `KNOWN_ISSUES.md`). `matchingDecisions` n'est jamais réécrit (table append-only). Toute autre référence à la ligne absorbée (valorisation, projection, document, garantie, prévisionnel) **bloque** la paire : vérifier `blocked` vide dans `inspect` avant d'appliquer. Idempotent : une cible déjà à une seule ligne ressort `done`. |
 | Audit du stockage de fichiers (lecture seule) | `convex/migrations/storageAudit.ts` (`scanPage` / `describe`) + `node scripts/storage-audit.mjs` | Dit **où sont les octets** du file storage Convex : total, répartition par type et par tranche de taille, gisement de PDF > 1 Mo, et les 30 plus gros fichiers nommés (titre, `kind`, porte d'entrée `upload` / `email`). Motivation : les backups automatisés sont facturés à l'**egress** (0,132 $/Go au-delà d'1 Go/mois), donc la taille de la base est multipliée par le nombre d'exports — cette mesure décide si le levier est la compression à l'import, une recompression de l'existant, ou aucun des deux. **N'écrit rien, ne télécharge aucun fichier** : deux `internalQuery`, pas de snapshot préalable nécessaire, re-run gratuit. La pagination et l'agrégation vivent dans le script et non dans une action Convex, pour que le module n'ait pas à se référencer lui-même via `internal.*` — cf. `KNOWN_ISSUES.md` « Un nouveau module Convex ne peut pas se citer lui-même ». Ne couvre **que** le file storage : la taille de la base se lit sur le dashboard (Convex → Settings → Usage), facturée sur la même ligne d'egress. |
 
 Les ponts Attio (`attioCompanyId` / `attioDealId`) et l'ingestion Powens sont
@@ -143,11 +143,17 @@ gcloud iam workload-identity-pools providers create-oidc albo-os \
 
 gcloud iam service-accounts add-iam-policy-binding $SA \
   --role=roles/iam.workloadIdentityUser \
-  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attributes.repository/$REPO"
+  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/$REPO"
 ```
 
 ⚠️ L'`--attribute-condition` n'est pas cosmétique : sans elle, **n'importe quel
 dépôt GitHub** pourrait demander un jeton pour ce compte de service.
+
+⚠️ Dans le `principalSet`, le segment est `attribute.repository` au
+**singulier** — `attributes.` fait échouer le binding sur un
+`INVALID_ARGUMENT: Invalid principalSet member` qui ne dit pas pourquoi. Les
+trois commandes précédentes réussissent quand même, donc l'erreur arrive
+au milieu d'une sortie qui a l'air saine.
 
 Le chemin du provider à reporter dans GitHub :
 `projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/albo-os`
@@ -170,7 +176,7 @@ aussi cette appartenance — et elle seule — qui borne la portée du scope
 
 | Onglet | Nom | Valeur |
 | --- | --- | --- |
-| **Secrets** | `CONVEX_DEPLOY_KEY` | dashboard Convex → déploiement **prod** → Deploy key |
+| **Secrets** | `CONVEX_DEPLOY_KEY` | dashboard Convex → déploiement **prod** → Create Deploy Key (permissions ci-dessous) |
 | **Variables** | `GCP_WORKLOAD_IDENTITY_PROVIDER` | le chemin du provider de l'étape 2 |
 | **Variables** | `GCP_SERVICE_ACCOUNT` | `albo-os-backup@<projet>.iam.gserviceaccount.com` |
 | **Variables** | `GDRIVE_BACKUP_FOLDER_ID` | l'ID du dossier de l'étape 3 |
@@ -178,6 +184,39 @@ aussi cette appartenance — et elle seule — qui borne la portée du scope
 Seule la clé Convex est un secret. Les trois autres sont des **variables** :
 le chemin du provider est inerte sans le lien de confiance vers ce dépôt, et
 le dossier Drive est protégé par l'appartenance, pas par l'obscurité.
+
+⚠️ **Permissions de la clé Convex.** `convex export` passe par l'API Backups,
+pas par une lecture de données : une clé qui ne porte que
+`deployment:data:view` échoue sur
+`You do not have permission to perform this operation (deployment:backups:create)`.
+Cocher :
+
+- `deployment:backups:view`
+- `deployment:backups:create`
+- `deployment:backups:download`
+- `deployment:data:view`
+
+Et **rien d'autre** — surtout pas `backups:delete` ni `backups:import`, qui
+sont destructives et dont une sauvegarde n'a aucun besoin.
+
+La documentation Convex ne dit nulle part quelle permission va avec quelle
+commande, et le CLI ne signale **que la première manquante** : chaque essai
+n'en révèle qu'une, et les permissions d'une clé ne se modifient pas — il faut
+en recréer une. D'où la liste donnée entière : elle a coûté deux runs.
+
+⚠️ **`ExportInProgress` : attendre, ne rien corriger.** Convex n'autorise
+qu'un export à la fois, et un run qui échoue **après** avoir demandé l'export
+en laisse un qui tourne côté serveur — c'est exactement ce que fait une clé
+qui a `backups:create` mais pas `backups:view` : la demande passe, la lecture
+d'état échoue, l'export continue. Le run suivant se prend alors
+`400 Bad Request: ExportInProgress`. Ce n'est pas une erreur de
+configuration : laisser l'export en cours se terminer (quelques minutes sur
+~1,7 Go) et relancer. Le cron quotidien n'y est pas exposé, 24 h suffisant
+largement.
+
+⚠️ **`GDRIVE_BACKUP_FOLDER_ID` est l'identifiant, pas l'URL.** Coller l'URL
+entière est le réflexe naturel ; le script sait désormais en extraire l'id,
+mais autant donner directement `1AbC…`.
 
 ⚠️ Le Drive est le **même compte Google** que les documents métier : un compte
 compromis ou fermé emporte les sauvegardes avec les originaux. Arbitrage
