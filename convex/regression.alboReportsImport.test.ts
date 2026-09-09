@@ -117,3 +117,132 @@ describe('alboReportsImport.importOne', () => {
     expect(rows).toHaveLength(1)
   })
 })
+
+/**
+ * Regression: the VASCO overlap audit
+ * (convex/migrations/alboReportsImport.ts:auditVascoOverlap).
+ *
+ * A fiche merges two tables in one timeline — `companyReports` and
+ * `vascoCommunicationsCache` — and no unicity guard spans them. The audit is
+ * what makes that overlap readable before anyone arbitrates it, so what it
+ * must never do is miss a side: an entity served by both channels has to
+ * surface, an entity linked to a portal that holds NOTHING has to surface too
+ * (there the backlog is missing, not duplicated), and communications belonging
+ * to another issuer must never be counted as this entity's.
+ */
+describe('alboReportsImport.auditVascoOverlap', () => {
+  const CLIENT = 'parallel'
+
+  async function linkToVasco(
+    t: Harness,
+    companyId: Id<'companies'>,
+    issuerId: string,
+  ) {
+    await t.run((ctx) =>
+      ctx.db.patch('companies', companyId, {
+        vascoClientSlug: CLIENT,
+        vascoIssuerId: issuerId,
+      }),
+    )
+  }
+
+  async function addCommunication(
+    t: Harness,
+    orgId: Id<'organizations'>,
+    issuerId: string,
+    communicationId: string,
+  ) {
+    await t.run((ctx) =>
+      ctx.db.insert('vascoCommunicationsCache', {
+        orgId,
+        clientSlug: CLIENT,
+        issuerId,
+        communicationId,
+        title: `Communication ${communicationId}`,
+        documents: [],
+        fetchedAt: Date.now(),
+      }),
+    )
+  }
+
+  const audit = (t: Harness, orgSlug: string) =>
+    t.query(internal.migrations.alboReportsImport.auditVascoOverlap, {
+      orgSlug,
+    })
+
+  test('an entity served by both channels surfaces, with the imported rows named', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'benjamin@test.dev')
+    const org = await createOrg(t, 'albo', [
+      { userId: user.userId, role: 'owner' },
+    ])
+    const linked = await createPortfolioCompany(t, org.orgId, 'AZmed')
+    const unlinked = await createPortfolioCompany(t, org.orgId, 'Corma')
+
+    await linkToVasco(t, linked, 'issuer-azmed')
+    await addCommunication(t, org.orgId, 'issuer-azmed', 'comm-1')
+    // Another issuer's communication, held by the same org: it must not be
+    // read as this entity's news.
+    await addCommunication(t, org.orgId, 'issuer-other', 'comm-2')
+    await importOne(t, linked)
+    await importOne(t, unlinked, {
+      alboReportId: 'aa24803c-bf85-4b00-8dbf-e289acaec4d4',
+    })
+
+    const out = await audit(t, 'albo')
+    expect(out.linkedEntities).toBe(1)
+    expect(out.bothChannels).toBe(1)
+    expect(out.importedOnLinked).toBe(1)
+
+    // The unlinked entity carries an imported report too, and stays out: the
+    // audit is about the entities the portal also serves.
+    expect(out.entities.map((e) => e.name)).toEqual(['AZmed'])
+    const [entity] = out.entities
+    expect(entity.communications).toBe(1)
+    expect(entity.rows.communications[0].title).toBe('Communication comm-1')
+    expect(entity.reports).toBe(1)
+    expect(entity.rows.reports[0].importedFromAlboApp).toBe(true)
+  })
+
+  test('a linked entity whose portal holds nothing surfaces as a hole', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'benjamin@test.dev')
+    const org = await createOrg(t, 'albo', [
+      { userId: user.userId, role: 'owner' },
+    ])
+    const linked = await createPortfolioCompany(t, org.orgId, 'AZmed')
+    await linkToVasco(t, linked, 'issuer-azmed')
+
+    const out = await audit(t, 'albo')
+    expect(out.linkedWithoutCommunications).toBe(1)
+    expect(out.bothChannels).toBe(0)
+    expect(out.entities[0].communications).toBe(0)
+  })
+
+  test('a report born from the inbox is not reported as imported', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'benjamin@test.dev')
+    const org = await createOrg(t, 'albo', [
+      { userId: user.userId, role: 'owner' },
+    ])
+    const linked = await createPortfolioCompany(t, org.orgId, 'AZmed')
+    await linkToVasco(t, linked, 'issuer-azmed')
+    await addCommunication(t, org.orgId, 'issuer-azmed', 'comm-1')
+    await t.run((ctx) =>
+      ctx.db.insert('companyReports', {
+        orgId: org.orgId,
+        companyId: linked,
+        source: 'email',
+        title: 'AZmed Update #85',
+        status: 'completed',
+      }),
+    )
+
+    const out = await audit(t, 'albo')
+    // Both channels feed the fiche, but nothing here may be deleted as an
+    // import artefact — the distinction decides what a cleanup can touch.
+    expect(out.bothChannels).toBe(1)
+    expect(out.importedOnLinked).toBe(0)
+    expect(out.entities[0].rows.reports[0].importedFromAlboApp).toBe(false)
+  })
+})
