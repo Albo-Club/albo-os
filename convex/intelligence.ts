@@ -364,12 +364,28 @@ export const runAnalysisBatch = internalAction({
   args: {
     refs: v.array(v.object({ companyId: v.id('companies'), orgId: v.id('organizations') })),
     send: v.optional(v.object(reportSendArgs)),
+    // Portal channel: the arrival announcement, released here for the same
+    // reason as `send` — the mail quotes "where the company stands", which is
+    // only true once the syntheses above have run.
+    announce: v.optional(
+      v.object({ clientSlug: v.string(), issuerId: v.string() }),
+    ),
   },
-  handler: async (ctx, { refs, send }) => {
+  handler: async (ctx, { refs, send, announce }) => {
     for (const ref of refs) {
       await ctx.runAction(internal.intelligence.runAnalysis, ref)
     }
     if (send) await ctx.runAction(internal.reportNotify.send, send)
+    if (announce) {
+      for (const ref of refs) {
+        await ctx.runAction(internal.vascoNotify.announce, {
+          companyId: ref.companyId,
+          orgId: ref.orgId,
+          clientSlug: announce.clientSlug,
+          issuerId: announce.issuerId,
+        })
+      }
+    }
     return null
   },
 })

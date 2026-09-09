@@ -133,8 +133,9 @@ La colonne principale, dans l'ordre de lecture :
   une fois.
 - **Rapports & communications** : le **journal** de la société — ce qu'elle
   nous envoie, du plus récent au plus ancien. On y trouve les rapports
-  investisseurs analysés (reçus par mail ou déposés à la main) et les
-  communications Parallel/VASCO des SPV (voir
+  investisseurs analysés — reçus par mail, déposés à la main, ou **publiés sur
+  le portail d'un émetteur** (Parallel/VASCO), ces derniers étant lus et
+  résumés comme les autres depuis 09/2026 (voir
   [Intégrations](15-integrations.md)).
   - **Ce qui classe une ligne, c'est sa date** : la période couverte quand
     elle existe (un reporting de janvier se range en janvier même s'il est
