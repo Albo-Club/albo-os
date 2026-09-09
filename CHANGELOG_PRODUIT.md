@@ -23,6 +23,42 @@ bas de page.
 
 ---
 
+## v1.220.1 — 09/09/2026 à 18:17 — La première sauvegarde réelle corrige deux détails de mise en service
+
+Toujours invisible à l'écran. Le premier lancement de la sauvegarde
+automatique a buté sur deux points que seule une exécution réelle pouvait
+révéler : l'autorisation demandée à la base n'était pas la bonne, et le
+repère du dossier de destination était accepté sous une forme trop stricte.
+Les deux sont corrigés et consignés, pour que la prochaine mise en service
+— ou la même à refaire un jour — ne repasse pas par là.
+
+> **🔧 Notes techniques**
+>
+> - **Permissions du deploy key Convex.** `convex export` passe par l'API
+>   Backups, pas par une lecture de données : une clé ne portant que
+>   `deployment:data:view` échoue sur `You do not have permission to perform
+>   this operation (deployment:backups:create)`. Il faut
+>   `deployment:backups:create` + `deployment:backups:download` (+
+>   `data:view`), et jamais `backups:delete` ni `backups:import`. Convex ne
+>   documente ce mapping nulle part — la liste vient du premier run réel, et
+>   est désormais dans `MIGRATIONS.md`, `TESTING.md` B12 et l'en-tête du
+>   script.
+> - **`GDRIVE_BACKUP_FOLDER_ID` accepte l'URL Drive.** Coller l'URL entière
+>   est le réflexe naturel (c'est ce que donne la barre d'adresse) et
+>   échouait beaucoup plus loin, sur un 404 Drive opaque au moment de
+>   l'upload. `folderIdFrom` extrait l'id de `/folders/<id>` et laisse passer
+>   un id déjà nu.
+> - Validé côté auth : l'échange OIDC → jeton Google d'une heure a fonctionné
+>   du premier coup sur le run réel, credentials WIF exportés sans clé.
+> - Le garde-fou d'alerte a fait son office : l'échec a ouvert une issue
+>   `convex-backup` avec la sortie du script.
+> - Porte aussi le correctif du binding WIF : dans le `principalSet`, le
+>   segment est `attribute.repository` au **singulier**, sans quoi
+>   `INVALID_ARGUMENT: Invalid principalSet member` — constaté au setup réel,
+>   et d'autant plus discret que les trois commandes précédentes réussissent.
+
+---
+
 ## v1.220.0 — 09/09/2026 à 17:55 — Un accès bancaire peut servir plusieurs sociétés
 
 Un même accès en banque porte souvent les comptes de plusieurs sociétés du
