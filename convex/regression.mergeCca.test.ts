@@ -66,7 +66,7 @@ const OLD = Date.parse('2021-05-03T00:00:00.000Z')
 const RECENT = OLD + 400 * DAY
 
 /**
- * `calte` with its three targets. Each gets two `cca` lines: a "big" one with
+ * `calte` with its four targets. Each gets two `cca` lines: a "big" one with
  * two transactions and a "small" one with a single, older transaction —
  * the shape prod ended up in after the requalification.
  */
@@ -79,7 +79,7 @@ async function calteSetup() {
   const account = await createBankAccount(t, calte)
 
   const targets = new Map<string, { big: Id<'deals'>; small: Id<'deals'> }>()
-  for (const name of ['Caltimo', 'SCI Chapelle', 'SCI Upload']) {
+  for (const name of ['Caltimo', 'SCI Chapelle', 'SCI Upload', 'RDB']) {
     const companyId = await createGroupEntity(t, calte.orgId, name)
     const deal = async (paidAmount: number, signedDate: number) =>
       await t.run(async (ctx) =>
@@ -131,13 +131,14 @@ describe('mergeGroupCcaDeals: apply', () => {
     expect(refused).toEqual([])
     expect(merged.map((m) => m.label).sort()).toEqual([
       'Caltimo',
+      'RDB',
       'SCI Chapelle',
       'SCI Upload',
     ])
     expect(merged.every((m) => m.transactionsMoved === 1)).toBe(true)
 
     const deals = await dealsOf(t, calte.orgId)
-    expect(deals).toHaveLength(3)
+    expect(deals).toHaveLength(4)
 
     const { big, small } = targets.get('Caltimo')!
     const survivor = deals.find((d) => d._id === big)!
@@ -179,8 +180,12 @@ describe('mergeGroupCcaDeals: apply', () => {
     const { merged, refused } = await t.mutation(applyRef, {})
     expect(refused).toHaveLength(1)
     expect(refused[0]).toContain('SCI Chapelle')
-    // The other two are unaffected by the refusal.
-    expect(merged.map((m) => m.label).sort()).toEqual(['Caltimo', 'SCI Upload'])
+    // The other three are unaffected by the refusal.
+    expect(merged.map((m) => m.label).sort()).toEqual([
+      'Caltimo',
+      'RDB',
+      'SCI Upload',
+    ])
 
     const deals = await dealsOf(t, calte.orgId)
     expect(deals.some((d) => d._id === small)).toBe(true)
@@ -234,6 +239,6 @@ describe('mergeGroupCcaDeals: apply', () => {
 
     const report = await t.query(inspectRef, {})
     expect(report.merges.every((m) => m.done)).toBe(true)
-    expect(await dealsOf(t, calte.orgId)).toHaveLength(3)
+    expect(await dealsOf(t, calte.orgId)).toHaveLength(4)
   })
 })
