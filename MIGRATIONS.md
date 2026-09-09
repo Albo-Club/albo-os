@@ -104,19 +104,78 @@ Un fichier dont le nom ne suit pas la convention n'est **jamais** supprimé.
 
 ### Mise en place (une seule fois)
 
-1. **Google Cloud** : créer un projet, activer **Google Drive API**, créer un **service account**, lui générer une clé **JSON**.
-2. Drive → **Drives partagés** → nouveau drive (ex. `Albo OS — Backups`) →
-   **Gérer les membres** → ajouter l'e-mail du service account en
-   **Gestionnaire de contenu** (il doit pouvoir écrire *et* supprimer).
-3. Relever l'ID du dossier dans son URL.
-4. GitHub → Settings → Secrets and variables → Actions → trois secrets :
-   `CONVEX_DEPLOY_KEY` (dashboard Convex → déploiement **prod**),
-   `GDRIVE_SERVICE_ACCOUNT` (le JSON entier), `GDRIVE_BACKUP_FOLDER_ID`.
+L'authentification passe par **Workload Identity Federation** : GitHub échange
+l'identité OIDC du run contre un jeton Google d'une heure qui usurpe le compte
+de service. **Aucune clé n'est créée ni stockée.** Ce n'est pas un raffinement
+gratuit : la règle d'organisation `iam.disableServiceAccountKeyCreation` est
+active sur ce Workspace et interdit de générer une clé de compte de service —
+la désactiver pour un seul cron serait le mauvais arbitrage.
 
-⚠️ L'étape 2 n'est pas optionnelle : un service account **n'a aucun quota de
-stockage propre**. Pointé ailleurs que sur un Drive partagé dont il est
-membre, l'upload échoue. C'est aussi cette appartenance — et elle seule — qui
-borne la portée du scope `drive` demandé par le script.
+**1. Le projet et le compte de service** (Cloud Shell ou `gcloud` local) :
+
+```bash
+PROJECT_ID=albo-os-backup
+REPO=Albo-Club/albo-os
+
+gcloud projects create $PROJECT_ID            # ou réutiliser un projet existant
+gcloud config set project $PROJECT_ID
+gcloud services enable drive.googleapis.com iamcredentials.googleapis.com sts.googleapis.com
+
+gcloud iam service-accounts create albo-os-backup --display-name="Albo OS backup"
+```
+
+**2. Le pool d'identité et la confiance envers CE dépôt** :
+
+```bash
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+SA=albo-os-backup@$PROJECT_ID.iam.gserviceaccount.com
+
+gcloud iam workload-identity-pools create github --location=global \
+  --display-name="GitHub Actions"
+
+gcloud iam workload-identity-pools providers create-oidc albo-os \
+  --location=global --workload-identity-pool=github \
+  --issuer-uri="https://token.actions.githubusercontent.com" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+  --attribute-condition="assertion.repository=='$REPO'"
+
+gcloud iam service-accounts add-iam-policy-binding $SA \
+  --role=roles/iam.workloadIdentityUser \
+  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attributes.repository/$REPO"
+```
+
+⚠️ L'`--attribute-condition` n'est pas cosmétique : sans elle, **n'importe quel
+dépôt GitHub** pourrait demander un jeton pour ce compte de service.
+
+Le chemin du provider à reporter dans GitHub :
+`projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/albo-os`
+
+**3. Le Drive partagé** (inchangé, et toujours l'étape qu'on oublie) :
+
+Drive → **Drives partagés** → nouveau drive (ex. `Albo OS — Backups`) → y créer
+un dossier `snapshots` → **Gérer les membres** → ajouter l'e-mail du compte de
+service en **Gestionnaire de contenu** (il doit pouvoir écrire *et* supprimer,
+sinon la purge échoue). Google avertit que l'adresse est hors de
+l'organisation : normal pour un compte de service. Relever l'ID du dossier
+dans son URL.
+
+⚠️ Un compte de service **n'a aucun quota de stockage propre**. Pointé
+ailleurs que sur un Drive partagé dont il est membre, l'upload échoue. C'est
+aussi cette appartenance — et elle seule — qui borne la portée du scope
+`drive`.
+
+**4. GitHub** → Settings → Secrets and variables → Actions :
+
+| Onglet | Nom | Valeur |
+| --- | --- | --- |
+| **Secrets** | `CONVEX_DEPLOY_KEY` | dashboard Convex → déploiement **prod** → Deploy key |
+| **Variables** | `GCP_WORKLOAD_IDENTITY_PROVIDER` | le chemin du provider de l'étape 2 |
+| **Variables** | `GCP_SERVICE_ACCOUNT` | `albo-os-backup@<projet>.iam.gserviceaccount.com` |
+| **Variables** | `GDRIVE_BACKUP_FOLDER_ID` | l'ID du dossier de l'étape 3 |
+
+Seule la clé Convex est un secret. Les trois autres sont des **variables** :
+le chemin du provider est inerte sans le lien de confiance vers ce dépôt, et
+le dossier Drive est protégé par l'appartenance, pas par l'obscurité.
 
 ⚠️ Le Drive est le **même compte Google** que les documents métier : un compte
 compromis ou fermé emporte les sauvegardes avec les originaux. Arbitrage
@@ -125,14 +184,24 @@ l'accès restreint sont la mitigation.
 
 ### Vérifier
 
+À blanc en local — le script n'authentifie rien lui-même, il faut donc lui
+fournir un jeton (valable une heure) :
+
 ```bash
+export GDRIVE_ACCESS_TOKEN=$(gcloud auth print-access-token \
+  --impersonate-service-account=albo-os-backup@<projet>.iam.gserviceaccount.com \
+  --scopes=https://www.googleapis.com/auth/drive)
+export GDRIVE_BACKUP_FOLDER_ID=<id>
 node scripts/convex-backup.mjs --dry   # dit ce qui partirait et ce qui serait purgé
 ```
 
-Puis Actions → « Convex backup » → Run workflow (case « archive complète »
-pour forcer les fichiers). Un échec ouvre une issue labellisée `convex-backup`
-— sauf si ce sont les secrets qui manquent, ce qui est un état de setup, pas
-un incident.
+Puis, pour de vrai : Actions → « Convex backup » → Run workflow, en cochant
+**« Forcer une archive complète »** au premier essai — ça valide d'un coup
+l'export, les fichiers, l'auth WIF, l'upload et la purge.
+
+Un échec ouvre une issue labellisée `convex-backup`. Deux exceptions
+volontaires, qui sont des états de setup et non des incidents : une
+configuration manquante, et un échec de l'étape d'authentification.
 
 ### Restaurer
 

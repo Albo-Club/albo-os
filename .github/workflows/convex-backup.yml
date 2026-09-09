@@ -13,10 +13,23 @@ name: Convex backup
 # Retention (7 daily / 4 weekly / 12 monthly) is recomputed from what is in
 # the folder, so a missed run does not break the rotation.
 #
-# Requires four repository SECRETS (Settings → Secrets and variables → Actions):
-#   CONVEX_DEPLOY_KEY        prod deploy key (Convex dashboard → prod → Deploy key)
-#   GDRIVE_SERVICE_ACCOUNT   the service-account JSON, verbatim
-#   GDRIVE_BACKUP_FOLDER_ID  folder id on the shared drive
+# Google auth uses WORKLOAD IDENTITY FEDERATION, not a service-account key:
+# GitHub's OIDC identity is traded for a one-hour token impersonating the
+# service account, so no credential is ever created or stored. That is also
+# what makes this work at all here — `iam.disableServiceAccountKeyCreation`
+# is enforced on this Workspace, and turning it off for one cron job would be
+# the wrong trade.
+#
+# One repository SECRET (Settings → Secrets and variables → Actions → Secrets):
+#   CONVEX_DEPLOY_KEY  prod deploy key (Convex dashboard → prod → Deploy key)
+#
+# Three repository VARIABLES (same page → Variables) — none is sensitive: the
+# provider path is inert without the trust binding to THIS repo, and the drive
+# folder is protected by membership, not by obscurity.
+#   GCP_WORKLOAD_IDENTITY_PROVIDER  projects/<num>/locations/global/workloadIdentityPools/<pool>/providers/<provider>
+#   GCP_SERVICE_ACCOUNT             <name>@<project>.iam.gserviceaccount.com
+#   GDRIVE_BACKUP_FOLDER_ID         folder id on the shared drive
+#
 # ⚠️ The service account must be a member of a SHARED drive: it has no
 # storage quota of its own. Setup runbook in MIGRATIONS.md.
 
@@ -35,6 +48,9 @@ on:
 permissions:
   contents: read
   issues: write
+  # Required to mint the OIDC token that Workload Identity Federation trades
+  # for a Google access token. Without it the auth step fails.
+  id-token: write
 
 # A run holds the retention of the whole folder: two at once could both
 # decide to purge the same archive, or upload the same name twice.
@@ -54,30 +70,43 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      # Missing secrets are a SETUP state, not an incident: fail with an
+      # Missing configuration is a SETUP state, not an incident: fail with an
       # actionable message and skip the issue-opening step below.
-      - name: Require the backup secrets
-        id: secrets
+      - name: Require the backup configuration
+        id: config
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
-          GDRIVE_SERVICE_ACCOUNT: ${{ secrets.GDRIVE_SERVICE_ACCOUNT }}
-          GDRIVE_BACKUP_FOLDER_ID: ${{ secrets.GDRIVE_BACKUP_FOLDER_ID }}
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          GDRIVE_BACKUP_FOLDER_ID: ${{ vars.GDRIVE_BACKUP_FOLDER_ID }}
         run: |
           missing=""
-          [ -z "$CONVEX_DEPLOY_KEY" ] && missing="$missing CONVEX_DEPLOY_KEY"
-          [ -z "$GDRIVE_SERVICE_ACCOUNT" ] && missing="$missing GDRIVE_SERVICE_ACCOUNT"
-          [ -z "$GDRIVE_BACKUP_FOLDER_ID" ] && missing="$missing GDRIVE_BACKUP_FOLDER_ID"
+          [ -z "$CONVEX_DEPLOY_KEY" ] && missing="$missing CONVEX_DEPLOY_KEY(secret)"
+          [ -z "$GCP_WORKLOAD_IDENTITY_PROVIDER" ] && missing="$missing GCP_WORKLOAD_IDENTITY_PROVIDER(variable)"
+          [ -z "$GCP_SERVICE_ACCOUNT" ] && missing="$missing GCP_SERVICE_ACCOUNT(variable)"
+          [ -z "$GDRIVE_BACKUP_FOLDER_ID" ] && missing="$missing GDRIVE_BACKUP_FOLDER_ID(variable)"
           if [ -n "$missing" ]; then
-            echo "::error::Secrets manquants :$missing — voir MIGRATIONS.md § « Backup automatique Convex → Drive »."
+            echo "::error::Configuration manquante :$missing — voir MIGRATIONS.md § « Backup automatique Convex → Drive »."
             exit 1
           fi
+
+      # Trades this run's OIDC identity for a one-hour Google access token
+      # impersonating the service account. No key file anywhere.
+      - name: Authenticate to Google
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/drive
 
       - name: Export, verify, upload, purge
         id: backup
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
-          GDRIVE_SERVICE_ACCOUNT: ${{ secrets.GDRIVE_SERVICE_ACCOUNT }}
-          GDRIVE_BACKUP_FOLDER_ID: ${{ secrets.GDRIVE_BACKUP_FOLDER_ID }}
+          GDRIVE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          GDRIVE_BACKUP_FOLDER_ID: ${{ vars.GDRIVE_BACKUP_FOLDER_ID }}
         run: |
           set -o pipefail
           node scripts/convex-backup.mjs ${{ inputs.full && '--full' || '' }} 2>&1 \
