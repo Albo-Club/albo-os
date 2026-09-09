@@ -64,6 +64,112 @@ des flux **continus**, pas des migrations (la fusion Palatine ci-dessus est
 l'exception : un rattrapage ponctuel de données, pas le flux) — cf. `KNOWN_ISSUES.md`
 (« Ingestion Powens ») et `CLAUDE.md` (frontière d'attribution Attio).
 
+## Backup automatique Convex → Drive (ALB-234)
+
+Sauvegarde quotidienne de la prod, poussée sur un Drive partagé par le
+workflow `.github/workflows/convex-backup.yml`. Convex ne sait pas exporter
+tout seul vers une destination qu'on choisit (le backup intégré est réservé au
+Pro et plafonne à 7 jours), donc un ordonnanceur externe lance le CLI.
+
+### Ce qui part, et quand
+
+| Quand | Contenu | Nom |
+| --- | --- | --- |
+| Tous les jours, 03:00 UTC | Données seules | `albo-os-AAAA-MM-JJ.zip` |
+| Dimanche + le 1er du mois | Données **+ fichiers** | `albo-os-AAAA-MM-JJ-full.zip` |
+
+Les fichiers ne sont pas dans l'archive quotidienne **volontairement** : un PDF
+stocké ne change jamais après son upload, et Convex facture l'**egress** à
+chaque export (0,132 $/Go au-delà d'1 Go inclus par mois). Les ré-exporter 365
+fois par an ne protège rien de plus et coûte ~15× plus cher. Le quotidien
+couvre ce qui bouge : sync bancaire, reports entrants, saisie manuelle.
+
+**Conséquence directe sur la restauration** : une archive quotidienne ne
+contient **pas** les fichiers. Restaurer = les données de l'archive visée
+**+** les fichiers de la dernière `-full`.
+
+### Rétention
+
+7 quotidiennes, 4 hebdomadaires, 12 mensuelles — seule une archive `-full`
+peut occuper un créneau hebdo ou mensuel (un point de restauration d'une
+semaine sans les fichiers n'en est pas un). La règle est **recalculée à chaque
+run** depuis les archives présentes dans le dossier
+(`scripts/lib/backup-retention.mjs`, testée par `tests/backupRetention.test.ts`) :
+rien n'est étiqueté ni mémorisé entre deux runs, donc un run manqué, rejoué ou
+en retard converge sur le même ensemble. Les horizons se comptent sur les
+archives **présentes**, pas sur le calendrier : si les backups s'arrêtent deux
+mois, les dernières existantes sont conservées au lieu d'être jugées périmées.
+Un fichier dont le nom ne suit pas la convention n'est **jamais** supprimé.
+
+### Mise en place (une seule fois)
+
+1. **Google Cloud** : créer un projet, activer **Google Drive API**, créer un **service account**, lui générer une clé **JSON**.
+2. Drive → **Drives partagés** → nouveau drive (ex. `Albo OS — Backups`) →
+   **Gérer les membres** → ajouter l'e-mail du service account en
+   **Gestionnaire de contenu** (il doit pouvoir écrire *et* supprimer).
+3. Relever l'ID du dossier dans son URL.
+4. GitHub → Settings → Secrets and variables → Actions → trois secrets :
+   `CONVEX_DEPLOY_KEY` (dashboard Convex → déploiement **prod**),
+   `GDRIVE_SERVICE_ACCOUNT` (le JSON entier), `GDRIVE_BACKUP_FOLDER_ID`.
+
+⚠️ L'étape 2 n'est pas optionnelle : un service account **n'a aucun quota de
+stockage propre**. Pointé ailleurs que sur un Drive partagé dont il est
+membre, l'upload échoue. C'est aussi cette appartenance — et elle seule — qui
+borne la portée du scope `drive` demandé par le script.
+
+⚠️ Le Drive est le **même compte Google** que les documents métier : un compte
+compromis ou fermé emporte les sauvegardes avec les originaux. Arbitrage
+assumé (ALB-234) au profit de « pas un outil de plus » ; le Drive dédié et
+l'accès restreint sont la mitigation.
+
+### Vérifier
+
+```bash
+node scripts/convex-backup.mjs --dry   # dit ce qui partirait et ce qui serait purgé
+```
+
+Puis Actions → « Convex backup » → Run workflow (case « archive complète »
+pour forcer les fichiers). Un échec ouvre une issue labellisée `convex-backup`
+— sauf si ce sont les secrets qui manquent, ce qui est un état de setup, pas
+un incident.
+
+### Restaurer
+
+⚠️ `convex import --replace-all` **écrase la base**. Prendre un export de
+secours avant, même — surtout — quand on restaure parce que la base est
+cassée.
+
+Attention aux deux drapeaux, ils ne font pas la même chose : `--replace` ne
+remplace que les tables **présentes dans l'archive** et laisse les autres
+intactes ; `--replace-all` remet le déploiement dans l'état de l'instantané
+(il vide les tables du schéma absentes de l'archive). Pour un vrai retour
+arrière, c'est `--replace-all`.
+
+**Cas nominal — restaurer un point complet** (le plus sûr, et celui à
+privilégier) :
+
+```bash
+pnpm exec convex export --prod --path ./avant-restauration-$(date +%Y%m%d-%H%M).zip
+unzip -t ./albo-os-AAAA-MM-JJ-full.zip          # l'archive est-elle saine ?
+pnpm exec convex import --prod --replace-all ./albo-os-AAAA-MM-JJ-full.zip
+```
+
+Puis vérifier : l'app répond, les compteurs du tableau de bord sont cohérents,
+et **une fiche société ouvre bien ses documents** — c'est ce dernier point qui
+prouve que le file storage est revenu, pas seulement les lignes.
+
+**Cas dégradé — remonter à une archive quotidienne.** Une quotidienne ne
+contient **pas** les fichiers : c'est le prix assumé de la cadence. On perd au
+maximum les fichiers arrivés depuis la dernière `-full` (donc moins d'une
+semaine), mais la manœuvre n'est pas un `import` d'une seule commande — il
+faut repartir de la `-full` pour les fichiers puis rejouer les données. **Cette
+combinaison n'a jamais été exécutée** : ne pas l'improviser un jour d'incident.
+
+⚠️ **Aucune restauration n'a jamais été déroulée pour de vrai**, ni complète ni
+dégradée : un `import --replace-all` sur la prod est destructif. La procédure
+est écrite, pas testée. La dérouler une fois à blanc — et trancher au passage
+le cas dégradé ci-dessus — mérite sa propre tâche.
+
 ## Chantier : retrait du champ legacy `documents.extractedText`
 
 Le champ n'est **écrit par aucun code de ce repo** (aucun commit ne l'alimente)
