@@ -6165,3 +6165,35 @@ imports d'`api.d.ts` — un module supprimé y reste listé sans rien casser, et
 c'est ainsi que le fichier a pu dériver (`gmail`, `lib/suggest`…) jusqu'à la
 régénération de septembre 2026. Seul `convex dev` / `convex codegen` le
 remet d'équerre, et il faut un `CONVEX_DEPLOYMENT` pour le lancer.
+
+## Un nouveau module Convex ne peut pas se citer lui-même hors déploiement
+
+`convex/_generated/api.d.ts` est **committé** et liste chaque module
+explicitement (deux lignes par fichier, un `import type` et une entrée dans
+`fullApi`). Il ne se régénère qu'avec `npx convex dev` / `convex deploy`,
+c'est-à-dire avec des identifiants de déploiement.
+
+Conséquence pour un module qu'on vient de créer : dès qu'il se réfère à
+lui-même — le cas classique d'une `internalAction` qui pilote une boucle en
+appelant sa propre `internalQuery` via `internal.migrations.<module>.<fn>` —
+`pnpm typecheck` échoue avec `Property '<module>' does not exist on type
+'{ … }'`. Le code est juste, c'est le fichier généré qui ne connaît pas encore
+le module. Et le job CI `check` lance `pnpm lint` (donc `tsc`) sur le
+`_generated` du dépôt, pas sur un régénéré : la PR est rouge.
+
+Éditer `convex/_generated/*` à la main pour ajouter les deux lignes est
+**interdit** (`CLAUDE.md` § Anti-patterns). Deux sorties propres :
+
+1. **Régénérer** — `pnpm dev` sur un poste qui a les identifiants Convex,
+   puis committer le `api.d.ts` mis à jour. C'est la voie normale.
+2. **Ne pas se référencer** — sortir la boucle du backend : le module
+   n'expose que des fonctions feuilles, et un script de `scripts/` enchaîne
+   les appels via `convex run` (patron de `import-legal-docs.mjs`, repris par
+   `storage-audit.mjs`). Rien ne pointe alors vers `internal.*`, `tsc` passe,
+   et le module reste appelable en prod puisque `convex deploy` régénère
+   l'API de son côté.
+
+La sortie 2 est la seule disponible depuis un environnement sans identifiants
+Convex (session distante, CI). Elle a un effet de bord acceptable : le module
+n'apparaît pas dans `api.d.ts` tant que personne n'a relancé `convex dev`, ce
+qui produira un diff de deux lignes sans rapport au prochain `pnpm dev`.

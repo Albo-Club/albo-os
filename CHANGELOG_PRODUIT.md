@@ -23,6 +23,45 @@ bas de page.
 
 ---
 
+## v1.217.6 — 09/09/2026 à 12:52 — Savoir ce qui pèse dans les documents stockés
+
+Changement purement technique, rien ne change à l'écran. Avant d'automatiser
+les sauvegardes, il fallait savoir ce que pèse réellement ce qu'on stocke :
+une mesure en lecture seule dresse l'inventaire des fichiers conservés — leur
+poids total, leur répartition par type et par taille, et les plus lourds
+d'entre eux, avec leur intitulé et la façon dont ils sont arrivés (dépôt
+manuel ou reporting reçu par mail). Elle ne modifie ni ne supprime rien.
+
+Ce que ça sert à trancher : un document scanné peut peser cent fois son
+équivalent compressé, et chaque sauvegarde recopie ce poids. Savoir si le
+volume tient dans quelques gros fichiers ou se disperse dans un long inventaire
+décide si l'effort doit porter sur la compression à l'arrivée, sur une reprise
+de l'existant, ou sur aucune des deux.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau `convex/migrations/storageAudit.ts` : deux `internalQuery`
+>   seulement. `scanPage` pagine la table système `_storage` (lignes légères :
+>   `size`, `contentType`) ; `describe` joint les plus gros blobs à
+>   `documents` via l'index `by_storage` pour les nommer (`title`, `kind`,
+>   `source`). Le join est volontairement plafonné : une ligne `documents`
+>   porte encore le champ legacy `extractedText`, donc balayer la table serait
+>   l'anti-patron « gros champ texte sur une ligne lue en liste » que cet
+>   audit sert justement à chiffrer.
+> - Nouveau `scripts/storage-audit.mjs` : porte la boucle de pagination et
+>   toute l'agrégation (totaux, répartition par `contentType`, tranches de
+>   taille, gisement de PDF > 1 Mo, top N nommé, projection d'egress). Appelle
+>   `convex run --prod`, avec le même helper de retry que
+>   `import-legal-docs.mjs`.
+> - L'agrégation vit dans le script et non dans une `internalAction` pour que
+>   le module n'ait pas à se citer via `internal.*` — ce qui exigerait de
+>   régénérer `convex/_generated/api.d.ts`, impossible sans identifiants
+>   Convex. Piège documenté dans `KNOWN_ISSUES.md` « Un nouveau module Convex
+>   ne peut pas se citer lui-même hors déploiement ».
+> - Motivation (ALB-234) : les backups automatisés sont facturés à l'**egress**
+>   Convex (0,132 $/Go au-delà d'1 Go/mois), donc taille de la base × nombre
+>   d'exports. Runbook indexé dans `MIGRATIONS.md`.
+
 ## v1.217.5 — 09/09/2026 à 11:04 — Un contrôle dit où les reports et les communications Parallel se recouvrent
 
 L'actualité d'une participation peut arriver par deux canaux : les reportings
