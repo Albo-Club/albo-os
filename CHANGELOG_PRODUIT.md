@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.220.1 — 09/09/2026 à 18:17 — La première sauvegarde réelle corrige deux détails de mise en service
+## v1.220.2 — 09/09/2026 à 18:32 — La première sauvegarde réelle corrige deux détails de mise en service
 
 Toujours invisible à l'écran. Le premier lancement de la sauvegarde
 automatique a buté sur deux points que seule une exécution réelle pouvait
@@ -65,6 +65,45 @@ Les deux sont corrigés et consignés, pour que la prochaine mise en service
 >   et d'autant plus discret que les trois commandes précédentes réussissent.
 
 ---
+
+---
+
+## v1.220.1 — 09/09/2026 à 18:22 — RDB aussi n'a qu'un seul compte courant
+
+RDB portait, comme trois autres filiales avant elle, deux lignes de compte
+courant côté CALTE pour une seule et même relation : l'ancienne, ouverte en
+décembre 2025 pour financer l'opération de Bidart, et une seconde ouverte fin
+juillet 2026. Le déclencheur est le remboursement partiel de 2 300 000 € versé
+par RDB en juillet, qui a fait paraître la ligne soldée : les virements
+suivants ont été rattachés à une ligne neuve.
+
+Or un remboursement partiel ne clôt pas un compte courant, il en déplace le
+solde — 468 155 € restaient dus. Les deux lignes sont donc repliées en une
+seule, qui reprend l'intégralité des mouvements et affiche enfin le vrai solde
+de RDB envers CALTE.
+
+Comme pour les trois filiales précédentes, le montant « versé » saisi à la
+main disparaît de la ligne conservée : seul reste le montant réellement
+pointé sur les relevés, recalculé à chaque affichage.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/mergeGroupCcaDeals.ts` : `RDB` ajouté à
+>   `TARGET_COMPANIES`. Aucune autre logique touchée — la survivante reste
+>   celle qui porte le plus de transactions (la ligne de décembre 2025, 6 tx
+>   contre 3), la date de signature la plus ancienne départageant une égalité,
+>   et le `paidAmount` figé est effacé plutôt que recalculé.
+> - Le commentaire d'en-tête distingue désormais les deux origines : séquelle
+>   de la requalification `real_estate_direct` → `cca` pour Caltimo,
+>   SCI Chapelle et SCI Upload ; ligne rouverte après un remboursement partiel
+>   pour RDB.
+> - `convex/regression.mergeCca.test.ts` : la fixture monte quatre cibles au
+>   lieu de trois, les quatre tests couvrant RDB à l'identique.
+> - Les trois premières fusions ayant déjà été appliquées en prod, un nouveau
+>   passage de `inspect` / `apply` les ressort `done` et ne traite que RDB.
+> - Signalé, non corrigé : les deux virements de 25 000 € du 04/08/2026 sur
+>   RDB sont rigoureusement identiques (même date, même montant, même libellé)
+>   — doublon d'import possible, à trancher sur le relevé.
 
 ## v1.220.0 — 09/09/2026 à 17:55 — Un accès bancaire peut servir plusieurs sociétés
 
