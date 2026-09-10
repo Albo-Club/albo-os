@@ -562,7 +562,7 @@ export const assignCompany = mutation({
  * The source row is corrected in the same transaction: the review queue stops
  * claiming the participation, and a later replay does not put the report back.
  */
-async function removeReportForCompany(
+export async function removeReportForCompany(
   ctx: MutationCtx,
   report: Doc<'companyReports'>,
   { deleteFiles }: { deleteFiles: boolean },

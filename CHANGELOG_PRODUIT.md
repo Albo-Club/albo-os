@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.220.3 — 09/09/2026 à 18:39 — Le compte courant Albo Club affiche enfin le bon montant versé
+## v1.220.4 — 09/09/2026 à 18:39 — Le compte courant Albo Club affiche enfin le bon montant versé
 
 La fiche du compte courant de CALTE envers Albo Club annonçait 400 000 €
 versés alors que 1 880 000 € sont effectivement rapprochés sur les relevés.
@@ -57,6 +57,52 @@ corriger.
 >   quand le saisi dépasse le pointé, idempotence.
 > - Trait déjà documenté dans `KNOWN_ISSUES.md` (`paidAmount` figé des deals
 >   importés) ; rien à y ajouter.
+## v1.220.3 — 09/09/2026 à 18:34 — Un SPV détenu par deux sociétés reçoit ses publications des deux côtés
+
+Quand CALTE et Albo Club ont toutes les deux souscrit à la même opération, le
+SPV existe en deux fiches — une par société. Les publications du portail
+n'atterrissaient que sur la première servie : la fiche Bernay d'Albo Club a
+reçu ses huit publications, celle de CALTE est restée vide, et la reprise
+affichait « 0 » pour elle, ce qui se lit exactement comme « rien à faire ».
+
+Une publication concerne l'opération, donc les deux investisseurs : elle
+apparaît désormais sur toutes les fiches qui détiennent le SPV, comme le fait
+déjà un reporting qui couvre plusieurs sociétés.
+
+Trois corrections d'ergonomie au passage : la commande de reprise annonce
+maintenant des publications **mises en file** et non des reportings créés — le
+contrôle des doublons agit en fin de traitement, bien après ; un garde-fou
+d'envoi de mail s'appuie sur l'origine de la ligne plutôt que sur une
+propriété indirecte ; et la documentation parle du « portail » plutôt que de
+« Parallel », les participations concernées venant de deux portails distincts.
+
+> **🔧 Notes techniques**
+>
+> - `vascoIngest.pendingForIssuer` cherche les entités liées à l'émetteur dans
+>   **toutes** les orgs, plus seulement celle appelée. L'ancre reste keyée par
+>   portail (`vasco:<clientSlug>:<communicationId>`) — une publication, une
+>   ingestion — mais l'éventail est désormais group-wide : c'est la
+>   combinaison « ancre globale + recherche locale » qui produisait des fiches
+>   sous-servies en silence. `orgId` ne décide plus que du cache lu et de la
+>   connexion qui télécharge.
+> - Lecture : scan complet de `companies` (le lien VASCO n'a pas d'index), une
+>   fois par émetteur, jamais depuis une query utilisateur.
+> - Réparation : `migrations/vascoReingestIssuer.ts` (`clientSlug` +
+>   `issuerId`, `apply` à false par défaut). Défait les lignes portail d'un
+>   émetteur et leurs reportings via `reportInbox.removeReportForCompany`
+>   (documents, blobs, KPI, index sémantique), pour que la reprise les recrée
+>   des deux côtés. Elle n'utilise **pas** `reportsOfInbound` : ce helper part
+>   de l'identifiant AgentMail, qu'un report portail ne porte pas, et du
+>   back-link `reportIds` qu'un pipeline complet seul écrit — il répondrait
+>   vide. Refuse toute ligne dont l'origine n'est pas `vasco`.
+> - Périmètre réel : un seul émetteur partagé entre les deux orgs (Bernay,
+>   `parallel` / `18`), soit 8 publications.
+> - Tests : 5 cas ajoutés à `regression.vascoIngest.test.ts` — l'éventail sur
+>   deux orgs, la fiche archivée toujours exclue, et les trois cas de la
+>   réparation (plan à blanc, application, et un report venu par mail qui n'est
+>   jamais emporté).
+
+---
 
 ## v1.220.2 — 09/09/2026 à 18:32 — La première sauvegarde réelle corrige deux détails de mise en service
 

@@ -813,6 +813,13 @@ export const remove = mutation({
   faire écrire une nouvelle source dans une table partagée, chercher la clé de
   dédup et se demander ce qu'elle **détruit** quand les deux sources se
   rencontrent — une reprise d'historique le fait par centaines et en silence.
+  Symétrique et tout aussi silencieux : une ancre **globale** (« ce document,
+  une fois ») combinée à un éventail **local** (« les fiches de cette org »)
+  sous-sert sans rien signaler. Le premier passage réclame les identifiants,
+  le second n'a plus rien à faire, et la sortie affiche `0` — indiscernable de
+  « rien à faire ». Les deux portées doivent coïncider : une ancre globale
+  exige un éventail global. Et la réparation n'est jamais un simple re-run,
+  puisque l'ancre rend inerte ce qui est déjà posé.
 - ❌ Accrocher un déclencheur métier (analyse, notification, alerte) à une
   intégration **pull** sans lui avoir d'abord donné une mémoire du « déjà vu ».
   Un webhook est un **événement** — il arrive une fois, sa nouveauté est

@@ -290,3 +290,149 @@ describe('a portal publication never overwrites a report', () => {
     expect(after[0].title).toBe('AZMed - Juin (corrigé)')
   })
 })
+
+/**
+ * Regression: one publication, every fiche that holds the SPV
+ * (convex/vascoIngest.ts:pendingForIssuer).
+ *
+ * The anchor is keyed by PORTAL, not by org — one publication, ingested once.
+ * That is right, and it is exactly why the entity lookup may not be
+ * org-scoped: CALTE and Albo Club both subscribed to Bernay and each keeps its
+ * own fiche, so the first org to run claimed the eight ids and the second
+ * found nothing left to do. Albo's fiche carried all eight publications,
+ * CALTE's carried none, and the run reported `0` for it — indistinguishable
+ * from "nothing to do".
+ */
+describe('a publication reaches every fiche holding the issuer', () => {
+  test('the entities of two orgs are served by one ingestion', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'shared@test.dev')
+    const albo = await createOrg(t, 'albo-shared', [
+      { userId: user.userId, role: 'owner' },
+    ])
+    const calte = await createOrg(t, 'calte-shared', [
+      { userId: user.userId, role: 'owner' },
+    ])
+    const alboFiche = await createPortfolioCompany(t, albo.orgId, 'SPV 13 Bernay')
+    const calteFiche = await createPortfolioCompany(
+      t,
+      calte.orgId,
+      'SPV13 Bernay Normandie',
+    )
+    for (const id of [alboFiche, calteFiche]) {
+      await t.run((ctx) =>
+        ctx.db.patch('companies', id, {
+          vascoClientSlug: CLIENT,
+          vascoIssuerId: ISSUER,
+        }),
+      )
+    }
+    await cache(t, albo.orgId, 'c1')
+
+    // Asked from ONE org, it answers with BOTH fiches: the publication
+    // concerns the operation, so it concerns both investors.
+    const pending = await t.query(internal.vascoIngest.pendingForIssuer, {
+      orgId: albo.orgId,
+      clientSlug: CLIENT,
+      issuerId: ISSUER,
+    })
+    expect(new Set(pending.companies.map((c) => c.companyId))).toEqual(
+      new Set([alboFiche, calteFiche]),
+    )
+    expect(pending.communications.map((c) => c.communicationId)).toEqual(['c1'])
+  })
+
+  test('an archived fiche is still left out of the fan-out', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'shared-arch@test.dev')
+    const albo = await createOrg(t, 'albo-arch', [
+      { userId: user.userId, role: 'owner' },
+    ])
+    const calte = await createOrg(t, 'calte-arch', [
+      { userId: user.userId, role: 'owner' },
+    ])
+    const alive = await createPortfolioCompany(t, albo.orgId, 'SPV vivant')
+    const archived = await createPortfolioCompany(t, calte.orgId, 'SPV sorti')
+    for (const id of [alive, archived]) {
+      await t.run((ctx) =>
+        ctx.db.patch('companies', id, {
+          vascoClientSlug: CLIENT,
+          vascoIssuerId: ISSUER,
+        }),
+      )
+    }
+    await t.run((ctx) =>
+      ctx.db.patch('companies', archived, { archivedAt: Date.now() }),
+    )
+    await cache(t, albo.orgId, 'c1')
+
+    const pending = await t.query(internal.vascoIngest.pendingForIssuer, {
+      orgId: albo.orgId,
+      clientSlug: CLIENT,
+      issuerId: ISSUER,
+    })
+    expect(pending.companies.map((c) => c.companyId)).toEqual([alive])
+  })
+})
+
+/**
+ * Regression: the repair that undoes one issuer's ingestion
+ * (convex/migrations/vascoReingestIssuer.ts).
+ *
+ * It exists because the anchor makes an already-ingested publication a no-op
+ * forever: the rows written before the fan-out was group-wide cannot be
+ * completed, only redone. Deleting is safe here and nowhere else — the portal
+ * still holds every publication, and its own id brings them back.
+ */
+describe('migrations.vascoReingestIssuer', () => {
+  test('dry run names what it would remove and writes nothing', async () => {
+    const { t, org, companyId } = await setup('org-repair')
+    const portal = await inboundRow(t, 'vasco', 'c1')
+    await store(t, companyId, org.orgId, portal, 'Bernay - Reporting')
+
+    const plan = await t.mutation(internal.migrations.vascoReingestIssuer.run, {
+      clientSlug: CLIENT,
+      issuerId: ISSUER,
+    })
+    expect(plan.applied).toBe(false)
+    expect(plan.inboundRows).toBe(1)
+    expect(plan.reports).toBe(1)
+
+    expect(await t.run((ctx) => ctx.db.query('companyReports').collect())).toHaveLength(1)
+  })
+
+  test('applying removes the portal reports and their inbound rows', async () => {
+    const { t, org, companyId } = await setup('org-repair-apply')
+    const portal = await inboundRow(t, 'vasco', 'c1')
+    await store(t, companyId, org.orgId, portal, 'Bernay - Reporting')
+
+    await t.mutation(internal.migrations.vascoReingestIssuer.run, {
+      clientSlug: CLIENT,
+      issuerId: ISSUER,
+      apply: true,
+    })
+
+    expect(await t.run((ctx) => ctx.db.query('companyReports').collect())).toEqual([])
+    expect(await t.run((ctx) => ctx.db.get('inboundEmails', portal))).toBeNull()
+  })
+
+  test('a report that came by mail is never swept up', async () => {
+    const { t, org, companyId } = await setup('org-repair-mail')
+    const mail = await inboundRow(t, 'email', 'transfert')
+    await store(t, companyId, org.orgId, mail, 'Update reçu par mail')
+
+    // The mail report is not portal-born, so it is not even in the plan.
+    const plan = await t.mutation(internal.migrations.vascoReingestIssuer.run, {
+      clientSlug: CLIENT,
+      issuerId: ISSUER,
+    })
+    expect(plan.reports).toBe(0)
+
+    await t.mutation(internal.migrations.vascoReingestIssuer.run, {
+      clientSlug: CLIENT,
+      issuerId: ISSUER,
+      apply: true,
+    })
+    expect(await t.run((ctx) => ctx.db.query('companyReports').collect())).toHaveLength(1)
+  })
+})
