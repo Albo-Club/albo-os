@@ -3695,8 +3695,9 @@ document est un **coffre** (cherché par nature, longtemps après, parce qu'il
 faut signer ou voter). Un journal se trie par date, un coffre par type — les
 mettre dans la même liste force chacun à adopter le tri de l'autre.
 
-- `CompanyReportsSection` — rapports + communications VASCO, colonne
-  principale, tri chronologique.
+- `CompanyReportsSection` — rapports + communications VASCO **non digérées**,
+  colonne principale, tri chronologique (une publication devenue rapport n'y
+  figure qu'une fois, sous sa forme rapport).
 - `CompanyDocumentsCard` — carte du panneau de droite (compteur + 5 plus
   récents) et son tiroir : recherche par titre, filtres et **regroupement par
   type**.
@@ -4161,6 +4162,16 @@ libre, jamais un créneau occupé** ; son propre créneau ne compte pas comme
 occupé, sinon une correction du portail ne pourrait plus atterrir. Tenu par
 `regression.vascoIngest.test.ts`.
 
+⚠️ **Une publication digérée ne s'affiche plus côté portail.** La frise fusionne
+reports et communications ; une publication devenue report y figurait donc
+**deux fois**. `companyReports.listByCompany` rend, pour chaque report d'origine
+portail, l'identifiant de la publication dont il vient (lu sur la ligne
+entrante, dont la clé de dédup **est** cet identifiant — rien à synchroniser, et
+pas de backfill des lignes déjà ingérées), et la frise masque les entrées
+portail correspondantes. Celles qui n'ont produit **aucun** report restent
+affichées : le portail est alors leur seule trace, et les masquer transformerait
+un trou en trou invisible.
+
 ⚠️ **Un émetteur peut être détenu par plusieurs orgs.** CALTE et Albo Club ont
 toutes deux souscrit à Bernay, donc le SPV existe en deux fiches. L'ancre étant
 keyée par **portail** et non par org, la première org traitée réclame les
@@ -4346,21 +4357,19 @@ SPV13"), dated (`publishDate`/`period`), with `title`, `htmlContent`, and
 
 ### Communications → AI synthesis (« Cerveau », étape 2c)
 
-The company AI synthesis (`intelligence.runAnalysis`) folds the linked issuer's
-communications into its prompt context, **pulled live on each run** (nothing
-new is persisted — the result still lands in `companyIntelligence`).
+La synthèse (`intelligence.runAnalysis`) **ne lit plus le portail** (09/2026).
+Elle le faisait en direct à chaque passage, par un
+`vasco.pullCommunicationsForSynthesis` supprimé depuis : une publication étant
+désormais digérée en report, le bloc « reports » du contexte la porte déjà, et
+la pulled-live remettait le même contenu **deux fois** dans le prompt — plus un
+aller-retour portail pour une donnée déjà en base. Le garde `no_data` se lit
+donc sur les seuls reports, et une entité Parallel n'est plus un cas
+particulier : ses publications **sont** des reports.
 
-- **System-context read path.** `runAnalysis` is a scheduled internalAction with
-  **no user identity**, so it can't use the org-member-guarded
-  `fetchCommunications`. It calls `vasco.pullCommunicationsForSynthesis` (an
-  internalAction) which resolves connections via `connections.listActiveForOrg`
-  — an **auth-less** internalQuery keyed by orgId (sibling of
-  `connections.listActiveByOrgSlug`, do **not** reuse
-  `connections.authorizeAndListActive`, which guards). Best-effort: it returns
-  `[]` on any VASCO failure so the
-  synthesis still runs on the company/report context alone. The `no_data` guard
-  is evaluated on (context **OR** comms), so a bare Parallel entity with only
-  communications is still analyzed.
+⚠️ Ne pas le « rétablir » en croyant combler un trou. Le seul cas non couvert
+est une publication qui a échoué à être digérée — elle reste visible sur la
+fiche côté portail (cf. la section « Une communication est DIGÉRÉE en report »),
+et c'est là qu'il faut aller la chercher, pas dans le prompt.
 - **Le cache est UPSERTÉ, pas effacé-réécrit (09/2026).** Le remplacement
   total ne faussait aucune date affichée — la fiche lit `publishDate`, la date
   du portail — mais il détruisait l'**identité** des lignes : chaque
