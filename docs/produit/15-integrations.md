@@ -181,6 +181,11 @@ publication déjà traitée n'est jamais reprise deux fois. Rattacher une socié
 son émetteur lance également son analyse dans la foulée, sans attendre la
 prochaine publication.
 
+La publication n'apparaît **qu'une fois** sur la fiche : sous sa forme
+reporting, celle qui porte le résumé, les chiffres et les pièces jointes. La
+version brute du portail n'est plus affichée à côté — sauf si l'analyse n'a pas
+abouti, auquel cas elle reste visible, le portail étant alors sa seule trace.
+
 **Quand un SPV est détenu par deux sociétés du groupe** — CALTE et Albo Club
 ont souscrit à la même opération, chacune avec sa fiche — la publication
 apparaît sur **les deux**. Elle concerne l'opération, donc les deux
