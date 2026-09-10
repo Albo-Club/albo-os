@@ -23,6 +23,40 @@ bas de page.
 
 ---
 
+## v1.220.4 — 09/09/2026 à 18:39 — Le compte courant Albo Club affiche enfin le bon montant versé
+
+La fiche du compte courant de CALTE envers Albo Club annonçait 400 000 €
+versés alors que 1 880 000 € sont effectivement rapprochés sur les relevés.
+Les deux chiffres se contredisaient à l'écran, l'un au-dessus de l'autre.
+
+Le montant « versé » saisi à la main est un instantané pris une fois lors de
+la reprise des données, que plus rien ne rafraîchit — contrairement au montant
+réel, recalculé à chaque affichage depuis les mouvements pointés. Il est donc
+retiré de cette ligne : reste le seul chiffre qui reste vrai. Aucun calcul de
+performance n'utilisait le montant saisi, les totaux du portefeuille ne
+bougent pas.
+
+Le nettoyage s'arrête volontairement à cette ligne. D'autres participations
+affichent aussi un écart, mais pour la plupart d'entre elles c'est l'inverse :
+aucun mouvement bancaire n'est encore rapproché, et le montant saisi est alors
+la seule information disponible — l'effacer détruirait la donnée au lieu de la
+corriger.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/clearAlboCcaPaidAmount.ts` (`inspect` / `apply`) :
+>   efface `paidAmount` sur l'unique deal `cca` de `calte` visant `ALBO CLUB`,
+>   ciblé par nom de société et non par id.
+> - Le garde-fou porte tout le script : l'effacement n'a lieu que si
+>   `paidActual` **dépasse** `paidAmount`, ce qui distingue « l'instantané est
+>   en retard sur la banque » de « la banque n'est pas encore dans l'app ».
+>   Sur les 13 deals `calte` dont saisi ≠ pointé, 7 n'ont aucune transaction
+>   pointée — le même code sans ce test serait une perte de donnée.
+> - `convex/regression.clearAlboCca.test.ts` (4 tests) : effacement quand le
+>   pointage est en avance, conservation quand rien n'est pointé, conservation
+>   quand le saisi dépasse le pointé, idempotence.
+> - Trait déjà documenté dans `KNOWN_ISSUES.md` (`paidAmount` figé des deals
+>   importés) ; rien à y ajouter.
 ## v1.220.3 — 09/09/2026 à 18:34 — Un SPV détenu par deux sociétés reçoit ses publications des deux côtés
 
 Quand CALTE et Albo Club ont toutes les deux souscrit à la même opération, le
