@@ -4,10 +4,16 @@
  * The cost of automated backups is an EGRESS cost: Convex bills the bytes
  * leaving the platform on every `convex export`, so the size of the base is
  * multiplied by the number of exports (0,132 $/GB beyond the 1 GB included
- * per month). Before compressing anything on the way in, we need to know
- * WHERE those bytes are — a handful of scanned PDFs, or a long tail. The
- * answer decides whether the lever is compression at import, a one-shot
- * re-compression of what is already stored, or neither.
+ * per month). Knowing WHERE those bytes are — a handful of scanned PDFs, or
+ * a long tail — decides whether the lever is compression, deduplication, or
+ * neither.
+ *
+ * It also groups blobs by their `sha256`, which turns "these two files have
+ * the same size" into "these two files ARE the same bytes". Deduplicating is
+ * the one saving that costs no quality, unlike compressing a scan — but a
+ * duplicate is not automatically waste: the same PDF legitimately attached to
+ * two companies is two references, not a mistake. Hence: measure, name who
+ * points at each copy, decide afterwards.
  *
  * Writes nothing, deletes nothing, downloads no file. Safe on prod at any
  * time, no snapshot needed.
@@ -47,6 +53,9 @@ export const scanPage = internalQuery({
         size: f.size,
         contentType: f.contentType,
         createdAt: f._creationTime,
+        // Convex stores a content hash per blob, so identical bytes are
+        // provable rather than guessed from a matching size.
+        sha256: f.sha256,
       })),
       cursor: res.continueCursor,
       isDone: res.isDone,
