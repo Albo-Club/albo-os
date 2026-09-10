@@ -23,6 +23,37 @@ bas de page.
 
 ---
 
+## v1.221.1 — 10/09/2026 à 09:40 — L'audit du stockage sait maintenant reconnaître deux fichiers identiques
+
+L'outil interne qui pèse les fichiers stockés se contentait de dire combien
+ils pèsent et lesquels sont les plus gros. Il compare désormais leur empreinte
+exacte : deux fichiers dont le contenu est rigoureusement identique sont
+repérés comme tels, et le rapport indique combien d'espace serait libéré si on
+n'en gardait qu'un seul exemplaire.
+
+Il nomme aussi, pour les dix contenus les plus lourds présents en plusieurs
+exemplaires, **chaque** copie et d'où elle vient — un report reçu par mail, une
+publication du portail, un dépôt manuel. Un même document rattaché à deux
+sociétés est un doublon légitime, pas une erreur : savoir qui pointe sur quoi
+est la seule façon de faire la différence.
+
+Rien n'est supprimé : ce lot ne fait que mesurer.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/storageAudit.ts` : `scanPage` renvoie désormais
+>   `sha256` — le champ est déjà porté par la ligne `_storage` lue, coût de
+>   lecture nul. Toujours deux `internalQuery`, rien n'est écrit ni téléchargé.
+> - `scripts/storage-audit.mjs` : accumulateur `bySha` (empreinte → taille +
+>   liste des `storageId`) alimenté dans `absorb()`. Un blob sans empreinte
+>   entre dans les totaux mais n'est **jamais** groupé, sinon tous les
+>   non-hashés se percuteraient dans un même faux groupe.
+> - Nouvelle section « Doublons exacts (même sha256) » du rapport : nombre de
+>   groupes, copies en trop, octets récupérables (`taille × (n − 1)`, une copie
+>   doit exister) et pourcentage du stockage. Les `TOP_DUPLICATE_GROUPS = 10`
+>   plus lourds passent par un second `describe` qui nomme chaque copie
+>   (`kind` / `source` / titre).
+> - `MIGRATIONS.md` : ligne d'audit mise à jour.
 ## v1.221.0 — 10/09/2026 à 09:26 — Une publication du portail n'apparaît plus deux fois
 
 Depuis que les publications Parallel sont analysées comme des reportings, la

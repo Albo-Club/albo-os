@@ -9,6 +9,13 @@
  * long tail — which decides whether the lever is compression on the way in,
  * a one-shot re-compression of what is already stored, or neither.
  *
+ * It also groups blobs by `sha256`: identical bytes are provable, not
+ * guessed from a matching size. Deduplicating is the one saving that costs no
+ * quality — unlike compressing a scan. But a duplicate is not automatically
+ * waste: the same PDF legitimately attached to two companies is two
+ * references, not a mistake. So the report names WHO points at each copy;
+ * deciding what to remove is a separate, human step.
+ *
  * Read-only end to end: it calls two internal QUERIES
  * (`migrations/storageAudit`), never a mutation, and downloads no file.
  * Running it twice changes nothing.
@@ -45,6 +52,9 @@ const EGRESS_FREE_GB_PER_MONTH = 1
 
 /** Above this, a PDF is worth looking at for compression. */
 const COMPRESSIBLE_THRESHOLD = 1024 * 1024
+
+/** How many duplicate groups get every one of their copies named. */
+const TOP_DUPLICATE_GROUPS = 10
 
 /** Size buckets, ascending. A file lands in the first one it fits under. */
 const BUCKETS = [
@@ -95,6 +105,8 @@ const state = {
   fatPdfCount: 0,
   fatPdfBytes: 0,
   largest: [],
+  /** sha256 → { size, ids[] }. Same hash = same bytes, no heuristic. */
+  bySha: new Map(),
 }
 
 function absorb(row) {
@@ -121,6 +133,14 @@ function absorb(row) {
   }
 
   state.largest.push(row)
+
+  // A blob with no hash cannot be compared: counted in the totals, never
+  // grouped — otherwise every unhashed blob would collide with the others.
+  if (row.sha256) {
+    const group = state.bySha.get(row.sha256) ?? { size: row.size, ids: [] }
+    group.ids.push(row.storageId)
+    state.bySha.set(row.sha256, group)
+  }
 }
 
 async function main() {
@@ -163,6 +183,48 @@ async function main() {
     console.log(
       `  ${b.label.padEnd(34)} ${String(b.count).padStart(6)} fichiers  ${human(b.bytes).padStart(10)}  ${pct(b.bytes, state.totalBytes).padStart(5)}`,
     )
+  }
+
+  // ── Doublons ────────────────────────────────────────────────────────────
+  // Groups of two or more blobs sharing a hash. What a group WASTES is
+  // `size × (n − 1)`: one copy has to exist.
+  const dupGroups = [...state.bySha.entries()]
+    .filter(([, g]) => g.ids.length > 1)
+    .map(([sha, g]) => ({ sha, size: g.size, ids: g.ids, wasted: g.size * (g.ids.length - 1) }))
+    .sort((a, b) => b.wasted - a.wasted)
+  const dupWasted = dupGroups.reduce((sum, g) => sum + g.wasted, 0)
+  const dupCopies = dupGroups.reduce((sum, g) => sum + g.ids.length - 1, 0)
+
+  console.log('\n── Doublons exacts (même sha256) ──')
+  if (dupGroups.length === 0) {
+    console.log('  aucun')
+  } else {
+    console.log(
+      `  ${dupGroups.length} contenus en plusieurs exemplaires, ${dupCopies} copies en trop`,
+    )
+    console.log(
+      `  récupérable sans perte : ${human(dupWasted)} — ${pct(dupWasted, state.totalBytes)} du stockage`,
+    )
+
+    // Name every copy of the heaviest groups: who points at which tells the
+    // story (two channels? a re-import? a manual upload of a mailed file?).
+    const shown = dupGroups.slice(0, TOP_DUPLICATE_GROUPS)
+    const ids = shown.flatMap((g) => g.ids)
+    const info = new Map(
+      (await convex('migrations/storageAudit:describe', { storageIds: ids })).map((d) => [
+        d.storageId,
+        d,
+      ]),
+    )
+    console.log(`\n  Les ${shown.length} plus lourds :`)
+    for (const g of shown) {
+      console.log(`\n  ${human(g.size)} × ${g.ids.length} exemplaires (${human(g.wasted)} en trop)`)
+      for (const id of g.ids) {
+        const d = info.get(id) ?? {}
+        const tags = [d.kind, d.source, d.inline ? 'inline' : null].filter(Boolean).join('/')
+        console.log(`      ${(tags || '—').padEnd(22)} ${String(d.title ?? '').slice(0, 66)}`)
+      }
+    }
   }
 
   console.log('\n── Gisement compressible ──')
