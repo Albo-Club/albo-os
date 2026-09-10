@@ -1413,57 +1413,12 @@ export const getCachedCommunications = query({
 })
 
 /**
- * Live issuer-scoped read for the AI-synthesis runner (`intelligence.runAnalysis`),
- * which runs in system context (no user identity → can't go through the
- * org-member-guarded path) and wants the freshest communications rather than the
- * cache. Resolves the org's active connections for `clientSlug` via the
- * auth-less internal query, logs in, and returns the issuer's communications
- * date-desc. Best-effort: returns `[]` if no connection logs in, so the
- * synthesis still runs on the company/report context alone.
- */
-export const pullCommunicationsForSynthesis = internalAction({
-  args: {
-    orgId: v.id('organizations'),
-    clientSlug: v.string(),
-    issuerId: v.string(),
-  },
-  handler: async (
-    ctx,
-    { orgId, clientSlug, issuerId },
-  ): Promise<Array<VascoCommunication>> => {
-    const conns: Array<VascoConnection> = await ctx.runQuery(
-      internal.connections.listActiveForOrg,
-      { orgId, platform: 'vasco' },
-    )
-    const matching = conns.filter((c) => connClientSlug(c) === clientSlug)
-    // Try each matching connection until one logs in (tolerates a stale dup).
-    for (const conn of matching) {
-      try {
-        const all = await pullCommunications(vascoCreds(conn))
-        return all
-          .filter((c) => c.issuerId === issuerId)
-          .sort((a, b) =>
-            (b.publishDate ?? '').localeCompare(a.publishDate ?? ''),
-          )
-      } catch (err) {
-        console.warn(
-          `[vasco] synthesis comms pull failed for ${clientSlug}:`,
-          err instanceof Error ? err.message : String(err),
-        )
-      }
-    }
-    return []
-  },
-})
-
-/**
  * System-context download: stores one portal document in Convex storage and
  * hands back its id, for the ingestion that turns a communication into a
  * report (`vascoIngest`).
  *
- * Auth-less sibling of `downloadCommunicationDocument` below, and for the same
- * reason as `pullCommunicationsForSynthesis`: the caller is a scheduled action
- * with no user identity, so it resolves connections through
+ * Auth-less sibling of `downloadCommunicationDocument` below: the caller is a
+ * scheduled action with no user identity, so it resolves connections through
  * `connections.listActiveForOrg` and never through the guarded
  * `authorizeAndListActive`. Never exposed to the client.
  *

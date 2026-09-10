@@ -23,6 +23,48 @@ bas de page.
 
 ---
 
+## v1.221.0 — 10/09/2026 à 09:26 — Une publication du portail n'apparaît plus deux fois
+
+Depuis que les publications Parallel sont analysées comme des reportings, la
+frise d'une participation les affichait **deux fois** : une fois en reporting —
+avec son résumé, ses chiffres, ses pièces jointes — et une fois en
+communication portail, la version brute dont elle vient.
+
+C'est la version brute qui disparaît. La frise ne garde que le reporting, qui
+dit strictement plus.
+
+Une publication qui n'a **pas** pu être analysée reste affichée, elle. Le
+portail est alors sa seule trace : la masquer transformerait un trou visible en
+trou invisible.
+
+La synthèse IA, de son côté, cesse d'aller interroger le portail en direct à
+chaque calcul. Elle lit les reportings, qui contiennent désormais la même
+chose — le contenu n'y figure donc plus en double.
+
+> **🔧 Notes techniques**
+>
+> - `companyReports.listByCompany` rend `vascoCommunicationId` pour un report
+>   d'origine portail : l'identifiant est **lu sur la ligne entrante**, dont la
+>   clé de dédup est précisément `vasco:<clientSlug>:<communicationId>`. Rien à
+>   synchroniser, et surtout aucun backfill des ~190 lignes déjà ingérées —
+>   dénormaliser l'id sur le report aurait exigé l'un et l'autre pour la même
+>   réponse. Coût : une lecture de plus par report portail, sur une fiche dont
+>   les reports sont lus de toute façon.
+> - `CompanyReportsSection` masque l'entrée portail des publications digérées,
+>   garde celles qui n'ont produit aucun report.
+> - `intelligence.runAnalysis` ne pulle plus les communications ; le garde
+>   `no_data` se lit sur les seuls reports. `vasco.pullCommunicationsForSynthesis`
+>   et `formatCommunications` sont supprimés (morts du fait de ce changement),
+>   et `getContext` ne rend plus le lien VASCO que personne ne lisait.
+> - **Non touché délibérément** : `lib/reportFreshness`, qui compte les deux
+>   canaux. Il prend la date la **plus récente**, jamais une somme — une
+>   publication comptée des deux côtés ne fausse donc rien, et y toucher
+>   risquerait l'alerte « boîte silencieuse » pour zéro gain.
+> - Tests : 2 cas dans `regression.vascoIngest.test.ts` (un report portail
+>   nomme sa publication, un report mail n'en nomme aucune).
+
+---
+
 ## v1.220.3 — 09/09/2026 à 18:34 — Un SPV détenu par deux sociétés reçoit ses publications des deux côtés
 
 Quand CALTE et Albo Club ont toutes les deux souscrit à la même opération, le

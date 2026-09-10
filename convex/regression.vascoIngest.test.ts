@@ -23,7 +23,7 @@
  *   and the 48h cron cannot re-ingest what it re-lists.
  */
 import { describe, expect, test } from 'vitest'
-import { internal } from './_generated/api'
+import { api, internal } from './_generated/api'
 import {
   createOrg,
   createPortfolioCompany,
@@ -434,5 +434,54 @@ describe('migrations.vascoReingestIssuer', () => {
       apply: true,
     })
     expect(await t.run((ctx) => ctx.db.query('companyReports').collect())).toHaveLength(1)
+  })
+})
+
+/**
+ * Regression: a digested publication is not shown twice on the fiche
+ * (convex/companyReports.ts:listByCompany).
+ *
+ * The fiche merges reports and portal communications in one timeline. Since a
+ * publication becomes a report, it was in that list TWICE — once digested,
+ * once as the portal entry it came from. The list hands back the publication
+ * each portal-born report came from, and the fiche drops the portal entry for
+ * those; a publication that produced no report keeps its entry, because the
+ * portal is then its only trace and hiding it would turn a gap into an
+ * invisible one.
+ */
+describe('companyReports.listByCompany — provenance of a portal report', () => {
+  test('a portal report names the publication it came from', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'prov@test.dev')
+    const org = await createOrg(t, 'org-prov', [
+      { userId: user.userId, role: 'owner' },
+    ])
+    const companyId = await createPortfolioCompany(t, org.orgId, 'SPV Bernay')
+    const portal = await inboundRow(t, 'vasco', 'comm-42')
+    await store(t, companyId, org.orgId, portal, 'Bernay - Coupon')
+
+    const [report] = await user.as.query(api.companyReports.listByCompany, {
+      companyId,
+    })
+    // The inbound row's dedup key is `vasco:<clientSlug>:<communicationId>`,
+    // and the id is what the fiche filters the portal entries on.
+    expect(report.vascoCommunicationId).toBe('comm-42')
+  })
+
+  test('a report that came by mail names no publication', async () => {
+    const t = setupHarness()
+    const user = await createUser(t, 'prov-mail@test.dev')
+    const org = await createOrg(t, 'org-prov-mail', [
+      { userId: user.userId, role: 'owner' },
+    ])
+    const companyId = await createPortfolioCompany(t, org.orgId, 'AZmed')
+    const mail = await inboundRow(t, 'email', 'transfert')
+    await store(t, companyId, org.orgId, mail, 'Update #83')
+
+    const [report] = await user.as.query(api.companyReports.listByCompany, {
+      companyId,
+    })
+    // Nothing to hide on the portal side: this one never came from there.
+    expect(report.vascoCommunicationId).toBeNull()
   })
 })

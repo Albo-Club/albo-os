@@ -13,6 +13,30 @@ import { listSilentCompanies } from './lib/reportFreshness'
 import type { Doc, Id } from './_generated/dataModel'
 import type { QueryCtx } from './_generated/server'
 
+/**
+ * The portal publication a report came from, or null for any other report.
+ *
+ * Read from the inbound row rather than denormalised on the report: that row's
+ * dedup key IS the publication's id (`vasco:<clientSlug>:<communicationId>`),
+ * so there is nothing to keep in sync — and putting the id on the report
+ * instead would have needed a backfill of every row already ingested, for the
+ * same answer. Cost: one extra read per portal report, on a fiche whose
+ * reports are being read anyway.
+ */
+async function communicationIdOf(
+  ctx: QueryCtx,
+  report: Doc<'companyReports'>,
+): Promise<string | null> {
+  if (report.source !== 'vasco' || !report.inboundEmailId) return null
+  const row = await ctx.db.get('inboundEmails', report.inboundEmailId)
+  const key = row?.agentmailMessageId
+  if (!key) return null
+  const parts = key.split(':')
+  // `vasco:<clientSlug>:<communicationId>` — the id keeps whatever colons it
+  // may contain, only the two leading segments are ours.
+  return parts.length >= 3 && parts[0] === 'vasco' ? parts.slice(2).join(':') : null
+}
+
 /** A company's reports, most recent period first (light fields for the list). */
 export const listByCompany = query({
   args: { companyId: v.id('companies') },
@@ -27,18 +51,23 @@ export const listByCompany = query({
       .order('desc')
       .take(200)
 
-    return rows.map((r) => ({
-      _id: r._id,
-      title: r.title ?? null,
-      headline: r.headline ?? null,
-      reportPeriod: r.reportPeriod ?? null,
-      periodSortDate: r.periodSortDate ?? null,
-      reportType: r.reportType ?? null,
-      status: r.status,
-      fromEmail: r.fromEmail ?? null,
-      emailDate: r.emailDate ?? null,
-      processedAt: r.processedAt ?? null,
-    }))
+    return await Promise.all(
+      rows.map(async (r) => ({
+        _id: r._id,
+        title: r.title ?? null,
+        headline: r.headline ?? null,
+        reportPeriod: r.reportPeriod ?? null,
+        periodSortDate: r.periodSortDate ?? null,
+        reportType: r.reportType ?? null,
+        status: r.status,
+        fromEmail: r.fromEmail ?? null,
+        emailDate: r.emailDate ?? null,
+        processedAt: r.processedAt ?? null,
+        // The portal publication this report was digested from, so the fiche
+        // can stop showing that publication a second time as a portal entry.
+        vascoCommunicationId: await communicationIdOf(ctx, r),
+      })),
+    )
   },
 })
 
