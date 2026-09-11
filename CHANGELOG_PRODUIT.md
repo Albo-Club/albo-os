@@ -23,6 +23,51 @@ bas de page.
 
 ---
 
+## v1.221.3 — 11/09/2026 à 10:33 — L'audit du stockage dit enfin qui se sert de chaque fichier
+
+L'audit savait repérer deux fichiers rigoureusement identiques, mais pas dire
+lesquels servent encore. Il ne regardait qu'un seul endroit — les documents
+rattachés aux fiches — alors qu'un fichier peut aussi être retenu par un mail
+reçu, par un avatar, par un logo, ou par une ancienne fonctionnalité de
+timeline email qui a été retirée sans que ses pièces jointes soient effacées.
+
+Résultat : un fichier parfaitement utilisé pouvait apparaître comme n'ayant
+aucun propriétaire. Le rapport répartit désormais tout le stockage entre ces
+cinq usages, et isole la seule catégorie réellement libre de suppression :
+celle que plus rien ne référence.
+
+Il dit aussi **quand** les copies en trop ont été créées, mois par mois. C'est
+ce qui permettra de vérifier que le problème est bien derrière nous plutôt que
+de le supposer.
+
+Toujours en lecture seule : rien n'est supprimé, rien n'est modifié.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/storageAudit.ts` : nouvelle `internalQuery`
+>   `scanHolders`, une branche par table porteuse (`documents`,
+>   `inboundEmails`, `companyEmails`, `users`, `organizations`, plus
+>   `documentTexts` à part). Elle balaie une table par appel pour que le script
+>   construise l'index inverse blob → porteurs en une passe par table, au lieu
+>   d'une requête par blob.
+> - `scripts/lib/storage-holders.mjs` (nouveau, pur) : `classify`, `tally`,
+>   `extraCopies`. `documentTexts` n'est **pas** un porteur — c'est le texte
+>   extrait DU blob, donc jamais une raison de le garder. `extraCopies`
+>   conserve la copie la mieux référencée, pas la plus ancienne : garder un
+>   orphelin en supprimant celle qu'une fiche affiche serait l'inverse du but.
+> - `tests/storageHolders.test.ts` : 13 tests, orientés sur les erreurs qui
+>   coûteraient de la donnée (une pièce jointe de mail prise pour un orphelin,
+>   une table inconnue qui surclasse un vrai porteur, un groupe entièrement
+>   orphelin qui perdrait sa dernière copie).
+> - `KNOWN_ISSUES.md` : nouvelle section. Elle consigne surtout que
+>   `releaseStorage` (`convex/lib/documentBlobs.ts`) ne compte que `documents`
+>   plus le mail qu'on lui passe — inoffensif aujourd'hui, mais une purge en
+>   masse ne doit pas s'appuyer dessus.
+> - Le balayage lit des lignes entières de deux tables lourdes, ce que
+>   l'anti-pattern CLAUDE.md interdit — pour une requête de LISTE que l'app
+>   rejoue sans arrêt. Ici c'est un audit manuel one-shot, et une recherche
+>   blob par blob lirait les mêmes lignes.
+
 ## v1.221.2 — 11/09/2026 à 10:03 — Un même document transféré par deux personnes ne crée plus deux reports
 
 Quand Benjamin et Clément transféraient tous les deux le même update d'une
