@@ -157,7 +157,7 @@ actifs »).
 couvre bien plus de domaines en écriture et fait valider ses actions par des
 boutons dans le panneau.
 
-## Parallel / VASCO (communications SPV)
+## VASCO (communications SPV)
 
 Pour les participations souscrites via un portail investisseur (Parallel,
 Teampact…), la fiche société se rattache à l'émetteur correspondant depuis

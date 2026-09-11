@@ -23,6 +23,24 @@ bas de page.
 
 ---
 
+## v1.224.1 — 11/09/2026 à 14:14 — L'intégration s'appelle VASCO
+
+« Parallel / VASCO » devient simplement **VASCO**. VASCO est la plateforme
+qui héberge les portails investisseurs ; Parallel n'en est qu'un parmi
+d'autres — Teampact en est un autre, déjà connecté. Mettre un seul portail
+dans le nom de l'intégration laissait croire qu'elle ne servait qu'à lui.
+Le nom des connexions, lui, reste celui que vous leur donnez.
+
+> **🔧 Notes techniques**
+>
+> - Renommage de la copie i18n FR/EN : `settings:integrations.platforms.vasco.name`
+>   et `participations:integrations.platforms.vasco` (dialogue « Rattacher à
+>   une intégration »). Aucun changement de code ni de donnée — le `platform`
+>   du registre reste `vasco`.
+> - Mentions « Parallel/VASCO » corrigées dans `docs/produit/` (pages
+>   vue d'ensemble, participations, intégrations, README) ; le journal des
+>   nouveautés garde les siennes, c'est un historique.
+
 ## v1.224.0 — 11/09/2026 à 13:11 — La page Intégrations se lit d'un coup d'œil
 
 Quatre changements sur **Réglages → Intégrations**.

@@ -98,7 +98,7 @@
         "description": "Agrégation bancaire : comptes et transactions synchronisés automatiquement. La connexion à la banque se fait dans la fenêtre sécurisée Powens."
       },
       "vasco": {
-        "name": "Parallel / VASCO",
+        "name": "VASCO",
         "description": "Portails investisseurs des plateformes de fund admin : positions, communications investisseurs et documents remontés sur les entités liées."
       }
     },

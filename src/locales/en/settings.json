@@ -98,7 +98,7 @@
         "description": "Bank aggregation: accounts and transactions synced automatically. The bank connection happens in the secure Powens window."
       },
       "vasco": {
-        "name": "Parallel / VASCO",
+        "name": "VASCO",
         "description": "Investor portals of fund-admin platforms: positions, investor communications and documents pulled into the linked entities."
       }
     },
