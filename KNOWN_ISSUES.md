@@ -6331,6 +6331,22 @@ Convex (session distante, CI). Elle a un effet de bord acceptable : le module
 n'apparaît pas dans `api.d.ts` tant que personne n'a relancé `convex dev`, ce
 qui produira un diff de deux lignes sans rapport au prochain `pnpm dev`.
 
+**Le même mur se dresse devant un TEST**, et la sortie 2 n'y suffit pas : un
+`convex-test` a besoin d'une *référence de fonction*, pas d'un chemin texte,
+donc `internal.migrations.<module>.<fn>` y revient par la fenêtre et `tsc`
+échoue à nouveau. La réponse est `anyApi` de `convex/server` —
+l'échappatoire prévue par Convex pour désigner une fonction sans types :
+
+```ts
+import { anyApi } from 'convex/server'
+const deleteOrphans = anyApi.migrations.storagePurge.deleteOrphans
+```
+
+Les arguments et le retour ne sont alors plus typés — c'est le prix, et il est
+supportable dans un test qui affirme de toute façon ses attentes. Patron en
+place dans `convex/regression.storagePurge.test.ts`. À repasser en `internal.*`
+le jour où quelqu'un régénère `api.d.ts` depuis un poste identifié.
+
 ---
 
 ## « Aucune ligne `documents` » ne veut pas dire « fichier orphelin »
@@ -6368,7 +6384,16 @@ deux mails, le refcount le ratera.
 
 Mesure : `node scripts/storage-audit.mjs`, section « Qui référence les
 fichiers ». Classement pur et testé dans `scripts/lib/storage-holders.mjs`
-(`tests/storageHolders.test.ts`).
+(`tests/storageHolders.test.ts`). Purge : `node scripts/storage-purge.mjs`
+(à blanc par défaut).
+
+**Le plancher d'âge n'est pas une prudence décorative.** Un upload dépose les
+octets AVANT que la ligne qui les désigne n'existe : pendant ces quelques
+secondes, un fichier parfaitement légitime est indiscernable d'un orphelin.
+Une purge qui ignore l'âge supprime le fichier que quelqu'un est en train
+d'envoyer, et l'échec est muet côté serveur — il se voit sur l'écran de
+l'utilisateur, en document cassé. D'où les 24 h, absurdement généreuses pour
+une danse qui dure des secondes et gratuites puisqu'on purge des mois.
 
 ---
 
