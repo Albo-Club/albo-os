@@ -13,6 +13,7 @@ import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
+import { periodRank } from '../../../convex/lib/reportPeriod'
 import type { ReactNode } from 'react'
 import type { FunctionReturnType } from 'convex/server'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
@@ -63,11 +64,28 @@ type ReportRow = FunctionReturnType<
 >[number]
 type ReportDoc = { _id: Id<'documents'>; title: string; url: string | null }
 
-/** One line of the feed. `sortDate` is the single axis: a covered period when
- * the entry has one, its arrival date otherwise. */
-type Entry =
-  | { key: string; sortDate: number; type: 'report'; report: ReportRow }
-  | { key: string; sortDate: number; type: 'vasco'; comm: VascoCommunication }
+/** Where an entry sits in the feed. The axis is the END of the covered
+ * period, the arrival date standing in when the entry has no period; `span`
+ * settles a tie (cf. `periodRank`), `receivedAt` settles what `span` cannot. */
+type Rank = { endMs: number; span: number; receivedAt: number }
+
+/** One line of the feed. */
+type Entry = { key: string; rank: Rank } & (
+  | { type: 'report'; report: ReportRow }
+  | { type: 'vasco'; comm: VascoCommunication }
+)
+
+/** Most recent period first, the wider period first at equal end. */
+function byRank(a: Entry, b: Entry): number {
+  return (
+    b.rank.endMs - a.rank.endMs ||
+    b.rank.span - a.rank.span ||
+    b.rank.receivedAt - a.rank.receivedAt
+  )
+}
+
+/** How many entries the feed shows before "see more". */
+const COLLAPSED_COUNT = 5
 
 /** Localised relative age, e.g. "il y a 13 j" / "13 days ago". */
 function useRelativeAge() {
@@ -425,6 +443,7 @@ export function CompanyReportsSection({
   const deleteReport = useConvexMutation(api.reportInbox.deleteReport)
 
   const [addOpen, setAddOpen] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const [reportId, setReportId] = useState<Id<'companyReports'> | null>(null)
   const [commId, setCommId] = useState<string | null>(null)
   // Same confirmation dialog for both ways out — only the copy and the
@@ -451,12 +470,19 @@ export function CompanyReportsSection({
     if (!reports) return undefined
     const rows: Array<Entry> = []
     for (const report of reports) {
+      const received = report.processedAt ?? report.emailDate ?? 0
+      const rank = report.reportPeriod ? periodRank(report.reportPeriod) : null
       rows.push({
         key: report._id,
         type: 'report',
         report,
-        sortDate:
-          report.periodSortDate ?? report.processedAt ?? report.emailDate ?? 0,
+        // A period-less report (or one nobody could parse) has no
+        // chronological anchor of its own: its arrival places it.
+        rank: {
+          endMs: rank?.endMs ?? received,
+          span: rank?.span ?? 0,
+          receivedAt: received,
+        },
       })
     }
     // A publication that has been digested is ALREADY in this list as a
@@ -472,16 +498,23 @@ export function CompanyReportsSection({
     )
     for (const comm of vasco.communications) {
       if (digested.has(comm.communicationId)) continue
-      const raw = comm.publishDate ?? comm.period
-      const parsed = raw ? Date.parse(raw) : NaN
+      const published = Date.parse(comm.publishDate ?? '')
+      const receivedAt = Number.isNaN(published) ? 0 : published
+      // Same axis as a report: the period covered first, the publication
+      // date only when the communication carries no period.
+      const covered = Date.parse(comm.period ?? '')
       rows.push({
         key: comm.communicationId,
         type: 'vasco',
         comm,
-        sortDate: Number.isNaN(parsed) ? 0 : parsed,
+        rank: {
+          endMs: Number.isNaN(covered) ? receivedAt : covered,
+          span: 0,
+          receivedAt,
+        },
       })
     }
-    return rows.sort((a, b) => b.sortDate - a.sortDate)
+    return rows.sort(byRank)
   }, [reports, vasco.communications])
 
   const latestReportId = entries?.find((e) => e.type === 'report')?.key ?? null
@@ -554,22 +587,38 @@ export function CompanyReportsSection({
         </div>
       ) : (
         <div className="space-y-2">
-          {entries.map((entry) =>
-            entry.type === 'report' ? (
-              <ReportEntry
-                key={entry.key}
-                report={entry.report}
-                docs={docsByReport.get(entry.report._id) ?? []}
-                isLatest={entry.key === latestReportId}
-                onOpen={() => setReportId(entry.report._id)}
-              />
-            ) : (
-              <VascoEntry
-                key={entry.key}
-                comm={entry.comm}
-                onOpen={() => setCommId(entry.comm.communicationId)}
-              />
-            ),
+          {(expanded ? entries : entries.slice(0, COLLAPSED_COUNT)).map(
+            (entry) =>
+              entry.type === 'report' ? (
+                <ReportEntry
+                  key={entry.key}
+                  report={entry.report}
+                  docs={docsByReport.get(entry.report._id) ?? []}
+                  isLatest={entry.key === latestReportId}
+                  onOpen={() => setReportId(entry.report._id)}
+                />
+              ) : (
+                <VascoEntry
+                  key={entry.key}
+                  comm={entry.comm}
+                  onOpen={() => setCommId(entry.comm.communicationId)}
+                />
+              ),
+          )}
+
+          {entries.length > COLLAPSED_COUNT && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full"
+              onClick={() => setExpanded((v) => !v)}
+            >
+              {expanded
+                ? t('participations:timeline.showLess')
+                : t('participations:timeline.showMore', {
+                    count: entries.length - COLLAPSED_COUNT,
+                  })}
+            </Button>
           )}
         </div>
       )}

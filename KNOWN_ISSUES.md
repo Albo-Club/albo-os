@@ -6435,3 +6435,39 @@ l'id du blob naît dans l'action et n'est rendu à personne, donc aucun mail,
 avatar ni logo ne peut le désigner. Une purge en masse, elle, doit bien faire
 le tour des cinq porteurs — cf. la section « Aucune ligne `documents` ne veut
 pas dire fichier orphelin ».
+
+---
+
+## Une période est un intervalle : la trier sur son début enterre le récap
+
+`companyReports.periodSortDate` est le **début** de la période couverte
+(`parsePeriod(...).startMs`, posé par `reportStore`). C'est le bon champ pour
+l'index `by_company` et pour la fraîcheur (`lib/reportFreshness.ts` : « la
+couverture va jusqu'à quand ? »), et le **mauvais** pour ordonner un fil.
+
+Un report annuel « 2025 » commence le 01/01/2025. Trié sur son début, il se
+rangeait donc **sous les douze mensuels de l'année**, janvier compris — alors
+qu'il arrive en 2026 et les résume. Même effet, plus discret, entre un
+trimestre et ses mois, ou un semestre et ses trimestres : dès que deux lignes
+n'ont pas la **même largeur** de période, comparer leurs débuts ne compare
+plus rien.
+
+Le fil de la fiche (`CompanyReportsSection`) trie donc sur la **fin** de
+période, via `periodRank` (`convex/lib/reportPeriod.ts`, pure et testée), avec
+la largeur (`span`) comme départage : à fin égale, la période **la plus large
+d'abord** (« 2025 » au-dessus de « Décembre 2025 » — le récap clôt l'année),
+puis la date de réception. Une ligne sans période parseable garde sa date
+d'arrivée comme axe, et VASCO suit la même règle (`period` d'abord,
+`publishDate` seulement à défaut).
+
+Deux conséquences à garder en tête :
+
+- **Le rang n'est pas stocké.** `periodSortDate` reste le début, côté base :
+  rien à migrer, mais rien à lire non plus pour savoir où une ligne s'affiche
+  — c'est `periodRank` qui le dit, à l'affichage. Ne pas « optimiser » en
+  stockant la fin : ce serait un chiffre dérivable de plus
+  (`CLAUDE.md` § Anti-patterns).
+- **Le `.take(200)` de `listByCompany` lit par début de période**, puisque
+  c'est l'ordre de l'index. Il borne ce qui est **lu**, pas ce qui est
+  **montré** ; au-delà de 200 reports sur une société les deux ordres
+  pourraient diverger à la marge. Aucune société n'en est proche.
