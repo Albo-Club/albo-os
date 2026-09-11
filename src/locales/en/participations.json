@@ -618,7 +618,7 @@
     "dialogTitle": "Entity integrations",
     "dialogDescription": "Link this entity to the connected external platforms to pull their data (communications, documents) into its page.",
     "platforms": {
-      "vasco": "Parallel / VASCO"
+      "vasco": "VASCO"
     },
     "linked": "Linked",
     "link": "Link",

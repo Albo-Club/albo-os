@@ -618,7 +618,7 @@
     "dialogTitle": "Intégrations de l'entité",
     "dialogDescription": "Rattachez cette entité aux plateformes externes connectées pour faire remonter leurs données (communications, documents) sur sa fiche.",
     "platforms": {
-      "vasco": "Parallel / VASCO"
+      "vasco": "VASCO"
     },
     "linked": "Rattachée",
     "link": "Rattacher",

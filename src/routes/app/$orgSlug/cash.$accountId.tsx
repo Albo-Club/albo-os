@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { ArrowUpRight, Building2, Pencil } from 'lucide-react'
+import { ArrowUpRight, Building2, Check, Copy, Pencil } from 'lucide-react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { ConvexError } from 'convex/values'
@@ -93,6 +93,53 @@ function Info({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
+/** "FR7630004..." → "FR76 3000 4..." — an IBAN is read four digits at a time. */
+function groupFours(value: string): string {
+  return value.replace(/(.{4})/g, '$1 ').trim()
+}
+
+/**
+ * The account's IBAN, spaced in fours so it can be checked against a bank
+ * statement, with a copy button that yields the compact form — what a
+ * transfer form expects.
+ */
+function IbanValue({ iban }: { iban: string }) {
+  const { t } = useTranslation('cash')
+  const [copied, setCopied] = useState(false)
+  const compact = iban.replace(/\s/g, '').toUpperCase()
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(compact)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error(t('detail.copyFailed'))
+    }
+  }
+
+  return (
+    <span className="flex items-start gap-1">
+      <span className="font-mono text-sm break-all">{groupFours(compact)}</span>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-6 shrink-0"
+        onClick={handleCopy}
+        title={t('detail.copyIban')}
+        aria-label={t('detail.copyIban')}
+      >
+        {copied ? (
+          <Check className="text-positive size-3.5" />
+        ) : (
+          <Copy className="size-3.5" />
+        )}
+      </Button>
+    </span>
+  )
+}
+
 /** "1 234,56", "-500", "12 000 €" (euros, sign allowed) → cents, null if invalid. */
 function parseSignedEuros(raw: string): number | null {
   const cleaned = raw.replace(/[\s€]/g, '').replace(',', '.')
@@ -103,8 +150,9 @@ function parseSignedEuros(raw: string): number | null {
 }
 
 /**
- * Account edit dialog: custom name (`displayName` — `label`, the original
- * bank name, stays read-only), lifecycle (closed at the bank), pledge flag
+ * Account edit dialog: description (`displayName`, the line shown under the
+ * bank name in the accounts list — `label`, the bank's own wording, is never
+ * overwritten), lifecycle (closed at the bank), pledge flag
  * (nantissement / blocked funds), and — for NON-connected accounts only —
  * a manual balance entry (Powens is the source of truth on connected ones).
  * Each block saves through its own mutation, only when it changed.
@@ -183,15 +231,17 @@ function EditAccountDialog({
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="account-name">{t('cash:rename.nameLabel')}</Label>
+            <Label htmlFor="account-name">
+              {t('cash:edit.descriptionLabel')}
+            </Label>
             <Input
               id="account-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={account.label}
+              placeholder={t('cash:edit.descriptionPlaceholder')}
             />
             <p className="text-muted-foreground text-xs">
-              {t('cash:rename.nameHint')}
+              {t('cash:edit.descriptionHint')}
             </p>
           </div>
           {!account.isConnected && (
@@ -458,7 +508,11 @@ function AccountDetail() {
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">
             {account ? (
-              `${account.bankName} · ${account.displayName ?? account.label}`
+              account.displayName ? (
+                `${account.bankName} · ${account.displayName}`
+              ) : (
+                account.bankName
+              )
             ) : (
               <LoadingLine>{t('loading')}</LoadingLine>
             )}
@@ -493,12 +547,16 @@ function AccountDetail() {
             </Button>
           )}
         </div>
-        {/* Original bank name, read-only, shown only when renamed. */}
-        {account?.displayName && (
-          <p className="text-muted-foreground text-sm">
-            {t('originalName', { name: account.label })}
-          </p>
-        )}
+        {/* The bank's own label, read-only: the title leads with the bank and
+            the description, so this is where the imported wording stays
+            reachable. Hidden when it only repeats the bank name. */}
+        {account &&
+          account.label.trim().toLowerCase() !==
+            account.bankName.trim().toLowerCase() && (
+            <p className="text-muted-foreground text-sm">
+              {t('originalName', { name: account.label })}
+            </p>
+          )}
       </div>
 
       <div className="grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-4">
@@ -515,7 +573,10 @@ function AccountDetail() {
             account?.balanceAsOf != null ? fmtDate(account.balanceAsOf) : null
           }
         />
-        <Info label={t('detail.iban')} value={account?.iban} />
+        <Info
+          label={t('detail.iban')}
+          value={account?.iban ? <IbanValue iban={account.iban} /> : null}
+        />
       </div>
 
       <section className="space-y-2">

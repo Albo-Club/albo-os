@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.225.0 — 11/09/2026 à 15:15 — Un mail par organisation, et un accusé pour les dépôts manuels
+## v1.228.0 — 11/09/2026 à 15:15 — Un mail par organisation, et un accusé pour les dépôts manuels
 
 Une société détenue par deux organisations recevait **un seul** mail
 d'annonce, dont le sujet listait les deux fiches (« nouveau report Waro,
@@ -61,7 +61,7 @@ dans chaque organisation.
 > - Couverture : `tests/reportRouting.test.ts` (nouveaux cas de canal par
 >   origine).
 
-## v1.224.0 — 11/09/2026 à 14:45 — Un même report transféré deux fois ne fait plus deux fiches
+## v1.227.0 — 11/09/2026 à 14:45 — Un même report transféré deux fois ne fait plus deux fiches
 
 Quand deux personnes transfèrent chacune de leur côté le même update, l'app
 rangeait parfois le document **deux fois** sur la même participation, avec
@@ -114,6 +114,176 @@ l'information repart.
 >   rejouent le détecteur sur tout l'historique (lecture seule) pour calibrer
 >   les seuils. Couverture : `tests/reportDuplicate.test.ts` et
 >   `convex/regression.reportDuplicate.test.ts`.
+## v1.226.0 — 11/09/2026 à 14:35 — La liste des comptes dit enfin quelle banque
+
+La carte **« Comptes »** de la Trésorerie affichait le libellé venu de la
+banque ou d'Airtable en gros, et le nom de la banque en petit gris en
+dessous, suivi du nom de la société — répété sur chaque ligne alors qu'on est
+déjà dans l'espace de cette société. Résultat : un compte s'appelait
+« CALTE », un autre « Qonto — Good », et on ne voyait pas où était l'argent.
+
+**Chaque ligne commence maintenant par la banque.** Nom de la banque en
+titre, avec son logo. Le libellé d'origine ne sert plus de titre : il reste
+consultable sur la page du compte.
+
+**En dessous, une description que vous écrivez.** « Compte courant 1 »,
+« Compte courant 2 » pour distinguer deux comptes de la même banque,
+« Spiko » ou « Compte-titres » pour nommer un support. Elle se saisit sur la
+page du compte, bouton « Modifier ». Tant qu'elle est vide, la ligne
+n'affiche que la banque — rien d'illisible à la place.
+
+**Le nom de la société disparaît quand il ne dit rien.** L'entité titulaire
+n'est rappelée que lorsque le compte appartient à une autre société que celle
+de l'espace ouvert.
+
+**L'IBAN se lit et se copie.** Sur la page d'un compte, il s'affiche espacé
+par groupes de quatre, avec un bouton pour le copier d'un clic — prêt à
+coller dans un virement ou un mail.
+
+**Et les banques sans logo ne se ressemblent plus** : à défaut de logo, la
+tuile porte l'initiale de la banque au lieu d'une icône identique pour
+toutes.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/cash/CashAccounts.tsx` : la ligne prend `bankName` comme
+>   titre (`font-semibold`) ; le sous-titre passe par le nouvel
+>   `accountSubtitle()` = `displayName` + entité titulaire **seulement si**
+>   `owner.kind !== 'group_root'`, joints par ` · `, et la ligne est omise si
+>   tout est vide. `label` n'est plus lu à l'affichage de la liste.
+> - Aucun changement de schéma ni de query : `listAccounts` renvoyait déjà
+>   `owner.kind`. `displayName` est **recyclé** en « description » (libellés
+>   i18n `cash:edit.description*`, anciens `cash:rename.name*` retirés) —
+>   `label` reste le libellé d'origine, jamais écrasé.
+> - `src/components/CompanyLogo.tsx` : prop `fallback` (`'icon' | 'monogram'`,
+>   défaut `'icon'`, donc aucune surface existante ne bouge) ; la carte
+>   Comptes passe `monogram`. Le cas Natixis est un domaine correct
+>   (`natixis.com`) sans logo servi par logo.dev — cf. `KNOWN_ISSUES.md`
+>   § « Logos d'entreprises », point 3.
+> - `src/routes/app/$orgSlug/cash.$accountId.tsx` : titre `banque ·
+>   description` (banque seule sans description), libellé d'origine rappelé
+>   dès qu'il diffère du nom de la banque, et cellule IBAN extraite en
+>   `IbanValue` (groupes de 4 via `groupFours`, copie de la forme compacte,
+>   icône `Check` pendant 2 s — patron du bouton copier de la page
+>   Intégrations).
+> - Hors périmètre, volontairement : `/placements` (section « Comptes
+>   nantis ») et les sélecteurs de compte (registre, prêts, passif) gardent
+>   `displayName ?? label`, qui reste le bon repli dans une liste déroulante.
+
+## v1.225.0 — 11/09/2026 à 14:31 — Supprimer une connexion bancaire, et voir d'où vient quoi
+
+Trois choses sur **Réglages → Intégrations**.
+
+**Supprimer une connexion bancaire** se fait enfin depuis la page (corbeille,
+admin). Elle est supprimée chez Powens et disparaît de la liste ; comptes et
+transactions ne bougent pas. Le cas visé est le reliquat d'une reconnexion
+ratée — cette deuxième ligne au nom identique qui traîne sans rien alimenter.
+Une connexion qui alimente encore des comptes reste protégée : le dialogue
+dit combien de comptes en dépendent, à reconnecter ailleurs ou à archiver
+depuis la Trésorerie d'abord.
+
+**On voit par où passe chaque connexion.** Les banques sont décalées sous
+Powens et les portails sous VASCO, rattachés par un filet. Avant, tout
+s'alignait à la même hauteur et il fallait deviner.
+
+**Chaque portail a son logo.** Parallel et Teampact ne se ressemblaient pas
+seulement : ils portaient le même. Un portail encore inconnu garde le logo
+VASCO, ce qui reste juste.
+
+> **🔧 Notes techniques**
+>
+> - `powens.deleteConnection` existait déjà (suppression côté Powens puis de
+>   la ligne `powensConnections`, admin, refus `connection_in_use` tant que
+>   des comptes vivants en dépendent) mais n'était exposée que sur la
+>   Trésorerie et pour les seules connexions « obsolètes ». Elle est câblée
+>   ici telle quelle — aucune règle relâchée.
+> - `listIntegrations` remonte `accountCount` par connexion `webview` (le
+>   `filter` remplace le `some` qui servait déjà à dériver l'état
+>   `inactive`) : le dialogue annonce le blocage **avant** le clic plutôt que
+>   de le découvrir sur une erreur serveur.
+> - Logo d'une connexion résolu du plus spécifique au plus général par
+>   `connectionDomain()` : fournisseur atteint (`bankDomain` sur le
+>   `connectorName` Powens, `PORTAL_DOMAINS` sur le `clientSlug` VASCO) →
+>   plateforme (`PLATFORM_DOMAINS`) → icône générique de `CompanyLogo`. Les
+>   deux tables sont typées `Record<string, string | undefined>` : l'accès
+>   par clé inconnue doit rendre `undefined`, sinon le `??` ment (et
+>   `no-unnecessary-condition` le signale).
+> - Les connexions passent dans un bloc `border-l` indenté, rendu seulement
+>   s'il y en a (sinon une plateforme « Disponible » gagnerait un filet vide).
+
+## v1.224.1 — 11/09/2026 à 14:14 — L'intégration s'appelle VASCO
+
+« Parallel / VASCO » devient simplement **VASCO**. VASCO est la plateforme
+qui héberge les portails investisseurs ; Parallel n'en est qu'un parmi
+d'autres — Teampact en est un autre, déjà connecté. Mettre un seul portail
+dans le nom de l'intégration laissait croire qu'elle ne servait qu'à lui.
+Le nom des connexions, lui, reste celui que vous leur donnez.
+
+> **🔧 Notes techniques**
+>
+> - Renommage de la copie i18n FR/EN : `settings:integrations.platforms.vasco.name`
+>   et `participations:integrations.platforms.vasco` (dialogue « Rattacher à
+>   une intégration »). Aucun changement de code ni de donnée — le `platform`
+>   du registre reste `vasco`.
+> - Mentions « Parallel/VASCO » corrigées dans `docs/produit/` (pages
+>   vue d'ensemble, participations, intégrations, README) ; le journal des
+>   nouveautés garde les siennes, c'est un historique.
+
+## v1.224.0 — 11/09/2026 à 13:11 — La page Intégrations se lit d'un coup d'œil
+
+Quatre changements sur **Réglages → Intégrations**.
+
+**Elle ne liste plus que ce qui se connecte.** Notion et DocSend en
+disparaissent : ce ne sont pas des intégrations, juste deux capacités qui
+tournent en coulisses quand un investor update cite une page Notion ou un
+deck DocSend. Il n'y avait rien à y brancher ni à y débrancher. Restent les
+banques et les portails de fund admin.
+
+**Chaque ligne porte son logo** — la plateforme comme chaque connexion, avec
+le logo de la banque pour les accès bancaires.
+
+**Toute connexion se renomme** (bouton crayon), banques comprises. C'était le
+manque le plus gênant : deux accès à la même banque arrivent tous les deux
+sous le même nom, impossible de les distinguer. « Palatine » et « Palatine »
+peuvent devenir « Palatine — SCI Chapelle » et « Palatine — Relais ». Le nom
+choisi n'est utilisé que dans Albo OS, tient face aux synchronisations
+suivantes, et suit la connexion partout — y compris sur la Trésorerie et dans
+les mails d'alerte. Corriger les **identifiants** d'un portail garde son
+bouton à part (la clé).
+
+**Les descriptions en gris sont rangées derrière un petit « i ».** La prose
+permanente sous chaque ligne finissait en bruit ; à la demande, au survol,
+elle redevient utile.
+
+> **🔧 Notes techniques**
+>
+> - `connections.listIntegrations` ne parcourt plus que les connecteurs
+>   `scope: 'org'` du registre ; les cas `env`/`none` et le champ
+>   `configured` sortent de la query (les capacités globales restent dans
+>   `connections:status`, le diagnostic CLI). Le champ `scope` du payload,
+>   devenu constant, disparaît aussi — avec le badge de portée côté UI.
+> - Nouvelle mutation `connections.renameConnection` (admin, dispatchée par
+>   kind d'auth comme le reste du module) : `credentials` → le `label` de la
+>   ligne `externalConnections`, unicité conservée dans l'org+plateforme ;
+>   `webview` → nouveau champ `powensConnections.customLabel`, posé **à
+>   côté** de `connectorName` que chaque synchro réécrit, et volontairement
+>   non unique (distinguer deux accès à la même banque est précisément
+>   l'usage). Les identifiants ne sont jamais touchés ici.
+> - `customLabel ?? connectorName` est appliqué aux trois surfaces qui
+>   nomment la connexion : `listIntegrations`, `powens.listConnections`
+>   (carte « Connexions bancaires » de la Trésorerie) et l'e-mail d'alerte
+>   de santé. Les diagnostics internes gardent le nom brut de Powens.
+> - `IntegrationConnection` gagne `providerName` (le nom de la banque tel que
+>   Powens le donne) : le logo se résout dessus, donc un renommage ne coûte
+>   pas le logo. Rendu par `CompanyLogo` + `bankDomain` (déjà utilisés par la
+>   Trésorerie), avec une table `PLATFORM_DOMAINS` locale pour la plateforme
+>   elle-même ; `natixis` ajouté à `src/lib/bankDomains.ts`.
+> - `InfoHint` (Tooltip shadcn, fourni par le `TooltipProvider` du shell)
+>   remplace les `CardDescription` de groupe et le paragraphe gris de chaque
+>   plateforme. Le crayon devient « Renommer », la clé « Modifier les
+>   identifiants ». Clés i18n FR/EN ajoutées (`rename`, `actions.rename`,
+>   toasts) et retirées (`scope`, `globalConfigured`,
+>   `globalNotConfigured`, plateformes `notion`/`docsend`).
 
 ## v1.223.4 — 11/09/2026 à 11:55 — L'historique d'une banque nouvellement connectée arrive dans tous les cas
 

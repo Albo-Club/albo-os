@@ -3551,7 +3551,7 @@ in `skills-lock.json`.
 ## Logos d'entreprises (logo.dev) — hotlink, pas de stockage
 
 `src/components/CompanyLogo.tsx` affiche les logos des boîtes du portefeuille
-(liste participations, vue `/app/all`, en-tête fiche société). Trois choix
+(liste participations, vue `/app/all`, en-tête fiche société). Quatre choix
 non-évidents :
 
 1. **Pas de stockage en base, ni Convex file storage.** La doc logo.dev
@@ -3574,7 +3574,19 @@ non-évidents :
    deux endroits, ce qu'une clé publishable autorise. Absente côté serveur, le
    mail affiche l'initiale de la société.
 
-3. **Le `domain` vient d'un snapshot Attio figé**
+3. **Un domaine résolu n'est pas un logo disponible.** `bankDomain` peut
+   rendre un domaine parfaitement correct sans que logo.dev serve quoi que ce
+   soit dessus — `natixis.com` en est le cas vécu (11/09/2026, ajouté la
+   veille et toujours sans logo). L'image échoue, `onError` prend le relais,
+   et la ligne affiche le même repli qu'une banque inconnue : on cherche
+   alors une erreur de mapping là où il n'y en a pas. D'où le repli
+   `fallback="monogram"` (initiale du nom) posé sur la carte Comptes : il
+   reste **discriminant** quand deux lignes n'ont pas de logo. Vérifier un
+   domaine douteux se fait avec le token, en ouvrant
+   `https://img.logo.dev/<domaine>?token=…` — sans token la CDN répond 401
+   sur tout, y compris les domaines qu'elle sert.
+
+4. **Le `domain` vient d'un snapshot Attio figé**
    (`convex/migrations/attioAlboImport.ts`, 28/05/2026), pas d'une sync live.
    Les ~35 boîtes Albo importées l'ont ; les autres (CALTE, créations manuelles)
    peuvent ne pas l'avoir → fallback, et le champ reste éditable via

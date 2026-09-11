@@ -55,7 +55,7 @@ organisations de l'utilisateur.
 | **Prévisionnel** | Flux récurrents et ponctuels, solde projeté, alertes |
 | **Passif** | Capitaux propres, comptes courants inter-entités |
 | **Assistant IA** | Copilote conversationnel sur les données de l'org, in-app et Telegram |
-| **Intégrations** | Attio, Powens, connecteur Claude (MCP), Parallel/VASCO, ingestion email |
+| **Intégrations** | Attio, Powens, connecteur Claude (MCP), VASCO, ingestion email |
 
 ## Pages liées
 

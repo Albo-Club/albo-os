@@ -11,6 +11,7 @@ const BANK_DOMAINS: ReadonlyArray<{ key: string; domain: string }> = [
   { key: 'memobank', domain: 'memo.bank' },
   { key: 'neuflize', domain: 'neuflizeobc.fr' },
   { key: 'wormser', domain: 'banque-wormser.fr' },
+  { key: 'natixis', domain: 'natixis.com' },
 ]
 
 export function bankDomain(bankName: string | null | undefined): string | null {
