@@ -81,12 +81,6 @@
   "integrations": {
     "title": "Integrations",
     "description": "External platforms this organization is connected to — what is installed, what is available, and its current state.",
-    "scope": {
-      "org": "Per organization",
-      "global": "Shared service"
-    },
-    "globalConfigured": "Operational",
-    "globalNotConfigured": "Not configured",
     "state": {
       "connected": "Connected",
       "stale": "Late",
@@ -106,14 +100,6 @@
       "vasco": {
         "name": "Parallel / VASCO",
         "description": "Investor portals of fund-admin platforms: positions, investor communications and documents pulled into the linked entities."
-      },
-      "notion": {
-        "name": "Notion",
-        "description": "Extraction of public Notion pages linked in investor updates received by email."
-      },
-      "docsend": {
-        "name": "DocSend",
-        "description": "Extraction of DocSend decks linked in investor updates received by email."
       }
     },
     "groups": {
@@ -131,7 +117,8 @@
       "reconnecting": "Redirecting…",
       "add": "Add",
       "sync": "Sync now",
-      "edit": "Edit connection"
+      "rename": "Rename connection",
+      "edit": "Edit credentials"
     },
     "dialog": {
       "title": "Connect {{name}}",
@@ -146,6 +133,10 @@
       "username": "Login",
       "password": "Password"
     },
+    "rename": {
+      "title": "Rename “{{label}}”",
+      "description": "The name is only used inside Albo OS — it is how you tell your connections apart, and nothing is sent to the platform."
+    },
     "confirm": {
       "title": "Disconnect “{{label}}”?",
       "description": "The stored credentials will be deleted. Already-imported data stays in place."
@@ -153,6 +144,8 @@
     "toasts": {
       "connected": "Connection saved.",
       "updated": "Connection updated.",
+      "renamed": "Connection renamed.",
+      "renameError": "Couldn't rename the connection.",
       "connectError": "Couldn't save the connection.",
       "labelTaken": "A connection with this name already exists.",
       "disconnected": "Connection removed.",

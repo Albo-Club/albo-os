@@ -217,11 +217,14 @@ type IntegrationConnection = {
    * `configKeys`, e.g. VASCO's clientSlug) — prefills the edit form.
    * Credentials never travel this way (write-only). */
   config?: Record<string, string>
+  /** The PLATFORM's own name for the connection (the bank, as Powens reports
+   * it), kept beside a `label` the user may have renamed — it is what the
+   * logo lookup matches on, so renaming never costs the logo. */
+  providerName?: string
 }
 
 type IntegrationItem = {
   platform: string
-  scope: string
   auth: string
   /** The platform supports the on-demand `syncNow` pull. */
   manualSync?: boolean
@@ -233,8 +236,6 @@ type IntegrationItem = {
   credentialKeys?: Array<string>
   /** org-scoped connectors: one entry per connection row of the org. */
   connections?: Array<IntegrationConnection>
-  /** global connectors: whether the capability is operational. */
-  configured?: boolean
 }
 
 /**
@@ -354,6 +355,68 @@ export const updateConnection = mutation({
 })
 
 /**
+ * Rename one connection — the only edit that applies to EVERY org connector,
+ * whatever its auth kind, because a label is ours and not the platform's.
+ * Admin-gated on the org, dispatched per auth kind like the rest of this
+ * module:
+ * - `credentials` → the row's own `label` (kept unique within org+platform,
+ *   same rule as create/update: the label identifies the connection in every
+ *   error and confirmation);
+ * - `webview` → `powensConnections.customLabel`, an override laid BESIDE the
+ *   bank's `connectorName` (which each sync rewrites) and deliberately NOT
+ *   unique: two accesses to the same bank arrive with the same name, and
+ *   telling them apart is exactly what renaming is for.
+ * Credentials are never touched here — fixing them is `updateConnection`.
+ */
+export const renameConnection = mutation({
+  args: {
+    orgId: v.id('organizations'),
+    platform: v.string(),
+    /** `externalConnections` id (credentials) or `powensConnectionId`
+     * (webview) — the `id` the integrations view handed out. */
+    connectionId: v.string(),
+    label: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const def = getConnector(args.platform)
+    await requireOrgRole(ctx, args.orgId, 'admin')
+    const label = args.label.trim()
+    if (!label) throw new ConvexError('label_required')
+    switch (def.auth) {
+      case 'credentials': {
+        const id = ctx.db.normalizeId('externalConnections', args.connectionId)
+        const row = id && (await ctx.db.get('externalConnections', id))
+        if (!row || row.orgId !== args.orgId) throw new ConvexError('not_found')
+        const siblings = await ctx.db
+          .query('externalConnections')
+          .withIndex('by_org_and_platform', (q) =>
+            q.eq('orgId', args.orgId).eq('platform', row.platform),
+          )
+          .collect()
+        if (siblings.some((c) => c._id !== row._id && c.label === label)) {
+          throw new ConvexError('label_taken')
+        }
+        await ctx.db.patch('externalConnections', row._id, { label })
+        return row._id
+      }
+      case 'webview': {
+        const row = await ctx.db
+          .query('powensConnections')
+          .withIndex('by_powens_connection', (q) =>
+            q.eq('powensConnectionId', args.connectionId),
+          )
+          .unique()
+        if (!row || row.orgId !== args.orgId) throw new ConvexError('not_found')
+        await ctx.db.patch('powensConnections', row._id, { customLabel: label })
+        return row._id
+      }
+      default:
+        throw new ConvexError(`rename_not_supported:${def.platform}`)
+    }
+  },
+})
+
+/**
  * Disconnect (delete) a credentials connection from the app. Admin-gated on
  * the row's org; deleting forgets the stored credentials. Webview platforms
  * (Powens) are NOT disconnectable here — their lifecycle lives on the
@@ -372,9 +435,14 @@ export const disconnectConnection = mutation({
 
 /**
  * Sanitized per-connector view feeding the Réglages → Intégrations page:
- * every registered platform with the org's connections and their state.
+ * every ORG-SCOPED platform with the org's connections and their state.
  * Org-member-guarded and dispatched per auth kind (like `status`), but NEVER
  * returns `config`/`credentials` — labels, states and timestamps only.
+ *
+ * `global` connectors (Notion / DocSend extraction) are deliberately left
+ * out: nobody connects or disconnects them — they are capabilities switched
+ * on by an env var, so they belong to the ops diagnostic (`status`), not to
+ * a page whose whole grammar is « connecter / renommer / déconnecter ».
  */
 export const listIntegrations = query({
   args: { orgId: v.id('organizations') },
@@ -383,9 +451,9 @@ export const listIntegrations = query({
     const now = Date.now()
     const out: Array<IntegrationItem> = []
     for (const def of CONNECTORS) {
+      if (def.scope !== 'org') continue
       const item: IntegrationItem = {
         platform: def.platform,
-        scope: def.scope,
         auth: def.auth,
         manualSync: def.manualSync,
         entityLink: def.entityLink,
@@ -436,23 +504,14 @@ export const listIntegrations = query({
             )
             return {
               id: r.powensConnectionId,
-              label: r.connectorName ?? r.powensConnectionId,
+              label: r.customLabel ?? r.connectorName ?? r.powensConnectionId,
+              providerName: r.connectorName,
               state:
                 health !== 'connected' && !feedsAccount ? 'inactive' : health,
               lastConnectedAt: r.lastSuccessfulSyncAt ?? null,
               lastError: r.errorMessage ?? null,
             }
           })
-          break
-        }
-        case 'env': {
-          item.configured = (def.envKeys ?? []).some((k) =>
-            Boolean(process.env[k]),
-          )
-          break
-        }
-        case 'none': {
-          item.configured = true
           break
         }
       }

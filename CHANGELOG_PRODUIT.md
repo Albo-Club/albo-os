@@ -23,6 +23,62 @@ bas de page.
 
 ---
 
+## v1.224.0 — 11/09/2026 à 13:11 — La page Intégrations se lit d'un coup d'œil
+
+Quatre changements sur **Réglages → Intégrations**.
+
+**Elle ne liste plus que ce qui se connecte.** Notion et DocSend en
+disparaissent : ce ne sont pas des intégrations, juste deux capacités qui
+tournent en coulisses quand un investor update cite une page Notion ou un
+deck DocSend. Il n'y avait rien à y brancher ni à y débrancher. Restent les
+banques et les portails de fund admin.
+
+**Chaque ligne porte son logo** — la plateforme comme chaque connexion, avec
+le logo de la banque pour les accès bancaires.
+
+**Toute connexion se renomme** (bouton crayon), banques comprises. C'était le
+manque le plus gênant : deux accès à la même banque arrivent tous les deux
+sous le même nom, impossible de les distinguer. « Palatine » et « Palatine »
+peuvent devenir « Palatine — SCI Chapelle » et « Palatine — Relais ». Le nom
+choisi n'est utilisé que dans Albo OS, tient face aux synchronisations
+suivantes, et suit la connexion partout — y compris sur la Trésorerie et dans
+les mails d'alerte. Corriger les **identifiants** d'un portail garde son
+bouton à part (la clé).
+
+**Les descriptions en gris sont rangées derrière un petit « i ».** La prose
+permanente sous chaque ligne finissait en bruit ; à la demande, au survol,
+elle redevient utile.
+
+> **🔧 Notes techniques**
+>
+> - `connections.listIntegrations` ne parcourt plus que les connecteurs
+>   `scope: 'org'` du registre ; les cas `env`/`none` et le champ
+>   `configured` sortent de la query (les capacités globales restent dans
+>   `connections:status`, le diagnostic CLI). Le champ `scope` du payload,
+>   devenu constant, disparaît aussi — avec le badge de portée côté UI.
+> - Nouvelle mutation `connections.renameConnection` (admin, dispatchée par
+>   kind d'auth comme le reste du module) : `credentials` → le `label` de la
+>   ligne `externalConnections`, unicité conservée dans l'org+plateforme ;
+>   `webview` → nouveau champ `powensConnections.customLabel`, posé **à
+>   côté** de `connectorName` que chaque synchro réécrit, et volontairement
+>   non unique (distinguer deux accès à la même banque est précisément
+>   l'usage). Les identifiants ne sont jamais touchés ici.
+> - `customLabel ?? connectorName` est appliqué aux trois surfaces qui
+>   nomment la connexion : `listIntegrations`, `powens.listConnections`
+>   (carte « Connexions bancaires » de la Trésorerie) et l'e-mail d'alerte
+>   de santé. Les diagnostics internes gardent le nom brut de Powens.
+> - `IntegrationConnection` gagne `providerName` (le nom de la banque tel que
+>   Powens le donne) : le logo se résout dessus, donc un renommage ne coûte
+>   pas le logo. Rendu par `CompanyLogo` + `bankDomain` (déjà utilisés par la
+>   Trésorerie), avec une table `PLATFORM_DOMAINS` locale pour la plateforme
+>   elle-même ; `natixis` ajouté à `src/lib/bankDomains.ts`.
+> - `InfoHint` (Tooltip shadcn, fourni par le `TooltipProvider` du shell)
+>   remplace les `CardDescription` de groupe et le paragraphe gris de chaque
+>   plateforme. Le crayon devient « Renommer », la clé « Modifier les
+>   identifiants ». Clés i18n FR/EN ajoutées (`rename`, `actions.rename`,
+>   toasts) et retirées (`scope`, `globalConfigured`,
+>   `globalNotConfigured`, plateformes `notion`/`docsend`).
+
 ## v1.223.4 — 11/09/2026 à 11:55 — L'historique d'une banque nouvellement connectée arrive dans tous les cas
 
 Le lot précédent promettait qu'un compte fraîchement connecté arrive avec

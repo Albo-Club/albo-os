@@ -855,7 +855,10 @@ async function maybeNotifyConnectionHealth(
     const { subject, html, text } = powensConnectionAlertEmail({
       locale: user.preferredLanguage === 'fr' ? 'fr' : 'en',
       orgName: org.name,
-      connectorName: row.connectorName ?? `connexion ${row.powensConnectionId}`,
+      connectorName:
+        row.customLabel ??
+        row.connectorName ??
+        `connexion ${row.powensConnectionId}`,
       health,
       lastSyncAt: row.lastSuccessfulSyncAt ?? null,
       errorMessage: row.errorMessage ?? null,
@@ -1254,7 +1257,8 @@ export const listConnections = query({
         return {
           key: r._id,
           powensConnectionId: r.powensConnectionId,
-          connectorName: r.connectorName ?? null,
+          // The user's own name wins over the bank's (cf. `customLabel`).
+          connectorName: r.customLabel ?? r.connectorName ?? null,
           // Degraded but feeding no account = leftover of a failed connection
           // attempt (or of accounts taken over by another connection).
           // Nothing to reconnect — it is offered for deletion instead.

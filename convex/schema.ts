@@ -506,6 +506,11 @@ export default defineSchema({
     orgId: v.id('organizations'),
     powensConnectionId: v.string(),
     connectorName: v.optional(v.string()), // bank label, e.g. "Palatine"
+    // User-chosen display name overriding `connectorName` (Réglages →
+    // Intégrations → « Renommer »). Powens keeps sending the bank's own
+    // label, so the override lives here and is never touched by a sync —
+    // it is what distinguishes two accesses to the same bank.
+    customLabel: v.optional(v.string()),
     state: v.optional(v.string()), // Powens state code; absent = OK
     errorMessage: v.optional(v.string()), // institution hint, user-facing
     lastSuccessfulSyncAt: v.optional(v.number()), // Powens `last_update`
