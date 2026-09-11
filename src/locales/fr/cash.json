@@ -34,8 +34,6 @@
   "rename": {
     "title": "Renommer le compte",
     "description": "Donner un nom personnalisé à ce compte. Le nom d'origine de la banque est conservé.",
-    "nameLabel": "Nom personnalisé",
-    "nameHint": "Laisser vide pour reprendre le nom d'origine de la banque.",
     "saved": "Compte renommé",
     "errors": {
       "default": "Impossible de renommer le compte. Réessayez."
@@ -43,8 +41,11 @@
   },
   "edit": {
     "title": "Modifier le compte",
-    "description": "Nom, statut et solde du compte. Rien n'est supprimé : un compte clôturé garde tout son historique.",
+    "description": "Description, statut et solde du compte. Rien n'est supprimé : un compte clôturé garde tout son historique.",
     "saved": "Compte mis à jour",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Compte courant 1",
+    "descriptionHint": "S'affiche sous le nom de la banque, dans la liste des comptes. De quoi distinguer deux comptes de la même banque, ou nommer un support : « Spiko », « Compte-titres ».",
     "balanceLabel": "Solde actuel (€)",
     "balanceHint": "Compte non connecté à la banque : le solde se met à jour à la main, avec sa date de saisie.",
     "pledged": "Fonds nantis / bloqués",
@@ -135,7 +136,9 @@
   "detail": {
     "owner": "Entité",
     "asOf": "Solde au",
-    "iban": "IBAN"
+    "iban": "IBAN",
+    "copyIban": "Copier l'IBAN",
+    "copyFailed": "Impossible de copier l'IBAN."
   },
   "tx": {
     "title": "Transactions",
