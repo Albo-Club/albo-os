@@ -185,3 +185,46 @@ describe('cutover floor', () => {
     expect(txs).toHaveLength(1)
   })
 })
+
+describe('catch-up scheduling', () => {
+  /** How many catch-up actions the ingestion has scheduled so far, as Convex
+   * records them in the system table. */
+  async function backfillJobs(t: Harness): Promise<number> {
+    return await t.run(async (ctx) => {
+      const rows = await ctx.db.system.query('_scheduled_functions').collect()
+      return rows.filter((r) => r.name === 'powens:backfillConnection').length
+    })
+  }
+
+  /** The connection is ALREADY tracked and healthy — what the 6h poll leaves
+   * behind. The health transition therefore cannot fire. */
+  async function trackedConnection(t: Harness, org: TestOrg): Promise<void> {
+    await t.run(async (ctx) => {
+      await ctx.db.insert('powensConnections', {
+        orgId: org.orgId,
+        powensConnectionId: CONNECTION,
+        connectorName: 'Natixis Wealth Management',
+        lastPolledAt: Date.now(),
+      })
+    })
+  }
+
+  test('a new account on an already healthy connection is caught up', async () => {
+    const { t, org } = await setup()
+    await trackedConnection(t, org)
+
+    await ingest(t, [payloadAccount()])
+
+    expect(await backfillJobs(t)).toBe(1)
+  })
+
+  test('a later sync on the same account schedules nothing more', async () => {
+    const { t, org } = await setup()
+    await trackedConnection(t, org)
+    await ingest(t, [payloadAccount()])
+
+    await ingest(t, [payloadAccount({ txId: 'tx-1' })])
+
+    expect(await backfillJobs(t)).toBe(1)
+  })
+})

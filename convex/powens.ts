@@ -530,14 +530,17 @@ async function takeOverAccount(
  * (otherwise a visible error, no silent write).
  *
  * `siblings` = every account of the same payload, needed to tell a lone
- * account of a bank from one of several (cf. `matchExistingAccount`). */
+ * account of a bank from one of several (cf. `matchExistingAccount`).
+ *
+ * `created` tells the caller this row did not exist before: it is what a
+ * freshly connected bank looks like, and what the catch-up must be run for. */
 async function resolveAccount(
   ctx: MutationCtx,
   connectionId: string,
   acc: NormAccount,
   org: Doc<'organizations'>,
   siblings: ReadonlyArray<NormAccount>,
-): Promise<Doc<'bankAccounts'> | null> {
+): Promise<{ account: Doc<'bankAccounts'>; created: boolean } | null> {
   // 1. Already linked by powensAccountId → reuse it (balance update).
   const linked = await ctx.db
     .query('bankAccounts')
@@ -568,7 +571,7 @@ async function resolveAccount(
     })
     const refreshed = await ctx.db.get('bankAccounts', linked._id)
     if (!refreshed) throw new ConvexError('account_vanished')
-    return refreshed
+    return { account: refreshed, created: false }
   }
 
   const connector = normalizeName(acc.connectorName)
@@ -624,7 +627,10 @@ async function resolveAccount(
         `rapproché par ${match.kind} du compte existant ${target} — ` +
         `lien repris, aucun doublon créé`,
     )
-    return takeOverAccount(ctx, target, acc, connectionId)
+    return {
+      account: await takeOverAccount(ctx, target, acc, connectionId),
+      created: false,
+    }
   }
 
   // 3. Qonto is never created here: its record comes from the Airtable
@@ -668,9 +674,9 @@ async function resolveAccount(
     powensConnectionId: connectionId,
     powensAccountId: acc.powensAccountId,
   })
-  const created = await ctx.db.get("bankAccounts", id)
-  if (!created) throw new ConvexError('account_create_failed')
-  return created
+  const account = await ctx.db.get("bankAccounts", id)
+  if (!account) throw new ConvexError('account_create_failed')
+  return { account, created: true }
 }
 
 /** Per-account cutover bound (nothing stored). What it protects against is
@@ -872,14 +878,17 @@ async function maybeNotifyConnectionHealth(
 }
 
 /** Idempotent upsert of a connection's health row, then evaluates whether an
- * alert email is due. `via` stamps the freshness of the matching feed. */
+ * alert email is due. `via` stamps the freshness of the matching feed.
+ *
+ * Returns whether it scheduled the catch-up, so the caller does not schedule
+ * a second one for the same connection in the same mutation. */
 async function upsertConnectionStatus(
   ctx: MutationCtx,
   orgId: Id<'organizations'>,
   powensConnectionId: string,
   meta: ConnMeta,
   via: 'webhook' | 'poll',
-): Promise<void> {
+): Promise<boolean> {
   const now = Date.now()
   const existing = await ctx.db
     .query('powensConnections')
@@ -914,7 +923,7 @@ async function upsertConnectionStatus(
       console.warn(
         `[powens] connexion ${powensConnectionId} déjà suivie pour une autre org — ignorée`,
       )
-      return
+      return false
     }
     await ctx.db.patch('powensConnections', existing._id, fields)
     rowId = existing._id
@@ -926,7 +935,7 @@ async function upsertConnectionStatus(
     })
   }
   const row = await ctx.db.get('powensConnections', rowId)
-  if (!row) return
+  if (!row) return false
   await maybeNotifyConnectionHealth(ctx, row, now)
 
   // A connection coming back to life (reconnection after a breakdown, or a
@@ -942,7 +951,9 @@ async function upsertConnectionStatus(
       `[powens] connexion ${powensConnectionId} de nouveau saine ` +
         `(avant: ${previousHealth ?? 'inconnue'}) — rattrapage planifié`,
     )
+    return true
   }
+  return false
 }
 
 export const ingestConnectionSync = internalMutation({
@@ -986,7 +997,7 @@ export const ingestConnectionSync = internalMutation({
 
     // Sync-health monitoring: refresh the connection row (state, last sync,
     // webhook heartbeat) and alert on degradation — even with 0 accounts.
-    await upsertConnectionStatus(
+    const backfillScheduled = await upsertConnectionStatus(
       ctx,
       org._id,
       connectionId,
@@ -1001,19 +1012,22 @@ export const ingestConnectionSync = internalMutation({
     // Learned auto-categorization rules, replayed on every NEW transaction
     // (never on a patch — redelivery must not overwrite the matching state).
     const categoryRules = await loadOrgRules(ctx, org._id)
+    let accountCreated = false
     for (const acc of accounts) {
-      const account = await resolveAccount(
+      const resolved = await resolveAccount(
         ctx,
         connectionId,
         acc,
         org,
         accounts,
       )
-      if (!account) {
+      if (!resolved) {
         // Account ignored (qonto_already_linked) — its txs are not ingested.
         summary.skipped += acc.transactions.length
         continue
       }
+      const { account } = resolved
+      accountCreated = accountCreated || resolved.created
       const cutoff = await computeCutoff(ctx, account)
       // Diagnostic: where the bound comes from (without changing computeCutoff).
       const cutoffSource =
@@ -1040,6 +1054,23 @@ export const ingestConnectionSync = internalMutation({
           `ingéré ${counters.ingested}, filtré ${counters.filteredCutover} (cutover)` +
           `${counters.filteredDeleted > 0 ? ` + ${counters.filteredDeleted} (deleted)` : ''}, ` +
           `${counters.alreadyExisting} déjà existante(s) (idempotence)`,
+      )
+    }
+    // A freshly created account is a bank just connected: it holds only what
+    // this payload carried, and the rest of its history sits in Powens' store
+    // waiting to be pulled. The connection-health transition above misses this
+    // case whenever the connection was already known and healthy — the poll
+    // records it every 6h, so an account appearing later on it would never be
+    // caught up. The account being new is the real trigger, not the connection
+    // being new.
+    if (accountCreated && !backfillScheduled) {
+      await ctx.scheduler.runAfter(0, internal.powens.backfillConnection, {
+        orgId: org._id,
+        powensConnectionId: connectionId,
+      })
+      console.log(
+        `[powens] compte(s) créé(s) sur la connexion ${connectionId} — ` +
+          `rattrapage planifié`,
       )
     }
     console.log(
@@ -1378,9 +1409,11 @@ export const ingestBackfilledTransactions = internalMutation({
  *
  * An account that holds no transaction yet has no resume point: it is a bank
  * just connected, and this is what brings in its history — it starts from
- * `BACKFILL_NEW_ACCOUNT_DEPTH_MS` instead of being skipped. The scheduling
- * above covers it: a brand-new connection row is itself a transition to
- * `connected`.
+ * `BACKFILL_NEW_ACCOUNT_DEPTH_MS` instead of being skipped. Reaching it does
+ * NOT rely on the health transition above, which only fires for a connection
+ * that was unknown or broken: `ingestConnectionSync` schedules this action
+ * whenever it CREATES an account, so an account appearing on a connection
+ * already known and healthy is caught up too.
  *
  * `minDate` (YYYY-MM-DD, operator only) overrides that start date for every
  * account of the connection. It is what repairs a gap noticed AFTER the

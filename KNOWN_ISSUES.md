@@ -2605,6 +2605,17 @@ permanent de l'org.
   rattrapage est planifié seulement sur `≠ connected → connected` (ligne
   absente incluse = nouvelle connexion). Se déclencher sur l'état « sain »
   relancerait un pull à chaque webhook.
+- **Second déclencheur : un COMPTE vient d'être créé** (`resolveAccount` le
+  signale, `ingestConnectionSync` planifie). La transition ci-dessus ne suffit
+  pas, et le trou est invisible : le poll 6h enregistre toute connexion, donc
+  une connexion peut être **connue et saine** bien avant que son premier compte
+  n'arrive chez nous — un webhook qui échoue (`unmapped_powens_account` avant
+  09/2026) ou une banque qui livre un nouveau compte sur un accès existant. Il
+  n'y a alors aucune transition, donc pas de rattrapage, donc un compte neuf
+  resté vide de tout passé. C'est le compte qui est neuf qui compte, pas la
+  connexion. Les deux déclencheurs ne se cumulent pas : `upsertConnectionStatus`
+  rend un booléen, et l'ingestion ne planifie que s'il vaut `false`, sinon un
+  même webhook lancerait deux pulls identiques.
 - **`ctx.scheduler.runAfter(0, …)`** et pas un appel direct : c'est une action
   (réseau), et le report post-commit garantit que les `bankAccounts` de la
   connexion sont déjà reliées quand elle s'exécute (le webhook appelle
