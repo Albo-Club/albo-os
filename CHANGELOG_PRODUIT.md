@@ -61,6 +61,50 @@ lignes**, « Voir plus » déplie le reste, « Voir moins » le replie.
 
 ---
 
+## v1.221.4 — 11/09/2026 à 11:01 — Ouvrir un document Parallel n'en laisse plus une copie derrière soi
+
+Les documents du portail Parallel ne sont pas accessibles directement : pour
+vous en ouvrir un, l'app va chercher le fichier et le dépose au passage dans
+son propre stockage, le temps de vous le servir.
+
+Sauf que cette copie de passage n'était jamais effacée. Chaque clic sur
+« ouvrir le document » laissait donc un exemplaire de plus, définitivement —
+un même document ouvert sept fois, sept copies. C'était devenu la première
+cause d'encombrement du stockage : **501 Mo, 28 % du total**, et ça grossissait
+d'une quarantaine de fichiers par jour.
+
+La copie de service est désormais effacée automatiquement une heure après
+avoir été servie. Vous ne verrez aucune différence : le téléchargement
+fonctionne exactement pareil.
+
+Deux précautions au passage. Si entre-temps ce fichier est devenu un vrai
+document rattaché à une fiche, il n'est pas touché. Et s'il a déjà disparu par
+ailleurs, l'effacement ne proteste pas.
+
+Le ménage des copies déjà accumulées reste à faire : il viendra séparément,
+maintenant que la source est tarie.
+
+> **🔧 Notes techniques**
+>
+> - `convex/vasco.ts` : `downloadCommunicationDocument` programme désormais un
+>   `scheduler.runAfter(PROXY_BLOB_TTL_MS = 1 h, internal.vasco.discardProxyBlob)`
+>   juste après le `storage.store`. Une heure couvre largement le
+>   `window.open` côté client, même pour un scan de 15 Mo.
+> - `discardProxyBlob` (nouvelle `internalMutation`) refuse de supprimer si une
+>   ligne `documents` a réclamé le blob entre-temps, et sort sans rien faire
+>   s'il a déjà disparu — `ctx.storage.delete` **lève** sur un blob absent, ce
+>   qui ferait échouer une tâche planifiée qui n'a plus rien à faire. Ce défaut
+>   a été trouvé par le test, pas à la relecture.
+> - Le contrôle se limite à `documents`, délibérément : l'id du blob naît dans
+>   l'action et n'est rendu à personne, donc aucun mail, avatar ni logo ne peut
+>   le désigner. Une purge en masse, elle, doit faire le tour des cinq
+>   porteurs.
+> - `convex/regression.vascoProxyBlob.test.ts` : 3 tests — jette une copie non
+>   réclamée, épargne une copie devenue document, ne casse pas en étant rejouée.
+> - `KNOWN_ISSUES.md` + `CLAUDE.md` : le motif généralisé — stocker *pour
+>   servir* plutôt que *pour garder* crée une file sans consommateur, et la
+>   durée de vie se décide au moment de l'écriture.
+
 ## v1.221.3 — 11/09/2026 à 10:33 — L'audit du stockage dit enfin qui se sert de chaque fichier
 
 L'audit savait repérer deux fichiers rigoureusement identiques, mais pas dire

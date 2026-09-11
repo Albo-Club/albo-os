@@ -6372,6 +6372,47 @@ fichiers ». Classement pur et testé dans `scripts/lib/storage-holders.mjs`
 
 ---
 
+## Un proxy de téléchargement qui stocke pour servir doit programmer son effacement
+
+**Symptôme** : 501 Mo — 28 % du stockage de fichiers — que **rien** ne
+référençait, et dont 564 sur 565 étaient le sosie exact d'un fichier déjà
+présent ailleurs. En croissance de ~45 fichiers par jour et accélérant : 13 en
+juillet 2026, 165 en août, 494 sur les onze premiers jours de septembre.
+
+**Cause** : `vasco.downloadCommunicationDocument`. Un document du portail
+Parallel vit derrière un endpoint authentifié, que le navigateur ne peut pas
+appeler seul. L'action fait donc proxy : elle récupère les octets, les met dans
+le stockage Convex pour pouvoir en tirer une URL, et rend cette URL au
+navigateur.
+
+Cette copie est un **coursier**, pas une archive. Aucune ligne ne la référence
+— elle n'existe que pour la durée d'un `window.open`. Or rien ne l'effaçait :
+**un clic = une copie permanente**, à vie. Le board deck Ouisub (3,9 Mo)
+existait en **sept exemplaires** : trois vrais documents et quatre clics.
+
+**Le motif à reconnaître**, au-delà de VASCO : dès qu'on stocke *pour servir*
+plutôt que *pour garder*, le stockage devient une file sans consommateur. Rien
+ne le signale — pas d'erreur, pas de doublon visible dans l'app, juste une
+facture qui monte. Deux réflexes :
+
+1. **La durée de vie se décide au moment de l'écriture**, pas plus tard.
+   `ctx.scheduler.runAfter(TTL, …)` posé dans la foulée du `storage.store`,
+   assez large pour couvrir le téléchargement (ici 1 h) et pas davantage.
+2. **L'effacement différé doit tolérer que le monde ait bougé.** Entre-temps la
+   copie a pu devenir un vrai document (on refuse alors de la supprimer), ou
+   avoir déjà disparu par un autre chemin — `ctx.storage.delete` **lève** sur
+   un blob absent, ce qui ferait échouer une tâche planifiée qui n'a plus rien
+   à faire. Les deux cas sont testés dans
+   `convex/regression.vascoProxyBlob.test.ts`.
+
+Le contrôle de réclamation se limite ici à `documents`, et c'est délibéré :
+l'id du blob naît dans l'action et n'est rendu à personne, donc aucun mail,
+avatar ni logo ne peut le désigner. Une purge en masse, elle, doit bien faire
+le tour des cinq porteurs — cf. la section « Aucune ligne `documents` ne veut
+pas dire fichier orphelin ».
+
+---
+
 ## Une période est un intervalle : la trier sur son début enterre le récap
 
 `companyReports.periodSortDate` est le **début** de la période couverte
