@@ -23,6 +23,44 @@ bas de page.
 
 ---
 
+## v1.222.0 — 11/09/2026 à 10:38 — Le journal d'une société se lit enfin dans l'ordre des périodes
+
+Dans « Rapports & communications », un rapport annuel se rangeait sous les
+douze mensuels de l'année qu'il résume : le classement retenait le **début**
+de la période couverte, donc « 2025 » tombait en janvier 2025. C'est
+maintenant la **fin** de la période qui classe, et à période égale la plus
+large passe devant — un rapport annuel « 2025 » s'affiche au-dessus de
+« Décembre 2025 », un trimestre au-dessus de son dernier mois. Les deux dates
+restent à l'écran : la période en titre de ligne, la date de réception en
+dessous.
+
+Les communications publiées sur un portail d'émetteur suivent la même règle :
+la période couverte d'abord, la date de publication seulement quand la
+communication n'annonce aucune période.
+
+Le journal ne déroule plus tout d'un bloc : il montre les **5 dernières
+lignes**, « Voir plus » déplie le reste, « Voir moins » le replie.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/reportPeriod.ts` : nouvelle fonction pure `periodRank(display)`
+>   → `{ endMs, span }`. Le fil trie sur `endMs` décroissant, `span`
+>   décroissant (la période la plus large d'abord à fin égale), puis la date
+>   de réception. Couverte par `tests/reportPeriod.test.ts`.
+> - `CompanyReportsSection.tsx` : `Entry.sortDate` remplacé par un `rank`
+>   (`endMs` / `span` / `receivedAt`) + comparateur `byRank`. Les
+>   communications VASCO passent de `publishDate ?? period` à `period ??
+>   publishDate`. Repli à `COLLAPSED_COUNT = 5` avec bouton
+>   `timeline.showMore` / `timeline.showLess` (i18n FR/EN).
+> - `companyReports.listByCompany` ne renvoie plus `periodSortDate`, devenu
+>   sans lecteur côté front. Le champ reste en base (début de période) : il
+>   porte l'index `by_company` et la fraîcheur des reports
+>   (`lib/reportFreshness.ts`) — aucun changement de schéma, aucune migration.
+> - Le pourquoi du « tri sur la fin » est consigné dans `KNOWN_ISSUES.md`
+>   § « Une période est un intervalle ».
+
+---
+
 ## v1.221.4 — 11/09/2026 à 11:01 — Ouvrir un document Parallel n'en laisse plus une copie derrière soi
 
 Les documents du portail Parallel ne sont pas accessibles directement : pour

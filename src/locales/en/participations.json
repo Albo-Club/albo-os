@@ -684,6 +684,8 @@
     "title": "Reports & communications",
     "empty": "Nothing yet. Received reports and platform communications will show up here, most recent first.",
     "refreshVasco": "Refresh VASCO",
+    "showMore": "Show more ({{count}})",
+    "showLess": "Show less",
     "files_one": "1 file",
     "files_other": "{{count}} files",
     "openReport": "Open report “{{title}}”",
