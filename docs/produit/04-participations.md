@@ -141,6 +141,12 @@ La colonne principale, dans l'ordre de lecture :
     elle existe (un reporting de janvier se range en janvier même s'il est
     déposé en mars), la date de réception sinon — et la ligne dit toujours
     laquelle des deux elle affiche.
+  - **Une période se classe par sa fin**, ce qui met les récapitulatifs à leur
+    place : un rapport annuel « 2025 » passe **au-dessus** de « Décembre
+    2025 », un trimestre au-dessus de son dernier mois. À période égale, c'est
+    la plus large qui passe devant — elle résume les autres.
+  - La section montre les **5 dernières lignes** ; « Voir plus » déplie tout
+    le journal, « Voir moins » le replie.
   - Chaque ligne se présente en bulle : titre, résumé d'une ligne, date, et
     le nombre de fichiers joints. Le pictogramme est sur **fond bleuté** et
     propre à sa nature (un pour les rapports, un autre pour les

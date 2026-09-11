@@ -185,9 +185,9 @@ celle qui couvre la période du report) et le récap dit lesquels manquent.
 
 ### 5. Rangement
 
-Le report est attaché à la fiche de la société, dans la liste « Documents &
-rapports », à la date de la période qu'il couvre : titre, période, points
-clés, documents, métriques. Renvoyer deux fois le même
+Le report est attaché à la fiche de la société, dans la liste « Rapports &
+communications », à la date de la période qu'il couvre : titre, période,
+points clés, documents, métriques. Renvoyer deux fois le même
 mail — ou le même report pour la même période — ne crée **jamais de
 doublon** : la fiche est mise à jour. La synthèse IA de la société est
 relancée à chaque report ingéré.

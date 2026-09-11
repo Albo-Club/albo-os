@@ -13,7 +13,9 @@ import { listSilentCompanies } from './lib/reportFreshness'
 import type { Doc, Id } from './_generated/dataModel'
 import type { QueryCtx } from './_generated/server'
 
-/** A company's reports, most recent period first (light fields for the list). */
+/** A company's reports (light fields for the list). The feed orders them on
+ * the END of the covered period — cf. `periodRank` — so the index order here
+ * only bounds WHICH reports are read, not how they are shown. */
 export const listByCompany = query({
   args: { companyId: v.id('companies') },
   handler: async (ctx, { companyId }) => {
@@ -32,7 +34,6 @@ export const listByCompany = query({
       title: r.title ?? null,
       headline: r.headline ?? null,
       reportPeriod: r.reportPeriod ?? null,
-      periodSortDate: r.periodSortDate ?? null,
       reportType: r.reportType ?? null,
       status: r.status,
       fromEmail: r.fromEmail ?? null,
