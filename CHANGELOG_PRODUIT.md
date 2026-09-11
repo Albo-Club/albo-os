@@ -23,6 +23,37 @@ bas de page.
 
 ---
 
+## v1.223.4 — 11/09/2026 à 11:55 — L'historique d'une banque nouvellement connectée arrive dans tous les cas
+
+Le lot précédent promettait qu'un compte fraîchement connecté arrive avec
+l'historique que la banque expose encore. C'était vrai quand la connexion
+bancaire elle-même était nouvelle, et faux dans un cas qui ne se voyait pas :
+quand l'app connaissait déjà la connexion — parce qu'un contrôle l'enregistre
+toutes les six heures — le compte était bien créé, mais seul ce que la
+synchronisation du moment portait entrait. Le reste du passé n'était jamais
+réclamé.
+
+C'est exactement la situation de l'accès Natixis, connecté hier et resté sans
+compte le temps du correctif. Désormais, c'est **l'arrivée d'un compte** qui
+déclenche la récupération de son historique, plus l'état de la connexion qui
+le porte. Le geste côté utilisateur ne change pas : connecter, et attendre.
+
+> **🔧 Notes techniques**
+>
+> - `convex/powens.ts` : `resolveAccount` rend maintenant `{ account, created }`
+>   et `ingestConnectionSync` planifie `backfillConnection` dès qu'un compte a
+>   été **créé** — la transition de santé (`≠ connected → connected` dans
+>   `upsertConnectionStatus`) ne couvrait pas une connexion déjà enregistrée
+>   par le poll 6h.
+> - Anti-doublon : `upsertConnectionStatus` rend un booléen disant si elle a
+>   déjà planifié le rattrapage ; l'ingestion ne planifie que sinon, pour qu'un
+>   même webhook ne lance pas deux pulls identiques sur les mêmes comptes.
+> - `convex/regression.powensNewBank.test.ts` : deux cas ajoutés — compte créé
+>   sur une connexion déjà connue et saine → un rattrapage planifié ; synchro
+>   suivante sur le même compte → toujours un seul.
+> - `KNOWN_ISSUES.md` § « Rattrapage après reconnexion » : le second
+>   déclencheur et la raison pour laquelle la transition seule ne suffit pas.
+
 ## v1.223.3 — 11/09/2026 à 11:55 — La consigne de sauvegarde avant purge était fausse
 
 Le ménage des fichiers orphelins a bien eu lieu : **565 fichiers, 501 Mo
