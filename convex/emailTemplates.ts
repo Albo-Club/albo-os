@@ -600,6 +600,19 @@ const REVIEW_REASON_LABELS: Record<string, string> = {
   no_content: 'aucun contenu exploitable',
   unknown_sender: 'expéditeur inconnu',
   spam: 'marqué comme spam',
+  possible_duplicate: 'doublon probable',
+}
+
+/**
+ * What a «doublon probable» notice says about the report it resembles. Kept
+ * short: it travels through the review notice's detail line, and what it has
+ * to do is let the reader recognise the document without opening anything.
+ */
+export function duplicateHint(twin: { title?: string; emailDate?: number }): string {
+  const day = twin.emailDate
+    ? ` du ${new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(twin.emailDate))}`
+    : ''
+  return `Ressemble au report « ${twin.title ?? 'sans titre'} »${day}, déjà rangé sur cette participation.`
 }
 
 /** Max characters of the raw technical message rendered in a failure recap. */

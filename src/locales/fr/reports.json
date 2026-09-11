@@ -29,7 +29,8 @@
     "identify_error": "Erreur d'identification",
     "no_content": "Aucun contenu exploitable",
     "analyze_error": "Erreur d'analyse",
-    "manual_reject": "Rejeté manuellement"
+    "manual_reject": "Rejeté manuellement",
+    "possible_duplicate": "Doublon probable"
   },
   "actions": {
     "assign": "Rattacher",
@@ -39,7 +40,8 @@
     "detach": "Détacher ce report de {{name}}",
     "deleteReport": "Supprimer ce report et ses fichiers de {{name}}",
     "deleteEmail": "Supprimer",
-    "deleteEmailBlocked": "Détache d’abord ce report des participations"
+    "deleteEmailBlocked": "Détache d’abord ce report des participations",
+    "storeAnyway": "Ranger quand même"
   },
   "assignDialog": {
     "title": "Rattacher à une participation",
@@ -61,7 +63,8 @@
     "error": "Action impossible — réessaie",
     "detached": "Report détaché de la participation",
     "deleted": "Report supprimé, fichiers compris",
-    "emailDeleted": "Email supprimé définitivement"
+    "emailDeleted": "Email supprimé définitivement",
+    "storedAnyway": "Report rangé"
   },
   "related": {
     "hint": "Une fiche du même domaine existe dans {{orgs}}, où ce report n'est pas rattaché — ouvre « Rattacher aussi » pour l'ajouter."

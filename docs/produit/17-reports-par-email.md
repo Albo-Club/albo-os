@@ -189,10 +189,30 @@ Le report est attaché à la fiche de la société, dans la liste « Rapports &
 communications », à la date de la période qu'il couvre : titre, période,
 points clés, documents, métriques. Renvoyer deux fois le même
 mail — ou le même report pour la même période — ne crée **jamais de
-doublon** : la fiche est mise à jour. C'est vrai aussi quand deux personnes
-transfèrent chacune de leur côté le **même** document : il est reconnu à son
-objet et à son titre, et vient compléter le report déjà rangé. La synthèse IA
-de la société est relancée à chaque report ingéré.
+doublon** : la fiche est mise à jour. La synthèse IA de la société est
+relancée à chaque report ingéré.
+
+**Quand deux personnes transfèrent chacune de leur côté le même document**,
+il est reconnu avant d'être rangé : le contenu reçu est comparé aux derniers
+reports déjà rangés sur la société — le texte du document lui-même
+(l'en-tête de transfert mis de côté), ses chiffres, son titre et son objet.
+Trois issues :
+
+- **c'est le même document** → rien n'est créé, la fiche garde la lecture la
+  plus complète (celle qui a reconnu une période l'emporte sur celle qui n'en
+  a vu aucune), et seule la personne qui vient de transférer reçoit une
+  réponse « déjà reçu ». Personne d'autre n'est prévenu : il n'y a pas de
+  nouvelle ;
+- **ça ressemble sans certitude** → **rien n'est rangé**. Le mail attend dans
+  la file [Rapports entrants](12-vue-consolidee.md) avec la mention
+  « doublon probable » et le nom du report auquel il ressemble. Deux boutons : **Ranger quand même**, ou
+  **Rejeter** si c'en est bien un. C'est volontaire — ranger un doublon et
+  perdre un vrai report coûtent tous les deux plus cher qu'un clic ;
+- **ça ne ressemble à rien de connu** → le report est rangé normalement.
+
+Un document **corrigé** puis renvoyé n'est pas un doublon : il est reconnu
+comme le même document, mais comme son contenu a bougé, la fiche est mise à
+jour **et** l'information repart normalement.
 
 **Tous les courriers d'une participation ne couvrent pas une période.** Un
 avis de liquidation, une notification juridique, une annonce de levée
@@ -208,7 +228,16 @@ traité comme un nouveau document, pas comme un renvoi.
 ### 6. Les mails de retour
 
 **Quand le report est rangé**, la personne qui l'a transféré reçoit une
-réponse dans son propre fil. Elle contient :
+réponse dans son propre fil (un ajout manuel depuis la fiche n'a pas de fil :
+la même réponse arrive alors comme un mail neuf).
+
+**Un mail par organisation.** Une société détenue par deux organisations
+reçoit son report dans chacune — tu reçois donc **deux mails**, un par
+organisation, chacun avec ses propres montants et sa propre fiche. C'est déjà
+ainsi que fonctionnent les publications Parallel, et la raison est qu'un mail
+ne doit jamais mélanger deux bilans.
+
+Chaque mail contient :
 
 - la **société**, son logo et l'organisation où le report a été rangé ;
 - la **fiche** en une ligne — le **versé encore en jeu** (ce qui est
@@ -338,9 +367,10 @@ points clés et ses métriques, et les fichiers déposés sont repliés dedans. 
 dans **chaque organisation** où la société existe, et la synthèse IA est
 relancée.
 
-Deux différences avec le mail : **toi, tu ne reçois rien** (tu es devant
-l'écran, le résultat est sous tes yeux) — les autres membres, eux, sont
-prévenus comme pour un report transféré ; et si l'analyse échoue, la ligne
+Une seule différence avec le mail, et c'est le **canal** : il n'y a pas de
+fil de discussion où répondre, donc ton accusé de réception arrive comme un
+mail neuf. Le contenu est le même que celui d'un report transféré, et les
+autres membres sont prévenus de la même façon. Si l'analyse échoue, la ligne
 passe en « analyse échouée » — le dépôt reste rattrapable depuis la boîte
 [Rapports entrants](12-vue-consolidee.md), comme un mail.
 

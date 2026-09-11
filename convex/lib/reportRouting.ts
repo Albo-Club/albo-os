@@ -5,7 +5,9 @@
  *
  * Three axes, deliberately independent:
  * - The CHANNEL follows the gesture: a member who forwarded gets the answer
- *   as a reply IN THEIR OWN THREAD; everyone else gets a fresh email.
+ *   as a reply IN THEIR OWN THREAD; a member who dropped the file on the fiche
+ *   has no thread, so the same answer reaches them as a fresh mail; everyone
+ *   else gets a fresh email too.
  * - The CONTENT follows the role: whoever handles the review queue also gets
  *   the quality-control block (sources read, KPI checklist, unusual values)
  *   appended to their confirmation, and the actionable cause when it breaks.
@@ -23,7 +25,7 @@
 
 export type RecapKind = 'success' | 'duplicate' | 'failure' | 'quarantine'
 
-/** Body to reply with in the forward's thread, or null to stay silent. */
+/** Body of the answer owed to whoever produced the report, or null. */
 export type ThreadReply =
   /** The report is filed: entity, fiche, what it says, where the company is. */
   | 'confirmation'
@@ -35,8 +37,19 @@ export type ThreadReply =
   | 'soft'
   | null
 
+/**
+ * How that answer reaches its author. The CHANNEL follows the GESTURE: a
+ * forward is answered in its own thread; a manual upload has no thread, so the
+ * same answer goes out as a fresh mail — the person who dropped the file is
+ * owed the same confirmation as the person who forwarded it. A portal
+ * publication has no author at all (`vascoNotify` announces it instead).
+ */
+export type ReplyChannel = 'thread' | 'fresh' | null
+
 export type RecapRoute = {
   reply: ThreadReply
+  /** Where `reply` goes — null means it goes nowhere, whatever `reply` says. */
+  replyChannel: ReplyChannel
   /**
    * Append the quality-control block to the confirmation. Only for people who
    * handle the queue — it is the signal they act on, and noise for anyone else.
@@ -56,14 +69,21 @@ export type RecapRoute = {
 
 export function routeRecap({
   kind,
+  origin,
   senderIsMember,
   senderHandlesIssues,
 }: {
   kind: RecapKind
+  /** Where the report came from — absent means an email (the historical case). */
+  origin?: 'email' | 'upload' | 'vasco'
   senderIsMember: boolean
   /** Member AND subscribed to report problems. */
   senderHandlesIssues: boolean
 }): RecapRoute {
+  // A portal publication has nobody waiting: no forwarder, no uploader, no
+  // thread. It is announced by `vascoNotify`, never answered here.
+  const channel: ReplyChannel =
+    origin === 'vasco' ? null : origin === 'upload' ? 'fresh' : 'thread'
   // Unknown sender: never reply, and never raise an alert either. The report
   // address is open to the outside — a founder writes to it directly, and so
   // does the odd stranger — so a problem mail per unidentified message is the
@@ -73,6 +93,7 @@ export function routeRecap({
   if (!senderIsMember) {
     return {
       reply: null,
+      replyChannel: null,
       withQuality: false,
       alertOthers: false,
       broadcast: kind === 'success',
@@ -82,6 +103,7 @@ export function routeRecap({
   if (kind === 'success') {
     return {
       reply: 'confirmation',
+      replyChannel: channel,
       withQuality: senderHandlesIssues,
       alertOthers: false,
       broadcast: true,
@@ -91,11 +113,12 @@ export function routeRecap({
   // A report that was already filed is not an event: only the person who just
   // forwarded it hears back, and only to say it was already there.
   if (kind === 'duplicate') {
-    return { reply: 'duplicate', withQuality: false, alertOthers: false, broadcast: false }
+    return { reply: 'duplicate', replyChannel: channel, withQuality: false, alertOthers: false, broadcast: false }
   }
 
   return {
     reply: senderHandlesIssues ? 'alert' : 'soft',
+    replyChannel: channel,
     withQuality: false,
     alertOthers: true,
     broadcast: false,
