@@ -74,3 +74,37 @@ export function extraCopies(ids, holders, meta) {
   )
   return ranked.slice(1)
 }
+
+/**
+ * How young a blob may be and still be spared. An upload is a TWO-STEP dance:
+ * the browser PUTs the bytes, and only then does the mutation create the row
+ * pointing at them. In between, a perfectly legitimate file has no holder and
+ * looks exactly like an orphan. Deleting it there breaks the upload the user
+ * is doing right now.
+ *
+ * A day is absurdly generous for a dance that lasts seconds — and costs
+ * nothing, since the blobs being purged are months old.
+ */
+export const MIN_ORPHAN_AGE_MS = 24 * 60 * 60 * 1000
+
+/**
+ * The blobs a purge may delete: no holder at all, AND old enough that no
+ * in-flight upload can be hiding among them.
+ *
+ * Returns ids only — the caller re-checks each one server-side before
+ * deleting, because this list is computed from a sweep that finished a while
+ * ago.
+ */
+export function purgeableOrphans(meta, holders, opts = {}) {
+  const now = opts.now ?? Date.now()
+  const minAgeMs = opts.minAgeMs ?? MIN_ORPHAN_AGE_MS
+  const out = []
+  for (const [id, { createdAt }] of meta) {
+    if (classify(id, holders) !== 'none') continue
+    // A blob with no creation date is not provably old: spare it.
+    if (typeof createdAt !== 'number') continue
+    if (now - createdAt < minAgeMs) continue
+    out.push(id)
+  }
+  return out
+}

@@ -9,8 +9,12 @@ import { test } from 'node:test'
 import {
   classify,
   extraCopies,
+  purgeableOrphans,
   tally,
 } from '../scripts/lib/storage-holders.mjs'
+
+/** One day in ms — the age floor the purge uses. */
+const DAY = 24 * 60 * 60 * 1000
 
 const meta = (entries: Array<[string, number, number]>) =>
   new Map(entries.map(([id, size, createdAt]) => [id, { size, createdAt }]))
@@ -112,4 +116,38 @@ test('extraCopies ne modifie pas le tableau reçu', () => {
   ])
   extraCopies(ids, new Map(), m)
   assert.deepEqual(ids, ['b', 'a'])
+})
+
+test('la purge ne prend que ce que rien ne référence', () => {
+  const m = meta([
+    ['held', 10, 0],
+    ['orphan', 10, 0],
+  ])
+  const holders = new Map([['held', new Set(['documents'])]])
+  assert.deepEqual(purgeableOrphans(m, holders, { now: DAY * 10 }), ['orphan'])
+})
+
+test('un upload en cours est épargné', () => {
+  // The blob exists, the row pointing at it does not YET. Deleting it here
+  // breaks an upload a user is doing right now — the whole reason for the age
+  // floor.
+  const m = meta([['uploading', 10, DAY * 10 - 1000]])
+  assert.deepEqual(purgeableOrphans(m, new Map(), { now: DAY * 10 }), [])
+})
+
+test('un orphelin pile à la limite d âge passe', () => {
+  const m = meta([['old', 10, 0]])
+  assert.deepEqual(purgeableOrphans(m, new Map(), { now: DAY }), ['old'])
+})
+
+test('un blob sans date de création est épargné', () => {
+  // Not provably old, so not provably safe.
+  const m = new Map([['nodate', { size: 10 }]])
+  assert.deepEqual(purgeableOrphans(m, new Map(), { now: DAY * 10 }), [])
+})
+
+test('la purge ne rend jamais un blob encore tenu, même très vieux', () => {
+  const m = meta([['ancient', 10, 0]])
+  const holders = new Map([['ancient', new Set(['companyEmails'])]])
+  assert.deepEqual(purgeableOrphans(m, holders, { now: DAY * 1000 }), [])
 })

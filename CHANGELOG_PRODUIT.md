@@ -23,6 +23,50 @@ bas de page.
 
 ---
 
+## v1.223.2 — 11/09/2026 à 11:29 — De quoi faire le ménage des fichiers que plus rien n'utilise
+
+La source du problème étant tarie, voici l'outil qui nettoie ce qui s'était
+accumulé : 501 Mo de fichiers — 28 % du stockage — que plus aucune fiche,
+aucun mail, aucun avatar ne référence. Sur ces 565 fichiers, 564 sont le
+sosie exact d'un fichier encore présent ailleurs : aucun contenu unique n'est
+perdu.
+
+L'outil ne supprime rien tant qu'on ne le lui demande pas explicitement. Par
+défaut il se contente de dire ce qu'il ferait.
+
+Deux garde-fous, et le plus important n'est pas celui qu'on croit. Un fichier
+en cours d'envoi ressemble trait pour trait à un fichier abandonné : les
+octets arrivent avant la ligne qui les désigne. Tout fichier de moins de
+24 heures est donc épargné — sans quoi le ménage effacerait le document que
+quelqu'un est en train de déposer. Le second garde-fou vérifie qu'aucune fiche
+n'a réclamé le fichier entre le moment où il a été repéré et celui où il est
+supprimé.
+
+Relancer l'outil une seconde fois ne trouve plus rien à faire.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/storagePurge.ts` (`deleteOrphans`) : re-vérifie
+>   **lui-même** l'âge et la réclamation `documents` de chaque blob, au lieu
+>   de faire confiance à la liste que le script lui passe — ce balayage a fini
+>   depuis plusieurs minutes. Emporte la ligne `documentTexts` associée.
+> - Les quatre autres tables porteuses ne sont pas re-vérifiées : chacune ne
+>   désigne qu'un blob qu'elle vient de créer, donc aucune ne peut réclamer un
+>   blob déjà vieux et sans porteur. Exception raisonnée à la règle de
+>   `KNOWN_ISSUES.md`, pas un oubli — les re-vérifier voudrait dire scanner
+>   deux tables lourdes PAR fichier.
+> - `scripts/storage-purge.mjs` : balayage puis suppression par lots de 100,
+>   à blanc par défaut, `--apply` pour exécuter. Ne réessaie jamais une
+>   écriture en silence (un lot qui expire a pu être commité).
+> - `purgeableOrphans` + `MIN_ORPHAN_AGE_MS` dans
+>   `scripts/lib/storage-holders.mjs`, avec 5 tests ; 7 tests de régression
+>   Convex dont la suppression réelle, l'upload en cours épargné et
+>   l'idempotence.
+> - Le test passe par `anyApi` : `api.d.ts` est committé et ne se régénère
+>   qu'avec des identifiants Convex, donc un module neuf est absent de l'arbre
+>   typé — nouvelle sous-section dans `KNOWN_ISSUES.md`.
+> - Runbook complet (ordre snapshot → à blanc → `--apply`) dans
+>   `MIGRATIONS.md`.
 ## v1.223.1 — 11/09/2026 à 11:24 — Le « Voir plus » des rapports ressemble aux autres
 
 Sous la liste « Rapports & communications », le bouton qui déplie le reste du
