@@ -23,6 +23,66 @@ bas de page.
 
 ---
 
+## v1.228.1 — 11/09/2026 à 16:55 — Une banque connectée deux fois n'importe plus les mouvements en double
+
+Quand la **même banque** se retrouvait connectée deux fois — deux connexions
+vivantes sur le même compte — chaque mouvement réel arrivait **deux fois**
+dans le registre. Les deux connexions livrent bien les mêmes opérations, mais
+chacune sous ses propres identifiants, et rien ne permettait de reconnaître
+que c'était la même. Constaté sur l'accès Natixis Wealth Management de CALTE.
+
+Désormais, **un compte n'est alimenté que par une connexion à la fois**. Une
+seconde connexion qui livre un compte déjà alimenté est ignorée : le compte
+reste sur la connexion en place, et celle en trop n'alimente plus rien — elle
+apparaît donc avec sa corbeille dans Réglages → Intégrations, prête à être
+supprimée.
+
+Ce qui ne change pas : **reconnecter** une banque reprend toujours la ligne
+existante, avec son historique et son pointage. La reprise reste la règle dès
+que la connexion précédente est morte (en erreur, silencieuse depuis plus de
+48 heures, ou disparue) — c'est exactement ce qui distingue une reconnexion
+d'un doublon. Et deux accès distincts chez le même établissement restent
+valides : le garde-fou porte sur le **compte**, jamais sur la banque.
+
+Les doublons **déjà** enregistrés, eux, ne s'effacent pas tout seuls : ils se
+retirent compte par compte, sur décision de l'opérateur, après relecture de ce
+qui serait supprimé. Deux mouvements réellement identiques le même jour, ça
+existe — rien ne les distingue d'un doublon, donc rien n'est automatique.
+
+> **🔧 Notes techniques**
+>
+> - `convex/powens.ts` — `resolveAccount` refuse désormais la reprise de lien
+>   (étape 2, rapprochement par IBAN) quand le compte visé est déjà alimenté
+>   par une **autre** connexion encore saine : nouveau helper
+>   `isConnectionLive` (lecture `powensConnections` + `connectionHealth`).
+>   Le compte est **sauté** (`return null`, log `duplicate_live_connection`,
+>   compteur `skipped`), jamais rejeté : un `throw` renverrait un 500 à
+>   Powens, qui suspend ses renvois. Ligne absente = connexion morte, la
+>   reprise a lieu — donc le garde-fou se défait seul dès que la connexion en
+>   place se dégrade ou sort du poll.
+> - La cause racine : la dédup d'ingestion ne connaît que `powensTxId`
+>   (`writeAccountTransactions`), une clé **propre à chaque connexion**. Deux
+>   accès = deux séries d'ids = aucune collision. Le garde-fou porte donc sur
+>   l'unicité du canal, pas sur la clé.
+> - `convex/migrations/dedupPowensTransactions.ts` — nettoyage one-shot,
+>   `dryRun` / `apply` / `verify`, **un compte à la fois** (`bankAccountId` en
+>   argument). Regroupement sur (date, sens, montant, libellé, contrepartie),
+>   lignes `source: 'powens'` uniquement. Survit : la ligne référencée
+>   (`matchingDecisions.transactionId`, `forecastEntries` et `forecasts`
+>   `.realizedTransactionId`), sinon celle qui porte une décision, sinon la
+>   plus ancienne ; deux références ou deux décisions divergentes →
+>   `needs_review`, groupe intact. `apply` exige `expectedDeletions` issu du
+>   `dryRun` (`plan_changed` sinon).
+> - `convex/regression.powensDuplicateConnection.test.ts` — 10 tests : le
+>   doublon ignoré (et sans second compte créé), la reconnexion sur connexion
+>   `wrongpass` ou non suivie qui reprend bien, un second accès livrant un
+>   **autre** compte ingéré normalement, et les règles de survie du nettoyage.
+> - Docs : `KNOWN_ISSUES.md` (« Un compte, une connexion VIVANTE »),
+>   `MIGRATIONS.md`, `TESTING.md` (P17/P18), `docs/produit/15-integrations.md`.
+>   Au passage, la ligne P5 de `TESTING.md` décrivait encore le plancher de
+>   cutover supprimé en 09/2026 — corrigée.
+
+---
 ## v1.228.0 — 11/09/2026 à 15:15 — Un mail par organisation, et un accusé pour les dépôts manuels
 
 Une société détenue par deux organisations recevait **un seul** mail
