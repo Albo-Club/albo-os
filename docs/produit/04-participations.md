@@ -134,7 +134,7 @@ La colonne principale, dans l'ordre de lecture :
 - **Rapports & communications** : le **journal** de la société — ce qu'elle
   nous envoie, du plus récent au plus ancien. On y trouve les rapports
   investisseurs analysés — reçus par mail, déposés à la main, ou **publiés sur
-  le portail d'un émetteur** (Parallel/VASCO), ces derniers étant lus et
+  le portail d'un émetteur** (VASCO), ces derniers étant lus et
   résumés comme les autres depuis 09/2026 (voir
   [Intégrations](15-integrations.md)).
   - **Ce qui classe une ligne, c'est sa date** : la période couverte quand
@@ -403,4 +403,4 @@ corriger le résumé d'un SPV ne touche plus les autres.
 
 - [Deals](05-deals.md),
   [Valorisations, KPIs et métriques](06-valorisations-et-kpis.md),
-  [Intégrations](15-integrations.md) (rapports par email, Parallel/VASCO)
+  [Intégrations](15-integrations.md) (rapports par email, VASCO)
