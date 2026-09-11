@@ -606,19 +606,18 @@ export function CompanyReportsSection({
               ),
           )}
 
+          {/* Same door as the changelog page's "older updates": an outline
+              button centred under the list, not a full-width band. */}
           {entries.length > COLLAPSED_COUNT && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full"
-              onClick={() => setExpanded((v) => !v)}
-            >
-              {expanded
-                ? t('participations:timeline.showLess')
-                : t('participations:timeline.showMore', {
-                    count: entries.length - COLLAPSED_COUNT,
-                  })}
-            </Button>
+            <div className="flex justify-center pt-2">
+              <Button variant="outline" onClick={() => setExpanded((v) => !v)}>
+                {expanded
+                  ? t('participations:timeline.showLess')
+                  : t('participations:timeline.showMore', {
+                      count: entries.length - COLLAPSED_COUNT,
+                    })}
+              </Button>
+            </div>
           )}
         </div>
       )}
