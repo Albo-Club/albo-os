@@ -228,7 +228,16 @@ traité comme un nouveau document, pas comme un renvoi.
 ### 6. Les mails de retour
 
 **Quand le report est rangé**, la personne qui l'a transféré reçoit une
-réponse dans son propre fil. Elle contient :
+réponse dans son propre fil (un ajout manuel depuis la fiche n'a pas de fil :
+la même réponse arrive alors comme un mail neuf).
+
+**Un mail par organisation.** Une société détenue par deux organisations
+reçoit son report dans chacune — tu reçois donc **deux mails**, un par
+organisation, chacun avec ses propres montants et sa propre fiche. C'est déjà
+ainsi que fonctionnent les publications Parallel, et la raison est qu'un mail
+ne doit jamais mélanger deux bilans.
+
+Chaque mail contient :
 
 - la **société**, son logo et l'organisation où le report a été rangé ;
 - la **fiche** en une ligne — le **versé encore en jeu** (ce qui est
@@ -358,9 +367,10 @@ points clés et ses métriques, et les fichiers déposés sont repliés dedans. 
 dans **chaque organisation** où la société existe, et la synthèse IA est
 relancée.
 
-Deux différences avec le mail : **toi, tu ne reçois rien** (tu es devant
-l'écran, le résultat est sous tes yeux) — les autres membres, eux, sont
-prévenus comme pour un report transféré ; et si l'analyse échoue, la ligne
+Une seule différence avec le mail, et c'est le **canal** : il n'y a pas de
+fil de discussion où répondre, donc ton accusé de réception arrive comme un
+mail neuf. Le contenu est le même que celui d'un report transféré, et les
+autres membres sont prévenus de la même façon. Si l'analyse échoue, la ligne
 passe en « analyse échouée » — le dépôt reste rattrapable depuis la boîte
 [Rapports entrants](12-vue-consolidee.md), comme un mail.
 

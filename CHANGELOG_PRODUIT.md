@@ -23,6 +23,44 @@ bas de page.
 
 ---
 
+## v1.225.0 — 11/09/2026 à 15:15 — Un mail par organisation, et un accusé pour les dépôts manuels
+
+Une société détenue par deux organisations recevait **un seul** mail
+d'annonce, dont le sujet listait les deux fiches (« nouveau report Waro,
+WARO ») et dont le corps mélangeait deux bilans. C'est désormais **un mail
+par organisation** : sujet « Albo OS — nouveau report Waro · Albo Club
+(S1 2026) », et chaque mail ne porte que les montants et la fiche de son
+organisation. C'est déjà ainsi que fonctionnent les publications Parallel —
+les deux canaux suivent maintenant la même règle.
+
+Conséquence visible : sur une société détenue des deux côtés, tu reçois deux
+mails au lieu d'un. C'est voulu — un mail ne doit jamais mélanger deux
+bilans.
+
+**Un rapport ajouté à la main depuis la fiche donne maintenant un accusé de
+réception à son auteur**, avec le même contenu que pour un report transféré
+(fiche, points clés, synthèse de la boîte, et le bloc contrôle qualité pour
+qui gère la file). Comme un dépôt n'a pas de fil de discussion où répondre,
+il arrive en mail neuf. Le reste du circuit était déjà identique à celui d'un
+mail transféré — lecture des fichiers, KPIs, synthèse IA relancée, rangement
+dans chaque organisation.
+
+> **🔧 Notes techniques**
+>
+> - `lib/reportRouting.ts:routeRecap` prend l'`origin` de la ligne et rend un
+>   `replyChannel` (`'thread'` | `'fresh'` | `null`) : le canal se décide là,
+>   avec le reste du routage, au lieu du test `canReply` qui vivait dans
+>   `send`. Un `upload` vaut donc une réponse en mail neuf, une publication
+>   `vasco` aucune réponse (c'est `vascoNotify.announce` qui parle).
+> - `reportNotify.send` boucle sur les orgs distinctes de `matchedCompanies`
+>   et appelle `entityCards` avec les entités de cette org seulement — pour la
+>   réponse à l'auteur comme pour la diffusion aux autres membres. Sujet via
+>   `announceSubject` (nom de l'entité · nom de l'org). Les mails de problème
+>   (quarantaine, échec, doublon probable) ne sont pas découpés : ils parlent
+>   du mail reçu, pas d'un report rangé dans une org.
+> - Couverture : `tests/reportRouting.test.ts` (nouveaux cas de canal par
+>   origine).
+
 ## v1.224.0 — 11/09/2026 à 14:45 — Un même report transféré deux fois ne fait plus deux fiches
 
 Quand deux personnes transfèrent chacune de leur côté le même update, l'app

@@ -5175,7 +5175,20 @@ transféreur :
 
 - **Le canal** dépend du geste : un membre qui a transféré reçoit la
   réponse **dans son propre fil** ; tous les autres reçoivent un **mail
-  neuf**.
+  neuf**. Un **ajout manuel** depuis la fiche est le même geste sans fil où
+  répondre : son auteur reçoit la même réponse, en mail neuf
+  (`replyChannel: 'fresh'`). Seule la publication de portail n'a aucun auteur
+  à qui répondre (`null` — `vascoNotify.announce` parle pour ce canal). Ce
+  choix vit dans `routeRecap`, pas dans `send` : il se déduit de l'`origin`
+  de la ligne, jamais d'un test indirect sur l'adresse de l'expéditeur.
+- **Une organisation par mail, jamais deux.** Un mail porte les montants et
+  la fiche d'**une** org : `send` boucle sur les orgs du rangement et
+  construit les cartes avec les entités de celle-là seulement. Avant
+  (09/2026), une société détenue par Albo et par CALTE produisait un seul
+  mail au sujet « nouveau report Waro, WARO », mélangeant deux bilans. Le
+  canal portail avait raison depuis le début (`vascoNotify.announce` part par
+  entité) ; c'est la même règle. Conséquence assumée : le transféreur d'un
+  report fan-outé reçoit **deux réponses** dans son fil, une par org.
 - **Le contenu** dépend du rôle : qui gère la file (abonné `reportIssues`)
   reçoit en plus le **bloc contrôle qualité** (sources lues, KPIs cibles,
   valeurs inhabituelles) et la cause exacte quand ça coince ; qui ne fait
