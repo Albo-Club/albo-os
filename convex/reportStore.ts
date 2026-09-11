@@ -132,6 +132,57 @@ const canonicalValidator = v.object({
 })
 
 /**
+ * `Re:` / `Fwd:` / `Tr:` chains an email client prepends when forwarding —
+ * noise added by the delivery, never by the document.
+ */
+const FORWARD_PREFIXES = /^(?:\s*(?:re|ré|fw|fwd|tr|trans(?:fert)?)\s*:\s*)+/i
+
+function squash(value: string | undefined): string {
+  return (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function subjectKey(subject: string | undefined): string {
+  return squash((subject ?? '').replace(FORWARD_PREFIXES, ''))
+}
+
+/**
+ * Past this delay, the same period-less subject is a NEW document. Bounds the
+ * one collision the key below cannot resolve on its own: a yearly courrier
+ * («Convocation AG») coming back twelve months on, which must not overwrite
+ * last year's.
+ */
+const RESEND_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+
+/**
+ * Is this stored period-less report the same document as the incoming one?
+ *
+ * `undefined` is ONE key shared by every period-less report of the company
+ * (cf. `KNOWN_ISSUES.md` « Report sans période »), so the row is picked by
+ * hand. It used to be picked on `subject + emailDate` — which identifies the
+ * DELIVERY, not the document: the reception date is unique per forward by
+ * construction, so the key could only ever match a replay of the same mail.
+ * Two people forwarding the same investor update ten minutes apart filed it
+ * twice (QOMON, 09/2026).
+ *
+ * What identifies the document is what the document says: its subject once
+ * the forwarding prefixes are off, AND the title read from its content — both,
+ * because either alone collides on recurring courriers. The window does the
+ * rest. A row with no `emailDate` (legacy import) can never be dated, so it is
+ * never a match: filing a second row is recoverable, overwriting is not.
+ */
+function isSameDocument(
+  row: Doc<'companyReports'>,
+  incoming: { subject: string; title: string; receivedAt: number },
+): boolean {
+  if (row.emailDate === undefined) return false
+  return (
+    subjectKey(row.subject) === subjectKey(incoming.subject) &&
+    squash(row.title) === squash(incoming.title) &&
+    Math.abs(row.emailDate - incoming.receivedAt) <= RESEND_WINDOW_MS
+  )
+}
+
+/**
  * Did a re-sent report actually bring something new?
  *
  * A second forward of the SAME report is a duplicate: it must stay silent and
@@ -239,8 +290,8 @@ export const storeForCompany = internalMutation({
     // Dedup on (company, period): a re-sent report updates in place. A
     // period-less document (one-off legal notice) has no period to key on:
     // keying every one of them on the same empty slot would make each new
-    // one overwrite the previous. They are identified by their source
-    // message instead — subject + date, both carried by email AND upload.
+    // one overwrite the previous. They are identified by the document
+    // itself instead — cf. `isSameDocument`.
     const existing = args.reportPeriod
       ? await ctx.db
           .query('companyReports')
@@ -255,7 +306,13 @@ export const storeForCompany = internalMutation({
               q.eq('companyId', args.companyId).eq('reportPeriod', undefined),
             )
             .collect()
-        ).find((r) => r.subject === email.subject && r.emailDate === email.receivedAt) ?? null)
+        ).find((r) =>
+          isSameDocument(r, {
+            subject: email.subject,
+            title: args.title,
+            receivedAt: email.receivedAt,
+          }),
+        ) ?? null)
 
     // A PORTAL publication takes a free slot, never an occupied one. Storage
     // updates in place, which is right for a corrected re-send and destructive
