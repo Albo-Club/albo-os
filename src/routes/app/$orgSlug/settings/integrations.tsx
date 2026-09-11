@@ -8,6 +8,8 @@ import { toast } from 'sonner'
 import {
   Check,
   Copy,
+  Info,
+  KeyRound,
   Link2,
   Loader2,
   Pencil,
@@ -18,6 +20,8 @@ import {
 import { api } from '../../../../../convex/_generated/api'
 import type { Id } from '../../../../../convex/_generated/dataModel'
 import { useAgo } from '~/components/cash/BankConnectionsHealth'
+import { CompanyLogo } from '~/components/CompanyLogo'
+import { bankDomain } from '~/lib/bankDomains'
 import { Button } from '~/components/ui/button'
 import {
   Card,
@@ -41,6 +45,11 @@ import {
   FieldGroup,
   FieldLabel,
 } from '~/components/ui/field'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '~/components/ui/tooltip'
 
 export const Route = createFileRoute('/app/$orgSlug/settings/integrations')({
   component: IntegrationsSettings,
@@ -67,6 +76,33 @@ function StateDot({ state, label }: { state: string; label: string }) {
         STATE_DOT[state] ?? STATE_DOT.inactive
       }`}
     />
+  )
+}
+
+/** platform → website domain, feeding the same logo.dev hotlink as company
+ * and bank logos (CompanyLogo). A connection shows its own provider's logo
+ * (the bank, via `bankDomain`) and falls back to its platform's. */
+const PLATFORM_DOMAINS: Record<string, string> = {
+  powens: 'powens.com',
+  vasco: 'vasco.fund',
+}
+
+/** The explanatory copy of a row, folded into a discreet « i ». Prose in
+ * permanent grey turns into noise nobody reads; on demand it stays useful. */
+function InfoHint({ text }: { text: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={text}
+          className="text-muted-foreground/50 hover:text-foreground shrink-0 transition-colors"
+        >
+          <Info className="size-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-72">{text}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -114,10 +150,9 @@ function IntegrationsList({
     )
   }
 
-  // "Installed" = the org already has at least one connection, or the global
-  // capability is operational; everything else is "available to connect".
-  const isInstalled = (i: Integration) =>
-    (i.connections?.length ?? 0) > 0 || i.configured === true
+  // "Installed" = the org already has at least one connection; everything
+  // else is "available to connect".
+  const isInstalled = (i: Integration) => (i.connections?.length ?? 0) > 0
   const installed = integrations.filter(isInstalled)
   const available = integrations.filter((i) => !isInstalled(i))
 
@@ -231,8 +266,10 @@ function IntegrationsGroup({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          {title}
+          <InfoHint text={description} />
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {items.length === 0 ? (
@@ -270,6 +307,10 @@ function PlatformRow({
     id: string
     label: string
     config: Record<string, string>
+  } | null>(null)
+  const [renaming, setRenaming] = useState<{
+    id: string
+    label: string
   } | null>(null)
   const [disconnecting, setDisconnecting] = useState<{
     id: string
@@ -309,6 +350,9 @@ function PlatformRow({
     }
   }
 
+  const platformName = t(
+    `settings:integrations.platforms.${item.platform}.name`,
+  )
   const connections = item.connections ?? []
   const hasConnections = connections.length > 0
   // Prominent "Connecter" only while nothing is connected; once a connection
@@ -324,24 +368,18 @@ function PlatformRow({
   return (
     <div className="space-y-2 px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <span className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium">
-            {t(`settings:integrations.platforms.${item.platform}.name`)}
-          </span>
-          {/* Global connectors: the dot alone says operational or not. */}
-          {item.configured !== undefined && (
-            <StateDot
-              state={item.configured ? 'connected' : 'inactive'}
-              label={
-                item.configured
-                  ? t('settings:integrations.globalConfigured')
-                  : t('settings:integrations.globalNotConfigured')
-              }
-            />
-          )}
-          <span className="text-muted-foreground rounded-full border px-2 py-0.5 text-xs">
-            {t(`settings:integrations.scope.${item.scope}`)}
-          </span>
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
+          <CompanyLogo
+            domain={PLATFORM_DOMAINS[item.platform]}
+            companyName={platformName}
+            size="md"
+          />
+          <span className="text-sm font-medium">{platformName}</span>
+          <InfoHint
+            text={t(
+              `settings:integrations.platforms.${item.platform}.description`,
+            )}
+          />
         </span>
         <span className="flex items-center gap-2">
           {/* On-demand pull (registry `manualSync`) — member-level, read-only. */}
@@ -389,9 +427,6 @@ function PlatformRow({
           )}
         </span>
       </div>
-      <p className="text-muted-foreground/80 text-xs">
-        {t(`settings:integrations.platforms.${item.platform}.description`)}
-      </p>
       {connections.map((c) => (
         <div key={c.id} className="space-y-0.5">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
@@ -399,6 +434,13 @@ function PlatformRow({
               <StateDot
                 state={c.state}
                 label={t(`settings:integrations.state.${c.state}`)}
+              />
+              <CompanyLogo
+                domain={
+                  bankDomain(c.providerName) ?? PLATFORM_DOMAINS[item.platform]
+                }
+                companyName={c.label}
+                size="sm"
               />
               <span className="truncate">{c.label}</span>
             </span>
@@ -425,6 +467,18 @@ function PlatformRow({
                       : t('settings:integrations.actions.reconnect')}
                   </Button>
                 )}
+              {canManage && (
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  className="text-muted-foreground"
+                  aria-label={t('settings:integrations.actions.rename')}
+                  title={t('settings:integrations.actions.rename')}
+                  onClick={() => setRenaming({ id: c.id, label: c.label })}
+                >
+                  <Pencil className="size-4" />
+                </Button>
+              )}
               {canManage && item.auth === 'credentials' && (
                 <>
                   <Button
@@ -441,7 +495,7 @@ function PlatformRow({
                       })
                     }
                   >
-                    <Pencil className="size-4" />
+                    <KeyRound className="size-4" />
                   </Button>
                   <Button
                     size="icon-sm"
@@ -481,6 +535,14 @@ function PlatformRow({
           existing={editing}
           onClose={() => setEditing(null)}
           onSaved={item.manualSync ? () => void handleSync() : undefined}
+        />
+      )}
+      {renaming && (
+        <RenameDialog
+          orgId={orgId}
+          platform={item.platform}
+          connection={renaming}
+          onClose={() => setRenaming(null)}
         />
       )}
       {disconnecting && (
@@ -656,6 +718,94 @@ function ConnectDialog({
             {existing
               ? t('common:actions.save')
               : t('settings:integrations.actions.connect')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/**
+ * Rename a connection — the one edit every connector shares, whatever its
+ * auth kind: a label is ours, not the platform's. Nothing else is touched
+ * (credentials stay untouched, the bank keeps sending its own name), which
+ * is why it is a separate, credential-free dialog.
+ */
+function RenameDialog({
+  orgId,
+  platform,
+  connection,
+  onClose,
+}: {
+  orgId: Id<'organizations'>
+  platform: string
+  connection: { id: string; label: string }
+  onClose: () => void
+}) {
+  const { t } = useTranslation(['settings', 'common'])
+  const rename = useConvexMutation(api.connections.renameConnection)
+  const [label, setLabel] = useState(connection.label)
+  const [saving, setSaving] = useState(false)
+
+  const trimmed = label.trim()
+
+  async function handleSubmit() {
+    setSaving(true)
+    try {
+      await rename({
+        orgId,
+        platform,
+        connectionId: connection.id,
+        label: trimmed,
+      })
+      toast.success(t('settings:integrations.toasts.renamed'))
+      onClose()
+    } catch (err) {
+      const code = err instanceof ConvexError ? (err.data as string) : ''
+      toast.error(
+        code === 'label_taken'
+          ? t('settings:integrations.toasts.labelTaken')
+          : t('settings:integrations.toasts.renameError'),
+      )
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {t('settings:integrations.rename.title', {
+              label: connection.label,
+            })}
+          </DialogTitle>
+          <DialogDescription>
+            {t('settings:integrations.rename.description')}
+          </DialogDescription>
+        </DialogHeader>
+        <Field>
+          <FieldLabel htmlFor="rename-label">
+            {t('settings:integrations.fields.label')}
+          </FieldLabel>
+          <Input
+            id="rename-label"
+            value={label}
+            autoFocus
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder={t('settings:integrations.fields.labelPlaceholder')}
+          />
+        </Field>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            {t('common:actions.cancel')}
+          </Button>
+          <Button
+            onClick={() => void handleSubmit()}
+            disabled={saving || trimmed === '' || trimmed === connection.label}
+          >
+            {saving && <Loader2 className="size-4 animate-spin" />}
+            {t('common:actions.save')}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -4,18 +4,24 @@
 
 Chaque organisation dispose d'une vue **Réglages → Intégrations**, le point
 d'entrée unique des outils externes, présentés en deux groupes : **Installées**
-(au moins une connexion, ou service opérationnel) et **Disponibles** (prêtes à
-brancher).
+(au moins une connexion) et **Disponibles** (prêtes à brancher).
 
-- Les plateformes **par organisation** (banques via Powens, portails fonds
-  type Parallel ou Teampact) affichent chaque connexion avec sa pastille
-  d'état (connectée / en retard / à reconnecter / en erreur) et sa dernière
-  synchronisation **réussie** (une connexion en erreur garde la date de son
-  dernier succès — ou « Jamais synchronisée »). Une connexion en erreur
-  affiche aussi le message d'erreur sous sa ligne, pour comprendre d'un coup
-  d'œil ce qui bloque (identifiants refusés, portail injoignable…).
-- Les **services partagés** (extraction Notion, DocSend) indiquent simplement
-  s'ils sont opérationnels.
+La page ne liste que ce qui se **connecte** : les banques via Powens et les
+portails de fund admin type Parallel ou Teampact. Les capacités qui marchent
+toutes seules en coulisses (lecture d'une page Notion ou d'un deck DocSend
+cité dans un investor update) n'y figurent pas — il n'y a rien à y brancher
+ni à y débrancher.
+
+Chaque plateforme et chaque connexion porte son **logo**, et chaque connexion
+sa pastille d'état (connectée / en retard / à reconnecter / en erreur) suivie
+de sa dernière synchronisation **réussie** (une connexion en erreur garde la
+date de son dernier succès — ou « Jamais synchronisée »). Une connexion en
+erreur affiche aussi le message d'erreur sous sa ligne, pour comprendre d'un
+coup d'œil ce qui bloque (identifiants refusés, portail injoignable…).
+
+Les explications ne s'étalent plus en gris sous chaque ligne : elles sont
+rangées derrière un petit **« i »** à côté du nom, à survoler quand on en a
+besoin.
 
 **Connecter et déconnecter se font depuis la page** (admins uniquement) :
 
@@ -25,15 +31,22 @@ brancher).
 - un portail investisseur se branche via un petit formulaire (nom, portail,
   identifiants) — les identifiants sont stockés côté serveur et ne
   redescendent jamais dans le navigateur ;
-- une connexion de portail se **corrige sur place** (bouton crayon) : le même
+- **toute** connexion se **renomme** (bouton crayon), banques comprises : le
+  nom n'est utilisé que dans Albo OS, rien n'est envoyé à la plateforme. C'est
+  ce qui permet de distinguer deux accès à la même banque, qui arrivent tous
+  les deux sous le même nom — « Palatine » et « Palatine » deviennent
+  « Palatine — SCI Chapelle » et « Palatine — Relais ». Le nom choisi tient
+  face aux synchronisations suivantes et suit la connexion partout, y compris
+  sur la Trésorerie et dans les mails d'alerte ;
+- les **identifiants** d'un portail se corrigent sur place (bouton clé) : le
   formulaire s'ouvre pré-rempli (nom, portail), les identifiants sont à
   ressaisir, et une synchronisation est relancée aussitôt pour vérifier que
   la connexion refonctionne — inutile de déconnecter puis reconnecter ;
 - « Déconnecter » (avec confirmation) oublie les identifiants ; les données
   déjà importées restent en place.
 
-Toute nouvelle plateforme déclarée au registre apparaîtra automatiquement
-dans cette liste, formulaire de connexion compris.
+Toute nouvelle plateforme à connecter déclarée au registre apparaîtra
+automatiquement dans cette liste, formulaire de connexion compris.
 
 ## Attio (CRM dealflow)
 

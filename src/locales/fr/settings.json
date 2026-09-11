@@ -81,12 +81,6 @@
   "integrations": {
     "title": "Intégrations",
     "description": "Les plateformes externes reliées à cette organisation — ce qui est installé, ce qui est disponible, et dans quel état.",
-    "scope": {
-      "org": "Par organisation",
-      "global": "Service partagé"
-    },
-    "globalConfigured": "Opérationnelle",
-    "globalNotConfigured": "Non configurée",
     "state": {
       "connected": "Connectée",
       "stale": "En retard",
@@ -106,14 +100,6 @@
       "vasco": {
         "name": "Parallel / VASCO",
         "description": "Portails investisseurs des plateformes de fund admin : positions, communications investisseurs et documents remontés sur les entités liées."
-      },
-      "notion": {
-        "name": "Notion",
-        "description": "Extraction des pages Notion publiques liées dans les investor updates reçus par email."
-      },
-      "docsend": {
-        "name": "DocSend",
-        "description": "Extraction des decks DocSend liés dans les investor updates reçus par email."
       }
     },
     "groups": {
@@ -131,7 +117,8 @@
       "reconnecting": "Redirection…",
       "add": "Ajouter",
       "sync": "Synchroniser",
-      "edit": "Modifier la connexion"
+      "rename": "Renommer la connexion",
+      "edit": "Modifier les identifiants"
     },
     "dialog": {
       "title": "Connecter {{name}}",
@@ -146,6 +133,10 @@
       "username": "Identifiant de connexion",
       "password": "Mot de passe"
     },
+    "rename": {
+      "title": "Renommer « {{label}} »",
+      "description": "Le nom n'est utilisé que dans Albo OS : il vous sert à distinguer vos connexions, rien n'est envoyé à la plateforme."
+    },
     "confirm": {
       "title": "Déconnecter « {{label}} » ?",
       "description": "Les identifiants enregistrés seront supprimés. Les données déjà importées restent en place."
@@ -153,6 +144,8 @@
     "toasts": {
       "connected": "Connexion enregistrée.",
       "updated": "Connexion mise à jour.",
+      "renamed": "Connexion renommée.",
+      "renameError": "Impossible de renommer la connexion.",
       "connectError": "Impossible d'enregistrer la connexion.",
       "labelTaken": "Une connexion porte déjà ce nom.",
       "disconnected": "Connexion supprimée.",
