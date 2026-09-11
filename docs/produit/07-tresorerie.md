@@ -79,6 +79,22 @@ La page de détail d'un compte montre son historique de transactions
 (recherche, lien vers le deal rattaché) et permet d'éditer nom personnalisé,
 solde manuel, nanti, clôturé.
 
+### Connecter une banque que l'app ne connaît pas encore
+
+Aucune banque n'a besoin d'être déclarée à l'avance : on lance la connexion
+depuis la page Trésorerie, et les comptes apparaissent seuls après la
+première synchro, au nom de la banque, dans la société qui a lancé la
+connexion. Il ne reste plus qu'à les renommer si le libellé de la banque ne
+parle pas, et à les rattacher à leur société si ce n'est pas la bonne
+(section suivante).
+
+La synchro rapporte aussi **l'historique** que la banque expose encore —
+souvent un à deux ans, parfois seulement quelques mois selon la banque. Un
+compte fraîchement connecté n'arrive donc pas vide. Ce que la banque ne
+publie plus ne peut être récupéré par aucune connexion : c'est le seul cas
+où un import de relevés a du sens, et il vaut mieux vérifier d'abord ce que
+la synchro a ramené — sinon on obtient deux fois les mêmes mouvements.
+
 ### Un accès bancaire, plusieurs sociétés
 
 Un même accès en banque porte souvent les comptes de plusieurs sociétés du
@@ -174,16 +190,20 @@ l'assistant IA).
 
 L'ingestion est idempotente : une transaction déjà connue est mise à jour,
 jamais dupliquée, et une re-livraison de la banque **n'écrase jamais** l'état
-de pointage déjà posé. Les comptes historiques importés d'Airtable ont une
-date de bascule : la synchro n'ingère que les transactions postérieures,
-pour éviter les doublons avec l'historique.
+de pointage déjà posé. Un compte qui porte déjà un historique venu d'ailleurs
+(reprise Airtable, import de relevés, saisie manuelle) a une date de bascule :
+la synchro n'ingère que les transactions postérieures, pour ne pas faire
+doublon avec cet historique. Un compte que la banque seule alimente n'a pas
+cette limite — il peut remonter aussi loin que la banque le permet.
 
 ## Points d'attention
 
 - Le prévisionnel et tous les soldes agrègent **l'euro uniquement** ; les
   comptes en autre devise sont comptés à part.
-- Les banques actuellement connectées : Palatine, Wormser, Neuflize (CALTE),
-  Mémo Bank (Albo Club), Qonto (rattaché au compte historique).
+- Les banques actuellement connectées : Palatine, Wormser, Neuflize, Natixis
+  Wealth Management (CALTE), Mémo Bank (Albo Club), Qonto (rattaché au compte
+  historique). La liste n'est pas fermée : une banque non listée se connecte
+  de la même façon.
 
 ## Pages liées
 
