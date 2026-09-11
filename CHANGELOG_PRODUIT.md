@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.221.0 — 11/09/2026 à 10:38 — Le journal d'une société se lit enfin dans l'ordre des périodes
+## v1.222.0 — 11/09/2026 à 10:38 — Le journal d'une société se lit enfin dans l'ordre des périodes
 
 Dans « Rapports & communications », un rapport annuel se rangeait sous les
 douze mensuels de l'année qu'il résume : le classement retenait le **début**
@@ -58,6 +58,159 @@ lignes**, « Voir plus » déplie le reste, « Voir moins » le replie.
 >   (`lib/reportFreshness.ts`) — aucun changement de schéma, aucune migration.
 > - Le pourquoi du « tri sur la fin » est consigné dans `KNOWN_ISSUES.md`
 >   § « Une période est un intervalle ».
+
+---
+
+## v1.221.3 — 11/09/2026 à 10:33 — L'audit du stockage dit enfin qui se sert de chaque fichier
+
+L'audit savait repérer deux fichiers rigoureusement identiques, mais pas dire
+lesquels servent encore. Il ne regardait qu'un seul endroit — les documents
+rattachés aux fiches — alors qu'un fichier peut aussi être retenu par un mail
+reçu, par un avatar, par un logo, ou par une ancienne fonctionnalité de
+timeline email qui a été retirée sans que ses pièces jointes soient effacées.
+
+Résultat : un fichier parfaitement utilisé pouvait apparaître comme n'ayant
+aucun propriétaire. Le rapport répartit désormais tout le stockage entre ces
+cinq usages, et isole la seule catégorie réellement libre de suppression :
+celle que plus rien ne référence.
+
+Il dit aussi **quand** les copies en trop ont été créées, mois par mois. C'est
+ce qui permettra de vérifier que le problème est bien derrière nous plutôt que
+de le supposer.
+
+Toujours en lecture seule : rien n'est supprimé, rien n'est modifié.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/storageAudit.ts` : nouvelle `internalQuery`
+>   `scanHolders`, une branche par table porteuse (`documents`,
+>   `inboundEmails`, `companyEmails`, `users`, `organizations`, plus
+>   `documentTexts` à part). Elle balaie une table par appel pour que le script
+>   construise l'index inverse blob → porteurs en une passe par table, au lieu
+>   d'une requête par blob.
+> - `scripts/lib/storage-holders.mjs` (nouveau, pur) : `classify`, `tally`,
+>   `extraCopies`. `documentTexts` n'est **pas** un porteur — c'est le texte
+>   extrait DU blob, donc jamais une raison de le garder. `extraCopies`
+>   conserve la copie la mieux référencée, pas la plus ancienne : garder un
+>   orphelin en supprimant celle qu'une fiche affiche serait l'inverse du but.
+> - `tests/storageHolders.test.ts` : 13 tests, orientés sur les erreurs qui
+>   coûteraient de la donnée (une pièce jointe de mail prise pour un orphelin,
+>   une table inconnue qui surclasse un vrai porteur, un groupe entièrement
+>   orphelin qui perdrait sa dernière copie).
+> - `KNOWN_ISSUES.md` : nouvelle section. Elle consigne surtout que
+>   `releaseStorage` (`convex/lib/documentBlobs.ts`) ne compte que `documents`
+>   plus le mail qu'on lui passe — inoffensif aujourd'hui, mais une purge en
+>   masse ne doit pas s'appuyer dessus.
+> - Le balayage lit des lignes entières de deux tables lourdes, ce que
+>   l'anti-pattern CLAUDE.md interdit — pour une requête de LISTE que l'app
+>   rejoue sans arrêt. Ici c'est un audit manuel one-shot, et une recherche
+>   blob par blob lirait les mêmes lignes.
+
+## v1.221.2 — 11/09/2026 à 10:03 — Un même document transféré par deux personnes ne crée plus deux reports
+
+Quand Benjamin et Clément transféraient tous les deux le même update d'une
+participation, Albo OS le rangeait deux fois : deux lignes sur la fiche, deux
+e-mails d'annonce. Le rapprochement se faisait sur l'heure de réception du
+mail, qui est forcément différente d'un transfert à l'autre — il ne pouvait
+donc reconnaître qu'un même mail retraité, jamais un même document reçu deux
+fois.
+
+Un document est désormais reconnu à ce qu'il est : son objet, une fois les
+« Fwd : » et « Tr : » retirés, et le titre lu dans son contenu. Le second
+transfert vient compléter le report déjà rangé au lieu d'en créer un nouveau.
+Deux courriers différents reçus la même semaine restent bien deux reports, et
+un courrier qui revient un an plus tard (une convocation d'assemblée, par
+exemple) reste un nouveau document — il n'écrase pas celui de l'an dernier.
+
+> **🔧 Notes techniques**
+>
+> - `convex/reportStore.ts` : la branche « sans période » de la dedup de
+>   `storeForCompany` ne se fait plus sur `subject + emailDate` (la livraison)
+>   mais sur le document, via `isSameDocument` — objet normalisé
+>   (`FORWARD_PREFIXES` + `squash`) ET titre, dans une fenêtre
+>   `RESEND_WINDOW_MS` de 30 jours. La fenêtre borne la seule collision que la
+>   clé ne sait pas trancher : le courrier récurrent au même objet et au même
+>   titre. Une ligne sans `emailDate` (import legacy) n'est jamais un match —
+>   ranger deux fois se rattrape, écraser non.
+> - La dedup `(société, période)` des reports périodiques est inchangée.
+> - `convex/regression.reportStore.test.ts` : trois cas ajoutés — deux
+>   transferts du même document à dix minutes d'écart → une ligne ; même objet
+>   un an plus tard → deux lignes ; même fil, deux titres → deux lignes.
+> - `KNOWN_ISSUES.md` § « Report sans période » mis à jour (la clé décrite
+>   était devenue fausse).
+
+---
+
+## v1.221.1 — 10/09/2026 à 09:40 — L'audit du stockage sait maintenant reconnaître deux fichiers identiques
+
+L'outil interne qui pèse les fichiers stockés se contentait de dire combien
+ils pèsent et lesquels sont les plus gros. Il compare désormais leur empreinte
+exacte : deux fichiers dont le contenu est rigoureusement identique sont
+repérés comme tels, et le rapport indique combien d'espace serait libéré si on
+n'en gardait qu'un seul exemplaire.
+
+Il nomme aussi, pour les dix contenus les plus lourds présents en plusieurs
+exemplaires, **chaque** copie et d'où elle vient — un report reçu par mail, une
+publication du portail, un dépôt manuel. Un même document rattaché à deux
+sociétés est un doublon légitime, pas une erreur : savoir qui pointe sur quoi
+est la seule façon de faire la différence.
+
+Rien n'est supprimé : ce lot ne fait que mesurer.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/storageAudit.ts` : `scanPage` renvoie désormais
+>   `sha256` — le champ est déjà porté par la ligne `_storage` lue, coût de
+>   lecture nul. Toujours deux `internalQuery`, rien n'est écrit ni téléchargé.
+> - `scripts/storage-audit.mjs` : accumulateur `bySha` (empreinte → taille +
+>   liste des `storageId`) alimenté dans `absorb()`. Un blob sans empreinte
+>   entre dans les totaux mais n'est **jamais** groupé, sinon tous les
+>   non-hashés se percuteraient dans un même faux groupe.
+> - Nouvelle section « Doublons exacts (même sha256) » du rapport : nombre de
+>   groupes, copies en trop, octets récupérables (`taille × (n − 1)`, une copie
+>   doit exister) et pourcentage du stockage. Les `TOP_DUPLICATE_GROUPS = 10`
+>   plus lourds passent par un second `describe` qui nomme chaque copie
+>   (`kind` / `source` / titre).
+> - `MIGRATIONS.md` : ligne d'audit mise à jour.
+## v1.221.0 — 10/09/2026 à 09:26 — Une publication du portail n'apparaît plus deux fois
+
+Depuis que les publications Parallel sont analysées comme des reportings, la
+frise d'une participation les affichait **deux fois** : une fois en reporting —
+avec son résumé, ses chiffres, ses pièces jointes — et une fois en
+communication portail, la version brute dont elle vient.
+
+C'est la version brute qui disparaît. La frise ne garde que le reporting, qui
+dit strictement plus.
+
+Une publication qui n'a **pas** pu être analysée reste affichée, elle. Le
+portail est alors sa seule trace : la masquer transformerait un trou visible en
+trou invisible.
+
+La synthèse IA, de son côté, cesse d'aller interroger le portail en direct à
+chaque calcul. Elle lit les reportings, qui contiennent désormais la même
+chose — le contenu n'y figure donc plus en double.
+
+> **🔧 Notes techniques**
+>
+> - `companyReports.listByCompany` rend `vascoCommunicationId` pour un report
+>   d'origine portail : l'identifiant est **lu sur la ligne entrante**, dont la
+>   clé de dédup est précisément `vasco:<clientSlug>:<communicationId>`. Rien à
+>   synchroniser, et surtout aucun backfill des ~190 lignes déjà ingérées —
+>   dénormaliser l'id sur le report aurait exigé l'un et l'autre pour la même
+>   réponse. Coût : une lecture de plus par report portail, sur une fiche dont
+>   les reports sont lus de toute façon.
+> - `CompanyReportsSection` masque l'entrée portail des publications digérées,
+>   garde celles qui n'ont produit aucun report.
+> - `intelligence.runAnalysis` ne pulle plus les communications ; le garde
+>   `no_data` se lit sur les seuls reports. `vasco.pullCommunicationsForSynthesis`
+>   et `formatCommunications` sont supprimés (morts du fait de ce changement),
+>   et `getContext` ne rend plus le lien VASCO que personne ne lisait.
+> - **Non touché délibérément** : `lib/reportFreshness`, qui compte les deux
+>   canaux. Il prend la date la **plus récente**, jamais une somme — une
+>   publication comptée des deux côtés ne fausse donc rien, et y toucher
+>   risquerait l'alerte « boîte silencieuse » pour zéro gain.
+> - Tests : 2 cas dans `regression.vascoIngest.test.ts` (un report portail
+>   nomme sa publication, un report mail n'en nomme aucune).
 
 ---
 

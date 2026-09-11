@@ -1767,14 +1767,39 @@ rangement (le schéma Convex les déclarait déjà `v.optional`). Le piège est
 ce qui suit : avec `reportPeriod` absent, `q.eq('reportPeriod', undefined)`
 matche **tous** les reports sans période de la société. Un `.first()` naïf
 ferait écraser chaque courrier ponctuel par le suivant — perte de données
-silencieuse, sans aucune erreur. Un document sans période est donc identifié
-par son **message d'origine** (`subject` + `emailDate`, portés aussi bien par
-un mail que par un dépôt manuel), pas par le créneau vide.
+silencieuse, sans aucune erreur. Un document sans période doit donc être
+identifié à la main, ligne par ligne.
 
-Règle : **toute nouvelle clé de dédoublonnage sur un champ optionnel doit
-dire ce qui se passe quand le champ est absent.** `undefined` n'est pas
-« pas de clé », c'est **une** clé — partagée par toutes les lignes qui n'ont
-rien. Couvert par `convex/regression.reportStore.test.ts`.
+La première version l'identifiait par son **message d'origine** (`subject` +
+`emailDate`). Faux, et de façon instructive : `emailDate` est la date de
+**réception**, unique par transfert par construction. Cette clé ne pouvait
+donc matcher qu'un rejeu du **même** mail (« Retraiter »), jamais le même
+document arrivé deux fois — Clément et Benjamin transférant le même update
+QOMON à dix minutes d'écart (09/2026) ont produit deux lignes et deux mails
+d'annonce, alors que l'objet était identique au préfixe près.
+
+Ce qui identifie un document, c'est ce que le document **dit** :
+`isSameDocument` compare l'**objet** débarrassé de ses préfixes de transfert
+(`Fwd:`, `Tr :`, `Re:`) **et** le **titre** extrait du contenu — les deux,
+parce que chacun seul collisionne sur les courriers récurrents — dans une
+fenêtre de **30 jours**. La fenêtre est là pour la seule collision que la clé
+ne sait pas trancher : la « Convocation AG » qui revient douze mois plus tard
+et ne doit surtout pas écraser celle de l'an dernier. Une ligne sans
+`emailDate` (import legacy) n'est jamais un match : ranger deux fois se
+rattrape, écraser non.
+
+Deux règles à retenir :
+
+- **Toute nouvelle clé de dédoublonnage sur un champ optionnel doit dire ce
+  qui se passe quand le champ est absent.** `undefined` n'est pas « pas de
+  clé », c'est **une** clé — partagée par toutes les lignes qui n'ont rien.
+- **Une clé de dédoublonnage ne se pose jamais sur un attribut de la
+  livraison** (date de réception, identifiant de message, expéditeur) quand
+  la question est « est-ce le même document ? ». Ces attributs sont uniques
+  par acheminement : la clé compile, passe les tests de rejeu, et ne
+  dédoublonne rien en production.
+
+Couvert par `convex/regression.reportStore.test.ts`.
 
 Corollaire d'affichage : `periodSortDate` retombe sur la date de réception
 quand il n'y a pas de période, sinon le courrier n'aurait aucun ancrage dans
@@ -3695,8 +3720,9 @@ document est un **coffre** (cherché par nature, longtemps après, parce qu'il
 faut signer ou voter). Un journal se trie par date, un coffre par type — les
 mettre dans la même liste force chacun à adopter le tri de l'autre.
 
-- `CompanyReportsSection` — rapports + communications VASCO, colonne
-  principale, tri chronologique.
+- `CompanyReportsSection` — rapports + communications VASCO **non digérées**,
+  colonne principale, tri chronologique (une publication devenue rapport n'y
+  figure qu'une fois, sous sa forme rapport).
 - `CompanyDocumentsCard` — carte du panneau de droite (compteur + 5 plus
   récents) et son tiroir : recherche par titre, filtres et **regroupement par
   type**.
@@ -4161,6 +4187,16 @@ libre, jamais un créneau occupé** ; son propre créneau ne compte pas comme
 occupé, sinon une correction du portail ne pourrait plus atterrir. Tenu par
 `regression.vascoIngest.test.ts`.
 
+⚠️ **Une publication digérée ne s'affiche plus côté portail.** La frise fusionne
+reports et communications ; une publication devenue report y figurait donc
+**deux fois**. `companyReports.listByCompany` rend, pour chaque report d'origine
+portail, l'identifiant de la publication dont il vient (lu sur la ligne
+entrante, dont la clé de dédup **est** cet identifiant — rien à synchroniser, et
+pas de backfill des lignes déjà ingérées), et la frise masque les entrées
+portail correspondantes. Celles qui n'ont produit **aucun** report restent
+affichées : le portail est alors leur seule trace, et les masquer transformerait
+un trou en trou invisible.
+
 ⚠️ **Un émetteur peut être détenu par plusieurs orgs.** CALTE et Albo Club ont
 toutes deux souscrit à Bernay, donc le SPV existe en deux fiches. L'ancre étant
 keyée par **portail** et non par org, la première org traitée réclame les
@@ -4346,21 +4382,19 @@ SPV13"), dated (`publishDate`/`period`), with `title`, `htmlContent`, and
 
 ### Communications → AI synthesis (« Cerveau », étape 2c)
 
-The company AI synthesis (`intelligence.runAnalysis`) folds the linked issuer's
-communications into its prompt context, **pulled live on each run** (nothing
-new is persisted — the result still lands in `companyIntelligence`).
+La synthèse (`intelligence.runAnalysis`) **ne lit plus le portail** (09/2026).
+Elle le faisait en direct à chaque passage, par un
+`vasco.pullCommunicationsForSynthesis` supprimé depuis : une publication étant
+désormais digérée en report, le bloc « reports » du contexte la porte déjà, et
+la pulled-live remettait le même contenu **deux fois** dans le prompt — plus un
+aller-retour portail pour une donnée déjà en base. Le garde `no_data` se lit
+donc sur les seuls reports, et une entité Parallel n'est plus un cas
+particulier : ses publications **sont** des reports.
 
-- **System-context read path.** `runAnalysis` is a scheduled internalAction with
-  **no user identity**, so it can't use the org-member-guarded
-  `fetchCommunications`. It calls `vasco.pullCommunicationsForSynthesis` (an
-  internalAction) which resolves connections via `connections.listActiveForOrg`
-  — an **auth-less** internalQuery keyed by orgId (sibling of
-  `connections.listActiveByOrgSlug`, do **not** reuse
-  `connections.authorizeAndListActive`, which guards). Best-effort: it returns
-  `[]` on any VASCO failure so the
-  synthesis still runs on the company/report context alone. The `no_data` guard
-  is evaluated on (context **OR** comms), so a bare Parallel entity with only
-  communications is still analyzed.
+⚠️ Ne pas le « rétablir » en croyant combler un trou. Le seul cas non couvert
+est une publication qui a échoué à être digérée — elle reste visible sur la
+fiche côté portail (cf. la section « Une communication est DIGÉRÉE en report »),
+et c'est là qu'il faut aller la chercher, pas dans le prompt.
 - **Le cache est UPSERTÉ, pas effacé-réécrit (09/2026).** Le remplacement
   total ne faussait aucune date affichée — la fiche lit `publishDate`, la date
   du portail — mais il détruisait l'**identité** des lignes : chaque
@@ -6296,6 +6330,47 @@ La sortie 2 est la seule disponible depuis un environnement sans identifiants
 Convex (session distante, CI). Elle a un effet de bord acceptable : le module
 n'apparaît pas dans `api.d.ts` tant que personne n'a relancé `convex dev`, ce
 qui produira un diff de deux lignes sans rapport au prochain `pnpm dev`.
+
+---
+
+## « Aucune ligne `documents` » ne veut pas dire « fichier orphelin »
+
+**Contexte** : ALB-234, audit du stockage. 32 % des octets stockés sont des
+doublons exacts (même `sha256`), et la première version de l'audit ne joignait
+les blobs qu'à `documents` — d'où une colonne « (aucune ligne documents) » très
+facile à lire comme « personne ne s'en sert, on peut supprimer ». C'est faux, et
+le croire coûte une pièce jointe perdue.
+
+**Six** champs du schéma pointent sur `_storage` :
+
+| Table | Champ | Nature |
+| --- | --- | --- |
+| `documents` | `storageId` | le document d'une fiche |
+| `inboundEmails` | `attachments[].storageId` | pièce jointe reçue (optionnel : le fichier peut n'avoir jamais été rangé) |
+| `companyEmails` | `attachments[].storageId` | **timeline email RETIRÉE** — table inerte, plus lue par rien, mais ses fichiers sont toujours là |
+| `users` | `avatarStorageId` | avatar |
+| `organizations` | `logoStorageId` | logo |
+| `documentTexts` | `storageId` | **pas un porteur** — le texte extrait DU blob, donc jamais une raison de le garder ; il part avec lui |
+
+Une pièce jointe de mail jamais promue en document est donc parfaitement
+utilisée **et** invisible à la jointure `documents`. Le critère de suppression
+est « aucun des cinq vrais porteurs », pas « pas de ligne `documents` ».
+
+**Corollaire, et c'est le vrai piège** : `releaseStorage`
+(`convex/lib/documentBlobs.ts`) ne vérifie que `documents` **plus le seul mail
+qu'on lui passe en argument**. Il ignore `companyEmails`, les avatars, les logos
+et les autres lignes `inboundEmails`. C'est sans conséquence aujourd'hui — deux
+transferts du même fichier produisent deux blobs distincts, pas un blob partagé,
+et la timeline retirée ne partage rien avec les documents — mais **une purge en
+masse ne doit pas s'appuyer dessus** : elle doit refaire le tour des cinq
+porteurs elle-même. Le jour où un chemin fera vraiment partager un blob entre
+deux mails, le refcount le ratera.
+
+Mesure : `node scripts/storage-audit.mjs`, section « Qui référence les
+fichiers ». Classement pur et testé dans `scripts/lib/storage-holders.mjs`
+(`tests/storageHolders.test.ts`).
+
+---
 
 ## Une période est un intervalle : la trier sur son début enterre le récap
 

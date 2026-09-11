@@ -26,12 +26,9 @@ import { INTELLIGENCE_SYSTEM_PROMPT } from './lib/reportPrompts'
 import { readMembership } from './lib/agentScope'
 import { requireOrgMember } from './lib/auth'
 import type { Id } from './_generated/dataModel'
-import type { VascoCommunication } from './vasco'
 
 const MAX_REPORTS = 5
 const MAX_RAW_PER_REPORT = 3000
-const MAX_COMMUNICATIONS = 5
-const MAX_COMM_BODY = 3000
 
 export const intelligenceAgent = new Agent(components.agent, {
   name: 'company-intelligence',
@@ -88,17 +85,10 @@ export const getContext = internalQuery({
   ): Promise<{
     text: string
     hasReports: boolean
-    vascoClientSlug: string | null
-    vascoIssuerId: string | null
   }> => {
     const company = await ctx.db.get('companies', companyId)
     if (!company)
-      return {
-        text: '',
-        hasReports: false,
-        vascoClientSlug: null,
-        vascoIssuerId: null,
-      }
+      return { text: '', hasReports: false }
 
     const parts: Array<string> = [`## Entreprise: ${company.name}`]
     if (company.domain) parts.push(`Domaine: ${company.domain}`)
@@ -122,38 +112,9 @@ export const getContext = internalQuery({
       }
     }
 
-    return {
-      text: parts.join('\n'),
-      hasReports: reports.length > 0,
-      vascoClientSlug: company.vascoClientSlug ?? null,
-      vascoIssuerId: company.vascoIssuerId ?? null,
-    }
+    return { text: parts.join('\n'), hasReports: reports.length > 0 }
   },
 })
-
-/**
- * Format the entity's recent VASCO/Parallel investor communications as a text
- * block appended to the analysis context. Body text is already plain (stripped
- * of HTML server-side in vasco.ts). Kept parallel to the reports block above.
- */
-function formatCommunications(comms: Array<VascoCommunication>): string {
-  if (comms.length === 0) return ''
-  const parts: Array<string> = [
-    '\n## Communications investisseur (Parallel/VASCO, récentes)',
-  ]
-  for (const c of comms.slice(0, MAX_COMMUNICATIONS)) {
-    const stamp = c.publishDate ?? c.period ?? ''
-    parts.push(
-      `\n### ${c.title ?? 'Communication'}${stamp ? ` (${stamp})` : ''}`,
-    )
-    if (c.bodyText) parts.push(c.bodyText.slice(0, MAX_COMM_BODY))
-    const docNames = c.documents
-      .map((d) => d.name)
-      .filter((n): n is string => Boolean(n))
-    if (docNames.length) parts.push(`Documents: ${docNames.join(', ')}`)
-  }
-  return parts.join('\n')
-}
 
 // ─── Persistence ─────────────────────────────────────────────────────────────
 
@@ -277,28 +238,24 @@ export const runAnalysis = internalAction({
     })
 
     try {
-      const { text, hasReports, vascoClientSlug, vascoIssuerId } =
-        await ctx.runQuery(internal.intelligence.getContext, { companyId })
+      const { text, hasReports } = await ctx.runQuery(
+        internal.intelligence.getContext,
+        { companyId },
+      )
 
-      // Live-pull the entity's Parallel/VASCO investor communications, if
-      // linked, and fold them into the context. getContext is a query (can't
-      // fetch); this action can. Best-effort — [] on any VASCO failure.
-      let vascoBlock = ''
-      if (vascoClientSlug && vascoIssuerId) {
-        const comms = await ctx.runAction(
-          internal.vasco.pullCommunicationsForSynthesis,
-          { orgId, clientSlug: vascoClientSlug, issuerId: vascoIssuerId },
-        )
-        vascoBlock = formatCommunications(comms)
-      }
+      // The portal is no longer read here. Since a publication is digested
+      // into a report (`convex/vascoIngest.ts`), the reports block above
+      // already carries it — pulling the communications too put the same
+      // content in the prompt twice, and a live pull on every synthesis is a
+      // portal round-trip for something already in the database.
 
-      // No report and no communication → `no_data`, never a score. The company
-      // row alone (name, sector, notes) always makes `text` non-empty, so
-      // gating on it would score an entity nobody ever reported on: the model
-      // then invents its good points ("domaine .com professionnel") and the
-      // health score becomes noise in the score column. A bare Parallel entity
-      // with communications is still worth analyzing.
-      if (!hasReports && !vascoBlock) {
+      // No report → `no_data`, never a score. The company row alone (name,
+      // sector, notes) always makes `text` non-empty, so gating on it would
+      // score an entity nobody ever reported on: the model then invents its
+      // good points ("domaine .com professionnel") and the health score
+      // becomes noise in the score column. A linked Parallel entity is no
+      // longer a special case — its publications ARE reports.
+      if (!hasReports) {
         // Clear any previous synthesis: the Participations score column reads
         // `aiAnalysis` alone (`aiScoresByCompany`), so leaving a stale one here
         // would keep a score in the list while the sheet says "no data".
@@ -311,7 +268,7 @@ export const runAnalysis = internalAction({
         return
       }
 
-      const context = `${text}${vascoBlock}`
+      const context = text
 
       const threadId = await createThread(ctx, components.agent, {
         userId: `${orgId}:system`,

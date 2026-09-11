@@ -485,7 +485,19 @@ export function CompanyReportsSection({
         },
       })
     }
+    // A publication that has been digested is ALREADY in this list as a
+    // report — richer, searchable, known to the agent. Showing it again as a
+    // portal entry is the duplicate every linked fiche used to carry.
+    //
+    // The ones that have NOT been digested stay: the portal is then the only
+    // trace of them, and hiding those would turn a gap into an invisible gap.
+    const digested = new Set(
+      reports
+        .map((r) => r.vascoCommunicationId)
+        .filter((id): id is string => Boolean(id)),
+    )
     for (const comm of vasco.communications) {
+      if (digested.has(comm.communicationId)) continue
       const published = Date.parse(comm.publishDate ?? '')
       const receivedAt = Number.isNaN(published) ? 0 : published
       // Same axis as a report: the period covered first, the publication

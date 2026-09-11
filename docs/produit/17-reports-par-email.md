@@ -189,8 +189,10 @@ Le report est attaché à la fiche de la société, dans la liste « Rapports &
 communications », à la date de la période qu'il couvre : titre, période,
 points clés, documents, métriques. Renvoyer deux fois le même
 mail — ou le même report pour la même période — ne crée **jamais de
-doublon** : la fiche est mise à jour. La synthèse IA de la société est
-relancée à chaque report ingéré.
+doublon** : la fiche est mise à jour. C'est vrai aussi quand deux personnes
+transfèrent chacune de leur côté le **même** document : il est reconnu à son
+objet et à son titre, et vient compléter le report déjà rangé. La synthèse IA
+de la société est relancée à chaque report ingéré.
 
 **Tous les courriers d'une participation ne couvrent pas une période.** Un
 avis de liquidation, une notification juridique, une annonce de levée
@@ -199,7 +201,9 @@ datés du jour de réception — avec leur titre, leur résumé et leurs points
 clés comme n'importe quel report. Rien n'est inventé : plutôt que de leur
 coller un mois au hasard, la période reste vide. Deux courriers ponctuels
 d'une même société ne se remplacent pas l'un l'autre, et aucun n'écrase le
-report périodique de la même période.
+report périodique de la même période. Un courrier au même objet reçu
+longtemps après (une convocation d'assemblée qui revient chaque année) est
+traité comme un nouveau document, pas comme un renvoi.
 
 ### 6. Les mails de retour
 
