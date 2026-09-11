@@ -1805,6 +1805,67 @@ Corollaire d'affichage : `periodSortDate` retombe sur la date de réception
 quand il n'y a pas de période, sinon le courrier n'aurait aucun ancrage dans
 la timeline de la fiche (l'index `by_company` trie là-dessus).
 
+## Deux lectures d'un même document ne tombent pas sur la même période
+
+Suite directe de la section précédente, et la preuve que le correctif ne
+suffisait pas. `isSameDocument` ne joue que sur la branche **sans période** :
+la dedup reste `(companyId, reportPeriod)` dès qu'une période est lue. Or
+**la période est produite par le LLM**. Le même update WARO transféré par
+Clément puis par Benjamin à trois minutes d'écart (09/2026) a été lu « aucune
+période » puis « S1 2026 » : deux clés, deux lignes, deux mails d'annonce —
+et ×2, la société étant détenue par Albo **et** par CALTE. Quatre fiches pour
+un document.
+
+La leçon générale : **une clé de dédoublonnage ne peut pas être dérivée d'une
+sortie non déterministe.** Renforcer le titre ou l'objet ne répare rien, ils
+viennent du même modèle. Et tant que la recherche se fait dans la **case de la
+période**, deux lectures divergentes ne se rencontrent jamais.
+
+D'où `convex/lib/reportDuplicate.ts`, interrogé par `reportStore.findTwin`
+**avant** la dedup par période, sur les 15 derniers reports **reçus** de
+l'entité (index `by_company_received` — trier par période mettrait hors de
+portée un report d'une vieille période reçu aujourd'hui) :
+
+- **signal maître, le texte source** (`rawContent`, corps + ce qui a été lu
+  des fichiers), comparé en **shingles de 5 mots** (Jaccard). L'en-tête de
+  transfert est retiré d'abord — marqueur « Forwarded message » le plus
+  profond, puis le bloc `De/Date/Objet/À` : la ligne `To:` nomme le
+  transféreur, elle diffère à chaque transfert du **même** document ;
+- **secours** quand le texte n'est pas comparable (un PDF OCRisé d'un côté,
+  échoué de l'autre) : métriques canoniques identiques **et** titre
+  identique ;
+- **doute** : similarité intermédiaire, ou simple égalité de titre/objet.
+
+Trois issues, et c'est le point important : `duplicate` (fusion silencieuse
+dans la ligne existante), **`doubt` → on ne range RIEN** (`needs_review` +
+`possible_duplicate`, bouton « Ranger quand même » ou « Rejeter »), `new`.
+L'asymétrie est voulue : une fausse certitude **perd** un vrai report, un
+faux doute coûte un clic.
+
+Deux pièges traités, à ne pas défaire :
+
+- **La fusion garde la meilleure lecture.** Une lecture sans période n'efface
+  jamais une période déjà reconnue (`reportPeriod`, `periodSortDate`,
+  `reportType` conservés).
+- **`sameSource` (Jaccard ≥ 0,98) décide de ce qui est une nouvelle**, pas
+  `reportContentChanged` : deux passages du modèle sur le même texte donnent
+  deux formulations différentes, ce qui ferait passer un doublon pour une
+  correction et rejouerait la synthèse + le mail. En dessous du seuil, le
+  document lui-même a bougé — un renvoi corrigé — et ça reste une nouvelle
+  (cf. § « Un report renvoyé n'est pas forcément un doublon », que cette règle
+  préserve au lieu de l'annuler).
+- **Un jumeau sur une entité ne dit rien de l'autre.** Le verdict est calculé
+  **par entité** du fan-out : une participation ajoutée à une org après le
+  premier transfert doit recevoir sa copie, ce n'est pas un doublon.
+
+Le geste manuel `reportInbox.storeAnyway` rejoue la brique 5 avec `force:
+true` — sans ça le même doute renverrait la ligne dans la file en boucle.
+
+Seuils calibrés sur deux cas réels seulement : `scripts/report-duplicates-audit.mjs`
+rejoue le détecteur sur tout l'historique et compte ce qu'il **aurait** fait.
+À relancer avant de bouger un seuil. Couvert par `tests/reportDuplicate.test.ts`
+(comparateur) et `convex/regression.reportDuplicate.test.ts` (pipeline).
+
 ## Une société n'est pas toujours une seule histoire (reports par opération)
 
 Découvert en traitant ALB-237, **non résolu** — la décision produit a été de

@@ -29,7 +29,8 @@
     "identify_error": "Identification error",
     "no_content": "No usable content",
     "analyze_error": "Analysis error",
-    "manual_reject": "Manually rejected"
+    "manual_reject": "Manually rejected",
+    "possible_duplicate": "Possible duplicate"
   },
   "actions": {
     "assign": "Assign",
@@ -39,7 +40,8 @@
     "detach": "Detach this report from {{name}}",
     "deleteReport": "Delete this report and its files from {{name}}",
     "deleteEmail": "Delete",
-    "deleteEmailBlocked": "Detach this report from the participations first"
+    "deleteEmailBlocked": "Detach this report from the participations first",
+    "storeAnyway": "File anyway"
   },
   "assignDialog": {
     "title": "Assign to a company",
@@ -61,7 +63,8 @@
     "error": "Action failed — try again",
     "detached": "Report detached from the participation",
     "deleted": "Report deleted, files included",
-    "emailDeleted": "Email permanently deleted"
+    "emailDeleted": "Email permanently deleted",
+    "storedAnyway": "Report filed"
   },
   "related": {
     "hint": "A company on the same domain exists in {{orgs}}, where this report is not attached — open “Attach as well” to add it."

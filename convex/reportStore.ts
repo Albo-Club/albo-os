@@ -21,9 +21,11 @@ import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { internalAction, internalMutation, internalQuery } from './_generated/server'
 import { getModel } from './agent'
+import { duplicateHint } from './emailTemplates'
 import { catalogPromptList, sanitizeKpiTargets, targetsPromptList, toCanonical } from './lib/metricCatalog'
 import { ModelOutputError, isTransientModelError } from './lib/modelRetry'
 import { analysisSchema, parseLenient } from './lib/reportAnalysis'
+import { findDuplicate } from './lib/reportDuplicate'
 import { normalizePeriodDisplay, parsePeriod } from './lib/reportPeriod'
 import { recordReportOnCompany } from './lib/reportFreshness'
 import type { Analysis } from './lib/reportAnalysis'
@@ -220,11 +222,91 @@ function reportContentChanged(
   )
 }
 
+/** How many of the entity's latest reports the detector compares against. */
+const TWIN_CANDIDATES = 15
+
+/**
+ * The report this document may already be filed as, on this entity.
+ *
+ * The (company, period) key below cannot answer that question: the period is
+ * read by the MODEL, and two readings of one document can disagree — that is
+ * exactly how the same WARO update was filed twice (09/2026). So the twin is
+ * looked for in the entity's neighbourhood, on what the document SAYS
+ * (`lib/reportDuplicate`), whatever period each reading landed on.
+ *
+ * The rows carry `rawContent`, which the CLAUDE.md anti-pattern keeps out of
+ * LIST queries. Here the text IS what is being read, the set is capped, and
+ * this runs once per incoming mail — not on every render.
+ */
+export const findTwin = internalQuery({
+  args: {
+    companyId: v.id('companies'),
+    title: v.string(),
+    subject: v.string(),
+    receivedAt: v.number(),
+    rawContent: v.optional(v.string()),
+    metrics: v.any(),
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    kind: 'new' | 'duplicate' | 'doubt'
+    reportId?: Id<'companyReports'>
+    reason?: string
+    sameSource?: boolean
+    title?: string
+    emailDate?: number
+  }> => {
+    const rows = await ctx.db
+      .query('companyReports')
+      .withIndex('by_company_received', (q) => q.eq('companyId', args.companyId))
+      .order('desc')
+      .take(TWIN_CANDIDATES)
+    const verdict = findDuplicate(
+      {
+        title: args.title,
+        subject: args.subject,
+        receivedAt: args.receivedAt,
+        rawContent: args.rawContent,
+        metrics: args.metrics,
+      },
+      rows.map((r) => ({
+        reportId: r._id,
+        title: r.title,
+        subject: r.subject,
+        emailDate: r.emailDate,
+        reportPeriod: r.reportPeriod,
+        rawContent: r.rawContent,
+        metrics: r.metrics,
+      })),
+    )
+    if (verdict.kind === 'new') return { kind: 'new' }
+    const twin = rows.find((r) => r._id === verdict.reportId)
+    return {
+      kind: verdict.kind,
+      reportId: verdict.reportId as Id<'companyReports'>,
+      reason: verdict.reason,
+      sameSource: verdict.sameSource,
+      title: twin?.title,
+      emailDate: twin?.emailDate,
+    }
+  },
+})
+
 export const storeForCompany = internalMutation({
   args: {
     companyId: v.id('companies'),
     orgId: v.id('organizations'),
     inboundEmailId: v.id('inboundEmails'),
+    /**
+     * The row this document is already filed as on this entity, when the
+     * detector recognised it. It replaces the (company, period) lookup: the
+     * two readings may disagree on the period, and the document is one.
+     */
+    mergeIntoReportId: v.optional(v.id('companyReports')),
+    /** Detector's verdict: the source text did not move, so nothing is news. */
+    sameSource: v.optional(v.boolean()),
     title: v.string(),
     headline: v.string(),
     keyHighlights: v.array(v.string()),
@@ -292,7 +374,14 @@ export const storeForCompany = internalMutation({
     // keying every one of them on the same empty slot would make each new
     // one overwrite the previous. They are identified by the document
     // itself instead — cf. `isSameDocument`.
-    const existing = args.reportPeriod
+    //
+    // A twin recognised by the detector (`findTwin`) short-circuits both: the
+    // document is already on file, under whichever period the first reading
+    // gave it.
+    const merged = args.mergeIntoReportId
+      ? await ctx.db.get('companyReports', args.mergeIntoReportId)
+      : null
+    const existing = merged ?? (args.reportPeriod
       ? await ctx.db
           .query('companyReports')
           .withIndex('by_company_period', (q) =>
@@ -312,7 +401,16 @@ export const storeForCompany = internalMutation({
             title: args.title,
             receivedAt: email.receivedAt,
           }),
-        ) ?? null)
+        ) ?? null))
+
+    // Merging keeps the BEST reading of the period: two readings of one
+    // document can disagree, and one of them saw a period the other missed.
+    // A reading that found none never erases one that did.
+    if (merged && !args.reportPeriod && merged.reportPeriod) {
+      reportFields.reportPeriod = merged.reportPeriod
+      reportFields.periodSortDate = merged.periodSortDate
+      reportFields.reportType = merged.reportType
+    }
 
     // A PORTAL publication takes a free slot, never an occupied one. Storage
     // updates in place, which is right for a corrected re-send and destructive
@@ -331,7 +429,10 @@ export const storeForCompany = internalMutation({
     let reportId: Id<'companyReports'>
     let changed = false
     if (existing) {
-      changed = reportContentChanged(existing, reportFields)
+      // A twin whose SOURCE text did not move brings nothing, however the
+      // model worded this second reading: re-running the extraction on the
+      // same document is not a correction, and must not be announced as one.
+      changed = args.sameSource ? false : reportContentChanged(existing, reportFields)
       await ctx.db.patch('companyReports', existing._id, reportFields)
       reportId = existing._id
       // Replace the document rows for this report. Storage blobs are NOT
@@ -544,8 +645,16 @@ ${text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}\n[...tronqué]` : text}`
 }
 
 export const run = internalAction({
-  args: { inboundEmailId: v.id('inboundEmails') },
-  handler: async (ctx, { inboundEmailId }) => {
+  args: {
+    inboundEmailId: v.id('inboundEmails'),
+    /**
+     * A human overruled the duplicate flag from the queue («Ranger quand
+     * même»): file it without asking the detector again, otherwise the row
+     * would come straight back to them.
+     */
+    force: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { inboundEmailId, force }) => {
     const claimed: boolean = await ctx.runMutation(internal.reportStore.markStoring, {
       inboundEmailId,
     })
@@ -652,13 +761,61 @@ export const run = internalAction({
       })
     }
 
+    // Is this document already on file? Asked HERE, per entity, and not left
+    // to the (company, period) key of `storeForCompany`: that key is read by
+    // the model, and two readings of one document can disagree — which is how
+    // the same WARO update was filed twice in three minutes (09/2026).
+    //
+    // Three outcomes. A certainty is merged in place, in silence. A DOUBT
+    // files nothing at all: the mail goes to the review queue and a human
+    // decides, because filing a second fiche and losing a real report are
+    // both worse than one click. Anything else is a new report.
+    type Twin = {
+      kind: 'new' | 'duplicate' | 'doubt'
+      reportId?: Id<'companyReports'>
+      reason?: string
+      sameSource?: boolean
+      title?: string
+      emailDate?: number
+    }
+    const twins: Array<Twin> = force
+      ? matched.map(() => ({ kind: 'new' as const }))
+      : await Promise.all(
+          matched.map((m) =>
+            ctx.runQuery(internal.reportStore.findTwin, {
+              companyId: m.companyId,
+              title: analysis.title,
+              subject: row.subject,
+              receivedAt: row.receivedAt,
+              rawContent: row.extractedText,
+              metrics: flat,
+            }),
+          ),
+        )
+    const doubt = twins.find((t) => t.kind === 'doubt')
+    if (doubt) {
+      await ctx.runMutation(internal.reportIdentify.setReview, {
+        inboundEmailId,
+        statusReason: 'possible_duplicate',
+        // Re-passed, not dropped: the patch would otherwise clear it, and it
+        // is what names the real author once the row is filed by hand.
+        realSenderEmail: row.realSenderEmail,
+        error: duplicateHint({ title: doubt.title, emailDate: doubt.emailDate }),
+      })
+      console.log(
+        `[reportStore] ${row.agentmailMessageId}: possible duplicate of ${doubt.reportId} (${doubt.reason}) → review queue`,
+      )
+      return null
+    }
+
     // Fan-out storage: one report per matched entity, in its org.
     const reportIds: Array<Id<'companyReports'>> = []
     // News = a report filed for the first time, OR one whose content was
     // actually corrected by this re-send. Both deserve the synthesis and the
     // confirmation; a byte-identical re-forward deserves neither.
     let anyNews = false
-    for (const m of matched) {
+    for (const [i, m] of matched.entries()) {
+      const twin = twins[i]
       const stored: {
         reportId: Id<'companyReports'>
         created: boolean
@@ -669,6 +826,11 @@ export const run = internalAction({
           companyId: m.companyId,
           orgId: m.orgId,
           inboundEmailId,
+          // An entity that does NOT already carry this document still gets its
+          // copy: a participation added to a new org after the first forward
+          // is not a duplicate, it is a first filing.
+          mergeIntoReportId: twin.kind === 'duplicate' ? twin.reportId : undefined,
+          sameSource: twin.kind === 'duplicate' ? twin.sameSource : undefined,
           title: analysis.title,
           headline: analysis.headline,
           keyHighlights: analysis.key_highlights,

@@ -1301,6 +1301,10 @@ export default defineSchema({
     alboReportId: v.optional(v.string()),
   })
     .index('by_company', ['companyId', 'periodSortDate'])
+    // Ordered by RECEPTION, not by period: the duplicate detector
+    // (`reportStore.findTwin`) looks for the document that just came in a
+    // second time, and a report can cover an old period while arriving today.
+    .index('by_company_received', ['companyId', 'emailDate'])
     .index('by_org', ['orgId'])
     .index('by_message_id', ['agentmailMessageId'])
     .index('by_company_period', ['companyId', 'reportPeriod'])
