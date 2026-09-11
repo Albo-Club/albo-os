@@ -23,6 +23,62 @@ bas de page.
 
 ---
 
+## v1.225.0 — 11/09/2026 à 14:35 — La liste des comptes dit enfin quelle banque
+
+La carte **« Comptes »** de la Trésorerie affichait le libellé venu de la
+banque ou d'Airtable en gros, et le nom de la banque en petit gris en
+dessous, suivi du nom de la société — répété sur chaque ligne alors qu'on est
+déjà dans l'espace de cette société. Résultat : un compte s'appelait
+« CALTE », un autre « Qonto — Good », et on ne voyait pas où était l'argent.
+
+**Chaque ligne commence maintenant par la banque.** Nom de la banque en
+titre, avec son logo. Le libellé d'origine ne sert plus de titre : il reste
+consultable sur la page du compte.
+
+**En dessous, une description que vous écrivez.** « Compte courant 1 »,
+« Compte courant 2 » pour distinguer deux comptes de la même banque,
+« Spiko » ou « Compte-titres » pour nommer un support. Elle se saisit sur la
+page du compte, bouton « Modifier ». Tant qu'elle est vide, la ligne
+n'affiche que la banque — rien d'illisible à la place.
+
+**Le nom de la société disparaît quand il ne dit rien.** L'entité titulaire
+n'est rappelée que lorsque le compte appartient à une autre société que celle
+de l'espace ouvert.
+
+**L'IBAN se lit et se copie.** Sur la page d'un compte, il s'affiche espacé
+par groupes de quatre, avec un bouton pour le copier d'un clic — prêt à
+coller dans un virement ou un mail.
+
+**Et les banques sans logo ne se ressemblent plus** : à défaut de logo, la
+tuile porte l'initiale de la banque au lieu d'une icône identique pour
+toutes.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/cash/CashAccounts.tsx` : la ligne prend `bankName` comme
+>   titre (`font-semibold`) ; le sous-titre passe par le nouvel
+>   `accountSubtitle()` = `displayName` + entité titulaire **seulement si**
+>   `owner.kind !== 'group_root'`, joints par ` · `, et la ligne est omise si
+>   tout est vide. `label` n'est plus lu à l'affichage de la liste.
+> - Aucun changement de schéma ni de query : `listAccounts` renvoyait déjà
+>   `owner.kind`. `displayName` est **recyclé** en « description » (libellés
+>   i18n `cash:edit.description*`, anciens `cash:rename.name*` retirés) —
+>   `label` reste le libellé d'origine, jamais écrasé.
+> - `src/components/CompanyLogo.tsx` : prop `fallback` (`'icon' | 'monogram'`,
+>   défaut `'icon'`, donc aucune surface existante ne bouge) ; la carte
+>   Comptes passe `monogram`. Le cas Natixis est un domaine correct
+>   (`natixis.com`) sans logo servi par logo.dev — cf. `KNOWN_ISSUES.md`
+>   § « Logos d'entreprises », point 3.
+> - `src/routes/app/$orgSlug/cash.$accountId.tsx` : titre `banque ·
+>   description` (banque seule sans description), libellé d'origine rappelé
+>   dès qu'il diffère du nom de la banque, et cellule IBAN extraite en
+>   `IbanValue` (groupes de 4 via `groupFours`, copie de la forme compacte,
+>   icône `Check` pendant 2 s — patron du bouton copier de la page
+>   Intégrations).
+> - Hors périmètre, volontairement : `/placements` (section « Comptes
+>   nantis ») et les sélecteurs de compte (registre, prêts, passif) gardent
+>   `displayName ?? label`, qui reste le bon repli dans une liste déroulante.
+
 ## v1.224.0 — 11/09/2026 à 13:11 — La page Intégrations se lit d'un coup d'œil
 
 Quatre changements sur **Réglages → Intégrations**.
