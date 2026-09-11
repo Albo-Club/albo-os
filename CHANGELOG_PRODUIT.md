@@ -23,6 +23,47 @@ bas de page.
 
 ---
 
+## v1.225.0 — 11/09/2026 à 14:31 — Supprimer une connexion bancaire, et voir d'où vient quoi
+
+Trois choses sur **Réglages → Intégrations**.
+
+**Supprimer une connexion bancaire** se fait enfin depuis la page (corbeille,
+admin). Elle est supprimée chez Powens et disparaît de la liste ; comptes et
+transactions ne bougent pas. Le cas visé est le reliquat d'une reconnexion
+ratée — cette deuxième ligne au nom identique qui traîne sans rien alimenter.
+Une connexion qui alimente encore des comptes reste protégée : le dialogue
+dit combien de comptes en dépendent, à reconnecter ailleurs ou à archiver
+depuis la Trésorerie d'abord.
+
+**On voit par où passe chaque connexion.** Les banques sont décalées sous
+Powens et les portails sous VASCO, rattachés par un filet. Avant, tout
+s'alignait à la même hauteur et il fallait deviner.
+
+**Chaque portail a son logo.** Parallel et Teampact ne se ressemblaient pas
+seulement : ils portaient le même. Un portail encore inconnu garde le logo
+VASCO, ce qui reste juste.
+
+> **🔧 Notes techniques**
+>
+> - `powens.deleteConnection` existait déjà (suppression côté Powens puis de
+>   la ligne `powensConnections`, admin, refus `connection_in_use` tant que
+>   des comptes vivants en dépendent) mais n'était exposée que sur la
+>   Trésorerie et pour les seules connexions « obsolètes ». Elle est câblée
+>   ici telle quelle — aucune règle relâchée.
+> - `listIntegrations` remonte `accountCount` par connexion `webview` (le
+>   `filter` remplace le `some` qui servait déjà à dériver l'état
+>   `inactive`) : le dialogue annonce le blocage **avant** le clic plutôt que
+>   de le découvrir sur une erreur serveur.
+> - Logo d'une connexion résolu du plus spécifique au plus général par
+>   `connectionDomain()` : fournisseur atteint (`bankDomain` sur le
+>   `connectorName` Powens, `PORTAL_DOMAINS` sur le `clientSlug` VASCO) →
+>   plateforme (`PLATFORM_DOMAINS`) → icône générique de `CompanyLogo`. Les
+>   deux tables sont typées `Record<string, string | undefined>` : l'accès
+>   par clé inconnue doit rendre `undefined`, sinon le `??` ment (et
+>   `no-unnecessary-condition` le signale).
+> - Les connexions passent dans un bloc `border-l` indenté, rendu seulement
+>   s'il y en a (sinon une plateforme « Disponible » gagnerait un filet vide).
+
 ## v1.224.1 — 11/09/2026 à 14:14 — L'intégration s'appelle VASCO
 
 « Parallel / VASCO » devient simplement **VASCO**. VASCO est la plateforme

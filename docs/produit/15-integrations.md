@@ -12,8 +12,11 @@ toutes seules en coulisses (lecture d'une page Notion ou d'un deck DocSend
 cité dans un investor update) n'y figurent pas — il n'y a rien à y brancher
 ni à y débrancher.
 
-Chaque plateforme et chaque connexion porte son **logo**, et chaque connexion
-sa pastille d'état (connectée / en retard / à reconnecter / en erreur) suivie
+Chaque plateforme porte son **logo**, et ses connexions sont **décalées
+dessous**, rattachées par un filet : on voit d'un coup d'œil que ces banques
+arrivent par Powens, et ces portails par VASCO. Chaque connexion porte elle
+aussi son logo — celui de la banque, celui du portail (Parallel, Teampact…) —
+et sa pastille d'état (connectée / en retard / à reconnecter / en erreur) suivie
 de sa dernière synchronisation **réussie** (une connexion en erreur garde la
 date de son dernier succès — ou « Jamais synchronisée »). Une connexion en
 erreur affiche aussi le message d'erreur sous sa ligne, pour comprendre d'un
@@ -42,8 +45,15 @@ besoin.
   formulaire s'ouvre pré-rempli (nom, portail), les identifiants sont à
   ressaisir, et une synchronisation est relancée aussitôt pour vérifier que
   la connexion refonctionne — inutile de déconnecter puis reconnecter ;
-- « Déconnecter » (avec confirmation) oublie les identifiants ; les données
-  déjà importées restent en place.
+- « Déconnecter » un portail (avec confirmation) oublie les identifiants ;
+  les données déjà importées restent en place ;
+- **supprimer une connexion bancaire** (corbeille, avec confirmation) la
+  supprime chez Powens et la fait disparaître de la liste — comptes et
+  transactions intacts. Le cas visé est le reliquat d'une reconnexion ratée,
+  qui traîne sans rien alimenter. Une connexion qui alimente encore des
+  comptes n'est pas supprimable : le dialogue dit combien de comptes en
+  dépendent, à reconnecter ailleurs ou à archiver depuis la Trésorerie
+  d'abord.
 
 Toute nouvelle plateforme à connecter déclarée au registre apparaîtra
 automatiquement dans cette liste, formulaire de connexion compris.
