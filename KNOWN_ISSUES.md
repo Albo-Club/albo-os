@@ -1767,14 +1767,39 @@ rangement (le schéma Convex les déclarait déjà `v.optional`). Le piège est
 ce qui suit : avec `reportPeriod` absent, `q.eq('reportPeriod', undefined)`
 matche **tous** les reports sans période de la société. Un `.first()` naïf
 ferait écraser chaque courrier ponctuel par le suivant — perte de données
-silencieuse, sans aucune erreur. Un document sans période est donc identifié
-par son **message d'origine** (`subject` + `emailDate`, portés aussi bien par
-un mail que par un dépôt manuel), pas par le créneau vide.
+silencieuse, sans aucune erreur. Un document sans période doit donc être
+identifié à la main, ligne par ligne.
 
-Règle : **toute nouvelle clé de dédoublonnage sur un champ optionnel doit
-dire ce qui se passe quand le champ est absent.** `undefined` n'est pas
-« pas de clé », c'est **une** clé — partagée par toutes les lignes qui n'ont
-rien. Couvert par `convex/regression.reportStore.test.ts`.
+La première version l'identifiait par son **message d'origine** (`subject` +
+`emailDate`). Faux, et de façon instructive : `emailDate` est la date de
+**réception**, unique par transfert par construction. Cette clé ne pouvait
+donc matcher qu'un rejeu du **même** mail (« Retraiter »), jamais le même
+document arrivé deux fois — Clément et Benjamin transférant le même update
+QOMON à dix minutes d'écart (09/2026) ont produit deux lignes et deux mails
+d'annonce, alors que l'objet était identique au préfixe près.
+
+Ce qui identifie un document, c'est ce que le document **dit** :
+`isSameDocument` compare l'**objet** débarrassé de ses préfixes de transfert
+(`Fwd:`, `Tr :`, `Re:`) **et** le **titre** extrait du contenu — les deux,
+parce que chacun seul collisionne sur les courriers récurrents — dans une
+fenêtre de **30 jours**. La fenêtre est là pour la seule collision que la clé
+ne sait pas trancher : la « Convocation AG » qui revient douze mois plus tard
+et ne doit surtout pas écraser celle de l'an dernier. Une ligne sans
+`emailDate` (import legacy) n'est jamais un match : ranger deux fois se
+rattrape, écraser non.
+
+Deux règles à retenir :
+
+- **Toute nouvelle clé de dédoublonnage sur un champ optionnel doit dire ce
+  qui se passe quand le champ est absent.** `undefined` n'est pas « pas de
+  clé », c'est **une** clé — partagée par toutes les lignes qui n'ont rien.
+- **Une clé de dédoublonnage ne se pose jamais sur un attribut de la
+  livraison** (date de réception, identifiant de message, expéditeur) quand
+  la question est « est-ce le même document ? ». Ces attributs sont uniques
+  par acheminement : la clé compile, passe les tests de rejeu, et ne
+  dédoublonne rien en production.
+
+Couvert par `convex/regression.reportStore.test.ts`.
 
 Corollaire d'affichage : `periodSortDate` retombe sur la date de réception
 quand il n'y a pas de période, sinon le courrier n'aurait aucun ancrage dans

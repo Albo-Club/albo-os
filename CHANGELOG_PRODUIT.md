@@ -23,6 +23,41 @@ bas de page.
 
 ---
 
+## v1.221.2 — 11/09/2026 à 10:03 — Un même document transféré par deux personnes ne crée plus deux reports
+
+Quand Benjamin et Clément transféraient tous les deux le même update d'une
+participation, Albo OS le rangeait deux fois : deux lignes sur la fiche, deux
+e-mails d'annonce. Le rapprochement se faisait sur l'heure de réception du
+mail, qui est forcément différente d'un transfert à l'autre — il ne pouvait
+donc reconnaître qu'un même mail retraité, jamais un même document reçu deux
+fois.
+
+Un document est désormais reconnu à ce qu'il est : son objet, une fois les
+« Fwd : » et « Tr : » retirés, et le titre lu dans son contenu. Le second
+transfert vient compléter le report déjà rangé au lieu d'en créer un nouveau.
+Deux courriers différents reçus la même semaine restent bien deux reports, et
+un courrier qui revient un an plus tard (une convocation d'assemblée, par
+exemple) reste un nouveau document — il n'écrase pas celui de l'an dernier.
+
+> **🔧 Notes techniques**
+>
+> - `convex/reportStore.ts` : la branche « sans période » de la dedup de
+>   `storeForCompany` ne se fait plus sur `subject + emailDate` (la livraison)
+>   mais sur le document, via `isSameDocument` — objet normalisé
+>   (`FORWARD_PREFIXES` + `squash`) ET titre, dans une fenêtre
+>   `RESEND_WINDOW_MS` de 30 jours. La fenêtre borne la seule collision que la
+>   clé ne sait pas trancher : le courrier récurrent au même objet et au même
+>   titre. Une ligne sans `emailDate` (import legacy) n'est jamais un match —
+>   ranger deux fois se rattrape, écraser non.
+> - La dedup `(société, période)` des reports périodiques est inchangée.
+> - `convex/regression.reportStore.test.ts` : trois cas ajoutés — deux
+>   transferts du même document à dix minutes d'écart → une ligne ; même objet
+>   un an plus tard → deux lignes ; même fil, deux titres → deux lignes.
+> - `KNOWN_ISSUES.md` § « Report sans période » mis à jour (la clé décrite
+>   était devenue fausse).
+
+---
+
 ## v1.221.1 — 10/09/2026 à 09:40 — L'audit du stockage sait maintenant reconnaître deux fichiers identiques
 
 L'outil interne qui pèse les fichiers stockés se contentait de dire combien
