@@ -1469,11 +1469,54 @@ export const storeCommunicationDocument = internalAction({
 })
 
 /**
+ * How long a proxied copy stays around before being discarded. The browser
+ * opens the URL immediately, so this only has to outlive the download itself
+ * — an hour is generous even for a 15 MB scan on a bad connection.
+ */
+const PROXY_BLOB_TTL_MS = 60 * 60 * 1000
+
+/**
+ * Throw away a blob served by the download proxy below.
+ *
+ * Refuses if a `documents` row has meanwhile claimed it, which is the only
+ * way this blob could have acquired a holder: its id is created inside the
+ * proxy action and returned to nobody, so no mail, avatar or logo can point
+ * at it (cf. KNOWN_ISSUES.md « Aucune ligne `documents` ne veut pas dire
+ * fichier orphelin » — a blanket purge does owe the full five-table check,
+ * this one does not).
+ */
+export const discardProxyBlob = internalMutation({
+  args: { storageId: v.id('_storage') },
+  handler: async (ctx, { storageId }) => {
+    const claimed = await ctx.db
+      .query('documents')
+      .withIndex('by_storage', (q) => q.eq('storageId', storageId))
+      .first()
+    if (claimed) return null
+    // The blob may already be gone — a document created on it and removed
+    // again takes it along (`releaseStorage`), and this fires an hour later.
+    // `storage.delete` throws on a missing blob, which would surface as a
+    // failed scheduled function for a job that has nothing left to do.
+    const still = await ctx.db.system.get('_storage', storageId)
+    if (!still) return null
+    await ctx.storage.delete(storageId)
+    return null
+  },
+})
+
+/**
  * Download proxy for a communication's attached document. The VASCO
  * `downloadUrl` is an authenticated endpoint (not a public signed URL), so the
  * browser can't fetch it directly: this logs in, fetches the bytes with the
  * bearer token, stores them in Convex storage, and returns a short-lived URL
  * the browser can open. Org-member-guarded.
+ *
+ * That copy is a COURIER, not an archive: nothing references it, and until
+ * 09/2026 nothing deleted it either — so every click on « ouvrir le document »
+ * left a permanent duplicate of a file the base usually already had. That one
+ * leak accounted for 86 % of the wasted bytes measured by ALB-234 (501 MB,
+ * 28 % of file storage, growing ~45 blobs a day). Hence the scheduled
+ * discard: the copy lives exactly as long as the download needs it.
  */
 export const downloadCommunicationDocument = action({
   args: {
@@ -1500,6 +1543,13 @@ export const downloadCommunicationDocument = action({
         const blob = await res.blob()
         const storageId = await ctx.storage.store(blob)
         const url = await ctx.storage.getUrl(storageId)
+        // Scheduled whether or not the URL came back: a blob we cannot serve
+        // is exactly the one nobody will ever come back for.
+        await ctx.scheduler.runAfter(
+          PROXY_BLOB_TTL_MS,
+          internal.vasco.discardProxyBlob,
+          { storageId },
+        )
         if (!url) {
           lastError = 'storage_url_null'
           continue
