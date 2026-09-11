@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.222.0 — 11/09/2026 à 11:16 — Connecter une nouvelle banque, avec son historique
+## v1.223.0 — 11/09/2026 à 11:16 — Connecter une nouvelle banque, avec son historique
 
 Jusqu'ici, seules cinq banques étaient reconnues. En connecter une autre
 échouait en silence : rien n'apparaissait à l'écran, et la seule trace était
@@ -70,6 +70,168 @@ en double.
 >   portant une tx `imported` → même tx filtrée par le cutover.
 > - Docs : `KNOWN_ISSUES.md` (mapping, cutover, rattrapage),
 >   `docs/produit/07-tresorerie.md`.
+
+## v1.222.0 — 11/09/2026 à 10:38 — Le journal d'une société se lit enfin dans l'ordre des périodes
+
+Dans « Rapports & communications », un rapport annuel se rangeait sous les
+douze mensuels de l'année qu'il résume : le classement retenait le **début**
+de la période couverte, donc « 2025 » tombait en janvier 2025. C'est
+maintenant la **fin** de la période qui classe, et à période égale la plus
+large passe devant — un rapport annuel « 2025 » s'affiche au-dessus de
+« Décembre 2025 », un trimestre au-dessus de son dernier mois. Les deux dates
+restent à l'écran : la période en titre de ligne, la date de réception en
+dessous.
+
+Les communications publiées sur un portail d'émetteur suivent la même règle :
+la période couverte d'abord, la date de publication seulement quand la
+communication n'annonce aucune période.
+
+Le journal ne déroule plus tout d'un bloc : il montre les **5 dernières
+lignes**, « Voir plus » déplie le reste, « Voir moins » le replie.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/reportPeriod.ts` : nouvelle fonction pure `periodRank(display)`
+>   → `{ endMs, span }`. Le fil trie sur `endMs` décroissant, `span`
+>   décroissant (la période la plus large d'abord à fin égale), puis la date
+>   de réception. Couverte par `tests/reportPeriod.test.ts`.
+> - `CompanyReportsSection.tsx` : `Entry.sortDate` remplacé par un `rank`
+>   (`endMs` / `span` / `receivedAt`) + comparateur `byRank`. Les
+>   communications VASCO passent de `publishDate ?? period` à `period ??
+>   publishDate`. Repli à `COLLAPSED_COUNT = 5` avec bouton
+>   `timeline.showMore` / `timeline.showLess` (i18n FR/EN).
+> - `companyReports.listByCompany` ne renvoie plus `periodSortDate`, devenu
+>   sans lecteur côté front. Le champ reste en base (début de période) : il
+>   porte l'index `by_company` et la fraîcheur des reports
+>   (`lib/reportFreshness.ts`) — aucun changement de schéma, aucune migration.
+> - Le pourquoi du « tri sur la fin » est consigné dans `KNOWN_ISSUES.md`
+>   § « Une période est un intervalle ».
+
+---
+
+## v1.221.4 — 11/09/2026 à 11:01 — Ouvrir un document Parallel n'en laisse plus une copie derrière soi
+
+Les documents du portail Parallel ne sont pas accessibles directement : pour
+vous en ouvrir un, l'app va chercher le fichier et le dépose au passage dans
+son propre stockage, le temps de vous le servir.
+
+Sauf que cette copie de passage n'était jamais effacée. Chaque clic sur
+« ouvrir le document » laissait donc un exemplaire de plus, définitivement —
+un même document ouvert sept fois, sept copies. C'était devenu la première
+cause d'encombrement du stockage : **501 Mo, 28 % du total**, et ça grossissait
+d'une quarantaine de fichiers par jour.
+
+La copie de service est désormais effacée automatiquement une heure après
+avoir été servie. Vous ne verrez aucune différence : le téléchargement
+fonctionne exactement pareil.
+
+Deux précautions au passage. Si entre-temps ce fichier est devenu un vrai
+document rattaché à une fiche, il n'est pas touché. Et s'il a déjà disparu par
+ailleurs, l'effacement ne proteste pas.
+
+Le ménage des copies déjà accumulées reste à faire : il viendra séparément,
+maintenant que la source est tarie.
+
+> **🔧 Notes techniques**
+>
+> - `convex/vasco.ts` : `downloadCommunicationDocument` programme désormais un
+>   `scheduler.runAfter(PROXY_BLOB_TTL_MS = 1 h, internal.vasco.discardProxyBlob)`
+>   juste après le `storage.store`. Une heure couvre largement le
+>   `window.open` côté client, même pour un scan de 15 Mo.
+> - `discardProxyBlob` (nouvelle `internalMutation`) refuse de supprimer si une
+>   ligne `documents` a réclamé le blob entre-temps, et sort sans rien faire
+>   s'il a déjà disparu — `ctx.storage.delete` **lève** sur un blob absent, ce
+>   qui ferait échouer une tâche planifiée qui n'a plus rien à faire. Ce défaut
+>   a été trouvé par le test, pas à la relecture.
+> - Le contrôle se limite à `documents`, délibérément : l'id du blob naît dans
+>   l'action et n'est rendu à personne, donc aucun mail, avatar ni logo ne peut
+>   le désigner. Une purge en masse, elle, doit faire le tour des cinq
+>   porteurs.
+> - `convex/regression.vascoProxyBlob.test.ts` : 3 tests — jette une copie non
+>   réclamée, épargne une copie devenue document, ne casse pas en étant rejouée.
+> - `KNOWN_ISSUES.md` + `CLAUDE.md` : le motif généralisé — stocker *pour
+>   servir* plutôt que *pour garder* crée une file sans consommateur, et la
+>   durée de vie se décide au moment de l'écriture.
+
+## v1.221.3 — 11/09/2026 à 10:33 — L'audit du stockage dit enfin qui se sert de chaque fichier
+
+L'audit savait repérer deux fichiers rigoureusement identiques, mais pas dire
+lesquels servent encore. Il ne regardait qu'un seul endroit — les documents
+rattachés aux fiches — alors qu'un fichier peut aussi être retenu par un mail
+reçu, par un avatar, par un logo, ou par une ancienne fonctionnalité de
+timeline email qui a été retirée sans que ses pièces jointes soient effacées.
+
+Résultat : un fichier parfaitement utilisé pouvait apparaître comme n'ayant
+aucun propriétaire. Le rapport répartit désormais tout le stockage entre ces
+cinq usages, et isole la seule catégorie réellement libre de suppression :
+celle que plus rien ne référence.
+
+Il dit aussi **quand** les copies en trop ont été créées, mois par mois. C'est
+ce qui permettra de vérifier que le problème est bien derrière nous plutôt que
+de le supposer.
+
+Toujours en lecture seule : rien n'est supprimé, rien n'est modifié.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/storageAudit.ts` : nouvelle `internalQuery`
+>   `scanHolders`, une branche par table porteuse (`documents`,
+>   `inboundEmails`, `companyEmails`, `users`, `organizations`, plus
+>   `documentTexts` à part). Elle balaie une table par appel pour que le script
+>   construise l'index inverse blob → porteurs en une passe par table, au lieu
+>   d'une requête par blob.
+> - `scripts/lib/storage-holders.mjs` (nouveau, pur) : `classify`, `tally`,
+>   `extraCopies`. `documentTexts` n'est **pas** un porteur — c'est le texte
+>   extrait DU blob, donc jamais une raison de le garder. `extraCopies`
+>   conserve la copie la mieux référencée, pas la plus ancienne : garder un
+>   orphelin en supprimant celle qu'une fiche affiche serait l'inverse du but.
+> - `tests/storageHolders.test.ts` : 13 tests, orientés sur les erreurs qui
+>   coûteraient de la donnée (une pièce jointe de mail prise pour un orphelin,
+>   une table inconnue qui surclasse un vrai porteur, un groupe entièrement
+>   orphelin qui perdrait sa dernière copie).
+> - `KNOWN_ISSUES.md` : nouvelle section. Elle consigne surtout que
+>   `releaseStorage` (`convex/lib/documentBlobs.ts`) ne compte que `documents`
+>   plus le mail qu'on lui passe — inoffensif aujourd'hui, mais une purge en
+>   masse ne doit pas s'appuyer dessus.
+> - Le balayage lit des lignes entières de deux tables lourdes, ce que
+>   l'anti-pattern CLAUDE.md interdit — pour une requête de LISTE que l'app
+>   rejoue sans arrêt. Ici c'est un audit manuel one-shot, et une recherche
+>   blob par blob lirait les mêmes lignes.
+
+## v1.221.2 — 11/09/2026 à 10:03 — Un même document transféré par deux personnes ne crée plus deux reports
+
+Quand Benjamin et Clément transféraient tous les deux le même update d'une
+participation, Albo OS le rangeait deux fois : deux lignes sur la fiche, deux
+e-mails d'annonce. Le rapprochement se faisait sur l'heure de réception du
+mail, qui est forcément différente d'un transfert à l'autre — il ne pouvait
+donc reconnaître qu'un même mail retraité, jamais un même document reçu deux
+fois.
+
+Un document est désormais reconnu à ce qu'il est : son objet, une fois les
+« Fwd : » et « Tr : » retirés, et le titre lu dans son contenu. Le second
+transfert vient compléter le report déjà rangé au lieu d'en créer un nouveau.
+Deux courriers différents reçus la même semaine restent bien deux reports, et
+un courrier qui revient un an plus tard (une convocation d'assemblée, par
+exemple) reste un nouveau document — il n'écrase pas celui de l'an dernier.
+
+> **🔧 Notes techniques**
+>
+> - `convex/reportStore.ts` : la branche « sans période » de la dedup de
+>   `storeForCompany` ne se fait plus sur `subject + emailDate` (la livraison)
+>   mais sur le document, via `isSameDocument` — objet normalisé
+>   (`FORWARD_PREFIXES` + `squash`) ET titre, dans une fenêtre
+>   `RESEND_WINDOW_MS` de 30 jours. La fenêtre borne la seule collision que la
+>   clé ne sait pas trancher : le courrier récurrent au même objet et au même
+>   titre. Une ligne sans `emailDate` (import legacy) n'est jamais un match —
+>   ranger deux fois se rattrape, écraser non.
+> - La dedup `(société, période)` des reports périodiques est inchangée.
+> - `convex/regression.reportStore.test.ts` : trois cas ajoutés — deux
+>   transferts du même document à dix minutes d'écart → une ligne ; même objet
+>   un an plus tard → deux lignes ; même fil, deux titres → deux lignes.
+> - `KNOWN_ISSUES.md` § « Report sans période » mis à jour (la clé décrite
+>   était devenue fausse).
+
+---
 
 ## v1.221.1 — 10/09/2026 à 09:40 — L'audit du stockage sait maintenant reconnaître deux fichiers identiques
 

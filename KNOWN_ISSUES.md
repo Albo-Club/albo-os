@@ -1767,14 +1767,39 @@ rangement (le schéma Convex les déclarait déjà `v.optional`). Le piège est
 ce qui suit : avec `reportPeriod` absent, `q.eq('reportPeriod', undefined)`
 matche **tous** les reports sans période de la société. Un `.first()` naïf
 ferait écraser chaque courrier ponctuel par le suivant — perte de données
-silencieuse, sans aucune erreur. Un document sans période est donc identifié
-par son **message d'origine** (`subject` + `emailDate`, portés aussi bien par
-un mail que par un dépôt manuel), pas par le créneau vide.
+silencieuse, sans aucune erreur. Un document sans période doit donc être
+identifié à la main, ligne par ligne.
 
-Règle : **toute nouvelle clé de dédoublonnage sur un champ optionnel doit
-dire ce qui se passe quand le champ est absent.** `undefined` n'est pas
-« pas de clé », c'est **une** clé — partagée par toutes les lignes qui n'ont
-rien. Couvert par `convex/regression.reportStore.test.ts`.
+La première version l'identifiait par son **message d'origine** (`subject` +
+`emailDate`). Faux, et de façon instructive : `emailDate` est la date de
+**réception**, unique par transfert par construction. Cette clé ne pouvait
+donc matcher qu'un rejeu du **même** mail (« Retraiter »), jamais le même
+document arrivé deux fois — Clément et Benjamin transférant le même update
+QOMON à dix minutes d'écart (09/2026) ont produit deux lignes et deux mails
+d'annonce, alors que l'objet était identique au préfixe près.
+
+Ce qui identifie un document, c'est ce que le document **dit** :
+`isSameDocument` compare l'**objet** débarrassé de ses préfixes de transfert
+(`Fwd:`, `Tr :`, `Re:`) **et** le **titre** extrait du contenu — les deux,
+parce que chacun seul collisionne sur les courriers récurrents — dans une
+fenêtre de **30 jours**. La fenêtre est là pour la seule collision que la clé
+ne sait pas trancher : la « Convocation AG » qui revient douze mois plus tard
+et ne doit surtout pas écraser celle de l'an dernier. Une ligne sans
+`emailDate` (import legacy) n'est jamais un match : ranger deux fois se
+rattrape, écraser non.
+
+Deux règles à retenir :
+
+- **Toute nouvelle clé de dédoublonnage sur un champ optionnel doit dire ce
+  qui se passe quand le champ est absent.** `undefined` n'est pas « pas de
+  clé », c'est **une** clé — partagée par toutes les lignes qui n'ont rien.
+- **Une clé de dédoublonnage ne se pose jamais sur un attribut de la
+  livraison** (date de réception, identifiant de message, expéditeur) quand
+  la question est « est-ce le même document ? ». Ces attributs sont uniques
+  par acheminement : la clé compile, passe les tests de rejeu, et ne
+  dédoublonne rien en production.
+
+Couvert par `convex/regression.reportStore.test.ts`.
 
 Corollaire d'affichage : `periodSortDate` retombe sur la date de réception
 quand il n'y a pas de période, sinon le courrier n'aurait aucun ancrage dans
@@ -6337,3 +6362,119 @@ La sortie 2 est la seule disponible depuis un environnement sans identifiants
 Convex (session distante, CI). Elle a un effet de bord acceptable : le module
 n'apparaît pas dans `api.d.ts` tant que personne n'a relancé `convex dev`, ce
 qui produira un diff de deux lignes sans rapport au prochain `pnpm dev`.
+
+---
+
+## « Aucune ligne `documents` » ne veut pas dire « fichier orphelin »
+
+**Contexte** : ALB-234, audit du stockage. 32 % des octets stockés sont des
+doublons exacts (même `sha256`), et la première version de l'audit ne joignait
+les blobs qu'à `documents` — d'où une colonne « (aucune ligne documents) » très
+facile à lire comme « personne ne s'en sert, on peut supprimer ». C'est faux, et
+le croire coûte une pièce jointe perdue.
+
+**Six** champs du schéma pointent sur `_storage` :
+
+| Table | Champ | Nature |
+| --- | --- | --- |
+| `documents` | `storageId` | le document d'une fiche |
+| `inboundEmails` | `attachments[].storageId` | pièce jointe reçue (optionnel : le fichier peut n'avoir jamais été rangé) |
+| `companyEmails` | `attachments[].storageId` | **timeline email RETIRÉE** — table inerte, plus lue par rien, mais ses fichiers sont toujours là |
+| `users` | `avatarStorageId` | avatar |
+| `organizations` | `logoStorageId` | logo |
+| `documentTexts` | `storageId` | **pas un porteur** — le texte extrait DU blob, donc jamais une raison de le garder ; il part avec lui |
+
+Une pièce jointe de mail jamais promue en document est donc parfaitement
+utilisée **et** invisible à la jointure `documents`. Le critère de suppression
+est « aucun des cinq vrais porteurs », pas « pas de ligne `documents` ».
+
+**Corollaire, et c'est le vrai piège** : `releaseStorage`
+(`convex/lib/documentBlobs.ts`) ne vérifie que `documents` **plus le seul mail
+qu'on lui passe en argument**. Il ignore `companyEmails`, les avatars, les logos
+et les autres lignes `inboundEmails`. C'est sans conséquence aujourd'hui — deux
+transferts du même fichier produisent deux blobs distincts, pas un blob partagé,
+et la timeline retirée ne partage rien avec les documents — mais **une purge en
+masse ne doit pas s'appuyer dessus** : elle doit refaire le tour des cinq
+porteurs elle-même. Le jour où un chemin fera vraiment partager un blob entre
+deux mails, le refcount le ratera.
+
+Mesure : `node scripts/storage-audit.mjs`, section « Qui référence les
+fichiers ». Classement pur et testé dans `scripts/lib/storage-holders.mjs`
+(`tests/storageHolders.test.ts`).
+
+---
+
+## Un proxy de téléchargement qui stocke pour servir doit programmer son effacement
+
+**Symptôme** : 501 Mo — 28 % du stockage de fichiers — que **rien** ne
+référençait, et dont 564 sur 565 étaient le sosie exact d'un fichier déjà
+présent ailleurs. En croissance de ~45 fichiers par jour et accélérant : 13 en
+juillet 2026, 165 en août, 494 sur les onze premiers jours de septembre.
+
+**Cause** : `vasco.downloadCommunicationDocument`. Un document du portail
+Parallel vit derrière un endpoint authentifié, que le navigateur ne peut pas
+appeler seul. L'action fait donc proxy : elle récupère les octets, les met dans
+le stockage Convex pour pouvoir en tirer une URL, et rend cette URL au
+navigateur.
+
+Cette copie est un **coursier**, pas une archive. Aucune ligne ne la référence
+— elle n'existe que pour la durée d'un `window.open`. Or rien ne l'effaçait :
+**un clic = une copie permanente**, à vie. Le board deck Ouisub (3,9 Mo)
+existait en **sept exemplaires** : trois vrais documents et quatre clics.
+
+**Le motif à reconnaître**, au-delà de VASCO : dès qu'on stocke *pour servir*
+plutôt que *pour garder*, le stockage devient une file sans consommateur. Rien
+ne le signale — pas d'erreur, pas de doublon visible dans l'app, juste une
+facture qui monte. Deux réflexes :
+
+1. **La durée de vie se décide au moment de l'écriture**, pas plus tard.
+   `ctx.scheduler.runAfter(TTL, …)` posé dans la foulée du `storage.store`,
+   assez large pour couvrir le téléchargement (ici 1 h) et pas davantage.
+2. **L'effacement différé doit tolérer que le monde ait bougé.** Entre-temps la
+   copie a pu devenir un vrai document (on refuse alors de la supprimer), ou
+   avoir déjà disparu par un autre chemin — `ctx.storage.delete` **lève** sur
+   un blob absent, ce qui ferait échouer une tâche planifiée qui n'a plus rien
+   à faire. Les deux cas sont testés dans
+   `convex/regression.vascoProxyBlob.test.ts`.
+
+Le contrôle de réclamation se limite ici à `documents`, et c'est délibéré :
+l'id du blob naît dans l'action et n'est rendu à personne, donc aucun mail,
+avatar ni logo ne peut le désigner. Une purge en masse, elle, doit bien faire
+le tour des cinq porteurs — cf. la section « Aucune ligne `documents` ne veut
+pas dire fichier orphelin ».
+
+---
+
+## Une période est un intervalle : la trier sur son début enterre le récap
+
+`companyReports.periodSortDate` est le **début** de la période couverte
+(`parsePeriod(...).startMs`, posé par `reportStore`). C'est le bon champ pour
+l'index `by_company` et pour la fraîcheur (`lib/reportFreshness.ts` : « la
+couverture va jusqu'à quand ? »), et le **mauvais** pour ordonner un fil.
+
+Un report annuel « 2025 » commence le 01/01/2025. Trié sur son début, il se
+rangeait donc **sous les douze mensuels de l'année**, janvier compris — alors
+qu'il arrive en 2026 et les résume. Même effet, plus discret, entre un
+trimestre et ses mois, ou un semestre et ses trimestres : dès que deux lignes
+n'ont pas la **même largeur** de période, comparer leurs débuts ne compare
+plus rien.
+
+Le fil de la fiche (`CompanyReportsSection`) trie donc sur la **fin** de
+période, via `periodRank` (`convex/lib/reportPeriod.ts`, pure et testée), avec
+la largeur (`span`) comme départage : à fin égale, la période **la plus large
+d'abord** (« 2025 » au-dessus de « Décembre 2025 » — le récap clôt l'année),
+puis la date de réception. Une ligne sans période parseable garde sa date
+d'arrivée comme axe, et VASCO suit la même règle (`period` d'abord,
+`publishDate` seulement à défaut).
+
+Deux conséquences à garder en tête :
+
+- **Le rang n'est pas stocké.** `periodSortDate` reste le début, côté base :
+  rien à migrer, mais rien à lire non plus pour savoir où une ligne s'affiche
+  — c'est `periodRank` qui le dit, à l'affichage. Ne pas « optimiser » en
+  stockant la fin : ce serait un chiffre dérivable de plus
+  (`CLAUDE.md` § Anti-patterns).
+- **Le `.take(200)` de `listByCompany` lit par début de période**, puisque
+  c'est l'ordre de l'index. Il borne ce qui est **lu**, pas ce qui est
+  **montré** ; au-delà de 200 reports sur une société les deux ordres
+  pourraient diverger à la marge. Aucune société n'en est proche.

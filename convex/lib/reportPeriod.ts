@@ -132,3 +132,24 @@ export function parsePeriod(display: string): ParsedPeriod | null {
 
   return null
 }
+
+export interface PeriodRank {
+  /** Last ms of the covered period. */
+  endMs: number
+  /** Width of the period in ms — the tie-break at equal end. */
+  span: number
+}
+
+/**
+ * Chronological rank of a covered period, for the fiche feed.
+ *
+ * The axis is the period's END, not its start: an annual "2025" starts on
+ * 01/01/2025 and would file under every monthly report of the year, while it
+ * is the recap that closes it. At equal end, `span` breaks the tie and the
+ * WIDER period comes first ("2025" above "December 2025").
+ */
+export function periodRank(display: string): PeriodRank | null {
+  const parsed = parsePeriod(display)
+  if (!parsed) return null
+  return { endMs: parsed.endMs, span: parsed.endMs - parsed.startMs }
+}
