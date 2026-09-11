@@ -499,6 +499,30 @@ async function qontoTestTxRows(
   return out
 }
 
+/** Is the connection currently feeding an account still alive?
+ *
+ * The question only has one use: telling a RECONNECTION apart from a DUPLICATE
+ * ACCESS (cf. `resolveAccount` step 2). After a reconnection the old
+ * connection is dead — that is why it was reconnected — and its row is either
+ * degraded or already pruned by the poll (`recordPolledConnections` drops what
+ * Powens no longer lists). Two live connections on the same account, on the
+ * other hand, means the bank was connected twice.
+ *
+ * An UNTRACKED connection (no row) counts as dead: nothing monitors it, and
+ * the takeover is precisely what puts the account back under watch. */
+async function isConnectionLive(
+  ctx: MutationCtx,
+  powensConnectionId: string,
+): Promise<boolean> {
+  const row = await ctx.db
+    .query('powensConnections')
+    .withIndex('by_powens_connection', (q) =>
+      q.eq('powensConnectionId', powensConnectionId),
+    )
+    .unique()
+  return row != null && connectionHealth(row, Date.now()) === 'connected'
+}
+
 /** Binds a payload account to an existing record: the same real account, seen
  * under new Powens ids (reconnection) or not yet linked at all (record
  * imported from Airtable). Backfills the IBAN, re-stamps the connection. */
@@ -622,6 +646,36 @@ async function resolveAccount(
   }
   if (match) {
     const target = match.id as Id<'bankAccounts'>
+    // ONE ACCOUNT, ONE LIVE CONNECTION. Taking the account over is right when
+    // it comes from a dead connection (reconnection — that branch is the whole
+    // point of matching by IBAN). It is WRONG when the connection it is fed by
+    // is still alive: the same bank has then been connected twice, and both
+    // accesses deliver the same movements under two different `powensTxId`.
+    // Dedup is by `powensTxId` alone, so nothing downstream can tell them
+    // apart — every real movement would land twice, forever.
+    //
+    // The intruder is skipped rather than rejected: a `throw` would 500 the
+    // webhook and Powens suspends its redeliveries. Skipping leaves the
+    // account fed by the connection in place, and leaves the duplicate
+    // feeding nothing — which is exactly what Réglages → Intégrations offers
+    // for deletion. Self-healing too: the day the incumbent goes stale or
+    // needs re-auth, the next payload takes the account over as before.
+    const incumbent = candidates.find(
+      (a) => a._id === target,
+    )?.powensConnectionId
+    if (
+      incumbent &&
+      incumbent !== connectionId &&
+      (await isConnectionLive(ctx, incumbent))
+    ) {
+      console.warn(
+        `[powens] duplicate_live_connection: compte ${target} déjà alimenté ` +
+          `par la connexion ${incumbent}, toujours saine — la connexion ` +
+          `${connectionId} (acct ${acc.powensAccountId}) livre le même compte ` +
+          `et est ignorée. Supprimer l'une des deux dans Réglages → Intégrations.`,
+      )
+      return null
+    }
     console.log(
       `[powens] compte acct ${acc.powensAccountId} ("${acc.accountName ?? '?'}") ` +
         `rapproché par ${match.kind} du compte existant ${target} — ` +
@@ -1025,7 +1079,8 @@ export const ingestConnectionSync = internalMutation({
         accounts,
       )
       if (!resolved) {
-        // Account ignored (qonto_already_linked) — its txs are not ingested.
+        // Account ignored (qonto_already_linked, or duplicate_live_connection:
+        // another live connection already feeds it) — its txs are not ingested.
         summary.skipped += acc.transactions.length
         continue
       }

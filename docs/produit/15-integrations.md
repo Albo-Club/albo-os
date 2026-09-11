@@ -101,6 +101,18 @@ banque reprend donc la ligne existante, avec son historique et son pointage :
 pas de banque en double. Quand deux comptes se ressemblent trop pour trancher,
 rien n'est écrit — mieux vaut ne rien faire que se tromper de compte.
 
+**Un compte n'est alimenté que par une connexion à la fois.** Si la même
+banque se retrouve connectée deux fois — en repassant par « Connecter une
+banque » alors qu'une connexion vivante existait déjà — la seconde est
+ignorée : sans ça, les deux livreraient les mêmes opérations et chaque
+mouvement arriverait **deux fois** dans le registre. Le compte reste sur la
+connexion en place, et celle en trop n'alimente plus rien : elle apparaît
+donc avec sa corbeille dans la liste. Attention, cela vaut pour un même
+**compte**, pas pour une même banque : deux accès distincts chez le même
+établissement restent parfaitement valides (c'est d'ailleurs à ça que sert
+le renommage). Et la reprise reste la règle dès que la connexion en place est
+morte — c'est exactement ce qui distingue une reconnexion d'un doublon.
+
 La santé de chaque connexion est **surveillée en continu** : état visible sur
 la page Trésorerie (connectée / en retard / à reconnecter), alerte email quand
 une connexion se dégrade, et bouton « Reconnecter » pour la rétablir sans

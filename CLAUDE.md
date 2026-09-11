@@ -820,6 +820,21 @@ export const remove = mutation({
   « rien à faire ». Les deux portées doivent coïncider : une ancre globale
   exige un éventail global. Et la réparation n'est jamais un simple re-run,
   puisque l'ancre rend inerte ce qui est déjà posé.
+- ❌ Se reposer sur une clé de dédup **fournie par la source** (`powensTxId`,
+  id de message, référence externe) pour garantir qu'un objet du monde réel
+  n'entre qu'une fois. Elle ne dédoublonne que les **renvois d'une même
+  source** ; elle est aveugle à une **seconde** source décrivant le même
+  objet, qui apporte ses propres identifiants. C'est ce qui a fait entrer
+  deux fois chaque mouvement du compte Natixis : deux connexions Powens
+  vivantes sur le même compte, deux séries de `powensTxId`, zéro collision,
+  zéro erreur (cf. `KNOWN_ISSUES.md` « Un compte, une connexion VIVANTE »).
+  Le réflexe : quand l'app peut recevoir deux canaux pour un même objet, la
+  protection se pose sur **l'unicité du canal** (une seule source vivante par
+  objet), pas sur la clé — une clé étrangère ne sait rien de ce qui existe à
+  côté d'elle. Et le garde-fou doit distinguer le **remplacement** (l'ancien
+  canal est mort — cas légitime) de la **concurrence** (les deux sont vivants
+  — le doublon) : sans ce test, on interdit la reconnexion en croyant
+  interdire le doublon.
 - ❌ Accrocher un déclencheur métier (analyse, notification, alerte) à une
   intégration **pull** sans lui avoir d'abord donné une mémoire du « déjà vu ».
   Un webhook est un **événement** — il arrive une fois, sa nouveauté est

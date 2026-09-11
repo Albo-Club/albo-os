@@ -2552,6 +2552,42 @@ Uint8Array(enc.encode(s))` produit bien de l'`ArrayBuffer`-backed.
   peut garder son id Powens tout en étant désormais livré par une AUTRE
   connexion. Sans ce re-tamponnage il resterait rattaché à une connexion
   morte, qui alerterait indéfiniment. Ne pas la retirer.
+- **Un compte, une connexion VIVANTE** (`duplicate_live_connection`). La
+  reprise de lien ci-dessus suppose que la connexion quittée est morte —
+  c'est le cas d'une reconnexion, et c'est pour ça que le rapprochement par
+  IBAN existe. Quand les deux sont vivantes, la même banque a été connectée
+  **deux fois**, et le mécanisme se retourne : chaque accès a ses propres
+  `powensAccountId`, donc chacun reprend le compte à l'autre à chaque
+  webhook, et chacun livre les mêmes mouvements sous ses propres
+  `powensTxId`. Or la dédup ne connaît que `powensTxId` : rien en aval ne
+  peut rapprocher les deux séries, **chaque mouvement réel entre deux fois**,
+  indéfiniment et sans erreur. Constaté sur l'accès Natixis Wealth Management
+  de CALTE (09/2026) — un doublon de transactions dont la cause était deux
+  lignes Natixis dans Réglages → Intégrations.
+  `resolveAccount` refuse donc la reprise quand la connexion en place est
+  encore saine (`connectionHealth === 'connected'`). Trois détails qui
+  portent tout :
+  1. **On saute, on ne lève pas.** Un `throw` renverrait un 500 à Powens,
+     qui suspend ses renvois — le prix documenté plus haut pour les
+     connecteurs non mappés. L'intruse est ignorée (compteur `skipped`),
+     le compte reste alimenté par la connexion en place.
+  2. **Le critère est le COMPTE, jamais la banque.** Deux accès distincts à
+     la même banque sont légitimes — `powensConnections.customLabel` existe
+     précisément pour les distinguer. Interdire « deux fois la même banque »
+     casserait ce cas et ne dirait rien du vrai problème.
+  3. **Une connexion non suivie compte pour morte.** Sans ligne
+     `powensConnections`, rien ne la surveille (vieux user Powens, ou
+     connexion que le poll a retirée), et la reprise est justement ce qui
+     remet le compte sous surveillance. Corollaire : le garde-fou se défait
+     tout seul dès que la connexion en place se dégrade (>48 h de silence,
+     ou ré-authentification requise) ou disparaît du poll — donc supprimer
+     la connexion en trop suffit toujours à débloquer l'autre.
+
+  Ce que le garde-fou **ne fait pas** : nettoyer les doublons déjà entrés.
+  Ils se retirent compte par compte avec
+  `migrations/dedupPowensTransactions` (cf. `MIGRATIONS.md`), jamais
+  globalement — deux mouvements réellement identiques le même jour existent,
+  et rien ne les distingue d'un doublon d'ingestion.
 - **Qonto n'est jamais créé** (pas d'entrée dans `CONNECTOR_OWNER`) : son
   record vient de l'import Airtable. Aucun match = tous les records Qonto sont
   déjà liés à un autre id (re-sync redondant d'une autre connexion/user) →
