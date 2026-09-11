@@ -853,6 +853,18 @@ export const remove = mutation({
   qu'une relance peut produire est celui de la bonne nouvelle, arbitré dans
   `reportNotify.claimNotify` via le `kind` — jamais par un reset. Cf.
   `KNOWN_ISSUES.md` « `notifiedAt` est un droit de parole ».
+- ❌ Stocker un fichier **pour le servir** (proxy de téléchargement, vignette,
+  export temporaire) sans décider de sa durée de vie dans la foulée du
+  `storage.store`. Une copie qui n'existe que le temps d'un `window.open` n'est
+  référencée par rien : sans `scheduler.runAfter` posé immédiatement, elle
+  reste à vie, et le stockage devient une file sans consommateur — sans erreur,
+  sans doublon visible dans l'app, juste la facture qui monte. C'est ce qu'a
+  fait le proxy Parallel pendant des mois : **un clic = une copie permanente**,
+  501 Mo et 28 % du stockage. L'effacement différé doit tolérer que le monde
+  ait bougé : la copie a pu devenir un vrai document (on s'abstient) ou avoir
+  déjà disparu (`storage.delete` **lève** sur un blob absent, et ferait échouer
+  une tâche planifiée qui n'a plus rien à faire). Cf. `KNOWN_ISSUES.md` « Un
+  proxy de téléchargement qui stocke pour servir ».
 - ❌ Anchor `#section` for nav between major sections.
 - ❌ Unrequested dark/light toggle.
 - ❌ `tailwind.config.js` (Tailwind v4 is CSS-first).
