@@ -429,6 +429,21 @@ async function resolveGroupCompany(
   return found
 }
 
+/** The `group_root` company of an org — the owner a new account falls back
+ * to when its connector is not mapped. Every org has exactly one. */
+async function orgRootCompany(
+  ctx: QueryCtx,
+  orgId: Id<'organizations'>,
+): Promise<Doc<'companies'>> {
+  const companies = await ctx.db
+    .query('companies')
+    .withIndex('by_org', (q) => q.eq('orgId', orgId))
+    .collect()
+  const root = companies.find((c) => c.kind === 'group_root')
+  if (!root) throw new ConvexError('group_root_not_found')
+  return root
+}
+
 async function qontoAccountsOfCalte(
   ctx: QueryCtx,
 ): Promise<Array<Doc<'bankAccounts'>>> {
@@ -623,22 +638,28 @@ async function resolveAccount(
     return null
   }
 
-  // 4. New account via the connector → entity mapping, scoped to the user's org.
-  if (!mapping) {
-    throw new ConvexError(`unmapped_powens_account:${acc.connectorName}`)
-  }
-  if (mapping.orgSlug !== org.slug) {
+  // 4. New account, in the org of the Powens user — that org is the source
+  // of truth for the write scope, never the mapping. A MAPPED connector only
+  // names the owning entity and the bank label, and must agree with that org.
+  // An UNMAPPED one is not an error: the account is created under the org's
+  // root company, with the connector's own name, then reattached to its real
+  // company by an admin (`cash.moveAccountToOrg`) — the very gesture the
+  // Palatine access already needs for the SCIs it carries. Connecting a new
+  // bank must not require a deploy.
+  if (mapping && mapping.orgSlug !== org.slug) {
     throw new ConvexError(
       `connector_org_mismatch:${acc.connectorName}:${org.slug}`,
     )
   }
-  const owner = await resolveGroupCompany(ctx, org._id, mapping.ownerName)
+  const owner = mapping
+    ? await resolveGroupCompany(ctx, org._id, mapping.ownerName)
+    : await orgRootCompany(ctx, org._id)
   const balance = balancePatch(acc)
   const id = await ctx.db.insert('bankAccounts', {
     orgId: org._id,
     ownerCompanyId: owner._id,
-    bankName: mapping.bankName,
-    label: acc.accountName ?? mapping.bankName,
+    bankName,
+    label: acc.accountName ?? bankName,
     iban: acc.iban,
     accountKind: mapAccountKind(acc.accountType),
     currency: acc.currency,
@@ -652,24 +673,39 @@ async function resolveAccount(
   return created
 }
 
-/** Per-account cutover bound (nothing stored):
+/** Per-account cutover bound (nothing stored). What it protects against is
+ * a history of ANOTHER origin being ingested a second time by Powens — never
+ * the age of the data in itself:
  * - Qonto (Airtable record, has `airtableId`) → date of its latest
  *   Airtable-originated tx; we only ingest what is strictly later.
- * - New account → `_creationTime` (≈ connection date). */
+ * - An account carrying a history entered by other means (manual entry, the
+ *   Mémo Bank CSV import…) → `_creationTime`. Such a history is always the
+ *   OLDEST part of the account — it is there precisely because it predates
+ *   the connection — so the source of its first transaction tells the two
+ *   cases apart in a single read.
+ * - An account only Powens ever fed → NO floor. Idempotency is carried by
+ *   the `powensTxId` dedup, not by the date, so a bank connected today can
+ *   bring in everything it still exposes instead of starting at zero. */
 async function computeCutoff(
   ctx: QueryCtx,
   account: Doc<'bankAccounts'>,
 ): Promise<number> {
-  if (!account.airtableId) return account._creationTime
-  const txs = await ctx.db
+  if (account.airtableId) {
+    const txs = await ctx.db
+      .query('transactions')
+      .withIndex('by_account_date', (q) => q.eq('bankAccountId', account._id))
+      .order('desc')
+      .collect()
+    for (const t of txs) {
+      if (t.airtableId) return t.transactionDate
+    }
+    return account._creationTime
+  }
+  const oldest = await ctx.db
     .query('transactions')
     .withIndex('by_account_date', (q) => q.eq('bankAccountId', account._id))
-    .order('desc')
-    .collect()
-  for (const t of txs) {
-    if (t.airtableId) return t.transactionDate
-  }
-  return account._creationTime
+    .first()
+  return oldest && oldest.source !== 'powens' ? account._creationTime : 0
 }
 
 // ─── Transaction write (shared by the webhook and the catch-up) ──────────────
@@ -981,9 +1017,11 @@ export const ingestConnectionSync = internalMutation({
       const cutoff = await computeCutoff(ctx, account)
       // Diagnostic: where the bound comes from (without changing computeCutoff).
       const cutoffSource =
-        cutoff === account._creationTime
-          ? '_creationTime'
-          : 'dernière tx Airtable'
+        cutoff === 0
+          ? 'aucun'
+          : cutoff === account._creationTime
+            ? '_creationTime'
+            : 'dernière tx Airtable'
       const counters = await writeAccountTransactions(
         ctx,
         account,
@@ -997,7 +1035,8 @@ export const ingestConnectionSync = internalMutation({
       console.log(
         `[powens] ${account.bankName} / connecteur "${acc.connectorName}" ` +
           `(acct ${acc.powensAccountId}): reçu ${counters.received} tx, ` +
-          `cutover=${new Date(cutoff).toISOString().slice(0, 10)} (${cutoffSource}), ` +
+          `cutover=${cutoff === 0 ? '—' : new Date(cutoff).toISOString().slice(0, 10)} ` +
+          `(${cutoffSource}), ` +
           `ingéré ${counters.ingested}, filtré ${counters.filteredCutover} (cutover)` +
           `${counters.filteredDeleted > 0 ? ` + ${counters.filteredDeleted} (deleted)` : ''}, ` +
           `${counters.alreadyExisting} déjà existante(s) (idempotence)`,
@@ -1252,6 +1291,12 @@ export const listConnections = query({
  * overlap is deduped by `powensTxId`. */
 const BACKFILL_OVERLAP_MS = 7 * 24 * 60 * 60 * 1000
 
+/** How far back the catch-up starts on an account that holds NO transaction
+ * yet — a bank just connected, where there is no resume point to compute.
+ * Deliberately wide: Powens exposes what the bank still serves (often a
+ * year or two), and the dedup makes an over-wide window harmless. */
+const BACKFILL_NEW_ACCOUNT_DEPTH_MS = 730 * 24 * 60 * 60 * 1000
+
 /** Pages walked at most per account. Stop against an endless pagination loop;
  * at 1000 transactions per page it is far above any real gap. */
 const BACKFILL_MAX_PAGES = 20
@@ -1331,7 +1376,13 @@ export const ingestBackfilledTransactions = internalMutation({
  * (cf. `upsertConnectionStatus`), which is the case the resume point is made
  * for: at that instant the last transaction held still predates the gap.
  *
- * `minDate` (YYYY-MM-DD, operator only) overrides that resume point for every
+ * An account that holds no transaction yet has no resume point: it is a bank
+ * just connected, and this is what brings in its history — it starts from
+ * `BACKFILL_NEW_ACCOUNT_DEPTH_MS` instead of being skipped. The scheduling
+ * above covers it: a brand-new connection row is itself a transition to
+ * `connected`.
+ *
+ * `minDate` (YYYY-MM-DD, operator only) overrides that start date for every
  * account of the connection. It is what repairs a gap noticed AFTER the
  * reconnection: once fresh transactions have landed, the resume point sits
  * past the gap and would step right over it.
@@ -1341,11 +1392,12 @@ export const ingestBackfilledTransactions = internalMutation({
  * `orgSlug` and `orgId` are interchangeable — the scheduled call passes the
  * id it already holds, the operator passes the slug.
  *
- * Bounds, in order: the start date (resume point or `minDate`), the account
- * cutover (`computeCutoff`, hard floor — a `minDate` cannot reach behind it)
- * and what Powens itself holds — no arbitrary depth limit, otherwise a long
- * breakdown would silently lose its oldest weeks. A per-account failure is
- * logged and does not stop the others. */
+ * Bounds, in order: the start date (resume point, default depth or
+ * `minDate`), the account cutover (`computeCutoff` — a hard floor where the
+ * account carries a history of another origin, none on an account only
+ * Powens feeds) and what Powens itself holds — no arbitrary depth limit,
+ * otherwise a long breakdown would silently lose its oldest weeks. A
+ * per-account failure is logged and does not stop the others. */
 export const backfillConnection = internalAction({
   args: {
     // Exactly one of the two: `orgId` for the scheduled call, `orgSlug` for
@@ -1388,17 +1440,20 @@ export const backfillConnection = internalAction({
     )
 
     for (const account of accounts) {
-      // Explicit start date wins over the resume point — including on an
-      // account with no transaction at all, where there is nothing to resume
-      // from. The account cutover still filters what may be written.
+      // Explicit start date wins over the resume point. An account with no
+      // transaction at all has no resume point to compute — it is a bank
+      // just connected, and the catch-up is exactly what fills it — so it
+      // starts from the default depth rather than being skipped. The account
+      // cutover still filters what may be written.
       const since =
         minDate ??
-        (account.lastTransactionAt == null
-          ? null
-          : new Date(account.lastTransactionAt - BACKFILL_OVERLAP_MS)
-              .toISOString()
-              .slice(0, 10))
-      if (!since) continue
+        new Date(
+          account.lastTransactionAt == null
+            ? Date.now() - BACKFILL_NEW_ACCOUNT_DEPTH_MS
+            : account.lastTransactionAt - BACKFILL_OVERLAP_MS,
+        )
+          .toISOString()
+          .slice(0, 10)
       let next: string | null =
         `https://${domain}/2.0/users/me/accounts/${account.powensAccountId}` +
         `/transactions?limit=1000&min_date=${since}`

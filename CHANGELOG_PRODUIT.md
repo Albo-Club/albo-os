@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.222.1 — 11/09/2026 à 11:16 — De quoi faire le ménage des fichiers que plus rien n'utilise
+## v1.223.1 — 11/09/2026 à 11:29 — De quoi faire le ménage des fichiers que plus rien n'utilise
 
 La source du problème étant tarie, voici l'outil qui nettoie ce qui s'était
 accumulé : 501 Mo de fichiers — 28 % du stockage — que plus aucune fiche,
@@ -67,6 +67,54 @@ Relancer l'outil une seconde fois ne trouve plus rien à faire.
 >   typé — nouvelle sous-section dans `KNOWN_ISSUES.md`.
 > - Runbook complet (ordre snapshot → à blanc → `--apply`) dans
 >   `MIGRATIONS.md`.
+## v1.223.0 — 11/09/2026 à 11:16 — Connecter une nouvelle banque, avec son historique
+
+Jusqu'ici, seules cinq banques étaient reconnues. En connecter une autre
+échouait en silence : rien n'apparaissait à l'écran, et la seule trace était
+un mail d'alerte de notre prestataire bancaire. C'est ce qui s'est passé avec
+l'accès Natixis Wealth Management de CALTE.
+
+Désormais, **n'importe quelle banque se connecte sans préparation**. Les
+comptes apparaissent seuls après la première synchro, au nom de la banque,
+dans la société qui a lancé la connexion — puis on les renomme et on les
+rattache à leur société depuis leur page, comme pour les comptes des SCI
+portés par l'accès Palatine.
+
+Deuxième changement : un compte fraîchement connecté n'arrive plus vide. La
+synchro rapporte **l'historique que la banque expose encore**, souvent un à
+deux ans, au lieu de démarrer à la date du jour. Les comptes qui portent déjà
+un historique venu d'ailleurs (reprise Airtable, import de relevés, saisie
+manuelle) gardent leur date de bascule : ils ne risquent pas de se retrouver
+en double.
+
+> **🔧 Notes techniques**
+>
+> - `convex/powens.ts`, `resolveAccount` : un connecteur absent de
+>   `CONNECTOR_OWNER` ne lève plus `unmapped_powens_account` (la mutation
+>   étant transactionnelle, l'erreur annulait tout le webhook et renvoyait un
+>   500 qui suspendait les renvois Powens). Le compte est créé dans l'org du
+>   `powensUsers` matché — l'org n'a jamais été devinée — sous sa société
+>   `group_root` (`orgRootCompany`), au nom du connecteur. Un connecteur mappé
+>   garde son entité, son libellé et son contrôle `connector_org_mismatch`.
+> - `computeCutoff` : le plancher ne protège plus que d'un historique d'une
+>   AUTRE origine. Qonto (`airtableId`) inchangé ; sinon plancher à
+>   `_creationTime` seulement si la transaction la plus ancienne du compte
+>   n'est pas `source: 'powens'` (un historique importé ou saisi précède
+>   toujours la connexion, donc une seule lecture indexée suffit — pas de
+>   `.collect()` sur le chemin chaud) ; compte purement Powens → cutover 0,
+>   l'idempotence étant portée par la dédup `powensTxId`.
+> - `backfillConnection` : un compte sans aucune transaction n'est plus sauté
+>   faute de point de reprise — il part de `BACKFILL_NEW_ACCOUNT_DEPTH_MS`
+>   (730 j). Combiné au rattrapage déjà planifié sur la transition vers
+>   `connected` (une ligne de connexion absente en fait partie), une banque
+>   neuve se remplit seule : ni bouton, ni commande opérateur.
+> - `convex/regression.powensNewBank.test.ts` : connecteur inconnu → compte
+>   créé sous le `group_root` ; connecteur mappé → entité et libellé
+>   conservés ; compte purement Powens → tx vieille de 60 j ingérée ; compte
+>   portant une tx `imported` → même tx filtrée par le cutover.
+> - Docs : `KNOWN_ISSUES.md` (mapping, cutover, rattrapage),
+>   `docs/produit/07-tresorerie.md`.
+
 ## v1.222.0 — 11/09/2026 à 10:38 — Le journal d'une société se lit enfin dans l'ordre des périodes
 
 Dans « Rapports & communications », un rapport annuel se rangeait sous les
