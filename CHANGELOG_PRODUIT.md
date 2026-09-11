@@ -23,6 +23,25 @@ bas de page.
 
 ---
 
+## v1.223.1 — 11/09/2026 à 11:24 — Le « Voir plus » des rapports ressemble aux autres
+
+Sous la liste « Rapports & communications », le bouton qui déplie le reste du
+journal s'affichait en large bande grise pleine largeur, alors que partout
+ailleurs dans l'app — la page Nouveautés, la carte Documents — le même geste
+se présente en bouton bordé. Il est désormais bordé et centré sous la liste,
+comme les autres.
+
+> **🔧 Notes techniques**
+>
+> - `CompanyReportsSection.tsx` : le bouton `timeline.showMore` /
+>   `showLess` passe de `variant="ghost"` + `w-full` à `variant="outline"`
+>   dans un `flex justify-center`, alignement sur
+>   `routes/app/$orgSlug/changelog.tsx` (« Voir les nouveautés plus
+>   anciennes »). Aucun changement de comportement : même seuil de 5, même
+>   libellé, même bascule.
+
+---
+
 ## v1.223.0 — 11/09/2026 à 11:16 — Connecter une nouvelle banque, avec son historique
 
 Jusqu'ici, seules cinq banques étaient reconnues. En connecter une autre
