@@ -98,7 +98,7 @@
         "description": "Agrégation bancaire : comptes et transactions synchronisés automatiquement. La connexion à la banque se fait dans la fenêtre sécurisée Powens."
       },
       "vasco": {
-        "name": "Parallel / VASCO",
+        "name": "VASCO",
         "description": "Portails investisseurs des plateformes de fund admin : positions, communications investisseurs et documents remontés sur les entités liées."
       }
     },
@@ -118,6 +118,7 @@
       "add": "Ajouter",
       "sync": "Synchroniser",
       "rename": "Renommer la connexion",
+      "delete": "Supprimer la connexion",
       "edit": "Modifier les identifiants"
     },
     "dialog": {
@@ -133,6 +134,12 @@
       "username": "Identifiant de connexion",
       "password": "Mot de passe"
     },
+    "deleteBank": {
+      "title": "Supprimer la connexion « {{label}} » ?",
+      "description": "Elle sera supprimée chez Powens et disparaîtra de la liste. Aucun compte ni aucune transaction n'est touché.",
+      "inUse": "Impossible : cette connexion alimente encore {{count}} compte. Reconnectez ces comptes à une autre connexion ou archivez-les depuis la Trésorerie, puis revenez ici.",
+      "inUse_other": "Impossible : cette connexion alimente encore {{count}} comptes. Reconnectez ces comptes à une autre connexion ou archivez-les depuis la Trésorerie, puis revenez ici."
+    },
     "rename": {
       "title": "Renommer « {{label}} »",
       "description": "Le nom n'est utilisé que dans Albo OS : il vous sert à distinguer vos connexions, rien n'est envoyé à la plateforme."
@@ -145,6 +152,8 @@
       "connected": "Connexion enregistrée.",
       "updated": "Connexion mise à jour.",
       "renamed": "Connexion renommée.",
+      "bankDeleted": "Connexion supprimée.",
+      "bankDeleteError": "Impossible de supprimer la connexion.",
       "renameError": "Impossible de renommer la connexion.",
       "connectError": "Impossible d'enregistrer la connexion.",
       "labelTaken": "Une connexion porte déjà ce nom.",
