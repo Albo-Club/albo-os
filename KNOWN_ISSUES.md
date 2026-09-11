@@ -2479,18 +2479,41 @@ Uint8Array(enc.encode(s))` produit bien de l'`ArrayBuffer`-backed.
   `MIGRATIONS.md`) ; l'IBAN repris à la fusion rend les reconnexions
   suivantes automatiques.
 - **Cutover sans champ au schéma.** Aucune date de connexion n'est stockée.
-  Borne par compte dans `computeCutoff` : compte neuf → `_creationTime` (champ
-  Convex natif ≈ date de connexion, l'historique antérieur du 1ᵉʳ lot est
-  ignoré) ; Qonto (a `airtableId`) → date de sa dernière tx d'origine Airtable.
+  Borne par compte dans `computeCutoff`, et ce qu'elle protège est **un
+  historique d'une AUTRE origine**, jamais l'ancienneté en soi : Qonto (a
+  `airtableId`) → date de sa dernière tx d'origine Airtable ; compte portant
+  une saisie manuelle ou un import (CSV Mémo Bank, relevés) → `_creationTime`,
+  pour que Powens ne réimporte pas par ses propres moyens ce qui a été entré à
+  la main ; compte alimenté **uniquement** par Powens → **aucun plancher**.
   On n'ingère que `tx.dateMs > cutoff`.
+  Le plancher à `_creationTime` était appliqué à tout compte neuf : une banque
+  fraîchement connectée jetait donc l'historique que Powens livrait avec sa
+  première synchro et démarrait à zéro (constaté sur Natixis, 09/2026).
+  L'idempotence est portée par la dédup `powensTxId`, pas par la date — un
+  compte que Powens seul alimente n'a rien à protéger. Et comme un historique
+  d'une autre origine est toujours la partie la plus **ancienne** du compte
+  (il est là parce qu'il précède la connexion), la source de sa **première**
+  transaction suffit à trancher, en une lecture indexée au lieu d'un scan.
 - **Idempotence par `powensTxId`** (index `by_powens_id`) : `patch` si existe,
   sinon `insert`. Rejouable sans effet de bord. Montants Powens = unité
   monétaire signée → `round(abs(value)*100)` cents + `direction` selon le signe.
 - **Mapping connecteur → entité** (constante `CONNECTOR_OWNER`, comptes neufs
   uniquement) : Palatine / Wormser / Neuflize → CALTE (org calte) ; Mémo Bank →
-  Albo Club (org albo). Un connecteur non mappé → `unmapped_powens_account`
-  (erreur visible, **pas** d'écriture muette dans la mauvaise org). Qonto n'y
-  figure pas (toujours résolu par match du record existant).
+  Albo Club (org albo). Qonto n'y figure pas (toujours résolu par match du
+  record existant). Le mapping ne choisit **que** la société propriétaire et
+  le libellé de banque — l'org d'écriture, elle, vient toujours du `powensUsers`
+  matché ; un mapping qui la contredit lève `connector_org_mismatch`.
+- **Un connecteur non mappé n'est PAS une erreur.** Il l'a été jusqu'en
+  09/2026 (`unmapped_powens_account`), et le prix était disproportionné : la
+  mutation étant transactionnelle, une banque inconnue faisait **tout** échouer
+  (500 à Powens, qui suspend ses renvois), donc aucun compte, aucune
+  transaction, un écran vide et un mail d'alerte Powens pour seule trace — et
+  toute nouvelle banque exigeait un déploiement. Le compte est désormais créé
+  dans l'org du user Powens, sous sa société racine (`group_root`), au nom du
+  connecteur, puis **rattaché** à sa vraie société par un admin — le geste que
+  l'accès Palatine réclame déjà pour ses SCI (point suivant). Rien n'est
+  deviné : l'org ne l'a jamais été, et le reste est corrigeable depuis la
+  fiche compte (renommage, rattachement).
 - **Un accès bancaire n'appartient pas à une seule société.** Le mapping
   ci-dessus est par **connecteur**, jamais par compte : l'accès Palatine de
   CALTE porte aussi les comptes courants des SCI Chapelle 1 et 2, et tout
@@ -2572,18 +2595,27 @@ permanent de l'org.
   découvert le 29/07 alors que la reconnexion datait du 23/07 : le point de
   reprise était au 28/07. D'où l'argument **`minDate`** (`YYYY-MM-DD`, usage
   opérateur), qui force la date de départ sur tous les comptes de la connexion.
-  Le cutover reste le plancher dur — un `minDate` ne peut pas remonter derrière.
+  Le cutover reste le plancher — un `minDate` ne peut pas remonter derrière un
+  historique d'une autre origine ; sur un compte que Powens seul alimente, il
+  n'y a pas de plancher à franchir.
 - **`orgSlug` ou `orgId`, au choix** : l'appel schedulé passe l'id qu'il a déjà
   en main, l'opérateur passe `"calte"` (via `orgIdBySlug`) comme dans tous les
   autres runbooks CLI. Aucun des deux → `org_id_or_slug_required` ; les deux
   arguments sont optionnels au validateur, la garde est dans le handler.
 - **Pas de plafond d'ancienneté, volontairement.** Un plafond (« 120 j max »)
   recréerait le bug : une panne plus longue perdrait silencieusement ses
-  semaines les plus anciennes. Les bornes réelles sont le point de reprise, le
-  cutover du compte (`computeCutoff`, plancher dur) et ce que Powens détient.
-- **Compte sans aucune transaction → ignoré** (`lastTransactionAt: null`) :
-  il n'y a rien d'où reprendre, son historique démarre à son propre cutover.
-  Sinon une première connexion réimporterait tout le passé du compte.
+  semaines les plus anciennes. Les bornes réelles sont la date de départ (point
+  de reprise, profondeur par défaut ou `minDate`), le cutover du compte
+  (`computeCutoff`) et ce que Powens détient.
+- **Compte sans aucune transaction → amorcé, pas ignoré.** Il n'a pas de point
+  de reprise à calculer : c'est une banque qui vient d'être connectée, et le
+  rattrapage est précisément ce qui la remplit. Il part donc de
+  `BACKFILL_NEW_ACCOUNT_DEPTH_MS` (730 j) — le sauter, comme on le faisait
+  jusqu'en 09/2026, laissait un compte neuf vide de tout passé alors que Powens
+  détient couramment un à deux ans. Une fenêtre trop large est sans danger (la
+  dédup `powensTxId` absorbe), et la planification existante suffit à couvrir
+  le cas : une ligne de connexion absente compte comme transition vers
+  `connected`.
 - **Écriture mutualisée** : `writeAccountTransactions` est le SEUL endroit qui
   écrit une tx Powens (filtre cutover + dédup + règles apprises à l'insert) —
   webhook et rattrapage l'appellent tous les deux, ils ne peuvent pas diverger.
