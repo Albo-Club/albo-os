@@ -6330,3 +6330,42 @@ La sortie 2 est la seule disponible depuis un environnement sans identifiants
 Convex (session distante, CI). Elle a un effet de bord acceptable : le module
 n'apparaît pas dans `api.d.ts` tant que personne n'a relancé `convex dev`, ce
 qui produira un diff de deux lignes sans rapport au prochain `pnpm dev`.
+
+---
+
+## « Aucune ligne `documents` » ne veut pas dire « fichier orphelin »
+
+**Contexte** : ALB-234, audit du stockage. 32 % des octets stockés sont des
+doublons exacts (même `sha256`), et la première version de l'audit ne joignait
+les blobs qu'à `documents` — d'où une colonne « (aucune ligne documents) » très
+facile à lire comme « personne ne s'en sert, on peut supprimer ». C'est faux, et
+le croire coûte une pièce jointe perdue.
+
+**Six** champs du schéma pointent sur `_storage` :
+
+| Table | Champ | Nature |
+| --- | --- | --- |
+| `documents` | `storageId` | le document d'une fiche |
+| `inboundEmails` | `attachments[].storageId` | pièce jointe reçue (optionnel : le fichier peut n'avoir jamais été rangé) |
+| `companyEmails` | `attachments[].storageId` | **timeline email RETIRÉE** — table inerte, plus lue par rien, mais ses fichiers sont toujours là |
+| `users` | `avatarStorageId` | avatar |
+| `organizations` | `logoStorageId` | logo |
+| `documentTexts` | `storageId` | **pas un porteur** — le texte extrait DU blob, donc jamais une raison de le garder ; il part avec lui |
+
+Une pièce jointe de mail jamais promue en document est donc parfaitement
+utilisée **et** invisible à la jointure `documents`. Le critère de suppression
+est « aucun des cinq vrais porteurs », pas « pas de ligne `documents` ».
+
+**Corollaire, et c'est le vrai piège** : `releaseStorage`
+(`convex/lib/documentBlobs.ts`) ne vérifie que `documents` **plus le seul mail
+qu'on lui passe en argument**. Il ignore `companyEmails`, les avatars, les logos
+et les autres lignes `inboundEmails`. C'est sans conséquence aujourd'hui — deux
+transferts du même fichier produisent deux blobs distincts, pas un blob partagé,
+et la timeline retirée ne partage rien avec les documents — mais **une purge en
+masse ne doit pas s'appuyer dessus** : elle doit refaire le tour des cinq
+porteurs elle-même. Le jour où un chemin fera vraiment partager un blob entre
+deux mails, le refcount le ratera.
+
+Mesure : `node scripts/storage-audit.mjs`, section « Qui référence les
+fichiers ». Classement pur et testé dans `scripts/lib/storage-holders.mjs`
+(`tests/storageHolders.test.ts`).
