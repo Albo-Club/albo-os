@@ -23,6 +23,36 @@ bas de page.
 
 ---
 
+## v1.223.3 — 11/09/2026 à 11:55 — La consigne de sauvegarde avant purge était fausse
+
+Le ménage des fichiers orphelins a bien eu lieu : **565 fichiers, 501 Mo
+libérés**, soit 28 % du stockage. Mais la sauvegarde censée le précéder n'a pas
+été prise, et c'est la consigne qui était en cause, pas la manipulation.
+
+Deux défauts dans la commande que le mode d'emploi donnait. Elle était
+incomplète, donc elle échouait — et comme les commandes se collent en bloc, la
+purge s'est exécutée derrière cet échec sans que rien ne l'arrête. Et même
+complète, elle n'aurait pas protégé : une sauvegarde ne contient les fichiers
+que si on le demande explicitement, faute de quoi elle ne ramène que les
+données. Le filet ne couvrait donc pas ce que l'opération allait détruire.
+
+Sans conséquence cette fois — 564 des 565 fichiers supprimés étaient le sosie
+exact d'un fichier toujours présent, et le dernier n'était affiché nulle part —
+mais la consigne est corrigée, avec l'avertissement qui manquait.
+
+> **🔧 Notes techniques**
+>
+> - `MIGRATIONS.md` : la ligne « Purge des fichiers orphelins » donne désormais
+>   `pnpm exec convex export --prod --include-file-storage --path <fichier>`.
+>   `--path` est requis (sans lui la commande sort en erreur) et
+>   `--include-file-storage` est ce qui met les blobs dans l'archive — sans
+>   quoi l'export ne porte que les tables.
+> - `CLAUDE.md` : nouvelle règle — un snapshot qui ne couvre pas ce que
+>   l'opération peut détruire n'est pas un snapshot, et une consigne
+>   destructive se donne en commande complète avec vérification du résultat
+>   avant l'étape suivante, puisqu'un bloc collé ne s'arrête pas sur l'échec
+>   d'une ligne.
+
 ## v1.223.2 — 11/09/2026 à 11:29 — De quoi faire le ménage des fichiers que plus rien n'utilise
 
 La source du problème étant tarie, voici l'outil qui nettoie ce qui s'était

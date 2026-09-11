@@ -865,6 +865,17 @@ export const remove = mutation({
   déjà disparu (`storage.delete` **lève** sur un blob absent, et ferait échouer
   une tâche planifiée qui n'a plus rien à faire). Cf. `KNOWN_ISSUES.md` « Un
   proxy de téléchargement qui stocke pour servir ».
+- ❌ Prescrire un snapshot **qui ne couvre pas ce qu'on va détruire**. Un
+  `convex export --prod` sans `--include-file-storage` ne contient **aucun
+  fichier** : devant une purge de blobs, ce filet ne rattrape rien, et il
+  rassure exactement autant qu'un vrai. Le critère : nommer d'abord ce que
+  l'opération peut détruire, puis vérifier que l'export le contient. Corollaire
+  de forme, appris le 11/09/2026 : une suite de commandes livrée en bloc sera
+  **collée en bloc**, donc un échec au milieu (ici `--path` manquant, qui rend
+  la commande invalide) n'arrête pas la suite — la destruction s'exécute
+  derrière l'échec du garde-fou. Toute consigne destructive donne la commande
+  complète, et demande de **vérifier le résultat du snapshot** avant l'étape
+  suivante.
 - ❌ Anchor `#section` for nav between major sections.
 - ❌ Unrequested dark/light toggle.
 - ❌ `tailwind.config.js` (Tailwind v4 is CSS-first).
