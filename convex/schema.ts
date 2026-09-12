@@ -997,6 +997,17 @@ export default defineSchema({
     // Powens Wealth positions (cf. investmentPositions).
     bankAccountId: v.optional(v.id('bankAccounts')),
 
+    // ─── Conversion (BSA AIR → actions, OC → actions…) ────────────────────
+    // A conversion is a CHANGE OF TYPE on the same row, never a second deal:
+    // no money moves and the position is unchanged, so splitting it in two
+    // would orphan the matched transaction and count the line twice. The
+    // columns of the previous instrument are already kept (see the archetype
+    // block above) — these two say WHICH kind they belonged to and WHEN it
+    // converted, which the row alone cannot tell. Written by `deals.update`
+    // when `instrumentKind` changes; only the LAST conversion is remembered.
+    convertedFromKind: v.optional(instrumentKind),
+    convertedAt: v.optional(v.number()), // ms epoch
+
     // Field names edited by hand on the deal sheet. The Airtable re-import
     // (convex/airtableImport.ts:upsertDeals) skips these columns so manual
     // corrections survive a re-run. See KNOWN_ISSUES « Édition manuelle deals ».

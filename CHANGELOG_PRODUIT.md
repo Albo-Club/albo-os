@@ -23,6 +23,67 @@ bas de page.
 
 ---
 
+## v1.229.0 — 12/09/2026 à 10:20 — Voir l'avant et l'après d'un deal converti
+
+Un **BSA AIR devient des actions**, une obligation convertible se convertit, un
+BSA s'exerce. Jusqu'ici, changer le type d'un deal faisait **disparaître de
+l'écran** les caractéristiques de l'ancien instrument : le cap de valorisation
+et la décote du BSA AIR n'étaient plus lisibles nulle part, alors qu'ils
+racontent à quelles conditions on était entré. Il fallait les recopier à la
+main dans les notes du deal.
+
+Désormais la fiche garde **les deux états côte à côte**. Le panneau « Détails
+de l'instrument » porte deux onglets :
+
+- **Après** (ouvert par défaut) : les caractéristiques du nouvel instrument.
+- **Avant** : celles de l'ancien, telles qu'elles étaient avant la conversion.
+
+Entre les deux, une ligne rappelle le chemin et la date — « BSA AIR → Actions ·
+converti le 15 septembre 2026 ». Les deux onglets restent **éditables au clic**,
+donc on peut compléter après coup ce qui n'avait jamais été saisi.
+
+Au moment de changer le type, l'app demande maintenant la **date de
+conversion**. Elle est pré-remplie au jour même, mais une conversion se
+renseigne souvent des semaines après : c'est la vraie date qu'il faut mettre.
+
+Trois précisions. Une conversion **n'est pas une sortie** : le deal reste
+actif, rien n'est encaissé, la performance ne bouge pas. L'app mémorise la
+**dernière** conversion — un instrument converti deux fois n'affichera que la
+dernière étape en « avant ». Et un deal converti **avant** cette mise à jour
+n'a pas de trace : pour lui en donner une, repasser le type à l'ancien
+instrument, enregistrer, puis reconvertir avec la bonne date.
+
+> **🔧 Notes techniques**
+>
+> - Une conversion reste un **changement de `instrumentKind` sur la même
+>   ligne** — jamais un second deal : aucun argent ne bouge, la position est
+>   la même, et le virement de souscription est pointé sur le deal (le
+>   scinder l'orphelinerait et compterait la participation deux fois).
+> - Deux colonnes neuves sur `deals`, toutes deux optionnelles (aucune
+>   migration) : `convertedFromKind` + `convertedAt`. Écrites par
+>   `deals.update` quand `instrumentKind` change ; `convertedFromKind` est
+>   lu **côté serveur** depuis la ligne, jamais pris en argument. La date
+>   vient du dialogue et reste patchable seule pour corriger après coup.
+> - `InstrumentBlock.tsx` : onglets Avant/Après quand `convertedFromKind`
+>   est posé, en remplacement des onglets Pré/Post. L'« avant » est la vue
+>   **pré-conversion** de l'ancien type (`preConversionFields()`, coupe au
+>   marqueur `SAFE_SPLIT_FIELD` existant) — la moitié post d'une config SAFE
+>   décrit l'après, pas l'avant.
+> - `EditDealDialog` (`deals.$dealId.tsx`) : champ **Date de conversion** sous
+>   le bandeau d'avertissement dès que le type change, requis pour enregistrer.
+> - Même règle **dupliquée** dans `agentTools.updateDealInternal` (outil
+>   `updateDeal` du serveur MCP, date en `convertedAtISO`) : ce chemin patche
+>   la ligne lui-même sans passer par `deals.update`. Les deux dérivations
+>   doivent rester alignées — cf. `KNOWN_ISSUES.md`.
+> - Limite assumée : une colonne présente dans les **deux** listes de champs
+>   (`closingDate`, `sharesAcquired`) n'a qu'une valeur en base, donc identique
+>   des deux côtés. La suite, si besoin, est une table `dealConversions` avec
+>   snapshot figé — cf. `KNOWN_ISSUES.md` « Conversion d'un deal ».
+> - Couverture : 4 tests dans `convex/regression.deals.test.ts` (trace écrite
+>   avec la date fournie, repli sur l'instant sinon, trace intacte hors
+>   changement de type, chemin agent/MCP). TESTING.md FD45/FD46, FD15 mis à
+>   jour.
+
 ## v1.228.1 — 11/09/2026 à 16:55 — Une banque connectée deux fois n'importe plus les mouvements en double
 
 Quand la **même banque** se retrouvait connectée deux fois — deux connexions

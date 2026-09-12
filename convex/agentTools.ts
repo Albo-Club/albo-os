@@ -454,6 +454,9 @@ export const updateDealInternal = internalMutation({
     fundType: v.optional(fundTypeValidator),
     vintageYear: v.optional(v.number()),
     managementCompany: v.optional(v.string()),
+    // Date of the conversion, when the caller changes `instrumentKind`.
+    // `convertedFromKind` is never an argument — it is read from the row.
+    convertedAt: v.optional(v.number()), // ms epoch
   },
   handler: async (ctx, { orgId, actorUserId, dealId, ...patch }) => {
     await readMembership(ctx, orgId, actorUserId)
@@ -462,7 +465,22 @@ export const updateDealInternal = internalMutation({
     if (patch.viaSpvCompanyId) {
       await assertSameOrg(ctx, orgId, patch.viaSpvCompanyId, 'spv_wrong_org')
     }
-    await ctx.db.patch("deals", dealId, patch)
+    // Same rule as `deals.update`: a change of instrument type IS a
+    // conversion, and the type left behind is recorded so the deal sheet can
+    // show its before/after tabs. Kept in sync deliberately — this path does
+    // not go through `deals.update`.
+    const converting =
+      patch.instrumentKind != null &&
+      patch.instrumentKind !== deal.instrumentKind
+    await ctx.db.patch("deals", dealId, {
+      ...patch,
+      ...(converting
+        ? {
+            convertedFromKind: deal.instrumentKind,
+            convertedAt: patch.convertedAt ?? Date.now(),
+          }
+        : {}),
+    })
     // Effective kind after the patch — the MCP layer needs it to build the
     // right deep link (placements live on their own page).
     return {

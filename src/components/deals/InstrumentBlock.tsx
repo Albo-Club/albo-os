@@ -137,6 +137,19 @@ export const FORMAT_UNIT: Partial<Record<FieldFormat, string>> = {
 const SAFE_SPLIT_FIELD = 'conversionValuation'
 
 /**
+ * The fields of an instrument as they read BEFORE its conversion: the
+ * pre-conversion half for the SAFE-shaped configs (safe, bsa_air, oc — split
+ * at the marker above), the whole list for the kinds without a marker (bsa).
+ * Used by the before/after tabs of a converted deal, so "before" is exactly
+ * the pre-conversion view the deal showed while it still was that kind.
+ */
+function preConversionFields(kind: InstrumentKind): Array<string> {
+  const fields = INSTRUMENT_FIELDS[kind] ?? []
+  const splitIdx = fields.indexOf(SAFE_SPLIT_FIELD)
+  return splitIdx >= 0 ? fields.slice(0, splitIdx) : fields
+}
+
+/**
  * Minimal shape a custom panel needs from a deal's transactions: the dated,
  * signed cash flows (the royalty panel uses them for the realized bar, CoC and
  * TRI). Structurally a subset of `transactions.listByDeal`'s rows.
@@ -215,6 +228,7 @@ function FieldsView({
   editable?: boolean
 }) {
   const { t } = useTranslation('participations')
+  const { fmtDate } = useFormatters()
   const updateDeal = useConvexMutation(api.deals.update)
   const fields = INSTRUMENT_FIELDS[instrumentKind] ?? []
   const splitIdx = fields.indexOf(SAFE_SPLIT_FIELD)
@@ -224,7 +238,27 @@ function FieldsView({
   // data: filled `conversionValuation` ⇒ post, otherwise pre.
   const [post, setPost] = useState(deal.conversionValuation != null)
 
-  const visible = isSafe ? (post ? fields : fields.slice(0, splitIdx)) : fields
+  // Converted deal (BSA AIR → actions…): the row still carries the previous
+  // instrument's columns and `convertedFromKind` names them. Its before/after
+  // tabs REPLACE the pre/post ones — after a conversion, "before" is the
+  // pre-conversion view of the kind that was left behind.
+  const fromKind =
+    deal.convertedFromKind && deal.convertedFromKind !== instrumentKind
+      ? deal.convertedFromKind
+      : undefined
+  const beforeFields = fromKind ? preConversionFields(fromKind) : []
+  const converted = beforeFields.length > 0
+  const [before, setBefore] = useState(false)
+
+  const visible = converted
+    ? before
+      ? beforeFields
+      : fields
+    : isSafe
+      ? post
+        ? fields
+        : fields.slice(0, splitIdx)
+      : fields
 
   // Inline save: one-field patch on the shared `deals.update` mutation (same
   // path as the edit dialog, so the field is marked manually edited and the
@@ -240,13 +274,48 @@ function FieldsView({
 
   return (
     <div className="space-y-4">
-      {isSafe && (
-        <Tabs value={post ? 'post' : 'pre'} onValueChange={(v) => setPost(v === 'post')}>
-          <TabsList>
-            <TabsTrigger value="pre">{t('fiche.safe.pre')}</TabsTrigger>
-            <TabsTrigger value="post">{t('fiche.safe.post')}</TabsTrigger>
-          </TabsList>
-        </Tabs>
+      {converted ? (
+        <div className="space-y-2">
+          <Tabs
+            value={before ? 'before' : 'after'}
+            onValueChange={(v) => setBefore(v === 'before')}
+          >
+            <TabsList>
+              <TabsTrigger value="before">
+                {t('fiche.conversion.before')}
+              </TabsTrigger>
+              <TabsTrigger value="after">
+                {t('fiche.conversion.after')}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {/* The instruments go on their own line, not in the tab labels: the
+              side panel is 320px wide and a long kind ("Obligation
+              convertible") would not fit next to "Avant". */}
+          <p className="text-muted-foreground text-xs">
+            {t(
+              deal.convertedAt != null
+                ? 'fiche.conversion.summaryDated'
+                : 'fiche.conversion.summary',
+              {
+                from: t(`instrument.${fromKind}`, { defaultValue: fromKind }),
+                to: t(`instrument.${instrumentKind}`, {
+                  defaultValue: instrumentKind,
+                }),
+                date: deal.convertedAt != null ? fmtDate(deal.convertedAt) : '',
+              },
+            )}
+          </p>
+        </div>
+      ) : (
+        isSafe && (
+          <Tabs value={post ? 'post' : 'pre'} onValueChange={(v) => setPost(v === 'post')}>
+            <TabsList>
+              <TabsTrigger value="pre">{t('fiche.safe.pre')}</TabsTrigger>
+              <TabsTrigger value="post">{t('fiche.safe.post')}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )
       )}
 
       {/* Rows, not a grid: the side panel is 320px wide, so label left / value

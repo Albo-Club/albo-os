@@ -844,11 +844,17 @@ export const mcpTools: Array<McpTool> = [
       'id. Amounts in CENTS EUR, rates in BASIS POINTS, dates as ISO ' +
       '"YYYY-MM-DD". To record an exit, set status plus exitedDateISO and ' +
       'exitProceeds. "cancelled" = deal called off after the funds were wired ' +
-      'and refunded (neither an exit nor a write-off).',
+      'and refunded (neither an exit nor a write-off). To record a conversion ' +
+      '(BSA AIR or convertible turning into shares), change instrumentKind on ' +
+      'the SAME deal — never create a second one — and pass convertedAtISO; ' +
+      'the app then shows the before/after of the deal.',
     schema: {
       org: orgSlug,
       dealId: z.string(),
       instrumentKind: z.enum(INSTRUMENTS).optional(),
+      convertedAtISO: isoDateArg(
+        'Date of the conversion — only with a new instrumentKind',
+      ),
       viaSpvCompanyId: z.string().optional(),
       status: z
         .enum(['active', 'fully_exited', 'written_off', 'cancelled'])
@@ -858,7 +864,7 @@ export const mcpTools: Array<McpTool> = [
     write: true,
     run: async (ctx, actorUserId, { org, dealId, viaSpvCompanyId, ...fields }) => {
       const orgId = await orgIdFor(ctx, actorUserId, org)
-      const { instrumentKind, status, ...values } = fields
+      const { instrumentKind, convertedAtISO, status, ...values } = fields
       const updated = await ctx.runMutation(
         internal.agentTools.updateDealInternal,
         {
@@ -867,6 +873,7 @@ export const mcpTools: Array<McpTool> = [
           dealId: dealId as Id<'deals'>,
           viaSpvCompanyId: viaSpvCompanyId as Id<'companies'> | undefined,
           instrumentKind,
+          convertedAt: optionalISODate(convertedAtISO),
           status,
           ...dealValueArgs(values),
         },

@@ -291,6 +291,12 @@
       "pre": "Pre-conversion",
       "post": "Post-conversion"
     },
+    "conversion": {
+      "before": "Before",
+      "after": "After",
+      "summary": "{{from}} → {{to}}",
+      "summaryDated": "{{from}} → {{to}} · converted on {{date}}"
+    },
     "placement": {
       "latentGain": "Latent gain/loss"
     },
@@ -347,7 +353,8 @@
     "dealNamePlaceholder": "Custom name (optional)",
     "dealNameHint": "Leave empty to use the instrument as title.",
     "instrumentLabel": "Instrument",
-    "typeChangeNotice": "The type changes from {{from}} to {{to}}. The fields specific to {{from}} are kept but hidden — they'll reappear if you switch back to {{from}}.",
+    "typeChangeNotice": "The type changes from {{from}} to {{to}}. The fields specific to {{from}} are kept and stay readable in the sheet’s “Before” tab.",
+    "conversionDateLabel": "Conversion date",
     "targetLabel": "Target entity",
     "targetHint": "Reassign the deal to another portfolio company.",
     "targetPlaceholder": "Pick a company",

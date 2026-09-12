@@ -68,7 +68,8 @@ visible pendant qu'on fait défiler la page.
   propres au type d'instrument — montants, taux, dates, multiples — une par
   ligne, **éditables au clic** sur la valeur. Le type lui-même sert de titre à
   la fiche tant que le deal n'a pas de nom personnalisé ; on le change via
-  ⋯ → « Modifier ».
+  ⋯ → « Modifier ». Si le deal a été **converti** (voir ci-dessous), ce
+  panneau porte deux onglets **Avant / Après**.
 - **Panneau Royalties** (deals royalties) : les royalties perçues face au
   plancher et au plafond, puis le business plan initial trimestre par
   trimestre et les réels — les écarts et le BP dégradé sont calculés à
@@ -92,6 +93,44 @@ visible pendant qu'on fait défiler la page.
 - **Notes** : texte libre, sous les détails de l'instrument dans le panneau de
   droite, **éditables au clic** comme les autres lignes du panneau : on clique
   le texte, on écrit, on clique ailleurs — c'est enregistré. Échap annule.
+
+## Convertir un deal
+
+Un BSA AIR devient des actions, une obligation convertible se convertit, un BSA
+s'exerce : l'instrument change, mais **c'est le même investissement** — le même
+argent, la même ligne, les mêmes virements rattachés. On ne crée donc pas un
+second deal : on **change le type** du deal existant, via ⋯ → « Modifier ».
+
+Au moment où le type change, l'app demande la **date de conversion**. Elle est
+pré-remplie au jour même, mais une conversion se saisit souvent après coup :
+c'est la vraie date qu'il faut mettre, c'est elle qui sera affichée.
+
+Ensuite, la fiche garde les deux états côte à côte. Le panneau « Détails de
+l'instrument » porte deux onglets :
+
+- **Après** (ouvert par défaut) : les caractéristiques du nouvel instrument —
+  pour des actions, le tour, les valorisations, les titres, le prix par titre.
+- **Avant** : celles de l'ancien, telles qu'elles étaient avant la conversion —
+  pour un BSA AIR, le cap de valorisation, la décote, l'échéance de conversion.
+
+Entre les deux, une ligne rappelle le chemin et la date : « BSA AIR → Actions ·
+converti le 15 septembre 2026 ». Les deux onglets restent **éditables au clic**,
+donc on peut compléter après coup les caractéristiques de l'ancien instrument si
+elles n'avaient jamais été saisies.
+
+**Points d'attention** :
+
+- Une conversion **n'est pas une sortie** : le deal reste actif, rien n'est
+  encaissé, les indicateurs de performance ne bougent pas.
+- L'app mémorise la **dernière** conversion. Un instrument converti deux fois
+  (BSA AIR, puis obligation convertible, puis actions) n'affichera que la
+  dernière étape en « avant ».
+- Quelques caractéristiques sont **communes** aux deux instruments — la date de
+  closing, le nombre de titres. Elles ont une seule valeur, affichée
+  identiquement dans les deux onglets.
+- Un deal converti **avant** l'arrivée de cette fonctionnalité n'a pas de trace
+  de conversion : pour lui en donner une, repasser le type à l'ancien
+  instrument, enregistrer, puis reconvertir avec la bonne date.
 
 ## Gérer une sortie
 
