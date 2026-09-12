@@ -688,6 +688,10 @@ export const update = mutation({
       exitProceeds: v.optional(v.union(v.null(), v.number())),
       // Same pattern: explicit null detaches the placement's bank account.
       bankAccountId: v.optional(v.union(v.null(), v.id('bankAccounts'))),
+      // Date of the conversion, supplied by the edit dialog when the caller
+      // changes `instrumentKind`. `convertedFromKind` is NOT an argument: it
+      // is the type the row actually had, read server-side.
+      convertedAt: v.optional(v.number()), // ms epoch
     }),
   },
   handler: async (ctx, { id, patch }) => {
@@ -731,13 +735,31 @@ export const update = mutation({
     // the columns it actually writes (cf. KNOWN_ISSUES « Édition manuelle deals »).
     const editedFields = new Set(deal.manuallyEditedFields ?? [])
     for (const key of Object.keys(patch)) editedFields.add(key)
+    // A change of instrument type IS a conversion (BSA AIR → actions, OC →
+    // actions…): the row keeps the columns of both instruments, so the only
+    // thing to record is which kind it is leaving and when. Same row on
+    // purpose — no money moves and the position is unchanged.
+    const converting =
+      patch.instrumentKind != null &&
+      patch.instrumentKind !== deal.instrumentKind
     // Lifecycle: an explicit null on exitedDate/exitProceeds clears the field
     // (cancelling an exit). `null ?? undefined` → undefined, which tells
     // db.patch to drop the column; absent keys are left untouched (so editing
     // an unrelated field never wipes a recorded exit).
-    const { exitedDate, exitProceeds, bankAccountId, ...rest } = patch
+    const { exitedDate, exitProceeds, bankAccountId, convertedAt, ...rest } =
+      patch
     await ctx.db.patch("deals", id, {
       ...rest,
+      ...(converting
+        ? {
+            convertedFromKind: deal.instrumentKind,
+            convertedAt: convertedAt ?? Date.now(),
+          }
+        : // Outside a conversion the date is still patchable on its own, to
+          // correct a wrong one after the fact.
+          'convertedAt' in patch
+          ? { convertedAt }
+          : {}),
       ...('exitedDate' in patch ? { exitedDate: exitedDate ?? undefined } : {}),
       ...('exitProceeds' in patch
         ? { exitProceeds: exitProceeds ?? undefined }

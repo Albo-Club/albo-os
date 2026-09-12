@@ -123,6 +123,109 @@ describe('deals: creation + investor guard', () => {
   })
 })
 
+/**
+ * A conversion (BSA AIR → actions, OC → actions…) is a change of instrument
+ * type on the SAME row: no money moves and the position is unchanged, so the
+ * matched transactions stay attached. The columns of both instruments coexist
+ * on the row — `convertedFromKind` / `convertedAt` are what let the deal sheet
+ * tell the before from the after.
+ */
+describe('deals: conversion trace', () => {
+  test('a type change records the kind left behind, with the given date', async () => {
+    const { t, user, org } = await orgSetup('org-convert')
+    const target = await createPortfolioCompany(t, org.orgId, 'Eclo')
+
+    const dealId = await user.as.mutation(api.deals.create, {
+      orgId: org.orgId,
+      investorCompanyId: org.rootCompanyId,
+      targetCompanyId: target,
+      instrumentKind: 'bsa_air',
+      committedAmount: 10_000_000,
+      valuationCap: 500_000_000,
+      discount: 2000, // 20 %
+    })
+
+    const convertedAt = Date.UTC(2026, 8, 15)
+    await user.as.mutation(api.deals.update, {
+      id: dealId,
+      patch: {
+        instrumentKind: 'share',
+        sharesAcquired: 4456,
+        convertedAt,
+      },
+    })
+
+    const deal = await t.run(async (ctx) => ctx.db.get('deals', dealId))
+    expect(deal).toMatchObject({
+      instrumentKind: 'share',
+      convertedFromKind: 'bsa_air',
+      convertedAt,
+      sharesAcquired: 4456,
+      // The BSA AIR parameters survive the conversion — they are what the
+      // "before" tab reads.
+      valuationCap: 500_000_000,
+      discount: 2000,
+    })
+  })
+
+  test('a conversion with no date falls back to the moment it is recorded', async () => {
+    const { t, user, org } = await orgSetup('org-convert-nodate')
+    const target = await createPortfolioCompany(t, org.orgId, 'Target')
+    const dealId = await user.as.mutation(api.deals.create, {
+      orgId: org.orgId,
+      investorCompanyId: org.rootCompanyId,
+      targetCompanyId: target,
+      instrumentKind: 'oc',
+    })
+
+    const before = Date.now()
+    await user.as.mutation(api.deals.update, {
+      id: dealId,
+      patch: { instrumentKind: 'share' },
+    })
+
+    const deal = await t.run(async (ctx) => ctx.db.get('deals', dealId))
+    expect(deal?.convertedFromKind).toBe('oc')
+    expect(deal?.convertedAt).toBeGreaterThanOrEqual(before)
+  })
+
+  test('an edit that is not a type change leaves the trace alone', async () => {
+    const { t, user, org } = await orgSetup('org-convert-edit')
+    const target = await createPortfolioCompany(t, org.orgId, 'Target')
+    const dealId = await user.as.mutation(api.deals.create, {
+      orgId: org.orgId,
+      investorCompanyId: org.rootCompanyId,
+      targetCompanyId: target,
+      instrumentKind: 'bsa_air',
+    })
+    const convertedAt = Date.UTC(2026, 8, 15)
+    await user.as.mutation(api.deals.update, {
+      id: dealId,
+      patch: { instrumentKind: 'share', convertedAt },
+    })
+
+    // Re-saving the same type is not a conversion: the trace must not move.
+    await user.as.mutation(api.deals.update, {
+      id: dealId,
+      patch: { instrumentKind: 'share', pricePerShare: 2300 },
+    })
+    let deal = await t.run(async (ctx) => ctx.db.get('deals', dealId))
+    expect(deal).toMatchObject({ convertedFromKind: 'bsa_air', convertedAt })
+
+    // The date alone stays patchable, to correct a wrong one after the fact.
+    const corrected = Date.UTC(2026, 8, 1)
+    await user.as.mutation(api.deals.update, {
+      id: dealId,
+      patch: { convertedAt: corrected },
+    })
+    deal = await t.run(async (ctx) => ctx.db.get('deals', dealId))
+    expect(deal).toMatchObject({
+      convertedFromKind: 'bsa_air',
+      convertedAt: corrected,
+    })
+  })
+})
+
 describe('companies: SIREN uniqueness (mutation-enforced)', () => {
   test('two companies of the same org cannot share a SIREN', async () => {
     const { user, org } = await orgSetup()

@@ -3842,6 +3842,64 @@ ce mapping ailleurs. Décisions non-évidentes :
       `LeadSpvPanel` n'expose qu'un bouton « Modifier » qui appelle `onEdit`
       (ouvre ce même dialog).
 
+## Conversion d'un deal (BSA AIR → actions) : même ligne, et ce que ça coûte
+
+**Une conversion est un changement de `instrumentKind` sur la MÊME ligne**, pas
+un second deal. C'est délibéré et ça ne se rediscute pas à la légère : aucun
+argent ne bouge lors d'une conversion, la position économique est la même, et
+le virement de souscription est **pointé sur le deal** — en scindant, il
+faudrait choisir laquelle des deux lignes le porte, et la participation
+compterait double dans les listes et les KPIs. La règle générale du schéma
+(« follow-on = new deal ») ne s'applique pas ici : un follow-on remet de
+l'argent, une conversion non.
+
+Les colonnes de l'ancien instrument **survivent** au changement de type (le
+patch est partiel, cf. § « Édition manuelle deals ») — ce qu'une ligne seule ne
+peut pas dire, c'est qu'elle a été autre chose. D'où les deux colonnes
+`deals.convertedFromKind` / `convertedAt`, écrites par `deals.update` quand
+`instrumentKind` change, et lues par les onglets **Avant / Après** du panneau
+« Détails de l'instrument » (`InstrumentBlock.tsx`).
+
+Trois limites assumées, toutes conséquences du choix « une seule ligne » :
+
+1. **Une colonne partagée par les deux instruments affiche la même valeur des
+   deux côtés.** `closingDate` et `sharesAcquired` sont dans `SAFE_FIELDS`
+   **et** dans `EQUITY_FIELDS` : il n'y a qu'une colonne en base, donc réécrire
+   la date de closing avec celle du tour de conversion réécrit aussi l'« avant ».
+   C'est le prix de ne pas figer un snapshot. Si ça devient gênant en usage
+   réel, la suite est une table `dealConversions` portant le snapshot des
+   champs à la date de bascule — les deux colonnes en deviennent la dernière
+   ligne, sans perte.
+2. **Seule la DERNIÈRE conversion est mémorisée.** BSA AIR → OC → actions
+   afficherait l'OC en « avant ». Non traité : le cas n'a jamais eu lieu.
+3. **L'« avant » est la vue PRÉ-conversion de l'ancien type**, pas sa liste
+   complète : `preConversionFields()` coupe au marqueur `SAFE_SPLIT_FIELD`
+   (donc pour `safe` / `bsa_air` / `oc`), sinon rend la liste entière (`bsa`,
+   qui n'a pas de marqueur). Raison : la moitié post-conversion de ces configs
+   (`conversionValuation`, `sharesAcquired`, `ownershipPct`) décrit précisément
+   l'**après** — la mettre dans l'onglet « Avant » ferait dire à l'ancien
+   instrument ce qu'il est devenu.
+
+⚠️ **`deals.update` n'est pas le seul chemin d'écriture de `instrumentKind`** —
+et c'est le seul qui pose la trace. `airtableImport.upsertDeals` et l'outil
+`updateDeal` de `agentTools.ts` (agent IA + serveur MCP) patchent la colonne
+**directement** (`ctx.db.patch`). Pour l'import c'est voulu : corriger un type
+mal mappé n'est pas une conversion. Pour l'agent, c'est un **trou assumé au
+moment de la livraison** : une conversion demandée à l'assistant ne laissera pas
+de trace et la fiche n'affichera pas d'onglets. Si on décide de le combler, la
+dérivation est la même que dans `deals.update` (l'agent n'a pas de date à
+proposer → le repli `Date.now()` s'applique).
+
+`convertedFromKind` n'est **pas** un argument de mutation : c'est le type que la
+ligne portait, lu côté serveur. Un appelant ne peut donc pas déclarer un passé
+qu'il n'a pas eu. Conséquence pratique pour un deal converti **avant** cette
+fonctionnalité (Eclo Beauty, seul cas connu) : il n'a pas de trace, et la seule
+façon de lui en donner une depuis l'app est de repasser le type à l'ancien puis
+de reconvertir avec la bonne date — deux saves, l'état final est correct. La
+date, elle, reste patchable seule (`convertedAt` dans le patch), pour corriger
+après coup.
+
+
 ## Documents & rapports : deux surfaces, et pourquoi on a re-séparé
 
 ### Ce qui s'est passé
