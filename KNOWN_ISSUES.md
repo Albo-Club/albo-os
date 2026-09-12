@@ -3880,15 +3880,19 @@ Trois limites assumées, toutes conséquences du choix « une seule ligne » :
    l'**après** — la mettre dans l'onglet « Avant » ferait dire à l'ancien
    instrument ce qu'il est devenu.
 
-⚠️ **`deals.update` n'est pas le seul chemin d'écriture de `instrumentKind`** —
-et c'est le seul qui pose la trace. `airtableImport.upsertDeals` et l'outil
-`updateDeal` de `agentTools.ts` (agent IA + serveur MCP) patchent la colonne
-**directement** (`ctx.db.patch`). Pour l'import c'est voulu : corriger un type
-mal mappé n'est pas une conversion. Pour l'agent, c'est un **trou assumé au
-moment de la livraison** : une conversion demandée à l'assistant ne laissera pas
-de trace et la fiche n'affichera pas d'onglets. Si on décide de le combler, la
-dérivation est la même que dans `deals.update` (l'agent n'a pas de date à
-proposer → le repli `Date.now()` s'applique).
+⚠️ **`deals.update` n'est pas le seul chemin d'écriture de `instrumentKind`**,
+et la règle est **dupliquée à dessein**. Trois écrivains :
+
+- `deals.update` (fiche + dialogue d'édition) — pose la trace.
+- `agentTools.updateDealInternal` (outil `updateDeal` du serveur MCP ; l'outil
+  du chat, lui, n'expose pas `instrumentKind`) — patche la ligne **lui-même**,
+  sans passer par `deals.update`, donc il **porte sa propre copie** de la
+  dérivation. Les deux doivent rester alignées : un troisième écrivain de
+  `instrumentKind` devra la porter aussi. Le MCP prend la date en
+  `convertedAtISO`, avec le même repli `Date.now()` si elle manque.
+- `airtableImport.upsertDeals` — patche la colonne **sans** poser de trace, et
+  c'est **voulu** : corriger un type mal mappé à l'import n'est pas une
+  conversion.
 
 `convertedFromKind` n'est **pas** un argument de mutation : c'est le type que la
 ligne portait, lu côté serveur. Un appelant ne peut donc pas déclarer un passé

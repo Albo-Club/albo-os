@@ -224,6 +224,47 @@ describe('deals: conversion trace', () => {
       convertedAt: corrected,
     })
   })
+
+  test('the agent/MCP path records the trace too', async () => {
+    const { t, user, org } = await orgSetup('org-convert-agent')
+    const target = await createPortfolioCompany(t, org.orgId, 'Target')
+    const dealId = await user.as.mutation(api.deals.create, {
+      orgId: org.orgId,
+      investorCompanyId: org.rootCompanyId,
+      targetCompanyId: target,
+      instrumentKind: 'bsa_air',
+      valuationCap: 500_000_000,
+    })
+
+    // `updateDealInternal` does NOT go through `deals.update` — it patches the
+    // row itself, so it carries its own copy of the conversion rule.
+    const convertedAt = Date.UTC(2026, 8, 15)
+    await t.mutation(internal.agentTools.updateDealInternal, {
+      orgId: org.orgId,
+      actorUserId: user.userId,
+      dealId,
+      instrumentKind: 'share',
+      convertedAt,
+    })
+
+    const deal = await t.run(async (ctx) => ctx.db.get('deals', dealId))
+    expect(deal).toMatchObject({
+      instrumentKind: 'share',
+      convertedFromKind: 'bsa_air',
+      convertedAt,
+      valuationCap: 500_000_000,
+    })
+
+    // An update that does not change the type leaves the trace alone.
+    await t.mutation(internal.agentTools.updateDealInternal, {
+      orgId: org.orgId,
+      actorUserId: user.userId,
+      dealId,
+      paidAmount: 10_000_000,
+    })
+    const after = await t.run(async (ctx) => ctx.db.get('deals', dealId))
+    expect(after).toMatchObject({ convertedFromKind: 'bsa_air', convertedAt })
+  })
 })
 
 describe('companies: SIREN uniqueness (mutation-enforced)', () => {

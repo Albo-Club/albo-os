@@ -71,13 +71,18 @@ instrument, enregistrer, puis reconvertir avec la bonne date.
 >   décrit l'après, pas l'avant.
 > - `EditDealDialog` (`deals.$dealId.tsx`) : champ **Date de conversion** sous
 >   le bandeau d'avertissement dès que le type change, requis pour enregistrer.
+> - Même règle **dupliquée** dans `agentTools.updateDealInternal` (outil
+>   `updateDeal` du serveur MCP, date en `convertedAtISO`) : ce chemin patche
+>   la ligne lui-même sans passer par `deals.update`. Les deux dérivations
+>   doivent rester alignées — cf. `KNOWN_ISSUES.md`.
 > - Limite assumée : une colonne présente dans les **deux** listes de champs
 >   (`closingDate`, `sharesAcquired`) n'a qu'une valeur en base, donc identique
 >   des deux côtés. La suite, si besoin, est une table `dealConversions` avec
 >   snapshot figé — cf. `KNOWN_ISSUES.md` « Conversion d'un deal ».
-> - Couverture : 3 tests dans `convex/regression.deals.test.ts` (trace écrite
+> - Couverture : 4 tests dans `convex/regression.deals.test.ts` (trace écrite
 >   avec la date fournie, repli sur l'instant sinon, trace intacte hors
->   changement de type). TESTING.md FD45/FD46, FD15 mis à jour.
+>   changement de type, chemin agent/MCP). TESTING.md FD45/FD46, FD15 mis à
+>   jour.
 
 ## v1.228.1 — 11/09/2026 à 16:55 — Une banque connectée deux fois n'importe plus les mouvements en double
 

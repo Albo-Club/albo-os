@@ -1385,6 +1385,7 @@ en place derrière lui : c'est l'amont, plus une URL à documenter.
 | M20 | `createDeal` avec `instrumentKind:"dat"`                                                               | `url` pointe `/placements/<id>` et non `/deals/<id>` (routage placement de trésorerie)                            |
 | M21 | Depuis claude.ai, demander une création (« crée la société … »)                                        | Claude demande confirmation avant l'appel (annotation `readOnlyHint: false`) et restitue le lien de la fiche      |
 | M22 | `updateCompany {org, companyId, siren:""}`                                                             | SIREN vidé sur la fiche, aucun autre champ modifié                                                                |
+| M23 | `updateDeal {org, dealId:<un deal `bsa_air`>, instrumentKind:"share", convertedAtISO:"2026-09-15"}` | Le deal passe en Actions **sur la même ligne** (pas de second deal) et sa fiche affiche les onglets **Avant / Après** avec « BSA AIR → Actions · converti le 15 sept. 2026 » — même résultat que par le dialogue (FD45). Sans `convertedAtISO`, la trace est posée à l'instant de l'appel. Un `updateDeal` **sans** `instrumentKind` ne touche pas la trace |
 
 > Nettoyage : archiver/supprimer dans l'app les sociétés et deals « Zzz Test »
 > créés par M13-M20 — ce sont de vraies écritures en base.
