@@ -5223,6 +5223,17 @@ Deux limites assumées :
   qui nommerait les deux part en revue au lieu d'atterrir sur l'une. Une
   seule collision dans le portefeuille au 26/08/2026 — les trois fiches
   `Banco (…)`, sans domaine, qui n'accrochaient déjà rien.
+  Corollaire payé cher : tant que le **véhicule** est écrit DEVANT
+  (« SIDE  TIMELEFT », « ASTERION SIDE BOCOLOCO »), l'aiguille cherchée est
+  ce nom-là en entier, qu'aucun fondateur n'écrit — la fiche ne pouvait donc
+  se rattacher que par le domaine de l'auteur, donc plus du tout dès que le
+  report est transféré par un tiers (contact investisseurs, co-investisseur).
+  48 fiches `calte` étaient dans ce cas, remises à l'endroit par
+  `migrations/renameSideVehicles` (09/2026). Le réflexe : **un préfixe de
+  véhicule n'est pas un préfixe, c'est une annotation** — il va en fin de nom
+  entre parenthèses. Sauf quand le fonds EST la participation (`SIDE 1`,
+  `ASTERION F2`, sur un domaine partagé où `identityKey` est le nom) : là, le
+  déplacer casserait le rattachement au lieu de le réparer.
 - Deux entités d'une **même boîte** nommées différemment sur un domaine de
   sponsor ne fanent plus ensemble (`Oprtrs & Co` côté Albo vs `OPRTRS CLUB`
   côté Calte ; `Parallel Invest SPV 13 (Bernay)` vs `Parallel Invest SPV13`).
