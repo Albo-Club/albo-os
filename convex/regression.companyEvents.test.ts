@@ -283,7 +283,7 @@ describe('companyEvents: journal written by the deal mutations', () => {
 
     const result = await t.mutation(
       internal.migrations.backfillCompanyEvents.apply,
-      { source: 'matching' },
+      { source: 'matching', chain: false },
     )
     expect(result).toMatchObject({ written: 4, removed: 0, unattributable: 0 })
 
@@ -304,7 +304,7 @@ describe('companyEvents: journal written by the deal mutations', () => {
     // Idempotent: a second run writes nothing.
     const again = await t.mutation(
       internal.migrations.backfillCompanyEvents.apply,
-      { source: 'matching' },
+      { source: 'matching', chain: false },
     )
     expect(again.written).toBe(0)
   })
@@ -362,7 +362,7 @@ describe('companyEvents: journal written by the deal mutations', () => {
 
     const result = await t.mutation(
       internal.migrations.backfillCompanyEvents.apply,
-      { source: 'matching' },
+      { source: 'matching', chain: false },
     )
     expect(result).toMatchObject({ written: 0, removed: 1, unattributable: 1 })
     const dry = await t.query(
@@ -563,17 +563,17 @@ describe('companyEvents: journal written by the deal mutations', () => {
     })
     const reports = await t.mutation(
       internal.migrations.backfillCompanyEvents.apply,
-      { source: 'reports' },
+      { source: 'reports', chain: false },
     )
     const vault = await t.mutation(
       internal.migrations.backfillCompanyEvents.apply,
-      { source: 'vault' },
+      { source: 'vault', chain: false },
     )
     expect(reports.written).toBe(1)
     expect(vault.written).toBe(1)
     const again = await t.mutation(
       internal.migrations.backfillCompanyEvents.apply,
-      { source: 'reports' },
+      { source: 'reports', chain: false },
     )
     expect(again.written).toBe(0)
     const rows = await user.as.query(api.companyEvents.listByCompany, {
@@ -591,7 +591,7 @@ describe('companyEvents: journal written by the deal mutations', () => {
       internal.migrations.backfillCompanyEvents.dryRun,
       {},
     )
-    expect(dry.candidates).toMatchObject({ reports: 1, vault: 1 })
+    expect(dry.candidates).toMatchObject({ vault: 1 })
   })
 
   test('the backfill skips what the Airtable import copied in bulk', async () => {
@@ -621,6 +621,7 @@ describe('companyEvents: journal written by the deal mutations', () => {
     })
     await t.mutation(internal.migrations.backfillCompanyEvents.apply, {
       source: 'deals',
+      chain: false,
     })
     const rows = await user.as.query(api.companyEvents.listByCompany, {
       companyId: target,
@@ -650,11 +651,12 @@ describe('companyEvents: journal written by the deal mutations', () => {
       internal.migrations.backfillCompanyEvents.apply,
       {
         source: 'deals',
+        chain: false,
       },
     )
     const second = await t.mutation(
       internal.migrations.backfillCompanyEvents.apply,
-      { source: 'deals' },
+      { source: 'deals', chain: false },
     )
     expect(first.written).toBe(1)
     expect(second.written).toBe(0)

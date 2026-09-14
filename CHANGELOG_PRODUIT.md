@@ -23,6 +23,24 @@ bas de page.
 
 ---
 
+## v1.232.1 — 14/09/2026 à 20:52 — Reprise du journal : une commande par source, sans curseur
+
+La reprise de l'historique du journal d'activité enchaîne désormais ses pages
+toute seule : une commande par source, plus de curseur à recopier. Les
+reports sont lus par tout petits lots, car chaque ligne porte le texte
+complet du mail et un lot de 500 dépassait la limite de lecture d'une
+fonction. Le comptage à blanc ne compte plus les reports pour la même
+raison ; on suit l'avancement au compteur `already`.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/backfillCompanyEvents.ts` : `apply` prend `chain`
+>   (défaut vrai) et planifie la page suivante via `ctx.scheduler.runAfter`
+>   tant que `isDone` est faux ; `REPORT_BATCH = 5` pour `companyReports`
+>   (règle CLAUDE.md « gros champ texte sur une ligne lue en liste ») ;
+>   `dryRun` ne lit plus `companyReports` (`note` explicite). Tests en pages
+>   manuelles (`chain: false`).
+
 ## v1.232.0 — 14/09/2026 à 20:36 — Les comptes-titres se mettent à jour en déposant le relevé
 
 Certaines banques ne livrent pas les comptes-titres à l'agrégation bancaire —
