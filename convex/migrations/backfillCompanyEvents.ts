@@ -27,6 +27,13 @@
  *                        author.
  * - `documents` with a `dealId` → `document_attached` by `uploadedBy` at
  *                        `uploadedAt`.
+ * - `companyReports`   → `report_received` at the mail date, by the member
+ *                        who forwarded / uploaded it (`inboundEmails.
+ *                        senderUserId`), by Parallel for a portal
+ *                        publication, no author otherwise. Detachments and
+ *                        deletions are gone with their rows: not rebuilt.
+ * - vault `documents`  (company anchor, no deal, not a report's file) →
+ *                        `vault_document_added` by `uploadedBy`.
  *
  * Only what happened IN Albo OS is reconstructed. The Airtable import is a
  * bulk copy of a history that predates the app, so a row it created (deal or
@@ -49,6 +56,8 @@
  *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"matching"}'
  *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"valuations"}'
  *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"documents"}'
+ *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"reports"}'
+ *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"vault"}'
  */
 import { v } from 'convex/values'
 import { internalMutation, internalQuery } from '../_generated/server'
@@ -61,6 +70,8 @@ const sourceValidator = v.union(
   v.literal('matching'),
   v.literal('valuations'),
   v.literal('documents'),
+  v.literal('reports'),
+  v.literal('vault'),
 )
 const BATCH = 500
 
@@ -155,21 +166,87 @@ async function upsert(
   event: CompanyEvent,
 ): Promise<number> {
   if (!deal) return 0
+  return await upsertOn(
+    ctx,
+    key,
+    { orgId: deal.orgId, companyId: deal.targetCompanyId, dealId: deal._id },
+    at,
+    actor,
+    event,
+  )
+}
+
+/** Same, anchored on a company (deal optional) — the company-level rows. */
+async function upsertOn(
+  ctx: MutCtx,
+  key: string,
+  target: {
+    orgId: Id<'organizations'>
+    companyId: Id<'companies'>
+    dealId?: Id<'deals'>
+  },
+  at: number,
+  actor: CompanyEventActor,
+  event: CompanyEvent,
+): Promise<number> {
   const existing = await ctx.db
     .query('companyEvents')
     .withIndex('by_backfill_key', (q) => q.eq('backfillKey', key))
     .first()
   if (existing) return 0
   await ctx.db.insert('companyEvents', {
-    orgId: deal.orgId,
-    companyId: deal.targetCompanyId,
-    dealId: deal._id,
+    ...target,
     at,
     actor,
     event,
     backfillKey: key,
   })
   return 1
+}
+
+/** A stored report as a `report_received` row: credited to the member who
+ * forwarded / uploaded it (the source mail says), to Parallel for a portal
+ * publication, to nobody when the mail is gone. Rows the Albo app import
+ * copied (`alboReportId`) predate the app and are skipped. */
+async function reportEvent(
+  ctx: MutCtx,
+  report: Doc<'companyReports'>,
+): Promise<{
+  at: number
+  actor: CompanyEventActor
+  event: CompanyEvent
+} | null> {
+  if (report.alboReportId) return null
+  const email = report.inboundEmailId
+    ? await ctx.db.get('inboundEmails', report.inboundEmailId)
+    : null
+  const channel = report.source
+  const actor: CompanyEventActor =
+    channel === 'vasco'
+      ? { kind: 'system', source: 'vasco' }
+      : email?.senderUserId
+        ? { kind: 'user', userId: email.senderUserId }
+        : UNKNOWN
+  const label = report.reportPeriod ?? report.title ?? report.subject ?? ''
+  return {
+    at: report.emailDate ?? report.processedAt ?? report._creationTime,
+    actor,
+    event: {
+      kind: 'report_received',
+      channel,
+      label,
+      ...(channel === 'email' && report.fromEmail
+        ? { fromEmail: report.fromEmail }
+        : {}),
+    },
+  }
+}
+
+/** A vault row: filed under the company, not a deal's, not a report's. */
+function isVaultDocument(doc: Doc<'documents'>): boolean {
+  return Boolean(
+    doc.companyId && !doc.dealId && !doc.reportId && doc.uploadedBy,
+  )
 }
 
 const UNKNOWN: CompanyEventActor = { kind: 'unknown' }
@@ -195,14 +272,19 @@ export const dryRun = internalQuery({
     const valuations = (await ctx.db.query('valuations').collect()).filter(
       (val) => !val.airtableId,
     ).length
-    const documents = (await ctx.db.query('documents').collect()).filter(
+    const allDocuments = await ctx.db.query('documents').collect()
+    const documents = allDocuments.filter(
       (d) => d.dealId && d.uploadedBy,
+    ).length
+    const vault = allDocuments.filter(isVaultDocument).length
+    const reports = (await ctx.db.query('companyReports').collect()).filter(
+      (r) => !r.alboReportId,
     ).length
     const already = (await ctx.db.query('companyEvents').collect()).filter(
       (e) => e.backfillKey,
     ).length
     return {
-      candidates: { deals, matching, valuations, documents },
+      candidates: { deals, matching, valuations, documents, reports, vault },
       unattributable,
       already,
     }
@@ -315,6 +397,40 @@ export const apply = internalMutation({
             doc.uploadedAt,
             { kind: 'user', userId: doc.uploadedBy },
             { kind: 'document_attached', title: doc.title },
+          )
+        }
+        ;({ continueCursor, isDone } = page)
+        break
+      }
+      case 'reports': {
+        const page = await ctx.db.query('companyReports').paginate(opts)
+        for (const report of page.page) {
+          const ev = await reportEvent(ctx, report)
+          if (!ev) continue
+          written += await upsertOn(
+            ctx,
+            `rep:${report._id}`,
+            { orgId: report.orgId, companyId: report.companyId },
+            ev.at,
+            ev.actor,
+            ev.event,
+          )
+        }
+        ;({ continueCursor, isDone } = page)
+        break
+      }
+      case 'vault': {
+        const page = await ctx.db.query('documents').paginate(opts)
+        for (const doc of page.page) {
+          if (!isVaultDocument(doc) || !doc.companyId || !doc.uploadedBy)
+            continue
+          written += await upsertOn(
+            ctx,
+            `doc:${doc._id}`,
+            { orgId: doc.orgId, companyId: doc.companyId },
+            doc.uploadedAt,
+            { kind: 'user', userId: doc.uploadedBy },
+            { kind: 'vault_document_added', title: doc.title },
           )
         }
         ;({ continueCursor, isDone } = page)

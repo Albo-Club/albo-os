@@ -120,7 +120,10 @@ export const run = internalMutation({
       }
     }
     for (const report of doomed) {
-      await removeReportForCompany(ctx, report, { deleteFiles: true })
+      await removeReportForCompany(ctx, report, {
+        deleteFiles: true,
+        actor: { kind: 'system', source: 'vasco' },
+      })
     }
     for (const inboundEmailId of inboundIds) {
       if (await ctx.db.get('inboundEmails', inboundEmailId)) {

@@ -23,6 +23,51 @@ bas de page.
 
 ---
 
+## v1.231.0 — 14/09/2026 à 20:13 — Le journal de la fiche société suit les reports et le coffre
+
+La section **Activité** de la fiche société ne se limite plus aux deals.
+Elle enregistre maintenant ce qui arrive à la société elle-même :
+
+- **Reports** : un reporting transmis par email est journalisé au nom de la
+  personne qui l'a transféré, avec l'expéditeur d'origine (« Clément a
+  transmis le reporting « Q2 2026 » (envoyé par i.milli@…) ») ; un dépôt à la
+  main, au nom de qui l'a déposé ; une publication sur le portail Parallel,
+  au nom de Parallel. Un renvoi corrigé donne « a renvoyé …, version
+  corrigée » ; un renvoi strictement identique n'écrit rien.
+- **Gestes sur la file** : rattacher un mail à une société, le stocker malgré
+  un doute de doublon, relancer son analyse, détacher un report de la fiche,
+  le supprimer.
+- **Coffre** : un document ajouté, renommé ou reclassé, retiré. Les fichiers
+  propres à un report ne font pas de ligne à part, le report suffit.
+
+Le passé est repris une fois de plus, avec la même mécanique : les reports
+déjà en base sont crédités à qui les a transférés ou déposés, ou à Parallel ;
+les documents du coffre à qui les a déposés. Les détachements et suppressions
+passés ne se reconstruisent pas, leurs lignes ont disparu.
+
+> **🔧 Notes techniques**
+>
+> - `convex/schema.ts` : neuf types d'événements société sans `dealId`
+>   (`report_received` avec `channel` email/upload/vasco et `fromEmail`,
+>   `report_updated`, `report_assigned`, `report_detached`, `report_deleted`,
+>   `report_reprocessed`, `vault_document_added/removed/updated`).
+> - `convex/lib/companyEvents.ts` : `logCompanyEvent` (ancre société),
+>   `reportActor` (forwarder → user, portail → `system:vasco`, sinon
+>   `unknown`), `reportChannel`.
+> - Accroches : `reportStore.storeForCompany` (received / updated, daté du mail,
+>   muet sur `sameSource` ou twin inchangé), `reportInbox.assignCompany` /
+>   `storeAnyway` (assigned par entité), `reprocess` (avant l'effacement du
+>   match), `removeReportForCompany` (paramètre `actor`, detached / deleted),
+>   `documents.create/update/remove` (coffre : ancre société sans deal ni
+>   report ; update muet si titre et type inchangés).
+> - Garde-fou `tests/journalGuards.test.ts` : `companyReports` et `documents`
+>   rejoignent `JOURNALED` ; les écritures de tenue d'état (OCR, index,
+>   classement auto) sont exemptées avec leur raison.
+> - Reprise : sources `reports` (hors `alboReportId`, acteur via
+>   `inboundEmails.senderUserId`) et `vault` dans
+>   `convex/migrations/backfillCompanyEvents.ts`.
+> - Quatre cas ajoutés dans `convex/regression.companyEvents.test.ts`.
+
 ## v1.230.2 — 14/09/2026 à 19:46 — Le journal voit un virement quitter son deal, par tous les chemins
 
 Deux corrections sur le journal d'activité, trouvées sur la fiche Marble qui
