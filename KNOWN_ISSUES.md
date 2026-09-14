@@ -2155,6 +2155,33 @@ pièces jointes. L'import écrit ses lignes lui-même et **saute** au lieu de
 patcher. Même raison pour `companyIntelligence.latestReportId`, laissé
 intact : un import historique ne doit pas repointer la synthèse courante.
 
+## `processedAt` date le RUN, jamais l'arrivée
+
+`companyReports` porte deux dates qui ne disent pas la même chose :
+`emailDate` est l'**arrivée** (date du mail transféré, date de publication du
+portail pour une publication digérée — `vascoIngest.receivedAtOf`), et
+`processedAt` l'instant où le pipeline a **fini de lire**
+(`Date.now()` dans `reportStore.storeForCompany`). La frise de la fiche
+société lisait `processedAt ?? emailDate` : juste par accident sur un mail
+traité à la volée — les deux tombent dans la même minute —, faux de plusieurs
+mois dès que le report entre autrement. La reprise VASCO du 09/09/2026 a daté
+de ce jour-là la publication Wandercraft × Renault du 16/03, et l'import de
+l'ancienne app Albo date du jour de l'import des reports dont il conserve
+pourtant l'`emailDate` d'origine.
+
+Le piège est que `processedAt` est **repatché à chaque écriture** : un renvoi
+corrigé ou un « Retraiter » déplace la date affichée sans que rien n'ait bougé
+côté expéditeur. Deux réflexes. Une date montrée à l'utilisateur se lit sur
+`emailDate`, `processedAt` ne servant que de secours. Et c'est déjà ce que fait
+la fraîcheur de la fiche (`recordReportOnCompany({ receivedAt: emailDate })`) :
+dès que deux surfaces datent le même objet, elles doivent lire le même champ,
+sinon le badge « À jour » et la ligne juste en dessous se contredisent.
+
+Corollaire de libellé : une publication de portail n'est pas **reçue**, elle
+est **publiée**. Le report qui en est digéré porte donc « Publié le », comme
+l'entrée portail qu'affiche la frise quand la publication n'a pas été digérée
+— d'où `source` dans le retour de `companyReports.listByCompany`.
+
 ## Retirer un report — l'empreinte à défaire, et le blob qui se compte
 
 Ranger un report écrit **cinq** choses par entité rattachée

@@ -229,10 +229,21 @@ function ReportEntry({
   isLatest: boolean
   onOpen: () => void
 }) {
-  const { t } = useTranslation('participations')
+  const { t } = useTranslation(['participations', 'vasco'])
   const { fmtDate } = useFormatters()
   const relAge = useRelativeAge()
-  const received = report.processedAt ?? report.emailDate
+  // When it ARRIVED, not when we read it: the email's own date, and for a
+  // portal publication the date the portal published it. `processedAt` — the
+  // moment the pipeline finished the analysis — only stands in when that is
+  // missing, because it is the date of whatever RUN produced the report: a
+  // historical backfill or a re-run dates a March publication from today.
+  const received = report.emailDate ?? report.processedAt
+  // A portal publication was published, not received — same wording as the
+  // portal entry the fiche shows for a communication left undigested.
+  const dateKey =
+    report.source === 'vasco'
+      ? 'vasco:communications.publishedOn'
+      : 'reports.history.received'
   const title = report.reportPeriod ?? report.title ?? t('reports.untitled')
 
   return (
@@ -255,8 +266,8 @@ function ReportEntry({
       preview={report.headline}
       meta={
         received == null
-          ? t('reports.history.received', { date: '—' })
-          : `${t('reports.history.received', { date: fmtDate(received) })} · ${relAge(received)}`
+          ? t(dateKey, { date: '—' })
+          : `${t(dateKey, { date: fmtDate(received) })} · ${relAge(received)}`
       }
       attachments={<ReportDocsButton docs={docs} />}
       onOpen={onOpen}
@@ -470,7 +481,7 @@ export function CompanyReportsSection({
     if (!reports) return undefined
     const rows: Array<Entry> = []
     for (const report of reports) {
-      const received = report.processedAt ?? report.emailDate ?? 0
+      const received = report.emailDate ?? report.processedAt ?? 0
       const rank = report.reportPeriod ? periodRank(report.reportPeriod) : null
       rows.push({
         key: report._id,
