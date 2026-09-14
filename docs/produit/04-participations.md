@@ -168,8 +168,13 @@ La colonne principale, dans l'ordre de lecture :
   [Intégrations](15-integrations.md)).
   - **Ce qui classe une ligne, c'est sa date** : la période couverte quand
     elle existe (un reporting de janvier se range en janvier même s'il est
-    déposé en mars), la date de réception sinon — et la ligne dit toujours
+    déposé en mars), la date d'arrivée sinon — et la ligne dit toujours
     laquelle des deux elle affiche.
+  - **La date sous une ligne est celle de son arrivée**, pas celle de son
+    analyse : la date du mail pour un reporting transféré, la date de
+    publication sur le portail pour un reporting repris de VASCO — qui dit
+    alors « Publié le ». Un lot repris des mois après coup garde donc ses
+    dates d'origine plutôt que celle de la reprise.
   - **Une période se classe par sa fin**, ce qui met les récapitulatifs à leur
     place : un rapport annuel « 2025 » passe **au-dessus** de « Décembre
     2025 », un trimestre au-dessus de son dernier mois. À période égale, c'est

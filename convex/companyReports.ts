@@ -62,6 +62,11 @@ export const listByCompany = query({
         reportType: r.reportType ?? null,
         status: r.status,
         fromEmail: r.fromEmail ?? null,
+        // The feed dates a row on `emailDate` — the arrival: the email's own
+        // date, or the portal's publication date on a digested publication.
+        // `source` is what lets it say "published" rather than "received" on
+        // the latter, the wording an undigested portal entry already carries.
+        source: r.source,
         emailDate: r.emailDate ?? null,
         processedAt: r.processedAt ?? null,
         // The portal publication this report was digested from, so the fiche

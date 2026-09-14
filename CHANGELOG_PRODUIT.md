@@ -65,6 +65,35 @@ reconstructibles.
 > - `convex/migrations/backfillCompanyEvents.ts` : sources `companies`,
 >   `kpis`, `projections`. Section Activité et i18n fr/en, 5 cas de
 >   régression.
+## v1.232.2 — 14/09/2026 à 21:30 — La date d'un rapport est celle de son arrivée
+
+Dans « Rapports & communications » d'une fiche société, la date affichée sous
+chaque ligne est désormais celle de l'**arrivée** du rapport — la date du mail
+pour un reporting transféré, la date de publication sur le portail pour un
+reporting repris de VASCO. Elle affichait jusqu'ici la date à laquelle notre
+analyse avait tourné : identique pour un mail traité à son arrivée, mais
+décalée de plusieurs mois pour tout ce qui a été repris en lot. Les trois
+reportings VASCO de Wandercraft, par exemple, se disaient tous « reçus » le
+9 septembre, jour de la reprise, alors que l'un d'eux a été publié le 16 mars.
+Un rapport venu d'un portail dit maintenant « Publié le », comme les
+communications non analysées juste à côté.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/CompanyReportsSection.tsx` : la date d'une ligne
+>   de report passe de `processedAt ?? emailDate` à `emailDate ?? processedAt`,
+>   pour l'affichage comme pour la clé de tri `rank.receivedAt`. `processedAt`
+>   est un horodatage de run (`Date.now()` dans `reportStore.storeForCompany`,
+>   repatché à chaque mise à jour en place), `emailDate` l'arrivée réelle —
+>   `vascoIngest.receivedAtOf` y met la `publishDate` du portail.
+> - Libellé : `source === 'vasco'` bascule sur la clé existante
+>   `vasco:communications.publishedOn` (« Publié le ») plutôt que
+>   `participations:reports.history.received` — aucune nouvelle chaîne i18n.
+> - `convex/companyReports.ts:listByCompany` renvoie `source` (seul ajout
+>   backend).
+> - Cohérence : la fraîcheur de la fiche lisait déjà `emailDate`
+>   (`recordReportOnCompany`) — les deux surfaces datent enfin pareil. Cf.
+>   `KNOWN_ISSUES.md` « `processedAt` date le RUN, jamais l'arrivée ».
 
 ## v1.232.1 — 14/09/2026 à 20:52 — Reprise du journal : une commande par source, sans curseur
 
