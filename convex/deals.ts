@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values'
 import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import { diffDealPatch, logDealEvent, userActor } from './lib/companyEvents'
 import { releaseStorage } from './lib/documentBlobs'
 import {
   couponPeriodicityValidator,
@@ -652,7 +653,7 @@ export const create = mutation({
     ...dealFields,
   },
   handler: async (ctx, args) => {
-    await requireOrgMember(ctx, args.orgId)
+    const { user } = await requireOrgMember(ctx, args.orgId)
     await assertSameOrg(
       ctx,
       args.orgId,
@@ -665,11 +666,18 @@ export const create = mutation({
     await assertInvestorIsGroupEntity(ctx, args.orgId, args.investorCompanyId)
 
     const { status, currency, ...rest } = args
-    return await ctx.db.insert('deals', {
+    const id = await ctx.db.insert('deals', {
       ...rest,
       currency: currency ?? 'EUR',
       status: status ?? 'active',
     })
+    await logDealEvent(
+      ctx,
+      { _id: id, orgId: args.orgId, targetCompanyId: args.targetCompanyId },
+      userActor(user._id),
+      { kind: 'created' },
+    )
+    return id
   },
 })
 
@@ -697,7 +705,7 @@ export const update = mutation({
   handler: async (ctx, { id, patch }) => {
     const deal = await ctx.db.get("deals", id)
     if (!deal) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, deal.orgId)
+    const { user } = await requireOrgMember(ctx, deal.orgId)
 
     if (patch.investorCompanyId) {
       await assertInvestorIsGroupEntity(
@@ -769,6 +777,10 @@ export const update = mutation({
         : {}),
       manuallyEditedFields: [...editedFields],
     })
+    // Activity journal: one event for the whole call (conversion > status >
+    // fields), nothing when the patch changes no value.
+    const event = diffDealPatch(deal, patch)
+    if (event) await logDealEvent(ctx, deal, userActor(user._id), event)
     // Placement balance history: every currentValue update (Placements page,
     // deal sheet or edit dialog — they all land here) also logs a valuation
     // row, so the balance builds a dated series over time. Skip 0 (the
@@ -778,13 +790,19 @@ export const update = mutation({
       patch.currentValue > 0 &&
       patch.currentValue !== deal.currentValue
     ) {
+      const asOf = Date.now()
       await ctx.db.insert('valuations', {
         orgId: deal.orgId,
         dealId: id,
-        asOf: Date.now(),
+        asOf,
         fairValue: patch.currentValue,
         valuationMethod: 'mark_to_market',
         source: 'balance_update',
+      })
+      await logDealEvent(ctx, deal, userActor(user._id), {
+        kind: 'valuation_added',
+        asOf,
+        fairValueCents: patch.currentValue,
       })
     }
     return id
@@ -835,6 +853,12 @@ export const remove = mutation({
         key: `doc:${doc._id}`,
       })
     }
+    // The journal is the deal's: nothing reads it once the deal is gone.
+    const events = await ctx.db
+      .query('companyEvents')
+      .withIndex('by_deal', (q) => q.eq('dealId', id))
+      .collect()
+    for (const event of events) await ctx.db.delete('companyEvents', event._id)
     await ctx.db.delete("deals", id)
     return { deletedId: id }
   },

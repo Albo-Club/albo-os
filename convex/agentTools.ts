@@ -22,6 +22,7 @@ import {
   transactionTotals,
 } from './deals'
 import { parseScope, readMembership } from './lib/agentScope'
+import { diffDealPatch, logDealEvent, userActor } from './lib/companyEvents'
 import { findSimilarCompanies, findSimilarDeals } from './lib/duplicates'
 import { isAvailableAccount } from './lib/bankAccounts'
 import { normalizeDomain } from './lib/domain'
@@ -282,6 +283,12 @@ export const createDealInternal = internalMutation({
       currency: 'EUR',
       status: status ?? 'active',
     })
+    await logDealEvent(
+      ctx,
+      { _id: id, orgId: args.orgId, targetCompanyId: args.targetCompanyId },
+      userActor(actorUserId, true),
+      { kind: 'created' },
+    )
     return { _id: id, similar }
   },
 })
@@ -481,6 +488,9 @@ export const updateDealInternal = internalMutation({
           }
         : {}),
     })
+    // Same journal as `deals.update`, under the confirming user's name.
+    const event = diffDealPatch(deal, patch)
+    if (event) await logDealEvent(ctx, deal, userActor(actorUserId, true), event)
     // Effective kind after the patch — the MCP layer needs it to build the
     // right deep link (placements live on their own page).
     return {

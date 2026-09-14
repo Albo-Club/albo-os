@@ -239,7 +239,11 @@ export const markEntryRealizedInternal = internalMutation({
     // Shared core (forecasts.ts): same-org guardrail, never touches the
     // transaction itself; `keepRemainder` splits off a pending one-shot
     // entry carrying the unpaid balance.
-    await applyMarkEntryRealized(ctx, entry, transactionId, mode ?? 'close')
+    await applyMarkEntryRealized(ctx, entry, transactionId, mode ?? 'close', {
+      kind: 'user',
+      userId: actorUserId,
+      viaAgent: true,
+    })
     return { _id: entryId, status: 'realized' as const }
   },
 })

@@ -24,6 +24,7 @@ import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { requireGuaranteeParty } from './guarantees'
 import { releaseStorage } from './lib/documentBlobs'
+import { logDealEvent, userActor } from './lib/companyEvents'
 import { sourceInbound } from './lib/reportSource'
 
 import type { Id } from './_generated/dataModel'
@@ -372,6 +373,12 @@ export const create = mutation({
     await ctx.scheduler.runAfter(0, internal.documentsExtract.run, {
       documentId,
     })
+    if (deal) {
+      await logDealEvent(ctx, deal, userActor(user._id), {
+        kind: 'document_attached',
+        title,
+      })
+    }
     return documentId
   },
 })
@@ -478,13 +485,23 @@ export const remove = mutation({
   handler: async (ctx, { documentId }) => {
     const doc = await ctx.db.get('documents', documentId)
     if (!doc) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, doc.orgId)
+    const { user } = await requireOrgMember(ctx, doc.orgId)
     await ctx.db.delete('documents', documentId)
+    // Mirror of the attach event: the journal must show the removal too.
+    const deal = doc.dealId ? await ctx.db.get('deals', doc.dealId) : null
+    if (deal) {
+      await logDealEvent(ctx, deal, userActor(user._id), {
+        kind: 'document_removed',
+        title: doc.title,
+      })
+    }
     // The text is keyed by the blob, and both only go when nothing points at
     // the blob any more: a report's file backs one row per fan-out entity, so
     // deleting it from one fiche must not blank the others. The source email
     // is not a holder — it loses the attachment with the last row.
-    const report = doc.reportId ? await ctx.db.get('companyReports', doc.reportId) : null
+    const report = doc.reportId
+      ? await ctx.db.get('companyReports', doc.reportId)
+      : null
     const inbound = report ? await sourceInbound(ctx, report) : null
     await releaseStorage(ctx, doc.storageId, { inboundEmailId: inbound?._id })
     // Drop the semantic-index entry (no-op if the doc was never indexed).

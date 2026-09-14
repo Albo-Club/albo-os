@@ -30,6 +30,7 @@ import type * as auth from "../auth.js";
 import type * as cash from "../cash.js";
 import type * as chat from "../chat.js";
 import type * as companies from "../companies.js";
+import type * as companyEvents from "../companyEvents.js";
 import type * as companyEnrichment from "../companyEnrichment.js";
 import type * as companyReports from "../companyReports.js";
 import type * as connections from "../connections.js";
@@ -121,6 +122,7 @@ import type * as migrations_alboReportsImport from "../migrations/alboReportsImp
 import type * as migrations_alboSummaryImport from "../migrations/alboSummaryImport.js";
 import type * as migrations_archiveCalteBlockedCards from "../migrations/archiveCalteBlockedCards.js";
 import type * as migrations_attioAlboImport from "../migrations/attioAlboImport.js";
+import type * as migrations_backfillCompanyEvents from "../migrations/backfillCompanyEvents.js";
 import type * as migrations_backfillCompanyEnrichment from "../migrations/backfillCompanyEnrichment.js";
 import type * as migrations_backfillReportFreshness from "../migrations/backfillReportFreshness.js";
 import type * as migrations_calteInstrumentImport from "../migrations/calteInstrumentImport.js";
@@ -200,6 +202,7 @@ declare const fullApi: ApiFromModules<{
   cash: typeof cash;
   chat: typeof chat;
   companies: typeof companies;
+  companyEvents: typeof companyEvents;
   companyEnrichment: typeof companyEnrichment;
   companyReports: typeof companyReports;
   connections: typeof connections;
@@ -291,6 +294,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/alboSummaryImport": typeof migrations_alboSummaryImport;
   "migrations/archiveCalteBlockedCards": typeof migrations_archiveCalteBlockedCards;
   "migrations/attioAlboImport": typeof migrations_attioAlboImport;
+  "migrations/backfillCompanyEvents": typeof migrations_backfillCompanyEvents;
   "migrations/backfillCompanyEnrichment": typeof migrations_backfillCompanyEnrichment;
   "migrations/backfillReportFreshness": typeof migrations_backfillReportFreshness;
   "migrations/calteInstrumentImport": typeof migrations_calteInstrumentImport;

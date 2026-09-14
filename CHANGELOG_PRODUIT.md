@@ -23,6 +23,83 @@ bas de page.
 
 ---
 
+## v1.230.0 — 14/09/2026 à 17:41 — Qui a fait quoi sur les deals d'une société
+
+La fiche société gagne une section **Activité**, entre le tableau des deals
+et le fil Reporting & communications : le journal de ce que **nous** avons
+fait sur les deals de cette boîte — qui, quoi, quand. Une ligne par geste,
+les plus récentes en haut, groupées par jour, cinq visibles puis « Afficher
+les précédentes ».
+
+Ce que le journal enregistre :
+
+- la **création** d'un deal ;
+- un **changement de statut** (term sheet → actif, actif → exité…), avec le
+  produit de sortie quand on l'a saisi en même temps ;
+- une **conversion** d'instrument (BSA AIR → actions) ;
+- une **modification de champs** : l'engagement et le produit de sortie
+  s'affichent en clair (avant → après), les autres champs sont comptés ;
+- une **valorisation** ajoutée, y compris la mise à jour de valeur d'un
+  placement ;
+- un virement **pointé** ou **dépointé**, et le passage en actif qu'un premier
+  décaissement pointé déclenche ;
+- un **document joint** au deal, ou retiré ;
+- une **échéance réalisée** du prévisionnel.
+
+Une écriture confirmée dans le panneau IA (ou faite via le serveur MCP) est
+affichée **à votre nom**, avec la mention « via l'agent IA ». Ce que fait la
+synchro Attio porte le nom **Attio**, ce que fait le pont Parallel porte le
+nom **Parallel**, et une rafale de synchros consécutives se replie en une
+ligne. Enregistrer un formulaire sans rien changer n'écrit
+rien.
+
+Pour que la section ne soit pas vide au lancement, l'historique déjà présent
+en base est repris une fois : la date de création de chaque deal, les
+pointages (avec leur auteur), les valorisations et les documents. Ce qui n'a
+jamais été enregistré — les modifications de champs d'avant aujourd'hui —
+reste perdu. Les lignes reprises sans auteur connu portent le nom « Albo OS ».
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle table `companyEvents` (`convex/schema.ts`, validateurs exportés
+>   `companyEventActor` / `companyEvent`) : journal en ajout seul de la fiche
+>   société, indexée par société (`by_company_at`), par deal (`by_deal`,
+>   `dealId` optionnel — toutes les familles d'aujourd'hui sont ancrées sur un
+>   deal, les familles société viendront sans) et par clé de reprise
+>   (`by_backfill_key`). Les lignes d'un deal sont supprimées avec lui dans
+>   `deals:remove`.
+> - `convex/lib/companyEvents.ts` : `logDealEvent` (écriture ancrée deal),
+>   `userActor`, et `diffDealPatch` (pur) qui réduit un patch à **un**
+>   événement par appel — priorité conversion > statut > champs, `null` si
+>   rien ne change réellement.
+> - Accroches : `deals.create/update`, `valuations.create/createInternal`,
+>   `lib/pointage.applyMatchToDeal/applyUnmatch` (couvre écran + agent),
+>   `documents.create` (ancre deal), `forecasts.applyMarkEntryRealized`
+>   (nouveau paramètre `actor`, passé par les deux appelants),
+>   `agentTools.createDealInternal/updateDealInternal` (`viaAgent`),
+>   `attioSync.upsertFromDeal` (acteur `system:attio`, diff sur le refresh
+>   pour ne pas journaliser un webhook identique),
+>   `vasco.applyInstrumentBridgePatch` (acteur `system:vasco`, affiché
+>   « Parallel »).
+> - Garde-fou CI `tests/journalGuards.test.ts` : tout fichier de `convex/` qui
+>   écrit directement une table journalisée (`deals` pour l'instant) doit
+>   appeler le logger **dans le même bloc de premier niveau** (mutation ou
+>   helper) ou figurer dans `EXEMPT` avec sa raison — c'est lui qui
+>   a révélé le pont VASCO oublié. Ajouter une famille = une entrée dans
+>   `JOURNALED`, le test nomme alors chaque writer à brancher.
+> - Lecture : `convex/companyEvents.ts:listByCompany` (100 derniers, noms
+>   d'utilisateurs et titres de deals résolus côté serveur).
+> - UI : `src/components/companies/CompanyActivitySection.tsx`, montée dans
+>   `participations.$companyId.tsx` ; phrases i18n `participations:activity.*`
+>   avec un jeton `{{deal}}` découpé pour rendre le lien.
+> - Reprise : `convex/migrations/backfillCompanyEvents.ts` (`dryRun` + `apply`
+>   paginé par source, idempotent par `backfillKey`) — à lancer en prod, cf.
+>   `MIGRATIONS.md`.
+> - `convex/_generated/api.d.ts` édité à la main pour les deux nouveaux
+>   modules (codegen indisponible hors déploiement, cf. `KNOWN_ISSUES.md`
+>   « Codegen Convex hors-ligne »).
+> - Tests : `convex/regression.dealEvents.test.ts` (10 cas).
+
 ## v1.229.0 — 12/09/2026 à 10:20 — Voir l'avant et l'après d'un deal converti
 
 Un **BSA AIR devient des actions**, une obligation convertible se convertit, un
