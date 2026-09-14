@@ -1,6 +1,8 @@
 /**
- * Deal activity journal — the write side of the « Activité » section of the
- * company sheet (`convex/dealEvents.ts` reads it).
+ * Company activity journal — the write side of the « Activité » section of
+ * the company sheet (`convex/companyEvents.ts` reads it). Every helper here
+ * is deal-anchored for now; the company-level families will add their own
+ * loggers next to `logDealEvent`, on the same table.
  *
  * Two rules keep the feed readable:
  *
@@ -16,15 +18,15 @@
  * Every writer of `deals` calls `logDealEvent` (create/update in
  * `convex/deals.ts`, the agent's internal mutations, the Attio sync, the
  * pointage core, valuations, documents, forecast realization). A new writer
- * must too — cf. CLAUDE.md « Anti-patterns ».
+ * must too — `tests/journalGuards.test.ts` fails the build otherwise.
  */
 import type { Infer } from 'convex/values'
 import type { GenericMutationCtx } from 'convex/server'
 import type { DataModel, Doc, Id } from '../_generated/dataModel'
-import type { dealEvent, dealEventActor } from '../schema'
+import type { companyEvent, companyEventActor } from '../schema'
 
-export type DealEventActor = Infer<typeof dealEventActor>
-export type DealEvent = Infer<typeof dealEvent>
+export type CompanyEventActor = Infer<typeof companyEventActor>
+export type CompanyEvent = Infer<typeof companyEvent>
 
 type MutCtx = GenericMutationCtx<DataModel>
 
@@ -50,7 +52,7 @@ function norm(value: unknown): unknown {
 export function diffDealPatch(
   before: Doc<'deals'>,
   patch: Record<string, unknown>,
-): DealEvent | null {
+): CompanyEvent | null {
   const changed: Array<string> = []
   for (const key of Object.keys(patch)) {
     if (IGNORED_KEYS.has(key) || key === 'currentValue') continue
@@ -96,14 +98,14 @@ export function diffDealPatch(
 export async function logDealEvent(
   ctx: MutCtx,
   deal: Pick<Doc<'deals'>, '_id' | 'orgId' | 'targetCompanyId'>,
-  actor: DealEventActor,
-  event: DealEvent,
+  actor: CompanyEventActor,
+  event: CompanyEvent,
   at: number = Date.now(),
-): Promise<Id<'dealEvents'>> {
-  return await ctx.db.insert('dealEvents', {
+): Promise<Id<'companyEvents'>> {
+  return await ctx.db.insert('companyEvents', {
     orgId: deal.orgId,
-    dealId: deal._id,
     companyId: deal.targetCompanyId,
+    dealId: deal._id,
     at,
     actor,
     event,
@@ -115,7 +117,7 @@ export async function logDealEvent(
 export function userActor(
   userId: Id<'users'>,
   viaAgent = false,
-): DealEventActor {
+): CompanyEventActor {
   return viaAgent
     ? { kind: 'user', userId, viaAgent: true }
     : { kind: 'user', userId }

@@ -350,11 +350,12 @@
     "today": "Aujourd'hui",
     "yesterday": "Hier",
     "viaAgent": "via l'agent IA",
-    "collapsedSync_one": "{{count}} autre synchro Attio repliée",
-    "collapsedSync_other": "{{count}} autres synchros Attio repliées",
+    "collapsedSync_one": "{{count}} autre synchro repliée",
+    "collapsedSync_other": "{{count}} autres synchros repliées",
     "deletedDeal": "deal supprimé",
     "actor": {
-      "system": "Attio",
+      "attio": "Attio",
+      "vasco": "Parallel",
       "unknown": "Albo OS"
     },
     "field": {

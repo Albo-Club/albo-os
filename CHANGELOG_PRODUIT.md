@@ -48,8 +48,9 @@ Ce que le journal enregistre :
 
 Une écriture confirmée dans le panneau IA (ou faite via le serveur MCP) est
 affichée **à votre nom**, avec la mention « via l'agent IA ». Ce que fait la
-synchro Attio porte le nom **Attio**, et une rafale de synchros consécutives
-se replie en une ligne. Enregistrer un formulaire sans rien changer n'écrit
+synchro Attio porte le nom **Attio**, ce que fait le pont Parallel porte le
+nom **Parallel**, et une rafale de synchros consécutives se replie en une
+ligne. Enregistrer un formulaire sans rien changer n'écrit
 rien.
 
 Pour que la section ne soit pas vide au lancement, l'historique déjà présent
@@ -60,26 +61,37 @@ reste perdu. Les lignes reprises sans auteur connu portent le nom « Albo OS ».
 
 > **🔧 Notes techniques**
 >
-> - Nouvelle table `dealEvents` (`convex/schema.ts`, validateurs exportés
->   `dealEventActor` / `dealEvent`) : journal en ajout seul, indexée par
->   société cible (`by_company_at`), par deal (`by_deal`) et par clé de
->   reprise (`by_backfill_key`). Supprimée avec son deal dans `deals:remove`.
-> - `convex/lib/dealEvents.ts` : `logDealEvent` (écriture), `userActor`, et
->   `diffDealPatch` (pur) qui réduit un patch à **un** événement par appel —
->   priorité conversion > statut > champs, `null` si rien ne change réellement.
+> - Nouvelle table `companyEvents` (`convex/schema.ts`, validateurs exportés
+>   `companyEventActor` / `companyEvent`) : journal en ajout seul de la fiche
+>   société, indexée par société (`by_company_at`), par deal (`by_deal`,
+>   `dealId` optionnel — toutes les familles d'aujourd'hui sont ancrées sur un
+>   deal, les familles société viendront sans) et par clé de reprise
+>   (`by_backfill_key`). Les lignes d'un deal sont supprimées avec lui dans
+>   `deals:remove`.
+> - `convex/lib/companyEvents.ts` : `logDealEvent` (écriture ancrée deal),
+>   `userActor`, et `diffDealPatch` (pur) qui réduit un patch à **un**
+>   événement par appel — priorité conversion > statut > champs, `null` si
+>   rien ne change réellement.
 > - Accroches : `deals.create/update`, `valuations.create/createInternal`,
 >   `lib/pointage.applyMatchToDeal/applyUnmatch` (couvre écran + agent),
 >   `documents.create` (ancre deal), `forecasts.applyMarkEntryRealized`
 >   (nouveau paramètre `actor`, passé par les deux appelants),
 >   `agentTools.createDealInternal/updateDealInternal` (`viaAgent`),
->   `attioSync.upsertFromDeal` (acteur `system`, diff sur le refresh pour ne
->   pas journaliser un webhook identique).
-> - Lecture : `convex/dealEvents.ts:listByCompany` (100 derniers, noms
+>   `attioSync.upsertFromDeal` (acteur `system:attio`, diff sur le refresh
+>   pour ne pas journaliser un webhook identique),
+>   `vasco.applyInstrumentBridgePatch` (acteur `system:vasco`, affiché
+>   « Parallel »).
+> - Garde-fou CI `tests/journalGuards.test.ts` : tout fichier de `convex/` qui
+>   écrit directement une table journalisée (`deals` pour l'instant) doit
+>   appeler le logger ou figurer dans `EXEMPT` avec sa raison — c'est lui qui
+>   a révélé le pont VASCO oublié. Ajouter une famille = une entrée dans
+>   `JOURNALED`, le test nomme alors chaque writer à brancher.
+> - Lecture : `convex/companyEvents.ts:listByCompany` (100 derniers, noms
 >   d'utilisateurs et titres de deals résolus côté serveur).
-> - UI : `src/components/deals/DealActivitySection.tsx`, montée dans
+> - UI : `src/components/companies/CompanyActivitySection.tsx`, montée dans
 >   `participations.$companyId.tsx` ; phrases i18n `participations:activity.*`
 >   avec un jeton `{{deal}}` découpé pour rendre le lien.
-> - Reprise : `convex/migrations/backfillDealEvents.ts` (`dryRun` + `apply`
+> - Reprise : `convex/migrations/backfillCompanyEvents.ts` (`dryRun` + `apply`
 >   paginé par source, idempotent par `backfillKey`) — à lancer en prod, cf.
 >   `MIGRATIONS.md`.
 > - `convex/_generated/api.d.ts` édité à la main pour les deux nouveaux

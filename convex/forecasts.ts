@@ -16,7 +16,7 @@ import { internalMutation, mutation, query } from './_generated/server'
 import { RESEND_FROM, resend } from './email'
 import { REPORT_EMAIL_MAX_CARDS, weeklyDigestEmail } from './emailTemplates'
 import { requireAppUser, requireOrgMember } from './lib/auth'
-import { logDealEvent } from './lib/dealEvents'
+import { logDealEvent } from './lib/companyEvents'
 import { isAvailableAccount } from './lib/bankAccounts'
 import { effectiveCategory, isValidForecastCategory } from './lib/categories'
 import { companyLogoUrl } from './lib/domain'
@@ -36,7 +36,7 @@ import { loanSchedule } from './loans'
 import { FAMILY_HEAD_SLUG, digestsFor } from './lib/weeklyDigest'
 import { computeVatPositionForOrg } from './transactions'
 import type { DigestReportItem } from './emailTemplates'
-import type { DealEventActor } from './lib/dealEvents'
+import type { CompanyEventActor } from './lib/companyEvents'
 import type { GridTx, HistoryTx } from './lib/recurrence'
 import type { OrgFinding } from './lib/weeklyDigest'
 import type { DataModel, Doc, Id } from './_generated/dataModel'
@@ -639,7 +639,7 @@ export async function applyMarkEntryRealized(
   entry: Doc<'forecastEntries'>,
   transactionId: Id<'transactions'>,
   mode: 'close' | 'keepRemainder',
-  actor: DealEventActor,
+  actor: CompanyEventActor,
 ) {
   // Same guardrail in both modes: the transaction must belong to the same
   // org; we never touch the transaction itself (matchStatus, reconciled and

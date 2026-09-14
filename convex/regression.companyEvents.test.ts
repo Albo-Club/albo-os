@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 /**
- * Regression: the deal activity journal (`dealEvents`).
+ * Regression: the company activity journal (`companyEvents`), deal families.
  *
  * - One event per mutation call, folded by priority (conversion > status >
  *   fields); a patch that changes nothing writes nothing.
@@ -14,7 +14,7 @@
  */
 import { describe, expect, test } from 'vitest'
 import { api, internal } from './_generated/api'
-import { diffDealPatch } from './lib/dealEvents'
+import { diffDealPatch } from './lib/companyEvents'
 import {
   createBankAccount,
   createOrg,
@@ -100,7 +100,7 @@ describe('diffDealPatch: one event per call', () => {
   })
 })
 
-describe('dealEvents: journal written by the deal mutations', () => {
+describe('companyEvents: journal written by the deal mutations', () => {
   test('create, then edit, then no-op edit', async () => {
     const { t, user, target, dealId } = await orgSetup()
 
@@ -113,7 +113,7 @@ describe('dealEvents: journal written by the deal mutations', () => {
       patch: { committedAmount: 150_000 },
     })
 
-    const rows = await user.as.query(api.dealEvents.listByCompany, {
+    const rows = await user.as.query(api.companyEvents.listByCompany, {
       companyId: target,
     })
     expect(rows.map((r) => r.event.kind)).toEqual(['fields_changed', 'created'])
@@ -153,7 +153,7 @@ describe('dealEvents: journal written by the deal mutations', () => {
       transactionId: txId,
     })
 
-    const rows = await user.as.query(api.dealEvents.listByCompany, {
+    const rows = await user.as.query(api.companyEvents.listByCompany, {
       companyId: target,
     })
     const ofDeal = rows.filter((r) => r.deal?._id === dealId)
@@ -179,7 +179,7 @@ describe('dealEvents: journal written by the deal mutations', () => {
       dealId,
       status: 'written_off',
     })
-    const rows = await user.as.query(api.dealEvents.listByCompany, {
+    const rows = await user.as.query(api.companyEvents.listByCompany, {
       companyId: target,
     })
     expect(rows[0].actor).toMatchObject({ kind: 'user', viaAgent: true })
@@ -202,7 +202,7 @@ describe('dealEvents: journal written by the deal mutations', () => {
       storageId,
     })
     await user.as.mutation(api.documents.remove, { documentId })
-    const rows = await user.as.query(api.dealEvents.listByCompany, {
+    const rows = await user.as.query(api.companyEvents.listByCompany, {
       companyId: target,
     })
     expect(rows.slice(0, 2).map((r) => r.event)).toEqual([
@@ -215,14 +215,14 @@ describe('dealEvents: journal written by the deal mutations', () => {
     const { t, user, target, dealId } = await orgSetup('org-scope')
     const stranger = await createUser(t, 'stranger@test.dev')
     await expectConvexError(
-      stranger.as.query(api.dealEvents.listByCompany, { companyId: target }),
+      stranger.as.query(api.companyEvents.listByCompany, { companyId: target }),
       'not_a_member',
     )
 
     await user.as.mutation(api.deals.remove, { id: dealId })
     const left = await t.run(async (ctx) =>
       ctx.db
-        .query('dealEvents')
+        .query('companyEvents')
         .withIndex('by_deal', (q) => q.eq('dealId', dealId))
         .collect(),
     )
@@ -234,26 +234,26 @@ describe('dealEvents: journal written by the deal mutations', () => {
     // Simulate a deal that predates the journal: drop its live event.
     await t.run(async (ctx) => {
       const rows = await ctx.db
-        .query('dealEvents')
+        .query('companyEvents')
         .withIndex('by_deal', (q) => q.eq('dealId', dealId))
         .collect()
-      for (const r of rows) await ctx.db.delete('dealEvents', r._id)
+      for (const r of rows) await ctx.db.delete('companyEvents', r._id)
     })
 
     const first = await t.mutation(
-      internal.migrations.backfillDealEvents.apply,
+      internal.migrations.backfillCompanyEvents.apply,
       {
         source: 'deals',
       },
     )
     const second = await t.mutation(
-      internal.migrations.backfillDealEvents.apply,
+      internal.migrations.backfillCompanyEvents.apply,
       { source: 'deals' },
     )
     expect(first.written).toBe(1)
     expect(second.written).toBe(0)
 
-    const rows = await user.as.query(api.dealEvents.listByCompany, {
+    const rows = await user.as.query(api.companyEvents.listByCompany, {
       companyId: target,
     })
     expect(rows).toHaveLength(1)

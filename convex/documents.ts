@@ -24,7 +24,7 @@ import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { requireGuaranteeParty } from './guarantees'
 import { releaseStorage } from './lib/documentBlobs'
-import { logDealEvent, userActor } from './lib/dealEvents'
+import { logDealEvent, userActor } from './lib/companyEvents'
 import { sourceInbound } from './lib/reportSource'
 
 import type { Id } from './_generated/dataModel'

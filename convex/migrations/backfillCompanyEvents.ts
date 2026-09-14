@@ -1,5 +1,5 @@
 /**
- * Backfill of the deal activity journal (`dealEvents`) from what the other
+ * Backfill of the company activity journal (`companyEvents`) from what the other
  * tables already remember, so the « Activité » section of a company sheet is
  * not empty on day one.
  *
@@ -22,17 +22,17 @@
  *
  * Execution (prod, manual, one source at a time, re-run with the returned
  * `continueCursor` until `isDone`):
- *   pnpm exec convex run --prod migrations/backfillDealEvents:dryRun
- *   pnpm exec convex run --prod migrations/backfillDealEvents:apply '{"source":"deals"}'
- *   pnpm exec convex run --prod migrations/backfillDealEvents:apply '{"source":"matching"}'
- *   pnpm exec convex run --prod migrations/backfillDealEvents:apply '{"source":"valuations"}'
- *   pnpm exec convex run --prod migrations/backfillDealEvents:apply '{"source":"documents"}'
+ *   pnpm exec convex run --prod migrations/backfillCompanyEvents:dryRun
+ *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"deals"}'
+ *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"matching"}'
+ *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"valuations"}'
+ *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"documents"}'
  */
 import { v } from 'convex/values'
 import { internalMutation, internalQuery } from '../_generated/server'
 import type { GenericMutationCtx } from 'convex/server'
 import type { DataModel, Doc } from '../_generated/dataModel'
-import type { DealEvent, DealEventActor } from '../lib/dealEvents'
+import type { CompanyEvent, CompanyEventActor } from '../lib/companyEvents'
 
 const sourceValidator = v.union(
   v.literal('deals'),
@@ -50,19 +50,19 @@ async function upsert(
   key: string,
   deal: Doc<'deals'> | null,
   at: number,
-  actor: DealEventActor,
-  event: DealEvent,
+  actor: CompanyEventActor,
+  event: CompanyEvent,
 ): Promise<number> {
   if (!deal) return 0
   const existing = await ctx.db
-    .query('dealEvents')
+    .query('companyEvents')
     .withIndex('by_backfill_key', (q) => q.eq('backfillKey', key))
     .first()
   if (existing) return 0
-  await ctx.db.insert('dealEvents', {
+  await ctx.db.insert('companyEvents', {
     orgId: deal.orgId,
-    dealId: deal._id,
     companyId: deal.targetCompanyId,
+    dealId: deal._id,
     at,
     actor,
     event,
@@ -71,7 +71,7 @@ async function upsert(
   return 1
 }
 
-const UNKNOWN: DealEventActor = { kind: 'unknown' }
+const UNKNOWN: CompanyEventActor = { kind: 'unknown' }
 
 export const dryRun = internalQuery({
   args: {},
@@ -84,7 +84,7 @@ export const dryRun = internalQuery({
     const documents = (await ctx.db.query('documents').collect()).filter(
       (d) => d.dealId,
     ).length
-    const already = (await ctx.db.query('dealEvents').collect()).filter(
+    const already = (await ctx.db.query('companyEvents').collect()).filter(
       (e) => e.backfillKey,
     ).length
     return { candidates: { deals, matching, valuations, documents }, already }

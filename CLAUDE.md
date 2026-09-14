@@ -724,12 +724,18 @@ export const remove = mutation({
   atteint par le plan précédent fait foi.
 - ❌ Écrire sur `deals` (ou sur ce qui s'y rattache : valorisation, pointage,
   document de deal, échéance réalisée) depuis une **nouvelle** mutation sans
-  appeler `logDealEvent` (`convex/lib/dealEvents.ts`). Le journal « Activité »
-  de la fiche société ne dérive rien : une écriture non journalisée est
-  invisible, sans erreur. Une modification de champs passe par
-  `diffDealPatch` (un événement par appel, muet si rien ne change) ; une
+  appeler `logDealEvent` (`convex/lib/companyEvents.ts`). Le journal
+  « Activité » de la fiche société ne dérive rien : une écriture non
+  journalisée est invisible, sans erreur. Une modification de champs passe
+  par `diffDealPatch` (un événement par appel, muet si rien ne change) ; une
   écriture faite via l'agent porte `userActor(actorUserId, true)`, jamais un
-  acteur « agent » à part ; la synchro Attio est l'acteur `system`.
+  acteur « agent » à part ; une intégration qui écrit seule (Attio, pont
+  Parallel) est l'acteur `system` avec sa `source`. Le filet est
+  `tests/journalGuards.test.ts` : un fichier qui écrit une table de
+  `JOURNALED` sans logger fait rougir la CI, et une exemption s'inscrit dans
+  `EXEMPT` avec sa raison. Quand une nouvelle famille rejoint le journal
+  (reports, coffre, identité…), l'ajouter à `JOURNALED` **d'abord** : le test
+  nomme alors chaque writer à brancher.
 - ❌ Ajouter une table qui référence des tables existantes sans poser, dans
   **chacune** d'elles, le refus de suppression correspondant. Le garde-fou
   vit dans le fichier de l'objet référencé (`deals.ts`, `properties.ts`…),

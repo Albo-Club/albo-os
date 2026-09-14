@@ -13,7 +13,7 @@ import {
 } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { readMembership } from './lib/agentScope'
-import { logDealEvent, userActor } from './lib/dealEvents'
+import { logDealEvent, userActor } from './lib/companyEvents'
 
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'

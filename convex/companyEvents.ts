@@ -7,11 +7,11 @@ import type { Id } from './_generated/dataModel'
 const LIMIT = 100
 
 /**
- * The activity journal of a company's deals, newest first: who did what,
- * when. Actor names and deal titles are resolved here (a handful of users
- * and deals per company) so the sheet renders rows without a second query.
- * The write side, and the one-event-per-call rule, live in
- * `convex/lib/dealEvents.ts`.
+ * The activity journal of a company sheet, newest first: who did what, when.
+ * Actor names and deal titles are resolved here (a handful of users and
+ * deals per company) so the sheet renders rows without a second query. The
+ * write side, and the one-event-per-call rule, live in
+ * `convex/lib/companyEvents.ts`.
  */
 export const listByCompany = query({
   args: { companyId: v.id('companies') },
@@ -21,7 +21,7 @@ export const listByCompany = query({
     await requireOrgMember(ctx, company.orgId)
 
     const rows = await ctx.db
-      .query('dealEvents')
+      .query('companyEvents')
       .withIndex('by_company_at', (q) => q.eq('companyId', companyId))
       .order('desc')
       .take(LIMIT)
@@ -36,7 +36,7 @@ export const listByCompany = query({
         const u = await ctx.db.get('users', row.actor.userId)
         names.set(row.actor.userId, u?.name ?? u?.email ?? '?')
       }
-      if (!deals.has(row.dealId)) {
+      if (row.dealId && !deals.has(row.dealId)) {
         const d = await ctx.db.get('deals', row.dealId)
         deals.set(
           row.dealId,
@@ -57,9 +57,11 @@ export const listByCompany = query({
               name: names.get(row.actor.userId) ?? '?',
               viaAgent: row.actor.viaAgent ?? false,
             }
-          : { kind: row.actor.kind },
+          : row.actor.kind === 'system'
+            ? { kind: 'system' as const, source: row.actor.source }
+            : { kind: 'unknown' as const },
       event: row.event,
-      deal: deals.get(row.dealId) ?? null,
+      deal: row.dealId ? (deals.get(row.dealId) ?? null) : null,
     }))
   },
 })

@@ -18,17 +18,19 @@ import { LoadingLine } from '~/components/ui/spinner'
 import { cn } from '~/lib/utils'
 
 /**
- * The activity journal of a company's deals — who did what, when — one line
- * per gesture, newest first, grouped by day. The compact "journal" form was
+ * The activity journal of a company sheet — who did what, when — one line
+ * per gesture, newest first, grouped by day. Every row is deal-anchored for
+ * now; company-level families will render here too, without the deal link. The compact "journal" form was
  * chosen over a richer timeline on purpose: the amounts already live in the
  * deals table above and the narrative in the reports feed below, so this
  * section answers "who touched this deal?" and nothing more.
  *
- * Consecutive lines written by the Attio sync collapse into the first one
- * plus a count, so a burst of webhooks does not bury the human gestures.
+ * Consecutive lines written by an integration (Attio, Parallel) collapse
+ * into the first one plus a count, so a burst of syncs does not bury the
+ * human gestures.
  */
 
-type Row = FunctionReturnType<typeof api.dealEvents.listByCompany>[number]
+type Row = FunctionReturnType<typeof api.companyEvents.listByCompany>[number]
 
 /** A run of consecutive system rows shows its first line plus a count. */
 type Visible = { row: Row; collapsed: number }
@@ -63,7 +65,7 @@ function initialsOf(name: string): string {
     : name.slice(0, 2).toUpperCase() || '?'
 }
 
-export function DealActivitySection({
+export function CompanyActivitySection({
   companyId,
   orgSlug,
 }: {
@@ -71,7 +73,7 @@ export function DealActivitySection({
   orgSlug: string
 }) {
   const { t, i18n } = useTranslation('participations')
-  const events = useConvexQuery(api.dealEvents.listByCompany, { companyId })
+  const events = useConvexQuery(api.companyEvents.listByCompany, { companyId })
   const [expanded, setExpanded] = useState(false)
 
   const rows = useMemo(() => collapseSystemRuns(events ?? []), [events])
@@ -165,12 +167,18 @@ export function DealActivitySection({
   )
 }
 
+/** A user's name, an integration's label, or the app itself for a
+ * backfilled row without author. */
+function actorLabel(row: Row, t: (key: string) => string): string {
+  if (row.actor.kind === 'user') return row.actor.name
+  if (row.actor.kind === 'system')
+    return t(`activity.actor.${row.actor.source}`)
+  return t('activity.actor.unknown')
+}
+
 function ActorAvatar({ row }: { row: Row }) {
   const { t } = useTranslation('participations')
-  const name =
-    row.actor.kind === 'user'
-      ? row.actor.name
-      : t(`activity.actor.${row.actor.kind}`)
+  const name = actorLabel(row, t)
   return (
     <Avatar className="mt-0.5 size-5">
       <AvatarFallback
@@ -196,10 +204,7 @@ function Sentence({ row, orgSlug }: { row: Row; orgSlug: string }) {
   const dealTitle = useDealTitle()
   const { event } = row
 
-  const actorName =
-    row.actor.kind === 'user'
-      ? row.actor.name
-      : t(`activity.actor.${row.actor.kind}`)
+  const actorName = actorLabel(row, t)
 
   let text = ''
   switch (event.kind) {

@@ -96,23 +96,29 @@ const dealStatus = v.union(
   v.literal('cancelled'),
 )
 
-/** Who wrote a deal event. `viaAgent`: the user confirmed a write proposed
- * by the AI agent (chat or MCP) — shown under their name. `system`: the
- * Attio sync. `unknown`: backfilled from a row that never recorded an
- * author (deal creation, valuation, a document without `uploadedBy`). */
-export const dealEventActor = v.union(
+/** Who wrote a company event. `viaAgent`: the user confirmed a write
+ * proposed by the AI agent (chat or MCP) — shown under their name. `system`:
+ * an integration writing on its own (the Attio sync, the Parallel/VASCO
+ * bridge). `unknown`: backfilled from a row that never recorded an author
+ * (deal creation, valuation, a document without `uploadedBy`). */
+export const companyEventActor = v.union(
   v.object({
     kind: v.literal('user'),
     userId: v.id('users'),
     viaAgent: v.optional(v.boolean()),
   }),
-  v.object({ kind: v.literal('system'), source: v.literal('attio') }),
+  v.object({
+    kind: v.literal('system'),
+    source: v.union(v.literal('attio'), v.literal('vasco')),
+  }),
   v.object({ kind: v.literal('unknown') }),
 )
 
 /** What happened. Payloads carry displayable values (amounts in cents, a
- * document title), never ids the sheet would have to resolve again. */
-export const dealEvent = v.union(
+ * document title), never ids the sheet would have to resolve again. Every
+ * kind below is a DEAL event (`dealId` set); the company-level families
+ * (reports, vault, identity…) join this union as they are wired. */
+export const companyEvent = v.union(
   v.object({ kind: v.literal('created') }),
   v.object({
     kind: v.literal('status_changed'),
@@ -2353,23 +2359,28 @@ export default defineSchema({
     .index('by_loan', ['loanId']),
 
   /**
-   * dealEvents — append-only journal of what happened to a deal: who did it,
-   * when, and the readable gist (before → after). One row per mutation call,
-   * never patched, deleted only with its deal (`deals:remove`). Fed by every
-   * writer of `deals` (`convex/lib/dealEvents.ts:logDealEvent`); read by the
-   * « Activité » section of the company sheet (`convex/dealEvents.ts`).
+   * companyEvents — append-only journal of what happened on a company sheet:
+   * who did it, when, and the readable gist (before → after). One row per
+   * mutation call, never patched. Today every row is anchored on a deal
+   * (`dealId` set, deleted with it in `deals:remove`); the company-level
+   * families (reports, vault, identity…) will land here with `dealId` absent,
+   * which is why the table is keyed by company and not by deal. Fed by every
+   * writer of the journaled tables (`convex/lib/companyEvents.ts`, guarded by
+   * `tests/journalGuards.test.ts`); read by the « Activité » section of the
+   * company sheet (`convex/companyEvents.ts`).
    *
-   * `companyId` is the deal's target at write time — the sheet lists by it.
-   * `backfillKey` anchors the rows the one-shot migration reconstructed from
-   * pre-existing tables (`migrations/backfillDealEvents`), so it is idempotent.
+   * `companyId` is the company the row is filed under (a deal's target at
+   * write time). `backfillKey` anchors the rows the one-shot migration
+   * reconstructed from pre-existing tables (`migrations/backfillCompanyEvents`),
+   * so it is idempotent.
    */
-  dealEvents: defineTable({
+  companyEvents: defineTable({
     orgId: v.id('organizations'),
-    dealId: v.id('deals'),
     companyId: v.id('companies'),
+    dealId: v.optional(v.id('deals')),
     at: v.number(), // ms epoch
-    actor: dealEventActor,
-    event: dealEvent,
+    actor: companyEventActor,
+    event: companyEvent,
     backfillKey: v.optional(v.string()),
   })
     .index('by_company_at', ['companyId', 'at'])

@@ -22,7 +22,7 @@ import {
   transactionTotals,
 } from './deals'
 import { parseScope, readMembership } from './lib/agentScope'
-import { diffDealPatch, logDealEvent, userActor } from './lib/dealEvents'
+import { diffDealPatch, logDealEvent, userActor } from './lib/companyEvents'
 import { findSimilarCompanies, findSimilarDeals } from './lib/duplicates'
 import { isAvailableAccount } from './lib/bankAccounts'
 import { normalizeDomain } from './lib/domain'

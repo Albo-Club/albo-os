@@ -63,7 +63,7 @@ import {
   secondaryRoundFromInstrumentRaw,
   shouldReplaceInstrument,
 } from './lib/attioSync'
-import { diffDealPatch, logDealEvent } from './lib/dealEvents'
+import { diffDealPatch, logDealEvent } from './lib/companyEvents'
 import type { MutationCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 

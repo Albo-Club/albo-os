@@ -2,7 +2,7 @@ import { ConvexError, v } from 'convex/values'
 import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
-import { diffDealPatch, logDealEvent, userActor } from './lib/dealEvents'
+import { diffDealPatch, logDealEvent, userActor } from './lib/companyEvents'
 import { releaseStorage } from './lib/documentBlobs'
 import {
   couponPeriodicityValidator,
@@ -855,10 +855,10 @@ export const remove = mutation({
     }
     // The journal is the deal's: nothing reads it once the deal is gone.
     const events = await ctx.db
-      .query('dealEvents')
+      .query('companyEvents')
       .withIndex('by_deal', (q) => q.eq('dealId', id))
       .collect()
-    for (const event of events) await ctx.db.delete('dealEvents', event._id)
+    for (const event of events) await ctx.db.delete('companyEvents', event._id)
     await ctx.db.delete("deals", id)
     return { deletedId: id }
   },

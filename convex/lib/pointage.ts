@@ -1,7 +1,7 @@
 import { ConvexError } from 'convex/values'
 
 import { recordDecision } from './matchingLog'
-import { logDealEvent, userActor } from './dealEvents'
+import { logDealEvent, userActor } from './companyEvents'
 import { loanSideForOrg } from './liabilities'
 import { transferLegs } from './transfers'
 
