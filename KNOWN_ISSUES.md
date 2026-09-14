@@ -5383,6 +5383,90 @@ Décisions de design à connaître avant de toucher `convex/investments.ts` :
 - Montants stockés en **cents** (arrondi de floats EUR Powens),
   `quantity` reste un float (nombre de parts).
 
+**Depuis 09/2026, cette table a DEUX alimentations** et une ligne dit laquelle
+par son champ `source` (absent = `powens`, la seule qui existait avant) :
+l'import de relevé PDF (`convex/statements.ts`) écrit dans la même table, en
+rattachant par `bankAccounts.accountNumber` au lieu de `powensAccountId`. D'où
+`powensInvestmentId` devenu **optionnel** : c'est l'identifiant de l'AUTRE
+flux, pas une identité de la position — aucune lecture ne le relit, ce qui a
+été vérifié avant de relâcher la contrainte (l'ordre imposé par `CLAUDE.md` :
+auditer, rendre tolérant, relâcher). Les deux flux gardent le même
+remplacement en bloc par compte, donc ils ne se marchent jamais dessus ligne à
+ligne — mais **le dernier passé sur un compte gagne**. Un compte alimenté par
+les deux n'existe pas aujourd'hui et n'aurait pas de sens : si Powens finit
+par livrer un compte qu'on importait à la main, il faut retirer l'import de ce
+compte, pas faire cohabiter les deux.
+
+## Un cours en pourcentage n'est pas un montant (import de relevé)
+
+Sur un relevé de compte-titres, deux lignes voisines portent un « cours » qui
+ne se lit pas dans la même unité :
+
+```
+FR0010831693   22,2449 parts   OSTRUM SRI CASH PLUS   112 533,89 EUR   2 503 305,13 €
+XS3449234346   500 000         PM WO CAC SX5E 08 26        99,13 %        495 650,00 €
+```
+
+Le fonds est coté **en euros par part** ; le produit structuré est coté **en
+pourcentage de son nominal**, et sa « quantité » de 500 000 est ce nominal, pas
+un nombre de parts. Ranger les deux dans le même champ de centimes affiche
+« 99,13 € » à côté de « 112 533,89 € » : le chiffre est juste, l'unité est
+fausse, et rien ne le signale — la valorisation de la ligne, elle, reste
+correcte, donc aucun total ne bronche.
+
+D'où deux champs **mutuellement exclusifs** sur `investmentPositions` :
+`unitValue` (centimes) et `unitValueBps` (points de base, la convention du
+repo pour tout ce qui est un taux). Le lecteur remplit l'un **ou** l'autre, et
+quand le modèle remplit les deux c'est le pourcentage qui gagne — c'est la
+réponse qu'il n'a pu donner qu'en lisant un « % » sur la page. L'affichage
+branche sur la présence de `unitValueBps`.
+
+La règle se généralise : **une colonne d'un tableau financier n'a pas
+forcément une unité**. Avant de mapper une colonne sur un champ, vérifier
+qu'elle porte la même unité sur *toutes* ses lignes.
+
+## Import de relevé : pourquoi l'écran de vérification n'est pas décoratif
+
+`convex/statements.ts` lit en deux temps — `parse` (OCR + modèle, **aucune
+écriture**) puis `apply` (l'écriture, sur ce que l'humain a validé). La
+tentation d'écrire directement est forte : c'est un clic de moins tous les
+trois mois. Elle est refusée, pour une raison qui n'est pas la prudence
+générale : **une valorisation fausse écrite en silence est invisible pour
+toujours**. Personne ne rouvre un relevé de PDF pour vérifier un chiffre déjà
+dans l'app, et une plus-value calculée dessus paraît parfaitement normale.
+
+Ce qui rend l'écran utile plutôt que cérémoniel, c'est qu'il **oppose deux
+chiffres du document lui-même** : la somme des lignes que le modèle a lues, et
+le total que le relevé imprime pour ce compte (`DraftAccount.coherent`,
+tolérance 1 €). Une ligne oubliée — le mode d'échec le plus courant d'une
+lecture de tableau — creuse l'écart et se voit ; un écran qui se contenterait
+de réafficher ce que le modèle a répondu ne verrait rien.
+
+Corollaire de modélisation : **la ligne de liquidités est une position**. Sans
+elle, l'enveloppe d'un compte à 3 004 130,28 € n'en totalise que 2 974 124,42 —
+et surtout le contrôle de cohérence accuserait à tort une lecture correcte.
+
+## Le PDF d'un import doit appartenir à quelqu'un dès le premier instant
+
+Le fichier déposé est en stockage **avant** que l'utilisateur ne valide quoi
+que ce soit : `parse` a besoin du blob pour l'OCR. Un utilisateur qui ferme la
+fenêtre laisse donc un fichier que plus rien ne référence — exactement le
+mécanisme qui a produit 501 Mo de copies orphelines côté proxy Parallel.
+
+Le montage : `parse` planifie sa propre balayeuse à +1 h
+(`sweepUnclaimedBlob`), qui **ne supprime que si aucun `statementImports` ne
+pointe sur le blob**. Un import validé entre-temps l'a adopté, la balayeuse ne
+fait rien ; un import abandonné voit son fichier libéré. Et comme
+`storage.delete` **lève** sur un blob déjà absent, la suppression est dans un
+try/catch : une tâche planifiée qui n'a plus rien à faire ne doit pas échouer.
+
+Même logique à la correction : réimporter la même date remplace le PDF de
+l'import, et l'ancien perd son unique référent — il est supprimé dans la
+foulée. À l'inverse, **supprimer une ligne d'import ne supprime pas la donnée
+qu'elle a écrite** (soldes, positions, valorisations) : ce sont les lectures du
+relevé, pas la propriété de la ligne. Effacer la trace d'un import ne doit pas
+vider un placement.
+
 ## Budget de texte : un cap global mange les onglets suivants (`convex/lib/excel.ts`)
 
 Un classeur Excel est dumpé onglet par onglet, et la boucle a **toujours**

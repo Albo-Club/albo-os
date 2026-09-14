@@ -87,12 +87,14 @@
     "col": {
       "support": "Asset",
       "quantity": "Quantity",
+      "avgPrice": "Avg. price",
       "unitValue": "Unit value",
       "valuation": "Valuation",
       "gain": "Gain / loss"
     },
     "total": "Total",
     "syncedOn": "Synced on {{date}}",
+    "statementOn": "From the statement dated {{date}}",
     "empty": "No position came up yet — make sure the Powens Wealth product is active and the account is synced."
   },
   "empty": "No placements yet. Crypto, capitalization accounts, term deposits and brokerage accounts will show up here.",
@@ -117,6 +119,47 @@
     "created": "Placement created",
     "errors": {
       "default": "Could not create the placement. Please retry."
+    }
+  },
+  "import": {
+    "button": "Import a statement",
+    "title": "Import an account statement",
+    "description": "Drop the statement PDF: it gets read, you check what was understood, then it is written. Nothing is saved before you confirm.",
+    "fileLabel": "Statement (PDF)",
+    "fileHint": "The bank's position statement, as it was sent to you.",
+    "read": "Read the statement",
+    "reading": "Reading the statement…",
+    "writing": "Importing…",
+    "submit": "Import",
+    "dateLabel": "Statement date",
+    "dateMissing": "Date unreadable on the statement — enter it.",
+    "ownerLabel": "Holding entity",
+    "ownerPlaceholder": "Pick a group entity",
+    "supportLabel": "Institution",
+    "supportNew": "+ Create “{{name}}”",
+    "defaultSupport": "Bank",
+    "accountsTitle": "Accounts found",
+    "positionsCount_one": "{{count}} line",
+    "positionsCount_other": "{{count}} lines",
+    "coherent": "The lines add up to the total the statement prints.",
+    "incoherent": "{{gap}} gap between the lines and the statement total — check before importing.",
+    "targetCreate": "Create a placement for this account",
+    "targetLink": "Update “{{name}}”",
+    "targetIgnore": "Do not import this account",
+    "currentAccountHint": "Current account: already fed by the bank connection.",
+    "total": "Imported total: {{amount}}",
+    "imported_one": "{{accounts}} account imported, {{positions}} lines",
+    "imported_other": "{{accounts}} accounts imported, {{positions}} lines",
+    "lastImport": "Last statement imported: {{bank}}, as of {{date}}.",
+    "errors": {
+      "statement_unreadable": "The PDF could not be read (unreadable scan?).",
+      "statement_unparsed": "No account could be extracted from this statement.",
+      "read": "Could not read the statement. Try again.",
+      "apply": "Could not import the statement. Try again.",
+      "owner_must_be_group_entity": "The holding entity must be a group company.",
+      "owner_wrong_org": "Holding entity outside this organisation.",
+      "support_wrong_org": "Institution outside this organisation.",
+      "support_required": "Pick the institution: a placement has to be created."
     }
   },
   "pledgedHint": "Blocked funds (pledge, escrow): out of the available treasury. The balance is updated on the account page.",

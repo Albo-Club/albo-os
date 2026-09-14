@@ -96,11 +96,13 @@ type SyncSummary = { positions: number; accounts: number; skipped: number }
 // ─── Org-facing query ────────────────────────────────────────────────────────
 
 /** Positions of one bank account, sorted by valuation desc — feeds the
- * placement views. */
+ * placement views. Serves BOTH feeds: the Powens sync below and the
+ * statement import (convex/statements.ts), which is the only one that fills
+ * `assetCategory`, `avgPrice` and `unitValueBps`. */
 export const listByAccount = query({
   args: { bankAccountId: v.id('bankAccounts') },
   handler: async (ctx, { bankAccountId }) => {
-    const account = await ctx.db.get("bankAccounts", bankAccountId)
+    const account = await ctx.db.get('bankAccounts', bankAccountId)
     if (!account) throw new ConvexError('not_found')
     await requireOrgMember(ctx, account.orgId)
     const rows = await ctx.db
@@ -113,11 +115,19 @@ export const listByAccount = query({
         _id: r._id,
         label: r.label,
         isinCode: r.isinCode ?? null,
+        assetCategory: r.assetCategory ?? null,
         quantity: r.quantity ?? null,
         unitValue: r.unitValue ?? null,
+        // Quote of a line priced in % of its nominal (a structured product).
+        // Never both: cf. the table's note in schema.ts.
+        unitValueBps: r.unitValueBps ?? null,
+        avgPrice: r.avgPrice ?? null,
         valuation: r.valuation ?? null,
         diff: r.diff ?? null,
+        isCash: r.isCash ?? false,
         valuationDate: r.valuationDate ?? null,
+        // Absent = 'powens' (the only feed before statement imports).
+        source: r.source ?? 'powens',
         syncedAt: r.syncedAt,
       }))
   },
@@ -170,7 +180,7 @@ export const replacePositions = internalMutation({
         .withIndex('by_account', (q) => q.eq('bankAccountId', account._id))
         .collect()
       for (const row of existing) {
-        await ctx.db.delete("investmentPositions", row._id)
+        await ctx.db.delete('investmentPositions', row._id)
       }
       for (const position of group.positions) {
         await ctx.db.insert('investmentPositions', {

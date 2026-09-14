@@ -175,10 +175,7 @@ function PlacementDetail() {
           {t('fiche.notPlacement')}
         </p>
         <Button asChild variant="outline" size="sm">
-          <Link
-            to="/app/$orgSlug/deals/$dealId"
-            params={{ orgSlug, dealId }}
-          >
+          <Link to="/app/$orgSlug/deals/$dealId" params={{ orgSlug, dealId }}>
             {t('fiche.openDeal')}
           </Link>
         </Button>
@@ -196,10 +193,19 @@ function PlacementDetail() {
     (sum, p) => sum + (p.valuation ?? 0),
     0,
   )
+  // What the envelope is dated at. A Powens sync is as fresh as its run, but
+  // an imported statement describes the day it was DRAWN — showing the import
+  // date there would age a three-week-old reading by three weeks in reverse.
+  const valuationDates = (positions ?? [])
+    .map((p) => p.valuationDate)
+    .filter((d): d is number => d != null)
+  const asOfDate =
+    valuationDates.length > 0 ? Math.max(...valuationDates) : null
   const lastSyncedAt =
     positions && positions.length > 0
       ? Math.max(...positions.map((p) => p.syncedAt))
       : null
+  const fromStatement = (positions ?? []).some((p) => p.source === 'statement')
 
   async function handleLiquidityChange(value: string) {
     try {
@@ -317,9 +323,7 @@ function PlacementDetail() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           label={t('col.balance')}
-          value={
-            metrics?.balance == null ? '—' : fmtEurCents(metrics.balance)
-          }
+          value={metrics?.balance == null ? '—' : fmtEurCents(metrics.balance)}
           icon={PiggyBank}
         />
         <KpiCard
@@ -433,13 +437,16 @@ function PlacementDetail() {
             </div>
             {positions && positions.length > 0 ? (
               <>
-                <div className="rounded-lg border">
+                <div className="overflow-x-auto rounded-lg border">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>{t('envelope.col.support')}</TableHead>
                         <TableHead className="text-right">
                           {t('envelope.col.quantity')}
+                        </TableHead>
+                        <TableHead className="text-right">
+                          {t('envelope.col.avgPrice')}
                         </TableHead>
                         <TableHead className="text-right">
                           {t('envelope.col.unitValue')}
@@ -470,9 +477,11 @@ function PlacementDetail() {
                               <div className="max-w-[320px] truncate font-medium">
                                 {position.label}
                               </div>
-                              {position.isinCode ? (
-                                <div className="text-muted-foreground text-xs">
-                                  {position.isinCode}
+                              {position.isinCode || position.assetCategory ? (
+                                <div className="text-muted-foreground max-w-[320px] truncate text-xs">
+                                  {[position.isinCode, position.assetCategory]
+                                    .filter(Boolean)
+                                    .join(' · ')}
                                 </div>
                               ) : null}
                             </TableCell>
@@ -480,9 +489,16 @@ function PlacementDetail() {
                               {fmtQty(position.quantity)}
                             </TableCell>
                             <TableCell className="text-right tabular-nums">
-                              {position.unitValue == null
+                              {position.avgPrice == null
                                 ? '—'
-                                : fmtEurCents(position.unitValue)}
+                                : fmtEurCents(position.avgPrice)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {position.unitValueBps != null
+                                ? fmtPercent(position.unitValueBps / 10000)
+                                : position.unitValue == null
+                                  ? '—'
+                                  : fmtEurCents(position.unitValue)}
                             </TableCell>
                             <TableCell className="text-right font-medium tabular-nums">
                               {position.valuation == null
@@ -508,7 +524,7 @@ function PlacementDetail() {
                     </TableBody>
                     <TableFooter>
                       <TableRow>
-                        <TableCell colSpan={3}>{t('envelope.total')}</TableCell>
+                        <TableCell colSpan={4}>{t('envelope.total')}</TableCell>
                         <TableCell className="text-right font-medium tabular-nums">
                           {fmtEurCents(totalValuation)}
                         </TableCell>
@@ -517,9 +533,15 @@ function PlacementDetail() {
                     </TableFooter>
                   </Table>
                 </div>
-                {lastSyncedAt != null && (
+                {(fromStatement ? asOfDate : lastSyncedAt) != null && (
                   <p className="text-muted-foreground text-xs">
-                    {t('envelope.syncedOn', { date: fmtDate(lastSyncedAt) })}
+                    {fromStatement
+                      ? t('envelope.statementOn', {
+                          date: fmtDate(asOfDate as number),
+                        })
+                      : t('envelope.syncedOn', {
+                          date: fmtDate(lastSyncedAt as number),
+                        })}
                   </p>
                 )}
               </>
