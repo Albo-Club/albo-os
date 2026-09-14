@@ -287,6 +287,27 @@ function Sentence({ row, orgSlug }: { row: Row; orgSlug: string }) {
         amount: fmtEurCents(event.amountCents),
       })
       break
+    // ── Company-level rows: no deal link in the sentence ──────────────────
+    case 'report_received':
+      text = t(`activity.ev.report_received_${event.channel}`, {
+        label: event.label,
+        from: event.fromEmail ?? '',
+      })
+      break
+    case 'report_updated':
+      text = t('activity.ev.report_updated', { label: event.label })
+      break
+    case 'report_assigned':
+    case 'report_detached':
+    case 'report_deleted':
+    case 'report_reprocessed':
+      text = t(`activity.ev.${event.kind}`, { label: event.label })
+      break
+    case 'vault_document_added':
+    case 'vault_document_removed':
+    case 'vault_document_updated':
+      text = t(`activity.ev.${event.kind}`, { title: event.title })
+      break
   }
 
   const [before, after] = text.split(DEAL_TOKEN)

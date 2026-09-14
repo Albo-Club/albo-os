@@ -377,7 +377,18 @@
       "transaction_unmatched": "unmatched a {{amount}} transfer from {{deal}}",
       "document_attached": "attached “{{title}}” to {{deal}}",
       "document_removed": "removed “{{title}}” from {{deal}}",
-      "entry_realized": "realized the {{date}} entry ({{amount}}) on {{deal}}"
+      "entry_realized": "realized the {{date}} entry ({{amount}}) on {{deal}}",
+      "report_received_email": "forwarded the “{{label}}” report (sent by {{from}})",
+      "report_received_upload": "uploaded the “{{label}}” report",
+      "report_received_vasco": "published the “{{label}}” report",
+      "report_updated": "re-sent the “{{label}}” report, corrected",
+      "report_assigned": "attached “{{label}}” to the company",
+      "report_detached": "detached the “{{label}}” report",
+      "report_deleted": "deleted the “{{label}}” report",
+      "report_reprocessed": "re-ran the analysis of “{{label}}”",
+      "vault_document_added": "added “{{title}}” to the vault",
+      "vault_document_removed": "removed “{{title}}” from the vault",
+      "vault_document_updated": "renamed or reclassified “{{title}}”"
     }
   },
   "edit": {

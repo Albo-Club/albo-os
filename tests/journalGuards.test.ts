@@ -35,6 +35,8 @@ const CONVEX_DIR = join(dirname(fileURLToPath(import.meta.url)), '../convex')
  */
 const JOURNALED: Record<string, Array<string>> = {
   deals: ['logDealEvent(', 'diffDealPatch('],
+  companyReports: ['logCompanyEvent('],
+  documents: ['logDealEvent(', 'logCompanyEvent('],
 }
 
 /**
@@ -46,6 +48,17 @@ const JOURNALED: Record<string, Array<string>> = {
 const EXEMPT: Record<string, string> = {
   'airtableImport.ts': 'one-shot historical import, no user gesture behind it',
   'seed.ts': 'seeds a fresh deployment, nothing to journal',
+  // Pipeline bookkeeping on rows the journal already covers at filing time:
+  // reading / indexing / classification state, never what the sheet shows.
+  'vectorize.ts#setReportState': 'semantic-index state of a report',
+  'vectorize.ts#setDocumentState': 'semantic-index state of a document',
+  'documents.ts#reextract': 'resets the OCR state before a re-read',
+  'documents.ts#reindex': 'resets the index state before a re-index',
+  'documentsExtract.ts#setState': 'OCR outcome of a read',
+  'documentsExtract.ts#sweepStalePending':
+    'expires OCR reads that never came back',
+  'documentsClassify.ts#apply':
+    'automatic kind on a fresh upload — the add event already names the filing',
 }
 
 /** Directories whose files never run against prod data on a user's behalf. */
