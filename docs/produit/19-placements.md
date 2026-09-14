@@ -25,6 +25,21 @@ du cash disponible tout de suite, pas un placement.
   et en option la banque/plateforme, la date d'ouverture et le solde
   actuel. La création débouche directement sur la fiche du placement ; la
   liquidité prend le défaut de son type, corrigeable sur la fiche.
+- **Importer un relevé** : le bouton « Importer un relevé » en tête de page
+  ouvre l'autre porte, celle des comptes qu'aucune connexion bancaire ne
+  remonte. On dépose le PDF du relevé envoyé par la banque, il est lu
+  automatiquement, et **un écran de vérification montre ce qui a été
+  compris** avant que quoi que ce soit ne soit enregistré : un bloc par
+  compte du relevé, avec sa valorisation, le nombre de lignes détectées et
+  surtout la réponse à la seule question qui compte — **est-ce que le détail
+  des lignes retombe sur le total imprimé par la banque ?** Si non, l'écart
+  est affiché en rouge. Pour chaque compte on choisit : créer un placement,
+  mettre à jour un placement existant, ou ne pas l'importer (ce qui est le
+  réglage par défaut d'un compte courant, déjà suivi par la connexion
+  bancaire). À la validation, l'import remplit d'un coup le solde du
+  placement, le contenu de son enveloppe et un point d'historique **daté du
+  relevé**, pas du jour de l'import. La date du dernier relevé importé
+  s'affiche sous le titre de la page.
 - **Quatre tuiles de synthèse** : solde total, versé net (versements moins
   retraits), plus-value latente (en euros et en %), rendement annualisé.
 - **Un tableau par liquidité**, empilés dans l'ordre : **Liquide** (bandeau
@@ -77,17 +92,34 @@ dessous », il ne double aucun chiffre.
 
 La fiche affiche aussi les **positions** du compte (les titres d'un
 compte-titres, les supports d'un contrat de capitalisation, les lignes
-crypto), remontées par la connexion bancaire (Powens Wealth) : support et
-code ISIN, quantité, valeur unitaire, valorisation, plus ou moins-value,
-avec le total du compte. Pour l'activer : **lier le placement à son compte
-bancaire** depuis la fiche (liste déroulante des comptes de
-l'organisation). Les positions se mettent à jour automatiquement chaque
-matin ; « Actualiser » force la mise à jour.
+crypto) : support, code ISIN et catégorie d'actif, quantité, prix moyen
+d'achat, cours, valorisation, plus ou moins-value, avec le total du compte.
+La ligne de liquidités du compte en fait partie — sans elle le total de
+l'enveloppe ne retomberait pas sur le solde.
 
-Point d'attention : ce flux dépend du produit **Powens Wealth**, à activer
-auprès de Powens (distinct de l'agrégation bancaire déjà branchée). Tant
-qu'il n'est pas actif, la section affiche « aucune position » sans rien
-casser.
+Un support coté **en pourcentage de son nominal** (un produit structuré à
+99,13 %) s'affiche bien en pourcentage, à côté d'un fonds coté en euros par
+part. Les deux ne se lisent pas dans la même unité et l'app ne les mélange
+pas.
+
+Ces positions arrivent par **deux chemins**, selon ce que la banque permet :
+
+- **La connexion bancaire** (Powens Wealth), quand la banque est couverte :
+  il suffit de **lier le placement à son compte bancaire** depuis la fiche
+  (liste déroulante des comptes de l'organisation), et les positions se
+  mettent à jour automatiquement chaque matin ; « Actualiser » force la mise
+  à jour. Sous le tableau : « Synchronisé le … ».
+- **L'import d'un relevé** (voir plus haut), quand elle ne l'est pas — le
+  cas de Natixis Wealth Management. Le compte, ses positions et le solde du
+  placement arrivent alors du PDF, et le tableau porte la mention **« D'après
+  le relevé au … »** : la date du document, pour qu'un chiffre vieux de deux
+  mois se voie comme tel.
+
+Point d'attention : le premier chemin dépend du produit **Powens Wealth**, à
+activer auprès de Powens (distinct de l'agrégation bancaire déjà branchée) —
+et il ne couvre pas toutes les banques. Tant qu'il n'est pas disponible pour
+une banque donnée, l'import de relevé est la façon de tenir ces placements à
+jour.
 
 ### Sous le capot : l'historique des soldes
 
@@ -100,6 +132,18 @@ sur la fiche placement, et la base d'une future courbe d'évolution.
 - Un placement **sans solde renseigné** affiche « — » et n'entre ni dans la
   plus-value ni dans le rendement globaux (il compterait sinon comme une
   perte totale, à tort). Renseigner le solde une première fois suffit.
+- Un placement alimenté par relevé vaut ce que disait **le dernier relevé
+  importé**. Entre deux relevés le chiffre ne bouge pas : c'est voulu, et
+  c'est pour ça que la date du document est affichée partout plutôt que
+  celle de l'import.
+- **Réimporter le même relevé le corrige**, il ne le double pas : l'app
+  range un relevé par date, et un second dépôt à la même date remplace le
+  premier. Un relevé d'une autre date ajoute un point à l'historique sans
+  toucher aux précédents.
+- Les comptes créés par un import arrivent **marqués comme nantis** : ce
+  sont des titres, pas de la trésorerie mobilisable, donc ils ne gonflent ni
+  le disponible ni le prévisionnel. Si un compte ne l'est pas réellement,
+  cela se décoche sur sa fiche côté [Trésorerie](07-tresorerie.md).
 - Le rendement annualisé suppose que les versements et retraits sont bien
   pointés en banque ; un flux non pointé fausse le calcul.
 - La [vue consolidée](12-vue-consolidee.md) (`/app/all`) ne distingue pas

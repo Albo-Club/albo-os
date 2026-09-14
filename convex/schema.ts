@@ -279,6 +279,21 @@ export const equityPositionType = v.union(
   v.literal('report_a_nouveau'),
 )
 
+// ─── Investment-position enums (investmentPositions / statementImports) ─────
+
+// Which feed wrote a position. Absent on a row = 'powens' (the only feed
+// that existed before statement imports).
+export const investmentPositionSource = v.union(
+  v.literal('powens'),
+  v.literal('statement'),
+)
+
+// The statement READER a PDF was parsed with. One value per bank layout:
+// a statement's wording, its account table and its position columns are
+// the bank's, and a reader tuned on one is wrong on another — better a
+// named reader per bank than one that pretends to read them all.
+export const statementSource = v.union(v.literal('natixis_wm'))
+
 // ─── Bank debt enums (loans / loanRates) ────────────────────────────────────
 
 // How the capital of a loan is repaid. Exported for the public mutations
@@ -2009,11 +2024,20 @@ export default defineSchema({
     // never write outside its own org. Survives a reconnection, unlike
     // `powensConnectionId` (new ids at each reconnect).
     powensFeedOrgId: v.optional(v.id('organizations')),
+    // Account number as the bank prints it on its statements ("68425000003").
+    // NOT an IBAN: it is what a statement import matches an account on, since
+    // a statement never carries the Powens id and rarely the IBAN. Absent on
+    // every account created by Powens or the Airtable import.
+    accountNumber: v.optional(v.string()),
     airtableId: v.optional(v.string()), // Airtable import anchor
     archivedAt: v.optional(v.number()),
   })
     .index('by_org', ['orgId'])
     .index('by_owner', ['orgId', 'ownerCompanyId'])
+    // Statement import: resolves "this account of the PDF" to its row. Rows
+    // without the field never match (a missing value equals no id), which is
+    // what keeps a Powens-fed account from being claimed by mistake.
+    .index('by_org_account_number', ['orgId', 'accountNumber'])
     .index('by_powens_account', ['powensAccountId'])
     // Accounts fed by one connection — read WITHOUT the org, because an
     // account can be attached to an org other than the one holding the
@@ -2025,27 +2049,85 @@ export default defineSchema({
     .index('by_airtable_id', ['airtableId']),
 
   /**
-   * investmentPositions — mirrors of Powens Wealth investments: the
-   * securities held inside a compte-titres / contrat de capitalisation /
-   * crypto account (`bankAccounts` row resolved via `powensAccountId`).
-   * Rows are replaced wholesale per account at each sync (convex/
-   * investments.ts) — no uniqueness constraint needed.
+   * investmentPositions — the securities held inside a compte-titres /
+   * contrat de capitalisation / crypto account (`bankAccounts` row). Rows
+   * are replaced wholesale per account at each refresh — no uniqueness
+   * constraint needed.
+   *
+   * TWO feeds write here, and a row says which by its `source`:
+   * - 'powens' — the Wealth sync (convex/investments.ts), account resolved
+   *   via `powensAccountId`. Carries `powensInvestmentId`.
+   * - 'statement' — a PDF statement import (convex/statements.ts), account
+   *   resolved via `accountNumber`. No Powens id to carry, which is why
+   *   `powensInvestmentId` is optional: it is the id of the OTHER feed, not
+   *   an identity of the position. Nothing reads it back.
+   * Absent `source` = 'powens' (the only feed that existed before).
    */
   investmentPositions: defineTable({
     orgId: v.id('organizations'),
     bankAccountId: v.id('bankAccounts'),
-    powensInvestmentId: v.string(),
+    powensInvestmentId: v.optional(v.string()),
+    source: v.optional(investmentPositionSource),
     label: v.string(),
     isinCode: v.optional(v.string()),
+    // Asset class as the source names it ("Produits Monétaires Zone Euro",
+    // "Produits structurés"). Free text on purpose: it is the bank's own
+    // wording, and no code branches on it — it only groups rows on screen.
+    assetCategory: v.optional(v.string()),
     quantity: v.optional(v.number()), // units, float
     unitValue: v.optional(v.number()), // cents
+    // Quote of a line priced as a PERCENTAGE of its nominal (a structured
+    // product at 99,13 %), in basis points. Mutually exclusive with
+    // `unitValue`: the same figure in cents would read as "99,13 €" next to
+    // a fund at "112 533,89 €". `quantity` is then a nominal, not a count.
+    unitValueBps: v.optional(v.number()),
+    avgPrice: v.optional(v.number()), // cents, cost per unit
     valuation: v.optional(v.number()), // cents
     diff: v.optional(v.number()), // cents, +/- vs cost
     valuationDate: v.optional(v.number()), // ms epoch (vdate)
+    // Cash sleeve of the envelope, not a security. Kept as a position so the
+    // envelope total matches the account balance to the cent.
+    isCash: v.optional(v.boolean()),
     syncedAt: v.number(),
   })
     .index('by_org', ['orgId'])
     .index('by_account', ['bankAccountId']),
+
+  /**
+   * statementImports — one row per PDF statement actually imported
+   * (convex/statements.ts). The row OWNS its blob: it is what decides the
+   * file's lifetime, so nothing is left in storage without a referent.
+   *
+   * Deliberately light: it carries counts and dates, never the parsed
+   * payload. The Placements page reads it as a list to date the last import
+   * (and, later, to raise the "statement is getting old" To-do signal), and
+   * Convex bills the whole row on every read — a parked JSON blob would be
+   * paid for on every page load, for data already written to its real tables.
+   *
+   * Uniqueness is (orgId, source, statementDate): re-importing the same
+   * statement date CORRECTS the import in place rather than stacking a
+   * second one. Enforced in the mutation — Convex has no unique constraint.
+   */
+  statementImports: defineTable({
+    orgId: v.id('organizations'),
+    source: statementSource,
+    statementDate: v.number(), // ms epoch UTC — the date the PDF is drawn at
+    bankName: v.string(),
+    storageId: v.id('_storage'),
+    accountsCount: v.number(),
+    positionsCount: v.number(),
+    totalValuation: v.optional(v.number()), // cents, all imported accounts
+    importedBy: v.id('users'),
+    importedAt: v.number(),
+  })
+    .index('by_org', ['orgId'])
+    // The listing: most recent statement first.
+    .index('by_org_date', ['orgId', 'statementDate'])
+    // The uniqueness key itself — one import per (org, reader, statement
+    // date), so a re-import lands on the row it corrects without the
+    // mutation having to filter a broader range by hand.
+    .index('by_org_source_date', ['orgId', 'source', 'statementDate'])
+    .index('by_storage', ['storageId']),
 
   /**
    * transactions — realized bank flow. `dealId` nullable because some

@@ -87,12 +87,14 @@
     "col": {
       "support": "Support",
       "quantity": "Quantité",
+      "avgPrice": "Prix moyen",
       "unitValue": "Valeur unitaire",
       "valuation": "Valorisation",
       "gain": "+/- value"
     },
     "total": "Total",
     "syncedOn": "Synchronisé le {{date}}",
+    "statementOn": "D'après le relevé au {{date}}",
     "empty": "Aucune position remontée pour l'instant — vérifie que le produit Powens Wealth est actif et que le compte est synchronisé."
   },
   "empty": "Aucun placement. Les deals crypto, comptes de capitalisation, dépôts à terme et comptes-titres apparaîtront ici.",
@@ -117,6 +119,47 @@
     "created": "Placement créé",
     "errors": {
       "default": "Impossible de créer le placement. Réessayez."
+    }
+  },
+  "import": {
+    "button": "Importer un relevé",
+    "title": "Importer un relevé de compte",
+    "description": "Dépose le PDF du relevé : il est lu, tu vérifies ce qui a été compris, puis c'est écrit. Rien n'est enregistré avant ta validation.",
+    "fileLabel": "Relevé (PDF)",
+    "fileHint": "Le relevé de situation de la banque, tel qu'il t'a été envoyé.",
+    "read": "Lire le relevé",
+    "reading": "Lecture du relevé…",
+    "writing": "Import en cours…",
+    "submit": "Importer",
+    "dateLabel": "Date du relevé",
+    "dateMissing": "Date illisible sur le relevé — saisis-la.",
+    "ownerLabel": "Entité détentrice",
+    "ownerPlaceholder": "Choisir une entité du groupe",
+    "supportLabel": "Établissement",
+    "supportNew": "+ Créer « {{name}} »",
+    "defaultSupport": "Banque",
+    "accountsTitle": "Comptes détectés",
+    "positionsCount_one": "{{count}} ligne",
+    "positionsCount_other": "{{count}} lignes",
+    "coherent": "Le détail des lignes retombe sur le total du relevé.",
+    "incoherent": "Écart de {{gap}} entre les lignes et le total du relevé — vérifie avant d'importer.",
+    "targetCreate": "Créer un placement pour ce compte",
+    "targetLink": "Mettre à jour « {{name}} »",
+    "targetIgnore": "Ne pas importer ce compte",
+    "currentAccountHint": "Compte courant : déjà suivi par la connexion bancaire.",
+    "total": "Total importé : {{amount}}",
+    "imported_one": "{{accounts}} compte importé, {{positions}} lignes",
+    "imported_other": "{{accounts}} comptes importés, {{positions}} lignes",
+    "lastImport": "Dernier relevé importé : {{bank}}, au {{date}}.",
+    "errors": {
+      "statement_unreadable": "Le PDF n'a pas pu être lu (scan illisible ?).",
+      "statement_unparsed": "Aucun compte n'a pu être extrait de ce relevé.",
+      "read": "Impossible de lire le relevé. Réessaie.",
+      "apply": "Impossible d'importer le relevé. Réessaie.",
+      "owner_must_be_group_entity": "L'entité détentrice doit être une société du groupe.",
+      "owner_wrong_org": "Entité détentrice hors de cette organisation.",
+      "support_wrong_org": "Établissement hors de cette organisation.",
+      "support_required": "Choisis l'établissement : un placement doit être créé."
     }
   },
   "pledgedHint": "Fonds bloqués (nantissement, séquestre) : hors de la trésorerie disponible. Le solde se met à jour sur la fiche du compte.",

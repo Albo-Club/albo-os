@@ -23,6 +23,103 @@ bas de page.
 
 ---
 
+## v1.232.0 — 14/09/2026 à 20:36 — Les comptes-titres se mettent à jour en déposant le relevé
+
+Certaines banques ne livrent pas les comptes-titres à l'agrégation bancaire —
+Natixis Wealth Management en fait partie. Jusqu'ici ces placements n'avaient
+donc qu'une option : un solde tapé à la main, qui se périme le lendemain.
+
+**Un nouveau bouton « Importer un relevé »** sur la page Placements ouvre
+l'autre porte. On y dépose le PDF du relevé que la banque envoie, il est lu
+automatiquement, et tout ce qu'il contient se range d'un coup : le solde de
+chaque compte, le **contenu de son enveloppe** ligne par ligne (support, code
+ISIN, catégorie d'actif, quantité, prix moyen d'achat, cours, valorisation,
+plus ou moins-value) et un point d'historique.
+
+**Rien n'est enregistré avant validation.** Le relevé est d'abord lu, puis un
+écran montre ce qui a été compris : un bloc par compte, et pour chacun la
+réponse à la seule question qui compte — est-ce que le détail des lignes
+retombe sur le total que la banque imprime ? Si non, l'écart s'affiche en
+rouge avant qu'on n'écrive quoi que ce soit. Une valorisation fausse entrée en
+silence ne se voit jamais ; un écart de quelques euros affiché, si.
+
+Compte par compte, on choisit : créer un placement, mettre à jour un
+placement existant, ou ne pas l'importer — le réglage par défaut d'un compte
+courant, déjà suivi par la connexion bancaire.
+
+**Les valeurs portent la date du relevé, pas celle de l'import.** Un relevé
+arrêté au 13 août reste un chiffre du 13 août, même déposé trois semaines plus
+tard : la fiche placement l'affiche ainsi (« D'après le relevé au … ») et
+l'historique du solde le date à la bonne journée. Redéposer le même relevé le
+corrige au lieu de le dupliquer ; un relevé plus récent ajoute un point sans
+toucher aux précédents. La date du dernier relevé importé s'affiche sous le
+titre de la page Placements.
+
+**Deux détails qui changent la lecture d'une enveloppe.** Un produit
+structuré coté en pourcentage de son nominal (99,13 %) s'affiche désormais en
+pourcentage et non comme un montant en euros — la confusion était silencieuse
+et le chiffre paraissait plausible. Et la ligne de liquidités d'un compte
+compte comme une position à part entière, sans quoi le total de l'enveloppe ne
+retombait pas sur le solde.
+
+Les comptes créés par un import arrivent marqués **nantis** : ce sont des
+titres, pas de la trésorerie mobilisable, donc ils n'entrent ni dans le
+disponible ni dans le prévisionnel. Cela se décoche sur la fiche du compte si
+ce n'est pas le cas.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau module `convex/statements.ts` en **deux temps** : `parse`
+>   (action — OCR Mistral via `lib/ocr.ts` puis `generateObject` sur le
+>   schéma Zod de `convex/lib/statements.ts`, **aucune écriture**, rend un
+>   brouillon à l'écran) et `apply` (mutation — comptes, positions,
+>   valorisations datées, ligne `statementImports`). La moitié pure
+>   (conversion d'unités, contrôle de cohérence, détection compte-titres vs
+>   compte courant) vit dans `convex/lib/statements.ts` et se teste sans
+>   déploiement.
+> - Schéma : table `statementImports` (volontairement légère — ni payload ni
+>   gros champ texte, elle est lue en liste), `bankAccounts.accountNumber` +
+>   index `by_org_account_number` (la clé de rattachement d'un relevé),
+>   et `investmentPositions` gagne `source`, `assetCategory`, `avgPrice`,
+>   `isCash` et `unitValueBps`.
+> - `investmentPositions.powensInvestmentId` passe **optionnel** : c'est
+>   l'identifiant de l'autre flux, aucune lecture ne le relit (audité avant
+>   de relâcher, dans l'ordre imposé par `CLAUDE.md`). La table a désormais
+>   deux alimentations, `source` dit laquelle.
+> - `unitValue` (centimes) et `unitValueBps` (points de base) sont
+>   **mutuellement exclusifs** : un cours en % de nominal rangé en centimes
+>   affichait « 99,13 € » à côté de « 112 533,89 € », faux sans que rien ne
+>   le signale. Cf. `KNOWN_ISSUES.md` « Un cours en pourcentage n'est pas un
+>   montant ».
+> - Unicité `(orgId, source, statementDate)` portée par l'index
+>   `by_org_source_date` : un réimport tombe sur la ligne qu'il corrige, et
+>   `upsertValuation` remplace le point `statement_import` de la même date
+>   au lieu d'en empiler un second (`deals:update` date au jour courant, ce
+>   qui serait faux ici).
+> - Durée de vie du blob décidée dès le dépôt : `parse` planifie
+>   `sweepUnclaimedBlob` à +1 h, qui ne supprime que si aucun
+>   `statementImports` ne référence le fichier (`storage.delete` dans un
+>   try/catch — il lève sur un blob absent). Un PDF remplacé par une
+>   correction est libéré ; supprimer une ligne d'import ne supprime **pas**
+>   la donnée écrite.
+> - Front : `src/components/placements/ImportStatementDialog.tsx` (dépôt →
+>   lecture → écran de vérification), bouton sur `placements.index.tsx` avec
+>   la date du dernier relevé, et le tableau « Contenu de l'enveloppe » de
+>   `placements.$dealId.tsx` gagne catégorie, prix moyen, cours en % et la
+>   mention « D'après le relevé au … ». i18n FR/EN (`placements:import`,
+>   `placements:envelope`).
+> - L'import est un écrivain de `deals` comme un autre : création de
+>   placement et revalorisation passent par `logDealEvent` (journal
+>   d'activité de la fiche société). Une correction qui ne change aucun
+>   chiffre ne journalise rien — `upsertValuation` rend un booléen disant si
+>   elle a réellement écrit.
+> - `convex/regression.statements.test.ts` (13 cas) pin les quatre
+>   invariants sur les chiffres du vrai relevé CALTE du 13/08/2026 : unités,
+>   contrôle de cohérence, correction vs nouveau point, tenancy — plus les
+>   lignes de journal attendues.
+> - `convex/_generated/api.d.ts` a été complété à la main pour les deux
+>   nouveaux modules, faute de déploiement pour lancer `convex codegen` :
+>   le prochain `convex dev` le régénère à l'identique.
 ## v1.231.1 — 14/09/2026 à 20:22 — Le véhicule passe en fin de nom de fiche
 
 Les 48 fiches qui portaient leur véhicule **devant** le nom de la société
