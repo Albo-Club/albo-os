@@ -23,6 +23,51 @@ bas de page.
 
 ---
 
+## v1.231.1 — 14/09/2026 à 20:22 — Le véhicule passe en fin de nom de fiche
+
+Les 48 fiches qui portaient leur véhicule **devant** le nom de la société
+— « SIDE  TIMELEFT », « ASTERION SIDE BOCOLOCO », « SPACELY STOCKAGE
+(STOCKOSS) » — s'appellent désormais « TIMELEFT (SIDE) », « BOCOLOCO
+(ASTERION SIDE) », « STOCKOSS (SPACELY STOCKAGE) ». Rien n'est perdu : le
+véhicule est simplement passé entre parenthèses, en fin de nom.
+
+Ce n'est pas cosmétique. Pour ranger un report reçu par email, le circuit
+cherche le nom de la fiche **écrit en entier** dans le message, et il ignore
+ce qui est entre parenthèses en fin de nom. Tant que le véhicule était
+devant, il cherchait « SIDE TIMELEFT » — que personne n'écrit jamais. Ces 48
+participations ne pouvaient donc se rattacher que par le site web de
+l'expéditeur, ce qui tombe dès que le report est transféré par quelqu'un
+d'autre que l'équipe fondatrice (un contact investisseurs, un
+co-investisseur). Elles atterrissaient dans les Rapports entrants à chaque
+envoi. Maintenant un message qui dit « Timeleft » suffit.
+
+Les fiches où le fonds **est** la participation ne bougent pas : SIDE 1, 2,
+3, SIDE Invest, ASTERION F1 et F2 gardent leur nom, puisque là « SIDE » est
+bien le nom de ce que vous détenez.
+
+> **🔧 Notes techniques**
+>
+> - Migration one-shot `convex/migrations/renameSideVehicles.ts`
+>   (`dryRun` / `apply` / `report`), 48 fiches de l'org `calte` ancrées par
+>   `_id` prod avec garde sur le nom stocké. La garde compare les noms
+>   **espaces normalisés** : 8 de ces fiches portent un espace double ou
+>   final (`SIDE  TIMELEFT`, `SIDE KAZADEN `), qu'une égalité stricte
+>   aurait fait passer en `anchorMismatch`. Idempotente, non destructive —
+>   une fiche renommée à la main entre-temps est signalée, jamais réécrite.
+> - Aucune ligne de code de rattachement n'a changé : on remet les fiches
+>   dans la convention que `matchableName` (`convex/lib/emailIdentify.ts`)
+>   suppose déjà — la parenthèse finale est notre annotation, retirée avant
+>   la recherche.
+> - Les 8 fiches sur `side-capital.com` / `asterionventures.com` sont hors
+>   lot : leur domaine est partagé, donc leur `identityKey` est leur **nom**
+>   — les renommer casserait le rattachement au lieu de le réparer.
+> - Les reports déjà rangés ne bougent pas (rattachement par `companyId`),
+>   et le sync Attio ne réécrira pas ces noms : il ne renomme que les fiches
+>   qu'il a créées lui-même et jamais renommées à la main
+>   (`convex/lib/attioSync.ts`).
+> - Signalé, pas corrigé : `ONIMA` porte `genopole.fr` et `FEELI` porte
+>   `tylia.fr` — des domaines qui ne sont pas ceux de la société. Le
+>   renommage les répare quand même (c'est le nom qui fera foi).
 ## v1.231.0 — 14/09/2026 à 20:13 — Le journal de la fiche société suit les reports et le coffre
 
 La section **Activité** de la fiche société ne se limite plus aux deals.
