@@ -131,20 +131,26 @@ La colonne principale, dans l'ordre de lecture :
   d'emblée **tous les champs de l'instrument** choisi (montant, dates dont
   le closing, tour, valorisations, titres acquis…) pour tout renseigner en
   une fois.
-- **Activité** : le journal de ce que nous avons fait sur les deals de cette
-  société — qui, quoi, quand. Une ligne par geste (création, changement de
-  statut avec le produit de sortie, conversion d'instrument, champs modifiés
-  avec l'engagement et le produit de sortie en clair et les autres comptés,
-  valorisation ajoutée, virement pointé ou dépointé, document joint ou retiré, échéance
-  réalisée), les plus récentes en haut, groupées par jour, cinq visibles puis
-  « Afficher les précédentes ». Le nom du deal est un lien vers sa fiche. Une
-  écriture confirmée dans le panneau IA est au nom de la personne qui l'a
-  confirmée, avec la mention « via l'agent IA » ; celles de la synchro Attio
-  portent le nom Attio et se replient quand elles s'enchaînent. Le journal
-  commence à sa mise en service ; les créations, pointages, valorisations et
-  documents antérieurs ont été repris une fois, sans auteur quand personne ne
-  l'avait enregistré (« Albo OS »). Enregistrer un formulaire sans rien
-  changer n'écrit rien.
+- **Activité** : le journal de ce que nous avons fait sur cette société —
+  qui, quoi, quand. Une ligne par geste, les plus récentes en haut, groupées
+  par jour, cinq visibles puis « Afficher les précédentes ». Sur les
+  **deals** : création, changement de statut avec le produit de sortie,
+  conversion d'instrument, champs modifiés avec l'engagement et le produit de
+  sortie en clair et les autres comptés, valorisation ajoutée, virement
+  pointé ou dépointé (un virement pointé reclassé en charge ou autre compte
+  comme un dépointage), document joint ou retiré, échéance réalisée — le nom
+  du deal est un lien vers sa fiche. Sur les **reports** : reporting transmis
+  par email (au nom de qui l'a transféré, avec l'expéditeur d'origine),
+  déposé à la main, publié par Parallel ; renvoi corrigé ; rattaché à la
+  société, stocké malgré un doute, analyse relancée, détaché, supprimé. Sur le
+  **coffre** : document ajouté, renommé ou reclassé, retiré. Une écriture
+  confirmée dans le panneau IA est au nom de la personne qui l'a confirmée,
+  avec la mention « via l'agent IA » ; celles des intégrations portent le nom
+  Attio ou Parallel et se replient quand elles s'enchaînent. Le journal
+  commence à sa mise en service ; les créations de deals, pointages et
+  dépointages, valorisations, documents et reports antérieurs ont été repris
+  une fois, sans auteur quand personne ne l'avait enregistré (« Albo OS »).
+  Enregistrer un formulaire sans rien changer n'écrit rien.
 - **Rapports & communications** : le **journal** de la société — ce qu'elle
   nous envoie, du plus récent au plus ancien. On y trouve les rapports
   investisseurs analysés — reçus par mail, déposés à la main, ou **publiés sur

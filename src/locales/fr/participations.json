@@ -377,7 +377,18 @@
       "transaction_unmatched": "a dépointé un virement de {{amount}} de {{deal}}",
       "document_attached": "a joint « {{title}} » à {{deal}}",
       "document_removed": "a retiré « {{title}} » de {{deal}}",
-      "entry_realized": "a réalisé l'échéance du {{date}} ({{amount}}) sur {{deal}}"
+      "entry_realized": "a réalisé l'échéance du {{date}} ({{amount}}) sur {{deal}}",
+      "report_received_email": "a transmis le reporting « {{label}} » (envoyé par {{from}})",
+      "report_received_upload": "a déposé le reporting « {{label}} »",
+      "report_received_vasco": "a publié le reporting « {{label}} »",
+      "report_updated": "a renvoyé le reporting « {{label}} », version corrigée",
+      "report_assigned": "a rattaché « {{label}} » à la société",
+      "report_detached": "a détaché le reporting « {{label}} »",
+      "report_deleted": "a supprimé le reporting « {{label}} »",
+      "report_reprocessed": "a relancé l'analyse de « {{label}} »",
+      "vault_document_added": "a ajouté « {{title}} » au coffre",
+      "vault_document_removed": "a retiré « {{title}} » du coffre",
+      "vault_document_updated": "a renommé ou reclassé « {{title}} »"
     }
   },
   "edit": {

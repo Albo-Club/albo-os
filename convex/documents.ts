@@ -24,7 +24,7 @@ import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { requireGuaranteeParty } from './guarantees'
 import { releaseStorage } from './lib/documentBlobs'
-import { logDealEvent, userActor } from './lib/companyEvents'
+import { logCompanyEvent, logDealEvent, userActor } from './lib/companyEvents'
 import { sourceInbound } from './lib/reportSource'
 
 import type { Id } from './_generated/dataModel'
@@ -378,6 +378,14 @@ export const create = mutation({
         kind: 'document_attached',
         title,
       })
+    } else if (company) {
+      // Filed under the company itself: the vault.
+      await logCompanyEvent(
+        ctx,
+        { orgId: company.orgId, companyId: company._id },
+        userActor(user._id),
+        { kind: 'vault_document_added', title },
+      )
     }
     return documentId
   },
@@ -403,7 +411,7 @@ export const update = mutation({
   handler: async (ctx, { documentId, title, kind, period }) => {
     const doc = await ctx.db.get('documents', documentId)
     if (!doc) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, doc.orgId)
+    const { user } = await requireOrgMember(ctx, doc.orgId)
 
     const trimmed = title.trim()
     if (!trimmed) throw new ConvexError('invalid_title')
@@ -413,6 +421,21 @@ export const update = mutation({
       kind,
       period,
     })
+    // Vault rows only (a report's own files are the report's, a deal's are
+    // the deal's), and only when something the sheet shows actually moved.
+    if (
+      doc.companyId &&
+      !doc.dealId &&
+      !doc.reportId &&
+      (trimmed !== doc.title || kind !== doc.kind)
+    ) {
+      await logCompanyEvent(
+        ctx,
+        { orgId: doc.orgId, companyId: doc.companyId },
+        userActor(user._id),
+        { kind: 'vault_document_updated', title: trimmed },
+      )
+    }
 
     if (trimmed !== doc.title || kind !== doc.kind) {
       await ctx.scheduler.runAfter(0, internal.vectorize.indexDocument, {
@@ -494,6 +517,13 @@ export const remove = mutation({
         kind: 'document_removed',
         title: doc.title,
       })
+    } else if (doc.companyId && !doc.reportId) {
+      await logCompanyEvent(
+        ctx,
+        { orgId: doc.orgId, companyId: doc.companyId },
+        userActor(user._id),
+        { kind: 'vault_document_removed', title: doc.title },
+      )
     }
     // The text is keyed by the blob, and both only go when nothing points at
     // the blob any more: a report's file backs one row per fan-out entity, so

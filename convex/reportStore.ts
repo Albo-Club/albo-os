@@ -28,6 +28,7 @@ import { analysisSchema, parseLenient } from './lib/reportAnalysis'
 import { findDuplicate } from './lib/reportDuplicate'
 import { normalizePeriodDisplay, parsePeriod } from './lib/reportPeriod'
 import { recordReportOnCompany } from './lib/reportFreshness'
+import { logCompanyEvent, reportActor, reportChannel } from './lib/companyEvents'
 import type { Analysis } from './lib/reportAnalysis'
 import type { RawMetric } from './lib/metricCatalog'
 import type { Doc, Id } from './_generated/dataModel'
@@ -556,6 +557,28 @@ export const storeForCompany = internalMutation({
     // The caller turns a fan-out where NOTHING was created into a duplicate
     // notice instead of a confirmation — and stays silent towards the org,
     // since nothing new happened.
+    // Journal: a new filing, or a re-send whose content moved. A twin that
+    // brought nothing stays silent, like everything else downstream.
+    if (!existing || changed) {
+      const channel = reportChannel(email)
+      const label = args.reportPeriod ?? args.title
+      await logCompanyEvent(
+        ctx,
+        { orgId: args.orgId, companyId: args.companyId },
+        reportActor(email),
+        !existing
+          ? {
+              kind: 'report_received',
+              channel,
+              label,
+              ...(channel === 'email'
+                ? { fromEmail: reportFields.fromEmail }
+                : {}),
+            }
+          : { kind: 'report_updated', channel, label },
+        reportFields.emailDate,
+      )
+    }
     return { reportId, created: !existing, changed }
   },
 })

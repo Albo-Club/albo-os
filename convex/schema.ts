@@ -167,6 +167,38 @@ export const companyEvent = v.union(
     date: v.number(),
     amountCents: v.number(),
   }),
+  // ── Company-level families (no `dealId`) ─────────────────────────────────
+  // Reports: `label` is what the sheet shows (period, else title, else the
+  // mail subject). `channel` says how it came in; `fromEmail` is the original
+  // sender when the actor is the member who forwarded it.
+  v.object({
+    kind: v.literal('report_received'),
+    channel: v.union(
+      v.literal('email'),
+      v.literal('upload'),
+      v.literal('vasco'),
+    ),
+    label: v.string(),
+    fromEmail: v.optional(v.string()),
+  }),
+  v.object({
+    kind: v.literal('report_updated'),
+    channel: v.union(
+      v.literal('email'),
+      v.literal('upload'),
+      v.literal('vasco'),
+    ),
+    label: v.string(),
+  }),
+  v.object({ kind: v.literal('report_assigned'), label: v.string() }),
+  v.object({ kind: v.literal('report_detached'), label: v.string() }),
+  v.object({ kind: v.literal('report_deleted'), label: v.string() }),
+  v.object({ kind: v.literal('report_reprocessed'), label: v.string() }),
+  // The company vault (documents filed under the company, not under a deal
+  // and not a report's own files).
+  v.object({ kind: v.literal('vault_document_added'), title: v.string() }),
+  v.object({ kind: v.literal('vault_document_removed'), title: v.string() }),
+  v.object({ kind: v.literal('vault_document_updated'), title: v.string() }),
 )
 
 // Instrument-archetype enums (dashboard refonte). Consumed only by the
@@ -2443,10 +2475,9 @@ export default defineSchema({
   /**
    * companyEvents — append-only journal of what happened on a company sheet:
    * who did it, when, and the readable gist (before → after). One row per
-   * mutation call, never patched. Today every row is anchored on a deal
-   * (`dealId` set, deleted with it in `deals:remove`); the company-level
-   * families (reports, vault, identity…) will land here with `dealId` absent,
-   * which is why the table is keyed by company and not by deal. Fed by every
+   * mutation call, never patched. A deal row (`dealId` set) is deleted with
+   * its deal in `deals:remove`; a company-level row (reports, vault) has no
+   * `dealId`, which is why the table is keyed by company. Fed by every
    * writer of the journaled tables (`convex/lib/companyEvents.ts`, guarded by
    * `tests/journalGuards.test.ts`); read by the « Activité » section of the
    * company sheet (`convex/companyEvents.ts`).
