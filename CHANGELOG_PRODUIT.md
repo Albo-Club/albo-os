@@ -23,6 +23,38 @@ bas de page.
 
 ---
 
+## v1.230.2 — 14/09/2026 à 19:46 — Le journal voit un virement quitter son deal, par tous les chemins
+
+Deux corrections sur le journal d'activité, trouvées sur la fiche Marble qui
+affichait deux « pointé » pour un seul virement.
+
+- **En direct** : reclasser un virement pointé en charge, impôt, produit,
+  virement interne ou « à ignorer » le retirait du deal **sans une ligne dans
+  le journal**. Ce geste écrit désormais « a dépointé … », comme le
+  dépointage explicite.
+- **Reprise du passé** : les dépointages sont maintenant reconstruits. Le
+  journal de pointage ne notait pas le deal au moment du dépointage ; la
+  reprise rejoue l'historique de chaque virement dans l'ordre et retrouve le
+  deal du pointage qui précède. Un dépointage dont le pointage est antérieur
+  à ce journal reste sans deal : il est écarté et compté à part. Les gestes
+  sur un virement supprimé depuis (doublons nettoyés) sont écartés, et les
+  lignes déjà reprises pour eux sont retirées.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/pointage.ts:applyCategorization` : `logDealEvent`
+>   `transaction_unmatched` quand la ligne pré-patch porte un `dealId`
+>   (couvre écran et agent).
+> - `convex/migrations/backfillCompanyEvents.ts` : source `matching` rejouée
+>   en une passe par `replayMatchingDecisions` (pure, exportée) — machine à
+>   états par transaction, `matched` fixe le deal courant, toute décision
+>   suivante produit `transaction_unmatched` dessus ; `unattributable` compte
+>   les sorties sans entrée connue ; transaction disparue → rien écrit et
+>   lignes `md:<id>` déjà posées supprimées (`removed`). `dryRun` compte via
+>   le même rejeu. Idempotent par `backfillKey`, plus de pagination sur cette
+>   source.
+> - Trois cas ajoutés dans `convex/regression.companyEvents.test.ts`.
+
 ## v1.230.1 — 14/09/2026 à 18:58 — Reprise du journal : seulement ce qui s'est passé dans Albo OS
 
 La reprise de l'historique du journal d'activité ne reconstruit plus que les
