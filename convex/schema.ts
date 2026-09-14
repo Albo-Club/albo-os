@@ -155,6 +155,7 @@ export const dealEvent = v.union(
     direction: v.optional(v.union(v.literal('in'), v.literal('out'))),
   }),
   v.object({ kind: v.literal('document_attached'), title: v.string() }),
+  v.object({ kind: v.literal('document_removed'), title: v.string() }),
   v.object({
     kind: v.literal('entry_realized'),
     date: v.number(),

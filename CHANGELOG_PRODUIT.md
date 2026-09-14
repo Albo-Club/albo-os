@@ -43,7 +43,7 @@ Ce que le journal enregistre :
   placement ;
 - un virement **pointé** ou **dépointé**, et le passage en actif qu'un premier
   décaissement pointé déclenche ;
-- un **document joint** au deal ;
+- un **document joint** au deal, ou retiré ;
 - une **échéance réalisée** du prévisionnel.
 
 Une écriture confirmée dans le panneau IA (ou faite via le serveur MCP) est
@@ -85,7 +85,7 @@ reste perdu. Les lignes reprises sans auteur connu portent le nom « Albo OS ».
 > - `convex/_generated/api.d.ts` édité à la main pour les deux nouveaux
 >   modules (codegen indisponible hors déploiement, cf. `KNOWN_ISSUES.md`
 >   « Codegen Convex hors-ligne »).
-> - Tests : `convex/regression.dealEvents.test.ts` (9 cas).
+> - Tests : `convex/regression.dealEvents.test.ts` (10 cas).
 
 ## v1.229.0 — 12/09/2026 à 10:20 — Voir l'avant et l'après d'un deal converti
 

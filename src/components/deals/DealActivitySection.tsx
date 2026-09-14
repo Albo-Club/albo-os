@@ -269,6 +269,12 @@ function Sentence({ row, orgSlug }: { row: Row; orgSlug: string }) {
         title: event.title,
       })
       break
+    case 'document_removed':
+      text = t('activity.ev.document_removed', {
+        deal: DEAL_TOKEN,
+        title: event.title,
+      })
+      break
     case 'entry_realized':
       text = t('activity.ev.entry_realized', {
         deal: DEAL_TOKEN,

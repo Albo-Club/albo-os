@@ -190,6 +190,27 @@ describe('dealEvents: journal written by the deal mutations', () => {
     })
   })
 
+  test('a deal document logs its attach AND its removal', async () => {
+    const { t, user, target, dealId } = await orgSetup('org-docs')
+    const storageId = await t.run(async (ctx) =>
+      ctx.storage.store(new Blob(['%PDF-1.4'], { type: 'application/pdf' })),
+    )
+    const documentId = await user.as.mutation(api.documents.create, {
+      dealId,
+      title: 'Pacte signé',
+      kind: 'pacte',
+      storageId,
+    })
+    await user.as.mutation(api.documents.remove, { documentId })
+    const rows = await user.as.query(api.dealEvents.listByCompany, {
+      companyId: target,
+    })
+    expect(rows.slice(0, 2).map((r) => r.event)).toEqual([
+      { kind: 'document_removed', title: 'Pacte signé' },
+      { kind: 'document_attached', title: 'Pacte signé' },
+    ])
+  })
+
   test('the journal is org-scoped and leaves with its deal', async () => {
     const { t, user, target, dealId } = await orgSetup('org-scope')
     const stranger = await createUser(t, 'stranger@test.dev')

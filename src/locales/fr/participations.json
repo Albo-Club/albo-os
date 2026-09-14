@@ -375,6 +375,7 @@
       "transaction_matched": "a pointé un virement de {{amount}} sur {{deal}}",
       "transaction_unmatched": "a dépointé un virement de {{amount}} de {{deal}}",
       "document_attached": "a joint « {{title}} » à {{deal}}",
+      "document_removed": "a retiré « {{title}} » de {{deal}}",
       "entry_realized": "a réalisé l'échéance du {{date}} ({{amount}}) sur {{deal}}"
     }
   },

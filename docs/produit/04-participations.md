@@ -135,7 +135,7 @@ La colonne principale, dans l'ordre de lecture :
   société — qui, quoi, quand. Une ligne par geste (création, changement de
   statut avec le produit de sortie, conversion d'instrument, champs modifiés
   avec l'engagement et le produit de sortie en clair et les autres comptés,
-  valorisation ajoutée, virement pointé ou dépointé, document joint, échéance
+  valorisation ajoutée, virement pointé ou dépointé, document joint ou retiré, échéance
   réalisée), les plus récentes en haut, groupées par jour, cinq visibles puis
   « Afficher les précédentes ». Le nom du deal est un lien vers sa fiche. Une
   écriture confirmée dans le panneau IA est au nom de la personne qui l'a

@@ -375,6 +375,7 @@
       "transaction_matched": "matched a {{amount}} transfer to {{deal}}",
       "transaction_unmatched": "unmatched a {{amount}} transfer from {{deal}}",
       "document_attached": "attached “{{title}}” to {{deal}}",
+      "document_removed": "removed “{{title}}” from {{deal}}",
       "entry_realized": "realized the {{date}} entry ({{amount}}) on {{deal}}"
     }
   },
