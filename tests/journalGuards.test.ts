@@ -37,6 +37,9 @@ const JOURNALED: Record<string, Array<string>> = {
   deals: ['logDealEvent(', 'diffDealPatch('],
   companyReports: ['logCompanyEvent('],
   documents: ['logDealEvent(', 'logCompanyEvent('],
+  companies: ['logCompanyEvent(', 'diffCompanyPatch('],
+  kpiSnapshots: ['logCompanyEvent('],
+  dealProjections: ['logDealEvent('],
 }
 
 /**
@@ -48,6 +51,17 @@ const JOURNALED: Record<string, Array<string>> = {
 const EXEMPT: Record<string, string> = {
   'airtableImport.ts': 'one-shot historical import, no user gesture behind it',
   'seed.ts': 'seeds a fresh deployment, nothing to journal',
+  'regression.setup.ts': 'test fixtures, never run against prod data',
+  // Derived or automatic writes on the company row — the sheet shows them,
+  // but nobody made them: journaling them would bury the human gestures
+  // under « Albo OS edited the summary » on every sync.
+  'lib/reportFreshness.ts': 'last report dates, derived from companyReports',
+  'lib/pitch.ts#applyPitchToDomainGroup':
+    'pitch propagated to same-domain siblings — journaled on the edited one',
+  'companyEnrichment.ts#applyEnrichment':
+    'pitch auto-filled from the website, no gesture behind it',
+  'companyEnrichment.ts#applyVascoPitch':
+    'pitch generated from the Parallel communications',
   // Pipeline bookkeeping on rows the journal already covers at filing time:
   // reading / indexing / classification state, never what the sheet shows.
   'vectorize.ts#setReportState': 'semantic-index state of a report',

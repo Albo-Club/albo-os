@@ -3,7 +3,7 @@
  * tables already remember, so the « Activité » section of a company sheet is
  * not empty on day one.
  *
- * Four sources, four kinds of events — nothing else is reconstructible:
+ * Nine sources — nothing else is reconstructible:
  *
  * - `deals`            → `created` at `_creationTime`; by « Attio » when the
  *                        row carries an `attioDealId` (the sync or the Attio
@@ -34,6 +34,14 @@
  *                        deletions are gone with their rows: not rebuilt.
  * - vault `documents`  (company anchor, no deal, not a report's file) →
  *                        `vault_document_added` by `uploadedBy`.
+ * - `companies`        → `company_created` at `_creationTime` (by « Attio »
+ *                        when the row carries an `attioCompanyId`, no author
+ *                        otherwise) and `company_archived` at `archivedAt`.
+ * - `kpiSnapshots` entered by hand (`capturedBy` set, not a report's
+ *                        extraction) → `kpi_added` by `capturedBy` at
+ *                        `capturedAt`.
+ * - `dealProjections`  → one `projection_replaced` per (deal, version) at
+ *                        the newest line's `_creationTime`, no author.
  *
  * Only what happened IN Albo OS is reconstructed. The Airtable import is a
  * bulk copy of a history that predates the app, so a row it created (deal or
@@ -42,7 +50,8 @@
  * say « created » about deals that were years old. Same for a document row
  * without `uploadedBy`: only a one-shot import writes one.
  *
- * Field edits made before the journal existed are lost: nobody recorded them.
+ * Field edits, people and link changes made before the journal existed are
+ * lost: nobody recorded them.
  *
  * Idempotent: every backfilled row carries `backfillKey = <source>:<rowId>`
  * and is skipped when already present, so a second run writes nothing. Rows
@@ -58,6 +67,9 @@
  *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"documents"}'
  *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"reports"}'
  *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"vault"}'
+ *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"companies"}'
+ *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"kpis"}'
+ *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"projections"}'
  */
 import { v } from 'convex/values'
 import { internal } from '../_generated/api'
@@ -73,6 +85,9 @@ const sourceValidator = v.union(
   v.literal('documents'),
   v.literal('reports'),
   v.literal('vault'),
+  v.literal('companies'),
+  v.literal('kpis'),
+  v.literal('projections'),
 )
 const BATCH = 500
 /** Report rows carry the whole mail text (`rawContent`, `cleanedHtml`) and
@@ -256,6 +271,12 @@ function isVaultDocument(doc: Doc<'documents'>): boolean {
 
 const UNKNOWN: CompanyEventActor = { kind: 'unknown' }
 
+/** A KPI a member typed in (or confirmed through the agent) — never one a
+ * report's extraction wrote, which the `report_received` row already covers. */
+function isManualKpi(row: Doc<'kpiSnapshots'>): boolean {
+  return Boolean(row.capturedBy) && !row.source?.startsWith('report:')
+}
+
 export const dryRun = internalQuery({
   args: {},
   handler: async (ctx) => {
@@ -282,6 +303,17 @@ export const dryRun = internalQuery({
       (d) => d.dealId && d.uploadedBy,
     ).length
     const vault = allDocuments.filter(isVaultDocument).length
+    const allCompanies = await ctx.db.query('companies').collect()
+    const companies = allCompanies.filter((c) => !c.airtableId).length
+    const archived = allCompanies.filter((c) => c.archivedAt != null).length
+    const kpis = (await ctx.db.query('kpiSnapshots').collect()).filter(
+      isManualKpi,
+    ).length
+    const projections = new Set(
+      (await ctx.db.query('dealProjections').collect()).map(
+        (p) => `${p.dealId}:${p.version}`,
+      ),
+    ).size
     // `companyReports` is deliberately NOT counted: its rows carry the full
     // mail text, and reading them all in one function exceeds the read
     // limit (that is also why `apply` pages them by REPORT_BATCH). Watch
@@ -290,7 +322,16 @@ export const dryRun = internalQuery({
       (e) => e.backfillKey,
     ).length
     return {
-      candidates: { deals, matching, valuations, documents, vault },
+      candidates: {
+        deals,
+        matching,
+        valuations,
+        documents,
+        vault,
+        companies: companies + archived,
+        kpis,
+        projections,
+      },
       unattributable,
       already,
       note: 'reports are not counted (rows too heavy to read in one call)',
@@ -450,6 +491,85 @@ export const apply = internalMutation({
           )
         }
         ;({ continueCursor, isDone } = page)
+        break
+      }
+      case 'companies': {
+        const page = await ctx.db.query('companies').paginate(opts)
+        for (const company of page.page) {
+          const target = { orgId: company.orgId, companyId: company._id }
+          if (!company.airtableId) {
+            written += await upsertOn(
+              ctx,
+              `co:${company._id}`,
+              target,
+              company._creationTime,
+              company.attioCompanyId
+                ? { kind: 'system', source: 'attio' }
+                : UNKNOWN,
+              { kind: 'company_created' },
+            )
+          }
+          if (company.archivedAt != null) {
+            written += await upsertOn(
+              ctx,
+              `coarch:${company._id}`,
+              target,
+              company.archivedAt,
+              UNKNOWN,
+              { kind: 'company_archived' },
+            )
+          }
+        }
+        ;({ continueCursor, isDone } = page)
+        break
+      }
+      case 'kpis': {
+        const page = await ctx.db.query('kpiSnapshots').paginate(opts)
+        for (const row of page.page) {
+          if (!isManualKpi(row) || !row.capturedBy) continue
+          written += await upsertOn(
+            ctx,
+            `kpi:${row._id}`,
+            { orgId: row.orgId, companyId: row.companyId },
+            row.capturedAt,
+            { kind: 'user', userId: row.capturedBy },
+            {
+              kind: 'kpi_added',
+              metricType: row.metricType,
+              periodEnd: row.periodEnd,
+              value: row.value,
+              unit: row.unit,
+            },
+          )
+        }
+        ;({ continueCursor, isDone } = page)
+        break
+      }
+      case 'projections': {
+        // One event per (deal, version), dated by its newest line: the table
+        // is small, and a version is written as a whole.
+        const byVersion = new Map<string, Array<Doc<'dealProjections'>>>()
+        for (const row of await ctx.db.query('dealProjections').collect()) {
+          const key = `${row.dealId}:${row.version}`
+          byVersion.set(key, [...(byVersion.get(key) ?? []), row])
+        }
+        for (const [key, rows] of byVersion) {
+          const deal = await ctx.db.get('deals', rows[0].dealId)
+          written += await upsert(
+            ctx,
+            `bp:${key}`,
+            deal,
+            Math.max(...rows.map((r) => r._creationTime)),
+            UNKNOWN,
+            {
+              kind: 'projection_replaced',
+              version: rows[0].version,
+              lineCount: rows.length,
+            },
+          )
+        }
+        continueCursor = ''
+        isDone = true
         break
       }
     }

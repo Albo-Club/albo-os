@@ -11,10 +11,13 @@
  * - A write confirmed through the agent is the user's, flagged `viaAgent`.
  * - The journal is read by org members only, and leaves with its deal.
  * - The backfill is idempotent.
+ * - The company itself: creation, identity (a rename in clear), people, the
+ *   Attio and Parallel links, archiving; hand-entered KPIs; the business
+ *   plan. Automatic writes on the row stay out (cf. tests/journalGuards).
  */
 import { describe, expect, test } from 'vitest'
 import { api, internal } from './_generated/api'
-import { diffDealPatch } from './lib/companyEvents'
+import { diffCompanyPatch, diffDealPatch } from './lib/companyEvents'
 import {
   createBankAccount,
   createOrg,
@@ -669,5 +672,288 @@ describe('companyEvents: journal written by the deal mutations', () => {
       actor: { kind: 'unknown' },
       event: { kind: 'created' },
     })
+  })
+})
+
+const baseCompany = {
+  _id: 'c' as Doc<'companies'>['_id'],
+  _creationTime: 0,
+  orgId: 'o' as Doc<'companies'>['orgId'],
+  name: 'Acme',
+  kind: 'portfolio',
+  sector: 'saas',
+  people: [{ role: 'founder', name: 'Ada' }],
+} as Doc<'companies'>
+
+describe('diffCompanyPatch: one event per save', () => {
+  test('a save equal to the row is no event', () => {
+    expect(
+      diffCompanyPatch(baseCompany, { name: 'Acme', sector: 'saas' }),
+    ).toBeNull()
+    expect(diffCompanyPatch(baseCompany, { summary: undefined })).toBeNull()
+  })
+
+  test('a rename is spelled out, the other fields counted', () => {
+    expect(
+      diffCompanyPatch(baseCompany, {
+        name: 'Acme Corp',
+        sector: 'fintech',
+        domain: 'acme.io',
+      }),
+    ).toEqual({
+      kind: 'company_updated',
+      rename: { from: 'Acme', to: 'Acme Corp' },
+      otherCount: 2,
+    })
+    expect(diffCompanyPatch(baseCompany, { sector: 'fintech' })).toEqual({
+      kind: 'company_updated',
+      otherCount: 1,
+    })
+  })
+
+  test('the people list diffs by name; the Attio link wins over the rest', () => {
+    expect(
+      diffCompanyPatch(baseCompany, {
+        people: [
+          { role: 'founder', name: 'Ada' },
+          { role: 'board', name: 'Grace' },
+        ],
+      }),
+    ).toEqual({ kind: 'people_changed', added: ['Grace'], removed: [] })
+    expect(
+      diffCompanyPatch(baseCompany, { attioCompanyId: 'rec1', name: 'X' }),
+    ).toEqual({ kind: 'attio_linked' })
+    expect(
+      diffCompanyPatch(
+        { ...baseCompany, attioCompanyId: 'rec1' },
+        { attioCompanyId: undefined },
+      ),
+    ).toEqual({ kind: 'attio_unlinked' })
+  })
+})
+
+describe('companyEvents: the company itself, KPIs and the business plan', () => {
+  test('created, renamed, people, links, archived then restored', async () => {
+    const { user, org } = await orgSetup('org-company')
+    const companyId = await user.as.mutation(api.companies.create, {
+      orgId: org.orgId,
+      name: 'Acme',
+      kind: 'portfolio',
+    })
+    await user.as.mutation(api.companies.update, {
+      id: companyId,
+      patch: { name: 'Acme Corp', sector: 'saas' },
+    })
+    // Saving the same values again is not a gesture.
+    await user.as.mutation(api.companies.update, {
+      id: companyId,
+      patch: { name: 'Acme Corp', sector: 'saas', summary: '' },
+    })
+    await user.as.mutation(api.companies.update, {
+      id: companyId,
+      patch: { people: [{ role: 'founder', name: 'Ada' }] },
+    })
+    await user.as.mutation(api.companies.update, {
+      id: companyId,
+      patch: { attioCompanyId: 'rec1' },
+    })
+    await user.as.mutation(api.companies.setVascoLink, {
+      id: companyId,
+      clientSlug: 'parallel',
+      issuerId: 'spv-1',
+    })
+    // Re-saving the same link is mute; unlinking is a gesture.
+    await user.as.mutation(api.companies.setVascoLink, {
+      id: companyId,
+      clientSlug: 'parallel',
+      issuerId: 'spv-1',
+    })
+    await user.as.mutation(api.companies.setVascoLink, { id: companyId })
+    await user.as.mutation(api.companies.archive, { id: companyId })
+    await user.as.mutation(api.companies.archive, { id: companyId })
+    await user.as.mutation(api.companies.restore, { id: companyId })
+    await user.as.mutation(api.companies.restore, { id: companyId })
+
+    const rows = await user.as.query(api.companyEvents.listByCompany, {
+      companyId,
+    })
+    expect(rows.map((r) => r.event)).toEqual([
+      { kind: 'company_restored' },
+      { kind: 'company_archived' },
+      { kind: 'vasco_unlinked' },
+      { kind: 'vasco_linked' },
+      { kind: 'attio_linked' },
+      { kind: 'people_changed', added: ['Ada'], removed: [] },
+      {
+        kind: 'company_updated',
+        rename: { from: 'Acme', to: 'Acme Corp' },
+        otherCount: 1,
+      },
+      { kind: 'company_created' },
+    ])
+    expect(rows.every((r) => r.deal === null)).toBe(true)
+    expect(rows[0].actor).toEqual({
+      kind: 'user',
+      name: expect.any(String),
+      viaAgent: false,
+    })
+  })
+
+  test("a company created or edited through the agent is the user's, viaAgent", async () => {
+    const { t, user, org } = await orgSetup('org-company-agent')
+    const { _id: companyId } = await t.mutation(
+      internal.agentTools.createCompanyInternal,
+      { orgId: org.orgId, actorUserId: user.userId, name: 'Beta' },
+    )
+    await t.mutation(internal.agentTools.updateCompanyInternal, {
+      orgId: org.orgId,
+      actorUserId: user.userId,
+      companyId,
+      name: 'Beta Labs',
+    })
+    const rows = await user.as.query(api.companyEvents.listByCompany, {
+      companyId,
+    })
+    expect(rows.map((r) => r.event.kind)).toEqual([
+      'company_updated',
+      'company_created',
+    ])
+    expect(rows.every((r) => r.actor.kind === 'user' && r.actor.viaAgent)).toBe(
+      true,
+    )
+  })
+
+  test('a KPI added by hand or through the agent, then removed', async () => {
+    const { t, user, org, target } = await orgSetup('org-kpi')
+    const snapshotId = await user.as.mutation(api.kpis.create, {
+      companyId: target,
+      metricType: 'ARR',
+      periodStart: 1,
+      periodEnd: 2,
+      value: 500_000,
+      unit: 'EUR_cents',
+    })
+    await t.mutation(internal.kpis.createInternal, {
+      orgId: org.orgId,
+      actorUserId: user.userId,
+      companyId: target,
+      metricType: 'headcount',
+      periodStart: 1,
+      periodEnd: 2,
+      value: 12,
+    })
+    await user.as.mutation(api.kpis.remove, { snapshotId })
+    const rows = (
+      await user.as.query(api.companyEvents.listByCompany, {
+        companyId: target,
+      })
+    ).filter((r) => r.deal === null)
+    expect(rows.map((r) => r.event)).toEqual([
+      { kind: 'kpi_removed', metricType: 'arr', periodEnd: 2 },
+      { kind: 'kpi_added', metricType: 'headcount', periodEnd: 2, value: 12 },
+      {
+        kind: 'kpi_added',
+        metricType: 'arr',
+        periodEnd: 2,
+        value: 500_000,
+        unit: 'EUR_cents',
+      },
+    ])
+    expect(
+      rows.map((r) => r.actor.kind === 'user' && r.actor.viaAgent),
+    ).toEqual([false, true, false])
+  })
+
+  test('a business plan replaced is one event on the deal', async () => {
+    const { user, target, dealId } = await orgSetup('org-bp')
+    await user.as.mutation(api.projections.replaceVersion, {
+      dealId,
+      version: 'initial',
+      lines: [
+        { period: 1, amountCents: 1_000, direction: 'in' },
+        { period: 2, amountCents: 1_000, direction: 'in' },
+      ],
+    })
+    const rows = await user.as.query(api.companyEvents.listByCompany, {
+      companyId: target,
+    })
+    expect(rows[0]).toMatchObject({
+      deal: { _id: dealId },
+      event: { kind: 'projection_replaced', version: 'initial', lineCount: 2 },
+    })
+  })
+
+  test('the backfill rebuilds companies, hand-entered KPIs and BPs once', async () => {
+    const { t, user, org, target, dealId } = await orgSetup('org-backfill-co')
+    // Newer than the rows the harness creates now, older than nothing.
+    const archivedAt = Date.now() + 5_000
+    await t.run(async (ctx) => {
+      await ctx.db.patch('companies', target, { archivedAt })
+      // An imported company and a report-extracted KPI must stay silent.
+      await ctx.db.insert('companies', {
+        orgId: org.orgId,
+        name: 'Imported',
+        kind: 'portfolio',
+        airtableId: 'recX',
+      })
+      await ctx.db.insert('kpiSnapshots', {
+        orgId: org.orgId,
+        companyId: target,
+        metricType: 'arr',
+        periodStart: 1,
+        periodEnd: 2,
+        value: 1,
+        source: 'report:abc',
+        capturedAt: 10,
+      })
+      await ctx.db.insert('kpiSnapshots', {
+        orgId: org.orgId,
+        companyId: target,
+        metricType: 'mrr',
+        periodStart: 1,
+        periodEnd: 2,
+        value: 2,
+        capturedAt: 20,
+        capturedBy: user.userId,
+      })
+      for (const period of [1, 2, 3]) {
+        await ctx.db.insert('dealProjections', {
+          orgId: org.orgId,
+          dealId,
+          version: 'revised',
+          period,
+          amountCents: 100,
+          direction: 'in',
+        })
+      }
+      const rows = await ctx.db.query('companyEvents').collect()
+      for (const r of rows) await ctx.db.delete('companyEvents', r._id)
+    })
+    const run = async () => {
+      let written = 0
+      for (const source of ['companies', 'kpis', 'projections'] as const) {
+        const r = await t.mutation(
+          internal.migrations.backfillCompanyEvents.apply,
+          { source, chain: false },
+        )
+        written += r.written
+      }
+      return written
+    }
+    // Target: created + archived; root entity: created; imported: nothing.
+    expect(await run()).toBe(3 + 1 + 1)
+    expect(await run()).toBe(0)
+
+    const rows = await user.as.query(api.companyEvents.listByCompany, {
+      companyId: target,
+    })
+    expect(rows.map((r) => r.event)).toEqual([
+      { kind: 'company_archived' },
+      { kind: 'projection_replaced', version: 'revised', lineCount: 3 },
+      { kind: 'company_created' },
+      { kind: 'kpi_added', metricType: 'mrr', periodEnd: 2, value: 2 },
+    ])
+    expect(rows[0].at).toBe(archivedAt)
+    expect(rows[3].actor.kind).toBe('user')
   })
 })

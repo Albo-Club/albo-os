@@ -1,8 +1,8 @@
 /**
  * Company activity journal — the write side of the « Activité » section of
- * the company sheet (`convex/companyEvents.ts` reads it). Every helper here
- * is deal-anchored for now; the company-level families will add their own
- * loggers next to `logDealEvent`, on the same table.
+ * the company sheet (`convex/companyEvents.ts` reads it). Deal events are
+ * filed under the deal's target (`logDealEvent`), company events under the
+ * company itself (`logCompanyEvent`), on the same table.
  *
  * Two rules keep the feed readable:
  *
@@ -18,10 +18,12 @@
  * Every writer of a journaled table calls the matching logger — `logDealEvent`
  * for what happens to a deal (create/update in `convex/deals.ts`, the agent's
  * internal mutations, the Attio sync, the pointage core, valuations, deal
- * documents, forecast realization), `logCompanyEvent` for what happens to the
- * company itself (reports in `convex/reportStore.ts` / `reportInbox.ts`, the
- * vault in `convex/documents.ts`). A new writer must too —
- * `tests/journalGuards.test.ts` fails the build otherwise.
+ * documents, forecast realization, the business plan), `logCompanyEvent` for
+ * what happens to the company itself (its creation, identity, people and
+ * links in `convex/companies.ts`, reports in `convex/reportStore.ts` /
+ * `reportInbox.ts`, the vault in `convex/documents.ts`, KPIs in
+ * `convex/kpis.ts`). A new writer must too — `tests/journalGuards.test.ts`
+ * fails the build otherwise.
  */
 import type { Infer } from 'convex/values'
 import type { GenericMutationCtx } from 'convex/server'
@@ -97,17 +99,66 @@ export function diffDealPatch(
   }
 }
 
-/** Appends one company-level event (no deal) to the company's journal. */
+/**
+ * The single event a patch on a company amounts to, or `null` when nothing
+ * changes. Priority when one call touches several things: the Attio link >
+ * the people list > the identity fields — each edit surface of the sheet
+ * saves one of the three, so the fold only matters for the agent. A rename
+ * is spelled out; every other identity field is counted.
+ */
+export function diffCompanyPatch(
+  before: Doc<'companies'>,
+  patch: Record<string, unknown>,
+): CompanyEvent | null {
+  const changed: Array<string> = []
+  for (const key of Object.keys(patch)) {
+    const next = norm(patch[key])
+    const prev = norm((before as Record<string, unknown>)[key])
+    if (next !== prev) changed.push(key)
+  }
+  if (changed.length === 0) return null
+
+  if (changed.includes('attioCompanyId')) {
+    return { kind: patch.attioCompanyId ? 'attio_linked' : 'attio_unlinked' }
+  }
+  if (changed.includes('people')) {
+    const names = (list: unknown) =>
+      Array.isArray(list)
+        ? list.map((p: { name: string }) => p.name.trim())
+        : []
+    const prev = names(before.people)
+    const next = names(patch.people)
+    return {
+      kind: 'people_changed',
+      added: next.filter((n) => !prev.includes(n)),
+      removed: prev.filter((n) => !next.includes(n)),
+    }
+  }
+  const renamed = changed.includes('name')
+  return {
+    kind: 'company_updated',
+    ...(renamed
+      ? { rename: { from: before.name, to: patch.name as string } }
+      : {}),
+    otherCount: changed.length - (renamed ? 1 : 0),
+  }
+}
+
+/** Appends one company-level event (no deal) to the company's journal —
+ * on the company row itself, or on an `{ orgId, companyId }` pair when the
+ * caller only holds the ids. */
 export async function logCompanyEvent(
   ctx: MutCtx,
-  target: { orgId: Id<'organizations'>; companyId: Id<'companies'> },
+  target:
+    | { orgId: Id<'organizations'>; companyId: Id<'companies'> }
+    | Pick<Doc<'companies'>, '_id' | 'orgId'>,
   actor: CompanyEventActor,
   event: CompanyEvent,
   at: number = Date.now(),
 ): Promise<Id<'companyEvents'>> {
   return await ctx.db.insert('companyEvents', {
     orgId: target.orgId,
-    companyId: target.companyId,
+    companyId: 'companyId' in target ? target.companyId : target._id,
     at,
     actor,
     event,

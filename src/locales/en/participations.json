@@ -345,7 +345,7 @@
   },
   "activity": {
     "title": "Activity",
-    "empty": "No activity recorded on this company's deals yet.",
+    "empty": "No activity recorded on this company yet.",
     "showMore": "Show {{count}} earlier",
     "today": "Today",
     "yesterday": "Yesterday",
@@ -388,7 +388,29 @@
       "report_reprocessed": "re-ran the analysis of “{{label}}”",
       "vault_document_added": "added “{{title}}” to the vault",
       "vault_document_removed": "removed “{{title}}” from the vault",
-      "vault_document_updated": "renamed or reclassified “{{title}}”"
+      "vault_document_updated": "renamed or reclassified “{{title}}”",
+      "company_created": "created the company",
+      "company_archived": "archived the company",
+      "company_restored": "restored the company",
+      "company_renamed": "renamed the company “{{from}}” to “{{to}}”",
+      "company_updated_one": "edited {{count}} field of the company",
+      "company_updated_other": "edited {{count}} fields of the company",
+      "people_added": "added {{names}} to the people",
+      "people_removed": "removed {{names}} from the people",
+      "people_join": " and ",
+      "people_edited": "edited the people",
+      "attio_linked": "linked the company to Attio",
+      "attio_unlinked": "unlinked the company from Attio",
+      "vasco_linked": "linked the company to a Parallel issuer",
+      "vasco_unlinked": "unlinked the company from its Parallel issuer",
+      "kpi_added": "added the {{metric}} KPI as of {{date}} · {{value}}",
+      "kpi_removed": "removed the {{metric}} KPI as of {{date}}",
+      "projection_replaced_one": "replaced the {{version}} BP of {{deal}} ({{count}} line)",
+      "projection_replaced_other": "replaced the {{version}} BP of {{deal}} ({{count}} lines)"
+    },
+    "bpVersion": {
+      "initial": "initial",
+      "revised": "revised"
     }
   },
   "edit": {

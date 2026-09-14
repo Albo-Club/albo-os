@@ -14,6 +14,7 @@ import {
 } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { readMembership } from './lib/agentScope'
+import { logCompanyEvent, userActor } from './lib/companyEvents'
 
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
@@ -110,10 +111,11 @@ export const create = mutation({
     const { user } = await requireOrgMember(ctx, company.orgId)
     assertValidSnapshot(args)
 
-    return await ctx.db.insert('kpiSnapshots', {
+    const metricType = normalizeMetricType(args.metricType)
+    const id = await ctx.db.insert('kpiSnapshots', {
       orgId: company.orgId,
       companyId: args.companyId,
-      metricType: normalizeMetricType(args.metricType),
+      metricType,
       periodStart: args.periodStart,
       periodEnd: args.periodEnd,
       value: args.value,
@@ -122,6 +124,14 @@ export const create = mutation({
       capturedAt: Date.now(),
       capturedBy: user._id,
     })
+    await logCompanyEvent(ctx, company, userActor(user._id), {
+      kind: 'kpi_added',
+      metricType,
+      periodEnd: args.periodEnd,
+      value: args.value,
+      unit: args.unit,
+    })
+    return id
   },
 })
 
@@ -130,8 +140,13 @@ export const remove = mutation({
   handler: async (ctx, { snapshotId }) => {
     const snapshot = await ctx.db.get('kpiSnapshots', snapshotId)
     if (!snapshot) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, snapshot.orgId)
+    const { user } = await requireOrgMember(ctx, snapshot.orgId)
     await ctx.db.delete('kpiSnapshots', snapshotId)
+    await logCompanyEvent(ctx, snapshot, userActor(user._id), {
+      kind: 'kpi_removed',
+      metricType: snapshot.metricType,
+      periodEnd: snapshot.periodEnd,
+    })
     return null
   },
 })
@@ -173,10 +188,11 @@ export const createInternal = internalMutation({
     await getOrgCompany(ctx, orgId, args.companyId)
     assertValidSnapshot(args)
 
+    const metricType = normalizeMetricType(args.metricType)
     const id = await ctx.db.insert('kpiSnapshots', {
       orgId,
       companyId: args.companyId,
-      metricType: normalizeMetricType(args.metricType),
+      metricType,
       periodStart: args.periodStart,
       periodEnd: args.periodEnd,
       value: args.value,
@@ -185,6 +201,18 @@ export const createInternal = internalMutation({
       capturedAt: Date.now(),
       capturedBy: actorUserId,
     })
+    await logCompanyEvent(
+      ctx,
+      { orgId, companyId: args.companyId },
+      userActor(actorUserId, true),
+      {
+        kind: 'kpi_added',
+        metricType,
+        periodEnd: args.periodEnd,
+        value: args.value,
+        unit: args.unit,
+      },
+    )
     return { _id: id }
   },
 })

@@ -143,13 +143,22 @@ La colonne principale, dans l'ordre de lecture :
   par email (au nom de qui l'a transféré, avec l'expéditeur d'origine),
   déposé à la main, publié par Parallel ; renvoi corrigé ; rattaché à la
   société, stocké malgré un doute, analyse relancée, détaché, supprimé. Sur le
-  **coffre** : document ajouté, renommé ou reclassé, retiré. Une écriture
+  **coffre** : document ajouté, renommé ou reclassé, retiré. Sur la **fiche
+  elle-même** : créée, archivée, restaurée ; renommée (ancien et nouveau nom
+  en clair, les autres champs modifiés comptés) ; personnes ajoutées ou
+  retirées ; lien Attio ou lien Parallel posé ou retiré. Sur les **KPIs** :
+  valeur saisie à la main ou confirmée dans le panneau IA, puis supprimée
+  (les KPIs extraits d'un reporting sont couverts par la ligne du report).
+  Sur le **BP** d'un deal : version initiale ou révisée remplacée. Ce qui se
+  remplit tout seul (pitch généré depuis le site ou depuis Parallel, dates de
+  dernier report) n'apparaît pas. Une écriture
   confirmée dans le panneau IA est au nom de la personne qui l'a confirmée,
   avec la mention « via l'agent IA » ; celles des intégrations portent le nom
   Attio ou Parallel et se replient quand elles s'enchaînent. Le journal
   commence à sa mise en service ; les créations de deals, pointages et
-  dépointages, valorisations, documents et reports antérieurs ont été repris
-  une fois, sans auteur quand personne ne l'avait enregistré (« Albo OS »).
+  dépointages, valorisations, documents, reports, créations et archivages de
+  fiches, KPIs saisis à la main et BP antérieurs ont été repris une fois,
+  sans auteur quand personne ne l'avait enregistré (« Albo OS »).
   Enregistrer un formulaire sans rien changer n'écrit rien.
 - **Rapports & communications** : le **journal** de la société — ce qu'elle
   nous envoie, du plus récent au plus ancien. On y trouve les rapports

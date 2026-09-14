@@ -115,9 +115,9 @@ export const companyEventActor = v.union(
 )
 
 /** What happened. Payloads carry displayable values (amounts in cents, a
- * document title), never ids the sheet would have to resolve again. Every
- * kind below is a DEAL event (`dealId` set); the company-level families
- * (reports, vault, identity…) join this union as they are wired. */
+ * document title), never ids the sheet would have to resolve again. The
+ * first kinds are DEAL events (`dealId` set); the company-level families
+ * (reports, vault, the company itself, KPIs) follow, without a deal. */
 export const companyEvent = v.union(
   v.object({ kind: v.literal('created') }),
   v.object({
@@ -199,6 +199,46 @@ export const companyEvent = v.union(
   v.object({ kind: v.literal('vault_document_added'), title: v.string() }),
   v.object({ kind: v.literal('vault_document_removed'), title: v.string() }),
   v.object({ kind: v.literal('vault_document_updated'), title: v.string() }),
+  // The company itself: its life on the sheet, its identity, its people, its
+  // links to Attio and to Parallel.
+  v.object({ kind: v.literal('company_created') }),
+  v.object({ kind: v.literal('company_archived') }),
+  v.object({ kind: v.literal('company_restored') }),
+  v.object({
+    kind: v.literal('company_updated'),
+    // A rename is shown in clear; every other changed field is counted.
+    rename: v.optional(v.object({ from: v.string(), to: v.string() })),
+    otherCount: v.number(),
+  }),
+  v.object({
+    kind: v.literal('people_changed'),
+    added: v.array(v.string()),
+    removed: v.array(v.string()),
+  }),
+  v.object({ kind: v.literal('attio_linked') }),
+  v.object({ kind: v.literal('attio_unlinked') }),
+  v.object({ kind: v.literal('vasco_linked') }),
+  v.object({ kind: v.literal('vasco_unlinked') }),
+  // KPIs entered by hand or through the agent (the ones a report brings in
+  // are covered by its own `report_received` row).
+  v.object({
+    kind: v.literal('kpi_added'),
+    metricType: v.string(),
+    periodEnd: v.number(),
+    value: v.number(),
+    unit: v.optional(v.string()),
+  }),
+  v.object({
+    kind: v.literal('kpi_removed'),
+    metricType: v.string(),
+    periodEnd: v.number(),
+  }),
+  // A deal's business plan replaced as a whole (one version at a time).
+  v.object({
+    kind: v.literal('projection_replaced'),
+    version: v.union(v.literal('initial'), v.literal('revised')),
+    lineCount: v.number(),
+  }),
 )
 
 // Instrument-archetype enums (dashboard refonte). Consumed only by the

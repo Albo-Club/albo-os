@@ -22,7 +22,13 @@ import {
   transactionTotals,
 } from './deals'
 import { parseScope, readMembership } from './lib/agentScope'
-import { diffDealPatch, logDealEvent, userActor } from './lib/companyEvents'
+import {
+  diffCompanyPatch,
+  diffDealPatch,
+  logCompanyEvent,
+  logDealEvent,
+  userActor,
+} from './lib/companyEvents'
 import { findSimilarCompanies, findSimilarDeals } from './lib/duplicates'
 import { isAvailableAccount } from './lib/bankAccounts'
 import { normalizeDomain } from './lib/domain'
@@ -195,6 +201,12 @@ export const createCompanyInternal = internalMutation({
       domain: cleanedDomain,
       siren: cleanedSiren,
     })
+    await logCompanyEvent(
+      ctx,
+      { orgId, companyId: id },
+      userActor(actorUserId, true),
+      { kind: 'company_created' },
+    )
     // Domain provided → auto-fill oneLiner + summary from the website
     // (additive — cf. convex/companyEnrichment.ts).
     if (cleanedDomain) {
@@ -994,7 +1006,11 @@ export const updateCompanyInternal = internalMutation({
       const trimmed = patch.domain.trim()
       patch.domain = trimmed ? (normalizeDomain(trimmed) ?? trimmed) : undefined
     }
+    const event = diffCompanyPatch(company, patch)
     await ctx.db.patch('companies', companyId, patch)
+    if (event) {
+      await logCompanyEvent(ctx, company, userActor(actorUserId, true), event)
+    }
     return { _id: companyId }
   },
 })
