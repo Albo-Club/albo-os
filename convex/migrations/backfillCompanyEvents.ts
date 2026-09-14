@@ -5,14 +5,23 @@
  *
  * Four sources, four kinds of events — nothing else is reconstructible:
  *
- * - `deals`            → `created` at `_creationTime`, no author (`unknown`).
+ * - `deals`            → `created` at `_creationTime`; by « Attio » when the
+ *                        row carries an `attioDealId` (the sync or the Attio
+ *                        import made it), no author otherwise.
  * - `matchingDecisions` (matched) → `transaction_matched` by `decidedBy` at
  *                        `decidedAt`; direction read from the transaction
  *                        when it still exists.
  * - `valuations`       → `valuation_added` at the row's `_creationTime`, no
  *                        author.
- * - `documents` with a `dealId` → `document_attached` by `uploadedBy` (or
- *                        `unknown`) at `uploadedAt`.
+ * - `documents` with a `dealId` → `document_attached` by `uploadedBy` at
+ *                        `uploadedAt`.
+ *
+ * Only what happened IN Albo OS is reconstructed. The Airtable import is a
+ * bulk copy of a history that predates the app, so a row it created (deal or
+ * valuation carrying an `airtableId`) gets no `created` / `valuation_added`
+ * line — hundreds of them would share the import day, and the journal would
+ * say « created » about deals that were years old. Same for a document row
+ * without `uploadedBy`: only a one-shot import writes one.
  *
  * Field edits made before the journal existed are lost: nobody recorded them.
  *
@@ -76,13 +85,17 @@ const UNKNOWN: CompanyEventActor = { kind: 'unknown' }
 export const dryRun = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const deals = (await ctx.db.query('deals').collect()).length
+    const deals = (await ctx.db.query('deals').collect()).filter(
+      (d) => !d.airtableId,
+    ).length
     const matching = (await ctx.db.query('matchingDecisions').collect()).filter(
       (d) => d.decision === 'matched' && d.dealId,
     ).length
-    const valuations = (await ctx.db.query('valuations').collect()).length
+    const valuations = (await ctx.db.query('valuations').collect()).filter(
+      (val) => !val.airtableId,
+    ).length
     const documents = (await ctx.db.query('documents').collect()).filter(
-      (d) => d.dealId,
+      (d) => d.dealId && d.uploadedBy,
     ).length
     const already = (await ctx.db.query('companyEvents').collect()).filter(
       (e) => e.backfillKey,
@@ -103,12 +116,13 @@ export const apply = internalMutation({
       case 'deals': {
         const page = await ctx.db.query('deals').paginate(opts)
         for (const deal of page.page) {
+          if (deal.airtableId) continue
           written += await upsert(
             ctx,
             `deal:${deal._id}`,
             deal,
             deal._creationTime,
-            UNKNOWN,
+            deal.attioDealId ? { kind: 'system', source: 'attio' } : UNKNOWN,
             { kind: 'created' },
           )
         }
@@ -140,6 +154,7 @@ export const apply = internalMutation({
       case 'valuations': {
         const page = await ctx.db.query('valuations').paginate(opts)
         for (const val of page.page) {
+          if (val.airtableId) continue
           const deal = await ctx.db.get('deals', val.dealId)
           written += await upsert(
             ctx,
@@ -160,14 +175,14 @@ export const apply = internalMutation({
       case 'documents': {
         const page = await ctx.db.query('documents').paginate(opts)
         for (const doc of page.page) {
-          if (!doc.dealId) continue
+          if (!doc.dealId || !doc.uploadedBy) continue
           const deal = await ctx.db.get('deals', doc.dealId)
           written += await upsert(
             ctx,
             `doc:${doc._id}`,
             deal,
             doc.uploadedAt,
-            doc.uploadedBy ? { kind: 'user', userId: doc.uploadedBy } : UNKNOWN,
+            { kind: 'user', userId: doc.uploadedBy },
             { kind: 'document_attached', title: doc.title },
           )
         }

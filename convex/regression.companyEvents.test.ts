@@ -229,6 +229,47 @@ describe('companyEvents: journal written by the deal mutations', () => {
     expect(left).toHaveLength(0)
   })
 
+  test('the backfill skips what the Airtable import copied in bulk', async () => {
+    const { t, user, org, target } = await orgSetup('org-backfill-import')
+    await t.run(async (ctx) => {
+      await ctx.db.insert('deals', {
+        orgId: org.orgId,
+        investorCompanyId: org.rootCompanyId,
+        targetCompanyId: target,
+        instrumentKind: 'share',
+        currency: 'EUR',
+        status: 'active',
+        airtableId: 'recIMPORTED',
+      })
+      await ctx.db.insert('deals', {
+        orgId: org.orgId,
+        investorCompanyId: org.rootCompanyId,
+        targetCompanyId: target,
+        instrumentKind: 'share',
+        currency: 'EUR',
+        status: 'pending',
+        attioDealId: 'attio-1',
+      })
+      // Drop the live events so only the backfill speaks.
+      const rows = await ctx.db.query('companyEvents').collect()
+      for (const r of rows) await ctx.db.delete('companyEvents', r._id)
+    })
+    await t.mutation(internal.migrations.backfillCompanyEvents.apply, {
+      source: 'deals',
+    })
+    const rows = await user.as.query(api.companyEvents.listByCompany, {
+      companyId: target,
+    })
+    // The manual deal (unknown author) and the Attio one; never the import.
+    expect(rows.map((r) => r.actor)).toEqual(
+      expect.arrayContaining([
+        { kind: 'unknown' },
+        { kind: 'system', source: 'attio' },
+      ]),
+    )
+    expect(rows).toHaveLength(2)
+  })
+
   test('the backfill reconstructs a creation once, never twice', async () => {
     const { t, user, target, dealId } = await orgSetup('org-backfill')
     // Simulate a deal that predates the journal: drop its live event.
