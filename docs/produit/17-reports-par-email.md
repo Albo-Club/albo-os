@@ -77,6 +77,15 @@ en fin de nom** est ignoré au moment du rattachement : c'est la place pour
 votre propre annotation, celle qui vous dit de quel véhicule il s'agit
 (« Batch Ventures 2025 (Fund n°2) »).
 
+C'est aussi la place du **véhicule** quand vous investissez via un SPV : la
+fiche s'appelle « TIMELEFT (SIDE) », jamais « SIDE TIMELEFT ». Le nom devant
+ferait chercher « SIDE TIMELEFT » dans le message — ce que le fondateur
+n'écrit jamais — et la participation ne se rattacherait plus que par le site
+web de l'expéditeur, donc plus du tout dès que le report est transféré par
+quelqu'un d'autre que l'équipe. Exception : quand le fonds **est** la
+participation (vous êtes souscripteur de SIDE 1, d'ASTERION F2), son nom est
+bien « SIDE 1 » — il n'y a pas de préfixe à déplacer.
+
 **Quand la participation est le fonds lui-même** : un fonds dont vous êtes
 souscripteur (Batch Ventures, Eutopia…) envoie des nouvelles de **ses**
 participations — une revente, une distribution. La société citée n'est pas
