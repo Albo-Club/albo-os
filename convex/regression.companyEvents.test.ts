@@ -229,6 +229,150 @@ describe('companyEvents: journal written by the deal mutations', () => {
     expect(left).toHaveLength(0)
   })
 
+  test('setting a matched transaction aside logs it leaving the deal', async () => {
+    const { t, user, org, target, dealId } = await orgSetup('org-aside')
+    const account = await createBankAccount(t, org)
+    const txId = await createTransaction(t, org.orgId, account, {
+      direction: 'out',
+      amount: 12_000_00,
+    })
+    await user.as.mutation(api.transactions.matchTransaction, {
+      transactionId: txId,
+      dealId,
+    })
+    // Reclassified straight to "charge": no explicit unmatch, yet the deal
+    // loses the transaction — the journal must say so.
+    await user.as.mutation(api.transactions.categorizeAsCharge, {
+      transactionId: txId,
+    })
+    const rows = await user.as.query(api.companyEvents.listByCompany, {
+      companyId: target,
+    })
+    expect(rows.map((r) => r.event.kind)).toEqual([
+      'transaction_unmatched',
+      'transaction_matched',
+      'created',
+    ])
+  })
+
+  test('the backfill replays the pointage log: match, unmatch, re-match, aside', async () => {
+    const { t, user, org, target, dealId } = await orgSetup('org-replay')
+    const account = await createBankAccount(t, org)
+    const txId = await createTransaction(t, org.orgId, account, {
+      direction: 'out',
+      amount: 150_000_00,
+    })
+    const match = () =>
+      user.as.mutation(api.transactions.matchTransaction, {
+        transactionId: txId,
+        dealId,
+      })
+    await match()
+    await user.as.mutation(api.transactions.unmatchTransaction, {
+      transactionId: txId,
+    })
+    await match()
+    await user.as.mutation(api.transactions.categorizeAsCharge, {
+      transactionId: txId,
+    })
+    // Pretend the journal did not exist: only the decision log remains.
+    await t.run(async (ctx) => {
+      const rows = await ctx.db.query('companyEvents').collect()
+      for (const r of rows) await ctx.db.delete('companyEvents', r._id)
+    })
+
+    const result = await t.mutation(
+      internal.migrations.backfillCompanyEvents.apply,
+      { source: 'matching' },
+    )
+    expect(result).toMatchObject({ written: 4, removed: 0, unattributable: 0 })
+
+    const rows = await user.as.query(api.companyEvents.listByCompany, {
+      companyId: target,
+    })
+    // Newest first: aside (unmatched), re-match, unmatch, first match.
+    expect(rows.map((r) => r.event.kind)).toEqual([
+      'transaction_unmatched',
+      'transaction_matched',
+      'transaction_unmatched',
+      'transaction_matched',
+    ])
+    expect(rows[0].event).toMatchObject({
+      amountCents: 150_000_00,
+      direction: 'out',
+    })
+    // Idempotent: a second run writes nothing.
+    const again = await t.mutation(
+      internal.migrations.backfillCompanyEvents.apply,
+      { source: 'matching' },
+    )
+    expect(again.written).toBe(0)
+  })
+
+  test('the backfill drops a deleted transaction and counts an orphan unmatch', async () => {
+    const { t, user, org, target, dealId } = await orgSetup('org-replay-edge')
+    const account = await createBankAccount(t, org)
+    const gone = await createTransaction(t, org.orgId, account, {
+      direction: 'out',
+      amount: 1_00,
+    })
+    const orphan = await createTransaction(t, org.orgId, account, {
+      direction: 'out',
+      amount: 2_00,
+    })
+    await user.as.mutation(api.transactions.matchTransaction, {
+      transactionId: gone,
+      dealId,
+    })
+    const goneDecision = await t.run(async (ctx) => {
+      const md = await ctx.db
+        .query('matchingDecisions')
+        .withIndex('by_transaction', (q) => q.eq('transactionId', gone))
+        .first()
+      // The transaction disappears (deduplication) after being matched…
+      await ctx.db.delete('transactions', gone)
+      // …and an unmatch is logged on a transaction the log never saw matched.
+      await ctx.db.insert('matchingDecisions', {
+        orgId: org.orgId,
+        transactionId: orphan,
+        decision: 'unmatched',
+        source: 'manual',
+        decidedBy: user.userId,
+        decidedAt: Date.now(),
+        txLabel: 'orphan',
+        txAmount: 2_00,
+        txDate: Date.now(),
+        txBankAccountId: account,
+      })
+      // A row an earlier backfill wrote for the deleted transaction.
+      const rows = await ctx.db.query('companyEvents').collect()
+      for (const r of rows) await ctx.db.delete('companyEvents', r._id)
+      await ctx.db.insert('companyEvents', {
+        orgId: org.orgId,
+        companyId: target,
+        dealId,
+        at: Date.now(),
+        actor: { kind: 'user', userId: user.userId },
+        event: { kind: 'transaction_matched', amountCents: 1_00 },
+        backfillKey: `md:${md!._id}`,
+      })
+      return md!._id
+    })
+    void goneDecision
+
+    const result = await t.mutation(
+      internal.migrations.backfillCompanyEvents.apply,
+      { source: 'matching' },
+    )
+    expect(result).toMatchObject({ written: 0, removed: 1, unattributable: 1 })
+    const dry = await t.query(
+      internal.migrations.backfillCompanyEvents.dryRun,
+      {},
+    )
+    expect(dry).toMatchObject({ unattributable: 1, already: 0 })
+    expect(dry.candidates.matching).toBe(0)
+  })
+
   test('the backfill skips what the Airtable import copied in bulk', async () => {
     const { t, user, org, target } = await orgSetup('org-backfill-import')
     await t.run(async (ctx) => {
