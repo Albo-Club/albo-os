@@ -48,9 +48,9 @@
  * and is skipped when already present, so a second run writes nothing. Rows
  * whose deal is gone are skipped (the journal follows the deal).
  *
- * Execution (prod, manual, one source at a time, re-run with the returned
- * `continueCursor` until `isDone` — `matching` replays the whole log in one
- * call, the table is small):
+ * Execution (prod, manual, one command per source — a paged source chains
+ * its own next pages through the scheduler; `matching` replays the whole log
+ * in one call, the table is small; progress shows in `dryRun`'s `already`):
  *   pnpm exec convex run --prod migrations/backfillCompanyEvents:dryRun
  *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"deals"}'
  *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"matching"}'
@@ -60,6 +60,7 @@
  *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"vault"}'
  */
 import { v } from 'convex/values'
+import { internal } from '../_generated/api'
 import { internalMutation, internalQuery } from '../_generated/server'
 import type { GenericMutationCtx } from 'convex/server'
 import type { DataModel, Doc, Id } from '../_generated/dataModel'
@@ -74,6 +75,10 @@ const sourceValidator = v.union(
   v.literal('vault'),
 )
 const BATCH = 500
+/** Report rows carry the whole mail text (`rawContent`, `cleanedHtml`) and
+ * the source mail read next to them carries as much again: a page must stay
+ * far under the 16 MB a single function may read. */
+const REPORT_BATCH = 5
 
 type MutCtx = GenericMutationCtx<DataModel>
 
@@ -277,27 +282,38 @@ export const dryRun = internalQuery({
       (d) => d.dealId && d.uploadedBy,
     ).length
     const vault = allDocuments.filter(isVaultDocument).length
-    const reports = (await ctx.db.query('companyReports').collect()).filter(
-      (r) => !r.alboReportId,
-    ).length
+    // `companyReports` is deliberately NOT counted: its rows carry the full
+    // mail text, and reading them all in one function exceeds the read
+    // limit (that is also why `apply` pages them by REPORT_BATCH). Watch
+    // `already` grow while the chained apply runs instead.
     const already = (await ctx.db.query('companyEvents').collect()).filter(
       (e) => e.backfillKey,
     ).length
     return {
-      candidates: { deals, matching, valuations, documents, reports, vault },
+      candidates: { deals, matching, valuations, documents, vault },
       unattributable,
       already,
+      note: 'reports are not counted (rows too heavy to read in one call)',
     }
   },
 })
 
 export const apply = internalMutation({
-  args: { source: sourceValidator, cursor: v.optional(v.string()) },
-  handler: async (ctx, { source, cursor }) => {
+  args: {
+    source: sourceValidator,
+    cursor: v.optional(v.string()),
+    /** Schedule the next page automatically (default). Tests pass `false`
+     * to drive the pages by hand. */
+    chain: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { source, cursor, chain }) => {
     let written = 0
     let removed = 0
     let unattributable = 0
-    const opts = { cursor: cursor ?? null, numItems: BATCH }
+    const opts = {
+      cursor: cursor ?? null,
+      numItems: source === 'reports' ? REPORT_BATCH : BATCH,
+    }
     let continueCursor: string
     let isDone: boolean
 
@@ -437,6 +453,24 @@ export const apply = internalMutation({
         break
       }
     }
-    return { source, written, removed, unattributable, continueCursor, isDone }
+    // One command per source: a paged source hands the next page to the
+    // scheduler itself, so nobody has to paste cursors until `isDone`.
+    const scheduledNext = !isDone && chain !== false
+    if (scheduledNext) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.migrations.backfillCompanyEvents.apply,
+        { source, cursor: continueCursor },
+      )
+    }
+    return {
+      source,
+      written,
+      removed,
+      unattributable,
+      continueCursor,
+      isDone,
+      scheduledNext,
+    }
   },
 })
