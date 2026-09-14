@@ -63,6 +63,7 @@ import {
   secondaryRoundFromInstrumentRaw,
   shouldReplaceInstrument,
 } from './lib/attioSync'
+import { diffDealPatch, logDealEvent } from './lib/dealEvents'
 import type { MutationCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 
@@ -435,6 +436,9 @@ export const attioWebhook = httpAction(async (ctx, request) => {
  * to that org. The branch decision (create / refresh / confirm / skip) is the
  * pure `decideSyncAction` (./lib/attioSync) — see it for the invariants.
  */
+/** The Attio sync writes deals on its own: the journal names it, not a user. */
+const ATTIO_ACTOR = { kind: 'system', source: 'attio' } as const
+
 export const upsertFromDeal = internalMutation({
   args: {
     attioDealId: v.string(),
@@ -473,6 +477,11 @@ export const upsertFromDeal = internalMutation({
       if (!existing) return { skipped: true as const, reason: 'invested_no_deal' }
       if (advancesStatus(existing.status, 'active')) {
         await ctx.db.patch('deals', existing._id, { status: 'active' })
+        await logDealEvent(ctx, existing, ATTIO_ACTOR, {
+          kind: 'status_changed',
+          from: existing.status,
+          to: 'active',
+        })
       }
       await confirmDealForecastEntry(ctx, existing._id)
       return { dealId: existing._id, action: 'invested' as const }
@@ -502,7 +511,7 @@ export const upsertFromDeal = internalMutation({
     if (action.kind === 'termsheet_refresh') {
       // Defensive: 'termsheet_refresh' is only returned with an existing deal.
       if (!existing) return { skipped: true as const, reason: 'termsheet_no_deal' }
-      await ctx.db.patch('deals', existing._id, {
+      const refresh = {
         ...(shouldReplaceInstrument(instrumentKind, existing.instrumentKind)
           ? { instrumentKind }
           : {}),
@@ -513,7 +522,12 @@ export const upsertFromDeal = internalMutation({
           : {}),
         ...(args.roundSize != null ? { roundSize: args.roundSize } : {}),
         ...(args.valuation != null ? { entryValuation: args.valuation } : {}),
-      })
+      }
+      await ctx.db.patch('deals', existing._id, refresh)
+      // Every webhook re-sends the whole term sheet: only a value that
+      // actually moved earns a line in the deal's journal.
+      const event = diffDealPatch(existing, refresh)
+      if (event) await logDealEvent(ctx, existing, ATTIO_ACTOR, event)
       await repairStubTargetCompany(ctx, existing, args)
       await upsertDealForecastEntry(ctx, existing._id, org._id, args)
       return { dealId: existing._id, action: 'termsheet_updated' as const }
@@ -554,6 +568,12 @@ export const upsertFromDeal = internalMutation({
       ...(args.roundSize != null ? { roundSize: args.roundSize } : {}),
       ...(args.valuation != null ? { entryValuation: args.valuation } : {}),
     })
+    await logDealEvent(
+      ctx,
+      { _id: dealId, orgId: org._id, targetCompanyId },
+      ATTIO_ACTOR,
+      { kind: 'created' },
+    )
     await upsertDealForecastEntry(ctx, dealId, org._id, args)
     return { dealId, action: 'termsheet_created' as const }
   },

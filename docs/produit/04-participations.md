@@ -131,6 +131,20 @@ La colonne principale, dans l'ordre de lecture :
   d'emblée **tous les champs de l'instrument** choisi (montant, dates dont
   le closing, tour, valorisations, titres acquis…) pour tout renseigner en
   une fois.
+- **Activité** : le journal de ce que nous avons fait sur les deals de cette
+  société — qui, quoi, quand. Une ligne par geste (création, changement de
+  statut avec le produit de sortie, conversion d'instrument, champs modifiés
+  avec l'engagement et le produit de sortie en clair et les autres comptés,
+  valorisation ajoutée, virement pointé ou dépointé, document joint, échéance
+  réalisée), les plus récentes en haut, groupées par jour, cinq visibles puis
+  « Afficher les précédentes ». Le nom du deal est un lien vers sa fiche. Une
+  écriture confirmée dans le panneau IA est au nom de la personne qui l'a
+  confirmée, avec la mention « via l'agent IA » ; celles de la synchro Attio
+  portent le nom Attio et se replient quand elles s'enchaînent. Le journal
+  commence à sa mise en service ; les créations, pointages, valorisations et
+  documents antérieurs ont été repris une fois, sans auteur quand personne ne
+  l'avait enregistré (« Albo OS »). Enregistrer un formulaire sans rien
+  changer n'écrit rien.
 - **Rapports & communications** : le **journal** de la société — ce qu'elle
   nous envoie, du plus récent au plus ancien. On y trouve les rapports
   investisseurs analysés — reçus par mail, déposés à la main, ou **publiés sur

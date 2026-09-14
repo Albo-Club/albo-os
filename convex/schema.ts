@@ -96,6 +96,72 @@ const dealStatus = v.union(
   v.literal('cancelled'),
 )
 
+/** Who wrote a deal event. `viaAgent`: the user confirmed a write proposed
+ * by the AI agent (chat or MCP) — shown under their name. `system`: the
+ * Attio sync. `unknown`: backfilled from a row that never recorded an
+ * author (deal creation, valuation, a document without `uploadedBy`). */
+export const dealEventActor = v.union(
+  v.object({
+    kind: v.literal('user'),
+    userId: v.id('users'),
+    viaAgent: v.optional(v.boolean()),
+  }),
+  v.object({ kind: v.literal('system'), source: v.literal('attio') }),
+  v.object({ kind: v.literal('unknown') }),
+)
+
+/** What happened. Payloads carry displayable values (amounts in cents, a
+ * document title), never ids the sheet would have to resolve again. */
+export const dealEvent = v.union(
+  v.object({ kind: v.literal('created') }),
+  v.object({
+    kind: v.literal('status_changed'),
+    from: dealStatus,
+    to: dealStatus,
+    // Exit proceeds when the same call recorded them (exit dialog).
+    proceedsCents: v.optional(v.number()),
+  }),
+  v.object({
+    kind: v.literal('converted'),
+    from: instrumentKind,
+    to: instrumentKind,
+  }),
+  v.object({
+    kind: v.literal('fields_changed'),
+    // Shown in clear (before → after); every other changed field is counted.
+    changes: v.array(
+      v.object({
+        field: v.union(v.literal('committedAmount'), v.literal('exitProceeds')),
+        from: v.optional(v.number()),
+        to: v.optional(v.number()),
+      }),
+    ),
+    otherCount: v.number(),
+  }),
+  v.object({
+    kind: v.literal('valuation_added'),
+    asOf: v.number(),
+    fairValueCents: v.number(),
+  }),
+  v.object({
+    kind: v.literal('transaction_matched'),
+    amountCents: v.number(),
+    // Absent on backfilled rows whose transaction is gone.
+    direction: v.optional(v.union(v.literal('in'), v.literal('out'))),
+  }),
+  v.object({
+    kind: v.literal('transaction_unmatched'),
+    amountCents: v.number(),
+    direction: v.optional(v.union(v.literal('in'), v.literal('out'))),
+  }),
+  v.object({ kind: v.literal('document_attached'), title: v.string() }),
+  v.object({
+    kind: v.literal('entry_realized'),
+    date: v.number(),
+    amountCents: v.number(),
+  }),
+)
+
 // Instrument-archetype enums (dashboard refonte). Consumed only by the
 // optional per-archetype columns on `deals`; see convex/lib/instruments.ts
 // for the validators (single source) and convex/lib/instrumentMapping.ts for
@@ -2284,6 +2350,30 @@ export default defineSchema({
     .index('by_rule', ['ruleId'])
     .index('by_deal', ['dealId'])
     .index('by_loan', ['loanId']),
+
+  /**
+   * dealEvents — append-only journal of what happened to a deal: who did it,
+   * when, and the readable gist (before → after). One row per mutation call,
+   * never patched, deleted only with its deal (`deals:remove`). Fed by every
+   * writer of `deals` (`convex/lib/dealEvents.ts:logDealEvent`); read by the
+   * « Activité » section of the company sheet (`convex/dealEvents.ts`).
+   *
+   * `companyId` is the deal's target at write time — the sheet lists by it.
+   * `backfillKey` anchors the rows the one-shot migration reconstructed from
+   * pre-existing tables (`migrations/backfillDealEvents`), so it is idempotent.
+   */
+  dealEvents: defineTable({
+    orgId: v.id('organizations'),
+    dealId: v.id('deals'),
+    companyId: v.id('companies'),
+    at: v.number(), // ms epoch
+    actor: dealEventActor,
+    event: dealEvent,
+    backfillKey: v.optional(v.string()),
+  })
+    .index('by_company_at', ['companyId', 'at'])
+    .index('by_deal', ['dealId'])
+    .index('by_backfill_key', ['backfillKey']),
 
   /**
    * todos — manual tasks of the « To do » tab (convex/todo.ts). Only the

@@ -35,6 +35,7 @@ import type * as companyReports from "../companyReports.js";
 import type * as connections from "../connections.js";
 import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
+import type * as dealEvents from "../dealEvents.js";
 import type * as deals from "../deals.js";
 import type * as documents from "../documents.js";
 import type * as documentsClassify from "../documentsClassify.js";
@@ -121,6 +122,7 @@ import type * as migrations_alboReportsImport from "../migrations/alboReportsImp
 import type * as migrations_alboSummaryImport from "../migrations/alboSummaryImport.js";
 import type * as migrations_archiveCalteBlockedCards from "../migrations/archiveCalteBlockedCards.js";
 import type * as migrations_attioAlboImport from "../migrations/attioAlboImport.js";
+import type * as migrations_backfillDealEvents from "../migrations/backfillDealEvents.js";
 import type * as migrations_backfillCompanyEnrichment from "../migrations/backfillCompanyEnrichment.js";
 import type * as migrations_backfillReportFreshness from "../migrations/backfillReportFreshness.js";
 import type * as migrations_calteInstrumentImport from "../migrations/calteInstrumentImport.js";
@@ -205,6 +207,7 @@ declare const fullApi: ApiFromModules<{
   connections: typeof connections;
   crons: typeof crons;
   dashboard: typeof dashboard;
+  dealEvents: typeof dealEvents;
   deals: typeof deals;
   documents: typeof documents;
   documentsClassify: typeof documentsClassify;
@@ -291,6 +294,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/alboSummaryImport": typeof migrations_alboSummaryImport;
   "migrations/archiveCalteBlockedCards": typeof migrations_archiveCalteBlockedCards;
   "migrations/attioAlboImport": typeof migrations_attioAlboImport;
+  "migrations/backfillDealEvents": typeof migrations_backfillDealEvents;
   "migrations/backfillCompanyEnrichment": typeof migrations_backfillCompanyEnrichment;
   "migrations/backfillReportFreshness": typeof migrations_backfillReportFreshness;
   "migrations/calteInstrumentImport": typeof migrations_calteInstrumentImport;

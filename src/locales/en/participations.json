@@ -343,6 +343,41 @@
       "placeholder": "This instrument type isn't configured yet."
     }
   },
+  "activity": {
+    "title": "Activity",
+    "empty": "No activity recorded on this company's deals yet.",
+    "showMore": "Show {{count}} earlier",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "viaAgent": "via the AI agent",
+    "collapsedSync_one": "{{count}} more Attio sync collapsed",
+    "collapsedSync_other": "{{count}} more Attio syncs collapsed",
+    "deletedDeal": "deleted deal",
+    "actor": {
+      "system": "Attio",
+      "unknown": "Albo OS"
+    },
+    "field": {
+      "committedAmount": "commitment",
+      "exitProceeds": "exit proceeds"
+    },
+    "ev": {
+      "created": "created {{deal}}",
+      "status_changed": "moved {{deal}} from {{from}} to {{to}}",
+      "proceedsSuffix": " · proceeds {{amount}}",
+      "converted": "converted {{deal}}: {{from}} → {{to}}",
+      "fields_changed": "edited {{deal}}: {{changes}}",
+      "otherFieldsSuffix_one": ", and {{count}} other field",
+      "otherFieldsSuffix_other": ", and {{count}} other fields",
+      "fields_changed_count_one": "edited {{count}} field of {{deal}}",
+      "fields_changed_count_other": "edited {{count}} fields of {{deal}}",
+      "valuation_added": "added a valuation on {{deal}} as of {{date}} · {{amount}}",
+      "transaction_matched": "matched a {{amount}} transfer to {{deal}}",
+      "transaction_unmatched": "unmatched a {{amount}} transfer from {{deal}}",
+      "document_attached": "attached “{{title}}” to {{deal}}",
+      "entry_realized": "realized the {{date}} entry ({{amount}}) on {{deal}}"
+    }
+  },
   "edit": {
     "dealTitle": "Edit deal",
     "dealDescription": "Rename the deal, change its instrument type, and edit its field values.",

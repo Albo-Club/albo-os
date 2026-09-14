@@ -722,6 +722,14 @@ export const remove = mutation({
   le chiffre soit un **constat** dont l'app n'a aucun moyen de dérivation —
   pas un calcul qu'on préfère figer. Il reste optionnel : absent, le montant
   atteint par le plan précédent fait foi.
+- ❌ Écrire sur `deals` (ou sur ce qui s'y rattache : valorisation, pointage,
+  document de deal, échéance réalisée) depuis une **nouvelle** mutation sans
+  appeler `logDealEvent` (`convex/lib/dealEvents.ts`). Le journal « Activité »
+  de la fiche société ne dérive rien : une écriture non journalisée est
+  invisible, sans erreur. Une modification de champs passe par
+  `diffDealPatch` (un événement par appel, muet si rien ne change) ; une
+  écriture faite via l'agent porte `userActor(actorUserId, true)`, jamais un
+  acteur « agent » à part ; la synchro Attio est l'acteur `system`.
 - ❌ Ajouter une table qui référence des tables existantes sans poser, dans
   **chacune** d'elles, le refus de suppression correspondant. Le garde-fou
   vit dans le fichier de l'objet référencé (`deals.ts`, `properties.ts`…),

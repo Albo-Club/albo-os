@@ -16,6 +16,7 @@ import { internalMutation, mutation, query } from './_generated/server'
 import { RESEND_FROM, resend } from './email'
 import { REPORT_EMAIL_MAX_CARDS, weeklyDigestEmail } from './emailTemplates'
 import { requireAppUser, requireOrgMember } from './lib/auth'
+import { logDealEvent } from './lib/dealEvents'
 import { isAvailableAccount } from './lib/bankAccounts'
 import { effectiveCategory, isValidForecastCategory } from './lib/categories'
 import { companyLogoUrl } from './lib/domain'
@@ -35,6 +36,7 @@ import { loanSchedule } from './loans'
 import { FAMILY_HEAD_SLUG, digestsFor } from './lib/weeklyDigest'
 import { computeVatPositionForOrg } from './transactions'
 import type { DigestReportItem } from './emailTemplates'
+import type { DealEventActor } from './lib/dealEvents'
 import type { GridTx, HistoryTx } from './lib/recurrence'
 import type { OrgFinding } from './lib/weeklyDigest'
 import type { DataModel, Doc, Id } from './_generated/dataModel'
@@ -550,7 +552,6 @@ export const expandLoanSchedules = mutation({
   },
 })
 
-
 // ─── Real balance history ────────────────────────────────────────────────────
 
 /**
@@ -638,6 +639,7 @@ export async function applyMarkEntryRealized(
   entry: Doc<'forecastEntries'>,
   transactionId: Id<'transactions'>,
   mode: 'close' | 'keepRemainder',
+  actor: DealEventActor,
 ) {
   // Same guardrail in both modes: the transaction must belong to the same
   // org; we never touch the transaction itself (matchStatus, reconciled and
@@ -645,6 +647,16 @@ export async function applyMarkEntryRealized(
   const tx = await ctx.db.get('transactions', transactionId)
   if (!tx || tx.orgId !== entry.orgId) {
     throw new ConvexError('transaction_wrong_org')
+  }
+  // Journal of the deal the entry belongs to, if any (loan schedules and
+  // recurring charges have none).
+  const deal = entry.dealId ? await ctx.db.get('deals', entry.dealId) : null
+  if (deal) {
+    await logDealEvent(ctx, deal, actor, {
+      kind: 'entry_realized',
+      date: entry.date,
+      amountCents: tx.amount,
+    })
   }
 
   if (mode === 'keepRemainder') {
@@ -694,8 +706,11 @@ export const markEntryRealized = mutation({
   handler: async (ctx, { entryId, transactionId, mode }) => {
     const entry = await ctx.db.get('forecastEntries', entryId)
     if (!entry) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, entry.orgId)
-    await applyMarkEntryRealized(ctx, entry, transactionId, mode ?? 'close')
+    const { user } = await requireOrgMember(ctx, entry.orgId)
+    await applyMarkEntryRealized(ctx, entry, transactionId, mode ?? 'close', {
+      kind: 'user',
+      userId: user._id,
+    })
     return null
   },
 })

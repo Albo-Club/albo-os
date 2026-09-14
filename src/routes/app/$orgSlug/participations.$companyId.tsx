@@ -36,6 +36,7 @@ import { AttioCompanyField } from '~/components/companies/AttioCompanyField'
 import { PeopleEditor } from '~/components/companies/PeopleEditor'
 import { CompanyDocumentsCard } from '~/components/companies/CompanyDocumentsCard'
 import { CompanyReportsSection } from '~/components/companies/CompanyReportsSection'
+import { DealActivitySection } from '~/components/deals/DealActivitySection'
 import { CompanyAiSynthesisBlock } from '~/components/companies/CompanyAiSynthesisBlock'
 import { EntityIntegrationsDialog } from '~/components/companies/EntityIntegrationsDialog'
 import { Button } from '~/components/ui/button'
@@ -657,6 +658,12 @@ function ParticipationDetail() {
               <CompanyDealsTable deals={deals} orgSlug={orgSlug} />
             )}
           </IdentitySection>
+
+          {/* What WE did on those deals — who changed what, when — before
+              what the company sends us. */}
+          {company && (
+            <DealActivitySection companyId={company._id} orgSlug={orgSlug} />
+          )}
 
           {/* What the company sends us — analysed reports and VASCO
               communications — in one chronological feed. The documents it
