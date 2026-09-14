@@ -23,6 +23,23 @@ bas de page.
 
 ---
 
+## v1.230.1 — 14/09/2026 à 18:58 — Reprise du journal : seulement ce qui s'est passé dans Albo OS
+
+La reprise de l'historique du journal d'activité ne reconstruit plus que les
+gestes faits **dans Albo OS**. Les deals et valorisations copiés en bloc
+depuis Airtable n'auraient produit que des lignes « créé » toutes datées du
+jour de l'import, sur des deals vieux de plusieurs années : elles sont
+écartées. Un deal arrivé par Attio est crédité à « Attio ». Un document sans
+auteur enregistré n'est pas repris non plus, seul un import en produit.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/backfillCompanyEvents.ts` : `deals` et `valuations`
+>   porteurs d'un `airtableId` ignorés ; `created` avec l'acteur
+>   `system:attio` quand `attioDealId` est présent ; `documents` repris
+>   seulement avec `uploadedBy`. `dryRun` compte avec les mêmes filtres.
+> - Cas ajouté dans `convex/regression.companyEvents.test.ts`.
+
 ## v1.230.0 — 14/09/2026 à 17:41 — Qui a fait quoi sur les deals d'une société
 
 La fiche société gagne une section **Activité**, entre le tableau des deals
