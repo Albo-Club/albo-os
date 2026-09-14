@@ -735,7 +735,10 @@ export const remove = mutation({
   `JOURNALED` sans logger fait rougir la CI, et une exemption s'inscrit dans
   `EXEMPT` avec sa raison. Quand une nouvelle famille rejoint le journal
   (reports, coffre, identité…), l'ajouter à `JOURNALED` **d'abord** : le test
-  nomme alors chaque writer à brancher.
+  nomme alors chaque writer à brancher. Le garde-fou vérifie qu'un logger est
+  **appelé**, pas qu'il dit vrai : chaque nouveau type d'événement arrive
+  avec son cas dans `convex/regression.companyEvents.test.ts` (la mutation
+  exécutée, la ligne produite contrôlée — acteur, type, avant/après).
 - ❌ Ajouter une table qui référence des tables existantes sans poser, dans
   **chacune** d'elles, le refus de suppression correspondant. Le garde-fou
   vit dans le fichier de l'objet référencé (`deals.ts`, `properties.ts`…),

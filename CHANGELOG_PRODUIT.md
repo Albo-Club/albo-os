@@ -83,7 +83,8 @@ reste perdu. Les lignes reprises sans auteur connu portent le nom « Albo OS ».
 >   « Parallel »).
 > - Garde-fou CI `tests/journalGuards.test.ts` : tout fichier de `convex/` qui
 >   écrit directement une table journalisée (`deals` pour l'instant) doit
->   appeler le logger ou figurer dans `EXEMPT` avec sa raison — c'est lui qui
+>   appeler le logger **dans le même bloc de premier niveau** (mutation ou
+>   helper) ou figurer dans `EXEMPT` avec sa raison — c'est lui qui
 >   a révélé le pont VASCO oublié. Ajouter une famille = une entrée dans
 >   `JOURNALED`, le test nomme alors chaque writer à brancher.
 > - Lecture : `convex/companyEvents.ts:listByCompany` (100 derniers, noms
