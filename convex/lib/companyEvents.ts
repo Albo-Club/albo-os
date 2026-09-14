@@ -15,10 +15,13 @@
  *   event: the Attio refresh re-sends the same term sheet on every webhook,
  *   and an edit dialog saved untouched should leave no trace either.
  *
- * Every writer of `deals` calls `logDealEvent` (create/update in
- * `convex/deals.ts`, the agent's internal mutations, the Attio sync, the
- * pointage core, valuations, documents, forecast realization). A new writer
- * must too — `tests/journalGuards.test.ts` fails the build otherwise.
+ * Every writer of a journaled table calls the matching logger — `logDealEvent`
+ * for what happens to a deal (create/update in `convex/deals.ts`, the agent's
+ * internal mutations, the Attio sync, the pointage core, valuations, deal
+ * documents, forecast realization), `logCompanyEvent` for what happens to the
+ * company itself (reports in `convex/reportStore.ts` / `reportInbox.ts`, the
+ * vault in `convex/documents.ts`). A new writer must too —
+ * `tests/journalGuards.test.ts` fails the build otherwise.
  */
 import type { Infer } from 'convex/values'
 import type { GenericMutationCtx } from 'convex/server'
@@ -94,7 +97,24 @@ export function diffDealPatch(
   }
 }
 
-/** Appends one event to the deal's journal. */
+/** Appends one company-level event (no deal) to the company's journal. */
+export async function logCompanyEvent(
+  ctx: MutCtx,
+  target: { orgId: Id<'organizations'>; companyId: Id<'companies'> },
+  actor: CompanyEventActor,
+  event: CompanyEvent,
+  at: number = Date.now(),
+): Promise<Id<'companyEvents'>> {
+  return await ctx.db.insert('companyEvents', {
+    orgId: target.orgId,
+    companyId: target.companyId,
+    at,
+    actor,
+    event,
+  })
+}
+
+/** Appends one event to the deal's journal (filed under its target). */
 export async function logDealEvent(
   ctx: MutCtx,
   deal: Pick<Doc<'deals'>, '_id' | 'orgId' | 'targetCompanyId'>,
@@ -110,6 +130,25 @@ export async function logDealEvent(
     actor,
     event,
   })
+}
+
+/** Who a stored report is credited to: the member who forwarded or uploaded
+ * it when known, the Parallel portal for a publication, nobody otherwise. */
+export function reportActor(
+  email: Pick<Doc<'inboundEmails'>, 'origin' | 'senderUserId'>,
+): CompanyEventActor {
+  if (email.origin === 'vasco') return { kind: 'system', source: 'vasco' }
+  if (email.senderUserId) return { kind: 'user', userId: email.senderUserId }
+  return { kind: 'unknown' }
+}
+
+/** The channel a report came in through, for the journal sentence. */
+export function reportChannel(
+  email: Pick<Doc<'inboundEmails'>, 'origin'>,
+): 'email' | 'upload' | 'vasco' {
+  return email.origin === 'vasco' || email.origin === 'upload'
+    ? email.origin
+    : 'email'
 }
 
 /** The actor for a write made by a signed-in user, from the app or through

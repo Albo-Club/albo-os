@@ -16,11 +16,13 @@ import { internalAction, internalMutation, mutation, query } from './_generated/
 import { fetchBody, getMessage } from './agentmail'
 import { requireAppUser, requireOrgMember } from './lib/auth'
 import { releaseStorage } from './lib/documentBlobs'
+import { logCompanyEvent, userActor } from './lib/companyEvents'
 import { identityKey, sharedDomains } from './lib/emailIdentify'
 import { RETRY_BACKOFFS_MS } from './lib/modelRetry'
 import { recomputeReportFreshness } from './lib/reportFreshness'
 import { resolveMemberByEmail } from './lib/reportSenders'
 import { sourceInbound } from './lib/reportSource'
+import type { CompanyEventActor } from './lib/companyEvents'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 
@@ -540,6 +542,14 @@ export const assignCompany = mutation({
       // re-checks the ORIGINAL sender at send time (anti-enumeration).
       senderUserId: row.senderUserId ?? user._id,
     })
+    // The attach is OUR gesture: one line per entity it lands on. The filing
+    // itself is journaled by `reportStore.storeForCompany` when it happens.
+    for (const m of matched.values()) {
+      await logCompanyEvent(ctx, m, userActor(user._id), {
+        kind: 'report_assigned',
+        label: row.subject,
+      })
+    }
     await ctx.scheduler.runAfter(
       0,
       row.sources ? internal.reportStore.run : internal.reportExtract.run,
@@ -565,9 +575,14 @@ export const assignCompany = mutation({
 export async function removeReportForCompany(
   ctx: MutationCtx,
   report: Doc<'companyReports'>,
-  { deleteFiles }: { deleteFiles: boolean },
+  { deleteFiles, actor }: { deleteFiles: boolean; actor: CompanyEventActor },
 ): Promise<void> {
   const reportId = report._id
+  // Journal first, while the row still says what it was.
+  await logCompanyEvent(ctx, report, actor, {
+    kind: deleteFiles ? 'report_deleted' : 'report_detached',
+    label: report.reportPeriod ?? report.title ?? report.subject ?? '',
+  })
   // Read once: it is both what gets corrected below and, when the files go,
   // the attachment holder `releaseStorage` has to empty.
   const inbound = await sourceInbound(ctx, report)
@@ -668,8 +683,11 @@ export const detachCompany = mutation({
   handler: async (ctx, { reportId }) => {
     const report = await ctx.db.get('companyReports', reportId)
     if (!report) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, report.orgId)
-    await removeReportForCompany(ctx, report, { deleteFiles: false })
+    const { user } = await requireOrgMember(ctx, report.orgId)
+    await removeReportForCompany(ctx, report, {
+      deleteFiles: false,
+      actor: userActor(user._id),
+    })
     return null
   },
 })
@@ -689,8 +707,11 @@ export const deleteReport = mutation({
   handler: async (ctx, { reportId }) => {
     const report = await ctx.db.get('companyReports', reportId)
     if (!report) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, report.orgId)
-    await removeReportForCompany(ctx, report, { deleteFiles: true })
+    const { user } = await requireOrgMember(ctx, report.orgId)
+    await removeReportForCompany(ctx, report, {
+      deleteFiles: true,
+      actor: userActor(user._id),
+    })
     return null
   },
 })
@@ -699,10 +720,18 @@ export const deleteReport = mutation({
 export const reprocess = mutation({
   args: { inboundEmailId: v.id('inboundEmails') },
   handler: async (ctx, { inboundEmailId }) => {
-    await requireAnyMember(ctx)
+    const user = await requireAnyMember(ctx)
     const row = await ctx.db.get('inboundEmails', inboundEmailId)
     if (!row) throw new ConvexError('not_found')
     if (row.status === 'processing') throw new ConvexError('invalid_status')
+    // The replay is a gesture on every sheet the mail was filed under —
+    // logged before the match is cleared, so the entities are still known.
+    for (const m of row.matchedCompanies ?? []) {
+      await logCompanyEvent(ctx, m, userActor(user._id), {
+        kind: 'report_reprocessed',
+        label: row.subject,
+      })
+    }
 
     // A member asked for the replay, so the row is processed whoever sent it
     // — including one the spam filter had parked. Attribution is re-read all
@@ -744,11 +773,18 @@ export const reprocess = mutation({
 export const storeAnyway = mutation({
   args: { inboundEmailId: v.id('inboundEmails') },
   handler: async (ctx, { inboundEmailId }) => {
-    await requireAnyMember(ctx)
+    const user = await requireAnyMember(ctx)
     const row = await ctx.db.get('inboundEmails', inboundEmailId)
     if (!row) throw new ConvexError('not_found')
     if (row.status !== 'needs_review' || row.statusReason !== 'possible_duplicate') {
       throw new ConvexError('invalid_status')
+    }
+    // Filing despite the doubt is OUR gesture, on each entity it goes to.
+    for (const m of row.matchedCompanies ?? []) {
+      await logCompanyEvent(ctx, m, userActor(user._id), {
+        kind: 'report_assigned',
+        label: row.subject,
+      })
     }
     await ctx.db.patch('inboundEmails', inboundEmailId, {
       status: 'received',

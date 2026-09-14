@@ -738,7 +738,10 @@ export const remove = mutation({
   nomme alors chaque writer à brancher. Le garde-fou vérifie qu'un logger est
   **appelé**, pas qu'il dit vrai : chaque nouveau type d'événement arrive
   avec son cas dans `convex/regression.companyEvents.test.ts` (la mutation
-  exécutée, la ligne produite contrôlée — acteur, type, avant/après).
+  exécutée, la ligne produite contrôlée — acteur, type, avant/après). Et
+  chercher les sorties **implicites** : reclasser un virement pointé
+  (`applyCategorization`) le détache du deal sans passer par « dépointer »,
+  c'est un dépointage et il se journalise comme tel.
 - ❌ Ajouter une table qui référence des tables existantes sans poser, dans
   **chacune** d'elles, le refus de suppression correspondant. Le garde-fou
   vit dans le fichier de l'objet référencé (`deals.ts`, `properties.ts`…),

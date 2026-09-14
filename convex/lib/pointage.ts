@@ -210,6 +210,21 @@ export async function applyCategorization(
     reconciledBy: undefined,
     reconciledAt: undefined,
   })
+  // Setting a matched transaction aside IS an unmatch for its deal — the
+  // journal must show it leaving, exactly as `applyUnmatch` does.
+  const deal = tx.dealId ? await ctx.db.get('deals', tx.dealId) : null
+  if (deal) {
+    await logDealEvent(
+      ctx,
+      deal,
+      userActor(decidedBy, source === 'agent_suggested'),
+      {
+        kind: 'transaction_unmatched',
+        amountCents: tx.amount,
+        direction: tx.direction,
+      },
+    )
+  }
   await recordDecision(ctx, {
     transaction: tx,
     decision: status,
