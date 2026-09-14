@@ -47,7 +47,12 @@ import {
 import { IdentitySection } from '~/components/companies/EntityFiche'
 import { DealFieldInput } from '~/components/deals/DealFieldInput'
 import { PlanVsActualSection } from '~/components/deals/PlanVsActualSection'
-import { parseField, rawToInput } from '~/lib/parse'
+import {
+  dateInputToMs,
+  msToDateInput,
+  parseField,
+  rawToInput,
+} from '~/lib/parse'
 import { cn } from '~/lib/utils'
 import { DealCombobox } from '~/components/pointage/DealCombobox'
 import {
@@ -288,12 +293,21 @@ function EditDealDialog({
     Object.fromEntries(fields.map((f) => [f, fieldToInput(deal, f)])),
   )
   const [pending, setPending] = useState(false)
+  // Date of the conversion, asked for as soon as the type changes: a
+  // conversion is usually recorded days or weeks after the fact, so the save
+  // date would be wrong. Defaults to today.
+  const [conversionDate, setConversionDate] = useState(() =>
+    msToDateInput(Date.now()),
+  )
+  const converting = instrument !== deal.instrumentKind
 
   // A non-empty input that fails to parse (e.g. letters in a € field) blocks
-  // the save → no partial write.
-  const valid = fields.every(
-    (f) => parseField(FIELD_FORMAT[f] ?? 'text', values[f]) !== null,
-  )
+  // the save → no partial write. Same for a cleared conversion date on a type
+  // change: the before/after tabs would have nothing to date.
+  const valid =
+    fields.every(
+      (f) => parseField(FIELD_FORMAT[f] ?? 'text', values[f]) !== null,
+    ) && (!converting || dateInputToMs(conversionDate) != null)
 
   async function handleSave() {
     if (!valid) return
@@ -302,7 +316,10 @@ function EditDealDialog({
       // Diff: send only changed fields. name '' clears it (server trims).
       const patch: Record<string, unknown> = {}
       if (name.trim() !== (deal.name ?? '')) patch.name = name
-      if (instrument !== deal.instrumentKind) patch.instrumentKind = instrument
+      if (converting) {
+        patch.instrumentKind = instrument
+        patch.convertedAt = dateInputToMs(conversionDate)
+      }
       if (targetId !== deal.targetCompanyId) patch.targetCompanyId = targetId
       for (const field of fields) {
         const parsed = parseField(FIELD_FORMAT[field] ?? 'text', values[field])
@@ -381,22 +398,35 @@ function EditDealDialog({
               {t('participations:edit.targetHint')}
             </p>
           </div>
-          {instrument !== deal.instrumentKind && (
-            <div
-              role="status"
-              className="border-chart-4/50 bg-chart-4/10 flex items-start gap-2 rounded-lg border px-3 py-2"
-            >
-              <Info className="text-chart-4 mt-0.5 size-4 shrink-0" />
-              <p className="text-muted-foreground text-xs">
-                {t('participations:edit.typeChangeNotice', {
-                  from: t(`participations:instrument.${deal.instrumentKind}`, {
-                    defaultValue: deal.instrumentKind,
-                  }),
-                  to: t(`participations:instrument.${instrument}`, {
-                    defaultValue: instrument,
-                  }),
-                })}
-              </p>
+          {converting && (
+            <div className="space-y-3">
+              <div
+                role="status"
+                className="border-chart-4/50 bg-chart-4/10 flex items-start gap-2 rounded-lg border px-3 py-2"
+              >
+                <Info className="text-chart-4 mt-0.5 size-4 shrink-0" />
+                <p className="text-muted-foreground text-xs">
+                  {t('participations:edit.typeChangeNotice', {
+                    from: t(`participations:instrument.${deal.instrumentKind}`, {
+                      defaultValue: deal.instrumentKind,
+                    }),
+                    to: t(`participations:instrument.${instrument}`, {
+                      defaultValue: instrument,
+                    }),
+                  })}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="deal-conversion-date">
+                  {t('participations:edit.conversionDateLabel')}
+                </Label>
+                <Input
+                  id="deal-conversion-date"
+                  type="date"
+                  value={conversionDate}
+                  onChange={(e) => setConversionDate(e.target.value)}
+                />
+              </div>
             </div>
           )}
           {fields.length > 0 && (

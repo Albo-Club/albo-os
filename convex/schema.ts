@@ -96,6 +96,79 @@ const dealStatus = v.union(
   v.literal('cancelled'),
 )
 
+/** Who wrote a company event. `viaAgent`: the user confirmed a write
+ * proposed by the AI agent (chat or MCP) — shown under their name. `system`:
+ * an integration writing on its own (the Attio sync, the Parallel/VASCO
+ * bridge). `unknown`: backfilled from a row that never recorded an author
+ * (deal creation, valuation, a document without `uploadedBy`). */
+export const companyEventActor = v.union(
+  v.object({
+    kind: v.literal('user'),
+    userId: v.id('users'),
+    viaAgent: v.optional(v.boolean()),
+  }),
+  v.object({
+    kind: v.literal('system'),
+    source: v.union(v.literal('attio'), v.literal('vasco')),
+  }),
+  v.object({ kind: v.literal('unknown') }),
+)
+
+/** What happened. Payloads carry displayable values (amounts in cents, a
+ * document title), never ids the sheet would have to resolve again. Every
+ * kind below is a DEAL event (`dealId` set); the company-level families
+ * (reports, vault, identity…) join this union as they are wired. */
+export const companyEvent = v.union(
+  v.object({ kind: v.literal('created') }),
+  v.object({
+    kind: v.literal('status_changed'),
+    from: dealStatus,
+    to: dealStatus,
+    // Exit proceeds when the same call recorded them (exit dialog).
+    proceedsCents: v.optional(v.number()),
+  }),
+  v.object({
+    kind: v.literal('converted'),
+    from: instrumentKind,
+    to: instrumentKind,
+  }),
+  v.object({
+    kind: v.literal('fields_changed'),
+    // Shown in clear (before → after); every other changed field is counted.
+    changes: v.array(
+      v.object({
+        field: v.union(v.literal('committedAmount'), v.literal('exitProceeds')),
+        from: v.optional(v.number()),
+        to: v.optional(v.number()),
+      }),
+    ),
+    otherCount: v.number(),
+  }),
+  v.object({
+    kind: v.literal('valuation_added'),
+    asOf: v.number(),
+    fairValueCents: v.number(),
+  }),
+  v.object({
+    kind: v.literal('transaction_matched'),
+    amountCents: v.number(),
+    // Absent on backfilled rows whose transaction is gone.
+    direction: v.optional(v.union(v.literal('in'), v.literal('out'))),
+  }),
+  v.object({
+    kind: v.literal('transaction_unmatched'),
+    amountCents: v.number(),
+    direction: v.optional(v.union(v.literal('in'), v.literal('out'))),
+  }),
+  v.object({ kind: v.literal('document_attached'), title: v.string() }),
+  v.object({ kind: v.literal('document_removed'), title: v.string() }),
+  v.object({
+    kind: v.literal('entry_realized'),
+    date: v.number(),
+    amountCents: v.number(),
+  }),
+)
+
 // Instrument-archetype enums (dashboard refonte). Consumed only by the
 // optional per-archetype columns on `deals`; see convex/lib/instruments.ts
 // for the validators (single source) and convex/lib/instrumentMapping.ts for
@@ -1012,6 +1085,17 @@ export default defineSchema({
     // Powens Wealth positions (cf. investmentPositions).
     bankAccountId: v.optional(v.id('bankAccounts')),
 
+    // ─── Conversion (BSA AIR → actions, OC → actions…) ────────────────────
+    // A conversion is a CHANGE OF TYPE on the same row, never a second deal:
+    // no money moves and the position is unchanged, so splitting it in two
+    // would orphan the matched transaction and count the line twice. The
+    // columns of the previous instrument are already kept (see the archetype
+    // block above) — these two say WHICH kind they belonged to and WHEN it
+    // converted, which the row alone cannot tell. Written by `deals.update`
+    // when `instrumentKind` changes; only the LAST conversion is remembered.
+    convertedFromKind: v.optional(instrumentKind),
+    convertedAt: v.optional(v.number()), // ms epoch
+
     // Field names edited by hand on the deal sheet. The Airtable re-import
     // (convex/airtableImport.ts:upsertDeals) skips these columns so manual
     // corrections survive a re-run. See KNOWN_ISSUES « Édition manuelle deals ».
@@ -1321,6 +1405,10 @@ export default defineSchema({
     alboReportId: v.optional(v.string()),
   })
     .index('by_company', ['companyId', 'periodSortDate'])
+    // Ordered by RECEPTION, not by period: the duplicate detector
+    // (`reportStore.findTwin`) looks for the document that just came in a
+    // second time, and a report can cover an old period while arriving today.
+    .index('by_company_received', ['companyId', 'emailDate'])
     .index('by_org', ['orgId'])
     .index('by_message_id', ['agentmailMessageId'])
     .index('by_company_period', ['companyId', 'reportPeriod'])
@@ -2351,6 +2439,35 @@ export default defineSchema({
     .index('by_rule', ['ruleId'])
     .index('by_deal', ['dealId'])
     .index('by_loan', ['loanId']),
+
+  /**
+   * companyEvents — append-only journal of what happened on a company sheet:
+   * who did it, when, and the readable gist (before → after). One row per
+   * mutation call, never patched. Today every row is anchored on a deal
+   * (`dealId` set, deleted with it in `deals:remove`); the company-level
+   * families (reports, vault, identity…) will land here with `dealId` absent,
+   * which is why the table is keyed by company and not by deal. Fed by every
+   * writer of the journaled tables (`convex/lib/companyEvents.ts`, guarded by
+   * `tests/journalGuards.test.ts`); read by the « Activité » section of the
+   * company sheet (`convex/companyEvents.ts`).
+   *
+   * `companyId` is the company the row is filed under (a deal's target at
+   * write time). `backfillKey` anchors the rows the one-shot migration
+   * reconstructed from pre-existing tables (`migrations/backfillCompanyEvents`),
+   * so it is idempotent.
+   */
+  companyEvents: defineTable({
+    orgId: v.id('organizations'),
+    companyId: v.id('companies'),
+    dealId: v.optional(v.id('deals')),
+    at: v.number(), // ms epoch
+    actor: companyEventActor,
+    event: companyEvent,
+    backfillKey: v.optional(v.string()),
+  })
+    .index('by_company_at', ['companyId', 'at'])
+    .index('by_deal', ['dealId'])
+    .index('by_backfill_key', ['backfillKey']),
 
   /**
    * todos — manual tasks of the « To do » tab (convex/todo.ts). Only the

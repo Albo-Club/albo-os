@@ -5,9 +5,15 @@
  */
 
 import { ConvexError, v } from 'convex/values'
-import { internalMutation, internalQuery, mutation, query } from './_generated/server'
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { readMembership } from './lib/agentScope'
+import { logDealEvent, userActor } from './lib/companyEvents'
 
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
@@ -72,10 +78,10 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const deal = await ctx.db.get('deals', args.dealId)
     if (!deal) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, deal.orgId)
+    const { user } = await requireOrgMember(ctx, deal.orgId)
     assertValidValuation(args)
 
-    return await ctx.db.insert('valuations', {
+    const id = await ctx.db.insert('valuations', {
       orgId: deal.orgId,
       dealId: args.dealId,
       asOf: args.asOf,
@@ -84,6 +90,12 @@ export const create = mutation({
       source: args.source,
       notes: args.notes,
     })
+    await logDealEvent(ctx, deal, userActor(user._id), {
+      kind: 'valuation_added',
+      asOf: args.asOf,
+      fairValueCents: args.fairValue,
+    })
+    return id
   },
 })
 
@@ -120,7 +132,7 @@ export const createInternal = internalMutation({
   },
   handler: async (ctx, { orgId, actorUserId, ...args }) => {
     await readMembership(ctx, orgId, actorUserId)
-    await getOrgDeal(ctx, orgId, args.dealId)
+    const deal = await getOrgDeal(ctx, orgId, args.dealId)
     assertValidValuation(args)
 
     const id = await ctx.db.insert('valuations', {
@@ -131,6 +143,11 @@ export const createInternal = internalMutation({
       valuationMethod: args.valuationMethod,
       source: args.source,
       notes: args.notes,
+    })
+    await logDealEvent(ctx, deal, userActor(actorUserId, true), {
+      kind: 'valuation_added',
+      asOf: args.asOf,
+      fairValueCents: args.fairValue,
     })
     return { _id: id }
   },

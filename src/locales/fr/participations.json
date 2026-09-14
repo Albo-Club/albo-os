@@ -291,6 +291,12 @@
       "pre": "Pré-conversion",
       "post": "Post-conversion"
     },
+    "conversion": {
+      "before": "Avant",
+      "after": "Après",
+      "summary": "{{from}} → {{to}}",
+      "summaryDated": "{{from}} → {{to}} · converti le {{date}}"
+    },
     "placement": {
       "latentGain": "Plus-value latente"
     },
@@ -337,6 +343,43 @@
       "placeholder": "Type d'instrument pas encore configuré."
     }
   },
+  "activity": {
+    "title": "Activité",
+    "empty": "Aucune activité enregistrée sur les deals de cette société.",
+    "showMore": "Afficher les {{count}} précédentes",
+    "today": "Aujourd'hui",
+    "yesterday": "Hier",
+    "viaAgent": "via l'agent IA",
+    "collapsedSync_one": "{{count}} autre synchro repliée",
+    "collapsedSync_other": "{{count}} autres synchros repliées",
+    "deletedDeal": "deal supprimé",
+    "actor": {
+      "attio": "Attio",
+      "vasco": "Parallel",
+      "unknown": "Albo OS"
+    },
+    "field": {
+      "committedAmount": "engagement",
+      "exitProceeds": "produit de sortie"
+    },
+    "ev": {
+      "created": "a créé {{deal}}",
+      "status_changed": "a passé {{deal}} de {{from}} à {{to}}",
+      "proceedsSuffix": " · produit {{amount}}",
+      "converted": "a converti {{deal}} : {{from}} → {{to}}",
+      "fields_changed": "a modifié {{deal}} : {{changes}}",
+      "otherFieldsSuffix_one": ", et {{count}} autre champ",
+      "otherFieldsSuffix_other": ", et {{count}} autres champs",
+      "fields_changed_count_one": "a modifié {{count}} champ de {{deal}}",
+      "fields_changed_count_other": "a modifié {{count}} champs de {{deal}}",
+      "valuation_added": "a ajouté une valorisation sur {{deal}} au {{date}} · {{amount}}",
+      "transaction_matched": "a pointé un virement de {{amount}} sur {{deal}}",
+      "transaction_unmatched": "a dépointé un virement de {{amount}} de {{deal}}",
+      "document_attached": "a joint « {{title}} » à {{deal}}",
+      "document_removed": "a retiré « {{title}} » de {{deal}}",
+      "entry_realized": "a réalisé l'échéance du {{date}} ({{amount}}) sur {{deal}}"
+    }
+  },
   "edit": {
     "dealTitle": "Modifier le deal",
     "dealDescription": "Renommer le deal, changer son type d'instrument et modifier les valeurs de ses champs.",
@@ -347,7 +390,8 @@
     "dealNamePlaceholder": "Nom personnalisé (optionnel)",
     "dealNameHint": "Laisser vide pour utiliser l'instrument comme titre.",
     "instrumentLabel": "Instrument",
-    "typeChangeNotice": "Le type passe de {{from}} à {{to}}. Les champs propres à {{from}} sont conservés mais masqués ; ils réapparaîtront si vous repassez en {{from}}.",
+    "typeChangeNotice": "Le type passe de {{from}} à {{to}}. Les champs propres à {{from}} sont conservés et resteront lisibles dans l'onglet « Avant » de la fiche.",
+    "conversionDateLabel": "Date de conversion",
     "targetLabel": "Entité cible",
     "targetHint": "Réaffecter le deal à une autre société du portefeuille.",
     "targetPlaceholder": "Choisir une société",
@@ -618,7 +662,7 @@
     "dialogTitle": "Intégrations de l'entité",
     "dialogDescription": "Rattachez cette entité aux plateformes externes connectées pour faire remonter leurs données (communications, documents) sur sa fiche.",
     "platforms": {
-      "vasco": "Parallel / VASCO"
+      "vasco": "VASCO"
     },
     "linked": "Rattachée",
     "link": "Rattacher",

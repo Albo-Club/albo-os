@@ -264,6 +264,15 @@ describe('applying a statement', () => {
     expect(placements).toHaveLength(2)
     const placement = placements.find((d) => d.currentValue === 2_998_960_27)
     expect(placement).toBeDefined()
+
+    // The import is a writer of `deals` like any other, so it journals.
+    const events = await t.run(async (ctx) =>
+      ctx.db.query('companyEvents').collect(),
+    )
+    expect(events.filter((e) => e.event.kind === 'created')).toHaveLength(2)
+    expect(
+      events.filter((e) => e.event.kind === 'valuation_added'),
+    ).toHaveLength(2)
   })
 
   test('the placement carries a valuation dated at the statement', async () => {
@@ -339,6 +348,16 @@ describe('applying a statement', () => {
       await user.as.query(api.deals.list, { orgId: org.orgId })
     ).filter((d) => d.instrumentKind === 'cto')
     expect(after).toHaveLength(2)
+
+    // The journal follows the same rule as the data: only the account whose
+    // figure actually moved gets a second line. A re-import that changes
+    // nothing must not fill the feed with identical entries.
+    const events = await t.run(async (ctx) =>
+      ctx.db.query('companyEvents').collect(),
+    )
+    expect(
+      events.filter((e) => e.event.kind === 'valuation_added'),
+    ).toHaveLength(3)
 
     // The superseded PDF lost its only referent and was freed.
     expect(await t.run(async (ctx) => ctx.storage.getUrl(first))).toBeNull()

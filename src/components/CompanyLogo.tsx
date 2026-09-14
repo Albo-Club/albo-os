@@ -18,27 +18,41 @@ const iconClasses = {
   lg: 'size-5',
 } as const
 
+const monogramClasses = {
+  sm: 'text-[10px]',
+  md: 'text-xs',
+  lg: 'text-sm',
+} as const
+
 type CompanyLogoProps = {
   domain?: string | null
   companyName?: string | null
   size?: keyof typeof sizeClasses
   className?: string
+  /**
+   * What replaces a missing logo: the generic building icon (default), or the
+   * initial of `companyName` — which keeps two logo-less rows of the same
+   * list distinguishable.
+   */
+  fallback?: 'icon' | 'monogram'
 }
 
 /**
  * Company logo via logo.dev's CDN (hotlinked, never stored — see KNOWN_ISSUES).
  * Falls back to a Building2 icon when the domain, token, or remote image is
- * missing.
+ * missing — or to the name's initial with `fallback="monogram"`.
  */
 export function CompanyLogo({
   domain,
   companyName,
   size = 'md',
   className,
+  fallback = 'icon',
 }: CompanyLogoProps) {
   const [hasError, setHasError] = useState(false)
 
   if (!domain || !LOGO_DEV_TOKEN || hasError) {
+    const initial = companyName?.trim().charAt(0).toUpperCase()
     return (
       <div
         className={cn(
@@ -48,7 +62,20 @@ export function CompanyLogo({
         )}
         title={companyName ?? undefined}
       >
-        <Building2 className={cn('text-muted-foreground', iconClasses[size])} />
+        {fallback === 'monogram' && initial ? (
+          <span
+            className={cn(
+              'text-muted-foreground font-semibold',
+              monogramClasses[size],
+            )}
+          >
+            {initial}
+          </span>
+        ) : (
+          <Building2
+            className={cn('text-muted-foreground', iconClasses[size])}
+          />
+        )}
       </div>
     )
   }

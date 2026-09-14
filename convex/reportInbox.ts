@@ -728,6 +728,41 @@ export const reprocess = mutation({
   },
 })
 
+/**
+ * File a report the detector flagged as a probable duplicate.
+ *
+ * The counterpart of `reject` for a `possible_duplicate` row: the queue offers
+ * both, because the detector deliberately refuses to bet on the grey zone.
+ * The replay is `force`d — without it the same doubt would send the row
+ * straight back to the queue.
+ *
+ * Nothing else is reset: the matched entities, the read sources and the
+ * extracted text are still valid, so the run starts back at the analysis.
+ * `notifiedAt` is left alone too — filing by hand is OUR gesture, not the
+ * forwarder's (cf. `reportNotify.claimNotify`).
+ */
+export const storeAnyway = mutation({
+  args: { inboundEmailId: v.id('inboundEmails') },
+  handler: async (ctx, { inboundEmailId }) => {
+    await requireAnyMember(ctx)
+    const row = await ctx.db.get('inboundEmails', inboundEmailId)
+    if (!row) throw new ConvexError('not_found')
+    if (row.status !== 'needs_review' || row.statusReason !== 'possible_duplicate') {
+      throw new ConvexError('invalid_status')
+    }
+    await ctx.db.patch('inboundEmails', inboundEmailId, {
+      status: 'received',
+      statusReason: undefined,
+      error: undefined,
+    })
+    await ctx.scheduler.runAfter(0, internal.reportStore.run, {
+      inboundEmailId,
+      force: true,
+    })
+    return null
+  },
+})
+
 /** Discard a reviewed email (kept in the list, never processed). */
 export const reject = mutation({
   args: { inboundEmailId: v.id('inboundEmails') },

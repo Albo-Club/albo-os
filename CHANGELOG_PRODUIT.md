@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.225.0 — 14/09/2026 à 20:11 — Les comptes-titres se mettent à jour en déposant le relevé
+## v1.231.0 — 14/09/2026 à 20:18 — Les comptes-titres se mettent à jour en déposant le relevé
 
 Certaines banques ne livrent pas les comptes-titres à l'agrégation bancaire —
 Natixis Wealth Management en fait partie. Jusqu'ici ces placements n'avaient
@@ -108,12 +108,470 @@ ce n'est pas le cas.
 >   `placements.$dealId.tsx` gagne catégorie, prix moyen, cours en % et la
 >   mention « D'après le relevé au … ». i18n FR/EN (`placements:import`,
 >   `placements:envelope`).
+> - L'import est un écrivain de `deals` comme un autre : création de
+>   placement et revalorisation passent par `logDealEvent` (journal
+>   d'activité de la fiche société). Une correction qui ne change aucun
+>   chiffre ne journalise rien — `upsertValuation` rend un booléen disant si
+>   elle a réellement écrit.
 > - `convex/regression.statements.test.ts` (13 cas) pin les quatre
 >   invariants sur les chiffres du vrai relevé CALTE du 13/08/2026 : unités,
->   contrôle de cohérence, correction vs nouveau point, tenancy.
+>   contrôle de cohérence, correction vs nouveau point, tenancy — plus les
+>   lignes de journal attendues.
 > - `convex/_generated/api.d.ts` a été complété à la main pour les deux
 >   nouveaux modules, faute de déploiement pour lancer `convex codegen` :
 >   le prochain `convex dev` le régénère à l'identique.
+## v1.230.2 — 14/09/2026 à 19:46 — Le journal voit un virement quitter son deal, par tous les chemins
+
+Deux corrections sur le journal d'activité, trouvées sur la fiche Marble qui
+affichait deux « pointé » pour un seul virement.
+
+- **En direct** : reclasser un virement pointé en charge, impôt, produit,
+  virement interne ou « à ignorer » le retirait du deal **sans une ligne dans
+  le journal**. Ce geste écrit désormais « a dépointé … », comme le
+  dépointage explicite.
+- **Reprise du passé** : les dépointages sont maintenant reconstruits. Le
+  journal de pointage ne notait pas le deal au moment du dépointage ; la
+  reprise rejoue l'historique de chaque virement dans l'ordre et retrouve le
+  deal du pointage qui précède. Un dépointage dont le pointage est antérieur
+  à ce journal reste sans deal : il est écarté et compté à part. Les gestes
+  sur un virement supprimé depuis (doublons nettoyés) sont écartés, et les
+  lignes déjà reprises pour eux sont retirées.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/pointage.ts:applyCategorization` : `logDealEvent`
+>   `transaction_unmatched` quand la ligne pré-patch porte un `dealId`
+>   (couvre écran et agent).
+> - `convex/migrations/backfillCompanyEvents.ts` : source `matching` rejouée
+>   en une passe par `replayMatchingDecisions` (pure, exportée) — machine à
+>   états par transaction, `matched` fixe le deal courant, toute décision
+>   suivante produit `transaction_unmatched` dessus ; `unattributable` compte
+>   les sorties sans entrée connue ; transaction disparue → rien écrit et
+>   lignes `md:<id>` déjà posées supprimées (`removed`). `dryRun` compte via
+>   le même rejeu. Idempotent par `backfillKey`, plus de pagination sur cette
+>   source.
+> - Trois cas ajoutés dans `convex/regression.companyEvents.test.ts`.
+
+## v1.230.1 — 14/09/2026 à 18:58 — Reprise du journal : seulement ce qui s'est passé dans Albo OS
+
+La reprise de l'historique du journal d'activité ne reconstruit plus que les
+gestes faits **dans Albo OS**. Les deals et valorisations copiés en bloc
+depuis Airtable n'auraient produit que des lignes « créé » toutes datées du
+jour de l'import, sur des deals vieux de plusieurs années : elles sont
+écartées. Un deal arrivé par Attio est crédité à « Attio ». Un document sans
+auteur enregistré n'est pas repris non plus, seul un import en produit.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/backfillCompanyEvents.ts` : `deals` et `valuations`
+>   porteurs d'un `airtableId` ignorés ; `created` avec l'acteur
+>   `system:attio` quand `attioDealId` est présent ; `documents` repris
+>   seulement avec `uploadedBy`. `dryRun` compte avec les mêmes filtres.
+> - Cas ajouté dans `convex/regression.companyEvents.test.ts`.
+
+## v1.230.0 — 14/09/2026 à 17:41 — Qui a fait quoi sur les deals d'une société
+
+La fiche société gagne une section **Activité**, entre le tableau des deals
+et le fil Reporting & communications : le journal de ce que **nous** avons
+fait sur les deals de cette boîte — qui, quoi, quand. Une ligne par geste,
+les plus récentes en haut, groupées par jour, cinq visibles puis « Afficher
+les précédentes ».
+
+Ce que le journal enregistre :
+
+- la **création** d'un deal ;
+- un **changement de statut** (term sheet → actif, actif → exité…), avec le
+  produit de sortie quand on l'a saisi en même temps ;
+- une **conversion** d'instrument (BSA AIR → actions) ;
+- une **modification de champs** : l'engagement et le produit de sortie
+  s'affichent en clair (avant → après), les autres champs sont comptés ;
+- une **valorisation** ajoutée, y compris la mise à jour de valeur d'un
+  placement ;
+- un virement **pointé** ou **dépointé**, et le passage en actif qu'un premier
+  décaissement pointé déclenche ;
+- un **document joint** au deal, ou retiré ;
+- une **échéance réalisée** du prévisionnel.
+
+Une écriture confirmée dans le panneau IA (ou faite via le serveur MCP) est
+affichée **à votre nom**, avec la mention « via l'agent IA ». Ce que fait la
+synchro Attio porte le nom **Attio**, ce que fait le pont Parallel porte le
+nom **Parallel**, et une rafale de synchros consécutives se replie en une
+ligne. Enregistrer un formulaire sans rien changer n'écrit
+rien.
+
+Pour que la section ne soit pas vide au lancement, l'historique déjà présent
+en base est repris une fois : la date de création de chaque deal, les
+pointages (avec leur auteur), les valorisations et les documents. Ce qui n'a
+jamais été enregistré — les modifications de champs d'avant aujourd'hui —
+reste perdu. Les lignes reprises sans auteur connu portent le nom « Albo OS ».
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle table `companyEvents` (`convex/schema.ts`, validateurs exportés
+>   `companyEventActor` / `companyEvent`) : journal en ajout seul de la fiche
+>   société, indexée par société (`by_company_at`), par deal (`by_deal`,
+>   `dealId` optionnel — toutes les familles d'aujourd'hui sont ancrées sur un
+>   deal, les familles société viendront sans) et par clé de reprise
+>   (`by_backfill_key`). Les lignes d'un deal sont supprimées avec lui dans
+>   `deals:remove`.
+> - `convex/lib/companyEvents.ts` : `logDealEvent` (écriture ancrée deal),
+>   `userActor`, et `diffDealPatch` (pur) qui réduit un patch à **un**
+>   événement par appel — priorité conversion > statut > champs, `null` si
+>   rien ne change réellement.
+> - Accroches : `deals.create/update`, `valuations.create/createInternal`,
+>   `lib/pointage.applyMatchToDeal/applyUnmatch` (couvre écran + agent),
+>   `documents.create` (ancre deal), `forecasts.applyMarkEntryRealized`
+>   (nouveau paramètre `actor`, passé par les deux appelants),
+>   `agentTools.createDealInternal/updateDealInternal` (`viaAgent`),
+>   `attioSync.upsertFromDeal` (acteur `system:attio`, diff sur le refresh
+>   pour ne pas journaliser un webhook identique),
+>   `vasco.applyInstrumentBridgePatch` (acteur `system:vasco`, affiché
+>   « Parallel »).
+> - Garde-fou CI `tests/journalGuards.test.ts` : tout fichier de `convex/` qui
+>   écrit directement une table journalisée (`deals` pour l'instant) doit
+>   appeler le logger **dans le même bloc de premier niveau** (mutation ou
+>   helper) ou figurer dans `EXEMPT` avec sa raison — c'est lui qui
+>   a révélé le pont VASCO oublié. Ajouter une famille = une entrée dans
+>   `JOURNALED`, le test nomme alors chaque writer à brancher.
+> - Lecture : `convex/companyEvents.ts:listByCompany` (100 derniers, noms
+>   d'utilisateurs et titres de deals résolus côté serveur).
+> - UI : `src/components/companies/CompanyActivitySection.tsx`, montée dans
+>   `participations.$companyId.tsx` ; phrases i18n `participations:activity.*`
+>   avec un jeton `{{deal}}` découpé pour rendre le lien.
+> - Reprise : `convex/migrations/backfillCompanyEvents.ts` (`dryRun` + `apply`
+>   paginé par source, idempotent par `backfillKey`) — à lancer en prod, cf.
+>   `MIGRATIONS.md`.
+> - `convex/_generated/api.d.ts` édité à la main pour les deux nouveaux
+>   modules (codegen indisponible hors déploiement, cf. `KNOWN_ISSUES.md`
+>   « Codegen Convex hors-ligne »).
+> - Tests : `convex/regression.dealEvents.test.ts` (10 cas).
+
+## v1.229.0 — 12/09/2026 à 10:20 — Voir l'avant et l'après d'un deal converti
+
+Un **BSA AIR devient des actions**, une obligation convertible se convertit, un
+BSA s'exerce. Jusqu'ici, changer le type d'un deal faisait **disparaître de
+l'écran** les caractéristiques de l'ancien instrument : le cap de valorisation
+et la décote du BSA AIR n'étaient plus lisibles nulle part, alors qu'ils
+racontent à quelles conditions on était entré. Il fallait les recopier à la
+main dans les notes du deal.
+
+Désormais la fiche garde **les deux états côte à côte**. Le panneau « Détails
+de l'instrument » porte deux onglets :
+
+- **Après** (ouvert par défaut) : les caractéristiques du nouvel instrument.
+- **Avant** : celles de l'ancien, telles qu'elles étaient avant la conversion.
+
+Entre les deux, une ligne rappelle le chemin et la date — « BSA AIR → Actions ·
+converti le 15 septembre 2026 ». Les deux onglets restent **éditables au clic**,
+donc on peut compléter après coup ce qui n'avait jamais été saisi.
+
+Au moment de changer le type, l'app demande maintenant la **date de
+conversion**. Elle est pré-remplie au jour même, mais une conversion se
+renseigne souvent des semaines après : c'est la vraie date qu'il faut mettre.
+
+Trois précisions. Une conversion **n'est pas une sortie** : le deal reste
+actif, rien n'est encaissé, la performance ne bouge pas. L'app mémorise la
+**dernière** conversion — un instrument converti deux fois n'affichera que la
+dernière étape en « avant ». Et un deal converti **avant** cette mise à jour
+n'a pas de trace : pour lui en donner une, repasser le type à l'ancien
+instrument, enregistrer, puis reconvertir avec la bonne date.
+
+> **🔧 Notes techniques**
+>
+> - Une conversion reste un **changement de `instrumentKind` sur la même
+>   ligne** — jamais un second deal : aucun argent ne bouge, la position est
+>   la même, et le virement de souscription est pointé sur le deal (le
+>   scinder l'orphelinerait et compterait la participation deux fois).
+> - Deux colonnes neuves sur `deals`, toutes deux optionnelles (aucune
+>   migration) : `convertedFromKind` + `convertedAt`. Écrites par
+>   `deals.update` quand `instrumentKind` change ; `convertedFromKind` est
+>   lu **côté serveur** depuis la ligne, jamais pris en argument. La date
+>   vient du dialogue et reste patchable seule pour corriger après coup.
+> - `InstrumentBlock.tsx` : onglets Avant/Après quand `convertedFromKind`
+>   est posé, en remplacement des onglets Pré/Post. L'« avant » est la vue
+>   **pré-conversion** de l'ancien type (`preConversionFields()`, coupe au
+>   marqueur `SAFE_SPLIT_FIELD` existant) — la moitié post d'une config SAFE
+>   décrit l'après, pas l'avant.
+> - `EditDealDialog` (`deals.$dealId.tsx`) : champ **Date de conversion** sous
+>   le bandeau d'avertissement dès que le type change, requis pour enregistrer.
+> - Même règle **dupliquée** dans `agentTools.updateDealInternal` (outil
+>   `updateDeal` du serveur MCP, date en `convertedAtISO`) : ce chemin patche
+>   la ligne lui-même sans passer par `deals.update`. Les deux dérivations
+>   doivent rester alignées — cf. `KNOWN_ISSUES.md`.
+> - Limite assumée : une colonne présente dans les **deux** listes de champs
+>   (`closingDate`, `sharesAcquired`) n'a qu'une valeur en base, donc identique
+>   des deux côtés. La suite, si besoin, est une table `dealConversions` avec
+>   snapshot figé — cf. `KNOWN_ISSUES.md` « Conversion d'un deal ».
+> - Couverture : 4 tests dans `convex/regression.deals.test.ts` (trace écrite
+>   avec la date fournie, repli sur l'instant sinon, trace intacte hors
+>   changement de type, chemin agent/MCP). TESTING.md FD45/FD46, FD15 mis à
+>   jour.
+
+## v1.228.1 — 11/09/2026 à 16:55 — Une banque connectée deux fois n'importe plus les mouvements en double
+
+Quand la **même banque** se retrouvait connectée deux fois — deux connexions
+vivantes sur le même compte — chaque mouvement réel arrivait **deux fois**
+dans le registre. Les deux connexions livrent bien les mêmes opérations, mais
+chacune sous ses propres identifiants, et rien ne permettait de reconnaître
+que c'était la même. Constaté sur l'accès Natixis Wealth Management de CALTE.
+
+Désormais, **un compte n'est alimenté que par une connexion à la fois**. Une
+seconde connexion qui livre un compte déjà alimenté est ignorée : le compte
+reste sur la connexion en place, et celle en trop n'alimente plus rien — elle
+apparaît donc avec sa corbeille dans Réglages → Intégrations, prête à être
+supprimée.
+
+Ce qui ne change pas : **reconnecter** une banque reprend toujours la ligne
+existante, avec son historique et son pointage. La reprise reste la règle dès
+que la connexion précédente est morte (en erreur, silencieuse depuis plus de
+48 heures, ou disparue) — c'est exactement ce qui distingue une reconnexion
+d'un doublon. Et deux accès distincts chez le même établissement restent
+valides : le garde-fou porte sur le **compte**, jamais sur la banque.
+
+Les doublons **déjà** enregistrés, eux, ne s'effacent pas tout seuls : ils se
+retirent compte par compte, sur décision de l'opérateur, après relecture de ce
+qui serait supprimé. Deux mouvements réellement identiques le même jour, ça
+existe — rien ne les distingue d'un doublon, donc rien n'est automatique.
+
+> **🔧 Notes techniques**
+>
+> - `convex/powens.ts` — `resolveAccount` refuse désormais la reprise de lien
+>   (étape 2, rapprochement par IBAN) quand le compte visé est déjà alimenté
+>   par une **autre** connexion encore saine : nouveau helper
+>   `isConnectionLive` (lecture `powensConnections` + `connectionHealth`).
+>   Le compte est **sauté** (`return null`, log `duplicate_live_connection`,
+>   compteur `skipped`), jamais rejeté : un `throw` renverrait un 500 à
+>   Powens, qui suspend ses renvois. Ligne absente = connexion morte, la
+>   reprise a lieu — donc le garde-fou se défait seul dès que la connexion en
+>   place se dégrade ou sort du poll.
+> - La cause racine : la dédup d'ingestion ne connaît que `powensTxId`
+>   (`writeAccountTransactions`), une clé **propre à chaque connexion**. Deux
+>   accès = deux séries d'ids = aucune collision. Le garde-fou porte donc sur
+>   l'unicité du canal, pas sur la clé.
+> - `convex/migrations/dedupPowensTransactions.ts` — nettoyage one-shot,
+>   `dryRun` / `apply` / `verify`, **un compte à la fois** (`bankAccountId` en
+>   argument). Regroupement sur (date, sens, montant, libellé, contrepartie),
+>   lignes `source: 'powens'` uniquement. Survit : la ligne référencée
+>   (`matchingDecisions.transactionId`, `forecastEntries` et `forecasts`
+>   `.realizedTransactionId`), sinon celle qui porte une décision, sinon la
+>   plus ancienne ; deux références ou deux décisions divergentes →
+>   `needs_review`, groupe intact. `apply` exige `expectedDeletions` issu du
+>   `dryRun` (`plan_changed` sinon).
+> - `convex/regression.powensDuplicateConnection.test.ts` — 10 tests : le
+>   doublon ignoré (et sans second compte créé), la reconnexion sur connexion
+>   `wrongpass` ou non suivie qui reprend bien, un second accès livrant un
+>   **autre** compte ingéré normalement, et les règles de survie du nettoyage.
+> - Docs : `KNOWN_ISSUES.md` (« Un compte, une connexion VIVANTE »),
+>   `MIGRATIONS.md`, `TESTING.md` (P17/P18), `docs/produit/15-integrations.md`.
+>   Au passage, la ligne P5 de `TESTING.md` décrivait encore le plancher de
+>   cutover supprimé en 09/2026 — corrigée.
+
+---
+## v1.228.0 — 11/09/2026 à 15:15 — Un mail par organisation, et un accusé pour les dépôts manuels
+
+Une société détenue par deux organisations recevait **un seul** mail
+d'annonce, dont le sujet listait les deux fiches (« nouveau report Waro,
+WARO ») et dont le corps mélangeait deux bilans. C'est désormais **un mail
+par organisation** : sujet « Albo OS — nouveau report Waro · Albo Club
+(S1 2026) », et chaque mail ne porte que les montants et la fiche de son
+organisation. C'est déjà ainsi que fonctionnent les publications Parallel —
+les deux canaux suivent maintenant la même règle.
+
+Conséquence visible : sur une société détenue des deux côtés, tu reçois deux
+mails au lieu d'un. C'est voulu — un mail ne doit jamais mélanger deux
+bilans.
+
+**Un rapport ajouté à la main depuis la fiche donne maintenant un accusé de
+réception à son auteur**, avec le même contenu que pour un report transféré
+(fiche, points clés, synthèse de la boîte, et le bloc contrôle qualité pour
+qui gère la file). Comme un dépôt n'a pas de fil de discussion où répondre,
+il arrive en mail neuf. Le reste du circuit était déjà identique à celui d'un
+mail transféré — lecture des fichiers, KPIs, synthèse IA relancée, rangement
+dans chaque organisation.
+
+> **🔧 Notes techniques**
+>
+> - `lib/reportRouting.ts:routeRecap` prend l'`origin` de la ligne et rend un
+>   `replyChannel` (`'thread'` | `'fresh'` | `null`) : le canal se décide là,
+>   avec le reste du routage, au lieu du test `canReply` qui vivait dans
+>   `send`. Un `upload` vaut donc une réponse en mail neuf, une publication
+>   `vasco` aucune réponse (c'est `vascoNotify.announce` qui parle).
+> - `reportNotify.send` boucle sur les orgs distinctes de `matchedCompanies`
+>   et appelle `entityCards` avec les entités de cette org seulement — pour la
+>   réponse à l'auteur comme pour la diffusion aux autres membres. Sujet via
+>   `announceSubject` (nom de l'entité · nom de l'org). Les mails de problème
+>   (quarantaine, échec, doublon probable) ne sont pas découpés : ils parlent
+>   du mail reçu, pas d'un report rangé dans une org.
+> - Couverture : `tests/reportRouting.test.ts` (nouveaux cas de canal par
+>   origine).
+
+## v1.227.0 — 11/09/2026 à 14:45 — Un même report transféré deux fois ne fait plus deux fiches
+
+Quand deux personnes transfèrent chacune de leur côté le même update, l'app
+rangeait parfois le document **deux fois** sur la même participation, avec
+deux mails d'annonce. C'est arrivé le 11/09 sur WARO : le même PDF, transféré
+à trois minutes d'écart, lu « S1 2026 » d'un côté et « document ponctuel » de
+l'autre — donc rangé dans deux cases différentes. Et comme WARO est détenue
+par Albo Club **et** par CALTE, ça faisait quatre fiches pour un document.
+
+Le rangement ne se fie plus à la période lue. Avant de créer quoi que ce soit,
+le contenu reçu est **comparé aux derniers reports de la société** : le texte
+du document lui-même (en-tête de transfert mis de côté), ses chiffres, son
+titre et son objet. Trois issues :
+
+- **c'est le même document** — rien n'est créé, la fiche garde la lecture la
+  plus complète (celle qui a reconnu une période l'emporte), et seule la
+  personne qui vient de transférer reçoit une réponse « déjà reçu ». Personne
+  d'autre n'est prévenu : il n'y a pas de nouvelle ;
+- **ça ressemble sans certitude** — **rien n'est rangé**. Le mail attend dans
+  les Rapports entrants avec la mention « Doublon probable » et le nom du
+  report auquel il ressemble. Deux boutons : « Ranger quand même » ou
+  « Rejeter ». Ranger un doublon et perdre un vrai report coûtent tous les
+  deux plus cher qu'un clic ;
+- **rien de connu** — le report est rangé normalement.
+
+Un document **corrigé** puis renvoyé reste une nouvelle : il est reconnu comme
+le même document, mais comme son contenu a bougé, la fiche est mise à jour et
+l'information repart.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau comparateur pur `convex/lib/reportDuplicate.ts` (`findDuplicate`) :
+>   similarité Jaccard sur shingles de 5 mots du texte source, en-tête de
+>   transfert retiré (marqueur « Forwarded message » le plus profond + bloc
+>   `De/Date/Objet/À`, dont la ligne `To:` qui diffère à chaque transfert) ;
+>   secours métriques canoniques + titre quand le texte n'est pas comparable ;
+>   fenêtre de 30 jours. Seuils : 0,90 doublon, 0,60 doute, 0,98 « source
+>   inchangée ».
+> - `reportStore.findTwin` (nouvel index `companyReports.by_company_received`,
+>   15 derniers reports **reçus**) est interrogé **par entité du fan-out**,
+>   avant la dedup `(société, période)` de `storeForCompany`, qui accepte
+>   désormais `mergeIntoReportId` + `sameSource`. La fusion conserve
+>   `reportPeriod` / `periodSortDate` / `reportType` quand la nouvelle lecture
+>   n'en a pas, et `sameSource` — pas `reportContentChanged` — décide de ce qui
+>   est une nouvelle : deux passages du modèle sur le même texte donnent deux
+>   formulations, ce qui ferait passer un doublon pour une correction.
+> - Doute → `reportIdentify.setReview('possible_duplicate')` (aucune écriture),
+>   `reportInbox.storeAnyway` rejoue la brique 5 avec `force: true`, bouton
+>   « Ranger quand même » dans `/app/all/reports`.
+> - `scripts/report-duplicates-audit.mjs` + `migrations/duplicateAudit.ts`
+>   rejouent le détecteur sur tout l'historique (lecture seule) pour calibrer
+>   les seuils. Couverture : `tests/reportDuplicate.test.ts` et
+>   `convex/regression.reportDuplicate.test.ts`.
+## v1.226.0 — 11/09/2026 à 14:35 — La liste des comptes dit enfin quelle banque
+
+La carte **« Comptes »** de la Trésorerie affichait le libellé venu de la
+banque ou d'Airtable en gros, et le nom de la banque en petit gris en
+dessous, suivi du nom de la société — répété sur chaque ligne alors qu'on est
+déjà dans l'espace de cette société. Résultat : un compte s'appelait
+« CALTE », un autre « Qonto — Good », et on ne voyait pas où était l'argent.
+
+**Chaque ligne commence maintenant par la banque.** Nom de la banque en
+titre, avec son logo. Le libellé d'origine ne sert plus de titre : il reste
+consultable sur la page du compte.
+
+**En dessous, une description que vous écrivez.** « Compte courant 1 »,
+« Compte courant 2 » pour distinguer deux comptes de la même banque,
+« Spiko » ou « Compte-titres » pour nommer un support. Elle se saisit sur la
+page du compte, bouton « Modifier ». Tant qu'elle est vide, la ligne
+n'affiche que la banque — rien d'illisible à la place.
+
+**Le nom de la société disparaît quand il ne dit rien.** L'entité titulaire
+n'est rappelée que lorsque le compte appartient à une autre société que celle
+de l'espace ouvert.
+
+**L'IBAN se lit et se copie.** Sur la page d'un compte, il s'affiche espacé
+par groupes de quatre, avec un bouton pour le copier d'un clic — prêt à
+coller dans un virement ou un mail.
+
+**Et les banques sans logo ne se ressemblent plus** : à défaut de logo, la
+tuile porte l'initiale de la banque au lieu d'une icône identique pour
+toutes.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/cash/CashAccounts.tsx` : la ligne prend `bankName` comme
+>   titre (`font-semibold`) ; le sous-titre passe par le nouvel
+>   `accountSubtitle()` = `displayName` + entité titulaire **seulement si**
+>   `owner.kind !== 'group_root'`, joints par ` · `, et la ligne est omise si
+>   tout est vide. `label` n'est plus lu à l'affichage de la liste.
+> - Aucun changement de schéma ni de query : `listAccounts` renvoyait déjà
+>   `owner.kind`. `displayName` est **recyclé** en « description » (libellés
+>   i18n `cash:edit.description*`, anciens `cash:rename.name*` retirés) —
+>   `label` reste le libellé d'origine, jamais écrasé.
+> - `src/components/CompanyLogo.tsx` : prop `fallback` (`'icon' | 'monogram'`,
+>   défaut `'icon'`, donc aucune surface existante ne bouge) ; la carte
+>   Comptes passe `monogram`. Le cas Natixis est un domaine correct
+>   (`natixis.com`) sans logo servi par logo.dev — cf. `KNOWN_ISSUES.md`
+>   § « Logos d'entreprises », point 3.
+> - `src/routes/app/$orgSlug/cash.$accountId.tsx` : titre `banque ·
+>   description` (banque seule sans description), libellé d'origine rappelé
+>   dès qu'il diffère du nom de la banque, et cellule IBAN extraite en
+>   `IbanValue` (groupes de 4 via `groupFours`, copie de la forme compacte,
+>   icône `Check` pendant 2 s — patron du bouton copier de la page
+>   Intégrations).
+> - Hors périmètre, volontairement : `/placements` (section « Comptes
+>   nantis ») et les sélecteurs de compte (registre, prêts, passif) gardent
+>   `displayName ?? label`, qui reste le bon repli dans une liste déroulante.
+
+## v1.225.0 — 11/09/2026 à 14:31 — Supprimer une connexion bancaire, et voir d'où vient quoi
+
+Trois choses sur **Réglages → Intégrations**.
+
+**Supprimer une connexion bancaire** se fait enfin depuis la page (corbeille,
+admin). Elle est supprimée chez Powens et disparaît de la liste ; comptes et
+transactions ne bougent pas. Le cas visé est le reliquat d'une reconnexion
+ratée — cette deuxième ligne au nom identique qui traîne sans rien alimenter.
+Une connexion qui alimente encore des comptes reste protégée : le dialogue
+dit combien de comptes en dépendent, à reconnecter ailleurs ou à archiver
+depuis la Trésorerie d'abord.
+
+**On voit par où passe chaque connexion.** Les banques sont décalées sous
+Powens et les portails sous VASCO, rattachés par un filet. Avant, tout
+s'alignait à la même hauteur et il fallait deviner.
+
+**Chaque portail a son logo.** Parallel et Teampact ne se ressemblaient pas
+seulement : ils portaient le même. Un portail encore inconnu garde le logo
+VASCO, ce qui reste juste.
+
+> **🔧 Notes techniques**
+>
+> - `powens.deleteConnection` existait déjà (suppression côté Powens puis de
+>   la ligne `powensConnections`, admin, refus `connection_in_use` tant que
+>   des comptes vivants en dépendent) mais n'était exposée que sur la
+>   Trésorerie et pour les seules connexions « obsolètes ». Elle est câblée
+>   ici telle quelle — aucune règle relâchée.
+> - `listIntegrations` remonte `accountCount` par connexion `webview` (le
+>   `filter` remplace le `some` qui servait déjà à dériver l'état
+>   `inactive`) : le dialogue annonce le blocage **avant** le clic plutôt que
+>   de le découvrir sur une erreur serveur.
+> - Logo d'une connexion résolu du plus spécifique au plus général par
+>   `connectionDomain()` : fournisseur atteint (`bankDomain` sur le
+>   `connectorName` Powens, `PORTAL_DOMAINS` sur le `clientSlug` VASCO) →
+>   plateforme (`PLATFORM_DOMAINS`) → icône générique de `CompanyLogo`. Les
+>   deux tables sont typées `Record<string, string | undefined>` : l'accès
+>   par clé inconnue doit rendre `undefined`, sinon le `??` ment (et
+>   `no-unnecessary-condition` le signale).
+> - Les connexions passent dans un bloc `border-l` indenté, rendu seulement
+>   s'il y en a (sinon une plateforme « Disponible » gagnerait un filet vide).
+
+## v1.224.1 — 11/09/2026 à 14:14 — L'intégration s'appelle VASCO
+
+« Parallel / VASCO » devient simplement **VASCO**. VASCO est la plateforme
+qui héberge les portails investisseurs ; Parallel n'en est qu'un parmi
+d'autres — Teampact en est un autre, déjà connecté. Mettre un seul portail
+dans le nom de l'intégration laissait croire qu'elle ne servait qu'à lui.
+Le nom des connexions, lui, reste celui que vous leur donnez.
+
+> **🔧 Notes techniques**
+>
+> - Renommage de la copie i18n FR/EN : `settings:integrations.platforms.vasco.name`
+>   et `participations:integrations.platforms.vasco` (dialogue « Rattacher à
+>   une intégration »). Aucun changement de code ni de donnée — le `platform`
+>   du registre reste `vasco`.
+> - Mentions « Parallel/VASCO » corrigées dans `docs/produit/` (pages
+>   vue d'ensemble, participations, intégrations, README) ; le journal des
+>   nouveautés garde les siennes, c'est un historique.
 
 ## v1.224.0 — 11/09/2026 à 13:11 — La page Intégrations se lit d'un coup d'œil
 

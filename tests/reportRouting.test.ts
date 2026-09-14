@@ -56,6 +56,7 @@ describe('routeRecap — a queue handler who forwarded', () => {
   it('gets the confirmation plus the quality block on success', () => {
     assert.deepEqual(routeRecap({ kind: 'success', ...handler }), {
       reply: 'confirmation',
+      replyChannel: 'thread',
       withQuality: true,
       alertOthers: false,
       broadcast: true,
@@ -98,14 +99,41 @@ describe('routeRecap — the audience follows the event', () => {
   })
 })
 
+describe('routeRecap — the channel follows the gesture', () => {
+  it('answers a forward in its own thread', () => {
+    assert.equal(routeRecap({ kind: 'success', ...forwarder }).replyChannel, 'thread')
+    assert.equal(
+      routeRecap({ kind: 'success', origin: 'email', ...forwarder }).replyChannel,
+      'thread',
+    )
+  })
+
+  it('answers a manual upload by a fresh mail — there is no thread', () => {
+    // The person who dropped the file on the fiche is owed the same
+    // confirmation as the person who forwarded: same content, other channel.
+    const route = routeRecap({ kind: 'success', origin: 'upload', ...forwarder })
+    assert.equal(route.reply, 'confirmation')
+    assert.equal(route.replyChannel, 'fresh')
+  })
+
+  it('answers a portal publication not at all', () => {
+    // Nobody sent us anything: `vascoNotify.announce` speaks for that channel.
+    for (const kind of ALL) {
+      assert.equal(
+        routeRecap({ kind, origin: 'vasco', ...handler }).replyChannel,
+        null,
+        `answered a portal publication on ${kind}`,
+      )
+    }
+  })
+})
+
 describe('routeRecap — anti-enumeration', () => {
   it('never replies to a non-member, whatever the outcome', () => {
     for (const kind of ALL) {
-      assert.equal(
-        routeRecap({ kind, ...stranger }).reply,
-        null,
-        `replied to a stranger on ${kind}`,
-      )
+      const route = routeRecap({ kind, ...stranger })
+      assert.equal(route.reply, null, `replied to a stranger on ${kind}`)
+      assert.equal(route.replyChannel, null, `opened a channel to a stranger on ${kind}`)
     }
   })
 

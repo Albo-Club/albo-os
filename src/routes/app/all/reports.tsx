@@ -186,6 +186,7 @@ function InboundReports() {
   const assignCompany = useConvexMutation(api.reportInbox.assignCompany)
   const reprocess = useConvexMutation(api.reportInbox.reprocess)
   const reject = useConvexMutation(api.reportInbox.reject)
+  const storeAnyway = useConvexMutation(api.reportInbox.storeAnyway)
   const detachCompany = useConvexMutation(api.reportInbox.detachCompany)
   const deleteReport = useConvexMutation(api.reportInbox.deleteReport)
   const deleteEmail = useConvexMutation(api.reportInbox.deleteEmail)
@@ -470,6 +471,25 @@ function InboundReports() {
                         </Button>
                       ) : reviewable ? (
                         <>
+                          {/* The detector refuses to bet on a document that
+                              only RESEMBLES one already on file: it files
+                              nothing and asks. Filing it is one click, and so
+                              is calling it a duplicate (Rejeter, below). */}
+                          {row.statusReason === 'possible_duplicate' ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() =>
+                                run(
+                                  () => storeAnyway({ inboundEmailId: row._id }),
+                                  'toasts.storedAnyway',
+                                )
+                              }
+                            >
+                              {t('actions.storeAnyway')}
+                            </Button>
+                          ) : null}
                           <Button
                             size="sm"
                             variant="outline"

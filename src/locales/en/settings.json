@@ -98,7 +98,7 @@
         "description": "Bank aggregation: accounts and transactions synced automatically. The bank connection happens in the secure Powens window."
       },
       "vasco": {
-        "name": "Parallel / VASCO",
+        "name": "VASCO",
         "description": "Investor portals of fund-admin platforms: positions, investor communications and documents pulled into the linked entities."
       }
     },
@@ -118,6 +118,7 @@
       "add": "Add",
       "sync": "Sync now",
       "rename": "Rename connection",
+      "delete": "Delete connection",
       "edit": "Edit credentials"
     },
     "dialog": {
@@ -133,6 +134,12 @@
       "username": "Login",
       "password": "Password"
     },
+    "deleteBank": {
+      "title": "Delete the “{{label}}” connection?",
+      "description": "It will be deleted on the Powens side and disappear from the list. No account and no transaction is touched.",
+      "inUse": "Not possible: this connection still feeds {{count}} account. Move it to another connection or archive it from the Cash page, then come back here.",
+      "inUse_other": "Not possible: this connection still feeds {{count}} accounts. Move them to another connection or archive them from the Cash page, then come back here."
+    },
     "rename": {
       "title": "Rename “{{label}}”",
       "description": "The name is only used inside Albo OS — it is how you tell your connections apart, and nothing is sent to the platform."
@@ -145,6 +152,8 @@
       "connected": "Connection saved.",
       "updated": "Connection updated.",
       "renamed": "Connection renamed.",
+      "bankDeleted": "Connection deleted.",
+      "bankDeleteError": "Couldn't delete the connection.",
       "renameError": "Couldn't rename the connection.",
       "connectError": "Couldn't save the connection.",
       "labelTaken": "A connection with this name already exists.",

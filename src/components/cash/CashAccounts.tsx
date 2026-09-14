@@ -97,6 +97,25 @@ export function AccountFreshness({ account }: { account: CashAccount }) {
   )
 }
 
+/**
+ * Secondary line of an account row: the description typed by hand
+ * (`displayName`), then the owning entity — but only when it is NOT the org's
+ * own company, since inside CALTE's space « · CALTE » on every row
+ * distinguishes nothing. The imported bank label (`label`) stays out: it is
+ * the very noise the description replaces, and it remains readable on the
+ * account's own page.
+ */
+function accountSubtitle(account: CashAccount): string | null {
+  const owner =
+    account.owner && account.owner.kind !== 'group_root'
+      ? account.owner.name
+      : null
+  const parts = [account.displayName, owner].filter(
+    (part): part is string => part != null && part.trim() !== '',
+  )
+  return parts.length > 0 ? parts.join(' · ') : null
+}
+
 /** One account row of the card — bank logo, names, freshness, balance. */
 function AccountRow({
   account,
@@ -109,6 +128,7 @@ function AccountRow({
 }) {
   const { t } = useTranslation('cash')
   const { fmtEur } = useFormatters()
+  const subtitle = accountSubtitle(account)
 
   return (
     <Link
@@ -122,12 +142,11 @@ function AccountRow({
         domain={bankDomain(account.bankName)}
         companyName={account.bankName}
         size="md"
+        fallback="monogram"
       />
       <span className="flex min-w-0 flex-col">
         <span className="flex flex-wrap items-center gap-1.5">
-          <span className="truncate font-medium">
-            {account.displayName ?? account.label}
-          </span>
+          <span className="truncate font-semibold">{account.bankName}</span>
           {account.pledged && (
             <Badge variant="outline">{t('badges.pledged')}</Badge>
           )}
@@ -135,11 +154,11 @@ function AccountRow({
             <Badge variant="secondary">{t('badges.closed')}</Badge>
           )}
         </span>
-        <span className="text-muted-foreground truncate text-xs">
-          {account.owner
-            ? `${account.bankName} · ${account.owner.name}`
-            : account.bankName}
-        </span>
+        {subtitle && (
+          <span className="text-muted-foreground truncate text-xs">
+            {subtitle}
+          </span>
+        )}
       </span>
       <span className="ml-auto flex shrink-0 flex-col items-end">
         <span className="font-medium tabular-nums">
@@ -160,10 +179,11 @@ function AccountRow({
 /**
  * The accounts card of the Cash overview: available accounts first (each row
  * linking to its detail), then the pledged/closed ones, dimmed with their
- * badge — one card so where the money sits reads in one glance. A footer line
- * sums the NON-LIQUID placements (capitalization accounts, term deposits…)
- * managed on the Placements page, so sleeping cash stays visible without
- * polluting the available balance.
+ * badge — one card so where the money sits reads in one glance. A row leads
+ * with its BANK, the description underneath (cf. `accountSubtitle`).
+ * A footer line sums the NON-LIQUID placements (capitalization accounts,
+ * term deposits…) managed on the Placements page, so sleeping cash stays
+ * visible without polluting the available balance.
  */
 export function CashAccountsCard({
   accounts,

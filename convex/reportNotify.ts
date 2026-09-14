@@ -343,63 +343,105 @@ export const send = internalAction({
     // problem mails.
     const senderHandlesIssues =
       member !== null && recipients.some((r) => r.userId === member.userId)
-    const route = routeRecap({ kind, senderIsMember: Boolean(member), senderHandlesIssues })
+    const route = routeRecap({
+      kind,
+      origin: row.origin,
+      senderIsMember: Boolean(member),
+      senderHandlesIssues,
+    })
 
-    // Only a real email can be replied to. A manual upload and a portal
-    // publication both carry placeholder AgentMail ids, and neither has a
-    // forwarder waiting: the upload's author is in front of the fiche, the
-    // portal has no author at all. No reply — the rest of the org still hears
-    // about an upload; a publication is announced by `vascoNotify` instead.
-    //
-    // Today an unknown sender already stops both the reply and the broadcast
-    // for a portal row, so this guard changes nothing in practice. It is here
-    // because that protection is INDIRECT — it holds only as long as
-    // `portail@…vasco.fund` matches no member — and the invariant we actually
-    // rely on is about the row's ORIGIN.
-    const canReply = row.origin === undefined || row.origin === 'email'
     const period = success?.reportPeriod
 
-    // ── The forwarder's answer, in their own thread ──────────────────────
-    if (route.reply && canReply) {
-      let body: string | null = null
-      if (route.reply === 'confirmation' && success && member) {
-        const cards: Array<ReportEntityCard> = await ctx.runQuery(
-          internal.reportNotify.entityCards,
-          { refs, userId: member.userId },
-        )
-        body = reportConfirmationHtml({
-          entities: cards,
-          reportPeriod: period,
-          highlights: success.highlights,
-          // They were told it was stuck; say that it no longer is.
-          afterFix: claim.previousKind === 'failure' || claim.previousKind === 'quarantine',
-          quality: route.withQuality
-            ? { ...success.quality, sources: row.sources ?? [] }
-            : undefined,
-        })
-      } else if (route.reply === 'duplicate' && member) {
-        const cards: Array<ReportEntityCard> = await ctx.runQuery(
-          internal.reportNotify.entityCards,
-          { refs, userId: member.userId },
-        )
-        body = reportDuplicateHtml({
-          entityName: cards[0]?.name ?? 'cette participation',
-          reportPeriod: period,
-          url: cards[0]?.url ?? null,
-        })
-      } else if (route.reply === 'alert') {
-        body = reportRecapFailureHtml(reason ?? 'unknown', queueUrl, row.error)
-      } else if (route.reply === 'soft') {
-        body = reportSoftFailureHtml(row.subject, row.receivedAt)
+    // One mail per ORGANIZATION, never one listing them all. A report on a
+    // company held by two orgs (Waro chez Albo, WARO chez CALTE) used to
+    // produce a single mail whose subject read "Waro, WARO" and whose cards
+    // mixed two balance sheets. The portal channel had it right from the
+    // start (`vascoNotify.announce` fires per entity), and this is the same
+    // rule: a mail carries the amounts and the fiche of ONE organization.
+    const orgIds = [...new Set(refs.map((r) => r.orgId))]
+    const refsOf = (orgId: Id<'organizations'>) => refs.filter((r) => r.orgId === orgId)
+    /** Subject of a fresh mail about one org's copy of the report. */
+    const announceSubject = (card: ReportEntityCard) =>
+      `Albo OS — nouveau report ${card.name} · ${card.orgName}${period ? ` (${period})` : ''}`
+
+    // Where that answer goes is decided by the ORIGIN, in `routeRecap`: a
+    // forward is answered in its thread, a manual upload — which carries
+    // placeholder AgentMail ids and has no thread — as a fresh mail to whoever
+    // dropped the file, and a portal publication not at all (`vascoNotify`
+    // announces it). For the portal row the sender guard already stopped the
+    // answer today, but only INDIRECTLY — as long as `portail@…vasco.fund`
+    // matches no member — and the invariant we rely on is about the origin.
+
+    // ── The author's answer: their thread, or a fresh mail ───────────────
+    if (route.reply && route.replyChannel) {
+      // The recipient is imposed, never inferred: the answer goes to the
+      // person who produced the report, and to nobody else. Last guard before
+      // the wire — an address we refuse to talk to (the mailing group, this
+      // inbox) is dropped even if it got this far.
+      const blocked = isBlockedSender(row.fromEmail, row.agentmailInboxId)
+      /** One answer per organization the report was filed in. */
+      const answer = async (body: string, subject: string) => {
+        if (blocked) return
+        if (route.replyChannel === 'thread') {
+          await replyToMessage(row.agentmailInboxId, row.agentmailMessageId, body, [
+            row.fromEmail,
+          ])
+        } else {
+          await sendMessage(outboundInbox(row.agentmailInboxId), [row.fromEmail], subject, body)
+        }
       }
-      // The recipient is imposed, never inferred: the reply goes to the
-      // person who forwarded, and to nobody else. Last guard before the wire
-      // — an address we refuse to talk to (the mailing group, this inbox) is
-      // dropped even if it got this far.
-      if (body && !isBlockedSender(row.fromEmail, row.agentmailInboxId)) {
-        await replyToMessage(row.agentmailInboxId, row.agentmailMessageId, body, [
-          row.fromEmail,
-        ])
+
+      if (route.reply === 'confirmation' && success && member) {
+        for (const orgId of orgIds) {
+          const cards: Array<ReportEntityCard> = await ctx.runQuery(
+            internal.reportNotify.entityCards,
+            { refs: refsOf(orgId), userId: member.userId },
+          )
+          // This organization is not theirs to see.
+          if (cards.length === 0) continue
+          await answer(
+            reportConfirmationHtml({
+              entities: cards,
+              reportPeriod: period,
+              highlights: success.highlights,
+              // They were told it was stuck; say that it no longer is.
+              afterFix:
+                claim.previousKind === 'failure' || claim.previousKind === 'quarantine',
+              quality: route.withQuality
+                ? { ...success.quality, sources: row.sources ?? [] }
+                : undefined,
+            }),
+            announceSubject(cards[0]),
+          )
+        }
+      } else if (route.reply === 'duplicate' && member) {
+        for (const orgId of orgIds) {
+          const cards: Array<ReportEntityCard> = await ctx.runQuery(
+            internal.reportNotify.entityCards,
+            { refs: refsOf(orgId), userId: member.userId },
+          )
+          if (cards.length === 0) continue
+          await answer(
+            reportDuplicateHtml({
+              entityName: cards[0].name,
+              reportPeriod: period,
+              url: cards[0].url,
+            }),
+            `Albo OS — report déjà reçu ${cards[0].name} · ${cards[0].orgName}`,
+          )
+        }
+      } else if (route.reply === 'alert') {
+        // A problem mail is about the MAIL, not about a report filed in an
+        // organization: there is nothing to split, and nothing was filed.
+        await answer(
+          reportRecapFailureHtml(reason ?? 'unknown', queueUrl, row.error),
+          `Albo OS — report non traité (${reviewReasonLabel(reason ?? 'unknown')})`,
+        )
+      } else if (route.reply === 'soft') {
+        await answer(
+          reportSoftFailureHtml(row.subject, row.receivedAt),
+          'Albo OS — report non traité',
+        )
       }
     }
 
@@ -431,24 +473,25 @@ export const send = internalAction({
         { orgIds: refs.map((r) => r.orgId), excludeUserId: member?.userId },
       )
       for (const target of targets) {
-        const cards: Array<ReportEntityCard> = await ctx.runQuery(
-          internal.reportNotify.entityCards,
-          { refs, userId: target.userId },
-        )
-        // Every entity of this report sits outside their organizations.
-        if (cards.length === 0) continue
-        const names = cards.map((c) => c.name).join(', ')
-        await sendMessage(
-          outboundInbox(row.agentmailInboxId),
-          [target.email],
-          `Albo OS — nouveau report ${names}${period ? ` (${period})` : ''}`,
-          reportConfirmationHtml({
-            entities: cards,
-            reportPeriod: period,
-            highlights: success.highlights,
-            forwardedBy,
-          }),
-        )
+        for (const orgId of orgIds) {
+          const cards: Array<ReportEntityCard> = await ctx.runQuery(
+            internal.reportNotify.entityCards,
+            { refs: refsOf(orgId), userId: target.userId },
+          )
+          // This organization of the report is outside theirs.
+          if (cards.length === 0) continue
+          await sendMessage(
+            outboundInbox(row.agentmailInboxId),
+            [target.email],
+            announceSubject(cards[0]),
+            reportConfirmationHtml({
+              entities: cards,
+              reportPeriod: period,
+              highlights: success.highlights,
+              forwardedBy,
+            }),
+          )
+        }
       }
     }
 

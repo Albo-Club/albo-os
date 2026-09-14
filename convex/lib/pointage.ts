@@ -1,6 +1,7 @@
 import { ConvexError } from 'convex/values'
 
 import { recordDecision } from './matchingLog'
+import { logDealEvent, userActor } from './companyEvents'
 import { loanSideForOrg } from './liabilities'
 import { transferLegs } from './transfers'
 
@@ -112,8 +113,21 @@ export async function applyMatchToDeal(
   // before the calls add up to the commitment. Forward-only, like the Attio
   // 'Invested' path (convex/attioSync.ts): no other status is touched, and
   // unmatching never demotes the deal back to `pending`.
+  const actor = userActor(decidedBy, source === 'agent_suggested')
+  await logDealEvent(ctx, deal, actor, {
+    kind: 'transaction_matched',
+    amountCents: tx.amount,
+    direction: tx.direction,
+  })
   if (deal.status === 'pending' && tx.direction === 'out') {
     await ctx.db.patch('deals', dealId, { status: 'active' })
+    // The promotion is a side effect of the pointing, logged under the same
+    // hand so the journal answers "who set it active?".
+    await logDealEvent(ctx, deal, actor, {
+      kind: 'status_changed',
+      from: 'pending',
+      to: 'active',
+    })
   }
 
   await recordDecision(ctx, {
@@ -146,6 +160,20 @@ export async function applyUnmatch(
     reconciledBy: undefined,
     reconciledAt: undefined,
   })
+  // `tx` is the pre-patch row: its dealId names the deal being left.
+  const deal = tx.dealId ? await ctx.db.get('deals', tx.dealId) : null
+  if (deal) {
+    await logDealEvent(
+      ctx,
+      deal,
+      userActor(decidedBy, source === 'agent_suggested'),
+      {
+        kind: 'transaction_unmatched',
+        amountCents: tx.amount,
+        direction: tx.direction,
+      },
+    )
+  }
   await recordDecision(ctx, {
     transaction: tx,
     decision: 'unmatched',
@@ -182,6 +210,21 @@ export async function applyCategorization(
     reconciledBy: undefined,
     reconciledAt: undefined,
   })
+  // Setting a matched transaction aside IS an unmatch for its deal — the
+  // journal must show it leaving, exactly as `applyUnmatch` does.
+  const deal = tx.dealId ? await ctx.db.get('deals', tx.dealId) : null
+  if (deal) {
+    await logDealEvent(
+      ctx,
+      deal,
+      userActor(decidedBy, source === 'agent_suggested'),
+      {
+        kind: 'transaction_unmatched',
+        amountCents: tx.amount,
+        direction: tx.direction,
+      },
+    )
+  }
   await recordDecision(ctx, {
     transaction: tx,
     decision: status,

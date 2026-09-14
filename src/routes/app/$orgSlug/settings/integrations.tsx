@@ -14,6 +14,7 @@ import {
   Loader2,
   Pencil,
   RefreshCw,
+  Trash2,
   Unlink,
 } from 'lucide-react'
 
@@ -82,9 +83,32 @@ function StateDot({ state, label }: { state: string; label: string }) {
 /** platform → website domain, feeding the same logo.dev hotlink as company
  * and bank logos (CompanyLogo). A connection shows its own provider's logo
  * (the bank, via `bankDomain`) and falls back to its platform's. */
-const PLATFORM_DOMAINS: Record<string, string> = {
+const PLATFORM_DOMAINS: Record<string, string | undefined> = {
   powens: 'powens.com',
   vasco: 'vasco.fund',
+}
+
+/** VASCO portal slug (`clientSlug`) → website domain. The slug never yields
+ * the domain (`parallel` → parallel-invest.com, `teampact` → teampact.ventures),
+ * so a lookup is unavoidable; a new portal costs one line here, and an unknown
+ * one is not broken, just generic — it falls back to VASCO's own logo. */
+const PORTAL_DOMAINS: Record<string, string | undefined> = {
+  parallel: 'parallel-invest.com',
+  teampact: 'teampact.ventures',
+}
+
+/** Logo of ONE connection, most specific first: the provider it reaches (the
+ * bank for Powens, the portal for VASCO), then the platform it goes through,
+ * then CompanyLogo's generic icon. */
+function connectionDomain(
+  platform: string,
+  connection: { providerName?: string; config?: Record<string, string> },
+): string | undefined {
+  return (
+    bankDomain(connection.providerName) ??
+    PORTAL_DOMAINS[connection.config?.clientSlug ?? ''] ??
+    PLATFORM_DOMAINS[platform]
+  )
 }
 
 /** The explanatory copy of a row, folded into a discreet « i ». Prose in
@@ -316,6 +340,11 @@ function PlatformRow({
     id: string
     label: string
   } | null>(null)
+  const [deletingBank, setDeletingBank] = useState<{
+    id: string
+    label: string
+    accountCount: number
+  } | null>(null)
 
   const startBank = useAction(api.powens.startBankConnection)
   const startReconnect = useAction(api.powens.startReconnect)
@@ -427,99 +456,122 @@ function PlatformRow({
           )}
         </span>
       </div>
-      {connections.map((c) => (
-        <div key={c.id} className="space-y-0.5">
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-            <span className="flex min-w-0 items-center gap-2 text-sm">
-              <StateDot
-                state={c.state}
-                label={t(`settings:integrations.state.${c.state}`)}
-              />
-              <CompanyLogo
-                domain={
-                  bankDomain(c.providerName) ?? PLATFORM_DOMAINS[item.platform]
-                }
-                companyName={c.label}
-                size="sm"
-              />
-              <span className="truncate">{c.label}</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="text-muted-foreground text-xs tabular-nums">
-                {c.lastConnectedAt != null
-                  ? t('settings:integrations.lastSync', {
-                      ago: ago(c.lastConnectedAt),
-                    })
-                  : t('settings:integrations.neverSynced')}
-              </span>
-              {canManage &&
-                item.auth === 'webview' &&
-                c.state !== 'connected' &&
-                c.state !== 'inactive' && (
-                  <Button
+      {/* Connections are nested under the platform they go through: the guide
+        * line is what says « these banks arrive via Powens » — at the same
+        * indent level they read as a flat list of unrelated rows. */}
+      {hasConnections && (
+        <div className="ml-3 space-y-1 border-l pl-4">
+          {connections.map((c) => (
+            <div key={c.id} className="space-y-0.5">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                <span className="flex min-w-0 items-center gap-2 text-sm">
+                  <StateDot
+                    state={c.state}
+                    label={t(`settings:integrations.state.${c.state}`)}
+                  />
+                  <CompanyLogo
+                    domain={connectionDomain(item.platform, c)}
+                    companyName={c.label}
                     size="sm"
-                    variant="outline"
-                    disabled={redirecting !== null}
-                    onClick={() => void openWebview('reconnect', c.id)}
-                  >
-                    {redirecting === c.id
-                      ? t('settings:integrations.actions.reconnecting')
-                      : t('settings:integrations.actions.reconnect')}
-                  </Button>
-                )}
-              {canManage && (
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  className="text-muted-foreground"
-                  aria-label={t('settings:integrations.actions.rename')}
-                  title={t('settings:integrations.actions.rename')}
-                  onClick={() => setRenaming({ id: c.id, label: c.label })}
-                >
-                  <Pencil className="size-4" />
-                </Button>
+                  />
+                  <span className="truncate">{c.label}</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="text-muted-foreground text-xs tabular-nums">
+                    {c.lastConnectedAt != null
+                      ? t('settings:integrations.lastSync', {
+                          ago: ago(c.lastConnectedAt),
+                        })
+                      : t('settings:integrations.neverSynced')}
+                  </span>
+                  {canManage &&
+                    item.auth === 'webview' &&
+                    c.state !== 'connected' &&
+                    c.state !== 'inactive' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={redirecting !== null}
+                        onClick={() => void openWebview('reconnect', c.id)}
+                      >
+                        {redirecting === c.id
+                          ? t('settings:integrations.actions.reconnecting')
+                          : t('settings:integrations.actions.reconnect')}
+                      </Button>
+                    )}
+                  {canManage && (
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="text-muted-foreground"
+                      aria-label={t('settings:integrations.actions.rename')}
+                      title={t('settings:integrations.actions.rename')}
+                      onClick={() => setRenaming({ id: c.id, label: c.label })}
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                  )}
+                  {canManage && item.auth === 'webview' && (
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="text-muted-foreground"
+                      aria-label={t('settings:integrations.actions.delete')}
+                      title={t('settings:integrations.actions.delete')}
+                      onClick={() =>
+                        setDeletingBank({
+                          id: c.id,
+                          label: c.label,
+                          accountCount: c.accountCount ?? 0,
+                        })
+                      }
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  )}
+                  {canManage && item.auth === 'credentials' && (
+                    <>
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        className="text-muted-foreground"
+                        aria-label={t('settings:integrations.actions.edit')}
+                        title={t('settings:integrations.actions.edit')}
+                        onClick={() =>
+                          setEditing({
+                            id: c.id,
+                            label: c.label,
+                            config: c.config ?? {},
+                          })
+                        }
+                      >
+                        <KeyRound className="size-4" />
+                      </Button>
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        className="text-muted-foreground"
+                        aria-label={t('settings:integrations.actions.disconnect')}
+                        title={t('settings:integrations.actions.disconnect')}
+                        onClick={() =>
+                          setDisconnecting({ id: c.id, label: c.label })
+                        }
+                      >
+                        <Unlink className="size-4" />
+                      </Button>
+                    </>
+                  )}
+                </span>
+              </div>
+              {c.lastError && (
+                <p className="text-destructive line-clamp-2 pl-4 text-xs">
+                  {t('settings:integrations.lastError', { message: c.lastError })}
+                </p>
               )}
-              {canManage && item.auth === 'credentials' && (
-                <>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    className="text-muted-foreground"
-                    aria-label={t('settings:integrations.actions.edit')}
-                    title={t('settings:integrations.actions.edit')}
-                    onClick={() =>
-                      setEditing({
-                        id: c.id,
-                        label: c.label,
-                        config: c.config ?? {},
-                      })
-                    }
-                  >
-                    <KeyRound className="size-4" />
-                  </Button>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    className="text-muted-foreground"
-                    aria-label={t('settings:integrations.actions.disconnect')}
-                    title={t('settings:integrations.actions.disconnect')}
-                    onClick={() =>
-                      setDisconnecting({ id: c.id, label: c.label })
-                    }
-                  >
-                    <Unlink className="size-4" />
-                  </Button>
-                </>
-              )}
-            </span>
-          </div>
-          {c.lastError && (
-            <p className="text-destructive line-clamp-2 pl-4 text-xs">
-              {t('settings:integrations.lastError', { message: c.lastError })}
-            </p>
-          )}
+            </div>
+          ))}
         </div>
-      ))}
+      )}
 
       {connectOpen && (
         <ConnectDialog
@@ -549,6 +601,13 @@ function PlatformRow({
         <DisconnectDialog
           connection={disconnecting}
           onClose={() => setDisconnecting(null)}
+        />
+      )}
+      {deletingBank && (
+        <DeleteBankConnectionDialog
+          orgId={orgId}
+          connection={deletingBank}
+          onClose={() => setDeletingBank(null)}
         />
       )}
     </div>
@@ -807,6 +866,81 @@ function RenameDialog({
             {saving && <Loader2 className="size-4 animate-spin" />}
             {t('common:actions.save')}
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/**
+ * Delete a bank connection for good — on the Powens side first, then its
+ * tracking row (`powens.deleteConnection`, admin-gated). Unlike a portal's
+ * « Déconnecter », there are no stored credentials to forget: the connection
+ * lives on Powens, so it has to be removed there.
+ *
+ * The server refuses while the connection still feeds live accounts
+ * (`connection_in_use`) — the guard is what keeps an account from losing its
+ * feed behind the user's back. Rather than let the click fail, the dialog
+ * reads `accountCount` and says so up front: the case that matters here is
+ * the leftover of a failed reconnection, which feeds nothing.
+ */
+function DeleteBankConnectionDialog({
+  orgId,
+  connection,
+  onClose,
+}: {
+  orgId: Id<'organizations'>
+  connection: { id: string; label: string; accountCount: number }
+  onClose: () => void
+}) {
+  const { t } = useTranslation(['settings', 'common'])
+  const deleteConnection = useAction(api.powens.deleteConnection)
+  const [pending, setPending] = useState(false)
+  const inUse = connection.accountCount > 0
+
+  async function handleConfirm() {
+    setPending(true)
+    try {
+      await deleteConnection({ orgId, powensConnectionId: connection.id })
+      toast.success(t('settings:integrations.toasts.bankDeleted'))
+      onClose()
+    } catch {
+      toast.error(t('settings:integrations.toasts.bankDeleteError'))
+      setPending(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {t('settings:integrations.deleteBank.title', {
+              label: connection.label,
+            })}
+          </DialogTitle>
+          <DialogDescription>
+            {inUse
+              ? t('settings:integrations.deleteBank.inUse', {
+                  count: connection.accountCount,
+                })
+              : t('settings:integrations.deleteBank.description')}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={pending}>
+            {t(inUse ? 'common:actions.close' : 'common:actions.cancel')}
+          </Button>
+          {!inUse && (
+            <Button
+              variant="destructive"
+              onClick={() => void handleConfirm()}
+              disabled={pending}
+            >
+              {pending && <Loader2 className="size-4 animate-spin" />}
+              {t('settings:integrations.actions.delete')}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

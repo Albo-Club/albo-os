@@ -722,6 +722,26 @@ export const remove = mutation({
   le chiffre soit un **constat** dont l'app n'a aucun moyen de dérivation —
   pas un calcul qu'on préfère figer. Il reste optionnel : absent, le montant
   atteint par le plan précédent fait foi.
+- ❌ Écrire sur `deals` (ou sur ce qui s'y rattache : valorisation, pointage,
+  document de deal, échéance réalisée) depuis une **nouvelle** mutation sans
+  appeler `logDealEvent` (`convex/lib/companyEvents.ts`). Le journal
+  « Activité » de la fiche société ne dérive rien : une écriture non
+  journalisée est invisible, sans erreur. Une modification de champs passe
+  par `diffDealPatch` (un événement par appel, muet si rien ne change) ; une
+  écriture faite via l'agent porte `userActor(actorUserId, true)`, jamais un
+  acteur « agent » à part ; une intégration qui écrit seule (Attio, pont
+  Parallel) est l'acteur `system` avec sa `source`. Le filet est
+  `tests/journalGuards.test.ts` : un fichier qui écrit une table de
+  `JOURNALED` sans logger fait rougir la CI, et une exemption s'inscrit dans
+  `EXEMPT` avec sa raison. Quand une nouvelle famille rejoint le journal
+  (reports, coffre, identité…), l'ajouter à `JOURNALED` **d'abord** : le test
+  nomme alors chaque writer à brancher. Le garde-fou vérifie qu'un logger est
+  **appelé**, pas qu'il dit vrai : chaque nouveau type d'événement arrive
+  avec son cas dans `convex/regression.companyEvents.test.ts` (la mutation
+  exécutée, la ligne produite contrôlée — acteur, type, avant/après). Et
+  chercher les sorties **implicites** : reclasser un virement pointé
+  (`applyCategorization`) le détache du deal sans passer par « dépointer »,
+  c'est un dépointage et il se journalise comme tel.
 - ❌ Ajouter une table qui référence des tables existantes sans poser, dans
   **chacune** d'elles, le refus de suppression correspondant. Le garde-fou
   vit dans le fichier de l'objet référencé (`deals.ts`, `properties.ts`…),
@@ -820,6 +840,21 @@ export const remove = mutation({
   « rien à faire ». Les deux portées doivent coïncider : une ancre globale
   exige un éventail global. Et la réparation n'est jamais un simple re-run,
   puisque l'ancre rend inerte ce qui est déjà posé.
+- ❌ Se reposer sur une clé de dédup **fournie par la source** (`powensTxId`,
+  id de message, référence externe) pour garantir qu'un objet du monde réel
+  n'entre qu'une fois. Elle ne dédoublonne que les **renvois d'une même
+  source** ; elle est aveugle à une **seconde** source décrivant le même
+  objet, qui apporte ses propres identifiants. C'est ce qui a fait entrer
+  deux fois chaque mouvement du compte Natixis : deux connexions Powens
+  vivantes sur le même compte, deux séries de `powensTxId`, zéro collision,
+  zéro erreur (cf. `KNOWN_ISSUES.md` « Un compte, une connexion VIVANTE »).
+  Le réflexe : quand l'app peut recevoir deux canaux pour un même objet, la
+  protection se pose sur **l'unicité du canal** (une seule source vivante par
+  objet), pas sur la clé — une clé étrangère ne sait rien de ce qui existe à
+  côté d'elle. Et le garde-fou doit distinguer le **remplacement** (l'ancien
+  canal est mort — cas légitime) de la **concurrence** (les deux sont vivants
+  — le doublon) : sans ce test, on interdit la reconnexion en croyant
+  interdire le doublon.
 - ❌ Accrocher un déclencheur métier (analyse, notification, alerte) à une
   intégration **pull** sans lui avoir d'abord donné une mémoire du « déjà vu ».
   Un webhook est un **événement** — il arrive une fois, sa nouveauté est

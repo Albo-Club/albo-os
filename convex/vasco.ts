@@ -34,6 +34,7 @@ import {
 } from './_generated/server'
 import { internal } from './_generated/api'
 import { requireOrgMember } from './lib/auth'
+import { diffDealPatch, logDealEvent } from './lib/companyEvents'
 import { getConnector, parseConnection } from './lib/connectors'
 import type { GenericActionCtx } from 'convex/server'
 import type { MutationCtx } from './_generated/server'
@@ -1660,6 +1661,17 @@ export const applyInstrumentBridgePatch = internalMutation({
       ...patch,
       manuallyEditedFields: [...editedFields],
     })
+    // Journal under the integration's name — the bridge runs from the CLI,
+    // no user confirms each row.
+    const event = diffDealPatch(deal, patch)
+    if (event) {
+      await logDealEvent(
+        ctx,
+        deal,
+        { kind: 'system', source: 'vasco' },
+        event,
+      )
+    }
     return dealId
   },
 })

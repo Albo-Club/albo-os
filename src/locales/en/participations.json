@@ -291,6 +291,12 @@
       "pre": "Pre-conversion",
       "post": "Post-conversion"
     },
+    "conversion": {
+      "before": "Before",
+      "after": "After",
+      "summary": "{{from}} → {{to}}",
+      "summaryDated": "{{from}} → {{to}} · converted on {{date}}"
+    },
     "placement": {
       "latentGain": "Latent gain/loss"
     },
@@ -337,6 +343,43 @@
       "placeholder": "This instrument type isn't configured yet."
     }
   },
+  "activity": {
+    "title": "Activity",
+    "empty": "No activity recorded on this company's deals yet.",
+    "showMore": "Show {{count}} earlier",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "viaAgent": "via the AI agent",
+    "collapsedSync_one": "{{count}} more sync collapsed",
+    "collapsedSync_other": "{{count}} more syncs collapsed",
+    "deletedDeal": "deleted deal",
+    "actor": {
+      "attio": "Attio",
+      "vasco": "Parallel",
+      "unknown": "Albo OS"
+    },
+    "field": {
+      "committedAmount": "commitment",
+      "exitProceeds": "exit proceeds"
+    },
+    "ev": {
+      "created": "created {{deal}}",
+      "status_changed": "moved {{deal}} from {{from}} to {{to}}",
+      "proceedsSuffix": " · proceeds {{amount}}",
+      "converted": "converted {{deal}}: {{from}} → {{to}}",
+      "fields_changed": "edited {{deal}}: {{changes}}",
+      "otherFieldsSuffix_one": ", and {{count}} other field",
+      "otherFieldsSuffix_other": ", and {{count}} other fields",
+      "fields_changed_count_one": "edited {{count}} field of {{deal}}",
+      "fields_changed_count_other": "edited {{count}} fields of {{deal}}",
+      "valuation_added": "added a valuation on {{deal}} as of {{date}} · {{amount}}",
+      "transaction_matched": "matched a {{amount}} transfer to {{deal}}",
+      "transaction_unmatched": "unmatched a {{amount}} transfer from {{deal}}",
+      "document_attached": "attached “{{title}}” to {{deal}}",
+      "document_removed": "removed “{{title}}” from {{deal}}",
+      "entry_realized": "realized the {{date}} entry ({{amount}}) on {{deal}}"
+    }
+  },
   "edit": {
     "dealTitle": "Edit deal",
     "dealDescription": "Rename the deal, change its instrument type, and edit its field values.",
@@ -347,7 +390,8 @@
     "dealNamePlaceholder": "Custom name (optional)",
     "dealNameHint": "Leave empty to use the instrument as title.",
     "instrumentLabel": "Instrument",
-    "typeChangeNotice": "The type changes from {{from}} to {{to}}. The fields specific to {{from}} are kept but hidden — they'll reappear if you switch back to {{from}}.",
+    "typeChangeNotice": "The type changes from {{from}} to {{to}}. The fields specific to {{from}} are kept and stay readable in the sheet’s “Before” tab.",
+    "conversionDateLabel": "Conversion date",
     "targetLabel": "Target entity",
     "targetHint": "Reassign the deal to another portfolio company.",
     "targetPlaceholder": "Pick a company",
@@ -618,7 +662,7 @@
     "dialogTitle": "Entity integrations",
     "dialogDescription": "Link this entity to the connected external platforms to pull their data (communications, documents) into its page.",
     "platforms": {
-      "vasco": "Parallel / VASCO"
+      "vasco": "VASCO"
     },
     "linked": "Linked",
     "link": "Link",

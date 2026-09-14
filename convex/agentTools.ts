@@ -22,6 +22,7 @@ import {
   transactionTotals,
 } from './deals'
 import { parseScope, readMembership } from './lib/agentScope'
+import { diffDealPatch, logDealEvent, userActor } from './lib/companyEvents'
 import { findSimilarCompanies, findSimilarDeals } from './lib/duplicates'
 import { isAvailableAccount } from './lib/bankAccounts'
 import { normalizeDomain } from './lib/domain'
@@ -282,6 +283,12 @@ export const createDealInternal = internalMutation({
       currency: 'EUR',
       status: status ?? 'active',
     })
+    await logDealEvent(
+      ctx,
+      { _id: id, orgId: args.orgId, targetCompanyId: args.targetCompanyId },
+      userActor(actorUserId, true),
+      { kind: 'created' },
+    )
     return { _id: id, similar }
   },
 })
@@ -454,6 +461,9 @@ export const updateDealInternal = internalMutation({
     fundType: v.optional(fundTypeValidator),
     vintageYear: v.optional(v.number()),
     managementCompany: v.optional(v.string()),
+    // Date of the conversion, when the caller changes `instrumentKind`.
+    // `convertedFromKind` is never an argument — it is read from the row.
+    convertedAt: v.optional(v.number()), // ms epoch
   },
   handler: async (ctx, { orgId, actorUserId, dealId, ...patch }) => {
     await readMembership(ctx, orgId, actorUserId)
@@ -462,7 +472,25 @@ export const updateDealInternal = internalMutation({
     if (patch.viaSpvCompanyId) {
       await assertSameOrg(ctx, orgId, patch.viaSpvCompanyId, 'spv_wrong_org')
     }
-    await ctx.db.patch("deals", dealId, patch)
+    // Same rule as `deals.update`: a change of instrument type IS a
+    // conversion, and the type left behind is recorded so the deal sheet can
+    // show its before/after tabs. Kept in sync deliberately — this path does
+    // not go through `deals.update`.
+    const converting =
+      patch.instrumentKind != null &&
+      patch.instrumentKind !== deal.instrumentKind
+    await ctx.db.patch("deals", dealId, {
+      ...patch,
+      ...(converting
+        ? {
+            convertedFromKind: deal.instrumentKind,
+            convertedAt: patch.convertedAt ?? Date.now(),
+          }
+        : {}),
+    })
+    // Same journal as `deals.update`, under the confirming user's name.
+    const event = diffDealPatch(deal, patch)
+    if (event) await logDealEvent(ctx, deal, userActor(actorUserId, true), event)
     // Effective kind after the patch — the MCP layer needs it to build the
     // right deep link (placements live on their own page).
     return {

@@ -1805,6 +1805,67 @@ Corollaire d'affichage : `periodSortDate` retombe sur la date de réception
 quand il n'y a pas de période, sinon le courrier n'aurait aucun ancrage dans
 la timeline de la fiche (l'index `by_company` trie là-dessus).
 
+## Deux lectures d'un même document ne tombent pas sur la même période
+
+Suite directe de la section précédente, et la preuve que le correctif ne
+suffisait pas. `isSameDocument` ne joue que sur la branche **sans période** :
+la dedup reste `(companyId, reportPeriod)` dès qu'une période est lue. Or
+**la période est produite par le LLM**. Le même update WARO transféré par
+Clément puis par Benjamin à trois minutes d'écart (09/2026) a été lu « aucune
+période » puis « S1 2026 » : deux clés, deux lignes, deux mails d'annonce —
+et ×2, la société étant détenue par Albo **et** par CALTE. Quatre fiches pour
+un document.
+
+La leçon générale : **une clé de dédoublonnage ne peut pas être dérivée d'une
+sortie non déterministe.** Renforcer le titre ou l'objet ne répare rien, ils
+viennent du même modèle. Et tant que la recherche se fait dans la **case de la
+période**, deux lectures divergentes ne se rencontrent jamais.
+
+D'où `convex/lib/reportDuplicate.ts`, interrogé par `reportStore.findTwin`
+**avant** la dedup par période, sur les 15 derniers reports **reçus** de
+l'entité (index `by_company_received` — trier par période mettrait hors de
+portée un report d'une vieille période reçu aujourd'hui) :
+
+- **signal maître, le texte source** (`rawContent`, corps + ce qui a été lu
+  des fichiers), comparé en **shingles de 5 mots** (Jaccard). L'en-tête de
+  transfert est retiré d'abord — marqueur « Forwarded message » le plus
+  profond, puis le bloc `De/Date/Objet/À` : la ligne `To:` nomme le
+  transféreur, elle diffère à chaque transfert du **même** document ;
+- **secours** quand le texte n'est pas comparable (un PDF OCRisé d'un côté,
+  échoué de l'autre) : métriques canoniques identiques **et** titre
+  identique ;
+- **doute** : similarité intermédiaire, ou simple égalité de titre/objet.
+
+Trois issues, et c'est le point important : `duplicate` (fusion silencieuse
+dans la ligne existante), **`doubt` → on ne range RIEN** (`needs_review` +
+`possible_duplicate`, bouton « Ranger quand même » ou « Rejeter »), `new`.
+L'asymétrie est voulue : une fausse certitude **perd** un vrai report, un
+faux doute coûte un clic.
+
+Deux pièges traités, à ne pas défaire :
+
+- **La fusion garde la meilleure lecture.** Une lecture sans période n'efface
+  jamais une période déjà reconnue (`reportPeriod`, `periodSortDate`,
+  `reportType` conservés).
+- **`sameSource` (Jaccard ≥ 0,98) décide de ce qui est une nouvelle**, pas
+  `reportContentChanged` : deux passages du modèle sur le même texte donnent
+  deux formulations différentes, ce qui ferait passer un doublon pour une
+  correction et rejouerait la synthèse + le mail. En dessous du seuil, le
+  document lui-même a bougé — un renvoi corrigé — et ça reste une nouvelle
+  (cf. § « Un report renvoyé n'est pas forcément un doublon », que cette règle
+  préserve au lieu de l'annuler).
+- **Un jumeau sur une entité ne dit rien de l'autre.** Le verdict est calculé
+  **par entité** du fan-out : une participation ajoutée à une org après le
+  premier transfert doit recevoir sa copie, ce n'est pas un doublon.
+
+Le geste manuel `reportInbox.storeAnyway` rejoue la brique 5 avec `force:
+true` — sans ça le même doute renverrait la ligne dans la file en boucle.
+
+Seuils calibrés sur deux cas réels seulement : `scripts/report-duplicates-audit.mjs`
+rejoue le détecteur sur tout l'historique et compte ce qu'il **aurait** fait.
+À relancer avant de bouger un seuil. Couvert par `tests/reportDuplicate.test.ts`
+(comparateur) et `convex/regression.reportDuplicate.test.ts` (pipeline).
+
 ## Une société n'est pas toujours une seule histoire (reports par opération)
 
 Découvert en traitant ALB-237, **non résolu** — la décision produit a été de
@@ -2491,6 +2552,42 @@ Uint8Array(enc.encode(s))` produit bien de l'`ArrayBuffer`-backed.
   peut garder son id Powens tout en étant désormais livré par une AUTRE
   connexion. Sans ce re-tamponnage il resterait rattaché à une connexion
   morte, qui alerterait indéfiniment. Ne pas la retirer.
+- **Un compte, une connexion VIVANTE** (`duplicate_live_connection`). La
+  reprise de lien ci-dessus suppose que la connexion quittée est morte —
+  c'est le cas d'une reconnexion, et c'est pour ça que le rapprochement par
+  IBAN existe. Quand les deux sont vivantes, la même banque a été connectée
+  **deux fois**, et le mécanisme se retourne : chaque accès a ses propres
+  `powensAccountId`, donc chacun reprend le compte à l'autre à chaque
+  webhook, et chacun livre les mêmes mouvements sous ses propres
+  `powensTxId`. Or la dédup ne connaît que `powensTxId` : rien en aval ne
+  peut rapprocher les deux séries, **chaque mouvement réel entre deux fois**,
+  indéfiniment et sans erreur. Constaté sur l'accès Natixis Wealth Management
+  de CALTE (09/2026) — un doublon de transactions dont la cause était deux
+  lignes Natixis dans Réglages → Intégrations.
+  `resolveAccount` refuse donc la reprise quand la connexion en place est
+  encore saine (`connectionHealth === 'connected'`). Trois détails qui
+  portent tout :
+  1. **On saute, on ne lève pas.** Un `throw` renverrait un 500 à Powens,
+     qui suspend ses renvois — le prix documenté plus haut pour les
+     connecteurs non mappés. L'intruse est ignorée (compteur `skipped`),
+     le compte reste alimenté par la connexion en place.
+  2. **Le critère est le COMPTE, jamais la banque.** Deux accès distincts à
+     la même banque sont légitimes — `powensConnections.customLabel` existe
+     précisément pour les distinguer. Interdire « deux fois la même banque »
+     casserait ce cas et ne dirait rien du vrai problème.
+  3. **Une connexion non suivie compte pour morte.** Sans ligne
+     `powensConnections`, rien ne la surveille (vieux user Powens, ou
+     connexion que le poll a retirée), et la reprise est justement ce qui
+     remet le compte sous surveillance. Corollaire : le garde-fou se défait
+     tout seul dès que la connexion en place se dégrade (>48 h de silence,
+     ou ré-authentification requise) ou disparaît du poll — donc supprimer
+     la connexion en trop suffit toujours à débloquer l'autre.
+
+  Ce que le garde-fou **ne fait pas** : nettoyer les doublons déjà entrés.
+  Ils se retirent compte par compte avec
+  `migrations/dedupPowensTransactions` (cf. `MIGRATIONS.md`), jamais
+  globalement — deux mouvements réellement identiques le même jour existent,
+  et rien ne les distingue d'un doublon d'ingestion.
 - **Qonto n'est jamais créé** (pas d'entrée dans `CONNECTOR_OWNER`) : son
   record vient de l'import Airtable. Aucun match = tous les records Qonto sont
   déjà liés à un autre id (re-sync redondant d'une autre connexion/user) →
@@ -3490,7 +3587,7 @@ in `skills-lock.json`.
 ## Logos d'entreprises (logo.dev) — hotlink, pas de stockage
 
 `src/components/CompanyLogo.tsx` affiche les logos des boîtes du portefeuille
-(liste participations, vue `/app/all`, en-tête fiche société). Trois choix
+(liste participations, vue `/app/all`, en-tête fiche société). Quatre choix
 non-évidents :
 
 1. **Pas de stockage en base, ni Convex file storage.** La doc logo.dev
@@ -3513,7 +3610,19 @@ non-évidents :
    deux endroits, ce qu'une clé publishable autorise. Absente côté serveur, le
    mail affiche l'initiale de la société.
 
-3. **Le `domain` vient d'un snapshot Attio figé**
+3. **Un domaine résolu n'est pas un logo disponible.** `bankDomain` peut
+   rendre un domaine parfaitement correct sans que logo.dev serve quoi que ce
+   soit dessus — `natixis.com` en est le cas vécu (11/09/2026, ajouté la
+   veille et toujours sans logo). L'image échoue, `onError` prend le relais,
+   et la ligne affiche le même repli qu'une banque inconnue : on cherche
+   alors une erreur de mapping là où il n'y en a pas. D'où le repli
+   `fallback="monogram"` (initiale du nom) posé sur la carte Comptes : il
+   reste **discriminant** quand deux lignes n'ont pas de logo. Vérifier un
+   domaine douteux se fait avec le token, en ouvrant
+   `https://img.logo.dev/<domaine>?token=…` — sans token la CDN répond 401
+   sur tout, y compris les domaines qu'elle sert.
+
+4. **Le `domain` vient d'un snapshot Attio figé**
    (`convex/migrations/attioAlboImport.ts`, 28/05/2026), pas d'une sync live.
    Les ~35 boîtes Albo importées l'ont ; les autres (CALTE, créations manuelles)
    peuvent ne pas l'avoir → fallback, et le champ reste éditable via
@@ -3732,6 +3841,68 @@ ce mapping ailleurs. Décisions non-évidentes :
       custom peut s'appuyer sur le dialog générique sans formulaire dédié. Le
       `LeadSpvPanel` n'expose qu'un bouton « Modifier » qui appelle `onEdit`
       (ouvre ce même dialog).
+
+## Conversion d'un deal (BSA AIR → actions) : même ligne, et ce que ça coûte
+
+**Une conversion est un changement de `instrumentKind` sur la MÊME ligne**, pas
+un second deal. C'est délibéré et ça ne se rediscute pas à la légère : aucun
+argent ne bouge lors d'une conversion, la position économique est la même, et
+le virement de souscription est **pointé sur le deal** — en scindant, il
+faudrait choisir laquelle des deux lignes le porte, et la participation
+compterait double dans les listes et les KPIs. La règle générale du schéma
+(« follow-on = new deal ») ne s'applique pas ici : un follow-on remet de
+l'argent, une conversion non.
+
+Les colonnes de l'ancien instrument **survivent** au changement de type (le
+patch est partiel, cf. § « Édition manuelle deals ») — ce qu'une ligne seule ne
+peut pas dire, c'est qu'elle a été autre chose. D'où les deux colonnes
+`deals.convertedFromKind` / `convertedAt`, écrites par `deals.update` quand
+`instrumentKind` change, et lues par les onglets **Avant / Après** du panneau
+« Détails de l'instrument » (`InstrumentBlock.tsx`).
+
+Trois limites assumées, toutes conséquences du choix « une seule ligne » :
+
+1. **Une colonne partagée par les deux instruments affiche la même valeur des
+   deux côtés.** `closingDate` et `sharesAcquired` sont dans `SAFE_FIELDS`
+   **et** dans `EQUITY_FIELDS` : il n'y a qu'une colonne en base, donc réécrire
+   la date de closing avec celle du tour de conversion réécrit aussi l'« avant ».
+   C'est le prix de ne pas figer un snapshot. Si ça devient gênant en usage
+   réel, la suite est une table `dealConversions` portant le snapshot des
+   champs à la date de bascule — les deux colonnes en deviennent la dernière
+   ligne, sans perte.
+2. **Seule la DERNIÈRE conversion est mémorisée.** BSA AIR → OC → actions
+   afficherait l'OC en « avant ». Non traité : le cas n'a jamais eu lieu.
+3. **L'« avant » est la vue PRÉ-conversion de l'ancien type**, pas sa liste
+   complète : `preConversionFields()` coupe au marqueur `SAFE_SPLIT_FIELD`
+   (donc pour `safe` / `bsa_air` / `oc`), sinon rend la liste entière (`bsa`,
+   qui n'a pas de marqueur). Raison : la moitié post-conversion de ces configs
+   (`conversionValuation`, `sharesAcquired`, `ownershipPct`) décrit précisément
+   l'**après** — la mettre dans l'onglet « Avant » ferait dire à l'ancien
+   instrument ce qu'il est devenu.
+
+⚠️ **`deals.update` n'est pas le seul chemin d'écriture de `instrumentKind`**,
+et la règle est **dupliquée à dessein**. Trois écrivains :
+
+- `deals.update` (fiche + dialogue d'édition) — pose la trace.
+- `agentTools.updateDealInternal` (outil `updateDeal` du serveur MCP ; l'outil
+  du chat, lui, n'expose pas `instrumentKind`) — patche la ligne **lui-même**,
+  sans passer par `deals.update`, donc il **porte sa propre copie** de la
+  dérivation. Les deux doivent rester alignées : un troisième écrivain de
+  `instrumentKind` devra la porter aussi. Le MCP prend la date en
+  `convertedAtISO`, avec le même repli `Date.now()` si elle manque.
+- `airtableImport.upsertDeals` — patche la colonne **sans** poser de trace, et
+  c'est **voulu** : corriger un type mal mappé à l'import n'est pas une
+  conversion.
+
+`convertedFromKind` n'est **pas** un argument de mutation : c'est le type que la
+ligne portait, lu côté serveur. Un appelant ne peut donc pas déclarer un passé
+qu'il n'a pas eu. Conséquence pratique pour un deal converti **avant** cette
+fonctionnalité (Eclo Beauty, seul cas connu) : il n'a pas de trace, et la seule
+façon de lui en donner une depuis l'app est de repasser le type à l'ancien puis
+de reconvertir avec la bonne date — deux saves, l'état final est correct. La
+date, elle, reste patchable seule (`convertedAt` dans le patch), pour corriger
+après coup.
+
 
 ## Documents & rapports : deux surfaces, et pourquoi on a re-séparé
 
@@ -5114,7 +5285,20 @@ transféreur :
 
 - **Le canal** dépend du geste : un membre qui a transféré reçoit la
   réponse **dans son propre fil** ; tous les autres reçoivent un **mail
-  neuf**.
+  neuf**. Un **ajout manuel** depuis la fiche est le même geste sans fil où
+  répondre : son auteur reçoit la même réponse, en mail neuf
+  (`replyChannel: 'fresh'`). Seule la publication de portail n'a aucun auteur
+  à qui répondre (`null` — `vascoNotify.announce` parle pour ce canal). Ce
+  choix vit dans `routeRecap`, pas dans `send` : il se déduit de l'`origin`
+  de la ligne, jamais d'un test indirect sur l'adresse de l'expéditeur.
+- **Une organisation par mail, jamais deux.** Un mail porte les montants et
+  la fiche d'**une** org : `send` boucle sur les orgs du rangement et
+  construit les cartes avec les entités de celle-là seulement. Avant
+  (09/2026), une société détenue par Albo et par CALTE produisait un seul
+  mail au sujet « nouveau report Waro, WARO », mélangeant deux bilans. Le
+  canal portail avait raison depuis le début (`vascoNotify.announce` part par
+  entité) ; c'est la même règle. Conséquence assumée : le transféreur d'un
+  report fan-outé reçoit **deux réponses** dans son fil, une par org.
 - **Le contenu** dépend du rôle : qui gère la file (abonné `reportIssues`)
   reçoit en plus le **bloc contrôle qualité** (sources lues, KPIs cibles,
   valeurs inhabituelles) et la cause exacte quand ça coince ; qui ne fait

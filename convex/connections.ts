@@ -221,6 +221,10 @@ type IntegrationConnection = {
    * it), kept beside a `label` the user may have renamed — it is what the
    * logo lookup matches on, so renaming never costs the logo. */
   providerName?: string
+  /** auth 'webview': live (non-archived) bank accounts this connection
+   * feeds. Deleting is refused while it is > 0 (`assertConnectionDeletable`),
+   * so the UI states the count BEFORE the click instead of failing after. */
+  accountCount?: number
 }
 
 type IntegrationItem = {
@@ -498,14 +502,16 @@ export const listIntegrations = query({
             // A degraded connection feeding no account is a leftover, not an
             // incident: shown as inactive (no reconnect prompt). The delete
             // affordance lives on the Cash page — cf. convex/powens.ts.
-            const feedsAccount = bankAccounts.some(
+            const fed = bankAccounts.filter(
               (a) =>
                 !a.archivedAt && a.powensConnectionId === r.powensConnectionId,
             )
+            const feedsAccount = fed.length > 0
             return {
               id: r.powensConnectionId,
               label: r.customLabel ?? r.connectorName ?? r.powensConnectionId,
               providerName: r.connectorName,
+              accountCount: fed.length,
               state:
                 health !== 'connected' && !feedsAccount ? 'inactive' : health,
               lastConnectedAt: r.lastSuccessfulSyncAt ?? null,

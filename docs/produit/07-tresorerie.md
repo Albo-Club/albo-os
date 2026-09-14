@@ -43,6 +43,15 @@ dernier, ce qui a été réellement constaté, et l'écart.
 
 ## Comptes bancaires
 
+Dans la liste, **chaque ligne commence par le nom de la banque**, avec son
+logo — c'est ce qu'on cherche en descendant la carte. Juste en dessous vient
+la **description** du compte, que vous écrivez vous-même : « Compte courant
+1 », « Compte courant 2 » pour distinguer deux comptes de la même banque,
+« Spiko » ou « Compte-titres » pour nommer un support. Tant qu'elle est vide,
+la ligne n'affiche que la banque ; le libellé d'origine de la banque, souvent
+illisible, reste consultable sur la page du compte. La société titulaire n'est
+rappelée que lorsqu'il ne s'agit pas de la société de l'espace où vous êtes.
+
 Chaque compte appartient à une **entité du groupe** (la société titulaire).
 Deux origines :
 
@@ -76,17 +85,18 @@ Trois états particuliers changent les calculs :
   comme un compte bancaire actif non nanti.
 
 La page de détail d'un compte montre son historique de transactions
-(recherche, lien vers le deal rattaché) et permet d'éditer nom personnalisé,
-solde manuel, nanti, clôturé.
+(recherche, lien vers le deal rattaché) et permet d'éditer description, solde
+manuel, nanti, clôturé. Elle affiche aussi l'**IBAN espacé par groupes de
+quatre**, avec un bouton pour le copier d'un clic — prêt à coller dans un
+virement ou un mail.
 
 ### Connecter une banque que l'app ne connaît pas encore
 
 Aucune banque n'a besoin d'être déclarée à l'avance : on lance la connexion
 depuis la page Trésorerie, et les comptes apparaissent seuls après la
 première synchro, au nom de la banque, dans la société qui a lancé la
-connexion. Il ne reste plus qu'à les renommer si le libellé de la banque ne
-parle pas, et à les rattacher à leur société si ce n'est pas la bonne
-(section suivante).
+connexion. Il ne reste plus qu'à leur donner une description, et à les
+rattacher à leur société si ce n'est pas la bonne (section suivante).
 
 La synchro rapporte aussi **l'historique** que la banque expose encore —
 souvent un à deux ans, parfois seulement quelques mois selon la banque. Un

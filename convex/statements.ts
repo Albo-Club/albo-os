@@ -24,6 +24,10 @@
  * would leave a blob referenced by nothing, so it schedules its own sweep —
  * cf. KNOWN_ISSUES.md « Un proxy de téléchargement qui stocke pour servir ».
  *
+ * Journal: every placement this module creates or revalues lands in the
+ * company activity feed (`logDealEvent`), like any other writer of `deals` —
+ * a correction that changes no figure logs nothing.
+ *
  * Tenancy: `parse` and `apply` both check membership of the org they are
  * given, and every row they resolve (account, deal) is re-checked to belong
  * to it. The org is an argument here and legitimately so — a PDF carries no
@@ -42,6 +46,7 @@ import {
 } from './_generated/server'
 import { getModel } from './agent'
 import { requireOrgMember } from './lib/auth'
+import { logDealEvent, userActor } from './lib/companyEvents'
 import { ocrPdf } from './lib/ocr'
 import {
   STATEMENT_SYSTEM_PROMPT,
@@ -295,22 +300,26 @@ export const apply = mutation({
       if (!account.dealId && !args.supportCompanyId) {
         throw new ConvexError('support_required')
       }
-      const dealId =
-        account.dealId ??
-        (await ctx.db.insert('deals', {
-          orgId: args.orgId,
-          investorCompanyId: args.ownerCompanyId,
-          targetCompanyId: args.supportCompanyId!,
-          instrumentKind: 'cto',
-          status: 'active',
-          currency: 'EUR',
-          name: account.label,
-          bankName: args.bankName,
-          bankAccountId,
-        }))
+      const createdDealId = account.dealId
+        ? null
+        : await ctx.db.insert('deals', {
+            orgId: args.orgId,
+            investorCompanyId: args.ownerCompanyId,
+            targetCompanyId: args.supportCompanyId!,
+            instrumentKind: 'cto',
+            status: 'active',
+            currency: 'EUR',
+            name: account.label,
+            bankName: args.bankName,
+            bankAccountId,
+          })
+      const dealId = account.dealId ?? createdDealId!
       const deal = await ctx.db.get('deals', dealId)
       if (!deal || deal.orgId !== args.orgId) {
         throw new ConvexError('deal_wrong_org')
+      }
+      if (createdDealId) {
+        await logDealEvent(ctx, deal, userActor(user._id), { kind: 'created' })
       }
       await ctx.db.patch('deals', dealId, {
         currentValue: account.valuation,
@@ -318,12 +327,21 @@ export const apply = mutation({
         // importing its statement is exactly the moment it becomes known.
         bankAccountId: deal.bankAccountId ?? bankAccountId,
       })
-      await upsertValuation(ctx, {
+      const written = await upsertValuation(ctx, {
         orgId: args.orgId,
         dealId,
         asOf: args.statementDate,
         fairValue: account.valuation,
       })
+      // A correction that changes nothing leaves no trace: re-importing the
+      // same statement twice must not fill the journal with identical lines.
+      if (written) {
+        await logDealEvent(ctx, deal, userActor(user._id), {
+          kind: 'valuation_added',
+          asOf: args.statementDate,
+          fairValueCents: account.valuation,
+        })
+      }
     }
 
     // One import per (org, source, statement date): a statement sent twice is
@@ -381,9 +399,9 @@ async function upsertValuation(
     asOf: number
     fairValue: number
   },
-) {
+): Promise<boolean> {
   // The valuations module's contract: a fair value is strictly positive.
-  if (row.fairValue <= 0) return
+  if (row.fairValue <= 0) return false
   const sameDate = await ctx.db
     .query('valuations')
     .withIndex('by_deal_asof', (q) =>
@@ -392,8 +410,9 @@ async function upsertValuation(
     .collect()
   const standing = sameDate.find((point) => point.source === VALUATION_SOURCE)
   if (standing) {
+    if (standing.fairValue === row.fairValue) return false
     await ctx.db.patch('valuations', standing._id, { fairValue: row.fairValue })
-    return
+    return true
   }
   await ctx.db.insert('valuations', {
     orgId: row.orgId,
@@ -403,6 +422,7 @@ async function upsertValuation(
     valuationMethod: 'mark_to_market',
     source: VALUATION_SOURCE,
   })
+  return true
 }
 
 // ─── Read ────────────────────────────────────────────────────────────────────
