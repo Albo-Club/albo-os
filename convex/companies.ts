@@ -2,6 +2,11 @@ import { ConvexError, v } from 'convex/values'
 import { internal } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import {
+  diffCompanyPatch,
+  logCompanyEvent,
+  userActor,
+} from './lib/companyEvents'
 import { normalizeDomain } from './lib/domain'
 import { sanitizeKpiTargets } from './lib/metricCatalog'
 import { applyPitchToDomainGroup, isVehicleEntity } from './lib/pitch'
@@ -93,7 +98,7 @@ export const create = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await requireOrgMember(ctx, args.orgId)
+    const { user } = await requireOrgMember(ctx, args.orgId)
     if (args.siren !== undefined) args.siren = normalizeSiren(args.siren)
     if (args.siren) await assertSirenFree(ctx, args.orgId, args.siren)
     // Domain: reduce to a bare hostname (keep raw if unparseable, '' clears).
@@ -102,6 +107,12 @@ export const create = mutation({
       args.domain = trimmed ? (normalizeDomain(trimmed) ?? trimmed) : undefined
     }
     const id = await ctx.db.insert('companies', args)
+    await logCompanyEvent(
+      ctx,
+      { orgId: args.orgId, companyId: id },
+      userActor(user._id),
+      { kind: 'company_created' },
+    )
     // Domain provided at creation → auto-fill oneLiner + summary from the
     // website (additive, portfolio only — cf. convex/companyEnrichment.ts).
     if (args.kind === 'portfolio' && args.domain) {
@@ -206,11 +217,14 @@ export const archive = mutation({
   handler: async (ctx, { id }) => {
     const company = await ctx.db.get('companies', id)
     if (!company) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, company.orgId)
+    const { user } = await requireOrgMember(ctx, company.orgId)
     if (company.archivedAt != null) return id
     const refs = await listBlockingRefs(ctx, company.orgId, id)
     if (hasBlockingRefs(refs)) throw new ConvexError('company_has_references')
     await ctx.db.patch('companies', id, { archivedAt: Date.now() })
+    await logCompanyEvent(ctx, company, userActor(user._id), {
+      kind: 'company_archived',
+    })
     return id
   },
 })
@@ -221,8 +235,12 @@ export const restore = mutation({
   handler: async (ctx, { id }) => {
     const company = await ctx.db.get('companies', id)
     if (!company) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, company.orgId)
+    const { user } = await requireOrgMember(ctx, company.orgId)
+    if (company.archivedAt == null) return id
     await ctx.db.patch('companies', id, { archivedAt: undefined })
+    await logCompanyEvent(ctx, company, userActor(user._id), {
+      kind: 'company_restored',
+    })
     return id
   },
 })
@@ -246,6 +264,12 @@ export const remove = mutation({
     }
     const refs = await listBlockingRefs(ctx, company.orgId, id)
     if (hasBlockingRefs(refs)) throw new ConvexError('company_has_references')
+    // The journal follows the company (same as `deals.remove`).
+    const events = await ctx.db
+      .query('companyEvents')
+      .withIndex('by_company_at', (q) => q.eq('companyId', id))
+      .collect()
+    for (const event of events) await ctx.db.delete('companyEvents', event._id)
     await ctx.db.delete('companies', id)
     return { deletedId: id }
   },
@@ -292,7 +316,7 @@ export const update = mutation({
   handler: async (ctx, { id, patch }) => {
     const company = await ctx.db.get('companies', id)
     if (!company) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, company.orgId)
+    const { user } = await requireOrgMember(ctx, company.orgId)
 
     // Guardrail: never demote the org's root entity.
     if (
@@ -337,7 +361,10 @@ export const update = mutation({
     if (patch.kpiTargets !== undefined) {
       patch.kpiTargets = sanitizeKpiTargets(patch.kpiTargets)
     }
+    // Diffed after normalisation, so a save that changes nothing stays mute.
+    const event = diffCompanyPatch(company, patch)
     await ctx.db.patch('companies', id, patch)
+    if (event) await logCompanyEvent(ctx, company, userActor(user._id), event)
     // Same-domain propagation: a pitch edit applies to every non-archived
     // entity of the org sharing the domain, so they stay identical (product
     // rule — cf. convex/lib/pitch.ts). '' clears propagate too. A vehicle
@@ -382,12 +409,21 @@ export const setVascoLink = mutation({
   handler: async (ctx, { id, clientSlug, issuerId }) => {
     const company = await ctx.db.get('companies', id)
     if (!company) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, company.orgId)
+    const { user } = await requireOrgMember(ctx, company.orgId)
     const link =
       clientSlug && issuerId
         ? { vascoClientSlug: clientSlug, vascoIssuerId: issuerId }
         : { vascoClientSlug: undefined, vascoIssuerId: undefined }
     await ctx.db.patch('companies', id, link)
+    // Re-saving the same link (or unlinking an unlinked entity) is no gesture.
+    if (
+      link.vascoIssuerId !== company.vascoIssuerId ||
+      link.vascoClientSlug !== company.vascoClientSlug
+    ) {
+      await logCompanyEvent(ctx, company, userActor(user._id), {
+        kind: link.vascoIssuerId ? 'vasco_linked' : 'vasco_unlinked',
+      })
+    }
     // Newly linked to a Parallel SPV → (re)generate its operation pitch from the
     // VASCO communications (fire-and-forget; overwrites the domain-based one),
     // and run the AI synthesis, which now has the issuer's communications to

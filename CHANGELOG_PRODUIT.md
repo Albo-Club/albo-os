@@ -23,6 +23,48 @@ bas de page.
 
 ---
 
+## v1.233.0 — 14/09/2026 à 21:39 — Le journal de la fiche société suit la fiche elle-même, ses KPIs et son BP
+
+La section **Activité** d'une fiche société raconte maintenant aussi ce qui
+arrive à la fiche : sa création, son archivage et sa restauration, un
+renommage (ancien et nouveau nom en clair, les autres champs modifiés
+comptés), les personnes ajoutées ou retirées, le lien Attio et le lien
+Parallel posés ou retirés. Elle note aussi chaque KPI saisi à la main ou
+confirmé dans le panneau IA (et sa suppression), et chaque remplacement du
+business plan d'un deal. Une fiche créée par la synchro Attio, ou renommée
+par elle, est au nom d'Attio.
+
+Ce qui se remplit tout seul reste hors journal : le pitch généré depuis le
+site ou depuis Parallel, sa propagation aux sociétés du même domaine, les
+dates de dernier report, les KPIs extraits d'un reporting (la ligne « report
+reçu » les couvre). Enregistrer un formulaire sans rien changer n'écrit
+toujours rien.
+
+L'historique est repris une fois : création et archivage des fiches (hors
+import Airtable), KPIs saisis à la main, business plans déjà en base. Les
+modifications d'identité et de personnes antérieures ne sont pas
+reconstructibles.
+
+> **🔧 Notes techniques**
+>
+> - `convex/schema.ts` : douze kinds de plus dans `companyEvent`
+>   (`company_created/archived/restored/updated`, `people_changed`,
+>   `attio_linked/unlinked`, `vasco_linked/unlinked`, `kpi_added/removed`,
+>   `projection_replaced`).
+> - `convex/lib/companyEvents.ts` : `diffCompanyPatch` (priorité lien Attio >
+>   personnes > champs, renommage en clair, muet si rien ne change) ;
+>   `logCompanyEvent` accepte la ligne société ou `{ orgId, companyId }`.
+> - Branchement : `convex/companies.ts` (create / archive / restore / update /
+>   setVascoLink ; `remove` purge le journal), `convex/kpis.ts`,
+>   `convex/projections.ts` (`replaceVersionCore` prend l'acteur),
+>   `convex/agentTools.ts` (`viaAgent`), `convex/attioSync.ts` (stub créé ou
+>   renommé, acteur Attio).
+> - `tests/journalGuards.test.ts` : `companies`, `kpiSnapshots`,
+>   `dealProjections` sous garde ; exemptions motivées (enrichissement,
+>   propagation du pitch, fraîcheur des reports, fixtures de test).
+> - `convex/migrations/backfillCompanyEvents.ts` : sources `companies`,
+>   `kpis`, `projections`. Section Activité et i18n fr/en, 5 cas de
+>   régression.
 ## v1.232.2 — 14/09/2026 à 21:30 — La date d'un rapport est celle de son arrivée
 
 Dans « Rapports & communications » d'une fiche société, la date affichée sous

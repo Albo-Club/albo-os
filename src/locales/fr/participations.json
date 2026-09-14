@@ -345,7 +345,7 @@
   },
   "activity": {
     "title": "Activité",
-    "empty": "Aucune activité enregistrée sur les deals de cette société.",
+    "empty": "Aucune activité enregistrée sur cette société.",
     "showMore": "Afficher les {{count}} précédentes",
     "today": "Aujourd'hui",
     "yesterday": "Hier",
@@ -388,7 +388,29 @@
       "report_reprocessed": "a relancé l'analyse de « {{label}} »",
       "vault_document_added": "a ajouté « {{title}} » au coffre",
       "vault_document_removed": "a retiré « {{title}} » du coffre",
-      "vault_document_updated": "a renommé ou reclassé « {{title}} »"
+      "vault_document_updated": "a renommé ou reclassé « {{title}} »",
+      "company_created": "a créé la fiche",
+      "company_archived": "a archivé la fiche",
+      "company_restored": "a restauré la fiche",
+      "company_renamed": "a renommé la fiche « {{from}} » en « {{to}} »",
+      "company_updated_one": "a modifié {{count}} champ de la fiche",
+      "company_updated_other": "a modifié {{count}} champs de la fiche",
+      "people_added": "a ajouté {{names}} aux personnes",
+      "people_removed": "a retiré {{names}} des personnes",
+      "people_join": " et ",
+      "people_edited": "a modifié les personnes",
+      "attio_linked": "a lié la fiche à Attio",
+      "attio_unlinked": "a délié la fiche d'Attio",
+      "vasco_linked": "a lié la fiche à un émetteur Parallel",
+      "vasco_unlinked": "a délié la fiche de son émetteur Parallel",
+      "kpi_added": "a ajouté le KPI {{metric}} au {{date}} · {{value}}",
+      "kpi_removed": "a supprimé le KPI {{metric}} au {{date}}",
+      "projection_replaced_one": "a remplacé le BP {{version}} de {{deal}} ({{count}} ligne)",
+      "projection_replaced_other": "a remplacé le BP {{version}} de {{deal}} ({{count}} lignes)"
+    },
+    "bpVersion": {
+      "initial": "initial",
+      "revised": "révisé"
     }
   },
   "edit": {

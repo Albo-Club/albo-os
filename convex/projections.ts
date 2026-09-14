@@ -16,8 +16,10 @@ import {
 } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
 import { readMembership } from './lib/agentScope'
+import { logDealEvent, userActor } from './lib/companyEvents'
 
 import type { Doc, Id } from './_generated/dataModel'
+import type { CompanyEventActor } from './lib/companyEvents'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 
 const versionValidator = v.union(v.literal('initial'), v.literal('revised'))
@@ -91,6 +93,7 @@ async function replaceVersionCore(
   deal: Doc<'deals'>,
   version: 'initial' | 'revised',
   lines: Array<Line>,
+  actor: CompanyEventActor,
 ) {
   assertValidLines(lines)
   const existing = await ctx.db
@@ -113,6 +116,11 @@ async function replaceVersionCore(
       notes: line.notes,
     })
   }
+  await logDealEvent(ctx, deal, actor, {
+    kind: 'projection_replaced',
+    version,
+    lineCount: lines.length,
+  })
   return { replaced: existing.length, inserted: lines.length }
 }
 
@@ -136,8 +144,14 @@ export const replaceVersion = mutation({
   handler: async (ctx, { dealId, version, lines }) => {
     const deal = await ctx.db.get('deals', dealId)
     if (!deal) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, deal.orgId)
-    return await replaceVersionCore(ctx, deal, version, lines)
+    const { user } = await requireOrgMember(ctx, deal.orgId)
+    return await replaceVersionCore(
+      ctx,
+      deal,
+      version,
+      lines,
+      userActor(user._id),
+    )
   },
 })
 
@@ -167,6 +181,12 @@ export const replaceVersionInternal = internalMutation({
   handler: async (ctx, { orgId, actorUserId, dealId, version, lines }) => {
     await readMembership(ctx, orgId, actorUserId)
     const deal = await getOrgDeal(ctx, orgId, dealId)
-    return await replaceVersionCore(ctx, deal, version, lines)
+    return await replaceVersionCore(
+      ctx,
+      deal,
+      version,
+      lines,
+      userActor(actorUserId, true),
+    )
   },
 })

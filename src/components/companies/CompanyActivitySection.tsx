@@ -19,11 +19,12 @@ import { cn } from '~/lib/utils'
 
 /**
  * The activity journal of a company sheet — who did what, when — one line
- * per gesture, newest first, grouped by day. Every row is deal-anchored for
- * now; company-level families will render here too, without the deal link. The compact "journal" form was
- * chosen over a richer timeline on purpose: the amounts already live in the
- * deals table above and the narrative in the reports feed below, so this
- * section answers "who touched this deal?" and nothing more.
+ * per gesture, newest first, grouped by day. Deal rows link to the deal;
+ * company rows (reports, vault, identity, KPIs) carry no link. The compact
+ * "journal" form was chosen over a richer timeline on purpose: the amounts
+ * already live in the deals table above and the narrative in the reports
+ * feed below, so this section answers "who touched this company?" and
+ * nothing more.
  *
  * Consecutive lines written by an integration (Attio, Parallel) collapse
  * into the first one plus a count, so a burst of syncs does not bury the
@@ -199,10 +200,19 @@ function ActorAvatar({ row }: { row: Row }) {
  * event kind. The key carries `{{deal}}`, interpolated with a placeholder
  * and split, so the link can sit anywhere the language needs it. */
 function Sentence({ row, orgSlug }: { row: Row; orgSlug: string }) {
-  const { t } = useTranslation('participations')
+  const { t, i18n } = useTranslation('participations')
   const { fmtEur, fmtEurCents, fmtDate } = useFormatters()
   const dealTitle = useDealTitle()
   const { event } = row
+
+  // A KPI value per unit: EUR cents as euros, otherwise the raw number with
+  // its unit (same reading as the KPIs section).
+  const fmtKpi = (value: number, unit?: string) =>
+    unit === 'EUR_cents'
+      ? fmtEur(value)
+      : unit
+        ? `${value.toLocaleString(i18n.language)} ${unit}`
+        : value.toLocaleString(i18n.language)
 
   const actorName = actorLabel(row, t)
 
@@ -307,6 +317,60 @@ function Sentence({ row, orgSlug }: { row: Row; orgSlug: string }) {
     case 'vault_document_removed':
     case 'vault_document_updated':
       text = t(`activity.ev.${event.kind}`, { title: event.title })
+      break
+    case 'company_created':
+    case 'company_archived':
+    case 'company_restored':
+    case 'attio_linked':
+    case 'attio_unlinked':
+    case 'vasco_linked':
+    case 'vasco_unlinked':
+      text = t(`activity.ev.${event.kind}`)
+      break
+    case 'company_updated':
+      text = event.rename
+        ? t('activity.ev.company_renamed', event.rename) +
+          (event.otherCount > 0
+            ? t('activity.ev.otherFieldsSuffix', { count: event.otherCount })
+            : '')
+        : t('activity.ev.company_updated', { count: event.otherCount })
+      break
+    case 'people_changed': {
+      const parts = [
+        event.added.length > 0
+          ? t('activity.ev.people_added', { names: event.added.join(', ') })
+          : '',
+        event.removed.length > 0
+          ? t('activity.ev.people_removed', {
+              names: event.removed.join(', '),
+            })
+          : '',
+      ].filter(Boolean)
+      text =
+        parts.length > 0
+          ? parts.join(t('activity.ev.people_join'))
+          : t('activity.ev.people_edited')
+      break
+    }
+    case 'kpi_added':
+      text = t('activity.ev.kpi_added', {
+        metric: event.metricType,
+        date: fmtDate(event.periodEnd),
+        value: fmtKpi(event.value, event.unit),
+      })
+      break
+    case 'kpi_removed':
+      text = t('activity.ev.kpi_removed', {
+        metric: event.metricType,
+        date: fmtDate(event.periodEnd),
+      })
+      break
+    case 'projection_replaced':
+      text = t('activity.ev.projection_replaced', {
+        deal: DEAL_TOKEN,
+        version: t(`activity.bpVersion.${event.version}`),
+        count: event.lineCount,
+      })
       break
   }
 

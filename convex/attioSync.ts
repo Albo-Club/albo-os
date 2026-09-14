@@ -63,7 +63,12 @@ import {
   secondaryRoundFromInstrumentRaw,
   shouldReplaceInstrument,
 } from './lib/attioSync'
-import { diffDealPatch, logDealEvent } from './lib/companyEvents'
+import {
+  diffCompanyPatch,
+  diffDealPatch,
+  logCompanyEvent,
+  logDealEvent,
+} from './lib/companyEvents'
 import type { MutationCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 
@@ -607,7 +612,7 @@ async function resolveOrCreateTargetCompany(
     : []
   const inOrg = anchored.find((c) => c.orgId === orgId)
   if (inOrg) return inOrg._id
-  return await ctx.db.insert('companies', {
+  const id = await ctx.db.insert('companies', {
     orgId,
     name:
       args.targetCompanyName?.trim() ||
@@ -620,6 +625,10 @@ async function resolveOrCreateTargetCompany(
     // the company just created instead of spawning a new one.
     ...(attioCompanyId ? { attioCompanyId } : {}),
   })
+  await logCompanyEvent(ctx, { orgId, companyId: id }, ATTIO_ACTOR, {
+    kind: 'company_created',
+  })
+  return id
 }
 
 /**
@@ -644,7 +653,9 @@ async function repairStubTargetCompany(
     stubNames: [deal.name, args.name],
   })
   if (patch) {
+    const event = diffCompanyPatch(company, patch)
     await ctx.db.patch('companies', company._id, patch)
+    if (event) await logCompanyEvent(ctx, company, ATTIO_ACTOR, event)
   }
 }
 
