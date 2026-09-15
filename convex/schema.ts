@@ -239,6 +239,43 @@ export const companyEvent = v.union(
     version: v.union(v.literal('initial'), v.literal('revised')),
     lineCount: v.number(),
   }),
+  // A forecast rule tied to a deal (a rule without a deal has no sheet to
+  // show on, so it is not journaled). `label` is the rule's at event time.
+  v.object({
+    kind: v.literal('rule_created'),
+    label: v.string(),
+    amountCents: v.number(),
+    // Mirrors `forecastFrequency` (declared further down, with the table).
+    frequency: v.union(
+      v.literal('weekly'),
+      v.literal('monthly'),
+      v.literal('quarterly'),
+      v.literal('yearly'),
+    ),
+  }),
+  v.object({ kind: v.literal('rule_updated'), label: v.string() }),
+  v.object({
+    kind: v.literal('rule_toggled'),
+    label: v.string(),
+    active: v.boolean(),
+  }),
+  // A rule moved from one deal to another: the old deal sees it leave, the
+  // new one sees it arrive.
+  v.object({ kind: v.literal('rule_linked'), label: v.string() }),
+  v.object({ kind: v.literal('rule_unlinked'), label: v.string() }),
+  v.object({ kind: v.literal('rule_deleted'), label: v.string() }),
+  // A to-do tied to a company (one without a company is not journaled).
+  v.object({ kind: v.literal('todo_created'), title: v.string() }),
+  v.object({
+    kind: v.literal('todo_status'),
+    title: v.string(),
+    status: v.union(
+      v.literal('open'),
+      v.literal('in_progress'),
+      v.literal('done'),
+    ),
+  }),
+  v.object({ kind: v.literal('todo_removed'), title: v.string() }),
 )
 
 // Instrument-archetype enums (dashboard refonte). Consumed only by the

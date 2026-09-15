@@ -372,6 +372,40 @@ function Sentence({ row, orgSlug }: { row: Row; orgSlug: string }) {
         count: event.lineCount,
       })
       break
+    case 'rule_created':
+      text = t('activity.ev.rule_created', {
+        deal: DEAL_TOKEN,
+        label: event.label,
+        amount: fmtEur(event.amountCents),
+        frequency: t(`activity.freq.${event.frequency}`),
+      })
+      break
+    case 'rule_toggled':
+      text = t(
+        event.active
+          ? 'activity.ev.rule_activated'
+          : 'activity.ev.rule_deactivated',
+        { deal: DEAL_TOKEN, label: event.label },
+      )
+      break
+    case 'rule_updated':
+    case 'rule_linked':
+    case 'rule_unlinked':
+    case 'rule_deleted':
+      text = t(`activity.ev.${event.kind}`, {
+        deal: DEAL_TOKEN,
+        label: event.label,
+      })
+      break
+    case 'todo_created':
+    case 'todo_removed':
+      text = t(`activity.ev.${event.kind}`, { title: event.title })
+      break
+    case 'todo_status':
+      text = t(`activity.ev.todo_status_${event.status}`, {
+        title: event.title,
+      })
+      break
   }
 
   const [before, after] = text.split(DEAL_TOKEN)

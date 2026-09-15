@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember } from './lib/auth'
+import { logCompanyEvent, userActor } from './lib/companyEvents'
 import { listSilentCompanies } from './lib/reportFreshness'
 import { attributeActuals } from './lib/amortization'
 import { loanSchedule } from './loans'
@@ -326,7 +327,7 @@ export const createTask = mutation({
       if (!company || company.orgId !== orgId)
         throw new ConvexError('company_not_in_org')
     }
-    return ctx.db.insert('todos', {
+    const id = await ctx.db.insert('todos', {
       orgId,
       title: trimmed,
       status: 'open',
@@ -336,6 +337,15 @@ export const createTask = mutation({
       assigneeUserId,
       companyId,
     })
+    // A to-do tied to a company shows on that company's journal; one tied
+    // to nothing has no sheet to show on.
+    if (companyId) {
+      await logCompanyEvent(ctx, { orgId, companyId }, userActor(user._id), {
+        kind: 'todo_created',
+        title: trimmed,
+      })
+    }
+    return id
   },
 })
 
@@ -351,11 +361,19 @@ export const setTaskStatus = mutation({
   handler: async (ctx, { taskId, status }) => {
     const task = await ctx.db.get('todos', taskId)
     if (!task) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, task.orgId)
+    const { user } = await requireOrgMember(ctx, task.orgId)
     await ctx.db.patch('todos', taskId, {
       status,
       doneAt: status === 'done' ? Date.now() : undefined,
     })
+    if (task.companyId && status !== task.status) {
+      await logCompanyEvent(
+        ctx,
+        { orgId: task.orgId, companyId: task.companyId },
+        userActor(user._id),
+        { kind: 'todo_status', title: task.title, status },
+      )
+    }
   },
 })
 
@@ -364,7 +382,15 @@ export const removeTask = mutation({
   handler: async (ctx, { taskId }) => {
     const task = await ctx.db.get('todos', taskId)
     if (!task) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, task.orgId)
+    const { user } = await requireOrgMember(ctx, task.orgId)
     await ctx.db.delete('todos', taskId)
+    if (task.companyId) {
+      await logCompanyEvent(
+        ctx,
+        { orgId: task.orgId, companyId: task.companyId },
+        userActor(user._id),
+        { kind: 'todo_removed', title: task.title },
+      )
+    }
   },
 })

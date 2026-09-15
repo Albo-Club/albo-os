@@ -20,6 +20,11 @@ import {
   insertRule,
 } from './forecasts'
 import { parseScope, readMembership } from './lib/agentScope'
+import {
+  journalRulePatch,
+  logRuleEvent,
+  userActor,
+} from './lib/companyEvents'
 import type { Id } from './_generated/dataModel'
 
 // The agent never triggers an expansion beyond 24 months (the public
@@ -90,7 +95,7 @@ export const createRuleInternal = internalMutation({
   },
   handler: async (ctx, { actorUserId, ...args }) => {
     await readMembership(ctx, args.orgId, actorUserId)
-    const id = await insertRule(ctx, args)
+    const id = await insertRule(ctx, args, userActor(actorUserId, true))
     return { _id: id }
   },
 })
@@ -478,6 +483,7 @@ export const updateRuleInternal = internalMutation({
     }
 
     await ctx.db.patch('forecastRules', ruleId, patch)
+    await journalRulePatch(ctx, rule, patch, userActor(actorUserId, true))
     return { _id: ruleId }
   },
 })
@@ -508,6 +514,10 @@ export const deleteRuleInternal = internalMutation({
       }
     }
     await ctx.db.delete('forecastRules', ruleId)
+    await logRuleEvent(ctx, rule, userActor(actorUserId, true), {
+      kind: 'rule_deleted',
+      label: rule.label,
+    })
     return { entriesRemoved }
   },
 })
