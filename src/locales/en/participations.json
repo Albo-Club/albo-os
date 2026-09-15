@@ -406,11 +406,29 @@
       "kpi_added": "added the {{metric}} KPI as of {{date}} · {{value}}",
       "kpi_removed": "removed the {{metric}} KPI as of {{date}}",
       "projection_replaced_one": "replaced the {{version}} BP of {{deal}} ({{count}} line)",
-      "projection_replaced_other": "replaced the {{version}} BP of {{deal}} ({{count}} lines)"
+      "projection_replaced_other": "replaced the {{version}} BP of {{deal}} ({{count}} lines)",
+      "rule_created": "added the “{{label}}” rule ({{amount}} {{frequency}}) on {{deal}}",
+      "rule_updated": "edited the “{{label}}” rule of {{deal}}",
+      "rule_activated": "activated the “{{label}}” rule of {{deal}}",
+      "rule_deactivated": "deactivated the “{{label}}” rule of {{deal}}",
+      "rule_linked": "attached the “{{label}}” rule to {{deal}}",
+      "rule_unlinked": "detached the “{{label}}” rule from {{deal}}",
+      "rule_deleted": "deleted the “{{label}}” rule of {{deal}}",
+      "todo_created": "created the “{{title}}” to-do",
+      "todo_status_open": "reopened the “{{title}}” to-do",
+      "todo_status_in_progress": "moved the “{{title}}” to-do to in progress",
+      "todo_status_done": "completed the “{{title}}” to-do",
+      "todo_removed": "deleted the “{{title}}” to-do"
     },
     "bpVersion": {
       "initial": "initial",
       "revised": "revised"
+    },
+    "freq": {
+      "weekly": "weekly",
+      "monthly": "monthly",
+      "quarterly": "quarterly",
+      "yearly": "yearly"
     }
   },
   "edit": {
