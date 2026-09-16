@@ -149,15 +149,22 @@ La colonne principale, dans l'ordre de lecture :
   retirées ; lien Attio ou lien Parallel posé ou retiré. Sur les **KPIs** :
   valeur saisie à la main ou confirmée dans le panneau IA, puis supprimée
   (les KPIs extraits d'un reporting sont couverts par la ligne du report).
-  Sur le **BP** d'un deal : version initiale ou révisée remplacée. Ce qui se
+  Sur le **BP** d'un deal : version initiale ou révisée remplacée. Sur les
+  **règles de prévisionnel** rattachées à un deal : ajoutée (libellé, montant,
+  fréquence), modifiée, activée ou désactivée, déplacée vers un autre deal,
+  supprimée. Sur les **to-dos** rattachées à la société : créée, passée en
+  cours, terminée, rouverte, supprimée. Ce qui se
   remplit tout seul (pitch généré depuis le site ou depuis Parallel, dates de
-  dernier report) n'apparaît pas. Une écriture
+  dernier report) n'apparaît pas, ni ce qui ne concerne aucune société (une
+  règle sans deal, une to-do sans société, le capital et les comptes courants
+  du Passif) : le journal ne vit que sur la fiche d'une société. Une écriture
   confirmée dans le panneau IA est au nom de la personne qui l'a confirmée,
   avec la mention « via l'agent IA » ; celles des intégrations portent le nom
   Attio ou Parallel et se replient quand elles s'enchaînent. Le journal
   commence à sa mise en service ; les créations de deals, pointages et
   dépointages, valorisations, documents, reports, créations et archivages de
-  fiches, KPIs saisis à la main et BP antérieurs ont été repris une fois,
+  fiches, KPIs saisis à la main, BP, règles de deal et to-dos de société
+  antérieurs ont été repris une fois,
   sans auteur quand personne ne l'avait enregistré (« Albo OS »).
   Enregistrer un formulaire sans rien changer n'écrit rien.
 - **Rapports & communications** : le **journal** de la société — ce qu'elle

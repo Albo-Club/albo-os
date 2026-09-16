@@ -183,6 +183,64 @@ export async function logDealEvent(
   })
 }
 
+/**
+ * A forecast rule's journal is its deal's: a rule tied to no deal has no
+ * sheet to show on, and writes nothing. Returns null in that case.
+ */
+export async function logRuleEvent(
+  ctx: MutCtx,
+  rule: Pick<Doc<'forecastRules'>, 'dealId'>,
+  actor: CompanyEventActor,
+  event: CompanyEvent,
+): Promise<Id<'companyEvents'> | null> {
+  if (!rule.dealId) return null
+  const deal = await ctx.db.get('deals', rule.dealId)
+  if (!deal) return null
+  return await logDealEvent(ctx, deal, actor, event)
+}
+
+/**
+ * Journals what a patch on a forecast rule amounts to: nothing when the
+ * values are the row's; a move between deals as a departure on the old deal
+ * and an arrival on the new one; an `active` flip alone as a toggle; any
+ * other change as one `rule_updated`. A key present with `undefined` clears
+ * the field (Convex patch semantics), so it counts as a change too.
+ */
+export async function journalRulePatch(
+  ctx: MutCtx,
+  before: Doc<'forecastRules'>,
+  patch: Record<string, unknown>,
+  actor: CompanyEventActor,
+): Promise<void> {
+  const changed = Object.keys(patch).filter(
+    (key) =>
+      norm(patch[key]) !== norm((before as Record<string, unknown>)[key]),
+  )
+  if (changed.length === 0) return
+  const label = typeof patch.label === 'string' ? patch.label : before.label
+  if (changed.includes('dealId')) {
+    await logRuleEvent(ctx, before, actor, {
+      kind: 'rule_unlinked',
+      label: before.label,
+    })
+    await logRuleEvent(
+      ctx,
+      { dealId: patch.dealId as Doc<'forecastRules'>['dealId'] },
+      actor,
+      { kind: 'rule_linked', label },
+    )
+    return
+  }
+  await logRuleEvent(
+    ctx,
+    before,
+    actor,
+    changed.length === 1 && changed[0] === 'active'
+      ? { kind: 'rule_toggled', label, active: Boolean(patch.active) }
+      : { kind: 'rule_updated', label },
+  )
+}
+
 /** Who a stored report is credited to: the member who forwarded or uploaded
  * it when known, the Parallel portal for a publication, nobody otherwise. */
 export function reportActor(

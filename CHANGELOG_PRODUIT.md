@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.234.0 — 16/09/2026 à 09:49 — La carte « Adresses d'envoi des reports » disparaît
+## v1.235.0 — 16/09/2026 à 09:49 — La carte « Adresses d'envoi des reports » disparaît
 
 Réglages → Membres perd sa dernière carte. Elle permettait de déclarer une
 adresse secondaire — un Gmail perso, une adresse dans une autre boîte —
@@ -67,7 +67,42 @@ Aucun compte, aucune adresse et aucun droit n'ont été touchés.
 >   table inerte », `docs/produit/14` (section retirée) et `17` (paragraphe
 >   réécrit).
 
----
+## v1.234.0 — 15/09/2026 à 19:04 — Le journal suit les règles de prévisionnel d'un deal et les to-dos d'une société
+
+La section **Activité** d'une fiche société note maintenant les règles de
+prévisionnel rattachées à un deal — ajoutée (libellé, montant, fréquence),
+modifiée, activée ou désactivée, déplacée d'un deal à un autre (départ sur
+l'ancien, arrivée sur le nouveau), supprimée — et les to-dos rattachées à la
+société : créée, passée en cours, terminée, rouverte, supprimée. Dans le
+panneau IA, une règle confirmée est au nom de qui l'a confirmée, avec la
+mention « via l'agent IA ».
+
+Ce qui ne concerne aucune société reste hors journal : une règle sans deal
+(loyer, salaires), une to-do sans société, le capital et les comptes
+courants du Passif. Le journal ne vit que sur la fiche d'une société ; ces
+objets n'en ont pas.
+
+L'historique est repris une fois : règles déjà rattachées à un deal (date
+de création, sans auteur), to-dos rattachées à une société (auteur et date
+de création, date de fin quand elle est terminée).
+
+> **🔧 Notes techniques**
+>
+> - `convex/schema.ts` : neuf kinds de plus (`rule_created/updated/toggled/
+>   linked/unlinked/deleted`, `todo_created/status/removed`).
+> - `convex/lib/companyEvents.ts` : `logRuleEvent` (journal du deal de la
+>   règle, muet sans deal) et `journalRulePatch` (déplacement = départ +
+>   arrivée, `active` seul = toggle, sinon `rule_updated`, muet sans
+>   changement).
+> - Branchement : `convex/forecasts.ts` (`insertRule` prend l'acteur,
+>   `updateRule`, `deleteRule`), `convex/agentToolsForecasts.ts` (`viaAgent`),
+>   `convex/todo.ts` (`createTask` / `setTaskStatus` / `removeTask`, statut
+>   inchangé muet).
+> - `tests/journalGuards.test.ts` : `forecastRules` et `todos` sous garde ;
+>   `equityPositions` / `intercompanyLoans` volontairement hors journal
+>   (pas de fiche), documenté dans le commentaire de `JOURNALED`.
+> - `convex/migrations/backfillCompanyEvents.ts` : sources `rules`, `todos`.
+>   Section Activité et i18n fr/en, 4 cas de régression.
 
 ## v1.233.0 — 14/09/2026 à 21:39 — Le journal de la fiche société suit la fiche elle-même, ses KPIs et son BP
 
