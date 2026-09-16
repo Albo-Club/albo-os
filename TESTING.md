@@ -830,8 +830,8 @@ AU MOMENT de l'envoi, non-membre → jamais de réponse — et **jamais d'alerte
 non plus** : l'adresse est ouverte (groupe de transfert), donc un mail non
 identifié attend dans la file en silence. Le traitement, lui, ne dépend
 **pas** de l'expéditeur : c'est le contenu qui décide (`reportIdentify`).
-Un membre est reconnu à son adresse de compte **ou** à une adresse
-secondaire déclarée (Réglages → Membres, table `userEmailAliases`) ; récap
+Un membre est reconnu à son adresse de compte, et à elle seule (une
+adresse depuis laquelle on transfère est un compte membre) ; récap
 succès = participations (liens fiches) + méthode de match + sources
 ✅/📦/⚠️ + métriques enregistrées / **non reconnues** / **valeurs
 inhabituelles** (×8 vs dernière valeur connue) / **habituelles absentes** ;
@@ -919,8 +919,6 @@ part (garde dans `reportNotify.send`), le report et ses documents portent
 | R33a | **Transfert via le groupe.** Depuis ton adresse alboteam, transférer un investor update à `report@alboteam.com` (groupe dont AgentMail est membre) | Le report se range. L'accusé arrive dans **ta** boîte, et son en-tête « À : » porte **ton** adresse — jamais `report@alboteam.com`. Aucun autre membre du groupe ne reçoit l'accusé (ils ont reçu le mail d'origine par le groupe, et la diffusion « nouveau report » s'ils l'ont cochée) |
 | R33b | **Le groupe réécrit l'expéditeur.** Activer un préfixe de sujet (ou le footer) sur le groupe — ce qui casse la signature et fait remplacer le `From` par l'adresse du groupe — puis transférer | Le circuit récupère l'auteur réel dans `X-Original-Sender` : le report se range sous son nom et l'accusé lui part quand même. Logs : `group forward: from=… → …`. **Remettre ensuite préfixe et footer à vide** : c'est la configuration recommandée |
 | R33c | **Anti-boucle.** Envoyer à l'inbox AgentMail un mail dont le `From` est `report@alboteam.com` sans `X-Original-Sender` (ou laisser une réponse de l'inbox revenir par le groupe) | Rien n'est créé : aucune ligne dans la file, aucun mail. Log `dropped loop-back from=…`. Vérifier aussi côté AgentMail que `report@alboteam.com` est dans la **send block list** de l'inbox |
-| R33d | **Adresse secondaire.** Réglages → Membres → « Adresses d'envoi des reports » → ajouter ton Gmail perso. Transférer un report depuis ce Gmail | Le report se range **et** tu reçois l'accusé complet (comme depuis ton adresse alboteam). Retirer l'adresse, re-transférer un autre report : il se range toujours, mais **plus aucun accusé** — tu es redevenu un inconnu pour le circuit |
-| R33e | **Une adresse appartient à une seule personne.** Tenter de déclarer une adresse déjà utilisée par un compte ou par un autre membre, puis l'adresse du groupe elle-même | Refus explicite dans les deux cas (« déjà rattachée à quelqu'un », « c'est l'adresse du groupe de transfert »). Un membre simple ne peut pas modifier la ligne d'un autre, mais gère la sienne |
 | R30 | Action « Rejeter »                                              | Ligne « Rejeté / Rejeté manuellement », aucun traitement ni email                                              |
 | R31 | Fiche participation → carte « KPIs suivis » → Modifier          | Dialog : liste du catalogue cochable ; fiche vide → les métriques déjà vues sont pré-cochées ; Enregistrer → badges à jour (clés hors catalogue impossibles) |
 | R32 | Report d'une boîte **avec** fiche KPI cible                     | Récap : section « KPIs cibles » ✅ valeur / ⚠️ « absent de ce report » pour **chaque** cible ; les extras sous « Autres métriques enregistrées » ; plus de ligne « Habituelles mais absentes » |

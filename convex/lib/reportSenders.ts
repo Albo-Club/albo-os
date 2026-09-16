@@ -10,9 +10,10 @@
  *   a reply, because the confirmation carries amounts, org names and fiche
  *   links. A stranger gets nothing at all (anti-enumeration).
  *
- * A member is recognized by their `users.email` OR by any address they
- * declared in `userEmailAliases` — the personal Gmail, the address at another
- * company. An alias is an identity map, never an access grant.
+ * A member is recognized by their `users.email`, and only by it. Forwarding
+ * from another address means being an unknown to the circuit: the mail is
+ * still filed, it just gets no reply. An address someone forwards from
+ * regularly is therefore an account of theirs, not a declaration on the side.
  */
 
 import type { GenericMutationCtx, GenericQueryCtx } from 'convex/server'
@@ -22,7 +23,6 @@ type Ctx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>
 
 /**
  * The user behind `email` when they are a member of ≥ 1 org, else null.
- * Looks at the account address first, then the declared aliases.
  */
 export async function resolveMemberByEmail(
   ctx: Ctx,
@@ -35,21 +35,13 @@ export async function resolveMemberByEmail(
     .query('users')
     .withIndex('by_email', (q) => q.eq('email', normalized))
     .first()
-  const userId =
-    user?._id ??
-    (
-      await ctx.db
-        .query('userEmailAliases')
-        .withIndex('by_email', (q) => q.eq('email', normalized))
-        .first()
-    )?.userId
-  if (!userId) return null
+  if (!user) return null
 
   const membership = await ctx.db
     .query('organizationMembers')
-    .withIndex('by_user', (q) => q.eq('userId', userId))
+    .withIndex('by_user', (q) => q.eq('userId', user._id))
     .first()
-  return membership ? userId : null
+  return membership ? user._id : null
 }
 
 /**

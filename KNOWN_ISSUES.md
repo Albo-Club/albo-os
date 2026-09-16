@@ -5973,20 +5973,34 @@ par pub reçue — exactement la boîte qui se remplit qu'on venait de corriger
 Ne pas rebrancher une alerte là-dessus. La file est l'endroit où ça se traite,
 et le point hebdo du lundi la résume.
 
-### Ce qu'un alias est, et ce qu'il n'est pas
+### Adresses d'envoi des reports : une carte retirée, sa table inerte
 
-`userEmailAliases` (Réglages → Membres) rattache une adresse secondaire à un
-membre. C'est une **carte d'identité**, jamais un droit d'accès :
+La carte « Adresses d'envoi des reports » (Réglages → Membres) et ses trois
+fonctions `organizations.{list,add,remove}MemberAlias` ont été **retirées en
+09/2026**. Elle permettait de déclarer une adresse secondaire pour être
+reconnu comme l'auteur d'un transfert.
 
-- ça ne décide **pas** si un mail est traité — le contenu s'en charge
-  (`reportIdentify` doit rattacher une participation ET corroborer le choix) ;
-- ça décide **à qui on a le droit de répondre**, l'accusé portant montants,
-  organisations et liens de fiches ;
-- ce n'est **pas** un moyen de connexion : rien dans Better Auth ne lit cette
-  table.
+Ce qui l'a tuée, et c'était vrai dès le départ : **chaque adresse depuis
+laquelle on transfère est déjà un compte membre** (`bouquetbenjamin@gmail.com`,
+`clement.alteresco@gmail.com`, `clement@morning.fr` sont des lignes `users`
+à part entière). Or `addMemberAlias` refusait `email_taken` sur une adresse
+déjà rattachée à un compte : la table ne pouvait pas accueillir les adresses
+mêmes pour lesquelles elle avait été construite. Elle est restée vide, et
+`resolveMemberByEmail` trouvait tout le monde sur `users.by_email`.
 
-Une adresse appartient à une seule personne (refus `email_taken` sinon),
-et l'adresse du groupe ne peut être réclamée par personne (`blocked_address`).
+- `resolveMemberByEmail` ne lit plus que `users.by_email` : un membre est
+  reconnu à son adresse de compte, et à elle seule.
+- La table `userEmailAliases` reste **déclarée mais inerte** au schéma, même
+  stance que la table legacy `forecasts` et les tables Gmail : la retirer
+  demande de purger la prod d'abord, puis de resserrer.
+- Le reste du raisonnement est inchangé et tient toujours : l'appartenance ne
+  décide **pas** si un mail est traité (le contenu s'en charge), elle décide
+  **à qui on a le droit de répondre**, l'accusé portant montants,
+  organisations et liens de fiches.
+
+Si le besoin revient (un transfert depuis une adresse qu'on ne veut pas
+promouvoir en compte), ne pas ressusciter la table sans trancher d'abord ce
+qu'elle fait d'une adresse déjà titulaire d'un compte.
 
 ## Un document ne peut se rattacher qu'à une société (`documents.companyId`)
 
